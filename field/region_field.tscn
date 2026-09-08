@@ -1,0 +1,44 @@
+[gd_scene format=3 uid="uid://bri0oi2b2lns1"]
+
+[ext_resource type="Script" uid="uid://c07aboh5g6nla" path="res://field/region_field.gd" id="1"]
+[ext_resource type="Script" uid="uid://dyi0qmtitk30r" path="res://field/region_sky.gd" id="2"]
+[ext_resource type="Script" uid="uid://cdvgdcbobcq5y" path="res://field/overcast_light.gd" id="3"]
+[ext_resource type="Script" uid="uid://bh86ttpfd68tx" path="res://field/ground.gd" id="4"]
+[ext_resource type="Script" uid="uid://boqbnc57buiff" path="res://field/tower.gd" id="5"]
+[ext_resource type="Script" uid="uid://c70wmcl2vmws3" path="res://field/wanderer.gd" id="6"]
+[ext_resource type="Script" uid="uid://c73umk7v0kdui" path="res://field/camera_rig.gd" id="7"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
+radius = 0.4
+height = 1.8
+
+[node name="RegionField" type="Node3D" unique_id=2096648515]
+script = ExtResource("1")
+
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2022836371]
+script = ExtResource("2")
+
+[node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=846207689]
+script = ExtResource("3")
+
+[node name="Ground" type="StaticBody3D" parent="." unique_id=1437900813]
+script = ExtResource("4")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=1297283630]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=236499926]
+
+[node name="Tower" type="MeshInstance3D" parent="." unique_id=1954687032]
+script = ExtResource("5")
+
+[node name="Wanderer" type="CharacterBody3D" parent="." unique_id=577093166]
+script = ExtResource("6")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Wanderer" unique_id=1638228685]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
+shape = SubResource("CapsuleShape3D_1")
+
+[node name="CameraPivot" type="Node3D" parent="." unique_id=2057239469]
+script = ExtResource("7")
+
+[node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=1648467848]
