@@ -16,6 +16,7 @@ height = 1.8
 
 [node name="RegionField" type="Node3D" unique_id=2096648515]
 script = ExtResource("1")
+field_extents = Vector2(40, 30)
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2022836371]
 script = ExtResource("2")
@@ -26,7 +27,9 @@ script = ExtResource("3")
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=1437900813]
 script = ExtResource("4")
-ground_color = Color(0.65880924, 0.6781388, 0.601874, 1)
+ground_color = Color(0.86504203, 0.87034494, 0.83228356, 1)
+wetness_scale = 8.0
+wet_color = Color(0.66668326, 0.67263305, 0.6651851, 1)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=1297283630]
 
@@ -47,18 +50,21 @@ shape = SubResource("CapsuleShape3D_1")
 
 [node name="CameraPivot" type="Node3D" parent="." unique_id=2057239469]
 script = ExtResource("7")
-distance = 7.0
+distance = 12.0
+pitch_degrees = 50.0
+fov = 45.0
 
 [node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=1648467848]
 
 [node name="FieldEnemy" parent="." unique_id=677119585 instance=ExtResource("8")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -12)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
 enemy_id = &"sputter"
 
 [node name="Sea" type="MeshInstance3D" parent="." unique_id=1533217746]
 script = ExtResource("9")
 sea_color = Color(0.2750388, 0.49996376, 0.5953062, 1)
 sea_level = 0.3
+sea_edge_distance = 12.0
 volume_db_max = -20.0
 
 [node name="BattleLayer" type="CanvasLayer" parent="." unique_id=1908553104]
