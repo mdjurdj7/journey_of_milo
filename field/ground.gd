@@ -199,8 +199,8 @@ func _ready() -> void:
 func _apply_water_line_uniforms() -> void:
 	var region_field := get_node_or_null(region_field_path) as RegionField
 	var sea := get_node_or_null(sea_path) as Sea
-	var forward := region_field.get_forward() if region_field else Vector3.FORWARD
-	var water_line_z := sea.get_near_edge_z() if sea else 0.0
+	var forward: Vector3 = region_field.get_forward() if region_field else Vector3.FORWARD
+	var water_line_z: float = sea.get_near_edge_z() if sea else 0.0
 	_apply_uniform("water_line_z", water_line_z)
 	_apply_uniform("water_forward_z", forward.z)
 
