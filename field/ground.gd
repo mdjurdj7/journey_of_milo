@@ -70,22 +70,94 @@ class_name Ground
 		pool_roughness = value
 		_apply_uniform("pool_roughness", value)
 
-@export var relief_amplitude: float = 0.15:
+@export var relief_amplitude: float = 0.3:
 	set(value):
 		relief_amplitude = value
 		_apply_uniform("relief_amplitude", value)
-@export var relief_noise_scale: float = 8.0:
+@export var relief_noise_scale: float = 4.0:
 	set(value):
 		relief_noise_scale = value
 		_apply_uniform("relief_noise_scale", value)
-@export var relief_fade_start: float = 40.0:
+@export var relief_fade_start: float = 30.0:
 	set(value):
 		relief_fade_start = value
 		_apply_uniform("relief_fade_start", value)
-@export var relief_fade_end: float = 80.0:
+@export var relief_fade_end: float = 60.0:
 	set(value):
 		relief_fade_end = value
 		_apply_uniform("relief_fade_end", value)
+
+# Drift lines: a few faint bands running parallel to the shore, marking
+# where wrack will sit later. Spaced inland from the water line, wobbled
+# so they don't read as ruled lines, and faded out after drift_line_count
+# of them so only a handful ever show.
+@export var drift_line_spacing: float = 6.0:
+	set(value):
+		drift_line_spacing = value
+		_apply_uniform("drift_line_spacing", value)
+@export var drift_line_width: float = 1.0:
+	set(value):
+		drift_line_width = value
+		_apply_uniform("drift_line_width", value)
+@export var drift_line_wobble: float = 1.5:
+	set(value):
+		drift_line_wobble = value
+		_apply_uniform("drift_line_wobble", value)
+@export var drift_line_wobble_scale: float = 10.0:
+	set(value):
+		drift_line_wobble_scale = value
+		_apply_uniform("drift_line_wobble_scale", value)
+@export var drift_line_count: int = 3:
+	set(value):
+		drift_line_count = value
+		_apply_uniform("drift_line_count", value)
+@export var drift_line_strength: float = 0.05:
+	set(value):
+		drift_line_strength = value
+		_apply_uniform("drift_line_strength", value)
+@export var drift_line_color: Color = Color(0.55, 0.48, 0.4):
+	set(value):
+		drift_line_color = value
+		_apply_uniform("drift_line_color", value)
+# Pseudo-height (meters) drift lines contribute to the vertex normal only —
+# they don't displace VERTEX, this just keeps them reading as shaded relief
+# rather than flat paint. Kept small relative to relief_amplitude.
+@export var drift_line_normal_amplitude: float = 0.02:
+	set(value):
+		drift_line_normal_amplitude = value
+		_apply_uniform("drift_line_normal_amplitude", value)
+
+# Ripple marks: faint, fine-scale directional noise in wet sand, perpendicular
+# to the shore. A value shift, not a texture.
+@export var ripple_scale: float = 0.4:
+	set(value):
+		ripple_scale = value
+		_apply_uniform("ripple_scale", value)
+@export var ripple_stretch: float = 6.0:
+	set(value):
+		ripple_stretch = value
+		_apply_uniform("ripple_stretch", value)
+@export var ripple_strength: float = 0.02:
+	set(value):
+		ripple_strength = value
+		_apply_uniform("ripple_strength", value)
+# Same idea as drift_line_normal_amplitude: a reduced-weight pseudo-height
+# used only to perturb the normal, so ripples read as surface, not paint.
+@export var ripple_normal_amplitude: float = 0.01:
+	set(value):
+		ripple_normal_amplitude = value
+		_apply_uniform("ripple_normal_amplitude", value)
+
+# Wet band: within shore_slope_start of the water line, sand wetness is
+# pushed to 1.0 so it reflects like the water does. water_line_z/
+# water_forward_z (pushed once in _ready(), below) come from Sea and
+# RegionField, not assumed.
+@export var shore_slope_start: float = 8.0:
+	set(value):
+		shore_slope_start = value
+		_apply_uniform("shore_slope_start", value)
+@export var region_field_path: NodePath = ^".."
+@export var sea_path: NodePath = ^"../Sea"
 
 var _material: ShaderMaterial
 
@@ -119,6 +191,19 @@ func _ready() -> void:
 	boundary.plane = Plane(Vector3.UP, 0.0)
 	collision_shape.shape = boundary
 
+	_apply_water_line_uniforms()
+
+# RegionField.get_forward() and Sea.get_near_edge_z() are both lazy and
+# safe to call regardless of node-ready order (see their own comments),
+# so this can run directly from _ready() with no deferral needed.
+func _apply_water_line_uniforms() -> void:
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	var sea := get_node_or_null(sea_path) as Sea
+	var forward := region_field.get_forward() if region_field else Vector3.FORWARD
+	var water_line_z := sea.get_near_edge_z() if sea else 0.0
+	_apply_uniform("water_line_z", water_line_z)
+	_apply_uniform("water_forward_z", forward.z)
+
 func _apply_all_uniforms() -> void:
 	_apply_uniform("dry_color", ground_color)
 	_apply_uniform("near_color", near_color)
@@ -130,6 +215,7 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("wet_color", wet_color)
 	_apply_uniform("wet_roughness", wet_roughness)
 	_apply_uniform("wet_specular", wet_specular)
+	_apply_uniform("shore_slope_start", shore_slope_start)
 	_apply_uniform("pool_threshold", pool_threshold)
 	_apply_uniform("pool_edge_width", pool_edge_width)
 	_apply_uniform("pool_color", pool_color)
@@ -138,6 +224,18 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("relief_noise_scale", relief_noise_scale)
 	_apply_uniform("relief_fade_start", relief_fade_start)
 	_apply_uniform("relief_fade_end", relief_fade_end)
+	_apply_uniform("drift_line_spacing", drift_line_spacing)
+	_apply_uniform("drift_line_width", drift_line_width)
+	_apply_uniform("drift_line_wobble", drift_line_wobble)
+	_apply_uniform("drift_line_wobble_scale", drift_line_wobble_scale)
+	_apply_uniform("drift_line_count", drift_line_count)
+	_apply_uniform("drift_line_strength", drift_line_strength)
+	_apply_uniform("drift_line_color", drift_line_color)
+	_apply_uniform("drift_line_normal_amplitude", drift_line_normal_amplitude)
+	_apply_uniform("ripple_scale", ripple_scale)
+	_apply_uniform("ripple_stretch", ripple_stretch)
+	_apply_uniform("ripple_strength", ripple_strength)
+	_apply_uniform("ripple_normal_amplitude", ripple_normal_amplitude)
 
 func _apply_uniform(uniform_name: String, value: Variant) -> void:
 	if _material:
@@ -147,11 +245,12 @@ func _apply_uniform(uniform_name: String, value: Variant) -> void:
 # sky's horizon color without manual duplication. pool_color's own
 # export default above is the fallback if no sky node pushes a value.
 # Darkened, not a direct copy: horizon_color at full brightness blows
-# pools out white once they're catching sky-colored specular.
+# pools out white once they're catching sky-colored specular. Pools are
+# meant to be the darkest thing on the ground, never the brightest.
 func set_pool_color_from_sky(sky_horizon_color: Color) -> void:
 	pool_color = Color(
-		sky_horizon_color.r * 0.8,
-		sky_horizon_color.g * 0.8,
-		sky_horizon_color.b * 0.8,
+		sky_horizon_color.r * 0.75,
+		sky_horizon_color.g * 0.75,
+		sky_horizon_color.b * 0.75,
 		sky_horizon_color.a
 	)
