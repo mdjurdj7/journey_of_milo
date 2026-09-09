@@ -1,23 +1,157 @@
 extends StaticBody3D
+class_name Ground
 
-@export var ground_color: Color = Color(0.72, 0.73, 0.66)
+@export var ground_color: Color = Color(0.72, 0.73, 0.66):
+	set(value):
+		ground_color = value
+		_apply_uniform("dry_color", value)
+
 @export var plane_size: Vector2 = Vector2(500.0, 500.0)
+@export var dressing_subdivisions: Vector2i = Vector2i(4, 4)
+
+# Fine-subdivided inner plane sized to the playable area, so relief
+# detail exists where the Wanderer actually walks; the outer dressing
+# plane (plane_size, above) stays coarse.
+@export var relief_extent: Vector2 = Vector2(80.0, 50.0)
+@export var relief_subdivisions: Vector2i = Vector2i(40, 25)
+
+@export var near_color: Color = Color(1.0, 1.0, 1.0):
+	set(value):
+		near_color = value
+		_apply_uniform("near_color", value)
+@export var far_color: Color = Color(0.7, 0.7, 0.72):
+	set(value):
+		far_color = value
+		_apply_uniform("far_color", value)
+@export var near_distance: float = 5.0:
+	set(value):
+		near_distance = value
+		_apply_uniform("near_distance", value)
+@export var far_distance: float = 60.0:
+	set(value):
+		far_distance = value
+		_apply_uniform("far_distance", value)
+
+@export var wetness_scale: float = 30.0:
+	set(value):
+		wetness_scale = value
+		_apply_uniform("wetness_scale", value)
+@export var wetness_amount: float = 0.4:
+	set(value):
+		wetness_amount = value
+		_apply_uniform("wetness_amount", value)
+@export var wet_color: Color = Color(0.35, 0.38, 0.40):
+	set(value):
+		wet_color = value
+		_apply_uniform("wet_color", value)
+@export var wet_roughness: float = 0.15:
+	set(value):
+		wet_roughness = value
+		_apply_uniform("wet_roughness", value)
+@export var wet_specular: float = 0.4:
+	set(value):
+		wet_specular = value
+		_apply_uniform("wet_specular", value)
+
+@export var pool_threshold: float = 0.75:
+	set(value):
+		pool_threshold = value
+		_apply_uniform("pool_threshold", value)
+@export var pool_edge_width: float = 0.15:
+	set(value):
+		pool_edge_width = value
+		_apply_uniform("pool_edge_width", value)
+@export var pool_color: Color = Color(0.696, 0.704, 0.68):
+	set(value):
+		pool_color = value
+		_apply_uniform("pool_color", value)
+@export var pool_roughness: float = 0.35:
+	set(value):
+		pool_roughness = value
+		_apply_uniform("pool_roughness", value)
+
+@export var relief_amplitude: float = 0.15:
+	set(value):
+		relief_amplitude = value
+		_apply_uniform("relief_amplitude", value)
+@export var relief_noise_scale: float = 8.0:
+	set(value):
+		relief_noise_scale = value
+		_apply_uniform("relief_noise_scale", value)
+@export var relief_fade_start: float = 40.0:
+	set(value):
+		relief_fade_start = value
+		_apply_uniform("relief_fade_start", value)
+@export var relief_fade_end: float = 80.0:
+	set(value):
+		relief_fade_end = value
+		_apply_uniform("relief_fade_end", value)
+
+var _material: ShaderMaterial
 
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 
 func _ready() -> void:
-	var plane_mesh := PlaneMesh.new()
-	plane_mesh.size = plane_size
+	_material = ShaderMaterial.new()
+	_material.shader = load("res://field/ground.gdshader")
+	_apply_all_uniforms()
 
-	var material := StandardMaterial3D.new()
-	material.albedo_color = ground_color
-	material.roughness = 1.0
-	material.metallic_specular = 0.0
-	plane_mesh.material = material
+	var dressing_mesh := PlaneMesh.new()
+	dressing_mesh.size = plane_size
+	dressing_mesh.subdivide_width = dressing_subdivisions.x
+	dressing_mesh.subdivide_depth = dressing_subdivisions.y
+	dressing_mesh.material = _material
+	mesh_instance.mesh = dressing_mesh
 
-	mesh_instance.mesh = plane_mesh
+	var relief_mesh := PlaneMesh.new()
+	relief_mesh.size = relief_extent
+	relief_mesh.subdivide_width = relief_subdivisions.x
+	relief_mesh.subdivide_depth = relief_subdivisions.y
+	relief_mesh.material = _material
+
+	var relief_instance := MeshInstance3D.new()
+	relief_instance.mesh = relief_mesh
+	relief_instance.position.y = 0.02 # clears the coarse dressing plane beneath, avoids z-fighting
+	add_child(relief_instance)
 
 	var boundary := WorldBoundaryShape3D.new()
 	boundary.plane = Plane(Vector3.UP, 0.0)
 	collision_shape.shape = boundary
+
+func _apply_all_uniforms() -> void:
+	_apply_uniform("dry_color", ground_color)
+	_apply_uniform("near_color", near_color)
+	_apply_uniform("far_color", far_color)
+	_apply_uniform("near_distance", near_distance)
+	_apply_uniform("far_distance", far_distance)
+	_apply_uniform("wetness_scale", wetness_scale)
+	_apply_uniform("wetness_amount", wetness_amount)
+	_apply_uniform("wet_color", wet_color)
+	_apply_uniform("wet_roughness", wet_roughness)
+	_apply_uniform("wet_specular", wet_specular)
+	_apply_uniform("pool_threshold", pool_threshold)
+	_apply_uniform("pool_edge_width", pool_edge_width)
+	_apply_uniform("pool_color", pool_color)
+	_apply_uniform("pool_roughness", pool_roughness)
+	_apply_uniform("relief_amplitude", relief_amplitude)
+	_apply_uniform("relief_noise_scale", relief_noise_scale)
+	_apply_uniform("relief_fade_start", relief_fade_start)
+	_apply_uniform("relief_fade_end", relief_fade_end)
+
+func _apply_uniform(uniform_name: String, value: Variant) -> void:
+	if _material:
+		_material.set_shader_parameter(uniform_name, value)
+
+# Called by region_sky.gd so the standing-pool color always tracks the
+# sky's horizon color without manual duplication. pool_color's own
+# export default above is the fallback if no sky node pushes a value.
+# Darkened, not a direct copy: horizon_color at full brightness blows
+# pools out white once they're catching sky-colored specular.
+func set_pool_color_from_sky(sky_horizon_color: Color) -> void:
+	pool_color = Color(
+		sky_horizon_color.r * 0.8,
+		sky_horizon_color.g * 0.8,
+		sky_horizon_color.b * 0.8,
+		sky_horizon_color.a
+	)
