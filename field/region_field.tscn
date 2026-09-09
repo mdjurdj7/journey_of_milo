@@ -57,7 +57,8 @@ enemy_id = &"sputter"
 
 [node name="Sea" type="MeshInstance3D" parent="." unique_id=1533217746]
 script = ExtResource("9")
-sea_color = Color(0, 0.68941545, 0.7818965, 1)
+sea_color = Color(0.2750388, 0.49996376, 0.5953062, 1)
+sea_level = 0.3
 volume_db_max = -20.0
 
 [node name="BattleLayer" type="CanvasLayer" parent="." unique_id=1908553104]

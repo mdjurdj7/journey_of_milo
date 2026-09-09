@@ -5,7 +5,6 @@ extends WorldEnvironment
 	set(value):
 		horizon_color = value
 		_push_pool_color()
-		_push_sea_color()
 @export var fog_color: Color = Color(0.87, 0.88, 0.85)
 @export var fog_density: float = 0.006
 @export var fog_depth_begin: float = 20.0
@@ -14,7 +13,6 @@ extends WorldEnvironment
 @export var fog_aerial_perspective: float = 0.5
 @export var ambient_energy: float = 1.0
 @export var ground_path: NodePath = ^"../Ground"
-@export var sea_path: NodePath = ^"../Sea"
 
 func _ready() -> void:
 	var sky_material := ProceduralSkyMaterial.new()
@@ -42,7 +40,6 @@ func _ready() -> void:
 	environment = env
 
 	_push_pool_color()
-	_push_sea_color()
 
 # Keeps Ground's standing-pool color matched to the sky's horizon color
 # without manual duplication. Ground keeps its own pool_color export as
@@ -53,13 +50,3 @@ func _push_pool_color() -> void:
 	var ground := get_node_or_null(ground_path) as Ground
 	if ground:
 		ground.set_pool_color_from_sky(horizon_color)
-
-# Keeps the Sea's color matched to the sky's horizon color (darkened),
-# without manual duplication. Sea keeps its own sea_color export as the
-# fallback if no sky node is present at sea_path.
-func _push_sea_color() -> void:
-	if not is_inside_tree():
-		return
-	var sea := get_node_or_null(sea_path) as Sea
-	if sea:
-		sea.set_sea_color_from_sky(horizon_color)
