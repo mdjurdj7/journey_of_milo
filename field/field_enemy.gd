@@ -3,8 +3,14 @@ class_name FieldEnemy
 
 signal contacted(enemy: FieldEnemy)
 
+const MODEL_SCENE_PATH := "res://assets/models/sputter_placeholder.fbx"
+
 @export var enemy_id: StringName = &"enemy"
 @export var contact_radius: float = 2.0
+@export var model_color: Color = Color(0.2, 0.22, 0.25, 1)
+@export var model_scale: float = 1.0
+@export var model_yaw_offset: float = 0.0
+@export var model_ground_offset: float = 0.0
 
 var _contacted: bool = false
 
@@ -18,6 +24,37 @@ func _ready() -> void:
 
 	contact_area.body_entered.connect(_on_body_entered)
 	contact_area.body_exited.connect(_on_body_exited)
+
+	_spawn_model()
+
+func _spawn_model() -> void:
+	var model := (load(MODEL_SCENE_PATH) as PackedScene).instantiate() as Node3D
+	add_child(model)
+	model.scale = Vector3.ONE * model_scale
+	model.rotation.y = deg_to_rad(model_yaw_offset)
+
+	var material := StandardMaterial3D.new()
+	material.albedo_color = model_color
+	material.roughness = 1.0
+	material.metallic_specular = 0.0
+
+	# Combined AABB of all mesh instances, expressed in this node's own
+	# space (not the model's), so its bottom tells us how far to raise the
+	# model regardless of the model's own pivot/rotation.
+	var combined_aabb: AABB
+	var has_aabb := false
+	for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
+		var mi := mesh_instance as MeshInstance3D
+		mi.material_override = material
+
+		var mi_transform_in_self := global_transform.affine_inverse() * mi.global_transform
+		var mi_aabb_in_self := mi_transform_in_self * mi.get_aabb()
+		combined_aabb = mi_aabb_in_self if not has_aabb else combined_aabb.merge(mi_aabb_in_self)
+		has_aabb = true
+
+	if has_aabb:
+		print("FieldEnemy '%s': model AABB height = %.3f at model_scale = %.3f" % [enemy_id, combined_aabb.size.y, model_scale])
+		model.position.y += -combined_aabb.position.y + model_ground_offset
 
 func _on_body_entered(body: Node3D) -> void:
 	if _contacted or not body.is_in_group("wanderer"):
