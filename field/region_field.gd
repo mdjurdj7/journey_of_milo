@@ -1,4 +1,5 @@
 extends Node3D
+class_name RegionField
 
 const BATTLE_STUB_SCENE_PATH := "res://battle/battle_stub.tscn"
 const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
@@ -6,25 +7,78 @@ const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 @export var escape_push_distance: float = 4.0
 
 # Playable boundary, centered on origin. X = width (left/right side
-# edges), Y-component of field_extents = depth along Z (the walk axis:
-# +Z is inland, toward the Tower; -Z is behind the Wanderer's spawn).
+# edges), Y-component of field_extents = depth along the field's
+# forward axis (see get_forward() below — not assumed to be +Z).
 @export var field_extents: Vector2 = Vector2(80.0, 50.0)
 @export var wall_height: float = 6.0
 @export var wall_thickness: float = 2.0
 @export var berm_height: float = 1.4
 @export var berm_width: float = 3.0
 @export var berm_color: Color = Color(0.54, 0.55, 0.50)
-@export var sea_path: NodePath = ^"../Sea"
+# Sea and Tower are RegionField's own children, not siblings — paths
+# must be direct child names ("Sea"/"Tower"), not "../Sea"/"../Tower".
+# RegionField is the scene root, so "../" either finds nothing (edited
+# standalone) or looks under the engine's own root Window (run as the
+# main scene) — get_node_or_null("../Sea") is null either way, verified
+# empirically. sea_path was already like this before this change; fixed
+# alongside tower_path since both are exactly this bug.
+@export var sea_path: NodePath = ^"Sea"
 @export var shoreline_wall_margin: float = 5.0
+@export var tower_path: NodePath = ^"Tower"
 
 @onready var wanderer: CharacterBody3D = $Wanderer
 @onready var battle_layer: CanvasLayer = $BattleLayer
 
+var _forward: Vector3 = Vector3.FORWARD
+var _forward_computed: bool = false
+
 func _ready() -> void:
+	# Ensures forward is computed (and printed) even if no child asked for
+	# it first; a no-op if one already did.
+	get_forward()
+
 	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
 		enemy.contacted.connect(_on_enemy_contacted)
 
+	_reposition_enemies_along_forward()
 	_build_boundary()
+
+# The field's forward direction: normalized XZ vector from the
+# Wanderer's spawn to the Tower. Nothing else should assume an axis or
+# sign for "ahead" — call get_forward() instead. Falls back to Godot's
+# own -Z forward convention if the Tower isn't present.
+#
+# Computed lazily and cached rather than eagerly in _ready(): Godot
+# calls _ready() bottom-up (children before their parent), and Sea is
+# RegionField's child, so Sea's _ready() runs before RegionField's own
+# — an eager computation here would still be Vector3.FORWARD's default
+# when Sea first asks. Resolving Wanderer via get_node_or_null() rather
+# than the @onready var for the same reason: @onready isn't populated
+# until immediately before RegionField's own _ready(), which may be
+# after this first runs.
+func _compute_forward() -> Vector3:
+	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
+	var tower := get_node_or_null(tower_path) as Node3D
+	if spawn_node == null or tower == null:
+		return Vector3.FORWARD
+	var to_tower := tower.global_position - spawn_node.global_position
+	to_tower.y = 0.0
+	return to_tower.normalized() if to_tower.length() > 0.0001 else Vector3.FORWARD
+
+func get_forward() -> Vector3:
+	if not _forward_computed:
+		_forward = _compute_forward()
+		_forward_computed = true
+		print("RegionField: forward = %s" % str(_forward))
+	return _forward
+
+# Preserves each enemy's authored distance from the Wanderer's spawn,
+# but re-derives the direction along get_forward() instead of whatever
+# axis its .tscn transform happened to assume.
+func _reposition_enemies_along_forward() -> void:
+	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
+		var distance := (enemy.global_position - wanderer.global_position).length()
+		enemy.global_position = wanderer.global_position + _forward * distance
 
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	process_mode = Node.PROCESS_MODE_DISABLED
@@ -64,35 +118,38 @@ func _push_wanderer_away_from(enemy: FieldEnemy) -> void:
 	wanderer.global_position = enemy.global_position + push_dir * push_distance
 
 # Four invisible collision walls around field_extents, tall enough to
-# block the Wanderer, plus a low mesh berm along the three land edges
-# (+Z inland, -X and +X sides). The -Z edge, behind the Wanderer's
-# spawn, is left open visually for a future water plane — no berm there.
+# block the Wanderer, plus a low mesh berm along the inland and side
+# edges. The edge behind the Wanderer (opposite get_forward()) is left
+# open visually for the sea — no berm there. Both Z-boundary edges are
+# positioned from get_forward()'s sign, not assumed to be +Z/-Z.
 func _build_boundary() -> void:
 	var half_width := field_extents.x / 2.0
 	var half_depth := field_extents.y / 2.0
+	var inland_z := half_depth * _forward.z
 
-	_add_wall(Vector3(0.0, wall_height / 2.0, half_depth), Vector3(field_extents.x, wall_height, wall_thickness))
+	_add_wall(Vector3(0.0, wall_height / 2.0, inland_z), Vector3(field_extents.x, wall_height, wall_thickness))
 	_add_wall(Vector3(0.0, wall_height / 2.0, _shoreward_wall_z(half_depth)), Vector3(field_extents.x, wall_height, wall_thickness))
 	_add_wall(Vector3(-half_width, wall_height / 2.0, 0.0), Vector3(wall_thickness, wall_height, field_extents.y))
 	_add_wall(Vector3(half_width, wall_height / 2.0, 0.0), Vector3(wall_thickness, wall_height, field_extents.y))
 
 	# Berm length is extended by berm_width past the true edge so the two
 	# side berms overlap the inland berm at the corners, with no gap.
-	_add_berm(Vector3(0.0, berm_height / 2.0, half_depth), Vector3(field_extents.x + berm_width, berm_height, berm_width))
+	_add_berm(Vector3(0.0, berm_height / 2.0, inland_z), Vector3(field_extents.x + berm_width, berm_height, berm_width))
 	_add_berm(Vector3(-half_width, berm_height / 2.0, 0.0), Vector3(berm_width, berm_height, field_extents.y + berm_width))
 	_add_berm(Vector3(half_width, berm_height / 2.0, 0.0), Vector3(berm_width, berm_height, field_extents.y + berm_width))
 
 # Pushed shoreline_wall_margin past the sea's near edge (derived from
-# the Wanderer's spawn and the Sea's own sea_edge_distance) rather than
-# sitting at the fixed field boundary, so the Wanderer can walk down to,
-# and a little into, the water. Falls back to the fixed half_depth
-# boundary if the Sea node isn't present.
+# the Wanderer's spawn, get_forward(), and the Sea's own
+# sea_edge_distance) rather than sitting at the fixed field boundary, so
+# the Wanderer can walk down to, and a little into, the water. Falls
+# back to the fixed half_depth boundary on the opposite side from
+# inland_z if the Sea node isn't present.
 func _shoreward_wall_z(half_depth: float) -> float:
 	var sea := get_node_or_null(sea_path) as Sea
 	if sea == null:
-		return -half_depth
-	var near_edge_z := wanderer.global_position.z - sea.sea_edge_distance
-	return near_edge_z - shoreline_wall_margin
+		return -half_depth * _forward.z
+	var near_edge_z := wanderer.global_position.z - _forward.z * sea.sea_edge_distance
+	return near_edge_z - _forward.z * shoreline_wall_margin
 
 func _add_wall(wall_position: Vector3, size: Vector3) -> void:
 	var shape := BoxShape3D.new()
