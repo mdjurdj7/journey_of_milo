@@ -4,12 +4,13 @@ class_name Sea
 const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 
 # Sea's one color source — no push from region_sky.gd or anywhere else.
-@export var sea_color: Color = Color(0.74, 0.75, 0.72):
+@export var sea_color: Color = Color(0.70, 0.74, 0.75):
 	set(value):
 		sea_color = value
 		_apply_uniform("sea_color", value)
 
-@export var sea_roughness: float = 0.35:
+# Soft sheen, not a mirror.
+@export var sea_roughness: float = 0.2:
 	set(value):
 		sea_roughness = value
 		_apply_uniform("sea_roughness", value)
@@ -18,10 +19,47 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 	set(value):
 		noise_amplitude = value
 		_apply_uniform("noise_amplitude", value)
+@export var noise_scale: float = 6.0:
+	set(value):
+		noise_scale = value
+		_apply_uniform("noise_scale", value)
 @export var noise_speed: float = 0.05:
 	set(value):
 		noise_speed = value
 		_apply_uniform("noise_speed", value)
+
+# Edge fade: alpha fades to 0 over shore_fade meters of scene-depth
+# difference between the water surface and whatever's behind it (the
+# depth texture), so the water thins into the sand instead of cutting
+# off at the mesh edge. edge_noise_amplitude/scale wander that fade
+# distance so the waterline isn't a straight, uniform band.
+@export var shore_fade: float = 3.0:
+	set(value):
+		shore_fade = value
+		_apply_uniform("shore_fade", value)
+@export var edge_noise_amplitude: float = 1.5:
+	set(value):
+		edge_noise_amplitude = value
+		_apply_uniform("edge_noise_amplitude", value)
+@export var edge_noise_scale: float = 4.0:
+	set(value):
+		edge_noise_scale = value
+		_apply_uniform("edge_noise_scale", value)
+
+# Distance: blends toward fog_color between fog_near_distance and
+# fog_far_distance so far water dissolves into the horizon.
+@export var fog_color: Color = Color(0.85, 0.87, 0.88):
+	set(value):
+		fog_color = value
+		_apply_uniform("fog_color", value)
+@export var fog_near_distance: float = 60.0:
+	set(value):
+		fog_near_distance = value
+		_apply_uniform("fog_near_distance", value)
+@export var fog_far_distance: float = 250.0:
+	set(value):
+		fog_far_distance = value
+		_apply_uniform("fog_far_distance", value)
 
 # Plane X spans the field's full width plus width_margin on each side,
 # so it runs well past the fog regardless of field_extents; Z is a flat
@@ -91,6 +129,25 @@ func _field_width() -> float:
 			return extents.x
 	return 0.0
 
+# Sets _forward as a side effect. Split out from _position_relative_to_
+# spawn() so get_near_edge_z() below can call it without needing mesh
+# to exist yet — unlike the rest of that function, this only touches
+# _wanderer and region_field, both already safe to resolve early.
+func _compute_near_edge_z() -> float:
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	_forward = region_field.get_forward() if region_field else Vector3.FORWARD
+	var spawn: Vector3 = _wanderer.global_position if _wanderer else Vector3.ZERO
+	return (spawn - _forward * sea_edge_distance).z
+
+# Lazily resolves _wanderer if needed, so this is safe to call from
+# another node's _ready() regardless of node-ready order (ground.gd
+# uses it for the wet-band shore line) — same reasoning as
+# RegionField.get_forward().
+func get_near_edge_z() -> float:
+	if _wanderer == null:
+		_wanderer = get_node_or_null(wanderer_path) as Node3D
+	return _compute_near_edge_z()
+
 # Centered in X on the field's own center (RegionField's world X —
 # field_extents is always centered on RegionField's origin). Near edge
 # sits sea_edge_distance behind the Wanderer's spawn point along
@@ -100,11 +157,9 @@ func _field_width() -> float:
 # the near edge itself, not the center, lands exactly on that line.
 func _position_relative_to_spawn() -> void:
 	var region_field := get_node_or_null(region_field_path) as RegionField
-	var field_center_x := region_field.global_position.x if region_field else 0.0
-	_forward = region_field.get_forward() if region_field else Vector3.FORWARD
+	var field_center_x: float = region_field.global_position.x if region_field else 0.0
 
-	var spawn := _wanderer.global_position if _wanderer else Vector3.ZERO
-	var near_edge_z := (spawn - _forward * sea_edge_distance).z
+	var near_edge_z := _compute_near_edge_z()
 	var center_z := near_edge_z - _forward.z * sea_depth / 2.0
 
 	global_position = Vector3(field_center_x, sea_level, center_z)
@@ -151,7 +206,14 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("sea_color", sea_color)
 	_apply_uniform("sea_roughness", sea_roughness)
 	_apply_uniform("noise_amplitude", noise_amplitude)
+	_apply_uniform("noise_scale", noise_scale)
 	_apply_uniform("noise_speed", noise_speed)
+	_apply_uniform("shore_fade", shore_fade)
+	_apply_uniform("edge_noise_amplitude", edge_noise_amplitude)
+	_apply_uniform("edge_noise_scale", edge_noise_scale)
+	_apply_uniform("fog_color", fog_color)
+	_apply_uniform("fog_near_distance", fog_near_distance)
+	_apply_uniform("fog_far_distance", fog_far_distance)
 
 func _apply_uniform(uniform_name: String, value: Variant) -> void:
 	if _material:
