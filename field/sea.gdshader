@@ -1,17 +1,38 @@
 shader_type spatial;
 render_mode blend_mix, cull_back, diffuse_burley, specular_schlick_ggx;
 
-uniform vec4 sea_color : source_color = vec4(0.74, 0.75, 0.72, 1.0);
-uniform float sea_roughness : hint_range(0.0, 1.0) = 0.35;
+// Surface: soft sheen, not a mirror.
+uniform vec4 sea_color : source_color = vec4(0.70, 0.74, 0.75, 1.0);
+uniform float sea_roughness : hint_range(0.0, 1.0) = 0.2;
 
 // Slow, subtle two-octave value-noise normal perturbation, no texture,
-// so the plane reads as water rather than glass.
+// so the surface reads as water rather than glass.
 uniform float noise_amplitude = 0.03;
-uniform float noise_speed = 0.05;
 uniform float noise_scale = 6.0;
+uniform float noise_speed = 0.05;
+
+// Edge: alpha fades to 0 over shore_fade meters of scene-depth
+// difference between this surface and whatever's behind it, so the
+// water thins into the sand instead of cutting off at the mesh edge.
+// edge_noise_amplitude/scale wander that fade distance so the
+// waterline isn't a straight, uniform band.
+uniform float shore_fade : hint_range(0.01, 20.0) = 3.0;
+uniform float edge_noise_amplitude = 1.5;
+uniform float edge_noise_scale = 4.0;
+
+// Distance: blend toward fog_color between fog_near_distance and
+// fog_far_distance (view-space distance, same smoothstep shape
+// ground.gdshader's near/far tint uses) so far water dissolves into
+// the horizon instead of holding a hard flat color to the fog line.
+uniform vec4 fog_color : source_color = vec4(0.85, 0.87, 0.88, 1.0);
+uniform float fog_near_distance = 60.0;
+uniform float fog_far_distance = 250.0;
+
+uniform sampler2D depth_texture : hint_depth_texture, filter_linear_mipmap;
 
 varying vec2 v_world_xz;
 
+// Textureless value noise, ~[0,1].
 float hash(vec2 p) {
 	p = fract(p * vec2(123.34, 456.21));
 	p += dot(p, p + 45.32);
@@ -58,9 +79,31 @@ void fragment() {
 		1.0,
 		(h_c - h_z) * noise_amplitude / epsilon
 	));
-
 	NORMAL = normalize(mat3(VIEW_MATRIX) * world_normal);
-	ALBEDO = sea_color.rgb;
+
+	// Edge fade: how far the opaque scene behind this fragment is from
+	// the water surface, in view-space meters. Small near the shore
+	// (ground rises to meet the water), large over open water (nothing
+	// but far background behind it).
+	float depth_raw = texture(depth_texture, SCREEN_UV).r;
+	vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, depth_raw);
+	vec4 view = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
+	view.xyz /= view.w;
+	float scene_depth = -view.z;
+	float water_depth = -VERTEX.z;
+	float depth_diff = max(scene_depth - water_depth, 0.0);
+
+	float wander = (value_noise(v_world_xz / max(edge_noise_scale, 0.001)) - 0.5) * 2.0 * edge_noise_amplitude;
+	float effective_fade = max(shore_fade + wander, 0.01);
+	float edge_alpha = smoothstep(0.0, effective_fade, depth_diff);
+
+	// Distance: dissolve into the fog color toward the horizon.
+	float dist = length(VERTEX);
+	float fog_t = smoothstep(fog_near_distance, fog_far_distance, dist);
+	vec3 albedo = mix(sea_color.rgb, fog_color.rgb, fog_t);
+
+	ALBEDO = albedo;
 	ROUGHNESS = sea_roughness;
 	METALLIC = 0.0;
+	ALPHA = edge_alpha;
 }
