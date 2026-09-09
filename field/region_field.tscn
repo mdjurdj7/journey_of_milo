@@ -8,6 +8,7 @@
 [ext_resource type="Script" uid="uid://c70wmcl2vmws3" path="res://field/wanderer.gd" id="6"]
 [ext_resource type="Script" uid="uid://c73umk7v0kdui" path="res://field/camera_rig.gd" id="7"]
 [ext_resource type="PackedScene" path="res://field/field_enemy.tscn" id="8"]
+[ext_resource type="Script" uid="uid://bp435mxjxefe2" path="res://field/sea.gd" id="9"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -53,6 +54,11 @@ distance = 7.0
 [node name="FieldEnemy" parent="." unique_id=677119585 instance=ExtResource("8")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -12)
 enemy_id = &"sputter"
+
+[node name="Sea" type="MeshInstance3D" parent="." unique_id=1533217746]
+script = ExtResource("9")
+sea_color = Color(0, 0.68941545, 0.7818965, 1)
+volume_db_max = -20.0
 
 [node name="BattleLayer" type="CanvasLayer" parent="." unique_id=1908553104]
 process_mode = 3

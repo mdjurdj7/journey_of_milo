@@ -14,6 +14,8 @@ const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 @export var berm_height: float = 1.4
 @export var berm_width: float = 3.0
 @export var berm_color: Color = Color(0.54, 0.55, 0.50)
+@export var sea_path: NodePath = ^"../Sea"
+@export var shoreline_wall_margin: float = 5.0
 
 @onready var wanderer: CharacterBody3D = $Wanderer
 @onready var battle_layer: CanvasLayer = $BattleLayer
@@ -70,7 +72,7 @@ func _build_boundary() -> void:
 	var half_depth := field_extents.y / 2.0
 
 	_add_wall(Vector3(0.0, wall_height / 2.0, half_depth), Vector3(field_extents.x, wall_height, wall_thickness))
-	_add_wall(Vector3(0.0, wall_height / 2.0, -half_depth), Vector3(field_extents.x, wall_height, wall_thickness))
+	_add_wall(Vector3(0.0, wall_height / 2.0, _shoreward_wall_z(half_depth)), Vector3(field_extents.x, wall_height, wall_thickness))
 	_add_wall(Vector3(-half_width, wall_height / 2.0, 0.0), Vector3(wall_thickness, wall_height, field_extents.y))
 	_add_wall(Vector3(half_width, wall_height / 2.0, 0.0), Vector3(wall_thickness, wall_height, field_extents.y))
 
@@ -79,6 +81,18 @@ func _build_boundary() -> void:
 	_add_berm(Vector3(0.0, berm_height / 2.0, half_depth), Vector3(field_extents.x + berm_width, berm_height, berm_width))
 	_add_berm(Vector3(-half_width, berm_height / 2.0, 0.0), Vector3(berm_width, berm_height, field_extents.y + berm_width))
 	_add_berm(Vector3(half_width, berm_height / 2.0, 0.0), Vector3(berm_width, berm_height, field_extents.y + berm_width))
+
+# Pushed shoreline_wall_margin past the sea's near edge (derived from
+# the Wanderer's spawn and the Sea's own sea_edge_distance) rather than
+# sitting at the fixed field boundary, so the Wanderer can walk down to,
+# and a little into, the water. Falls back to the fixed half_depth
+# boundary if the Sea node isn't present.
+func _shoreward_wall_z(half_depth: float) -> float:
+	var sea := get_node_or_null(sea_path) as Sea
+	if sea == null:
+		return -half_depth
+	var near_edge_z := wanderer.global_position.z - sea.sea_edge_distance
+	return near_edge_z - shoreline_wall_margin
 
 func _add_wall(wall_position: Vector3, size: Vector3) -> void:
 	var shape := BoxShape3D.new()
