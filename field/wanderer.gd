@@ -15,6 +15,7 @@ const WALK_SCENE_PATH := "res://assets/models/wanderer_placeholder_walking.fbx"
 @export var animation_blend_time: float = 0.2
 @export var remove_walk_root_motion: bool = true
 @export var camera_path: NodePath = ^"../CameraPivot/Camera3D"
+@export var model_yaw_offset: float = 180.0
 
 var _animation_player: AnimationPlayer
 var _animation_tree: AnimationTree
@@ -26,8 +27,11 @@ var _dash_direction: Vector3 = Vector3.ZERO
 func _ready() -> void:
 	_camera = get_node_or_null(camera_path) as Camera3D
 
-	var model := (load(IDLE_SCENE_PATH) as PackedScene).instantiate()
+	var model := (load(IDLE_SCENE_PATH) as PackedScene).instantiate() as Node3D
 	add_child(model)
+	# Mixamo meshes face +Z in their own space while the body's forward is
+	# -Z (see _forward_from_angle()), so the model is rotated to match.
+	model.rotation.y = deg_to_rad(model_yaw_offset)
 
 	var players := model.find_children("*", "AnimationPlayer", true, false)
 	_animation_player = players[0] as AnimationPlayer if not players.is_empty() else null
@@ -199,19 +203,39 @@ func _flatten_normalized(vector: Vector3) -> Vector3:
 	var flat := Vector3(vector.x, 0.0, vector.z)
 	return flat.normalized() if flat.length() > 0.0001 else Vector3.ZERO
 
+# Node3D's actual forward vector at rotation.y=angle is (-sin angle, 0,
+# -cos angle) — engine-verified; (sin angle, 0, -cos angle) is the wrong
+# sign on X and silently mismatches turn-to-face against velocity on any
+# lateral component. This and _angle_from_direction() are exact inverses
+# and are the ONLY place either conversion happens.
+func _forward_from_angle(angle: float) -> Vector3:
+	return Vector3(-sin(angle), 0.0, -cos(angle))
+
+func _angle_from_direction(direction: Vector3) -> float:
+	return atan2(-direction.x, -direction.z)
+
 func _physics_process(delta: float) -> void:
 	_dash_cooldown_timer = maxf(_dash_cooldown_timer - delta, 0.0)
 
-	var move_dir: Vector3
+	if _dash_timer <= 0.0 and Input.is_action_just_pressed("dash") and _dash_cooldown_timer <= 0.0:
+		# Dash in the direction the Wanderer is currently facing, via the
+		# same angle<->direction conversion turn-to-face uses below, so it
+		# always matches what's on screen.
+		_dash_direction = _forward_from_angle(rotation.y)
+		_dash_timer = dash_duration
+		_dash_cooldown_timer = dash_cooldown
 
-	if _dash_timer > 0.0:
-		# Ignore movement input entirely for the dash's duration; velocity is
-		# fixed to the direction captured when the dash started.
+	# The one and only move_direction for this frame: everything below
+	# (velocity target, turn-to-face) reads from this, nothing re-derives
+	# it separately.
+	var move_direction: Vector3
+	var is_dashing := _dash_timer > 0.0
+
+	if is_dashing:
+		# Ignore movement input entirely for the dash's duration; direction
+		# is fixed to what was captured when the dash started.
 		_dash_timer -= delta
-		move_dir = _dash_direction
-		var dash_speed := dash_distance / dash_duration
-		velocity.x = _dash_direction.x * dash_speed
-		velocity.z = _dash_direction.z * dash_speed
+		move_direction = _dash_direction
 	else:
 		var input_dir := Vector2(
 			Input.get_action_strength("move_right") - Input.get_action_strength("move_left"),
@@ -220,30 +244,25 @@ func _physics_process(delta: float) -> void:
 		if input_dir.length() > 1.0:
 			input_dir = input_dir.normalized()
 
-		move_dir = Vector3(input_dir.x, 0.0, -input_dir.y)
+		move_direction = Vector3(input_dir.x, 0.0, -input_dir.y)
 		if _camera:
 			var camera_basis := _camera.global_transform.basis
 			var camera_forward := _flatten_normalized(-camera_basis.z)
 			var camera_right := _flatten_normalized(camera_basis.x)
-			# input_dir.y is +1 on W (forward - back), so it must be negated here: W has to add camera_forward, not subtract it.
-			move_dir = camera_right * input_dir.x + camera_forward * -input_dir.y
-			if move_dir.length() > 1.0:
-				move_dir = move_dir.normalized()
+			# input_dir.y is +1 on W (forward - back); camera_forward already
+			# points away from the camera, so W adds it directly.
+			move_direction = camera_right * input_dir.x + camera_forward * input_dir.y
+			if move_direction.length() > 1.0:
+				move_direction = move_direction.normalized()
 
-		if Input.is_action_just_pressed("dash") and _dash_cooldown_timer <= 0.0:
-			# Dash in the direction the Wanderer is currently facing, not the
-			# raw input, so it always matches what's on screen.
-			_dash_direction = Vector3(sin(rotation.y), 0.0, -cos(rotation.y))
-			_dash_timer = dash_duration
-			_dash_cooldown_timer = dash_cooldown
-			move_dir = _dash_direction
-			var dash_speed := dash_distance / dash_duration
-			velocity.x = _dash_direction.x * dash_speed
-			velocity.z = _dash_direction.z * dash_speed
-		else:
-			var target_velocity := move_dir * move_speed
-			velocity.x = move_toward(velocity.x, target_velocity.x, acceleration * delta)
-			velocity.z = move_toward(velocity.z, target_velocity.z, acceleration * delta)
+	if is_dashing:
+		var dash_speed := dash_distance / dash_duration
+		velocity.x = move_direction.x * dash_speed
+		velocity.z = move_direction.z * dash_speed
+	else:
+		var target_velocity := move_direction * move_speed
+		velocity.x = move_toward(velocity.x, target_velocity.x, acceleration * delta)
+		velocity.z = move_toward(velocity.z, target_velocity.z, acceleration * delta)
 
 	if not is_on_floor():
 		velocity.y -= gravity * delta
@@ -252,9 +271,8 @@ func _physics_process(delta: float) -> void:
 
 	move_and_slide()
 
-	if move_dir.length() > 0.01:
-		var target_angle := atan2(move_dir.x, -move_dir.z)
-		rotation.y = lerp_angle(rotation.y, target_angle, rotation_speed * delta)
+	if move_direction.length() > 0.01:
+		rotation.y = lerp_angle(rotation.y, _angle_from_direction(move_direction), rotation_speed * delta)
 
 	var planar_speed := Vector2(velocity.x, velocity.z).length()
 	if use_animation_tree:
