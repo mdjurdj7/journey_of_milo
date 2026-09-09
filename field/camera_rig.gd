@@ -5,6 +5,7 @@ extends Node3D
 @export var height: float = 4.0
 @export var pitch_degrees: float = 18.0
 @export var follow_smoothing: float = 6.0
+@export var max_follow_speed: float = 10.0
 
 var _target: Node3D
 
@@ -20,4 +21,15 @@ func _ready() -> void:
 func _physics_process(delta: float) -> void:
 	if _target == null:
 		return
-	global_position = global_position.lerp(_target.global_position, 1.0 - exp(-follow_smoothing * delta))
+
+	var smoothed := global_position.lerp(_target.global_position, 1.0 - exp(-follow_smoothing * delta))
+	var motion := smoothed - global_position
+
+	# Below max_follow_speed this is identical to the plain lerp. Above it
+	# (a dash burst) the step is clamped so the target visibly leads the
+	# frame instead of the camera snapping to keep up.
+	var max_step := max_follow_speed * delta
+	if motion.length() > max_step:
+		motion = motion.normalized() * max_step
+
+	global_position += motion

@@ -7,6 +7,7 @@
 [ext_resource type="Script" uid="uid://boqbnc57buiff" path="res://field/tower.gd" id="5"]
 [ext_resource type="Script" uid="uid://c70wmcl2vmws3" path="res://field/wanderer.gd" id="6"]
 [ext_resource type="Script" uid="uid://c73umk7v0kdui" path="res://field/camera_rig.gd" id="7"]
+[ext_resource type="PackedScene" path="res://field/field_enemy.tscn" id="8"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -17,12 +18,14 @@ script = ExtResource("1")
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2022836371]
 script = ExtResource("2")
+fog_density = 0.008
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=846207689]
 script = ExtResource("3")
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=1437900813]
 script = ExtResource("4")
+ground_color = Color(0.65880924, 0.6781388, 0.601874, 1)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=1297283630]
 
@@ -31,8 +34,11 @@ script = ExtResource("4")
 [node name="Tower" type="MeshInstance3D" parent="." unique_id=1954687032]
 script = ExtResource("5")
 
-[node name="Wanderer" type="CharacterBody3D" parent="." unique_id=577093166]
+[node name="Wanderer" type="CharacterBody3D" parent="." unique_id=577093166 groups=["wanderer"]]
 script = ExtResource("6")
+move_speed = 5.0
+acceleration = 30.0
+dash_distance = 3.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Wanderer" unique_id=1638228685]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
@@ -40,5 +46,13 @@ shape = SubResource("CapsuleShape3D_1")
 
 [node name="CameraPivot" type="Node3D" parent="." unique_id=2057239469]
 script = ExtResource("7")
+distance = 7.0
 
 [node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=1648467848]
+
+[node name="FieldEnemy" parent="." unique_id=677119585 instance=ExtResource("8")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -12)
+enemy_id = &"sputter"
+
+[node name="BattleLayer" type="CanvasLayer" parent="." unique_id=1908553104]
+process_mode = 3

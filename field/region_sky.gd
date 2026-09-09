@@ -1,16 +1,18 @@
 extends WorldEnvironment
 
-@export var sky_color: Color = Color(0.93, 0.93, 0.91)
-@export var horizon_color: Color = Color(0.86, 0.86, 0.84)
-@export var fog_color: Color = Color(0.86, 0.86, 0.84)
-@export var fog_density: float = 0.015
+@export var sky_top_color: Color = Color(0.82, 0.85, 0.86)
+@export var horizon_color: Color = Color(0.87, 0.88, 0.85)
+@export var fog_color: Color = Color(0.87, 0.88, 0.85)
+@export var fog_density: float = 0.006
 @export var fog_depth_begin: float = 20.0
 @export var fog_depth_end: float = 320.0
+@export var fog_sky_affect: float = 1.0
+@export var fog_aerial_perspective: float = 0.5
 @export var ambient_energy: float = 1.0
 
 func _ready() -> void:
 	var sky_material := ProceduralSkyMaterial.new()
-	sky_material.sky_top_color = sky_color
+	sky_material.sky_top_color = sky_top_color
 	sky_material.sky_horizon_color = horizon_color
 	sky_material.ground_bottom_color = horizon_color
 	sky_material.ground_horizon_color = horizon_color
@@ -28,5 +30,7 @@ func _ready() -> void:
 	env.fog_density = fog_density
 	env.fog_depth_begin = fog_depth_begin
 	env.fog_depth_end = fog_depth_end
+	env.fog_sky_affect = fog_sky_affect
+	env.fog_aerial_perspective = fog_aerial_perspective
 
 	environment = env

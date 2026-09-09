@@ -1,6 +1,6 @@
 extends StaticBody3D
 
-@export var ground_color: Color = Color(0.72, 0.74, 0.67)
+@export var ground_color: Color = Color(0.72, 0.73, 0.66)
 @export var plane_size: Vector2 = Vector2(500.0, 500.0)
 
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D

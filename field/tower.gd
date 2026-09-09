@@ -1,6 +1,6 @@
 extends MeshInstance3D
 
-@export var tower_color: Color = Color(0.07, 0.08, 0.10)
+@export var tower_color: Color = Color(0.30, 0.32, 0.33)
 @export var height: float = 150.0
 @export var base_radius: float = 9.0
 @export var top_radius: float = 2.0
