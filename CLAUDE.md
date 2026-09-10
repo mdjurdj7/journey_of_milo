@@ -7,8 +7,6 @@
 - Never run the game. I verify against a live instance and report back.
 
 ## Git
-- Never run `git push`. I push. No exceptions, no matter what the
-  task says.
 - Local commits only when I explicitly ask. Never stage with
   `git add .`; name each path.
 - One concern per commit. If the diff mixes my task with unrelated
