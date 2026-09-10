@@ -53,9 +53,9 @@ shape = SubResource("CapsuleShape3D_1")
 [node name="CameraPivot" type="Node3D" parent="." unique_id=2057239469]
 process_mode = 3
 script = ExtResource("7")
-distance = 12.0
+distance = 10.5
 pitch_degrees = 50.0
-fov = 45.0
+fov = 35.0
 
 [node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=1648467848]
 
