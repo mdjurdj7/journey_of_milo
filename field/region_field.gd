@@ -25,8 +25,10 @@ const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 @export var sea_path: NodePath = ^"Sea"
 @export var shoreline_wall_margin: float = 5.0
 @export var tower_path: NodePath = ^"Tower"
+@export var camera_rig_path: NodePath = ^"CameraPivot"
+@export var battle_spacing: float = 3.0
 
-@onready var wanderer: CharacterBody3D = $Wanderer
+@onready var wanderer: Wanderer = $Wanderer
 @onready var battle_layer: CanvasLayer = $BattleLayer
 
 var _forward: Vector3 = Vector3.FORWARD
@@ -83,6 +85,12 @@ func _reposition_enemies_along_forward() -> void:
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	process_mode = Node.PROCESS_MODE_DISABLED
 
+	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
+	if camera_rig:
+		camera_rig.enter_battle(wanderer, enemy)
+		wanderer.enter_battle_stance(enemy, battle_spacing, camera_rig.battle_transition_time)
+		enemy.face_toward(wanderer, camera_rig.battle_transition_time)
+
 	var stub := (load(BATTLE_STUB_SCENE_PATH) as PackedScene).instantiate() as BattleStub
 	battle_layer.add_child(stub)
 	stub.set_enemy_id(enemy.enemy_id)
@@ -91,6 +99,10 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 func _on_battle_finished(outcome: BattleStub.Outcome, enemy: FieldEnemy, stub: BattleStub) -> void:
 	stub.queue_free()
 	process_mode = Node.PROCESS_MODE_INHERIT
+
+	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
+	if camera_rig:
+		camera_rig.exit_battle()
 
 	match outcome:
 		BattleStub.Outcome.WIN:

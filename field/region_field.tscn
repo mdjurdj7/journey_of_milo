@@ -49,6 +49,7 @@ transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
 shape = SubResource("CapsuleShape3D_1")
 
 [node name="CameraPivot" type="Node3D" parent="." unique_id=2057239469]
+process_mode = 3
 script = ExtResource("7")
 distance = 12.0
 pitch_degrees = 50.0

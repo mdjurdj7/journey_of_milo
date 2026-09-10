@@ -56,6 +56,28 @@ func _spawn_model() -> void:
 		print("FieldEnemy '%s': model AABB height = %.3f at model_scale = %.3f" % [enemy_id, combined_aabb.size.y, model_scale])
 		model.position.y += -combined_aabb.position.y + model_ground_offset
 
+# Called by region_field.gd on contact. Yaws to face target over duration,
+# taking the short way around. RegionField's contact freeze stops nothing
+# here (FieldEnemy has no _physics_process), but the tween still needs
+# TWEEN_PAUSE_PROCESS to play through it, same as Wanderer.enter_battle_stance().
+func face_toward(target: Node3D, duration: float) -> void:
+	if target == null:
+		return
+
+	var to_target := Vector3(target.global_position.x - global_position.x, 0.0, target.global_position.z - global_position.z)
+	if to_target.length() < 0.0001:
+		return
+
+	# Same verified direction<->angle convention as Wanderer._angle_from_
+	# direction()/_forward_from_angle().
+	var face_angle := atan2(-to_target.x, -to_target.z)
+	var target_angle := rotation.y + wrapf(face_angle - rotation.y, -PI, PI)
+
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(self, "rotation:y", target_angle, duration)
+
 func _on_body_entered(body: Node3D) -> void:
 	if _contacted or not body.is_in_group("wanderer"):
 		return

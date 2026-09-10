@@ -1,4 +1,5 @@
 extends CharacterBody3D
+class_name Wanderer
 
 const IDLE_SCENE_PATH := "res://assets/models/wanderer_placeholder_idle.fbx"
 const WALK_SCENE_PATH := "res://assets/models/wanderer_placeholder_walking.fbx"
@@ -35,6 +36,12 @@ func _ready() -> void:
 
 	var players := model.find_children("*", "AnimationPlayer", true, false)
 	_animation_player = players[0] as AnimationPlayer if not players.is_empty() else null
+	# RegionField freezes itself (and, by inheritance, the Wanderer) on
+	# battle contact, but enter_battle_stance()'s Idle blend still needs to
+	# play out through that freeze — same reasoning as CameraPivot's
+	# process_mode override.
+	if _animation_player:
+		_animation_player.process_mode = Node.PROCESS_MODE_ALWAYS
 
 	_merge_placeholder_clips(_animation_player)
 	if use_animation_tree:
@@ -213,6 +220,38 @@ func _forward_from_angle(angle: float) -> Vector3:
 
 func _angle_from_direction(direction: Vector3) -> float:
 	return atan2(-direction.x, -direction.z)
+
+# Called by region_field.gd on enemy contact. Tweens into a fixed spacing
+# from target along the target->Wanderer ground line, facing target, and
+# blends the AnimationPlayer to Idle — independent of _physics_process
+# (and its own dash/move-input handling), which RegionField's contact
+# freeze has already stopped by the time this runs.
+func enter_battle_stance(target: Node3D, spacing: float, duration: float) -> void:
+	if target == null:
+		return
+
+	var away_from_target := _flatten_normalized(global_position - target.global_position)
+	if away_from_target == Vector3.ZERO:
+		away_from_target = _forward_from_angle(rotation.y)
+
+	var stance_position := target.global_position + away_from_target * spacing
+	stance_position.y = global_position.y
+
+	var face_angle := _angle_from_direction(-away_from_target)
+	# Shift face_angle to the equivalent value nearest rotation.y so the
+	# linear rotation:y tween below takes the short way around, matching
+	# lerp_angle's turn-to-face behavior in _physics_process.
+	var target_angle := rotation.y + wrapf(face_angle - rotation.y, -PI, PI)
+
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(self, "global_position", stance_position, duration)
+	tween.tween_property(self, "rotation:y", target_angle, duration)
+
+	if _animation_player:
+		_animation_player.play("Idle", animation_blend_time)
 
 func _physics_process(delta: float) -> void:
 	_dash_cooldown_timer = maxf(_dash_cooldown_timer - delta, 0.0)
