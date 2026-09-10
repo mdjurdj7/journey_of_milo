@@ -11,8 +11,13 @@ class_name Ground
 
 # Fine-subdivided inner plane sized to the playable area, so relief
 # detail exists where the Wanderer actually walks; the outer dressing
-# plane (plane_size, above) stays coarse.
-@export var relief_extent: Vector2 = Vector2(80.0, 50.0)
+# plane (plane_size, above) stays coarse. Also pushed to the shader as
+# relief_edge_fade's bounds — changing this live re-fades the edge but
+# does not resize the already-built mesh.
+@export var relief_extent: Vector2 = Vector2(80.0, 50.0):
+	set(value):
+		relief_extent = value
+		_apply_uniform("relief_extent", value)
 @export var relief_subdivisions: Vector2i = Vector2i(40, 25)
 
 @export var near_color: Color = Color(1.0, 1.0, 1.0):
@@ -86,6 +91,14 @@ class_name Ground
 	set(value):
 		relief_fade_end = value
 		_apply_uniform("relief_fade_end", value)
+# Relief displacement (and its normal contribution) fades to zero over the
+# last relief_edge_fade meters inside relief_extent's edges, so the fine
+# relief mesh meets the flat outer dressing plane flush instead of leaving
+# a seam where the two meshes' displacement disagrees at the boundary.
+@export var relief_edge_fade: float = 4.0:
+	set(value):
+		relief_edge_fade = value
+		_apply_uniform("relief_edge_fade", value)
 
 # Drift lines: a few faint bands running parallel to the shore, marking
 # where wrack will sit later. Spaced inland from the water line, wobbled
@@ -224,6 +237,8 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("relief_noise_scale", relief_noise_scale)
 	_apply_uniform("relief_fade_start", relief_fade_start)
 	_apply_uniform("relief_fade_end", relief_fade_end)
+	_apply_uniform("relief_extent", relief_extent)
+	_apply_uniform("relief_edge_fade", relief_edge_fade)
 	_apply_uniform("drift_line_spacing", drift_line_spacing)
 	_apply_uniform("drift_line_width", drift_line_width)
 	_apply_uniform("drift_line_wobble", drift_line_wobble)

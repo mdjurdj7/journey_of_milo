@@ -35,6 +35,14 @@ uniform float relief_noise_scale = 4.0;
 uniform float relief_fade_start = 30.0;
 uniform float relief_fade_end = 60.0;
 
+// relief_extent matches ground.gd's mesh-sizing export of the same name —
+// the fine relief plane's world-space bounds, centered on the origin.
+// Displacement (and its normal contribution) fades to zero over the last
+// relief_edge_fade meters inside those bounds, so the fine mesh meets the
+// flat outer dressing plane flush instead of a seam at the boundary.
+uniform vec2 relief_extent = vec2(80.0, 50.0);
+uniform float relief_edge_fade = 4.0;
+
 // Drift lines: a handful of faint, slightly warm bands running parallel to
 // the shore, spaced inland from the water line. drift_line_count bounds
 // how many fade in before the band dies out entirely. Value shift only —
@@ -125,6 +133,16 @@ float relief_height(vec2 world_xz) {
 	return bump * relief_amplitude - wetness * relief_amplitude;
 }
 
+// 0 at/beyond relief_extent's edges, 1 more than relief_edge_fade meters
+// inside them. Zero outside relief_extent as a side effect (smoothstep
+// clamps a negative edge_dist to its 0 edge), which is exactly what the
+// coarse outer dressing plane — sharing this same shader — needs too.
+float relief_edge_fade_factor(vec2 world_xz) {
+	vec2 half_extent = relief_extent * 0.5;
+	float edge_dist = min(half_extent.x - abs(world_xz.x), half_extent.y - abs(world_xz.y));
+	return smoothstep(0.0, max(relief_edge_fade, 0.001), edge_dist);
+}
+
 // 2..drift_line_count faint bands, spaced drift_line_spacing apart starting
 // at the water line, wobbled along the shore so they don't read as ruled
 // lines, and fading out after drift_line_count of them.
@@ -153,9 +171,10 @@ float ripple_mask(vec2 world_xz) {
 }
 
 // Combined pseudo-height used only to derive the vertex normal: relief at
-// full amplitude (faded by camera distance same as the real displacement),
-// plus drift lines and ripples at their own much smaller amplitudes so they
-// shade as surface detail without actually displacing the mesh.
+// full amplitude (faded by camera distance and relief_extent's edges, same
+// as the real displacement), plus drift lines and ripples at their own much
+// smaller amplitudes so they shade as surface detail without actually
+// displacing the mesh.
 float surface_height(vec2 world_xz, float relief_fade) {
 	float h = relief_height(world_xz) * relief_fade;
 	h += drift_line_mask(world_xz) * drift_line_normal_amplitude;
@@ -169,6 +188,7 @@ void vertex() {
 
 	float cam_dist = length(world_pos - CAMERA_POSITION_WORLD);
 	float relief_fade = 1.0 - smoothstep(relief_fade_start, relief_fade_end, cam_dist);
+	relief_fade *= relief_edge_fade_factor(world_pos.xz);
 
 	VERTEX.y += relief_height(world_pos.xz) * relief_fade;
 
