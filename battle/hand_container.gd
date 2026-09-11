@@ -14,6 +14,12 @@ signal play_animation_finished(card_data: CardData)
 @export var draw_stagger_sec: float = 0.07
 @export var discard_collapse_duration_sec: float = 0.16
 
+# At rest, only this much of a card's own height pokes up above the
+# bottom edge - the rest sits pushed down out of view (see CardView.
+# set_rest_offset()). hover_lift on CardView is what brings it back up,
+# now measured from this baseline instead of from 0.
+@export var hand_rest_visible_height: float = 230.0
+
 # Row width cap - past this, every card in the row is scaled down
 # uniformly (see _apply_hand_scale()) so the hand never runs off-screen.
 # 1600 keeps six cards at full card_size (6 * 247 + 5 * 14 = 1552) but
@@ -93,7 +99,7 @@ func _add_card_view(card: CardData) -> void:
 	# needs card_view's @onready label references already populated.
 	add_child(slot)
 
-	card_view.position = Vector2.ZERO
+	card_view.set_rest_offset(card_size.y - hand_rest_visible_height)
 	card_view.set_card_data(card)
 	card_view.clicked.connect(_on_card_view_clicked.bind(card_view))
 

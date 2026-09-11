@@ -1,6 +1,11 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="CardData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+
+[sub_resource type="Resource" id="CardEffect_toll_damage"]
+script = ExtResource("2_card_effect")
+effect_type = 5
 
 [resource]
 script = ExtResource("1_card_data")
@@ -9,3 +14,4 @@ cost = 2
 target_type = 0
 description = "Spend all Toll. 
 Deal damage equal to the amount consumed."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_toll_damage")])

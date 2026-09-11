@@ -9,6 +9,7 @@
 [ext_resource type="Script" uid="uid://c73umk7v0kdui" path="res://field/camera_rig.gd" id="7"]
 [ext_resource type="PackedScene" path="res://field/field_enemy.tscn" id="8"]
 [ext_resource type="Script" uid="uid://bp435mxjxefe2" path="res://field/sea.gd" id="9"]
+[ext_resource type="Resource" path="res://battle/rules/enemies/sputter.tres" id="10"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -17,6 +18,7 @@ height = 1.8
 [node name="RegionField" type="Node3D" unique_id=2096648515]
 script = ExtResource("1")
 field_extents = Vector2(40, 30)
+battle_spacing = 4.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2022836371]
 script = ExtResource("2")
@@ -60,6 +62,7 @@ fov = 45.0
 [node name="FieldEnemy" parent="." unique_id=677119585 instance=ExtResource("8")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
 enemy_id = &"sputter"
+enemy_data = ExtResource("10")
 model_yaw_offset = 180.0
 
 [node name="Sea" type="MeshInstance3D" parent="." unique_id=1533217746]

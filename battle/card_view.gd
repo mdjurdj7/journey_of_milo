@@ -16,7 +16,11 @@ signal clicked(card_data: CardData)
 @export var name_font: Font = load("res://assets/fonts/Spectral-SemiBold.ttf")
 
 @export_group("Hover")
-@export var hover_lift: float = 26.0
+# Measured from rest (see _rest_offset_y below), not from 0 - with
+# HandContainer's own default hand_rest_visible_height (230, card_size.y
+# 345 -> a 115px rest offset), this needs to clear that 115 for hover to
+# actually read as "fully into view," not just "a little less hidden."
+@export var hover_lift: float = 130.0
 @export var hover_duration_sec: float = 0.12
 
 @onready var name_label: Label = $NameLabel
@@ -27,6 +31,11 @@ signal clicked(card_data: CardData)
 
 var card_data: CardData
 var _armed: bool = false
+var _rest_offset_y: float = 0.0
+# How far down from this card's own local origin "at rest" actually sits -
+# pushed down by HandContainer.hand_rest_visible_height so only part of
+# the card pokes up past the screen's bottom edge. hover_lift below is
+# measured FROM this baseline, not from 0 - see set_rest_offset().
 
 func _ready() -> void:
 	size = card_size
@@ -43,25 +52,34 @@ func set_card_data(data: CardData) -> void:
 	cost_label.text = str(data.cost)
 	description_label.text = data.description
 
+# Called once by HandContainer right after this card enters the row - sets
+# where "at rest" actually is and snaps there immediately (not tweened;
+# this is initial placement, not a hover transition). Safe to call before
+# or after set_card_data().
+func set_rest_offset(offset_y: float) -> void:
+	_rest_offset_y = offset_y
+	if not _armed:
+		position.y = _rest_offset_y
+
 # Held while awaiting a target for this card (see BattleController.
 # request_play()) - hover in/out is ignored while armed, since the card is
 # already deliberately lifted and shouldn't drop just because the mouse
 # passes over it.
 func lift_and_hold() -> void:
 	_armed = true
-	_tween_to(-hover_lift)
+	_tween_to(_rest_offset_y - hover_lift)
 
 func release() -> void:
 	_armed = false
-	_tween_to(0.0)
+	_tween_to(_rest_offset_y)
 
 func _on_mouse_entered() -> void:
 	if not _armed:
-		_tween_to(-hover_lift)
+		_tween_to(_rest_offset_y - hover_lift)
 
 func _on_mouse_exited() -> void:
 	if not _armed:
-		_tween_to(0.0)
+		_tween_to(_rest_offset_y)
 
 func _tween_to(target_y: float) -> void:
 	var tween: Tween = create_tween()

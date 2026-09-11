@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "braced"
+display_name = "Braced"
+description = "Halves the next hit you take, then fades - whether or not it deals damage."
+category = 1
+default_magnitude = -50
+default_duration_turns = 1
+clears_on_trigger = true
+modifier_target = 0
+modifier_operation = 1
+stack_rule = 0

@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://ihhjm1h7lafu"]
+
+[ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
+[ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
+
+[sub_resource type="Resource" id="EnemyIntent_block"]
+script = ExtResource("2_intent")
+type = 1
+value = 8
+turn_one_locked = true
+no_immediate_repeat = true
+
+[sub_resource type="Resource" id="EnemyIntent_strike"]
+script = ExtResource("2_intent")
+value = 5
+
+[sub_resource type="Resource" id="EnemyIntent_scissor"]
+script = ExtResource("2_intent")
+value = 11
+erratic_weight = 0.6
+turn_one_locked = true
+
+[resource]
+script = ExtResource("1_enemy_data")
+enemy_name = "Sputter"
+max_hp = 45
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_block"), SubResource("EnemyIntent_strike"), SubResource("EnemyIntent_scissor")])
+erratic_intent_selection = true

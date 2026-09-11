@@ -37,3 +37,7 @@
   fully generated.
 - How events are represented in the field.
 - Rest without fire.
+- HP-as-only-cost: a card that spends HP directly with no Toll granted
+  in return (the "secrets that cost HP with no Toll" framing above).
+  Energy stays as the card-cost currency for now; this is parked, not
+  built. (2026-09-11, rules-layer port.)

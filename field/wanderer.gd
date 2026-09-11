@@ -3,6 +3,7 @@ class_name Wanderer
 
 const IDLE_SCENE_PATH := "res://assets/models/wanderer_placeholder_idle.fbx"
 const WALK_SCENE_PATH := "res://assets/models/wanderer_placeholder_walking.fbx"
+const BATTLE_IDLE_SCENE_PATH := "res://assets/models/wanderer_placeholder_battle_idle.fbx"
 
 @export var move_speed: float = 4.5
 @export var acceleration: float = 14.0
@@ -17,6 +18,10 @@ const WALK_SCENE_PATH := "res://assets/models/wanderer_placeholder_walking.fbx"
 @export var remove_walk_root_motion: bool = true
 @export var camera_path: NodePath = ^"../CameraPivot/Camera3D"
 @export var model_yaw_offset: float = 180.0
+# A touch warmer than the crab's own charcoal (see FieldEnemy.model_color)
+# so the two read as different things even at a glance, not just "the
+# same placeholder grey twice."
+@export var wanderer_color: Color = Color(0.16, 0.15, 0.14, 1)
 
 var _animation_player: AnimationPlayer
 var _animation_tree: AnimationTree
@@ -43,6 +48,7 @@ func _ready() -> void:
 	# Mixamo meshes face +Z in their own space while the body's forward is
 	# -Z (see _forward_from_angle()), so the model is rotated to match.
 	model.rotation.y = deg_to_rad(model_yaw_offset)
+	_apply_model_material(model)
 
 	var players := model.find_children("*", "AnimationPlayer", true, false)
 	_animation_player = players[0] as AnimationPlayer if not players.is_empty() else null
@@ -57,6 +63,20 @@ func _ready() -> void:
 		_build_animation_tree()
 	elif _animation_player:
 		_animation_player.play("Idle")
+
+# One shared flat material for the whole placeholder model - same "one
+# StandardMaterial3D, roughness 1, specular 0" shape FieldEnemy._spawn_
+# model() already uses for the crab, so both placeholders read as the
+# same kind of flat-shaded figure while wanderer_color keeps them
+# visually distinct from each other.
+func _apply_model_material(model: Node3D) -> void:
+	var material := StandardMaterial3D.new()
+	material.albedo_color = wanderer_color
+	material.roughness = 1.0
+	material.metallic_specular = 0.0
+	for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
+		var mi := mesh_instance as MeshInstance3D
+		mi.material_override = material
 
 # Placeholder-only: idle and walk currently ship as two separate Mixamo FBX
 # files, each importing with a single clip whose name Godot's FBX importer
@@ -115,6 +135,39 @@ func _merge_placeholder_clips(anim_player: AnimationPlayer) -> void:
 
 	if remove_walk_root_motion:
 		_remove_walk_root_motion(walk_animation)
+
+	# BattleIdle - same shape as the Walk merge above (load, find its one
+	# real clip by keyframe count, loop it, merge into the same idle_
+	# library, then the same post-merge checks) - see enter_battle_stance()/
+	# exit_battle_stance() for where this actually gets played.
+	var battle_idle_scene := load(BATTLE_IDLE_SCENE_PATH) as PackedScene
+	var battle_idle_instance := battle_idle_scene.instantiate()
+	var battle_idle_players := battle_idle_instance.find_children("*", "AnimationPlayer", true, false)
+	if battle_idle_players.is_empty():
+		push_error("Wanderer: battle-idle placeholder has no AnimationPlayer; BattleIdle clip not merged.")
+		battle_idle_instance.free()
+		return
+
+	var battle_idle_player := battle_idle_players[0] as AnimationPlayer
+	var battle_idle_entry := _find_single_animation(battle_idle_player, "battle-idle AnimationPlayer")
+	if battle_idle_entry.is_empty():
+		battle_idle_instance.free()
+		return
+
+	var battle_idle_animation: Animation = battle_idle_entry["animation"]
+	battle_idle_animation.loop_mode = Animation.LOOP_LINEAR
+	idle_library.add_animation("BattleIdle", battle_idle_animation)
+	battle_idle_instance.free()
+
+	if battle_idle_animation.get_track_count() == 0:
+		push_error("Wanderer: merged BattleIdle animation has no tracks; placeholder merge is broken.")
+		return
+
+	var battle_idle_track_node_path := NodePath(battle_idle_animation.track_get_path(0).get_concatenated_names())
+	var battle_idle_resolved := anim_root.get_node_or_null(battle_idle_track_node_path) if anim_root else null
+	if not (battle_idle_resolved is Skeleton3D):
+		push_error("Wanderer: BattleIdle animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; placeholder merge is broken." % str(battle_idle_track_node_path))
+		return
 
 # Freezes a Walk clip's Hips position track to its first key's X/Z, leaving
 # Y (vertical bob) untouched, so the placeholder plays in place even if the
@@ -247,7 +300,7 @@ func _angle_from_direction(direction: Vector3) -> float:
 
 # Called by region_field.gd on enemy contact. Tweens into a fixed spacing
 # from target along the target->Wanderer ground line, facing target, and
-# blends the AnimationPlayer to Idle — independent of _physics_process
+# blends the AnimationPlayer to BattleIdle — independent of _physics_process
 # (and its own dash/move-input handling), which RegionField's contact
 # freeze has already stopped by the time this runs.
 func enter_battle_stance(target: Node3D, spacing: float, duration: float) -> void:
@@ -274,6 +327,16 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float) -> voi
 	tween.tween_property(self, "global_position", stance_position, duration)
 	tween.tween_property(self, "rotation:y", target_angle, duration)
 
+	if _animation_player:
+		_animation_player.play("BattleIdle", animation_blend_time)
+
+# Called by region_field.gd once the battle overlay resolves (win, lose,
+# or escape) - blends back from BattleIdle to the normal field Idle.
+# _physics_process's own Idle/Walk switching only fires on movement input,
+# which won't happen until the player takes a first step post-fight - this
+# is what makes standing still right after a battle read as "back to
+# normal" immediately instead of staying frozen on BattleIdle's last pose.
+func exit_battle_stance() -> void:
 	if _animation_player:
 		_animation_player.play("Idle", animation_blend_time)
 

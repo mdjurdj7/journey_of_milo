@@ -6,6 +6,10 @@ signal contacted(enemy: FieldEnemy)
 const MODEL_SCENE_PATH := "res://assets/models/sputter_placeholder.fbx"
 
 @export var enemy_id: StringName = &"enemy"
+@export var enemy_data: EnemyData
+# The rules-side stats/move list battle_controller.gd builds this fight's
+# Combatant from (see EnemyTurn) - FieldEnemy itself stays rules-ignorant,
+# just a reference plus the field-visual/contact concerns below.
 @export var contact_radius: float = 2.0
 @export var model_color: Color = Color(0.2, 0.22, 0.25, 1)
 @export var model_scale: float = 1.0

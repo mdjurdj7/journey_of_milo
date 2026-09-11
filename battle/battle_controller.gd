@@ -1,10 +1,22 @@
 extends Node
 class_name BattleController
 
+# --- View-facing input/targeting signals (unchanged from the previous pass) ---
 signal card_played(card: CardData, target: FieldEnemy)
 signal hand_changed()
 signal target_requested(card: CardData)
 signal target_cancelled()
+
+# --- Rules-facing signals - the overlay/FloatingNumber react to these only. ---
+signal hp_changed(current: int, max_hp: int)
+signal toll_changed(new_toll: int)
+signal status_changed()
+signal enemy_hp_changed(enemy: FieldEnemy, current: int, max_hp: int)
+signal damage_dealt(source: Variant, target: Variant, amount: int, kind: String)
+# source/target are each either the String "player" or a FieldEnemy node -
+# whichever combatant actually dealt/received the hit.
+signal battle_won()
+signal battle_lost()
 
 # Path -> copy count, same composition as the old project's STARTING_DECK
 # (reference/old_project's run_state.gd) re-pointed at the trimmed
@@ -18,6 +30,7 @@ const STARTER_DECK_COUNTS: Dictionary = {
 }
 
 @export var turn_draw_amount: int = 5
+@export var player_max_hp: int = 70
 @export var enemy_head_height: float = 1.8
 # Where a SELF/NONE card's play tween aims, relative to the viewport's own
 # center - there's no "target" to unproject for those, just somewhere up
@@ -25,15 +38,34 @@ const STARTER_DECK_COUNTS: Dictionary = {
 @export var self_play_screen_offset: Vector2 = Vector2(0.0, -250.0)
 
 var deck: Deck
+var player: Combatant
 var enemies: Array[FieldEnemy] = []
+var cards_played_this_turn: int = 0
 
 var _hand_container: HandContainer
 var _pending_card_view: CardView = null
 var _hovered_enemy: FieldEnemy = null
+var _combatants: Dictionary = {} # FieldEnemy -> Combatant
+var _effect_resolver := EffectResolver.new()
 
 func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy]) -> void:
 	_hand_container = hand_container
 	enemies = enemy_list
+
+	player = Combatant.new(player_max_hp)
+	player.energy = player.max_energy
+
+	_combatants.clear()
+	var enemy_names: Array[String] = []
+	for enemy in enemies:
+		var data: EnemyData = enemy.enemy_data
+		var combatant := Combatant.new(data.max_hp if data != null else 1)
+		if data != null:
+			EnemyTurn.pick_initial_intent(combatant, data)
+			enemy_names.append(data.enemy_name)
+		_combatants[enemy] = combatant
+
+	RunLogger.log_battle_start(enemy_names)
 
 	deck = Deck.new(_build_starting_deck())
 	deck.drawn.connect(func(_card: CardData) -> void: hand_changed.emit())
@@ -41,6 +73,12 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy]) -> void
 	_hand_container.set_deck(deck)
 	_hand_container.card_clicked.connect(_on_card_view_clicked)
 	_hand_container.play_animation_finished.connect(_on_play_animation_finished)
+
+	hp_changed.emit(player.hp, player.max_hp)
+	toll_changed.emit(player.toll)
+	for enemy in enemies:
+		var combatant: Combatant = _combatants[enemy]
+		enemy_hp_changed.emit(enemy, combatant.hp, combatant.max_hp)
 
 	_hand_container.draw_cards(turn_draw_amount)
 
@@ -51,6 +89,8 @@ func request_play(card_view: CardView) -> void:
 	if _pending_card_view != null or card_view.card_data == null:
 		return
 	var card: CardData = card_view.card_data
+	if card.cost > player.energy:
+		return
 	if card.target_type == CardData.TargetType.ENEMY:
 		_pending_card_view = card_view
 		card_view.lift_and_hold()
@@ -76,17 +116,121 @@ func cancel_target() -> void:
 
 func end_turn() -> void:
 	_hand_container.discard_hand()
-	_hand_container.draw_cards(turn_draw_amount)
+	player.rally_pool = 0
+	_run_enemy_turn()
+	if not _check_battle_end():
+		_start_player_turn()
 
-func _resolve_play(card_view: CardView, target: FieldEnemy) -> void:
+func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	var card: CardData = card_view.card_data
-	var target_screen_pos: Vector2 = _screen_pos_for(target)
-	print("Played %s on %s" % [card.card_name, str(target.enemy_id) if target != null else "self"])
-	card_played.emit(card, target)
-	_hand_container.play_card(card, target_screen_pos)
+	player.energy -= card.cost
+
+	var ctx := EffectContext.new()
+	ctx.player = player
+	ctx.target = _combatants.get(target_enemy)
+	ctx.enemies = _living_enemy_combatants()
+	ctx.deck = deck
+	ctx.cards_played_this_turn = cards_played_this_turn
+	ctx.rally_window = RallyWindow.new()
+	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
+		_report_damage("player", target_combatant, amount, kind)
+
+	RunLogger.log_card_played(card.card_name)
+	_effect_resolver.resolve_card(card, ctx)
+	cards_played_this_turn += 1
+
+	toll_changed.emit(player.toll)
+	status_changed.emit()
+
+	card_played.emit(card, target_enemy)
+	_hand_container.play_card(card, _screen_pos_for(target_enemy))
+
+	_check_battle_end()
 
 func _on_play_animation_finished(card: CardData) -> void:
-	deck.discard(card)
+	match card.removal_scope:
+		CardData.RemovalScope.NONE:
+			deck.discard(card)
+		_:
+			deck.exhaust(card)
+
+func _run_enemy_turn() -> void:
+	for enemy in enemies:
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant == null or combatant.hp <= 0:
+			continue
+		var data: EnemyData = enemy.enemy_data
+		if data == null:
+			continue
+		var result := EnemyTurn.take_turn(combatant, data, player)
+		if result["attacked"] and result["damage_to_hp"] > 0:
+			RunLogger.log_damage_taken(result["damage_to_hp"])
+			_report_damage(enemy, player, result["damage_to_hp"], "attack")
+		status_changed.emit()
+		if player.hp <= 0:
+			break
+
+	player.took_damage_last_turn = player.took_damage_this_turn
+	player.took_damage_this_turn = false
+	toll_changed.emit(player.toll)
+
+func _start_player_turn() -> void:
+	player.block = 0
+	player.energy = player.max_energy
+	cards_played_this_turn = 0
+
+	Status.tick_all(player.statuses, func(amount: int) -> void:
+		var lost := DamagePipeline.apply_bypass(amount, player)
+		if lost > 0:
+			player.toll += lost
+			hp_changed.emit(player.hp, player.max_hp)
+			toll_changed.emit(player.toll)
+	)
+	Status.remove_expired(player.statuses)
+	status_changed.emit()
+
+	if not _check_battle_end():
+		_hand_container.draw_cards(turn_draw_amount)
+
+func _check_battle_end() -> bool:
+	if player.hp <= 0:
+		RunLogger.log_battle_end("defeat", player.energy)
+		battle_lost.emit()
+		return true
+	if _living_enemy_combatants().is_empty():
+		RunLogger.log_battle_end("victory", player.energy)
+		battle_won.emit()
+		return true
+	return false
+
+func _living_enemy_combatants() -> Array[Combatant]:
+	var living: Array[Combatant] = []
+	for enemy in enemies:
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant != null and combatant.hp > 0:
+			living.append(combatant)
+	return living
+
+# source/target_combatant identify who dealt/received the hit; the
+# emitted signal reports the FieldEnemy/"player" pair the view actually
+# understands, and also fans out into hp_changed/enemy_hp_changed so the
+# overlay never has to re-derive HP from a damage event itself.
+func _report_damage(source: Variant, target_combatant: Combatant, amount: int, kind: String) -> void:
+	RunLogger.log_damage_dealt(amount)
+	if target_combatant == player:
+		damage_dealt.emit(source, "player", amount, kind)
+		hp_changed.emit(player.hp, player.max_hp)
+	else:
+		var enemy := _field_enemy_for(target_combatant)
+		damage_dealt.emit(source, enemy, amount, kind)
+		if enemy != null:
+			enemy_hp_changed.emit(enemy, target_combatant.hp, target_combatant.max_hp)
+
+func _field_enemy_for(combatant: Combatant) -> FieldEnemy:
+	for enemy in _combatants:
+		if _combatants[enemy] == combatant:
+			return enemy
+	return null
 
 func _screen_pos_for(target: FieldEnemy) -> Vector2:
 	var camera := get_viewport().get_camera_3d()

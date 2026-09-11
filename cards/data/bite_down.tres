@@ -1,6 +1,16 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="CardData" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+
+[sub_resource type="Resource" id="CardEffect_damage"]
+script = ExtResource("2_card_effect")
+value = 10
+
+[sub_resource type="Resource" id="CardEffect_self_damage"]
+script = ExtResource("2_card_effect")
+effect_type = 2
+value = 2
 
 [resource]
 script = ExtResource("1_card_data")
@@ -9,3 +19,4 @@ cost = 1
 target_type = 0
 description = "Lose 2 HP.
 Deal 10 damage."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage"), SubResource("CardEffect_self_damage")])

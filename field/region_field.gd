@@ -107,6 +107,8 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, over
 	overlay.queue_free()
 	process_mode = Node.PROCESS_MODE_INHERIT
 
+	wanderer.exit_battle_stance()
+
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
 	if camera_rig:
 		camera_rig.exit_battle()

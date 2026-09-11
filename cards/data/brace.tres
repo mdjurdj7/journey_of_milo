@@ -1,6 +1,13 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="CardData" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/braced.tres" id="3_braced"]
+
+[sub_resource type="Resource" id="CardEffect_apply_status"]
+script = ExtResource("2_card_effect")
+effect_type = 12
+status_data = ExtResource("3_braced")
 
 [resource]
 script = ExtResource("1_card_data")
@@ -8,3 +15,4 @@ card_name = "Brace"
 cost = 1
 target_type = 1
 description = "Halve the next hit you take."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])

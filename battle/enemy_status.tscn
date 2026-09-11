@@ -1,0 +1,35 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/enemy_status.gd" id="1_enemy_status"]
+
+[node name="EnemyStatus" type="PanelContainer"]
+mouse_filter = 2
+script = ExtResource("1_enemy_status")
+
+[node name="Content" type="HBoxContainer" parent="."]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="IntentSlot" type="Control" parent="Content"]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="VBox" type="VBoxContainer" parent="Content"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="HPLabel" type="Label" parent="Content/VBox"]
+layout_mode = 2
+mouse_filter = 2
+text = "HP 0/0"
+
+[node name="BarBackground" type="ColorRect" parent="Content/VBox"]
+custom_minimum_size = Vector2(120, 6)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BarFill" type="ColorRect" parent="Content/VBox/BarBackground"]
+offset_right = 120.0
+offset_bottom = 6.0
+mouse_filter = 2
