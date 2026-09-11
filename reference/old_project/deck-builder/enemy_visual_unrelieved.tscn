@@ -1,0 +1,26 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://enemy_visual.gd" id="1_visual"]
+
+[node name="Unrelieved" type="Node2D"]
+script = ExtResource("1_visual")
+color = Color(0.32, 0.34, 0.38, 1)
+accent_node_names = Array[String](["AttentionLight"])
+idle_bob_amount_px = 0.5
+idle_bob_period_sec = 1.2
+
+[node name="Body" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-14, 0, -14, -60, -9, -72, 9, -72, 14, -60, 14, 0)
+
+[node name="Head" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-9, -72, -9, -88, 9, -88, 9, -72)
+
+[node name="LeftVane" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-14, -50, -28, -56, -28, -42, -14, -36)
+
+[node name="RightVane" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(14, -50, 28, -56, 28, -42, 14, -36)
+
+[node name="AttentionLight" type="Polygon2D" parent="."]
+color = Color(0.95, 0.35, 0.2, 1)
+polygon = PackedVector2Array(0, -85, 4, -80, 0, -75, -4, -80)

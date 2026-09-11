@@ -1,0 +1,110 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Elite layers: 2 chosen (6, 8) | side-by-side promotions: 8
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [COMBAT] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [EVENT] -> L3_0, L3_2
+    L2_1 [HEAP] -> L3_1, L3_0
+  Layer 3:
+    L3_0 [COMBAT] -> L4_0
+    L3_1 [HEAP] -> L4_1, L4_0
+    L3_2 [COMBAT] -> L4_1, L4_0
+  Layer 4:
+    L4_0 [SHOP] -> L5_0
+    L4_1 [TREASURE] -> L5_0, L5_1
+  Layer 5:
+    L5_0 [EVENT] -> L6_0, L6_3
+    L5_1 [COMBAT] -> L6_1, L6_2
+  Layer 6:
+    L6_0 [COMBAT] -> L7_0
+    L6_1 [COMBAT] -> L7_1
+    L6_2 [ELITE] -> L7_0
+    L6_3 [COMBAT] -> L7_1
+  Layer 7:
+    L7_0 [COMBAT] -> L8_2
+    L7_1 [COMBAT] -> L8_0, L8_1
+  Layer 8:
+    L8_0 [COMBAT] -> L9_0
+    L8_1 [ELITE] -> L9_0
+    L8_2 [ELITE] -> L9_0
+  Layer 9:
+    L9_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+--- Room: L1_0 [COMBAT] ---
+  Battle: Tideworn
+    Turn 1: HP 70->70 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 70->70 | Enemies: Tideworn
+  Damage: dealt 100, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 20 (battle reward)
+--- Room: L2_1 [HEAP] ---
+  Options were: L2_0 [EVENT], L2_1 [HEAP] (chosen)
+--- Room: L3_1 [HEAP] ---
+  Options were: L3_1 [HEAP] (chosen), L3_0 [COMBAT]
+--- Room: L4_1 [TREASURE] ---
+  Options were: L4_1 [TREASURE] (chosen), L4_0 [SHOP]
+  Weapon offered: The Creditor -> took The Creditor
+--- Room: L5_1 [COMBAT] ---
+  Options were: L5_0 [EVENT], L5_1 [COMBAT] (chosen)
+  Battle: Picket, Tender
+    Turn 1: HP 60->60 | dealt 200, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 60->60 | Enemies: Picket, Tender
+  Damage: dealt 200, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 19 (battle reward)
+--- Room: L6_1 [COMBAT] ---
+  Options were: L6_1 [COMBAT] (chosen), L6_2 [ELITE]
+  Battle: Tender, Picket
+    Turn 1: HP 60->60 | dealt 200, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 60->60 | Enemies: Tender, Picket
+  Damage: dealt 200, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 18 (battle reward)
+  Card choice offered: Ballast, Guillotine, Come To -> took Guillotine
+--- Room: L7_1 [COMBAT] ---
+  Battle: Beachwrack
+    Turn 1: HP 60->60 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 60->60 | Enemies: Beachwrack
+  Damage: dealt 100, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 19 (battle reward)
+--- Room: L8_0 [COMBAT] ---
+  Options were: L8_0 [COMBAT] (chosen), L8_1 [ELITE]
+  Battle: Tideworn
+    Turn 1: HP 60->60 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 60->60 | Enemies: Tideworn
+  Damage: dealt 100, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 19 (battle reward)
+  Card choice offered: Owed in Full, Reckoning, Ballast -> took Reckoning
+--- Room: L9_0 [BOSS] ---
+  Battle: The Holdfast
+    Turn 1: HP 60->60 | dealt 300, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 60->60 | Enemies: The Holdfast
+  Damage: dealt 300, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+=== RUN END: VICTORY ===
+Rooms reached: 10
+Final HP: 60/70
+Final gold: 110
+Final deck (15 cards): 6x Strike, 5x Guard, 1x Bite Down, 1x Held Position, 1x Guillotine, 1x Reckoning

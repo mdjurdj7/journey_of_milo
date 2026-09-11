@@ -1,0 +1,67 @@
+[gd_scene format=3 uid="uid://bpw2ttytfukvv"]
+
+[ext_resource type="Script" uid="uid://bs6bnxdnr1qy" path="res://field_heap.gd" id="1_heap"]
+[ext_resource type="Script" uid="uid://b6ok65s3oiuq" path="res://sift_outcome_data.gd" id="2_gifgw"]
+[ext_resource type="Texture2D" uid="uid://3i5g15xrv3t4" path="res://assets/regions/beach/Dunes/heap_stage_0.png" id="2_stage0"]
+[ext_resource type="Script" uid="uid://b82btlir1tubw" path="res://sift_outcome_table.gd" id="3_f3w3d"]
+[ext_resource type="Texture2D" uid="uid://o7rnytegmv3j" path="res://assets/regions/beach/Dunes/heap_stage_1.png" id="3_stage1"]
+[ext_resource type="Texture2D" uid="uid://bq3m54bckuckx" path="res://assets/regions/beach/Dunes/heap_stage_2.png" id="4_stage2"]
+[ext_resource type="Texture2D" uid="uid://blhiale3jawm2" path="res://assets/regions/beach/Dunes/heap_stage_3.png" id="5_stage3"]
+[ext_resource type="Texture2D" uid="uid://bviu5nkebr2ah" path="res://assets/regions/beach/Dunes/buried_object_a.png" id="6_buried"]
+
+[sub_resource type="Resource" id="Resource_wt2hw"]
+script = ExtResource("3_f3w3d")
+metadata/_custom_type_script = "uid://b82btlir1tubw"
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_heap"]
+size = Vector2(70, 130)
+
+[node name="FieldHeap" type="Area2D" unique_id=618193298]
+script = ExtResource("1_heap")
+sift_outcome_table = SubResource("Resource_wt2hw")
+sifting_cost_step = 2
+stage_textures = Array[Texture2D]([ExtResource("2_stage0"), ExtResource("3_stage1"), ExtResource("4_stage2"), ExtResource("5_stage3")])
+buried_object_texture = ExtResource("6_buried")
+heap_color = Color(0.54901963, 0.5176471, 0.46666667, 1)
+buried_object_scale = 0.7
+mound_scale = 1.2
+mound_offset = Vector2(0, 10)
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=697460826]
+position = Vector2(0, -60)
+shape = SubResource("RectangleShape2D_heap")
+
+[node name="VisualRoot" type="Node2D" parent="." unique_id=722877108]
+
+[node name="PromptCanvas" type="CanvasLayer" parent="." unique_id=1248956249]
+
+[node name="OfferPrompt" type="Control" parent="PromptCanvas" unique_id=2009992468]
+layout_mode = 3
+anchors_preset = 0
+
+[node name="PromptColumn" type="VBoxContainer" parent="PromptCanvas/OfferPrompt" unique_id=1515319885]
+layout_mode = 0
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="ResultLabel" type="Label" parent="PromptCanvas/OfferPrompt/PromptColumn" unique_id=1366596242]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="ChoiceRow" type="HBoxContainer" parent="PromptCanvas/OfferPrompt/PromptColumn" unique_id=1176026109]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 40
+alignment = 1
+
+[node name="SiftButton" type="Button" parent="PromptCanvas/OfferPrompt/PromptColumn/ChoiceRow" unique_id=1072195279]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Sift"
+
+[node name="LeaveButton" type="Button" parent="PromptCanvas/OfferPrompt/PromptColumn/ChoiceRow" unique_id=1228049087]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Leave"

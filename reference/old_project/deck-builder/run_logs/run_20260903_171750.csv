@@ -1,0 +1,6 @@
+battle,enemies,turns,hp_start,hp_end,damage_dealt,damage_taken,damage_blocked,toll_accrued,toll_peak,toll_enemy,toll_self,toll_status
+1,Sputter,5,70,68,54,7,11,7,7,5,2,0
+2,Saltdarner,1,33,31,20,2,0,2,2,0,2,0
+3,Sputter,5,31,31,48,5,0,5,5,5,0,0
+4,Wardling,7,31,21,94,28,39,33,33,19,14,0
+5,The Holdfast,6,21,19,206,23,25,23,23,21,2,0

@@ -1,0 +1,180 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [TREASURE] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [TREASURE] -> L3_0, L3_1
+    L2_1 [TREASURE] -> L3_1
+  Layer 3:
+    L3_0 [TREASURE] -> L4_1, L4_0
+    L3_1 [COMBAT] -> L4_2
+  Layer 4:
+    L4_0 [COMBAT] -> L5_1, L5_0
+    L4_1 [COMBAT] -> L5_2
+    L4_2 [COMBAT] -> L5_3, L5_1
+  Layer 5:
+    L5_0 [COMBAT] -> L6_1
+    L5_1 [COMBAT] -> L6_0, L6_1
+    L5_2 [EVENT] -> L6_1
+    L5_3 [COMBAT] -> L6_1, L6_0
+  Layer 6:
+    L6_0 [COMBAT] -> L7_1, L7_0
+    L6_1 [COMBAT] -> L7_2, L7_1
+  Layer 7:
+    L7_0 [COMBAT] -> L8_0
+    L7_1 [COMBAT] -> L8_1
+    L7_2 [SHOP] -> L8_1
+  Layer 8:
+    L8_0 [COMBAT] -> L9_1, L9_0
+    L8_1 [EVENT] -> L9_0
+  Layer 9:
+    L9_0 [COMBAT] -> L10_1
+    L9_1 [COMBAT] -> L10_0, L10_1
+  Layer 10:
+    L10_0 [ELITE] -> L11_0
+    L10_1 [ELITE] -> L11_0
+  Layer 11:
+    L11_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+--- Room: L1_0 [TREASURE] ---
+  Gold gained: 48 (field chest)
+  Weapon offered: Last Wages -> took Last Wages
+--- Room: L2_1 [TREASURE] ---
+  Options were: L2_0 [TREASURE], L2_1 [TREASURE] (chosen)
+  Gold gained: 47 (field chest)
+--- Room: L3_1 [COMBAT] ---
+  Gold gained: 15 (field chest)
+  Battle: Tideworn
+    Turn 1: HP 70->68 | dealt 16, took 2 | played: Bite Down, Guard, Strike
+    Turn 2: HP 68->68 | dealt 12, took 0 | played: Strike, Strike, Guard
+    Turn 3: HP 68->68 | dealt 12, took 0 | played: Strike, Strike, Guard
+    Turn 4: HP 68->68 | dealt 6, took 0 | played: Strike
+  Battle result: victory
+  Turns: 4 | HP 70->68 | Enemies: Tideworn
+  Damage: dealt 46, taken 2 (blocked 12) | Toll: accrued 2, peak 2
+  Cards played: 10 | Energy unspent (total): 2 | Chain: openers 1, payoffs 0, expired 1
+
+  Gold gained: 24 (battle reward)
+  Card choice offered: Ballast, Full Weight, Paid in Pain -> took Full Weight
+--- Room: L4_2 [COMBAT] ---
+  Battle: Glasswing
+    Turn 1: HP 68->67 | dealt 12, took 1 | played: Strike, Guard, Strike
+    Turn 2: HP 67->62 | dealt 10, took 6 | played: Full Weight, Guard
+    Turn 3: HP 62->67 | dealt 10, took 0 | played: Bite Down
+  Battle result: victory
+  Turns: 3 | HP 68->67 | Enemies: Glasswing
+  Damage: dealt 32, taken 7 (blocked 5) | Toll: accrued 7, peak 7
+  Cards played: 6 | Energy unspent (total): 2 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 22 (battle reward)
+  Card choice offered: Guillotine, Come To, Full Weight -> took Guillotine
+--- Room: L5_1 [COMBAT] ---
+  Options were: L5_3 [COMBAT], L5_1 [COMBAT] (chosen)
+  Gold gained: 15 (field chest)
+  Battle: Glasswing
+    Turn 1: HP 67->61 | dealt 18, took 6 | played: Strike, Strike, Strike
+    Turn 2: HP 61->67 | dealt 12, took 0 | played: Strike, Strike
+  Battle result: victory
+  Turns: 2 | HP 67->67 | Enemies: Glasswing
+  Damage: dealt 30, taken 6 (blocked 0) | Toll: accrued 6, peak 6
+  Cards played: 5 | Energy unspent (total): 1 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 19 (battle reward)
+--- Room: L6_1 [COMBAT] ---
+  Options were: L6_0 [COMBAT], L6_1 [COMBAT] (chosen)
+  Battle: Glasswing
+    Turn 1: HP 67->64 | dealt 16, took 3 | played: Bite Down, Guard, Strike
+    Turn 2: HP 64->65 | dealt 20, took 0 | played: Strike, Guillotine
+  Battle result: victory
+  Turns: 2 | HP 67->65 | Enemies: Glasswing
+  Damage: dealt 36, taken 3 (blocked 5) | Toll: accrued 3, peak 3
+  Cards played: 5 | Energy unspent (total): 0 | Chain: openers 1, payoffs 0, expired 1
+
+  Gold gained: 24 (battle reward)
+  Card choice offered: Ballast, Riposte, Guillotine -> took Riposte
+  Battle: Glasswing
+    Turn 1: HP 65->64 | dealt 14, took 1 | played: Guillotine, Guard
+    Turn 2: HP 64->65 | dealt 12, took 0 | played: Strike, Strike
+  Battle result: victory
+  Turns: 2 | HP 65->65 | Enemies: Glasswing
+  Damage: dealt 26, taken 1 (blocked 5) | Toll: accrued 1, peak 1
+  Cards played: 4 | Energy unspent (total): 1 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 22 (battle reward)
+  Gold gained: 23 (field chest)
+--- Room: L7_2 [SHOP] ---
+  Options were: L7_2 [SHOP] (chosen), L7_1 [COMBAT]
+--- Room: L8_1 [EVENT] ---
+  Weapon offered: The Creditor -> took The Creditor
+--- Room: L9_0 [COMBAT] ---
+  Battle: Glasswing
+    Turn 1: HP 50->49 | dealt 12, took 1 | played: Strike, Guard, Strike
+    Turn 2: HP 49->50 | dealt 16, took 0 | played: Strike, Full Weight
+  Battle result: victory
+  Turns: 2 | HP 50->50 | Enemies: Glasswing
+  Damage: dealt 28, taken 1 (blocked 5) | Toll: accrued 1, peak 1
+  Cards played: 5 | Energy unspent (total): 0 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 17 (battle reward)
+  Rare drop offered: Kept Warmth -> took Kept Warmth
+  Gold gained: 18 (field chest)
+  Battle: Beachwrack
+    Turn 1: HP 50->50 | dealt 18, took 0 | played: Strike, Compound, Strike
+    (Tideworn joins the fight)
+    Turn 2: HP 50->55 | dealt 0, took 15 | played: Kept Warmth
+    Turn 3: HP 55->65 | dealt 20, took 0 | played: Guillotine, Strike
+    Turn 4: HP 65->61 | dealt 14, took 4 | played: Compound, Strike, Guard
+    Turn 5: HP 61->39 | dealt 24, took 26 | played: Bite Down, Strike, Strike
+    Turn 6: HP 39->45 | dealt 20, took 4 | played: Strike, Guillotine
+    Turn 7: HP 45->49 | dealt 20, took 0 | played: Guillotine, Strike
+    Turn 8: HP 49->49 | dealt 16, took 0 | played: Full Weight, Strike
+  Battle result: victory
+  Turns: 8 | HP 50->49 | Enemies: Beachwrack
+  Damage: dealt 132, taken 49 (blocked 5) | Toll: accrued 49, peak 49
+  Cards played: 18 | Energy unspent (total): 0 | Chain: openers 1, payoffs 0, expired 1
+
+  Gold gained: 21 (battle reward)
+  Card choice offered: Iron Will, Come To, Siphon -> took Siphon
+  Rare drop offered: Kept Warmth -> took Kept Warmth
+--- Room: L10_1 [ELITE] ---
+  Battle: Wardling
+    Turn 1: HP 49->45 | dealt 12, took 4 | played: Guard, Compound, Strike
+    Turn 2: HP 45->47 | dealt 22, took 2 | played: Riposte, Bite Down
+    Turn 3: HP 47->56 | dealt 0, took 14 | played: Kept Warmth
+    Turn 4: HP 56->62 | dealt 18, took 2 | played: Guard, Bite Down, Strike
+    Turn 5: HP 62->59 | dealt 14, took 3 | played: Guard, Guillotine
+    Turn 6: HP 59->62 | dealt 26, took 0 | played: Compound, Riposte
+  Battle result: victory
+  Turns: 6 | HP 49->62 | Enemies: Wardling
+  Damage: dealt 92, taken 25 (blocked 15) | Toll: accrued 25, peak 25
+  Cards played: 13 | Energy unspent (total): 0 | Chain: openers 2, payoffs 0, expired 2
+
+  Gold gained: 32 (battle reward)
+  Card choice offered: Advance, Iron Will, Owed in Full -> took Owed in Full
+--- Room: L11_0 [BOSS] ---
+  Battle: Wardling Alpha
+    Turn 1: HP 62->48 | dealt 20, took 14 | played: Guillotine, Strike
+    Turn 2: HP 48->55 | dealt 14, took 8 | played: Compound, Siphon
+    Turn 3: HP 55->41 | dealt 16, took 22 | played: Full Weight, Strike
+    Turn 4: HP 41->29 | dealt 12, took 18 | played: Strike, Strike
+    Turn 5: HP 29->40 | dealt 47, took 7 | played: Owed in Full, Riposte
+    Turn 6: HP 40->47 | dealt 28, took 0 | played: Compound, Strike, Strike
+    Turn 7: HP 47->45 | dealt 26, took 2 | played: Bite Down, Guillotine (chain: Stoppage)
+    Turn 8: HP 45->29 | dealt 38, took 16 | played: Owed in Full, Strike, Strike
+    Turn 9: HP 29->43 | dealt 28, took 0 | played: Compound, Strike, Strike
+  Battle result: victory
+  Turns: 9 | HP 62->43 | Enemies: Wardling Alpha
+  Damage: dealt 229, taken 87 (blocked 6) | Toll: accrued 87, peak 62
+  Cards played: 21 | Energy unspent (total): 1 | Chain: openers 1, payoffs 1, expired 0
+
+=== RUN END: VICTORY ===
+Rooms reached: 12
+Final HP: 43/70
+Final gold: 267
+Final deck (18 cards): 5x Strike, 5x Guard, 1x Bite Down, 1x Second Wind, 1x Full Weight, 1x Guillotine, 1x Riposte, 1x Compound, 1x Siphon, 1x Owed in Full

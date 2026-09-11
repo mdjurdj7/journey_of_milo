@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="TrinketData" format=3 uid="uid://ccgukhd05twqr"]
+
+[ext_resource type="Script" uid="uid://brvctt40iiuch" path="res://trinket_data.gd" id="1_amnesty"]
+[ext_resource type="Script" uid="uid://cs1asvm4umo5x" path="res://trinket_modifier.gd" id="2_modifier"]
+
+[sub_resource type="Resource" id="TrinketModifier_1"]
+script = ExtResource("2_modifier")
+
+[resource]
+script = ExtResource("1_amnesty")
+trinket_name = "Amnesty"
+rarity = 1
+description = "Every ledger, no matter how heavy, is eventually settled. This one settles itself."
+modifier = SubResource("TrinketModifier_1")

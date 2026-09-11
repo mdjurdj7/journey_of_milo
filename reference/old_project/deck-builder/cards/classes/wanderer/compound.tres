@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://card_data.gd" id="1_compound"]
+[ext_resource type="Script" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/cards/upgrades/compound_plus.tres" id="3_compound_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 10
+value = 6
+toll_threshold = 15
+threshold_value = 16
+
+[resource]
+script = ExtResource("1_compound")
+card_name = "Compound"
+energy_cost = 1
+card_type = 0
+rarity = 1
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "[cond_inactive]Deal 6 damage.[/cond_inactive]
+[cond_active]If Toll is 15 or more, deal 16 damage instead.[/cond_active]"
+upgrades = Array[ExtResource("1_compound")]([ExtResource("3_compound_plus")])

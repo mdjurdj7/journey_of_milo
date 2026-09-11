@@ -1,0 +1,67 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (9 cards): 3x Slash, 2x Bite Down, 2x Brace, 1x Reckoning, 1x Down Payment
+
+Elite layers: 3 chosen (3, 5, 7) | side-by-side promotions: 3
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [COMBAT] -> L2_1, L2_0
+  Layer 2:
+    L2_0 [COMBAT] -> L3_0
+    L2_1 [FORGE] -> L3_1, L3_0
+  Layer 3:
+    L3_0 [ELITE] -> L4_0
+    L3_1 [ELITE] -> L4_1, L4_0
+  Layer 4:
+    L4_0 [TREASURE] -> L5_1, L5_0
+    L4_1 [COMBAT] -> L5_0
+  Layer 5:
+    L5_0 [SHOP] -> L6_1
+    L5_1 [ELITE] -> L6_2, L6_0
+  Layer 6:
+    L6_0 [COMBAT] -> L7_2, L7_0
+    L6_1 [EVENT] -> L7_1
+    L6_2 [COMBAT] -> L7_1, L7_0
+  Layer 7:
+    L7_0 [EVENT] -> L8_2, L8_1
+    L7_1 [FORGE] -> L8_0
+    L7_2 [ELITE] -> L8_2, L8_0
+  Layer 8:
+    L8_0 [HEAP] -> L9_0
+    L8_1 [COMBAT] -> L9_0
+    L8_2 [EVENT] -> L9_0
+  Layer 9:
+    L9_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+--- Room: L1_0 [COMBAT] ---
+  Battle: Sputter
+    Turn 1: HP 70->65 | dealt 0, took 5 | played: (none)
+    Turn 2: HP 65->65 | dealt 0, took 0 | played: (none)
+    Turn 3: HP 65->65 | dealt 0, took 0 | played: (none)
+    Turn 4: HP 65->54 | dealt 0, took 11 | played: (none)
+    Turn 5: HP 54->43 | dealt 0, took 11 | played: (none)
+    Turn 6: HP 43->38 | dealt 0, took 5 | played: (none)
+    Turn 7: HP 38->33 | dealt 0, took 5 | played: (none)
+    Turn 8: HP 33->28 | dealt 0, took 5 | played: (none)
+    Turn 9: HP 28->23 | dealt 0, took 5 | played: (none)
+    Turn 10: HP 23->23 | dealt 0, took 0 | played: (none)
+    Turn 11: HP 23->12 | dealt 0, took 11 | played: (none)
+    Turn 12: HP 12->7 | dealt 0, took 5 | played: (none)
+    Turn 13: HP 7->2 | dealt 0, took 5 | played: (none)
+    Turn 14: HP 2->0 | dealt 0, took 5 | played: (none)
+  Battle result: defeat
+  Turns: 14 | HP 70->0 | Enemies: Sputter
+  Damage: dealt 0, taken 73 (blocked 0, absorbed 0) | Toll: accrued 70, peak 70
+  Toll by source: enemy 70, self 0, status 0
+  Cards played: 0 | Energy unspent (total): 42 | Chain: openers 0, payoffs 0, expired 0
+
+=== RUN END: DEFEAT ===
+Rooms reached: 2
+Final HP: 0/70
+Final gold: 0
+Final shards: 0
+Final deck (9 cards): 3x Slash, 2x Bite Down, 2x Brace, 1x Reckoning, 1x Down Payment

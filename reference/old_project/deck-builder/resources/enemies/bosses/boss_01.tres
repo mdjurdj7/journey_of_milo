@@ -1,0 +1,41 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://cuhjdfqfll782"]
+
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="1_boss_01"]
+[ext_resource type="Script" uid="uid://8e2aq40illkg" path="res://enemy_intent.gd" id="2_intent"]
+[ext_resource type="Resource" uid="uid://bqlxxn8vh3y78" path="res://resources/statuses/boss_01_charge_buff.tres" id="3_charge_buff"]
+[ext_resource type="PackedScene" uid="uid://rtv8cy7i4rdo" path="res://enemy_visual_boss_01.tscn" id="4_visual"]
+[ext_resource type="Resource" uid="uid://crn82pgrsiksp" path="res://resources/statuses/boss_01_charging_indicator.tres" id="5_charging_indicator"]
+
+[sub_resource type="Resource" id="EnemyIntent_attack_14"]
+script = ExtResource("2_intent")
+value = 14
+
+[sub_resource type="Resource" id="EnemyIntent_attack_10"]
+script = ExtResource("2_intent")
+value = 10
+
+[sub_resource type="Resource" id="EnemyIntent_charge_attack"]
+script = ExtResource("2_intent")
+type = 5
+
+[sub_resource type="Resource" id="EnemyIntent_mark"]
+script = ExtResource("2_intent")
+type = 6
+
+[resource]
+script = ExtResource("1_boss_01")
+enemy_name = "The Holdfast"
+max_hp = 200
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_attack_14"), SubResource("EnemyIntent_attack_10"), SubResource("EnemyIntent_charge_attack"), SubResource("EnemyIntent_mark")])
+visual_scene = ExtResource("4_visual")
+battle_visual_scale = 1.2
+battle_visual_offset_px = Vector2(200, 65)
+field_foot_offset_px = 32.0
+is_elite = true
+charge_window_turns = 3
+charge_damage_threshold = 60
+charge_attack_value = 6
+charge_buff_status = ExtResource("3_charge_buff")
+charge_indicator_status = ExtResource("5_charging_indicator")
+status_badge_row_height_override_px = 38.0
+mark_cost_increase = 1

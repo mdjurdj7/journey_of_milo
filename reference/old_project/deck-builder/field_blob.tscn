@@ -1,0 +1,26 @@
+[gd_scene format=3 uid="uid://drqhpqphwrl88"]
+
+[ext_resource type="Script" uid="uid://bscdcn5cda5k" path="res://field_blob.gd" id="1_blob"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_blob"]
+size = Vector2(80, 80)
+
+[sub_resource type="CircleShape2D" id="CircleShape2D_notice"]
+radius = 140.0
+
+[node name="FieldBlob" type="Area2D" unique_id=2033467390]
+script = ExtResource("1_blob")
+all_enemies_field_drop_px = 25.0
+hitbox_size_factor = 0.9
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=1051679841]
+shape = SubResource("RectangleShape2D_blob")
+
+[node name="Polygon2D" type="Polygon2D" parent="." unique_id=537675854]
+color = Color(0.85, 0.25, 0.25, 1)
+polygon = PackedVector2Array(-40, -40, 40, -40, 40, 40, -40, 40)
+
+[node name="NoticeZone" type="Area2D" parent="." unique_id=82045308]
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="NoticeZone" unique_id=1749715573]
+shape = SubResource("CircleShape2D_notice")

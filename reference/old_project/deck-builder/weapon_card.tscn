@@ -1,0 +1,121 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://weapon_card.gd" id="1_weapon_card"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_visual"]
+bg_color = Color(0.14, 0.13, 0.15, 1)
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+border_color = Color(0.4, 0.42, 0.48, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_name_banner"]
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+bg_color = Color(0.22, 0.19, 0.16, 1)
+border_width_bottom = 2
+border_color = Color(0.45, 0.4, 0.32, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_art_slot"]
+content_margin_left = 8.0
+content_margin_top = 8.0
+content_margin_right = 8.0
+content_margin_bottom = 8.0
+bg_color = Color(0.08, 0.08, 0.1, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.3, 0.3, 0.34, 1)
+
+[node name="WeaponCard" type="Control"]
+custom_minimum_size = Vector2(300, 480)
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1_weapon_card")
+
+[node name="Visual" type="Panel" parent="."]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_visual")
+
+[node name="Frame" type="MarginContainer" parent="Visual"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="Zones" type="VBoxContainer" parent="Visual/Frame"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="NameBanner" type="PanelContainer" parent="Visual/Frame/Zones"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 0.55
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_name_banner")
+
+[node name="NameLabel" type="Label" parent="Visual/Frame/Zones/NameBanner"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 24
+text = "Weapon Name"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="ArtSlot" type="PanelContainer" parent="Visual/Frame/Zones"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 2.2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_art_slot")
+
+[node name="ArtTexture" type="TextureRect" parent="Visual/Frame/Zones/ArtSlot"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="EffectLabel" type="Label" parent="Visual/Frame/Zones"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 0.85
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.7, 0.85, 1, 1)
+theme_override_font_sizes/font_size = 17
+text = "Effect text."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="LoreLabel" type="Label" parent="Visual/Frame/Zones"]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 0.95
+mouse_filter = 2
+theme_override_colors/font_color = Color(0.62, 0.62, 0.68, 1)
+theme_override_font_sizes/font_size = 14
+text = "Lore text."
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2

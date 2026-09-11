@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://isqwo5ixod2w"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_retaliation"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/statuses/retaliation_primed.tres" id="3_status"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 8
+toll_cost = 5
+status_data = ExtResource("3_status")
+
+[resource]
+script = ExtResource("1_retaliation")
+card_name = "Retaliation"
+card_type = 1
+rarity = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Spend 5 Toll.
+Return 150% of the next unblocked hit to its attacker."

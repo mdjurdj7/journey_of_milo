@@ -1,0 +1,134 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Elite layers: 3 chosen (4, 6, 8) | side-by-side promotions: 6, 8
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [EVENT] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [COMBAT] -> L3_0, L3_1
+    L2_1 [EVENT] -> L3_1
+  Layer 3:
+    L3_0 [TREASURE] -> L4_1, L4_2
+    L3_1 [EVENT] -> L4_0, L4_2
+  Layer 4:
+    L4_0 [COMBAT] -> L5_1, L5_0
+    L4_1 [EVENT] -> L5_1, L5_0
+    L4_2 [ELITE] -> L5_0
+  Layer 5:
+    L5_0 [SHOP] -> L6_0
+    L5_1 [EVENT] -> L6_1, L6_2
+  Layer 6:
+    L6_0 [ELITE] -> L7_1
+    L6_1 [ELITE] -> L7_1
+    L6_2 [COMBAT] -> L7_0, L7_2
+  Layer 7:
+    L7_0 [HEAP] -> L8_0
+    L7_1 [COMBAT] -> L8_2, L8_1
+    L7_2 [HEAP] -> L8_1, L8_2
+  Layer 8:
+    L8_0 [ELITE] -> L9_0
+    L8_1 [ELITE] -> L9_0
+    L8_2 [EVENT] -> L9_0
+  Layer 9:
+    L9_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+--- Room: L1_0 [EVENT] ---
+  Weapon offered: The Creditor -> took The Creditor
+--- Room: L2_0 [COMBAT] ---
+  Options were: L2_0 [COMBAT] (chosen), L2_1 [EVENT]
+  Battle: Tideworn
+    Turn 1: HP 55->49 | dealt 18, took 6 | played: Strike, Bite Down, Guard
+    Turn 2: HP 49->53 | dealt 18, took 0 | played: Strike, Strike, Strike
+    Turn 3: HP 53->53 | dealt 12, took 0 | played: Strike, Strike
+  Battle result: victory
+  Turns: 3 | HP 55->53 | Enemies: Tideworn
+  Damage: dealt 48, taken 6 (blocked 5) | Toll: accrued 6, peak 6
+  Cards played: 8 | Energy unspent (total): 1 | Chain: openers 1, payoffs 0, expired 1
+
+  Gold gained: 21 (battle reward)
+--- Room: L3_0 [TREASURE] ---
+  Options were: L3_0 [TREASURE] (chosen), L3_1 [EVENT]
+--- Room: L4_2 [ELITE] ---
+  Options were: L4_1 [EVENT], L4_2 [ELITE] (chosen)
+  Battle: Wardling
+    Turn 1: HP 53->53 | dealt 6, took 0 | played: Guard, Guard, Strike
+    Turn 2: HP 53->51 | dealt 12, took 2 | played: Bite Down, Ballast, Guard
+    Turn 3: HP 51->37 | dealt 18, took 14 | played: Strike, Strike, Strike
+    Turn 4: HP 37->43 | dealt 18, took 2 | played: Bite Down, Strike, Ballast
+    Turn 5: HP 43->40 | dealt 12, took 3 | played: Strike, Strike, Guard
+    Turn 6: HP 40->34 | dealt 12, took 9 | played: Ballast, Guard, Bite Down
+    Turn 7: HP 34->40 | dealt 12, took 0 | played: Strike, Strike
+  Battle result: victory
+  Turns: 7 | HP 53->40 | Enemies: Wardling
+  Damage: dealt 90, taken 30 (blocked 30) | Toll: accrued 30, peak 30
+  Cards played: 20 | Energy unspent (total): 1 | Chain: openers 6, payoffs 0, expired 3
+
+  Gold gained: 32 (battle reward)
+  Card choice offered: Selfeater, Riposte, Siphon -> took Selfeater
+  Rare drop offered: Kept Warmth -> took Kept Warmth
+--- Room: L5_0 [SHOP] ---
+--- Room: L6_0 [ELITE] ---
+  Battle: Wardling
+    Turn 1: HP 40->37 | dealt 12, took 3 | played: Ballast, Strike, Strike
+    Turn 2: HP 37->38 | dealt 12, took 2 | played: Bite Down, Guard, Guard
+    Turn 3: HP 38->34 | dealt 6, took 4 | played: Guard, Guard, Strike
+    Turn 4: HP 34->34 | dealt 12, took 4 | played: Guard, Guard, Bite Down
+    Turn 5: HP 34->32 | dealt 18, took 4 | played: Selfeater, Strike, Strike
+    Turn 6: HP 32->30 | dealt 9, took 2 | played: Paid in Pain, Strike, Guard
+    Turn 7: HP 30->15 | dealt 9, took 15 | played: Strike, Second Wind, Guard
+    Turn 8: HP 15->23 | dealt 22, took 2 | played: Paid in Pain, Strike, Bite Down
+  Battle result: victory
+  Turns: 8 | HP 40->23 | Enemies: Wardling
+  Damage: dealt 100, taken 36 (blocked 54) | Toll: accrued 36, peak 27
+  Cards played: 24 | Energy unspent (total): 0 | Chain: openers 3, payoffs 0, expired 3
+
+  Gold gained: 32 (battle reward)
+  Card choice offered: Iron Will, Full Weight, Guillotine -> took Guillotine
+--- Room: L7_1 [COMBAT] ---
+  Battle: Beachwrack
+    Turn 1: HP 23->23 | dealt 14, took 0 | played: Guillotine, Guard
+    Turn 2: HP 23->23 | dealt 10, took 0 | played: Strike, Strike, Strike
+    (Tideworn joins the fight)
+    Turn 3: HP 23->18 | dealt 6, took 5 | played: Strike, Guard, Guard
+    Turn 4: HP 18->43 | dealt 0, took 0 | played: Kept Warmth
+    Turn 5: HP 43->43 | dealt 0, took 0 | played: Ballast, Strike, Guard
+    Turn 6: HP 43->22 | dealt 16, took 21 | played: Strike, Bite Down, Guard
+    Turn 7: HP 22->29 | dealt 14, took 0 | played: Ballast, Guillotine (chain: Stoppage)
+    Turn 8: HP 29->29 | dealt 6, took 0 | played: Strike, Guard, Selfeater
+    Turn 9: HP 29->25 | dealt 18, took 4 | played: Paid in Pain, Strike, Strike
+    Turn 10: HP 25->21 | dealt 18, took 4 | played: Strike, Guard, Strike
+    Turn 11: HP 21->21 | dealt 9, took 0 | played: Strike
+  Battle result: victory
+  Turns: 11 | HP 23->21 | Enemies: Beachwrack
+  Damage: dealt 111, taken 34 (blocked 27) | Toll: accrued 34, peak 27
+  Cards played: 27 | Energy unspent (total): 2 | Chain: openers 3, payoffs 1, expired 2
+
+  Gold gained: 16 (battle reward)
+--- Room: L8_2 [EVENT] ---
+  Options were: L8_2 [EVENT] (chosen), L8_1 [ELITE]
+--- Room: L9_0 [BOSS] ---
+  Battle: The Holdfast
+    Turn 1: HP 21->12 | dealt 12, took 9 | played: Guard, Strike, Strike
+    Turn 2: HP 12->19 | dealt 14, took 0 | played: Paid in Pain, Guillotine
+    Turn 3: HP 19->11 | dealt 24, took 8 | played: Bite Down, Strike, Strike
+    Turn 4: HP 11->14 | dealt 6, took 0 | played: Guard, Strike, Guard
+    Turn 5: HP 14->3 | dealt 18, took 11 | played: Ballast, Bite Down, Strike
+    Turn 6: HP 3->12 | dealt 20, took 0 | played: Strike, Guillotine
+    Turn 7: HP 12->0 | dealt 14, took 16 | played: Guillotine, Guard
+  Battle result: defeat
+  Turns: 7 | HP 21->0 | Enemies: The Holdfast
+  Damage: dealt 108, taken 44 (blocked 28) | Toll: accrued 40, peak 33
+  Cards played: 18 | Energy unspent (total): 0 | Chain: openers 3, payoffs 0, expired 2
+  Boss Charges: attempted 1, interrupted 0, buffed 1 | Check damages: [44]
+
+=== RUN END: DEFEAT ===
+Rooms reached: 10
+Final HP: 0/70
+Final gold: 56
+Final deck (16 cards): 5x Strike, 5x Guard, 1x Bite Down, 1x Second Wind, 1x Ballast, 1x Selfeater, 1x Paid in Pain, 1x Guillotine

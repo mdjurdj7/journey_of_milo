@@ -1,0 +1,26 @@
+[gd_scene format=3 uid="uid://bh8ah5p0jd1a3"]
+
+[ext_resource type="Script" uid="uid://3wpc32onsqdj" path="res://intent_display.gd" id="1_intent_display"]
+
+[node name="IntentDisplay" type="Control" unique_id=65604402]
+layout_mode = 3
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 48.0
+grow_horizontal = 2
+mouse_filter = 2
+script = ExtResource("1_intent_display")
+icon_scale = 1.4
+
+[node name="IconRoot" type="Node2D" parent="." unique_id=956055413]
+position = Vector2(250, 22)
+scale = Vector2(1.2, 1.2)
+
+[node name="ValueLabel" type="Label" parent="." unique_id=916324144]
+layout_mode = 0
+offset_left = 240.0
+offset_top = 2.0
+offset_right = 340.0
+offset_bottom = 42.0
+text = "0"
+vertical_alignment = 1

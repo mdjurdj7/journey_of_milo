@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://drre55qsau4k6"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_reckoning_plus"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 5
+
+[sub_resource type="Resource" id="CardEffect_2"]
+script = ExtResource("2_effect")
+value = 8
+
+[resource]
+script = ExtResource("1_reckoning_plus")
+card_name = "Reckoning+"
+energy_cost = 2
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1"), SubResource("CardEffect_2")])
+description = "Spend all Toll.
+Deal damage equal to the amount consumed, plus 8 more."
+flavor_text = "The Works keeps a ledger. Today, it pays."

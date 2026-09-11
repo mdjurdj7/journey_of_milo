@@ -1,0 +1,39 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://field_structure.gd" id="1_structure"]
+[ext_resource type="PackedScene" path="res://pay_house_interior.tscn" id="2_interior"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_payhouse"]
+size = Vector2(70, 65)
+
+[node name="FieldPayHouse" type="Area2D"]
+scale = Vector2(4.1142, 4.1142)
+script = ExtResource("1_structure")
+structure_id = "pay_house"
+interior_scene = ExtResource("2_interior")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_payhouse")
+position = Vector2(0, -32)
+
+[node name="Silhouette" type="Node2D" parent="."]
+
+[node name="Body" type="Polygon2D" parent="Silhouette"]
+color = Color(0.38, 0.37, 0.34, 1)
+polygon = PackedVector2Array(-140, 0, 140, 0, 140, -100, -140, -100)
+
+[node name="Roof" type="Polygon2D" parent="Silhouette"]
+color = Color(0.42, 0.44, 0.47, 0.9)
+polygon = PackedVector2Array(-145, -100, 145, -100, 137, -112, -137, -112)
+
+[node name="Doorway" type="Polygon2D" parent="Silhouette"]
+color = Color(0.08, 0.08, 0.09, 1)
+polygon = PackedVector2Array(-20, 0, 20, 0, 20, -55, -20, -55)
+
+[node name="Sill" type="Polygon2D" parent="Silhouette"]
+color = Color(0.42, 0.44, 0.47, 0.85)
+polygon = PackedVector2Array(-34, 2, -28, 2, -16, -54, -22, -54)
+
+[node name="RustStreak" type="Polygon2D" parent="Silhouette"]
+color = Color(0.55, 0.32, 0.18, 0.65)
+polygon = PackedVector2Array(123, -100, 133, -100, 129, -72, 121, -72)

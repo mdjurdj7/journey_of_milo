@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="NPCData" format=3 uid="uid://cjvmbgbnc34km"]
+
+[ext_resource type="Script" uid="uid://c18y1e1pe2wql" path="res://npc_data.gd" id="1_npc_data"]
+[ext_resource type="PackedScene" uid="uid://bj1yuyvs2h2bk" path="res://npc_visual_keeper.tscn" id="2_visual"]
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="3_card_data"]
+[ext_resource type="Resource" uid="uid://cxb1336gfcj8d" path="res://resources/cards/classes/wanderer/npc_offers/held_position.tres" id="4_held_position"]
+[ext_resource type="Resource" uid="uid://cslye2tevtesa" path="res://resources/cards/classes/wanderer/npc_offers/second_wind.tres" id="5_second_wind"]
+[ext_resource type="Resource" uid="uid://5yhw7if4bb0h" path="res://resources/cards/classes/wanderer/npc_offers/left_hand.tres" id="6_left_hand"]
+
+[resource]
+script = ExtResource("1_npc_data")
+npc_id = "opening_room_npc"
+dialogue_text = "She holds something out. It was not hers."
+post_interaction_text = "Still facing out."
+granted_cards = Array[ExtResource("3_card_data")]([ExtResource("4_held_position"), ExtResource("5_second_wind"), ExtResource("6_left_hand")])
+visual_scene = ExtResource("2_visual")
+visual_scale = 0.123

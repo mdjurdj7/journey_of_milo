@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://6nkk1045akxu"
+path="res://.godot/imported/Hand draw.mp3-f3ddb7f19bfe9eb9759584220309264a.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/ui/Hand draw.mp3"
+dest_files=["res://.godot/imported/Hand draw.mp3-f3ddb7f19bfe9eb9759584220309264a.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

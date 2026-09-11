@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EncounterData" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://encounter_data.gd" id="1_encounter_data"]
+[ext_resource type="Script" path="res://enemy_data.gd" id="2_enemy_data"]
+[ext_resource type="Resource" path="res://resources/enemies/wardling.tres" id="3_wardling"]
+
+[resource]
+script = ExtResource("1_encounter_data")
+encounter_name = "The Wardling"
+enemies = Array[ExtResource("2_enemy_data")]([ExtResource("3_wardling")])
+pool_weight = 1.0

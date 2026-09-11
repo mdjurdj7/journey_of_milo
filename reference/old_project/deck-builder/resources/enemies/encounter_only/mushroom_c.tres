@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://c17ht3xxhwpc4"]
+
+[ext_resource type="Script" uid="uid://8e2aq40illkg" path="res://enemy_intent.gd" id="1_gon40"]
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="1_mushroom_c"]
+[ext_resource type="PackedScene" path="res://enemy_visual_mushroom_sprite.tscn" id="2_visual"]
+
+[resource]
+script = ExtResource("1_mushroom_c")
+enemy_name = "Mushroom"
+max_hp = 26
+visual_scene = ExtResource("2_visual")
+battle_visual_scale = 0.59
+growth_stage_track_length = 4
+growth_start_stage = 2
+attack_impact_sfx = "mushroom_explosion"

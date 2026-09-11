@@ -1,0 +1,64 @@
+[gd_scene format=3 uid="uid://d2hsafbcvwcrn"]
+
+[ext_resource type="Script" uid="uid://ve4nme6l3rre" path="res://field_forge.gd" id="1_forge"]
+[ext_resource type="Script" uid="uid://bcjpqx0a2eg2m" path="res://wagon_placement.gd" id="2_wagon_script"]
+[ext_resource type="Texture2D" uid="uid://by3ligpn0us77" path="res://assets/regions/beach/Forge/Wagon.png" id="3_wagon_tex"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_forge"]
+size = Vector2(70, 70)
+
+[node name="FieldForge" type="Area2D" unique_id=1577898886]
+script = ExtResource("1_forge")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=26279934]
+shape = SubResource("RectangleShape2D_forge")
+
+[node name="Wagon" type="Sprite2D" parent="." unique_id=2096870199]
+position = Vector2(-3.943573, -330.9718)
+scale = Vector2(0.43887147, 0.43887147)
+texture = ExtResource("3_wagon_tex")
+centered = false
+flip_h = true
+script = ExtResource("2_wagon_script")
+wagon_offset = Vector2(18, 100)
+
+[node name="ForgeRoot" type="Node2D" parent="." unique_id=1798424386]
+
+[node name="Slab" type="Polygon2D" parent="ForgeRoot" unique_id=1161246214]
+
+[node name="SupportLeft" type="Polygon2D" parent="ForgeRoot" unique_id=589647452]
+
+[node name="SupportRight" type="Polygon2D" parent="ForgeRoot" unique_id=1567850064]
+
+[node name="PromptCanvas" type="CanvasLayer" parent="." unique_id=1752694133]
+
+[node name="OfferPrompt" type="Control" parent="PromptCanvas" unique_id=2036370198]
+layout_mode = 3
+anchors_preset = 0
+
+[node name="PromptColumn" type="VBoxContainer" parent="PromptCanvas/OfferPrompt" unique_id=686632788]
+layout_mode = 0
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="PromptLabel" type="Label" parent="PromptCanvas/OfferPrompt/PromptColumn" unique_id=1263839832]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="ChoiceRow" type="HBoxContainer" parent="PromptCanvas/OfferPrompt/PromptColumn" unique_id=632585929]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 40
+alignment = 1
+
+[node name="TakeButton" type="Button" parent="PromptCanvas/OfferPrompt/PromptColumn/ChoiceRow" unique_id=332166935]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Get to Work"
+
+[node name="LeaveButton" type="Button" parent="PromptCanvas/OfferPrompt/PromptColumn/ChoiceRow" unique_id=1247476528]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Leave"

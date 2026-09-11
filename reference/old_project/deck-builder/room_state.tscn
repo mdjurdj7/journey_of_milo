@@ -1,0 +1,10 @@
+[gd_scene format=3 uid="uid://d1as3o437nxkj"]
+
+[ext_resource type="Script" uid="uid://bp8xuk0lvjvdm" path="res://room_state.gd" id="1_room_state"]
+
+[node name="RoomState" type="Node" unique_id=1612021182]
+script = ExtResource("1_room_state")
+entity_shadow_color = Color(0.2784314, 0.25882354, 0.21960784, 0.53333336)
+treasure_chest_a_offset = Vector2(90, 30)
+treasure_chest_b_offset = Vector2(60, 20)
+treasure_chest_c_offset = Vector2(50, 35)

@@ -1,0 +1,96 @@
+[gd_scene format=3 uid="uid://dg07bi7v3y5sc"]
+
+[ext_resource type="Script" uid="uid://bomighgg2fnmd" path="res://vitals_bar.gd" id="1_vitals_bar"]
+[ext_resource type="PackedScene" path="res://block_badge.tscn" id="2_block_badge"]
+[ext_resource type="PackedScene" path="res://absorb_badge.tscn" id="3_absorb_badge"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hp_bg"]
+bg_color = Color(0.15, 0.1, 0.1, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.4, 0.42, 0.48, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hp_fill"]
+bg_color = Color(0.8, 0.2, 0.2, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_hp_border"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.4, 0.42, 0.48, 1)
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_rally_fill"]
+bg_color = Color(0.8, 0.2, 0.2, 1)
+
+[node name="VitalsBar" type="Control" unique_id=2034099235]
+custom_minimum_size = Vector2(380, 42)
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1_vitals_bar")
+
+[node name="HPBar" type="ProgressBar" parent="." unique_id=1249078556]
+layout_mode = 0
+anchor_right = 1.0
+offset_bottom = 42.0
+mouse_filter = 2
+theme_override_styles/background = SubResource("StyleBoxFlat_hp_bg")
+theme_override_styles/fill = SubResource("StyleBoxFlat_hp_fill")
+show_percentage = false
+
+[node name="RallyOverlay" type="Panel" parent="." unique_id=2847193561]
+visible = false
+layout_mode = 0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_rally_fill")
+
+[node name="BarBorder" type="Panel" parent="." unique_id=3927185640]
+layout_mode = 0
+anchor_right = 1.0
+offset_bottom = 42.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_hp_border")
+
+[node name="ValueLabel" type="Label" parent="." unique_id=128916223]
+layout_mode = 0
+anchor_right = 1.0
+offset_top = -12.0
+offset_bottom = 30.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 20
+text = "70/70"
+horizontal_alignment = 0
+vertical_alignment = 1
+
+[node name="BlockBadge" parent="." unique_id=497198214 instance=ExtResource("2_block_badge")]
+anchors_preset = 0
+offset_right = 38.0
+offset_bottom = 38.0
+
+[node name="AbsorbBadge" parent="." instance=ExtResource("3_absorb_badge")]
+anchors_preset = 0
+offset_right = 38.0
+offset_bottom = 38.0
+
+[node name="StatusBadgeRow" type="HBoxContainer" parent="."]
+layout_mode = 0
+offset_top = 46.0
+offset_bottom = 64.0
+grow_horizontal = 1
+theme_override_constants/separation = 6

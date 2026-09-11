@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://cf68kak8ci08f"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_held_position_plus"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 15
+value = 11
+bonus_value = 4
+
+[resource]
+script = ExtResource("1_held_position_plus")
+card_name = "Held Position+"
+card_type = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Gain 11 block.
+[cond_active]If you took no damage last turn, gain 4 more.[/cond_active]"

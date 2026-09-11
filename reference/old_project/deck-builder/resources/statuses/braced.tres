@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="StatusEffectData" format=3]
+
+[ext_resource type="Script" path="res://status_effect_data.gd" id="1_status_effect"]
+
+[resource]
+script = ExtResource("1_status_effect")
+id = "braced"
+display_name = "Braced"
+category = 1
+default_magnitude = -50
+default_duration_turns = 1
+clears_on_trigger = true
+modifier_target = 0
+modifier_operation = 1
+stack_rule = 0
+icon_color = Color(0.207843, 0.2, 0.184314, 1)
+badge_label_override = "½"
+badge_glyph_color_override = Color(0.74902, 0.74902, 0.74902, 1)
+badge_border_color_override = Color(0.207843, 0.2, 0.184314, 1)
+badge_diameter_override_px = 28.0
+tooltip_text = "Your next hit is halved."

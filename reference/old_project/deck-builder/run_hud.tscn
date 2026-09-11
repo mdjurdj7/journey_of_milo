@@ -1,0 +1,29 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://run_hud.gd" id="1_run_hud"]
+[ext_resource type="PackedScene" uid="uid://dg07bi7v3y5sc" path="res://vitals_bar.tscn" id="2_hp_bar"]
+
+[node name="RunHUD" type="VBoxContainer"]
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 420.0
+offset_bottom = 320.0
+theme_override_constants/separation = 12
+script = ExtResource("1_run_hud")
+
+[node name="PlayerHPBar" parent="." instance=ExtResource("2_hp_bar")]
+layout_mode = 2
+show_block = false
+fill_color = Color(0.301961, 0.184314, 0.184314, 1)
+
+[node name="RoomLabel" type="Label" parent="."]
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 27
+text = "Room: 1"
+
+[node name="RoomTypeLabel" type="Label" parent="."]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.8, 0.8, 0.85, 1)
+theme_override_font_sizes/font_size = 22
+text = "Combat Room"

@@ -1,0 +1,80 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Elite layers: 2 chosen (4, 10) | side-by-side promotions: none
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [TREASURE] -> L2_1, L2_0
+  Layer 2:
+    L2_0 [TREASURE] -> L3_0, L3_2
+    L2_1 [COMBAT] -> L3_1
+  Layer 3:
+    L3_0 [COMBAT] -> L4_1, L4_0
+    L3_1 [EVENT] -> L4_0, L4_1
+    L3_2 [COMBAT] -> L4_1
+  Layer 4:
+    L4_0 [HEAP] -> L5_0, L5_1
+    L4_1 [ELITE] -> L5_1
+  Layer 5:
+    L5_0 [COMBAT] -> L6_1, L6_0
+    L5_1 [EVENT] -> L6_2
+  Layer 6:
+    L6_0 [TREASURE] -> L7_1, L7_0
+    L6_1 [TREASURE] -> L7_1, L7_0
+    L6_2 [COMBAT] -> L7_0
+  Layer 7:
+    L7_0 [COMBAT] -> L8_2
+    L7_1 [EVENT] -> L8_0, L8_1
+  Layer 8:
+    L8_0 [COMBAT] -> L9_0, L9_1
+    L8_1 [COMBAT] -> L9_1
+    L8_2 [SHOP] -> L9_0, L9_1
+  Layer 9:
+    L9_0 [COMBAT] -> L10_2, L10_0
+    L9_1 [TREASURE] -> L10_1, L10_2
+  Layer 10:
+    L10_0 [COMBAT] -> L11_0
+    L10_1 [ELITE] -> L11_0
+    L10_2 [COMBAT] -> L11_0
+  Layer 11:
+    L11_0 [BOSS]
+
+  Battle: Wardling
+    Turn 1: HP 70->70 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 70->70 | Enemies: Wardling
+  Damage: dealt 100, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 25 (battle reward)
+  Battle: Glasswing
+    Turn 1: HP 70->60 | dealt 18, took 10 | played: Selfeater, Strike, Strike
+    Turn 2: HP 60->66 | dealt 15, took 0 | played: Selfeater, Selfeater, Strike
+  Battle result: victory
+  Turns: 2 | HP 70->66 | Enemies: Glasswing
+  Damage: dealt 33, taken 10 (blocked 0) | Toll: accrued 10, peak 10
+  Cards played: 6 | Energy unspent (total): 0 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 16 (battle reward)
+  Card choice offered: Iron Will, Ballast, Full Weight -> took Full Weight
+  Battle: Beachwrack
+    Turn 1: HP 66->61 | dealt 12, took 5 | played: Selfeater, Selfeater, Strike
+    (Tideworn joins the fight)
+    Turn 2: HP 61->36 | dealt 28, took 25 | played: Strike, Full Weight
+    Turn 3: HP 36->31 | dealt 19, took 14 | played: Selfeater, Bite Down, Guard, Selfeater
+    Turn 4: HP 31->11 | dealt 40, took 24 | played: Bite Down, Strike, Guard
+    Turn 5: HP 11->0 | dealt 18, took 11 | played: Strike
+  Battle result: defeat
+  Turns: 5 | HP 66->0 | Enemies: Beachwrack
+  Damage: dealt 117, taken 79 (blocked 4) | Toll: accrued 79, peak 79
+  Cards played: 13 | Energy unspent (total): 2 | Chain: openers 2, payoffs 0, expired 2
+
+=== RUN END: DEFEAT ===
+Rooms reached: 1
+Final HP: 0/70
+Final gold: 41
+Final deck (19 cards): 5x Strike, 5x Guard, 1x Bite Down, 7x Selfeater, 1x Full Weight

@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://emtuvlrhar03"
+path="res://.godot/imported/Beachwrack Wind Up.mp3-6719898287043369a69a5419a2c916f9.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/enemies/Beachwrack/Beachwrack Wind Up.mp3"
+dest_files=["res://.godot/imported/Beachwrack Wind Up.mp3-6719898287043369a69a5419a2c916f9.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

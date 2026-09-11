@@ -1,0 +1,27 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://enemy_visual.gd" id="1_visual"]
+
+[node name="Glasswing" type="Node2D"]
+script = ExtResource("1_visual")
+color = Color(0.75, 0.85, 0.9, 1)
+idle_bob_amount_px = 1.2
+idle_bob_period_sec = 1.1
+
+[node name="Head" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(7, -78, 4.95, -73.05, 0, -71, -4.95, -73.05, -7, -78, -4.95, -82.95, 0, -85, 4.95, -82.95)
+
+[node name="Body" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(10, -44, 7.07, -22.8, 0, -14, -7.07, -22.8, -10, -44, -7.07, -65.2, 0, -74, 7.07, -65.2)
+
+[node name="LeftWing" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-9, -62, -42, -66, -28, -36)
+
+[node name="RightWing" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(9, -62, 42, -66, 28, -36)
+
+[node name="LeftLeg" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(-4, -14, -1, -14, -1, 0, -4, 0)
+
+[node name="RightLeg" type="Polygon2D" parent="."]
+polygon = PackedVector2Array(1, -14, 4, -14, 4, 0, 1, 0)

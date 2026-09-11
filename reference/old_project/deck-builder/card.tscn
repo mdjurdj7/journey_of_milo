@@ -1,0 +1,283 @@
+[gd_scene format=3 uid="uid://bn53ca5xhwfdm"]
+
+[ext_resource type="Script" uid="uid://c5cnxsdr7keha" path="res://card.gd" id="1_card"]
+[ext_resource type="Texture2D" uid="uid://eo1wtyscp3v6" path="res://assets/ui/cost_pips/cost_0.png" id="cost_pip_0"]
+[ext_resource type="Texture2D" uid="uid://cin7ghfx6ltfq" path="res://assets/ui/cost_pips/cost_1.png" id="cost_pip_1"]
+[ext_resource type="Texture2D" uid="uid://bxsegt7aeiacx" path="res://assets/ui/cost_pips/cost_2.png" id="cost_pip_2"]
+[ext_resource type="Texture2D" uid="uid://b17ll44sv1dbh" path="res://assets/ui/cost_pips/cost_3.png" id="cost_pip_3"]
+[ext_resource type="Texture2D" uid="uid://c5o32n5iplon4" path="res://assets/ui/cost_pips/cost_4.png" id="cost_pip_4"]
+[ext_resource type="Texture2D" uid="uid://cjnmcg2kr5byn" path="res://assets/ui/cost_pips/cost_5.png" id="cost_pip_5"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_default"]
+border_width_left = 7
+border_width_top = 7
+border_width_right = 7
+border_width_bottom = 7
+border_color = Color(0.4, 0.42, 0.48, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_chain_glow"]
+bg_color = Color(0, 0, 0, 0)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+shadow_color = Color(0.95, 0.65, 0.25, 0.85)
+shadow_size = 18
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_condition_frame"]
+bg_color = Color(0, 0, 0, 0)
+border_width_left = 4
+border_width_top = 4
+border_width_right = 4
+border_width_bottom = 4
+border_color = Color(0.85, 0.15, 0.4, 0.92)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_name_banner"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+border_width_bottom = 2
+corner_radius_top_left = 8
+corner_radius_top_right = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_art_slot"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+border_width_left = 5
+border_width_top = 5
+border_width_right = 5
+border_width_bottom = 5
+corner_radius_top_left = 6
+corner_radius_top_right = 6
+corner_radius_bottom_right = 6
+corner_radius_bottom_left = 6
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_description_panel"]
+content_margin_left = 6.0
+content_margin_top = 6.0
+content_margin_right = 6.0
+content_margin_bottom = 6.0
+border_width_top = 2
+corner_radius_bottom_right = 8
+corner_radius_bottom_left = 8
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_cost_badge"]
+bg_color = Color(0.95, 0.95, 0.9, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.35, 0.37, 0.42, 1)
+corner_radius_top_left = 23
+corner_radius_top_right = 23
+corner_radius_bottom_right = 23
+corner_radius_bottom_left = 23
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_attack_hp_drain"]
+bg_color = Color(0.08, 0.08, 0.08, 1)
+border_width_left = 2
+border_width_top = 2
+border_width_right = 2
+border_width_bottom = 2
+border_color = Color(0.85, 0.15, 0.15, 1)
+corner_radius_top_left = 21
+corner_radius_top_right = 21
+corner_radius_bottom_right = 21
+corner_radius_bottom_left = 21
+
+[node name="Card" type="Control" unique_id=1905948020]
+custom_minimum_size = Vector2(247.5, 345)
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_card")
+cost_badge_diameter_px = 27.0
+cost_badge_margin_px = 7.0
+cost_pip_textures = Dictionary[int, Texture2D]({
+0: ExtResource("cost_pip_0"),
+1: ExtResource("cost_pip_1"),
+2: ExtResource("cost_pip_2"),
+3: ExtResource("cost_pip_3"),
+4: ExtResource("cost_pip_4"),
+5: ExtResource("cost_pip_5")
+})
+cost_pip_size_px = 57.0
+cost_pip_offset_px = Vector2(-14, -14)
+attack_hp_drain_offset_px = Vector2(-8, -8)
+attack_hp_drain_number_color = Color(0.78039217, 0.32156864, 0.2901961, 1)
+attack_hp_drain_plate_color = Color(0.2519786, 0.14866614, 0.13648117, 1)
+attack_hp_drain_border_color = Color(0.8509804, 0.14901961, 0.14901961, 0)
+attack_hp_drain_border_width_px = 0.0
+
+[node name="Visual" type="Panel" parent="." unique_id=181455586]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+pivot_offset = Vector2(123.75, 172.5)
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_default")
+
+[node name="ChainGlow" type="Panel" parent="Visual" unique_id=875089313]
+visible = false
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_chain_glow")
+
+[node name="ConditionFrame" type="Panel" parent="Visual" unique_id=257110619]
+visible = false
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -5.0
+offset_top = -5.0
+offset_right = 5.0
+offset_bottom = 5.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_condition_frame")
+
+[node name="Frame" type="MarginContainer" parent="Visual" unique_id=1345663225]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+theme_override_constants/margin_bottom = 10
+
+[node name="Zones" type="VBoxContainer" parent="Visual/Frame" unique_id=1223725267]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 8
+
+[node name="NameBanner" type="PanelContainer" parent="Visual/Frame/Zones" unique_id=886348920]
+layout_mode = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_name_banner")
+
+[node name="NameLabel" type="Label" parent="Visual/Frame/Zones/NameBanner" unique_id=2011558801]
+layout_mode = 2
+text = "Card Name"
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="ArtSlot" type="PanelContainer" parent="Visual/Frame/Zones" unique_id=1166697512]
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 1.7
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_art_slot")
+
+[node name="ArtTypeFill" type="ColorRect" parent="Visual/Frame/Zones/ArtSlot" unique_id=1458751463]
+layout_mode = 2
+mouse_filter = 2
+color = Color(0.72, 0.4, 0.3, 1)
+
+[node name="ArtTexture" type="TextureRect" parent="Visual/Frame/Zones/ArtSlot" unique_id=632594422]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ArtDescriptionGapSpacer" type="Control" parent="Visual/Frame/Zones" unique_id=338935345]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="DescriptionClip" type="Control" parent="Visual/Frame/Zones" unique_id=54389085]
+clip_contents = true
+layout_mode = 2
+size_flags_vertical = 3
+size_flags_stretch_ratio = 1.1
+mouse_filter = 2
+
+[node name="DescriptionPanel" type="PanelContainer" parent="Visual/Frame/Zones/DescriptionClip" unique_id=649623258]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_description_panel")
+
+[node name="DescriptionLabel" type="RichTextLabel" parent="Visual/Frame/Zones/DescriptionClip/DescriptionPanel" unique_id=990708253]
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+theme_override_font_sizes/normal_font_size = 15
+bbcode_enabled = true
+text = "Description"
+fit_content = true
+scroll_active = false
+autowrap_mode = 2
+
+[node name="CostBadge" type="Panel" parent="Visual" unique_id=1528281600]
+layout_mode = 0
+offset_left = 6.0
+offset_top = 6.0
+offset_right = 52.0
+offset_bottom = 52.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_cost_badge")
+
+[node name="CostLabel" type="Label" parent="Visual/CostBadge" unique_id=175903303]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+text = "0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CostPip" type="TextureRect" parent="Visual" unique_id=1543762087]
+visible = false
+layout_mode = 0
+offset_left = 6.0
+offset_top = 6.0
+offset_right = 52.0
+offset_bottom = 52.0
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CostPipScene" type="Control" parent="Visual" unique_id=1460825567]
+visible = false
+anchors_preset = 0
+offset_left = 6.0
+offset_top = 6.0
+offset_right = 52.0
+offset_bottom = 52.0
+mouse_filter = 2
+
+[node name="AttackHpDrainBadge" type="Panel" parent="Visual" unique_id=755809014]
+visible = false
+layout_mode = 0
+offset_left = 50.0
+offset_top = 12.0
+offset_right = 76.0
+offset_bottom = 38.0
+mouse_filter = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_attack_hp_drain")
+
+[node name="AttackHpDrainLabel" type="Label" parent="Visual/AttackHpDrainBadge" unique_id=564537398]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_colors/font_color = Color(0.95, 0.3, 0.3, 1)
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+vertical_alignment = 1

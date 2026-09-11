@@ -1,0 +1,8 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Texture2D" uid="uid://cxfg0ixb71qca" path="res://assets/characters/wanderer/wanderer_battle.png" id="1_wanderer_battle"]
+
+[node name="WandererBattleVisual" type="Node2D"]
+
+[node name="Sprite2D" type="Sprite2D" parent="."]
+texture = ExtResource("1_wanderer_battle")

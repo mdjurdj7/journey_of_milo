@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://ccji8r1jw42fu"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_paid_in_pain"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/cards/upgrades/paid_in_pain_plus.tres" id="3_paid_in_pain_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 7
+value = 10
+toll_cost = 7
+
+[resource]
+script = ExtResource("1_paid_in_pain")
+card_name = "Paid in Pain"
+card_type = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Spend 7 Toll.
+Gain [cond_inactive]10[/cond_inactive] block, or gain [cond_active]20[/cond_active] below half HP."
+upgrades = Array[ExtResource("1_paid_in_pain")]([ExtResource("3_paid_in_pain_plus")])

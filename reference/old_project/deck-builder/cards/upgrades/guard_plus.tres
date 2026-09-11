@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://dn4uygifh6n62"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_guard_plus"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_guard_plus"]
+script = ExtResource("2_effect")
+effect_type = 1
+value = 8
+
+[resource]
+script = ExtResource("1_guard_plus")
+card_name = "Guard+"
+card_type = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_guard_plus")])
+description = "Gain 8 block."

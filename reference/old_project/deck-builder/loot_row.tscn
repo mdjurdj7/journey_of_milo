@@ -1,0 +1,62 @@
+[gd_scene format=3 uid="uid://83js7hrei6hj"]
+
+[ext_resource type="Script" uid="uid://dbdpf45dix6i7" path="res://loot_row.gd" id="1_loot_row"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_row"]
+bg_color = Color(0.16, 0.16, 0.2, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.4, 0.42, 0.48, 1)
+corner_radius_top_left = 10
+corner_radius_top_right = 10
+corner_radius_bottom_right = 10
+corner_radius_bottom_left = 10
+
+[node name="LootRow" type="Panel" unique_id=17374099]
+custom_minimum_size = Vector2(700, 110)
+theme_override_styles/panel = SubResource("StyleBoxFlat_row")
+script = ExtResource("1_loot_row")
+
+[node name="IconRect" type="ColorRect" parent="." unique_id=863401460]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 20.0
+offset_right = 90.0
+offset_bottom = 90.0
+mouse_filter = 2
+color = Color(0.6, 0.6, 0.6, 1)
+
+[node name="Label" type="Label" parent="." unique_id=350643581]
+layout_mode = 0
+offset_left = 115.0
+offset_right = 520.0
+offset_bottom = 110.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 32
+text = "Loot Row"
+vertical_alignment = 1
+
+[node name="TypeIndicatorLabel" type="Label" parent="." unique_id=2603987441]
+layout_mode = 0
+offset_left = 520.0
+offset_right = 595.0
+offset_bottom = 110.0
+theme_override_colors/font_color = Color(0.65, 0.65, 0.7, 1)
+theme_override_font_sizes/font_size = 20
+text = ""
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="CheckmarkLabel" type="Label" parent="." unique_id=1140650849]
+visible = false
+layout_mode = 0
+offset_left = 600.0
+offset_right = 680.0
+offset_bottom = 110.0
+theme_override_colors/font_color = Color(0.4, 0.9, 0.5, 1)
+theme_override_font_sizes/font_size = 44
+text = "✓"
+horizontal_alignment = 1
+vertical_alignment = 1

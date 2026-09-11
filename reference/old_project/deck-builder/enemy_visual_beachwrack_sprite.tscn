@@ -1,0 +1,13 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" uid="uid://c62n84auoyfts" path="res://enemy_visual.gd" id="1_visual"]
+[ext_resource type="Texture2D" path="res://assets/enemies/Works_beackwrack.png" id="2_sprite"]
+
+[node name="Beachwrack" type="Node2D"]
+script = ExtResource("1_visual")
+idle_bob_enabled = false
+
+[node name="Sprite" type="Sprite2D" parent="."]
+position = Vector2(-1.8, -83.8)
+scale = Vector2(0.2, 0.2)
+texture = ExtResource("2_sprite")

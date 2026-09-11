@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://75q51rwaqhaa"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_ballast"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/cards/upgrades/ballast_plus.tres" id="3_ballast_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 1
+value = 6
+
+[resource]
+script = ExtResource("1_ballast")
+chain_role = 1
+card_name = "Ballast"
+card_type = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Gain 6 block."
+upgrades = Array[ExtResource("1_ballast")]([ExtResource("3_ballast_plus")])

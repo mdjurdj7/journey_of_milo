@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://ddyag7uvuddxx"
+path="res://.godot/imported/ES_False Immunity - DEX 1200 - PLACEHOLDER.mp3-77548c54c552fbf683ab9b618156e5e6.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/enemies/Works_Boss/ES_False Immunity - DEX 1200 - PLACEHOLDER.mp3"
+dest_files=["res://.godot/imported/ES_False Immunity - DEX 1200 - PLACEHOLDER.mp3-77548c54c552fbf683ab9b618156e5e6.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

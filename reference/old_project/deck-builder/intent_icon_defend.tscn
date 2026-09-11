@@ -1,0 +1,17 @@
+[gd_scene format=3 uid="uid://goq03tpq0fh1"]
+
+[node name="DefendIcon" type="Node2D" unique_id=1437344886]
+scale = Vector2(0.62, 0.62)
+
+[node name="ShieldDark" type="Polygon2D" parent="." unique_id=151510755]
+position = Vector2(10.741936, 1.2264003)
+scale = Vector2(1.0760367, 1.0760367)
+color = Color(0.053889446, 0.10078993, 0.14605513, 1)
+antialiased = true
+polygon = PackedVector2Array(14, -10, 11.290321, 8.064516, 3.2258062, 16.129032, -3.2258062, 16.129032, -11.290321, 6.4516125, -14, -10, -6.4516125, -16.129032, 0.41003418, -16.129036, 6.4516125, -16.129032)
+
+[node name="Shield" type="Polygon2D" parent="." unique_id=2040861674]
+position = Vector2(9.67742, 0)
+color = Color(0.33829433, 0.48065108, 0.62238204, 1)
+antialiased = true
+polygon = PackedVector2Array(14, -10, 11.290321, 8.064516, 3.2258062, 16.129032, -3.2258062, 16.129032, -11.290321, 6.4516125, -14, -10, -6.4516125, -16.129032, 0.41003418, -16.129036, 6.4516125, -16.129032)

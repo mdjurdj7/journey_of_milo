@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://card_data.gd" id="1_owed_in_full"]
+[ext_resource type="Script" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/cards/upgrades/owed_in_full_plus.tres" id="3_owed_in_full_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 11
+value = 6
+
+[sub_resource type="Resource" id="CardEffect_2"]
+script = ExtResource("2_effect")
+effect_type = 14
+toll_fraction = 0.5
+
+[resource]
+script = ExtResource("1_owed_in_full")
+card_name = "Owed in Full"
+energy_cost = 1
+rarity = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1"), SubResource("CardEffect_2")])
+description = "Deal 6 damage to all enemies.
+Spend half your Toll to deal bonus damage."
+upgrades = Array[ExtResource("1_owed_in_full")]([ExtResource("3_owed_in_full_plus")])

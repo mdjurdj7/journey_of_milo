@@ -1,0 +1,247 @@
+[gd_scene format=3 uid="uid://bny1ym18ubtk8"]
+
+[ext_resource type="Script" uid="uid://dnfqylthmfju4" path="res://reward_screen.gd" id="1_reward"]
+[ext_resource type="PackedScene" path="res://deck_viewer.tscn" id="2_deck_viewer"]
+[ext_resource type="PackedScene" path="res://weapon_pickup_window.tscn" id="4_weapon_pickup"]
+[ext_resource type="PackedScene" path="res://run_hud.tscn" id="5_run_hud"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_confirm"]
+bg_color = Color(0.16, 0.16, 0.2, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.4, 0.42, 0.48, 1)
+corner_radius_top_left = 13
+corner_radius_top_right = 13
+corner_radius_bottom_right = 13
+corner_radius_bottom_left = 13
+
+[node name="RewardScreen" type="Node2D" unique_id=126868186]
+script = ExtResource("1_reward")
+
+[node name="DeckViewer" parent="." unique_id=941235479 instance=ExtResource("2_deck_viewer")]
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=1431628255]
+
+[node name="Background" type="ColorRect" parent="UI" unique_id=71034527]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.08, 0.08, 0.1, 1)
+
+[node name="HUD" parent="UI" instance=ExtResource("5_run_hud")]
+compact = true
+
+[node name="DeckButton" type="Button" parent="UI" unique_id=646388081]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 33.0
+offset_top = -80.0
+offset_right = 233.0
+offset_bottom = -33.0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 22
+text = "Deck (0)"
+
+[node name="LootPanel" type="Control" parent="UI" unique_id=1637626504]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="MainColumn" type="VBoxContainer" parent="UI/LootPanel" unique_id=1182938559]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 30
+
+[node name="HeadingLabel" type="Label" parent="UI/LootPanel/MainColumn" unique_id=2072558719]
+custom_minimum_size = Vector2(0, 70)
+layout_mode = 2
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 50
+text = "Loot"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RowScrollContainer" type="ScrollContainer" parent="UI/LootPanel/MainColumn" unique_id=614823183]
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="LootRowContainer" type="VBoxContainer" parent="UI/LootPanel/MainColumn/RowScrollContainer" unique_id=1470047556]
+layout_mode = 2
+theme_override_constants/separation = 32
+
+[node name="ContinueButton" type="Button" parent="UI/LootPanel/MainColumn" unique_id=261171923]
+custom_minimum_size = Vector2(300, 70)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 33
+text = "Continue"
+
+[node name="CardChoiceOverlay" type="Control" parent="UI" unique_id=299310992]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="DimBackground" type="ColorRect" parent="UI/CardChoiceOverlay"]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+color = Color(0, 0, 0, 0.6)
+
+[node name="ChoiceModalPanel" type="Panel" parent="UI/CardChoiceOverlay"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -550.0
+offset_top = -350.0
+offset_right = 550.0
+offset_bottom = 350.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_confirm")
+
+[node name="MainColumn" type="VBoxContainer" parent="UI/CardChoiceOverlay/ChoiceModalPanel"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 30
+
+[node name="CardRewardContainer" type="HBoxContainer" parent="UI/CardChoiceOverlay/ChoiceModalPanel/MainColumn" unique_id=874378081]
+custom_minimum_size = Vector2(951.6, 386.4)
+layout_mode = 2
+theme_override_constants/separation = 60
+alignment = 1
+
+[node name="SkipButton" type="Button" parent="UI/CardChoiceOverlay/ChoiceModalPanel/MainColumn" unique_id=1601466809]
+custom_minimum_size = Vector2(140, 55)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_font_sizes/font_size = 24
+text = "Skip"
+
+[node name="RareDropOverlay" type="Control" parent="UI" unique_id=1338454035]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="MainColumn" type="VBoxContainer" parent="UI/RareDropOverlay"]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 70
+
+[node name="HeadingLabel" type="Label" parent="UI/RareDropOverlay/MainColumn" unique_id=1111831154]
+custom_minimum_size = Vector2(0, 70)
+layout_mode = 2
+theme_override_colors/font_color = Color(0.95, 0.8, 0.4, 1)
+theme_override_font_sizes/font_size = 50
+text = "A Rare Find"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="RareCardContainer" type="Control" parent="UI/RareDropOverlay/MainColumn" unique_id=963708848]
+custom_minimum_size = Vector2(396, 552)
+layout_mode = 2
+size_flags_horizontal = 4
+
+[node name="TakeLeaveContainer" type="HBoxContainer" parent="UI/RareDropOverlay/MainColumn" unique_id=1848754641]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 70
+alignment = 1
+
+[node name="TakeButton" type="Button" parent="UI/RareDropOverlay/MainColumn/TakeLeaveContainer" unique_id=530465426]
+custom_minimum_size = Vector2(200, 70)
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Take"
+
+[node name="LeaveButton" type="Button" parent="UI/RareDropOverlay/MainColumn/TakeLeaveContainer" unique_id=637965434]
+custom_minimum_size = Vector2(200, 70)
+layout_mode = 2
+theme_override_font_sizes/font_size = 28
+text = "Leave"
+
+[node name="WeaponPickupWindow" parent="UI" instance=ExtResource("4_weapon_pickup")]
+
+[node name="LeaveConfirmPanel" type="Control" parent="UI" unique_id=1849041754]
+visible = false
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="DimBackground" type="ColorRect" parent="UI/LeaveConfirmPanel" unique_id=1804584462]
+layout_mode = 0
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="ConfirmBox" type="Panel" parent="UI/LeaveConfirmPanel" unique_id=1834505250]
+layout_mode = 0
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -300.0
+offset_top = -130.0
+offset_right = 300.0
+offset_bottom = 130.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_confirm")
+
+[node name="ConfirmLabel" type="Label" parent="UI/LeaveConfirmPanel/ConfirmBox" unique_id=677638956]
+layout_mode = 0
+offset_left = 20.0
+offset_top = 30.0
+offset_right = 580.0
+offset_bottom = 90.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 32
+text = "Leave unclaimed loot?"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LeaveButton" type="Button" parent="UI/LeaveConfirmPanel/ConfirmBox" unique_id=362160783]
+layout_mode = 0
+offset_left = 60.0
+offset_top = 165.0
+offset_right = 260.0
+offset_bottom = 225.0
+theme_override_font_sizes/font_size = 26
+text = "Leave"
+
+[node name="CancelButton" type="Button" parent="UI/LeaveConfirmPanel/ConfirmBox" unique_id=1469287786]
+layout_mode = 0
+offset_left = 340.0
+offset_top = 165.0
+offset_right = 540.0
+offset_bottom = 225.0
+theme_override_font_sizes/font_size = 26
+text = "Cancel"

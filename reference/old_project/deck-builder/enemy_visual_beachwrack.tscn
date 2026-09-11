@@ -1,0 +1,146 @@
+[gd_scene format=3 uid="uid://cq4y8t2h6r8yx"]
+
+[ext_resource type="Script" uid="uid://c62n84auoyfts" path="res://enemy_visual.gd" id="1_visual"]
+
+[node name="Beachwrack" type="Node2D" unique_id=1841871951]
+position = Vector2(40, 0)
+script = ExtResource("1_visual")
+color = Color(0.3, 0.36, 0.44, 1)
+accent_node_names = Array[String](["ScaffoldPost", "ScaffoldRail", "KelpFront", "KelpBack", "Eye", "Head", "Body", "BodyLight", "BodyDark", "KelpFront", "KelpBack", "KelpBack2", "FrontLeg", "BackLeg", "MidLeg", "BackLeg2", "Mouth", "ScaffoldPost5", "ScaffoldPost4"])
+idle_bob_enabled = false
+idle_bob_amount_px = 3.0
+idle_bob_period_sec = 4.2
+
+[node name="ScaffoldPost4" type="Polygon2D" parent="." unique_id=1508225279]
+position = Vector2(-294, -23.000002)
+scale = Vector2(8.574779, 0.70911527)
+color = Color(0.4463054, 0.30343553, 0.21310571, 1)
+antialiased = true
+polygon = PackedVector2Array(36.03592, -49.35728, 30.088242, -81.79205, 29.505136, -76.15123, 32.682644, -60.07251, 35.452812, -42.306232)
+
+[node name="Mouth" type="Polygon2D" parent="." unique_id=1954003085]
+position = Vector2(36, -35.000004)
+scale = Vector2(1.2830806, 0.9677419)
+color = Color(0.2578516, 0.29572782, 0.2767933, 1)
+polygon = PackedVector2Array(-97.42178, -3.0999985, -91.966156, -1.033329, -77.93742, 3.1000023, -71.70243, -3.0999985, -96.64241, -7.23333, -101.31865, -6.199997)
+
+[node name="Scaffolding" type="Polygon2D" parent="." unique_id=1994664787]
+color = Color(0.38039216, 0.29411766, 0.21960784, 1)
+
+[node name="ScaffoldPost3" type="Polygon2D" parent="Scaffolding" unique_id=1031708807]
+position = Vector2(-343, -10)
+scale = Vector2(8.574774, 0.7091151)
+color = Color(0.3529412, 0.23529412, 0.16078432, 1)
+antialiased = true
+polygon = PackedVector2Array(32.07082, -88.843124, 32.537304, -86.02271, 34.986347, -97.304375, 34.519863, -102.94521)
+
+[node name="ScaffoldPost2" type="Polygon2D" parent="Scaffolding" unique_id=1941680424]
+position = Vector2(-337.00003, -26)
+scale = Vector2(8.574779, 0.70911527)
+color = Color(0.45559895, 0.31030315, 0.21845943, 1)
+antialiased = true
+polygon = PackedVector2Array(35.686054, -53.587902, 29.505138, -78.97165, 28.922033, -76.15123, 35.452816, -49.35728)
+
+[node name="ScaffoldRail" type="Polygon2D" parent="Scaffolding" unique_id=588349250]
+color = Color(0.49283862, 0.33802888, 0.24026617, 1)
+antialiased = true
+polygon = PackedVector2Array(33, -78, -13, -83, -45, -86, -47, -86, -87, -88, -105, -88, -110, -82, -68, -78, -10, -75, -1.1593704, -73.70625, 31, -69)
+
+[node name="Debris" type="Polygon2D" parent="Scaffolding/ScaffoldRail" unique_id=195490874]
+position = Vector2(-70, -10)
+color = Color(0.3319387, 0.3635879, 0.20124754, 1)
+antialiased = true
+polygon = PackedVector2Array(26, -76, 22, -76, 22, -74, 23, -73, 23, -69, 22, -67, 23, -63, 23, -59, 24, -60, 25, -65, 26, -67, 26, -72)
+
+[node name="Debris2" type="Polygon2D" parent="Scaffolding/ScaffoldRail" unique_id=46696651]
+position = Vector2(-61, -10)
+color = Color(0.3319387, 0.3635879, 0.20124754, 1)
+antialiased = true
+polygon = PackedVector2Array(26, -76, 22, -76, 22, -74, 23, -73, 23, -69, 22, -67, 22, -59, 22, -49, 26, -57, 27, -61, 30, -66, 32, -75)
+
+[node name="Head" type="Polygon2D" parent="." unique_id=729505787]
+position = Vector2(36, -35.000004)
+scale = Vector2(1.2830806, 0.9677419)
+color = Color(0.37254903, 0.41568628, 0.3882353, 1)
+antialiased = true
+polygon = PackedVector2Array(-58, -34, -81.05492, -29.966663, -100.539276, -25.833332, -104.43615, -22.73333, -105.994896, -19.633331, -107.55365, -15.499996, -108.333015, -11.366665, -108.33302, -9.299999, -106.77428, -6.199997, -104.43615, -4.1333313, -100.539276, -5.166664, -97.42178, -4.1333313, -62.349937, -1.033329, -60, -8, -55, -22)
+
+[node name="Jaw" type="Polygon2D" parent="Head" unique_id=1348591684]
+color = Color(0.37254903, 0.41568628, 0.3882353, 1)
+polygon = PackedVector2Array(-78.7168, 4.133335, -77.15805, 6.2000027, -87.28992, 4.133335, -95.86304, 4.133335, -100.539276, 2.0666695, -102.09802, -1.033329, -100.539276, -2.0666656, -98.98053, -1.033329, -96.64241, -2.0666656, -84.9518, 3.8146973e-06, -79.49617, -2.0666656, -77.15805, -1.033329)
+
+[node name="Body" type="Polygon2D" parent="." unique_id=108279327]
+color = Color(0.37254903, 0.41568628, 0.3882353, 1)
+antialiased = true
+polygon = PackedVector2Array(49, -24, 36, -48, 14, -59, -31, -69, -59, -65, -65, -30, -40, -15, 40, -15, 46, -15, 49, -20)
+
+[node name="BodyLight" type="Polygon2D" parent="." unique_id=1730109010]
+color = Color(0.47058824, 0.52156866, 0.4862745, 1)
+polygon = PackedVector2Array(49, -24, 48, -26, 36, -48, 14, -59, -2, -64, -6, -65, -10, -66, -31, -69, -41, -69, -49, -67, -58, -66, -88, -61, -78.38733, -59.038734, -68, -58, -51, -58, -42, -57, -31, -61, -25, -60, -14, -58, -1, -52, 20, -49, 29, -46, 36, -39, 46, -27)
+
+[node name="BodyDark" type="Polygon2D" parent="." unique_id=880150942]
+position = Vector2(-2, 2)
+color = Color(0.27058825, 0.30980393, 0.2901961, 1)
+antialiased = true
+polygon = PackedVector2Array(37, -17, 33, -17, 33, -21, 29, -24, 21, -26, 12, -23, 4, -26, -6, -26, -13, -27, -21, -30, -40, -28, -51, -30, -54, -33, -59, -32, -68, -32, -64, -28, -75, -10, -79, -5, -81, -1, -78, 1, -73, 2, -64, 1, -60, 0, -58, -2, -59, -8, -54, -12, -52, -17, -47, -20, -38, -17, -30, -16, -20, -14, -12, -13, -5, -13, 4, -13, 10, -16, 22, -16, 32, -15, 36, -15)
+
+[node name="Eye" type="Polygon2D" parent="." unique_id=1773032923]
+position = Vector2(-19, -32)
+color = Color(0.08, 0.08, 0.1, 1)
+antialiased = true
+polygon = PackedVector2Array(-71, -22, -73, -22, -76, -19, -69, -21)
+
+[node name="FrontLeg" type="Polygon2D" parent="." unique_id=2060053836]
+color = Color(0.37254903, 0.41568628, 0.3882353, 1)
+antialiased = true
+polygon = PackedVector2Array(-28, -18, -34, -30, -49, -29, -48, -21, -42, -10, -45, -8, -48, -3, -50, -1, -51, 4, -48, 5, -44, 6, -40, 6, -33, 6, -27, 4, -27, -1, -28, -2, -25, -12)
+
+[node name="BackLeg" type="Polygon2D" parent="." unique_id=1880198667]
+position = Vector2(2, -5)
+color = Color(0.37254903, 0.41568628, 0.3882353, 1)
+antialiased = true
+polygon = PackedVector2Array(46, -18, 31, -21, 29, -7, 27, -1, 26, 6, 30, 9, 37, 10, 44, 9, 46, 7, 48, 4, 46, 0, 46, -3, 47, -13)
+
+[node name="BackLeg2" type="Polygon2D" parent="." unique_id=975186250]
+position = Vector2(-23, -5)
+color = Color(0.27058825, 0.30980393, 0.2901961, 1)
+antialiased = true
+polygon = PackedVector2Array(43, -15, 28, -17, 29, -6, 26, -3, 24, 2, 25, 7, 30, 9, 38, 9, 42, 7, 45, 4, 45, -11, 46, -11)
+
+[node name="KelpFront" type="Polygon2D" parent="." unique_id=1369246522]
+position = Vector2(-47, -42)
+color = Color(0.28061762, 0.3191599, 0.17972863, 1)
+antialiased = true
+polygon = PackedVector2Array(-34, -20, -28, -21, -27, -17, -26, -9, -24, -5, -24, 0, -26, 4, -29, 5, -29, 0, -32, -13, -34.697155, -17.72002, -36, -20)
+
+[node name="KelpBack" type="Polygon2D" parent="." unique_id=19942268]
+position = Vector2(-14, -14)
+color = Color(0.28061762, 0.3191599, 0.17972863, 1)
+antialiased = true
+polygon = PackedVector2Array(56, -26, 57, -19, 56, -14, 55, -3, 55, -9, 53, -17, 54, -22, 51, -22, 48, -23, 45, -27, 42, -38, 46, -37, 50, -34)
+
+[node name="KelpBack2" type="Polygon2D" parent="." unique_id=1648823679]
+position = Vector2(-30, -21)
+color = Color(0.28061762, 0.3191599, 0.17972863, 1)
+antialiased = true
+polygon = PackedVector2Array(58, -32, 57, -19, 55, -10, 52, -3, 48, 3, 47, -7, 48, -12, 46, -15, 44, -20, 45, -25, 42, -29, 38, -40, 45, -38, 54, -34)
+
+[node name="ScaffoldPost5" type="Polygon2D" parent="KelpBack2" unique_id=1559270415]
+position = Vector2(-270, 12)
+scale = Vector2(8.574774, 0.7091151)
+color = Color(0.3529412, 0.23529412, 0.16078432, 1)
+antialiased = true
+polygon = PackedVector2Array(34.986347, -91.66354, 29.855003, -78.97165, 30.671364, -73.33084, 35.802692, -90.25333)
+
+[node name="ScaffoldPost" type="Polygon2D" parent="KelpBack2/ScaffoldPost5" unique_id=1206572111]
+position = Vector2(-6.4141636, 2.8204174)
+scale = Vector2(1.0579205, 1.1986772)
+color = Color(0.35457072, 0.23581874, 0.1591928, 1)
+antialiased = true
+polygon = PackedVector2Array(41.95568, -61.913376, 31.637796, -74.117645, 29.322834, -75.29411, 27.448818, -74.117645, 27.11811, -63.529408, 32.299213, -64.70588, 37.37008, -58.82353, 43.433075, -48.23529, 43.763783, -54.11764)
+
+[node name="ScaffoldPost6" type="Polygon2D" parent="KelpBack2/ScaffoldPost5" unique_id=1174671117]
+position = Vector2(4.7814674, 7.0510416)
+color = Color(0.3529412, 0.23529412, 0.16078432, 1)
+antialiased = true
+polygon = PackedVector2Array(32.18744, -94.48396, 31.021225, -97.304375, 31.254469, -93.07375, 33.470272, -70.51042, 34.053375, -71.92063)

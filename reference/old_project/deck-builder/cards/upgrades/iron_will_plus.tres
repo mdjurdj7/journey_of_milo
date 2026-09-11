@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://card_data.gd" id="1_iron_will_plus"]
+[ext_resource type="Script" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 1
+value = 20
+
+[resource]
+script = ExtResource("1_iron_will_plus")
+card_name = "Iron Will+"
+energy_cost = 2
+card_type = 1
+rarity = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Gain 20 block."

@@ -1,0 +1,46 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://dorrqvdlt63b4"]
+
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="1_beachwrack"]
+[ext_resource type="Script" uid="uid://8e2aq40illkg" path="res://enemy_intent.gd" id="2_intent"]
+[ext_resource type="PackedScene" path="res://enemy_visual_beachwrack_sprite.tscn" id="3_visual"]
+[ext_resource type="Resource" path="res://resources/enemies/sputter.tres" id="4_sputter"]
+
+[sub_resource type="Resource" id="EnemyIntent_windup"]
+script = ExtResource("2_intent")
+type = 3
+value = 15
+flavor_text = "Shifts its weight, rearing back."
+
+[sub_resource type="Resource" id="EnemyIntent_hit"]
+script = ExtResource("2_intent")
+value = 15
+flavor_text = "Raised high, weight held at the peak."
+
+[sub_resource type="Resource" id="EnemyIntent_settle"]
+script = ExtResource("2_intent")
+type = 2
+erratic_weight = 0.4
+flavor_text = "Settles its weight. Something groans beneath the plating."
+
+[sub_resource type="Resource" id="EnemyIntent_brace"]
+script = ExtResource("2_intent")
+type = 1
+value = 8
+erratic_weight = 0.4
+flavor_text = "Draws its plating in, bracing the frame."
+
+[resource]
+script = ExtResource("1_beachwrack")
+enemy_name = "Beachwrack"
+max_hp = 65
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_windup"), SubResource("EnemyIntent_hit"), SubResource("EnemyIntent_settle"), SubResource("EnemyIntent_brace")])
+visual_scene = ExtResource("3_visual")
+battle_visual_scale = 0.8
+battle_visual_offset_px = Vector2(20, 25)
+intent_horizontal_offset_px = -10.0
+field_visual_scale = 0.62
+field_foot_offset_px = 20.0
+erratic_intent_selection = true
+pool_weight = 1.0
+debris_spawn_enemy = ExtResource("4_sputter")
+attack_impact_sfx = "beachwrack_impact"

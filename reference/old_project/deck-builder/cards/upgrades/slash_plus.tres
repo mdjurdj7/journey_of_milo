@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://5e1psh42hibp"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_slash_plus"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="Resource_slash_plus"]
+script = ExtResource("2_effect")
+value = 9
+metadata/_custom_type_script = "uid://duk4ygvvdbtlg"
+
+[resource]
+script = ExtResource("1_slash_plus")
+card_name = "Slash+"
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("Resource_slash_plus")])
+description = "Deal 9 damage."

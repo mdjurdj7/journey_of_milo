@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://buwg0vuj5jj5o"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_slash"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" uid="uid://5e1psh42hibp" path="res://resources/cards/upgrades/slash_plus.tres" id="3_slash_plus"]
+
+[sub_resource type="Resource" id="Resource_dtvx0"]
+script = ExtResource("2_effect")
+value = 6
+metadata/_custom_type_script = "uid://duk4ygvvdbtlg"
+
+[resource]
+script = ExtResource("1_slash")
+card_name = "Slash"
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("Resource_dtvx0")])
+description = "Deal 6 damage."
+upgrades = Array[ExtResource("1_slash")]([ExtResource("3_slash_plus")])

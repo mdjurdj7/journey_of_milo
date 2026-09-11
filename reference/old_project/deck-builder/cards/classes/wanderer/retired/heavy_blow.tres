@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://bl7g3gjsf6j12"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_heavy_blow"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+value = 12
+
+[resource]
+script = ExtResource("1_heavy_blow")
+chain_role = 2
+card_name = "Heavy Blow"
+energy_cost = 2
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Deal 12 damage."

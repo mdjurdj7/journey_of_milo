@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://cd03ee8xtls6q"]
+
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="1_sputter"]
+[ext_resource type="Script" uid="uid://8e2aq40illkg" path="res://enemy_intent.gd" id="2_intent"]
+[ext_resource type="PackedScene" path="res://enemy_visual_sputter_sprite.tscn" id="3_visual"]
+
+[sub_resource type="Resource" id="EnemyIntent_block"]
+script = ExtResource("2_intent")
+type = 1
+value = 8
+no_immediate_repeat = true
+turn_one_locked = true
+
+[sub_resource type="Resource" id="EnemyIntent_strike"]
+script = ExtResource("2_intent")
+value = 5
+
+[sub_resource type="Resource" id="EnemyIntent_scissor"]
+script = ExtResource("2_intent")
+value = 11
+erratic_weight = 0.6
+turn_one_locked = true
+
+[resource]
+script = ExtResource("1_sputter")
+enemy_name = "Sputter"
+max_hp = 45
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_block"), SubResource("EnemyIntent_strike"), SubResource("EnemyIntent_scissor")])
+visual_scene = ExtResource("3_visual")
+battle_visual_scale = 0.45
+battle_head_offset_px = 25.6
+battle_visual_offset_px = Vector2(0, 24.8)
+field_visual_scale = 0.2
+field_foot_offset_px = 21.2
+pool_weight = 7.0
+erratic_intent_selection = true

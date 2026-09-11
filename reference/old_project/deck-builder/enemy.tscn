@@ -1,0 +1,75 @@
+[gd_scene format=3 uid="uid://c770ds7tkm7be"]
+
+[ext_resource type="Script" uid="uid://c34g8ik4dkelh" path="res://enemy.gd" id="1_enemy"]
+[ext_resource type="PackedScene" uid="uid://bh8ah5p0jd1a3" path="res://intent_display.tscn" id="2_intent_display"]
+[ext_resource type="PackedScene" uid="uid://dg07bi7v3y5sc" path="res://vitals_bar.tscn" id="3_vitals_bar"]
+[ext_resource type="PackedScene" path="res://grounding.tscn" id="4_grounding"]
+
+[node name="Enemy" type="Control" unique_id=619177620]
+custom_minimum_size = Vector2(500, 360)
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1_enemy")
+defeat_fade_out_sec = 0.5
+
+[node name="IntentDisplay" parent="." unique_id=1683699130 instance=ExtResource("2_intent_display")]
+layout_mode = 0
+anchors_preset = 0
+anchor_right = 0.0
+grow_horizontal = 1
+icon_scale = 1.5
+icon_value_gap = -2.0
+value_outline_width = 5
+center_offset_x = 20.0
+
+[node name="NameLabel" type="Label" parent="." unique_id=1384782381]
+layout_mode = 0
+anchor_right = 1.0
+offset_top = -46.0
+offset_bottom = -10.0
+theme_override_colors/font_color = Color(1, 1, 1, 1)
+theme_override_font_sizes/font_size = 30
+text = "Enemy Name"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="VisualRoot" type="CanvasGroup" parent="." unique_id=748560671]
+clear_margin = 32.0
+
+[node name="Grounding" parent="." unique_id=356880827 instance=ExtResource("4_grounding")]
+
+[node name="SilhouetteHoverArea" type="Control" parent="." unique_id=1308896287]
+anchors_preset = 0
+
+[node name="VitalsBar" parent="." unique_id=437185120 instance=ExtResource("3_vitals_bar")]
+layout_mode = 0
+offset_right = 380.0
+offset_bottom = 42.0
+bar_height_px = 15.0
+
+[node name="FlavorLabel" type="Label" parent="." unique_id=54580739]
+layout_mode = 0
+anchor_right = 1.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.55)
+theme_override_font_sizes/font_size = 16
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="DamagePreviewLabel" type="Label" parent="." unique_id=-1165119736]
+visible = false
+layout_mode = 0
+anchor_right = 1.0
+theme_override_colors/font_color = Color(0.85, 0.5, 0.4, 0.95)
+theme_override_font_sizes/font_size = 15
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="DefeatFlavorLabel" type="Label" parent="." unique_id=500513655]
+layout_mode = 0
+anchor_right = 1.0
+offset_bottom = 50.0
+theme_override_colors/font_color = Color(1, 1, 1, 0.6)
+theme_override_font_sizes/font_size = 22
+horizontal_alignment = 1
+vertical_alignment = 1

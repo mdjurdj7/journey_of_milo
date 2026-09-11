@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://cb11lnq4ysjqc"
+path="res://.godot/imported/sift through dune.mp3-a46164e026e678752cf11f19f98824f8.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/field/sift through dune.mp3"
+dest_files=["res://.godot/imported/sift through dune.mp3-a46164e026e678752cf11f19f98824f8.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

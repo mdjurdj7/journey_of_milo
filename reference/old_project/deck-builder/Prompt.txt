@@ -1,0 +1,10 @@
+Found it. HandContainer's runtime position is (-640, -300) with size 
+(1280, 280) - it spans y = -300 to -20, entirely above the visible window 
+(and half off the left edge). The code appears to center it by offsetting 
+half its size from (0,0), i.e. centering on the top-left corner instead of 
+the bottom-center of the screen. Please fix so the hand sits centered 
+horizontally near the bottom of the window - use anchors/layout presets 
+rather than hardcoded pixel positions if that's cleaner in Godot, so it 
+stays put if the window size changes. Also the container is 1280 wide but 
+the window is only 1152 - size it sensibly. Explain the fix and why the 
+original math put it offscreen.

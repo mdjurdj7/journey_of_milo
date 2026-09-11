@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="BiomeData" format=3 uid="uid://b8wud26o4vxxr"]
+
+[ext_resource type="Script" uid="uid://oa1x87nouhcf" path="res://biome_data.gd" id="1_sunken_works"]
+[ext_resource type="Texture2D" uid="uid://16fqp32hutv6" path="res://assets/biomes/sunken_works/SunkenWorks1.png" id="2_backdrop"]
+[ext_resource type="Texture2D" uid="uid://clasuyedsdax6" path="res://assets/biomes/sunken_works/SunkenWorksBoss.png" id="3_boss_backdrop"]
+[ext_resource type="Texture2D" path="res://assets/regions/beach/PaintedBackgrounds/battle_backdrop_wet_a.png" id="4_backdrop_wet"]
+[ext_resource type="Texture2D" path="res://assets/regions/beach/PaintedBackgrounds/battle_backdrop_wet_a.png" id="5_backdrop_dry"]
+
+[resource]
+script = ExtResource("1_sunken_works")
+biome_name = "The Sunken Works"
+battle_backdrop = ExtResource("2_backdrop")
+boss_battle_backdrop = ExtResource("3_boss_backdrop")
+battle_backdrop_wet = ExtResource("4_backdrop_wet")
+battle_backdrop_dry = ExtResource("5_backdrop_dry")
+ground_color_wet = Color(0.71, 0.68, 0.65, 1)
+ground_color_dry = Color(0.65, 0.59, 0.52, 1)
+ambient_loop_name = "ambient_wind_beach"
+field_music_track = "region_1_field"

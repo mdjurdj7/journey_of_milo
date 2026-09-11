@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://bkvn15dgga41s"]
+
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="1_glasswing"]
+[ext_resource type="Script" uid="uid://8e2aq40illkg" path="res://enemy_intent.gd" id="2_intent"]
+[ext_resource type="PackedScene" path="res://enemy_visual_glasswing.tscn" id="3_visual"]
+
+[sub_resource type="Resource" id="EnemyIntent_1"]
+script = ExtResource("2_intent")
+value = 6
+
+[sub_resource type="Resource" id="EnemyIntent_2"]
+script = ExtResource("2_intent")
+value = 6
+
+[sub_resource type="Resource" id="EnemyIntent_3"]
+script = ExtResource("2_intent")
+value = 9
+
+[resource]
+script = ExtResource("1_glasswing")
+enemy_name = "Glasswing"
+max_hp = 26
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_1"), SubResource("EnemyIntent_2"), SubResource("EnemyIntent_3")])
+visual_scene = ExtResource("3_visual")
+field_visual_scale = 0.7

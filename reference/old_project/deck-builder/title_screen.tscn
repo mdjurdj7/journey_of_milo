@@ -1,0 +1,128 @@
+[gd_scene format=3 uid="uid://cisxcxy3ou8ni"]
+
+[ext_resource type="Script" uid="uid://wainwna7d4n1" path="res://title_screen.gd" id="1_title"]
+[ext_resource type="FontFile" uid="uid://dv3d1nxy8nprl" path="res://assets/fonts/Spectral-Light.ttf" id="2_title_font"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_menu"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_underline"]
+bg_color = Color(0, 0, 0, 0)
+border_width_bottom = 1
+border_color = Color(0.419608, 0.384314, 0.333333, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_menu_focus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_bottom = 1
+border_color = Color(0.419608, 0.384314, 0.333333, 1)
+
+[node name="TitleScreen" type="Node2D" unique_id=1976746553]
+script = ExtResource("1_title")
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=385791081]
+
+[node name="Background" type="ColorRect" parent="UI" unique_id=518443351]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.08, 0.08, 0.1, 1)
+
+[node name="ContentColumn" type="VBoxContainer" parent="UI" unique_id=-2093082825]
+anchors_preset = -1
+anchor_left = 0.5
+anchor_top = 0.22
+anchor_right = 0.5
+anchor_bottom = 0.22
+grow_horizontal = 2
+theme_override_constants/separation = 0
+
+[node name="TitleLabel" type="Label" parent="UI/ContentColumn" unique_id=2029996134]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_fonts/font = ExtResource("2_title_font")
+theme_override_font_sizes/font_size = 90
+text = "The Legend of Milo"
+horizontal_alignment = 1
+
+[node name="MenuSpacer" type="Control" parent="UI/ContentColumn" unique_id=-593408454]
+custom_minimum_size = Vector2(0, 120)
+layout_mode = 2
+
+[node name="MenuList" type="VBoxContainer" parent="UI/ContentColumn" unique_id=-1777874935]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 30
+
+[node name="BeginRunButton" type="Button" parent="UI/ContentColumn/MenuList" unique_id=136274705]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0.419608, 0.384314, 0.333333, 1)
+theme_override_colors/font_focus_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_colors/font_pressed_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_colors/font_hover_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_menu")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_underline")
+theme_override_styles/hover = SubResource("StyleBoxFlat_menu_underline")
+theme_override_styles/focus = SubResource("StyleBoxFlat_menu_focus")
+text = "Begin run"
+flat = true
+
+[node name="CardGlossaryButton" type="Button" parent="UI/ContentColumn/MenuList"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0.419608, 0.384314, 0.333333, 1)
+theme_override_colors/font_focus_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_colors/font_pressed_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_colors/font_hover_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_menu")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_underline")
+theme_override_styles/hover = SubResource("StyleBoxFlat_menu_underline")
+theme_override_styles/focus = SubResource("StyleBoxFlat_menu_focus")
+text = "Card glossary"
+flat = true
+
+[node name="DevBattleChainButton" type="Button" parent="UI/ContentColumn/MenuList" unique_id=1157912874]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0.419608, 0.384314, 0.333333, 1)
+theme_override_colors/font_focus_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_colors/font_pressed_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_colors/font_hover_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_menu")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_underline")
+theme_override_styles/hover = SubResource("StyleBoxFlat_menu_underline")
+theme_override_styles/focus = SubResource("StyleBoxFlat_menu_focus")
+text = "Dev: battle chain"
+flat = true
+
+[node name="DevEncounterPickerButton" type="Button" parent="UI/ContentColumn/MenuList"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0.419608, 0.384314, 0.333333, 1)
+theme_override_colors/font_focus_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_colors/font_pressed_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_colors/font_hover_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_menu")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_underline")
+theme_override_styles/hover = SubResource("StyleBoxFlat_menu_underline")
+theme_override_styles/focus = SubResource("StyleBoxFlat_menu_focus")
+text = "Dev: encounter picker"
+flat = true
+
+[node name="QuitButton" type="Button" parent="UI/ContentColumn/MenuList" unique_id=901240390]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0.419608, 0.384314, 0.333333, 1)
+theme_override_colors/font_focus_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_colors/font_pressed_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_colors/font_hover_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_menu")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_menu_underline")
+theme_override_styles/hover = SubResource("StyleBoxFlat_menu_underline")
+theme_override_styles/focus = SubResource("StyleBoxFlat_menu_focus")
+text = "Quit"
+flat = true

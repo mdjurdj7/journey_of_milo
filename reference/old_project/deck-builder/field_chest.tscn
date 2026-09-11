@@ -1,0 +1,52 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://field_chest.gd" id="1_chest"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_chest"]
+size = Vector2(70, 70)
+
+[node name="FieldChest" type="Area2D"]
+script = ExtResource("1_chest")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+shape = SubResource("RectangleShape2D_chest")
+
+[node name="ChestRoot" type="Node2D" parent="."]
+
+[node name="Body" type="Polygon2D" parent="ChestRoot"]
+
+[node name="Lid" type="Polygon2D" parent="ChestRoot"]
+
+[node name="Latch" type="Polygon2D" parent="ChestRoot"]
+
+[node name="BelongingSprite" type="Sprite2D" parent="ChestRoot"]
+
+[node name="PromptCanvas" type="CanvasLayer" parent="."]
+
+[node name="OfferPrompt" type="Control" parent="PromptCanvas"]
+
+[node name="PromptColumn" type="VBoxContainer" parent="PromptCanvas/OfferPrompt"]
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="PromptLabel" type="Label" parent="PromptCanvas/OfferPrompt/PromptColumn"]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="ChoiceRow" type="HBoxContainer" parent="PromptCanvas/OfferPrompt/PromptColumn"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 40
+alignment = 1
+
+[node name="TakeButton" type="Button" parent="PromptCanvas/OfferPrompt/PromptColumn/ChoiceRow"]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Take"
+
+[node name="LeaveButton" type="Button" parent="PromptCanvas/OfferPrompt/PromptColumn/ChoiceRow"]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Leave"

@@ -1,0 +1,36 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://field_backdrop.gd" id="1_backdrop"]
+
+[node name="FieldBackdrop" type="Node2D"]
+script = ExtResource("1_backdrop")
+
+[node name="Sky" type="Parallax2D" parent="."]
+z_index = -100
+
+[node name="Clouds" type="Parallax2D" parent="."]
+z_index = -90
+
+[node name="Tower" type="Parallax2D" parent="."]
+z_index = -80
+
+[node name="FarMass" type="Parallax2D" parent="."]
+z_index = -70
+
+[node name="HazeFar" type="Parallax2D" parent="."]
+z_index = -65
+
+[node name="MidMass" type="Parallax2D" parent="."]
+z_index = -60
+
+[node name="HazeMid" type="Parallax2D" parent="."]
+z_index = -55
+
+[node name="Ground" type="Parallax2D" parent="."]
+z_index = -50
+
+[node name="HazeGround" type="Parallax2D" parent="."]
+z_index = -45
+
+[node name="Foreground" type="Parallax2D" parent="."]
+z_index = 50

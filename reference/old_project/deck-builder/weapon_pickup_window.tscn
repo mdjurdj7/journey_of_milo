@@ -1,0 +1,225 @@
+[gd_scene format=3 uid="uid://b3ar7vy83ruvo"]
+
+[ext_resource type="Script" uid="uid://b3g011ngbkntc" path="res://weapon_pickup_window.gd" id="1_pickup"]
+[ext_resource type="FontFile" uid="uid://dv3d1nxy8nprl" path="res://assets/fonts/Spectral-Light.ttf" id="2_name_font"]
+[ext_resource type="FontFile" uid="uid://cmvejvjg3twh4" path="res://assets/fonts/Spectral-Regular.ttf" id="3_flavor_font"]
+
+[sub_resource type="StyleBoxLine" id="StyleBoxLine_rule"]
+color = Color(0.419608, 0.384314, 0.333333, 1)
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_button"]
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_underline"]
+bg_color = Color(0, 0, 0, 0)
+border_width_bottom = 1
+border_color = Color(0.419608, 0.384314, 0.333333, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_button_focus"]
+bg_color = Color(0, 0, 0, 0)
+border_width_bottom = 1
+border_color = Color(0.419608, 0.384314, 0.333333, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_take_hover"]
+bg_color = Color(0.611765, 0.498039, 0.305882, 0.12)
+border_width_bottom = 2
+border_color = Color(0.75, 0.62, 0.36, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_leave_hover"]
+bg_color = Color(0.5, 0.494118, 0.462745, 0.1)
+border_width_bottom = 2
+border_color = Color(0.65, 0.615686, 0.552941, 1)
+
+[sub_resource type="StyleBoxFlat" id="StyleBoxFlat_content_panel"]
+bg_color = Color(0.13, 0.13, 0.16, 1)
+border_width_left = 3
+border_width_top = 3
+border_width_right = 3
+border_width_bottom = 3
+border_color = Color(0.4, 0.42, 0.48, 1)
+corner_radius_top_left = 14
+corner_radius_top_right = 14
+corner_radius_bottom_right = 14
+corner_radius_bottom_left = 14
+content_margin_left = 40.0
+content_margin_top = 40.0
+content_margin_right = 40.0
+content_margin_bottom = 40.0
+
+[node name="WeaponPickupWindow" type="CanvasLayer" unique_id=1327114994]
+visible = false
+layer = 8
+script = ExtResource("1_pickup")
+
+[node name="Backdrop" type="ColorRect" parent="." unique_id=2145965562]
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 0
+color = Color(0, 0, 0, 0.52)
+
+[node name="ContentScroll" type="ScrollContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+horizontal_scroll_mode = 0
+
+[node name="ContentCenter" type="CenterContainer" parent="ContentScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="Panel" type="PanelContainer" parent="ContentScroll/ContentCenter"]
+layout_mode = 2
+theme_override_styles/panel = SubResource("StyleBoxFlat_content_panel")
+
+[node name="ContentColumn" type="VBoxContainer" parent="ContentScroll/ContentCenter/Panel" unique_id=2108749834]
+custom_minimum_size = Vector2(420, 0)
+layout_mode = 2
+theme_override_constants/separation = 0
+
+[node name="LocationLabel" type="Label" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=256356064]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.419608, 0.384314, 0.333333, 1)
+theme_override_font_sizes/font_size = 13
+text = "found in the sunken works"
+horizontal_alignment = 1
+
+[node name="Spacer1" type="Control" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=1066660108]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+
+[node name="SingleArt" type="TextureRect" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=699688063]
+custom_minimum_size = Vector2(0, 200)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ComparisonRow" type="HBoxContainer" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=1248712969]
+visible = false
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 40
+alignment = 1
+
+[node name="EquippedColumn" type="VBoxContainer" parent="ContentScroll/ContentCenter/Panel/ContentColumn/ComparisonRow" unique_id=1915201718]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EquippedArt" type="TextureRect" parent="ContentScroll/ContentCenter/Panel/ContentColumn/ComparisonRow/EquippedColumn" unique_id=1458988302]
+modulate = Color(1, 1, 1, 0.45)
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="EquippedSmallLabel" type="Label" parent="ContentScroll/ContentCenter/Panel/ContentColumn/ComparisonRow/EquippedColumn" unique_id=1011104064]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.419608, 0.384314, 0.333333, 1)
+theme_override_font_sizes/font_size = 12
+text = "carrying"
+horizontal_alignment = 1
+
+[node name="OfferedColumn" type="VBoxContainer" parent="ContentScroll/ContentCenter/Panel/ContentColumn/ComparisonRow" unique_id=975916469]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OfferedArt" type="TextureRect" parent="ContentScroll/ContentCenter/Panel/ContentColumn/ComparisonRow/OfferedColumn" unique_id=1042439646]
+custom_minimum_size = Vector2(150, 150)
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="OfferedSmallLabel" type="Label" parent="ContentScroll/ContentCenter/Panel/ContentColumn/ComparisonRow/OfferedColumn" unique_id=612098471]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.419608, 0.384314, 0.333333, 1)
+theme_override_font_sizes/font_size = 12
+text = "found"
+horizontal_alignment = 1
+
+[node name="Spacer2" type="Control" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=1964783815]
+custom_minimum_size = Vector2(0, 10)
+layout_mode = 2
+
+[node name="NameLabel" type="Label" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=1929480724]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_fonts/font = ExtResource("2_name_font")
+theme_override_font_sizes/font_size = 30
+text = "Weapon Name"
+horizontal_alignment = 1
+
+[node name="Spacer3" type="Control" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=1439714898]
+custom_minimum_size = Vector2(0, 6)
+layout_mode = 2
+
+[node name="RuleLabel" type="Label" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=10559467]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.419608, 0.384314, 0.333333, 1)
+theme_override_font_sizes/font_size = 14
+text = "Rule text"
+horizontal_alignment = 1
+
+[node name="Spacer4" type="Control" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=579906268]
+custom_minimum_size = Vector2(0, 12)
+layout_mode = 2
+
+[node name="RuleSeparator" type="HSeparator" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=561402565]
+custom_minimum_size = Vector2(0, 1)
+layout_mode = 2
+theme_override_styles/separator = SubResource("StyleBoxLine_rule")
+
+[node name="Spacer5" type="Control" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=1144522909]
+custom_minimum_size = Vector2(0, 8)
+layout_mode = 2
+
+[node name="FlavorLabel" type="Label" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=1793128400]
+custom_minimum_size = Vector2(380, 0)
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_colors/font_color = Color(0.521569, 0.486275, 0.431373, 1)
+theme_override_constants/line_spacing = 8
+theme_override_fonts/font = ExtResource("3_flavor_font")
+theme_override_font_sizes/font_size = 17
+text = "Flavor text."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="Spacer6" type="Control" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=1101607969]
+custom_minimum_size = Vector2(0, 18)
+layout_mode = 2
+
+[node name="ButtonRow" type="HBoxContainer" parent="ContentScroll/ContentCenter/Panel/ContentColumn" unique_id=1995096288]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 48
+alignment = 1
+
+[node name="TakeButton" type="Button" parent="ContentScroll/ContentCenter/Panel/ContentColumn/ButtonRow" unique_id=674169793]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_colors/font_focus_color = Color(0.941176, 0.909804, 0.85098, 1)
+theme_override_colors/font_pressed_color = Color(0.941176, 0.909804, 0.85098, 1)
+theme_override_colors/font_hover_color = Color(0.976471, 0.870588, 0.65098, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxEmpty_button")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_underline")
+theme_override_styles/hover = SubResource("StyleBoxFlat_take_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_button_focus")
+text = "Take it"
+flat = true
+
+[node name="LeaveButton" type="Button" parent="ContentScroll/ContentCenter/Panel/ContentColumn/ButtonRow" unique_id=666930371]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+theme_override_colors/font_color = Color(0.6, 0.568627, 0.505882, 1)
+theme_override_colors/font_focus_color = Color(0.941176, 0.909804, 0.85098, 1)
+theme_override_colors/font_pressed_color = Color(0.941176, 0.909804, 0.85098, 1)
+theme_override_colors/font_hover_color = Color(0.78, 0.745098, 0.670588, 1)
+theme_override_font_sizes/font_size = 15
+theme_override_styles/normal = SubResource("StyleBoxEmpty_button")
+theme_override_styles/pressed = SubResource("StyleBoxFlat_button_underline")
+theme_override_styles/hover = SubResource("StyleBoxFlat_leave_hover")
+theme_override_styles/focus = SubResource("StyleBoxFlat_button_focus")
+text = "Leave it"
+flat = true

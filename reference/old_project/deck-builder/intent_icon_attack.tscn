@@ -1,0 +1,18 @@
+[gd_scene format=3 uid="uid://2vlxc30e6bd0"]
+
+[node name="AttackIcon" type="Node2D" unique_id=1695745708]
+position = Vector2(-3, 0)
+
+[node name="ChevronShadow" type="Polygon2D" parent="." unique_id=2910871]
+position = Vector2(2.3111105, 0.79999924)
+scale = Vector2(0.74509794, 0.72799987)
+color = Color(0.14318043, 0.014835257, 0.01867456, 1)
+antialiased = true
+polygon = PackedVector2Array(-3.1017542, -0.29761818, 8.977196, -13.461541, 21.056145, -13.461541, 14.345618, -2.4725275, 21.056145, 8.516486, 8.977196, 8.516486)
+
+[node name="Chevron" type="Polygon2D" parent="." unique_id=952091731]
+position = Vector2(2.1333332, 0.19999981)
+scale = Vector2(0.68778276, 0.6719999)
+color = Color(0.44107234, 0.10293762, 0.11787557, 1)
+antialiased = true
+polygon = PackedVector2Array(-3.1017542, -0.29761818, 9.983772, -13.690476, 20.161406, -13.690476, 12.891667, -1.7857136, 20.161406, 8.630955, 9.983772, 8.630955)

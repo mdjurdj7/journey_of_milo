@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://card_data.gd" id="1_riposte_plus"]
+[ext_resource type="Script" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 1
+value = 6
+
+[sub_resource type="Resource" id="CardEffect_2"]
+script = ExtResource("2_effect")
+value = 14
+
+[resource]
+script = ExtResource("1_riposte_plus")
+card_name = "Riposte+"
+energy_cost = 2
+rarity = 1
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1"), SubResource("CardEffect_2")])
+description = "Gain 6 block.
+Deal 14 damage."

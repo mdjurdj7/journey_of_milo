@@ -1,0 +1,135 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (9 cards): 3x Slash, 2x Bite Down, 2x Brace, 1x Reckoning, 1x Down Payment
+
+Elite layers: 3 chosen (3, 6, 8) | side-by-side promotions: 3, 6
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [COMBAT] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [COMBAT] -> L3_1
+    L2_1 [HEAP] -> L3_0, L3_1
+  Layer 3:
+    L3_0 [ELITE] -> L4_1
+    L3_1 [ELITE] -> L4_0, L4_1
+  Layer 4:
+    L4_0 [EVENT] -> L5_2
+    L4_1 [COMBAT] -> L5_0, L5_1
+  Layer 5:
+    L5_0 [SHOP] -> L6_1, L6_0
+    L5_1 [COMBAT] -> L6_2, L6_1
+    L5_2 [TREASURE] -> L6_0, L6_1
+  Layer 6:
+    L6_0 [ELITE] -> L7_0
+    L6_1 [ELITE] -> L7_0
+    L6_2 [COMBAT] -> L7_0
+  Layer 7:
+    L7_0 [COMBAT] -> L8_0, L8_1
+  Layer 8:
+    L8_0 [ELITE] -> L9_0
+    L8_1 [COMBAT] -> L9_0
+  Layer 9:
+    L9_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+--- Room: L1_0 [COMBAT] ---
+  Battle: Sputter
+    Turn 1: HP 70->68 | dealt 16, took 2 | played: Slash, Held Position, Bite Down
+    Turn 2: HP 68->65 | dealt 6, took 3 | played: Slash, Bite Down, Down Payment, Brace
+    Turn 3: HP 65->57 | dealt 6, took 8 | played: Held Position, Bite Down, Slash, Down Payment
+    Turn 4: HP 57->62 | dealt 27, took 0 | played: Slash, Reckoning
+  Battle result: victory
+  Turns: 4 | HP 70->62 | Enemies: Sputter
+  Damage: dealt 55, taken 13 (blocked 6, absorbed 0) | Toll: accrued 21, peak 21
+  Toll by source: enemy 5, self 16, status 0
+  Cards played: 13 | Energy unspent (total): 0 | Chain: openers 3, payoffs 0, expired 3
+
+  Gold gained: 23 (battle reward)
+  Card choice offered: Full Weight, Selfeater, Ballast -> took Selfeater
+--- Room: L2_1 [HEAP] ---
+  Options were: L2_0 [COMBAT], L2_1 [HEAP] (chosen)
+  Shard gained: 1 (heap)
+--- Room: L3_0 [ELITE] ---
+  Options were: L3_0 [ELITE] (chosen), L3_1 [ELITE]
+  Battle: Wardling
+    Turn 1: HP 41->39 | dealt 16, took 2 | played: Held Position, Slash, Bite Down
+    Turn 2: HP 39->35 | dealt 9, took 4 | played: Selfeater, Slash, Brace
+    Turn 3: HP 35->31 | dealt 22, took 6 | played: Brace, Slash, Bite Down
+    Turn 4: HP 31->25 | dealt 18, took 6 | played: Slash, Slash, Held Position, Kept Coin, Brace
+    Turn 5: HP 25->19 | dealt 18, took 6 | played: Slash, Slash, Held Position
+    Turn 6: HP 19->21 | dealt 27, took 0 | played: Reckoning
+  Battle result: victory
+  Turns: 6 | HP 41->21 | Enemies: Wardling
+  Damage: dealt 110, taken 24 (blocked 21, absorbed 0) | Toll: accrued 24, peak 24
+  Toll by source: enemy 4, self 20, status 0
+  Cards played: 18 | Energy unspent (total): 2 | Chain: openers 2, payoffs 0, expired 2
+
+  Gold gained: 48 (battle reward)
+  Card choice offered: Forbearance, Compound, Paid in Pain -> took Compound
+--- Room: L4_1 [COMBAT] ---
+  Battle: Sputter
+    Turn 1: HP 21->16 | dealt 18, took 5 | played: Slash, Slash, Compound
+    Turn 2: HP 16->12 | dealt 17, took 7 | played: Bite Down, Reckoning
+    Turn 3: HP 12->14 | dealt 12, took 0 | played: Slash, Slash
+  Battle result: victory
+  Turns: 3 | HP 21->14 | Enemies: Sputter
+  Damage: dealt 47, taken 12 (blocked 0, absorbed 0) | Toll: accrued 12, peak 7
+  Toll by source: enemy 10, self 2, status 0
+  Cards played: 7 | Energy unspent (total): 1 | Chain: openers 1, payoffs 0, expired 1
+
+  Gold gained: 24 (battle reward)
+--- Room: L5_0 [SHOP] ---
+  Options were: L5_0 [SHOP] (chosen), L5_1 [COMBAT]
+--- Room: L6_0 [ELITE] ---
+  Options were: L6_1 [ELITE], L6_0 [ELITE] (chosen)
+  Battle: Wardling
+    Turn 1: HP 14->14 | dealt 12, took 0 | played: Held Position, Slash, Slash
+    Turn 2: HP 14->8 | dealt 20, took 6 | played: Brace, Bite Down, Bite Down
+    Turn 3: HP 8->8 | dealt 22, took 2 | played: Slash, Bite Down, Slash
+    Turn 4: HP 8->8 | dealt 6, took 0 | played: Held Position, Brace, Compound
+    Turn 5: HP 8->4 | dealt 12, took 4 | played: Slash, Slash, Brace
+    Turn 6: HP 4->6 | dealt 20, took 2 | played: Bite Down, Bite Down
+  Battle result: victory
+  Turns: 6 | HP 14->6 | Enemies: Wardling
+  Damage: dealt 92, taken 14 (blocked 15, absorbed 0) | Toll: accrued 14, peak 14
+  Toll by source: enemy 6, self 8, status 0
+  Cards played: 17 | Energy unspent (total): 1 | Chain: openers 4, payoffs 0, expired 2
+
+  Gold gained: 48 (battle reward)
+  Card choice offered: Ballast, Owed in Full, Forbearance -> took Owed in Full
+  Rare drop offered: Kept Warmth -> took Kept Warmth
+--- Room: L7_0 [COMBAT] ---
+  Battle: Sputter
+    Turn 1: HP 6->6 | dealt 12, took 0 | played: Held Position, Slash, Slash
+    Turn 2: HP 6->4 | dealt 2, took 2 | played: Slash, Brace, Owed in Full
+    Turn 3: HP 4->4 | dealt 22, took 2 | played: Slash, Compound, Bite Down
+    Turn 4: HP 4->2 | dealt 6, took 2 | played: Slash, Bite Down, Held Position
+    Turn 5: HP 2->2 | dealt 8, took 0 | played: Slash, Compound, Owed in Full
+  Battle result: victory
+  Turns: 5 | HP 6->2 | Enemies: Sputter
+  Damage: dealt 50, taken 6 (blocked 0, absorbed 0) | Toll: accrued 6, peak 6
+  Toll by source: enemy 2, self 4, status 0
+  Cards played: 15 | Energy unspent (total): 0 | Chain: openers 2, payoffs 0, expired 2
+
+  Gold gained: 25 (battle reward)
+  Card choice offered: Retaliation, Selfeater, Paid in Pain -> took Retaliation
+--- Room: L8_0 [ELITE] ---
+  Options were: L8_0 [ELITE] (chosen), L8_1 [COMBAT]
+  Battle: Wardling
+    Turn 1: HP 2->2 | dealt 12, took 0 | played: Held Position, Compound, Slash
+    Turn 2: HP 2->0 | dealt 16, took 2 | played: Slash, Bite Down
+  Battle result: defeat
+  Turns: 2 | HP 2->0 | Enemies: Wardling
+  Damage: dealt 28, taken 2 (blocked 9, absorbed 0) | Toll: accrued 2, peak 2
+  Toll by source: enemy 0, self 2, status 0
+  Cards played: 5 | Energy unspent (total): 1 | Chain: openers 0, payoffs 0, expired 0
+
+=== RUN END: DEFEAT ===
+Rooms reached: 9
+Final HP: 0/70
+Final gold: 221
+Final shards: 1
+Final deck (14 cards): 3x Slash, 2x Bite Down, 2x Brace, 1x Reckoning, 1x Held Position, 1x Selfeater, 1x Compound, 1x Owed in Full, 1x Kept Warmth, 1x Retaliation

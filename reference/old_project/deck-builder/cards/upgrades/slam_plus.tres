@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://card_data.gd" id="1_slam_plus"]
+[ext_resource type="Script" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+value = 40
+
+[resource]
+script = ExtResource("1_slam_plus")
+card_name = "Slam+"
+rarity = 2
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Deal 40 damage."
+removal_scope = 2

@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://cv4ojiaajic3y"
+path="res://.godot/imported/Ragged Breath.mp3-20d60c3f258e4bd343256d3432d12a3a.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/enemies/Works_Wardling/Ragged Breath.mp3"
+dest_files=["res://.godot/imported/Ragged Breath.mp3-20d60c3f258e4bd343256d3432d12a3a.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

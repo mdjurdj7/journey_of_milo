@@ -1,0 +1,37 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://t82b0jxc78vw"]
+
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="1_wardling"]
+[ext_resource type="Script" uid="uid://8e2aq40illkg" path="res://enemy_intent.gd" id="2_intent"]
+[ext_resource type="PackedScene" path="res://enemy_visual_wardling_sprite.tscn" id="3_visual"]
+
+[sub_resource type="Resource" id="EnemyIntent_1"]
+script = ExtResource("2_intent")
+value = 9
+
+[sub_resource type="Resource" id="EnemyIntent_2"]
+script = ExtResource("2_intent")
+value = 5
+
+[sub_resource type="Resource" id="EnemyIntent_3"]
+script = ExtResource("2_intent")
+value = 11
+
+[resource]
+script = ExtResource("1_wardling")
+enemy_name = "Wardling"
+max_hp = 90
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_1"), SubResource("EnemyIntent_2"), SubResource("EnemyIntent_3")])
+visual_scene = ExtResource("3_visual")
+battle_visual_scale = 0.66225
+intent_horizontal_offset_px = 7.8
+field_visual_scale = 0.825
+field_foot_offset_px = 15.0
+is_elite = true
+defeat_flavor = "The Wardling is still."
+pool_weight = 0.5
+escalation_multipliers = Array[float]([1.0, 1.3, 1.6, 2.0])
+escalation_stage_length = 2
+escalation_stage_descriptions = Array[String](["Flinches toward you, uncertain", "Lunges, growing desperate", "Claws bared, shaking with tension", "Wholly frenzied, past reason"])
+pain_turn_hp_threshold = 0.5
+pain_turn_flavor = "A ragged breath. It isn't moving."
+pain_turn_sfx = "ragged_breath"

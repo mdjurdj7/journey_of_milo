@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3 uid="uid://dsu3ntospyqb4"]
+
+[ext_resource type="Script" uid="uid://irne17w3c5a6" path="res://weapon_data.gd" id="1_last_wages"]
+[ext_resource type="Script" uid="uid://dgphyibyxhkce" path="res://weapon_modifier.gd" id="2_modifier"]
+[ext_resource type="Texture2D" uid="uid://8roepawwv2he" path="res://assets/equipment/weapons/last_wages.png" id="3_icon"]
+
+[sub_resource type="Resource" id="WeaponModifier_1"]
+script = ExtResource("2_modifier")
+kind = 1
+value = 4
+
+[resource]
+script = ExtResource("1_last_wages")
+weapon_name = "Last Wages"
+rarity = 1
+description = "Paid out before the work was finished. Whoever it was owed to never came to collect."
+modifier = SubResource("WeaponModifier_1")
+icon_texture = ExtResource("3_icon")

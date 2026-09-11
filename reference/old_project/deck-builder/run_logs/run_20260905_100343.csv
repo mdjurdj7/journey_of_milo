@@ -1,0 +1,6 @@
+battle,enemies,turns,hp_start,hp_end,damage_dealt,damage_taken,damage_blocked,toll_accrued,toll_peak,toll_enemy,toll_self,toll_status,absorb_used
+1,Sputter,2,70,66,48,9,0,9,9,5,4,0,0
+2,Wardling,4,66,47,99,23,0,31,31,9,22,0,5
+3,Saltdarner,2,47,37,32,12,0,12,12,6,6,0,0
+4,Tender;Picket,5,37,19,124,23,0,23,23,5,18,0,11
+5,Saltdarner;Saltdarner,4,19,0,50,27,0,26,26,8,4,14,8

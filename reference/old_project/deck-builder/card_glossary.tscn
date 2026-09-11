@@ -1,0 +1,90 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://card_glossary.gd" id="1_glossary"]
+
+[node name="CardGlossary" type="Node2D"]
+script = ExtResource("1_glossary")
+
+[node name="UI" type="CanvasLayer" parent="."]
+
+[node name="Background" type="ColorRect" parent="UI"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0.08, 0.08, 0.1, 1)
+
+[node name="Margin" type="MarginContainer" parent="UI"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_top = 30
+theme_override_constants/margin_right = 40
+theme_override_constants/margin_bottom = 30
+
+[node name="Root" type="VBoxContainer" parent="UI/Margin"]
+layout_mode = 2
+theme_override_constants/separation = 16
+
+[node name="HeaderRow" type="HBoxContainer" parent="UI/Margin/Root"]
+layout_mode = 2
+
+[node name="TitleLabel" type="Label" parent="UI/Margin/Root/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_font_sizes/font_size = 28
+text = "Card Glossary"
+
+[node name="BackButton" type="Button" parent="UI/Margin/Root/HeaderRow"]
+layout_mode = 2
+text = "Back"
+
+[node name="CharacterTabRow" type="HBoxContainer" parent="UI/Margin/Root"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="TypeFilterRow" type="HBoxContainer" parent="UI/Margin/Root"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="MainRow" type="HBoxContainer" parent="UI/Margin/Root"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 20
+
+[node name="GridScroll" type="ScrollContainer" parent="UI/Margin/Root/MainRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+
+[node name="GridMargin" type="MarginContainer" parent="UI/Margin/Root/MainRow/GridScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/margin_top = 90
+theme_override_constants/margin_left = 40
+theme_override_constants/margin_bottom = 60
+theme_override_constants/margin_right = 40
+
+[node name="CardGrid" type="GridContainer" parent="UI/Margin/Root/MainRow/GridScroll/GridMargin"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 12
+theme_override_constants/v_separation = 12
+
+[node name="DetailPanel" type="VBoxContainer" parent="UI/Margin/Root/MainRow"]
+layout_mode = 2
+custom_minimum_size = Vector2(280, 0)
+theme_override_constants/separation = 8
+
+[node name="DetailNameLabel" type="Label" parent="UI/Margin/Root/MainRow/DetailPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.870588, 0.839216, 0.784314, 1)
+theme_override_font_sizes/font_size = 20
+autowrap_mode = 3
+
+[node name="DetailFlavorLabel" type="Label" parent="UI/Margin/Root/MainRow/DetailPanel"]
+layout_mode = 2
+theme_override_colors/font_color = Color(0.6, 0.56, 0.5, 1)
+theme_override_font_sizes/font_size = 15
+autowrap_mode = 3

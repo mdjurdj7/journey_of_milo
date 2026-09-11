@@ -1,0 +1,8 @@
+[gd_resource type="Resource" script_class="CardEffect" format=3]
+
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="1_stoppage"]
+
+[resource]
+script = ExtResource("1_stoppage")
+effect_type = 6
+combat_message = "It seizes mid-motion, and goes still."

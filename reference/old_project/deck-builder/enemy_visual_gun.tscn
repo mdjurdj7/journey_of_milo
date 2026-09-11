@@ -1,0 +1,14 @@
+[gd_scene format=3 uid="uid://cicq3u131x2ro"]
+
+[ext_resource type="Script" uid="uid://c62n84auoyfts" path="res://enemy_visual.gd" id="1_visual"]
+[ext_resource type="Texture2D" uid="uid://t0updnu0b7qi" path="res://assets/enemies/Works_Gun.png" id="2_sprite"]
+
+[node name="Gun" type="Node2D" unique_id=1303170420]
+z_index = 1
+script = ExtResource("1_visual")
+idle_bob_enabled = false
+
+[node name="Sprite" type="Sprite2D" parent="." unique_id=598471852]
+position = Vector2(24.1, -94.8)
+scale = Vector2(0.22, 0.22)
+texture = ExtResource("2_sprite")

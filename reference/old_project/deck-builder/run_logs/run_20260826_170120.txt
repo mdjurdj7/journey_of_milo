@@ -1,0 +1,149 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [COMBAT] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [COMBAT] -> L3_0
+    L2_1 [COMBAT] -> L3_2, L3_1
+  Layer 3:
+    L3_0 [COMBAT] -> L4_0
+    L3_1 [COMBAT] -> L4_0, L4_1
+    L3_2 [TREASURE] -> L4_1, L4_0
+  Layer 4:
+    L4_0 [ELITE] -> L5_0
+    L4_1 [COMBAT] -> L5_1
+  Layer 5:
+    L5_0 [EVENT] -> L6_1, L6_0
+    L5_1 [COMBAT] -> L6_0, L6_1
+  Layer 6:
+    L6_0 [SHOP] -> L7_1, L7_0
+    L6_1 [TREASURE] -> L7_0
+  Layer 7:
+    L7_0 [COMBAT] -> L8_0
+    L7_1 [TREASURE] -> L8_0
+  Layer 8:
+    L8_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+  Battle: Tideworn
+    Turn 1: HP 70->70 | dealt 12, took 0 | played: Strike, Strike, Guard
+    Turn 2: HP 70->68 | dealt 22, took 2 | played: Strike, Bite Down, Strike
+    Turn 3: HP 68->68 | dealt 0, took 0 | played: Guard, Guard, Guard
+    Turn 4: HP 68->68 | dealt 16, took 0 | played: Strike, Bite Down
+  Battle result: victory
+  Turns: 4 | HP 70->68 | Enemies: Tideworn
+  Damage: dealt 50, taken 2 (blocked 13) | Toll: accrued 2, peak 2
+  Cards played: 11 | Energy unspent (total): 1 | Chain: openers 1, payoffs 0, expired 1
+
+  Gold gained: 21 (battle reward)
+  Card choice offered: Paid in Pain, Reckoning, Come To -> took Reckoning
+  Rare drop offered: Kept Warmth -> took Kept Warmth
+  Gold gained: 25 (field chest)
+--- Room: L1_0 [COMBAT] ---
+  Battle: Beachwrack
+    Turn 1: HP 68->68 | dealt 12, took 0 | played: Strike, Strike, Guard
+    (Tideworn joins the fight)
+    Turn 2: HP 68->58 | dealt 12, took 10 | played: Guard, Strike, Strike
+    Turn 3: HP 58->66 | dealt 22, took 2 | played: Bite Down, Strike, Strike
+    Turn 4: HP 66->57 | dealt 6, took 9 | played: Guard, Strike, Guard
+    Turn 5: HP 57->66 | dealt 18, took 0 | played: Strike, Strike, Strike
+    Turn 6: HP 66->64 | dealt 116, took 2 | played: Bite Down, Strike
+  Battle result: victory
+  Turns: 6 | HP 68->64 | Enemies: Beachwrack
+  Damage: dealt 186, taken 23 (blocked 15) | Toll: accrued 23, peak 23
+  Cards played: 17 | Energy unspent (total): 1 | Chain: openers 2, payoffs 0, expired 1
+
+  Gold gained: 20 (battle reward)
+--- Room: L2_1 [COMBAT] ---
+  Options were: L2_0 [COMBAT], L2_1 [COMBAT] (chosen)
+  Battle: Beachwrack
+    Turn 1: HP 64->62 | dealt 22, took 2 | played: Bite Down, Strike, Strike
+    Turn 2: HP 62->62 | dealt 0, took 0 | played: Guard, Strike, Strike
+    Turn 3: HP 62->62 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+  Turns: 3 | HP 64->62 | Enemies: Beachwrack
+  Damage: dealt 122, taken 2 (blocked 0) | Toll: accrued 2, peak 2
+  Cards played: 6 | Energy unspent (total): 3 | Chain: openers 1, payoffs 0, expired 1
+
+  Gold gained: 24 (battle reward)
+  Gold gained: 19 (field chest)
+--- Room: L3_2 [TREASURE] ---
+  Options were: L3_2 [TREASURE] (chosen), L3_1 [COMBAT]
+  Gold gained: 45 (field chest)
+--- Room: L4_0 [ELITE] ---
+  Options were: L4_1 [COMBAT], L4_0 [ELITE] (chosen)
+  Battle: Glasswing, Glasswing
+    Turn 1: HP 62->62 | dealt 200, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 62->62 | Enemies: Glasswing, Glasswing
+  Damage: dealt 200, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 36 (battle reward)
+  Card choice offered: Guillotine, Ballast, Advance -> took Guillotine
+--- Room: L5_0 [EVENT] ---
+  Weapon offered: Last Wages -> took Last Wages
+--- Room: L6_0 [SHOP] ---
+  Options were: L6_1 [TREASURE], L6_0 [SHOP] (chosen)
+--- Room: L7_0 [COMBAT] ---
+  Options were: L7_1 [TREASURE], L7_0 [COMBAT] (chosen)
+  Battle: Beachwrack
+    Turn 1: HP 62->60 | dealt 10, took 2 | played: Ballast, Guard, Bite Down
+    Turn 2: HP 60->60 | dealt 2, took 0 | played: Guard, Guillotine
+    Turn 3: HP 60->60 | dealt 14, took 0 | played: Guillotine, Guard
+    (Tideworn joins the fight)
+    Turn 4: HP 60->56 | dealt 6, took 4 | played: Guard, Ballast, Strike
+    Turn 5: HP 56->60 | dealt 14, took 0 | played: Guillotine, Guard
+    Turn 6: HP 60->49 | dealt 6, took 11 | played: Bite Down, Reckoning
+    Turn 7: HP 49->41 | dealt 12, took 14 | played: Guard, Strike, Strike
+    Turn 8: HP 41->41 | dealt 0, took 0 | played: Guard, Guard, Guard
+    Turn 9: HP 41->41 | dealt 2, took 0 | played: Ballast, Guillotine (chain: Stoppage)
+    Turn 10: HP 41->62 | dealt 0, took 4 | played: Kept Warmth
+    Turn 11: HP 62->66 | dealt 200, took 0 | played: (none)
+  Battle result: victory
+  Turns: 11 | HP 62->66 | Enemies: Beachwrack
+  Damage: dealt 266, taken 35 (blocked 24) | Toll: accrued 35, peak 27
+  Cards played: 23 | Energy unspent (total): 3 | Chain: openers 5, payoffs 1, expired 3
+
+  Gold gained: 25 (battle reward)
+  Card choice offered: Guillotine, Come To, Paid in Pain -> took Come To
+  Battle: Beachwrack
+    Turn 1: HP 66->66 | dealt 18, took 0 | played: Strike, Strike, Strike
+    Turn 2: HP 66->66 | dealt 2, took 0 | played: Ballast, Guillotine (chain: Stoppage)
+    Turn 3: HP 66->64 | dealt 16, took 2 | played: Bite Down, Strike
+    Turn 4: HP 64->64 | dealt 14, took 0 | played: Ballast, Guillotine (chain: Stoppage)
+    Turn 5: HP 64->58 | dealt 24, took 6 | played: Come To, Bite Down, Guillotine (chain: Stoppage)
+    Turn 6: HP 58->58 | dealt 6, took 0 | played: Strike
+  Battle result: victory
+  Turns: 6 | HP 66->58 | Enemies: Beachwrack
+  Damage: dealt 80, taken 8 (blocked 0) | Toll: accrued 8, peak 8
+  Cards played: 13 | Energy unspent (total): 3 | Chain: openers 4, payoffs 3, expired 1
+
+  Gold gained: 15 (battle reward)
+--- Room: L8_0 [BOSS] ---
+  Battle: Wardling Alpha
+    Turn 1: HP 58->50 | dealt 0, took 8 | played: Come To, Guard, Guard
+    Turn 2: HP 50->51 | dealt 12, took 3 | played: Guard, Strike, Strike
+    Turn 3: HP 51->36 | dealt 16, took 18 | played: Strike, Bite Down, Ballast
+    Turn 4: HP 36->25 | dealt 12, took 17 | played: Come To, Guard, Strike, Strike
+    Turn 5: HP 25->25 | dealt 6, took 3 | played: Strike, Guard, Guard
+    Turn 6: HP 25->24 | dealt 14, took 4 | played: Come To, Ballast, Guillotine (chain: Stoppage)
+    Turn 7: HP 24->24 | dealt 53, took 0 | played: Reckoning, Guard
+    Turn 8: HP 24->19 | dealt 0, took 5 | played: Come To, Guard, Guard, Guard
+    Turn 9: HP 19->20 | dealt 14, took 0 | played: Ballast, Guillotine (chain: Stoppage)
+    Turn 10: HP 20->0 | dealt 12, took 23 | played: Guard, Strike, Strike
+  Battle result: defeat
+  Turns: 10 | HP 58->0 | Enemies: Wardling Alpha
+  Damage: dealt 139, taken 81 (blocked 56) | Toll: accrued 78, peak 53
+  Cards played: 30 | Energy unspent (total): 1 | Chain: openers 4, payoffs 2, expired 1
+
+=== RUN END: DEFEAT ===
+Rooms reached: 9
+Final HP: 0/70
+Final gold: 90
+Final deck (16 cards): 5x Strike, 5x Guard, 1x Bite Down, 1x Reckoning, 2x Guillotine, 1x Ballast, 1x Come To

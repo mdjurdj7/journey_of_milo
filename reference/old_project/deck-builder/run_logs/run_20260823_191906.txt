@@ -1,0 +1,114 @@
+=== RUN START ===
+Class: Warrior
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Overreach
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [TREASURE] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [EVENT] -> L3_1, L3_0
+    L2_1 [COMBAT] -> L3_0, L3_1
+  Layer 3:
+    L3_0 [COMBAT] -> L4_0
+    L3_1 [ELITE] -> L4_1, L4_2
+  Layer 4:
+    L4_0 [TREASURE] -> L5_0, L5_1
+    L4_1 [SHOP] -> L5_1
+    L4_2 [COMBAT] -> L5_1
+  Layer 5:
+    L5_0 [TREASURE] -> L6_2, L6_0
+    L5_1 [COMBAT] -> L6_1
+  Layer 6:
+    L6_0 [COMBAT] -> L7_1, L7_0
+    L6_1 [COMBAT] -> L7_0
+    L6_2 [TREASURE] -> L7_0, L7_1
+  Layer 7:
+    L7_0 [COMBAT] -> L8_0
+    L7_1 [COMBAT] -> L8_0
+  Layer 8:
+    L8_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+  Battle: Tideworn
+    Turn 1: HP 70->70 | dealt 18, took 0 | played: Strike, Strike, Strike
+    Turn 2: HP 70->68 | dealt 16, took 2 | played: Overreach, Strike, Guard
+    Turn 3: HP 68->68 | dealt 22, took 0 | played: Strike, Strike, Overreach
+  Battle result: victory
+
+  Gold gained: 20 (battle reward)
+  Card choice offered: Iron Will, Back Pay, Warlord's Cleave -> took Back Pay
+  Gold gained: 20 (field chest)
+--- Room: L1_0 [TREASURE] ---
+  Gold gained: 58 (field chest)
+--- Room: L2_0 [EVENT] ---
+  Options were: L2_0 [EVENT] (chosen), L2_1 [COMBAT]
+  Weapon offered: The Creditor -> took The Creditor
+--- Room: L3_1 [ELITE] ---
+  Options were: L3_1 [ELITE] (chosen), L3_0 [COMBAT]
+  Battle: Glasswing, Glasswing
+    Turn 1: HP 53->53 | dealt 200, took 0 | played: (none)
+  Battle result: victory
+
+  Gold gained: 30 (battle reward)
+  Card choice offered: Back Pay, Guillotine, Warlord's Cleave -> took Guillotine
+--- Room: L4_2 [COMBAT] ---
+  Options were: L4_1 [SHOP], L4_2 [COMBAT] (chosen)
+  Battle: Glasswing
+    Turn 1: HP 53->52 | dealt 12, took 1 | played: Guard, Strike, Strike
+    Turn 2: HP 52->52 | dealt 6, took 0 | played: Guard, Guard, Strike
+    Turn 3: HP 52->52 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+
+  Gold gained: 22 (battle reward)
+  Card choice offered: Guillotine, Back Pay, Riposte -> took Guillotine
+  Rare drop offered: Kept Warmth -> took Kept Warmth
+  Gold gained: 23 (field chest)
+--- Room: L5_1 [COMBAT] ---
+  Battle: Glasswing
+    Turn 1: HP 52->52 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+
+  Gold gained: 21 (battle reward)
+  Rare drop offered: Kept Warmth -> took Kept Warmth
+  Gold gained: 23 (field chest)
+--- Room: L6_1 [COMBAT] ---
+  Battle: Beachwrack
+    Turn 1: HP 52->52 | dealt 18, took 0 | played: Guillotine, Strike
+    Turn 2: HP 52->70 | dealt 0, took 0 | played: Kept Warmth
+    (Tideworn joins the fight)
+    Turn 3: HP 70->65 | dealt 6, took 5 | played: Guard, Guard, Strike
+    Turn 4: HP 65->59 | dealt 24, took 6 | played: Overreach, Guillotine (chain: Stoppage)
+    Turn 5: HP 59->45 | dealt 6, took 14 | played: Guard, Guard, Strike
+    Turn 6: HP 45->70 | dealt 0, took 0 | played: Kept Warmth
+    Turn 7: HP 70->51 | dealt 18, took 19 | played: Guillotine, Strike
+    Turn 8: HP 51->51 | dealt 150, took 0 | played: Strike, Back Pay
+  Battle result: victory
+
+  Gold gained: 25 (battle reward)
+  Card choice offered: Back Pay, Guillotine, Iron Will -> took Back Pay
+--- Room: L7_0 [COMBAT] ---
+  Battle: Outbound
+    Turn 1: HP 51->48 | dealt 18, took 3 | played: Guillotine, Strike
+    Turn 2: HP 48->48 | dealt 10, took 0 | played: Strike, Guard, Strike
+    Turn 3: HP 48->46 | dealt 19, took 2 | played: Overreach, Guillotine (chain: Stoppage)
+    Turn 4: HP 46->42 | dealt 12, took 4 | played: Strike, Strike, Strike
+    Turn 5: HP 42->39 | dealt 10, took 3 | played: Strike, Guillotine
+    Turn 6: HP 39->39 | dealt 3, took 0 | played: Strike
+  Battle result: victory
+
+  Gold gained: 19 (battle reward)
+--- Room: L8_0 [BOSS] ---
+  Battle: Wardling Alpha
+    Turn 1: HP 39->25 | dealt 18, took 14 | played: Strike, Guillotine
+    Turn 2: HP 25->22 | dealt 14, took 3 | played: Guard, Back Pay
+    Turn 3: HP 22->5 | dealt 12, took 17 | played: Guillotine, Guard
+    Turn 4: HP 5->0 | dealt 20, took 13 | played: Guard, Back Pay
+  Battle result: defeat
+
+=== RUN END: DEFEAT ===
+Rooms reached: 9
+Final HP: 0/70
+Final gold: 261
+Final deck (15 cards): 5x Strike, 5x Guard, 1x Overreach, 2x Back Pay, 2x Guillotine

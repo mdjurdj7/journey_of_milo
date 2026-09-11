@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://card_data.gd" id="1_owed"]
+[ext_resource type="Script" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/statuses/owed.tres" id="3_owed_status"]
+
+[sub_resource type="Resource" id="Resource_owed_apply"]
+script = ExtResource("2_effect")
+effect_type = 18
+status_data = ExtResource("3_owed_status")
+
+[resource]
+script = ExtResource("1_owed")
+card_name = "Owed"
+card_type = 1
+energy_cost = 1
+toll_cost = 10
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("Resource_owed_apply")])
+description = "Spend 10 Toll.
+Apply Owed 3."

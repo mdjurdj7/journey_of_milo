@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://ctnluc8sji0rr"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_advance_plus"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 9
+value = 5
+toll_gain = 14
+
+[resource]
+script = ExtResource("1_advance_plus")
+card_name = "Advance+"
+energy_cost = 0
+card_type = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Lose 5 HP.
+Gain 14 Toll."

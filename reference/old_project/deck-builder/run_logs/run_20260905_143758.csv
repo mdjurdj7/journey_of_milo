@@ -1,0 +1,2 @@
+battle,enemies,turns,hp_start,hp_end,damage_dealt,damage_taken,damage_blocked,toll_accrued,toll_peak,toll_enemy,toll_self,toll_status,absorb_used
+1,Sputter,14,70,0,0,73,0,70,70,70,0,0,0

@@ -1,0 +1,19 @@
+[remap]
+
+importer="csv_translation"
+type="Translation"
+uid="uid://cofqhjof3sv4x"
+
+[deps]
+
+files=["res://run_logs/run_20260905_164726.enemies.translation", "res://run_logs/run_20260905_164726.turns.translation", "res://run_logs/run_20260905_164726.hp.translation", "res://run_logs/run_20260905_164726.hp.translation", "res://run_logs/run_20260905_164726.damage.translation", "res://run_logs/run_20260905_164726.damage.translation", "res://run_logs/run_20260905_164726.damage.translation", "res://run_logs/run_20260905_164726.toll.translation", "res://run_logs/run_20260905_164726.toll.translation", "res://run_logs/run_20260905_164726.toll.translation", "res://run_logs/run_20260905_164726.toll.translation", "res://run_logs/run_20260905_164726.toll.translation", "res://run_logs/run_20260905_164726.absorb.translation"]
+
+source_file="res://run_logs/run_20260905_164726.csv"
+dest_files=["res://run_logs/run_20260905_164726.enemies.translation", "res://run_logs/run_20260905_164726.turns.translation", "res://run_logs/run_20260905_164726.hp.translation", "res://run_logs/run_20260905_164726.hp.translation", "res://run_logs/run_20260905_164726.damage.translation", "res://run_logs/run_20260905_164726.damage.translation", "res://run_logs/run_20260905_164726.damage.translation", "res://run_logs/run_20260905_164726.toll.translation", "res://run_logs/run_20260905_164726.toll.translation", "res://run_logs/run_20260905_164726.toll.translation", "res://run_logs/run_20260905_164726.toll.translation", "res://run_logs/run_20260905_164726.toll.translation", "res://run_logs/run_20260905_164726.absorb.translation"]
+
+[params]
+
+compress=1
+delimiter=0
+unescape_keys=false
+unescape_translations=true

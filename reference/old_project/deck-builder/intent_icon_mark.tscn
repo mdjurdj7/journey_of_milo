@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[node name="MarkIcon" type="Node2D"]
+
+[node name="ShackleShadow" type="Polygon2D" parent="."]
+position = Vector2(1.5, 1.2)
+scale = Vector2(1.08, 1.08)
+color = Color(0.10769, 0.05043, 0.13029, 1)
+antialiased = true
+polygon = PackedVector2Array(-9, 16, -9, -14, 9, -14, 9, 16, 4, 16, 4, -9, -4, -9, -4, 16)
+
+[node name="Shackle" type="Polygon2D" parent="."]
+color = Color(0.45559, 0.24966, 0.51529, 1)
+antialiased = true
+polygon = PackedVector2Array(-9, 16, -9, -14, 9, -14, 9, 16, 4, 16, 4, -9, -4, -9, -4, 16)

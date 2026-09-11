@@ -1,0 +1,69 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Elite layers: 3 chosen (3, 5, 7) | side-by-side promotions: 3, 7
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [TREASURE] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [HEAP] -> L3_2
+    L2_1 [EVENT] -> L3_1, L3_0
+  Layer 3:
+    L3_0 [ELITE] -> L4_0
+    L3_1 [ELITE] -> L4_2
+    L3_2 [TREASURE] -> L4_2, L4_1
+  Layer 4:
+    L4_0 [COMBAT] -> L5_1, L5_2
+    L4_1 [EVENT] -> L5_0
+    L4_2 [EVENT] -> L5_1
+  Layer 5:
+    L5_0 [ELITE] -> L6_1, L6_0
+    L5_1 [COMBAT] -> L6_2, L6_0
+    L5_2 [SHOP] -> L6_0
+  Layer 6:
+    L6_0 [COMBAT] -> L7_0
+    L6_1 [COMBAT] -> L7_0, L7_1
+    L6_2 [HEAP] -> L7_0, L7_1
+  Layer 7:
+    L7_0 [ELITE] -> L8_0, L8_2
+    L7_1 [ELITE] -> L8_1
+  Layer 8:
+    L8_0 [COMBAT] -> L9_0
+    L8_1 [COMBAT] -> L9_0
+    L8_2 [COMBAT] -> L9_0
+  Layer 9:
+    L9_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+  Battle: Leviathan
+    Turn 1: HP 70->66 | dealt 6, took 4 | played: Guard, Guard, Strike
+    Turn 2: HP 66->62 | dealt 22, took 8 | played: Bite Down, Strike, Strike
+    Turn 3: HP 62->60 | dealt 22, took 8 | played: Strike, Bite Down, Strike
+    Turn 4: HP 60->60 | dealt 18, took 6 | played: Strike, Strike, Strike
+    Turn 5: HP 60->50 | dealt 22, took 16 | played: Strike, Bite Down, Strike
+    Turn 6: HP 50->53 | dealt 18, took 6 | played: Strike, Strike, Strike
+    Turn 7: HP 53->53 | dealt 18, took 6 | played: Strike, Strike, Strike
+    Turn 8: HP 53->58 | dealt 12, took 1 | played: Strike, Strike, Guard
+    Turn 9: HP 58->42 | dealt 22, took 17 | played: Strike, Strike, Bite Down
+    Turn 10: HP 42->38 | dealt 12, took 10 | played: Strike, Strike, Guard
+    Turn 11: HP 38->17 | dealt 18, took 30 | played: Strike, Strike, Strike
+    Turn 12: HP 17->22 | dealt 12, took 1 | played: Strike, Strike, Guard
+    Turn 13: HP 22->15 | dealt 16, took 8 | played: Strike, Bite Down
+    Turn 14: HP 15->15 | dealt 18, took 6 | played: Strike, Strike, Strike
+    Turn 15: HP 15->4 | dealt 22, took 17 | played: Bite Down, Strike, Strike
+    Turn 16: HP 4->10 | dealt 12, took 0 | played: Strike, Strike
+  Battle result: victory
+  Turns: 16 | HP 70->10 | Enemies: Leviathan
+  Damage: dealt 270, taken 144 (blocked 25) | Toll: accrued 144, peak 144
+  Cards played: 46 | Energy unspent (total): 2 | Chain: openers 6, payoffs 0, expired 6
+  Boss Charges: attempted 3, interrupted 1, buffed 2 | Check damages: [62, 48, 46]
+
+=== RUN END: VICTORY ===
+Rooms reached: 1
+Final HP: 10/70
+Final gold: 0
+Final deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down

@@ -1,0 +1,29 @@
+[gd_scene format=3 uid="uid://b4o03yv37uqan"]
+
+[ext_resource type="Script" uid="uid://cpgkp864d4fk" path="res://resource_display.gd" id="1_resource_display"]
+
+[node name="ResourceDisplay" type="Control" unique_id=1566116458]
+custom_minimum_size = Vector2(700, 50)
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1_resource_display")
+
+[node name="PipRow" type="HBoxContainer" parent="." unique_id=1942851134]
+layout_mode = 0
+offset_top = 4.0
+offset_right = 460.0
+offset_bottom = 46.0
+mouse_filter = 2
+
+[node name="ValueLabel" type="Label" parent="." unique_id=1769960914]
+layout_mode = 0
+offset_left = 460.0
+offset_right = 700.0
+offset_bottom = 50.0
+theme_override_colors/font_color = Color(0.95, 0.9, 0.75, 1)
+theme_override_font_sizes/font_size = 24
+text = "3/3"
+vertical_alignment = 1
+visible_characters = 0
+visible_ratio = 0.0

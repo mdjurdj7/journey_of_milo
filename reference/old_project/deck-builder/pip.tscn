@@ -1,0 +1,91 @@
+[gd_scene format=3 uid="uid://dlhb6vuno0bri"]
+
+[ext_resource type="Script" uid="uid://c1ivqkrike51d" path="res://pip.gd" id="1_pip"]
+
+[node name="Pip" type="Control" unique_id=986149091]
+layout_mode = 3
+anchors_preset = 0
+script = ExtResource("1_pip")
+
+[node name="Visual" type="Node2D" parent="." unique_id=197457959]
+
+[node name="CoinIcon" type="Node2D" parent="Visual" unique_id=1695783390]
+
+[node name="CoinDark2" type="Polygon2D" parent="Visual/CoinIcon" unique_id=642975222]
+position = Vector2(-2.9942918, 46.375004)
+scale = Vector2(1.8627245, 1.4100002)
+color = Color(0.2367194, 0.21234173, 0.17710051, 1)
+antialiased = true
+polygon = PackedVector2Array(-30.603405, -124.37942, -13.109827, -128.45746, 4.369944, -130.05319, 23.722548, -128.45746, 38.113148, -125.08864, 41.334236, -112.32268, 49.508682, -107.43617, 58.513374, -81.82623, 62.80816, -63.386517, 64.95553, -45.2784, 59.306366, -11.170212, 50.47253, 9.05319, 43.07515, 21.542555, 31.213879, 30.31915, 4.369944, 35.90426, -23, 29, -39.729824, 17.464535, -43.48776, -5.9397182, -49, -16, -53.687866, -43.085106, -51.30458, -64.842255, -49.317924, -82.97872, -45.0983, -105.939705)
+
+[node name="Coin" type="Polygon2D" parent="Visual/CoinIcon" unique_id=2013177215]
+position = Vector2(-5.000002, 39)
+scale = Vector2(1.6018518, 1.2533333)
+color = Color(0.7138504, 0.7138948, 0.6948307, 1)
+antialiased = true
+polygon = PackedVector2Array(-31, -121, -13.109827, -128.45746, 4.369944, -130.05319, 23.722548, -128.45746, 36.208096, -123.67021, 39.329483, -111.702126, 49.508682, -107.43617, 57, -91, 62.427753, -67.81915, 63.86707, -45.202133, 59.306366, -11.170212, 50.47253, 9.05319, 43.07515, 21.542555, 31.213879, 30.31915, 4.369944, 35.90426, -23, 29, -37.945057, 12.24468, -33.086708, -1.5957432, -34.335266, -12.765957, -41.202316, -18.351063, -49, -16, -53.687866, -43.085106, -51.30458, -64.842255, -49.317924, -82.97872, -41.635838, -104.24469)
+
+[node name="CoinLight" type="Polygon2D" parent="Visual/CoinIcon" unique_id=862653036]
+position = Vector2(-5.000002, 39)
+scale = Vector2(1.6018518, 1.2533333)
+color = Color(0.5411765, 0.4862745, 0.41568628, 1)
+antialiased = true
+polygon = PackedVector2Array(-31, -121, -13.109827, -128.45746, 4.369944, -130.05319, 23.722548, -128.45746, 36.208096, -123.67021, 39.329483, -111.702126, 49.508682, -107.43617, 57, -91, 59.306366, -67.02128, 61.1792, -55.053192, 58.682087, -43.88298, 56.809254, -29.521276, 55.5607, -60.638298, 50.56648, -71.01064, 54.312145, -77.393616, 53.06359, -86.17021, 49.942204, -94.94681, 41.826595, -94.14894, 37.456654, -97.34042, 38.08093, -104.52128, 33.710987, -118.88298, 27.468214, -123.67021, 16.231216, -119.680855, 11.236998, -126.8617, -1.2485538, -127.65958, -7.4913287, -125.26596, -18.728325, -122.07447, -28.092487, -117.28723, -35.58382, -106.914894, -26.219654, -108.510635, -25.595377, -102.92553, -29.341043, -98.1383, -29.965319, -91.75532, -34.335266, -84.57447, -39.953762, -83.776596, -44.323704, -87.76596, -43.07515, -78.19149, -46.820816, -74.202126, -46.196537, -68.61702, -48.69365, -62.234043, -47.44509, -55.851067, -48.69365, -51.06383, -47.44509, -46.276596, -49.942204, -41.489365, -45.57226, -31.117022, -39.329483, -20.74468, -29.341043, -7.180851, -43.69943, -22.340425, -53.687866, -43.085106, -49.317924, -82.97872, -41.635838, -104.24469)
+
+[node name="Sigil" type="Polygon2D" parent="Visual/CoinIcon" unique_id=1065700858]
+position = Vector2(3, -1)
+color = Color(0.36544248, 0.3316665, 0.28343964, 1)
+antialiased = true
+polygon = PackedVector2Array(-31, 17, -60, -16, -1, -95, 66, -16, 27, 20, 36, -13, 1, -60, -31, -19)
+
+[node name="Line2D" type="Line2D" parent="Visual/CoinIcon/Sigil" unique_id=158719811]
+visible = false
+points = PackedVector2Array(-60, -17, -31, 16)
+width = 3.0
+default_color = Color(0.5411765, 0.4862745, 0.41568628, 1)
+
+[node name="Line2D5" type="Line2D" parent="Visual/CoinIcon/Sigil" unique_id=427732656]
+visible = false
+position = Vector2(0, 6)
+points = PackedVector2Array(-31, -27, -31, -17, -31, 9)
+width = 3.0
+default_color = Color(0.5411765, 0.4862745, 0.41568628, 1)
+
+[node name="Line2D6" type="Line2D" parent="Visual/CoinIcon/Sigil" unique_id=1630991301]
+visible = false
+position = Vector2(61, 9)
+points = PackedVector2Array(-24, -24, -33, 11)
+width = 3.0
+default_color = Color(0.5411765, 0.4862745, 0.41568628, 1)
+
+[node name="Line2D3" type="Line2D" parent="Visual/CoinIcon/Sigil" unique_id=1064679143]
+visible = false
+position = Vector2(0, 2)
+points = PackedVector2Array(0, -62, 37, -16)
+width = 3.0
+default_color = Color(0.5411765, 0.4862745, 0.41568628, 1)
+
+[node name="Line2D4" type="Line2D" parent="Visual/CoinIcon/Sigil" unique_id=1899671173]
+visible = false
+position = Vector2(0, 4)
+points = PackedVector2Array(1, -64, -31, -24)
+width = 3.0
+default_color = Color(0.5411765, 0.4862745, 0.41568628, 1)
+
+[node name="Line2D2" type="Line2D" parent="Visual/CoinIcon/Sigil" unique_id=844682204]
+visible = false
+points = PackedVector2Array(67, -15, 29, 19)
+width = 3.0
+default_color = Color(0.5411765, 0.4862745, 0.41568628, 1)
+
+[node name="SigilMid" type="Polygon2D" parent="Visual/CoinIcon" unique_id=685199165]
+color = Color(0.36544248, 0.3316665, 0.28343964, 1)
+antialiased = true
+polygon = PackedVector2Array(1, 11, -15, -13, 2, -36, 22, -15)
+
+[node name="CoinDark" type="Polygon2D" parent="Visual/CoinIcon" unique_id=504418231]
+position = Vector2(-5.000002, 39)
+scale = Vector2(1.6018518, 1.2533333)
+color = Color(0.30588236, 0.27058825, 0.23137255, 1)
+antialiased = true
+polygon = PackedVector2Array(29.341045, 19.14894, 41.202316, 8.776598, 51.190758, -19.148937, 58.682087, -48.67021, 57.95967, -66.84958, 57, -91, 62.427753, -67.81915, 69.29481, -42.287235, 62.427753, -10.372339, 45.572258, 25.531916, 33.710987, 32.71277, 4.369944, 35.90426, -23, 29, -38.08093, 19.94681, -41.826595, 7.9787235, -41.202316, -2.3936157, -49, -16, -53.687866, -43.085106, -44.323704, -23.93617, -34.95954, -13.563829, -29.341043, -6.3829784, -26.843931, 7.9787235, -16.855492, 17.553194, -3.1213865, 18.351065)

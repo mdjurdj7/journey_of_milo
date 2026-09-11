@@ -1,0 +1,9 @@
+[gd_scene format=3 uid="uid://bj1yuyvs2h2bk"]
+
+[ext_resource type="Texture2D" uid="uid://jk5dne8xhkst" path="res://assets/npcs/Keeper.png" id="1_keeper"]
+
+[node name="Keeper" type="Node2D" unique_id=657461698]
+
+[node name="Sprite" type="Sprite2D" parent="." unique_id=2130548006]
+texture = ExtResource("1_keeper")
+offset = Vector2(0, -620)

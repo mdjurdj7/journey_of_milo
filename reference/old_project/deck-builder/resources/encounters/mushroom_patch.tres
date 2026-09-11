@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="EncounterData" format=3 uid="uid://c4o4mtchlvi80"]
+
+[ext_resource type="Script" uid="uid://br1gloyh6tpn6" path="res://encounter_data.gd" id="1_encounter_data"]
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="2_enemy_data"]
+[ext_resource type="Resource" path="res://resources/enemies/encounter_only/mushroom_a.tres" id="3_mushroom_a"]
+[ext_resource type="Resource" path="res://resources/enemies/encounter_only/mushroom_b.tres" id="4_mushroom_b"]
+[ext_resource type="Resource" path="res://resources/enemies/encounter_only/mushroom_c.tres" id="5_mushroom_c"]
+
+[resource]
+script = ExtResource("1_encounter_data")
+encounter_name = "Mushroom Patch"
+enemies = Array[ExtResource("2_enemy_data")]([ExtResource("3_mushroom_a"), ExtResource("4_mushroom_b"), ExtResource("5_mushroom_c")])
+pool_weight = 3.0
+field_preview_enemies = Array[ExtResource("2_enemy_data")]([ExtResource("3_mushroom_a")])

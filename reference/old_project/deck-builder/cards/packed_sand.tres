@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://2qsoxcveytwo"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_packed_sand"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="Resource_packed_sand_damage"]
+script = ExtResource("2_effect")
+value = 6
+
+[resource]
+script = ExtResource("1_packed_sand")
+card_name = "Packed Sand"
+energy_cost = 0
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("Resource_packed_sand_damage")])
+description = "Deal 6 damage."
+removal_scope = 2

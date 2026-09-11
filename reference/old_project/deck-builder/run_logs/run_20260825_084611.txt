@@ -1,0 +1,112 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Overreach
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [COMBAT] -> L2_1, L2_0
+  Layer 2:
+    L2_0 [COMBAT] -> L3_0
+    L2_1 [COMBAT] -> L3_1
+  Layer 3:
+    L3_0 [COMBAT] -> L4_2, L4_0
+    L3_1 [EVENT] -> L4_1
+  Layer 4:
+    L4_0 [TREASURE] -> L5_0, L5_1
+    L4_1 [ELITE] -> L5_1
+    L4_2 [EVENT] -> L5_0
+  Layer 5:
+    L5_0 [COMBAT] -> L6_1, L6_2
+    L5_1 [TREASURE] -> L6_2, L6_0
+  Layer 6:
+    L6_0 [SHOP] -> L7_1
+    L6_1 [COMBAT] -> L7_0
+    L6_2 [EVENT] -> L7_0
+  Layer 7:
+    L7_0 [TREASURE] -> L8_0
+    L7_1 [EVENT] -> L8_0
+  Layer 8:
+    L8_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+  Battle: Tideworn
+    Turn 1: HP 70->61 | dealt 18, took 9 | played: Strike, Strike, Strike
+    Turn 2: HP 61->62 | dealt 16, took 2 | played: Strike, Overreach, Guard
+    Turn 3: HP 62->62 | dealt 12, took 0 | played: Strike, Strike, Guard
+    Turn 4: HP 62->62 | dealt 6, took 0 | played: Strike
+  Battle result: victory
+
+  Gold gained: 19 (battle reward)
+  Card choice offered: Retaliation, Riposte, Iron Will -> took Retaliation
+  Gold gained: 17 (field chest)
+--- Room: L1_0 [COMBAT] ---
+  Battle: Glasswing
+    Turn 1: HP 62->61 | dealt 12, took 1 | played: Strike, Guard, Strike
+    Turn 2: HP 61->61 | dealt 12, took 1 | played: Strike, Strike, Guard
+    Turn 3: HP 61->62 | dealt 6, took 0 | played: Strike
+  Battle result: victory
+
+  Gold gained: 18 (battle reward)
+--- Room: L2_0 [COMBAT] ---
+  Options were: L2_1 [COMBAT], L2_0 [COMBAT] (chosen)
+  Battle: Beachwrack
+    Turn 1: HP 62->60 | dealt 16, took 2 | played: Strike, Overreach, Guard
+    Turn 2: HP 60->60 | dealt 18, took 0 | played: Strike, Strike, Strike
+    (Tideworn joins the fight)
+    Turn 3: HP 60->50 | dealt 12, took 10 | played: Strike, Strike, Guard
+    Turn 4: HP 50->44 | dealt 18, took 9 | played: Strike, Strike, Strike
+    Turn 5: HP 44->38 | dealt 30, took 11 | played: Overreach, Strike, Retaliation
+    Turn 6: HP 38->40 | dealt 12, took 0 | played: Strike, Strike, Guard
+    Turn 7: HP 40->40 | dealt 6, took 0 | played: Guard, Strike, Guard
+    Turn 8: HP 40->31 | dealt 30, took 11 | played: Strike, Retaliation, Overreach
+  Battle result: victory
+
+  Gold gained: 21 (battle reward)
+  Card choice offered: Paid in Pain, Reckoning, Guillotine -> took Reckoning
+  Gold gained: 24 (field chest)
+  Battle: Glasswing
+    Turn 1: HP 31->30 | dealt 12, took 1 | played: Guard, Strike, Strike
+    Turn 2: HP 30->30 | dealt 12, took 1 | played: Strike, Strike, Guard
+    Turn 3: HP 30->31 | dealt 6, took 0 | played: Strike
+  Battle result: victory
+
+  Gold gained: 19 (battle reward)
+  Rare drop offered: Slam -> took Slam
+--- Room: L3_0 [COMBAT] ---
+  Battle: Glasswing
+    Turn 1: HP 31->31 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+
+  Gold gained: 17 (battle reward)
+  Card choice offered: Paid in Pain, Reckoning, Guillotine -> took Reckoning
+  Gold gained: 18 (field chest)
+--- Room: L4_2 [EVENT] ---
+  Options were: L4_2 [EVENT] (chosen), L4_0 [TREASURE]
+  Weapon offered: Last Wages -> took Last Wages
+--- Room: L5_0 [COMBAT] ---
+  Battle: Glasswing
+    Turn 1: HP 31->28 | dealt 16, took 3 | played: Strike, Overreach, Guard
+    Turn 2: HP 28->29 | dealt 12, took 0 | played: Strike, Strike
+  Battle result: victory
+
+  Gold gained: 24 (battle reward)
+  Card choice offered: Reckoning, Iron Will, Paid in Pain -> took Paid in Pain
+  Battle: Beachwrack
+    Turn 1: HP 29->29 | dealt 12, took 0 | played: Strike, Strike, Guard
+    (Tideworn joins the fight)
+    Turn 2: HP 29->14 | dealt 36, took 15 | played: Strike, Slam
+    Turn 3: HP 14->15 | dealt 16, took 2 | played: Strike, Overreach, Guard
+    Turn 4: HP 15->6 | dealt 23, took 9 | played: Reckoning, Strike
+    Turn 5: HP 6->7 | dealt 6, took 0 | played: Strike, Guard, Guard
+    Turn 6: HP 7->7 | dealt 12, took 0 | played: Strike, Paid in Pain, Strike
+    Turn 7: HP 7->7 | dealt 0, took 0 | played: Guard, Guard, Guard
+    Turn 8: HP 7->0 | dealt 22, took 11 | played: Strike, Overreach, Strike
+  Battle result: defeat
+
+=== RUN END: DEFEAT ===
+Rooms reached: 6
+Final HP: 0/70
+Final gold: 127
+Final deck (15 cards): 5x Strike, 5x Guard, 1x Overreach, 1x Retaliation, 2x Reckoning, 1x Paid in Pain

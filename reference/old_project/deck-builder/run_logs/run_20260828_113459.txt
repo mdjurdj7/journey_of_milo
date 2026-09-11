@@ -1,0 +1,92 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Elite layers: 2 chosen (6, 10) | side-by-side promotions: none
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [EVENT] -> L2_1, L2_0
+  Layer 2:
+    L2_0 [EVENT] -> L3_0, L3_1
+    L2_1 [COMBAT] -> L3_1
+  Layer 3:
+    L3_0 [COMBAT] -> L4_0
+    L3_1 [COMBAT] -> L4_0
+  Layer 4:
+    L4_0 [COMBAT] -> L5_1, L5_0
+  Layer 5:
+    L5_0 [HEAP] -> L6_0, L6_1
+    L5_1 [HEAP] -> L6_1
+  Layer 6:
+    L6_0 [ELITE] -> L7_0, L7_1
+    L6_1 [COMBAT] -> L7_1
+  Layer 7:
+    L7_0 [COMBAT] -> L8_2, L8_0
+    L7_1 [SHOP] -> L8_1, L8_0
+  Layer 8:
+    L8_0 [COMBAT] -> L9_0
+    L8_1 [COMBAT] -> L9_0, L9_1
+    L8_2 [COMBAT] -> L9_2
+  Layer 9:
+    L9_0 [COMBAT] -> L10_2, L10_1
+    L9_1 [COMBAT] -> L10_1, L10_2
+    L9_2 [TREASURE] -> L10_0
+  Layer 10:
+    L10_0 [COMBAT] -> L11_0
+    L10_1 [ELITE] -> L11_0
+    L10_2 [TREASURE] -> L11_0
+  Layer 11:
+    L11_0 [BOSS]
+
+  Battle: Outbound
+    Turn 1: HP 70->70 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 70->70 | Enemies: Outbound
+  Damage: dealt 100, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Battle: Wardling
+    Turn 1: HP 70->61 | dealt 0, took 9 | played: (none)
+    Turn 2: HP 61->63 | dealt 9, took 2 | played: Selfeater, Strike, Guard
+    Turn 3: HP 63->50 | dealt 18, took 13 | played: Guard, Strike, Strike
+    Turn 4: HP 50->51 | dealt 31, took 8 | played: Strike, Bite Down, Strike
+    Turn 5: HP 51->44 | dealt 18, took 7 | played: Strike, Strike, Guard
+    Turn 6: HP 44->45 | dealt 22, took 2 | played: Strike, Bite Down
+  Battle result: victory
+  Turns: 6 | HP 70->45 | Enemies: Wardling
+  Damage: dealt 98, taken 41 (blocked 15) | Toll: accrued 41, peak 41
+  Cards played: 14 | Energy unspent (total): 5 | Chain: openers 1, payoffs 0, expired 1
+
+  Gold gained: 21 (battle reward)
+  Card choice offered: Come To, Full Weight, Paid in Pain -> took Come To
+  Battle: Beachwrack
+    Turn 1: HP 45->41 | dealt 18, took 4 | played: Selfeater, Strike, Strike
+    Turn 2: HP 41->37 | dealt 18, took 4 | played: Strike, Strike, Guard
+    Turn 3: HP 37->25 | dealt 23, took 12 | played: Strike, Bite Down, Come To, Strike
+    (Tideworn joins the fight)
+    Turn 4: HP 25->11 | dealt 18, took 14 | played: Strike, Strike, Guard
+    Turn 5: HP 11->13 | dealt 31, took 8 | played: Strike, Bite Down, Guard, Strike
+    Turn 6: HP 13->1 | dealt 18, took 12 | played: Strike, Strike, Guard, Come To
+    Turn 7: HP 1->5 | dealt 9, took 0 | played: Strike
+  Battle result: victory
+  Turns: 7 | HP 45->5 | Enemies: Beachwrack
+  Damage: dealt 135, taken 54 (blocked 14) | Toll: accrued 54, peak 54
+  Cards played: 22 | Energy unspent (total): 2 | Chain: openers 2, payoffs 0, expired 2
+
+  Gold gained: 17 (battle reward)
+  Card choice offered: Paid in Pain, Full Weight, Compound -> took Compound
+  Battle: Glasswing
+    Turn 1: HP 5->0 | dealt 18, took 10 | played: Selfeater, Strike, Strike
+  Battle result: defeat
+  Turns: 1 | HP 5->0 | Enemies: Glasswing
+  Damage: dealt 18, taken 10 (blocked 0) | Toll: accrued 5, peak 5
+  Cards played: 3 | Energy unspent (total): 0 | Chain: openers 0, payoffs 0, expired 0
+
+=== RUN END: DEFEAT ===
+Rooms reached: 1
+Final HP: 0/70
+Final gold: 38
+Final deck (14 cards): 5x Strike, 5x Guard, 1x Bite Down, 1x Selfeater, 1x Come To, 1x Compound

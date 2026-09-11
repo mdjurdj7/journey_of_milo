@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://d35dfj1e4qh8g"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_guard"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" uid="uid://dn4uygifh6n62" path="res://resources/cards/upgrades/guard_plus.tres" id="3_guard_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 1
+value = 5
+
+[resource]
+script = ExtResource("1_guard")
+card_name = "Guard"
+card_type = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Gain 5 block."
+upgrades = Array[ExtResource("1_guard")]([ExtResource("3_guard_plus")])

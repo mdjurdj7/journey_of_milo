@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="EncounterData" format=3]
+
+[ext_resource type="Script" path="res://encounter_data.gd" id="1_encounter_data"]
+[ext_resource type="Script" path="res://enemy_data.gd" id="2_enemy_data"]
+[ext_resource type="Resource" path="res://resources/enemies/saltdarner.tres" id="3_saltdarner"]
+
+[resource]
+script = ExtResource("1_encounter_data")
+encounter_name = "Saltdarner Pair"
+enemies = Array[ExtResource("2_enemy_data")]([ExtResource("3_saltdarner"), ExtResource("3_saltdarner")])
+pool_weight = 1.0

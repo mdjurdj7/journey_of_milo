@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://5yhw7if4bb0h"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_left_hand"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" uid="uid://3pa50ygsab8v" path="res://resources/cards/upgrades/left_hand_plus.tres" id="3_left_hand_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 13
+value = 6
+threshold_value = 10
+
+[resource]
+script = ExtResource("1_left_hand")
+card_name = "Left Hand"
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "[cond_inactive]Deal 6 damage.[/cond_inactive]
+[cond_active]If this is the first card you've played this turn, deal 10 damage instead.[/cond_active]"
+upgrades = Array[ExtResource("1_left_hand")]([ExtResource("3_left_hand_plus")])

@@ -1,0 +1,128 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Elite layers: 3 chosen (3, 5, 7) | side-by-side promotions: none
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [COMBAT] -> L2_1, L2_0
+  Layer 2:
+    L2_0 [HEAP] -> L3_1, L3_0
+    L2_1 [EVENT] -> L3_0
+  Layer 3:
+    L3_0 [ELITE] -> L4_1, L4_3
+    L3_1 [COMBAT] -> L4_0, L4_2
+  Layer 4:
+    L4_0 [FORGE] -> L5_0
+    L4_1 [SHOP] -> L5_0, L5_1
+    L4_2 [TREASURE] -> L5_0, L5_1
+    L4_3 [COMBAT] -> L5_1
+  Layer 5:
+    L5_0 [COMBAT] -> L6_1, L6_0
+    L5_1 [ELITE] -> L6_2, L6_0
+  Layer 6:
+    L6_0 [TREASURE] -> L7_0, L7_1
+    L6_1 [COMBAT] -> L7_0
+    L6_2 [COMBAT] -> L7_0, L7_1
+  Layer 7:
+    L7_0 [TREASURE] -> L8_0, L8_1
+    L7_1 [ELITE] -> L8_1
+  Layer 8:
+    L8_0 [HEAP] -> L9_0
+    L8_1 [FORGE] -> L9_0
+  Layer 9:
+    L9_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+--- Room: L1_0 [COMBAT] ---
+  Battle: Sputter
+    Turn 1: HP 70->68 | dealt 16, took 2 | played: Held Position, Strike, Bite Down
+    Turn 2: HP 68->68 | dealt 2, took 0 | played: Strike, Guard, Strike
+    Turn 3: HP 68->68 | dealt 0, took 0 | played: Held Position, Strike, Guard
+    Turn 4: HP 68->63 | dealt 14, took 5 | played: Strike, Strike, Strike
+    Turn 5: HP 63->68 | dealt 22, took 0 | played: Strike, Strike, Bite Down
+  Battle result: victory
+  Turns: 5 | HP 70->68 | Enemies: Sputter
+  Damage: dealt 54, taken 7 (blocked 11) | Toll: accrued 7, peak 7
+  Toll by source: enemy 5, self 2, status 0
+  Cards played: 15 | Energy unspent (total): 0 | Chain: openers 1, payoffs 0, expired 1
+
+  Gold gained: 24 (battle reward)
+--- Room: L2_0 [HEAP] ---
+  Options were: L2_1 [EVENT], L2_0 [HEAP] (chosen)
+--- Room: L3_1 [COMBAT] ---
+  Options were: L3_1 [COMBAT] (chosen), L3_0 [ELITE]
+  Battle: Saltdarner
+    Turn 1: HP 33->31 | dealt 20, took 2 | played: Bite Down+, Strike
+  Battle result: victory
+  Turns: 1 | HP 33->31 | Enemies: Saltdarner
+  Damage: dealt 20, taken 2 (blocked 0) | Toll: accrued 2, peak 2
+  Toll by source: enemy 0, self 2, status 0
+  Cards played: 2 | Energy unspent (total): 1 | Chain: openers 1, payoffs 0, expired 0
+
+  Gold gained: 22 (battle reward)
+--- Room: L4_0 [FORGE] ---
+  Options were: L4_0 [FORGE] (chosen), L4_2 [TREASURE]
+  Shard spent: 1 (forge)
+--- Room: L5_0 [COMBAT] ---
+  Battle: Sputter
+    Turn 1: HP 31->31 | dealt 21, took 0 | played: Strike, Strike, Strike+
+    Turn 2: HP 31->31 | dealt 0, took 0 | played: Strike, Guard
+    Turn 3: HP 31->31 | dealt 1, took 0 | played: Strike, Strike+, Held Position
+    Turn 4: HP 31->26 | dealt 8, took 5 | played: Strike, Strike, Strike
+    Turn 5: HP 26->31 | dealt 18, took 0 | played: Strike, Strike, Strike
+  Battle result: victory
+  Turns: 5 | HP 31->31 | Enemies: Sputter
+  Damage: dealt 48, taken 5 (blocked 0) | Toll: accrued 5, peak 5
+  Toll by source: enemy 5, self 0, status 0
+  Cards played: 14 | Energy unspent (total): 1 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 23 (battle reward)
+  Card choice offered: Retaliation, Selfeater, Reckoning -> took Selfeater
+--- Room: L6_0 [TREASURE] ---
+  Options were: L6_1 [COMBAT], L6_0 [TREASURE] (chosen)
+--- Room: L7_1 [ELITE] ---
+  Options were: L7_0 [TREASURE], L7_1 [ELITE] (chosen)
+  Battle: Wardling
+    Turn 1: HP 31->26 | dealt 6, took 5 | played: Guard, Guard, Strike, Advance
+    Turn 2: HP 26->26 | dealt 12, took 0 | played: Guard, Strike, Strike
+    Turn 3: HP 26->20 | dealt 14, took 6 | played: Bite Down+, Guard, Guard
+    Turn 4: HP 20->17 | dealt 12, took 7 | played: Strike, Guard, Strike
+    Turn 5: HP 17->22 | dealt 29, took 2 | played: Bite Down+, Strike+, Strike
+    Turn 6: HP 22->14 | dealt 6, took 8 | played: Guard, Guard, Strike
+    Turn 7: HP 14->21 | dealt 15, took 0 | played: Strike+, Strike
+  Battle result: victory
+  Turns: 7 | HP 31->21 | Enemies: Wardling
+  Damage: dealt 94, taken 28 (blocked 39) | Toll: accrued 33, peak 33
+  Toll by source: enemy 19, self 14, status 0
+  Cards played: 21 | Energy unspent (total): 1 | Chain: openers 2, payoffs 0, expired 2
+
+  Gold gained: 30 (battle reward)
+  Card choice offered: Guillotine, Iron Will, Ballast -> took Guillotine
+  Rare drop offered: Slam -> took Slam
+--- Room: L8_1 [FORGE] ---
+  Shard spent: 1 (forge)
+--- Room: L9_0 [BOSS] ---
+  Battle: The Holdfast
+    Turn 1: HP 21->21 | dealt 0, took 0 | played: Guard, Guard, Guard
+    Turn 2: HP 21->19 | dealt 20, took 2 | played: Held Position+, Strike, Bite Down+
+    Turn 3: HP 19->13 | dealt 20, took 6 | played: Strike, Guillotine
+    Turn 4: HP 13->18 | dealt 118, took 1 | played: Strike+, Guard, Strike
+    Turn 5: HP 18->5 | dealt 15, took 14 | played: Strike, Strike, Selfeater
+    Turn 6: HP 5->19 | dealt 33, took 0 | played: Slam
+  Battle result: victory
+  Turns: 6 | HP 21->19 | Enemies: The Holdfast
+  Damage: dealt 206, taken 23 (blocked 25) | Toll: accrued 23, peak 23
+  Toll by source: enemy 21, self 2, status 0
+  Cards played: 15 | Energy unspent (total): 2 | Chain: openers 1, payoffs 0, expired 1
+  Boss Charges: attempted 2, interrupted 1, buffed 0 | Check damages: [155]
+
+=== RUN END: VICTORY ===
+Rooms reached: 10
+Final HP: 19/70
+Final gold: 114
+Final shards: 0
+Final deck (16 cards): 5x Strike, 1x Strike+, 5x Guard, 1x Bite Down+, 1x Held Position+, 1x Selfeater, 1x Advance, 1x Guillotine

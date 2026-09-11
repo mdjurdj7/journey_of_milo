@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://cxb1336gfcj8d"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_held_position"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" uid="uid://cf68kak8ci08f" path="res://resources/cards/upgrades/held_position_plus.tres" id="3_held_position_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 15
+value = 6
+bonus_value = 4
+
+[resource]
+script = ExtResource("1_held_position")
+card_name = "Held Position"
+card_type = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Gain 6 block.
+[cond_active]If you took no damage last turn, gain 4 more.[/cond_active]"
+upgrades = Array[ExtResource("1_held_position")]([ExtResource("3_held_position_plus")])

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://3pa50ygsab8v"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_left_hand_plus"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 13
+value = 8
+threshold_value = 14
+
+[resource]
+script = ExtResource("1_left_hand_plus")
+card_name = "Left Hand+"
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "[cond_inactive]Deal 8 damage.[/cond_inactive]
+[cond_active]If this is the first card you've played this turn, deal 14 damage instead.[/cond_active]"

@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StatusEffectData" format=3]
+
+[ext_resource type="Script" path="res://status_effect_data.gd" id="1_status_effect"]
+
+[resource]
+script = ExtResource("1_status_effect")
+id = "retaliation_primed"
+display_name = "Retaliation Primed"
+category = 2
+default_magnitude = 0
+default_duration_turns = 1
+clears_on_trigger = true
+stack_rule = 3
+icon_color = Color(0.9, 0.4, 0.15, 1)
+badge_label_override = "RT"
+tooltip_text = "Your next hit reflects damage back at the attacker."

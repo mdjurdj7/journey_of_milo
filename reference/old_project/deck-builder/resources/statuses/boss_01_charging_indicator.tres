@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="StatusEffectData" format=3 uid="uid://crn82pgrsiksp"]
+
+[ext_resource type="Script" uid="uid://cug88yevpbxq4" path="res://status_effect_data.gd" id="1_status_effect"]
+
+[resource]
+script = ExtResource("1_status_effect")
+id = "boss_01_charging_indicator"
+display_name = "Charging"
+icon_color = Color(0.52, 0.3, 0.14, 1)
+badge_diameter_override_px = 36.0
+tooltip_text = "Attempting to free itself from its chains."

@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://g4shublpipl1"]
+
+[ext_resource type="Script" uid="uid://5o1yiwogk3kr" path="res://player_battle_visual.gd" id="1_player_battle_visual"]
+[ext_resource type="PackedScene" uid="uid://dg07bi7v3y5sc" path="res://vitals_bar.tscn" id="2_vitals_bar"]
+[ext_resource type="PackedScene" path="res://grounding.tscn" id="3_grounding"]
+
+[node name="PlayerBattleVisual" type="Control" unique_id=2070945749]
+custom_minimum_size = Vector2(440, 360)
+layout_mode = 3
+anchors_preset = 0
+mouse_filter = 2
+script = ExtResource("1_player_battle_visual")
+stance_tint_alpha_per_stack = 0.3
+stance_tint_alpha_max = 1.0
+stance_tint_radius_px = 275.0
+stance_tint_falloff_start = 0.7
+
+[node name="VisualRoot" type="Node2D" parent="." unique_id=1163390193]
+
+[node name="Grounding" parent="." unique_id=1188084255 instance=ExtResource("3_grounding")]
+contact_shadow_height_ratio = 0.14
+contact_shadow_alpha = 0.71
+contact_shadow_luminance_drop = 0.55
+footprint_width_override_px = nan
+footprint_center_x_override_px = nan
+
+[node name="VitalsBar" parent="." unique_id=1210075490 instance=ExtResource("2_vitals_bar")]
+layout_mode = 0
+offset_right = 380.0
+offset_bottom = 42.0
+show_rally_pool = true
+fill_color = Color(0.301961, 0.184314, 0.184314, 1)
+bar_height_px = 15.0

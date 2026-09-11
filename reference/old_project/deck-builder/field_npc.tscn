@@ -1,0 +1,24 @@
+[gd_scene format=3 uid="uid://cby8a5jbwicb"]
+
+[ext_resource type="Script" uid="uid://kpkhrqtycnjg" path="res://field_npc.gd" id="1_npc"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_npc"]
+size = Vector2(70, 130)
+
+[node name="FieldNPC" type="Area2D" unique_id=1691118329]
+script = ExtResource("1_npc")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="." unique_id=2134357316]
+position = Vector2(0, -60)
+shape = SubResource("RectangleShape2D_npc")
+
+[node name="VisualRoot" type="Node2D" parent="." unique_id=1034916882]
+
+[node name="OfferLabel" type="Label" parent="." unique_id=445660696]
+offset_left = -160.0
+offset_top = -343.6
+offset_right = 160.0
+offset_bottom = -308.6
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2

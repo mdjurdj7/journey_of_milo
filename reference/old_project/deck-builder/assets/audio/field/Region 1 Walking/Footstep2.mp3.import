@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://bjv5v3vu44a7u"
+path="res://.godot/imported/Footstep2.mp3-3d0f712297093d81ceedd2ea2d4f23e3.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/field/Region 1 Walking/Footstep2.mp3"
+dest_files=["res://.godot/imported/Footstep2.mp3-3d0f712297093d81ceedd2ea2d4f23e3.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4

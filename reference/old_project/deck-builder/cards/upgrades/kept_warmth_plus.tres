@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://card_data.gd" id="1_kept_warmth_plus"]
+[ext_resource type="Script" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 4
+value = 35
+
+[resource]
+script = ExtResource("1_kept_warmth_plus")
+card_name = "Kept Warmth+"
+energy_cost = 3
+card_type = 1
+rarity = 2
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Restore 35 HP."
+removal_scope = 2

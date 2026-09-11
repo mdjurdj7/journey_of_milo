@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_iron_will"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/cards/upgrades/iron_will_plus.tres" id="3_iron_will_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 1
+value = 15
+
+[resource]
+script = ExtResource("1_iron_will")
+card_name = "Iron Will"
+energy_cost = 2
+card_type = 1
+rarity = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Gain 15 block."
+upgrades = Array[ExtResource("1_iron_will")]([ExtResource("3_iron_will_plus")])

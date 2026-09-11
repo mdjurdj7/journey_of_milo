@@ -1,0 +1,66 @@
+{
+  "far_ridge_a": {
+    "source": "ChatGPT_Image_Sep_7__2026__06_29_34_PM.png",
+    "field_color": [
+      194.4,
+      205.1,
+      218.2
+    ],
+    "cropped_size": [
+      1616,
+      187
+    ],
+    "content_bounds_in_crop": {
+      "x0": 8,
+      "y0": 8,
+      "x1": 1607,
+      "y1": 178
+    },
+    "base_fade_px": 13,
+    "mean_R_minus_B": -20.2
+  },
+  "mid_headland_a": {
+    "source": "ChatGPT_Image_Sep_7__2026__06_26_05_PM.png",
+    "field_color": [
+      192.6,
+      201.5,
+      211.5
+    ],
+    "cropped_size": [
+      1447,
+      222
+    ],
+    "content_bounds_in_crop": {
+      "x0": 8,
+      "y0": 8,
+      "x1": 1438,
+      "y1": 213
+    },
+    "base_fade_px": 16,
+    "mean_R_minus_B": -8.8
+  },
+  "ground_flat": {
+    "source": "ChatGPT_Image_Sep_7__2026__06_26_00_PM.png",
+    "sky_field_color": [
+      190.1,
+      199.7,
+      210.2
+    ],
+    "ground_line_y_range": [
+      522,
+      534
+    ],
+    "raw_edge_mismatch_mean": 7.3,
+    "tile_size": [
+      1820,
+      309
+    ],
+    "crossfade_px": 96,
+    "mean_R_minus_B": -10.6,
+    "cropped_top_rows": 512,
+    "ground_line_y_in_tile": [
+      10,
+      22
+    ]
+  }
+}

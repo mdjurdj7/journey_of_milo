@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_guillotine"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/chain_payoffs/stoppage.tres" id="3_stoppage"]
+[ext_resource type="Resource" path="res://resources/cards/upgrades/guillotine_plus.tres" id="4_guillotine_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+value = 14
+
+[resource]
+script = ExtResource("1_guillotine")
+chain_role = 2
+chain_followup_effect = ExtResource("3_stoppage")
+card_name = "Guillotine"
+energy_cost = 2
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Deal 14 damage."
+flavor_text = "It doesn't ask twice. It falls, and it doesn't stop."
+play_sfx = "guillotine_play"
+impact_delay = 0.5
+upgrades = Array[ExtResource("1_guillotine")]([ExtResource("4_guillotine_plus")])

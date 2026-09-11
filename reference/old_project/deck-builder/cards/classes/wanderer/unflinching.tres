@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://card_data.gd" id="1_unflinching"]
+[ext_resource type="Script" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/statuses/unflinching.tres" id="3_unflinching_status"]
+
+[sub_resource type="Resource" id="CardEffect_self_damage"]
+script = ExtResource("2_effect")
+effect_type = 2
+value = 4
+
+[sub_resource type="Resource" id="CardEffect_apply_status"]
+script = ExtResource("2_effect")
+effect_type = 12
+status_data = ExtResource("3_unflinching_status")
+
+[resource]
+script = ExtResource("1_unflinching")
+card_name = "Unflinching"
+card_type = 1
+energy_cost = 1
+requires_target = false
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_self_damage"), SubResource("CardEffect_apply_status")])
+description = "Lose 4 HP. The next hit you take deals 0."

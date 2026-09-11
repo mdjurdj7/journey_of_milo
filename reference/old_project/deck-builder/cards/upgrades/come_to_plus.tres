@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://card_data.gd" id="1_come_to_plus"]
+[ext_resource type="Script" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 9
+value = 3
+
+[sub_resource type="Resource" id="CardEffect_2"]
+script = ExtResource("2_effect")
+effect_type = 3
+value = 2
+
+[resource]
+script = ExtResource("1_come_to_plus")
+card_name = "Come To+"
+energy_cost = 0
+card_type = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1"), SubResource("CardEffect_2")])
+description = "Lose 3 HP.
+Draw 2 cards."

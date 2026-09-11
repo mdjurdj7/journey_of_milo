@@ -1,0 +1,84 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [EVENT] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [COMBAT] -> L3_0, L3_1
+    L2_1 [COMBAT] -> L3_1, L3_0
+  Layer 3:
+    L3_0 [TREASURE] -> L4_1, L4_0
+    L3_1 [TREASURE] -> L4_2
+  Layer 4:
+    L4_0 [COMBAT] -> L5_2, L5_1
+    L4_1 [ELITE] -> L5_0
+    L4_2 [COMBAT] -> L5_2
+  Layer 5:
+    L5_0 [COMBAT] -> L6_1, L6_0
+    L5_1 [COMBAT] -> L6_0
+    L5_2 [SHOP] -> L6_1, L6_2
+  Layer 6:
+    L6_0 [TREASURE] -> L7_2, L7_0
+    L6_1 [COMBAT] -> L7_1, L7_0
+    L6_2 [COMBAT] -> L7_1, L7_0
+  Layer 7:
+    L7_0 [ELITE] -> L8_0
+    L7_1 [EVENT] -> L8_0
+    L7_2 [COMBAT] -> L8_0
+  Layer 8:
+    L8_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+  Battle: Tideworn
+    Turn 1: HP 70->70 | dealt 6, took 0 | played: Strike, Guard, Guard
+    Turn 2: HP 70->68 | dealt 16, took 2 | played: Strike, Bite Down
+    Turn 3: HP 68->57 | dealt 22, took 11 | played: Strike, Bite Down, Strike
+    Turn 4: HP 57->60 | dealt 6, took 0 | played: Strike
+  Battle result: victory
+
+  Gold gained: 24 (battle reward)
+  Card choice offered: Reckoning, Come To, Advance -> took Come To
+  Gold gained: 19 (field chest)
+--- Room: L1_0 [EVENT] ---
+  Weapon offered: The Creditor -> took The Creditor
+--- Room: L2_0 [COMBAT] ---
+  Options were: L2_0 [COMBAT] (chosen), L2_1 [COMBAT]
+  Battle: Beachwrack
+    Turn 1: HP 45->41 | dealt 18, took 4 | played: Strike, Come To, Strike, Strike
+    Turn 2: HP 41->39 | dealt 18, took 2 | played: Bite Down, Strike, Guard
+    Turn 3: HP 39->35 | dealt 0, took 4 | played: Come To, Guard, Guard, Guard
+    Turn 4: HP 35->35 | dealt 18, took 0 | played: Strike, Strike, Strike
+    (Tideworn joins the fight)
+    Turn 5: HP 35->18 | dealt 24, took 17 | played: Bite Down, Strike, Strike
+    Turn 6: HP 18->24 | dealt 12, took 0 | played: Strike, Strike, Guard
+    Turn 7: HP 24->24 | dealt 6, took 0 | played: Strike, Guard, Guard
+    Turn 8: HP 24->18 | dealt 18, took 6 | played: Come To, Strike, Guard, Bite Down
+    Turn 9: HP 18->18 | dealt 12, took 0 | played: Strike, Strike, Guard
+    Turn 10: HP 18->18 | dealt 12, took 0 | played: Strike, Strike
+  Battle result: victory
+
+  Gold gained: 18 (battle reward)
+  Card choice offered: Reckoning, Paid in Pain, Riposte -> took Riposte
+  Gold gained: 24 (field chest)
+--- Room: L3_1 [TREASURE] ---
+  Options were: L3_0 [TREASURE], L3_1 [TREASURE] (chosen)
+  Gold gained: 45 (field chest)
+--- Room: L4_2 [COMBAT] ---
+  Battle: Beachwrack
+    Turn 1: HP 18->18 | dealt 16, took 0 | played: Riposte, Strike
+    Turn 2: HP 18->16 | dealt 18, took 2 | played: Strike, Bite Down, Guard
+    (Tideworn joins the fight)
+    Turn 3: HP 16->7 | dealt 6, took 9 | played: Guard, Come To, Guard, Strike
+    Turn 4: HP 7->10 | dealt 12, took 2 | played: Bite Down, Guard, Guard
+    Turn 5: HP 10->0 | dealt 12, took 10 | played: Strike, Strike, Guard
+  Battle result: defeat
+
+=== RUN END: DEFEAT ===
+Rooms reached: 5
+Final HP: 0/70
+Final gold: 130
+Final deck (13 cards): 5x Strike, 5x Guard, 1x Bite Down, 1x Come To, 1x Riposte

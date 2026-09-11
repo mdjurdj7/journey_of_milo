@@ -1,0 +1,97 @@
+=== RUN START ===
+Class: Warrior
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Overreach
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [COMBAT] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [TREASURE] -> L3_0, L3_1
+    L2_1 [TREASURE] -> L3_1
+  Layer 3:
+    L3_0 [COMBAT] -> L4_2, L4_1
+    L3_1 [SHOP] -> L4_0, L4_1
+  Layer 4:
+    L4_0 [ELITE] -> L5_1, L5_0
+    L4_1 [EVENT] -> L5_1
+    L4_2 [ELITE] -> L5_0, L5_1
+  Layer 5:
+    L5_0 [EVENT] -> L6_1, L6_0
+    L5_1 [TREASURE] -> L6_1, L6_0
+  Layer 6:
+    L6_0 [COMBAT] -> L7_1, L7_2
+    L6_1 [EVENT] -> L7_0
+  Layer 7:
+    L7_0 [COMBAT] -> L8_0
+    L7_1 [EVENT] -> L8_0
+    L7_2 [TREASURE] -> L8_0
+  Layer 8:
+    L8_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+  Battle: Tideworn
+    Turn 1: HP 70->70 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+
+  Gold gained: 23 (battle reward)
+  Card choice offered: Paid in Pain, Guillotine, Back Pay -> took Guillotine
+  Gold gained: 21 (field chest)
+--- Room: L1_0 [COMBAT] ---
+  Battle: Beachwrack
+    Turn 1: HP 70->68 | dealt 22, took 2 | played: Overreach, Guillotine (chain: Stoppage)
+    (Tideworn joins the fight)
+    Turn 2: HP 68->63 | dealt 6, took 5 | played: Guard, Guard, Strike
+    Turn 3: HP 63->63 | dealt 200, took 0 | played: (none)
+  Battle result: victory
+
+  Gold gained: 15 (battle reward)
+  Card choice offered: Paid in Pain, Retaliation, Back Pay -> took Retaliation
+  Gold gained: 18 (field chest)
+--- Room: L2_0 [TREASURE] ---
+  Options were: L2_0 [TREASURE] (chosen), L2_1 [TREASURE]
+  Gold gained: 45 (field chest)
+--- Room: L3_0 [COMBAT] ---
+  Options were: L3_0 [COMBAT] (chosen), L3_1 [SHOP]
+  Battle: Beachwrack
+    Turn 1: HP 63->61 | dealt 10, took 2 | played: Overreach, Guard, Guard
+    Turn 2: HP 61->61 | dealt 18, took 0 | played: Guillotine, Strike
+    (Tideworn joins the fight)
+    Turn 3: HP 61->46 | dealt 18, took 15 | played: Strike, Strike, Strike
+    Turn 4: HP 46->44 | dealt 22, took 2 | played: Overreach, Guillotine (chain: Stoppage)
+    Turn 5: HP 44->44 | dealt 6, took 0 | played: Retaliation, Strike, Guard
+    Turn 6: HP 44->27 | dealt 22, took 17 | played: Strike, Overreach, Strike
+    Turn 7: HP 27->27 | dealt 0, took 0 | played: (none)
+    Turn 8: HP 27->12 | dealt 23, took 15 | played: Retaliation
+    Turn 9: HP 12->12 | dealt 0, took 0 | played: (none)
+    Turn 10: HP 12->12 | dealt 0, took 0 | played: (none)
+  Battle result: escape
+
+  Battle: Glasswing
+    Turn 1: HP 12->11 | dealt 0, took 1 | played: Guard
+    Turn 2: HP 11->10 | dealt 0, took 1 | played: Guard
+    Turn 3: HP 10->10 | dealt 0, took 0 | played: Guard, Guard
+    Turn 4: HP 10->10 | dealt 0, took 0 | played: Guard, Guard
+    Turn 5: HP 10->10 | dealt 0, took 0 | played: Guard, Guard, Guard
+    Turn 6: HP 10->6 | dealt 0, took 4 | played: Guard
+    Turn 7: HP 6->5 | dealt 0, took 1 | played: Guard
+    Turn 8: HP 5->2 | dealt 12, took 3 | played: Retaliation, Overreach, Guard
+    Turn 9: HP 2->2 | dealt 6, took 0 | played: Guard, Guard, Strike
+    Turn 10: HP 2->2 | dealt 10, took 0 | played: Overreach
+  Battle result: victory
+
+  Gold gained: 18 (battle reward)
+  Card choice offered: Back Pay, Paid in Pain, Guillotine -> took Paid in Pain
+--- Room: L4_2 [ELITE] ---
+  Options were: L4_2 [ELITE] (chosen), L4_1 [EVENT]
+  Battle: Wardling
+    Turn 1: HP 2->2 | dealt 6, took 0 | played: Guard, Guard, Strike
+    Turn 2: HP 2->0 | dealt 10, took 2 | played: Overreach
+  Battle result: defeat
+
+=== RUN END: DEFEAT ===
+Rooms reached: 5
+Final HP: 0/70
+Final gold: 140
+Final deck (14 cards): 5x Strike, 5x Guard, 1x Overreach, 1x Guillotine, 1x Retaliation, 1x Paid in Pain

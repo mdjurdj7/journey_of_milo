@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://bfac4syo60uht"]
+
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="1_unrelieved"]
+[ext_resource type="Script" uid="uid://8e2aq40illkg" path="res://enemy_intent.gd" id="2_intent"]
+[ext_resource type="PackedScene" path="res://enemy_visual_unrelieved.tscn" id="3_visual"]
+
+[sub_resource type="Resource" id="EnemyIntent_1"]
+script = ExtResource("2_intent")
+value = 3
+flavor_text = "Contact registered."
+
+[sub_resource type="Resource" id="EnemyIntent_2"]
+script = ExtResource("2_intent")
+value = 3
+flavor_text = "Directive unchanged. Continuing."
+
+[sub_resource type="Resource" id="EnemyIntent_3"]
+script = ExtResource("2_intent")
+type = 1
+value = 4
+flavor_text = "Threat parameters unmet."
+
+[resource]
+script = ExtResource("1_unrelieved")
+enemy_name = "Unrelieved"
+max_hp = 20
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_1"), SubResource("EnemyIntent_2"), SubResource("EnemyIntent_3")])
+visual_scene = ExtResource("3_visual")

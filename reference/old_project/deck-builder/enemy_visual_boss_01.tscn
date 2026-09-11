@@ -1,0 +1,15 @@
+[gd_scene format=3 uid="uid://rtv8cy7i4rdo"]
+
+[ext_resource type="Script" uid="uid://c62n84auoyfts" path="res://enemy_visual.gd" id="1_visual"]
+[ext_resource type="Texture2D" uid="uid://c4n7t15avnri4" path="res://assets/bosses/Works_Boss.png" id="2_sprite"]
+
+[node name="EnemyVisualBoss01" type="Node2D" unique_id=1504843893]
+script = ExtResource("1_visual")
+idle_bob_enabled = false
+idle_bob_amount_px = 1.5
+idle_bob_period_sec = 3.2
+
+[node name="Sprite" type="Sprite2D" parent="." unique_id=616887650]
+position = Vector2(0, -65.55)
+scale = Vector2(0.19, 0.19)
+texture = ExtResource("2_sprite")

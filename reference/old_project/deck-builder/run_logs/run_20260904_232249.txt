@@ -1,0 +1,100 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (9 cards): 3x Strike, 2x Bite Down, 2x Brace, 1x Reckoning, 1x Down Payment
+
+Elite layers: 2 chosen (5, 8) | side-by-side promotions: none
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [HEAP] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [FORGE] -> L3_0, L3_1
+    L2_1 [COMBAT] -> L3_0
+  Layer 3:
+    L3_0 [TREASURE] -> L4_1
+    L3_1 [COMBAT] -> L4_1, L4_0
+  Layer 4:
+    L4_0 [EVENT] -> L5_1
+    L4_1 [COMBAT] -> L5_2, L5_0
+  Layer 5:
+    L5_0 [COMBAT] -> L6_1
+    L5_1 [ELITE] -> L6_0, L6_1
+    L5_2 [HEAP] -> L6_0
+  Layer 6:
+    L6_0 [TREASURE] -> L7_0, L7_1
+    L6_1 [EVENT] -> L7_1
+  Layer 7:
+    L7_0 [SHOP] -> L8_0
+    L7_1 [TREASURE] -> L8_2, L8_1
+  Layer 8:
+    L8_0 [ELITE] -> L9_0
+    L8_1 [EVENT] -> L9_0
+    L8_2 [TREASURE] -> L9_0
+  Layer 9:
+    L9_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+--- Room: L1_0 [HEAP] ---
+  Shard gained: 1 (heap)
+--- Room: L2_0 [FORGE] ---
+  Options were: L2_0 [FORGE] (chosen), L2_1 [COMBAT]
+  Shard spent: 1 (forge)
+--- Room: L3_0 [TREASURE] ---
+  Options were: L3_0 [TREASURE] (chosen), L3_1 [COMBAT]
+--- Room: L4_1 [COMBAT] ---
+  Battle: Sputter
+    Turn 1: HP 43->41 | dealt 22, took 2 | played: Strike, Bite Down, Strike
+    Turn 2: HP 41->34 | dealt 0, took 7 | played: Bite Down, Second Wind, Brace
+    Turn 3: HP 34->36 | dealt 22, took 2 | played: Strike, Bite Down, Strike
+    Turn 4: HP 36->36 | dealt 6, took 0 | played: Strike, Bite Down
+  Battle result: victory
+  Turns: 4 | HP 43->36 | Enemies: Sputter
+  Damage: dealt 50, taken 11 (blocked 0, absorbed 0) | Toll: accrued 11, peak 11
+  Toll by source: enemy 5, self 6, status 0
+  Cards played: 11 | Energy unspent (total): 1 | Chain: openers 3, payoffs 0, expired 3
+
+  Gold gained: 25 (battle reward)
+  Card choice offered: Come To, Reckoning, Full Weight -> took Full Weight
+--- Room: L5_0 [COMBAT] ---
+  Options were: L5_2 [HEAP], L5_0 [COMBAT] (chosen)
+  Battle: Saltdarner, Saltdarner
+    Turn 1: HP 36->30 | dealt 26, took 6 | played: Full Weight, Strike
+    Turn 2: HP 30->29 | dealt 22, took 5 | played: Strike, Strike, Bite Down
+    Turn 3: HP 29->23 | dealt 10, took 6 | played: Full Weight
+  Battle result: victory
+  Turns: 3 | HP 36->23 | Enemies: Saltdarner, Saltdarner
+  Damage: dealt 58, taken 17 (blocked 0, absorbed 0) | Toll: accrued 17, peak 17
+  Toll by source: enemy 6, self 2, status 9
+  Cards played: 6 | Energy unspent (total): 1 | Chain: openers 1, payoffs 0, expired 1
+
+  Gold gained: 15 (battle reward)
+--- Room: L6_1 [EVENT] ---
+  Weapon offered: Last Wages -> took Last Wages
+--- Room: L7_1 [TREASURE] ---
+--- Room: L8_2 [TREASURE] ---
+  Options were: L8_2 [TREASURE] (chosen), L8_1 [EVENT]
+  Weapon offered: The Creditor -> took The Creditor
+--- Room: L9_0 [BOSS] ---
+  Battle: The Holdfast
+    Turn 1: HP 23->16 | dealt 10, took 7 | played: Full Weight, Brace
+    Turn 2: HP 16->15 | dealt 12, took 3 | played: Packed Sand, Strike, Brace
+    Turn 3: HP 15->5 | dealt 22, took 13 | played: Full Weight, Bite Down, Come To, Down Payment
+    Turn 4: HP 5->5 | dealt 41, took 6 | played: Reckoning+, Strike
+    Turn 5: HP 5->5 | dealt 30, took 5 | played: Bite Down, Bite Down, Strike, Down Payment
+    Turn 6: HP 5->2 | dealt 23, took 3 | played: Brace, Reckoning+
+    Turn 7: HP 2->0 | dealt 16, took 6 | played: Full Weight, Strike
+  Battle result: defeat
+  Turns: 7 | HP 23->0 | Enemies: The Holdfast
+  Damage: dealt 154, taken 43 (blocked 0, absorbed 0) | Toll: accrued 50, peak 27
+  Toll by source: enemy 30, self 20, status 0
+  Cards played: 19 | Energy unspent (total): 1 | Chain: openers 3, payoffs 0, expired 2
+  Boss Charges: attempted 2, interrupted 1, buffed 0 | Check damages: [75]
+
+=== RUN END: DEFEAT ===
+Rooms reached: 10
+Final HP: 0/70
+Final gold: 41
+Final shards: 0
+Final deck (13 cards): 3x Strike, 2x Bite Down, 2x Brace, 1x Reckoning+, 1x Down Payment, 1x Second Wind, 1x Come To, 2x Full Weight

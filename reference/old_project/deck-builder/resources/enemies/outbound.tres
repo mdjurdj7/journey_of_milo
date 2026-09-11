@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://b14b2k5njnfnr"]
+
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="1_outbound"]
+[ext_resource type="Script" uid="uid://8e2aq40illkg" path="res://enemy_intent.gd" id="2_intent"]
+[ext_resource type="PackedScene" path="res://enemy_visual_outbound_sprite.tscn" id="3_visual"]
+
+[sub_resource type="Resource" id="EnemyIntent_wash"]
+script = ExtResource("2_intent")
+value = 3
+flavor_text = "Just the wash of its passing."
+
+[sub_resource type="Resource" id="EnemyIntent_undertow"]
+script = ExtResource("2_intent")
+value = 4
+flavor_text = "The undertow catches, briefly."
+
+[resource]
+script = ExtResource("1_outbound")
+enemy_name = "Outbound"
+max_hp = 90
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_wash"), SubResource("EnemyIntent_undertow")])
+visual_scene = ExtResource("3_visual")
+battle_visual_scale = 0.72
+field_visual_scale = 0.75
+defeat_flavor = "The current stills."
+pool_weight = 1.5
+escape_distance_ramp = Array[float]([10.0, 15.0, 20.0, 25.0, 30.0])
+escape_distance_max = 100.0
+min_layer = 6

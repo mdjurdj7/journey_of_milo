@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://dg0wv3d2eayqp"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_selfeater"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" uid="uid://das2vw4a3yegc" path="res://resources/statuses/selfeater_mark.tres" id="3_selfeater_mark"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 12
+status_data = ExtResource("3_selfeater_mark")
+
+[resource]
+script = ExtResource("1_selfeater")
+card_name = "Selfeater"
+card_type = 2
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "For the rest of combat, your attacks deal 3 additional damage, then cost you 2 HP."
+removal_scope = 1
+play_sfx = "selfeater_play"

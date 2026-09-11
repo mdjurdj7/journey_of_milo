@@ -1,0 +1,13 @@
+[gd_scene format=3]
+
+[node name="NPCPlaceholder" type="Node2D"]
+
+[node name="Body" type="Polygon2D" parent="."]
+color = Color(0.6, 0.45, 0.35, 1)
+antialiased = true
+polygon = PackedVector2Array(-20, 0, 20, 0, 25, -95, -25, -95)
+
+[node name="Head" type="Polygon2D" parent="."]
+color = Color(0.6, 0.45, 0.35, 1)
+antialiased = true
+polygon = PackedVector2Array(0, -130, 12, -125, 17, -113, 12, -101, 0, -96, -12, -101, -17, -113, -12, -125)

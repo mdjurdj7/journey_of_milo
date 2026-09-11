@@ -1,0 +1,15 @@
+[gd_scene format=3]
+
+[node name="StatusIcon" type="Node2D"]
+
+[node name="DropShadow" type="Polygon2D" parent="."]
+position = Vector2(1.5, 1.2)
+scale = Vector2(1.08, 1.08)
+color = Color(0.0827, 0.0967, 0.0768, 1)
+antialiased = true
+polygon = PackedVector2Array(0, -14, 11, 0, 0, 14, -11, 0)
+
+[node name="Drop" type="Polygon2D" parent="."]
+color = Color(0.402, 0.451, 0.365, 1)
+antialiased = true
+polygon = PackedVector2Array(0, -14, 11, 0, 0, 14, -11, 0)

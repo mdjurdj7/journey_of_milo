@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://58lkcg25d6t7"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_slam"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/cards/upgrades/slam_plus.tres" id="3_slam_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+value = 30
+
+[resource]
+script = ExtResource("1_slam")
+card_name = "Slam"
+rarity = 2
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Deal 30 damage."
+removal_scope = 2
+upgrades = Array[ExtResource("1_slam")]([ExtResource("3_slam_plus")])

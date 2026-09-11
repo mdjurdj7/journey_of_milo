@@ -1,0 +1,302 @@
+[gd_scene format=3 uid="uid://dchmtg6tnqd6x"]
+
+[ext_resource type="Script" uid="uid://3dqvxkryg3vc" path="res://field_room.gd" id="1_room"]
+[ext_resource type="Script" uid="uid://5nwv6qa74cms" path="res://player.gd" id="2_player"]
+[ext_resource type="PackedScene" uid="uid://ro58pdl2ohmt" path="res://player_visual.tscn" id="3_visual"]
+[ext_resource type="PackedScene" path="res://run_hud.tscn" id="4_run_hud"]
+[ext_resource type="PackedScene" path="res://deck_viewer.tscn" id="6_deck_viewer"]
+[ext_resource type="Script" uid="uid://ooagcj16vrec" path="res://field_wall.gd" id="7_wall"]
+[ext_resource type="PackedScene" uid="uid://bkgxkh6ruqw5i" path="res://shop_window.tscn" id="8_shop_window"]
+[ext_resource type="Script" uid="uid://b8tn0fuy8mquc" path="res://field_camera.gd" id="9_camera"]
+[ext_resource type="PackedScene" path="res://map_screen.tscn" id="10_map_screen"]
+[ext_resource type="PackedScene" uid="uid://b3ar7vy83ruvo" path="res://weapon_pickup_window.tscn" id="11_weapon_pickup"]
+[ext_resource type="Texture2D" uid="uid://db5lcbhivsb40" path="res://assets/regions/beach/ground_tile_wide.png" id="12_ground_texture"]
+[ext_resource type="Texture2D" uid="uid://fjd3ycfqpx85" path="res://assets/regions/beach/foreground_band.png" id="13_foreground_band"]
+[ext_resource type="Texture2D" uid="uid://bnyeuv65gfwe8" path="res://assets/regions/beach/foreground_band_coastal.png" id="14_foreground_band_coastal"]
+[ext_resource type="Texture2D" uid="uid://ba66xuuvd7s0p" path="res://assets/regions/beach/Grass/grass_00.png" id="15_grass_00"]
+[ext_resource type="Texture2D" uid="uid://djrqkrcctwwxf" path="res://assets/regions/beach/Grass/grass_01.png" id="16_grass_01"]
+[ext_resource type="Texture2D" uid="uid://c431g4yd2a3h0" path="res://assets/regions/beach/Grass/grass_02.png" id="17_grass_02"]
+[ext_resource type="Texture2D" uid="uid://w6xjrkxskr3k" path="res://assets/regions/beach/Grass/grass_03.png" id="18_grass_03"]
+[ext_resource type="Texture2D" uid="uid://bcysfpw8i3xno" path="res://assets/regions/beach/Grass/grass_04.png" id="19_grass_04"]
+[ext_resource type="Texture2D" uid="uid://drdkjnopb7g8s" path="res://assets/regions/beach/Grass/grass_05.png" id="20_grass_05"]
+[ext_resource type="Texture2D" uid="uid://2x8b8de8jait" path="res://assets/regions/beach/Landforms/landform_far.png" id="21_landform_far"]
+[ext_resource type="Texture2D" uid="uid://csq88brytnplt" path="res://assets/regions/beach/Landforms/landform_mid.png" id="22_landform_mid"]
+[ext_resource type="Texture2D" uid="uid://bueojvdsegtib" path="res://assets/regions/beach/Landforms/landform_mid_b.png" id="24_landform_mid_b"]
+[ext_resource type="Texture2D" uid="uid://duomwwhp20340" path="res://assets/regions/beach/Landforms/landform_mid_c.png" id="25_landform_mid_c"]
+[ext_resource type="Texture2D" uid="uid://fwdcxk2w864g" path="res://assets/regions/beach/Landforms/landform_mid_d.png" id="26_landform_mid_d"]
+[ext_resource type="Texture2D" uid="uid://d2p6tgvpdogrr" path="res://assets/regions/beach/Clouds/cloud_00.png" id="27_cloud_00"]
+[ext_resource type="Texture2D" uid="uid://cpoep2bew0oby" path="res://assets/regions/beach/Clouds/cloud_01.png" id="28_cloud_01"]
+[ext_resource type="Texture2D" uid="uid://d4mhgaxhonsi3" path="res://assets/regions/beach/Clouds/cloud_02.png" id="29_cloud_02"]
+[ext_resource type="Texture2D" uid="uid://db4pdmgt7584w" path="res://assets/regions/beach/Clouds/cloud_03.png" id="30_cloud_03"]
+[ext_resource type="Texture2D" uid="uid://bx8ksm5b21ywr" path="res://assets/regions/beach/Clouds/cloud_04.png" id="31_cloud_04"]
+[ext_resource type="Texture2D" uid="uid://dff3tvwoiv76b" path="res://assets/regions/beach/Clouds/cloud_05.png" id="32_cloud_05"]
+[ext_resource type="Texture2D" uid="uid://d1mc0keyy5ce4" path="res://assets/regions/beach/overhang_mask_r1.png" id="33_treasure_overhang"]
+[ext_resource type="Texture2D" uid="uid://cv3lgc4dk4wko" path="res://assets/ui/hud/Deck.png" id="34_deck_icon"]
+[ext_resource type="Texture2D" uid="uid://kb5y1qm3nsb2" path="res://assets/ui/hud/Map.png" id="35_map_icon"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_topbottom"]
+size = Vector2(2800, 40)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_leftright"]
+size = Vector2(40, 1080)
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_player"]
+size = Vector2(50, 50)
+
+[node name="FieldRoom" type="Node2D" unique_id=1885102833]
+script = ExtResource("1_room")
+far_structure_color = Color(0.7803922, 0.7803922, 0.7803922, 0.7764706)
+landform_far_texture = ExtResource("21_landform_far")
+landform_far_height_fraction = 0.2
+cloud_textures = Array[Texture2D]([ExtResource("27_cloud_00"), ExtResource("28_cloud_01"), ExtResource("29_cloud_02"), ExtResource("30_cloud_03"), ExtResource("31_cloud_04"), ExtResource("32_cloud_05")])
+landform_mid_textures = Array[Texture2D]([ExtResource("22_landform_mid"), ExtResource("24_landform_mid_b"), ExtResource("25_landform_mid_c"), ExtResource("26_landform_mid_d")])
+landform_mid_width_fraction = 0.55
+landform_mid_height_fraction = 0.35
+vegetation_color = Color(0.56078434, 0.61960787, 0.52156866, 1)
+recession_band_count = 6
+recession_band_top_y_offset = 180.0
+tower_width_fraction = 0.18
+tower_taper = 0.7
+occluder_color = Color(0.2117647, 0.1882353, 0.1607843, 1)
+foreground_band_texture = ExtResource("13_foreground_band")
+foreground_band_texture_coastal = ExtResource("14_foreground_band_coastal")
+foreground_band_height = 205.0
+foreground_band_far_fade = 0.45
+painted_preview_bg_horizon_fraction = 1.0
+painted_preview_fg_y_offset = 270.0
+painted_preview_fg_mass_per_screen = 1.5
+painted_preview_fg_mass_scale_min = 0.22
+painted_preview_fg_mass_scale_max = 0.32
+painted_preview_fg_mass_min_gap_px = 600.0
+painted_preview_bloom_strength = 0.15
+painted_preview_bloom_scale = 0.85
+painted_preview_bloom_pos = Vector2(0.08, -0.05)
+painted_preview_cloud_alpha = 0.6
+painted_preview_mid_modulate = Color(1, 1, 1, 1)
+painted_preview_mid_y_offset = 25.0
+painted_preview_mid_hull_a_height_frac = 0.06
+painted_preview_mid_hull_a_x_frac = -0.7
+painted_preview_mid_hull_a_y_offset = -20.0
+painted_preview_mid_hull_b_height_frac = 0.09
+painted_preview_mid_hull_b_x_frac = 0.95
+painted_preview_mid_hull_c_height_frac = 0.1
+painted_preview_mid_hull_c_x_frac = 0.65
+painted_preview_mid_hull_a_modulate = Color(0.91627353, 0.940525, 0.9822071, 1)
+painted_preview_mid_hull_b_modulate = Color(0.972549, 0.98039216, 1, 1)
+painted_preview_mid_hull_c_modulate = Color(0.91764706, 0.9411765, 0.98039216, 1)
+opening_room_hull_line_screen_y_fraction = 0.48
+treasure_overhang_texture = ExtResource("33_treasure_overhang")
+vegetation_clump_textures = Array[Texture2D]([ExtResource("15_grass_00"), ExtResource("16_grass_01"), ExtResource("17_grass_02"), ExtResource("18_grass_03"), ExtResource("19_grass_04"), ExtResource("20_grass_05")])
+vegetation_scale_min = 0.14
+vegetation_scale_max = 0.25
+ground_texture = ExtResource("12_ground_texture")
+seam_debris_count = 15
+seam_vegetation_count = 8
+ground_line_plank_height_frac = 0.042
+ground_line_plank_y_offset = 7.0
+ground_line_plank_color = Color(0.24313726, 0.26666668, 0.3019608, 1)
+ground_line_ridge_height_frac = 0.04
+ground_line_ridge_y_offset = 6.0
+ground_line_ridge_color = Color(0.3372549, 0.3529412, 0.34901962, 1)
+ground_line_stone_single_height_frac = 0.038
+ground_line_stone_single_y_offset = 6.0
+ground_line_stone_single_color = Color(0.3882353, 0.40784314, 0.4, 1)
+ground_line_stone_cluster_height_frac = 0.044
+ground_line_stone_cluster_y_offset = 5.0
+ground_line_stone_cluster_color = Color(0.6313726, 0.6117647, 0.5764706, 1)
+opening_room_water_height_above_floor = 13.0
+
+[node name="SkyLayer" type="CanvasLayer" parent="." unique_id=2001772930]
+layer = -100
+
+[node name="SkyRect" type="TextureRect" parent="SkyLayer" unique_id=2001772931]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+expand_mode = 1
+
+[node name="Background" type="ParallaxBackground" parent="." unique_id=2001772934]
+
+[node name="FarLayer" type="ParallaxLayer" parent="Background" unique_id=2001772935]
+
+[node name="MidLayer" type="ParallaxLayer" parent="Background" unique_id=2001772936]
+
+[node name="ParticulateFarLayer" type="ParallaxLayer" parent="Background" unique_id=2001772937]
+
+[node name="ParticulateNearLayer" type="ParallaxLayer" parent="Background" unique_id=2001772938]
+
+[node name="PaintedMidLayer" type="ParallaxLayer" parent="Background" unique_id=2001772939]
+
+[node name="DeckViewer" parent="." unique_id=81570842 instance=ExtResource("6_deck_viewer")]
+
+[node name="ShopWindow" parent="." unique_id=1254193563 instance=ExtResource("8_shop_window")]
+
+[node name="MapScreen" parent="." unique_id=1936147622 instance=ExtResource("10_map_screen")]
+
+[node name="WeaponPickupWindow" parent="." unique_id=110271721 instance=ExtResource("11_weapon_pickup")]
+
+[node name="Floor" type="Polygon2D" parent="." unique_id=935095520]
+color = Color(0.12, 0.12, 0.15, 1)
+polygon = PackedVector2Array(40, 900, 2760, 900, 2760, 1040, 40, 1040)
+
+[node name="TopWall" type="StaticBody2D" parent="." unique_id=1668312622]
+position = Vector2(1400, 20)
+script = ExtResource("7_wall")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="TopWall" unique_id=1224026009]
+shape = SubResource("RectangleShape2D_topbottom")
+
+[node name="Polygon2D" type="Polygon2D" parent="TopWall" unique_id=273220464]
+
+[node name="DepthShade" type="Polygon2D" parent="TopWall" unique_id=1451667023]
+
+[node name="BottomWall" type="StaticBody2D" parent="." unique_id=1801520011]
+position = Vector2(1400, 1060)
+script = ExtResource("7_wall")
+outward_sign = 1.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="BottomWall" unique_id=1084404073]
+shape = SubResource("RectangleShape2D_topbottom")
+
+[node name="Polygon2D" type="Polygon2D" parent="BottomWall" unique_id=116931519]
+
+[node name="DepthShade" type="Polygon2D" parent="BottomWall" unique_id=682407445]
+
+[node name="LeftWall" type="StaticBody2D" parent="." unique_id=1136148028]
+position = Vector2(20, 540)
+script = ExtResource("7_wall")
+is_horizontal = false
+half_length = 540.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="LeftWall" unique_id=1883030289]
+shape = SubResource("RectangleShape2D_leftright")
+
+[node name="Polygon2D" type="Polygon2D" parent="LeftWall" unique_id=1513817928]
+
+[node name="DepthShade" type="Polygon2D" parent="LeftWall" unique_id=13968347]
+
+[node name="RightWall" type="StaticBody2D" parent="." unique_id=1998221783]
+position = Vector2(2780, 540)
+script = ExtResource("7_wall")
+is_horizontal = false
+outward_sign = 1.0
+half_length = 540.0
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="RightWall" unique_id=1432337045]
+shape = SubResource("RectangleShape2D_leftright")
+
+[node name="Polygon2D" type="Polygon2D" parent="RightWall" unique_id=1325079323]
+
+[node name="DepthShade" type="Polygon2D" parent="RightWall" unique_id=1680950494]
+
+[node name="Exits" type="Node2D" parent="." unique_id=770186212]
+
+[node name="Content" type="Node2D" parent="." unique_id=557841953]
+
+[node name="TreasureOverhangShape" type="Sprite2D" parent="Content" unique_id=1631042240]
+centered = false
+offset = Vector2(50, 0)
+
+[node name="TreasureForegroundRock" type="Polygon2D" parent="Content" unique_id=-400749691]
+polygon = PackedVector2Array(0, 270, 20, 180, 10, 90, 60, 30, 140, 0, 220, 40, 280, 100, 340, 160, 350, 230, 300, 270)
+
+[node name="Player" type="CharacterBody2D" parent="." unique_id=1854067683]
+position = Vector2(140, 900)
+motion_mode = 1
+script = ExtResource("2_player")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="Player" unique_id=73867480]
+shape = SubResource("RectangleShape2D_player")
+
+[node name="Visual" parent="Player" unique_id=497392163 instance=ExtResource("3_visual")]
+
+[node name="Camera2D" type="Camera2D" parent="Player" unique_id=810619154]
+limit_left = 0
+limit_top = 0
+limit_right = 2800
+limit_bottom = 1080
+script = ExtResource("9_camera")
+
+[node name="Foreground" type="ParallaxBackground" parent="." unique_id=2001772940]
+layer = 1
+
+[node name="OccluderFarLayer" type="ParallaxLayer" parent="Foreground" unique_id=2001772942]
+
+[node name="OccluderLayer" type="ParallaxLayer" parent="Foreground" unique_id=2001772941]
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=1360173337]
+layer = 10
+
+[node name="ExitHaze" type="TextureRect" parent="UI" unique_id=1211227651]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+expand_mode = 1
+
+[node name="HUD" parent="UI" unique_id=1370182402 instance=ExtResource("4_run_hud")]
+compact = true
+
+[node name="DeckButton" type="TextureButton" parent="UI" unique_id=1888708218]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 33.0
+offset_top = -133.0
+offset_right = 108.5
+offset_bottom = -61.0
+grow_vertical = 0
+texture_normal = ExtResource("34_deck_icon")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="DeckLabel" type="Label" parent="UI" unique_id=1888708219]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 33.0
+offset_top = -55.0
+offset_right = 108.5
+offset_bottom = -33.0
+grow_vertical = 0
+text = "Deck (0)"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="MapButton" type="TextureButton" parent="UI" unique_id=1577305967]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 183.5
+offset_top = -133.0
+offset_right = 250.5
+offset_bottom = -61.0
+grow_vertical = 0
+texture_normal = ExtResource("35_map_icon")
+ignore_texture_size = true
+stretch_mode = 5
+
+[node name="MapLabel" type="Label" parent="UI" unique_id=1577305968]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 183.5
+offset_top = -55.0
+offset_right = 250.5
+offset_bottom = -33.0
+grow_vertical = 0
+text = "Map"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="DevRoomPicker" type="OptionButton" parent="UI" unique_id=385076928]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -197.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 46.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 16

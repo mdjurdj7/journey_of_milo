@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" path="res://enemy_data.gd" id="1_saltdarner"]
+[ext_resource type="Script" path="res://enemy_intent.gd" id="2_intent"]
+[ext_resource type="PackedScene" path="res://enemy_visual_saltdarner_sprite.tscn" id="3_visual"]
+[ext_resource type="Resource" path="res://resources/statuses/poison.tres" id="4_poison"]
+
+[sub_resource type="Resource" id="EnemyIntent_basic"]
+script = ExtResource("2_intent")
+value = 6
+
+[sub_resource type="Resource" id="EnemyIntent_spray"]
+script = ExtResource("2_intent")
+type = 2
+status_data = ExtResource("4_poison")
+
+[sub_resource type="Resource" id="EnemyIntent_big"]
+script = ExtResource("2_intent")
+value = 13
+
+[resource]
+script = ExtResource("1_saltdarner")
+enemy_name = "Saltdarner"
+max_hp = 28
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_basic"), SubResource("EnemyIntent_spray"), SubResource("EnemyIntent_basic"), SubResource("EnemyIntent_big")])
+visual_scene = ExtResource("3_visual")
+erratic_intent_selection = false
+pool_weight = 4.0

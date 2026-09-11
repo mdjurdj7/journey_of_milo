@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://dw857sugi788i"]
+
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="1_tideworn"]
+[ext_resource type="Script" uid="uid://8e2aq40illkg" path="res://enemy_intent.gd" id="2_intent"]
+[ext_resource type="PackedScene" path="res://enemy_visual_tideworn_sprite.tscn" id="3_visual"]
+
+[sub_resource type="Resource" id="EnemyIntent_1"]
+script = ExtResource("2_intent")
+value = 9
+
+[sub_resource type="Resource" id="EnemyIntent_2"]
+script = ExtResource("2_intent")
+type = 2
+flavor_text = "Sags. Something shifts loose, then settles."
+
+[sub_resource type="Resource" id="EnemyIntent_3"]
+script = ExtResource("2_intent")
+value = 4
+
+[resource]
+script = ExtResource("1_tideworn")
+enemy_name = "Tideworn"
+max_hp = 45
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_1"), SubResource("EnemyIntent_2"), SubResource("EnemyIntent_3")])
+visual_scene = ExtResource("3_visual")
+battle_visual_scale = 0.5
+battle_head_offset_px = 15.0
+battle_visual_offset_px = Vector2(0, 45)
+intent_horizontal_offset_px = 19.5
+field_visual_scale = 0.325
+field_foot_offset_px = 42.0
+pool_weight = 7.0
+erratic_intent_selection = true

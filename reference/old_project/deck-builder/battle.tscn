@@ -1,0 +1,297 @@
+[gd_scene format=3 uid="uid://ddvn5k4rbyxk3"]
+
+[ext_resource type="Script" uid="uid://djkshp4tpq72e" path="res://battle.gd" id="1_battle"]
+[ext_resource type="PackedScene" path="res://player_resource_cluster.tscn" id="3_resource_cluster"]
+[ext_resource type="PackedScene" path="res://deck_viewer.tscn" id="4_deck_viewer"]
+[ext_resource type="PackedScene" uid="uid://g4shublpipl1" path="res://player_battle_visual.tscn" id="5_player_battle_visual"]
+[ext_resource type="PackedScene" path="res://battle_background.tscn" id="6_battle_background"]
+[ext_resource type="Script" uid="uid://o8jv785y5waf" path="res://target_line.gd" id="7_target_line"]
+
+[sub_resource type="StyleBoxEmpty" id="StyleBoxEmpty_deck_button"]
+
+[node name="Battle" type="Node2D" unique_id=701439498]
+script = ExtResource("1_battle")
+victory_dim_fade_sec = 0.5
+victory_beat_pause_sec = 0.0
+victory_continue_fade_sec = 0.2
+
+[node name="DeckViewer" parent="." unique_id=1484360587 instance=ExtResource("4_deck_viewer")]
+
+[node name="UI" type="CanvasLayer" parent="." unique_id=107729431]
+
+[node name="BattleBackground" parent="UI" unique_id=1589719599 instance=ExtResource("6_battle_background")]
+layout_mode = 3
+anchors_preset = 15
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BackdropTexture" type="TextureRect" parent="UI" unique_id=47756709]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+mouse_filter = 2
+
+[node name="InfoLabelBackground" type="ColorRect" parent="UI" unique_id=1939471469]
+offset_left = 12.0
+offset_top = 8.0
+offset_right = 228.0
+offset_bottom = 150.0
+mouse_filter = 2
+color = Color(0.05, 0.05, 0.08, 0.55)
+
+[node name="HandContainer" type="HBoxContainer" parent="UI" unique_id=1796594317]
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 67.0
+offset_top = -486.75
+offset_right = -67.0
+offset_bottom = -90.0
+grow_horizontal = 2
+grow_vertical = 0
+mouse_filter = 2
+theme_override_constants/separation = 27
+alignment = 1
+
+[node name="DiscardLabel" type="Label" parent="UI" unique_id=1019766908]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -190.0
+offset_top = -80.0
+offset_right = -33.0
+offset_bottom = -33.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.75, 0.78, 0.85, 0.7)
+theme_override_font_sizes/font_size = 27
+text = "Discard: 0"
+horizontal_alignment = 2
+
+[node name="RoomLabel" type="Label" parent="UI" unique_id=1254554095]
+offset_left = 20.0
+offset_top = 16.0
+offset_right = 220.0
+offset_bottom = 38.0
+theme_override_colors/font_color = Color(0.75, 0.78, 0.85, 0.7)
+theme_override_font_sizes/font_size = 17
+text = "Room: 1"
+
+[node name="BattleLabel" type="Label" parent="UI" unique_id=1902190602]
+offset_left = 20.0
+offset_top = 42.0
+offset_right = 220.0
+offset_bottom = 64.0
+theme_override_colors/font_color = Color(0.75, 0.78, 0.85, 0.7)
+theme_override_font_sizes/font_size = 17
+text = "Battle: 1"
+
+[node name="TurnLabel" type="Label" parent="UI" unique_id=503095008]
+offset_left = 20.0
+offset_top = 68.0
+offset_right = 220.0
+offset_bottom = 90.0
+theme_override_colors/font_color = Color(0.75, 0.78, 0.85, 0.7)
+theme_override_font_sizes/font_size = 17
+text = "Turn: 1"
+
+[node name="GoldLabel" type="Label" parent="UI" unique_id=630260999]
+offset_left = 20.0
+offset_top = 94.0
+offset_right = 220.0
+offset_bottom = 116.0
+theme_override_colors/font_color = Color(0.75, 0.78, 0.85, 0.7)
+theme_override_font_sizes/font_size = 17
+text = "Gold: 0"
+
+[node name="ClassLabel" type="Label" parent="UI" unique_id=630261010]
+offset_left = 20.0
+offset_top = 120.0
+offset_right = 220.0
+offset_bottom = 142.0
+theme_override_colors/font_color = Color(0.75, 0.78, 0.85, 0.7)
+theme_override_font_sizes/font_size = 17
+text = "Class: Wanderer"
+
+[node name="PlayerResourceCluster" parent="UI" unique_id=609904068 instance=ExtResource("3_resource_cluster")]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 67.0
+offset_top = -557.0
+offset_right = 767.0
+offset_bottom = -507.0
+grow_vertical = 0
+
+[node name="PlayerBattleVisual" parent="UI" unique_id=268074418 instance=ExtResource("5_player_battle_visual")]
+anchors_preset = -1
+anchor_left = 0.26
+anchor_right = 0.26
+offset_left = -220.0
+offset_top = 50.0
+offset_right = 220.0
+offset_bottom = 510.0
+grow_horizontal = 2
+stance_tint_alpha_per_stack = 0.28
+stance_tint_radius_px = 153.0
+stance_tint_offset = Vector2(-40, 0)
+
+[node name="DeckButton" type="Button" parent="UI" unique_id=57342885]
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_left = 33.0
+offset_top = -80.0
+offset_right = 233.0
+offset_bottom = -33.0
+grow_vertical = 0
+theme_override_colors/font_color = Color(0.75, 0.78, 0.85, 0.7)
+theme_override_colors/font_focus_color = Color(0.75, 0.78, 0.85, 0.7)
+theme_override_colors/font_pressed_color = Color(0.75, 0.78, 0.85, 0.7)
+theme_override_colors/font_hover_color = Color(0.75, 0.78, 0.85, 0.7)
+theme_override_colors/font_disabled_color = Color(0.75, 0.78, 0.85, 0.4)
+theme_override_font_sizes/font_size = 22
+theme_override_styles/normal = SubResource("StyleBoxEmpty_deck_button")
+theme_override_styles/pressed = SubResource("StyleBoxEmpty_deck_button")
+theme_override_styles/hover = SubResource("StyleBoxEmpty_deck_button")
+theme_override_styles/disabled = SubResource("StyleBoxEmpty_deck_button")
+theme_override_styles/focus = SubResource("StyleBoxEmpty_deck_button")
+text = "Deck (0)"
+
+[node name="DevDamageButton" type="Button" parent="UI" unique_id=65991805]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -167.0
+offset_top = 10.0
+offset_right = -10.0
+offset_bottom = 46.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 16
+text = "Dev: -100 Enemy HP"
+
+[node name="DevStatusButton" type="Button" parent="UI" unique_id=538579425]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -167.0
+offset_top = 52.0
+offset_right = -10.0
+offset_bottom = 88.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 16
+text = "Dev: Apply Test Status"
+
+[node name="DevEscapeButton" type="Button" parent="UI" unique_id=926810659]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -167.0
+offset_top = 94.0
+offset_right = -10.0
+offset_bottom = 130.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 16
+text = "Dev: Escape"
+
+[node name="DevUpgradeButton" type="Button" parent="UI" unique_id=1073254866]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -167.0
+offset_top = 136.0
+offset_right = -10.0
+offset_bottom = 172.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 16
+text = "Dev: Upgrade Card"
+
+[node name="DevAddCardButton" type="Button" parent="UI" unique_id=1510378371]
+anchors_preset = 1
+anchor_left = 1.0
+anchor_right = 1.0
+offset_left = -167.0
+offset_top = 178.0
+offset_right = -10.0
+offset_bottom = 214.0
+grow_horizontal = 0
+theme_override_font_sizes/font_size = 16
+text = "Dev: Add Card"
+
+[node name="EndTurnButton" type="Button" parent="UI" unique_id=1553892133]
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -233.0
+offset_top = -538.0
+offset_right = -33.0
+offset_bottom = -490.0
+grow_horizontal = 0
+grow_vertical = 0
+theme_override_font_sizes/font_size = 22
+text = "End Turn"
+
+[node name="EnemyZone" type="HBoxContainer" parent="UI" unique_id=1797622585]
+anchors_preset = -1
+anchor_left = 0.68
+anchor_right = 0.68
+offset_left = -250.0
+offset_top = 50.0
+offset_right = 250.0
+offset_bottom = 548.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/separation = 40
+alignment = 1
+
+[node name="DefeatLabel" type="Label" parent="UI" unique_id=1993164351]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -250.0
+offset_top = -67.0
+offset_right = 250.0
+offset_bottom = 67.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 80
+text = "Defeat"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="TargetLine" type="Node2D" parent="UI" unique_id=84525648]
+script = ExtResource("7_target_line")
+
+[node name="BattleOverlay" type="CanvasLayer" parent="." unique_id=1147712213]
+layer = 10
+
+[node name="DimBackground" type="ColorRect" parent="BattleOverlay" unique_id=291679789]
+visible = false
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0)
+
+[node name="PostBattleButton" type="Button" parent="BattleOverlay" unique_id=437568208]
+visible = false
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+offset_left = -117.0
+offset_top = 83.0
+offset_right = 117.0
+offset_bottom = 150.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_font_sizes/font_size = 27
+text = "Continue"

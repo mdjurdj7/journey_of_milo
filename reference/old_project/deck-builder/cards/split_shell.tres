@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://bq3f0cr8ows5h"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_split_shell"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="Resource_split_shell_block"]
+script = ExtResource("2_effect")
+effect_type = 1
+value = 8
+
+[resource]
+script = ExtResource("1_split_shell")
+card_name = "Split Shell"
+energy_cost = 0
+card_type = 1
+effects = Array[ExtResource("2_effect")]([SubResource("Resource_split_shell_block")])
+description = "Gain 8 block."
+removal_scope = 2

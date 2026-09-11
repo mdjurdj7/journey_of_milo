@@ -1,0 +1,114 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [TREASURE] -> L2_1, L2_0
+  Layer 2:
+    L2_0 [COMBAT] -> L3_1, L3_2
+    L2_1 [EVENT] -> L3_2, L3_0
+  Layer 3:
+    L3_0 [COMBAT] -> L4_1
+    L3_1 [COMBAT] -> L4_2
+    L3_2 [COMBAT] -> L4_2, L4_0
+  Layer 4:
+    L4_0 [EVENT] -> L5_0, L5_1
+    L4_1 [ELITE] -> L5_1, L5_0
+    L4_2 [COMBAT] -> L5_0, L5_1
+  Layer 5:
+    L5_0 [COMBAT] -> L6_1, L6_0
+    L5_1 [TREASURE] -> L6_0, L6_1
+  Layer 6:
+    L6_0 [COMBAT] -> L7_2, L7_0
+    L6_1 [SHOP] -> L7_1, L7_0
+  Layer 7:
+    L7_0 [COMBAT] -> L8_0
+    L7_1 [TREASURE] -> L8_0
+    L7_2 [COMBAT] -> L8_0
+  Layer 8:
+    L8_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+  Battle: Tideworn
+    Turn 1: HP 70->61 | dealt 18, took 9 | played: Strike, Strike, Strike
+    Turn 2: HP 61->64 | dealt 6, took 0 | played: Guard, Guard, Strike
+    Turn 3: HP 64->62 | dealt 16, took 2 | played: Bite Down, Strike, Guard
+    Turn 4: HP 62->62 | dealt 12, took 0 | played: Strike, Strike
+  Battle result: victory
+  Turns: 4 | HP 70->62 | Enemies: Tideworn
+  Damage: dealt 52, taken 11 (blocked 13) | Toll: accrued 11, peak 11
+  Cards played: 11 | Energy unspent (total): 1 | Chain: openers 1, payoffs 0, expired 1
+
+  Gold gained: 17 (battle reward)
+  Card choice offered: Paid in Pain, Reckoning, Iron Will -> took Reckoning
+  Gold gained: 23 (field chest)
+--- Room: L1_0 [TREASURE] ---
+  Gold gained: 53 (field chest)
+--- Room: L2_1 [EVENT] ---
+  Options were: L2_1 [EVENT] (chosen), L2_0 [COMBAT]
+  Weapon offered: The Creditor -> took The Creditor
+--- Room: L3_0 [COMBAT] ---
+  Options were: L3_2 [COMBAT], L3_0 [COMBAT] (chosen)
+  Battle: Beachwrack
+    Turn 1: HP 47->45 | dealt 12, took 2 | played: Guard, Guard, Bite Down
+    (Tideworn joins the fight)
+    Turn 2: HP 45->40 | dealt 6, took 5 | played: Guard, Guard, Strike
+    Turn 3: HP 40->41 | dealt 12, took 4 | played: Strike, Strike, Guard
+    Turn 4: HP 41->32 | dealt 0, took 9 | played: Guard, Guard, Guard
+    Turn 5: HP 32->39 | dealt 18, took 2 | played: Bite Down, Guard, Strike
+    Turn 6: HP 39->30 | dealt 0, took 9 | played: Guard, Guard, Guard
+    Turn 7: HP 30->39 | dealt 137, took 0 | played: Reckoning, Strike
+  Battle result: victory
+  Turns: 7 | HP 47->39 | Enemies: Beachwrack
+  Damage: dealt 185, taken 31 (blocked 49) | Toll: accrued 31, peak 31
+  Cards played: 20 | Energy unspent (total): 0 | Chain: openers 2, payoffs 0, expired 2
+
+  Gold gained: 25 (battle reward)
+  Card choice offered: Guillotine, Advance, Retaliation -> took Retaliation
+--- Room: L4_1 [ELITE] ---
+  Battle: Glasswing, Glasswing
+    Turn 1: HP 39->32 | dealt 12, took 7 | played: Strike, Strike, Guard
+    Turn 2: HP 32->39 | dealt 200, took 0 | played: (none)
+  Battle result: victory
+  Turns: 2 | HP 39->39 | Enemies: Glasswing, Glasswing
+  Damage: dealt 212, taken 7 (blocked 5) | Toll: accrued 7, peak 7
+  Cards played: 3 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 44 (battle reward)
+  Card choice offered: Advance, Retaliation, Paid in Pain -> took Retaliation
+--- Room: L5_1 [TREASURE] ---
+  Options were: L5_1 [TREASURE] (chosen), L5_0 [COMBAT]
+  Gold gained: 44 (field chest)
+  Weapon offered: The Creditor -> took The Creditor
+--- Room: L6_1 [SHOP] ---
+  Options were: L6_0 [COMBAT], L6_1 [SHOP] (chosen)
+--- Room: L7_0 [COMBAT] ---
+  Options were: L7_1 [TREASURE], L7_0 [COMBAT] (chosen)
+  Battle: Beachwrack
+    Turn 1: HP 39->39 | dealt 9, took 0 | played: Strike+, Guard, Guard
+    Turn 2: HP 39->39 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+  Turns: 2 | HP 39->39 | Enemies: Beachwrack
+  Damage: dealt 109, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 3 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 19 (battle reward)
+--- Room: L8_0 [BOSS] ---
+  Battle: Beachwrack Alpha
+    Turn 1: HP 39->37 | dealt 28, took 2 | played: Bite Down+, Strike, Strike
+    (Tideworn joins the fight)
+    Turn 2: HP 37->29 | dealt 0, took 8 | played: Guard, Guard, Guard
+    Turn 3: HP 29->37 | dealt 300, took 0 | played: (none)
+  Battle result: victory
+  Turns: 3 | HP 39->37 | Enemies: Beachwrack Alpha
+  Damage: dealt 328, taken 10 (blocked 15) | Toll: accrued 10, peak 10
+  Cards played: 6 | Energy unspent (total): 3 | Chain: openers 1, payoffs 0, expired 1
+
+=== RUN END: VICTORY ===
+Rooms reached: 9
+Final HP: 37/70
+Final gold: 60
+Final deck (15 cards): 1x Strike+, 4x Strike, 5x Guard, 1x Bite Down+, 1x Reckoning, 2x Retaliation, 1x Guillotine

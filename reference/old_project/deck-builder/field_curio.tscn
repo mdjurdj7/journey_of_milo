@@ -1,0 +1,43 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://field_curio.gd" id="1_curio"]
+
+[sub_resource type="RectangleShape2D" id="RectangleShape2D_curio"]
+size = Vector2(70, 130)
+
+[node name="FieldCurio" type="Area2D"]
+script = ExtResource("1_curio")
+
+[node name="CollisionShape2D" type="CollisionShape2D" parent="."]
+position = Vector2(0, -60)
+shape = SubResource("RectangleShape2D_curio")
+
+[node name="VisualRoot" type="Node2D" parent="."]
+
+[node name="OfferPrompt" type="Control" parent="."]
+
+[node name="PromptColumn" type="VBoxContainer" parent="OfferPrompt"]
+theme_override_constants/separation = 12
+alignment = 1
+
+[node name="ResultLabel" type="Label" parent="OfferPrompt/PromptColumn"]
+layout_mode = 2
+horizontal_alignment = 1
+vertical_alignment = 1
+autowrap_mode = 2
+
+[node name="ChoiceRow" type="HBoxContainer" parent="OfferPrompt/PromptColumn"]
+layout_mode = 2
+size_flags_horizontal = 4
+theme_override_constants/separation = 40
+alignment = 1
+
+[node name="InvestigateButton" type="Button" parent="OfferPrompt/PromptColumn/ChoiceRow"]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Investigate"
+
+[node name="LeaveButton" type="Button" parent="OfferPrompt/PromptColumn/ChoiceRow"]
+layout_mode = 2
+mouse_default_cursor_shape = 2
+text = "Leave"

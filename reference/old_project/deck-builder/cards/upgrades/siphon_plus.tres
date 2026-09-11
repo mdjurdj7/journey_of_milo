@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://card_data.gd" id="1_siphon_plus"]
+[ext_resource type="Script" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+value = 11
+
+[sub_resource type="Resource" id="CardEffect_2"]
+script = ExtResource("2_effect")
+effect_type = 4
+value = 6
+
+[resource]
+script = ExtResource("1_siphon_plus")
+card_name = "Siphon+"
+energy_cost = 2
+rarity = 1
+requires_target = true
+play_sfx = "siphon_play"
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1"), SubResource("CardEffect_2")])
+description = "Deal 11 damage.
+Heal 6 HP."

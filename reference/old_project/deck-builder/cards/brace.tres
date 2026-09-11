@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://cy3vcp5hyko61"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_brace"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/statuses/braced.tres" id="3_braced"]
+
+[sub_resource type="Resource" id="Resource_brace_status"]
+script = ExtResource("2_effect")
+effect_type = 12
+status_data = ExtResource("3_braced")
+
+[resource]
+script = ExtResource("1_brace")
+card_name = "Brace"
+card_type = 1
+effects = Array[ExtResource("2_effect")]([SubResource("Resource_brace_status")])
+description = "Halve the next hit you take."

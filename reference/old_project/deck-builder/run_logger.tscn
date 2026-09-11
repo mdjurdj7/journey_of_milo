@@ -1,0 +1,7 @@
+[gd_scene format=3]
+
+[ext_resource type="Script" path="res://run_logger.gd" id="1_run_logger"]
+
+[node name="RunLogger" type="Node"]
+script = ExtResource("1_run_logger")
+enabled = true

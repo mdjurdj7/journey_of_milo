@@ -1,0 +1,115 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Elite layers: 3 chosen (3, 5, 8) | side-by-side promotions: none
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [COMBAT] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [COMBAT] -> L3_0, L3_2
+    L2_1 [EVENT] -> L3_1
+  Layer 3:
+    L3_0 [ELITE] -> L4_0
+    L3_1 [COMBAT] -> L4_0, L4_1
+    L3_2 [COMBAT] -> L4_1, L4_0
+  Layer 4:
+    L4_0 [COMBAT] -> L5_2, L5_0
+    L4_1 [HEAP] -> L5_1, L5_0
+  Layer 5:
+    L5_0 [ELITE] -> L6_2
+    L5_1 [TREASURE] -> L6_0, L6_1
+    L5_2 [COMBAT] -> L6_1
+  Layer 6:
+    L6_0 [COMBAT] -> L7_1, L7_0
+    L6_1 [SHOP] -> L7_1, L7_0
+    L6_2 [EVENT] -> L7_0
+  Layer 7:
+    L7_0 [COMBAT] -> L8_1, L8_0
+    L7_1 [EVENT] -> L8_2, L8_0
+  Layer 8:
+    L8_0 [COMBAT] -> L9_0
+    L8_1 [COMBAT] -> L9_0
+    L8_2 [ELITE] -> L9_0
+  Layer 9:
+    L9_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+--- Room: L1_0 [COMBAT] ---
+  Battle: Tideworn
+    Turn 1: HP 70->70 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 70->70 | Enemies: Tideworn
+  Damage: dealt 100, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 23 (battle reward)
+--- Room: L2_1 [EVENT] ---
+  Options were: L2_0 [COMBAT], L2_1 [EVENT] (chosen)
+--- Room: L3_1 [COMBAT] ---
+  Battle: Tender, Picket
+    Turn 1: HP 70->70 | dealt 200, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 70->70 | Enemies: Tender, Picket
+  Damage: dealt 200, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 19 (battle reward)
+  Card choice offered: Full Weight, Advance, Compound -> took Full Weight
+--- Room: L4_1 [HEAP] ---
+  Options were: L4_0 [COMBAT], L4_1 [HEAP] (chosen)
+--- Room: L5_1 [TREASURE] ---
+  Options were: L5_1 [TREASURE] (chosen), L5_0 [ELITE]
+  Weapon offered: The Creditor -> took The Creditor
+--- Room: L6_0 [COMBAT] ---
+  Options were: L6_0 [COMBAT] (chosen), L6_1 [SHOP]
+  Battle: Tideworn
+    Turn 1: HP 70->70 | dealt 12, took 0 | played: Strike, Strike, Guard
+    Turn 2: HP 70->70 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+  Turns: 2 | HP 70->70 | Enemies: Tideworn
+  Damage: dealt 112, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 3 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 16 (battle reward)
+  Card choice offered: Full Weight, Come To, Ballast -> took Full Weight
+--- Room: L7_0 [COMBAT] ---
+  Options were: L7_1 [EVENT], L7_0 [COMBAT] (chosen)
+  Battle: Tender, Picket
+    Turn 1: HP 70->70 | dealt 200, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 70->70 | Enemies: Tender, Picket
+  Damage: dealt 200, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 24 (battle reward)
+--- Room: L8_0 [COMBAT] ---
+  Options were: L8_1 [COMBAT], L8_0 [COMBAT] (chosen)
+  Battle: Tideworn
+    Turn 1: HP 70->70 | dealt 100, took 0 | played: (none)
+  Battle result: victory
+  Turns: 1 | HP 70->70 | Enemies: Tideworn
+  Damage: dealt 100, taken 0 (blocked 0) | Toll: accrued 0, peak 0
+  Cards played: 0 | Energy unspent (total): 3 | Chain: openers 0, payoffs 0, expired 0
+
+  Gold gained: 25 (battle reward)
+  Card choice offered: Paid in Pain, Selfeater, Owed in Full -> took Selfeater
+--- Room: L9_0 [BOSS] ---
+  Battle: The Holdfast
+    Turn 1: HP 70->54 | dealt 22, took 16 | played: Full Weight, Bite Down
+    Turn 2: HP 54->50 | dealt 9, took 8 | played: Selfeater, Strike, Guard
+    Turn 3: HP 50->56 | dealt 200, took 0 | played: (none)
+  Battle result: victory
+  Turns: 3 | HP 70->56 | Enemies: The Holdfast
+  Damage: dealt 231, taken 24 (blocked 0) | Toll: accrued 24, peak 24
+  Cards played: 5 | Energy unspent (total): 3 | Chain: openers 1, payoffs 0, expired 1
+  Boss Charges: attempted 1, interrupted 0, buffed 0 | Check damages: []
+
+=== RUN END: VICTORY ===
+Rooms reached: 10
+Final HP: 56/70
+Final gold: 107
+Final deck (14 cards): 5x Strike, 5x Guard, 1x Bite Down, 2x Full Weight, 1x Selfeater

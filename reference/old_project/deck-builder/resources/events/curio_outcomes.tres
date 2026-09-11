@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="SiftOutcomeTable" format=3 uid="uid://b6durii40u3st"]
+
+[ext_resource type="Script" uid="uid://b82btlir1tubw" path="res://sift_outcome_table.gd" id="1_table"]
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="2_b4sqn"]
+[ext_resource type="Script" uid="uid://b6ok65s3oiuq" path="res://sift_outcome_data.gd" id="2_entry"]
+
+[sub_resource type="Resource" id="SiftOutcomeData_1"]
+script = ExtResource("2_entry")
+effect_type = 1
+value = 20
+text = "Placeholder curio outcome 1 (gold)."
+
+[sub_resource type="Resource" id="SiftOutcomeData_2"]
+script = ExtResource("2_entry")
+effect_type = 5
+value = -8
+text = "Placeholder curio outcome 2 (HP change, hazard)."
+
+[sub_resource type="Resource" id="SiftOutcomeData_3"]
+script = ExtResource("2_entry")
+text = "Placeholder curio outcome 3 (no effect)."
+
+[resource]
+script = ExtResource("1_table")
+entries = Array[ExtResource("2_entry")]([SubResource("SiftOutcomeData_1"), SubResource("SiftOutcomeData_2"), SubResource("SiftOutcomeData_3")])

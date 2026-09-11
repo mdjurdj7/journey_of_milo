@@ -1,0 +1,96 @@
+[gd_scene format=3 uid="uid://cy40prrse5yrd"]
+
+[ext_resource type="Script" uid="uid://c62n84auoyfts" path="res://enemy_visual.gd" id="1_visual"]
+[ext_resource type="Shader" uid="uid://6hrx4o7sseor" path="res://enemy_visual_outbound.gdshader" id="2_a53wt"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_g0snq"]
+shader = ExtResource("2_a53wt")
+shader_parameter/top_color = Color(0.55, 0.6, 0.65, 1)
+shader_parameter/bottom_color = Color(0.18, 0.2, 0.26, 1)
+shader_parameter/height = 200.0
+
+[node name="Outbound" type="Node2D" unique_id=549850529]
+position = Vector2(0, 5)
+scale = Vector2(1.015, 1.015)
+script = ExtResource("1_visual")
+color = Color(0.5, 0.5, 0.55, 1)
+accent_node_names = Array[String](["Head", "Mouth", "HeadOutline", "Eyes", "Eyes2", "Fin", "FinOutline", "Body", "Boot", "BodyShadow", "Water"])
+idle_bob_enabled = false
+
+[node name="Water" type="Polygon2D" parent="." unique_id=1793746606]
+color = Color(0.2901961, 0.45882353, 0.6509804, 0.7372549)
+polygon = PackedVector2Array(-47.29064, -6.896552, -66.00986, -1.9704437, -84.72907, -1.9704437, -99.50739, -1.9704437, -112.31528, -0.98522186, -118.22661, 4.926109, -112.31528, 7.8817735, -104.4335, 7.8817735, -99.50739, 13.793104, -86.69952, 15.763548, -68.96552, 14.778326, -65.024635, 10.837439, -55.172417, 8.866995, -45.3202, 12.807882, -15.763548, 12.807882, -2.955665, 10.837439, 8.866996, 11.82266, 18.719213, 8.866995, 23.64532, 5.9113307, 18.719213, 0, 7.881774, -1.9704437, -17.733992, -5.9113307, -27.586208, -6.896552)
+
+[node name="WaterLight" type="Polygon2D" parent="." unique_id=1743301158]
+color = Color(0.36862746, 0.53333336, 0.6509804, 0.2509804)
+polygon = PackedVector2Array(-78.81774, 10.837439, -89.65518, 9.852217, -101.47784, 4.926109, -118.22661, 4.926109, -112.31528, 7.8817735, -104.4335, 7.8817735, -99.50739, 13.793104, -86.69952, 15.763548, -68.96552, 14.778326, -65.024635, 10.837439, -55.172417, 8.866995, -45.3202, 12.807882, -15.763548, 12.807882, -2.955665, 10.837439, 8.866996, 11.82266, 21.67488, 3.940887, 12.807882, 4.926109, 17.733992, 6.8965516, -11.82266, 8.866995, -39.40887, 10.837439, -61.083748, 6.8965516)
+
+[node name="Boot" type="Polygon2D" parent="." unique_id=994875073]
+position = Vector2(11.999999, 3.000001)
+rotation = 0.2617994
+color = Color(0.50262403, 0.32609767, 0.14193198, 1)
+polygon = PackedVector2Array(-56, -11, -46, 7, -67, 16, -81, 0, -81, -6, -78, -9, -73, -9, -65, -2, -58.412308, -6.791046)
+
+[node name="Laces" type="Line2D" parent="Boot" unique_id=147246898]
+position = Vector2(2, -1)
+points = PackedVector2Array(-64, -1, -61, 3)
+width = 2.0
+default_color = Color(0.080783345, 0.080783345, 0.080783345, 1)
+
+[node name="Laces2" type="Line2D" parent="Boot" unique_id=482926602]
+position = Vector2(5.5367365, -2.5188437)
+points = PackedVector2Array(-64, -1, -62.467205, 1.0437317, -61, 3)
+width = 2.0
+default_color = Color(0.080783345, 0.080783345, 0.080783345, 1)
+
+[node name="Sole" type="Polygon2D" parent="Boot" unique_id=447561114]
+color = Color(0.13319641, 0.13319641, 0.13319638, 1)
+polygon = PackedVector2Array(-81, -1, -66, 16, -68, 17, -84, -1, -81, -6)
+
+[node name="Body" type="Polygon2D" parent="." unique_id=942387308]
+material = SubResource("ShaderMaterial_g0snq")
+color = Color(0.23137255, 0.25882354, 0.3372549, 1)
+polygon = PackedVector2Array(-39, -2, -40, -5, -38, -7, -45, -5, -48, -6, -46, -8, -41, -12, -43, -13, -39, -16, -42, -16, -45, -18, -26, -42, -15, -47, -8, -48, -13, -67, 8, -60, 16, -53, 38, -44, 58, -18, 66, -10, 69, -4, 67, 3, 58, 1, 50, -5, 47, 1, 41, 2, 31, 3, 19, 2, -6, -2, -12, 0, -19, -1, -27, 1, -33, -1, -36, -1)
+
+[node name="BodyShadow" type="Polygon2D" parent="." unique_id=1299356813]
+color = Color(0.14053631, 0.15298998, 0.19864407, 1)
+polygon = PackedVector2Array(-42, -2, -45, -5, -48, -6, -43, -10, -42, -11, -43, -13, -30.541874, -5.9113307, -25, -5, -5, -7, 14, -3, 22, -2, 28, -1, 38, -1, 47, -5, 58, -10, 58, -18, 66, -10, 69, -4, 67, 3, 58, 1, 51, -3, 47, 1, 41, 2, 31, 3, 19, 2, -6, -2, -12, 0, -27, 1, -31.527096, 0.9852214, -41, -1)
+
+[node name="Head" type="Polygon2D" parent="." unique_id=865177646]
+position = Vector2(296.00003, -17)
+scale = Vector2(0.517647, 0.5176471)
+color = Color(0.279035, 0.3062925, 0.37436828, 1)
+polygon = PackedVector2Array(-546.70465, -52.159092, -546.70465, -56.022724, -548.6365, -59.886364, -544.7728, -61.81818, -540.9092, -61.81818, -542.841, -65.68182, -546.70465, -67.61363, -542.841, -71.477264, -529.3183, -69.545456, -517.72736, -71.477264, -488.75012, -69.545456, -469.43192, -59.886364, -463.63647, -44.43182, -457.841, -27.045452, -463.63647, -9.659092, -473.29556, 5.795454, -492.61374, 13.522726, -510.00012, 19.31818, -519.6592, 13.522726, -523.5228, 3.863636, -535.1138, -7.727272, -538.79895, -20.34488, -544.7728, -46.363636)
+uv = PackedVector2Array(-546, -45, -518, -73, -466, -67, -453, -37, -481, 12, -520, 9)
+
+[node name="BodyLight" type="Polygon2D" parent="." unique_id=1629934071]
+color = Color(0.30064064, 0.33142212, 0.4138374, 1)
+polygon = PackedVector2Array(-26, -42, -15, -47, -8, -48, -13, -67, 8, -60, 16, -53, 40.394093, -53.201973, 20.689657, -49.26109, 18.719213, -45.3202, 14.778326, -43.34976, 13.793104, -35.467983, 5.91133, -45.3202, -8.866996, -42.364536, -20.689657, -38.42365, -33.49754, -31.527096)
+
+[node name="Eyes" type="Polygon2D" parent="." unique_id=1367593568]
+position = Vector2(391, -35)
+scale = Vector2(0.5454541, 0.54545456)
+color = Color(0.606441, 0.42925733, 0.3135115, 1)
+polygon = PackedVector2Array(-671.00055, -3.6666641, -667.33386, -5.5, -663.66724, -7.333336, -658.16724, -7.333336, -650, -6, -656.33386, -3.6666641, -661.83386, -3.6666641, -665.50055, -3.6666641)
+uv = PackedVector2Array(-675, -1, -659, -9, -659, -9, -650, -6, -662, 2)
+
+[node name="Eyes2" type="Polygon2D" parent="." unique_id=969267719]
+position = Vector2(235, -24.999998)
+scale = Vector2(0.28301856, 0.28301904)
+color = Color(0.606441, 0.42925733, 0.3135115, 1)
+polygon = PackedVector2Array(-666.40076, -39.19998, -647, -32, -637, -18, -657.2007, -31.799988)
+uv = PackedVector2Array(-669, -32, -647, -32, -637, -18, -668, -23)
+
+[node name="HeadOutline" type="Polygon2D" parent="." unique_id=195823805]
+color = Color(0, 0, 0, 1)
+polygon = PackedVector2Array(13, -41, 18, -20, 25, -13, 18, -21, 14, -40)
+
+[node name="Fin" type="Polygon2D" parent="." unique_id=1761737626]
+position = Vector2(8, -2)
+rotation = -0.2617994
+color = Color(0.20784314, 0.23137255, 0.2901961, 1)
+polygon = PackedVector2Array(-16, -16, -11.54166, -3.0619798, -5, 9, 2.9197745, 3.87288, 10, -5, 12.3168, -11.193591, 9.557723, -20.215094, 5, -27, 0.22663307, -27.891733, -10.591354, -18.833069)
+
+[node name="FinOutline" type="Polygon2D" parent="." unique_id=1484584506]
+color = Color(0.029506557, 0.029506557, 0.029506557, 1)
+polygon = PackedVector2Array(-1, -27, -9, -10, 5, 7, -8, -10)

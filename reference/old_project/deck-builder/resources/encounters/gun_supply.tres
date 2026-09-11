@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="EncounterData" format=3]
+
+[ext_resource type="Script" uid="uid://br1gloyh6tpn6" path="res://encounter_data.gd" id="1_encounter_data"]
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="2_enemy_data"]
+[ext_resource type="Resource" path="res://resources/enemies/encounter_only/supply.tres" id="3_supply"]
+[ext_resource type="Resource" path="res://resources/enemies/encounter_only/gun.tres" id="4_gun"]
+
+[resource]
+script = ExtResource("1_encounter_data")
+encounter_name = "Gun/Supply"
+enemies = Array[ExtResource("2_enemy_data")]([ExtResource("4_gun"), ExtResource("3_supply")])
+pool_weight = 7.0
+field_preview_enemies = Array[ExtResource("2_enemy_data")]([ExtResource("4_gun")])

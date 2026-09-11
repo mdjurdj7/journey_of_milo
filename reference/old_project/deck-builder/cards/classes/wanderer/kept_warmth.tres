@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://tcy2j8pfd4tm"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_kept_warmth"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/cards/upgrades/kept_warmth_plus.tres" id="3_kept_warmth_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 4
+value = 25
+
+[resource]
+script = ExtResource("1_kept_warmth")
+card_name = "Kept Warmth"
+energy_cost = 3
+card_type = 1
+rarity = 2
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Restore 25 HP."
+removal_scope = 2
+upgrades = Array[ExtResource("1_kept_warmth")]([ExtResource("3_kept_warmth_plus")])

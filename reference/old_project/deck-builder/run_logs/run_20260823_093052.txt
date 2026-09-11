@@ -1,0 +1,69 @@
+=== RUN START ===
+Class: Warrior
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Overreach
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [COMBAT] -> L2_1, L2_0
+  Layer 2:
+    L2_0 [COMBAT] -> L3_0, L3_1
+    L2_1 [COMBAT] -> L3_1, L3_0
+  Layer 3:
+    L3_0 [COMBAT] -> L4_2, L4_0
+    L3_1 [TREASURE] -> L4_0, L4_1
+  Layer 4:
+    L4_0 [ELITE] -> L5_0, L5_1
+    L4_1 [COMBAT] -> L5_1, L5_0
+    L4_2 [COMBAT] -> L5_1, L5_0
+  Layer 5:
+    L5_0 [EVENT] -> L6_1, L6_0
+    L5_1 [SHOP] -> L6_2, L6_0
+  Layer 6:
+    L6_0 [ELITE] -> L7_1
+    L6_1 [COMBAT] -> L7_2, L7_0
+    L6_2 [COMBAT] -> L7_0
+  Layer 7:
+    L7_0 [COMBAT] -> L8_0
+    L7_1 [COMBAT] -> L8_0
+    L7_2 [EVENT] -> L8_0
+  Layer 8:
+    L8_0 [BOSS]
+
+  Weapon offered: Last Wages -> took Last Wages
+  Battle: Glasswing, Glasswing
+    Turn 1: HP 70->61 | dealt 16, took 9 | played: Strike, Overreach, Guard
+    Turn 2: HP 61->60 | dealt 12, took 1 | played: Strike, Strike, Guard
+    Turn 3: HP 60->54 | dealt 16, took 6 | played: Strike, Overreach, Guard
+    Turn 4: HP 54->54 | dealt 12, took 0 | played: Strike, Strike
+  Battle result: victory
+
+  Gold gained: 23 (battle reward)
+  Card choice offered: Heavy Blow, Riposte, Iron Will -> took Riposte
+  Battle: Wardling
+    Turn 1: HP 54->51 | dealt 16, took 3 | played: Riposte, Strike
+    Turn 2: HP 51->51 | dealt 12, took 0 | played: Guard, Strike, Strike
+    Turn 3: HP 51->48 | dealt 10, took 3 | played: Riposte, Guard
+    Turn 4: HP 48->46 | dealt 6, took 2 | played: Strike, Guard, Guard
+    Turn 5: HP 46->46 | dealt 12, took 0 | played: Guard, Strike, Strike
+    Turn 6: HP 46->33 | dealt 12, took 13 | played: Strike, Strike, Guard
+    Turn 7: HP 33->21 | dealt 16, took 12 | played: Riposte, Strike
+    Turn 8: HP 21->21 | dealt 6, took 0 | played: Strike
+  Battle result: victory
+
+  Gold gained: 21 (battle reward)
+  Card choice offered: Heavy Blow, Warlord's Cleave, Riposte -> took Heavy Blow
+  Battle: Beachwrack
+    Turn 1: HP 21->19 | dealt 22, took 2 | played: Strike, Overreach, Strike
+    (Tideworn joins the fight)
+    Turn 2: HP 19->4 | dealt 30, took 15 | played: Strike, Heavy Blow (chain: +8 dmg)
+    Turn 3: HP 4->4 | dealt 12, took 0 | played: Strike, Strike, Guard
+    Turn 4: HP 4->0 | dealt 30, took 9 | played: Strike, Heavy Blow (chain: +8 dmg)
+  Battle result: defeat
+
+=== RUN END: DEFEAT ===
+Rooms reached: 1
+Final HP: 0/70
+Final gold: 44
+Final deck (13 cards): 5x Strike, 5x Guard, 1x Overreach, 1x Riposte, 1x Heavy Blow

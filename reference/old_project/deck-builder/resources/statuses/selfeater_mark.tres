@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="StatusEffectData" format=3 uid="uid://das2vw4a3yegc"]
+
+[ext_resource type="Script" uid="uid://cug88yevpbxq4" path="res://status_effect_data.gd" id="1_status_effect"]
+
+[resource]
+script = ExtResource("1_status_effect")
+id = "selfeater_mark"
+display_name = "Selfeater's Mark"
+category = 1
+default_magnitude = 3
+default_duration_turns = -1
+modifier_target = 1
+stack_rule = 3
+attack_hp_drain_base = 2
+attack_hp_drain_increment = 3
+is_persistent_stance = true
+icon_color = Color(0.42, 0.3, 0.55, 1)

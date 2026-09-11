@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://cslye2tevtesa"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_second_wind"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" uid="uid://vlqw8efu1fse" path="res://resources/cards/upgrades/second_wind_plus.tres" id="3_second_wind_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 3
+value = 2
+
+[resource]
+script = ExtResource("1_second_wind")
+card_name = "Second Wind"
+card_type = 1
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1")])
+description = "Draw 2.
+If your hand is empty after playing this, draw 1 more."
+upgrades = Array[ExtResource("1_second_wind")]([ExtResource("3_second_wind_plus")])

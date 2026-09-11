@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://cnxrlx7jr7ptj"]
+
+[ext_resource type="Script" uid="uid://colr8uy5qsvow" path="res://enemy_data.gd" id="1_gun"]
+[ext_resource type="Script" uid="uid://8e2aq40illkg" path="res://enemy_intent.gd" id="2_intent"]
+[ext_resource type="Resource" uid="uid://0gb3h51ywsfv" path="res://resources/enemies/encounter_only/supply.tres" id="3_supply"]
+[ext_resource type="PackedScene" uid="uid://cicq3u131x2ro" path="res://enemy_visual_gun.tscn" id="4_visual"]
+
+[sub_resource type="Resource" id="EnemyIntent_attack"]
+script = ExtResource("2_intent")
+value = 12
+
+[resource]
+script = ExtResource("1_gun")
+enemy_name = "Picket"
+max_hp = 70
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_attack")])
+visual_scene = ExtResource("4_visual")
+battle_visual_scale = 0.9
+field_visual_scale = 0.6
+field_foot_offset_px = 32.0
+damage_source_enemy = ExtResource("3_supply")
+damage_step_thresholds = Array[float]([0.5, 0.333])
+damage_step_values = Array[int]([12, 6, 4])
+damage_source_dead_value = 3
+damage_source_alive_sfx = "gun_attack_with_supply"
+damage_source_dead_sfx = "gun_attack_without_supply"
+damage_source_dead_flavor = "Running in low-power mode."

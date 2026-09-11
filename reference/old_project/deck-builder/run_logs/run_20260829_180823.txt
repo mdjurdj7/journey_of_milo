@@ -1,0 +1,92 @@
+=== RUN START ===
+Class: Wanderer
+Starting deck (11 cards): 5x Strike, 5x Guard, 1x Bite Down
+
+Elite layers: 3 chosen (3, 6, 8) | side-by-side promotions: none
+
+Run graph:
+  Layer 0 (Opening):
+    L0_0 [COMBAT] -> L1_0
+  Layer 1:
+    L1_0 [TREASURE] -> L2_0, L2_1
+  Layer 2:
+    L2_0 [TREASURE] -> L3_1, L3_0
+    L2_1 [TREASURE] -> L3_0, L3_2
+  Layer 3:
+    L3_0 [COMBAT] -> L4_0
+    L3_1 [COMBAT] -> L4_0
+    L3_2 [ELITE] -> L4_0
+  Layer 4:
+    L4_0 [TREASURE] -> L5_1, L5_0
+  Layer 5:
+    L5_0 [SHOP] -> L6_0
+    L5_1 [HEAP] -> L6_1, L6_2
+  Layer 6:
+    L6_0 [EVENT] -> L7_2, L7_0
+    L6_1 [ELITE] -> L7_0, L7_1
+    L6_2 [COMBAT] -> L7_1
+  Layer 7:
+    L7_0 [EVENT] -> L8_2
+    L7_1 [HEAP] -> L8_1, L8_2
+    L7_2 [COMBAT] -> L8_0, L8_2
+  Layer 8:
+    L8_0 [COMBAT] -> L9_0
+    L8_1 [ELITE] -> L9_0
+    L8_2 [TREASURE] -> L9_0
+  Layer 9:
+    L9_0 [BOSS]
+
+--- Room: L0_0 [COMBAT] (Opening) ---
+--- Room: L1_0 [TREASURE] ---
+  Gold gained: 53 (field chest)
+--- Room: L2_1 [TREASURE] ---
+  Options were: L2_0 [TREASURE], L2_1 [TREASURE] (chosen)
+  Gold gained: 41 (field chest)
+--- Room: L3_2 [ELITE] ---
+  Options were: L3_0 [COMBAT], L3_2 [ELITE] (chosen)
+  Battle: Wardling
+    Turn 1: HP 70->70 | dealt 0, took 0 | played: Second Wind, Guard, Guard
+    Turn 2: HP 70->68 | dealt 16, took 2 | played: Bite Down, Strike, Guard
+    Turn 3: HP 68->64 | dealt 6, took 4 | played: Guard, Guard, Strike
+    Turn 4: HP 64->65 | dealt 6, took 2 | played: Strike, Guard, Guard
+    Turn 5: HP 65->65 | dealt 22, took 2 | played: Strike, Strike, Bite Down
+    Turn 6: HP 65->57 | dealt 6, took 8 | played: Strike, Guard, Guard
+    Turn 7: HP 57->52 | dealt 6, took 8 | played: Strike, Guard, Guard
+    Turn 8: HP 52->55 | dealt 10, took 2 | played: Guard, Guard, Bite Down
+    Turn 9: HP 55->55 | dealt 18, took 0 | played: Strike, Strike, Strike
+  Battle result: victory
+  Turns: 9 | HP 70->55 | Enemies: Wardling
+  Damage: dealt 90, taken 28 (blocked 64) | Toll: accrued 28, peak 28
+  Cards played: 27 | Energy unspent (total): 0 | Chain: openers 3, payoffs 0, expired 3
+
+  Gold gained: 46 (battle reward)
+  Card choice offered: Paid in Pain, Riposte, Selfeater -> took Selfeater
+--- Room: L4_0 [TREASURE] ---
+  Gold gained: 48 (field chest)
+--- Room: L5_0 [SHOP] ---
+  Options were: L5_1 [HEAP], L5_0 [SHOP] (chosen)
+--- Room: L6_0 [EVENT] ---
+--- Room: L7_0 [EVENT] ---
+  Options were: L7_2 [COMBAT], L7_0 [EVENT] (chosen)
+  Weapon offered: The Creditor -> took The Creditor
+--- Room: L8_2 [TREASURE] ---
+  Gold gained: 50 (field chest)
+--- Room: L9_0 [BOSS] ---
+  Battle: The Holdfast
+    Turn 1: HP 40->27 | dealt 19, took 13 | played: Selfeater, Bite Down+, Guard
+    Turn 2: HP 27->30 | dealt 18, took 5 | played: Strike, Strike, Guard
+    Turn 3: HP 30->29 | dealt 9, took 2 | played: Strike, Guard, Guard
+    Turn 4: HP 29->24 | dealt 18, took 5 | played: Guard, Strike, Strike
+    Turn 5: HP 24->9 | dealt 28, took 16 | played: Guard, Bite Down+, Strike
+    Turn 6: HP 9->0 | dealt 18, took 20 | played: Strike, Strike, Guard
+  Battle result: defeat
+  Turns: 6 | HP 40->0 | Enemies: The Holdfast
+  Damage: dealt 110, taken 61 (blocked 31) | Toll: accrued 58, peak 58
+  Cards played: 18 | Energy unspent (total): 0 | Chain: openers 2, payoffs 0, expired 2
+  Boss Charges: attempted 1, interrupted 0, buffed 1 | Check damages: [45]
+
+=== RUN END: DEFEAT ===
+Rooms reached: 10
+Final HP: 0/70
+Final gold: 133
+Final deck (14 cards): 5x Strike, 5x Guard, 1x Bite Down+, 1x Second Wind, 1x Selfeater, 1x Guillotine

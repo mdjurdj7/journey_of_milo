@@ -1,0 +1,13 @@
+[gd_scene format=3 uid="uid://c0r3lu5c80ujg"]
+
+[ext_resource type="Script" uid="uid://c62n84auoyfts" path="res://enemy_visual.gd" id="1_visual"]
+[ext_resource type="Texture2D" uid="uid://i5xgnt44bmo7" path="res://assets/enemies/Works_Supply.png" id="2_sprite"]
+
+[node name="Supply" type="Node2D" unique_id=1810361376]
+script = ExtResource("1_visual")
+idle_bob_enabled = false
+
+[node name="Sprite" type="Sprite2D" parent="." unique_id=815738200]
+position = Vector2(-0.7, -48)
+scale = Vector2(0.155, 0.155)
+texture = ExtResource("2_sprite")

@@ -1,0 +1,26 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://gold_display.gd" id="1_gold_display"]
+
+[node name="GoldDisplay" type="Control"]
+custom_minimum_size = Vector2(200, 40)
+mouse_filter = 2
+script = ExtResource("1_gold_display")
+
+[node name="CoinIcon" type="Control" parent="."]
+layout_mode = 0
+offset_right = 40.0
+offset_bottom = 40.0
+mouse_filter = 2
+
+[node name="GoldLabel" type="Label" parent="."]
+layout_mode = 0
+offset_left = 48.0
+offset_right = 200.0
+offset_bottom = 40.0
+mouse_filter = 2
+theme_override_colors/font_color = Color(1, 0.85, 0.3, 1)
+theme_override_font_sizes/font_size = 27
+horizontal_alignment = 0
+vertical_alignment = 1
+text = "0"

@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" path="res://card_data.gd" id="1_full_weight"]
+[ext_resource type="Script" path="res://card_effect.gd" id="2_effect"]
+[ext_resource type="Resource" path="res://resources/statuses/overextended.tres" id="3_overextended"]
+[ext_resource type="Resource" path="res://resources/cards/upgrades/full_weight_plus.tres" id="4_full_weight_plus"]
+
+[sub_resource type="Resource" id="CardEffect_1"]
+script = ExtResource("2_effect")
+effect_type = 11
+value = 10
+
+[sub_resource type="Resource" id="CardEffect_2"]
+script = ExtResource("2_effect")
+effect_type = 12
+status_data = ExtResource("3_overextended")
+
+[resource]
+script = ExtResource("1_full_weight")
+card_name = "Full Weight"
+energy_cost = 2
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_1"), SubResource("CardEffect_2")])
+description = "Deal 10 damage to all enemies.
+You cannot gain block during your next turn."
+upgrades = Array[ExtResource("1_full_weight")]([ExtResource("4_full_weight_plus")])

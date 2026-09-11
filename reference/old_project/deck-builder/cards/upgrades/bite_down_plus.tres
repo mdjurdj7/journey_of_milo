@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://dsipt77hpfgds"]
+
+[ext_resource type="Script" uid="uid://cbrwjmgdtu4ym" path="res://card_data.gd" id="1_bite_down_plus"]
+[ext_resource type="Script" uid="uid://duk4ygvvdbtlg" path="res://card_effect.gd" id="2_effect"]
+
+[sub_resource type="Resource" id="CardEffect_bite_down_plus_1"]
+script = ExtResource("2_effect")
+value = 14
+
+[sub_resource type="Resource" id="CardEffect_bite_down_plus_2"]
+script = ExtResource("2_effect")
+effect_type = 2
+value = 2
+
+[resource]
+script = ExtResource("1_bite_down_plus")
+chain_role = 1
+card_name = "Bite Down+"
+requires_target = true
+effects = Array[ExtResource("2_effect")]([SubResource("CardEffect_bite_down_plus_1"), SubResource("CardEffect_bite_down_plus_2")])
+description = "Lose 2 HP.
+Deal 14 damage."
