@@ -11,13 +11,25 @@ const MODEL_SCENE_PATH := "res://assets/models/sputter_placeholder.fbx"
 @export var model_scale: float = 1.0
 @export var model_yaw_offset: float = 0.0
 @export var model_ground_offset: float = 0.0
+@export var face_shore_at_spawn: bool = true
+@export var region_field_path: NodePath = ^".."
+@export_range(0.0, 1.0, 0.01) var highlight_lighten_amount: float = 0.35
 
 var _contacted: bool = false
+var _model_material: StandardMaterial3D
 
 @onready var contact_area: Area3D = $ContactArea
 @onready var contact_shape: CollisionShape3D = $ContactArea/CollisionShape3D
 
 func _ready() -> void:
+	# RegionField's own freeze (PROCESS_MODE_DISABLED on contact) defaults
+	# to removing every CollisionObject3D beneath it from the physics space
+	# entirely (disable_mode's default, REMOVE) - which would make this
+	# enemy un-raycastable for card targeting during the very battle that
+	# freeze exists for. MAKE_STATIC keeps the body in space (immobile,
+	# which it already effectively is once frozen) instead.
+	disable_mode = CollisionObject3D.DISABLE_MODE_MAKE_STATIC
+
 	var shape := SphereShape3D.new()
 	shape.radius = contact_radius
 	contact_shape.shape = shape
@@ -26,6 +38,24 @@ func _ready() -> void:
 	contact_area.body_exited.connect(_on_body_exited)
 
 	_spawn_model()
+
+	if face_shore_at_spawn:
+		_face_shore()
+
+# get_forward() points inland (spawn -> Tower, see RegionField's own doc),
+# so facing the shore/sea is the opposite direction. Yaws the body itself,
+# not the model - model_yaw_offset above stays a separate, local correction
+# for the imported asset's own facing.
+func _face_shore() -> void:
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	if region_field == null:
+		return
+	var to_shore := -region_field.get_forward()
+	if to_shore.length() < 0.0001:
+		return
+	# Same verified direction<->angle convention as face_toward() below and
+	# Wanderer._angle_from_direction().
+	rotation.y = atan2(-to_shore.x, -to_shore.z)
 
 func _spawn_model() -> void:
 	var model := (load(MODEL_SCENE_PATH) as PackedScene).instantiate() as Node3D
@@ -37,6 +67,7 @@ func _spawn_model() -> void:
 	material.albedo_color = model_color
 	material.roughness = 1.0
 	material.metallic_specular = 0.0
+	_model_material = material
 
 	# Combined AABB of all mesh instances, expressed in this node's own
 	# space (not the model's), so its bottom tells us how far to raise the
@@ -55,6 +86,14 @@ func _spawn_model() -> void:
 	if has_aabb:
 		print("FieldEnemy '%s': model AABB height = %.3f at model_scale = %.3f" % [enemy_id, combined_aabb.size.y, model_scale])
 		model.position.y += -combined_aabb.position.y + model_ground_offset
+
+# Called by BattleController while this enemy is the hovered raycast target
+# during card targeting. Brightness lift via albedo only, no emission - a
+# hover cue, not a glow effect.
+func set_highlight(on: bool) -> void:
+	if _model_material == null:
+		return
+	_model_material.albedo_color = model_color.lightened(highlight_lighten_amount) if on else model_color
 
 # Called by region_field.gd on contact. Yaws to face target over duration,
 # taking the short way around. RegionField's contact freeze stops nothing

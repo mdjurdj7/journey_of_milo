@@ -178,6 +178,12 @@ var _material: ShaderMaterial
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
 
 func _ready() -> void:
+	# Same reasoning as FieldEnemy's own disable_mode override: RegionField's
+	# battle freeze would otherwise remove Ground from the physics space
+	# entirely (disable_mode's default, REMOVE), and the targeting raycast
+	# needs solid ground behind/around enemies to behave sanely too.
+	disable_mode = CollisionObject3D.DISABLE_MODE_MAKE_STATIC
+
 	_material = ShaderMaterial.new()
 	_material.shader = load("res://field/ground.gdshader")
 	_apply_all_uniforms()

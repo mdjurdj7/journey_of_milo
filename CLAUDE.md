@@ -45,6 +45,8 @@
   root_node must point at the model. FBX imports carry a static
   "Take 001" clip that outscores the real one on track count — select
   by keyframe count.
+- Freezing RegionField removes physics bodies unless disable_mode is
+  MAKE_STATIC; anything that must be raycast during battle needs it.
 
 ## Project docs
 - DESIGN.md tracks parked decisions and deferred items. Update it when

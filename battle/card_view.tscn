@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/card_view.gd" id="1_card_view"]
+
+[node name="CardView" type="Panel"]
+script = ExtResource("1_card_view")
+
+[node name="NameLabel" type="Label" parent="."]
+
+[node name="Badge" type="Panel" parent="."]
+
+[node name="CostLabel" type="Label" parent="Badge"]
+
+[node name="ArtRect" type="ColorRect" parent="."]
+
+[node name="DescriptionLabel" type="Label" parent="."]

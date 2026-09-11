@@ -92,8 +92,19 @@ var _audio_player: AudioStreamPlayer
 var _current_volume_db: float
 var _forward: Vector3 = Vector3.FORWARD
 var _ready_complete: bool = false
+var _sea_time: float = 0.0
 
 func _ready() -> void:
+	# RegionField freezes itself (and, by inheritance, Sea) on battle
+	# contact, but the shader's normal drift must keep animating through
+	# that freeze - see _physics_process()'s _sea_time accumulation below,
+	# which is what the shader actually reads instead of the engine's own
+	# TIME. The distance-based audio fade further down keeps running too,
+	# but its only input (the Wanderer's position) is itself frozen while
+	# the field is, so it just settles and stops changing - not a case of
+	# field logic advancing during a freeze.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+
 	_material = ShaderMaterial.new()
 	_material.shader = load("res://field/sea.gdshader")
 	_apply_all_uniforms()
@@ -181,14 +192,17 @@ func _spawn_ambience() -> void:
 	add_child(_audio_player)
 	_audio_player.play()
 
-# near_edge_z is the inverse of the center_z calc in
-# _position_relative_to_spawn(). Distance is measured along _forward
-# (not assumed +Z) from the Wanderer to that edge, clamped to 0 once
-# the Wanderer is at or past it.
 func _physics_process(delta: float) -> void:
+	_sea_time += delta
+	_apply_uniform("sea_time", _sea_time)
+
 	if _audio_player == null or _wanderer == null:
 		return
 
+	# near_edge_z is the inverse of the center_z calc in
+	# _position_relative_to_spawn(). Distance is measured along _forward
+	# (not assumed +Z) from the Wanderer to that edge, clamped to 0 once
+	# the Wanderer is at or past it.
 	var near_edge_z := global_position.z + _forward.z * sea_depth / 2.0
 	var distance := maxf((_wanderer.global_position.z - near_edge_z) * _forward.z, 0.0)
 

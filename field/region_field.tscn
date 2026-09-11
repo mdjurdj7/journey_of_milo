@@ -60,6 +60,7 @@ fov = 45.0
 [node name="FieldEnemy" parent="." unique_id=677119585 instance=ExtResource("8")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
 enemy_id = &"sputter"
+model_yaw_offset = 180.0
 
 [node name="Sea" type="MeshInstance3D" parent="." unique_id=1533217746]
 script = ExtResource("9")

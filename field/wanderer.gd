@@ -30,16 +30,25 @@ func _ready() -> void:
 
 	var model := (load(IDLE_SCENE_PATH) as PackedScene).instantiate() as Node3D
 	add_child(model)
+	# RegionField freezes itself (and, by inheritance, the Wanderer and
+	# everything under it) on battle contact, but Idle still needs to keep
+	# playing through that freeze. Overriding only the AnimationPlayer's own
+	# process_mode below isn't enough: the player would keep advancing and
+	# writing bone poses, but the model's own Skeleton3D still inherits the
+	# freeze and gates the internal step that flushes those poses to the
+	# renderer, so the mesh would visibly stay stuck mid-pose regardless.
+	# Exempting the whole model subtree here (before anything below it is
+	# queried) covers Skeleton3D and everything else in one shot.
+	model.process_mode = Node.PROCESS_MODE_ALWAYS
 	# Mixamo meshes face +Z in their own space while the body's forward is
 	# -Z (see _forward_from_angle()), so the model is rotated to match.
 	model.rotation.y = deg_to_rad(model_yaw_offset)
 
 	var players := model.find_children("*", "AnimationPlayer", true, false)
 	_animation_player = players[0] as AnimationPlayer if not players.is_empty() else null
-	# RegionField freezes itself (and, by inheritance, the Wanderer) on
-	# battle contact, but enter_battle_stance()'s Idle blend still needs to
-	# play out through that freeze — same reasoning as CameraPivot's
-	# process_mode override.
+	# Same reasoning as CameraPivot's own process_mode override - belt and
+	# suspenders alongside model.process_mode above, since this is also the
+	# node whose own _process actually advances playback.
 	if _animation_player:
 		_animation_player.process_mode = Node.PROCESS_MODE_ALWAYS
 
@@ -66,6 +75,13 @@ func _merge_placeholder_clips(anim_player: AnimationPlayer) -> void:
 		return
 	var idle_library := anim_player.get_animation_library(idle_entry["library"])
 	idle_library.rename_animation(idle_entry["name"], "Idle")
+	# Mixamo/FBX imports default to LOOP_NONE - play() would run this once
+	# and hold on the last frame instead of looping, which reads as "idle
+	# froze" the moment the clip's own (short) duration elapses. Applies
+	# whether Idle is playing standalone or re-triggered by enter_battle_
+	# stance()'s own play("Idle") call.
+	var idle_animation: Animation = idle_entry["animation"]
+	idle_animation.loop_mode = Animation.LOOP_LINEAR
 
 	var walk_scene := load(WALK_SCENE_PATH) as PackedScene
 	var walk_instance := walk_scene.instantiate()
@@ -82,6 +98,7 @@ func _merge_placeholder_clips(anim_player: AnimationPlayer) -> void:
 		return
 
 	var walk_animation: Animation = walk_entry["animation"]
+	walk_animation.loop_mode = Animation.LOOP_LINEAR
 	idle_library.add_animation("Walk", walk_animation)
 	walk_instance.free()
 
@@ -192,6 +209,13 @@ func _build_animation_tree() -> void:
 	_animation_tree = AnimationTree.new()
 	_animation_tree.tree_root = blend_space
 	add_child(_animation_tree)
+	# When use_animation_tree is on, the AnimationTree - not the
+	# AnimationPlayer - is the mixer actually blending and applying poses
+	# each frame (the AnimationPlayer above just supplies the Idle/Walk
+	# clips via anim_player below). Without this, _animation_player's own
+	# PROCESS_MODE_ALWAYS is inert here: the tree itself would still
+	# inherit RegionField's freeze and stop blending during battle.
+	_animation_tree.process_mode = Node.PROCESS_MODE_ALWAYS
 	_animation_tree.anim_player = _animation_tree.get_path_to(_animation_player)
 
 	# AnimationTree.root_node defaults to "..", i.e. Wanderer — but the

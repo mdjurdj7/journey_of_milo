@@ -11,6 +11,11 @@ uniform float noise_amplitude = 0.03;
 uniform float noise_scale = 6.0;
 uniform float noise_speed = 0.05;
 
+// Driven from sea.gd's own _sea_time accumulator (_physics_process()),
+// not the engine's built-in TIME - sea.gd keeps advancing this while
+// RegionField is frozen for battle, so the drift never visibly stalls.
+uniform float sea_time = 0.0;
+
 // Edge: alpha fades to 0 over shore_fade meters of scene-depth
 // difference between this surface and whatever's behind it, so the
 // water thins into the sand instead of cutting off at the mesh edge.
@@ -70,9 +75,9 @@ void fragment() {
 	// field, then rotated into view space (no non-uniform scale on this
 	// mesh, so mat3(VIEW_MATRIX) alone is a valid normal transform).
 	float epsilon = 0.5;
-	float h_c = sea_height(v_world_xz, TIME);
-	float h_x = sea_height(v_world_xz + vec2(epsilon, 0.0), TIME);
-	float h_z = sea_height(v_world_xz + vec2(0.0, epsilon), TIME);
+	float h_c = sea_height(v_world_xz, sea_time);
+	float h_x = sea_height(v_world_xz + vec2(epsilon, 0.0), sea_time);
+	float h_z = sea_height(v_world_xz + vec2(0.0, epsilon), sea_time);
 
 	vec3 world_normal = normalize(vec3(
 		(h_c - h_x) * noise_amplitude / epsilon,

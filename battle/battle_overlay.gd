@@ -5,20 +5,11 @@ enum Outcome { WIN, LOSE, ESCAPE }
 
 signal battle_finished(outcome: Outcome)
 
-# Path -> copy count, same composition as the old project's STARTING_DECK
-# (reference/old_project's run_state.gd) re-pointed at the trimmed
-# CardData resources under cards/data/.
-const STARTER_DECK_COUNTS: Dictionary = {
-	"res://cards/data/slash.tres": 3,
-	"res://cards/data/bite_down.tres": 2,
-	"res://cards/data/brace.tres": 2,
-	"res://cards/data/reckoning.tres": 1,
-	"res://cards/data/down_payment.tres": 1,
-}
-
 @export var starting_hp: int = 50
 @export var starting_toll: int = 0
-@export var turn_draw_amount: int = 5
+@export var enemy_head_height: float = 1.8
+@export var rising_number_rise_px: float = 60.0
+@export var rising_number_duration_sec: float = 0.6
 
 @onready var hp_label: Label = $StatsPanel/StatsBox/HPLabel
 @onready var toll_label: Label = $StatsPanel/StatsBox/TollLabel
@@ -31,17 +22,21 @@ const STARTER_DECK_COUNTS: Dictionary = {
 @onready var draw_button: Button = $DebugRow/DrawButton
 @onready var discard_button: Button = $DebugRow/DiscardButton
 
-var deck: Deck
+var battle_controller: BattleController
 
 func _ready() -> void:
-	# Safe default (on-pale) in case this scene is ever previewed or
-	# instanced without enter_battle() being called - region_field.gd's
-	# own call right after instancing is what actually decides this.
+	# RegionField freezes itself (and, by inheritance, this whole overlay -
+	# it's added under BattleLayer, RegionField's own child) on battle
+	# contact. Every interactive piece here (cards, buttons, the controller
+	# added in enter_battle()) needs to keep working through that freeze.
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Covers the full screen - a click meant for a 3D enemy behind it must
+	# fall through to BattleController's own _unhandled_input() raycast
+	# instead of being swallowed here. Cards/buttons keep their own STOP.
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
 	if theme is BattleTheme:
 		(theme as BattleTheme).apply_value_set(false)
-
-	deck = Deck.new(_build_starting_deck())
-	hand_container.set_deck(deck)
 
 	hp_label.text = "HP: %d" % starting_hp
 	toll_label.text = "Toll: %d" % starting_toll
@@ -51,27 +46,60 @@ func _ready() -> void:
 	win_button.pressed.connect(func() -> void: battle_finished.emit(Outcome.WIN))
 	lose_button.pressed.connect(func() -> void: battle_finished.emit(Outcome.LOSE))
 	escape_button.pressed.connect(func() -> void: battle_finished.emit(Outcome.ESCAPE))
-	draw_button.pressed.connect(func() -> void: hand_container.draw_cards(turn_draw_amount))
+	draw_button.pressed.connect(func() -> void: hand_container.draw_cards(5))
 	discard_button.pressed.connect(func() -> void: hand_container.discard_hand())
 
 # Reads RegionField's ui_on_dark_world switch and applies the matching
-# value set to this overlay's theme - see ui/battle_theme.gd's own
-# apply_value_set(). Called by region_field.gd right alongside
-# CameraRig's own enter_battle(), the same point in the flow.
-func enter_battle(on_dark_world: bool) -> void:
+# value set to this overlay's theme (see ui/battle_theme.gd's own
+# apply_value_set()), then builds this fight's BattleController - owner of
+# the Deck and the enemies list, the only thing hand_container/this overlay
+# ever call into to report input or drive rules. Called by region_field.gd
+# right alongside CameraRig's own enter_battle().
+func enter_battle(on_dark_world: bool, enemies: Array[FieldEnemy]) -> void:
 	if theme is BattleTheme:
 		(theme as BattleTheme).apply_value_set(on_dark_world)
+
+	battle_controller = BattleController.new()
+	add_child(battle_controller)
+	battle_controller.target_requested.connect(_on_target_requested)
+	battle_controller.target_cancelled.connect(_on_target_cancelled)
+	battle_controller.card_played.connect(_on_card_played)
+	battle_controller.setup(hand_container, enemies)
+
+	end_turn_button.pressed.connect(func() -> void: battle_controller.end_turn())
+
+func _on_target_requested(_card: CardData) -> void:
+	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
+
+func _on_target_cancelled() -> void:
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+
+func _on_card_played(card: CardData, target: FieldEnemy) -> void:
+	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+	if target != null:
+		_spawn_rising_number(card.cost, target)
+
+# Placeholder-only: reads card.cost, not any real effect value - see this
+# pass's own out-of-scope note (no real effects/HP/Toll yet).
+func _spawn_rising_number(value: int, target: FieldEnemy) -> void:
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return
+	var screen_pos: Vector2 = camera.unproject_position(target.global_position + Vector3.UP * enemy_head_height)
+
+	var label := Label.new()
+	label.text = str(value)
+	label.position = screen_pos
+	label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(label)
+
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(label, "position:y", screen_pos.y - rising_number_rise_px, rising_number_duration_sec)
+	tween.tween_property(label, "modulate:a", 0.0, rising_number_duration_sec)
+	tween.chain().tween_callback(label.queue_free)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F1:
 		debug_row.visible = not debug_row.visible
 		get_viewport().set_input_as_handled()
-
-func _build_starting_deck() -> Array[CardData]:
-	var cards: Array[CardData] = []
-	for path: String in STARTER_DECK_COUNTS:
-		var base_card: CardData = load(path) as CardData
-		var copies: int = int(STARTER_DECK_COUNTS[path])
-		for i in copies:
-			cards.append(base_card.duplicate() as CardData)
-	return cards

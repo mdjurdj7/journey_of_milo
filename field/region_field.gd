@@ -97,7 +97,10 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 
 	var overlay := (load(BATTLE_OVERLAY_SCENE_PATH) as PackedScene).instantiate() as BattleOverlay
 	battle_layer.add_child(overlay)
-	overlay.enter_battle(ui_on_dark_world)
+	# Single-enemy contact model for now - a list of one. BattleController
+	# owns whatever this becomes once a fight can hold more than one enemy.
+	var battle_enemies: Array[FieldEnemy] = [enemy]
+	overlay.enter_battle(ui_on_dark_world, battle_enemies)
 	overlay.battle_finished.connect(_on_battle_finished.bind(enemy, overlay))
 
 func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, overlay: BattleOverlay) -> void:
