@@ -20,9 +20,8 @@ const STARTER_DECK_COUNTS: Dictionary = {
 @export var starting_toll: int = 0
 @export var turn_draw_amount: int = 5
 
-@onready var enemy_label: Label = $EnemyLabel
-@onready var hp_label: Label = $TopLeft/HPLabel
-@onready var toll_label: Label = $TopLeft/TollLabel
+@onready var hp_label: Label = $StatsPanel/StatsBox/HPLabel
+@onready var toll_label: Label = $StatsPanel/StatsBox/TollLabel
 @onready var end_turn_button: Button = $EndTurnButton
 @onready var hand_container: HandContainer = $HandContainer
 @onready var debug_row: Control = $DebugRow
@@ -35,6 +34,12 @@ const STARTER_DECK_COUNTS: Dictionary = {
 var deck: Deck
 
 func _ready() -> void:
+	# Safe default (on-pale) in case this scene is ever previewed or
+	# instanced without enter_battle() being called - region_field.gd's
+	# own call right after instancing is what actually decides this.
+	if theme is BattleTheme:
+		(theme as BattleTheme).apply_value_set(false)
+
 	deck = Deck.new(_build_starting_deck())
 	hand_container.set_deck(deck)
 
@@ -49,8 +54,13 @@ func _ready() -> void:
 	draw_button.pressed.connect(func() -> void: hand_container.draw_cards(turn_draw_amount))
 	discard_button.pressed.connect(func() -> void: hand_container.discard_hand())
 
-func set_enemy_id(enemy_id: StringName) -> void:
-	enemy_label.text = "Enemy: %s" % enemy_id
+# Reads RegionField's ui_on_dark_world switch and applies the matching
+# value set to this overlay's theme - see ui/battle_theme.gd's own
+# apply_value_set(). Called by region_field.gd right alongside
+# CameraRig's own enter_battle(), the same point in the flow.
+func enter_battle(on_dark_world: bool) -> void:
+	if theme is BattleTheme:
+		(theme as BattleTheme).apply_value_set(on_dark_world)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_F1:

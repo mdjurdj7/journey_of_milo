@@ -27,6 +27,10 @@ const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 @export var tower_path: NodePath = ^"Tower"
 @export var camera_rig_path: NodePath = ^"CameraPivot"
 @export var battle_spacing: float = 3.0
+# Which of BattleTheme's two value sets the overlay applies on entering
+# battle - see ui/battle_theme.gd's own rule: UI is the dark element on a
+# pale world (false, default) and the pale element on a dark one (true).
+@export var ui_on_dark_world: bool = false
 
 @onready var wanderer: Wanderer = $Wanderer
 @onready var battle_layer: CanvasLayer = $BattleLayer
@@ -93,7 +97,7 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 
 	var overlay := (load(BATTLE_OVERLAY_SCENE_PATH) as PackedScene).instantiate() as BattleOverlay
 	battle_layer.add_child(overlay)
-	overlay.set_enemy_id(enemy.enemy_id)
+	overlay.enter_battle(ui_on_dark_world)
 	overlay.battle_finished.connect(_on_battle_finished.bind(enemy, overlay))
 
 func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, overlay: BattleOverlay) -> void:

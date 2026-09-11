@@ -10,34 +10,30 @@ anchor_bottom = 1.0
 theme = ExtResource("3_theme")
 script = ExtResource("1_overlay")
 
-[node name="EnemyLabel" type="Label" parent="."]
+[node name="StatsPanel" type="PanelContainer" parent="."]
 offset_left = 40.0
 offset_top = 40.0
-offset_right = 500.0
-offset_bottom = 80.0
-text = "Enemy"
+offset_right = 220.0
+offset_bottom = 110.0
 
-[node name="TopLeft" type="VBoxContainer" parent="."]
-offset_left = 40.0
-offset_top = 90.0
-offset_right = 300.0
-offset_bottom = 150.0
+[node name="StatsBox" type="VBoxContainer" parent="StatsPanel"]
+layout_mode = 2
 
-[node name="HPLabel" type="Label" parent="TopLeft"]
+[node name="HPLabel" type="Label" parent="StatsPanel/StatsBox"]
 layout_mode = 2
 text = "HP: 50"
 
-[node name="TollLabel" type="Label" parent="TopLeft"]
+[node name="TollLabel" type="Label" parent="StatsPanel/StatsBox"]
 layout_mode = 2
 text = "Toll: 0"
 
-[node name="HandContainer" type="HBoxContainer" parent="." node_paths=PackedStringArray()]
+[node name="HandContainer" type="HBoxContainer" parent="."]
 anchor_left = 0.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = 40.0
-offset_top = -220.0
+offset_top = -365.0
 offset_right = -40.0
 offset_bottom = -20.0
 alignment = 1
@@ -49,9 +45,9 @@ anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
 offset_left = -180.0
-offset_top = -260.0
+offset_top = -405.0
 offset_right = -20.0
-offset_bottom = -224.0
+offset_bottom = -369.0
 text = "End Turn"
 
 [node name="DebugRow" type="HBoxContainer" parent="."]
