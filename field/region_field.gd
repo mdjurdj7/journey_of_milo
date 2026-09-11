@@ -1,7 +1,7 @@
 extends Node3D
 class_name RegionField
 
-const BATTLE_STUB_SCENE_PATH := "res://battle/battle_stub.tscn"
+const BATTLE_OVERLAY_SCENE_PATH := "res://battle/battle_overlay.tscn"
 const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 
 @export var escape_push_distance: float = 4.0
@@ -91,13 +91,13 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 		wanderer.enter_battle_stance(enemy, battle_spacing, camera_rig.battle_transition_time)
 		enemy.face_toward(wanderer, camera_rig.battle_transition_time)
 
-	var stub := (load(BATTLE_STUB_SCENE_PATH) as PackedScene).instantiate() as BattleStub
-	battle_layer.add_child(stub)
-	stub.set_enemy_id(enemy.enemy_id)
-	stub.battle_finished.connect(_on_battle_finished.bind(enemy, stub))
+	var overlay := (load(BATTLE_OVERLAY_SCENE_PATH) as PackedScene).instantiate() as BattleOverlay
+	battle_layer.add_child(overlay)
+	overlay.set_enemy_id(enemy.enemy_id)
+	overlay.battle_finished.connect(_on_battle_finished.bind(enemy, overlay))
 
-func _on_battle_finished(outcome: BattleStub.Outcome, enemy: FieldEnemy, stub: BattleStub) -> void:
-	stub.queue_free()
+func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, overlay: BattleOverlay) -> void:
+	overlay.queue_free()
 	process_mode = Node.PROCESS_MODE_INHERIT
 
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
@@ -105,11 +105,11 @@ func _on_battle_finished(outcome: BattleStub.Outcome, enemy: FieldEnemy, stub: B
 		camera_rig.exit_battle()
 
 	match outcome:
-		BattleStub.Outcome.WIN:
+		BattleOverlay.Outcome.WIN:
 			enemy.queue_free()
-		BattleStub.Outcome.ESCAPE:
+		BattleOverlay.Outcome.ESCAPE:
 			_push_wanderer_away_from(enemy)
-		BattleStub.Outcome.LOSE:
+		BattleOverlay.Outcome.LOSE:
 			get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
 
 # The push distance must clear the enemy's own contact radius, or the

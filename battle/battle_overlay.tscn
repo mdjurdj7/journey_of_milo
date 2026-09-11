@@ -1,0 +1,82 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://battle/battle_overlay.gd" id="1_overlay"]
+[ext_resource type="Script" path="res://battle/hand_container.gd" id="2_hand"]
+[ext_resource type="Theme" path="res://ui/battle_theme.tres" id="3_theme"]
+
+[node name="BattleOverlay" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme = ExtResource("3_theme")
+script = ExtResource("1_overlay")
+
+[node name="EnemyLabel" type="Label" parent="."]
+offset_left = 40.0
+offset_top = 40.0
+offset_right = 500.0
+offset_bottom = 80.0
+text = "Enemy"
+
+[node name="TopLeft" type="VBoxContainer" parent="."]
+offset_left = 40.0
+offset_top = 90.0
+offset_right = 300.0
+offset_bottom = 150.0
+
+[node name="HPLabel" type="Label" parent="TopLeft"]
+layout_mode = 2
+text = "HP: 50"
+
+[node name="TollLabel" type="Label" parent="TopLeft"]
+layout_mode = 2
+text = "Toll: 0"
+
+[node name="HandContainer" type="HBoxContainer" parent="." node_paths=PackedStringArray()]
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 40.0
+offset_top = -220.0
+offset_right = -40.0
+offset_bottom = -20.0
+alignment = 1
+script = ExtResource("2_hand")
+
+[node name="EndTurnButton" type="Button" parent="."]
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -180.0
+offset_top = -260.0
+offset_right = -20.0
+offset_bottom = -224.0
+text = "End Turn"
+
+[node name="DebugRow" type="HBoxContainer" parent="."]
+offset_left = 520.0
+offset_top = 40.0
+offset_right = 1200.0
+offset_bottom = 80.0
+visible = false
+
+[node name="WinButton" type="Button" parent="DebugRow"]
+layout_mode = 2
+text = "Win"
+
+[node name="LoseButton" type="Button" parent="DebugRow"]
+layout_mode = 2
+text = "Lose"
+
+[node name="EscapeButton" type="Button" parent="DebugRow"]
+layout_mode = 2
+text = "Escape"
+
+[node name="DrawButton" type="Button" parent="DebugRow"]
+layout_mode = 2
+text = "Draw"
+
+[node name="DiscardButton" type="Button" parent="DebugRow"]
+layout_mode = 2
+text = "Discard Hand"
