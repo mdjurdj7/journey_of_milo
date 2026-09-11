@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://6a80mtv6q25l"
-path="res://.godot/imported/wanderer_placeholder_battle_idle.fbx-fb59b174b0eb15b26171faeaf19d840d.scn"
+uid="uid://caje3ynkauc8p"
+path="res://.godot/imported/wanderer_idle.fbx-57e151ea556b1b3719140a0ed66ff949.scn"
 
 [deps]
 
-source_file="res://assets/models/wanderer_placeholder_battle_idle.fbx"
-dest_files=["res://.godot/imported/wanderer_placeholder_battle_idle.fbx-fb59b174b0eb15b26171faeaf19d840d.scn"]
+source_file="res://assets/models/wanderer/wanderer_idle.fbx"
+dest_files=["res://.godot/imported/wanderer_idle.fbx-57e151ea556b1b3719140a0ed66ff949.scn"]
 
 [params]
 

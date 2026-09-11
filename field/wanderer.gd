@@ -1,9 +1,9 @@
 extends CharacterBody3D
 class_name Wanderer
 
-const IDLE_SCENE_PATH := "res://assets/models/wanderer_placeholder_idle.fbx"
-const WALK_SCENE_PATH := "res://assets/models/wanderer_placeholder_walking.fbx"
-const BATTLE_IDLE_SCENE_PATH := "res://assets/models/wanderer_placeholder_battle_idle.fbx"
+const IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_idle.fbx"
+const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_walking.fbx"
+const BATTLE_IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_idle.fbx"
 
 @export var move_speed: float = 4.5
 @export var acceleration: float = 14.0
@@ -58,17 +58,17 @@ func _ready() -> void:
 	if _animation_player:
 		_animation_player.process_mode = Node.PROCESS_MODE_ALWAYS
 
-	_merge_placeholder_clips(_animation_player)
+	_merge_clips(_animation_player)
 	if use_animation_tree:
 		_build_animation_tree()
 	elif _animation_player:
 		_animation_player.play("Idle")
 
-# One shared flat material for the whole placeholder model - same "one
+# One shared flat material for the whole model - same "one
 # StandardMaterial3D, roughness 1, specular 0" shape FieldEnemy._spawn_
-# model() already uses for the crab, so both placeholders read as the
-# same kind of flat-shaded figure while wanderer_color keeps them
-# visually distinct from each other.
+# model() already uses for the crab, so both read as the same kind of
+# flat-shaded figure while wanderer_color keeps them visually distinct
+# from each other.
 func _apply_model_material(model: Node3D) -> void:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = wanderer_color
@@ -78,16 +78,17 @@ func _apply_model_material(model: Node3D) -> void:
 		var mi := mesh_instance as MeshInstance3D
 		mi.material_override = material
 
-# Placeholder-only: idle and walk currently ship as two separate Mixamo FBX
-# files, each importing with a single clip whose name Godot's FBX importer
-# assigns (not "mixamo.com" — don't assume a specific name). This finds
-# each player's one clip by count, not by name, and merges them into one
-# AnimationPlayer library as "Idle"/"Walk". Remove this once the real model
-# ships both clips in one animation file — nothing else should depend on
-# how the clips arrived.
-func _merge_placeholder_clips(anim_player: AnimationPlayer) -> void:
+# Idle/Walk/BattleIdle ship as three separate Mixamo FBX files, each
+# importing with a single clip whose name Godot's FBX importer assigns
+# (not "mixamo.com" — don't assume a specific name). This finds each
+# player's one clip by count, not by name, and merges them into one
+# AnimationPlayer library as "Idle"/"Walk"/"BattleIdle" - this is the
+# real model, not a stand-in; the merge exists because of how the three
+# clips currently ship as separate files, not because anything here is
+# temporary.
+func _merge_clips(anim_player: AnimationPlayer) -> void:
 	if anim_player == null:
-		push_error("Wanderer: idle model has no AnimationPlayer; cannot merge placeholder clips.")
+		push_error("Wanderer: idle model has no AnimationPlayer; cannot merge clips.")
 		return
 
 	var idle_entry := _find_single_animation(anim_player, "idle AnimationPlayer")
@@ -107,7 +108,7 @@ func _merge_placeholder_clips(anim_player: AnimationPlayer) -> void:
 	var walk_instance := walk_scene.instantiate()
 	var walk_players := walk_instance.find_children("*", "AnimationPlayer", true, false)
 	if walk_players.is_empty():
-		push_error("Wanderer: walking placeholder has no AnimationPlayer; Walk clip not merged.")
+		push_error("Wanderer: walking model has no AnimationPlayer; Walk clip not merged.")
 		walk_instance.free()
 		return
 
@@ -123,14 +124,14 @@ func _merge_placeholder_clips(anim_player: AnimationPlayer) -> void:
 	walk_instance.free()
 
 	if walk_animation.get_track_count() == 0:
-		push_error("Wanderer: merged Walk animation has no tracks; placeholder merge is broken.")
+		push_error("Wanderer: merged Walk animation has no tracks; clip merge is broken.")
 		return
 
 	var anim_root := anim_player.get_node_or_null(anim_player.root_node)
 	var track_node_path := NodePath(walk_animation.track_get_path(0).get_concatenated_names())
 	var resolved := anim_root.get_node_or_null(track_node_path) if anim_root else null
 	if not (resolved is Skeleton3D):
-		push_error("Wanderer: Walk animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; placeholder merge is broken." % str(track_node_path))
+		push_error("Wanderer: Walk animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(track_node_path))
 		return
 
 	if remove_walk_root_motion:
@@ -144,7 +145,7 @@ func _merge_placeholder_clips(anim_player: AnimationPlayer) -> void:
 	var battle_idle_instance := battle_idle_scene.instantiate()
 	var battle_idle_players := battle_idle_instance.find_children("*", "AnimationPlayer", true, false)
 	if battle_idle_players.is_empty():
-		push_error("Wanderer: battle-idle placeholder has no AnimationPlayer; BattleIdle clip not merged.")
+		push_error("Wanderer: battle-idle model has no AnimationPlayer; BattleIdle clip not merged.")
 		battle_idle_instance.free()
 		return
 
@@ -160,18 +161,18 @@ func _merge_placeholder_clips(anim_player: AnimationPlayer) -> void:
 	battle_idle_instance.free()
 
 	if battle_idle_animation.get_track_count() == 0:
-		push_error("Wanderer: merged BattleIdle animation has no tracks; placeholder merge is broken.")
+		push_error("Wanderer: merged BattleIdle animation has no tracks; clip merge is broken.")
 		return
 
 	var battle_idle_track_node_path := NodePath(battle_idle_animation.track_get_path(0).get_concatenated_names())
 	var battle_idle_resolved := anim_root.get_node_or_null(battle_idle_track_node_path) if anim_root else null
 	if not (battle_idle_resolved is Skeleton3D):
-		push_error("Wanderer: BattleIdle animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; placeholder merge is broken." % str(battle_idle_track_node_path))
+		push_error("Wanderer: BattleIdle animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(battle_idle_track_node_path))
 		return
 
 # Freezes a Walk clip's Hips position track to its first key's X/Z, leaving
-# Y (vertical bob) untouched, so the placeholder plays in place even if the
-# Mixamo export carried forward locomotion into the root bone.
+# Y (vertical bob) untouched, so it plays in place even if the Mixamo
+# export carried forward locomotion into the root bone.
 func _remove_walk_root_motion(walk_animation: Animation) -> void:
 	for track_idx in walk_animation.get_track_count():
 		if walk_animation.track_get_type(track_idx) != Animation.TYPE_POSITION_3D:

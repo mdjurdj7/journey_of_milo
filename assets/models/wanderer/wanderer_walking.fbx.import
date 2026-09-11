@@ -3,13 +3,13 @@
 importer="scene"
 importer_version=1
 type="PackedScene"
-uid="uid://b1ac5iij7yjv7"
-path="res://.godot/imported/wanderer_placeholder_walking.fbx-f612e9ff3dbe4bdd41df45ff9077d93b.scn"
+uid="uid://bwx5sourbtabd"
+path="res://.godot/imported/wanderer_walking.fbx-c36c9c2865cc5457fba9b2c5f23d1fd6.scn"
 
 [deps]
 
-source_file="res://assets/models/wanderer_placeholder_walking.fbx"
-dest_files=["res://.godot/imported/wanderer_placeholder_walking.fbx-f612e9ff3dbe4bdd41df45ff9077d93b.scn"]
+source_file="res://assets/models/wanderer/wanderer_walking.fbx"
+dest_files=["res://.godot/imported/wanderer_walking.fbx-c36c9c2865cc5457fba9b2c5f23d1fd6.scn"]
 
 [params]
 
