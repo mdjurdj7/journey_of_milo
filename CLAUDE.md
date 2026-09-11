@@ -50,3 +50,4 @@
 - DESIGN.md tracks parked decisions and deferred items. Update it when
   a decision is deferred.
 - BESTIARY.md is the enemy source of truth.
+- Read docs/GAME_FRAMEWORK.md before any design or field task.
