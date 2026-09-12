@@ -25,29 +25,18 @@ uniform float pool_edge_width : hint_range(0.0, 1.0) = 0.15;
 uniform vec4 pool_color : source_color = vec4(0.696, 0.704, 0.68, 1.0);
 uniform float pool_roughness : hint_range(0.0, 1.0) = 0.35;
 
-// Ground relief. Coupled to wetness: wet ground (and pools most of all)
-// sinks, so pools sit in the low spots rather than coincidentally
-// overlapping unrelated bumps. Fades to zero between relief_fade_start
-// and relief_fade_end (distance from the camera) so the horizon stays
-// flat instead of visibly bumpy at range.
-uniform float relief_amplitude = 0.3;
-uniform float relief_noise_scale = 4.0;
-uniform float relief_fade_start = 30.0;
-uniform float relief_fade_end = 60.0;
-
-// relief_extent matches ground.gd's mesh-sizing export of the same name —
-// the fine relief plane's world-space bounds, centered on the origin.
-// Displacement (and its normal contribution) fades to zero over the last
-// relief_edge_fade meters inside those bounds, so the fine mesh meets the
-// flat outer dressing plane flush instead of a seam at the boundary.
-uniform vec2 relief_extent = vec2(80.0, 50.0);
-uniform float relief_edge_fade = 4.0;
+// Ground relief no longer displaces vertices here - ground.gd bakes it
+// directly into the relief mesh's own vertices (and the matching
+// HeightMapShape3D) via Ground.get_height_at(), so collision and render
+// share one source of truth instead of two independent approximations of
+// the same noise. relief_amplitude/relief_noise_scale/relief_extent/
+// relief_edge_fade live on as GDScript-only exports on Ground for that
+// baking - this shader has no more use for them.
 
 // Drift lines: a handful of faint, slightly warm bands running parallel to
 // the shore, spaced inland from the water line. drift_line_count bounds
-// how many fade in before the band dies out entirely. Value shift only —
-// no displacement — but folded into the normal at reduced weight (see
-// drift_line_normal_amplitude) so they read as surface, not paint.
+// how many fade in before the band dies out entirely. Value shift only,
+// fragment-only - no vertex displacement, no normal perturbation.
 uniform float drift_line_spacing = 6.0;
 uniform float drift_line_width = 1.0;
 uniform float drift_line_wobble = 1.5;
@@ -55,16 +44,13 @@ uniform float drift_line_wobble_scale = 10.0;
 uniform int drift_line_count = 3;
 uniform float drift_line_strength : hint_range(0.0, 1.0) = 0.05;
 uniform vec4 drift_line_color : source_color = vec4(0.55, 0.48, 0.4, 1.0);
-uniform float drift_line_normal_amplitude = 0.02;
 
 // Ripple marks: faint, fine-scale directional noise in wet sand only,
 // stretched parallel to the shore (ripple_stretch) so it varies quickly
-// perpendicular to it. A value shift, same reduced-weight normal folding
-// as drift lines.
+// perpendicular to it. A value shift, fragment-only like drift lines.
 uniform float ripple_scale = 0.4;
 uniform float ripple_stretch = 6.0;
 uniform float ripple_strength : hint_range(0.0, 1.0) = 0.02;
-uniform float ripple_normal_amplitude = 0.01;
 
 // Wet band: within shore_slope_start (meters) of the water line, sand
 // wetness is pushed to 1.0 so it blends toward wet_color/wet_roughness/
@@ -124,25 +110,6 @@ float sand_wetness_mask(vec2 world_xz) {
 	return max(wetness_mask(world_xz), shore_t(world_xz));
 }
 
-// Plain relief bump, coupled to wetness so pools and damp sand sink.
-// Not yet faded by camera distance — callers apply relief_fade themselves,
-// since it's also needed unfaded for the normal computed at each sample.
-float relief_height(vec2 world_xz) {
-	float wetness = wetness_mask(world_xz);
-	float bump = (value_noise(world_xz / max(relief_noise_scale, 0.001)) - 0.5) * 2.0;
-	return bump * relief_amplitude - wetness * relief_amplitude;
-}
-
-// 0 at/beyond relief_extent's edges, 1 more than relief_edge_fade meters
-// inside them. Zero outside relief_extent as a side effect (smoothstep
-// clamps a negative edge_dist to its 0 edge), which is exactly what the
-// coarse outer dressing plane — sharing this same shader — needs too.
-float relief_edge_fade_factor(vec2 world_xz) {
-	vec2 half_extent = relief_extent * 0.5;
-	float edge_dist = min(half_extent.x - abs(world_xz.x), half_extent.y - abs(world_xz.y));
-	return smoothstep(0.0, max(relief_edge_fade, 0.001), edge_dist);
-}
-
 // 2..drift_line_count faint bands, spaced drift_line_spacing apart starting
 // at the water line, wobbled along the shore so they don't read as ruled
 // lines, and fading out after drift_line_count of them.
@@ -170,37 +137,15 @@ float ripple_mask(vec2 world_xz) {
 	return (value_noise(sample_pos + vec2(0.0, 251.3)) - 0.5) * 2.0;
 }
 
-// Combined pseudo-height used only to derive the vertex normal: relief at
-// full amplitude (faded by camera distance and relief_extent's edges, same
-// as the real displacement), plus drift lines and ripples at their own much
-// smaller amplitudes so they shade as surface detail without actually
-// displacing the mesh.
-float surface_height(vec2 world_xz, float relief_fade) {
-	float h = relief_height(world_xz) * relief_fade;
-	h += drift_line_mask(world_xz) * drift_line_normal_amplitude;
-	h += ripple_mask(world_xz) * ripple_normal_amplitude * sand_wetness_mask(world_xz);
-	return h;
-}
-
+// VERTEX already holds the real, baked relief height (ground.gd wrote it
+// directly into the relief mesh's own vertex data via get_height_at()) and
+// NORMAL is left untouched on purpose: the built-in NORMAL input is already
+// the mesh's own authored per-vertex normal (also baked by ground.gd from
+// the same height field, via its gradient), correctly transformed - this
+// shader has nothing to add to either one anymore.
 void vertex() {
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	v_world_xz = world_pos.xz;
-
-	float cam_dist = length(world_pos - CAMERA_POSITION_WORLD);
-	float relief_fade = 1.0 - smoothstep(relief_fade_start, relief_fade_end, cam_dist);
-	relief_fade *= relief_edge_fade_factor(world_pos.xz);
-
-	VERTEX.y += relief_height(world_pos.xz) * relief_fade;
-
-	// Central-difference gradient of the same height field feeding the
-	// normal, so relief (and, at reduced weight, drift lines and ripples)
-	// is shaded rather than just displaced.
-	float eps = 0.05;
-	float h_x0 = surface_height(world_pos.xz - vec2(eps, 0.0), relief_fade);
-	float h_x1 = surface_height(world_pos.xz + vec2(eps, 0.0), relief_fade);
-	float h_z0 = surface_height(world_pos.xz - vec2(0.0, eps), relief_fade);
-	float h_z1 = surface_height(world_pos.xz + vec2(0.0, eps), relief_fade);
-	NORMAL = normalize(vec3((h_x0 - h_x1) / (2.0 * eps), 1.0, (h_z0 - h_z1) / (2.0 * eps)));
 }
 
 void fragment() {

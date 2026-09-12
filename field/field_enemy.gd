@@ -103,6 +103,12 @@ func set_highlight(on: bool) -> void:
 # taking the short way around. RegionField's contact freeze stops nothing
 # here (FieldEnemy has no _physics_process), but the tween still needs
 # TWEEN_PAUSE_PROCESS to play through it, same as Wanderer.enter_battle_stance().
+#
+# Rotation only, deliberately - unlike Wanderer.enter_battle_stance(), this
+# never repositions the enemy (contact happens wherever the enemy already
+# stands), so its Y - set correctly from Ground.get_height_at() once at
+# spawn, see region_field.gd's _reposition_enemies_along_forward() - never
+# goes stale between spawn and battle. Nothing here needs to re-sample it.
 func face_toward(target: Node3D, duration: float) -> void:
 	if target == null:
 		return
