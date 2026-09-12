@@ -127,23 +127,19 @@ horizon_color = Color(0.62, 0.66, 0.7, 1)
 fog_color = Color(0.58, 0.63, 0.68, 1)
 fog_density = 0.01
 fog_aerial_perspective = 0.65
-ambient_energy = 0.55
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=846207689]
 light_energy = 2.0
 script = ExtResource("3")
 elevation_degrees = 45.0
 azimuth_degrees = 70.0
-energy = 0.9
 color = Color(0.8, 0.84, 0.9, 1)
 shadow_blur_amount = 1.0
 shadow_darkness = 0.7
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=1437900813]
 script = ExtResource("4")
-ground_color = Color(0.86504203, 0.87034494, 0.83228356, 1)
 wetness_scale = 8.0
-wet_color = Color(0.66668326, 0.67263305, 0.6651851, 1)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=1297283630]
 
@@ -156,7 +152,8 @@ script = ExtResource("5")
 script = ExtResource("6")
 move_speed = 5.0
 acceleration = 30.0
-dash_distance = 3.0
+dash_distance = 8.0
+dash_duration = 0.9
 leg_spread_correction_degrees = -4.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Wanderer" unique_id=1638228685]

@@ -35,7 +35,6 @@ const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 
 @onready var wanderer: Wanderer = $Wanderer
 @onready var battle_layer: CanvasLayer = $BattleLayer
-@onready var ground: Ground = $Ground
 
 var _forward: Vector3 = Vector3.FORWARD
 var _forward_computed: bool = false
@@ -82,24 +81,15 @@ func get_forward() -> Vector3:
 
 # Preserves each enemy's authored distance from the Wanderer's spawn,
 # but re-derives the direction along get_forward() instead of whatever
-# axis its .tscn transform happened to assume. Y is set from Ground.
-# get_height_at() at the enemy's new XZ - the same function props should
-# use to sit on the surface at spawn - since FieldEnemy has no gravity/
-# _physics_process of its own to settle onto the relief naturally the way
-# the physically-simulated Wanderer does.
-#
-# get_height_at() alone isn't the whole story though: FieldEnemy._spawn_
-# model()'s own AABB grounding places the model's feet at body-local
-# Y = model_ground_offset, not Y = 0 - so the body's own global Y has to
-# be get_height_at() MINUS that offset for the feet (not the body origin)
-# to land on the actual terrain surface. Reads model_ground_offset
-# directly since it's already a public @export on FieldEnemy.
+# axis its .tscn transform happened to assume. Y is left alone here -
+# FieldEnemy grounds its own Y against Ground.get_height_at() itself (see
+# its _ground_to_relief(), called once deferred from _ready() and again
+# on every Ground.relief_rebuilt), which also means it stays correct
+# across live relief edits, not just at this one spawn moment.
 func _reposition_enemies_along_forward() -> void:
 	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
 		var distance := (enemy.global_position - wanderer.global_position).length()
-		var new_position: Vector3 = wanderer.global_position + _forward * distance
-		new_position.y = ground.get_height_at(Vector2(new_position.x, new_position.z)) - enemy.model_ground_offset
-		enemy.global_position = new_position
+		enemy.global_position = wanderer.global_position + _forward * distance
 
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	process_mode = Node.PROCESS_MODE_DISABLED

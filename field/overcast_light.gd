@@ -9,7 +9,7 @@ class_name OvercastLight
 	set(value):
 		azimuth_degrees = value
 		_apply_rotation()
-@export var energy: float = 0.4:
+@export var energy: float = 1.0:
 	set(value):
 		energy = value
 		light_energy = value

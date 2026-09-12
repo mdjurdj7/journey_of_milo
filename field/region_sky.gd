@@ -11,8 +11,21 @@ extends WorldEnvironment
 @export var fog_depth_end: float = 320.0
 @export var fog_sky_affect: float = 1.0
 @export var fog_aerial_perspective: float = 0.5
-@export var ambient_energy: float = 1.0
+# Flat color fill instead of the sky's own color - AMBIENT_SOURCE_SKY was
+# tinting every surface (sand most of all) noticeably blue, since the
+# procedural sky's horizon/top colors lean cool. ambient_color's default
+# is a warm off-white close to the sand's own dry tone instead.
+@export var ambient_color: Color = Color(0.78, 0.77, 0.74):
+	set(value):
+		ambient_color = value
+		_apply_ambient()
+@export var ambient_energy: float = 0.7:
+	set(value):
+		ambient_energy = value
+		_apply_ambient()
 @export var ground_path: NodePath = ^"../Ground"
+
+var _environment: Environment
 
 func _ready() -> void:
 	var sky_material := ProceduralSkyMaterial.new()
@@ -24,22 +37,31 @@ func _ready() -> void:
 	var sky := Sky.new()
 	sky.sky_material = sky_material
 
-	var env := Environment.new()
-	env.background_mode = Environment.BG_SKY
-	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
-	env.ambient_light_energy = ambient_energy
-	env.fog_enabled = true
-	env.fog_light_color = fog_color
-	env.fog_density = fog_density
-	env.fog_depth_begin = fog_depth_begin
-	env.fog_depth_end = fog_depth_end
-	env.fog_sky_affect = fog_sky_affect
-	env.fog_aerial_perspective = fog_aerial_perspective
+	_environment = Environment.new()
+	_environment.background_mode = Environment.BG_SKY
+	_environment.sky = sky
+	_environment.fog_enabled = true
+	_environment.fog_light_color = fog_color
+	_environment.fog_density = fog_density
+	_environment.fog_depth_begin = fog_depth_begin
+	_environment.fog_depth_end = fog_depth_end
+	_environment.fog_sky_affect = fog_sky_affect
+	_environment.fog_aerial_perspective = fog_aerial_perspective
+	_apply_ambient()
 
-	environment = env
+	environment = _environment
 
 	_push_pool_color()
+
+# Guarded the same way _push_pool_color() already is: ambient_color/
+# ambient_energy's setters can fire during scene deserialization, before
+# _ready() has built _environment.
+func _apply_ambient() -> void:
+	if _environment == null:
+		return
+	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	_environment.ambient_light_color = ambient_color
+	_environment.ambient_light_energy = ambient_energy
 
 # Keeps Ground's standing-pool color matched to the sky's horizon color
 # without manual duplication. Ground keeps its own pool_color export as

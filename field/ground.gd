@@ -1,7 +1,13 @@
 extends StaticBody3D
 class_name Ground
 
-@export var ground_color: Color = Color(0.72, 0.73, 0.66):
+# Emitted after every relief mesh/collision rebuild (initial build and any
+# live relief-export edit) so anything standing on the terrain - FieldEnemy,
+# any future prop - can re-ground itself without RegionField having to
+# know about or re-trigger that on their behalf.
+signal relief_rebuilt
+
+@export var ground_color: Color = Color(0.82, 0.77, 0.66):
 	set(value):
 		ground_color = value
 		_apply_uniform("dry_color", value)
@@ -23,22 +29,40 @@ class_name Ground
 		relief_subdivisions = value
 		_rebuild_ground_mesh_and_collision()
 
-@export var near_color: Color = Color(1.0, 1.0, 1.0):
+@export var near_color: Color = Color(0.78, 0.73, 0.62):
 	set(value):
 		near_color = value
 		_apply_uniform("near_color", value)
-@export var far_color: Color = Color(0.7, 0.7, 0.72):
+@export var far_color: Color = Color(0.84, 0.83, 0.79):
 	set(value):
 		far_color = value
 		_apply_uniform("far_color", value)
-@export var near_distance: float = 5.0:
+@export var near_distance: float = 20.0:
 	set(value):
 		near_distance = value
 		_apply_uniform("near_distance", value)
-@export var far_distance: float = 60.0:
+@export var far_distance: float = 120.0:
 	set(value):
 		far_distance = value
 		_apply_uniform("far_distance", value)
+
+# Shader-only toggle: when off, ground.gdshader's own wetness_mask()
+# (and therefore pool_factor, which reads it directly) returns 0
+# everywhere, so wet patches and standing pools both stop rendering.
+# Deliberately does NOT touch _wetness_mask() below (the GDScript port
+# feeding get_height_at()/collision) - wetness still sinks the actual
+# terrain shape either way, only the visual "reads too dark and muddy"
+# wet-sand/pool coloring is what this turns off.
+@export var wet_patches_enabled: bool = false:
+	set(value):
+		wet_patches_enabled = value
+		_apply_uniform("wet_patches_enabled", value)
+# Separate from wet_patches_enabled so the shore can still read damp even
+# with wet patches elsewhere turned off.
+@export var shore_wetness_enabled: bool = true:
+	set(value):
+		shore_wetness_enabled = value
+		_apply_uniform("shore_wetness_enabled", value)
 
 @export var wetness_scale: float = 30.0:
 	set(value):
@@ -50,7 +74,7 @@ class_name Ground
 		wetness_amount = value
 		_apply_uniform("wetness_amount", value)
 		_rebuild_ground_mesh_and_collision()
-@export var wet_color: Color = Color(0.35, 0.38, 0.40):
+@export var wet_color: Color = Color(0.44, 0.42, 0.38):
 	set(value):
 		wet_color = value
 		_apply_uniform("wet_color", value)
@@ -145,6 +169,36 @@ class_name Ground
 	set(value):
 		ripple_strength = value
 		_apply_uniform("ripple_strength", value)
+
+# Sand grain: two small-scale value-noise octaves modulating albedo
+# brightness only (never hue - see ground.gdshader's grain_value() for
+# how), plus a sparse dark speckle (shell fragments) wherever a separate,
+# finer noise clears speckle_threshold. Both are stronger on dry sand and
+# suppressed on wet - see fragment()'s own grain_suppression.
+@export var grain_scale_fine: float = 0.15:
+	set(value):
+		grain_scale_fine = value
+		_apply_uniform("grain_scale_fine", value)
+@export var grain_scale_coarse: float = 0.6:
+	set(value):
+		grain_scale_coarse = value
+		_apply_uniform("grain_scale_coarse", value)
+@export var grain_strength: float = 0.02:
+	set(value):
+		grain_strength = value
+		_apply_uniform("grain_strength", value)
+@export var speckle_scale: float = 0.08:
+	set(value):
+		speckle_scale = value
+		_apply_uniform("speckle_scale", value)
+@export var speckle_threshold: float = 0.97:
+	set(value):
+		speckle_threshold = value
+		_apply_uniform("speckle_threshold", value)
+@export var speckle_darken: float = 0.15:
+	set(value):
+		speckle_darken = value
+		_apply_uniform("speckle_darken", value)
 
 # Wet band: within shore_slope_start of the water line, sand wetness is
 # pushed to 1.0 so it reflects like the water does. water_line_z/
@@ -268,6 +322,8 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("far_color", far_color)
 	_apply_uniform("near_distance", near_distance)
 	_apply_uniform("far_distance", far_distance)
+	_apply_uniform("wet_patches_enabled", wet_patches_enabled)
+	_apply_uniform("shore_wetness_enabled", shore_wetness_enabled)
 	_apply_uniform("wetness_scale", wetness_scale)
 	_apply_uniform("wetness_amount", wetness_amount)
 	_apply_uniform("wet_color", wet_color)
@@ -288,6 +344,12 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("ripple_scale", ripple_scale)
 	_apply_uniform("ripple_stretch", ripple_stretch)
 	_apply_uniform("ripple_strength", ripple_strength)
+	_apply_uniform("grain_scale_fine", grain_scale_fine)
+	_apply_uniform("grain_scale_coarse", grain_scale_coarse)
+	_apply_uniform("grain_strength", grain_strength)
+	_apply_uniform("speckle_scale", speckle_scale)
+	_apply_uniform("speckle_threshold", speckle_threshold)
+	_apply_uniform("speckle_darken", speckle_darken)
 
 func _apply_uniform(uniform_name: String, value: Variant) -> void:
 	if _material:
@@ -462,6 +524,8 @@ func _rebuild_ground_mesh_and_collision() -> void:
 	_build_outer_flat_frame()
 	_rebuild_dressing_frame()
 	_rebuild_ground_debug()
+
+	relief_rebuilt.emit()
 
 # The one shared mapping from a relief grid index to its world XZ - every
 # consumer (sampling, mesh vertices, the collision transform's spacing, the

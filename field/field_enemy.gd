@@ -17,10 +17,12 @@ const MODEL_SCENE_PATH := "res://assets/models/sputter_placeholder.fbx"
 @export var model_ground_offset: float = 0.0
 @export var face_shore_at_spawn: bool = true
 @export var region_field_path: NodePath = ^".."
+@export var ground_path: NodePath = ^"../Ground"
 @export_range(0.0, 1.0, 0.01) var highlight_lighten_amount: float = 0.35
 
 var _contacted: bool = false
 var _model_material: StandardMaterial3D
+var _ground: Ground = null
 
 @onready var contact_area: Area3D = $ContactArea
 @onready var contact_shape: CollisionShape3D = $ContactArea/CollisionShape3D
@@ -49,6 +51,31 @@ func _ready() -> void:
 	var contact_shadow := ContactShadow.new()
 	contact_shadow.name = "ContactShadow"
 	add_child(contact_shadow)
+
+	# relief_rebuilt covers every LIVE relief edit after this point, but its
+	# very first emission happens inside Ground's own _ready() - before this
+	# node could possibly have connected to it - so the initial grounding
+	# still needs a manual call. Deferred a frame (rather than called
+	# immediately) so it runs after RegionField's own _ready() has finished
+	# repositioning this enemy along get_forward(), not before.
+	_ground = get_node_or_null(ground_path) as Ground
+	if _ground:
+		_ground.relief_rebuilt.connect(_ground_to_relief)
+		await get_tree().process_frame
+		_ground_to_relief()
+
+# Sits the body on the current terrain height at its own XZ, minus
+# model_ground_offset - _spawn_model()'s own AABB grounding puts the
+# model's feet at body-local Y = model_ground_offset, not Y = 0, so the
+# body's global Y has to account for that for the feet (not the body
+# origin) to land on the surface. Called once, deferred, from _ready()
+# and again on every Ground.relief_rebuilt - see _ready()'s own comment
+# for why both are needed.
+func _ground_to_relief() -> void:
+	if _ground == null:
+		return
+	var local_xz: Vector3 = _ground.to_local(Vector3(global_position.x, 0.0, global_position.z))
+	global_position.y = _ground.get_height_at(Vector2(local_xz.x, local_xz.z)) - model_ground_offset
 
 # get_forward() points inland (spawn -> Tower, see RegionField's own doc),
 # so facing the shore/sea is the opposite direction. Yaws the body itself,
@@ -111,9 +138,9 @@ func set_highlight(on: bool) -> void:
 #
 # Rotation only, deliberately - unlike Wanderer.enter_battle_stance(), this
 # never repositions the enemy (contact happens wherever the enemy already
-# stands), so its Y - set correctly from Ground.get_height_at() once at
-# spawn, see region_field.gd's _reposition_enemies_along_forward() - never
-# goes stale between spawn and battle. Nothing here needs to re-sample it.
+# stands), and its Y stays correct on its own via _ground_to_relief() (see
+# _ready()/Ground.relief_rebuilt) regardless of when battle starts, so
+# nothing here needs to re-sample terrain height itself.
 func face_toward(target: Node3D, duration: float) -> void:
 	if target == null:
 		return
