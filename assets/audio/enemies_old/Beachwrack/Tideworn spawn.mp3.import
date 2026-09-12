@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://dwh68mh3jp7k6"
+path="res://.godot/imported/Tideworn spawn.mp3-a3813361bdba73637110d1b822bc8a9a.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/enemies_old/Beachwrack/Tideworn spawn.mp3"
+dest_files=["res://.godot/imported/Tideworn spawn.mp3-a3813361bdba73637110d1b822bc8a9a.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
