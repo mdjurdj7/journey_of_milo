@@ -3,6 +3,7 @@ class_name Wanderer
 
 const IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_idle.fbx"
 const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_walking.fbx"
+const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_running.fbx"
 const BATTLE_IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_idle.fbx"
 const DRAW_SWORD_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_start_draw_sword.fbx"
 const ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/wanderer_albedo.png"
@@ -151,6 +152,18 @@ func _ready() -> void:
 	var contact_shadow := ContactShadow.new()
 	contact_shadow.name = "ContactShadow"
 	add_child(contact_shadow)
+
+	var ground := get_node_or_null(ground_path) as Ground
+
+	var footprint_spawner := FootprintSpawner.new()
+	footprint_spawner.name = "FootprintSpawner"
+	add_child(footprint_spawner)
+	footprint_spawner.setup(model, self, ground)
+
+	var footstep_audio := FootstepAudio.new()
+	footstep_audio.name = "FootstepAudio"
+	add_child(footstep_audio)
+	footstep_audio.setup(footprint_spawner, ground)
 
 # One shared material for the whole model, applied via material_override
 # on every MeshInstance3D under it. Which material depends on shading_
@@ -385,6 +398,43 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 	if remove_walk_root_motion:
 		_remove_walk_root_motion(walk_animation)
 
+	# Run - same shape as the Walk merge above (load, find its one real
+	# clip by keyframe count, loop it, merge into the same idle_library),
+	# reusing remove_walk_root_motion/_remove_walk_root_motion() since it's
+	# the same Mixamo locomotion-root quirk, just a different clip. Played
+	# during a dash in place of Walk/Idle - see _physics_process().
+	var run_scene := load(RUN_SCENE_PATH) as PackedScene
+	var run_instance := run_scene.instantiate()
+	var run_players := run_instance.find_children("*", "AnimationPlayer", true, false)
+	if run_players.is_empty():
+		push_error("Wanderer: running model has no AnimationPlayer; Run clip not merged.")
+		run_instance.free()
+		return
+
+	var run_player := run_players[0] as AnimationPlayer
+	var run_entry := _find_single_animation(run_player, "running AnimationPlayer")
+	if run_entry.is_empty():
+		run_instance.free()
+		return
+
+	var run_animation: Animation = run_entry["animation"]
+	run_animation.loop_mode = Animation.LOOP_LINEAR
+	idle_library.add_animation("Run", run_animation)
+	run_instance.free()
+
+	if run_animation.get_track_count() == 0:
+		push_error("Wanderer: merged Run animation has no tracks; clip merge is broken.")
+		return
+
+	var run_track_node_path := NodePath(run_animation.track_get_path(0).get_concatenated_names())
+	var run_resolved := anim_root.get_node_or_null(run_track_node_path) if anim_root else null
+	if not (run_resolved is Skeleton3D):
+		push_error("Wanderer: Run animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(run_track_node_path))
+		return
+
+	if remove_walk_root_motion:
+		_remove_walk_root_motion(run_animation)
+
 	# BattleIdle - same shape as the Walk merge above (load, find its one
 	# real clip by keyframe count, loop it, merge into the same idle_
 	# library, then the same post-merge checks) - see enter_battle_stance()/
@@ -531,6 +581,14 @@ func _build_animation_tree() -> void:
 	if _animation_player == null:
 		return
 
+	# Run is deliberately not a blend point here: it's a discrete state
+	# tied to is_dashing (see _physics_process()'s AnimationPlayer branch),
+	# not a continuous function of speed the way Idle<->Walk is, and dash
+	# speed itself runs well past move_speed (this blend space's own
+	# max_space). Wiring it in properly would need an
+	# AnimationNodeStateMachine transition, not another blend point - out
+	# of scope while use_animation_tree defaults to false and isn't the
+	# path any current scene actually enables.
 	var blend_space := AnimationNodeBlendSpace1D.new()
 	blend_space.min_space = 0.0
 	blend_space.max_space = move_speed
@@ -581,6 +639,12 @@ func _forward_from_angle(angle: float) -> Vector3:
 
 func _angle_from_direction(direction: Vector3) -> float:
 	return atan2(-direction.x, -direction.z)
+
+# Public read of dash state - used by FootprintSpawner to pick a shorter
+# per-foot cooldown while dashing (Run's own foot-plant cadence is faster
+# than Walk's), without exposing _dash_timer itself.
+func is_dashing() -> bool:
+	return _dash_timer > 0.0
 
 # Called by region_field.gd on enemy contact. Tweens into a fixed spacing
 # from target along the target->Wanderer ground line, facing target, and
@@ -717,6 +781,19 @@ func _physics_process(delta: float) -> void:
 		if _animation_tree:
 			_animation_tree.set("parameters/blend_position", clampf(planar_speed, 0.0, move_speed))
 	elif _animation_player:
-		var next_animation := "Walk" if planar_speed > walk_speed_threshold else "Idle"
+		# Run plays for the dash's own duration - a discrete "he sprints"
+		# state, not a continuous speed blend (dash_speed can be well past
+		# move_speed, and it starts/stops instantly rather than ramping),
+		# which is exactly why this branch (not the AnimationTree/
+		# BlendSpace1D one above) is where it's wired: that blend space
+		# only spans 0..move_speed and models continuous Idle<->Walk
+		# blending, not a hard cut into a separate clip.
+		var next_animation: String
+		if is_dashing:
+			next_animation = "Run"
+		elif planar_speed > walk_speed_threshold:
+			next_animation = "Walk"
+		else:
+			next_animation = "Idle"
 		if _animation_player.current_animation != next_animation:
 			_animation_player.play(next_animation, animation_blend_time)
