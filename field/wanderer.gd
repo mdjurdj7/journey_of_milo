@@ -56,6 +56,18 @@ const FLAT_SHADER_PATH := "res://field/wanderer_flat.gdshader"
 # eases in over a few frames instead of popping.
 @export var foot_grounding_smoothing_speed: float = 12.0
 
+# The Mixamo rig's own A-pose rest pose bakes in a wider leg stance than
+# the model should stand at. Corrected continuously via a
+# LegSpreadCorrectionModifier (a SkeletonModifier3D added under the
+# skeleton by _setup_leg_spread_correction()) rather than a one-time pose
+# edit, so it stacks with every clip (Idle, Walk, BattleIdle, DrawSword)
+# instead of needing separate correction per clip.
+@export var leg_spread_correction_degrees: float = 6.0:
+	set(value):
+		leg_spread_correction_degrees = value
+		if _leg_spread_modifier:
+			_leg_spread_modifier.correction_degrees = value
+
 enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 
 @export_group("Shading")
@@ -95,6 +107,7 @@ var _dash_direction: Vector3 = Vector3.ZERO
 # pose reads by index, every physics frame.
 var _grounding_skeleton: Skeleton3D = null
 var _grounding_bone_indices: Array[int] = []
+var _leg_spread_modifier: LegSpreadCorrectionModifier = null
 
 func _ready() -> void:
 	_camera = get_node_or_null(camera_path) as Camera3D
@@ -133,6 +146,7 @@ func _ready() -> void:
 		_animation_player.play("Idle")
 
 	_find_grounding_bones(model)
+	_setup_leg_spread_correction(model)
 
 	var contact_shadow := ContactShadow.new()
 	contact_shadow.name = "ContactShadow"
@@ -264,6 +278,23 @@ func _find_grounding_bones(model: Node3D) -> void:
 	if _grounding_bone_indices.is_empty():
 		push_warning("Wanderer: none of the expected foot/toe bones were found on the skeleton; continuous foot grounding disabled.")
 		_grounding_skeleton = null
+
+# Does its own Skeleton3D lookup rather than reusing _grounding_skeleton:
+# _find_grounding_bones() above nulls that out when foot/toe bones aren't
+# found, which is a completely unrelated failure mode from the leg-spread
+# bones this needs - leg spread correction shouldn't fail just because
+# the foot-bone names didn't match on some other rig.
+func _setup_leg_spread_correction(model: Node3D) -> void:
+	var skeletons := model.find_children("*", "Skeleton3D", true, false)
+	var skeleton := skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
+	if skeleton == null:
+		push_warning("Wanderer: no Skeleton3D found under model; leg spread correction disabled.")
+		return
+
+	_leg_spread_modifier = LegSpreadCorrectionModifier.new()
+	_leg_spread_modifier.name = "LegSpreadCorrection"
+	_leg_spread_modifier.correction_degrees = leg_spread_correction_degrees
+	skeleton.add_child(_leg_spread_modifier)
 
 # The float this replaces was per-clip: grounding measured once, on
 # Idle, doesn't hold once a battle clip (a different hips height) takes
