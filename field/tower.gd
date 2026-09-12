@@ -20,3 +20,7 @@ func _ready() -> void:
 
 	mesh = cylinder
 	position = Vector3(0.0, height / 2.0, -distance_along_walk)
+	# A distant silhouette, not something the player stands near - its huge
+	# size (150m tall) was eating the directional shadow's depth precision
+	# for every other, much smaller caster in the scene. No shadow needed.
+	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF

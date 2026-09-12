@@ -46,6 +46,10 @@ func _ready() -> void:
 	if face_shore_at_spawn:
 		_face_shore()
 
+	var contact_shadow := ContactShadow.new()
+	contact_shadow.name = "ContactShadow"
+	add_child(contact_shadow)
+
 # get_forward() points inland (spawn -> Tower, see RegionField's own doc),
 # so facing the shore/sea is the opposite direction. Yaws the body itself,
 # not the model - model_yaw_offset above stays a separate, local correction
@@ -81,6 +85,7 @@ func _spawn_model() -> void:
 	for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
 		var mi := mesh_instance as MeshInstance3D
 		mi.material_override = material
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 		var mi_transform_in_self := global_transform.affine_inverse() * mi.global_transform
 		var mi_aabb_in_self := mi_transform_in_self * mi.get_aabb()

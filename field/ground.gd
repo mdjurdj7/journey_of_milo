@@ -167,6 +167,34 @@ class_name Ground
 		draw_ground_debug = value
 		_rebuild_ground_debug()
 
+# Bisect for the "ground doesn't render at all" investigation: forces
+# every ground surface (relief mesh + all four dressing frame strips) onto
+# a plain StandardMaterial3D instead of ground.gdshader's ShaderMaterial,
+# so the mesh/AABB/visibility side of things can be checked independent of
+# whether the shader itself is the problem. See _current_ground_material().
+@export var use_plain_ground_material: bool = false:
+	set(value):
+		use_plain_ground_material = value
+		_rebuild_ground_mesh_and_collision()
+
+# Draws a short line from every normal_debug_stride-th vertex of the
+# actual committed relief mesh, along its actual committed normal (read
+# back from the mesh itself post-generate_normals(), not recomputed) - on
+# ground with no slope these should all point straight up-ish, not lean
+# or vary with position.
+@export var draw_normal_debug: bool = false:
+	set(value):
+		draw_normal_debug = value
+		_rebuild_normal_debug()
+@export var normal_debug_stride: int = 4:
+	set(value):
+		normal_debug_stride = value
+		_rebuild_normal_debug()
+@export var normal_debug_length: float = 0.5:
+	set(value):
+		normal_debug_length = value
+		_rebuild_normal_debug()
+
 var _material: ShaderMaterial
 # Guards _rebuild_ground_mesh_and_collision() against firing from a relief
 # export's own setter mid-deserialization, before collision_shape (an
@@ -213,6 +241,8 @@ func _ready() -> void:
 	# there would reintroduce a real (if tiny) visual/collision mismatch,
 	# the exact thing this rebuild exists to eliminate.
 	_relief_mesh_instance.position.y = 0.02
+	# Receives only - the ground shouldn't cast its own shadow onto itself.
+	_relief_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_relief_mesh_instance)
 
 	_ready_done = true
@@ -413,6 +443,7 @@ const OUTER_FRAME_THICKNESS: float = 2.0
 const DRESSING_FRAME_NODE_PREFIX: String = "DressingFrame_"
 const GROUND_DEBUG_NODE_NAME: String = "GroundDebugSpheres"
 const GROUND_DEBUG_SPHERE_RADIUS: float = 0.15
+const NORMAL_DEBUG_NODE_NAME: String = "NormalDebugLines"
 
 func _rebuild_ground_mesh_and_collision() -> void:
 	if not _ready_done:
@@ -462,44 +493,26 @@ func _sample_relief_heights(cols: int, rows: int) -> PackedFloat32Array:
 			heights[row * cols + col] = get_height_at(world_xz)
 	return heights
 
-# Builds the relief ArrayMesh directly from heights - no PlaneMesh, no
-# shader displacement. Normals come from the central-difference gradient
-# of this same array (one-sided at the grid's own edges), the same
-# formula ground.gdshader's old vertex() used, just evaluated over the
-# mesh's real spacing instead of a small epsilon.
+# Builds the relief mesh through SurfaceTool rather than hand-computing
+# normals from a height-gradient formula: add_vertex() per-triangle (each
+# grid point duplicated once per adjacent triangle), index() merges those
+# duplicates back into a shared index buffer, then generate_normals()
+# derives each vertex's normal from the actual committed triangles sharing
+# it - guaranteed geometrically consistent with the real winding, instead
+# of a separately-computed formula that has to be kept in sync with it by
+# hand (the previous gradient-based version was the actual source of the
+# across-the-field lighting/shadow errors this replaces).
 func _apply_relief_mesh(cols: int, rows: int, heights: PackedFloat32Array) -> void:
-	var spacing: Vector2 = _relief_grid_spacing(cols, rows)
-	var spacing_x: float = spacing.x
-	var spacing_z: float = spacing.y
-
 	var vertices: PackedVector3Array = PackedVector3Array()
-	var normals: PackedVector3Array = PackedVector3Array()
 	vertices.resize(cols * rows)
-	normals.resize(cols * rows)
-
 	for row in rows:
 		for col in cols:
 			var world_xz: Vector2 = _relief_grid_to_world_xz(col, row, cols, rows)
 			var index: int = row * cols + col
 			vertices[index] = Vector3(world_xz.x, heights[index], world_xz.y)
 
-			var col_left: int = maxi(col - 1, 0)
-			var col_right: int = mini(col + 1, cols - 1)
-			var row_down: int = maxi(row - 1, 0)
-			var row_up: int = mini(row + 1, rows - 1)
-			var h_left: float = heights[row * cols + col_left]
-			var h_right: float = heights[row * cols + col_right]
-			var h_down: float = heights[row_down * cols + col]
-			var h_up: float = heights[row_up * cols + col]
-			var dx_span: float = spacing_x * float(col_right - col_left)
-			var dz_span: float = spacing_z * float(row_up - row_down)
-			var slope_x: float = (h_right - h_left) / dx_span if dx_span > 0.0001 else 0.0
-			var slope_z: float = (h_up - h_down) / dz_span if dz_span > 0.0001 else 0.0
-			normals[index] = Vector3(-slope_x, 1.0, -slope_z).normalized()
-
-	var indices: PackedInt32Array = PackedInt32Array()
-	indices.resize((cols - 1) * (rows - 1) * 6)
-	var tri: int = 0
+	var surface_tool := SurfaceTool.new()
+	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
 	for row in rows - 1:
 		for col in cols - 1:
 			var top_left: int = row * cols + col
@@ -507,24 +520,70 @@ func _apply_relief_mesh(cols: int, rows: int, heights: PackedFloat32Array) -> vo
 			var bottom_left: int = (row + 1) * cols + col
 			var bottom_right: int = bottom_left + 1
 
-			indices[tri] = top_left
-			indices[tri + 1] = bottom_left
-			indices[tri + 2] = top_right
-			indices[tri + 3] = top_right
-			indices[tri + 4] = bottom_left
-			indices[tri + 5] = bottom_right
-			tri += 6
+			# Counter-clockwise as seen from +Y - keep the winding fix from
+			# the last pass (the prior order rendered nothing under
+			# cull_back, wound clockwise from above instead).
+			surface_tool.add_vertex(vertices[top_left])
+			surface_tool.add_vertex(vertices[top_right])
+			surface_tool.add_vertex(vertices[bottom_left])
+
+			surface_tool.add_vertex(vertices[top_right])
+			surface_tool.add_vertex(vertices[bottom_right])
+			surface_tool.add_vertex(vertices[bottom_left])
+
+	surface_tool.index()
+	surface_tool.generate_normals()
+	surface_tool.set_material(_current_ground_material())
+
+	_relief_mesh_instance.name = "ReliefMesh"
+	_relief_mesh_instance.mesh = surface_tool.commit()
+
+	_rebuild_normal_debug()
+
+# Short lines from every normal_debug_stride-th vertex of the actual
+# committed relief mesh, along its actual committed normal - read back
+# from the mesh itself (post-generate_normals()) rather than recomputed,
+# so this shows exactly what the mesh really has, not what it should have.
+# Parented under _relief_mesh_instance so the lines are already in the
+# right local space with no manual offset.
+func _rebuild_normal_debug() -> void:
+	if not _ready_done:
+		return
+	var existing: Node = _relief_mesh_instance.get_node_or_null(NORMAL_DEBUG_NODE_NAME)
+	if existing:
+		existing.queue_free()
+	if not draw_normal_debug or _relief_mesh_instance.mesh == null:
+		return
+
+	var mesh_arrays: Array = (_relief_mesh_instance.mesh as ArrayMesh).surface_get_arrays(0)
+	var mesh_vertices: PackedVector3Array = mesh_arrays[Mesh.ARRAY_VERTEX]
+	var mesh_normals: PackedVector3Array = mesh_arrays[Mesh.ARRAY_NORMAL]
+
+	var line_vertices: PackedVector3Array = PackedVector3Array()
+	var stride: int = maxi(normal_debug_stride, 1)
+	var i: int = 0
+	while i < mesh_vertices.size():
+		line_vertices.append(mesh_vertices[i])
+		line_vertices.append(mesh_vertices[i] + mesh_normals[i] * normal_debug_length)
+		i += stride
 
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
-	arrays[Mesh.ARRAY_VERTEX] = vertices
-	arrays[Mesh.ARRAY_NORMAL] = normals
-	arrays[Mesh.ARRAY_INDEX] = indices
+	arrays[Mesh.ARRAY_VERTEX] = line_vertices
 
-	var array_mesh := ArrayMesh.new()
-	array_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	array_mesh.surface_set_material(0, _material)
-	_relief_mesh_instance.mesh = array_mesh
+	var line_mesh := ArrayMesh.new()
+	line_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_LINES, arrays)
+
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = Color(0.1, 1.0, 0.3)
+	line_mesh.surface_set_material(0, material)
+
+	var line_instance := MeshInstance3D.new()
+	line_instance.name = NORMAL_DEBUG_NODE_NAME
+	line_instance.mesh = line_mesh
+	line_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_relief_mesh_instance.add_child(line_instance)
 
 # HeightMapShape3D's own grid is always 1 local unit between samples (no
 # separate cell-size property) - collision_shape's transform is scaled to
@@ -658,6 +717,7 @@ func _build_dressing_frame() -> void:
 
 	mesh_instance.position = Vector3(0.0, 0.0, (inner_half.y + outer_half.y) * 0.5)
 	mesh_instance.mesh = _build_dressing_plane(Vector2(plane_size.x, outer_half.y - inner_half.y))
+	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	var strips: Array[Dictionary] = [
 		{
@@ -682,6 +742,7 @@ func _build_dressing_frame() -> void:
 		strip_instance.name = DRESSING_FRAME_NODE_PREFIX + str(strip["name"])
 		strip_instance.mesh = _build_dressing_plane(strip["size"])
 		strip_instance.position = strip["position"]
+		strip_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(strip_instance)
 
 func _build_dressing_plane(size: Vector2) -> PlaneMesh:
@@ -689,5 +750,19 @@ func _build_dressing_plane(size: Vector2) -> PlaneMesh:
 	plane.size = size
 	plane.subdivide_width = dressing_subdivisions.x
 	plane.subdivide_depth = dressing_subdivisions.y
-	plane.material = _material
+	plane.material = _current_ground_material()
 	return plane
+
+# use_plain_ground_material's bisect: a loud, obviously-not-the-shader
+# StandardMaterial3D in place of ground.gdshader's ShaderMaterial, applied
+# to every ground surface (relief mesh + all four dressing strips) so the
+# mesh/AABB/visibility side of "ground doesn't render" can be checked
+# independent of whether the shader itself is at fault.
+func _current_ground_material() -> Material:
+	if not use_plain_ground_material:
+		return _material
+	var material := StandardMaterial3D.new()
+	material.albedo_color = Color(0.85, 0.15, 0.75)
+	material.roughness = 1.0
+	material.metallic_specular = 0.0
+	return material

@@ -113,6 +113,10 @@ func _ready() -> void:
 	plane_mesh.size = Vector2(_field_width() + width_margin * 2.0, sea_depth)
 	plane_mesh.material = _material
 	mesh = plane_mesh
+	# Receives only - a flat expanse of water casting its own shadow onto
+	# itself/the shore has nothing to gain and risks self-shadowing
+	# artifacts on a surface that's already animating.
+	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 	_wanderer = get_node_or_null(wanderer_path) as Node3D
 	_position_relative_to_spawn()

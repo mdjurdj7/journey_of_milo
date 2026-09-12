@@ -127,15 +127,17 @@ horizon_color = Color(0.62, 0.66, 0.7, 1)
 fog_color = Color(0.58, 0.63, 0.68, 1)
 fog_density = 0.01
 fog_aerial_perspective = 0.65
-ambient_energy = 0.88
+ambient_energy = 0.55
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=846207689]
+light_energy = 2.0
 script = ExtResource("3")
-elevation_degrees = 55.0
-azimuth_degrees = 35.0
-energy = 0.55
+elevation_degrees = 45.0
+azimuth_degrees = 70.0
+energy = 0.9
 color = Color(0.8, 0.84, 0.9, 1)
-shadow_softness = 3.0
+shadow_blur_amount = 1.0
+shadow_darkness = 0.7
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=1437900813]
 script = ExtResource("4")

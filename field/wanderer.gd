@@ -134,6 +134,10 @@ func _ready() -> void:
 
 	_find_grounding_bones(model)
 
+	var contact_shadow := ContactShadow.new()
+	contact_shadow.name = "ContactShadow"
+	add_child(contact_shadow)
+
 # One shared material for the whole model, applied via material_override
 # on every MeshInstance3D under it. Which material depends on shading_
 # mode (see that export's own doc); TEXTURED/POSTERIZED both fall back to
@@ -156,6 +160,7 @@ func _apply_model_material(model: Node3D) -> void:
 	for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
 		var mi := mesh_instance as MeshInstance3D
 		mi.material_override = material
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 # Meshy's own painted colors, no posterizing - same "roughness 1,
 # specular 0" shape every other Wanderer/FieldEnemy material already uses.

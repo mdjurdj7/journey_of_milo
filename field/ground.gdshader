@@ -1,5 +1,12 @@
 shader_type spatial;
-render_mode blend_mix, cull_back, diffuse_burley, specular_schlick_ggx;
+// depth_draw_opaque forces this into the opaque depth/lighting/shadow pass
+// regardless of blend mode - without it (and without ever writing ALPHA -
+// fragment() below never does), the ground rendered unlit and didn't
+// receive shadows: spatial's default blend mode is blend_mix, and an
+// unwritten ALPHA under that mode doesn't reliably resolve to opaque in
+// practice. Same fix, same root cause, as wanderer_flat.gdshader's own
+// "invisible Wanderer" bug - never reintroduce blend_mix here.
+render_mode cull_back, diffuse_burley, specular_schlick_ggx, depth_draw_opaque;
 
 // Near/far albedo darkening, applied before the wetness blend.
 uniform vec4 near_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);

@@ -26,6 +26,7 @@ const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 @export var shoreline_wall_margin: float = 5.0
 @export var tower_path: NodePath = ^"Tower"
 @export var camera_rig_path: NodePath = ^"CameraPivot"
+@export var directional_light_path: NodePath = ^"DirectionalLight3D"
 @export var battle_spacing: float = 3.0
 # Which of BattleTheme's two value sets the overlay applies on entering
 # battle - see ui/battle_theme.gd's own rule: UI is the dark element on a
@@ -109,6 +110,10 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 		wanderer.enter_battle_stance(enemy, battle_spacing, camera_rig.battle_transition_time)
 		enemy.face_toward(wanderer, camera_rig.battle_transition_time)
 
+	var directional_light := get_node_or_null(directional_light_path) as OvercastLight
+	if directional_light:
+		directional_light.enter_battle()
+
 	var overlay := (load(BATTLE_OVERLAY_SCENE_PATH) as PackedScene).instantiate() as BattleOverlay
 	battle_layer.add_child(overlay)
 	# Single-enemy contact model for now - a list of one. BattleController
@@ -126,6 +131,10 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, over
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
 	if camera_rig:
 		camera_rig.exit_battle()
+
+	var directional_light := get_node_or_null(directional_light_path) as OvercastLight
+	if directional_light:
+		directional_light.exit_battle()
 
 	match outcome:
 		BattleOverlay.Outcome.WIN:
