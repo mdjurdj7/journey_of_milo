@@ -3,6 +3,12 @@ class_name CardData
 
 enum TargetType { ENEMY, SELF, NONE }
 
+# Drives CardView's own art-fill/border color (see its own art_color_attack/
+# art_color_skill exports) - no gameplay effect of its own. STANCE isn't
+# added here yet since no card needs it; add it alongside CardView's own
+# third color export once one does.
+enum CardType { ATTACK, SKILL }
+
 enum RemovalScope { NONE, SPENT, CONSUMED }
 # NONE: goes to the discard pile, reshuffles back in for the rest of the
 # fight like any other card. SPENT and CONSUMED both leave this fight's
@@ -16,6 +22,7 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 
 @export var card_name: String = ""
 @export var cost: int = 0
+@export var card_type: CardType = CardType.ATTACK
 @export var target_type: TargetType = TargetType.NONE
 @export_multiline var description: String = ""
 @export var effects: Array[CardEffect] = []

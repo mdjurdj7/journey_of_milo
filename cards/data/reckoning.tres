@@ -11,6 +11,7 @@ effect_type = 5
 script = ExtResource("1_card_data")
 card_name = "Reckoning"
 cost = 2
+card_type = 0
 target_type = 0
 description = "Spend all Toll. 
 Deal damage equal to the amount consumed."

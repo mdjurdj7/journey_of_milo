@@ -61,5 +61,7 @@ func apply_value_set(on_dark_world: bool) -> void:
 	set_color("panel_color", "CardFace", panel_color)
 	set_color("panel_light_color", "CardFace", panel_light_color)
 	set_color("text_color", "CardFace", text_color)
-	set_color("badge_bg_color", "CardFace", text_color)
-	set_color("badge_fg_color", "CardFace", panel_color)
+	# No badge_bg_color/badge_fg_color entries - CardView's cost badge is
+	# a fixed dark-plate/light-numeral token regardless of which value set
+	# is active (see its own badge_bg_color/badge_fg_color exports), not
+	# part of the face's own on-pale/on-dark inversion.

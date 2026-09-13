@@ -13,6 +13,7 @@ toll_gain = 5
 script = ExtResource("1_card_data")
 card_name = "Down Payment"
 cost = 0
+card_type = 1
 target_type = 1
 description = "Lose 1 HP.
 Gain 5 Toll."

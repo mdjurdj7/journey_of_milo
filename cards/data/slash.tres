@@ -11,6 +11,7 @@ value = 6
 script = ExtResource("1_card_data")
 card_name = "Slash"
 cost = 1
+card_type = 0
 target_type = 0
 description = "Deal 6 damage."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])

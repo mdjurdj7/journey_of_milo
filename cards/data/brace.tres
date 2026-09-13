@@ -13,6 +13,7 @@ status_data = ExtResource("3_braced")
 script = ExtResource("1_card_data")
 card_name = "Brace"
 cost = 1
+card_type = 1
 target_type = 1
 description = "Halve the next hit you take."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
