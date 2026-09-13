@@ -14,3 +14,4 @@ clears_on_trigger = true
 modifier_target = 0
 modifier_operation = 1
 stack_rule = 0
+battle_animation = &"Brace"

@@ -2,7 +2,6 @@ extends Control
 class_name BattleOverlay
 
 const FLOATING_NUMBER_SCENE_PATH := "res://battle/floating_number.tscn"
-const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 const DECK_PANEL_SCENE_PATH := "res://ui/deck_panel.tscn"
 
 # Bottom-right margin for the discard panel - mirrors the field HUD's own
@@ -16,13 +15,8 @@ enum Outcome { WIN, LOSE, ESCAPE }
 
 signal battle_finished(outcome: Outcome)
 
-@export var starting_hp: int = 50
-@export var starting_toll: int = 0
 @export var enemy_head_height: float = 1.8
 
-@onready var stats_panel: PanelContainer = $StatsPanel
-@onready var hp_label: Label = $StatsPanel/StatsBox/HPLabel
-@onready var toll_label: Label = $StatsPanel/StatsBox/TollLabel
 @onready var end_turn_button: Button = $EndTurnButton
 @onready var hand_container: HandContainer = $HandContainer
 @onready var debug_row: Control = $DebugRow
@@ -34,6 +28,7 @@ signal battle_finished(outcome: Outcome)
 
 var battle_controller: BattleController
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
+var _field_hp_bar: HPBar = null
 
 func _ready() -> void:
 	# RegionField freezes itself (and, by inheritance, this whole overlay -
@@ -49,14 +44,11 @@ func _ready() -> void:
 	if theme is BattleTheme:
 		(theme as BattleTheme).apply_value_set(false)
 
-	hp_label.text = "HP: %d" % starting_hp
-	toll_label.text = "Toll: %d" % starting_toll
-
 	debug_row.visible = false
 
-	win_button.pressed.connect(func() -> void: battle_finished.emit(Outcome.WIN))
-	lose_button.pressed.connect(func() -> void: battle_finished.emit(Outcome.LOSE))
-	escape_button.pressed.connect(func() -> void: battle_finished.emit(Outcome.ESCAPE))
+	win_button.pressed.connect(func() -> void: _finish_battle(Outcome.WIN))
+	lose_button.pressed.connect(func() -> void: _finish_battle(Outcome.LOSE))
+	escape_button.pressed.connect(func() -> void: _finish_battle(Outcome.ESCAPE))
 	draw_button.pressed.connect(func() -> void: hand_container.draw_cards(5))
 	discard_button.pressed.connect(func() -> void: hand_container.discard_hand())
 
@@ -69,11 +61,20 @@ func _ready() -> void:
 # field HUD's own persistent DeckPanel (not this overlay's child - it
 # outlives every battle) - switched to draw-pile mode here and back to
 # whole-deck mode by region_field.gd's own _on_battle_finished().
-func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck_panel: DeckPanel) -> void:
+# field_hp_bar is that same HUD's persistent HPBar (also not this
+# overlay's child, also outlives every battle) - it already reads
+# RunState.player_hp/player_max_hp on its own, so this call only adds the
+# Toll line to it (see HPBar.show_toll()'s own doc); _finish_battle()
+# below removes it again.
+func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck_panel: DeckPanel, field_hp_bar: HPBar) -> void:
 	if theme is BattleTheme:
 		(theme as BattleTheme).apply_value_set(on_dark_world)
 
-	# Created before battle_controller.setup() runs, and enemy_hp_changed
+	_field_hp_bar = field_hp_bar
+	_field_hp_bar.enter_battle()
+	_field_hp_bar.show_toll(0)
+
+	# Reused before battle_controller.setup() runs, and enemy_hp_changed
 	# connected before it too - setup()'s own initial emission (one per
 	# enemy) is what gives each panel its starting HP text/bar, with no
 	# separate hydration step needed here.
@@ -84,12 +85,11 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.target_requested.connect(_on_target_requested)
 	battle_controller.target_cancelled.connect(_on_target_cancelled)
 	battle_controller.card_played.connect(_on_card_played)
-	battle_controller.hp_changed.connect(_on_hp_changed)
 	battle_controller.toll_changed.connect(_on_toll_changed)
 	battle_controller.enemy_hp_changed.connect(_on_enemy_hp_changed)
 	battle_controller.damage_dealt.connect(_on_damage_dealt)
-	battle_controller.battle_won.connect(func() -> void: battle_finished.emit(Outcome.WIN))
-	battle_controller.battle_lost.connect(func() -> void: battle_finished.emit(Outcome.LOSE))
+	battle_controller.battle_won.connect(func() -> void: _finish_battle(Outcome.WIN))
+	battle_controller.battle_lost.connect(func() -> void: _finish_battle(Outcome.LOSE))
 	battle_controller.setup(hand_container, enemy_list)
 
 	field_deck_panel.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DRAW)
@@ -131,14 +131,17 @@ func _create_discard_panel(field_deck_panel: DeckPanel) -> void:
 
 	discard_panel.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DISCARD)
 
-# One EnemyStatus per enemy, as this overlay's own children - freed
-# automatically when region_field.gd frees the whole overlay at battle
-# end, same as every other child here (HandContainer, StatsPanel, ...).
+# Reuses each enemy's own persistent EnemyStatus (see FieldEnemy.
+# enemy_status's own doc) rather than creating a fresh one - unlike
+# _create_discard_panel()'s DeckPanel, these live in RegionField.field_hud
+# and outlive this overlay, so there's nothing to free at battle end
+# beyond entering/exiting battle mode (see _finish_battle()).
 func _create_enemy_statuses(enemy_list: Array[FieldEnemy]) -> void:
 	for enemy in enemy_list:
-		var status := (load(ENEMY_STATUS_SCENE_PATH) as PackedScene).instantiate() as EnemyStatus
-		add_child(status)
-		status.set_target(enemy)
+		var status := enemy.enemy_status
+		if status == null:
+			continue
+		status.enter_battle()
 		_enemy_statuses[enemy] = status
 
 func _on_enemy_hp_changed(enemy: FieldEnemy, current: int, max_hp: int) -> void:
@@ -155,11 +158,8 @@ func _on_target_cancelled() -> void:
 func _on_card_played(_card: CardData, _target: FieldEnemy) -> void:
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 
-func _on_hp_changed(current: int, max_hp: int) -> void:
-	hp_label.text = "HP: %d/%d" % [current, max_hp]
-
 func _on_toll_changed(new_toll: int) -> void:
-	toll_label.text = "Toll: %d" % new_toll
+	_field_hp_bar.update_toll(new_toll)
 
 # Placeholder-only: shows whatever amount actually landed, no distinction
 # between damage/self-damage/attack kinds yet - see this pass's own
@@ -173,9 +173,21 @@ func _screen_pos_for_damage_target(target: Variant) -> Vector2:
 		if camera != null:
 			return camera.unproject_position((target as FieldEnemy).global_position + Vector3.UP * enemy_head_height)
 	# "player" (or anything else without a 3D position this overlay can
-	# reach) - anchor near the stats panel instead of unprojecting a
+	# reach) - anchor near the field HP bar instead of unprojecting a
 	# Wanderer position this overlay has no reference to.
-	return stats_panel.global_position + Vector2(stats_panel.size.x / 2.0, stats_panel.size.y + 20.0)
+	return _field_hp_bar.global_position + Vector2(_field_hp_bar.size.x / 2.0, _field_hp_bar.size.y + 20.0)
+
+# The one path every battle-ending trigger (WIN/LOSE/ESCAPE debug buttons,
+# battle_controller.battle_won/battle_lost) now goes through, rather than
+# emitting battle_finished directly - see enter_battle()'s own doc on why
+# the Toll line has to come off _field_hp_bar before region_field.gd reacts
+# to battle_finished and frees this overlay.
+func _finish_battle(outcome: Outcome) -> void:
+	_field_hp_bar.hide_toll()
+	_field_hp_bar.exit_battle()
+	for status: EnemyStatus in _enemy_statuses.values():
+		status.exit_battle()
+	battle_finished.emit(outcome)
 
 func _spawn_floating_number(value: int, screen_pos: Vector2) -> void:
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber

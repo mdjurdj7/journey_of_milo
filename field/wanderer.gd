@@ -6,6 +6,8 @@ const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_walking.fbx"
 const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_running.fbx"
 const BATTLE_IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_idle.fbx"
 const DRAW_SWORD_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_start_draw_sword.fbx"
+const SLASH_SCENE_PATH := "res://assets/models/wanderer/wanderer_slash.fbx"
+const BRACE_SCENE_PATH := "res://assets/models/wanderer/wanderer_brace.fbx"
 const ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/wanderer_albedo.png"
 const FLAT_SHADER_PATH := "res://field/wanderer_flat.gdshader"
 # sword.glb (glTF, unlike the earlier sword_albedo.fbx) imports with its
@@ -235,6 +237,10 @@ var _sword_mesh_holder: Node3D = null
 var _sword_raw_aabb: AABB = AABB()
 var _back_attachment: BoneAttachment3D = null
 var _hand_attachment: BoneAttachment3D = null
+
+# Set by bind_to_battle(), cleared by unbind_battle() - see both for why
+# region_field.gd is the only caller of either.
+var _battle_controller: BattleController = null
 
 func _ready() -> void:
 	_camera = get_node_or_null(camera_path) as Camera3D
@@ -868,6 +874,71 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 		push_error("Wanderer: DrawSword animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(draw_sword_track_node_path))
 		return
 
+	# Slash - same load/find/merge/check shape as DrawSword above: a one-
+	# shot attack swing (LOOP_NONE), not a loop. Triggered by CardData.
+	# battle_animation (see _on_card_played()), not anything here.
+	var slash_scene := load(SLASH_SCENE_PATH) as PackedScene
+	var slash_instance := slash_scene.instantiate()
+	var slash_players := slash_instance.find_children("*", "AnimationPlayer", true, false)
+	if slash_players.is_empty():
+		push_error("Wanderer: slash model has no AnimationPlayer; Slash clip not merged.")
+		slash_instance.free()
+		return
+
+	var slash_player := slash_players[0] as AnimationPlayer
+	var slash_entry := _find_single_animation(slash_player, "slash AnimationPlayer")
+	if slash_entry.is_empty():
+		slash_instance.free()
+		return
+
+	var slash_animation: Animation = slash_entry["animation"]
+	slash_animation.loop_mode = Animation.LOOP_NONE
+	idle_library.add_animation("Slash", slash_animation)
+	slash_instance.free()
+
+	if slash_animation.get_track_count() == 0:
+		push_error("Wanderer: merged Slash animation has no tracks; clip merge is broken.")
+		return
+
+	var slash_track_node_path := NodePath(slash_animation.track_get_path(0).get_concatenated_names())
+	var slash_resolved := anim_root.get_node_or_null(slash_track_node_path) if anim_root else null
+	if not (slash_resolved is Skeleton3D):
+		push_error("Wanderer: Slash animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(slash_track_node_path))
+		return
+
+	# Brace - same shape again, but LOOP_LINEAR: a held stance rather than
+	# a one-shot, played for as long as the Braced status (or any other
+	# status carrying a StatusData.battle_animation) stays active on the
+	# player. See _on_status_changed().
+	var brace_scene := load(BRACE_SCENE_PATH) as PackedScene
+	var brace_instance := brace_scene.instantiate()
+	var brace_players := brace_instance.find_children("*", "AnimationPlayer", true, false)
+	if brace_players.is_empty():
+		push_error("Wanderer: brace model has no AnimationPlayer; Brace clip not merged.")
+		brace_instance.free()
+		return
+
+	var brace_player := brace_players[0] as AnimationPlayer
+	var brace_entry := _find_single_animation(brace_player, "brace AnimationPlayer")
+	if brace_entry.is_empty():
+		brace_instance.free()
+		return
+
+	var brace_animation: Animation = brace_entry["animation"]
+	brace_animation.loop_mode = Animation.LOOP_LINEAR
+	idle_library.add_animation("Brace", brace_animation)
+	brace_instance.free()
+
+	if brace_animation.get_track_count() == 0:
+		push_error("Wanderer: merged Brace animation has no tracks; clip merge is broken.")
+		return
+
+	var brace_track_node_path := NodePath(brace_animation.track_get_path(0).get_concatenated_names())
+	var brace_resolved := anim_root.get_node_or_null(brace_track_node_path) if anim_root else null
+	if not (brace_resolved is Skeleton3D):
+		push_error("Wanderer: Brace animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(brace_track_node_path))
+		return
+
 # Freezes a Walk clip's Hips position track to its first key's X/Z, leaving
 # Y (vertical bob) untouched, so it plays in place even if the Mixamo
 # export carried forward locomotion into the root bone.
@@ -1082,6 +1153,58 @@ func exit_battle_stance() -> void:
 		_animation_player.play("Idle", animation_blend_time)
 
 	_switch_sword_mount(_back_attachment, back_mount_position, back_mount_rotation_degrees, animation_blend_time)
+
+# Called by region_field.gd right after BattleOverlay.enter_battle() (the
+# only point battle_controller exists to hand over - it's created inside
+# that call, not before). Connects the two battle-animation triggers so
+# this Wanderer's own swings/held stances react to the actual fight -
+# torn down by unbind_battle() at battle end.
+func bind_to_battle(controller: BattleController) -> void:
+	_battle_controller = controller
+	controller.card_played.connect(_on_card_played)
+	controller.status_changed.connect(_on_status_changed)
+
+func unbind_battle() -> void:
+	if _battle_controller == null:
+		return
+	if _battle_controller.card_played.is_connected(_on_card_played):
+		_battle_controller.card_played.disconnect(_on_card_played)
+	if _battle_controller.status_changed.is_connected(_on_status_changed):
+		_battle_controller.status_changed.disconnect(_on_status_changed)
+	_battle_controller = null
+
+# See CardData.battle_animation's own doc - empty means this card has no
+# swing. Queues _resting_battle_animation() rather than a bare "BattleIdle"
+# so a card played while a held stance (e.g. Brace) is still active on the
+# player doesn't permanently cancel that stance once the swing finishes.
+func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
+	if card.battle_animation == &"" or _animation_player == null:
+		return
+	_animation_player.play(card.battle_animation, animation_blend_time)
+	_animation_player.queue(_resting_battle_animation())
+
+# See StatusData.battle_animation's own doc. Re-evaluates on every status
+# change (a status being applied, ticked, or cleared - e.g. Braced clearing
+# via Status.consume_triggered() the instant the player is hit) rather than
+# reacting to any one specific status by name.
+func _on_status_changed() -> void:
+	if _animation_player == null or _battle_controller == null:
+		return
+	var target := _resting_battle_animation()
+	if _animation_player.current_animation != target:
+		_animation_player.play(target, animation_blend_time)
+
+# What the AnimationPlayer should be resting on right now: the first
+# active player status carrying its own battle_animation (see StatusData.
+# battle_animation), or BattleIdle if none does. Shared by _on_status_
+# changed() (its direct target) and _on_card_played() (what a one-shot
+# swing queues after itself), so both stay consistent with each other.
+func _resting_battle_animation() -> StringName:
+	if _battle_controller != null and _battle_controller.player != null:
+		for status: Status in _battle_controller.player.statuses:
+			if status.data.battle_animation != &"":
+				return status.data.battle_animation
+	return &"BattleIdle"
 
 func _physics_process(delta: float) -> void:
 	_apply_continuous_foot_grounding(delta)

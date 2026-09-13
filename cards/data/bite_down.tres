@@ -21,3 +21,4 @@ target_type = 0
 description = "Lose 2 HP.
 Deal 10 damage."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage"), SubResource("CardEffect_self_damage")])
+battle_animation = &"Slash"

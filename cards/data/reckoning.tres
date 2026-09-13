@@ -16,3 +16,4 @@ target_type = 0
 description = "Spend all Toll. 
 Deal damage equal to the amount consumed."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_toll_damage")])
+battle_animation = &"Slash"

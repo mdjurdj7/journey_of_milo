@@ -4,6 +4,7 @@ class_name RegionField
 const BATTLE_OVERLAY_SCENE_PATH := "res://battle/battle_overlay.tscn"
 const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
+const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 
 @export var escape_push_distance: float = 4.0
 
@@ -37,6 +38,7 @@ const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 @onready var wanderer: Wanderer = $Wanderer
 @onready var battle_layer: CanvasLayer = $BattleLayer
 @onready var deck_panel: DeckPanel = $FieldHUD/DeckPanel
+@onready var hp_bar: HPBar = $FieldHUD/HPBar
 
 var _forward: Vector3 = Vector3.FORWARD
 var _forward_computed: bool = false
@@ -57,7 +59,7 @@ func _ready() -> void:
 		enemy.contacted.connect(_on_enemy_contacted)
 
 	_reposition_enemies_along_forward()
-	_setup_deck_panel()
+	_setup_field_hud()
 	_build_boundary()
 
 # The field's forward direction: normalized XZ vector from the
@@ -102,22 +104,47 @@ func _reposition_enemies_along_forward() -> void:
 		enemy.global_position = wanderer.global_position + _forward * distance
 
 # Applies this region's own on-pale/on-dark value set to the shared
-# BattleTheme resource - deck_panel is styled from it (see DeckPanel.
-# _apply_style()'s "CardFace" color reads) same as everything BattleOverlay
-# itself styles, but deck_panel lives outside BattleOverlay's own tree
-# (FieldHUD, not BattleLayer), so nothing else ever applies this for it.
-# refresh_style() re-reads those colors immediately after, since (like
-# CardView/EnemyStatus) DeckPanel caches them via override at _ready()
-# rather than tracking the Theme resource live - without this, deck_panel
-# would render with whatever value set the theme resource happened to
-# already be on. Also seeds the field-mode display (whole starting deck)
-# deck_panel starts in.
-func _setup_deck_panel() -> void:
+# BattleTheme resource - deck_panel and hp_bar are both styled from it
+# (see DeckPanel/HPBar's own "CardFace" color reads) same as everything
+# BattleOverlay itself styles, but both live outside BattleOverlay's own
+# tree (FieldHUD, not BattleLayer), so nothing else ever applies this for
+# them. refresh_style() re-reads those colors immediately after, since
+# (like CardView/EnemyStatus) both cache them via override at _ready()
+# rather than tracking the Theme resource live - without this, they'd
+# render with whatever value set the theme resource happened to already
+# be on. Also seeds the field-mode display (whole starting deck) deck_
+# panel starts in.
+func _setup_field_hud() -> void:
 	var battle_theme := deck_panel.theme as BattleTheme
 	if battle_theme != null:
 		battle_theme.apply_value_set(ui_on_dark_world)
 		deck_panel.refresh_style()
+		hp_bar.refresh_style()
+		# Every FieldEnemy has already created and registered its own
+		# enemy_status by now (children's _ready() runs before this one -
+		# see get_forward()'s own doc on the same ordering) - each one read
+		# its colors before apply_value_set() above ever ran, so each needs
+		# its own refresh here too.
+		for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
+			if enemy.enemy_status != null:
+				enemy.enemy_status.refresh_style()
 	deck_panel.show_whole_deck(RunState.deck)
+	hp_bar.set_target(wanderer)
+
+# Parents a FieldEnemy's own persistent HP display under this field's HUD
+# CanvasLayer (a Control needs one as an ancestor to render at all - see
+# EnemyStatus's own doc) and applies the shared battle theme to it. Called
+# from FieldEnemy._ready(), which runs BEFORE this node's own _ready() -
+# see get_forward()'s own doc on the same bottom-up ordering - so this
+# resolves FieldHUD via a direct node lookup rather than the @onready
+# deck_panel/hp_bar vars use, which aren't populated yet at that point.
+func add_enemy_status(status: EnemyStatus) -> void:
+	status.theme = load(BATTLE_THEME_PATH) as Theme
+	var hud := get_node_or_null(^"FieldHUD") as CanvasLayer
+	if hud == null:
+		push_warning("RegionField: FieldHUD not found; enemy HP display not added to the tree.")
+		return
+	hud.add_child(status)
 
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	process_mode = Node.PROCESS_MODE_DISABLED
@@ -137,10 +164,14 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# Single-enemy contact model for now - a list of one. BattleController
 	# owns whatever this becomes once a fight can hold more than one enemy.
 	var battle_enemies: Array[FieldEnemy] = [enemy]
-	overlay.enter_battle(ui_on_dark_world, battle_enemies, deck_panel)
+	overlay.enter_battle(ui_on_dark_world, battle_enemies, deck_panel, hp_bar)
 	overlay.battle_finished.connect(_on_battle_finished.bind(enemy, overlay))
+	# Only reachable now - enter_battle() is what creates battle_controller
+	# (see Wanderer.bind_to_battle()'s own doc).
+	wanderer.bind_to_battle(overlay.battle_controller)
 
 func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, overlay: BattleOverlay) -> void:
+	wanderer.unbind_battle()
 	_apply_consumed_removals(overlay.battle_controller.deck)
 	overlay.queue_free()
 	process_mode = Node.PROCESS_MODE_INHERIT
@@ -159,6 +190,12 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, over
 
 	match outcome:
 		BattleOverlay.Outcome.WIN:
+			# enemy_status lives under FieldHUD, not as enemy's own child
+			# (see FieldEnemy.enemy_status's own doc) - freeing enemy alone
+			# would leave it behind as an orphaned, permanently-invisible
+			# leak.
+			if enemy.enemy_status != null:
+				enemy.enemy_status.queue_free()
 			enemy.queue_free()
 		BattleOverlay.Outcome.ESCAPE:
 			_push_wanderer_away_from(enemy)

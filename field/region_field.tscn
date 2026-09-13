@@ -14,6 +14,7 @@
 [ext_resource type="Shader" path="res://field/ruin_stone.gdshader" id="12"]
 [ext_resource type="PackedScene" path="res://ui/deck_panel.tscn" id="13"]
 [ext_resource type="Theme" path="res://ui/battle_theme.tres" id="14"]
+[ext_resource type="PackedScene" path="res://ui/hp_bar.tscn" id="15"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -227,6 +228,9 @@ offset_left = 32.0
 offset_top = -76.0
 offset_right = 192.0
 offset_bottom = -32.0
+
+[node name="HPBar" parent="FieldHUD" instance=ExtResource("15")]
+theme = ExtResource("14")
 
 [node name="LookDevSurface" type="Node3D" parent="." unique_id=-1194967296]
 visible = false

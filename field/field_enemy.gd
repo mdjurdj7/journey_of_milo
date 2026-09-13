@@ -4,6 +4,7 @@ class_name FieldEnemy
 signal contacted(enemy: FieldEnemy)
 
 const MODEL_SCENE_PATH := "res://assets/models/sputter_placeholder.fbx"
+const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 
 @export var enemy_id: StringName = &"enemy"
 @export var enemy_data: EnemyData
@@ -23,6 +24,15 @@ const MODEL_SCENE_PATH := "res://assets/models/sputter_placeholder.fbx"
 var _contacted: bool = false
 var _model_material: StandardMaterial3D
 var _ground: Ground = null
+
+# Owned by this enemy, but lives in RegionField.field_hud, not here (a
+# Control needs a CanvasLayer ancestor, not a Node3D one) - see _ready()'s
+# own creation of it and add_enemy_status()'s doc on the other end.
+# BattleOverlay reuses this exact instance rather than creating its own
+# (see its own _create_enemy_statuses()); region_field.gd frees it
+# explicitly on a WIN outcome, since freeing this node doesn't cascade to
+# it the way freeing a real child would.
+var enemy_status: EnemyStatus = null
 
 @onready var contact_area: Area3D = $ContactArea
 @onready var contact_shape: CollisionShape3D = $ContactArea/CollisionShape3D
@@ -44,6 +54,7 @@ func _ready() -> void:
 	contact_area.body_exited.connect(_on_body_exited)
 
 	_spawn_model()
+	_spawn_enemy_status()
 
 	if face_shore_at_spawn:
 		_face_shore()
@@ -122,6 +133,26 @@ func _spawn_model() -> void:
 	if has_aabb:
 		print("FieldEnemy '%s': model AABB height = %.3f at model_scale = %.3f" % [enemy_id, combined_aabb.size.y, model_scale])
 		model.position.y += -combined_aabb.position.y + model_ground_offset
+
+# Creates this enemy's own persistent HP display and hands it to RegionField
+# to parent (see enemy_status's own doc on why - a Control needs a
+# CanvasLayer ancestor, not this Node3D). Seeded at full HP so it reads
+# correctly in the field, before any battle has ever touched this enemy;
+# BattleController.setup()'s own initial enemy_hp_changed emit re-seeds it
+# identically the instant a fight actually starts (see EnemyStatus.update_
+# hp()'s own doc on why that reseed doesn't trigger a spurious reveal).
+func _spawn_enemy_status() -> void:
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	if region_field == null:
+		push_warning("FieldEnemy '%s': region_field_path did not resolve to a RegionField; no HP display." % enemy_id)
+		return
+
+	var status := (load(ENEMY_STATUS_SCENE_PATH) as PackedScene).instantiate() as EnemyStatus
+	region_field.add_enemy_status(status)
+	status.set_target(self)
+	var max_hp: int = enemy_data.max_hp if enemy_data != null else 1
+	status.update_hp(max_hp, max_hp)
+	enemy_status = status
 
 # Called by BattleController while this enemy is the hovered raycast target
 # during card targeting. Brightness lift via albedo only, no emission - a

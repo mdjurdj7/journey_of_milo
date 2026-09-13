@@ -27,3 +27,10 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 @export_multiline var description: String = ""
 @export var effects: Array[CardEffect] = []
 @export var removal_scope: RemovalScope = RemovalScope.NONE
+
+# Which Wanderer battle clip to play once (LOOP_NONE) when this card
+# resolves - empty (default) means no swing. Set per-card in the
+# Inspector (e.g. "Slash" on the current attack cards) rather than
+# inferred from card_type, since not every ATTACK card is guaranteed to
+# want the same swing forever. See Wanderer._on_card_played().
+@export var battle_animation: StringName = &""

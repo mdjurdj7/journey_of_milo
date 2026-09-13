@@ -56,3 +56,10 @@ const DURATION_UNTIL_TRIGGERED := -2
 @export var modifier_target: ModifierTarget = ModifierTarget.INCOMING_DAMAGE
 @export var modifier_operation: ModifierOperation = ModifierOperation.ADD
 @export var stack_rule: StackRule = StackRule.REFRESH_DURATION
+
+# Which Wanderer battle clip to hold (LOOP_LINEAR) for as long as this
+# status is active on the player - empty (default) means no held pose.
+# Generic, not Braced-specific: Wanderer._on_status_changed() just looks
+# for the first active status carrying one, so a future status gets a
+# pose for free by setting this, no new wiring needed.
+@export var battle_animation: StringName = &""

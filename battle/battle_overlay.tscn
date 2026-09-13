@@ -12,24 +12,6 @@ anchor_bottom = 1.0
 theme = ExtResource("3_theme")
 script = ExtResource("1_overlay")
 
-[node name="StatsPanel" type="PanelContainer" parent="." unique_id=227799826]
-layout_mode = 0
-offset_left = 40.0
-offset_top = 40.0
-offset_right = 220.0
-offset_bottom = 110.0
-
-[node name="StatsBox" type="VBoxContainer" parent="StatsPanel" unique_id=1654179280]
-layout_mode = 2
-
-[node name="HPLabel" type="Label" parent="StatsPanel/StatsBox" unique_id=1611988432]
-layout_mode = 2
-text = "HP: 50"
-
-[node name="TollLabel" type="Label" parent="StatsPanel/StatsBox" unique_id=465621482]
-layout_mode = 2
-text = "Toll: 0"
-
 [node name="HandContainer" type="Control" parent="." unique_id=524001564]
 anchors_preset = 0
 anchor_top = 1.0

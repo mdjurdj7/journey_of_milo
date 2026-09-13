@@ -22,10 +22,9 @@ const FADE_DURATION := 0.1
 @export var line_alpha: float = 0.25
 @export var curve_amount: float = 60.0
 
-# Just above the Sputter's own shell for EnemyStatus.head_offset (0.9) -
-# chest sits a bit lower on the same body. An untested guess like every
-# other body-relative offset in this project (no way to check without
-# running the game); retune live if it reads high or low.
+# Just above the Sputter's own shell, chest height. An untested guess
+# like every other body-relative offset in this project (no way to check
+# without running the game); retune live if it reads high or low.
 @export var chest_offset: Vector3 = Vector3(0.0, 0.5, 0.0)
 
 var _battle_controller: BattleController
