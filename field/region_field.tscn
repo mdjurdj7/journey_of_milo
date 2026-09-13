@@ -214,9 +214,11 @@ volume_db_max = -20.0
 
 [node name="BattleLayer" type="CanvasLayer" parent="." unique_id=1908553104]
 process_mode = 3
+layer = 2
 
 [node name="FieldHUD" type="CanvasLayer" parent="."]
 process_mode = 3
+layer = 1
 
 [node name="DeckPanel" parent="FieldHUD" instance=ExtResource("13")]
 theme = ExtResource("14")

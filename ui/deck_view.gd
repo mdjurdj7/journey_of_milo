@@ -226,9 +226,19 @@ func _compute_column_count(scaled_card_width: float, card_count: int) -> int:
 	columns = mini(columns, max_columns)
 	return mini(columns, maxi(card_count, 1))
 
+# Frees the wrapping CanvasLayer DeckPanel._open_deck_view() parents this
+# under (see DeckPanel.DECK_VIEW_LAYER's own doc), not just this node -
+# that CanvasLayer has no purpose once this is gone, and would otherwise
+# linger as an empty, harmless-but-orphaned node. Falls back to freeing
+# self directly if that's ever not the case (defensive only - every real
+# caller today goes through that wrapper).
 func close() -> void:
 	closed.emit()
-	queue_free()
+	var wrapper := get_parent()
+	if wrapper is CanvasLayer:
+		wrapper.queue_free()
+	else:
+		queue_free()
 
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

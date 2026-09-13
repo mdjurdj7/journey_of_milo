@@ -29,6 +29,16 @@ class_name DeckPanel
 
 const DECK_VIEW_SCENE_PATH := "res://ui/deck_view.tscn"
 
+# CanvasLayer ordering across the whole field/battle UI: FieldHUD = 1 (HP
+# bars), BattleLayer = 2 (hand, target line, End Turn - see region_field.
+# tscn), DeckView's own scrim = 3, always on top of both regardless of
+# which is active when it opens. DeckView itself has no CanvasLayer of
+# its own (it's a plain Control, reused by both a persistent field-mode
+# panel and a battle-mode one - see its own doc) - _open_deck_view() below
+# wraps it in one on the way into the tree; DeckView.close() frees that
+# wrapper again (see its own doc).
+const DECK_VIEW_LAYER: int = 3
+
 enum Pile { DRAW, DISCARD }
 
 # DeckView's own header in field mode ("Belongings") - battle mode uses
@@ -211,7 +221,15 @@ func _open_deck_view() -> void:
 		header_text = deck_title
 
 	var deck_view := (load(DECK_VIEW_SCENE_PATH) as PackedScene).instantiate() as DeckView
-	get_tree().root.add_child(deck_view)
+
+	# See DECK_VIEW_LAYER's own doc - DeckView has no CanvasLayer of its
+	# own, so this is what actually puts it above FieldHUD/BattleLayer
+	# regardless of which is active right now.
+	var layer := CanvasLayer.new()
+	layer.layer = DECK_VIEW_LAYER
+	get_tree().root.add_child(layer)
+	layer.add_child(deck_view)
+
 	deck_view.closed.connect(_on_deck_view_closed)
 	deck_view.open(cards, header_text)
 	_deck_view_instance = deck_view
