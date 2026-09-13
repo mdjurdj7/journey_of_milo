@@ -34,6 +34,17 @@ class_name CameraRig
 @export var battle_framing_bias: float = -0.08
 @export var battle_transition_time: float = 0.6
 
+@export_group("Battle DOF")
+# Far blur only (near stays off - see _update_dof()) - reads as "the
+# background falls away" behind the fight without ever blurring either
+# combatant. far_distance is battle_distance + this, not the live blended
+# eff_distance _place_camera() computes - a fixed depth relationship to
+# the battle camera's own resting distance, so it doesn't shift as the
+# transition blends in.
+@export var battle_dof_far_extra_distance: float = 8.0
+@export var battle_dof_far_transition: float = 12.0
+@export var battle_dof_amount: float = 0.06
+
 var _target: Node3D
 
 var _battle_a: Node3D
@@ -53,9 +64,17 @@ var _blend_elapsed: float = 0.0
 
 @onready var camera: Camera3D = $Camera3D
 
+# Camera3D itself has no dof_blur_* properties in Godot 4 - those live on
+# a CameraAttributes resource assigned to Camera3D.attributes instead (see
+# _update_dof()). Practical, not Physical - no exposure/lens simulation
+# needed here, just the far-blur knobs battle_dof_* below already name.
+var _camera_attributes: CameraAttributesPractical
+
 func _ready() -> void:
 	_target = get_node_or_null(target_path) as Node3D
 	camera.fov = fov
+	_camera_attributes = CameraAttributesPractical.new()
+	camera.attributes = _camera_attributes
 	if _target:
 		global_position = _target.global_position
 		_place_camera()
@@ -100,6 +119,7 @@ func _physics_process(delta: float) -> void:
 	global_position += motion
 
 	_place_camera()
+	_update_dof()
 
 # The rig never rotates, so this is a fixed world direction — the follow
 # framing's viewing axis.
@@ -151,3 +171,21 @@ func _place_camera() -> void:
 	var biased_target := look_target + ground_forward * frame_half_height * eff_framing_bias
 
 	camera.look_at(biased_target)
+
+# dof_active covers both directions of the transition: _blend_to > 0 makes
+# it true the instant enter_battle() sets a battle target, even before
+# _battle_blend itself has risen off 0 (so the very first tick's rise is
+# already visible); _battle_blend > 0 keeps it true through the whole
+# exit fade-out even once _blend_to has already dropped back to 0, so DOF
+# doesn't cut off abruptly mid-fade - only once _battle_blend actually
+# reaches 0 does this go false again. Drives _camera_attributes (see its
+# own doc), not Camera3D directly - it has no dof_blur_* properties of
+# its own in Godot 4.
+func _update_dof() -> void:
+	var dof_active: bool = _battle_blend > 0.0 or _blend_to > 0.0
+	_camera_attributes.dof_blur_near_enabled = false
+	_camera_attributes.dof_blur_far_enabled = dof_active
+	if dof_active:
+		_camera_attributes.dof_blur_far_distance = battle_distance + battle_dof_far_extra_distance
+		_camera_attributes.dof_blur_far_transition = battle_dof_far_transition
+		_camera_attributes.dof_blur_amount = battle_dof_amount * _battle_blend
