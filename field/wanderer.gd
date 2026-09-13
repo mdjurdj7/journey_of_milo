@@ -8,14 +8,14 @@ const BATTLE_IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_id
 const DRAW_SWORD_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_start_draw_sword.fbx"
 const ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/wanderer_albedo.png"
 const FLAT_SHADER_PATH := "res://field/wanderer_flat.gdshader"
-# NOTE: the file on disk is named "sword_albedo.fbx" - it's the sword
-# mesh itself (Meshy's own export naming), not a texture. There is no
-# separate sword_albedo.png; the FBX imports with materials/extract=0 and
-# no embedded image was extracted, so _build_textured_material()/_build_
-# posterized_material() below will fail to load this and fall back to the
-# flat charcoal material (with a push_warning) until a real texture
-# exists at this path.
-const SWORD_SCENE_PATH := "res://assets/models/wanderer/sword_albedo.fbx"
+# sword.glb (glTF, unlike the earlier sword_albedo.fbx) imports with its
+# own embedded textures correctly extracted (sword_0/1/2.jpg) and a real
+# material built from them - see _apply_model_material()'s
+# keep_imported_material_when_textured, which leaves that material alone
+# in TEXTURED mode. SWORD_ALBEDO_TEXTURE_PATH below still has no file at
+# it; POSTERIZED mode still falls back to flat charcoal (with a
+# push_warning) until a real texture exists there.
+const SWORD_SCENE_PATH := "res://assets/models/wanderer/sword.glb"
 const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.png"
 
 @export var move_speed: float = 4.5
@@ -93,7 +93,7 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 		if _model != null:
 			_apply_model_material(_model)
 		if _sword_root != null:
-			_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH)
+			_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH, true)
 
 # Mirrors wanderer_flat.gdshader's own uniforms one-to-one - see that
 # file's own doc for what each does. Only used when shading_mode is
@@ -303,7 +303,22 @@ func _ready() -> void:
 # texture_path defaults to the body's own albedo; _setup_sword() and the
 # shading_mode setter both pass SWORD_ALBEDO_TEXTURE_PATH explicitly to
 # apply the same mode to the sword.
-func _apply_model_material(model: Node3D, texture_path: String = ALBEDO_TEXTURE_PATH) -> void:
+# keep_imported_material_when_textured is for the sword only: Meshy
+# embedded the sword's texture directly in the FBX and the importer
+# already built a correct material from it, so in TEXTURED mode
+# material_override is left null (clearing any override from a previous
+# POSTERIZED/FLAT mode) rather than replaced with a StandardMaterial3D
+# built from SWORD_ALBEDO_TEXTURE_PATH, which likely doesn't exist as a
+# standalone file. The body has no such imported material (its FBX ships
+# untextured geometry) so it always keeps the override path.
+func _apply_model_material(model: Node3D, texture_path: String = ALBEDO_TEXTURE_PATH, keep_imported_material_when_textured: bool = false) -> void:
+	if shading_mode == ShadingMode.TEXTURED and keep_imported_material_when_textured:
+		for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
+			var mi := mesh_instance as MeshInstance3D
+			mi.material_override = null
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		return
+
 	var material: Material = null
 	match shading_mode:
 		ShadingMode.TEXTURED:
@@ -563,7 +578,7 @@ func _setup_sword(model: Node3D) -> void:
 		push_warning("Wanderer: _model_scale_factor is ~0 (%f); sword scale not compensated." % _model_scale_factor)
 	_sword_root.scale = Vector3.ONE * world_scale_factor
 
-	_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH)
+	_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH, true)
 
 	_apply_grip_offset()
 
