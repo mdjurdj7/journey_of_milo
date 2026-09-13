@@ -12,6 +12,8 @@
 [ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="10"]
 [ext_resource type="PackedScene" uid="uid://gs247wxjvj43" path="res://assets/Environment/ruin_paving_test/ruin_paving_test.glb" id="11"]
 [ext_resource type="Shader" path="res://field/ruin_stone.gdshader" id="12"]
+[ext_resource type="PackedScene" path="res://ui/deck_panel.tscn" id="13"]
+[ext_resource type="Theme" path="res://ui/battle_theme.tres" id="14"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -211,6 +213,20 @@ volume_db_max = -20.0
 
 [node name="BattleLayer" type="CanvasLayer" parent="." unique_id=1908553104]
 process_mode = 3
+
+[node name="FieldHUD" type="CanvasLayer" parent="."]
+process_mode = 3
+
+[node name="DeckPanel" parent="FieldHUD" instance=ExtResource("13")]
+theme = ExtResource("14")
+anchor_left = 0.0
+anchor_top = 1.0
+anchor_right = 0.0
+anchor_bottom = 1.0
+offset_left = 32.0
+offset_top = -76.0
+offset_right = 192.0
+offset_bottom = -32.0
 
 [node name="LookDevSurface" type="Node3D" parent="." unique_id=-1194967296]
 visible = false

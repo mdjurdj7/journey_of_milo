@@ -3,6 +3,14 @@ class_name BattleOverlay
 
 const FLOATING_NUMBER_SCENE_PATH := "res://battle/floating_number.tscn"
 const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
+const DECK_PANEL_SCENE_PATH := "res://ui/deck_panel.tscn"
+
+# Bottom-right margin for the discard panel - mirrors the field HUD's own
+# persistent DeckPanel, which sits at this same margin bottom-LEFT (see
+# region_field.tscn's own DeckPanel node). Kept as one named constant
+# here rather than duplicated inline so the mirroring is visible at a
+# glance if either ever needs to change.
+const DISCARD_PANEL_MARGIN := 32.0
 
 enum Outcome { WIN, LOSE, ESCAPE }
 
@@ -57,8 +65,11 @@ func _ready() -> void:
 # apply_value_set()), then builds this fight's BattleController - owner of
 # the Deck/Combatants and the only thing hand_container/this overlay ever
 # call into to report input or drive rules. Called by region_field.gd
-# right alongside CameraRig's own enter_battle().
-func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy]) -> void:
+# right alongside CameraRig's own enter_battle(). field_deck_panel is the
+# field HUD's own persistent DeckPanel (not this overlay's child - it
+# outlives every battle) - switched to draw-pile mode here and back to
+# whole-deck mode by region_field.gd's own _on_battle_finished().
+func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck_panel: DeckPanel) -> void:
 	if theme is BattleTheme:
 		(theme as BattleTheme).apply_value_set(on_dark_world)
 
@@ -81,7 +92,44 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy]) -> void:
 	battle_controller.battle_lost.connect(func() -> void: battle_finished.emit(Outcome.LOSE))
 	battle_controller.setup(hand_container, enemy_list)
 
+	field_deck_panel.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DRAW)
+	_create_discard_panel(field_deck_panel)
+
+	var target_line := TargetLine.new()
+	add_child(target_line)
+	target_line.setup(battle_controller)
+
 	end_turn_button.pressed.connect(func() -> void: battle_controller.end_turn())
+
+# Mirrors field_deck_panel exactly - same size and export values (copied
+# straight off it rather than duplicated as separate literals, so the two
+# can't drift out of sync), positioned bottom-right at the same margin
+# field_deck_panel sits at bottom-left. As this overlay's own child, it's
+# freed automatically (no unbind needed) when region_field.gd frees the
+# whole overlay at battle end - unlike field_deck_panel, this instance
+# has no life outside of battle.
+func _create_discard_panel(field_deck_panel: DeckPanel) -> void:
+	var discard_panel := (load(DECK_PANEL_SCENE_PATH) as PackedScene).instantiate() as DeckPanel
+	discard_panel.panel_size = field_deck_panel.panel_size
+	discard_panel.panel_margin = field_deck_panel.panel_margin
+	discard_panel.icon_size = field_deck_panel.icon_size
+	discard_panel.text_font_size_px = field_deck_panel.text_font_size_px
+	discard_panel.count_tone_alpha = field_deck_panel.count_tone_alpha
+	discard_panel.draw_label_text = field_deck_panel.draw_label_text
+	discard_panel.discard_label_text = field_deck_panel.discard_label_text
+	discard_panel.spent_label_text = field_deck_panel.spent_label_text
+
+	add_child(discard_panel)
+	discard_panel.anchor_left = 1.0
+	discard_panel.anchor_top = 1.0
+	discard_panel.anchor_right = 1.0
+	discard_panel.anchor_bottom = 1.0
+	discard_panel.offset_right = -DISCARD_PANEL_MARGIN
+	discard_panel.offset_left = -DISCARD_PANEL_MARGIN - field_deck_panel.panel_size.x
+	discard_panel.offset_bottom = -DISCARD_PANEL_MARGIN
+	discard_panel.offset_top = -DISCARD_PANEL_MARGIN - field_deck_panel.panel_size.y
+
+	discard_panel.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DISCARD)
 
 # One EnemyStatus per enemy, as this overlay's own children - freed
 # automatically when region_field.gd frees the whole overlay at battle

@@ -1,0 +1,10 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/deck_panel.gd" id="1_deck_panel"]
+
+[node name="DeckPanel" type="Panel"]
+script = ExtResource("1_deck_panel")
+
+[node name="Icon" type="ColorRect" parent="."]
+
+[node name="TextLabel" type="RichTextLabel" parent="."]

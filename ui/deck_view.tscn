@@ -1,0 +1,41 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://ui/deck_view.gd" id="1_deck_view"]
+[ext_resource type="Theme" path="res://ui/battle_theme.tres" id="2_theme"]
+
+[node name="DeckView" type="Control"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+theme = ExtResource("2_theme")
+script = ExtResource("1_deck_view")
+
+[node name="Scrim" type="ColorRect" parent="."]
+anchor_right = 1.0
+anchor_bottom = 1.0
+color = Color(0, 0, 0, 0.6)
+
+[node name="CenterContainer" type="CenterContainer" parent="Scrim"]
+anchor_right = 1.0
+anchor_bottom = 1.0
+
+[node name="ContentPanel" type="PanelContainer" parent="Scrim/CenterContainer"]
+layout_mode = 2
+
+[node name="Margin" type="MarginContainer" parent="Scrim/CenterContainer/ContentPanel"]
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Scrim/CenterContainer/ContentPanel/Margin"]
+layout_mode = 2
+
+[node name="HeaderLabel" type="Label" parent="Scrim/CenterContainer/ContentPanel/Margin/VBox"]
+layout_mode = 2
+horizontal_alignment = 1
+text = "Deck"
+
+[node name="ScrollContainer" type="ScrollContainer" parent="Scrim/CenterContainer/ContentPanel/Margin/VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="GridContainer" type="GridContainer" parent="Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer"]
+layout_mode = 2
+columns = 1
