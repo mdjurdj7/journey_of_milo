@@ -107,6 +107,18 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 @export var tone_light: Color = Color(0.31, 0.295, 0.28, 1)
 
 @export_group("Sword")
+# Audited: every sword export below carries an explicit get (returns the
+# backing field directly - no implicit-getter ambiguity) alongside its
+# set, and every setter that touches a node (_sword_root/_sword_mesh_
+# holder) guards on that node being non-null, which is only true once
+# _setup_sword() has run in _ready() - so a setter firing during scene
+# deserialization (before _ready()) is always a plain no-op on the
+# backing field, never a reset of anything else. _setup_sword() and
+# _switch_sword_mount() never read a constant or a cached copy of any of
+# these - every read below is the live export at call time, so a scene-
+# file override is exactly what ends up applied at _ready() and at every
+# enter_battle_stance()/exit_battle_stance() mount switch after it.
+
 # Uniform scale is derived from this / the sword model's own raw AABB
 # longest axis (see _setup_sword()) - same "measure raw, then derive a
 # factor" approach _scale_and_ground_model() uses for the body.
@@ -118,6 +130,8 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 # grip point, not the mesh's own (arbitrary) authored origin. See
 # _apply_grip_offset().
 @export_range(0.0, 1.0) var grip_fraction: float = 0.82:
+	get:
+		return grip_fraction
 	set(value):
 		grip_fraction = value
 		_apply_grip_offset()
@@ -126,6 +140,8 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 # one is. Flip live if the grip lands at the wrong end (i.e. near the
 # point instead of the guard).
 @export var grip_axis_flip: bool = false:
+	get:
+		return grip_axis_flip
 	set(value):
 		grip_axis_flip = value
 		_apply_grip_offset()
@@ -133,11 +149,21 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 # Bone names may be sanitized on import (see LegSpreadCorrectionModifier's
 # own doc) - resolved by suffix match against the skeleton, same as
 # everywhere else in this project that reads Mixamo bone names.
-@export var back_mount_bone_suffix: String = "Spine2":
+# StringName (not String): these are identifiers, not display text, and
+# an empty one is a real hazard - String.ends_with("") is true for every
+# bone, so an empty suffix would silently "match" bone 0 instead of
+# failing to match anything. _find_bone_by_suffix() checks for and warns
+# on that case explicitly rather than relying on the "-1, not found"
+# warning alone. Both defaults are non-empty and must stay that way.
+@export var back_mount_bone_suffix: StringName = &"Spine2":
+	get:
+		return back_mount_bone_suffix
 	set(value):
 		back_mount_bone_suffix = value
 		_update_mount_bone(true)
-@export var hand_mount_bone_suffix: String = "RightHand":
+@export var hand_mount_bone_suffix: StringName = &"RightHand":
+	get:
+		return hand_mount_bone_suffix
 	set(value):
 		hand_mount_bone_suffix = value
 		_update_mount_bone(false)
@@ -153,21 +179,29 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 # by _model_scale_factor before writing _sword_root.position. Rotations
 # are unaffected by that scale, so they're applied as given.
 @export var back_mount_position: Vector3 = Vector3(0.0, 0.15, -0.18):
+	get:
+		return back_mount_position
 	set(value):
 		back_mount_position = value
 		if _sword_root != null and _sword_root.get_parent() == _back_attachment:
 			_sword_root.position = _world_offset_to_local(value)
 @export var back_mount_rotation_degrees: Vector3 = Vector3(15.0, -100.0, 80.0):
+	get:
+		return back_mount_rotation_degrees
 	set(value):
 		back_mount_rotation_degrees = value
 		if _sword_root != null and _sword_root.get_parent() == _back_attachment:
 			_sword_root.rotation_degrees = value
 @export var hand_mount_position: Vector3 = Vector3(0.0, 0.0, 0.0):
+	get:
+		return hand_mount_position
 	set(value):
 		hand_mount_position = value
 		if _sword_root != null and _sword_root.get_parent() == _hand_attachment:
 			_sword_root.position = _world_offset_to_local(value)
 @export var hand_mount_rotation_degrees: Vector3 = Vector3(0.0, 0.0, 0.0):
+	get:
+		return hand_mount_rotation_degrees
 	set(value):
 		hand_mount_rotation_degrees = value
 		if _sword_root != null and _sword_root.get_parent() == _hand_attachment:
@@ -406,9 +440,18 @@ func _setup_leg_spread_correction(model: Node3D) -> void:
 	_leg_spread_modifier.correction_degrees = leg_spread_correction_degrees
 	skeleton.add_child(_leg_spread_modifier)
 
-func _find_bone_by_suffix(skeleton: Skeleton3D, suffix: String) -> int:
+# suffix is a StringName (an identifier, not display text) - converted to
+# String once here for ends_with(). An empty suffix is rejected outright:
+# String.ends_with("") is true for every bone name, so without this check
+# an empty suffix would silently match bone 0 instead of failing to match
+# anything, and the caller's own "-1, not found" warning would never fire.
+func _find_bone_by_suffix(skeleton: Skeleton3D, suffix: StringName) -> int:
+	var suffix_text := String(suffix)
+	if suffix_text.is_empty():
+		push_warning("Wanderer: bone suffix is empty; no bone will match.")
+		return -1
 	for bone_idx in skeleton.get_bone_count():
-		if skeleton.get_bone_name(bone_idx).ends_with(suffix):
+		if skeleton.get_bone_name(bone_idx).ends_with(suffix_text):
 			return bone_idx
 	return -1
 
@@ -585,7 +628,7 @@ func _update_mount_bone(is_back: bool) -> void:
 	var attachment: BoneAttachment3D = _back_attachment if is_back else _hand_attachment
 	if attachment == null:
 		return
-	var suffix: String = back_mount_bone_suffix if is_back else hand_mount_bone_suffix
+	var suffix: StringName = back_mount_bone_suffix if is_back else hand_mount_bone_suffix
 	var bone_idx := _find_bone_by_suffix(_sword_skeleton, suffix)
 	if bone_idx == -1:
 		push_warning("Wanderer: no bone ending in '%s' found; mount bone unchanged." % suffix)
