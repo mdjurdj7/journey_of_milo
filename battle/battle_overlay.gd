@@ -29,6 +29,7 @@ signal battle_finished(outcome: Outcome)
 var battle_controller: BattleController
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
 var _field_hp_bar: HPBar = null
+var _battle_transition_time: float = 0.0
 
 func _ready() -> void:
 	# RegionField freezes itself (and, by inheritance, this whole overlay -
@@ -65,20 +66,27 @@ func _ready() -> void:
 # overlay's child, also outlives every battle) - it already reads
 # RunState.player_hp/player_max_hp on its own, so this call only adds the
 # Toll line to it (see HPBar.show_toll()'s own doc); _finish_battle()
-# below removes it again.
-func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck_panel: DeckPanel, field_hp_bar: HPBar) -> void:
+# below removes it again. battle_transition_time is CameraRig's own
+# battle_transition_time (region_field.gd reads it off the same rig it
+# hands to Wanderer.enter_battle_stance()) - passed through to HPBar/
+# EnemyStatus's own enter_battle() so their field->battle style tween
+# (see HPBar._battle_blend's own doc) takes exactly as long as the camera
+# swing/stance step, rather than an unrelated separate duration.
+func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck_panel: DeckPanel, field_hp_bar: HPBar, battle_transition_time: float) -> void:
 	if theme is BattleTheme:
 		(theme as BattleTheme).apply_value_set(on_dark_world)
 
+	_battle_transition_time = battle_transition_time
+
 	_field_hp_bar = field_hp_bar
-	_field_hp_bar.enter_battle()
+	_field_hp_bar.enter_battle(battle_transition_time)
 	_field_hp_bar.show_toll(0)
 
 	# Reused before battle_controller.setup() runs, and enemy_hp_changed
 	# connected before it too - setup()'s own initial emission (one per
 	# enemy) is what gives each panel its starting HP text/bar, with no
 	# separate hydration step needed here.
-	_create_enemy_statuses(enemy_list)
+	_create_enemy_statuses(enemy_list, battle_transition_time)
 
 	battle_controller = BattleController.new()
 	add_child(battle_controller)
@@ -100,6 +108,11 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	target_line.setup(battle_controller)
 
 	end_turn_button.pressed.connect(func() -> void: battle_controller.end_turn())
+
+	# Deferred until the stance step/style tween has actually settled ("at
+	# rest" - measuring mid-transition would read a bar that hasn't
+	# finished growing yet) - see _debug_print_enemy_bar_gaps()'s own doc.
+	get_tree().create_timer(battle_transition_time).timeout.connect(_debug_print_enemy_bar_gaps)
 
 # Mirrors field_deck_panel exactly - same size and export values (copied
 # straight off it rather than duplicated as separate literals, so the two
@@ -136,12 +149,12 @@ func _create_discard_panel(field_deck_panel: DeckPanel) -> void:
 # _create_discard_panel()'s DeckPanel, these live in RegionField.field_hud
 # and outlive this overlay, so there's nothing to free at battle end
 # beyond entering/exiting battle mode (see _finish_battle()).
-func _create_enemy_statuses(enemy_list: Array[FieldEnemy]) -> void:
+func _create_enemy_statuses(enemy_list: Array[FieldEnemy], duration: float) -> void:
 	for enemy in enemy_list:
 		var status := enemy.enemy_status
 		if status == null:
 			continue
-		status.enter_battle()
+		status.enter_battle(duration)
 		_enemy_statuses[enemy] = status
 
 func _on_enemy_hp_changed(enemy: FieldEnemy, current: int, max_hp: int) -> void:
@@ -184,10 +197,25 @@ func _screen_pos_for_damage_target(target: Variant) -> Vector2:
 # to battle_finished and frees this overlay.
 func _finish_battle(outcome: Outcome) -> void:
 	_field_hp_bar.hide_toll()
-	_field_hp_bar.exit_battle()
+	_field_hp_bar.exit_battle(_battle_transition_time)
 	for status: EnemyStatus in _enemy_statuses.values():
-		status.exit_battle()
+		status.exit_battle(_battle_transition_time)
 	battle_finished.emit(outcome)
+
+# One-shot, per battle: how much clearance each enemy's under-feet HP bar
+# actually has above HandContainer's own top edge, once the stance step/
+# style tween has settled - the live number CameraRig.battle_framing_bias
+# was raised against (see that export's own doc) but can't be verified
+# without running the game. Read this from the console after a real fight
+# and retune battle_framing_bias if it's not close to the ~24px target.
+func _debug_print_enemy_bar_gaps() -> void:
+	for enemy: FieldEnemy in _enemy_statuses:
+		var status: EnemyStatus = _enemy_statuses[enemy]
+		if status == null or not is_instance_valid(status):
+			continue
+		var bar_bottom: Vector2 = status.get_global_transform() * Vector2(status.size.x / 2.0, status.size.y)
+		var gap: float = hand_container.global_position.y - bar_bottom.y
+		print("BattleOverlay: enemy '%s' HP bar bottom-to-hand gap = %.1f px" % [enemy.enemy_id, gap])
 
 func _spawn_floating_number(value: int, screen_pos: Vector2) -> void:
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber

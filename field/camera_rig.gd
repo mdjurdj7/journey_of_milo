@@ -20,7 +20,18 @@ class_name CameraRig
 @export var battle_pitch: float = 18.0
 @export var battle_distance: float = 9.0
 @export var battle_fov: float = 35.0
-@export var battle_framing_bias: float = 0.0
+# Negative raises both figures on screen (see _place_camera()'s own doc:
+# positive pushes the look-target's subject BELOW center, by this many
+# frame-half-heights) - so a bar sitting under the enemy's feet clears
+# HandContainer's top edge (BattleOverlay's card hand, docked at the
+# bottom of the screen) with room to spare, rather than being framed
+# right at/below it. -0.08 is an untested first estimate (~43px of a
+# 1080-tall viewport, for a targeted ~24px of actual clearance - some
+# margin built in since the true starting gap at 0.0 isn't knowable
+# without running the game): BattleOverlay._debug_print_enemy_bar_gaps()
+# prints the real gap once per battle - retune this against that number,
+# not this comment's own math.
+@export var battle_framing_bias: float = -0.08
 @export var battle_transition_time: float = 0.6
 
 var _target: Node3D

@@ -2,35 +2,28 @@
 
 [ext_resource type="Script" path="res://ui/hp_bar.gd" id="1_hp_bar"]
 
-[node name="HPBar" type="PanelContainer"]
+[node name="HPBar" type="Control"]
 mouse_filter = 2
 script = ExtResource("1_hp_bar")
 
-[node name="Content" type="HBoxContainer" parent="."]
-layout_mode = 2
+[node name="BarBackground" type="Panel" parent="."]
+layout_mode = 0
 mouse_filter = 2
 
-[node name="VBox" type="VBoxContainer" parent="Content"]
-layout_mode = 2
+[node name="BarFill" type="Panel" parent="BarBackground"]
+layout_mode = 0
 mouse_filter = 2
 
-[node name="BarBackground" type="ColorRect" parent="Content/VBox"]
-custom_minimum_size = Vector2(100, 4)
-layout_mode = 2
+[node name="NumbersBacking" type="Panel" parent="."]
+layout_mode = 0
 mouse_filter = 2
 
-[node name="BarFill" type="ColorRect" parent="Content/VBox/BarBackground"]
-offset_right = 100.0
-offset_bottom = 4.0
-mouse_filter = 2
-
-[node name="NumbersLabel" type="Label" parent="Content/VBox"]
-layout_mode = 2
+[node name="NumbersLabel" type="Label" parent="."]
+layout_mode = 0
 mouse_filter = 2
 text = "0/0"
 
-[node name="TollLabel" type="Label" parent="Content"]
-layout_mode = 2
-size_flags_vertical = 4
+[node name="TollLabel" type="Label" parent="."]
+layout_mode = 0
 mouse_filter = 2
-text = "Toll: 0"
+text = "Toll 0"
