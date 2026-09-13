@@ -13,6 +13,11 @@ signal relief_rebuilt
 		_apply_uniform("dry_color", value)
 
 @export var plane_size: Vector2 = Vector2(500.0, 500.0)
+# Only governs the dressing frame's own OUTER dimensions - .x for East/
+# West's width, .y for North/South's depth. Whichever dimension actually
+# borders the relief mesh (North/South's width, East/West's depth) is
+# driven by relief_subdivisions instead, to keep that shared edge
+# T-junction free - see _build_ns_dressing_mesh()'s own doc.
 @export var dressing_subdivisions: Vector2i = Vector2i(4, 4)
 
 # Fine-subdivided inner plane sized to the playable area, so relief
@@ -120,6 +125,23 @@ signal relief_rebuilt
 @export var relief_edge_fade: float = 4.0:
 	set(value):
 		relief_edge_fade = value
+		_rebuild_ground_mesh_and_collision()
+# A genuinely flat (height held at exactly 0, not just asymptotically
+# approaching it) margin inside relief_extent's edges, BEFORE relief_edge_
+# fade's own transition even starts - see _relief_edge_fade_factor()'s own
+# doc for why this exists: smoothstep's height reaches exactly 0 only AT
+# its lower bound, never at points past it, so without this margin the row
+# of grid vertices just inside the boundary still carries a small nonzero
+# bump, and SurfaceTool.generate_normals() derives the boundary row's own
+# normal from the real (still-sloped) triangle connecting it to that row -
+# reading as a visible lighting seam against the perfectly flat (0,1,0)
+# dressing strips even though both sides already agree on height. Sized in
+# meters (not grid steps) to keep get_height_at() a pure function of world
+# position, independent of relief_subdivisions - widen this if a future
+# subdivision drop reopens the seam.
+@export var relief_flat_margin: float = 3.0:
+	set(value):
+		relief_flat_margin = value
 		_rebuild_ground_mesh_and_collision()
 
 # Drift lines: a few faint bands running parallel to the shore, marking
@@ -283,18 +305,17 @@ func _ready() -> void:
 	_apply_all_uniforms()
 
 	_relief_mesh_instance = MeshInstance3D.new()
-	# Cosmetic-only, render-side nudge: _rebuild_dressing_frame() keeps the
-	# coarse dressing mesh entirely OUTSIDE relief_extent (see its own doc
-	# for why - it used to fully underlie the relief mesh at y=0 and
-	# occlude every negative/sunk dip, which was the real cause of "buried"
-	# debug spheres), so the only remaining coincidence is the shared
-	# boundary edge, where the relief mesh's own edge-faded-to-zero border
-	# meets the dressing frame's inner edge at the same height - this nudge
-	# keeps the relief mesh on top there instead of z-fighting the seam.
-	# Deliberately NOT reflected in get_height_at()/collision - baking it in
-	# there would reintroduce a real (if tiny) visual/collision mismatch,
-	# the exact thing this rebuild exists to eliminate.
-	_relief_mesh_instance.position.y = 0.02
+	# No Y nudge here (there used to be one - see the retired comment this
+	# replaces if you're reading blame): the old 0.02 render-only offset
+	# patched over the relief mesh's edge and the dressing frame's inner
+	# edge not being EXACTLY coincident (two independently-tessellated
+	# PlaneMesh-family resources, each computing "the same" boundary
+	# position its own way). _build_dressing_plane()/_apply_relief_mesh()
+	# now share the exact same grid spacing and anchor at that boundary
+	# (see relief_flat_margin's own doc for the matching normal fix), so
+	# the two meshes are watertight there and don't compete for the same
+	# depth - a nudge now would just reintroduce the seam as a visible 2cm
+	# step instead of a z-fight.
 	# Receives only - the ground shouldn't cast its own shadow onto itself.
 	_relief_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	add_child(_relief_mesh_instance)
@@ -441,10 +462,15 @@ func _relief_height(world_xz: Vector2) -> float:
 	var bump: float = (_value_noise(world_xz / noise_scale) - 0.5) * 2.0
 	return bump * relief_amplitude - wetness * relief_amplitude
 
+# Exactly 0 for edge_dist <= relief_flat_margin (smoothstep clamps at its
+# own lower bound), THEN transitions to 1 over the next relief_edge_fade
+# meters - see relief_flat_margin's own doc for why the flat zone has to
+# be a real margin, not just the single point edge_dist == 0.
 func _relief_edge_fade_factor(world_xz: Vector2) -> float:
 	var half_extent: Vector2 = relief_extent * 0.5
 	var edge_dist: float = minf(half_extent.x - absf(world_xz.x), half_extent.y - absf(world_xz.y))
-	return smoothstep(0.0, maxf(relief_edge_fade, 0.001), edge_dist)
+	var flat_margin: float = maxf(relief_flat_margin, 0.0)
+	return smoothstep(flat_margin, flat_margin + maxf(relief_edge_fade, 0.001), edge_dist)
 
 # Sample points and their expected get_height_at() result, computed once
 # by an independent re-port of the same shader math (in Node.js, not this
@@ -459,10 +485,17 @@ const DEBUG_DEFAULT_RELIEF_NOISE_SCALE: float = 4.0
 const DEBUG_DEFAULT_RELIEF_AMPLITUDE: float = 0.3
 const DEBUG_DEFAULT_RELIEF_EXTENT: Vector2 = Vector2(80.0, 50.0)
 const DEBUG_DEFAULT_RELIEF_EDGE_FADE: float = 4.0
+const DEBUG_DEFAULT_RELIEF_FLAT_MARGIN: float = 3.0
+# (38.0, 0.0) sits at edge_dist=2.0 - inside DEBUG_DEFAULT_RELIEF_FLAT_
+# MARGIN (3.0), so _relief_edge_fade_factor() is now exactly 0 there and
+# the expected height collapses to 0.0 regardless of the noise term - not
+# re-derived from the external Node.js re-port like the others (trivial to
+# confirm from the formula alone: anything * 0 == 0), but still an exact
+# value, not an approximation.
 const DEBUG_REFERENCE_SAMPLES: Dictionary = {
 	Vector2(0.0, 0.0): -0.3,
 	Vector2(20.0, -12.0): -0.05804631,
-	Vector2(38.0, 0.0): 0.0275360891,
+	Vector2(38.0, 0.0): 0.0,
 	Vector2(100.0, 100.0): 0.0,
 	Vector2(-15.0, 8.0): -0.2684771334,
 }
@@ -477,6 +510,7 @@ func _debug_assert_height_matches_shader_math() -> void:
 		and is_equal_approx(relief_amplitude, DEBUG_DEFAULT_RELIEF_AMPLITUDE)
 		and relief_extent.is_equal_approx(DEBUG_DEFAULT_RELIEF_EXTENT)
 		and is_equal_approx(relief_edge_fade, DEBUG_DEFAULT_RELIEF_EDGE_FADE)
+		and is_equal_approx(relief_flat_margin, DEBUG_DEFAULT_RELIEF_FLAT_MARGIN)
 	)
 	if not at_defaults:
 		return
@@ -672,14 +706,15 @@ func _clear_outer_frame() -> void:
 # Small unshaded spheres at get_height_at() over the exact same grid
 # _relief_heights already holds - reused, not resampled, so this always
 # shows literally the same data the mesh/collision were built from. Placed
-# directly under Ground (not _relief_mesh_instance), so they sit at the
-# collision's actual height, WITHOUT _relief_mesh_instance's own +0.02
-# cosmetic z-fight nudge - expect the rendered surface to sit ~2cm above
-# these spheres everywhere, that's the known offset, not a bug. If a
-# sphere sits any further from the rendered surface than that, or a
-# character doesn't stand on the sphere nearest it, the mismatch is in the
-# ArrayMesh/HeightMapShape3D construction (winding, indexing, transform),
-# not in get_height_at() itself.
+# directly under Ground (not _relief_mesh_instance) - the two used to sit
+# at different Y (a since-removed +0.02 cosmetic z-fight nudge on
+# _relief_mesh_instance), but _relief_mesh_instance has no offset of its
+# own anymore, so a sphere is now expected to sit exactly ON the rendered
+# surface everywhere, not ~2cm below it. If a sphere sits any distance
+# from the rendered surface, or a character doesn't stand on the sphere
+# nearest it, the mismatch is in the ArrayMesh/HeightMapShape3D
+# construction (winding, indexing, transform), not in get_height_at()
+# itself.
 func _rebuild_ground_debug() -> void:
 	if not _ready_done:
 		return
@@ -779,16 +814,25 @@ func _build_dressing_frame() -> void:
 		mesh_instance.mesh = null # plane_size doesn't extend past relief_extent - nothing to dress
 		return
 
+	var ns_depth: float = outer_half.y - inner_half.y
 	mesh_instance.position = Vector3(0.0, 0.0, (inner_half.y + outer_half.y) * 0.5)
-	mesh_instance.mesh = _build_dressing_plane(Vector2(plane_size.x, outer_half.y - inner_half.y))
+	mesh_instance.mesh = _build_ns_dressing_mesh(ns_depth)
 	mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
-	var strips: Array[Dictionary] = [
-		{
-			"name": "South",
-			"size": Vector2(plane_size.x, outer_half.y - inner_half.y),
-			"position": Vector3(0.0, 0.0, -(inner_half.y + outer_half.y) * 0.5),
-		},
+	var south_instance := MeshInstance3D.new()
+	south_instance.name = DRESSING_FRAME_NODE_PREFIX + "South"
+	south_instance.mesh = _build_ns_dressing_mesh(ns_depth)
+	south_instance.position = Vector3(0.0, 0.0, -(inner_half.y + outer_half.y) * 0.5)
+	south_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	add_child(south_instance)
+
+	# East/West's shared edge with the relief mesh runs along Z, spanning
+	# EXACTLY relief_extent.y (not a wider span the way North/South's X
+	# does) - subdivide_depth = relief's own Z segment count reproduces
+	# relief's exact Z spacing with no rounding drift, since both divide
+	# the identical extent by the identical count. A plain PlaneMesh is
+	# enough here; only North/South need the custom mesh below.
+	var ew_strips: Array[Dictionary] = [
 		{
 			"name": "East",
 			"size": Vector2(outer_half.x - inner_half.x, relief_extent.y),
@@ -801,21 +845,78 @@ func _build_dressing_frame() -> void:
 		},
 	]
 
-	for strip: Dictionary in strips:
+	for strip: Dictionary in ew_strips:
 		var strip_instance := MeshInstance3D.new()
 		strip_instance.name = DRESSING_FRAME_NODE_PREFIX + str(strip["name"])
-		strip_instance.mesh = _build_dressing_plane(strip["size"])
+		strip_instance.mesh = _build_dressing_plane(strip["size"], dressing_subdivisions.x, relief_subdivisions.y + 1)
 		strip_instance.position = strip["position"]
 		strip_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		add_child(strip_instance)
 
-func _build_dressing_plane(size: Vector2) -> PlaneMesh:
+func _build_dressing_plane(size: Vector2, subdivide_width: int, subdivide_depth: int) -> PlaneMesh:
 	var plane := PlaneMesh.new()
 	plane.size = size
-	plane.subdivide_width = dressing_subdivisions.x
-	plane.subdivide_depth = dressing_subdivisions.y
+	plane.subdivide_width = subdivide_width
+	plane.subdivide_depth = subdivide_depth
 	plane.material = _current_ground_material()
 	return plane
+
+# North/South's shared edge with the relief mesh spans the relief mesh's
+# own width (relief_extent.x) - a small fraction of the strip's actual
+# width (plane_size.x). A plain PlaneMesh's subdivide_width only controls
+# an EVEN division of its own total size, so rounding it to approximately
+# match relief's absolute spacing (relief_extent.x / (relief_subdivisions.x
+# + 1)) drifts the real per-segment spacing by however unevenly plane_
+# size.x happens to divide by it - at the shared edge that drift is small
+# in absolute terms but easily centimeters, i.e. worse than the seam this
+# exists to fix. Built via SurfaceTool instead: the CENTER columns
+# reproduce relief's own edge-row X positions exactly (identical formula
+# to _relief_grid_to_world_xz()), with one plain wing quad on each side
+# out to the strip's own true edge - the wings don't need to match
+# anything, so they stay single quads rather than finely subdividing the
+# entire (often much larger) far reaches of the strip. Perfectly flat, so
+# generate_normals() gives (0,1,0) throughout with no special-casing.
+func _build_ns_dressing_mesh(depth: float) -> ArrayMesh:
+	var relief_half_x: float = relief_extent.x * 0.5
+	var relief_cols: int = relief_subdivisions.x + 2
+	var relief_spacing_x: float = relief_extent.x / float(relief_subdivisions.x + 1)
+	var half_width: float = plane_size.x * 0.5
+
+	var xs: PackedFloat32Array = PackedFloat32Array()
+	xs.append(-half_width)
+	for col in relief_cols:
+		xs.append(-relief_half_x + float(col) * relief_spacing_x)
+	xs.append(half_width)
+
+	var depth_rows: int = dressing_subdivisions.y + 2
+	var depth_spacing: float = depth / float(depth_rows - 1)
+	var zs: PackedFloat32Array = PackedFloat32Array()
+	for row in depth_rows:
+		zs.append(-depth * 0.5 + float(row) * depth_spacing)
+
+	var surface_tool := SurfaceTool.new()
+	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for row in depth_rows - 1:
+		for col in xs.size() - 1:
+			var top_left := Vector3(xs[col], 0.0, zs[row])
+			var top_right := Vector3(xs[col + 1], 0.0, zs[row])
+			var bottom_left := Vector3(xs[col], 0.0, zs[row + 1])
+			var bottom_right := Vector3(xs[col + 1], 0.0, zs[row + 1])
+
+			# Same winding as _apply_relief_mesh() - counter-clockwise as
+			# seen from +Y.
+			surface_tool.add_vertex(top_left)
+			surface_tool.add_vertex(top_right)
+			surface_tool.add_vertex(bottom_left)
+
+			surface_tool.add_vertex(top_right)
+			surface_tool.add_vertex(bottom_right)
+			surface_tool.add_vertex(bottom_left)
+
+	surface_tool.index()
+	surface_tool.generate_normals()
+	surface_tool.set_material(_current_ground_material())
+	return surface_tool.commit()
 
 # use_plain_ground_material's bisect: a loud, obviously-not-the-shader
 # StandardMaterial3D in place of ground.gdshader's ShaderMaterial, applied
