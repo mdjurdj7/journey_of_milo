@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CharacterData" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://run/character_data.gd" id="1_character_data"]
+[ext_resource type="Resource" path="res://cards/data/slash.tres" id="2_slash"]
+[ext_resource type="Resource" path="res://cards/data/bite_down.tres" id="3_bite_down"]
+[ext_resource type="Resource" path="res://cards/data/brace.tres" id="4_brace"]
+[ext_resource type="Resource" path="res://cards/data/reckoning.tres" id="5_reckoning"]
+[ext_resource type="Resource" path="res://cards/data/down_payment.tres" id="6_down_payment"]
+
+[resource]
+script = ExtResource("1_character_data")
+character_name = "Wanderer"
+max_hp = 70
+starting_deck_counts = {
+ExtResource("2_slash"): 3,
+ExtResource("3_bite_down"): 2,
+ExtResource("4_brace"): 2,
+ExtResource("5_reckoning"): 1,
+ExtResource("6_down_payment"): 1
+}
+rally_recovery_percent = 50

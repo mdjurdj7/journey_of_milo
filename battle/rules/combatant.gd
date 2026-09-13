@@ -21,11 +21,10 @@ var energy: int = 0
 var max_energy: int = 3
 var rally_pool: int = 0
 var rally_recovery_percent: int = 50
-# Placeholder value - the old project read this from CharacterData.rally_
-# recovery_percent (the Wanderer's own class passive), which isn't ported
-# this pass (no RunState/character selection yet - see GAME_FRAMEWORK.md's
-# own settled/open notes). Retune here directly once a real class
-# resource exists to read it from instead.
+# Default only - BattleController.setup() overwrites this from RunState.
+# character.rally_recovery_percent (the run's own CharacterData) the
+# instant a Combatant is created, same as the old project read it from
+# CharacterData directly.
 var took_damage_this_turn: bool = false
 var took_damage_last_turn: bool = false
 

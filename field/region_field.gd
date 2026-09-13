@@ -3,6 +3,7 @@ class_name RegionField
 
 const BATTLE_OVERLAY_SCENE_PATH := "res://battle/battle_overlay.tscn"
 const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
+const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 
 @export var escape_push_distance: float = 4.0
 
@@ -35,11 +36,19 @@ const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 
 @onready var wanderer: Wanderer = $Wanderer
 @onready var battle_layer: CanvasLayer = $BattleLayer
+@onready var deck_panel: DeckPanel = $FieldHUD/DeckPanel
 
 var _forward: Vector3 = Vector3.FORWARD
 var _forward_computed: bool = false
 
 func _ready() -> void:
+	# Starts the run once, at game start - the only place this is called
+	# from today (see RunState.new_run()'s own doc: a proper run-start
+	# flow, e.g. a character-select screen, replaces this call site later
+	# without RunState itself needing to change). Must run before anything
+	# below reads RunState.deck.
+	RunState.new_run(load(STARTING_CHARACTER_PATH) as CharacterData)
+
 	# Ensures forward is computed (and printed) even if no child asked for
 	# it first; a no-op if one already did.
 	get_forward()
@@ -48,6 +57,7 @@ func _ready() -> void:
 		enemy.contacted.connect(_on_enemy_contacted)
 
 	_reposition_enemies_along_forward()
+	_setup_deck_panel()
 	_build_boundary()
 
 # The field's forward direction: normalized XZ vector from the
@@ -91,6 +101,24 @@ func _reposition_enemies_along_forward() -> void:
 		var distance := (enemy.global_position - wanderer.global_position).length()
 		enemy.global_position = wanderer.global_position + _forward * distance
 
+# Applies this region's own on-pale/on-dark value set to the shared
+# BattleTheme resource - deck_panel is styled from it (see DeckPanel.
+# _apply_style()'s "CardFace" color reads) same as everything BattleOverlay
+# itself styles, but deck_panel lives outside BattleOverlay's own tree
+# (FieldHUD, not BattleLayer), so nothing else ever applies this for it.
+# refresh_style() re-reads those colors immediately after, since (like
+# CardView/EnemyStatus) DeckPanel caches them via override at _ready()
+# rather than tracking the Theme resource live - without this, deck_panel
+# would render with whatever value set the theme resource happened to
+# already be on. Also seeds the field-mode display (whole starting deck)
+# deck_panel starts in.
+func _setup_deck_panel() -> void:
+	var battle_theme := deck_panel.theme as BattleTheme
+	if battle_theme != null:
+		battle_theme.apply_value_set(ui_on_dark_world)
+		deck_panel.refresh_style()
+	deck_panel.show_whole_deck(RunState.deck)
+
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	process_mode = Node.PROCESS_MODE_DISABLED
 
@@ -109,12 +137,15 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# Single-enemy contact model for now - a list of one. BattleController
 	# owns whatever this becomes once a fight can hold more than one enemy.
 	var battle_enemies: Array[FieldEnemy] = [enemy]
-	overlay.enter_battle(ui_on_dark_world, battle_enemies)
+	overlay.enter_battle(ui_on_dark_world, battle_enemies, deck_panel)
 	overlay.battle_finished.connect(_on_battle_finished.bind(enemy, overlay))
 
 func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, overlay: BattleOverlay) -> void:
+	_apply_consumed_removals(overlay.battle_controller.deck)
 	overlay.queue_free()
 	process_mode = Node.PROCESS_MODE_INHERIT
+
+	deck_panel.show_whole_deck(RunState.deck)
 
 	wanderer.exit_battle_stance()
 
@@ -133,6 +164,18 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, over
 			_push_wanderer_away_from(enemy)
 		BattleOverlay.Outcome.LOSE:
 			get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
+
+# CONSUMED cards leave RunState.deck (the run's Belongings) for good once
+# the fight that consumed them ends; SPENT ones (the rest of exhaust_pile)
+# never touch RunState at all - they simply return to the Belongings next
+# battle, since BattleController.setup() rebuilds a fresh per-fight Deck
+# straight from whatever's still in RunState.deck. Must run before overlay.
+# queue_free() above frees battle_controller (and this exhaust_pile) -
+# called first in _on_battle_finished() for exactly that reason.
+func _apply_consumed_removals(fight_deck: Deck) -> void:
+	for card in fight_deck.exhaust_pile:
+		if card.removal_scope == CardData.RemovalScope.CONSUMED:
+			RunState.remove_card(card)
 
 # The push distance must clear the enemy's own contact radius, or the
 # Wanderer lands back inside the Area3D and either re-triggers contact

@@ -18,19 +18,7 @@ signal damage_dealt(source: Variant, target: Variant, amount: int, kind: String)
 signal battle_won()
 signal battle_lost()
 
-# Path -> copy count, same composition as the old project's STARTING_DECK
-# (reference/old_project's run_state.gd) re-pointed at the trimmed
-# CardData resources under cards/data/.
-const STARTER_DECK_COUNTS: Dictionary = {
-	"res://cards/data/slash.tres": 3,
-	"res://cards/data/bite_down.tres": 2,
-	"res://cards/data/brace.tres": 2,
-	"res://cards/data/reckoning.tres": 1,
-	"res://cards/data/down_payment.tres": 1,
-}
-
 @export var turn_draw_amount: int = 5
-@export var player_max_hp: int = 70
 @export var enemy_head_height: float = 1.8
 # Where a SELF/NONE card's play tween aims, relative to the viewport's own
 # center - there's no "target" to unproject for those, just somewhere up
@@ -52,7 +40,9 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy]) -> void
 	_hand_container = hand_container
 	enemies = enemy_list
 
-	player = Combatant.new(player_max_hp)
+	player = Combatant.new(RunState.player_max_hp)
+	player.hp = RunState.player_hp
+	player.rally_recovery_percent = RunState.character.rally_recovery_percent
 	player.energy = player.max_energy
 
 	_combatants.clear()
@@ -67,7 +57,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy]) -> void
 
 	RunLogger.log_battle_start(enemy_names)
 
-	deck = Deck.new(_build_starting_deck())
+	deck = Deck.new(RunState.deck)
 	deck.drawn.connect(func(_card: CardData) -> void: hand_changed.emit())
 	deck.discarded.connect(func(_card: CardData) -> void: hand_changed.emit())
 	_hand_container.set_deck(deck)
@@ -84,6 +74,16 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy]) -> void
 
 func is_awaiting_target() -> bool:
 	return _pending_card_view != null
+
+# Read-only access for TargetLine, which needs the armed card's own view
+# (for its on-screen top-center) and the currently hovered enemy (for its
+# chest position) but shouldn't own or duplicate this controller's own
+# targeting state.
+func get_pending_card_view() -> CardView:
+	return _pending_card_view
+
+func get_hovered_enemy() -> FieldEnemy:
+	return _hovered_enemy
 
 func request_play(card_view: CardView) -> void:
 	if _pending_card_view != null or card_view.card_data == null:
@@ -183,6 +183,7 @@ func _start_player_turn() -> void:
 		var lost := DamagePipeline.apply_bypass(amount, player)
 		if lost > 0:
 			player.toll += lost
+			RunState.lose_hp(lost)
 			hp_changed.emit(player.hp, player.max_hp)
 			toll_changed.emit(player.toll)
 	)
@@ -219,6 +220,7 @@ func _report_damage(source: Variant, target_combatant: Combatant, amount: int, k
 	RunLogger.log_damage_dealt(amount)
 	if target_combatant == player:
 		damage_dealt.emit(source, "player", amount, kind)
+		RunState.lose_hp(amount)
 		hp_changed.emit(player.hp, player.max_hp)
 	else:
 		var enemy := _field_enemy_for(target_combatant)
@@ -299,12 +301,3 @@ func _raycast_enemy(screen_pos: Vector2) -> FieldEnemy:
 		if collider == enemy:
 			return enemy
 	return null
-
-func _build_starting_deck() -> Array[CardData]:
-	var cards: Array[CardData] = []
-	for path: String in STARTER_DECK_COUNTS:
-		var base_card: CardData = load(path) as CardData
-		var copies: int = int(STARTER_DECK_COUNTS[path])
-		for i in copies:
-			cards.append(base_card.duplicate() as CardData)
-	return cards
