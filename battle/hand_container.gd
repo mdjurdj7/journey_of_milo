@@ -1,31 +1,93 @@
-extends HBoxContainer
+extends Control
 class_name HandContainer
 
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
+
+# How far above its normal arc position a hovered/armed card gets raised
+# in draw order - just needs to clear the largest realistic hand z_index
+# (one per card), not tied to card count itself.
+const HOVER_Z_INDEX := 1000
 
 signal card_clicked(card_view: CardView)
 signal play_animation_finished(card_data: CardData)
 
 @export var card_size: Vector2 = Vector2(247.0, 345.0)
-@export var card_spacing: float = 14.0:
+# Base display scale for every card in the hand - applied before (and
+# composed with) the further shrink-to-fit factor _compute_scale_factor()
+# derives against hand_max_span, same "smaller than full card_size for
+# this context" role DeckView's own deck_view_card_scale plays there.
+@export_range(0.1, 1.0) var hand_card_scale: float = 0.85:
 	set(value):
-		card_spacing = value
-		add_theme_constant_override("separation", int(card_spacing))
+		hand_card_scale = value
+		_reflow_hand(false)
 @export var draw_stagger_sec: float = 0.07
 @export var discard_collapse_duration_sec: float = 0.16
+# How long a card's own slot takes to glide to its new arc position/
+# rotation when the hand's composition changes (draw/discard reflowing
+# every other card to make room or close the gap) - the one genuinely new
+# timing this feature adds; every other duration here predates it.
+@export var reflow_duration_sec: float = 0.15
 
 # At rest, only this much of a card's own height pokes up above the
 # bottom edge - the rest sits pushed down out of view (see CardView.
 # set_rest_offset()). hover_lift on CardView is what brings it back up,
 # now measured from this baseline instead of from 0.
-@export var hand_rest_visible_height: float = 230.0
+@export var hand_rest_visible_height: float = 230.0:
+	set(value):
+		hand_rest_visible_height = value
+		for slot: Control in _views.values():
+			var card_view: CardView = slot.get_child(0) as CardView
+			card_view.set_rest_offset(card_size.y - hand_rest_visible_height)
 
-# Row width cap - past this, every card in the row is scaled down
-# uniformly (see _apply_hand_scale()) so the hand never runs off-screen.
-# 1600 keeps six cards at full card_size (6 * 247 + 5 * 14 = 1552) but
-# starts shrinking at seven (7 * 247 + 6 * 14 = 1813) - "more than six
-# cards would overflow" at this card_size/card_spacing pairing.
-@export var hand_max_span: float = 1600.0
+# Row width cap, measured against hand_card_scale-sized cards (not full
+# card_size) - past this, the hand is scaled down further still (see
+# _compute_scale_factor()) so it never runs off-screen regardless of how
+# many cards it holds.
+@export var hand_max_span: float = 1600.0:
+	set(value):
+		hand_max_span = value
+		_reflow_hand(false)
+
+@export_group("Fan")
+# Gap between adjacent cards' edges while the hand holds fan_gap_max_cards
+# or fewer - see fan_overlap below for what replaces this once there are
+# more.
+@export var fan_gap: float = 12.0:
+	set(value):
+		fan_gap = value
+		_reflow_hand(false)
+# Above this many cards, adjacent cards switch from fan_gap's fixed edge
+# gap to fan_overlap's proportional overlap instead (see _reflow_hand()'s
+# own spacing_x branch) - at or below it, cards never overlap regardless
+# of fan_overlap's own value.
+@export var fan_gap_max_cards: int = 6:
+	set(value):
+		fan_gap_max_cards = value
+		_reflow_hand(false)
+# Outer cards tilt outward by up to this many degrees - 0 at the hand's
+# own center, ±this at its two ends (see _reflow_hand()'s own t/rotation
+# math). First-pass numbers, all three below - untested without running
+# the game; retune live once seen.
+@export var fan_max_rotation_degrees: float = 6.0:
+	set(value):
+		fan_max_rotation_degrees = value
+		_reflow_hand(false)
+# How much higher the center of the hand sits than its two ends - a
+# parabola through (t=-1, 0), (t=0, this), (t=1, 0), same t as rotation
+# above.
+@export var fan_arc_height: float = 22.0:
+	set(value):
+		fan_arc_height = value
+		_reflow_hand(false)
+# Fraction of (scaled) card width adjacent cards overlap by once the hand
+# holds more than fan_gap_max_cards cards - below that, cards use
+# fan_gap's normal edge gap instead and never overlap at all. Applies
+# uniformly to every gap in the hand, not just where it'd otherwise
+# overflow hand_max_span.
+@export_range(0.0, 0.9) var fan_overlap: float = 0.15:
+	set(value):
+		fan_overlap = value
+		_reflow_hand(false)
 
 @export_group("Play Tween")
 @export var play_to_target_duration_sec: float = 0.25
@@ -37,8 +99,25 @@ var _views: Dictionary = {} # CardData -> Control (the card's slot; its only chi
 var _pending_reveals: Array[CardData] = []
 var _revealing: bool = false
 
+# No longer a Container (HBoxContainer defaulted this to IGNORE on its
+# own) - the arc leaves real gaps between/around fanned cards where the
+# battle scene behind should stay clickable, same reasoning BattleOverlay
+# itself already sets this for.
 func _ready() -> void:
-	add_theme_constant_override("separation", int(card_spacing))
+	mouse_filter = Control.MOUSE_FILTER_IGNORE
+
+# This slot's own current arc target - read back by _on_card_lowered() to
+# know what to return to (_reflow_hand() may have moved the target while
+# the card was lifted, since a reflow keeps updating these for every slot
+# regardless of lift state - see that function's own doc).
+var _arc_positions: Dictionary = {} # Control (slot) -> Vector2
+var _arc_rotations: Dictionary = {} # Control (slot) -> float degrees
+var _arc_z_indices: Dictionary = {} # Control (slot) -> int
+# Slots currently hovered or armed - _reflow_hand() skips touching a
+# lifted slot's own rotation/z_index (position still updates, so the rest
+# of the hand can shift around it), leaving CardView's own lift signal
+# handlers as the only thing driving those two properties until lowered.
+var _lifted_slots: Dictionary = {} # Control (slot) -> true
 
 func set_deck(deck: Deck) -> void:
 	if _deck != null:
@@ -83,7 +162,8 @@ func _on_card_discarded(card: CardData) -> void:
 	if slot == null:
 		return
 	_views.erase(card)
-	_apply_hand_scale()
+	_forget_slot(slot)
+	_reflow_hand()
 	_collapse_and_remove(slot)
 
 func _add_card_view(card: CardData) -> void:
@@ -102,12 +182,37 @@ func _add_card_view(card: CardData) -> void:
 	card_view.set_rest_offset(card_size.y - hand_rest_visible_height)
 	card_view.set_card_data(card)
 	card_view.clicked.connect(_on_card_view_clicked.bind(card_view))
+	card_view.lifted.connect(_on_card_lifted.bind(slot, card_view))
+	card_view.lowered.connect(_on_card_lowered.bind(slot, card_view))
 
 	_views[card] = slot
-	_apply_hand_scale()
+	_reflow_hand()
 
 func _on_card_view_clicked(_card_data: CardData, card_view: CardView) -> void:
 	card_clicked.emit(card_view)
+
+# Straightens this slot to 0 rotation and brings it to the front of the
+# fan - fired for both a plain hover and an armed card (CardView.lifted
+# covers both, see its own doc), so a card picked out of the hand either
+# way reads the same: level and on top of its neighbors.
+func _on_card_lifted(slot: Control, card_view: CardView) -> void:
+	_lifted_slots[slot] = true
+	slot.z_index = HOVER_Z_INDEX
+	var tween := create_tween()
+	tween.tween_property(slot, "rotation_degrees", 0.0, card_view.hover_duration_sec)
+
+func _on_card_lowered(slot: Control, card_view: CardView) -> void:
+	_lifted_slots.erase(slot)
+	slot.z_index = int(_arc_z_indices.get(slot, 0))
+	var target_rotation: float = _arc_rotations.get(slot, 0.0)
+	var tween := create_tween()
+	tween.tween_property(slot, "rotation_degrees", target_rotation, card_view.hover_duration_sec)
+
+func _forget_slot(slot: Control) -> void:
+	_arc_positions.erase(slot)
+	_arc_rotations.erase(slot)
+	_arc_z_indices.erase(slot)
+	_lifted_slots.erase(slot)
 
 func _collapse_and_remove(slot: Control) -> void:
 	var tween: Tween = create_tween()
@@ -124,15 +229,16 @@ func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
 	if slot == null:
 		return
 	_views.erase(card_data)
-	_apply_hand_scale()
+	_forget_slot(slot)
+	_reflow_hand()
 
 	var card_view: CardView = slot.get_child(0) as CardView
 	card_view.release()
 
-	# Detach from the row - left parented under this HBoxContainer, it would
-	# keep getting re-laid-out every frame, fighting the tween below. Its
-	# parent (BattleOverlay's own root Control) is a plain, non-container
-	# Control, safe for free on-screen travel.
+	# Detach from the row - left parented under this Control, it would
+	# collide with the reflow tween above the instant the next card is
+	# drawn/discarded. Its new parent (BattleOverlay's own root Control)
+	# is a plain, non-container Control, safe for free on-screen travel.
 	var slot_global_pos: Vector2 = slot.global_position
 	remove_child(slot)
 	get_parent().add_child(slot)
@@ -147,19 +253,92 @@ func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
 		play_animation_finished.emit(card_data)
 	)
 
-# Scales every card in the row down uniformly (footprint via
-# slot.custom_minimum_size, rendering via the inner card_view's own scale)
-# once the row's natural width would exceed hand_max_span. card_size
-# itself never changes - only this derived factor does.
-func _apply_hand_scale() -> void:
+# Lays every current card out on an arc centered on this container's own
+# midpoint: each card's normalized position t (-1 at the leftmost card, 0
+# at the hand's center, +1 at the rightmost) drives both its rotation
+# (t * fan_max_rotation_degrees) and its vertical lift (a parabola peaking
+# at fan_arc_height when t=0, 0 at the two ends) - see the per-card loop
+# below. Horizontal spacing is fan_overlap of a card's own width once the
+# hand holds more than fan_gap_max_cards cards, fan_gap's normal edge-to-
+# edge gap otherwise (see those exports' own doc). scale_factor (hand_card_
+# scale, further reduced only if that would still exceed hand_max_span)
+# is uniform across the hand regardless of which spacing rule is active.
+#
+# Called after every draw/discard/play (animate=true, the default -
+# existing slots glide to their updated targets over reflow_duration_sec)
+# and by every fan/spacing export's own live setter (animate=false -
+# snaps immediately, since that's a designer tuning it from the Remote
+# tab, not a gameplay event worth animating). A slot with no prior arc
+# entry (brand new this call) always snaps to its target rather than
+# animating in from Control.new()'s default (0,0) - it wasn't anywhere
+# coherent yet to glide from. A lifted slot (hovered/armed) keeps
+# updating its own STORED target here so it returns to the right place on
+# lower, but neither its live rotation nor z_index are touched while
+# lifted - see _on_card_lifted()/_on_card_lowered() for who owns those
+# until then.
+func _reflow_hand(animate: bool = true) -> void:
 	var count: int = _views.size()
 	if count == 0:
 		return
-	var natural_width: float = count * card_size.x + max(count - 1, 0) * card_spacing
-	var scale_factor: float = 1.0
-	if natural_width > hand_max_span:
-		scale_factor = hand_max_span / natural_width
+
+	var scale_factor: float = _compute_scale_factor(count)
+	var scaled_card_size: Vector2 = card_size * scale_factor
+
+	var spacing_x: float
+	if count > fan_gap_max_cards:
+		spacing_x = scaled_card_size.x * (1.0 - fan_overlap)
+	else:
+		spacing_x = scaled_card_size.x + fan_gap
+
+	var total_width: float = scaled_card_size.x + spacing_x * float(count - 1)
+	var start_center_x: float = size.x / 2.0 - total_width / 2.0 + scaled_card_size.x / 2.0
+
+	var index := 0
 	for slot: Control in _views.values():
-		slot.custom_minimum_size = card_size * scale_factor
+		var t: float = 0.0 if count == 1 else (float(index) / float(count - 1)) * 2.0 - 1.0
+		var rotation_degrees: float = t * fan_max_rotation_degrees
+		var lift: float = fan_arc_height * (1.0 - t * t)
+		var card_center_x: float = start_center_x + spacing_x * float(index)
+		var target_position := Vector2(card_center_x - scaled_card_size.x / 2.0, -lift)
+
+		slot.custom_minimum_size = scaled_card_size
+		# Bottom-center pivot - cards fan out from a shared point below
+		# the visible hand, same as a real hand of cards held from below.
+		slot.pivot_offset = Vector2(scaled_card_size.x / 2.0, scaled_card_size.y)
+
 		var card_view: Control = slot.get_child(0) as Control
 		card_view.scale = Vector2(scale_factor, scale_factor)
+
+		var is_new_slot: bool = not _arc_positions.has(slot)
+		if animate and not is_new_slot:
+			var tween := create_tween()
+			tween.set_parallel(true)
+			tween.tween_property(slot, "position", target_position, reflow_duration_sec)
+			if not _lifted_slots.has(slot):
+				tween.tween_property(slot, "rotation_degrees", rotation_degrees, reflow_duration_sec)
+		else:
+			slot.position = target_position
+			if not _lifted_slots.has(slot):
+				slot.rotation_degrees = rotation_degrees
+
+		_arc_positions[slot] = target_position
+		_arc_rotations[slot] = rotation_degrees
+		_arc_z_indices[slot] = index
+		if not _lifted_slots.has(slot):
+			slot.z_index = index
+
+		index += 1
+
+# hand_card_scale is the base factor (a card in hand is never full
+# card_size, regardless of count); this only shrinks further, on top of
+# that, once even hand_card_scale-sized cards at fan_gap spacing would
+# exceed hand_max_span. natural_width uses fan_gap regardless of the
+# overlap rule above (an approximation, not an exact fit, same as before
+# this feature existed - see fan_overlap's own doc for the actual overlap
+# math this doesn't need to mirror precisely).
+func _compute_scale_factor(count: int) -> float:
+	var base_card_width: float = card_size.x * hand_card_scale
+	var natural_width: float = count * base_card_width + max(count - 1, 0) * fan_gap
+	if natural_width > hand_max_span:
+		return hand_card_scale * (hand_max_span / natural_width)
+	return hand_card_scale

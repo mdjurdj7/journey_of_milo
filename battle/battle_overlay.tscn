@@ -1,34 +1,37 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene format=3 uid="uid://d3u7jfp4naa0j"]
 
-[ext_resource type="Script" path="res://battle/battle_overlay.gd" id="1_overlay"]
-[ext_resource type="Script" path="res://battle/hand_container.gd" id="2_hand"]
+[ext_resource type="Script" uid="uid://chnecwekglmqw" path="res://battle/battle_overlay.gd" id="1_overlay"]
+[ext_resource type="Script" uid="uid://bek0ew44cja31" path="res://battle/hand_container.gd" id="2_hand"]
 [ext_resource type="Theme" path="res://ui/battle_theme.tres" id="3_theme"]
 
-[node name="BattleOverlay" type="Control"]
+[node name="BattleOverlay" type="Control" unique_id=1428338779]
+layout_mode = 3
+anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 theme = ExtResource("3_theme")
 script = ExtResource("1_overlay")
 
-[node name="StatsPanel" type="PanelContainer" parent="."]
+[node name="StatsPanel" type="PanelContainer" parent="." unique_id=227799826]
+layout_mode = 0
 offset_left = 40.0
 offset_top = 40.0
 offset_right = 220.0
 offset_bottom = 110.0
 
-[node name="StatsBox" type="VBoxContainer" parent="StatsPanel"]
+[node name="StatsBox" type="VBoxContainer" parent="StatsPanel" unique_id=1654179280]
 layout_mode = 2
 
-[node name="HPLabel" type="Label" parent="StatsPanel/StatsBox"]
+[node name="HPLabel" type="Label" parent="StatsPanel/StatsBox" unique_id=1611988432]
 layout_mode = 2
 text = "HP: 50"
 
-[node name="TollLabel" type="Label" parent="StatsPanel/StatsBox"]
+[node name="TollLabel" type="Label" parent="StatsPanel/StatsBox" unique_id=465621482]
 layout_mode = 2
 text = "Toll: 0"
 
-[node name="HandContainer" type="HBoxContainer" parent="."]
-anchor_left = 0.0
+[node name="HandContainer" type="Control" parent="." unique_id=524001564]
+anchors_preset = 0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -36,43 +39,47 @@ offset_left = 40.0
 offset_top = -365.0
 offset_right = -40.0
 offset_bottom = -20.0
-alignment = 1
 script = ExtResource("2_hand")
+fan_gap = 18.0
+fan_max_rotation_degrees = 3.0
+fan_overlap = 0.0
 
-[node name="EndTurnButton" type="Button" parent="."]
+[node name="EndTurnButton" type="Button" parent="." unique_id=1869802361]
+layout_mode = 0
 anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -180.0
-offset_top = -405.0
-offset_right = -20.0
-offset_bottom = -369.0
+offset_left = -222.0
+offset_top = -136.0
+offset_right = -32.0
+offset_bottom = -88.0
 text = "End Turn"
 
-[node name="DebugRow" type="HBoxContainer" parent="."]
+[node name="DebugRow" type="HBoxContainer" parent="." unique_id=770130127]
+visible = false
+layout_mode = 0
 offset_left = 520.0
 offset_top = 40.0
 offset_right = 1200.0
 offset_bottom = 80.0
-visible = false
 
-[node name="WinButton" type="Button" parent="DebugRow"]
+[node name="WinButton" type="Button" parent="DebugRow" unique_id=1284046934]
 layout_mode = 2
 text = "Win"
 
-[node name="LoseButton" type="Button" parent="DebugRow"]
+[node name="LoseButton" type="Button" parent="DebugRow" unique_id=1515185015]
 layout_mode = 2
 text = "Lose"
 
-[node name="EscapeButton" type="Button" parent="DebugRow"]
+[node name="EscapeButton" type="Button" parent="DebugRow" unique_id=189524687]
 layout_mode = 2
 text = "Escape"
 
-[node name="DrawButton" type="Button" parent="DebugRow"]
+[node name="DrawButton" type="Button" parent="DebugRow" unique_id=1862899709]
 layout_mode = 2
 text = "Draw"
 
-[node name="DiscardButton" type="Button" parent="DebugRow"]
+[node name="DiscardButton" type="Button" parent="DebugRow" unique_id=1493703075]
 layout_mode = 2
 text = "Discard Hand"
