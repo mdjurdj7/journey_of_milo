@@ -58,6 +58,13 @@ var _bound_to_deck: bool = false
 var _whole_deck_cards: Array[CardData] = []
 var _text_color: Color = Color.WHITE
 
+# The DeckView this panel currently has open, if any - see _toggle_deck_
+# view()'s own doc. Cleared by _on_deck_view_closed() (connected to
+# DeckView.closed), not just by this panel's own toggle-close, so it
+# stays accurate whether the view closed via this panel, a scrim click,
+# or Escape.
+var _deck_view_instance: DeckView = null
+
 func _ready() -> void:
 	custom_minimum_size = panel_size
 	size = panel_size
@@ -178,8 +185,19 @@ func _update_text() -> void:
 
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_open_deck_view()
+		_toggle_deck_view()
 		get_viewport().set_input_as_handled()
+
+# Toggle, not always-open: clicking while a view from this panel is
+# already open closes that one instead of stacking a second on top of it
+# (each with its own scrim, needing its own Escape) - see
+# _deck_view_instance's own doc for how it stays accurate regardless of
+# which of DeckView's three close paths actually fired.
+func _toggle_deck_view() -> void:
+	if _deck_view_instance != null and is_instance_valid(_deck_view_instance):
+		_deck_view_instance.close()
+		return
+	_open_deck_view()
 
 func _open_deck_view() -> void:
 	var cards: Array[CardData]
@@ -194,4 +212,9 @@ func _open_deck_view() -> void:
 
 	var deck_view := (load(DECK_VIEW_SCENE_PATH) as PackedScene).instantiate() as DeckView
 	get_tree().root.add_child(deck_view)
+	deck_view.closed.connect(_on_deck_view_closed)
 	deck_view.open(cards, header_text)
+	_deck_view_instance = deck_view
+
+func _on_deck_view_closed() -> void:
+	_deck_view_instance = null

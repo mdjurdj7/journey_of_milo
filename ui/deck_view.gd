@@ -1,6 +1,13 @@
 extends Control
 class_name DeckView
 
+# Emitted right before queue_free(), regardless of which of the three
+# close paths fired (DeckPanel's own toggle-close, a scrim click, or
+# Escape) - DeckPanel connects to this to clear its own "a view from me
+# is currently open" reference (see its _on_deck_view_closed()), so that
+# stays accurate no matter how this instance actually closed.
+signal closed()
+
 # Full-screen dark scrim behind a scrollable grid of CardView instances,
 # sorted by name - browsing only (hover_enabled is turned off on every
 # card, so nothing lifts/fights the grid layout). Escape or a click
@@ -139,12 +146,24 @@ func _ready() -> void:
 	_header_label.add_theme_color_override("font_color", text_color)
 	_header_label.add_theme_font_size_override("font_size", header_font_size_px)
 
+	# Horizontal scroll is never actually wanted (columns are already capped
+	# to fit _available_grid_width - see _compute_column_count()) - left at
+	# ScrollContainer's own default (AUTO), it sizes its child to exactly
+	# that child's own minimum width on this axis regardless of whether
+	# scrolling is actually needed, which defeats size_flags_horizontal
+	# below entirely (SHRINK_CENTER only centers a child within a rect
+	# LARGER than its minimum size). DISABLED makes ScrollContainer treat
+	# this axis like a normal stretch container instead, handing the grid
+	# the full available width so SHRINK_CENTER actually has room to center
+	# it in. Vertical scrolling (a tall pile) is untouched.
+	_scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+
 	_grid.add_theme_constant_override("h_separation", int(grid_h_separation))
 	_grid.add_theme_constant_override("v_separation", int(grid_v_separation))
-	# SHRINK_CENTER (not the Control default FILL) - ScrollContainer would
-	# otherwise stretch the grid to its own full width, leaving it
-	# left-aligned instead of centered whenever it's narrower than that
-	# (fewer cards than max_columns, or the column cap itself).
+	# SHRINK_CENTER (not the Control default FILL) - centers the grid within
+	# the ScrollContainer's now-full-width rect (see horizontal_scroll_mode
+	# above) whenever it's narrower than that (fewer cards than max_columns,
+	# or the column cap itself), with equal margins either side.
 	_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 func open(cards: Array[CardData], header_text: String) -> void:
@@ -194,6 +213,7 @@ func _compute_column_count(scaled_card_width: float) -> int:
 	return mini(columns, max_columns)
 
 func close() -> void:
+	closed.emit()
 	queue_free()
 
 func _gui_input(event: InputEvent) -> void:
