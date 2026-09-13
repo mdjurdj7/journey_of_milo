@@ -83,16 +83,6 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy]) -> void:
 
 	end_turn_button.pressed.connect(func() -> void: battle_controller.end_turn())
 
-	var battle_audio := BattleAudio.new()
-	add_child(battle_audio)
-	battle_audio.setup(battle_controller)
-	# battle_finished is this class's own "battle is over" event - there's
-	# no separate exit_battle() method, region_field.gd just queue_free()s
-	# this whole overlay once it fires. Freeing battle_audio here rather
-	# than waiting for that keeps it from lingering into (or lagging past)
-	# the transition back to the field.
-	battle_finished.connect(func(_outcome: Outcome) -> void: battle_audio.queue_free())
-
 # One EnemyStatus per enemy, as this overlay's own children - freed
 # automatically when region_field.gd frees the whole overlay at battle
 # end, same as every other child here (HandContainer, StatsPanel, ...).
