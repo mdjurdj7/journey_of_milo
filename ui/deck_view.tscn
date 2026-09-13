@@ -36,6 +36,9 @@ text = "Deck"
 layout_mode = 2
 size_flags_vertical = 3
 
-[node name="GridContainer" type="GridContainer" parent="Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer"]
+[node name="GridCenterContainer" type="CenterContainer" parent="Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer"]
+layout_mode = 2
+
+[node name="GridContainer" type="GridContainer" parent="Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer/GridCenterContainer"]
 layout_mode = 2
 columns = 1

@@ -19,11 +19,13 @@ signal closed()
 # anywhere: Scrim (full-rect) -> CenterContainer (full-rect) ->
 # ContentPanel, sized only via custom_minimum_size (a fraction of the
 # viewport) and placed by CenterContainer itself -> MarginContainer ->
-# VBoxContainer -> HeaderLabel + a filling ScrollContainer -> GridContainer,
-# whose own size_flags_horizontal (SHRINK_CENTER, set below) is what keeps
-# it centered - with equal left/right margins - whenever it's narrower
-# than the available width (fewer cards than max_columns, or the column
-# cap itself).
+# VBoxContainer -> HeaderLabel + a filling ScrollContainer -> a second
+# CenterContainer (GridCenterContainer, EXPAND_FILL - see _ready()'s own
+# doc on why a real CenterContainer is needed here rather than a size
+# flag on GridContainer itself) -> GridContainer, which ends up centered
+# with equal left/right margins whenever it's narrower than the available
+# width (fewer cards than fit, or the column cap itself - see _compute_
+# column_count()).
 #
 # Opened via DeckPanel._open_deck_view(), added directly under the
 # SceneTree's own root so it renders full-screen over both the field and
@@ -71,7 +73,8 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 @onready var _vbox: VBoxContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox
 @onready var _header_label: Label = $Scrim/CenterContainer/ContentPanel/Margin/VBox/HeaderLabel
 @onready var _scroll_container: ScrollContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer
-@onready var _grid: GridContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer/GridContainer
+@onready var _grid_center: CenterContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer/GridCenterContainer
+@onready var _grid: GridContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer/GridCenterContainer/GridContainer
 
 # The width _grid actually has to lay columns out in, derived arithmetically
 # from content_width_fraction/content_margin_px rather than read back off
@@ -148,23 +151,29 @@ func _ready() -> void:
 
 	# Horizontal scroll is never actually wanted (columns are already capped
 	# to fit _available_grid_width - see _compute_column_count()) - left at
-	# ScrollContainer's own default (AUTO), it sizes its child to exactly
-	# that child's own minimum width on this axis regardless of whether
-	# scrolling is actually needed, which defeats size_flags_horizontal
-	# below entirely (SHRINK_CENTER only centers a child within a rect
-	# LARGER than its minimum size). DISABLED makes ScrollContainer treat
-	# this axis like a normal stretch container instead, handing the grid
-	# the full available width so SHRINK_CENTER actually has room to center
-	# it in. Vertical scrolling (a tall pile) is untouched.
+	# ScrollContainer's own default (AUTO), it sizes its DIRECT child to
+	# exactly that child's own minimum width on this axis regardless of
+	# whether scrolling is actually needed, leaving GridCenterContainer no
+	# extra room to center into. DISABLED makes ScrollContainer treat this
+	# axis like a normal stretch container instead, handing GridCenter
+	# Container the full available width. Vertical scrolling (a tall pile)
+	# is untouched.
 	_scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+
+	# ScrollContainer does not honor a direct child's own size_flags for
+	# centering purposes (confirmed: GridContainer's own SHRINK_CENTER,
+	# even with scrolling disabled above, still left it flush left) - the
+	# working fix is structural, not a flag on the grid itself:
+	# GridCenterContainer sits between ScrollContainer and GridContainer
+	# specifically so a real CenterContainer (which always centers its own
+	# child, regardless of that child's flags) does the centering.
+	# EXPAND_FILL is what makes ScrollContainer stretch THIS node to the
+	# full available width in the first place, giving it room to center
+	# GridContainer into whenever the grid is narrower than that.
+	_grid_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 
 	_grid.add_theme_constant_override("h_separation", int(grid_h_separation))
 	_grid.add_theme_constant_override("v_separation", int(grid_v_separation))
-	# SHRINK_CENTER (not the Control default FILL) - centers the grid within
-	# the ScrollContainer's now-full-width rect (see horizontal_scroll_mode
-	# above) whenever it's narrower than that (fewer cards than max_columns,
-	# or the column cap itself), with equal margins either side.
-	_grid.size_flags_horizontal = Control.SIZE_SHRINK_CENTER
 
 func open(cards: Array[CardData], header_text: String) -> void:
 	_header_label.text = header_text
@@ -182,7 +191,7 @@ func open(cards: Array[CardData], header_text: String) -> void:
 	var scaled_card_size: Vector2 = reference_card.card_size * deck_view_card_scale
 	reference_card.free()
 
-	_grid.columns = _compute_column_count(scaled_card_size.x)
+	_grid.columns = _compute_column_count(scaled_card_size.x, sorted_cards.size())
 
 	for card in sorted_cards:
 		var slot := Control.new()
@@ -205,12 +214,17 @@ func open(cards: Array[CardData], header_text: String) -> void:
 
 # Largest column count whose total width (n cards plus (n-1) gaps between
 # them) still fits _available_grid_width, floored at 1 (a single huge
-# card never divides out to zero columns) and capped at max_columns
-# regardless of how much width is actually available.
-func _compute_column_count(scaled_card_width: float) -> int:
+# card never divides out to zero columns), capped at max_columns
+# regardless of how much width is actually available, and also capped at
+# card_count - a pile with fewer cards than would otherwise fit no longer
+# reserves more columns than it has cards for, which used to leave a
+# short last row inside an unnecessarily wide grid (still centered as a
+# block by GridCenterContainer, but reading as lopsided internally).
+func _compute_column_count(scaled_card_width: float, card_count: int) -> int:
 	var columns: int = int((_available_grid_width + grid_h_separation) / (scaled_card_width + grid_h_separation))
 	columns = maxi(columns, 1)
-	return mini(columns, max_columns)
+	columns = mini(columns, max_columns)
+	return mini(columns, maxi(card_count, 1))
 
 func close() -> void:
 	closed.emit()
