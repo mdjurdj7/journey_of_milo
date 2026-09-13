@@ -27,6 +27,25 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 @export var dash_distance: float = 6.0
 @export var dash_duration: float = 0.2
 @export var dash_cooldown: float = 1.0
+
+@export_group("Step-Up")
+# How tall a ledge/curb the Wanderer can walk straight up onto, and how far
+# below his feet a drop-off is still treated as a step-down snap rather than
+# a fall. Field only - _apply_step_up_and_down() no-ops while a battle
+# stance is bound (see _battle_controller).
+@export var step_height: float = 0.35
+# The forward probe (see _try_step_up()) has to clear the capsule's own
+# leading edge, not just this frame's move distance from its center - a
+# cast that only reaches move_distance ahead still lands the down cast on
+# the ground BEFORE the obstacle (inside the capsule's own radius), never
+# on top of it. This is the extra clearance added past capsule radius +
+# move distance, in case the obstacle's near face isn't perfectly vertical.
+@export var step_probe_margin: float = 0.1
+# Draws the forward (green) and downward (red) probe casts each physics
+# frame while true. Re-read live every frame rather than cached, so this
+# takes effect immediately from the Remote tab like every other tunable
+# here - no setter needed since there's no baked state to invalidate.
+@export var debug_draw_step_casts: bool = false
 @export var use_animation_tree: bool = false
 @export var walk_speed_threshold: float = 0.1
 @export var animation_blend_time: float = 0.2
@@ -80,6 +99,35 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 		if _leg_spread_modifier:
 			_leg_spread_modifier.correction_degrees = value
 
+# Widens BattleIdle's own square-on stance into a fencer's ready stance -
+# see BattleStanceModifier's own doc for the mechanics (which bone rotates
+# which way, the influence-based blend enter_battle_stance()/exit_battle_
+# stance() drive). Forwarded live into _battle_stance_modifier, same
+# shape as leg_spread_correction_degrees above.
+@export_group("Battle Stance")
+@export var battle_back_leg_degrees: float = 12.0:
+	set(value):
+		battle_back_leg_degrees = value
+		if _battle_stance_modifier:
+			_battle_stance_modifier.battle_back_leg_degrees = value
+@export var battle_front_leg_degrees: float = 4.0:
+	set(value):
+		battle_front_leg_degrees = value
+		if _battle_stance_modifier:
+			_battle_stance_modifier.battle_front_leg_degrees = value
+@export var battle_pelvis_yaw_degrees: float = 6.0:
+	set(value):
+		battle_pelvis_yaw_degrees = value
+		if _battle_stance_modifier:
+			_battle_stance_modifier.battle_pelvis_yaw_degrees = value
+# Default true: he squares up with the sword in his right hand (see hand_
+# mount_bone_suffix below), so the left leg trails as the back leg.
+@export var battle_back_leg_is_left: bool = true:
+	set(value):
+		battle_back_leg_is_left = value
+		if _battle_stance_modifier:
+			_battle_stance_modifier.back_leg_is_left = value
+
 enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 
 @export_group("Shading")
@@ -95,7 +143,7 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 		if _model != null:
 			_apply_model_material(_model)
 		if _sword_root != null:
-			_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH, true)
+			_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH, true, false)
 
 # Mirrors wanderer_flat.gdshader's own uniforms one-to-one - see that
 # file's own doc for what each does. Only used when shading_mode is
@@ -217,12 +265,31 @@ var _dash_timer: float = 0.0
 var _dash_cooldown_timer: float = 0.0
 var _dash_direction: Vector3 = Vector3.ZERO
 
+# Debug-only line visualizations for _apply_step_up_and_down()'s two probe
+# casts - built once in _ready() (top_level, so their own transform IS
+# world space rather than inheriting Wanderer's) and only fed vertices/
+# shown while debug_draw_step_casts is true; see _set_debug_line().
+var _step_forward_line: MeshInstance3D = null
+var _step_down_line: MeshInstance3D = null
+
+# TEMPORARY - see the diagnostic note in _apply_step_up_and_down. Edge-
+# triggers the debug print so it fires once per wall contact, not every
+# physics frame the body stays pressed against one.
+var _wall_step_logged: bool = false
+
+# Read once from the actual CapsuleShape3D at _ready() (see _find_capsule_
+# radius()) rather than exported separately - the collision shape is the
+# one source of truth for it, and duplicating it as its own tunable would
+# just be one more place to forget to update if the capsule is ever resized.
+var _capsule_radius: float = 0.0
+
 # Cached once by _find_grounding_bones() so _apply_continuous_foot_
 # grounding() never does a name lookup or a skeleton scan - just two
 # pose reads by index, every physics frame.
 var _grounding_skeleton: Skeleton3D = null
 var _grounding_bone_indices: Array[int] = []
 var _leg_spread_modifier: LegSpreadCorrectionModifier = null
+var _battle_stance_modifier: BattleStanceModifier = null
 
 # The uniform scale _scale_and_ground_model() applied to the model, set
 # once there - _setup_sword() has to divide its own scale factor by this,
@@ -237,6 +304,15 @@ var _sword_mesh_holder: Node3D = null
 var _sword_raw_aabb: AABB = AABB()
 var _back_attachment: BoneAttachment3D = null
 var _hand_attachment: BoneAttachment3D = null
+
+# The body's own currently-applied material (set by _apply_model_material()
+# for is_body calls only, never for the sword's) - play_hit_flash() tweens
+# this directly rather than re-deriving it, since re-deriving would mean
+# re-walking the model's MeshInstance3D children and, worse, building a
+# second material instance no MeshInstance3D actually has assigned.
+var _active_material: Material = null
+var _ground: Ground = null
+var _attack_audio: AttackAudio = null
 
 # Set by bind_to_battle(), cleared by unbind_battle() - see both for why
 # region_field.gd is the only caller of either.
@@ -280,13 +356,17 @@ func _ready() -> void:
 
 	_find_grounding_bones(model)
 	_setup_leg_spread_correction(model)
+	_setup_battle_stance_modifier(model)
 	_setup_sword(model)
+	_setup_step_debug_lines()
+	_capsule_radius = _find_capsule_radius()
 
 	var contact_shadow := ContactShadow.new()
 	contact_shadow.name = "ContactShadow"
 	add_child(contact_shadow)
 
 	var ground := get_node_or_null(ground_path) as Ground
+	_ground = ground
 
 	var footprint_spawner := FootprintSpawner.new()
 	footprint_spawner.name = "FootprintSpawner"
@@ -297,6 +377,11 @@ func _ready() -> void:
 	footstep_audio.name = "FootstepAudio"
 	add_child(footstep_audio)
 	footstep_audio.setup(footprint_spawner, ground)
+
+	_attack_audio = AttackAudio.new()
+	_attack_audio.name = "AttackAudio"
+	add_child(_attack_audio)
+	_attack_audio.setup()
 
 # One shared material for the whole model, applied via material_override
 # on every MeshInstance3D under it. Which material depends on shading_
@@ -317,7 +402,7 @@ func _ready() -> void:
 # built from SWORD_ALBEDO_TEXTURE_PATH, which likely doesn't exist as a
 # standalone file. The body has no such imported material (its FBX ships
 # untextured geometry) so it always keeps the override path.
-func _apply_model_material(model: Node3D, texture_path: String = ALBEDO_TEXTURE_PATH, keep_imported_material_when_textured: bool = false) -> void:
+func _apply_model_material(model: Node3D, texture_path: String = ALBEDO_TEXTURE_PATH, keep_imported_material_when_textured: bool = false, is_body: bool = true) -> void:
 	if shading_mode == ShadingMode.TEXTURED and keep_imported_material_when_textured:
 		for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
 			var mi := mesh_instance as MeshInstance3D
@@ -339,6 +424,12 @@ func _apply_model_material(model: Node3D, texture_path: String = ALBEDO_TEXTURE_
 		var mi := mesh_instance as MeshInstance3D
 		mi.material_override = material
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	# The sword's own material_override is never what play_hit_flash()
+	# should be lerping (only the body should flash) - is_body is false
+	# for both of _setup_sword()'s own calls, so this only ever tracks the
+	# body's material regardless of which shading_mode built it.
+	if is_body:
+		_active_material = material
 
 # Meshy's own painted colors, no posterizing - same "roughness 1,
 # specular 0" shape every other Wanderer/FieldEnemy material already uses.
@@ -460,6 +551,74 @@ func _setup_leg_spread_correction(model: Node3D) -> void:
 	_leg_spread_modifier.name = "LegSpreadCorrection"
 	_leg_spread_modifier.correction_degrees = leg_spread_correction_degrees
 	skeleton.add_child(_leg_spread_modifier)
+
+# Same skeleton lookup as _setup_leg_spread_correction() above, duplicated
+# rather than shared since each already has its own reason to fail
+# independently of the other (see that function's own doc on why it
+# doesn't reuse _grounding_skeleton either). animation_player is handed
+# over directly since BattleStanceModifier has no other way to reach it -
+# see its own doc. influence starts at 0: this should be completely inert
+# on the field, only ever raised by enter_battle_stance()'s own tween.
+func _setup_battle_stance_modifier(model: Node3D) -> void:
+	var skeletons := model.find_children("*", "Skeleton3D", true, false)
+	var skeleton := skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
+	if skeleton == null:
+		push_warning("Wanderer: no Skeleton3D found under model; battle stance widening disabled.")
+		return
+
+	_battle_stance_modifier = BattleStanceModifier.new()
+	_battle_stance_modifier.name = "BattleStanceModifier"
+	_battle_stance_modifier.animation_player = _animation_player
+	_battle_stance_modifier.battle_back_leg_degrees = battle_back_leg_degrees
+	_battle_stance_modifier.battle_front_leg_degrees = battle_front_leg_degrees
+	_battle_stance_modifier.battle_pelvis_yaw_degrees = battle_pelvis_yaw_degrees
+	_battle_stance_modifier.back_leg_is_left = battle_back_leg_is_left
+	_battle_stance_modifier.influence = 0.0
+	skeleton.add_child(_battle_stance_modifier)
+
+# Builds the two ImmediateMesh line visualizations _apply_step_up_and_down()
+# draws into via _set_debug_line() - green for the forward probe, red for
+# the downward one. Created once here regardless of debug_draw_step_casts's
+# current value (both start hidden) so toggling the export live from the
+# Remote tab has something to show/hide rather than needing its own setter.
+func _setup_step_debug_lines() -> void:
+	_step_forward_line = _create_debug_line_mesh(Color(0.2, 0.9, 0.3))
+	_step_down_line = _create_debug_line_mesh(Color(0.9, 0.25, 0.2))
+
+# Wanderer's own body collider is a direct CollisionShape3D child (not the
+# model's - that one's under _model, unrelated to physics), so this is a
+# plain top-level find rather than the model.find_children() pattern used
+# everywhere else in this file. Returns 0.0 (with a warning) if the shape
+# isn't a CapsuleShape3D, matching this project's "degrade loudly, don't
+# crash" convention (see e.g. _build_textured_material()'s own fallback).
+func _find_capsule_radius() -> float:
+	for child in get_children():
+		var collision_shape := child as CollisionShape3D
+		if collision_shape == null:
+			continue
+		var capsule := collision_shape.shape as CapsuleShape3D
+		if capsule != null:
+			return capsule.radius
+	push_warning("Wanderer: no CapsuleShape3D found on the body; step-up forward probe won't clear the collider's own radius.")
+	return 0.0
+
+# top_level = true detaches the node's own transform from Wanderer's, so
+# with that transform left at its default (identity) the mesh's local
+# vertex space IS world space - _set_debug_line() can feed raw world-space
+# cast endpoints straight into surface_add_vertex() with no conversion.
+func _create_debug_line_mesh(color: Color) -> MeshInstance3D:
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = color
+
+	var mesh_instance := MeshInstance3D.new()
+	mesh_instance.name = "StepDebugLine"
+	mesh_instance.mesh = ImmediateMesh.new()
+	mesh_instance.material_override = material
+	mesh_instance.top_level = true
+	mesh_instance.visible = false
+	add_child(mesh_instance)
+	return mesh_instance
 
 # suffix is a StringName (an identifier, not display text) - converted to
 # String once here for ends_with(). An empty suffix is rejected outright:
@@ -584,7 +743,7 @@ func _setup_sword(model: Node3D) -> void:
 		push_warning("Wanderer: _model_scale_factor is ~0 (%f); sword scale not compensated." % _model_scale_factor)
 	_sword_root.scale = Vector3.ONE * world_scale_factor
 
-	_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH, true)
+	_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH, true, false)
 
 	_apply_grip_offset()
 
@@ -1082,6 +1241,111 @@ func _angle_from_direction(direction: Vector3) -> float:
 func is_dashing() -> bool:
 	return _dash_timer > 0.0
 
+# Length of a merged clip, in seconds - CardData.impact_time's own clamp
+# (see BattleController._impact_delay_for()) against a clip shorter than
+# the authored value. 0.0 (not found/no player yet) means "don't clamp,
+# use impact_time as authored" to that caller, not "instant".
+func get_clip_length(anim_name: StringName) -> float:
+	if _animation_player == null or not _animation_player.has_animation(anim_name):
+		return 0.0
+	return _animation_player.get_animation(anim_name).length
+
+# Called by BattleFeedback once BattleController reports a card hit
+# landing on the player. _active_material may be a plain StandardMaterial3D
+# (TEXTURED/FLAT) or wanderer_flat.gdshader's ShaderMaterial (POSTERIZED) -
+# each needs a different property tweened to read as the same "lerp to
+# near-white bone, then back" flash, so this only dispatches; the two
+# _tween_*_flash() helpers below do the actual work.
+func play_hit_flash(flash_color: Color, rise_time: float, fall_time: float) -> void:
+	if _active_material is StandardMaterial3D:
+		_tween_standard_flash(_active_material as StandardMaterial3D, flash_color, rise_time, fall_time)
+	elif _active_material is ShaderMaterial:
+		_tween_shader_flash(_active_material as ShaderMaterial, flash_color, rise_time, fall_time)
+
+func _tween_standard_flash(material: StandardMaterial3D, flash_color: Color, rise_time: float, fall_time: float) -> void:
+	var base_color: Color = material.albedo_color
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_property(material, "albedo_color", flash_color, rise_time)
+	tween.tween_property(material, "albedo_color", base_color, fall_time)
+
+# wanderer_flat.gdshader has no single "albedo" property to lerp (its own
+# ALBEDO is computed from a posterized ramp, not read back from a
+# uniform) - flash_amount/flash_color are a separate pair of uniforms
+# added to that shader purely for this, blended in on top of the ramp in
+# its own fragment().
+func _tween_shader_flash(material: ShaderMaterial, flash_color: Color, rise_time: float, fall_time: float) -> void:
+	material.set_shader_parameter("flash_color", flash_color)
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_method(func(v: float) -> void: material.set_shader_parameter("flash_amount", v), 0.0, 1.0, rise_time)
+	tween.tween_method(func(v: float) -> void: material.set_shader_parameter("flash_amount", v), 1.0, 0.0, fall_time)
+
+# from_direction is the direction the hit traveled (attacker -> the
+# Wanderer, not normalized) - same mechanism as FieldEnemy.play_hit_
+# recoil(), duplicated rather than shared (see that method's own doc on
+# why - still only the second occurrence).
+func play_hit_recoil(from_direction: Vector3, distance: float, tilt_degrees: float, out_time: float, return_time: float) -> void:
+	var away := Vector3(from_direction.x, 0.0, from_direction.z)
+	away = away.normalized() if away.length() > 0.0001 else Vector3.BACK
+
+	var base_position := global_position
+	var base_tilt := rotation.x
+	var recoil_position := base_position + away * distance
+	var recoil_tilt := base_tilt + deg_to_rad(tilt_degrees)
+
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "global_position", recoil_position, out_time)
+	tween.parallel().tween_property(self, "rotation:x", recoil_tilt, out_time)
+	tween.chain().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(self, "global_position", base_position, return_time)
+	tween.parallel().tween_property(self, "rotation:x", base_tilt, return_time)
+
+# Same mechanism as FieldEnemy.spawn_sand_puff() (see its own doc),
+# duplicated for the same reason play_hit_recoil() above is.
+func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spread_degrees: float) -> void:
+	if _ground == null:
+		return
+
+	var particles := GPUParticles3D.new()
+	particles.process_mode = Node.PROCESS_MODE_ALWAYS
+	particles.emitting = false
+	particles.one_shot = true
+	particles.amount = particle_count
+	particles.lifetime = lifetime
+	particles.explosiveness = 1.0
+
+	var quad_mesh := QuadMesh.new()
+	quad_mesh.size = Vector2(0.12, 0.12)
+
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.albedo_color = _ground.ground_color
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	quad_mesh.material = material
+	particles.draw_pass_1 = quad_mesh
+
+	var process_material := ParticleProcessMaterial.new()
+	process_material.direction = Vector3(0.0, 1.0, 0.0)
+	process_material.spread = spread_degrees
+	process_material.initial_velocity_min = velocity * 0.5
+	process_material.initial_velocity_max = velocity
+	process_material.gravity = Vector3(0.0, -2.0, 0.0)
+	process_material.scale_min = 0.6
+	process_material.scale_max = 1.2
+	particles.process_material = process_material
+
+	add_child(particles)
+	particles.global_position = global_position
+	particles.emitting = true
+	get_tree().create_timer(lifetime + 0.1).timeout.connect(particles.queue_free)
+
+func play_slash_audio() -> void:
+	if _attack_audio != null:
+		_attack_audio.play_slash()
+
 # Called by region_field.gd on enemy contact. Tweens into a fixed spacing
 # from target along the target->Wanderer ground line, facing target, and
 # blends the AnimationPlayer into DrawSword, queuing BattleIdle to follow
@@ -1142,6 +1406,11 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float) -> voi
 
 	_switch_sword_mount(_hand_attachment, hand_mount_position, hand_mount_rotation_degrees, duration)
 
+	if _battle_stance_modifier:
+		var stance_tween := create_tween()
+		stance_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		stance_tween.tween_property(_battle_stance_modifier, "influence", 1.0, duration)
+
 # Called by region_field.gd once the battle overlay resolves (win, lose,
 # or escape) - blends back from BattleIdle to the normal field Idle.
 # _physics_process's own Idle/Walk switching only fires on movement input,
@@ -1154,6 +1423,11 @@ func exit_battle_stance() -> void:
 
 	_switch_sword_mount(_back_attachment, back_mount_position, back_mount_rotation_degrees, animation_blend_time)
 
+	if _battle_stance_modifier:
+		var stance_tween := create_tween()
+		stance_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		stance_tween.tween_property(_battle_stance_modifier, "influence", 0.0, animation_blend_time)
+
 # Called by region_field.gd right after BattleOverlay.enter_battle() (the
 # only point battle_controller exists to hand over - it's created inside
 # that call, not before). Connects the two battle-animation triggers so
@@ -1162,6 +1436,7 @@ func exit_battle_stance() -> void:
 func bind_to_battle(controller: BattleController) -> void:
 	_battle_controller = controller
 	controller.card_played.connect(_on_card_played)
+	controller.card_impact.connect(_on_card_impact)
 	controller.status_changed.connect(_on_status_changed)
 
 func unbind_battle() -> void:
@@ -1169,9 +1444,23 @@ func unbind_battle() -> void:
 		return
 	if _battle_controller.card_played.is_connected(_on_card_played):
 		_battle_controller.card_played.disconnect(_on_card_played)
+	if _battle_controller.card_impact.is_connected(_on_card_impact):
+		_battle_controller.card_impact.disconnect(_on_card_impact)
 	if _battle_controller.status_changed.is_connected(_on_status_changed):
 		_battle_controller.status_changed.disconnect(_on_status_changed)
 	_battle_controller = null
+
+# BattleController.card_impact fires once its own impact delay has
+# elapsed for ANY card carrying a battle_animation (see its own doc) -
+# regardless of whether that card's effects actually land a hit, which is
+# why this reads battle_animation directly rather than waiting on
+# damage_dealt the way BattleFeedback's own reactions do. Slash.mp3 is the
+# only combat clip that exists so far, so it stands in as the generic
+# sword-impact sound for every battle_animation card until dedicated ones
+# exist.
+func _on_card_impact(card: CardData) -> void:
+	if card.battle_animation != &"":
+		play_slash_audio()
 
 # See CardData.battle_animation's own doc - empty means this card has no
 # swing. Queues _resting_battle_animation() rather than a bare "BattleIdle"
@@ -1205,6 +1494,197 @@ func _resting_battle_animation() -> StringName:
 			if status.data.battle_animation != &"":
 				return status.data.battle_animation
 	return &"BattleIdle"
+
+# Field-only step-up/step-down, called from _physics_process right before
+# move_and_slide() while velocity.x/z already holds this frame's intended
+# horizontal move and velocity.y is known (zeroed if is_on_floor()). Wanderer's
+# CollisionShape3D (CapsuleShape3D, radius 0.4, height 1.8) sits offset +0.9
+# up in local space, so its bottom - the feet - lands exactly at local y=0;
+# global_position IS the foot position, same convention _apply_continuous_
+# foot_grounding() and enter_battle_stance() already rely on.
+#
+# Disabled during battle stance: _battle_controller is only non-null once
+# bind_to_battle() runs, which is after enter_battle_stance()'s own tween
+# starts - RegionField's process-mode freeze (set before either call) means
+# _physics_process itself won't fire again until battle ends anyway, but the
+# explicit guard below doesn't depend on that ordering to be correct.
+func _apply_step_up_and_down(delta: float) -> void:
+	if _battle_controller != null:
+		_hide_debug_lines()
+		_wall_step_logged = false
+		return
+
+	var planar_motion := Vector3(velocity.x, 0.0, velocity.z) * delta
+	if planar_motion.length() <= 0.0001:
+		_hide_debug_lines()
+		_wall_step_logged = false
+		return
+
+	var foot_position := global_position
+	var move_dir := planar_motion.normalized()
+	var move_distance := planar_motion.length()
+
+	# test_move checks the actual capsule against this frame's horizontal
+	# motion without committing it (move_and_slide() hasn't run yet this
+	# frame, so there's no slide-collision data to read another way). Run
+	# regardless of is_on_floor() - the diagnostic below needs to see a wall
+	# even on a frame where is_on_floor() is false, since that's the likely
+	# way "step-up silently does nothing" actually happens.
+	var collision := KinematicCollision3D.new()
+	var blocked := test_move(global_transform, planar_motion, collision)
+
+	if not blocked:
+		_wall_step_logged = false
+		if is_on_floor():
+			_try_step_down(foot_position, move_dir, move_distance)
+		else:
+			_hide_debug_lines()
+		return
+
+	# Blocked, but by a walkable slope (within floor_max_angle) rather than a
+	# genuine wall - move_and_slide() climbs this on its own; nothing to do.
+	var wall_normal: Vector3 = collision.get_normal(0)
+	var wall_angle := wall_normal.angle_to(Vector3.UP)
+	if wall_angle <= floor_max_angle:
+		_hide_debug_lines()
+		_wall_step_logged = false
+		return
+
+	# TEMPORARY diagnostic for the spawn-slab step-up miss - print once per
+	# wall contact (not every physics frame the body stays pressed against
+	# it) via _wall_step_logged, reset above the moment the wall goes away.
+	# Remove once the miss is diagnosed.
+	var should_log := not _wall_step_logged
+	_wall_step_logged = true
+	if should_log:
+		print("Wanderer step-up: wall detected - is_on_floor=%s wall_normal=%s wall_angle_deg=%.1f floor_max_angle_deg=%.1f" % [is_on_floor(), wall_normal, rad_to_deg(wall_angle), rad_to_deg(floor_max_angle)])
+
+	if not is_on_floor():
+		if should_log:
+			print("Wanderer step-up: rejected - not on floor")
+		return
+
+	_try_step_up(foot_position, move_dir, move_distance, should_log)
+
+# Casts from step_height above the foot, forward past the capsule's own
+# leading edge (radius + this frame's move distance + step_probe_margin -
+# a cast that only reached move_distance from the CENTER would still land
+# short of the obstacle's far side, putting the down cast on the ground in
+# FRONT of it rather than on top of it), then straight down from there to
+# find the landing. Lifts the body onto it only if the landing is within
+# step_height of the current foot and its normal is walkable - otherwise
+# it's a wall too tall to step up, and move_and_slide() runs unmodified and
+# simply blocks against it as normal.
+# should_log prints each stage's result - see the TEMPORARY note in
+# _apply_step_up_and_down, the only caller that ever passes true.
+func _try_step_up(foot_position: Vector3, move_dir: Vector3, move_distance: float, should_log: bool = false) -> void:
+	var forward_distance: float = _capsule_radius + move_distance + step_probe_margin
+	var raised_start: Vector3 = foot_position + Vector3.UP * step_height
+	var raised_end: Vector3 = raised_start + move_dir * forward_distance
+	var forward_result: Dictionary = _cast_ray(raised_start, raised_end)
+	_set_debug_line(_step_forward_line, raised_start, raised_end)
+
+	if should_log:
+		if forward_result.is_empty():
+			print("Wanderer step-up: forward cast at step_height=%.3f, distance=%.3f (radius=%.3f + move=%.3f + margin=%.3f) from %s to %s - clear" % [step_height, forward_distance, _capsule_radius, move_distance, step_probe_margin, raised_start, raised_end])
+		else:
+			print("Wanderer step-up: forward cast at step_height=%.3f, distance=%.3f - hit %s at %s" % [step_height, forward_distance, forward_result.get("collider"), forward_result.get("position")])
+
+	if not forward_result.is_empty():
+		_set_debug_line(_step_down_line, Vector3.ZERO, Vector3.ZERO, false)
+		if should_log:
+			print("Wanderer step-up: rejected - forward cast blocked at step_height")
+		return
+
+	var down_start: Vector3 = raised_end
+	var down_end: Vector3 = down_start - Vector3.UP * (step_height + 0.05)
+	var down_result: Dictionary = _cast_ray(down_start, down_end)
+	_set_debug_line(_step_down_line, down_start, down_end)
+
+	if down_result.is_empty():
+		if should_log:
+			print("Wanderer step-up: rejected - down cast from %s to %s found no landing" % [down_start, down_end])
+		return
+
+	var landing_position: Vector3 = down_result["position"]
+	var landing_normal: Vector3 = down_result["normal"]
+	var rise: float = landing_position.y - foot_position.y
+	var landing_angle_deg: float = rad_to_deg(landing_normal.angle_to(Vector3.UP))
+	if should_log:
+		print("Wanderer step-up: down cast landing_y=%.4f foot_y=%.4f rise=%.4f landing_normal=%s landing_angle_deg=%.1f" % [landing_position.y, foot_position.y, rise, landing_normal, landing_angle_deg])
+
+	if rise < -0.001 or rise > step_height + 0.001:
+		if should_log:
+			print("Wanderer step-up: rejected - rise %.4f outside [0, step_height=%.4f]" % [rise, step_height])
+		return
+	if landing_angle_deg > rad_to_deg(floor_max_angle):
+		if should_log:
+			print("Wanderer step-up: rejected - landing_angle_deg %.1f exceeds floor_max_angle_deg %.1f" % [landing_angle_deg, rad_to_deg(floor_max_angle)])
+		return
+
+	if should_log:
+		print("Wanderer step-up: accepted - lifting foot to y=%.4f (rise=%.4f)" % [landing_position.y, rise])
+
+	global_position.y = landing_position.y
+	velocity.y = 0.0
+
+# The step-down counterpart: test_move found nothing blocking this frame's
+# horizontal move, but that alone doesn't mean the ground continues at the
+# same height - walking off the edge of a raised slab is also "not blocked"
+# horizontally. Casts down through step_height at the destination and, if
+# the drop is within range, sets the body straight down onto it rather than
+# letting gravity peel it off the edge (which reads as a brief float/hitch
+# before it starts actually falling).
+func _try_step_down(foot_position: Vector3, move_dir: Vector3, move_distance: float) -> void:
+	var destination: Vector3 = foot_position + move_dir * move_distance
+	var probe_start: Vector3 = destination + Vector3.UP * step_height
+	var probe_end: Vector3 = probe_start - Vector3.UP * (step_height * 2.0)
+	var result: Dictionary = _cast_ray(probe_start, probe_end)
+	_set_debug_line(_step_forward_line, foot_position, destination)
+	_set_debug_line(_step_down_line, probe_start, probe_end)
+
+	if result.is_empty():
+		return
+
+	var landing_position: Vector3 = result["position"]
+	var landing_normal: Vector3 = result["normal"]
+	var drop: float = foot_position.y - landing_position.y
+	if drop <= 0.001 or drop > step_height + 0.001:
+		return
+	if landing_normal.angle_to(Vector3.UP) > floor_max_angle:
+		return
+
+	global_position.y = landing_position.y
+	velocity.y = 0.0
+
+func _cast_ray(from: Vector3, to: Vector3) -> Dictionary:
+	var space_state: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.exclude = [get_rid()]
+	return space_state.intersect_ray(query)
+
+# show_line false is a plain hide - used when a probe was never reached
+# this frame (e.g. the forward cast already found a landing/blocker so the
+# other cast's line should read as "not part of this frame's result"
+# instead of showing a stale segment from a previous frame).
+func _set_debug_line(mesh_instance: MeshInstance3D, from: Vector3, to: Vector3, show_line: bool = true) -> void:
+	if not debug_draw_step_casts or not show_line:
+		mesh_instance.visible = false
+		return
+
+	var immediate_mesh: ImmediateMesh = mesh_instance.mesh as ImmediateMesh
+	immediate_mesh.clear_surfaces()
+	immediate_mesh.surface_begin(Mesh.PRIMITIVE_LINES)
+	immediate_mesh.surface_add_vertex(from)
+	immediate_mesh.surface_add_vertex(to)
+	immediate_mesh.surface_end()
+	mesh_instance.visible = true
+
+func _hide_debug_lines() -> void:
+	if _step_forward_line:
+		_step_forward_line.visible = false
+	if _step_down_line:
+		_step_down_line.visible = false
 
 func _physics_process(delta: float) -> void:
 	_apply_continuous_foot_grounding(delta)
@@ -1262,6 +1742,8 @@ func _physics_process(delta: float) -> void:
 		velocity.y -= gravity * delta
 	else:
 		velocity.y = 0.0
+
+	_apply_step_up_and_down(delta)
 
 	move_and_slide()
 

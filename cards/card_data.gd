@@ -34,3 +34,10 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 # inferred from card_type, since not every ATTACK card is guaranteed to
 # want the same swing forever. See Wanderer._on_card_played().
 @export var battle_animation: StringName = &""
+
+# Seconds into battle_animation's clip at which BattleController delays
+# damage resolution/reporting until (see its own _resolve_play() doc) -
+# clamped there against the clip's actual length, so a shorter clip still
+# fires at its own end rather than after it's already finished playing.
+# Ignored entirely when battle_animation is empty (resolves immediately).
+@export var impact_time: float = 0.4

@@ -31,6 +31,14 @@ uniform vec4 tone_dark : source_color = vec4(0.125, 0.12, 0.115, 1.0);
 uniform vec4 tone_mid : source_color = vec4(0.205, 0.195, 0.185, 1.0);
 uniform vec4 tone_light : source_color = vec4(0.31, 0.295, 0.28, 1.0);
 
+// Battle hit-flash (see wanderer.gd's own play_hit_flash()/_tween_shader_
+// flash()): this ramp has no single albedo property a Tween could lerp
+// directly, so flash_amount/flash_color are driven by a Tween instead and
+// blended on top of the posterized ramp below - 0 (default, at rest) is a
+// no-op, 1.0 is fully flash_color.
+uniform float flash_amount : hint_range(0.0, 1.0) = 0.0;
+uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+
 void fragment() {
 	vec3 sampled = texture(albedo_texture, UV).rgb;
 	float luminance = dot(sampled, vec3(0.299, 0.587, 0.114));
@@ -42,6 +50,7 @@ void fragment() {
 	vec3 albedo = t < 0.5
 		? mix(tone_dark.rgb, tone_mid.rgb, t * 2.0)
 		: mix(tone_mid.rgb, tone_light.rgb, (t - 0.5) * 2.0);
+	albedo = mix(albedo, flash_color.rgb, flash_amount);
 
 	ALBEDO = albedo;
 	ROUGHNESS = 1.0;

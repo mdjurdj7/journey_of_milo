@@ -165,7 +165,7 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# owns whatever this becomes once a fight can hold more than one enemy.
 	var battle_enemies: Array[FieldEnemy] = [enemy]
 	var transition_time: float = camera_rig.battle_transition_time if camera_rig != null else 0.0
-	overlay.enter_battle(ui_on_dark_world, battle_enemies, deck_panel, hp_bar, transition_time)
+	overlay.enter_battle(ui_on_dark_world, battle_enemies, deck_panel, hp_bar, transition_time, wanderer)
 	overlay.battle_finished.connect(_on_battle_finished.bind(enemy, overlay))
 	# Only reachable now - enter_battle() is what creates battle_controller
 	# (see Wanderer.bind_to_battle()'s own doc).

@@ -47,6 +47,11 @@ class_name CameraRig
 
 var _target: Node3D
 
+# Set by micro_shake(), consumed and counted down by _apply_shake() -
+# see that method's own doc.
+var _shake_offset: Vector3 = Vector3.ZERO
+var _shake_frames_remaining: int = 0
+
 var _battle_a: Node3D
 var _battle_b: Node3D
 # Last valid battle look target/axis, kept for the exit transition in case
@@ -120,6 +125,29 @@ func _physics_process(delta: float) -> void:
 
 	_place_camera()
 	_update_dof()
+	_apply_shake()
+
+# Called by BattleFeedback on any damage_dealt (see its own doc) - magnitude
+# is BattleFeedback's own max_offset already scaled by that hit's damage,
+# not a tunable of this rig's. Held for exactly 2 physics frames: since
+# _place_camera() fully recomputes camera.global_position from scratch
+# every frame (never incrementally), re-adding this same offset on top of
+# that fresh base for 2 frames reads as a brief snap rather than a
+# compounding drift, and the 3rd frame's own _place_camera() call (with
+# _shake_frames_remaining already at 0) renders with no offset at all.
+func micro_shake(magnitude: float) -> void:
+	if magnitude <= 0.0:
+		return
+	var shake_direction := Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0))
+	shake_direction = shake_direction.normalized() if shake_direction.length() > 0.0001 else Vector2.RIGHT
+	_shake_offset = Vector3(shake_direction.x, shake_direction.y, 0.0) * magnitude
+	_shake_frames_remaining = 2
+
+func _apply_shake() -> void:
+	if _shake_frames_remaining <= 0:
+		return
+	camera.position += _shake_offset
+	_shake_frames_remaining -= 1
 
 # The rig never rotates, so this is a fixed world direction — the follow
 # framing's viewing axis.

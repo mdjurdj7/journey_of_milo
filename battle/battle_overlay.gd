@@ -3,6 +3,7 @@ class_name BattleOverlay
 
 const FLOATING_NUMBER_SCENE_PATH := "res://battle/floating_number.tscn"
 const DECK_PANEL_SCENE_PATH := "res://ui/deck_panel.tscn"
+const CARD_PLAY_SFX_PATH := "res://assets/audio/cards/card_play.wav"
 
 # Bottom-right margin for the discard panel - mirrors the field HUD's own
 # persistent DeckPanel, which sits at this same margin bottom-LEFT (see
@@ -16,6 +17,11 @@ enum Outcome { WIN, LOSE, ESCAPE }
 signal battle_finished(outcome: Outcome)
 
 @export var enemy_head_height: float = 1.8
+# Every card's own shared "played" cue (see _on_card_played()) - fires the
+# instant a card commits to play, independent of that card's own
+# impact_time delay (that's Wanderer's slash sound, not this). Not a
+# per-card override; every card uses this same one today.
+@export var card_play_volume_db: float = -6.0
 
 @onready var end_turn_button: Button = $EndTurnButton
 @onready var hand_container: HandContainer = $HandContainer
@@ -30,6 +36,7 @@ var battle_controller: BattleController
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
 var _field_hp_bar: HPBar = null
 var _battle_transition_time: float = 0.0
+var _card_play_player: AudioStreamPlayer = null
 
 func _ready() -> void:
 	# RegionField freezes itself (and, by inheritance, this whole overlay -
@@ -71,8 +78,12 @@ func _ready() -> void:
 # hands to Wanderer.enter_battle_stance()) - passed through to HPBar/
 # EnemyStatus's own enter_battle() so their field->battle style tween
 # (see HPBar._battle_blend's own doc) takes exactly as long as the camera
-# swing/stance step, rather than an unrelated separate duration.
-func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck_panel: DeckPanel, field_hp_bar: HPBar, battle_transition_time: float) -> void:
+# swing/stance step, rather than an unrelated separate duration. wanderer
+# is the same Wanderer region_field.gd already has in scope - handed to
+# BattleController (clip-length lookups for its own impact-delay timing)
+# and BattleFeedback (the actor its own reactions apply to for an enemy
+# attack) rather than either re-finding it on its own.
+func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck_panel: DeckPanel, field_hp_bar: HPBar, battle_transition_time: float, wanderer: Wanderer) -> void:
 	if theme is BattleTheme:
 		(theme as BattleTheme).apply_value_set(on_dark_world)
 
@@ -98,7 +109,12 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.damage_dealt.connect(_on_damage_dealt)
 	battle_controller.battle_won.connect(func() -> void: _finish_battle(Outcome.WIN))
 	battle_controller.battle_lost.connect(func() -> void: _finish_battle(Outcome.LOSE))
-	battle_controller.setup(hand_container, enemy_list)
+	battle_controller.setup(hand_container, enemy_list, wanderer)
+
+	var battle_feedback := BattleFeedback.new()
+	add_child(battle_feedback)
+	battle_feedback.setup(wanderer, on_dark_world)
+	battle_controller.damage_dealt.connect(battle_feedback.on_damage_dealt)
 
 	field_deck_panel.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DRAW)
 	_create_discard_panel(field_deck_panel)
@@ -106,6 +122,12 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	var target_line := TargetLine.new()
 	add_child(target_line)
 	target_line.setup(battle_controller)
+
+	_card_play_player = AudioStreamPlayer.new()
+	add_child(_card_play_player)
+	_card_play_player.stream = load(CARD_PLAY_SFX_PATH) as AudioStream
+	if _card_play_player.stream == null:
+		push_warning("BattleOverlay: card-play SFX failed to load (%s); card-play audio disabled." % CARD_PLAY_SFX_PATH)
 
 	end_turn_button.pressed.connect(func() -> void: battle_controller.end_turn())
 
@@ -170,6 +192,9 @@ func _on_target_cancelled() -> void:
 
 func _on_card_played(_card: CardData, _target: FieldEnemy) -> void:
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+	if _card_play_player != null and _card_play_player.stream != null:
+		_card_play_player.volume_db = card_play_volume_db
+		_card_play_player.play()
 
 func _on_toll_changed(new_toll: int) -> void:
 	_field_hp_bar.update_toll(new_toll)

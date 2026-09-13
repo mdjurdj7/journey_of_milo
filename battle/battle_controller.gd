@@ -3,6 +3,13 @@ class_name BattleController
 
 # --- View-facing input/targeting signals (unchanged from the previous pass) ---
 signal card_played(card: CardData, target: FieldEnemy)
+# Fires once _resolve_play()'s own impact delay has elapsed - the instant
+# the swing (or, with no battle_animation, the play itself) actually
+# lands - for feedback that cares about the moment of impact but not the
+# damage numbers themselves (see Wanderer._on_card_impact(), the slash
+# sound). damage_dealt below already fires at this same moment for
+# anything that does care about the numbers.
+signal card_impact(card: CardData)
 signal hand_changed()
 signal target_requested(card: CardData)
 signal target_cancelled()
@@ -35,10 +42,20 @@ var _pending_card_view: CardView = null
 var _hovered_enemy: FieldEnemy = null
 var _combatants: Dictionary = {} # FieldEnemy -> Combatant
 var _effect_resolver := EffectResolver.new()
+# Read-only from here on: the Wanderer whose clip lengths _impact_delay_
+# for() clamps against, and whose play_attack_snap() timing _run_enemy_
+# turn() awaits. Set once, in setup().
+var _wanderer: Wanderer = null
+# True from the moment a card commits to playing (or a turn ends) until
+# its own impact/enemy-turn delay has fully resolved - request_play() and
+# end_turn() both refuse to start anything new while this is true, so a
+# second card/turn can never be armed mid-swing.
+var _input_locked: bool = false
 
-func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy]) -> void:
+func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wanderer: Wanderer) -> void:
 	_hand_container = hand_container
 	enemies = enemy_list
+	_wanderer = wanderer
 
 	player = Combatant.new(RunState.player_max_hp)
 	player.hp = RunState.player_hp
@@ -86,7 +103,7 @@ func get_hovered_enemy() -> FieldEnemy:
 	return _hovered_enemy
 
 func request_play(card_view: CardView) -> void:
-	if _pending_card_view != null or card_view.card_data == null:
+	if _input_locked or _pending_card_view != null or card_view.card_data == null:
 		return
 	var card: CardData = card_view.card_data
 	if card.cost > player.energy:
@@ -115,15 +132,41 @@ func cancel_target() -> void:
 	target_cancelled.emit()
 
 func end_turn() -> void:
+	if _input_locked:
+		return
+	_input_locked = true
 	_hand_container.discard_hand()
 	player.rally_pool = 0
-	_run_enemy_turn()
+	await _run_enemy_turn()
+	_input_locked = false
 	if not _check_battle_end():
 		_start_player_turn()
 
+# card_played fires first (so the swing/fly-out animation starts
+# immediately), then this awaits the card's own impact delay - min(card.
+# impact_time, the clip's real length so a shorter clip still fires at
+# its own end) - before resolving a single effect, 0 with no battle_
+# animation at all. Every existing consumer of the signals below
+# (damage_dealt, hp_changed, enemy_hp_changed, RunState.lose_hp, the
+# floating number, HP bars) already reacts to whichever of them fires
+# once resolve_card() actually runs, so all of that lands in sync with
+# the swing with no rewiring - only the wait moved. _input_locked (set
+# by the caller path this always runs on) keeps a second card from being
+# armed while this is in flight.
 func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	var card: CardData = card_view.card_data
 	player.energy -= card.cost
+	_input_locked = true
+
+	RunLogger.log_card_played(card.card_name)
+	card_played.emit(card, target_enemy)
+	_hand_container.play_card(card, _screen_pos_for(target_enemy))
+
+	var delay := _impact_delay_for(card)
+	if delay > 0.0:
+		await get_tree().create_timer(delay).timeout
+
+	card_impact.emit(card)
 
 	var ctx := EffectContext.new()
 	ctx.player = player
@@ -135,17 +178,29 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
 		_report_damage("player", target_combatant, amount, kind)
 
-	RunLogger.log_card_played(card.card_name)
 	_effect_resolver.resolve_card(card, ctx)
 	cards_played_this_turn += 1
 
 	toll_changed.emit(player.toll)
 	status_changed.emit()
 
-	card_played.emit(card, target_enemy)
-	_hand_container.play_card(card, _screen_pos_for(target_enemy))
-
+	_input_locked = false
 	_check_battle_end()
+
+# CardData.impact_time's own clamp: a clip shorter than the authored
+# impact_time fires at the clip's own end instead of after it's already
+# finished. _wanderer is only used to look up that length - if it's ever
+# unset, the authored impact_time is used unclamped rather than dropped
+# to 0.
+func _impact_delay_for(card: CardData) -> float:
+	if card.battle_animation == &"":
+		return 0.0
+	var delay: float = card.impact_time
+	if _wanderer != null:
+		var clip_length: float = _wanderer.get_clip_length(card.battle_animation)
+		if clip_length > 0.0:
+			delay = minf(delay, clip_length)
+	return delay
 
 func _on_play_animation_finished(card: CardData) -> void:
 	match card.removal_scope:
@@ -154,6 +209,16 @@ func _on_play_animation_finished(card: CardData) -> void:
 		_:
 			deck.exhaust(card)
 
+# Same shape as _resolve_play()'s own await: EnemyTurn.take_turn() has
+# already mutated combatant/player HP synchronously by the time this
+# awaits anything (rules stay instant), but the report - and everything
+# that reacts to it - waits for enemy.play_attack_snap()'s own return
+# value, the point in its forward lunge that counts as "landed". Creatures
+# have no clips to sync to (see FieldEnemy.play_attack_snap()'s own doc),
+# so that snap is this loop's equivalent of a card's battle_animation.
+# Runs regardless of whether the attack actually did any damage (a fully
+# blocked attack still visibly lunges), the report itself only fires with
+# damage_to_hp > 0, same as before.
 func _run_enemy_turn() -> void:
 	for enemy in enemies:
 		var combatant: Combatant = _combatants.get(enemy)
@@ -163,9 +228,13 @@ func _run_enemy_turn() -> void:
 		if data == null:
 			continue
 		var result := EnemyTurn.take_turn(combatant, data, player)
-		if result["attacked"] and result["damage_to_hp"] > 0:
-			RunLogger.log_damage_taken(result["damage_to_hp"])
-			_report_damage(enemy, player, result["damage_to_hp"], "attack")
+		if result["attacked"]:
+			var snap_delay: float = enemy.play_attack_snap(_wanderer)
+			if snap_delay > 0.0:
+				await get_tree().create_timer(snap_delay).timeout
+			if result["damage_to_hp"] > 0:
+				RunLogger.log_damage_taken(result["damage_to_hp"])
+				_report_damage(enemy, player, result["damage_to_hp"], "attack")
 		status_changed.emit()
 		if player.hp <= 0:
 			break
