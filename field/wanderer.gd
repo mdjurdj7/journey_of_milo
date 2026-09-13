@@ -8,6 +8,15 @@ const BATTLE_IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_id
 const DRAW_SWORD_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_start_draw_sword.fbx"
 const ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/wanderer_albedo.png"
 const FLAT_SHADER_PATH := "res://field/wanderer_flat.gdshader"
+# NOTE: the file on disk is named "sword_albedo.fbx" - it's the sword
+# mesh itself (Meshy's own export naming), not a texture. There is no
+# separate sword_albedo.png; the FBX imports with materials/extract=0 and
+# no embedded image was extracted, so _build_textured_material()/_build_
+# posterized_material() below will fail to load this and fall back to the
+# flat charcoal material (with a push_warning) until a real texture
+# exists at this path.
+const SWORD_SCENE_PATH := "res://assets/models/wanderer/sword_albedo.fbx"
+const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.png"
 
 @export var move_speed: float = 4.5
 @export var acceleration: float = 14.0
@@ -83,6 +92,8 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 		shading_mode = value
 		if _model != null:
 			_apply_model_material(_model)
+		if _sword_root != null:
+			_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH)
 
 # Mirrors wanderer_flat.gdshader's own uniforms one-to-one - see that
 # file's own doc for what each does. Only used when shading_mode is
@@ -94,6 +105,73 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 @export var tone_dark: Color = Color(0.125, 0.12, 0.115, 1)
 @export var tone_mid: Color = Color(0.205, 0.195, 0.185, 1)
 @export var tone_light: Color = Color(0.31, 0.295, 0.28, 1)
+
+@export_group("Sword")
+# Uniform scale is derived from this / the sword model's own raw AABB
+# longest axis (see _setup_sword()) - same "measure raw, then derive a
+# factor" approach _scale_and_ground_model() uses for the body.
+@export var sword_length: float = 1.3
+
+# Where _sword_root's own origin sits along the blade's detected long
+# axis, as a fraction from the tip - 0.82 is "just below the guard" for a
+# typical sword's blade:hilt proportions. Both mounts then position this
+# grip point, not the mesh's own (arbitrary) authored origin. See
+# _apply_grip_offset().
+@export_range(0.0, 1.0) var grip_fraction: float = 0.82:
+	set(value):
+		grip_fraction = value
+		_apply_grip_offset()
+# Which end of the detected axis is the tip is a guess - true assumes the
+# lower local coordinate is the tip, false (default) assumes the higher
+# one is. Flip live if the grip lands at the wrong end (i.e. near the
+# point instead of the guard).
+@export var grip_axis_flip: bool = false:
+	set(value):
+		grip_axis_flip = value
+		_apply_grip_offset()
+
+# Bone names may be sanitized on import (see LegSpreadCorrectionModifier's
+# own doc) - resolved by suffix match against the skeleton, same as
+# everywhere else in this project that reads Mixamo bone names.
+@export var back_mount_bone_suffix: String = "Spine2":
+	set(value):
+		back_mount_bone_suffix = value
+		_update_mount_bone(true)
+@export var hand_mount_bone_suffix: String = "RightHand":
+	set(value):
+		hand_mount_bone_suffix = value
+		_update_mount_bone(false)
+
+# All four offsets below are untested first guesses (this project's own
+# "never run the game" rule means they can't be checked here) - meant to
+# be tuned live from the Remote tab against an actual running instance,
+# which is exactly why each has a live-reapplying setter rather than only
+# taking effect once at _ready(). The two positions are in WORLD metres
+# (not the attachment's own local space, which is the model's unscaled
+# bone space - the source model is ~0.019m tall, so a raw 0.14 offset
+# there would place the sword ~13m away): _world_offset_to_local() divides
+# by _model_scale_factor before writing _sword_root.position. Rotations
+# are unaffected by that scale, so they're applied as given.
+@export var back_mount_position: Vector3 = Vector3(0.0, 0.15, -0.18):
+	set(value):
+		back_mount_position = value
+		if _sword_root != null and _sword_root.get_parent() == _back_attachment:
+			_sword_root.position = _world_offset_to_local(value)
+@export var back_mount_rotation_degrees: Vector3 = Vector3(15.0, -100.0, 80.0):
+	set(value):
+		back_mount_rotation_degrees = value
+		if _sword_root != null and _sword_root.get_parent() == _back_attachment:
+			_sword_root.rotation_degrees = value
+@export var hand_mount_position: Vector3 = Vector3(0.0, 0.0, 0.0):
+	set(value):
+		hand_mount_position = value
+		if _sword_root != null and _sword_root.get_parent() == _hand_attachment:
+			_sword_root.position = _world_offset_to_local(value)
+@export var hand_mount_rotation_degrees: Vector3 = Vector3(0.0, 0.0, 0.0):
+	set(value):
+		hand_mount_rotation_degrees = value
+		if _sword_root != null and _sword_root.get_parent() == _hand_attachment:
+			_sword_root.rotation_degrees = value
 
 var _model: Node3D = null
 var _animation_player: AnimationPlayer
@@ -109,6 +187,20 @@ var _dash_direction: Vector3 = Vector3.ZERO
 var _grounding_skeleton: Skeleton3D = null
 var _grounding_bone_indices: Array[int] = []
 var _leg_spread_modifier: LegSpreadCorrectionModifier = null
+
+# The uniform scale _scale_and_ground_model() applied to the model, set
+# once there - _setup_sword() has to divide its own scale factor by this,
+# since the sword sits under a BoneAttachment3D that's a descendant of
+# the (hugely up-scaled) model and inherits its scale on top of whatever
+# the sword's own node.scale is set to.
+var _model_scale_factor: float = 1.0
+
+var _sword_skeleton: Skeleton3D = null
+var _sword_root: Node3D = null
+var _sword_mesh_holder: Node3D = null
+var _sword_raw_aabb: AABB = AABB()
+var _back_attachment: BoneAttachment3D = null
+var _hand_attachment: BoneAttachment3D = null
 
 func _ready() -> void:
 	_camera = get_node_or_null(camera_path) as Camera3D
@@ -148,6 +240,7 @@ func _ready() -> void:
 
 	_find_grounding_bones(model)
 	_setup_leg_spread_correction(model)
+	_setup_sword(model)
 
 	var contact_shadow := ContactShadow.new()
 	contact_shadow.name = "ContactShadow"
@@ -173,13 +266,16 @@ func _ready() -> void:
 # missing/not-yet-imported asset degrades to a solid color instead of an
 # invisible or shaderless model. Re-run whenever shading_mode's setter
 # fires, so this always reflects the current mode - not just at _ready().
-func _apply_model_material(model: Node3D) -> void:
+# texture_path defaults to the body's own albedo; _setup_sword() and the
+# shading_mode setter both pass SWORD_ALBEDO_TEXTURE_PATH explicitly to
+# apply the same mode to the sword.
+func _apply_model_material(model: Node3D, texture_path: String = ALBEDO_TEXTURE_PATH) -> void:
 	var material: Material = null
 	match shading_mode:
 		ShadingMode.TEXTURED:
-			material = _build_textured_material()
+			material = _build_textured_material(texture_path)
 		ShadingMode.POSTERIZED:
-			material = _build_posterized_material()
+			material = _build_posterized_material(texture_path)
 		ShadingMode.FLAT:
 			material = null
 	if material == null:
@@ -191,10 +287,10 @@ func _apply_model_material(model: Node3D) -> void:
 
 # Meshy's own painted colors, no posterizing - same "roughness 1,
 # specular 0" shape every other Wanderer/FieldEnemy material already uses.
-func _build_textured_material() -> StandardMaterial3D:
-	var texture := load(ALBEDO_TEXTURE_PATH) as Texture2D
+func _build_textured_material(texture_path: String) -> StandardMaterial3D:
+	var texture := load(texture_path) as Texture2D
 	if texture == null:
-		push_warning("Wanderer: albedo texture failed to load (%s); using the flat charcoal fallback material." % ALBEDO_TEXTURE_PATH)
+		push_warning("Wanderer: albedo texture failed to load (%s); using the flat charcoal fallback material." % texture_path)
 		return null
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = texture
@@ -202,10 +298,10 @@ func _build_textured_material() -> StandardMaterial3D:
 	material.metallic_specular = 0.0
 	return material
 
-func _build_posterized_material() -> ShaderMaterial:
-	var texture := load(ALBEDO_TEXTURE_PATH) as Texture2D
+func _build_posterized_material(texture_path: String) -> ShaderMaterial:
+	var texture := load(texture_path) as Texture2D
 	if texture == null:
-		push_warning("Wanderer: albedo texture failed to load (%s); using the flat charcoal fallback material." % ALBEDO_TEXTURE_PATH)
+		push_warning("Wanderer: albedo texture failed to load (%s); using the flat charcoal fallback material." % texture_path)
 		return null
 	var shader := load(FLAT_SHADER_PATH) as Shader
 	if shader == null:
@@ -218,7 +314,7 @@ func _build_posterized_material() -> ShaderMaterial:
 	material.set_shader_parameter("tone_dark", tone_dark)
 	material.set_shader_parameter("tone_mid", tone_mid)
 	material.set_shader_parameter("tone_light", tone_light)
-	print("Wanderer: applied posterized material - texture=%s tone_count=%d tone_dark=%s tone_mid=%s tone_light=%s" % [ALBEDO_TEXTURE_PATH, tone_count, tone_dark, tone_mid, tone_light])
+	print("Wanderer: applied posterized material - texture=%s tone_count=%d tone_dark=%s tone_mid=%s tone_light=%s" % [texture_path, tone_count, tone_dark, tone_mid, tone_light])
 	return material
 
 # The source model ships at whatever raw scale its file happens to use
@@ -257,6 +353,7 @@ func _scale_and_ground_model(model: Node3D) -> void:
 
 	model.scale = Vector3.ONE * scale_factor
 	model.position.y += -combined_aabb.position.y * scale_factor
+	_model_scale_factor = scale_factor
 
 # Finds the skeleton and the lowest-contact bone indices once, at
 # startup - cached into _grounding_skeleton/_grounding_bone_indices so the
@@ -308,6 +405,216 @@ func _setup_leg_spread_correction(model: Node3D) -> void:
 	_leg_spread_modifier.name = "LegSpreadCorrection"
 	_leg_spread_modifier.correction_degrees = leg_spread_correction_degrees
 	skeleton.add_child(_leg_spread_modifier)
+
+func _find_bone_by_suffix(skeleton: Skeleton3D, suffix: String) -> int:
+	for bone_idx in skeleton.get_bone_count():
+		if skeleton.get_bone_name(bone_idx).ends_with(suffix):
+			return bone_idx
+	return -1
+
+# back_mount_position/hand_mount_position are exported in world metres;
+# _sword_root's own position is read in its parent BoneAttachment3D's
+# local space, which is the model's unscaled bone space (inheriting the
+# model's own up-scale via _model_scale_factor) - dividing converts a
+# world-metre offset into that local space.
+func _world_offset_to_local(world_offset: Vector3) -> Vector3:
+	if _model_scale_factor <= 0.0001:
+		return world_offset
+	return world_offset / _model_scale_factor
+
+# Builds two BoneAttachment3D children of the skeleton (one per mount),
+# loads and scales the sword once, and parks it on the back mount to
+# start. enter_battle_stance()/exit_battle_stance() move it between the
+# two via _switch_sword_mount() - the attachments themselves never move
+# once created; only which one currently parents _sword_root changes.
+func _setup_sword(model: Node3D) -> void:
+	var skeletons := model.find_children("*", "Skeleton3D", true, false)
+	_sword_skeleton = skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
+	if _sword_skeleton == null:
+		push_warning("Wanderer: no Skeleton3D found under model; sword mount disabled.")
+		return
+
+	var back_bone_idx := _find_bone_by_suffix(_sword_skeleton, back_mount_bone_suffix)
+	var hand_bone_idx := _find_bone_by_suffix(_sword_skeleton, hand_mount_bone_suffix)
+	if back_bone_idx == -1:
+		push_warning("Wanderer: no bone ending in '%s' found for back_mount; sword mount disabled." % back_mount_bone_suffix)
+		return
+	if hand_bone_idx == -1:
+		push_warning("Wanderer: no bone ending in '%s' found for hand_mount; sword mount disabled." % hand_mount_bone_suffix)
+		return
+
+	_back_attachment = BoneAttachment3D.new()
+	_back_attachment.name = "SwordBackMount"
+	_sword_skeleton.add_child(_back_attachment)
+	_back_attachment.bone_name = _sword_skeleton.get_bone_name(back_bone_idx)
+
+	_hand_attachment = BoneAttachment3D.new()
+	_hand_attachment.name = "SwordHandMount"
+	_sword_skeleton.add_child(_hand_attachment)
+	_hand_attachment.bone_name = _sword_skeleton.get_bone_name(hand_bone_idx)
+
+	var sword_scene := load(SWORD_SCENE_PATH) as PackedScene
+	if sword_scene == null:
+		push_warning("Wanderer: sword scene failed to load (%s); sword mount disabled." % SWORD_SCENE_PATH)
+		return
+	var sword_mesh_holder := sword_scene.instantiate() as Node3D
+	if sword_mesh_holder == null:
+		push_warning("Wanderer: sword scene root (%s) is not a Node3D; sword mount disabled." % SWORD_SCENE_PATH)
+		return
+
+	# _sword_root is the node mounts actually position/scale/rotate - its
+	# origin is the grip (see _apply_grip_offset()), not wherever the
+	# loaded scene's own origin happens to be. _sword_mesh_holder is the
+	# loaded scene itself, offset inside _sword_root so the grip point
+	# lands at _sword_root's origin regardless of _sword_root's own scale.
+	_sword_root = Node3D.new()
+	_sword_root.name = "SwordRoot"
+	_back_attachment.add_child(_sword_root)
+
+	_sword_mesh_holder = sword_mesh_holder
+	_sword_mesh_holder.name = "SwordMesh"
+	_sword_root.add_child(_sword_mesh_holder)
+
+	# Same "add to tree at scale 1, measure via global_transform, then
+	# scale" technique _scale_and_ground_model() uses for the body - the
+	# AABB has to come from meshes already in the tree for global_transform
+	# to be meaningful. Measured against _sword_mesh_holder (not
+	# _sword_root), since _sword_root's own position/scale are about to be
+	# set below and would otherwise contaminate this reading.
+	var combined_aabb: AABB
+	var has_aabb := false
+	for mesh_instance in _sword_mesh_holder.find_children("*", "MeshInstance3D", true, false):
+		var mi := mesh_instance as MeshInstance3D
+		var mi_transform_in_sword: Transform3D = _sword_mesh_holder.global_transform.affine_inverse() * mi.global_transform
+		var mi_aabb_in_sword: AABB = mi_transform_in_sword * mi.get_aabb()
+		combined_aabb = mi_aabb_in_sword if not has_aabb else combined_aabb.merge(mi_aabb_in_sword)
+		has_aabb = true
+	if not has_aabb:
+		push_warning("Wanderer: sword model has no MeshInstance3D children; sword mount disabled.")
+		_sword_root.queue_free()
+		_sword_root = null
+		_sword_mesh_holder = null
+		return
+
+	print("Wanderer: sword AABB (pre-scale) = %s" % combined_aabb)
+	_sword_raw_aabb = combined_aabb
+
+	var axis := _longest_axis_index(combined_aabb.size)
+	var longest_axis: float = combined_aabb.size[axis]
+	var local_scale_factor := 1.0
+	if longest_axis <= 0.0001:
+		push_warning("Wanderer: sword AABB longest axis is ~0 (%f); leaving scale at 1.0." % longest_axis)
+	else:
+		local_scale_factor = sword_length / longest_axis
+
+	# _sword_root sits under _back_attachment, a child of the model's own
+	# Skeleton3D - it inherits the model's whole up-scale (model_scale_
+	# factor, easily 50-100x since the source model ships at ~0.019m tall)
+	# on top of whatever _sword_root.scale is set to here. Dividing it back
+	# out is what makes the sword's actual WORLD length come out to
+	# sword_length instead of sword_length * model_scale_factor.
+	var world_scale_factor := local_scale_factor
+	if _model_scale_factor > 0.0001:
+		world_scale_factor = local_scale_factor / _model_scale_factor
+	else:
+		push_warning("Wanderer: _model_scale_factor is ~0 (%f); sword scale not compensated." % _model_scale_factor)
+	_sword_root.scale = Vector3.ONE * world_scale_factor
+
+	_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH)
+
+	_apply_grip_offset()
+
+	_sword_root.position = _world_offset_to_local(back_mount_position)
+	_sword_root.rotation_degrees = back_mount_rotation_degrees
+
+	# Final sanity check, in world space (i.e. through the whole model-
+	# scale + sword-scale chain), to confirm the compensation above
+	# actually landed the sword at sword_length rather than still being
+	# off by model_scale_factor.
+	var world_aabb: AABB
+	var has_world_aabb := false
+	for mesh_instance in _sword_root.find_children("*", "MeshInstance3D", true, false):
+		var mi := mesh_instance as MeshInstance3D
+		var mi_aabb_world: AABB = mi.global_transform * mi.get_aabb()
+		world_aabb = mi_aabb_world if not has_world_aabb else world_aabb.merge(mi_aabb_world)
+		has_world_aabb = true
+	if has_world_aabb:
+		print("Wanderer: sword final world-space AABB height = %f" % world_aabb.size.y)
+
+func _longest_axis_index(size: Vector3) -> int:
+	var axis := 0
+	if size[1] > size[axis]:
+		axis = 1
+	if size[2] > size[axis]:
+		axis = 2
+	return axis
+
+# Offsets _sword_mesh_holder inside _sword_root so the grip - at
+# grip_fraction along the detected long axis, measured from the tip -
+# sits at _sword_root's own origin (the point both mounts actually
+# position). Off the other two axes, the pivot is centered on the AABB
+# rather than at a corner. Which end of the axis IS the tip is a guess
+# (grip_axis_flip) since this project's "never run the game" rule means
+# it can't be checked here - flip it live if the grip lands at the wrong
+# end. No-op until _setup_sword() has populated _sword_mesh_holder/
+# _sword_raw_aabb.
+func _apply_grip_offset() -> void:
+	if _sword_mesh_holder == null:
+		return
+
+	var axis := _longest_axis_index(_sword_raw_aabb.size)
+	var min_val: float = _sword_raw_aabb.position[axis]
+	var max_val: float = min_val + _sword_raw_aabb.size[axis]
+	var tip_val: float = min_val if grip_axis_flip else max_val
+	var butt_val: float = max_val if grip_axis_flip else min_val
+	var grip_val: float = lerpf(tip_val, butt_val, grip_fraction)
+
+	var grip_local: Vector3 = _sword_raw_aabb.position + _sword_raw_aabb.size * 0.5
+	grip_local[axis] = grip_val
+
+	_sword_mesh_holder.position = -grip_local
+
+# Re-resolves one mount's bone (is_back true for back_mount_bone_suffix,
+# false for hand_mount_bone_suffix) against the already-found skeleton and
+# repoints that BoneAttachment3D's own bone_name - lets the suffix export
+# be retuned live from the Remote tab without a re-run, same as every
+# other tunable here.
+func _update_mount_bone(is_back: bool) -> void:
+	if _sword_skeleton == null:
+		return
+	var attachment: BoneAttachment3D = _back_attachment if is_back else _hand_attachment
+	if attachment == null:
+		return
+	var suffix: String = back_mount_bone_suffix if is_back else hand_mount_bone_suffix
+	var bone_idx := _find_bone_by_suffix(_sword_skeleton, suffix)
+	if bone_idx == -1:
+		push_warning("Wanderer: no bone ending in '%s' found; mount bone unchanged." % suffix)
+		return
+	attachment.bone_name = _sword_skeleton.get_bone_name(bone_idx)
+
+# Reparents _sword_root onto target_attachment (a no-op if it's already
+# there) and tweens its local position/rotation to the target mount's
+# offsets over duration, so the switch reads as the sword sliding into
+# place rather than popping - matches enter_battle_stance's own movement
+# tween shape (parallel, sine in-out) so both read as one motion.
+# target_position_world is in world metres (see back_mount_position's own
+# doc) - converted to _sword_root's local space before the tween.
+func _switch_sword_mount(target_attachment: BoneAttachment3D, target_position_world: Vector3, target_rotation_degrees: Vector3, duration: float) -> void:
+	if _sword_root == null or target_attachment == null:
+		return
+
+	var current_parent := _sword_root.get_parent()
+	if current_parent != target_attachment:
+		if current_parent != null:
+			current_parent.remove_child(_sword_root)
+		target_attachment.add_child(_sword_root)
+
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_parallel(true)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(_sword_root, "position", _world_offset_to_local(target_position_world), duration)
+	tween.tween_property(_sword_root, "rotation_degrees", target_rotation_degrees, duration)
 
 # The float this replaces was per-clip: grounding measured once, on
 # Idle, doesn't hold once a battle clip (a different hips height) takes
@@ -704,6 +1011,8 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float) -> voi
 		_animation_player.play("DrawSword", animation_blend_time)
 		_animation_player.queue("BattleIdle")
 
+	_switch_sword_mount(_hand_attachment, hand_mount_position, hand_mount_rotation_degrees, duration)
+
 # Called by region_field.gd once the battle overlay resolves (win, lose,
 # or escape) - blends back from BattleIdle to the normal field Idle.
 # _physics_process's own Idle/Walk switching only fires on movement input,
@@ -713,6 +1022,8 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float) -> voi
 func exit_battle_stance() -> void:
 	if _animation_player:
 		_animation_player.play("Idle", animation_blend_time)
+
+	_switch_sword_mount(_back_attachment, back_mount_position, back_mount_rotation_degrees, animation_blend_time)
 
 func _physics_process(delta: float) -> void:
 	_apply_continuous_foot_grounding(delta)
