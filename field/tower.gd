@@ -4,7 +4,6 @@ extends MeshInstance3D
 @export var height: float = 150.0
 @export var base_radius: float = 9.0
 @export var top_radius: float = 2.0
-@export var distance_along_walk: float = 380.0
 
 func _ready() -> void:
 	var cylinder := CylinderMesh.new()
@@ -19,7 +18,15 @@ func _ready() -> void:
 	cylinder.material = material
 
 	mesh = cylinder
-	position = Vector3(0.0, height / 2.0, -distance_along_walk)
+	# Position is baked into this node's own transform in region_field.tscn,
+	# not set here - Ground._apply_water_line_uniforms() calls RegionField.
+	# get_forward() from Ground's own _ready(), which (Ground being an
+	# earlier sibling than Tower) runs before Tower's _ready() could apply
+	# a script-computed offset. get_forward()'s spawn->Tower vector would
+	# see Tower still at its scene-default (0,0,0), read zero length, and
+	# permanently cache the -Z fallback. Baking the position into the node
+	# transform instead makes it correct from the moment the scene loads -
+	# before any node's _ready() runs at all.
 	# A distant silhouette, not something the player stands near - its huge
 	# size (150m tall) was eating the directional shadow's depth precision
 	# for every other, much smaller caster in the scene. No shadow needed.

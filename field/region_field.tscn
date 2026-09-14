@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" path="res://ui/deck_panel.tscn" id="13"]
 [ext_resource type="Theme" path="res://ui/battle_theme.tres" id="14"]
 [ext_resource type="PackedScene" path="res://ui/hp_bar.tscn" id="15"]
+[ext_resource type="PackedScene" path="res://field/exit_gate.tscn" id="16"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -169,6 +170,7 @@ wetness_scale = 8.0
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=236499926]
 
 [node name="Tower" type="MeshInstance3D" parent="." unique_id=1954687032]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 75, -380)
 script = ExtResource("5")
 
 [node name="Wanderer" type="CharacterBody3D" parent="." unique_id=577093166 groups=["wanderer"]]
@@ -200,10 +202,12 @@ fov = 38.0
 [node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=1648467848]
 
 [node name="FieldEnemy" parent="." unique_id=677119585 instance=ExtResource("8")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -10)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6)
 enemy_id = &"sputter"
 enemy_data = ExtResource("10")
 model_yaw_offset = 180.0
+
+[node name="ExitGate" parent="." instance=ExtResource("16")]
 
 [node name="Sea" type="MeshInstance3D" parent="." unique_id=1533217746]
 script = ExtResource("9")

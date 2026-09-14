@@ -1,0 +1,26 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://field/exit_gate.gd" id="1"]
+
+[node name="ExitGate" type="Node3D"]
+script = ExtResource("1")
+
+[node name="LeftBlock" type="MeshInstance3D" parent="."]
+
+[node name="RightBlock" type="MeshInstance3D" parent="."]
+
+[node name="Strip" type="MeshInstance3D" parent="."]
+
+[node name="Bar" type="MeshInstance3D" parent="."]
+
+[node name="Blocker" type="StaticBody3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="Blocker"]
+
+[node name="TriggerArea" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="TriggerArea"]
+
+[node name="BlockContactArea" type="Area3D" parent="."]
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="BlockContactArea"]

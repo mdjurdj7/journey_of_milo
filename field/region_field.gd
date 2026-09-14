@@ -6,6 +6,10 @@ const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 
+# Floor-exit prototype. Emitted once, when the last "enemies"-group member
+# is defeated - see _on_battle_finished()'s own WIN branch.
+signal floor_cleared
+
 @export var escape_push_distance: float = 4.0
 
 # Playable boundary, centered on origin. X = width (left/right side
@@ -29,6 +33,14 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 @export var tower_path: NodePath = ^"Tower"
 @export var camera_rig_path: NodePath = ^"CameraPivot"
 @export var directional_light_path: NodePath = ^"DirectionalLight3D"
+@export var exit_gate_path: NodePath = ^"ExitGate"
+# Distance beyond the (currently sole) enemy's own position, along
+# get_forward() - see _setup_exit_gate()'s own doc. 4.0 pairs with the
+# enemy's own authored distance (6.0, see region_field.tscn's FieldEnemy
+# transform) to land the gate's own line at 10.0 from spawn - 4.0 clear of
+# the inland wall's near face at field_extents.y/2 - wall_thickness/2 = 14.0
+# in this scene's current field_extents/wall_thickness.
+@export var exit_gate_distance_beyond_enemy: float = 4.0
 @export var battle_spacing: float = 3.0
 # Which of BattleTheme's two value sets the overlay applies on entering
 # battle - see ui/battle_theme.gd's own rule: UI is the dark element on a
@@ -44,12 +56,17 @@ var _forward: Vector3 = Vector3.FORWARD
 var _forward_computed: bool = false
 
 func _ready() -> void:
-	# Starts the run once, at game start - the only place this is called
-	# from today (see RunState.new_run()'s own doc: a proper run-start
-	# flow, e.g. a character-select screen, replaces this call site later
-	# without RunState itself needing to change). Must run before anything
-	# below reads RunState.deck.
-	RunState.new_run(load(STARTING_CHARACTER_PATH) as CharacterData)
+	# Starts the run once per game session, seeding HP and the starting
+	# Belongings from RunState.new_run()'s own doc - guarded on character
+	# being unset rather than called unconditionally, because the floor-exit
+	# prototype's own reload_current_scene() (see _on_floor_exited()) re-runs
+	# this same _ready(), and an unconditional call would wipe the run's HP/
+	# deck back to starting values on every floor transition. A proper
+	# run-start flow (e.g. a character-select screen) replaces this call
+	# site later without RunState itself needing to change. Must run before
+	# anything below reads RunState.deck.
+	if RunState.character == null:
+		RunState.new_run(load(STARTING_CHARACTER_PATH) as CharacterData)
 
 	# Ensures forward is computed (and printed) even if no child asked for
 	# it first; a no-op if one already did.
@@ -59,6 +76,7 @@ func _ready() -> void:
 		enemy.contacted.connect(_on_enemy_contacted)
 
 	_reposition_enemies_along_forward()
+	_setup_exit_gate()
 	_setup_field_hud()
 	_build_boundary()
 
@@ -146,6 +164,45 @@ func add_enemy_status(status: EnemyStatus) -> void:
 		return
 	hud.add_child(status)
 
+# Positions and orients the ExitGate along get_forward(), a fixed distance
+# beyond the (currently sole) enemy's own position, then wires it to this
+# field's floor_cleared/floor_exited handshake. Done here rather than in
+# ExitGate's own _ready(): children's _ready() runs before their parent's
+# (see get_forward()'s own doc on the same bottom-up ordering), and both
+# get_forward() and _reposition_enemies_along_forward() only resolve inside
+# THIS _ready() - so an ExitGate trying to position itself would always be
+# a frame too early. Same rotation.y = atan2(-dir.x, -dir.z) convention
+# FieldEnemy._face_shore()/face_toward() already use to align a node's
+# local -Z with a world direction.
+func _setup_exit_gate() -> void:
+	var exit_gate := get_node_or_null(exit_gate_path) as ExitGate
+	if exit_gate == null:
+		push_warning("RegionField: exit_gate_path did not resolve to an ExitGate; no floor exit.")
+		return
+
+	var enemies := get_tree().get_nodes_in_group("enemies")
+	if enemies.is_empty():
+		push_warning("RegionField: no enemies to measure the exit gate's distance from.")
+		return
+	var enemy := enemies[0] as FieldEnemy
+
+	exit_gate.global_position = enemy.global_position + _forward * exit_gate_distance_beyond_enemy
+	exit_gate.rotation.y = atan2(-_forward.x, -_forward.z)
+
+	floor_cleared.connect(exit_gate.open)
+	exit_gate.floor_exited.connect(_on_floor_exited)
+
+# RunState.current_floor_index persists (see RunState.deck's own doc on
+# what survives a battle; this is the same idea across a floor) because
+# reload_current_scene() only re-runs this scene's own _ready(), and
+# RunState is an autoload - it isn't touched by the reload at all. The
+# guarded RunState.new_run() call in _ready() is what actually keeps HP/
+# deck from being wiped alongside it - see that guard's own doc.
+func _on_floor_exited() -> void:
+	RunState.current_floor_index += 1
+	print("RegionField: floor_exited, current_floor_index = %d" % RunState.current_floor_index)
+	get_tree().reload_current_scene()
+
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	process_mode = Node.PROCESS_MODE_DISABLED
 
@@ -191,6 +248,11 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, over
 
 	match outcome:
 		BattleOverlay.Outcome.WIN:
+			# Snapshotted before queue_free() below: queue_free() defers the
+			# actual removal from the "enemies" group to end of frame, so
+			# this enemy would still count itself here either way - taken
+			# before freeing just so that ordering isn't load-bearing.
+			var was_last_enemy: bool = get_tree().get_nodes_in_group("enemies").size() <= 1
 			# enemy_status lives under FieldHUD, not as enemy's own child
 			# (see FieldEnemy.enemy_status's own doc) - freeing enemy alone
 			# would leave it behind as an orphaned, permanently-invisible
@@ -198,6 +260,8 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, over
 			if enemy.enemy_status != null:
 				enemy.enemy_status.queue_free()
 			enemy.queue_free()
+			if was_last_enemy:
+				floor_cleared.emit()
 		BattleOverlay.Outcome.ESCAPE:
 			_push_wanderer_away_from(enemy)
 		BattleOverlay.Outcome.LOSE:
