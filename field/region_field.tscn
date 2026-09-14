@@ -141,7 +141,8 @@ size = Vector3(0.9, 0.7, 0.45)
 
 [node name="RegionField" type="Node3D" unique_id=2096648515]
 script = ExtResource("1")
-field_extents = Vector2(40, 30)
+field_extents = Vector2(20, 30)
+shoreline_wall_margin = 3.0
 battle_spacing = 4.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2022836371]
@@ -213,7 +214,7 @@ model_yaw_offset = 180.0
 script = ExtResource("9")
 sea_color = Color(0.2750388, 0.49996376, 0.5953062, 1)
 sea_level = 0.3
-sea_edge_distance = 12.0
+sea_edge_distance = 6.0
 volume_db_max = -20.0
 
 [node name="BattleLayer" type="CanvasLayer" parent="." unique_id=1908553104]

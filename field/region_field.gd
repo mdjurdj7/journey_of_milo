@@ -305,17 +305,28 @@ func _build_boundary() -> void:
 	var half_width := field_extents.x / 2.0
 	var half_depth := field_extents.y / 2.0
 	var inland_z := half_depth * _forward.z
+	var shoreward_z := _shoreward_wall_z(half_depth)
+	# The side walls/berms span between the two actual end-cap Z positions,
+	# not a symmetric ±field_extents.y/2 - inland_z and shoreward_z aren't
+	# generally symmetric around 0 (see _shoreward_wall_z()'s own doc: the
+	# seaward side is placed from Sea's own edge distance/margin, not
+	# field_extents, and can sit much closer to spawn than the inland side).
+	# Reduces to the old symmetric math exactly when shoreward_z is the
+	# half_depth fallback (Sea absent), so this isn't a behavior change for
+	# that case - just correct once the two sides diverge.
+	var span_center_z := (inland_z + shoreward_z) / 2.0
+	var span_length := absf(shoreward_z - inland_z)
 
 	_add_wall(Vector3(0.0, wall_height / 2.0, inland_z), Vector3(field_extents.x, wall_height, wall_thickness))
-	_add_wall(Vector3(0.0, wall_height / 2.0, _shoreward_wall_z(half_depth)), Vector3(field_extents.x, wall_height, wall_thickness))
-	_add_wall(Vector3(-half_width, wall_height / 2.0, 0.0), Vector3(wall_thickness, wall_height, field_extents.y))
-	_add_wall(Vector3(half_width, wall_height / 2.0, 0.0), Vector3(wall_thickness, wall_height, field_extents.y))
+	_add_wall(Vector3(0.0, wall_height / 2.0, shoreward_z), Vector3(field_extents.x, wall_height, wall_thickness))
+	_add_wall(Vector3(-half_width, wall_height / 2.0, span_center_z), Vector3(wall_thickness, wall_height, span_length))
+	_add_wall(Vector3(half_width, wall_height / 2.0, span_center_z), Vector3(wall_thickness, wall_height, span_length))
 
 	# Berm length is extended by berm_width past the true edge so the two
 	# side berms overlap the inland berm at the corners, with no gap.
 	_add_berm(Vector3(0.0, berm_height / 2.0, inland_z), Vector3(field_extents.x + berm_width, berm_height, berm_width))
-	_add_berm(Vector3(-half_width, berm_height / 2.0, 0.0), Vector3(berm_width, berm_height, field_extents.y + berm_width))
-	_add_berm(Vector3(half_width, berm_height / 2.0, 0.0), Vector3(berm_width, berm_height, field_extents.y + berm_width))
+	_add_berm(Vector3(-half_width, berm_height / 2.0, span_center_z), Vector3(berm_width, berm_height, span_length + berm_width))
+	_add_berm(Vector3(half_width, berm_height / 2.0, span_center_z), Vector3(berm_width, berm_height, span_length + berm_width))
 
 # Pushed shoreline_wall_margin past the sea's near edge (derived from
 # the Wanderer's spawn, get_forward(), and the Sea's own
