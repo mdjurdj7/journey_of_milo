@@ -23,6 +23,10 @@ layout_mode = 0
 mouse_filter = 2
 text = "0/0"
 
+[node name="TollBacking" type="Panel" parent="."]
+layout_mode = 0
+mouse_filter = 2
+
 [node name="TollLabel" type="Label" parent="."]
 layout_mode = 0
 mouse_filter = 2

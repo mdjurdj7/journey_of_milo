@@ -67,6 +67,7 @@ class_name HPBar
 @export var far_scale_distance: float = 12.0
 
 @onready var _numbers_backing: Panel = $NumbersBacking
+@onready var _toll_backing: Panel = $TollBacking
 @onready var _bar_background: Panel = $BarBackground
 @onready var _bar_fill: Panel = $BarBackground/BarFill
 @onready var _numbers_label: Label = $NumbersLabel
@@ -129,13 +130,15 @@ func _blended_numbers_font_size() -> int:
 func _blended_toll_font_size() -> int:
 	return roundi(lerpf(float(toll_font_size_px), float(battle_toll_font_size_px), _battle_blend))
 
-# Bar+numbers only - Toll (when shown) and the numbers backing plate both
-# overflow past this Control's own size without affecting it, so the bar
-# never shifts when Toll appears/disappears. pivot_offset centers scale
-# (see DistanceScale) on the bar's own middle rather than its top-left
-# corner. Re-run on every _battle_blend/_displayed_fraction tween step
-# (see their own doc), not just once - every size in here can be
-# mid-transition at any given moment.
+# Bar+numbers only - Toll and its own backing (when shown) overflow past
+# this Control's own size without affecting it, so the bar never shifts
+# when Toll appears/disappears, and Toll's own presence/width never
+# shifts the numbers or their backing either (each backing is sized to
+# its own label alone - see _update_numbers_backing()/_update_toll_
+# backing()). pivot_offset centers scale (see DistanceScale) on the bar's
+# own middle rather than its top-left corner. Re-run on every _battle_
+# blend/_displayed_fraction tween step (see their own doc), not just
+# once - every size in here can be mid-transition at any given moment.
 func _apply_layout() -> void:
 	var current_bar_size: Vector2 = _blended_bar_size()
 	var numbers_size: int = _blended_numbers_font_size()
@@ -171,27 +174,47 @@ func _apply_layout() -> void:
 	_toll_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_toll_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	_update_backing(current_bar_size, numbers_size, toll_size, numbers_top, numbers_line_height)
+	_update_numbers_backing(current_bar_size, numbers_size, numbers_top, numbers_line_height)
+	_update_toll_backing(current_bar_size.x, toll_size, numbers_top, numbers_line_height)
 
-# Sized to the union of the rendered numbers/Toll text (not a fixed box -
-# both change length as HP/Toll change), plus backing_padding on every
-# side. Alpha scales with _battle_blend directly (0 in the field, backing_
-# alpha in battle) rather than being a separate visible toggle, so it
-# fades in/out with the rest of the battle-style transition.
-func _update_backing(current_bar_size: Vector2, numbers_size: int, toll_size: int, numbers_top: float, numbers_line_height: float) -> void:
+# Sized to the rendered numbers text alone (not a fixed box - it changes
+# length as HP changes), plus backing_padding on every side, centered
+# under the bar the same way the numbers label itself is. Never affected
+# by Toll's own presence/width - see _update_toll_backing() for that
+# separate plate.
+func _update_numbers_backing(current_bar_size: Vector2, numbers_size: int, numbers_top: float, numbers_line_height: float) -> void:
 	var numbers_width: float = _text_width(_numbers_label, numbers_size)
 	var backing_left: float = (current_bar_size.x - numbers_width) / 2.0
-	var backing_right: float = backing_left + numbers_width
-
-	if _toll_label.visible:
-		var toll_width: float = _text_width(_toll_label, toll_size)
-		var toll_left: float = current_bar_size.x + toll_gap
-		backing_right = maxf(backing_right, toll_left + toll_width)
 
 	_numbers_backing.position = Vector2(backing_left - backing_padding.x, numbers_top - backing_padding.y)
-	_numbers_backing.size = Vector2(backing_right - backing_left + backing_padding.x * 2.0, numbers_line_height + backing_padding.y * 2.0)
+	_numbers_backing.size = Vector2(numbers_width + backing_padding.x * 2.0, numbers_line_height + backing_padding.y * 2.0)
 	_numbers_backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_numbers_backing.add_theme_stylebox_override("panel", _build_backing_style())
 
+# Sized to the rendered Toll text alone, positioned behind the Toll label
+# exactly (same top-left offset by backing_padding) - a separate plate
+# from _update_numbers_backing() above, not a shared one that grows to
+# include Toll, so neither element's presence/width ever shifts the
+# other. Hidden outright (not just transparent) whenever the Toll label
+# itself is, matching hide_toll()/show_toll().
+func _update_toll_backing(bar_width: float, toll_size: int, numbers_top: float, numbers_line_height: float) -> void:
+	_toll_backing.visible = _toll_label.visible
+	if not _toll_label.visible:
+		return
+
+	var toll_width: float = _text_width(_toll_label, toll_size)
+	var toll_left: float = bar_width + toll_gap
+
+	_toll_backing.position = Vector2(toll_left - backing_padding.x, numbers_top - backing_padding.y)
+	_toll_backing.size = Vector2(toll_width + backing_padding.x * 2.0, numbers_line_height + backing_padding.y * 2.0)
+	_toll_backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toll_backing.add_theme_stylebox_override("panel", _build_backing_style())
+
+# Shared by both backings (see above) so they can't drift out of sync
+# with each other - alpha scales with _battle_blend directly (0 in the
+# field, backing_alpha in battle) rather than being a separate visible
+# toggle, so it fades in/out with the rest of the battle-style transition.
+func _build_backing_style() -> StyleBoxFlat:
 	var backing_color: Color = get_theme_color("panel_color", "CardFace")
 	backing_color.a = backing_alpha * _battle_blend
 	var style := StyleBoxFlat.new()
@@ -201,7 +224,7 @@ func _update_backing(current_bar_size: Vector2, numbers_size: int, toll_size: in
 	style.corner_radius_bottom_right = backing_corner_radius
 	style.corner_radius_bottom_left = backing_corner_radius
 	style.shadow_size = 0
-	_numbers_backing.add_theme_stylebox_override("panel", style)
+	return style
 
 func _text_width(label: Label, font_size: int) -> float:
 	var font: Font = label.get_theme_font("font")
