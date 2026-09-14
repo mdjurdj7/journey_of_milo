@@ -141,7 +141,7 @@ size = Vector3(0.9, 0.7, 0.45)
 
 [node name="RegionField" type="Node3D" unique_id=2096648515]
 script = ExtResource("1")
-field_extents = Vector2(20, 30)
+field_extents = Vector2(26, 30)
 shoreline_wall_margin = 3.0
 battle_spacing = 4.0
 
