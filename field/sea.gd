@@ -130,8 +130,9 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 # need to resolve the waves at all. Both meshes share one ShaderMaterial,
 # so the outer skirt reading as flat isn't a per-mesh toggle - it falls
 # out naturally from wave_fade_factor() in the shader, which fades
-# displacement to 0 by inner_wave_extent purely as a function of world
-# position, seamlessly at whatever position the two meshes actually meet.
+# displacement to 0 near the actual shoreline (see wave_calm_distance's
+# own doc) purely as a function of world position, seamlessly at whatever
+# position the two meshes actually meet.
 #
 # outer_wave_spacing only coarsens the SKIRT'S OWN DEPTH (Z) subdivision -
 # see _rebuild_wave_meshes(), which deliberately gives the skirt the exact
@@ -144,7 +145,6 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 @export var inner_wave_extent: float = 60.0:
 	set(value):
 		inner_wave_extent = value
-		_apply_uniform("inner_wave_extent", value)
 		_rebuild_if_ready()
 @export var inner_wave_spacing: float = 1.0:
 	set(value):
@@ -154,13 +154,22 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 	set(value):
 		outer_wave_spacing = value
 		_rebuild_if_ready()
-# How many meters before inner_wave_extent the wave amplitude starts
-# easing to 0 - widen this if the inner/outer boundary is visible as a
-# seam; shader-only, no mesh rebuild needed.
-@export var wave_fade_width: float = 25.0:
+
+# How many meters of open water it takes for wave amplitude to build back
+# up to full as the water gets further past the actual shoreline (the same
+# landmass shape ground.gd's wet band/RegionField's wade drain key off, not
+# a fixed world-space line) - 0 right at the shore, full amplitude in open
+# water. Widen this if the near-shore water still reads as too lively;
+# shader-only, no mesh rebuild needed. Replaces the old inner_wave_extent-
+# anchored wave_fade_width, which only ever calmed waves near the single
+# seaward line Sea used to be positioned from - now that Sea covers the
+# whole field (mesh_inland_reach) and the shoreline wraps three sides, a
+# fixed line can't track it; see _push_landmass_uniforms()'s own doc for
+# how the actual shoreline reaches this shader.
+@export var wave_calm_distance: float = 2.0:
 	set(value):
-		wave_fade_width = value
-		_apply_uniform("wave_fade_width", value)
+		wave_calm_distance = value
+		_apply_uniform("wave_calm_distance", value)
 
 # Edge fade: alpha fades to 0 over shore_fade meters of scene-depth
 # difference between the water surface and whatever's behind it (the
@@ -209,6 +218,20 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 # meshes above.
 @export var width_margin: float = 200.0
 @export var sea_depth: float = 400.0
+# How far past near_edge_z, back toward the Tower, the inner (fine) mesh
+# also extends - lets one Sea plane cover the whole landmass (including
+# inland of the inland wall/gate), not just the strip seaward of near_edge_z,
+# so the ground's own height (not this mesh's edge) is what decides where
+# water shows anywhere on the field. Independent of sea_edge_distance/
+# get_near_edge_z() on purpose - those still mean exactly what they always
+# did (the wade-line/shoreline-reference point other code reads), this only
+# grows the MESH's own geometric reach around that same point. Reduces to
+# the old inner-plane math exactly at 0 (see _position_relative_to_spawn()'s
+# own formula) - not a behavior change for that case.
+@export var mesh_inland_reach: float = 60.0:
+	set(value):
+		mesh_inland_reach = value
+		_rebuild_if_ready()
 
 # Kept fractionally below 0.0 (Ground's plane) so the two don't z-fight
 # along the shoreline where they meet.
@@ -219,6 +242,7 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 
 @export var region_field_path: NodePath = ^".."
 @export var wanderer_path: NodePath = ^"../Wanderer"
+@export var ground_path: NodePath = ^"../Ground"
 @export var sea_edge_distance: float = 18.0:
 	set(value):
 		sea_edge_distance = value
@@ -266,6 +290,15 @@ func _ready() -> void:
 
 	_wanderer = get_node_or_null(wanderer_path) as Node3D
 	_rebuild_wave_meshes()
+
+	_push_landmass_uniforms()
+	# Ground's landmass exports all trigger a relief_rebuilt on edit (see
+	# RegionField's own use of the same signal for its walls) - reconnecting
+	# here keeps wave_fade_factor()'s shoreline in sync with live shape
+	# tuning too, not just the initial value at scene load.
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null:
+		ground.relief_rebuilt.connect(_push_landmass_uniforms)
 
 	_spawn_ambience()
 
@@ -335,13 +368,14 @@ func get_near_edge_z() -> float:
 # not width.
 func _rebuild_wave_meshes() -> void:
 	var full_width: float = _field_width() + width_margin * 2.0
+	var inner_depth: float = inner_wave_extent + mesh_inland_reach
 	var outer_depth: float = maxf(sea_depth - inner_wave_extent, 0.0)
 	var shared_width_subdivisions: int = _subdivisions_for(full_width, inner_wave_spacing)
 
 	var inner_plane := PlaneMesh.new()
-	inner_plane.size = Vector2(full_width, inner_wave_extent)
+	inner_plane.size = Vector2(full_width, inner_depth)
 	inner_plane.subdivide_width = shared_width_subdivisions
-	inner_plane.subdivide_depth = _subdivisions_for(inner_wave_extent, inner_wave_spacing)
+	inner_plane.subdivide_depth = _subdivisions_for(inner_depth, inner_wave_spacing)
 	inner_plane.material = _material
 	# A single PlaneMesh resource is one contiguous, engine-generated
 	# vertex/index buffer - watertight internally by construction, no
@@ -367,19 +401,26 @@ func _subdivisions_for(extent: float, spacing: float) -> int:
 # Centered in X on the field's own center (RegionField's world X —
 # field_extents is always centered on RegionField's origin). Near edge
 # sits sea_edge_distance behind the Wanderer's spawn point along
-# RegionField.get_forward() (never assumed to be -Z), extending further
-# away from the Tower from there: the inner patch spans the first
-# inner_wave_extent meters of that, the outer skirt the remaining
-# sea_depth - inner_wave_extent beyond it. self (the inner patch)'s own
-# position is what global_position sets; _outer_skirt's position is
-# local to self, so it's the world-space gap between the two centers.
+# RegionField.get_forward() (never assumed to be -Z). The inner patch spans
+# mesh_inland_reach meters back toward the Tower from there PLUS
+# inner_wave_extent meters further away from it; the outer skirt covers
+# the remaining sea_depth - inner_wave_extent beyond that. self (the inner
+# patch)'s own position is what global_position sets; _outer_skirt's
+# position is local to self, so it's the world-space gap between the two
+# centers.
 func _position_relative_to_spawn() -> void:
 	var region_field := get_node_or_null(region_field_path) as RegionField
 	var field_center_x: float = region_field.global_position.x if region_field else 0.0
 
 	var near_edge_z := _compute_near_edge_z()
+	var inner_depth: float = inner_wave_extent + mesh_inland_reach
 	var outer_depth: float = maxf(sea_depth - inner_wave_extent, 0.0)
-	var inner_center_z := near_edge_z - _forward.z * inner_wave_extent / 2.0
+	# The inner patch now runs from mesh_inland_reach meters inland of
+	# near_edge_z out to inner_wave_extent meters seaward of it, so it's no
+	# longer centered ON near_edge_z - centered on the midpoint of that
+	# combined span instead. Reduces to the original near_edge_z - forward.z
+	# * inner_wave_extent/2 exactly when mesh_inland_reach is 0.
+	var inner_center_z := near_edge_z + _forward.z * (mesh_inland_reach - inner_wave_extent) / 2.0
 	var outer_center_z := near_edge_z - _forward.z * (inner_wave_extent + outer_depth / 2.0)
 
 	global_position = Vector3(field_center_x, sea_level, inner_center_z)
@@ -388,12 +429,14 @@ func _position_relative_to_spawn() -> void:
 	# wave_fade_factor() in the shader needs to know where "near the
 	# shore" is in world space - pushed here (not _apply_all_uniforms())
 	# since it depends on the Wanderer's spawn position, not available
-	# until this function's first real call.
+	# until this function's first real call. Still anchored on near_edge_z
+	# alone (the seaward shore) - left/right/inland shorelines won't get
+	# the same wave-calming fade. Flagged, not fixed, this round.
 	_apply_uniform("near_edge_z", near_edge_z)
 	_apply_uniform("shore_forward_z", _forward.z)
 
 	var half_width := (_field_width() + width_margin * 2.0) / 2.0
-	print("Sea: near edge z=%.2f, inner extent=%.1fm, outer extent=%.1fm, X extent=[%.2f, %.2f]" % [near_edge_z, inner_wave_extent, outer_depth, global_position.x - half_width, global_position.x + half_width])
+	print("Sea: near edge z=%.2f, inner extent=%.1fm (incl. %.1fm inland reach), outer extent=%.1fm, X extent=[%.2f, %.2f]" % [near_edge_z, inner_depth, mesh_inland_reach, outer_depth, global_position.x - half_width, global_position.x + half_width])
 
 func _spawn_ambience() -> void:
 	var stream := load(AMBIENCE_PATH) as AudioStream
@@ -460,8 +503,7 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("foam_width", foam_width)
 	_apply_uniform("foam_strength", foam_strength)
 
-	_apply_uniform("inner_wave_extent", inner_wave_extent)
-	_apply_uniform("wave_fade_width", wave_fade_width)
+	_apply_uniform("wave_calm_distance", wave_calm_distance)
 
 	_apply_uniform("shore_fade", shore_fade)
 	_apply_uniform("edge_noise_amplitude", edge_noise_amplitude)
@@ -469,6 +511,29 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("fog_color", fog_color)
 	_apply_uniform("fog_near_distance", fog_near_distance)
 	_apply_uniform("fog_far_distance", fog_far_distance)
+
+# Mirrors Ground's own landmass shape into the shader so wave_fade_factor()
+# reads the exact same shoreline the wet band and wade drain do, instead of
+# an independently-tuned line (the bug this exists to fix - see sea.gdshader's
+# own wave_calm_distance doc). Reads Ground's exports directly (plain
+# properties, no ordering hazard) plus two Z references that are themselves
+# order-safe lazy getters: RegionField.get_inland_z() and this node's own
+# get_near_edge_z(). landmass_seaward_edge_z is resolved here (0 means
+# "use near_edge_z", same as Ground._seaward_edge_z()) rather than reading
+# Ground's private cache, so this never touches Ground's internals directly.
+func _push_landmass_uniforms() -> void:
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground == null:
+		return
+	var region_field := get_node_or_null(region_field_path) as RegionField
+
+	_apply_uniform("landmass_half_width_inland", ground.landmass_half_width_inland)
+	_apply_uniform("landmass_half_width_seaward", ground.landmass_half_width_seaward)
+	_apply_uniform("landmass_width_curve_power", ground.landmass_width_curve_power)
+	_apply_uniform("shoreline_noise_scale", ground.shoreline_noise_scale)
+	_apply_uniform("shoreline_noise_amplitude", ground.shoreline_noise_amplitude)
+	_apply_uniform("landmass_inland_z", region_field.get_inland_z() if region_field else 0.0)
+	_apply_uniform("landmass_seaward_edge_z", ground.landmass_seaward_edge_z)
 
 func _apply_uniform(uniform_name: String, value: Variant) -> void:
 	if _material:

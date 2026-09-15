@@ -33,20 +33,37 @@ uniform float short_wave_amplitude = 0.01;
 uniform float short_wave_speed = 0.6;
 uniform vec2 short_wave_direction = vec2(0.5736, 0.8192);
 
-// Wave amplitude fades to 0 over the last wave_fade_width meters before
-// inner_wave_extent (from sea.gd's near shoreward edge) - this is what
-// lets the coarse, undisplaced outer skirt mesh meet the fine inner patch
-// with no seam: both evaluate this exact function at the exact same world
-// position at the boundary, so they agree regardless of which mesh either
-// vertex actually belongs to. near_edge_z/shore_forward_z are pushed from
-// sea.gd's own already-computed near-edge math. Displacement math alone
-// isn't sufficient to prevent a visible seam though - see
-// wave_fade_factor()'s own doc for the vertex-position half of that fix,
-// which lives in sea.gd's _rebuild_wave_meshes().
-uniform float inner_wave_extent = 60.0;
-uniform float wave_fade_width = 25.0;
+// Wave amplitude fades to 0 over wave_calm_distance meters as the water
+// approaches the actual shoreline (the same landmass shape ground.gd's
+// wet band and RegionField's wade drain both key off - see
+// landmass_distance()'s own doc below), full amplitude everywhere else.
+// This is also what keeps the inner (fine) mesh and outer (coarse) skirt
+// seamless where they meet: both share one material and evaluate this
+// exact function at the exact same world position, so they agree
+// regardless of which mesh a given vertex belongs to, wherever that
+// meeting edge happens to fall - the fade no longer needs to be anchored
+// to inner_wave_extent itself for that (it isn't, any more).
+uniform float wave_calm_distance = 2.0;
+// near_edge_z/shore_forward_z still mean exactly what they always did
+// (Sea's own near-edge/forward reference, pushed from sea.gd's already-
+// computed math) - shore_forward_z is reused below as the sign convention
+// for the seaward edge (forward points inland); near_edge_z doubles as
+// the curve's seaward reference (see landmass_curve_t()'s own doc) since
+// it's numerically the same point by construction.
 uniform float near_edge_z = 0.0;
 uniform float shore_forward_z = -1.0;
+// The rest of the landmass shape, mirrored from ground.gd's own GDScript
+// (_landmass_curve_t()/_landmass_distance()/_seaward_distance()) - same
+// dual-port approach this file's hash()/value_noise() already use for
+// ground.gdshader's identical functions. Pushed from sea.gd, which reads
+// them off Ground/RegionField directly (see Sea._push_landmass_uniforms()).
+uniform float landmass_half_width_inland = 12.0;
+uniform float landmass_half_width_seaward = 18.0;
+uniform float landmass_width_curve_power = 1.0;
+uniform float shoreline_noise_scale = 6.0;
+uniform float shoreline_noise_amplitude = 2.5;
+uniform float landmass_inland_z = 0.0;
+uniform float landmass_seaward_edge_z = 0.0;
 
 // Fresnel: blend toward fog_color (already the sky/horizon tone - see its
 // own doc below) at grazing angles, sea_color's own depth-graded tone
@@ -131,24 +148,60 @@ float sea_height(vec2 world_xz, float time) {
 	return h;
 }
 
-// 1 near the shore, smoothly fading to 0 by inner_wave_extent - see its
-// own uniform doc above for why this is what keeps the inner/outer mesh
-// boundary seamless.
-//
-// DIVIDES by shore_forward_z, not multiplies - deliberately different from
-// ground.gdshader's own dist_from_shore(), which multiplies. That's fine
-// there: it's only ever compared against empirically-tuned thresholds
-// (shore_slope_start etc.), so an off-by-|forward|^2 scale doesn't matter.
-// Here it has to land EXACTLY on sea.gd's geometric mesh boundary (placed
-// via world_z = near_edge_z - shore_forward_z * distance), so this must be
-// that formula's exact inverse - multiplying would only be correct when
-// |shore_forward_z| == 1 (the field's forward running along pure Z), and
-// silently mismatch the real mesh boundary by shore_forward_z^2 otherwise,
-// reintroducing exactly the seam this function exists to prevent.
+// 0 at the inland wall's own Z (landmass_inland_z), 1 at the curve's
+// seaward reference (near_edge_z), clamped beyond both - mirrors ground.gd's
+// _landmass_curve_t() exactly (same clamp-past-1 reasoning: the shape stays
+// open-ended toward the sea, the half-width just holds at
+// landmass_half_width_seaward past that point rather than closing off).
+float landmass_curve_t(float world_z) {
+	float span = near_edge_z - landmass_inland_z;
+	if (abs(span) < 0.0001) {
+		return 0.0;
+	}
+	float linear_t = clamp((world_z - landmass_inland_z) / span, 0.0, 1.0);
+	return pow(linear_t, max(landmass_width_curve_power, 0.0001));
+}
+
+// Mirrors ground.gd's _landmass_distance() - left/right only, noised,
+// no rounding at either end (see ground.gd's own doc on why there are no
+// corners left to round once both ends are open).
+float landmass_side_distance(vec2 world_xz) {
+	float t = landmass_curve_t(world_xz.y);
+	float local_half_width = mix(landmass_half_width_inland, landmass_half_width_seaward, t);
+	float noise = (value_noise(world_xz / max(shoreline_noise_scale, 0.001)) - 0.5) * 2.0 * shoreline_noise_amplitude;
+	return abs(world_xz.x) - local_half_width + noise;
+}
+
+// Mirrors ground.gd's _seaward_distance() - a plain straight ramp along Z,
+// no rounding, no noise. DIVIDES... no, MULTIPLIES by shore_forward_z here,
+// matching ground.gd's own convention (forward points inland, so
+// subtracting forward.z*distance moves seaward) - safe unconditionally
+// since this is a sign flip, not a geometric-boundary division (contrast
+// the old wave_fade_factor(), which divided because it had to land exactly
+// on a specific meshed boundary; this is just "which side of a line").
+float landmass_seaward_distance(float world_z) {
+	float edge_z = landmass_seaward_edge_z != 0.0 ? landmass_seaward_edge_z : near_edge_z;
+	return (edge_z - world_z) * shore_forward_z;
+}
+
+// Mirrors ground.gd's get_landmass_distance() - whichever edge (left/
+// right's noised landmass_side_distance(), or seaward's plain landmass_
+// seaward_distance()) a position is furthest past wins, same max()
+// combination ground.gd uses to decide which edge actually submerges a
+// point.
+float landmass_distance(vec2 world_xz) {
+	return max(landmass_side_distance(world_xz), landmass_seaward_distance(world_xz.y));
+}
+
+// 0 landward of the shoreline (calm - flat water right at the sand), 1 by
+// wave_calm_distance meters past it (full amplitude - open water), reading
+// the same noised/ramped shoreline the wet band and wade drain use instead
+// of a straight world-space line, so calming (and, upstream in vertex(),
+// the real vertex displacement) actually follows wherever the shore
+// really is - including its own wander - rather than a fixed line that
+// can drift out of sync with it (the bug this function replaces).
 float wave_fade_factor(vec2 world_xz) {
-	float safe_forward_z = shore_forward_z >= 0.0 ? max(shore_forward_z, 0.0001) : min(shore_forward_z, -0.0001);
-	float seaward_dist = (near_edge_z - world_xz.y) / safe_forward_z;
-	return 1.0 - smoothstep(inner_wave_extent - max(wave_fade_width, 0.001), inner_wave_extent, seaward_dist);
+	return smoothstep(0.0, max(wave_calm_distance, 0.001), landmass_distance(world_xz));
 }
 
 // A single traveling sine wave: height and its analytic (dh/dx, dh/dz)

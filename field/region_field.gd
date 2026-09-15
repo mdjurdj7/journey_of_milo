@@ -47,6 +47,36 @@ signal floor_cleared
 # pale world (false, default) and the pale element on a dark one (true).
 @export var ui_on_dark_world: bool = false
 
+@export var ground_path: NodePath = ^"Ground"
+
+# How far past the (worst-case, noise-included) shoreline the side walls
+# sit - lets the Wanderer wade a few metres in before being stopped, same
+# shape as shoreline_wall_margin already does on the seaward side. See
+# _rebuild_boundary_walls()'s own doc for how "worst-case" is computed
+# from Ground's own landmass exports.
+@export var side_wade_margin: float = 4.0:
+	set(value):
+		side_wade_margin = value
+		_rebuild_boundary_walls()
+
+# Wading costs HP: draining while the Wanderer stands past the landmass's
+# own shoreline (see Ground.get_landmass_distance()'s own doc - this reads
+# the exact same noised distance field the visual shoreline is drawn from,
+# not an independent approximation of it). No push-back, no floor -
+# RunState.lose_hp() already floors at 0, which is exactly the lethal
+# behavior this wants. Gated on wade_drain_enabled so it can be switched
+# off for testing without touching the other wade exports.
+@export var wade_drain_enabled: bool = false
+# distance_in_water (Ground.get_landmass_distance(), floored at 0) is a
+# horizontal distance past the shoreline, not a real vertical depth - this
+# fakes an outward slope: effective_depth = distance_in_water *
+# wade_slope_per_metre.
+@export var wade_slope_per_metre: float = 0.15
+# Below this effective depth, no drain at all (ankle-deep is free).
+@export var wade_depth_threshold: float = 0.05
+@export var wade_drain_rate_per_metre: float = 40.0
+@export var wade_drain_max_per_second: float = 15.0
+
 @onready var wanderer: Wanderer = $Wanderer
 @onready var battle_layer: CanvasLayer = $BattleLayer
 @onready var deck_panel: DeckPanel = $FieldHUD/DeckPanel
@@ -54,6 +84,33 @@ signal floor_cleared
 
 var _forward: Vector3 = Vector3.FORWARD
 var _forward_computed: bool = false
+
+# Cached once by _build_boundary() and reused by _rebuild_boundary_walls() -
+# field_extents/wall_thickness/forward/shoreline_wall_margin/sea_edge_
+# distance never change live, so this can't go stale. Also guards that
+# export setter against firing during scene deserialization, before
+# _forward/Sea are resolved - same reasoning as ExitGate's own _ready_done
+# flag.
+var _boundary_ready: bool = false
+var _boundary_half_width: float = 0.0
+var _boundary_inland_z: float = 0.0
+var _boundary_shoreward_z: float = 0.0
+var _boundary_span_center_z: float = 0.0
+var _boundary_span_length: float = 0.0
+
+var _wall_inland: StaticBody3D = null
+var _wall_shoreward: StaticBody3D = null
+var _wall_left: StaticBody3D = null
+var _wall_right: StaticBody3D = null
+
+# Fractional HP carried between physics frames so a slow drain (a couple
+# HP/sec) still costs whole HP over time instead of rounding away to
+# nothing every frame - see _physics_process()'s own doc.
+var _wade_drain_accumulator: float = 0.0
+# Set once RunState.player_hp reaches 0 from wading, so a scene change
+# already in flight (change_scene_to_file doesn't happen mid-frame) can't
+# be re-triggered by another drain tick before it lands.
+var _run_lost_to_wading: bool = false
 
 func _ready() -> void:
 	# Starts the run once per game session, seeding HP and the starting
@@ -79,6 +136,50 @@ func _ready() -> void:
 	_setup_exit_gate()
 	_setup_field_hud()
 	_build_boundary()
+
+	# Keeps the walls in sync with live landmass-shape tuning: Ground emits
+	# relief_rebuilt after every mesh/collision rebuild (any landmass/relief
+	# export's own setter), and _rebuild_boundary_walls() reads Ground's
+	# landmass exports directly to place the walls - see its own doc.
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null:
+		ground.relief_rebuilt.connect(_rebuild_boundary_walls)
+
+# Wade-HP drain only - everything else on the field (movement, contact,
+# battle) is either physics-engine-driven or event-driven and doesn't need
+# a per-frame tick here. Naturally stops during battle: RegionField's own
+# process_mode goes to PROCESS_MODE_DISABLED on enemy contact (see
+# _on_enemy_contacted()), which cascades to this by inheritance same as
+# everything else under it.
+func _physics_process(delta: float) -> void:
+	if not wade_drain_enabled or not _boundary_ready or _run_lost_to_wading:
+		return
+
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground == null:
+		return
+
+	var wanderer_xz := Vector2(wanderer.global_position.x, wanderer.global_position.z)
+	var distance_in_water := maxf(ground.get_landmass_distance(wanderer_xz), 0.0)
+	if distance_in_water <= 0.0:
+		_wade_drain_accumulator = 0.0
+		return
+
+	var effective_depth := distance_in_water * wade_slope_per_metre
+	var drain_rate := clampf((effective_depth - wade_depth_threshold) * wade_drain_rate_per_metre, 0.0, wade_drain_max_per_second)
+	if drain_rate <= 0.0:
+		return
+
+	_wade_drain_accumulator += drain_rate * delta
+	var whole_damage := int(_wade_drain_accumulator)
+	if whole_damage <= 0:
+		return
+	_wade_drain_accumulator -= whole_damage
+
+	RunState.lose_hp(whole_damage)
+	if RunState.player_hp <= 0:
+		_run_lost_to_wading = true
+		get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
 
 # The field's forward direction: normalized XZ vector from the
 # Wanderer's spawn to the Tower. Nothing else should assume an axis or
@@ -108,6 +209,16 @@ func get_forward() -> Vector3:
 		_forward_computed = true
 		print("RegionField: forward = %s" % str(_forward))
 	return _forward
+
+# The inland wall's own Z, in world space - Ground's landmass shape reads
+# this as the "fully inland, full dry width" end of its left/right taper
+# (see Ground._landmass_curve_t()'s own doc). A small, order-safe formula
+# (get_forward() is itself lazy/safe regardless of node-ready order) rather
+# than reading _boundary_half_width/_boundary_inland_z, which only exist
+# after _build_boundary() has actually run - Ground's own _ready() (a
+# child's, running before this node's) can't rely on that yet.
+func get_inland_z() -> float:
+	return (field_extents.y / 2.0) * get_forward().z
 
 # Preserves each enemy's authored distance from the Wanderer's spawn,
 # but re-derives the direction along get_forward() instead of whatever
@@ -296,37 +407,91 @@ func _push_wanderer_away_from(enemy: FieldEnemy) -> void:
 
 	wanderer.global_position = enemy.global_position + push_dir * push_distance
 
-# Four invisible collision walls around field_extents, tall enough to
-# block the Wanderer, plus a low mesh berm along the inland and side
-# edges. The edge behind the Wanderer (opposite get_forward()) is left
-# open visually for the sea — no berm there. Both Z-boundary edges are
+# Computes and caches the field's span (see _boundary_ready's own doc),
+# then delegates the four collision walls and the (always-present, never
+# varies) inland berm to their own functions. The sides no longer get a
+# berm at all - the landmass shoreline (Ground's own relief shape) is what
+# reads as ground meeting water there now. Both Z-boundary edges are
 # positioned from get_forward()'s sign, not assumed to be +Z/-Z.
 func _build_boundary() -> void:
-	var half_width := field_extents.x / 2.0
 	var half_depth := field_extents.y / 2.0
 	var inland_z := half_depth * _forward.z
 	var shoreward_z := _shoreward_wall_z(half_depth)
-	# The side walls/berms span between the two actual end-cap Z positions,
-	# not a symmetric ±field_extents.y/2 - inland_z and shoreward_z aren't
-	# generally symmetric around 0 (see _shoreward_wall_z()'s own doc: the
-	# seaward side is placed from Sea's own edge distance/margin, not
-	# field_extents, and can sit much closer to spawn than the inland side).
-	# Reduces to the old symmetric math exactly when shoreward_z is the
-	# half_depth fallback (Sea absent), so this isn't a behavior change for
-	# that case - just correct once the two sides diverge.
-	var span_center_z := (inland_z + shoreward_z) / 2.0
-	var span_length := absf(shoreward_z - inland_z)
+	# The side walls span between the two actual end-cap Z positions, not
+	# a symmetric ±field_extents.y/2 - inland_z and
+	# shoreward_z aren't generally symmetric around 0 (see
+	# _shoreward_wall_z()'s own doc: the seaward side is placed from Sea's
+	# own edge distance/margin, not field_extents, and can sit much closer
+	# to spawn than the inland side). Reduces to the old symmetric math
+	# exactly when shoreward_z is the half_depth fallback (Sea absent), so
+	# this isn't a behavior change for that case - just correct once the
+	# two sides diverge.
+	_boundary_half_width = field_extents.x / 2.0
+	_boundary_inland_z = inland_z
+	_boundary_shoreward_z = shoreward_z
+	_boundary_span_center_z = (inland_z + shoreward_z) / 2.0
+	_boundary_span_length = absf(shoreward_z - inland_z)
+	_boundary_ready = true
 
-	_add_wall(Vector3(0.0, wall_height / 2.0, inland_z), Vector3(field_extents.x, wall_height, wall_thickness))
-	_add_wall(Vector3(0.0, wall_height / 2.0, shoreward_z), Vector3(field_extents.x, wall_height, wall_thickness))
-	_add_wall(Vector3(-half_width, wall_height / 2.0, span_center_z), Vector3(wall_thickness, wall_height, span_length))
-	_add_wall(Vector3(half_width, wall_height / 2.0, span_center_z), Vector3(wall_thickness, wall_height, span_length))
+	_rebuild_boundary_walls()
 
-	# Berm length is extended by berm_width past the true edge so the two
-	# side berms overlap the inland berm at the corners, with no gap.
+	# Inland berm - unaffected by the landmass shoreline (inland stays
+	# unconditionally dry per that round's own decision). Length is
+	# extended by berm_width past the true edge, same overlap idiom the
+	# side walls' corner-sealing below uses, though there's no side berm
+	# left to overlap into any more.
 	_add_berm(Vector3(0.0, berm_height / 2.0, inland_z), Vector3(field_extents.x + berm_width, berm_height, berm_width))
-	_add_berm(Vector3(-half_width, berm_height / 2.0, span_center_z), Vector3(berm_width, berm_height, span_length + berm_width))
-	_add_berm(Vector3(half_width, berm_height / 2.0, span_center_z), Vector3(berm_width, berm_height, span_length + berm_width))
+
+# The four boundary collision walls. Tracked and always freed first so
+# side_wade_margin (and any live landmass-shape edit, via _ready()'s own
+# relief_rebuilt connection) can move/resize them with no scene reload.
+#
+# The side walls' X offset is no longer derived from field_extents.x at
+# all - it has to clear the shoreline's own WORST-CASE excursion, not the
+# field's nominal width, since the two can differ once the landmass shape
+# has its own half-width/noise exports. Worst case is the wider of Ground's
+# two half-width exports (seaward is wider by design, but this doesn't
+# assume that) plus shoreline_noise_amplitude (the furthest the noised
+# crossing could wander out) - then side_wade_margin past THAT. Falls back
+# to the old field_extents.x-based offset if Ground doesn't resolve, so a
+# misconfigured ground_path degrades rather than breaking wall placement
+# entirely.
+#
+# The two end-cap walls still widen to match the side walls' new X
+# (field_extents.x replaced by outer_half_width*2) - without this, the
+# strip of X between the field's own edge and the pushed-out side wall, at
+# each end-cap's Z line, would have no collision at all, letting the
+# Wanderer walk around it. This is a structural requirement of the side
+# walls moving, not a change to the inland edge itself - the inland wall's
+# own Z position, margin, and berm are all untouched.
+func _rebuild_boundary_walls() -> void:
+	if _wall_inland != null:
+		_wall_inland.queue_free()
+		_wall_inland = null
+	if _wall_shoreward != null:
+		_wall_shoreward.queue_free()
+		_wall_shoreward = null
+	if _wall_left != null:
+		_wall_left.queue_free()
+		_wall_left = null
+	if _wall_right != null:
+		_wall_right.queue_free()
+		_wall_right = null
+
+	if not _boundary_ready:
+		return
+
+	var ground := get_node_or_null(ground_path) as Ground
+	var outer_half_width: float = _boundary_half_width + side_wade_margin
+	if ground != null:
+		var worst_case_half_width: float = maxf(ground.landmass_half_width_inland, ground.landmass_half_width_seaward) + ground.shoreline_noise_amplitude
+		outer_half_width = worst_case_half_width + side_wade_margin
+	var end_cap_width := outer_half_width * 2.0
+
+	_wall_inland = _add_wall(Vector3(0.0, wall_height / 2.0, _boundary_inland_z), Vector3(end_cap_width, wall_height, wall_thickness))
+	_wall_shoreward = _add_wall(Vector3(0.0, wall_height / 2.0, _boundary_shoreward_z), Vector3(end_cap_width, wall_height, wall_thickness))
+	_wall_left = _add_wall(Vector3(-outer_half_width, wall_height / 2.0, _boundary_span_center_z), Vector3(wall_thickness, wall_height, _boundary_span_length))
+	_wall_right = _add_wall(Vector3(outer_half_width, wall_height / 2.0, _boundary_span_center_z), Vector3(wall_thickness, wall_height, _boundary_span_length))
 
 # Pushed shoreline_wall_margin past the sea's near edge (derived from
 # the Wanderer's spawn, get_forward(), and the Sea's own
@@ -341,7 +506,7 @@ func _shoreward_wall_z(half_depth: float) -> float:
 	var near_edge_z := wanderer.global_position.z - _forward.z * sea.sea_edge_distance
 	return near_edge_z - _forward.z * shoreline_wall_margin
 
-func _add_wall(wall_position: Vector3, size: Vector3) -> void:
+func _add_wall(wall_position: Vector3, size: Vector3) -> StaticBody3D:
 	var shape := BoxShape3D.new()
 	shape.size = size
 	var collision_shape := CollisionShape3D.new()
@@ -352,8 +517,9 @@ func _add_wall(wall_position: Vector3, size: Vector3) -> void:
 	wall.add_child(collision_shape)
 
 	add_child(wall)
+	return wall
 
-func _add_berm(berm_position: Vector3, size: Vector3) -> void:
+func _add_berm(berm_position: Vector3, size: Vector3) -> MeshInstance3D:
 	var material := StandardMaterial3D.new()
 	material.albedo_color = berm_color
 	material.roughness = 1.0
@@ -368,3 +534,4 @@ func _add_berm(berm_position: Vector3, size: Vector3) -> void:
 	mesh_instance.position = berm_position
 
 	add_child(mesh_instance)
+	return mesh_instance

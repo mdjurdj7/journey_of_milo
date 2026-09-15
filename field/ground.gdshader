@@ -78,18 +78,21 @@ uniform float speckle_scale = 0.08;
 uniform float speckle_threshold : hint_range(0.0, 1.0) = 0.92;
 uniform float speckle_darken : hint_range(0.0, 1.0) = 0.15;
 
-// Wet band: within shore_slope_start (meters) of the water line, sand
+// Wet band: within shore_slope_start (meters) of ABOVE sea_level, sand
 // wetness is pushed to 1.0 so it blends toward wet_color/wet_roughness/
 // wet_specular like damp sand right at the shore — not toward
 // pool_color, which stays driven by the plain noise mask so isolated
 // standing pools don't turn into a strip along the whole shoreline.
-// water_line_z and water_forward_z are pushed from ground.gd (from
-// Sea's near edge and RegionField's get_forward()), not assumed.
+// Height-based (v_world_height vs. sea_level below), not a straight line -
+// this follows the landmass's own noised shoreline contour for free,
+// since v_world_height already IS that shape (baked into the mesh by
+// ground.gd's _relief_height()). sea_level is pushed from ground.gd (from
+// Sea's own sea_level), not assumed.
 uniform float shore_slope_start = 8.0;
-uniform float water_line_z = 0.0;
-uniform float water_forward_z = -1.0;
+uniform float sea_level = 0.0;
 
 varying vec2 v_world_xz;
+varying float v_world_height;
 
 // Textureless value noise, ~[0,1].
 float hash(vec2 p) {
@@ -121,34 +124,37 @@ float wetness_mask(vec2 world_xz) {
 	return clamp(n + (wetness_amount - 0.5) * 2.0, 0.0, 1.0);
 }
 
-// Signed distance from the water line, positive on the inland/dry side,
-// per the same forward-sign convention region_field.gd/sea.gd use.
-// Negative under the sea plane itself, where this doesn't matter (occluded,
-// except right at the fading shore edge, exactly where the effects driven
-// by this should show through).
-float dist_from_shore(vec2 world_xz) {
-	return (world_xz.y - water_line_z) * water_forward_z;
+// Height above sea_level, positive on the dry side - replaces the old
+// straight-line dist_from_shore(): the baked relief height already IS the
+// landmass's noised shoreline shape (see ground.gd's _relief_height()), so
+// this needs no separate shoreline geometry of its own and follows every
+// side's wander (and the noise) automatically. Negative under the sea
+// plane itself, where this doesn't matter (occluded, except right at the
+// fading shore edge, exactly where the effects driven by this should show
+// through).
+float dist_from_shore(float world_height) {
+	return world_height - sea_level;
 }
 
-float shore_t(vec2 world_xz) {
+float shore_t(float world_height) {
 	if (!shore_wetness_enabled) {
 		return 0.0;
 	}
-	return 1.0 - smoothstep(0.0, max(shore_slope_start, 0.001), dist_from_shore(world_xz));
+	return 1.0 - smoothstep(0.0, max(shore_slope_start, 0.001), dist_from_shore(world_height));
 }
 
 // Wetness used for sand shading: the plain noise mask, boosted to 1 right
 // at the shore. Kept separate from the noise mask alone (used for pools)
 // so the shore band reads as wet sand rather than a strip of standing pool.
-float sand_wetness_mask(vec2 world_xz) {
-	return max(wetness_mask(world_xz), shore_t(world_xz));
+float sand_wetness_mask(vec2 world_xz, float world_height) {
+	return max(wetness_mask(world_xz), shore_t(world_height));
 }
 
 // 2..drift_line_count faint bands, spaced drift_line_spacing apart starting
 // at the water line, wobbled along the shore so they don't read as ruled
 // lines, and fading out after drift_line_count of them.
-float drift_line_mask(vec2 world_xz) {
-	float shore_dist = dist_from_shore(world_xz);
+float drift_line_mask(vec2 world_xz, float world_height) {
+	float shore_dist = dist_from_shore(world_height);
 	float spacing = max(drift_line_spacing, 0.001);
 
 	float wobble = (value_noise(vec2(world_xz.x / max(drift_line_wobble_scale, 0.001), 91.7)) - 0.5) * 2.0 * drift_line_wobble;
@@ -163,9 +169,9 @@ float drift_line_mask(vec2 world_xz) {
 // Anisotropic noise: fine (ripple_scale) across the shore, stretched
 // (ripple_stretch times coarser) along it, so it reads as ridges parallel
 // to the shoreline rather than a uniform speckle.
-float ripple_mask(vec2 world_xz) {
+float ripple_mask(vec2 world_xz, float world_height) {
 	vec2 sample_pos = vec2(
-		dist_from_shore(world_xz) / max(ripple_scale, 0.001),
+		dist_from_shore(world_height) / max(ripple_scale, 0.001),
 		world_xz.x / max(ripple_scale * ripple_stretch, 0.001)
 	);
 	return (value_noise(sample_pos + vec2(0.0, 251.3)) - 0.5) * 2.0;
@@ -201,11 +207,12 @@ float speckle_mask(vec2 world_xz) {
 void vertex() {
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	v_world_xz = world_pos.xz;
+	v_world_height = world_pos.y;
 }
 
 void fragment() {
 	float base_wetness = wetness_mask(v_world_xz);
-	float sand_wetness = sand_wetness_mask(v_world_xz);
+	float sand_wetness = sand_wetness_mask(v_world_xz, v_world_height);
 
 	// VERTEX in fragment() is view-space; its length is distance from the camera.
 	float dist = length(VERTEX);
@@ -232,11 +239,11 @@ void fragment() {
 
 	// Drift lines: nudge the sand toward a slightly darker, slightly
 	// warmer tone, at most drift_line_strength of the way there.
-	float drift = drift_line_mask(v_world_xz);
+	float drift = drift_line_mask(v_world_xz, v_world_height);
 	sand_albedo = mix(sand_albedo, drift_line_color.rgb, drift * drift_line_strength);
 
 	// Ripple marks: a plain brightness shift in wet sand only.
-	float ripple = ripple_mask(v_world_xz) * ripple_strength * sand_wetness;
+	float ripple = ripple_mask(v_world_xz, v_world_height) * ripple_strength * sand_wetness;
 	sand_albedo += ripple;
 
 	// Pools are the wettest extreme of the plain noise mask (not the

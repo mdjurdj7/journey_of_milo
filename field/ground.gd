@@ -25,11 +25,20 @@ signal relief_rebuilt
 # plane (plane_size, above) stays coarse. GDScript-only now (see
 # get_height_at()) - no longer pushed to the shader, which no longer
 # displaces vertices at all.
-@export var relief_extent: Vector2 = Vector2(80.0, 50.0):
+# Sized to comfortably contain the landmass's own worst-case shoreline
+# excursion (half_width_seaward + shoreline_noise_amplitude +
+# landmass_falloff_width) plus relief_flat_margin/relief_edge_fade's own
+# seam-matching zone, at the current landmass defaults below - re-check
+# this margin if those are tuned much wider. relief_subdivisions is sized
+# for ~0.35m vertex spacing at this extent, needed for the shoreline
+# contour to read as curved rather than faceted at this field's scale;
+# the wet-band's own soft gradient (shore_slope_start) does the rest of
+# the smoothing work perceptually.
+@export var relief_extent: Vector2 = Vector2(100.0, 70.0):
 	set(value):
 		relief_extent = value
 		_rebuild_ground_mesh_and_collision()
-@export var relief_subdivisions: Vector2i = Vector2i(40, 25):
+@export var relief_subdivisions: Vector2i = Vector2i(285, 199):
 	set(value):
 		relief_subdivisions = value
 		_rebuild_ground_mesh_and_collision()
@@ -144,6 +153,77 @@ signal relief_rebuilt
 		relief_flat_margin = value
 		_rebuild_ground_mesh_and_collision()
 
+# The landmass: a dry strip that narrows toward the inland wall and fans
+# out toward the sea, falling away below sea_level on three sides. Left/
+# right (see _landmass_distance()'s own doc) get a noisy falloff so the
+# shoreline reads as a wandering, rounded coast; seaward (see _seaward_
+# distance()'s own doc) gets a plain straight ramp along Z instead - no
+# rounding, no noise, an open beach slope rather than another wandering
+# edge. Inland has no term at all - stays unconditionally dry.
+@export_group("Landmass Shape")
+# Left/right half-width at the inland wall's own Z and at Sea's near edge
+# respectively - _landmass_curve_t() lerps between them along Z. Seaward
+# wider than inland by default, so the dry flat fans out toward the water.
+@export var landmass_half_width_inland: float = 12.0:
+	set(value):
+		landmass_half_width_inland = value
+		_rebuild_ground_mesh_and_collision()
+@export var landmass_half_width_seaward: float = 18.0:
+	set(value):
+		landmass_half_width_seaward = value
+		_rebuild_ground_mesh_and_collision()
+# Exponent applied to the (0..1, clamped) linear inland->seaward
+# parameter before the half-width lerp - 1.0 is a straight linear taper;
+# >1 stays narrow longer then flares out near the sea; <1 widens early.
+@export var landmass_width_curve_power: float = 1.0:
+	set(value):
+		landmass_width_curve_power = value
+		_rebuild_ground_mesh_and_collision()
+# How many meters past the (noised) shoreline distance it takes to reach
+# landmass_below_sea_depth - widen for a more gradual slope into the water.
+@export var landmass_falloff_width: float = 8.0:
+	set(value):
+		landmass_falloff_width = value
+		_rebuild_ground_mesh_and_collision()
+# Both relative to Sea's own sea_level (not absolute), so the landmass
+# stays correctly seated if sea_level is ever retuned.
+@export var landmass_interior_height: float = 0.5:
+	set(value):
+		landmass_interior_height = value
+		_rebuild_ground_mesh_and_collision()
+@export var landmass_below_sea_depth: float = 2.0:
+	set(value):
+		landmass_below_sea_depth = value
+		_rebuild_ground_mesh_and_collision()
+# Perturbs the shoreline's effective distance (not just its color) so the
+# actual sea_level-crossing contour wanders instead of tracing the lerped
+# half-width exactly.
+@export var shoreline_noise_scale: float = 6.0:
+	set(value):
+		shoreline_noise_scale = value
+		_rebuild_ground_mesh_and_collision()
+@export var shoreline_noise_amplitude: float = 2.5:
+	set(value):
+		shoreline_noise_amplitude = value
+		_rebuild_ground_mesh_and_collision()
+
+# Seaward falloff - unlike the left/right edges, this is a plain straight
+# ramp along Z only: no rounding, no noise (the sides already carry the
+# irregularity; this one's meant to read as an open beach slope, not
+# another wandering edge). 0 (default) means "auto": use Sea's own near
+# edge (get_near_edge_z()) - same "0 means auto" pattern Wanderer's
+# model_scale_override uses. Nonzero overrides it directly, e.g. to start
+# the ramp a bit before/after that reference point.
+@export var landmass_seaward_edge_z: float = 0.0:
+	set(value):
+		landmass_seaward_edge_z = value
+		_rebuild_ground_mesh_and_collision()
+# Long on purpose (~6-8m) so this reads as a beach slope, not a bank.
+@export var landmass_seaward_falloff_width: float = 7.0:
+	set(value):
+		landmass_seaward_falloff_width = value
+		_rebuild_ground_mesh_and_collision()
+
 # Drift lines: a few faint bands running parallel to the shore, marking
 # where wrack will sit later. Spaced inland from the water line, wobbled
 # so they don't read as ruled lines, and faded out after drift_line_count
@@ -222,10 +302,12 @@ signal relief_rebuilt
 		speckle_darken = value
 		_apply_uniform("speckle_darken", value)
 
-# Wet band: within shore_slope_start of the water line, sand wetness is
-# pushed to 1.0 so it reflects like the water does. water_line_z/
-# water_forward_z (pushed once in _ready(), below) come from Sea and
-# RegionField, not assumed.
+# Wet band: within shore_slope_start meters of ABOVE sea_level, sand
+# wetness is pushed toward 1.0 so it reflects like the water does - height-
+# based (v_world_height vs. the sea_level uniform below), not a straight
+# line, so it follows the shoreline's own wander for free. sea_level is
+# pushed once in _ready() (see _push_sea_level_uniform()) from Sea, not
+# assumed.
 @export var shore_slope_start: float = 8.0:
 	set(value):
 		shore_slope_start = value
@@ -324,18 +406,37 @@ func _ready() -> void:
 	_rebuild_ground_mesh_and_collision()
 	_debug_assert_height_matches_shader_math()
 
-	_apply_water_line_uniforms()
+	_push_sea_level_uniform()
+	_check_landmass_interior_height_clears_water()
 
-# RegionField.get_forward() and Sea.get_near_edge_z() are both lazy and
-# safe to call regardless of node-ready order (see their own comments),
-# so this can run directly from _ready() with no deferral needed.
-func _apply_water_line_uniforms() -> void:
-	var region_field := get_node_or_null(region_field_path) as RegionField
+# sea_level drives both the shader's height-based wet band (shore_t()) and
+# this script's own landmass height formula (_landmass_distance()'s own
+# doc) - pushed once here since Sea's sea_level has no live setter that
+# would otherwise leave this stale. Sea.sea_level is a plain property
+# (safe to read regardless of node-ready order, unlike get_forward()/
+# get_near_edge_z() which compute lazily), so no deferral needed.
+func _push_sea_level_uniform() -> void:
 	var sea := get_node_or_null(sea_path) as Sea
-	var forward: Vector3 = region_field.get_forward() if region_field else Vector3.FORWARD
-	var water_line_z: float = sea.get_near_edge_z() if sea else 0.0
-	_apply_uniform("water_line_z", water_line_z)
-	_apply_uniform("water_forward_z", forward.z)
+	_apply_uniform("sea_level", sea.sea_level if sea else 0.0)
+
+# Boot-time sanity check: if the dry interior's own height doesn't clear
+# sea_level by more than relief's own fine-detail noise plus the sea's
+# actual wave displacement, the two could overlap somewhere and water
+# would show through supposedly-dry sand - the exact bug this whole
+# landmass shape exists to prevent. wave_amplitude_max is the real vertex-
+# displacement bound (long_wave_amplitude + short_wave_amplitude) - Sea's
+# own noise_amplitude is deliberately excluded, since it's normal-only and
+# never actually raises the rendered surface (see sea.gd's own doc on it).
+# Not re-run live on a relevant export's own setter - this is a one-time
+# boot sanity check, not a continuously-enforced invariant.
+func _check_landmass_interior_height_clears_water() -> void:
+	var sea := get_node_or_null(sea_path) as Sea
+	if sea == null:
+		return
+	var wave_amplitude_max: float = sea.long_wave_amplitude + sea.short_wave_amplitude
+	var threshold: float = sea.sea_level + relief_amplitude + wave_amplitude_max
+	if landmass_interior_height <= threshold:
+		push_warning("Ground: landmass_interior_height (%.3f) does not clear sea_level (%.3f) + relief_amplitude (%.3f) + wave_amplitude_max (%.3f) = %.3f - water may show through the dry interior." % [landmass_interior_height, sea.sea_level, relief_amplitude, wave_amplitude_max, threshold])
 
 func _apply_all_uniforms() -> void:
 	_apply_uniform("dry_color", ground_color)
@@ -413,17 +514,17 @@ func set_pool_color_from_sky(sky_horizon_color: Color) -> void:
 # concept has nowhere left to plug in, and both exports were removed as
 # dead code alongside it.
 #
-# Shore slope (shore_t()/water_line_z in the shader) was NOT moved in here
-# despite being asked for, because it was never a height effect to begin
-# with: the shader's own relief_height() always read the plain
-# wetness_mask(), never the shore-boosted sand_wetness_mask() shore_t()
-# feeds into - shoreline proximity only ever affected fragment coloring.
-# Moving it into get_height_at() would invent a new "beach slopes into the
-# water" effect the shader never had, rather than reproducing an existing
-# one - out of scope for a refactor about making collision agree with what
-# already rendered. get_wetness_at() below is the same story: it mirrors
+# Historical note, now inverted by the landmass shape change: shore
+# proximity used to be a fragment-only color effect, entirely independent
+# of get_height_at() (the shader's shore_t() read a separately-pushed
+# water_line_z, never height). That's no longer true - the landmass term
+# in _relief_height() below IS the shoreline now, and the shader's shore_t()
+# reads height (v_world_height vs. the sea_level uniform) back out of it
+# instead of an independent line, specifically so the wet band can't drift
+# from the real, noised contour. get_wetness_at() below is a separate
+# story, unaffected by any of this: it mirrors
 # the plain wetness_mask() relief_height() itself sinks by, not the shore-
-# boosted variant. Flag this if an actual sloped shoreline was wanted.
+# boosted variant.
 func get_height_at(world_xz: Vector2) -> float:
 	return _relief_height(world_xz) * _relief_edge_fade_factor(world_xz)
 
@@ -432,6 +533,18 @@ func get_height_at(world_xz: Vector2) -> float:
 # boosted sand_wetness_mask() is deliberately not what this exposes).
 func get_wetness_at(world_xz: Vector2) -> float:
 	return _wetness_mask(world_xz)
+
+# The one source of truth for "how far past the shoreline" a world
+# position is - RegionField's wade-HP drain calls this directly (see its
+# own doc) instead of re-deriving the shoreline from straight lines, so
+# the drain can't drift out of sync with the actual visual contour
+# _relief_height() draws from the exact same two functions. Whichever edge
+# (left/right's noised _landmass_distance(), or seaward's plain _seaward_
+# distance()) the position is furthest past wins - same max() combination
+# _relief_height() uses to pick which edge actually submerges a point.
+func get_landmass_distance(world_xz: Vector2) -> float:
+	_ensure_landmass_refs()
+	return maxf(_landmass_distance(world_xz), _seaward_distance(world_xz.y))
 
 func _hash(p: Vector2) -> float:
 	var x: float = fposmod(p.x * 123.34, 1.0)
@@ -456,11 +569,100 @@ func _wetness_mask(world_xz: Vector2) -> float:
 	var n: float = _value_noise(world_xz / scale)
 	return clampf(n + (wetness_amount - 0.5) * 2.0, 0.0, 1.0)
 
+# Lazily resolved and cached (same shape as RegionField.get_forward()'s own
+# _forward_computed flag) rather than looked up on every call - unlike
+# get_height_at()'s per-point sampling during a mesh rebuild, get_landmass_
+# distance() is also called once per physics frame by RegionField's wade
+# drain, so a live node lookup there every frame is worth avoiding.
+# Invalidated by _rebuild_ground_mesh_and_collision() (see its own call to
+# this) so a shape-export edit always re-reads Sea/RegionField fresh rather
+# than serving a stale cache from before they were both in the tree.
+var _landmass_refs_ready: bool = false
+var _landmass_inland_z: float = 0.0
+var _landmass_seaward_z: float = 0.0
+var _landmass_sea_level: float = 0.0
+var _landmass_forward_z: float = -1.0
+
+func _ensure_landmass_refs() -> void:
+	if _landmass_refs_ready:
+		return
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	var sea := get_node_or_null(sea_path) as Sea
+	_landmass_inland_z = region_field.get_inland_z() if region_field else 0.0
+	_landmass_forward_z = region_field.get_forward().z if region_field else -1.0
+	_landmass_seaward_z = sea.get_near_edge_z() if sea else 0.0
+	_landmass_sea_level = sea.sea_level if sea else 0.0
+	_landmass_refs_ready = true
+
+# landmass_seaward_edge_z's own "0 means auto" resolution - see its doc.
+func _seaward_edge_z() -> float:
+	return landmass_seaward_edge_z if landmass_seaward_edge_z != 0.0 else _landmass_seaward_z
+
+# Signed distance past the seaward edge, positive once world_z sits
+# seaward of it - same forward-sign convention _landmass_distance()'s
+# siblings use elsewhere in this file (forward points inland, so
+# subtracting forward.z*distance moves seaward). Negative/0 on the inland
+# side, where the seaward falloff doesn't apply. Deliberately Z-only, no
+# noise, no X term at all - this edge is a plain ramp, not a wandering
+# coast (see this export group's own doc for why).
+func _seaward_distance(world_z: float) -> float:
+	return (_seaward_edge_z() - world_z) * _landmass_forward_z
+
+# 0 at the inland wall's own Z, 1 at Sea's near edge, clamped beyond both -
+# clamping past 1 is what lets the shape stay open-ended toward the sea
+# (see _landmass_distance()'s own doc): once past the near edge, the
+# half-width just holds at landmass_half_width_seaward forever, it never
+# curves back inward. landmass_width_curve_power reshapes the transition
+# between the two ends, not the clamping itself.
+func _landmass_curve_t(world_z: float) -> float:
+	var span: float = _landmass_seaward_z - _landmass_inland_z
+	if absf(span) < 0.0001:
+		return 0.0
+	var linear_t: float = clampf((world_z - _landmass_inland_z) / span, 0.0, 1.0)
+	return pow(linear_t, maxf(landmass_width_curve_power, 0.0001))
+
+# Signed distance past the (noised) shoreline: negative on the dry side,
+# positive past it, roughly 0 at the crossing - not an exact promise that
+# height == sea_level exactly at distance == 0 (the falloff below is a
+# continuous blend, not a hard threshold), just close enough that this
+# moves consistently with the real, noised visual contour, which is the
+# property RegionField's wade drain actually needs.
+#
+# Deliberately only ever measures distance from the LEFT/RIGHT edges
+# (abs(world_x) - local_half_width) - the seaward edge has its own,
+# separate, noise-free straight ramp instead (_seaward_distance()), and
+# inland has no term at all (stays unconditionally dry, per this round's
+# decision - no falloff, no corner to round). _landmass_curve_t() clamps
+# at the near edge rather than closing off past it, so this function alone
+# describes an open channel with two wandering side edges, not a rounded
+# rectangle - there are no corners to round on this function's own account;
+# _relief_height()/get_landmass_distance() combine this with
+# _seaward_distance() via max() to get the full shape.
+func _landmass_distance(world_xz: Vector2) -> float:
+	_ensure_landmass_refs()
+	var t: float = _landmass_curve_t(world_xz.y)
+	var local_half_width: float = lerpf(landmass_half_width_inland, landmass_half_width_seaward, t)
+	var noise: float = (_value_noise(world_xz / maxf(shoreline_noise_scale, 0.001)) - 0.5) * 2.0 * shoreline_noise_amplitude
+	return absf(world_xz.x) - local_half_width + noise
+
 func _relief_height(world_xz: Vector2) -> float:
+	_ensure_landmass_refs()
+	# Whichever edge is closer wins - a point can only be "past the
+	# shoreline" via one edge or the other, never averaged between them.
+	var side_factor: float = smoothstep(0.0, maxf(landmass_falloff_width, 0.001), _landmass_distance(world_xz))
+	var seaward_factor: float = smoothstep(0.0, maxf(landmass_seaward_falloff_width, 0.001), _seaward_distance(world_xz.y))
+	var landmass_factor: float = maxf(side_factor, seaward_factor)
+	var landmass_height: float = _landmass_sea_level + lerpf(landmass_interior_height, -landmass_below_sea_depth, landmass_factor)
+
+	# Fine surface detail on top of the landmass base - the field's
+	# original bump/wetness noise, unrelated to sea_level, kept purely as
+	# texture now that the landmass term carries the actual shore shape.
 	var wetness: float = _wetness_mask(world_xz)
 	var noise_scale: float = maxf(relief_noise_scale, 0.001)
 	var bump: float = (_value_noise(world_xz / noise_scale) - 0.5) * 2.0
-	return bump * relief_amplitude - wetness * relief_amplitude
+	var fine_detail: float = bump * relief_amplitude - wetness * relief_amplitude
+
+	return landmass_height + fine_detail
 
 # Exactly 0 for edge_dist <= relief_flat_margin (smoothstep clamps at its
 # own lower bound), THEN transitions to 1 over the next relief_edge_fade
@@ -479,6 +681,15 @@ func _relief_edge_fade_factor(world_xz: Vector2) -> float:
 # matches its default: _debug_assert_height_matches_shader_math() skips
 # the whole comparison the moment any of them has been tuned away from
 # that, so editing relief in the Remote tab never trips a false failure.
+#
+# Permanently skipped as of the landmass shape change: relief_extent's own
+# default moved to (100, 70) and _relief_height() now includes the
+# landmass term, so DEBUG_DEFAULT_RELIEF_EXTENT/DEBUG_REFERENCE_SAMPLES
+# below (still the old (80, 50)/bump-only values) never match at_defaults
+# again - this intentionally reuses the same "skip if not at defaults"
+# escape hatch rather than re-deriving a new Node.js reference for the
+# landmass formula, which is out of scope for this pass. Flag if that
+# parity check is wanted back.
 const DEBUG_DEFAULT_WETNESS_SCALE: float = 30.0
 const DEBUG_DEFAULT_WETNESS_AMOUNT: float = 0.4
 const DEBUG_DEFAULT_RELIEF_NOISE_SCALE: float = 4.0
@@ -544,6 +755,12 @@ const NORMAL_DEBUG_NODE_NAME: String = "NormalDebugLines"
 func _rebuild_ground_mesh_and_collision() -> void:
 	if not _ready_done:
 		return
+
+	# Forces _ensure_landmass_refs() to re-read Sea/RegionField on the next
+	# _relief_height()/get_landmass_distance() call, rather than serving a
+	# cache that could predate either being ready, or predate a live edit
+	# to Sea's own near_edge_z-affecting exports.
+	_landmass_refs_ready = false
 
 	var cols: int = relief_subdivisions.x + 2
 	var rows: int = relief_subdivisions.y + 2
