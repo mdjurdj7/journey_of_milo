@@ -247,6 +247,68 @@ signal relief_rebuilt
 		landmass_seaward_below_sea_depth = value
 		_rebuild_ground_mesh_and_collision()
 
+# Painted landmass: a grayscale image is the land shape instead of the SDF
+# above. White = sand, black = water; the 0.5 contour IS the waterline -
+# the painting is treated as PURE SHAPE, the gray in between only places
+# that contour at sub-pixel precision (bilinear sample, then threshold), it
+# does not paint the beach slope. The slope is still landmass_falloff_width
+# (via the same smoothstep _relief_height()'s side branch uses), fed by a
+# signed distance field computed from the mask once per change (see
+# _rebuild_mask_data()) - but unlike the SDF, whose distance 0 is where the
+# ramp STARTS (the sea_level crossing lands ~0.29 x falloff_width further
+# out at the current exports), the mask ramp is shifted inland by
+# _mask_ramp_offset() so height == sea_level exactly at mask distance 0:
+# sand ends where it was drawn, and get_landmass_distance()'s 0 (the
+# drain's own "shore") is that same drawn line. Mode is automatic: mask
+# set -> mask; null -> SDF. In mask mode the half-width/curve/seaward_*
+# exports and shoreline_noise_* are ignored (the painted edge is the edge);
+# landmass_interior_height/landmass_below_sea_depth/landmass_falloff_width
+# still apply. Sea's wave calming still follows the SDF under a mask - see
+# DESIGN.md.
+#
+# Image -> world: image up = inland (+RegionField.get_forward()), image
+# right = forward rotated 90 degrees (+X when forward is -Z); the pixel at
+# landmass_mask_origin (normalized image coords, (0.5, 0.5) = image centre)
+# sits on the Wanderer's spawn. Beyond the image's left/right/bottom edges
+# everything is water; beyond the TOP edge the top row is extended (clamp-
+# to-edge) so a neck that runs off the top of the drawing stays dry up to
+# the inland wall - inland is unconditionally dry, same as the SDF.
+@export_group("Landmass Mask")
+@export var landmass_mask: Texture2D = null:
+	set(value):
+		landmass_mask = value
+		_mask_dirty = true
+		_rebuild_ground_mesh_and_collision()
+@export var landmass_mask_pixels_per_metre: float = 30.0:
+	set(value):
+		landmass_mask_pixels_per_metre = value
+		_mask_dirty = true
+		_rebuild_ground_mesh_and_collision()
+@export var landmass_mask_origin: Vector2 = Vector2(0.5, 0.5):
+	set(value):
+		landmass_mask_origin = value
+		_mask_dirty = true
+		_rebuild_ground_mesh_and_collision()
+# The distance field's own grid, NOT the image's resolution: an exact EDT
+# over the full image (~700k cells) is seconds in GDScript, far too slow
+# for a live setter; at 4 cells/m over the image rect plus padding it's
+# ~30k cells and well under a frame's worth of work at load. Contour
+# precision comes from bilinear-sampling the mask before thresholding, not
+# from this cell size. Padding is how far past the image rect the grid
+# extends (the walls sit inside it); beyond that the sample clamps to the
+# grid's edge value.
+@export var landmass_mask_distance_cells_per_metre: float = 4.0:
+	set(value):
+		landmass_mask_distance_cells_per_metre = value
+		_mask_dirty = true
+		_rebuild_ground_mesh_and_collision()
+@export var landmass_mask_distance_padding: float = 8.0:
+	set(value):
+		landmass_mask_distance_padding = value
+		_mask_dirty = true
+		_rebuild_ground_mesh_and_collision()
+@export_group("")
+
 # Drift lines: a few faint bands running parallel to the shore, marking
 # where wrack will sit later. Spaced inland from the water line, wobbled
 # so they don't read as ruled lines, and faded out after drift_line_count
@@ -565,9 +627,37 @@ func get_wetness_at(world_xz: Vector2) -> float:
 # (left/right's noised _landmass_distance(), or seaward's plain _seaward_
 # distance()) the position is furthest past wins - same max() combination
 # _relief_height() uses to pick which edge actually submerges a point.
+# Under a landmass_mask the signed distance comes from the mask's own
+# distance field instead (see _rebuild_mask_data()) - same sign convention
+# (negative on sand, positive in water), but 0 is the DRAWN LINE, which
+# _relief_height()'s mask branch makes the exact sea_level crossing (see
+# _mask_ramp_offset()) - so in mask mode the drain's "distance past shore"
+# is literally distance past the waterline, with none of the SDF's ~2m of
+# ramp-start lead-in on dry sand. No offset is applied here on purpose:
+# the raw mask distance already has the drawn line at 0; the offset only
+# belongs in the height ramp, which is what had to move to meet it.
 func get_landmass_distance(world_xz: Vector2) -> float:
+	if has_landmass_mask():
+		return _mask_distance_sample(world_xz)
 	_ensure_landmass_refs()
 	return maxf(_landmass_distance(world_xz), _seaward_distance(world_xz.y))
+
+# True once a landmass_mask is set AND decoded into a distance field - false
+# during the brief window between assignment and the rebuild that decodes
+# it, and whenever the texture yields no readable image (see _rebuild_mask_
+# data()'s own fallback), so every consumer degrades to the SDF together.
+func has_landmass_mask() -> bool:
+	return landmass_mask != null and _mask_ready
+
+# World-XZ (x = X, y = Z) bounding rectangle of the painted land - the
+# cells at/above the 0.5 threshold INSIDE the image rect only, so a neck
+# that runs off the top of the drawing bounds at the image's top edge, not
+# at the padded distance grid's (the clamp-to-edge band past that edge is
+# dry, but it's not authored land). RegionField sizes the boundary walls
+# from this in mask mode (see its _rebuild_boundary_walls()). Meaningless
+# (an empty Rect2) without a mask - check has_landmass_mask() first.
+func get_landmass_bounds() -> Rect2:
+	return _mask_land_bounds
 
 func _hash(p: Vector2) -> float:
 	var x: float = fposmod(p.x * 123.34, 1.0)
@@ -605,6 +695,10 @@ var _landmass_inland_z: float = 0.0
 var _landmass_seaward_z: float = 0.0
 var _landmass_sea_level: float = 0.0
 var _landmass_forward_z: float = -1.0
+# Mask mode's own two references (see _mask_world_to_pixel()): the full XZ
+# forward (not just its Z) and the spawn the mask's origin pixel sits on.
+var _landmass_forward_xz: Vector2 = Vector2(0.0, -1.0)
+var _landmass_spawn_xz: Vector2 = Vector2.ZERO
 
 func _ensure_landmass_refs() -> void:
 	if _landmass_refs_ready:
@@ -612,7 +706,11 @@ func _ensure_landmass_refs() -> void:
 	var region_field := get_node_or_null(region_field_path) as RegionField
 	var sea := get_node_or_null(sea_path) as Sea
 	_landmass_inland_z = region_field.get_inland_z() if region_field else 0.0
-	_landmass_forward_z = region_field.get_forward().z if region_field else -1.0
+	var forward: Vector3 = region_field.get_forward() if region_field else Vector3.FORWARD
+	_landmass_forward_z = forward.z
+	_landmass_forward_xz = Vector2(forward.x, forward.z)
+	var spawn: Vector3 = region_field.get_spawn_position() if region_field else Vector3.ZERO
+	_landmass_spawn_xz = Vector2(spawn.x, spawn.z)
 	_landmass_seaward_z = sea.get_near_edge_z() if sea else 0.0
 	_landmass_sea_level = sea.sea_level if sea else 0.0
 	_landmass_refs_ready = true
@@ -672,20 +770,33 @@ func _landmass_distance(world_xz: Vector2) -> float:
 
 func _relief_height(world_xz: Vector2) -> float:
 	_ensure_landmass_refs()
-	# Whichever edge actually submerges this point further wins - computed
-	# as two independent HEIGHTS (not factors combined by max()) because
-	# the two edges no longer share one below_sea_depth: the seaward wade
-	# depth was tuned against the wall's own distance from shore, unrelated
-	# to how deep the sides go (see landmass_seaward_below_sea_depth's own
-	# doc). min() picks whichever edge's height is lower - the correct
-	# generalization once the two branches can bottom out at different
-	# depths (comparing raw factors wouldn't tell you which resulting
-	# height is actually lower).
-	var side_factor: float = smoothstep(0.0, maxf(landmass_falloff_width, 0.001), _landmass_distance(world_xz))
-	var seaward_factor: float = smoothstep(0.0, maxf(landmass_seaward_falloff_width, 0.001), _seaward_distance(world_xz.y))
-	var side_height: float = _landmass_sea_level + lerpf(landmass_interior_height, -landmass_below_sea_depth, side_factor)
-	var seaward_height: float = _landmass_sea_level + lerpf(landmass_interior_height, -landmass_seaward_below_sea_depth, seaward_factor)
-	var landmass_height: float = minf(side_height, seaward_height)
+	var landmass_height: float
+	if has_landmass_mask():
+		# One edge, one depth: the mask's signed shore distance through the
+		# same smoothstep/lerp the SDF's side branch below uses, shifted
+		# inland by _mask_ramp_offset() so the ramp crosses sea_level at
+		# mask distance 0 - the drawn line - rather than starting there.
+		# No seaward-specific branch - the painting doesn't know which edge
+		# is which, and the seaward_* exports are SDF-only.
+		var ramp_distance: float = _mask_distance_sample(world_xz) + _mask_ramp_offset()
+		var mask_factor: float = smoothstep(0.0, maxf(landmass_falloff_width, 0.001), ramp_distance)
+		landmass_height = _landmass_sea_level + lerpf(landmass_interior_height, -landmass_below_sea_depth, mask_factor)
+	else:
+		# Whichever edge actually submerges this point further wins -
+		# computed as two independent HEIGHTS (not factors combined by
+		# max()) because the two edges no longer share one below_sea_depth:
+		# the seaward wade depth was tuned against the wall's own distance
+		# from shore, unrelated to how deep the sides go (see landmass_
+		# seaward_below_sea_depth's own doc). min() picks whichever edge's
+		# height is lower - the correct generalization once the two
+		# branches can bottom out at different depths (comparing raw
+		# factors wouldn't tell you which resulting height is actually
+		# lower).
+		var side_factor: float = smoothstep(0.0, maxf(landmass_falloff_width, 0.001), _landmass_distance(world_xz))
+		var seaward_factor: float = smoothstep(0.0, maxf(landmass_seaward_falloff_width, 0.001), _seaward_distance(world_xz.y))
+		var side_height: float = _landmass_sea_level + lerpf(landmass_interior_height, -landmass_below_sea_depth, side_factor)
+		var seaward_height: float = _landmass_sea_level + lerpf(landmass_interior_height, -landmass_seaward_below_sea_depth, seaward_factor)
+		landmass_height = minf(side_height, seaward_height)
 
 	# Fine surface detail on top of the landmass base - the field's
 	# original bump/wetness noise, unrelated to sea_level, kept purely as
@@ -706,6 +817,275 @@ func _relief_edge_fade_factor(world_xz: Vector2) -> float:
 	var edge_dist: float = minf(half_extent.x - absf(world_xz.x), half_extent.y - absf(world_xz.y))
 	var flat_margin: float = maxf(relief_flat_margin, 0.0)
 	return smoothstep(flat_margin, flat_margin + maxf(relief_edge_fade, 0.001), edge_dist)
+
+# --- Landmass mask: decode, signed distance field, sampling ---
+#
+# Decoded once per mask-affecting export change (see _mask_dirty and the
+# Landmass Mask export group's own doc), inside _rebuild_ground_mesh_and_
+# collision() rather than in the setters themselves, so a mask assigned in
+# the .tscn (whose setter fires during deserialization, before _ready())
+# is decoded exactly once, on the first real rebuild. Two arrays result:
+# the image's own luminance bytes (_mask_bytes, sampled bilinearly by
+# _mask_sample()) and the coarser signed distance grid (_mask_distance,
+# sampled by _mask_distance_sample()) that everything height/drain-related
+# actually reads - the image itself is only ever read while building that
+# grid.
+const MASK_LAND_THRESHOLD: float = 0.5
+# "No source here yet" for the EDT below. Finite on purpose: with a true
+# INF, INF - INF in _edt_intersection() is NaN and the lower-envelope
+# bookkeeping silently relies on NaN comparison semantics; 1e20 keeps
+# every intermediate finite while still dwarfing any real squared
+# distance at this grid size, so a parabola rooted here never wins.
+const MASK_EDT_FAR: float = 1.0e20
+
+var _mask_dirty: bool = true
+var _mask_ready: bool = false
+var _mask_bytes: PackedByteArray = PackedByteArray()
+var _mask_width: int = 0
+var _mask_height: int = 0
+var _mask_distance: PackedFloat32Array = PackedFloat32Array()
+var _mask_distance_cols: int = 0
+var _mask_distance_rows: int = 0
+# World XZ of distance cell (0, 0); cells step +cell_size along +X (col)
+# and +Z (row) from there - the grid is world-axis-aligned regardless of
+# forward, since it's built from the image rect's world-space bounds.
+var _mask_distance_origin: Vector2 = Vector2.ZERO
+var _mask_distance_cell_size: float = 0.25
+var _mask_land_bounds: Rect2 = Rect2()
+
+func _rebuild_mask_data() -> void:
+	_mask_dirty = false
+	_mask_ready = false
+	_mask_bytes = PackedByteArray()
+	_mask_distance = PackedFloat32Array()
+	_mask_land_bounds = Rect2()
+	if landmass_mask == null:
+		return
+	if not _decode_mask_image():
+		push_warning("Ground: landmass_mask yielded no readable image; falling back to the SDF landmass.")
+		return
+	_build_mask_distance_field()
+	_mask_ready = true
+
+# Texture2D.get_image() hands back a fresh copy, so converting it in place
+# is safe. A PNG's default import is lossless, so decompress() is normally
+# a no-op - it's here for the day Detect 3D flips the import to VRAM-
+# compressed. L8 so one byte per pixel is the whole story; for a grayscale
+# painting the engine's RGB->L conversion is the identity either way.
+func _decode_mask_image() -> bool:
+	var image: Image = landmass_mask.get_image()
+	if image == null or image.is_empty():
+		return false
+	if image.is_compressed() and image.decompress() != OK:
+		return false
+	image.clear_mipmaps()
+	image.convert(Image.FORMAT_L8)
+	_mask_width = image.get_width()
+	_mask_height = image.get_height()
+	_mask_bytes = image.get_data()
+	return _mask_bytes.size() == _mask_width * _mask_height
+
+# Continuous pixel coordinates (top-left origin, pixel i spanning [i, i+1))
+# of a world XZ position, per the Landmass Mask group's own image->world
+# doc: right = forward rotated a quarter turn (so +X when forward is -Z),
+# rows run seaward (against forward).
+func _mask_world_to_pixel(world_xz: Vector2) -> Vector2:
+	var forward: Vector2 = _landmass_forward_xz
+	var right: Vector2 = Vector2(-forward.y, forward.x)
+	var rel: Vector2 = world_xz - _landmass_spawn_xz
+	var ppm: float = maxf(landmass_mask_pixels_per_metre, 0.001)
+	var origin_px: Vector2 = landmass_mask_origin * Vector2(float(_mask_width), float(_mask_height))
+	return Vector2(origin_px.x + rel.dot(right) * ppm, origin_px.y - rel.dot(forward) * ppm)
+
+func _mask_pixel_to_world(pixel: Vector2) -> Vector2:
+	var forward: Vector2 = _landmass_forward_xz
+	var right: Vector2 = Vector2(-forward.y, forward.x)
+	var ppm: float = maxf(landmass_mask_pixels_per_metre, 0.001)
+	var origin_px: Vector2 = landmass_mask_origin * Vector2(float(_mask_width), float(_mask_height))
+	var offset: Vector2 = (pixel - origin_px) / ppm
+	return _landmass_spawn_xz + right * offset.x - forward * offset.y
+
+func _mask_byte(x: int, y: int) -> float:
+	return float(_mask_bytes[y * _mask_width + x]) / 255.0
+
+# Bilinear over pixel centres. Past the left/right/bottom edges: water
+# (0). Past the top edge: the top row extended, so land running off the
+# top of the drawing stays land all the way inland (see the export group's
+# own doc on why inland is the one dry side).
+func _mask_sample(world_xz: Vector2) -> float:
+	var p: Vector2 = _mask_world_to_pixel(world_xz) - Vector2(0.5, 0.5)
+	if p.x < -0.5 or p.x > float(_mask_width) - 0.5 or p.y > float(_mask_height) - 0.5:
+		return 0.0
+	var x: float = clampf(p.x, 0.0, float(_mask_width - 1))
+	var y: float = clampf(p.y, 0.0, float(_mask_height - 1))
+	var x0: int = int(floor(x))
+	var y0: int = int(floor(y))
+	var x1: int = mini(x0 + 1, _mask_width - 1)
+	var y1: int = mini(y0 + 1, _mask_height - 1)
+	var fx: float = x - float(x0)
+	var fy: float = y - float(y0)
+	var top: float = lerpf(_mask_byte(x0, y0), _mask_byte(x1, y0), fx)
+	var bottom: float = lerpf(_mask_byte(x0, y1), _mask_byte(x1, y1), fx)
+	return lerpf(top, bottom, fy)
+
+# The signed shore distance grid: negative on land, positive in water, in
+# metres, over the image rect grown by landmass_mask_distance_padding.
+# Each cell is classified by bilinear-sampling the mask at its centre and
+# thresholding (that's where the contour's sub-pixel precision comes from
+# - see the export group's doc), then two exact Euclidean distance
+# transforms (Felzenszwalb-Huttenlocher, see _edt_squared()) give every
+# water cell its distance to the nearest land cell and vice versa. A cell
+# on either side of the boundary lands at +-1 cell, so the bilinear sample
+# crosses 0 exactly halfway between them - on the contour.
+#
+# Also the one place _mask_land_bounds is measured: land cells whose
+# position falls inside the image rect proper, so the clamp-to-edge band
+# past the top edge doesn't count (see get_landmass_bounds()'s own doc).
+func _build_mask_distance_field() -> void:
+	_ensure_landmass_refs()
+	var image_rect: Rect2 = Rect2(_mask_pixel_to_world(Vector2.ZERO), Vector2.ZERO)
+	image_rect = image_rect.expand(_mask_pixel_to_world(Vector2(float(_mask_width), 0.0)))
+	image_rect = image_rect.expand(_mask_pixel_to_world(Vector2(0.0, float(_mask_height))))
+	image_rect = image_rect.expand(_mask_pixel_to_world(Vector2(float(_mask_width), float(_mask_height))))
+	var grid_rect: Rect2 = image_rect.grow(maxf(landmass_mask_distance_padding, 0.0))
+	var cell: float = 1.0 / maxf(landmass_mask_distance_cells_per_metre, 0.01)
+	var cols: int = int(ceil(grid_rect.size.x / cell)) + 1
+	var rows: int = int(ceil(grid_rect.size.y / cell)) + 1
+	_mask_distance_cols = cols
+	_mask_distance_rows = rows
+	_mask_distance_origin = grid_rect.position
+	_mask_distance_cell_size = cell
+
+	var land: PackedByteArray = PackedByteArray()
+	land.resize(cols * rows)
+	var bounds_started: bool = false
+	var bounds: Rect2 = Rect2()
+	for row in rows:
+		for col in cols:
+			var world_xz: Vector2 = _mask_distance_origin + Vector2(float(col), float(row)) * cell
+			var is_land: bool = _mask_sample(world_xz) >= MASK_LAND_THRESHOLD
+			land[row * cols + col] = 1 if is_land else 0
+			if is_land and image_rect.has_point(world_xz):
+				if bounds_started:
+					bounds = bounds.expand(world_xz)
+				else:
+					bounds = Rect2(world_xz, Vector2.ZERO)
+					bounds_started = true
+	_mask_land_bounds = bounds
+
+	var to_land: PackedFloat64Array = _edt_squared(land, cols, rows, 1)
+	var to_water: PackedFloat64Array = _edt_squared(land, cols, rows, 0)
+	# A grid with no land (or no water) at all leaves one transform at
+	# MASK_EDT_FAR everywhere - capped to the grid's own diagonal so the
+	# result is a sane "very far" rather than 1e10 metres.
+	var far: float = grid_rect.size.length()
+	_mask_distance.resize(cols * rows)
+	for i in cols * rows:
+		var distance: float = -sqrt(to_water[i]) * cell if land[i] == 1 else sqrt(to_land[i]) * cell
+		_mask_distance[i] = clampf(distance, -far, far)
+
+	print("Ground: landmass mask %dx%d px at %.1f px/m -> image rect %s, land bounds %s, distance grid %dx%d @ %.2fm" % [_mask_width, _mask_height, landmass_mask_pixels_per_metre, image_rect, _mask_land_bounds, cols, rows, cell])
+
+# Squared Euclidean distance (in cells) from every cell to the nearest
+# cell whose land[] value == source_value - Felzenszwalb & Huttenlocher's
+# separable lower-envelope-of-parabolas transform: exact, O(cells), one
+# 1-D pass down every column then one along every row. Float64 working
+# arrays because the parabola intersections in _edt_1d() mix MASK_EDT_FAR
+# with small squared distances, which float32 would flatten.
+func _edt_squared(land: PackedByteArray, cols: int, rows: int, source_value: int) -> PackedFloat64Array:
+	var cell_count: int = cols * rows
+	var grid: PackedFloat64Array = PackedFloat64Array()
+	grid.resize(cell_count)
+	for i in cell_count:
+		grid[i] = 0.0 if land[i] == source_value else MASK_EDT_FAR
+
+	var length: int = maxi(cols, rows)
+	var f: PackedFloat64Array = PackedFloat64Array()
+	f.resize(length)
+	var d: PackedFloat64Array = PackedFloat64Array()
+	d.resize(length)
+	var v: PackedInt32Array = PackedInt32Array()
+	v.resize(length)
+	var z: PackedFloat64Array = PackedFloat64Array()
+	z.resize(length + 1)
+
+	for col in cols:
+		for row in rows:
+			f[row] = grid[row * cols + col]
+		_edt_1d(f, rows, d, v, z)
+		for row in rows:
+			grid[row * cols + col] = d[row]
+	for row in rows:
+		for col in cols:
+			f[col] = grid[row * cols + col]
+		_edt_1d(f, cols, d, v, z)
+		for col in cols:
+			grid[row * cols + col] = d[col]
+	return grid
+
+# One 1-D pass of the transform above: d[q] = min over p of (q-p)^2 + f[p].
+# v[] holds the parabola vertices on the lower envelope, z[] the boundaries
+# between consecutive ones; scratch arrays are passed in (sized by the
+# caller) rather than allocated per row.
+func _edt_1d(f: PackedFloat64Array, n: int, d: PackedFloat64Array, v: PackedInt32Array, z: PackedFloat64Array) -> void:
+	var k: int = 0
+	v[0] = 0
+	z[0] = -INF
+	z[1] = INF
+	for q in range(1, n):
+		var s: float = _edt_intersection(f, q, v[k])
+		while s <= z[k]:
+			k -= 1
+			s = _edt_intersection(f, q, v[k])
+		k += 1
+		v[k] = q
+		z[k] = s
+		z[k + 1] = INF
+	k = 0
+	for q in n:
+		while z[k + 1] < float(q):
+			k += 1
+		var dq: float = float(q - v[k])
+		d[q] = dq * dq + f[v[k]]
+
+# X of the intersection of the parabolas rooted at q and p (q > p).
+func _edt_intersection(f: PackedFloat64Array, q: int, p: int) -> float:
+	return ((f[q] + float(q * q)) - (f[p] + float(p * p))) / float(2 * q - 2 * p)
+
+# How far inland of the drawn line the mask ramp's flat interior ends -
+# i.e. the distance along the ramp at which lerp(interior_height,
+# -below_sea_depth, smoothstep(0, falloff_width, d)) crosses 0. Solved
+# exactly: the crossing is at smoothstep factor f0 = interior / (interior
+# + below), and smoothstep's t*t*(3 - 2t) inverts in closed form as
+# t = 0.5 - sin(asin(1 - 2f) / 3) (the real root of the depressed cubic
+# on [0, 1]). Adding this to the raw mask distance before the smoothstep
+# (see _relief_height()) puts the sea_level crossing exactly on mask
+# distance 0. Recomputed per sample rather than cached - a couple of trig
+# calls, and it keeps get_height_at() a pure function of the exports.
+func _mask_ramp_offset() -> float:
+	var total: float = landmass_interior_height + landmass_below_sea_depth
+	if total <= 0.0001:
+		return 0.0
+	var f0: float = clampf(landmass_interior_height / total, 0.0, 1.0)
+	var t0: float = 0.5 - sin(asin(1.0 - 2.0 * f0) / 3.0)
+	return maxf(landmass_falloff_width, 0.001) * t0
+
+# Bilinear over the distance grid, clamped to its edge beyond it - past
+# the padding everything is either open water or the dry inland band, and
+# the walls sit well inside either way.
+func _mask_distance_sample(world_xz: Vector2) -> float:
+	var g: Vector2 = (world_xz - _mask_distance_origin) / _mask_distance_cell_size
+	var x: float = clampf(g.x, 0.0, float(_mask_distance_cols - 1))
+	var y: float = clampf(g.y, 0.0, float(_mask_distance_rows - 1))
+	var x0: int = int(floor(x))
+	var y0: int = int(floor(y))
+	var x1: int = mini(x0 + 1, _mask_distance_cols - 1)
+	var y1: int = mini(y0 + 1, _mask_distance_rows - 1)
+	var fx: float = x - float(x0)
+	var fy: float = y - float(y0)
+	var top: float = lerpf(_mask_distance[y0 * _mask_distance_cols + x0], _mask_distance[y0 * _mask_distance_cols + x1], fx)
+	var bottom: float = lerpf(_mask_distance[y1 * _mask_distance_cols + x0], _mask_distance[y1 * _mask_distance_cols + x1], fx)
+	return lerpf(top, bottom, fy)
 
 # Sample points and their expected get_height_at() result, computed once
 # by an independent re-port of the same shader math (in Node.js, not this
@@ -794,6 +1174,12 @@ func _rebuild_ground_mesh_and_collision() -> void:
 	# cache that could predate either being ready, or predate a live edit
 	# to Sea's own near_edge_z-affecting exports.
 	_landmass_refs_ready = false
+	# After the refs invalidation above, since the distance grid is placed
+	# from spawn/forward (see _build_mask_distance_field()) and must read
+	# them fresh too. Only re-decodes when a mask-affecting export changed;
+	# a plain relief edit reuses the existing grid.
+	if _mask_dirty:
+		_rebuild_mask_data()
 
 	var cols: int = relief_subdivisions.x + 2
 	var rows: int = relief_subdivisions.y + 2
