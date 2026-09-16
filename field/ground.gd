@@ -186,7 +186,13 @@ signal relief_rebuilt
 		landmass_falloff_width = value
 		_rebuild_ground_mesh_and_collision()
 # Both relative to Sea's own sea_level (not absolute), so the landmass
-# stays correctly seated if sea_level is ever retuned.
+# stays correctly seated if sea_level is ever retuned. landmass_interior_
+# height is shared by both edges (it's the same dry baseline everywhere);
+# landmass_below_sea_depth is the LEFT/RIGHT edges' own max depth only -
+# see landmass_seaward_below_sea_depth below for the separate seaward one
+# (the two need independent values: the seaward wade depth was tuned
+# against the wall's own distance from the shore, which has nothing to do
+# with how deep the sides go).
 @export var landmass_interior_height: float = 0.5:
 	set(value):
 		landmass_interior_height = value
@@ -210,18 +216,35 @@ signal relief_rebuilt
 # Seaward falloff - unlike the left/right edges, this is a plain straight
 # ramp along Z only: no rounding, no noise (the sides already carry the
 # irregularity; this one's meant to read as an open beach slope, not
-# another wandering edge). 0 (default) means "auto": use Sea's own near
-# edge (get_near_edge_z()) - same "0 means auto" pattern Wanderer's
-# model_scale_override uses. Nonzero overrides it directly, e.g. to start
-# the ramp a bit before/after that reference point.
-@export var landmass_seaward_edge_z: float = 0.0:
+# another wandering edge).
+#
+# Set explicitly (not the "0 means auto" default this used to carry - see
+# _seaward_edge_z()'s own doc, the fallback still exists but is unused at
+# this value) to land the sea_level crossing at z=+2.5 (2.5m seaward of
+# spawn) while landmass_seaward_falloff_width/landmass_seaward_below_sea_
+# depth below independently pin the depth at the seaward wall (z=9) to
+# 0.9m - waist-deep on the Wanderer (target_height 1.8m). Solved as a pair:
+# with the ramp's full 0-to-1 transition landing exactly on [edge_z,
+# edge_z + falloff_width] = [-1.9, 9.0], smoothstep saturates to exactly 1
+# (and depth to exactly landmass_seaward_below_sea_depth) AT the wall with
+# no earlier plateau - i.e. no shelf - and crosses sea_level (depth 0) at
+# the point where the lerp between interior_height and -below_sea_depth
+# hits 0, which lands at z=2.5 for these particular values. Retune together
+# if any of the three (edge_z, falloff_width, below_sea_depth) changes -
+# they're coupled, not independent.
+@export var landmass_seaward_edge_z: float = -1.9:
 	set(value):
 		landmass_seaward_edge_z = value
 		_rebuild_ground_mesh_and_collision()
-# Long on purpose (~6-8m) so this reads as a beach slope, not a bank.
-@export var landmass_seaward_falloff_width: float = 7.0:
+@export var landmass_seaward_falloff_width: float = 10.9:
 	set(value):
 		landmass_seaward_falloff_width = value
+		_rebuild_ground_mesh_and_collision()
+# Seaward-only max depth (see landmass_below_sea_depth's own doc on why
+# this is separate from the sides' value) - 0.9m, waist-deep at the wall.
+@export var landmass_seaward_below_sea_depth: float = 0.9:
+	set(value):
+		landmass_seaward_below_sea_depth = value
 		_rebuild_ground_mesh_and_collision()
 
 # Drift lines: a few faint bands running parallel to the shore, marking
@@ -635,9 +658,11 @@ func _landmass_curve_t(world_z: float) -> float:
 # decision - no falloff, no corner to round). _landmass_curve_t() clamps
 # at the near edge rather than closing off past it, so this function alone
 # describes an open channel with two wandering side edges, not a rounded
-# rectangle - there are no corners to round on this function's own account;
-# _relief_height()/get_landmass_distance() combine this with
-# _seaward_distance() via max() to get the full shape.
+# rectangle - there are no corners to round on this function's own account.
+# get_landmass_distance() combines this with _seaward_distance() via max()
+# for the raw shoreline-distance shape; _relief_height() combines the two
+# edges' resulting HEIGHTS instead (via min()), since they can bottom out
+# at different depths - see its own doc.
 func _landmass_distance(world_xz: Vector2) -> float:
 	_ensure_landmass_refs()
 	var t: float = _landmass_curve_t(world_xz.y)
@@ -647,12 +672,20 @@ func _landmass_distance(world_xz: Vector2) -> float:
 
 func _relief_height(world_xz: Vector2) -> float:
 	_ensure_landmass_refs()
-	# Whichever edge is closer wins - a point can only be "past the
-	# shoreline" via one edge or the other, never averaged between them.
+	# Whichever edge actually submerges this point further wins - computed
+	# as two independent HEIGHTS (not factors combined by max()) because
+	# the two edges no longer share one below_sea_depth: the seaward wade
+	# depth was tuned against the wall's own distance from shore, unrelated
+	# to how deep the sides go (see landmass_seaward_below_sea_depth's own
+	# doc). min() picks whichever edge's height is lower - the correct
+	# generalization once the two branches can bottom out at different
+	# depths (comparing raw factors wouldn't tell you which resulting
+	# height is actually lower).
 	var side_factor: float = smoothstep(0.0, maxf(landmass_falloff_width, 0.001), _landmass_distance(world_xz))
 	var seaward_factor: float = smoothstep(0.0, maxf(landmass_seaward_falloff_width, 0.001), _seaward_distance(world_xz.y))
-	var landmass_factor: float = maxf(side_factor, seaward_factor)
-	var landmass_height: float = _landmass_sea_level + lerpf(landmass_interior_height, -landmass_below_sea_depth, landmass_factor)
+	var side_height: float = _landmass_sea_level + lerpf(landmass_interior_height, -landmass_below_sea_depth, side_factor)
+	var seaward_height: float = _landmass_sea_level + lerpf(landmass_interior_height, -landmass_seaward_below_sea_depth, seaward_factor)
+	var landmass_height: float = minf(side_height, seaward_height)
 
 	# Fine surface detail on top of the landmass base - the field's
 	# original bump/wetness noise, unrelated to sea_level, kept purely as
