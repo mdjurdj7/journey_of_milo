@@ -355,28 +355,26 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 		shore_fade_width = value
 		_apply_uniform("shore_fade_width", value)
 
-# Distance: blends toward fog_color between fog_near_distance and
-# fog_far_distance, scaled by fog_strength, so far water dissolves into
-# the horizon. fog_strength is 0 by default - the sea's own fog is OFF,
-# leaving deep_color to run to the horizon (the environment's fog no
-# longer reaches this surface either, see sea.gdshader's fog_disabled) -
-# raise it if the far sea needs to dissolve into the sky again. The
-# region's sky/horizon tone (see region_sky.gd's near-identical
-# horizon_color default); the near-field reflection has its own, paler
-# sky_reflect_color above.
-@export var fog_color: Color = Color(0.85, 0.87, 0.88):
+# Distance fog: the sea material is fog_disabled (see sea.gdshader), so
+# it reproduces the WorldEnvironment's depth fog itself with the same
+# curve and the same unlit blend - keep these equal to the environment's
+# fog_depth_begin / fog_depth_end / fog_color (14 / 28 / (0.86, 0.87,
+# 0.86)) and fog_strength 1.0, and the shore and the water plane fog at
+# the same rate at the same distance. The near-field reflection has its
+# own, paler sky_reflect_color above.
+@export var fog_color: Color = Color(0.86, 0.87, 0.86):
 	set(value):
 		fog_color = value
 		_apply_uniform("fog_color", value)
-@export_range(0.0, 1.0) var fog_strength: float = 0.0:
+@export_range(0.0, 1.0) var fog_strength: float = 1.0:
 	set(value):
 		fog_strength = value
 		_apply_uniform("fog_strength", value)
-@export var fog_near_distance: float = 60.0:
+@export var fog_near_distance: float = 14.0:
 	set(value):
 		fog_near_distance = value
 		_apply_uniform("fog_near_distance", value)
-@export var fog_far_distance: float = 250.0:
+@export var fog_far_distance: float = 28.0:
 	set(value):
 		fog_far_distance = value
 		_apply_uniform("fog_far_distance", value)

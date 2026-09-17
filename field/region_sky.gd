@@ -5,12 +5,24 @@ extends WorldEnvironment
 	set(value):
 		horizon_color = value
 		_push_pool_color()
+# The procedural sky's sun halo (ProceduralSkyMaterial.sun_angle_max) - 0
+# for an overcast sky with no visible sun; under fog_sky_affect 1.0 the
+# sky is fog-coloured anyway, but with any aerial perspective the halo
+# bled through as a pale blob in the upper frame.
+@export var sun_halo_degrees: float = 0.0
+# Depth fog: a linear ramp from fog_depth_begin (camera metres) to full
+# fog_density at fog_depth_end - FOG_MODE_DEPTH, so the far field is
+# actually removed rather than hazed (exponential fog at a usable
+# density never reaches opacity inside the field). Colour matched to
+# the sky at the horizon, no aerial-perspective blend (a flat colour, so
+# nothing in the sky - sun halo, gradient - shows through the fog).
+@export var fog_mode: Environment.FogMode = Environment.FOG_MODE_DEPTH
 @export var fog_color: Color = Color(0.87, 0.88, 0.85)
-@export var fog_density: float = 0.006
-@export var fog_depth_begin: float = 20.0
-@export var fog_depth_end: float = 320.0
+@export var fog_density: float = 1.0
+@export var fog_depth_begin: float = 14.0
+@export var fog_depth_end: float = 28.0
 @export var fog_sky_affect: float = 1.0
-@export var fog_aerial_perspective: float = 0.5
+@export var fog_aerial_perspective: float = 0.0
 # Tonemapping shifts how the fog itself reads (AgX/Filmic both compress
 # highlights differently than linear) - exposed here so that can be
 # corrected independently of fog_color/fog_density above, which stay
@@ -22,9 +34,10 @@ extends WorldEnvironment
 		_apply_fog_light_energy()
 # Flat color fill instead of the sky's own color - AMBIENT_SOURCE_SKY was
 # tinting every surface (sand most of all) noticeably blue, since the
-# procedural sky's horizon/top colors lean cool. ambient_color's default
-# is a warm off-white close to the sand's own dry tone instead.
-@export var ambient_color: Color = Color(0.78, 0.77, 0.74):
+# procedural sky's horizon/top colors lean cool. Neutral grey (no warm
+# light in Region 1); together with the sun it puts dry sand at ~0.87
+# before AgX.
+@export var ambient_color: Color = Color(0.85, 0.85, 0.85):
 	set(value):
 		ambient_color = value
 		_apply_ambient()
@@ -122,6 +135,7 @@ func _ready() -> void:
 	sky_material.sky_horizon_color = horizon_color
 	sky_material.ground_bottom_color = horizon_color
 	sky_material.ground_horizon_color = horizon_color
+	sky_material.sun_angle_max = sun_halo_degrees
 
 	var sky := Sky.new()
 	sky.sky_material = sky_material
@@ -130,6 +144,7 @@ func _ready() -> void:
 	_environment.background_mode = Environment.BG_SKY
 	_environment.sky = sky
 	_environment.fog_enabled = true
+	_environment.fog_mode = fog_mode
 	_environment.fog_light_color = fog_color
 	_environment.fog_density = fog_density
 	_environment.fog_depth_begin = fog_depth_begin

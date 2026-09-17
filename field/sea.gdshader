@@ -210,19 +210,20 @@ uniform float swash_phase_spread : hint_range(0.0, 1.0) = 0.15;
 // alpha 0).
 uniform float shore_fade_width : hint_range(0.01, 5.0) = 0.3;
 
-// Distance: blend toward fog_color between fog_near_distance and
-// fog_far_distance (view-space distance, same smoothstep shape
-// ground.gdshader's near/far tint uses) so far water dissolves into
-// the horizon instead of holding a hard flat color to the fog line. The
-// region's sky/horizon tone (see region_sky.gd's near-identical
-// horizon_color default); the near-field sky reflection has its own
-// sky_reflect_color above, deliberately paler than this.
-uniform vec4 fog_color : source_color = vec4(0.85, 0.87, 0.88, 1.0);
-uniform float fog_near_distance = 60.0;
-uniform float fog_far_distance = 250.0;
-// Scales the blend above; 0 (default) turns the sea's own fog off
-// entirely and deep_color runs to the horizon.
-uniform float fog_strength : hint_range(0.0, 1.0) = 0.0;
+// Distance fog - this material is fog_disabled (see render_mode), so it
+// reproduces the WorldEnvironment's depth fog itself: the SAME curve,
+// smoothstep(fog_near_distance, fog_far_distance, view distance) (Godot's
+// FOG_MODE_DEPTH at curve 1.0 is exactly that), applied as the SAME kind
+// of term - an unlit flat colour blended over the finished pixel, after
+// the overlays (see the composite in fragment()), never into ALBEDO
+// where the sun would light it. Keep fog_near/far/color equal to the
+// environment's depth begin/end/colour and the shore and the water plane
+// fog at the same rate at the same distance. fog_strength scales it
+// (1 = matches the environment's density 1.0).
+uniform vec4 fog_color : source_color = vec4(0.86, 0.87, 0.86, 1.0);
+uniform float fog_near_distance = 14.0;
+uniform float fog_far_distance = 28.0;
+uniform float fog_strength : hint_range(0.0, 1.0) = 1.0;
 
 uniform sampler2D depth_texture : hint_depth_texture, filter_linear_mipmap;
 
@@ -519,12 +520,9 @@ void fragment() {
 	float sky_t = clamp(fresnel * (1.0 + ripple * ripple_strength), 0.0, 1.0);
 	vec3 albedo = mix(water_rgb, sky_reflect_color.rgb, sky_t);
 
-	// Distance: dissolve into the fog color toward the horizon. Applied
-	// last to the surface colour so far water always fully resolves to it
-	// regardless of the depth/reflection layering above.
-	float dist = length(VERTEX);
-	float fog_t = smoothstep(fog_near_distance, fog_far_distance, dist) * fog_strength;
-	albedo = mix(albedo, fog_color.rgb, fog_t);
+	// Distance fog amount (see fog_color's own doc) - applied at the very
+	// end of the composite below, not here.
+	float fog_t = smoothstep(fog_near_distance, fog_far_distance, length(VERTEX)) * fog_strength;
 
 	// Surface pattern (see surface_pattern_strength's own doc): two
 	// scrolling noise layers summed, upper half -> bright ridges. Computed
@@ -596,10 +594,16 @@ void fragment() {
 	surface = mix(surface, foam_color.rgb, foam_amount);
 	surface = mix(surface, swash_color.rgb, swash_amount);
 	float overlay_amount = 1.0 - (1.0 - pattern_amount) * (1.0 - foam_amount) * (1.0 - swash_amount);
-	ALBEDO = surface;
-	EMISSION = behind * (1.0 - water_amount) * (1.0 - overlay_amount);
+	// Fog last, over everything, the way the environment fogs the opaque
+	// pass: the lit term and the specular scale down by (1 - fog_t), the
+	// unlit EMISSION carries the flat fog colour in. (The see-through
+	// sample already holds the environment's own fog for the seabed, so
+	// that share is fogged twice - it's the transparent fraction of water
+	// past 14m, i.e. next to nothing.)
+	ALBEDO = surface * (1.0 - fog_t);
+	EMISSION = behind * (1.0 - water_amount) * (1.0 - overlay_amount) * (1.0 - fog_t) + fog_color.rgb * fog_t;
 	ROUGHNESS = sea_roughness;
-	SPECULAR = sea_specular * water_amount;
+	SPECULAR = sea_specular * water_amount * (1.0 - fog_t);
 	METALLIC = 0.0;
 	ALPHA = 1.0;
 }

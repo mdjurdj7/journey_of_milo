@@ -162,20 +162,19 @@ battle_spacing = 4.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2022836371]
 script = ExtResource("2")
-sky_top_color = Color(0.46, 0.53, 0.61, 1)
-horizon_color = Color(0.62, 0.66, 0.7, 1)
-fog_color = Color(0.58, 0.63, 0.68, 1)
-fog_density = 0.01
-fog_aerial_perspective = 0.65
+sky_top_color = Color(0.8, 0.82, 0.82, 1)
+horizon_color = Color(0.86, 0.87, 0.86, 1)
+fog_color = Color(0.86, 0.87, 0.86, 1)
 
 [node name="DirectionalLight3D" type="DirectionalLight3D" parent="." unique_id=846207689]
-light_energy = 2.0
 script = ExtResource("3")
 elevation_degrees = 45.0
 azimuth_degrees = 70.0
-color = Color(0.8, 0.84, 0.9, 1)
-shadow_blur_amount = 1.0
-shadow_darkness = 0.7
+energy = 0.9
+color = Color(0.92, 0.94, 0.97, 1)
+shadow_softness = 3.0
+shadow_blur_amount = 4.0
+shadow_darkness = 0.35
 
 [node name="Ground" type="StaticBody3D" parent="." unique_id=1437900813]
 script = ExtResource("4")
