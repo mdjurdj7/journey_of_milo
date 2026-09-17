@@ -565,19 +565,19 @@ mesh = SubResource("BoxMesh_ruin_mass_4")
 [node name="Hulls" type="Node3D" parent="."]
 
 [node name="Hull1" parent="Hulls" instance=ExtResource("17")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7, 0, 4)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 0, 3)
 roll_degrees = 8.0
 yaw_offset_degrees = 8.0
 
 [node name="Hull2" parent="Hulls" instance=ExtResource("17")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, 7)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, 6.2)
 roll_degrees = -12.0
-yaw_offset_degrees = -8.0
+yaw_offset_degrees = 33.0
 
 [node name="Hull3" parent="Hulls" instance=ExtResource("17")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 5, 0, 6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 0, 2.5)
 roll_degrees = 11.0
-yaw_offset_degrees = 5.0
+yaw_offset_degrees = -6.0
 
 [editable path="RuinPavingTest"]
 [editable path="HeroPavingPatch/Slabs/HeroSlab1"]
