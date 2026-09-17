@@ -40,11 +40,11 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 		_apply_uniform("ripple_strength", value)
 
 @export_group("Waves")
-# Long, slow swell and short, quick chop - real vertex displacement (see
-# _rebuild_wave_meshes()'s mesh-resolution exports below for why that
-# needs its own mesh, not just this shader). Angles are independent so
-# the two don't run parallel; sea.gdshader receives the derived direction
-# vectors, not the angles themselves.
+# Long, slow swell and short, quick chop - normal-only now (their slope
+# goes into the per-fragment normal, the long wave's height drives the
+# foam's breathing; no vertex displacement - see sea.gdshader's vertex()).
+# Angles are independent so the two don't run parallel; sea.gdshader
+# receives the derived direction vectors, not the angles themselves.
 @export var long_wave_length: float = 14.0:
 	set(value):
 		long_wave_length = value
@@ -86,7 +86,7 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 # sand from the field camera's ~45 degree pitch, where the pure fresnel
 # term is ~0.01 - see sea.gdshader's own doc. Near-white by default,
 # paler than fog_color (the far horizon tone) on purpose.
-@export var sky_reflect_color: Color = Color(0.94, 0.95, 0.96):
+@export var sky_reflect_color: Color = Color(0.78, 0.81, 0.84):
 	set(value):
 		sky_reflect_color = value
 		_apply_uniform("sky_reflect_color", value)
@@ -110,11 +110,11 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 # darker with depth), near-white sky (sky_reflect_color / the horizon's
 # grey-blue (0.62, 0.66, 0.70)). Shallow is close to the horizon in value
 # but greener; deep is well below both.
-@export var shallow_color: Color = Color(0.62, 0.72, 0.70):
+@export var shallow_color: Color = Color(0.54, 0.60, 0.61):
 	set(value):
 		shallow_color = value
 		_apply_uniform("shallow_color", value)
-@export var deep_color: Color = Color(0.30, 0.46, 0.50):
+@export var deep_color: Color = Color(0.26, 0.36, 0.41):
 	set(value):
 		deep_color = value
 		_apply_uniform("deep_color", value)
@@ -151,11 +151,13 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 # The visible pattern ON the water plane (distinct from the caustics on
 # the seabed under it): two scrolling noise layers at surface_pattern_
 # scale and a third of it, drifting in different directions at different
-# speeds, whose ridges brighten the surface toward sky_reflect_color -
-# mean lift about surface_pattern_strength, peaks twice that, never
-# darker than the depth tint. Surface term only; the refracted seabed
-# never sees it. See sea.gdshader's own doc.
-@export_range(0.0, 0.5) var surface_pattern_strength: float = 0.06:
+# speeds, whose ridges paint the surface toward sky_reflect_color - mean
+# lift about surface_pattern_strength, peaks twice that, never darker
+# than the depth tint. An overlay on the final surface/seabed mix, gated
+# only by the waterline edge, so it reads the same in the shallows as in
+# deep water regardless of how transparent the water is there. See
+# sea.gdshader's own doc.
+@export_range(0.0, 0.5) var surface_pattern_strength: float = 0.05:
 	set(value):
 		surface_pattern_strength = value
 		_apply_uniform("surface_pattern_strength", value)
@@ -163,10 +165,45 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 	set(value):
 		surface_pattern_scale = value
 		_apply_uniform("surface_pattern_scale", value)
-@export var surface_pattern_speed: float = 0.12:
+@export var surface_pattern_speed: float = 0.4:
 	set(value):
 		surface_pattern_speed = value
 		_apply_uniform("surface_pattern_speed", value)
+# The baked noise tile both the surface pattern and the ripple sample
+# (see _create_surface_noise()): how many noise features span one tile.
+# A tile is surface_pattern_scale metres for the pattern's large layer,
+# noise_scale metres for the ripple's - so at 2 periods a feature is
+# ~1.5m on the pattern and ~3m on the ripple. Rebakes live.
+@export var surface_noise_periods: float = 2.0:
+	set(value):
+		surface_noise_periods = value
+		_apply_surface_noise_frequency()
+@export var surface_noise_octaves: int = 3:
+	set(value):
+		surface_noise_octaves = value
+		_apply_surface_noise_frequency()
+
+# sea_time wraps to [0, sea_time_period) so it never grows without bound
+# (float precision in every time-driven term would degrade over a long
+# session). The period is chosen so every time-driven term is at exactly
+# the same phase at the wrap as at 0, so nothing pops - each term's
+# "cycles per second", times the period, must be a whole number:
+#   ripple drifts (noise_speed 0.05 x (1, 0.7) and x (-1.3, 0.9)):
+#     0.05, 0.035, 0.065, 0.045 tiles/s -> whole at multiples of 200 s
+#   pattern drifts (0.4 x (0.7, 0.4) and 0.4 x 1.7 x (-0.3, 0.9)):
+#     0.28, 0.16, 0.204, 0.612 tiles/s -> whole at multiples of 250 s
+#   waves (speed / wavelength): long 0.25/14, short 0.6/3
+#     -> whole at multiples of 56 s
+#   -> lcm(200, 250, 56) = 7000 s (~1h57m).
+# A whole number of tiles is invisible because the noise tile repeats and
+# the drift is applied in texture space (see sea.gdshader's surface_
+# noise_rotated()); a whole number of wave cycles is invisible because
+# sin() repeats. The foam's breathing reads the long wave, so it wraps
+# with it; nothing else reads sea_time. Retune if any of those speeds/
+# lengths/scales change - the arithmetic above is specific to the
+# defaults. Precision at 7000 s: the largest drift is 0.612 x 7000 =
+# 4284 tiles, where float32 resolves ~0.0005 tiles = 0.1 texel - fine.
+@export var sea_time_period: float = 7000.0
 
 @export_group("Foam")
 # A thin bright line at the waterline: foam_width metres of water DEPTH
@@ -177,7 +214,7 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 # nearly transparent exactly there - see sea.gdshader's foam_color doc).
 # Patchy via value noise at edge_noise_scale, and breathes with the long
 # wave's own height at that point rather than a generic timer.
-@export var foam_color: Color = Color(0.74, 0.82, 0.80):
+@export var foam_color: Color = Color(0.66, 0.70, 0.70):
 	set(value):
 		foam_color = value
 		_apply_uniform("foam_color", value)
@@ -185,7 +222,7 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 	set(value):
 		foam_width = value
 		_apply_uniform("foam_width", value)
-@export_range(0.0, 1.0) var foam_strength: float = 0.5:
+@export_range(0.0, 1.0) var foam_strength: float = 0.35:
 	set(value):
 		foam_strength = value
 		_apply_uniform("foam_strength", value)
@@ -197,29 +234,35 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 @export_group("Wave Mesh")
 # Same split as ground.gd's fine relief mesh vs. coarse dressing frame:
 # an inner patch (self's own mesh) covering inner_wave_extent meters out
-# from the near shoreward edge at inner_wave_spacing resolution, and a
-# coarse outer skirt (_outer_skirt) covering the rest of sea_depth at
-# outer_wave_spacing - the far skirt is fogged out anyway, so it doesn't
-# need to resolve the waves at all. Both meshes share one ShaderMaterial,
-# so the outer skirt reading as flat isn't a per-mesh toggle - it falls
-# out naturally from wave_fade_factor() in the shader, which fades
-# displacement to 0 near the actual shoreline (see wave_calm_distance's
-# own doc) purely as a function of world position, seamlessly at whatever
-# position the two meshes actually meet.
+# from the near shoreward edge (plus mesh_inland_reach back toward the
+# Tower, and width_margin to each side - the whole playable field and
+# everything the camera can reach sit inside it) at inner_wave_spacing
+# resolution, and a coarse outer skirt (_outer_skirt) covering the rest
+# of sea_depth at outer_wave_spacing. Both meshes share one
+# ShaderMaterial.
+#
+# The plane is exactly flat: sea.gdshader no longer displaces vertices,
+# and evaluates the normal, ripple, surface pattern, depth and refraction
+# per fragment from world position - so vertex spacing cannot show
+# through as edges anywhere, and the inner/outer split is now only about
+# vertex budget, not quality. inner_wave_spacing is kept fine (0.5m,
+# ~200k vertices at the current extents) so the split stays ready for
+# any future displacement. Sizing the inner patch tighter (e.g. from the
+# painted land's bounds) would need a T-junction-safe frame of skirt
+# strips around it; with nothing per-vertex left to save, one wide patch
+# is the version with no seams to get wrong.
 #
 # outer_wave_spacing only coarsens the SKIRT'S OWN DEPTH (Z) subdivision -
 # see _rebuild_wave_meshes(), which deliberately gives the skirt the exact
 # same WIDTH (X) column count/spacing as the inner patch. Two independently
 # generated PlaneMesh resources meeting edge-to-edge is a classic T-junction
-# crack source even where both sides are mathematically flat (zero
-# displacement doesn't help if the two edges don't share the same vertex
-# X-positions to begin with) - matching column count is what actually
-# makes the shared edge watertight, not the displacement math alone.
+# crack source even where both sides are mathematically flat - matching
+# column count is what makes the shared edge watertight.
 @export var inner_wave_extent: float = 60.0:
 	set(value):
 		inner_wave_extent = value
 		_rebuild_if_ready()
-@export var inner_wave_spacing: float = 1.0:
+@export var inner_wave_spacing: float = 0.5:
 	set(value):
 		inner_wave_spacing = value
 		_rebuild_if_ready()
@@ -325,6 +368,7 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 @export var volume_time_constant: float = 0.5
 
 var _material: ShaderMaterial
+var _surface_noise: NoiseTexture2D
 var _outer_skirt: MeshInstance3D
 var _wanderer: Node3D
 var _audio_player: AudioStreamPlayer
@@ -355,10 +399,11 @@ func _ready() -> void:
 	# blend over it instead. Over dry sand the plane is depth-tested away
 	# by the ground regardless, so this only matters in the water.
 	_material.render_priority = -1
+	_create_surface_noise()
 	_apply_all_uniforms()
 
-	# self is the inner (fine, displaced) patch; _outer_skirt is the
-	# coarse, effectively-flat far skirt - see inner_wave_extent's own doc.
+	# self is the inner (fine) patch; _outer_skirt is the coarse far skirt
+	# - see inner_wave_extent's own doc.
 	# Receives only - a flat expanse of water casting its own shadow onto
 	# itself/the shore has nothing to gain and risks self-shadowing
 	# artifacts on a surface that's already animating.
@@ -383,6 +428,41 @@ func _ready() -> void:
 	_spawn_ambience()
 
 	_ready_complete = true
+
+# The one noise tile the shader's surface pattern and ripple both sample
+# (see sea.gdshader's surface_noise doc for why a texture and not
+# procedural noise): seamless FastNoiseLite Perlin, 256x256, mipmapped,
+# normalized to 0..1, pushed once as the surface_noise sampler - the
+# shader's own uniform hints (repeat_enable, filter_linear_mipmap) do the
+# wrapping/filtering. NoiseTexture2D bakes on a thread; the material
+# samples whatever it holds and picks up the finished tile automatically.
+const SURFACE_NOISE_SIZE: int = 256
+
+func _create_surface_noise() -> void:
+	var noise := FastNoiseLite.new()
+	noise.noise_type = FastNoiseLite.TYPE_PERLIN
+	noise.fractal_type = FastNoiseLite.FRACTAL_FBM
+	_surface_noise = NoiseTexture2D.new()
+	_surface_noise.width = SURFACE_NOISE_SIZE
+	_surface_noise.height = SURFACE_NOISE_SIZE
+	_surface_noise.seamless = true
+	_surface_noise.generate_mipmaps = true
+	_surface_noise.normalize = true
+	_surface_noise.noise = noise
+	_apply_surface_noise_frequency()
+	_apply_uniform("surface_noise", _surface_noise)
+
+# FastNoiseLite's frequency is per texel here (NoiseTexture2D samples it
+# at pixel coordinates), so periods-per-tile / tile-size-in-texels is the
+# base frequency. Setting it on the FastNoiseLite triggers a rebake.
+func _apply_surface_noise_frequency() -> void:
+	if _surface_noise == null:
+		return
+	var noise := _surface_noise.noise as FastNoiseLite
+	if noise == null:
+		return
+	noise.frequency = maxf(surface_noise_periods, 0.01) / float(SURFACE_NOISE_SIZE)
+	noise.fractal_octaves = maxi(surface_noise_octaves, 1)
 
 # Guards sea_level/sea_edge_distance's setters: they can fire during
 # scene deserialization before _ready() has built the meshes or resolved
@@ -439,9 +519,8 @@ func get_near_edge_z() -> float:
 # actually makes the shared edge watertight: two independent PlaneMesh
 # resources meeting edge-to-edge need identical vertex X-positions along
 # that edge to avoid a T-junction crack, and a crack shows up as a visible
-# hairline seam even where both sides evaluate to zero displacement -
-# matching displacement math alone (wave_fade_factor() reaching exactly 0
-# at the boundary; see its own doc) doesn't fix a vertex-position mismatch.
+# hairline seam even on an exactly flat plane - only matching vertex
+# positions fix it.
 # Column count is a small, uniform cost across the whole skirt (not just
 # its inner edge) - simpler and just as cheap as a tapering LOD skirt would
 # be, since the real vertex-count savings here come from coarsening depth,
@@ -532,7 +611,7 @@ func _spawn_ambience() -> void:
 	_audio_player.play()
 
 func _physics_process(delta: float) -> void:
-	_sea_time += delta
+	_sea_time = fmod(_sea_time + delta, maxf(sea_time_period, 1.0))
 	_apply_uniform("sea_time", _sea_time)
 
 	if _audio_player == null or _wanderer == null:

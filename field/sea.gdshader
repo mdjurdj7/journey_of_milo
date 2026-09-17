@@ -16,9 +16,9 @@ render_mode blend_mix, cull_back, diffuse_burley, specular_schlick_ggx, fog_disa
 uniform float sea_roughness : hint_range(0.0, 1.0) = 0.7;
 uniform float sea_specular : hint_range(0.0, 1.0) = 0.12;
 
-// The surface ripple: a slow two-octave value-noise field (sea_height()),
-// no texture, scrolling at noise_speed - the THIRD, smallest-scale rate
-// on top of the two real vertex-displacement waves below. Read twice in
+// The surface ripple: a slow two-octave field (sea_height(), sampling the
+// baked surface_noise tile) scrolling at noise_speed - the THIRD,
+// smallest-scale rate on top of the two analytic waves below. Read twice in
 // fragment(): as a finite-difference NORMAL perturbation scaled by
 // noise_amplitude (the light's specular responds to that), and as a
 // direct modulation of the sky-reflection amount scaled by
@@ -36,12 +36,14 @@ uniform float ripple_strength : hint_range(0.0, 1.0) = 0.35;
 // RegionField is frozen for battle, so the drift never visibly stalls.
 uniform float sea_time = 0.0;
 
-// --- Waves: two analytic sine waves, vertex()-displaced ---
+// --- Waves: two analytic sine waves, normal-only ---
 // Long, slow swell and a short, quick chop, each traveling along its own
 // direction (long_wave_direction/short_wave_direction, unit XZ vectors -
 // sea.gd derives these from its own *_angle_degrees exports so the two
-// don't run parallel). Amplitudes are tiny on purpose - this is a flat,
-// not surf.
+// don't run parallel). Their slope goes into the per-fragment normal and
+// the long wave's height drives the foam's breathing; they no longer
+// displace vertices (see vertex()). Amplitudes are tiny on purpose -
+// this is a flat, not surf.
 uniform float long_wave_length = 14.0;
 uniform float long_wave_amplitude = 0.03;
 uniform float long_wave_speed = 0.25;
@@ -136,19 +138,21 @@ uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
 uniform float refraction_strength = 0.01;
 
 // Surface pattern: what makes the plane itself read as a surface from
-// directly above. Two scrolling value-noise layers - surface_pattern_
-// scale (~3m) and a third of it (~1m) - moving in different directions
+// directly above. Two scrolling samples of the surface_noise tile - at
+// surface_pattern_scale (~3m per tile) and a third of it (~1m) - moving in different directions
 // at different speeds (the small one faster), summed into a soft field
-// whose upper half becomes bright ridges that blend toward sky_reflect_
+// whose upper half becomes bright ridges painted toward sky_reflect_
 // color by up to 2 x surface_pattern_strength (so the mean lift is about
 // the strength itself, peaks twice that). Brighten-only: nothing goes
-// darker than the depth tint. Applied to the surface colour BEFORE the
-// composite, so it never touches the refracted seabed term - it's a
-// pattern ON the water, distinct from the caustics under it. Scrolls on
-// sea_time like the ripple.
-uniform float surface_pattern_strength : hint_range(0.0, 0.5) = 0.06;
+// darker than the depth tint. Composited as an OVERLAY on the final
+// surface/seabed mix (see fragment()), gated only by the waterline edge
+// - so it reads identically in the shallows and in deep water, and the
+// refracted seabed underneath is covered, not tinted: a pattern ON the
+// water, distinct from the caustics under it. Scrolls on sea_time like
+// the ripple.
+uniform float surface_pattern_strength : hint_range(0.0, 0.5) = 0.10;
 uniform float surface_pattern_scale = 3.0;
-uniform float surface_pattern_speed = 0.12;
+uniform float surface_pattern_speed = 0.4;
 
 // Foam: a thin bright line at the waterline - foam_width metres of water
 // DEPTH wide (~2-3x that laterally at the beach's slope), hugging the
@@ -211,14 +215,52 @@ float value_noise(vec2 p) {
 	return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
 }
 
+// Every surface field that is SEEN - the ripple normal and the surface
+// pattern - samples surface_noise, a seamless FastNoiseLite Perlin tile
+// baked by sea.gd (see its _create_surface_noise()), rather than any
+// procedural noise evaluated here. value_noise() above is kept only for
+// the SDF-shoreline mirror (landmass_side_distance(), which must match
+// ground.gd's own port) and the foam's patchiness. History: the value
+// noise put lattice-aligned creases into the ripple (a derivative of it)
+// that scrolled as straight seams; a hash-based gradient noise replaced
+// it and produced large flat-edged blocks instead, since fract(p * 123)
+// style hashes lose precision once the ever-growing sea_time drift pushes
+// the cell coordinates into the hundreds. A texture has neither problem:
+// exact values at any coordinate (repeat_enable wraps them), bilinear
+// between texels, mipmapped for the far skirt. One tile = one unit of
+// UV, so sampling at world_xz / scale makes a tile span scale metres.
+uniform sampler2D surface_noise : filter_linear_mipmap, repeat_enable;
+
+float surface_noise_at(vec2 uv) {
+	return texture(surface_noise, uv).r;
+}
+
+// The same tile sampled on a rotated UV frame - give every octave/layer
+// its own angle so their tiles never line up (a rotated seamless tile is
+// still seamless under repeat). The scroll drift is added AFTER the
+// rotation, in texture space, so that a drift of a whole number of tiles
+// is invisible - that's what lets sea.gd wrap sea_time (see its
+// sea_time_period) without any layer popping: at the wrap every drift
+// vector lands on an integer, and an integer shift of a repeating tile
+// is a no-op. (Added before the rotation it would be rotated into a
+// non-integer shift and pop.)
+float surface_noise_rotated(vec2 uv, float angle_radians, vec2 drift) {
+	float c = cos(angle_radians);
+	float s = sin(angle_radians);
+	return surface_noise_at(vec2(c * uv.x - s * uv.y, s * uv.x + c * uv.y) + drift);
+}
+
 // Two octaves, each drifting slowly and independently so the pattern
-// doesn't repeat in an obviously periodic way. Normal-only (see
-// noise_amplitude's own doc) - this never displaces VERTEX.
+// doesn't repeat in an obviously periodic way, on two differently
+// rotated tile frames. Range ~[0, 1.5], mean 0.75 - fragment() relies on
+// that when it remaps to a signed ripple. Normal-only (see
+// noise_amplitude's own doc) - this never displaces VERTEX; the normal
+// takes its derivative by two offset taps in fragment().
 float sea_height(vec2 world_xz, float time) {
 	vec2 drift_a = vec2(time * noise_speed, time * noise_speed * 0.7);
 	vec2 drift_b = vec2(-time * noise_speed * 1.3, time * noise_speed * 0.9);
-	float h = value_noise(world_xz / max(noise_scale, 0.001) + drift_a);
-	h += value_noise(world_xz / max(noise_scale * 0.35, 0.001) + drift_b) * 0.5;
+	float h = surface_noise_rotated(world_xz / max(noise_scale, 0.001), 0.0, drift_a);
+	h += surface_noise_rotated(world_xz / max(noise_scale * 0.35, 0.001), 0.61, drift_b) * 0.5;
 	return h;
 }
 
@@ -291,9 +333,9 @@ float wave_height_and_slope(vec2 world_xz, float time, vec2 direction, float wav
 	return height;
 }
 
-// Sum of the long + short waves, shore-faded - the one function vertex()
-// (for displacement) and fragment() (for its slope's normal contribution
-// and foam's breathing) both call, so all three stay in agreement.
+// Sum of the long + short waves, shore-faded. Fragment-only now: its
+// slope feeds the per-fragment normal (and the long wave alone feeds the
+// foam's breathing). vertex() no longer displaces - see its own doc.
 float combined_wave_height(vec2 world_xz, float time, out vec2 slope) {
 	vec2 slope_long;
 	vec2 slope_short;
@@ -304,19 +346,23 @@ float combined_wave_height(vec2 world_xz, float time, out vec2 slope) {
 	return (h_long + h_short) * fade;
 }
 
+// No vertex displacement any more - the plane is exactly flat and every
+// visible quantity (normal, pattern, depth, refraction) is evaluated per
+// fragment from v_world_xz, so mesh resolution can't show through as
+// edges anywhere. The waves' +-4cm of height was invisible from the
+// field camera anyway; what they contribute (their slope in the normal)
+// is unchanged. Also makes the depth-buffer water depth exact and steady
+// instead of breathing with the surface.
 void vertex() {
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
 	v_world_xz = world_pos.xz;
-
-	vec2 slope;
-	VERTEX.y += combined_wave_height(v_world_xz, sea_time, slope);
 }
 
 void fragment() {
-	// Normal: the two waves' analytic slope plus the small-scale noise's
-	// finite-difference slope, combined under one sign convention -
-	// normalize(-dh/dx, 1, -dh/dz). The noise term is unchanged from v1;
-	// wave_slope is new.
+	// Normal, per fragment: the two waves' analytic slope plus the ripple
+	// noise's finite-difference slope, combined under one sign convention
+	// - normalize(-dh/dx, 1, -dh/dz). Nothing here comes from the mesh's
+	// own vertex normals.
 	vec2 wave_slope;
 	combined_wave_height(v_world_xz, sea_time, wave_slope);
 
@@ -379,23 +425,27 @@ void fragment() {
 	float sky_t = clamp(fresnel * (1.0 + ripple * ripple_strength), 0.0, 1.0);
 	vec3 albedo = mix(water_rgb, sky_reflect_color.rgb, sky_t);
 
-	// Surface pattern (see surface_pattern_strength's own doc): two
-	// scrolling noise layers summed, upper half -> bright ridges, blended
-	// toward the sky colour. Surface term only.
-	float pattern_scale = max(surface_pattern_scale, 0.001);
-	vec2 pattern_drift_a = vec2(0.7, 0.4) * surface_pattern_speed * sea_time;
-	vec2 pattern_drift_b = vec2(-0.3, 0.9) * surface_pattern_speed * 1.7 * sea_time;
-	float pattern_a = value_noise(v_world_xz / pattern_scale + pattern_drift_a);
-	float pattern_b = value_noise(v_world_xz / (pattern_scale / 3.0) + pattern_drift_b);
-	float pattern = smoothstep(0.45, 0.85, pattern_a * 0.6 + pattern_b * 0.4);
-	albedo = mix(albedo, sky_reflect_color.rgb, pattern * surface_pattern_strength * 2.0);
-
 	// Distance: dissolve into the fog color toward the horizon. Applied
 	// last to the surface colour so far water always fully resolves to it
-	// regardless of the depth/reflection/pattern layering above.
+	// regardless of the depth/reflection layering above.
 	float dist = length(VERTEX);
 	float fog_t = smoothstep(fog_near_distance, fog_far_distance, dist) * fog_strength;
 	albedo = mix(albedo, fog_color.rgb, fog_t);
+
+	// Surface pattern (see surface_pattern_strength's own doc): two
+	// scrolling noise layers summed, upper half -> bright ridges. Computed
+	// here, composited below as an OVERLAY on the final surface/seabed mix
+	// (not folded into the water colour, which is scaled by water_amount
+	// and so vanishes exactly where the water is transparent) - gated only
+	// by edge_alpha, i.e. "is there water here at all", so it reads the
+	// same in the shallows as in deep water.
+	float pattern_scale = max(surface_pattern_scale, 0.001);
+	vec2 pattern_drift_a = vec2(0.7, 0.4) * surface_pattern_speed * sea_time;
+	vec2 pattern_drift_b = vec2(-0.3, 0.9) * surface_pattern_speed * 1.7 * sea_time;
+	float pattern_a = surface_noise_rotated(v_world_xz / pattern_scale, 1.13, pattern_drift_a);
+	float pattern_b = surface_noise_rotated(v_world_xz / (pattern_scale / 3.0), 2.31, pattern_drift_b);
+	float pattern = smoothstep(0.45, 0.85, pattern_a * 0.6 + pattern_b * 0.4);
+	float pattern_amount = pattern * surface_pattern_strength * 2.0 * edge_alpha;
 
 	// Foam: a band foam_width of water depth wide right at the true
 	// waterline, patchy via value noise, breathing with the long wave's
@@ -428,11 +478,15 @@ void fragment() {
 	vec3 transmittance = exp(-water_depth * max(absorption, vec3(0.0)));
 	behind *= transmittance;
 
-	// Foam paints over the whole mix: it replaces foam_amount of both the
-	// lit surface term and the see-through term, so it reads at full
-	// strength even where the water itself is nearly transparent.
-	ALBEDO = mix(albedo * water_amount, foam_color.rgb, foam_amount);
-	EMISSION = behind * (1.0 - water_amount) * (1.0 - foam_amount);
+	// Overlays paint over the whole mix, in order: the surface pattern
+	// (toward the sky colour), then foam on top. Each replaces its amount
+	// of both the lit surface term and the see-through term, so both read
+	// at full strength even where the water itself is nearly transparent.
+	vec3 surface = mix(albedo * water_amount, sky_reflect_color.rgb, pattern_amount);
+	surface = mix(surface, foam_color.rgb, foam_amount);
+	float overlay_amount = 1.0 - (1.0 - pattern_amount) * (1.0 - foam_amount);
+	ALBEDO = surface;
+	EMISSION = behind * (1.0 - water_amount) * (1.0 - overlay_amount);
 	ROUGHNESS = sea_roughness;
 	SPECULAR = sea_specular * water_amount;
 	METALLIC = 0.0;
