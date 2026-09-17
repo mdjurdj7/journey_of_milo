@@ -1,0 +1,229 @@
+extends Node3D
+class_name Hull
+
+# An aged rowing-boat hull pulled up on the sand: the opening room's mid-
+# distance dressing (Region 1 doc, section 3). Loads hull.glb at runtime
+# under this node, applies the project's flat matte material (same shape
+# as Wanderer._build_flat_material() - one StandardMaterial3D via
+# material_override on every mesh, roughness 1, no specular; the glb's own
+# PBR textures are ignored, this field is flat-shaded), faces its bow
+# seaward, and sits on the relief minus sink_depth of its own height. No
+# collision - dressing only.
+
+const MODEL_SCENE_PATH := "res://assets/models/hull/hull.glb"
+
+# hull.glb ships normalised to a 1m-long boat (bbox 1.00 x 0.31 x 0.51m,
+# long axis X, verified from the vertex data, no import scale); a rowing
+# boat is ~4-5m. The mesh's final size is model_scale x mesh_scale -
+# mesh_scale is the on-screen correction knob, model_scale the nominal
+# metres-per-unit. _ready() prints the resulting bbox so the real size is
+# never a guess.
+@export var model_scale: float = 4.5:
+	set(value):
+		model_scale = value
+		_apply_model_transform()
+@export var mesh_scale: float = 0.65:
+	set(value):
+		mesh_scale = value
+		_apply_model_transform()
+# Yaw of the model under this node so its bow lies on the node's local -Z
+# (the direction _apply_facing() points seaward). The glb's long axis is
+# X; 90 maps +X onto -Z. Flip to -90 if the boat lands stern-first.
+@export var model_yaw_offset_degrees: float = 90.0:
+	set(value):
+		model_yaw_offset_degrees = value
+		_apply_model_transform()
+# Fraction of the model's SCALED bounding-box height the hull is lowered
+# into the ground - the bbox bottom sits that far below the relief
+# surface at the hull's centre (and the hull is pitched to the beach
+# slope, so both ends sit the same way - see _ground_to_relief()). 0.3
+# with a ~10 degree roll puts the sand up the low side inside the hull
+# and leaves the outer quarter of the floor (the inside of the bottom
+# planking) showing on the high side, 12-16cm proud.
+@export_range(0.0, 1.0) var sink_depth: float = 0.3:
+	set(value):
+		sink_depth = value
+		_ground_to_relief()
+# List around the hull's own long axis (the keel line), so it reads as
+# settled into the sand rather than sitting level - sand climbs one side
+# inside, the floor shows on the other.
+@export var roll_degrees: float = 10.0:
+	set(value):
+		roll_degrees = value
+		_ground_to_relief()
+# Added to the seaward facing, so several hulls don't all point exactly
+# the same way. Re-grounds (not just re-faces): the slope samples run
+# along the facing, so the pitch changes with it.
+@export var yaw_offset_degrees: float = 0.0:
+	set(value):
+		yaw_offset_degrees = value
+		_ground_to_relief()
+# Weathered wood as a dark figure on the pale ground: a grey with a
+# slight warm bias (R - B +0.08, less warm than the sand's +0.14),
+# applied as the albedo of this hull's own duplicate of the shared flat
+# material (see _shared_flat_material), so it's well below the sand
+# (Ground.ground_color (0.74, 0.70, 0.60), value 0.74 vs 0.50 here)
+# without touching the material anything else shares.
+@export var hull_tint: Color = Color(0.50, 0.47, 0.42):
+	set(value):
+		hull_tint = value
+		if _material != null:
+			_material.albedo_color = value
+# Instances live under RegionField/Hulls, so Ground and RegionField are
+# two levels up.
+@export var ground_path: NodePath = ^"../../Ground"
+@export var region_field_path: NodePath = ^"../.."
+
+# The project's flat matte material (the same recipe as Wanderer._build_
+# flat_material(): roughness 1, no specular), built once for the class
+# and never applied directly - every Hull duplicates it and tints the
+# copy (hull_tint), so the shared instance stays untouched for anything
+# else that adopts it.
+static var _shared_flat_material: StandardMaterial3D = null
+
+static func _get_shared_flat_material() -> StandardMaterial3D:
+	if _shared_flat_material == null:
+		_shared_flat_material = StandardMaterial3D.new()
+		_shared_flat_material.roughness = 1.0
+		_shared_flat_material.metallic_specular = 0.0
+	return _shared_flat_material
+
+var _model: Node3D = null
+# This hull's own tinted duplicate of _shared_flat_material.
+var _material: StandardMaterial3D = null
+var _ground: Ground = null
+# Model bbox in this node's space at the final scale, from _apply_model_
+# transform(): height for sink_depth, length for the slope samples,
+# bottom for seating the bbox on the node origin.
+var _aabb_height: float = 0.0
+var _aabb_length: float = 0.0
+# Guards the setters above during scene deserialization, same as
+# Ground/Sea's own _ready_done flags.
+var _ready_done: bool = false
+
+func _ready() -> void:
+	_spawn_model()
+	_ready_done = true
+	_apply_facing()
+
+	# Ground precedes Hulls in the scene, so Ground's own first
+	# relief_rebuilt (inside its _ready()) has already fired by now - the
+	# manual call covers the initial grounding (model scale and relief
+	# both final at this point), the connection every live relief/landmass
+	# edit after it (same reasoning as FieldEnemy's).
+	_ground = get_node_or_null(ground_path) as Ground
+	if _ground == null:
+		push_warning("Hull '%s': ground_path did not resolve to a Ground; not grounded." % name)
+		return
+	_ground.relief_rebuilt.connect(_ground_to_relief)
+	_ground_to_relief()
+
+func _spawn_model() -> void:
+	var scene := load(MODEL_SCENE_PATH) as PackedScene
+	if scene == null:
+		push_warning("Hull: could not load %s; no model." % MODEL_SCENE_PATH)
+		return
+	_model = scene.instantiate() as Node3D
+	_model.name = "Model"
+	add_child(_model)
+
+	_material = _get_shared_flat_material().duplicate() as StandardMaterial3D
+	_material.albedo_color = hull_tint
+	for mesh_instance in _model.find_children("*", "MeshInstance3D", true, false):
+		var mi := mesh_instance as MeshInstance3D
+		mi.material_override = _material
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+
+	_apply_model_transform()
+
+# Order of operations, because it matters for the sink: (1) scale + bow
+# yaw on the model, (2) measure its combined bbox in THIS node's space -
+# the model's transform is already applied, so height/length are the
+# final scaled ones - (3) seat the bbox bottom on the node origin, (4)
+# re-ground (a no-op until _ready() is done; _ready() then grounds once
+# itself, after Ground's relief already exists). The node's own Y is
+# therefore always "relief minus sink x the SCALED height", never a
+# pre-scale number. Same AABB-grounding idiom as FieldEnemy._spawn_model().
+func _apply_model_transform() -> void:
+	if _model == null:
+		return
+	_model.scale = Vector3.ONE * model_scale * mesh_scale
+	_model.rotation = Vector3(0.0, deg_to_rad(model_yaw_offset_degrees), 0.0)
+	_model.position = Vector3.ZERO
+
+	var combined_aabb: AABB
+	var has_aabb := false
+	for mesh_instance in _model.find_children("*", "MeshInstance3D", true, false):
+		var mi := mesh_instance as MeshInstance3D
+		var mi_transform_in_self := _model.transform * _model_local_transform_of(mi)
+		var mi_aabb_in_self := mi_transform_in_self * mi.get_aabb()
+		combined_aabb = mi_aabb_in_self if not has_aabb else combined_aabb.merge(mi_aabb_in_self)
+		has_aabb = true
+	if not has_aabb:
+		return
+	_aabb_height = combined_aabb.size.y
+	_aabb_length = combined_aabb.size.z
+	_model.position.y = -combined_aabb.position.y
+	print("Hull '%s': scaled bbox %.2f long x %.2f high x %.2f beam (model_scale %.2f x mesh_scale %.2f)" % [name, combined_aabb.size.z, combined_aabb.size.y, combined_aabb.size.x, model_scale, mesh_scale])
+	_ground_to_relief()
+
+# A mesh instance's transform relative to the model root (not the world),
+# so the bbox measurement above doesn't depend on this node's own current
+# rotation/position - it must be the same number before and after
+# _apply_facing() pitches and rolls the node.
+func _model_local_transform_of(mi: MeshInstance3D) -> Transform3D:
+	return _model.global_transform.affine_inverse() * mi.global_transform
+
+# The hull's yaw: bow toward the sea (-get_forward(), same direction<->
+# angle convention FieldEnemy._face_shore() uses) plus yaw_offset_degrees.
+func _facing_yaw() -> float:
+	var to_sea := Vector3.BACK
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	if region_field != null:
+		to_sea = -region_field.get_forward()
+	if to_sea.length() < 0.0001:
+		to_sea = Vector3.BACK
+	return atan2(-to_sea.x, -to_sea.z) + deg_to_rad(yaw_offset_degrees)
+
+# Rebuilds the node's basis from yaw, the beach-slope pitch and
+# roll_degrees around the hull's long axis (the node's local Z once the
+# model yaw has put the bow on -Z). Replaces the basis outright -
+# position is left to the editor, rotation isn't authored there.
+func _apply_facing(pitch: float = 0.0) -> void:
+	if not _ready_done:
+		return
+	basis = Basis(Vector3.UP, _facing_yaw()) * Basis(Vector3.RIGHT, pitch) * Basis(Vector3.BACK, deg_to_rad(roll_degrees))
+
+# Relief height at a world XZ - get_height_at() is in Ground's local
+# frame, to_local() first, same as FieldEnemy/Wanderer.
+func _relief_height_at(world_x: float, world_z: float) -> float:
+	var local_xz: Vector3 = _ground.to_local(Vector3(world_x, 0.0, world_z))
+	return _ground.get_height_at(Vector2(local_xz.x, local_xz.z))
+
+# Seats the hull on the relief: height sampled at the bow and stern (half
+# the scaled length either way along the facing), the node placed at
+# their mean minus sink_depth x the SCALED bbox height, and pitched to
+# the slope between them - grounding at the centre alone left one end
+# floating clear of the sand on the beach's 1:8-1:12 slope, which is what
+# read as "the keel is visible". Called once from _ready() (after both
+# the model scale and Ground's relief are final) and on every Ground.
+# relief_rebuilt, so landmass tuning re-seats it.
+func _ground_to_relief() -> void:
+	if not _ready_done or _ground == null:
+		return
+	var yaw: float = _facing_yaw()
+	# Local -Z (the bow) in world space for this yaw.
+	var bow_dir := Vector3(-sin(yaw), 0.0, -cos(yaw))
+	var half_length: float = _aabb_length * 0.5
+	var centre := Vector3(global_position.x, 0.0, global_position.z)
+	var bow_point: Vector3 = centre + bow_dir * half_length
+	var stern_point: Vector3 = centre - bow_dir * half_length
+	var bow_height: float = _relief_height_at(bow_point.x, bow_point.z)
+	var stern_height: float = _relief_height_at(stern_point.x, stern_point.z)
+
+	# Pitch about local X: positive tips the bow (local -Z) up. The bow
+	# is lower than the stern when the beach falls seaward, so the sign
+	# follows (bow - stern).
+	var pitch: float = atan2(bow_height - stern_height, maxf(_aabb_length, 0.001))
+	_apply_facing(pitch)
+	global_position.y = (bow_height + stern_height) * 0.5 - sink_depth * _aabb_height
