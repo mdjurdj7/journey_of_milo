@@ -7,7 +7,13 @@ class_name Ground
 # know about or re-trigger that on their behalf.
 signal relief_rebuilt
 
-@export var ground_color: Color = Color(0.82, 0.77, 0.66):
+# The sand: high-key pale with a slight warm bias (R - B ~ +0.14), a pale
+# flat rather than tan. Rendered as authored - near_color/far_color below
+# are neutral by default (they MULTIPLY into this; see ground.gdshader's
+# own doc on them). Also read directly by contact shadows, footprints and
+# the Wanderer's/enemies' own ground-matched materials, so this is the one
+# sand colour everything keys off.
+@export var ground_color: Color = Color(0.74, 0.70, 0.60):
 	set(value):
 		ground_color = value
 		_apply_uniform("dry_color", value)
@@ -31,9 +37,7 @@ signal relief_rebuilt
 # seam-matching zone, at the current landmass defaults below - re-check
 # this margin if those are tuned much wider. relief_subdivisions is sized
 # for ~0.35m vertex spacing at this extent, needed for the shoreline
-# contour to read as curved rather than faceted at this field's scale;
-# the wet-band's own soft gradient (shore_slope_start) does the rest of
-# the smoothing work perceptually.
+# contour to read as curved rather than faceted at this field's scale.
 @export var relief_extent: Vector2 = Vector2(100.0, 70.0):
 	set(value):
 		relief_extent = value
@@ -43,11 +47,16 @@ signal relief_rebuilt
 		relief_subdivisions = value
 		_rebuild_ground_mesh_and_collision()
 
-@export var near_color: Color = Color(0.78, 0.73, 0.62):
+# Near/far tint, multiplied into ground_color (not blended toward) -
+# white at both ends by default so the sand renders exactly as
+# ground_color; the WorldEnvironment's fog/aerial perspective handles
+# distance lightening. The old (0.78, 0.73, 0.62) near value silently
+# darkened the sand by ~25% at the camera.
+@export var near_color: Color = Color(1.0, 1.0, 1.0):
 	set(value):
 		near_color = value
 		_apply_uniform("near_color", value)
-@export var far_color: Color = Color(0.84, 0.83, 0.79):
+@export var far_color: Color = Color(1.0, 1.0, 1.0):
 	set(value):
 		far_color = value
 		_apply_uniform("far_color", value)
@@ -88,18 +97,15 @@ signal relief_rebuilt
 		wetness_amount = value
 		_apply_uniform("wetness_amount", value)
 		_rebuild_ground_mesh_and_collision()
-@export var wet_color: Color = Color(0.44, 0.42, 0.38):
+# Wet sand = ground_color x wet_darken (hue preserved) - the shore band,
+# the noise wet patches, and the sand under the sea plane are all this,
+# no separate wet colour. Albedo only: the ground is diffuse-only now
+# (roughness 1, specular 0 everywhere - the old wet_roughness/wet_specular
+# gloss was the source of the white hotspots).
+@export_range(0.0, 1.0) var wet_darken: float = 0.72:
 	set(value):
-		wet_color = value
-		_apply_uniform("wet_color", value)
-@export var wet_roughness: float = 0.15:
-	set(value):
-		wet_roughness = value
-		_apply_uniform("wet_roughness", value)
-@export var wet_specular: float = 0.4:
-	set(value):
-		wet_specular = value
-		_apply_uniform("wet_specular", value)
+		wet_darken = value
+		_apply_uniform("wet_darken", value)
 
 @export var pool_threshold: float = 0.75:
 	set(value):
@@ -113,10 +119,6 @@ signal relief_rebuilt
 	set(value):
 		pool_color = value
 		_apply_uniform("pool_color", value)
-@export var pool_roughness: float = 0.35:
-	set(value):
-		pool_roughness = value
-		_apply_uniform("pool_roughness", value)
 
 # GDScript-only (see get_height_at()) - relief is baked into the mesh/
 # collision at rebuild time, not pushed to the shader as a uniform.
@@ -387,16 +389,54 @@ signal relief_rebuilt
 		speckle_darken = value
 		_apply_uniform("speckle_darken", value)
 
-# Wet band: within shore_slope_start meters of ABOVE sea_level, sand
-# wetness is pushed toward 1.0 so it reflects like the water does - height-
-# based (v_world_height vs. the sea_level uniform below), not a straight
-# line, so it follows the shoreline's own wander for free. sea_level is
-# pushed once in _ready() (see _push_sea_level_uniform()) from Sea, not
-# assumed.
-@export var shore_slope_start: float = 8.0:
+# Wet band: within shore_slope_start metres of HEIGHT above sea_level,
+# sand wetness is pushed to 1.0 (darkened by wet_darken) - height-based
+# (v_world_height vs. the sea_level uniform below), not a straight line,
+# so it follows the shoreline for free. Metres of height, so keep it
+# small: the dry interior is only landmass_interior_height (0.5) above
+# sea_level, and the old 8.0 made the entire landmass read as wet. 0.15
+# is a narrow strip right at the waterline; below sea_level the wet
+# darkening simply continues. sea_level is pushed once in _ready() (see
+# _push_sea_level_uniform()) from Sea, not assumed.
+@export var shore_slope_start: float = 0.15:
 	set(value):
 		shore_slope_start = value
 		_apply_uniform("shore_slope_start", value)
+
+# Caustics on the sand below sea_level - see ground.gdshader's own doc: a
+# scrolling two-layer cellular web brightening the wet sand by up to
+# caustic_strength, cells ~caustic_scale metres, drifting at caustic_speed,
+# fading out over caustic_fade_depth metres below the surface.
+# caustic_sharpness thins the web's lines (higher = finer). Scrolls on the
+# shader's own TIME; nothing to push per frame.
+@export_group("Caustics")
+@export var caustic_strength: float = 0.25:
+	set(value):
+		caustic_strength = value
+		_apply_uniform("caustic_strength", value)
+@export var caustic_scale: float = 0.6:
+	set(value):
+		caustic_scale = value
+		_apply_uniform("caustic_scale", value)
+@export var caustic_speed: float = 0.08:
+	set(value):
+		caustic_speed = value
+		_apply_uniform("caustic_speed", value)
+@export var caustic_fade_depth: float = 3.0:
+	set(value):
+		caustic_fade_depth = value
+		_apply_uniform("caustic_fade_depth", value)
+@export var caustic_sharpness: float = 4.0:
+	set(value):
+		caustic_sharpness = value
+		_apply_uniform("caustic_sharpness", value)
+# Drift lines/ripple marks run at this multiple of their dry strength
+# under sea_level (both darken-only, so this can't lighten the seabed).
+@export var underwater_detail_boost: float = 1.5:
+	set(value):
+		underwater_detail_boost = value
+		_apply_uniform("underwater_detail_boost", value)
+@export_group("")
 @export var region_field_path: NodePath = ^".."
 @export var sea_path: NodePath = ^"../Sea"
 
@@ -533,14 +573,17 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("shore_wetness_enabled", shore_wetness_enabled)
 	_apply_uniform("wetness_scale", wetness_scale)
 	_apply_uniform("wetness_amount", wetness_amount)
-	_apply_uniform("wet_color", wet_color)
-	_apply_uniform("wet_roughness", wet_roughness)
-	_apply_uniform("wet_specular", wet_specular)
+	_apply_uniform("wet_darken", wet_darken)
 	_apply_uniform("shore_slope_start", shore_slope_start)
+	_apply_uniform("caustic_strength", caustic_strength)
+	_apply_uniform("caustic_scale", caustic_scale)
+	_apply_uniform("caustic_speed", caustic_speed)
+	_apply_uniform("caustic_fade_depth", caustic_fade_depth)
+	_apply_uniform("caustic_sharpness", caustic_sharpness)
+	_apply_uniform("underwater_detail_boost", underwater_detail_boost)
 	_apply_uniform("pool_threshold", pool_threshold)
 	_apply_uniform("pool_edge_width", pool_edge_width)
 	_apply_uniform("pool_color", pool_color)
-	_apply_uniform("pool_roughness", pool_roughness)
 	_apply_uniform("drift_line_spacing", drift_line_spacing)
 	_apply_uniform("drift_line_width", drift_line_width)
 	_apply_uniform("drift_line_wobble", drift_line_wobble)

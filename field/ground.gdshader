@@ -6,21 +6,34 @@ shader_type spatial;
 // unwritten ALPHA under that mode doesn't reliably resolve to opaque in
 // practice. Same fix, same root cause, as wanderer_flat.gdshader's own
 // "invisible Wanderer" bug - never reintroduce blend_mix here.
+// Diffuse only: fragment() pins ROUGHNESS to 1.0 and SPECULAR to 0.0
+// everywhere (dry, wet, pools). The wet band and pools used to drop to a
+// glossy roughness/specular, which under the field's 45-degree light and
+// camera read as white hotspots across the sand - the wet look now comes
+// from albedo alone (wet_darken below). specular_schlick_ggx stays in
+// render_mode only because it's the pipeline default; at SPECULAR 0 it
+// contributes nothing.
 render_mode cull_back, diffuse_burley, specular_schlick_ggx, depth_draw_opaque;
 
-// Near/far albedo darkening, applied before the wetness blend.
-uniform vec4 near_color : source_color = vec4(0.78, 0.73, 0.62, 1.0);
-uniform vec4 far_color : source_color = vec4(0.84, 0.83, 0.79, 1.0);
+// Near/far albedo tint, MULTIPLIED into the sand colour before the wetness
+// blend. Neutral (white) at both ends by default so dry_color renders as
+// authored - the WorldEnvironment's own fog/aerial perspective already
+// handles distance lightening. Kept as a knob (e.g. a faint far tint)
+// rather than removed.
+uniform vec4 near_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
+uniform vec4 far_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 uniform float near_distance = 20.0;
 uniform float far_distance = 120.0;
 
-// Dry/wet sand blend.
-uniform vec4 dry_color : source_color = vec4(0.82, 0.77, 0.66, 1.0);
-uniform vec4 wet_color : source_color = vec4(0.35, 0.38, 0.40, 1.0);
+// Sand colour: high-key pale with a slight warm bias (R - B ~ +0.14) - a
+// pale flat, not tan. Wet sand is the SAME colour darkened by wet_darken
+// (multiplicative, so hue is preserved), never a separate colour: the
+// shore band, the noise wet patches, and everything under the sea plane
+// are all just darker sand.
+uniform vec4 dry_color : source_color = vec4(0.74, 0.70, 0.60, 1.0);
+uniform float wet_darken : hint_range(0.0, 1.0) = 0.72;
 uniform float wetness_scale = 30.0;
 uniform float wetness_amount : hint_range(0.0, 1.0) = 0.5;
-uniform float wet_roughness : hint_range(0.0, 1.0) = 0.15;
-uniform float wet_specular : hint_range(0.0, 1.0) = 0.4;
 // When false, wetness_mask() (and therefore pool_factor, which reads it
 // directly) returns 0 everywhere - "wet patches" and standing pools both
 // off. shore_wetness_enabled is separate and gates shore_t() instead, so
@@ -32,11 +45,10 @@ uniform bool shore_wetness_enabled = true;
 // pool_threshold. pool_edge_width widens that into a fade-through-damp-
 // sand transition instead of a hard edge. Meant to be the darkest thing
 // on the ground, never the brightest — see set_pool_color_from_sky() in
-// ground.gd.
+// ground.gd. Albedo only now - no gloss (see render_mode's own doc).
 uniform float pool_threshold : hint_range(0.0, 1.0) = 0.75;
 uniform float pool_edge_width : hint_range(0.0, 1.0) = 0.15;
 uniform vec4 pool_color : source_color = vec4(0.696, 0.704, 0.68, 1.0);
-uniform float pool_roughness : hint_range(0.0, 1.0) = 0.35;
 
 // Ground relief no longer displaces vertices here - ground.gd bakes it
 // directly into the relief mesh's own vertices (and the matching
@@ -78,18 +90,44 @@ uniform float speckle_scale = 0.08;
 uniform float speckle_threshold : hint_range(0.0, 1.0) = 0.92;
 uniform float speckle_darken : hint_range(0.0, 1.0) = 0.15;
 
-// Wet band: within shore_slope_start (meters) of ABOVE sea_level, sand
-// wetness is pushed to 1.0 so it blends toward wet_color/wet_roughness/
-// wet_specular like damp sand right at the shore — not toward
-// pool_color, which stays driven by the plain noise mask so isolated
-// standing pools don't turn into a strip along the whole shoreline.
-// Height-based (v_world_height vs. sea_level below), not a straight line -
-// this follows the landmass's own noised shoreline contour for free,
-// since v_world_height already IS that shape (baked into the mesh by
-// ground.gd's _relief_height()). sea_level is pushed from ground.gd (from
-// Sea's own sea_level), not assumed.
-uniform float shore_slope_start = 8.0;
+// Wet band: within shore_slope_start metres of HEIGHT above sea_level,
+// sand wetness is pushed to 1.0 so it darkens by wet_darken like damp
+// sand right at the shore — not toward pool_color, which stays driven by
+// the plain noise mask so isolated standing pools don't turn into a strip
+// along the whole shoreline. Height-based (v_world_height vs. sea_level
+// below), not a straight line - this follows the shoreline contour for
+// free, since v_world_height already IS that shape (baked into the mesh
+// by ground.gd's _relief_height()). Small on purpose: it's metres of
+// HEIGHT, and the dry interior sits only ~0.5m above sea_level, so
+// anything near that value makes the whole landmass read as wet (the old
+// 8.0 did exactly that). 0.15 is a narrow strip at the waterline (~0.4m
+// laterally at the mask ramp's slope). Below sea_level shore_t() is
+// simply 1.0 - the darker sand continues down under the water, no
+// separate colour. sea_level is pushed from ground.gd (from Sea's own
+// sea_level), not assumed.
+uniform float shore_slope_start = 0.15;
 uniform float sea_level = 0.0;
+
+// Caustics: a scrolling bright web on the sand BELOW sea_level, so the
+// seabed reads as lit through moving water. Two Worley (cellular) layers
+// at caustic_scale and 0.6x that, drifting in different directions at
+// caustic_speed; each layer's cell BORDERS (F2 - F1 -> 0, sharpened by
+// caustic_sharpness) are the bright lines, and the two are screen-
+// blended so both webs show at full brightness where they cross. Value
+// multiplier on the sand (1 + web * caustic_strength), hue preserved,
+// fading to nothing over caustic_fade_depth metres below sea_level.
+// Scrolls on the engine's TIME (no sea_time push here) - keeps moving
+// through the battle freeze, same as the sea surface does.
+uniform float caustic_strength : hint_range(0.0, 2.0) = 0.25;
+uniform float caustic_scale = 0.6;
+uniform float caustic_speed = 0.08;
+uniform float caustic_fade_depth = 3.0;
+uniform float caustic_sharpness = 4.0;
+// Drift lines and ripple marks run at this multiple of their dry
+// strength under sea_level, so the seabed keeps some structure through
+// the water. Both are darken-only (see fragment()), so boosting them can
+// never lift the sand above the wet base colour.
+uniform float underwater_detail_boost = 1.5;
 
 varying vec2 v_world_xz;
 varying float v_world_height;
@@ -198,6 +236,54 @@ float speckle_mask(vec2 world_xz) {
 	return step(speckle_threshold, n);
 }
 
+// Worley/cellular noise: one jittered feature point per unit cell (from
+// the same hash() the value noise uses), 3x3 neighbourhood search. Returns
+// (F1, F2) - distance to the nearest and second-nearest point - so the
+// caller can read cell borders as F2 - F1 -> 0.
+vec2 worley_f1_f2(vec2 p) {
+	vec2 cell = floor(p);
+	vec2 local = fract(p);
+	float f1 = 8.0;
+	float f2 = 8.0;
+	for (int y = -1; y <= 1; y++) {
+		for (int x = -1; x <= 1; x++) {
+			vec2 neighbour = vec2(float(x), float(y));
+			vec2 point = vec2(hash(cell + neighbour), hash(cell + neighbour + vec2(17.3, 41.9)));
+			vec2 delta = neighbour + point - local;
+			float d = dot(delta, delta);
+			if (d < f1) {
+				f2 = f1;
+				f1 = d;
+			} else if (d < f2) {
+				f2 = d;
+			}
+		}
+	}
+	return sqrt(vec2(f1, f2));
+}
+
+// One caustic layer: bright on the cell borders, dark inside the cells.
+// F2 - F1 is 0 exactly on a border and grows toward the cell centre; the
+// /0.5 puts a typical cell interior at ~1, and the pow sharpens the
+// remaining band into a thin line.
+float caustic_layer(vec2 p) {
+	vec2 f = worley_f1_f2(p);
+	float edge = clamp((f.y - f.x) / 0.5, 0.0, 1.0);
+	return pow(1.0 - edge, max(caustic_sharpness, 0.001));
+}
+
+// Two layers at different scales, drifting in different directions,
+// screen-blended (1 - (1-a)(1-b)) so both webs read at full brightness
+// where they overlap and neither dims the other elsewhere.
+float caustic_web(vec2 world_xz, float time) {
+	float scale = max(caustic_scale, 0.001);
+	vec2 drift_a = vec2(1.0, 0.35) * caustic_speed * time;
+	vec2 drift_b = vec2(-0.45, 1.0) * caustic_speed * time;
+	float a = caustic_layer(world_xz / scale + drift_a);
+	float b = caustic_layer(world_xz / (scale * 0.6) + drift_b);
+	return 1.0 - (1.0 - a) * (1.0 - b);
+}
+
 // VERTEX already holds the real, baked relief height (ground.gd wrote it
 // directly into the relief mesh's own vertex data via get_height_at()) and
 // NORMAL is left untouched on purpose: the built-in NORMAL input is already
@@ -219,12 +305,11 @@ void fragment() {
 	float near_far_t = smoothstep(near_distance, far_distance, dist);
 	vec3 distance_tint = mix(near_color.rgb, far_color.rgb, near_far_t);
 
+	// Wet sand is dry sand darkened, hue preserved (see wet_darken's doc).
 	vec3 dry = dry_color.rgb * distance_tint;
-	vec3 wet = wet_color.rgb * distance_tint;
+	vec3 wet = dry * wet_darken;
 
 	vec3 sand_albedo = mix(dry, wet, sand_wetness);
-	float sand_roughness = mix(1.0, wet_roughness, sand_wetness);
-	float sand_specular = mix(0.0, wet_specular, sand_wetness);
 
 	// Sand grain + speckle: both multiplicative and applied identically
 	// across R/G/B, so they shift ALBEDO's value only, never its hue.
@@ -237,14 +322,37 @@ void fragment() {
 	float speckle = speckle_mask(v_world_xz) * speckle_darken * grain_suppression;
 	sand_albedo *= 1.0 - speckle;
 
-	// Drift lines: nudge the sand toward a slightly darker, slightly
-	// warmer tone, at most drift_line_strength of the way there.
-	float drift = drift_line_mask(v_world_xz, v_world_height);
-	sand_albedo = mix(sand_albedo, drift_line_color.rgb, drift * drift_line_strength);
+	// Under sea_level the drift/ripple detail runs at underwater_detail_
+	// boost x strength (see its own doc) - a short 5cm blend rather than a
+	// hard step so the boost doesn't draw its own line at the waterline.
+	float depth_below_sea = sea_level - v_world_height;
+	float underwater = smoothstep(0.0, 0.05, depth_below_sea);
+	float detail_boost = mix(1.0, underwater_detail_boost, underwater);
 
-	// Ripple marks: a plain brightness shift in wet sand only.
-	float ripple = ripple_mask(v_world_xz, v_world_height) * ripple_strength * sand_wetness;
-	sand_albedo += ripple;
+	// Drift lines: nudge the sand toward a slightly darker, slightly
+	// warmer tone, at most drift_line_strength (boosted under water) of
+	// the way there. Darken-only: the target is clamped per channel to
+	// never exceed the sand it's blending from, so a drift_line_color
+	// channel that happens to sit above the (wet, darkened) sand can't
+	// lighten it - the hue nudge survives, the value can only go down.
+	float drift = drift_line_mask(v_world_xz, v_world_height);
+	vec3 drift_target = min(drift_line_color.rgb, sand_albedo);
+	sand_albedo = mix(sand_albedo, drift_target, clamp(drift * drift_line_strength * detail_boost, 0.0, 1.0));
+
+	// Ripple marks: a brightness shift in wet sand only - darken-only
+	// (the signed noise is remapped to [0, 1] and subtracted), so ripples
+	// can never lift wet sand back toward the dry value. Multiplicative,
+	// same hue-preserving reasoning as grain/speckle above. Boosted under
+	// water like the drift lines.
+	float ripple = (0.5 + 0.5 * ripple_mask(v_world_xz, v_world_height)) * ripple_strength * detail_boost * sand_wetness;
+	sand_albedo *= 1.0 - clamp(ripple, 0.0, 1.0);
+
+	// Caustics: the one thing allowed to BRIGHTEN wet sand, and only under
+	// sea_level - full strength just below the waterline (the 3cm ramp
+	// keeps it from cutting a hard edge exactly there), gone by
+	// caustic_fade_depth. Multiplicative, hue preserved.
+	float caustic_fade = smoothstep(0.0, 0.03, depth_below_sea) * (1.0 - smoothstep(0.0, max(caustic_fade_depth, 0.001), depth_below_sea));
+	sand_albedo *= 1.0 + caustic_web(v_world_xz, TIME) * caustic_strength * caustic_fade;
 
 	// Pools are the wettest extreme of the plain noise mask (not the
 	// shore-boosted one), blended in as a distinct final layer so they
@@ -254,7 +362,8 @@ void fragment() {
 	float pool_factor = smoothstep(pool_threshold - pool_edge_width * 0.5, pool_threshold + pool_edge_width * 0.5, base_wetness);
 
 	ALBEDO = mix(sand_albedo, pool_color.rgb, pool_factor);
-	ROUGHNESS = mix(sand_roughness, pool_roughness, pool_factor);
-	SPECULAR = mix(sand_specular, 1.0, pool_factor);
+	// Diffuse only, everywhere - see render_mode's own doc.
+	ROUGHNESS = 1.0;
+	SPECULAR = 0.0;
 	METALLIC = 0.0;
 }
