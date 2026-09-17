@@ -122,7 +122,7 @@ signal relief_rebuilt
 
 # GDScript-only (see get_height_at()) - relief is baked into the mesh/
 # collision at rebuild time, not pushed to the shader as a uniform.
-@export var relief_amplitude: float = 0.3:
+@export var relief_amplitude: float = 0.15:
 	set(value):
 		relief_amplitude = value
 		_rebuild_ground_mesh_and_collision()
@@ -181,11 +181,22 @@ signal relief_rebuilt
 	set(value):
 		landmass_width_curve_power = value
 		_rebuild_ground_mesh_and_collision()
-# How many meters past the (noised) shoreline distance it takes to reach
-# landmass_below_sea_depth - widen for a more gradual slope into the water.
-@export var landmass_falloff_width: float = 8.0:
+# SDF mode: how many meters past the (noised) shoreline distance it takes
+# to reach landmass_below_sea_depth. Mask mode: the SAND side of the
+# drawn line only - how many metres inland the beach takes to rise from
+# sea_level to landmass_interior_height (see _relief_height()); the water
+# side has its own landmass_underwater_falloff_width below.
+@export var landmass_falloff_width: float = 6.0:
 	set(value):
 		landmass_falloff_width = value
+		_rebuild_ground_mesh_and_collision()
+# Mask mode only: how many metres past the drawn line the seabed takes to
+# fall from sea_level to -landmass_below_sea_depth, on an ease-in
+# (smoothstep) curve so the first metre of water is only centimetres
+# deep - see _relief_height()'s mask branch. Unused by the SDF.
+@export var landmass_underwater_falloff_width: float = 6.0:
+	set(value):
+		landmass_underwater_falloff_width = value
 		_rebuild_ground_mesh_and_collision()
 # Both relative to Sea's own sea_level (not absolute), so the landmass
 # stays correctly seated if sea_level is ever retuned. landmass_interior_
@@ -195,11 +206,11 @@ signal relief_rebuilt
 # (the two need independent values: the seaward wade depth was tuned
 # against the wall's own distance from the shore, which has nothing to do
 # with how deep the sides go).
-@export var landmass_interior_height: float = 0.5:
+@export var landmass_interior_height: float = 0.25:
 	set(value):
 		landmass_interior_height = value
 		_rebuild_ground_mesh_and_collision()
-@export var landmass_below_sea_depth: float = 2.0:
+@export var landmass_below_sea_depth: float = 1.6:
 	set(value):
 		landmass_below_sea_depth = value
 		_rebuild_ground_mesh_and_collision()
@@ -253,20 +264,19 @@ signal relief_rebuilt
 # above. White = sand, black = water; the 0.5 contour IS the waterline -
 # the painting is treated as PURE SHAPE, the gray in between only places
 # that contour at sub-pixel precision (bilinear sample, then threshold), it
-# does not paint the beach slope. The slope is still landmass_falloff_width
-# (via the same smoothstep _relief_height()'s side branch uses), fed by a
-# signed distance field computed from the mask once per change (see
-# _rebuild_mask_data()) - but unlike the SDF, whose distance 0 is where the
-# ramp STARTS (the sea_level crossing lands ~0.29 x falloff_width further
-# out at the current exports), the mask ramp is shifted inland by
-# _mask_ramp_offset() so height == sea_level exactly at mask distance 0:
-# sand ends where it was drawn, and get_landmass_distance()'s 0 (the
-# drain's own "shore") is that same drawn line. Mode is automatic: mask
-# set -> mask; null -> SDF. In mask mode the half-width/curve/seaward_*
-# exports and shoreline_noise_* are ignored (the painted edge is the edge);
-# landmass_interior_height/landmass_below_sea_depth/landmass_falloff_width
-# still apply. Sea's wave calming still follows the SDF under a mask - see
-# DESIGN.md.
+# does not paint the beach slope. The slope is a ramp split at the drawn
+# line, fed by a signed distance field computed from the mask once per
+# change (see _rebuild_mask_data()): on the sand side the beach rises from
+# sea_level to landmass_interior_height over landmass_falloff_width, on
+# the water side the seabed falls from sea_level to -landmass_below_sea_
+# depth over landmass_underwater_falloff_width (ease-in, so the shallows
+# stay shallow) - see _relief_height(). The line is sea_level by
+# construction, so sand ends exactly where it was drawn and get_landmass_
+# distance()'s 0 (the drain's own "shore") is that same line. Mode is
+# automatic: mask set -> mask; null -> SDF. In mask mode the half-width/
+# curve/seaward_* exports and shoreline_noise_* are ignored (the painted
+# edge is the edge). Sea's wave calming still follows the SDF under a mask
+# - see DESIGN.md.
 #
 # Image -> world: image up = inland (+RegionField.get_forward()), image
 # right = forward rotated 90 degrees (+X when forward is -Z); the pixel at
@@ -398,7 +408,7 @@ signal relief_rebuilt
 # is a narrow strip right at the waterline; below sea_level the wet
 # darkening simply continues. sea_level is pushed once in _ready() (see
 # _push_sea_level_uniform()) from Sea, not assumed.
-@export var shore_slope_start: float = 0.15:
+@export var shore_slope_start: float = 0.08:
 	set(value):
 		shore_slope_start = value
 		_apply_uniform("shore_slope_start", value)
@@ -673,12 +683,10 @@ func get_wetness_at(world_xz: Vector2) -> float:
 # Under a landmass_mask the signed distance comes from the mask's own
 # distance field instead (see _rebuild_mask_data()) - same sign convention
 # (negative on sand, positive in water), but 0 is the DRAWN LINE, which
-# _relief_height()'s mask branch makes the exact sea_level crossing (see
-# _mask_ramp_offset()) - so in mask mode the drain's "distance past shore"
-# is literally distance past the waterline, with none of the SDF's ~2m of
-# ramp-start lead-in on dry sand. No offset is applied here on purpose:
-# the raw mask distance already has the drawn line at 0; the offset only
-# belongs in the height ramp, which is what had to move to meet it.
+# _relief_height()'s mask branch makes the exact sea_level crossing (the
+# ramp is split there) - so in mask mode the drain's "distance past
+# shore" is literally distance past the waterline, with none of the SDF's
+# ~2m of ramp-start lead-in on dry sand.
 func get_landmass_distance(world_xz: Vector2) -> float:
 	if has_landmass_mask():
 		return _mask_distance_sample(world_xz)
@@ -815,15 +823,25 @@ func _relief_height(world_xz: Vector2) -> float:
 	_ensure_landmass_refs()
 	var landmass_height: float
 	if has_landmass_mask():
-		# One edge, one depth: the mask's signed shore distance through the
-		# same smoothstep/lerp the SDF's side branch below uses, shifted
-		# inland by _mask_ramp_offset() so the ramp crosses sea_level at
-		# mask distance 0 - the drawn line - rather than starting there.
-		# No seaward-specific branch - the painting doesn't know which edge
-		# is which, and the seaward_* exports are SDF-only.
-		var ramp_distance: float = _mask_distance_sample(world_xz) + _mask_ramp_offset()
-		var mask_factor: float = smoothstep(0.0, maxf(landmass_falloff_width, 0.001), ramp_distance)
-		landmass_height = _landmass_sea_level + lerpf(landmass_interior_height, -landmass_below_sea_depth, mask_factor)
+		# A ramp split at the drawn line (mask distance 0 = sea_level by
+		# construction, no offset needed). Sand side: the beach rises to
+		# landmass_interior_height over landmass_falloff_width on an ease-
+		# OUT (1 - (1 - u)^2) - a real, nonzero slope right at the line
+		# (2 x interior / width) flattening into the interior; a smoothstep
+		# would start flat at the line and turn the wet band into a shelf.
+		# Water side: the seabed falls to -landmass_below_sea_depth over
+		# landmass_underwater_falloff_width on an ease-IN (smoothstep), so
+		# the first metre of water is centimetres deep and the wade only
+		# gets serious toward the walls. One edge, one depth - the painting
+		# doesn't know which edge is which, and the seaward_* exports are
+		# SDF-only.
+		var shore_distance: float = _mask_distance_sample(world_xz)
+		if shore_distance <= 0.0:
+			var u: float = clampf(-shore_distance / maxf(landmass_falloff_width, 0.001), 0.0, 1.0)
+			landmass_height = _landmass_sea_level + landmass_interior_height * (1.0 - (1.0 - u) * (1.0 - u))
+		else:
+			var under: float = smoothstep(0.0, maxf(landmass_underwater_falloff_width, 0.001), shore_distance)
+			landmass_height = _landmass_sea_level - landmass_below_sea_depth * under
 	else:
 		# Whichever edge actually submerges this point further wins -
 		# computed as two independent HEIGHTS (not factors combined by
@@ -1094,24 +1112,6 @@ func _edt_1d(f: PackedFloat64Array, n: int, d: PackedFloat64Array, v: PackedInt3
 # X of the intersection of the parabolas rooted at q and p (q > p).
 func _edt_intersection(f: PackedFloat64Array, q: int, p: int) -> float:
 	return ((f[q] + float(q * q)) - (f[p] + float(p * p))) / float(2 * q - 2 * p)
-
-# How far inland of the drawn line the mask ramp's flat interior ends -
-# i.e. the distance along the ramp at which lerp(interior_height,
-# -below_sea_depth, smoothstep(0, falloff_width, d)) crosses 0. Solved
-# exactly: the crossing is at smoothstep factor f0 = interior / (interior
-# + below), and smoothstep's t*t*(3 - 2t) inverts in closed form as
-# t = 0.5 - sin(asin(1 - 2f) / 3) (the real root of the depressed cubic
-# on [0, 1]). Adding this to the raw mask distance before the smoothstep
-# (see _relief_height()) puts the sea_level crossing exactly on mask
-# distance 0. Recomputed per sample rather than cached - a couple of trig
-# calls, and it keeps get_height_at() a pure function of the exports.
-func _mask_ramp_offset() -> float:
-	var total: float = landmass_interior_height + landmass_below_sea_depth
-	if total <= 0.0001:
-		return 0.0
-	var f0: float = clampf(landmass_interior_height / total, 0.0, 1.0)
-	var t0: float = 0.5 - sin(asin(1.0 - 2.0 * f0) / 3.0)
-	return maxf(landmass_falloff_width, 0.001) * t0
 
 # Bilinear over the distance grid, clamped to its edge beyond it - past
 # the padding everything is either open water or the dry inland band, and
