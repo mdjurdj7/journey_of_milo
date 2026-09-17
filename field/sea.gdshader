@@ -165,10 +165,41 @@ uniform float surface_pattern_speed = 0.4;
 // edge_noise_scale, and breathing with the long wave's own height at
 // that point (not a generic timer) so it visibly pulses as an actual
 // wave crest passes under it.
-uniform vec4 foam_color : source_color = vec4(0.74, 0.82, 0.80, 1.0);
+uniform vec4 foam_color : source_color = vec4(0.66, 0.70, 0.70, 1.0);
 uniform float foam_width = 0.25;
-uniform float foam_strength : hint_range(0.0, 1.0) = 0.5;
+uniform float foam_strength : hint_range(0.0, 1.0) = 0.35;
 uniform float edge_noise_scale = 4.0;
+
+// Swash: a periodic wash of foam-coloured water that advances from
+// swash_start_depth to the waterline over the first part of each
+// swash_period cycle, brightening as it nears the line, holds, then
+// recedes and fades. The band is swash_band_width metres of water DEPTH
+// either side of its moving centre depth. Phase and per-cycle amplitude
+// come from the shared swash_phase()/swash_cycle_amplitude() below -
+// the SAME code ground.gdshader runs (see there) so the ground's wet
+// band breathes in step with each wash at the same stretch of beach.
+// Reads as a FRONT: a crisp leading edge on the shoreward side
+// (smoothstep over swash_edge_width of depth), a soft trailing edge over
+// swash_band_width toward deeper water, no patch noise, and its own
+// swash_color - lighter than foam_color - so the front is the brightest
+// thing near the line. Composited as its own overlay on top of the foam
+// line (which stays as a floor under it). Never past the waterline:
+// gated by depth like the foam. swash_period must divide sea.gd's
+// sea_time_period so the phase doesn't jump at the time wrap (7 into
+// 7000: fine).
+uniform vec4 swash_color : source_color = vec4(0.82, 0.84, 0.82, 1.0);
+uniform float swash_strength : hint_range(0.0, 1.0) = 0.7;
+uniform float swash_period = 7.0;
+uniform float swash_start_depth = 0.6;
+uniform float swash_band_width = 0.2;
+uniform float swash_edge_width = 0.05;
+// Phase offset along the shore: the noise at swash_phase_noise_scale
+// (slow - ~24m features) shifts the phase by (noise - 0.5) x swash_phase_
+// spread of a cycle, so the whole shore stays within +-spread/2 of one
+// cycle of itself and the front reads as one wave arriving a little
+// earlier or later along the beach, not as unrelated patches.
+uniform float swash_phase_noise_scale = 24.0;
+uniform float swash_phase_spread : hint_range(0.0, 1.0) = 0.15;
 
 // Edge: a thin softener only - alpha ramps 0 -> shallow_alpha over the
 // first shore_fade_width metres of water depth, so the waterline reads as
@@ -262,6 +293,69 @@ float sea_height(vec2 world_xz, float time) {
 	float h = surface_noise_rotated(world_xz / max(noise_scale, 0.001), 0.0, drift_a);
 	h += surface_noise_rotated(world_xz / max(noise_scale * 0.35, 0.001), 0.61, drift_b) * 0.5;
 	return h;
+}
+
+// --- Swash phase: SHARED by sea.gdshader and ground.gdshader, keep byte-identical ---
+// Both shaders declare the same uniforms (sea_time, swash_period,
+// swash_phase_noise_scale, swash_phase_spread, surface_noise with the
+// same sampler hints - all pushed from sea.gd) and run this exact code
+// at the same world XZ, so the sea's wash and the ground's wet band
+// agree on where in the cycle every stretch of beach is. Edit one, paste
+// to the other.
+//
+// swash_phase(): 0..1 through one cycle, offset per stretch of shore by
+// the slow noise at swash_phase_noise_scale - but only by
+// (noise - 0.5) x swash_phase_spread of a cycle, so the whole shore is
+// within +-spread/2 of one cycle of itself: one continuous front that
+// lands a little earlier here and later there, never unrelated patches.
+// swash_cycle_amplitude(): 0.6..1, a fixed random per cycle per stretch
+// (the noise at twice the phase scale, re-sampled at a golden-ratio step
+// per cycle index), so some washes are bigger than others and that too
+// varies slowly along the shore.
+float swash_phase(vec2 world_xz, float time) {
+	float offset = (texture(surface_noise, world_xz / max(swash_phase_noise_scale, 0.001)).r - 0.5) * swash_phase_spread;
+	return fract(time / max(swash_period, 0.001) + offset);
+}
+
+float swash_cycle_amplitude(vec2 world_xz, float time) {
+	vec2 phase_uv = world_xz / max(swash_phase_noise_scale, 0.001);
+	float offset = (texture(surface_noise, phase_uv).r - 0.5) * swash_phase_spread;
+	float cycle = floor(time / max(swash_period, 0.001) + offset);
+	float n = texture(surface_noise, phase_uv * 0.5 + vec2(cycle * 0.618, cycle * 0.382)).r;
+	return mix(0.6, 1.0, n);
+}
+// --- end shared block ---
+
+// Where in the cycle the wash does what - fixed shape, not tuning:
+// advance for the first 40%, hold at the line to 60% (while ground.
+// gdshader's run-up sheet climbs 0.40-0.52 and holds to 0.60), recede to
+// 80%, rest to 100%. ground.gdshader keys its run-up and wet mark off
+// the same numbers - edit both together, or the front and the sheet
+// stop meeting at the line at 0.40.
+const float SWASH_ADVANCE_END = 0.4;
+const float SWASH_HOLD_END = 0.6;
+const float SWASH_RECEDE_END = 0.8;
+
+// The wash's centre depth and intensity at a phase - centre runs
+// swash_start_depth -> 0 over the advance (intensity rising to 1), sits
+// at 0 through the hold, runs back out over the recede (intensity
+// fading), and is off through the rest.
+void swash_centre_and_intensity(float phase, out float centre, out float intensity) {
+	if (phase < SWASH_ADVANCE_END) {
+		float t = phase / SWASH_ADVANCE_END;
+		centre = swash_start_depth * (1.0 - t);
+		intensity = smoothstep(0.0, 1.0, t);
+	} else if (phase < SWASH_HOLD_END) {
+		centre = 0.0;
+		intensity = 1.0;
+	} else if (phase < SWASH_RECEDE_END) {
+		float t = (phase - SWASH_HOLD_END) / (SWASH_RECEDE_END - SWASH_HOLD_END);
+		centre = swash_start_depth * t;
+		intensity = 1.0 - smoothstep(0.0, 1.0, t);
+	} else {
+		centre = swash_start_depth;
+		intensity = 0.0;
+	}
 }
 
 // 0 at the inland wall's own Z (landmass_inland_z), 1 at the curve's
@@ -460,6 +554,21 @@ void fragment() {
 	float foam_edge = smoothstep(0.0, 0.05, water_depth) * (1.0 - smoothstep(0.05, max(foam_width, 0.06), water_depth));
 	float foam_amount = foam_edge * mix(0.6, 1.0, foam_noise) * mix(0.7, 1.0, breathe) * foam_strength;
 
+	// Swash (see swash_color's own doc): the front's leading edge is the
+	// shoreward (shallower) side of the cycle's centre depth, crisp over
+	// swash_edge_width; the trailing edge fades over swash_band_width
+	// toward deeper water. No patch noise - the cycle amplitude and the
+	// phase offset already vary it along the shore. Gated off dry sand by
+	// depth like the foam; composited below as its own overlay above the
+	// foam line.
+	float swash_ph = swash_phase(v_world_xz, sea_time);
+	float swash_centre;
+	float swash_intensity;
+	swash_centre_and_intensity(swash_ph, swash_centre, swash_intensity);
+	float swash_lead = smoothstep(swash_centre - max(swash_edge_width, 0.001), swash_centre, water_depth);
+	float swash_trail = 1.0 - smoothstep(swash_centre, swash_centre + max(swash_band_width, 0.001), water_depth);
+	float swash_amount = swash_lead * swash_trail * swash_intensity * swash_cycle_amplitude(v_world_xz, sea_time) * swash_strength * smoothstep(0.0, 0.03, water_depth);
+
 	// Composite (see refraction_strength's own doc): water_amount is what
 	// ALPHA used to be. The see-through part is the screen texture behind
 	// this fragment, displaced by the ripple slope, into EMISSION; the
@@ -479,12 +588,14 @@ void fragment() {
 	behind *= transmittance;
 
 	// Overlays paint over the whole mix, in order: the surface pattern
-	// (toward the sky colour), then foam on top. Each replaces its amount
-	// of both the lit surface term and the see-through term, so both read
-	// at full strength even where the water itself is nearly transparent.
+	// (toward the sky colour), the foam line, then the swash front on top.
+	// Each replaces its amount of both the lit surface term and the see-
+	// through term, so all read at full strength even where the water
+	// itself is nearly transparent.
 	vec3 surface = mix(albedo * water_amount, sky_reflect_color.rgb, pattern_amount);
 	surface = mix(surface, foam_color.rgb, foam_amount);
-	float overlay_amount = 1.0 - (1.0 - pattern_amount) * (1.0 - foam_amount);
+	surface = mix(surface, swash_color.rgb, swash_amount);
+	float overlay_amount = 1.0 - (1.0 - pattern_amount) * (1.0 - foam_amount) * (1.0 - swash_amount);
 	ALBEDO = surface;
 	EMISSION = behind * (1.0 - water_amount) * (1.0 - overlay_amount);
 	ROUGHNESS = sea_roughness;

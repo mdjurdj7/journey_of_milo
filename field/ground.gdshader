@@ -108,6 +108,56 @@ uniform float speckle_darken : hint_range(0.0, 1.0) = 0.15;
 uniform float shore_slope_start = 0.15;
 uniform float sea_level = 0.0;
 
+// Swash surge on the wet band: as each wash reaches the waterline (see
+// sea.gdshader's swash), shore_slope_start widens by up to
+// wet_band_surge metres of height (x the cycle's own amplitude), then
+// relaxes back over wet_dry_time seconds after the water recedes, so the
+// sand stays visibly wet a moment after the wash pulls back. Stateless -
+// a pure function of the shared phase, so it needs no history and can't
+// drift. The phase inputs below (sea_time, swash_period, swash_phase_
+// noise_scale, surface_noise) are all pushed by sea.gd - Sea owns the
+// wrapped time and the noise tile; Ground reads the same objects so the
+// phase computed here is the phase the sea's wash uses at this XZ.
+uniform float wet_band_surge = 0.25;
+uniform float wet_dry_time = 2.0;
+uniform float sea_time = 0.0;
+uniform float swash_period = 7.0;
+uniform float swash_phase_noise_scale = 24.0;
+uniform float swash_phase_spread : hint_range(0.0, 1.0) = 0.15;
+uniform sampler2D surface_noise : filter_linear_mipmap, repeat_enable;
+// The surge's shore gate: Ground's signed landmass distance (negative on
+// sand, positive in water, 0 on the drawn line) as an R32F texture over
+// the mask's padded distance grid - pushed once per mask rebuild by
+// ground.gd's _push_mask_distance_texture(), one texel per grid cell.
+// Everything swash-related on the ground is keyed to this distance, so
+// none of it can reach the interior's own relief dips (5m+ inside the
+// line) the way a height-only band did. landmass_distance_ready is false
+// in SDF mode (no grid) - the run-up, its sheet and the surge are simply
+// off there.
+uniform sampler2D landmass_distance_tex : filter_linear, repeat_disable;
+uniform vec2 landmass_distance_origin = vec2(0.0);
+uniform float landmass_distance_cell = 0.25;
+uniform vec2 landmass_distance_dims = vec2(1.0);
+uniform bool landmass_distance_ready = false;
+
+// Run-up: the ground draws the wash's continuation up the sand, since
+// the sea plane is depth-tested away there. Each cycle the sheet slides
+// from the drawn line to swash_runup_distance x the cycle's amplitude
+// (swash_runup_envelope(): the sea's own centre-depth curve mirrored, so
+// the two fronts move in step and meet at the line at the hold), then
+// drains back. The sheet is a translucent film toward swash_sheet_color
+// (darker/cooler than dry sand) at swash_sheet_alpha, with a bright
+// leading edge swash_edge_width_ground wide toward swash_color (the
+// sea's front colour). Behind it the sand stays wet as far as the sheet
+// reached this cycle (swash_wet_footprint()), drying over wet_dry_time -
+// that's the "how far it got" mark; wet_band_surge on top of that still
+// breathes the height band right at the line.
+uniform float swash_runup_distance = 1.2;
+uniform vec4 swash_sheet_color : source_color = vec4(0.60, 0.66, 0.66, 1.0);
+uniform float swash_sheet_alpha : hint_range(0.0, 1.0) = 0.45;
+uniform float swash_edge_width_ground = 0.08;
+uniform vec4 swash_color : source_color = vec4(0.82, 0.84, 0.82, 1.0);
+
 // Caustics: a scrolling bright web on the sand BELOW sea_level, so the
 // seabed reads as lit through moving water. Two Worley (cellular) layers
 // at caustic_scale and 0.6x that, drifting in different directions at
@@ -174,18 +224,150 @@ float dist_from_shore(float world_height) {
 	return world_height - sea_level;
 }
 
-float shore_t(float world_height) {
+// --- Swash phase: SHARED by sea.gdshader and ground.gdshader, keep byte-identical ---
+// Both shaders declare the same uniforms (sea_time, swash_period,
+// swash_phase_noise_scale, swash_phase_spread, surface_noise with the
+// same sampler hints - all pushed from sea.gd) and run this exact code
+// at the same world XZ, so the sea's wash and the ground's wet band
+// agree on where in the cycle every stretch of beach is. Edit one, paste
+// to the other.
+//
+// swash_phase(): 0..1 through one cycle, offset per stretch of shore by
+// the slow noise at swash_phase_noise_scale - but only by
+// (noise - 0.5) x swash_phase_spread of a cycle, so the whole shore is
+// within +-spread/2 of one cycle of itself: one continuous front that
+// lands a little earlier here and later there, never unrelated patches.
+// swash_cycle_amplitude(): 0.6..1, a fixed random per cycle per stretch
+// (the noise at twice the phase scale, re-sampled at a golden-ratio step
+// per cycle index), so some washes are bigger than others and that too
+// varies slowly along the shore.
+float swash_phase(vec2 world_xz, float time) {
+	float offset = (texture(surface_noise, world_xz / max(swash_phase_noise_scale, 0.001)).r - 0.5) * swash_phase_spread;
+	return fract(time / max(swash_period, 0.001) + offset);
+}
+
+float swash_cycle_amplitude(vec2 world_xz, float time) {
+	vec2 phase_uv = world_xz / max(swash_phase_noise_scale, 0.001);
+	float offset = (texture(surface_noise, phase_uv).r - 0.5) * swash_phase_spread;
+	float cycle = floor(time / max(swash_period, 0.001) + offset);
+	float n = texture(surface_noise, phase_uv * 0.5 + vec2(cycle * 0.618, cycle * 0.382)).r;
+	return mix(0.6, 1.0, n);
+}
+// --- end shared block ---
+
+// The sea's cycle shape (sea.gdshader's SWASH_ADVANCE_END / _HOLD_END /
+// _RECEDE_END): the wash reaches the line at 0.4, sits there to 0.6,
+// is gone by 0.8. The sheet's own climb window sits inside the sea's
+// hold: it starts climbing the sand the moment the front reaches the
+// line (0.40), is fully up by SWASH_CLIMB_END (0.52), holds to 0.60,
+// then drains back over the recede in step with the front. Edit these
+// together with sea.gdshader's, or the front and the sheet stop meeting
+// at the line at 0.40.
+const float SWASH_ADVANCE_END = 0.4;
+const float SWASH_CLIMB_END = 0.52;
+const float SWASH_HOLD_END = 0.6;
+const float SWASH_RECEDE_END = 0.8;
+
+// 0..1: how far up the sand the sheet is right now, as a fraction of
+// this cycle's full run-up. 0 until the sea front reaches the line
+// (0.40), linear 0 -> 1 over the climb (0.40-0.52), 1 through the rest
+// of the sea's hold (to 0.60), linear 1 -> 0 over the recede (0.60-
+// 0.80), 0 through the rest.
+float swash_runup_envelope(float phase) {
+	if (phase < SWASH_ADVANCE_END) {
+		return 0.0;
+	}
+	if (phase < SWASH_CLIMB_END) {
+		return (phase - SWASH_ADVANCE_END) / (SWASH_CLIMB_END - SWASH_ADVANCE_END);
+	}
+	if (phase < SWASH_HOLD_END) {
+		return 1.0;
+	}
+	if (phase < SWASH_RECEDE_END) {
+		return 1.0 - (phase - SWASH_HOLD_END) / (SWASH_RECEDE_END - SWASH_HOLD_END);
+	}
+	return 0.0;
+}
+
+// 0..1: the furthest the sheet has reached so far this cycle, as a
+// fraction of the full run-up - 0 before the climb, the run-up envelope
+// during it, then 1 for the rest of the cycle. The wet footprint's
+// inland extent.
+float swash_reached_envelope(float phase) {
+	if (phase < SWASH_ADVANCE_END) {
+		return 0.0;
+	}
+	if (phase < SWASH_CLIMB_END) {
+		return (phase - SWASH_ADVANCE_END) / (SWASH_CLIMB_END - SWASH_ADVANCE_END);
+	}
+	return 1.0;
+}
+
+// 0..1: how wet the swash has left the sand at a phase - 1 while the
+// water is on it (through the hold), then exp(-t / wet_dry_time) from
+// the moment it starts receding, forced to 0 over the last tenth of the
+// cycle so a slow dry time can't leave a step at the phase wrap.
+float swash_wet_decay(float phase) {
+	float since_recede = max(phase - SWASH_HOLD_END, 0.0) * max(swash_period, 0.001);
+	float decay = exp(-since_recede / max(wet_dry_time, 0.001));
+	float wrap_guard = 1.0 - smoothstep(0.9, 1.0, phase);
+	return decay * wrap_guard;
+}
+
+// The height-band surge's envelope: rises over the last tenth of the
+// advance (the water arriving at the line), then the wet decay above.
+float swash_wet_envelope(float phase) {
+	return smoothstep(SWASH_ADVANCE_END - 0.1, SWASH_ADVANCE_END, phase) * swash_wet_decay(phase);
+}
+
+// Bilinear sample of the pushed distance grid, matching ground.gd's own
+// _mask_distance_sample(): grid node i sits at origin + i * cell, texel
+// i's centre at (i + 0.5) / dims, and repeat_disable clamps to the edge
+// texel exactly as the CPU sampler clamps its index.
+float landmass_distance_at(vec2 world_xz) {
+	vec2 uv = ((world_xz - landmass_distance_origin) / max(landmass_distance_cell, 0.001) + 0.5) / max(landmass_distance_dims, vec2(1.0));
+	return texture(landmass_distance_tex, uv).r;
+}
+
+// 0 deep inside the sand, 1 within half this cycle's full run-up of the
+// drawn line (and on the water side), fading between - keeps the
+// height-band surge tied to how far the wash actually gets.
+float swash_shore_gate(float distance, float runup_max) {
+	float reach = max(runup_max, 0.001);
+	return smoothstep(-reach, -reach * 0.5, distance);
+}
+
+// The wet band's height threshold at this XZ right now: shore_slope_
+// start plus the swash surge (wet_band_surge x this cycle's amplitude x
+// the envelope above x the shore gate). distance/runup_max come from
+// fragment(), which already has them.
+float shore_band_height(float distance, float runup_max, float phase, float amplitude) {
+	float surge = landmass_distance_ready ? wet_band_surge * amplitude * swash_wet_envelope(phase) * swash_shore_gate(distance, runup_max) : 0.0;
+	return max(shore_slope_start + surge, 0.001);
+}
+
+float shore_t(float world_height, float band_height) {
 	if (!shore_wetness_enabled) {
 		return 0.0;
 	}
-	return 1.0 - smoothstep(0.0, max(shore_slope_start, 0.001), dist_from_shore(world_height));
+	return 1.0 - smoothstep(0.0, band_height, dist_from_shore(world_height));
+}
+
+// The sheet's own wet footprint: 1 from the line up to as far as the
+// sheet has reached this cycle (a 5cm edge so the mark has a visible
+// limit), decaying by swash_wet_decay() once the water pulls back. Cut
+// at the line (distance 0) - beyond it the sand is under water anyway.
+float swash_wet_footprint(float distance, float reached, float phase) {
+	float inland = smoothstep(-reached - 0.05, -reached, distance);
+	float seaward = 1.0 - smoothstep(0.0, 0.05, distance);
+	return inland * seaward * swash_wet_decay(phase);
 }
 
 // Wetness used for sand shading: the plain noise mask, boosted to 1 right
 // at the shore. Kept separate from the noise mask alone (used for pools)
 // so the shore band reads as wet sand rather than a strip of standing pool.
-float sand_wetness_mask(vec2 world_xz, float world_height) {
-	return max(wetness_mask(world_xz), shore_t(world_height));
+float sand_wetness_mask(vec2 world_xz, float world_height, float band_height) {
+	return max(wetness_mask(world_xz), shore_t(world_height, band_height));
 }
 
 // 2..drift_line_count faint bands, spaced drift_line_spacing apart starting
@@ -297,8 +479,25 @@ void vertex() {
 }
 
 void fragment() {
+	// Swash state at this XZ, computed once: shared phase/amplitude (see
+	// the shared block), this cycle's full run-up, where the sheet is
+	// now, how far it has reached, and the signed shore distance. All
+	// zero/inert without the distance grid (SDF mode).
+	float swash_ph = swash_phase(v_world_xz, sea_time);
+	float swash_amp = swash_cycle_amplitude(v_world_xz, sea_time);
+	float runup_max = max(swash_runup_distance, 0.0) * swash_amp;
+	float runup = runup_max * swash_runup_envelope(swash_ph);
+	float reached = runup_max * swash_reached_envelope(swash_ph);
+	float shore_distance = landmass_distance_ready ? landmass_distance_at(v_world_xz) : -1000.0;
+
 	float base_wetness = wetness_mask(v_world_xz);
-	float sand_wetness = sand_wetness_mask(v_world_xz, v_world_height);
+	float band_height = shore_band_height(shore_distance, runup_max, swash_ph, swash_amp);
+	float sand_wetness = sand_wetness_mask(v_world_xz, v_world_height, band_height);
+	// The run-up's own wet mark, on top of the height band: as far as the
+	// sheet reached this cycle, drying back over wet_dry_time.
+	if (landmass_distance_ready) {
+		sand_wetness = max(sand_wetness, swash_wet_footprint(shore_distance, reached, swash_ph));
+	}
 
 	// VERTEX in fragment() is view-space; its length is distance from the camera.
 	float dist = length(VERTEX);
@@ -353,6 +552,20 @@ void fragment() {
 	// caustic_fade_depth. Multiplicative, hue preserved.
 	float caustic_fade = smoothstep(0.0, 0.03, depth_below_sea) * (1.0 - smoothstep(0.0, max(caustic_fade_depth, 0.001), depth_below_sea));
 	sand_albedo *= 1.0 + caustic_web(v_world_xz, TIME) * caustic_strength * caustic_fade;
+
+	// Run-up sheet (see swash_runup_distance's own doc): the thin film
+	// between the drawn line and the sheet's current reach, cut at the
+	// line (the sea draws from there), with its bright leading edge on
+	// the inland end. Last, over everything on the sand - it's water on
+	// top of it. Extent goes to 0 with the envelope, so nothing pops.
+	if (landmass_distance_ready) {
+		// x smoothstep(runup) so the two edges' overlap can't leave a
+		// hairline at the line while the sheet is (nearly) drained.
+		float sheet = smoothstep(-runup - 0.02, -runup, shore_distance) * (1.0 - smoothstep(-0.02, 0.0, shore_distance)) * smoothstep(0.0, 0.05, runup);
+		float sheet_edge = sheet * (1.0 - smoothstep(0.0, max(swash_edge_width_ground, 0.001), shore_distance + runup));
+		sand_albedo = mix(sand_albedo, swash_sheet_color.rgb, sheet * swash_sheet_alpha);
+		sand_albedo = mix(sand_albedo, swash_color.rgb, sheet_edge);
+	}
 
 	// Pools are the wettest extreme of the plain noise mask (not the
 	// shore-boosted one), blended in as a distinct final layer so they

@@ -194,7 +194,8 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 #     0.28, 0.16, 0.204, 0.612 tiles/s -> whole at multiples of 250 s
 #   waves (speed / wavelength): long 0.25/14, short 0.6/3
 #     -> whole at multiples of 56 s
-#   -> lcm(200, 250, 56) = 7000 s (~1h57m).
+#   swash (1 / swash_period): 7 s -> whole at multiples of 7 s
+#   -> lcm(200, 250, 56, 7) = 7000 s (~1h57m).
 # A whole number of tiles is invisible because the noise tile repeats and
 # the drift is applied in texture space (see sea.gdshader's surface_
 # noise_rotated()); a whole number of wave cycles is invisible because
@@ -226,6 +227,60 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 	set(value):
 		foam_strength = value
 		_apply_uniform("foam_strength", value)
+
+@export_group("Swash")
+# A periodic wash advancing from swash_start_depth to the waterline,
+# holding, receding - see sea.gdshader's swash_strength doc. Ground's wet
+# band breathes with it: Sea pushes the shared inputs (the wrapped time,
+# swash_period, swash_phase_noise_scale and the surface_noise tile) into
+# Ground (_push_swash_source()/_push_sea_time()) so both shaders compute
+# the identical phase. swash_period must divide sea_time_period so the
+# phase doesn't jump at the time wrap.
+# Its own colour, lighter than foam_color, so the front is the brightest
+# thing near the line; a crisp leading edge (swash_edge_width of depth)
+# and a soft trailing edge (swash_band_width) - see sea.gdshader's own
+# swash_color doc.
+@export var swash_color: Color = Color(0.82, 0.84, 0.82):
+	set(value):
+		swash_color = value
+		_apply_uniform("swash_color", value)
+@export_range(0.0, 1.0) var swash_strength: float = 0.7:
+	set(value):
+		swash_strength = value
+		_apply_uniform("swash_strength", value)
+@export var swash_edge_width: float = 0.05:
+	set(value):
+		swash_edge_width = value
+		_apply_uniform("swash_edge_width", value)
+@export var swash_period: float = 7.0:
+	set(value):
+		swash_period = value
+		_apply_uniform("swash_period", value)
+		_push_swash_source()
+@export var swash_start_depth: float = 0.6:
+	set(value):
+		swash_start_depth = value
+		_apply_uniform("swash_start_depth", value)
+@export var swash_band_width: float = 0.2:
+	set(value):
+		swash_band_width = value
+		_apply_uniform("swash_band_width", value)
+# Phase offset along the shore: the noise at swash_phase_noise_scale
+# (slow, ~24m features) shifts each stretch's phase by (noise - 0.5) x
+# swash_phase_spread of a cycle - so the whole shore is within
+# +-spread/2 of a cycle of itself: one continuous front arriving a
+# little earlier here and later there, never unrelated patches. Both
+# pushed into Ground too (see _push_swash_source()).
+@export var swash_phase_noise_scale: float = 24.0:
+	set(value):
+		swash_phase_noise_scale = value
+		_apply_uniform("swash_phase_noise_scale", value)
+		_push_swash_source()
+@export_range(0.0, 1.0) var swash_phase_spread: float = 0.15:
+	set(value):
+		swash_phase_spread = value
+		_apply_uniform("swash_phase_spread", value)
+		_push_swash_source()
 @export var edge_noise_scale: float = 4.0:
 	set(value):
 		edge_noise_scale = value
@@ -401,6 +456,9 @@ func _ready() -> void:
 	_material.render_priority = -1
 	_create_surface_noise()
 	_apply_all_uniforms()
+	# Ground precedes Sea in the scene, so its material already exists
+	# here; the swash setters above re-push on any later change.
+	_push_swash_source()
 
 	# self is the inner (fine) patch; _outer_skirt is the coarse far skirt
 	# - see inner_wave_extent's own doc.
@@ -463,6 +521,22 @@ func _apply_surface_noise_frequency() -> void:
 		return
 	noise.frequency = maxf(surface_noise_periods, 0.01) / float(SURFACE_NOISE_SIZE)
 	noise.fractal_octaves = maxi(surface_noise_octaves, 1)
+
+# The swash's shared inputs, into Ground (see the Swash export group's
+# doc on why Sea is the single source): the one surface_noise texture
+# object, swash_period and swash_phase_noise_scale once (and on change),
+# the wrapped time every physics frame. Ground's own _apply_uniform()
+# no-ops until its material exists, so an early call is harmless.
+func _push_swash_source() -> void:
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground == null or _surface_noise == null:
+		return
+	ground.set_swash_source(_surface_noise, swash_period, swash_phase_noise_scale, swash_phase_spread)
+
+func _push_sea_time() -> void:
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null:
+		ground.set_sea_time(_sea_time)
 
 # Guards sea_level/sea_edge_distance's setters: they can fire during
 # scene deserialization before _ready() has built the meshes or resolved
@@ -613,6 +687,7 @@ func _spawn_ambience() -> void:
 func _physics_process(delta: float) -> void:
 	_sea_time = fmod(_sea_time + delta, maxf(sea_time_period, 1.0))
 	_apply_uniform("sea_time", _sea_time)
+	_push_sea_time()
 
 	if _audio_player == null or _wanderer == null:
 		return
@@ -671,6 +746,15 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("foam_width", foam_width)
 	_apply_uniform("foam_strength", foam_strength)
 	_apply_uniform("edge_noise_scale", edge_noise_scale)
+
+	_apply_uniform("swash_color", swash_color)
+	_apply_uniform("swash_strength", swash_strength)
+	_apply_uniform("swash_edge_width", swash_edge_width)
+	_apply_uniform("swash_period", swash_period)
+	_apply_uniform("swash_start_depth", swash_start_depth)
+	_apply_uniform("swash_band_width", swash_band_width)
+	_apply_uniform("swash_phase_noise_scale", swash_phase_noise_scale)
+	_apply_uniform("swash_phase_spread", swash_phase_spread)
 
 	_apply_uniform("wave_calm_distance", wave_calm_distance)
 

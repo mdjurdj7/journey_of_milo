@@ -412,6 +412,51 @@ signal relief_rebuilt
 	set(value):
 		shore_slope_start = value
 		_apply_uniform("shore_slope_start", value)
+# The wet band breathes with the sea's swash: shore_slope_start widens by
+# up to wet_band_surge metres of height as each wash reaches the line,
+# relaxing back over wet_dry_time seconds after it recedes. The phase
+# inputs (wrapped time, period, phase-noise scale, the noise tile) are
+# pushed by Sea - see set_swash_source()/set_sea_time() - so this reads
+# the identical phase the sea's wash uses; nothing here is authored.
+@export var wet_band_surge: float = 0.25:
+	set(value):
+		wet_band_surge = value
+		_apply_uniform("wet_band_surge", value)
+@export var wet_dry_time: float = 2.0:
+	set(value):
+		wet_dry_time = value
+		_apply_uniform("wet_dry_time", value)
+# Run-up: the ground draws each wash's continuation up the sand (the sea
+# plane is depth-tested away there) - see ground.gdshader's own
+# swash_runup_distance doc. The sheet slides from the drawn line to
+# swash_runup_distance x the cycle's amplitude and back, in step with the
+# sea's front; a translucent film toward swash_sheet_color at swash_sheet_
+# alpha with a bright leading edge swash_edge_width_ground wide toward
+# swash_color (the sea's front colour - keep the two defaults matched).
+# The sand stays wet as far as the sheet reached, drying over wet_dry_
+# time. All keyed to the mask distance grid pushed as a texture (see
+# _push_mask_distance_texture()) so none of it can reach the interior; in
+# SDF mode there is no grid and the whole run-up is off.
+@export var swash_runup_distance: float = 1.2:
+	set(value):
+		swash_runup_distance = value
+		_apply_uniform("swash_runup_distance", value)
+@export var swash_sheet_color: Color = Color(0.60, 0.66, 0.66):
+	set(value):
+		swash_sheet_color = value
+		_apply_uniform("swash_sheet_color", value)
+@export_range(0.0, 1.0) var swash_sheet_alpha: float = 0.45:
+	set(value):
+		swash_sheet_alpha = value
+		_apply_uniform("swash_sheet_alpha", value)
+@export var swash_edge_width_ground: float = 0.08:
+	set(value):
+		swash_edge_width_ground = value
+		_apply_uniform("swash_edge_width_ground", value)
+@export var swash_color: Color = Color(0.82, 0.84, 0.82):
+	set(value):
+		swash_color = value
+		_apply_uniform("swash_color", value)
 
 # Caustics on the sand below sea_level - see ground.gdshader's own doc: a
 # scrolling two-layer cellular web brightening the wet sand by up to
@@ -585,6 +630,13 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("wetness_amount", wetness_amount)
 	_apply_uniform("wet_darken", wet_darken)
 	_apply_uniform("shore_slope_start", shore_slope_start)
+	_apply_uniform("wet_band_surge", wet_band_surge)
+	_apply_uniform("wet_dry_time", wet_dry_time)
+	_apply_uniform("swash_runup_distance", swash_runup_distance)
+	_apply_uniform("swash_sheet_color", swash_sheet_color)
+	_apply_uniform("swash_sheet_alpha", swash_sheet_alpha)
+	_apply_uniform("swash_edge_width_ground", swash_edge_width_ground)
+	_apply_uniform("swash_color", swash_color)
 	_apply_uniform("caustic_strength", caustic_strength)
 	_apply_uniform("caustic_scale", caustic_scale)
 	_apply_uniform("caustic_speed", caustic_speed)
@@ -614,6 +666,22 @@ func _apply_all_uniforms() -> void:
 func _apply_uniform(uniform_name: String, value: Variant) -> void:
 	if _material:
 		_material.set_shader_parameter(uniform_name, value)
+
+# Called by sea.gd (see its _push_swash_source()/_push_sea_time()): the
+# swash phase's shared inputs. Sea owns the wrapped time and the baked
+# surface_noise tile; handing Ground the same texture object and the same
+# float is what makes ground.gdshader's swash_phase() equal the sea's at
+# every XZ. set_swash_source() once (and on export change), set_sea_time()
+# every physics frame. Both just push uniforms - _apply_uniform() no-ops
+# until _material exists, so call order relative to _ready() is safe.
+func set_swash_source(noise: Texture2D, period: float, phase_noise_scale: float, phase_spread: float) -> void:
+	_apply_uniform("surface_noise", noise)
+	_apply_uniform("swash_period", period)
+	_apply_uniform("swash_phase_noise_scale", phase_noise_scale)
+	_apply_uniform("swash_phase_spread", phase_spread)
+
+func set_sea_time(sea_time: float) -> void:
+	_apply_uniform("sea_time", sea_time)
 
 # Called by region_sky.gd so the standing-pool color always tracks the
 # sky's horizon color without manual duplication. pool_color's own
@@ -913,6 +981,9 @@ var _mask_distance_rows: int = 0
 var _mask_distance_origin: Vector2 = Vector2.ZERO
 var _mask_distance_cell_size: float = 0.25
 var _mask_land_bounds: Rect2 = Rect2()
+# The distance grid as an R32F texture for ground.gdshader (the swash
+# surge's shore gate) - see _push_mask_distance_texture().
+var _mask_distance_texture: ImageTexture = null
 
 func _rebuild_mask_data() -> void:
 	_mask_dirty = false
@@ -921,12 +992,36 @@ func _rebuild_mask_data() -> void:
 	_mask_distance = PackedFloat32Array()
 	_mask_land_bounds = Rect2()
 	if landmass_mask == null:
+		_push_mask_distance_texture()
 		return
 	if not _decode_mask_image():
 		push_warning("Ground: landmass_mask yielded no readable image; falling back to the SDF landmass.")
+		_push_mask_distance_texture()
 		return
 	_build_mask_distance_field()
 	_mask_ready = true
+	_push_mask_distance_texture()
+
+# The same signed distance grid _mask_distance_sample() reads, handed to
+# the shader as one R32F texel per cell (cols x rows, ~115 KB at the
+# current 188x153) plus the grid's origin/cell size/dims, so the shader
+# can bilinearly sample the identical field at any world XZ (see
+# ground.gdshader's landmass_distance_at()). Uploaded here, once per mask
+# rebuild - never per frame. With no mask the ready flag goes false and
+# the shader treats the distance as unknown (surge off). This is also the
+# texture the deferred sea-side wave calming would read - see DESIGN.md.
+func _push_mask_distance_texture() -> void:
+	if not _mask_ready or _mask_distance.is_empty():
+		_mask_distance_texture = null
+		_apply_uniform("landmass_distance_ready", false)
+		return
+	var image: Image = Image.create_from_data(_mask_distance_cols, _mask_distance_rows, false, Image.FORMAT_RF, _mask_distance.to_byte_array())
+	_mask_distance_texture = ImageTexture.create_from_image(image)
+	_apply_uniform("landmass_distance_tex", _mask_distance_texture)
+	_apply_uniform("landmass_distance_origin", _mask_distance_origin)
+	_apply_uniform("landmass_distance_cell", _mask_distance_cell_size)
+	_apply_uniform("landmass_distance_dims", Vector2(float(_mask_distance_cols), float(_mask_distance_rows)))
+	_apply_uniform("landmass_distance_ready", true)
 
 # Texture2D.get_image() hands back a fresh copy, so converting it in place
 # is safe. A PNG's default import is lossless, so decompress() is normally
