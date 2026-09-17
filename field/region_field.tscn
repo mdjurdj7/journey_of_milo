@@ -5,13 +5,14 @@
 [ext_resource type="Script" uid="uid://cdvgdcbobcq5y" path="res://field/overcast_light.gd" id="3"]
 [ext_resource type="Script" uid="uid://bh86ttpfd68tx" path="res://field/ground.gd" id="4"]
 [ext_resource type="Script" uid="uid://boqbnc57buiff" path="res://field/tower.gd" id="5"]
+[ext_resource type="Texture2D" uid="uid://ddam5sfywfl2u" path="res://assets/field/masks/Map1_mask.png" id="5_6yf30"]
 [ext_resource type="Script" uid="uid://c70wmcl2vmws3" path="res://field/wanderer.gd" id="6"]
 [ext_resource type="Script" uid="uid://c73umk7v0kdui" path="res://field/camera_rig.gd" id="7"]
 [ext_resource type="PackedScene" path="res://field/field_enemy.tscn" id="8"]
 [ext_resource type="Script" uid="uid://bp435mxjxefe2" path="res://field/sea.gd" id="9"]
 [ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="10"]
 [ext_resource type="PackedScene" uid="uid://gs247wxjvj43" path="res://assets/Environment/ruin_paving_test/ruin_paving_test.glb" id="11"]
-[ext_resource type="Shader" path="res://field/ruin_stone.gdshader" id="12"]
+[ext_resource type="Shader" uid="uid://fsjar5sb1exb" path="res://field/ruin_stone.gdshader" id="12"]
 [ext_resource type="PackedScene" path="res://ui/deck_panel.tscn" id="13"]
 [ext_resource type="Theme" path="res://ui/battle_theme.tres" id="14"]
 [ext_resource type="PackedScene" path="res://ui/hp_bar.tscn" id="15"]
@@ -65,12 +66,44 @@ size = Vector3(1.4, 0.07, 1)
 material = SubResource("StandardMaterial3D_lookdev_slab")
 size = Vector3(0.85, 0.09, 0.8)
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_ruin_stone"]
+render_priority = 0
+shader = ExtResource("12")
+shader_parameter/base_color = Color(0.36, 0.4, 0.44, 1)
+shader_parameter/shade_color = Color(0.22, 0.25, 0.29, 1)
+shader_parameter/warm_worn_color = Color(0.5, 0.44, 0.37, 1)
+shader_parameter/value_noise_scale = 1.8
+shader_parameter/value_noise_strength = 0.6
+shader_parameter/warm_noise_scale = 2.6
+shader_parameter/warm_threshold = 0.62
+shader_parameter/warm_strength = 0.35
+shader_parameter/normal_break_scale = 0.6
+shader_parameter/normal_break_amplitude = 0.015
+shader_parameter/stone_roughness = 0.94
+shader_parameter/stone_specular = 0.25
+
 [sub_resource type="BoxShape3D" id="BoxShape3D_spawn_slab"]
 size = Vector3(1.3164691, 0.16, 1.0683886)
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hero_grass"]
+albedo_color = Color(0.33, 0.39, 0.27, 1)
+roughness = 0.85
+
+[sub_resource type="BoxMesh" id="BoxMesh_hero_grass_blade"]
+material = SubResource("StandardMaterial3D_hero_grass")
+size = Vector3(0.05, 0.28, 0.18)
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_ruin_blockout"]
 albedo_color = Color(0.38, 0.4, 0.43, 1)
 roughness = 0.92
+
+[sub_resource type="BoxMesh" id="BoxMesh_hero_rubble"]
+material = SubResource("StandardMaterial3D_ruin_blockout")
+size = Vector3(0.42, 0.3, 0.4)
+
+[sub_resource type="BoxMesh" id="BoxMesh_hero_fragment"]
+material = SubResource("StandardMaterial3D_ruin_blockout")
+size = Vector3(0.9, 0.7, 0.45)
 
 [sub_resource type="BoxMesh" id="BoxMesh_ruin_wall_1"]
 material = SubResource("StandardMaterial3D_ruin_blockout")
@@ -120,25 +153,6 @@ size = Vector3(3, 1.3, 2.2)
 material = SubResource("StandardMaterial3D_ruin_blockout")
 size = Vector3(4.4, 2.2, 3.2)
 
-[sub_resource type="ShaderMaterial" id="ShaderMaterial_ruin_stone"]
-shader = ExtResource("12")
-
-[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_hero_grass"]
-albedo_color = Color(0.33, 0.39, 0.27, 1)
-roughness = 0.85
-
-[sub_resource type="BoxMesh" id="BoxMesh_hero_grass_blade"]
-material = SubResource("StandardMaterial3D_hero_grass")
-size = Vector3(0.05, 0.28, 0.18)
-
-[sub_resource type="BoxMesh" id="BoxMesh_hero_rubble"]
-material = SubResource("StandardMaterial3D_ruin_blockout")
-size = Vector3(0.42, 0.3, 0.4)
-
-[sub_resource type="BoxMesh" id="BoxMesh_hero_fragment"]
-material = SubResource("StandardMaterial3D_ruin_blockout")
-size = Vector3(0.9, 0.7, 0.45)
-
 [node name="RegionField" type="Node3D" unique_id=2096648515]
 script = ExtResource("1")
 field_extents = Vector2(26, 30)
@@ -165,6 +179,9 @@ shadow_darkness = 0.7
 [node name="Ground" type="StaticBody3D" parent="." unique_id=1437900813]
 script = ExtResource("4")
 wetness_scale = 8.0
+landmass_falloff_width = 4.0
+landmass_below_sea_depth = 1.0
+landmass_mask = ExtResource("5_6yf30")
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=1297283630]
 
@@ -208,11 +225,15 @@ enemy_id = &"sputter"
 enemy_data = ExtResource("10")
 model_yaw_offset = 180.0
 
-[node name="ExitGate" parent="." instance=ExtResource("16")]
+[node name="ExitGate" parent="." unique_id=1640815979 instance=ExtResource("16")]
 
 [node name="Sea" type="MeshInstance3D" parent="." unique_id=1533217746]
 script = ExtResource("9")
-sea_color = Color(0.2750388, 0.49996376, 0.5953062, 1)
+sky_reflect_min = 0.06
+shallow_color = Color(0.7483791, 0.7977378, 0.7977378, 1)
+deep_color = Color(0.6100377, 0.71656334, 0.83283556, 1)
+shallow_alpha = 0.1
+depth_opaque = 2.0
 sea_level = 0.3
 sea_edge_distance = 6.0
 volume_db_max = -20.0
@@ -221,22 +242,22 @@ volume_db_max = -20.0
 process_mode = 3
 layer = 2
 
-[node name="FieldHUD" type="CanvasLayer" parent="."]
+[node name="FieldHUD" type="CanvasLayer" parent="." unique_id=1492226510]
 process_mode = 3
-layer = 1
 
-[node name="DeckPanel" parent="FieldHUD" instance=ExtResource("13")]
-theme = ExtResource("14")
-anchor_left = 0.0
+[node name="DeckPanel" parent="FieldHUD" unique_id=2061940216 instance=ExtResource("13")]
+anchors_preset = 2
 anchor_top = 1.0
-anchor_right = 0.0
 anchor_bottom = 1.0
 offset_left = 32.0
 offset_top = -76.0
 offset_right = 192.0
 offset_bottom = -32.0
+theme = ExtResource("14")
 
-[node name="HPBar" parent="FieldHUD" instance=ExtResource("15")]
+[node name="HPBar" parent="FieldHUD" unique_id=240261920 instance=ExtResource("15")]
+layout_mode = 3
+anchors_preset = 0
 theme = ExtResource("14")
 
 [node name="LookDevSurface" type="Node3D" parent="." unique_id=-1194967296]
@@ -285,229 +306,203 @@ mesh = SubResource("BoxMesh_lookdev_slab_10")
 [node name="RuinPavingTest" parent="." unique_id=934835729 instance=ExtResource("11")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
 
+[node name="PavingSlab_01" parent="RuinPavingTest" index="0" unique_id=574256938]
+surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
+
+[node name="PavingSlab_02" parent="RuinPavingTest" index="1" unique_id=1930720007]
+surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
+
+[node name="PavingSlab_03" parent="RuinPavingTest" index="2" unique_id=974147002]
+surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
+
 [node name="SpawnSlabBody" type="StaticBody3D" parent="." unique_id=1207347768]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0410794, 0.05, 0.0137395)
 disable_mode = 1
 
-[editable path="RuinPavingTest"]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="SpawnSlabBody" unique_id=1369458258]
+shape = SubResource("BoxShape3D_spawn_slab")
 
-[node name="PavingSlab_01" parent="RuinPavingTest" index="0"]
-surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
+[node name="HeroPavingPatch" type="Node3D" parent="." unique_id=1950039972]
 
-[node name="PavingSlab_02" parent="RuinPavingTest" index="1"]
-surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
+[node name="Slabs" type="Node3D" parent="HeroPavingPatch" unique_id=169690602]
 
-[node name="PavingSlab_03" parent="RuinPavingTest" index="2"]
-surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
-
-[node name="HeroPavingPatch" type="Node3D" parent="."]
-
-[node name="Slabs" type="Node3D" parent="HeroPavingPatch"]
-
-[node name="HeroSlab1" parent="HeroPavingPatch/Slabs" instance=ExtResource("11")]
+[node name="HeroSlab1" parent="HeroPavingPatch/Slabs" unique_id=1403464063 instance=ExtResource("11")]
 transform = Transform3D(0.9816, 0, 0.1908, 0, 1, 0, -0.1908, 0, 0.9816, -0.25, 0.04, -1.8)
 
-[editable path="HeroPavingPatch/Slabs/HeroSlab1"]
-
-[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab1" index="0"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab1" index="0" unique_id=574256938]
 surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 
-[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab1" index="1"]
+[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab1" index="1" unique_id=1930720007]
 visible = false
 
-[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab1" index="2"]
+[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab1" index="2" unique_id=974147002]
 visible = false
 
-[node name="HeroSlab2" parent="HeroPavingPatch/Slabs" instance=ExtResource("11")]
+[node name="HeroSlab2" parent="HeroPavingPatch/Slabs" unique_id=249256837 instance=ExtResource("11")]
 transform = Transform3D(0.9477, 0, 0.0663, 0, 0.95, 0, -0.0663, 0, 0.9477, 0.15, 0.03, -2.7)
 
-[editable path="HeroPavingPatch/Slabs/HeroSlab2"]
-
-[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab2" index="0"]
+[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab2" index="0" unique_id=574256938]
 visible = false
 
-[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab2" index="1"]
+[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab2" index="1" unique_id=1930720007]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 
-[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab2" index="2"]
+[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab2" index="2" unique_id=974147002]
 visible = false
 
-[node name="HeroSlab3" parent="HeroPavingPatch/Slabs" instance=ExtResource("11")]
+[node name="HeroSlab3" parent="HeroPavingPatch/Slabs" unique_id=857045912 instance=ExtResource("11")]
 transform = Transform3D(0.9848, 0, 0.1736, 0, 1, 0, -0.1736, 0, 0.9848, 0.2, 0.05, 1.5)
 
-[editable path="HeroPavingPatch/Slabs/HeroSlab3"]
-
-[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab3" index="0"]
+[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab3" index="0" unique_id=574256938]
 visible = false
 
-[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab3" index="1"]
+[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab3" index="1" unique_id=1930720007]
 visible = false
 
-[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab3" index="2"]
+[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab3" index="2" unique_id=974147002]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 
-[node name="HeroSlab4" parent="HeroPavingPatch/Slabs" instance=ExtResource("11")]
+[node name="HeroSlab4" parent="HeroPavingPatch/Slabs" unique_id=572746019 instance=ExtResource("11")]
 transform = Transform3D(0.8966, 0, 0.0785, 0, 0.9, 0, -0.0785, 0, 0.8966, -0.15, 0.04, 2.4)
 
-[editable path="HeroPavingPatch/Slabs/HeroSlab4"]
-
-[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab4" index="0"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab4" index="0" unique_id=574256938]
 surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 
-[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab4" index="1"]
+[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab4" index="1" unique_id=1930720007]
 visible = false
 
-[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab4" index="2"]
+[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab4" index="2" unique_id=974147002]
 visible = false
 
-[node name="HeroSlab5" parent="HeroPavingPatch/Slabs" instance=ExtResource("11")]
+[node name="HeroSlab5" parent="HeroPavingPatch/Slabs" unique_id=524668032 instance=ExtResource("11")]
 transform = Transform3D(0.9613, 0, 0.2756, 0, 1, 0, -0.2756, 0, 0.9613, -1.3, 0.05, 0.2)
 
-[editable path="HeroPavingPatch/Slabs/HeroSlab5"]
-
-[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab5" index="0"]
+[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab5" index="0" unique_id=574256938]
 visible = false
 
-[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab5" index="1"]
+[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab5" index="1" unique_id=1930720007]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 
-[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab5" index="2"]
+[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab5" index="2" unique_id=974147002]
 visible = false
 
-[node name="HeroSlab6" parent="HeroPavingPatch/Slabs" instance=ExtResource("11")]
-transform = Transform3D(0.8863, 0, -0.1562, 0, 0.9, 0, 0.1562, 0, 0.8863, -1.95, 0.0, -0.9)
+[node name="HeroSlab6" parent="HeroPavingPatch/Slabs" unique_id=288654610 instance=ExtResource("11")]
+transform = Transform3D(0.8863, 0, -0.1562, 0, 0.9, 0, 0.1562, 0, 0.8863, -1.95, 0, -0.9)
 
-[editable path="HeroPavingPatch/Slabs/HeroSlab6"]
-
-[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab6" index="0"]
+[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab6" index="0" unique_id=574256938]
 visible = false
 
-[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab6" index="1"]
+[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab6" index="1" unique_id=1930720007]
 visible = false
 
-[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab6" index="2"]
+[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab6" index="2" unique_id=974147002]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 
-[node name="HeroSlab7" parent="HeroPavingPatch/Slabs" instance=ExtResource("11")]
+[node name="HeroSlab7" parent="HeroPavingPatch/Slabs" unique_id=1709902891 instance=ExtResource("11")]
 transform = Transform3D(0.671, 0, 0.4357, 0, 0.8, 0, -0.4357, 0, 0.671, -2.6, -0.05, 1.1)
 
-[editable path="HeroPavingPatch/Slabs/HeroSlab7"]
-
-[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab7" index="0"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab7" index="0" unique_id=574256938]
 surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 
-[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab7" index="1"]
+[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab7" index="1" unique_id=1930720007]
 visible = false
 
-[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab7" index="2"]
+[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab7" index="2" unique_id=974147002]
 visible = false
 
-[node name="HeroSlab8" parent="HeroPavingPatch/Slabs" instance=ExtResource("11")]
+[node name="HeroSlab8" parent="HeroPavingPatch/Slabs" unique_id=721073951 instance=ExtResource("11")]
 transform = Transform3D(0.9703, 0, 0.2419, 0, 1, 0, -0.2419, 0, 0.9703, 1.25, 0.05, -0.4)
 
-[editable path="HeroPavingPatch/Slabs/HeroSlab8"]
+[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab8" index="0" unique_id=574256938]
+surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 
-[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab8" index="0"]
+[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab8" index="1" unique_id=1930720007]
+visible = false
+
+[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab8" index="2" unique_id=974147002]
+visible = false
+
+[node name="HeroSlab9" parent="HeroPavingPatch/Slabs" unique_id=867988657 instance=ExtResource("11")]
+transform = Transform3D(0.8803, 0, -0.1871, 0, 0.9, 0, 0.1871, 0, 0.8803, 1.9, 0, 0.8)
+
+[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab9" index="0" unique_id=574256938]
+visible = false
+
+[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab9" index="1" unique_id=1930720007]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 
-[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab8" index="1"]
+[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab9" index="2" unique_id=974147002]
 visible = false
 
-[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab8" index="2"]
-visible = false
-
-[node name="HeroSlab9" parent="HeroPavingPatch/Slabs" instance=ExtResource("11")]
-transform = Transform3D(0.8803, 0, -0.1871, 0, 0.9, 0, 0.1871, 0, 0.8803, 1.9, 0.0, 0.8)
-
-[editable path="HeroPavingPatch/Slabs/HeroSlab9"]
-
-[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab9" index="0"]
-visible = false
-
-[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab9" index="1"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
-surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
-
-[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab9" index="2"]
-visible = false
-
-[node name="HeroSlab10" parent="HeroPavingPatch/Slabs" instance=ExtResource("11")]
+[node name="HeroSlab10" parent="HeroPavingPatch/Slabs" unique_id=366126689 instance=ExtResource("11")]
 transform = Transform3D(0.7361, 0, 0.425, 0, 0.85, 0, -0.425, 0, 0.7361, 2.55, -0.05, -1.3)
 
-[editable path="HeroPavingPatch/Slabs/HeroSlab10"]
-
-[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab10" index="0"]
+[node name="PavingSlab_01" parent="HeroPavingPatch/Slabs/HeroSlab10" index="0" unique_id=574256938]
 visible = false
 
-[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab10" index="1"]
+[node name="PavingSlab_02" parent="HeroPavingPatch/Slabs/HeroSlab10" index="1" unique_id=1930720007]
 visible = false
 
-[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab10" index="2"]
+[node name="PavingSlab_03" parent="HeroPavingPatch/Slabs/HeroSlab10" index="2" unique_id=974147002]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
 surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 
-[node name="Grass" type="Node3D" parent="HeroPavingPatch"]
+[node name="Grass" type="Node3D" parent="HeroPavingPatch" unique_id=813261092]
 
-[node name="GrassClump1A" type="MeshInstance3D" parent="HeroPavingPatch/Grass"]
+[node name="GrassClump1A" type="MeshInstance3D" parent="HeroPavingPatch/Grass" unique_id=1774976034]
 transform = Transform3D(0.9848, 0, 0.1736, 0, 1, 0, -0.1736, 0, 0.9848, -2.3, 0.14, 0.5)
 mesh = SubResource("BoxMesh_hero_grass_blade")
 
-[node name="GrassClump1B" type="MeshInstance3D" parent="HeroPavingPatch/Grass"]
+[node name="GrassClump1B" type="MeshInstance3D" parent="HeroPavingPatch/Grass" unique_id=1291336281]
 transform = Transform3D(0.1562, 0, 0.8863, 0, 0.9, 0, -0.8863, 0, 0.1562, -2.22, 0.13, 0.55)
 mesh = SubResource("BoxMesh_hero_grass_blade")
 
-[node name="GrassClump2A" type="MeshInstance3D" parent="HeroPavingPatch/Grass"]
+[node name="GrassClump2A" type="MeshInstance3D" parent="HeroPavingPatch/Grass" unique_id=248855653]
 transform = Transform3D(0.9516, 0, -0.4437, 0, 1.05, 0, 0.4437, 0, 0.9516, -2.9, 0.14, 1.4)
 mesh = SubResource("BoxMesh_hero_grass_blade")
 
-[node name="GrassClump2B" type="MeshInstance3D" parent="HeroPavingPatch/Grass"]
+[node name="GrassClump2B" type="MeshInstance3D" parent="HeroPavingPatch/Grass" unique_id=2032811208]
 transform = Transform3D(0.425, 0, 0.7361, 0, 0.85, 0, -0.7361, 0, 0.425, -2.82, 0.13, 1.46)
 mesh = SubResource("BoxMesh_hero_grass_blade")
 
-[node name="GrassClump3A" type="MeshInstance3D" parent="HeroPavingPatch/Grass"]
+[node name="GrassClump3A" type="MeshInstance3D" parent="HeroPavingPatch/Grass" unique_id=319818365]
 transform = Transform3D(0.9397, 0, 0.342, 0, 1, 0, -0.342, 0, 0.9397, 2.2, 0.14, 0.2)
 mesh = SubResource("BoxMesh_hero_grass_blade")
 
-[node name="GrassClump3B" type="MeshInstance3D" parent="HeroPavingPatch/Grass"]
+[node name="GrassClump3B" type="MeshInstance3D" parent="HeroPavingPatch/Grass" unique_id=98801239]
 transform = Transform3D(-0.0785, 0, 0.8966, 0, 0.9, 0, -0.8966, 0, -0.0785, 2.28, 0.13, 0.26)
 mesh = SubResource("BoxMesh_hero_grass_blade")
 
-[node name="GrassClump4A" type="MeshInstance3D" parent="HeroPavingPatch/Grass"]
+[node name="GrassClump4A" type="MeshInstance3D" parent="HeroPavingPatch/Grass" unique_id=1262185788]
 transform = Transform3D(0.866, 0, -0.5, 0, 1, 0, 0.5, 0, 0.866, 2.9, 0.14, -1.5)
 mesh = SubResource("BoxMesh_hero_grass_blade")
 
-[node name="GrassClump4B" type="MeshInstance3D" parent="HeroPavingPatch/Grass"]
+[node name="GrassClump4B" type="MeshInstance3D" parent="HeroPavingPatch/Grass" unique_id=1895417777]
 transform = Transform3D(0.601, 0, 0.601, 0, 0.85, 0, -0.601, 0, 0.601, 2.97, 0.13, -1.44)
 mesh = SubResource("BoxMesh_hero_grass_blade")
 
-[node name="Rubble" type="Node3D" parent="HeroPavingPatch"]
+[node name="Rubble" type="Node3D" parent="HeroPavingPatch" unique_id=1995034809]
 
-[node name="RubbleChunk1" type="MeshInstance3D" parent="HeroPavingPatch/Rubble"]
+[node name="RubbleChunk1" type="MeshInstance3D" parent="HeroPavingPatch/Rubble" unique_id=1300278257]
 transform = Transform3D(0.9063, 0, 0.4226, 0, 1, 0, -0.4226, 0, 0.9063, -3.2, 0.1, 1.6)
 mesh = SubResource("BoxMesh_hero_rubble")
 
-[node name="RubbleChunk2" type="MeshInstance3D" parent="HeroPavingPatch/Rubble"]
+[node name="RubbleChunk2" type="MeshInstance3D" parent="HeroPavingPatch/Rubble" unique_id=521880890]
 transform = Transform3D(0.7987, 0, -0.2907, 0, 0.85, 0, 0.2907, 0, 0.7987, 3.1, 0.08, -1.7)
 mesh = SubResource("BoxMesh_hero_rubble")
 
-[node name="RubbleChunk3" type="MeshInstance3D" parent="HeroPavingPatch/Rubble"]
+[node name="RubbleChunk3" type="MeshInstance3D" parent="HeroPavingPatch/Rubble" unique_id=2035400427]
 transform = Transform3D(0.8693, 0, 0.2329, 0, 0.9, 0, -0.2329, 0, 0.8693, 0.6, 0.09, -3.4)
 mesh = SubResource("BoxMesh_hero_rubble")
 
-[node name="MasonryFragment" type="MeshInstance3D" parent="HeroPavingPatch"]
-transform = Transform3D(0.9659, 0, -0.2588, 0.08, 0.9511, 0.2985, 0.2461, -0.309, 0.9188, -3.0, 0.22, 0.6)
+[node name="MasonryFragment" type="MeshInstance3D" parent="HeroPavingPatch" unique_id=212192961]
+transform = Transform3D(0.9659, 0, -0.2588, 0.08, 0.9511, 0.2985, 0.2461, -0.309, 0.9188, -3, 0.22, 0.6)
 mesh = SubResource("BoxMesh_hero_fragment")
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="SpawnSlabBody" unique_id=1369458258]
-shape = SubResource("BoxShape3D_spawn_slab")
 
 [node name="RuinBlockout" type="Node3D" parent="." unique_id=-1094967296]
 
@@ -564,3 +559,15 @@ mesh = SubResource("BoxMesh_ruin_mass_3")
 [node name="MassLowBroad" type="MeshInstance3D" parent="RuinBlockout/CollapsedMass" unique_id=-1094967262]
 transform = Transform3D(0.978, 0, -0.208, 0, 1, 0, 0.208, 0, 0.978, 10.2, 0.7, -12.8)
 mesh = SubResource("BoxMesh_ruin_mass_4")
+
+[editable path="RuinPavingTest"]
+[editable path="HeroPavingPatch/Slabs/HeroSlab1"]
+[editable path="HeroPavingPatch/Slabs/HeroSlab2"]
+[editable path="HeroPavingPatch/Slabs/HeroSlab3"]
+[editable path="HeroPavingPatch/Slabs/HeroSlab4"]
+[editable path="HeroPavingPatch/Slabs/HeroSlab5"]
+[editable path="HeroPavingPatch/Slabs/HeroSlab6"]
+[editable path="HeroPavingPatch/Slabs/HeroSlab7"]
+[editable path="HeroPavingPatch/Slabs/HeroSlab8"]
+[editable path="HeroPavingPatch/Slabs/HeroSlab9"]
+[editable path="HeroPavingPatch/Slabs/HeroSlab10"]
