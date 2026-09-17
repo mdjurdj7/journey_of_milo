@@ -25,9 +25,6 @@ signal floor_cleared
 # lets them walk underneath. Sized to clear the deepest water plus a
 # margin; see _add_wall().
 @export var wall_sink: float = 4.0
-@export var berm_height: float = 1.4
-@export var berm_width: float = 3.0
-@export var berm_color: Color = Color(0.54, 0.55, 0.50)
 # Sea and Tower are RegionField's own children, not siblings — paths
 # must be direct child names ("Sea"/"Tower"), not "../Sea"/"../Tower".
 # RegionField is the scene root, so "../" either finds nothing (edited
@@ -109,11 +106,8 @@ var _wall_inland: StaticBody3D = null
 var _wall_shoreward: StaticBody3D = null
 var _wall_left: StaticBody3D = null
 var _wall_right: StaticBody3D = null
-# Tracked alongside the walls (not built once in _build_boundary() any
-# more) because in mask mode the inland wall's own line comes from the
-# painted land's bounds, which can change live - the berm has to follow
-# it or end up floating in water/behind the wall.
-var _berm: MeshInstance3D = null
+# The walls' centre-line rectangle, kept for get_wall_rect().
+var _wall_rect: Rect2 = Rect2()
 
 # Fractional HP carried between physics frames so a slow drain (a couple
 # HP/sec) still costs whole HP over time instead of rounding away to
@@ -148,6 +142,7 @@ func _ready() -> void:
 	_setup_exit_gate()
 	_setup_field_hud()
 	_build_boundary()
+	_setup_exit_gate_channel()
 
 	# Keeps the walls in sync with live landmass-shape tuning: Ground emits
 	# relief_rebuilt after every mesh/collision rebuild (any landmass/relief
@@ -324,6 +319,23 @@ func _setup_exit_gate() -> void:
 	floor_cleared.connect(exit_gate.open)
 	exit_gate.floor_exited.connect(_on_floor_exited)
 
+# Only once the gate is where it will stay AND the boundary walls exist
+# (the channel is sized from them) can the gate cut its channel across
+# the neck - see ExitGate.setup_channel(). Called from _ready() after
+# _build_boundary().
+func _setup_exit_gate_channel() -> void:
+	var exit_gate := get_node_or_null(exit_gate_path) as ExitGate
+	var ground := get_node_or_null(ground_path) as Ground
+	if exit_gate == null or ground == null:
+		return
+	exit_gate.setup_channel(ground, get_wall_rect())
+
+# The rectangle the four boundary walls' centre lines enclose, in world
+# XZ (Rect2.x = X, Rect2.y = Z) - what ExitGate sizes its channel from.
+# Only meaningful after _build_boundary(); an empty Rect2 before that.
+func get_wall_rect() -> Rect2:
+	return _wall_rect
+
 # RunState.current_floor_index persists (see RunState.deck's own doc on
 # what survives a battle; this is the same idea across a floor) because
 # reload_current_scene() only re-runs this scene's own _ready(), and
@@ -429,11 +441,11 @@ func _push_wanderer_away_from(enemy: FieldEnemy) -> void:
 	wanderer.global_position = enemy.global_position + push_dir * push_distance
 
 # Computes and caches the field's span (see _boundary_ready's own doc),
-# then delegates the four collision walls and the inland berm to
-# _rebuild_boundary_walls(). The sides no longer get a berm at all - the
-# landmass shoreline (Ground's own relief shape) is what reads as ground
-# meeting water there now. Both Z-boundary edges are positioned from
-# get_forward()'s sign, not assumed to be +Z/-Z.
+# then delegates the four collision walls to _rebuild_boundary_walls().
+# No berm any more - the inland edge is the neck's own tidal channel (see
+# ExitGate) and the landmass shoreline elsewhere; the inland collision
+# wall stays. Both Z-boundary edges are positioned from get_forward()'s
+# sign, not assumed to be +Z/-Z.
 func _build_boundary() -> void:
 	var half_depth := field_extents.y / 2.0
 	var inland_z := half_depth * _forward.z
@@ -456,7 +468,7 @@ func _build_boundary() -> void:
 
 	_rebuild_boundary_walls()
 
-# The four boundary collision walls plus the inland berm. Tracked and
+# The four boundary collision walls. Tracked and
 # always freed first so side_wade_margin (and any live landmass-shape edit,
 # via _ready()'s own relief_rebuilt connection) can move/resize them with
 # no scene reload.
@@ -468,9 +480,7 @@ func _build_boundary() -> void:
 # landmass_bounds()) grown by side_wade_margin on all four sides, one wall
 # per rect edge. Still a rectangle around an arbitrary shape - the wade
 # drain is what actually keeps the Wanderer near the shore; the walls are
-# the hard stop a few metres past the furthest the painting reaches. The
-# berm goes on whichever rect edge faces inland (furthest along
-# get_forward()), where the neck runs off the top of the drawing.
+# the hard stop a few metres past the furthest the painting reaches.
 #
 # SDF mode - unchanged from before the mask existed: the side walls' X
 # offset has to clear the shoreline's own WORST-CASE excursion, not the
@@ -485,8 +495,7 @@ func _build_boundary() -> void:
 # (field_extents.x replaced by outer_half_width*2) - without this, the
 # strip of X between the field's own edge and the pushed-out side wall, at
 # each end-cap's Z line, would have no collision at all, letting the
-# Wanderer walk around it. Inland stays unconditionally dry, berm at the
-# field_extents-derived inland line as always.
+# Wanderer walk around it. Inland stays unconditionally dry.
 func _rebuild_boundary_walls() -> void:
 	if _wall_inland != null:
 		_wall_inland.queue_free()
@@ -500,9 +509,6 @@ func _rebuild_boundary_walls() -> void:
 	if _wall_right != null:
 		_wall_right.queue_free()
 		_wall_right = null
-	if _berm != null:
-		_berm.queue_free()
-		_berm = null
 
 	if not _boundary_ready:
 		return
@@ -522,18 +528,14 @@ func _rebuild_boundary_walls() -> void:
 	_wall_shoreward = _add_wall(Vector3(0.0, wall_height / 2.0, _boundary_shoreward_z), Vector3(end_cap_width, wall_height, wall_thickness))
 	_wall_left = _add_wall(Vector3(-outer_half_width, wall_height / 2.0, _boundary_span_center_z), Vector3(wall_thickness, wall_height, _boundary_span_length))
 	_wall_right = _add_wall(Vector3(outer_half_width, wall_height / 2.0, _boundary_span_center_z), Vector3(wall_thickness, wall_height, _boundary_span_length))
-
-	# Length is extended by berm_width past the true edge, same overlap
-	# idiom the side walls' corner-sealing above uses, though there's no
-	# side berm left to overlap into any more.
-	_berm = _add_berm(Vector3(0.0, berm_height / 2.0, _boundary_inland_z), Vector3(field_extents.x + berm_width, berm_height, berm_width))
+	_wall_rect = Rect2(-outer_half_width, minf(_boundary_inland_z, _boundary_shoreward_z), outer_half_width * 2.0, _boundary_span_length)
 
 # Mask-mode walls (see _rebuild_boundary_walls()'s own doc): land_bounds is
 # Ground's painted-land rect in world XZ (Rect2.x = X, Rect2.y = Z). The
 # end caps (min/max Z) run the full outer width plus one wall_thickness so
 # they seal the corners against the side walls' own centre lines; which of
-# the two is "inland" (and gets the berm) is whichever lies further along
-# get_forward() - never assumed to be -Z.
+# the two is "inland" is whichever lies further along get_forward() -
+# never assumed to be -Z.
 func _build_mask_boundary_walls(land_bounds: Rect2) -> void:
 	var bounds: Rect2 = land_bounds.grow(side_wade_margin)
 	var center: Vector2 = bounds.get_center()
@@ -546,9 +548,7 @@ func _build_mask_boundary_walls(land_bounds: Rect2) -> void:
 	_wall_shoreward = wall_max_z if min_z_is_inland else wall_min_z
 	_wall_left = _add_wall(Vector3(bounds.position.x, wall_height / 2.0, center.y), Vector3(wall_thickness, wall_height, bounds.size.y))
 	_wall_right = _add_wall(Vector3(bounds.end.x, wall_height / 2.0, center.y), Vector3(wall_thickness, wall_height, bounds.size.y))
-
-	var inland_z: float = bounds.position.y if min_z_is_inland else bounds.end.y
-	_berm = _add_berm(Vector3(center.x, berm_height / 2.0, inland_z), Vector3(bounds.size.x + berm_width, berm_height, berm_width))
+	_wall_rect = bounds
 
 # Pushed shoreline_wall_margin past the sea's near edge (derived from
 # the Wanderer's spawn, get_forward(), and the Sea's own
@@ -578,20 +578,3 @@ func _add_wall(wall_position: Vector3, size: Vector3) -> StaticBody3D:
 
 	add_child(wall)
 	return wall
-
-func _add_berm(berm_position: Vector3, size: Vector3) -> MeshInstance3D:
-	var material := StandardMaterial3D.new()
-	material.albedo_color = berm_color
-	material.roughness = 1.0
-	material.metallic_specular = 0.0
-
-	var mesh := BoxMesh.new()
-	mesh.size = size
-	mesh.material = material
-
-	var mesh_instance := MeshInstance3D.new()
-	mesh_instance.mesh = mesh
-	mesh_instance.position = berm_position
-
-	add_child(mesh_instance)
-	return mesh_instance

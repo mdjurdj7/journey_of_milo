@@ -5,75 +5,64 @@ class_name ExitGate
 # floor_exited handshake). RegionField positions and orients this node
 # itself - see RegionField._setup_exit_gate()'s own doc for why this can't
 # compute its own placement from its _ready(), the same ordering constraint
-# FieldEnemy's own doc describes for get_forward(). Every export below is
-# baked into a mesh/shape once in _ready(); each one that affects a built
-# shape gets a setter so a Remote-tab edit rebuilds it live, same pattern
-# as contact_shadow.gd's radius/shadow_opacity.
+# FieldEnemy's own doc describes for get_forward().
+#
+# The gate has no geometry of its own any more: what closes the neck is a
+# tidal channel cut into the relief across it (a GroundChannel registered
+# on Ground by setup_channel(), once RegionField has placed this node),
+# full of water while the floor is uncleared and drained by open(). The
+# only things here are the invisible Blocker (a StaticBody3D across the
+# channel's whole width while closed), its BlockContactArea, and the
+# TriggerArea on the inland side that fires floor_exited. Every export
+# that affects a built shape gets a setter so a Remote-tab edit rebuilds
+# it live, same pattern as contact_shadow.gd's radius/shadow_opacity.
 
 signal floor_exited
 
-@export var gap_width: float = 3.0:
-	set(value):
-		gap_width = value
-		_rebuild()
-@export var block_width: float = 2.0:
-	set(value):
-		block_width = value
-		_rebuild()
+# The channel (see ground_channel.gd) is sized from the boundary walls in
+# setup_channel(): its near bank sits channel_near_offset past the gate
+# line on the spawn side, it runs inland to the inland wall and channel_
+# beyond_wall metres past it (into the fog), and it spans the side walls
+# plus channel_width_margin - so from the gate line inland there is
+# nothing but water while the floor is uncleared. channel_depth 0.5 puts
+# the floor 0.25m under sea_level at the neck's 0.25m interior. The banks
+# wander by the relief's noise (channel_edge_noise_*) over a channel_edge
+# soft edge - the near bank is the one that has to read as a shore.
+# Draining surfaces only channel_bar_width of sand along the neck's axis
+# (the gate's own line), leaving a channel either side.
+@export var channel_near_offset: float = 1.0
+@export var channel_beyond_wall: float = 12.0
+@export var channel_width_margin: float = 4.0
+@export var channel_depth: float = 0.5
+@export var channel_edge: float = 1.2
+@export var channel_edge_noise_scale: float = 2.0
+@export var channel_edge_noise_amplitude: float = 0.6
+@export var channel_bar_width: float = 6.0
+# How long the channel takes to drain after open(), eased out - fast at
+# first, settling as the sand surfaces. The drain itself is a shader
+# uniform tween (Ground.set_channel_live_amount(), one uniform write per
+# frame - the relief mesh isn't touched); Ground bakes the drained
+# channel into mesh/collision/get_height_at() ONCE when the tween ends,
+# and only then does the Blocker come down.
+@export var drain_seconds: float = 4.0
+
+# The Blocker: an invisible box across the closed channel's near bank -
+# blocker_depth along the neck, centred blocker_inland_offset inland of
+# the gate line (2.5: its near face is 1m past the waterline, so the
+# Wanderer is held standing in water at the channel's full depth, with
+# the drain running), as wide as the channel, block_height tall.
 @export var block_height: float = 1.4:
 	set(value):
 		block_height = value
 		_rebuild()
-@export var block_depth: float = 3.0:
+@export var blocker_depth: float = 3.0:
 	set(value):
-		block_depth = value
+		blocker_depth = value
 		_rebuild()
-@export var block_color: Color = Color(0.62, 0.58, 0.46, 1):
+@export var blocker_inland_offset: float = 2.5:
 	set(value):
-		block_color = value
+		blocker_inland_offset = value
 		_rebuild()
-@export var strip_height: float = 0.15:
-	set(value):
-		strip_height = value
-		_rebuild()
-# Runs from the gate line toward the berm - 2.5 (with the trigger's own
-# offset/size below) stays comfortably inside the ~4m this scene's current
-# field_extents/wall_thickness leave between the gate line and the inland
-# wall - see RegionField.exit_gate_distance_beyond_enemy's own doc for that
-# arithmetic.
-@export var strip_depth: float = 2.5:
-	set(value):
-		strip_depth = value
-		_rebuild()
-@export var strip_color: Color = Color(0.75, 0.73, 0.66, 1):
-	set(value):
-		strip_color = value
-		_rebuild()
-# Read live at open() time, not baked into anything at _ready() - no
-# setter needed, same reasoning as contact_shadow.gd's height_offset.
-@export var strip_open_color: Color = Color(0.92, 0.9, 0.85, 1)
-# The thin dark "physical no" bar across the gap at knee height while
-# closed - see open()'s own doc on what happens to it.
-@export var bar_height_offset: float = 0.5:
-	set(value):
-		bar_height_offset = value
-		_rebuild()
-@export var bar_thickness: float = 0.1:
-	set(value):
-		bar_thickness = value
-		_rebuild()
-@export var bar_depth: float = 0.15:
-	set(value):
-		bar_depth = value
-		_rebuild()
-@export var bar_color: Color = Color(0.15, 0.13, 0.11, 1):
-	set(value):
-		bar_color = value
-		_rebuild()
-# Read live at open() time only - no setter needed, same as bar_sink_depth
-# below and strip_open_color above.
-@export var bar_sink_depth: float = 0.4
-@export var open_transition_time: float = 1.0
 @export var trigger_forward_offset: float = 2.0:
 	set(value):
 		trigger_forward_offset = value
@@ -93,7 +82,6 @@ signal floor_exited
 		block_contact_padding = value
 		_rebuild()
 
-var _strip_material: StandardMaterial3D = null
 # Guards _rebuild() against running off an export's default-value setter
 # firing before _ready() has resolved the @onready node references above -
 # not is_node_ready() (its return value during this node's own _ready() is
@@ -106,10 +94,14 @@ var _open: bool = false
 # own _contacted flag uses.
 var _blocker_contact_active: bool = false
 
-@onready var left_block: MeshInstance3D = $LeftBlock
-@onready var right_block: MeshInstance3D = $RightBlock
-@onready var strip: MeshInstance3D = $Strip
-@onready var bar: MeshInstance3D = $Bar
+var _ground: Ground = null
+var _channel: GroundChannel = null
+var _channel_index: int = -1
+# The channel's width once sized from the walls (the Blocker's width).
+var _channel_width: float = 14.0
+# The tweened value: 1 = channel fully cut and full, 0 = gone.
+var _channel_amount: float = 1.0
+
 @onready var blocker: StaticBody3D = $Blocker
 @onready var blocker_shape: CollisionShape3D = $Blocker/CollisionShape3D
 @onready var trigger_area: Area3D = $TriggerArea
@@ -125,79 +117,86 @@ func _ready() -> void:
 	_rebuild()
 	print("ExitGate: closed")
 
-# Every exported dimension/color above lands here rather than each having
-# its own narrow _apply_*() - the block/strip/blocker shapes all share
-# gap_width and block_height, so splitting this up would just mean most
-# setters call two or three functions instead of one. Cheap enough
-# (a handful of small meshes/shapes) that rebuilding the lot on any single
-# edit isn't worth avoiding.
+# Called by RegionField once this node is in its final place and the
+# boundary walls exist (wall_rect: their centre-line rectangle in world
+# XZ): sizes and registers the channel. Along the neck (this node's local
+# -Z = the field's forward): from channel_near_offset on the spawn side
+# of the gate line to the inland wall plus channel_beyond_wall. Across:
+# the walls' span plus channel_width_margin, centred on the walls, with
+# the drained bar centred on the gate line itself. Everything is
+# projected onto forward/right rather than read off X/Z, so it holds for
+# any forward. Ground cuts the channel through its partial path (no full
+# rebuild). Idempotent - a second call re-sizes the existing channel.
+func setup_channel(ground: Ground, wall_rect: Rect2) -> void:
+	_ground = ground
+	var forward := Vector2(-global_transform.basis.z.x, -global_transform.basis.z.z).normalized()
+	var right := Vector2(-forward.y, forward.x)
+	var gate := Vector2(global_position.x, global_position.z)
+
+	# Wall extents along forward (inland = furthest along it) and across.
+	var corners: Array[Vector2] = [wall_rect.position, wall_rect.end, Vector2(wall_rect.position.x, wall_rect.end.y), Vector2(wall_rect.end.x, wall_rect.position.y)]
+	var inland_along: float = -INF
+	var across_min: float = INF
+	var across_max: float = -INF
+	for corner in corners:
+		var rel: Vector2 = corner - gate
+		inland_along = maxf(inland_along, rel.dot(forward))
+		across_min = minf(across_min, rel.dot(right))
+		across_max = maxf(across_max, rel.dot(right))
+	if wall_rect.size == Vector2.ZERO:
+		inland_along = channel_beyond_wall
+		across_min = -7.0
+		across_max = 7.0
+
+	var length: float = channel_near_offset + inland_along + channel_beyond_wall
+	_channel_width = (across_max - across_min) + channel_width_margin
+	var across_centre: float = (across_min + across_max) * 0.5
+	var centre: Vector2 = gate + forward * (length * 0.5 - channel_near_offset) + right * across_centre
+
+	if _channel == null:
+		_channel = GroundChannel.new()
+	_channel.centre = centre
+	_channel.length = length
+	_channel.width = _channel_width
+	_channel.depth = channel_depth
+	_channel.edge = channel_edge
+	_channel.edge_noise_scale = channel_edge_noise_scale
+	_channel.edge_noise_amplitude = channel_edge_noise_amplitude
+	_channel.bar_width = channel_bar_width
+	# The bar sits on the gate line, not the walls' midline.
+	_channel.bar_offset = -across_centre
+	_channel.amount = _channel_amount
+	if _channel_index < 0:
+		_channel_index = _ground.add_channel(_channel)
+	else:
+		_ground.set_channel_amount(_channel_index, _channel_amount)
+	print("ExitGate: channel %.1f x %.1f m, near bank %.1f m spawn-side of the gate line, bar %.1f m" % [length, _channel_width, channel_near_offset, channel_bar_width])
+	_rebuild()
+
+# Every exported dimension above lands here rather than each having its
+# own narrow _apply_*() - the blocker and its contact area share the same
+# footprint, and the lot is a couple of shapes. Cheap enough that
+# rebuilding everything on any single edit isn't worth avoiding.
 func _rebuild() -> void:
 	if not _ready_done:
 		return
-	_build_blocks()
-	_build_strip()
-	_build_bar()
 	_build_blocker()
 	_build_trigger()
 
-func _build_blocks() -> void:
-	var half_gap := gap_width / 2.0
-	var half_block := block_width / 2.0
-	_apply_block(left_block, Vector3(-(half_gap + half_block), block_height / 2.0, 0.0))
-	_apply_block(right_block, Vector3(half_gap + half_block, block_height / 2.0, 0.0))
-
-func _apply_block(block: MeshInstance3D, block_position: Vector3) -> void:
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(block_width, block_height, block_depth)
-	var material := StandardMaterial3D.new()
-	material.albedo_color = block_color
-	material.roughness = 1.0
-	material.metallic_specular = 0.0
-	mesh.material = material
-	block.mesh = mesh
-	block.position = block_position
-
-# The strip is the visible stand-in for the gap the Blocker actually
-# blocks - see open()'s own doc on why its material is kept as a separate
-# mutable instance rather than shared/duplicated per rebuild.
-func _build_strip() -> void:
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(gap_width, strip_height, strip_depth)
-	_strip_material = StandardMaterial3D.new()
-	_strip_material.albedo_color = strip_color
-	_strip_material.roughness = 1.0
-	_strip_material.metallic_specular = 0.0
-	mesh.material = _strip_material
-	strip.mesh = mesh
-	strip.position = Vector3(0.0, strip_height / 2.0, 0.0)
-
-# The visible "physical no" while closed - see open()'s own doc on what
-# happens to it. Sits at knee height, a separate element from the
-# ground-level strip so the two can read independently (a barrier you'd
-# actually catch your shin on, above a runway that's merely tinted).
-func _build_bar() -> void:
-	var mesh := BoxMesh.new()
-	mesh.size = Vector3(gap_width, bar_thickness, bar_depth)
-	var material := StandardMaterial3D.new()
-	material.albedo_color = bar_color
-	material.roughness = 1.0
-	material.metallic_specular = 0.0
-	mesh.material = material
-	bar.mesh = mesh
-	bar.position = Vector3(0.0, bar_height_offset, 0.0)
-
-# Sized/positioned to exactly cover the strip's footprint (not the whole
-# gate) - the dune blocks flanking it are permanent, only the gap itself
-# ever opens. BlockContactArea shares this exact footprint so "the Wanderer
-# hit the blocker" (see _on_block_contact_entered()) means what it says,
-# rather than some looser approximation of it.
+# Spans the closed channel's near bank: the channel's full width across
+# the neck, blocker_depth along it, centred blocker_inland_offset inland
+# (local -Z) of the gate line, block_height tall - the water is what
+# reads as the closed gate, this is the physical "no" standing in it, and
+# there's no dry way round it since the channel runs wall to wall.
+# BlockContactArea shares this exact footprint so "the Wanderer hit the
+# blocker" (see _on_block_contact_entered()) means what it says.
 func _build_blocker() -> void:
-	var footprint := Vector3(gap_width, block_height, strip_depth)
+	var footprint := Vector3(_channel_width, block_height, blocker_depth)
 
 	var shape := BoxShape3D.new()
 	shape.size = footprint
 	blocker_shape.shape = shape
-	blocker.position = Vector3(0.0, block_height / 2.0, 0.0)
+	blocker.position = Vector3(0.0, block_height / 2.0, -blocker_inland_offset)
 
 	var contact_shape := BoxShape3D.new()
 	contact_shape.size = footprint + Vector3.ONE * block_contact_padding
@@ -220,23 +219,42 @@ func _build_trigger() -> void:
 # this node never watches for that condition itself. _open guards against
 # a second call re-triggering the tween/print - floor_cleared itself only
 # ever emits once (see RegionField's own doc), but nothing here should
-# assume that on its own. Disabling the shape rather than freeing it:
-# reopening on a future re-clear (there isn't one yet, but nothing here
-# assumes one-way) is just flipping this back.
+# assume that on its own. Drains the channel over drain_seconds (ease-
+# out), and only when the water is gone does the Blocker's shape get
+# disabled - disabled rather than freed: reopening on a future re-clear
+# (there isn't one yet, but nothing here assumes one-way) is just flipping
+# this back. As the sand surfaces, Ground's own wet band/wet mark take
+# over the look.
 func open() -> void:
 	if _open:
 		return
 	_open = true
-	blocker_shape.disabled = true
-	print("ExitGate: open")
+	print("ExitGate: open - draining")
 
 	var tween := create_tween()
-	tween.set_parallel(true)
-	# Sinks the physical-no bar into the sand rather than fading/freeing it -
-	# reads as the barrier itself giving way, not just disappearing.
-	tween.tween_property(bar, "position:y", bar_height_offset - bar_sink_depth, open_transition_time)
-	if _strip_material != null:
-		tween.tween_property(_strip_material, "albedo_color", strip_open_color, open_transition_time)
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.tween_method(_set_channel_amount, _channel_amount, 0.0, drain_seconds)
+	tween.tween_callback(_on_drained)
+
+# Per tween frame: the shader-side amount only (and the drain's view of
+# it) - no relief re-cut.
+func _set_channel_amount(amount: float) -> void:
+	_channel_amount = amount
+	if _ground == null or _channel_index < 0:
+		return
+	_ground.set_channel_live_amount(_channel_index, amount)
+
+# Tween done: one CPU bake at the final amount so mesh, collision and
+# get_height_at() agree with what the shader has been showing (the
+# shader's delta collapses to 0 in the same call), then the Blocker
+# comes down.
+func _on_drained() -> void:
+	_channel_amount = 0.0
+	if _ground != null and _channel_index >= 0:
+		_ground.set_channel_amount(_channel_index, 0.0)
+	blocker_shape.disabled = true
+	print("ExitGate: drained")
 
 func _on_trigger_body_entered(body: Node3D) -> void:
 	if body.is_in_group("wanderer"):

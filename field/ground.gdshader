@@ -466,14 +466,116 @@ float caustic_web(vec2 world_xz, float time) {
 	return 1.0 - (1.0 - a) * (1.0 - b);
 }
 
-// VERTEX already holds the real, baked relief height (ground.gd wrote it
-// directly into the relief mesh's own vertex data via get_height_at()) and
-// NORMAL is left untouched on purpose: the built-in NORMAL input is already
-// the mesh's own authored per-vertex normal (also baked by ground.gd, via
-// SurfaceTool's generate_normals() over the same height field), correctly
-// transformed - this shader has nothing to add to either one anymore.
+// --- Tidal channel, GPU side ---
+// The one animated channel (Ground.channels[0] - the exit gate's), so the
+// drain can tween without touching the mesh: the CPU mesh/collision/
+// get_height_at() carry the channel baked at channel_amount_baked, and
+// vertex() applies only the DIFFERENCE to the live channel_amount -
+// depth x factor x bar_mask x (amount - baked), so nothing is applied
+// twice: while both are equal the delta is exactly 0 and the mesh shows
+// whatever Ground baked; during the drain Ground leaves the bake alone
+// and tweens channel_amount, then re-bakes at the end and pushes both
+// values equal again. channel_factor()/channel_bar_mask()/relief_edge_
+// fade_factor() below are ports of ground.gd's _channel_factor()/
+// _channel_bar_mask()/_relief_edge_fade_factor(), byte-for-byte in their
+// math, over the same value_noise() ground.gd's _value_noise() mirrors -
+// so the animated surface lands exactly where the next bake puts it.
+// Pushed by Ground._push_channel_uniforms().
+uniform bool channel_enabled = false;
+uniform vec2 channel_centre = vec2(0.0);
+// The field's forward axis (RegionField.get_forward() XZ), never assumed.
+uniform vec2 channel_axis = vec2(0.0, -1.0);
+uniform float channel_length = 3.0;
+uniform float channel_width = 14.0;
+uniform float channel_depth = 0.5;
+uniform float channel_edge = 1.2;
+uniform float channel_edge_noise_scale = 2.0;
+uniform float channel_edge_noise_amplitude = 0.6;
+uniform float channel_bar_width = 6.0;
+uniform float channel_bar_offset = 0.0;
+uniform float channel_amount = 1.0;
+uniform float channel_amount_baked = 1.0;
+// get_height_at() multiplies the whole relief by its edge fade; the
+// channel term sits inside that product, so the delta must too.
+uniform vec2 relief_extent = vec2(100.0, 70.0);
+uniform float relief_flat_margin = 3.0;
+uniform float relief_edge_fade = 4.0;
+// Step for the finite-difference normal fix-up in vertex(): the relief
+// grid's own spacing, so it approximates the CPU's central differences.
+uniform float channel_normal_epsilon = 0.35;
+
+float channel_edge_wander(vec2 world_xz) {
+	if (channel_edge_noise_amplitude <= 0.0) {
+		return 0.0;
+	}
+	return (value_noise(world_xz / max(channel_edge_noise_scale, 0.001)) - 0.5) * 2.0 * channel_edge_noise_amplitude;
+}
+
+float channel_factor(vec2 world_xz) {
+	vec2 axis = channel_axis;
+	vec2 right = vec2(-axis.y, axis.x);
+	vec2 rel = world_xz - channel_centre;
+	float dx = abs(dot(rel, axis)) - channel_length * 0.5;
+	float dy = abs(dot(rel, right)) - channel_width * 0.5;
+	float outside = length(vec2(max(dx, 0.0), max(dy, 0.0)));
+	float inside = min(max(dx, dy), 0.0);
+	float box_distance = outside + inside + channel_edge_wander(world_xz);
+	return 1.0 - smoothstep(-max(channel_edge, 0.001), 0.0, box_distance);
+}
+
+float channel_bar_mask(vec2 world_xz) {
+	if (channel_bar_width <= 0.0) {
+		return 1.0;
+	}
+	vec2 axis = channel_axis;
+	vec2 right = vec2(-axis.y, axis.x);
+	float across = dot(world_xz - channel_centre, right) - channel_bar_offset;
+	float strip_distance = abs(across) - channel_bar_width * 0.5 + channel_edge_wander(world_xz);
+	return 1.0 - smoothstep(-max(channel_edge, 0.001), 0.0, strip_distance);
+}
+
+float relief_edge_fade_factor(vec2 world_xz) {
+	vec2 half_extent = relief_extent * 0.5;
+	float edge_dist = min(half_extent.x - abs(world_xz.x), half_extent.y - abs(world_xz.y));
+	float flat_margin = max(relief_flat_margin, 0.0);
+	return smoothstep(flat_margin, flat_margin + max(relief_edge_fade, 0.001), edge_dist);
+}
+
+// How much LOWER the surface is at world_xz than the baked mesh says
+// (negative = higher, i.e. the bar surfacing during a drain).
+float channel_delta(vec2 world_xz) {
+	if (!channel_enabled) {
+		return 0.0;
+	}
+	float factor = channel_factor(world_xz);
+	if (factor <= 0.0) {
+		return 0.0;
+	}
+	return channel_depth * factor * channel_bar_mask(world_xz) * (channel_amount - channel_amount_baked) * relief_edge_fade_factor(world_xz);
+}
+
+// VERTEX holds the real, baked relief height (ground.gd wrote it directly
+// into the relief mesh's own vertex data via get_height_at()) and NORMAL
+// the mesh's own baked per-vertex normal; the only thing added here is
+// the animated channel delta (see channel_delta()), and the matching
+// normal fix-up: the mesh normal's slope minus the delta's finite-
+// difference slope (the delta is subtracted from height, so its gradient
+// is subtracted from the slope). Assumes Ground is unscaled, which it is
+// - the delta is applied in metres straight to VERTEX.y.
 void vertex() {
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
+	float delta = channel_delta(world_pos.xz);
+	if (delta != 0.0) {
+		VERTEX.y -= delta;
+		world_pos.y -= delta;
+		float eps = max(channel_normal_epsilon, 0.001);
+		float ddx = (channel_delta(world_pos.xz + vec2(eps, 0.0)) - channel_delta(world_pos.xz - vec2(eps, 0.0))) / (2.0 * eps);
+		float ddz = (channel_delta(world_pos.xz + vec2(0.0, eps)) - channel_delta(world_pos.xz - vec2(0.0, eps))) / (2.0 * eps);
+		vec3 n = NORMAL;
+		float ny = max(n.y, 0.001);
+		vec2 slope = vec2(-n.x / ny, -n.z / ny) - vec2(ddx, ddz);
+		NORMAL = normalize(vec3(-slope.x, 1.0, -slope.y));
+	}
 	v_world_xz = world_pos.xz;
 	v_world_height = world_pos.y;
 }

@@ -41,6 +41,7 @@ signal relief_rebuilt
 @export var relief_extent: Vector2 = Vector2(100.0, 70.0):
 	set(value):
 		relief_extent = value
+		_apply_uniform("relief_extent", value)
 		_rebuild_ground_mesh_and_collision()
 @export var relief_subdivisions: Vector2i = Vector2i(285, 199):
 	set(value):
@@ -136,6 +137,7 @@ signal relief_rebuilt
 @export var relief_edge_fade: float = 4.0:
 	set(value):
 		relief_edge_fade = value
+		_apply_uniform("relief_edge_fade", value)
 		_rebuild_ground_mesh_and_collision()
 # A genuinely flat (height held at exactly 0, not just asymptotically
 # approaching it) margin inside relief_extent's edges, BEFORE relief_edge_
@@ -153,6 +155,7 @@ signal relief_rebuilt
 @export var relief_flat_margin: float = 3.0:
 	set(value):
 		relief_flat_margin = value
+		_apply_uniform("relief_flat_margin", value)
 		_rebuild_ground_mesh_and_collision()
 
 # The landmass: a dry strip that narrows toward the inland wall and fans
@@ -197,6 +200,20 @@ signal relief_rebuilt
 @export var landmass_underwater_falloff_width: float = 6.0:
 	set(value):
 		landmass_underwater_falloff_width = value
+		_rebuild_ground_mesh_and_collision()
+# Tidal channels cut into the relief (see GroundChannel): each lowers the
+# ground inside its rectangle by depth x amount with a soft edge, in
+# either landmass mode, on top of the landmass height and under the fine
+# detail. Authored here or added at runtime (add_channel() - ExitGate
+# registers its own across the neck); amount is tweened through
+# set_channel_amount(), which resamples only that channel's patch of the
+# relief and re-commits the mesh natively rather than rebuilding
+# everything. A channel below sea_level fills: the wet band, caustics and
+# the sea's depth tint are all height-driven and need nothing else, and
+# get_landmass_distance() treats its water as shallows for the drain.
+@export var channels: Array[GroundChannel] = []:
+	set(value):
+		channels = value
 		_rebuild_ground_mesh_and_collision()
 # Both relative to Sea's own sea_level (not absolute), so the landmass
 # stays correctly seated if sea_level is ever retuned. landmass_interior_
@@ -551,6 +568,18 @@ var _relief_mesh_instance: MeshInstance3D
 var _relief_heights: PackedFloat32Array = PackedFloat32Array()
 var _relief_cols: int = 0
 var _relief_rows: int = 0
+# The relief mesh's own arrays, cached so a channel update can patch a
+# few vertices and re-commit natively (see _commit_relief_mesh()): one
+# vertex per grid point in the same row-major layout as _relief_heights,
+# and the triangle index list, which only depends on cols/rows.
+var _relief_vertices: PackedVector3Array = PackedVector3Array()
+var _relief_normals: PackedVector3Array = PackedVector3Array()
+var _relief_indices: PackedInt32Array = PackedInt32Array()
+var _relief_indices_cols: int = 0
+var _relief_indices_rows: int = 0
+# The live HeightMapShape3D, kept so a channel update can reassign its
+# map_data instead of building a new shape.
+var _relief_height_shape: HeightMapShape3D = null
 
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
 @onready var collision_shape: CollisionShape3D = $CollisionShape3D
@@ -662,6 +691,10 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("speckle_scale", speckle_scale)
 	_apply_uniform("speckle_threshold", speckle_threshold)
 	_apply_uniform("speckle_darken", speckle_darken)
+	_apply_uniform("relief_extent", relief_extent)
+	_apply_uniform("relief_flat_margin", relief_flat_margin)
+	_apply_uniform("relief_edge_fade", relief_edge_fade)
+	_push_channel_uniforms()
 
 func _apply_uniform(uniform_name: String, value: Variant) -> void:
 	if _material:
@@ -755,11 +788,21 @@ func get_wetness_at(world_xz: Vector2) -> float:
 # ramp is split there) - so in mask mode the drain's "distance past
 # shore" is literally distance past the waterline, with none of the SDF's
 # ~2m of ramp-start lead-in on dry sand.
+#
+# Channels: a point inside a channel and under water counts as shallows -
+# _channel_water_distance() converts its actual depth into the distance
+# past shore that would produce that depth on the underwater ramp, so a
+# 0.25m-deep channel drains exactly like 0.25m of real shallows and stops
+# draining by itself as the channel empties. Whichever is further "past
+# shore" wins.
 func get_landmass_distance(world_xz: Vector2) -> float:
+	var base: float
 	if has_landmass_mask():
-		return _mask_distance_sample(world_xz)
-	_ensure_landmass_refs()
-	return maxf(_landmass_distance(world_xz), _seaward_distance(world_xz.y))
+		base = _mask_distance_sample(world_xz)
+	else:
+		_ensure_landmass_refs()
+		base = maxf(_landmass_distance(world_xz), _seaward_distance(world_xz.y))
+	return maxf(base, _channel_water_distance(world_xz))
 
 # True once a landmass_mask is set AND decoded into a distance field - false
 # during the brief window between assignment and the rebuild that decodes
@@ -927,6 +970,10 @@ func _relief_height(world_xz: Vector2) -> float:
 		var seaward_height: float = _landmass_sea_level + lerpf(landmass_interior_height, -landmass_seaward_below_sea_depth, seaward_factor)
 		landmass_height = minf(side_height, seaward_height)
 
+	# Channels cut into the landmass base, before the fine detail so the
+	# sand texture rides the channel floor too.
+	landmass_height -= _channel_drop(world_xz)
+
 	# Fine surface detail on top of the landmass base - the field's
 	# original bump/wetness noise, unrelated to sea_level, kept purely as
 	# texture now that the landmass term carries the actual shore shape.
@@ -936,6 +983,237 @@ func _relief_height(world_xz: Vector2) -> float:
 	var fine_detail: float = bump * relief_amplitude - wetness * relief_amplitude
 
 	return landmass_height + fine_detail
+
+# --- Channels ---
+
+# The relief's own value noise as a signed bank wander, in metres: the
+# same _value_noise() the relief bumps use, at the channel's edge_noise_
+# scale, remapped to +-edge_noise_amplitude. Added to a distance before
+# its smoothstep, so an edge wanders in and out instead of ruling a line.
+func _channel_edge_wander(channel: GroundChannel, world_xz: Vector2) -> float:
+	if channel.edge_noise_amplitude <= 0.0:
+		return 0.0
+	return (_value_noise(world_xz / maxf(channel.edge_noise_scale, 0.001)) - 0.5) * 2.0 * channel.edge_noise_amplitude
+
+# 0..1: how much of a channel's full cut applies at a world XZ - 1 deeper
+# than `edge` inside its rectangle, falling to 0 at the (noised)
+# boundary. The rectangle is `length` along the field's forward axis and
+# `width` across it (a proper box distance, so the corners round off by
+# the edge width rather than staying square). Independent of amount.
+func _channel_factor(channel: GroundChannel, world_xz: Vector2) -> float:
+	var forward: Vector2 = _landmass_forward_xz
+	var right: Vector2 = Vector2(-forward.y, forward.x)
+	var rel: Vector2 = world_xz - channel.centre
+	var dx: float = absf(rel.dot(forward)) - channel.length * 0.5
+	var dy: float = absf(rel.dot(right)) - channel.width * 0.5
+	var outside: float = Vector2(maxf(dx, 0.0), maxf(dy, 0.0)).length()
+	var inside: float = minf(maxf(dx, dy), 0.0)
+	var box_distance: float = outside + inside + _channel_edge_wander(channel, world_xz)
+	return 1.0 - smoothstep(-maxf(channel.edge, 0.001), 0.0, box_distance)
+
+# 0..1: how much of the channel's amount applies at a world XZ. Without a
+# bar it's 1 everywhere (the whole rectangle drains). With bar_width, 1
+# inside a strip that wide along the channel's axis (offset bar_offset
+# across), 0 outside it, over the same noised edge - so draining
+# surfaces the bar and leaves the water either side of it untouched.
+func _channel_bar_mask(channel: GroundChannel, world_xz: Vector2) -> float:
+	if channel.bar_width <= 0.0:
+		return 1.0
+	var forward: Vector2 = _landmass_forward_xz
+	var right: Vector2 = Vector2(-forward.y, forward.x)
+	var across: float = (world_xz - channel.centre).dot(right) - channel.bar_offset
+	var strip_distance: float = absf(across) - channel.bar_width * 0.5 + _channel_edge_wander(channel, world_xz)
+	return 1.0 - smoothstep(-maxf(channel.edge, 0.001), 0.0, strip_distance)
+
+# The channel's effective amount at a world XZ: full (1) outside the bar,
+# `amount` inside it.
+func _channel_effective_amount_for(channel: GroundChannel, amount: float, world_xz: Vector2) -> float:
+	return 1.0 - (1.0 - amount) * _channel_bar_mask(channel, world_xz)
+
+# ...at the BAKED amount (what the mesh, collision and get_height_at()
+# carry).
+func _channel_effective_amount(channel: GroundChannel, world_xz: Vector2) -> float:
+	return _channel_effective_amount_for(channel, channel.amount, world_xz)
+
+# Live (tweened) amounts by channel index - what the shader is showing
+# right now, which can run ahead of the bake during a drain (see
+# set_channel_live_amount()). Absent = same as baked.
+var _channel_live_amounts: Dictionary = {}
+
+func _channel_live_amount(index: int) -> float:
+	var channel: GroundChannel = channels[index]
+	return float(_channel_live_amounts[index]) if _channel_live_amounts.has(index) else channel.amount
+
+# How much lower the LIVE surface is than the baked one at a world XZ -
+# the same delta ground.gdshader's channel_delta() applies to the mesh,
+# summed over every channel with a live amount (metres, negative while a
+# bar is surfacing).
+func _channel_live_delta(world_xz: Vector2) -> float:
+	if _channel_live_amounts.is_empty():
+		return 0.0
+	var delta: float = 0.0
+	for index in _channel_live_amounts:
+		var i: int = int(index)
+		if i < 0 or i >= channels.size() or channels[i] == null:
+			continue
+		var channel: GroundChannel = channels[i]
+		var factor: float = _channel_factor(channel, world_xz)
+		if factor <= 0.0:
+			continue
+		delta += channel.depth * factor * _channel_bar_mask(channel, world_xz) * (float(_channel_live_amounts[index]) - channel.amount)
+	return delta * _relief_edge_fade_factor(world_xz)
+
+# Total lowering from every channel at a world XZ (metres).
+func _channel_drop(world_xz: Vector2) -> float:
+	var drop: float = 0.0
+	for channel: GroundChannel in channels:
+		if channel == null:
+			continue
+		var factor: float = _channel_factor(channel, world_xz)
+		if factor <= 0.0:
+			continue
+		drop += channel.depth * _channel_effective_amount(channel, world_xz) * factor
+	return drop
+
+# The drain's view of a channel (see get_landmass_distance()): if this
+# point is inside any channel and its surface sits below sea_level, the
+# distance past shore that the underwater ramp would need to be this
+# deep - smoothstep(0, W, d) x below = depth, inverted in closed form (see
+# the mask ramp's own history for the same identity). -INF when not in a
+# channel or not under water, so it never wins the max().
+func _channel_water_distance(world_xz: Vector2) -> float:
+	_ensure_landmass_refs()
+	var in_channel: bool = false
+	for i in channels.size():
+		var channel: GroundChannel = channels[i]
+		if channel != null and _channel_factor(channel, world_xz) > 0.0 and _channel_effective_amount_for(channel, _channel_live_amount(i), world_xz) > 0.0:
+			in_channel = true
+			break
+	if not in_channel:
+		return -INF
+	# The LIVE surface: the baked height plus whatever the shader is
+	# currently showing on top of it, so the drain tracks the tween.
+	var depth_below: float = _landmass_sea_level - (get_height_at(world_xz) - _channel_live_delta(world_xz))
+	if depth_below <= 0.0 or landmass_below_sea_depth <= 0.0001:
+		return -INF
+	var f: float = clampf(depth_below / landmass_below_sea_depth, 0.0, 1.0)
+	var t: float = 0.5 - sin(asin(1.0 - 2.0 * f) / 3.0)
+	return maxf(landmass_underwater_falloff_width, 0.001) * t
+
+# Runtime registration (ExitGate registers the neck channel once
+# RegionField has placed it). Returns the channel's index for
+# set_channel_amount(). Cuts it into the existing relief through the
+# partial path - no full rebuild, no relief_rebuilt.
+func add_channel(channel: GroundChannel) -> int:
+	channels.append(channel)
+	var index: int = channels.size() - 1
+	_update_channel_region(channel, false)
+	_push_channel_uniforms()
+	return index
+
+# The animated path: sets only what the SHADER shows (channel_amount) and
+# what the drain reads, leaving the bake (mesh, collision, get_height_at)
+# alone - one uniform write per call, safe every frame. Only channels[0]
+# has a GPU counterpart today (one uniform set); other indices still get
+# the live amount for the drain but their mesh won't move until baked.
+# Finish with set_channel_amount() to bake the final value.
+func set_channel_live_amount(index: int, amount: float) -> void:
+	if index < 0 or index >= channels.size() or channels[index] == null:
+		return
+	_channel_live_amounts[index] = clampf(amount, 0.0, 1.0)
+	_push_channel_uniforms()
+
+# The tween entry point: sets the channel's amount and resamples only the
+# grid points that can change - the bar strip if the channel has one,
+# else its whole rectangle - then re-commits the mesh and reassigns the
+# collision heightmap, cheap enough to call twenty-odd times over a
+# drain. Deliberately does NOT emit relief_rebuilt: that would rebuild
+# the walls and re-ground every enemy and hull on each step, and nothing
+# stands in a channel.
+func set_channel_amount(index: int, amount: float) -> void:
+	if index < 0 or index >= channels.size() or channels[index] == null:
+		return
+	var channel: GroundChannel = channels[index]
+	channel.amount = clampf(amount, 0.0, 1.0)
+	_channel_live_amounts.erase(index)
+	_update_channel_region(channel, true)
+	_push_channel_uniforms()
+
+# The GPU side of channels[0] (see ground.gdshader's channel block): its
+# geometry, the baked amount and the live amount. With no channel the
+# shader's term is disabled. Cheap - a dozen uniform writes.
+func _push_channel_uniforms() -> void:
+	if _material == null:
+		return
+	if channels.is_empty() or channels[0] == null:
+		_apply_uniform("channel_enabled", false)
+		return
+	_ensure_landmass_refs()
+	var channel: GroundChannel = channels[0]
+	_apply_uniform("channel_enabled", true)
+	_apply_uniform("channel_centre", channel.centre)
+	_apply_uniform("channel_axis", _landmass_forward_xz)
+	_apply_uniform("channel_length", channel.length)
+	_apply_uniform("channel_width", channel.width)
+	_apply_uniform("channel_depth", channel.depth)
+	_apply_uniform("channel_edge", channel.edge)
+	_apply_uniform("channel_edge_noise_scale", channel.edge_noise_scale)
+	_apply_uniform("channel_edge_noise_amplitude", channel.edge_noise_amplitude)
+	_apply_uniform("channel_bar_width", channel.bar_width)
+	_apply_uniform("channel_bar_offset", channel.bar_offset)
+	_apply_uniform("channel_amount_baked", channel.amount)
+	_apply_uniform("channel_amount", _channel_live_amount(0))
+	var spacing: Vector2 = _relief_grid_spacing(relief_subdivisions.x + 2, relief_subdivisions.y + 2)
+	_apply_uniform("channel_normal_epsilon", maxf(spacing.x, spacing.y))
+
+# Resamples get_height_at() over the grid range that can change, patches
+# _relief_heights/_relief_vertices in place, recomputes the normals for
+# that patch plus a one-vertex border (a normal reads its neighbours),
+# and re-commits mesh + collision. The range is the rotated rectangle's
+# world bounds grown by the edge, the edge noise and one cell so the
+# smoothstep's tail is included: the whole channel when it's added or
+# resized, only the bar strip (bar_width + edges, full length) for an
+# amount change with a bar - the water either side of the bar doesn't
+# move, so it isn't resampled.
+func _update_channel_region(channel: GroundChannel, amount_only: bool) -> void:
+	if not _ready_done or _relief_heights.is_empty():
+		return
+	_ensure_landmass_refs()
+	var forward: Vector2 = _landmass_forward_xz
+	var right: Vector2 = Vector2(-forward.y, forward.x)
+	var margin: float = channel.edge + channel.edge_noise_amplitude
+	var half_l: Vector2 = forward * (channel.length * 0.5 + margin)
+	var across_centre: Vector2 = channel.centre
+	var half_w: Vector2 = right * (channel.width * 0.5 + margin)
+	if amount_only and channel.bar_width > 0.0:
+		across_centre = channel.centre + right * channel.bar_offset
+		half_w = right * (channel.bar_width * 0.5 + margin)
+	var bounds: Rect2 = Rect2(across_centre + half_l + half_w, Vector2.ZERO)
+	bounds = bounds.expand(across_centre + half_l - half_w)
+	bounds = bounds.expand(across_centre - half_l + half_w)
+	bounds = bounds.expand(across_centre - half_l - half_w)
+
+	var cols: int = _relief_cols
+	var rows: int = _relief_rows
+	var spacing: Vector2 = _relief_grid_spacing(cols, rows)
+	var half_extent: Vector2 = relief_extent * 0.5
+	var col_min: int = clampi(int(floor((bounds.position.x + half_extent.x) / spacing.x)) - 1, 0, cols - 1)
+	var col_max: int = clampi(int(ceil((bounds.end.x + half_extent.x) / spacing.x)) + 1, 0, cols - 1)
+	var row_min: int = clampi(int(floor((bounds.position.y + half_extent.y) / spacing.y)) - 1, 0, rows - 1)
+	var row_max: int = clampi(int(ceil((bounds.end.y + half_extent.y) / spacing.y)) + 1, 0, rows - 1)
+
+	for row in range(row_min, row_max + 1):
+		for col in range(col_min, col_max + 1):
+			var world_xz: Vector2 = _relief_grid_to_world_xz(col, row, cols, rows)
+			var index: int = row * cols + col
+			var height: float = get_height_at(world_xz)
+			_relief_heights[index] = height
+			_relief_vertices[index] = Vector3(world_xz.x, height, world_xz.y)
+
+	_compute_relief_normals(maxi(row_min - 1, 0), mini(row_max + 1, rows - 1), maxi(col_min - 1, 0), mini(col_max + 1, cols - 1))
+	_commit_relief_mesh()
+	if _relief_height_shape != null:
+		_relief_height_shape.map_data = _relief_heights
 
 # Exactly 0 for edge_dist <= relief_flat_margin (smoothstep clamps at its
 # own lower bound), THEN transitions to 1 over the next relief_edge_fade
@@ -1332,6 +1610,10 @@ func _rebuild_ground_mesh_and_collision() -> void:
 	_build_outer_flat_frame()
 	_rebuild_dressing_frame()
 	_rebuild_ground_debug()
+	# The bake just happened at each channel's own amount; the shader's
+	# baked/live pair must say so (a rebuild mid-drain keeps the delta =
+	# live - baked consistent either way).
+	_push_channel_uniforms()
 
 	relief_rebuilt.emit()
 
@@ -1365,50 +1647,97 @@ func _sample_relief_heights(cols: int, rows: int) -> PackedFloat32Array:
 			heights[row * cols + col] = get_height_at(world_xz)
 	return heights
 
-# Builds the relief mesh through SurfaceTool rather than hand-computing
-# normals from a height-gradient formula: add_vertex() per-triangle (each
-# grid point duplicated once per adjacent triangle), index() merges those
-# duplicates back into a shared index buffer, then generate_normals()
-# derives each vertex's normal from the actual committed triangles sharing
-# it - guaranteed geometrically consistent with the real winding, instead
-# of a separately-computed formula that has to be kept in sync with it by
-# hand (the previous gradient-based version was the actual source of the
-# across-the-field lighting/shadow errors this replaces).
+# Builds the relief mesh's vertex and normal arrays (one per grid point)
+# and, when the grid size changed, its index list, then hands them to
+# _commit_relief_mesh(). Normals are central differences of the height
+# GRID (see _compute_relief_normals()) - derived from the exact heights
+# the triangles are built from, so they agree with the geometry the way
+# SurfaceTool.generate_normals() did (the old hand-computed normals that
+# caused the across-the-field lighting errors were a SHADER gradient of
+# the noise, not a grid difference), and unlike generate_normals() they
+# can be recomputed for just a patch: that's what lets a channel update
+# (a strip of resampled vertices + their normals + one native array
+# commit) run twenty times over a drain without hitching.
 func _apply_relief_mesh(cols: int, rows: int, heights: PackedFloat32Array) -> void:
-	var vertices: PackedVector3Array = PackedVector3Array()
-	vertices.resize(cols * rows)
+	_relief_vertices = PackedVector3Array()
+	_relief_vertices.resize(cols * rows)
 	for row in rows:
 		for col in cols:
 			var world_xz: Vector2 = _relief_grid_to_world_xz(col, row, cols, rows)
 			var index: int = row * cols + col
-			vertices[index] = Vector3(world_xz.x, heights[index], world_xz.y)
+			_relief_vertices[index] = Vector3(world_xz.x, heights[index], world_xz.y)
 
-	var surface_tool := SurfaceTool.new()
-	surface_tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	_relief_normals = PackedVector3Array()
+	_relief_normals.resize(cols * rows)
+	_compute_relief_normals(0, rows - 1, 0, cols - 1)
+
+	if _relief_indices_cols != cols or _relief_indices_rows != rows:
+		_relief_indices = _build_relief_indices(cols, rows)
+		_relief_indices_cols = cols
+		_relief_indices_rows = rows
+
+	_commit_relief_mesh()
+
+# Per-vertex normals for the given inclusive grid range from central
+# differences of _relief_heights (one-sided at the grid's own borders):
+# normalize(-dh/dx, 1, -dh/dz), the same sign convention the sea's
+# normal uses. Reads neighbours, so a caller patching a region must
+# include a one-vertex border around it.
+func _compute_relief_normals(row_min: int, row_max: int, col_min: int, col_max: int) -> void:
+	var cols: int = _relief_cols
+	var rows: int = _relief_rows
+	var spacing: Vector2 = _relief_grid_spacing(cols, rows)
+	for row in range(row_min, row_max + 1):
+		var row_prev: int = maxi(row - 1, 0)
+		var row_next: int = mini(row + 1, rows - 1)
+		var dz_span: float = float(row_next - row_prev) * spacing.y
+		for col in range(col_min, col_max + 1):
+			var col_prev: int = maxi(col - 1, 0)
+			var col_next: int = mini(col + 1, cols - 1)
+			var dx_span: float = float(col_next - col_prev) * spacing.x
+			var dh_dx: float = (_relief_heights[row * cols + col_next] - _relief_heights[row * cols + col_prev]) / maxf(dx_span, 0.0001)
+			var dh_dz: float = (_relief_heights[row_next * cols + col] - _relief_heights[row_prev * cols + col]) / maxf(dz_span, 0.0001)
+			_relief_normals[row * cols + col] = Vector3(-dh_dx, 1.0, -dh_dz).normalized()
+
+# Two triangles per grid cell, counter-clockwise as seen from +Y (the
+# winding fix from an earlier pass - the other order rendered nothing
+# under cull_back). Depends only on the grid size, so it's cached.
+func _build_relief_indices(cols: int, rows: int) -> PackedInt32Array:
+	var indices: PackedInt32Array = PackedInt32Array()
+	indices.resize((cols - 1) * (rows - 1) * 6)
+	var i: int = 0
 	for row in rows - 1:
 		for col in cols - 1:
 			var top_left: int = row * cols + col
 			var top_right: int = top_left + 1
 			var bottom_left: int = (row + 1) * cols + col
 			var bottom_right: int = bottom_left + 1
+			indices[i] = top_left
+			indices[i + 1] = top_right
+			indices[i + 2] = bottom_left
+			indices[i + 3] = top_right
+			indices[i + 4] = bottom_right
+			indices[i + 5] = bottom_left
+			i += 6
+	return indices
 
-			# Counter-clockwise as seen from +Y - keep the winding fix from
-			# the last pass (the prior order rendered nothing under
-			# cull_back, wound clockwise from above instead).
-			surface_tool.add_vertex(vertices[top_left])
-			surface_tool.add_vertex(vertices[top_right])
-			surface_tool.add_vertex(vertices[bottom_left])
+# Commits _relief_vertices/_relief_normals/_relief_indices as the relief
+# mesh in one native add_surface_from_arrays() - no SurfaceTool pass, the
+# normals are already in the arrays. Used by the full rebuild and by
+# every channel update.
+func _commit_relief_mesh() -> void:
+	var arrays: Array = []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = _relief_vertices
+	arrays[Mesh.ARRAY_NORMAL] = _relief_normals
+	arrays[Mesh.ARRAY_INDEX] = _relief_indices
 
-			surface_tool.add_vertex(vertices[top_right])
-			surface_tool.add_vertex(vertices[bottom_right])
-			surface_tool.add_vertex(vertices[bottom_left])
-
-	surface_tool.index()
-	surface_tool.generate_normals()
-	surface_tool.set_material(_current_ground_material())
+	var mesh := ArrayMesh.new()
+	mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	mesh.surface_set_material(0, _current_ground_material())
 
 	_relief_mesh_instance.name = "ReliefMesh"
-	_relief_mesh_instance.mesh = surface_tool.commit()
+	_relief_mesh_instance.mesh = mesh
 
 	_rebuild_normal_debug()
 
@@ -1471,6 +1800,9 @@ func _apply_relief_collision(cols: int, rows: int, heights: PackedFloat32Array) 
 	var spacing: Vector2 = _relief_grid_spacing(cols, rows)
 	collision_shape.transform = Transform3D(Basis.from_scale(Vector3(spacing.x, 1.0, spacing.y)), Vector3.ZERO)
 	collision_shape.shape = height_shape
+	# Kept so a channel update can reassign map_data in place (see
+	# _update_channel_region()).
+	_relief_height_shape = height_shape
 
 func _clear_outer_frame() -> void:
 	for child in get_children():
