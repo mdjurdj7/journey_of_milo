@@ -410,7 +410,7 @@ signal relief_rebuilt
 # caustic_sharpness thins the web's lines (higher = finer). Scrolls on the
 # shader's own TIME; nothing to push per frame.
 @export_group("Caustics")
-@export var caustic_strength: float = 0.25:
+@export var caustic_strength: float = 0.15:
 	set(value):
 		caustic_strength = value
 		_apply_uniform("caustic_strength", value)
