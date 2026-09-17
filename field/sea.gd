@@ -3,19 +3,25 @@ class_name Sea
 
 const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 
-# Sea's one color source — no push from region_sky.gd or anywhere else.
-# Also the fresnel target below - see fresnel_power's own doc.
-@export var sea_color: Color = Color(0.52, 0.60, 0.64):
-	set(value):
-		sea_color = value
-		_apply_uniform("sea_color", value)
-
-# Soft sheen, not a mirror.
-@export var sea_roughness: float = 0.25:
+# Matte, not a mirror: at roughness 0.7 / specular 0.12 the sun's lobe
+# peaks under 1% of its radiance even dead in the mirror direction, so no
+# white patch from any angle - see sea.gdshader's own doc. (0.25 / 0.5
+# put that same peak near full white.)
+@export var sea_roughness: float = 0.7:
 	set(value):
 		sea_roughness = value
 		_apply_uniform("sea_roughness", value)
+@export_range(0.0, 1.0) var sea_specular: float = 0.12:
+	set(value):
+		sea_specular = value
+		_apply_uniform("sea_specular", value)
 
+# The surface ripple - one slow scrolling two-octave noise field read two
+# ways in sea.gdshader (see its own doc on these): noise_amplitude is its
+# NORMAL perturbation (what the light's specular responds to),
+# ripple_strength is how much the same field modulates the sky reflection
+# amount - the part that actually reads as slow movement from the top-
+# down camera. Never displaces vertices.
 @export var noise_amplitude: float = 0.015:
 	set(value):
 		noise_amplitude = value
@@ -28,6 +34,10 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 	set(value):
 		noise_speed = value
 		_apply_uniform("noise_speed", value)
+@export_range(0.0, 1.0) var ripple_strength: float = 0.35:
+	set(value):
+		ripple_strength = value
+		_apply_uniform("ripple_strength", value)
 
 @export_group("Waves")
 # Long, slow swell and short, quick chop - real vertex displacement (see
@@ -68,51 +78,110 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 		short_wave_angle_degrees = value
 		_apply_uniform("short_wave_direction", _direction_from_angle(value))
 
-@export_group("Fresnel")
-# Blends sea_color toward fog_color (already the sky/horizon tone - see
-# its own doc) at grazing angles. Higher = the reflected-sky band stays
-# narrower, closer to the true horizon.
+@export_group("Sky Reflection")
+# Schlick-shaped blend toward sky_reflect_color: sky_reflect_min of it
+# looking straight down, full at grazing angles, fresnel_power shaping
+# the rise (higher = the reflected-sky band stays narrower, closer to the
+# true horizon). The floor is what lets the water sit lighter than the
+# sand from the field camera's ~45 degree pitch, where the pure fresnel
+# term is ~0.01 - see sea.gdshader's own doc. Near-white by default,
+# paler than fog_color (the far horizon tone) on purpose.
+@export var sky_reflect_color: Color = Color(0.94, 0.95, 0.96):
+	set(value):
+		sky_reflect_color = value
+		_apply_uniform("sky_reflect_color", value)
+@export_range(0.0, 1.0) var sky_reflect_min: float = 0.05:
+	set(value):
+		sky_reflect_min = value
+		_apply_uniform("sky_reflect_min", value)
 @export var fresnel_power: float = 4.0:
 	set(value):
 		fresnel_power = value
 		_apply_uniform("fresnel_power", value)
 
 @export_group("Depth Color")
-# Driven by the same view-space depth_diff the shore alpha fade already
-# reads from the depth texture - see shore_fade's own doc. shallow_color
-# is sand showing through a thin film of water; deep_color is a touch
-# darker/more saturated past shallow_depth, saturating by
-# deep_saturate_depth.
-@export var shallow_color: Color = Color(0.62, 0.66, 0.64):
+# Driven by the VERTICAL water depth under each fragment (from the depth
+# texture - see sea.gdshader's own conversion). Colour runs shallow_color
+# -> deep_color and alpha shallow_alpha -> 1.0 over the same curve,
+# smoothstep(0, depth_opaque, depth): shallow water is mostly the sand
+# showing through tinted, past depth_opaque it's opaque deep_color. Muted
+# teal, set so the three field hues stay distinct: pale warm sand
+# (Ground.ground_color (0.74, 0.70, 0.60)), teal water (green-leaning,
+# darker with depth), near-white sky (sky_reflect_color / the horizon's
+# grey-blue (0.62, 0.66, 0.70)). Shallow is close to the horizon in value
+# but greener; deep is well below both.
+@export var shallow_color: Color = Color(0.62, 0.72, 0.70):
 	set(value):
 		shallow_color = value
 		_apply_uniform("shallow_color", value)
-@export var deep_color: Color = Color(0.34, 0.44, 0.50):
+@export var deep_color: Color = Color(0.30, 0.46, 0.50):
 	set(value):
 		deep_color = value
 		_apply_uniform("deep_color", value)
-@export var shallow_depth: float = 0.3:
+@export_range(0.0, 1.0) var shallow_alpha: float = 0.15:
 	set(value):
-		shallow_depth = value
-		_apply_uniform("shallow_depth", value)
-@export var deep_saturate_depth: float = 3.0:
+		shallow_alpha = value
+		_apply_uniform("shallow_alpha", value)
+# 2.0 = the field's own maximum water depth (Ground.landmass_below_sea_
+# depth), so the deepest water actually reaches deep_color - larger
+# values leave warm sand showing through everywhere and grey the water.
+@export var depth_opaque: float = 2.0:
 	set(value):
-		deep_saturate_depth = value
-		_apply_uniform("deep_saturate_depth", value)
+		depth_opaque = value
+		_apply_uniform("depth_opaque", value)
+# Per-channel absorption (1/m) applied to the see-through seabed sample:
+# transmittance = exp(-depth * absorption). Red absorbed fastest, blue
+# least, so the sand seen through the water cools and darkens with depth
+# (and the caustics on it dim by the same law). Surface colour untouched.
+@export var absorption: Vector3 = Vector3(1.4, 0.7, 0.5):
+	set(value):
+		absorption = value
+		_apply_uniform("absorption", value)
+
+@export_group("Refraction")
+# UV displacement of the see-through screen sample at unit ripple slope -
+# see sea.gdshader's own doc on how the composite works and why the sea
+# draws first among transparents (_ready()). ~0.01 is 5-10 px at 1080p.
+@export var refraction_strength: float = 0.01:
+	set(value):
+		refraction_strength = value
+		_apply_uniform("refraction_strength", value)
+
+@export_group("Surface Pattern")
+# The visible pattern ON the water plane (distinct from the caustics on
+# the seabed under it): two scrolling noise layers at surface_pattern_
+# scale and a third of it, drifting in different directions at different
+# speeds, whose ridges brighten the surface toward sky_reflect_color -
+# mean lift about surface_pattern_strength, peaks twice that, never
+# darker than the depth tint. Surface term only; the refracted seabed
+# never sees it. See sea.gdshader's own doc.
+@export_range(0.0, 0.5) var surface_pattern_strength: float = 0.06:
+	set(value):
+		surface_pattern_strength = value
+		_apply_uniform("surface_pattern_strength", value)
+@export var surface_pattern_scale: float = 3.0:
+	set(value):
+		surface_pattern_scale = value
+		_apply_uniform("surface_pattern_scale", value)
+@export var surface_pattern_speed: float = 0.12:
+	set(value):
+		surface_pattern_speed = value
+		_apply_uniform("surface_pattern_speed", value)
 
 @export_group("Foam")
-# A pale (not white) band, foam_width meters of water-DEPTH wide (not a
-# lateral distance), hugging the true waterline however it actually
-# curves. Layered on top of the depth color/fresnel above, not a
-# replacement for the shore alpha fade below - see shore_fade's own doc
-# for why that has to stay. Modulated by the same edge noise the alpha
-# fade wanders by, and breathes with the long wave's own height at that
-# point rather than a generic timer.
-@export var foam_color: Color = Color(0.86, 0.88, 0.86):
+# A thin bright line at the waterline: foam_width metres of water DEPTH
+# wide (not a lateral distance - ~2-3x that across the beach's slope),
+# hugging the true waterline however it curves, a touch lighter than
+# shallow_color rather than white. Composited as opaque paint over the
+# final surface/seabed mix (not inside the surface colour, which is
+# nearly transparent exactly there - see sea.gdshader's foam_color doc).
+# Patchy via value noise at edge_noise_scale, and breathes with the long
+# wave's own height at that point rather than a generic timer.
+@export var foam_color: Color = Color(0.74, 0.82, 0.80):
 	set(value):
 		foam_color = value
 		_apply_uniform("foam_color", value)
-@export var foam_width: float = 0.4:
+@export var foam_width: float = 0.25:
 	set(value):
 		foam_width = value
 		_apply_uniform("foam_width", value)
@@ -120,6 +189,10 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 	set(value):
 		foam_strength = value
 		_apply_uniform("foam_strength", value)
+@export var edge_noise_scale: float = 4.0:
+	set(value):
+		edge_noise_scale = value
+		_apply_uniform("edge_noise_scale", value)
 
 @export_group("Wave Mesh")
 # Same split as ground.gd's fine relief mesh vs. coarse dressing frame:
@@ -171,38 +244,36 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 		wave_calm_distance = value
 		_apply_uniform("wave_calm_distance", value)
 
-# Edge fade: alpha fades to 0 over shore_fade meters of scene-depth
-# difference between the water surface and whatever's behind it (the
-# depth texture), so the water thins into the sand instead of cutting
-# off at the mesh edge. edge_noise_amplitude/scale wander that fade
-# distance so the waterline isn't a straight, uniform band. Still the
-# only thing gating ALPHA - depth color and foam above are layered on
-# top of it, not a replacement: the sea mesh's near edge sits generously
-# inland of the real shoreline (see _rebuild_wave_meshes()), and this
-# depth-buffer read is what keeps flat water from rendering over dry
-# land there.
-@export var shore_fade: float = 3.0:
+# Edge: a thin waterline softener - alpha ramps 0 -> shallow_alpha over
+# the first shore_fade_width metres of water depth, so the contour reads
+# as a line rather than a haze (the old multi-metre noised shore_fade was
+# the haze; the ground's own wet band carries the transition inland, so
+# nothing here duplicates it). Still what keeps flat water from rendering
+# over dry land: the sea mesh's near edge sits generously inland of the
+# real shoreline (see _rebuild_wave_meshes()), and depth 0 -> alpha 0 is
+# what hides it there.
+@export var shore_fade_width: float = 0.3:
 	set(value):
-		shore_fade = value
-		_apply_uniform("shore_fade", value)
-@export var edge_noise_amplitude: float = 1.5:
-	set(value):
-		edge_noise_amplitude = value
-		_apply_uniform("edge_noise_amplitude", value)
-@export var edge_noise_scale: float = 4.0:
-	set(value):
-		edge_noise_scale = value
-		_apply_uniform("edge_noise_scale", value)
+		shore_fade_width = value
+		_apply_uniform("shore_fade_width", value)
 
 # Distance: blends toward fog_color between fog_near_distance and
-# fog_far_distance so far water dissolves into the horizon. Also the
-# fresnel target above - it's already the region's sky/horizon tone (see
-# region_sky.gd's near-identical horizon_color default), so there's no
-# separate sky-color plumbing.
+# fog_far_distance, scaled by fog_strength, so far water dissolves into
+# the horizon. fog_strength is 0 by default - the sea's own fog is OFF,
+# leaving deep_color to run to the horizon (the environment's fog no
+# longer reaches this surface either, see sea.gdshader's fog_disabled) -
+# raise it if the far sea needs to dissolve into the sky again. The
+# region's sky/horizon tone (see region_sky.gd's near-identical
+# horizon_color default); the near-field reflection has its own, paler
+# sky_reflect_color above.
 @export var fog_color: Color = Color(0.85, 0.87, 0.88):
 	set(value):
 		fog_color = value
 		_apply_uniform("fog_color", value)
+@export_range(0.0, 1.0) var fog_strength: float = 0.0:
+	set(value):
+		fog_strength = value
+		_apply_uniform("fog_strength", value)
 @export var fog_near_distance: float = 60.0:
 	set(value):
 		fog_near_distance = value
@@ -275,6 +346,15 @@ func _ready() -> void:
 
 	_material = ShaderMaterial.new()
 	_material.shader = load("res://field/sea.gdshader")
+	# Drawn FIRST among transparent surfaces. sea.gdshader composites its
+	# see-through component from the screen texture (opaque geometry only)
+	# and writes ALPHA 1.0 - so any alpha-blended decal sorted before it
+	# (the Wanderer's contact shadow, footprints, an enemy's spawn fade,
+	# all sitting on the seabed while wading) would be replaced by the
+	# capture and vanish. Lower priority makes those draw after the sea and
+	# blend over it instead. Over dry sand the plane is depth-tested away
+	# by the ground regardless, so this only matters in the water.
+	_material.render_priority = -1
 	_apply_all_uniforms()
 
 	# self is the inner (fine, displaced) patch; _outer_skirt is the
@@ -477,11 +557,12 @@ func _physics_process(delta: float) -> void:
 	_audio_player.volume_db = _current_volume_db
 
 func _apply_all_uniforms() -> void:
-	_apply_uniform("sea_color", sea_color)
 	_apply_uniform("sea_roughness", sea_roughness)
+	_apply_uniform("sea_specular", sea_specular)
 	_apply_uniform("noise_amplitude", noise_amplitude)
 	_apply_uniform("noise_scale", noise_scale)
 	_apply_uniform("noise_speed", noise_speed)
+	_apply_uniform("ripple_strength", ripple_strength)
 
 	_apply_uniform("long_wave_length", long_wave_length)
 	_apply_uniform("long_wave_amplitude", long_wave_amplitude)
@@ -492,23 +573,31 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("short_wave_speed", short_wave_speed)
 	_apply_uniform("short_wave_direction", _direction_from_angle(short_wave_angle_degrees))
 
+	_apply_uniform("sky_reflect_color", sky_reflect_color)
+	_apply_uniform("sky_reflect_min", sky_reflect_min)
 	_apply_uniform("fresnel_power", fresnel_power)
 
 	_apply_uniform("shallow_color", shallow_color)
 	_apply_uniform("deep_color", deep_color)
-	_apply_uniform("shallow_depth", shallow_depth)
-	_apply_uniform("deep_saturate_depth", deep_saturate_depth)
+	_apply_uniform("shallow_alpha", shallow_alpha)
+	_apply_uniform("depth_opaque", depth_opaque)
+	_apply_uniform("absorption", absorption)
+	_apply_uniform("refraction_strength", refraction_strength)
+
+	_apply_uniform("surface_pattern_strength", surface_pattern_strength)
+	_apply_uniform("surface_pattern_scale", surface_pattern_scale)
+	_apply_uniform("surface_pattern_speed", surface_pattern_speed)
 
 	_apply_uniform("foam_color", foam_color)
 	_apply_uniform("foam_width", foam_width)
 	_apply_uniform("foam_strength", foam_strength)
+	_apply_uniform("edge_noise_scale", edge_noise_scale)
 
 	_apply_uniform("wave_calm_distance", wave_calm_distance)
 
-	_apply_uniform("shore_fade", shore_fade)
-	_apply_uniform("edge_noise_amplitude", edge_noise_amplitude)
-	_apply_uniform("edge_noise_scale", edge_noise_scale)
+	_apply_uniform("shore_fade_width", shore_fade_width)
 	_apply_uniform("fog_color", fog_color)
+	_apply_uniform("fog_strength", fog_strength)
 	_apply_uniform("fog_near_distance", fog_near_distance)
 	_apply_uniform("fog_far_distance", fog_far_distance)
 

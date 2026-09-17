@@ -1,17 +1,35 @@
 shader_type spatial;
-render_mode blend_mix, cull_back, diffuse_burley, specular_schlick_ggx;
+// fog_disabled: the see-through component is a screen-texture sample
+// (see refraction_strength below) that already carries the environment's
+// fog, so letting the environment fog this surface again would fog the
+// seabed twice. The water's own colour still dissolves toward fog_color
+// with distance via the shader's own fog_near/far blend in fragment().
+render_mode blend_mix, cull_back, diffuse_burley, specular_schlick_ggx, fog_disabled;
 
-// Surface: soft sheen, not a mirror.
-uniform vec4 sea_color : source_color = vec4(0.52, 0.60, 0.64, 1.0);
-uniform float sea_roughness : hint_range(0.0, 1.0) = 0.25;
+// Surface: matte, not a mirror. The sun's GGX lobe at roughness 0.7 with
+// sea_specular 0.12 (Godot maps SPECULAR to F0 = 0.08 x value, so ~0.01)
+// peaks at well under 1% of the light's radiance in the mirror direction
+// - broad and faint by construction, so no white patch can appear from
+// any camera angle. (At the old 0.25 / 0.5 the same lobe peaked near
+// full white.) sea_specular is scaled by the water amount in fragment()
+// so invisible water carries no highlight at all.
+uniform float sea_roughness : hint_range(0.0, 1.0) = 0.7;
+uniform float sea_specular : hint_range(0.0, 1.0) = 0.12;
 
-// Slow, subtle two-octave value-noise normal perturbation, no texture -
-// the THIRD, smallest-scale rate on top of the two real vertex-
-// displacement waves below. Normal-only: never displaces VERTEX, just
-// keeps the surface from reading as two perfectly smooth sine sheets.
+// The surface ripple: a slow two-octave value-noise field (sea_height()),
+// no texture, scrolling at noise_speed - the THIRD, smallest-scale rate
+// on top of the two real vertex-displacement waves below. Read twice in
+// fragment(): as a finite-difference NORMAL perturbation scaled by
+// noise_amplitude (the light's specular responds to that), and as a
+// direct modulation of the sky-reflection amount scaled by
+// ripple_strength (see sky_reflect_color below) - the latter is what
+// actually reads as slow movement from the top-down camera, where the
+// normal wobble alone barely changes the view angle. Never displaces
+// VERTEX.
 uniform float noise_amplitude = 0.015;
 uniform float noise_scale = 6.0;
 uniform float noise_speed = 0.05;
+uniform float ripple_strength : hint_range(0.0, 1.0) = 0.35;
 
 // Driven from sea.gd's own _sea_time accumulator (_physics_process()),
 // not the engine's built-in TIME - sea.gd keeps advancing this while
@@ -65,55 +83,111 @@ uniform float shoreline_noise_amplitude = 2.5;
 uniform float landmass_inland_z = 0.0;
 uniform float landmass_seaward_edge_z = 0.0;
 
-// Fresnel: blend toward fog_color (already the sky/horizon tone - see its
-// own doc below) at grazing angles, sea_color's own depth-graded tone
-// looking straight down.
+// Sky reflection: a Schlick-shaped blend toward sky_reflect_color -
+// sky_reflect_min of it looking straight down, rising to full at grazing
+// angles with fresnel_power. The floor matters: from the field camera's
+// ~45 degree pitch, pow(1 - NdotV, 4) alone is ~0.01, i.e. no reflection
+// at all, and the water reads as its flat base colour. The floor is what
+// lets it sit lighter than the sand; ripple_strength (above) then
+// modulates this same term so the reflection visibly drifts.
+uniform vec4 sky_reflect_color : source_color = vec4(0.94, 0.95, 0.96, 1.0);
+uniform float sky_reflect_min : hint_range(0.0, 1.0) = 0.05;
 uniform float fresnel_power = 4.0;
 
-// Depth-based color: shallow_color reads as sand showing through a thin
-// film of water, deep_color a touch darker/more saturated - both driven
-// by the same depth_diff (view-space water depth in meters, from the
-// depth texture) the shore alpha fade already computes below, so all
-// three effects (alpha fade, depth color, foam) agree on what "how deep
-// is the water here" means.
-uniform vec4 shallow_color : source_color = vec4(0.62, 0.66, 0.64, 1.0);
-uniform vec4 deep_color : source_color = vec4(0.34, 0.44, 0.50, 1.0);
-uniform float shallow_depth = 0.3;
-uniform float deep_saturate_depth = 3.0;
+// Depth-driven tint: water_depth is the VERTICAL metres of water under
+// each fragment (depth texture, converted from view-space Z in
+// fragment()). Colour runs shallow_color -> deep_color and alpha
+// shallow_alpha -> 1.0 over the same smoothstep(0, depth_opaque, depth),
+// so shallow water is mostly the sand showing through tinted and past
+// depth_opaque it's opaque deep_color. Muted teal - green-leaning against
+// the ground's pale warm sand (dry_color (0.74, 0.70, 0.60)) and the
+// grey-blue horizon, darker with depth so the three hues stay distinct.
+uniform vec4 shallow_color : source_color = vec4(0.62, 0.72, 0.70, 1.0);
+uniform vec4 deep_color : source_color = vec4(0.30, 0.46, 0.50, 1.0);
+uniform float shallow_alpha : hint_range(0.0, 1.0) = 0.15;
+// 2.0 = the field's own maximum water depth (landmass_below_sea_depth),
+// so the deepest water actually reaches deep_color; larger values leave
+// warm sand showing through everywhere and grey the water out.
+uniform float depth_opaque = 2.0;
 
-// Foam: a pale (not white) band foam_width meters of water-depth wide,
-// hugging the true waterline (depth_diff -> 0) however it actually
-// curves - not a fixed world-space line. Modulated by the same edge noise
-// the shore alpha fade wanders by, and breathing with the long wave's own
-// height at that point (not a generic timer) so it visibly pulses as an
-// actual wave crest passes under it.
-uniform vec4 foam_color : source_color = vec4(0.86, 0.88, 0.86, 1.0);
-uniform float foam_width = 0.4;
+// Absorption: the see-through seabed sample is multiplied by a per-
+// channel transmittance exp(-water_depth * absorption) before it's mixed
+// in, so the sand seen through the water darkens and cools with depth -
+// red absorbed fastest, blue least, like real water. Caustics ride on the
+// seabed sample, so they dim with depth by the same law. Applied to the
+// refracted sample only; the surface's own colour (shallow/deep tint) is
+// untouched.
+uniform vec3 absorption = vec3(1.4, 0.7, 0.5);
+
+// Refraction: the see-through component isn't plain alpha blending any
+// more - it's the screen texture sampled at SCREEN_UV displaced by the
+// ripple's own surface slope (the finite-difference slope of sea_height(),
+// rotated into view space) x refraction_strength, so the seabed wobbles
+// with the surface. Composited the way BaseMaterial3D's refraction does
+// it: the refracted sample goes to EMISSION (already lit, must not be lit
+// again), ALBEDO/SPECULAR are scaled by the water amount, ALPHA is 1.0
+// (the material stays in the transparent pass, which is what makes the
+// screen/depth textures available at all). The displacement is scaled by
+// the water amount too, so where the water is invisible (depth 0, the
+// mesh over dry sand) the sample is exactly the pixel behind - no wobble
+// on dry land. refraction_strength is UV units at unit slope; the ripple
+// slope runs to ~1, so ~0.01 is about 5-10 px at 1080p.
+uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
+uniform float refraction_strength = 0.01;
+
+// Surface pattern: what makes the plane itself read as a surface from
+// directly above. Two scrolling value-noise layers - surface_pattern_
+// scale (~3m) and a third of it (~1m) - moving in different directions
+// at different speeds (the small one faster), summed into a soft field
+// whose upper half becomes bright ridges that blend toward sky_reflect_
+// color by up to 2 x surface_pattern_strength (so the mean lift is about
+// the strength itself, peaks twice that). Brighten-only: nothing goes
+// darker than the depth tint. Applied to the surface colour BEFORE the
+// composite, so it never touches the refracted seabed term - it's a
+// pattern ON the water, distinct from the caustics under it. Scrolls on
+// sea_time like the ripple.
+uniform float surface_pattern_strength : hint_range(0.0, 0.5) = 0.06;
+uniform float surface_pattern_scale = 3.0;
+uniform float surface_pattern_speed = 0.12;
+
+// Foam: a thin bright line at the waterline - foam_width metres of water
+// DEPTH wide (~2-3x that laterally at the beach's slope), hugging the
+// true waterline however it curves. A touch lighter than shallow_color,
+// not white. Composited as its own opaque paint on top of the final
+// surface/seabed mix (see fragment()), NOT folded into the surface colour
+// - the water is nearly transparent exactly where foam lives, so a foam
+// term inside the surface colour was scaled to nothing. Its own 5cm
+// fade-in from depth 0 keeps it off dry sand. Patchy via value noise at
+// edge_noise_scale, and breathing with the long wave's own height at
+// that point (not a generic timer) so it visibly pulses as an actual
+// wave crest passes under it.
+uniform vec4 foam_color : source_color = vec4(0.74, 0.82, 0.80, 1.0);
+uniform float foam_width = 0.25;
 uniform float foam_strength : hint_range(0.0, 1.0) = 0.5;
-
-// Edge: alpha fades to 0 over shore_fade meters of scene-depth
-// difference between this surface and whatever's behind it, so the
-// water thins into the sand instead of cutting off at the mesh edge.
-// edge_noise_amplitude/scale wander that fade distance so the
-// waterline isn't a straight, uniform band. Still the ONLY thing gating
-// ALPHA - foam/depth-color above are layered on top of it, not a
-// replacement (the sea mesh's near edge sits generously inland of the
-// real shoreline; this depth-buffer read is what keeps flat water from
-// rendering over dry land there).
-uniform float shore_fade : hint_range(0.01, 20.0) = 3.0;
-uniform float edge_noise_amplitude = 1.5;
 uniform float edge_noise_scale = 4.0;
+
+// Edge: a thin softener only - alpha ramps 0 -> shallow_alpha over the
+// first shore_fade_width metres of water depth, so the waterline reads as
+// a line, not a haze (the old multi-metre noised fade was the haze). The
+// ground's own wet band carries the transition inland; this doesn't
+// duplicate it. Still what keeps flat water from rendering over dry land
+// where the sea mesh reaches inland of the real shoreline (depth 0 ->
+// alpha 0).
+uniform float shore_fade_width : hint_range(0.01, 5.0) = 0.3;
 
 // Distance: blend toward fog_color between fog_near_distance and
 // fog_far_distance (view-space distance, same smoothstep shape
 // ground.gdshader's near/far tint uses) so far water dissolves into
-// the horizon instead of holding a hard flat color to the fog line.
-// Doubles as the fresnel target above - it's already the region's sky/
-// horizon tone (see region_sky.gd's near-identical horizon_color
-// default), so there's no separate "sky color" plumbing needed.
+// the horizon instead of holding a hard flat color to the fog line. The
+// region's sky/horizon tone (see region_sky.gd's near-identical
+// horizon_color default); the near-field sky reflection has its own
+// sky_reflect_color above, deliberately paler than this.
 uniform vec4 fog_color : source_color = vec4(0.85, 0.87, 0.88, 1.0);
 uniform float fog_near_distance = 60.0;
 uniform float fog_far_distance = 250.0;
+// Scales the blend above; 0 (default) turns the sea's own fog off
+// entirely and deep_color runs to the horizon.
+uniform float fog_strength : hint_range(0.0, 1.0) = 0.0;
 
 uniform sampler2D depth_texture : hint_depth_texture, filter_linear_mipmap;
 
@@ -259,56 +333,108 @@ void fragment() {
 	vec3 view_normal = normalize(mat3(VIEW_MATRIX) * world_normal);
 	NORMAL = view_normal;
 
-	// Edge fade: how far the opaque scene behind this fragment is from
-	// the water surface, in view-space meters - the same quantity used
-	// below for depth color and foam, so all three agree on "how deep is
-	// the water here."
+	// Water depth: how far the opaque scene behind this fragment (the
+	// ground, or whatever stands in the water) is below the surface, in
+	// VERTICAL metres. The depth texture gives a view-space Z difference;
+	// that's a distance along the camera's axis, not down through the
+	// water - from a 45 degree pitch it overstates depth by ~1.4x and
+	// changes with view angle. Converted through the world-space view ray:
+	// both the surface point and the ground point sit on the same ray, so
+	// their height difference is (ray length difference) x |ray.y|, and
+	// ray length per unit of view Z is 1 / |ray_view.z|. The one depth
+	// quantity tint, alpha, edge and foam all read, so they agree on "how
+	// deep is the water here."
 	float depth_raw = texture(depth_texture, SCREEN_UV).r;
 	vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, depth_raw);
 	vec4 view = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
 	view.xyz /= view.w;
-	float scene_depth = -view.z;
-	float water_depth = -VERTEX.z;
-	float depth_diff = max(scene_depth - water_depth, 0.0);
+	float scene_depth_view = -view.z;
+	float surface_depth_view = -VERTEX.z;
+	float depth_diff_view = max(scene_depth_view - surface_depth_view, 0.0);
+	vec3 ray_view = normalize(VERTEX);
+	vec3 ray_world = normalize(mat3(INV_VIEW_MATRIX) * ray_view);
+	float vertical_per_view_z = max(-ray_world.y, 0.0) / max(-ray_view.z, 0.001);
+	float water_depth = depth_diff_view * vertical_per_view_z;
 
-	float wander = (value_noise(v_world_xz / max(edge_noise_scale, 0.001)) - 0.5) * 2.0 * edge_noise_amplitude;
-	float effective_fade = max(shore_fade + wander, 0.01);
-	float edge_alpha = smoothstep(0.0, effective_fade, depth_diff);
+	// Depth-driven tint and opacity: one curve for both (see shallow_color's
+	// own doc), so the colour takes over exactly as the sand stops showing
+	// through.
+	float depth_t = smoothstep(0.0, max(depth_opaque, 0.001), water_depth);
+	vec3 water_rgb = mix(shallow_color.rgb, deep_color.rgb, depth_t);
+	float depth_alpha = mix(shallow_alpha, 1.0, depth_t);
 
-	// Depth-based color: lighten toward shallow_color as depth_diff -> 0,
-	// darken toward deep_color past shallow_depth, saturating by
-	// deep_saturate_depth. Both segments meet at plain sea_color exactly
-	// at shallow_depth.
-	float shallow_t = 1.0 - smoothstep(0.0, max(shallow_depth, 0.001), depth_diff);
-	float deep_t = smoothstep(shallow_depth, max(deep_saturate_depth, shallow_depth + 0.001), depth_diff);
-	vec3 depth_albedo = mix(mix(sea_color.rgb, shallow_color.rgb, shallow_t), deep_color.rgb, deep_t);
+	// Edge: the thin waterline softener (see shore_fade_width's own doc).
+	float edge_alpha = smoothstep(0.0, max(shore_fade_width, 0.001), water_depth);
 
-	// Fresnel: reflected sky at grazing angles, the depth-graded tone
-	// above looking straight down.
-	vec3 view_dir = normalize(-VERTEX);
-	float fresnel = pow(1.0 - clamp(dot(view_normal, view_dir), 0.0, 1.0), max(fresnel_power, 0.001));
-	vec3 albedo = mix(depth_albedo, fog_color.rgb, fresnel);
+	// Sky reflection: Schlick with a floor (see sky_reflect_color's own
+	// doc), then modulated by the same ripple field the normal above was
+	// perturbed by - h_c is sea_height()'s two-octave sum, range ~[0, 1.5]
+	// around 0.75, remapped to [-1, 1]. Reflection only: the base colour
+	// and alpha are untouched by it, so the ripple reads as light moving
+	// on the surface, not the water changing.
+	vec3 view_dir = -ray_view;
+	float n_dot_v = clamp(dot(view_normal, view_dir), 0.0, 1.0);
+	float fresnel = sky_reflect_min + (1.0 - sky_reflect_min) * pow(1.0 - n_dot_v, max(fresnel_power, 0.001));
+	float ripple = (h_c - 0.75) / 0.75;
+	float sky_t = clamp(fresnel * (1.0 + ripple * ripple_strength), 0.0, 1.0);
+	vec3 albedo = mix(water_rgb, sky_reflect_color.rgb, sky_t);
 
-	// Foam: a band foam_width of depth_diff wide right at the true
-	// waterline, patchy via the same edge noise, breathing with the long
-	// wave's own height at this point (not a generic timer).
+	// Surface pattern (see surface_pattern_strength's own doc): two
+	// scrolling noise layers summed, upper half -> bright ridges, blended
+	// toward the sky colour. Surface term only.
+	float pattern_scale = max(surface_pattern_scale, 0.001);
+	vec2 pattern_drift_a = vec2(0.7, 0.4) * surface_pattern_speed * sea_time;
+	vec2 pattern_drift_b = vec2(-0.3, 0.9) * surface_pattern_speed * 1.7 * sea_time;
+	float pattern_a = value_noise(v_world_xz / pattern_scale + pattern_drift_a);
+	float pattern_b = value_noise(v_world_xz / (pattern_scale / 3.0) + pattern_drift_b);
+	float pattern = smoothstep(0.45, 0.85, pattern_a * 0.6 + pattern_b * 0.4);
+	albedo = mix(albedo, sky_reflect_color.rgb, pattern * surface_pattern_strength * 2.0);
+
+	// Distance: dissolve into the fog color toward the horizon. Applied
+	// last to the surface colour so far water always fully resolves to it
+	// regardless of the depth/reflection/pattern layering above.
+	float dist = length(VERTEX);
+	float fog_t = smoothstep(fog_near_distance, fog_far_distance, dist) * fog_strength;
+	albedo = mix(albedo, fog_color.rgb, fog_t);
+
+	// Foam: a band foam_width of water depth wide right at the true
+	// waterline, patchy via value noise, breathing with the long wave's
+	// own height at this point (not a generic timer). Computed here,
+	// composited below as opaque paint over both the surface and the
+	// seabed terms - see foam_color's own doc for why it can't live in
+	// the surface colour.
 	vec2 breathe_slope;
 	float long_h = wave_height_and_slope(v_world_xz, sea_time, normalize(long_wave_direction), long_wave_length, long_wave_amplitude, long_wave_speed, breathe_slope);
 	float breathe = 0.5 + 0.5 * (long_h / max(long_wave_amplitude, 0.0001));
 	float foam_noise = value_noise(v_world_xz / max(edge_noise_scale, 0.001));
-	float foam_edge = 1.0 - smoothstep(0.0, max(foam_width, 0.001), depth_diff);
-	float foam_mask = foam_edge * mix(0.6, 1.0, foam_noise) * mix(0.7, 1.0, breathe);
-	albedo = mix(albedo, foam_color.rgb, foam_mask * foam_strength);
+	float foam_edge = smoothstep(0.0, 0.05, water_depth) * (1.0 - smoothstep(0.05, max(foam_width, 0.06), water_depth));
+	float foam_amount = foam_edge * mix(0.6, 1.0, foam_noise) * mix(0.7, 1.0, breathe) * foam_strength;
 
-	// Distance: dissolve into the fog color toward the horizon. Applied
-	// last so far water always fully resolves to it regardless of the
-	// depth/fresnel/foam layering above.
-	float dist = length(VERTEX);
-	float fog_t = smoothstep(fog_near_distance, fog_far_distance, dist);
-	albedo = mix(albedo, fog_color.rgb, fog_t);
+	// Composite (see refraction_strength's own doc): water_amount is what
+	// ALPHA used to be. The see-through part is the screen texture behind
+	// this fragment, displaced by the ripple slope, into EMISSION; the
+	// water's own lit colour is ALBEDO scaled to the remainder. SPECULAR
+	// scales too, or the light's highlight would show at full strength
+	// over invisible water. Also fades in with the edge, so far-shore
+	// pixels never get pulled onto dry sand.
+	float water_amount = depth_alpha * edge_alpha;
+	vec2 ripple_slope = vec2(h_c - h_x, h_c - h_z) / epsilon;
+	vec2 ripple_view = (mat3(VIEW_MATRIX) * vec3(ripple_slope.x, 0.0, ripple_slope.y)).xy;
+	vec2 refracted_uv = SCREEN_UV + ripple_view * refraction_strength * water_amount;
+	vec3 behind = textureLod(screen_texture, refracted_uv, 0.0).rgb;
+	// Absorption through this fragment's own column of water (see
+	// absorption's doc) - the depth at SCREEN_UV, not at the refracted UV;
+	// the offset is a few pixels, the difference is nothing.
+	vec3 transmittance = exp(-water_depth * max(absorption, vec3(0.0)));
+	behind *= transmittance;
 
-	ALBEDO = albedo;
+	// Foam paints over the whole mix: it replaces foam_amount of both the
+	// lit surface term and the see-through term, so it reads at full
+	// strength even where the water itself is nearly transparent.
+	ALBEDO = mix(albedo * water_amount, foam_color.rgb, foam_amount);
+	EMISSION = behind * (1.0 - water_amount) * (1.0 - foam_amount);
 	ROUGHNESS = sea_roughness;
+	SPECULAR = sea_specular * water_amount;
 	METALLIC = 0.0;
-	ALPHA = edge_alpha;
+	ALPHA = 1.0;
 }
