@@ -49,6 +49,10 @@ func new_run(starting_character: CharacterData) -> void:
 	deck = _build_starting_deck(starting_character)
 	current_region_index = 0
 	current_floor_index = 0
+	# Field findings (a Hull's one-time world line) are remembered per
+	# run in Hull's own static set - see Hull._findings_shown - so a new
+	# run starts with none of them heard.
+	Hull.reset_findings()
 	player_hp_changed.emit(player_hp, player_max_hp)
 	deck_changed.emit()
 

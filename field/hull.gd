@@ -74,6 +74,34 @@ const MODEL_SCENE_PATH := "res://assets/models/hull/hull.glb"
 @export var ground_path: NodePath = ^"../../Ground"
 @export var region_field_path: NodePath = ^"../.."
 
+# A finding, not an incident: when the Wanderer first comes within
+# approach_radius, world_line (if any) is shown once through the field's
+# WorldVoiceLine (see ui/world_voice_line.gd) - fades in, holds
+# hold_seconds, fades out. No sound, no prompt, no interaction. Empty
+# world_line = this hull says nothing (Hull1/Hull3). shows_once_per_run
+# remembers the finding across the floor reloads a run goes through (see
+# _findings_shown).
+@export_group("Finding")
+@export var approach_radius: float = 2.5:
+	set(value):
+		approach_radius = value
+		_apply_approach_radius()
+@export_multiline var world_line: String = ""
+@export var shows_once_per_run: bool = true
+@export var hold_seconds: float = 4.0
+@export var fade_seconds: float = 0.5
+@export_group("")
+
+# Findings already shown this run, keyed by _finding_id() - static so it
+# survives the reload_current_scene() a floor exit does (a node-local
+# flag would replay the line on the next floor). Cleared by
+# RunState.new_run() via reset_findings(), so a new run hears every
+# line again.
+static var _findings_shown: Dictionary = {}
+
+static func reset_findings() -> void:
+	_findings_shown.clear()
+
 # The project's flat matte material (the same recipe as Wanderer._build_
 # flat_material(): roughness 1, no specular), built once for the class
 # and never applied directly - every Hull duplicates it and tints the
@@ -91,6 +119,8 @@ static func _get_shared_flat_material() -> StandardMaterial3D:
 var _model: Node3D = null
 # This hull's own tinted duplicate of _shared_flat_material.
 var _material: StandardMaterial3D = null
+var _approach_area: Area3D = null
+var _approach_shape: SphereShape3D = null
 var _ground: Ground = null
 # Model bbox in this node's space at the final scale, from _apply_model_
 # transform(): height for sink_depth, length for the slope samples,
@@ -103,6 +133,7 @@ var _ready_done: bool = false
 
 func _ready() -> void:
 	_spawn_model()
+	_spawn_approach_area()
 	_ready_done = true
 	_apply_facing()
 
@@ -135,6 +166,52 @@ func _spawn_model() -> void:
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
 	_apply_model_transform()
+
+# The approach trigger: a sphere of approach_radius around the hull's
+# origin, watching for the Wanderer (group "wanderer", a CharacterBody3D
+# on the default layer). Built here rather than in hull.tscn so the
+# radius export can re-apply live. Not monitorable - nothing needs to
+# detect the hull.
+func _spawn_approach_area() -> void:
+	_approach_area = Area3D.new()
+	_approach_area.name = "ApproachArea"
+	_approach_area.monitorable = false
+	_approach_shape = SphereShape3D.new()
+	var shape_node := CollisionShape3D.new()
+	shape_node.shape = _approach_shape
+	_approach_area.add_child(shape_node)
+	add_child(_approach_area)
+	_apply_approach_radius()
+	_approach_area.body_entered.connect(_on_approach_body_entered)
+
+func _apply_approach_radius() -> void:
+	if _approach_shape != null:
+		_approach_shape.radius = maxf(approach_radius, 0.0)
+
+# Scene file + path from the scene root, so the same hull on a reloaded
+# floor has the same id and the same hull in another scene doesn't.
+func _finding_id() -> String:
+	var root: Node = owner if owner != null else self
+	return "%s:%s" % [root.scene_file_path, str(root.get_path_to(self))]
+
+func _on_approach_body_entered(body: Node3D) -> void:
+	if not body.is_in_group("wanderer"):
+		return
+	if world_line.is_empty():
+		return
+	var id: String = _finding_id()
+	if shows_once_per_run and _findings_shown.has(id):
+		return
+	var region_field := get_node_or_null(region_field_path) as Node
+	var hud: Node = region_field.get_node_or_null(^"FieldHUD") if region_field != null else null
+	var line := WorldVoiceLine.on_hud(hud)
+	if line == null:
+		push_warning("Hull '%s': no FieldHUD to show its world line on." % name)
+		return
+	line.fade_in_seconds = fade_seconds
+	line.fade_out_seconds = fade_seconds
+	line.show_line(world_line, hold_seconds)
+	_findings_shown[id] = true
 
 # Order of operations, because it matters for the sink: (1) scale + bow
 # yaw on the model, (2) measure its combined bbox in THIS node's space -
