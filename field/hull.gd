@@ -7,8 +7,8 @@ class_name Hull
 # as Wanderer._build_flat_material() - one StandardMaterial3D via
 # material_override on every mesh, roughness 1, no specular; the glb's own
 # PBR textures are ignored, this field is flat-shaded), faces its bow
-# seaward, and sits on the relief minus sink_depth of its own height. No
-# collision - dressing only.
+# seaward, and sits on the relief minus sink_depth of its own height.
+# Solid to the Wanderer at the gunwale (see collision_inset).
 
 const MODEL_SCENE_PATH := "res://assets/models/hull/hull.glb"
 
@@ -43,7 +43,21 @@ const MODEL_SCENE_PATH := "res://assets/models/hull/hull.glb"
 @export_range(0.0, 1.0) var sink_depth: float = 0.3:
 	set(value):
 		sink_depth = value
+		_apply_collision()
 		_ground_to_relief()
+# Collision: one BoxShape3D under a StaticBody3D child of this node (so
+# the sink, pitch and roll carry over), sized from the scaled bbox - X/Z
+# inset by collision_inset so the Wanderer brushes the gunwale rather
+# than snagging on the box's own corners, height cut down by the sink so
+# the box top sits at the visible gunwale and its bottom at the sand.
+# Default physics layer/mask (1/1), the same the boundary walls and the
+# Wanderer use. A box is still square at the pointed bow, so the corners
+# there stand ~0.5m proud of the wood - raise collision_inset if that
+# snags.
+@export var collision_inset: float = 0.15:
+	set(value):
+		collision_inset = value
+		_apply_collision()
 # List around the hull's own long axis (the keel line), so it reads as
 # settled into the sand rather than sitting level - sand climbs one side
 # inside, the floor shows on the other.
@@ -121,6 +135,13 @@ var _model: Node3D = null
 var _material: StandardMaterial3D = null
 var _approach_area: Area3D = null
 var _approach_shape: SphereShape3D = null
+var _collision_body: StaticBody3D = null
+var _collision_shape_node: CollisionShape3D = null
+var _collision_shape: BoxShape3D = null
+# The model's combined bbox in this node's space at the final scale, as
+# measured by _apply_model_transform() (before it seats the bottom on the
+# origin - _aabb_height/_aabb_length are its size).
+var _aabb: AABB = AABB()
 var _ground: Ground = null
 # Model bbox in this node's space at the final scale, from _apply_model_
 # transform(): height for sink_depth, length for the slope samples,
@@ -238,11 +259,42 @@ func _apply_model_transform() -> void:
 		has_aabb = true
 	if not has_aabb:
 		return
+	_aabb = combined_aabb
 	_aabb_height = combined_aabb.size.y
 	_aabb_length = combined_aabb.size.z
 	_model.position.y = -combined_aabb.position.y
 	print("Hull '%s': scaled bbox %.2f long x %.2f high x %.2f beam (model_scale %.2f x mesh_scale %.2f)" % [name, combined_aabb.size.z, combined_aabb.size.y, combined_aabb.size.x, model_scale, mesh_scale])
+	_apply_collision()
 	_ground_to_relief()
+
+# Builds the StaticBody3D/BoxShape3D on first call, then (re)sizes it
+# from _aabb, collision_inset and sink_depth - see collision_inset's own
+# doc. In node space the bbox bottom sits on the origin (see above) and
+# the sand surface at sink_depth x height, so the box runs from the sand
+# to the gunwale: size.y = height x (1 - sink), centred between the two.
+func _apply_collision() -> void:
+	if _model == null or _aabb.size == Vector3.ZERO:
+		return
+	if _collision_body == null:
+		_collision_body = StaticBody3D.new()
+		_collision_body.name = "Collision"
+		_collision_shape = BoxShape3D.new()
+		_collision_shape_node = CollisionShape3D.new()
+		_collision_shape_node.shape = _collision_shape
+		_collision_body.add_child(_collision_shape_node)
+		add_child(_collision_body)
+	var inset: float = maxf(collision_inset, 0.0)
+	var sink: float = clampf(sink_depth, 0.0, 1.0)
+	var box_height: float = _aabb.size.y * (1.0 - sink)
+	_collision_shape.size = Vector3(
+		maxf(_aabb.size.x - 2.0 * inset, 0.01),
+		maxf(box_height, 0.01),
+		maxf(_aabb.size.z - 2.0 * inset, 0.01)
+	)
+	# XZ centred on the bbox (the model yaw leaves it centred on the
+	# origin, but don't assume it); Y from the sand level up.
+	var centre: Vector3 = _aabb.get_center()
+	_collision_shape_node.position = Vector3(centre.x, _aabb.size.y * sink + box_height * 0.5, centre.z)
 
 # A mesh instance's transform relative to the model root (not the world),
 # so the bbox measurement above doesn't depend on this node's own current
