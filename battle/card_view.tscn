@@ -5,16 +5,26 @@
 [node name="CardView" type="Panel"]
 script = ExtResource("1_card_view")
 
+[node name="ShadowSoft" type="Panel" parent="."]
+show_behind_parent = true
+
+[node name="ShadowHairline" type="Panel" parent="."]
+show_behind_parent = true
+
+[node name="Keyline" type="ColorRect" parent="."]
+
 [node name="NameLabel" type="Label" parent="."]
 
-[node name="HeaderSeparator" type="ColorRect" parent="."]
+[node name="CostLabel" type="Label" parent="."]
 
-[node name="Badge" type="Panel" parent="."]
+[node name="HpCostLabel" type="Label" parent="."]
 
-[node name="CostLabel" type="Label" parent="Badge"]
+[node name="ArtField" type="Panel" parent="."]
 
-[node name="ArtRect" type="ColorRect" parent="."]
+[node name="Glyph" type="Control" parent="ArtField"]
 
-[node name="ArtSeparator" type="ColorRect" parent="."]
+[node name="RulesText" type="RichTextLabel" parent="."]
 
-[node name="DescriptionLabel" type="Label" parent="."]
+[node name="FooterRule" type="ColorRect" parent="."]
+
+[node name="TypeLabel" type="Label" parent="."]

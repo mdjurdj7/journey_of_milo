@@ -7,11 +7,14 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 # in draw order - just needs to clear the largest realistic hand z_index
 # (one per card), not tied to card count itself.
 const HOVER_Z_INDEX := 1000
+# Above even a hovered card.
+const ARMED_Z_INDEX := 1001
 
 signal card_clicked(card_view: CardView)
 signal play_animation_finished(card_data: CardData)
 
-@export var card_size: Vector2 = Vector2(247.0, 345.0)
+# Must match CardView.card_size (200 x 280 at 1x).
+@export var card_size: Vector2 = Vector2(200.0, 280.0)
 # Base display scale for every card in the hand - applied before (and
 # composed with) the further shrink-to-fit factor _compute_scale_factor()
 # derives against hand_max_span, same "smaller than full card_size for
@@ -28,11 +31,13 @@ signal play_animation_finished(card_data: CardData)
 # timing this feature adds; every other duration here predates it.
 @export var reflow_duration_sec: float = 0.15
 
-# At rest, only this much of a card's own height pokes up above the
-# bottom edge - the rest sits pushed down out of view (see CardView.
-# set_rest_offset()). hover_lift on CardView is what brings it back up,
-# now measured from this baseline instead of from 0.
-@export var hand_rest_visible_height: float = 230.0:
+# At rest, only this much of a card's own height (1x px) pokes up above
+# this container's own top-of-arc line - the rest sits pushed down (see
+# CardView.set_rest_offset()). 119 with the overlay's container (top at
+# 1080 - 365 = 715, arc 22) puts a hand card's top at y 854 (0.79 of
+# 1080) and its bottom 12px below the viewport - the hand is held, not
+# laid on the screen. CardView.hover_lift is measured from this baseline.
+@export var hand_rest_visible_height: float = 119.0:
 	set(value):
 		hand_rest_visible_height = value
 		for slot: Control in _views.values():
@@ -68,7 +73,7 @@ signal play_animation_finished(card_data: CardData)
 # own center, ±this at its two ends (see _reflow_hand()'s own t/rotation
 # math). First-pass numbers, all three below - untested without running
 # the game; retune live once seen.
-@export var fan_max_rotation_degrees: float = 6.0:
+@export var fan_max_rotation_degrees: float = 4.0:
 	set(value):
 		fan_max_rotation_degrees = value
 		_reflow_hand(false)
@@ -96,6 +101,9 @@ signal play_animation_finished(card_data: CardData)
 
 var _deck: Deck = null
 var _views: Dictionary = {} # CardData -> Control (the card's slot; its only child is a CardView)
+# The player's current energy, as last pushed by update_playable() - a
+# card drawn later is faded or not against this same number.
+var _last_energy: int = -1
 var _pending_reveals: Array[CardData] = []
 var _revealing: bool = false
 
@@ -113,11 +121,15 @@ func _ready() -> void:
 var _arc_positions: Dictionary = {} # Control (slot) -> Vector2
 var _arc_rotations: Dictionary = {} # Control (slot) -> float degrees
 var _arc_z_indices: Dictionary = {} # Control (slot) -> int
-# Slots currently hovered or armed - _reflow_hand() skips touching a
-# lifted slot's own rotation/z_index (position still updates, so the rest
-# of the hand can shift around it), leaving CardView's own lift signal
-# handlers as the only thing driving those two properties until lowered.
+# Slots currently hovered - _reflow_hand() skips touching a lifted slot's
+# own rotation/z_index (position still updates, so the rest of the hand
+# can shift around it), leaving CardView's own lift signal handlers as
+# the only thing driving those two properties until lowered.
 var _lifted_slots: Dictionary = {} # Control (slot) -> true
+# The one armed slot, if any: left out of the fan entirely (the hand
+# closes under it) and parked at the card's armed_position until
+# disarmed - see _on_card_armed()/_on_card_disarmed().
+var _armed_slot: Control = null
 
 func set_deck(deck: Deck) -> void:
 	if _deck != null:
@@ -181,15 +193,39 @@ func _add_card_view(card: CardData) -> void:
 
 	card_view.set_rest_offset(card_size.y - hand_rest_visible_height)
 	card_view.set_card_data(card)
+	if _last_energy >= 0:
+		card_view.set_playable(card.cost <= _last_energy)
 	card_view.clicked.connect(_on_card_view_clicked.bind(card_view))
 	card_view.lifted.connect(_on_card_lifted.bind(slot, card_view))
 	card_view.lowered.connect(_on_card_lowered.bind(slot, card_view))
+	card_view.armed.connect(_on_card_armed.bind(slot, card_view))
+	card_view.disarmed.connect(_on_card_disarmed.bind(slot, card_view))
+	if _armed_slot != null:
+		card_view.set_hover_suppressed(true)
 
 	_views[card] = slot
 	_reflow_hand()
 
 func _on_card_view_clicked(_card_data: CardData, card_view: CardView) -> void:
 	card_clicked.emit(card_view)
+
+# Global Y of a resting centre card's top edge - what anything above the
+# hand (HP/Toll chips, enemy bars) has to clear: the arc's peak slot plus
+# the rest offset (a slot-space offset, unscaled - the card's own scale
+# only shrinks it downward from there).
+func get_rest_top_y() -> float:
+	return global_position.y - fan_arc_height + (card_size.y - hand_rest_visible_height)
+
+# Fades every card the player can't currently afford (see CardView.
+# set_playable()) - called on BattleController.energy_changed, and
+# applied to cards drawn afterwards too.
+func update_playable(energy: int) -> void:
+	_last_energy = energy
+	for card in _views:
+		var slot: Control = _views[card]
+		var card_view: CardView = slot.get_child(0) as CardView
+		if card_view != null:
+			card_view.set_playable((card as CardData).cost <= energy)
 
 # Straightens this slot to 0 rotation and brings it to the front of the
 # fan - fired for both a plain hover and an armed card (CardView.lifted
@@ -203,10 +239,56 @@ func _on_card_lifted(slot: Control, card_view: CardView) -> void:
 
 func _on_card_lowered(slot: Control, card_view: CardView) -> void:
 	_lifted_slots.erase(slot)
+	if slot == _armed_slot:
+		return
 	slot.z_index = int(_arc_z_indices.get(slot, 0))
 	var target_rotation: float = _arc_rotations.get(slot, 0.0)
 	var tween := create_tween()
 	tween.tween_property(slot, "rotation_degrees", target_rotation, card_view.hover_duration_sec)
+
+# Armed: the slot leaves the fan (the others close the gap, animated),
+# goes on top, straightens, and travels so the card's bottom centre lands
+# on CardView.get_armed_bottom_centre() - the card itself scales to
+# armed_scale in the same time. Every other card stops responding to
+# hover until disarmed. The slot is NOT re-parented (unlike play_card()):
+# it stays a child here, just parked outside the arc, so returning it is
+# a plain reflow.
+func _on_card_armed(slot: Control, card_view: CardView) -> void:
+	_armed_slot = slot
+	_lifted_slots.erase(slot)
+	for other in _views.values():
+		var other_view: CardView = (other as Control).get_child(0) as CardView
+		if other_view != null and other_view != card_view:
+			other_view.set_hover_suppressed(true)
+	slot.z_index = ARMED_Z_INDEX
+	_reflow_hand()
+
+	# The card's bottom centre in slot space is fixed by its pivot (bottom
+	# centre) regardless of scale: position + (size/2, size).
+	var card_bottom_centre_local: Vector2 = card_view.position + Vector2(card_view.size.x / 2.0, card_view.size.y)
+	var target_global: Vector2 = card_view.get_armed_bottom_centre() - card_bottom_centre_local
+	var tween := create_tween()
+	tween.set_ease(Tween.EASE_OUT)
+	tween.set_trans(Tween.TRANS_CUBIC)
+	tween.set_parallel(true)
+	tween.tween_property(slot, "rotation_degrees", 0.0, card_view.armed_duration_sec)
+	tween.tween_property(slot, "global_position", target_global, card_view.armed_duration_sec)
+
+# Disarmed (cancelled): back into the fan - the reflow re-includes the
+# slot and glides it to its arc target over the same time; hover comes
+# back for everyone.
+func _on_card_disarmed(slot: Control, card_view: CardView) -> void:
+	if _armed_slot != slot:
+		return
+	_armed_slot = null
+	for other in _views.values():
+		var other_view: CardView = (other as Control).get_child(0) as CardView
+		if other_view != null:
+			other_view.set_hover_suppressed(false)
+	if not _views.values().has(slot):
+		return
+	slot.z_index = int(_arc_z_indices.get(slot, 0))
+	_reflow_hand(true, card_view.armed_duration_sec)
 
 func _forget_slot(slot: Control) -> void:
 	_arc_positions.erase(slot)
@@ -233,7 +315,13 @@ func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
 	_reflow_hand()
 
 	var card_view: CardView = slot.get_child(0) as CardView
-	card_view.release()
+	card_view.mark_played()
+	if _armed_slot == slot:
+		_armed_slot = null
+		for other in _views.values():
+			var other_view: CardView = (other as Control).get_child(0) as CardView
+			if other_view != null:
+				other_view.set_hover_suppressed(false)
 
 	# Detach from the row - left parented under this Control, it would
 	# collide with the reflow tween above the instant the next card is
@@ -276,10 +364,18 @@ func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
 # lower, but neither its live rotation nor z_index are touched while
 # lifted - see _on_card_lifted()/_on_card_lowered() for who owns those
 # until then.
-func _reflow_hand(animate: bool = true) -> void:
-	var count: int = _views.size()
+func _reflow_hand(animate: bool = true, duration: float = -1.0) -> void:
+	# The armed slot is laid out as if it weren't there - the fan closes
+	# under it; its own position is _on_card_armed()'s.
+	var slots: Array = []
+	for slot: Control in _views.values():
+		if slot != _armed_slot:
+			slots.append(slot)
+	var count: int = slots.size()
 	if count == 0:
 		return
+	if duration < 0.0:
+		duration = reflow_duration_sec
 
 	var scale_factor: float = _compute_scale_factor(count)
 	var scaled_card_size: Vector2 = card_size * scale_factor
@@ -294,7 +390,7 @@ func _reflow_hand(animate: bool = true) -> void:
 	var start_center_x: float = size.x / 2.0 - total_width / 2.0 + scaled_card_size.x / 2.0
 
 	var index := 0
-	for slot: Control in _views.values():
+	for slot: Control in slots:
 		var t: float = 0.0 if count == 1 else (float(index) / float(count - 1)) * 2.0 - 1.0
 		var rotation_degrees: float = t * fan_max_rotation_degrees
 		var lift: float = fan_arc_height * (1.0 - t * t)
@@ -306,16 +402,18 @@ func _reflow_hand(animate: bool = true) -> void:
 		# the visible hand, same as a real hand of cards held from below.
 		slot.pivot_offset = Vector2(scaled_card_size.x / 2.0, scaled_card_size.y)
 
-		var card_view: Control = slot.get_child(0) as Control
-		card_view.scale = Vector2(scale_factor, scale_factor)
+		var card_view: CardView = slot.get_child(0) as CardView
+		card_view.set_base_scale(scale_factor)
 
 		var is_new_slot: bool = not _arc_positions.has(slot)
 		if animate and not is_new_slot:
 			var tween := create_tween()
+			tween.set_ease(Tween.EASE_OUT)
+			tween.set_trans(Tween.TRANS_CUBIC)
 			tween.set_parallel(true)
-			tween.tween_property(slot, "position", target_position, reflow_duration_sec)
+			tween.tween_property(slot, "position", target_position, duration)
 			if not _lifted_slots.has(slot):
-				tween.tween_property(slot, "rotation_degrees", rotation_degrees, reflow_duration_sec)
+				tween.tween_property(slot, "rotation_degrees", rotation_degrees, duration)
 		else:
 			slot.position = target_position
 			if not _lifted_slots.has(slot):

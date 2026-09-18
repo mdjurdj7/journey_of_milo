@@ -285,8 +285,13 @@ func _debug_print_enemy_bar_gaps() -> void:
 		if status == null or not is_instance_valid(status):
 			continue
 		var bar_bottom: Vector2 = status.get_global_transform() * Vector2(status.size.x / 2.0, status.size.y)
-		var gap: float = hand_container.global_position.y - bar_bottom.y
+		# Against the resting cards' actual top edge, not the container's
+		# (the cards sit well below it - see HandContainer.get_rest_top_y()).
+		var gap: float = hand_container.get_rest_top_y() - bar_bottom.y
 		print("BattleOverlay: enemy '%s' HP bar bottom-to-hand gap = %.1f px" % [enemy.enemy_id, gap])
+	if _field_hp_bar != null:
+		var hp_bottom: float = (_field_hp_bar.get_global_transform() * Vector2(0.0, _field_hp_bar.size.y)).y
+		print("BattleOverlay: Wanderer HP/Toll chip bottom-to-hand gap = %.1f px" % (hand_container.get_rest_top_y() - hp_bottom))
 
 func _spawn_floating_number(value: int, screen_pos: Vector2) -> void:
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber

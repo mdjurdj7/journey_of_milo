@@ -81,7 +81,10 @@ func _process(_delta: float) -> void:
 	if card_view == null:
 		return
 
-	var start: Vector2 = card_view.global_position + Vector2(card_view.size.x * card_view.scale.x / 2.0, 0.0)
+	# The card's rendered top-centre through its own transform - CardView
+	# scales about a bottom-centre pivot (hover/armed), so the rendered
+	# rect is not global_position + size * scale.
+	var start: Vector2 = card_view.get_global_transform() * Vector2(card_view.size.x / 2.0, 0.0)
 
 	var hovered_enemy: FieldEnemy = _battle_controller.get_hovered_enemy()
 	var show_circle := false

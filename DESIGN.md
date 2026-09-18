@@ -32,3 +32,10 @@ so it doesn't get silently reinvented or silently forgotten.
   shore gate). The sea side only needs the same five uniforms pushed to
   its material and a mask-mode branch in `landmass_distance()`; still not
   built. (2026-09-16, swash.)
+- **CardData.CardType should gain TOLL and rename SKILL to GUARD.** The
+  card face's keyline/field/type label (strike / guard / toll) is
+  derived in `CardView._derive_keyline_type()`: any Toll-mechanic effect
+  (`TOLL_*`, `SELF_DAMAGE_TOLL`) makes a toll card, otherwise SKILL is
+  guard and ATTACK is strike. Once CardType carries the three real
+  values that derivation goes away and the face reads `card_type`
+  directly. Card data untouched for now. (2026-09-17, ink-on-bone card.)

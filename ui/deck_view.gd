@@ -64,6 +64,8 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 @export var content_panel_steps: int = 2
 @export var use_card_edge: bool = false
 @export var card_edge_steps: int = 1
+# How far each step moves the edge from the card's bone toward its ink.
+@export_range(0.0, 1.0) var card_edge_step_fraction: float = 0.15
 @export var card_edge_width_px: float = 1.0
 
 @onready var _scrim: ColorRect = $Scrim
@@ -137,7 +139,12 @@ func _ready() -> void:
 	style.corner_radius_bottom_left = 12
 	_content_panel.add_theme_stylebox_override("panel", style)
 
-	_card_edge_color = panel_color + step * float(card_edge_steps)
+	# Cards are always ink-on-bone (they don't take the theme's value set -
+	# see CardView), so their browsing edge steps the card's own bone
+	# toward its ink rather than following panel_color.
+	var reference_card := (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
+	_card_edge_color = reference_card.field_color.lerp(reference_card.ink_color, card_edge_step_fraction * float(card_edge_steps))
+	reference_card.free()
 
 	_margin.add_theme_constant_override("margin_left", content_margin_px)
 	_margin.add_theme_constant_override("margin_top", content_margin_px)
