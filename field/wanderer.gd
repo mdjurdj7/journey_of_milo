@@ -298,6 +298,19 @@ var _battle_stance_modifier: BattleStanceModifier = null
 # the sword's own node.scale is set to.
 var _model_scale_factor: float = 1.0
 
+# The model's scaled bbox height and half its larger horizontal extent,
+# from _scale_and_ground_model() - same pair FieldEnemy keeps, read by
+# CameraRig's battle fit. Height is target_height whenever the scale is
+# auto-derived; 0 until the model has been measured.
+var _model_height: float = 0.0
+var _model_half_width: float = 0.0
+
+func get_head_height() -> float:
+	return _model_height
+
+func get_half_width() -> float:
+	return _model_half_width
+
 var _sword_skeleton: Skeleton3D = null
 var _sword_root: Node3D = null
 var _sword_mesh_holder: Node3D = null
@@ -500,6 +513,8 @@ func _scale_and_ground_model(model: Node3D) -> void:
 	model.scale = Vector3.ONE * scale_factor
 	model.position.y += -combined_aabb.position.y * scale_factor
 	_model_scale_factor = scale_factor
+	_model_height = combined_aabb.size.y * scale_factor
+	_model_half_width = maxf(combined_aabb.size.x, combined_aabb.size.z) * 0.5 * scale_factor
 
 # Finds the skeleton and the lowest-contact bone indices once, at
 # startup - cached into _grounding_skeleton/_grounding_bone_indices so the

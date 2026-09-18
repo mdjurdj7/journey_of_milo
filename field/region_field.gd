@@ -350,9 +350,20 @@ func _on_floor_exited() -> void:
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	process_mode = Node.PROCESS_MODE_DISABLED
 
+	# Overlay first: CameraRig's battle fit needs the card hand's resting
+	# top edge, and that only exists once the overlay's layout is in the
+	# tree (anchors resolve synchronously on add_child).
+	var overlay := (load(BATTLE_OVERLAY_SCENE_PATH) as PackedScene).instantiate() as BattleOverlay
+	battle_layer.add_child(overlay)
+	# Single-enemy contact model for now - a list of one. BattleController
+	# owns whatever this becomes once a fight can hold more than one enemy.
+	var battle_enemies: Array[FieldEnemy] = [enemy]
+
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
 	if camera_rig:
-		camera_rig.enter_battle(wanderer, enemy)
+		var viewport_height: float = overlay.get_viewport().get_visible_rect().size.y
+		var hand_top_fraction: float = overlay.hand_container.get_rest_top_y() / maxf(viewport_height, 1.0)
+		camera_rig.enter_battle(wanderer, battle_enemies, hand_top_fraction)
 		wanderer.enter_battle_stance(enemy, battle_spacing, camera_rig.battle_transition_time)
 		enemy.face_toward(wanderer, camera_rig.battle_transition_time)
 
@@ -360,11 +371,6 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	if directional_light:
 		directional_light.enter_battle()
 
-	var overlay := (load(BATTLE_OVERLAY_SCENE_PATH) as PackedScene).instantiate() as BattleOverlay
-	battle_layer.add_child(overlay)
-	# Single-enemy contact model for now - a list of one. BattleController
-	# owns whatever this becomes once a fight can hold more than one enemy.
-	var battle_enemies: Array[FieldEnemy] = [enemy]
 	var transition_time: float = camera_rig.battle_transition_time if camera_rig != null else 0.0
 	overlay.enter_battle(ui_on_dark_world, battle_enemies, deck_panel, hp_bar, transition_time, wanderer)
 	overlay.battle_finished.connect(_on_battle_finished.bind(enemy, overlay))

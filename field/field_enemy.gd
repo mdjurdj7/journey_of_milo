@@ -67,9 +67,16 @@ var enemy_status: EnemyStatus = null
 # creature's own head height above its ground position, for anything
 # that anchors above it (BattleIntent). 0 until the model has spawned.
 var _model_height: float = 0.0
+# Half the model's larger horizontal bbox extent (X or Z), same source -
+# how far the body reaches sideways from its ground position, for
+# CameraRig's battle fit. 0 until the model has spawned.
+var _model_half_width: float = 0.0
 
 func get_head_height() -> float:
 	return _model_height
+
+func get_half_width() -> float:
+	return _model_half_width
 
 @onready var contact_area: Area3D = $ContactArea
 @onready var contact_shape: CollisionShape3D = $ContactArea/CollisionShape3D
@@ -174,6 +181,7 @@ func _spawn_model() -> void:
 		print("FieldEnemy '%s': model AABB height = %.3f at model_scale = %.3f" % [enemy_id, combined_aabb.size.y, model_scale])
 		model.position.y += -combined_aabb.position.y + model_ground_offset
 		_model_height = combined_aabb.size.y
+		_model_half_width = maxf(combined_aabb.size.x, combined_aabb.size.z) * 0.5
 
 # Duplicates the mesh's own imported material (Sputter.glb ships a real
 # baseColorTexture/metallicRoughnessTexture/normalTexture set) rather than

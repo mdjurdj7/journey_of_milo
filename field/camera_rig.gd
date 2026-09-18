@@ -14,33 +14,49 @@ class_name CameraRig
 		if is_instance_valid(camera):
 			camera.fov = fov
 
-# Battle framing: side-on, perpendicular to the a->b line, on whichever
-# side keeps the Wanderer screen-left. Blended in/out of the follow
-# framing above over battle_transition_time, both ways.
+# Battle framing: side-on, perpendicular to the Wanderer->enemy line, on
+# whichever side keeps the Wanderer screen-left. Distance and look target
+# are fitted to the combatants every frame (see _fit_battle_frame());
+# pitch/fov are fixed. Blended in/out of the follow framing above over
+# battle_transition_time, both ways.
 @export var battle_pitch: float = 18.0
-@export var battle_distance: float = 9.0
 @export var battle_fov: float = 35.0
-# Negative raises both figures on screen (see _place_camera()'s own doc:
-# positive pushes the look-target's subject BELOW center, by this many
-# frame-half-heights) - so a bar sitting under the enemy's feet clears
-# HandContainer's top edge (BattleOverlay's card hand, docked at the
-# bottom of the screen) with room to spare, rather than being framed
-# right at/below it. -0.08 is an untested first estimate (~43px of a
-# 1080-tall viewport, for a targeted ~24px of actual clearance - some
-# margin built in since the true starting gap at 0.0 isn't knowable
-# without running the game): BattleOverlay._debug_print_enemy_bar_gaps()
-# prints the real gap once per battle - retune this against that number,
-# not this comment's own math.
-@export var battle_framing_bias: float = -0.08
 @export var battle_transition_time: float = 0.6
+
+@export_group("Battle fit")
+# Horizontal room past the outermost bodies' bbox edges, metres at the
+# combatants' depth, averaged over both sides: the two sides split
+# 2 * battle_margin so the enemy side gets battle_enemy_room_ratio times
+# the Wanderer's (3.0 / 1.1 -> 2.86 m Wanderer-side, 3.14 m enemy-side).
+@export var battle_margin: float = 3.0
+@export var battle_enemy_room_ratio: float = 1.1
+# The fitted distance never comes closer than min (1.18x the old fixed
+# 9 m frame - one crab at spacing 4 fits at ~9.5 m, so min is what a
+# single-crab fight actually gets) nor further than max, however wide the
+# cluster spreads.
+@export var battle_distance_min: float = 10.62
+@export var battle_distance_max: float = 22.0
+# Vertical placement, all as fractions of viewport height: the lowest
+# combatant's HP readout - hanging readout_allowance under its feet
+# (HPBar/EnemyStatus's bar_offset, ~0.45 m, is what this stands in for)
+# - sits hand_clearance above the card hand's resting top edge (passed in
+# by RegionField from the real overlay layout, see enter_battle()), so
+# the feet themselves land hand_clearance + readout_allowance above it;
+# and the tallest head stays head_clearance below the top of the frame -
+# room for the intent display above it. The head limit pushes the
+# distance out only for bodies taller than ~3 m; below that the
+# horizontal fit or battle_distance_min governs.
+@export var hand_clearance: float = 0.12
+@export var readout_allowance: float = 0.085
+@export var head_clearance: float = 0.10
 
 @export_group("Battle DOF")
 # Far blur only (near stays off - see _update_dof()) - reads as "the
 # background falls away" behind the fight without ever blurring either
-# combatant. far_distance is battle_distance + this, not the live blended
-# eff_distance _place_camera() computes - a fixed depth relationship to
-# the battle camera's own resting distance, so it doesn't shift as the
-# transition blends in.
+# combatant. far_distance is the fitted battle distance + this, not the
+# live blended eff_distance _place_camera() computes - a fixed depth
+# relationship to the battle camera's own resting distance, so it doesn't
+# shift as the transition blends in.
 @export var battle_dof_far_extra_distance: float = 8.0
 @export var battle_dof_far_transition: float = 12.0
 @export var battle_dof_amount: float = 0.06
@@ -52,12 +68,26 @@ var _target: Node3D
 var _shake_offset: Vector3 = Vector3.ZERO
 var _shake_frames_remaining: int = 0
 
-var _battle_a: Node3D
-var _battle_b: Node3D
-# Last valid battle look target/axis, kept for the exit transition in case
-# a or b (e.g. a defeated enemy) is freed while blending back out.
+var _battle_wanderer: Wanderer
+var _battle_enemies: Array[FieldEnemy] = []
+# Where the card hand's resting top edge sits, as a fraction of viewport
+# height from the top (0.79 at 1080p today) - measured by RegionField
+# from the live BattleOverlay and handed to enter_battle().
+var _hand_top_fraction: float = 1.0
+# Last valid fitted frame, kept for the exit transition in case the
+# Wanderer or an enemy (e.g. a defeated one) is freed while blending back
+# out - and reused by _update_dof() as the resting battle distance.
 var _battle_last_target: Vector3
 var _battle_last_forward: Vector3 = Vector3.FORWARD
+var _battle_last_distance: float = 0.0
+
+# One measured combatant, in world units: its ground position, feet and
+# head heights, and how far its bbox reaches sideways.
+class BattleBody:
+	var position: Vector3
+	var feet_y: float
+	var head_y: float
+	var half_width: float
 
 # 0 = pure follow framing, 1 = pure battle framing. Animated by
 # _advance_battle_blend() from _blend_from to _blend_to over
@@ -84,10 +114,15 @@ func _ready() -> void:
 		global_position = _target.global_position
 		_place_camera()
 
-# Called by region_field.gd on enemy contact, before the battle stub shows.
-func enter_battle(a: Node3D, b: Node3D) -> void:
-	_battle_a = a
-	_battle_b = b
+# Called by region_field.gd on enemy contact, once the BattleOverlay is in
+# the tree so the hand's resting top edge can be measured from its real
+# layout (hand_top_fraction, viewport-height fraction from the top).
+# enemies is the whole cluster the fight holds; the first one defines the
+# framing axis with the Wanderer.
+func enter_battle(wanderer: Wanderer, enemies: Array[FieldEnemy], hand_top_fraction: float) -> void:
+	_battle_wanderer = wanderer
+	_battle_enemies = enemies
+	_hand_top_fraction = hand_top_fraction
 	_start_blend(1.0)
 
 # Called by region_field.gd once the battle stub resolves. Follow mode
@@ -165,26 +200,127 @@ func _battle_ground_forward(a_pos: Vector3, b_pos: Vector3) -> Vector3:
 		return _rig_ground_forward()
 	return Vector3.UP.cross(axis).normalized()
 
+# Every combatant still alive, measured: feet at body-local
+# model_ground_offset (the same "feet at body floor" convention both
+# bodies ground their models by), head = feet + scaled bbox height.
+func _battle_bodies() -> Array[BattleBody]:
+	var bodies: Array[BattleBody] = []
+	if is_instance_valid(_battle_wanderer):
+		var body := BattleBody.new()
+		body.position = _battle_wanderer.global_position
+		body.feet_y = body.position.y + _battle_wanderer.model_ground_offset
+		body.head_y = body.feet_y + _battle_wanderer.get_head_height()
+		body.half_width = _battle_wanderer.get_half_width()
+		bodies.append(body)
+	for enemy in _battle_enemies:
+		if not is_instance_valid(enemy):
+			continue
+		var body := BattleBody.new()
+		body.position = enemy.global_position
+		body.feet_y = body.position.y + enemy.model_ground_offset
+		body.head_y = body.feet_y + enemy.get_head_height()
+		body.half_width = enemy.get_half_width()
+		bodies.append(body)
+	return bodies
+
+# Metres of world height per metre of camera distance that land on
+# normalised screen row y (half-heights from centre, +up) for a point on
+# the combatants' line, with the camera pitched down by pitch_rad and
+# looking straight at that line: y = h cos(p) / ((d - h sin(p)) t)
+# solved for h/d, t = tan(fov/2). Exact for points at the look target's
+# depth, which is where every body on the framing axis sits.
+func _height_per_distance(y: float, pitch_rad: float, tan_half_fov: float) -> float:
+	return y * tan_half_fov / (cos(pitch_rad) + y * tan_half_fov * sin(pitch_rad))
+
+# Fits distance and look target to the live combatants. Horizontal: the
+# bodies' bbox extents projected onto the Wanderer->first-enemy axis (=
+# screen right, since the camera sits perpendicular to it), plus the
+# split battle_margin room, must span the frame width at that depth.
+# Vertical: with the camera looking exactly at the returned target, the
+# lowest feet land hand_clearance + readout_allowance above the hand's
+# top edge (the readout under them is what clears the hand); if the
+# tallest head would then break head_clearance, the distance grows until
+# it doesn't. Whichever of the two (or battle_distance_min) is largest
+# wins, capped at battle_distance_max. Returns false and leaves the last
+# frame in place when nothing is left to frame.
+func _fit_battle_frame() -> bool:
+	if not is_instance_valid(_battle_wanderer):
+		return false
+	var bodies := _battle_bodies()
+	if bodies.size() < 2:
+		return false
+
+	var wanderer_pos: Vector3 = bodies[0].position
+	var first_enemy_pos: Vector3 = bodies[1].position
+	var forward := _battle_ground_forward(wanderer_pos, first_enemy_pos)
+	# (UP x axis) x UP is the axis itself flattened - screen right, from
+	# the Wanderer toward the enemies.
+	var right := forward.cross(Vector3.UP).normalized()
+
+	var lo: float = INF
+	var hi: float = -INF
+	var feet_min: float = INF
+	var head_max: float = -INF
+	for body in bodies:
+		var s: float = (body.position - wanderer_pos).dot(right)
+		lo = minf(lo, s - body.half_width)
+		hi = maxf(hi, s + body.half_width)
+		feet_min = minf(feet_min, body.feet_y)
+		head_max = maxf(head_max, body.head_y)
+
+	var room_wanderer: float = 2.0 * battle_margin / (1.0 + battle_enemy_room_ratio)
+	var room_enemy: float = room_wanderer * battle_enemy_room_ratio
+	var left_edge: float = lo - room_wanderer
+	var right_edge: float = hi + room_enemy
+
+	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
+	var aspect: float = viewport_size.x / maxf(viewport_size.y, 1.0)
+	var tan_half_fov := tan(deg_to_rad(battle_fov) * 0.5)
+	var pitch_rad := deg_to_rad(battle_pitch)
+
+	var distance_horizontal: float = (right_edge - left_edge) * 0.5 / (tan_half_fov * aspect)
+
+	# Screen rows, half-heights from centre, +up: the hand's top edge
+	# lifted by the clearance plus the readout hanging under the feet, and
+	# the top edge dropped by its own clearance.
+	var feet_row: float = (0.5 - _hand_top_fraction + hand_clearance + readout_allowance) * 2.0
+	var head_row: float = 1.0 - head_clearance * 2.0
+	var feet_k := _height_per_distance(feet_row, pitch_rad, tan_half_fov)
+	var head_k := _height_per_distance(head_row, pitch_rad, tan_half_fov)
+	var distance_vertical: float = 0.0
+	if head_k - feet_k > 0.0001:
+		distance_vertical = (head_max - feet_min) / (head_k - feet_k)
+
+	var fitted_distance: float = clampf(maxf(distance_horizontal, distance_vertical), battle_distance_min, battle_distance_max)
+
+	var target := wanderer_pos + right * ((left_edge + right_edge) * 0.5)
+	target.y = feet_min - feet_k * fitted_distance
+
+	_battle_last_target = target
+	_battle_last_forward = forward
+	_battle_last_distance = fitted_distance
+	return true
+
 func _place_camera() -> void:
 	var follow_target := _target.global_position + look_offset
 	var follow_forward := _rig_ground_forward()
 
+	# Refit every frame while the fight holds bodies - the Wanderer is still
+	# walking into its stance during the swing in - else the last frame.
+	_fit_battle_frame()
 	var battle_target := _battle_last_target
 	var battle_forward := _battle_last_forward
-	if is_instance_valid(_battle_a) and is_instance_valid(_battle_b):
-		battle_target = (_battle_a.global_position + _battle_b.global_position) * 0.5 + look_offset
-		battle_forward = _battle_ground_forward(_battle_a.global_position, _battle_b.global_position)
-		_battle_last_target = battle_target
-		_battle_last_forward = battle_forward
 
 	var look_target: Vector3 = follow_target.lerp(battle_target, _battle_blend)
 	var ground_forward: Vector3 = follow_forward.lerp(battle_forward, _battle_blend)
 	ground_forward = follow_forward if ground_forward.length() < 0.0001 else ground_forward.normalized()
 
 	var eff_pitch: float = lerpf(pitch_degrees, battle_pitch, _battle_blend)
-	var eff_distance: float = lerpf(distance, battle_distance, _battle_blend)
+	var eff_distance: float = lerpf(distance, _battle_last_distance, _battle_blend)
 	var eff_fov: float = lerpf(fov, battle_fov, _battle_blend)
-	var eff_framing_bias: float = lerpf(framing_bias, battle_framing_bias, _battle_blend)
+	# The battle frame's vertical placement is baked into its look target
+	# (see _fit_battle_frame()), so the follow bias fades to none.
+	var eff_framing_bias: float = lerpf(framing_bias, 0.0, _battle_blend)
 	var pitch_rad := deg_to_rad(eff_pitch)
 
 	# Sphere of radius `eff_distance` around the look target: pitch swings
@@ -214,6 +350,6 @@ func _update_dof() -> void:
 	_camera_attributes.dof_blur_near_enabled = false
 	_camera_attributes.dof_blur_far_enabled = dof_active
 	if dof_active:
-		_camera_attributes.dof_blur_far_distance = battle_distance + battle_dof_far_extra_distance
+		_camera_attributes.dof_blur_far_distance = _battle_last_distance + battle_dof_far_extra_distance
 		_camera_attributes.dof_blur_far_transition = battle_dof_far_transition
 		_camera_attributes.dof_blur_amount = battle_dof_amount * _battle_blend

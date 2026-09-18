@@ -54,7 +54,7 @@ class_name OvercastLight
 		shadow_opacity = value
 
 # Battle framing is a tight two-character medium shot (see CameraRig's
-# own battle_distance/battle_fov), nowhere near as wide as the field
+# own battle_distance_min..max/battle_fov), nowhere near as wide as the field
 # exploration view shadow_max_distance above is tuned for - tightening to
 # this during battle spends the same shadow map resolution over a much
 # smaller area instead of most of it landing on ground the camera can't
