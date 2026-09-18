@@ -71,12 +71,19 @@ var _model_height: float = 0.0
 # how far the body reaches sideways from its ground position, for
 # CameraRig's battle fit. 0 until the model has spawned.
 var _model_half_width: float = 0.0
+# The model's combined mesh AABB in this body's own space, as placed (the
+# grounding shift applied) - what BattleController projects for the
+# armed-card target test. Empty until the model has spawned.
+var _model_aabb: AABB = AABB()
 
 func get_head_height() -> float:
 	return _model_height
 
 func get_half_width() -> float:
 	return _model_half_width
+
+func get_model_aabb() -> AABB:
+	return _model_aabb
 
 @onready var contact_area: Area3D = $ContactArea
 @onready var contact_shape: CollisionShape3D = $ContactArea/CollisionShape3D
@@ -179,9 +186,11 @@ func _spawn_model() -> void:
 
 	if has_aabb:
 		print("FieldEnemy '%s': model AABB height = %.3f at model_scale = %.3f" % [enemy_id, combined_aabb.size.y, model_scale])
-		model.position.y += -combined_aabb.position.y + model_ground_offset
+		var grounding_shift: float = -combined_aabb.position.y + model_ground_offset
+		model.position.y += grounding_shift
 		_model_height = combined_aabb.size.y
 		_model_half_width = maxf(combined_aabb.size.x, combined_aabb.size.z) * 0.5
+		_model_aabb = AABB(combined_aabb.position + Vector3(0.0, grounding_shift, 0.0), combined_aabb.size)
 
 # Duplicates the mesh's own imported material (Sputter.glb ships a real
 # baseColorTexture/metallicRoughnessTexture/normalTexture set) rather than

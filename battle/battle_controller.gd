@@ -49,6 +49,9 @@ signal battle_lost()
 # center - there's no "target" to unproject for those, just somewhere up
 # and away from the hand.
 @export var self_play_screen_offset: Vector2 = Vector2(0.0, -250.0)
+# Padding around each enemy's projected model rect for the armed-card
+# target test - see _refresh_enemy_rects().
+@export var target_padding_px: float = 16.0
 
 var deck: Deck
 var player: Combatant
@@ -58,6 +61,7 @@ var cards_played_this_turn: int = 0
 var _hand_container: HandContainer
 var _pending_card_view: CardView = null
 var _hovered_enemy: FieldEnemy = null
+var _enemy_rects: Dictionary = {} # FieldEnemy -> Rect2, see _refresh_enemy_rects()
 var _combatants: Dictionary = {} # FieldEnemy -> Combatant
 var _effect_resolver := EffectResolver.new()
 # Read-only from here on: the Wanderer whose clip lengths _impact_delay_
@@ -126,9 +130,9 @@ func is_awaiting_target() -> bool:
 	return _pending_card_view != null
 
 # Read-only access for TargetLine, which needs the armed card's own view
-# (for its on-screen top-center) and the currently hovered enemy (for its
-# chest position) but shouldn't own or duplicate this controller's own
-# targeting state.
+# (for its on-screen top-center) and the currently hovered enemy plus its
+# screen rect (see get_hovered_enemy_rect()) but shouldn't own or
+# duplicate this controller's own targeting state.
 func get_pending_card_view() -> CardView:
 	return _pending_card_view
 
@@ -154,6 +158,7 @@ func confirm_target(enemy: FieldEnemy) -> void:
 	var card_view := _pending_card_view
 	_pending_card_view = null
 	_clear_hover()
+	_enemy_rects.clear()
 	_resolve_play(card_view, enemy)
 
 func cancel_target() -> void:
@@ -162,6 +167,7 @@ func cancel_target() -> void:
 	_pending_card_view.release()
 	_pending_card_view = null
 	_clear_hover()
+	_enemy_rects.clear()
 	target_cancelled.emit()
 
 func end_turn() -> void:
@@ -380,7 +386,7 @@ func _unhandled_input(event: InputEvent) -> void:
 			cancel_target()
 			get_viewport().set_input_as_handled()
 		elif event.button_index == MOUSE_BUTTON_LEFT:
-			var enemy := _raycast_enemy(event.position)
+			var enemy := _enemy_at(event.position)
 			if enemy != null:
 				confirm_target(enemy)
 				get_viewport().set_input_as_handled()
@@ -391,11 +397,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		return
 
-	if event is InputEventMouseMotion:
-		_update_hover(event.position)
+# The target-under-cursor test runs every physics frame while a card is
+# armed (not on mouse motion): the rects move with the camera swing and
+# the enemies' own lunges, so a still cursor has to re-evaluate too, and
+# motion a card's own Control swallowed never has to reach this node.
+func _physics_process(_delta: float) -> void:
+	if _pending_card_view == null:
+		return
+	_refresh_enemy_rects()
+	_update_hover(get_viewport().get_mouse_position())
 
 func _update_hover(screen_pos: Vector2) -> void:
-	var enemy := _raycast_enemy(screen_pos)
+	var enemy := _enemy_at(screen_pos)
 	if enemy == _hovered_enemy:
 		return
 	_clear_hover()
@@ -408,19 +421,62 @@ func _clear_hover() -> void:
 		_hovered_enemy.set_highlight(false)
 		_hovered_enemy = null
 
-func _raycast_enemy(screen_pos: Vector2) -> FieldEnemy:
+# Each living enemy's screen-space bounding rect of its model's world
+# AABB (FieldEnemy.get_model_aabb() - the real mesh bounds, as placed):
+# the 8 corners unprojected, bounded, padded by target_padding_px on
+# every side. No physics shape, no camera-distance dependence - what you
+# can see is what you can target, plus a little. Recomputed by
+# _physics_process() while a card is armed; _enemy_at() reads the cache.
+# An enemy whose AABB reaches behind the camera gets no rect.
+func _refresh_enemy_rects() -> void:
+	_enemy_rects.clear()
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
-		return null
-	var from: Vector3 = camera.project_ray_origin(screen_pos)
-	var to: Vector3 = from + camera.project_ray_normal(screen_pos) * 1000.0
-	var query := PhysicsRayQueryParameters3D.create(from, to)
-	var space_state := get_viewport().get_world_3d().direct_space_state
-	var result := space_state.intersect_ray(query)
-	if result.is_empty():
-		return null
-	var collider: Object = result.get("collider")
+		return
 	for enemy in enemies:
-		if collider == enemy:
-			return enemy
-	return null
+		if not is_instance_valid(enemy):
+			continue
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant == null or combatant.hp <= 0:
+			continue
+		var aabb: AABB = enemy.get_model_aabb()
+		if aabb.size == Vector3.ZERO:
+			continue
+		var rect := Rect2()
+		var behind := false
+		for i in 8:
+			var corner: Vector3 = enemy.global_transform * aabb.get_endpoint(i)
+			if camera.is_position_behind(corner):
+				behind = true
+				break
+			var point: Vector2 = camera.unproject_position(corner)
+			rect = Rect2(point, Vector2.ZERO) if i == 0 else rect.expand(point)
+		if behind:
+			continue
+		_enemy_rects[enemy] = rect.grow(target_padding_px)
+
+# The enemy whose padded rect holds screen_pos; on overlap, the one
+# nearest the camera. Rebuilds the cache if a click lands before the
+# first armed physics frame.
+func _enemy_at(screen_pos: Vector2) -> FieldEnemy:
+	if _enemy_rects.is_empty():
+		_refresh_enemy_rects()
+	var camera := get_viewport().get_camera_3d()
+	var best: FieldEnemy = null
+	var best_distance: float = INF
+	for enemy: FieldEnemy in _enemy_rects:
+		var rect: Rect2 = _enemy_rects[enemy]
+		if not rect.has_point(screen_pos):
+			continue
+		var distance: float = camera.global_position.distance_to(enemy.global_position) if camera != null else 0.0
+		if distance < best_distance:
+			best_distance = distance
+			best = enemy
+	return best
+
+# The hovered enemy's padded screen rect (see _refresh_enemy_rects()) -
+# TargetLine ends at its centre. Empty when nothing is hovered.
+func get_hovered_enemy_rect() -> Rect2:
+	if _hovered_enemy == null:
+		return Rect2()
+	return _enemy_rects.get(_hovered_enemy, Rect2())

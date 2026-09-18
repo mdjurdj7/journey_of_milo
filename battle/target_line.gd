@@ -2,7 +2,8 @@ extends Control
 class_name TargetLine
 
 # Faint curved line from the armed card's top-center to the mouse (or, if
-# an enemy is hovered, that enemy's chest) - reads as a thrown line
+# an enemy is hovered, the centre of that enemy's projected model rect -
+# BattleController.get_hovered_enemy_rect()) - reads as a thrown line
 # rather than a ruler thanks to the upward sag (see _bezier_points()). One
 # Control (mouse_filter IGNORE, covers the whole overlay so its own local
 # coordinates line up with screen coordinates) holding two Line2D
@@ -21,11 +22,6 @@ const FADE_DURATION := 0.1
 @export var line_width: float = 2.0
 @export var line_alpha: float = 0.25
 @export var curve_amount: float = 60.0
-
-# Just above the Sputter's own shell, chest height. An untested guess
-# like every other body-relative offset in this project (no way to check
-# without running the game); retune live if it reads high or low.
-@export var chest_offset: Vector3 = Vector3(0.0, 0.5, 0.0)
 
 var _battle_controller: BattleController
 var _line: Line2D
@@ -90,9 +86,9 @@ func _process(_delta: float) -> void:
 	var show_circle := false
 	var end: Vector2 = get_viewport().get_mouse_position()
 	if hovered_enemy != null and is_instance_valid(hovered_enemy):
-		var camera := get_viewport().get_camera_3d()
-		if camera != null:
-			end = camera.unproject_position(hovered_enemy.global_position + chest_offset)
+		var rect: Rect2 = _battle_controller.get_hovered_enemy_rect()
+		if rect.size != Vector2.ZERO:
+			end = rect.get_center()
 			show_circle = true
 
 	var color: Color = get_theme_color("text_color", "CardFace")
