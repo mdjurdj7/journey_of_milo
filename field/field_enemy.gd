@@ -63,6 +63,13 @@ var _slash_mark_texture: GradientTexture2D = null
 # explicitly on a WIN outcome, since freeing this node doesn't cascade to
 # it the way freeing a real child would.
 var enemy_status: EnemyStatus = null
+# The model's scaled bounding-box height, from _spawn_model() - the
+# creature's own head height above its ground position, for anything
+# that anchors above it (BattleIntent). 0 until the model has spawned.
+var _model_height: float = 0.0
+
+func get_head_height() -> float:
+	return _model_height
 
 @onready var contact_area: Area3D = $ContactArea
 @onready var contact_shape: CollisionShape3D = $ContactArea/CollisionShape3D
@@ -166,6 +173,7 @@ func _spawn_model() -> void:
 	if has_aabb:
 		print("FieldEnemy '%s': model AABB height = %.3f at model_scale = %.3f" % [enemy_id, combined_aabb.size.y, model_scale])
 		model.position.y += -combined_aabb.position.y + model_ground_offset
+		_model_height = combined_aabb.size.y
 
 # Duplicates the mesh's own imported material (Sputter.glb ships a real
 # baseColorTexture/metallicRoughnessTexture/normalTexture set) rather than

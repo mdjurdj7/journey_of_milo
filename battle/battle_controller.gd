@@ -16,9 +16,22 @@ signal target_cancelled()
 
 # --- Rules-facing signals - the overlay/FloatingNumber react to these only. ---
 signal hp_changed(current: int, max_hp: int)
+# The player's energy after anything that changes it (setup, a card
+# played, a turn start) - HandContainer fades what can't be afforded.
+signal energy_changed(current: int)
 signal toll_changed(new_toll: int)
 signal status_changed()
 signal enemy_hp_changed(enemy: FieldEnemy, current: int, max_hp: int)
+# The intent display's two signals. enemy_intent_changed carries
+# EnemyTurn.preview_intent()'s dictionary for that enemy's QUEUED action
+# (empty = nothing to show) - emitted for every living enemy after
+# setup(), after every card resolves and at each player-turn start (the
+# preview depends on the player's block/statuses, which those change),
+# and for one enemy right after it has resolved its action, so the
+# display always shows the NEXT action. enemy_acting fires just before an
+# enemy resolves, so the display can hide while it acts.
+signal enemy_intent_changed(enemy: FieldEnemy, preview: Dictionary)
+signal enemy_acting(enemy: FieldEnemy)
 signal damage_dealt(source: Variant, target: Variant, amount: int, kind: String)
 # source/target are each either the String "player" or a FieldEnemy node -
 # whichever combatant actually dealt/received the hit.
@@ -87,7 +100,22 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		var combatant: Combatant = _combatants[enemy]
 		enemy_hp_changed.emit(enemy, combatant.hp, combatant.max_hp)
 
+	energy_changed.emit(player.energy)
 	_hand_container.draw_cards(turn_draw_amount)
+	_emit_intent_previews()
+
+# The queued action of one enemy as the display should show it - see
+# EnemyTurn.preview_intent(). Empty for a dead/unknown enemy.
+func get_intent_preview(enemy: FieldEnemy) -> Dictionary:
+	var combatant: Combatant = _combatants.get(enemy)
+	var data: EnemyData = enemy.enemy_data if enemy != null else null
+	if combatant == null or data == null or combatant.hp <= 0:
+		return {}
+	return EnemyTurn.preview_intent(combatant, data, player)
+
+func _emit_intent_previews() -> void:
+	for enemy in enemies:
+		enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
 
 func is_awaiting_target() -> bool:
 	return _pending_card_view != null
@@ -183,6 +211,10 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 
 	toll_changed.emit(player.toll)
 	status_changed.emit()
+	energy_changed.emit(player.energy)
+	# Block/statuses may have moved - the previews' modified numbers and
+	# lethal flags follow.
+	_emit_intent_previews()
 
 	_input_locked = false
 	_check_battle_end()
@@ -227,6 +259,7 @@ func _run_enemy_turn() -> void:
 		var data: EnemyData = enemy.enemy_data
 		if data == null:
 			continue
+		enemy_acting.emit(enemy)
 		var result := EnemyTurn.take_turn(combatant, data, player)
 		if result["attacked"]:
 			var snap_delay: float = enemy.play_attack_snap(_wanderer)
@@ -236,6 +269,9 @@ func _run_enemy_turn() -> void:
 				RunLogger.log_damage_taken(result["damage_to_hp"])
 				_report_damage(enemy, player, result["damage_to_hp"], "attack")
 		status_changed.emit()
+		# take_turn() has already advanced this enemy to its next intent -
+		# show it the moment this action has landed.
+		enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
 		if player.hp <= 0:
 			break
 
@@ -258,6 +294,9 @@ func _start_player_turn() -> void:
 	)
 	Status.remove_expired(player.statuses)
 	status_changed.emit()
+	energy_changed.emit(player.energy)
+	# Block just reset to 0 and statuses ticked: lethal flags change here.
+	_emit_intent_previews()
 
 	if not _check_battle_end():
 		_hand_container.draw_cards(turn_draw_amount)

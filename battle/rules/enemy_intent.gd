@@ -5,12 +5,20 @@ class_name EnemyIntent
 # ATTACK/MARK types all belonged to mechanics this pass explicitly drops
 # (wind-up telegraphs, growth tracks, boss charge, mark attacks - see
 # DESIGN.md's own parked-items note). Extend this enum the same way the
-# old project did, when a real enemy needs one of them back.
+# old project did, when a real enemy needs one of them back - BUFF/DEBUFF
+# (a status on self / on the Wanderer) are the expected next two; the
+# BattleIntent display draws only what exists here.
 enum IntentType { ATTACK, DEFEND }
 
 @export var type: IntentType = IntentType.ATTACK
 @export var value: int = 0
-# Damage dealt if ATTACK, block gained if DEFEND.
+# Damage dealt PER HIT if ATTACK, block gained if DEFEND.
+
+@export var hits: int = 1
+# ATTACK only: how many separate hits of `value` this intent lands in one
+# turn - each one goes through the player's block/absorb on its own, and
+# one-shot statuses (StatusData.clears_on_trigger) are consumed by the
+# first. BattleIntent shows this as "N x M". 1 for every existing enemy.
 
 @export var erratic_weight: float = 1.0
 # Only consulted when EnemyData.erratic_intent_selection is true - this

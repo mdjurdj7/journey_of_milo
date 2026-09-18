@@ -34,6 +34,10 @@ signal battle_finished(outcome: Outcome)
 
 var battle_controller: BattleController
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
+# One BattleIntent per enemy for this fight - children of this overlay,
+# so they're freed with it and nothing of them exists on the field.
+var _enemy_intents: Dictionary = {} # FieldEnemy -> BattleIntent
+var _intents_revealed: bool = false
 var _field_hp_bar: HPBar = null
 var _battle_transition_time: float = 0.0
 var _card_play_player: AudioStreamPlayer = null
@@ -99,6 +103,12 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	# separate hydration step needed here.
 	_create_enemy_statuses(enemy_list, battle_transition_time)
 
+	# Intent displays exist before setup() so its first enemy_intent_
+	# changed (one per enemy) lands on them; they stay hidden until the
+	# battle frame has settled (see the timer below), and hide again while
+	# an enemy acts.
+	_create_enemy_intents(enemy_list)
+
 	battle_controller = BattleController.new()
 	add_child(battle_controller)
 	battle_controller.target_requested.connect(_on_target_requested)
@@ -107,9 +117,13 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.toll_changed.connect(_on_toll_changed)
 	battle_controller.enemy_hp_changed.connect(_on_enemy_hp_changed)
 	battle_controller.damage_dealt.connect(_on_damage_dealt)
+	battle_controller.enemy_intent_changed.connect(_on_enemy_intent_changed)
+	battle_controller.energy_changed.connect(hand_container.update_playable)
+	battle_controller.enemy_acting.connect(_on_enemy_acting)
 	battle_controller.battle_won.connect(func() -> void: _finish_battle(Outcome.WIN))
 	battle_controller.battle_lost.connect(func() -> void: _finish_battle(Outcome.LOSE))
 	battle_controller.setup(hand_container, enemy_list, wanderer)
+	get_tree().create_timer(battle_transition_time).timeout.connect(_reveal_enemy_intents)
 
 	var battle_feedback := BattleFeedback.new()
 	add_child(battle_feedback)
@@ -183,6 +197,38 @@ func _on_enemy_hp_changed(enemy: FieldEnemy, current: int, max_hp: int) -> void:
 	var status: EnemyStatus = _enemy_statuses.get(enemy)
 	if status != null:
 		status.update_hp(current, max_hp)
+
+func _create_enemy_intents(enemy_list: Array[FieldEnemy]) -> void:
+	for enemy in enemy_list:
+		var intent := BattleIntent.new()
+		add_child(intent)
+		intent.set_target(enemy)
+		_enemy_intents[enemy] = intent
+
+# Once the camera swing/stance step has settled - the same delay HPBar/
+# EnemyStatus's style tween takes - every display with an intent shows.
+func _reveal_enemy_intents() -> void:
+	_intents_revealed = true
+	for intent: BattleIntent in _enemy_intents.values():
+		if is_instance_valid(intent):
+			intent.set_revealed(true)
+
+# After setup, after each card resolves, at each turn start, and right
+# after an enemy has acted (its NEXT action) - see BattleController's own
+# signal doc. A display hidden for the enemy's action is revealed again
+# here, with the new intent.
+func _on_enemy_intent_changed(enemy: FieldEnemy, preview: Dictionary) -> void:
+	var intent: BattleIntent = _enemy_intents.get(enemy)
+	if intent == null or not is_instance_valid(intent):
+		return
+	intent.show_intent(preview)
+	if _intents_revealed:
+		intent.set_revealed(true)
+
+func _on_enemy_acting(enemy: FieldEnemy) -> void:
+	var intent: BattleIntent = _enemy_intents.get(enemy)
+	if intent != null and is_instance_valid(intent):
+		intent.set_revealed(false)
 
 func _on_target_requested(_card: CardData) -> void:
 	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)

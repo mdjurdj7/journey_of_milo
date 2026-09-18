@@ -40,18 +40,23 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 	if intent != null:
 		match intent.type:
 			EnemyIntent.IntentType.ATTACK:
-				var amount: int = Status.apply_modifiers(intent.value, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
-				amount = Status.apply_modifiers(amount, player.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
-				# Braced/Unflinching-shaped statuses are consumed by this
-				# attack whether or not damage actually reaches HP - see
-				# status.gd's consume_triggered() and StatusData.clears_on_
-				# trigger's own doc.
-				Status.consume_triggered(player.statuses)
-				var damage_result := DamagePipeline.resolve(amount, player)
+				# One pass per hit (EnemyIntent.hits, 1 for every enemy so far):
+				# modifiers are re-read each hit, so a Braced/Unflinching-shaped
+				# status - consumed by the first hit whether or not damage
+				# reached HP, see status.gd's consume_triggered() and
+				# StatusData.clears_on_trigger's own doc - only softens the
+				# first; block/absorb are worn down hit by hit.
 				result["attacked"] = true
-				result["damage_to_hp"] = damage_result["damage_to_hp"]
-				if damage_result["damage_to_hp"] > 0:
-					player.rally_pool += damage_result["damage_to_hp"]
+				var total_to_hp: int = 0
+				for _hit in maxi(intent.hits, 1):
+					var amount: int = Status.apply_modifiers(intent.value, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+					amount = Status.apply_modifiers(amount, player.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
+					Status.consume_triggered(player.statuses)
+					var damage_result := DamagePipeline.resolve(amount, player)
+					total_to_hp += damage_result["damage_to_hp"]
+				result["damage_to_hp"] = total_to_hp
+				if total_to_hp > 0:
+					player.rally_pool += total_to_hp
 					player.took_damage_this_turn = true
 			EnemyIntent.IntentType.DEFEND:
 				combatant.block += intent.value
@@ -62,6 +67,46 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 	if combatant.hp > 0:
 		_advance_intent(combatant, data)
 	return result
+
+# What the queued intent WILL do if it resolves now, for the intent
+# display - the exact arithmetic take_turn() runs, on copies, mutating
+# nothing: the same two apply_modifiers() calls per hit, the one-shot
+# statuses consumed after the first hit (on a duplicate of the player's
+# status list - the Status objects themselves aren't touched), and the
+# block/absorb wear-down of DamagePipeline.resolve() replayed on local
+# counters. Keys: "type" (EnemyIntent.IntentType), "hits", "per_hit"
+# (the first hit's modified damage - what "N x M" shows - or the block
+# gained for DEFEND), "damage_to_hp" (total that would reach HP through
+# block and absorb), "lethal" (damage_to_hp >= the player's current HP).
+# Empty when the enemy has no intent.
+static func preview_intent(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
+	var intent := current_intent(combatant, data)
+	if intent == null:
+		return {}
+	var preview: Dictionary = {"type": intent.type, "hits": 1, "per_hit": intent.value, "damage_to_hp": 0, "lethal": false}
+	if intent.type != EnemyIntent.IntentType.ATTACK:
+		return preview
+	var player_statuses: Array[Status] = player.statuses.duplicate()
+	var block: int = player.block
+	var absorb: int = player.absorb
+	var total_to_hp: int = 0
+	var hits: int = maxi(intent.hits, 1)
+	for hit in hits:
+		var amount: int = Status.apply_modifiers(intent.value, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+		amount = Status.apply_modifiers(amount, player_statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
+		if hit == 0:
+			preview["per_hit"] = amount
+		Status.consume_triggered(player_statuses)
+		var blocked: int = mini(block, amount)
+		var after_block: int = amount - blocked
+		var absorbed: int = mini(absorb, after_block)
+		block -= blocked
+		absorb -= absorbed
+		total_to_hp += after_block - absorbed
+	preview["hits"] = hits
+	preview["damage_to_hp"] = total_to_hp
+	preview["lethal"] = total_to_hp >= player.hp
+	return preview
 
 static func _advance_intent(combatant: Combatant, data: EnemyData) -> void:
 	if data.intents.is_empty():
