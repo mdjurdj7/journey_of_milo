@@ -220,19 +220,24 @@ func _open_deck_view() -> void:
 		cards = _whole_deck_cards
 		header_text = deck_title
 
-	var deck_view := (load(DECK_VIEW_SCENE_PATH) as PackedScene).instantiate() as DeckView
-
-	# See DECK_VIEW_LAYER's own doc - DeckView has no CanvasLayer of its
-	# own, so this is what actually puts it above FieldHUD/BattleLayer
-	# regardless of which is active right now.
-	var layer := CanvasLayer.new()
-	layer.layer = DECK_VIEW_LAYER
-	get_tree().root.add_child(layer)
-	layer.add_child(deck_view)
-
+	var deck_view: DeckView = open_view(get_tree(), cards, header_text)
 	deck_view.closed.connect(_on_deck_view_closed)
-	deck_view.open(cards, header_text)
 	_deck_view_instance = deck_view
 
 func _on_deck_view_closed() -> void:
 	_deck_view_instance = null
+
+# Opens a DeckView over everything - shared by this panel and battle's
+# PileReadouts (the DECK/DISCARD text bottom-left/right), which open the
+# same view the same way. See DECK_VIEW_LAYER's own doc - DeckView has no
+# CanvasLayer of its own, so this is what actually puts it above FieldHUD/
+# BattleLayer regardless of which is active right now. The caller owns
+# the returned view's `closed` handling.
+static func open_view(tree: SceneTree, cards: Array[CardData], header_text: String) -> DeckView:
+	var deck_view := (load(DECK_VIEW_SCENE_PATH) as PackedScene).instantiate() as DeckView
+	var layer := CanvasLayer.new()
+	layer.layer = DECK_VIEW_LAYER
+	tree.root.add_child(layer)
+	layer.add_child(deck_view)
+	deck_view.open(cards, header_text)
+	return deck_view

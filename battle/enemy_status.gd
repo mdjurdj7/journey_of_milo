@@ -4,27 +4,29 @@ class_name EnemyStatus
 # One per FieldEnemy, owned and created by FieldEnemy itself (see its own
 # _ready()) and parented under RegionField.field_hud - persistent for the
 # enemy's whole life, in field and battle alike, not just created/freed
-# per fight the way this used to work. A bar with current/max beneath it
-# (no "HP" prefix - Toll doesn't apply here so there's nothing else on
-# this row to distinguish it from), repositioned every physics tick under
-# the enemy's feet via unproject and scaled by camera distance (see
-# DistanceScale) - same shape HPBar uses for the player.
+# per fight the way this used to work. Repositioned every physics tick
+# under the enemy's feet via unproject and, in the field, scaled by
+# camera distance (see DistanceScale) - same shape HPBar uses for the
+# player; in battle that scale eases to battle_scale (1.0) so the Battle
+# Style's pixel sizes are what actually lands on screen.
 #
-# Two style sets, blended over the battle transition time rather than
-# snapped: field (bare bar, no backing) and battle (bigger bar, bigger
-# numbers, a soft backing plate behind the numbers so they read against
-# any ground - see the Battle Style group's exports). See enter_battle()/
-# exit_battle() and _battle_blend's own doc - same mechanism as HPBar,
-# just without a Toll reading (enemies don't have Toll).
+# Two styles, blended over the battle transition time rather than
+# snapped: field (the Bar group - a bare bar with current/max centred
+# beneath it, drawn by the child Panels/Label) and battle (the Battle
+# Style group - ink on the world, drawn by _draw() below: a Spectral
+# numeral row with " / max" and the enemy's name on one baseline, a 3px
+# ink bar beneath over an ink track, and a thin ink segment above the
+# bar's left end for block, nothing boxed). The two cross-fade: the field
+# children fade out as the battle drawing fades in, and this control's
+# own size eases between the two layouts' sizes so the centring never
+# jumps. See enter_battle()/exit_battle() and _battle_blend's own doc -
+# same mechanism as HPBar.
 #
 # In battle, BattleOverlay reuses this same instance (via FieldEnemy.
 # enemy_status - see its own doc) rather than creating a fresh one, wires
-# it to BattleController's own enemy_hp_changed signal, and calls enter_
-# battle()/exit_battle() alongside the same calls it makes on HPBar.
-#
-# No reserved space for a future intent icon this pass (the old panel-
-# based layout's IntentSlot placeholder is gone with the panel itself) -
-# revisit alongside whatever adds one.
+# it to BattleController's own enemy_hp_changed signal, pushes block on
+# status_changed (see set_block()), and calls enter_battle()/exit_battle()
+# alongside the same calls it makes on HPBar.
 
 # Points down from the enemy's own ground position, same idea as HPBar.
 # ground_offset - retune per enemy live (Remote tab) once a taller/
@@ -43,11 +45,29 @@ class_name EnemyStatus
 @export var outline_size: int = 1
 
 @export_group("Battle Style")
-@export var battle_bar_size: Vector2 = Vector2(180.0, 8.0)
-@export var battle_numbers_font_size_px: int = 18
-@export_range(0.0, 1.0) var backing_alpha: float = 0.45
-@export var backing_corner_radius: int = 6
-@export var backing_padding: Vector2 = Vector2(6.0, 3.0)
+# The readout's width - numeral row and bar alike.
+@export var battle_width: float = 160.0
+@export var numeral_font: Font = load("res://assets/fonts/Spectral-SemiBold.ttf")
+@export var name_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf")
+@export var battle_numeral_size_px: int = 22
+@export var battle_max_size_px: int = 14
+@export var battle_name_size_px: int = 10
+@export var battle_name_tracking_em: float = 0.16
+# " / max" and the name, ink at this alpha; the numeral is full ink.
+@export_range(0.0, 1.0) var battle_secondary_alpha: float = 0.6
+@export var battle_max_prefix: String = " / "
+# Row gap between the numeral row's descent and the bar's top - the block
+# segment lives inside it (see block_thickness_px/block_gap_px).
+@export var battle_row_gap: float = 6.0
+@export var battle_bar_height: float = 3.0
+@export_range(0.0, 1.0) var battle_track_alpha: float = 0.22
+# Block: a segment this thick, this far above the bar's top, from the
+# bar's left end, block/max_hp of the bar's width (never shorter than
+# block_min_length_px while any block is up).
+@export var block_thickness_px: float = 2.0
+@export var block_gap_px: float = 2.0
+@export var block_min_length_px: float = 6.0
+@export var battle_scale: float = 1.0
 
 @export_group("Distance Scale")
 @export var min_scale: float = 0.6
@@ -55,7 +75,6 @@ class_name EnemyStatus
 @export var near_scale_distance: float = 3.0
 @export var far_scale_distance: float = 12.0
 
-@onready var numbers_backing: Panel = $NumbersBacking
 @onready var bar_background: Panel = $BarBackground
 @onready var bar_fill: Panel = $BarBackground/BarFill
 @onready var hp_label: Label = $NumbersLabel
@@ -63,8 +82,12 @@ class_name EnemyStatus
 var target: FieldEnemy
 var _current_hp: int = -1
 var _max_hp: int = 1
+var _block: int = 0
 var _in_battle: bool = false
 var _visibility: HoverFadeVisibility = null
+# Cached theme ink (see refresh_style()).
+var _ink: Color = Color.BLACK
+var _name_font_tracked: Font = null
 
 # 0 = field style, 1 = battle style - see HPBar._battle_blend's own doc,
 # same mechanism.
@@ -108,89 +131,106 @@ func _ready() -> void:
 	if _pending_max != -1:
 		_apply_hp(_pending_current, _pending_max)
 
-func _blended_bar_size() -> Vector2:
-	return bar_size.lerp(battle_bar_size, _battle_blend)
-
-func _blended_numbers_font_size() -> int:
-	return roundi(lerpf(float(numbers_font_size_px), float(battle_numbers_font_size_px), _battle_blend))
-
 func _current_hp_fraction() -> float:
 	if _max_hp <= 0:
 		return 0.0
 	return clampf(float(_current_hp) / float(_max_hp), 0.0, 1.0)
 
-# Bar+numbers bounding size only, same as HPBar's own _apply_layout() -
-# pivot_offset centers scale (see DistanceScale) on the bar's own middle
-# rather than its top-left corner. Re-run on every _battle_blend tween
-# step and every real HP change, not just once - every size in here can
-# be mid-transition at any given moment.
-func _apply_layout() -> void:
-	var current_bar_size: Vector2 = _blended_bar_size()
-	var numbers_size: int = _blended_numbers_font_size()
-	var numbers_line_height: float = numbers_size * 1.3
+# --- Field layout (the child nodes) ---
 
-	var content_size := Vector2(current_bar_size.x, current_bar_size.y + row_gap + numbers_line_height)
+func _field_content_size() -> Vector2:
+	var numbers_line_height: float = numbers_font_size_px * 1.3
+	return Vector2(bar_size.x, bar_size.y + row_gap + numbers_line_height)
+
+# --- Battle layout (drawn) ---
+
+func _numeral_ascent() -> float:
+	return numeral_font.get_ascent(battle_numeral_size_px) if numeral_font != null else float(battle_numeral_size_px)
+
+func _numeral_descent() -> float:
+	return numeral_font.get_descent(battle_numeral_size_px) if numeral_font != null else 0.0
+
+func _battle_content_size() -> Vector2:
+	return Vector2(battle_width, _numeral_ascent() + _numeral_descent() + battle_row_gap + battle_bar_height)
+
+# This control's size eases between the two layouts' sizes with the
+# blend (see the class doc) - pivot_offset centres scale (see
+# DistanceScale) on the content's own middle rather than its top-left
+# corner. Re-run on every _battle_blend tween step and every real HP
+# change, not just once.
+func _apply_layout() -> void:
+	var content_size: Vector2 = _field_content_size().lerp(_battle_content_size(), _battle_blend)
 	size = content_size
 	pivot_offset = content_size / 2.0
 
+	var field_alpha: float = 1.0 - _battle_blend
+	var numbers_line_height: float = numbers_font_size_px * 1.3
+
 	bar_background.position = Vector2.ZERO
-	bar_background.size = current_bar_size
+	bar_background.size = bar_size
 	bar_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bar_background.modulate.a = field_alpha
 
 	bar_fill.position = Vector2.ZERO
-	bar_fill.size = Vector2(current_bar_size.x * _current_hp_fraction(), current_bar_size.y)
+	bar_fill.size = Vector2(bar_size.x * _current_hp_fraction(), bar_size.y)
 	bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-	var numbers_top: float = current_bar_size.y + row_gap
+	var numbers_top: float = bar_size.y + row_gap
 	hp_label.position = Vector2(0.0, numbers_top)
-	hp_label.size = Vector2(current_bar_size.x, numbers_line_height)
-	hp_label.add_theme_font_size_override("font_size", numbers_size)
+	hp_label.size = Vector2(bar_size.x, numbers_line_height)
+	hp_label.add_theme_font_size_override("font_size", numbers_font_size_px)
 	hp_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	hp_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	hp_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	hp_label.modulate.a = field_alpha
 
-	_update_backing(current_bar_size, numbers_size, numbers_top, numbers_line_height)
+	queue_redraw()
 
-# Sized to the rendered numbers text (not a fixed box - it changes length
-# as HP changes), plus backing_padding on every side. Alpha scales with
-# _battle_blend directly (0 in the field, backing_alpha in battle) rather
-# than being a separate visible toggle, so it fades in/out with the rest
-# of the battle-style transition.
-func _update_backing(current_bar_size: Vector2, numbers_size: int, numbers_top: float, numbers_line_height: float) -> void:
-	var numbers_width: float = _text_width(hp_label, numbers_size)
-	var backing_left: float = (current_bar_size.x - numbers_width) / 2.0
+# The battle readout, at _battle_blend alpha over the fading field nodes -
+# see HPBar._draw(), same layout at this readout's own width.
+func _draw() -> void:
+	if _battle_blend <= 0.0 or numeral_font == null:
+		return
+	var ink: Color = _ink
+	ink.a = _battle_blend
+	var secondary: Color = _ink
+	secondary.a = battle_secondary_alpha * _battle_blend
+	var track: Color = _ink
+	track.a = battle_track_alpha * _battle_blend
 
-	numbers_backing.position = Vector2(backing_left - backing_padding.x, numbers_top - backing_padding.y)
-	numbers_backing.size = Vector2(numbers_width + backing_padding.x * 2.0, numbers_line_height + backing_padding.y * 2.0)
-	numbers_backing.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var baseline: float = _numeral_ascent()
+	var x: float = InkType.draw_run(self, numeral_font, str(maxi(_current_hp, 0)), Vector2(0.0, baseline), battle_numeral_size_px, ink)
+	InkType.draw_run(self, numeral_font, battle_max_prefix + str(_max_hp), Vector2(x, baseline), battle_max_size_px, secondary)
 
-	var backing_color: Color = get_theme_color("panel_color", "CardFace")
-	backing_color.a = backing_alpha * _battle_blend
-	var style := StyleBoxFlat.new()
-	style.bg_color = backing_color
-	style.corner_radius_top_left = backing_corner_radius
-	style.corner_radius_top_right = backing_corner_radius
-	style.corner_radius_bottom_right = backing_corner_radius
-	style.corner_radius_bottom_left = backing_corner_radius
-	style.shadow_size = 0
-	numbers_backing.add_theme_stylebox_override("panel", style)
+	var name_text: String = _enemy_name()
+	if _name_font_tracked != null and not name_text.is_empty():
+		var name_width: float = InkType.width(_name_font_tracked, name_text, battle_name_size_px)
+		InkType.draw_run(self, _name_font_tracked, name_text, Vector2(battle_width - name_width, baseline), battle_name_size_px, secondary)
 
-func _text_width(label: Label, font_size: int) -> float:
-	var font: Font = label.get_theme_font("font")
-	if font == null:
-		return 0.0
-	return font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	var bar_top: float = baseline + _numeral_descent() + battle_row_gap
+	draw_rect(Rect2(0.0, bar_top, battle_width, battle_bar_height), track)
+	draw_rect(Rect2(0.0, bar_top, battle_width * _current_hp_fraction(), battle_bar_height), ink)
 
-# Re-reads this panel's theme colors - called once here at _ready() and
+	if _block > 0 and _max_hp > 0:
+		var length: float = maxf(battle_width * clampf(float(_block) / float(_max_hp), 0.0, 1.0), block_min_length_px)
+		var block_top: float = bar_top - block_gap_px - block_thickness_px
+		draw_rect(Rect2(0.0, block_top, length, block_thickness_px), ink)
+
+func _enemy_name() -> String:
+	if target == null or not is_instance_valid(target) or target.enemy_data == null:
+		return ""
+	return target.enemy_data.enemy_name.to_upper()
+
+# Re-reads this panel's theme colours - called once here at _ready() and
 # again by RegionField.add_enemy_status()'s own caller (_setup_field_hud())
 # once the shared BattleTheme resource's value set is actually applied,
 # since this node is very likely created (see FieldEnemy._spawn_enemy_
-# status()) before that ever runs - same "cached once, refreshed on
-# demand" shape HPBar/DeckPanel/CardView already use. A no-op if called
-# before _ready() (bar_background/bar_fill still null) - safe to skip,
-# since _ready() calls this itself once it actually runs. Colors only -
-# font size/backing geometry are _apply_layout()'s job (see its own doc),
-# since those are blend-driven and this isn't.
+# status()) before that ever runs - and by BattleOverlay's F2 flip. Same
+# "cached once, refreshed on demand" shape HPBar/DeckPanel/CardView
+# already use. A no-op if called before _ready() (bar_background/bar_fill
+# still null) - safe to skip, since _ready() calls this itself once it
+# actually runs. The field style keeps its CardFace tokens; the battle
+# style draws with the Battle ink token.
 func refresh_style() -> void:
 	if not _is_ready:
 		return
@@ -206,6 +246,10 @@ func refresh_style() -> void:
 	hp_label.add_theme_color_override("font_color", text_color)
 	hp_label.add_theme_color_override("font_outline_color", outline_color)
 	hp_label.add_theme_constant_override("outline_size", outline_size)
+
+	_ink = get_theme_color("ink", "Battle")
+	_name_font_tracked = InkType.tracked(name_font, battle_name_size_px, battle_name_tracking_em)
+	queue_redraw()
 
 func _build_bar_style(color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -246,6 +290,13 @@ func _apply_hp(current: int, max_hp: int) -> void:
 	if changed:
 		_visibility.notify_hp_changed()
 
+# Called by BattleOverlay on the controller's status_changed with this
+# enemy's current block (0 clears the segment) - battle-only; the field
+# style never shows it.
+func set_block(block: int) -> void:
+	_block = maxi(block, 0)
+	queue_redraw()
+
 # Called by BattleOverlay when this enemy's fight starts/ends (see its own
 # _create_enemy_statuses()/_finish_battle()) - bypasses the field hover/
 # hold/low-hp visibility rules entirely while true (see HoverFadeVisibility
@@ -258,17 +309,18 @@ func enter_battle(duration: float) -> void:
 
 func exit_battle(duration: float) -> void:
 	_in_battle = false
+	_block = 0
 	_tween_battle_blend(0.0, duration)
 
-func _tween_battle_blend(target: float, duration: float) -> void:
+func _tween_battle_blend(target_blend: float, duration: float) -> void:
 	if _blend_tween != null:
 		_blend_tween.kill()
 	if duration <= 0.0:
-		_set_battle_blend(target)
+		_set_battle_blend(target_blend)
 		return
 	_blend_tween = create_tween()
 	_blend_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_blend_tween.tween_method(_set_battle_blend, _battle_blend, target, duration)
+	_blend_tween.tween_method(_set_battle_blend, _battle_blend, target_blend, duration)
 
 func _set_battle_blend(value: float) -> void:
 	_battle_blend = value
@@ -289,7 +341,8 @@ func _physics_process(delta: float) -> void:
 	position = (screen_pos - size / 2.0).round()
 
 	var distance: float = camera.global_position.distance_to(target_position)
-	scale = Vector2.ONE * DistanceScale.compute_scale(distance, near_scale_distance, far_scale_distance, min_scale, max_scale)
+	var field_scale: float = DistanceScale.compute_scale(distance, near_scale_distance, far_scale_distance, min_scale, max_scale)
+	scale = Vector2.ONE * lerpf(field_scale, battle_scale, _battle_blend)
 
 	var hovered: bool = not _in_battle and HoverRaycast.is_hovering(get_viewport(), target)
 	var low_hp: bool = _current_hp_fraction() <= low_hp_fraction

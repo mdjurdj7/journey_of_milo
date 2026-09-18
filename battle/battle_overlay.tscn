@@ -1,8 +1,9 @@
-[gd_scene format=3 uid="uid://d3u7jfp4naa0j"]
+[gd_scene load_steps=5 format=3 uid="uid://d3u7jfp4naa0j"]
 
 [ext_resource type="Script" uid="uid://chnecwekglmqw" path="res://battle/battle_overlay.gd" id="1_overlay"]
 [ext_resource type="Script" uid="uid://bek0ew44cja31" path="res://battle/hand_container.gd" id="2_hand"]
 [ext_resource type="Theme" path="res://ui/battle_theme.tres" id="3_theme"]
+[ext_resource type="Script" path="res://battle/end_turn_button.gd" id="4_end_turn"]
 
 [node name="BattleOverlay" type="Control" unique_id=1428338779]
 layout_mode = 3
@@ -30,15 +31,8 @@ fan_overlap = 0.0
 
 [node name="EndTurnButton" type="Button" parent="." unique_id=1869802361]
 layout_mode = 0
-anchor_left = 1.0
-anchor_top = 1.0
-anchor_right = 1.0
-anchor_bottom = 1.0
-offset_left = -222.0
-offset_top = -136.0
-offset_right = -32.0
-offset_bottom = -88.0
-text = "End Turn"
+text = "END TURN"
+script = ExtResource("4_end_turn")
 
 [node name="DebugRow" type="HBoxContainer" parent="." unique_id=770130127]
 visible = false

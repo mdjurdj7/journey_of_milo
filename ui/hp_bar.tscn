@@ -14,20 +14,7 @@ mouse_filter = 2
 layout_mode = 0
 mouse_filter = 2
 
-[node name="NumbersBacking" type="Panel" parent="."]
-layout_mode = 0
-mouse_filter = 2
-
 [node name="NumbersLabel" type="Label" parent="."]
 layout_mode = 0
 mouse_filter = 2
 text = "0/0"
-
-[node name="TollBacking" type="Panel" parent="."]
-layout_mode = 0
-mouse_filter = 2
-
-[node name="TollLabel" type="Label" parent="."]
-layout_mode = 0
-mouse_filter = 2
-text = "Toll 0"

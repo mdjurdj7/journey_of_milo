@@ -21,6 +21,11 @@ signal hp_changed(current: int, max_hp: int)
 signal energy_changed(current: int)
 signal toll_changed(new_toll: int)
 signal status_changed()
+# False the moment end_turn() commits (the enemy turn is running), true
+# again once the next player turn has started - BattleOverlay disables
+# End Turn in between. Not emitted by setup(): the fight opens on the
+# player's turn.
+signal turn_phase_changed(player_turn: bool)
 signal enemy_hp_changed(enemy: FieldEnemy, current: int, max_hp: int)
 # The intent display's two signals. enemy_intent_changed carries
 # EnemyTurn.preview_intent()'s dictionary for that enemy's QUEUED action
@@ -163,12 +168,14 @@ func end_turn() -> void:
 	if _input_locked:
 		return
 	_input_locked = true
+	turn_phase_changed.emit(false)
 	_hand_container.discard_hand()
 	player.rally_pool = 0
 	await _run_enemy_turn()
 	_input_locked = false
 	if not _check_battle_end():
 		_start_player_turn()
+		turn_phase_changed.emit(true)
 
 # card_played fires first (so the swing/fly-out animation starts
 # immediately), then this awaits the card's own impact delay - min(card.
@@ -311,6 +318,14 @@ func _check_battle_end() -> bool:
 		battle_won.emit()
 		return true
 	return false
+
+# This enemy's current block, for its EnemyStatus's segment - read by
+# BattleOverlay on status_changed. 0 for a dead/unknown enemy.
+func get_enemy_block(enemy: FieldEnemy) -> int:
+	var combatant: Combatant = _combatants.get(enemy)
+	if combatant == null or combatant.hp <= 0:
+		return 0
+	return combatant.block
 
 func _living_enemy_combatants() -> Array[Combatant]:
 	var living: Array[Combatant] = []

@@ -39,3 +39,13 @@ so it doesn't get silently reinvented or silently forgotten.
   guard and ATTACK is strike. Once CardType carries the three real
   values that derivation goes away and the face reads `card_type`
   directly. Card data untouched for now. (2026-09-17, ink-on-bone card.)
+- **Field HUD still speaks the old panel language.** The battle UI is
+  ink on the world (BattleTheme's `Battle/ink`/`bone` tokens - HP
+  readouts' battle style, BattleIntent, BattleResources, End Turn, the
+  DECK/DISCARD lines). Out of scope for that pass and still on the older
+  `CardFace` tokens: HPBar/EnemyStatus's *field* style (bare rounded bar +
+  outlined numbers), the field's DeckPanel box (hidden during battle),
+  DeckView's panel, FloatingNumber, TargetLine and BattleFeedback's
+  flash colour. Restyle them together when the field HUD gets its pass;
+  the CardFace tokens can go once nothing reads them. (2026-09-17, battle
+  UI ink pass.)

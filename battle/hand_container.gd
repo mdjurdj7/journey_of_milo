@@ -12,6 +12,9 @@ const ARMED_Z_INDEX := 1001
 
 signal card_clicked(card_view: CardView)
 signal play_animation_finished(card_data: CardData)
+# A card was lifted into the armed position / returned or played from it -
+# BattleOverlay disables End Turn while one is armed.
+signal armed_changed(armed: bool)
 
 # Must match CardView.card_size (200 x 280 at 1x).
 @export var card_size: Vector2 = Vector2(200.0, 280.0)
@@ -255,6 +258,7 @@ func _on_card_lowered(slot: Control, card_view: CardView) -> void:
 # a plain reflow.
 func _on_card_armed(slot: Control, card_view: CardView) -> void:
 	_armed_slot = slot
+	armed_changed.emit(true)
 	_lifted_slots.erase(slot)
 	for other in _views.values():
 		var other_view: CardView = (other as Control).get_child(0) as CardView
@@ -281,6 +285,7 @@ func _on_card_disarmed(slot: Control, card_view: CardView) -> void:
 	if _armed_slot != slot:
 		return
 	_armed_slot = null
+	armed_changed.emit(false)
 	for other in _views.values():
 		var other_view: CardView = (other as Control).get_child(0) as CardView
 		if other_view != null:
@@ -318,6 +323,7 @@ func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
 	card_view.mark_played()
 	if _armed_slot == slot:
 		_armed_slot = null
+		armed_changed.emit(false)
 		for other in _views.values():
 			var other_view: CardView = (other as Control).get_child(0) as CardView
 			if other_view != null:
