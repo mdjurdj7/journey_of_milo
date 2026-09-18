@@ -17,17 +17,23 @@ class_name HPBar
 # beneath it, drawn by the child Panels/Label) and battle (the Battle
 # Style group - ink on the world, drawn by _draw() below: a Spectral
 # numeral row with " / max" and the character's name on one baseline, a
-# 3px ink bar beneath over an ink track, and a thin ink segment above the
-# bar's left end for block, nothing boxed). The two cross-fade: the field
+# 3px ink bar beneath over an ink track, a thin ink segment above the
+# bar's left end for block, and - while show_toll() has it on - a Toll
+# block off the bar's right end: a Spectral numeral with "TOLL" beside it
+# on one baseline and a rule in the toll keyline colour beneath, sitting
+# on the HP bar's own rows; nothing boxed). The two cross-fade: the field
 # children fade out as the battle drawing fades in, and this control's
-# own size eases between the two layouts' sizes so the centring never
-# jumps. See enter_battle()/exit_battle() and _battle_blend's own doc.
+# own size eases between the two layouts' sizes; the HP block stays
+# centred on the anchor in both, with Toll hanging off to the right (see
+# _anchor_offset()). See enter_battle()/exit_battle() and _battle_blend's
+# own doc.
 #
 # Reads RunState.player_hp/player_max_hp directly and updates on RunState.
 # player_hp_changed - the only HP source this bar ever reads, in field or
 # battle alike. Block is battle-only, pushed by BattleOverlay on the
-# controller's status_changed (see set_block()). Toll is no longer here -
-# BattleResources shows it fixed bottom-left.
+# controller's status_changed (see set_block()); so is Toll, shown by
+# show_toll()/update_toll() and taken off by hide_toll() (BattleOverlay's
+# enter/finish), with a short pop of the numeral on every change.
 #
 # Field visibility (see HoverFadeVisibility): hidden by default, fades in
 # on mouse hover over the Wanderer or on any HP change (held briefly, then
@@ -73,6 +79,21 @@ class_name HPBar
 @export var block_min_length_px: float = 6.0
 @export var battle_scale: float = 1.0
 
+@export_group("Toll")
+@export var toll_label_text: String = "TOLL"
+@export var toll_numeral_size_px: int = 30
+@export var toll_label_size_px: int = 10
+@export var toll_label_tracking_em: float = 0.16
+# Space between the HP bar's right end and the block, between numeral and
+# label, and between the numeral's baseline and the rule's top. The rule
+# is toll_rule_px thick and sits on the HP bar's own rows (same top).
+@export var toll_gap_px: float = 22.0
+@export var toll_label_gap_px: float = 6.0
+@export var toll_rule_gap_px: float = 4.0
+@export var toll_rule_px: float = 3.0
+@export var toll_pop_scale: float = 1.15
+@export var toll_pop_time: float = 0.22
+
 @export_group("Distance Scale")
 @export var min_scale: float = 0.6
 @export var max_scale: float = 1.0
@@ -87,6 +108,12 @@ var _wanderer: Wanderer = null
 var _current_hp: int = 0
 var _max_hp: int = 1
 var _block: int = 0
+var _toll: int = 0
+var _toll_visible: bool = false
+var _toll_pop: float = 1.0
+var _pop_tween: Tween = null
+var _toll_rule_color: Color = Color.WHITE
+var _toll_label_tracked: Font = null
 var _current_fraction: float = 1.0
 var _displayed_fraction: float = 1.0
 var _fraction_tween: Tween = null
@@ -150,8 +177,38 @@ func _numeral_ascent() -> float:
 func _numeral_descent() -> float:
 	return numeral_font.get_descent(battle_numeral_size_px) if numeral_font != null else 0.0
 
+func _toll_ascent() -> float:
+	return numeral_font.get_ascent(toll_numeral_size_px) if numeral_font != null else float(toll_numeral_size_px)
+
+func _toll_block_width() -> float:
+	return InkType.width(numeral_font, str(_toll), toll_numeral_size_px) + toll_label_gap_px + InkType.width(_toll_label_tracked, toll_label_text, toll_label_size_px)
+
+# The Toll numeral is taller than the HP row above the bar; whatever it
+# needs beyond that pushes the whole battle drawing down by this much so
+# nothing pokes above the control.
+func _battle_top_pad() -> float:
+	if not _toll_visible:
+		return 0.0
+	var hp_rows: float = _numeral_ascent() + _numeral_descent() + battle_row_gap
+	return maxf(0.0, _toll_ascent() + toll_rule_gap_px - hp_rows)
+
+func _battle_bar_top() -> float:
+	return _battle_top_pad() + _numeral_ascent() + _numeral_descent() + battle_row_gap
+
 func _battle_content_size() -> Vector2:
-	return Vector2(battle_width, _numeral_ascent() + _numeral_descent() + battle_row_gap + battle_bar_height)
+	var width: float = battle_width
+	if _toll_visible:
+		width += toll_gap_px + _toll_block_width()
+	return Vector2(width, _battle_bar_top() + battle_bar_height)
+
+# The point of this control that sits on the unprojected anchor (and
+# that DistanceScale scales about): the field layout's centre, or the HP
+# block's centre in battle - Toll hangs off to the right of it, never
+# shifting the bar off the Wanderer.
+func _anchor_offset() -> Vector2:
+	var field_offset: Vector2 = _field_content_size() / 2.0
+	var battle_offset := Vector2(battle_width / 2.0, _battle_content_size().y / 2.0)
+	return field_offset.lerp(battle_offset, _battle_blend)
 
 # This control's size eases between the two layouts' sizes with the
 # blend (see the class doc) - pivot_offset centres scale (see
@@ -161,7 +218,7 @@ func _battle_content_size() -> Vector2:
 func _apply_layout() -> void:
 	var content_size: Vector2 = _field_content_size().lerp(_battle_content_size(), _battle_blend)
 	size = content_size
-	pivot_offset = content_size / 2.0
+	pivot_offset = _anchor_offset()
 
 	var field_alpha: float = 1.0 - _battle_blend
 	var numbers_line_height: float = numbers_font_size_px * 1.3
@@ -201,7 +258,7 @@ func _draw() -> void:
 	var track: Color = _ink
 	track.a = battle_track_alpha * _battle_blend
 
-	var baseline: float = _numeral_ascent()
+	var baseline: float = _battle_top_pad() + _numeral_ascent()
 	var x: float = InkType.draw_run(self, numeral_font, str(_current_hp), Vector2(0.0, baseline), battle_numeral_size_px, ink)
 	InkType.draw_run(self, numeral_font, battle_max_prefix + str(_max_hp), Vector2(x, baseline), battle_max_size_px, secondary)
 
@@ -210,7 +267,7 @@ func _draw() -> void:
 		var name_width: float = InkType.width(_name_font_tracked, name_text, battle_name_size_px)
 		InkType.draw_run(self, _name_font_tracked, name_text, Vector2(battle_width - name_width, baseline), battle_name_size_px, secondary)
 
-	var bar_top: float = baseline + _numeral_descent() + battle_row_gap
+	var bar_top: float = _battle_bar_top()
 	draw_rect(Rect2(0.0, bar_top, battle_width, battle_bar_height), track)
 	draw_rect(Rect2(0.0, bar_top, battle_width * _displayed_fraction, battle_bar_height), ink)
 
@@ -218,6 +275,29 @@ func _draw() -> void:
 		var length: float = maxf(battle_width * clampf(float(_block) / float(_max_hp), 0.0, 1.0), block_min_length_px)
 		var block_top: float = bar_top - block_gap_px - block_thickness_px
 		draw_rect(Rect2(0.0, block_top, length, block_thickness_px), ink)
+
+	if _toll_visible:
+		_draw_toll(bar_top, ink)
+
+# The Toll block, off the bar's right end: numeral and "TOLL" on one
+# baseline toll_rule_gap_px above the rule, the rule on the bar's rows,
+# as wide as the block. The numeral pops about its baseline-left corner
+# on a change so the label and rule hold still.
+func _draw_toll(bar_top: float, ink: Color) -> void:
+	var left: float = battle_width + toll_gap_px
+	var baseline: float = bar_top - toll_rule_gap_px
+	var numeral_text: String = str(_toll)
+	var numeral_width: float = InkType.width(numeral_font, numeral_text, toll_numeral_size_px)
+	if _toll_pop != 1.0:
+		draw_set_transform(Vector2(left, baseline), 0.0, Vector2.ONE * _toll_pop)
+		InkType.draw_run(self, numeral_font, numeral_text, Vector2.ZERO, toll_numeral_size_px, ink)
+		draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
+	else:
+		InkType.draw_run(self, numeral_font, numeral_text, Vector2(left, baseline), toll_numeral_size_px, ink)
+	InkType.draw_run(self, _toll_label_tracked, toll_label_text, Vector2(left + numeral_width + toll_label_gap_px, baseline), toll_label_size_px, ink)
+	var rule_color: Color = _toll_rule_color
+	rule_color.a = _battle_blend
+	draw_rect(Rect2(left, bar_top, _toll_block_width(), toll_rule_px), rule_color)
 
 func _character_name() -> String:
 	if RunState.character == null:
@@ -251,8 +331,10 @@ func refresh_style() -> void:
 	_numbers_label.add_theme_constant_override("outline_size", outline_size)
 
 	_ink = get_theme_color("ink", "Battle")
+	_toll_rule_color = get_theme_color("toll_rule", "Battle")
 	_name_font_tracked = InkType.tracked(name_font, battle_name_size_px, battle_name_tracking_em)
-	queue_redraw()
+	_toll_label_tracked = InkType.tracked(name_font, toll_label_size_px, toll_label_tracking_em)
+	_apply_layout()
 
 func _build_bar_style(color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -276,7 +358,7 @@ func _physics_process(delta: float) -> void:
 	# Whole pixels only - a fractional Control position on a bare bar (no
 	# panel background to visually absorb it) reads as shimmer/jitter on
 	# thin edges, most visibly on the 1px label outline.
-	position = (screen_pos - size / 2.0).round()
+	position = (screen_pos - _anchor_offset()).round()
 
 	var distance: float = camera.global_position.distance_to(target_position)
 	var field_scale: float = DistanceScale.compute_scale(distance, near_scale_distance, far_scale_distance, min_scale, max_scale)
@@ -338,6 +420,43 @@ func exit_battle(duration: float) -> void:
 	_in_battle = false
 	_block = 0
 	_tween_battle_blend(0.0, duration)
+
+# Called by BattleOverlay.enter_battle() - puts the Toll block on. The
+# initial value shows immediately; BattleController.setup() emits the
+# real one synchronously right after (see BattleOverlay.enter_battle()'s
+# own connect-then-setup order), so there's no stale-number frame.
+func show_toll(initial_toll: int) -> void:
+	_toll = maxi(initial_toll, 0)
+	_toll_visible = true
+	_apply_layout()
+
+func update_toll(new_toll: int) -> void:
+	if not _toll_visible:
+		return
+	var changed: bool = new_toll != _toll
+	_toll = maxi(new_toll, 0)
+	if changed:
+		_pop_toll()
+	_apply_layout()
+
+func hide_toll() -> void:
+	_toll_visible = false
+	if _pop_tween != null:
+		_pop_tween.kill()
+	_toll_pop = 1.0
+	_apply_layout()
+
+func _pop_toll() -> void:
+	if _pop_tween != null:
+		_pop_tween.kill()
+	_pop_tween = create_tween()
+	_pop_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_pop_tween.tween_method(_set_toll_pop, 1.0, toll_pop_scale, toll_pop_time * 0.4).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	_pop_tween.tween_method(_set_toll_pop, toll_pop_scale, 1.0, toll_pop_time * 0.6).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_CUBIC)
+
+func _set_toll_pop(value: float) -> void:
+	_toll_pop = value
+	queue_redraw()
 
 func _tween_battle_blend(target: float, duration: float) -> void:
 	if _blend_tween != null:

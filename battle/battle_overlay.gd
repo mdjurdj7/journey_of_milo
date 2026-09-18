@@ -17,7 +17,7 @@ signal battle_finished(outcome: Outcome)
 
 @export_group("Corners")
 # The fixed readouts' inset from the viewport's edges: bottom-left the
-# BattleResources stack (energy, Toll) with the DECK line beneath it,
+# BattleResources stack (energy) with the DECK line beneath it,
 # bottom-right End Turn with the DISCARD line beneath it - see
 # _layout_corners().
 @export var corner_margin_px: float = 40.0
@@ -87,8 +87,8 @@ func _ready() -> void:
 # that same HUD's persistent HPBar (also not this overlay's child, also
 # outlives every battle) - it already reads RunState.player_hp/
 # player_max_hp on its own, so this call only switches it to its battle
-# style and feeds it block. battle_transition_time is CameraRig's own
-# battle_transition_time (region_field.gd reads it off the same rig it
+# style, puts its Toll block on and feeds it block. battle_transition_
+# time is CameraRig's own (region_field.gd reads it off the same rig it
 # hands to Wanderer.enter_battle_stance()) - passed through to HPBar/
 # EnemyStatus's own enter_battle() so their field->battle style tween
 # (see HPBar._battle_blend's own doc) takes exactly as long as the camera
@@ -106,6 +106,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 
 	_field_hp_bar = field_hp_bar
 	_field_hp_bar.enter_battle(battle_transition_time)
+	_field_hp_bar.show_toll(0)
 	_field_deck_panel = field_deck_panel
 	_field_deck_panel.visible = false
 
@@ -122,7 +123,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	_create_enemy_intents(enemy_list)
 
 	# The fixed corner readouts exist before setup() too, for the same
-	# reason - its energy/toll emissions are their first values.
+	# reason - its energy emission is their first value.
 	_create_corner_readouts()
 
 	battle_controller = BattleController.new()
@@ -257,7 +258,7 @@ func _on_energy_changed(current: int) -> void:
 	_resources.set_energy(current, battle_controller.player.max_energy)
 
 func _on_toll_changed(new_toll: int) -> void:
-	_resources.set_toll(new_toll)
+	_field_hp_bar.update_toll(new_toll)
 
 # Block moved somewhere (a card, a turn start, an enemy's own guard) -
 # every readout's segment follows.
@@ -313,6 +314,7 @@ func _screen_pos_for_damage_target(target: Variant) -> Vector2:
 # battle style (and the field DeckPanel come back) before region_field.gd
 # reacts to battle_finished and frees this overlay.
 func _finish_battle(outcome: Outcome) -> void:
+	_field_hp_bar.hide_toll()
 	_field_hp_bar.exit_battle(_battle_transition_time)
 	if _field_deck_panel != null:
 		_field_deck_panel.visible = true
