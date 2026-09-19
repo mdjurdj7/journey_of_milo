@@ -2,7 +2,7 @@ extends Control
 class_name BattleOverlay
 
 const FLOATING_NUMBER_SCENE_PATH := "res://battle/floating_number.tscn"
-const CARD_PLAY_SFX_PATH := "res://assets/audio/cards/card_play.wav"
+const CARD_PLAY_SFX_PATH := "res://assets/audio/ui/card_played.mp3"
 
 enum Outcome { WIN, LOSE, ESCAPE }
 
@@ -11,9 +11,12 @@ signal battle_finished(outcome: Outcome)
 @export var enemy_head_height: float = 1.8
 # Every card's own shared "played" cue (see _on_card_played()) - fires the
 # instant a card commits to play, independent of that card's own
-# impact_time delay (that's Wanderer's slash sound, not this). Not a
-# per-card override; every card uses this same one today.
-@export var card_play_volume_db: float = -6.0
+# impact_time delay (the swing and the enemy's contact crack are the
+# Wanderer's/FieldEnemy's, not this). Not a per-card override; every card
+# uses this same one today. Levels: a -6 dBFS take through this 2D
+# player at -16 peaks about -22 dBFS - under the swing (~-20) and well
+# under the contact (~-10.5).
+@export var card_play_volume_db: float = -16.0
 
 @export_group("Corners")
 # The fixed readouts' inset from the viewport's edges: bottom-left the
@@ -160,6 +163,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	target_line.setup(battle_controller)
 
 	_card_play_player = AudioStreamPlayer.new()
+	_card_play_player.bus = &"SFX"
 	add_child(_card_play_player)
 	_card_play_player.stream = load(CARD_PLAY_SFX_PATH) as AudioStream
 	if _card_play_player.stream == null:

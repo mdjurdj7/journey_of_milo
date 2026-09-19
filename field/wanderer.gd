@@ -1426,9 +1426,9 @@ func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spre
 	particles.emitting = true
 	get_tree().create_timer(lifetime + 0.1).timeout.connect(particles.queue_free)
 
-func play_slash_audio() -> void:
+func play_swing_audio() -> void:
 	if _attack_audio != null:
-		_attack_audio.play_slash()
+		_attack_audio.play_swing()
 
 # Called by region_field.gd on enemy contact. Tweens into a fixed spacing
 # from target along the target->Wanderer ground line, facing target, and
@@ -1522,7 +1522,7 @@ func exit_battle_stance() -> void:
 func bind_to_battle(controller: BattleController) -> void:
 	_battle_controller = controller
 	controller.card_played.connect(_on_card_played)
-	controller.card_impact.connect(_on_card_impact)
+	controller.card_swing.connect(_on_card_swing)
 	controller.status_changed.connect(_on_status_changed)
 
 func unbind_battle() -> void:
@@ -1530,23 +1530,18 @@ func unbind_battle() -> void:
 		return
 	if _battle_controller.card_played.is_connected(_on_card_played):
 		_battle_controller.card_played.disconnect(_on_card_played)
-	if _battle_controller.card_impact.is_connected(_on_card_impact):
-		_battle_controller.card_impact.disconnect(_on_card_impact)
+	if _battle_controller.card_swing.is_connected(_on_card_swing):
+		_battle_controller.card_swing.disconnect(_on_card_swing)
 	if _battle_controller.status_changed.is_connected(_on_status_changed):
 		_battle_controller.status_changed.disconnect(_on_status_changed)
 	_battle_controller = null
 
-# BattleController.card_impact fires once its own impact delay has
-# elapsed for ANY card carrying a battle_animation (see its own doc) -
-# regardless of whether that card's effects actually land a hit, which is
-# why this reads battle_animation directly rather than waiting on
-# damage_dealt the way BattleFeedback's own reactions do. Slash.mp3 is the
-# only combat clip that exists so far, so it stands in as the generic
-# sword-impact sound for every battle_animation card until dedicated ones
-# exist.
-func _on_card_impact(card: CardData) -> void:
-	if card.battle_animation != &"":
-		play_slash_audio()
+# BattleController.card_swing fires swing_lead_seconds before the card's
+# impact, only for a card with a battle_animation - the blade's whoosh
+# (AttackAudio). The impact itself sounds from the enemy (its contact
+# sound, on the hit frame - see BattleFeedback._react_to_card_hit()).
+func _on_card_swing(_card: CardData) -> void:
+	play_swing_audio()
 
 # See CardData.battle_animation's own doc - empty means this card has no
 # swing. Queues _resting_battle_animation() rather than a bare "BattleIdle"

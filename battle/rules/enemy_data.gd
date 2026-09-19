@@ -10,6 +10,10 @@ class_name EnemyData
 @export var enemy_name: String = ""
 @export var max_hp: int = 1
 @export var intents: Array[EnemyIntent] = []
+# The sound of a card's hit landing on this creature (its shell, its
+# hide), played by its FieldEnemy on the hit frame - takes dealt
+# round-robin (see SoundPool); one take is fine.
+@export var contact_sounds: Array[AudioStream] = []
 # The enemy's attack pattern. Fixed enemies step through this in order,
 # looping; erratic ones (see below) pick freely each turn instead.
 

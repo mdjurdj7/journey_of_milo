@@ -10,6 +10,12 @@ signal card_played(card: CardData, target: FieldEnemy)
 # sound). damage_dealt below already fires at this same moment for
 # anything that does care about the numbers.
 signal card_impact(card: CardData)
+# Fires swing_lead_seconds before card_impact for a card with a
+# battle_animation - the moment the blade's whoosh starts (see Wanderer.
+# _on_card_swing()), so the enemy's contact crack lands that far after
+# the swing's onset. Clamped to the impact delay itself: a card whose
+# delay is shorter than the lead swings at its play instant.
+signal card_swing(card: CardData)
 signal hand_changed()
 signal target_requested(card: CardData)
 signal target_cancelled()
@@ -44,6 +50,8 @@ signal battle_won()
 signal battle_lost()
 
 @export var turn_draw_amount: int = 5
+# See card_swing.
+@export var swing_lead_seconds: float = 0.04
 @export var enemy_head_height: float = 1.8
 # Where a SELF/NONE card's play tween aims, relative to the viewport's own
 # center - there's no "target" to unproject for those, just somewhere up
@@ -205,7 +213,13 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 
 	var delay := _impact_delay_for(card)
 	if delay > 0.0:
-		await get_tree().create_timer(delay).timeout
+		var lead: float = clampf(swing_lead_seconds, 0.0, delay)
+		if delay - lead > 0.0:
+			await get_tree().create_timer(delay - lead).timeout
+		if card.battle_animation != &"":
+			card_swing.emit(card)
+		if lead > 0.0:
+			await get_tree().create_timer(lead).timeout
 
 	card_impact.emit(card)
 

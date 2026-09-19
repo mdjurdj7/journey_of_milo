@@ -74,6 +74,7 @@ func _react_to_card_hit(enemy: FieldEnemy) -> void:
 	if _wanderer == null:
 		return
 	var attack_direction: Vector3 = enemy.global_position - _wanderer.global_position
+	enemy.play_contact_sound()
 	enemy.play_hit_flash(flash_color, flash_rise_time, flash_fall_time)
 	enemy.play_hit_recoil(attack_direction, recoil_distance, recoil_tilt_degrees, recoil_out_time, recoil_return_time)
 	enemy.spawn_sand_puff(sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity, sand_puff_spread_degrees)

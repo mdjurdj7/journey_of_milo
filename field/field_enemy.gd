@@ -36,7 +36,22 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export var attack_snap_out_time: float = 0.12
 @export var attack_snap_return_time: float = 0.2
 
+# The sound of a card's hit landing on this creature - enemy_data.
+# contact_sounds dealt round-robin (SoundPool) through one
+# AudioStreamPlayer3D on the SFX bus, played on the hit frame by
+# BattleFeedback._react_to_card_hit() (with the flash, recoil and damage
+# number). Levels: the takes are normalised to -6 dBFS; at the battle
+# camera's ~10.6 m the 3D attenuation takes ~0.5 dB, so -4 peaks about
+# -10.5 dBFS at the listener - the loudest thing in a strike.
+@export_group("Contact Sound")
+@export var contact_volume_db: float = -4.0
+@export var contact_volume_variance_db: float = 1.0
+@export var contact_pitch_variance: float = 0.04
+@export_group("")
+
 var _contacted: bool = false
+var _contact_player: AudioStreamPlayer3D = null
+var _contact_pool := SoundPool.new()
 # BaseMaterial3D, not StandardMaterial3D: Godot's glTF importer can produce
 # either it or an ORMMaterial3D for a material with a combined metallic-
 # roughness texture (both are BaseMaterial3D siblings, not one a subclass
@@ -123,6 +138,7 @@ func _ready() -> void:
 
 	_spawn_model()
 	_spawn_enemy_status()
+	_spawn_contact_audio()
 
 	if face_shore_at_spawn:
 		_face_shore()
@@ -288,6 +304,26 @@ func play_hit_flash(flash_color: Color, rise_time: float, fall_time: float) -> v
 # away from the attacker, and tilts back the same amount before easing
 # back to rest. TRANS_BACK on the return leg is what gives it its own
 # small overshoot past rest rather than a plain ease-in stop.
+# See the Contact Sound exports. ALWAYS: RegionField's battle freeze
+# cascades here and this plays during it.
+func _spawn_contact_audio() -> void:
+	if enemy_data != null:
+		_contact_pool.set_clips(enemy_data.contact_sounds)
+	_contact_player = AudioStreamPlayer3D.new()
+	_contact_player.name = "ContactAudio"
+	_contact_player.bus = &"SFX"
+	_contact_player.process_mode = Node.PROCESS_MODE_ALWAYS
+	add_child(_contact_player)
+
+func play_contact_sound() -> void:
+	var clip: AudioStream = _contact_pool.next()
+	if clip == null or _contact_player == null:
+		return
+	_contact_player.stream = clip
+	_contact_player.pitch_scale = 1.0 + randf_range(-contact_pitch_variance, contact_pitch_variance)
+	_contact_player.volume_db = contact_volume_db + randf_range(-contact_volume_variance_db, contact_volume_variance_db)
+	_contact_player.play()
+
 func play_hit_recoil(from_direction: Vector3, distance: float, tilt_degrees: float, out_time: float, return_time: float) -> void:
 	var away := Vector3(from_direction.x, 0.0, from_direction.z)
 	away = away.normalized() if away.length() > 0.0001 else Vector3.BACK
