@@ -45,6 +45,24 @@ signal floor_cleared
 # Map2's neck, where the painted land pinches from ~22 m wide (z -12) to
 # under 10 m (z -20); the neck then runs on to the inland wall.
 @export var exit_gate_distance_beyond_enemy: float = 6.0
+# The follow camera's inland bound (see CameraRig.set_inland_limit()):
+# the look target stops this far along get_forward() past the gate line
+# (3 m on the tutorial floor puts the line at z -22, where the Wanderer's
+# head just clears the top of the frame when he reaches the inland wall)
+# - or, with the override on, at a fixed z regardless of where the gate
+# landed. Re-applied live by each setter.
+@export var camera_inland_limit_beyond_gate: float = 3.0:
+	set(value):
+		camera_inland_limit_beyond_gate = value
+		_apply_camera_inland_limit()
+@export var camera_inland_limit_override_enabled: bool = false:
+	set(value):
+		camera_inland_limit_override_enabled = value
+		_apply_camera_inland_limit()
+@export var camera_inland_limit_override_z: float = 0.0:
+	set(value):
+		camera_inland_limit_override_z = value
+		_apply_camera_inland_limit()
 @export var battle_spacing: float = 3.0
 # Which of BattleTheme's two value sets the overlay applies on entering
 # battle - see ui/battle_theme.gd's own rule: UI is the dark element on a
@@ -395,9 +413,27 @@ func _setup_exit_gate() -> void:
 
 	exit_gate.global_position = enemy.global_position + _forward * exit_gate_distance_beyond_enemy
 	exit_gate.rotation.y = atan2(-_forward.x, -_forward.z)
+	_apply_camera_inland_limit()
 
 	floor_cleared.connect(exit_gate.open)
 	exit_gate.floor_exited.connect(_on_floor_exited)
+
+# Hands the camera rig its inland bound from the gate's final position -
+# see camera_inland_limit_beyond_gate's own doc. Safe to call from the
+# limit exports' setters at any time: a no-op until both the rig and a
+# placed gate exist (before _setup_exit_gate() the gate still sits at its
+# authored transform, so nothing is derived from it).
+func _apply_camera_inland_limit() -> void:
+	if not is_inside_tree():
+		return
+	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
+	var exit_gate := get_node_or_null(exit_gate_path) as ExitGate
+	if camera_rig == null or exit_gate == null:
+		return
+	var point: Vector3 = exit_gate.global_position + get_forward() * camera_inland_limit_beyond_gate
+	if camera_inland_limit_override_enabled:
+		point = Vector3(exit_gate.global_position.x, exit_gate.global_position.y, camera_inland_limit_override_z)
+	camera_rig.set_inland_limit(point, get_forward())
 
 # Only once the gate is where it will stay AND the boundary walls exist
 # (the channel is sized from them) can the gate cut its channel across

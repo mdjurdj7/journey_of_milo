@@ -23,6 +23,32 @@ class_name CameraRig
 @export var battle_fov: float = 35.0
 @export var battle_transition_time: float = 0.6
 
+@export_group("Follow bounds")
+# How far inland the follow framing will go: the look target is held
+# at a plane perpendicular to the field's forward (see set_inland_limit()
+# - RegionField hands over the plane's point and get_forward(), so no
+# axis is assumed) while the Wanderer walks on past it and rises in the
+# frame. camera_inland_limit_z mirrors that point's z for Remote-tab
+# tuning; on the ±Z forward every floor has today it IS the limit line.
+# The battle fit is untouched - _place_camera() blends the bounded follow
+# target against the fitted battle target, so the bound fades out with
+# the follow framing itself.
+@export var inland_limit_enabled: bool = true
+@export var camera_inland_limit_z: float = 0.0:
+	set(value):
+		camera_inland_limit_z = value
+		_inland_limit_point.z = value
+# Optional sideways bound, off by default: the look target stays within
+# camera_side_limit_x either side of the forward line through the inland
+# limit point.
+@export var side_limit_enabled: bool = false
+@export var camera_side_limit_x: float = 0.0
+# The bound is applied as an eased offset, not a snap: the pull-back
+# from the Wanderer's real position settles (~95%) in this many seconds,
+# both into the limit and back out of it - once he's inside the bounds
+# again the offset decays to nothing and the follow is exact.
+@export var limit_ease_time: float = 0.3
+
 @export_group("Battle fit")
 # Horizontal room past the outermost bodies' bbox edges, metres at the
 # combatants' depth, averaged over both sides: the two sides split
@@ -62,6 +88,15 @@ class_name CameraRig
 @export var battle_dof_amount: float = 0.06
 
 var _target: Node3D
+
+# The follow bound's plane: a point on it and the field forward as its
+# normal (see set_inland_limit()). Zero forward = no bound, until
+# RegionField sets one.
+var _inland_limit_point: Vector3 = Vector3.ZERO
+var _inland_forward: Vector3 = Vector3.ZERO
+# The eased pull-back from the Wanderer's real position that the bounds
+# currently apply - see _advance_follow_bounds().
+var _bound_offset: Vector3 = Vector3.ZERO
 
 # Set by micro_shake(), consumed and counted down by _apply_shake() -
 # see that method's own doc.
@@ -130,6 +165,46 @@ func enter_battle(wanderer: Wanderer, enemies: Array[FieldEnemy], hand_top_fract
 func exit_battle() -> void:
 	_start_blend(0.0)
 
+# Called by RegionField once the ExitGate is placed (and again on any
+# live edit of its own limit exports): the bound is the plane through
+# `point` with `forward` (get_forward()) as its normal - "inland" is
+# whichever side forward points to, never an assumed axis.
+func set_inland_limit(point: Vector3, forward: Vector3) -> void:
+	_inland_limit_point = point
+	camera_inland_limit_z = point.z
+	_inland_forward = Vector3(forward.x, 0.0, forward.z).normalized() if forward.length() > 0.0001 else Vector3.ZERO
+
+# Where the bounds would hold `raw` (the Wanderer's position): pulled
+# back along forward to the inland plane, and sideways to within
+# camera_side_limit_x of the forward line, each only when enabled.
+func _bounded_position(raw: Vector3) -> Vector3:
+	if _inland_forward == Vector3.ZERO:
+		return raw
+	var bounded := raw
+	var rel := raw - _inland_limit_point
+	if inland_limit_enabled:
+		var over: float = rel.dot(_inland_forward)
+		if over > 0.0:
+			bounded -= _inland_forward * over
+	if side_limit_enabled:
+		var right := _inland_forward.cross(Vector3.UP).normalized()
+		var side: float = rel.dot(right)
+		var excess: float = absf(side) - camera_side_limit_x
+		if excess > 0.0:
+			bounded -= right * signf(side) * excess
+	return bounded
+
+# Eases _bound_offset toward whatever pull-back the bounds want this
+# frame - exponential, ~95% settled in limit_ease_time. Only the offset
+# is eased, never the follow itself, so inside the bounds (offset -> 0)
+# the frame tracks the Wanderer exactly as before.
+func _advance_follow_bounds(delta: float) -> void:
+	var wanted: Vector3 = _bounded_position(_target.global_position) - _target.global_position
+	if limit_ease_time <= 0.0:
+		_bound_offset = wanted
+		return
+	_bound_offset = _bound_offset.lerp(wanted, 1.0 - exp(-3.0 * delta / limit_ease_time))
+
 func _start_blend(target: float) -> void:
 	_blend_from = _battle_blend
 	_blend_to = target
@@ -145,6 +220,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_advance_battle_blend(delta)
+	_advance_follow_bounds(delta)
 
 	var smoothed: Vector3 = global_position.lerp(_target.global_position, 1.0 - exp(-follow_smoothing * delta))
 	var motion := smoothed - global_position
@@ -302,7 +378,9 @@ func _fit_battle_frame() -> bool:
 	return true
 
 func _place_camera() -> void:
-	var follow_target := _target.global_position + look_offset
+	# The Wanderer's position held back by the follow bounds (see
+	# _advance_follow_bounds()) - the battle target below never is.
+	var follow_target := _target.global_position + _bound_offset + look_offset
 	var follow_forward := _rig_ground_forward()
 
 	# Refit every frame while the fight holds bodies - the Wanderer is still
