@@ -226,7 +226,9 @@ fov = 38.0
 [node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=1648467848]
 
 [node name="FieldEnemy" parent="." unique_id=677119585 instance=ExtResource("8")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -13)
+transform = Transform3D(0.990268, 0, 0.139173, 0, 1, 0, -0.139173, 0, 0.990268, -2.25, 0, -10.73)
+snap_to_forward_axis = false
+face_shore_at_spawn = false
 enemy_id = &"sputter"
 enemy_data = ExtResource("10")
 model_yaw_offset = 180.0
@@ -589,6 +591,7 @@ yaw_offset_degrees = 8.0
 [node name="Bird" parent="Hulls/Hull1" instance=ExtResource("18")]
 bird_mesh = ExtResource("20_cormorant")
 perch_offset = Vector3(0, 0.7, -1.42)
+perch_yaw_degrees = -15.0
 
 [node name="Hull2" parent="Hulls" instance=ExtResource("17")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 0, -0.25)

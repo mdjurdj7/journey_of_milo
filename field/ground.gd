@@ -331,6 +331,15 @@ signal relief_rebuilt
 		landmass_mask_distance_cells_per_metre = value
 		_mask_dirty = true
 		_rebuild_ground_mesh_and_collision()
+# How sharply a cell decides whether its nearest water is the sea or a
+# pool - the width, in metres, of the crossover between the two. Wide
+# enough that the boundary isn't a visible line, narrow enough that a
+# pool 6 m from the sea still reads as fully enclosed at its own rim.
+@export var mask_enclosure_blend: float = 1.0:
+	set(value):
+		mask_enclosure_blend = value
+		_mask_dirty = true
+		_rebuild_ground_mesh_and_collision()
 @export var landmass_mask_distance_padding: float = 8.0:
 	set(value):
 		landmass_mask_distance_padding = value
@@ -509,6 +518,55 @@ signal relief_rebuilt
 		underwater_detail_boost = value
 		_apply_uniform("underwater_detail_boost", value)
 @export_group("")
+
+# Wear: the walked band. A few percent darker and a little smoother than
+# the sand either side of it, and nothing else - Region 1's routes are
+# meant to be findable and losable, so this is tuned to sit at the edge
+# of visibility rather than to read as a path. See ground.gdshader's own
+# wear block for the rule; everything here just pushes it.
+#
+# The centreline is pushed by RegionField (see set_wear_path()), which is
+# the only thing that knows where spawn, the crab and the gate are - this
+# node never learns what the band connects.
+@export_group("Wear")
+@export var wear_enabled: bool = true:
+	set(value):
+		wear_enabled = value
+		_apply_uniform("wear_enabled", value)
+@export var wear_half_width: float = 2.0:
+	set(value):
+		wear_half_width = value
+		_apply_uniform("wear_half_width", value)
+@export var wear_edge_noise_scale: float = 6.0:
+	set(value):
+		wear_edge_noise_scale = value
+		_apply_uniform("wear_edge_noise_scale", value)
+@export var wear_edge_noise_amplitude: float = 0.8:
+	set(value):
+		wear_edge_noise_amplitude = value
+		_apply_uniform("wear_edge_noise_amplitude", value)
+@export var wear_shore_fade: float = 3.0:
+	set(value):
+		wear_shore_fade = value
+		_apply_uniform("wear_shore_fade", value)
+# At the sand's own colour: 0.05 is about 3.5 points of value against
+# untrodden ground, 0.24 about 17, 0.4 about 28. The first reads as a
+# band you can lose, the last as a road.
+@export_range(0.0, 1.0) var wear_darken: float = 0.24:
+	set(value):
+		wear_darken = value
+		_apply_uniform("wear_darken", value)
+@export_range(0.0, 1.0) var wear_flatten: float = 0.6:
+	set(value):
+		wear_flatten = value
+		_apply_uniform("wear_flatten", value)
+# Optional painted band on the same rect as landmass_mask - white is
+# worn. Null (the default) leaves only the procedural curve.
+@export var wear_mask: Texture2D = null:
+	set(value):
+		wear_mask = value
+		_push_wear_mask()
+@export_group("")
 @export var region_field_path: NodePath = ^".."
 @export var sea_path: NodePath = ^"../Sea"
 
@@ -616,6 +674,11 @@ func _ready() -> void:
 	_debug_assert_height_matches_shader_math()
 
 	_push_sea_level_uniform()
+	# Again, now that the rebuild above has resolved the landmass refs a
+	# wear mask's image->world mapping is derived from - the push inside
+	# _apply_all_uniforms() happens before RegionField/Sea are readable,
+	# so with a mask set it would otherwise keep spawn-at-origin defaults.
+	_push_wear_mask()
 	_check_landmass_interior_height_clears_water()
 
 # sea_level drives both the shader's height-based wet band (shore_t()) and
@@ -672,6 +735,14 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("caustic_fade_depth", caustic_fade_depth)
 	_apply_uniform("caustic_sharpness", caustic_sharpness)
 	_apply_uniform("underwater_detail_boost", underwater_detail_boost)
+	_apply_uniform("wear_enabled", wear_enabled)
+	_apply_uniform("wear_half_width", wear_half_width)
+	_apply_uniform("wear_edge_noise_scale", wear_edge_noise_scale)
+	_apply_uniform("wear_edge_noise_amplitude", wear_edge_noise_amplitude)
+	_apply_uniform("wear_shore_fade", wear_shore_fade)
+	_apply_uniform("wear_darken", wear_darken)
+	_apply_uniform("wear_flatten", wear_flatten)
+	_push_wear_mask()
 	_apply_uniform("pool_threshold", pool_threshold)
 	_apply_uniform("pool_edge_width", pool_edge_width)
 	_apply_uniform("pool_color", pool_color)
@@ -700,6 +771,17 @@ func _apply_uniform(uniform_name: String, value: Variant) -> void:
 	if _material:
 		_material.set_shader_parameter(uniform_name, value)
 
+# The same grid the ground reads, handed to the sea - it needs channel g
+# to know which water is a pool and drop the foam line and swash band
+# there. Pushed from here rather than pulled by Sea so the two can never
+# be looking at different rebuilds of it.
+func _push_landmass_distance_to_sea() -> void:
+	var sea := get_node_or_null(sea_path) as Sea
+	if sea == null:
+		return
+	sea.set_landmass_distance(_mask_distance_texture, _mask_distance_origin, _mask_distance_cell_size,
+		Vector2(float(_mask_distance_cols), float(_mask_distance_rows)))
+
 # Called by sea.gd (see its _push_swash_source()/_push_sea_time()): the
 # swash phase's shared inputs. Sea owns the wrapped time and the baked
 # surface_noise tile; handing Ground the same texture object and the same
@@ -715,6 +797,37 @@ func set_swash_source(noise: Texture2D, period: float, phase_noise_scale: float,
 
 func set_sea_time(sea_time: float) -> void:
 	_apply_uniform("sea_time", sea_time)
+
+# The walked band's centreline, in world XZ: where it starts, a point it
+# passes THROUGH, and where it ends. Called by RegionField once the gate
+# has its final position (see its _setup_exit_gate()) - this node has no
+# idea those are spawn, the crab and the neck, which is why the band can
+# be re-aimed per floor without touching the ground at all.
+func set_wear_path(start_point: Vector3, mid_point: Vector3, end_point: Vector3) -> void:
+	_apply_uniform("wear_start", Vector2(start_point.x, start_point.z))
+	_apply_uniform("wear_mid", Vector2(mid_point.x, mid_point.z))
+	_apply_uniform("wear_end", Vector2(end_point.x, end_point.z))
+
+# The painted band's image->world mapping, matching _mask_world_to_pixel()
+# exactly so a wear mask lines up with a landmass mask painted on the same
+# canvas. Pushed as the spawn point plus the two image axes rather than a
+# matrix, so the shader can do the same dot products the CPU does.
+func _push_wear_mask() -> void:
+	if wear_mask == null:
+		_apply_uniform("wear_mask_ready", false)
+		return
+	_ensure_landmass_refs()
+	var forward: Vector2 = _landmass_forward_xz
+	var right: Vector2 = Vector2(-forward.y, forward.x)
+	var ppm: float = maxf(landmass_mask_pixels_per_metre, 0.001)
+	var size: Vector2 = wear_mask.get_size()
+	_apply_uniform("wear_mask", wear_mask)
+	_apply_uniform("wear_mask_spawn", _landmass_spawn_xz)
+	_apply_uniform("wear_mask_right", right)
+	_apply_uniform("wear_mask_forward", forward)
+	_apply_uniform("wear_mask_origin_uv", landmass_mask_origin)
+	_apply_uniform("wear_mask_metres", size / ppm)
+	_apply_uniform("wear_mask_ready", true)
 
 # Called by region_sky.gd so the standing-pool color always tracks the
 # sky's horizon color without manual duplication. pool_color's own
@@ -803,6 +916,23 @@ func get_landmass_distance(world_xz: Vector2) -> float:
 		_ensure_landmass_refs()
 		base = maxf(_landmass_distance(world_xz), _seaward_distance(world_xz.y))
 	return maxf(base, _channel_water_distance(world_xz))
+
+# 0..1: is the nearest water to this world XZ a pool rather than the sea?
+# Same bilinear read as _mask_distance_sample(), on the same grid.
+func get_enclosure_at(world_xz: Vector2) -> float:
+	if not _mask_ready or _mask_enclosure.is_empty():
+		return 0.0
+	var fx: float = clampf((world_xz.x - _mask_distance_origin.x) / _mask_distance_cell_size, 0.0, float(_mask_distance_cols - 1))
+	var fz: float = clampf((world_xz.y - _mask_distance_origin.y) / _mask_distance_cell_size, 0.0, float(_mask_distance_rows - 1))
+	var x0: int = int(floor(fx))
+	var z0: int = int(floor(fz))
+	var x1: int = mini(x0 + 1, _mask_distance_cols - 1)
+	var z1: int = mini(z0 + 1, _mask_distance_rows - 1)
+	var tx: float = fx - float(x0)
+	var tz: float = fz - float(z0)
+	var top: float = lerpf(_mask_enclosure[z0 * _mask_distance_cols + x0], _mask_enclosure[z0 * _mask_distance_cols + x1], tx)
+	var bottom: float = lerpf(_mask_enclosure[z1 * _mask_distance_cols + x0], _mask_enclosure[z1 * _mask_distance_cols + x1], tx)
+	return lerpf(top, bottom, tz)
 
 # True once a landmass_mask is set AND decoded into a distance field - false
 # during the brief window between assignment and the rebuild that decodes
@@ -1251,6 +1381,17 @@ var _mask_bytes: PackedByteArray = PackedByteArray()
 var _mask_width: int = 0
 var _mask_height: int = 0
 var _mask_distance: PackedFloat32Array = PackedFloat32Array()
+# 0..1 per distance cell: is the nearest water ENCLOSED - a pool, with
+# sand all round it - rather than the open sea? Everything that belongs
+# to the sea's edge and not to a pool's reads this and stands down: the
+# wet band's swash surge, the run-up sheet and its wet footprint on the
+# ground, the foam line and the swash band on the sea. Depth tint and
+# caustics are not gated: a pool is still water, it just isn't surf.
+#
+# A property of the NEAREST WATER, not of the cell - so the sand around a
+# pool reads 1 and the sand around the sea reads 0, which is what the
+# rim effects actually need to know.
+var _mask_enclosure: PackedFloat32Array = PackedFloat32Array()
 var _mask_distance_cols: int = 0
 var _mask_distance_rows: int = 0
 # World XZ of distance cell (0, 0); cells step +cell_size along +X (col)
@@ -1268,6 +1409,7 @@ func _rebuild_mask_data() -> void:
 	_mask_ready = false
 	_mask_bytes = PackedByteArray()
 	_mask_distance = PackedFloat32Array()
+	_mask_enclosure = PackedFloat32Array()
 	_mask_land_bounds = Rect2()
 	if landmass_mask == null:
 		_push_mask_distance_texture()
@@ -1292,14 +1434,25 @@ func _push_mask_distance_texture() -> void:
 	if not _mask_ready or _mask_distance.is_empty():
 		_mask_distance_texture = null
 		_apply_uniform("landmass_distance_ready", false)
+		_push_landmass_distance_to_sea()
 		return
-	var image: Image = Image.create_from_data(_mask_distance_cols, _mask_distance_rows, false, Image.FORMAT_RF, _mask_distance.to_byte_array())
+	# Two channels now: r = signed shore distance, g = is the nearest water
+	# enclosed. Interleaved into one RG texture rather than shipped as a
+	# second sampler so the two can never disagree about their own grid -
+	# every consumer samples one uv and gets both.
+	var packed: PackedFloat32Array = PackedFloat32Array()
+	packed.resize(_mask_distance.size() * 2)
+	for i in _mask_distance.size():
+		packed[i * 2] = _mask_distance[i]
+		packed[i * 2 + 1] = _mask_enclosure[i] if i < _mask_enclosure.size() else 0.0
+	var image: Image = Image.create_from_data(_mask_distance_cols, _mask_distance_rows, false, Image.FORMAT_RGF, packed.to_byte_array())
 	_mask_distance_texture = ImageTexture.create_from_image(image)
 	_apply_uniform("landmass_distance_tex", _mask_distance_texture)
 	_apply_uniform("landmass_distance_origin", _mask_distance_origin)
 	_apply_uniform("landmass_distance_cell", _mask_distance_cell_size)
 	_apply_uniform("landmass_distance_dims", Vector2(float(_mask_distance_cols), float(_mask_distance_rows)))
 	_apply_uniform("landmass_distance_ready", true)
+	_push_landmass_distance_to_sea()
 
 # Texture2D.get_image() hands back a fresh copy, so converting it in place
 # is safe. A PNG's default import is lossless, so decompress() is normally
@@ -1418,7 +1571,67 @@ func _build_mask_distance_field() -> void:
 		var distance: float = -sqrt(to_water[i]) * cell if land[i] == 1 else sqrt(to_land[i]) * cell
 		_mask_distance[i] = clampf(distance, -far, far)
 
-	print("Ground: landmass mask %dx%d px at %.1f px/m -> image rect %s, land bounds %s, distance grid %dx%d @ %.2fm" % [_mask_width, _mask_height, landmass_mask_pixels_per_metre, image_rect, _mask_land_bounds, cols, rows, cell])
+	# Which water is the sea and which is a pool: flood the border-touching
+	# water and call everything it reaches open. Then a distance transform
+	# to each kind separately, and a cell's enclosure is simply which of
+	# the two is nearer - smoothed over a metre so the boundary between
+	# "belongs to the pool" and "belongs to the sea" isn't a hard line
+	# halfway between them.
+	var open_water: PackedByteArray = _flood_open_water(land, cols, rows)
+	var enclosed_water: PackedByteArray = PackedByteArray()
+	enclosed_water.resize(cols * rows)
+	var enclosed_count: int = 0
+	for i in cols * rows:
+		var is_enclosed: bool = land[i] == 0 and open_water[i] == 0
+		enclosed_water[i] = 1 if is_enclosed else 0
+		if is_enclosed:
+			enclosed_count += 1
+	var to_open: PackedFloat64Array = _edt_squared(open_water, cols, rows, 1)
+	var to_enclosed: PackedFloat64Array = _edt_squared(enclosed_water, cols, rows, 1)
+	_mask_enclosure.resize(cols * rows)
+	for i in cols * rows:
+		var open_distance: float = sqrt(to_open[i]) * cell
+		var enclosed_distance: float = sqrt(to_enclosed[i]) * cell
+		_mask_enclosure[i] = 1.0 - smoothstep(-mask_enclosure_blend, mask_enclosure_blend, enclosed_distance - open_distance)
+
+	print("Ground: landmass mask %dx%d px at %.1f px/m -> image rect %s, land bounds %s, distance grid %dx%d @ %.2fm, %d enclosed-water cells" % [_mask_width, _mask_height, landmass_mask_pixels_per_metre, image_rect, _mask_land_bounds, cols, rows, cell, enclosed_count])
+
+# Water cells reachable from the image border, 4-connected - the sea and
+# anything open to it. Everything else that is water is a pool. Iterative
+# rather than recursive: the grid is ~40k cells and GDScript's own stack
+# is not the place to find that out.
+func _flood_open_water(land: PackedByteArray, cols: int, rows: int) -> PackedByteArray:
+	var open_water: PackedByteArray = PackedByteArray()
+	open_water.resize(cols * rows)
+	var queue: Array[int] = []
+	for col in cols:
+		for row in [0, rows - 1]:
+			var i: int = row * cols + col
+			if land[i] == 0 and open_water[i] == 0:
+				open_water[i] = 1
+				queue.append(i)
+	for row in rows:
+		for col in [0, cols - 1]:
+			var i: int = row * cols + col
+			if land[i] == 0 and open_water[i] == 0:
+				open_water[i] = 1
+				queue.append(i)
+	var head: int = 0
+	while head < queue.size():
+		var index: int = queue[head]
+		head += 1
+		var col: int = index % cols
+		var row: int = index / cols
+		for step in [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]:
+			var nc: int = col + step.x
+			var nr: int = row + step.y
+			if nc < 0 or nc >= cols or nr < 0 or nr >= rows:
+				continue
+			var n: int = nr * cols + nc
+			if land[n] == 0 and open_water[n] == 0:
+				open_water[n] = 1
+				queue.append(n)
+	return open_water
 
 # Squared Euclidean distance (in cells) from every cell to the nearest
 # cell whose land[] value == source_value - Felzenszwalb & Huttenlocher's

@@ -57,6 +57,10 @@ signal floor_cleared
 # Map2's neck, where the painted land pinches from ~22 m wide (z -12) to
 # under 10 m (z -20); the neck then runs on to the inland wall.
 @export var exit_gate_distance_beyond_enemy: float = 6.0
+# How far the worn band's middle control point sits off the enemy, along
+# the field's right. 1.5 m bends the band past the standing pool beside
+# the crab; 0 runs it straight through where the enemy stands.
+@export var wear_path_mid_offset: float = 1.5
 # The follow camera's inland bound (see CameraRig.set_inland_limit()):
 # the look target stops this far along get_forward() past the gate line
 # (3 m on the tutorial floor puts the line at z -22, where the Wanderer's
@@ -352,6 +356,11 @@ func get_spawn_position() -> Vector3:
 # across live relief edits, not just at this one spawn moment.
 func _reposition_enemies_along_forward() -> void:
 	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
+		# Opted out: its position means something in the world (standing by
+		# a pool, say) rather than "this far along forward" - see
+		# FieldEnemy.snap_to_forward_axis.
+		if not enemy.snap_to_forward_axis:
+			continue
 		var distance := (enemy.global_position - wanderer.global_position).length()
 		enemy.global_position = wanderer.global_position + _forward * distance
 
@@ -426,6 +435,7 @@ func _setup_exit_gate() -> void:
 	exit_gate.global_position = enemy.global_position + _forward * exit_gate_distance_beyond_enemy
 	exit_gate.rotation.y = atan2(-_forward.x, -_forward.z)
 	_apply_camera_inland_limit()
+	_aim_wear_path(enemy)
 
 	floor_cleared.connect(exit_gate.open)
 	exit_gate.floor_exited.connect(_on_floor_exited)
@@ -577,6 +587,29 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	spread.enemy = fell_to
 	add_child(spread)
 	spread.global_position = fell_at
+
+# Points the ground's walked band along the route the floor actually
+# takes: out of spawn, past the enemy, to the gate. Ground knows none of
+# those - it takes three world points and draws a band through them (see
+# Ground.set_wear_path()), so a floor with a different shape re-aims it
+# by calling this with different points rather than by editing a shader.
+# Called from _setup_exit_gate(), the first moment the gate's own
+# position is final.
+func _aim_wear_path(enemy: FieldEnemy) -> void:
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground == null:
+		return
+	var gate := get_node_or_null(exit_gate_path) as Node3D
+	if gate == null:
+		return
+	# The middle point is pushed off the enemy along the field's right, so
+	# the band bends past the standing pool painted beside the crab rather
+	# than running through it. Right is get_forward() turned a quarter
+	# turn, not world +X, so this stays correct if a floor's forward ever
+	# isn't -Z.
+	var right: Vector3 = get_forward().cross(Vector3.UP).normalized()
+	var mid: Vector3 = enemy.global_position + right * wear_path_mid_offset
+	ground.set_wear_path(get_spawn_position(), mid, gate.global_position)
 
 # CONSUMED cards leave RunState.deck (the run's Belongings) for good once
 # the fight that consumed them ends; SPENT ones (the rest of exhaust_pile)

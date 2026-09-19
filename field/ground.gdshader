@@ -179,6 +179,45 @@ uniform float caustic_sharpness = 4.0;
 // never lift the sand above the wet base colour.
 uniform float underwater_detail_boost = 1.5;
 
+// --- Wear: the walked band ---
+//
+// A faint stretch of sand that reads as trodden, not a path drawn on the
+// ground. Region 1's routes are meant to be findable and losable, so this
+// is deliberately at the edge of visibility: it darkens the sand a few
+// percent and quiets the fine detail, and does nothing else. No height
+// change, no line, no hue shift.
+//
+// Two sources, combined by max(): a procedural band along a curve from
+// spawn through the crab to the gate line (pushed by RegionField via
+// Ground.set_wear_path()), and an optional painted wear_mask on the same
+// rect as the landmass mask. Either alone is enough; neither is required.
+uniform bool wear_enabled = false;
+// The three world-XZ points the band runs through. wear_mid is passed
+// THROUGH, not used as a raw Bezier handle - see wear_curve_point().
+uniform vec2 wear_start = vec2(0.0);
+uniform vec2 wear_mid = vec2(0.0);
+uniform vec2 wear_end = vec2(0.0);
+uniform float wear_half_width = 2.5;
+// Low-frequency wobble on the band's own edge, so it never reads as a
+// ruled boundary. Metres, applied to the distance before the falloff.
+uniform float wear_edge_noise_scale = 6.0;
+uniform float wear_edge_noise_amplitude = 0.8;
+// Wear fades out over the last few metres before the drawn shoreline -
+// nobody wears a track into ground the sea washes twice a day.
+uniform float wear_shore_fade = 3.0;
+uniform float wear_darken : hint_range(0.0, 1.0) = 0.05;
+// How much of the ripple/grain/speckle detail the band flattens away.
+uniform float wear_flatten : hint_range(0.0, 1.0) = 0.6;
+// Optional painted band, same rect and orientation as landmass_mask (see
+// wear_mask_uv()). White is worn. Null by default.
+uniform sampler2D wear_mask : filter_linear, repeat_disable;
+uniform bool wear_mask_ready = false;
+uniform vec2 wear_mask_spawn = vec2(0.0);
+uniform vec2 wear_mask_right = vec2(1.0, 0.0);
+uniform vec2 wear_mask_forward = vec2(0.0, -1.0);
+uniform vec2 wear_mask_origin_uv = vec2(0.5);
+uniform vec2 wear_mask_metres = vec2(1.0);
+
 varying vec2 v_world_xz;
 varying float v_world_height;
 
@@ -324,9 +363,24 @@ float swash_wet_envelope(float phase) {
 // _mask_distance_sample(): grid node i sits at origin + i * cell, texel
 // i's centre at (i + 0.5) / dims, and repeat_disable clamps to the edge
 // texel exactly as the CPU sampler clamps its index.
+vec2 landmass_distance_uv(vec2 world_xz) {
+	return ((world_xz - landmass_distance_origin) / max(landmass_distance_cell, 0.001) + 0.5) / max(landmass_distance_dims, vec2(1.0));
+}
+
 float landmass_distance_at(vec2 world_xz) {
-	vec2 uv = ((world_xz - landmass_distance_origin) / max(landmass_distance_cell, 0.001) + 0.5) / max(landmass_distance_dims, vec2(1.0));
-	return texture(landmass_distance_tex, uv).r;
+	return texture(landmass_distance_tex, landmass_distance_uv(world_xz)).r;
+}
+
+// 0..1: is the nearest water a pool rather than the sea? The grid's
+// second channel, written by Ground._build_mask_distance_field(). Pools
+// are still water - they take the depth tint and the caustics - but they
+// are not surf, so everything that belongs to the sea's own edge reads
+// this and stands down.
+float landmass_enclosure_at(vec2 world_xz) {
+	if (!landmass_distance_ready) {
+		return 0.0;
+	}
+	return texture(landmass_distance_tex, landmass_distance_uv(world_xz)).g;
 }
 
 // 0 deep inside the sand, 1 within half this cycle's full run-up of the
@@ -341,8 +395,11 @@ float swash_shore_gate(float distance, float runup_max) {
 // start plus the swash surge (wet_band_surge x this cycle's amplitude x
 // the envelope above x the shore gate). distance/runup_max come from
 // fragment(), which already has them.
-float shore_band_height(float distance, float runup_max, float phase, float amplitude) {
-	float surge = landmass_distance_ready ? wet_band_surge * amplitude * swash_wet_envelope(phase) * swash_shore_gate(distance, runup_max) : 0.0;
+// `open` is 1 - enclosure: the surge is the sea breathing, so it is
+// scaled away entirely at a pool's rim. shore_slope_start itself stays -
+// a pool has a damp margin, it just doesn't pulse.
+float shore_band_height(float distance, float runup_max, float phase, float amplitude, float open) {
+	float surge = landmass_distance_ready ? wet_band_surge * amplitude * swash_wet_envelope(phase) * swash_shore_gate(distance, runup_max) * open : 0.0;
 	return max(shore_slope_start + surge, 0.001);
 }
 
@@ -580,6 +637,73 @@ void vertex() {
 	v_world_height = world_pos.y;
 }
 
+// The band's centreline, as a quadratic Bezier that PASSES THROUGH
+// wear_mid at t=0.5 rather than merely leaning toward it: solving
+// B(0.5) = mid for the handle gives c = 2*mid - (start + end)/2, so the
+// crab really is on the path rather than just near it.
+vec2 wear_curve_point(float t) {
+	vec2 c = 2.0 * wear_mid - 0.5 * (wear_start + wear_end);
+	float u = 1.0 - t;
+	return u * u * wear_start + 2.0 * u * t * c + t * t * wear_end;
+}
+
+// Distance from an XZ to that curve, as the minimum over a polyline
+// approximation. Point-to-SEGMENT rather than point-to-sample, so 16
+// steps are enough to stay smooth at this half-width - sampling points
+// alone would scallop the band's edge wherever the curve bends.
+const int WEAR_SEGMENTS = 16;
+float wear_distance(vec2 p) {
+	float best = 1.0e20;
+	vec2 prev = wear_curve_point(0.0);
+	for (int i = 1; i <= WEAR_SEGMENTS; i++) {
+		vec2 cur = wear_curve_point(float(i) / float(WEAR_SEGMENTS));
+		vec2 ab = cur - prev;
+		float h = clamp(dot(p - prev, ab) / max(dot(ab, ab), 1.0e-6), 0.0, 1.0);
+		best = min(best, length(p - prev - ab * h));
+		prev = cur;
+	}
+	return best;
+}
+
+// Same image->world mapping Ground._mask_world_to_pixel() uses on the
+// CPU, normalised to UV: image right is the field's forward turned a
+// quarter turn, image up is inland, and wear_mask_origin_uv sits on the
+// spawn.
+vec2 wear_mask_uv(vec2 world_xz) {
+	vec2 rel = world_xz - wear_mask_spawn;
+	return vec2(
+		wear_mask_origin_uv.x + dot(rel, wear_mask_right) / max(wear_mask_metres.x, 0.001),
+		wear_mask_origin_uv.y - dot(rel, wear_mask_forward) / max(wear_mask_metres.y, 0.001)
+	);
+}
+
+// 0..1 of "this sand is walked". Procedural band and painted mask by
+// max(), then gated: nothing below sea level, nothing in the wet band,
+// and a fade through the last wear_shore_fade metres before the drawn
+// line. The gates are multiplications rather than branches so the band
+// dies away rather than ending at an edge - which is the whole point.
+float wear_factor(vec2 world_xz, float shore_distance, float sand_wetness, float underwater) {
+	float wear = 0.0;
+	if (wear_enabled) {
+		float wobble = (value_noise(world_xz / max(wear_edge_noise_scale, 0.001)) - 0.5) * 2.0 * wear_edge_noise_amplitude;
+		wear = 1.0 - smoothstep(0.0, max(wear_half_width, 0.001), wear_distance(world_xz) + wobble);
+	}
+	if (wear_mask_ready) {
+		vec2 uv = wear_mask_uv(world_xz);
+		float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
+		wear = max(wear, texture(wear_mask, clamp(uv, vec2(0.0), vec2(1.0))).r * inside);
+	}
+	if (wear <= 0.0) {
+		return 0.0;
+	}
+	if (landmass_distance_ready) {
+		wear *= 1.0 - smoothstep(-max(wear_shore_fade, 0.001), 0.0, shore_distance);
+	}
+	wear *= 1.0 - underwater;
+	wear *= 1.0 - sand_wetness;
+	return clamp(wear, 0.0, 1.0);
+}
+
 void fragment() {
 	// Swash state at this XZ, computed once: shared phase/amplitude (see
 	// the shared block), this cycle's full run-up, where the sheet is
@@ -592,13 +716,19 @@ void fragment() {
 	float reached = runup_max * swash_reached_envelope(swash_ph);
 	float shore_distance = landmass_distance_ready ? landmass_distance_at(v_world_xz) : -1000.0;
 
+	// Pools are water without surf: every sea-edge effect below is scaled
+	// by `open`, so a standing pool keeps its depth tint and its caustics
+	// and loses the swash entirely.
+	float enclosure = landmass_enclosure_at(v_world_xz);
+	float open = 1.0 - enclosure;
+
 	float base_wetness = wetness_mask(v_world_xz);
-	float band_height = shore_band_height(shore_distance, runup_max, swash_ph, swash_amp);
+	float band_height = shore_band_height(shore_distance, runup_max, swash_ph, swash_amp, open);
 	float sand_wetness = sand_wetness_mask(v_world_xz, v_world_height, band_height);
 	// The run-up's own wet mark, on top of the height band: as far as the
 	// sheet reached this cycle, drying back over wet_dry_time.
 	if (landmass_distance_ready) {
-		sand_wetness = max(sand_wetness, swash_wet_footprint(shore_distance, reached, swash_ph));
+		sand_wetness = max(sand_wetness, swash_wet_footprint(shore_distance, reached, swash_ph) * open);
 	}
 
 	// VERTEX in fragment() is view-space; its length is distance from the camera.
@@ -612,23 +742,31 @@ void fragment() {
 
 	vec3 sand_albedo = mix(dry, wet, sand_wetness);
 
+	// Under sea_level the drift/ripple detail runs at underwater_detail_
+	// boost x strength (see its own doc) - a short 5cm blend rather than a
+	// hard step so the boost doesn't draw its own line at the waterline.
+	// Computed before the grain below because wear needs it too.
+	float depth_below_sea = sea_level - v_world_height;
+	float underwater = smoothstep(0.0, 0.05, depth_below_sea);
+	float detail_boost = mix(1.0, underwater_detail_boost, underwater);
+
+	// The walked band. Darkens the sand a little and quiets the fine
+	// detail; see wear_factor()'s own doc for what it will not do.
+	float wear = wear_factor(v_world_xz, shore_distance, sand_wetness, underwater);
+	float wear_smoothing = 1.0 - wear * wear_flatten;
+
 	// Sand grain + speckle: both multiplicative and applied identically
 	// across R/G/B, so they shift ALBEDO's value only, never its hue.
 	// Suppressed on wet sand - wet sand reads smoother/packed, not
-	// grainy - by the same sand_wetness driving the dry/wet blend above.
-	float grain_suppression = 1.0 - sand_wetness;
+	// grainy - by the same sand_wetness driving the dry/wet blend above,
+	// and quieted again on a walked band, which is packed for the same
+	// reason.
+	float grain_suppression = (1.0 - sand_wetness) * wear_smoothing;
 	float grain = grain_value(v_world_xz) * grain_strength * grain_suppression;
 	sand_albedo *= 1.0 + grain;
 
 	float speckle = speckle_mask(v_world_xz) * speckle_darken * grain_suppression;
 	sand_albedo *= 1.0 - speckle;
-
-	// Under sea_level the drift/ripple detail runs at underwater_detail_
-	// boost x strength (see its own doc) - a short 5cm blend rather than a
-	// hard step so the boost doesn't draw its own line at the waterline.
-	float depth_below_sea = sea_level - v_world_height;
-	float underwater = smoothstep(0.0, 0.05, depth_below_sea);
-	float detail_boost = mix(1.0, underwater_detail_boost, underwater);
 
 	// Drift lines: nudge the sand toward a slightly darker, slightly
 	// warmer tone, at most drift_line_strength (boosted under water) of
@@ -645,8 +783,14 @@ void fragment() {
 	// can never lift wet sand back toward the dry value. Multiplicative,
 	// same hue-preserving reasoning as grain/speckle above. Boosted under
 	// water like the drift lines.
-	float ripple = (0.5 + 0.5 * ripple_mask(v_world_xz, v_world_height)) * ripple_strength * detail_boost * sand_wetness;
+	float ripple = (0.5 + 0.5 * ripple_mask(v_world_xz, v_world_height)) * ripple_strength * detail_boost * sand_wetness * wear_smoothing;
 	sand_albedo *= 1.0 - clamp(ripple, 0.0, 1.0);
+
+	// The band itself: a flat multiplicative darkening, hue preserved like
+	// every other sand modifier here. Applied after the dry detail and
+	// before anything water-side, so the shore, the sheet and the pools
+	// are untouched by it.
+	sand_albedo *= 1.0 - wear * wear_darken;
 
 	// Caustics: the one thing allowed to BRIGHTEN wet sand, and only under
 	// sea_level - full strength just below the waterline (the 3cm ramp
@@ -663,7 +807,7 @@ void fragment() {
 	if (landmass_distance_ready) {
 		// x smoothstep(runup) so the two edges' overlap can't leave a
 		// hairline at the line while the sheet is (nearly) drained.
-		float sheet = smoothstep(-runup - 0.02, -runup, shore_distance) * (1.0 - smoothstep(-0.02, 0.0, shore_distance)) * smoothstep(0.0, 0.05, runup);
+		float sheet = smoothstep(-runup - 0.02, -runup, shore_distance) * (1.0 - smoothstep(-0.02, 0.0, shore_distance)) * smoothstep(0.0, 0.05, runup) * open;
 		float sheet_edge = sheet * (1.0 - smoothstep(0.0, max(swash_edge_width_ground, 0.001), shore_distance + runup));
 		sand_albedo = mix(sand_albedo, swash_sheet_color.rgb, sheet * swash_sheet_alpha);
 		sand_albedo = mix(sand_albedo, swash_color.rgb, sheet_edge);

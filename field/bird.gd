@@ -48,6 +48,25 @@ enum FlyDirection { SEAWARD, INLAND, LEFT, RIGHT }
 	set(value):
 		perch_offset = value
 		position = perch_offset
+# How far the perched bird is turned on its perch, on top of whatever
+# yaw it inherits from the thing it is standing on. Staging only: it
+# decides what the camera sees of the bird at rest, nothing else.
+#
+# Kept separate from model_yaw_offset_degrees on purpose - that one
+# corrects the ASSET (which way the glb's beak points) and would have to
+# change if the model were swapped, while this one is about the shot.
+# Folding the two together bakes a camera decision into an asset fix.
+#
+# Turns the NODE, not the model under it: _take_flight() reads this
+# node's own global_rotation.y as the start of its turn-into-heading
+# tween, so the bird visibly turns off its perch into the flight. Yawing
+# the model instead would leave the node facing elsewhere and the bird
+# would fly sideways. The lift-off heading itself is computed in world
+# space by _flight_direction() and is untouched by this.
+@export var perch_yaw_degrees: float = 0.0:
+	set(value):
+		perch_yaw_degrees = value
+		rotation.y = deg_to_rad(perch_yaw_degrees)
 # Larger than a Hull's world-line radius (2.5): the bird sees the
 # Wanderer coming before he's at the hull.
 @export var approach_radius: float = 4.0:

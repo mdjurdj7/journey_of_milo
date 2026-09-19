@@ -165,6 +165,19 @@ uniform float surface_pattern_speed = 0.4;
 // edge_noise_scale, and breathing with the long wave's own height at
 // that point (not a generic timer) so it visibly pulses as an actual
 // wave crest passes under it.
+// The ground's own landmass distance grid, handed over by Sea._push_
+// landmass_distance() - the hookup this shader's wave calming was always
+// meant to grow into, arriving now because standing pools are its first
+// consumer. Channel g is "the nearest water here is enclosed": a pool,
+// not the sea. Foam and swash are the sea's edge behaviours and are
+// scaled away over one; the depth tint, the absorption and the sky
+// reflection are properties of water itself and are not.
+uniform sampler2D landmass_distance_tex : filter_linear, repeat_disable;
+uniform vec2 landmass_distance_origin = vec2(0.0);
+uniform float landmass_distance_cell = 0.25;
+uniform vec2 landmass_distance_dims = vec2(1.0);
+uniform bool landmass_distance_ready = false;
+
 uniform vec4 foam_color : source_color = vec4(0.66, 0.70, 0.70, 1.0);
 uniform float foam_width = 0.25;
 uniform float foam_strength : hint_range(0.0, 1.0) = 0.35;
@@ -313,6 +326,16 @@ float sea_height(vec2 world_xz, float time) {
 // (the noise at twice the phase scale, re-sampled at a golden-ratio step
 // per cycle index), so some washes are bigger than others and that too
 // varies slowly along the shore.
+// 0..1: is the water at this XZ a pool rather than the sea? See the
+// uniform block above.
+float landmass_enclosure_at(vec2 world_xz) {
+	if (!landmass_distance_ready) {
+		return 0.0;
+	}
+	vec2 uv = ((world_xz - landmass_distance_origin) / max(landmass_distance_cell, 0.001) + 0.5) / max(landmass_distance_dims, vec2(1.0));
+	return texture(landmass_distance_tex, uv).g;
+}
+
 float swash_phase(vec2 world_xz, float time) {
 	float offset = (texture(surface_noise, world_xz / max(swash_phase_noise_scale, 0.001)).r - 0.5) * swash_phase_spread;
 	return fract(time / max(swash_period, 0.001) + offset);
@@ -548,9 +571,15 @@ void fragment() {
 	vec2 breathe_slope;
 	float long_h = wave_height_and_slope(v_world_xz, sea_time, normalize(long_wave_direction), long_wave_length, long_wave_amplitude, long_wave_speed, breathe_slope);
 	float breathe = 0.5 + 0.5 * (long_h / max(long_wave_amplitude, 0.0001));
+	// Still water has no foam line and no swash - both are the sea's edge,
+	// and a pool has no sea in it. Scaled rather than branched so the
+	// transition across a pool's own boundary can't draw an edge of its
+	// own.
+	float sea_open = 1.0 - landmass_enclosure_at(v_world_xz);
+
 	float foam_noise = value_noise(v_world_xz / max(edge_noise_scale, 0.001));
 	float foam_edge = smoothstep(0.0, 0.05, water_depth) * (1.0 - smoothstep(0.05, max(foam_width, 0.06), water_depth));
-	float foam_amount = foam_edge * mix(0.6, 1.0, foam_noise) * mix(0.7, 1.0, breathe) * foam_strength;
+	float foam_amount = foam_edge * mix(0.6, 1.0, foam_noise) * mix(0.7, 1.0, breathe) * foam_strength * sea_open;
 
 	// Swash (see swash_color's own doc): the front's leading edge is the
 	// shoreward (shallower) side of the cycle's centre depth, crisp over
@@ -565,7 +594,7 @@ void fragment() {
 	swash_centre_and_intensity(swash_ph, swash_centre, swash_intensity);
 	float swash_lead = smoothstep(swash_centre - max(swash_edge_width, 0.001), swash_centre, water_depth);
 	float swash_trail = 1.0 - smoothstep(swash_centre, swash_centre + max(swash_band_width, 0.001), water_depth);
-	float swash_amount = swash_lead * swash_trail * swash_intensity * swash_cycle_amplitude(v_world_xz, sea_time) * swash_strength * smoothstep(0.0, 0.03, water_depth);
+	float swash_amount = swash_lead * swash_trail * swash_intensity * swash_cycle_amplitude(v_world_xz, sea_time) * swash_strength * smoothstep(0.0, 0.03, water_depth) * sea_open;
 
 	// Composite (see refraction_strength's own doc): water_amount is what
 	// ALPHA used to be. The see-through part is the screen texture behind

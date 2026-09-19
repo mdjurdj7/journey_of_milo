@@ -531,6 +531,19 @@ func _push_swash_source() -> void:
 		return
 	ground.set_swash_source(_surface_noise, swash_period, swash_phase_noise_scale, swash_phase_spread)
 
+# The ground's landmass distance grid, handed straight over. Ground owns
+# it (it builds it from the mask); the sea only reads it, and only for
+# channel g - "is this water a pool" - which is what switches the foam
+# line and the swash band off over still water. This is the wave-calming
+# hookup DESIGN.md parked: the texture is here now, and calming the waves
+# themselves over the same signal is a second consumer away.
+func set_landmass_distance(texture: Texture2D, origin: Vector2, cell: float, dims: Vector2) -> void:
+	_apply_uniform("landmass_distance_tex", texture)
+	_apply_uniform("landmass_distance_origin", origin)
+	_apply_uniform("landmass_distance_cell", cell)
+	_apply_uniform("landmass_distance_dims", dims)
+	_apply_uniform("landmass_distance_ready", texture != null)
+
 func _push_sea_time() -> void:
 	var ground := get_node_or_null(ground_path) as Ground
 	if ground != null:
