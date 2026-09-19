@@ -278,6 +278,13 @@ func _apply_collision() -> void:
 	if _collision_body == null:
 		_collision_body = StaticBody3D.new()
 		_collision_body.name = "Collision"
+		# Same reasoning as Ground's/FieldEnemy's/Keeper's own override:
+		# RegionField's battle freeze would otherwise remove the hull from
+		# the physics space entirely (disable_mode's default, REMOVE), and a
+		# click on it during a fight would fall through to the sand behind -
+		# the point-to-move raycast takes whatever body it hits (see
+		# RegionField._unhandled_input()). MAKE_STATIC keeps it solid frozen.
+		_collision_body.disable_mode = CollisionObject3D.DISABLE_MODE_MAKE_STATIC
 		_collision_shape = BoxShape3D.new()
 		_collision_shape_node = CollisionShape3D.new()
 		_collision_shape_node.shape = _collision_shape
