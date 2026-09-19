@@ -242,6 +242,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	ctx.deck = deck
 	ctx.cards_played_this_turn = cards_played_this_turn
 	ctx.on_grace_reclaimed = _on_grace_reclaimed
+	ctx.on_heal = _on_card_heal
 	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
 		_report_damage("player", target_combatant, amount, kind)
 
@@ -384,6 +385,13 @@ func _living_enemy_combatants() -> Array[Combatant]:
 # RunState.heal(), which touches HP and nothing else - Toll accrues only
 # from SELF-inflicted loss (status ticks, SELF_DAMAGE, SELF_DAMAGE_TOLL),
 # so reclaiming cannot generate Toll or undo any.
+# A card put HP back. Mirrored onto the run's own HP the same way a loss
+# is - RunState.heal() touches HP and nothing else, so this generates no
+# Toll and undoes none.
+func _on_card_heal(amount: int) -> void:
+	RunState.heal(amount)
+	hp_changed.emit(player.hp, player.max_hp)
+
 func _on_grace_reclaimed(amount: int) -> void:
 	RunState.heal(amount)
 	RunLogger.log_grace_reclaimed(amount, player.grace)

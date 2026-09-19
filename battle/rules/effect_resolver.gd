@@ -29,6 +29,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.ABSORB: "res://battle/rules/effects/absorb_effect.gd",
 	CardEffect.EffectType.APPLY_STATUS_TO_TARGET: "res://battle/rules/effects/apply_status_to_target_effect.gd",
 	CardEffect.EffectType.APPLY_STANCE: "res://battle/rules/effects/apply_stance_effect.gd",
+	CardEffect.EffectType.TOLL_HEAL: "res://battle/rules/effects/toll_heal_effect.gd",
 }
 
 var _cache: Dictionary = {}
@@ -39,11 +40,22 @@ var _cache: Dictionary = {}
 # ATTACK leaves both at nothing, which is how a stance card can be played
 # while a stance is already up without charging for itself.
 func resolve_card(card: CardData, ctx: EffectContext) -> void:
+	# Per card, not per effect: "if this kills" means this CARD's own
+	# damage, so a kill from the card before must not still be standing.
+	ctx.killed_this_card = false
 	ctx.stance_attack_bonus = 0
 	if card.card_type == CardData.CardType.ATTACK and ctx.player.stance != null:
 		ctx.stance_attack_bonus = Stance.attack_bonus(ctx.player.stance)
 		ctx.pay_stance_attack_cost(Stance.attack_hp_loss(ctx.player.stance))
 	for effect in card.effects:
+		# The gate lives HERE, not in each resolver - it used to be checked
+		# only inside damage_effect.gd, so a condition on any other effect
+		# type was silently ignored (With Regards' energy paid out whether
+		# or not the blow killed). A REPLACE still goes through: its
+		# condition chooses between two values rather than whether to
+		# resolve at all, and damage_effect.gd owns that choice.
+		if effect.alt_value == 0 and not condition_met(effect, ctx):
+			continue
 		var resolver: Object = _get_resolver(effect.effect_type)
 		if resolver != null:
 			resolver.resolve(effect, ctx)
@@ -69,4 +81,8 @@ static func condition_met(effect: CardEffect, ctx: EffectContext) -> bool:
 			return ctx.player.hp < ctx.player.max_hp * (effect.condition_value / 100.0)
 		CardEffect.Condition.FIRST_CARD_THIS_TURN:
 			return ctx.cards_played_this_turn == 0
+		CardEffect.Condition.TARGET_KILLED:
+			return ctx.killed_this_card
+		CardEffect.Condition.HAS_GRACE:
+			return ctx.player.grace > 0
 	return true

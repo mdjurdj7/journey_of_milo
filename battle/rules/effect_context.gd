@@ -24,6 +24,19 @@ var on_grace_reclaimed: Callable = Callable()
 # effect needs to know what a stance is.
 var stance_attack_bonus: int = 0
 
+# Did this card's damage finish something off? Set by damage_effect.gd,
+# cleared per card by EffectResolver.resolve_card(), read by
+# Condition.TARGET_KILLED - the one condition that depends on what an
+# earlier effect on the same card did rather than on state that already
+# existed.
+var killed_this_card: bool = false
+
+# HP put back by a card (HEAL, TOLL_HEAL). The rules mutate the
+# Combatant; this is how battle_controller.gd learns to mirror it onto
+# the run's own HP and tell the readouts - the same split report_damage()
+# already uses, and the same one Grace's reclaim uses.
+var on_heal: Callable = Callable()
+
 var on_damage: Callable = Callable()
 # Called as on_damage.call(target_combatant, amount, kind) whenever an
 # effect actually lands damage.
@@ -48,6 +61,18 @@ func pay_stance_attack_cost(amount: int) -> void:
 		player.toll += lost
 		player.took_damage_this_turn = true
 		report_damage(player, lost, "self")
+
+# Heals the player and reports it. Callers mutate through this rather
+# than touching hp directly, so the run's HP can't drift from the
+# fight's - it silently did for HEAL before this existed.
+func heal(amount: int) -> void:
+	if amount <= 0:
+		return
+	var before: int = player.hp
+	player.hp = mini(player.hp + amount, player.max_hp)
+	var gained: int = player.hp - before
+	if gained > 0 and on_heal.is_valid():
+		on_heal.call(gained)
 
 func grace_reclaim(damage_to_hp: int) -> void:
 	if damage_to_hp <= 0 or player.grace <= 0:

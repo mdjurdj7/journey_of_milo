@@ -15,7 +15,7 @@ enum EffectType {
 	TOLL_RETALIATE, SELF_DAMAGE_TOLL, TOLL_THRESHOLD_DAMAGE, DAMAGE_ALL,
 	APPLY_STATUS, FIRST_CARD_DAMAGE, TOLL_FRACTION_DAMAGE_ALL,
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
-	APPLY_STANCE,
+	APPLY_STANCE, TOLL_HEAL,
 }
 
 # When the effect resolves. Two modes, chosen by `alt_value` below rather
@@ -32,7 +32,7 @@ enum EffectType {
 # `alt_value` is that second value field, added for Left Hand (cards/
 # neutral/left_hand.tres) and read by damage_effect.gd ONLY - no other
 # resolver consults it, so every other type is gate-or-nothing as before.
-enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN }
+enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE }
 
 # Which combatant(s) an effect resolves against - lets DAMAGE_ALL collapse
 # into plain DAMAGE (target_scope = ALL_ENEMIES) instead of needing its
@@ -41,6 +41,11 @@ enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN }
 # nothing reads it yet.
 enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 
+# EFFECT ORDER IS LOAD-BEARING. Effects resolve top to bottom (see
+# EffectResolver.resolve_card()), and TARGET_KILLED reads what an EARLIER
+# effect on this same card did - so With Regards' GAIN_ENERGY has to sit
+# after its DAMAGE or it will never fire. Every other condition reads
+# state that exists before the card is played and doesn't care.
 @export var effect_type: EffectType = EffectType.DAMAGE
 @export var value: int = 0
 

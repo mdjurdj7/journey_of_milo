@@ -12,11 +12,11 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	# pipeline below - the reason this lives here rather than being
 	# authored as two stacked DAMAGE effects, which would run the pipeline
 	# twice and get blocked twice.
-	var met: bool = EffectResolver.condition_met(effect, ctx)
+	# Only the REPLACE choice is made here - a pure gate has already been
+	# applied by EffectResolver.resolve_card(), which is the one place
+	# that decides whether an effect resolves at all.
 	var replaces: bool = effect.alt_value != 0
-	if not met and not replaces:
-		return
-	var base: int = effect.alt_value if (met and replaces) else effect.value
+	var base: int = effect.alt_value if (replaces and EffectResolver.condition_met(effect, ctx)) else effect.value
 
 	# The stance's bonus is part of the attack's own number, so it goes in
 	# BEFORE the status modifiers - a status that scales outgoing damage
@@ -33,6 +33,8 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	for enemy in targets:
 		var incoming: int = Status.apply_modifiers(amount, enemy.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
 		var result := DamagePipeline.resolve(incoming, enemy)
+		if enemy.hp <= 0:
+			ctx.killed_this_card = true
 		if result["damage_to_hp"] > 0:
 			ctx.report_damage(enemy, result["damage_to_hp"], "card")
 			ctx.grace_reclaim(result["damage_to_hp"])
