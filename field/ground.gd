@@ -435,7 +435,7 @@ signal relief_rebuilt
 # inputs (wrapped time, period, phase-noise scale, the noise tile) are
 # pushed by Sea - see set_swash_source()/set_sea_time() - so this reads
 # the identical phase the sea's wash uses; nothing here is authored.
-@export var wet_band_surge: float = 0.25:
+@export var wet_band_surge: float = 0.15:
 	set(value):
 		wet_band_surge = value
 		_apply_uniform("wet_band_surge", value)
@@ -462,11 +462,11 @@ signal relief_rebuilt
 	set(value):
 		swash_sheet_color = value
 		_apply_uniform("swash_sheet_color", value)
-@export_range(0.0, 1.0) var swash_sheet_alpha: float = 0.45:
+@export_range(0.0, 1.0) var swash_sheet_alpha: float = 0.30:
 	set(value):
 		swash_sheet_alpha = value
 		_apply_uniform("swash_sheet_alpha", value)
-@export var swash_edge_width_ground: float = 0.08:
+@export var swash_edge_width_ground: float = 0.14:
 	set(value):
 		swash_edge_width_ground = value
 		_apply_uniform("swash_edge_width_ground", value)

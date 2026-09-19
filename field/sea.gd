@@ -240,19 +240,19 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 # thing near the line; a crisp leading edge (swash_edge_width of depth)
 # and a soft trailing edge (swash_band_width) - see sea.gdshader's own
 # swash_color doc.
-@export var swash_color: Color = Color(0.82, 0.84, 0.82):
+@export var swash_color: Color = Color(0.76, 0.79, 0.78):
 	set(value):
 		swash_color = value
 		_apply_uniform("swash_color", value)
-@export_range(0.0, 1.0) var swash_strength: float = 0.7:
+@export_range(0.0, 1.0) var swash_strength: float = 0.45:
 	set(value):
 		swash_strength = value
 		_apply_uniform("swash_strength", value)
-@export var swash_edge_width: float = 0.05:
+@export var swash_edge_width: float = 0.08:
 	set(value):
 		swash_edge_width = value
 		_apply_uniform("swash_edge_width", value)
-@export var swash_period: float = 7.0:
+@export var swash_period: float = 10.0:
 	set(value):
 		swash_period = value
 		_apply_uniform("swash_period", value)
