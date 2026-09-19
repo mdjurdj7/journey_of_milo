@@ -6,7 +6,7 @@
 [sub_resource type="Resource" id="CardEffect_undamaged_block"]
 script = ExtResource("2_card_effect")
 effect_type = 15
-value = 6
+value = 4
 bonus_value = 4
 
 [resource]
@@ -15,6 +15,6 @@ card_name = "Untouched"
 cost = 1
 card_type = 1
 target_type = 1
-description = "Gain 6 block.
+description = "Gain 4 block.
 If you took no damage last turn, gain 4 more."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_undamaged_block")])
