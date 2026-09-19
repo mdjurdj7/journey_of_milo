@@ -69,6 +69,23 @@ class_name EnemyStatus
 @export var block_min_length_px: float = 6.0
 @export var battle_scale: float = 1.0
 
+@export_group("Block Readout")
+# While block is up, the card's open-shield glyph with the block value
+# centred inside it sits to the LEFT of the HP numeral, both ink at
+# block_readout_alpha, block_hp_gap_px before the numeral. The readout
+# grows leftward for it - the HP block stays put on the anchor.
+@export var block_glyph_size_px: float = 24.0
+@export var block_glyph_line_width_px: float = 1.5
+# The shield's centre sits this fraction of the HP numeral's size above
+# the HP baseline - level with the numeral's cap centre.
+@export var block_glyph_baseline_lift: float = 0.33
+@export var block_value_size_px: int = 13
+# The value's baseline sits this fraction of its size below the shield's
+# centre, which centres its cap height on the shield.
+@export var block_value_baseline_drop: float = 0.33
+@export_range(0.0, 1.0) var block_readout_alpha: float = 0.7
+@export var block_hp_gap_px: float = 16.0
+
 @export_group("Distance Scale")
 @export var min_scale: float = 0.6
 @export var max_scale: float = 1.0
@@ -150,8 +167,43 @@ func _numeral_ascent() -> float:
 func _numeral_descent() -> float:
 	return numeral_font.get_descent(battle_numeral_size_px) if numeral_font != null else 0.0
 
+# The block readout's width including its gap to the HP numeral - the
+# HP block's own left edge; 0 while no block is up.
+func _block_readout_width() -> float:
+	if _block <= 0:
+		return 0.0
+	return block_glyph_size_px + block_hp_gap_px
+
+# Shield glyph (the card's guard glyph, CardView._draw_glyph()) with the
+# value centred inside it, level with the HP numeral's cap centre.
+func _draw_block_readout(baseline: float, ink: Color) -> void:
+	if _block <= 0:
+		return
+	var color: Color = ink
+	color.a *= block_readout_alpha
+	var r: float = block_glyph_size_px * 0.5
+	var centre := Vector2(r, baseline - float(battle_numeral_size_px) * block_glyph_baseline_lift)
+	var shield := PackedVector2Array([
+		centre + Vector2(-r * 0.8, -r * 0.9), centre + Vector2(r * 0.8, -r * 0.9), centre + Vector2(r * 0.8, r * 0.1),
+		centre + Vector2(0.0, r * 0.95), centre + Vector2(-r * 0.8, r * 0.1), centre + Vector2(-r * 0.8, -r * 0.9),
+	])
+	draw_polyline(shield, color, block_glyph_line_width_px, true)
+	var value_text: String = str(_block)
+	var value_width: float = InkType.width(numeral_font, value_text, block_value_size_px)
+	var value_origin := Vector2(centre.x - value_width * 0.5, centre.y + float(block_value_size_px) * block_value_baseline_drop)
+	InkType.draw_run(self, numeral_font, value_text, value_origin, block_value_size_px, color)
+
 func _battle_content_size() -> Vector2:
-	return Vector2(battle_width, _numeral_ascent() + _numeral_descent() + battle_row_gap + battle_bar_height)
+	return Vector2(_block_readout_width() + battle_width, _numeral_ascent() + _numeral_descent() + battle_row_gap + battle_bar_height)
+
+# The point of this control that sits on the unprojected anchor (and
+# that DistanceScale scales about): the field layout's centre, or the HP
+# block's centre in battle - the block readout hangs off to its left,
+# never shifting the bar off the enemy.
+func _anchor_offset() -> Vector2:
+	var field_offset: Vector2 = _field_content_size() / 2.0
+	var battle_offset := Vector2(_block_readout_width() + battle_width / 2.0, _battle_content_size().y / 2.0)
+	return field_offset.lerp(battle_offset, _battle_blend)
 
 # This control's size eases between the two layouts' sizes with the
 # blend (see the class doc) - pivot_offset centres scale (see
@@ -161,7 +213,7 @@ func _battle_content_size() -> Vector2:
 func _apply_layout() -> void:
 	var content_size: Vector2 = _field_content_size().lerp(_battle_content_size(), _battle_blend)
 	size = content_size
-	pivot_offset = content_size / 2.0
+	pivot_offset = _anchor_offset()
 
 	var field_alpha: float = 1.0 - _battle_blend
 	var numbers_line_height: float = numbers_font_size_px * 1.3
@@ -199,22 +251,24 @@ func _draw() -> void:
 	track.a = battle_track_alpha * _battle_blend
 
 	var baseline: float = _numeral_ascent()
-	var x: float = InkType.draw_run(self, numeral_font, str(maxi(_current_hp, 0)), Vector2(0.0, baseline), battle_numeral_size_px, ink)
+	_draw_block_readout(baseline, ink)
+	var left: float = _block_readout_width()
+	var x: float = left + InkType.draw_run(self, numeral_font, str(maxi(_current_hp, 0)), Vector2(left, baseline), battle_numeral_size_px, ink)
 	InkType.draw_run(self, numeral_font, battle_max_prefix + str(_max_hp), Vector2(x, baseline), battle_max_size_px, secondary)
 
 	var name_text: String = _enemy_name()
 	if _name_font_tracked != null and not name_text.is_empty():
 		var name_width: float = InkType.width(_name_font_tracked, name_text, battle_name_size_px)
-		InkType.draw_run(self, _name_font_tracked, name_text, Vector2(battle_width - name_width, baseline), battle_name_size_px, secondary)
+		InkType.draw_run(self, _name_font_tracked, name_text, Vector2(left + battle_width - name_width, baseline), battle_name_size_px, secondary)
 
 	var bar_top: float = baseline + _numeral_descent() + battle_row_gap
-	draw_rect(Rect2(0.0, bar_top, battle_width, battle_bar_height), track)
-	draw_rect(Rect2(0.0, bar_top, battle_width * _current_hp_fraction(), battle_bar_height), ink)
+	draw_rect(Rect2(left, bar_top, battle_width, battle_bar_height), track)
+	draw_rect(Rect2(left, bar_top, battle_width * _current_hp_fraction(), battle_bar_height), ink)
 
 	if _block > 0 and _max_hp > 0:
 		var length: float = maxf(battle_width * clampf(float(_block) / float(_max_hp), 0.0, 1.0), block_min_length_px)
 		var block_top: float = bar_top - block_gap_px - block_thickness_px
-		draw_rect(Rect2(0.0, block_top, length, block_thickness_px), ink)
+		draw_rect(Rect2(left, block_top, length, block_thickness_px), ink)
 
 func _enemy_name() -> String:
 	if target == null or not is_instance_valid(target) or target.enemy_data == null:
@@ -295,7 +349,7 @@ func _apply_hp(current: int, max_hp: int) -> void:
 # style never shows it.
 func set_block(block: int) -> void:
 	_block = maxi(block, 0)
-	queue_redraw()
+	_apply_layout()
 
 # Called by BattleOverlay when this enemy's fight starts/ends (see its own
 # _create_enemy_statuses()/_finish_battle()) - bypasses the field hover/
@@ -338,7 +392,7 @@ func _physics_process(delta: float) -> void:
 	# Whole pixels only - a fractional Control position on a bare bar (no
 	# panel background to visually absorb it) reads as shimmer/jitter on
 	# thin edges, most visibly on the 1px label outline.
-	position = (screen_pos - size / 2.0).round()
+	position = (screen_pos - _anchor_offset()).round()
 
 	var distance: float = camera.global_position.distance_to(target_position)
 	var field_scale: float = DistanceScale.compute_scale(distance, near_scale_distance, far_scale_distance, min_scale, max_scale)
