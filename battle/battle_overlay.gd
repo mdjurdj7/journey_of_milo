@@ -135,6 +135,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.target_cancelled.connect(_on_target_cancelled)
 	battle_controller.card_played.connect(_on_card_played)
 	battle_controller.toll_changed.connect(_on_toll_changed)
+	battle_controller.grace_changed.connect(_on_grace_changed)
 	battle_controller.enemy_hp_changed.connect(_on_enemy_hp_changed)
 	battle_controller.damage_dealt.connect(_on_damage_dealt)
 	battle_controller.enemy_intent_changed.connect(_on_enemy_intent_changed)
@@ -264,6 +265,9 @@ func _on_energy_changed(current: int) -> void:
 func _on_toll_changed(new_toll: int) -> void:
 	_field_hp_bar.update_toll(new_toll)
 
+func _on_grace_changed(grace: int) -> void:
+	_field_hp_bar.update_grace(grace)
+
 # Block moved somewhere (a card, a turn start, an enemy's own guard) -
 # every readout's segment follows.
 func _on_status_changed() -> void:
@@ -319,6 +323,9 @@ func _screen_pos_for_damage_target(target: Variant) -> Vector2:
 # reacts to battle_finished and frees this overlay.
 func _finish_battle(outcome: Outcome) -> void:
 	_field_hp_bar.hide_toll()
+	# Grace is per fight (it lives on the Combatant, which this battle's
+	# end discards) - the segment goes with it whatever the outcome.
+	_field_hp_bar.hide_grace()
 	_field_hp_bar.exit_battle(_battle_transition_time)
 	if _field_deck_panel != null:
 		_field_deck_panel.visible = true

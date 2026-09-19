@@ -19,12 +19,20 @@ var statuses: Array[Status] = []
 var toll: int = 0
 var energy: int = 0
 var max_energy: int = 3
-var rally_pool: int = 0
-var rally_recovery_percent: int = 50
-# Default only - BattleController.setup() overwrites this from RunState.
-# character.rally_recovery_percent (the run's own CharacterData) the
-# instant a Combatant is created, same as the old project read it from
-# CharacterData directly.
+# Grace: HP an enemy took that this player can still take back, and how
+# many of their turns are left to do it in. Per FIGHT, not per run - a
+# Combatant is rebuilt by BattleController.setup() every battle, so
+# leaving or winning a fight discards any open Grace with nothing to
+# clear. See CharacterData's own Grace doc for the rule.
+var grace: int = 0
+var grace_turns_left: int = 0
+# Defaults only - BattleController.setup() overwrites all three from
+# RunState.character (the run's own CharacterData) the instant a
+# Combatant is created. False on every enemy Combatant, which is what
+# keeps Grace the Wanderer's alone.
+var has_grace: bool = false
+var grace_cap_mode: int = CharacterData.GraceCapMode.LARGEST_HIT
+var grace_window_turns: int = 1
 var took_damage_this_turn: bool = false
 var took_damage_last_turn: bool = false
 

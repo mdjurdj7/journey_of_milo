@@ -31,4 +31,4 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 		var result := DamagePipeline.resolve(incoming, enemy)
 		if result["damage_to_hp"] > 0:
 			ctx.report_damage(enemy, result["damage_to_hp"], "card")
-			ctx.contribute_to_rally(result["damage_to_hp"])
+			ctx.grace_reclaim(result["damage_to_hp"])

@@ -27,7 +27,7 @@ static func current_intent(combatant: Combatant, data: EnemyData) -> EnemyIntent
 # report), so a duration-1 status still affects the very turn that ticks
 # it to 0.
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0}
+	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0}
 
 	Status.tick_all(combatant.statuses, func(amount: int) -> void:
 		combatant.hp = max(combatant.hp - amount, 0)
@@ -48,16 +48,23 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# first; block/absorb are worn down hit by hit.
 				result["attacked"] = true
 				var total_to_hp: int = 0
+				# Tracked per hit as well as summed, because Grace's
+				# LARGEST_HIT cap is about one hit, not the turn's total -
+				# and DamagePipeline is the only thing that knows the split
+				# between what block ate and what reached HP.
+				var largest_hit: int = 0
 				for _hit in maxi(intent.hits, 1):
 					var amount: int = Status.apply_modifiers(intent.value, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 					amount = Status.apply_modifiers(amount, player.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
 					Status.consume_triggered(player.statuses)
 					var damage_result := DamagePipeline.resolve(amount, player)
-					total_to_hp += damage_result["damage_to_hp"]
+					var to_hp: int = damage_result["damage_to_hp"]
+					total_to_hp += to_hp
+					largest_hit = maxi(largest_hit, to_hp)
 				result["damage_to_hp"] = total_to_hp
 				if total_to_hp > 0:
-					player.rally_pool += total_to_hp
 					player.took_damage_this_turn = true
+					result["grace_opened"] = open_grace(player, largest_hit, total_to_hp)
 			EnemyIntent.IntentType.DEFEND:
 				combatant.block += intent.value
 				result["defended"] = true
@@ -107,6 +114,28 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	preview["damage_to_hp"] = total_to_hp
 	preview["lethal"] = total_to_hp >= player.hp
 	return preview
+
+# Unblocked damage becomes Grace. Accumulates ACROSS the whole enemy
+# turn rather than per enemy: the cap is the window's, so two enemies
+# hitting for 5 and 8 leave 8 under LARGEST_HIT and 13 under SUM. Called
+# by take_turn() and never by anything else; public only so
+# battle_controller.gd's tests of the same rule have a seam.
+#
+# Only reached when damage actually got past block and absorb, and never
+# from DamagePipeline.apply_bypass() - which is the whole of self-damage
+# and status ticks - so a Bite Down opens nothing without being
+# special-cased. Returns how much Grace this call added.
+static func open_grace(player: Combatant, largest_hit: int, total_to_hp: int) -> int:
+	if not player.has_grace:
+		return 0
+	var before: int = player.grace
+	if player.grace_cap_mode == CharacterData.GraceCapMode.SUM:
+		player.grace += total_to_hp
+	else:
+		player.grace = maxi(player.grace, largest_hit)
+	if player.grace > before:
+		player.grace_turns_left = maxi(player.grace_window_turns, 1)
+	return player.grace - before
 
 static func _advance_intent(combatant: Combatant, data: EnemyData) -> void:
 	if data.intents.is_empty():

@@ -26,6 +26,8 @@ signal hp_changed(current: int, max_hp: int)
 # played, a turn start) - HandContainer fades what can't be afforded.
 signal energy_changed(current: int)
 signal toll_changed(new_toll: int)
+# Grace opened, spent or lost - the HP bar's pale segment follows this.
+signal grace_changed(grace: int)
 signal status_changed()
 # False the moment end_turn() commits (the enemy turn is running), true
 # again once the next player turn has started - BattleOverlay disables
@@ -89,7 +91,9 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 
 	player = Combatant.new(RunState.player_max_hp)
 	player.hp = RunState.player_hp
-	player.rally_recovery_percent = RunState.character.rally_recovery_percent
+	player.has_grace = RunState.character.has_grace
+	player.grace_cap_mode = RunState.character.grace_cap_mode
+	player.grace_window_turns = RunState.character.grace_window_turns
 	player.energy = player.max_energy
 
 	_combatants.clear()
@@ -184,7 +188,7 @@ func end_turn() -> void:
 	_input_locked = true
 	turn_phase_changed.emit(false)
 	_hand_container.discard_hand()
-	player.rally_pool = 0
+	_close_grace_window()
 	await _run_enemy_turn()
 	_input_locked = false
 	if not _check_battle_end():
@@ -229,7 +233,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	ctx.enemies = _living_enemy_combatants()
 	ctx.deck = deck
 	ctx.cards_played_this_turn = cards_played_this_turn
-	ctx.rally_window = RallyWindow.new()
+	ctx.on_grace_reclaimed = _on_grace_reclaimed
 	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
 		_report_damage("player", target_combatant, amount, kind)
 
@@ -295,6 +299,9 @@ func _run_enemy_turn() -> void:
 			if result["damage_to_hp"] > 0:
 				RunLogger.log_damage_taken(result["damage_to_hp"])
 				_report_damage(enemy, player, result["damage_to_hp"], "attack")
+			if result["grace_opened"] > 0:
+				RunLogger.log_grace_opened(result["grace_opened"], player.grace)
+				grace_changed.emit(player.grace)
 		status_changed.emit()
 		# take_turn() has already advanced this enemy to its next intent -
 		# show it the moment this action has landed.
@@ -359,6 +366,33 @@ func _living_enemy_combatants() -> Array[Combatant]:
 # emitted signal reports the FieldEnemy/"player" pair the view actually
 # understands, and also fans out into hp_changed/enemy_hp_changed so the
 # overlay never has to re-derive HP from a damage event itself.
+# Grace spent: the rules layer has already taken it off player.grace and
+# put it back on player.hp (see EffectContext.grace_reclaim()); this
+# mirrors it onto the run's own HP and tells the readouts. Through
+# RunState.heal(), which touches HP and nothing else - Toll accrues only
+# from SELF-inflicted loss (status ticks, SELF_DAMAGE, SELF_DAMAGE_TOLL),
+# so reclaiming cannot generate Toll or undo any.
+func _on_grace_reclaimed(amount: int) -> void:
+	RunState.heal(amount)
+	RunLogger.log_grace_reclaimed(amount, player.grace)
+	hp_changed.emit(player.hp, player.max_hp)
+	grace_changed.emit(player.grace)
+
+# End of the player's turn: the window ages, and whatever Grace is left
+# when it runs out is gone. Runs BEFORE the enemy turn (see end_turn()),
+# so the hits that are about to land open a fresh window rather than
+# topping up a spent one.
+func _close_grace_window() -> void:
+	if player.grace <= 0:
+		player.grace_turns_left = 0
+		return
+	player.grace_turns_left -= 1
+	if player.grace_turns_left > 0:
+		return
+	RunLogger.log_grace_lost(player.grace)
+	player.grace = 0
+	grace_changed.emit(0)
+
 func _report_damage(source: Variant, target_combatant: Combatant, amount: int, kind: String) -> void:
 	RunLogger.log_damage_dealt(amount)
 	if target_combatant == player:

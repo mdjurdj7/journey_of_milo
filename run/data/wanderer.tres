@@ -18,4 +18,4 @@ ExtResource("4_brace"): 2,
 ExtResource("5_reckoning"): 1,
 ExtResource("6_down_payment"): 1
 }
-rally_recovery_percent = 50
+has_grace = true

@@ -44,7 +44,7 @@ signal disarmed
 enum KeylineType { STRIKE, GUARD, TOLL, UTILITY }
 
 # Rules-text words set in bold. Whole-word, case-sensitive.
-const KEYWORDS: Array[String] = ["Toll", "Rally"]
+const KEYWORDS: Array[String] = ["Toll", "Grace"]
 
 @export var card_size: Vector2 = Vector2(200.0, 280.0)
 

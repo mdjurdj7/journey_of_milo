@@ -77,6 +77,13 @@ class_name HPBar
 @export var block_thickness_px: float = 2.0
 @export var block_gap_px: float = 2.0
 @export var block_min_length_px: float = 6.0
+# Grace (the Wanderer's passive - see CharacterData): HP an enemy took
+# that is still reclaimable this turn, drawn INSIDE the bar immediately
+# right of the filled HP, in ink at grace_alpha. Unlike block - which is
+# its own rule floating above the bar - this is part of the bar, because
+# it is literally the stretch of HP you could still get back. No numeral:
+# the HP numeral keeps reading current HP, which is what you have.
+@export_range(0.0, 1.0) var grace_alpha: float = 0.3
 @export var battle_scale: float = 1.0
 
 @export_group("Block Readout")
@@ -125,6 +132,7 @@ var _wanderer: Wanderer = null
 var _current_hp: int = 0
 var _max_hp: int = 1
 var _block: int = 0
+var _grace: int = 0
 var _toll: int = 0
 var _toll_visible: bool = false
 var _toll_pop: float = 1.0
@@ -316,6 +324,19 @@ func _draw() -> void:
 	draw_rect(Rect2(left, bar_top, battle_width, battle_bar_height), track)
 	draw_rect(Rect2(left, bar_top, battle_width * _displayed_fraction, battle_bar_height), ink)
 
+	# Pinned to _displayed_fraction, so it stays welded to the filled end
+	# while the bar eases toward a new HP value rather than briefly
+	# overlapping or detaching from it.
+	if _grace > 0 and _max_hp > 0:
+		var grace_left: float = left + battle_width * _displayed_fraction
+		var grace_length: float = battle_width * clampf(float(_grace) / float(_max_hp), 0.0, 1.0)
+		# Never past the bar's own right end, however much is open.
+		grace_length = minf(grace_length, left + battle_width - grace_left)
+		if grace_length > 0.0:
+			var grace_color: Color = _ink
+			grace_color.a = grace_alpha * _battle_blend
+			draw_rect(Rect2(grace_left, bar_top, grace_length, battle_bar_height), grace_color)
+
 	if _block > 0 and _max_hp > 0:
 		var length: float = maxf(battle_width * clampf(float(_block) / float(_max_hp), 0.0, 1.0), block_min_length_px)
 		var block_top: float = bar_top - block_gap_px - block_thickness_px
@@ -450,6 +471,15 @@ func _set_displayed_fraction(value: float) -> void:
 func set_block(block: int) -> void:
 	_block = maxi(block, 0)
 	_apply_layout()
+
+# Grace changed (opened by an enemy turn, spent by a hit, or lost when
+# the window closed). 0 simply draws nothing.
+func update_grace(grace: int) -> void:
+	_grace = maxi(grace, 0)
+	queue_redraw()
+
+func hide_grace() -> void:
+	update_grace(0)
 
 # Called by BattleOverlay.enter_battle()/_finish_battle() - bypasses the
 # field hover/hold/low-hp visibility rules entirely while true (see

@@ -29,6 +29,19 @@ static func log_damage_blocked(_amount: int) -> void:
 static func log_toll_change(_new_toll: int) -> void:
 	pass
 
+# Grace, the Wanderer's passive (see CharacterData): how much an enemy
+# turn opened, how much the player took back with a hit, and how much ran
+# out unclaimed at the end of their turn. `remaining` is what is still
+# open after the event, so a turn's three lines reconcile on their own.
+static func log_grace_opened(_amount: int, _remaining: int) -> void:
+	pass
+
+static func log_grace_reclaimed(_amount: int, _remaining: int) -> void:
+	pass
+
+static func log_grace_lost(_amount: int) -> void:
+	pass
+
 static func begin_turn(_turn_number: int, _hp: int) -> void:
 	pass
 
