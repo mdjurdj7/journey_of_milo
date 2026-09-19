@@ -37,6 +37,17 @@ var character: CharacterData = null
 var current_region_index: int = 0
 var current_floor_index: int = 0
 
+# The run's one generator. Everything that rolls something a player could
+# call luck draws from HERE rather than from the global randi(), so a run
+# is one sequence and can be replayed from its seed: the Keeper's card
+# (Keeper._pick_card()) and a fight's reward spread (RewardSpread) both
+# use it today. Seeded in new_run(); `seed` is kept so a run can say
+# which one it was, and so a future "replay this seed" has something to
+# set. Deliberately NOT used for anything cosmetic - a bird's flight or a
+# wave's phase must not shift the card you are about to be offered.
+var rng: RandomNumberGenerator = RandomNumberGenerator.new()
+var run_seed: int = 0
+
 # Starts a brand new run: seeds HP and the starting Belongings from
 # `starting_character`'s own values, resets run-graph position. The only
 # intended caller today is region_field.gd's _ready() (called once at
@@ -44,6 +55,11 @@ var current_floor_index: int = 0
 # character-select screen, etc.) isn't wired up yet.
 func new_run(starting_character: CharacterData) -> void:
 	character = starting_character
+	# Fresh seed per run, recorded rather than thrown away. randi() is
+	# fine as the SOURCE of a seed - it's the one roll that doesn't need
+	# to be reproducible, since it's what makes the rest of them so.
+	run_seed = randi()
+	rng.seed = run_seed
 	player_max_hp = starting_character.max_hp
 	player_hp = player_max_hp
 	deck = _build_starting_deck(starting_character)

@@ -543,10 +543,9 @@ func _spawn_world_card() -> void:
 	add_child(_world_card)
 
 # offered_card forces the pick; otherwise roll once per run and remember
-# it. RunState has no seeded RNG of its own today (checked - new_run()
-# seeds HP and the deck, nothing else), so this is a plain randi(); move
-# it onto that generator the day one exists, or a re-rolled run stops
-# being reproducible.
+# it. Draws from RunState.rng, the run's own seeded generator, so which
+# card she holds belongs to the run's sequence rather than to whenever
+# the scene happened to load.
 func _pick_card() -> CardData:
 	if offered_card != null:
 		return offered_card
@@ -554,7 +553,7 @@ func _pick_card() -> CardData:
 		return _pool_pick
 	if keeper_pool.is_empty():
 		return null
-	_pool_pick = keeper_pool[randi() % keeper_pool.size()]
+	_pool_pick = keeper_pool[RunState.rng.randi() % keeper_pool.size()]
 	return _pool_pick
 
 # Taking is the offer: RunState.add_card() already ran inside WorldCard
