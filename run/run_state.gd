@@ -50,11 +50,12 @@ func new_run(starting_character: CharacterData) -> void:
 	current_region_index = 0
 	current_floor_index = 0
 	# Field findings (a Hull's one-time world line, a Bird's one-time
-	# flight) are remembered per run in their own static sets - see
-	# Hull._findings_shown / Bird._flown - so a new run starts with none
-	# of them heard or flown.
+	# flight, the Keeper's one-time offer) are remembered per run in their
+	# own static sets - see Hull._findings_shown / Bird._flown / Keeper.
+	# _offers_made - so a new run starts with none of them spent.
 	Hull.reset_findings()
 	Bird.reset_flights()
+	Keeper.reset_offers()
 	player_hp_changed.emit(player_hp, player_max_hp)
 	deck_changed.emit()
 

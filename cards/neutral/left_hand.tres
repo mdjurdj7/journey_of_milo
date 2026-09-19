@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+
+[sub_resource type="Resource" id="CardEffect_first_card_damage"]
+script = ExtResource("2_card_effect")
+effect_type = 13
+value = 6
+condition = 3
+alt_value = 10
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Left Hand"
+cost = 1
+card_type = 0
+target_type = 0
+description = "Deal 6 damage.
+If this is the first card you've played this turn, deal 10 instead."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_first_card_damage")])
+battle_animation = &"Slash"
+impact_time = 0.55

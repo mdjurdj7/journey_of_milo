@@ -1,0 +1,10 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://field/keeper.gd" id="1_keeper"]
+[ext_resource type="Resource" path="res://cards/neutral/left_hand.tres" id="2_left_hand"]
+[ext_resource type="Resource" path="res://cards/neutral/untouched.tres" id="3_untouched"]
+[ext_resource type="Resource" path="res://cards/neutral/second_thoughts.tres" id="4_second_thoughts"]
+
+[node name="Keeper" type="Node3D"]
+script = ExtResource("1_keeper")
+keeper_pool = Array[ExtResource("2_left_hand")]([ExtResource("2_left_hand"), ExtResource("3_untouched"), ExtResource("4_second_thoughts")])

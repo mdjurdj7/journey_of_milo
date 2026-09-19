@@ -19,6 +19,7 @@
 [ext_resource type="PackedScene" path="res://field/exit_gate.tscn" id="16"]
 [ext_resource type="PackedScene" path="res://field/hull.tscn" id="17"]
 [ext_resource type="PackedScene" path="res://field/bird.tscn" id="18"]
+[ext_resource type="PackedScene" path="res://field/keeper.tscn" id="19"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -569,6 +570,11 @@ mesh = SubResource("BoxMesh_ruin_mass_3")
 [node name="MassLowBroad" type="MeshInstance3D" parent="RuinBlockout/CollapsedMass" unique_id=-1094967262]
 transform = Transform3D(0.978, 0, -0.208, 0, 1, 0, 0.208, 0, 0.978, 10.2, 0.7, -12.8)
 mesh = SubResource("BoxMesh_ruin_mass_4")
+
+[node name="Keeper" parent="." instance=ExtResource("19")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 10.119, 0, -7)
+face_direction = 3
+face_yaw_offset_degrees = 30.0
 
 [node name="Hulls" type="Node3D" parent="."]
 
