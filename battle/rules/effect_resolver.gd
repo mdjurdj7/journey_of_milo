@@ -28,11 +28,21 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.GAIN_ENERGY: "res://battle/rules/effects/gain_energy_effect.gd",
 	CardEffect.EffectType.ABSORB: "res://battle/rules/effects/absorb_effect.gd",
 	CardEffect.EffectType.APPLY_STATUS_TO_TARGET: "res://battle/rules/effects/apply_status_to_target_effect.gd",
+	CardEffect.EffectType.APPLY_STANCE: "res://battle/rules/effects/apply_stance_effect.gd",
 }
 
 var _cache: Dictionary = {}
 
+# The stance pass runs BEFORE the card's own effects: an Attack pays the
+# active stance's price as part of being played, and the bonus it buys has
+# to be on ctx before any damage effect reads it. A card that isn't an
+# ATTACK leaves both at nothing, which is how a stance card can be played
+# while a stance is already up without charging for itself.
 func resolve_card(card: CardData, ctx: EffectContext) -> void:
+	ctx.stance_attack_bonus = 0
+	if card.card_type == CardData.CardType.ATTACK and ctx.player.stance != null:
+		ctx.stance_attack_bonus = Stance.attack_bonus(ctx.player.stance)
+		ctx.pay_stance_attack_cost(Stance.attack_hp_loss(ctx.player.stance))
 	for effect in card.effects:
 		var resolver: Object = _get_resolver(effect.effect_type)
 		if resolver != null:

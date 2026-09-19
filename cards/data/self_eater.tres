@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" path="res://battle/rules/stances/self_eater.tres" id="3_self_eater"]
+
+[sub_resource type="Resource" id="CardEffect_apply_stance"]
+script = ExtResource("2_card_effect")
+effect_type = 19
+stance_data = ExtResource("3_self_eater")
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Self-Eater"
+cost = 1
+card_type = 2
+target_type = 1
+description = "Whenever you play an Attack, lose 2 HP.
+That Attack deals 3 additional damage."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_stance")])

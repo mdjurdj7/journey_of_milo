@@ -18,7 +18,11 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 		return
 	var base: int = effect.alt_value if (met and replaces) else effect.value
 
-	var amount: int = Status.apply_modifiers(base, ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+	# The stance's bonus is part of the attack's own number, so it goes in
+	# BEFORE the status modifiers - a status that scales outgoing damage
+	# scales the whole blow, stance included, rather than only the part
+	# the card authored.
+	var amount: int = Status.apply_modifiers(base + ctx.stance_attack_bonus, ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 
 	var targets: Array[Combatant] = []
 	if effect.target_scope == CardEffect.TargetScope.ALL_ENEMIES:

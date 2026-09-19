@@ -10,6 +10,10 @@ var max_hp: int = 1
 var block: int = 0
 var absorb: int = 0
 var statuses: Array[Status] = []
+# The one stance this fighter holds, or null. Player-only in practice;
+# an enemy simply never takes one. See stance.gd for why it's one and not
+# a list.
+var stance: Stance = null
 
 # --- Player-only resources ---
 #

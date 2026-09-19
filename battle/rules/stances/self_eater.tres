@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="StanceData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/stance_data.gd" id="1_stance_data"]
+
+[resource]
+script = ExtResource("1_stance_data")
+id = "self_eater"
+display_name = "Self-Eater"
+description = "Whenever you play an Attack, lose 2 HP. That Attack deals 3 additional damage."
+attack_hp_loss = 2
+attack_damage_bonus = 3
+duration_turns = 0

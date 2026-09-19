@@ -15,6 +15,7 @@ enum EffectType {
 	TOLL_RETALIATE, SELF_DAMAGE_TOLL, TOLL_THRESHOLD_DAMAGE, DAMAGE_ALL,
 	APPLY_STATUS, FIRST_CARD_DAMAGE, TOLL_FRACTION_DAMAGE_ALL,
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
+	APPLY_STANCE,
 }
 
 # When the effect resolves. Two modes, chosen by `alt_value` below rather
@@ -61,6 +62,10 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 
 @export var toll_cost: int = 0
 # Fixed Toll spent by TOLL_BLOCK/TOLL_RETALIATE. Unused by every other type.
+
+@export var stance_data: StanceData = null
+# Read by APPLY_STANCE only. The stance a STANCE card takes - or deepens,
+# when it is the one already held.
 
 @export var status_data: StatusData = null
 # Read by TOLL_RETALIATE, APPLY_STATUS, APPLY_STATUS_TO_TARGET. Unused by

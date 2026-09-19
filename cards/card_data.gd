@@ -3,11 +3,11 @@ class_name CardData
 
 enum TargetType { ENEMY, SELF, NONE }
 
-# Drives CardView's own art-fill/border color (see its own art_color_attack/
-# art_color_skill exports) - no gameplay effect of its own. STANCE isn't
-# added here yet since no card needs it; add it alongside CardView's own
-# third color export once one does.
-enum CardType { ATTACK, SKILL }
+# ATTACK is what a stance's on-attack hook fires on (see StanceData), so
+# this is no longer display-only: getting a card's type wrong now changes
+# what it costs to play. Appended, never reordered - the integers are
+# baked into every .tres.
+enum CardType { ATTACK, SKILL, STANCE }
 
 enum RemovalScope { NONE, SPENT, CONSUMED }
 # NONE: goes to the discard pile, reshuffles back in for the rest of the

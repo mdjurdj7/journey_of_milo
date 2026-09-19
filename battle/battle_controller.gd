@@ -28,6 +28,10 @@ signal energy_changed(current: int)
 signal toll_changed(new_toll: int)
 # Grace opened, spent or lost - the HP bar's pale segment follows this.
 signal grace_changed(grace: int)
+# The player's stance was taken, deepened, replaced or expired. Carries
+# the live Stance (null when none) - the stance row and the card faces
+# both re-read from it.
+signal stance_changed(stance: Stance)
 signal status_changed()
 # False the moment end_turn() commits (the enemy turn is running), true
 # again once the next player turn has started - BattleOverlay disables
@@ -189,6 +193,10 @@ func end_turn() -> void:
 	turn_phase_changed.emit(false)
 	_hand_container.discard_hand()
 	_close_grace_window()
+	# A stance with a duration ages on the player's own turn ending, the
+	# same beat Grace closes on.
+	if Stance.tick(player):
+		stance_changed.emit(player.stance)
 	await _run_enemy_turn()
 	_input_locked = false
 	if not _check_battle_end():
@@ -239,6 +247,10 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 
 	_effect_resolver.resolve_card(card, ctx)
 	cards_played_this_turn += 1
+	# Taken, deepened or replaced by the card just played - and the card
+	# faces need to know either way, since a stance changes what the hand
+	# says it will do.
+	stance_changed.emit(player.stance)
 
 	toll_changed.emit(player.toll)
 	status_changed.emit()
