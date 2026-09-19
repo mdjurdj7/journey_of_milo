@@ -5,7 +5,7 @@
 [ext_resource type="Script" uid="uid://cdvgdcbobcq5y" path="res://field/overcast_light.gd" id="3"]
 [ext_resource type="Script" uid="uid://bh86ttpfd68tx" path="res://field/ground.gd" id="4"]
 [ext_resource type="Script" uid="uid://boqbnc57buiff" path="res://field/tower.gd" id="5"]
-[ext_resource type="Texture2D" uid="uid://ddam5sfywfl2u" path="res://assets/field/masks/Map1_mask.png" id="5_6yf30"]
+[ext_resource type="Texture2D" path="res://assets/field/masks/Map2_mask.png" id="5_map2"]
 [ext_resource type="Script" uid="uid://c70wmcl2vmws3" path="res://field/wanderer.gd" id="6"]
 [ext_resource type="Script" uid="uid://c73umk7v0kdui" path="res://field/camera_rig.gd" id="7"]
 [ext_resource type="PackedScene" path="res://field/field_enemy.tscn" id="8"]
@@ -182,7 +182,8 @@ script = ExtResource("4")
 wetness_scale = 8.0
 landmass_falloff_width = 4.0
 landmass_below_sea_depth = 1.0
-landmass_mask = ExtResource("5_6yf30")
+landmass_mask = ExtResource("5_map2")
+landmass_mask_origin = Vector2(0.49, 0.828)
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=1297283630]
 
@@ -221,12 +222,13 @@ fov = 38.0
 [node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=1648467848]
 
 [node name="FieldEnemy" parent="." unique_id=677119585 instance=ExtResource("8")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -6)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -11)
 enemy_id = &"sputter"
 enemy_data = ExtResource("10")
 model_yaw_offset = 180.0
 
 [node name="ExitGate" parent="." unique_id=1640815979 instance=ExtResource("16")]
+channel_bar_axis_offset = 0.85
 
 [node name="Sea" type="MeshInstance3D" parent="." unique_id=1533217746]
 script = ExtResource("9")
@@ -565,7 +567,7 @@ mesh = SubResource("BoxMesh_ruin_mass_4")
 [node name="Hulls" type="Node3D" parent="."]
 
 [node name="Hull1" parent="Hulls" instance=ExtResource("17")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 0, 3)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -10.5, 0, -1.25)
 roll_degrees = 8.0
 yaw_offset_degrees = 8.0
 
@@ -573,15 +575,15 @@ yaw_offset_degrees = 8.0
 perch_offset = Vector3(0, 0.7, -1.42)
 
 [node name="Hull2" parent="Hulls" instance=ExtResource("17")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, 6.2)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.5, 0, -0.25)
 roll_degrees = -12.0
 yaw_offset_degrees = 33.0
 world_line = "Hauled up past the tide, and left."
 
 [node name="Hull3" parent="Hulls" instance=ExtResource("17")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 6.5, 0, 2.5)
-roll_degrees = 11.0
-yaw_offset_degrees = -6.0
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -8.2, 0, -9)
+roll_degrees = -10.0
+yaw_offset_degrees = -90.0
 
 [editable path="RuinPavingTest"]
 [editable path="HeroPavingPatch/Slabs/HeroSlab1"]

@@ -29,7 +29,9 @@ signal floor_exited
 # wander by the relief's noise (channel_edge_noise_*) over a channel_edge
 # soft edge - the near bank is the one that has to read as a shore.
 # Draining surfaces only channel_bar_width of sand along the neck's axis
-# (the gate's own line), leaving a channel either side.
+# - the gate's own line, shifted across by channel_bar_axis_offset for a
+# neck that isn't centred on the gate (Map2's runs x -1.4..3.1, axis
+# 0.85) - leaving a channel either side.
 @export var channel_near_offset: float = 1.0
 @export var channel_beyond_wall: float = 12.0
 @export var channel_width_margin: float = 4.0
@@ -37,7 +39,10 @@ signal floor_exited
 @export var channel_edge: float = 1.2
 @export var channel_edge_noise_scale: float = 2.0
 @export var channel_edge_noise_amplitude: float = 0.6
-@export var channel_bar_width: float = 6.0
+@export var channel_bar_width: float = 5.0
+# Metres across (the gate's local right) from the gate's own line to the
+# bar's centre line.
+@export var channel_bar_axis_offset: float = 0.0
 # How long the channel takes to drain after open(), eased out - fast at
 # first, settling as the sand surfaces. The drain itself is a shader
 # uniform tween (Ground.set_channel_live_amount(), one uniform write per
@@ -164,13 +169,13 @@ func setup_channel(ground: Ground, wall_rect: Rect2) -> void:
 	_channel.edge_noise_amplitude = channel_edge_noise_amplitude
 	_channel.bar_width = channel_bar_width
 	# The bar sits on the gate line, not the walls' midline.
-	_channel.bar_offset = -across_centre
+	_channel.bar_offset = -across_centre + channel_bar_axis_offset
 	_channel.amount = _channel_amount
 	if _channel_index < 0:
 		_channel_index = _ground.add_channel(_channel)
 	else:
 		_ground.set_channel_amount(_channel_index, _channel_amount)
-	print("ExitGate: channel %.1f x %.1f m, near bank %.1f m spawn-side of the gate line, bar %.1f m" % [length, _channel_width, channel_near_offset, channel_bar_width])
+	print("ExitGate: channel %.1f x %.1f m, near bank %.1f m spawn-side of the gate line, bar %.1f m at %+.2f m across" % [length, _channel_width, channel_near_offset, channel_bar_width, channel_bar_axis_offset])
 	_rebuild()
 
 # Every exported dimension above lands here rather than each having its

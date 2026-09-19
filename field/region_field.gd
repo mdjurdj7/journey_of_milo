@@ -39,12 +39,12 @@ signal floor_cleared
 @export var directional_light_path: NodePath = ^"DirectionalLight3D"
 @export var exit_gate_path: NodePath = ^"ExitGate"
 # Distance beyond the (currently sole) enemy's own position, along
-# get_forward() - see _setup_exit_gate()'s own doc. 4.0 pairs with the
-# enemy's own authored distance (6.0, see region_field.tscn's FieldEnemy
-# transform) to land the gate's own line at 10.0 from spawn - 4.0 clear of
-# the inland wall's near face at field_extents.y/2 - wall_thickness/2 = 14.0
-# in this scene's current field_extents/wall_thickness.
-@export var exit_gate_distance_beyond_enemy: float = 4.0
+# get_forward() - see _setup_exit_gate()'s own doc. 8.0 pairs with the
+# enemy's own authored distance (11.0, see region_field.tscn's FieldEnemy
+# transform) to land the gate's own line at 19.0 from spawn - the mouth of
+# Map2's neck, where the painted land pinches from 28 m wide (z -10) to
+# under 10 m (z -18..-20); the neck then runs 12 m on to the inland wall.
+@export var exit_gate_distance_beyond_enemy: float = 8.0
 @export var battle_spacing: float = 3.0
 # Which of BattleTheme's two value sets the overlay applies on entering
 # battle - see ui/battle_theme.gd's own rule: UI is the dark element on a
