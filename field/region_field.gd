@@ -81,6 +81,17 @@ signal floor_cleared
 @export var wade_drain_rate_per_metre: float = 40.0
 @export var wade_drain_max_per_second: float = 15.0
 
+@export_group("Point To Move")
+# A click on the field sends the Wanderer walking (see Wanderer.
+# set_move_target()). An enemy is picked first, by its projected model
+# rect grown by this much (FieldEnemy.get_screen_rect(), the same test
+# the armed-card targeting uses); otherwise a physics ray from the camera
+# through the cursor, this long, against every body but the Wanderer -
+# ground, hull, wall alike, the hit point is the target. Clicks the HUD
+# swallows (DeckPanel, WorldVoiceLine's band) never get here.
+@export var click_target_padding_px: float = 16.0
+@export var click_ray_length: float = 1000.0
+
 @onready var wanderer: Wanderer = $Wanderer
 @onready var battle_layer: CanvasLayer = $BattleLayer
 @onready var deck_panel: DeckPanel = $FieldHUD/DeckPanel
@@ -117,6 +128,9 @@ var _wade_drain_accumulator: float = 0.0
 # already in flight (change_scene_to_file doesn't happen mid-frame) can't
 # be re-triggered by another drain tick before it lands.
 var _run_lost_to_wading: bool = false
+
+# The click mark, created on first use - see ClickMarker.
+var _click_marker: ClickMarker = null
 
 func _ready() -> void:
 	# Starts the run once per game session, seeding HP and the starting
@@ -158,6 +172,69 @@ func _ready() -> void:
 # process_mode goes to PROCESS_MODE_DISABLED on enemy contact (see
 # _on_enemy_contacted()), which cascades to this by inheritance same as
 # everything else under it.
+# Point to move: left or right click, either sets (or replaces) the
+# Wanderer's target - an enemy under the cursor, else whatever body the
+# camera ray hits. Never reached while frozen for battle (PROCESS_MODE_
+# DISABLED gates input too), nor for clicks a HUD control has stopped.
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton) or not event.pressed:
+		return
+	if event.button_index != MOUSE_BUTTON_LEFT and event.button_index != MOUSE_BUTTON_RIGHT:
+		return
+	if _handle_move_click(event.position):
+		get_viewport().set_input_as_handled()
+
+func _handle_move_click(screen_pos: Vector2) -> bool:
+	if wanderer == null:
+		return false
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return false
+
+	var enemy: FieldEnemy = _enemy_under_cursor(camera, screen_pos)
+	if enemy != null:
+		wanderer.set_move_target_enemy(enemy)
+		_show_click_marker(enemy.global_position)
+		return true
+
+	var from: Vector3 = camera.project_ray_origin(screen_pos)
+	var to: Vector3 = from + camera.project_ray_normal(screen_pos) * click_ray_length
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	query.exclude = [wanderer.get_rid()]
+	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
+	if hit.is_empty():
+		return false
+	var point: Vector3 = hit["position"]
+	wanderer.set_move_target(point)
+	_show_click_marker(point)
+	return true
+
+# The enemy whose padded screen rect holds the cursor; nearest to the
+# camera on overlap.
+func _enemy_under_cursor(camera: Camera3D, screen_pos: Vector2) -> FieldEnemy:
+	var best: FieldEnemy = null
+	var best_distance: float = INF
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as FieldEnemy
+		if enemy == null:
+			continue
+		var rect: Rect2 = enemy.get_screen_rect(camera, click_target_padding_px)
+		if rect.size == Vector2.ZERO or not rect.has_point(screen_pos):
+			continue
+		var distance: float = camera.global_position.distance_to(enemy.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = enemy
+	return best
+
+func _show_click_marker(point: Vector3) -> void:
+	if _click_marker == null:
+		_click_marker = ClickMarker.new()
+		add_child(_click_marker)
+	var theme := load(BATTLE_THEME_PATH) as Theme
+	var ink: Color = theme.get_color("ink", "Battle") if theme != null and theme.has_color("ink", "Battle") else Color.BLACK
+	_click_marker.show_at(point, ink)
+
 func _physics_process(delta: float) -> void:
 	if not wade_drain_enabled or not _boundary_ready or _run_lost_to_wading:
 		return

@@ -49,7 +49,11 @@ static func on_hud(hud: Node) -> WorldVoiceLine:
 	return line
 
 func _ready() -> void:
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# A click on the line's band is UI, not a point-to-move click (see
+	# RegionField._unhandled_input()) - STOP swallows it. The band is the
+	# full 120..-120 px width at screen_height_fraction, whether or not a
+	# line is currently showing (it hides by modulate, not visibility).
+	mouse_filter = Control.MOUSE_FILTER_STOP
 	horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	autowrap_mode = TextServer.AUTOWRAP_WORD_SMART

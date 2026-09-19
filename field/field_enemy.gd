@@ -85,6 +85,23 @@ func get_half_width() -> float:
 func get_model_aabb() -> AABB:
 	return _model_aabb
 
+# The model's world AABB as a screen rect: its 8 corners unprojected,
+# bounded, grown by padding_px on every side - what a click or an armed
+# card has to land in to mean this enemy (BattleController's target test
+# and RegionField's point-to-move both use it). Empty when the model
+# hasn't spawned or any corner is behind the camera.
+func get_screen_rect(camera: Camera3D, padding_px: float) -> Rect2:
+	if camera == null or _model_aabb.size == Vector3.ZERO:
+		return Rect2()
+	var rect := Rect2()
+	for i in 8:
+		var corner: Vector3 = global_transform * _model_aabb.get_endpoint(i)
+		if camera.is_position_behind(corner):
+			return Rect2()
+		var point: Vector2 = camera.unproject_position(corner)
+		rect = Rect2(point, Vector2.ZERO) if i == 0 else rect.expand(point)
+	return rect.grow(padding_px)
+
 @onready var contact_area: Area3D = $ContactArea
 @onready var contact_shape: CollisionShape3D = $ContactArea/CollisionShape3D
 

@@ -422,12 +422,12 @@ func _clear_hover() -> void:
 		_hovered_enemy = null
 
 # Each living enemy's screen-space bounding rect of its model's world
-# AABB (FieldEnemy.get_model_aabb() - the real mesh bounds, as placed):
-# the 8 corners unprojected, bounded, padded by target_padding_px on
-# every side. No physics shape, no camera-distance dependence - what you
-# can see is what you can target, plus a little. Recomputed by
-# _physics_process() while a card is armed; _enemy_at() reads the cache.
-# An enemy whose AABB reaches behind the camera gets no rect.
+# AABB (FieldEnemy.get_screen_rect() - the real mesh bounds, as placed,
+# padded by target_padding_px on every side). No physics shape, no
+# camera-distance dependence - what you can see is what you can target,
+# plus a little. Recomputed by _physics_process() while a card is armed;
+# _enemy_at() reads the cache. An enemy whose AABB reaches behind the
+# camera gets no rect.
 func _refresh_enemy_rects() -> void:
 	_enemy_rects.clear()
 	var camera := get_viewport().get_camera_3d()
@@ -439,21 +439,10 @@ func _refresh_enemy_rects() -> void:
 		var combatant: Combatant = _combatants.get(enemy)
 		if combatant == null or combatant.hp <= 0:
 			continue
-		var aabb: AABB = enemy.get_model_aabb()
-		if aabb.size == Vector3.ZERO:
+		var rect: Rect2 = enemy.get_screen_rect(camera, target_padding_px)
+		if rect.size == Vector2.ZERO:
 			continue
-		var rect := Rect2()
-		var behind := false
-		for i in 8:
-			var corner: Vector3 = enemy.global_transform * aabb.get_endpoint(i)
-			if camera.is_position_behind(corner):
-				behind = true
-				break
-			var point: Vector2 = camera.unproject_position(corner)
-			rect = Rect2(point, Vector2.ZERO) if i == 0 else rect.expand(point)
-		if behind:
-			continue
-		_enemy_rects[enemy] = rect.grow(target_padding_px)
+		_enemy_rects[enemy] = rect
 
 # The enemy whose padded rect holds screen_pos; on overlap, the one
 # nearest the camera. Rebuilds the cache if a click lands before the

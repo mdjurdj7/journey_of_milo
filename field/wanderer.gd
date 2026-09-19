@@ -28,6 +28,18 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 @export var dash_duration: float = 0.2
 @export var dash_cooldown: float = 1.0
 
+@export_group("Point To Move")
+# A click on the field (see RegionField._unhandled_input()) sets a move
+# target; the Wanderer walks toward it at move_speed, facing the way he
+# walks, and the target clears within arrive_radius of it, the moment
+# any WASD input arrives, or after stuck_time of standing still against
+# something (a hull, a wall) with the target still ahead - no
+# pathfinding, he stops where he's blocked. An enemy target (see
+# set_move_target_enemy()) is followed live until contact starts the
+# fight, which clears it (see enter_battle_stance()).
+@export var arrive_radius: float = 0.25
+@export var stuck_time: float = 0.4
+
 @export_group("Step-Up")
 # How tall a ledge/curb the Wanderer can walk straight up onto, and how far
 # below his feet a drop-off is still treated as a step-down snap rather than
@@ -264,6 +276,11 @@ var _camera: Camera3D
 var _dash_timer: float = 0.0
 var _dash_cooldown_timer: float = 0.0
 var _dash_direction: Vector3 = Vector3.ZERO
+
+var _has_move_target: bool = false
+var _move_target: Vector3 = Vector3.ZERO
+var _move_target_enemy: FieldEnemy = null
+var _stuck_timer: float = 0.0
 
 # Debug-only line visualizations for _apply_step_up_and_down()'s two probe
 # casts - built once in _ready() (top_level, so their own transform IS
@@ -1250,6 +1267,58 @@ func _forward_from_angle(angle: float) -> Vector3:
 func _angle_from_direction(direction: Vector3) -> float:
 	return atan2(-direction.x, -direction.z)
 
+# --- Point to move (see the Point To Move exports) ---
+
+func set_move_target(point: Vector3) -> void:
+	_move_target = point
+	_move_target_enemy = null
+	_has_move_target = true
+	_stuck_timer = 0.0
+
+# Walks at the enemy's live position until its own contact area starts
+# the fight.
+func set_move_target_enemy(enemy: FieldEnemy) -> void:
+	_move_target_enemy = enemy
+	_move_target = enemy.global_position
+	_has_move_target = true
+	_stuck_timer = 0.0
+
+func clear_move_target() -> void:
+	_has_move_target = false
+	_move_target_enemy = null
+	_stuck_timer = 0.0
+
+func has_move_target() -> bool:
+	return _has_move_target
+
+# This frame's walking direction toward the target, or ZERO once it's
+# reached (which also clears it) or its enemy is gone.
+func _move_target_direction() -> Vector3:
+	if not _has_move_target:
+		return Vector3.ZERO
+	if _move_target_enemy != null:
+		if not is_instance_valid(_move_target_enemy):
+			clear_move_target()
+			return Vector3.ZERO
+		_move_target = _move_target_enemy.global_position
+	var to_target := Vector3(_move_target.x - global_position.x, 0.0, _move_target.z - global_position.z)
+	if to_target.length() <= arrive_radius:
+		clear_move_target()
+		return Vector3.ZERO
+	return to_target.normalized()
+
+# Standing still against something with the target still ahead: after
+# stuck_time of it, give up rather than push forever.
+func _tick_stuck(delta: float, planar_speed: float) -> void:
+	if not _has_move_target:
+		return
+	if planar_speed < walk_speed_threshold:
+		_stuck_timer += delta
+		if _stuck_timer >= stuck_time:
+			clear_move_target()
+	else:
+		_stuck_timer = 0.0
+
 # Public read of dash state - used by FootprintSpawner to pick a shorter
 # per-foot cooldown while dashing (Run's own foot-plant cadence is faster
 # than Walk's), without exposing _dash_timer itself.
@@ -1373,6 +1442,8 @@ func play_slash_audio() -> void:
 func enter_battle_stance(target: Node3D, spacing: float, duration: float) -> void:
 	if target == null:
 		return
+	# Contact is where a walk-to-enemy target ends; nothing resumes after.
+	clear_move_target()
 
 	var away_from_target := _flatten_normalized(global_position - target.global_position)
 	if away_from_target == Vector3.ZERO:
@@ -1733,6 +1804,10 @@ func _physics_process(delta: float) -> void:
 		if input_dir.length() > 1.0:
 			input_dir = input_dir.normalized()
 
+		# Any key input takes over from a click target.
+		if input_dir.length() > 0.0001:
+			clear_move_target()
+
 		move_direction = Vector3(input_dir.x, 0.0, -input_dir.y)
 		if _camera:
 			var camera_basis := _camera.global_transform.basis
@@ -1743,6 +1818,9 @@ func _physics_process(delta: float) -> void:
 			move_direction = camera_right * input_dir.x + camera_forward * input_dir.y
 			if move_direction.length() > 1.0:
 				move_direction = move_direction.normalized()
+
+		if _has_move_target:
+			move_direction = _move_target_direction()
 
 	if is_dashing:
 		var dash_speed := dash_distance / dash_duration
@@ -1766,6 +1844,7 @@ func _physics_process(delta: float) -> void:
 		rotation.y = lerp_angle(rotation.y, _angle_from_direction(move_direction), rotation_speed * delta)
 
 	var planar_speed := Vector2(velocity.x, velocity.z).length()
+	_tick_stuck(delta, planar_speed)
 	if use_animation_tree:
 		if _animation_tree:
 			_animation_tree.set("parameters/blend_position", clampf(planar_speed, 0.0, move_speed))
