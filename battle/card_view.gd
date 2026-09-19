@@ -72,8 +72,8 @@ const KEYWORDS: Array[String] = ["Toll", "Rally"]
 @export var hp_cost_font_size_px: int = 9
 @export_range(0.0, 1.0) var hp_cost_letter_spacing_em: float = 0.08
 @export_range(0.0, 1.0) var hp_cost_alpha: float = 0.72
-@export var rules_font_size_px: int = 12
-@export var rules_font_size_tight_px: int = 11
+@export var rules_font_size_px: int = 15
+@export var rules_font_size_tight_px: int = 13
 @export var rules_line_height: float = 1.35
 @export_range(0.0, 1.0) var rules_alpha: float = 0.92
 # At this many lines the rules text drops to rules_font_size_tight_px and
