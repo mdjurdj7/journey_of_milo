@@ -14,5 +14,5 @@ card_name = "Second Thoughts"
 cost = 1
 card_type = 1
 target_type = 1
-description = "Draw 2."
+description = "Draw {draw}."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_draw")])

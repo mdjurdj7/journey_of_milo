@@ -15,6 +15,6 @@ card_name = "Down Payment"
 cost = 0
 card_type = 1
 target_type = 1
-description = "Lose 1 HP.
+description = "Lose {hp_cost} HP.
 Gain 5 Toll."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_self_damage_toll")])

@@ -112,6 +112,8 @@ var _deck: Deck = null
 var _views: Dictionary = {} # CardData -> Control (the card's slot; its only child is a CardView)
 # The player's current energy, as last pushed by update_playable() - a
 # card drawn later is faded or not against this same number.
+# The stance every card in this hand is currently printed against.
+var _stance: Stance = null
 var _last_energy: int = -1
 var _pending_reveals: Array[CardData] = []
 var _revealing: bool = false
@@ -193,6 +195,7 @@ func _add_card_view(card: CardData) -> void:
 
 	var card_view := (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
 	card_view.card_size = card_size
+	card_view.set_stance(_stance)
 	slot.add_child(card_view)
 
 	# Brings slot (and card_view within it) into the live tree, firing
@@ -229,6 +232,19 @@ func get_rest_top_y() -> float:
 # Fades every card the player can't currently afford (see CardView.
 # set_playable()) - called on BattleController.energy_changed, and
 # applied to cards drawn afterwards too.
+# The stance in force, pushed down to every card in hand: an Attack's
+# printed damage and its "-N HP" line both move with it, so a card that
+# is sitting in the hand when a stance is taken has to be re-read, not
+# just the one played next. Kept so a card drawn AFTER the stance was
+# taken gets it too (see _add_card_view()).
+func set_stance(stance: Stance) -> void:
+	_stance = stance
+	for card in _views:
+		var slot: Control = _views[card]
+		var card_view: CardView = slot.get_child(0) as CardView
+		if card_view != null:
+			card_view.set_stance(stance)
+
 func update_playable(energy: int) -> void:
 	_last_energy = energy
 	for card in _views:

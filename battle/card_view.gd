@@ -46,6 +46,23 @@ enum KeylineType { STRIKE, GUARD, TOLL, UTILITY }
 # Rules-text words set in bold. Whole-word, case-sensitive.
 const KEYWORDS: Array[String] = ["Toll", "Grace"]
 
+# Numbers a card's text can defer to its own effects, so the face shows
+# what the card will ACTUALLY do rather than what it did when it was
+# authored. "Deal {damage} damage." on Slash reads "Deal 6 damage."
+# normally and "Deal 12 damage." under two stacks of Self-Eater.
+#
+# Only for text whose number IS an effect value. Reckoning's "damage
+# equal to the amount consumed" has no fixed number to substitute and
+# stays prose - a token there would have to invent one.
+#
+# {hp_cost} is the exception that reads across effects rather than from
+# one: it's the same sum the "-N HP" line shows (see _derive_hp_cost()),
+# stance included.
+const TOKEN_DAMAGE := "{damage}"
+const TOKEN_BLOCK := "{block}"
+const TOKEN_DRAW := "{draw}"
+const TOKEN_HP_COST := "{hp_cost}"
+
 @export var card_size: Vector2 = Vector2(200.0, 280.0)
 
 @export_group("Colours")
@@ -171,6 +188,8 @@ var _armed: bool = false
 var _armed_at_msec: int = 0
 var _playable: bool = true
 var _keyline_type: KeylineType = KeylineType.STRIKE
+# The stance in force, for the numbers on this face - see set_stance().
+var _stance: Stance = null
 var _hp_cost: int = 0
 var _rest_offset_y: float = 0.0
 # How far down from this card's own local origin "at rest" actually sits -
@@ -214,13 +233,65 @@ func set_card_data(data: CardData) -> void:
 	name_label.text = data.card_name
 	cost_label.text = str(data.cost)
 	_keyline_type = _derive_keyline_type(data)
-	_hp_cost = _derive_hp_cost(data)
-	hp_cost_label.text = "−%d HP" % _hp_cost if _hp_cost > 0 else ""
-	hp_cost_label.visible = _hp_cost > 0
-	rules_text.text = _format_rules(data.description)
+	_refresh_dynamic_text()
 	type_label.text = _type_label_text(_keyline_type)
 	_apply_type_style()
 	_apply_layout()
+
+# The active stance, or null. Pushed by HandContainer/DeckView on the
+# controller's stance_changed - a stance changes what an Attack costs and
+# deals, so the face has to be re-read, not just the rules state.
+func set_stance(stance: Stance) -> void:
+	if _stance == stance:
+		return
+	_stance = stance
+	if card_data != null:
+		_refresh_dynamic_text()
+		_apply_layout()
+
+# Everything on the face whose number can move: the rules text's tokens
+# and the HP cost line. Re-run whenever the card or the stance changes.
+func _refresh_dynamic_text() -> void:
+	_hp_cost = _derive_hp_cost(card_data)
+	hp_cost_label.text = "−%d HP" % _hp_cost if _hp_cost > 0 else ""
+	hp_cost_label.visible = _hp_cost > 0
+	rules_text.text = _format_rules(_resolve_tokens(card_data.description))
+
+# Substitutes the effect-backed tokens. A token whose card has no
+# matching effect is left standing rather than replaced with 0 - that way
+# a mis-authored card reads as obviously wrong on its face instead of
+# quietly claiming it deals nothing.
+func _resolve_tokens(description: String) -> String:
+	var text: String = description
+	if text.contains(TOKEN_DAMAGE):
+		var damage: int = _effect_value(card_data, [CardEffect.EffectType.DAMAGE,
+			CardEffect.EffectType.FIRST_CARD_DAMAGE, CardEffect.EffectType.DAMAGE_ALL,
+			CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE])
+		if damage >= 0:
+			# An Attack's number is what it will actually land for, stance
+			# included - the same addition damage_effect.gd makes.
+			if card_data.card_type == CardData.CardType.ATTACK:
+				damage += Stance.attack_bonus(_stance)
+			text = text.replace(TOKEN_DAMAGE, str(damage))
+	if text.contains(TOKEN_BLOCK):
+		var block: int = _effect_value(card_data, [CardEffect.EffectType.BLOCK,
+			CardEffect.EffectType.UNDAMAGED_BLOCK, CardEffect.EffectType.TOLL_BLOCK])
+		if block >= 0:
+			text = text.replace(TOKEN_BLOCK, str(block))
+	if text.contains(TOKEN_DRAW):
+		var draw: int = _effect_value(card_data, [CardEffect.EffectType.DRAW])
+		if draw >= 0:
+			text = text.replace(TOKEN_DRAW, str(draw))
+	if text.contains(TOKEN_HP_COST):
+		text = text.replace(TOKEN_HP_COST, str(_hp_cost))
+	return text
+
+# The first matching effect's `value`, or -1 when the card has none.
+static func _effect_value(data: CardData, types: Array) -> int:
+	for effect in data.effects:
+		if effect != null and types.has(effect.effect_type):
+			return effect.value
+	return -1
 
 # Whether the player can currently afford this card - HandContainer pushes
 # this on every energy change. Unplayable fades the whole card.
@@ -400,13 +471,18 @@ static func _is_defensive_status(status: StatusData) -> bool:
 
 # The HP the card costs to play: the sum of its self-scoped SELF_DAMAGE /
 # SELF_DAMAGE_TOLL effect values. CardData.cost is energy only.
-static func _derive_hp_cost(data: CardData) -> int:
+func _derive_hp_cost(data: CardData) -> int:
 	var total: int = 0
 	for effect in data.effects:
 		if effect == null:
 			continue
 		if effect.effect_type == CardEffect.EffectType.SELF_DAMAGE or effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL:
 			total += effect.value
+	# A stance charges for playing an ATTACK, which is a cost of this card
+	# exactly as much as its own self-damage is - so it belongs on the same
+	# line rather than hidden in the stance's description.
+	if data.card_type == CardData.CardType.ATTACK:
+		total += Stance.attack_hp_loss(_stance)
 	return total
 
 static func _type_label_text(keyline_type: KeylineType) -> String:

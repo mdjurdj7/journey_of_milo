@@ -16,7 +16,7 @@ card_name = "Left Hand"
 cost = 1
 card_type = 0
 target_type = 0
-description = "Deal 6 damage.
+description = "Deal {damage} damage.
 If this is the first card you've played this turn, deal 10 instead."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_first_card_damage")])
 battle_animation = &"Slash"

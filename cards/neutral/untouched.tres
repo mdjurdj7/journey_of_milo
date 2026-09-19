@@ -15,6 +15,6 @@ card_name = "Untouched"
 cost = 1
 card_type = 1
 target_type = 1
-description = "Gain 4 block.
+description = "Gain {block} block.
 If you took no damage last turn, gain 4 more."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_undamaged_block")])
