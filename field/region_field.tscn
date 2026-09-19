@@ -330,6 +330,7 @@ shape = SubResource("BoxShape3D_spawn_slab")
 disabled = true
 
 [node name="HeroPavingPatch" type="Node3D" parent="." unique_id=1950039972]
+visible = false
 
 [node name="Slabs" type="Node3D" parent="HeroPavingPatch" unique_id=169690602]
 
@@ -579,7 +580,7 @@ yaw_offset_degrees = 8.0
 perch_offset = Vector3(0, 0.7, -1.42)
 
 [node name="Hull2" parent="Hulls" instance=ExtResource("17")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -5.5, 0, -0.25)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -7.5, 0, -0.25)
 roll_degrees = -12.0
 yaw_offset_degrees = 33.0
 world_line = "Hauled up past the tide, and left."
