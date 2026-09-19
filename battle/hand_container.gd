@@ -37,12 +37,16 @@ signal armed_changed(armed: bool)
 # At rest, a card's slot-space offset is card_size.y minus this (see
 # CardView.set_rest_offset()) - and since a hand card scales about its
 # bottom centre, its rendered top is that offset plus card_size.y * (1 -
-# hand_card_scale) further down. 91 with the overlay's container (top at
-# 1080 - 365 = 715, arc 22) and hand_card_scale 0.95 puts a hand card's
-# top at y 896 (0.83 of 1080) with 184px of it on screen and its bottom
-# 54px below the viewport - the hand is held, not laid on the screen.
-# CardView.hover_lift is measured from this baseline.
-@export var hand_rest_visible_height: float = 91.0:
+# hand_card_scale) further down. 182 with the overlay's container (top
+# at 1080 - 365 = 715, arc 22) and hand_card_scale 0.95 puts the centre
+# card's top at y 805 (0.75 of 1080), its bottom 9px inside the viewport;
+# the outer cards sit the full arc (22px) lower and lean +-4 deg, which
+# drops their rules line's low corner another ~6px - the number is set so
+# that corner (rules box ends 243 x 0.95 = 231px down the card) still
+# clears the viewport's bottom edge by ~16px, and only the outer cards'
+# footer rule and type label are cut. CardView.hover_lift is measured
+# from this baseline.
+@export var hand_rest_visible_height: float = 182.0:
 	set(value):
 		hand_rest_visible_height = value
 		for slot: Control in _views.values():
@@ -214,12 +218,13 @@ func _add_card_view(card: CardData) -> void:
 func _on_card_view_clicked(_card_data: CardData, card_view: CardView) -> void:
 	card_clicked.emit(card_view)
 
-# Global Y of a resting centre card's top edge - what anything above the
-# hand (HP/Toll chips, enemy bars) has to clear: the arc's peak slot plus
-# the rest offset (a slot-space offset, unscaled - the card's own scale
-# only shrinks it downward from there).
+# Global Y of a resting centre card's rendered top edge - what anything
+# above the hand (the readouts; CameraRig's battle fit reads it) has to
+# clear: the arc's peak slot plus the rest offset (a slot-space offset,
+# unscaled), plus the height the card loses to hand_card_scale - it
+# scales about its bottom centre, so the shrink comes off the top.
 func get_rest_top_y() -> float:
-	return global_position.y - fan_arc_height + (card_size.y - hand_rest_visible_height)
+	return global_position.y - fan_arc_height + (card_size.y - hand_rest_visible_height) + card_size.y * (1.0 - hand_card_scale)
 
 # Fades every card the player can't currently afford (see CardView.
 # set_playable()) - called on BattleController.energy_changed, and
