@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+
+[sub_resource type="Resource" id="E_damage"]
+script = ExtResource("2_card_effect")
+value = 8
+
+[sub_resource type="Resource" id="E_energy"]
+script = ExtResource("2_card_effect")
+effect_type = 16
+value = 1
+condition = 4
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "With Regards"
+cost = 1
+card_type = 0
+target_type = 0
+description = "Deal {damage} damage.
+If this kills, gain 1 energy."
+battle_animation = &"Slash"
+impact_time = 0.55
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_damage"), SubResource("E_energy")])

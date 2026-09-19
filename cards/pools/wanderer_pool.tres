@@ -1,11 +1,17 @@
-[gd_resource type="Resource" script_class="RewardPool" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="RewardPool" load_steps=9 format=3]
 
 [ext_resource type="Script" path="res://cards/reward_pool.gd" id="1_reward_pool"]
-[ext_resource type="Resource" path="res://cards/data/self_eater.tres" id="2_self_eater"]
+[ext_resource type="Resource" path="res://cards/data/carve.tres" id="2_carve"]
+[ext_resource type="Resource" path="res://cards/data/endure.tres" id="3_endure"]
+[ext_resource type="Resource" path="res://cards/data/hold_fast.tres" id="4_hold_fast"]
+[ext_resource type="Resource" path="res://cards/data/reprisal.tres" id="5_reprisal"]
+[ext_resource type="Resource" path="res://cards/data/open_wound.tres" id="6_open_wound"]
+[ext_resource type="Resource" path="res://cards/data/debt_forgiven.tres" id="7_debt_forgiven"]
+[ext_resource type="Resource" path="res://cards/data/self_eater.tres" id="8_self_eater"]
 
 [resource]
 script = ExtResource("1_reward_pool")
-entries = Array[ExtResource("2_self_eater")]([ExtResource("2_self_eater")])
+entries = Array[ExtResource("2_carve")]([ExtResource("2_carve"), ExtResource("3_endure"), ExtResource("4_hold_fast"), ExtResource("5_reprisal"), ExtResource("6_open_wound"), ExtResource("7_debt_forgiven"), ExtResource("8_self_eater")])
 weights = Array[float]([])
 enemy_bias = {}
 enemy_bias_multiplier = 2.0

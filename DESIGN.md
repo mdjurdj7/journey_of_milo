@@ -86,3 +86,13 @@ so it doesn't get silently reinvented or silently forgotten.
   per-CARD `toll_cost`, which only CardEffect has. ("Pound of Flesh" and
   "Overdraw" were also asked after; neither exists in the old project.)
   (2026-09-19, first fight rewards.)
+- **With Regards is authored but deliberately out of the reward pool.**
+  "Deal 8; if this kills, gain 1 energy" is a fine card in a fight with
+  several enemies and close to a dead one in a fight with a single enemy
+  - the kill that pays it out is the kill that ends the fight, so the
+  energy arrives with nothing left to spend it on. It stays in
+  `cards/data/` and out of `cards/pools/wanderer_pool.tres` until a floor
+  fields more than one enemy at a time. Carve ("deal 5 to all enemies")
+  has the same shape but is not held back: it is merely unexciting
+  against one enemy rather than actively dead. (2026-09-19, second
+  Wanderer card pass.)
