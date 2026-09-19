@@ -114,6 +114,7 @@ var _views: Dictionary = {} # CardData -> Control (the card's slot; its only chi
 # card drawn later is faded or not against this same number.
 # The stance every card in this hand is currently printed against.
 var _stance: Stance = null
+var _grace: int = 0
 var _last_energy: int = -1
 var _pending_reveals: Array[CardData] = []
 var _revealing: bool = false
@@ -196,6 +197,7 @@ func _add_card_view(card: CardData) -> void:
 	var card_view := (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
 	card_view.card_size = card_size
 	card_view.set_stance(_stance)
+	card_view.set_grace(_grace)
 	slot.add_child(card_view)
 
 	# Brings slot (and card_view within it) into the live tree, firing
@@ -244,6 +246,17 @@ func set_stance(stance: Stance) -> void:
 		var card_view: CardView = slot.get_child(0) as CardView
 		if card_view != null:
 			card_view.set_stance(stance)
+
+# The player's Grace, pushed to every card for the same reason the stance
+# is: a card whose damage depends on it has to say so while it sits in
+# the hand.
+func set_grace(grace: int) -> void:
+	_grace = grace
+	for card in _views:
+		var slot: Control = _views[card]
+		var card_view: CardView = slot.get_child(0) as CardView
+		if card_view != null:
+			card_view.set_grace(grace)
 
 func update_playable(energy: int) -> void:
 	_last_energy = energy

@@ -268,6 +268,8 @@ func _on_toll_changed(new_toll: int) -> void:
 
 func _on_grace_changed(grace: int) -> void:
 	_field_hp_bar.update_grace(grace)
+	# Reprisal prints its replacement damage while any Grace is open.
+	hand_container.set_grace(grace)
 
 func _on_stance_changed(stance: Stance) -> void:
 	_refresh_standing_row()

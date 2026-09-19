@@ -41,7 +41,7 @@ signal disarmed
 # a habit: nothing serialises this today (it's derived every time a card
 # is shown, never authored), but the enum sits next to CardEffect's own,
 # where an inserted value silently rewrites existing .tres data.
-enum KeylineType { STRIKE, GUARD, TOLL, UTILITY }
+enum KeylineType { STRIKE, GUARD, TOLL, UTILITY, STANCE }
 
 # Rules-text words set in bold. Whole-word, case-sensitive.
 const KEYWORDS: Array[String] = ["Toll", "Grace"]
@@ -76,10 +76,15 @@ const TOKEN_HP_COST := "{hp_cost}"
 # Grey-neutral on purpose: utility is the type that isn't about damage or
 # defence, so it reads as the absence of a hue rather than a fourth one.
 @export var keyline_utility: Color = Color(0.58, 0.58, 0.60)
+# Warmer and darker than the rest: a stance is the one card type that
+# stays with you after it is played, and it should not read as cool or
+# incidental.
+@export var keyline_stance: Color = Color(0.52, 0.45, 0.44)
 @export var art_field_strike: Color = Color(0.886, 0.863, 0.796)
 @export var art_field_guard: Color = Color(0.875, 0.878, 0.855)
 @export var art_field_toll: Color = Color(0.878, 0.863, 0.886)
 @export var art_field_utility: Color = Color(0.87, 0.87, 0.85)
+@export var art_field_stance: Color = Color(0.886, 0.856, 0.846)
 @export var art_field_radius: int = 3
 # The two shadows: a hairline (1px down, 18%) and a soft spread (8px,
 # 12%). Both deepen on hover (see Hover).
@@ -190,6 +195,9 @@ var _playable: bool = true
 var _keyline_type: KeylineType = KeylineType.STRIKE
 # The stance in force, for the numbers on this face - see set_stance().
 var _stance: Stance = null
+# The player's Grace, for the same reason - Reprisal's printed damage is
+# its replacement value while any is open.
+var _grace: int = 0
 var _hp_cost: int = 0
 var _rest_offset_y: float = 0.0
 # How far down from this card's own local origin "at rest" actually sits -
@@ -241,6 +249,16 @@ func set_card_data(data: CardData) -> void:
 # The active stance, or null. Pushed by HandContainer/DeckView on the
 # controller's stance_changed - a stance changes what an Attack costs and
 # deals, so the face has to be re-read, not just the rules state.
+func set_grace(grace: int) -> void:
+	var had: bool = _grace > 0
+	_grace = maxi(grace, 0)
+	# Only the crossing matters - a card reads differently with Grace and
+	# without, not with more or less of it.
+	if had == (_grace > 0) or card_data == null:
+		return
+	_refresh_dynamic_text()
+	_apply_layout()
+
 func set_stance(stance: Stance) -> void:
 	if _stance == stance:
 		return
@@ -286,11 +304,19 @@ func _resolve_tokens(description: String) -> String:
 		text = text.replace(TOKEN_HP_COST, str(_hp_cost))
 	return text
 
-# The first matching effect's `value`, or -1 when the card has none.
-static func _effect_value(data: CardData, types: Array) -> int:
+# The first matching effect's value, or -1 when the card has none - the
+# REPLACEMENT value when the effect's condition is one this face can
+# evaluate and it currently holds (see set_grace()). Only HAS_GRACE is
+# previewed: the others read state the view isn't given, and a card whose
+# number can't be previewed spells its own condition out in prose
+# instead, the way Left Hand does.
+func _effect_value(data: CardData, types: Array) -> int:
 	for effect in data.effects:
-		if effect != null and types.has(effect.effect_type):
-			return effect.value
+		if effect == null or not types.has(effect.effect_type):
+			continue
+		if effect.alt_value != 0 and effect.condition == CardEffect.Condition.HAS_GRACE and _grace > 0:
+			return effect.alt_value
+		return effect.value
 	return -1
 
 # Whether the player can currently afford this card - HandContainer pushes
@@ -438,8 +464,13 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 			continue
 		match effect.effect_type:
 			CardEffect.EffectType.TOLL_DAMAGE, CardEffect.EffectType.TOLL_BLOCK, CardEffect.EffectType.TOLL_RETALIATE, \
-			CardEffect.EffectType.SELF_DAMAGE_TOLL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_FRACTION_DAMAGE_ALL:
+			CardEffect.EffectType.SELF_DAMAGE_TOLL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_FRACTION_DAMAGE_ALL, 			CardEffect.EffectType.TOLL_HEAL:
 				return KeylineType.TOLL
+	# Read off card_type, not off the effect: a stance is a stance because
+	# of what it LEAVES BEHIND, and the effect that applies it is the same
+	# APPLY_STANCE whatever the stance does.
+	if data.card_type == CardData.CardType.STANCE:
+		return KeylineType.STANCE
 	if data.card_type == CardData.CardType.SKILL:
 		for effect in data.effects:
 			if effect == null:
@@ -493,6 +524,8 @@ static func _type_label_text(keyline_type: KeylineType) -> String:
 			return "TOLL"
 		KeylineType.UTILITY:
 			return "UTILITY"
+		KeylineType.STANCE:
+			return "STANCE"
 		_:
 			return "STRIKE"
 
@@ -516,6 +549,8 @@ func _keyline_color() -> Color:
 			return keyline_toll
 		KeylineType.UTILITY:
 			return keyline_utility
+		KeylineType.STANCE:
+			return keyline_stance
 		_:
 			return keyline_strike
 
@@ -527,6 +562,8 @@ func _art_field_color() -> Color:
 			return art_field_toll
 		KeylineType.UTILITY:
 			return art_field_utility
+		KeylineType.STANCE:
+			return art_field_stance
 		_:
 			return art_field_strike
 
@@ -822,6 +859,15 @@ func _draw_glyph() -> void:
 			var front := centre + Vector2(r * 0.30, r * 0.10)
 			glyph.draw_line(back - lean, back + lean, faint, w, true)
 			glyph.draw_line(front - lean, front + lean, ink_color, w, true)
+		KeylineType.STANCE:
+			# The same bitten ring the standing row draws, at card scale -
+			# one mark for the thing, wherever it appears.
+			var ring := PackedVector2Array()
+			for i in 19:
+				var t: float = 30.0 + 270.0 * float(i) / 18.0
+				ring.append(centre + Vector2(cos(deg_to_rad(t)), sin(deg_to_rad(t))) * r * 0.85)
+			glyph.draw_line(centre + Vector2(-r * 0.2, r * 0.2), centre + Vector2(r * 0.55, -r * 0.55), faint, w, true)
+			glyph.draw_polyline(ring, ink_color, w, true)
 		KeylineType.TOLL:
 			glyph.draw_line(centre + Vector2(-r * 0.8, r * 0.9), centre + Vector2(r * 0.8, r * 0.9), faint, w, true)
 			glyph.draw_line(centre + Vector2(0.0, r * 0.6), centre + Vector2(0.0, -r * 0.9), ink_color, w, true)
