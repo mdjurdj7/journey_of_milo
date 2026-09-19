@@ -123,7 +123,14 @@ enum FaceDirection { SEAWARD, INLAND, LEFT, RIGHT }
 # of the model (x -0.392) is the hair, and there is no outstretched arm
 # on +X at all - the +X side only reaches x +0.19 at this height, which
 # is body width.
-@export var keeper_hand_offset: Vector3 = Vector3(0.213, 1.126, -0.342)
+#
+# Deliberately NOT sitting on that measured point any more: at the
+# field camera's 44 deg the card read as pinned against her chest. It is
+# dropped to 0.80 (waist) and pushed out to 0.45 along her facing, which
+# reads as held beside her from that angle. Staging over anatomy - the
+# measurement above is still what the number is derived FROM, so put it
+# back if the camera pitch ever changes.
+@export var keeper_hand_offset: Vector3 = Vector3(0.213, 0.80, -0.45)
 @export var world_card_scene_path: String = "res://field/world_card.tscn"
 @export_group("")
 
@@ -557,10 +564,13 @@ func _pick_card() -> CardData:
 # in the deck for the next fight and shows in the field DeckPanel at once
 # via deck_changed). All that's left here is to remember it happened, so
 # her line switches and the card doesn't come back on the next floor.
-func _on_world_card_taken(_card_data: CardData) -> void:
+func _on_world_card_taken(card_data: CardData) -> void:
 	_offers_made[_offer_id()] = true
 	_world_card = null
-	print("Keeper '%s': offered '%s'." % [name, offered_card.card_name])
+	# The card that was actually taken - NOT offered_card, which is the
+	# optional authoring override and is null on every normal run, since
+	# the card comes from keeper_pool.
+	print("Keeper '%s': offered '%s'." % [name, card_data.card_name])
 
 # The facing yaw: face_direction relative to the field's forward, plus
 # face_yaw_offset_degrees - same direction<->angle convention as Hull.

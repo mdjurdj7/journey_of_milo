@@ -66,7 +66,16 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 # projected silhouette edge (see holder_half_width), and its centre sits
 # on the anchor's own screen height - so it reads as held out at the
 # hand, just clear of her.
-@export var screen_gap_px: float = 40.0
+@export var screen_gap_px: float = 16.0
+# Where the lifted card's BOTTOM EDGE sits: this many metres above the
+# holder's feet, projected. Pinning the bottom rather than the centre is
+# what keeps the card off her legs no matter how tall it renders - it is
+# about 1.8 m tall in world terms at the usual camera distance (168 px at
+# 93 px/m), so a centre-based rule moves the bottom whenever the scale
+# changes, and a card that clears her head can still hang across her
+# knees. Measured from the HOLDER's feet, not the anchor, so moving the
+# hand offset doesn't drag the lifted card with it.
+@export var near_bottom_height: float = 0.15
 # Half the holder's width in metres, projected each frame to find that
 # silhouette edge. 0 (the default) measures it once from holder_path's
 # own meshes; set it non-zero to override. Measured rather than authored
@@ -80,6 +89,10 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 @export var lift_duration_sec: float = 0.18
 
 @export var near_scale: float = 1.0
+# Growth on hover, this node's own rather than CardView.hover_scale (1.15,
+# which is tuned for a card already close in the hand). The tween's
+# duration still comes from the CardView - see _hover_scale().
+@export var hover_scale: float = 1.35
 
 # The far state's quad. Card-shaped rather than square; 0.09 x 0.13 m is
 # a playing card at roughly a third scale, which is what reads as "held"
@@ -152,6 +165,15 @@ func _ready() -> void:
 	# its own _physics_process at the default priority, so a higher number
 	# here puts this behind it in the same frame.
 	process_priority = 1
+	# A WorldCard with nothing to offer has no reason to exist: the quad
+	# would sit in her hand looking takeable and _take() would refuse it,
+	# which reads as a broken offer rather than as no offer. Refuse to
+	# spawn instead, loudly. Keeper already declines to build one when its
+	# pool comes up empty; this is the backstop for any other caller.
+	if card == null:
+		push_warning("WorldCard: spawned with no card; freeing rather than showing an empty one.")
+		queue_free()
+		return
 	_spawn_quad()
 	_layer = CanvasLayer.new()
 	_layer.name = "CardLayer"
@@ -331,10 +353,24 @@ func _apply_transform(camera: Camera3D, anchor: Vector3) -> void:
 	# screen position, not the anchor's - the anchor is the hand, which is
 	# already off-centre, so measuring from it would shift the gap by
 	# however far she happens to be reaching.
+	# Height is set by the BOTTOM edge, not the centre: project a point
+	# near_bottom_height above the holder's feet, put the card's lower edge
+	# on it, and let the top land where the card's own height takes it.
+	# Screen y grows downward, so the centre is half a card ABOVE that.
+	# The card's DEPTH is still the anchor's: it moves in the frame, it
+	# doesn't come toward the camera, so the scale computed above stays
+	# right.
 	var near_centre: Vector2 = Vector2(
 		_silhouette_right_edge(camera, pixels_per_metre) + screen_gap_px + half.x,
-		anchor_screen.y)
+		camera.unproject_position(_holder_feet() + Vector3.UP * near_bottom_height).y - half.y)
 	_card_view.position = (far_centre.lerp(near_centre, _lift) - half).round()
+
+# The holder's own origin, which is at her feet (the glb's origin is at
+# the feet and Keeper grounds that origin onto the relief). Falls back to
+# the anchor, which only makes the bottom edge relative to the hand.
+func _holder_feet() -> Vector3:
+	var holder := get_node_or_null(holder_path) as Node3D
+	return holder.global_position if holder != null else anchor_position()
 
 # Screen x of the holder's right-hand silhouette edge, at the anchor's
 # depth. Falls back to the anchor itself if there's no holder to measure,
@@ -360,10 +396,12 @@ func _quad_match_scale(pixels_per_metre: float) -> float:
 		return 0.0
 	return quad_size.x * pixels_per_metre / _card_view.card_size.x
 
-# 1 at rest, CardView.hover_scale when hovered. Read off the CardView so
-# the lifted card and a card in the hand agree by construction.
+# 1 at rest, hover_scale when hovered. The SCALE is this node's own (a
+# card in the world is read at a distance and needs a bigger jump than
+# one already filling the hand), but the DURATION still comes off the
+# CardView, so the two grow at the same rate even at different sizes.
 func _hover_scale() -> float:
-	return lerpf(1.0, _card_view.hover_scale, _hover)
+	return lerpf(1.0, hover_scale, _hover)
 
 func _on_card_mouse_entered() -> void:
 	_tween_hover(1.0)
