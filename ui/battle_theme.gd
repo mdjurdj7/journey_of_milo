@@ -33,7 +33,7 @@ const DEBUG_BUTTON_OUTLINE_PX := 1
 # Applies one of the two value sets above to every colour this theme
 # drives: the "Battle" ink/bone tokens every battle readout draws with
 # (HPBar/EnemyStatus's battle style, BattleIntent, BattleResources,
-# EndTurnButton, PileReadout), the older "CardFace" tokens the field-side
+# EndTurnButton, DeckPanel), the older "CardFace" tokens the field-side
 # readouts and BattleFeedback still read, Label's default font colour,
 # and the DebugButton outline. Layout and fonts never change here, only
 # these values. Called by RegionField._setup_field_hud() with its

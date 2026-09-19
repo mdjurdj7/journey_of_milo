@@ -253,11 +253,12 @@ process_mode = 3
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
-offset_left = 32.0
-offset_top = -76.0
-offset_right = 192.0
-offset_bottom = -32.0
+offset_left = 40.0
+offset_top = -40.0
+offset_right = 40.0
+offset_bottom = -40.0
 theme = ExtResource("14")
+align_bottom = true
 
 [node name="HPBar" parent="FieldHUD" unique_id=240261920 instance=ExtResource("15")]
 layout_mode = 3

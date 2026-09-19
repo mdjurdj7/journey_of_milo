@@ -44,8 +44,22 @@ so it doesn't get silently reinvented or silently forgotten.
   readouts' battle style, BattleIntent, BattleResources, End Turn, the
   DECK/DISCARD lines). Out of scope for that pass and still on the older
   `CardFace` tokens: HPBar/EnemyStatus's *field* style (bare rounded bar +
-  outlined numbers), the field's DeckPanel box (hidden during battle),
-  DeckView's panel, FloatingNumber, TargetLine and BattleFeedback's
-  flash colour. Restyle them together when the field HUD gets its pass;
-  the CardFace tokens can go once nothing reads them. (2026-09-17, battle
-  UI ink pass.)
+  outlined numbers), DeckView's panel, FloatingNumber, TargetLine and
+  BattleFeedback's flash colour. Restyle them together when the field HUD
+  gets its pass; the CardFace tokens can go once nothing reads them.
+  (2026-09-17, battle UI ink pass. 2026-09-19: the field's deck line moved
+  over - DeckPanel is now the one ink line the battle's DECK/DISCARD
+  readouts use too.)
+- **A card pool scan must take an explicit folder list, never "everything
+  under `cards/`".** There is no pool scan today (decks come from
+  `CharacterData.starting_deck_counts`, by explicit reference), so the
+  question is only which shape the first one takes. `cards/neutral/` now
+  holds class-agnostic cards the Keeper hands out (Left Hand, Untouched,
+  Second Thoughts) - they are hers to give, not reward or shop stock, and
+  a scan rooted at `cards/` would sweep them into both. The old project
+  hit exactly this and solved it by hiding the cards in a subfolder its
+  flat, non-recursive scan happened to miss (`npc_offers/`, see
+  `reference/old_project/deck-builder/docs/DESIGN.md`) - a guard that
+  depended on the scan staying non-recursive. Name the folders a pool
+  draws from instead, so adding a folder is a decision rather than a
+  side effect. (2026-09-19, Keeper's offer.)

@@ -334,8 +334,10 @@ func _reposition_enemies_along_forward() -> void:
 # (like CardView/EnemyStatus) both cache them via override at _ready()
 # rather than tracking the Theme resource live - without this, they'd
 # render with whatever value set the theme resource happened to already
-# be on. Also seeds the field-mode display (whole starting deck) deck_
-# panel starts in.
+# be on. Also seeds the field-mode display (the run's whole deck) deck_
+# panel starts in, and keeps its count current on RunState.deck_changed -
+# the panel holds the deck by reference, so a card landing (the Keeper's
+# offer) only needs the line re-laid out, not re-seeded.
 func _setup_field_hud() -> void:
 	var battle_theme := deck_panel.theme as BattleTheme
 	if battle_theme != null:
@@ -351,6 +353,7 @@ func _setup_field_hud() -> void:
 			if enemy.enemy_status != null:
 				enemy.enemy_status.refresh_style()
 	deck_panel.show_whole_deck(RunState.deck)
+	RunState.deck_changed.connect(func() -> void: deck_panel.show_whole_deck(RunState.deck))
 	hp_bar.set_target(wanderer)
 
 # Parents a FieldEnemy's own persistent HP display under this field's HUD

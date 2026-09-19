@@ -47,8 +47,8 @@ var _field_deck_panel: DeckPanel = null
 var _battle_transition_time: float = 0.0
 var _card_play_player: AudioStreamPlayer = null
 var _resources: BattleResources = null
-var _deck_readout: PileReadout = null
-var _discard_readout: PileReadout = null
+var _deck_readout: DeckPanel = null
+var _discard_readout: DeckPanel = null
 # The theme's current value set (see enter_battle()/_flip_dark_world()).
 var _on_dark_world: bool = false
 # End Turn is enabled only while both hold - see _update_end_turn().
@@ -154,8 +154,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_feedback.setup(wanderer, on_dark_world)
 	battle_controller.damage_dealt.connect(battle_feedback.on_damage_dealt)
 
-	_deck_readout.bind_to_deck(battle_controller.deck, PileReadout.Pile.DRAW)
-	_discard_readout.bind_to_deck(battle_controller.deck, PileReadout.Pile.DISCARD)
+	_deck_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DRAW)
+	_discard_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DISCARD)
 	_layout_corners()
 
 	var target_line := TargetLine.new()
@@ -183,9 +183,9 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 func _create_corner_readouts() -> void:
 	_resources = BattleResources.new()
 	add_child(_resources)
-	_deck_readout = PileReadout.new()
+	_deck_readout = DeckPanel.new()
 	add_child(_deck_readout)
-	_discard_readout = PileReadout.new()
+	_discard_readout = DeckPanel.new()
 	_discard_readout.align_right = true
 	add_child(_discard_readout)
 

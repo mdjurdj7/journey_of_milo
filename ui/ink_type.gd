@@ -2,7 +2,7 @@ extends RefCounted
 class_name InkType
 
 # The battle UI's type, shared by every ink-on-the-world readout (HPBar/
-# EnemyStatus's battle style, BattleResources, EndTurnButton, PileReadout):
+# EnemyStatus's battle style, BattleResources, EndTurnButton, DeckPanel):
 # the same vendored faces the cards use, and the one thing Godot's Label/
 # draw_string can't express on their own - letter-spacing. A caps label
 # ("ENERGY", "TOLL", "DECK", "END TURN") is Alegreya Sans Bold tracked by

@@ -2,7 +2,7 @@ extends Control
 class_name BattleResources
 
 # The player's energy, fixed bottom-left of the battle overlay
-# (BattleOverlay places it; the DECK line - a PileReadout - sits beneath).
+# (BattleOverlay places it; the DECK line - a DeckPanel - sits beneath).
 # Ink on the world, drawn: one circle per point of max energy, filled
 # while available and hollow once spent, with "ENERGY" tracked beneath.
 # Toll lives on the Wanderer's own readout (see HPBar), not here.

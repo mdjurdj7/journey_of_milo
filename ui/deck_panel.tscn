@@ -2,9 +2,5 @@
 
 [ext_resource type="Script" path="res://ui/deck_panel.gd" id="1_deck_panel"]
 
-[node name="DeckPanel" type="Panel"]
+[node name="DeckPanel" type="Control"]
 script = ExtResource("1_deck_panel")
-
-[node name="Icon" type="ColorRect" parent="."]
-
-[node name="TextLabel" type="RichTextLabel" parent="."]
