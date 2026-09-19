@@ -12,9 +12,13 @@ class_name Bird
 # bird_tint) - a flattened capsule body along local -Z, a neck raised
 # forward with the head on it, and two thin wing boxes on pivots at the
 # body's sides, held half-open at rest (wing_rest_yaw_degrees - a
-# cormorant drying). ~0.9m wingtip to wingtip spread, ~0.4m tall. Set bird_mesh to a PackedScene (a glb) and it replaces the
-# placeholder; the flight then only animates the whole model (no wing
-# pivots to find), which is the price of a drop-in.
+# cormorant drying). ~0.9m wingtip to wingtip spread, ~0.4m tall. Set
+# bird_mesh to a PackedScene (a glb) and it replaces the placeholder:
+# yawed by model_yaw_offset_degrees (the cormorant glb's beak is on +Z,
+# the node's forward is -Z), grounded by its AABB so the feet sit on the
+# perch whatever its origin. A glb is one merged surface (no wing pivots
+# to find), so the flight animates the whole model - the path and the
+# body bob, no wing beat - which is the price of a drop-in.
 #
 # The flight (see _take_flight()): the bird reparents to the field
 # (keeps its world transform, sheds the hull's roll/pitch), rises
@@ -28,7 +32,16 @@ class_name Bird
 enum FlyDirection { SEAWARD, INLAND, LEFT, RIGHT }
 
 @export var bird_mesh: PackedScene = null
-@export var bird_tint: Color = Color(0.30, 0.31, 0.33)
+# Yaw of a bird_mesh model under this node so its beak lies on the
+# node's local -Z (the placeholder's forward): 180 for the cormorant
+# glb, whose beak is on +Z. Unused by the placeholder.
+@export var model_yaw_offset_degrees: float = 180.0:
+	set(value):
+		model_yaw_offset_degrees = value
+		if _model != null and _body == null:
+			_model.rotation = Vector3(0.0, deg_to_rad(model_yaw_offset_degrees), 0.0)
+# Cormorant-dark: clearly darker than a Hull's hull_tint.
+@export var bird_tint: Color = Color(0.28, 0.29, 0.31)
 # Local position on the parent (the perch): the point the bird's feet
 # rest on.
 @export var perch_offset: Vector3 = Vector3.ZERO:
@@ -119,11 +132,23 @@ func _spawn_model() -> void:
 	if bird_mesh != null:
 		_model = bird_mesh.instantiate() as Node3D
 		_model.name = "Model"
+		_model.rotation = Vector3(0.0, deg_to_rad(model_yaw_offset_degrees), 0.0)
 		add_child(_model)
+		# Seat the model's bbox bottom on this node's origin (the perch
+		# point) - same AABB-grounding idiom as Hull._apply_model_transform();
+		# the yaw above is already in the transform the bbox is measured
+		# through, so only Y is read from it.
+		var combined_aabb: AABB
+		var has_aabb := false
 		for mesh_instance in _model.find_children("*", "MeshInstance3D", true, false):
 			var mi := mesh_instance as MeshInstance3D
 			mi.material_override = _material
 			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+			var mi_aabb_in_self: AABB = (_model.transform * _model.global_transform.affine_inverse() * mi.global_transform) * mi.get_aabb()
+			combined_aabb = mi_aabb_in_self if not has_aabb else combined_aabb.merge(mi_aabb_in_self)
+			has_aabb = true
+		if has_aabb:
+			_model.position.y = -combined_aabb.position.y
 		return
 	_model = Node3D.new()
 	_model.name = "Placeholder"
@@ -272,8 +297,7 @@ func _take_flight() -> void:
 
 	if _wing_right != null:
 		_animate_wings()
-	if _body != null:
-		_animate_bob()
+	_animate_bob()
 
 # Open the rest of the way over wing_open_seconds (yaw to 0 from the
 # rest pose), then beat: each half-beat
@@ -297,11 +321,16 @@ func _beat_wings() -> void:
 	beat.chain().tween_property(_wing_right, "rotation:z", -amplitude, half_beat).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 	beat.tween_property(_wing_left, "rotation:z", amplitude, half_beat).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
 
-# The body rides up on the downbeat and settles on the upbeat.
+# The body rides up on the downbeat and settles on the upbeat - the
+# placeholder's Body node, or the whole bird_mesh model (its one merged
+# surface has no separate body to move).
 func _animate_bob() -> void:
+	var bobbing: Node3D = _body if _body != null else _model
+	if bobbing == null:
+		return
 	var half_beat: float = 0.5 / maxf(wing_beat_hz, 0.1)
-	var rest_y: float = _body.position.y
+	var rest_y: float = bobbing.position.y
 	var bob := create_tween()
 	bob.set_loops()
-	bob.tween_property(_body, "position:y", rest_y + bob_height, half_beat).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
-	bob.tween_property(_body, "position:y", rest_y, half_beat).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	bob.tween_property(bobbing, "position:y", rest_y + bob_height, half_beat).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	bob.tween_property(bobbing, "position:y", rest_y, half_beat).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)

@@ -20,6 +20,8 @@
 [ext_resource type="PackedScene" path="res://field/hull.tscn" id="17"]
 [ext_resource type="PackedScene" path="res://field/bird.tscn" id="18"]
 [ext_resource type="PackedScene" path="res://field/keeper.tscn" id="19"]
+[ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="21_wanderer_pool"]
+[ext_resource type="PackedScene" uid="uid://bti18febtfxyt" path="res://assets/models/cormorant/bird.glb" id="20_cormorant"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -159,6 +161,7 @@ size = Vector3(4.4, 2.2, 3.2)
 [node name="RegionField" type="Node3D" unique_id=2096648515]
 script = ExtResource("1")
 field_extents = Vector2(26, 30)
+reward_pool = ExtResource("21_wanderer_pool")
 shoreline_wall_margin = 3.0
 battle_spacing = 4.0
 
@@ -584,6 +587,7 @@ roll_degrees = 8.0
 yaw_offset_degrees = 8.0
 
 [node name="Bird" parent="Hulls/Hull1" instance=ExtResource("18")]
+bird_mesh = ExtResource("20_cormorant")
 perch_offset = Vector3(0, 0.7, -1.42)
 
 [node name="Hull2" parent="Hulls" instance=ExtResource("17")]
