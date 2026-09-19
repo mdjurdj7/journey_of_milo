@@ -18,6 +18,7 @@
 [ext_resource type="PackedScene" path="res://ui/hp_bar.tscn" id="15"]
 [ext_resource type="PackedScene" path="res://field/exit_gate.tscn" id="16"]
 [ext_resource type="PackedScene" path="res://field/hull.tscn" id="17"]
+[ext_resource type="PackedScene" path="res://field/bird.tscn" id="18"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -567,6 +568,9 @@ mesh = SubResource("BoxMesh_ruin_mass_4")
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -9.5, 0, 3)
 roll_degrees = 8.0
 yaw_offset_degrees = 8.0
+
+[node name="Bird" parent="Hulls/Hull1" instance=ExtResource("18")]
+perch_offset = Vector3(0, 0.7, -1.42)
 
 [node name="Hull2" parent="Hulls" instance=ExtResource("17")]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -3, 0, 6.2)
