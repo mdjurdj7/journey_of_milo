@@ -222,7 +222,7 @@ fov = 38.0
 [node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=1648467848]
 
 [node name="FieldEnemy" parent="." unique_id=677119585 instance=ExtResource("8")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -11)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -13)
 enemy_id = &"sputter"
 enemy_data = ExtResource("10")
 model_yaw_offset = 180.0
