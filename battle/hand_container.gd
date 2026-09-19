@@ -22,7 +22,7 @@ signal armed_changed(armed: bool)
 # composed with) the further shrink-to-fit factor _compute_scale_factor()
 # derives against hand_max_span, same "smaller than full card_size for
 # this context" role DeckView's own deck_view_card_scale plays there.
-@export_range(0.1, 1.0) var hand_card_scale: float = 0.85:
+@export_range(0.1, 1.0) var hand_card_scale: float = 0.95:
 	set(value):
 		hand_card_scale = value
 		_reflow_hand(false)
@@ -34,13 +34,15 @@ signal armed_changed(armed: bool)
 # timing this feature adds; every other duration here predates it.
 @export var reflow_duration_sec: float = 0.15
 
-# At rest, only this much of a card's own height (1x px) pokes up above
-# this container's own top-of-arc line - the rest sits pushed down (see
-# CardView.set_rest_offset()). 119 with the overlay's container (top at
-# 1080 - 365 = 715, arc 22) puts a hand card's top at y 854 (0.79 of
-# 1080) and its bottom 12px below the viewport - the hand is held, not
-# laid on the screen. CardView.hover_lift is measured from this baseline.
-@export var hand_rest_visible_height: float = 119.0:
+# At rest, a card's slot-space offset is card_size.y minus this (see
+# CardView.set_rest_offset()) - and since a hand card scales about its
+# bottom centre, its rendered top is that offset plus card_size.y * (1 -
+# hand_card_scale) further down. 91 with the overlay's container (top at
+# 1080 - 365 = 715, arc 22) and hand_card_scale 0.95 puts a hand card's
+# top at y 896 (0.83 of 1080) with 184px of it on screen and its bottom
+# 54px below the viewport - the hand is held, not laid on the screen.
+# CardView.hover_lift is measured from this baseline.
+@export var hand_rest_visible_height: float = 91.0:
 	set(value):
 		hand_rest_visible_height = value
 		for slot: Control in _views.values():
