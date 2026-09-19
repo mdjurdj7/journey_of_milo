@@ -84,6 +84,27 @@ class_name HPBar
 # it is literally the stretch of HP you could still get back. No numeral:
 # the HP numeral keeps reading current HP, which is what you have.
 @export_range(0.0, 1.0) var grace_alpha: float = 0.3
+
+# --- The standing row: stance first, then statuses ---
+#
+# The player's first status display of any kind. Enemies have had one
+# since the start (EnemyStatus); the player's own Braced has been
+# applying and expiring invisibly. Built as the general row rather than
+# as a stance widget, so a status only has to exist to be shown.
+#
+# Order is deliberate: the stance is a standing bargain and comes first,
+# statuses are transient and follow it. A stance shows its own glyph and
+# name; a status shows its name and, when stacked, a multiplier.
+@export_group("Standing Row")
+@export var row_font_size_px: int = 10
+@export_range(0.0, 1.0) var row_tracking_em: float = 0.16
+@export_range(0.0, 1.0) var row_alpha: float = 0.7
+@export var row_gap_px: float = 6.0
+@export var row_item_gap_px: float = 14.0
+@export var row_glyph_size_px: float = 9.0
+@export var row_glyph_gap_px: float = 5.0
+@export var row_glyph_line_width_px: float = 1.3
+@export_group("")
 @export var battle_scale: float = 1.0
 
 @export_group("Block Readout")
@@ -133,6 +154,11 @@ var _current_hp: int = 0
 var _max_hp: int = 1
 var _block: int = 0
 var _grace: int = 0
+# The row's contents, as flat display data rather than rules objects -
+# this node never reaches into a Stance or a Status, it is handed what to
+# draw. Each entry: {"text": String, "glyph": bool}.
+var _row_items: Array[Dictionary] = []
+var _row_font_tracked: Font = null
 var _toll: int = 0
 var _toll_visible: bool = false
 var _toll_pop: float = 1.0
@@ -250,7 +276,10 @@ func _battle_content_size() -> Vector2:
 	var width: float = _block_readout_width() + battle_width
 	if _toll_visible:
 		width += toll_gap_px + _toll_block_width()
-	return Vector2(width, _battle_bar_top() + battle_bar_height)
+	var row_height: float = 0.0
+	if not _row_items.is_empty() and _row_font_tracked != null:
+		row_height = row_gap_px + _row_font_tracked.get_height(row_font_size_px)
+	return Vector2(width, _battle_bar_top() + battle_bar_height + row_height)
 
 # The point of this control that sits on the unprojected anchor (and
 # that DistanceScale scales about): the field layout's centre, or the HP
@@ -345,10 +374,43 @@ func _draw() -> void:
 	if _toll_visible:
 		_draw_toll(bar_top, ink)
 
+	_draw_standing_row(bar_top + battle_bar_height + row_gap_px, left)
+
 # The Toll block, off the bar's right end: numeral and "TOLL" on one
 # baseline toll_rule_gap_px above the rule, the rule on the bar's rows,
 # as wide as the block. The numeral pops about its baseline-left corner
 # on a change so the label and rule hold still.
+# Stance then statuses, left to right under the bar. Nothing at all when
+# empty - no label, no placeholder, no reserved gap.
+func _draw_standing_row(top: float, left: float) -> void:
+	if _row_items.is_empty() or _row_font_tracked == null:
+		return
+	var color: Color = _ink
+	color.a = row_alpha * _battle_blend
+	var ascent: float = _row_font_tracked.get_ascent(row_font_size_px)
+	var baseline: float = top + ascent
+	var x: float = left
+	for item: Dictionary in _row_items:
+		if item.get("glyph", false):
+			_draw_stance_glyph(Vector2(x, baseline - ascent * 0.5), color)
+			x += row_glyph_size_px + row_glyph_gap_px
+		x += InkType.draw_run(self, _row_font_tracked, String(item["text"]), Vector2(x, baseline), row_font_size_px, color)
+		x += row_item_gap_px
+
+# The stance mark: a ring with a bite out of its lower right - a thing
+# consuming itself. Drawn rather than authored so it scales with the row
+# and needs no texture; one shape for every stance, since what makes them
+# different is the name beside it.
+func _draw_stance_glyph(centre: Vector2, color: Color) -> void:
+	var r: float = row_glyph_size_px * 0.5
+	var points: PackedVector2Array = PackedVector2Array()
+	var steps: int = 18
+	for i in steps + 1:
+		# Open between 300 and 30 degrees - the bite.
+		var t: float = 30.0 + 270.0 * float(i) / float(steps)
+		points.append(centre + Vector2(cos(deg_to_rad(t)), sin(deg_to_rad(t))) * r)
+	draw_polyline(points, color, row_glyph_line_width_px, true)
+
 func _draw_toll(bar_top: float, ink: Color) -> void:
 	var left: float = _block_readout_width() + battle_width + toll_gap_px
 	var baseline: float = bar_top - toll_rule_gap_px
@@ -399,6 +461,9 @@ func refresh_style() -> void:
 	_ink = get_theme_color("ink", "Battle")
 	_toll_rule_color = get_theme_color("toll_rule", "Battle")
 	_name_font_tracked = InkType.tracked(name_font, battle_name_size_px, battle_name_tracking_em)
+	# Alegreya Bold, tracked - the same treatment the card's own type label
+	# uses, so the row reads as the same voice as "STRIKE"/"GUARD".
+	_row_font_tracked = InkType.tracked(InkType.text_bold_font(), row_font_size_px, row_tracking_em)
 	_toll_label_tracked = InkType.tracked(name_font, toll_label_size_px, toll_label_tracking_em)
 	_apply_layout()
 
@@ -480,6 +545,24 @@ func update_grace(grace: int) -> void:
 
 func hide_grace() -> void:
 	update_grace(0)
+
+# The standing row's contents, pushed by BattleOverlay on the
+# controller's stance_changed/status_changed. `stance_text` is empty when
+# no stance is held; `status_texts` is every active status's label, in the
+# order the rules hold them. This node does no rules reading of its own -
+# it is handed strings, which is why it needs no knowledge of stacking
+# rules or status categories.
+func set_standing_row(stance_text: String, status_texts: PackedStringArray) -> void:
+	_row_items.clear()
+	if not stance_text.is_empty():
+		_row_items.append({"text": stance_text, "glyph": true})
+	for text in status_texts:
+		if not text.is_empty():
+			_row_items.append({"text": text, "glyph": false})
+	_apply_layout()
+
+func clear_standing_row() -> void:
+	set_standing_row("", PackedStringArray())
 
 # Called by BattleOverlay.enter_battle()/_finish_battle() - bypasses the
 # field hover/hold/low-hp visibility rules entirely while true (see

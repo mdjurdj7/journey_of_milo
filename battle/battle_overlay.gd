@@ -136,6 +136,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.card_played.connect(_on_card_played)
 	battle_controller.toll_changed.connect(_on_toll_changed)
 	battle_controller.grace_changed.connect(_on_grace_changed)
+	battle_controller.stance_changed.connect(_on_stance_changed)
 	battle_controller.enemy_hp_changed.connect(_on_enemy_hp_changed)
 	battle_controller.damage_dealt.connect(_on_damage_dealt)
 	battle_controller.enemy_intent_changed.connect(_on_enemy_intent_changed)
@@ -268,10 +269,38 @@ func _on_toll_changed(new_toll: int) -> void:
 func _on_grace_changed(grace: int) -> void:
 	_field_hp_bar.update_grace(grace)
 
+func _on_stance_changed(stance: Stance) -> void:
+	_refresh_standing_row()
+	# The hand's faces move with it - see HandContainer.set_stance().
+	hand_container.set_stance(stance)
+
+# Turns the player's rules state into the strings the row draws - this
+# is the only place that knows a Stance/Status has a display_name or a
+# stack count, so HPBar can stay a thing that draws text it is handed.
+# Names are upper-cased here rather than by the font, so the row reads
+# the same whatever face it is set in.
+func _refresh_standing_row() -> void:
+	var stance: Stance = battle_controller.player.stance
+	var stance_text: String = ""
+	if stance != null and stance.data != null:
+		stance_text = stance.data.display_name.to_upper()
+		if stance.stacks > 1:
+			stance_text += " ×%d" % stance.stacks
+	var status_texts := PackedStringArray()
+	for active: Status in battle_controller.player.statuses:
+		if active.data == null:
+			continue
+		var text: String = active.data.display_name.to_upper()
+		if active.stack_count > 1:
+			text += " ×%d" % active.stack_count
+		status_texts.append(text)
+	_field_hp_bar.set_standing_row(stance_text, status_texts)
+
 # Block moved somewhere (a card, a turn start, an enemy's own guard) -
 # every readout's segment follows.
 func _on_status_changed() -> void:
 	_field_hp_bar.set_block(battle_controller.player.block)
+	_refresh_standing_row()
 	for enemy: FieldEnemy in _enemy_statuses:
 		var status: EnemyStatus = _enemy_statuses[enemy]
 		if status != null and is_instance_valid(status):
@@ -326,6 +355,9 @@ func _finish_battle(outcome: Outcome) -> void:
 	# Grace is per fight (it lives on the Combatant, which this battle's
 	# end discards) - the segment goes with it whatever the outcome.
 	_field_hp_bar.hide_grace()
+	# Stances and statuses are per fight, like Grace - the row goes with
+	# them whatever the outcome.
+	_field_hp_bar.clear_standing_row()
 	_field_hp_bar.exit_battle(_battle_transition_time)
 	if _field_deck_panel != null:
 		_field_deck_panel.visible = true
