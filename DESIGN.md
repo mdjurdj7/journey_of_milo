@@ -63,3 +63,26 @@ so it doesn't get silently reinvented or silently forgotten.
   depended on the scan staying non-recursive. Name the folders a pool
   draws from instead, so adding a folder is a decision rather than a
   side effect. (2026-09-19, Keeper's offer.)
+- **The old project's Wanderer pool is reference, not a source to port
+  from.** Six of its cards (Ballast, Forbearance, Guillotine, Paid in
+  Pain, Siphon, Unflinching) were ported and then rolled back out again:
+  they mapped onto the effect system cleanly enough, but porting a pool
+  card-by-card imports the old class's economy along with it, and this
+  Wanderer's costs are being set to their own principle. Wanderer reward
+  cards will be authored fresh against that principle instead.
+  `cards/pools/wanderer_pool.tres` stays in place with an EMPTY entries
+  array - the reward machinery (RewardPool, RewardSpread, the seeded
+  RunState.rng) is all built and wired, so authoring a card and adding a
+  line to that pool is the whole job. A fight with an empty pool drops
+  nothing and says so once per session rather than warning per fight.
+  Three of the old cards could not have been ported at all, and the
+  reasons are worth keeping: **Retaliation** - nothing reads a retaliate
+  status when the player is hit; reflecting a hit back has no home in
+  the damage pipeline. **Selfeater** - its status wants
+  `attack_hp_drain_base`/`attack_hp_drain_increment`/`is_persistent_
+  stance` on StatusData, and the card is `CardType.STANCE`, a third type
+  CardData doesn't carry. **Owed** - the status's behaviour lives in the
+  damage pipeline rather than in StatusData, and the card needs a
+  per-CARD `toll_cost`, which only CardEffect has. ("Pound of Flesh" and
+  "Overdraw" were also asked after; neither exists in the old project.)
+  (2026-09-19, first fight rewards.)

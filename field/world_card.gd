@@ -86,6 +86,10 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 @export var holder_path: NodePath = ^".."
 
 @export var lift_radius: float = 2.5
+# Off when something else decides whether this card is lifted - see
+# set_lifted(). A RewardSpread lifts its three together from the spread's
+# own centre, so each card measuring its own radius would stagger them.
+@export var lift_radius_enabled: bool = true
 @export var lift_duration_sec: float = 0.18
 
 @export var near_scale: float = 1.0
@@ -130,6 +134,9 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 @export_group("")
 
 @export_group("Take Flight")
+# How long the quad takes to fade once a card is dismissed rather than
+# taken - see dismiss().
+@export var dismiss_fade_sec: float = 0.6
 @export var flight_duration_sec: float = 0.45
 @export var flight_end_scale: float = 0.12
 # Resolved to <region_field>/FieldHUD/DeckPanel - the card flies to the
@@ -150,6 +157,10 @@ var _lift: float = 0.0
 var _lift_tween: Tween = null
 var _near: bool = false
 var _taking: bool = false
+# Being taken away un-taken - see dismiss(). Distinct from _taking: the
+# card still tracks its anchor while it settles, it just can't be
+# clicked any more.
+var _dismissing: bool = false
 # 0 = not hovered, 1 = hovered. Same shape as _lift, and the same reason:
 # tweened so it grows rather than snaps.
 var _hover: float = 0.0
@@ -308,7 +319,7 @@ func _physics_process(_delta: float) -> void:
 	var anchor: Vector3 = anchor_position()
 	if _wanderer == null or not is_instance_valid(_wanderer):
 		_wanderer = _find_wanderer()
-	if _wanderer != null:
+	if lift_radius_enabled and _wanderer != null:
 		_set_near(anchor.distance_to(_wanderer.global_position) <= lift_radius)
 
 	# Exactly one of the two is ever on screen. The quad holds the far end
@@ -418,6 +429,14 @@ func _tween_hover(to: float) -> void:
 	_hover_tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	_hover_tween.tween_property(self, "_hover", to, _card_view.hover_duration_sec)
 
+# Lift this card from outside, for a holder that decides for a GROUP -
+# a RewardSpread measures once from the spread's centre and pushes the
+# same answer into all three, so they rise together instead of each
+# crossing its own radius a step apart. Turn lift_radius_enabled off
+# alongside, or the card's own per-frame check fights this every frame.
+func set_lifted(lifted: bool) -> void:
+	_set_near(lifted)
+
 func _set_near(near: bool) -> void:
 	if near == _near:
 		return
@@ -437,12 +456,41 @@ func _set_near(near: bool) -> void:
 # through it would otherwise swallow a point-to-move click on the sand
 # behind it (CardView's own mouse_filter is STOP).
 func _on_card_gui_input(event: InputEvent) -> void:
-	if _taking or not _near:
+	if _taking or _dismissing or not _near:
 		return
 	var button := event as InputEventMouseButton
 	if button == null or button.button_index != MOUSE_BUTTON_LEFT or not button.pressed:
 		return
 	_take()
+
+# Not taken - withdrawn. The card settles back to its quad first and only
+# then fades, so it never dissolves in mid-air: a card you didn't choose
+# should be seen being put down. Frees itself at the end, which is what
+# lets a RewardSpread free itself simply by noticing it has no cards
+# left. Immediate if it wasn't lifted (nothing to settle).
+func dismiss() -> void:
+	if _taking or _dismissing:
+		return
+	_dismissing = true
+	if _card_view != null:
+		_card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var settle: float = lift_duration_sec if _lift > 0.001 else 0.0
+	_set_near(false)
+	var tween := create_tween()
+	tween.tween_interval(settle)
+	tween.tween_callback(_fade_quad_and_free)
+
+# The quad is unlit and opaque; fading it means opting into the
+# transparent pipeline for these last 0.6 s only, which is why this isn't
+# just set up front in _spawn_quad().
+func _fade_quad_and_free() -> void:
+	if _quad_material == null:
+		queue_free()
+		return
+	_quad_material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	var tween := create_tween()
+	tween.tween_property(_quad_material, "albedo_color:a", 0.0, dismiss_fade_sec)
+	tween.tween_callback(queue_free)
 
 func _take() -> void:
 	if _taking or card == null:

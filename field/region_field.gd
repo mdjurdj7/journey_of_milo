@@ -12,6 +12,18 @@ signal floor_cleared
 
 @export var escape_push_distance: float = 4.0
 
+# What a won fight leaves behind. Null (the default) means no drop at
+# all, which is what every floor without an authored pool gets - the
+# tutorial scene points this at cards/pools/wanderer_pool.tres. Only WINS
+# drop: an escape leaves nothing, and a loss ends the run.
+@export var reward_pool: RewardPool = null
+@export var reward_spread_scene_path: String = "res://field/reward_spread.tscn"
+# Held back until the battle framing has gone: the cards should appear on
+# an ordinary field view, not under the battle camera mid-swing-out.
+# Raised to the camera rig's own battle_transition_time when that's
+# longer, so retuning the blend doesn't leave this stale.
+@export var reward_spread_delay_sec: float = 0.6
+
 # Playable boundary, centered on origin. X = width (left/right side
 # edges), Y-component of field_extents = depth along the field's
 # forward axis (see get_forward() below — not assumed to be +Z).
@@ -525,13 +537,46 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, over
 			# leak.
 			if enemy.enemy_status != null:
 				enemy.enemy_status.queue_free()
+			# Both read off the enemy BEFORE it is freed - the spread is
+			# spawned a beat later (see _spawn_reward_spread()), by which
+			# time this node is gone. Same "don't make the ordering
+			# load-bearing" reasoning as was_last_enemy above.
+			var fell_at: Vector3 = enemy.global_position
+			var fell_to: EnemyData = enemy.enemy_data
 			enemy.queue_free()
+			_spawn_reward_spread(fell_at, fell_to)
 			if was_last_enemy:
 				floor_cleared.emit()
 		BattleOverlay.Outcome.ESCAPE:
 			_push_wanderer_away_from(enemy)
 		BattleOverlay.Outcome.LOSE:
 			get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
+
+# Three cards on the sand where the enemy fell, once the battle framing
+# has blended away. Awaits rather than spawning inline so the cards don't
+# appear under the battle camera; the caller doesn't await this, it just
+# lets it run. The position is a snapshotted Vector3, not the enemy - by
+# the time this resumes that node is freed.
+func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
+	if reward_pool == null:
+		return
+	var delay: float = reward_spread_delay_sec
+	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
+	if camera_rig != null:
+		delay = maxf(delay, camera_rig.battle_transition_time)
+	await get_tree().create_timer(delay).timeout
+	# The floor can be left, or the run ended, during that beat.
+	if not is_inside_tree():
+		return
+	var scene := load(reward_spread_scene_path) as PackedScene
+	if scene == null:
+		push_warning("RegionField: could not load %s; no reward spread." % reward_spread_scene_path)
+		return
+	var spread := scene.instantiate() as RewardSpread
+	spread.pool = reward_pool
+	spread.enemy = fell_to
+	add_child(spread)
+	spread.global_position = fell_at
 
 # CONSUMED cards leave RunState.deck (the run's Belongings) for good once
 # the fight that consumed them ends; SPENT ones (the rest of exhaust_pile)
