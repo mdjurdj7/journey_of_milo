@@ -5,10 +5,20 @@ class_name DamageEffect
 # FIRST_CARD_DAMAGE, DAMAGE_ALL) - see effect_resolver.gd's registry and
 # CardEffect's own doc on condition/target_scope.
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
-	if not EffectResolver.condition_met(effect, ctx):
+	# Gate or replace, per CardEffect.alt_value (see the Condition enum's
+	# own doc). Gate is the original behaviour and still the default; a
+	# replace swaps which number is dealt and always deals one. Whichever
+	# it is, exactly ONE number goes through the modifiers and the damage
+	# pipeline below - the reason this lives here rather than being
+	# authored as two stacked DAMAGE effects, which would run the pipeline
+	# twice and get blocked twice.
+	var met: bool = EffectResolver.condition_met(effect, ctx)
+	var replaces: bool = effect.alt_value != 0
+	if not met and not replaces:
 		return
+	var base: int = effect.alt_value if (met and replaces) else effect.value
 
-	var amount: int = Status.apply_modifiers(effect.value, ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+	var amount: int = Status.apply_modifiers(base, ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 
 	var targets: Array[Combatant] = []
 	if effect.target_scope == CardEffect.TargetScope.ALL_ENEMIES:

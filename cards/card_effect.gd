@@ -17,14 +17,20 @@ enum EffectType {
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
 }
 
-# Gates whether an effect resolves at all - a deliberately simpler
-# primitive than the old TOLL_THRESHOLD_DAMAGE/FIRST_CARD_DAMAGE's own
-# REPLACE-the-base-number shape (base value if false, a second authored
-# value if true, always dealing SOMETHING either way). Unused by every
-# starter card today, so this simplification costs nothing yet - a future
-# card that genuinely needs "deal X normally, Y instead above a
-# threshold" will need a second value field added back, not just this
-# gate reused.
+# When the effect resolves. Two modes, chosen by `alt_value` below rather
+# than by a second enum:
+#   alt_value == 0 - GATE. Condition false and the effect doesn't resolve
+#                    at all. The original shape, and still what every
+#                    conditional effect except a replace uses.
+#   alt_value != 0 - REPLACE. Condition false uses `value`, true uses
+#                    `alt_value`; something always resolves. This is the
+#                    old project's TOLL_THRESHOLD_DAMAGE/FIRST_CARD_DAMAGE
+#                    shape, which its .tres files carried in a field
+#                    called threshold_value.
+# The second mode was predicted here as future work before it existed;
+# `alt_value` is that second value field, added for Left Hand (cards/
+# neutral/left_hand.tres) and read by damage_effect.gd ONLY - no other
+# resolver consults it, so every other type is gate-or-nothing as before.
 enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN }
 
 # Which combatant(s) an effect resolves against - lets DAMAGE_ALL collapse
@@ -41,6 +47,15 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 @export var condition_value: float = 0.0
 # TOLL_AT_LEAST reads this as an int Toll threshold; HP_BELOW_PERCENT
 # reads it as a percent (0-100) of max HP. Unused when condition is NONE.
+
+@export var alt_value: int = 0
+# The number used INSTEAD of `value` when `condition` holds - see the
+# Condition enum's own doc for the gate/replace split this selects, and
+# damage_effect.gd for the only resolver that reads it. 0 means "no
+# replacement authored", which is also why a replace that wants to deal
+# literally 0 can't be expressed: deal-nothing is a gate, not a replace.
+# One resolution either way, so the value goes through the damage
+# pipeline once - NOT two stacked effects, which would be blocked twice.
 
 @export var target_scope: TargetScope = TargetScope.TARGET
 
