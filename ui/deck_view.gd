@@ -46,6 +46,21 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 # reserving only its scaled footprint) so a whole pile reads at a glance
 # instead of needing to scroll through full hand-sized cards.
 @export_range(0.1, 1.0) var deck_view_card_scale: float = 0.75
+
+# Inspect: clicking a card in the grid lifts THAT SAME CardView out of
+# its slot, over a dim, at reading size. The same instance rather than a
+# second one so the card can't drift from the grid's - one layout, one
+# set of colours, text simply larger. Lifting it out of the tree is also
+# what makes it possible at all: in the grid it lives inside a
+# ScrollContainer, which clips, so a card scaled up in place would be cut
+# off at the panel's edge.
+@export_group("Inspect")
+@export var inspect_scale: float = 2.2
+@export var inspect_duration_sec: float = 0.15
+# CardView's own ink at 35% - the same dark the cards are drawn with, so
+# the dim reads as the deck receding rather than as a new surface.
+@export var inspect_scrim_color: Color = Color(0.165, 0.165, 0.18, 0.35)
+@export_group("")
 # Hard cap regardless of how much width is actually available - past a
 # point, more columns just means smaller reading distance between eye and
 # card, not a more useful browse. GridCenterContainer keeps the grid
@@ -77,6 +92,8 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 @onready var _scroll_container: ScrollContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer
 @onready var _grid_center: CenterContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer/GridCenterContainer
 @onready var _grid: GridContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer/GridCenterContainer/GridContainer
+@onready var _inspect_layer: Control = $InspectLayer
+@onready var _inspect_scrim: ColorRect = $InspectLayer/InspectScrim
 
 # The width _grid actually has to lay columns out in, derived arithmetically
 # from content_width_fraction/content_margin_px rather than read back off
@@ -85,6 +102,14 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 # without needing to wait for a layout pass to settle before open() can
 # use it.
 var _available_grid_width: float = 0.0
+# The card currently lifted out for inspection, and the slot it came
+# from - the slot stays in the grid holding its footprint, so nothing
+# reflows while a card is out and it has somewhere exact to go back to.
+var _inspected: CardView = null
+var _inspect_slot: Control = null
+var _inspect_tween: Tween = null
+# True for the length of a lift or a return - see _on_card_clicked().
+var _inspect_busy: bool = false
 
 # One "step" in the theme's own value set - the delta between panel_color
 # and panel_light_color, extrapolated by content_panel_steps/
@@ -117,6 +142,22 @@ func _ready() -> void:
 	_content_panel.mouse_filter = Control.MOUSE_FILTER_STOP
 
 	_available_grid_width = content_size.x - float(content_margin_px) * 2.0
+
+	# Above Scrim in the scene, so the lifted card and its dim cover the
+	# grid and the panel alike. IGNORE on the layer itself and STOP on the
+	# scrim inside it: while a card is out, the scrim is what catches
+	# "click anywhere", and it has to catch it BEFORE this node's own
+	# _gui_input() closes the whole view.
+	_inspect_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_inspect_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_inspect_layer.visible = false
+	_inspect_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_inspect_scrim.color = inspect_scrim_color
+	_inspect_scrim.mouse_filter = Control.MOUSE_FILTER_STOP
+	_inspect_scrim.gui_input.connect(_on_inspect_scrim_gui_input)
+	# Starts fully transparent and is faded in by the lift; the colour's
+	# own 0.35 is the target, modulate is what animates to it.
+	_inspect_scrim.modulate.a = 0.0
 
 	var panel_color: Color = get_theme_color("panel_color", "CardFace")
 	var panel_light_color: Color = get_theme_color("panel_light_color", "CardFace")
@@ -218,6 +259,10 @@ func open(cards: Array[CardData], header_text: String) -> void:
 		slot.add_child(card_view)
 		_grid.add_child(slot)
 		card_view.set_card_data(card)
+		# The card carries its own slot to the handler - the slot is where
+		# it has to land again, and looking it up later through get_parent()
+		# wouldn't work while the card is out of the tree it came from.
+		card_view.clicked.connect(_on_card_clicked.bind(card_view, slot))
 
 # Largest column count whose total width (n cards plus (n-1) gaps between
 # them) still fits _available_grid_width, floored at 1 (a single huge
@@ -252,7 +297,88 @@ func _gui_input(event: InputEvent) -> void:
 		close()
 		get_viewport().set_input_as_handled()
 
+# Escape backs out one level at a time: it puts an inspected card down
+# before it closes the view, so the key never skips a step the click
+# can't.
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
-		close()
+		if _inspected != null:
+			_end_inspect()
+		else:
+			close()
 		get_viewport().set_input_as_handled()
+
+# --- Inspect ---
+
+# A grid card was clicked, or the inspected one was clicked again. Only
+# those two reach here: while a card is out, the scrim covers the grid,
+# so no OTHER card can be clicked and there is no card-to-card swap to
+# handle. _inspect_busy holds off both for the length of a transition,
+# so a click landing mid-flight can't start a second one on a card that
+# is currently between parents.
+func _on_card_clicked(_card_data: CardData, card_view: CardView, slot: Control) -> void:
+	if _inspect_busy:
+		return
+	if _inspected == card_view:
+		_end_inspect()
+	elif _inspected == null:
+		_begin_inspect(card_view, slot)
+
+func _on_inspect_scrim_gui_input(event: InputEvent) -> void:
+	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+		_end_inspect()
+		get_viewport().set_input_as_handled()
+
+# Lifts the card out of its slot into the overlay, keeping it exactly
+# where it looked, then grows it to the middle of the screen. Its global
+# position is captured and re-applied by hand rather than trusting the
+# reparent: the card leaves a ScrollContainer (scrolled, and clipping)
+# for a full-rect layer, and the two don't share an origin.
+func _begin_inspect(card_view: CardView, slot: Control) -> void:
+	var from_position: Vector2 = card_view.global_position
+	slot.remove_child(card_view)
+	_inspect_layer.add_child(card_view)
+	card_view.global_position = from_position
+
+	_inspected = card_view
+	_inspect_slot = slot
+	_inspect_layer.visible = true
+	_tween_inspect(card_view, _inspect_centre(card_view), inspect_scale, 1.0)
+
+# Puts it back: the reverse tween onto the slot's own screen position,
+# then home into the slot at a clean zero offset so the grid owns its
+# placement again.
+func _end_inspect() -> void:
+	if _inspected == null or _inspect_busy:
+		return
+	var card_view: CardView = _inspected
+	var slot: Control = _inspect_slot
+	_inspected = null
+	_inspect_slot = null
+	_tween_inspect(card_view, slot.global_position, deck_view_card_scale, 0.0)
+	_inspect_tween.tween_callback(func() -> void:
+		if is_instance_valid(card_view) and is_instance_valid(slot):
+			card_view.get_parent().remove_child(card_view)
+			slot.add_child(card_view)
+			card_view.position = Vector2.ZERO
+		_inspect_layer.visible = false)
+
+# Top-left that centres the card at `inspect_scale`. pivot_offset is
+# ZERO on these (see open()), so a card grows down-right from its own
+# position and its rendered size is card_size x scale - the centring has
+# to account for that rather than just using the viewport's middle.
+func _inspect_centre(card_view: CardView) -> Vector2:
+	return (get_viewport_rect().size - card_view.card_size * inspect_scale) / 2.0
+
+func _tween_inspect(card_view: CardView, to_position: Vector2, to_scale: float, scrim_alpha: float) -> void:
+	if _inspect_tween != null and _inspect_tween.is_valid():
+		_inspect_tween.kill()
+	_inspect_busy = true
+	_inspect_tween = create_tween()
+	_inspect_tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	_inspect_tween.set_parallel(true)
+	_inspect_tween.tween_property(card_view, "global_position", to_position, inspect_duration_sec)
+	_inspect_tween.tween_property(card_view, "scale", Vector2.ONE * to_scale, inspect_duration_sec)
+	_inspect_tween.tween_property(_inspect_scrim, "modulate:a", scrim_alpha, inspect_duration_sec)
+	_inspect_tween.chain()
+	_inspect_tween.tween_callback(func() -> void: _inspect_busy = false)
