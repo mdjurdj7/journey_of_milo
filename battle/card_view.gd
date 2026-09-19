@@ -35,10 +35,13 @@ signal lowered
 signal armed
 signal disarmed
 
-# Card type from the rules' point of view (strike / guard / toll), derived
-# in _derive_keyline_type() - see DESIGN.md's note on why this isn't
-# CardData.CardType yet.
-enum KeylineType { STRIKE, GUARD, TOLL }
+# Card type from the rules' point of view (strike / guard / toll /
+# utility), derived in _derive_keyline_type() - see DESIGN.md's note on
+# why this isn't CardData.CardType yet. Appended rather than inserted, as
+# a habit: nothing serialises this today (it's derived every time a card
+# is shown, never authored), but the enum sits next to CardEffect's own,
+# where an inserted value silently rewrites existing .tres data.
+enum KeylineType { STRIKE, GUARD, TOLL, UTILITY }
 
 # Rules-text words set in bold. Whole-word, case-sensitive.
 const KEYWORDS: Array[String] = ["Toll", "Rally"]
@@ -53,9 +56,13 @@ const KEYWORDS: Array[String] = ["Toll", "Rally"]
 @export var keyline_strike: Color = Color(0.62, 0.56, 0.49)
 @export var keyline_guard: Color = Color(0.49, 0.56, 0.59)
 @export var keyline_toll: Color = Color(0.54, 0.50, 0.58)
+# Grey-neutral on purpose: utility is the type that isn't about damage or
+# defence, so it reads as the absence of a hue rather than a fourth one.
+@export var keyline_utility: Color = Color(0.58, 0.58, 0.60)
 @export var art_field_strike: Color = Color(0.886, 0.863, 0.796)
 @export var art_field_guard: Color = Color(0.875, 0.878, 0.855)
 @export var art_field_toll: Color = Color(0.878, 0.863, 0.886)
+@export var art_field_utility: Color = Color(0.87, 0.87, 0.85)
 @export var art_field_radius: int = 3
 # The two shadows: a hairline (1px down, 18%) and a soft spread (8px,
 # 12%). Both deepen on hover (see Hover).
@@ -339,10 +346,21 @@ func _on_gui_input(event: InputEvent) -> void:
 
 # --- Derivations from CardData ---
 
-# Strike / guard / toll from what the card does: any Toll-mechanic effect
-# makes it a toll card, otherwise SKILL is guard and ATTACK is strike.
+# Strike / guard / toll / utility from what the card does. Any Toll-
+# mechanic effect makes it a toll card first, whatever else it does.
+# Otherwise ATTACK is strike, and SKILL splits on whether the card
+# actually defends the player: raising block (BLOCK/UNDAMAGED_BLOCK),
+# adding absorb, or putting a damage-reducing status on HER. Everything
+# else is utility - draw, energy, anything that changes the shape of the
+# turn rather than the damage in it.
+#
+# "Defensive status" is read off the status itself rather than listed by
+# name (see _is_defensive_status), so a second Braced-like status is
+# classified the day it is authored, with nothing to remember here.
+#
 # Interim - see DESIGN.md: CardType should grow TOLL and rename SKILL to
-# GUARD, at which point this becomes a straight read of card_type.
+# GUARD, at which point the strike/guard/toll part becomes a straight
+# read of card_type and only the guard/utility split stays derived.
 static func _derive_keyline_type(data: CardData) -> KeylineType:
 	for effect in data.effects:
 		if effect == null:
@@ -352,8 +370,33 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 			CardEffect.EffectType.SELF_DAMAGE_TOLL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_FRACTION_DAMAGE_ALL:
 				return KeylineType.TOLL
 	if data.card_type == CardData.CardType.SKILL:
-		return KeylineType.GUARD
+		for effect in data.effects:
+			if effect == null:
+				continue
+			match effect.effect_type:
+				CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK, CardEffect.EffectType.ABSORB:
+					return KeylineType.GUARD
+				CardEffect.EffectType.APPLY_STATUS:
+					# APPLY_STATUS only - APPLY_STATUS_TO_TARGET puts the
+					# status on the ENEMY (see apply_status_to_target_
+					# effect.gd), where incoming-damage reduction makes the
+					# enemy harder to kill. That is the opposite of guard.
+					if _is_defensive_status(effect.status_data):
+						return KeylineType.GUARD
+		return KeylineType.UTILITY
 	return KeylineType.STRIKE
+
+# A status that reduces the damage its holder takes. Both modifier
+# operations reduce on a NEGATIVE magnitude - ADD adds it, MULTIPLY adds
+# magnitude% of the running total (see Status.apply_modifiers()) - so the
+# sign is the whole test, and it reads the same for a flat -3 as for
+# Braced's -50%.
+static func _is_defensive_status(status: StatusData) -> bool:
+	if status == null:
+		return false
+	return status.category == StatusData.Category.MODIFIER \
+		and status.modifier_target == StatusData.ModifierTarget.INCOMING_DAMAGE \
+		and status.default_magnitude < 0
 
 # The HP the card costs to play: the sum of its self-scoped SELF_DAMAGE /
 # SELF_DAMAGE_TOLL effect values. CardData.cost is energy only.
@@ -372,6 +415,8 @@ static func _type_label_text(keyline_type: KeylineType) -> String:
 			return "GUARD"
 		KeylineType.TOLL:
 			return "TOLL"
+		KeylineType.UTILITY:
+			return "UTILITY"
 		_:
 			return "STRIKE"
 
@@ -393,6 +438,8 @@ func _keyline_color() -> Color:
 			return keyline_guard
 		KeylineType.TOLL:
 			return keyline_toll
+		KeylineType.UTILITY:
+			return keyline_utility
 		_:
 			return keyline_strike
 
@@ -402,6 +449,8 @@ func _art_field_color() -> Color:
 			return art_field_guard
 		KeylineType.TOLL:
 			return art_field_toll
+		KeylineType.UTILITY:
+			return art_field_utility
 		_:
 			return art_field_strike
 
@@ -687,6 +736,16 @@ func _draw_glyph() -> void:
 			])
 			glyph.draw_line(centre + Vector2(0.0, -r * 0.7), centre + Vector2(0.0, r * 0.7), faint, w, true)
 			glyph.draw_polyline(shield, ink_color, w, true)
+		KeylineType.UTILITY:
+			# Two short parallel strokes, offset diagonally - two cards, one
+			# behind the other. Same faint-behind/ink-in-front reading as the
+			# strike chevron and the shield's centre line: the back card is
+			# the secondary stroke, the front one carries the ink.
+			var lean := Vector2(r * 0.30, r * 0.65)
+			var back := centre + Vector2(-r * 0.30, -r * 0.10)
+			var front := centre + Vector2(r * 0.30, r * 0.10)
+			glyph.draw_line(back - lean, back + lean, faint, w, true)
+			glyph.draw_line(front - lean, front + lean, ink_color, w, true)
 		KeylineType.TOLL:
 			glyph.draw_line(centre + Vector2(-r * 0.8, r * 0.9), centre + Vector2(r * 0.8, r * 0.9), faint, w, true)
 			glyph.draw_line(centre + Vector2(0.0, r * 0.6), centre + Vector2(0.0, -r * 0.9), ink_color, w, true)
