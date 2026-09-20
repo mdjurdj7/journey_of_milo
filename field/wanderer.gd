@@ -353,6 +353,8 @@ var _hand_attachment: BoneAttachment3D = null
 var _active_material: Material = null
 var _ground: Ground = null
 var _attack_audio: AttackAudio = null
+# The sound of being hit - see HitAudio; made beside _attack_audio below.
+var _hit_audio: HitAudio = null
 
 # Set by bind_to_battle(), cleared by unbind_battle() - see both for why
 # region_field.gd is the only caller of either.
@@ -422,6 +424,11 @@ func _ready() -> void:
 	_attack_audio.name = "AttackAudio"
 	add_child(_attack_audio)
 	_attack_audio.setup()
+
+	_hit_audio = HitAudio.new()
+	_hit_audio.name = "HitAudio"
+	add_child(_hit_audio)
+	_hit_audio.setup()
 
 # One shared material for the whole model, applied via material_override
 # on every MeshInstance3D under it. Which material depends on shading_
@@ -1439,6 +1446,13 @@ func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spre
 func play_swing_audio() -> void:
 	if _attack_audio != null:
 		_attack_audio.play_swing()
+
+# An enemy's hit landing on him - called by BattleFeedback._react_to_
+# enemy_attack() with the flash and recoil (see HitAudio for what that
+# does and doesn't cover).
+func play_hit_audio() -> void:
+	if _hit_audio != null:
+		_hit_audio.play_hit()
 
 # Called by region_field.gd on enemy contact. Tweens into a fixed spacing
 # from target along the target->Wanderer ground line, facing target, and
