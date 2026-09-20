@@ -14,7 +14,7 @@
 [ext_resource type="Theme" path="res://ui/battle_theme.tres" id="14"]
 [ext_resource type="PackedScene" path="res://ui/hp_bar.tscn" id="15"]
 [ext_resource type="PackedScene" path="res://field/exit_gate.tscn" id="16"]
-[ext_resource type="Resource" path="res://floors/region1.tres" id="21_region1"]
+[ext_resource type="Resource" uid="uid://b0a7mp27d3sfv" path="res://floors/region1.tres" id="21_region1"]
 [ext_resource type="Script" uid="uid://b1kiu1ojh1n34" path="res://field/zone_intro.gd" id="22_zone_intro"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
@@ -154,8 +154,8 @@ size = Vector3(4.4, 2.2, 3.2)
 
 [node name="RegionField" type="Node3D" unique_id=2096648515]
 script = ExtResource("1")
-field_extents = Vector2(26, 30)
 region = ExtResource("21_region1")
+field_extents = Vector2(26, 30)
 shoreline_wall_margin = 3.0
 battle_spacing = 4.0
 
@@ -188,7 +188,7 @@ landmass_below_sea_depth = 1.0
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -430, 0, -60)
 script = ExtResource("5")
 
-[node name="ForwardMarker" type="Marker3D" parent="."]
+[node name="ForwardMarker" type="Marker3D" parent="." unique_id=1285582266]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -100)
 
 [node name="Wanderer" type="CharacterBody3D" parent="." unique_id=577093166 groups=["wanderer"]]
@@ -241,6 +241,7 @@ layer = 2
 process_mode = 3
 
 [node name="DeckPanel" parent="FieldHUD" unique_id=2061940216 instance=ExtResource("13")]
+layout_mode = 3
 anchors_preset = 2
 anchor_top = 1.0
 anchor_bottom = 1.0
@@ -300,8 +301,8 @@ transform = Transform3D(0.97437, 0, -0.22495, 0, 1, 0, 0.22495, 0, 0.97437, 0.95
 mesh = SubResource("BoxMesh_lookdev_slab_10")
 
 [node name="RuinPavingTest" parent="." unique_id=934835729 instance=ExtResource("11")]
-visible = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.05, 0)
+visible = false
 
 [node name="PavingSlab_01" parent="RuinPavingTest" index="0" unique_id=574256938]
 surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
@@ -313,8 +314,8 @@ surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 surface_material_override/0 = SubResource("ShaderMaterial_ruin_stone")
 
 [node name="SpawnSlabBody" type="StaticBody3D" parent="." unique_id=1207347768]
-visible = false
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.0410794, 0.05, 0.0137395)
+visible = false
 disable_mode = 1
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="SpawnSlabBody" unique_id=1369458258]
@@ -561,9 +562,11 @@ mesh = SubResource("BoxMesh_ruin_mass_3")
 transform = Transform3D(0.978, 0, -0.208, 0, 1, 0, 0.208, 0, 0.978, 10.2, 0.7, -12.8)
 mesh = SubResource("BoxMesh_ruin_mass_4")
 
-[node name="ZoneIntro" type="Node" parent="."]
+[node name="ZoneIntro" type="Node" parent="." unique_id=1886195087]
 process_mode = 3
 script = ExtResource("22_zone_intro")
+pose_height = 9.0
+pose_back_distance = 2.0
 
 [editable path="RuinPavingTest"]
 [editable path="HeroPavingPatch/Slabs/HeroSlab1"]
