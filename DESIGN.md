@@ -108,7 +108,9 @@ so it doesn't get silently reinvented or silently forgotten.
   `world_card.tscn`, holding one card rolled from the floor's reward
   pool; a real find type replaces it. (3) The editor no longer previews
   a floor - Ground gets its mask from FloorData at runtime, so the scene
-  shows the SDF landmass when edited. (4) The threshold look-up aims at
-  the tower's base, but `RegionSky`'s depth fog is full at 28 m and the
-  tower stands 380 m off - unless the fog is retuned for that beat, the
-  frame lifts to fog where the tower is. (2026-09-19, floors as data.)
+  shows the SDF landmass when edited. (4) Resolved 2026-09-20: the
+  threshold look-up aims at the tower's base, and the tower now renders
+  outside the depth fog (unshaded, `disable_fog`, painted fog colour
+  darkened by `tower_contrast`) as a landmark west of the field, so the
+  look finds a silhouette rather than flat fog. (2026-09-19, floors as
+  data.)

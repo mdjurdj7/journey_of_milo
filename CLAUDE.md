@@ -32,8 +32,10 @@
 - Every field script uses class_name.
 
 ## Field conventions
-- Field forward is derived at runtime from spawn→Tower via
-  RegionField.get_forward(). Never hardcode an axis.
+- Field forward is derived at runtime from spawn→ForwardMarker via
+  RegionField.get_forward(). Never hardcode an axis. The Tower is a
+  landmark placed for the frames that show it, not an axis — nothing
+  derives direction from it.
 - RegionField is the scene root; child NodePaths are ^"Sea", not
   ^"../Sea".
 - Children _ready() before parents. Anything a child needs from
