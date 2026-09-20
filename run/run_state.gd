@@ -53,6 +53,12 @@ var current_floor_index: int = 0
 # run's first frame, not a floor's.
 var run_opening_pending: bool = false
 
+# Raised by the boot scene (TitleScreen) alone, consumed by RegionField's
+# _ready(): the field holds the title (ZoneIntro.hold_title() - the intro's
+# frame zero with the TitleMenu over it) instead of playing the intro
+# outright. F6 on the field and a RunOver restart never raise it.
+var title_pending: bool = false
+
 # The run's one generator. Everything that rolls something a player could
 # call luck draws from HERE rather than from the global randi(), so a run
 # is one sequence and can be replayed from its seed: the Keeper's card

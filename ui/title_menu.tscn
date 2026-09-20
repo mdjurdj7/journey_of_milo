@@ -1,0 +1,42 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/title_menu.gd" id="1_title_menu"]
+
+[node name="TitleMenu" type="CanvasLayer"]
+layer = 4
+script = ExtResource("1_title_menu")
+
+[node name="Column" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TitleLabel" type="Label" parent="Column"]
+layout_mode = 0
+text = "The Journey of Milo"
+
+[node name="StartItem" type="Control" parent="Column"]
+layout_mode = 0
+
+[node name="Hairline" type="ColorRect" parent="Column/StartItem"]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Column/StartItem"]
+layout_mode = 0
+text = "START GAME"
+
+[node name="ExitItem" type="Control" parent="Column"]
+layout_mode = 0
+
+[node name="Hairline" type="ColorRect" parent="Column/ExitItem"]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Column/ExitItem"]
+layout_mode = 0
+text = "EXIT GAME"

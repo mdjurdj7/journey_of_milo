@@ -37,9 +37,20 @@ class_name ZoneIntro
 # press after skip_lockout_seconds, blended out over skip_blend_seconds) -
 # go through the one _finish(), so the end state is identical: fog back
 # to the region's own values, free pose cleared, title and fade gone,
-# Wanderer INHERIT and unlocked, HUD shown, field live. The two debug
-# exports (debug_hold_opening, debug_replay) exist for tuning the held
-# frame live from the Remote tab and replaying without a restart.
+# Wanderer INHERIT and unlocked, HUD shown, field live.
+#
+# The title screen is this same frame zero, held (TITLE_HOLD, entered by
+# hold_title() when the boot scene raised RunState.title_pending): the
+# same freeze, the same pose from the same exports, the fog closed to
+# title_fog_begin/end so only the unfogged tower survives, and the
+# TitleMenu (ui/title_menu.tscn) over it owning input. Start
+# (start_from_title()) fades the menu, then runs the ordinary timeline
+# from t = 0 - with the fog opening from the title values to the intro's
+# over title_fog_open_seconds where a play() would have had the fade
+# lift - so the tower never moves and nothing loads between the press
+# and the sea appearing. The three debug exports (debug_hold_opening,
+# debug_replay, debug_title_hold) exist for tuning the held frames live
+# from the Remote tab and replaying without a restart.
 
 signal finished
 
@@ -152,6 +163,24 @@ const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 		title_anchor = value
 		_reapply_title()
 
+@export_group("Title Hold")
+# The fog the title screen holds under, both pairs alike: closed to a
+# couple of metres, so every pixel but the fog-exempt tower is fog
+# colour. Re-apply live while held.
+@export var title_fog_begin: float = 0.5:
+	set(value):
+		title_fog_begin = value
+		_reapply_held_fog()
+@export var title_fog_end: float = 2.0:
+	set(value):
+		title_fog_end = value
+		_reapply_held_fog()
+# After Start, the fog opens from the title values to the intro's over
+# this, from the timeline's t = 0 - in place of the fade a play() lifts.
+@export var title_fog_open_seconds: float = 0.8
+# The menu shown while the title is held (a TitleMenu CanvasLayer).
+@export var title_menu_scene_path: String = "res://ui/title_menu.tscn"
+
 @export_group("Debug")
 # On: freeze and hold the opening frame - pose, intro fog, title fully
 # shown, no fade - and keep it; the pose/fog/title exports update it
@@ -177,8 +206,25 @@ const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 		debug_replay = false
 		if value and _ready_done and _can_start():
 			_start(Phase.PLAYING)
+# On: back into the title screen's held frame from a running floor -
+# the menu included, so Start plays the intro from it as at boot - to
+# compose the type against the tower. Off again: _finish(). Same no-op
+# rule as debug_hold_opening.
+@export var debug_title_hold: bool = false:
+	set(value):
+		var was: bool = debug_title_hold
+		debug_title_hold = value
+		if not _ready_done or value == was:
+			return
+		if value:
+			if _can_start():
+				_start(Phase.TITLE_HOLD)
+			else:
+				debug_title_hold = false
+		elif _phase == Phase.TITLE_HOLD:
+			_finish()
 
-enum Phase { IDLE, PLAYING, SKIPPING, DEBUG_HOLD }
+enum Phase { IDLE, PLAYING, SKIPPING, DEBUG_HOLD, TITLE_HOLD }
 var _phase: Phase = Phase.IDLE
 var _ready_done: bool = false
 # Seconds since the first frame of the current play.
@@ -202,6 +248,13 @@ var _skip_from_title_alpha: float = 0.0
 var _fade: FloorFade = null
 var _title_layer: CanvasLayer = null
 var _title: Label = null
+# The title screen's menu while held, and whether Start has been taken
+# and its fade is running.
+var _menu: TitleMenu = null
+var _title_starting: bool = false
+# A play begun from the title: the fog opens from the title values over
+# title_fog_open_seconds instead of a FloorFade lifting.
+var _fog_from_title: bool = false
 
 func _ready() -> void:
 	# Belt and braces with the scene's own override: this node runs the
@@ -217,6 +270,46 @@ func play() -> bool:
 		return false
 	_start(Phase.PLAYING)
 	return true
+
+# RegionField's other entry point, when the boot scene raised RunState.
+# title_pending: the title screen, held over this frame zero. Shown even
+# with zone_intro_enabled off - Start then goes straight to the field.
+func hold_title() -> bool:
+	if not _can_start():
+		return false
+	_start(Phase.TITLE_HOLD)
+	return true
+
+# Start, from the menu: the menu locks and fades on its own start delay,
+# then the ordinary timeline runs from t = 0 with the fog opening from
+# the title values (see _apply_fog_at()) - or, with the intro off, the
+# field simply begins. The press that started it was consumed by the
+# menu; the skip lockout counts from this t = 0, so it can't skip.
+func start_from_title() -> void:
+	if _phase != Phase.TITLE_HOLD or _title_starting or _menu == null:
+		return
+	_title_starting = true
+	_menu.lock()
+	await _menu.fade_out()
+	# A debug toggle or a finish could have landed during the fade.
+	if _phase != Phase.TITLE_HOLD or not _title_starting:
+		return
+	_title_starting = false
+	_free_menu()
+	if not zone_intro_enabled:
+		_finish()
+		debug_title_hold = false
+		return
+	_phase = Phase.PLAYING
+	_clock = 0.0
+	_fog_from_title = true
+	_set_title_alpha(0.0)
+	# Cleared only now that the phase has moved on: its setter finishes a
+	# hold that is still TITLE_HOLD.
+	debug_title_hold = false
+
+func _on_menu_exit_requested() -> void:
+	get_tree().quit()
 
 func is_playing() -> bool:
 	return _phase != Phase.IDLE
@@ -253,11 +346,13 @@ func _start(phase: Phase) -> void:
 
 	_freeze()
 	_apply_pose()
-	_apply_fog(0.0)
+	_apply_held_fog()
 	_spawn_title()
 	if _title != null:
 		_title.modulate.a = 1.0 if phase == Phase.DEBUG_HOLD else 0.0
 
+	if phase == Phase.TITLE_HOLD:
+		_spawn_menu()
 	if phase == Phase.PLAYING:
 		_fade = FloorFade.new()
 		_fade.name = "IntroFade"
@@ -272,6 +367,7 @@ func _process(delta: float) -> void:
 			_set_title_alpha(_title_alpha_at(_clock))
 			var move_end: float = move_start + move_seconds
 			_apply_move(smoothstep(0.0, 1.0, _progress(_clock, move_start, move_seconds)))
+			_apply_fog_at(_clock)
 			if _clock >= move_end + release_delay_seconds:
 				_finish()
 		Phase.SKIPPING:
@@ -296,14 +392,34 @@ func _progress(t: float, start: float, seconds: float) -> float:
 	return clampf((t - start) / seconds, 0.0, 1.0)
 
 # The move at smoothstep progress `s`: the camera's free-pose weight
-# falls 1 -> 0 (CameraRig applies it over the live follow pose) and the
-# fog runs from the intro's values to the region's own, both on the same
-# curve. At 1 the rig clears the free pose itself.
+# falls 1 -> 0 (CameraRig applies it over the live follow pose). At 1
+# the rig clears the free pose itself. The fog goes with it - see
+# _apply_fog_at(), on the same curve.
 func _apply_move(s: float) -> void:
 	var camera_rig := _camera_rig()
 	if camera_rig != null:
 		camera_rig.set_free_blend(1.0 - s)
-	_apply_fog(s)
+
+# The fog at timeline time `t`: from the title, the first title_fog_open_
+# seconds open it from the title values to the intro's (smoothstep);
+# then, and always, the move runs it from the intro's to the region's on
+# the move's own curve. Should the opening still be running at move_
+# start, the move's segment simply takes over.
+func _apply_fog_at(t: float) -> void:
+	if _fog_from_title and t < title_fog_open_seconds and t < move_start:
+		var s: float = smoothstep(0.0, 1.0, _progress(t, 0.0, title_fog_open_seconds))
+		_set_fog(lerpf(title_fog_begin, fog_depth_begin, s), lerpf(title_fog_end, fog_depth_end, s),
+			lerpf(title_fog_begin, fog_depth_begin, s), lerpf(title_fog_end, fog_depth_end, s))
+		return
+	_apply_fog(smoothstep(0.0, 1.0, _progress(t, move_start, move_seconds)))
+
+# The fog a held frame shows: the title's under TITLE_HOLD, else the
+# intro's own - what _start() sets and a fog export's setter re-applies.
+func _apply_held_fog() -> void:
+	if _phase == Phase.TITLE_HOLD:
+		_set_fog(title_fog_begin, title_fog_end, title_fog_begin, title_fog_end)
+	else:
+		_apply_fog(0.0)
 
 # The skip: everything still in flight - move, fog, title - captured
 # where it stands and run to the end state over skip_blend_seconds, then
@@ -342,6 +458,9 @@ func _finish() -> void:
 		_title_layer.queue_free()
 		_title_layer = null
 		_title = null
+	_free_menu()
+	_title_starting = false
+	_fog_from_title = false
 	_release()
 	finished.emit()
 
@@ -398,7 +517,7 @@ func _release() -> void:
 # begins, or under a debug hold - which is when a pose/fog/title export
 # edit should show at once.
 func _is_holding() -> bool:
-	if _phase == Phase.DEBUG_HOLD:
+	if _phase == Phase.DEBUG_HOLD or _phase == Phase.TITLE_HOLD:
 		return true
 	return _phase == Phase.PLAYING and _clock < move_start
 
@@ -408,7 +527,7 @@ func _reapply_held_pose() -> void:
 
 func _reapply_held_fog() -> void:
 	if _ready_done and _is_holding():
-		_apply_fog(0.0)
+		_apply_held_fog()
 
 func _reapply_title() -> void:
 	if _ready_done and _phase != Phase.IDLE:
@@ -462,6 +581,29 @@ func _set_fog(sky_begin: float, sky_end: float, sea_near: float, sea_far: float)
 	if sea != null:
 		sea.fog_near_distance = sea_near
 		sea.fog_far_distance = sea_far
+
+# --- the menu -----------------------------------------------------------
+
+# The title screen's menu (TitleMenu), a child so it runs ALWAYS with
+# this node through the freeze; Start and Exit come back as signals.
+func _spawn_menu() -> void:
+	_free_menu()
+	var scene := load(title_menu_scene_path) as PackedScene
+	if scene == null:
+		push_warning("ZoneIntro: could not load %s; the title has no menu." % title_menu_scene_path)
+		return
+	_menu = scene.instantiate() as TitleMenu
+	if _menu == null:
+		push_warning("ZoneIntro: %s is not a TitleMenu; the title has no menu." % title_menu_scene_path)
+		return
+	_menu.start_requested.connect(start_from_title)
+	_menu.exit_requested.connect(_on_menu_exit_requested)
+	add_child(_menu)
+
+func _free_menu() -> void:
+	if _menu != null:
+		_menu.queue_free()
+		_menu = null
 
 # --- the title ----------------------------------------------------------
 

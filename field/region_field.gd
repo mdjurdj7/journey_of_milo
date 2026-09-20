@@ -330,16 +330,24 @@ func _ready() -> void:
 
 	# Last, with the gate placed (the camera's inland limit is set) and the
 	# HUD seeded: the new run's zone intro, once, on the region's first
-	# floor. The flag is consumed here whether or not it plays, so a run
-	# that starts elsewhere (or with the intro off) doesn't carry it to a
-	# later floor. ZoneIntro.play() freezes this node (the battle freeze,
-	# process_mode DISABLED) and releases it itself when done.
+	# floor - or, booted from the title scene (RunState.title_pending),
+	# the title held over the intro's own first frame, which Start then
+	# plays from. Both flags are consumed here whether or not anything
+	# plays, so a run that starts elsewhere (or with the intro off)
+	# doesn't carry them to a later floor. ZoneIntro freezes this node
+	# (the battle freeze, process_mode DISABLED) and releases it itself
+	# when done.
 	var opening_pending: bool = RunState.run_opening_pending
 	RunState.run_opening_pending = false
-	if opening_pending and RunState.current_floor_index == 0:
-		var zone_intro := get_node_or_null(zone_intro_path) as ZoneIntro
-		if zone_intro != null:
-			zone_intro.play()
+	var title_pending: bool = RunState.title_pending
+	RunState.title_pending = false
+	var zone_intro := get_node_or_null(zone_intro_path) as ZoneIntro
+	if zone_intro == null:
+		return
+	if title_pending:
+		zone_intro.hold_title()
+	elif opening_pending and RunState.current_floor_index == 0:
+		zone_intro.play()
 
 # Wade-HP drain only - everything else on the field (movement, contact,
 # battle) is either physics-engine-driven or event-driven and doesn't need
