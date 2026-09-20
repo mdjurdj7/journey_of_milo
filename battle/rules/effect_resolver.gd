@@ -51,10 +51,11 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 		# The gate lives HERE, not in each resolver - it used to be checked
 		# only inside damage_effect.gd, so a condition on any other effect
 		# type was silently ignored (With Regards' energy paid out whether
-		# or not the blow killed). A REPLACE still goes through: its
-		# condition chooses between two values rather than whether to
-		# resolve at all, and damage_effect.gd owns that choice.
-		if effect.alt_value == 0 and not condition_met(effect, ctx):
+		# or not the blow killed). A REPLACE or an ADD still goes through:
+		# its condition chooses a number rather than whether to resolve at
+		# all - CardBonus tells the three apart and hands each resolver
+		# the number (CardBonus.resolved_value()).
+		if not CardBonus.should_resolve(effect, ctx):
 			continue
 		var resolver: Object = _get_resolver(effect.effect_type)
 		if resolver != null:
@@ -80,9 +81,11 @@ static func condition_met(effect: CardEffect, ctx: EffectContext) -> bool:
 		CardEffect.Condition.HP_BELOW_PERCENT:
 			return ctx.player.hp < ctx.player.max_hp * (effect.condition_value / 100.0)
 		CardEffect.Condition.FIRST_CARD_THIS_TURN:
-			return ctx.cards_played_this_turn == 0
+			return ctx.cards_played_before_this == 0
 		CardEffect.Condition.TARGET_KILLED:
 			return ctx.killed_this_card
 		CardEffect.Condition.HAS_GRACE:
 			return ctx.player.grace > 0
+		CardEffect.Condition.UNDAMAGED_LAST_TURN:
+			return not ctx.player.took_damage_last_turn
 	return true

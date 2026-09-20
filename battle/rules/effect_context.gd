@@ -12,7 +12,11 @@ var player: Combatant
 var target: Combatant = null
 var enemies: Array[Combatant] = []
 var deck: Deck
-var cards_played_this_turn: int = 0
+# Cards committed this turn BEFORE the one this context is for - what
+# Condition.FIRST_CARD_THIS_TURN reads. The controller counts a card at
+# commit, so for the card resolving this is its count minus one; for a
+# preview of a card still in hand it is the count itself.
+var cards_played_before_this: int = 0
 # Called with the amount reclaimed, so battle_controller.gd can mirror it
 # onto RunState and tell the readouts. Grace itself is spent here, in the
 # rules, the same way damage is dealt here and only REPORTED outward.

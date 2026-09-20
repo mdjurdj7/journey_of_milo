@@ -5,18 +5,15 @@ class_name DamageEffect
 # FIRST_CARD_DAMAGE, DAMAGE_ALL) - see effect_resolver.gd's registry and
 # CardEffect's own doc on condition/target_scope.
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
-	# Gate or replace, per CardEffect.alt_value (see the Condition enum's
-	# own doc). Gate is the original behaviour and still the default; a
-	# replace swaps which number is dealt and always deals one. Whichever
-	# it is, exactly ONE number goes through the modifiers and the damage
-	# pipeline below - the reason this lives here rather than being
-	# authored as two stacked DAMAGE effects, which would run the pipeline
-	# twice and get blocked twice.
-	# Only the REPLACE choice is made here - a pure gate has already been
-	# applied by EffectResolver.resolve_card(), which is the one place
-	# that decides whether an effect resolves at all.
-	var replaces: bool = effect.alt_value != 0
-	var base: int = effect.alt_value if (replaces and EffectResolver.condition_met(effect, ctx)) else effect.value
+	# The number this lands for - value, or alt_value on a met REPLACE -
+	# is CardBonus's reading, the same one the card face prints. A pure
+	# gate has already been applied by EffectResolver.resolve_card(), the
+	# one place that decides whether an effect resolves at all. Exactly
+	# ONE number goes through the modifiers and the damage pipeline below
+	# - the reason a replace lives here rather than being authored as two
+	# stacked DAMAGE effects, which would run the pipeline twice and get
+	# blocked twice.
+	var base: int = CardBonus.resolved_value(effect, ctx)
 
 	# The stance's bonus is part of the attack's own number, so it goes in
 	# BEFORE the status modifiers - a status that scales outgoing damage

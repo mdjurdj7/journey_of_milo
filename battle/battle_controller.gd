@@ -218,6 +218,10 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	var card: CardData = card_view.card_data
 	player.energy -= card.cost
 	_input_locked = true
+	# Counted at commit, before anyone hears of the play - so a face that
+	# re-reads itself on card_played sees this card as played. The card's
+	# own context carries the count from before it (below).
+	cards_played_this_turn += 1
 
 	RunLogger.log_card_played(card.card_name)
 	card_played.emit(card, target_enemy)
@@ -240,14 +244,13 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	ctx.target = _combatants.get(target_enemy)
 	ctx.enemies = _living_enemy_combatants()
 	ctx.deck = deck
-	ctx.cards_played_this_turn = cards_played_this_turn
+	ctx.cards_played_before_this = cards_played_this_turn - 1
 	ctx.on_grace_reclaimed = _on_grace_reclaimed
 	ctx.on_heal = _on_card_heal
 	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
 		_report_damage("player", target_combatant, amount, kind)
 
 	_effect_resolver.resolve_card(card, ctx)
-	cards_played_this_turn += 1
 	# Taken, deepened or replaced by the card just played - and the card
 	# faces need to know either way, since a stance changes what the hand
 	# says it will do.

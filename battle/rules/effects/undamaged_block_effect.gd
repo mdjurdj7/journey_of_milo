@@ -1,10 +1,9 @@
 extends RefCounted
 class_name UndamagedBlockEffect
 
-# `value` block, PLUS `bonus_value` more if the player took no HP loss
-# during their previous turn - ADDS, doesn't replace.
+# `value` block, PLUS `bonus_value` more when the effect's condition
+# holds (UNDAMAGED_LAST_TURN on Untouched: no HP lost during the
+# player's previous turn) - an ADD, not a replace. The number is
+# CardBonus's reading, the same one the card face prints.
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
-	var block_gained := effect.value
-	if not ctx.player.took_damage_last_turn:
-		block_gained += effect.bonus_value
-	ctx.player.block += block_gained
+	ctx.player.block += CardBonus.resolved_value(effect, ctx)

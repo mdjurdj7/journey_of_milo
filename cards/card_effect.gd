@@ -18,21 +18,21 @@ enum EffectType {
 	APPLY_STANCE, TOLL_HEAL,
 }
 
-# When the effect resolves. Two modes, chosen by `alt_value` below rather
-# than by a second enum:
-#   alt_value == 0 - GATE. Condition false and the effect doesn't resolve
-#                    at all. The original shape, and still what every
-#                    conditional effect except a replace uses.
-#   alt_value != 0 - REPLACE. Condition false uses `value`, true uses
-#                    `alt_value`; something always resolves. This is the
-#                    old project's TOLL_THRESHOLD_DAMAGE/FIRST_CARD_DAMAGE
-#                    shape, which its .tres files carried in a field
-#                    called threshold_value.
-# The second mode was predicted here as future work before it existed;
-# `alt_value` is that second value field, added for Left Hand (cards/
-# neutral/left_hand.tres) and read by damage_effect.gd ONLY - no other
-# resolver consults it, so every other type is gate-or-nothing as before.
-enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE }
+# When the effect resolves, or with what number. Three modes, told apart
+# from the fields below by CardBonus.mode() and NOWHERE else:
+#   GATE    - alt_value and bonus_value both 0: condition false and the
+#             effect doesn't resolve at all (With Regards' energy).
+#   REPLACE - alt_value set: false uses `value`, true `alt_value`;
+#             something always resolves (Left Hand, Reprisal). The old
+#             project's TOLL_THRESHOLD_DAMAGE/FIRST_CARD_DAMAGE shape,
+#             which its .tres files carried as threshold_value.
+#   ADD     - bonus_value set: true adds bonus_value on top of `value`;
+#             something always resolves (Untouched).
+# The number an effect lands for is CardBonus.resolved_value(); the card
+# face prints the same call, so what it says is what the rules pay.
+# UNDAMAGED_LAST_TURN is appended last: an inserted value would rewrite
+# every .tres that stores one of these as an integer.
+enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE, UNDAMAGED_LAST_TURN }
 
 # Which combatant(s) an effect resolves against - lets DAMAGE_ALL collapse
 # into plain DAMAGE (target_scope = ALL_ENEMIES) instead of needing its
@@ -55,13 +55,13 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 # reads it as a percent (0-100) of max HP. Unused when condition is NONE.
 
 @export var alt_value: int = 0
-# The number used INSTEAD of `value` when `condition` holds - see the
-# Condition enum's own doc for the gate/replace split this selects, and
-# damage_effect.gd for the only resolver that reads it. 0 means "no
-# replacement authored", which is also why a replace that wants to deal
-# literally 0 can't be expressed: deal-nothing is a gate, not a replace.
-# One resolution either way, so the value goes through the damage
-# pipeline once - NOT two stacked effects, which would be blocked twice.
+# The number used INSTEAD of `value` when `condition` holds - the REPLACE
+# mode of the Condition enum's own doc, read through CardBonus. 0 means
+# "no replacement authored", which is also why a replace that wants to
+# deal literally 0 can't be expressed: deal-nothing is a gate, not a
+# replace. One resolution either way, so the value goes through the
+# damage pipeline once - NOT two stacked effects, which would be blocked
+# twice.
 
 @export var target_scope: TargetScope = TargetScope.TARGET
 
@@ -86,8 +86,9 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 # other type.
 
 @export var bonus_value: int = 0
-# Extra block UNDAMAGED_BLOCK ADDS on top of `value` when its condition is
-# met. Unused by every other type.
+# The amount ADDED on top of `value` when `condition` holds - the ADD
+# mode of the Condition enum's own doc, read through CardBonus. Authored
+# on UNDAMAGED_BLOCK (Untouched) today.
 
 @export_multiline var combat_message: String = ""
 # Shown when a STUN resolves. Unused by every other type - and STUN
