@@ -43,7 +43,7 @@ class_name ZoneIntro
 
 signal finished
 
-const TITLE_FONT_PATH := "res://assets/fonts/Spectral-SemiBold.ttf"
+const TITLE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 # Above FieldHUD (1) and BattleLayer (2), under the fade (FloorFade.LAYER).
 const TITLE_LAYER := 3
 # title_size_px is authored for this viewport height and scales with it.
@@ -129,16 +129,21 @@ const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 @export var skip_blend_seconds: float = 0.3
 
 @export_group("Title")
-# Spectral SemiBold in the UI's ink, straight on the sky - no box, no
+# The region's display_name as authored (never re-cased here), in
+# Spectral Light and the UI's ink, straight on the sky - no box, no
 # scrim, no shadow. Size is pixels at a 1080-high viewport, scaled with
 # the viewport height. The anchor is the label's centre as a fraction of
 # the viewport: left side, upper third, opposite the tower - it must not
 # cross the tower's column (checked once at play(), with a warning).
+@export var title_font: Font = load(TITLE_FONT_PATH):
+	set(value):
+		title_font = value
+		_reapply_title()
 @export var title_color: Color = Color(0.165, 0.165, 0.18, 1.0):
 	set(value):
 		title_color = value
 		_reapply_title()
-@export var title_size_px: float = 72.0:
+@export var title_size_px: float = 56.0:
 	set(value):
 		title_size_px = value
 		_reapply_title()
@@ -478,20 +483,19 @@ func _spawn_title() -> void:
 	_title.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	_title.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	_title.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var font := load(TITLE_FONT_PATH) as Font
-	if font != null:
-		_title.add_theme_font_override("font", font)
 	_title_layer.add_child(_title)
 	_layout_title()
 	_warn_if_title_crosses_tower()
 
-# Colour, size (scaled from 1080p by the viewport height) and the centre
-# anchor, re-done whenever a title export changes.
+# Font, colour, size (scaled from 1080p by the viewport height) and the
+# centre anchor, re-done whenever a title export changes.
 func _layout_title() -> void:
 	if _title == null:
 		return
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var scale: float = viewport_size.y / REFERENCE_VIEWPORT_HEIGHT
+	if title_font != null:
+		_title.add_theme_font_override("font", title_font)
 	_title.add_theme_color_override("font_color", title_color)
 	_title.add_theme_font_size_override("font_size", maxi(int(round(title_size_px * scale)), 1))
 	var label_size: Vector2 = _title.get_combined_minimum_size()

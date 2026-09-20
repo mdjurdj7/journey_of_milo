@@ -8,4 +8,4 @@
 [resource]
 script = ExtResource("1_region_data")
 floors = Array[ExtResource("2_floor_data")]([ExtResource("3_floor1"), ExtResource("4_floor2")])
-display_name = "REGION NAME"
+display_name = "Region Name"
