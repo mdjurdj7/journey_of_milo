@@ -41,3 +41,11 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 # fires at its own end rather than after it's already finished playing.
 # Ignored entirely when battle_animation is empty (resolves immediately).
 @export var impact_time: float = 0.4
+
+# This card's own sound on being played, INSTEAD of the shared card-play
+# cue (see BattleOverlay._on_card_played()) - empty (default) means the
+# shared one. A path, loaded with load() at play time, never a preloaded
+# stream. Fires once, at commit, like the cue it replaces: not on
+# anything the card goes on to do (Self-Eater's per-Attack HP loss, a
+# stance ending), and never outside a battle hand.
+@export_file("*.wav", "*.mp3", "*.ogg") var play_sound_path: String = ""

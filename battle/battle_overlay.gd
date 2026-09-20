@@ -12,11 +12,16 @@ signal battle_finished(outcome: Outcome)
 # Every card's own shared "played" cue (see _on_card_played()) - fires the
 # instant a card commits to play, independent of that card's own
 # impact_time delay (the swing and the enemy's contact crack are the
-# Wanderer's/FieldEnemy's, not this). Not a per-card override; every card
-# uses this same one today. Levels: a -6 dBFS take through this 2D
-# player at -16 peaks about -22 dBFS - under the swing (~-20) and well
-# under the contact (~-10.5).
+# Wanderer's/FieldEnemy's, not this). Levels: a -6 dBFS take through
+# this 2D player at -16 peaks about -22 dBFS - under the swing (~-20)
+# and well under the contact (~-10.5).
 @export var card_play_volume_db: float = -16.0
+# A card with its own sound (CardData.play_sound_path - Self-Eater's
+# swell today) plays that INSTEAD of the cue above, on a second SFX-bus
+# player at this level: the same -16 by default, so the order swing <
+# card play < contact holds, but its own export since the two files'
+# loudness differ.
+@export var card_override_volume_db: float = -16.0
 
 @export_group("Corners")
 # The fixed readouts' inset from the viewport's edges: bottom-left the
@@ -46,6 +51,8 @@ var _field_hp_bar: HPBar = null
 var _field_deck_panel: DeckPanel = null
 var _battle_transition_time: float = 0.0
 var _card_play_player: AudioStreamPlayer = null
+# The per-card override's player, made on first use - see _on_card_played().
+var _card_override_player: AudioStreamPlayer = null
 var _resources: BattleResources = null
 var _deck_readout: DeckPanel = null
 var _discard_readout: DeckPanel = null
@@ -344,8 +351,24 @@ func _on_target_requested(_card: CardData) -> void:
 func _on_target_cancelled() -> void:
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 
-func _on_card_played(_card: CardData, _target: FieldEnemy) -> void:
+# The card's own sound if it names one (CardData.play_sound_path), else
+# the shared cue - one or the other, never both. Both fire here, at
+# commit, and nowhere else: the override is not tied to anything the
+# card does afterwards.
+func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
 	Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+	if card != null and not card.play_sound_path.is_empty():
+		var stream := load(card.play_sound_path) as AudioStream
+		if stream != null:
+			if _card_override_player == null:
+				_card_override_player = AudioStreamPlayer.new()
+				_card_override_player.bus = &"SFX"
+				add_child(_card_override_player)
+			_card_override_player.stream = stream
+			_card_override_player.volume_db = card_override_volume_db
+			_card_override_player.play()
+			return
+		push_warning("BattleOverlay: '%s' names a play sound that failed to load (%s); using the shared cue." % [card.card_name, card.play_sound_path])
 	if _card_play_player != null and _card_play_player.stream != null:
 		_card_play_player.volume_db = card_play_volume_db
 		_card_play_player.play()
