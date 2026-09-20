@@ -23,6 +23,7 @@ class_name RewardScreen
 signal closed()
 
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
+const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 
 @export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.40)
 # Bone - the on-dark ink of the theme's own pair.
@@ -76,6 +77,10 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 @export var choice_dismiss_gap_px: float = 40.0
 @export var choice_dismiss_text: String = "NONE OF THESE"
 @export var card_flight_duration_sec: float = 0.45
+# The card being taken (see _play_take_sound()) - once, on the choice
+# itself, never on hover, the gold line or a skip. A -6 dBFS take at -18
+# sits just under the battle's card-play cue (-16).
+@export var take_volume_db: float = -18.0
 @export var card_flight_end_scale: float = 0.12
 @export_group("")
 
@@ -348,11 +353,35 @@ func _on_choice_clicked(card_data: CardData, card_view: CardView) -> void:
 		return
 	_taking_card = true
 	RunState.add_card(card_data)
+	_play_take_sound()
 	print("RewardScreen: took '%s' (deck now %d)." % [card_data.card_name, RunState.deck.size()])
 	for other in _card_views:
 		if other != card_view and is_instance_valid(other):
 			other.queue_free()
 	_fly_to_deck(card_view)
+
+# The take's sound, on its own 2D player on the SFX bus - parented to the
+# tree's ROOT with process ALWAYS and freed on its own `finished`, so it
+# plays to the end whatever happens to this node next: this screen
+# closes and frees itself once its lines are spent, right after the
+# card's flight, and RegionField (its parent) stands DISABLED for as
+# long as it is open. load() at the moment of taking, never a preloaded
+# stream. The twin of this lives on WorldCard - two consumers, not yet a
+# helper.
+func _play_take_sound() -> void:
+	var stream := load(TAKE_SFX_PATH) as AudioStream
+	if stream == null:
+		push_warning("RewardScreen: card-take SFX failed to load (%s); silent." % TAKE_SFX_PATH)
+		return
+	var player := AudioStreamPlayer.new()
+	player.name = "CardTakeAudio"
+	player.bus = &"SFX"
+	player.process_mode = Node.PROCESS_MODE_ALWAYS
+	player.stream = stream
+	player.volume_db = take_volume_db
+	player.finished.connect(player.queue_free)
+	get_tree().root.add_child(player)
+	player.play()
 
 # Lifted from WorldCard._fly_to_deck() rather than shared: two consumers
 # is not yet three, and the two differ in what they fly (a Control this

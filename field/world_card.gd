@@ -42,6 +42,7 @@ class_name WorldCard
 signal taken(card_data: CardData)
 
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
+const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 
 @export var card: CardData = null:
 	set(value):
@@ -133,6 +134,11 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 @export var far_scale_distance: float = 12.0
 @export_group("")
 
+@export_group("Take Sound")
+# The card being taken (see _play_take_sound()) - once, on the take
+# itself, never on hover, lift, dismissal or walking away. A -6 dBFS take
+# at -18 sits just under the battle's card-play cue (-16).
+@export var take_volume_db: float = -18.0
 @export_group("Take Flight")
 # How long the quad takes to fade once a card is dismissed rather than
 # taken - see dismiss().
@@ -497,8 +503,32 @@ func _take() -> void:
 		return
 	_taking = true
 	RunState.add_card(card)
+	_play_take_sound()
 	taken.emit(card)
 	_fly_to_deck()
+
+# The take's sound, on its own 2D player on the SFX bus - parented to the
+# tree's ROOT with process ALWAYS and freed on its own `finished`, so it
+# plays to the end whatever happens to this node next: this card frees
+# itself flight_duration_sec after the take, and a field freeze (a
+# battle contact, the floor transition) would pause anything under
+# RegionField. load() at the moment of taking, never a preloaded stream.
+# The twin of this lives on RewardScreen - two consumers, not yet a
+# helper.
+func _play_take_sound() -> void:
+	var stream := load(TAKE_SFX_PATH) as AudioStream
+	if stream == null:
+		push_warning("WorldCard: card-take SFX failed to load (%s); silent." % TAKE_SFX_PATH)
+		return
+	var player := AudioStreamPlayer.new()
+	player.name = "CardTakeAudio"
+	player.bus = &"SFX"
+	player.process_mode = Node.PROCESS_MODE_ALWAYS
+	player.stream = stream
+	player.volume_db = take_volume_db
+	player.finished.connect(player.queue_free)
+	get_tree().root.add_child(player)
+	player.play()
 
 # To the Belongings panel it just incremented. Frees this whole node at
 # the end rather than only the CardView - the anchor has nothing left to
