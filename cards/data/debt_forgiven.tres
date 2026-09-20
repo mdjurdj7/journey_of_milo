@@ -16,5 +16,5 @@ cost = 1
 card_type = 1
 target_type = 1
 description = "Spend up to 10 Toll.
-Heal 1 HP for every 2 spent."
+Heal {toll_heal} HP."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_toll_heal")])

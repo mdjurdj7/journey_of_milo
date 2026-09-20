@@ -15,6 +15,5 @@ card_name = "Self-Eater"
 cost = 1
 card_type = 2
 target_type = 1
-description = "Whenever you play an Attack, lose 2 HP.
-That Attack deals 3 additional damage."
+description = "Your Attacks deal 3 more and cost 2 HP."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_stance")])

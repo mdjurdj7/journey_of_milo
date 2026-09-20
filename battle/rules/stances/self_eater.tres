@@ -6,7 +6,7 @@
 script = ExtResource("1_stance_data")
 id = "self_eater"
 display_name = "Self-Eater"
-description = "Whenever you play an Attack, lose 2 HP. That Attack deals 3 additional damage."
+description = "Your Attacks deal 3 more and cost 2 HP."
 attack_hp_loss = 2
 attack_damage_bonus = 3
 duration_turns = 0

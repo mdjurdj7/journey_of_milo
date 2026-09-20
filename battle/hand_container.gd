@@ -115,6 +115,7 @@ var _views: Dictionary = {} # CardData -> Control (the card's slot; its only chi
 # The stance every card in this hand is currently printed against.
 var _stance: Stance = null
 var _grace: int = 0
+var _toll: int = 0
 var _last_energy: int = -1
 var _pending_reveals: Array[CardData] = []
 var _revealing: bool = false
@@ -198,6 +199,7 @@ func _add_card_view(card: CardData) -> void:
 	card_view.card_size = card_size
 	card_view.set_stance(_stance)
 	card_view.set_grace(_grace)
+	card_view.set_toll(_toll)
 	slot.add_child(card_view)
 
 	# Brings slot (and card_view within it) into the live tree, firing
@@ -257,6 +259,17 @@ func set_grace(grace: int) -> void:
 		var card_view: CardView = slot.get_child(0) as CardView
 		if card_view != null:
 			card_view.set_grace(grace)
+
+# The player's Toll, for the same reason as the stance and Grace:
+# Reckoning's printed damage and Debt Forgiven's printed heal are both
+# made of it, and both move every time it does.
+func set_toll(toll: int) -> void:
+	_toll = toll
+	for card in _views:
+		var slot: Control = _views[card]
+		var card_view: CardView = slot.get_child(0) as CardView
+		if card_view != null:
+			card_view.set_toll(toll)
 
 func update_playable(energy: int) -> void:
 	_last_energy = energy

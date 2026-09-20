@@ -62,6 +62,13 @@ const TOKEN_DAMAGE := "{damage}"
 const TOKEN_BLOCK := "{block}"
 const TOKEN_DRAW := "{draw}"
 const TOKEN_HP_COST := "{hp_cost}"
+# The player's Toll right now - 0 outside a battle, which is also what a
+# card in the deck view shows. Reckoning spends all of it, so its printed
+# damage IS this number.
+const TOKEN_TOLL := "{toll}"
+# What a TOLL_HEAL would heal for at that Toll: half of whatever it can
+# actually spend, capped. Debt Forgiven's own preview.
+const TOKEN_TOLL_HEAL := "{toll_heal}"
 
 @export var card_size: Vector2 = Vector2(200.0, 280.0)
 
@@ -198,6 +205,8 @@ var _stance: Stance = null
 # The player's Grace, for the same reason - Reprisal's printed damage is
 # its replacement value while any is open.
 var _grace: int = 0
+# The player's Toll, for the cards whose numbers are made of it.
+var _toll: int = 0
 var _hp_cost: int = 0
 var _rest_offset_y: float = 0.0
 # How far down from this card's own local origin "at rest" actually sits -
@@ -259,6 +268,15 @@ func set_grace(grace: int) -> void:
 	_refresh_dynamic_text()
 	_apply_layout()
 
+func set_toll(toll: int) -> void:
+	var value: int = maxi(toll, 0)
+	if _toll == value or card_data == null:
+		_toll = value
+		return
+	_toll = value
+	_refresh_dynamic_text()
+	_apply_layout()
+
 func set_stance(stance: Stance) -> void:
 	if _stance == stance:
 		return
@@ -302,7 +320,20 @@ func _resolve_tokens(description: String) -> String:
 			text = text.replace(TOKEN_DRAW, str(draw))
 	if text.contains(TOKEN_HP_COST):
 		text = text.replace(TOKEN_HP_COST, str(_hp_cost))
+	if text.contains(TOKEN_TOLL):
+		text = text.replace(TOKEN_TOLL, str(_toll))
+	if text.contains(TOKEN_TOLL_HEAL):
+		text = text.replace(TOKEN_TOLL_HEAL, str(_toll_heal_preview()))
 	return text
+
+# What this card's TOLL_HEAL would actually heal at the Toll now held -
+# the same arithmetic toll_heal_effect.gd does, so the face can't promise
+# a number the resolver won't pay. 0 with no such effect.
+func _toll_heal_preview() -> int:
+	for effect in card_data.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.TOLL_HEAL:
+			return mini(mini(effect.toll_cost, _toll) / 2, effect.value)
+	return 0
 
 # The first matching effect's value, or -1 when the card has none - the
 # REPLACEMENT value when the effect's condition is one this face can

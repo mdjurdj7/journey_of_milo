@@ -265,6 +265,8 @@ func _on_energy_changed(current: int) -> void:
 
 func _on_toll_changed(new_toll: int) -> void:
 	_field_hp_bar.update_toll(new_toll)
+	# Reckoning and Debt Forgiven print numbers made of Toll.
+	hand_container.set_toll(new_toll)
 
 func _on_grace_changed(grace: int) -> void:
 	_field_hp_bar.update_grace(grace)
