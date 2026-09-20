@@ -60,7 +60,14 @@ enum RewardMode { SCREEN, WORLD }
 # alongside tower_path since both are exactly this bug.
 @export var sea_path: NodePath = ^"Sea"
 @export var shoreline_wall_margin: float = 5.0
+# The landmark - read only by the threshold look (_on_floor_exited()),
+# never for direction: see forward_marker_path.
 @export var tower_path: NodePath = ^"Tower"
+# What defines the field's forward: spawn -> this marker, XZ (see
+# get_forward()). A bare Marker3D, so the direction the floor runs in is
+# authored on its own and the Tower is free to stand wherever the frames
+# want it. -Z today.
+@export var forward_marker_path: NodePath = ^"ForwardMarker"
 @export var camera_rig_path: NodePath = ^"CameraPivot"
 @export var directional_light_path: NodePath = ^"DirectionalLight3D"
 @export var exit_gate_path: NodePath = ^"ExitGate"
@@ -372,9 +379,12 @@ func _physics_process(delta: float) -> void:
 		get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
 
 # The field's forward direction: normalized XZ vector from the
-# Wanderer's spawn to the Tower. Nothing else should assume an axis or
-# sign for "ahead" — call get_forward() instead. Falls back to Godot's
-# own -Z forward convention if the Tower isn't present.
+# Wanderer's spawn to the ForwardMarker. Nothing else should assume an
+# axis or sign for "ahead" — call get_forward() instead. Falls back to
+# Godot's own -Z forward convention if the marker isn't present. The
+# Tower used to be the far end of this vector; it is a landmark now
+# (placed for the battle frame, off to the field's side) and plays no
+# part in direction.
 #
 # Computed lazily and cached rather than eagerly in _ready(): Godot
 # calls _ready() bottom-up (children before their parent), and Sea is
@@ -386,12 +396,12 @@ func _physics_process(delta: float) -> void:
 # after this first runs.
 func _compute_forward() -> Vector3:
 	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
-	var tower := get_node_or_null(tower_path) as Node3D
-	if spawn_node == null or tower == null:
+	var marker := get_node_or_null(forward_marker_path) as Node3D
+	if spawn_node == null or marker == null:
 		return Vector3.FORWARD
-	var to_tower := tower.global_position - spawn_node.global_position
-	to_tower.y = 0.0
-	return to_tower.normalized() if to_tower.length() > 0.0001 else Vector3.FORWARD
+	var to_marker := marker.global_position - spawn_node.global_position
+	to_marker.y = 0.0
+	return to_marker.normalized() if to_marker.length() > 0.0001 else Vector3.FORWARD
 
 func get_forward() -> Vector3:
 	if not _forward_computed:

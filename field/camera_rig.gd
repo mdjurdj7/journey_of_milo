@@ -19,7 +19,7 @@ class_name CameraRig
 # are fitted to the combatants every frame (see _fit_battle_frame());
 # pitch/fov are fixed. Blended in/out of the follow framing above over
 # battle_transition_time, both ways.
-@export var battle_pitch: float = 18.0
+@export var battle_pitch: float = 12.0
 @export var battle_fov: float = 35.0
 @export var battle_transition_time: float = 0.6
 

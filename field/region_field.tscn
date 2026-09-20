@@ -184,8 +184,11 @@ landmass_below_sea_depth = 1.0
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Ground" unique_id=236499926]
 
 [node name="Tower" type="MeshInstance3D" parent="." unique_id=1954687032]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 75, -380)
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -430, 0, -60)
 script = ExtResource("5")
+
+[node name="ForwardMarker" type="Marker3D" parent="."]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, -100)
 
 [node name="Wanderer" type="CharacterBody3D" parent="." unique_id=577093166 groups=["wanderer"]]
 script = ExtResource("6")
