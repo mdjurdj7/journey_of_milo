@@ -20,17 +20,10 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export var model_scale: float = 1.0
 @export var model_yaw_offset: float = 0.0
 @export var model_ground_offset: float = 0.0
+# Off for an enemy placed from FloorData (RegionField._spawn_floor_
+# enemies()), whose yaw is authored outright - the crab beside the pool
+# faces where it faces.
 @export var face_shore_at_spawn: bool = true
-# On by default: RegionField re-derives this enemy's spawn position along
-# get_forward(), keeping only its authored DISTANCE from spawn, so a
-# floor can be laid out without assuming which way forward points (see
-# RegionField._reposition_enemies_along_forward()).
-#
-# Off for an enemy whose position is about something else in the world -
-# the crab standing beside the pool, which is off that axis on purpose
-# and would be snapped back onto it. Such an enemy's .tscn transform is
-# then taken literally, forward and all.
-@export var snap_to_forward_axis: bool = true
 @export var region_field_path: NodePath = ^".."
 @export var ground_path: NodePath = ^"../Ground"
 @export_range(0.0, 1.0, 0.01) var highlight_lighten_amount: float = 0.35
@@ -162,7 +155,7 @@ func _ready() -> void:
 	# node could possibly have connected to it - so the initial grounding
 	# still needs a manual call. Deferred a frame (rather than called
 	# immediately) so it runs after RegionField's own _ready() has finished
-	# repositioning this enemy along get_forward(), not before.
+	# placing this enemy from FloorData, not before.
 	_ground = get_node_or_null(ground_path) as Ground
 	if _ground:
 		_ground.relief_rebuilt.connect(_ground_to_relief)

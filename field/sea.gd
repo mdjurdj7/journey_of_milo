@@ -429,6 +429,9 @@ var _current_volume_db: float
 var _forward: Vector3 = Vector3.FORWARD
 var _ready_complete: bool = false
 var _sea_time: float = 0.0
+# Set by duck(): the distance fade below stops writing the volume so the
+# duck's own tween owns it until this node goes with the floor.
+var _ducked: bool = false
 
 func _ready() -> void:
 	# RegionField freezes itself (and, by inheritance, Sea) on battle
@@ -695,12 +698,24 @@ func _spawn_ambience() -> void:
 	add_child(_audio_player)
 	_audio_player.play()
 
+# The ambience down to volume_db_min over `seconds`, for the floor
+# transition (RegionField._on_floor_exited()): the field freezes but this
+# node runs ALWAYS, so the tween plays out under the fade. There is no
+# un-duck - the floor change is a scene reload, and the new Sea's player
+# starts at volume_db_min and eases up on its own, which IS the return.
+func duck(seconds: float) -> void:
+	if _audio_player == null:
+		return
+	_ducked = true
+	var tween := create_tween()
+	tween.tween_property(_audio_player, "volume_db", volume_db_min, seconds)
+
 func _physics_process(delta: float) -> void:
 	_sea_time = fmod(_sea_time + delta, maxf(sea_time_period, 1.0))
 	_apply_uniform("sea_time", _sea_time)
 	_push_sea_time()
 
-	if _audio_player == null or _wanderer == null:
+	if _audio_player == null or _wanderer == null or _ducked:
 		return
 
 	# Distance is measured along _forward (not assumed +Z) from the

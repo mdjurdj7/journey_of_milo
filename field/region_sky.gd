@@ -1,4 +1,5 @@
 extends WorldEnvironment
+class_name RegionSky
 
 @export var sky_top_color: Color = Color(0.82, 0.85, 0.86)
 @export var horizon_color: Color = Color(0.87, 0.88, 0.85):

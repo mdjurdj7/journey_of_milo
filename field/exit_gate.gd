@@ -68,6 +68,10 @@ signal floor_exited
 	set(value):
 		blocker_inland_offset = value
 		_rebuild()
+# The TriggerArea's distance inland of the gate line - the floor's far
+# end. RegionField pushes its own transition_distance here (12 m past the
+# gate, the end of the surfaced bar); the 2.0 default is only what a gate
+# standing alone gets.
 @export var trigger_forward_offset: float = 2.0:
 	set(value):
 		trigger_forward_offset = value

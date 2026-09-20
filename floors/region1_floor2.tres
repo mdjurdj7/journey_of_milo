@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="FloorData" load_steps=10 format=3]
+
+[ext_resource type="Script" path="res://floors/floor_data.gd" id="1_floor_data"]
+[ext_resource type="Script" path="res://floors/floor_enemy.gd" id="2_floor_enemy"]
+[ext_resource type="Script" path="res://floors/floor_prop.gd" id="3_floor_prop"]
+[ext_resource type="Texture2D" path="res://assets/field/masks/Map3_mask.png" id="4_map3"]
+[ext_resource type="Resource" path="res://battle/rules/enemies/sputter.tres" id="5_sputter"]
+[ext_resource type="PackedScene" path="res://field/world_card.tscn" id="6_world_card"]
+[ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
+
+[sub_resource type="Resource" id="FloorEnemy_sputter"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("5_sputter")
+position = Vector2(1.2, -17)
+yaw_degrees = 0.0
+
+[sub_resource type="Resource" id="FloorProp_belongings"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("6_world_card")
+position = Vector3(-3.4, 0, -8)
+
+[resource]
+script = ExtResource("1_floor_data")
+mask = ExtResource("4_map3")
+mask_origin = Vector2(0.5, 0.888889)
+interior_height = 0.3
+falloff = 4.0
+relief_amplitude = 0.18
+caustic_strength = 0.12
+spawn = Vector2(0, 0)
+exit_direction = Vector2(0, -1)
+enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_belongings")])
+gate_distance_beyond_enemy = 6.0
+gate_bar_axis_offset = 0.0
+wear_path_mid_offset = 1.5
+reward_pool = ExtResource("7_wanderer_pool")
+gold_min = 10
+gold_max = 18

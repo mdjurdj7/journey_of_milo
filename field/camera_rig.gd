@@ -76,6 +76,15 @@ class_name CameraRig
 @export var readout_allowance: float = 0.085
 @export var head_clearance: float = 0.10
 
+@export_group("Threshold look")
+# The "look up" at a floor's threshold (see look_up()): the follow frame
+# tilts from pitch_degrees down to this over the seconds RegionField
+# passes, the camera staying on its distance-orbit round the Wanderer,
+# the view swinging to the tower and the look-at point going to the
+# tower's base - so the tower is seen at every threshold, low in the
+# frame with the Wanderer's back in the foreground.
+@export var look_up_pitch_degrees: float = 15.0
+
 @export_group("Battle DOF")
 # Far blur only (near stays off - see _update_dof()) - reads as "the
 # background falls away" behind the fight without ever blurring either
@@ -102,6 +111,15 @@ var _bound_offset: Vector3 = Vector3.ZERO
 # see that method's own doc.
 var _shake_offset: Vector3 = Vector3.ZERO
 var _shake_frames_remaining: int = 0
+
+# The threshold look (see look_up()): 0 = none, 1 = fully on the tower.
+# Only ever rises - the floor change that follows is a scene reload, and
+# a fresh rig starts at 0.
+var _look_up_blend: float = 0.0
+var _look_up_elapsed: float = 0.0
+var _look_up_seconds: float = 0.0
+var _look_up_target: Vector3 = Vector3.ZERO
+var _look_up_active: bool = false
 
 var _battle_wanderer: Wanderer
 var _battle_enemies: Array[FieldEnemy] = []
@@ -165,6 +183,23 @@ func enter_battle(wanderer: Wanderer, enemies: Array[FieldEnemy], hand_top_fract
 func exit_battle() -> void:
 	_start_blend(0.0)
 
+# Called by RegionField when the Wanderer reaches a floor's far end, before
+# the fade: over `seconds` the frame lifts toward `target` (the tower's
+# base) - see look_up_pitch_degrees' own doc for the shape. Runs through
+# the field's transition freeze because this node is PROCESS_MODE_ALWAYS.
+func look_up(target: Vector3, seconds: float) -> void:
+	_look_up_target = target
+	_look_up_seconds = seconds
+	_look_up_elapsed = 0.0
+	_look_up_active = true
+
+func _advance_look_up(delta: float) -> void:
+	if not _look_up_active:
+		return
+	_look_up_elapsed = minf(_look_up_elapsed + delta, _look_up_seconds)
+	var t := 1.0 if _look_up_seconds <= 0.0 else _look_up_elapsed / _look_up_seconds
+	_look_up_blend = smoothstep(0.0, 1.0, t)
+
 # Called by RegionField once the ExitGate is placed (and again on any
 # live edit of its own limit exports): the bound is the plane through
 # `point` with `forward` (get_forward()) as its normal - "inland" is
@@ -221,6 +256,7 @@ func _physics_process(delta: float) -> void:
 
 	_advance_battle_blend(delta)
 	_advance_follow_bounds(delta)
+	_advance_look_up(delta)
 
 	var smoothed: Vector3 = global_position.lerp(_target.global_position, 1.0 - exp(-follow_smoothing * delta))
 	var motion := smoothed - global_position
@@ -399,6 +435,17 @@ func _place_camera() -> void:
 	# The battle frame's vertical placement is baked into its look target
 	# (see _fit_battle_frame()), so the follow bias fades to none.
 	var eff_framing_bias: float = lerpf(framing_bias, 0.0, _battle_blend)
+	# The threshold look, over whichever of the two framings above is
+	# current: the viewing axis swings toward the target, the pitch drops
+	# to look_up_pitch_degrees, and (below) the aim goes to the target
+	# itself. The orbit centre stays the look target, so the camera stays
+	# with the Wanderer and only its eyes lift.
+	if _look_up_blend > 0.0:
+		var to_target := Vector3(_look_up_target.x - look_target.x, 0.0, _look_up_target.z - look_target.z)
+		if to_target.length() > 0.0001:
+			var swung: Vector3 = ground_forward.lerp(to_target.normalized(), _look_up_blend)
+			ground_forward = ground_forward if swung.length() < 0.0001 else swung.normalized()
+		eff_pitch = lerpf(eff_pitch, look_up_pitch_degrees, _look_up_blend)
 	var pitch_rad := deg_to_rad(eff_pitch)
 
 	# Sphere of radius `eff_distance` around the look target: pitch swings
@@ -411,6 +458,8 @@ func _place_camera() -> void:
 	# eff_framing_bias of the frame height below screen center.
 	var frame_half_height := eff_distance * tan(deg_to_rad(eff_fov) * 0.5)
 	var biased_target := look_target + ground_forward * frame_half_height * eff_framing_bias
+	if _look_up_blend > 0.0:
+		biased_target = biased_target.lerp(_look_up_target, _look_up_blend)
 
 	camera.look_at(biased_target)
 

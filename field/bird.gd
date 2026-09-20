@@ -82,6 +82,10 @@ enum FlyDirection { SEAWARD, INLAND, LEFT, RIGHT }
 # straight away from the tower.
 @export var fly_yaw_offset_degrees: float = 25.0
 @export var once_per_run: bool = true
+# What the once-per-run flights are keyed under - set by RegionField when
+# the bird is spawned from FloorData (floor resource path + prop index);
+# empty = derived from the authoring scene, see _flight_id().
+@export var flight_id: String = ""
 
 @export_group("Flight")
 @export var rise_height: float = 1.5
@@ -139,11 +143,22 @@ func _ready() -> void:
 	_spawn_model()
 	_spawn_approach_area()
 
-# Scene file + path from the scene root - the same bird on a reloaded
-# floor has the same id.
+# flight_id if the spawner set one; else scene file + path from the scene
+# root - the same bird on a reloaded floor has the same id. Same shape and
+# same reason as Hull._finding_id().
 func _flight_id() -> String:
+	if not flight_id.is_empty():
+		return flight_id
 	var root: Node = owner if owner != null else self
 	return "%s:%s" % [root.scene_file_path, str(root.get_path_to(self))]
+
+# FloorProp's placement onto this bird's own exports (RegionField._spawn_
+# floor_props()): the position is the perch, local to the parent prop
+# (all three axes - it's a point on a gunwale, not on the ground), yaw is
+# perch_yaw_degrees. A bird doesn't roll on its own.
+func set_floor_placement(local_position: Vector3, yaw: float, _roll: float) -> void:
+	perch_offset = local_position
+	perch_yaw_degrees = yaw
 
 func _spawn_model() -> void:
 	_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D

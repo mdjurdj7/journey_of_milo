@@ -96,3 +96,19 @@ so it doesn't get silently reinvented or silently forgotten.
   has the same shape but is not held back: it is merely unexciting
   against one enemy rather than actively dead. (2026-09-19, second
   Wanderer card pass.)
+- **Floors as data - what the first pass left open.** `region_field.tscn`
+  is the region (sea, sky, light, tower, HUD); a floor is a `FloorData`
+  in `floors/` (`region1_floor1.tres` = the tutorial floor extracted,
+  `region1_floor2.tres` = Map3), listed by `floors/region1.tres`, and a
+  floor change is a `reload_current_scene()` with
+  `RunState.current_floor_index` advanced under a root-level `FloorFade`.
+  Left for later: (1) the region's last floor wraps back to floor 1 with
+  a print - region 2 and the traveller are not this pass. (2) Floor 2's
+  belongings marker is a placeholder: a `FloorProp` whose scene is
+  `world_card.tscn`, holding one card rolled from the floor's reward
+  pool; a real find type replaces it. (3) The editor no longer previews
+  a floor - Ground gets its mask from FloorData at runtime, so the scene
+  shows the SDF landmass when edited. (4) The threshold look-up aims at
+  the tower's base, but `RegionSky`'s depth fog is full at 28 m and the
+  tower stands 380 m off - unless the fog is retuned for that beat, the
+  frame lifts to fog where the tower is. (2026-09-19, floors as data.)

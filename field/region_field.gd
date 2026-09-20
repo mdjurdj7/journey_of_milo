@@ -5,28 +5,31 @@ const BATTLE_OVERLAY_SCENE_PATH := "res://battle/battle_overlay.tscn"
 const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
+const FIELD_ENEMY_SCENE_PATH := "res://field/field_enemy.tscn"
+const PROPS_NODE_NAME := "Props"
 
-# Floor-exit prototype. Emitted once, when the last "enemies"-group member
-# is defeated - see _on_battle_finished()'s own WIN branch.
+# Emitted once, when the last "enemies"-group member is defeated - see
+# _on_battle_finished()'s own WIN branch. Opens the ExitGate.
 signal floor_cleared
+
+# This scene is the REGION: sea, sky, light, tower, HUD. Which floor of it
+# is standing is data - region.floors[RunState.current_floor_index], a
+# FloorData (see floors/floor_data.gd) read once per scene load. Its
+# landmass and spawn go onto Ground/Wanderer in _enter_tree() (before any
+# child's _ready() can read them - see that method's own doc), its
+# enemies and props are spawned in _ready(), and everything else (gate,
+# wear, rewards) reads get_floor_data() where it needs it. A floor change
+# is a scene reload with the index advanced - see _on_floor_exited().
+@export var region: RegionData = null
 
 @export var escape_push_distance: float = 4.0
 
-# What a won fight leaves behind. Null (the default) means no drop at
-# all, which is what every floor without an authored pool gets - the
-# tutorial scene points this at cards/pools/wanderer_pool.tres. Only WINS
-# drop: an escape leaves nothing, and a loss ends the run.
-@export var reward_pool: RewardPool = null
 # Where a won fight's reward is offered. SCREEN is the interim static
 # list; WORLD is the three cards laid on the sand where the enemy fell
 # (RewardSpread, kept and still working - see DESIGN.md). One or the
 # other, never both.
 enum RewardMode { SCREEN, WORLD }
 @export var reward_mode: RewardMode = RewardMode.SCREEN
-# Coin this floor's fights leave, rolled per fight from the run's own
-# generator so it belongs to the run's sequence. Inclusive both ends.
-@export var gold_min: int = 10
-@export var gold_max: int = 18
 @export var reward_screen_scene_path: String = "res://battle/reward_screen.tscn"
 @export var reward_spread_scene_path: String = "res://field/reward_spread.tscn"
 # Held back until the battle framing has gone: the cards should appear on
@@ -61,19 +64,29 @@ enum RewardMode { SCREEN, WORLD }
 @export var camera_rig_path: NodePath = ^"CameraPivot"
 @export var directional_light_path: NodePath = ^"DirectionalLight3D"
 @export var exit_gate_path: NodePath = ^"ExitGate"
-# Distance beyond the (currently sole) enemy's own position, along
-# get_forward() - see _setup_exit_gate()'s own doc. 6.0 pairs with the
-# enemy's own authored distance (13.0, see region_field.tscn's FieldEnemy
-# transform) to land the gate's own line at 19.0 from spawn - the mouth of
-# Map2's neck, where the painted land pinches from ~22 m wide (z -12) to
-# under 10 m (z -20); the neck then runs on to the inland wall.
-@export var exit_gate_distance_beyond_enemy: float = 6.0
-# How far the worn band's middle control point sits off the enemy, along
-# the field's right. 1.5 m bends the band past the standing pool beside
-# the crab; 0 runs it straight through where the enemy stands.
-@export var wear_path_mid_offset: float = 1.5
+@export var sky_path: NodePath = ^"WorldEnvironment"
+
+@export_group("Floor Transition")
+# Where the floor ends: the ExitGate's own TriggerArea, pushed this far
+# along the floor's exit_direction past the gate line (ExitGate.trigger_
+# forward_offset) - the far end of the surfaced bar. On the tutorial
+# floor (gate at z -16.7) that is z -28.7, in the neck short of the inland
+# wall; on floor 2 (gate at z -23) it sits against the wall at z -35.
+@export var transition_distance: float = 12.0
+# The look up: the field camera lifts its eyes to the tower over this
+# long (CameraRig.look_up()) before the fade begins.
+@export var look_up_seconds: float = 0.6
+# The fade to the fog colour, and the fade back on the new floor - each
+# this long (FloorFade).
+@export var fade_seconds: float = 0.8
+# A WorldCard lying on the sand (a FloorProp whose scene is world_card.
+# tscn) sits this far above the relief - the quad is flat and would
+# z-fight the sand at exactly ground height. Same value RewardSpread uses.
+@export var world_card_ground_clearance: float = 0.02
+@export_group("")
+
 # The follow camera's inland bound (see CameraRig.set_inland_limit()):
-# the look target stops this far along get_forward() past the gate line
+# the look target stops this far along the exit direction past the gate line
 # (3 m on the tutorial floor puts the line at z -22, where the Wanderer's
 # head just clears the top of the frame when he reaches the inland wall)
 # - or, with the override on, at a fixed z regardless of where the gate
@@ -145,6 +158,14 @@ enum RewardMode { SCREEN, WORLD }
 var _forward: Vector3 = Vector3.FORWARD
 var _forward_computed: bool = false
 
+# The floor this scene load is playing - see get_floor_data().
+var _floor: FloorData = null
+var _floor_resolved: bool = false
+# Set by _on_floor_exited() for the rest of this scene's life: the
+# trigger can't fire twice while the field stands frozen, but nothing
+# here should depend on that.
+var _transitioning: bool = false
+
 # Cached once by _build_boundary() and reused by _rebuild_boundary_walls() -
 # field_extents/wall_thickness/forward/shoreline_wall_margin/sea_edge_
 # distance never change live, so this can't go stale. Also guards that
@@ -177,13 +198,41 @@ var _run_lost_to_wading: bool = false
 # The click mark, created on first use - see ClickMarker.
 var _click_marker: ClickMarker = null
 
+# Parent-first, before any child has entered the tree or run its
+# _ready(): the one moment the floor's landmass and spawn can be put onto
+# Ground and the Wanderer such that Ground's own _ready() builds the right
+# relief and Sea/Ground read the right spawn - _ready() is bottom-up (see
+# get_forward()'s own doc), so it is already too late there. Ground's
+# setters store the values without rebuilding until its _ready_done, and
+# the Wanderer's local position IS its world position (this node sits at
+# the origin), so nothing here needs the tree. The spawn faces the floor's
+# exit_direction - same rotation.y = atan2(-dir.x, -dir.z) convention
+# FieldEnemy.face_toward()/Wanderer._angle_from_direction() use.
+func _enter_tree() -> void:
+	var floor_data := get_floor_data()
+	if floor_data == null:
+		return
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null:
+		ground.landmass_mask = floor_data.mask
+		ground.landmass_mask_origin = floor_data.mask_origin
+		ground.landmass_interior_height = floor_data.interior_height
+		ground.landmass_falloff_width = floor_data.falloff
+		ground.relief_amplitude = floor_data.relief_amplitude
+		ground.caustic_strength = floor_data.caustic_strength
+	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
+	if spawn_node != null:
+		spawn_node.position = Vector3(floor_data.spawn.x, 0.0, floor_data.spawn.y)
+		var exit: Vector3 = get_exit_direction()
+		spawn_node.rotation.y = atan2(-exit.x, -exit.z)
+
 func _ready() -> void:
 	# Starts the run once per game session, seeding HP and the starting
 	# Belongings from RunState.new_run()'s own doc - guarded on character
-	# being unset rather than called unconditionally, because the floor-exit
-	# prototype's own reload_current_scene() (see _on_floor_exited()) re-runs
-	# this same _ready(), and an unconditional call would wipe the run's HP/
-	# deck back to starting values on every floor transition. A proper
+	# being unset rather than called unconditionally, because a floor
+	# change is a reload_current_scene() (see _on_floor_exited()) that
+	# re-runs this same _ready(), and an unconditional call would wipe the
+	# run's HP/deck/gold back to starting values on every floor. A proper
 	# run-start flow (e.g. a character-select screen) replaces this call
 	# site later without RunState itself needing to change. Must run before
 	# anything below reads RunState.deck.
@@ -194,14 +243,26 @@ func _ready() -> void:
 	# it first; a no-op if one already did.
 	get_forward()
 
+	# From FloorData, now that Ground has its relief for them to stand on
+	# (every authored child is ready by here). Before the "enemies" loops
+	# below, which must see them.
+	_spawn_floor_enemies()
+	_spawn_floor_props()
+
 	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
 		enemy.contacted.connect(_on_enemy_contacted)
 
-	_reposition_enemies_along_forward()
 	_setup_exit_gate()
 	_setup_field_hud()
 	_build_boundary()
 	_setup_exit_gate_channel()
+
+	# Arriving from another floor: the fade that took the frame there is
+	# still up (it lives on the tree's root, not in this scene) - bring it
+	# down over this floor. The first floor of a session has none.
+	var fade := FloorFade.find_existing(get_tree())
+	if fade != null:
+		fade.fade_in(fade_seconds)
 
 	# Keeps the walls in sync with live landmass-shape tuning: Ground emits
 	# relief_rebuilt after every mesh/collision rebuild (any landmass/relief
@@ -339,6 +400,39 @@ func get_forward() -> Vector3:
 		print("RegionField: forward = %s" % str(_forward))
 	return _forward
 
+# The floor this scene load plays: region.floors[RunState.current_floor_
+# index], resolved once (lazily, so _enter_tree() and any child can ask in
+# whatever order) and held for the scene's life - the index only moves
+# in _on_floor_exited(), right before the reload that makes a new one of
+# these. Null, with a warning, if no region is set; the scene then stands
+# with its own defaults and nothing on it.
+func get_floor_data() -> FloorData:
+	if _floor_resolved:
+		return _floor
+	_floor_resolved = true
+	if region == null or region.floors.is_empty():
+		push_warning("RegionField: no region (or an empty one) - no floor to play.")
+		return null
+	var index: int = clampi(RunState.current_floor_index, 0, region.floors.size() - 1)
+	_floor = region.floors[index]
+	if _floor == null:
+		push_warning("RegionField: region floor %d is null." % index)
+		return null
+	print("RegionField: floor %d of %d - %s" % [index + 1, region.floors.size(), _floor.resource_path])
+	return _floor
+
+# The way OUT of this floor, unit XZ: the gate channel, the camera's
+# inland bound, the worn band's end and the transition trigger all lie
+# along it (FloorData.exit_direction). Distinct from get_forward(), which
+# is where the TOWER is and so where the sea isn't - "seaward" facings,
+# the sea's own placement and the mask's image-up all stay on that. Falls
+# back to forward when there's no floor or its direction is degenerate.
+func get_exit_direction() -> Vector3:
+	var floor_data := get_floor_data()
+	if floor_data != null and floor_data.exit_direction.length() > 0.0001:
+		return Vector3(floor_data.exit_direction.x, 0.0, floor_data.exit_direction.y).normalized()
+	return get_forward()
+
 # The inland wall's own Z, in world space - Ground's landmass shape reads
 # this as the "fully inland, full dry width" end of its left/right taper
 # (see Ground._landmass_curve_t()'s own doc). A small, order-safe formula
@@ -358,22 +452,147 @@ func get_spawn_position() -> Vector3:
 	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
 	return spawn_node.global_position if spawn_node != null else global_position
 
-# Preserves each enemy's authored distance from the Wanderer's spawn,
-# but re-derives the direction along get_forward() instead of whatever
-# axis its .tscn transform happened to assume. Y is left alone here -
-# FieldEnemy grounds its own Y against Ground.get_height_at() itself (see
-# its _ground_to_relief(), called once deferred from _ready() and again
-# on every Ground.relief_rebuilt), which also means it stays correct
-# across live relief edits, not just at this one spawn moment.
-func _reposition_enemies_along_forward() -> void:
-	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
-		# Opted out: its position means something in the world (standing by
-		# a pool, say) rather than "this far along forward" - see
-		# FieldEnemy.snap_to_forward_axis.
-		if not enemy.snap_to_forward_axis:
+# The floor's enemies, one field_enemy.tscn each, direct children of this
+# node (its own ^".."/^"../Ground" defaults assume exactly that), placed
+# at spawn + the authored XZ offset with the authored yaw taken literally
+# (no face-shore). Y is left alone - FieldEnemy grounds its own Y against
+# Ground.get_height_at() itself (see its _ground_to_relief(), called once
+# deferred from _ready() and again on every Ground.relief_rebuilt), which
+# also means it stays correct across live relief edits.
+func _spawn_floor_enemies() -> void:
+	var floor_data := get_floor_data()
+	if floor_data == null:
+		return
+	var scene := load(FIELD_ENEMY_SCENE_PATH) as PackedScene
+	if scene == null:
+		push_warning("RegionField: could not load %s; no enemies." % FIELD_ENEMY_SCENE_PATH)
+		return
+	var spawn: Vector3 = get_spawn_position()
+	for index in floor_data.enemies.size():
+		var entry: FloorEnemy = floor_data.enemies[index]
+		if entry == null or entry.enemy_data == null:
+			push_warning("RegionField: floor enemy %d has no EnemyData; skipped." % index)
 			continue
-		var distance := (enemy.global_position - wanderer.global_position).length()
-		enemy.global_position = wanderer.global_position + _forward * distance
+		var enemy := scene.instantiate() as FieldEnemy
+		enemy.name = "FieldEnemy%d" % index
+		enemy.enemy_data = entry.enemy_data
+		enemy.face_shore_at_spawn = false
+		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)
+		enemy.rotation.y = deg_to_rad(entry.yaw_degrees)
+		add_child(enemy)
+
+# The floor's props (FloorProp) under one Props node made here, or under
+# an earlier prop when parent_index says so (the Bird on its hull). Each
+# prop's relative ground_path/region_field_path are re-aimed for its
+# actual depth before it enters the tree (_aim_prop_paths()), its
+# overrides applied, then its placement handed to its own
+# set_floor_placement() where it has one - a WorldCard has no facing and
+# is simply grounded (see _setup_belongings_card()). Once-per-run ids
+# (Hull.finding_id / Bird.flight_id / Keeper.offer_id) are the floor
+# resource's path plus the prop's index: stable across the reload a
+# floor change is, distinct across floors.
+func _spawn_floor_props() -> void:
+	var floor_data := get_floor_data()
+	if floor_data == null or floor_data.props.is_empty():
+		return
+	var props_root := Node3D.new()
+	props_root.name = PROPS_NODE_NAME
+	add_child(props_root)
+	var spawn: Vector3 = get_spawn_position()
+	# Per index: the spawned node (null if skipped) and its depth below
+	# this node, for the parent lookups that follow.
+	var spawned: Array[Node3D] = []
+	var depths: Array[int] = []
+	for index in floor_data.props.size():
+		spawned.append(null)
+		depths.append(0)
+		var entry: FloorProp = floor_data.props[index]
+		if entry == null or entry.scene == null:
+			push_warning("RegionField: floor prop %d has no scene; skipped." % index)
+			continue
+		var parent: Node3D = props_root
+		var depth: int = 2
+		if entry.parent_index >= 0:
+			if entry.parent_index >= index or spawned[entry.parent_index] == null:
+				push_warning("RegionField: floor prop %d names parent %d, which isn't an earlier, spawned prop; skipped." % [index, entry.parent_index])
+				continue
+			parent = spawned[entry.parent_index]
+			depth = depths[entry.parent_index] + 1
+		var prop := entry.scene.instantiate() as Node3D
+		if prop == null:
+			push_warning("RegionField: floor prop %d's scene is not a Node3D; skipped." % index)
+			continue
+		prop.name = "%s%d" % [prop.name, index]
+		_aim_prop_paths(prop, depth)
+		for key: String in entry.overrides:
+			prop.set(key, entry.overrides[key])
+		var id: String = "%s#%d" % [floor_data.resource_path, index]
+		if prop is Hull:
+			var hull := prop as Hull
+			hull.finding_id = id
+			if not entry.world_line.is_empty():
+				hull.world_line = entry.world_line
+		elif prop is Keeper:
+			(prop as Keeper).offer_id = id
+		elif prop is Bird:
+			(prop as Bird).flight_id = id
+		elif prop is WorldCard:
+			if not _setup_belongings_card(prop as WorldCard, floor_data):
+				prop.free()
+				continue
+		# A child prop's position is local to its parent (a perch); a top-
+		# level one's is an XZ offset from spawn, grounded by the prop.
+		var placement: Vector3 = entry.position if entry.parent_index >= 0 else Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.z)
+		if prop.has_method("set_floor_placement"):
+			prop.call("set_floor_placement", placement, entry.yaw_degrees, entry.roll_degrees)
+		else:
+			prop.position = placement
+		parent.add_child(prop)
+		if prop is WorldCard:
+			prop.global_position = _ground_point(prop.global_position, world_card_ground_clearance)
+		spawned[index] = prop
+		depths[index] = depth
+
+# A prop authored in region_field.tscn sat at a known depth and its
+# NodePath exports (^"../Ground", ^"../../Ground", ^"../../..") were
+# written for it; spawned under Props, or under another prop, it sits
+# `depth` levels below this node instead. Only the two paths every prop
+# script declares; a prop without one is left alone.
+func _aim_prop_paths(prop: Node, depth: int) -> void:
+	var up: String = "../".repeat(depth)
+	if "ground_path" in prop:
+		prop.set("ground_path", NodePath(up + "Ground"))
+	if "region_field_path" in prop:
+		prop.set("region_field_path", NodePath(up.trim_suffix("/")))
+
+# The placeholder belongings: a WorldCard on the sand holding one card
+# rolled from the floor's reward pool by the run's own generator, in the
+# standalone configuration RewardSpread uses (no holder to measure a
+# silhouette against). A real find type is not this - see the task's
+# out-of-scope list. False, with a warning, if there's nothing to hold.
+func _setup_belongings_card(card: WorldCard, floor_data: FloorData) -> bool:
+	if floor_data.reward_pool == null:
+		push_warning("RegionField: a belongings WorldCard needs the floor's reward_pool to roll from; none set.")
+		return false
+	var rolled: Array[CardData] = floor_data.reward_pool.roll(1, RunState.rng, null)
+	if rolled.is_empty():
+		push_warning("RegionField: the floor's reward_pool rolled nothing for the belongings WorldCard.")
+		return false
+	card.card = rolled[0]
+	card.holder_path = ^""
+	return true
+
+# A world point seated on the relief plus `clearance` - same to_local()-
+# first idiom RewardSpread/Keeper use, since get_height_at() works in
+# Ground's own frame. Returns the point lifted by clearance alone if
+# Ground doesn't resolve.
+func _ground_point(world_position: Vector3, clearance: float) -> Vector3:
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground == null:
+		return world_position + Vector3.UP * clearance
+	var local: Vector3 = ground.to_local(Vector3(world_position.x, 0.0, world_position.z))
+	var height: float = ground.get_height_at(Vector2(local.x, local.z))
+	return Vector3(world_position.x, height + clearance, world_position.z)
 
 # Applies this region's own on-pale/on-dark value set to the shared
 # BattleTheme resource - deck_panel and hp_bar are both styled from it
@@ -421,20 +640,26 @@ func add_enemy_status(status: EnemyStatus) -> void:
 		return
 	hud.add_child(status)
 
-# Positions and orients the ExitGate along get_forward(), a fixed distance
-# beyond the (currently sole) enemy's own position, then wires it to this
-# field's floor_cleared/floor_exited handshake. Done here rather than in
-# ExitGate's own _ready(): children's _ready() runs before their parent's
-# (see get_forward()'s own doc on the same bottom-up ordering), and both
-# get_forward() and _reposition_enemies_along_forward() only resolve inside
-# THIS _ready() - so an ExitGate trying to position itself would always be
-# a frame too early. Same rotation.y = atan2(-dir.x, -dir.z) convention
-# FieldEnemy._face_shore()/face_toward() already use to align a node's
-# local -Z with a world direction.
+# Positions and orients the ExitGate along the floor's exit direction,
+# the floor's gate_distance_beyond_enemy past the first enemy's own
+# position, pushes its trigger out to transition_distance and its bar
+# offset from the floor, then wires it to this field's floor_cleared/
+# floor_exited handshake. Done here rather than in ExitGate's own
+# _ready(): children's _ready() runs before their parent's (see
+# get_forward()'s own doc on the same bottom-up ordering), and the
+# enemies only exist once THIS _ready() has spawned them - so an ExitGate
+# trying to position itself would always be too early. Same rotation.y =
+# atan2(-dir.x, -dir.z) convention FieldEnemy._face_shore()/face_toward()
+# already use to align a node's local -Z with a world direction - which
+# is what orients the channel and the surfaced bar (ExitGate.setup_
+# channel() reads this node's basis).
 func _setup_exit_gate() -> void:
 	var exit_gate := get_node_or_null(exit_gate_path) as ExitGate
 	if exit_gate == null:
 		push_warning("RegionField: exit_gate_path did not resolve to an ExitGate; no floor exit.")
+		return
+	var floor_data := get_floor_data()
+	if floor_data == null:
 		return
 
 	var enemies := get_tree().get_nodes_in_group("enemies")
@@ -443,8 +668,11 @@ func _setup_exit_gate() -> void:
 		return
 	var enemy := enemies[0] as FieldEnemy
 
-	exit_gate.global_position = enemy.global_position + _forward * exit_gate_distance_beyond_enemy
-	exit_gate.rotation.y = atan2(-_forward.x, -_forward.z)
+	var exit: Vector3 = get_exit_direction()
+	exit_gate.channel_bar_axis_offset = floor_data.gate_bar_axis_offset
+	exit_gate.trigger_forward_offset = transition_distance
+	exit_gate.global_position = enemy.global_position + exit * floor_data.gate_distance_beyond_enemy
+	exit_gate.rotation.y = atan2(-exit.x, -exit.z)
 	_apply_camera_inland_limit()
 	_aim_wear_path(enemy)
 
@@ -463,10 +691,11 @@ func _apply_camera_inland_limit() -> void:
 	var exit_gate := get_node_or_null(exit_gate_path) as ExitGate
 	if camera_rig == null or exit_gate == null:
 		return
-	var point: Vector3 = exit_gate.global_position + get_forward() * camera_inland_limit_beyond_gate
+	var exit: Vector3 = get_exit_direction()
+	var point: Vector3 = exit_gate.global_position + exit * camera_inland_limit_beyond_gate
 	if camera_inland_limit_override_enabled:
 		point = Vector3(exit_gate.global_position.x, exit_gate.global_position.y, camera_inland_limit_override_z)
-	camera_rig.set_inland_limit(point, get_forward())
+	camera_rig.set_inland_limit(point, exit)
 
 # Only once the gate is where it will stay AND the boundary walls exist
 # (the channel is sized from them) can the gate cut its channel across
@@ -485,16 +714,52 @@ func _setup_exit_gate_channel() -> void:
 func get_wall_rect() -> Rect2:
 	return _wall_rect
 
-# RunState.current_floor_index persists (see RunState.deck's own doc on
-# what survives a battle; this is the same idea across a floor) because
-# reload_current_scene() only re-runs this scene's own _ready(), and
-# RunState is an autoload - it isn't touched by the reload at all. The
-# guarded RunState.new_run() call in _ready() is what actually keeps HP/
-# deck from being wiped alongside it - see that guard's own doc.
+# The threshold, from the ExitGate's trigger at the far end of the bar:
+# the field freezes (the same process-mode freeze battle uses - this
+# node's own coroutine still resumes on the timer/tween signals below,
+# and CameraRig, Sea and FloorFade all run ALWAYS), the camera lifts its
+# eyes to the tower's base, the ambience ducks, the fog colour takes the
+# frame, and only then does the floor index move and the scene reload.
+# The new scene's _ready() finds the fade still up and brings it down.
+#
+# What carries is whatever lives on RunState (deck, HP, gold, the rng's
+# state) - an autoload, untouched by the reload; the guarded new_run()
+# in _ready() is what keeps it from being reset. Toll and Grace are per
+# combat and live in BattleController, gone with the fight. Past the
+# region's last floor there is nothing yet: say so and go round to floor
+# 1 again (the once-per-run findings stay spent, as they should).
 func _on_floor_exited() -> void:
-	RunState.current_floor_index += 1
+	if _transitioning:
+		return
+	_transitioning = true
+	process_mode = Node.PROCESS_MODE_DISABLED
+
+	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
+	var tower := get_node_or_null(tower_path) as Tower
+	if camera_rig != null and tower != null:
+		camera_rig.look_up(tower.get_base_position(), look_up_seconds)
+	var sea := get_node_or_null(sea_path) as Sea
+	if sea != null:
+		sea.duck(look_up_seconds + fade_seconds)
+
+	await get_tree().create_timer(look_up_seconds).timeout
+	var fade := FloorFade.get_or_create(get_tree())
+	await fade.fade_out(_fog_colour(), fade_seconds)
+
+	var floor_count: int = region.floors.size() if region != null else 0
+	if RunState.current_floor_index + 1 >= floor_count:
+		print("RegionField: end of region - back to floor 1 for now")
+		RunState.current_floor_index = 0
+	else:
+		RunState.current_floor_index += 1
 	print("RegionField: floor_exited, current_floor_index = %d" % RunState.current_floor_index)
 	get_tree().reload_current_scene()
+
+# The pale the fade goes to: the region's own fog colour, so the frame
+# fills with the same nothing the far field already is.
+func _fog_colour() -> Color:
+	var sky := get_node_or_null(sky_path) as RegionSky
+	return sky.fog_color if sky != null else Color.WHITE
 
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	process_mode = Node.PROCESS_MODE_DISABLED
@@ -579,7 +844,8 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, over
 # lets it run. The position is a snapshotted Vector3, not the enemy - by
 # the time this resumes that node is freed.
 func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
-	if reward_pool == null:
+	var floor_data := get_floor_data()
+	if floor_data == null or floor_data.reward_pool == null:
 		return
 	var delay: float = reward_spread_delay_sec
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
@@ -597,7 +863,7 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 		push_warning("RegionField: could not load %s; no reward spread." % reward_spread_scene_path)
 		return
 	var spread := scene.instantiate() as RewardSpread
-	spread.pool = reward_pool
+	spread.pool = floor_data.reward_pool
 	spread.enemy = fell_to
 	add_child(spread)
 	spread.global_position = fell_at
@@ -614,8 +880,11 @@ func _open_reward_screen() -> void:
 		push_warning("RegionField: could not load %s; no reward screen." % reward_screen_scene_path)
 		return
 	var screen := scene.instantiate() as RewardScreen
-	var gold: int = RunState.rng.randi_range(mini(gold_min, gold_max), maxi(gold_min, gold_max))
-	screen.setup(gold, reward_pool, deck_panel)
+	# Only reached through _spawn_reward_spread(), which has already checked
+	# the floor and its pool.
+	var floor_data := get_floor_data()
+	var gold: int = RunState.rng.randi_range(mini(floor_data.gold_min, floor_data.gold_max), maxi(floor_data.gold_min, floor_data.gold_max))
+	screen.setup(gold, floor_data.reward_pool, deck_panel)
 	screen.closed.connect(_on_reward_screen_closed)
 	add_child(screen)
 	process_mode = Node.PROCESS_MODE_DISABLED
@@ -624,12 +893,13 @@ func _on_reward_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 
 # Points the ground's walked band along the route the floor actually
-# takes: out of spawn, past the enemy, to the gate. Ground knows none of
-# those - it takes three world points and draws a band through them (see
-# Ground.set_wear_path()), so a floor with a different shape re-aims it
-# by calling this with different points rather than by editing a shader.
-# Called from _setup_exit_gate(), the first moment the gate's own
-# position is final.
+# takes: out of spawn, past the enemy, to the gate - or along the floor's
+# own three points when it overrides that (FloorData.wear_path_override).
+# Ground knows none of those - it takes three world points and draws a
+# band through them (see Ground.set_wear_path()), so a floor with a
+# different shape re-aims it by calling this with different points rather
+# than by editing a shader. Called from _setup_exit_gate(), the first
+# moment the gate's own position is final.
 func _aim_wear_path(enemy: FieldEnemy) -> void:
 	var ground := get_node_or_null(ground_path) as Ground
 	if ground == null:
@@ -637,14 +907,24 @@ func _aim_wear_path(enemy: FieldEnemy) -> void:
 	var gate := get_node_or_null(exit_gate_path) as Node3D
 	if gate == null:
 		return
-	# The middle point is pushed off the enemy along the field's right, so
+	var floor_data := get_floor_data()
+	if floor_data == null:
+		return
+	var spawn: Vector3 = get_spawn_position()
+	if floor_data.wear_path_override.size() >= 3:
+		var points: PackedVector2Array = floor_data.wear_path_override
+		ground.set_wear_path(
+			spawn + Vector3(points[0].x, 0.0, points[0].y),
+			spawn + Vector3(points[1].x, 0.0, points[1].y),
+			spawn + Vector3(points[2].x, 0.0, points[2].y))
+		return
+	# The middle point is pushed off the enemy along the exit's right, so
 	# the band bends past the standing pool painted beside the crab rather
-	# than running through it. Right is get_forward() turned a quarter
-	# turn, not world +X, so this stays correct if a floor's forward ever
-	# isn't -Z.
-	var right: Vector3 = get_forward().cross(Vector3.UP).normalized()
-	var mid: Vector3 = enemy.global_position + right * wear_path_mid_offset
-	ground.set_wear_path(get_spawn_position(), mid, gate.global_position)
+	# than running through it. Right is the exit direction turned a
+	# quarter turn, not world +X, so this holds for any exit.
+	var right: Vector3 = get_exit_direction().cross(Vector3.UP).normalized()
+	var mid: Vector3 = enemy.global_position + right * floor_data.wear_path_mid_offset
+	ground.set_wear_path(spawn, mid, gate.global_position)
 
 # CONSUMED cards leave RunState.deck (the run's Belongings) for good once
 # the fight that consumed them ends; SPENT ones (the rest of exhaust_pile)
@@ -769,13 +1049,14 @@ func _rebuild_boundary_walls() -> void:
 # Ground's painted-land rect in world XZ (Rect2.x = X, Rect2.y = Z). The
 # end caps (min/max Z) run the full outer width plus one wall_thickness so
 # they seal the corners against the side walls' own centre lines; which of
-# the two is "inland" is whichever lies further along get_forward() -
-# never assumed to be -Z.
+# the two is "inland" (the way out) is whichever lies further along the
+# floor's exit direction - never assumed to be -Z. Naming only: all four
+# walls are built either way, and get_wall_rect() is what the gate reads.
 func _build_mask_boundary_walls(land_bounds: Rect2) -> void:
 	var bounds: Rect2 = land_bounds.grow(side_wade_margin)
 	var center: Vector2 = bounds.get_center()
 	var end_cap_width: float = bounds.size.x + wall_thickness
-	var min_z_is_inland: bool = _forward.z < 0.0
+	var min_z_is_inland: bool = get_exit_direction().z < 0.0
 
 	var wall_min_z := _add_wall(Vector3(center.x, wall_height / 2.0, bounds.position.y), Vector3(end_cap_width, wall_height, wall_thickness))
 	var wall_max_z := _add_wall(Vector3(center.x, wall_height / 2.0, bounds.end.y), Vector3(end_cap_width, wall_height, wall_thickness))

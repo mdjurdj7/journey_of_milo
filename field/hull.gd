@@ -104,6 +104,12 @@ const MODEL_SCENE_PATH := "res://assets/models/hull/hull.glb"
 @export var shows_once_per_run: bool = true
 @export var hold_seconds: float = 4.0
 @export var fade_seconds: float = 0.5
+# What the once-per-run set keys this hull's line under. Set by RegionField
+# when the hull is spawned from FloorData (the floor resource's path plus
+# its index in that floor's props - stable across the reload a floor
+# change is, distinct across floors); empty = derived from the scene this
+# node was authored in, see _finding_id().
+@export var finding_id: String = ""
 @export_group("")
 
 # Findings already shown this run, keyed by _finding_id() - static so it
@@ -209,11 +215,25 @@ func _apply_approach_radius() -> void:
 	if _approach_shape != null:
 		_approach_shape.radius = maxf(approach_radius, 0.0)
 
-# Scene file + path from the scene root, so the same hull on a reloaded
-# floor has the same id and the same hull in another scene doesn't.
+# finding_id if the spawner set one; else scene file + path from the scene
+# root, so the same hull on a reloaded floor has the same id and the same
+# hull in another scene doesn't. (A hull spawned at runtime has no owner,
+# so that fallback would give every such hull the same id - which is why
+# FloorData spawns set finding_id.)
 func _finding_id() -> String:
+	if not finding_id.is_empty():
+		return finding_id
 	var root: Node = owner if owner != null else self
 	return "%s:%s" % [root.scene_file_path, str(root.get_path_to(self))]
+
+# FloorProp's placement onto this hull's own exports (RegionField._spawn_
+# floor_props()): the node sits at `world_position` (Y ignored, the hull
+# grounds itself), yaw is yaw_offset_degrees on top of the bow-to-sea
+# facing, roll is roll_degrees. Called before this node enters the tree.
+func set_floor_placement(world_position: Vector3, yaw: float, roll: float) -> void:
+	position = Vector3(world_position.x, 0.0, world_position.z)
+	yaw_offset_degrees = yaw
+	roll_degrees = roll
 
 func _on_approach_body_entered(body: Node3D) -> void:
 	if not body.is_in_group("wanderer"):

@@ -152,6 +152,10 @@ enum FaceDirection { SEAWARD, INLAND, LEFT, RIGHT }
 # fade identically - they share the one WorldVoiceLine instance.
 @export var hold_seconds: float = 4.0
 @export var fade_seconds: float = 0.5
+# What the once-per-run offers are keyed under - set by RegionField when
+# she is spawned from FloorData (floor resource path + prop index); empty
+# = derived from the authoring scene, see _offer_id().
+@export var offer_id: String = ""
 @export_group("")
 
 # A slow wind on the cloak hem - the only part of her that moves. See
@@ -481,9 +485,20 @@ func _spawn_approach_area() -> void:
 
 # Scene file + path from the scene root - the same keeper on a reloaded
 # floor has the same id.
+# offer_id if the spawner set one; else scene file + path from the scene
+# root - same shape and same reason as Hull._finding_id().
 func _offer_id() -> String:
+	if not offer_id.is_empty():
+		return offer_id
 	var root: Node = owner if owner != null else self
 	return "%s:%s" % [root.scene_file_path, str(root.get_path_to(self))]
+
+# FloorProp's placement onto her own exports (RegionField._spawn_floor_
+# props()): position (Y ignored, she grounds herself) and yaw as
+# face_yaw_offset_degrees on top of face_direction. She doesn't roll.
+func set_floor_placement(world_position: Vector3, yaw: float, _roll: float) -> void:
+	position = Vector3(world_position.x, 0.0, world_position.z)
+	face_yaw_offset_degrees = yaw
 
 # Which line she says follows whether the card is still in her hand, not
 # how many times she has been approached: approach_line while the offer
@@ -535,10 +550,11 @@ func _spawn_world_card() -> void:
 	_world_card.card = picked
 	_world_card.position = keeper_hand_offset
 	# WorldCard resolves FieldHUD/DeckPanel from here; it sits one level
-	# deeper than this node, so its own default (^"../..") already lands on
-	# RegionField - passed explicitly anyway so re-parenting her doesn't
-	# silently break the card's flight target.
-	_world_card.region_field_path = ^"../.."
+	# deeper than this node, so RegionField is one step further up than
+	# this node's own region_field_path says - derived from that path
+	# rather than typed, so wherever she is spawned (under the field's
+	# Props node, from FloorData) the card's flight target still resolves.
+	_world_card.region_field_path = NodePath("../%s" % str(region_field_path))
 	_world_card.taken.connect(_on_world_card_taken)
 	add_child(_world_card)
 

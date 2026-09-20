@@ -1,0 +1,78 @@
+[gd_resource type="Resource" script_class="FloorData" load_steps=17 format=3]
+
+[ext_resource type="Script" path="res://floors/floor_data.gd" id="1_floor_data"]
+[ext_resource type="Script" path="res://floors/floor_enemy.gd" id="2_floor_enemy"]
+[ext_resource type="Script" path="res://floors/floor_prop.gd" id="3_floor_prop"]
+[ext_resource type="Texture2D" path="res://assets/field/masks/Map2_mask.png" id="4_map2"]
+[ext_resource type="Resource" path="res://battle/rules/enemies/sputter.tres" id="5_sputter"]
+[ext_resource type="PackedScene" path="res://field/hull.tscn" id="6_hull"]
+[ext_resource type="PackedScene" path="res://field/bird.tscn" id="7_bird"]
+[ext_resource type="PackedScene" path="res://field/keeper.tscn" id="8_keeper"]
+[ext_resource type="PackedScene" path="res://assets/models/cormorant/bird.glb" id="9_cormorant"]
+[ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="10_wanderer_pool"]
+
+[sub_resource type="Resource" id="FloorEnemy_crab"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("5_sputter")
+position = Vector2(-2.25, -10.73)
+yaw_degrees = 8.0
+
+[sub_resource type="Resource" id="FloorProp_hull1"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("6_hull")
+position = Vector3(-10.5, 0, -1.25)
+yaw_degrees = 8.0
+roll_degrees = 8.0
+
+[sub_resource type="Resource" id="FloorProp_bird"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("7_bird")
+position = Vector3(0, 0.7, -1.42)
+yaw_degrees = -15.0
+parent_index = 0
+overrides = {
+"bird_mesh": ExtResource("9_cormorant")
+}
+
+[sub_resource type="Resource" id="FloorProp_hull2"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("6_hull")
+position = Vector3(-7.5, 0, -0.25)
+yaw_degrees = 33.0
+roll_degrees = -12.0
+world_line = "Hauled up past the tide, and left."
+
+[sub_resource type="Resource" id="FloorProp_hull3"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("6_hull")
+position = Vector3(-8.2, 0, -9)
+yaw_degrees = -90.0
+roll_degrees = -10.0
+
+[sub_resource type="Resource" id="FloorProp_keeper"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("8_keeper")
+position = Vector3(10.119, 0, -7)
+yaw_degrees = 30.0
+overrides = {
+"face_direction": 3
+}
+
+[resource]
+script = ExtResource("1_floor_data")
+mask = ExtResource("4_map2")
+mask_origin = Vector2(0.49, 0.828)
+interior_height = 0.25
+falloff = 4.0
+relief_amplitude = 0.15
+caustic_strength = 0.15
+spawn = Vector2(0, 0)
+exit_direction = Vector2(0, -1)
+enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_crab")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_hull1"), SubResource("FloorProp_bird"), SubResource("FloorProp_hull2"), SubResource("FloorProp_hull3"), SubResource("FloorProp_keeper")])
+gate_distance_beyond_enemy = 6.0
+gate_bar_axis_offset = 0.85
+wear_path_mid_offset = 1.5
+reward_pool = ExtResource("10_wanderer_pool")
+gold_min = 10
+gold_max = 18
