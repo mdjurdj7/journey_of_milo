@@ -60,8 +60,31 @@ const KEYWORDS: Array[String] = ["Toll", "Grace"]
 # stance included.
 const TOKEN_DAMAGE := "{damage}"
 const TOKEN_BLOCK := "{block}"
+# The number a conditional clause is FOR (CardBonus.bonus_value(): the
+# replacement on a REPLACE, the extra on an ADD) - resolved on the same
+# path as {damage}/{block}, stance included, so both halves of a face
+# move together. Two spellings for the same thing, so a clause reads as
+# authored: "deal {alt_damage}" on a replace, "{bonus_block} more" on an
+# add.
+const TOKEN_ALT_DAMAGE := "{alt_damage}"
+const TOKEN_BONUS_DAMAGE := "{bonus_damage}"
+const TOKEN_ALT_BLOCK := "{alt_block}"
+const TOKEN_BONUS_BLOCK := "{bonus_block}"
+# The conditional clause, and the base text a REPLACE supersedes - see
+# _style_bonus_clauses(). Stripped on render; in a battle hand the two
+# are inked by CardBonus.state(): the half that applies in ink, the
+# other in bonus_dormant_ink.
+const MARK_IF_OPEN := "{if}"
+const MARK_IF_CLOSE := "{/if}"
+const MARK_ELSE_OPEN := "{else}"
+const MARK_ELSE_CLOSE := "{/else}"
 const TOKEN_DRAW := "{draw}"
 const TOKEN_HP_COST := "{hp_cost}"
+# The effect types {damage}/{alt_damage} and {block}/{alt_block} read.
+const DAMAGE_EFFECT_TYPES: Array = [CardEffect.EffectType.DAMAGE, CardEffect.EffectType.FIRST_CARD_DAMAGE,
+	CardEffect.EffectType.DAMAGE_ALL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE]
+const BLOCK_EFFECT_TYPES: Array = [CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK,
+	CardEffect.EffectType.TOLL_BLOCK]
 # The player's Toll right now - 0 outside a battle, which is also what a
 # card in the deck view shows. Reckoning spends all of it, so its printed
 # damage IS this number.
@@ -87,6 +110,10 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 # stays with you after it is played, and it should not read as cool or
 # incidental.
 @export var keyline_stance: Color = Color(0.52, 0.45, 0.44)
+# A conditional's half that does NOT apply right now (see set_bonus_
+# context()): midway between the ink and the utility grey, still legible
+# on bone. Neutral cards (no battle context) never use it.
+@export var bonus_dormant_ink: Color = Color(0.37, 0.37, 0.39)
 @export var art_field_strike: Color = Color(0.886, 0.863, 0.796)
 @export var art_field_guard: Color = Color(0.875, 0.878, 0.855)
 @export var art_field_toll: Color = Color(0.878, 0.863, 0.886)
@@ -121,6 +148,18 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @export_range(0.0, 1.0) var type_label_letter_spacing_em: float = 0.16
 @export_range(0.0, 1.0) var type_label_alpha: float = 0.62
 @export_range(0.0, 1.0) var footer_rule_alpha: float = 0.25
+
+@export_group("Bonus Hairline")
+# The one mark of a LIVE conditional besides the ink: a hairline in the
+# type keyline's colour, under the keyline's left end, drawn in from
+# nothing to bonus_hairline_length_px over bonus_hairline_in_seconds
+# (ease-out) and back over bonus_hairline_out_seconds. Nothing else
+# moves; it holds while the card stays live.
+@export var bonus_hairline_length_px: float = 36.0
+@export var bonus_hairline_thickness_px: float = 1.0
+@export var bonus_hairline_gap_px: float = 2.0
+@export var bonus_hairline_in_seconds: float = 0.2
+@export var bonus_hairline_out_seconds: float = 0.15
 
 @export_group("Layout")
 @export var outer_margin: float = 12.0
@@ -202,11 +241,19 @@ var _playable: bool = true
 var _keyline_type: KeylineType = KeylineType.STRIKE
 # The stance in force, for the numbers on this face - see set_stance().
 var _stance: Stance = null
-# The player's Grace, for the same reason - Reprisal's printed damage is
-# its replacement value while any is open.
+# The player's Grace - kept for the crossing it announces; the face's
+# own reading of a Grace condition goes through the bonus context below.
 var _grace: int = 0
 # The player's Toll, for the cards whose numbers are made of it.
 var _toll: int = 0
+# The battle as it stands, for this card's conditionals (see set_bonus_
+# context()) - null anywhere but a battle hand, which is what keeps a
+# reward, an offer or a deck view neutral: no state, no dimming, no
+# hairline. And the reading taken from it: CardBonus.state().
+var _bonus_context: EffectContext = null
+var _bonus_state: CardBonus.State = CardBonus.State.NONE
+var _bonus_hairline: ColorRect = null
+var _bonus_hairline_tween: Tween = null
 var _hp_cost: int = 0
 var _rest_offset_y: float = 0.0
 # How far down from this card's own local origin "at rest" actually sits -
@@ -239,6 +286,11 @@ func _ready() -> void:
 			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.draw.connect(_draw_glyph)
+	_bonus_hairline = ColorRect.new()
+	_bonus_hairline.name = "BonusHairline"
+	_bonus_hairline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bonus_hairline.size = Vector2(0.0, bonus_hairline_thickness_px)
+	add_child(_bonus_hairline)
 	_apply_style()
 	_apply_layout()
 	mouse_entered.connect(_on_mouse_entered)
@@ -259,11 +311,16 @@ func set_card_data(data: CardData) -> void:
 # controller's stance_changed - a stance changes what an Attack costs and
 # deals, so the face has to be re-read, not just the rules state.
 func set_grace(grace: int) -> void:
-	var had: bool = _grace > 0
 	_grace = maxi(grace, 0)
-	# Only the crossing matters - a card reads differently with Grace and
-	# without, not with more or less of it.
-	if had == (_grace > 0) or card_data == null:
+
+# The battle state this card's conditionals are read against - pushed
+# by HandContainer on every signal that can move one (a card played, a
+# turn boundary, Grace, HP, Toll), never per frame; null outside a
+# battle hand. Re-reads the face: which half of a conditional is inked,
+# and the hairline.
+func set_bonus_context(ctx: EffectContext) -> void:
+	_bonus_context = ctx
+	if card_data == null:
 		return
 	_refresh_dynamic_text()
 	_apply_layout()
@@ -291,7 +348,11 @@ func _refresh_dynamic_text() -> void:
 	_hp_cost = _derive_hp_cost(card_data)
 	hp_cost_label.text = "−%d HP" % _hp_cost if _hp_cost > 0 else ""
 	hp_cost_label.visible = _hp_cost > 0
-	rules_text.text = _format_rules(_resolve_tokens(card_data.description))
+	var was: CardBonus.State = _bonus_state
+	_bonus_state = CardBonus.state(card_data, _bonus_context) if _bonus_context != null else CardBonus.State.NONE
+	rules_text.text = _style_bonus_clauses(_format_rules(_resolve_tokens(card_data.description)))
+	if _bonus_state != was:
+		_animate_bonus_hairline()
 
 # Substitutes the effect-backed tokens. A token whose card has no
 # matching effect is left standing rather than replaced with 0 - that way
@@ -300,20 +361,29 @@ func _refresh_dynamic_text() -> void:
 func _resolve_tokens(description: String) -> String:
 	var text: String = description
 	if text.contains(TOKEN_DAMAGE):
-		var damage: int = _effect_value(card_data, [CardEffect.EffectType.DAMAGE,
-			CardEffect.EffectType.FIRST_CARD_DAMAGE, CardEffect.EffectType.DAMAGE_ALL,
-			CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE])
+		var damage: int = _effect_value(card_data, DAMAGE_EFFECT_TYPES)
 		if damage >= 0:
 			# An Attack's number is what it will actually land for, stance
 			# included - the same addition damage_effect.gd makes.
 			if card_data.card_type == CardData.CardType.ATTACK:
 				damage += Stance.attack_bonus(_stance)
 			text = text.replace(TOKEN_DAMAGE, str(damage))
+	if text.contains(TOKEN_ALT_DAMAGE) or text.contains(TOKEN_BONUS_DAMAGE):
+		var bonus_damage: int = _bonus_effect_value(card_data, DAMAGE_EFFECT_TYPES)
+		if bonus_damage >= 0:
+			# The same stance addition as {damage} - the two halves of a
+			# face must move together.
+			if card_data.card_type == CardData.CardType.ATTACK:
+				bonus_damage += Stance.attack_bonus(_stance)
+			text = text.replace(TOKEN_ALT_DAMAGE, str(bonus_damage)).replace(TOKEN_BONUS_DAMAGE, str(bonus_damage))
 	if text.contains(TOKEN_BLOCK):
-		var block: int = _effect_value(card_data, [CardEffect.EffectType.BLOCK,
-			CardEffect.EffectType.UNDAMAGED_BLOCK, CardEffect.EffectType.TOLL_BLOCK])
+		var block: int = _effect_value(card_data, BLOCK_EFFECT_TYPES)
 		if block >= 0:
 			text = text.replace(TOKEN_BLOCK, str(block))
+	if text.contains(TOKEN_ALT_BLOCK) or text.contains(TOKEN_BONUS_BLOCK):
+		var bonus_block: int = _bonus_effect_value(card_data, BLOCK_EFFECT_TYPES)
+		if bonus_block >= 0:
+			text = text.replace(TOKEN_ALT_BLOCK, str(bonus_block)).replace(TOKEN_BONUS_BLOCK, str(bonus_block))
 	if text.contains(TOKEN_DRAW):
 		var draw: int = _effect_value(card_data, [CardEffect.EffectType.DRAW])
 		if draw >= 0:
@@ -341,14 +411,88 @@ func _toll_heal_preview() -> int:
 # previewed: the others read state the view isn't given, and a card whose
 # number can't be previewed spells its own condition out in prose
 # instead, the way Left Hand does.
+# The BASE number of the first effect of one of `types` - never the
+# conditional one: which half of a face applies is said with ink (see
+# _style_bonus_clauses()), not by swapping the number.
 func _effect_value(data: CardData, types: Array) -> int:
 	for effect in data.effects:
 		if effect == null or not types.has(effect.effect_type):
 			continue
-		if effect.alt_value != 0 and effect.condition == CardEffect.Condition.HAS_GRACE and _grace > 0:
-			return effect.alt_value
 		return effect.value
 	return -1
+
+# The number the first conditional effect of one of `types` is FOR - see
+# CardBonus.bonus_value(). -1 when the card has none, so a stray
+# {alt_damage} is left standing on the face like any other unmatched
+# token.
+func _bonus_effect_value(data: CardData, types: Array) -> int:
+	for effect in data.effects:
+		if effect == null or not types.has(effect.effect_type):
+			continue
+		if effect.condition == CardEffect.Condition.NONE:
+			continue
+		return CardBonus.bonus_value(effect)
+	return -1
+
+# Whether any previewable conditional on this card is a REPLACE - the
+# one mode where the base sentence itself stops applying when the
+# condition holds, and so dims.
+func _bonus_replaces() -> bool:
+	if card_data == null:
+		return false
+	for effect in card_data.effects:
+		if CardBonus.previewable(effect) and CardBonus.mode(effect) == CardBonus.Mode.REPLACE:
+			return true
+	return false
+
+# Which half of a conditional face applies, said in ink. The {if}
+# clause and the {else} base text (markers stripped either way):
+#   neutral / NONE  - everything ink, as authored.
+#   DORMANT         - the clause in bonus_dormant_ink, the rest ink.
+#   LIVE, REPLACE   - the clause ink, the {else} text dormant.
+#   LIVE, ADD/GATE  - everything ink; the base still applies.
+# Runs on BBCode _format_rules() has already escaped and bolded - the
+# markers carry no brackets, so they survive that, and a keyword inside
+# a clause is still bold.
+func _style_bonus_clauses(bbcode: String) -> String:
+	var dormant: String = "[color=#%s]" % Color(bonus_dormant_ink, rules_alpha).to_html(true)
+	var if_open: String = ""
+	var else_open: String = ""
+	match _bonus_state:
+		CardBonus.State.DORMANT:
+			if_open = dormant
+		CardBonus.State.LIVE:
+			if _bonus_replaces():
+				else_open = dormant
+		_:
+			pass
+	var text: String = bbcode
+	text = text.replace(MARK_IF_OPEN, if_open).replace(MARK_IF_CLOSE, "[/color]" if not if_open.is_empty() else "")
+	text = text.replace(MARK_ELSE_OPEN, else_open).replace(MARK_ELSE_CLOSE, "[/color]" if not else_open.is_empty() else "")
+	return text
+
+# The description with its markers stripped - what the face reads as
+# plain text, for measuring.
+static func _strip_markers(text: String) -> String:
+	return text.replace(MARK_IF_OPEN, "").replace(MARK_IF_CLOSE, "").replace(MARK_ELSE_OPEN, "").replace(MARK_ELSE_CLOSE, "")
+
+# The hairline's draw-in on LIVE and retraction on anything else - one
+# tween, restarted from wherever the width stands, so a quick flip never
+# pops.
+func _animate_bonus_hairline() -> void:
+	if _bonus_hairline == null:
+		return
+	if _bonus_hairline_tween != null and _bonus_hairline_tween.is_valid():
+		_bonus_hairline_tween.kill()
+	var live: bool = _bonus_state == CardBonus.State.LIVE
+	var target_width: float = bonus_hairline_length_px if live else 0.0
+	var seconds: float = bonus_hairline_in_seconds if live else bonus_hairline_out_seconds
+	if seconds <= 0.0 or not is_inside_tree():
+		_bonus_hairline.size.x = target_width
+		return
+	_bonus_hairline_tween = create_tween()
+	_bonus_hairline_tween.set_ease(Tween.EASE_OUT if live else Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	_bonus_hairline_tween.tween_property(_bonus_hairline, "size:x", target_width, seconds)
 
 # Whether the player can currently afford this card - HandContainer pushes
 # this on every energy change. Unplayable fades the whole card.
@@ -727,6 +871,8 @@ func _apply_type_style() -> void:
 	if card_data == null:
 		return
 	keyline.color = _keyline_color()
+	if _bonus_hairline != null:
+		_bonus_hairline.color = _keyline_color()
 	art_field.add_theme_stylebox_override("panel", _rounded_style(_art_field_color(), art_field_radius))
 	glyph.queue_redraw()
 
@@ -747,6 +893,11 @@ func _apply_layout() -> void:
 	# pokes out of the rounded corners.
 	keyline.position = Vector2(float(corner_radius) + 1.0, 1.0)
 	keyline.size = Vector2(card_size.x - 2.0 * (float(corner_radius) + 1.0), keyline_height)
+	# The bonus hairline hangs under the keyline's left end; its width is
+	# the tween's alone (see _animate_bonus_hairline()), never set here.
+	if _bonus_hairline != null:
+		_bonus_hairline.position = Vector2(keyline.position.x, keyline.position.y + keyline_height + bonus_hairline_gap_px)
+		_bonus_hairline.size.y = bonus_hairline_thickness_px
 
 	# Cost numeral top-right; the name gets the rest of the header width.
 	# Every Label is sized from its font's real line height (Font.get_
@@ -845,7 +996,8 @@ func _rules_line_count(font_size: int, width: float) -> int:
 	if card_data == null or rules_font == null or card_data.description.is_empty():
 		return 1
 	var line_height: float = rules_font.get_height(font_size)
-	var total: float = rules_font.get_multiline_string_size(card_data.description, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, -1, TextServer.BREAK_WORD_BOUND | TextServer.BREAK_MANDATORY).y
+	var plain: String = _strip_markers(_resolve_tokens(card_data.description))
+	var total: float = rules_font.get_multiline_string_size(plain, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, -1, TextServer.BREAK_WORD_BOUND | TextServer.BREAK_MANDATORY).y
 	return maxi(roundi(total / maxf(line_height, 1.0)), 1)
 
 func _warn_overlong(lines: int) -> void:

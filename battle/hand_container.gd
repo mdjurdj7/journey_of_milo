@@ -116,6 +116,9 @@ var _views: Dictionary = {} # CardData -> Control (the card's slot; its only chi
 var _stance: Stance = null
 var _grace: int = 0
 var _toll: int = 0
+# The battle state the cards' conditionals are read against - see
+# set_bonus_context(). Null until the overlay's first push.
+var _bonus_context: EffectContext = null
 var _last_energy: int = -1
 var _pending_reveals: Array[CardData] = []
 var _revealing: bool = false
@@ -200,6 +203,7 @@ func _add_card_view(card: CardData) -> void:
 	card_view.set_stance(_stance)
 	card_view.set_grace(_grace)
 	card_view.set_toll(_toll)
+	card_view.set_bonus_context(_bonus_context)
 	slot.add_child(card_view)
 
 	# Brings slot (and card_view within it) into the live tree, firing
@@ -270,6 +274,19 @@ func set_toll(toll: int) -> void:
 		var card_view: CardView = slot.get_child(0) as CardView
 		if card_view != null:
 			card_view.set_toll(toll)
+
+# The battle as it stands (BattleController.preview_context()), pushed
+# by the overlay on every signal that can move a conditional - a card
+# played, a turn boundary, Grace, HP, Toll - and to cards drawn
+# afterwards. This is the ONLY place a CardView ever gets one, which is
+# what keeps every other card on screen neutral.
+func set_bonus_context(ctx: EffectContext) -> void:
+	_bonus_context = ctx
+	for card in _views:
+		var slot: Control = _views[card]
+		var card_view: CardView = slot.get_child(0) as CardView
+		if card_view != null:
+			card_view.set_bonus_context(ctx)
 
 func update_playable(energy: int) -> void:
 	_last_energy = energy

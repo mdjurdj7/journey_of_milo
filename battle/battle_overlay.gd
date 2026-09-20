@@ -148,7 +148,17 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.battle_won.connect(func() -> void: _finish_battle(Outcome.WIN))
 	battle_controller.battle_lost.connect(func() -> void: _finish_battle(Outcome.LOSE))
 	hand_container.armed_changed.connect(_on_card_armed_changed)
+	# The hand's conditionals re-read on exactly the signals that can move
+	# one - never per frame. card_played fires after the play is counted,
+	# turn_phase_changed(true) after the count resets and last turn's
+	# damage is settled.
+	battle_controller.card_played.connect(func(_card: CardData, _target: FieldEnemy) -> void: _push_bonus_context())
+	battle_controller.turn_phase_changed.connect(func(_player_turn: bool) -> void: _push_bonus_context())
+	battle_controller.grace_changed.connect(func(_grace: int) -> void: _push_bonus_context())
+	battle_controller.hp_changed.connect(func(_current: int, _max_hp: int) -> void: _push_bonus_context())
+	battle_controller.toll_changed.connect(func(_toll: int) -> void: _push_bonus_context())
 	battle_controller.setup(hand_container, enemy_list, wanderer)
+	_push_bonus_context()
 	get_tree().create_timer(battle_transition_time).timeout.connect(_reveal_enemy_intents)
 
 	var battle_feedback := BattleFeedback.new()
@@ -313,6 +323,13 @@ func _on_status_changed() -> void:
 func _on_turn_phase_changed(player_turn: bool) -> void:
 	_player_turn = player_turn
 	_update_end_turn()
+
+# The hand's reading of the battle - see HandContainer.set_bonus_
+# context() and the connections in enter_battle().
+func _push_bonus_context() -> void:
+	if battle_controller == null:
+		return
+	hand_container.set_bonus_context(battle_controller.preview_context())
 
 func _on_card_armed_changed(armed: bool) -> void:
 	_card_armed = armed

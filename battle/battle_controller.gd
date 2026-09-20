@@ -145,6 +145,19 @@ func _emit_intent_previews() -> void:
 func is_awaiting_target() -> bool:
 	return _pending_card_view != null
 
+# The battle as it stands, for reading a card still in hand: the same
+# shape resolve_card() gets, with cards_played_before_this the count
+# itself (the card hasn't been played) and no target. Read by CardBonus
+# on the card faces (see BattleOverlay._push_bonus_context()); nothing
+# here changes.
+func preview_context() -> EffectContext:
+	var ctx := EffectContext.new()
+	ctx.player = player
+	ctx.enemies = _living_enemy_combatants()
+	ctx.deck = deck
+	ctx.cards_played_before_this = cards_played_this_turn
+	return ctx
+
 # Read-only access for TargetLine, which needs the armed card's own view
 # (for its on-screen top-center) and the currently hovered enemy plus its
 # screen rect (see get_hovered_enemy_rect()) but shouldn't own or

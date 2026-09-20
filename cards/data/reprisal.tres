@@ -14,8 +14,7 @@ script = ExtResource("1_card_data")
 card_name = "Reprisal"
 cost = 1
 target_type = 0
-description = "Deal {damage} damage.
-If you have Grace, deal 12 instead."
+description = "{else}Deal {damage} damage.{/else} {if}With Grace: deal {alt_damage}.{/if}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_damage")])
 battle_animation = &"Slash"
 impact_time = 0.55
