@@ -111,9 +111,9 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 # incidental.
 @export var keyline_stance: Color = Color(0.52, 0.45, 0.44)
 # A conditional's half that does NOT apply right now (see set_bonus_
-# context()): midway between the ink and the utility grey, still legible
-# on bone. Neutral cards (no battle context) never use it.
-@export var bonus_dormant_ink: Color = Color(0.37, 0.37, 0.39)
+# context()): the utility grey, legible on bone but clearly not the ink.
+# Neutral cards (no battle context) never use it.
+@export var bonus_dormant_ink: Color = Color(0.58, 0.58, 0.60)
 @export var art_field_strike: Color = Color(0.886, 0.863, 0.796)
 @export var art_field_guard: Color = Color(0.875, 0.878, 0.855)
 @export var art_field_toll: Color = Color(0.878, 0.863, 0.886)
@@ -149,15 +149,16 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @export_range(0.0, 1.0) var type_label_alpha: float = 0.62
 @export_range(0.0, 1.0) var footer_rule_alpha: float = 0.25
 
-@export_group("Bonus Hairline")
-# The one mark of a LIVE conditional besides the ink: a hairline in the
-# type keyline's colour, under the keyline's left end, drawn in from
-# nothing to bonus_hairline_length_px over bonus_hairline_in_seconds
-# (ease-out) and back over bonus_hairline_out_seconds. Nothing else
-# moves; it holds while the card stays live.
-@export var bonus_hairline_length_px: float = 36.0
-@export var bonus_hairline_thickness_px: float = 1.0
-@export var bonus_hairline_gap_px: float = 2.0
+@export_group("Bonus Underline")
+# The one mark of a LIVE conditional besides the ink: the card's name
+# underlined in its ink - bonus_underline_thickness_px thick, bonus_
+# underline_gap_px under the name's baseline, the name's own rendered
+# width - drawn in left to right over bonus_hairline_in_seconds
+# (ease-out) and retracted over bonus_hairline_out_seconds. Nothing
+# else moves; it holds while the card stays live. Sizes are at 1x and
+# scale with the card like everything on it.
+@export var bonus_underline_thickness_px: float = 1.5
+@export var bonus_underline_gap_px: float = 3.0
 @export var bonus_hairline_in_seconds: float = 0.2
 @export var bonus_hairline_out_seconds: float = 0.15
 
@@ -252,8 +253,8 @@ var _toll: int = 0
 # hairline. And the reading taken from it: CardBonus.state().
 var _bonus_context: EffectContext = null
 var _bonus_state: CardBonus.State = CardBonus.State.NONE
-var _bonus_hairline: ColorRect = null
-var _bonus_hairline_tween: Tween = null
+var _bonus_underline: ColorRect = null
+var _bonus_underline_tween: Tween = null
 var _hp_cost: int = 0
 var _rest_offset_y: float = 0.0
 # How far down from this card's own local origin "at rest" actually sits -
@@ -286,11 +287,11 @@ func _ready() -> void:
 			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.draw.connect(_draw_glyph)
-	_bonus_hairline = ColorRect.new()
-	_bonus_hairline.name = "BonusHairline"
-	_bonus_hairline.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bonus_hairline.size = Vector2(0.0, bonus_hairline_thickness_px)
-	add_child(_bonus_hairline)
+	_bonus_underline = ColorRect.new()
+	_bonus_underline.name = "BonusUnderline"
+	_bonus_underline.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bonus_underline.size = Vector2(0.0, bonus_underline_thickness_px)
+	add_child(_bonus_underline)
 	_apply_style()
 	_apply_layout()
 	mouse_entered.connect(_on_mouse_entered)
@@ -352,7 +353,7 @@ func _refresh_dynamic_text() -> void:
 	_bonus_state = CardBonus.state(card_data, _bonus_context) if _bonus_context != null else CardBonus.State.NONE
 	rules_text.text = _style_bonus_clauses(_format_rules(_resolve_tokens(card_data.description)))
 	if _bonus_state != was:
-		_animate_bonus_hairline()
+		_animate_bonus_underline()
 
 # Substitutes the effect-backed tokens. A token whose card has no
 # matching effect is left standing rather than replaced with 0 - that way
@@ -476,23 +477,28 @@ func _style_bonus_clauses(bbcode: String) -> String:
 static func _strip_markers(text: String) -> String:
 	return text.replace(MARK_IF_OPEN, "").replace(MARK_IF_CLOSE, "").replace(MARK_ELSE_OPEN, "").replace(MARK_ELSE_CLOSE, "")
 
-# The hairline's draw-in on LIVE and retraction on anything else - one
+# The underline's draw-in on LIVE and retraction on anything else - one
 # tween, restarted from wherever the width stands, so a quick flip never
 # pops.
-func _animate_bonus_hairline() -> void:
-	if _bonus_hairline == null:
+func _animate_bonus_underline() -> void:
+	if _bonus_underline == null:
 		return
-	if _bonus_hairline_tween != null and _bonus_hairline_tween.is_valid():
-		_bonus_hairline_tween.kill()
+	if _bonus_underline_tween != null and _bonus_underline_tween.is_valid():
+		_bonus_underline_tween.kill()
 	var live: bool = _bonus_state == CardBonus.State.LIVE
-	var target_width: float = bonus_hairline_length_px if live else 0.0
+	var target_width: float = _bonus_underline_target_width() if live else 0.0
 	var seconds: float = bonus_hairline_in_seconds if live else bonus_hairline_out_seconds
 	if seconds <= 0.0 or not is_inside_tree():
-		_bonus_hairline.size.x = target_width
+		_bonus_underline.size.x = target_width
 		return
-	_bonus_hairline_tween = create_tween()
-	_bonus_hairline_tween.set_ease(Tween.EASE_OUT if live else Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
-	_bonus_hairline_tween.tween_property(_bonus_hairline, "size:x", target_width, seconds)
+	_bonus_underline_tween = create_tween()
+	_bonus_underline_tween.set_ease(Tween.EASE_OUT if live else Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	_bonus_underline_tween.tween_property(_bonus_underline, "size:x", target_width, seconds)
+
+# The name's rendered width - its own string width, clipped to the label
+# as the name itself is.
+func _bonus_underline_target_width() -> float:
+	return minf(_string_width(name_label, name_font_size_px), name_label.size.x)
 
 # Whether the player can currently afford this card - HandContainer pushes
 # this on every energy change. Unplayable fades the whole card.
@@ -780,6 +786,8 @@ func _apply_style() -> void:
 	name_label.add_theme_font_size_override("font_size", name_font_size_px)
 	if name_font != null:
 		name_label.add_theme_font_override("font", name_font)
+	if _bonus_underline != null:
+		_bonus_underline.color = ink_color
 
 	cost_label.add_theme_color_override("font_color", ink_color)
 	cost_label.add_theme_font_size_override("font_size", cost_font_size_px)
@@ -871,8 +879,6 @@ func _apply_type_style() -> void:
 	if card_data == null:
 		return
 	keyline.color = _keyline_color()
-	if _bonus_hairline != null:
-		_bonus_hairline.color = _keyline_color()
 	art_field.add_theme_stylebox_override("panel", _rounded_style(_art_field_color(), art_field_radius))
 	glyph.queue_redraw()
 
@@ -893,11 +899,6 @@ func _apply_layout() -> void:
 	# pokes out of the rounded corners.
 	keyline.position = Vector2(float(corner_radius) + 1.0, 1.0)
 	keyline.size = Vector2(card_size.x - 2.0 * (float(corner_radius) + 1.0), keyline_height)
-	# The bonus hairline hangs under the keyline's left end; its width is
-	# the tween's alone (see _animate_bonus_hairline()), never set here.
-	if _bonus_hairline != null:
-		_bonus_hairline.position = Vector2(keyline.position.x, keyline.position.y + keyline_height + bonus_hairline_gap_px)
-		_bonus_hairline.size.y = bonus_hairline_thickness_px
 
 	# Cost numeral top-right; the name gets the rest of the header width.
 	# Every Label is sized from its font's real line height (Font.get_
@@ -929,6 +930,20 @@ func _apply_layout() -> void:
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.clip_text = true
+	# The bonus underline: under the name's last line's baseline, the
+	# name's rendered width (its own, clipped to the label). Its current
+	# width is the tween's alone (see _animate_bonus_underline()) - only
+	# a settled underline is re-fitted here, so a live card re-laid out
+	# stays underlined.
+	if _bonus_underline != null:
+		var name_font_face: Font = name_label.get_theme_font("font")
+		var ascent: float = name_font_face.get_ascent(name_font_size_px) if name_font_face != null else name_line * 0.75
+		var baseline: float = name_label.position.y + name_line * float(name_lines - 1) + ascent
+		_bonus_underline.position = Vector2(name_label.position.x, baseline + bonus_underline_gap_px)
+		_bonus_underline.size.y = bonus_underline_thickness_px
+		var settled: bool = _bonus_underline_tween == null or not _bonus_underline_tween.is_valid() or not _bonus_underline_tween.is_running()
+		if settled:
+			_bonus_underline.size.x = _bonus_underline_target_width() if _bonus_state == CardBonus.State.LIVE else 0.0
 
 	var header_bottom: float = outer_margin + maxf(name_height, cost_height + hp_height)
 
