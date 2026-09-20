@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://b4el2e84o7yrt"]
 
-[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
-[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/stances/self_eater.tres" id="3_self_eater"]
 
 [sub_resource type="Resource" id="CardEffect_apply_stance"]

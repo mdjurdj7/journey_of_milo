@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://bs6hicysi2lvh"
-path="res://.godot/imported/Map3_mask.png-3a11593a7375abfd29d95174d162ef79.ctex"
+uid="uid://dkhl5vyt1v7np"
+path="res://.godot/imported/Map3_elev.png-07ec94ab4e400392513f9625c0ed1b7b.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/field/masks/Map3_mask.png"
-dest_files=["res://.godot/imported/Map3_mask.png-3a11593a7375abfd29d95174d162ef79.ctex"]
+source_file="res://assets/field/masks/Map3_elev.png"
+dest_files=["res://.godot/imported/Map3_elev.png-07ec94ab4e400392513f9625c0ed1b7b.ctex"]
 
 [params]
 

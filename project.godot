@@ -11,7 +11,7 @@ config_version=5
 [application]
 
 config/name="Journey of Milo"
-run/main_scene="res://field/region_field.tscn"
+run/main_scene="uid://b126beo12ivbn"
 config/features=PackedStringArray("4.7", "Forward Plus")
 config/icon="res://icon.svg"
 

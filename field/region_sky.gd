@@ -20,8 +20,18 @@ class_name RegionSky
 @export var fog_mode: Environment.FogMode = Environment.FOG_MODE_DEPTH
 @export var fog_color: Color = Color(0.87, 0.88, 0.85)
 @export var fog_density: float = 1.0
-@export var fog_depth_begin: float = 14.0
-@export var fog_depth_end: float = 28.0
+# Live setters (the other fog exports still apply once in _ready()): the
+# zone intro (ZoneIntro) opens on a far fog and tweens these two back to
+# the values authored here, reading them off this node first - so these
+# stay the region's real fog, and the intro only borrows them.
+@export var fog_depth_begin: float = 14.0:
+	set(value):
+		fog_depth_begin = value
+		_apply_fog_depth()
+@export var fog_depth_end: float = 28.0:
+	set(value):
+		fog_depth_end = value
+		_apply_fog_depth()
 @export var fog_sky_affect: float = 1.0
 @export var fog_aerial_perspective: float = 0.0
 # Tonemapping shifts how the fog itself reads (AgX/Filmic both compress
@@ -178,6 +188,12 @@ func _apply_fog_light_energy() -> void:
 	if _environment == null:
 		return
 	_environment.fog_light_energy = fog_light_energy
+
+func _apply_fog_depth() -> void:
+	if _environment == null:
+		return
+	_environment.fog_depth_begin = fog_depth_begin
+	_environment.fog_depth_end = fog_depth_end
 
 func _apply_tonemap() -> void:
 	if _environment == null:

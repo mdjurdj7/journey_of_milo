@@ -289,8 +289,8 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 @export_group("Wave Mesh")
 # Same split as ground.gd's fine relief mesh vs. coarse dressing frame:
 # an inner patch (self's own mesh) covering inner_wave_extent meters out
-# from the near shoreward edge (plus mesh_inland_reach back toward the
-# Tower, and width_margin to each side - the whole playable field and
+# from the near shoreward edge (plus mesh_inland_reach back inland, along
+# forward, and width_margin to each side - the whole playable field and
 # everything the camera can reach sit inside it) at inner_wave_spacing
 # resolution, and a coarse outer skirt (_outer_skirt) covering the rest
 # of sea_depth at outer_wave_spacing. Both meshes share one
@@ -385,7 +385,7 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 # meshes above.
 @export var width_margin: float = 200.0
 @export var sea_depth: float = 400.0
-# How far past near_edge_z, back toward the Tower, the inner (fine) mesh
+# How far past near_edge_z, back inland along forward, the inner (fine) mesh
 # also extends - lets one Sea plane cover the whole landmass (including
 # inland of the inland wall/gate), not just the strip seaward of near_edge_z,
 # so the ground's own height (not this mesh's edge) is what decides where
@@ -649,7 +649,7 @@ func _subdivisions_for(extent: float, spacing: float) -> int:
 # field_extents is always centered on RegionField's origin). Near edge
 # sits sea_edge_distance behind the Wanderer's spawn point along
 # RegionField.get_forward() (never assumed to be -Z). The inner patch spans
-# mesh_inland_reach meters back toward the Tower from there PLUS
+# mesh_inland_reach meters back inland (along forward) from there PLUS
 # inner_wave_extent meters further away from it; the outer skirt covers
 # the remaining sea_depth - inner_wave_extent beyond that. self (the inner
 # patch)'s own position is what global_position sets; _outer_skirt's

@@ -121,6 +121,17 @@ var _look_up_seconds: float = 0.0
 var _look_up_target: Vector3 = Vector3.ZERO
 var _look_up_active: bool = false
 
+# The free pose (see set_free_pose()): a camera transform that is NOT an
+# orbit of anything, blended over whatever _place_camera() has just set.
+# _free_blend 1 = the free pose outright, 0 = the placed pose untouched;
+# the owner (ZoneIntro) drives the blend, this rig only applies it.
+var _free_pose_active: bool = false
+var _free_blend: float = 0.0
+var _free_position: Vector3 = Vector3.ZERO
+var _free_yaw: float = 0.0
+var _free_pitch: float = 0.0
+var _free_fov: float = 40.0
+
 var _battle_wanderer: Wanderer
 var _battle_enemies: Array[FieldEnemy] = []
 # Where the card hand's resting top edge sits, as a fraction of viewport
@@ -200,6 +211,63 @@ func _advance_look_up(delta: float) -> void:
 	var t := 1.0 if _look_up_seconds <= 0.0 else _look_up_elapsed / _look_up_seconds
 	_look_up_blend = smoothstep(0.0, 1.0, t)
 
+# The zone intro's opening shot (see ZoneIntro): a camera placed freely -
+# `yaw` and `pitch` are Node3D rotation.y / rotation.x in radians, zero
+# roll - and held at full weight (blend 1) until set_free_blend() says
+# otherwise. Re-callable while held, so the owner's pose exports can
+# re-apply live. Also snaps the pivot onto the target, so the follow pose
+# under it starts converged rather than easing in from wherever the rig
+# stood. Applied at once, not next physics tick: the first frame after
+# this is already the free pose.
+func set_free_pose(position: Vector3, yaw: float, pitch: float, fov_value: float) -> void:
+	_free_position = position
+	_free_yaw = yaw
+	_free_pitch = pitch
+	_free_fov = fov_value
+	if not _free_pose_active:
+		_free_pose_active = true
+		_free_blend = 1.0
+	if _target != null:
+		global_position = _target.global_position
+		_place_camera()
+	_apply_free_pose()
+
+# The blend weight, 1 = free pose, 0 = the follow pose _place_camera()
+# computes that same frame - which is what makes the landing exact: the
+# end values are never stored, always the live ones. Reaching 0 clears
+# the free pose entirely.
+func set_free_blend(blend: float) -> void:
+	if not _free_pose_active:
+		return
+	_free_blend = clampf(blend, 0.0, 1.0)
+	if _free_blend <= 0.0:
+		clear_free_pose()
+
+func clear_free_pose() -> void:
+	_free_pose_active = false
+	_free_blend = 0.0
+
+func has_free_pose() -> bool:
+	return _free_pose_active
+
+# Over the pose _place_camera() has just set: position, yaw, pitch and
+# fov each lerped (yaw through lerp_angle) by _free_blend, and the basis
+# rebuilt from yaw + pitch alone - so the horizon stays level through the
+# whole move, whatever the two ends are. The follow pose's yaw/pitch are
+# read back off the camera's own basis (look_at() leaves zero roll), so
+# nothing here duplicates _place_camera()'s geometry.
+func _apply_free_pose() -> void:
+	if not _free_pose_active:
+		return
+	var follow_forward: Vector3 = -camera.global_transform.basis.z
+	var follow_yaw: float = atan2(-follow_forward.x, -follow_forward.z)
+	var follow_pitch: float = asin(clampf(follow_forward.y, -1.0, 1.0))
+	var blended_position: Vector3 = camera.global_position.lerp(_free_position, _free_blend)
+	var blended_yaw: float = lerp_angle(follow_yaw, _free_yaw, _free_blend)
+	var blended_pitch: float = lerpf(follow_pitch, _free_pitch, _free_blend)
+	camera.global_transform = Transform3D(Basis.from_euler(Vector3(blended_pitch, blended_yaw, 0.0)), blended_position)
+	camera.fov = lerpf(camera.fov, _free_fov, _free_blend)
+
 # Called by RegionField once the ExitGate is placed (and again on any
 # live edit of its own limit exports): the bound is the plane through
 # `point` with `forward` (get_forward()) as its normal - "inland" is
@@ -271,6 +339,7 @@ func _physics_process(delta: float) -> void:
 	global_position += motion
 
 	_place_camera()
+	_apply_free_pose()
 	_update_dof()
 	_apply_shake()
 

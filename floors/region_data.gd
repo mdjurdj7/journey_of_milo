@@ -9,3 +9,8 @@ class_name RegionData
 # scene, not here.
 
 @export var floors: Array[FloorData] = []
+
+# The region's name as the zone intro shows it (ZoneIntro's title): in
+# Spectral on the open sky, faded in over the hold and out before the
+# camera comes down. Empty = no title; the move still plays.
+@export var display_name: String = ""

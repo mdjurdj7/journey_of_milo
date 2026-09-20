@@ -7,6 +7,11 @@ class_name RewardSpread
 # stay exactly as they are for the rest of the run - there is no timer
 # and no "skip" control, because walking away IS the skip.
 #
+# Also a cache placed as a floor prop (FloorProp with this scene and a
+# pool, see RegionField._spawn_floor_props()): the same lift/take/dismiss
+# with no fight in front of it, laid along an authored fan_axis so the
+# cards follow the ground they lie on rather than the camera.
+#
 # The three are WorldCards, the same ones the Keeper holds out, in their
 # standalone configuration: no holder to measure a silhouette against
 # (so the near-state gap is taken from the card's own ground point), and
@@ -26,16 +31,31 @@ class_name RewardSpread
 @export var card_count: int = 3
 
 @export_group("Layout")
-# Across the camera's right axis, captured ONCE when the spread is built
-# rather than tracked: these are cards lying on sand, and a fan that
-# re-aimed itself as the camera moved would read as them sliding about.
-@export var spacing: float = 0.55
+# The fan's own axis, world XZ. Zero (the fight-drop default) = the
+# camera's right, captured ONCE when the spread is built rather than
+# tracked: these are cards lying on sand, and a fan that re-aimed itself
+# as the camera moved would read as them sliding about. Set for a cache
+# so the row follows the alcove it lies in.
+@export var fan_axis: Vector2 = Vector2.ZERO:
+	set(value):
+		fan_axis = value
+		_relayout()
+@export var spacing: float = 0.55:
+	set(value):
+		spacing = value
+		_relayout()
 # Alternating nudge along the fan's own depth, so three cards in a row
 # don't read as a ruled line.
-@export var depth_stagger: float = 0.18
+@export var depth_stagger: float = 0.18:
+	set(value):
+		depth_stagger = value
+		_relayout()
 # Clear of the relief by this much - the quads are flat and would z-fight
 # the sand at exactly ground height.
-@export var ground_clearance: float = 0.02
+@export var ground_clearance: float = 0.02:
+	set(value):
+		ground_clearance = value
+		_relayout()
 @export_group("")
 
 # From the spread's CENTRE, not from any one card.
@@ -87,11 +107,6 @@ func _spawn_cards() -> void:
 		push_warning("RewardSpread: could not load %s; nothing to offer." % world_card_scene_path)
 		return
 
-	var right: Vector3 = _fan_axis()
-	# The fan's own depth axis: right turned a quarter turn on the ground
-	# plane, so the stagger runs into and out of the screen rather than
-	# up and down it.
-	var depth: Vector3 = Vector3(-right.z, 0.0, right.x)
 	var region_field := get_node_or_null(region_field_path)
 
 	for index in rolled.size():
@@ -107,15 +122,37 @@ func _spawn_cards() -> void:
 		add_child(card)
 		if region_field != null:
 			card.region_field_path = card.get_path_to(region_field)
-		var across: float = (float(index) - float(rolled.size() - 1) / 2.0) * spacing
-		var stagger: float = depth_stagger * (0.5 if index % 2 == 1 else -0.5)
-		card.global_position = _ground_point(global_position + right * across + depth * stagger)
 		card.taken.connect(_on_card_taken.bind(card))
 		_cards.append(card)
+	_relayout()
 
-# The camera's right, flattened. Falls back to world +X if there's no
-# camera yet - the fan is still a fan, just not aimed at anyone.
+# Seats every card on the fan: index order along the axis, centred on
+# this node, alternately nudged along the fan's depth. Called once at
+# build and again from the Layout setters, so a Remote-tab edit moves
+# the cards in place.
+func _relayout() -> void:
+	if _cards.is_empty():
+		return
+	var right: Vector3 = _fan_axis()
+	# The fan's own depth axis: right turned a quarter turn on the ground
+	# plane, so the stagger runs into and out of the screen rather than
+	# up and down it.
+	var depth: Vector3 = Vector3(-right.z, 0.0, right.x)
+	var count: int = _cards.size()
+	for index in count:
+		var card: WorldCard = _cards[index]
+		if not is_instance_valid(card):
+			continue
+		var across: float = (float(index) - float(count - 1) / 2.0) * spacing
+		var stagger: float = depth_stagger * (0.5 if index % 2 == 1 else -0.5)
+		card.global_position = _ground_point(global_position + right * across + depth * stagger)
+
+# fan_axis when set; else the camera's right, flattened. Falls back to
+# world +X if there's no camera yet - the fan is still a fan, just not
+# aimed at anyone.
 func _fan_axis() -> Vector3:
+	if fan_axis.length() > 0.0001:
+		return Vector3(fan_axis.x, 0.0, fan_axis.y).normalized()
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
 		return Vector3.RIGHT

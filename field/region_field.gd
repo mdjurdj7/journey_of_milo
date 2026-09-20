@@ -74,12 +74,13 @@ enum RewardMode { SCREEN, WORLD }
 @export var sky_path: NodePath = ^"WorldEnvironment"
 
 @export_group("Floor Transition")
-# Where the floor ends: the ExitGate's own TriggerArea, pushed this far
-# along the floor's exit_direction past the gate line (ExitGate.trigger_
-# forward_offset) - the far end of the surfaced bar. On the tutorial
-# floor (gate at z -16.7) that is z -28.7, in the neck short of the inland
-# wall; on floor 2 (gate at z -23) it sits against the wall at z -35.
-@export var transition_distance: float = 12.0
+# Where the floor ends: the ExitGate's own TriggerArea, this far along
+# the floor's exit_direction past the gate line (ExitGate.trigger_
+# forward_offset) - two steps onto the surfaced bar and the floor ends.
+# Its width is fitted to the land at that line (ExitGate.fit_trigger_to_
+# land()). On the tutorial floor (gate at z -16.7) the line is z -19.2;
+# on floor 2 (gate at z -23) z -25.5.
+@export var transition_distance: float = 2.5
 # The look up: the field camera lifts its eyes to the tower over this
 # long (CameraRig.look_up()) before the fade begins.
 @export var look_up_seconds: float = 0.6
@@ -90,15 +91,27 @@ enum RewardMode { SCREEN, WORLD }
 # tscn) sits this far above the relief - the quad is flat and would
 # z-fight the sand at exactly ground height. Same value RewardSpread uses.
 @export var world_card_ground_clearance: float = 0.02
+# Where the Wanderer's feet are set when the floor's ground is first
+# built: this far above the relief at spawn, so the capsule never starts
+# inside the heightmap (it used to start at y 0 with the sand at ~0.27,
+# leaving the first physics step to push it out - upward if it felt like
+# it). See _on_ground_built().
+@export var spawn_ground_clearance: float = 0.05
 @export_group("")
 
+# The zone intro node (ZoneIntro, a child of this scene, process ALWAYS):
+# the opening shot a new run's first floor plays before the field is
+# handed over - see _ready()'s tail and ZoneIntro's own doc. Absent, or
+# its zone_intro_enabled off, the floor starts plain.
+@export var zone_intro_path: NodePath = ^"ZoneIntro"
+
 # The follow camera's inland bound (see CameraRig.set_inland_limit()):
-# the look target stops this far along the exit direction past the gate line
-# (3 m on the tutorial floor puts the line at z -22, where the Wanderer's
-# head just clears the top of the frame when he reaches the inland wall)
-# - or, with the override on, at a fixed z regardless of where the gate
-# landed. Re-applied live by each setter.
-@export var camera_inland_limit_beyond_gate: float = 3.0:
+# the look target stops this far along the exit direction past the gate
+# line - 0: at the gate line itself, so the camera stops where the bar
+# begins and the Wanderer walks up the frame onto it - or, with the
+# override on, at a fixed z regardless of where the gate landed.
+# Re-applied live by each setter.
+@export var camera_inland_limit_beyond_gate: float = 0.0:
 	set(value):
 		camera_inland_limit_beyond_gate = value
 		_apply_camera_inland_limit()
@@ -133,8 +146,9 @@ enum RewardMode { SCREEN, WORLD }
 # the exact same noised distance field the visual shoreline is drawn from,
 # not an independent approximation of it). No push-back, no floor -
 # RunState.lose_hp() already floors at 0, which is exactly the lethal
-# behavior this wants. Gated on wade_drain_enabled so it can be switched
-# off for testing without touching the other wade exports.
+# behavior this wants. Gated on wade_drain_enabled, which the floor sets
+# (FloorData.wade_drain_enabled, pushed in _enter_tree()) - the scene's own
+# value only holds until a floor is read.
 @export var wade_drain_enabled: bool = false
 # distance_in_water (Ground.get_landmass_distance(), floored at 0) is a
 # horizontal distance past the shoreline, not a real vertical depth - this
@@ -143,7 +157,7 @@ enum RewardMode { SCREEN, WORLD }
 @export var wade_slope_per_metre: float = 0.15
 # Below this effective depth, no drain at all (ankle-deep is free).
 @export var wade_depth_threshold: float = 0.05
-@export var wade_drain_rate_per_metre: float = 40.0
+@export var wade_drain_rate_per_metre: float = 30.0
 @export var wade_drain_max_per_second: float = 15.0
 
 @export_group("Point To Move")
@@ -215,23 +229,58 @@ var _click_marker: ClickMarker = null
 # the origin), so nothing here needs the tree. The spawn faces the floor's
 # exit_direction - same rotation.y = atan2(-dir.x, -dir.z) convention
 # FieldEnemy.face_toward()/Wanderer._angle_from_direction() use.
+#
+# The Wanderer is then HELD (process mode disabled - its body leaves the
+# physics space, disable_mode REMOVE) until Ground says its first build is
+# done: relief_rebuilt, connected here, before Ground's _ready() emits it.
+# Not a frame delay - the release is _on_ground_built(), on the signal,
+# and it also seats the feet on the relief that now exists.
 func _enter_tree() -> void:
 	var floor_data := get_floor_data()
-	if floor_data == null:
-		return
 	var ground := get_node_or_null(ground_path) as Ground
-	if ground != null:
+	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
+	if ground != null and floor_data != null:
 		ground.landmass_mask = floor_data.mask
+		ground.elevation_mask = floor_data.elevation_mask
 		ground.landmass_mask_origin = floor_data.mask_origin
 		ground.landmass_interior_height = floor_data.interior_height
 		ground.landmass_falloff_width = floor_data.falloff
 		ground.relief_amplitude = floor_data.relief_amplitude
 		ground.caustic_strength = floor_data.caustic_strength
-	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
-	if spawn_node != null:
+	if floor_data != null:
+		wade_drain_enabled = floor_data.wade_drain_enabled
+	if spawn_node != null and floor_data != null:
 		spawn_node.position = Vector3(floor_data.spawn.x, 0.0, floor_data.spawn.y)
 		var exit: Vector3 = get_exit_direction()
 		spawn_node.rotation.y = atan2(-exit.x, -exit.z)
+	if spawn_node != null and ground != null:
+		spawn_node.process_mode = Node.PROCESS_MODE_DISABLED
+		if ground.is_built():
+			_on_ground_built()
+		else:
+			ground.relief_rebuilt.connect(_on_ground_built)
+
+# Ground has a relief mesh and a HeightMapShape3D. If the floor paints a
+# mask and this build isn't the mask one yet (it always is today - the
+# mask is on Ground before its _ready() - but that is the thing being
+# guaranteed, not assumed), keep waiting for the build that is. Then:
+# feet on the relief at spawn, and the Wanderer is released into the
+# simulation. Once only - the connection comes off here.
+func _on_ground_built() -> void:
+	var ground := get_node_or_null(ground_path) as Ground
+	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
+	if ground == null or spawn_node == null:
+		return
+	var floor_data := get_floor_data()
+	if floor_data != null and floor_data.mask != null and not ground.has_landmass_mask():
+		return
+	if ground.relief_rebuilt.is_connected(_on_ground_built):
+		ground.relief_rebuilt.disconnect(_on_ground_built)
+	var local: Vector3 = ground.to_local(Vector3(spawn_node.global_position.x, 0.0, spawn_node.global_position.z))
+	var height: float = ground.get_height_at(Vector2(local.x, local.z))
+	spawn_node.global_position.y = height + spawn_ground_clearance
+	spawn_node.process_mode = Node.PROCESS_MODE_INHERIT
+	print("RegionField: Wanderer released onto %s ground at y %.3f" % ["mask" if ground.has_landmass_mask() else "SDF", spawn_node.global_position.y])
 
 func _ready() -> void:
 	# Starts the run once per game session, seeding HP and the starting
@@ -278,6 +327,19 @@ func _ready() -> void:
 	var ground := get_node_or_null(ground_path) as Ground
 	if ground != null:
 		ground.relief_rebuilt.connect(_rebuild_boundary_walls)
+
+	# Last, with the gate placed (the camera's inland limit is set) and the
+	# HUD seeded: the new run's zone intro, once, on the region's first
+	# floor. The flag is consumed here whether or not it plays, so a run
+	# that starts elsewhere (or with the intro off) doesn't carry it to a
+	# later floor. ZoneIntro.play() freezes this node (the battle freeze,
+	# process_mode DISABLED) and releases it itself when done.
+	var opening_pending: bool = RunState.run_opening_pending
+	RunState.run_opening_pending = false
+	if opening_pending and RunState.current_floor_index == 0:
+		var zone_intro := get_node_or_null(zone_intro_path) as ZoneIntro
+		if zone_intro != null:
+			zone_intro.play()
 
 # Wade-HP drain only - everything else on the field (movement, contact,
 # battle) is either physics-engine-driven or event-driven and doesn't need
@@ -547,9 +609,18 @@ func _spawn_floor_props() -> void:
 		elif prop is Bird:
 			(prop as Bird).flight_id = id
 		elif prop is WorldCard:
-			if not _setup_belongings_card(prop as WorldCard, floor_data):
+			if not _setup_belongings_card(prop as WorldCard, entry, floor_data):
 				prop.free()
 				continue
+		elif prop is RewardSpread:
+			# A cache: the spread rolls its own cards from the prop's pool on
+			# entering the tree, and lifts/takes/dismisses exactly as it does
+			# after a fight. No enemy, so the roll is flat.
+			if entry.pool == null:
+				push_warning("RegionField: floor prop %d is a RewardSpread with no pool; skipped." % index)
+				prop.free()
+				continue
+			(prop as RewardSpread).pool = entry.pool
 		# A child prop's position is local to its parent (a perch); a top-
 		# level one's is an XZ offset from spawn, grounded by the prop.
 		var placement: Vector3 = entry.position if entry.parent_index >= 0 else Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.z)
@@ -576,17 +647,19 @@ func _aim_prop_paths(prop: Node, depth: int) -> void:
 		prop.set("region_field_path", NodePath(up.trim_suffix("/")))
 
 # The placeholder belongings: a WorldCard on the sand holding one card
-# rolled from the floor's reward pool by the run's own generator, in the
-# standalone configuration RewardSpread uses (no holder to measure a
-# silhouette against). A real find type is not this - see the task's
-# out-of-scope list. False, with a warning, if there's nothing to hold.
-func _setup_belongings_card(card: WorldCard, floor_data: FloorData) -> bool:
-	if floor_data.reward_pool == null:
-		push_warning("RegionField: a belongings WorldCard needs the floor's reward_pool to roll from; none set.")
+# rolled by the run's own generator from the prop's own pool, or the
+# floor's reward pool when the prop names none, in the standalone
+# configuration RewardSpread uses (no holder to measure a silhouette
+# against). A real find type is not this - see the task's out-of-scope
+# list. False, with a warning, if there's nothing to hold.
+func _setup_belongings_card(card: WorldCard, entry: FloorProp, floor_data: FloorData) -> bool:
+	var pool: RewardPool = entry.pool if entry.pool != null else floor_data.reward_pool
+	if pool == null:
+		push_warning("RegionField: a belongings WorldCard needs a pool to roll from (the prop's, or the floor's reward_pool); none set.")
 		return false
-	var rolled: Array[CardData] = floor_data.reward_pool.roll(1, RunState.rng, null)
+	var rolled: Array[CardData] = pool.roll(1, RunState.rng, null)
 	if rolled.is_empty():
-		push_warning("RegionField: the floor's reward_pool rolled nothing for the belongings WorldCard.")
+		push_warning("RegionField: the pool rolled nothing for the belongings WorldCard.")
 		return false
 	card.card = rolled[0]
 	card.holder_path = ^""
@@ -683,6 +756,9 @@ func _setup_exit_gate() -> void:
 	exit_gate.trigger_forward_offset = transition_distance
 	exit_gate.global_position = enemy.global_position + exit * floor_data.gate_distance_beyond_enemy
 	exit_gate.rotation.y = atan2(-exit.x, -exit.z)
+	# Against the painted land, so before _setup_exit_gate_channel() cuts
+	# the channel across it - see ExitGate.fit_trigger_to_land().
+	exit_gate.fit_trigger_to_land(get_node_or_null(ground_path) as Ground)
 	_apply_camera_inland_limit()
 	_aim_wear_path(enemy)
 

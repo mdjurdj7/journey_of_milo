@@ -31,7 +31,8 @@ signal floor_exited
 # Draining surfaces only channel_bar_width of sand along the neck's axis
 # - the gate's own line, shifted across by channel_bar_axis_offset for a
 # neck that isn't centred on the gate (Map2's runs x -1.4..3.1, axis
-# 0.85) - leaving a channel either side.
+# 0.85) - leaving a channel either side. 9 m so the bar reads as ground
+# to walk on, not a plank laid across.
 @export var channel_near_offset: float = 1.0
 @export var channel_beyond_wall: float = 12.0
 @export var channel_width_margin: float = 4.0
@@ -39,7 +40,7 @@ signal floor_exited
 @export var channel_edge: float = 1.2
 @export var channel_edge_noise_scale: float = 2.0
 @export var channel_edge_noise_amplitude: float = 0.6
-@export var channel_bar_width: float = 5.0
+@export var channel_bar_width: float = 9.0
 # Metres across (the gate's local right) from the gate's own line to the
 # bar's centre line.
 @export var channel_bar_axis_offset: float = 0.0
@@ -76,10 +77,27 @@ signal floor_exited
 	set(value):
 		trigger_forward_offset = value
 		_rebuild()
+# Across (x) is only the standalone default: RegionField fits it to the
+# painted land at the trigger's own line - see fit_trigger_to_land().
 @export var trigger_size: Vector3 = Vector3(4.0, 3.0, 2.0):
 	set(value):
 		trigger_size = value
 		_rebuild()
+# Metres across (local +X, the gate's right) from the gate's own line to
+# the trigger's centre - the neck at the trigger line needn't be centred
+# on the gate. Set by fit_trigger_to_land().
+@export var trigger_across_offset: float = 0.0:
+	set(value):
+		trigger_across_offset = value
+		_rebuild()
+# How far past the land's edge the fitted trigger reaches on each side,
+# and the step it samples the shore distance at (the mask distance grid
+# is 0.25 m; sampling finer buys nothing).
+@export var trigger_land_margin: float = 2.0
+@export var trigger_fit_step: float = 0.25
+# Furthest the fit looks either side of the trigger line's centre before
+# giving up - wider than any neck this region paints.
+@export var trigger_fit_max_half_width: float = 40.0
 # BlockContactArea is padded this much larger than the physical blocker on
 # every axis (see _build_blocker()'s own doc) - sized exactly to the
 # blocker's own footprint, a Wanderer capsule grazing the solid collision
@@ -222,7 +240,49 @@ func _build_trigger() -> void:
 	var shape := BoxShape3D.new()
 	shape.size = trigger_size
 	trigger_shape.shape = shape
-	trigger_area.position = Vector3(0.0, trigger_size.y / 2.0, -trigger_forward_offset)
+	trigger_area.position = Vector3(trigger_across_offset, trigger_size.y / 2.0, -trigger_forward_offset)
+
+# Called by RegionField once this node is placed and Ground is built,
+# BEFORE the channel is registered (the channel turns everything past the
+# gate line into water for Ground.get_landmass_distance(), and it is the
+# painted land this measures): samples the shore distance along the
+# trigger's own line (across = local +X) either side of its centre, takes
+# the contiguous run of land the centre sits in - or the nearest run if
+# the centre itself is water - and sizes/centres the trigger on it plus
+# trigger_land_margin each side, so no path up the neck can miss it.
+# Leaves the authored size alone, with a warning, if no land is found.
+func fit_trigger_to_land(ground: Ground) -> void:
+	if ground == null:
+		return
+	var forward := Vector2(-global_transform.basis.z.x, -global_transform.basis.z.z).normalized()
+	var right := Vector2(-forward.y, forward.x)
+	var centre: Vector2 = Vector2(global_position.x, global_position.z) + forward * trigger_forward_offset
+	var step: float = maxf(trigger_fit_step, 0.01)
+	var count: int = int(ceil(trigger_fit_max_half_width / step))
+	# land[i] is the sample at across = (i - count) * step.
+	var land: PackedByteArray = PackedByteArray()
+	land.resize(count * 2 + 1)
+	var nearest: int = -1
+	for i in land.size():
+		var across: float = float(i - count) * step
+		var on_land: bool = ground.get_landmass_distance(centre + right * across) <= 0.0
+		land[i] = 1 if on_land else 0
+		if on_land and (nearest < 0 or absi(i - count) < absi(nearest - count)):
+			nearest = i
+	if nearest < 0:
+		push_warning("ExitGate: no painted land within %.0f m of the trigger line; trigger left at %.1f m across." % [trigger_fit_max_half_width, trigger_size.x])
+		return
+	var lo: int = nearest
+	while lo > 0 and land[lo - 1] == 1:
+		lo -= 1
+	var hi: int = nearest
+	while hi < land.size() - 1 and land[hi + 1] == 1:
+		hi += 1
+	var left_edge: float = float(lo - count) * step - trigger_land_margin
+	var right_edge: float = float(hi - count) * step + trigger_land_margin
+	trigger_across_offset = (left_edge + right_edge) * 0.5
+	trigger_size = Vector3(right_edge - left_edge, trigger_size.y, trigger_size.z)
+	print("ExitGate: trigger fitted to the land at its line - %.1f m across (land %.1f m, +%.1f m each side), centred %+.2f m across from the gate line" % [trigger_size.x, float(hi - lo) * step, trigger_land_margin, trigger_across_offset])
 
 # Called once by RegionField when floor_cleared fires (see its own doc) -
 # this node never watches for that condition itself. _open guards against
@@ -265,8 +325,11 @@ func _on_drained() -> void:
 	blocker_shape.disabled = true
 	print("ExitGate: drained")
 
+# Only once open: the trigger now sits a couple of metres past the gate
+# line, inside the closed Blocker's own reach, so a Wanderer pressed
+# against the blocker must not be able to end the floor through it.
 func _on_trigger_body_entered(body: Node3D) -> void:
-	if body.is_in_group("wanderer"):
+	if _open and body.is_in_group("wanderer"):
 		floor_exited.emit()
 
 # push_warning, not print - this is a confirm-the-collision-is-real signal

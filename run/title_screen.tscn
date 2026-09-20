@@ -1,0 +1,58 @@
+[gd_scene format=3 uid="uid://b126beo12ivbn"]
+
+[ext_resource type="Script" uid="uid://kcicphsstxk4" path="res://run/title_screen.gd" id="1_title_screen"]
+
+[node name="TitleScreen" type="Control" unique_id=1523314090]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+script = ExtResource("1_title_screen")
+
+[node name="Background" type="ColorRect" parent="." unique_id=184637674]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.86, 0.87, 0.86, 1)
+
+[node name="Column" type="Control" parent="." unique_id=610153828]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TitleLabel" type="Label" parent="Column" unique_id=1418748914]
+layout_mode = 0
+text = "THE LONG WALK"
+
+[node name="StartItem" type="Control" parent="Column" unique_id=886711368]
+anchors_preset = 0
+
+[node name="Hairline" type="ColorRect" parent="Column/StartItem" unique_id=199963605]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Column/StartItem" unique_id=1577244804]
+layout_mode = 0
+text = "START GAME"
+
+[node name="ExitItem" type="Control" parent="Column" unique_id=1923350853]
+anchors_preset = 0
+
+[node name="Hairline" type="ColorRect" parent="Column/ExitItem" unique_id=1497046168]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Column/ExitItem" unique_id=1885335795]
+layout_mode = 0
+text = "EXIT GAME"

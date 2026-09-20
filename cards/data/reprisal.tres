@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://do7vjm5wwtbyl"]
 
-[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
-[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 
 [sub_resource type="Resource" id="E_damage"]
 script = ExtResource("2_card_effect")
@@ -13,10 +13,9 @@ alt_value = 12
 script = ExtResource("1_card_data")
 card_name = "Reprisal"
 cost = 1
-card_type = 0
 target_type = 0
 description = "Deal {damage} damage.
 If you have Grace, deal 12 instead."
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_damage")])
 battle_animation = &"Slash"
 impact_time = 0.55
-effects = Array[ExtResource("2_card_effect")]([SubResource("E_damage")])

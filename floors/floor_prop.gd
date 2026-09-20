@@ -27,6 +27,11 @@ class_name FloorProp
 # The one-time line this prop says on approach (Hull.world_line). Empty
 # = says nothing, or keeps its own default (the Keeper's lines are hers).
 @export_multiline var world_line: String = ""
+# What a prop that offers cards rolls from: a RewardSpread (a cache on
+# the sand) needs one; a belongings WorldCard uses it when set and falls
+# back to the floor's own reward_pool when not. Ignored by props that
+# don't offer cards.
+@export var pool: RewardPool = null
 # Anything else the scene's exports should be set to before it enters the
 # tree, by property name: {"bird_mesh": <glb>, "face_direction": 3}.
 # Applied with Object.set(), so a name the prop doesn't have is a silent

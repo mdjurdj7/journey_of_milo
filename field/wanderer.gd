@@ -282,6 +282,16 @@ var _move_target: Vector3 = Vector3.ZERO
 var _move_target_enemy: FieldEnemy = null
 var _stuck_timer: float = 0.0
 
+# Set by ZoneIntro for the zone intro, which runs this node ALWAYS
+# through the field freeze: input is read as nothing - no WASD, no dash,
+# any click target dropped - while everything else in _physics_process()
+# (gravity, foot grounding, move_and_slide(), Idle) keeps running, so he
+# stands seated on the sand rather than hovering the way the freeze alone
+# would leave him (see _apply_continuous_foot_grounding()). Cleared when
+# the intro ends or is skipped; a key still held at that moment moves
+# him then.
+var input_locked: bool = false
+
 # Debug-only line visualizations for _apply_step_up_and_down()'s two probe
 # casts - built once in _ready() (top_level, so their own transform IS
 # world space rather than inheriting Wanderer's) and only fed vertices/
@@ -1772,7 +1782,7 @@ func _physics_process(delta: float) -> void:
 
 	_dash_cooldown_timer = maxf(_dash_cooldown_timer - delta, 0.0)
 
-	if _dash_timer <= 0.0 and Input.is_action_just_pressed("dash") and _dash_cooldown_timer <= 0.0:
+	if not input_locked and _dash_timer <= 0.0 and Input.is_action_just_pressed("dash") and _dash_cooldown_timer <= 0.0:
 		# Dash in the direction the Wanderer is currently facing, via the
 		# same angle<->direction conversion turn-to-face uses below, so it
 		# always matches what's on screen.
@@ -1796,6 +1806,9 @@ func _physics_process(delta: float) -> void:
 			Input.get_action_strength("move_right") - Input.get_action_strength("move_left"),
 			Input.get_action_strength("move_forward") - Input.get_action_strength("move_back")
 		)
+		if input_locked:
+			input_dir = Vector2.ZERO
+			clear_move_target()
 		if input_dir.length() > 1.0:
 			input_dir = input_dir.normalized()
 

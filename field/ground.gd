@@ -4,7 +4,11 @@ class_name Ground
 # Emitted after every relief mesh/collision rebuild (initial build and any
 # live relief-export edit) so anything standing on the terrain - FieldEnemy,
 # any future prop - can re-ground itself without RegionField having to
-# know about or re-trigger that on their behalf.
+# know about or re-trigger that on their behalf. The FIRST emission is
+# this node's "built" signal: it fires inside _ready(), so only a parent
+# (whose _enter_tree() precedes it) can be connected in time - RegionField
+# holds the Wanderer out of the simulation until it lands, see its
+# _on_ground_built(). is_built() answers the same question after the fact.
 signal relief_rebuilt
 
 # The sand: high-key pale with a slight warm bias (R - B ~ +0.14), a pale
@@ -344,6 +348,33 @@ signal relief_rebuilt
 	set(value):
 		landmass_mask_distance_padding = value
 		_mask_dirty = true
+		_rebuild_ground_mesh_and_collision()
+# An optional second painting on the SAME canvas as landmass_mask (same
+# pixel size, origin and pixels-per-metre - it is mapped through the exact
+# same _mask_world_to_pixel()): white lifts the sand by elevation_max_
+# height, black leaves the landmass ramp alone. Added on the sand side
+# only, scaled by a land factor that is 0 at the drawn shoreline and 1
+# elevation_shore_fade metres inland (see _elevation_lift()), so a plateau
+# painted out over the water is clipped at the coast and never lifts the
+# seabed. Where the painting's own edge is hard (~0.4 m at full height)
+# the result is a step the Wanderer can't climb (step_height 0.35 against
+# a 45-degree floor_max_angle); paint a ~2 m gradient where it should be
+# a ramp. Keep elevation_shore_fade under ~1 m: wider than that, the
+# coast-side clip itself becomes a walkable slope at the relief grid's
+# 0.35 m spacing. Ignored without a landmass mask, or when the two images
+# differ in size (warned at decode).
+@export var elevation_mask: Texture2D = null:
+	set(value):
+		elevation_mask = value
+		_mask_dirty = true
+		_rebuild_ground_mesh_and_collision()
+@export var elevation_max_height: float = 1.2:
+	set(value):
+		elevation_max_height = value
+		_rebuild_ground_mesh_and_collision()
+@export var elevation_shore_fade: float = 0.5:
+	set(value):
+		elevation_shore_fade = value
 		_rebuild_ground_mesh_and_collision()
 @export_group("")
 
@@ -941,6 +972,11 @@ func get_enclosure_at(world_xz: Vector2) -> float:
 func has_landmass_mask() -> bool:
 	return landmass_mask != null and _mask_ready
 
+# True once the first relief mesh + HeightMapShape3D exist (the first
+# relief_rebuilt has fired). Before that there is nothing to stand on.
+func is_built() -> bool:
+	return _ready_done and not _relief_heights.is_empty()
+
 # World-XZ (x = X, y = Z) bounding rectangle of the painted land - the
 # cells at/above the 0.5 threshold INSIDE the image rect only, so a neck
 # that runs off the top of the drawing bounds at the image's top edge, not
@@ -1075,11 +1111,13 @@ func _relief_height(world_xz: Vector2) -> float:
 		# the first metre of water is centimetres deep and the wade only
 		# gets serious toward the walls. One edge, one depth - the painting
 		# doesn't know which edge is which, and the seaward_* exports are
-		# SDF-only.
+		# SDF-only. The elevation painting rides on top of the sand side
+		# alone (_elevation_lift(), clipped to 0 at the drawn line).
 		var shore_distance: float = _mask_distance_sample(world_xz)
 		if shore_distance <= 0.0:
 			var u: float = clampf(-shore_distance / maxf(landmass_falloff_width, 0.001), 0.0, 1.0)
 			landmass_height = _landmass_sea_level + landmass_interior_height * (1.0 - (1.0 - u) * (1.0 - u))
+			landmass_height += _elevation_lift(world_xz, shore_distance)
 		else:
 			var under: float = smoothstep(0.0, maxf(landmass_underwater_falloff_width, 0.001), shore_distance)
 			landmass_height = _landmass_sea_level - landmass_below_sea_depth * under
@@ -1363,10 +1401,12 @@ func _relief_edge_fade_factor(world_xz: Vector2) -> float:
 # the .tscn (whose setter fires during deserialization, before _ready())
 # is decoded exactly once, on the first real rebuild. Two arrays result:
 # the image's own luminance bytes (_mask_bytes, sampled bilinearly by
-# _mask_sample()) and the coarser signed distance grid (_mask_distance,
+# _canvas_sample()) and the coarser signed distance grid (_mask_distance,
 # sampled by _mask_distance_sample()) that everything height/drain-related
 # actually reads - the image itself is only ever read while building that
-# grid.
+# grid. The elevation painting (elevation_mask) is decoded alongside onto
+# the same canvas (_elevation_bytes) and, unlike the mask, IS sampled per
+# height query - see _elevation_lift().
 const MASK_LAND_THRESHOLD: float = 0.5
 # "No source here yet" for the EDT below. Finite on purpose: with a true
 # INF, INF - INF in _edt_intersection() is NaN and the lower-envelope
@@ -1380,6 +1420,12 @@ var _mask_ready: bool = false
 var _mask_bytes: PackedByteArray = PackedByteArray()
 var _mask_width: int = 0
 var _mask_height: int = 0
+# elevation_mask's own luminance bytes on the landmass mask's canvas (same
+# _mask_width x _mask_height, checked at decode), read by _elevation_lift()
+# through the same _canvas_sample(). Empty, with _elevation_ready false,
+# whenever there is no usable elevation painting.
+var _elevation_bytes: PackedByteArray = PackedByteArray()
+var _elevation_ready: bool = false
 var _mask_distance: PackedFloat32Array = PackedFloat32Array()
 # 0..1 per distance cell: is the nearest water ENCLOSED - a pool, with
 # sand all round it - rather than the open sea? Everything that belongs
@@ -1408,6 +1454,8 @@ func _rebuild_mask_data() -> void:
 	_mask_dirty = false
 	_mask_ready = false
 	_mask_bytes = PackedByteArray()
+	_elevation_bytes = PackedByteArray()
+	_elevation_ready = false
 	_mask_distance = PackedFloat32Array()
 	_mask_enclosure = PackedFloat32Array()
 	_mask_land_bounds = Rect2()
@@ -1420,6 +1468,7 @@ func _rebuild_mask_data() -> void:
 		return
 	_build_mask_distance_field()
 	_mask_ready = true
+	_elevation_ready = _decode_elevation_image()
 	_push_mask_distance_texture()
 
 # The same signed distance grid _mask_distance_sample() reads, handed to
@@ -1459,18 +1508,41 @@ func _push_mask_distance_texture() -> void:
 # a no-op - it's here for the day Detect 3D flips the import to VRAM-
 # compressed. L8 so one byte per pixel is the whole story; for a grayscale
 # painting the engine's RGB->L conversion is the identity either way.
-func _decode_mask_image() -> bool:
-	var image: Image = landmass_mask.get_image()
+# Null when the texture yields nothing readable.
+func _decode_l8_image(texture: Texture2D) -> Image:
+	var image: Image = texture.get_image()
 	if image == null or image.is_empty():
-		return false
+		return null
 	if image.is_compressed() and image.decompress() != OK:
-		return false
+		return null
 	image.clear_mipmaps()
 	image.convert(Image.FORMAT_L8)
+	return image
+
+func _decode_mask_image() -> bool:
+	var image: Image = _decode_l8_image(landmass_mask)
+	if image == null:
+		return false
 	_mask_width = image.get_width()
 	_mask_height = image.get_height()
 	_mask_bytes = image.get_data()
 	return _mask_bytes.size() == _mask_width * _mask_height
+
+# After _decode_mask_image(), so the canvas it must match is known. A size
+# mismatch is the one authoring mistake this can catch (the two paintings
+# share one origin/scale by contract, not by anything checkable here).
+func _decode_elevation_image() -> bool:
+	if elevation_mask == null:
+		return false
+	var image: Image = _decode_l8_image(elevation_mask)
+	if image == null:
+		push_warning("Ground: elevation_mask yielded no readable image; elevation ignored.")
+		return false
+	if image.get_width() != _mask_width or image.get_height() != _mask_height:
+		push_warning("Ground: elevation_mask is %dx%d but landmass_mask is %dx%d - the two must share one canvas; elevation ignored." % [image.get_width(), image.get_height(), _mask_width, _mask_height])
+		return false
+	_elevation_bytes = image.get_data()
+	return _elevation_bytes.size() == _mask_width * _mask_height
 
 # Continuous pixel coordinates (top-left origin, pixel i spanning [i, i+1))
 # of a world XZ position, per the Landmass Mask group's own image->world
@@ -1492,14 +1564,16 @@ func _mask_pixel_to_world(pixel: Vector2) -> Vector2:
 	var offset: Vector2 = (pixel - origin_px) / ppm
 	return _landmass_spawn_xz + right * offset.x - forward * offset.y
 
-func _mask_byte(x: int, y: int) -> float:
-	return float(_mask_bytes[y * _mask_width + x]) / 255.0
+func _canvas_byte(bytes: PackedByteArray, x: int, y: int) -> float:
+	return float(bytes[y * _mask_width + x]) / 255.0
 
-# Bilinear over pixel centres. Past the left/right/bottom edges: water
-# (0). Past the top edge: the top row extended, so land running off the
-# top of the drawing stays land all the way inland (see the export group's
-# own doc on why inland is the one dry side).
-func _mask_sample(world_xz: Vector2) -> float:
+# Bilinear over pixel centres of a painting on the landmass mask's canvas
+# (_mask_bytes or _elevation_bytes - same size, same mapping). Past the
+# left/right/bottom edges: 0 (water; no lift). Past the top edge: the top
+# row extended, so land running off the top of the drawing stays land all
+# the way inland (see the export group's own doc on why inland is the one
+# dry side).
+func _canvas_sample(bytes: PackedByteArray, world_xz: Vector2) -> float:
 	var p: Vector2 = _mask_world_to_pixel(world_xz) - Vector2(0.5, 0.5)
 	if p.x < -0.5 or p.x > float(_mask_width) - 0.5 or p.y > float(_mask_height) - 0.5:
 		return 0.0
@@ -1511,9 +1585,21 @@ func _mask_sample(world_xz: Vector2) -> float:
 	var y1: int = mini(y0 + 1, _mask_height - 1)
 	var fx: float = x - float(x0)
 	var fy: float = y - float(y0)
-	var top: float = lerpf(_mask_byte(x0, y0), _mask_byte(x1, y0), fx)
-	var bottom: float = lerpf(_mask_byte(x0, y1), _mask_byte(x1, y1), fx)
+	var top: float = lerpf(_canvas_byte(bytes, x0, y0), _canvas_byte(bytes, x1, y0), fx)
+	var bottom: float = lerpf(_canvas_byte(bytes, x0, y1), _canvas_byte(bytes, x1, y1), fx)
 	return lerpf(top, bottom, fy)
+
+# The painted elevation's lift at a sand-side point, in metres: the
+# painting's value x elevation_max_height x a land factor that runs 0 at
+# the drawn shoreline (shore_distance 0) to 1 elevation_shore_fade metres
+# inland - see elevation_mask's own doc. 0 with nothing decoded.
+func _elevation_lift(world_xz: Vector2, shore_distance: float) -> float:
+	if not _elevation_ready:
+		return 0.0
+	var land_factor: float = clampf(-shore_distance / maxf(elevation_shore_fade, 0.001), 0.0, 1.0)
+	if land_factor <= 0.0:
+		return 0.0
+	return _canvas_sample(_elevation_bytes, world_xz) * elevation_max_height * land_factor
 
 # The signed shore distance grid: negative on land, positive in water, in
 # metres, over the image rect grown by landmass_mask_distance_padding.
@@ -1550,7 +1636,7 @@ func _build_mask_distance_field() -> void:
 	for row in rows:
 		for col in cols:
 			var world_xz: Vector2 = _mask_distance_origin + Vector2(float(col), float(row)) * cell
-			var is_land: bool = _mask_sample(world_xz) >= MASK_LAND_THRESHOLD
+			var is_land: bool = _canvas_sample(_mask_bytes, world_xz) >= MASK_LAND_THRESHOLD
 			land[row * cols + col] = 1 if is_land else 0
 			if is_land and image_rect.has_point(world_xz):
 				if bounds_started:

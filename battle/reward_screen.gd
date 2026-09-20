@@ -61,11 +61,19 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 @export_group("")
 
 @export_group("Card Choice")
+# The cards: a level row, no container, positioned outright under the
+# Column control (see _open_choice()) - equal size, no rotation, centred
+# on the viewport's width with the row's centre line at choice_row_
+# centre_fraction of its height. TAKE ONE sits above the row (baseline
+# choice_header_gap_px above the cards' top edge), NONE OF THESE below
+# it (choice_dismiss_gap_px of clear space under the cards' bottom
+# edge), both centred on the row.
 @export var choice_header_text: String = "TAKE ONE"
 @export var choice_count: int = 3
 @export var card_gap_px: float = 26.0
-# The outer two lean out by this; the middle stays level.
-@export var card_outer_tilt_degrees: float = 3.0
+@export_range(0.0, 1.0) var choice_row_centre_fraction: float = 0.46
+@export var choice_header_gap_px: float = 28.0
+@export var choice_dismiss_gap_px: float = 40.0
 @export var choice_dismiss_text: String = "NONE OF THESE"
 @export var card_flight_duration_sec: float = 0.45
 @export var card_flight_end_scale: float = 0.12
@@ -90,6 +98,9 @@ var _mode: int = Mode.LIST
 var _hovered: int = -1
 var _card_views: Array[CardView] = []
 var _taking_card: bool = false
+# The card row's rect in Column pixels while a choice is open - what the
+# choice header, its dismiss and the dismiss hit-test hang off.
+var _choice_row: Rect2 = Rect2()
 
 var _draw_layer: Control = null
 var _scrim: ColorRect = null
@@ -165,7 +176,13 @@ func _column_top() -> float:
 	var total: float = float(header_size_px) + header_gap_px + lines_height + dismiss_gap_px + float(dismiss_size_px)
 	return (_draw_layer.size.y - total) / 2.0
 
+# The dismiss line's hit rect - under the list, or under the card row
+# while a choice is open; _draw_dismiss() draws the text at its
+# baseline (top + dismiss_size_px) in either case.
 func _dismiss_rect() -> Rect2:
+	if _mode == Mode.CHOICE:
+		var baseline: float = _choice_row.end.y + choice_dismiss_gap_px + float(dismiss_size_px)
+		return Rect2(_choice_row.position.x, baseline - float(dismiss_size_px), _choice_row.size.x, float(dismiss_size_px) * 2.0)
 	var top: float = _column_top() + float(header_size_px) + header_gap_px + float(_lines.size()) * line_height_px + dismiss_gap_px
 	return Rect2(_column_left(), top - float(dismiss_size_px), column_width, float(dismiss_size_px) * 2.0)
 
@@ -225,16 +242,13 @@ func _draw_dismiss(text: String) -> void:
 	color.a = dismiss_alpha
 	var width: float = InkType.width(_dismiss_font, text, dismiss_size_px)
 	var rect: Rect2 = _dismiss_rect()
-	_text(_dismiss_font, text, Vector2(_column_left() + (column_width - width) / 2.0, rect.position.y + float(dismiss_size_px)), dismiss_size_px, color)
+	_text(_dismiss_font, text, Vector2(rect.position.x + (rect.size.x - width) / 2.0, rect.position.y + float(dismiss_size_px)), dismiss_size_px, color)
 
 func _draw_choice() -> void:
-	var left: float = _column_left()
-	var baseline: float = _choice_header_baseline()
-	_text(_header_font, choice_header_text, Vector2(left, baseline), header_size_px, bone)
+	var width: float = InkType.width(_header_font, choice_header_text, header_size_px)
+	var baseline: float = _choice_row.position.y - choice_header_gap_px
+	_text(_header_font, choice_header_text, Vector2(_choice_row.position.x + (_choice_row.size.x - width) / 2.0, baseline), header_size_px, bone)
 	_draw_dismiss(choice_dismiss_text)
-
-func _choice_header_baseline() -> float:
-	return _draw_layer.size.y * 0.5 - 220.0
 
 # --- Input ---
 
@@ -307,20 +321,23 @@ func _open_choice() -> void:
 	var card_size: Vector2 = reference.card_size
 	reference.free()
 
+	# Whole pixels, so the card faces don't land on half-pixel edges.
 	var span: float = float(rolled.size()) * card_size.x + float(rolled.size() - 1) * card_gap_px
-	var start_x: float = (_draw_layer.size.x - span) / 2.0
-	var top: float = _draw_layer.size.y * 0.5 - card_size.y * 0.5
+	var start_x: float = roundf((_draw_layer.size.x - span) / 2.0)
+	var top: float = roundf(_draw_layer.size.y * choice_row_centre_fraction - card_size.y * 0.5)
+	_choice_row = Rect2(start_x, top, span, card_size.y)
 	for index in rolled.size():
 		var card_view := scene.instantiate() as CardView
-		# Scale and rotate about the card's own middle so the outer two
-		# lean rather than swing.
-		card_view.pivot_offset = card_size / 2.0
+		# Hover grows the card in place, about its own centre, and moves
+		# nothing: no lift (a hand card's hover_lift is a position.y tween
+		# measured from its rest offset - here rest IS the row), and the
+		# pivot set AFTER add_child(), since CardView._ready() puts a
+		# hover-enabled card's pivot at its bottom centre for the hand.
+		card_view.hover_lift = 0.0
 		card_view.position = Vector2(start_x + float(index) * (card_size.x + card_gap_px), top)
-		if index == 0:
-			card_view.rotation_degrees = -card_outer_tilt_degrees
-		elif index == rolled.size() - 1:
-			card_view.rotation_degrees = card_outer_tilt_degrees
 		_draw_layer.add_child(card_view)
+		card_view.set_rest_offset(top)
+		card_view.pivot_offset = card_size / 2.0
 		card_view.set_card_data(rolled[index])
 		card_view.clicked.connect(_on_choice_clicked.bind(card_view))
 		_card_views.append(card_view)

@@ -45,6 +45,14 @@ var character: CharacterData = null
 var current_region_index: int = 0
 var current_floor_index: int = 0
 
+# The zone intro (ZoneIntro, played by RegionField) is owed exactly once,
+# by the first floor of a NEW run: new_run() raises this and RegionField
+# consumes it (reads and clears) in its _ready(). A floor change
+# (reload_current_scene()) and the RunOver restart (change_scene back to
+# the field) never call new_run(), so neither raises it - the intro is a
+# run's first frame, not a floor's.
+var run_opening_pending: bool = false
+
 # The run's one generator. Everything that rolls something a player could
 # call luck draws from HERE rather than from the global randi(), so a run
 # is one sequence and can be replayed from its seed: the Keeper's card
@@ -81,6 +89,7 @@ func new_run(starting_character: CharacterData) -> void:
 	Hull.reset_findings()
 	Bird.reset_flights()
 	Keeper.reset_offers()
+	run_opening_pending = true
 	player_hp_changed.emit(player_hp, player_max_hp)
 	deck_changed.emit()
 	gold_changed.emit(gold)

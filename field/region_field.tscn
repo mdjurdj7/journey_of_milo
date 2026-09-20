@@ -15,6 +15,7 @@
 [ext_resource type="PackedScene" path="res://ui/hp_bar.tscn" id="15"]
 [ext_resource type="PackedScene" path="res://field/exit_gate.tscn" id="16"]
 [ext_resource type="Resource" path="res://floors/region1.tres" id="21_region1"]
+[ext_resource type="Script" uid="uid://b1kiu1ojh1n34" path="res://field/zone_intro.gd" id="22_zone_intro"]
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_1"]
 radius = 0.4
@@ -559,6 +560,10 @@ mesh = SubResource("BoxMesh_ruin_mass_3")
 [node name="MassLowBroad" type="MeshInstance3D" parent="RuinBlockout/CollapsedMass" unique_id=-1094967262]
 transform = Transform3D(0.978, 0, -0.208, 0, 1, 0, 0.208, 0, 0.978, 10.2, 0.7, -12.8)
 mesh = SubResource("BoxMesh_ruin_mass_4")
+
+[node name="ZoneIntro" type="Node" parent="."]
+process_mode = 3
+script = ExtResource("22_zone_intro")
 
 [editable path="RuinPavingTest"]
 [editable path="HeroPavingPatch/Slabs/HeroSlab1"]

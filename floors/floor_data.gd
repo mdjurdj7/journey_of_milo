@@ -14,6 +14,10 @@ class_name FloorData
 # Image up is the TOWER direction (RegionField.get_forward()), for every
 # floor of a region alike, so the tower is at the top of every painting.
 @export var mask: Texture2D = null
+# Optional relief painted on the SAME canvas as `mask` (same size, origin,
+# scale): white lifts the sand by Ground.elevation_max_height, clipped to
+# the drawn shoreline - see Ground's elevation_mask. Null = flat floor.
+@export var elevation_mask: Texture2D = null
 # Normalized image coords of the pixel that sits on `spawn`.
 @export var mask_origin: Vector2 = Vector2(0.5, 0.5)
 # The four Ground values that set how wet the floor reads, pushed onto
@@ -23,11 +27,14 @@ class_name FloorData
 @export var falloff: float = 4.0
 @export var relief_amplitude: float = 0.15
 @export var caustic_strength: float = 0.15
+# RegionField.wade_drain_enabled for this floor: whether standing past the
+# shoreline costs HP (the rates stay RegionField's own, region-wide).
+@export var wade_drain_enabled: bool = false
 
 @export_group("Layout")
 # The Wanderer's start, world XZ. Every floor so far spawns at the
 # origin and lets mask_origin do the shifting, which keeps the
-# spawn->Tower forward exactly the region's own.
+# spawn->ForwardMarker forward exactly the region's own.
 @export var spawn: Vector2 = Vector2.ZERO
 # Unit XZ, the way OUT of this floor: the gate channel, the camera's
 # inland bound, the worn band's end and the transition trigger all lie

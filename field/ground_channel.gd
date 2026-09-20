@@ -25,5 +25,5 @@ class_name GroundChannel
 @export var edge_noise_amplitude: float = 0.6
 @export_range(0.0, 1.0) var amount: float = 1.0
 # 0 = the whole rectangle drains with amount.
-@export var bar_width: float = 6.0
+@export var bar_width: float = 9.0
 @export var bar_offset: float = 0.0

@@ -75,7 +75,7 @@ enum FlyDirection { SEAWARD, INLAND, LEFT, RIGHT }
 		if _approach_shape != null:
 			_approach_shape.radius = maxf(approach_radius, 0.0)
 @export var flight_seconds: float = 2.2
-# Relative to RegionField.get_forward() (spawn -> Tower): SEAWARD is
+# Relative to RegionField.get_forward() (spawn -> ForwardMarker): SEAWARD is
 # -forward, away from the tower.
 @export var fly_direction_bias: FlyDirection = FlyDirection.SEAWARD
 # Added to the flight heading so it banks off rather than flying dead

@@ -1,39 +1,63 @@
-[gd_resource type="Resource" script_class="FloorData" load_steps=10 format=3]
+[gd_resource type="Resource" script_class="FloorData" format=3 uid="uid://d34pu250xcrln"]
 
-[ext_resource type="Script" path="res://floors/floor_data.gd" id="1_floor_data"]
-[ext_resource type="Script" path="res://floors/floor_enemy.gd" id="2_floor_enemy"]
-[ext_resource type="Script" path="res://floors/floor_prop.gd" id="3_floor_prop"]
-[ext_resource type="Texture2D" path="res://assets/field/masks/Map3_mask.png" id="4_map3"]
-[ext_resource type="Resource" path="res://battle/rules/enemies/sputter.tres" id="5_sputter"]
+[ext_resource type="Script" uid="uid://8yxy7cpevuvt" path="res://floors/floor_data.gd" id="1_floor_data"]
+[ext_resource type="Script" uid="uid://eby4csrr8fpj" path="res://floors/floor_enemy.gd" id="2_floor_enemy"]
+[ext_resource type="Script" uid="uid://bi5wh88prg3u6" path="res://floors/floor_prop.gd" id="3_floor_prop"]
+[ext_resource type="Texture2D" uid="uid://bs6hicysi2lvh" path="res://assets/field/masks/Map3_mask.png" id="4_map3"]
+[ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="5_sputter"]
 [ext_resource type="PackedScene" path="res://field/world_card.tscn" id="6_world_card"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
+[ext_resource type="Texture2D" uid="uid://dkhl5vyt1v7np" path="res://assets/field/masks/Map3_elev.png" id="8_map3_elev"]
+[ext_resource type="PackedScene" path="res://field/reward_spread.tscn" id="9_reward_spread"]
+[ext_resource type="Resource" path="res://cards/pools/belongings_pool.tres" id="10_belongings_pool"]
 
 [sub_resource type="Resource" id="FloorEnemy_sputter"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("5_sputter")
 position = Vector2(1.2, -17)
-yaw_degrees = 0.0
+
+[sub_resource type="Resource" id="FloorEnemy_island_sputter1"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("5_sputter")
+position = Vector2(-11.6, -16.4)
+yaw_degrees = -113.2
+
+[sub_resource type="Resource" id="FloorEnemy_island_sputter2"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("5_sputter")
+position = Vector2(-9.4, -15.6)
+yaw_degrees = -116.6
 
 [sub_resource type="Resource" id="FloorProp_belongings"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("6_world_card")
 position = Vector3(-3.4, 0, -8)
 
+[sub_resource type="Resource" id="FloorProp_island_belongings"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("6_world_card")
+position = Vector3(-12, 0, -15.6)
+
+[sub_resource type="Resource" id="FloorProp_alcove_cache"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("9_reward_spread")
+position = Vector3(9.2, 0, -16.8)
+pool = ExtResource("10_belongings_pool")
+overrides = {
+"card_count": 4,
+"fan_axis": Vector2(0, 1),
+"spacing": 0.5
+}
+
 [resource]
 script = ExtResource("1_floor_data")
 mask = ExtResource("4_map3")
+elevation_mask = ExtResource("8_map3_elev")
 mask_origin = Vector2(0.5, 0.888889)
 interior_height = 0.3
-falloff = 4.0
 relief_amplitude = 0.18
 caustic_strength = 0.12
-spawn = Vector2(0, 0)
-exit_direction = Vector2(0, -1)
-enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter")])
-props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_belongings")])
-gate_distance_beyond_enemy = 6.0
-gate_bar_axis_offset = 0.0
-wear_path_mid_offset = 1.5
+enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_sputter1"), SubResource("FloorEnemy_island_sputter2")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_belongings"), SubResource("FloorProp_island_belongings"), SubResource("FloorProp_alcove_cache")])
+wear_path_override = null
 reward_pool = ExtResource("7_wanderer_pool")
-gold_min = 10
-gold_max = 18

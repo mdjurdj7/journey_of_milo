@@ -1,10 +1,11 @@
-[gd_resource type="Resource" script_class="RegionData" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="RegionData" format=3 uid="uid://b0a7mp27d3sfv"]
 
-[ext_resource type="Script" path="res://floors/region_data.gd" id="1_region_data"]
-[ext_resource type="Script" path="res://floors/floor_data.gd" id="2_floor_data"]
-[ext_resource type="Resource" path="res://floors/region1_floor1.tres" id="3_floor1"]
-[ext_resource type="Resource" path="res://floors/region1_floor2.tres" id="4_floor2"]
+[ext_resource type="Script" uid="uid://64my4s1ldhv2" path="res://floors/region_data.gd" id="1_region_data"]
+[ext_resource type="Script" uid="uid://8yxy7cpevuvt" path="res://floors/floor_data.gd" id="2_floor_data"]
+[ext_resource type="Resource" uid="uid://dblsdrgjpebnk" path="res://floors/region1_floor1.tres" id="3_floor1"]
+[ext_resource type="Resource" uid="uid://d34pu250xcrln" path="res://floors/region1_floor2.tres" id="4_floor2"]
 
 [resource]
 script = ExtResource("1_region_data")
 floors = Array[ExtResource("2_floor_data")]([ExtResource("3_floor1"), ExtResource("4_floor2")])
+display_name = "REGION NAME"

@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://rtvqe3f6001i"]
 
-[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
-[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 
 [sub_resource type="Resource" id="E_self"]
 script = ExtResource("2_card_effect")
@@ -16,7 +16,6 @@ value = 1
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Open Wound"
-cost = 0
 card_type = 1
 target_type = 1
 description = "Lose {hp_cost} HP.

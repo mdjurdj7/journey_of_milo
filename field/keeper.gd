@@ -73,7 +73,7 @@ enum FaceDirection { SEAWARD, INLAND, LEFT, RIGHT }
 	set(value):
 		keeper_tint = value
 		_apply_tint()
-# Relative to RegionField.get_forward() (spawn -> Tower): SEAWARD is
+# Relative to RegionField.get_forward() (spawn -> ForwardMarker): SEAWARD is
 # -forward. Applied once at _ready(); she never rotates at runtime.
 @export var face_direction: FaceDirection = FaceDirection.SEAWARD:
 	set(value):

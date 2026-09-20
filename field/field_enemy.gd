@@ -175,7 +175,7 @@ func _ground_to_relief() -> void:
 	var local_xz: Vector3 = _ground.to_local(Vector3(global_position.x, 0.0, global_position.z))
 	global_position.y = _ground.get_height_at(Vector2(local_xz.x, local_xz.z)) - model_ground_offset
 
-# get_forward() points inland (spawn -> Tower, see RegionField's own doc),
+# get_forward() points inland (spawn -> ForwardMarker, see RegionField's own doc),
 # so facing the shore/sea is the opposite direction. Yaws the body itself,
 # not the model - model_yaw_offset above stays a separate, local correction
 # for the imported asset's own facing.

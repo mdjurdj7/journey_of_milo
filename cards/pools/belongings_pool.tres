@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="RewardPool" load_steps=7 format=3]
+
+[ext_resource type="Script" path="res://cards/reward_pool.gd" id="1_reward_pool"]
+[ext_resource type="Resource" path="res://cards/neutral/left_hand.tres" id="2_left_hand"]
+[ext_resource type="Resource" path="res://cards/neutral/second_thoughts.tres" id="3_second_thoughts"]
+[ext_resource type="Resource" path="res://cards/neutral/untouched.tres" id="4_untouched"]
+[ext_resource type="Resource" path="res://cards/data/endure.tres" id="5_endure"]
+[ext_resource type="Resource" path="res://cards/data/hold_fast.tres" id="6_hold_fast"]
+
+[resource]
+script = ExtResource("1_reward_pool")
+entries = Array[ExtResource("2_left_hand")]([ExtResource("2_left_hand"), ExtResource("3_second_thoughts"), ExtResource("4_untouched"), ExtResource("5_endure"), ExtResource("6_hold_fast")])
+weights = Array[float]([])
+enemy_bias = {}
+enemy_bias_multiplier = 2.0
