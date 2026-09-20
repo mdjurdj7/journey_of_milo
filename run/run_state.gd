@@ -17,6 +17,9 @@ extends Node
 
 signal player_hp_changed(current: int, max_hp: int)
 signal deck_changed()
+# Emits the NEW TOTAL, not the delta - same shape player_hp_changed uses,
+# and what a readout actually wants to draw.
+signal gold_changed(amount: int)
 
 var player_hp: int = 0
 var player_max_hp: int = 0
@@ -31,6 +34,11 @@ var player_max_hp: int = 0
 # all - they just aren't reachable again until Deck.new() rebuilds next
 # fight's draw pile from whatever's still here.
 var deck: Array[CardData] = []
+
+# Coin off the dead. Mutated only through add_gold()/spend_gold() below,
+# the same way HP and the deck are - nothing writes this field directly,
+# so nothing can change it without the readouts hearing.
+var gold: int = 0
 
 var character: CharacterData = null
 
@@ -60,6 +68,7 @@ func new_run(starting_character: CharacterData) -> void:
 	# to be reproducible, since it's what makes the rest of them so.
 	run_seed = randi()
 	rng.seed = run_seed
+	gold = 0
 	player_max_hp = starting_character.max_hp
 	player_hp = player_max_hp
 	deck = _build_starting_deck(starting_character)
@@ -74,6 +83,7 @@ func new_run(starting_character: CharacterData) -> void:
 	Keeper.reset_offers()
 	player_hp_changed.emit(player_hp, player_max_hp)
 	deck_changed.emit()
+	gold_changed.emit(gold)
 
 func _build_starting_deck(starting_character: CharacterData) -> Array[CardData]:
 	var cards: Array[CardData] = []
@@ -114,6 +124,22 @@ func set_max_hp(new_max_hp: int) -> void:
 	player_max_hp = new_max_hp
 	player_hp = mini(player_hp, player_max_hp)
 	player_hp_changed.emit(player_hp, player_max_hp)
+
+func add_gold(amount: int) -> void:
+	if amount <= 0:
+		return
+	gold += amount
+	gold_changed.emit(gold)
+
+# True when there was enough and it was taken, false when there wasn't
+# and nothing changed - so a caller can't half-spend by checking the
+# total itself and racing something else.
+func spend_gold(amount: int) -> bool:
+	if amount <= 0 or gold < amount:
+		return false
+	gold -= amount
+	gold_changed.emit(gold)
+	return true
 
 func add_card(card: CardData) -> void:
 	deck.append(card)
