@@ -1163,13 +1163,21 @@ func _channel_edge_wander(channel: GroundChannel, world_xz: Vector2) -> float:
 		return 0.0
 	return (_value_noise(world_xz / maxf(channel.edge_noise_scale, 0.001)) - 0.5) * 2.0 * channel.edge_noise_amplitude
 
+# The axis a channel runs along - its own (ExitGate writes the floor's
+# exit direction), the field's forward only if none was authored. The
+# one value the CPU functions below and the shader's channel_axis share.
+func _channel_axis(channel: GroundChannel) -> Vector2:
+	if channel.axis.length() > 0.0001:
+		return channel.axis.normalized()
+	return _landmass_forward_xz
+
 # 0..1: how much of a channel's full cut applies at a world XZ - 1 deeper
 # than `edge` inside its rectangle, falling to 0 at the (noised)
-# boundary. The rectangle is `length` along the field's forward axis and
+# boundary. The rectangle is `length` along the channel's own axis and
 # `width` across it (a proper box distance, so the corners round off by
 # the edge width rather than staying square). Independent of amount.
 func _channel_factor(channel: GroundChannel, world_xz: Vector2) -> float:
-	var forward: Vector2 = _landmass_forward_xz
+	var forward: Vector2 = _channel_axis(channel)
 	var right: Vector2 = Vector2(-forward.y, forward.x)
 	var rel: Vector2 = world_xz - channel.centre
 	var dx: float = absf(rel.dot(forward)) - channel.length * 0.5
@@ -1187,7 +1195,7 @@ func _channel_factor(channel: GroundChannel, world_xz: Vector2) -> float:
 func _channel_bar_mask(channel: GroundChannel, world_xz: Vector2) -> float:
 	if channel.bar_width <= 0.0:
 		return 1.0
-	var forward: Vector2 = _landmass_forward_xz
+	var forward: Vector2 = _channel_axis(channel)
 	var right: Vector2 = Vector2(-forward.y, forward.x)
 	var across: float = (world_xz - channel.centre).dot(right) - channel.bar_offset
 	var strip_distance: float = absf(across) - channel.bar_width * 0.5 + _channel_edge_wander(channel, world_xz)
@@ -1198,50 +1206,83 @@ func _channel_bar_mask(channel: GroundChannel, world_xz: Vector2) -> float:
 func _channel_effective_amount_for(channel: GroundChannel, amount: float, world_xz: Vector2) -> float:
 	return 1.0 - (1.0 - amount) * _channel_bar_mask(channel, world_xz)
 
-# ...at the BAKED amount (what the mesh, collision and get_height_at()
-# carry).
-func _channel_effective_amount(channel: GroundChannel, world_xz: Vector2) -> float:
-	return _channel_effective_amount_for(channel, channel.amount, world_xz)
-
-# Live (tweened) amounts by channel index - what the shader is showing
-# right now, which can run ahead of the bake during a drain (see
-# set_channel_live_amount()). Absent = same as baked.
+# Live (tweened) amounts by channel index - what the drain is at right
+# now, which runs ahead of the bake (see set_channel_live_amount()).
+# Absent = same as baked. get_height_at() reads THIS, so the CPU surface
+# is the surface the shader draws at every instant of a drain; the mesh
+# and collision carry the baked amount until set_channel_amount() (which
+# erases the live value first, so the bake samples the baked amount).
 var _channel_live_amounts: Dictionary = {}
 
 func _channel_live_amount(index: int) -> float:
 	var channel: GroundChannel = channels[index]
 	return float(_channel_live_amounts[index]) if _channel_live_amounts.has(index) else channel.amount
 
-# How much lower the LIVE surface is than the baked one at a world XZ -
-# the same delta ground.gdshader's channel_delta() applies to the mesh,
-# summed over every channel with a live amount (metres, negative while a
-# bar is surfacing).
-func _channel_live_delta(world_xz: Vector2) -> float:
-	if _channel_live_amounts.is_empty():
-		return 0.0
-	var delta: float = 0.0
-	for index in _channel_live_amounts:
-		var i: int = int(index)
-		if i < 0 or i >= channels.size() or channels[i] == null:
-			continue
-		var channel: GroundChannel = channels[i]
-		var factor: float = _channel_factor(channel, world_xz)
-		if factor <= 0.0:
-			continue
-		delta += channel.depth * factor * _channel_bar_mask(channel, world_xz) * (float(_channel_live_amounts[index]) - channel.amount)
-	return delta * _relief_edge_fade_factor(world_xz)
+# Whether any channel is mid-drain - the live amount differing from the
+# baked one, so the mesh and collision lag get_height_at(). The Wanderer
+# reads this to tell a drain from a bad spot (see its own ground hold).
+func is_channel_draining() -> bool:
+	return not _channel_live_amounts.is_empty()
 
-# Total lowering from every channel at a world XZ (metres).
+# Total lowering from every channel at a world XZ (metres), at the LIVE
+# amounts.
 func _channel_drop(world_xz: Vector2) -> float:
 	var drop: float = 0.0
-	for channel: GroundChannel in channels:
+	for i in channels.size():
+		var channel: GroundChannel = channels[i]
 		if channel == null:
 			continue
 		var factor: float = _channel_factor(channel, world_xz)
 		if factor <= 0.0:
 			continue
-		drop += channel.depth * _channel_effective_amount(channel, world_xz) * factor
+		drop += channel.depth * _channel_effective_amount_for(channel, _channel_live_amount(i), world_xz) * factor
 	return drop
+
+# The delta ground.gdshader's channel_delta() applies to the baked mesh
+# for channels[0] (the one channel with a GPU side): how much LOWER the
+# drawn surface is than the baked one at a world XZ - negative while a
+# bar surfaces. Only get_visible_height_at() needs it.
+func _shader_channel_delta(world_xz: Vector2) -> float:
+	if channels.is_empty() or channels[0] == null or not _channel_live_amounts.has(0):
+		return 0.0
+	var channel: GroundChannel = channels[0]
+	var factor: float = _channel_factor(channel, world_xz)
+	if factor <= 0.0:
+		return 0.0
+	return channel.depth * factor * _channel_bar_mask(channel, world_xz) * (float(_channel_live_amounts[0]) - channel.amount) * _relief_edge_fade_factor(world_xz)
+
+# The height of the surface as DRAWN at a world XZ: the relief mesh's own
+# triangles (the baked heights, interpolated exactly as the mesh is
+# triangulated - see _build_relief_indices()) plus the channel delta the
+# shader is displacing them by. Not the analytic get_height_at(): on a
+# steep patch that sits up to a decimetre off the mesh between grid
+# points. What the Wanderer's ground hold compares his feet against.
+# Outside the relief the dressing frame is flat: get_height_at() there.
+func get_visible_height_at(world_xz: Vector2) -> float:
+	if _relief_heights.is_empty() or _relief_cols < 2 or _relief_rows < 2:
+		return get_height_at(world_xz)
+	var spacing: Vector2 = _relief_grid_spacing(_relief_cols, _relief_rows)
+	var half_extent: Vector2 = relief_extent * 0.5
+	var col_f: float = (world_xz.x + half_extent.x) / spacing.x
+	var row_f: float = (world_xz.y + half_extent.y) / spacing.y
+	if col_f < 0.0 or row_f < 0.0 or col_f > float(_relief_cols - 1) or row_f > float(_relief_rows - 1):
+		return get_height_at(world_xz)
+	var col: int = mini(int(floor(col_f)), _relief_cols - 2)
+	var row: int = mini(int(floor(row_f)), _relief_rows - 2)
+	var fx: float = col_f - float(col)
+	var fy: float = row_f - float(row)
+	var top_left: float = _relief_heights[row * _relief_cols + col]
+	var top_right: float = _relief_heights[row * _relief_cols + col + 1]
+	var bottom_left: float = _relief_heights[(row + 1) * _relief_cols + col]
+	var bottom_right: float = _relief_heights[(row + 1) * _relief_cols + col + 1]
+	# The cell's diagonal runs top_right -> bottom_left (see _build_relief_
+	# indices()): the lower-left triangle holds fx + fy <= 1.
+	var mesh_height: float
+	if fx + fy <= 1.0:
+		mesh_height = top_left + fx * (top_right - top_left) + fy * (bottom_left - top_left)
+	else:
+		mesh_height = bottom_right + (1.0 - fx) * (bottom_left - bottom_right) + (1.0 - fy) * (top_right - bottom_right)
+	return mesh_height - _shader_channel_delta(world_xz)
 
 # The drain's view of a channel (see get_landmass_distance()): if this
 # point is inside any channel and its surface sits below sea_level, the
@@ -1259,9 +1300,9 @@ func _channel_water_distance(world_xz: Vector2) -> float:
 			break
 	if not in_channel:
 		return -INF
-	# The LIVE surface: the baked height plus whatever the shader is
-	# currently showing on top of it, so the drain tracks the tween.
-	var depth_below: float = _landmass_sea_level - (get_height_at(world_xz) - _channel_live_delta(world_xz))
+	# get_height_at() is the LIVE surface (the tweened amount), so the
+	# drain tracks the tween.
+	var depth_below: float = _landmass_sea_level - get_height_at(world_xz)
 	if depth_below <= 0.0 or landmass_below_sea_depth <= 0.0001:
 		return -INF
 	var f: float = clampf(depth_below / landmass_below_sea_depth, 0.0, 1.0)
@@ -1279,12 +1320,13 @@ func add_channel(channel: GroundChannel) -> int:
 	_push_channel_uniforms()
 	return index
 
-# The animated path: sets only what the SHADER shows (channel_amount) and
-# what the drain reads, leaving the bake (mesh, collision, get_height_at)
-# alone - one uniform write per call, safe every frame. Only channels[0]
-# has a GPU counterpart today (one uniform set); other indices still get
-# the live amount for the drain but their mesh won't move until baked.
-# Finish with set_channel_amount() to bake the final value.
+# The animated path: sets what the SHADER shows (channel_amount) and
+# what get_height_at() and the drain read, leaving the bake (mesh,
+# collision) alone - one uniform write per call, safe every frame. Only
+# channels[0] has a GPU counterpart today (one uniform set); other
+# indices still get the live amount for get_height_at() but their mesh
+# won't move until baked. Finish with set_channel_amount() to bake the
+# final value.
 func set_channel_live_amount(index: int, amount: float) -> void:
 	if index < 0 or index >= channels.size() or channels[index] == null:
 		return
@@ -1320,7 +1362,7 @@ func _push_channel_uniforms() -> void:
 	var channel: GroundChannel = channels[0]
 	_apply_uniform("channel_enabled", true)
 	_apply_uniform("channel_centre", channel.centre)
-	_apply_uniform("channel_axis", _landmass_forward_xz)
+	_apply_uniform("channel_axis", _channel_axis(channel))
 	_apply_uniform("channel_length", channel.length)
 	_apply_uniform("channel_width", channel.width)
 	_apply_uniform("channel_depth", channel.depth)
@@ -1347,7 +1389,7 @@ func _update_channel_region(channel: GroundChannel, amount_only: bool) -> void:
 	if not _ready_done or _relief_heights.is_empty():
 		return
 	_ensure_landmass_refs()
-	var forward: Vector2 = _landmass_forward_xz
+	var forward: Vector2 = _channel_axis(channel)
 	var right: Vector2 = Vector2(-forward.y, forward.x)
 	var margin: float = channel.edge + channel.edge_noise_amplitude
 	var half_l: Vector2 = forward * (channel.length * 0.5 + margin)

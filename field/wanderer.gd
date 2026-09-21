@@ -58,6 +58,28 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 # takes effect immediately from the Remote tab like every other tunable
 # here - no setter needed since there's no baked state to invalidate.
 @export var debug_draw_step_casts: bool = false
+
+@export_group("Ground Hold")
+# The feet are never left below the surface as DRAWN (Ground.get_visible_
+# height_at(): the relief mesh's own triangles plus the channel delta
+# the shader is displacing them by). Checked last thing every physics
+# frame (see _hold_above_visible_ground()): further below it than this,
+# and he is put onto it with any fall cancelled. The one case this is
+# built for is a draining channel - the exit gate's bar surfaces on the
+# GPU over four seconds while mesh and collision only catch up at the
+# end, so on the bar he would otherwise walk under the sand and, when
+# the collision finally jumps up through him, fall out of the world.
+# While it is what holds him (no collision under his feet) he counts as
+# grounded everywhere is_on_floor() is read. The tolerance only has to
+# clear what a resting capsule ever shows: the drawn triangles and the
+# physics heightmap agree to under a millimetre on both floors (same
+# grid, same diagonal - measured), and a body at rest on a slope sits
+# ON the surface, never in it, so 3 cm is three times the physics
+# recovery margin and still under a visible sink. On ordinary ground it
+# never fires; if it ever does outside a drain it warns once per floor
+# with the spot, so a bad patch of relief gets found rather than hidden.
+@export var ground_penetration_tolerance_m: float = 0.03
+@export_group("")
 @export var use_animation_tree: bool = false
 @export var walk_speed_threshold: float = 0.1
 @export var animation_blend_time: float = 0.2
@@ -281,6 +303,13 @@ var _has_move_target: bool = false
 var _move_target: Vector3 = Vector3.ZERO
 var _move_target_enemy: FieldEnemy = null
 var _stuck_timer: float = 0.0
+
+# True while the ground hold is what he stands on - the drawn surface is
+# above the collision under him (a draining channel) - see _hold_above_
+# visible_ground(). Read through _is_grounded() wherever the body would
+# otherwise ask is_on_floor().
+var _ground_hold_active: bool = false
+var _ground_hold_warned: bool = false
 
 # Set by ZoneIntro for the zone intro, which runs this node ALWAYS
 # through the field freeze: input is read as nothing - no WASD, no dash,
@@ -1640,7 +1669,7 @@ func _apply_step_up_and_down(delta: float) -> void:
 
 	if not blocked:
 		_wall_step_logged = false
-		if is_on_floor():
+		if _is_grounded():
 			_try_step_down(foot_position, move_dir, move_distance)
 		else:
 			_hide_debug_lines()
@@ -1664,7 +1693,7 @@ func _apply_step_up_and_down(delta: float) -> void:
 	if should_log:
 		print("Wanderer step-up: wall detected - is_on_floor=%s wall_normal=%s wall_angle_deg=%.1f floor_max_angle_deg=%.1f" % [is_on_floor(), wall_normal, rad_to_deg(wall_angle), rad_to_deg(floor_max_angle)])
 
-	if not is_on_floor():
+	if not _is_grounded():
 		if should_log:
 			print("Wanderer step-up: rejected - not on floor")
 		return
@@ -1762,6 +1791,36 @@ func _try_step_down(foot_position: Vector3, move_dir: Vector3, move_distance: fl
 	global_position.y = landing_position.y
 	velocity.y = 0.0
 
+# On the ground for every purpose the body has - gravity, the step
+# probes, the animation state that follows planar speed alone: a real
+# floor contact, or the ground hold standing in for one.
+func _is_grounded() -> bool:
+	return is_on_floor() or _ground_hold_active
+
+# See ground_penetration_tolerance_m's own doc. Three outcomes against
+# the drawn surface at his XZ: feet further below it than the tolerance
+# - put onto it, any fall cancelled, the hold on (and a warning, once per
+# floor, if no channel is draining - that is a bad spot in the relief,
+# not the case this exists for); feet clearly above it - the hold off,
+# so stepping off a ledge falls as it should; within the tolerance - the
+# hold stays whatever it was, and a real floor contact always ends it.
+func _hold_above_visible_ground() -> void:
+	if _ground == null or _battle_controller != null:
+		_ground_hold_active = false
+		return
+	var local: Vector3 = _ground.to_local(Vector3(global_position.x, 0.0, global_position.z))
+	var surface: float = _ground.get_visible_height_at(Vector2(local.x, local.z))
+	var gap: float = global_position.y - surface
+	if gap < -ground_penetration_tolerance_m:
+		if not _ground_hold_active and not _ground.is_channel_draining() and not _ground_hold_warned:
+			_ground_hold_warned = true
+			push_warning("Wanderer: feet %.2f m under the drawn ground at XZ (%.2f, %.2f) with no channel draining - a bad spot in the relief." % [-gap, global_position.x, global_position.z])
+		global_position.y = surface
+		velocity.y = maxf(velocity.y, 0.0)
+		_ground_hold_active = true
+	elif gap > ground_penetration_tolerance_m or is_on_floor():
+		_ground_hold_active = false
+
 func _cast_ray(from: Vector3, to: Vector3) -> Dictionary:
 	var space_state: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
 	var query := PhysicsRayQueryParameters3D.create(from, to)
@@ -1853,7 +1912,7 @@ func _physics_process(delta: float) -> void:
 		velocity.x = move_toward(velocity.x, target_velocity.x, acceleration * delta)
 		velocity.z = move_toward(velocity.z, target_velocity.z, acceleration * delta)
 
-	if not is_on_floor():
+	if not _is_grounded():
 		velocity.y -= gravity * delta
 	else:
 		velocity.y = 0.0
@@ -1861,6 +1920,11 @@ func _physics_process(delta: float) -> void:
 	_apply_step_up_and_down(delta)
 
 	move_and_slide()
+
+	# Last, after every other write to global_position this frame, so the
+	# position that renders is the held one - a step-down onto lagging
+	# collision earlier in the frame never shows.
+	_hold_above_visible_ground()
 
 	if move_direction.length() > 0.01:
 		rotation.y = lerp_angle(rotation.y, _angle_from_direction(move_direction), rotation_speed * delta)

@@ -183,6 +183,9 @@ func setup_channel(ground: Ground, wall_rect: Rect2) -> void:
 	if _channel == null:
 		_channel = GroundChannel.new()
 	_channel.centre = centre
+	# The one axis the channel runs along - the gate's own forward, the
+	# floor's exit direction - for Ground's CPU functions and its shader.
+	_channel.axis = forward
 	_channel.length = length
 	_channel.width = _channel_width
 	_channel.depth = channel_depth

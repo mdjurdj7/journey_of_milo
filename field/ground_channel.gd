@@ -3,8 +3,10 @@ class_name GroundChannel
 
 # One tidal channel cut into the relief - see Ground.channels. A world-
 # space rectangle centred on `centre` (world XZ), `length` metres along
-# the field's forward axis (Ground reads RegionField.get_forward(), never
-# a hardcoded axis) and `width` across it, lowering the ground inside by
+# `axis` (unit XZ - the floor's exit direction, written by ExitGate.
+# setup_channel() and read by Ground's CPU side and its shader alike, so
+# there is one axis, never an assumed one) and `width` across it,
+# lowering the ground inside by
 # `depth` with a soft edge `edge` metres wide. The edge is perturbed by
 # the relief's own value noise (edge_noise_scale / edge_noise_amplitude)
 # so the banks wander like a shore instead of ruling a canal.
@@ -17,6 +19,7 @@ class_name GroundChannel
 # of sand between two channels that stay full.
 
 @export var centre: Vector2 = Vector2.ZERO
+@export var axis: Vector2 = Vector2(0.0, -1.0)
 @export var length: float = 3.0
 @export var width: float = 14.0
 @export var depth: float = 0.5
