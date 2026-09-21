@@ -513,6 +513,8 @@ func _physics_process(_delta: float) -> void:
 
 func _update_hover(screen_pos: Vector2) -> void:
 	var enemy := _enemy_at(screen_pos)
+	if enemy == null:
+		enemy = _default_target()
 	if enemy == _hovered_enemy:
 		return
 	_clear_hover()
@@ -524,6 +526,26 @@ func _clear_hover() -> void:
 	if _hovered_enemy != null:
 		_hovered_enemy.set_highlight(false)
 		_hovered_enemy = null
+
+# What an armed card means when the cursor is over none of them: the
+# leftmost living enemy on screen - the one nearest the Wanderer along
+# the battle line - shown with the same highlight and target line a
+# hover gets. Only in a fight with more than one living enemy; against
+# a single enemy nothing is indicated until the cursor reaches it, as
+# before. Reads the rect cache, so a member behind the camera is never
+# the default.
+func _default_target() -> FieldEnemy:
+	if enemies.size() < 2:
+		return null
+	var best: FieldEnemy = null
+	var best_x: float = INF
+	for enemy: FieldEnemy in _enemy_rects:
+		var rect: Rect2 = _enemy_rects[enemy]
+		var centre_x: float = rect.get_center().x
+		if centre_x < best_x:
+			best_x = centre_x
+			best = enemy
+	return best
 
 # Each living enemy's screen-space bounding rect of its model's world
 # AABB (FieldEnemy.get_screen_rect() - the real mesh bounds, as placed,

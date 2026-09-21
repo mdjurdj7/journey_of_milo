@@ -131,6 +131,10 @@ enum RewardMode { SCREEN, WORLD }
 		camera_inland_limit_override_z = value
 		_apply_camera_inland_limit()
 @export var battle_spacing: float = 3.0
+# Metres between the members of a cluster along the line they step into
+# for a fight (see _place_cluster_line()) - read at contact, so a Remote-
+# tab edit takes on the next fight.
+@export var cluster_member_gap: float = 1.3
 # Which of BattleTheme's two value sets the overlay applies on entering
 # battle - see ui/battle_theme.gd's own rule: UI is the dark element on a
 # pale world (false, default) and the pale element on a dark one (true).
@@ -609,6 +613,7 @@ func _spawn_floor_enemies() -> void:
 		enemy.name = "FieldEnemy%d" % index
 		enemy.enemy_data = entry.enemy_data
 		enemy.required = entry.required
+		enemy.group = entry.group
 		enemy.face_shore_at_spawn = false
 		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)
 		enemy.rotation.y = deg_to_rad(entry.yaw_degrees)
@@ -908,12 +913,64 @@ func _fog_colour() -> Color:
 	var sky := get_node_or_null(sky_path) as RegionSky
 	return sky.fog_color if sky != null else Color.WHITE
 
-# The enemies one contact starts a fight with, the contacted one first:
-# the first is who the Wanderer steps up to and what the camera's fit
-# takes its axis from (CameraRig.enter_battle()). A list of one today.
+# The enemies one contact starts a fight with. A lone enemy: itself. A
+# cluster member (FieldEnemy.group): every member of its group still on
+# the field, nearest-to-the-Wanderer first - the first is who the
+# Wanderer steps up to and what the camera's fit takes its axis from
+# (CameraRig.enter_battle()); the rest follow in the order they will
+# stand along the line (see _place_cluster_line()). The contact zone is
+# the union of the members' own contact areas - no merged shape.
 func _battle_members_for(enemy: FieldEnemy) -> Array[FieldEnemy]:
 	var members: Array[FieldEnemy] = [enemy]
+	if enemy.group == &"":
+		return members
+	members.clear()
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var member := node as FieldEnemy
+		if member == null or member.group != enemy.group or member.is_queued_for_deletion():
+			continue
+		members.append(member)
+	var from: Vector3 = wanderer.global_position
+	members.sort_custom(func(a: FieldEnemy, b: FieldEnemy) -> bool:
+		return a.global_position.distance_squared_to(from) < b.global_position.distance_squared_to(from)
+	)
 	return members
+
+# The line a cluster fights in, from the members' own arrangement, not
+# the Wanderer's approach: it starts at the anchor (the nearest member,
+# which keeps its spot) and runs toward the member farthest from it, the
+# others stepping onto it cluster_member_gap apart in order of how far
+# along it they already stand. Returns the direction from the anchor
+# back toward where the Wanderer stands (the line extended past its near
+# end), for Wanderer.enter_battle_stance(); ZERO for a lone enemy, which
+# keeps the approach line as it always has.
+func _place_cluster_line(members: Array[FieldEnemy], duration: float) -> Vector3:
+	if members.size() < 2:
+		return Vector3.ZERO
+	var anchor: FieldEnemy = members[0]
+	var far: FieldEnemy = members[0]
+	var far_distance: float = 0.0
+	for member in members:
+		var distance: float = anchor.global_position.distance_squared_to(member.global_position)
+		if distance > far_distance:
+			far_distance = distance
+			far = member
+	var along := far.global_position - anchor.global_position
+	along.y = 0.0
+	if along.length() < 0.0001:
+		return Vector3.ZERO
+	along = along.normalized()
+	# Anchor first, then by how far along the line each already stands -
+	# the pack keeps its own order rather than crossing.
+	var rest: Array[FieldEnemy] = members.slice(1)
+	rest.sort_custom(func(a: FieldEnemy, b: FieldEnemy) -> bool:
+		return (a.global_position - anchor.global_position).dot(along) < (b.global_position - anchor.global_position).dot(along)
+	)
+	for index in rest.size():
+		var spot: Vector3 = anchor.global_position + along * cluster_member_gap * float(index + 1)
+		rest[index].step_to(spot, duration)
+		members[index + 1] = rest[index]
+	return -along
 
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# Two contact areas can fire in one physics frame; the second must
@@ -941,9 +998,15 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 		var viewport_height: float = overlay.get_viewport().get_visible_rect().size.y
 		var hand_top_fraction: float = overlay.hand_container.get_rest_top_y() / maxf(viewport_height, 1.0)
 		camera_rig.enter_battle(wanderer, _battle_members, hand_top_fraction)
-		wanderer.enter_battle_stance(anchor, battle_spacing, camera_rig.battle_transition_time)
+		var stance_direction: Vector3 = _place_cluster_line(_battle_members, camera_rig.battle_transition_time)
+		wanderer.enter_battle_stance(anchor, battle_spacing, camera_rig.battle_transition_time, stance_direction)
+		# A lone enemy faces the Wanderer where he is (his stance lies on
+		# that same line); a cluster faces where its line will put him.
+		var face_point: Vector3 = wanderer.global_position
+		if stance_direction != Vector3.ZERO:
+			face_point = anchor.global_position + stance_direction * battle_spacing
 		for member in _battle_members:
-			member.face_toward(wanderer, camera_rig.battle_transition_time)
+			member.face_toward_point(face_point, camera_rig.battle_transition_time)
 
 	var directional_light := get_node_or_null(directional_light_path) as OvercastLight
 	if directional_light:
@@ -1033,6 +1096,11 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 				floor_cleared.emit()
 		BattleOverlay.Outcome.ESCAPE:
 			_push_wanderer_away_from(standing)
+			# Back to their own spots, over the same beat the frame
+			# blends out on. A lone enemy never stepped; no-op for it.
+			var return_time: float = camera_rig.battle_transition_time if camera_rig != null else 0.0
+			for member in standing:
+				member.return_to_field_pose(return_time)
 		BattleOverlay.Outcome.LOSE:
 			get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
 
@@ -1171,11 +1239,13 @@ func _apply_consumed_removals(fight_deck: Deck) -> void:
 
 # Straight back from the nearest of them, escape_push_distance out - and
 # further, if that still lands inside any of their contact areas
-# (contact_radius + escape_clearance_margin from each), or the Wanderer
-# lands back inside an Area3D and either re-triggers contact immediately
-# or can't leave it. push_warning when the export didn't clear on its
-# own, so a misconfigured pair is loud, not a silent soft-lock. Empty
-# list (nothing left to escape from): no push.
+# (contact_radius + escape_clearance_margin from each, where each stands
+# now AND where it is about to go back to, since the area sweeps between
+# the two), or the Wanderer lands back inside an Area3D and either
+# re-triggers contact immediately or can't leave it. push_warning when
+# the export didn't clear on its own, so a misconfigured pair is loud,
+# not a silent soft-lock. Empty list (nothing left to escape from): no
+# push.
 func _push_wanderer_away_from(enemies: Array[FieldEnemy]) -> void:
 	var anchor: FieldEnemy = null
 	var anchor_distance: float = INF
@@ -1195,21 +1265,25 @@ func _push_wanderer_away_from(enemies: Array[FieldEnemy]) -> void:
 	var target: Vector3 = anchor.global_position + push_dir * push_distance
 	for enemy in enemies:
 		var clearance: float = enemy.contact_radius + escape_clearance_margin
-		var to_target := target - enemy.global_position
-		to_target.y = 0.0
-		if to_target.length() >= clearance:
-			continue
-		# Along the push line, how much further out clears this one's
-		# circle: solve |anchor + dir * d - enemy| = clearance for d.
-		var rel := anchor.global_position - enemy.global_position
-		rel.y = 0.0
-		var b: float = rel.dot(push_dir)
-		var c: float = rel.length_squared() - clearance * clearance
-		var disc: float = b * b - c
-		var needed: float = -b + sqrt(maxf(disc, 0.0))
-		push_warning("RegionField: escape_push_distance (%.2f) does not clear enemy '%s' contact_radius (%.2f); pushing %.2f." % [push_distance, enemy.enemy_id, enemy.contact_radius, needed])
-		push_distance = maxf(push_distance, needed)
-		target = anchor.global_position + push_dir * push_distance
+		var centres: Array[Vector3] = [enemy.global_position]
+		if enemy.get_field_position() != enemy.global_position:
+			centres.append(enemy.get_field_position())
+		for centre in centres:
+			var to_target := target - centre
+			to_target.y = 0.0
+			if to_target.length() >= clearance:
+				continue
+			# Along the push line, how much further out clears this
+			# circle: solve |anchor + dir * d - centre| = clearance for d.
+			var rel := anchor.global_position - centre
+			rel.y = 0.0
+			var b: float = rel.dot(push_dir)
+			var c: float = rel.length_squared() - clearance * clearance
+			var disc: float = b * b - c
+			var needed: float = -b + sqrt(maxf(disc, 0.0))
+			push_warning("RegionField: escape_push_distance (%.2f) does not clear enemy '%s' contact_radius (%.2f); pushing %.2f." % [push_distance, enemy.enemy_id, enemy.contact_radius, needed])
+			push_distance = maxf(push_distance, needed)
+			target = anchor.global_position + push_dir * push_distance
 
 	wanderer.global_position = target
 

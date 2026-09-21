@@ -1492,13 +1492,20 @@ func play_hit_audio() -> void:
 # play("Idle") safe to call even mid-DrawSword) — independent of
 # _physics_process (and its own dash/move-input handling), which
 # RegionField's contact freeze has already stopped by the time this runs.
-func enter_battle_stance(target: Node3D, spacing: float, duration: float) -> void:
+#
+# direction, when given, is the way from target to where this Wanderer
+# should stand (a cluster's line extended past its near end - see
+# RegionField._place_cluster_line()); ZERO (the default, a lone enemy)
+# keeps the target->Wanderer ground line, wherever contact happened.
+func enter_battle_stance(target: Node3D, spacing: float, duration: float, direction: Vector3 = Vector3.ZERO) -> void:
 	if target == null:
 		return
 	# Contact is where a walk-to-enemy target ends; nothing resumes after.
 	clear_move_target()
 
-	var away_from_target := _flatten_normalized(global_position - target.global_position)
+	var away_from_target := _flatten_normalized(direction)
+	if away_from_target == Vector3.ZERO:
+		away_from_target = _flatten_normalized(global_position - target.global_position)
 	if away_from_target == Vector3.ZERO:
 		away_from_target = _forward_from_angle(rotation.y)
 

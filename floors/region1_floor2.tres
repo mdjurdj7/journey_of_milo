@@ -19,14 +19,26 @@ position = Vector2(1.2, -17)
 [sub_resource type="Resource" id="FloorEnemy_island_sputter1"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("5_sputter")
-position = Vector2(-11.6, -16.4)
+position = Vector2(-11.4, -16.4)
 yaw_degrees = -113.2
+required = false
+group = &"island"
 
 [sub_resource type="Resource" id="FloorEnemy_island_sputter2"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("5_sputter")
-position = Vector2(-9.4, -15.6)
+position = Vector2(-12.7, -17.1)
 yaw_degrees = -116.6
+required = false
+group = &"island"
+
+[sub_resource type="Resource" id="FloorEnemy_island_sputter3"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("5_sputter")
+position = Vector2(-13.5, -16.6)
+yaw_degrees = -122.0
+required = false
+group = &"island"
 
 [sub_resource type="Resource" id="FloorProp_belongings"]
 script = ExtResource("3_floor_prop")
@@ -57,7 +69,7 @@ mask_origin = Vector2(0.5, 0.888889)
 interior_height = 0.3
 relief_amplitude = 0.18
 caustic_strength = 0.12
-enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_sputter1"), SubResource("FloorEnemy_island_sputter2")])
+enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_sputter1"), SubResource("FloorEnemy_island_sputter2"), SubResource("FloorEnemy_island_sputter3")])
 props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_belongings"), SubResource("FloorProp_island_belongings"), SubResource("FloorProp_alcove_cache")])
 wear_path_override = null
 ambience_sea_db = -3.0

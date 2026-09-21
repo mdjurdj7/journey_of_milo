@@ -29,6 +29,9 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 # (see RegionField._required_enemy_remains()). True for an enemy this
 # scene is placed by hand, same as the data default.
 @export var required: bool = true
+# FloorEnemy.group, mirrored the same way - RegionField reads it off the
+# "enemies" group to find this enemy's cluster on contact.
+@export var group: StringName = &""
 @export var region_field_path: NodePath = ^".."
 @export var ground_path: NodePath = ^"../Ground"
 @export_range(0.0, 1.0, 0.01) var highlight_lighten_amount: float = 0.35
@@ -86,6 +89,12 @@ var _model_base_color: Color = Color.WHITE
 # moves under it.
 var _model: Node3D = null
 var _settling: bool = false
+# Where this enemy stood before step_to() moved it into a fight's line,
+# and which way it faced - what return_to_field_pose() goes back to
+# after an escape. Set by step_to(), cleared by the return.
+var _field_position: Vector3 = Vector3.ZERO
+var _field_yaw: float = 0.0
+var _has_field_pose: bool = false
 var _ground: Ground = null
 var _slash_mark_mesh: ArrayMesh = null
 var _slash_mark_texture: GradientTexture2D = null
@@ -544,8 +553,13 @@ func play_attack_snap(target: Node3D) -> float:
 func face_toward(target: Node3D, duration: float) -> void:
 	if target == null:
 		return
+	face_toward_point(target.global_position, duration)
 
-	var to_target := Vector3(target.global_position.x - global_position.x, 0.0, target.global_position.z - global_position.z)
+# The same yaw, to a world point - where the Wanderer is GOING to stand
+# when a cluster's line puts him somewhere other than where contact
+# happened (see RegionField._on_enemy_contacted()).
+func face_toward_point(point: Vector3, duration: float) -> void:
+	var to_target := Vector3(point.x - global_position.x, 0.0, point.z - global_position.z)
 	if to_target.length() < 0.0001:
 		return
 
@@ -558,6 +572,49 @@ func face_toward(target: Node3D, duration: float) -> void:
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(self, "rotation:y", target_angle, duration)
+
+# Called by RegionField on contact for a cluster member that isn't the
+# one the Wanderer squares up to (see its _place_cluster_line()): tweens
+# this body's XZ to `spot` over duration, through the battle freeze
+# like face_toward(), with its Y sampled from the relief at the NEW spot
+# (the relief callback only re-grounds at the current one). The pose it
+# leaves is kept for return_to_field_pose(); a second step in the same
+# fight (none today) keeps the first pose, not the stepped one.
+func step_to(spot: Vector3, duration: float) -> void:
+	if not _has_field_pose:
+		_field_position = global_position
+		_field_yaw = rotation.y
+		_has_field_pose = true
+	_tween_to(spot, duration)
+
+# The escape's counterpart: back to where it stood and faced before the
+# fight, over duration. No-op for a body that never stepped.
+func return_to_field_pose(duration: float) -> void:
+	if not _has_field_pose:
+		return
+	_has_field_pose = false
+	_tween_to(_field_position, duration)
+	var target_angle := rotation.y + wrapf(_field_yaw - rotation.y, -PI, PI)
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(self, "rotation:y", target_angle, duration)
+
+# The XZ where this enemy stands when not stepped into a line - its
+# authored spot - for anything that must clear its contact area after it
+# has gone back there (RegionField._push_wanderer_away_from()).
+func get_field_position() -> Vector3:
+	return _field_position if _has_field_pose else global_position
+
+func _tween_to(spot: Vector3, duration: float) -> void:
+	var destination := Vector3(spot.x, global_position.y, spot.z)
+	if _ground != null:
+		var local_xz: Vector3 = _ground.to_local(Vector3(spot.x, 0.0, spot.z))
+		destination.y = _ground.get_height_at(Vector2(local_xz.x, local_xz.z)) - model_ground_offset
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(self, "global_position", destination, duration)
 
 # Called by RegionField when this enemy dies in a fight that goes on
 # without it (see its _on_enemy_defeated()). The HP readout goes at once

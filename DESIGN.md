@@ -96,6 +96,21 @@ so it doesn't get silently reinvented or silently forgotten.
   has the same shape but is not held back: it is merely unexciting
   against one enemy rather than actively dead. (2026-09-19, second
   Wanderer card pass.)
+  Update: floor 2 now fields one - the island's three Sputters fight as
+  a cluster (`FloorEnemy.group`), so the card is no longer dead there.
+  Still out of the pool: floor 1 is one crab and the pool is per floor,
+  so putting it in is a per-floor pool decision, not a side effect of
+  the cluster landing. (2026-09-21, multi-enemy clusters.)
+- **A cluster's contact zone is the union of its members' own contact
+  spheres, not one merged shape.** Contact with any member starts the
+  fight with every member of its `FloorEnemy.group` still standing
+  (`RegionField._battle_members_for()`); nothing else exists on the
+  field for a cluster - no node, no Area of its own. That is exact as
+  long as neighbours stand within 2 x `contact_radius` (4 m) of each
+  other, which the island's three do (1.3-1.5 m). A cluster spread wider
+  than that would have holes in its zone; if one is ever authored, give
+  the cluster a merged Area (a capsule along its line) instead of
+  growing every member's sphere. (2026-09-21, multi-enemy clusters.)
 - **Floors as data - what the first pass left open.** `region_field.tscn`
   is the region (sea, sky, light, tower, HUD); a floor is a `FloorData`
   in `floors/` (`region1_floor1.tres` = the tutorial floor extracted,

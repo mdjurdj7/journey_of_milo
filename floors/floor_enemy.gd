@@ -22,3 +22,11 @@ class_name FloorEnemy
 # required enemy is left standing. False = an optional fight, there to be
 # chosen or walked past.
 @export var required: bool = true
+# Entries sharing a non-empty id are one cluster: contact with any of
+# them starts one fight with all of them (RegionField._battle_members_
+# for()), and they step into one line for it (FieldEnemy.step_to()). The
+# line runs through their authored positions, so lay a cluster out
+# roughly as it should stand; their contact areas (contact_radius, 2 m)
+# are the zone, so keep members within 2 x that of a neighbour or the
+# zone has a hole. Empty (the default) = fights alone.
+@export var group: StringName = &""
