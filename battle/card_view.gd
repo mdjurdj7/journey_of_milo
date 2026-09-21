@@ -149,18 +149,19 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @export_range(0.0, 1.0) var type_label_alpha: float = 0.62
 @export_range(0.0, 1.0) var footer_rule_alpha: float = 0.25
 
-@export_group("Bonus Underline")
-# The one mark of a LIVE conditional besides the ink: the card's name
-# underlined in its ink - bonus_underline_thickness_px thick, bonus_
-# underline_gap_px under the name's baseline, the name's own rendered
-# width - drawn in left to right over bonus_hairline_in_seconds
-# (ease-out) and retracted over bonus_hairline_out_seconds. Nothing
-# else moves; it holds while the card stays live. Sizes are at 1x and
-# scale with the card like everything on it.
-@export var bonus_underline_thickness_px: float = 1.5
-@export var bonus_underline_gap_px: float = 3.0
-@export var bonus_hairline_in_seconds: float = 0.2
-@export var bonus_hairline_out_seconds: float = 0.15
+@export_group("Bonus Panel")
+# The one mark of a LIVE conditional besides the ink: the art panel's
+# tint deepens toward the card's own type keyline colour - by bonus_
+# panel_live_amount of the way, over bonus_panel_in_seconds (ease-out)
+# - and returns to the plain tint over bonus_panel_out_seconds. Nothing
+# else moves; it holds while the card stays live. The glyph stays ink
+# on it: at 0.6 every type's deepened panel keeps it above 4.5:1.
+@export_range(0.0, 1.0) var bonus_panel_live_amount: float = 0.6
+@export var bonus_panel_in_seconds: float = 0.2
+@export var bonus_panel_out_seconds: float = 0.15
+# The name's colour while LIVE - the ink by default, i.e. no change;
+# exported only so an alternative can be compared against the panel.
+@export var bonus_name_live_color: Color = Color(0.165, 0.165, 0.18)
 
 @export_group("Layout")
 @export var outer_margin: float = 12.0
@@ -250,11 +251,15 @@ var _toll: int = 0
 # The battle as it stands, for this card's conditionals (see set_bonus_
 # context()) - null anywhere but a battle hand, which is what keeps a
 # reward, an offer or a deck view neutral: no state, no dimming, no
-# hairline. And the reading taken from it: CardBonus.state().
+# deepened panel. And the reading taken from it: CardBonus.state().
 var _bonus_context: EffectContext = null
 var _bonus_state: CardBonus.State = CardBonus.State.NONE
-var _bonus_underline: ColorRect = null
-var _bonus_underline_tween: Tween = null
+# The art panel's deepening, 0 = the plain tint, 1 = bonus_panel_live_
+# amount of the way to the keyline colour - tweened by _animate_bonus_
+# panel(), written through _set_bonus_panel_blend().
+var _bonus_panel_blend: float = 0.0
+var _bonus_panel_tween: Tween = null
+var _art_style: StyleBoxFlat = null
 var _hp_cost: int = 0
 var _rest_offset_y: float = 0.0
 # How far down from this card's own local origin "at rest" actually sits -
@@ -287,11 +292,6 @@ func _ready() -> void:
 			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.draw.connect(_draw_glyph)
-	_bonus_underline = ColorRect.new()
-	_bonus_underline.name = "BonusUnderline"
-	_bonus_underline.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bonus_underline.size = Vector2(0.0, bonus_underline_thickness_px)
-	add_child(_bonus_underline)
 	_apply_style()
 	_apply_layout()
 	mouse_entered.connect(_on_mouse_entered)
@@ -318,7 +318,7 @@ func set_grace(grace: int) -> void:
 # by HandContainer on every signal that can move one (a card played, a
 # turn boundary, Grace, HP, Toll), never per frame; null outside a
 # battle hand. Re-reads the face: which half of a conditional is inked,
-# and the hairline.
+# and the panel.
 func set_bonus_context(ctx: EffectContext) -> void:
 	_bonus_context = ctx
 	if card_data == null:
@@ -353,7 +353,8 @@ func _refresh_dynamic_text() -> void:
 	_bonus_state = CardBonus.state(card_data, _bonus_context) if _bonus_context != null else CardBonus.State.NONE
 	rules_text.text = _style_bonus_clauses(_format_rules(_resolve_tokens(card_data.description)))
 	if _bonus_state != was:
-		_animate_bonus_underline()
+		_animate_bonus_panel()
+		_apply_name_color()
 
 # Substitutes the effect-backed tokens. A token whose card has no
 # matching effect is left standing rather than replaced with 0 - that way
@@ -477,28 +478,38 @@ func _style_bonus_clauses(bbcode: String) -> String:
 static func _strip_markers(text: String) -> String:
 	return text.replace(MARK_IF_OPEN, "").replace(MARK_IF_CLOSE, "").replace(MARK_ELSE_OPEN, "").replace(MARK_ELSE_CLOSE, "")
 
-# The underline's draw-in on LIVE and retraction on anything else - one
-# tween, restarted from wherever the width stands, so a quick flip never
+# The panel's deepening on LIVE and its return on anything else - one
+# tween, restarted from wherever the blend stands, so a quick flip never
 # pops.
-func _animate_bonus_underline() -> void:
-	if _bonus_underline == null:
-		return
-	if _bonus_underline_tween != null and _bonus_underline_tween.is_valid():
-		_bonus_underline_tween.kill()
+func _animate_bonus_panel() -> void:
+	if _bonus_panel_tween != null and _bonus_panel_tween.is_valid():
+		_bonus_panel_tween.kill()
 	var live: bool = _bonus_state == CardBonus.State.LIVE
-	var target_width: float = _bonus_underline_target_width() if live else 0.0
-	var seconds: float = bonus_hairline_in_seconds if live else bonus_hairline_out_seconds
+	var target: float = 1.0 if live else 0.0
+	var seconds: float = bonus_panel_in_seconds if live else bonus_panel_out_seconds
 	if seconds <= 0.0 or not is_inside_tree():
-		_bonus_underline.size.x = target_width
+		_set_bonus_panel_blend(target)
 		return
-	_bonus_underline_tween = create_tween()
-	_bonus_underline_tween.set_ease(Tween.EASE_OUT if live else Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
-	_bonus_underline_tween.tween_property(_bonus_underline, "size:x", target_width, seconds)
+	_bonus_panel_tween = create_tween()
+	_bonus_panel_tween.set_ease(Tween.EASE_OUT if live else Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	_bonus_panel_tween.tween_method(_set_bonus_panel_blend, _bonus_panel_blend, target, seconds)
 
-# The name's rendered width - its own string width, clipped to the label
-# as the name itself is.
-func _bonus_underline_target_width() -> float:
-	return minf(_string_width(name_label, name_font_size_px), name_label.size.x)
+func _set_bonus_panel_blend(blend: float) -> void:
+	_bonus_panel_blend = clampf(blend, 0.0, 1.0)
+	_apply_panel_color()
+
+# The art panel's colour now: the type's plain tint, pulled toward the
+# type's keyline colour by the current blend x bonus_panel_live_amount.
+# One StyleBoxFlat kept and recoloured, not rebuilt per frame.
+func _apply_panel_color() -> void:
+	if _art_style == null:
+		_art_style = _rounded_style(_art_field_color(), art_field_radius)
+		art_field.add_theme_stylebox_override("panel", _art_style)
+	_art_style.bg_color = _art_field_color().lerp(_keyline_color(), _bonus_panel_blend * bonus_panel_live_amount)
+
+# The name in bonus_name_live_color while LIVE, the ink otherwise.
+func _apply_name_color() -> void:
+	name_label.add_theme_color_override("font_color", bonus_name_live_color if _bonus_state == CardBonus.State.LIVE else ink_color)
 
 # Whether the player can currently afford this card - HandContainer pushes
 # this on every energy change. Unplayable fades the whole card.
@@ -782,12 +793,10 @@ func _apply_style() -> void:
 	shadow_soft.add_theme_stylebox_override("panel", soft)
 	_apply_shadows(false)
 
-	name_label.add_theme_color_override("font_color", ink_color)
+	_apply_name_color()
 	name_label.add_theme_font_size_override("font_size", name_font_size_px)
 	if name_font != null:
 		name_label.add_theme_font_override("font", name_font)
-	if _bonus_underline != null:
-		_bonus_underline.color = ink_color
 
 	cost_label.add_theme_color_override("font_color", ink_color)
 	cost_label.add_theme_font_size_override("font_size", cost_font_size_px)
@@ -801,7 +810,7 @@ func _apply_style() -> void:
 	if rules_font_bold != null:
 		hp_cost_label.add_theme_font_override("font", _spaced_bold(hp_cost_font_size_px, hp_cost_letter_spacing_em))
 
-	art_field.add_theme_stylebox_override("panel", _rounded_style(_art_field_color(), art_field_radius))
+	_apply_panel_color()
 
 	rules_text.bbcode_enabled = true
 	rules_text.scroll_active = false
@@ -879,7 +888,7 @@ func _apply_type_style() -> void:
 	if card_data == null:
 		return
 	keyline.color = _keyline_color()
-	art_field.add_theme_stylebox_override("panel", _rounded_style(_art_field_color(), art_field_radius))
+	_apply_panel_color()
 	glyph.queue_redraw()
 
 # --- Layout ---
@@ -930,20 +939,6 @@ func _apply_layout() -> void:
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_label.clip_text = true
-	# The bonus underline: under the name's last line's baseline, the
-	# name's rendered width (its own, clipped to the label). Its current
-	# width is the tween's alone (see _animate_bonus_underline()) - only
-	# a settled underline is re-fitted here, so a live card re-laid out
-	# stays underlined.
-	if _bonus_underline != null:
-		var name_font_face: Font = name_label.get_theme_font("font")
-		var ascent: float = name_font_face.get_ascent(name_font_size_px) if name_font_face != null else name_line * 0.75
-		var baseline: float = name_label.position.y + name_line * float(name_lines - 1) + ascent
-		_bonus_underline.position = Vector2(name_label.position.x, baseline + bonus_underline_gap_px)
-		_bonus_underline.size.y = bonus_underline_thickness_px
-		var settled: bool = _bonus_underline_tween == null or not _bonus_underline_tween.is_valid() or not _bonus_underline_tween.is_running()
-		if settled:
-			_bonus_underline.size.x = _bonus_underline_target_width() if _bonus_state == CardBonus.State.LIVE else 0.0
 
 	var header_bottom: float = outer_margin + maxf(name_height, cost_height + hp_height)
 
