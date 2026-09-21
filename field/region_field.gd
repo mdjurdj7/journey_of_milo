@@ -130,6 +130,18 @@ enum RewardMode { SCREEN, WORLD }
 # pale world (false, default) and the pale element on a dark one (true).
 @export var ui_on_dark_world: bool = false
 
+@export_group("Ambience Duck")
+# On enemy contact the Ambience bus (both beds: sea and wind) comes down
+# by ambience_duck_db over the camera's battle swing (CameraRig.battle_
+# transition_time), and comes back over the swing out on a win or an
+# escape; a loss puts it straight back before the scene changes, and
+# every floor load writes ambience_bus_base_db outright, since the bus
+# is global and keeps whatever the last scene left on it. The base must
+# be the bus's authored level in default_bus_layout.tres (0).
+@export var ambience_duck_db: float = -4.0
+@export var ambience_bus_base_db: float = 0.0
+@export_group("")
+
 @export var ground_path: NodePath = ^"Ground"
 
 # How far past the (worst-case, noise-included) shoreline the side walls
@@ -219,6 +231,9 @@ var _run_lost_to_wading: bool = false
 
 # The click mark, created on first use - see ClickMarker.
 var _click_marker: ClickMarker = null
+
+# The Ambience bus's running duck/return - see _duck_ambience().
+var _ambience_tween: Tween = null
 
 # Parent-first, before any child has entered the tree or run its
 # _ready(): the one moment the floor's landmass and spawn can be put onto
@@ -320,6 +335,10 @@ func _ready() -> void:
 	_setup_field_hud()
 	_build_boundary()
 	_setup_exit_gate_channel()
+
+	# The Ambience bus at its base - a loss mid-duck or a restart must not
+	# inherit the last scene's level.
+	_set_ambience_bus_db(ambience_bus_base_db)
 
 	# The wind bed, at this floor's offset - see WindAmbience.
 	var floor_for_wind := get_floor_data()
@@ -873,6 +892,9 @@ func _fog_colour() -> Color:
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	process_mode = Node.PROCESS_MODE_DISABLED
 
+	var swing_rig := get_node_or_null(camera_rig_path) as CameraRig
+	_duck_ambience(ambience_bus_base_db + ambience_duck_db, swing_rig.battle_transition_time if swing_rig != null else 0.0)
+
 	# Overlay first: CameraRig's battle fit needs the card hand's resting
 	# top edge, and that only exists once the overlay's layout is in the
 	# tree (anchors resolve synchronously on add_child).
@@ -918,6 +940,13 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, over
 	var directional_light := get_node_or_null(directional_light_path) as OvercastLight
 	if directional_light:
 		directional_light.exit_battle()
+
+	# The ambience back up with the frame's return - or at once on a loss,
+	# since the scene is about to go and the bus is not.
+	if outcome == BattleOverlay.Outcome.LOSE:
+		_duck_ambience(ambience_bus_base_db, 0.0)
+	else:
+		_duck_ambience(ambience_bus_base_db, camera_rig.battle_transition_time if camera_rig != null else 0.0)
 
 	match outcome:
 		BattleOverlay.Outcome.WIN:
@@ -1034,6 +1063,27 @@ func _aim_wear_path(enemy: FieldEnemy) -> void:
 	var right: Vector3 = get_exit_direction().cross(Vector3.UP).normalized()
 	var mid: Vector3 = enemy.global_position + right * floor_data.wear_path_mid_offset
 	ground.set_wear_path(spawn, mid, gate.global_position)
+
+# The Ambience bus toward `to_db` over `seconds` - one tween, the last
+# call wins, and it runs through this node's own battle freeze (TWEEN_
+# PAUSE_PROCESS, the same override FieldEnemy's flash carries). 0 seconds
+# writes the level outright.
+func _duck_ambience(to_db: float, seconds: float) -> void:
+	var bus: int = AudioServer.get_bus_index(&"Ambience")
+	if bus < 0:
+		return
+	if _ambience_tween != null and _ambience_tween.is_valid():
+		_ambience_tween.kill()
+	_ambience_tween = null
+	if seconds <= 0.0:
+		AudioServer.set_bus_volume_db(bus, to_db)
+		return
+	_ambience_tween = create_tween()
+	_ambience_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_ambience_tween.tween_method(func(value: float) -> void: AudioServer.set_bus_volume_db(bus, value), AudioServer.get_bus_volume_db(bus), to_db, seconds)
+
+func _set_ambience_bus_db(level_db: float) -> void:
+	_duck_ambience(level_db, 0.0)
 
 # CONSUMED cards leave RunState.deck (the run's Belongings) for good once
 # the fight that consumed them ends; SPENT ones (the rest of exhaust_pile)
