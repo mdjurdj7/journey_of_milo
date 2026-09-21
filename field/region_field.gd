@@ -8,8 +8,10 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 const FIELD_ENEMY_SCENE_PATH := "res://field/field_enemy.tscn"
 const PROPS_NODE_NAME := "Props"
 
-# Emitted once, when the last "enemies"-group member is defeated - see
-# _on_battle_finished()'s own WIN branch. Opens the ExitGate.
+# Emitted once, when the last REQUIRED enemy (FloorEnemy.required) is
+# defeated - see _on_battle_finished()'s own WIN branch and _required_
+# enemy_remains(). Opens the ExitGate. An optional fight won afterwards
+# doesn't emit it again.
 signal floor_cleared
 
 # This scene is the REGION: sea, sky, light, tower, HUD. Which floor of it
@@ -23,6 +25,10 @@ signal floor_cleared
 @export var region: RegionData = null
 
 @export var escape_push_distance: float = 4.0
+# How far past every enemy's contact_radius the escape push must land the
+# Wanderer - the push grows past escape_push_distance until it does (see
+# _push_wanderer_away_from()).
+@export var escape_clearance_margin: float = 0.5
 
 # Where a won fight's reward is offered. SCREEN is the interim static
 # list; WORLD is the three cards laid on the sand where the enemy fell
@@ -234,6 +240,18 @@ var _click_marker: ClickMarker = null
 
 # The Ambience bus's running duck/return - see _duck_ambience().
 var _ambience_tween: Tween = null
+
+# The fight in progress, from _on_enemy_contacted() to _on_battle_
+# finished(): its guard (a second contact while one is open is ignored,
+# loudly), the enemies it holds (in the order the battle layer got them -
+# the first is the one the Wanderer squares up to), and where the last
+# of them fell, snapshotted at the kill so the reward can land there
+# after the body is gone.
+var _battle_open: bool = false
+var _battle_members: Array[FieldEnemy] = []
+var _last_fallen_at: Vector3 = Vector3.ZERO
+var _last_fallen_data: EnemyData = null
+var _floor_cleared_emitted: bool = false
 
 # Parent-first, before any child has entered the tree or run its
 # _ready(): the one moment the floor's landmass and spawn can be put onto
@@ -590,6 +608,7 @@ func _spawn_floor_enemies() -> void:
 		var enemy := scene.instantiate() as FieldEnemy
 		enemy.name = "FieldEnemy%d" % index
 		enemy.enemy_data = entry.enemy_data
+		enemy.required = entry.required
 		enemy.face_shore_at_spawn = false
 		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)
 		enemy.rotation.y = deg_to_rad(entry.yaw_degrees)
@@ -889,7 +908,21 @@ func _fog_colour() -> Color:
 	var sky := get_node_or_null(sky_path) as RegionSky
 	return sky.fog_color if sky != null else Color.WHITE
 
+# The enemies one contact starts a fight with, the contacted one first:
+# the first is who the Wanderer steps up to and what the camera's fit
+# takes its axis from (CameraRig.enter_battle()). A list of one today.
+func _battle_members_for(enemy: FieldEnemy) -> Array[FieldEnemy]:
+	var members: Array[FieldEnemy] = [enemy]
+	return members
+
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
+	# Two contact areas can fire in one physics frame; the second must
+	# not open a second fight over the first. Loud, so it's known when a
+	# layout makes that happen.
+	if _battle_open:
+		push_warning("RegionField: enemy '%s' contacted while a battle is already open; ignored." % enemy.name)
+		return
+	_battle_open = true
 	process_mode = Node.PROCESS_MODE_DISABLED
 
 	var swing_rig := get_node_or_null(camera_rig_path) as CameraRig
@@ -900,34 +933,57 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# tree (anchors resolve synchronously on add_child).
 	var overlay := (load(BATTLE_OVERLAY_SCENE_PATH) as PackedScene).instantiate() as BattleOverlay
 	battle_layer.add_child(overlay)
-	# Single-enemy contact model for now - a list of one. BattleController
-	# owns whatever this becomes once a fight can hold more than one enemy.
-	var battle_enemies: Array[FieldEnemy] = [enemy]
+	_battle_members = _battle_members_for(enemy)
+	var anchor: FieldEnemy = _battle_members[0]
 
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
 	if camera_rig:
 		var viewport_height: float = overlay.get_viewport().get_visible_rect().size.y
 		var hand_top_fraction: float = overlay.hand_container.get_rest_top_y() / maxf(viewport_height, 1.0)
-		camera_rig.enter_battle(wanderer, battle_enemies, hand_top_fraction)
-		wanderer.enter_battle_stance(enemy, battle_spacing, camera_rig.battle_transition_time)
-		enemy.face_toward(wanderer, camera_rig.battle_transition_time)
+		camera_rig.enter_battle(wanderer, _battle_members, hand_top_fraction)
+		wanderer.enter_battle_stance(anchor, battle_spacing, camera_rig.battle_transition_time)
+		for member in _battle_members:
+			member.face_toward(wanderer, camera_rig.battle_transition_time)
 
 	var directional_light := get_node_or_null(directional_light_path) as OvercastLight
 	if directional_light:
 		directional_light.enter_battle()
 
 	var transition_time: float = camera_rig.battle_transition_time if camera_rig != null else 0.0
-	overlay.enter_battle(ui_on_dark_world, battle_enemies, deck_panel, hp_bar, transition_time, wanderer)
-	overlay.battle_finished.connect(_on_battle_finished.bind(enemy, overlay))
+	overlay.enter_battle(ui_on_dark_world, _battle_members, deck_panel, hp_bar, transition_time, wanderer)
+	overlay.battle_finished.connect(_on_battle_finished.bind(overlay))
 	# Only reachable now - enter_battle() is what creates battle_controller
 	# (see Wanderer.bind_to_battle()'s own doc).
+	overlay.battle_controller.enemy_defeated.connect(_on_enemy_defeated.bind(overlay))
 	wanderer.bind_to_battle(overlay.battle_controller)
 
-func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, overlay: BattleOverlay) -> void:
+# A member of the fight died. Where it stood and what it was are kept for
+# the reward (see _on_battle_finished()'s WIN). If the fight goes on
+# without it, it leaves now (FieldEnemy.settle_and_free()); the last kill
+# is the win, and that body is freed with the win exactly as it always
+# was - the controller has already dropped the dead from its own
+# `enemies`, so an empty list there means this was the last.
+func _on_enemy_defeated(enemy: FieldEnemy, overlay: BattleOverlay) -> void:
+	_last_fallen_at = enemy.global_position
+	_last_fallen_data = enemy.enemy_data
+	if overlay.battle_controller.enemies.is_empty():
+		return
+	enemy.settle_and_free()
+
+func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay) -> void:
 	wanderer.unbind_battle()
 	_apply_consumed_removals(overlay.battle_controller.deck)
 	overlay.queue_free()
 	process_mode = Node.PROCESS_MODE_INHERIT
+	_battle_open = false
+	# Whoever is still on the field - not freed, not on the way out. On a
+	# win that is the last kill (left standing for this, see _on_enemy_
+	# defeated()); on an escape, the survivors.
+	var standing: Array[FieldEnemy] = []
+	for member in _battle_members:
+		if is_instance_valid(member) and not member.is_queued_for_deletion():
+			standing.append(member)
+	_battle_members.clear()
 
 	deck_panel.show_whole_deck(RunState.deck)
 
@@ -950,31 +1006,47 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, enemy: FieldEnemy, over
 
 	match outcome:
 		BattleOverlay.Outcome.WIN:
-			# Snapshotted before queue_free() below: queue_free() defers the
-			# actual removal from the "enemies" group to end of frame, so
-			# this enemy would still count itself here either way - taken
-			# before freeing just so that ordering isn't load-bearing.
-			var was_last_enemy: bool = get_tree().get_nodes_in_group("enemies").size() <= 1
-			# enemy_status lives under FieldHUD, not as enemy's own child
-			# (see FieldEnemy.enemy_status's own doc) - freeing enemy alone
-			# would leave it behind as an orphaned, permanently-invisible
-			# leak.
-			if enemy.enemy_status != null:
-				enemy.enemy_status.queue_free()
-			# Both read off the enemy BEFORE it is freed - the spread is
-			# spawned a beat later (see _spawn_reward_spread()), by which
-			# time this node is gone. Same "don't make the ordering
-			# load-bearing" reasoning as was_last_enemy above.
-			var fell_at: Vector3 = enemy.global_position
-			var fell_to: EnemyData = enemy.enemy_data
-			enemy.queue_free()
+			# The reward lands where the last of them fell. Read off the
+			# body still standing when there is one (the last kill, or a
+			# debug win with nobody hurt) BEFORE it is freed - the spread
+			# is spawned a beat later (see _spawn_reward_spread()), by
+			# which time the node is gone; else the snapshot the kill left.
+			var fell_at: Vector3 = _last_fallen_at
+			var fell_to: EnemyData = _last_fallen_data
+			if not standing.is_empty():
+				fell_at = standing[0].global_position
+				fell_to = standing[0].enemy_data
+			for member in standing:
+				# enemy_status lives under FieldHUD, not as the enemy's
+				# own child (see FieldEnemy.enemy_status's own doc) -
+				# freeing the enemy alone would leave it behind as an
+				# orphaned, permanently-invisible leak.
+				if member.enemy_status != null:
+					member.enemy_status.queue_free()
+				member.queue_free()
 			_spawn_reward_spread(fell_at, fell_to)
-			if was_last_enemy:
+			# queue_free() defers the actual removal from the "enemies"
+			# group to end of frame - _required_enemy_remains() skips what
+			# is on its way out, so the ordering isn't load-bearing.
+			if not _floor_cleared_emitted and not _required_enemy_remains():
+				_floor_cleared_emitted = true
 				floor_cleared.emit()
 		BattleOverlay.Outcome.ESCAPE:
-			_push_wanderer_away_from(enemy)
+			_push_wanderer_away_from(standing)
 		BattleOverlay.Outcome.LOSE:
 			get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
+
+# Is a fight the floor demands still standing? FloorEnemy.required,
+# mirrored onto each FieldEnemy; a body queued for deletion is already
+# counted as gone.
+func _required_enemy_remains() -> bool:
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as FieldEnemy
+		if enemy == null or enemy.is_queued_for_deletion():
+			continue
+		if enemy.required:
+			return true
+	return false
 
 # Three cards on the sand where the enemy fell, once the battle framing
 # has blended away. Awaits rather than spawning inline so the cards don't
@@ -1097,22 +1169,49 @@ func _apply_consumed_removals(fight_deck: Deck) -> void:
 		if card.removal_scope == CardData.RemovalScope.CONSUMED:
 			RunState.remove_card(card)
 
-# The push distance must clear the enemy's own contact radius, or the
-# Wanderer lands back inside the Area3D and either re-triggers contact
-# immediately or can't leave it. Clamp up to radius + a small margin and
-# push_warning so a misconfigured pair is loud, not a silent soft-lock.
-func _push_wanderer_away_from(enemy: FieldEnemy) -> void:
-	var push_distance := escape_push_distance
-	var min_safe_distance: float = enemy.contact_radius + 0.5
-	if push_distance <= enemy.contact_radius:
-		push_warning("RegionField: escape_push_distance (%.2f) does not clear enemy '%s' contact_radius (%.2f); clamping to %.2f." % [push_distance, enemy.enemy_id, enemy.contact_radius, min_safe_distance])
-		push_distance = min_safe_distance
+# Straight back from the nearest of them, escape_push_distance out - and
+# further, if that still lands inside any of their contact areas
+# (contact_radius + escape_clearance_margin from each), or the Wanderer
+# lands back inside an Area3D and either re-triggers contact immediately
+# or can't leave it. push_warning when the export didn't clear on its
+# own, so a misconfigured pair is loud, not a silent soft-lock. Empty
+# list (nothing left to escape from): no push.
+func _push_wanderer_away_from(enemies: Array[FieldEnemy]) -> void:
+	var anchor: FieldEnemy = null
+	var anchor_distance: float = INF
+	for enemy in enemies:
+		var distance: float = wanderer.global_position.distance_to(enemy.global_position)
+		if distance < anchor_distance:
+			anchor_distance = distance
+			anchor = enemy
+	if anchor == null:
+		return
 
-	var push_dir := wanderer.global_position - enemy.global_position
+	var push_dir := wanderer.global_position - anchor.global_position
 	push_dir.y = 0.0
 	push_dir = push_dir.normalized() if push_dir.length() > 0.0001 else Vector3.BACK
 
-	wanderer.global_position = enemy.global_position + push_dir * push_distance
+	var push_distance := escape_push_distance
+	var target: Vector3 = anchor.global_position + push_dir * push_distance
+	for enemy in enemies:
+		var clearance: float = enemy.contact_radius + escape_clearance_margin
+		var to_target := target - enemy.global_position
+		to_target.y = 0.0
+		if to_target.length() >= clearance:
+			continue
+		# Along the push line, how much further out clears this one's
+		# circle: solve |anchor + dir * d - enemy| = clearance for d.
+		var rel := anchor.global_position - enemy.global_position
+		rel.y = 0.0
+		var b: float = rel.dot(push_dir)
+		var c: float = rel.length_squared() - clearance * clearance
+		var disc: float = b * b - c
+		var needed: float = -b + sqrt(maxf(disc, 0.0))
+		push_warning("RegionField: escape_push_distance (%.2f) does not clear enemy '%s' contact_radius (%.2f); pushing %.2f." % [push_distance, enemy.enemy_id, enemy.contact_radius, needed])
+		push_distance = maxf(push_distance, needed)
+		target = anchor.global_position + push_dir * push_distance
+
+	wanderer.global_position = target
 
 # Computes and caches the field's span (see _boundary_ready's own doc),
 # then delegates the four collision walls to _rebuild_boundary_walls().

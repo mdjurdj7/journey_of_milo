@@ -24,6 +24,11 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 # enemies()), whose yaw is authored outright - the crab beside the pool
 # faces where it faces.
 @export var face_shore_at_spawn: bool = true
+# FloorEnemy.required, mirrored here at spawn so RegionField can read it
+# off the "enemies" group when it decides whether the floor is cleared
+# (see RegionField._required_enemy_remains()). True for an enemy this
+# scene is placed by hand, same as the data default.
+@export var required: bool = true
 @export var region_field_path: NodePath = ^".."
 @export var ground_path: NodePath = ^"../Ground"
 @export_range(0.0, 1.0, 0.01) var highlight_lighten_amount: float = 0.35
@@ -50,6 +55,13 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export var contact_volume_db: float = -4.0
 @export var contact_volume_variance_db: float = 1.0
 @export var contact_pitch_variance: float = 0.04
+
+# How a member of a cluster leaves a fight it didn't end (see settle_and_
+# free()): the model sinks its own height into the sand over settle_time,
+# then the node goes. Unused by a fight's last kill, which RegionField
+# frees outright with the win as it always has.
+@export_group("Settle")
+@export var settle_time: float = 0.4
 @export_group("")
 
 var _contacted: bool = false
@@ -69,6 +81,11 @@ var _model_material: BaseMaterial3D
 # actually is (white, so the real texture reads unmodified), only falling
 # back to model_color when the mesh had no material of its own to inherit.
 var _model_base_color: Color = Color.WHITE
+# The instantiated glb root from _spawn_model() - what settle_and_free()
+# sinks. The BODY keeps its place (the recoil tweens that), the model
+# moves under it.
+var _model: Node3D = null
+var _settling: bool = false
 var _ground: Ground = null
 var _slash_mark_mesh: ArrayMesh = null
 var _slash_mark_texture: GradientTexture2D = null
@@ -193,6 +210,7 @@ func _face_shore() -> void:
 func _spawn_model() -> void:
 	var model := (load(MODEL_SCENE_PATH) as PackedScene).instantiate() as Node3D
 	add_child(model)
+	_model = model
 	model.scale = Vector3.ONE * model_scale
 	model.rotation.y = deg_to_rad(model_yaw_offset)
 
@@ -540,6 +558,33 @@ func face_toward(target: Node3D, duration: float) -> void:
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(self, "rotation:y", target_angle, duration)
+
+# Called by RegionField when this enemy dies in a fight that goes on
+# without it (see its _on_enemy_defeated()). The HP readout goes at once
+# - a "0/45" hanging under a body that's leaving is a corpse in the line
+# - the model sinks its own height into the sand over settle_time
+# (through the battle freeze, like every tween here), and then this node
+# is freed. Sinks the MODEL rather than the body so the killing blow's
+# own recoil (play_hit_recoil(), a tween on this body's global_position
+# still returning to rest) never fights it. The contact area goes with
+# the node, so a fight the Wanderer re-contacts later can't include a
+# member that isn't there.
+func settle_and_free() -> void:
+	if _settling:
+		return
+	_settling = true
+	set_highlight(false)
+	if enemy_status != null and is_instance_valid(enemy_status):
+		enemy_status.queue_free()
+		enemy_status = null
+	if _model == null or _model_height <= 0.0:
+		queue_free()
+		return
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_property(_model, "position:y", _model.position.y - _model_height, settle_time)
+	tween.tween_callback(queue_free)
 
 func _on_body_entered(body: Node3D) -> void:
 	if _contacted or not body.is_in_group("wanderer"):

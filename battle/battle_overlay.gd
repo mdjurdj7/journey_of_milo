@@ -152,6 +152,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.status_changed.connect(_on_status_changed)
 	battle_controller.turn_phase_changed.connect(_on_turn_phase_changed)
 	battle_controller.enemy_acting.connect(_on_enemy_acting)
+	battle_controller.enemy_defeated.connect(_on_enemy_defeated)
 	battle_controller.battle_won.connect(func() -> void: _finish_battle(Outcome.WIN))
 	battle_controller.battle_lost.connect(func() -> void: _finish_battle(Outcome.LOSE))
 	hand_container.armed_changed.connect(_on_card_armed_changed)
@@ -276,6 +277,17 @@ func _on_enemy_acting(enemy: FieldEnemy) -> void:
 	var intent: BattleIntent = _enemy_intents.get(enemy)
 	if intent != null and is_instance_valid(intent):
 		intent.set_revealed(false)
+
+# The member is out of the fight: its intent goes now, and its status
+# leaves this overlay's hands - whoever takes the body off the field
+# (FieldEnemy.settle_and_free(), or RegionField's win) frees the status
+# with it, so nothing here may touch it again at _finish_battle().
+func _on_enemy_defeated(enemy: FieldEnemy) -> void:
+	var intent: BattleIntent = _enemy_intents.get(enemy)
+	if intent != null and is_instance_valid(intent):
+		intent.queue_free()
+	_enemy_intents.erase(enemy)
+	_enemy_statuses.erase(enemy)
 
 func _on_energy_changed(current: int) -> void:
 	_resources.set_energy(current, battle_controller.player.max_energy)

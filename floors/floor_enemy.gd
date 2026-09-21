@@ -17,3 +17,8 @@ class_name FloorEnemy
 # Authored outright rather than derived from "seaward": the crab beside
 # the pool faces where it faces.
 @export var yaw_degrees: float = 0.0
+# Whether this enemy stands between the Wanderer and the gate: the floor
+# is cleared (RegionField.floor_cleared, the ExitGate opens) once no
+# required enemy is left standing. False = an optional fight, there to be
+# chosen or walked past.
+@export var required: bool = true

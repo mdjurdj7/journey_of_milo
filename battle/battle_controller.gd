@@ -52,6 +52,13 @@ signal enemy_acting(enemy: FieldEnemy)
 signal damage_dealt(source: Variant, target: Variant, amount: int, kind: String)
 # source/target are each either the String "player" or a FieldEnemy node -
 # whichever combatant actually dealt/received the hit.
+# An enemy's HP reached 0. Fires right after that hit's own damage_dealt/
+# enemy_hp_changed, and BEFORE battle_won when it was the last one - by
+# then the enemy is already out of `enemies`/_combatants, so nothing here
+# reads it again (its node may be freed by whoever listens). The overlay
+# drops the member's displays on this; RegionField takes it off the
+# field.
+signal enemy_defeated(enemy: FieldEnemy)
 signal battle_won()
 signal battle_lost()
 
@@ -440,6 +447,19 @@ func _report_damage(source: Variant, target_combatant: Combatant, amount: int, k
 		damage_dealt.emit(source, enemy, amount, kind)
 		if enemy != null:
 			enemy_hp_changed.emit(enemy, target_combatant.hp, target_combatant.max_hp)
+			if target_combatant.hp <= 0:
+				_drop_enemy(enemy)
+
+# The enemy is dead: out of the lists first (so no later preview/turn/
+# rect pass touches a node that may be freed), then told. The hover
+# clears too, or an armed card could keep a sinking body lit.
+func _drop_enemy(enemy: FieldEnemy) -> void:
+	enemies.erase(enemy)
+	_combatants.erase(enemy)
+	_enemy_rects.erase(enemy)
+	if _hovered_enemy == enemy:
+		_clear_hover()
+	enemy_defeated.emit(enemy)
 
 func _field_enemy_for(combatant: Combatant) -> FieldEnemy:
 	for enemy in _combatants:
