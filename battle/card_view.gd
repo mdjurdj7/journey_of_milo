@@ -149,19 +149,19 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @export_range(0.0, 1.0) var type_label_alpha: float = 0.62
 @export_range(0.0, 1.0) var footer_rule_alpha: float = 0.25
 
-@export_group("Bonus Panel")
-# The one mark of a LIVE conditional besides the ink: the art panel's
-# tint deepens toward the card's own type keyline colour - by bonus_
-# panel_live_amount of the way, over bonus_panel_in_seconds (ease-out)
-# - and returns to the plain tint over bonus_panel_out_seconds. Nothing
-# else moves; it holds while the card stays live. The glyph stays ink
-# on it: at 0.6 every type's deepened panel keeps it above 4.5:1.
-@export_range(0.0, 1.0) var bonus_panel_live_amount: float = 0.6
-@export var bonus_panel_in_seconds: float = 0.2
-@export var bonus_panel_out_seconds: float = 0.15
-# The name's colour while LIVE - the ink by default, i.e. no change;
-# exported only so an alternative can be compared against the panel.
-@export var bonus_name_live_color: Color = Color(0.165, 0.165, 0.18)
+@export_group("Bonus Corner")
+# The one mark of a LIVE conditional besides the ink: a filled ink
+# right-triangle folded into the top-right corner, legs bonus_corner_px
+# along the top and right edges, inset from the card's edge by
+# corner_radius so its right angle sits inside the rounded corner and
+# clear of the border at every frame weight. It grows from nothing over
+# bonus_in_seconds (ease-out) on LIVE and shrinks away over bonus_out_
+# seconds on anything else; nothing else on the face moves. Drawn in
+# the card's own coordinates, so it scales with the card at hover, armed
+# and inspect. Never shown without a battle context (see _bonus_context).
+@export var bonus_corner_px: float = 14.0
+@export var bonus_in_seconds: float = 0.2
+@export var bonus_out_seconds: float = 0.15
 
 @export_group("Layout")
 @export var outer_margin: float = 12.0
@@ -251,14 +251,16 @@ var _toll: int = 0
 # The battle as it stands, for this card's conditionals (see set_bonus_
 # context()) - null anywhere but a battle hand, which is what keeps a
 # reward, an offer or a deck view neutral: no state, no dimming, no
-# deepened panel. And the reading taken from it: CardBonus.state().
+# corner. And the reading taken from it: CardBonus.state().
 var _bonus_context: EffectContext = null
 var _bonus_state: CardBonus.State = CardBonus.State.NONE
-# The art panel's deepening, 0 = the plain tint, 1 = bonus_panel_live_
-# amount of the way to the keyline colour - tweened by _animate_bonus_
-# panel(), written through _set_bonus_panel_blend().
-var _bonus_panel_blend: float = 0.0
-var _bonus_panel_tween: Tween = null
+# The corner fold's growth, 0 = nothing, 1 = legs of bonus_corner_px -
+# tweened by _animate_bonus_corner(), written through _set_bonus_corner_
+# blend(). Drawn by _bonus_corner, a Control over the whole face made in
+# _ready() (not in the scene: it has no layout of its own).
+var _bonus_corner_blend: float = 0.0
+var _bonus_corner_tween: Tween = null
+var _bonus_corner: Control = null
 var _art_style: StyleBoxFlat = null
 var _hp_cost: int = 0
 var _rest_offset_y: float = 0.0
@@ -292,6 +294,11 @@ func _ready() -> void:
 			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.draw.connect(_draw_glyph)
+	_bonus_corner = Control.new()
+	_bonus_corner.name = "BonusCorner"
+	_bonus_corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bonus_corner.draw.connect(_draw_bonus_corner)
+	add_child(_bonus_corner)
 	_apply_style()
 	_apply_layout()
 	mouse_entered.connect(_on_mouse_entered)
@@ -353,8 +360,7 @@ func _refresh_dynamic_text() -> void:
 	_bonus_state = CardBonus.state(card_data, _bonus_context) if _bonus_context != null else CardBonus.State.NONE
 	rules_text.text = _style_bonus_clauses(_format_rules(_resolve_tokens(card_data.description)))
 	if _bonus_state != was:
-		_animate_bonus_panel()
-		_apply_name_color()
+		_animate_bonus_corner()
 
 # Substitutes the effect-backed tokens. A token whose card has no
 # matching effect is left standing rather than replaced with 0 - that way
@@ -478,38 +484,50 @@ func _style_bonus_clauses(bbcode: String) -> String:
 static func _strip_markers(text: String) -> String:
 	return text.replace(MARK_IF_OPEN, "").replace(MARK_IF_CLOSE, "").replace(MARK_ELSE_OPEN, "").replace(MARK_ELSE_CLOSE, "")
 
-# The panel's deepening on LIVE and its return on anything else - one
+# The corner's growth on LIVE and its return on anything else - one
 # tween, restarted from wherever the blend stands, so a quick flip never
 # pops.
-func _animate_bonus_panel() -> void:
-	if _bonus_panel_tween != null and _bonus_panel_tween.is_valid():
-		_bonus_panel_tween.kill()
+func _animate_bonus_corner() -> void:
+	if _bonus_corner_tween != null and _bonus_corner_tween.is_valid():
+		_bonus_corner_tween.kill()
 	var live: bool = _bonus_state == CardBonus.State.LIVE
 	var target: float = 1.0 if live else 0.0
-	var seconds: float = bonus_panel_in_seconds if live else bonus_panel_out_seconds
+	var seconds: float = bonus_in_seconds if live else bonus_out_seconds
 	if seconds <= 0.0 or not is_inside_tree():
-		_set_bonus_panel_blend(target)
+		_set_bonus_corner_blend(target)
 		return
-	_bonus_panel_tween = create_tween()
-	_bonus_panel_tween.set_ease(Tween.EASE_OUT if live else Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
-	_bonus_panel_tween.tween_method(_set_bonus_panel_blend, _bonus_panel_blend, target, seconds)
+	_bonus_corner_tween = create_tween()
+	_bonus_corner_tween.set_ease(Tween.EASE_OUT if live else Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	_bonus_corner_tween.tween_method(_set_bonus_corner_blend, _bonus_corner_blend, target, seconds)
 
-func _set_bonus_panel_blend(blend: float) -> void:
-	_bonus_panel_blend = clampf(blend, 0.0, 1.0)
-	_apply_panel_color()
+func _set_bonus_corner_blend(blend: float) -> void:
+	_bonus_corner_blend = clampf(blend, 0.0, 1.0)
+	if _bonus_corner != null:
+		_bonus_corner.queue_redraw()
 
-# The art panel's colour now: the type's plain tint, pulled toward the
-# type's keyline colour by the current blend x bonus_panel_live_amount.
-# One StyleBoxFlat kept and recoloured, not rebuilt per frame.
+# The fold: its right angle at the top-right corner inset by corner_
+# radius (inside the rounded edge, and past the border at either weight,
+# 1 or hover_frame_width_px), the two legs running along the top and
+# right edges, bonus_corner_px long at full growth.
+func _draw_bonus_corner() -> void:
+	var leg: float = bonus_corner_px * _bonus_corner_blend
+	if leg <= 0.0:
+		return
+	var inset: float = float(corner_radius)
+	var right_angle := Vector2(card_size.x - inset, inset)
+	var points := PackedVector2Array([
+		right_angle + Vector2(-leg, 0.0),
+		right_angle,
+		right_angle + Vector2(0.0, leg),
+	])
+	_bonus_corner.draw_colored_polygon(points, ink_color)
+
+# The art panel's tint. One StyleBoxFlat kept, not rebuilt per call.
 func _apply_panel_color() -> void:
 	if _art_style == null:
 		_art_style = _rounded_style(_art_field_color(), art_field_radius)
 		art_field.add_theme_stylebox_override("panel", _art_style)
-	_art_style.bg_color = _art_field_color().lerp(_keyline_color(), _bonus_panel_blend * bonus_panel_live_amount)
-
-# The name in bonus_name_live_color while LIVE, the ink otherwise.
-func _apply_name_color() -> void:
-	name_label.add_theme_color_override("font_color", bonus_name_live_color if _bonus_state == CardBonus.State.LIVE else ink_color)
+	_art_style.bg_color = _art_field_color()
 
 # Whether the player can currently afford this card - HandContainer pushes
 # this on every energy change. Unplayable fades the whole card.
@@ -793,7 +811,7 @@ func _apply_style() -> void:
 	shadow_soft.add_theme_stylebox_override("panel", soft)
 	_apply_shadows(false)
 
-	_apply_name_color()
+	name_label.add_theme_color_override("font_color", ink_color)
 	name_label.add_theme_font_size_override("font_size", name_font_size_px)
 	if name_font != null:
 		name_label.add_theme_font_override("font", name_font)
@@ -903,6 +921,10 @@ func _apply_layout() -> void:
 	shadow_soft.size = card_size
 	shadow_hairline.position = Vector2.ZERO
 	shadow_hairline.size = card_size
+	if _bonus_corner != null:
+		_bonus_corner.position = Vector2.ZERO
+		_bonus_corner.size = card_size
+		_bonus_corner.queue_redraw()
 
 	# Keyline inside the frame, inset past the corner radius so it never
 	# pokes out of the rounded corners.
