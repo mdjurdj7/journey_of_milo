@@ -31,6 +31,18 @@ class_name FloorData
 # shoreline costs HP (the rates stay RegionField's own, region-wide).
 @export var wade_drain_enabled: bool = false
 
+@export_group("Ambience")
+# This floor's sea/wind balance, as offsets on the beds' own base levels
+# (Sea.volume_db_max/min for the sea, WindAmbience.base_volume_db for the
+# wind) - pushed by RegionField in _enter_tree(), before either bed
+# spawns, so a floor starts at its own levels under the fade with no
+# step. The low-pass sits on the Sea bus (default_bus_layout.tres) and is
+# written on every floor load, 20000 (open) included - a global bus
+# keeps whatever the last floor left on it.
+@export var ambience_sea_db: float = 0.0
+@export var ambience_wind_db: float = 0.0
+@export var ambience_sea_lowpass_hz: float = 20000.0
+
 @export_group("Layout")
 # The Wanderer's start, world XZ. Every floor so far spawns at the
 # origin and lets mask_origin do the shifting, which keeps the

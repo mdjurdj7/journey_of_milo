@@ -2,6 +2,7 @@ extends MeshInstance3D
 class_name Sea
 
 const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
+const SEA_BUS_NAME := &"Sea"
 
 # Matte, not a mirror: at roughness 0.7 / specular 0.12 the sun's lobe
 # peaks under 1% of its radiance even dead in the mirror direction, so no
@@ -419,6 +420,14 @@ const AMBIENCE_PATH := "res://assets/audio/Floor_0/ocean_waves.mp3"
 @export var volume_db_max: float = 0.0
 @export var volume_db_min: float = -40.0
 @export var volume_time_constant: float = 0.5
+# The floor's own shift on the bed's level (FloorData.ambience_sea_db),
+# on top of the distance fade and the threshold duck alike - set by
+# RegionField in its _enter_tree(), before _ready() spawns the player.
+@export var floor_offset_db: float = 0.0:
+	set(value):
+		floor_offset_db = value
+		if _audio_player != null and not _ducked:
+			_audio_player.volume_db = _current_volume_db + floor_offset_db
 
 var _material: ShaderMaterial
 var _surface_noise: NoiseTexture2D
@@ -693,10 +702,29 @@ func _spawn_ambience() -> void:
 	_current_volume_db = volume_db_min
 
 	_audio_player = AudioStreamPlayer.new()
+	# The Sea bus (default_bus_layout.tres): the one with the low-pass,
+	# sent on to Ambience with the wind bed - see set_lowpass_hz().
+	_audio_player.bus = SEA_BUS_NAME
 	_audio_player.stream = stream
-	_audio_player.volume_db = _current_volume_db
+	_audio_player.volume_db = _current_volume_db + floor_offset_db
 	add_child(_audio_player)
 	_audio_player.play()
+
+# The Sea bus's low-pass cutoff (FloorData.ambience_sea_lowpass_hz; 20000
+# is open) - written on every floor load by RegionField, since the bus
+# is global and keeps whatever the last floor set. Warns and does
+# nothing if the layout doesn't carry the bus or its filter.
+func set_lowpass_hz(cutoff_hz: float) -> void:
+	var bus: int = AudioServer.get_bus_index(SEA_BUS_NAME)
+	if bus < 0:
+		push_warning("Sea: no '%s' audio bus in the layout; the sea low-pass can't be set." % SEA_BUS_NAME)
+		return
+	for i in AudioServer.get_bus_effect_count(bus):
+		var effect := AudioServer.get_bus_effect(bus, i) as AudioEffectLowPassFilter
+		if effect != null:
+			effect.cutoff_hz = cutoff_hz
+			return
+	push_warning("Sea: the '%s' bus has no AudioEffectLowPassFilter; the sea low-pass can't be set." % SEA_BUS_NAME)
 
 # The ambience down to volume_db_min over `seconds`, for the floor
 # transition (RegionField._on_floor_exited()): the field freezes but this
@@ -708,7 +736,7 @@ func duck(seconds: float) -> void:
 		return
 	_ducked = true
 	var tween := create_tween()
-	tween.tween_property(_audio_player, "volume_db", volume_db_min, seconds)
+	tween.tween_property(_audio_player, "volume_db", volume_db_min + floor_offset_db, seconds)
 
 func _physics_process(delta: float) -> void:
 	_sea_time = fmod(_sea_time + delta, maxf(sea_time_period, 1.0))
@@ -734,7 +762,7 @@ func _physics_process(delta: float) -> void:
 
 	var blend := 1.0 - exp(-delta / maxf(volume_time_constant, 0.001))
 	_current_volume_db = lerp(_current_volume_db, target_volume_db, blend)
-	_audio_player.volume_db = _current_volume_db
+	_audio_player.volume_db = _current_volume_db + floor_offset_db
 
 func _apply_all_uniforms() -> void:
 	_apply_uniform("sea_roughness", sea_roughness)

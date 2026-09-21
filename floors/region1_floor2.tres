@@ -60,4 +60,7 @@ caustic_strength = 0.12
 enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_sputter1"), SubResource("FloorEnemy_island_sputter2")])
 props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_belongings"), SubResource("FloorProp_island_belongings"), SubResource("FloorProp_alcove_cache")])
 wear_path_override = null
+ambience_sea_db = -3.0
+ambience_wind_db = 1.0
+ambience_sea_lowpass_hz = 7000.0
 reward_pool = ExtResource("7_wanderer_pool")

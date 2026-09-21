@@ -250,6 +250,13 @@ func _enter_tree() -> void:
 		ground.caustic_strength = floor_data.caustic_strength
 	if floor_data != null:
 		wade_drain_enabled = floor_data.wade_drain_enabled
+	# The floor's ambience balance onto the Sea before its _ready() spawns
+	# the bed (the wind bed reads its own in _ready() below); the low-pass
+	# written every time, since its bus outlives the scene.
+	var sea := get_node_or_null(sea_path) as Sea
+	if sea != null and floor_data != null:
+		sea.floor_offset_db = floor_data.ambience_sea_db
+		sea.set_lowpass_hz(floor_data.ambience_sea_lowpass_hz)
 	if spawn_node != null and floor_data != null:
 		spawn_node.position = Vector3(floor_data.spawn.x, 0.0, floor_data.spawn.y)
 		var exit: Vector3 = get_exit_direction()
@@ -313,6 +320,13 @@ func _ready() -> void:
 	_setup_field_hud()
 	_build_boundary()
 	_setup_exit_gate_channel()
+
+	# The wind bed, at this floor's offset - see WindAmbience.
+	var floor_for_wind := get_floor_data()
+	var wind := WindAmbience.new()
+	wind.name = "WindAmbience"
+	add_child(wind)
+	wind.setup(floor_for_wind.ambience_wind_db if floor_for_wind != null else 0.0)
 
 	# Arriving from another floor: the fade that took the frame there is
 	# still up (it lives on the tree's root, not in this scene) - bring it
