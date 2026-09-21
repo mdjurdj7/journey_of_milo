@@ -106,14 +106,15 @@ enum RewardMode { SCREEN, WORLD }
 @export var zone_intro_path: NodePath = ^"ZoneIntro"
 
 # The follow camera's inland bound (see CameraRig.set_inland_limit()):
-# the look target stops this far along the exit direction past the gate
-# line - 0: at the gate line itself, so the camera stops where the bar
-# begins and the Wanderer walks up the frame onto it - or, with the
-# override on, at a fixed z regardless of where the gate landed.
-# Re-applied live by each setter.
-@export var camera_inland_limit_beyond_gate: float = 0.0:
+# the look target stops this far along the exit direction from the gate
+# line - negative is before the gate (-4: the camera stops four metres
+# short of it and the Wanderer walks up the frame onto the bar and to
+# the trigger), 0 the gate line itself - or, with the override on, at a
+# fixed z regardless of where the gate landed. Re-applied live by each
+# setter.
+@export var camera_inland_limit_offset_m: float = -4.0:
 	set(value):
-		camera_inland_limit_beyond_gate = value
+		camera_inland_limit_offset_m = value
 		_apply_camera_inland_limit()
 @export var camera_inland_limit_override_enabled: bool = false:
 	set(value):
@@ -774,7 +775,7 @@ func _setup_exit_gate() -> void:
 	exit_gate.floor_exited.connect(_on_floor_exited)
 
 # Hands the camera rig its inland bound from the gate's final position -
-# see camera_inland_limit_beyond_gate's own doc. Safe to call from the
+# see camera_inland_limit_offset_m's own doc. Safe to call from the
 # limit exports' setters at any time: a no-op until both the rig and a
 # placed gate exist (before _setup_exit_gate() the gate still sits at its
 # authored transform, so nothing is derived from it).
@@ -786,7 +787,7 @@ func _apply_camera_inland_limit() -> void:
 	if camera_rig == null or exit_gate == null:
 		return
 	var exit: Vector3 = get_exit_direction()
-	var point: Vector3 = exit_gate.global_position + exit * camera_inland_limit_beyond_gate
+	var point: Vector3 = exit_gate.global_position + exit * camera_inland_limit_offset_m
 	if camera_inland_limit_override_enabled:
 		point = Vector3(exit_gate.global_position.x, exit_gate.global_position.y, camera_inland_limit_override_z)
 	camera_rig.set_inland_limit(point, exit)
