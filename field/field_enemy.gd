@@ -3,7 +3,9 @@ class_name FieldEnemy
 
 signal contacted(enemy: FieldEnemy)
 
-const MODEL_SCENE_PATH := "res://assets/models/enemies/Sputter/Sputter.glb"
+# The body worn when enemy_data names none (EnemyData.model_scene_path
+# empty) - see model_scene_path below.
+const DEFAULT_MODEL_SCENE_PATH := "res://assets/models/enemies/Sputter/Sputter.glb"
 const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 
 @export var enemy_id: StringName = &"enemy"
@@ -17,6 +19,11 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 # real textured material, so this doesn't drive its look today the way it
 # drove the old untextured placeholder's.
 @export var model_color: Color = Color(0.2, 0.22, 0.25, 1)
+# Which glb this body is, its units-to-metres and its facing - set from
+# EnemyData's Field Body group by RegionField at spawn (like required/
+# group below), or left at this scene's own values for an enemy placed
+# by hand. Empty path = DEFAULT_MODEL_SCENE_PATH.
+@export_file("*.glb", "*.gltf", "*.fbx", "*.tscn") var model_scene_path: String = ""
 @export var model_scale: float = 1.0
 @export var model_yaw_offset: float = 0.0
 @export var model_ground_offset: float = 0.0
@@ -217,7 +224,12 @@ func _face_shore() -> void:
 	rotation.y = atan2(-to_shore.x, -to_shore.z)
 
 func _spawn_model() -> void:
-	var model := (load(MODEL_SCENE_PATH) as PackedScene).instantiate() as Node3D
+	var scene_path: String = model_scene_path if not model_scene_path.is_empty() else DEFAULT_MODEL_SCENE_PATH
+	var scene := load(scene_path) as PackedScene
+	if scene == null:
+		push_warning("FieldEnemy '%s': model scene failed to load (%s); no body." % [enemy_id, scene_path])
+		return
+	var model := scene.instantiate() as Node3D
 	add_child(model)
 	_model = model
 	model.scale = Vector3.ONE * model_scale

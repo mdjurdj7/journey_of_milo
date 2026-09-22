@@ -614,6 +614,12 @@ func _spawn_floor_enemies() -> void:
 		enemy.enemy_data = entry.enemy_data
 		enemy.required = entry.required
 		enemy.group = entry.group
+		# The body, from the data's Field Body group - its defaults are
+		# this scene's own values, so a resource that sets none (the
+		# Sputter) wears exactly what it did.
+		enemy.model_scene_path = entry.enemy_data.model_scene_path
+		enemy.model_scale = entry.enemy_data.model_scale
+		enemy.model_yaw_offset = entry.enemy_data.model_yaw_offset_degrees
 		enemy.face_shore_at_spawn = false
 		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)
 		enemy.rotation.y = deg_to_rad(entry.yaw_degrees)

@@ -5,6 +5,7 @@
 [ext_resource type="Script" uid="uid://bi5wh88prg3u6" path="res://floors/floor_prop.gd" id="3_floor_prop"]
 [ext_resource type="Texture2D" uid="uid://bs6hicysi2lvh" path="res://assets/field/masks/Map3_mask.png" id="4_map3"]
 [ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="5_sputter"]
+[ext_resource type="Resource" path="res://battle/rules/enemies/dragonfly.tres" id="11_dragonfly"]
 [ext_resource type="PackedScene" path="res://field/world_card.tscn" id="6_world_card"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
 [ext_resource type="Texture2D" uid="uid://dkhl5vyt1v7np" path="res://assets/field/masks/Map3_elev.png" id="8_map3_elev"]
@@ -16,25 +17,25 @@ script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("5_sputter")
 position = Vector2(1.2, -17)
 
-[sub_resource type="Resource" id="FloorEnemy_island_sputter1"]
+[sub_resource type="Resource" id="FloorEnemy_island_dragonfly1"]
 script = ExtResource("2_floor_enemy")
-enemy_data = ExtResource("5_sputter")
+enemy_data = ExtResource("11_dragonfly")
 position = Vector2(-11.4, -16.4)
 yaw_degrees = -113.2
 required = false
 group = &"island"
 
-[sub_resource type="Resource" id="FloorEnemy_island_sputter2"]
+[sub_resource type="Resource" id="FloorEnemy_island_dragonfly2"]
 script = ExtResource("2_floor_enemy")
-enemy_data = ExtResource("5_sputter")
+enemy_data = ExtResource("11_dragonfly")
 position = Vector2(-12.7, -17.1)
 yaw_degrees = -116.6
 required = false
 group = &"island"
 
-[sub_resource type="Resource" id="FloorEnemy_island_sputter3"]
+[sub_resource type="Resource" id="FloorEnemy_island_dragonfly3"]
 script = ExtResource("2_floor_enemy")
-enemy_data = ExtResource("5_sputter")
+enemy_data = ExtResource("11_dragonfly")
 position = Vector2(-13.5, -16.6)
 yaw_degrees = -122.0
 required = false
@@ -69,7 +70,7 @@ mask_origin = Vector2(0.5, 0.888889)
 interior_height = 0.3
 relief_amplitude = 0.18
 caustic_strength = 0.12
-enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_sputter1"), SubResource("FloorEnemy_island_sputter2"), SubResource("FloorEnemy_island_sputter3")])
+enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3")])
 props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_belongings"), SubResource("FloorProp_island_belongings"), SubResource("FloorProp_alcove_cache")])
 wear_path_override = null
 ambience_sea_db = -3.0

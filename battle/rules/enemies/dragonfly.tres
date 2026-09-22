@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
+[ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
+[ext_resource type="AudioStream" uid="uid://co5jagvmbnmkr" path="res://assets/audio/enemies/Sputter/hit_shell_1.mp3" id="3_hit_shell"]
+
+[sub_resource type="Resource" id="EnemyIntent_bite_1"]
+script = ExtResource("2_intent")
+value = 3
+
+[sub_resource type="Resource" id="EnemyIntent_bite_2"]
+script = ExtResource("2_intent")
+value = 3
+
+[sub_resource type="Resource" id="EnemyIntent_swarm"]
+script = ExtResource("2_intent")
+value = 4
+
+[resource]
+script = ExtResource("1_enemy_data")
+enemy_name = "Dragonfly"
+max_hp = 14
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_bite_1"), SubResource("EnemyIntent_bite_2"), SubResource("EnemyIntent_swarm")])
+contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell")])

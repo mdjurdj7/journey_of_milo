@@ -101,6 +101,11 @@ so it doesn't get silently reinvented or silently forgotten.
   Still out of the pool: floor 1 is one crab and the pool is per floor,
   so putting it in is a per-floor pool decision, not a side effect of
   the cluster landing. (2026-09-21, multi-enemy clusters.)
+- **The Dragonfly borrows the Sputter's hit sound.** `battle/rules/
+  enemies/dragonfly.tres` names `hit_shell_1.mp3` in `contact_sounds` -
+  a TODO placeholder, not a choice: a 14 HP insect should not crack like
+  a shell. Replace when it has takes of its own; nothing else references
+  the file through the dragonfly. (2026-09-21, dragonfly rules.)
 - **A cluster's contact zone is the union of its members' own contact
   spheres, not one merged shape.** Contact with any member starts the
   fight with every member of its `FloorEnemy.group` still standing
