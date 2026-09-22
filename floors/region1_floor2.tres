@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://bs6hicysi2lvh" path="res://assets/field/masks/Map3_mask.png" id="4_map3"]
 [ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="5_sputter"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/dragonfly.tres" id="11_dragonfly"]
+[ext_resource type="Script" path="res://floors/floor_patrol.gd" id="12_floor_patrol"]
 [ext_resource type="PackedScene" path="res://field/world_card.tscn" id="6_world_card"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
 [ext_resource type="Texture2D" uid="uid://dkhl5vyt1v7np" path="res://assets/field/masks/Map3_elev.png" id="8_map3_elev"]
@@ -41,6 +42,13 @@ yaw_degrees = -122.0
 required = false
 group = &"island"
 
+[sub_resource type="Resource" id="FloorPatrol_island"]
+script = ExtResource("12_floor_patrol")
+group = &"island"
+waypoints = PackedVector2Array(-12.53, -16.7, -9.6, -16.3, -11, -14.8)
+dwell_min_seconds = 2.0
+dwell_max_seconds = 5.0
+
 [sub_resource type="Resource" id="FloorProp_belongings"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("6_world_card")
@@ -72,6 +80,7 @@ relief_amplitude = 0.18
 caustic_strength = 0.12
 enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3")])
 props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_belongings"), SubResource("FloorProp_island_belongings"), SubResource("FloorProp_alcove_cache")])
+patrols = Array[ExtResource("12_floor_patrol")]([SubResource("FloorPatrol_island")])
 wear_path_override = null
 ambience_sea_db = -3.0
 ambience_wind_db = 1.0

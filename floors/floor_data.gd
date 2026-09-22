@@ -55,6 +55,9 @@ class_name FloorData
 @export var exit_direction: Vector2 = Vector2(0.0, -1.0)
 @export var enemies: Array[FloorEnemy] = []
 @export var props: Array[FloorProp] = []
+# Routes for clusters that move between perches - one per group that
+# does (see FloorPatrol). Empty: every enemy stands where it was put.
+@export var patrols: Array[FloorPatrol] = []
 
 @export_group("Gate")
 # Beyond the first enemy's own position, along exit_direction - where the
