@@ -26,7 +26,6 @@ signal armed_changed(armed: bool)
 	set(value):
 		hand_card_scale = value
 		_reflow_hand(false)
-@export var draw_stagger_sec: float = 0.07
 @export var discard_collapse_duration_sec: float = 0.16
 # How long a card's own slot takes to glide to its new arc position/
 # rotation when the hand's composition changes (draw/discard reflowing
@@ -49,8 +48,7 @@ signal armed_changed(armed: bool)
 @export var hand_rest_visible_height: float = 182.0:
 	set(value):
 		hand_rest_visible_height = value
-		for slot: Control in _views.values():
-			var card_view: CardView = slot.get_child(0) as CardView
+		for card_view in _card_views():
 			card_view.set_rest_offset(card_size.y - hand_rest_visible_height)
 
 # Row width cap, measured against hand_card_scale-sized cards (not full
@@ -109,7 +107,18 @@ signal armed_changed(armed: bool)
 @export var discard_point: Vector2 = Vector2(1750.0, 150.0)
 
 var _deck: Deck = null
-var _views: Dictionary = {} # CardData -> Control (the card's slot; its only child is a CardView)
+# The hand's slots in hand order, each a Control whose only child is a
+# CardView, and the card each shows. An ARRAY, not a map keyed by
+# CardData: the deck can hold one CardData twice (a reward taken twice
+# used to be the same resource appended twice), and a map lost the
+# first slot the moment the second was drawn - an orphan stuck at its
+# last arc position, never reflowed or removed. Both structures are
+# only ever written by _sync_with_deck(), play_card() and _forget_slot().
+var _slots: Array[Control] = []
+var _slot_cards: Dictionary = {} # Control (slot) -> CardData
+# Each slot's running reflow glide, so the next reflow retargets it
+# rather than racing it - see _reflow_hand().
+var _reflow_tweens: Dictionary = {} # Control (slot) -> Tween
 # The player's current energy, as last pushed by update_playable() - a
 # card drawn later is faded or not against this same number.
 # The stance every card in this hand is currently printed against.
@@ -120,8 +129,6 @@ var _toll: int = 0
 # set_bonus_context(). Null until the overlay's first push.
 var _bonus_context: EffectContext = null
 var _last_energy: int = -1
-var _pending_reveals: Array[CardData] = []
-var _revealing: bool = false
 
 # No longer a Container (HBoxContainer defaulted this to IGNORE on its
 # own) - the arc leaves real gaps between/around fanned cards where the
@@ -129,6 +136,8 @@ var _revealing: bool = false
 # itself already sets this for.
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# The arc is centred on this control's own width.
+	resized.connect(func() -> void: _reflow_hand(false))
 
 # This slot's own current arc target - read back by _on_card_lowered() to
 # know what to return to (_reflow_hand() may have moved the target while
@@ -149,11 +158,44 @@ var _armed_slot: Control = null
 
 func set_deck(deck: Deck) -> void:
 	if _deck != null:
-		_deck.drawn.disconnect(_on_card_drawn)
-		_deck.discarded.disconnect(_on_card_discarded)
+		_deck.drawn.disconnect(_on_deck_changed)
+		_deck.discarded.disconnect(_on_deck_changed)
 	_deck = deck
-	_deck.drawn.connect(_on_card_drawn)
-	_deck.discarded.connect(_on_card_discarded)
+	_deck.drawn.connect(_on_deck_changed)
+	_deck.discarded.connect(_on_deck_changed)
+	_sync_with_deck()
+
+func _on_deck_changed(_card: CardData) -> void:
+	_sync_with_deck()
+
+# The one way the hand's contents change: the Deck's hand is the truth,
+# and the slots are brought to match it - a slot for every card the
+# hand holds (two for a card it holds twice, matched one for one), a
+# collapse for every slot whose card it no longer holds, a fresh view
+# for every card without one - then a single reflow. Called on every
+# drawn/discarded signal and on set_deck(); play_card() takes its own
+# slot out before the Deck hears of the play, so the play's later
+# discard/exhaust changes nothing here. A view is never made or dropped
+# anywhere else.
+func _sync_with_deck() -> void:
+	if _deck == null:
+		return
+	var wanted: Array[CardData] = _deck.hand.duplicate()
+	var kept: Array[Control] = []
+	for slot in _slots:
+		var card: CardData = _slot_cards.get(slot)
+		var index: int = wanted.find(card)
+		if index >= 0:
+			wanted.remove_at(index)
+			kept.append(slot)
+		else:
+			_slot_cards.erase(slot)
+			_forget_slot(slot)
+			_collapse_and_remove(slot)
+	_slots = kept
+	for card in wanted:
+		_add_card_view(card)
+	_reflow_hand()
 
 func draw_cards(amount: int) -> void:
 	if _deck == null:
@@ -164,35 +206,6 @@ func discard_hand() -> void:
 	if _deck == null:
 		return
 	_deck.discard_hand()
-
-func _on_card_drawn(card: CardData) -> void:
-	_pending_reveals.append(card)
-	if not _revealing:
-		_reveal_pending_cards()
-
-# Reveals queued cards one at a time, draw_stagger_sec apart - matches the
-# old project's per-card deal stagger (see reference/old_project's
-# _draw_cards()/_await_deal_stagger()).
-func _reveal_pending_cards() -> void:
-	_revealing = true
-	while not _pending_reveals.is_empty():
-		var card: CardData = _pending_reveals.pop_front()
-		_add_card_view(card)
-		if not _pending_reveals.is_empty():
-			await get_tree().create_timer(draw_stagger_sec).timeout
-	_revealing = false
-
-# No-op if play_card() already erased this card's entry and freed its view -
-# the controller only calls Deck.discard() after play_card()'s own
-# choreography (and view removal) has already finished.
-func _on_card_discarded(card: CardData) -> void:
-	var slot: Control = _views.get(card)
-	if slot == null:
-		return
-	_views.erase(card)
-	_forget_slot(slot)
-	_reflow_hand()
-	_collapse_and_remove(slot)
 
 func _add_card_view(card: CardData) -> void:
 	var slot := Control.new()
@@ -223,8 +236,8 @@ func _add_card_view(card: CardData) -> void:
 	if _armed_slot != null:
 		card_view.set_hover_suppressed(true)
 
-	_views[card] = slot
-	_reflow_hand()
+	_slots.append(slot)
+	_slot_cards[slot] = card
 
 func _on_card_view_clicked(_card_data: CardData, card_view: CardView) -> void:
 	card_clicked.emit(card_view)
@@ -247,33 +260,24 @@ func get_rest_top_y() -> float:
 # taken gets it too (see _add_card_view()).
 func set_stance(stance: Stance) -> void:
 	_stance = stance
-	for card in _views:
-		var slot: Control = _views[card]
-		var card_view: CardView = slot.get_child(0) as CardView
-		if card_view != null:
-			card_view.set_stance(stance)
+	for card_view in _card_views():
+		card_view.set_stance(stance)
 
 # The player's Grace, pushed to every card for the same reason the stance
 # is: a card whose damage depends on it has to say so while it sits in
 # the hand.
 func set_grace(grace: int) -> void:
 	_grace = grace
-	for card in _views:
-		var slot: Control = _views[card]
-		var card_view: CardView = slot.get_child(0) as CardView
-		if card_view != null:
-			card_view.set_grace(grace)
+	for card_view in _card_views():
+		card_view.set_grace(grace)
 
 # The player's Toll, for the same reason as the stance and Grace:
 # Reckoning's printed damage and Debt Forgiven's printed heal are both
 # made of it, and both move every time it does.
 func set_toll(toll: int) -> void:
 	_toll = toll
-	for card in _views:
-		var slot: Control = _views[card]
-		var card_view: CardView = slot.get_child(0) as CardView
-		if card_view != null:
-			card_view.set_toll(toll)
+	for card_view in _card_views():
+		card_view.set_toll(toll)
 
 # The battle as it stands (BattleController.preview_context()), pushed
 # by the overlay on every signal that can move a conditional - a card
@@ -282,19 +286,25 @@ func set_toll(toll: int) -> void:
 # what keeps every other card on screen neutral.
 func set_bonus_context(ctx: EffectContext) -> void:
 	_bonus_context = ctx
-	for card in _views:
-		var slot: Control = _views[card]
-		var card_view: CardView = slot.get_child(0) as CardView
-		if card_view != null:
-			card_view.set_bonus_context(ctx)
+	for card_view in _card_views():
+		card_view.set_bonus_context(ctx)
 
 func update_playable(energy: int) -> void:
 	_last_energy = energy
-	for card in _views:
-		var slot: Control = _views[card]
+	for slot in _slots:
+		var card_view: CardView = slot.get_child(0) as CardView
+		var card: CardData = _slot_cards.get(slot)
+		if card_view != null and card != null:
+			card_view.set_playable(card.cost <= energy)
+
+# Every slot's CardView, in hand order.
+func _card_views() -> Array[CardView]:
+	var views: Array[CardView] = []
+	for slot in _slots:
 		var card_view: CardView = slot.get_child(0) as CardView
 		if card_view != null:
-			card_view.set_playable((card as CardData).cost <= energy)
+			views.append(card_view)
+	return views
 
 # Straightens this slot to 0 rotation and brings it to the front of the
 # fan - fired for both a plain hover and an armed card (CardView.lifted
@@ -326,8 +336,8 @@ func _on_card_armed(slot: Control, card_view: CardView) -> void:
 	_armed_slot = slot
 	armed_changed.emit(true)
 	_lifted_slots.erase(slot)
-	for other in _views.values():
-		var other_view: CardView = (other as Control).get_child(0) as CardView
+	for other in _slots:
+		var other_view: CardView = other.get_child(0) as CardView
 		if other_view != null and other_view != card_view:
 			other_view.set_hover_suppressed(true)
 	slot.z_index = ARMED_Z_INDEX
@@ -352,20 +362,27 @@ func _on_card_disarmed(slot: Control, card_view: CardView) -> void:
 		return
 	_armed_slot = null
 	armed_changed.emit(false)
-	for other in _views.values():
-		var other_view: CardView = (other as Control).get_child(0) as CardView
+	for other in _slots:
+		var other_view: CardView = other.get_child(0) as CardView
 		if other_view != null:
 			other_view.set_hover_suppressed(false)
-	if not _views.values().has(slot):
+	if not _slots.has(slot):
 		return
 	slot.z_index = int(_arc_z_indices.get(slot, 0))
 	_reflow_hand(true, card_view.armed_duration_sec)
 
 func _forget_slot(slot: Control) -> void:
+	_kill_reflow_tween(slot)
 	_arc_positions.erase(slot)
 	_arc_rotations.erase(slot)
 	_arc_z_indices.erase(slot)
 	_lifted_slots.erase(slot)
+
+func _kill_reflow_tween(slot: Control) -> void:
+	var tween: Tween = _reflow_tweens.get(slot)
+	if tween != null and tween.is_valid():
+		tween.kill()
+	_reflow_tweens.erase(slot)
 
 func _collapse_and_remove(slot: Control) -> void:
 	var tween: Tween = create_tween()
@@ -378,10 +395,15 @@ func _collapse_and_remove(slot: Control) -> void:
 # an ENEMY-target card, or some up-and-away point for SELF/NONE) - this
 # function doesn't interpret target_type at all, only where it's told to go.
 func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
-	var slot: Control = _views.get(card_data)
+	var slot: Control = null
+	for candidate in _slots:
+		if _slot_cards.get(candidate) == card_data:
+			slot = candidate
+			break
 	if slot == null:
 		return
-	_views.erase(card_data)
+	_slots.erase(slot)
+	_slot_cards.erase(slot)
 	_forget_slot(slot)
 	_reflow_hand()
 
@@ -390,8 +412,8 @@ func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
 	if _armed_slot == slot:
 		_armed_slot = null
 		armed_changed.emit(false)
-		for other in _views.values():
-			var other_view: CardView = (other as Control).get_child(0) as CardView
+		for other in _slots:
+			var other_view: CardView = other.get_child(0) as CardView
 			if other_view != null:
 				other_view.set_hover_suppressed(false)
 
@@ -439,8 +461,8 @@ func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
 func _reflow_hand(animate: bool = true, duration: float = -1.0) -> void:
 	# The armed slot is laid out as if it weren't there - the fan closes
 	# under it; its own position is _on_card_armed()'s.
-	var slots: Array = []
-	for slot: Control in _views.values():
+	var slots: Array[Control] = []
+	for slot in _slots:
 		if slot != _armed_slot:
 			slots.append(slot)
 	var count: int = slots.size()
@@ -478,6 +500,9 @@ func _reflow_hand(animate: bool = true, duration: float = -1.0) -> void:
 		card_view.set_base_scale(scale_factor)
 
 		var is_new_slot: bool = not _arc_positions.has(slot)
+		# A glide still running from the last reflow is retargeted, not
+		# left to race this one for the same slot.
+		_kill_reflow_tween(slot)
 		if animate and not is_new_slot:
 			var tween := create_tween()
 			tween.set_ease(Tween.EASE_OUT)
@@ -486,6 +511,7 @@ func _reflow_hand(animate: bool = true, duration: float = -1.0) -> void:
 			tween.tween_property(slot, "position", target_position, duration)
 			if not _lifted_slots.has(slot):
 				tween.tween_property(slot, "rotation_degrees", rotation_degrees, duration)
+			_reflow_tweens[slot] = tween
 		else:
 			slot.position = target_position
 			if not _lifted_slots.has(slot):

@@ -156,8 +156,15 @@ func spend_gold(amount: int) -> bool:
 	gold_changed.emit(gold)
 	return true
 
+# The run's one card-grant path (rewards, the Keeper's offer, a find on
+# the sand). The deck holds a COPY, never the pool's own resource - the
+# same way new_run() copies each starter - so two grants of one card are
+# two cards: everything that tracks cards by identity (Deck's piles,
+# HandContainer's slots, remove_card() below) counts on every entry
+# being its own object. Appending the shared resource twice made the
+# hand lose a slot each time the second copy was drawn.
 func add_card(card: CardData) -> void:
-	deck.append(card)
+	deck.append(card.duplicate() as CardData)
 	deck_changed.emit()
 
 func remove_card(card: CardData) -> void:
