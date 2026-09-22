@@ -32,3 +32,11 @@ enum IntentType { ATTACK, DEFEND }
 @export var no_immediate_repeat: bool = false
 # Excludes this intent from being picked as the very next turn's free
 # choice if it was ALSO the intent picked last turn.
+
+@export var simultaneous: bool = false
+# A pack's shared move (the dragonflies' Swarm): when every living member
+# of a fight's cluster is queued on an intent with this set, they act as
+# one - lunges started together, one wait, every hit landed in the same
+# beat (BattleController._run_enemy_turn()). The rules are unchanged:
+# each member's take_turn() runs on its own, so Grace still sees three
+# separate hits. False = the ordinary one-after-another turn.

@@ -15,6 +15,7 @@ value = 3
 [sub_resource type="Resource" id="EnemyIntent_swarm"]
 script = ExtResource("2_intent")
 value = 4
+simultaneous = true
 
 [resource]
 script = ExtResource("1_enemy_data")

@@ -318,7 +318,25 @@ func _on_play_animation_finished(card: CardData) -> void:
 # Runs regardless of whether the attack actually did any damage (a fully
 # blocked attack still visibly lunges), the report itself only fires with
 # damage_to_hp > 0, same as before.
+#
+# A pack's shared move (EnemyIntent.simultaneous, the dragonflies' Swarm)
+# runs the other way round: when every living member is queued on one,
+# every lunge starts in the same frame, one wait covers the longest
+# snap, and every hit is reported in the same beat - the flaps and the
+# contact as one event. Each member's take_turn() still runs on its own,
+# so the rules (block worn down hit by hit, Grace's largest-single-hit
+# cap) see three separate hits, as they always did.
 func _run_enemy_turn() -> void:
+	if _all_living_simultaneous():
+		await _run_simultaneous_turn()
+	else:
+		await _run_sequential_turn()
+
+	player.took_damage_last_turn = player.took_damage_this_turn
+	player.took_damage_this_turn = false
+	toll_changed.emit(player.toll)
+
+func _run_sequential_turn() -> void:
 	for enemy in enemies:
 		var combatant: Combatant = _combatants.get(enemy)
 		if combatant == null or combatant.hp <= 0:
@@ -332,12 +350,7 @@ func _run_enemy_turn() -> void:
 			var snap_delay: float = enemy.play_attack_snap(_wanderer)
 			if snap_delay > 0.0:
 				await get_tree().create_timer(snap_delay).timeout
-			if result["damage_to_hp"] > 0:
-				RunLogger.log_damage_taken(result["damage_to_hp"])
-				_report_damage(enemy, player, result["damage_to_hp"], "attack")
-			if result["grace_opened"] > 0:
-				RunLogger.log_grace_opened(result["grace_opened"], player.grace)
-				grace_changed.emit(player.grace)
+			_report_enemy_attack(enemy, result)
 		status_changed.emit()
 		# take_turn() has already advanced this enemy to its next intent -
 		# show it the moment this action has landed.
@@ -345,9 +358,61 @@ func _run_enemy_turn() -> void:
 		if player.hp <= 0:
 			break
 
-	player.took_damage_last_turn = player.took_damage_this_turn
-	player.took_damage_this_turn = false
-	toll_changed.emit(player.toll)
+func _run_simultaneous_turn() -> void:
+	var acting: Array[FieldEnemy] = []
+	var results: Dictionary = {} # FieldEnemy -> take_turn() result
+	var longest_snap: float = 0.0
+	for enemy in enemies:
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant == null or combatant.hp <= 0 or enemy.enemy_data == null:
+			continue
+		enemy_acting.emit(enemy)
+		results[enemy] = EnemyTurn.take_turn(combatant, enemy.enemy_data, player)
+		acting.append(enemy)
+		if results[enemy]["attacked"]:
+			longest_snap = maxf(longest_snap, enemy.play_attack_snap(_wanderer))
+	if longest_snap > 0.0:
+		await get_tree().create_timer(longest_snap).timeout
+	for enemy in acting:
+		var result: Dictionary = results[enemy]
+		if result["attacked"]:
+			_report_enemy_attack(enemy, result)
+	status_changed.emit()
+	for enemy in acting:
+		enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
+
+# The hit as the view hears it, once the lunge has landed: the damage
+# that reached HP, and any Grace it opened.
+func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
+	if result["damage_to_hp"] > 0:
+		RunLogger.log_damage_taken(result["damage_to_hp"])
+		_report_damage(enemy, player, result["damage_to_hp"], "attack")
+	if result["grace_opened"] > 0:
+		RunLogger.log_grace_opened(result["grace_opened"], player.grace)
+		grace_changed.emit(player.grace)
+
+# True when the fight is a cluster acting as one this turn: more than one
+# living enemy, all of one group, every one queued on a simultaneous
+# intent. A lone enemy, a mixed queue or a lone survivor of a pack takes
+# the ordinary sequential turn.
+func _all_living_simultaneous() -> bool:
+	var living: int = 0
+	var group: StringName = &""
+	for enemy in enemies:
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant == null or combatant.hp <= 0 or enemy.enemy_data == null:
+			continue
+		if enemy.group == &"":
+			return false
+		if living == 0:
+			group = enemy.group
+		elif enemy.group != group:
+			return false
+		var intent: EnemyIntent = EnemyTurn.current_intent(combatant, enemy.enemy_data)
+		if intent == null or not intent.simultaneous:
+			return false
+		living += 1
+	return living > 1
 
 func _start_player_turn() -> void:
 	player.block = 0
