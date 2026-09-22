@@ -51,7 +51,16 @@
   MAKE_STATIC; anything that must be raycast during battle needs it.
 
 ## Project docs
+- docs/ holds the design context, in number order - read
+  docs/00_START_HERE.md first, then what the task needs:
+  02_GAME_FRAMEWORK_v2.md wins on structure, 03_ART_DIRECTION_BIBLE_v2.md
+  on visual principle, 04_FIELD_ASSET_SPEC_v1.md on numbers and pipeline
+  (masks, models, sound, UI), 05_REGION_01_v4.md for region 1,
+  06_REGION_PROGRESSION_v1.md for the premise and the later regions.
+  01_CURRENT_STATE is a snapshot and goes stale - check git log instead.
+- Read 02_GAME_FRAMEWORK_v2.md and, for a field task, 04_FIELD_ASSET_SPEC_v1.md
+  before any design or field work.
 - DESIGN.md tracks parked decisions and deferred items. Update it when
   a decision is deferred.
-- BESTIARY.md is the enemy source of truth.
-- Read docs/GAME_FRAMEWORK.md before any design or field task.
+- BESTIARY.md is the enemy source of truth - and does not exist yet;
+  battle/rules/enemies/*.tres is the truth until it does.
