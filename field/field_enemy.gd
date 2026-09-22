@@ -107,6 +107,9 @@ var _model_base_color: Color = Color.WHITE
 # (see _attach_scene()). Parallel arrays, filled by _spawn_model().
 var _tint_materials: Array[BaseMaterial3D] = []
 var _tint_base_colors: Array[Color] = []
+# The attachment_scene_path instance, if any (see _attach_scene()) - the
+# lunge tells it to flap and the settle tells it to fold, when it can.
+var _attachment: Node3D = null
 # The instantiated glb root from _spawn_model() - what settle_and_free()
 # sinks. The BODY keeps its place (the recoil tweens that), the model
 # moves under it.
@@ -314,6 +317,7 @@ func _attach_scene(model: Node3D) -> void:
 		push_warning("FieldEnemy '%s': attachment scene (%s) is not a Node3D; none attached." % [enemy_id, attachment_scene_path])
 		return
 	model.add_child(attachment)
+	_attachment = attachment
 	if attachment.has_method("get_tint_materials"):
 		var materials: Array[BaseMaterial3D] = attachment.call("get_tint_materials")
 		for material in materials:
@@ -620,6 +624,10 @@ func play_attack_snap(target: Node3D) -> float:
 	var base_position := global_position
 	var lunge_position := base_position + direction * attack_snap_distance
 
+	# The wings beat as the lunge starts (DragonflyWings.start_flap()).
+	if _attachment != null and _attachment.has_method("start_flap"):
+		_attachment.call("start_flap")
+
 	var tween := create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
@@ -708,7 +716,8 @@ func _tween_to(spot: Vector3, duration: float) -> void:
 # Called by RegionField when this enemy dies in a fight that goes on
 # without it (see its _on_enemy_defeated()). The HP readout goes at once
 # - a "0/45" hanging under a body that's leaving is a corpse in the line
-# - the model sinks its own height into the sand over settle_time
+# - an attachment that can fold drops its wings over settle_time, the
+# model then sinks its own height into the sand over settle_time
 # (through the battle freeze, like every tween here), and then this node
 # is freed. Sinks the MODEL rather than the body so the killing blow's
 # own recoil (play_hit_recoil(), a tween on this body's global_position
@@ -735,6 +744,11 @@ func settle_and_free() -> void:
 		return
 	var tween := create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	# Wings first, body after: an attachment that can fold takes the
+	# settle time to drop its wings, and only then does the body sink.
+	if _attachment != null and _attachment.has_method("fold"):
+		_attachment.call("fold", settle_time)
+		tween.tween_interval(settle_time)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.tween_property(_model, "position:y", _model.position.y - _model_height, settle_time)
 	tween.tween_callback(queue_free)
