@@ -40,6 +40,13 @@ signal floor_exited
 @export var channel_edge: float = 1.2
 @export var channel_edge_noise_scale: float = 2.0
 @export var channel_edge_noise_amplitude: float = 0.6
+# The channel spans the walls, which is right for a field whose land IS
+# the neck. A floor with land off to one side (floor 2's alcove) would
+# have the channel reach out to it and carve its near bank straight
+# through - so past this many metres the channel holds its width and
+# centres on the GATE instead of the walls' midline, staying the neck's
+# own channel. 0 = span the walls, as every floor did before.
+@export var channel_max_width: float = 0.0
 @export var channel_bar_width: float = 9.0
 # Metres across (the gate's local right) from the gate's own line to the
 # bar's centre line.
@@ -178,6 +185,10 @@ func setup_channel(ground: Ground, wall_rect: Rect2) -> void:
 	var length: float = channel_near_offset + inland_along + channel_beyond_wall
 	_channel_width = (across_max - across_min) + channel_width_margin
 	var across_centre: float = (across_min + across_max) * 0.5
+	if channel_max_width > 0.0 and _channel_width > channel_max_width:
+		_channel_width = channel_max_width
+		# Centred on the gate, so the bar stays exactly where it was.
+		across_centre = 0.0
 	var centre: Vector2 = gate + forward * (length * 0.5 - channel_near_offset) + right * across_centre
 
 	if _channel == null:

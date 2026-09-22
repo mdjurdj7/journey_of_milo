@@ -873,6 +873,7 @@ func _setup_exit_gate() -> void:
 
 	var exit: Vector3 = get_exit_direction()
 	exit_gate.channel_bar_axis_offset = floor_data.gate_bar_axis_offset
+	exit_gate.channel_max_width = floor_data.gate_channel_max_width
 	exit_gate.trigger_forward_offset = transition_distance
 	exit_gate.global_position = enemy.global_position + exit * floor_data.gate_distance_beyond_enemy
 	exit_gate.rotation.y = atan2(-exit.x, -exit.z)

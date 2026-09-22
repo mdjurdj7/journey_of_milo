@@ -87,6 +87,10 @@ class_name FloorData
 # ExitGate.channel_bar_axis_offset: metres across from the gate line to
 # the surfaced bar's centre, for a neck that isn't centred on the gate.
 @export var gate_bar_axis_offset: float = 0.0
+# ExitGate.channel_max_width: metres past which the channel stops
+# widening with the walls and centres on the gate. 0 (the default) spans
+# them, which is what every floor did before floor 2 grew an alcove.
+@export var gate_channel_max_width: float = 0.0
 
 @export_group("Wear")
 # How far the worn band's middle point sits off the enemy along the
