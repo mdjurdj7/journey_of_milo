@@ -47,7 +47,12 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export var group: StringName = &""
 @export var region_field_path: NodePath = ^".."
 @export var ground_path: NodePath = ^"../Ground"
-@export_range(0.0, 1.0, 0.01) var highlight_lighten_amount: float = 0.35
+# The hover highlight and the hit flash both BRIGHTEN: albedo times this,
+# not Color.lightened() toward white - a textured body's albedo is
+# already white (the texture carries the colour), and lightening white
+# is nothing, which is what the hover did on the Sputter from the day it
+# got its real material. Above 1.0 the albedo overdrives the texture.
+@export var highlight_brightness: float = 1.35
 
 # The forward-lunge-and-back this enemy's own attacks play in place of a
 # clip (creatures have no animations to swing) - see play_attack_snap()'s
@@ -376,14 +381,20 @@ func _spawn_enemy_status() -> void:
 func set_highlight(on: bool) -> void:
 	for index in _tint_materials.size():
 		var base: Color = _tint_base_colors[index]
-		_tint_materials[index].albedo_color = base.lightened(highlight_lighten_amount) if on else base
+		_tint_materials[index].albedo_color = _brightened(base) if on else base
+
+# base x highlight_brightness on the colour channels, alpha untouched.
+func _brightened(base: Color) -> Color:
+	return Color(base.r * highlight_brightness, base.g * highlight_brightness, base.b * highlight_brightness, base.a)
 
 # Called by BattleFeedback once BattleController reports a card hit
-# landing on this enemy - lerps this enemy's own material albedo up to
-# flash_color over rise_time, then back down to _model_base_color over
-# fall_time. All-color parameters (not exports here): BattleFeedback owns
-# the actual tunables for this and every other reactive hit-feedback
-# effect (see its own doc) - this method is only the mechanism.
+# landing on this enemy - lerps each tinted material's albedo up to its
+# base x flash_color x highlight_brightness over rise_time (the same
+# multiplicative lift the hover uses, tinted by BattleFeedback's flash
+# colour), then back down to its base over fall_time. Timing and tint
+# are parameters, not exports here: BattleFeedback owns the tunables
+# for this and every other reactive hit-feedback effect (see its own
+# doc) - this method is only the mechanism.
 func play_hit_flash(flash_color: Color, rise_time: float, fall_time: float) -> void:
 	if _tint_materials.is_empty():
 		return
@@ -393,8 +404,10 @@ func play_hit_flash(flash_color: Color, rise_time: float, fall_time: float) -> v
 	var tween := create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.set_parallel(true)
-	for material in _tint_materials:
-		tween.tween_property(material, "albedo_color", flash_color, rise_time)
+	for index in _tint_materials.size():
+		var target: Color = _brightened(_tint_base_colors[index] * flash_color)
+		target.a = _tint_base_colors[index].a
+		tween.tween_property(_tint_materials[index], "albedo_color", target, rise_time)
 	tween.chain()
 	for index in _tint_materials.size():
 		tween.tween_property(_tint_materials[index], "albedo_color", _tint_base_colors[index], fall_time)
