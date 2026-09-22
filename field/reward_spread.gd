@@ -199,6 +199,14 @@ func _physics_process(_delta: float) -> void:
 	for card in _cards:
 		card.set_lifted(near)
 
+# The field's freeze drops every WorldCard to far on its own (see
+# WorldCard._notification()); this node's cached answer has to drop with
+# them, or a spread the Wanderer was standing in when a fight started
+# would never lift again until he walked out and back.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_DISABLED:
+		_lifted = false
+
 # One was taken (it has already granted itself through RunState.add_card
 # and is flying to the deck count). The others are put back down and
 # faded; this node frees once every card has gone.

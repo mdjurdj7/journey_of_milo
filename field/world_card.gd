@@ -435,6 +435,36 @@ func _tween_hover(to: float) -> void:
 	_hover_tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	_hover_tween.tween_property(self, "_hover", to, _card_view.hover_duration_sec)
 
+# The field's freeze (RegionField goes PROCESS_MODE_DISABLED for a fight
+# and for the reward screen) cascades here and stops _physics_process -
+# the one thing that projects and hides the near CardView - and pauses
+# the lift tween with it. Left alone, a card mid-lift when a fight
+# starts stays on screen at its last field-camera projection, a stray
+# miniature over the battle hand. So the freeze drops the card back to
+# its far state outright: the quad returns (material-billboarded, it
+# needs no tick to face the battle camera) and the CardView goes. When
+# the field resumes, the next tick re-measures the radius and lifts it
+# again if the Wanderer is still close - a RewardSpread resets its own
+# cached answer for the same reason (see its _notification()). A card
+# being taken or dismissed is left to finish.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_DISABLED:
+		_drop_for_freeze()
+
+func _drop_for_freeze() -> void:
+	if _card_view == null or _taking or _dismissing:
+		return
+	if _lift_tween != null and _lift_tween.is_valid():
+		_lift_tween.kill()
+	if _hover_tween != null and _hover_tween.is_valid():
+		_hover_tween.kill()
+	_near = false
+	_lift = 0.0
+	_hover = 0.0
+	_card_view.visible = false
+	if _quad != null and is_instance_valid(_quad):
+		_quad.visible = true
+
 # Lift this card from outside, for a holder that decides for a GROUP -
 # a RewardSpread measures once from the spread's centre and pushes the
 # same answer into all three, so they rise together instead of each
