@@ -140,6 +140,12 @@ class_name DragonflyWings
 # The flap hands back to the quiver over this, after flap_seconds.
 @export var flap_release_seconds: float = 0.2
 
+@export_group("Flight")
+# The beat while airborne (FieldEnemy.fly_to() -> set_airborne()), at
+# the flap's amplitude: slower than the attack's beat, steady until the
+# landing, which releases into the quiver like an attack does.
+@export var flight_flap_hz: float = 8.0
+
 @export_group("Fold")
 # Where the tips go on death, degrees of dihedral (negative = down).
 @export var fold_degrees: float = -60.0
@@ -161,6 +167,8 @@ var _flap_last_angle: float = 0.0
 var _fold_blend: float = 0.0
 var _folding: bool = false
 var _fold_tween: Tween = null
+# In the air: the steady flight beat replaces quiver and flap.
+var _airborne: bool = false
 # Per-quad phase offsets for the quiver, degrees, fixed at _ready() so
 # the four never line up: [front right, front left, hind right, hind
 # left] - the pairs share a phase (mirrored by `side` in the layout), the
@@ -210,6 +218,9 @@ func _quiver_angle(index: int) -> float:
 # release, the quiver alone otherwise.
 func _motion_angle(index: int) -> float:
 	var quiver: float = _quiver_angle(index)
+	if _airborne:
+		_flap_last_angle = flap_degrees * sin(TAU * flight_flap_hz * _time)
+		return _flap_last_angle
 	if _flap_elapsed < 0.0:
 		return quiver
 	if _flap_elapsed <= flap_seconds:
@@ -224,6 +235,15 @@ func start_flap() -> void:
 	if _folding:
 		return
 	_flap_elapsed = 0.0
+
+# Take-off and landing, from the body's own flight (FieldEnemy.fly_to()
+# / _on_landed() / land_now()). Landing hands the last beat angle to the
+# flap's release, so the wings ease into the quiver rather than snap.
+func set_airborne(on: bool) -> void:
+	if _folding or on == _airborne:
+		return
+	_airborne = on
+	_flap_elapsed = -1.0 if on else flap_seconds
 
 # Death: the quiver and any flap stop where they are and the dihedral
 # eases to fold_degrees over `seconds` (FieldEnemy's settle_time) -

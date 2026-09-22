@@ -83,6 +83,14 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 # frees outright with the win as it always has.
 @export_group("Settle")
 @export var settle_time: float = 0.4
+
+# Flight, for a patrolling pack member (PackPatrol -> fly_to()): how
+# fast the body turns to face its travel, and how long a flyer takes to
+# drop where it is when a fight starts (land_now(), from RegionField's
+# contact handler or step_to()).
+@export_group("Flight")
+@export var flight_turn_rate: float = 6.0
+@export var battle_land_seconds: float = 0.3
 @export_group("")
 
 var _contacted: bool = false
@@ -127,6 +135,15 @@ var _defeated: bool = false
 var _field_position: Vector3 = Vector3.ZERO
 var _field_yaw: float = 0.0
 var _has_field_pose: bool = false
+# In the air (fly_to() until it lands): the flight tween drives
+# _flight_xz and _hover, and _process() puts the body at that XZ, hover
+# above the relief there, turned toward _flight_heading. The contact
+# area doesn't monitor while airborne - a flyer is nothing to bump into.
+var _airborne: bool = false
+var _flight_tween: Tween = null
+var _flight_xz: Vector2 = Vector2.ZERO
+var _hover: float = 0.0
+var _flight_heading: float = 0.0
 var _ground: Ground = null
 var _slash_mark_mesh: ArrayMesh = null
 var _slash_mark_texture: GradientTexture2D = null
@@ -196,6 +213,8 @@ func _ready() -> void:
 
 	contact_area.body_entered.connect(_on_body_entered)
 	contact_area.body_exited.connect(_on_body_exited)
+	# _process() is the flight's own; nothing runs there on the ground.
+	set_process(false)
 
 	_spawn_model()
 	_spawn_enemy_status()
@@ -230,8 +249,16 @@ func _ready() -> void:
 func _ground_to_relief() -> void:
 	if _ground == null:
 		return
-	var local_xz: Vector3 = _ground.to_local(Vector3(global_position.x, 0.0, global_position.z))
-	global_position.y = _ground.get_height_at(Vector2(local_xz.x, local_xz.z)) - model_ground_offset
+	global_position.y = _body_y_on_ground(global_position.x, global_position.z)
+
+# The body's global Y with its feet on the relief at this XZ (see
+# _ground_to_relief()'s doc for the model_ground_offset part). The
+# current Y when there is no Ground to ask.
+func _body_y_on_ground(x: float, z: float) -> float:
+	if _ground == null:
+		return global_position.y
+	var local_xz: Vector3 = _ground.to_local(Vector3(x, 0.0, z))
+	return _ground.get_height_at(Vector2(local_xz.x, local_xz.z)) - model_ground_offset
 
 # get_forward() points inland (spawn -> ForwardMarker, see RegionField's own doc),
 # so facing the shore/sea is the opposite direction. Yaws the body itself,
@@ -678,11 +705,14 @@ func face_toward_point(point: Vector3, duration: float) -> void:
 # leaves is kept for return_to_field_pose(); a second step in the same
 # fight (none today) keeps the first pose, not the stepped one.
 func step_to(spot: Vector3, duration: float) -> void:
+	# A flyer drops where it is first (short), then walks in - the step
+	# waits that long, so the two never pull on the body at once.
+	var delay: float = land_now()
 	if not _has_field_pose:
 		_field_position = global_position
 		_field_yaw = rotation.y
 		_has_field_pose = true
-	_tween_to(spot, duration)
+	_tween_to(spot, duration, delay)
 
 # The escape's counterpart: back to where it stood and faced before the
 # fight, over duration. No-op for a body that never stepped.
@@ -703,15 +733,98 @@ func return_to_field_pose(duration: float) -> void:
 func get_field_position() -> Vector3:
 	return _field_position if _has_field_pose else global_position
 
-func _tween_to(spot: Vector3, duration: float) -> void:
-	var destination := Vector3(spot.x, global_position.y, spot.z)
-	if _ground != null:
-		var local_xz: Vector3 = _ground.to_local(Vector3(spot.x, 0.0, spot.z))
-		destination.y = _ground.get_height_at(Vector2(local_xz.x, local_xz.z)) - model_ground_offset
+func _tween_to(spot: Vector3, duration: float, delay: float = 0.0) -> void:
+	var destination := Vector3(spot.x, _body_y_on_ground(spot.x, spot.z), spot.z)
 	var tween := create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	if delay > 0.0:
+		tween.tween_interval(delay)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(self, "global_position", destination, duration)
+
+# --- Flight (a patrolling pack member; see PackPatrol) ---
+
+# Take off, cross to `spot` (world XZ) at `speed`, land there: the
+# hover rises over rise_seconds, the crossing eases in and out, the
+# descent takes land_seconds, and _on_landed() puts the feet on the
+# relief. The tween is the default TWEEN_PAUSE_BOUND - the field's
+# freeze holds a flyer in the air exactly where it was, and it carries
+# on when the field thaws; a fight lands it first (see land_now()).
+# Facing turns toward the travel direction as it goes.
+func fly_to(spot: Vector3, hover: float, speed: float, rise_seconds: float, land_seconds: float) -> void:
+	_kill_flight()
+	_airborne = true
+	contact_area.monitoring = false
+	_set_wings_airborne(true)
+	_flight_xz = Vector2(global_position.x, global_position.z)
+	_hover = global_position.y - _body_y_on_ground(global_position.x, global_position.z)
+	var target := Vector2(spot.x, spot.z)
+	var distance: float = _flight_xz.distance_to(target)
+	if distance > 0.0001:
+		var direction: Vector2 = (target - _flight_xz) / distance
+		# Same direction<->angle convention as face_toward_point().
+		_flight_heading = atan2(-direction.x, -direction.y)
+	var seconds: float = maxf(distance / maxf(speed, 0.01), 0.2)
+	set_process(true)
+	_flight_tween = create_tween()
+	_flight_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	_flight_tween.tween_property(self, "_hover", hover, rise_seconds)
+	_flight_tween.set_ease(Tween.EASE_IN_OUT)
+	_flight_tween.tween_property(self, "_flight_xz", target, seconds)
+	_flight_tween.set_ease(Tween.EASE_IN)
+	_flight_tween.tween_property(self, "_hover", 0.0, land_seconds)
+	_flight_tween.tween_callback(_on_landed)
+
+func is_airborne() -> bool:
+	return _airborne
+
+# A fight is starting and this member is in the air: the flight ends
+# here, and the body drops straight down over battle_land_seconds -
+# through the freeze (PAUSE_PROCESS, like every battle tween), since
+# the field is already frozen by the time this is called. Returns how
+# long the drop takes (0 for a body on the ground), so a step onto the
+# battle line can wait for it (see step_to()).
+func land_now() -> float:
+	if not _airborne:
+		return 0.0
+	_kill_flight()
+	_airborne = false
+	set_process(false)
+	_set_wings_airborne(false)
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
+	tween.tween_property(self, "global_position:y", _body_y_on_ground(global_position.x, global_position.z), battle_land_seconds)
+	tween.tween_callback(_restore_contact)
+	return battle_land_seconds
+
+func _on_landed() -> void:
+	_airborne = false
+	set_process(false)
+	_ground_to_relief()
+	_set_wings_airborne(false)
+	_restore_contact()
+
+func _restore_contact() -> void:
+	contact_area.monitoring = true
+
+func _kill_flight() -> void:
+	if _flight_tween != null and _flight_tween.is_valid():
+		_flight_tween.kill()
+	_flight_tween = null
+
+func _set_wings_airborne(on: bool) -> void:
+	if _attachment != null and _attachment.has_method("set_airborne"):
+		_attachment.call("set_airborne", on)
+
+# Only while airborne (set_process() is switched with the flight): the
+# body at the flight's XZ, hover above the relief THERE - so a crossing
+# follows the ground's shape - turning toward its heading.
+func _process(delta: float) -> void:
+	if not _airborne:
+		return
+	global_position = Vector3(_flight_xz.x, _body_y_on_ground(_flight_xz.x, _flight_xz.y) + _hover, _flight_xz.y)
+	rotation.y = lerp_angle(rotation.y, _flight_heading, clampf(delta * flight_turn_rate, 0.0, 1.0))
 
 # Called by RegionField when this enemy dies in a fight that goes on
 # without it (see its _on_enemy_defeated()). The HP readout goes at once

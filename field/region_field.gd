@@ -256,6 +256,8 @@ var _battle_members: Array[FieldEnemy] = []
 var _last_fallen_at: Vector3 = Vector3.ZERO
 var _last_fallen_data: EnemyData = null
 var _floor_cleared_emitted: bool = false
+# One PackPatrol per FloorData.patrols entry - see _spawn_floor_patrols().
+var _patrols: Array[PackPatrol] = []
 
 # Parent-first, before any child has entered the tree or run its
 # _ready(): the one moment the floor's landmass and spawn can be put onto
@@ -349,6 +351,7 @@ func _ready() -> void:
 	# below, which must see them.
 	_spawn_floor_enemies()
 	_spawn_floor_props()
+	_spawn_floor_patrols()
 
 	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
 		enemy.contacted.connect(_on_enemy_contacted)
@@ -625,6 +628,44 @@ func _spawn_floor_enemies() -> void:
 		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)
 		enemy.rotation.y = deg_to_rad(entry.yaw_degrees)
 		add_child(enemy)
+
+# The floor's routes (FloorPatrol), one PackPatrol each, direct children
+# of this node so the field's freeze stops them: handed the group's
+# members as spawned (their authored spots are the flock's shape) and
+# the waypoints as world positions, spawn-relative like the enemies'.
+func _spawn_floor_patrols() -> void:
+	var floor_data := get_floor_data()
+	if floor_data == null:
+		return
+	var spawn: Vector3 = get_spawn_position()
+	for index in floor_data.patrols.size():
+		var entry: FloorPatrol = floor_data.patrols[index]
+		if entry == null or entry.group == &"" or entry.waypoints.size() < 2:
+			push_warning("RegionField: floor patrol %d needs a group and at least two waypoints; skipped." % index)
+			continue
+		var members: Array[FieldEnemy] = []
+		for node in get_tree().get_nodes_in_group("enemies"):
+			var enemy := node as FieldEnemy
+			if enemy != null and enemy.group == entry.group:
+				members.append(enemy)
+		if members.is_empty():
+			push_warning("RegionField: floor patrol %d names group '%s' but no enemy has it; skipped." % [index, entry.group])
+			continue
+		var waypoints: Array[Vector3] = []
+		for point in entry.waypoints:
+			waypoints.append(Vector3(spawn.x + point.x, 0.0, spawn.z + point.y))
+		var patrol := PackPatrol.new()
+		patrol.name = "Patrol_%s" % entry.group
+		add_child(patrol)
+		patrol.setup(members, waypoints, entry.dwell_min_seconds, entry.dwell_max_seconds)
+		_patrols.append(patrol)
+
+# The route a group flies, if any.
+func _patrol_for(group: StringName) -> PackPatrol:
+	for patrol in _patrols:
+		if is_instance_valid(patrol) and patrol.name == "Patrol_%s" % group:
+			return patrol
+	return null
 
 # The floor's props (FloorProp) under one Props node made here, or under
 # an earlier prop when parent_index says so (the Bird on its hull). Each
@@ -999,6 +1040,13 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	battle_layer.add_child(overlay)
 	_battle_members = _battle_members_for(enemy)
 	var anchor: FieldEnemy = _battle_members[0]
+	# A patrolling pack stops where it is: pending take-offs dropped, and
+	# any member in the air comes down where it is - the anchor here,
+	# the rest through their own step_to() (see FieldEnemy.land_now()).
+	var patrol: PackPatrol = _patrol_for(enemy.group)
+	if patrol != null:
+		patrol.interrupt()
+	anchor.land_now()
 
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
 	if camera_rig:
