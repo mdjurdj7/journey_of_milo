@@ -620,6 +620,7 @@ func _spawn_floor_enemies() -> void:
 		enemy.model_scene_path = entry.enemy_data.model_scene_path
 		enemy.model_scale = entry.enemy_data.model_scale
 		enemy.model_yaw_offset = entry.enemy_data.model_yaw_offset_degrees
+		enemy.attachment_scene_path = entry.enemy_data.attachment_scene_path
 		enemy.face_shore_at_spawn = false
 		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)
 		enemy.rotation.y = deg_to_rad(entry.yaw_degrees)

@@ -26,6 +26,12 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export_file("*.glb", "*.gltf", "*.fbx", "*.tscn") var model_scene_path: String = ""
 @export var model_scale: float = 1.0
 @export var model_yaw_offset: float = 0.0
+# An optional scene instantiated under the model root AFTER the material
+# pass (the dragonfly's wings, DragonflyWings) - EnemyData.attachment_
+# scene_path, copied the same way. It keeps its own materials, rides the
+# model's grounding/yaw/scale/settle, and if it offers get_tint_
+# materials() those lighten and flash with the body's. Empty = none.
+@export_file("*.tscn") var attachment_scene_path: String = ""
 @export var model_ground_offset: float = 0.0
 # Off for an enemy placed from FloorData (RegionField._spawn_floor_
 # enemies()), whose yaw is authored outright - the crab beside the pool
@@ -91,6 +97,11 @@ var _model_material: BaseMaterial3D
 # actually is (white, so the real texture reads unmodified), only falling
 # back to model_color when the mesh had no material of its own to inherit.
 var _model_base_color: Color = Color.WHITE
+# Everything the highlight and the hit flash tint, with what each returns
+# to: the body's material first, then whatever an attachment hands over
+# (see _attach_scene()). Parallel arrays, filled by _spawn_model().
+var _tint_materials: Array[BaseMaterial3D] = []
+var _tint_base_colors: Array[Color] = []
 # The instantiated glb root from _spawn_model() - what settle_and_free()
 # sinks. The BODY keeps its place (the recoil tweens that), the model
 # moves under it.
@@ -259,6 +270,10 @@ func _spawn_model() -> void:
 		combined_aabb = mi_aabb_in_self if not has_aabb else combined_aabb.merge(mi_aabb_in_self)
 		has_aabb = true
 
+	if _model_material != null:
+		_tint_materials.append(_model_material)
+		_tint_base_colors.append(_model_base_color)
+
 	if has_aabb:
 		print("FieldEnemy '%s': model AABB height = %.3f at model_scale = %.3f" % [enemy_id, combined_aabb.size.y, model_scale])
 		var grounding_shift: float = -combined_aabb.position.y + model_ground_offset
@@ -266,6 +281,42 @@ func _spawn_model() -> void:
 		_model_height = combined_aabb.size.y
 		_model_half_width = maxf(combined_aabb.size.x, combined_aabb.size.z) * 0.5
 		_model_aabb = AABB(combined_aabb.position + Vector3(0.0, grounding_shift, 0.0), combined_aabb.size)
+
+	_attach_scene(model)
+
+# The attachment (attachment_scene_path), under the model root once the
+# body is grounded and its material pass is over, so the attachment's
+# own materials are left alone - and taken into the tint list when it
+# offers them (DragonflyWings.get_tint_materials()). Its meshes widen the
+# extents the camera fit and the click rect read (a wing sticks out
+# further than the body) but never the grounding, which the body's own
+# feet already settled.
+func _attach_scene(model: Node3D) -> void:
+	if attachment_scene_path.is_empty():
+		return
+	var scene := load(attachment_scene_path) as PackedScene
+	if scene == null:
+		push_warning("FieldEnemy '%s': attachment scene failed to load (%s); none attached." % [enemy_id, attachment_scene_path])
+		return
+	var attachment := scene.instantiate() as Node3D
+	if attachment == null:
+		push_warning("FieldEnemy '%s': attachment scene (%s) is not a Node3D; none attached." % [enemy_id, attachment_scene_path])
+		return
+	model.add_child(attachment)
+	if attachment.has_method("get_tint_materials"):
+		var materials: Array[BaseMaterial3D] = attachment.call("get_tint_materials")
+		for material in materials:
+			_tint_materials.append(material)
+			_tint_base_colors.append(material.albedo_color)
+	for mesh_instance in attachment.find_children("*", "MeshInstance3D", true, false):
+		var mi := mesh_instance as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		var mi_transform_in_self := global_transform.affine_inverse() * mi.global_transform
+		var mi_aabb_in_self := mi_transform_in_self * mi.get_aabb()
+		_model_aabb = mi_aabb_in_self if _model_aabb.size == Vector3.ZERO else _model_aabb.merge(mi_aabb_in_self)
+	_model_half_width = maxf(_model_aabb.size.x, _model_aabb.size.z) * 0.5
+	_model_height = maxf(_model_height, _model_aabb.position.y + _model_aabb.size.y)
 
 # Duplicates the mesh's own imported material (Sputter.glb ships a real
 # baseColorTexture/metallicRoughnessTexture/normalTexture set) rather than
@@ -323,9 +374,9 @@ func _spawn_enemy_status() -> void:
 # during card targeting. Brightness lift via albedo only, no emission - a
 # hover cue, not a glow effect.
 func set_highlight(on: bool) -> void:
-	if _model_material == null:
-		return
-	_model_material.albedo_color = _model_base_color.lightened(highlight_lighten_amount) if on else _model_base_color
+	for index in _tint_materials.size():
+		var base: Color = _tint_base_colors[index]
+		_tint_materials[index].albedo_color = base.lightened(highlight_lighten_amount) if on else base
 
 # Called by BattleFeedback once BattleController reports a card hit
 # landing on this enemy - lerps this enemy's own material albedo up to
@@ -334,12 +385,19 @@ func set_highlight(on: bool) -> void:
 # the actual tunables for this and every other reactive hit-feedback
 # effect (see its own doc) - this method is only the mechanism.
 func play_hit_flash(flash_color: Color, rise_time: float, fall_time: float) -> void:
-	if _model_material == null:
+	if _tint_materials.is_empty():
 		return
+	# Every tinted material rises together, then falls together: the
+	# rises in parallel, chain() puts the first fall after them, and the
+	# remaining falls run alongside it.
 	var tween := create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	tween.tween_property(_model_material, "albedo_color", flash_color, rise_time)
-	tween.tween_property(_model_material, "albedo_color", _model_base_color, fall_time)
+	tween.set_parallel(true)
+	for material in _tint_materials:
+		tween.tween_property(material, "albedo_color", flash_color, rise_time)
+	tween.chain()
+	for index in _tint_materials.size():
+		tween.tween_property(_tint_materials[index], "albedo_color", _tint_base_colors[index], fall_time)
 
 # from_direction is the direction the hit traveled (attacker -> this
 # enemy, not normalized) - this recoils further along that same line,
