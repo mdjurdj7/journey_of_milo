@@ -280,7 +280,12 @@ func _enter_tree() -> void:
 	var ground := get_node_or_null(ground_path) as Ground
 	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
 	if ground != null and floor_data != null:
+		# Before the mask: both rebuild the relief, and the mask's own
+		# build should be the one that lands on the final grid.
+		ground.relief_extent = floor_data.relief_extent
+		ground.relief_subdivisions = floor_data.relief_subdivisions
 		ground.landmass_mask = floor_data.mask
+		ground.wear_mask = floor_data.wear_mask
 		ground.elevation_mask = floor_data.elevation_mask
 		ground.landmass_mask_origin = floor_data.mask_origin
 		ground.landmass_interior_height = floor_data.interior_height

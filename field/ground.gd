@@ -282,7 +282,11 @@ signal relief_rebuilt
 		_rebuild_ground_mesh_and_collision()
 
 # Painted landmass: a grayscale image is the land shape instead of the SDF
-# above. White = sand, black = water; the 0.5 contour IS the waterline -
+# above. White = sand, black = water; the 0.5 contour IS the waterline,
+# and a grey BELOW it is a painted shallow: the seabed there only falls
+# by (0.5 - value) / 0.5 of its full depth, so 0.42 wades at about a
+# sixth of it (see _shoal_factor()). Grey ABOVE the line is not a height
+# - that is elevation_mask's job -
 # the painting is treated as PURE SHAPE, the gray in between only places
 # that contour at sub-pixel precision (bilinear sample, then threshold), it
 # does not paint the beach slope. The slope is a ramp split at the drawn
@@ -1120,7 +1124,7 @@ func _relief_height(world_xz: Vector2) -> float:
 			landmass_height += _elevation_lift(world_xz, shore_distance)
 		else:
 			var under: float = smoothstep(0.0, maxf(landmass_underwater_falloff_width, 0.001), shore_distance)
-			landmass_height = _landmass_sea_level - landmass_below_sea_depth * under
+			landmass_height = _landmass_sea_level - landmass_below_sea_depth * under * _shoal_factor(world_xz)
 	else:
 		# Whichever edge actually submerges this point further wins -
 		# computed as two independent HEIGHTS (not factors combined by
@@ -1630,6 +1634,25 @@ func _canvas_sample(bytes: PackedByteArray, world_xz: Vector2) -> float:
 	var top: float = lerpf(_canvas_byte(bytes, x0, y0), _canvas_byte(bytes, x1, y0), fx)
 	var bottom: float = lerpf(_canvas_byte(bytes, x0, y1), _canvas_byte(bytes, x1, y1), fx)
 	return lerpf(top, bottom, fy)
+
+# Painted shallows. The mask's water side is not just "not land": a
+# value between 0 and the 0.5 waterline says how much of the full depth
+# applies here, so 0 is the open sea as it always was and 0.42 is 16% of
+# it - a shoal to wade rather than a channel to swim. The DEPTH still
+# comes from the distance to the drawn line (the ramp above); this only
+# scales it, so painting a shallow never moves the shoreline, and the
+# anti-aliased pixel either side of the line is ~0 deep under both rules
+# alike. 1.0 (the sea, unchanged) with nothing decoded.
+#
+# Geometry only: the ground shader still reads its depth tint and its wet
+# band from the distance field, so a shoal is shallow to stand in before
+# it looks shallow. See FIELD_ASSET_SPEC-to-be (the mask's own doc in the
+# Landmass Mask group above is the spec today).
+func _shoal_factor(world_xz: Vector2) -> float:
+	if _mask_bytes.is_empty():
+		return 1.0
+	var value: float = _canvas_sample(_mask_bytes, world_xz)
+	return clampf((MASK_LAND_THRESHOLD - value) / MASK_LAND_THRESHOLD, 0.0, 1.0)
 
 # The painted elevation's lift at a sand-side point, in metres: the
 # painting's value x elevation_max_height x a land factor that runs 0 at

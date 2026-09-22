@@ -18,6 +18,12 @@ class_name FloorData
 # scale): white lifts the sand by Ground.elevation_max_height, clipped to
 # the drawn shoreline - see Ground's elevation_mask. Null = flat floor.
 @export var elevation_mask: Texture2D = null
+# Optional painted wear on the same canvas again: white is walked sand,
+# and the value scales it, so a mid grey is a fainter trace than the
+# band Ground draws along this floor's own route. Onto Ground.wear_mask,
+# which combines the two by max() and gates both at the waterline. Null
+# = only the derived band.
+@export var wear_mask: Texture2D = null
 # Normalized image coords of the pixel that sits on `spawn`.
 @export var mask_origin: Vector2 = Vector2(0.5, 0.5)
 # The four Ground values that set how wet the floor reads, pushed onto
@@ -27,6 +33,15 @@ class_name FloorData
 @export var falloff: float = 4.0
 @export var relief_amplitude: float = 0.15
 @export var caustic_strength: float = 0.15
+# The relief mesh's own size and density, onto Ground's exports of the
+# same names - a floor whose painted land runs past the default extent
+# (Z -35..35 at 100 x 70, centred on spawn) needs its own, or the land
+# beyond it is flat dressing with no relief and no collision. Keep
+# subdivisions near 0.35 m a vertex: the shoreline contour reads as
+# faceted much past that. Defaults are the region scene's own values,
+# so a floor that says nothing gets exactly what it always had.
+@export var relief_extent: Vector2 = Vector2(100.0, 70.0)
+@export var relief_subdivisions: Vector2i = Vector2i(285, 199)
 # RegionField.wade_drain_enabled for this floor: whether standing past the
 # shoreline costs HP (the rates stay RegionField's own, region-wide).
 @export var wade_drain_enabled: bool = false
