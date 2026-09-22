@@ -3,25 +3,26 @@
 [ext_resource type="Script" uid="uid://8yxy7cpevuvt" path="res://floors/floor_data.gd" id="1_floor_data"]
 [ext_resource type="Script" uid="uid://eby4csrr8fpj" path="res://floors/floor_enemy.gd" id="2_floor_enemy"]
 [ext_resource type="Script" uid="uid://bi5wh88prg3u6" path="res://floors/floor_prop.gd" id="3_floor_prop"]
-[ext_resource type="Texture2D" uid="uid://bs6hicysi2lvh" path="res://assets/field/masks/Map3_mask.png" id="4_map3"]
+[ext_resource type="Texture2D" uid="uid://cwec64ooqg7ev" path="res://assets/field/masks/Map3_mask_x1.5_alcove.png" id="4_map3"]
 [ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="5_sputter"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/dragonfly.tres" id="11_dragonfly"]
 [ext_resource type="Script" path="res://floors/floor_patrol.gd" id="12_floor_patrol"]
 [ext_resource type="PackedScene" path="res://field/world_card.tscn" id="6_world_card"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
-[ext_resource type="Texture2D" uid="uid://dkhl5vyt1v7np" path="res://assets/field/masks/Map3_elev.png" id="8_map3_elev"]
+[ext_resource type="Texture2D" uid="uid://cng8k2jiwlohk" path="res://assets/field/masks/Map3_elev_x1.5_alcove.png" id="8_map3_elev"]
+[ext_resource type="Texture2D" uid="uid://cjala7u1fdknr" path="res://assets/field/masks/Map3_wear_x1.5_alcove.png" id="13_map3_wear"]
 [ext_resource type="PackedScene" path="res://field/reward_spread.tscn" id="9_reward_spread"]
 [ext_resource type="Resource" path="res://cards/pools/belongings_pool.tres" id="10_belongings_pool"]
 
 [sub_resource type="Resource" id="FloorEnemy_sputter"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("5_sputter")
-position = Vector2(1.2, -17)
+position = Vector2(1.8, -25.5)
 
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly1"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("11_dragonfly")
-position = Vector2(-11.4, -16.4)
+position = Vector2(-17.1, -24.6)
 yaw_degrees = -113.2
 required = false
 group = &"island"
@@ -29,7 +30,7 @@ group = &"island"
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly2"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("11_dragonfly")
-position = Vector2(-12.7, -17.1)
+position = Vector2(-19.05, -25.65)
 yaw_degrees = -116.6
 required = false
 group = &"island"
@@ -37,7 +38,7 @@ group = &"island"
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly3"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("11_dragonfly")
-position = Vector2(-13.5, -16.6)
+position = Vector2(-20.25, -24.9)
 yaw_degrees = -122.0
 required = false
 group = &"island"
@@ -45,24 +46,29 @@ group = &"island"
 [sub_resource type="Resource" id="FloorPatrol_island"]
 script = ExtResource("12_floor_patrol")
 group = &"island"
-waypoints = PackedVector2Array(-12.53, -16.7, -9.6, -16.3, -11, -14.8)
+waypoints = PackedVector2Array(-18.795, -25.05, -14.4, -24.45, -16.5, -22.2)
 dwell_min_seconds = 2.0
 dwell_max_seconds = 5.0
 
 [sub_resource type="Resource" id="FloorProp_belongings"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("6_world_card")
-position = Vector3(-3.4, 0, -8)
+position = Vector3(-5.1, 0, -12)
 
 [sub_resource type="Resource" id="FloorProp_island_belongings"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("6_world_card")
-position = Vector3(-12, 0, -15.6)
+position = Vector3(-18, 0, -23.4)
+
+[sub_resource type="Resource" id="FloorProp_ledge_belongings"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("6_world_card")
+position = Vector3(25, 0, -35)
 
 [sub_resource type="Resource" id="FloorProp_alcove_cache"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("9_reward_spread")
-position = Vector3(9.2, 0, -16.8)
+position = Vector3(13.8, 0, -25.2)
 pool = ExtResource("10_belongings_pool")
 overrides = {
 "card_count": 4,
@@ -74,13 +80,20 @@ overrides = {
 script = ExtResource("1_floor_data")
 mask = ExtResource("4_map3")
 elevation_mask = ExtResource("8_map3_elev")
-mask_origin = Vector2(0.5, 0.888889)
+wear_mask = ExtResource("13_map3_wear")
+mask_origin = Vector2(0.461538, 0.888889)
 interior_height = 0.3
+underwater_falloff = 3.0
 relief_amplitude = 0.18
 caustic_strength = 0.12
+relief_extent = Vector2(110, 110)
+relief_subdivisions = Vector2i(313, 313)
 enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3")])
-props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_belongings"), SubResource("FloorProp_island_belongings"), SubResource("FloorProp_alcove_cache")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_belongings"), SubResource("FloorProp_island_belongings"), SubResource("FloorProp_ledge_belongings"), SubResource("FloorProp_alcove_cache")])
 patrols = Array[ExtResource("12_floor_patrol")]([SubResource("FloorPatrol_island")])
+gate_distance_beyond_enemy = 9.0
+gate_channel_max_width = 30.0
+wear_path_mid_offset = 2.25
 wear_path_override = null
 ambience_sea_db = -3.0
 ambience_wind_db = 1.0
