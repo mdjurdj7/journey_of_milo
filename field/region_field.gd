@@ -290,6 +290,7 @@ func _enter_tree() -> void:
 		ground.landmass_mask_origin = floor_data.mask_origin
 		ground.landmass_interior_height = floor_data.interior_height
 		ground.landmass_falloff_width = floor_data.falloff
+		ground.landmass_underwater_falloff_width = floor_data.underwater_falloff
 		ground.relief_amplitude = floor_data.relief_amplitude
 		ground.caustic_strength = floor_data.caustic_strength
 	if floor_data != null:

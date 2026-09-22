@@ -31,6 +31,12 @@ class_name FloorData
 # landmass_falloff_width, relief_amplitude, caustic_strength).
 @export var interior_height: float = 0.25
 @export var falloff: float = 4.0
+# Ground.landmass_underwater_falloff_width: how many metres past the
+# drawn line the seabed takes to reach full depth. The region's own 6 m
+# is right for an open shore; a floor with a WADE - a gap between two
+# shores only a few metres wide - never gets past the shallow end of
+# that ramp, so its crossing reads as wet sand however it is painted.
+@export var underwater_falloff: float = 6.0
 @export var relief_amplitude: float = 0.15
 @export var caustic_strength: float = 0.15
 # The relief mesh's own size and density, onto Ground's exports of the
