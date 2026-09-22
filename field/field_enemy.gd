@@ -112,6 +112,12 @@ var _tint_base_colors: Array[Color] = []
 # moves under it.
 var _model: Node3D = null
 var _settling: bool = false
+# Set the moment this enemy's HP reaches 0 in a fight (RegionField._on_
+# enemy_defeated() -> mark_defeated()), whether it settles now or is
+# freed with the win a beat later: from then on it is not a thing the
+# Wanderer can bump into, not a member a cluster fight collects, and
+# not a required fight the gate waits on.
+var _defeated: bool = false
 # Where this enemy stood before step_to() moved it into a fight's line,
 # and which way it faced - what return_to_field_pose() goes back to
 # after an escape. Set by step_to(), cleared by the return.
@@ -709,10 +715,17 @@ func _tween_to(spot: Vector3, duration: float) -> void:
 # still returning to rest) never fights it. The contact area goes with
 # the node, so a fight the Wanderer re-contacts later can't include a
 # member that isn't there.
+func mark_defeated() -> void:
+	_defeated = true
+
+func is_defeated() -> bool:
+	return _defeated
+
 func settle_and_free() -> void:
 	if _settling:
 		return
 	_settling = true
+	mark_defeated()
 	set_highlight(false)
 	if enemy_status != null and is_instance_valid(enemy_status):
 		enemy_status.queue_free()
@@ -727,7 +740,9 @@ func settle_and_free() -> void:
 	tween.tween_callback(queue_free)
 
 func _on_body_entered(body: Node3D) -> void:
-	if _contacted or not body.is_in_group("wanderer"):
+	# A dead body's area comes back into the space with the field's
+	# unfreeze a beat before the node is freed - never a contact.
+	if _contacted or _defeated or is_queued_for_deletion() or not body.is_in_group("wanderer"):
 		return
 	_contacted = true
 	contacted.emit(self)

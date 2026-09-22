@@ -455,7 +455,7 @@ func _enemy_under_cursor(camera: Camera3D, screen_pos: Vector2) -> FieldEnemy:
 	var best_distance: float = INF
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as FieldEnemy
-		if enemy == null:
+		if enemy == null or enemy.is_defeated():
 			continue
 		var rect: Rect2 = enemy.get_screen_rect(camera, click_target_padding_px)
 		if rect.size == Vector2.ZERO or not rect.has_point(screen_pos):
@@ -934,7 +934,7 @@ func _battle_members_for(enemy: FieldEnemy) -> Array[FieldEnemy]:
 	members.clear()
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var member := node as FieldEnemy
-		if member == null or member.group != enemy.group or member.is_queued_for_deletion():
+		if member == null or member.group != enemy.group or member.is_queued_for_deletion() or member.is_defeated():
 			continue
 		members.append(member)
 	var from: Vector3 = wanderer.global_position
@@ -1004,8 +1004,14 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	if camera_rig:
 		var viewport_height: float = overlay.get_viewport().get_visible_rect().size.y
 		var hand_top_fraction: float = overlay.hand_container.get_rest_top_y() / maxf(viewport_height, 1.0)
-		camera_rig.enter_battle(wanderer, _battle_members, hand_top_fraction)
+		# The line is settled (and _battle_members put in its order)
+		# before anyone else gets the list. The camera and the battle
+		# layer each get their OWN copy: BattleController erases the dead
+		# from the list it holds, and _on_battle_finished() needs the
+		# full roster to free the last kill - one shared array left that
+		# body standing.
 		var stance_direction: Vector3 = _place_cluster_line(_battle_members, camera_rig.battle_transition_time)
+		camera_rig.enter_battle(wanderer, _battle_members.duplicate(), hand_top_fraction)
 		wanderer.enter_battle_stance(anchor, battle_spacing, camera_rig.battle_transition_time, stance_direction)
 		# A lone enemy faces the Wanderer where he is (his stance lies on
 		# that same line); a cluster faces where its line will put him.
@@ -1020,7 +1026,7 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 		directional_light.enter_battle()
 
 	var transition_time: float = camera_rig.battle_transition_time if camera_rig != null else 0.0
-	overlay.enter_battle(ui_on_dark_world, _battle_members, deck_panel, hp_bar, transition_time, wanderer)
+	overlay.enter_battle(ui_on_dark_world, _battle_members.duplicate(), deck_panel, hp_bar, transition_time, wanderer)
 	overlay.battle_finished.connect(_on_battle_finished.bind(overlay))
 	# Only reachable now - enter_battle() is what creates battle_controller
 	# (see Wanderer.bind_to_battle()'s own doc).
@@ -1036,6 +1042,9 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 func _on_enemy_defeated(enemy: FieldEnemy, overlay: BattleOverlay) -> void:
 	_last_fallen_at = enemy.global_position
 	_last_fallen_data = enemy.enemy_data
+	# Dead from here whichever path frees it - no contact, no cluster
+	# roster, no gate waiting on it (see FieldEnemy.mark_defeated()).
+	enemy.mark_defeated()
 	if overlay.battle_controller.enemies.is_empty():
 		return
 	enemy.settle_and_free()
@@ -1117,7 +1126,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 func _required_enemy_remains() -> bool:
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as FieldEnemy
-		if enemy == null or enemy.is_queued_for_deletion():
+		if enemy == null or enemy.is_queued_for_deletion() or enemy.is_defeated():
 			continue
 		if enemy.required:
 			return true
