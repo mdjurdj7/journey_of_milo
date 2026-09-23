@@ -16,10 +16,10 @@ shader_type spatial;
 //
 // Driven entirely by BundleProp's exports (see its Cloth group).
 
-uniform vec3 tint : source_color = vec3(0.50, 0.47, 0.42);
+uniform vec3 tint : source_color = vec3(0.50, 0.51, 0.50);
 uniform float weave_scale_fine = 90.0;
 uniform float weave_scale_coarse = 22.0;
-uniform float weave_amplitude = 0.07;
+uniform float weave_amplitude = 0.10;
 uniform vec3 weave_cool : source_color = vec3(0.90, 0.95, 1.0);
 uniform float crease_darkening = 0.25;
 uniform float crease_curvature_scale = 0.04;

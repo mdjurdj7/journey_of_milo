@@ -40,8 +40,9 @@ enum Contents { NONE, GOLD, CARD, RARE_CARD }
 	set(value):
 		yaw_degrees = value
 		rotation = Vector3(0.0, deg_to_rad(yaw_degrees), 0.0)
-# A step darker than the dry sand (0.74, 0.70, 0.60 - file 03's palette).
-@export var bundle_tint: Color = Color(0.63, 0.60, 0.51):
+# A cool grey: the hulls' value (0.50) without their warmth, so from
+# above it reads as cloth against the warm sand, not as more of it.
+@export var bundle_tint: Color = Color(0.50, 0.51, 0.50):
 	set(value):
 		bundle_tint = value
 		_apply_cloth()
@@ -65,7 +66,7 @@ enum Contents { NONE, GOLD, CARD, RARE_CARD }
 		weave_scale_coarse = value
 		_apply_cloth()
 # How far the weave moves the albedo either way, as a fraction of it.
-@export_range(0.0, 0.5) var weave_amplitude: float = 0.07:
+@export_range(0.0, 0.5) var weave_amplitude: float = 0.10:
 	set(value):
 		weave_amplitude = value
 		_apply_cloth()

@@ -24,6 +24,6 @@ max_hp = 14
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_bite_1"), SubResource("EnemyIntent_bite_2"), SubResource("EnemyIntent_swarm")])
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell")])
 model_scene_path = "res://assets/models/enemies/Dragonfly/Dragonfly_body.glb"
-model_scale = 0.2896
+model_scale = 0.42
 model_yaw_offset_degrees = 180.0
 attachment_scene_path = "res://field/dragonfly_wings.tscn"
