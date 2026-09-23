@@ -66,9 +66,10 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 # frame (see _hold_above_visible_ground()): further below it than this,
 # and he is put onto it with any fall cancelled. The one case this is
 # built for is a draining channel - the exit gate's bar surfaces on the
-# GPU over four seconds while mesh and collision only catch up at the
-# end, so on the bar he would otherwise walk under the sand and, when
-# the collision finally jumps up through him, fall out of the world.
+# GPU over ExitGate.drain_seconds while mesh and collision only catch
+# up at the end, so on the bar he would otherwise walk under the sand
+# and, when the collision finally jumps up through him, fall out of the
+# world.
 # While it is what holds him (no collision under his feet) he counts as
 # grounded everywhere is_on_floor() is read. The tolerance only has to
 # clear what a resting capsule ever shows: the drawn triangles and the

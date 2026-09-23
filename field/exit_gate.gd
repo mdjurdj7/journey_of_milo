@@ -56,8 +56,12 @@ signal floor_exited
 # uniform tween (Ground.set_channel_live_amount(), one uniform write per
 # frame - the relief mesh isn't touched); Ground bakes the drained
 # channel into mesh/collision/get_height_at() ONCE when the tween ends,
-# and only then does the Blocker come down.
-@export var drain_seconds: float = 4.0
+# and only then does the Blocker come down. 2 s: at the start of the
+# ease the sand rises about 1.25 cm per physics frame, still well under
+# the Wanderer's 3 cm ground-hold tolerance (tests/drain_probe.gd checks
+# this). Read once per open(), so an edit made before the floor clears
+# applies; it doesn't re-time a drain that's already running.
+@export var drain_seconds: float = 2.0
 
 # The Blocker: an invisible box across the closed channel's near bank -
 # blocker_depth along the neck, centred blocker_inland_offset inland of
