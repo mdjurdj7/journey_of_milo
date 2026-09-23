@@ -32,12 +32,16 @@ class_name LootScreen
 # Wanderer. The two items are the only things here that stop the mouse -
 # a left click anywhere else is the field's.
 #
+# Opening plays the bundle's own open sound (BundleProp.play_open_
+# sound()), once per opening.
+#
 # TAKE grants through RunState, plays the take's sound (TakeFeedback),
 # marks the bundle taken and closes - a card flies to the Belongings
-# panel first. LEAVE closes and changes nothing, and so does walking out
-# of the bundle's reach or the field freezing (a fight, the floor
-# transition): leaving is not final, and the bundle opens again with the
-# same thing inside.
+# panel on its own - and on that close the bundle sinks and goes
+# (BundleProp.settle_and_free()). LEAVE closes and changes nothing, and
+# so does walking out of the bundle's reach or the field freezing (a
+# fight, the floor transition): leaving is not final, and the bundle
+# opens again with the same thing inside.
 
 signal closed()
 
@@ -145,6 +149,7 @@ func _ready() -> void:
 		return
 	if _bundle.contents_card != null:
 		_spawn_card()
+	_bundle.play_open_sound()
 
 	visible = false
 	modulate.a = 0.0
@@ -364,5 +369,7 @@ func close() -> void:
 	if _closing:
 		return
 	_closing = true
+	if _done and _bundle != null and is_instance_valid(_bundle):
+		_bundle.settle_and_free()
 	closed.emit()
 	queue_free()
