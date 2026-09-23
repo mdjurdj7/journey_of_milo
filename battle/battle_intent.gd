@@ -222,7 +222,9 @@ func _anchor_offset() -> Vector3:
 	var head: float = target.get_head_height() if target != null else 0.0
 	if head <= 0.0:
 		head = fallback_head_height
-	return Vector3(0.0, head + head_margin, 0.0)
+	# The bob on top: the head's own height already carries the hover.
+	var bob: float = target.get_bob_offset() if target != null else 0.0
+	return Vector3(0.0, head + head_margin + bob, 0.0)
 
 # Same loop as EnemyStatus._physics_process(): unproject, whole pixels.
 # Also re-evaluates the chevron's direction, since the framing can swap

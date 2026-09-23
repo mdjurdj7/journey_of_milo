@@ -387,7 +387,9 @@ func _physics_process(delta: float) -> void:
 	if camera == null:
 		return
 
-	var target_position: Vector3 = target.global_position + bar_offset
+	# Under the model, wherever it stands or hovers (FieldEnemy.get_body_
+	# lift()) - the body itself never leaves the sand.
+	var target_position: Vector3 = target.global_position + bar_offset + Vector3.UP * target.get_body_lift()
 	var screen_pos: Vector2 = camera.unproject_position(target_position)
 	# Whole pixels only - a fractional Control position on a bare bar (no
 	# panel background to visually absorb it) reads as shimmer/jitter on

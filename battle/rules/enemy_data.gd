@@ -44,3 +44,11 @@ class_name EnemyData
 # own materials but rides the body's grounding, yaw, scale and settle.
 # Empty = nothing attached.
 @export_file("*.tscn") var attachment_scene_path: String = ""
+# Metres the body stands clear of the sand in the field, applied after
+# its AABB grounding - legs the mesh doesn't carry (the dragonfly's
+# 0.12). Its contact shadow stays on the sand. 0 = the mesh's own feet.
+@export var rest_height_m: float = 0.0
+# Metres above the sand the body hovers at through a fight, from the
+# moment the battle frame settles (FieldEnemy.enter_battle_hover()). 0 =
+# it stays where it stands (the Sputter).
+@export var battle_hover_m: float = 0.0

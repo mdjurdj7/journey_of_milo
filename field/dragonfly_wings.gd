@@ -35,7 +35,12 @@ class_name DragonflyWings
 #                  quiver_settle_seconds so nothing pops at spawn.
 #   Attack flap  - start_flap(), from FieldEnemy.play_attack_snap(): a
 #                  beat of flap_degrees at flap_hz for flap_seconds, then
-#                  the quiver takes back over flap_release_seconds.
+#                  whatever was running - the quiver, or the flight beat
+#                  while airborne - takes back over flap_release_seconds.
+#   Flight beat  - set_airborne(), from the patrol's flight and a fight's
+#                  hover (FieldEnemy.enter_battle_hover()): a steady beat
+#                  of flap_degrees at flight_flap_hz in place of the
+#                  quiver, with the attack flap still on top.
 #   Death fold   - fold(seconds), from FieldEnemy.settle_and_free(): the
 #                  quiver stops and the dihedral eases to fold_degrees
 #                  (tips down) over the settle; the body sinks after.
@@ -214,20 +219,20 @@ func _quiver_angle(index: int) -> float:
 	return quiver_degrees * base * breath * settle
 
 # The hinge angle a quad adds to the authored dihedral right now: the
-# flap while it beats, its last angle easing into the quiver over the
-# release, the quiver alone otherwise.
+# attack flap while it beats, its last angle easing back into the base
+# motion over the release, the base motion alone otherwise. The base is
+# the flight beat while airborne, the rest quiver on the ground.
 func _motion_angle(index: int) -> float:
-	var quiver: float = _quiver_angle(index)
-	if _airborne:
-		_flap_last_angle = flap_degrees * sin(TAU * flight_flap_hz * _time)
-		return _flap_last_angle
+	var base: float = flap_degrees * sin(TAU * flight_flap_hz * _time) if _airborne else _quiver_angle(index)
 	if _flap_elapsed < 0.0:
-		return quiver
+		if _airborne:
+			_flap_last_angle = base
+		return base
 	if _flap_elapsed <= flap_seconds:
 		_flap_last_angle = flap_degrees * sin(TAU * flap_hz * _flap_elapsed)
 		return _flap_last_angle
 	var release: float = 1.0 if flap_release_seconds <= 0.0 else clampf((_flap_elapsed - flap_seconds) / flap_release_seconds, 0.0, 1.0)
-	return lerpf(_flap_last_angle, quiver, smoothstep(0.0, 1.0, release))
+	return lerpf(_flap_last_angle, base, smoothstep(0.0, 1.0, release))
 
 # The attack beat - called by FieldEnemy.play_attack_snap() as the lunge
 # starts. A beat already running restarts.

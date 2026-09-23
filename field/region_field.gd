@@ -133,6 +133,12 @@ enum RewardMode { SCREEN, WORLD }
 		camera_inland_limit_override_z = value
 		_apply_camera_inland_limit()
 @export var battle_spacing: float = 3.0
+# The Wanderer's stance keeps battle_spacing from the anchor unless that
+# puts him within stance_dry_margin_m of the water; then it is pulled in
+# along the same line toward the pack, never closer than
+# battle_spacing_min (see _dry_stance_spacing()).
+@export var stance_dry_margin_m: float = 0.5
+@export var battle_spacing_min: float = 1.5
 # Metres between the members of a cluster along the line they step into
 # for a fight (see _place_cluster_line()) - read at contact, so a Remote-
 # tab edit takes on the next fight.
@@ -665,6 +671,8 @@ func _spawn_floor_enemies() -> void:
 		enemy.model_scale = entry.enemy_data.model_scale
 		enemy.model_yaw_offset = entry.enemy_data.model_yaw_offset_degrees
 		enemy.attachment_scene_path = entry.enemy_data.attachment_scene_path
+		enemy.rest_height = entry.enemy_data.rest_height_m
+		enemy.battle_hover = entry.enemy_data.battle_hover_m
 		enemy.face_shore_at_spawn = false
 		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)
 		enemy.rotation.y = deg_to_rad(entry.yaw_degrees)
@@ -1112,13 +1120,20 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 		# full roster to free the last kill - one shared array left that
 		# body standing.
 		var stance_direction: Vector3 = _place_cluster_line(_battle_members, camera_rig.battle_transition_time)
+		# Where the stance lies from the anchor: the cluster's line, or
+		# for a lone enemy the line back to where the Wanderer is - the
+		# same direction Wanderer.enter_battle_stance() takes for it.
+		var stance_toward: Vector3 = stance_direction
+		if stance_toward == Vector3.ZERO:
+			stance_toward = Vector3(wanderer.global_position.x - anchor.global_position.x, 0.0, wanderer.global_position.z - anchor.global_position.z).normalized()
+		var spacing: float = _dry_stance_spacing(anchor, stance_toward)
 		camera_rig.enter_battle(wanderer, _battle_members.duplicate(), hand_top_fraction)
-		wanderer.enter_battle_stance(anchor, battle_spacing, camera_rig.battle_transition_time, stance_direction)
+		wanderer.enter_battle_stance(anchor, spacing, camera_rig.battle_transition_time, stance_direction)
 		# A lone enemy faces the Wanderer where he is (his stance lies on
 		# that same line); a cluster faces where its line will put him.
 		var face_point: Vector3 = wanderer.global_position
 		if stance_direction != Vector3.ZERO:
-			face_point = anchor.global_position + stance_direction * battle_spacing
+			face_point = anchor.global_position + stance_direction * spacing
 		for member in _battle_members:
 			member.face_toward_point(face_point, camera_rig.battle_transition_time)
 
@@ -1128,25 +1143,64 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 
 	var transition_time: float = camera_rig.battle_transition_time if camera_rig != null else 0.0
 	overlay.enter_battle(ui_on_dark_world, _battle_members.duplicate(), deck_panel, hp_bar, transition_time, wanderer)
+	# The battle frame settles on the beat the overlay reveals the intents
+	# (BattleOverlay._reveal_enemy_intents()); a flyer takes to the air
+	# then, and stays up until the fight ends.
+	get_tree().create_timer(transition_time).timeout.connect(_start_battle_hover.bind(_battle_members.duplicate()))
 	overlay.battle_finished.connect(_on_battle_finished.bind(overlay))
 	# Only reachable now - enter_battle() is what creates battle_controller
 	# (see Wanderer.bind_to_battle()'s own doc).
 	overlay.battle_controller.enemy_defeated.connect(_on_enemy_defeated.bind(overlay))
 	wanderer.bind_to_battle(overlay.battle_controller)
 
+# The Wanderer's stance distance from the anchor along `direction`:
+# battle_spacing, pulled in toward the pack a tenth of a metre at a time
+# while the spot lies within stance_dry_margin_m of the water (Ground.
+# get_landmass_distance(), negative on sand), but never under battle_
+# spacing_min - where the island is too narrow even for that, he stands
+# at the minimum and it says so.
+func _dry_stance_spacing(anchor: FieldEnemy, direction: Vector3) -> float:
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground == null or direction == Vector3.ZERO:
+		return battle_spacing
+	var spacing: float = battle_spacing
+	while spacing > battle_spacing_min:
+		var point: Vector3 = anchor.global_position + direction * spacing
+		if -ground.get_landmass_distance(Vector2(point.x, point.z)) >= stance_dry_margin_m:
+			if spacing < battle_spacing:
+				print("RegionField: stance pulled in to %.1f m from '%s' to stay on dry sand." % [spacing, anchor.name])
+			return spacing
+		spacing -= 0.1
+	push_warning("RegionField: no dry stance within %.1f..%.1f m of '%s'; standing at the minimum." % [battle_spacing_min, battle_spacing, anchor.name])
+	return battle_spacing_min
+
+# The frame has settled: every member of this fight that flies takes to
+# the air (FieldEnemy.enter_battle_hover()), each a step further round
+# the bob's cycle so a pack never bobs as one. Skipped if the fight is
+# already over.
+func _start_battle_hover(members: Array[FieldEnemy]) -> void:
+	if not _battle_open:
+		return
+	for index in members.size():
+		var member: FieldEnemy = members[index]
+		if not is_instance_valid(member) or not _battle_members.has(member):
+			continue
+		member.enter_battle_hover(TAU * float(index) / float(members.size()))
+
 # A member of the fight died. Where it stood and what it was are kept for
 # the reward (see _on_battle_finished()'s WIN). If the fight goes on
 # without it, it leaves now (FieldEnemy.settle_and_free()); the last kill
-# is the win, and that body is freed with the win exactly as it always
-# was - the controller has already dropped the dead from its own
-# `enemies`, so an empty list there means this was the last.
+# is the win, and a body on the ground is freed with the win exactly as
+# it always was - the controller has already dropped the dead from its
+# own `enemies`, so an empty list there means this was the last. A last
+# kill in the air folds and falls like any other (the win leaves it to).
 func _on_enemy_defeated(enemy: FieldEnemy, overlay: BattleOverlay) -> void:
 	_last_fallen_at = enemy.global_position
 	_last_fallen_data = enemy.enemy_data
 	# Dead from here whichever path frees it - no contact, no cluster
 	# roster, no gate waiting on it (see FieldEnemy.mark_defeated()).
 	enemy.mark_defeated()
-	if overlay.battle_controller.enemies.is_empty():
+	if overlay.battle_controller.enemies.is_empty() and not enemy.is_battle_hovering():
 		return
 	enemy.settle_and_free()
 
@@ -1197,6 +1251,9 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 				fell_at = standing[0].global_position
 				fell_to = standing[0].enemy_data
 			for member in standing:
+				# The last kill folding from the air frees itself.
+				if member.is_settling():
+					continue
 				# enemy_status lives under FieldHUD, not as the enemy's
 				# own child (see FieldEnemy.enemy_status's own doc) -
 				# freeing the enemy alone would leave it behind as an
@@ -1218,6 +1275,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 			var return_time: float = camera_rig.battle_transition_time if camera_rig != null else 0.0
 			for member in standing:
 				member.return_to_field_pose(return_time)
+				member.exit_battle_hover()
 		BattleOverlay.Outcome.LOSE:
 			get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
 

@@ -91,6 +91,34 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export_group("Flight")
 @export var flight_turn_rate: float = 6.0
 @export var battle_land_seconds: float = 0.3
+
+# Standing clear of the sand and hovering through a fight - EnemyData.
+# rest_height_m and battle_hover_m, copied by RegionField at spawn like
+# model_scale. Both move the MODEL, never the body: the body stays on the
+# sand, and with it the contact shadow, the contact area and every
+# lunge/recoil/step tween, so none of them has to know. See
+# enter_battle_hover() for the fight's hover and its bob.
+@export_group("Rest And Hover")
+@export var rest_height: float = 0.0:
+	set(value):
+		rest_height = value
+		_apply_model_lift()
+# Above the sand, metres; 0 = this body never leaves the ground in a fight.
+@export var battle_hover: float = 0.0:
+	set(value):
+		battle_hover = value
+		if _hovering:
+			_tween_hover(_hover_lift(), 1.0, battle_rise_seconds, Tween.EASE_OUT)
+# The bob on top of the hover: this far either way, over this long.
+@export var battle_bob_m: float = 0.03
+@export var battle_bob_seconds: float = 1.2:
+	set(value):
+		battle_bob_seconds = value
+		if _hovering:
+			_start_bob()
+@export var battle_rise_seconds: float = 0.3
+# Back down to rest height on a win or an escape.
+@export var battle_settle_seconds: float = 0.4
 @export_group("")
 
 var _contacted: bool = false
@@ -145,6 +173,19 @@ var _flight_xz: Vector2 = Vector2.ZERO
 var _hover: float = 0.0
 var _flight_heading: float = 0.0
 var _ground: Ground = null
+# The model's grounded Y (its AABB feet on the body floor), from
+# _spawn_model() - what rest height, hover and bob are added to.
+var _model_ground_y: float = 0.0
+# A fight's hover (see enter_battle_hover()): the lift above rest height
+# and the bob's weight, both tweened in and out; the bob's angle, looped;
+# this member's own phase on it.
+var _hovering: bool = false
+var _lift: float = 0.0
+var _bob_weight: float = 0.0
+var _bob_angle: float = 0.0
+var _bob_phase: float = 0.0
+var _hover_tween: Tween = null
+var _bob_tween: Tween = null
 var _slash_mark_mesh: ArrayMesh = null
 var _slash_mark_texture: GradientTexture2D = null
 
@@ -169,14 +210,27 @@ var _model_half_width: float = 0.0
 # armed-card target test. Empty until the model has spawned.
 var _model_aabb: AABB = AABB()
 
+# The head above the body's feet: the model's own height, standing at
+# rest height, lifted by a fight's hover. Not the bob - the camera's
+# battle fit reads this every frame and must not breathe with it.
 func get_head_height() -> float:
-	return _model_height
+	return _model_height + rest_height + _lift
 
 func get_half_width() -> float:
 	return _model_half_width
 
 func get_model_aabb() -> AABB:
-	return _model_aabb
+	return AABB(_model_aabb.position + Vector3.UP * get_body_lift(), _model_aabb.size)
+
+# How far the model sits above its grounded place right now: rest height,
+# hover and bob. What anything anchored to the body adds (EnemyStatus).
+func get_body_lift() -> float:
+	return rest_height + _lift + get_bob_offset()
+
+# The bob alone, for what anchors to the head (BattleIntent), which
+# already has the rest of the lift through get_head_height().
+func get_bob_offset() -> float:
+	return battle_bob_m * _bob_weight * sin(_bob_angle + _bob_phase)
 
 # The model's world AABB as a screen rect: its 8 corners unprojected,
 # bounded, grown by padding_px on every side - what a click or an armed
@@ -187,8 +241,9 @@ func get_screen_rect(camera: Camera3D, padding_px: float) -> Rect2:
 	if camera == null or _model_aabb.size == Vector3.ZERO:
 		return Rect2()
 	var rect := Rect2()
+	var aabb: AABB = get_model_aabb()
 	for i in 8:
-		var corner: Vector3 = global_transform * _model_aabb.get_endpoint(i)
+		var corner: Vector3 = global_transform * aabb.get_endpoint(i)
 		if camera.is_position_behind(corner):
 			return Rect2()
 		var point: Vector2 = camera.unproject_position(corner)
@@ -322,8 +377,10 @@ func _spawn_model() -> void:
 		_model_height = combined_aabb.size.y
 		_model_half_width = maxf(combined_aabb.size.x, combined_aabb.size.z) * 0.5
 		_model_aabb = AABB(combined_aabb.position + Vector3(0.0, grounding_shift, 0.0), combined_aabb.size)
+	_model_ground_y = model.position.y
 
 	_attach_scene(model)
+	_apply_model_lift()
 
 # The attachment (attachment_scene_path), under the model root once the
 # body is grounded and its material pass is over, so the attachment's
@@ -813,6 +870,92 @@ func _kill_flight() -> void:
 		_flight_tween.kill()
 	_flight_tween = null
 
+# --- A fight's hover (a flyer: battle_hover > 0) ---
+
+# From the moment the battle frame settles (RegionField, on the same beat
+# BattleOverlay reveals the intents) until the fight ends: the model
+# rises to battle_hover above the sand over battle_rise_seconds and bobs
+# battle_bob_m either way every battle_bob_seconds, on `phase` (radians -
+# RegionField spreads a pack's members around the cycle so they never bob
+# together), and the wings beat their flight beat the whole time
+# (DragonflyWings.set_airborne()) with the lunge's flap on top. Every
+# tween is PAUSE_PROCESS, through the fight's freeze. A no-op for a body
+# that doesn't hover.
+func enter_battle_hover(phase: float) -> void:
+	if battle_hover <= 0.0 or _hovering or _settling or _defeated or _model == null:
+		return
+	_hovering = true
+	_bob_phase = phase
+	_set_wings_airborne(true)
+	_start_bob()
+	_tween_hover(_hover_lift(), 1.0, battle_rise_seconds, Tween.EASE_OUT)
+
+func is_battle_hovering() -> bool:
+	return _hovering
+
+# A win or an escape: back down to rest height over battle_settle_
+# seconds, the bob fading out with the lift; the wings land at the end.
+func exit_battle_hover() -> void:
+	if not _hovering or _settling:
+		return
+	_hovering = false
+	var tween: Tween = _tween_hover(0.0, 0.0, battle_settle_seconds, Tween.EASE_IN_OUT)
+	tween.tween_callback(_on_hover_landed)
+
+func _on_hover_landed() -> void:
+	if _hovering or _settling:
+		return
+	_kill_bob()
+	_set_wings_airborne(false)
+
+# The hover's lift above rest height.
+func _hover_lift() -> float:
+	return maxf(battle_hover - rest_height, 0.0)
+
+func _tween_hover(lift: float, bob_weight: float, seconds: float, easing: Tween.EaseType) -> Tween:
+	if _hover_tween != null and _hover_tween.is_valid():
+		_hover_tween.kill()
+	var duration: float = maxf(seconds, 0.001)
+	_hover_tween = create_tween()
+	_hover_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_hover_tween.set_trans(Tween.TRANS_SINE).set_ease(easing)
+	_hover_tween.set_parallel(true)
+	_hover_tween.tween_method(_set_lift, _lift, lift, duration)
+	_hover_tween.tween_method(_set_bob_weight, _bob_weight, bob_weight, duration)
+	_hover_tween.set_parallel(false)
+	return _hover_tween
+
+func _start_bob() -> void:
+	_kill_bob()
+	_bob_tween = create_tween()
+	_bob_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_bob_tween.set_loops()
+	_bob_tween.tween_method(_set_bob_angle, 0.0, TAU, maxf(battle_bob_seconds, 0.05))
+
+func _kill_bob() -> void:
+	if _bob_tween != null and _bob_tween.is_valid():
+		_bob_tween.kill()
+	_bob_tween = null
+
+func _set_lift(value: float) -> void:
+	_lift = value
+	_apply_model_lift()
+
+func _set_bob_weight(value: float) -> void:
+	_bob_weight = value
+	_apply_model_lift()
+
+func _set_bob_angle(value: float) -> void:
+	_bob_angle = value
+	_apply_model_lift()
+
+# The model at its grounded place plus rest height, hover and bob. Left
+# alone once settling - the sink owns the model from then on.
+func _apply_model_lift() -> void:
+	if _model == null or _settling:
+		return
+	_model.position.y = _model_ground_y + get_body_lift()
+
 func _set_wings_airborne(on: bool) -> void:
 	if _attachment != null and _attachment.has_method("set_airborne"):
 		_attachment.call("set_airborne", on)
@@ -843,6 +986,11 @@ func mark_defeated() -> void:
 func is_defeated() -> bool:
 	return _defeated
 
+# On its way out through settle_and_free() - RegionField's win leaves a
+# settling body to finish rather than freeing it outright.
+func is_settling() -> bool:
+	return _settling
+
 func settle_and_free() -> void:
 	if _settling:
 		return
@@ -852,18 +1000,26 @@ func settle_and_free() -> void:
 	if enemy_status != null and is_instance_valid(enemy_status):
 		enemy_status.queue_free()
 		enemy_status = null
+	# A hovering body stops where it is - no more lift, no more bob - and
+	# folds and falls from there.
+	_hovering = false
+	if _hover_tween != null and _hover_tween.is_valid():
+		_hover_tween.kill()
+	_kill_bob()
 	if _model == null or _model_height <= 0.0:
 		queue_free()
 		return
 	var tween := create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	# Wings first, body after: an attachment that can fold takes the
-	# settle time to drop its wings, and only then does the body sink.
+	# settle time to drop its wings, and only then does the body sink -
+	# from wherever it is (standing, or hovering in a fight) to its own
+	# height below its grounded place.
 	if _attachment != null and _attachment.has_method("fold"):
 		_attachment.call("fold", settle_time)
 		tween.tween_interval(settle_time)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.tween_property(_model, "position:y", _model.position.y - _model_height, settle_time)
+	tween.tween_property(_model, "position:y", _model_ground_y - _model_height, settle_time)
 	tween.tween_callback(queue_free)
 
 func _on_body_entered(body: Node3D) -> void:
