@@ -13,6 +13,7 @@
 [ext_resource type="Texture2D" uid="uid://nweve28tkmpt" path="res://assets/field/masks/Map3_wear_x1.25_pocket.png" id="13_map3_wear"]
 [ext_resource type="PackedScene" path="res://field/reward_spread.tscn" id="9_reward_spread"]
 [ext_resource type="Resource" path="res://cards/pools/belongings_pool.tres" id="10_belongings_pool"]
+[ext_resource type="PackedScene" path="res://field/bundle_prop.tscn" id="14_bundle"]
 
 [sub_resource type="Resource" id="FloorEnemy_sputter"]
 script = ExtResource("2_floor_enemy")
@@ -50,15 +51,17 @@ waypoints = PackedVector2Array(-16.6625, -20.875, -13, -20.375, -14.75, -18.5)
 dwell_min_seconds = 2.0
 dwell_max_seconds = 5.0
 
-[sub_resource type="Resource" id="FloorProp_belongings"]
+[sub_resource type="Resource" id="FloorProp_bundle"]
 script = ExtResource("3_floor_prop")
-scene = ExtResource("6_world_card")
-position = Vector3(-4.25, 0, -10)
+scene = ExtResource("14_bundle")
+position = Vector3(-3.6, 0, -9.8)
+pool = ExtResource("10_belongings_pool")
 
 [sub_resource type="Resource" id="FloorProp_island_belongings"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("6_world_card")
 position = Vector3(-16, 0, -19.5)
+pool = ExtResource("10_belongings_pool")
 
 [sub_resource type="Resource" id="FloorProp_alcove_cache"]
 script = ExtResource("3_floor_prop")
@@ -84,7 +87,7 @@ caustic_strength = 0.12
 relief_extent = Vector2(125, 88)
 relief_subdivisions = Vector2i(356, 251)
 enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3")])
-props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_belongings"), SubResource("FloorProp_island_belongings"), SubResource("FloorProp_alcove_cache")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_bundle"), SubResource("FloorProp_island_belongings"), SubResource("FloorProp_alcove_cache")])
 patrols = Array[ExtResource("12_floor_patrol")]([SubResource("FloorPatrol_island")])
 gate_distance_beyond_enemy = 7.5
 wear_path_mid_offset = 1.875
