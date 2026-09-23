@@ -53,9 +53,14 @@ class_name CameraRig
 # Horizontal room past the outermost bodies' bbox edges, metres at the
 # combatants' depth, averaged over both sides: the two sides split
 # 2 * battle_margin so the enemy side gets battle_enemy_room_ratio times
-# the Wanderer's (3.0 / 1.1 -> 2.86 m Wanderer-side, 3.14 m enemy-side).
-@export var battle_margin: float = 3.0
-@export var battle_enemy_room_ratio: float = 1.1
+# the Wanderer's (2.0 / 0.6 -> 2.5 m Wanderer-side, 1.5 m enemy-side).
+# Under 1 on purpose: less room past the far enemy pushes a cluster right
+# of centre. The ratio alone only slides the group across the frame
+# (moving the pack right moves the Wanderer in from the left edge too),
+# so the margin is tight as well; the frame then meets
+# battle_distance_min on a short line, which holds the spacing.
+@export var battle_margin: float = 2.0
+@export var battle_enemy_room_ratio: float = 0.6
 # The fitted distance never comes closer than min (1.18x the old fixed
 # 9 m frame - one crab at spacing 4 fits at ~9.5 m, so min is what a
 # single-crab fight actually gets) nor further than max, however wide the
