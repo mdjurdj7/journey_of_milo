@@ -38,7 +38,7 @@ group = &"island"
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly3"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("11_dragonfly")
-position = Vector2(-17.875, -20.75)
+position = Vector2(-17.875, -20.125)
 yaw_degrees = -122.0
 required = false
 group = &"island"
@@ -46,14 +46,14 @@ group = &"island"
 [sub_resource type="Resource" id="FloorPatrol_island"]
 script = ExtResource("12_floor_patrol")
 group = &"island"
-waypoints = PackedVector2Array(-16.6625, -20.875, -13, -20.375, -14.75, -18.5)
+waypoints = PackedVector2Array(-16.6667, -20.6667, -13, -20.375, -14.75, -18.5)
 dwell_min_seconds = 2.0
 dwell_max_seconds = 5.0
 
 [sub_resource type="Resource" id="FloorProp_island_bundle"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("14_bundle")
-position = Vector3(-17.25, 0, -18.375)
+position = Vector3(-17.875, 0, -18.375)
 pool = ExtResource("10_belongings_pool")
 
 [sub_resource type="Resource" id="FloorProp_alcove_cache"]
