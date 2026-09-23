@@ -13,6 +13,7 @@
 [ext_resource type="PackedScene" path="res://field/reward_spread.tscn" id="9_reward_spread"]
 [ext_resource type="Resource" path="res://cards/pools/belongings_pool.tres" id="10_belongings_pool"]
 [ext_resource type="PackedScene" path="res://field/bundle_prop.tscn" id="14_bundle"]
+[ext_resource type="PackedScene" path="res://field/sand_overhang.tscn" id="15_overhang"]
 
 [sub_resource type="Resource" id="FloorEnemy_sputter"]
 script = ExtResource("2_floor_enemy")
@@ -56,15 +57,20 @@ scene = ExtResource("14_bundle")
 position = Vector3(-17.875, 0, -18.375)
 pool = ExtResource("10_belongings_pool")
 
+[sub_resource type="Resource" id="FloorProp_pocket_overhang"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("15_overhang")
+position = Vector3(8.3, 0, -24.3)
+
 [sub_resource type="Resource" id="FloorProp_alcove_cache"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("9_reward_spread")
-position = Vector3(9.43, 0, -25.13)
+position = Vector3(8.6, 0, -24.3)
 pool = ExtResource("10_belongings_pool")
 overrides = {
 "card_count": 3,
 "depth_stagger": 0.0,
-"fan_axis": Vector2(0.7071, 0.7071),
+"fan_axis": Vector2(0, 1),
 "spacing": 0.35
 }
 
@@ -80,7 +86,7 @@ caustic_strength = 0.12
 relief_extent = Vector2(125, 88)
 relief_subdivisions = Vector2i(356, 251)
 enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3")])
-props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_bundle"), SubResource("FloorProp_alcove_cache")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_bundle"), SubResource("FloorProp_pocket_overhang"), SubResource("FloorProp_alcove_cache")])
 patrols = Array[ExtResource("12_floor_patrol")]([SubResource("FloorPatrol_island")])
 gate_distance_beyond_enemy = 7.5
 wear_path_mid_offset = 1.875
