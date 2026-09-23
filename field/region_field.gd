@@ -38,6 +38,8 @@ enum RewardMode { SCREEN, WORLD }
 @export var reward_mode: RewardMode = RewardMode.SCREEN
 @export var reward_screen_scene_path: String = "res://battle/reward_screen.tscn"
 @export var reward_spread_scene_path: String = "res://field/reward_spread.tscn"
+# What a BundleProp opens into (see _open_loot_screen()).
+@export var loot_screen_scene_path: String = "res://battle/loot_screen.tscn"
 # Held back until the battle framing has gone: the cards should appear on
 # an ordinary field view, not under the battle camera mid-swing-out.
 # Raised to the camera rig's own battle_transition_time when that's
@@ -429,6 +431,9 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.button_index != MOUSE_BUTTON_LEFT and event.button_index != MOUSE_BUTTON_RIGHT:
 		return
+	if event.button_index == MOUSE_BUTTON_LEFT and _try_open_bundle(event.position):
+		get_viewport().set_input_as_handled()
+		return
 	if _handle_move_click(event.position):
 		get_viewport().set_input_as_handled()
 
@@ -455,6 +460,33 @@ func _handle_move_click(screen_pos: Vector2) -> bool:
 	var point: Vector3 = hit["position"]
 	wanderer.set_move_target(point)
 	_show_click_marker(point)
+	return true
+
+# A left click on a bundle's padded screen rect (the enemy's click
+# padding) with the Wanderer in its reach opens it. Out of reach, or
+# already taken, the click falls through to an ordinary move click.
+func _try_open_bundle(screen_pos: Vector2) -> bool:
+	if wanderer == null:
+		return false
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return false
+	var best: BundleProp = null
+	var best_distance: float = INF
+	for node in get_tree().get_nodes_in_group(BundleProp.GROUP):
+		var bundle := node as BundleProp
+		if bundle == null or not bundle.can_open_from(wanderer.global_position):
+			continue
+		var rect: Rect2 = bundle.get_screen_rect(camera, click_target_padding_px)
+		if rect.size == Vector2.ZERO or not rect.has_point(screen_pos):
+			continue
+		var distance: float = camera.global_position.distance_to(bundle.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = bundle
+	if best == null:
+		return false
+	_open_loot_screen(best)
 	return true
 
 # The enemy whose padded screen rect holds the cursor; nearest to the
@@ -741,6 +773,8 @@ func _spawn_floor_props() -> void:
 				prop.free()
 				continue
 			(prop as RewardSpread).pool = entry.pool
+		elif prop is BundleProp:
+			_setup_bundle(prop as BundleProp, entry, floor_data)
 		# A child prop's position is local to its parent (a perch); a top-
 		# level one's is an XZ offset from spawn, grounded by the prop.
 		var placement: Vector3 = entry.position if entry.parent_index >= 0 else Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.z)
@@ -784,6 +818,15 @@ func _setup_belongings_card(card: WorldCard, entry: FloorProp, floor_data: Floor
 	card.card = rolled[0]
 	card.holder_path = ^""
 	return true
+
+# A bundle's one roll, at floor load from the run's own generator, in
+# the props' own order: a card from the prop's pool (the floor's reward
+# pool when it names none, as the belongings card does), a rare card
+# from FloorData.rare_pool, gold from the floor's range - see
+# BundleProp.roll() for the split and the fallbacks.
+func _setup_bundle(bundle: BundleProp, entry: FloorProp, floor_data: FloorData) -> void:
+	var pool: RewardPool = entry.pool if entry.pool != null else floor_data.reward_pool
+	bundle.roll(RunState.rng, floor_data.gold_min, floor_data.gold_max, pool, floor_data.rare_pool)
 
 # A world point seated on the relief plus `clearance` - same to_local()-
 # first idiom RewardSpread/Keeper use, since get_height_at() works in
@@ -1239,6 +1282,21 @@ func _open_reward_screen() -> void:
 	process_mode = Node.PROCESS_MODE_DISABLED
 
 func _on_reward_screen_closed() -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT
+
+# A bundle's loot window, under the same freeze as the reward screen.
+func _open_loot_screen(bundle: BundleProp) -> void:
+	var scene := load(loot_screen_scene_path) as PackedScene
+	if scene == null:
+		push_warning("RegionField: could not load %s; no loot window." % loot_screen_scene_path)
+		return
+	var screen := scene.instantiate() as LootScreen
+	screen.setup(bundle, deck_panel)
+	screen.closed.connect(_on_loot_screen_closed)
+	add_child(screen)
+	process_mode = Node.PROCESS_MODE_DISABLED
+
+func _on_loot_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 
 # Points the ground's walked band along the route the floor actually

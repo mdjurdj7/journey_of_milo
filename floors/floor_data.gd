@@ -104,6 +104,10 @@ class_name FloorData
 @export_group("Rewards")
 # What a won fight offers. Null = no drop at all.
 @export var reward_pool: RewardPool = null
+# A bundle's rare draw (BundleProp.roll()) - the placeholder for trinkets
+# and weapons until those exist. Null or empty = the bundle draws its
+# rare card from its own pool instead.
+@export var rare_pool: RewardPool = null
 # Coin per won fight, inclusive both ends, rolled from RunState.rng.
 @export var gold_min: int = 10
 @export var gold_max: int = 18

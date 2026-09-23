@@ -134,3 +134,13 @@ so it doesn't get silently reinvented or silently forgotten.
   darkened by `tower_contrast`) as a landmark west of the field, so the
   look finds a silhouette rather than flat fog. (2026-09-19, floors as
   data.)
+- **The bundle's opened pose, its tail in the wind, and a real rare
+  pool.** `bundle.glb` is one static mesh with no opened or tail-down
+  variant, so a taken BundleProp only darkens (`opened_tint`) and falls
+  silent. The knot's loose ends (about 0.10-0.15 m at y 0.45-0.58) could
+  move through keeper_wind.gdshader's hair mask aimed at the knot, with
+  its hem and luma tests switched off, but that takes the bundle off the
+  hulls' shared flat material, and cloth that small barely reads from
+  the field camera; it stays still. `FloorData.rare_pool` exists and is
+  empty on every floor, so the 5% rare draw falls back to the bundle's
+  own pool until trinkets or weapons exist. (2026-09-22, bundle.)
