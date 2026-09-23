@@ -22,8 +22,9 @@ class_name BundleProp
 # seconds - a settled enemy's sink (FieldEnemy.settle_and_free()) - and
 # frees itself. Left, it stays as it was and opens again.
 #
-# Loads bundle.glb (0.60 m tall, origin at its base, measured from the
-# vertex data) under this node on its own cloth shader (bundle_cloth.
+# Loads bundle.glb (0.40 m tall, 0.38 x 0.35 m across, origin at its
+# base, measured from the vertex data) under this node on its own cloth
+# shader (bundle_cloth.
 # gdshader): the hulls' flat matte rules, tinted from bundle_tint, with a
 # procedural weave and the rope's creases darkened - see the Cloth group.
 # The glb's own textures are ignored, as the hull's are. Grounded by its
@@ -46,8 +47,9 @@ enum Contents { NONE, GOLD, CARD, RARE_CARD }
 	set(value):
 		bundle_tint = value
 		_apply_cloth()
-# A cylinder round the sack so the Wanderer walks round it, not through.
-@export var collision_radius: float = 0.26:
+# A cylinder round the sack so the Wanderer walks round it, not through:
+# about the model's own half-width (0.19 x 0.18 m).
+@export var collision_radius: float = 0.19:
 	set(value):
 		collision_radius = value
 		_apply_collision()
