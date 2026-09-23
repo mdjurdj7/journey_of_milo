@@ -27,8 +27,10 @@ class_name LootScreen
 # focused item in full ink with a short hairline to its left, the other
 # in the utility grey with none. TAKE has focus on open. ui_up/ui_down
 # move it (wrapping), ui_accept activates; hovering an item focuses it
-# and a click activates. The two items are the only things here that
-# stop the mouse - a click anywhere else is the field's.
+# and a click activates. ui_cancel and a right click anywhere are LEAVE,
+# and that right click is spent on closing - it doesn't also move the
+# Wanderer. The two items are the only things here that stop the mouse -
+# a left click anywhere else is the field's.
 #
 # TAKE grants through RunState, plays the take's sound (TakeFeedback),
 # marks the bundle taken and closes - a card flies to the Belongings
@@ -288,12 +290,22 @@ func _unhandled_input(event: InputEvent) -> void:
 		_set_focus(posmod(_focused - 1, 2))
 	elif event.is_action_pressed("ui_accept"):
 		_activate(_focused)
+	elif event.is_action_pressed("ui_cancel") or _is_right_press(event):
+		_activate(Item.LEAVE)
 	else:
 		return
 	get_viewport().set_input_as_handled()
 
+func _is_right_press(event: InputEvent) -> bool:
+	var button := event as InputEventMouseButton
+	return button != null and button.button_index == MOUSE_BUTTON_RIGHT and button.pressed
+
 func _on_choice_gui_input(event: InputEvent, index: int) -> void:
 	if _done:
+		return
+	if _is_right_press(event):
+		_activate(Item.LEAVE)
+		accept_event()
 		return
 	var button := event as InputEventMouseButton
 	if button == null or button.button_index != MOUSE_BUTTON_LEFT or not button.pressed:
