@@ -166,7 +166,7 @@ func _apply_tint() -> void:
 		_material.albedo_color = opened_tint if is_opened else bundle_tint
 
 # MAKE_STATIC for the same reason as the hull's: RegionField's freeze
-# (a battle, the loot window itself) would otherwise take the body out
+# (a battle, the floor transition) would otherwise take the body out
 # of the physics space, and a click would fall through to the sand.
 func _apply_collision() -> void:
 	if _model == null or _aabb.size == Vector3.ZERO:

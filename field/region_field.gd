@@ -247,6 +247,9 @@ var _click_marker: ClickMarker = null
 # The Ambience bus's running duck/return - see _duck_ambience().
 var _ambience_tween: Tween = null
 
+# The bundle window open beside a bundle, if any - one at a time.
+var _loot_screen: LootScreen = null
+
 # The fight in progress, from _on_enemy_contacted() to _on_battle_
 # finished(): its guard (a second contact while one is open is ignored,
 # loudly), the enemies it holds (in the order the battle layer got them -
@@ -1284,20 +1287,32 @@ func _open_reward_screen() -> void:
 func _on_reward_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 
-# A bundle's loot window, under the same freeze as the reward screen.
+# A bundle's loot window, beside the bundle on FieldHUD - the field stays
+# live under it (LootScreen closes itself on leaving reach or a freeze).
+# A click on the bundle it already shows changes nothing; a click on
+# another bundle closes the open one first.
 func _open_loot_screen(bundle: BundleProp) -> void:
+	if _loot_screen != null and is_instance_valid(_loot_screen):
+		if _loot_screen.get_bundle() == bundle:
+			return
+		_loot_screen.close()
+	var hud := get_node_or_null(^"FieldHUD") as CanvasLayer
+	if hud == null:
+		push_warning("RegionField: FieldHUD not found; no loot window.")
+		return
 	var scene := load(loot_screen_scene_path) as PackedScene
 	if scene == null:
 		push_warning("RegionField: could not load %s; no loot window." % loot_screen_scene_path)
 		return
 	var screen := scene.instantiate() as LootScreen
-	screen.setup(bundle, deck_panel)
-	screen.closed.connect(_on_loot_screen_closed)
-	add_child(screen)
-	process_mode = Node.PROCESS_MODE_DISABLED
+	screen.setup(bundle, deck_panel, wanderer, self)
+	screen.closed.connect(_on_loot_screen_closed.bind(screen))
+	_loot_screen = screen
+	hud.add_child(screen)
 
-func _on_loot_screen_closed() -> void:
-	process_mode = Node.PROCESS_MODE_INHERIT
+func _on_loot_screen_closed(screen: LootScreen) -> void:
+	if _loot_screen == screen:
+		_loot_screen = null
 
 # Points the ground's walked band along the route the floor actually
 # takes: out of spawn, past the enemy, to the gate - or along the floor's

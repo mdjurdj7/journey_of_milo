@@ -2,5 +2,5 @@
 
 [ext_resource type="Script" path="res://battle/loot_screen.gd" id="1_loot_screen"]
 
-[node name="LootScreen" type="CanvasLayer"]
+[node name="LootScreen" type="Control"]
 script = ExtResource("1_loot_screen")
