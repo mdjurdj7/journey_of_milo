@@ -30,7 +30,7 @@ group = &"island"
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly2"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("11_dragonfly")
-position = Vector2(-16.875, -21.375)
+position = Vector2(-17.875, -21.75)
 yaw_degrees = -116.6
 required = false
 group = &"island"
@@ -38,7 +38,7 @@ group = &"island"
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly3"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("11_dragonfly")
-position = Vector2(-17.875, -20.125)
+position = Vector2(-17.125, -20.0)
 yaw_degrees = -122.0
 required = false
 group = &"island"
@@ -46,7 +46,7 @@ group = &"island"
 [sub_resource type="Resource" id="FloorPatrol_island"]
 script = ExtResource("12_floor_patrol")
 group = &"island"
-waypoints = PackedVector2Array(-16.6667, -20.6667, -13, -20.375, -14.75, -18.5)
+waypoints = PackedVector2Array(-16.75, -20.75, -13, -20.375, -14.75, -18.5)
 dwell_min_seconds = 2.0
 dwell_max_seconds = 5.0
 

@@ -158,6 +158,7 @@ region = ExtResource("21_region1")
 field_extents = Vector2(26, 30)
 shoreline_wall_margin = 3.0
 battle_spacing = 4.0
+cluster_member_gap = 1.85
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=2022836371]
 script = ExtResource("2")
