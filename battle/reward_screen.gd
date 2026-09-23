@@ -78,7 +78,7 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 @export var choice_dismiss_gap_px: float = 40.0
 @export var choice_dismiss_text: String = "NONE OF THESE"
 @export var card_flight_duration_sec: float = 0.45
-# The card being taken (see _play_sfx()) - once, on the choice
+# The card being taken (see TakeFeedback.play_sound()) - once, on the choice
 # itself, never on hover, the gold line or a skip. A -6 dBFS take at -18
 # sits just under the battle's card-play cue (-16).
 @export var take_volume_db: float = -18.0
@@ -306,7 +306,7 @@ func _take_line(index: int) -> void:
 	match line.id:
 		"gold":
 			RunState.add_gold(_gold)
-			_play_sfx(GOLD_SFX_PATH, gold_volume_db, "GoldTakeAudio")
+			TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, gold_volume_db, "GoldTakeAudio", "RewardScreen")
 			print("RewardScreen: took %d gold (run total %d)." % [_gold, RunState.gold])
 			line.taken = true
 			_hovered = -1
@@ -360,49 +360,17 @@ func _on_choice_clicked(card_data: CardData, card_view: CardView) -> void:
 		return
 	_taking_card = true
 	RunState.add_card(card_data)
-	_play_sfx(TAKE_SFX_PATH, take_volume_db, "CardTakeAudio")
+	TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "RewardScreen")
 	print("RewardScreen: took '%s' (deck now %d)." % [card_data.card_name, RunState.deck.size()])
 	for other in _card_views:
 		if other != card_view and is_instance_valid(other):
 			other.queue_free()
 	_fly_to_deck(card_view)
 
-# A take's sound (the card's or the gold's), on its own 2D player on the
-# SFX bus - parented to the tree's ROOT with process ALWAYS and freed on
-# its own `finished`, so it
-# plays to the end whatever happens to this node next: this screen
-# closes and frees itself once its lines are spent, right after the
-# card's flight, and RegionField (its parent) stands DISABLED for as
-# long as it is open. load() at the moment of taking, never a preloaded
-# stream. The twin of this lives on WorldCard - two consumers, not yet a
-# helper.
-func _play_sfx(path: String, volume_db: float, player_name: String) -> void:
-	var stream := load(path) as AudioStream
-	if stream == null:
-		push_warning("RewardScreen: take SFX failed to load (%s); silent." % path)
-		return
-	var player := AudioStreamPlayer.new()
-	player.name = player_name
-	player.bus = &"SFX"
-	player.process_mode = Node.PROCESS_MODE_ALWAYS
-	player.stream = stream
-	player.volume_db = volume_db
-	player.finished.connect(player.queue_free)
-	get_tree().root.add_child(player)
-	player.play()
-
-# Lifted from WorldCard._fly_to_deck() rather than shared: two consumers
-# is not yet three, and the two differ in what they fly (a Control this
-# node owns, vs one a 3D anchor owns) and in what happens after.
+# The flight itself is TakeFeedback's; what ends it is this screen's -
+# back to the list with the card line struck.
 func _fly_to_deck(card_view: CardView) -> void:
-	card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var destination: Vector2 = _deck_panel_centre()
-	var tween := create_tween()
-	tween.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_CUBIC)
-	tween.set_parallel(true)
-	tween.tween_property(card_view, "position", destination - card_view.card_size * card_flight_end_scale / 2.0, card_flight_duration_sec)
-	tween.tween_property(card_view, "scale", Vector2.ONE * card_flight_end_scale, card_flight_duration_sec)
-	tween.tween_property(card_view, "modulate:a", 0.0, card_flight_duration_sec)
+	var tween: Tween = TakeFeedback.fly_to(self, card_view, _deck_panel_centre(), card_flight_duration_sec, card_flight_end_scale)
 	tween.chain().tween_callback(func() -> void:
 		if is_instance_valid(card_view):
 			card_view.queue_free()

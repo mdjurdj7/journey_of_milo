@@ -135,7 +135,7 @@ const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 @export_group("")
 
 @export_group("Take Sound")
-# The card being taken (see _play_take_sound()) - once, on the take
+# The card being taken (see TakeFeedback.play_sound()) - once, on the take
 # itself, never on hover, lift, dismissal or walking away. A -6 dBFS take
 # at -18 sits just under the battle's card-play cue (-16).
 @export var take_volume_db: float = -18.0
@@ -533,32 +533,9 @@ func _take() -> void:
 		return
 	_taking = true
 	RunState.add_card(card)
-	_play_take_sound()
+	TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "WorldCard")
 	taken.emit(card)
 	_fly_to_deck()
-
-# The take's sound, on its own 2D player on the SFX bus - parented to the
-# tree's ROOT with process ALWAYS and freed on its own `finished`, so it
-# plays to the end whatever happens to this node next: this card frees
-# itself flight_duration_sec after the take, and a field freeze (a
-# battle contact, the floor transition) would pause anything under
-# RegionField. load() at the moment of taking, never a preloaded stream.
-# The twin of this lives on RewardScreen - two consumers, not yet a
-# helper.
-func _play_take_sound() -> void:
-	var stream := load(TAKE_SFX_PATH) as AudioStream
-	if stream == null:
-		push_warning("WorldCard: card-take SFX failed to load (%s); silent." % TAKE_SFX_PATH)
-		return
-	var player := AudioStreamPlayer.new()
-	player.name = "CardTakeAudio"
-	player.bus = &"SFX"
-	player.process_mode = Node.PROCESS_MODE_ALWAYS
-	player.stream = stream
-	player.volume_db = take_volume_db
-	player.finished.connect(player.queue_free)
-	get_tree().root.add_child(player)
-	player.play()
 
 # To the Belongings panel it just incremented. Frees this whole node at
 # the end rather than only the CardView - the anchor has nothing left to
@@ -567,14 +544,7 @@ func _fly_to_deck() -> void:
 	if _card_view == null:
 		queue_free()
 		return
-	_card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var destination: Vector2 = _deck_panel_centre()
-	var tween := create_tween()
-	tween.set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_CUBIC)
-	tween.set_parallel(true)
-	tween.tween_property(_card_view, "position", destination - _card_view.card_size * flight_end_scale / 2.0, flight_duration_sec)
-	tween.tween_property(_card_view, "scale", Vector2.ONE * flight_end_scale, flight_duration_sec)
-	tween.tween_property(_card_view, "modulate:a", 0.0, flight_duration_sec)
+	var tween: Tween = TakeFeedback.fly_to(self, _card_view, _deck_panel_centre(), flight_duration_sec, flight_end_scale)
 	tween.chain().tween_callback(queue_free)
 
 func _deck_panel_centre() -> Vector2:
