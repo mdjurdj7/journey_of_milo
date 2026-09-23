@@ -605,6 +605,16 @@ func mark_played() -> void:
 	if _scale_tween != null and _scale_tween.is_valid():
 		_scale_tween.kill()
 
+# Hover driven from outside the mouse - a screen's keyboard focus
+# (RewardScreen's card choice) - with exactly the mouse's own effect.
+func set_hovered(hovered: bool) -> void:
+	if hovered == _hovering:
+		return
+	if hovered:
+		_on_mouse_entered()
+	else:
+		_on_mouse_exited()
+
 func _on_mouse_entered() -> void:
 	_hovering = true
 	if hover_enabled and not _armed and not _hover_suppressed:
