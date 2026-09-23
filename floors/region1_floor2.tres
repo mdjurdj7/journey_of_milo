@@ -3,13 +3,13 @@
 [ext_resource type="Script" uid="uid://8yxy7cpevuvt" path="res://floors/floor_data.gd" id="1_floor_data"]
 [ext_resource type="Script" uid="uid://eby4csrr8fpj" path="res://floors/floor_enemy.gd" id="2_floor_enemy"]
 [ext_resource type="Script" uid="uid://bi5wh88prg3u6" path="res://floors/floor_prop.gd" id="3_floor_prop"]
-[ext_resource type="Texture2D" uid="uid://d2ucb8bvf72ff" path="res://assets/field/masks/Map3_mask_x1.25_pocket.png" id="4_map3"]
+[ext_resource type="Texture2D" uid="uid://don06thfbbany" path="res://assets/field/masks/Map3_mask_x1.25_alcove.png" id="4_map3"]
 [ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="5_sputter"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/dragonfly.tres" id="11_dragonfly"]
 [ext_resource type="Script" path="res://floors/floor_patrol.gd" id="12_floor_patrol"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
-[ext_resource type="Texture2D" uid="uid://vdjwwfi06aqo" path="res://assets/field/masks/Map3_elev_x1.25_pocket.png" id="8_map3_elev"]
-[ext_resource type="Texture2D" uid="uid://nweve28tkmpt" path="res://assets/field/masks/Map3_wear_x1.25_pocket.png" id="13_map3_wear"]
+[ext_resource type="Texture2D" uid="uid://dsffqcfjt0n5d" path="res://assets/field/masks/Map3_elev_x1.25_alcove.png" id="8_map3_elev"]
+[ext_resource type="Texture2D" uid="uid://cx25fsucs3u3d" path="res://assets/field/masks/Map3_wear_x1.25_alcove.png" id="13_map3_wear"]
 [ext_resource type="PackedScene" path="res://field/reward_spread.tscn" id="9_reward_spread"]
 [ext_resource type="Resource" path="res://cards/pools/belongings_pool.tres" id="10_belongings_pool"]
 [ext_resource type="PackedScene" path="res://field/bundle_prop.tscn" id="14_bundle"]
@@ -59,12 +59,12 @@ pool = ExtResource("10_belongings_pool")
 [sub_resource type="Resource" id="FloorProp_alcove_cache"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("9_reward_spread")
-position = Vector3(10.25, 0, -20)
+position = Vector3(9.43, 0, -25.13)
 pool = ExtResource("10_belongings_pool")
 overrides = {
-"card_count": 4,
+"card_count": 3,
 "depth_stagger": 0.0,
-"fan_axis": Vector2(0, 1),
+"fan_axis": Vector2(0.7071, 0.7071),
 "spacing": 0.35
 }
 
