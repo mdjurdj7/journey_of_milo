@@ -38,27 +38,37 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 @export var ink: Color = Color(0.165, 0.165, 0.18, 1.0)
 @export var text_outline_px: int = 1
 
+# The list's caps - LEFT BEHIND, each line's TAKE/CHOOSE and WALK ON -
+# are the card choice's own tracked caps (22 px at 0.16 em), and the
+# actions and WALK ON share its focus language: the utility grey at rest
+# (choice_unfocused_color), full bone with the short hairline to the
+# left when focused. The mouse focuses by hovering and activates by
+# clicking; ui_up/ui_down move through the untaken lines and WALK ON
+# (wrapping), ui_accept activates. Nothing is focused until the mouse or
+# a key says so. WALK ON keeps clear of the Wanderer the way NONE OF
+# THESE does (see _below_wanderer()).
 @export_group("Column")
 @export var column_width: float = 300.0
 @export var header_text: String = "LEFT BEHIND"
-@export var header_size_px: int = 11
-@export_range(0.0, 1.0) var header_tracking_em: float = 0.22
+@export var header_size_px: int = 22
+@export_range(0.0, 1.0) var header_tracking_em: float = 0.16
 @export var header_gap_px: float = 28.0
 # Each line: Spectral item text on the left, a tracked caps action on the
 # right, a hairline under both.
 @export var line_height_px: float = 44.0
 @export var item_size_px: int = 26
-@export var action_size_px: int = 11
-@export_range(0.0, 1.0) var action_tracking_em: float = 0.18
+@export var action_size_px: int = 22
+@export_range(0.0, 1.0) var action_tracking_em: float = 0.16
 @export var rule_px: float = 1.0
 @export var rule_hover_px: float = 2.0
 @export_range(0.0, 1.0) var rule_alpha: float = 0.45
 @export var strike_px: float = 1.0
 @export_range(0.0, 1.0) var taken_alpha: float = 0.45
 @export var dismiss_text: String = "WALK ON"
-@export var dismiss_size_px: int = 12
-@export_range(0.0, 1.0) var dismiss_tracking_em: float = 0.18
-@export_range(0.0, 1.0) var dismiss_alpha: float = 0.6
+@export var dismiss_size_px: int = 22
+@export_range(0.0, 1.0) var dismiss_tracking_em: float = 0.16
+# From the last line's bottom edge to WALK ON's baseline, before any push
+# clear of the Wanderer.
 @export var dismiss_gap_px: float = 72.0
 @export_group("")
 
@@ -94,9 +104,10 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 @export var choice_hairline_length_px: float = 28.0
 @export var choice_hairline_gap_px: float = 14.0
 @export var choice_hairline_thickness_px: float = 1.0
-# The decline line's top never sits above the Wanderer's projected feet
-# plus this where it would cross him, whatever reward_decline_gap says -
-# he stands under the row.
+# Where NONE OF THESE or WALK ON would cross the Wanderer's projected
+# silhouette, it drops to this far below his feet - never up, and never
+# more than reward_decline_gap x 2 below the row or the last line (see
+# _below_wanderer()).
 @export var decline_wanderer_clearance_px: float = 16.0
 # His height, for the projected silhouette the decline line must clear.
 @export var wanderer_height_m: float = 1.8
@@ -148,6 +159,9 @@ var _choice_font: Font = null
 # the decline line, so leaving it clears only a mouse focus.
 var _choice_focus: int = -1
 var _decline_hovered: bool = false
+# The list's own: which line (or WALK ON, _walk_on_index()) the mouse is
+# on, so leaving it clears only a mouse focus - _hovered is the focus.
+var _list_mouse_on: int = -1
 # The decline line's top in Column pixels, fixed when the choice opens -
 # the field (and its camera) is frozen under this screen.
 var _decline_top_px: float = 0.0
@@ -220,14 +234,36 @@ func _column_top() -> float:
 	var total: float = float(header_size_px) + header_gap_px + lines_height + dismiss_gap_px + float(dismiss_size_px)
 	return (_draw_layer.size.y - total) / 2.0
 
-# The dismiss line's hit rect - under the list, or under the card row
-# while a choice is open; _draw_dismiss() draws the text at its
-# baseline (top + dismiss_size_px) in either case.
+# The dismiss line's hit rect - WALK ON under the list, or NONE OF THESE
+# under the card row while a choice is open.
 func _dismiss_rect() -> Rect2:
 	if _mode == Mode.CHOICE:
 		return _decline_rect()
-	var top: float = _column_top() + float(header_size_px) + header_gap_px + float(_lines.size()) * line_height_px + dismiss_gap_px
-	return Rect2(_column_left(), top - float(dismiss_size_px), column_width, float(dismiss_size_px) * 2.0)
+	return _walk_on_rect()
+
+func _last_line_bottom() -> float:
+	return _column_top() + float(header_size_px) + header_gap_px + float(_lines.size()) * line_height_px
+
+# WALK ON's label, centred on the column.
+func _walk_on_label_left() -> float:
+	return roundf(_column_left() + (column_width - InkType.width(_dismiss_font, dismiss_text, dismiss_size_px)) / 2.0)
+
+# dismiss_gap_px under the last line (to the baseline), pushed below the
+# Wanderer where it would cross him, never more than reward_decline_gap
+# x 2 below the last line.
+func _walk_on_top() -> float:
+	var bottom: float = _last_line_bottom()
+	return _below_wanderer(bottom + dismiss_gap_px - float(dismiss_size_px), float(dismiss_size_px) * 1.3, bottom + reward_decline_gap * 2.0)
+
+# WALK ON's hit rect: the label and the hairline's room to its left.
+func _walk_on_rect() -> Rect2:
+	var label_left: float = _walk_on_label_left()
+	var left: float = label_left - choice_hairline_gap_px - choice_hairline_length_px
+	var right: float = label_left + InkType.width(_dismiss_font, dismiss_text, dismiss_size_px)
+	return Rect2(left, _walk_on_top(), right - left, float(dismiss_size_px) * 1.3)
+
+func _walk_on_index() -> int:
+	return _lines.size()
 
 # --- Draw ---
 
@@ -264,7 +300,14 @@ func _draw_column() -> void:
 			color.a = taken_alpha
 		_text(_item_font, line.item, Vector2(left, text_baseline), item_size_px, color)
 		var action_width: float = InkType.width(_action_font, line.action, action_size_px)
-		_text(_action_font, line.action, Vector2(left + column_width - action_width, text_baseline), action_size_px, color)
+		var action_left: float = left + column_width - action_width
+		var focused: bool = _hovered == index and not line.taken
+		var action_color: Color = color
+		if not line.taken:
+			action_color = bone if focused else choice_unfocused_color
+		_text(_action_font, line.action, Vector2(action_left, text_baseline), action_size_px, action_color)
+		if focused:
+			_draw_hairline(action_left, text_baseline, action_size_px)
 
 		var rule_color: Color = bone
 		rule_color.a = rule_alpha * (taken_alpha if line.taken else 1.0)
@@ -278,14 +321,19 @@ func _draw_column() -> void:
 			_draw_layer.draw_rect(Rect2(left, strike_y, column_width, strike_px), color)
 		y += line_height_px
 
-	_draw_dismiss(dismiss_text)
+	var walk_on_focused: bool = _hovered == _walk_on_index()
+	var walk_on_left: float = _walk_on_label_left()
+	var walk_on_baseline: float = _walk_on_top() + float(dismiss_size_px)
+	_text(_dismiss_font, dismiss_text, Vector2(walk_on_left, walk_on_baseline), dismiss_size_px, bone if walk_on_focused else choice_unfocused_color)
+	if walk_on_focused:
+		_draw_hairline(walk_on_left, walk_on_baseline, dismiss_size_px)
 
-func _draw_dismiss(text: String) -> void:
-	var color: Color = bone
-	color.a = dismiss_alpha
-	var width: float = InkType.width(_dismiss_font, text, dismiss_size_px)
-	var rect: Rect2 = _dismiss_rect()
-	_text(_dismiss_font, text, Vector2(rect.position.x + (rect.size.x - width) / 2.0, rect.position.y + float(dismiss_size_px)), dismiss_size_px, color)
+# The focus hairline: choice_hairline_length_px long, choice_hairline_
+# gap_px left of a label starting at label_left, at the caps' middle.
+func _draw_hairline(label_left: float, baseline: float, size_px: int) -> void:
+	var mid: float = baseline - float(size_px) * 0.35
+	var hairline_left: float = label_left - choice_hairline_gap_px - choice_hairline_length_px
+	_draw_layer.draw_rect(Rect2(hairline_left, mid - choice_hairline_thickness_px * 0.5, choice_hairline_length_px, choice_hairline_thickness_px), bone)
 
 func _draw_choice() -> void:
 	var width: float = InkType.width(_choice_font, choice_header_text, choice_label_size_px)
@@ -297,9 +345,7 @@ func _draw_choice() -> void:
 	var decline_baseline: float = _decline_top_px + float(choice_label_size_px)
 	_text(_choice_font, choice_dismiss_text, Vector2(label_left, decline_baseline), choice_label_size_px, bone if focused else choice_unfocused_color)
 	if focused:
-		var mid: float = decline_baseline - float(choice_label_size_px) * 0.35
-		var hairline_left: float = label_left - choice_hairline_gap_px - choice_hairline_length_px
-		_draw_layer.draw_rect(Rect2(hairline_left, mid - choice_hairline_thickness_px * 0.5, choice_hairline_length_px, choice_hairline_thickness_px), bone)
+		_draw_hairline(label_left, decline_baseline, choice_label_size_px)
 
 # The decline label is centred on the row; its hairline hangs off to the
 # left of that.
@@ -315,11 +361,17 @@ func _decline_rect() -> Rect2:
 	var right: float = label_left + InkType.width(_choice_font, choice_dismiss_text, choice_label_size_px)
 	return Rect2(left, _decline_top_px, right - left, float(choice_label_size_px) * 1.3)
 
-# reward_decline_gap under the row - or, where the Wanderer's projected
-# silhouette would sit under the line there, just below his feet.
+# reward_decline_gap under the row, kept clear of the Wanderer.
 func _decline_top() -> float:
-	var top: float = _choice_row.end.y + reward_decline_gap
-	var line_height: float = float(choice_label_size_px) * 1.3
+	var bottom: float = _choice_row.end.y
+	return _below_wanderer(bottom + reward_decline_gap, float(choice_label_size_px) * 1.3, bottom + reward_decline_gap * 2.0)
+
+# A line of caps `line_height` tall, wanted at `top`: where it would cross
+# the Wanderer's projected silhouette (feet to wanderer_height_m, grown by
+# decline_wanderer_clearance_px), it drops to that far below his feet -
+# only ever down, never above him - but no lower than max_top, so it
+# stays with what it belongs to even if that leaves it on his feet.
+func _below_wanderer(top: float, line_height: float, max_top: float) -> float:
 	var camera := get_viewport().get_camera_3d()
 	var found: Array[Node] = get_tree().get_nodes_in_group("wanderer")
 	var wanderer: Node3D = found[0] as Node3D if not found.is_empty() else null
@@ -333,7 +385,7 @@ func _decline_top() -> float:
 	var head_y: float = camera.unproject_position(head).y
 	var crosses: bool = top < feet_y + decline_wanderer_clearance_px and top + line_height > head_y - decline_wanderer_clearance_px
 	if crosses:
-		top = feet_y + decline_wanderer_clearance_px
+		top = maxf(top, minf(feet_y + decline_wanderer_clearance_px, max_top))
 	return roundf(top)
 
 # --- Input ---
@@ -349,10 +401,15 @@ func _on_gui_input(event: InputEvent) -> void:
 				_set_choice_focus(-1)
 			_decline_hovered = over
 			return
-		var was: int = _hovered
-		_hovered = _line_at(motion.position)
-		if was != _hovered:
-			_draw_layer.queue_redraw()
+		var under: int = _line_at(motion.position)
+		if under < 0 and _walk_on_rect().has_point(motion.position):
+			under = _walk_on_index()
+		if under != _list_mouse_on:
+			if under >= 0:
+				_set_list_focus(under)
+			elif _hovered == _list_mouse_on:
+				_set_list_focus(-1)
+			_list_mouse_on = under
 		return
 	var button := event as InputEventMouseButton
 	if button == null or button.button_index != MOUSE_BUTTON_LEFT or not button.pressed:
@@ -393,7 +450,41 @@ func _on_choice_card_mouse_exited(index: int) -> void:
 	if not _taking_card and _choice_focus == index:
 		_set_choice_focus(-1)
 
+func _set_list_focus(index: int) -> void:
+	if index == _hovered:
+		return
+	_hovered = index
+	_draw_layer.queue_redraw()
+
+# The untaken lines, then WALK ON - what ui_up/ui_down move through.
+func _list_focusable() -> Array[int]:
+	var indices: Array[int] = []
+	for index in _lines.size():
+		if not _lines[index].taken:
+			indices.append(index)
+	indices.append(_walk_on_index())
+	return indices
+
+func _list_input(event: InputEvent) -> void:
+	var focusable: Array[int] = _list_focusable()
+	var at: int = focusable.find(_hovered)
+	if event.is_action_pressed("ui_down"):
+		_set_list_focus(focusable[posmod(at + 1, focusable.size())] if at >= 0 else focusable[0])
+	elif event.is_action_pressed("ui_up"):
+		_set_list_focus(focusable[posmod(at - 1, focusable.size())] if at >= 0 else focusable[focusable.size() - 1])
+	elif event.is_action_pressed("ui_accept"):
+		if _hovered == _walk_on_index():
+			_on_dismiss()
+		elif at >= 0:
+			_take_line(_hovered)
+	else:
+		return
+	get_viewport().set_input_as_handled()
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _mode == Mode.LIST:
+		_list_input(event)
+		return
 	if _mode != Mode.CHOICE or _taking_card or _card_views.is_empty():
 		return
 	var cards: int = _card_views.size()
@@ -528,6 +619,8 @@ func _finish_card_line() -> void:
 	_card_views.clear()
 	_choice_focus = -1
 	_decline_hovered = false
+	_hovered = -1
+	_list_mouse_on = -1
 	_taking_card = false
 	_mode = Mode.LIST
 	for line in _lines:
