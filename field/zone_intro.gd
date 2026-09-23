@@ -175,6 +175,18 @@ const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 	set(value):
 		title_fog_end = value
 		_reapply_held_fog()
+# The sea bed under the title: its floor offset (Sea.floor_offset_db,
+# the same shift FloorData.ambience_sea_db sets) and the Sea bus's
+# low-pass, held here while the title is up and opened to the floor's
+# own values with the fog after Start. The wind bed is left alone.
+@export var title_sea_db: float = -6.0:
+	set(value):
+		title_sea_db = value
+		_reapply_held_sea()
+@export var title_sea_lowpass_hz: float = 2000.0:
+	set(value):
+		title_sea_lowpass_hz = value
+		_reapply_held_sea()
 # After Start, the fog opens from the title values to the intro's over
 # this, from the timeline's t = 0 - in place of the fade a play() lifts.
 @export var title_fog_open_seconds: float = 0.8
@@ -244,6 +256,16 @@ var _skip_from_fog_end: float = 0.0
 var _skip_from_sea_fog_near: float = 0.0
 var _skip_from_sea_fog_far: float = 0.0
 var _skip_from_title_alpha: float = 0.0
+# The floor's sea balance - Sea.floor_offset_db and the low-pass
+# RegionField wrote from FloorData - read at _start() and put back by
+# _finish(), like the fog. The title only borrows them.
+var _floor_sea_db: float = 0.0
+var _floor_sea_lowpass_hz: float = 20000.0
+# True from a title hold until _finish(): the sea is at, or opening from,
+# the title's values.
+var _sea_from_title: bool = false
+var _sea_open: float = 1.0
+var _skip_from_sea_open: float = 1.0
 
 var _fade: FloorFade = null
 var _title_layer: CanvasLayer = null
@@ -343,6 +365,9 @@ func _start(phase: Phase) -> void:
 	if sea != null:
 		_floor_sea_fog_near = sea.fog_near_distance
 		_floor_sea_fog_far = sea.fog_far_distance
+		_floor_sea_db = sea.floor_offset_db
+	var floor_data: FloorData = _region_field().get_floor_data()
+	_floor_sea_lowpass_hz = floor_data.ambience_sea_lowpass_hz if floor_data != null else 20000.0
 
 	_freeze()
 	_apply_pose()
@@ -352,6 +377,8 @@ func _start(phase: Phase) -> void:
 		_title.modulate.a = 1.0 if phase == Phase.DEBUG_HOLD else 0.0
 
 	if phase == Phase.TITLE_HOLD:
+		_sea_from_title = true
+		_set_sea_open(0.0)
 		_spawn_menu()
 	if phase == Phase.PLAYING:
 		_fade = FloorFade.new()
@@ -379,6 +406,8 @@ func _process(delta: float) -> void:
 			_set_fog(lerpf(_skip_from_fog_begin, _floor_fog_begin, s), lerpf(_skip_from_fog_end, _floor_fog_end, s),
 				lerpf(_skip_from_sea_fog_near, _floor_sea_fog_near, s), lerpf(_skip_from_sea_fog_far, _floor_sea_fog_far, s))
 			_set_title_alpha(lerpf(_skip_from_title_alpha, 0.0, s))
+			if _sea_from_title:
+				_set_sea_open(lerpf(_skip_from_sea_open, 1.0, s))
 			if _skip_clock >= skip_blend_seconds:
 				_finish()
 		_:
@@ -406,6 +435,8 @@ func _apply_move(s: float) -> void:
 # the move's own curve. Should the opening still be running at move_
 # start, the move's segment simply takes over.
 func _apply_fog_at(t: float) -> void:
+	if _sea_from_title:
+		_set_sea_open(smoothstep(0.0, 1.0, _progress(t, 0.0, title_fog_open_seconds)))
 	if _fog_from_title and t < title_fog_open_seconds and t < move_start:
 		var s: float = smoothstep(0.0, 1.0, _progress(t, 0.0, title_fog_open_seconds))
 		_set_fog(lerpf(title_fog_begin, fog_depth_begin, s), lerpf(title_fog_end, fog_depth_end, s),
@@ -437,6 +468,7 @@ func _skip() -> void:
 	_skip_from_sea_fog_near = sea.fog_near_distance if sea != null else _floor_sea_fog_near
 	_skip_from_sea_fog_far = sea.fog_far_distance if sea != null else _floor_sea_fog_far
 	_skip_from_title_alpha = _title.modulate.a if _title != null else 0.0
+	_skip_from_sea_open = _sea_open
 	_phase = Phase.SKIPPING
 
 # The one end, for the timeline, the skip and both debug toggles: the
@@ -450,6 +482,9 @@ func _finish() -> void:
 	if camera_rig != null:
 		camera_rig.clear_free_pose()
 	_set_fog(_floor_fog_begin, _floor_fog_end, _floor_sea_fog_near, _floor_sea_fog_far)
+	if _sea_from_title:
+		_set_sea_open(1.0)
+		_sea_from_title = false
 	if _fade != null:
 		_fade.clear()
 		_fade.queue_free()
@@ -529,6 +564,10 @@ func _reapply_held_fog() -> void:
 	if _ready_done and _is_holding():
 		_apply_held_fog()
 
+func _reapply_held_sea() -> void:
+	if _ready_done and _phase == Phase.TITLE_HOLD and not _title_starting:
+		_set_sea_open(0.0)
+
 func _reapply_title() -> void:
 	if _ready_done and _phase != Phase.IDLE:
 		_layout_title()
@@ -581,6 +620,20 @@ func _set_fog(sky_begin: float, sky_end: float, sea_near: float, sea_far: float)
 	if sea != null:
 		sea.fog_near_distance = sea_near
 		sea.fog_far_distance = sea_far
+
+# The sea bed at opening `s`: 0 = the title's level and low-pass, 1 = the
+# floor's. The cutoff runs in log frequency, so the same curve that opens
+# the fog is heard as an even opening rather than a jump in its first
+# frames.
+func _set_sea_open(s: float) -> void:
+	_sea_open = s
+	var sea := _sea()
+	if sea == null:
+		return
+	sea.floor_offset_db = lerpf(title_sea_db, _floor_sea_db, s)
+	var from_hz: float = maxf(title_sea_lowpass_hz, 1.0)
+	var to_hz: float = maxf(_floor_sea_lowpass_hz, 1.0)
+	sea.set_lowpass_hz(exp(lerpf(log(from_hz), log(to_hz), s)))
 
 # --- the menu -----------------------------------------------------------
 
