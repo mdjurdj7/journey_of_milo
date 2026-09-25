@@ -180,6 +180,7 @@ shadow_darkness = 0.35
 script = ExtResource("4")
 wetness_scale = 8.0
 landmass_below_sea_depth = 1.0
+elevation_max_height = 2.6
 
 [node name="MeshInstance3D" type="MeshInstance3D" parent="Ground" unique_id=1297283630]
 

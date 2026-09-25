@@ -97,17 +97,20 @@ const MODEL_SCENE_PATH := "res://assets/models/props/overhang/overhang.glb"
 	set(value):
 		sand_tint = value
 		_recolour()
-# The downward faces, as a multiplier on sand_tint.
-@export_range(0.0, 1.0) var underside_shade: float = 0.8:
+# The downward faces, as a multiplier on sand_tint: shade, not another
+# material - the cave's own shadow does most of the darkening.
+@export_range(0.0, 1.0) var underside_shade: float = 0.9:
 	set(value):
 		underside_shade = value
 		_recolour()
 # The normal.y the darkening starts at and the one it is full from.
-@export_range(-1.0, 0.0) var shade_blend_start: float = -0.2:
+# Narrow and low, so only the roof's underside darkens: the cave walls
+# lean in and out around n.y 0 and stay plain sand.
+@export_range(-1.0, 0.0) var shade_blend_start: float = -0.6:
 	set(value):
 		shade_blend_start = value
 		_recolour()
-@export_range(-1.0, 0.0) var shade_blend_end: float = -0.7:
+@export_range(-1.0, 0.0) var shade_blend_end: float = -0.9:
 	set(value):
 		shade_blend_end = value
 		_recolour()
@@ -121,7 +124,10 @@ const MODEL_SCENE_PATH := "res://assets/models/props/overhang/overhang.glb"
 	set(value):
 		barrier_bottom_height = value
 		_rebuild_barrier()
-@export var barrier_top_margin: float = 0.5:
+# Over the model's top: tall enough that ground piled against the rim
+# (up to the model's crest) never leaves less than his step height of
+# wall above his feet.
+@export var barrier_top_margin: float = 2.0:
 	set(value):
 		barrier_top_margin = value
 		_rebuild_barrier()
