@@ -16,9 +16,8 @@ class_name SandOverhang
 # defaults put the cache's three cards on the sand under the hollow's
 # roof, ~1.3 m in from the lip, with ~2.0 m of roof over them.
 #
-# The painted bank is dropped to the pocket floor inside the model's
-# footprint (floor 2's elevation mask) and ramps down to its rim outside
-# it, so the model's own mass is the pocket's back and sides.
+# Floor 2 has no elevation layer: the model is the only raised ground,
+# its own mass the pocket's back and sides.
 #
 # The glb (origin at its base, ~6.5 x 2.4 x 6.6 m) is a thin double-
 # skinned shell: its undercut face and hollow look along the model's +Z,
@@ -52,8 +51,9 @@ const MODEL_SCENE_PATH := "res://assets/models/props/overhang/overhang.glb"
 @export_group("Model")
 # Local to this node, which sits on the pocket floor. y is the sink: the
 # cave's floor dish rises to ~0.17 m (model units) under the cards'
-# ends, and 0.23 m puts it all under the sand there.
-@export var model_offset: Vector3 = Vector3(-1.13, -0.23, -0.01):
+# ends; 0.28 m puts it all under the sand there, and the rim under the
+# flat sand all round.
+@export var model_offset: Vector3 = Vector3(-1.13, -0.28, -0.01):
 	set(value):
 		model_offset = value
 		if _model_instance != null:
