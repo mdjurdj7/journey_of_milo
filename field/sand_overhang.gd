@@ -1,89 +1,82 @@
 extends Node3D
 class_name SandOverhang
 
-# The lip over the back of floor 2's pocket: a slab of the bank projecting
-# out over the pocket's back 1.5 m, and the mass it grows from, sitting on
-# the painted bank behind the back wall. The ground is a heightfield and
-# tops out at Ground.elevation_max_height, so it can neither overhang nor
-# reach this high; this is the one thing on the floor that does both.
+# The overhang over the back of floor 2's pocket: a sculpted dune with an
+# undercut face and a hollow beneath it (overhang.glb), the one thing on
+# the floor the ground can't make - the ground is a heightfield, so it
+# can neither overhang nor rise past Ground.elevation_max_height.
 #
-# Local frame: the origin is the back wall's inner face at the pocket's
-# middle, on the pocket floor; +X runs out toward the mouth, Z across it.
 # Placed by RegionField from FloorData.props like any prop (set_floor_
 # placement(): XZ from the floor, yaw onto yaw_degrees) and grounded on
-# the relief just in front of its origin (ground_sample_offset), so the
-# underside is underside_height over the pocket floor wherever the floor
-# ends up.
+# the relief just in front of its origin (ground_sample_offset) - the
+# pocket floor, so the model's own cave floor can be sunk under it by a
+# fixed amount wherever the floor ends up. The model then sits under this
+# node at model_offset, scaled by model_scale, mirrored across when
+# mirror_across is set and turned by model_yaw_degrees, all live. The
+# defaults put the cache's three cards on the sand under the hollow's
+# roof, ~1.3 m in from the lip, with ~2.0 m of roof over them.
 #
-# Three solids, built into one mesh:
-#   the mass - behind the back wall, from embed_height (the floor, so it
-#              meets the painted wall's foot and is buried in the bank
-#              everywhere else) up to top_height;
-#   the lip  - the slab, from underside_height to top_height, out to an
-#              irregular edge (lip_depth, wobbled by lip_wobble);
-#   the ends - over the side walls, solid from embed_height to the top,
-#              so no slot of light shows between the bank and the slab.
-# Every face is flat. The whole prop is sand (sand_tint, on the flat
-# matte material the hulls use); the faces that look down are darker
-# sand (x underside_shade) - the underside is lit by the ambient alone
-# (the key light is near overhead) and sits in the prop's own shadow, and
-# the vertex colour deepens that without a texture or a new material.
+# The painted bank is dropped to the pocket floor inside the model's
+# footprint (floor 2's elevation mask) and ramps down to its rim outside
+# it, so the model's own mass is the pocket's back and sides.
 #
-# Collision: a box per solid. The lip's stops the Wanderer at its edge -
-# he is 1.8 m tall and the underside is 1.6 m, so he never stands under
-# it, and nothing needs to fade. Not walkable on top (nothing reaches it
-# - the bank round it is unclimbable) and nothing spawns on it.
+# The glb (origin at its base, ~6.5 x 2.4 x 6.6 m) is a thin double-
+# skinned shell: its undercut face and hollow look along the model's +Z,
+# its rear is a slope down to the ground, and it is open underneath. Its
+# hollow has its own floor, a shallow dish ~0.1 m up; model_offset.y
+# sinks that dish under the pocket floor so the painted floor (and the
+# cache on it) is what shows, and the rim goes under the sand all round.
+#
+# The scale, mirror and yaw are baked into the vertices here, not set on
+# a node: model_scale is not uniform (narrower across, taller), and a
+# scaled or mirrored concave collision shape or a scaled normal would all
+# come out wrong.
+#
+# Colour: the glb's textures are discarded at import. The whole model is
+# sand (sand_tint, on the flat matte material the hulls use); the faces
+# that look down are darker sand, through vertex colour worked out from
+# each vertex's normal - full sand_tint down to a normal.y of
+# shade_blend_start, sand_tint x underside_shade from shade_blend_end
+# on, a smooth blend between. The key light is near overhead and the
+# ambient flat, so the cave roof is lit by the ambient alone; the vertex
+# colour deepens that without a texture or a new material.
+#
+# Collision: a trimesh of the same baked mesh, collision on both faces
+# (the skin is ~5 cm thick; a one-sided face lets a capsule through from
+# behind). He walks in under the lip and stops at the surface he can see,
+# the cave's back wall. Nothing fades: past the lip the roof hides him
+# from the field camera.
 
-@export_group("Shape")
-# Kept inside the painted back bank (1.3 m wide) so its back rises from
-# the bank's own slope, not from the ramp beyond it.
-@export var mass_depth: float = 1.0:
+const MODEL_SCENE_PATH := "res://assets/models/props/overhang/overhang.glb"
+
+@export_group("Model")
+# Local to this node, which sits on the pocket floor. y is the sink: the
+# cave's floor dish rises to ~0.17 m (model units) under the cards'
+# ends, and 0.23 m puts it all under the sand there.
+@export var model_offset: Vector3 = Vector3(-1.13, -0.23, -0.01):
 	set(value):
-		mass_depth = value
+		model_offset = value
+		if _model_instance != null:
+			_model_instance.position = model_offset
+# Turns the model's +Z (its undercut face) onto this node's +X (the
+# pocket's mouth).
+@export var model_yaw_degrees: float = 90.0:
+	set(value):
+		model_yaw_degrees = value
 		_rebuild()
-@export var lip_depth: float = 1.5:
+# In the model's own axes, before the yaw: X across the hollow, Y up, Z
+# from the rear slope out to the lip.
+@export var model_scale: Vector3 = Vector3(0.85, 1.15, 0.85):
 	set(value):
-		lip_depth = value
+		model_scale = value
 		_rebuild()
-# How far the lip's edge wanders either way, metres, and where along its
-# sin sum it starts - the edge is the same every load.
-@export var lip_wobble: float = 0.25:
+# Flips the model across (its X) before the yaw. The hollow's roof stops
+# short on the model's -X side and leaves the cave open to the sky there;
+# the field camera looks north from high in the south, so that side goes
+# north, to the sea, and the model's solid +X side faces the camera.
+@export var mirror_across: bool = true:
 	set(value):
-		lip_wobble = value
-		_rebuild()
-@export var wobble_seed: float = 11.0:
-	set(value):
-		wobble_seed = value
-		_rebuild()
-# Half the pocket's width (the open part under the lip), and half the
-# whole prop's width (the ends run into the side walls).
-@export var pocket_half_width: float = 1.5:
-	set(value):
-		pocket_half_width = value
-		_rebuild()
-@export var half_span: float = 2.3:
-	set(value):
-		half_span = value
-		_rebuild()
-@export var underside_height: float = 1.6:
-	set(value):
-		underside_height = value
-		_rebuild()
-@export var top_height: float = 2.0:
-	set(value):
-		top_height = value
-		_rebuild()
-# The bottom of the mass and the ends, over the pocket floor. At the floor
-# (0) their faces toward the pocket stand on it with no slot beneath,
-# and everywhere else they are buried in the painted bank.
-@export var embed_height: float = 0.0:
-	set(value):
-		embed_height = value
-		_rebuild()
-# Strips along Z the lip's edge is broken into.
-@export var lip_segments: int = 14:
-	set(value):
-		lip_segments = value
+		mirror_across = value
 		_rebuild()
 @export_group("")
 
@@ -92,12 +85,21 @@ class_name SandOverhang
 @export var sand_tint: Color = Color(0.74, 0.70, 0.60):
 	set(value):
 		sand_tint = value
-		_rebuild()
+		_recolour()
 # The downward faces, as a multiplier on sand_tint.
 @export_range(0.0, 1.0) var underside_shade: float = 0.8:
 	set(value):
 		underside_shade = value
-		_rebuild()
+		_recolour()
+# The normal.y the darkening starts at and the one it is full from.
+@export_range(-1.0, 0.0) var shade_blend_start: float = -0.2:
+	set(value):
+		shade_blend_start = value
+		_recolour()
+@export_range(-1.0, 0.0) var shade_blend_end: float = -0.7:
+	set(value):
+		shade_blend_end = value
+		_recolour()
 @export_group("")
 
 @export var yaw_degrees: float = 0.0:
@@ -105,19 +107,24 @@ class_name SandOverhang
 		yaw_degrees = value
 		rotation = Vector3(0.0, deg_to_rad(yaw_degrees), 0.0)
 # Grounded on the relief this far in front of the origin (local +X) -
-# the pocket floor, clear of the painted back wall whose face wanders
-# either side of the origin itself.
+# the pocket floor, under the hollow.
 @export var ground_sample_offset: float = 0.6:
 	set(value):
 		ground_sample_offset = value
 		_ground_to_relief()
 @export var ground_path: NodePath = ^"../../Ground"
 
-var _mesh_instance: MeshInstance3D = null
+var _model_instance: MeshInstance3D = null
 var _material: StandardMaterial3D = null
 var _body: StaticBody3D = null
+var _shape_node: CollisionShape3D = null
 var _ground: Ground = null
 var _ready_done: bool = false
+# The glb's surfaces as imported (Mesh.ARRAY_* arrays), and the baked
+# ones - vertices and normals scaled and turned - the colours are written
+# onto.
+var _source_surfaces: Array[Array] = []
+var _baked_surfaces: Array[Array] = []
 
 # RegionField's placement (FloorProp): XZ here, Y from the relief, yaw
 # onto yaw_degrees; it doesn't roll.
@@ -126,22 +133,27 @@ func set_floor_placement(world_position: Vector3, yaw: float, _roll: float) -> v
 	yaw_degrees = yaw
 
 func _ready() -> void:
-	_mesh_instance = MeshInstance3D.new()
-	_mesh_instance.name = "Mesh"
-	_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	add_child(_mesh_instance)
+	_model_instance = MeshInstance3D.new()
+	_model_instance.name = "Model"
+	_model_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+	_model_instance.position = model_offset
+	add_child(_model_instance)
 	_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
 	_material.vertex_color_use_as_albedo = true
 	# The tints are authored like every other colour here, in sRGB.
 	_material.vertex_color_is_srgb = true
 	_material.albedo_color = Color.WHITE
-	_mesh_instance.material_override = _material
+	_model_instance.material_override = _material
 	_body = StaticBody3D.new()
 	_body.name = "Collision"
 	# Kept in the physics space through RegionField's freeze, like every
 	# prop that must stay solid (and clickable) under a fight.
 	_body.disable_mode = CollisionObject3D.DISABLE_MODE_MAKE_STATIC
-	add_child(_body)
+	_model_instance.add_child(_body)
+	_shape_node = CollisionShape3D.new()
+	_shape_node.name = "Shape"
+	_body.add_child(_shape_node)
+	_load_source()
 	_ready_done = true
 	_rebuild()
 	_ground = get_node_or_null(ground_path) as Ground
@@ -158,118 +170,88 @@ func _ground_to_relief() -> void:
 	var local_xz: Vector3 = _ground.to_local(Vector3(sample.x, 0.0, sample.z))
 	global_position.y = _ground.get_height_at(Vector2(local_xz.x, local_xz.z))
 
-func _wobble(t: float) -> float:
-	return sin(t * 1.3 + wobble_seed) * 0.6 + sin(t * 2.9 + wobble_seed * 2.1) * 0.4
+# The glb's mesh surfaces, in the scene root's frame.
+func _load_source() -> void:
+	var scene := load(MODEL_SCENE_PATH) as PackedScene
+	if scene == null:
+		push_warning("SandOverhang: could not load %s; no model." % MODEL_SCENE_PATH)
+		return
+	var root: Node3D = scene.instantiate() as Node3D
+	for node in root.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		var to_root: Transform3D = Transform3D.IDENTITY
+		var n: Node = mi
+		while n != root and n is Node3D:
+			to_root = (n as Node3D).transform * to_root
+			n = n.get_parent()
+		var normal_basis: Basis = to_root.basis.inverse().transposed()
+		for s in mi.mesh.get_surface_count():
+			var arrays: Array = mi.mesh.surface_get_arrays(s)
+			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+			var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
+			for i in verts.size():
+				verts[i] = to_root * verts[i]
+				normals[i] = (normal_basis * normals[i]).normalized()
+			var kept: Array = []
+			kept.resize(Mesh.ARRAY_MAX)
+			kept[Mesh.ARRAY_VERTEX] = verts
+			kept[Mesh.ARRAY_NORMAL] = normals
+			kept[Mesh.ARRAY_INDEX] = arrays[Mesh.ARRAY_INDEX]
+			_source_surfaces.append(kept)
+	root.free()
 
-# The lip's edge at this Z.
-func _lip_at(z: float) -> float:
-	return maxf(lip_depth + lip_wobble * _wobble(z * 1.7), 0.1)
-
+# Scale and yaw into the vertices, then the colours, the mesh and the
+# collision.
 func _rebuild() -> void:
 	if not _ready_done:
 		return
-	_mesh_instance.mesh = _build_mesh()
-	_build_collision()
+	var scale_xyz: Vector3 = model_scale
+	if mirror_across:
+		scale_xyz.x = -scale_xyz.x
+	var basis: Basis = Basis(Vector3.UP, deg_to_rad(model_yaw_degrees)) * Basis.from_scale(scale_xyz)
+	var normal_basis: Basis = basis.inverse().transposed()
+	# A mirror turns every triangle inside out; swapping two corners of
+	# each puts the front faces back outside.
+	var flip: bool = basis.determinant() < 0.0
+	_baked_surfaces.clear()
+	for source in _source_surfaces:
+		var verts: PackedVector3Array = (source[Mesh.ARRAY_VERTEX] as PackedVector3Array).duplicate()
+		var normals: PackedVector3Array = (source[Mesh.ARRAY_NORMAL] as PackedVector3Array).duplicate()
+		for i in verts.size():
+			verts[i] = basis * verts[i]
+			normals[i] = (normal_basis * normals[i]).normalized()
+		var indices: PackedInt32Array = (source[Mesh.ARRAY_INDEX] as PackedInt32Array).duplicate()
+		if flip:
+			for t in range(0, indices.size() - 2, 3):
+				var corner: int = indices[t + 1]
+				indices[t + 1] = indices[t + 2]
+				indices[t + 2] = corner
+		var baked: Array = []
+		baked.resize(Mesh.ARRAY_MAX)
+		baked[Mesh.ARRAY_VERTEX] = verts
+		baked[Mesh.ARRAY_NORMAL] = normals
+		baked[Mesh.ARRAY_INDEX] = indices
+		_baked_surfaces.append(baked)
+	_recolour()
+	var shape: ConcavePolygonShape3D = _model_instance.mesh.create_trimesh_shape() if _model_instance.mesh != null else null
+	if shape != null:
+		shape.backface_collision = true
+	_shape_node.shape = shape
 
-# --- Mesh ---
-
-var _st: SurfaceTool = null
-
-func _build_mesh() -> ArrayMesh:
-	_st = SurfaceTool.new()
-	_st.begin(Mesh.PRIMITIVE_TRIANGLES)
-	# Three runs of strips, split exactly at the pocket's edges: the end
-	# over one side wall, the open part, the other end.
-	var runs: Array = [[-half_span, -pocket_half_width, true], [-pocket_half_width, pocket_half_width, false], [pocket_half_width, half_span, true]]
-	var total: int = maxi(lip_segments, 3)
-	for r in runs:
-		var r0: float = r[0]
-		var r1: float = r[1]
-		var solid_end: bool = r[2]
-		var n: int = maxi(int(round(float(total) * (r1 - r0) / (2.0 * half_span))), 1)
-		var dz: float = (r1 - r0) / float(n)
-		for i in n:
-			var za: float = r0 + dz * float(i)
-			var zb: float = za + dz
-			var la: float = _lip_at(za)
-			var lb: float = _lip_at(zb)
-			var cap_a: bool = is_equal_approx(za, -half_span)
-			var cap_b: bool = is_equal_approx(zb, half_span)
-			# The mass behind the wall, full height.
-			_prism(-mass_depth, -mass_depth, 0.0, 0.0, embed_height, top_height, za, zb, cap_a, cap_b, true, false)
-			if solid_end:
-				# Over a side wall: solid from the bank up, out to the lip.
-				_prism(0.0, 0.0, la, lb, embed_height, top_height, za, zb, cap_a, cap_b, false, true)
-			else:
-				# Over the pocket: the slab, and under it the mass's own face -
-				# the back wall carried on above the painted bank.
-				_prism(0.0, 0.0, la, lb, underside_height, top_height, za, zb, false, false, false, true)
-				_quad(Vector3(0.0, embed_height, za), Vector3(0.0, embed_height, zb), Vector3(0.0, underside_height, zb), Vector3(0.0, underside_height, za), Vector3.RIGHT)
-	# The ends' faces toward the pocket, under the slab.
-	for side in [-1.0, 1.0]:
-		var zc: float = side * pocket_half_width
-		var lc: float = _lip_at(zc)
-		_quad(Vector3(0.0, embed_height, zc), Vector3(lc, embed_height, zc), Vector3(lc, underside_height, zc), Vector3(0.0, underside_height, zc), Vector3(0.0, 0.0, -side))
-	var mesh: ArrayMesh = _st.commit()
-	_st = null
-	return mesh
-
-# A strip between za and zb, x from x_back to x_front (front edge per
-# end: fa at za, fb at zb), y from y0 to y1. Caps at the strip's ends only
-# where asked (the prop's own two ends); a back face only for the mass, a
-# front face only where the strip is the lip.
-func _prism(ba: float, bb: float, fa: float, fb: float, y0: float, y1: float, za: float, zb: float, cap_a: bool, cap_b: bool, back: bool, front: bool) -> void:
-	# Top.
-	_quad(Vector3(ba, y1, za), Vector3(bb, y1, zb), Vector3(fb, y1, zb), Vector3(fa, y1, za), Vector3.UP)
-	# Bottom.
-	_quad(Vector3(ba, y0, za), Vector3(fa, y0, za), Vector3(fb, y0, zb), Vector3(bb, y0, zb), Vector3.DOWN)
-	if front:
-		var edge := Vector3(fb - fa, 0.0, zb - za)
-		var nrm: Vector3 = edge.cross(Vector3.UP).normalized() * -1.0
-		if nrm.x < 0.0:
-			nrm = -nrm
-		_quad(Vector3(fa, y0, za), Vector3(fa, y1, za), Vector3(fb, y1, zb), Vector3(fb, y0, zb), nrm)
-	if back:
-		_quad(Vector3(ba, y0, za), Vector3(bb, y0, zb), Vector3(bb, y1, zb), Vector3(ba, y1, za), Vector3.LEFT)
-	if cap_a:
-		_quad(Vector3(ba, y0, za), Vector3(ba, y1, za), Vector3(fa, y1, za), Vector3(fa, y0, za), Vector3.FORWARD)
-	if cap_b:
-		_quad(Vector3(ba, y0, zb), Vector3(fb, y0, zb), Vector3(fb, y1, zb), Vector3(bb, y1, zb), Vector3.BACK)
-
-# One flat quad, wound to face `normal` (either winding is accepted and
-# fixed here), coloured sand or - facing down - darker sand.
-func _quad(a: Vector3, b: Vector3, c: Vector3, d: Vector3, normal: Vector3) -> void:
-	var face: Vector3 = (b - a).cross(c - a)
-	if face.dot(normal) > 0.0:
-		var t: Vector3 = b
-		b = d
-		d = t
-	var colour: Color = sand_tint
-	if normal.y < -0.5:
-		colour = Color(sand_tint.r * underside_shade, sand_tint.g * underside_shade, sand_tint.b * underside_shade, 1.0)
-	_st.set_color(colour)
-	_st.set_normal(normal)
-	for v in [a, b, c, a, c, d]:
-		_st.add_vertex(v)
-
-# --- Collision ---
-
-func _build_collision() -> void:
-	for child in _body.get_children():
-		_body.remove_child(child)
-		child.queue_free()
-	var slab_depth: float = lip_depth + lip_wobble
-	_add_box("Mass", Vector3(-mass_depth * 0.5, (embed_height + top_height) * 0.5, 0.0), Vector3(mass_depth, top_height - embed_height, 2.0 * half_span))
-	_add_box("Lip", Vector3(slab_depth * 0.5, (underside_height + top_height) * 0.5, 0.0), Vector3(slab_depth, top_height - underside_height, 2.0 * pocket_half_width))
-	var end_w: float = half_span - pocket_half_width
-	for side in [-1.0, 1.0]:
-		_add_box("EndSouth" if side > 0.0 else "EndNorth", Vector3(slab_depth * 0.5, (embed_height + top_height) * 0.5, side * (pocket_half_width + end_w * 0.5)), Vector3(slab_depth, top_height - embed_height, end_w))
-
-func _add_box(label: String, centre: Vector3, size: Vector3) -> void:
-	var shape := BoxShape3D.new()
-	shape.size = size
-	var node := CollisionShape3D.new()
-	node.name = label
-	node.shape = shape
-	node.position = centre
-	_body.add_child(node)
+func _recolour() -> void:
+	if not _ready_done:
+		return
+	var shade := Color(sand_tint.r * underside_shade, sand_tint.g * underside_shade, sand_tint.b * underside_shade, 1.0)
+	var mesh := ArrayMesh.new()
+	for baked in _baked_surfaces:
+		var normals: PackedVector3Array = baked[Mesh.ARRAY_NORMAL]
+		var colours := PackedColorArray()
+		colours.resize(normals.size())
+		for i in normals.size():
+			var t: float = smoothstep(shade_blend_start, shade_blend_end, normals[i].y)
+			colours[i] = sand_tint.lerp(shade, t)
+		baked[Mesh.ARRAY_COLOR] = colours
+		mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, baked)
+	_model_instance.mesh = mesh

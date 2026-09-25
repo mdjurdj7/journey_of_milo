@@ -144,3 +144,10 @@ so it doesn't get silently reinvented or silently forgotten.
   the field camera; it stays still. `FloorData.rare_pool` exists and is
   empty on every floor, so the 5% rare draw falls back to the bundle's
   own pool until trinkets or weapons exist. (2026-09-22, bundle.)
+- **The overhang hides the Wanderer for ~2 m.** A cutaway/fade for
+  interiors is deferred to Region 3, where the run goes vertical. Floor
+  2's SandOverhang lets him walk ~2 m in under its roof. From about
+  x 9.6 (the lip is at 9.35-9.85) to the cave's back wall at 7.8, the
+  field camera loses him, his contact shadow with him. The cards'
+  lifted CardViews are drawn on a CanvasLayer from their anchors, so the
+  lift and the take still read. (2026-09-25, sculpted overhang.)
