@@ -8,6 +8,7 @@
 [ext_resource type="Resource" path="res://battle/rules/enemies/dragonfly.tres" id="11_dragonfly"]
 [ext_resource type="Script" path="res://floors/floor_patrol.gd" id="12_floor_patrol"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
+[ext_resource type="Texture2D" uid="uid://i82lal47k3wr" path="res://assets/field/masks/Map3_elev_x1.25_dune.png" id="8_map3_elev"]
 [ext_resource type="Texture2D" uid="uid://cx25fsucs3u3d" path="res://assets/field/masks/Map3_wear_x1.25_alcove.png" id="13_map3_wear"]
 [ext_resource type="PackedScene" path="res://field/reward_spread.tscn" id="9_reward_spread"]
 [ext_resource type="Resource" path="res://cards/pools/belongings_pool.tres" id="10_belongings_pool"]
@@ -59,12 +60,12 @@ pool = ExtResource("10_belongings_pool")
 [sub_resource type="Resource" id="FloorProp_pocket_overhang"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("15_overhang")
-position = Vector3(8.3, 0, -24.3)
+position = Vector3(9.8, 0, -24.3)
 
 [sub_resource type="Resource" id="FloorProp_alcove_cache"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("9_reward_spread")
-position = Vector3(8.6, 0, -24.3)
+position = Vector3(10.1, 0, -24.3)
 pool = ExtResource("10_belongings_pool")
 overrides = {
 "card_count": 3,
@@ -76,6 +77,7 @@ overrides = {
 [resource]
 script = ExtResource("1_floor_data")
 mask = ExtResource("4_map3")
+elevation_mask = ExtResource("8_map3_elev")
 wear_mask = ExtResource("13_map3_wear")
 mask_origin = Vector2(0.5, 0.888889)
 interior_height = 0.3
