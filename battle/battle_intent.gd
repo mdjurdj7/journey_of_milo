@@ -17,10 +17,11 @@ class_name BattleIntent
 #
 # An interruptible attack (EnemyIntent.interrupt_threshold, the Siltjaw's
 # charge) adds a second row under the hairline: the damage still to deal
-# this turn, counting down as cards land, inside a thin ink ring with a
-# gap in it - a break waiting to be made, not a second number coming at
-# you. Met, the number goes and the ring closes, empty, and the attack
-# pair dims to hairline ink - it won't land. The whole
+# this turn, counting down as cards land, inside a ring gauge - a faint
+# track that fills clockwise in ink from ring_start_degrees with what has
+# been dealt this turn. Empty at the start of the turn, full when the
+# threshold is met: a full ring is the stopped state, the numeral reads 0
+# and the attack pair dims to hairline ink - it won't land. The whole
 # stack still ends at the anchor, so the attack line sits a ring higher.
 # A BURROW (buried - it does nothing this turn) is its glyph alone: there
 # is no number coming.
@@ -75,19 +76,22 @@ class_name BattleIntent
 	set(value):
 		ring_diameter_px = value
 		_apply_layout()
+# Stroke weight of the track and the fill alike.
 @export var ring_stroke_px: float = 2.0:
 	set(value):
 		ring_stroke_px = value
 		queue_redraw()
-# The break in the ring, degrees of arc, and where its middle faces
-# (degrees, screen space: 0 = right, -90 = up).
-@export_range(0.0, 180.0) var ring_gap_degrees: float = 50.0:
+# How far inside the track's centreline the fill runs, px. 0 = the fill
+# rides on the track; more draws it as an inner ring within it.
+@export var ring_fill_inset_px: float = 0.0:
 	set(value):
-		ring_gap_degrees = value
+		ring_fill_inset_px = value
 		queue_redraw()
-@export var ring_gap_facing_degrees: float = -60.0:
+# Where the fill starts, degrees in screen space (0 = right, -90 = up);
+# it grows clockwise from here.
+@export var ring_start_degrees: float = -90.0:
 	set(value):
-		ring_gap_facing_degrees = value
+		ring_start_degrees = value
 		queue_redraw()
 # Between the hairline's underside and the ring's top.
 @export var ring_top_gap_px: float = 5.0:
@@ -110,6 +114,8 @@ var _lethal: bool = false
 var _threshold_label: Label = null
 var _has_threshold: bool = false
 var _interrupted: bool = false
+# How much of the ring is filled, 0..1: dealt this turn over the threshold.
+var _ring_fill: float = 0.0
 var _ring_centre: Vector2 = Vector2.ZERO
 var _rule_top: float = 0.0
 # "Revealed" is the overlay's say (frame settled, not acting); the display
@@ -171,9 +177,12 @@ func show_intent(preview: Dictionary) -> void:
 			_label.text = ""
 		_has_threshold = preview.has("threshold")
 		_interrupted = bool(preview.get("interrupted", false))
-		# Met, the ring holds nothing: there is no more to deal.
-		var threshold_text: String = str(int(preview.get("threshold_left", 0)))
-		_threshold_label.text = threshold_text if _has_threshold and not _interrupted else ""
+		# The numeral counts down to 0 and stays; the gauge fills with
+		# what has been dealt, full once the threshold is met.
+		var threshold: int = int(preview.get("threshold", 0))
+		var left: int = int(preview.get("threshold_left", 0))
+		_threshold_label.text = str(left) if _has_threshold else ""
+		_ring_fill = 1.0 if _interrupted else (clampf(float(threshold - left) / float(threshold), 0.0, 1.0) if threshold > 0 else 0.0)
 	_apply_layout()
 	_update_visibility()
 
@@ -264,19 +273,30 @@ func _draw() -> void:
 	var rule_left: float = (size.x - hairline_width_px) * 0.5
 	draw_rect(Rect2(rule_left, _rule_top, hairline_width_px, rule_thickness), rule_color)
 
-# The threshold ring: bone under ink, like every stroke here, broken by
-# ring_gap_degrees around ring_gap_facing_degrees - sealed once met.
+# The threshold gauge: the whole track at hairline ink, then the fill in
+# full ink from ring_start_degrees clockwise (screen angles grow
+# clockwise, y being down) over _ring_fill of the turn - bone under ink,
+# like every stroke here.
 func _draw_ring() -> void:
 	var ink: Color = get_theme_color("ink", "Battle")
 	var outline: Color = get_theme_color("bone", "Battle")
 	var radius: float = ring_diameter_px * 0.5
-	var gap: float = 0.0 if _interrupted else deg_to_rad(clampf(ring_gap_degrees, 0.0, 180.0))
-	var facing: float = deg_to_rad(ring_gap_facing_degrees)
-	var start: float = facing + gap * 0.5
-	var end: float = facing + TAU - gap * 0.5
+	var outline_width: float = ring_stroke_px + float(outline_size_px) * 2.0
 	var segments: int = 64
-	draw_arc(_ring_centre, radius, start, end, segments, outline, ring_stroke_px + float(outline_size_px) * 2.0, true)
-	draw_arc(_ring_centre, radius, start, end, segments, ink, ring_stroke_px, true)
+	var track_ink: Color = ink
+	track_ink.a *= hairline_alpha
+	var track_outline: Color = outline
+	track_outline.a *= hairline_alpha
+	draw_arc(_ring_centre, radius, 0.0, TAU, segments, track_outline, outline_width, true)
+	draw_arc(_ring_centre, radius, 0.0, TAU, segments, track_ink, ring_stroke_px, true)
+	if _ring_fill <= 0.0:
+		return
+	var fill_radius: float = maxf(radius - ring_fill_inset_px, 0.0)
+	var start: float = deg_to_rad(ring_start_degrees)
+	var end: float = start + TAU * _ring_fill
+	var fill_segments: int = maxi(ceili(segments * _ring_fill), 2)
+	draw_arc(_ring_centre, fill_radius, start, end, fill_segments, outline, outline_width, true)
+	draw_arc(_ring_centre, fill_radius, start, end, fill_segments, ink, ring_stroke_px, true)
 
 # One glyph stroke in the numeral's ink over its bone outline, at alpha.
 func _stroke(points: PackedVector2Array, alpha: float) -> void:
