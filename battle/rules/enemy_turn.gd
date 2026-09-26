@@ -208,19 +208,39 @@ static func _sync_buried(combatant: Combatant, data: EnemyData) -> void:
 	var intent := current_intent(combatant, data)
 	combatant.buried = intent != null and intent.type == EnemyIntent.IntentType.BURROW
 
+# The last of its pack (Combatant.pack_alone, from now on): a queued
+# simultaneous intent gives way to the next one in the loop that isn't,
+# as if it had been played. An interjection is left where it is. Returns
+# whether the queued intent changed, for the display to catch up.
+static func leave_pack(combatant: Combatant, data: EnemyData) -> bool:
+	combatant.pack_alone = true
+	var queued: EnemyIntent = current_intent(combatant, data)
+	if combatant.interjected_intent != null or queued == null or not queued.simultaneous:
+		return false
+	_advance_intent(combatant, data)
+	_sync_buried(combatant, data)
+	return true
+
 static func _advance_intent(combatant: Combatant, data: EnemyData) -> void:
 	if data.intents.is_empty():
 		return
 	if data.erratic_intent_selection:
-		combatant.current_intent_index = _pick_erratic_intent_index(data, combatant.current_intent_index)
-	else:
+		combatant.current_intent_index = _pick_erratic_intent_index(data, combatant.current_intent_index, combatant.pack_alone)
+		return
+	# Alone, the cycle steps over its pack moves - at most once round, so
+	# a loop of nothing else still queues something.
+	for _step in data.intents.size():
 		combatant.current_intent_index = (combatant.current_intent_index + 1) % data.intents.size()
+		if not combatant.pack_alone or not data.intents[combatant.current_intent_index].simultaneous:
+			return
 
-static func _pick_erratic_intent_index(data: EnemyData, previous_index: int) -> int:
+static func _pick_erratic_intent_index(data: EnemyData, previous_index: int, pack_alone: bool) -> int:
 	var weights: Dictionary = {}
 	for i in data.intents.size():
 		var intent := data.intents[i]
 		if i == previous_index and intent.no_immediate_repeat:
+			continue
+		if pack_alone and intent.simultaneous:
 			continue
 		weights[i] = intent.erratic_weight
 	return _weighted_pick(weights, previous_index)

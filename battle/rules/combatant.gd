@@ -65,6 +65,11 @@ var buried: bool = false
 # interrupt_threshold is measured against. Counted by DamagePipeline.
 # resolve(), reset by BattleController._start_player_turn().
 var damage_taken_this_turn: int = 0
+# No living packmate left in this fight (the last of its FieldEnemy.group,
+# or never one): a simultaneous intent is a pack's move, so EnemyTurn
+# steps past it from here on - see EnemyTurn.leave_pack(). Set by
+# BattleController; never cleared, a pack doesn't regroup mid-fight.
+var pack_alone: bool = false
 
 func _init(starting_hp: int = 1) -> void:
 	hp = starting_hp

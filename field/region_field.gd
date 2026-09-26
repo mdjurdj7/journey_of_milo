@@ -704,6 +704,7 @@ func _spawn_floor_enemies() -> void:
 		enemy.enemy_data = entry.enemy_data
 		enemy.required = entry.required
 		enemy.group = entry.group
+		enemy.anchor = entry.anchor
 		# The body, from the data's Field Body group - its defaults are
 		# this scene's own values, so a resource that sets none (the
 		# Sputter) wears exactly what it did.
@@ -1120,7 +1121,8 @@ func _fog_colour() -> Color:
 
 # The enemies one contact starts a fight with. A lone enemy: itself. A
 # cluster member (FieldEnemy.group): every member of its group still on
-# the field, nearest-to-the-Wanderer first - the first is who the
+# the field, its anchor (FieldEnemy.anchor) first when it has one still
+# standing, else nearest-to-the-Wanderer first - the first is who the
 # Wanderer steps up to and what the camera's fit takes its axis from
 # (CameraRig.enter_battle()); the rest follow in the order they will
 # stand along the line (see _place_cluster_line()). The contact zone is
@@ -1137,13 +1139,16 @@ func _battle_members_for(enemy: FieldEnemy) -> Array[FieldEnemy]:
 		members.append(member)
 	var from: Vector3 = wanderer.global_position
 	members.sort_custom(func(a: FieldEnemy, b: FieldEnemy) -> bool:
+		if a.anchor != b.anchor:
+			return a.anchor
 		return a.global_position.distance_squared_to(from) < b.global_position.distance_squared_to(from)
 	)
 	return members
 
 # The line a cluster fights in, from the members' own arrangement, not
-# the Wanderer's approach: it starts at the anchor (the nearest member,
-# which keeps its spot) and runs toward the member farthest from it, the
+# the Wanderer's approach: it starts at the anchor (the first member -
+# its FieldEnemy.anchor, else the nearest - which keeps its spot) and
+# runs toward the member farthest from it, the
 # others stepping onto it cluster_member_gap apart in order of how far
 # along it they already stand. Returns the direction from the anchor
 # back toward where the Wanderer stands (the line extended past its near

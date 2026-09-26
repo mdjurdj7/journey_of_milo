@@ -117,6 +117,9 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 			EnemyTurn.pick_initial_intent(combatant, data)
 			enemy_names.append(data.enemy_name)
 		_combatants[enemy] = combatant
+	# A pack met with one member left (the rest killed in an earlier fight
+	# it was escaped from) opens without its pack move.
+	_mark_lone_pack_members()
 
 	RunLogger.log_battle_start(enemy_names)
 
@@ -613,7 +616,35 @@ func _drop_enemy(enemy: FieldEnemy) -> void:
 	_enemy_rects.erase(enemy)
 	if _hovered_enemy == enemy:
 		_clear_hover()
+	_mark_lone_pack_members()
 	enemy_defeated.emit(enemy)
+
+# Every living enemy with no living packmate left in the fight (none
+# sharing its FieldEnemy.group - an ungrouped enemy has none) stops using
+# its pack move (EnemyTurn.leave_pack()): the island's last dragonfly
+# bites instead of Swarming alone. A queued Swarm that gives way is shown
+# at once. Living by HP, not by the list - a card that kills several
+# drops them one at a time, and the ones still to go are already dead.
+func _mark_lone_pack_members() -> void:
+	for enemy in enemies:
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant == null or combatant.hp <= 0 or combatant.pack_alone or enemy.enemy_data == null:
+			continue
+		if _has_living_packmate(enemy):
+			continue
+		if EnemyTurn.leave_pack(combatant, enemy.enemy_data):
+			enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
+
+func _has_living_packmate(enemy: FieldEnemy) -> bool:
+	if enemy.group == &"":
+		return false
+	for other in enemies:
+		if other == enemy or other.group != enemy.group:
+			continue
+		var combatant: Combatant = _combatants.get(other)
+		if combatant != null and combatant.hp > 0:
+			return true
+	return false
 
 func _field_enemy_for(combatant: Combatant) -> FieldEnemy:
 	for enemy in _combatants:

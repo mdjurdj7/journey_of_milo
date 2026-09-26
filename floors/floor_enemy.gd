@@ -30,3 +30,9 @@ class_name FloorEnemy
 # are the zone, so keep members within 2 x that of a neighbour or the
 # zone has a hole. Empty (the default) = fights alone.
 @export var group: StringName = &""
+# The member a cluster's line is built from, whichever way it is
+# approached: the Wanderer steps up to it, it keeps its spot and the rest
+# line up beyond it (RegionField._battle_members_for()). Without one the
+# member nearest the Wanderer at contact anchors. Floor 2's crab anchors
+# its dragonfly, so the stance never lands up the shelf's rise behind it.
+@export var anchor: bool = false

@@ -6,6 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://don06thfbbany" path="res://assets/field/masks/Map3_mask_x1.25_alcove.png" id="4_map3"]
 [ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="5_sputter"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/dragonfly.tres" id="11_dragonfly"]
+[ext_resource type="Resource" path="res://battle/rules/enemies/dragonfly_lone.tres" id="18_dragonfly_lone"]
 [ext_resource type="Script" path="res://floors/floor_patrol.gd" id="12_floor_patrol"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
 [ext_resource type="Texture2D" uid="uid://i82lal47k3wr" path="res://assets/field/masks/Map3_elev_x1.25_dune.png" id="8_map3_elev"]
@@ -20,6 +21,15 @@
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("5_sputter")
 position = Vector2(1.5, -21.25)
+group = &"crab"
+anchor = true
+
+[sub_resource type="Resource" id="FloorEnemy_crab_dragonfly"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("18_dragonfly_lone")
+position = Vector2(0, -22.25)
+yaw_degrees = -167.0
+group = &"crab"
 
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly1"]
 script = ExtResource("2_floor_enemy")
@@ -84,7 +94,7 @@ relief_amplitude = 0.18
 caustic_strength = 0.12
 relief_extent = Vector2(125, 88)
 relief_subdivisions = Vector2i(356, 251)
-enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3"), SubResource("FloorEnemy_siltjaw")])
+enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_crab_dragonfly"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3"), SubResource("FloorEnemy_siltjaw")])
 props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_bundle"), SubResource("FloorProp_alcove_cache")])
 patrols = Array[ExtResource("12_floor_patrol")]([SubResource("FloorPatrol_island")])
 ledges = Array[PackedVector2Array]([PackedVector2Array(-5.538, -25.350, -5.664, -25.000, -5.679, -24.650, -5.620, -24.300, -5.547, -23.950, -5.400, -23.631, -5.100, -23.359, -4.904, -23.050, -4.806, -22.700, -4.781, -22.350, -4.754, -22.000, -4.565, -21.650, -4.322, -21.350, -4.000, -21.182, -3.650, -21.281, -3.359, -21.500, -3.058, -21.750, -2.800, -22.039, -2.737, -22.400, -2.741, -22.750, -2.737, -22.850)])

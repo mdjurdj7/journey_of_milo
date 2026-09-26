@@ -6,19 +6,26 @@ extends SceneTree
 # doesn't move a body through the physics server, so the Area never
 # fires headless), and kills the members the way _resolve_play() does -
 # _report_damage() inside the resolution, _check_battle_end() after -
-# in five orders:
+# in seven orders:
 #
-#   one_at_a_time  - one kill per turn, three turns
-#   carve_two      - two in one card, then the last alone
-#   carve_three    - all three in one card
-#   last_normal    - two in one card, the last by a single attack
-#   floor1_crab    - the one required crab on floor 1
+#   one_at_a_time      - one kill per turn, three turns; the last is
+#                        queued on its Swarm as its last packmate dies,
+#                        and must be queued on something else after
+#   carve_two          - two in one card, then the last alone
+#   carve_three        - all three in one card
+#   last_normal        - two in one card, the last by a single attack
+#   pair_anchor_first  - floor 2's required crab and its dragonfly, the
+#                        crab first
+#   pair_other_first   - the same pair, the dragonfly first
+#   floor1_crab        - the one required crab on floor 1
 #
 # and asserts, after the win and the reward beat: no member of the pack
 # left on the field, an EnemyStatus left under the HUD for each enemy
-# outside the fight and none more (floor 2's crab and Siltjaw; none on
-# floor 1), floor_cleared emitted on floor 1 and NOT by the optional pack
-# on floor 2, no fight left open.
+# outside the fight and none more (the rest of floor 2; none on floor 1),
+# floor_cleared emitted by floor 1's crab and floor 2's pair and NOT by
+# the optional island pack, no fight left open. The pair is contacted at
+# its dragonfly from the west - the dragonfly nearest the Wanderer - and
+# the crab (FloorEnemy.anchor) must still head the line.
 #
 # Run it before committing anything that touches region_field.gd,
 # field_enemy.gd or battle_controller.gd, and say in the commit that it
@@ -57,6 +64,9 @@ func _initialize() -> void:
 	for order in ["one_at_a_time", "carve_two", "carve_three", "last_normal"]:
 		run_state.set("current_floor_index", 1)
 		await _run_case(order, &"island", false)
+	for order in ["pair_anchor_first", "pair_other_first"]:
+		run_state.set("current_floor_index", 1)
+		await _run_case(order, &"crab", true)
 	run_state.set("current_floor_index", 0)
 	await _run_case("floor1_crab", &"", true)
 
@@ -85,13 +95,17 @@ func _run_case(order: String, group: StringName, expect_cleared: bool) -> void:
 		return
 
 	# The Wanderer stands just east of the easternmost member - the
-	# island's approach - and that member is the contact.
+	# island's approach - and that member is the contact. The crab's pair
+	# the other way round: west of its westernmost, the dragonfly, so the
+	# member he touches is not the one that anchors.
+	var west: bool = group == &"crab"
+	var side: float = -1.0 if west else 1.0
 	var anchor: Node3D = pack[0]
 	for member in pack:
-		if member.global_position.x > anchor.global_position.x:
+		if member.global_position.x * side > anchor.global_position.x * side:
 			anchor = member
 	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
-	wanderer.global_position = anchor.global_position + Vector3(1.5, 0.0, 0.0)
+	wanderer.global_position = anchor.global_position + Vector3(1.5 * side, 0.0, 0.0)
 	await physics_frame
 	# Deferred: RegionField's own handler runs from an Area signal, i.e.
 	# never inside a physics callback, and disabling collision objects
@@ -110,10 +124,31 @@ func _run_case(order: String, group: StringName, expect_cleared: bool) -> void:
 	var members: Array = (controller.get("enemies") as Array).duplicate()
 	var combatants: Dictionary = controller.get("_combatants")
 	print("fight members: ", members.size())
+	if west:
+		_check(order, members.size() == 2, "%d member(s) in the pair's fight, expected 2" % members.size())
+		_check(order, members[0].get("anchor") == true, "'%s' heads the line, not the anchor" % members[0].name)
+
 
 	match order:
-		"one_at_a_time", "floor1_crab":
+		"one_at_a_time":
+			var last: Node = members.back()
 			for member in members:
+				if member == members[members.size() - 2]:
+					_check(order, _queue_simultaneous(combatants, last), "no simultaneous intent to queue on '%s'" % last.name)
+				elif member == last:
+					_check(order, not _queued_simultaneous(combatants, last), "the last of the pack is still queued on its Swarm")
+				_kill(controller, combatants, member)
+				controller.call("_check_battle_end")
+				await create_timer(0.6).timeout
+		"floor1_crab", "pair_anchor_first":
+			for member in members:
+				_kill(controller, combatants, member)
+				controller.call("_check_battle_end")
+				await create_timer(0.6).timeout
+		"pair_other_first":
+			var reversed: Array = members.duplicate()
+			reversed.reverse()
+			for member in reversed:
 				_kill(controller, combatants, member)
 				controller.call("_check_battle_end")
 				await create_timer(0.6).timeout
@@ -164,6 +199,21 @@ func _kill(controller: Node, combatants: Dictionary, member: Node) -> void:
 		return
 	combatant.set("hp", 0)
 	controller.call("_report_damage", "player", combatant, 14, "card")
+
+# Queues `member` on the first simultaneous intent (the Swarm) in its
+# loop; false when it has none.
+func _queue_simultaneous(combatants: Dictionary, member: Node) -> bool:
+	var intents: Array = member.get("enemy_data").get("intents")
+	for index in intents.size():
+		if intents[index].get("simultaneous"):
+			combatants.get(member).set("current_intent_index", index)
+			return true
+	return false
+
+func _queued_simultaneous(combatants: Dictionary, member: Node) -> bool:
+	var intents: Array = member.get("enemy_data").get("intents")
+	var index: int = combatants.get(member).get("current_intent_index")
+	return intents[index].get("simultaneous")
 
 # EnemyStatus controls still alive under the field HUD.
 func _status_count() -> int:

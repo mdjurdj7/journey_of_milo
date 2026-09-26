@@ -45,6 +45,8 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 # FloorEnemy.group, mirrored the same way - RegionField reads it off the
 # "enemies" group to find this enemy's cluster on contact.
 @export var group: StringName = &""
+# FloorEnemy.anchor, mirrored the same way - read at contact.
+@export var anchor: bool = false
 @export var region_field_path: NodePath = ^".."
 @export var ground_path: NodePath = ^"../Ground"
 # The hover highlight and the hit flash both BRIGHTEN: albedo times this,
