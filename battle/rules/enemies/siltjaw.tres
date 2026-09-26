@@ -17,7 +17,7 @@ rear_while_queued = true
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Siltjaw"
-max_hp = 34
+max_hp = 53
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_charge")])
 model_scene_path = "res://assets/models/enemies/Siltjaw/Siltjaw.glb"
 model_scale = 1.3356
