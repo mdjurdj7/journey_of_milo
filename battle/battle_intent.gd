@@ -16,9 +16,12 @@ class_name BattleIntent
 # thick - the one emphasis, nothing else.
 #
 # An interruptible attack (EnemyIntent.interrupt_threshold, the Siltjaw's
-# charge) carries a second pair on the same line: a crack glyph and the
-# damage still to deal this turn, counting down as cards land. Met, it
-# reads 0 and the attack pair dims to interrupted_alpha - it won't land.
+# charge) adds a second row under the hairline: the damage still to deal
+# this turn, counting down as cards land, inside a thin ink ring with a
+# gap in it - a break waiting to be made, not a second number coming at
+# you. Met, it reads 0, the ring closes (or fills, closed_ring_filled)
+# and the attack pair dims to hairline ink - it won't land. The whole
+# stack still ends at the anchor, so the attack line sits a ring higher.
 # A BURROW (buried - it does nothing this turn) is its glyph alone: there
 # is no number coming.
 #
@@ -59,16 +62,45 @@ class_name BattleIntent
 @export var hairline_drop_px: float = 4.0
 # The lethal emphasis: the hairline becomes a full-ink rule this thick.
 @export var lethal_rule_px: float = 2.0
-# Between the attack pair and the threshold pair.
-@export var threshold_pair_gap_px: float = 14.0:
+
+# The threshold ring, under the hairline (see the header). Its numeral is
+# never smaller than the HP readout's (EnemyStatus.battle_numeral_size_px,
+# 22) - it has to read at the battle frame's scale.
+@export_group("Threshold Ring")
+@export var threshold_numeral_size_px: int = 22:
 	set(value):
-		threshold_pair_gap_px = value
+		threshold_numeral_size_px = value
 		_apply_layout()
-# The attack pair's ink once its threshold is met.
-@export_range(0.0, 1.0) var interrupted_alpha: float = 0.35:
+@export var ring_diameter_px: float = 40.0:
 	set(value):
-		interrupted_alpha = value
+		ring_diameter_px = value
 		_apply_layout()
+@export var ring_stroke_px: float = 2.0:
+	set(value):
+		ring_stroke_px = value
+		queue_redraw()
+# The break in the ring, degrees of arc, and where its middle faces
+# (degrees, screen space: 0 = right, -90 = up).
+@export_range(0.0, 180.0) var ring_gap_degrees: float = 50.0:
+	set(value):
+		ring_gap_degrees = value
+		queue_redraw()
+@export var ring_gap_facing_degrees: float = -60.0:
+	set(value):
+		ring_gap_facing_degrees = value
+		queue_redraw()
+# Between the hairline's underside and the ring's top.
+@export var ring_top_gap_px: float = 5.0:
+	set(value):
+		ring_top_gap_px = value
+		_apply_layout()
+# Met: the ring closes as a line (false) or fills solid ink with the 0 in
+# bone (true).
+@export var closed_ring_filled: bool = false:
+	set(value):
+		closed_ring_filled = value
+		refresh_style()
+@export_group("")
 
 var target: FieldEnemy = null
 var _label: Label = null
@@ -79,11 +111,13 @@ var _text_rect: Rect2 = Rect2()
 var _type: int = EnemyIntent.IntentType.ATTACK
 var _has_intent: bool = false
 var _lethal: bool = false
-# The threshold pair (see the header): shown, met, and where it sits.
+# The threshold ring (see the header): shown, met, where it sits, and
+# the hairline's top now that it no longer ends the control.
 var _threshold_label: Label = null
 var _has_threshold: bool = false
 var _interrupted: bool = false
-var _threshold_glyph_centre: Vector2 = Vector2.ZERO
+var _ring_centre: Vector2 = Vector2.ZERO
+var _rule_top: float = 0.0
 # "Revealed" is the overlay's say (frame settled, not acting); the display
 # is only visible when revealed AND it has something to show.
 var _revealed: bool = false
@@ -124,10 +158,16 @@ func set_target(enemy: FieldEnemy) -> void:
 func refresh_style() -> void:
 	if _label == null:
 		return
+	var ink: Color = get_theme_color("ink", "Battle")
+	var bone: Color = get_theme_color("bone", "Battle")
 	for label: Label in [_label, _threshold_label]:
-		label.add_theme_color_override("font_color", get_theme_color("ink", "Battle"))
-		label.add_theme_color_override("font_outline_color", get_theme_color("bone", "Battle"))
+		label.add_theme_color_override("font_color", ink)
+		label.add_theme_color_override("font_outline_color", bone)
 		label.add_theme_constant_override("outline_size", outline_size_px)
+	# A filled, closed ring is ink: its 0 turns bone to read on it.
+	if closed_ring_filled and _interrupted:
+		_threshold_label.add_theme_color_override("font_color", bone)
+		_threshold_label.add_theme_color_override("font_outline_color", ink)
 	queue_redraw()
 
 # preview is EnemyTurn.preview_intent()'s dictionary (empty = nothing).
@@ -144,6 +184,7 @@ func show_intent(preview: Dictionary) -> void:
 		_has_threshold = preview.has("threshold")
 		_interrupted = bool(preview.get("interrupted", false))
 		_threshold_label.text = str(int(preview.get("threshold_left", 0))) if _has_threshold else ""
+	refresh_style()
 	_apply_layout()
 	_update_visibility()
 
@@ -158,7 +199,8 @@ func _update_visibility() -> void:
 # centred beneath. This control's width is the wider of the pair and the
 # hairline, measured from the rendered text width (EnemyStatus's own
 # approach, not the label's lazily-updated minimum size) so the unproject
-# can centre it exactly; its bottom edge is the rule's underside.
+# can centre it exactly; its bottom edge is the rule's underside - or,
+# with a threshold, the ring's, which hangs centred under the rule.
 func _apply_layout() -> void:
 	if not _ready_done:
 		return
@@ -166,36 +208,37 @@ func _apply_layout() -> void:
 	var font: Font = _label.get_theme_font("font")
 	var line_height: float = font.get_height(numeral_size_px) if font != null else float(numeral_size_px)
 	_glyph_size = minf(float(numeral_size_px) * glyph_cap_scale, float(numeral_size_px))
-	_threshold_label.add_theme_font_size_override("font_size", numeral_size_px)
+	_threshold_label.add_theme_font_size_override("font_size", threshold_numeral_size_px)
 	var text_width: float = _text_width(_label, numeral_size_px)
 	# A glyph with no numeral (BURROW) is the glyph alone, no gap.
 	var pair_width: float = _glyph_size
 	if text_width > 0.0:
 		pair_width += glyph_numeral_gap_px + text_width
-	# The threshold pair, when there is one, after threshold_pair_gap_px.
-	var threshold_text_width: float = _text_width(_threshold_label, numeral_size_px) if _has_threshold else 0.0
-	var line_width: float = pair_width
-	if _has_threshold:
-		line_width += threshold_pair_gap_px + _glyph_size + glyph_numeral_gap_px + threshold_text_width
-	var content_width: float = maxf(line_width, hairline_width_px)
 	var rule_thickness: float = lethal_rule_px if _lethal else hairline_thickness_px
+	var ring_box: float = ring_diameter_px + ring_stroke_px + float(outline_size_px) * 2.0
+	var content_width: float = maxf(pair_width, hairline_width_px)
 	var content_height: float = line_height + hairline_drop_px + rule_thickness
+	if _has_threshold:
+		content_width = maxf(content_width, ring_box)
+		content_height += ring_top_gap_px + ring_box
 
 	size = Vector2(content_width, content_height)
 	pivot_offset = size / 2.0
 
-	var pair_left: float = (content_width - line_width) * 0.5
+	var pair_left: float = (content_width - pair_width) * 0.5
 	_glyph_centre = Vector2(pair_left + _glyph_size * 0.5, line_height * 0.5)
 	_text_rect = Rect2(pair_left + _glyph_size + glyph_numeral_gap_px, 0.0, text_width, line_height)
 	_label.position = _text_rect.position
 	_label.size = _text_rect.size
 	_label.visible = text_width > 0.0
-	_label.modulate.a = interrupted_alpha if _interrupted else 1.0
+	_label.modulate.a = hairline_alpha if _interrupted else 1.0
+	_rule_top = line_height + hairline_drop_px
 
-	var threshold_left: float = pair_left + pair_width + threshold_pair_gap_px
-	_threshold_glyph_centre = Vector2(threshold_left + _glyph_size * 0.5, line_height * 0.5)
-	_threshold_label.position = Vector2(threshold_left + _glyph_size + glyph_numeral_gap_px, 0.0)
-	_threshold_label.size = Vector2(threshold_text_width, line_height)
+	# The ring's numeral fills the ring's box, centred both ways.
+	var ring_top: float = _rule_top + rule_thickness + ring_top_gap_px
+	_ring_centre = Vector2(content_width * 0.5, ring_top + ring_box * 0.5)
+	_threshold_label.position = _ring_centre - Vector2(ring_box, ring_box) * 0.5
+	_threshold_label.size = Vector2(ring_box, ring_box)
 	_threshold_label.visible = _has_threshold
 	queue_redraw()
 
@@ -221,17 +264,36 @@ func _draw() -> void:
 	if _type == EnemyIntent.IntentType.ATTACK and _points_left():
 		for i in points.size():
 			points[i] = Vector2(2.0 * glyph_centre.x - points[i].x, points[i].y)
-	_stroke(points, interrupted_alpha if _interrupted else 1.0)
+	_stroke(points, hairline_alpha if _interrupted else 1.0)
 	if _has_threshold:
-		_stroke(_crack_points(_threshold_glyph_centre, _glyph_size * 0.5), 1.0)
+		_draw_ring()
 
 	var rule_thickness: float = lethal_rule_px if _lethal else hairline_thickness_px
 	var rule_color: Color = ink
 	if not _lethal:
 		rule_color.a = hairline_alpha
 	var rule_left: float = (size.x - hairline_width_px) * 0.5
-	var rule_top: float = size.y - rule_thickness
-	draw_rect(Rect2(rule_left, rule_top, hairline_width_px, rule_thickness), rule_color)
+	draw_rect(Rect2(rule_left, _rule_top, hairline_width_px, rule_thickness), rule_color)
+
+# The threshold ring: bone under ink, like every stroke here, broken by
+# ring_gap_degrees around ring_gap_facing_degrees - sealed once met, or
+# filled solid (closed_ring_filled), the 0 then drawn in bone by
+# refresh_style().
+func _draw_ring() -> void:
+	var ink: Color = get_theme_color("ink", "Battle")
+	var outline: Color = get_theme_color("bone", "Battle")
+	var radius: float = ring_diameter_px * 0.5
+	if _interrupted and closed_ring_filled:
+		draw_circle(_ring_centre, radius + ring_stroke_px * 0.5 + float(outline_size_px), outline, true, -1.0, true)
+		draw_circle(_ring_centre, radius + ring_stroke_px * 0.5, ink, true, -1.0, true)
+		return
+	var gap: float = 0.0 if _interrupted else deg_to_rad(clampf(ring_gap_degrees, 0.0, 180.0))
+	var facing: float = deg_to_rad(ring_gap_facing_degrees)
+	var start: float = facing + gap * 0.5
+	var end: float = facing + TAU - gap * 0.5
+	var segments: int = 64
+	draw_arc(_ring_centre, radius, start, end, segments, outline, ring_stroke_px + float(outline_size_px) * 2.0, true)
+	draw_arc(_ring_centre, radius, start, end, segments, ink, ring_stroke_px, true)
 
 # One glyph stroke in the numeral's ink over its bone outline, at alpha.
 func _stroke(points: PackedVector2Array, alpha: float) -> void:
@@ -243,16 +305,6 @@ func _stroke(points: PackedVector2Array, alpha: float) -> void:
 	outline.a *= alpha
 	draw_polyline(points, outline, glyph_line_width_px + float(outline_size_px) * 2.0, true)
 	draw_polyline(points, ink, glyph_line_width_px, true)
-
-# The threshold's glyph: a crack, a zigzag run top to bottom - what the
-# number beside it breaks. Same square as _glyph_points().
-func _crack_points(centre: Vector2, r: float) -> PackedVector2Array:
-	var points := PackedVector2Array()
-	points.append(centre + Vector2(-r * 0.15, -r))
-	points.append(centre + Vector2(r * 0.3, -r * 0.3))
-	points.append(centre + Vector2(-r * 0.3, r * 0.25))
-	points.append(centre + Vector2(r * 0.15, r))
-	return points
 
 # ATTACK: a chevron pointing right with a short shaft - an arrow, the
 # action coming at you. DEFEND: an open shield - flat top, sides, a point
