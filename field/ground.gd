@@ -2388,6 +2388,14 @@ func _build_ns_dressing_mesh(depth: float) -> ArrayMesh:
 	surface_tool.set_material(_current_ground_material())
 	return surface_tool.commit()
 
+# The sand's own ShaderMaterial - the one instance every uniform above is
+# pushed to - for a mesh that has to read as this ground (SandMound). It
+# is world-space throughout (v_world_xz, v_world_height, view distance),
+# so a separate mesh drawn with it takes the same tint, grain, wetness
+# and wear as the sand under it, live. Null before _ready().
+func get_sand_material() -> ShaderMaterial:
+	return _material
+
 # use_plain_ground_material's bisect: a loud, obviously-not-the-shader
 # StandardMaterial3D in place of ground.gdshader's ShaderMaterial, applied
 # to every ground surface (relief mesh + all four dressing strips) so the

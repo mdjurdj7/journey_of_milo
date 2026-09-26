@@ -820,7 +820,11 @@ void fragment() {
 	// wet sand rather than a strip of standing pool.
 	float pool_factor = smoothstep(pool_threshold - pool_edge_width * 0.5, pool_threshold + pool_edge_width * 0.5, base_wetness);
 
-	ALBEDO = mix(sand_albedo, pool_color.rgb, pool_factor);
+	// Vertex colour, multiplied in last: white (the default for a mesh with
+	// no colour array - the relief mesh and the dressing strips) changes
+	// nothing; a mesh drawn with this material to read as the sand
+	// (SandMound) darkens itself with it, over whatever the sand is there.
+	ALBEDO = mix(sand_albedo, pool_color.rgb, pool_factor) * COLOR.rgb;
 	// Diffuse only, everywhere - see render_mode's own doc.
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;

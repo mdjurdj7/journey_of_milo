@@ -19,13 +19,20 @@ class_name SandMound
 # (Ground.get_visible_height_at() - the relief mesh's own triangles; the
 # analytic get_height_at() stands up to a few centimetres off them on
 # the hill's lifted face, which floated the rim there) plus the bell, so
-# the mound lies on whatever the sand does under it. Only the last
-# rim_band of the way out does it dip, to rim_sink_m under the sand at
-# the rim: a rim at exactly the ground's height would fight it for the
-# pixel, but sinking the whole bell by that much buried its outer fifth
-# (the raised cosine barely leaves the sand there) and the mound showed
-# ~0.94 x 1.98 m of its 1.2 x 2.5. This way it meets the sand near the
-# footprint it is given. The sand is sampled once, when
+# the mound lies on whatever the sand does under it, and its rim is the
+# sand: the raised cosine is tangent to it there, so the two meet with
+# no step in slope. That tangency is what hides the edge. Drawn through
+# the ground's own shader, the mound has no colour of its own and only
+# its slope can outline it. Wherever it crosses UNDER the sand instead,
+# even 1 cm down, the crossing sits where the bell is still ~9 degrees
+# steep, and that edge catches the light on one side and falls into
+# shade on the other. Sinking the whole bell 3 cm, as it first did, also
+# buried its outer fifth (it showed ~0.94 x 1.98 m of 1.2 x 2.5). A rim
+# at the ground's height fights it for the pixel, but both are drawn by
+# the same shader from the same XZ, so the fight is between two
+# identical colours. rim_sink_m (0) and rim_band are kept for a floor
+# where that fight shows: a sink dips the rim under over rim_band's
+# outer fraction. The sand is sampled once, when
 # FieldEnemy first grounds the body where it was placed (resample()), and
 # again only if the relief itself is rebuilt (a live terrain edit) or a
 # shape export changes - the body never moves in the field, and a
@@ -37,11 +44,14 @@ class_name SandMound
 # model rises on (_apply_model_lift()), so the sand falls away exactly as
 # the body comes up through it, and swells back as it goes under.
 #
-# Colour: the ground's own sand (Ground.ground_color, read on every
-# build), on the flat matte material the hulls use, with a darker ridge
-# down the spine through vertex colour - pale sand with one dark line,
-# seen from above. The ridge narrows with the footprint to a point at
-# each end, and fades into the sand over ridge_soft_m either side -
+# Colour: drawn with the ground's own material (Ground.get_sand_material(),
+# the one instance its uniforms go to), so every vertex takes the tint,
+# grain, speckle, wetness and wear of the sand at its XZ and height, live
+# - no colour edge where it meets the ground, only its shading. The spine
+# darkens on top of that through vertex colour, which ground.gdshader
+# multiplies into its final albedo (white on the ground itself, which has
+# none) - pale sand with one dark line, seen from above. The ridge
+# narrows with the footprint to a point at each end, and fades into the sand over ridge_soft_m either side -
 # across evenly spaced columns, so the vertex colour has room to blend.
 
 @export_group("Shape")
@@ -68,14 +78,15 @@ class_name SandMound
 	set(value):
 		forward_offset_m = value
 		_rebuild_grid()
-# How far under the sand the rim sits.
-@export var rim_sink_m: float = 0.03:
+# How far under the sand the rim sits. 0 = on it, tangent (see the
+# header for why that is the default).
+@export var rim_sink_m: float = 0.0:
 	set(value):
 		rim_sink_m = value
 		_write_mesh()
 # The outer fraction of the way from crest to rim over which it dips to
 # rim_sink_m - inside that it stands on the sand, the bell alone.
-@export_range(0.01, 0.5, 0.01) var rim_band: float = 0.08:
+@export_range(0.01, 0.5, 0.01) var rim_band: float = 0.3:
 	set(value):
 		rim_band = value
 		_rebuild_grid()
@@ -91,7 +102,8 @@ class_name SandMound
 	set(value):
 		ridge_soft_m = value
 		_rebuild_grid()
-# The ridge's colour as a multiplier on the sand.
+# The ridge's colour as a multiplier on the sand, in display (sRGB)
+# terms - 0.6 is the sand at 60% of its shown value.
 @export_range(0.0, 1.0, 0.01) var ridge_shade: float = 0.6:
 	set(value):
 		ridge_shade = value
@@ -110,7 +122,6 @@ class_name SandMound
 		_rebuild_grid()
 var _ground: Ground = null
 var _rise: float = 1.0
-var _material: StandardMaterial3D = null
 var _ready_done: bool = false
 # The grid in the body's frame, row by row from the front: each vertex's
 # local XZ, its bell (0..1), how far into the rim's dip it is (0..1) and
@@ -132,19 +143,15 @@ func _ready() -> void:
 	global_transform = Transform3D.IDENTITY
 	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	mesh = ArrayMesh.new()
-	_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
-	_material.vertex_color_use_as_albedo = true
-	# The sand and the ridge are authored in sRGB, like the ground's own.
-	_material.vertex_color_is_srgb = true
-	_material.albedo_color = Color.WHITE
-	material_override = _material
 	_ready_done = true
 	_rebuild_grid()
 
-# The sand it lies on - FieldEnemy hands over its own Ground. Nothing is
+# The sand it lies on - FieldEnemy hands over its own Ground, and the
+# mound is drawn with that ground's material from here on. Nothing is
 # sampled until resample().
 func set_ground(ground: Ground) -> void:
 	_ground = ground
+	material_override = ground.get_sand_material() if ground != null else null
 
 # 1 = full height, 0 = flat and hidden. Rescales the cached sample only.
 func set_rise(rise: float) -> void:
@@ -292,12 +299,14 @@ func _write_mesh() -> void:
 	for i in count:
 		normals[i] = normals[i].normalized() if normals[i].length() > 0.000001 else Vector3.UP
 
-	var sand: Color = _ground.ground_color
-	var ridge := Color(sand.r * ridge_shade, sand.g * ridge_shade, sand.b * ridge_shade, 1.0)
+	# Multipliers on the shader's own albedo, which is linear: ridge_shade
+	# is a display-value fraction, so it goes through the sRGB curve first.
+	var shade: float = Color(ridge_shade, ridge_shade, ridge_shade).srgb_to_linear().r
 	var colours := PackedColorArray()
 	colours.resize(count)
 	for i in count:
-		colours[i] = sand.lerp(ridge, _ridge[i])
+		var multiplier: float = lerpf(1.0, shade, _ridge[i])
+		colours[i] = Color(multiplier, multiplier, multiplier, 1.0)
 
 	var arrays: Array = []
 	arrays.resize(Mesh.ARRAY_MAX)
