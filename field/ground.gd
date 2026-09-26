@@ -600,7 +600,38 @@ signal relief_rebuilt
 @export var wear_mask: Texture2D = null:
 	set(value):
 		wear_mask = value
-		_push_wear_mask()
+		_push_canvas_paintings()
+@export_group("")
+
+# Exposed rock: steep ground turns to stone where rock_mask allows it -
+# see ground.gdshader's own rock block for the rule. No mask, no rock:
+# steep sand stays sand everywhere else.
+@export_group("Rock")
+# Cool, muted, a step darker than the sand - exposed stone is the one
+# ground surface in Region 1 without the sand's warm bias.
+@export var rock_color: Color = Color(0.56, 0.58, 0.55):
+	set(value):
+		rock_color = value
+		_apply_uniform("rock_color", value)
+# Degrees. Stone starts showing past rock_slope_min and is full stone
+# rock_slope_blend further on. The slope is the shading normal's, which
+# the relief's central differences round off: a 0.9 m one-cell drop
+# (~70 degrees of triangle) shades at ~50-60.
+@export var rock_slope_min: float = 35.0:
+	set(value):
+		rock_slope_min = value
+		_apply_uniform("rock_slope_min", value)
+@export var rock_slope_blend: float = 15.0:
+	set(value):
+		rock_slope_blend = value
+		_apply_uniform("rock_slope_blend", value)
+# On the same canvas as landmass_mask, like wear_mask: white = stone may
+# show here, if the ground is steep enough. Rough is fine - the slope
+# finds the edge.
+@export var rock_mask: Texture2D = null:
+	set(value):
+		rock_mask = value
+		_push_canvas_paintings()
 @export_group("")
 @export var region_field_path: NodePath = ^".."
 @export var sea_path: NodePath = ^"../Sea"
@@ -710,10 +741,11 @@ func _ready() -> void:
 
 	_push_sea_level_uniform()
 	# Again, now that the rebuild above has resolved the landmass refs a
-	# wear mask's image->world mapping is derived from - the push inside
-	# _apply_all_uniforms() happens before RegionField/Sea are readable,
-	# so with a mask set it would otherwise keep spawn-at-origin defaults.
-	_push_wear_mask()
+	# canvas painting's image->world mapping is derived from - the push
+	# inside _apply_all_uniforms() happens before RegionField/Sea are
+	# readable, so with a mask set it would otherwise keep spawn-at-origin
+	# defaults.
+	_push_canvas_paintings()
 	_check_landmass_interior_height_clears_water()
 
 # sea_level drives both the shader's height-based wet band (shore_t()) and
@@ -777,7 +809,10 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("wear_shore_fade", wear_shore_fade)
 	_apply_uniform("wear_darken", wear_darken)
 	_apply_uniform("wear_flatten", wear_flatten)
-	_push_wear_mask()
+	_apply_uniform("rock_color", rock_color)
+	_apply_uniform("rock_slope_min", rock_slope_min)
+	_apply_uniform("rock_slope_blend", rock_slope_blend)
+	_push_canvas_paintings()
 	_apply_uniform("pool_threshold", pool_threshold)
 	_apply_uniform("pool_edge_width", pool_edge_width)
 	_apply_uniform("pool_color", pool_color)
@@ -843,26 +878,34 @@ func set_wear_path(start_point: Vector3, mid_point: Vector3, end_point: Vector3)
 	_apply_uniform("wear_mid", Vector2(mid_point.x, mid_point.z))
 	_apply_uniform("wear_end", Vector2(end_point.x, end_point.z))
 
-# The painted band's image->world mapping, matching _mask_world_to_pixel()
-# exactly so a wear mask lines up with a landmass mask painted on the same
-# canvas. Pushed as the spawn point plus the two image axes rather than a
-# matrix, so the shader can do the same dot products the CPU does.
-func _push_wear_mask() -> void:
-	if wear_mask == null:
-		_apply_uniform("wear_mask_ready", false)
+# The paintings the shader samples on the landmass canvas (wear_mask,
+# rock_mask) and the canvas's image->world mapping, matching
+# _mask_world_to_pixel() exactly so each lines up with a landmass mask
+# painted on the same canvas. The mapping is pushed as the spawn point
+# plus the two image axes rather than a matrix, so the shader can do the
+# same dot products the CPU does. Its size comes from whichever painting
+# is set - they share one canvas, so a mismatch is warned, not resolved.
+func _push_canvas_paintings() -> void:
+	_apply_uniform("wear_mask_ready", wear_mask != null)
+	_apply_uniform("rock_mask_ready", rock_mask != null)
+	if wear_mask != null:
+		_apply_uniform("wear_mask", wear_mask)
+	if rock_mask != null:
+		_apply_uniform("rock_mask", rock_mask)
+	var sized: Texture2D = wear_mask if wear_mask != null else rock_mask
+	if sized == null:
 		return
+	if wear_mask != null and rock_mask != null and wear_mask.get_size() != rock_mask.get_size():
+		push_warning("Ground: wear_mask is %s but rock_mask is %s - paintings must share the landmass canvas; rock is mapped by the wear mask's size." % [wear_mask.get_size(), rock_mask.get_size()])
 	_ensure_landmass_refs()
 	var forward: Vector2 = _landmass_forward_xz
 	var right: Vector2 = Vector2(-forward.y, forward.x)
 	var ppm: float = maxf(landmass_mask_pixels_per_metre, 0.001)
-	var size: Vector2 = wear_mask.get_size()
-	_apply_uniform("wear_mask", wear_mask)
-	_apply_uniform("wear_mask_spawn", _landmass_spawn_xz)
-	_apply_uniform("wear_mask_right", right)
-	_apply_uniform("wear_mask_forward", forward)
-	_apply_uniform("wear_mask_origin_uv", landmass_mask_origin)
-	_apply_uniform("wear_mask_metres", size / ppm)
-	_apply_uniform("wear_mask_ready", true)
+	_apply_uniform("canvas_spawn", _landmass_spawn_xz)
+	_apply_uniform("canvas_right", right)
+	_apply_uniform("canvas_forward", forward)
+	_apply_uniform("canvas_origin_uv", landmass_mask_origin)
+	_apply_uniform("canvas_metres", sized.get_size() / ppm)
 
 # Called by region_sky.gd so the standing-pool color always tracks the
 # sky's horizon color without manual duplication. pool_color's own

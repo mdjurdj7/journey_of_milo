@@ -24,6 +24,10 @@ class_name FloorData
 # which combines the two by max() and gates both at the waterline. Null
 # = only the derived band.
 @export var wear_mask: Texture2D = null
+# Optional exposed rock on the same canvas: white = the ground turns to
+# stone here where it is steep (Ground.rock_mask). Null = no rock on the
+# floor, however steep its sand.
+@export var rock_mask: Texture2D = null
 # Normalized image coords of the pixel that sits on `spawn`.
 @export var mask_origin: Vector2 = Vector2(0.5, 0.5)
 # The four Ground values that set how wet the floor reads, pushed onto

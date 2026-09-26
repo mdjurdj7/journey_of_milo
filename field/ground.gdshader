@@ -209,14 +209,38 @@ uniform float wear_darken : hint_range(0.0, 1.0) = 0.05;
 // How much of the ripple/grain/speckle detail the band flattens away.
 uniform float wear_flatten : hint_range(0.0, 1.0) = 0.6;
 // Optional painted band, same rect and orientation as landmass_mask (see
-// wear_mask_uv()). White is worn. Null by default.
+// canvas_uv()). White is worn. Null by default.
 uniform sampler2D wear_mask : filter_linear, repeat_disable;
 uniform bool wear_mask_ready = false;
-uniform vec2 wear_mask_spawn = vec2(0.0);
-uniform vec2 wear_mask_right = vec2(1.0, 0.0);
-uniform vec2 wear_mask_forward = vec2(0.0, -1.0);
-uniform vec2 wear_mask_origin_uv = vec2(0.5);
-uniform vec2 wear_mask_metres = vec2(1.0);
+
+// --- Exposed rock ---
+//
+// Steep ground reads as stone: past rock_slope_min degrees the sand's dry
+// colour blends toward rock_color over rock_slope_blend more, so a drop's
+// face turns to stone while its flat top and its foot stay sand, and the
+// sand thins across the lip as the slope comes on. The slope is the
+// interpolated vertex normal's, not the triangle's - the relief grid's
+// 0.35 m facets would staircase a wandering face's outline, where the
+// smoothed normal carries the tint ~0.35 m onto the lip and the foot.
+// Only where rock_mask allows it: a painting on the landmass canvas,
+// white = stone may show here. Without one there is no rock anywhere -
+// steep SAND (a dune's slip face, the hollow's wall) stays sand, and the
+// mask is what tells the two apart. The mask can be rough; the slope
+// finds the edge. Blended into the dry colour before the wet mix, so wet
+// rock darkens like wet sand and grain, wear and caustics ride on it.
+uniform vec4 rock_color : source_color = vec4(0.56, 0.58, 0.55, 1.0);
+uniform float rock_slope_min = 35.0;
+uniform float rock_slope_blend = 15.0;
+uniform sampler2D rock_mask : filter_linear, repeat_disable;
+uniform bool rock_mask_ready = false;
+
+// The landmass canvas's image->world mapping, shared by every painting on
+// it the shader samples (wear_mask, rock_mask) - see canvas_uv().
+uniform vec2 canvas_spawn = vec2(0.0);
+uniform vec2 canvas_right = vec2(1.0, 0.0);
+uniform vec2 canvas_forward = vec2(0.0, -1.0);
+uniform vec2 canvas_origin_uv = vec2(0.5);
+uniform vec2 canvas_metres = vec2(1.0);
 
 varying vec2 v_world_xz;
 varying float v_world_height;
@@ -667,14 +691,36 @@ float wear_distance(vec2 p) {
 
 // Same image->world mapping Ground._mask_world_to_pixel() uses on the
 // CPU, normalised to UV: image right is the field's forward turned a
-// quarter turn, image up is inland, and wear_mask_origin_uv sits on the
+// quarter turn, image up is inland, and canvas_origin_uv sits on the
 // spawn.
-vec2 wear_mask_uv(vec2 world_xz) {
-	vec2 rel = world_xz - wear_mask_spawn;
+vec2 canvas_uv(vec2 world_xz) {
+	vec2 rel = world_xz - canvas_spawn;
 	return vec2(
-		wear_mask_origin_uv.x + dot(rel, wear_mask_right) / max(wear_mask_metres.x, 0.001),
-		wear_mask_origin_uv.y - dot(rel, wear_mask_forward) / max(wear_mask_metres.y, 0.001)
+		canvas_origin_uv.x + dot(rel, canvas_right) / max(canvas_metres.x, 0.001),
+		canvas_origin_uv.y - dot(rel, canvas_forward) / max(canvas_metres.y, 0.001)
 	);
+}
+
+// A canvas painting's value at an XZ: 0 off the canvas rect (no clamp-
+// to-edge smear past the image).
+float canvas_sample(sampler2D painting, vec2 world_xz) {
+	vec2 uv = canvas_uv(world_xz);
+	float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
+	return texture(painting, clamp(uv, vec2(0.0), vec2(1.0))).r * inside;
+}
+
+// 0..1 of "this ground is stone": the slope ramp gated by rock_mask - see
+// rock_color's own doc. world_up is the surface normal's world Y.
+float rock_factor(vec2 world_xz, float world_up) {
+	if (!rock_mask_ready) {
+		return 0.0;
+	}
+	float slope = degrees(acos(clamp(world_up, -1.0, 1.0)));
+	float ramp = smoothstep(rock_slope_min, rock_slope_min + max(rock_slope_blend, 0.001), slope);
+	if (ramp <= 0.0) {
+		return 0.0;
+	}
+	return ramp * canvas_sample(rock_mask, world_xz);
 }
 
 // 0..1 of "this sand is walked". Procedural band and painted mask by
@@ -689,9 +735,7 @@ float wear_factor(vec2 world_xz, float shore_distance, float sand_wetness, float
 		wear = 1.0 - smoothstep(0.0, max(wear_half_width, 0.001), wear_distance(world_xz) + wobble);
 	}
 	if (wear_mask_ready) {
-		vec2 uv = wear_mask_uv(world_xz);
-		float inside = step(0.0, uv.x) * step(uv.x, 1.0) * step(0.0, uv.y) * step(uv.y, 1.0);
-		wear = max(wear, texture(wear_mask, clamp(uv, vec2(0.0), vec2(1.0))).r * inside);
+		wear = max(wear, canvas_sample(wear_mask, world_xz));
 	}
 	if (wear <= 0.0) {
 		return 0.0;
@@ -736,8 +780,13 @@ void fragment() {
 	float near_far_t = smoothstep(near_distance, far_distance, dist);
 	vec3 distance_tint = mix(near_color.rgb, far_color.rgb, near_far_t);
 
+	// Exposed rock replaces the dry colour where the ground is steep and
+	// the rock mask allows it (see rock_color's doc). NORMAL here is view
+	// space; the slope is against world up.
+	float rock = rock_factor(v_world_xz, normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz).y);
+
 	// Wet sand is dry sand darkened, hue preserved (see wet_darken's doc).
-	vec3 dry = dry_color.rgb * distance_tint;
+	vec3 dry = mix(dry_color.rgb, rock_color.rgb, rock) * distance_tint;
 	vec3 wet = dry * wet_darken;
 
 	vec3 sand_albedo = mix(dry, wet, sand_wetness);
@@ -765,7 +814,8 @@ void fragment() {
 	float grain = grain_value(v_world_xz) * grain_strength * grain_suppression;
 	sand_albedo *= 1.0 + grain;
 
-	float speckle = speckle_mask(v_world_xz) * speckle_darken * grain_suppression;
+	// The speckle is shell and dark grains in sand - not on stone.
+	float speckle = speckle_mask(v_world_xz) * speckle_darken * grain_suppression * (1.0 - rock);
 	sand_albedo *= 1.0 - speckle;
 
 	// Drift lines: nudge the sand toward a slightly darker, slightly
