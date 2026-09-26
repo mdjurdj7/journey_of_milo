@@ -53,6 +53,16 @@ class_name FloorData
 @export var underwater_falloff: float = 6.0
 @export var relief_amplitude: float = 0.15
 @export var caustic_strength: float = 0.15
+# Ground's Basin Tint, for this floor: low ground toward basin_color,
+# rising ground back to the dry sand, over basin_tint_heights (metres
+# above the floor's land level - full at x, gone by y). Strength 0 (the
+# default) is off.
+@export var basin_color: Color = Color(0.66, 0.63, 0.55)
+@export_range(0.0, 1.0) var basin_tint_strength: float = 0.0
+@export var basin_tint_heights: Vector2 = Vector2(0.0, 1.2)
+# Ground.wear_darken for this floor: how much darker the worn band is than
+# the ground under it. 0.24 is the region's own value.
+@export_range(0.0, 1.0) var wear_darken: float = 0.24
 # The relief mesh's own size and density, onto Ground's exports of the
 # same names - a floor whose painted land runs past the default extent
 # (Z -35..35 at 100 x 70, centred on spawn) needs its own, or the land

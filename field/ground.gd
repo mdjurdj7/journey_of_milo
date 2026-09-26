@@ -231,6 +231,7 @@ signal relief_rebuilt
 	set(value):
 		landmass_interior_height = value
 		_rebuild_ground_mesh_and_collision()
+		_push_basin_heights()
 @export var landmass_below_sea_depth: float = 1.6:
 	set(value):
 		landmass_below_sea_depth = value
@@ -615,6 +616,27 @@ signal relief_rebuilt
 		_push_canvas_paintings()
 @export_group("")
 
+# Height read as tone: the floor's low ground blends toward basin_color,
+# rising ground back to the dry sand - see ground.gdshader's own basin
+# block. basin_tint_heights is in metres ABOVE the floor's own land level
+# (the Sea's sea_level + landmass_interior_height): x is where the tint is
+# full, y where it has gone. Strength 0 (the default) is off. Per floor,
+# from FloorData.
+@export_group("Basin Tint")
+@export var basin_color: Color = Color(0.66, 0.63, 0.55):
+	set(value):
+		basin_color = value
+		_apply_uniform("basin_color", value)
+@export_range(0.0, 1.0) var basin_tint_strength: float = 0.0:
+	set(value):
+		basin_tint_strength = value
+		_apply_uniform("basin_tint_strength", value)
+@export var basin_tint_heights: Vector2 = Vector2(0.0, 1.2):
+	set(value):
+		basin_tint_heights = value
+		_push_basin_heights()
+@export_group("")
+
 # Exposed rock: steep ground turns to stone where rock_mask allows it -
 # see ground.gdshader's own rock block for the rule. No mask, no rock:
 # steep sand stays sand everywhere else.
@@ -773,6 +795,17 @@ func _ready() -> void:
 func _push_sea_level_uniform() -> void:
 	var sea := get_node_or_null(sea_path) as Sea
 	_apply_uniform("sea_level", sea.sea_level if sea else 0.0)
+	_push_basin_heights()
+
+# basin_tint_heights onto the shader as world heights: over the floor's
+# own land level, which needs the Sea's sea_level (0 without a Sea).
+func _push_basin_heights() -> void:
+	var sea: Sea = null
+	if is_inside_tree():
+		sea = get_node_or_null(sea_path) as Sea
+	var land_level: float = (sea.sea_level if sea else 0.0) + landmass_interior_height
+	_apply_uniform("basin_height_low", land_level + basin_tint_heights.x)
+	_apply_uniform("basin_height_high", land_level + basin_tint_heights.y)
 
 # Boot-time sanity check: if the dry interior's own height doesn't clear
 # sea_level by more than relief's own fine-detail noise plus the sea's
@@ -828,6 +861,9 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("rock_color", rock_color)
 	_apply_uniform("rock_slope_min", rock_slope_min)
 	_apply_uniform("rock_slope_blend", rock_slope_blend)
+	_apply_uniform("basin_color", basin_color)
+	_apply_uniform("basin_tint_strength", basin_tint_strength)
+	_push_basin_heights()
 	_push_canvas_paintings()
 	_apply_uniform("pool_threshold", pool_threshold)
 	_apply_uniform("pool_edge_width", pool_edge_width)

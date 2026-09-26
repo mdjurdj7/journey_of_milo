@@ -230,6 +230,20 @@ uniform bool wear_mask_ready = false;
 // mask is what tells the two apart. The mask can be rough; the slope
 // finds the edge. Blended into the dry colour before the wet mix, so wet
 // rock darkens like wet sand and grain, wear and caustics ride on it.
+// --- Basin tint ---
+//
+// Height reads as tone: low ground blends toward basin_color, rising
+// ground back to dry_color, over basin_height_low..basin_height_high
+// (world metres - Ground converts its basin_tint_heights, which are
+// metres above the floor's own land level). basin_tint_strength scales it
+// and 0 is off, which is every floor that doesn't ask for it. Replaces
+// the dry colour before rock, wet, wear and caustics, so all of those
+// ride on it exactly as they do on plain sand.
+uniform vec4 basin_color : source_color = vec4(0.66, 0.63, 0.55, 1.0);
+uniform float basin_tint_strength = 0.0;
+uniform float basin_height_low = 0.0;
+uniform float basin_height_high = 1.0;
+
 uniform vec4 rock_color : source_color = vec4(0.56, 0.59, 0.50, 1.0);
 uniform float rock_slope_min = 22.0;
 uniform float rock_slope_blend = 12.0;
@@ -788,7 +802,12 @@ void fragment() {
 	float rock = rock_factor(v_world_xz, normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz).y);
 
 	// Wet sand is dry sand darkened, hue preserved (see wet_darken's doc).
-	vec3 dry = mix(dry_color.rgb, rock_color.rgb, rock) * distance_tint;
+	// The basin tint (see basin_color's doc): 1 at basin_height_low, 0 by
+	// basin_height_high, eased so the change sits on the slopes.
+	float basin_t = clamp((v_world_height - basin_height_low) / max(basin_height_high - basin_height_low, 0.001), 0.0, 1.0);
+	float basin = basin_tint_strength * (1.0 - smoothstep(0.0, 1.0, basin_t));
+	vec3 sand_base = mix(dry_color.rgb, basin_color.rgb, basin);
+	vec3 dry = mix(sand_base, rock_color.rgb, rock) * distance_tint;
 	vec3 wet = dry * wet_darken;
 
 	vec3 sand_albedo = mix(dry, wet, sand_wetness);

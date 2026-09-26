@@ -338,6 +338,10 @@ func _enter_tree() -> void:
 		ground.landmass_underwater_falloff_width = floor_data.underwater_falloff
 		ground.relief_amplitude = floor_data.relief_amplitude
 		ground.caustic_strength = floor_data.caustic_strength
+		ground.basin_color = floor_data.basin_color
+		ground.basin_tint_strength = floor_data.basin_tint_strength
+		ground.basin_tint_heights = floor_data.basin_tint_heights
+		ground.wear_darken = floor_data.wear_darken
 	if floor_data != null:
 		wade_drain_enabled = floor_data.wade_drain_enabled
 	# The floor's ambience balance onto the Sea before its _ready() spawns
