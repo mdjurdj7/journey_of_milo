@@ -103,12 +103,13 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 	set(value):
 		rest_height = value
 		_apply_model_lift()
-# Above the sand, metres; 0 = this body never leaves the ground in a fight.
+# Above the sand, metres; 0 = this body never leaves the ground in a fight
+# (or, sunk under a negative rest_height, surfaces onto it - the Siltjaw).
 @export var battle_hover: float = 0.0:
 	set(value):
 		battle_hover = value
 		if _hovering:
-			_tween_hover(_hover_lift(), 1.0, battle_rise_seconds, Tween.EASE_OUT)
+			_tween_hover(_hover_lift(), _flight_bob_weight(), battle_rise_seconds, Tween.EASE_OUT)
 # The bob on top of the hover: this far either way, over this long.
 @export var battle_bob_m: float = 0.03
 @export var battle_bob_seconds: float = 1.2:
@@ -119,6 +120,8 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export var battle_rise_seconds: float = 0.3
 # Back down to rest height on a win or an escape.
 @export var battle_settle_seconds: float = 0.4
+# A buried body going under mid-fight, or coming back up (play_burrow()).
+@export var burrow_seconds: float = 0.5
 @export_group("")
 
 var _contacted: bool = false
@@ -835,6 +838,16 @@ func fly_to(spot: Vector3, hover: float, speed: float, rise_seconds: float, land
 func is_airborne() -> bool:
 	return _airborne
 
+# --- Roaming (a body drifting on the sand; see Roamer) ---
+
+# One step of a roam: the body at world XZ `xz` with its feet on the
+# relief there, turned turn_weight of the way toward `heading` (radians,
+# face_toward_point()'s convention). The contact area rides along and
+# keeps monitoring - a roamer is always something to walk into.
+func roam_step(xz: Vector2, heading: float, turn_weight: float) -> void:
+	global_position = Vector3(xz.x, _body_y_on_ground(xz.x, xz.y), xz.y)
+	rotation.y = lerp_angle(rotation.y, heading, clampf(turn_weight, 0.0, 1.0))
+
 # A fight is starting and this member is in the air: the flight ends
 # here, and the body drops straight down over battle_land_seconds -
 # through the freeze (PAUSE_PROCESS, like every battle tween), since
@@ -881,14 +894,19 @@ func _kill_flight() -> void:
 # (DragonflyWings.set_airborne()) with the lunge's flap on top. Every
 # tween is PAUSE_PROCESS, through the fight's freeze. A no-op for a body
 # that doesn't hover.
+#
+# A body sunk under a negative rest_height surfaces here the same way -
+# the lift is the depth it was buried at, up to battle_hover (0: onto the
+# sand) - without the bob or the wings, which are a flyer's.
 func enter_battle_hover(phase: float) -> void:
-	if battle_hover <= 0.0 or _hovering or _settling or _defeated or _model == null:
+	if _hover_lift() <= 0.0 or _hovering or _settling or _defeated or _model == null:
 		return
 	_hovering = true
 	_bob_phase = phase
-	_set_wings_airborne(true)
-	_start_bob()
-	_tween_hover(_hover_lift(), 1.0, battle_rise_seconds, Tween.EASE_OUT)
+	if _flies():
+		_set_wings_airborne(true)
+		_start_bob()
+	_tween_hover(_hover_lift(), _flight_bob_weight(), battle_rise_seconds, Tween.EASE_OUT)
 
 func is_battle_hovering() -> bool:
 	return _hovering
@@ -911,6 +929,27 @@ func _on_hover_landed() -> void:
 # The hover's lift above rest height.
 func _hover_lift() -> float:
 	return maxf(battle_hover - rest_height, 0.0)
+
+# Only a body that leaves the sand in a fight flies - bobs, beats its
+# wings. A buried one surfacing just rises.
+func _flies() -> bool:
+	return battle_hover > 0.0
+
+func _flight_bob_weight() -> float:
+	return 1.0 if _flies() else 0.0
+
+# The Siltjaw's burial mid-fight (BattleController, on an interrupted
+# charge and on the turn it comes back up): down to its field rest under
+# the sand, or back up to its fight's surface, over burrow_seconds.
+# Returns how long that takes, for the enemy turn to wait on - 0 for a
+# body with nowhere to go (not in a fight's hover, or leaving).
+func play_burrow(buried: bool) -> float:
+	if not _hovering or _settling:
+		return 0.0
+	var lift: float = 0.0 if buried else _hover_lift()
+	var bob_weight: float = 0.0 if buried else _flight_bob_weight()
+	_tween_hover(lift, bob_weight, burrow_seconds, Tween.EASE_IN_OUT)
+	return maxf(burrow_seconds, 0.0)
 
 func _tween_hover(lift: float, bob_weight: float, seconds: float, easing: Tween.EaseType) -> Tween:
 	if _hover_tween != null and _hover_tween.is_valid():

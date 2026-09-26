@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
+[ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
+
+[sub_resource type="Resource" id="EnemyIntent_burrow"]
+script = ExtResource("2_intent")
+type = 2
+
+[sub_resource type="Resource" id="EnemyIntent_charge"]
+script = ExtResource("2_intent")
+value = 14
+interrupt_threshold = 9
+on_interrupt = SubResource("EnemyIntent_burrow")
+
+[resource]
+script = ExtResource("1_enemy_data")
+enemy_name = "Siltjaw"
+max_hp = 34
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_charge")])
+rest_height_m = -0.4
+contact_radius_m = 1.0

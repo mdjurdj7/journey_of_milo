@@ -15,6 +15,13 @@ class_name BattleIntent
 # through block, the hairline becomes a full-ink rule, lethal_rule_px
 # thick - the one emphasis, nothing else.
 #
+# An interruptible attack (EnemyIntent.interrupt_threshold, the Siltjaw's
+# charge) carries a second pair on the same line: a crack glyph and the
+# damage still to deal this turn, counting down as cards land. Met, it
+# reads 0 and the attack pair dims to interrupted_alpha - it won't land.
+# A BURROW (buried - it does nothing this turn) is its glyph alone: there
+# is no number coming.
+#
 # One per enemy, created by BattleOverlay for the fight (its child, so it
 # dies with the overlay - nothing of this exists on the field). Anchored
 # the way EnemyStatus is: repositioned every physics tick at priority 1
@@ -52,6 +59,16 @@ class_name BattleIntent
 @export var hairline_drop_px: float = 4.0
 # The lethal emphasis: the hairline becomes a full-ink rule this thick.
 @export var lethal_rule_px: float = 2.0
+# Between the attack pair and the threshold pair.
+@export var threshold_pair_gap_px: float = 14.0:
+	set(value):
+		threshold_pair_gap_px = value
+		_apply_layout()
+# The attack pair's ink once its threshold is met.
+@export_range(0.0, 1.0) var interrupted_alpha: float = 0.35:
+	set(value):
+		interrupted_alpha = value
+		_apply_layout()
 
 var target: FieldEnemy = null
 var _label: Label = null
@@ -62,6 +79,11 @@ var _text_rect: Rect2 = Rect2()
 var _type: int = EnemyIntent.IntentType.ATTACK
 var _has_intent: bool = false
 var _lethal: bool = false
+# The threshold pair (see the header): shown, met, and where it sits.
+var _threshold_label: Label = null
+var _has_threshold: bool = false
+var _interrupted: bool = false
+var _threshold_glyph_centre: Vector2 = Vector2.ZERO
 # "Revealed" is the overlay's say (frame settled, not acting); the display
 # is only visible when revealed AND it has something to show.
 var _revealed: bool = false
@@ -81,6 +103,14 @@ func _ready() -> void:
 		_label.add_theme_font_override("font", numeral_font)
 	add_child(_label)
 
+	_threshold_label = Label.new()
+	_threshold_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_threshold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_threshold_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	if numeral_font != null:
+		_threshold_label.add_theme_font_override("font", numeral_font)
+	add_child(_threshold_label)
+
 	refresh_style()
 	_apply_layout()
 	_update_visibility()
@@ -94,9 +124,10 @@ func set_target(enemy: FieldEnemy) -> void:
 func refresh_style() -> void:
 	if _label == null:
 		return
-	_label.add_theme_color_override("font_color", get_theme_color("ink", "Battle"))
-	_label.add_theme_color_override("font_outline_color", get_theme_color("bone", "Battle"))
-	_label.add_theme_constant_override("outline_size", outline_size_px)
+	for label: Label in [_label, _threshold_label]:
+		label.add_theme_color_override("font_color", get_theme_color("ink", "Battle"))
+		label.add_theme_color_override("font_outline_color", get_theme_color("bone", "Battle"))
+		label.add_theme_constant_override("outline_size", outline_size_px)
 	queue_redraw()
 
 # preview is EnemyTurn.preview_intent()'s dictionary (empty = nothing).
@@ -108,6 +139,11 @@ func show_intent(preview: Dictionary) -> void:
 		var hits: int = int(preview.get("hits", 1))
 		var per_hit: int = int(preview.get("per_hit", 0))
 		_label.text = ("%d×%d" % [hits, per_hit]) if hits > 1 else str(per_hit)
+		if _type == EnemyIntent.IntentType.BURROW:
+			_label.text = ""
+		_has_threshold = preview.has("threshold")
+		_interrupted = bool(preview.get("interrupted", false))
+		_threshold_label.text = str(int(preview.get("threshold_left", 0))) if _has_threshold else ""
 	_apply_layout()
 	_update_visibility()
 
@@ -130,27 +166,44 @@ func _apply_layout() -> void:
 	var font: Font = _label.get_theme_font("font")
 	var line_height: float = font.get_height(numeral_size_px) if font != null else float(numeral_size_px)
 	_glyph_size = minf(float(numeral_size_px) * glyph_cap_scale, float(numeral_size_px))
-	var text_width: float = _text_width(numeral_size_px)
-	var pair_width: float = _glyph_size + glyph_numeral_gap_px + text_width
-	var content_width: float = maxf(pair_width, hairline_width_px)
+	_threshold_label.add_theme_font_size_override("font_size", numeral_size_px)
+	var text_width: float = _text_width(_label, numeral_size_px)
+	# A glyph with no numeral (BURROW) is the glyph alone, no gap.
+	var pair_width: float = _glyph_size
+	if text_width > 0.0:
+		pair_width += glyph_numeral_gap_px + text_width
+	# The threshold pair, when there is one, after threshold_pair_gap_px.
+	var threshold_text_width: float = _text_width(_threshold_label, numeral_size_px) if _has_threshold else 0.0
+	var line_width: float = pair_width
+	if _has_threshold:
+		line_width += threshold_pair_gap_px + _glyph_size + glyph_numeral_gap_px + threshold_text_width
+	var content_width: float = maxf(line_width, hairline_width_px)
 	var rule_thickness: float = lethal_rule_px if _lethal else hairline_thickness_px
 	var content_height: float = line_height + hairline_drop_px + rule_thickness
 
 	size = Vector2(content_width, content_height)
 	pivot_offset = size / 2.0
 
-	var pair_left: float = (content_width - pair_width) * 0.5
+	var pair_left: float = (content_width - line_width) * 0.5
 	_glyph_centre = Vector2(pair_left + _glyph_size * 0.5, line_height * 0.5)
 	_text_rect = Rect2(pair_left + _glyph_size + glyph_numeral_gap_px, 0.0, text_width, line_height)
 	_label.position = _text_rect.position
 	_label.size = _text_rect.size
+	_label.visible = text_width > 0.0
+	_label.modulate.a = interrupted_alpha if _interrupted else 1.0
+
+	var threshold_left: float = pair_left + pair_width + threshold_pair_gap_px
+	_threshold_glyph_centre = Vector2(threshold_left + _glyph_size * 0.5, line_height * 0.5)
+	_threshold_label.position = Vector2(threshold_left + _glyph_size + glyph_numeral_gap_px, 0.0)
+	_threshold_label.size = Vector2(threshold_text_width, line_height)
+	_threshold_label.visible = _has_threshold
 	queue_redraw()
 
-func _text_width(font_size: int) -> float:
-	var font: Font = _label.get_theme_font("font")
-	if font == null:
+func _text_width(label: Label, font_size: int) -> float:
+	var font: Font = label.get_theme_font("font")
+	if font == null or label.text.is_empty():
 		return 0.0
-	return font.get_string_size(_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+	return font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 
 # The glyph in the same ink/outline as the numeral: each stroke is drawn
 # twice, outline colour wide underneath, ink colour on top - the line
@@ -163,15 +216,14 @@ func _draw() -> void:
 	if not _has_intent:
 		return
 	var ink: Color = get_theme_color("ink", "Battle")
-	var outline: Color = get_theme_color("bone", "Battle")
 	var glyph_centre: Vector2 = _glyph_centre
 	var points: PackedVector2Array = _glyph_points(glyph_centre, _glyph_size * 0.5)
 	if _type == EnemyIntent.IntentType.ATTACK and _points_left():
 		for i in points.size():
 			points[i] = Vector2(2.0 * glyph_centre.x - points[i].x, points[i].y)
-	if points.size() >= 2:
-		draw_polyline(points, outline, glyph_line_width_px + float(outline_size_px) * 2.0, true)
-		draw_polyline(points, ink, glyph_line_width_px, true)
+	_stroke(points, interrupted_alpha if _interrupted else 1.0)
+	if _has_threshold:
+		_stroke(_crack_points(_threshold_glyph_centre, _glyph_size * 0.5), 1.0)
 
 	var rule_thickness: float = lethal_rule_px if _lethal else hairline_thickness_px
 	var rule_color: Color = ink
@@ -181,9 +233,31 @@ func _draw() -> void:
 	var rule_top: float = size.y - rule_thickness
 	draw_rect(Rect2(rule_left, rule_top, hairline_width_px, rule_thickness), rule_color)
 
+# One glyph stroke in the numeral's ink over its bone outline, at alpha.
+func _stroke(points: PackedVector2Array, alpha: float) -> void:
+	if points.size() < 2:
+		return
+	var ink: Color = get_theme_color("ink", "Battle")
+	var outline: Color = get_theme_color("bone", "Battle")
+	ink.a *= alpha
+	outline.a *= alpha
+	draw_polyline(points, outline, glyph_line_width_px + float(outline_size_px) * 2.0, true)
+	draw_polyline(points, ink, glyph_line_width_px, true)
+
+# The threshold's glyph: a crack, a zigzag run top to bottom - what the
+# number beside it breaks. Same square as _glyph_points().
+func _crack_points(centre: Vector2, r: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	points.append(centre + Vector2(-r * 0.15, -r))
+	points.append(centre + Vector2(r * 0.3, -r * 0.3))
+	points.append(centre + Vector2(-r * 0.3, r * 0.25))
+	points.append(centre + Vector2(r * 0.15, r))
+	return points
+
 # ATTACK: a chevron pointing right with a short shaft - an arrow, the
 # action coming at you. DEFEND: an open shield - flat top, sides, a point
-# at the bottom, closed. Both fit a square of half-size r about centre.
+# at the bottom, closed. BURROW: a mound on a ground line - the swell it
+# pushes up under the sand. All fit a square of half-size r about centre.
 func _glyph_points(centre: Vector2, r: float) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	match _type:
@@ -200,6 +274,13 @@ func _glyph_points(centre: Vector2, r: float) -> PackedVector2Array:
 			points.append(centre + Vector2(0.0, r * 0.95))
 			points.append(centre + Vector2(-r * 0.8, r * 0.1))
 			points.append(centre + Vector2(-r * 0.8, -r * 0.9))
+		EnemyIntent.IntentType.BURROW:
+			points.append(centre + Vector2(-r, r * 0.45))
+			var arc_steps: int = 8
+			for step in arc_steps + 1:
+				var angle: float = PI - PI * float(step) / float(arc_steps)
+				points.append(centre + Vector2(cos(angle) * r * 0.6, r * 0.45 - sin(angle) * r * 0.7))
+			points.append(centre + Vector2(r, r * 0.45))
 	return points
 
 # Whether the Wanderer is to the screen-left of the enemy right now -

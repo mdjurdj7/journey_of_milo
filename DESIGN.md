@@ -151,3 +151,15 @@ so it doesn't get silently reinvented or silently forgotten.
   field camera loses him, his contact shadow with him. The cards'
   lifted CardViews are drawn on a CanvasLayer from their anchors, so the
   lift and the take still read. (2026-09-25, sculpted overhang.)
+- **The Siltjaw's buried look is only its body sunk into the sand.** Its
+  rules, intent, burial and roam are built (`battle/rules/enemies/
+  siltjaw.tres`, `field/roamer.gd`), but in the field it is its body at a
+  negative `rest_height_m` (-0.4 m), so only a dark ridge clears the
+  sand - no swell. The look the design wants (a sand-coloured swell with
+  the dark ridge through it; surfaced, a dark body - Bible §5 stands)
+  needs its own mound mesh riding the body, in the sand's material, or
+  a relief/shader bump at the body's XZ. A moving relief rebuild is too
+  expensive, so it's a mesh (SandOverhang's sculpted-dune approach is
+  the nearest precedent) or a ground-shader uniform. The body is
+  still the Sputter's glb, and it has no contact sound. Build all three
+  with the model. (2026-09-25, Siltjaw rules pass.)

@@ -10,6 +10,8 @@ class_name EffectContext
 
 var player: Combatant
 var target: Combatant = null
+# The enemies a card can reach: living and not buried (Combatant.buried).
+# A buried enemy is left out, so an all-enemies effect never counts it.
 var enemies: Array[Combatant] = []
 var deck: Deck
 # Cards committed this turn BEFORE the one this context is for - what

@@ -38,13 +38,15 @@ var _cache: Dictionary = {}
 # active stance's price as part of being played, and the bonus it buys has
 # to be on ctx before any damage effect reads it. A card that isn't an
 # ATTACK leaves both at nothing, which is how a stance card can be played
-# while a stance is already up without charging for itself.
+# while a stance is already up without charging for itself. Nor does an
+# Attack with nothing it can hit - every enemy buried (ctx.enemies is
+# only the hittable ones): the stance's HP isn't paid into immunity.
 func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	# Per card, not per effect: "if this kills" means this CARD's own
 	# damage, so a kill from the card before must not still be standing.
 	ctx.killed_this_card = false
 	ctx.stance_attack_bonus = 0
-	if card.card_type == CardData.CardType.ATTACK and ctx.player.stance != null:
+	if card.card_type == CardData.CardType.ATTACK and ctx.player.stance != null and not ctx.enemies.is_empty():
 		ctx.stance_attack_bonus = Stance.attack_bonus(ctx.player.stance)
 		ctx.pay_stance_attack_cost(Stance.attack_hp_loss(ctx.player.stance))
 	for effect in card.effects:

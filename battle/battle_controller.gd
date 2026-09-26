@@ -132,6 +132,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		var combatant: Combatant = _combatants[enemy]
 		enemy_hp_changed.emit(enemy, combatant.hp, combatant.max_hp)
 
+	_push_enemy_target_available()
 	energy_changed.emit(player.energy)
 	_hand_container.draw_cards(turn_draw_amount)
 	_emit_intent_previews()
@@ -160,7 +161,7 @@ func is_awaiting_target() -> bool:
 func preview_context() -> EffectContext:
 	var ctx := EffectContext.new()
 	ctx.player = player
-	ctx.enemies = _living_enemy_combatants()
+	ctx.enemies = _hittable_enemy_combatants()
 	ctx.deck = deck
 	ctx.cards_played_before_this = cards_played_this_turn
 	return ctx
@@ -180,6 +181,9 @@ func request_play(card_view: CardView) -> void:
 		return
 	var card: CardData = card_view.card_data
 	if card.cost > player.energy:
+		return
+	# Every enemy buried: an enemy-target card has nothing to land on.
+	if card.target_type == CardData.TargetType.ENEMY and _hittable_enemy_combatants().is_empty():
 		return
 	if card.target_type == CardData.TargetType.ENEMY:
 		_pending_card_view = card_view
@@ -262,7 +266,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	var ctx := EffectContext.new()
 	ctx.player = player
 	ctx.target = _combatants.get(target_enemy)
-	ctx.enemies = _living_enemy_combatants()
+	ctx.enemies = _hittable_enemy_combatants()
 	ctx.deck = deck
 	ctx.cards_played_before_this = cards_played_this_turn - 1
 	ctx.on_grace_reclaimed = _on_grace_reclaimed
@@ -278,6 +282,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 
 	toll_changed.emit(player.toll)
 	status_changed.emit()
+	# A kill can leave only buried enemies standing.
+	_push_enemy_target_available()
 	energy_changed.emit(player.energy)
 	# Block/statuses may have moved - the previews' modified numbers and
 	# lethal flags follow.
@@ -351,6 +357,9 @@ func _run_sequential_turn() -> void:
 			if snap_delay > 0.0:
 				await get_tree().create_timer(snap_delay).timeout
 			_report_enemy_attack(enemy, result)
+		var burrow_delay: float = _play_burrow_for(enemy, result)
+		if burrow_delay > 0.0:
+			await get_tree().create_timer(burrow_delay).timeout
 		status_changed.emit()
 		# take_turn() has already advanced this enemy to its next intent -
 		# show it the moment this action has landed.
@@ -371,6 +380,7 @@ func _run_simultaneous_turn() -> void:
 		acting.append(enemy)
 		if results[enemy]["attacked"]:
 			longest_snap = maxf(longest_snap, enemy.play_attack_snap(_wanderer))
+		longest_snap = maxf(longest_snap, _play_burrow_for(enemy, results[enemy]))
 	if longest_snap > 0.0:
 		await get_tree().create_timer(longest_snap).timeout
 	for enemy in acting:
@@ -390,6 +400,16 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 	if result["grace_opened"] > 0:
 		RunLogger.log_grace_opened(result["grace_opened"], player.grace)
 		grace_changed.emit(player.grace)
+
+# An interrupted enemy going under, or a buried one coming up, on the
+# field body (FieldEnemy.play_burrow()) - how long that takes, for the
+# turn to wait on the way it waits on a lunge. 0 when neither happened.
+func _play_burrow_for(enemy: FieldEnemy, result: Dictionary) -> float:
+	if result["buried"]:
+		return enemy.play_burrow(true)
+	if result["surfaced"]:
+		return enemy.play_burrow(false)
+	return 0.0
 
 # True when the fight is a cluster acting as one this turn: more than one
 # living enemy, all of one group, every one queued on a simultaneous
@@ -418,6 +438,12 @@ func _start_player_turn() -> void:
 	player.block = 0
 	player.energy = player.max_energy
 	cards_played_this_turn = 0
+	# A fresh turn for every interrupt threshold.
+	player.damage_taken_this_turn = 0
+	for enemy in enemies:
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant != null:
+			combatant.damage_taken_this_turn = 0
 
 	Status.tick_all(player.statuses, func(amount: int) -> void:
 		var lost := DamagePipeline.apply_bypass(amount, player)
@@ -429,6 +455,8 @@ func _start_player_turn() -> void:
 	)
 	Status.remove_expired(player.statuses)
 	status_changed.emit()
+	# The enemy turn may have buried or surfaced someone.
+	_push_enemy_target_available()
 	energy_changed.emit(player.energy)
 	# Block just reset to 0 and statuses ticked: lethal flags change here.
 	_emit_intent_previews()
@@ -454,6 +482,20 @@ func get_enemy_block(enemy: FieldEnemy) -> int:
 	if combatant == null or combatant.hp <= 0:
 		return 0
 	return combatant.block
+
+# The living enemies a card can reach - not the buried (Combatant.
+# buried). What every card's context carries as ctx.enemies.
+func _hittable_enemy_combatants() -> Array[Combatant]:
+	var hittable: Array[Combatant] = []
+	for combatant in _living_enemy_combatants():
+		if not combatant.buried:
+			hittable.append(combatant)
+	return hittable
+
+# Enemy-target cards fade in the hand while every enemy is buried - told
+# before each energy_changed, which is what re-reads playability.
+func _push_enemy_target_available() -> void:
+	_hand_container.set_enemy_target_available(not _hittable_enemy_combatants().is_empty())
 
 func _living_enemy_combatants() -> Array[Combatant]:
 	var living: Array[Combatant] = []
@@ -628,7 +670,9 @@ func _refresh_enemy_rects() -> void:
 		if not is_instance_valid(enemy):
 			continue
 		var combatant: Combatant = _combatants.get(enemy)
-		if combatant == null or combatant.hp <= 0:
+		# The buried can't be targeted: no rect, so no click, hover or
+		# default target lands on one.
+		if combatant == null or combatant.hp <= 0 or combatant.buried:
 			continue
 		var rect: Rect2 = enemy.get_screen_rect(camera, target_padding_px)
 		if rect.size == Vector2.ZERO:

@@ -47,8 +47,17 @@ class_name EnemyData
 # Metres the body stands clear of the sand in the field, applied after
 # its AABB grounding - legs the mesh doesn't carry (the dragonfly's
 # 0.12). Its contact shadow stays on the sand. 0 = the mesh's own feet.
+# Negative = sunk that far under the sand (the Siltjaw, buried in the
+# field); a fight lifts it to battle_hover_m when the frame settles.
 @export var rest_height_m: float = 0.0
 # Metres above the sand the body hovers at through a fight, from the
 # moment the battle frame settles (FieldEnemy.enter_battle_hover()). 0 =
-# it stays where it stands (the Sputter).
+# it stays where it stands (the Sputter) - or, under a negative rest
+# height, surfaces onto the sand (the Siltjaw). Only a body with this
+# above 0 flies: bobs, beats its wings.
 @export var battle_hover_m: float = 0.0
+# Radius of the sphere the Wanderer has to walk into to start this
+# fight, metres, onto FieldEnemy.contact_radius. 2.0 is every standing
+# enemy's; a roaming one wants its own body's size, so drifting past him
+# never reaches out and takes him.
+@export var contact_radius_m: float = 2.0

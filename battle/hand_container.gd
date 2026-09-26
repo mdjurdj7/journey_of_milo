@@ -129,6 +129,8 @@ var _toll: int = 0
 # set_bonus_context(). Null until the overlay's first push.
 var _bonus_context: EffectContext = null
 var _last_energy: int = -1
+# Set by BattleController - see set_enemy_target_available().
+var _enemy_target_available: bool = true
 
 # No longer a Container (HBoxContainer defaulted this to IGNORE on its
 # own) - the arc leaves real gaps between/around fanned cards where the
@@ -227,7 +229,7 @@ func _add_card_view(card: CardData) -> void:
 	card_view.set_rest_offset(card_size.y - hand_rest_visible_height)
 	card_view.set_card_data(card)
 	if _last_energy >= 0:
-		card_view.set_playable(card.cost <= _last_energy)
+		card_view.set_playable(_can_play(card, _last_energy))
 	card_view.clicked.connect(_on_card_view_clicked.bind(card_view))
 	card_view.lifted.connect(_on_card_lifted.bind(slot, card_view))
 	card_view.lowered.connect(_on_card_lowered.bind(slot, card_view))
@@ -295,7 +297,19 @@ func update_playable(energy: int) -> void:
 		var card_view: CardView = slot.get_child(0) as CardView
 		var card: CardData = _slot_cards.get(slot)
 		if card_view != null and card != null:
-			card_view.set_playable(card.cost <= energy)
+			card_view.set_playable(_can_play(card, energy))
+
+# Whether any enemy can be targeted - false while every one is buried
+# (see BattleController._push_enemy_target_available(), which sets it
+# just before the energy_changed that re-reads the hand). An enemy-
+# target card fades like an unaffordable one while it's false.
+func set_enemy_target_available(available: bool) -> void:
+	_enemy_target_available = available
+
+func _can_play(card: CardData, energy: int) -> bool:
+	if card.target_type == CardData.TargetType.ENEMY and not _enemy_target_available:
+		return false
+	return card.cost <= energy
 
 # Every slot's CardView, in hand order.
 func _card_views() -> Array[CardView]:

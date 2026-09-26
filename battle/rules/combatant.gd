@@ -44,6 +44,18 @@ var took_damage_last_turn: bool = false
 #
 # Left at its default -1 for the player Combatant - see enemy_turn.gd.
 var current_intent_index: int = -1
+# An interrupted intent's on_interrupt, queued in front of the loop for
+# one turn (see EnemyIntent.on_interrupt) - EnemyTurn.current_intent()
+# returns it while it's set. Null = the loop's own intent.
+var interjected_intent: EnemyIntent = null
+# Under the sand: the queued intent is a BURROW. Can't be targeted, takes
+# no damage (DamagePipeline.resolve()). Kept in step with the queued
+# intent by EnemyTurn - nothing else writes it.
+var buried: bool = false
+# HP damage taken since the player's turn began - what an intent's
+# interrupt_threshold is measured against. Counted by DamagePipeline.
+# resolve(), reset by BattleController._start_player_turn().
+var damage_taken_this_turn: int = 0
 
 func _init(starting_hp: int = 1) -> void:
 	hp = starting_hp
