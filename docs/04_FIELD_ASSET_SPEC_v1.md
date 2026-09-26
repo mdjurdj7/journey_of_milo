@@ -21,7 +21,12 @@
 - Walls are placed at the land's bounding box plus the wade margin; the drain is what keeps the player near the shore.
 
 ### Elevation layer (optional)
-- Second grayscale PNG on the same canvas. Value × `elevation_max_height` (default 1.2 m) is added to land height. Soft edges (~2 m) are walkable ramps; hard edges (~0.4 m) are drops the Wanderer cannot climb (step-up 0.35 m).
+- Second grayscale PNG on the same canvas. Value × `elevation_max_height` (default 1.2 m; the region scene sets 1.8) is added to land height. Soft edges (~2 m) are walkable ramps; hard edges (~0.4 m) are drops the Wanderer cannot climb (step-up 0.35 m).
+- At the relief's 0.35 m vertex spacing, any drop steep enough to be unclimbable (over 45°) is at most ~2.4 cells wide, so it reads as a step, not a ramp. A 0.8 m face comes out 60–68° of triangle and 55–60° on the shading normals. Where a drop has to end, let it widen into walkable slope before its height falls to the step-up; don't let it shrink to a short step (floor 2's shelf, `15902d5`).
+
+### Rock mask (optional)
+- Third grayscale PNG on the same canvas (`FloorData.rock_mask`): white = exposed stone may show here. The ground shader blends the dry colour toward `rock_color` (0.56, 0.58, 0.55) past `rock_slope_min` (35°) of shading-normal slope, over `rock_slope_blend` (15°) more. Flat tops and feet stay sand.
+- No mask, no rock: steep **sand** stays sand. Floor 2's hollow wall (38.5°), floor 1's channel bank (39°) and any dune slip face would otherwise go grey. The mask can be rough — the outline grown ~1 m — because the slope finds the edge.
 
 ### Wear
 - A worn band from spawn through the required fight to the exit: `wear_darken` 0.10, half-width 2 m, edges wobbled by noise; flattens grain and ripples. Optionally a painted wear mask on the same canvas. Region 1's band is faint; later regions deepen it.

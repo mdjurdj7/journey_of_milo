@@ -99,7 +99,7 @@ One NPC, travelling the same direction as the player. He recurs across the run (
 
 **Bright and empty, not cold and empty.** High pale sky, washed out. Depth fog 14 → 28 m in the sky's colour; sun 0.9 neutral-cool with soft shadows; neutral ambient. No warm light anywhere in the region — no golden hour, fire, warm rim or warm sky. Rest happens without fire.
 
-**Surfaces may lean warm.** Dry sand (0.74, 0.70, 0.60), bleached wood, exposed stone: R−B ≈ +0.1 in 0..1 terms. Wet sand darker, not lighter (× ~0.72). Water cool and slate — shallow (0.54, 0.60, 0.61), deep (0.26, 0.36, 0.41) — with the seabed visible and caustics through the shallows. Dry sand is the brightest large surface in the frame; nothing on the water is brighter than it.
+**Surfaces may lean warm.** Dry sand (0.74, 0.70, 0.60) and bleached wood: R−B ≈ +0.1 in 0..1 terms. Exposed stone is the exception — cool and muted, grey-green, a step darker than the sand: (0.56, 0.58, 0.55), no warm bias. Wet sand darker, not lighter (× ~0.72). Water cool and slate — shallow (0.54, 0.60, 0.61), deep (0.26, 0.36, 0.41) — with the seabed visible and caustics through the shallows. Dry sand is the brightest large surface in the frame; nothing on the water is brighter than it.
 
 ---
 
