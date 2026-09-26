@@ -327,6 +327,7 @@ func _enter_tree() -> void:
 		ground.relief_extent = floor_data.relief_extent
 		ground.relief_subdivisions = floor_data.relief_subdivisions
 		ground.elevation_max_height = floor_data.elevation_max_height
+		ground.landmass_mask_beyond_is_land = floor_data.mask_beyond_is_land
 		ground.landmass_mask = floor_data.mask
 		ground.wear_mask = floor_data.wear_mask
 		ground.rock_mask = floor_data.rock_mask

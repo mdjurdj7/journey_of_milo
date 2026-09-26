@@ -309,7 +309,8 @@ signal relief_rebuilt
 # sits on the Wanderer's spawn. Beyond the image's left/right/bottom edges
 # everything is water; beyond the TOP edge the top row is extended (clamp-
 # to-edge) so a neck that runs off the top of the drawing stays dry up to
-# the inland wall - inland is unconditionally dry, same as the SDF.
+# the inland wall - inland is unconditionally dry, same as the SDF. With
+# landmass_mask_beyond_is_land, every side is land past the image instead.
 @export_group("Landmass Mask")
 @export var landmass_mask: Texture2D = null:
 	set(value):
@@ -324,6 +325,17 @@ signal relief_rebuilt
 @export var landmass_mask_origin: Vector2 = Vector2(0.5, 0.5):
 	set(value):
 		landmass_mask_origin = value
+		_mask_dirty = true
+		_rebuild_ground_mesh_and_collision()
+# An inland floor with no coast: past ALL four of the image's edges the
+# landmask reads as land (1.0), not the water/top-row rule above - so a
+# mask painted white to its edges is land forever, and the only edge
+# left is the relief mesh's own (relief_extent). The landmask only: the
+# elevation, wear and rock paintings still read 0 past the image (the
+# elevation's top row still extends). False = the rule above, unchanged.
+@export var landmass_mask_beyond_is_land: bool = false:
+	set(value):
+		landmass_mask_beyond_is_land = value
 		_mask_dirty = true
 		_rebuild_ground_mesh_and_collision()
 # The distance field's own grid, NOT the image's resolution: an exact EDT
@@ -1682,6 +1694,16 @@ func _canvas_sample(bytes: PackedByteArray, world_xz: Vector2) -> float:
 	var bottom: float = lerpf(_canvas_byte(bytes, x0, y1), _canvas_byte(bytes, x1, y1), fx)
 	return lerpf(top, bottom, fy)
 
+# The landmask itself (_mask_bytes): _canvas_sample()'s edge rule, or,
+# with landmass_mask_beyond_is_land, 1.0 (land) anywhere past the image.
+# Inside the image the two agree, so a pixel's own value never changes.
+func _mask_sample(world_xz: Vector2) -> float:
+	if landmass_mask_beyond_is_land:
+		var p: Vector2 = _mask_world_to_pixel(world_xz)
+		if p.x < 0.0 or p.y < 0.0 or p.x > float(_mask_width) or p.y > float(_mask_height):
+			return 1.0
+	return _canvas_sample(_mask_bytes, world_xz)
+
 # Painted shallows. The mask's water side is not just "not land": a
 # value between 0 and the 0.5 waterline says how much of the full depth
 # applies here, so 0 is the open sea as it always was and 0.42 is 16% of
@@ -1698,7 +1720,7 @@ func _canvas_sample(bytes: PackedByteArray, world_xz: Vector2) -> float:
 func _shoal_factor(world_xz: Vector2) -> float:
 	if _mask_bytes.is_empty():
 		return 1.0
-	var value: float = _canvas_sample(_mask_bytes, world_xz)
+	var value: float = _mask_sample(world_xz)
 	return clampf((MASK_LAND_THRESHOLD - value) / MASK_LAND_THRESHOLD, 0.0, 1.0)
 
 # The painted elevation's lift at a sand-side point, in metres: the
@@ -1748,7 +1770,7 @@ func _build_mask_distance_field() -> void:
 	for row in rows:
 		for col in cols:
 			var world_xz: Vector2 = _mask_distance_origin + Vector2(float(col), float(row)) * cell
-			var is_land: bool = _canvas_sample(_mask_bytes, world_xz) >= MASK_LAND_THRESHOLD
+			var is_land: bool = _mask_sample(world_xz) >= MASK_LAND_THRESHOLD
 			land[row * cols + col] = 1 if is_land else 0
 			if is_land and image_rect.has_point(world_xz):
 				if bounds_started:

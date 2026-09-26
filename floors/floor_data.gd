@@ -35,6 +35,11 @@ class_name FloorData
 @export var rock_mask: Texture2D = null
 # Normalized image coords of the pixel that sits on `spawn`.
 @export var mask_origin: Vector2 = Vector2(0.5, 0.5)
+# Ground.landmass_mask_beyond_is_land: past every edge of `mask` is land,
+# not water - for an inland floor with no coast, whose mask is white to
+# its edges. False (the default) = water past the sides and bottom, the
+# top row extended, as every coastal floor has it.
+@export var mask_beyond_is_land: bool = false
 # The four Ground values that set how wet the floor reads, pushed onto
 # Ground's own exports of the same names (landmass_interior_height,
 # landmass_falloff_width, relief_amplitude, caustic_strength).
