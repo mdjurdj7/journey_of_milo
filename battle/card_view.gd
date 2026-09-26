@@ -15,9 +15,9 @@ class_name CardView
 # whole card, so every size below is a 1x pixel. Top to bottom: keyline;
 # name (top-left, up to two lines) beside the cost numeral (top-right,
 # with a "-N HP" line under it when the card costs HP); the tonal field
-# with the type glyph or the card's art, which flexes; the rules text; a hairline footer
-# rule and the small-caps type label. See _apply_layout() for how the
-# field gives way to a longer rules text.
+# with the type glyph or the card's art, a fixed rect on every card; the
+# rules text, which fits the space left by stepping its size down; a
+# hairline footer rule and the small-caps type label. See _apply_layout().
 
 signal clicked(card_data: CardData)
 # Fired whenever this card visually lifts out of the hand for any reason -
@@ -140,15 +140,14 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @export var hp_cost_font_size_px: int = 9
 @export_range(0.0, 1.0) var hp_cost_letter_spacing_em: float = 0.08
 @export_range(0.0, 1.0) var hp_cost_alpha: float = 0.72
-@export var rules_font_size_px: int = 15
-@export var rules_font_size_tight_px: int = 13
+# The rules text's sizes at 1x, largest first: each is tried in turn
+# until the text fits the space under the art field. The last is the
+# floor - text that still doesn't fit there wraps on and the card grows
+# downward rather than shrinking further (_warn_overlong() says so). A
+# card that lands below the first size is saying too much.
+@export var rules_font_sizes: Array[int] = [15, 14, 13, 12]
 @export var rules_line_height: float = 1.35
 @export_range(0.0, 1.0) var rules_alpha: float = 0.92
-# At this many lines the rules text drops to rules_font_size_tight_px and
-# the field holds its minimum; one more and _warn_overlong() fires so the
-# card can be rewritten.
-@export var rules_max_comfortable_lines: int = 3
-@export var rules_max_lines: int = 4
 @export var type_label_font_size_px: int = 9
 @export_range(0.0, 1.0) var type_label_letter_spacing_em: float = 0.16
 @export_range(0.0, 1.0) var type_label_alpha: float = 0.62
@@ -173,7 +172,12 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @export var keyline_height: float = 2.0
 @export var name_cost_gap: float = 8.0
 @export var header_field_gap: float = 8.0
-@export var field_min_height: float = 56.0
+# The art field: one rect on every card, whatever its name, HP cost or
+# rules text - art is painted for this window, so it never gives way.
+# The top clears the tallest header (name beside cost, with the "-N HP"
+# line) plus header_field_gap; a card without an HP line keeps the gap.
+@export var art_field_top: float = 66.0
+@export var art_field_size: Vector2 = Vector2(176.0, 128.0)
 @export var field_rules_gap: float = 8.0
 @export var rules_footer_gap: float = 8.0
 @export var footer_rule_gap: float = 6.0
@@ -965,7 +969,7 @@ func _apply_style() -> void:
 		rules_text.add_theme_font_override("normal_font", rules_font)
 	if rules_font_bold != null:
 		rules_text.add_theme_font_override("bold_font", rules_font_bold)
-	_apply_rules_font_size(rules_font_size_px)
+	_apply_rules_font_size(rules_font_sizes[0] if not rules_font_sizes.is_empty() else 15)
 
 	var rule_ink: Color = ink_color
 	rule_ink.a = footer_rule_alpha
@@ -1035,19 +1039,44 @@ func _apply_type_style() -> void:
 
 # --- Layout ---
 
-# Vertical stack at 1x. The name may wrap to two lines beside the cost;
-# the field flexes between the header and the rules text; the rules text
-# takes as many lines as it needs up to rules_max_comfortable_lines at
-# full size, then the tight size at rules_max_lines with the field held
-# at field_min_height. Beyond that, _warn_overlong().
+# Vertical stack at 1x. The name holds one line beside the cost (a
+# longer one is clipped and warned about); the art field is the fixed
+# art_field_top/art_field_size rect; the rules text takes the space
+# between it and the footer at the first of rules_font_sizes that fits.
+# Past the last size the card grows downward by what the text still
+# needs - the face only: its containers keep card_size, and no current
+# card gets there. Decided once at 1x; hover, armed and inspect scale the
+# whole card.
 func _apply_layout() -> void:
+	# Rules text first: the face's height depends on it.
+	var rules_width: float = card_size.x - outer_margin * 2.0
+	var type_height: float = _line_height(type_label, type_label_font_size_px)
+	var rules_top: float = art_field_top + art_field_size.y + field_rules_gap
+	var rules_bottom: float = card_size.y - outer_margin - type_height - footer_rule_gap - 1.0 - rules_footer_gap
+	var available: float = rules_bottom - rules_top
+	var font_size: int = 15
+	var lines: int = 1
+	var rules_height: float = 0.0
+	for candidate in rules_font_sizes:
+		font_size = candidate
+		lines = _rules_line_count(font_size, rules_width)
+		rules_height = float(lines) * float(font_size) * rules_line_height
+		if rules_height <= available:
+			break
+	var growth: float = maxf(ceilf(rules_height - available), 0.0)
+	if growth > 0.0:
+		_warn_overlong(lines, font_size)
+	_apply_rules_font_size(font_size)
+	var face: Vector2 = Vector2(card_size.x, card_size.y + growth)
+	size = face
+
 	shadow_soft.position = Vector2.ZERO
-	shadow_soft.size = card_size
+	shadow_soft.size = face
 	shadow_hairline.position = Vector2.ZERO
-	shadow_hairline.size = card_size
+	shadow_hairline.size = face
 	if _bonus_corner != null:
 		_bonus_corner.position = Vector2.ZERO
-		_bonus_corner.size = card_size
+		_bonus_corner.size = face
 		_bonus_corner.queue_redraw()
 
 	# Keyline inside the frame, inset past the corner radius so it never
@@ -1075,55 +1104,33 @@ func _apply_layout() -> void:
 		hp_cost_label.size = Vector2(hp_width, hp_height)
 		hp_cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
+	# One line, always: the art field sits at a fixed height below it.
 	var name_width: float = card_size.x - outer_margin * 2.0 - cost_width - name_cost_gap
-	var name_line: float = _line_height(name_label, name_font_size_px)
-	var name_lines: int = clampi(_wrapped_line_count(name_label, name_font_size_px, name_width), 1, 2)
-	var name_height: float = name_line * float(name_lines)
+	if _wrapped_line_count(name_label, name_font_size_px, name_width) > 1:
+		_warn_long_name()
 	name_label.position = Vector2(outer_margin, outer_margin)
-	name_label.size = Vector2(name_width, name_height)
+	name_label.size = Vector2(name_width, _line_height(name_label, name_font_size_px))
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
-	name_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	name_label.clip_text = true
 
-	var header_bottom: float = outer_margin + maxf(name_height, cost_height + hp_height)
-
-	# Footer: type label at the bottom, the rule above it.
-	var type_height: float = _line_height(type_label, type_label_font_size_px)
-	type_label.position = Vector2(outer_margin, card_size.y - outer_margin - type_height)
+	# Footer: type label at the bottom of the face, the rule above it.
+	type_label.position = Vector2(outer_margin, face.y - outer_margin - type_height)
 	type_label.size = Vector2(card_size.x - outer_margin * 2.0, type_height)
 	footer_rule.position = Vector2(outer_margin, type_label.position.y - footer_rule_gap - 1.0)
 	footer_rule.size = Vector2(card_size.x - outer_margin * 2.0, 1.0)
-	var footer_top: float = footer_rule.position.y
 
-	# Rules text: how many lines at full size?
-	var rules_width: float = card_size.x - outer_margin * 2.0
-	var font_size: int = rules_font_size_px
-	var lines: int = _rules_line_count(font_size, rules_width)
-	if lines > rules_max_comfortable_lines:
-		font_size = rules_font_size_tight_px
-		lines = _rules_line_count(font_size, rules_width)
-		if lines > rules_max_lines:
-			_warn_overlong(lines)
-	_apply_rules_font_size(font_size)
-	var rules_height: float = float(lines) * float(font_size) * rules_line_height
-
-	# The field takes what's left, never less than its minimum - if the
-	# text needs more than that leaves, the text wins the space and the
-	# field holds at minimum (the rules are the card).
-	var field_top: float = header_bottom + header_field_gap
-	var available: float = footer_top - rules_footer_gap - field_rules_gap - field_top
-	var field_height: float = maxf(available - rules_height, field_min_height)
-	art_field.position = Vector2(outer_margin, field_top)
-	art_field.size = Vector2(card_size.x - outer_margin * 2.0, field_height)
+	art_field.position = Vector2(outer_margin, art_field_top)
+	art_field.size = art_field_size
 	art_rect.position = Vector2.ZERO
 	art_rect.size = art_field.size
 	glyph.position = Vector2.ZERO
 	glyph.size = art_field.size
 	glyph.queue_redraw()
 
-	rules_text.position = Vector2(outer_margin, field_top + field_height + field_rules_gap)
-	rules_text.size = Vector2(rules_width, maxf(footer_top - rules_footer_gap - rules_text.position.y, rules_height))
+	rules_text.position = Vector2(outer_margin, rules_top)
+	rules_text.size = Vector2(rules_width, rules_bottom + growth - rules_top)
 
 func _string_width(label: Label, font_size: int) -> float:
 	var font: Font = label.get_theme_font("font")
@@ -1158,9 +1165,23 @@ func _rules_line_count(font_size: int, width: float) -> int:
 	var total: float = rules_font.get_multiline_string_size(plain, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, -1, TextServer.BREAK_WORD_BOUND | TextServer.BREAK_MANDATORY).y
 	return maxi(roundi(total / maxf(line_height, 1.0)), 1)
 
-func _warn_overlong(lines: int) -> void:
+# Once per card name per session: the layout re-runs on every live
+# refresh, and a warning per refresh would bury the log.
+static var _warned: Dictionary = {}
+
+func _warn_overlong(lines: int, font_size: int) -> void:
 	var card_name: String = card_data.card_name if card_data != null else name
-	push_warning("CardView: '%s' rules text runs to %d lines at %dpx - rewrite it shorter." % [card_name, lines, rules_font_size_tight_px])
+	if _warned.has("rules:" + card_name):
+		return
+	_warned["rules:" + card_name] = true
+	push_warning("CardView: '%s' rules text runs to %d lines at %dpx, past the smallest size - the card grows. Rewrite it shorter." % [card_name, lines, font_size])
+
+func _warn_long_name() -> void:
+	var card_name: String = card_data.card_name if card_data != null else name
+	if _warned.has("name:" + card_name):
+		return
+	_warned["name:" + card_name] = true
+	push_warning("CardView: '%s' doesn't fit on one line beside its cost - clipped. Shorten the name." % card_name)
 
 # --- Glyph ---
 

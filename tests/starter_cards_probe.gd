@@ -14,7 +14,15 @@ extends SceneTree
 
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_CONTROLLER_PATH := "res://battle/battle_controller.gd"
-const CASES := 11
+const CASES := 12
+# The rules text size each card lands at outside a fight; any card not
+# listed fits at the first size, 15. A card that moves here has changed
+# its wording - or needs to.
+const SHRUNK_RULES: Dictionary = {
+	"Last Resort": 14,
+	"Last Wager": 13,
+	"Refuse the End": 12,
+}
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # The starter cards' art, by file. Every other card has none yet.
@@ -44,6 +52,7 @@ func _initialize() -> void:
 	_check_brace_face()
 	_check_lasting_cards_leave_rotation()
 	await _check_starter_art()
+	await _check_face_layout()
 	if _completed != CASES:
 		_failures += 1
 		print("FAIL: only %d of %d cases ran to the end" % [_completed, CASES])
@@ -207,6 +216,47 @@ func _check_starter_art() -> void:
 	_expect(not with_art.art_rect.visible and with_art.glyph.visible, "A reused face drops the art for a card without")
 	with_art.queue_free()
 	without_art.queue_free()
+	_completed += 1
+
+# The art field is one rect on every card; the rules text steps down to
+# fit under it, and no current card grows. Past the smallest size a card
+# grows downward instead, and a name too long for one line is clipped to
+# one.
+func _check_face_layout() -> void:
+	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
+	var view: CardView = scene.instantiate()
+	root.add_child(view)
+	await process_frame
+	var art_rect: Rect2 = Rect2(Vector2(view.outer_margin, view.art_field_top), view.art_field_size)
+	for dir in CARD_DIRS:
+		for file in DirAccess.get_files_at(dir):
+			if not file.ends_with(".tres"):
+				continue
+			var card := load(dir + file) as CardData
+			view.set_card_data(card)
+			_expect_eq(Rect2(view.art_field.position, view.art_field.size), art_rect, "%s's art field" % card.card_name)
+			_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), SHRUNK_RULES.get(card.card_name, 15), "%s's rules size" % card.card_name)
+			_expect_eq(view.size, view.card_size, "%s keeps the card's size" % card.card_name)
+			_expect(view.rules_text.position.y + view.rules_text.size.y <= view.footer_rule.position.y, "%s's text ends above the footer" % card.card_name)
+
+	var footer_y: float = view.footer_rule.position.y
+	var long_card := CardData.new()
+	long_card.card_name = "Probe Long"
+	long_card.description = "Lose 2 HP. Draw 1. Gain 5 Toll. Deal 6 damage to all enemies. Gain 8 block. Heal 3 HP. If this kills, gain 1 energy."
+	view.set_card_data(long_card)
+	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), view.rules_font_sizes[view.rules_font_sizes.size() - 1], "Overlong text sits at the floor size")
+	_expect(view.size.y > view.card_size.y, "...and the card grows (%s)" % str(view.size))
+	_expect_eq(view.footer_rule.position.y - (view.size.y - view.card_size.y), footer_y, "...its footer moving down with it")
+	_expect_eq(Rect2(view.art_field.position, view.art_field.size), art_rect, "...its art field unmoved")
+
+	var long_name := CardData.new()
+	long_name.card_name = "A Name Far Too Long To Sit Beside Its Cost"
+	long_name.description = "Draw 1."
+	view.set_card_data(long_name)
+	_expect(view.name_label.autowrap_mode == TextServer.AUTOWRAP_OFF and view.name_label.clip_text, "A long name is clipped to one line")
+	_expect(view.name_label.position.y + view.name_label.size.y <= view.art_field_top, "...clear of the art field")
+	_expect_eq(view.size, view.card_size, "A short card back at card_size after a grown one")
+	view.queue_free()
 	_completed += 1
 
 # A played stance or power card is exhausted, not discarded; an ordinary
