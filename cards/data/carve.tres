@@ -5,7 +5,7 @@
 
 [sub_resource type="Resource" id="E_damage"]
 script = ExtResource("2_card_effect")
-value = 5
+value = 6
 target_scope = 1
 
 [resource]
