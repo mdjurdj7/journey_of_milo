@@ -47,7 +47,7 @@ group = &"island"
 [sub_resource type="Resource" id="FloorEnemy_siltjaw"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("16_siltjaw")
-position = Vector2(4.5, -7)
+position = Vector2(5.2, -7)
 yaw_degrees = -11.0
 required = false
 
