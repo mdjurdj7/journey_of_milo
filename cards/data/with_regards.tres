@@ -16,6 +16,7 @@ condition = 4
 [resource]
 script = ExtResource("1_card_data")
 card_name = "With Regards"
+rarity = 2
 cost = 1
 card_type = 0
 target_type = 0

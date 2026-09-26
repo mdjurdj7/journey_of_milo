@@ -10,6 +10,7 @@ value = 5
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Slash"
+rarity = 1
 cost = 1
 target_type = 0
 description = "Deal {damage} damage."

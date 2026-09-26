@@ -101,6 +101,23 @@ so it doesn't get silently reinvented or silently forgotten.
   Still out of the pool: floor 1 is one crab and the pool is per floor,
   so putting it in is a per-floor pool decision, not a side effect of
   the cluster landing. (2026-09-21, multi-enemy clusters.)
+  Update: in the pool now, as an Uncommon. Blood Arc joined it in the
+  same pass, so the pool holds 15 Wanderer cards and no longer sits
+  empty as the entry above describes. Floor 1's single crab still makes
+  it a weak pick there; the card itself is unchanged. (2026-09-26,
+  card rarity.)
+- **Rarity rolls only a fight's card reward.** `RewardPool.roll_by_
+  rarity()` (tier first, 60/30/9/1, empty tiers renormalised) is what
+  the reward screen and the fight's sand spread call; belongings bags,
+  bundles, single-card props, caches placed as a `RewardSpread` prop
+  and the Keeper keep the flat `roll()`. Deferred: whether exploration
+  rewards get their own rarity rates. Giving them the fight's rates as
+  a side effect would have rebalanced every floor's props, so that is a
+  separate decision. (2026-09-26, card rarity.)
+- **Rarity has no look yet.** No border, gem, colour or glow marks a
+  card's tier on its face, and no debug view shows it. The data is in
+  place (`CardData.rarity`); the visual treatment is its own pass.
+  (2026-09-26, card rarity.)
 - **The Dragonfly borrows the Sputter's hit sound.** `battle/rules/
   enemies/dragonfly.tres` names `hit_shell_1.mp3` in `contact_sounds` -
   a TODO placeholder, not a choice: a 14 HP insect should not crack like

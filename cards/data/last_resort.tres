@@ -12,6 +12,7 @@ stance_data = ExtResource("3_last_resort")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Last Resort"
+rarity = 3
 cost = 1
 card_type = 2
 target_type = 1

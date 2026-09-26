@@ -541,7 +541,8 @@ func _take_line(index: int) -> void:
 # --- Card choice ---
 
 func _open_choice() -> void:
-	var rolled: Array[CardData] = _pool.roll(choice_count, RunState.rng)
+	# A fight's reward, so tier first - see RewardPool.roll_by_rarity().
+	var rolled: Array[CardData] = _pool.roll_by_rarity(choice_count, RunState.rng)
 	if rolled.is_empty():
 		_finish_card_line()
 		return

@@ -14,6 +14,18 @@ enum TargetType { ENEMY, SELF, NONE }
 # finished()), whatever removal_scope says.
 enum CardType { ATTACK, SKILL, STANCE, POWER }
 
+# How often a fight's reward offers this card (RewardPool.roll_by_
+# rarity()). A property of the card, not of any pool: a pool decides
+# WHETHER a card can drop, rarity only how often among the ones that can.
+# Four tiers, COMMON to ULTRA_RARE. UNSET is not a fifth - it is the
+# default so a card nobody tagged reads as untagged rather than silently
+# Common; no reward roll ever picks it and tests/card_rarity_probe.gd
+# fails on it. ULTRA_RARE is a real tier with no cards yet, reserved for
+# cards that change a class rule (two stances at once, Toll or Grace
+# rewritten). Integers are explicit: they're baked into every .tres, so
+# a new tier is appended with its own number, never inserted.
+enum CardRarity { UNSET = 0, COMMON = 1, UNCOMMON = 2, RARE = 3, ULTRA_RARE = 4 }
+
 enum RemovalScope { NONE, SPENT, CONSUMED }
 # NONE: goes to the discard pile, reshuffles back in for the rest of the
 # fight like any other card. SPENT and CONSUMED both leave this fight's
@@ -28,6 +40,7 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 @export var card_name: String = ""
 @export var cost: int = 0
 @export var card_type: CardType = CardType.ATTACK
+@export var rarity: CardRarity = CardRarity.UNSET
 @export var target_type: TargetType = TargetType.NONE
 @export_multiline var description: String = ""
 @export var effects: Array[CardEffect] = []
@@ -54,3 +67,8 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 # anything the card goes on to do (Self-Eater's per-Attack HP loss, a
 # stance ending), and never outside a battle hand.
 @export_file("*.wav", "*.mp3", "*.ogg") var play_sound_path: String = ""
+
+# The four real tiers, lowest first - UNSET left out. What a rarity roll
+# walks and what a probe checks a card's tag against.
+static func rarity_tiers() -> Array[CardRarity]:
+	return [CardRarity.COMMON, CardRarity.UNCOMMON, CardRarity.RARE, CardRarity.ULTRA_RARE]

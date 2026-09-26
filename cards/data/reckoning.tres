@@ -10,6 +10,7 @@ effect_type = 5
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Reckoning"
+rarity = 2
 cost = 2
 card_type = 0
 target_type = 0

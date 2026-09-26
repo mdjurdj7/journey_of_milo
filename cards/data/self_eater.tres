@@ -12,6 +12,7 @@ stance_data = ExtResource("3_self_eater")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Self-Eater"
+rarity = 2
 cost = 1
 card_type = 2
 target_type = 1

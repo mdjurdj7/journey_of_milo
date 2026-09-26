@@ -12,6 +12,7 @@ alt_value = 12
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Reprisal"
+rarity = 1
 cost = 1
 target_type = 0
 description = "{else}Deal {damage} damage.{/else} {if}With Grace: deal {alt_damage}.{/if}"

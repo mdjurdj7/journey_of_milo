@@ -21,6 +21,7 @@ value = 1
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Hold Fast"
+rarity = 1
 cost = 1
 card_type = 1
 target_type = 1

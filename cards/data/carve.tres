@@ -11,6 +11,7 @@ target_scope = 1
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Carve"
+rarity = 1
 cost = 1
 description = "Deal {damage} damage to all enemies."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_damage")])

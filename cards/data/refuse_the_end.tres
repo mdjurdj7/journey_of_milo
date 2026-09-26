@@ -12,6 +12,7 @@ status_data = ExtResource("3_refuse_the_end")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Refuse the End"
+rarity = 3
 cost = 1
 card_type = 3
 target_type = 1

@@ -1455,6 +1455,7 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	var spread := scene.instantiate() as RewardSpread
 	spread.pool = floor_data.reward_pool
 	spread.enemy = fell_to
+	spread.roll_by_rarity = true
 	add_child(spread)
 	spread.global_position = fell_at
 

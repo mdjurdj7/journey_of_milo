@@ -13,6 +13,7 @@ bonus_value = 4
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Untouched"
+rarity = 1
 cost = 1
 card_type = 1
 target_type = 1

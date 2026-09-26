@@ -13,6 +13,7 @@ alt_value = 10
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Left Hand"
+rarity = 1
 cost = 1
 target_type = 0
 description = "{else}Deal {damage} damage.{/else} {if}First card this turn: deal {alt_damage}.{/if}"

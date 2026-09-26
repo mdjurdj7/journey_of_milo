@@ -12,6 +12,7 @@ status_data = ExtResource("3_dying_light")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Dying Light"
+rarity = 3
 cost = 1
 card_type = 3
 target_type = 1

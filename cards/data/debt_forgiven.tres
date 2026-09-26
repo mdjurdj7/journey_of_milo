@@ -12,6 +12,7 @@ toll_cost = 10
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Debt Forgiven"
+rarity = 2
 cost = 1
 card_type = 1
 target_type = 1

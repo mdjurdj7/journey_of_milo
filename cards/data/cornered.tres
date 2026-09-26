@@ -12,6 +12,7 @@ alt_value = 16
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Cornered"
+rarity = 1
 cost = 1
 card_type = 0
 target_type = 0

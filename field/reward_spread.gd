@@ -29,6 +29,12 @@ class_name RewardSpread
 # bias; null simply rolls the pool flat.
 @export var enemy: EnemyData = null
 @export var card_count: int = 3
+# A fight's drop rolls by rarity (RewardPool.roll_by_rarity(), set by
+# RegionField._spawn_reward_spread()); a cache placed as a prop keeps the
+# flat roll() - exploration rewards don't take on the fight's rarity
+# rates until they're given their own. Read once, when the cards are
+# laid out.
+@export var roll_by_rarity: bool = false
 
 @export_group("Layout")
 # The fan's own axis, world XZ. Zero (the fight-drop default) = the
@@ -99,7 +105,7 @@ func _find_wanderer() -> Node3D:
 	return found[0] as Node3D if not found.is_empty() else null
 
 func _spawn_cards() -> void:
-	var rolled: Array[CardData] = pool.roll(card_count, RunState.rng, enemy)
+	var rolled: Array[CardData] = pool.roll_by_rarity(card_count, RunState.rng, enemy) if roll_by_rarity else pool.roll(card_count, RunState.rng, enemy)
 	if rolled.is_empty():
 		return
 	var scene := load(world_card_scene_path) as PackedScene
