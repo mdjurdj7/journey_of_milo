@@ -190,6 +190,11 @@ var _bob_phase: float = 0.0
 var _hover_tween: Tween = null
 var _bob_tween: Tween = null
 var _slash_mark_mesh: ArrayMesh = null
+# A buried body's show while it's down (rest height under the sand; see
+# _apply_model_lift()): the sand swelling over it, and the contact shadow
+# that goes with the model.
+var _mound: SandMound = null
+var _contact_shadow: ContactShadow = null
 var _slash_mark_texture: GradientTexture2D = null
 
 # Owned by this enemy, but lives in RegionField.field_hud, not here (a
@@ -284,6 +289,13 @@ func _ready() -> void:
 	var contact_shadow := ContactShadow.new()
 	contact_shadow.name = "ContactShadow"
 	add_child(contact_shadow)
+	_contact_shadow = contact_shadow
+
+	if rest_height < 0.0:
+		_mound = SandMound.new()
+		_mound.name = "SandMound"
+		add_child(_mound)
+	_apply_model_lift()
 
 	# relief_rebuilt covers every LIVE relief edit after this point, but its
 	# very first emission happens inside Ground's own _ready() - before this
@@ -293,6 +305,8 @@ func _ready() -> void:
 	# placing this enemy from FloorData, not before.
 	_ground = get_node_or_null(ground_path) as Ground
 	if _ground:
+		if _mound != null:
+			_mound.set_ground(_ground)
 		_ground.relief_rebuilt.connect(_ground_to_relief)
 		await get_tree().process_frame
 		_ground_to_relief()
@@ -308,6 +322,8 @@ func _ground_to_relief() -> void:
 	if _ground == null:
 		return
 	global_position.y = _body_y_on_ground(global_position.x, global_position.z)
+	if _mound != null:
+		_mound.follow()
 
 # The body's global Y with its feet on the relief at this XZ (see
 # _ground_to_relief()'s doc for the model_ground_offset part). The
@@ -847,6 +863,8 @@ func is_airborne() -> bool:
 func roam_step(xz: Vector2, heading: float, turn_weight: float) -> void:
 	global_position = Vector3(xz.x, _body_y_on_ground(xz.x, xz.y), xz.y)
 	rotation.y = lerp_angle(rotation.y, heading, clampf(turn_weight, 0.0, 1.0))
+	if _mound != null:
+		_mound.follow()
 
 # A fight is starting and this member is in the air: the flight ends
 # here, and the body drops straight down over battle_land_seconds -
@@ -990,10 +1008,33 @@ func _set_bob_angle(value: float) -> void:
 
 # The model at its grounded place plus rest height, hover and bob. Left
 # alone once settling - the sink owns the model from then on.
+#
+# A buried body (rest height under the sand) is not seen at all while it
+# is down: the model and its contact shadow are hidden and the mound
+# (SandMound) shows instead. The same lift that raises the body flattens
+# the mound - it falls as the body comes up through it, one motion, and
+# swells back as the body goes under (play_burrow(), an escape's exit_
+# battle_hover()).
 func _apply_model_lift() -> void:
 	if _model == null or _settling:
 		return
 	_model.position.y = _model_ground_y + get_body_lift()
+	var surfaced: float = _surfaced_fraction()
+	_model.visible = surfaced > 0.0
+	if _contact_shadow != null:
+		_contact_shadow.visible = surfaced > 0.0
+	if _mound != null:
+		_mound.set_rise(1.0 - surfaced)
+
+# How far a buried body is on its way up to its fight's surface: 0 down
+# at rest height, 1 all the way up. 1 for a body that isn't buried.
+func _surfaced_fraction() -> float:
+	if rest_height >= 0.0:
+		return 1.0
+	var reach: float = _hover_lift()
+	if reach <= 0.0:
+		return 0.0
+	return clampf(_lift / reach, 0.0, 1.0)
 
 func _set_wings_airborne(on: bool) -> void:
 	if _attachment != null and _attachment.has_method("set_airborne"):
