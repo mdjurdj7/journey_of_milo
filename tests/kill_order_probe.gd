@@ -15,9 +15,10 @@ extends SceneTree
 #   floor1_crab    - the one required crab on floor 1
 #
 # and asserts, after the win and the reward beat: no member of the pack
-# left on the field, only the required crab's EnemyStatus left under the
-# HUD (none on floor 1), floor_cleared emitted on floor 1 and NOT by the
-# optional pack on floor 2, no fight left open.
+# left on the field, an EnemyStatus left under the HUD for each enemy
+# outside the fight and none more (floor 2's crab and Siltjaw; none on
+# floor 1), floor_cleared emitted on floor 1 and NOT by the optional pack
+# on floor 2, no fight left open.
 #
 # Run it before committing anything that touches region_field.gd,
 # field_enemy.gd or battle_controller.gd, and say in the commit that it
@@ -55,18 +56,19 @@ func _initialize() -> void:
 
 	for order in ["one_at_a_time", "carve_two", "carve_three", "last_normal"]:
 		run_state.set("current_floor_index", 1)
-		await _run_case(order, &"island", false, 1)
+		await _run_case(order, &"island", false)
 	run_state.set("current_floor_index", 0)
-	await _run_case("floor1_crab", &"", true, 0)
+	await _run_case("floor1_crab", &"", true)
 
 	print("\nkill_order_probe: %s" % ("PASSED" if _failures == 0 else "%d FAILURE(S)" % _failures))
 	quit(0 if _failures == 0 else 1)
 
 # One floor load, one fight, one kill order, the assertions.
 # group: the FloorEnemy.group of the pack to fight (&"" = an ungrouped
-# enemy, floor 1's crab). expect_cleared / expect_statuses: what should
-# be true after the win.
-func _run_case(order: String, group: StringName, expect_cleared: bool, expect_statuses: int) -> void:
+# enemy, floor 1's crab). expect_cleared: whether the win clears the
+# floor. The EnemyStatus count expected after it is the enemies outside
+# the fight, counted from the field.
+func _run_case(order: String, group: StringName, expect_cleared: bool) -> void:
 	print("\n=== case: ", order)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate() as Node3D
 	root.add_child(_field)
@@ -131,10 +133,15 @@ func _run_case(order: String, group: StringName, expect_cleared: bool, expect_st
 		await physics_frame
 
 	var left: int = 0
+	var expect_statuses: int = 0
 	for node in get_nodes_in_group("enemies"):
-		if is_instance_valid(node) and not node.is_queued_for_deletion() and node.get("group") == group:
+		if not is_instance_valid(node) or node.is_queued_for_deletion():
+			continue
+		if node.get("group") == group:
 			left += 1
 			print("   still standing: ", node.name, " status=", node.get("enemy_status") != null)
+		else:
+			expect_statuses += 1
 	var statuses: int = _status_count()
 	var battle_open: bool = _field.get("_battle_open")
 	var cleared: bool = _field.get("_floor_cleared_emitted")
