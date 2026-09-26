@@ -205,6 +205,21 @@ signal relief_rebuilt
 	set(value):
 		landmass_underwater_falloff_width = value
 		_rebuild_ground_mesh_and_collision()
+# Mask mode only: painted water stays water. The fine detail roughens a
+# seabed but never lifts it above sea_level less this much, reached
+# seabed_min_depth_reach metres past the drawn line (a smoothstep from
+# the line itself, so the bed still meets the sand at sea_level). Without
+# it a +relief_amplitude bump stood up to ~1.3 m of painted shallows out
+# of the water as sand - a narrow inlet read as a sand track. Deeper than
+# the sea's wave_amplitude_max, or its troughs bare the bed.
+@export var seabed_min_depth: float = 0.06:
+	set(value):
+		seabed_min_depth = value
+		_rebuild_ground_mesh_and_collision()
+@export var seabed_min_depth_reach: float = 0.5:
+	set(value):
+		seabed_min_depth_reach = value
+		_rebuild_ground_mesh_and_collision()
 # Tidal channels cut into the relief (see GroundChannel): each lowers the
 # ground inside its rectangle by depth x amount with a soft edge, in
 # either landmass mode, on top of the landmass height and under the fine
@@ -1198,6 +1213,8 @@ func _landmass_distance(world_xz: Vector2) -> float:
 func _relief_height(world_xz: Vector2) -> float:
 	_ensure_landmass_refs()
 	var landmass_height: float
+	# Painted distance past the drawn line (mask mode); 0 = no cap below.
+	var shore_distance: float = 0.0
 	if has_landmass_mask():
 		# A ramp split at the drawn line (mask distance 0 = sea_level by
 		# construction, no offset needed). Sand side: the beach rises to
@@ -1212,7 +1229,7 @@ func _relief_height(world_xz: Vector2) -> float:
 		# doesn't know which edge is which, and the seaward_* exports are
 		# SDF-only. The elevation painting rides on top of the sand side
 		# alone (_elevation_lift(), clipped to 0 at the drawn line).
-		var shore_distance: float = _mask_distance_sample(world_xz)
+		shore_distance = _mask_distance_sample(world_xz)
 		if shore_distance <= 0.0:
 			var u: float = clampf(-shore_distance / maxf(landmass_falloff_width, 0.001), 0.0, 1.0)
 			landmass_height = _landmass_sea_level + landmass_interior_height * (1.0 - (1.0 - u) * (1.0 - u))
@@ -1239,7 +1256,8 @@ func _relief_height(world_xz: Vector2) -> float:
 
 	# Channels cut into the landmass base, before the fine detail so the
 	# sand texture rides the channel floor too.
-	landmass_height -= _channel_drop(world_xz)
+	var channel_drop: float = _channel_drop(world_xz)
+	landmass_height -= channel_drop
 
 	# Fine surface detail on top of the landmass base - the field's
 	# original bump/wetness noise, unrelated to sea_level, kept purely as
@@ -1249,7 +1267,13 @@ func _relief_height(world_xz: Vector2) -> float:
 	var bump: float = (_value_noise(world_xz / noise_scale) - 0.5) * 2.0
 	var fine_detail: float = bump * relief_amplitude - wetness * relief_amplitude
 
-	return landmass_height + fine_detail
+	var height: float = landmass_height + fine_detail
+	# Painted water stays water (see seabed_min_depth) - capped before the
+	# channel's cut, so a draining channel still surfaces what it drains.
+	if shore_distance > 0.0:
+		var min_depth: float = seabed_min_depth * smoothstep(0.0, maxf(seabed_min_depth_reach, 0.001), shore_distance)
+		height = minf(height, _landmass_sea_level - min_depth - channel_drop)
+	return height
 
 # --- Channels ---
 

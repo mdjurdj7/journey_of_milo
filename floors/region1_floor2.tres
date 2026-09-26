@@ -27,7 +27,7 @@ anchor = true
 [sub_resource type="Resource" id="FloorEnemy_crab_dragonfly"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("18_dragonfly_lone")
-position = Vector2(0, -22.25)
+position = Vector2(0, -22)
 yaw_degrees = -167.0
 group = &"crab"
 
