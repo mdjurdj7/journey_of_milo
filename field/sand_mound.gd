@@ -21,10 +21,12 @@ class_name SandMound
 # the hill's lifted face, which floated the rim there) plus the bell, so
 # the mound lies on whatever the sand does under it, with its rim
 # rim_sink_m under the sand all round: a rim at exactly the ground's
-# height would fight it for the pixel. The heights are sampled only when the body has moved or
-# turned past resample_distance_m / resample_degrees (follow(), from
-# every roam step and every regrounding); a rise change only rescales the
-# bell over the cached ground.
+# height would fight it for the pixel. The sand is sampled once, when
+# FieldEnemy first grounds the body where it was placed (resample()), and
+# again only if the relief itself is rebuilt (a live terrain edit) or a
+# shape export changes - the body never moves in the field, and a
+# fight's lunge, recoil or turn is not the mound's to follow. A rise
+# change only rescales the bell over the cached ground.
 #
 # set_rise() is the whole of its motion: 1 = full height, 0 = flattened
 # into the sand and hidden. FieldEnemy drives it from the same lift its
@@ -94,11 +96,6 @@ class_name SandMound
 	set(value):
 		segments_across = value
 		_rebuild_grid()
-# follow() samples the ground again once the body has moved or turned
-# this far since the last sample.
-@export var resample_distance_m: float = 0.05
-@export var resample_degrees: float = 2.0
-
 var _ground: Ground = null
 var _rise: float = 1.0
 var _material: StandardMaterial3D = null
@@ -116,8 +113,6 @@ var _indices: PackedInt32Array = PackedInt32Array()
 var _world_xz: PackedVector2Array = PackedVector2Array()
 var _ground_y: PackedFloat32Array = PackedFloat32Array()
 var _sampled: bool = false
-var _sampled_position: Vector3 = Vector3.ZERO
-var _sampled_yaw: float = 0.0
 
 func _ready() -> void:
 	top_level = true
@@ -133,47 +128,33 @@ func _ready() -> void:
 	_ready_done = true
 	_rebuild_grid()
 
-# The sand it lies on - FieldEnemy hands over its own Ground.
+# The sand it lies on - FieldEnemy hands over its own Ground. Nothing is
+# sampled until resample().
 func set_ground(ground: Ground) -> void:
 	_ground = ground
-	_sampled = false
-	follow()
 
-# 1 = full height, 0 = flat and hidden.
+# 1 = full height, 0 = flat and hidden. Rescales the cached sample only.
 func set_rise(rise: float) -> void:
 	var clamped: float = clampf(rise, 0.0, 1.0)
-	if is_equal_approx(clamped, _rise) and _sampled:
+	if is_equal_approx(clamped, _rise):
 		return
 	_rise = clamped
-	_refresh_sample()
 	_write_mesh()
 
 func get_rise() -> float:
 	return _rise
 
-# The body has moved (a roam step, a regrounding): sample the sand again
-# if it has gone far enough to matter.
-func follow() -> void:
-	if _refresh_sample():
-		_write_mesh()
-
-# Samples again when there is no sample yet or the body has moved or
-# turned past the thresholds; true when it did.
-func _refresh_sample() -> bool:
+# Samples the sand under the body where it stands and faces now, and
+# rebuilds - FieldEnemy calls it when the body is grounded at spawn and
+# on a relief rebuild; the shape exports call it through _rebuild_grid().
+func resample() -> void:
 	if not _ready_done or _ground == null:
-		return false
+		return
 	var anchor := get_parent() as Node3D
 	if anchor == null:
-		return false
-	var position_now: Vector3 = anchor.global_position
-	var yaw_now: float = anchor.global_rotation.y
-	if _sampled:
-		var moved: float = Vector2(position_now.x - _sampled_position.x, position_now.z - _sampled_position.z).length()
-		var turned: float = absf(rad_to_deg(wrapf(yaw_now - _sampled_yaw, -PI, PI)))
-		if moved < resample_distance_m and turned < resample_degrees:
-			return false
-	_sample(position_now, yaw_now)
-	return true
+		return
+	_sample(anchor.global_position, anchor.global_rotation.y)
+	_write_mesh()
 
 # The body's frame -> world, yaw only: the sand never tilts with a
 # recoil.
@@ -189,8 +170,6 @@ func _sample(anchor_position: Vector3, anchor_yaw: float) -> void:
 		_world_xz[i] = Vector2(world.x, world.z)
 		_ground_y[i] = _ground.to_global(Vector3(on_ground.x, height, on_ground.z)).y
 	_sampled = true
-	_sampled_position = anchor_position
-	_sampled_yaw = anchor_yaw
 
 # The grid from the shape exports: rows from the front (-Z) to the back,
 # each across from -X to +X - the relief mesh's own order, so the same
@@ -253,8 +232,10 @@ func _rebuild_grid() -> void:
 			_indices[n + 4] = bottom_right
 			_indices[n + 5] = bottom_left
 			n += 6
+	# A new grid needs its own sample - only once there is sand to take it
+	# from (not at _ready(), before FieldEnemy has handed the Ground over).
 	_sampled = false
-	follow()
+	resample()
 
 # The cached sand plus the bell at this rise; hidden once flat.
 func _write_mesh() -> void:

@@ -14,7 +14,6 @@
 [ext_resource type="Resource" path="res://cards/pools/belongings_pool.tres" id="10_belongings_pool"]
 [ext_resource type="PackedScene" path="res://field/bundle_prop.tscn" id="14_bundle"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/siltjaw.tres" id="16_siltjaw"]
-[ext_resource type="Script" path="res://floors/floor_roam.gd" id="17_floor_roam"]
 
 [sub_resource type="Resource" id="FloorEnemy_sputter"]
 script = ExtResource("2_floor_enemy")
@@ -48,16 +47,9 @@ group = &"island"
 [sub_resource type="Resource" id="FloorEnemy_siltjaw"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("16_siltjaw")
-position = Vector2(7, -3)
-yaw_degrees = 150.0
+position = Vector2(4.5, -7)
+yaw_degrees = -11.0
 required = false
-
-[sub_resource type="Resource" id="FloorRoam_siltjaw"]
-script = ExtResource("17_floor_roam")
-enemy_index = 4
-area = Rect2(3, -10, 8, 13)
-speed_mps = 0.35
-band_keep_off_m = 3.0
 
 [sub_resource type="Resource" id="FloorPatrol_island"]
 script = ExtResource("12_floor_patrol")
@@ -92,7 +84,6 @@ relief_subdivisions = Vector2i(356, 251)
 enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3"), SubResource("FloorEnemy_siltjaw")])
 props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_bundle"), SubResource("FloorProp_alcove_cache")])
 patrols = Array[ExtResource("12_floor_patrol")]([SubResource("FloorPatrol_island")])
-roams = Array[ExtResource("17_floor_roam")]([SubResource("FloorRoam_siltjaw")])
 gate_distance_beyond_enemy = 7.5
 wear_path_mid_offset = 1.875
 wear_path_override = null

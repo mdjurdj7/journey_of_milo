@@ -144,19 +144,14 @@ so it doesn't get silently reinvented or silently forgotten.
   the field camera; it stays still. `FloorData.rare_pool` exists and is
   empty on every floor, so the 5% rare draw falls back to the bundle's
   own pool until trinkets or weapons exist. (2026-09-22, bundle.)
-- **The Siltjaw's buried look is only its body sunk into the sand.** Its
-  rules, intent, burial and roam are built (`battle/rules/enemies/
-  siltjaw.tres`, `field/roamer.gd`), but in the field it is its body at a
-  negative `rest_height_m` (-0.4 m), so only a dark ridge clears the
-  sand - no swell. The look the design wants (a sand-coloured swell with
-  the dark ridge through it; surfaced, a dark body - Bible §5 stands)
-  needs its own mound mesh riding the body, in the sand's material, or
-  a relief/shader bump at the body's XZ. A moving relief rebuild is too
-  expensive, so it's a mesh (the sculpted-dune mesh floor 2's removed
-  SandOverhang baked, in git history, is the nearest precedent) or a
-  ground-shader uniform. The body is
-  still the Sputter's glb, and it has no contact sound. Build all three
-  with the model. (2026-09-25, Siltjaw rules pass.)
+- **The Siltjaw still wears the Sputter's body and has no contact
+  sound.** Its rules, intent, burial and buried look (a SandMound over it
+  in the field) are built (`battle/rules/enemies/siltjaw.tres`,
+  `field/sand_mound.gd`); the surfaced body is the default glb and its
+  `contact_sounds` is empty. Build both with the model. It no longer
+  roams: it stands at a fixed spot on floor 2's flats, and its mound
+  samples the sand once. (2026-09-25, Siltjaw rules pass; 2026-09-26,
+  roam removed.)
 - **The focus-language drawing is copied, not shared.** The title menu,
   `RewardScreen`, `LootScreen` and now `BelongingsScreen` each draw the
   same focus language (utility grey at rest, bone or ink plus a short

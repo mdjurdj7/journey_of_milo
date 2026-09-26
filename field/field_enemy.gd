@@ -322,8 +322,10 @@ func _ground_to_relief() -> void:
 	if _ground == null:
 		return
 	global_position.y = _body_y_on_ground(global_position.x, global_position.z)
+	# The mound's one sample of the sand: here, once the body stands where
+	# it was placed - and again only if the relief itself is rebuilt.
 	if _mound != null:
-		_mound.follow()
+		_mound.resample()
 
 # The body's global Y with its feet on the relief at this XZ (see
 # _ground_to_relief()'s doc for the model_ground_offset part). The
@@ -853,18 +855,6 @@ func fly_to(spot: Vector3, hover: float, speed: float, rise_seconds: float, land
 
 func is_airborne() -> bool:
 	return _airborne
-
-# --- Roaming (a body drifting on the sand; see Roamer) ---
-
-# One step of a roam: the body at world XZ `xz` with its feet on the
-# relief there, turned turn_weight of the way toward `heading` (radians,
-# face_toward_point()'s convention). The contact area rides along and
-# keeps monitoring - a roamer is always something to walk into.
-func roam_step(xz: Vector2, heading: float, turn_weight: float) -> void:
-	global_position = Vector3(xz.x, _body_y_on_ground(xz.x, xz.y), xz.y)
-	rotation.y = lerp_angle(rotation.y, heading, clampf(turn_weight, 0.0, 1.0))
-	if _mound != null:
-		_mound.follow()
 
 # A fight is starting and this member is in the air: the flight ends
 # here, and the body drops straight down over battle_land_seconds -

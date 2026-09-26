@@ -282,9 +282,6 @@ var _last_fallen_data: EnemyData = null
 var _floor_cleared_emitted: bool = false
 # One PackPatrol per FloorData.patrols entry - see _spawn_floor_patrols().
 var _patrols: Array[PackPatrol] = []
-# The worn band's three points, world space, as _aim_wear_path() handed
-# them to Ground - see get_wear_path(). Empty until the gate is placed.
-var _wear_path: PackedVector3Array = PackedVector3Array()
 
 # Parent-first, before any child has entered the tree or run its
 # _ready(): the one moment the floor's landmass and spawn can be put onto
@@ -390,8 +387,6 @@ func _ready() -> void:
 		enemy.contacted.connect(_on_enemy_contacted)
 
 	_setup_exit_gate()
-	# After the gate: a roam keeps off the worn band, which the gate aims.
-	_spawn_floor_roams()
 	_setup_field_hud()
 	_build_boundary()
 	_setup_exit_gate_channel()
@@ -727,36 +722,6 @@ func _spawn_floor_patrols() -> void:
 		add_child(patrol)
 		patrol.setup(members, waypoints, entry.dwell_min_seconds, entry.dwell_max_seconds)
 		_patrols.append(patrol)
-
-# The floor's roams (FloorRoam), one Roamer each, direct children of this
-# node so the field's freeze stops them. The enemy is found by the name
-# _spawn_floor_enemies() gave it (its index), the area made world space
-# from the spawn like every other floor position. Runs after the gate is
-# placed: the worn band a roam keeps off is aimed there.
-func _spawn_floor_roams() -> void:
-	var floor_data := get_floor_data()
-	if floor_data == null:
-		return
-	var spawn: Vector3 = get_spawn_position()
-	for index in floor_data.roams.size():
-		var entry: FloorRoam = floor_data.roams[index]
-		if entry == null:
-			continue
-		var enemy := get_node_or_null(NodePath("FieldEnemy%d" % entry.enemy_index)) as FieldEnemy
-		if enemy == null:
-			push_warning("RegionField: floor roam %d names enemy %d, which isn't on the field; skipped." % [index, entry.enemy_index])
-			continue
-		var area := Rect2(Vector2(spawn.x, spawn.z) + entry.area.position, entry.area.size)
-		var roamer := Roamer.new()
-		roamer.name = "Roam_%s" % enemy.name
-		add_child(roamer)
-		roamer.setup(enemy, get_node_or_null(ground_path) as Ground, area, entry.speed_mps, entry.band_keep_off_m, _wear_path)
-
-# The worn band as it was aimed: start, the point it passes through, end
-# (world space; Ground draws the curve through them). Empty before the
-# gate is placed or on a floor with no gate.
-func get_wear_path() -> PackedVector3Array:
-	return _wear_path
 
 # The route a group flies, if any.
 func _patrol_for(group: StringName) -> PackPatrol:
@@ -1499,11 +1464,10 @@ func _aim_wear_path(enemy: FieldEnemy) -> void:
 	var spawn: Vector3 = get_spawn_position()
 	if floor_data.wear_path_override.size() >= 3:
 		var points: PackedVector2Array = floor_data.wear_path_override
-		_wear_path = PackedVector3Array([
+		ground.set_wear_path(
 			spawn + Vector3(points[0].x, 0.0, points[0].y),
 			spawn + Vector3(points[1].x, 0.0, points[1].y),
-			spawn + Vector3(points[2].x, 0.0, points[2].y)])
-		ground.set_wear_path(_wear_path[0], _wear_path[1], _wear_path[2])
+			spawn + Vector3(points[2].x, 0.0, points[2].y))
 		return
 	# The middle point is pushed off the enemy along the exit's right, so
 	# the band bends past the standing pool painted beside the crab rather
@@ -1511,7 +1475,6 @@ func _aim_wear_path(enemy: FieldEnemy) -> void:
 	# quarter turn, not world +X, so this holds for any exit.
 	var right: Vector3 = get_exit_direction().cross(Vector3.UP).normalized()
 	var mid: Vector3 = enemy.global_position + right * floor_data.wear_path_mid_offset
-	_wear_path = PackedVector3Array([spawn, mid, gate.global_position])
 	ground.set_wear_path(spawn, mid, gate.global_position)
 
 # The Ambience bus toward `to_db` over `seconds` - one tween, the last

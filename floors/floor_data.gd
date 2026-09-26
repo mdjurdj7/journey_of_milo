@@ -79,10 +79,6 @@ class_name FloorData
 # Routes for clusters that move between perches - one per group that
 # does (see FloorPatrol). Empty: every enemy stands where it was put.
 @export var patrols: Array[FloorPatrol] = []
-# Enemies that drift aimlessly about a patch of the floor - one per enemy
-# that does (see FloorRoam). Empty: none roams.
-@export var roams: Array[FloorRoam] = []
-
 @export_group("Gate")
 # Beyond the first enemy's own position, along exit_direction - where the
 # gate line lands.
