@@ -212,6 +212,15 @@ func _check_starter_art() -> void:
 	_expect_eq(with_art.art_rect.stretch_mode, TextureRect.STRETCH_KEEP_ASPECT_COVERED, "...as a cover crop")
 	_expect(not without_art.art_rect.visible and without_art.art_rect.texture == null, "Carve's face shows no image")
 	_expect(without_art.glyph.visible, "...and keeps its glyph")
+	# One shared material, tuned in one place; its defaults leave the art
+	# as painted.
+	var material := with_art.art_rect.material as ShaderMaterial
+	_expect(material != null and material == without_art.art_rect.material, "Every face shares the one card-art material")
+	if material != null:
+		_expect_eq(material.resource_path, "res://battle/card_art_material.tres", "...card_art_material.tres")
+		_expect_eq(material.shader.get_shader_uniform_list().size(), 3, "The card-art shader compiles (3 uniforms)")
+		_expect_eq(material.get_shader_parameter("art_contrast"), 1.0, "art_contrast defaults to 1.0 (off)")
+		_expect_eq(material.get_shader_parameter("art_tint"), Color.WHITE, "art_tint defaults to white (off)")
 	with_art.set_card_data(_card("carve"))
 	_expect(not with_art.art_rect.visible and with_art.glyph.visible, "A reused face drops the art for a card without")
 	with_art.queue_free()

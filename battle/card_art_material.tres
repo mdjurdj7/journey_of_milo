@@ -1,0 +1,9 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://battle/card_art.gdshader" id="1_card_art"]
+
+[resource]
+shader = ExtResource("1_card_art")
+shader_parameter/art_contrast = 1.0
+shader_parameter/art_tint = Color(1, 1, 1, 1)
+shader_parameter/bone = Color(0.94, 0.91, 0.86, 1)

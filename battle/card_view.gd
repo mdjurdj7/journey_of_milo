@@ -125,6 +125,11 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @export var art_field_stance: Color = Color(0.886, 0.856, 0.846)
 @export var art_field_power: Color = Color(0.890, 0.868, 0.820)
 @export var art_field_radius: int = 3
+# The art's tint and contrast pull (battle/card_art.gdshader). One
+# material SHARED by every card, not a copy each: its art_tint and
+# art_contrast are the game-wide card-art values, and editing them on
+# that resource moves every face at once, live.
+@export_file("*.tres") var art_material_path: String = "res://battle/card_art_material.tres"
 # The two shadows: a hairline (1px down, 18%) and a soft spread (8px,
 # 12%). Both deepen on hover (see Hover).
 @export_range(0.0, 1.0) var shadow_hairline_alpha: float = 0.18
@@ -313,6 +318,8 @@ func _ready() -> void:
 	art_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	art_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 	art_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	if not art_material_path.is_empty():
+		art_rect.material = load(art_material_path) as Material
 	art_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	art_rect.visible = false
 	_bonus_corner = Control.new()
