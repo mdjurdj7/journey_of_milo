@@ -19,9 +19,13 @@ class_name SandMound
 # (Ground.get_visible_height_at() - the relief mesh's own triangles; the
 # analytic get_height_at() stands up to a few centimetres off them on
 # the hill's lifted face, which floated the rim there) plus the bell, so
-# the mound lies on whatever the sand does under it, with its rim
-# rim_sink_m under the sand all round: a rim at exactly the ground's
-# height would fight it for the pixel. The sand is sampled once, when
+# the mound lies on whatever the sand does under it. Only the last
+# rim_band of the way out does it dip, to rim_sink_m under the sand at
+# the rim: a rim at exactly the ground's height would fight it for the
+# pixel, but sinking the whole bell by that much buried its outer fifth
+# (the raised cosine barely leaves the sand there) and the mound showed
+# ~0.94 x 1.98 m of its 1.2 x 2.5. This way it meets the sand near the
+# footprint it is given. The sand is sampled once, when
 # FieldEnemy first grounds the body where it was placed (resample()), and
 # again only if the relief itself is rebuilt (a live terrain edit) or a
 # shape export changes - the body never moves in the field, and a
@@ -37,7 +41,8 @@ class_name SandMound
 # build), on the flat matte material the hulls use, with a darker ridge
 # down the spine through vertex colour - pale sand with one dark line,
 # seen from above. The ridge narrows with the footprint to a point at
-# each end.
+# each end, and fades into the sand over ridge_soft_m either side -
+# across evenly spaced columns, so the vertex colour has room to blend.
 
 @export_group("Shape")
 @export var length_m: float = 2.5:
@@ -68,6 +73,12 @@ class_name SandMound
 	set(value):
 		rim_sink_m = value
 		_write_mesh()
+# The outer fraction of the way from crest to rim over which it dips to
+# rim_sink_m - inside that it stands on the sand, the bell alone.
+@export_range(0.01, 0.5, 0.01) var rim_band: float = 0.08:
+	set(value):
+		rim_band = value
+		_rebuild_grid()
 
 @export_group("Ridge")
 # Across the widest point; it narrows with the footprint.
@@ -76,7 +87,7 @@ class_name SandMound
 		ridge_width_m = value
 		_rebuild_grid()
 # The blend from ridge to sand on each side.
-@export var ridge_soft_m: float = 0.03:
+@export var ridge_soft_m: float = 0.2:
 	set(value):
 		ridge_soft_m = value
 		_rebuild_grid()
@@ -91,8 +102,9 @@ class_name SandMound
 	set(value):
 		segments_long = value
 		_rebuild_grid()
-# Per side, from the ridge's soft edge out to the rim.
-@export var segments_across: int = 8:
+# Per side, evenly from the spine out to the rim (one more is added just
+# inside the rim, for the dip).
+@export var segments_across: int = 10:
 	set(value):
 		segments_across = value
 		_rebuild_grid()
@@ -101,11 +113,12 @@ var _rise: float = 1.0
 var _material: StandardMaterial3D = null
 var _ready_done: bool = false
 # The grid in the body's frame, row by row from the front: each vertex's
-# local XZ, its bell (0..1) and its ridge weight (0..1); the triangles
-# over it.
+# local XZ, its bell (0..1), how far into the rim's dip it is (0..1) and
+# its ridge weight (0..1); the triangles over it.
 var _cols: int = 0
 var _local_xz: PackedVector2Array = PackedVector2Array()
 var _bell: PackedFloat32Array = PackedFloat32Array()
+var _dip: PackedFloat32Array = PackedFloat32Array()
 var _ridge: PackedFloat32Array = PackedFloat32Array()
 var _indices: PackedInt32Array = PackedInt32Array()
 # The last sample: each vertex's world XZ and the sand's world Y there,
@@ -175,21 +188,23 @@ func _sample(anchor_position: Vector3, anchor_yaw: float) -> void:
 # each across from -X to +X - the relief mesh's own order, so the same
 # winding faces up (see Ground._build_relief_indices()). Columns are
 # fractions of the row's half-width, so every row ends on the rim and
-# the two end rows close to a point; two columns each side pin the
-# ridge's edge and its soft edge.
+# the two end rows close to a point. They are evenly spaced, so the
+# ridge's colour fades across several of them rather than stepping at
+# one; one more sits halfway into the rim's dip.
 func _rebuild_grid() -> void:
 	if not _ready_done:
 		return
 	var rows: int = maxi(segments_long, 2) + 1
-	var outer: int = maxi(segments_across, 1)
+	var outer: int = maxi(segments_across, 2)
 	var half_width: float = maxf(width_m, 0.01) * 0.5
-	var ridge_edge: float = clampf(ridge_width_m * 0.5 / half_width, 0.0, 0.9)
-	var soft_edge: float = clampf(ridge_edge + maxf(ridge_soft_m, 0.0) / half_width, ridge_edge + 0.01, 0.95)
-	# One side's fractions, centre out: 0, the ridge, then the soft edge
-	# evenly out to the rim.
-	var side: Array[float] = [ridge_edge]
-	for k in outer + 1:
-		side.append(lerpf(soft_edge, 1.0, float(k) / float(outer)))
+	var band: float = clampf(rim_band, 0.01, 0.5)
+	# One side's fractions, centre out, not counting the centre itself.
+	var side: Array[float] = []
+	for k in range(1, outer + 1):
+		var fraction: float = float(k) / float(outer)
+		if k == outer and 1.0 - band * 0.5 > side.back():
+			side.append(1.0 - band * 0.5)
+		side.append(fraction)
 	var fractions: Array[float] = []
 	for k in range(side.size() - 1, -1, -1):
 		fractions.append(-side[k])
@@ -202,6 +217,7 @@ func _rebuild_grid() -> void:
 	var front_z: float = -forward_offset_m - length * 0.5
 	_local_xz.resize(rows * _cols)
 	_bell.resize(rows * _cols)
+	_dip.resize(rows * _cols)
 	_ridge.resize(rows * _cols)
 	for row in rows:
 		var s: float = float(row) / float(rows - 1)
@@ -215,7 +231,12 @@ func _rebuild_grid() -> void:
 			var i: int = row * _cols + col
 			_local_xz[i] = Vector2(a * row_half, z)
 			_bell[i] = 0.5 + 0.5 * cos(PI * r)
-			_ridge[i] = 1.0 if absf(a) <= ridge_edge + 0.0001 else 0.0
+			_dip[i] = smoothstep(1.0 - band, 1.0, r)
+			# Full ridge within its half-width (narrowing with the row's),
+			# fading to sand over ridge_soft_m beyond it.
+			var ridge_half: float = maxf(ridge_width_m, 0.0) * 0.5 * row_half / half_width
+			var across: float = absf(a) * row_half
+			_ridge[i] = 1.0 - smoothstep(ridge_half, ridge_half + maxf(ridge_soft_m, 0.001), across)
 
 	_indices.resize((rows - 1) * (_cols - 1) * 6)
 	var n: int = 0
@@ -246,11 +267,15 @@ func _write_mesh() -> void:
 	if array_mesh == null or not _sampled or _rise <= 0.0 or _ground == null:
 		return
 	var count: int = _world_xz.size()
-	var lift: float = (maxf(height_m, 0.0) + rim_sink_m) * _rise
+	# The bell stands on the sand, dipping under it only over the rim band;
+	# as the rise falls the dip spreads inward with it, so a flattening
+	# mound sinks under the sand rather than lying on it.
+	var lift: float = maxf(height_m, 0.0) * _rise
 	var vertices := PackedVector3Array()
 	vertices.resize(count)
 	for i in count:
-		vertices[i] = Vector3(_world_xz[i].x, _ground_y[i] + lift * _bell[i] - rim_sink_m, _world_xz[i].y)
+		var sink: float = rim_sink_m * lerpf(1.0, _dip[i], _rise)
+		vertices[i] = Vector3(_world_xz[i].x, _ground_y[i] + lift * _bell[i] - sink, _world_xz[i].y)
 
 	# Smooth normals, each vertex the sum of its triangles'. This winding
 	# faces up with (c - a) x (b - a); a closed end's collapsed triangles
