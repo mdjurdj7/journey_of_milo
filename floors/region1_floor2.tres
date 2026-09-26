@@ -10,7 +10,7 @@
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
 [ext_resource type="Texture2D" uid="uid://i82lal47k3wr" path="res://assets/field/masks/Map3_elev_x1.25_dune.png" id="8_map3_elev"]
 [ext_resource type="Texture2D" uid="uid://cx25fsucs3u3d" path="res://assets/field/masks/Map3_wear_x1.25_alcove.png" id="13_map3_wear"]
-[ext_resource type="PackedScene" path="res://field/reward_spread.tscn" id="9_reward_spread"]
+[ext_resource type="PackedScene" path="res://field/belongings_cache.tscn" id="9_belongings_cache"]
 [ext_resource type="Resource" path="res://cards/pools/belongings_pool.tres" id="10_belongings_pool"]
 [ext_resource type="PackedScene" path="res://field/bundle_prop.tscn" id="14_bundle"]
 [ext_resource type="PackedScene" path="res://field/sand_overhang.tscn" id="15_overhang"]
@@ -80,15 +80,9 @@ position = Vector3(9.8, 0, -24.3)
 
 [sub_resource type="Resource" id="FloorProp_alcove_cache"]
 script = ExtResource("3_floor_prop")
-scene = ExtResource("9_reward_spread")
+scene = ExtResource("9_belongings_cache")
 position = Vector3(10.1, 0, -24.3)
 pool = ExtResource("10_belongings_pool")
-overrides = {
-"card_count": 3,
-"depth_stagger": 0.0,
-"fan_axis": Vector2(0, 1),
-"spacing": 0.35
-}
 
 [resource]
 script = ExtResource("1_floor_data")

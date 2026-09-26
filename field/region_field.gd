@@ -40,6 +40,8 @@ enum RewardMode { SCREEN, WORLD }
 @export var reward_spread_scene_path: String = "res://field/reward_spread.tscn"
 # What a BundleProp opens into (see _open_loot_screen()).
 @export var loot_screen_scene_path: String = "res://battle/loot_screen.tscn"
+# What a BelongingsCache opens into (see open_belongings_screen()).
+@export var belongings_screen_scene_path: String = "res://battle/belongings_screen.tscn"
 # Held back until the battle framing has gone: the cards should appear on
 # an ordinary field view, not under the battle camera mid-swing-out.
 # Raised to the camera rig's own battle_transition_time when that's
@@ -833,6 +835,8 @@ func _spawn_floor_props() -> void:
 			(prop as RewardSpread).pool = entry.pool
 		elif prop is BundleProp:
 			_setup_bundle(prop as BundleProp, entry, floor_data)
+		elif prop is BelongingsCache:
+			_setup_belongings_cache(prop as BelongingsCache, entry, floor_data, id)
 		# A child prop's position is local to its parent (a perch); a top-
 		# level one's is an XZ offset from spawn, grounded by the prop.
 		var placement: Vector3 = entry.position if entry.parent_index >= 0 else Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.z)
@@ -885,6 +889,16 @@ func _setup_belongings_card(card: WorldCard, entry: FloorProp, floor_data: Floor
 func _setup_bundle(bundle: BundleProp, entry: FloorProp, floor_data: FloorData) -> void:
 	var pool: RewardPool = entry.pool if entry.pool != null else floor_data.reward_pool
 	bundle.roll(RunState.rng, floor_data.gold_min, floor_data.gold_max, pool, floor_data.rare_pool)
+
+# A belongings cache's one roll, at floor load from the run's own
+# generator, the same pools as a bundle's (see BelongingsCache.roll()),
+# plus its once-per-run id and the prop's own line when it names one.
+func _setup_belongings_cache(cache: BelongingsCache, entry: FloorProp, floor_data: FloorData, id: String) -> void:
+	var pool: RewardPool = entry.pool if entry.pool != null else floor_data.reward_pool
+	cache.cache_id = id
+	if not entry.world_line.is_empty():
+		cache.world_line = entry.world_line
+	cache.roll(RunState.rng, floor_data.gold_min, floor_data.gold_max, pool, floor_data.rare_pool)
 
 # A world point seated on the relief plus `clearance` - same to_local()-
 # first idiom RewardSpread/Keeper use, since get_height_at() works in
@@ -1411,6 +1425,31 @@ func _open_reward_screen() -> void:
 
 func _on_reward_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
+
+# A belongings cache's choice, over the field under the reward screen's
+# own freeze (see _open_reward_screen()) - the camera holds where it is
+# and the alcove stays in view behind the scrim. False (the cache tries
+# again next tick) while a fight is open or the field is already frozen.
+func open_belongings_screen(cache: BelongingsCache) -> bool:
+	if _battle_open or not can_process():
+		return false
+	var scene := load(belongings_screen_scene_path) as PackedScene
+	if scene == null:
+		push_warning("RegionField: could not load %s; no belongings screen." % belongings_screen_scene_path)
+		return false
+	var screen := scene.instantiate() as BelongingsScreen
+	screen.setup(cache.world_line, cache.shown_card, cache.gold, cache.closed_card, deck_panel)
+	screen.closed.connect(_on_belongings_screen_closed.bind(cache))
+	if _loot_screen != null and is_instance_valid(_loot_screen):
+		_loot_screen.close()
+	process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(screen)
+	return true
+
+func _on_belongings_screen_closed(taken: int, cache: BelongingsCache) -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT
+	if is_instance_valid(cache):
+		cache.resolve(taken)
 
 # A bundle's loot window, beside the bundle on FieldHUD - the field stays
 # live under it (LootScreen closes itself on leaving reach or a freeze).

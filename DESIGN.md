@@ -163,3 +163,13 @@ so it doesn't get silently reinvented or silently forgotten.
   the nearest precedent) or a ground-shader uniform. The body is
   still the Sputter's glb, and it has no contact sound. Build all three
   with the model. (2026-09-25, Siltjaw rules pass.)
+- **The focus-language drawing is copied, not shared.** The title menu,
+  `RewardScreen`, `LootScreen` and now `BelongingsScreen` each draw the
+  same focus language (utility grey at rest, bone or ink plus a short
+  hairline to the left when focused); the three screens each carry
+  their own outlined-text helper, `RewardScreen` and `BelongingsScreen`
+  each build their own scrim, and `BelongingsScreen` copies
+  `LootScreen`'s gold ring. Extracting one helper means touching
+  the reward screen, which was out of scope for the alcove belongings
+  pass, so the fourth copy went in as a copy. Extract when one of those
+  screens is next open for work. (2026-09-26, alcove belongings.)

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://field/belongings_cache.gd" id="1_belongings_cache"]
+
+[node name="BelongingsCache" type="Node3D"]
+script = ExtResource("1_belongings_cache")
