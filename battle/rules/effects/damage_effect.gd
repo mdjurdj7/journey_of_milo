@@ -15,11 +15,12 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	# blocked twice.
 	var base: int = CardBonus.resolved_value(effect, ctx)
 
-	# The stance's bonus is part of the attack's own number, so it goes in
-	# BEFORE the status modifiers - a status that scales outgoing damage
-	# scales the whole blow, stance included, rather than only the part
-	# the card authored.
-	var amount: int = Status.apply_modifiers(base + ctx.stance_attack_bonus, ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+	# The attack bonus (stance, Dying Light) is part of the attack's own
+	# number, so it goes in BEFORE the status modifiers - a status that
+	# scales outgoing damage scales the whole blow, bonus included, rather
+	# than only the part the card authored. Taken once per card: a second
+	# damage effect on the same Attack gets 0 (take_attack_bonus()).
+	var amount: int = Status.apply_modifiers(base + ctx.take_attack_bonus(), ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 
 	var targets: Array[Combatant] = []
 	if effect.target_scope == CardEffect.TargetScope.ALL_ENEMIES:

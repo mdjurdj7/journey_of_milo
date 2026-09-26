@@ -6,4 +6,4 @@ class_name UndamagedBlockEffect
 # player's previous turn) - an ADD, not a replace. The number is
 # CardBonus's reading, the same one the card face prints.
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
-	ctx.player.block += CardBonus.resolved_value(effect, ctx)
+	ctx.gain_block(CardBonus.resolved_value(effect, ctx))

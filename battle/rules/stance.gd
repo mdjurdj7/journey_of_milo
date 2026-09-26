@@ -35,11 +35,19 @@ static func apply_to(combatant: Combatant, stance_data: StanceData) -> Stance:
 	return combatant.stance
 
 # Extra damage this stance adds to an Attack, all stacks counted. 0 with
-# no stance, which is every fight for a player who hasn't taken one.
-static func attack_bonus(stance: Stance) -> int:
+# no stance, which is every fight for a player who hasn't taken one - and
+# 0 when the stance wants Critical and `critical` says the player isn't.
+# The whole attack bonus, stance and statuses together, is AttackBonus's.
+static func attack_bonus(stance: Stance, critical: bool) -> int:
 	if stance == null or stance.data == null:
 		return 0
+	if stance.data.bonus_requires_critical and not critical:
+		return 0
 	return stance.data.attack_damage_bonus * stance.stacks
+
+# Whether the stance held forbids gaining Block (Last Resort).
+static func prevents_block_gain(stance: Stance) -> bool:
+	return stance != null and stance.data != null and stance.data.prevents_block_gain
 
 # HP playing an Attack costs, all stacks counted.
 static func attack_hp_loss(stance: Stance) -> int:

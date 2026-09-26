@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="StanceData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/stance_data.gd" id="1_stance_data"]
+
+[resource]
+script = ExtResource("1_stance_data")
+id = "last_resort"
+display_name = "Last Resort"
+description = "While Critical, your Attacks deal 6 more. You can't gain block."
+attack_damage_bonus = 6
+duration_turns = 0
+bonus_requires_critical = true
+prevents_block_gain = true

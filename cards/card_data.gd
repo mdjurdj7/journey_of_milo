@@ -7,7 +7,12 @@ enum TargetType { ENEMY, SELF, NONE }
 # this is no longer display-only: getting a card's type wrong now changes
 # what it costs to play. Appended, never reordered - the integers are
 # baked into every .tres.
-enum CardType { ATTACK, SKILL, STANCE }
+# POWER: a lasting effect that is not a stance - it applies a status that
+# stays for the fight (Dying Light, Refuse the End), coexists with the
+# stance and with other powers, and leaves the deck's rotation for the
+# rest of the fight once played (BattleController._on_play_animation_
+# finished()), whatever removal_scope says.
+enum CardType { ATTACK, SKILL, STANCE, POWER }
 
 enum RemovalScope { NONE, SPENT, CONSUMED }
 # NONE: goes to the discard pile, reshuffles back in for the rest of the

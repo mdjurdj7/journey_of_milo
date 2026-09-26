@@ -63,3 +63,22 @@ const DURATION_UNTIL_TRIGGERED := -2
 # for the first active status carrying one, so a future status gets a
 # pose for free by setting this, no new wiring needed.
 @export var battle_animation: StringName = &""
+
+# Extra damage per stack each Attack card deals while this is up (Dying
+# Light). Once per Attack card, like a stance's bonus - not a MODIFIER,
+# which would land on every damage the player deals (a Toll spend
+# included). Summed with the stance's by AttackBonus. 0 = none.
+@export var attack_damage_bonus: int = 0
+# The bonus above only while the player is Critical.
+@export var bonus_requires_critical: bool = false
+
+# The Refuse the End rule: an ENEMY hit that would take the player to 0
+# HP while they're Critical leaves them at 1 instead, and removes this
+# status (EnemyTurn.take_turn()). Self-inflicted loss never reaches it -
+# that goes through DamagePipeline.apply_bypass(), which doesn't ask.
+@export var prevents_lethal_while_critical: bool = false
+
+# Can be held at most once per fight: while it's active, or once it has
+# fired (Combatant.spent_statuses), a card that would apply it can't be
+# played (EffectResolver.card_blocked()).
+@export var once_per_combat: bool = false

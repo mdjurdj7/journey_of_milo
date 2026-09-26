@@ -39,6 +39,15 @@ var grace_cap_mode: int = CharacterData.GraceCapMode.LARGEST_HIT
 var grace_window_turns: int = 1
 var took_damage_this_turn: bool = false
 var took_damage_last_turn: bool = false
+# Critical: HP at or below this fraction of max HP. A default only, like
+# the Grace fields above - BattleController.setup() copies CharacterData.
+# critical_hp_fraction over it. Read through is_critical_at(), never
+# compared against hp directly, so the rule lives in one place.
+var critical_hp_fraction: float = 0.3
+# Once-per-combat statuses that have fired this fight (StatusData.once_
+# per_combat) - what keeps a second copy of the card from re-arming one.
+# Per fight, like everything else here.
+var spent_statuses: Array[StatusData] = []
 
 # --- Enemy-only ---
 #
@@ -60,3 +69,12 @@ var damage_taken_this_turn: int = 0
 func _init(starting_hp: int = 1) -> void:
 	hp = starting_hp
 	max_hp = starting_hp
+
+func is_critical() -> bool:
+	return is_critical_at(hp)
+
+# Whether `at_hp` is Critical for this fighter - `at_hp` rather than hp so
+# a card face can ask about the HP it WILL have once its own costs are
+# paid (see EffectContext.preview_hp_cost).
+func is_critical_at(at_hp: int) -> bool:
+	return float(at_hp) <= max_hp * critical_hp_fraction

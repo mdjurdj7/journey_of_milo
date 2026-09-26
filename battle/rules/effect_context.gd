@@ -24,11 +24,19 @@ var cards_played_before_this: int = 0
 # rules, the same way damage is dealt here and only REPORTED outward.
 var on_grace_reclaimed: Callable = Callable()
 
-# Extra damage the active stance grants THIS card's attacks, set by
-# EffectResolver.resolve_card() and read by damage_effect.gd. Zero unless
-# the card being resolved is an ATTACK and a stance is up, so no damage
-# effect needs to know what a stance is.
-var stance_attack_bonus: int = 0
+# Whether the card being resolved is an ATTACK - set by EffectResolver.
+# resolve_card(), and what take_attack_bonus() pays out on.
+var card_is_attack: bool = false
+# Whether this card's attack bonus has been handed out already - see
+# take_attack_bonus(). Cleared per card by resolve_card().
+var attack_bonus_taken: bool = false
+
+# HP a card still in hand will have paid before its conditions are read -
+# its own self-damage ahead of them, and the stance's per-Attack cost. Set
+# only on a card face's preview copy (for_card_preview()); 0 when a card
+# actually resolves, since by then those costs HAVE been paid. Read by
+# Condition.CRITICAL alone.
+var preview_hp_cost: int = 0
 
 # Did this card's damage finish something off? Set by damage_effect.gd,
 # cleared per card by EffectResolver.resolve_card(), read by
@@ -46,6 +54,37 @@ var on_heal: Callable = Callable()
 var on_damage: Callable = Callable()
 # Called as on_damage.call(target_combatant, amount, kind) whenever an
 # effect actually lands damage.
+
+# The attack bonus (AttackBonus) for the card being resolved, ONCE: the
+# first damage effect to ask gets it, every later one 0 - the bonus is per
+# Attack card, not per hit. Read when that effect resolves, so Critical
+# is judged after whatever the card paid before it (Last Wager's HP). 0 on
+# anything but an ATTACK.
+func take_attack_bonus() -> int:
+	if not card_is_attack or attack_bonus_taken:
+		return 0
+	attack_bonus_taken = true
+	return AttackBonus.for_player(player, player.hp)
+
+# Every Block the player gains goes through here, so a stance that
+# forbids it (Last Resort) is asked in one place. Returns what was gained.
+func gain_block(amount: int) -> int:
+	if amount <= 0 or Stance.prevents_block_gain(player.stance):
+		return 0
+	player.block += amount
+	return amount
+
+# This context for reading one card still in hand whose costs come to
+# `hp_cost` - a copy, so the hand's shared context is never touched.
+func for_card_preview(hp_cost: int) -> EffectContext:
+	var copy := EffectContext.new()
+	copy.player = player
+	copy.target = target
+	copy.enemies = enemies
+	copy.deck = deck
+	copy.cards_played_before_this = cards_played_before_this
+	copy.preview_hp_cost = hp_cost
+	return copy
 
 func report_damage(target_combatant: Combatant, amount: int, kind: String) -> void:
 	if on_damage.is_valid():

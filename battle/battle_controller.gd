@@ -105,6 +105,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	player.has_grace = RunState.character.has_grace
 	player.grace_cap_mode = RunState.character.grace_cap_mode
 	player.grace_window_turns = RunState.character.grace_window_turns
+	player.critical_hp_fraction = RunState.character.critical_hp_fraction
 	player.energy = player.max_energy
 
 	_combatants.clear()
@@ -185,6 +186,10 @@ func request_play(card_view: CardView) -> void:
 		return
 	var card: CardData = card_view.card_data
 	if card.cost > player.energy:
+		return
+	# A once-per-combat power already up or already spent (Refuse the End)
+	# - the hand shows it faded, and this is the rule behind the fade.
+	if EffectResolver.card_blocked(card, player):
 		return
 	# Every enemy buried: an enemy-target card has nothing to land on.
 	if card.target_type == CardData.TargetType.ENEMY and _hittable_enemy_combatants().is_empty():
@@ -316,6 +321,15 @@ func _impact_delay_for(card: CardData) -> float:
 	return delay
 
 func _on_play_animation_finished(card: CardData) -> void:
+	# A power or a stance has done its work once played - it stays, as a
+	# status or a stance stack - so it leaves rotation for the rest of the
+	# fight, like SPENT, and is back in the deck next fight. For a stance
+	# that is what makes a stack one physical copy: reshuffled, the same
+	# card would stack itself again.
+	var lasting: bool = card.card_type == CardData.CardType.POWER or card.card_type == CardData.CardType.STANCE
+	if lasting and card.removal_scope == CardData.RemovalScope.NONE:
+		deck.exhaust(card)
+		return
 	match card.removal_scope:
 		CardData.RemovalScope.NONE:
 			deck.discard(card)

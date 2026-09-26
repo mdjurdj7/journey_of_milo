@@ -78,8 +78,17 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 					var amount: int = Status.apply_modifiers(intent.value, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 					amount = Status.apply_modifiers(amount, player.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
 					Status.consume_triggered(player.statuses)
+					# Critical is judged BEFORE the hit: Refuse the End saves a
+					# player who was already there, not one this hit put there.
+					var hp_before: int = player.hp
+					var was_critical: bool = player.is_critical()
 					var damage_result := DamagePipeline.resolve(amount, player)
 					var to_hp: int = damage_result["damage_to_hp"]
+					# Left at 1 HP, what reached HP is what was actually lost -
+					# the number the run's HP, the floating number and Grace
+					# all take from here.
+					if Status.refuse_lethal(player, was_critical):
+						to_hp = hp_before - player.hp
 					total_to_hp += to_hp
 					largest_hit = maxi(largest_hit, to_hp)
 				result["damage_to_hp"] = total_to_hp
@@ -116,8 +125,10 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 # counters. Keys: "type" (EnemyIntent.IntentType), "hits", "per_hit"
 # (the first hit's modified damage - what "N x M" shows - or the block
 # gained for DEFEND), "damage_to_hp" (total that would reach HP through
-# block and absorb), "lethal" (damage_to_hp >= the player's current HP).
-# Empty when the enemy has no intent.
+# block and absorb), "lethal" (it would take the player to 0 - replayed
+# hit by hit on a local HP, so a lethal guard that would leave them at 1
+# (Status.refuse_lethal()) keeps it off). Empty when the enemy has no
+# intent.
 #
 # An ATTACK with an interrupt_threshold also carries "threshold" (the
 # authored number), "threshold_left" (what the player still has to deal
@@ -138,6 +149,8 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	var block: int = player.block
 	var absorb: int = player.absorb
 	var total_to_hp: int = 0
+	var hp: int = player.hp
+	var guard_left: bool = true
 	var hits: int = maxi(intent.hits, 1)
 	for hit in hits:
 		var amount: int = Status.apply_modifiers(intent.value, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
@@ -151,9 +164,14 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 		block -= blocked
 		absorb -= absorbed
 		total_to_hp += after_block - absorbed
+		var was_critical: bool = player.is_critical_at(hp)
+		hp -= after_block - absorbed
+		if hp <= 0 and guard_left and Status.lethal_guard(player_statuses, was_critical) != null:
+			hp = 1
+			guard_left = false
 	preview["hits"] = hits
 	preview["damage_to_hp"] = total_to_hp
-	preview["lethal"] = total_to_hp >= player.hp and not bool(preview.get("interrupted", false))
+	preview["lethal"] = hp <= 0 and not bool(preview.get("interrupted", false))
 	return preview
 
 # Unblocked damage becomes Grace. Accumulates ACROSS the whole enemy

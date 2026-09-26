@@ -34,20 +34,22 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 
 var _cache: Dictionary = {}
 
-# The stance pass runs BEFORE the card's own effects: an Attack pays the
-# active stance's price as part of being played, and the bonus it buys has
-# to be on ctx before any damage effect reads it. A card that isn't an
-# ATTACK leaves both at nothing, which is how a stance card can be played
-# while a stance is already up without charging for itself. Nor does an
-# Attack with nothing it can hit - every enemy buried (ctx.enemies is
-# only the hittable ones): the stance's HP isn't paid into immunity.
+# The stance's price is paid BEFORE the card's own effects: an Attack pays
+# it as part of being played. The bonus is NOT fixed here - the card's
+# first damage effect takes it as it lands (EffectContext.take_attack_
+# bonus()), so Critical is judged after everything the card paid first.
+# A card that isn't an ATTACK pays and gets nothing, which is how a stance
+# card can be played while a stance is already up without charging for
+# itself. Nor does an Attack with nothing it can hit - every enemy buried
+# (ctx.enemies is only the hittable ones): the stance's HP isn't paid
+# into immunity.
 func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	# Per card, not per effect: "if this kills" means this CARD's own
 	# damage, so a kill from the card before must not still be standing.
 	ctx.killed_this_card = false
-	ctx.stance_attack_bonus = 0
-	if card.card_type == CardData.CardType.ATTACK and ctx.player.stance != null and not ctx.enemies.is_empty():
-		ctx.stance_attack_bonus = Stance.attack_bonus(ctx.player.stance)
+	ctx.card_is_attack = card.card_type == CardData.CardType.ATTACK
+	ctx.attack_bonus_taken = false
+	if ctx.card_is_attack and ctx.player.stance != null and not ctx.enemies.is_empty():
 		ctx.pay_stance_attack_cost(Stance.attack_hp_loss(ctx.player.stance))
 	for effect in card.effects:
 		# The gate lives HERE, not in each resolver - it used to be checked
@@ -62,6 +64,24 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 		var resolver: Object = _get_resolver(effect.effect_type)
 		if resolver != null:
 			resolver.resolve(effect, ctx)
+
+# Whether the rules forbid playing this card right now, whatever its
+# energy: it would apply a once-per-combat status that is already up or
+# has already fired this fight (Refuse the End). Read by BattleController.
+# request_play() and by the hand, which fades the card - so a spent copy
+# shows it can't be played rather than being taken and doing nothing.
+static func card_blocked(card: CardData, player: Combatant) -> bool:
+	if card == null or player == null:
+		return false
+	for effect in card.effects:
+		if effect == null or effect.effect_type != CardEffect.EffectType.APPLY_STATUS:
+			continue
+		var data: StatusData = effect.status_data
+		if data == null or not data.once_per_combat:
+			continue
+		if Status.find_in(player.statuses, data) != null or player.spent_statuses.has(data):
+			return true
+	return false
 
 func _get_resolver(effect_type: CardEffect.EffectType) -> Object:
 	if _cache.has(effect_type):
@@ -90,4 +110,6 @@ static func condition_met(effect: CardEffect, ctx: EffectContext) -> bool:
 			return ctx.player.grace > 0
 		CardEffect.Condition.UNDAMAGED_LAST_TURN:
 			return not ctx.player.took_damage_last_turn
+		CardEffect.Condition.CRITICAL:
+			return ctx.player.is_critical_at(ctx.player.hp - ctx.preview_hp_cost)
 	return true

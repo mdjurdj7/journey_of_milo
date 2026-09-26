@@ -41,10 +41,10 @@ signal disarmed
 # a habit: nothing serialises this today (it's derived every time a card
 # is shown, never authored), but the enum sits next to CardEffect's own,
 # where an inserted value silently rewrites existing .tres data.
-enum KeylineType { STRIKE, GUARD, TOLL, UTILITY, STANCE }
+enum KeylineType { STRIKE, GUARD, TOLL, UTILITY, STANCE, POWER }
 
 # Rules-text words set in bold. Whole-word, case-sensitive.
-const KEYWORDS: Array[String] = ["Toll", "Grace"]
+const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical"]
 
 # Numbers a card's text can defer to its own effects, so the face shows
 # what the card will ACTUALLY do rather than what it did when it was
@@ -110,6 +110,10 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 # stays with you after it is played, and it should not read as cool or
 # incidental.
 @export var keyline_stance: Color = Color(0.52, 0.45, 0.44)
+# A dim amber: a power also stays after it is played, like a stance, but
+# sits beside it rather than being the one mode you fight in - kin to the
+# stance's warmth, lighter and yellower so the two never read as one.
+@export var keyline_power: Color = Color(0.60, 0.53, 0.40)
 # A conditional's half that does NOT apply right now (see set_bonus_
 # context()): the utility grey, legible on bone but clearly not the ink.
 # Neutral cards (no battle context) never use it.
@@ -119,6 +123,7 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @export var art_field_toll: Color = Color(0.878, 0.863, 0.886)
 @export var art_field_utility: Color = Color(0.87, 0.87, 0.85)
 @export var art_field_stance: Color = Color(0.886, 0.856, 0.846)
+@export var art_field_power: Color = Color(0.890, 0.868, 0.820)
 @export var art_field_radius: int = 3
 # The two shadows: a hairline (1px down, 18%) and a soft spread (8px,
 # 12%). Both deepen on hover (see Hover).
@@ -357,7 +362,9 @@ func _refresh_dynamic_text() -> void:
 	hp_cost_label.text = "−%d HP" % _hp_cost if _hp_cost > 0 else ""
 	hp_cost_label.visible = _hp_cost > 0
 	var was: CardBonus.State = _bonus_state
-	_bonus_state = CardBonus.state(card_data, _bonus_context) if _bonus_context != null else CardBonus.State.NONE
+	# Read at the HP the card will have once its own costs are paid, so a
+	# Critical clause the payment itself reaches (Last Wager) already shows.
+	_bonus_state = CardBonus.state(card_data, _bonus_context.for_card_preview(_upfront_hp_cost())) if _bonus_context != null else CardBonus.State.NONE
 	rules_text.text = _style_bonus_clauses(_format_rules(_resolve_tokens(card_data.description)))
 	if _bonus_state != was:
 		_animate_bonus_corner()
@@ -371,26 +378,33 @@ func _resolve_tokens(description: String) -> String:
 	if text.contains(TOKEN_DAMAGE):
 		var damage: int = _effect_value(card_data, DAMAGE_EFFECT_TYPES)
 		if damage >= 0:
-			# An Attack's number is what it will actually land for, stance
-			# included - the same addition damage_effect.gd makes.
+			# An Attack's number is what it will actually land for, its
+			# attack bonus included - the same addition damage_effect.gd
+			# makes, once, to the card's first damage effect. On a Critical
+			# card this is the {else} half: the bonus as if NOT Critical.
 			if card_data.card_type == CardData.CardType.ATTACK:
-				damage += Stance.attack_bonus(_stance)
+				damage += _attack_bonus_for_half(false)
 			text = text.replace(TOKEN_DAMAGE, str(damage))
 	if text.contains(TOKEN_ALT_DAMAGE) or text.contains(TOKEN_BONUS_DAMAGE):
 		var bonus_damage: int = _bonus_effect_value(card_data, DAMAGE_EFFECT_TYPES)
 		if bonus_damage >= 0:
-			# The same stance addition as {damage} - the two halves of a
-			# face must move together.
+			# The {if} half's bonus - on a Critical card, as if Critical.
 			if card_data.card_type == CardData.CardType.ATTACK:
-				bonus_damage += Stance.attack_bonus(_stance)
+				bonus_damage += _attack_bonus_for_half(true)
 			text = text.replace(TOKEN_ALT_DAMAGE, str(bonus_damage)).replace(TOKEN_BONUS_DAMAGE, str(bonus_damage))
+	# Under a stance that forbids Block (Last Resort) every Block number
+	# reads 0 - what EffectContext.gain_block() will actually give. The
+	# card's own data is untouched.
+	var no_block: bool = Stance.prevents_block_gain(_stance)
 	if text.contains(TOKEN_BLOCK):
 		var block: int = _effect_value(card_data, BLOCK_EFFECT_TYPES)
 		if block >= 0:
-			text = text.replace(TOKEN_BLOCK, str(block))
+			text = text.replace(TOKEN_BLOCK, str(0 if no_block else block))
 	if text.contains(TOKEN_ALT_BLOCK) or text.contains(TOKEN_BONUS_BLOCK):
 		var bonus_block: int = _bonus_effect_value(card_data, BLOCK_EFFECT_TYPES)
 		if bonus_block >= 0:
+			if no_block:
+				bonus_block = 0
 			text = text.replace(TOKEN_ALT_BLOCK, str(bonus_block)).replace(TOKEN_BONUS_BLOCK, str(bonus_block))
 	if text.contains(TOKEN_DRAW):
 		var draw: int = _effect_value(card_data, [CardEffect.EffectType.DRAW])
@@ -399,7 +413,7 @@ func _resolve_tokens(description: String) -> String:
 	if text.contains(TOKEN_HP_COST):
 		text = text.replace(TOKEN_HP_COST, str(_hp_cost))
 	if text.contains(TOKEN_TOLL):
-		text = text.replace(TOKEN_TOLL, str(_toll))
+		text = text.replace(TOKEN_TOLL, str(_toll_token_value()))
 	if text.contains(TOKEN_TOLL_HEAL):
 		text = text.replace(TOKEN_TOLL_HEAL, str(_toll_heal_preview()))
 	return text
@@ -691,6 +705,8 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 	# APPLY_STANCE whatever the stance does.
 	if data.card_type == CardData.CardType.STANCE:
 		return KeylineType.STANCE
+	if data.card_type == CardData.CardType.POWER:
+		return KeylineType.POWER
 	if data.card_type == CardData.CardType.SKILL:
 		for effect in data.effects:
 			if effect == null:
@@ -736,6 +752,70 @@ func _derive_hp_cost(data: CardData) -> int:
 		total += Stance.attack_hp_loss(_stance)
 	return total
 
+# The HP paid before this card's first conditional or damage effect reads
+# anything: the stance's per-Attack cost (paid before any effect, see
+# EffectResolver.resolve_card()) and the card's own self-damage authored
+# ahead of it (Last Wager's). What the face judges Critical against, so
+# it shows the number the card will land for, not the one it would at the
+# HP held now. Self-damage authored after (Bite Down's) is paid too late
+# to count.
+func _upfront_hp_cost() -> int:
+	var total: int = 0
+	if card_data.card_type == CardData.CardType.ATTACK:
+		total += Stance.attack_hp_loss(_stance)
+	for effect in card_data.effects:
+		if effect == null:
+			continue
+		if effect.effect_type == CardEffect.EffectType.SELF_DAMAGE or effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL:
+			total += effect.value
+			continue
+		if effect.condition != CardEffect.Condition.NONE or DAMAGE_EFFECT_TYPES.has(effect.effect_type) \
+				or effect.effect_type == CardEffect.EffectType.TOLL_DAMAGE:
+			break
+	return total
+
+# The attack bonus one half of the face prints. On a card whose damage is
+# conditional on Critical, each half is read in its own state - the {if}
+# half as if Critical, the {else} half as if not - so neither inherits a
+# bonus (Last Resort, Dying Light) that needs the other. Any other card
+# prints the bonus as it stands (_attack_bonus_preview()).
+func _attack_bonus_for_half(conditional_half: bool) -> int:
+	if _bonus_context == null or _bonus_context.player == null:
+		return _attack_bonus_preview()
+	for effect in card_data.effects:
+		if effect == null or not DAMAGE_EFFECT_TYPES.has(effect.effect_type):
+			continue
+		if effect.condition == CardEffect.Condition.CRITICAL:
+			return AttackBonus.when_critical(_bonus_context.player, conditional_half)
+		break
+	return _attack_bonus_preview()
+
+# What {toll} prints. On a card that spends all Toll as damage
+# (Reckoning) it is that blow, as toll_damage_effect.gd will land it: the
+# Toll held, plus the Toll the card's own upfront HP will make (Self-
+# Eater's 2, paid first - never more than the HP there is to lose), plus
+# the attack bonus. Anywhere else, the Toll held.
+func _toll_token_value() -> int:
+	for effect in card_data.effects:
+		if effect == null or effect.effect_type != CardEffect.EffectType.TOLL_DAMAGE:
+			continue
+		var made: int = _upfront_hp_cost()
+		if _bonus_context != null and _bonus_context.player != null:
+			made = mini(made, _bonus_context.player.hp)
+		var bonus: int = _attack_bonus_preview() if card_data.card_type == CardData.CardType.ATTACK else 0
+		return _toll + made + bonus
+	return _toll
+
+# The attack bonus this Attack would get if played now - AttackBonus, the
+# resolver's own sum, at the HP left after _upfront_hp_cost(). Outside a
+# battle hand there is no player to read, so only the stance counts, and
+# never its Critical half.
+func _attack_bonus_preview() -> int:
+	if _bonus_context == null or _bonus_context.player == null:
+		return Stance.attack_bonus(_stance, false)
+	var player: Combatant = _bonus_context.player
+	return AttackBonus.for_player(player, player.hp - _upfront_hp_cost())
+
 static func _type_label_text(keyline_type: KeylineType) -> String:
 	match keyline_type:
 		KeylineType.GUARD:
@@ -746,6 +826,8 @@ static func _type_label_text(keyline_type: KeylineType) -> String:
 			return "UTILITY"
 		KeylineType.STANCE:
 			return "STANCE"
+		KeylineType.POWER:
+			return "POWER"
 		_:
 			return "STRIKE"
 
@@ -771,6 +853,8 @@ func _keyline_color() -> Color:
 			return keyline_utility
 		KeylineType.STANCE:
 			return keyline_stance
+		KeylineType.POWER:
+			return keyline_power
 		_:
 			return keyline_strike
 
@@ -784,6 +868,8 @@ func _art_field_color() -> Color:
 			return art_field_utility
 		KeylineType.STANCE:
 			return art_field_stance
+		KeylineType.POWER:
+			return art_field_power
 		_:
 			return art_field_strike
 
@@ -1093,6 +1179,12 @@ func _draw_glyph() -> void:
 				ring.append(centre + Vector2(cos(deg_to_rad(t)), sin(deg_to_rad(t))) * r * 0.85)
 			glyph.draw_line(centre + Vector2(-r * 0.2, r * 0.2), centre + Vector2(r * 0.55, -r * 0.55), faint, w, true)
 			glyph.draw_polyline(ring, ink_color, w, true)
+		KeylineType.POWER:
+			# The stance's ring closed, with a faint one inside - it stays
+			# like a stance does, but whole: nothing is bitten out of you
+			# to hold it.
+			glyph.draw_arc(centre, r * 0.85, 0.0, TAU, 36, ink_color, w, true)
+			glyph.draw_arc(centre, r * 0.4, 0.0, TAU, 24, faint, w, true)
 		KeylineType.TOLL:
 			glyph.draw_line(centre + Vector2(-r * 0.8, r * 0.9), centre + Vector2(r * 0.8, r * 0.9), faint, w, true)
 			glyph.draw_line(centre + Vector2(0.0, r * 0.6), centre + Vector2(0.0, -r * 0.9), ink_color, w, true)

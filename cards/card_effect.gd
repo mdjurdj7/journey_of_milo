@@ -30,9 +30,12 @@ enum EffectType {
 #             something always resolves (Untouched).
 # The number an effect lands for is CardBonus.resolved_value(); the card
 # face prints the same call, so what it says is what the rules pay.
-# UNDAMAGED_LAST_TURN is appended last: an inserted value would rewrite
-# every .tres that stores one of these as an integer.
-enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE, UNDAMAGED_LAST_TURN }
+# UNDAMAGED_LAST_TURN and CRITICAL are appended last: an inserted value
+# would rewrite every .tres that stores one of these as an integer.
+# CRITICAL reads the character's own threshold (Combatant.is_critical_at())
+# rather than condition_value, so every Critical card moves together when
+# it's tuned.
+enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE, UNDAMAGED_LAST_TURN, CRITICAL }
 
 # Which combatant(s) an effect resolves against - lets DAMAGE_ALL collapse
 # into plain DAMAGE (target_scope = ALL_ENEMIES) instead of needing its

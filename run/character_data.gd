@@ -38,3 +38,9 @@ enum GraceCapMode { LARGEST_HIT, SUM }
 # How many of the player's turns the window stays open for. 1 is "your
 # next turn, then it's gone".
 @export var grace_window_turns: int = 1
+
+# Critical: HP at or below this fraction of max HP. What the Critical
+# cards (Cornered, Unbroken, Last Wager, Dying Light, Refuse the End, Last
+# Resort) read - see Combatant.is_critical_at(). 0.3 is a playtest
+# starting point, not a settled number.
+@export_range(0.0, 1.0, 0.01) var critical_hp_fraction: float = 0.3

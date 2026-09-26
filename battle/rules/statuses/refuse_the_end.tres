@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "refuse_the_end"
+display_name = "Refuse the End"
+description = "If an enemy hit would kill you while Critical, survive at 1 HP instead. Then it is gone, for the rest of the fight."
+category = 2
+default_duration_turns = -2
+stack_rule = 3
+prevents_lethal_while_critical = true
+once_per_combat = true

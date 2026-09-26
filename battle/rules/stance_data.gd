@@ -14,9 +14,13 @@ class_name StanceData
 # spend, a reflect) and its HP price would never be charged at all.
 #
 # One stance is active at a time: playing a different one replaces it,
-# playing the same one again adds a stack. Every value below is PER
-# STACK and scales linearly - two stacks of Self-Eater is lose 4, deal 6
-# more. A stance that needs a different curve needs a field for it, not a
+# every stack gone, at one stack; playing the same one again adds a stack
+# - every stance, Last Resort included. A played stance card leaves the
+# deck's rotation for the rest of the fight (BattleController._on_play_
+# animation_finished()), so a stack is one physical copy and a reshuffle
+# can't farm more. Every value below is PER STACK and scales linearly -
+# two stacks of Self-Eater is lose 4, deal 6 more; two of Last Resort is
+# 12 more while Critical (a flag like prevents_block_gain doesn't scale). A stance that needs a different curve needs a field for it, not a
 # reinterpretation of these.
 
 @export var id: String = ""
@@ -37,3 +41,14 @@ class_name StanceData
 # supposed to be a commitment, not a buff. A new stack refreshes the
 # whole stance's timer rather than tracking its own.
 @export var duration_turns: int = 0
+
+# The attack bonus only while the player is Critical (Last Resort) - off
+# the moment HP climbs back over the line, on again when it drops. Read
+# when the attack lands (see AttackBonus). The HP loss above is never
+# gated: a price is a price.
+@export var bonus_requires_critical: bool = false
+
+# While held, the player gains no Block from anything - every player
+# Block gain goes through EffectContext.gain_block(), which asks. Block
+# already up when the stance is taken stays.
+@export var prevents_block_gain: bool = false

@@ -48,13 +48,15 @@ Multi-enemy encounters are a cluster sharing one contact zone; all members stand
 
 **Grace** (Wanderer passive; replaces the old Rally) is survival, not reward. An unblocked enemy hit opens recoverable HP; damage the player deals on their next turn reclaims it 1:1; it is capped per window by the largest single hit and clears at the end of that turn. Self-damage never opens it. Drawn as a pale segment on the HP bar. Cards may later extend the window or raise the cap.
 
-**Stances** are a card type: ongoing per-combat effects, one active at a time (playing another replaces it). Self-Eater: your Attacks deal 3 more and cost 2 HP (the HP loss is self-inflicted and makes Toll).
+**Stances** are a card type: ongoing per-combat effects, one stance type active at a time. Another copy of the stance already held adds a stack, and its numbers scale with stacks (Self-Eater ×2: Attacks deal 6 more and cost 4 HP). A different stance removes every stack of the old one and starts at 1. A played stance card leaves the deck's rotation for the rest of the fight, so each stack is one physical copy. Self-Eater: your Attacks deal 3 more and cost 2 HP (the HP loss is self-inflicted and makes Toll). Last Resort: while Critical, your Attacks deal 6 more; you cannot gain Block.
+
+**Powers** are a card type: a lasting per-combat effect that is not a stance. Powers coexist with the stance and with each other, and a played Power leaves the deck's rotation for the rest of the fight. Dying Light (stacks); Refuse the End (once per combat, never re-armed).
 
 **Block** absorbs before HP; **absorb** persists longer. If an HP-adjacent mechanic must be cut for complexity, absorb goes before Grace.
 
 **The Wanderer's card rule:** every Wanderer card answers *what does this cost, or what has already been paid.* Plain numbers cards (a Defend, a Bludgeon) belong to the class-agnostic region pool, with one deliberate exception — Endure, the class's "costs nothing" rest card.
 
-**Planned archetype — cornered:** stays at ≤ 25% HP for much greater output. Needs ways in (self-damage), ways to survive there (negate, absorb, Toll→block, Grace), and payoffs that are dead above the line.
+**Archetype — Critical (cornered):** Critical is HP ≤ 30% of max (a CharacterData tunable, to be settled in playtest) — dangerous, but common enough to build around entering and leaving. The archetype stays there for much greater output. Needs ways in (self-damage), ways to survive there (negate, absorb, Toll→block, Grace), and payoffs that are dead above the line.
 
 **The deck is built from the field.** The keeper's card, fight rewards, belongings, the collector. The deck is the record of how the player walked.
 

@@ -309,6 +309,10 @@ func set_enemy_target_available(available: bool) -> void:
 func _can_play(card: CardData, energy: int) -> bool:
 	if card.target_type == CardData.TargetType.ENEMY and not _enemy_target_available:
 		return false
+	# A once-per-combat power already up or spent fades like an unaffordable
+	# card (EffectResolver.card_blocked()). No context yet = nothing to ask.
+	if _bonus_context != null and EffectResolver.card_blocked(card, _bonus_context.player):
+		return false
 	return card.cost <= energy
 
 # Every slot's CardView, in hand order.

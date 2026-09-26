@@ -165,6 +165,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.grace_changed.connect(func(_grace: int) -> void: _push_bonus_context())
 	battle_controller.hp_changed.connect(func(_current: int, _max_hp: int) -> void: _push_bonus_context())
 	battle_controller.toll_changed.connect(func(_toll: int) -> void: _push_bonus_context())
+	# A power taken (Dying Light) moves every Attack's printed damage.
+	battle_controller.status_changed.connect(func() -> void: _push_bonus_context())
 	battle_controller.setup(hand_container, enemy_list, wanderer)
 	_push_bonus_context()
 	get_tree().create_timer(battle_transition_time).timeout.connect(_reveal_enemy_intents)
@@ -310,20 +312,20 @@ func _on_stance_changed(stance: Stance) -> void:
 # Turns the player's rules state into the strings the row draws - this
 # is the only place that knows a Stance/Status has a display_name or a
 # stack count, so HPBar can stay a thing that draws text it is handed.
-# Names are upper-cased here rather than by the font, so the row reads
-# the same whatever face it is set in.
+# Names are shown as authored, in title case (Self-Eater, Last Resort),
+# with the stack count after them once there is more than one.
 func _refresh_standing_row() -> void:
 	var stance: Stance = battle_controller.player.stance
 	var stance_text: String = ""
 	if stance != null and stance.data != null:
-		stance_text = stance.data.display_name.to_upper()
+		stance_text = stance.data.display_name
 		if stance.stacks > 1:
 			stance_text += " ×%d" % stance.stacks
 	var status_texts := PackedStringArray()
 	for active: Status in battle_controller.player.statuses:
 		if active.data == null:
 			continue
-		var text: String = active.data.display_name.to_upper()
+		var text: String = active.data.display_name
 		if active.stack_count > 1:
 			text += " ×%d" % active.stack_count
 		status_texts.append(text)

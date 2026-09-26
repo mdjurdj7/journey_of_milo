@@ -84,6 +84,45 @@ static func consume_triggered(statuses: Array[Status]) -> void:
 		if active.data.clears_on_trigger:
 			statuses.erase(active)
 
+# The attack bonus every status on `statuses` grants one Attack card -
+# attack_damage_bonus per stack, skipping the ones that want Critical when
+# `critical` says the player isn't. See AttackBonus.
+static func attack_bonus(statuses: Array[Status], critical: bool) -> int:
+	var total: int = 0
+	for active in statuses:
+		if active.data == null or active.data.attack_damage_bonus == 0:
+			continue
+		if active.data.bonus_requires_critical and not critical:
+			continue
+		total += active.data.attack_damage_bonus * active.stack_count
+	return total
+
+# The status that would stop a lethal enemy hit on a player who was
+# `was_critical` before it, or null.
+static func lethal_guard(statuses: Array[Status], was_critical: bool) -> Status:
+	if not was_critical:
+		return null
+	for active in statuses:
+		if active.data != null and active.data.prevents_lethal_while_critical:
+			return active
+	return null
+
+# An enemy hit just took `player` to 0 HP. If they were Critical before it
+# and hold a lethal guard, they're left at 1 HP and the guard is spent -
+# removed, and recorded when it's once per combat. Returns whether it
+# fired.
+static func refuse_lethal(player: Combatant, was_critical: bool) -> bool:
+	if player.hp > 0:
+		return false
+	var guard: Status = lethal_guard(player.statuses, was_critical)
+	if guard == null:
+		return false
+	player.hp = 1
+	player.statuses.erase(guard)
+	if guard.data.once_per_combat:
+		player.spent_statuses.append(guard.data)
+	return true
+
 # Applies every active MODIFIER-category status matching `target` to
 # `amount`, in list order - ADD sums directly; MULTIPLY treats magnitude
 # as a PERCENTAGE. Never returns below 0.
