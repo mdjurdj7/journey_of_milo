@@ -15,7 +15,7 @@ class_name CardView
 # whole card, so every size below is a 1x pixel. Top to bottom: keyline;
 # name (top-left, up to two lines) beside the cost numeral (top-right,
 # with a "-N HP" line under it when the card costs HP); the tonal field
-# with the type glyph, which flexes; the rules text; a hairline footer
+# with the type glyph or the card's art, which flexes; the rules text; a hairline footer
 # rule and the small-caps type label. See _apply_layout() for how the
 # field gives way to a longer rules text.
 
@@ -236,6 +236,7 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @onready var cost_label: Label = $CostLabel
 @onready var hp_cost_label: Label = $HpCostLabel
 @onready var art_field: Panel = $ArtField
+@onready var art_rect: TextureRect = $ArtField/Art
 @onready var glyph: Control = $ArtField/Glyph
 @onready var rules_text: RichTextLabel = $RulesText
 @onready var footer_rule: ColorRect = $FooterRule
@@ -299,6 +300,17 @@ func _ready() -> void:
 			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.draw.connect(_draw_glyph)
+	# The card's art (CardData.art) as a centred cover crop: fills the
+	# field at its own aspect, the overflow cut, never stretched. Clipped
+	# to the field's own drawn shape so it keeps the rounded corners; the
+	# type-coloured field still draws underneath, and is all there is for
+	# a card without art. Mipmapped - it sits at a fraction of its size.
+	art_field.clip_children = CanvasItem.CLIP_CHILDREN_AND_DRAW
+	art_rect.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	art_rect.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	art_rect.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	art_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	art_rect.visible = false
 	_bonus_corner = Control.new()
 	_bonus_corner.name = "BonusCorner"
 	_bonus_corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -315,6 +327,10 @@ func set_card_data(data: CardData) -> void:
 	name_label.text = data.card_name
 	cost_label.text = str(data.cost)
 	_keyline_type = _derive_keyline_type(data)
+	# Art replaces the glyph rather than sitting on it.
+	art_rect.texture = data.art
+	art_rect.visible = data.art != null
+	glyph.visible = data.art == null
 	_refresh_dynamic_text()
 	type_label.text = _type_label_text(_keyline_type)
 	_apply_type_style()
@@ -1100,6 +1116,8 @@ func _apply_layout() -> void:
 	var field_height: float = maxf(available - rules_height, field_min_height)
 	art_field.position = Vector2(outer_margin, field_top)
 	art_field.size = Vector2(card_size.x - outer_margin * 2.0, field_height)
+	art_rect.position = Vector2.ZERO
+	art_rect.size = art_field.size
 	glyph.position = Vector2.ZERO
 	glyph.size = art_field.size
 	glyph.queue_redraw()

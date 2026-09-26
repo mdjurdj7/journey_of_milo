@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://cwypn1c3f6exg" path="res://cards/art/Wanderer/Slash.png" id="9_art"]
 
 [sub_resource type="Resource" id="CardEffect_damage"]
 script = ExtResource("2_card_effect")
@@ -17,3 +18,4 @@ description = "Deal {damage} damage."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
 battle_animation = &"Slash"
 impact_time = 0.55
+art = ExtResource("9_art")

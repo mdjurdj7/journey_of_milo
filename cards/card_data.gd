@@ -46,6 +46,13 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 @export var effects: Array[CardEffect] = []
 @export var removal_scope: RemovalScope = RemovalScope.NONE
 
+# The illustration in the face's art field (CardView), shown as a centred
+# cover crop over the type-coloured field. Null is fine and expected for
+# most cards today: the face keeps its type glyph instead. A reference in
+# the .tres, so the art is imported (with mipmaps - it's reduced heavily
+# in the hand) and loaded like any other resource.
+@export var art: Texture2D = null
+
 # Which Wanderer battle clip to play once (LOOP_NONE) when this card
 # resolves - empty (default) means no swing. Set per-card in the
 # Inspector (e.g. "Slash" on the current attack cards) rather than

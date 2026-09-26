@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://dindvlu1y7dxu" path="res://cards/art/Wanderer/Bite Down.png" id="9_art"]
 
 [sub_resource type="Resource" id="CardEffect_damage"]
 script = ExtResource("2_card_effect")
@@ -23,3 +24,4 @@ description = "Deal {damage} damage.
 Lose {hp_cost} HP."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage"), SubResource("CardEffect_self_damage")])
 battle_animation = &"Slash"
+art = ExtResource("9_art")

@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/braced.tres" id="3_braced"]
+[ext_resource type="Texture2D" uid="uid://ba7r0wy7dmp4w" path="res://cards/art/Wanderer/Brace.png" id="9_art"]
 
 [sub_resource type="Resource" id="CardEffect_apply_status_to_target"]
 script = ExtResource("2_card_effect")
@@ -19,3 +20,4 @@ target_type = 0
 description = "Target enemy's next Attack deals 50% less damage."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status_to_target")])
 battle_animation = &"Brace"
+art = ExtResource("9_art")

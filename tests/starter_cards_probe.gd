@@ -14,7 +14,17 @@ extends SceneTree
 
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_CONTROLLER_PATH := "res://battle/battle_controller.gd"
-const CASES := 10
+const CASES := 11
+const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
+const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
+# The starter cards' art, by file. Every other card has none yet.
+const STARTER_ART: Dictionary = {
+	"slash": "res://cards/art/Wanderer/Slash.png",
+	"bite_down": "res://cards/art/Wanderer/Bite Down.png",
+	"brace": "res://cards/art/Wanderer/Brace.png",
+	"reckoning": "res://cards/art/Wanderer/Reckoning.png",
+	"down_payment": "res://cards/art/Wanderer/Down Payment.png",
+}
 
 var _failures: int = 0
 # Cases that ran to their end. A script error aborts a case without
@@ -33,6 +43,7 @@ func _initialize() -> void:
 	_check_brace_reapplied()
 	_check_brace_face()
 	_check_lasting_cards_leave_rotation()
+	await _check_starter_art()
 	if _completed != CASES:
 		_failures += 1
 		print("FAIL: only %d of %d cases ran to the end" % [_completed, CASES])
@@ -159,6 +170,43 @@ func _check_brace_face() -> void:
 	var player: Combatant = _player(50)
 	_brace(player, _enemy(_enemy_data([_attack(8, 1)])))
 	_expect(player.statuses.is_empty(), "Nothing lands on the Wanderer")
+	_completed += 1
+
+# Each starter card carries its own art, mipmapped; nothing else has any.
+# A face with art shows it and hides the glyph; one without keeps the
+# glyph and shows no image.
+func _check_starter_art() -> void:
+	for dir in CARD_DIRS:
+		for file in DirAccess.get_files_at(dir):
+			if not file.ends_with(".tres"):
+				continue
+			var card := load(dir + file) as CardData
+			var key: String = file.get_basename()
+			if dir == "res://cards/data/" and STARTER_ART.has(key):
+				_expect(card.art != null and card.art.resource_path == STARTER_ART[key], "%s shows %s (got %s)" % [key, STARTER_ART[key], card.art.resource_path if card.art != null else "none"])
+				if card.art != null:
+					_expect(card.art.get_image().has_mipmaps(), "%s's art is mipmapped" % key)
+			else:
+				_expect(card.art == null, "%s has no art yet" % key)
+
+	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
+	var with_art: CardView = scene.instantiate()
+	var without_art: CardView = scene.instantiate()
+	root.add_child(with_art)
+	root.add_child(without_art)
+	await process_frame
+	with_art.set_card_data(_card("slash"))
+	without_art.set_card_data(_card("carve"))
+	_expect(with_art.art_rect.visible and with_art.art_rect.texture == _card("slash").art, "Slash's face shows its art")
+	_expect(not with_art.glyph.visible, "...and hides the glyph")
+	_expect_eq(with_art.art_rect.size, with_art.art_field.size, "...filling the art field")
+	_expect_eq(with_art.art_rect.stretch_mode, TextureRect.STRETCH_KEEP_ASPECT_COVERED, "...as a cover crop")
+	_expect(not without_art.art_rect.visible and without_art.art_rect.texture == null, "Carve's face shows no image")
+	_expect(without_art.glyph.visible, "...and keeps its glyph")
+	with_art.set_card_data(_card("carve"))
+	_expect(not with_art.art_rect.visible and with_art.glyph.visible, "A reused face drops the art for a card without")
+	with_art.queue_free()
+	without_art.queue_free()
 	_completed += 1
 
 # A played stance or power card is exhausted, not discarded; an ordinary

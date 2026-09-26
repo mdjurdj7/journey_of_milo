@@ -21,6 +21,8 @@ show_behind_parent = true
 
 [node name="ArtField" type="Panel" parent="."]
 
+[node name="Art" type="TextureRect" parent="ArtField"]
+
 [node name="Glyph" type="Control" parent="ArtField"]
 
 [node name="RulesText" type="RichTextLabel" parent="."]
