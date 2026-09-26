@@ -401,6 +401,7 @@ func _ready() -> void:
 	_spawn_floor_enemies()
 	_spawn_floor_props()
 	_spawn_floor_patrols()
+	_spawn_floor_ledges()
 
 	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
 		enemy.contacted.connect(_on_enemy_contacted)
@@ -494,7 +495,12 @@ func _handle_move_click(screen_pos: Vector2) -> bool:
 	var from: Vector3 = camera.project_ray_origin(screen_pos)
 	var to: Vector3 = from + camera.project_ray_normal(screen_pos) * click_ray_length
 	var query := PhysicsRayQueryParameters3D.create(from, to)
-	query.exclude = [wanderer.get_rid()]
+	# Not the invisible ledge walls either: a click past a lip is meant
+	# for the sand there, not for the air above it.
+	var excluded: Array[RID] = [wanderer.get_rid()]
+	for barrier: Node in get_tree().get_nodes_in_group(LedgeBarrier.LEDGE_GROUP):
+		excluded.append((barrier as CollisionObject3D).get_rid())
+	query.exclude = excluded
 	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
 		return false
@@ -759,6 +765,23 @@ func _patrol_for(group: StringName) -> PackPatrol:
 # (Hull.finding_id / Bird.flight_id / Keeper.offer_id) are the floor
 # resource's path plus the prop's index: stable across the reload a
 # floor change is, distinct across floors.
+# The floor's ledge walls (FloorData.ledges), one LedgeBarrier each,
+# standing on Ground's relief and rebuilt with it.
+func _spawn_floor_ledges() -> void:
+	var floor_data := get_floor_data()
+	var ground := get_node_or_null(ground_path) as Ground
+	if floor_data == null or ground == null:
+		return
+	var spawn: Vector3 = get_spawn_position()
+	for index in floor_data.ledges.size():
+		var line := PackedVector2Array()
+		for point: Vector2 in floor_data.ledges[index]:
+			line.append(Vector2(spawn.x + point.x, spawn.z + point.y))
+		var barrier := LedgeBarrier.new()
+		barrier.name = "LedgeBarrier%d" % index
+		add_child(barrier)
+		barrier.setup(ground, line)
+
 func _spawn_floor_props() -> void:
 	var floor_data := get_floor_data()
 	if floor_data == null or floor_data.props.is_empty():

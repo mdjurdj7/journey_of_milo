@@ -84,6 +84,11 @@ class_name FloorData
 # Routes for clusters that move between perches - one per group that
 # does (see FloorPatrol). Empty: every enemy stands where it was put.
 @export var patrols: Array[FloorPatrol] = []
+# Invisible walls along the lips of raised faces painted too gentle to
+# stop him on their own (LedgeBarrier) - one line per ledge, world XZ
+# offsets from spawn in order along the lip. Empty: every face stops him
+# or doesn't by its slope alone.
+@export var ledges: Array[PackedVector2Array] = []
 @export_group("Gate")
 # How the way out is closed while required fights remain (ExitGate.
 # exit_kind). CHANNEL: a tidal channel across the neck, a Blocker in it,
