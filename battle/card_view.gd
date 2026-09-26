@@ -176,13 +176,21 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @export var outer_margin: float = 12.0
 @export var keyline_height: float = 2.0
 @export var name_cost_gap: float = 8.0
-@export var header_field_gap: float = 8.0
+# The header: one height on every card. Its labels are placed by
+# BASELINE, not stacked by line box - Spectral's box is ~1.5em with room
+# below for descenders a numeral never uses, so stacked boxes waste a
+# row. The name and the cost numeral share header_baseline_px (the
+# numeral's ink tops out ~18px above it at 23px, ~10px down the card);
+# the "-N HP" line sits on hp_cost_baseline_px, right under the numeral,
+# inside header_height rather than adding a row.
+@export var header_height: float = 42.0
+@export var header_baseline_px: float = 28.0
+@export var hp_cost_baseline_px: float = 39.0
+@export var header_field_gap: float = 6.0
 # The art field: one rect on every card, whatever its name, HP cost or
 # rules text - art is painted for this window, so it never gives way.
-# The top clears the tallest header (name beside cost, with the "-N HP"
-# line) plus header_field_gap; a card without an HP line keeps the gap.
-@export var art_field_top: float = 66.0
-@export var art_field_size: Vector2 = Vector2(176.0, 128.0)
+# Its top is header_height + header_field_gap.
+@export var art_field_size: Vector2 = Vector2(176.0, 146.0)
 @export var field_rules_gap: float = 8.0
 @export var rules_footer_gap: float = 8.0
 @export var footer_rule_gap: float = 6.0
@@ -1048,7 +1056,7 @@ func _apply_type_style() -> void:
 
 # Vertical stack at 1x. The name holds one line beside the cost (a
 # longer one is clipped and warned about); the art field is the fixed
-# art_field_top/art_field_size rect; the rules text takes the space
+# art_field_size rect under the header; the rules text takes the space
 # between it and the footer at the first of rules_font_sizes that fits.
 # Past the last size the card grows downward by what the text still
 # needs - the face only: its containers keep card_size, and no current
@@ -1058,7 +1066,8 @@ func _apply_layout() -> void:
 	# Rules text first: the face's height depends on it.
 	var rules_width: float = card_size.x - outer_margin * 2.0
 	var type_height: float = _line_height(type_label, type_label_font_size_px)
-	var rules_top: float = art_field_top + art_field_size.y + field_rules_gap
+	var art_top: float = header_height + header_field_gap
+	var rules_top: float = art_top + art_field_size.y + field_rules_gap
 	var rules_bottom: float = card_size.y - outer_margin - type_height - footer_rule_gap - 1.0 - rules_footer_gap
 	var available: float = rules_bottom - rules_top
 	var font_size: int = 15
@@ -1095,27 +1104,27 @@ func _apply_layout() -> void:
 	# Every Label is sized from its font's real line height (Font.get_
 	# height()), never an em guess: a Label whose height is under one line
 	# draws NO lines at all - Spectral's line box is ~1.4em, so 1.2em of
-	# name label rendered nothing.
+	# name label rendered nothing. Each is placed so its first baseline
+	# lands on the header's (_top_for_baseline()); the boxes overlap, the
+	# ink doesn't.
 	var cost_width: float = _string_width(cost_label, cost_font_size_px)
 	var cost_height: float = _line_height(cost_label, cost_font_size_px)
-	cost_label.position = Vector2(card_size.x - outer_margin - cost_width, outer_margin)
+	cost_label.position = Vector2(card_size.x - outer_margin - cost_width, _top_for_baseline(cost_label, cost_font_size_px, header_baseline_px))
 	cost_label.size = Vector2(cost_width, cost_height)
 	cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	cost_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 
-	var hp_height: float = 0.0
 	if hp_cost_label.visible:
 		var hp_width: float = _string_width(hp_cost_label, hp_cost_font_size_px)
-		hp_height = _line_height(hp_cost_label, hp_cost_font_size_px)
-		hp_cost_label.position = Vector2(card_size.x - outer_margin - hp_width, outer_margin + cost_height)
-		hp_cost_label.size = Vector2(hp_width, hp_height)
+		hp_cost_label.position = Vector2(card_size.x - outer_margin - hp_width, _top_for_baseline(hp_cost_label, hp_cost_font_size_px, hp_cost_baseline_px))
+		hp_cost_label.size = Vector2(hp_width, _line_height(hp_cost_label, hp_cost_font_size_px))
 		hp_cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 
 	# One line, always: the art field sits at a fixed height below it.
 	var name_width: float = card_size.x - outer_margin * 2.0 - cost_width - name_cost_gap
 	if _wrapped_line_count(name_label, name_font_size_px, name_width) > 1:
 		_warn_long_name()
-	name_label.position = Vector2(outer_margin, outer_margin)
+	name_label.position = Vector2(outer_margin, _top_for_baseline(name_label, name_font_size_px, header_baseline_px))
 	name_label.size = Vector2(name_width, _line_height(name_label, name_font_size_px))
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
@@ -1128,7 +1137,7 @@ func _apply_layout() -> void:
 	footer_rule.position = Vector2(outer_margin, type_label.position.y - footer_rule_gap - 1.0)
 	footer_rule.size = Vector2(card_size.x - outer_margin * 2.0, 1.0)
 
-	art_field.position = Vector2(outer_margin, art_field_top)
+	art_field.position = Vector2(outer_margin, art_top)
 	art_field.size = art_field_size
 	art_rect.position = Vector2.ZERO
 	art_rect.size = art_field.size
@@ -1144,6 +1153,14 @@ func _string_width(label: Label, font_size: int) -> float:
 	if font == null:
 		return 0.0
 	return font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+
+# Where a one-line Label's top goes so its baseline sits at `baseline` -
+# a Label draws its first line's baseline one font ascent below its top.
+func _top_for_baseline(label: Label, font_size: int, baseline: float) -> float:
+	var font: Font = label.get_theme_font("font")
+	if font == null:
+		return baseline - float(font_size)
+	return baseline - font.get_ascent(font_size)
 
 # One line's real height for this label's font at this size, rounded up
 # so the Label always fits a whole line.

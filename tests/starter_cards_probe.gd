@@ -236,7 +236,9 @@ func _check_face_layout() -> void:
 	var view: CardView = scene.instantiate()
 	root.add_child(view)
 	await process_frame
-	var art_rect: Rect2 = Rect2(Vector2(view.outer_margin, view.art_field_top), view.art_field_size)
+	var art_top: float = view.header_height + view.header_field_gap
+	var art_rect: Rect2 = Rect2(Vector2(view.outer_margin, art_top), view.art_field_size)
+	_expect_eq(art_rect, Rect2(12.0, 48.0, 176.0, 146.0), "The art field is 176 x 146 at (12, 48)")
 	for dir in CARD_DIRS:
 		for file in DirAccess.get_files_at(dir):
 			if not file.ends_with(".tres"):
@@ -247,6 +249,11 @@ func _check_face_layout() -> void:
 			_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), SHRUNK_RULES.get(card.card_name, 15), "%s's rules size" % card.card_name)
 			_expect_eq(view.size, view.card_size, "%s keeps the card's size" % card.card_name)
 			_expect(view.rules_text.position.y + view.rules_text.size.y <= view.footer_rule.position.y, "%s's text ends above the footer" % card.card_name)
+			# The header holds the "-N HP" line without adding a row, and
+			# the numeral's ink clears the keyline.
+			if view.hp_cost_label.visible:
+				_expect(view.hp_cost_label.position.y + view.hp_cost_label.size.y <= view.header_height, "%s's HP line sits inside the header" % card.card_name)
+			_expect(view.header_baseline_px + _ink_top(view.cost_label, view.cost_font_size_px) >= view.keyline.position.y + view.keyline.size.y, "%s's numeral clears the keyline" % card.card_name)
 
 	var footer_y: float = view.footer_rule.position.y
 	var long_card := CardData.new()
@@ -263,10 +270,21 @@ func _check_face_layout() -> void:
 	long_name.description = "Draw 1."
 	view.set_card_data(long_name)
 	_expect(view.name_label.autowrap_mode == TextServer.AUTOWRAP_OFF and view.name_label.clip_text, "A long name is clipped to one line")
-	_expect(view.name_label.position.y + view.name_label.size.y <= view.art_field_top, "...clear of the art field")
+	_expect(view.name_label.position.y + view.name_label.size.y <= art_top, "...clear of the art field")
 	_expect_eq(view.size, view.card_size, "A short card back at card_size after a grown one")
 	view.queue_free()
 	_completed += 1
+
+# How far above its baseline a label's text inks, from the glyphs
+# themselves (negative = up) - the line box's ascent overstates it.
+func _ink_top(label: Label, font_size: int) -> float:
+	var ts: TextServer = TextServerManager.get_primary_interface()
+	var rid: RID = label.get_theme_font("font").get_rids()[0]
+	var top: float = 0.0
+	for ch in label.text:
+		var glyph: int = ts.font_get_glyph_index(rid, font_size, ch.unicode_at(0), 0)
+		top = minf(top, ts.font_get_glyph_offset(rid, Vector2i(font_size, 0), glyph).y)
+	return top
 
 # A played stance or power card is exhausted, not discarded; an ordinary
 # card is discarded as before.
