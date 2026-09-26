@@ -24,6 +24,24 @@ class_name RearPose
 # and up its +Y, taken into the mesh's own space through the transforms
 # FieldEnemy has already set (scale, yaw offset, grounding), so the pivot
 # and the bend sit right whichever way a glb faces.
+#
+# The same skin breathes. A third bone, "breath", lies along the belly
+# line; the soft segmented rear follows it, fading out across
+# breath_blend_m centred breath_front_m ahead of the body's middle - on
+# the Siltjaw, from the middle to just behind the head's plates, so the
+# shell, jaws and eyes (separate pieces, all further forward) never move.
+# A breath scales the bone across and up by 1 + breath_amount: the rear
+# swells and settles on the belly, eased in and out (a cosine out and
+# back). Each breath draws its own length, depth and rest after from this
+# body's own random generator, the way SputterClaws spaces its claw, so
+# there is no countable loop. It is independent of the front bone, so a
+# reared body keeps breathing; once the body is settling on death
+# (FieldEnemy.is_settling()) it eases out over breath_stop_seconds and
+# stops. Not fold(): an attachment with fold() holds the sink back by
+# settle_time (see FieldEnemy.settle_and_free()). Runs in _process at
+# PROCESS_MODE_ALWAYS, like DragonflyWings - through the battle freeze
+# and the reward screen - and leaves the bone alone while the body is
+# hidden under its mound.
 
 # How far the front comes up, degrees.
 @export_range(0.0, 90.0, 0.5) var rear_degrees: float = 45.0:
@@ -53,6 +71,33 @@ class_name RearPose
 @export var rear_seconds: float = 0.5
 @export var drop_seconds: float = 0.4
 
+@export_group("Breath")
+# Where the breathing rear fades out: the fade's centre, this far forward
+# of the body's middle, and its length, metres. Rebuilds the skin.
+@export var breath_front_m: float = 0.15:
+	set(value):
+		breath_front_m = value
+		_rebuild()
+@export var breath_blend_m: float = 0.3:
+	set(value):
+		breath_blend_m = value
+		_rebuild()
+# Read each frame, so an edit takes at once.
+# How much the rear swells across and up at a breath's peak, as a
+# fraction of its size.
+@export var breath_amount: float = 0.03
+# One swell and settle, seconds, before the variation below.
+@export var breath_seconds: float = 3.5
+# Each breath's length is breath_seconds times a factor drawn from
+# 1 +- this; its depth is breath_amount times a factor drawn from
+# (1 - breath_depth_variation) to 1.
+@export_range(0.0, 0.9, 0.01) var breath_length_variation: float = 0.25
+@export_range(0.0, 1.0, 0.01) var breath_depth_variation: float = 0.3
+# The rest after each breath, drawn from 0 to this, seconds.
+@export var breath_rest_max_seconds: float = 0.8
+# From breathing to still once the body is settling on death.
+@export var breath_stop_seconds: float = 0.4
+
 var _mesh_instance: MeshInstance3D = null
 var _source_mesh: Mesh = null
 var _skeleton: Skeleton3D = null
@@ -71,6 +116,17 @@ var _angle: float = 0.0
 var _target: float = 0.0
 var _tween: Tween = null
 var _ready_done: bool = false
+# The breath bone's rest in mesh space: across, up and back as its axes,
+# on the belly line.
+var _breath_rest: Transform3D = Transform3D.IDENTITY
+# The breath now: seconds into the current breath (negative = resting
+# that long before the next), its drawn length and depth, and the fade
+# to still on death (1 breathing, 0 stopped).
+var _breath_elapsed: float = 0.0
+var _breath_length: float = 0.0
+var _breath_depth: float = 0.0
+var _breath_stop: float = 1.0
+var _rng := RandomNumberGenerator.new()
 
 func _ready() -> void:
 	var model := get_parent() as Node3D
@@ -88,8 +144,50 @@ func _ready() -> void:
 	_skeleton = Skeleton3D.new()
 	_skeleton.name = "RearSkeleton"
 	add_child(_skeleton)
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	_rng.randomize()
+	# Arrives at rest: the first breath waits out a drawn rest.
+	_draw_breath()
 	_ready_done = true
 	_rebuild()
+
+func _process(delta: float) -> void:
+	if not _ready_done:
+		return
+	var body := get_parent().get_parent() as Node3D
+	if body != null and body.has_method("is_settling") and bool(body.call("is_settling")):
+		_breath_stop = 0.0 if breath_stop_seconds <= 0.0 else maxf(_breath_stop - delta / breath_stop_seconds, 0.0)
+	_breath_elapsed += delta
+	if _breath_elapsed >= _breath_length:
+		_draw_breath()
+	if _mesh_instance.is_visible_in_tree() or _breath_stop <= 0.0:
+		_apply_breath()
+	if _breath_stop <= 0.0:
+		set_process(false)
+
+# The next breath: a rest drawn from 0..breath_rest_max_seconds, then a
+# swell and settle of its own length and depth.
+func _draw_breath() -> void:
+	_breath_elapsed = -_rng.randf_range(0.0, maxf(breath_rest_max_seconds, 0.0))
+	_breath_length = maxf(breath_seconds, 0.01) * _rng.randf_range(1.0 - breath_length_variation, 1.0 + breath_length_variation)
+	_breath_depth = _rng.randf_range(1.0 - breath_depth_variation, 1.0)
+
+# How far the rear is swollen right now, as a fraction of its size.
+func get_breath_swell() -> float:
+	if _breath_elapsed <= 0.0 or _breath_length <= 0.0:
+		return 0.0
+	var phase: float = clampf(_breath_elapsed / _breath_length, 0.0, 1.0)
+	return breath_amount * _breath_depth * _breath_stop * 0.5 * (1.0 - cos(TAU * phase))
+
+# The breath bone at the current swell, across and up about the belly
+# line.
+func _apply_breath() -> void:
+	if _skeleton == null or _skeleton.get_bone_count() < 3:
+		return
+	var swell: float = get_breath_swell()
+	_skeleton.set_bone_pose_position(2, _breath_rest.origin)
+	_skeleton.set_bone_pose_rotation(2, _breath_rest.basis.get_rotation_quaternion())
+	_skeleton.set_bone_pose_scale(2, Vector3(1.0 + swell, 1.0 + swell, 1.0))
 
 # FieldEnemy.set_rearing(): up to rear_degrees over rear_seconds, or down
 # over drop_seconds (see the easing below); returns how long that takes - 0 when it is
@@ -125,8 +223,8 @@ func get_rear_lift() -> float:
 	return _full_extra * clampf(_angle / rear_degrees, 0.0, 1.0)
 
 # The skin, from the exports: the pivot and axes in mesh space, each
-# vertex's weight, the mesh rebuilt once with bones/weights, the two
-# bones and their binds.
+# vertex's weights (front, breath, the rest on the still root), the mesh
+# rebuilt once with bones/weights, the three bones and their binds.
 func _rebuild() -> void:
 	if not _ready_done:
 		return
@@ -157,18 +255,29 @@ func _rebuild() -> void:
 	_pivot = forward * pivot_front + _up * (floor_level + pivot_up_m / _metres_per_unit) + _axis * ((side_lo + side_hi) * 0.5)
 
 	var half_blend: float = maxf(bend_blend_m, 0.001) * 0.5 / _metres_per_unit
+	# The breath: its fade along the body, and its bone on the belly line
+	# with across, up and back as its axes (a right-handed basis, so the
+	# pose scale's X and Y are the short axes).
+	var breath_centre: float = (front_lo + front_hi) * 0.5 + breath_front_m / _metres_per_unit
+	var breath_half: float = maxf(breath_blend_m, 0.001) * 0.5 / _metres_per_unit
+	var belly: Vector3 = forward * pivot_front + _up * floor_level + _axis * ((side_lo + side_hi) * 0.5)
+	_breath_rest = Transform3D(Basis(_axis, _up, -forward), belly)
 	_weights.resize(_vertices.size())
 	var bones := PackedInt32Array()
 	var bone_weights := PackedFloat32Array()
 	bones.resize(_vertices.size() * 4)
 	bone_weights.resize(_vertices.size() * 4)
 	for i in _vertices.size():
-		var w: float = smoothstep(pivot_front - half_blend, pivot_front + half_blend, _vertices[i].dot(forward))
+		var along: float = _vertices[i].dot(forward)
+		var w: float = smoothstep(pivot_front - half_blend, pivot_front + half_blend, along)
+		var breath: float = (1.0 - w) * (1.0 - smoothstep(breath_centre - breath_half, breath_centre + breath_half, along))
 		_weights[i] = w
 		bones[i * 4] = 0
 		bones[i * 4 + 1] = 1
-		bone_weights[i * 4] = 1.0 - w
+		bones[i * 4 + 2] = 2
+		bone_weights[i * 4] = 1.0 - w - breath
 		bone_weights[i * 4 + 1] = w
+		bone_weights[i * 4 + 2] = breath
 	surface[Mesh.ARRAY_BONES] = bones
 	surface[Mesh.ARRAY_WEIGHTS] = bone_weights
 	var skinned := ArrayMesh.new()
@@ -182,9 +291,13 @@ func _rebuild() -> void:
 	_skeleton.set_bone_parent(1, 0)
 	_skeleton.set_bone_rest(0, Transform3D.IDENTITY)
 	_skeleton.set_bone_rest(1, Transform3D(Basis.IDENTITY, _pivot))
+	_skeleton.add_bone("breath")
+	_skeleton.set_bone_parent(2, 0)
+	_skeleton.set_bone_rest(2, _breath_rest)
 	var skin := Skin.new()
 	skin.add_bind(0, Transform3D.IDENTITY)
 	skin.add_bind(1, Transform3D(Basis.IDENTITY, _pivot).affine_inverse())
+	skin.add_bind(2, _breath_rest.affine_inverse())
 	# The skeleton in the mesh's own space, so bind, rest and vertex all
 	# share one frame.
 	_skeleton.global_transform = _mesh_instance.global_transform
@@ -192,6 +305,7 @@ func _rebuild() -> void:
 	_mesh_instance.skeleton = _mesh_instance.get_path_to(_skeleton)
 	_measure()
 	_set_angle(_angle)
+	_apply_breath()
 
 # At rear_degrees: how far the body's top rises - one pass over the
 # vertices, the same linear blend the GPU does.
