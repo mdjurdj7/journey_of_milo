@@ -97,6 +97,9 @@ func new_run(starting_character: CharacterData) -> void:
 	Bird.reset_flights()
 	Keeper.reset_offers()
 	BelongingsCache.reset_spent()
+	# The LINE exit's world line is said once per run, the same way - see
+	# RegionField.hold_line_world_line.
+	RegionField.reset_hold_line_spoken()
 	run_opening_pending = true
 	player_hp_changed.emit(player_hp, player_max_hp)
 	deck_changed.emit()

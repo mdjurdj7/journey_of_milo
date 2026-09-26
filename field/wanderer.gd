@@ -1,6 +1,10 @@
 extends CharacterBody3D
 class_name Wanderer
 
+# He has come to rest at the hold line (see the Hold Line export group) -
+# once per arrival.
+signal hold_line_reached
+
 const IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_idle.fbx"
 const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_walking.fbx"
 const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_running.fbx"
@@ -80,6 +84,24 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 # never fires; if it ever does outside a drain it warns once per floor
 # with the spot, so a bad patch of relief gets found rather than hidden.
 @export var ground_penetration_tolerance_m: float = 0.03
+
+@export_group("Hold Line")
+# A LINE floor's gate (ExitGate.setup_hold_line()): while required fights
+# remain he won't cross the gate line. Not a wall - nothing on the field
+# stops him - he slows over the last hold_line_ease_distance metres (a
+# constant deceleration, so at walking pace he comes to rest ON the line,
+# and a dash is reined in the same way) and then stands there; only his
+# motion INTO the line is held, so he still walks along it. At rest
+# within hold_line_arrive_margin of it he emits hold_line_reached once
+# (RegionField turns him to look back - see look_back_toward()), and is
+# re-armed once he has walked hold_line_rearm_distance back off it. The
+# look-back turn runs at hold_line_turn_speed (rotation_speed is his
+# walking turn; this one is slower, a look rather than a step). All read
+# live every frame.
+@export var hold_line_ease_distance: float = 1.0
+@export var hold_line_arrive_margin: float = 0.05
+@export var hold_line_rearm_distance: float = 0.75
+@export var hold_line_turn_speed: float = 4.0
 @export_group("")
 @export var use_animation_tree: bool = false
 @export var walk_speed_threshold: float = 0.1
@@ -311,6 +333,19 @@ var _stuck_timer: float = 0.0
 # otherwise ask is_on_floor().
 var _ground_hold_active: bool = false
 var _ground_hold_warned: bool = false
+
+# The hold line (see the Hold Line export group): a point on it and the
+# unit XZ direction he may not move along past it, set by set_hold_line()
+# and dropped by clear_hold_line(). _hold_line_armed: hold_line_reached
+# may fire on the next arrival. The look back (look_back_toward()): a
+# facing he turns to while he stands at the line, dropped when he walks
+# off it or the line lifts.
+var _hold_line_active: bool = false
+var _hold_line_point: Vector3 = Vector3.ZERO
+var _hold_line_normal: Vector3 = Vector3.ZERO
+var _hold_line_armed: bool = true
+var _look_back_active: bool = false
+var _look_back_direction: Vector3 = Vector3.ZERO
 
 # Set by ZoneIntro for the zone intro, which runs this node ALWAYS
 # through the field freeze: input is read as nothing - no WASD, no dash,
@@ -1338,6 +1373,71 @@ func clear_move_target() -> void:
 func has_move_target() -> bool:
 	return _has_move_target
 
+# See the Hold Line export group. `point` is any point on the line,
+# `normal` the direction (XZ, normalized here) he may not move past it
+# along - the floor's exit direction.
+func set_hold_line(point: Vector3, normal: Vector3) -> void:
+	_hold_line_point = point
+	_hold_line_normal = Vector3(normal.x, 0.0, normal.z).normalized()
+	_hold_line_active = _hold_line_normal.length() > 0.0001
+	_hold_line_armed = true
+
+func clear_hold_line() -> void:
+	_hold_line_active = false
+	_look_back_active = false
+
+func has_hold_line() -> bool:
+	return _hold_line_active
+
+# Turn to face `point` while he stands at the hold line (hold_line_turn_
+# speed) - kept until he walks off the line or it lifts. Walking along
+# the line faces the way he walks, as always; coming to rest there again
+# turns him back.
+func look_back_toward(point: Vector3) -> void:
+	var to_point := Vector3(point.x - global_position.x, 0.0, point.z - global_position.z)
+	if to_point.length() < 0.0001:
+		return
+	_look_back_direction = to_point.normalized()
+	_look_back_active = true
+
+# Metres left before the hold line along its normal - negative past it.
+func _hold_line_distance() -> float:
+	return (_hold_line_point - global_position).dot(_hold_line_normal)
+
+# Before move_and_slide(): his velocity into the line is capped at what a
+# constant deceleration from move_speed over hold_line_ease_distance would
+# still allow this far out (sqrt(2 a d)), so he eases to rest on it -
+# along the line is untouched.
+func _limit_velocity_at_hold_line() -> void:
+	if not _hold_line_active or _battle_controller != null:
+		return
+	var into: float = velocity.x * _hold_line_normal.x + velocity.z * _hold_line_normal.z
+	if into <= 0.0:
+		return
+	var deceleration: float = move_speed * move_speed / (2.0 * maxf(hold_line_ease_distance, 0.01))
+	var allowed: float = sqrt(2.0 * deceleration * maxf(_hold_line_distance(), 0.0))
+	if into > allowed:
+		velocity.x -= _hold_line_normal.x * (into - allowed)
+		velocity.z -= _hold_line_normal.z * (into - allowed)
+
+# After move_and_slide(): a frame's step that still overshot is put back
+# onto the line. Then the arrival (at rest, within the margin) and the
+# re-arm once he is well back off it.
+func _hold_at_line(planar_speed: float) -> void:
+	if not _hold_line_active or _battle_controller != null:
+		return
+	var distance: float = _hold_line_distance()
+	if distance < 0.0:
+		global_position.x += _hold_line_normal.x * distance
+		global_position.z += _hold_line_normal.z * distance
+		distance = 0.0
+	if distance > hold_line_rearm_distance:
+		_hold_line_armed = true
+		_look_back_active = false
+	elif _hold_line_armed and distance <= hold_line_arrive_margin and planar_speed < walk_speed_threshold:
+		_hold_line_armed = false
+		hold_line_reached.emit()
+
 # This frame's walking direction toward the target, or ZERO once it's
 # reached (which also clears it) or its enemy is gone.
 func _move_target_direction() -> Vector3:
@@ -1925,19 +2025,29 @@ func _physics_process(delta: float) -> void:
 	else:
 		velocity.y = 0.0
 
+	# Before the step probes, so they test the motion he will actually make.
+	_limit_velocity_at_hold_line()
+
 	_apply_step_up_and_down(delta)
 
 	move_and_slide()
+
+	var planar_speed := Vector2(velocity.x, velocity.z).length()
+	_hold_at_line(planar_speed)
 
 	# Last, after every other write to global_position this frame, so the
 	# position that renders is the held one - a step-down onto lagging
 	# collision earlier in the frame never shows.
 	_hold_above_visible_ground()
 
-	if move_direction.length() > 0.01:
+	# At rest at the hold line he looks back (look_back_toward()) - even
+	# with a key still pressing him into it; moving at all, he faces the
+	# way he moves.
+	if _look_back_active and planar_speed < walk_speed_threshold:
+		rotation.y = lerp_angle(rotation.y, _angle_from_direction(_look_back_direction), hold_line_turn_speed * delta)
+	elif move_direction.length() > 0.01:
 		rotation.y = lerp_angle(rotation.y, _angle_from_direction(move_direction), rotation_speed * delta)
 
-	var planar_speed := Vector2(velocity.x, velocity.z).length()
 	_tick_stuck(delta, planar_speed)
 	if use_animation_tree:
 		if _animation_tree:

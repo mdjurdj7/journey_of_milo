@@ -73,10 +73,11 @@ class_name FloorData
 # origin and lets mask_origin do the shifting, which keeps the
 # spawn->ForwardMarker forward exactly the region's own.
 @export var spawn: Vector2 = Vector2.ZERO
-# Unit XZ, the way OUT of this floor: the gate channel, the camera's
-# inland bound, the worn band's end and the transition trigger all lie
-# along it. Independent of the tower direction (which is where the sea
-# isn't) - on region 1's floors so far the two agree.
+# Unit XZ, the way OUT of this floor: the gate (its channel or its hold
+# line - see exit_kind), the camera's inland bound, the worn band's end
+# and the transition trigger all lie along it. Independent of the tower
+# direction (which is where the sea isn't) - on region 1's floors so far
+# the two agree.
 @export var exit_direction: Vector2 = Vector2(0.0, -1.0)
 @export var enemies: Array[FloorEnemy] = []
 @export var props: Array[FloorProp] = []
@@ -84,6 +85,14 @@ class_name FloorData
 # does (see FloorPatrol). Empty: every enemy stands where it was put.
 @export var patrols: Array[FloorPatrol] = []
 @export_group("Gate")
+# How the way out is closed while required fights remain (ExitGate.
+# exit_kind). CHANNEL: a tidal channel across the neck, a Blocker in it,
+# drained to a bar on clear - for a floor with a real neck. LINE: nothing
+# on the ground at all - the Wanderer himself won't cross the gate line
+# (Wanderer.set_hold_line()) until the floor is cleared - for a floor that
+# opens out rather than funnelling.
+enum ExitKind { CHANNEL, LINE }
+@export var exit_kind: ExitKind = ExitKind.CHANNEL
 # Beyond the first enemy's own position, along exit_direction - where the
 # gate line lands.
 @export var gate_distance_beyond_enemy: float = 6.0

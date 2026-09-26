@@ -16,8 +16,20 @@ class_name ExitGate
 # TriggerArea on the inland side that fires floor_exited. Every export
 # that affects a built shape gets a setter so a Remote-tab edit rebuilds
 # it live, same pattern as contact_shadow.gd's radius/shadow_opacity.
+#
+# That is exit_kind CHANNEL. A LINE floor (FloorData.exit_kind) has none
+# of it - no channel is registered, the Blocker and its contact area stay
+# disabled, and nothing is drained or baked: setup_hold_line() hands this
+# node's own line (its position, its forward) to the Wanderer, who won't
+# cross it, and open() takes it back. The TriggerArea is the same in both.
 
 signal floor_exited
+
+# Pushed by RegionField from FloorData.exit_kind before anything is set
+# up (_setup_exit_gate()), and read by it to pick setup_channel() or
+# setup_hold_line(). Not re-applied live - swapping a channel for a line
+# on a standing floor isn't a tuning edit.
+@export var exit_kind: FloorData.ExitKind = FloorData.ExitKind.CHANNEL
 
 # The channel (see ground_channel.gd) is sized from the boundary walls in
 # setup_channel(): its near bank sits channel_near_offset past the gate
@@ -139,6 +151,8 @@ var _channel_index: int = -1
 var _channel_width: float = 14.0
 # The tweened value: 1 = channel fully cut and full, 0 = gone.
 var _channel_amount: float = 1.0
+# LINE only: who holds the line (setup_hold_line()), so open() can lift it.
+var _hold_wanderer: Wanderer = null
 
 @onready var blocker: StaticBody3D = $Blocker
 @onready var blocker_shape: CollisionShape3D = $Blocker/CollisionShape3D
@@ -217,6 +231,23 @@ func setup_channel(ground: Ground, wall_rect: Rect2) -> void:
 		_ground.set_channel_amount(_channel_index, _channel_amount)
 	print("ExitGate: channel %.1f x %.1f m, near bank %.1f m spawn-side of the gate line, bar %.1f m at %+.2f m across" % [length, _channel_width, channel_near_offset, channel_bar_width, channel_bar_axis_offset])
 	_rebuild()
+
+# LINE's counterpart to setup_channel(), called by RegionField at the same
+# point (this node placed, Ground built): the Blocker and its contact area
+# go off for good - there is nothing to stand in - and the Wanderer is
+# given this node's line, the gate line through its position facing its
+# forward (local -Z, the floor's exit direction), to stop at. open()
+# lifts it.
+func setup_hold_line(wanderer: Wanderer) -> void:
+	blocker_shape.disabled = true
+	block_contact_shape.disabled = true
+	_hold_wanderer = wanderer
+	if wanderer == null:
+		push_warning("ExitGate: no Wanderer to hold at the line; the floor's exit is open.")
+		return
+	var forward := Vector3(-global_transform.basis.z.x, 0.0, -global_transform.basis.z.z).normalized()
+	wanderer.set_hold_line(global_position, forward)
+	print("ExitGate: hold line at %s, facing %s" % [global_position, forward])
 
 # Every exported dimension above lands here rather than each having its
 # own narrow _apply_*() - the blocker and its contact area share the same
@@ -312,10 +343,18 @@ func fit_trigger_to_land(ground: Ground) -> void:
 # (there isn't one yet, but nothing here assumes one-way) is just flipping
 # this back. As the sand surfaces, Ground's own wet band/wet mark take
 # over the look.
+#
+# A LINE gate has nothing to drain: the Wanderer's line is lifted and the
+# trigger is armed on the spot.
 func open() -> void:
 	if _open:
 		return
 	_open = true
+	if exit_kind == FloorData.ExitKind.LINE:
+		if _hold_wanderer != null and is_instance_valid(_hold_wanderer):
+			_hold_wanderer.clear_hold_line()
+		print("ExitGate: open - the line lifts")
+		return
 	print("ExitGate: open - draining")
 
 	var tween := create_tween()

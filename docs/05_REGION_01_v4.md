@@ -21,13 +21,13 @@ The sea is still not the subject. The subject is the ground the sea has left.
 
 ## 2. Spatial logic
 
-Arrival at the water's edge → inland → the land narrows to a neck → the way onward is under water until the floor is cleared → a bar surfaces → the next floor.
+Arrival at the water's edge → inland → the way onward is held until the floor is cleared (under water at a neck, or a line he won't cross where the land opens out) → the next floor.
 
 **Direction of travel is away from the sea.** The sea is a thing the character could turn back toward and doesn't.
 
 **Frame:** horizontal throughout. A low exposed shelf (≈1 m, walkable from the landward side, a drop on the seaward side) is permitted as the first exposed rock of the dry end arriving early; cliffs, banks, anything overhead are not. Region 2 begins the compression; Region 1 spends almost none of it.
 
-**Exits.** A floor's exit can be on any side. Region 1's first two floors exit inland; later floors need not.
+**Exits.** A floor's exit can be on any side. Region 1's first two floors exit inland; later floors need not. How the exit is held until the floor is cleared is per floor too (`FloorData.exit_kind`) — see §12, Threshold marker.
 
 ---
 
@@ -169,7 +169,9 @@ Enemies stand still, often facing away from the player — a crab looking at a p
 
 ## 12. Open threads
 
-**Threshold marker.** Answered: the neck, the channel, and the bar that surfaces.
+**Threshold marker.** Answered, per floor — each floor declares its exit mechanism (`FloorData.exit_kind`):
+- *Floor 1 — the channel.* The neck, the channel across it, and the bar that surfaces when the floor is cleared. It has a real neck, and it is the tutorial floor.
+- *Floor 2 — the line.* The land opens out to the top of the map rather than narrowing, so nothing marks the way out on the ground: no channel, no water, no prop. While a required fight stands, the Wanderer won't cross the exit line. He slows to a stop on it and turns back toward the nearest fight still standing. The first time in a run, "Not with that still behind him." is said over him; after that the turn carries it. When every required fight is won, the line lifts.
 
 **Arrival method.** Answered: by sea — hulls hauled above the tide line, spawn at the water's edge.
 

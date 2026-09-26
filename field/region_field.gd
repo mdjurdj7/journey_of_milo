@@ -107,7 +107,25 @@ enum RewardMode { SCREEN, WORLD }
 # leaving the first physics step to push it out - upward if it felt like
 # it). See _on_ground_built().
 @export var spawn_ground_clearance: float = 0.05
+# A LINE floor's exit (FloorData.exit_kind): each time the Wanderer comes
+# to rest at the gate line with a required fight still standing, he looks
+# back at the nearest one (Wanderer.look_back_toward()). The first time
+# in a run, this world-voice line is said over him as well (Wanderer.
+# get_head_height() plus the clearance, via WorldVoiceLine.show_line_
+# near()), held this long - never again that run (_hold_line_spoken,
+# reset by RunState.new_run()); after that the look back carries it.
+# Empty = no line.
+@export var hold_line_world_line: String = "Not with that still behind him."
+@export var hold_line_world_line_seconds: float = 3.0
+@export var hold_line_world_line_head_clearance: float = 0.35
 @export_group("")
+
+# See hold_line_world_line - per run, not per floor or per scene load (a
+# floor change is a reload).
+static var _hold_line_spoken: bool = false
+
+static func reset_hold_line_spoken() -> void:
+	_hold_line_spoken = false
 
 # The zone intro node (ZoneIntro, a child of this scene, process ALWAYS):
 # the opening shot a new run's first floor plays before the field is
@@ -953,6 +971,7 @@ func _setup_exit_gate() -> void:
 	var enemy := enemies[0] as FieldEnemy
 
 	var exit: Vector3 = get_exit_direction()
+	exit_gate.exit_kind = floor_data.exit_kind
 	exit_gate.channel_bar_axis_offset = floor_data.gate_bar_axis_offset
 	exit_gate.channel_max_width = floor_data.gate_channel_max_width
 	exit_gate.trigger_forward_offset = transition_distance
@@ -988,13 +1007,38 @@ func _apply_camera_inland_limit() -> void:
 # Only once the gate is where it will stay AND the boundary walls exist
 # (the channel is sized from them) can the gate cut its channel across
 # the neck - see ExitGate.setup_channel(). Called from _ready() after
-# _build_boundary().
+# _build_boundary(). A LINE floor has no channel: the gate hands the
+# Wanderer its line instead (ExitGate.setup_hold_line()), and his
+# arrivals at it come here.
 func _setup_exit_gate_channel() -> void:
 	var exit_gate := get_node_or_null(exit_gate_path) as ExitGate
 	var ground := get_node_or_null(ground_path) as Ground
 	if exit_gate == null or ground == null:
 		return
+	if exit_gate.exit_kind == FloorData.ExitKind.LINE:
+		exit_gate.setup_hold_line(wanderer)
+		if wanderer != null and not wanderer.hold_line_reached.is_connected(_on_wanderer_hold_line_reached):
+			wanderer.hold_line_reached.connect(_on_wanderer_hold_line_reached)
+		return
 	exit_gate.setup_channel(ground, get_wall_rect())
+
+# He has come to rest at a LINE floor's gate line with the floor not yet
+# cleared (the line lifts on floor_cleared - ExitGate.open()): he looks
+# back at the nearest required fight still standing, and the first time
+# in a run the line is said over him - see hold_line_world_line.
+func _on_wanderer_hold_line_reached() -> void:
+	var enemy: FieldEnemy = _nearest_required_enemy(wanderer.global_position)
+	if enemy != null:
+		wanderer.look_back_toward(enemy.global_position)
+	if _hold_line_spoken or hold_line_world_line.is_empty():
+		return
+	var line := WorldVoiceLine.on_hud(get_node_or_null(^"FieldHUD"))
+	if line == null:
+		push_warning("RegionField: no FieldHUD to say the hold line's world line on.")
+		return
+	var height: float = wanderer.get_head_height() + hold_line_world_line_head_clearance
+	line.show_line_near(hold_line_world_line, hold_line_world_line_seconds, wanderer, Vector3.UP * height)
+	_hold_line_spoken = true
 
 # The rectangle the four boundary walls' centre lines enclose, in world
 # XZ (Rect2.x = X, Rect2.y = Z) - what ExitGate sizes its channel from.
@@ -1330,13 +1374,25 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 # mirrored onto each FieldEnemy; a body queued for deletion is already
 # counted as gone.
 func _required_enemy_remains() -> bool:
+	return _nearest_required_enemy(Vector3.ZERO) != null
+
+# The standing required enemy nearest `from` (XZ), by the same rule as
+# _required_enemy_remains() - null when none is left. A cluster is its
+# members, so this is the nearest member.
+func _nearest_required_enemy(from: Vector3) -> FieldEnemy:
+	var nearest: FieldEnemy = null
+	var nearest_distance: float = INF
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as FieldEnemy
 		if enemy == null or enemy.is_queued_for_deletion() or enemy.is_defeated():
 			continue
-		if enemy.required:
-			return true
-	return false
+		if not enemy.required:
+			continue
+		var offset := Vector2(enemy.global_position.x - from.x, enemy.global_position.z - from.z)
+		if offset.length() < nearest_distance:
+			nearest_distance = offset.length()
+			nearest = enemy
+	return nearest
 
 # Three cards on the sand where the enemy fell, once the battle framing
 # has blended away. Awaits rather than spawning inline so the cards don't

@@ -7,8 +7,10 @@ extends SceneTree
 # hold is what keeps him on the drawn sand in between. The only channel
 # he can reach mid-drain is the strip between the near bank and the
 # Blocker's near face (the Blocker comes down with the bake), so every
-# case stands him there. Loads the real region scene on floor 1 and
-# floor 2, and for each drain_seconds in DRAIN_DURATIONS runs:
+# case stands him there. Loads the real region scene on floor 1 - the
+# only CHANNEL floor; floor 2 is a LINE floor with nothing to drain (see
+# hold_line_probe.gd) - and for each drain_seconds in DRAIN_DURATIONS
+# runs:
 #
 #   stand - on the bar's centre line at the gate line before open(),
 #           standing through the drain and the bake
@@ -48,7 +50,7 @@ extends SceneTree
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 const DRAIN_DURATIONS: Array[float] = [4.0, 2.0]
-const FLOOR_INDICES: Array[int] = [0, 1]
+const FLOOR_INDICES: Array[int] = [0]
 const SAFETY_SECONDS := 400.0
 const LOAD_FRAMES := 30
 const SETTLE_FRAMES := 60
