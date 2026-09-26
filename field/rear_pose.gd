@@ -42,6 +42,18 @@ class_name RearPose
 # PROCESS_MODE_ALWAYS, like DragonflyWings - through the battle freeze
 # and the reward screen - and leaves the bone alone while the body is
 # hidden under its mound.
+#
+# The jaws open with the rear. The Siltjaw's two mandibles are the front
+# of the main piece - two crescent lobes, apart ahead of glb z 0.55 and
+# welded to the head behind it - not pieces of their own, so each lobe is
+# skinned to a jaw bone by position (fading in across the weld band,
+# neither side at the centre line) and only on the main piece: the face,
+# cheek pads, palps, eyes and shell never move. Each jaw hinges at its
+# own root and swings out about the head's up, mirrored, by jaw_degrees
+# at the full rear. The jaw bones ride the front bone, and their angle is
+# the rear's own fraction, so they track it - same curve, same timing -
+# opening as the head lifts and closing as it drops, whether the charge
+# lands, breaks or the burrow follows.
 
 # How far the front comes up, degrees.
 @export_range(0.0, 90.0, 0.5) var rear_degrees: float = 45.0:
@@ -98,6 +110,43 @@ class_name RearPose
 # From breathing to still once the body is settling on death.
 @export var breath_stop_seconds: float = 0.4
 
+@export_group("Jaws")
+# How far each jaw swings out at the full rear, degrees. The jaws track
+# the rear: at any moment they are open by the rear's own fraction of
+# rear_degrees, so they open as the head lifts and close as it drops.
+@export var jaw_degrees: float = 15.0:
+	set(value):
+		jaw_degrees = value
+		_set_angle(_angle)
+# The jaws' hinges: this far forward of the body's middle and this far
+# either side of its centre line, metres (glb z 0.52, x +-0.2 on the
+# Siltjaw - each lobe's own root, where it welds to the head).
+@export var jaw_pivot_forward_m: float = 0.695:
+	set(value):
+		jaw_pivot_forward_m = value
+		_rebuild()
+@export var jaw_pivot_across_m: float = 0.267:
+	set(value):
+		jaw_pivot_across_m = value
+		_rebuild()
+# Where a jaw starts following its hinge: from nothing to fully over
+# jaw_root_blend_m centred jaw_root_forward_m ahead of the body's middle
+# - across the weld band behind the lobes (glb z 0.45-0.55).
+@export var jaw_root_forward_m: float = 0.668:
+	set(value):
+		jaw_root_forward_m = value
+		_rebuild()
+@export var jaw_root_blend_m: float = 0.134:
+	set(value):
+		jaw_root_blend_m = value
+		_rebuild()
+# Within this far of the centre line a vertex follows neither jaw fully,
+# so the weld between the two roots stretches rather than splits.
+@export var jaw_midline_m: float = 0.04:
+	set(value):
+		jaw_midline_m = value
+		_rebuild()
+
 var _mesh_instance: MeshInstance3D = null
 var _source_mesh: Mesh = null
 var _skeleton: Skeleton3D = null
@@ -127,6 +176,8 @@ var _breath_length: float = 0.0
 var _breath_depth: float = 0.0
 var _breath_stop: float = 1.0
 var _rng := RandomNumberGenerator.new()
+# The jaws' hinges in mesh space: [right (+_axis), left].
+var _jaw_pivots: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO]
 
 func _ready() -> void:
 	var model := get_parent() as Node3D
@@ -223,8 +274,8 @@ func get_rear_lift() -> float:
 	return _full_extra * clampf(_angle / rear_degrees, 0.0, 1.0)
 
 # The skin, from the exports: the pivot and axes in mesh space, each
-# vertex's weights (front, breath, the rest on the still root), the mesh
-# rebuilt once with bones/weights, the three bones and their binds.
+# vertex's weights (front, a jaw, breath, the rest on the still root), the
+# mesh rebuilt once with bones/weights, the five bones and their binds.
 func _rebuild() -> void:
 	if not _ready_done:
 		return
@@ -262,6 +313,18 @@ func _rebuild() -> void:
 	var breath_half: float = maxf(breath_blend_m, 0.001) * 0.5 / _metres_per_unit
 	var belly: Vector3 = forward * pivot_front + _up * floor_level + _axis * ((side_lo + side_hi) * 0.5)
 	_breath_rest = Transform3D(Basis(_axis, _up, -forward), belly)
+	# The jaws: the two lobes at the front of the main piece, each on its
+	# own bone hinged at its root. Only the main piece - the face, cheek
+	# pads, palps, eyes and shell are pieces of their own, and the cheek
+	# pads sit inside the crescents where a box would catch them.
+	var middle: float = (front_lo + front_hi) * 0.5
+	var side_mid: float = (side_lo + side_hi) * 0.5
+	var jaw_hinge: Vector3 = forward * (middle + jaw_pivot_forward_m / _metres_per_unit) + _up * floor_level + _axis * side_mid
+	_jaw_pivots = [jaw_hinge + _axis * (jaw_pivot_across_m / _metres_per_unit), jaw_hinge - _axis * (jaw_pivot_across_m / _metres_per_unit)]
+	var jaw_root: float = middle + jaw_root_forward_m / _metres_per_unit
+	var jaw_half: float = maxf(jaw_root_blend_m, 0.001) * 0.5 / _metres_per_unit
+	var midline: float = maxf(jaw_midline_m, 0.0001) / _metres_per_unit
+	var main_piece: PackedByteArray = _main_piece(surface[Mesh.ARRAY_INDEX])
 	_weights.resize(_vertices.size())
 	var bones := PackedInt32Array()
 	var bone_weights := PackedFloat32Array()
@@ -271,13 +334,19 @@ func _rebuild() -> void:
 		var along: float = _vertices[i].dot(forward)
 		var w: float = smoothstep(pivot_front - half_blend, pivot_front + half_blend, along)
 		var breath: float = (1.0 - w) * (1.0 - smoothstep(breath_centre - breath_half, breath_centre + breath_half, along))
+		var across: float = _vertices[i].dot(_axis) - side_mid
+		var jaw: float = 0.0
+		if main_piece[i] == 1:
+			jaw = w * smoothstep(jaw_root - jaw_half, jaw_root + jaw_half, along) * smoothstep(0.0, midline, absf(across))
 		_weights[i] = w
 		bones[i * 4] = 0
 		bones[i * 4 + 1] = 1
 		bones[i * 4 + 2] = 2
+		bones[i * 4 + 3] = 3 if across >= 0.0 else 4
 		bone_weights[i * 4] = 1.0 - w - breath
-		bone_weights[i * 4 + 1] = w
+		bone_weights[i * 4 + 1] = w - jaw
 		bone_weights[i * 4 + 2] = breath
+		bone_weights[i * 4 + 3] = jaw
 	surface[Mesh.ARRAY_BONES] = bones
 	surface[Mesh.ARRAY_WEIGHTS] = bone_weights
 	var skinned := ArrayMesh.new()
@@ -294,10 +363,18 @@ func _rebuild() -> void:
 	_skeleton.add_bone("breath")
 	_skeleton.set_bone_parent(2, 0)
 	_skeleton.set_bone_rest(2, _breath_rest)
+	# The jaws ride the front bone, so they lift with the rear and open on
+	# top of it.
+	for side in 2:
+		_skeleton.add_bone(["jaw_right", "jaw_left"][side])
+		_skeleton.set_bone_parent(3 + side, 1)
+		_skeleton.set_bone_rest(3 + side, Transform3D(Basis.IDENTITY, _jaw_pivots[side] - _pivot))
 	var skin := Skin.new()
 	skin.add_bind(0, Transform3D.IDENTITY)
 	skin.add_bind(1, Transform3D(Basis.IDENTITY, _pivot).affine_inverse())
 	skin.add_bind(2, _breath_rest.affine_inverse())
+	skin.add_bind(3, Transform3D(Basis.IDENTITY, _jaw_pivots[0]).affine_inverse())
+	skin.add_bind(4, Transform3D(Basis.IDENTITY, _jaw_pivots[1]).affine_inverse())
 	# The skeleton in the mesh's own space, so bind, rest and vertex all
 	# share one frame.
 	_skeleton.global_transform = _mesh_instance.global_transform
@@ -323,7 +400,7 @@ func _measure() -> void:
 	_full_extra = (top_reared - top_flat) * _metres_per_unit
 
 # The front bone at `degrees` about the bend axis, on the pivot (its
-# rest).
+# rest), and the jaws open by the same fraction of the rear.
 func _set_angle(degrees: float) -> void:
 	_angle = degrees
 	if _skeleton == null or _skeleton.get_bone_count() < 2:
@@ -332,3 +409,62 @@ func _set_angle(degrees: float) -> void:
 	_skeleton.set_bone_pose_rotation(0, Quaternion.IDENTITY)
 	_skeleton.set_bone_pose_position(1, _pivot)
 	_skeleton.set_bone_pose_rotation(1, Quaternion(_axis, deg_to_rad(degrees)))
+	if _skeleton.get_bone_count() < 5:
+		return
+	# The jaws track the rear. About the head's own up; a turn of -angle
+	# takes a tip ahead of the hinge toward +_axis (up x forward is
+	# -_axis), so the right jaw turns by -open and the left by +open.
+	var fraction: float = clampf(degrees / rear_degrees, 0.0, 1.0) if rear_degrees > 0.0 else 0.0
+	var open: float = deg_to_rad(jaw_degrees * fraction)
+	for side in 2:
+		_skeleton.set_bone_pose_position(3 + side, _jaw_pivots[side] - _pivot)
+		_skeleton.set_bone_pose_rotation(3 + side, Quaternion(_up, -open if side == 0 else open))
+
+# 1 for each vertex of the mesh's largest piece - connected by its
+# triangles, or sharing a position with a vertex that is (a UV seam
+# splits a vertex without splitting the surface) - 0 for the rest.
+func _main_piece(indices: PackedInt32Array) -> PackedByteArray:
+	var count: int = _vertices.size()
+	var parent := PackedInt32Array()
+	parent.resize(count)
+	for i in count:
+		parent[i] = i
+	var at_position: Dictionary = {}
+	for i in count:
+		var key: Vector3 = _vertices[i]
+		if at_position.has(key):
+			_union(parent, i, int(at_position[key]))
+		else:
+			at_position[key] = i
+	for t in range(0, indices.size() - 2, 3):
+		_union(parent, indices[t], indices[t + 1])
+		_union(parent, indices[t + 1], indices[t + 2])
+	var sizes: Dictionary = {}
+	var biggest: int = -1
+	for i in count:
+		var root: int = _find(parent, i)
+		var size: int = int(sizes.get(root, 0)) + 1
+		sizes[root] = size
+		if biggest < 0 or size > int(sizes[biggest]):
+			biggest = root
+	var main := PackedByteArray()
+	main.resize(count)
+	for i in count:
+		main[i] = 1 if _find(parent, i) == biggest else 0
+	return main
+
+func _find(parent: PackedInt32Array, i: int) -> int:
+	var root: int = i
+	while parent[root] != root:
+		root = parent[root]
+	while parent[i] != root:
+		var next: int = parent[i]
+		parent[i] = root
+		i = next
+	return root
+
+func _union(parent: PackedInt32Array, a: int, b: int) -> void:
+	var ra: int = _find(parent, a)
+	var rb: int = _find(parent, b)
+	if ra != rb:
+		parent[ra] = rb
