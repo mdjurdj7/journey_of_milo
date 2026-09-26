@@ -41,7 +41,7 @@ class_name BattleIntent
 
 # The display's bottom edge (the hairline) sits head_margin metres above
 # the enemy's own head - FieldEnemy.get_head_height(), its model's scaled
-# bbox height (0.58m for the Sputter) - with fallback_head_height
+# bbox height (0.75m for the Sputter) - with fallback_head_height
 # (BattleOverlay's humanoid-guess enemy_head_height) only if the enemy
 # reports 0.
 @export var head_margin: float = 0.1

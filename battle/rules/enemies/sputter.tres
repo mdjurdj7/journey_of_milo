@@ -28,3 +28,4 @@ max_hp = 45
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_block"), SubResource("EnemyIntent_strike"), SubResource("EnemyIntent_scissor")])
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell")])
 erratic_intent_selection = true
+model_scale = 1.25
