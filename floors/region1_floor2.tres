@@ -14,6 +14,7 @@
 [ext_resource type="Resource" path="res://cards/pools/belongings_pool.tres" id="10_belongings_pool"]
 [ext_resource type="PackedScene" path="res://field/bundle_prop.tscn" id="14_bundle"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/siltjaw.tres" id="16_siltjaw"]
+[ext_resource type="Texture2D" uid="uid://nkw6gcc8t1ld" path="res://assets/field/masks/Map3_rock_x1.25_shelf.png" id="17_map3_rock"]
 
 [sub_resource type="Resource" id="FloorEnemy_sputter"]
 script = ExtResource("2_floor_enemy")
@@ -75,6 +76,7 @@ script = ExtResource("1_floor_data")
 mask = ExtResource("4_map3")
 elevation_mask = ExtResource("8_map3_elev")
 wear_mask = ExtResource("13_map3_wear")
+rock_mask = ExtResource("17_map3_rock")
 mask_origin = Vector2(0.5, 0.888889)
 interior_height = 0.3
 relief_amplitude = 0.18
