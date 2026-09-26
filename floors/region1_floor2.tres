@@ -21,6 +21,7 @@
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("5_sputter")
 position = Vector2(1.5, -21.25)
+yaw_degrees = 133.0
 group = &"crab"
 anchor = true
 
