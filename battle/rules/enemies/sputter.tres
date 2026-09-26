@@ -29,3 +29,4 @@ intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_block"), SubR
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell")])
 erratic_intent_selection = true
 model_scale = 1.25
+attachment_scene_path = "res://field/sputter_claws.tscn"
