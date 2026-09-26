@@ -62,11 +62,13 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 		match intent.type:
 			EnemyIntent.IntentType.ATTACK:
 				# One pass per hit (EnemyIntent.hits, 1 for every enemy so far):
-				# modifiers are re-read each hit, so a Braced/Unflinching-shaped
-				# status - consumed by the first hit whether or not damage
-				# reached HP, see status.gd's consume_triggered() and
-				# StatusData.clears_on_trigger's own doc - only softens the
-				# first; block/absorb are worn down hit by hit.
+				# modifiers are re-read each hit, so an Unflinching-shaped
+				# status on the player - consumed by the first hit whether or
+				# not damage reached HP, see status.gd's consume_triggered()
+				# and StatusData.clears_on_trigger's own doc - only softens the
+				# first, while one on this enemy that lasts the whole attack
+				# (Braced, StatusData.consumed_by_own_attack) softens every
+				# hit; block/absorb are worn down hit by hit.
 				result["attacked"] = true
 				var total_to_hp: int = 0
 				# Tracked per hit as well as summed, because Grace's
@@ -91,6 +93,10 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 						to_hp = hp_before - player.hp
 					total_to_hp += to_hp
 					largest_hit = maxi(largest_hit, to_hp)
+				# The attack has resolved, every hit of it: a status that
+				# lasted only until then (Braced on this enemy) is spent -
+				# even if the player's block ate all of it.
+				Status.consume_after_attack(combatant.statuses)
 				result["damage_to_hp"] = total_to_hp
 				if total_to_hp > 0:
 					player.took_damage_this_turn = true

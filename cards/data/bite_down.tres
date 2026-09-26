@@ -5,7 +5,7 @@
 
 [sub_resource type="Resource" id="CardEffect_damage"]
 script = ExtResource("2_card_effect")
-value = 10
+value = 8
 
 [sub_resource type="Resource" id="CardEffect_self_damage"]
 script = ExtResource("2_card_effect")
@@ -18,7 +18,7 @@ card_name = "Bite Down"
 cost = 1
 card_type = 0
 target_type = 0
-description = "Lose {hp_cost} HP.
-Deal {damage} damage."
+description = "Deal {damage} damage.
+Lose {hp_cost} HP."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage"), SubResource("CardEffect_self_damage")])
 battle_animation = &"Slash"

@@ -123,6 +123,13 @@ static func refuse_lethal(player: Combatant, was_critical: bool) -> bool:
 		player.spent_statuses.append(guard.data)
 	return true
 
+# The holder's own attack has resolved: every status that lasts only until
+# then (StatusData.consumed_by_own_attack - Braced on an enemy) is gone.
+static func consume_after_attack(statuses: Array[Status]) -> void:
+	for active in statuses.duplicate():
+		if active.data.consumed_by_own_attack:
+			statuses.erase(active)
+
 # Applies every active MODIFIER-category status matching `target` to
 # `amount`, in list order - ADD sums directly; MULTIPLY treats magnitude
 # as a PERCENTAGE. Never returns below 0.

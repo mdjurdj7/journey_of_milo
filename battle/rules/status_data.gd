@@ -39,8 +39,8 @@ const DURATION_UNTIL_TRIGGERED := -2
 @export var display_name: String = ""
 @export_multiline var description: String = ""
 # Rules text, not flavor - what this status actually does, including its
-# consumption rule where relevant (see braced.tres for the wording this
-# was added for: consumed by the next hit whether or not it deals damage).
+# consumption rule where relevant (see braced.tres: gone once the
+# enemy's next attack lands, whether or not it deals damage).
 
 @export var category: Category = Category.INFORMATIONAL
 @export var default_magnitude: int = 0
@@ -71,6 +71,14 @@ const DURATION_UNTIL_TRIGGERED := -2
 @export var attack_damage_bonus: int = 0
 # The bonus above only while the player is Critical.
 @export var bonus_requires_critical: bool = false
+
+# Removed from its holder once the holder's own ATTACK has resolved -
+# after every hit of it, so a status that softens that attack (Braced, on
+# an enemy) softens all of it - whether or not any damage got through.
+# An attack interrupted before it resolves, a Defend or a Burrow leave it
+# in place (EnemyTurn.take_turn()). Pair it with DURATION_UNTIL_TRIGGERED
+# so the turn counter never takes it first.
+@export var consumed_by_own_attack: bool = false
 
 # The Refuse the End rule: an ENEMY hit that would take the player to 0
 # HP while they're Critical leaves them at 1 instead, and removes this

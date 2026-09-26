@@ -1179,10 +1179,10 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 		push_error("Wanderer: Slash animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(slash_track_node_path))
 		return
 
-	# Brace - same shape again, but LOOP_LINEAR: a held stance rather than
-	# a one-shot, played for as long as the Braced status (or any other
-	# status carrying a StatusData.battle_animation) stays active on the
-	# player. See _on_status_changed().
+	# Brace - same shape again, and a one-shot like Slash: the Brace card
+	# plays it once (CardData.battle_animation) and the Wanderer returns to
+	# rest. It used to loop as a held pose while Braced sat on the player;
+	# Braced is on the enemy now, so there's nothing on him to hold it for.
 	var brace_scene := load(BRACE_SCENE_PATH) as PackedScene
 	var brace_instance := brace_scene.instantiate()
 	var brace_players := brace_instance.find_children("*", "AnimationPlayer", true, false)
@@ -1198,7 +1198,7 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 		return
 
 	var brace_animation: Animation = brace_entry["animation"]
-	brace_animation.loop_mode = Animation.LOOP_LINEAR
+	brace_animation.loop_mode = Animation.LOOP_NONE
 	idle_library.add_animation("Brace", brace_animation)
 	brace_instance.free()
 
@@ -1701,13 +1701,19 @@ func unbind_battle() -> void:
 # impact, only for a card with a battle_animation - the blade's whoosh
 # (AttackAudio). The impact itself sounds from the enemy (its contact
 # sound, on the hit frame - see BattleFeedback._react_to_card_hit()).
-func _on_card_swing(_card: CardData) -> void:
+#
+# An Attack's only: a Skill with a clip of its own (Brace) is a guard, not
+# a blade, and has no whoosh.
+func _on_card_swing(card: CardData) -> void:
+	if card.card_type != CardData.CardType.ATTACK:
+		return
 	play_swing_audio()
 
 # See CardData.battle_animation's own doc - empty means this card has no
 # swing. Queues _resting_battle_animation() rather than a bare "BattleIdle"
-# so a card played while a held stance (e.g. Brace) is still active on the
-# player doesn't permanently cancel that stance once the swing finishes.
+# so a card played while a status holding a pose (StatusData.battle_
+# animation) is active on the player doesn't permanently cancel that pose
+# once the swing finishes. Brace's own clip is a one-shot like Slash.
 func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
 	if card.battle_animation == &"" or _animation_player == null:
 		return
@@ -1715,9 +1721,8 @@ func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
 	_animation_player.queue(_resting_battle_animation())
 
 # See StatusData.battle_animation's own doc. Re-evaluates on every status
-# change (a status being applied, ticked, or cleared - e.g. Braced clearing
-# via Status.consume_triggered() the instant the player is hit) rather than
-# reacting to any one specific status by name.
+# change (a status being applied, ticked, or cleared) rather than reacting
+# to any one specific status by name.
 func _on_status_changed() -> void:
 	if _animation_player == null or _battle_controller == null:
 		return

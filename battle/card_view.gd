@@ -715,11 +715,14 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 				CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK, CardEffect.EffectType.ABSORB:
 					return KeylineType.GUARD
 				CardEffect.EffectType.APPLY_STATUS:
-					# APPLY_STATUS only - APPLY_STATUS_TO_TARGET puts the
-					# status on the ENEMY (see apply_status_to_target_
-					# effect.gd), where incoming-damage reduction makes the
-					# enemy harder to kill. That is the opposite of guard.
 					if _is_defensive_status(effect.status_data):
+						return KeylineType.GUARD
+				CardEffect.EffectType.APPLY_STATUS_TO_TARGET:
+					# On the ENEMY (see apply_status_to_target_effect.gd) the
+					# test turns round: cutting its OUTGOING damage is guard
+					# (Brace); cutting its incoming would make it harder to
+					# kill, the opposite of guard.
+					if _is_disarming_status(effect.status_data):
 						return KeylineType.GUARD
 		return KeylineType.UTILITY
 	return KeylineType.STRIKE
@@ -734,6 +737,15 @@ static func _is_defensive_status(status: StatusData) -> bool:
 		return false
 	return status.category == StatusData.Category.MODIFIER \
 		and status.modifier_target == StatusData.ModifierTarget.INCOMING_DAMAGE \
+		and status.default_magnitude < 0
+
+# A status that cuts the damage its holder DEALS - on an enemy, the
+# player's defence (Braced). Same sign test as _is_defensive_status().
+static func _is_disarming_status(status: StatusData) -> bool:
+	if status == null:
+		return false
+	return status.category == StatusData.Category.MODIFIER \
+		and status.modifier_target == StatusData.ModifierTarget.OUTGOING_DAMAGE \
 		and status.default_magnitude < 0
 
 # The HP the card costs to play: the sum of its self-scoped SELF_DAMAGE /
