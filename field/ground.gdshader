@@ -219,18 +219,20 @@ uniform bool wear_mask_ready = false;
 // colour blends toward rock_color over rock_slope_blend more, so a drop's
 // face turns to stone while its flat top and its foot stay sand, and the
 // sand thins across the lip as the slope comes on. The slope is the
-// interpolated vertex normal's, not the triangle's - the relief grid's
-// 0.35 m facets would staircase a wandering face's outline, where the
-// smoothed normal carries the tint ~0.35 m onto the lip and the foot.
+// interpolated vertex normal's, not the triangle's. Faces want painting
+// ~1.2 m wide: at the relief's 0.35 m spacing a one- or two-cell face
+// staircases along any wandering outline, and this tint follows every
+// tooth; the defaults (22 + 12) are set for the 25-35 degrees a wide
+// face comes out at.
 // Only where rock_mask allows it: a painting on the landmass canvas,
 // white = stone may show here. Without one there is no rock anywhere -
 // steep SAND (a dune's slip face, the hollow's wall) stays sand, and the
 // mask is what tells the two apart. The mask can be rough; the slope
 // finds the edge. Blended into the dry colour before the wet mix, so wet
 // rock darkens like wet sand and grain, wear and caustics ride on it.
-uniform vec4 rock_color : source_color = vec4(0.56, 0.58, 0.55, 1.0);
-uniform float rock_slope_min = 35.0;
-uniform float rock_slope_blend = 15.0;
+uniform vec4 rock_color : source_color = vec4(0.56, 0.59, 0.50, 1.0);
+uniform float rock_slope_min = 22.0;
+uniform float rock_slope_blend = 12.0;
 uniform sampler2D rock_mask : filter_linear, repeat_disable;
 uniform bool rock_mask_ready = false;
 

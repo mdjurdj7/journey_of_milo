@@ -86,6 +86,7 @@ relief_subdivisions = Vector2i(356, 251)
 enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3"), SubResource("FloorEnemy_siltjaw")])
 props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_bundle"), SubResource("FloorProp_alcove_cache")])
 patrols = Array[ExtResource("12_floor_patrol")]([SubResource("FloorPatrol_island")])
+ledges = Array[PackedVector2Array]([PackedVector2Array(-5.538, -25.350, -5.664, -25.000, -5.679, -24.650, -5.620, -24.300, -5.547, -23.950, -5.400, -23.631, -5.100, -23.359, -4.904, -23.050, -4.806, -22.700, -4.781, -22.350, -4.754, -22.000, -4.565, -21.650, -4.322, -21.350, -4.000, -21.182, -3.650, -21.281, -3.359, -21.500, -3.058, -21.750, -2.800, -22.039, -2.737, -22.400, -2.741, -22.750, -2.737, -22.850)])
 exit_kind = 1
 gate_distance_beyond_enemy = 7.5
 wear_path_mid_offset = 1.875

@@ -607,21 +607,25 @@ signal relief_rebuilt
 # see ground.gdshader's own rock block for the rule. No mask, no rock:
 # steep sand stays sand everywhere else.
 @export_group("Rock")
-# Cool, muted, a step darker than the sand - exposed stone is the one
-# ground surface in Region 1 without the sand's warm bias.
-@export var rock_color: Color = Color(0.56, 0.58, 0.55):
+# Cool, muted, grey-green, a step darker than the sand - exposed stone is
+# the one ground surface in Region 1 without the sand's warm bias. Its
+# green has to survive the region's cool sun (0.92, 0.94, 0.97), which
+# lifts blue ~5% over red: (0.56, 0.58, 0.55) lit to a neutral that read
+# blue beside the sand; this lights to about G-B +0.08.
+@export var rock_color: Color = Color(0.56, 0.59, 0.50):
 	set(value):
 		rock_color = value
 		_apply_uniform("rock_color", value)
-# Degrees. Stone starts showing past rock_slope_min and is full stone
-# rock_slope_blend further on. The slope is the shading normal's, which
-# the relief's central differences round off: a 0.9 m one-cell drop
-# (~70 degrees of triangle) shades at ~50-60.
-@export var rock_slope_min: float = 35.0:
+# Degrees of shading-normal slope. Stone starts showing past
+# rock_slope_min and is full stone rock_slope_blend further on - set for
+# faces painted ~1.2 m wide (25-35 degrees), the width the relief draws
+# without a sawtooth; see LedgeBarrier for why those faces don't need to
+# be steep to stop him.
+@export var rock_slope_min: float = 22.0:
 	set(value):
 		rock_slope_min = value
 		_apply_uniform("rock_slope_min", value)
-@export var rock_slope_blend: float = 15.0:
+@export var rock_slope_blend: float = 12.0:
 	set(value):
 		rock_slope_blend = value
 		_apply_uniform("rock_slope_blend", value)
