@@ -19,8 +19,8 @@ class_name BattleIntent
 # charge) adds a second row under the hairline: the damage still to deal
 # this turn, counting down as cards land, inside a thin ink ring with a
 # gap in it - a break waiting to be made, not a second number coming at
-# you. Met, it reads 0, the ring closes (or fills, closed_ring_filled)
-# and the attack pair dims to hairline ink - it won't land. The whole
+# you. Met, the number goes and the ring closes, empty, and the attack
+# pair dims to hairline ink - it won't land. The whole
 # stack still ends at the anchor, so the attack line sits a ring higher.
 # A BURROW (buried - it does nothing this turn) is its glyph alone: there
 # is no number coming.
@@ -94,12 +94,6 @@ class_name BattleIntent
 	set(value):
 		ring_top_gap_px = value
 		_apply_layout()
-# Met: the ring closes as a line (false) or fills solid ink with the 0 in
-# bone (true).
-@export var closed_ring_filled: bool = false:
-	set(value):
-		closed_ring_filled = value
-		refresh_style()
 @export_group("")
 
 var target: FieldEnemy = null
@@ -158,16 +152,10 @@ func set_target(enemy: FieldEnemy) -> void:
 func refresh_style() -> void:
 	if _label == null:
 		return
-	var ink: Color = get_theme_color("ink", "Battle")
-	var bone: Color = get_theme_color("bone", "Battle")
 	for label: Label in [_label, _threshold_label]:
-		label.add_theme_color_override("font_color", ink)
-		label.add_theme_color_override("font_outline_color", bone)
+		label.add_theme_color_override("font_color", get_theme_color("ink", "Battle"))
+		label.add_theme_color_override("font_outline_color", get_theme_color("bone", "Battle"))
 		label.add_theme_constant_override("outline_size", outline_size_px)
-	# A filled, closed ring is ink: its 0 turns bone to read on it.
-	if closed_ring_filled and _interrupted:
-		_threshold_label.add_theme_color_override("font_color", bone)
-		_threshold_label.add_theme_color_override("font_outline_color", ink)
 	queue_redraw()
 
 # preview is EnemyTurn.preview_intent()'s dictionary (empty = nothing).
@@ -183,8 +171,9 @@ func show_intent(preview: Dictionary) -> void:
 			_label.text = ""
 		_has_threshold = preview.has("threshold")
 		_interrupted = bool(preview.get("interrupted", false))
-		_threshold_label.text = str(int(preview.get("threshold_left", 0))) if _has_threshold else ""
-	refresh_style()
+		# Met, the ring holds nothing: there is no more to deal.
+		var threshold_text: String = str(int(preview.get("threshold_left", 0)))
+		_threshold_label.text = threshold_text if _has_threshold and not _interrupted else ""
 	_apply_layout()
 	_update_visibility()
 
@@ -239,7 +228,7 @@ func _apply_layout() -> void:
 	_ring_centre = Vector2(content_width * 0.5, ring_top + ring_box * 0.5)
 	_threshold_label.position = _ring_centre - Vector2(ring_box, ring_box) * 0.5
 	_threshold_label.size = Vector2(ring_box, ring_box)
-	_threshold_label.visible = _has_threshold
+	_threshold_label.visible = _has_threshold and not _threshold_label.text.is_empty()
 	queue_redraw()
 
 func _text_width(label: Label, font_size: int) -> float:
@@ -276,17 +265,11 @@ func _draw() -> void:
 	draw_rect(Rect2(rule_left, _rule_top, hairline_width_px, rule_thickness), rule_color)
 
 # The threshold ring: bone under ink, like every stroke here, broken by
-# ring_gap_degrees around ring_gap_facing_degrees - sealed once met, or
-# filled solid (closed_ring_filled), the 0 then drawn in bone by
-# refresh_style().
+# ring_gap_degrees around ring_gap_facing_degrees - sealed once met.
 func _draw_ring() -> void:
 	var ink: Color = get_theme_color("ink", "Battle")
 	var outline: Color = get_theme_color("bone", "Battle")
 	var radius: float = ring_diameter_px * 0.5
-	if _interrupted and closed_ring_filled:
-		draw_circle(_ring_centre, radius + ring_stroke_px * 0.5 + float(outline_size_px), outline, true, -1.0, true)
-		draw_circle(_ring_centre, radius + ring_stroke_px * 0.5, ink, true, -1.0, true)
-		return
 	var gap: float = 0.0 if _interrupted else deg_to_rad(clampf(ring_gap_degrees, 0.0, 180.0))
 	var facing: float = deg_to_rad(ring_gap_facing_degrees)
 	var start: float = facing + gap * 0.5
