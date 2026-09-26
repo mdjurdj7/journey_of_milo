@@ -13,7 +13,6 @@
 [ext_resource type="PackedScene" path="res://field/belongings_cache.tscn" id="9_belongings_cache"]
 [ext_resource type="Resource" path="res://cards/pools/belongings_pool.tres" id="10_belongings_pool"]
 [ext_resource type="PackedScene" path="res://field/bundle_prop.tscn" id="14_bundle"]
-[ext_resource type="PackedScene" path="res://field/sand_overhang.tscn" id="15_overhang"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/siltjaw.tres" id="16_siltjaw"]
 [ext_resource type="Script" path="res://floors/floor_roam.gd" id="17_floor_roam"]
 
@@ -73,11 +72,6 @@ scene = ExtResource("14_bundle")
 position = Vector3(-17.875, 0, -18.375)
 pool = ExtResource("10_belongings_pool")
 
-[sub_resource type="Resource" id="FloorProp_pocket_overhang"]
-script = ExtResource("3_floor_prop")
-scene = ExtResource("15_overhang")
-position = Vector3(9.8, 0, -24.3)
-
 [sub_resource type="Resource" id="FloorProp_alcove_cache"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("9_belongings_cache")
@@ -96,7 +90,7 @@ caustic_strength = 0.12
 relief_extent = Vector2(125, 88)
 relief_subdivisions = Vector2i(356, 251)
 enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3"), SubResource("FloorEnemy_siltjaw")])
-props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_bundle"), SubResource("FloorProp_pocket_overhang"), SubResource("FloorProp_alcove_cache")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_bundle"), SubResource("FloorProp_alcove_cache")])
 patrols = Array[ExtResource("12_floor_patrol")]([SubResource("FloorPatrol_island")])
 roams = Array[ExtResource("17_floor_roam")]([SubResource("FloorRoam_siltjaw")])
 gate_distance_beyond_enemy = 7.5
