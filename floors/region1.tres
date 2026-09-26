@@ -4,8 +4,9 @@
 [ext_resource type="Script" uid="uid://8yxy7cpevuvt" path="res://floors/floor_data.gd" id="2_floor_data"]
 [ext_resource type="Resource" uid="uid://dblsdrgjpebnk" path="res://floors/region1_floor1.tres" id="3_floor1"]
 [ext_resource type="Resource" uid="uid://d34pu250xcrln" path="res://floors/region1_floor2.tres" id="4_floor2"]
+[ext_resource type="Resource" path="res://floors/region1_floor3.tres" id="5_floor3"]
 
 [resource]
 script = ExtResource("1_region_data")
-floors = Array[ExtResource("2_floor_data")]([ExtResource("3_floor1"), ExtResource("4_floor2")])
+floors = Array[ExtResource("2_floor_data")]([ExtResource("3_floor1"), ExtResource("4_floor2"), ExtResource("5_floor3")])
 display_name = "Landfall"

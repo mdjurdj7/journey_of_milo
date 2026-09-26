@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="FloorData" format=3]
+
+[ext_resource type="Script" uid="uid://8yxy7cpevuvt" path="res://floors/floor_data.gd" id="1_floor_data"]
+[ext_resource type="Script" uid="uid://eby4csrr8fpj" path="res://floors/floor_enemy.gd" id="2_floor_enemy"]
+[ext_resource type="Texture2D" uid="uid://b1h7aevwtvt7x" path="res://assets/field/masks/Map4_mask.png" id="3_map4"]
+[ext_resource type="Texture2D" uid="uid://dk62pc7a68fir" path="res://assets/field/masks/Map4_elev.png" id="4_map4_elev"]
+[ext_resource type="Texture2D" uid="uid://cjljc5xcevy27" path="res://assets/field/masks/Map4_rock.png" id="5_map4_rock"]
+[ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="6_sputter"]
+[ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
+
+[sub_resource type="Resource" id="FloorEnemy_sputter"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("6_sputter")
+position = Vector2(-3, -9)
+
+[resource]
+script = ExtResource("1_floor_data")
+mask = ExtResource("3_map4")
+elevation_mask = ExtResource("4_map4_elev")
+rock_mask = ExtResource("5_map4_rock")
+mask_origin = Vector2(0.5, 0.911111)
+interior_height = 0.45
+relief_amplitude = 0.22
+caustic_strength = 0.0
+relief_extent = Vector2(125, 88)
+relief_subdivisions = Vector2i(356, 251)
+ambience_sea_db = -9.0
+ambience_wind_db = 2.0
+ambience_sea_lowpass_hz = 3000.0
+enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter")])
+exit_kind = 1
+gate_distance_beyond_enemy = 26.0
+wear_path_override = PackedVector2Array(0, 0, -5.5, -16, 10.5, -35)
+reward_pool = ExtResource("7_wanderer_pool")

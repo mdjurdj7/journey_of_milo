@@ -27,7 +27,7 @@ Arrival at the water's edge → inland → the way onward is held until the floo
 
 **Frame:** horizontal throughout. A low exposed shelf (≈1 m, walkable from the landward side, a drop on the seaward side) is permitted as the first exposed rock of the dry end arriving early; cliffs, banks, anything overhead are not. Region 2 begins the compression; Region 1 spends almost none of it.
 
-**Exits.** A floor's exit can be on any side. Region 1's first two floors exit inland; later floors need not. How the exit is held until the floor is cleared is per floor too (`FloorData.exit_kind`) — see §12, Threshold marker.
+**Exits.** A floor's exit can be on any side. Region 1's first two floors exit inland; floor 3 exits north-east, where the land it opens onto lies ~10 m east of the way it came in. How the exit is held until the floor is cleared is per floor too (`FloorData.exit_kind`) — see §12, Threshold marker.
 
 ---
 
@@ -39,7 +39,7 @@ Region 1 is a gradient from tidal flat to dry inland, and the run moves along it
 
 **Middle — the transition.** Damp giving way to dry. Interior height rising, relief growing, caustics fading. Floor 2: 0.30 / 0.18 / 0.12.
 
-**Late — dry.** Dunes (elevation layer), marram at its densest, no standing water, first exposed rock, the sea gone from the frame.
+**Late — dry.** Dunes (elevation layer), marram at its densest, no standing water, first exposed rock, the sea gone from the frame. Floor 3: 0.45 / 0.22 / 0.00, landmass falloff 4.0; the sea −9 dB under a 3 kHz low-pass, the wind +2 dB.
 
 **What the gradient drives:** ground tint, standing water, wet band, vegetation (not yet built), visible life, landform (elevation layer), the worn band's depth.
 

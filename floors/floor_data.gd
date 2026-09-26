@@ -18,6 +18,11 @@ class_name FloorData
 # scale): white lifts the sand by Ground.elevation_max_height, clipped to
 # the drawn shoreline - see Ground's elevation_mask. Null = flat floor.
 @export var elevation_mask: Texture2D = null
+# Ground.elevation_max_height for this floor: the lift, in metres, that a
+# white pixel of elevation_mask stands for. Per floor because a painting
+# is authored against one - the same grey at another height is another
+# slope. 1.2 is Ground's own default; floor 2 was painted at 1.8.
+@export var elevation_max_height: float = 1.2
 # Optional painted wear on the same canvas again: white is walked sand,
 # and the value scales it, so a mid grey is a fainter trace than the
 # band Ground draws along this floor's own route. Onto Ground.wear_mask,

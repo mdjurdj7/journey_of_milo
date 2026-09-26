@@ -161,3 +161,15 @@ so it doesn't get silently reinvented or silently forgotten.
   the reward screen, which was out of scope for the alcove belongings
   pass, so the fourth copy went in as a copy. Extract when one of those
   screens is next open for work. (2026-09-26, alcove belongings.)
+- **Floor 3 (Map4) is a walkable shell, not a finished floor.** One
+  placeholder Sputter stands on the required fight at (-3, -9) so the
+  gate has an enemy to measure from and the line something to lift on;
+  the rest of the roster, the finding and the elite are unauthored. The
+  elite flat is undersized: its largest flat circle is ~6.5 m, centred
+  (11, -18), against the 9-10 m it was meant to be - two sea inlets pinch
+  it north and south. Its steep faces (over 45 degrees, painted narrower
+  than the ~1.2 m spec 04 asks for) will sawtooth and are left as painted
+  for now: the NW dune's (5.4 m2), the mass east of spawn's (0.7 m2), the
+  mass beside the finding's (0.6 m2) are all in the walking frame from
+  the route; the east shoulder's (1.8 m2) only from the elite flat.
+  (2026-09-26, floor 3.)
