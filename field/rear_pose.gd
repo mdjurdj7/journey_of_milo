@@ -92,7 +92,7 @@ func _ready() -> void:
 	_rebuild()
 
 # FieldEnemy.set_rearing(): up to rear_degrees over rear_seconds, or down
-# over drop_seconds, eased; returns how long that takes - 0 when it is
+# over drop_seconds (see the easing below); returns how long that takes - 0 when it is
 # already heading there. Through the battle freeze (PAUSE_PROCESS).
 func set_rearing(on: bool) -> float:
 	if not _ready_done:
@@ -109,7 +109,10 @@ func set_rearing(on: bool) -> float:
 		return 0.0
 	_tween = create_tween()
 	_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	# Up eases in and out; down eases out - it gives way at once and lands
+	# soft, so a charge broken mid-turn settles on the very frame its ring
+	# closes (BattleController._resolve_play()) rather than after a pause.
+	_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT if on else Tween.EASE_OUT)
 	_tween.tween_method(_set_angle, _angle, target, seconds)
 	return seconds
 

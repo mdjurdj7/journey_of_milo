@@ -292,6 +292,10 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	# Block/statuses may have moved - the previews' modified numbers and
 	# lethal flags follow.
 	_emit_intent_previews()
+	# A charge broken by this card lets its rear down now, on the same
+	# frame its ring closes - the body settling is the confirmation.
+	for enemy in enemies:
+		_pose_for_intent(enemy)
 
 	_input_locked = false
 	_check_battle_end()
@@ -361,8 +365,10 @@ func _run_sequential_turn() -> void:
 			if snap_delay > 0.0:
 				await get_tree().create_timer(snap_delay).timeout
 			_report_enemy_attack(enemy, result)
-		# A charge spent - landed or broken - lets the rear down first, then
-		# any burrow carries on from there.
+		# A charge spent lets the rear down first, then any burrow carries on
+		# from there. A broken one is already down - it dropped on the card
+		# that broke it (_resolve_play()), so this waits on nothing and the
+		# burrow follows at once.
 		if result["attacked"] or result["interrupted"]:
 			var drop_delay: float = enemy.set_rearing(false)
 			if drop_delay > 0.0:
@@ -417,14 +423,15 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 
 # The body's pose for its queued intent (FieldEnemy.set_rearing()):
 # reared while an intent that asks for it (EnemyIntent.rear_while_
-# queued) is queued and the enemy is above the sand, flat otherwise.
-# Returns how long the change takes; 0 when there is none.
+# queued) is queued, not yet broken (its interrupt threshold met) and the
+# enemy is above the sand; flat otherwise. Returns how long the change
+# takes; 0 when there is none.
 func _pose_for_intent(enemy: FieldEnemy) -> float:
 	var combatant: Combatant = _combatants.get(enemy)
 	var rear: bool = false
 	if combatant != null and combatant.hp > 0 and not combatant.buried and enemy.enemy_data != null:
 		var intent: EnemyIntent = EnemyTurn.current_intent(combatant, enemy.enemy_data)
-		rear = intent != null and intent.rear_while_queued
+		rear = intent != null and intent.rear_while_queued and not EnemyTurn.is_interrupted(combatant, intent)
 	return enemy.set_rearing(rear)
 
 # An interrupted enemy going under, or a buried one coming up, on the
