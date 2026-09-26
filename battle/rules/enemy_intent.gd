@@ -60,3 +60,10 @@ enum IntentType { ATTACK, DEFEND, BURROW }
 # interjection outside the intents loop (Combatant.interjected_intent),
 # which carries on where it was once this has resolved. The Siltjaw's is
 # a BURROW. Null = the interrupted turn is simply lost.
+
+@export var rear_while_queued: bool = false
+# The body rears for as long as this intent is queued and the enemy is
+# above the sand - the front up off it, held, dropping back once the
+# intent has resolved or been interrupted (BattleController._pose_for_
+# intent(), FieldEnemy.set_rearing()). Only a body whose attachment can
+# rear (RearPose) shows it. The Siltjaw's charge; false for every other.

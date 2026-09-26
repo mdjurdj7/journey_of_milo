@@ -219,16 +219,33 @@ var _model_half_width: float = 0.0
 var _model_aabb: AABB = AABB()
 
 # The head above the body's feet: the model's own height, standing at
-# rest height, lifted by a fight's hover. Not the bob - the camera's
-# battle fit reads this every frame and must not breathe with it.
+# rest height, lifted by a fight's hover, and raised by a rear (see
+# set_rearing()). Not the bob - the camera's battle fit reads this every
+# frame and must not breathe with it.
 func get_head_height() -> float:
-	return _model_height + rest_height + _lift
+	return _model_height + rest_height + _lift + _rear_lift()
 
 func get_half_width() -> float:
 	return _model_half_width
 
 func get_model_aabb() -> AABB:
-	return AABB(_model_aabb.position + Vector3.UP * get_body_lift(), _model_aabb.size)
+	return AABB(_model_aabb.position + Vector3.UP * get_body_lift(), _model_aabb.size + Vector3.UP * _rear_lift())
+
+# The pose a queued intent asks of the body (EnemyIntent.rear_while_
+# queued, the Siltjaw's charge): the attachment rears the front up or
+# lets it back down (RearPose.set_rearing()). Returns how long that
+# takes, for the enemy turn to wait on - 0 for a body with no such
+# attachment, or already heading there.
+func set_rearing(on: bool) -> float:
+	if _attachment == null or not _attachment.has_method("set_rearing") or _settling:
+		return 0.0
+	return float(_attachment.call("set_rearing", on))
+
+# How much higher a rear has put the top of the body, metres.
+func _rear_lift() -> float:
+	if _attachment == null or not _attachment.has_method("get_rear_lift"):
+		return 0.0
+	return float(_attachment.call("get_rear_lift"))
 
 # How far the model sits above its grounded place right now: rest height,
 # hover and bob. What anything anchored to the body adds (EnemyStatus).
@@ -925,6 +942,7 @@ func exit_battle_hover() -> void:
 	if not _hovering or _settling:
 		return
 	_hovering = false
+	set_rearing(false)
 	var tween: Tween = _tween_hover(0.0, 0.0, battle_settle_seconds, Tween.EASE_IN_OUT)
 	tween.tween_callback(_on_hover_landed)
 

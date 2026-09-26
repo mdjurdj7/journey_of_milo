@@ -136,6 +136,10 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	energy_changed.emit(player.energy)
 	_hand_container.draw_cards(turn_draw_amount)
 	_emit_intent_previews()
+	# Each body takes the pose of what it opens on - under way through the
+	# camera's swing, so a rear is held by the time the frame settles.
+	for enemy in enemies:
+		_pose_for_intent(enemy)
 
 # The queued action of one enemy as the display should show it - see
 # EnemyTurn.preview_intent(). Empty for a dead/unknown enemy.
@@ -357,10 +361,20 @@ func _run_sequential_turn() -> void:
 			if snap_delay > 0.0:
 				await get_tree().create_timer(snap_delay).timeout
 			_report_enemy_attack(enemy, result)
+		# A charge spent - landed or broken - lets the rear down first, then
+		# any burrow carries on from there.
+		if result["attacked"] or result["interrupted"]:
+			var drop_delay: float = enemy.set_rearing(false)
+			if drop_delay > 0.0:
+				await get_tree().create_timer(drop_delay).timeout
 		var burrow_delay: float = _play_burrow_for(enemy, result)
 		if burrow_delay > 0.0:
 			await get_tree().create_timer(burrow_delay).timeout
 		status_changed.emit()
+		# The pose of what comes next, landing on the beat the intent shows.
+		var pose_delay: float = _pose_for_intent(enemy)
+		if pose_delay > 0.0:
+			await get_tree().create_timer(pose_delay).timeout
 		# take_turn() has already advanced this enemy to its next intent -
 		# show it the moment this action has landed.
 		enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
@@ -400,6 +414,18 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 	if result["grace_opened"] > 0:
 		RunLogger.log_grace_opened(result["grace_opened"], player.grace)
 		grace_changed.emit(player.grace)
+
+# The body's pose for its queued intent (FieldEnemy.set_rearing()):
+# reared while an intent that asks for it (EnemyIntent.rear_while_
+# queued) is queued and the enemy is above the sand, flat otherwise.
+# Returns how long the change takes; 0 when there is none.
+func _pose_for_intent(enemy: FieldEnemy) -> float:
+	var combatant: Combatant = _combatants.get(enemy)
+	var rear: bool = false
+	if combatant != null and combatant.hp > 0 and not combatant.buried and enemy.enemy_data != null:
+		var intent: EnemyIntent = EnemyTurn.current_intent(combatant, enemy.enemy_data)
+		rear = intent != null and intent.rear_while_queued
+	return enemy.set_rearing(rear)
 
 # An interrupted enemy going under, or a buried one coming up, on the
 # field body (FieldEnemy.play_burrow()) - how long that takes, for the

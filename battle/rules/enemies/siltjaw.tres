@@ -12,6 +12,7 @@ script = ExtResource("2_intent")
 value = 14
 interrupt_threshold = 9
 on_interrupt = SubResource("EnemyIntent_burrow")
+rear_while_queued = true
 
 [resource]
 script = ExtResource("1_enemy_data")
@@ -21,6 +22,7 @@ intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_charge")])
 model_scene_path = "res://assets/models/enemies/Siltjaw/Siltjaw.glb"
 model_scale = 1.3356
 model_yaw_offset_degrees = 180.0
+attachment_scene_path = "res://field/rear_pose.tscn"
 rest_height_m = -0.66
 battle_hover_m = -0.08
 contact_radius_m = 1.0
