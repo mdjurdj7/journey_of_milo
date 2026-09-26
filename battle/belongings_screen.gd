@@ -117,8 +117,8 @@ const DISMISS := SLOT_COUNT
 
 @export_group("Objects")
 # The render: one SubViewport, three cells side by side, one render. The
-# models share a scale (a case stays bigger than a bedroll), fitted to
-# the largest. Tinted bone - the on-dark value, as text on the scrim is.
+# models keep their relative sizes at the cache's object_scales (the
+# same as on the sand), the largest fitted to its cell. Tinted bone - the on-dark value, as text on the scrim is.
 @export var object_tint: Color = Color(0.94, 0.91, 0.86, 1.0):
 	set(value):
 		object_tint = value
@@ -214,6 +214,7 @@ var _card: CardData = null
 var _gold: int = 0
 var _closed_card: CardData = null
 var _object_paths: PackedStringArray = PackedStringArray()
+var _object_scales: PackedFloat32Array = PackedFloat32Array()
 var _deck_panel: Control = null
 
 var _scrim: ColorRect = null
@@ -240,13 +241,15 @@ var _opened_msec: int = 0
 
 # Called by RegionField before the screen enters the tree. card and
 # closed_card may be null and gold 0 - that column is then left out.
-# object_paths are the three models, column order.
-func setup(line: String, card: CardData, gold: int, closed_card: CardData, object_paths: PackedStringArray, deck_panel: Control) -> void:
+# object_paths are the three models and object_scales their scales, column
+# order - the same scales the cache puts on the sand.
+func setup(line: String, card: CardData, gold: int, closed_card: CardData, object_paths: PackedStringArray, object_scales: PackedFloat32Array, deck_panel: Control) -> void:
 	_line = line
 	_card = card
 	_gold = gold
 	_closed_card = closed_card
 	_object_paths = object_paths
+	_object_scales = object_scales
 	_deck_panel = deck_panel
 
 func _ready() -> void:
@@ -384,15 +387,15 @@ func _render_objects() -> void:
 	# One cell is one bounding-sphere diameter of the largest object, over
 	# object_fill.
 	var diameter: float = 0.01
-	for aabb in _model_aabbs:
-		diameter = maxf(diameter, aabb.size.length())
+	for slot in _model_aabbs.size():
+		diameter = maxf(diameter, _model_aabbs[slot].size.length() * _scale_of(slot))
 	var cell: float = diameter / maxf(object_fill, 0.1)
 	for slot in _models.size():
 		var model: Node3D = _models[slot]
 		if model == null:
 			continue
 		var yaw: float = deg_to_rad(object_yaws_degrees[slot]) if slot < object_yaws_degrees.size() else 0.0
-		var basis := Basis(Vector3.UP, yaw)
+		var basis := Basis(Vector3.UP, yaw) * Basis.from_scale(Vector3.ONE * _scale_of(slot))
 		model.transform = Transform3D(basis, Vector3((float(slot) - 1.0) * cell, 0.0, 0.0) - basis * _model_aabbs[slot].get_center())
 	var pitch: float = deg_to_rad(object_pitch_degrees)
 	_camera.size = cell
@@ -403,6 +406,9 @@ func _render_objects() -> void:
 	_environment.ambient_light_energy = ambient_energy
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	_refresh()
+
+func _scale_of(slot: int) -> float:
+	return _object_scales[slot] if slot < _object_scales.size() else 1.0
 
 # --- Layout ---
 

@@ -46,6 +46,16 @@ class_name BelongingsCache
 	set(value):
 		object_yaws_degrees = value
 		_place_objects()
+# Each model's uniform scale, column order - the case at 0.6 so it is the
+# smallest of the three, as a case beside a pack and a bedroll should be.
+# The screen renders them at these scales too.
+@export var object_scales: PackedFloat32Array = PackedFloat32Array([0.6, 1.0, 1.0]):
+	set(value):
+		object_scales = value
+		for index in _objects.size():
+			if _objects[index] != null and is_instance_valid(_objects[index]):
+				_objects[index].model_scale = object_scale(index)
+		_place_objects()
 # The hulls' tint.
 @export var object_tint: Color = Color(0.50, 0.47, 0.42):
 	set(value):
@@ -135,11 +145,15 @@ func _spawn_objects() -> void:
 		var object := BelongingsObject.new()
 		object.name = "Object%d" % index
 		object.model_scene_path = object_scene_paths[index]
+		object.model_scale = object_scale(index)
 		object.tint = object_tint
 		object.ground_path = NodePath("../" + String(ground_path))
 		add_child(object)
 		_objects.append(object)
 	_place_objects()
+
+func object_scale(index: int) -> float:
+	return object_scales[index] if index < object_scales.size() else 1.0
 
 func _respawn_objects() -> void:
 	if not is_inside_tree():

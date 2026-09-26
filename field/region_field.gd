@@ -1403,7 +1403,7 @@ func open_belongings_screen(cache: BelongingsCache) -> bool:
 		push_warning("RegionField: could not load %s; no belongings screen." % belongings_screen_scene_path)
 		return false
 	var screen := scene.instantiate() as BelongingsScreen
-	screen.setup(cache.world_line, cache.shown_card, cache.gold, cache.closed_card, cache.object_scene_paths, deck_panel)
+	screen.setup(cache.world_line, cache.shown_card, cache.gold, cache.closed_card, cache.object_scene_paths, cache.object_scales, deck_panel)
 	screen.closed.connect(_on_belongings_screen_closed.bind(cache))
 	if _loot_screen != null and is_instance_valid(_loot_screen):
 		_loot_screen.close()

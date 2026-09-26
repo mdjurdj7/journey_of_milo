@@ -26,10 +26,17 @@ class_name BelongingsObject
 	set(value):
 		yaw_degrees = value
 		rotation = Vector3(0.0, deg_to_rad(yaw_degrees), 0.0)
+# Uniform, on the model - the bbox, grounding and collision are measured
+# after it, and a change rebuilds all three.
+@export var model_scale: float = 1.0:
+	set(value):
+		model_scale = value
+		_rebuild()
 @export var settle_seconds: float = 0.5
 @export var ground_path: NodePath = ^"../../../Ground"
 
 var _model: Node3D = null
+var _body: StaticBody3D = null
 var _material: StandardMaterial3D = null
 var _aabb: AABB = AABB()
 var _ground: Ground = null
@@ -51,9 +58,11 @@ func _spawn_model() -> void:
 		return
 	_model = scene.instantiate() as Node3D
 	_model.name = "Model"
+	_model.scale = Vector3.ONE * model_scale
 	add_child(_model)
 	_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
 	_material.albedo_color = tint
+	_aabb = AABB()
 	var has_aabb := false
 	for mesh_instance in _model.find_children("*", "MeshInstance3D", true, false):
 		var mi := mesh_instance as MeshInstance3D
@@ -70,6 +79,7 @@ func _spawn_model() -> void:
 	var body := StaticBody3D.new()
 	body.name = "Collision"
 	body.disable_mode = CollisionObject3D.DISABLE_MODE_MAKE_STATIC
+	_body = body
 	var box := BoxShape3D.new()
 	box.size = _aabb.size
 	var shape_node := CollisionShape3D.new()
@@ -77,6 +87,18 @@ func _spawn_model() -> void:
 	shape_node.position = _aabb.get_center()
 	body.add_child(shape_node)
 	add_child(body)
+
+# A new model_scale: the model, its bbox and its collision again.
+func _rebuild() -> void:
+	if not is_inside_tree() or _settling:
+		return
+	if _model != null:
+		_model.free()
+		_model = null
+	if _body != null:
+		_body.free()
+		_body = null
+	_spawn_model()
 
 # Onto the relief at this node's XZ. The cache calls it after moving the
 # object; the relief's own rebuild calls it too.
