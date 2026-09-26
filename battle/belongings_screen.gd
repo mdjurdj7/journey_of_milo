@@ -1,7 +1,7 @@
 extends CanvasLayer
 class_name BelongingsScreen
 
-# Three bundles set down together, as one choice over the field. Opened
+# Three things set down together, as one choice over the field. Opened
 # by a BelongingsCache when the Wanderer walks within its reach (see
 # RegionField.open_belongings_screen()), over the same scrim-and-freeze
 # the reward screen uses: the field goes DISABLED under it, the camera
@@ -9,35 +9,33 @@ class_name BelongingsScreen
 #
 # At the top, the cache's one world-voice line in Spectral, bone over
 # the scrim with the reward screen's ink outline - no box, no quotes.
-# Under it three columns side by side, each with the same small grey
-# bundle silhouette (see _build_silhouette()) above what it holds:
-#   - the card, as a CardView at item_scale, not interactive - TAKE is
-#     the button, the card is to read;
-#   - the gold, as the loot window's ring and numeral;
-#   - the closed one - the silhouette alone. Nothing about what is inside
-#     is drawn or instanced until it is taken: no name, no type colour,
-#     no hover preview.
-# A column whose slot rolled nothing is not drawn and cannot be focused.
+# Under it three columns side by side, and each column is its object
+# alone - the case, the pack, the bedroll, rendered from their models
+# (see _build_render()). Nothing of what is inside is drawn or named:
+# no card, no gold, no label, no hover preview. A column whose slot
+# rolled nothing is not drawn and cannot be focused.
 #
-# TAKE under each column, and WALK ON under the row, in the title menu's
-# focus language: the utility grey at rest, full bone with a short
-# hairline to the left when focused. Hovering anywhere in a column
-# focuses its TAKE and a click there takes; ui_left/ui_right move across
-# the columns (wrapping), ui_down drops to WALK ON, ui_up returns, and
-# ui_accept activates. Nothing is focused until the mouse or a key says
-# so.
+# The focus language is on the object itself, the title menu's two
+# states carried over: at rest the object is drawn down in the utility
+# grey (rest_modulate); focused it is full bone, with the short hairline
+# centred under it. The mouse focuses by hovering a column and takes by
+# clicking it; ui_left/ui_right move across the columns (wrapping),
+# ui_down drops to WALK ON, ui_up returns, ui_accept takes. Nothing is
+# focused until the mouse or a key says so. WALK ON keeps the text form
+# of the language (grey at rest, bone and a hairline to its left).
 #
-# Taking one grants it through RunState, plays the take's sound, and a
-# card flies to the Belongings panel (the closed one's card appears only
-# for that flight); the screen closes when it lands. WALK ON, ui_cancel,
-# a right click anywhere and a fresh press of a move key all decline -
-# the move keys only after move_decline_delay_sec, so a key held down
-# while walking in doesn't count. Declining is final, as the reward
-# screen's skip is: the cache is spent either way (see BelongingsCache).
+# Taking one grants it through RunState and plays the take's sound; with
+# reveal_card_on_take a card then flies from the column to the
+# Belongings panel - after the choice, as every other take in the game
+# does - and the screen closes when it lands. WALK ON, ui_cancel, a right
+# click anywhere and a fresh press of a move key all decline - the move
+# keys only after move_decline_delay_sec, so a key held down while
+# walking in doesn't count. Declining is final, as the reward screen's
+# skip is: the cache is spent either way (see BelongingsCache).
 #
-# The scrim, the outlined text, the hairline and the gold ring are
-# copies of RewardScreen's and LootScreen's own - the shared focus-
-# drawing extraction is deferred (see DESIGN.md).
+# The scrim, the outlined text and the hairline are copies of
+# RewardScreen's own - the shared focus-drawing extraction is deferred
+# (see DESIGN.md).
 
 # The column taken, or -1 for a decline.
 signal closed(taken: int)
@@ -85,83 +83,82 @@ const DISMISS := SLOT_COUNT
 @export_group("")
 
 @export_group("Columns")
-# The card's scale against CardView's 1x card_size - 1.6 is 320 x 448.
-@export var item_scale: float = 1.6:
+# Each column is a square this many pixels across - its object's render.
+@export var column_px: float = 300.0:
 	set(value):
-		item_scale = value
+		column_px = value
 		_refresh()
-@export var min_column_width_px: float = 200.0:
-	set(value):
-		min_column_width_px = value
-		_refresh()
-@export var column_gap_px: float = 64.0:
+@export var column_gap_px: float = 40.0:
 	set(value):
 		column_gap_px = value
 		_refresh()
-# The block's centre (silhouette to TAKE), as a fraction of the viewport
-# height.
-@export_range(0.0, 1.0) var columns_centre_fraction: float = 0.54:
+# The columns' centre, as a fraction of the viewport height - above the
+# frozen Wanderer, whose head the field camera keeps near y 0.57.
+@export_range(0.0, 1.0) var columns_centre_fraction: float = 0.40:
 	set(value):
 		columns_centre_fraction = value
 		_refresh()
-@export var silhouette_px: float = 72.0:
+# The focused object's hairline: this far under the column's square.
+@export var object_hairline_gap_px: float = 10.0:
 	set(value):
-		silhouette_px = value
+		object_hairline_gap_px = value
 		_refresh()
-@export var silhouette_gap_px: float = 18.0:
+@export var object_hairline_length_px: float = 56.0:
 	set(value):
-		silhouette_gap_px = value
+		object_hairline_length_px = value
 		_refresh()
-@export var take_gap_px: float = 36.0:
+# An object at rest is drawn at this multiple of its bone render, which
+# brings its lit faces down to about the title menu's utility grey.
+@export var rest_modulate: Color = Color(0.62, 0.64, 0.70, 1.0):
 	set(value):
-		take_gap_px = value
+		rest_modulate = value
 		_refresh()
 @export_group("")
 
-@export_group("Silhouette")
-# The bundle's model, rendered once into one small viewport shared by all
-# three columns (flat, unshaded, this grey).
-@export_file("*.glb", "*.tscn") var silhouette_model_path: String = BundleProp.MODEL_SCENE_PATH
-@export var silhouette_color: Color = Color(0.58, 0.58, 0.60, 1.0):
+@export_group("Objects")
+# The render: one SubViewport, three cells side by side, one render. The
+# models share a scale (a case stays bigger than a bedroll), fitted to
+# the largest. Tinted bone - the on-dark value, as text on the scrim is.
+@export var object_tint: Color = Color(0.94, 0.91, 0.86, 1.0):
 	set(value):
-		silhouette_color = value
-		_render_silhouette()
-# Looked down on at the field camera's pitch, turned by the yaw.
-@export var silhouette_pitch_degrees: float = 50.0:
+		object_tint = value
+		_render_objects()
+# Looked down on at this pitch - lower than the field camera's 50 so the
+# sides read - and each object turned by its own yaw, column order.
+@export var object_pitch_degrees: float = 35.0:
 	set(value):
-		silhouette_pitch_degrees = value
-		_render_silhouette()
-@export var silhouette_yaw_degrees: float = 30.0:
+		object_pitch_degrees = value
+		_render_objects()
+@export var object_yaws_degrees: PackedFloat32Array = PackedFloat32Array([30.0, -25.0, 20.0]):
 	set(value):
-		silhouette_yaw_degrees = value
-		_render_silhouette()
-@export var silhouette_resolution: int = 256
-@export_group("")
-
-@export_group("Gold")
-@export var gold_size_px: int = 48:
+		object_yaws_degrees = value
+		_render_objects()
+# Fraction of each cell the largest object's bounding sphere fills.
+@export_range(0.1, 1.0) var object_fill: float = 0.92:
 	set(value):
-		gold_size_px = value
-		_refresh()
-@export var ring_radius_px: float = 13.0:
+		object_fill = value
+		_render_objects()
+# The key light, from over the viewer's left shoulder, and the flat fill.
+@export var light_energy: float = 0.9:
 	set(value):
-		ring_radius_px = value
-		_refresh()
-@export var ring_width_px: float = 2.0:
+		light_energy = value
+		_render_objects()
+@export var light_pitch_degrees: float = -55.0:
 	set(value):
-		ring_width_px = value
-		_refresh()
-@export var ring_gap_px: float = 12.0:
+		light_pitch_degrees = value
+		_render_objects()
+@export var light_yaw_degrees: float = -35.0:
 	set(value):
-		ring_gap_px = value
-		_refresh()
+		light_yaw_degrees = value
+		_render_objects()
+@export var ambient_energy: float = 0.45:
+	set(value):
+		ambient_energy = value
+		_render_objects()
+@export var render_cell_px: int = 384
 @export_group("")
 
 @export_group("Choices")
-@export var take_text: String = "TAKE":
-	set(value):
-		take_text = value
-		_refresh()
 @export var dismiss_text: String = "WALK ON":
 	set(value):
 		dismiss_text = value
@@ -174,10 +171,11 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		label_tracking_em = value
 		_rebuild_fonts()
-# From the TAKE row's baseline to WALK ON's.
-@export var dismiss_gap_px: float = 64.0:
+# WALK ON's baseline, as a fraction of the viewport height - under the
+# frozen Wanderer's feet (near y 0.72).
+@export_range(0.0, 1.0) var dismiss_baseline_fraction: float = 0.84:
 	set(value):
-		dismiss_gap_px = value
+		dismiss_baseline_fraction = value
 		_refresh()
 # The title menu's unfocused item: CardView's keyline_utility.
 @export var unfocused_color: Color = Color(0.58, 0.58, 0.60, 1.0):
@@ -201,8 +199,12 @@ const DISMISS := SLOT_COUNT
 @export_group("")
 
 @export_group("Take")
+# A taken card flies from its column to the Belongings panel - after the
+# choice. Off = the sound alone.
+@export var reveal_card_on_take: bool = true
 @export var take_volume_db: float = -18.0
 @export var gold_volume_db: float = -20.0
+@export var card_flight_scale: float = 1.0
 @export var card_flight_duration_sec: float = 0.45
 @export var card_flight_end_scale: float = 0.12
 @export_group("")
@@ -211,20 +213,23 @@ var _line: String = ""
 var _card: CardData = null
 var _gold: int = 0
 var _closed_card: CardData = null
+var _object_paths: PackedStringArray = PackedStringArray()
 var _deck_panel: Control = null
 
 var _scrim: ColorRect = null
 var _draw_layer: Control = null
-var _card_view: CardView = null
-var _card_size: Vector2 = Vector2(200.0, 280.0)
 var _line_font: Font = null
-var _gold_font: Font = null
 var _label_font: Font = null
 
 var _viewport: SubViewport = null
-var _silhouette_camera: Camera3D = null
-var _silhouette_material: StandardMaterial3D = null
-var _silhouette_aabb: AABB = AABB()
+var _camera: Camera3D = null
+var _light: DirectionalLight3D = null
+var _environment: Environment = null
+var _material: StandardMaterial3D = null
+# Per column: the model's root (null if it didn't load) and its bbox in
+# its own space.
+var _models: Array[Node3D] = []
+var _model_aabbs: Array[AABB] = []
 
 # 0..2 a column, DISMISS WALK ON, -1 nothing. _mouse_on is what the
 # mouse is over, so leaving it clears only a mouse focus.
@@ -235,11 +240,13 @@ var _opened_msec: int = 0
 
 # Called by RegionField before the screen enters the tree. card and
 # closed_card may be null and gold 0 - that column is then left out.
-func setup(line: String, card: CardData, gold: int, closed_card: CardData, deck_panel: Control) -> void:
+# object_paths are the three models, column order.
+func setup(line: String, card: CardData, gold: int, closed_card: CardData, object_paths: PackedStringArray, deck_panel: Control) -> void:
 	_line = line
 	_card = card
 	_gold = gold
 	_closed_card = closed_card
+	_object_paths = object_paths
 	_deck_panel = deck_panel
 
 func _ready() -> void:
@@ -267,9 +274,8 @@ func _ready() -> void:
 	_draw_layer.resized.connect(_refresh)
 	add_child(_draw_layer)
 
-	_build_silhouette()
-	_spawn_card()
-	if not _has_slot(Slot.CARD) and not _has_slot(Slot.GOLD) and not _has_slot(Slot.CLOSED):
+	_build_render()
+	if _present_slots().is_empty():
 		push_warning("BelongingsScreen: nothing to offer; closing.")
 		_finish(-1)
 		return
@@ -277,17 +283,12 @@ func _ready() -> void:
 
 func _rebuild_fonts() -> void:
 	_line_font = InkType.numeral_font()
-	_gold_font = InkType.numeral_font()
 	_label_font = InkType.tracked(InkType.text_bold_font(), label_size_px, label_tracking_em)
 	_refresh()
 
-# Re-seats the card and redraws - every layout export's setter lands here.
 func _refresh() -> void:
-	if _draw_layer == null:
-		return
-	if _card_view != null and is_instance_valid(_card_view) and not _done:
-		_seat_card(_card_view, Slot.CARD)
-	_draw_layer.queue_redraw()
+	if _draw_layer != null:
+		_draw_layer.queue_redraw()
 
 func _has_slot(slot: int) -> bool:
 	match slot:
@@ -299,132 +300,120 @@ func _has_slot(slot: int) -> bool:
 			return _closed_card != null
 	return false
 
-# --- Silhouette ---
+# The columns that hold something, left to right.
+func _present_slots() -> Array[int]:
+	var slots: Array[int] = []
+	for slot in SLOT_COUNT:
+		if _has_slot(slot):
+			slots.append(slot)
+	return slots
 
-# One SubViewport, its own world, transparent, rendered once: the bundle
-# model in a flat unshaded grey under an orthographic camera fitted to
-# its bbox. Its one texture is drawn under all three columns.
-func _build_silhouette() -> void:
-	var scene := load(silhouette_model_path) as PackedScene
-	if scene == null:
-		push_warning("BelongingsScreen: could not load %s; no silhouettes." % silhouette_model_path)
-		return
+# --- The objects' render ---
+
+# One SubViewport three cells wide, its own world, transparent, rendered
+# once (and again when a render export changes): the three models side
+# by side along X, one cell apart, each centred on its own bbox and
+# turned by its own yaw, under one orthographic camera whose frame is
+# exactly the three cells. One shared material, lit by one key light and
+# a flat ambient. Cheaper than three viewports - one world, one camera,
+# one render pass - and the columns draw sub-rects of its one texture.
+func _build_render() -> void:
 	_viewport = SubViewport.new()
-	_viewport.name = "Silhouette"
+	_viewport.name = "Objects"
 	_viewport.own_world_3d = true
 	_viewport.transparent_bg = true
 	_viewport.msaa_3d = Viewport.MSAA_4X
-	_viewport.size = Vector2i(silhouette_resolution, silhouette_resolution)
+	_viewport.size = Vector2i(render_cell_px * SLOT_COUNT, render_cell_px)
 	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(_viewport)
 
-	var model := scene.instantiate() as Node3D
-	_viewport.add_child(model)
-	_silhouette_material = StandardMaterial3D.new()
-	_silhouette_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	var has_aabb := false
-	for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
-		var mi := mesh_instance as MeshInstance3D
-		mi.material_override = _silhouette_material
-		var mi_aabb: AABB = (model.global_transform.affine_inverse() * mi.global_transform) * mi.get_aabb()
-		_silhouette_aabb = mi_aabb if not has_aabb else _silhouette_aabb.merge(mi_aabb)
-		has_aabb = true
+	_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
+	for slot in SLOT_COUNT:
+		var model: Node3D = null
+		var aabb := AABB()
+		var path: String = _object_paths[slot] if slot < _object_paths.size() else ""
+		var scene: PackedScene = null
+		if not path.is_empty():
+			scene = load(path) as PackedScene
+		if scene == null:
+			push_warning("BelongingsScreen: could not load object %d (%s); its column is left out." % [slot, path])
+		else:
+			model = scene.instantiate() as Node3D
+			_viewport.add_child(model)
+			var has_aabb := false
+			for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
+				var mi := mesh_instance as MeshInstance3D
+				mi.material_override = _material
+				var mi_aabb: AABB = (model.global_transform.affine_inverse() * mi.global_transform) * mi.get_aabb()
+				aabb = mi_aabb if not has_aabb else aabb.merge(mi_aabb)
+				has_aabb = true
+		_models.append(model)
+		_model_aabbs.append(aabb)
+		if model == null:
+			_drop_slot(slot)
 
-	_silhouette_camera = Camera3D.new()
-	_silhouette_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	_viewport.add_child(_silhouette_camera)
-	_render_silhouette()
+	_light = DirectionalLight3D.new()
+	_viewport.add_child(_light)
+	_environment = Environment.new()
+	_environment.background_mode = Environment.BG_CLEAR_COLOR
+	_environment.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	_environment.ambient_light_color = Color.WHITE
+	var world_environment := WorldEnvironment.new()
+	world_environment.environment = _environment
+	_viewport.add_child(world_environment)
+	_camera = Camera3D.new()
+	_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	_camera.keep_aspect = Camera3D.KEEP_HEIGHT
+	_viewport.add_child(_camera)
+	_render_objects()
 
-# Aims the camera and colours the mesh, then asks for one more frame.
-func _render_silhouette() -> void:
-	if _viewport == null or _silhouette_camera == null:
+# A column with no model is a column with nothing to take.
+func _drop_slot(slot: int) -> void:
+	match slot:
+		Slot.CARD:
+			_card = null
+		Slot.GOLD:
+			_gold = 0
+		Slot.CLOSED:
+			_closed_card = null
+
+func _render_objects() -> void:
+	if _viewport == null or _camera == null:
 		return
-	_silhouette_material.albedo_color = silhouette_color
-	var centre: Vector3 = _silhouette_aabb.get_center()
-	var extent: float = maxf(_silhouette_aabb.size.length(), 0.01)
-	var pitch: float = deg_to_rad(silhouette_pitch_degrees)
-	var yaw: float = deg_to_rad(silhouette_yaw_degrees)
-	var direction := Vector3(sin(yaw) * cos(pitch), sin(pitch), cos(yaw) * cos(pitch))
-	_silhouette_camera.size = extent
-	_silhouette_camera.position = centre + direction * (extent * 2.0 + 1.0)
-	_silhouette_camera.look_at(centre, Vector3.UP)
+	_material.albedo_color = object_tint
+	# One cell is one bounding-sphere diameter of the largest object, over
+	# object_fill.
+	var diameter: float = 0.01
+	for aabb in _model_aabbs:
+		diameter = maxf(diameter, aabb.size.length())
+	var cell: float = diameter / maxf(object_fill, 0.1)
+	for slot in _models.size():
+		var model: Node3D = _models[slot]
+		if model == null:
+			continue
+		var yaw: float = deg_to_rad(object_yaws_degrees[slot]) if slot < object_yaws_degrees.size() else 0.0
+		var basis := Basis(Vector3.UP, yaw)
+		model.transform = Transform3D(basis, Vector3((float(slot) - 1.0) * cell, 0.0, 0.0) - basis * _model_aabbs[slot].get_center())
+	var pitch: float = deg_to_rad(object_pitch_degrees)
+	_camera.size = cell
+	_camera.position = Vector3(0.0, sin(pitch), cos(pitch)) * (cell * 4.0)
+	_camera.look_at(Vector3.ZERO, Vector3.UP)
+	_light.light_energy = light_energy
+	_light.rotation = Vector3(deg_to_rad(light_pitch_degrees), deg_to_rad(light_yaw_degrees), 0.0)
+	_environment.ambient_light_energy = ambient_energy
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
-	if _draw_layer != null:
-		_draw_layer.queue_redraw()
-
-# --- Card ---
-
-func _spawn_card() -> void:
-	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
-	if scene == null:
-		push_warning("BelongingsScreen: could not load %s; the card column is left out." % CARD_VIEW_SCENE_PATH)
-		_card = null
-		return
-	var reference := scene.instantiate() as CardView
-	_card_size = reference.card_size
-	reference.free()
-	if _card != null:
-		_card_view = _new_card_view(_card)
-
-# A CardView for reading, not for clicking: no hover, IGNORE (set after
-# add_child - CardView._ready() makes itself STOP), scaled about its
-# top-left so TakeFeedback.fly_to()'s placement holds.
-func _new_card_view(card_data: CardData) -> CardView:
-	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
-	if scene == null:
-		return null
-	var view := scene.instantiate() as CardView
-	view.hover_enabled = false
-	_draw_layer.add_child(view)
-	view.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	view.pivot_offset = Vector2.ZERO
-	view.set_card_data(card_data)
-	return view
-
-func _seat_card(view: CardView, slot: int) -> void:
-	var item: Rect2 = _item_rect(slot)
-	var width: float = _card_size.x * item_scale
-	view.scale = Vector2.ONE * item_scale
-	view.position = Vector2(roundf(item.position.x + (item.size.x - width) / 2.0), item.position.y)
+	_refresh()
 
 # --- Layout ---
 
-func _column_width() -> float:
-	return maxf(_card_size.x * item_scale, min_column_width_px)
-
-func _item_height() -> float:
-	return _card_size.y * item_scale
-
-# Silhouette to TAKE's caps, one column.
-func _block_height() -> float:
-	return silhouette_px + silhouette_gap_px + _item_height() + take_gap_px + float(label_size_px)
-
-func _block_top() -> float:
-	return roundf(_draw_layer.size.y * columns_centre_fraction - _block_height() / 2.0)
-
-func _column_left(slot: int) -> float:
-	var span: float = float(SLOT_COUNT) * _column_width() + float(SLOT_COUNT - 1) * column_gap_px
-	return roundf((_draw_layer.size.x - span) / 2.0 + float(slot) * (_column_width() + column_gap_px))
-
-func _silhouette_rect(slot: int) -> Rect2:
-	var centre_x: float = _column_left(slot) + _column_width() / 2.0
-	return Rect2(roundf(centre_x - silhouette_px / 2.0), _block_top(), silhouette_px, silhouette_px)
-
-func _item_rect(slot: int) -> Rect2:
-	return Rect2(_column_left(slot), _block_top() + silhouette_px + silhouette_gap_px, _column_width(), _item_height())
-
-func _take_baseline() -> float:
-	return _block_top() + _block_height()
-
-func _take_label_left(slot: int) -> float:
-	return roundf(_column_left(slot) + (_column_width() - InkType.width(_label_font, take_text, label_size_px)) / 2.0)
-
-# The whole column, silhouette to TAKE - where the mouse focuses and takes.
 func _column_rect(slot: int) -> Rect2:
-	return Rect2(_column_left(slot), _block_top(), _column_width(), _block_height() + float(label_size_px) * 0.3)
+	var span: float = float(SLOT_COUNT) * column_px + float(SLOT_COUNT - 1) * column_gap_px
+	var left: float = roundf((_draw_layer.size.x - span) / 2.0 + float(slot) * (column_px + column_gap_px))
+	var top: float = roundf(_draw_layer.size.y * columns_centre_fraction - column_px / 2.0)
+	return Rect2(left, top, column_px, column_px)
 
 func _dismiss_baseline() -> float:
-	return _take_baseline() + dismiss_gap_px
+	return roundf(_draw_layer.size.y * dismiss_baseline_fraction)
 
 func _dismiss_label_left() -> float:
 	return roundf((_draw_layer.size.x - InkType.width(_label_font, dismiss_text, label_size_px)) / 2.0)
@@ -448,13 +437,8 @@ func _text(font: Font, text: String, origin: Vector2, size_px: int, color: Color
 		_draw_layer.draw_string_outline(font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, text_outline_px, outline)
 	InkType.draw_run(_draw_layer, font, text, origin, size_px, color)
 
-func _draw_hairline(label_left: float, baseline: float) -> void:
-	var mid: float = baseline - float(label_size_px) * 0.35
-	var left: float = label_left - hairline_gap_px - hairline_length_px
-	_draw_layer.draw_rect(Rect2(left, mid - hairline_thickness_px * 0.5, hairline_length_px, hairline_thickness_px), bone)
-
 func _draw_columns() -> void:
-	# Once a take is under way the choice has closed: only the flying card
+	# Once a take is under way the choice has closed: only a flying card
 	# (a child of this layer) is left over the scrim.
 	if _done:
 		return
@@ -462,44 +446,30 @@ func _draw_columns() -> void:
 	var line_baseline: float = roundf(_draw_layer.size.y * line_centre_fraction + float(line_size_px) * 0.35)
 	_text(_line_font, _line, Vector2(roundf((_draw_layer.size.x - line_width) / 2.0), line_baseline), line_size_px, bone)
 
-	var silhouette: Texture2D = _viewport.get_texture() if _viewport != null else null
-	for slot in SLOT_COUNT:
-		if not _has_slot(slot):
-			continue
-		if silhouette != null:
-			_draw_layer.draw_texture_rect(silhouette, _silhouette_rect(slot), false)
-		if slot == Slot.GOLD:
-			_draw_gold(_item_rect(slot))
+	var texture: Texture2D = _viewport.get_texture() if _viewport != null else null
+	for slot in _present_slots():
+		var rect: Rect2 = _column_rect(slot)
 		var focused: bool = _focus == slot
-		var label_left: float = _take_label_left(slot)
-		_text(_label_font, take_text, Vector2(label_left, _take_baseline()), label_size_px, bone if focused else unfocused_color)
+		if texture != null:
+			var source := Rect2(float(slot * render_cell_px), 0.0, float(render_cell_px), float(render_cell_px))
+			_draw_layer.draw_texture_rect_region(texture, rect, source, Color.WHITE if focused else rest_modulate)
 		if focused:
-			_draw_hairline(label_left, _take_baseline())
+			var y: float = rect.end.y + object_hairline_gap_px
+			_draw_layer.draw_rect(Rect2(roundf(rect.get_center().x - object_hairline_length_px / 2.0), y, object_hairline_length_px, hairline_thickness_px), bone)
 
 	var dismiss_focused: bool = _focus == DISMISS
 	var dismiss_left: float = _dismiss_label_left()
 	_text(_label_font, dismiss_text, Vector2(dismiss_left, _dismiss_baseline()), label_size_px, bone if dismiss_focused else unfocused_color)
 	if dismiss_focused:
-		_draw_hairline(dismiss_left, _dismiss_baseline())
-
-# The loot window's ring and numeral, centred in the item's rect.
-func _draw_gold(item: Rect2) -> void:
-	var text: String = str(_gold)
-	var width: float = ring_radius_px * 2.0 + ring_gap_px + InkType.width(_gold_font, text, gold_size_px)
-	var left: float = roundf(item.position.x + (item.size.x - width) / 2.0)
-	var centre_y: float = roundf(item.position.y + item.size.y / 2.0)
-	var ring_centre := Vector2(left + ring_radius_px, centre_y)
-	if text_outline_px > 0:
-		_draw_layer.draw_arc(ring_centre, ring_radius_px, 0.0, TAU, 48, ink, ring_width_px + float(text_outline_px) * 2.0, true)
-	_draw_layer.draw_arc(ring_centre, ring_radius_px, 0.0, TAU, 48, bone, ring_width_px, true)
-	var baseline: float = centre_y + float(gold_size_px) * 0.3
-	_text(_gold_font, text, Vector2(left + ring_radius_px * 2.0 + ring_gap_px, baseline), gold_size_px, bone)
+		var mid: float = _dismiss_baseline() - float(label_size_px) * 0.35
+		var left: float = dismiss_left - hairline_gap_px - hairline_length_px
+		_draw_layer.draw_rect(Rect2(left, mid - hairline_thickness_px * 0.5, hairline_length_px, hairline_thickness_px), bone)
 
 # --- Input ---
 
 func _hit(position: Vector2) -> int:
-	for slot in SLOT_COUNT:
-		if _has_slot(slot) and _column_rect(slot).has_point(position):
+	for slot in _present_slots():
+		if _column_rect(slot).has_point(position):
 			return slot
 	if _dismiss_rect().has_point(position):
 		return DISMISS
@@ -535,14 +505,6 @@ func _on_gui_input(event: InputEvent) -> void:
 		if index >= 0:
 			_activate(index)
 		_draw_layer.accept_event()
-
-# The columns that hold something, left to right.
-func _present_slots() -> Array[int]:
-	var slots: Array[int] = []
-	for slot in SLOT_COUNT:
-		if _has_slot(slot):
-			slots.append(slot)
-	return slots
 
 func _unhandled_input(event: InputEvent) -> void:
 	if _done:
@@ -592,33 +554,44 @@ func _activate(index: int) -> void:
 	_done = true
 	_draw_layer.queue_redraw()
 	match index:
-		Slot.CARD:
-			_take_card(_card, _card_view, index)
 		Slot.GOLD:
 			RunState.add_gold(_gold)
 			TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, gold_volume_db, "GoldTakeAudio", "BelongingsScreen")
 			print("BelongingsScreen: took %d gold (run total %d)." % [_gold, RunState.gold])
 			_finish(index)
+		Slot.CARD:
+			_take_card(_card, index)
 		Slot.CLOSED:
-			# Only now does the closed bundle's card exist on screen - for
-			# its flight, from where the item would have been.
-			var view: CardView = _new_card_view(_closed_card)
-			if view != null:
-				_seat_card(view, Slot.CLOSED)
-			_take_card(_closed_card, view, index)
+			_take_card(_closed_card, index)
 
-func _take_card(card_data: CardData, view: CardView, index: int) -> void:
-	if _card_view != null and is_instance_valid(_card_view) and _card_view != view:
-		_card_view.queue_free()
+func _take_card(card_data: CardData, index: int) -> void:
 	RunState.add_card(card_data)
 	TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "BelongingsScreen")
 	print("BelongingsScreen: took '%s' (deck now %d)." % [card_data.card_name, RunState.deck.size()])
+	var view: CardView = _new_card_view(card_data, index) if reveal_card_on_take else null
 	if view == null:
 		_finish(index)
 		return
 	var tween: Tween = TakeFeedback.fly_to(self, view, _deck_panel_centre(), card_flight_duration_sec, card_flight_end_scale)
 	tween.chain().tween_callback(func() -> void:
 		_finish(index))
+
+# The taken card, for its flight only: centred on the column it came
+# from, not interactive, scaled about its top-left so TakeFeedback.
+# fly_to()'s placement holds.
+func _new_card_view(card_data: CardData, slot: int) -> CardView:
+	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
+	if scene == null:
+		return null
+	var view := scene.instantiate() as CardView
+	view.hover_enabled = false
+	_draw_layer.add_child(view)
+	view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	view.pivot_offset = Vector2.ZERO
+	view.set_card_data(card_data)
+	view.scale = Vector2.ONE * card_flight_scale
+	view.position = (_column_rect(slot).get_center() - view.card_size * card_flight_scale / 2.0).round()
+	return view
 
 func _deck_panel_centre() -> Vector2:
 	if _deck_panel == null:

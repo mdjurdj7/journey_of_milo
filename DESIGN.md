@@ -161,9 +161,8 @@ so it doesn't get silently reinvented or silently forgotten.
   `RewardScreen`, `LootScreen` and now `BelongingsScreen` each draw the
   same focus language (utility grey at rest, bone or ink plus a short
   hairline to the left when focused); the three screens each carry
-  their own outlined-text helper, `RewardScreen` and `BelongingsScreen`
-  each build their own scrim, and `BelongingsScreen` copies
-  `LootScreen`'s gold ring. Extracting one helper means touching
+  their own outlined-text helper, and `RewardScreen` and
+  `BelongingsScreen` each build their own scrim. Extracting one helper means touching
   the reward screen, which was out of scope for the alcove belongings
   pass, so the fourth copy went in as a copy. Extract when one of those
   screens is next open for work. (2026-09-26, alcove belongings.)
