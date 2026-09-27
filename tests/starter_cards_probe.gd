@@ -25,13 +25,15 @@ const SHRUNK_RULES: Dictionary = {
 }
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
-# The starter cards' art, by file. Every other card has none yet.
-const STARTER_ART: Dictionary = {
+# The cards with art, by file - the starters and Carve. Every other card
+# has none yet.
+const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
 	"bite_down": "res://cards/art/Wanderer/Bite Down.png",
 	"brace": "res://cards/art/Wanderer/Brace.png",
 	"reckoning": "res://cards/art/Wanderer/Reckoning.png",
 	"down_payment": "res://cards/art/Wanderer/Down Payment.png",
+	"carve": "res://cards/art/Wanderer/Carve.png",
 }
 
 var _failures: int = 0
@@ -191,8 +193,8 @@ func _check_starter_art() -> void:
 				continue
 			var card := load(dir + file) as CardData
 			var key: String = file.get_basename()
-			if dir == "res://cards/data/" and STARTER_ART.has(key):
-				_expect(card.art != null and card.art.resource_path == STARTER_ART[key], "%s shows %s (got %s)" % [key, STARTER_ART[key], card.art.resource_path if card.art != null else "none"])
+			if dir == "res://cards/data/" and CARD_ART.has(key):
+				_expect(card.art != null and card.art.resource_path == CARD_ART[key], "%s shows %s (got %s)" % [key, CARD_ART[key], card.art.resource_path if card.art != null else "none"])
 				if card.art != null:
 					_expect(card.art.get_image().has_mipmaps(), "%s's art is mipmapped" % key)
 			else:
@@ -205,12 +207,12 @@ func _check_starter_art() -> void:
 	root.add_child(without_art)
 	await process_frame
 	with_art.set_card_data(_card("slash"))
-	without_art.set_card_data(_card("carve"))
+	without_art.set_card_data(_card("endure"))
 	_expect(with_art.art_rect.visible and with_art.art_rect.texture == _card("slash").art, "Slash's face shows its art")
 	_expect(not with_art.glyph.visible, "...and hides the glyph")
 	_expect_eq(with_art.art_rect.size, with_art.art_field.size, "...filling the art field")
 	_expect_eq(with_art.art_rect.stretch_mode, TextureRect.STRETCH_KEEP_ASPECT_COVERED, "...as a cover crop")
-	_expect(not without_art.art_rect.visible and without_art.art_rect.texture == null, "Carve's face shows no image")
+	_expect(not without_art.art_rect.visible and without_art.art_rect.texture == null, "Endure's face shows no image")
 	_expect(without_art.glyph.visible, "...and keeps its glyph")
 	# One shared material, tuned in one place; its defaults leave the art
 	# as painted.
@@ -221,7 +223,7 @@ func _check_starter_art() -> void:
 		_expect_eq(material.shader.get_shader_uniform_list().size(), 3, "The card-art shader compiles (3 uniforms)")
 		_expect_eq(material.get_shader_parameter("art_contrast"), 1.0, "art_contrast defaults to 1.0 (off)")
 		_expect_eq(material.get_shader_parameter("art_tint"), Color.WHITE, "art_tint defaults to white (off)")
-	with_art.set_card_data(_card("carve"))
+	with_art.set_card_data(_card("endure"))
 	_expect(not with_art.art_rect.visible and with_art.glyph.visible, "A reused face drops the art for a card without")
 	with_art.queue_free()
 	without_art.queue_free()
