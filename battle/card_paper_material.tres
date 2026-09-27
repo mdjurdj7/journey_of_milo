@@ -1,0 +1,13 @@
+[gd_resource type="ShaderMaterial" load_steps=2 format=3]
+
+[ext_resource type="Shader" path="res://battle/card_paper.gdshader" id="1_card_paper"]
+
+[resource]
+shader = ExtResource("1_card_paper")
+shader_parameter/paper_grain_strength = 0.015
+shader_parameter/paper_tonal_variation_strength = 0.01
+shader_parameter/bone = Color(0.94, 0.91, 0.86, 1)
+shader_parameter/tone_scale_px = 70.0
+shader_parameter/tooth_scale_px = 2.5
+shader_parameter/tooth_weight = 0.35
+shader_parameter/tonal_scale_px = 220.0

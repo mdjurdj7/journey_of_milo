@@ -144,6 +144,11 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # art_contrast are the game-wide card-art values, and editing them on
 # that resource moves every face at once, live.
 @export_file("*.tres") var art_material_path: String = "res://battle/card_art_material.tres"
+# The paper under everything on the face (battle/card_paper.gdshader):
+# one material SHARED by every card, like the art's. Its two strengths,
+# paper_grain_strength and paper_tonal_variation_strength, are the whole
+# game's card stock; both 0 is flat bone.
+@export_file("*.tres") var paper_material_path: String = "res://battle/card_paper_material.tres"
 # The two shadows, lit from above: a contact hairline (1px down, 18%) and
 # a soft shadow thrown down the page (10px, 14%, 3px down). A lifted card
 # (see Hover) throws the soft one further and lighter, and the contact
@@ -326,6 +331,7 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 
 @onready var shadow_soft: Panel = $ShadowSoft
 @onready var shadow_hairline: Panel = $ShadowHairline
+@onready var paper: Control = $Paper
 @onready var keyline: Control = $Keyline
 @onready var name_label: Label = $NameLabel
 @onready var cost_label: Label = $CostLabel
@@ -401,6 +407,9 @@ func _ready() -> void:
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.draw.connect(_draw_glyph)
 	keyline.draw.connect(_draw_keyline)
+	if not paper_material_path.is_empty():
+		paper.material = load(paper_material_path) as Material
+	paper.draw.connect(_draw_paper)
 	# The card's art (CardData.art) as a centred cover crop: fills the
 	# field at its own aspect, the overflow cut, never stretched. Clipped
 	# to the field's own drawn shape so it keeps the rounded corners; the
@@ -675,6 +684,15 @@ func _draw_art_rule() -> void:
 	if art_outer_rule_enabled and art_outer_rule_width_px > 0 and card_data != null:
 		var grow: int = art_outer_rule_inset_px + art_outer_rule_width_px
 		_art_rule.draw_style_box(_rule_style(_keyline_color(), art_outer_rule_width_px, art_field_radius + grow), field.grow(float(grow)))
+
+# The face inside the frame as one rounded box for the paper shader: its
+# alpha is the corner mask, its red channel this card's seed (from the
+# name, so a card is always cut from the same place on the sheet).
+func _draw_paper() -> void:
+	var seed: float = float(absi(card_data.card_name.hash()) % 1000) / 1000.0 if card_data != null else 0.0
+	var inset: float = float(_card_style.border_width_top) if _card_style != null else 1.0
+	var style := _rounded_style(Color(seed, 0.0, 0.0, 1.0), maxi(corner_radius - int(inset), 0))
+	paper.draw_style_box(style, Rect2(Vector2.ZERO, size).grow(-inset))
 
 # The inset rule and the card-stock edges, under everything on the face:
 # the top light and bottom shade run just inside the frame.
@@ -1279,6 +1297,9 @@ func _apply_layout() -> void:
 		_art_rule.size = face
 		_art_rule.queue_redraw()
 
+	paper.position = Vector2.ZERO
+	paper.size = face
+	paper.queue_redraw()
 	keyline.position = Vector2.ZERO
 	keyline.size = face
 	keyline.queue_redraw()

@@ -11,6 +11,8 @@ show_behind_parent = true
 [node name="ShadowHairline" type="Panel" parent="."]
 show_behind_parent = true
 
+[node name="Paper" type="Control" parent="."]
+
 [node name="Keyline" type="Control" parent="."]
 
 [node name="NameLabel" type="Label" parent="."]
