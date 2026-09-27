@@ -3,7 +3,7 @@
 [ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/braced.tres" id="3_braced"]
-[ext_resource type="Texture2D" uid="uid://ba7r0wy7dmp4w" path="res://cards/art/Wanderer/Brace.png" id="9_art"]
+[ext_resource type="Texture2D" uid="uid://e5tsgsnu68ob" path="res://cards/art/Wanderer/Brace.png" id="9_art"]
 
 [sub_resource type="Resource" id="CardEffect_apply_status_to_target"]
 script = ExtResource("2_card_effect")
