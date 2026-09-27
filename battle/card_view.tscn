@@ -11,13 +11,15 @@ show_behind_parent = true
 [node name="ShadowHairline" type="Panel" parent="."]
 show_behind_parent = true
 
-[node name="Keyline" type="ColorRect" parent="."]
+[node name="Keyline" type="Control" parent="."]
 
 [node name="NameLabel" type="Label" parent="."]
 
 [node name="CostLabel" type="Label" parent="."]
 
 [node name="HpCostLabel" type="Label" parent="."]
+
+[node name="CostRule" type="ColorRect" parent="."]
 
 [node name="ArtField" type="Panel" parent="."]
 

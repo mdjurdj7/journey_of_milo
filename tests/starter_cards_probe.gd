@@ -16,12 +16,13 @@ const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_CONTROLLER_PATH := "res://battle/battle_controller.gd"
 const CASES := 12
 # The rules text size each card lands at outside a fight; any card not
-# listed fits at the first size, 15. A card that moves here has changed
-# its wording - or needs to.
+# listed fits at the first size, 15, cleanly - room to spare and no lone
+# last word (CardView.rules_min_air_px). A card that moves here has
+# changed its wording - or needs to.
 const SHRUNK_RULES: Dictionary = {
+	"Cornered": 14,
 	"Last Resort": 14,
 	"Last Wager": 13,
-	"Refuse the End": 13,
 }
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
@@ -250,25 +251,26 @@ func _check_face_layout() -> void:
 			_expect_eq(Rect2(view.art_field.position, view.art_field.size), art_rect, "%s's art field" % card.card_name)
 			_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), SHRUNK_RULES.get(card.card_name, 15), "%s's rules size" % card.card_name)
 			_expect_eq(view.size, view.card_size, "%s keeps the card's size" % card.card_name)
-			_expect(view.rules_text.position.y + view.rules_text.size.y <= view.footer_rule.position.y, "%s's text ends above the footer" % card.card_name)
-			# The header holds the "-N HP" line without adding a row, and
-			# the numeral's ink clears the keyline.
+			_expect(view.rules_text.position.y + view.rules_text.size.y <= _type_baseline(view) + _ink_top(view.type_label, view.type_label_font_size_px), "%s's text ends above the type label" % card.card_name)
+			# The header holds the ledger rule and the "-N HP" line without
+			# adding a row - the HP ink clear of the art field by 4 px - and
+			# the numeral's ink clears the inset rule.
 			if view.hp_cost_label.visible:
-				_expect(view.hp_cost_label.position.y + view.hp_cost_label.size.y <= view.header_height, "%s's HP line sits inside the header" % card.card_name)
-			_expect(view.header_baseline_px + _ink_top(view.cost_label, view.cost_font_size_px) >= view.keyline.position.y + view.keyline.size.y, "%s's numeral clears the keyline" % card.card_name)
+				_expect(view.hp_cost_label.position.y + view.hp_cost_label.get_theme_font("font").get_ascent(view.hp_cost_font_size_px) <= art_top - 4.0, "%s's HP line sits clear of the art" % card.card_name)
+				_expect(view.cost_rule.visible and view.cost_rule.position.y < view.hp_cost_baseline_px + _ink_top(view.hp_cost_label, view.hp_cost_font_size_px), "%s's ledger rule sits over its HP line" % card.card_name)
+			_expect(view.header_baseline_px + _ink_top(view.cost_label, view.cost_font_size_px) >= float(view.inner_keyline_inset_px + view.inner_keyline_width_px), "%s's numeral clears the inset rule" % card.card_name)
 
-	var footer_y: float = view.footer_rule.position.y
-	# The footer by ink: the type label's baseline 6 px off the bottom
-	# edge, the rule 4 px clear above its caps.
-	_expect_eq(footer_y, 264.0, "The footer rule sits at y 264")
-	_expect_eq(view.type_label.position.y + view.type_label.get_theme_font("font").get_ascent(view.type_label_font_size_px), 274.0, "...the type label's baseline at y 274")
+	var footer_y: float = _type_baseline(view)
+	# The footer by ink: the type label's baseline 9 px off the bottom
+	# edge, 4 px clear of the inset rule.
+	_expect_eq(footer_y, 271.0, "The type label's baseline sits at y 271")
 	var long_card := CardData.new()
 	long_card.card_name = "Probe Long"
 	long_card.description = "Lose 2 HP. Draw 1. Gain 5 Toll. Deal 6 damage to all enemies. Gain 8 block. Heal 3 HP. If this kills, gain 1 energy. Exhaust a card in your hand."
 	view.set_card_data(long_card)
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), view.rules_font_sizes[view.rules_font_sizes.size() - 1], "Overlong text sits at the floor size")
 	_expect(view.size.y > view.card_size.y, "...and the card grows (%s)" % str(view.size))
-	_expect_eq(view.footer_rule.position.y - (view.size.y - view.card_size.y), footer_y, "...its footer moving down with it")
+	_expect_eq(_type_baseline(view) - (view.size.y - view.card_size.y), footer_y, "...its footer moving down with it")
 	_expect_eq(Rect2(view.art_field.position, view.art_field.size), art_rect, "...its art field unmoved")
 
 	var long_name := CardData.new()
@@ -280,6 +282,9 @@ func _check_face_layout() -> void:
 	_expect_eq(view.size, view.card_size, "A short card back at card_size after a grown one")
 	view.queue_free()
 	_completed += 1
+
+func _type_baseline(view: CardView) -> float:
+	return view.type_label.position.y + view.type_label.get_theme_font("font").get_ascent(view.type_label_font_size_px)
 
 # How far above its baseline a label's text inks, from the glyphs
 # themselves (negative = up) - the line box's ascent overstates it.

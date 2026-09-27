@@ -3,21 +3,22 @@ class_name CardView
 
 # "Ink on bone": a pale card with dark type and edges, never a dark slab.
 # The name is world voice (Spectral), the rules text is system voice
-# (Alegreya Sans); dark reads as ink and lines - the 1px frame, the
-# glyph, the footer rule - not as fill. The one colour on the card is a
-# 2px keyline inside the top edge, by type (strike / guard / toll), and
-# a matching tonal field behind the glyph. Cards never invert with the
+# (Alegreya Sans); dark reads as ink and lines - the 1px frame and the
+# faint rule inset inside it (a double printed rule), the glyph - not as
+# fill. Type colour is only the tonal field behind the glyph; rarity is
+# only the rule round the art field. Cards never invert with the
 # theme's on-pale/on-dark switch: every colour here is this script's
 # own export, and nothing reads the theme's CardFace tokens any more -
 # those belong to the chips and buttons.
 #
 # Layout at 1x is 200 x 280 (5:7); HandContainer/DeckView scale the
-# whole card, so every size below is a 1x pixel. Top to bottom: keyline;
-# name (top-left, up to two lines) beside the cost numeral (top-right,
-# with a "-N HP" line under it when the card costs HP); the tonal field
-# with the type glyph or the card's art, a fixed rect on every card; the
-# rules text, which fits the space left by stepping its size down; a
-# hairline footer rule and the small-caps type label. See _apply_layout().
+# whole card, so every size below is a 1x pixel. Top to bottom: name
+# (top-left, one line) beside the cost numeral (top-right, with a ledger
+# rule and a "-N HP" line under it when the card costs HP); the tonal
+# field with the type glyph or the card's art, a fixed rect on every
+# card; the rules text, centred in the space left and stepping its size
+# down to fit; the small-caps type label just inside the inset rule. See
+# _apply_layout().
 
 signal clicked(card_data: CardData)
 # Fired whenever this card visually lifts out of the hand for any reason -
@@ -101,8 +102,18 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 @export_group("Colours")
 @export var field_color: Color = Color(0.94, 0.91, 0.86)
 @export var ink_color: Color = Color(0.165, 0.165, 0.18)
-@export_range(0.0, 1.0) var frame_alpha: float = 0.72
-@export var corner_radius: int = 5
+@export_range(0.0, 1.0) var frame_alpha: float = 0.88
+@export var corner_radius: int = 6
+# The second printed rule: neutral ink, inset from the frame, its corners
+# concentric with the card's (corner_radius - inset). Drawn by Keyline,
+# under the type, with the card-stock edges below.
+@export var inner_keyline_inset_px: int = 4
+@export var inner_keyline_width_px: int = 1
+@export_range(0.0, 1.0) var inner_keyline_alpha: float = 0.25
+# Card stock: a 1px light just inside the top edge and a 1px shade just
+# inside the bottom one, both between the rounded corners.
+@export var top_highlight_color: Color = Color(1.0, 1.0, 1.0, 0.3)
+@export_range(0.0, 1.0) var bottom_shade_alpha: float = 0.08
 @export var keyline_strike: Color = Color(0.62, 0.56, 0.49)
 @export var keyline_guard: Color = Color(0.49, 0.56, 0.59)
 @export var keyline_toll: Color = Color(0.54, 0.50, 0.58)
@@ -127,38 +138,62 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 @export var art_field_utility: Color = Color(0.87, 0.87, 0.85)
 @export var art_field_stance: Color = Color(0.886, 0.856, 0.846)
 @export var art_field_power: Color = Color(0.890, 0.868, 0.820)
-@export var art_field_radius: int = 3
+@export var art_field_radius: int = 2
 # The art's tint and contrast pull (battle/card_art.gdshader). One
 # material SHARED by every card, not a copy each: its art_tint and
 # art_contrast are the game-wide card-art values, and editing them on
 # that resource moves every face at once, live.
 @export_file("*.tres") var art_material_path: String = "res://battle/card_art_material.tres"
-# The two shadows: a hairline (1px down, 18%) and a soft spread (8px,
-# 12%). Both deepen on hover (see Hover).
+# The two shadows, lit from above: a contact hairline (1px down, 18%) and
+# a soft shadow thrown down the page (10px, 14%, 3px down). A lifted card
+# (see Hover) throws the soft one further and lighter, and the contact
+# line fades - it has left the table.
 @export_range(0.0, 1.0) var shadow_hairline_alpha: float = 0.18
-@export var shadow_soft_size_px: int = 8
-@export_range(0.0, 1.0) var shadow_soft_alpha: float = 0.12
+@export var shadow_soft_size_px: int = 10
+@export_range(0.0, 1.0) var shadow_soft_alpha: float = 0.14
+@export var shadow_soft_offset_px: float = 3.0
 
 @export_group("Type")
 @export var name_font: Font = load("res://assets/fonts/Spectral-SemiBold.ttf")
 @export var rules_font: Font = load("res://assets/fonts/AlegreyaSans-Regular.ttf")
 @export var rules_font_bold: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf")
-@export var name_font_size_px: int = 18
-@export var cost_font_size_px: int = 23
-@export var hp_cost_font_size_px: int = 9
-@export_range(0.0, 1.0) var hp_cost_letter_spacing_em: float = 0.08
+# The numeral is the Light cut, larger than the name: the name leads by
+# weight, the cost anchors by size, and the two never match.
+@export var cost_font: Font = load("res://assets/fonts/Spectral-Light.ttf")
+@export var name_font_size_px: int = 19
+@export var cost_font_size_px: int = 26
+@export var hp_cost_font_size_px: int = 10
+@export_range(0.0, 1.0) var hp_cost_letter_spacing_em: float = 0.16
 @export_range(0.0, 1.0) var hp_cost_alpha: float = 0.72
+# The ledger rule between the numeral and the "-N HP" line - only on a
+# card that costs HP - as wide as the wider of the two, right-aligned.
+@export var cost_rule_y_px: float = 33.0
+@export_range(0.0, 1.0) var cost_rule_alpha: float = 0.3
 # The rules text's sizes at 1x, largest first: each is tried in turn
 # until the text fits the space under the art field. The last is the
 # floor - text that still doesn't fit there wraps on and the card grows
 # downward rather than shrinking further (_warn_overlong() says so). A
 # card that lands below the first size is saying too much.
 @export var rules_font_sizes: Array[int] = [15, 14, 13, 12]
-@export var rules_line_height: float = 1.35
+@export var rules_line_height: float = 1.28
+# Extra space between the description's authored lines ("Deal 8 damage."
+# / "Lose 2 HP."), on top of the line spacing, so clauses read apart
+# from mere wrapping.
+@export var rules_paragraph_gap_px: int = 4
+# The rules block is centred in its space, this much above true centre.
+@export var rules_optical_lift_px: float = 2.0
+# A size is taken only if it leaves at least this much of the space
+# spare (split above and below the centred block) and no authored line
+# wraps to a lone last word ("26."); otherwise the next size is tried.
+# If no size is that clean, the first that fits at all is used.
+@export var rules_min_air_px: float = 4.0
 @export_range(0.0, 1.0) var rules_alpha: float = 0.92
 @export var type_label_font_size_px: int = 9
 @export_range(0.0, 1.0) var type_label_letter_spacing_em: float = 0.16
-@export_range(0.0, 1.0) var type_label_alpha: float = 0.62
+@export_range(0.0, 1.0) var type_label_alpha: float = 0.55
+# Off: the inset rule already bounds the footer. On, it is the hairline
+# over the type label that the card had before.
+@export var footer_rule_enabled: bool = false
 @export_range(0.0, 1.0) var footer_rule_alpha: float = 0.25
 
 @export_group("Bonus Corner")
@@ -182,6 +217,10 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # the picture.
 @export var art_rule_width_px: int = 1
 @export var art_rule_color: Color = Color(0.165, 0.165, 0.18)
+# Set into the page: 1px just inside the ink rule, a shade along the top
+# and a light along the bottom, between the corners. Transparent = off.
+@export var art_inset_shade: Color = Color(0.165, 0.165, 0.18, 0.15)
+@export var art_inset_light: Color = Color(1.0, 1.0, 1.0, 0.12)
 # A second rule outside the first, in the card's keyline colour, for
 # trying the panel with a double edge. art_outer_rule_inset_px is the
 # gap between the two rules; the outer one's corners stay concentric
@@ -203,32 +242,33 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 
 @export_group("Layout")
 @export var outer_margin: float = 12.0
-@export var keyline_height: float = 2.0
 @export var name_cost_gap: float = 8.0
 # The header: one height on every card. Its labels are placed by
 # BASELINE, not stacked by line box - Spectral's box is ~1.5em with room
 # below for descenders a numeral never uses, so stacked boxes waste a
-# row. The name and the cost numeral share header_baseline_px (the
-# numeral's ink tops out ~18px above it at 23px, ~10px down the card);
-# the "-N HP" line sits on hp_cost_baseline_px, right under the numeral,
-# inside header_height rather than adding a row.
+# row. The name and the cost numeral share header_baseline_px; the
+# ledger rule (cost_rule_y_px) and the "-N HP" line (hp_cost_baseline_px)
+# sit right under the numeral, in the header's height and the gap below
+# it rather than adding a row.
 @export var header_height: float = 42.0
-@export var header_baseline_px: float = 28.0
-@export var hp_cost_baseline_px: float = 39.0
+@export var header_baseline_px: float = 29.0
+@export var hp_cost_baseline_px: float = 42.0
 @export var header_field_gap: float = 6.0
 # The art field: one rect on every card, whatever its name, HP cost or
 # rules text - art is painted for this window, so it never gives way.
 # Its top is header_height + header_field_gap.
 @export var art_field_size: Vector2 = Vector2(176.0, 146.0)
 @export var field_rules_gap: float = 8.0
-@export var rules_footer_gap: float = 8.0
+@export var rules_footer_gap: float = 6.0
 # The footer is placed by INK, like the header: the type label's
 # baseline sits footer_bottom_ink_px above the face's bottom edge (its
-# small caps have no descenders, so that is the ink's bottom), and the
-# rule's lower edge footer_rule_ink_gap_px above the caps' tops
-# (_cap_top()), rounded to a whole pixel.
+# small caps have no descenders, so that is the ink's bottom; 9 leaves
+# 4px clear of the inset rule), and the rules text ends rules_footer_gap
+# above the caps' tops (_cap_top()) - or above the footer rule, if on,
+# whose lower edge is footer_rule_ink_gap_px above them. Both rounded to
+# a whole pixel.
 @export var footer_rule_ink_gap_px: float = 4.0
-@export var footer_bottom_ink_px: float = 6.0
+@export var footer_bottom_ink_px: float = 9.0
 @export var glyph_size_px: float = 36.0
 @export var glyph_line_width_px: float = 3.5
 # The glyph's faint secondary stroke (the second chevron, the shield's
@@ -260,10 +300,13 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 @export var armed_scale: float = 1.2
 @export_range(0.0, 1.0) var armed_bottom_y_fraction: float = 0.86
 @export var armed_duration_sec: float = 0.18
-@export var hover_frame_width_px: int = 2
-@export_range(0.0, 1.0) var hover_shadow_hairline_alpha: float = 0.28
-@export var hover_shadow_soft_size_px: int = 12
-@export_range(0.0, 1.0) var hover_shadow_soft_alpha: float = 0.2
+# Lifted (hover or armed), the frame goes to full ink at this width - 1:
+# the lift is said by the shadow, not by a heavier edge.
+@export var hover_frame_width_px: int = 1
+@export_range(0.0, 1.0) var hover_shadow_hairline_alpha: float = 0.08
+@export var hover_shadow_soft_size_px: int = 16
+@export_range(0.0, 1.0) var hover_shadow_soft_alpha: float = 0.16
+@export var hover_shadow_soft_offset_px: float = 7.0
 # An armed (selected) card holds its lifted pose at least this long
 # before release() may lower it, so a quick cancel still reads.
 @export var selected_hold_sec: float = 0.5
@@ -283,10 +326,11 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 
 @onready var shadow_soft: Panel = $ShadowSoft
 @onready var shadow_hairline: Panel = $ShadowHairline
-@onready var keyline: ColorRect = $Keyline
+@onready var keyline: Control = $Keyline
 @onready var name_label: Label = $NameLabel
 @onready var cost_label: Label = $CostLabel
 @onready var hp_cost_label: Label = $HpCostLabel
+@onready var cost_rule: ColorRect = $CostRule
 @onready var art_field: Panel = $ArtField
 @onready var art_rect: TextureRect = $ArtField/Art
 @onready var glyph: Control = $ArtField/Glyph
@@ -356,6 +400,7 @@ func _ready() -> void:
 			(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	glyph.draw.connect(_draw_glyph)
+	keyline.draw.connect(_draw_keyline)
 	# The card's art (CardData.art) as a centred cover crop: fills the
 	# field at its own aspect, the overflow cut, never stretched. Clipped
 	# to the field's own drawn shape so it keeps the rounded corners; the
@@ -622,6 +667,7 @@ func _draw_art_rule() -> void:
 	var field := Rect2(art_field.position, art_field.size)
 	if art_rule_width_px > 0:
 		_art_rule.draw_style_box(_rule_style(art_rule_color, art_rule_width_px, art_field_radius), field)
+	_draw_edge_pair(_art_rule, field.grow(-float(art_rule_width_px)), float(art_field_radius), art_inset_shade, art_inset_light)
 	var rarity_color: Color = _rarity_rule_color()
 	var rarity_width: int = _rarity_rule_width()
 	if rarity_width > 0 and rarity_color.a > 0.0:
@@ -629,6 +675,31 @@ func _draw_art_rule() -> void:
 	if art_outer_rule_enabled and art_outer_rule_width_px > 0 and card_data != null:
 		var grow: int = art_outer_rule_inset_px + art_outer_rule_width_px
 		_art_rule.draw_style_box(_rule_style(_keyline_color(), art_outer_rule_width_px, art_field_radius + grow), field.grow(float(grow)))
+
+# The inset rule and the card-stock edges, under everything on the face:
+# the top light and bottom shade run just inside the frame.
+func _draw_keyline() -> void:
+	var face := Rect2(Vector2.ZERO, size)
+	var shade: Color = ink_color
+	shade.a = bottom_shade_alpha
+	_draw_edge_pair(keyline, face.grow(-1.0), float(corner_radius), top_highlight_color, shade)
+	if inner_keyline_width_px > 0:
+		var inset: int = inner_keyline_inset_px
+		var rule: Color = ink_color
+		rule.a = inner_keyline_alpha
+		keyline.draw_style_box(_rule_style(rule, inner_keyline_width_px, maxi(corner_radius - inset, 0)), face.grow(-float(inset)))
+
+# A 1px line along the inside top of `rect` and one along its inside
+# bottom, each stopping `radius` short of the corners.
+func _draw_edge_pair(canvas: Control, rect: Rect2, radius: float, top: Color, bottom: Color) -> void:
+	var left: float = rect.position.x + radius
+	var right: float = rect.end.x - radius
+	if right <= left:
+		return
+	if top.a > 0.0:
+		canvas.draw_line(Vector2(left, rect.position.y + 0.5), Vector2(right, rect.position.y + 0.5), top, 1.0)
+	if bottom.a > 0.0:
+		canvas.draw_line(Vector2(left, rect.end.y - 0.5), Vector2(right, rect.end.y - 0.5), bottom, 1.0)
 
 # The rarity rule's colour for this card: transparent (none) for Common,
 # UNSET, or no card at all.
@@ -1039,6 +1110,7 @@ func _apply_style() -> void:
 	shadow_hairline.add_theme_stylebox_override("panel", hairline)
 	var soft := _rounded_style(Color(0, 0, 0, 0), corner_radius)
 	soft.shadow_size = shadow_soft_size_px
+	soft.shadow_offset = Vector2(0.0, shadow_soft_offset_px)
 	shadow_soft.add_theme_stylebox_override("panel", soft)
 	_apply_shadows(false)
 
@@ -1049,8 +1121,8 @@ func _apply_style() -> void:
 
 	cost_label.add_theme_color_override("font_color", ink_color)
 	cost_label.add_theme_font_size_override("font_size", cost_font_size_px)
-	if name_font != null:
-		cost_label.add_theme_font_override("font", name_font)
+	if cost_font != null:
+		cost_label.add_theme_font_override("font", cost_font)
 
 	var hp_ink: Color = ink_color
 	hp_ink.a = hp_cost_alpha
@@ -1058,6 +1130,9 @@ func _apply_style() -> void:
 	hp_cost_label.add_theme_font_size_override("font_size", hp_cost_font_size_px)
 	if rules_font_bold != null:
 		hp_cost_label.add_theme_font_override("font", _spaced_bold(hp_cost_font_size_px, hp_cost_letter_spacing_em))
+	var ledger_ink: Color = ink_color
+	ledger_ink.a = cost_rule_alpha
+	cost_rule.color = ledger_ink
 
 	_apply_panel_color()
 
@@ -1065,6 +1140,8 @@ func _apply_style() -> void:
 	rules_text.scroll_active = false
 	rules_text.fit_content = false
 	rules_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	rules_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	rules_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
 	var rules_ink: Color = ink_color
 	rules_ink.a = rules_alpha
 	rules_text.add_theme_color_override("default_color", rules_ink)
@@ -1077,6 +1154,7 @@ func _apply_style() -> void:
 	var rule_ink: Color = ink_color
 	rule_ink.a = footer_rule_alpha
 	footer_rule.color = rule_ink
+	footer_rule.visible = footer_rule_enabled
 
 	var type_ink: Color = ink_color
 	type_ink.a = type_label_alpha
@@ -1093,6 +1171,7 @@ func _apply_rules_font_size(font_size: int) -> void:
 	# line_separation is the EXTRA pixels between lines; the font's own
 	# line is ~1.0 em, so this puts the total near rules_line_height em.
 	rules_text.add_theme_constant_override("line_separation", roundi(float(font_size) * (rules_line_height - 1.0)))
+	rules_text.add_theme_constant_override("paragraph_separation", rules_paragraph_gap_px)
 
 # The frame: 1px ink at frame_alpha at rest, hover_frame_width_px full
 # ink lifted; or the override edge if a caller asked for one.
@@ -1126,6 +1205,7 @@ func _apply_shadows(lifted_look: bool) -> void:
 	soft_color.a = hover_shadow_soft_alpha if lifted_look else shadow_soft_alpha
 	soft.shadow_color = soft_color
 	soft.shadow_size = hover_shadow_soft_size_px if lifted_look else shadow_soft_size_px
+	soft.shadow_offset = Vector2(0.0, hover_shadow_soft_offset_px if lifted_look else shadow_soft_offset_px)
 
 func _set_lifted_look(lifted_look: bool) -> void:
 	_apply_frame(lifted_look)
@@ -1136,7 +1216,6 @@ func _set_lifted_look(lifted_look: bool) -> void:
 func _apply_type_style() -> void:
 	if card_data == null:
 		return
-	keyline.color = _keyline_color()
 	_apply_panel_color()
 	glyph.queue_redraw()
 	if _art_rule != null:
@@ -1159,18 +1238,27 @@ func _apply_layout() -> void:
 	var art_top: float = header_height + header_field_gap
 	var rules_top: float = art_top + art_field_size.y + field_rules_gap
 	var type_baseline: float = card_size.y - footer_bottom_ink_px
-	var rule_top: float = roundf(type_baseline + _cap_top(type_label, type_label_font_size_px) - footer_rule_ink_gap_px - 1.0)
-	var rules_bottom: float = rule_top - rules_footer_gap
+	var caps_top: float = roundf(type_baseline + _cap_top(type_label, type_label_font_size_px))
+	var rule_top: float = caps_top - footer_rule_ink_gap_px - 1.0
+	var rules_bottom: float = (rule_top if footer_rule_enabled else caps_top) - rules_footer_gap
 	var available: float = rules_bottom - rules_top
-	var font_size: int = 15
-	var lines: int = 1
-	var rules_height: float = 0.0
+	var paragraph_gaps: float = float(_rules_paragraph_count() - 1) * float(rules_paragraph_gap_px)
+	var font_size: int = rules_font_sizes[rules_font_sizes.size() - 1] if not rules_font_sizes.is_empty() else 15
+	var first_fit: int = -1
 	for candidate in rules_font_sizes:
-		font_size = candidate
-		lines = _rules_line_count(font_size, rules_width)
-		rules_height = float(lines) * float(font_size) * rules_line_height
-		if rules_height <= available:
+		var wrapped: Array[PackedStringArray] = _rules_wrap(candidate, rules_width)
+		var height: float = _rules_block_height(candidate, _line_total(wrapped)) + paragraph_gaps
+		if height > available:
+			continue
+		if first_fit < 0:
+			first_fit = candidate
+		if available - height >= rules_min_air_px and not _ends_on_lone_word(wrapped):
+			first_fit = candidate
 			break
+	if first_fit >= 0:
+		font_size = first_fit
+	var lines: int = _line_total(_rules_wrap(font_size, rules_width))
+	var rules_height: float = _rules_block_height(font_size, lines) + paragraph_gaps
 	var growth: float = maxf(ceilf(rules_height - available), 0.0)
 	if growth > 0.0:
 		_warn_overlong(lines, font_size)
@@ -1191,10 +1279,9 @@ func _apply_layout() -> void:
 		_art_rule.size = face
 		_art_rule.queue_redraw()
 
-	# Keyline inside the frame, inset past the corner radius so it never
-	# pokes out of the rounded corners.
-	keyline.position = Vector2(float(corner_radius) + 1.0, 1.0)
-	keyline.size = Vector2(card_size.x - 2.0 * (float(corner_radius) + 1.0), keyline_height)
+	keyline.position = Vector2.ZERO
+	keyline.size = face
+	keyline.queue_redraw()
 
 	# Cost numeral top-right; the name gets the rest of the header width.
 	# Every Label is sized from its font's real line height (Font.get_
@@ -1215,6 +1302,11 @@ func _apply_layout() -> void:
 		hp_cost_label.position = Vector2(card_size.x - outer_margin - hp_width, _top_for_baseline(hp_cost_label, hp_cost_font_size_px, hp_cost_baseline_px))
 		hp_cost_label.size = Vector2(hp_width, _line_height(hp_cost_label, hp_cost_font_size_px))
 		hp_cost_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+		# The ledger rule: a whole pixel, as wide as the wider figure.
+		var rule_width: float = ceilf(maxf(cost_width, hp_width))
+		cost_rule.position = Vector2(card_size.x - outer_margin - rule_width, floorf(cost_rule_y_px))
+		cost_rule.size = Vector2(rule_width, 1.0)
+	cost_rule.visible = hp_cost_label.visible
 
 	# One line, always: the art field sits at a fixed height below it.
 	var name_width: float = card_size.x - outer_margin * 2.0 - cost_width - name_cost_gap
@@ -1242,7 +1334,9 @@ func _apply_layout() -> void:
 	glyph.size = art_field.size
 	glyph.queue_redraw()
 
-	rules_text.position = Vector2(outer_margin, rules_top)
+	# Centred in its space (see _apply_style()), lifted a touch above true
+	# centre.
+	rules_text.position = Vector2(outer_margin, rules_top - rules_optical_lift_px)
 	rules_text.size = Vector2(rules_width, rules_bottom + growth - rules_top)
 
 func _string_width(label: Label, font_size: int) -> float:
@@ -1290,16 +1384,65 @@ func _wrapped_line_count(label: Label, font_size: int, width: float) -> int:
 	var total: float = font.get_multiline_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, -1, TextServer.BREAK_WORD_BOUND | TextServer.BREAK_MANDATORY).y
 	return maxi(roundi(total / maxf(line_height, 1.0)), 1)
 
-# Measured on the plain description with the regular face (bold runs are
-# a touch wider; a card that wraps only because of that is one line from
-# the limit anyway).
-func _rules_line_count(font_size: int, width: float) -> int:
+# The rules text as the face breaks it: per authored line (paragraph),
+# the lines it wraps to. Shaped with the bold face on KEYWORDS, the way
+# the RichTextLabel sets them, and broken as its WORD_SMART does - a
+# bold "Critical" is wide enough to move a wrap.
+func _rules_wrap(font_size: int, width: float) -> Array[PackedStringArray]:
+	var wrapped: Array[PackedStringArray] = []
 	if card_data == null or rules_font == null or card_data.description.is_empty():
+		return wrapped
+	var bold: Font = rules_font_bold if rules_font_bold != null else rules_font
+	var keyword := RegEx.new()
+	keyword.compile("\\b(%s)\\b" % "|".join(PackedStringArray(KEYWORDS)))
+	var plain: String = _strip_markers(_resolve_tokens(card_data.description)).strip_edges()
+	for text in plain.split("\n"):
+		var paragraph := TextParagraph.new()
+		paragraph.width = width
+		paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
+		var at: int = 0
+		for found in keyword.search_all(text):
+			if found.get_start() > at:
+				paragraph.add_string(text.substr(at, found.get_start() - at), rules_font, font_size)
+			paragraph.add_string(found.get_string(), bold, font_size)
+			at = found.get_end()
+		if at < text.length() or text.is_empty():
+			paragraph.add_string(text.substr(at), rules_font, font_size)
+		var lines := PackedStringArray()
+		for i in paragraph.get_line_count():
+			var span: Vector2i = paragraph.get_line_range(i)
+			lines.append(text.substr(span.x, span.y - span.x).strip_edges())
+		wrapped.append(lines)
+	return wrapped
+
+static func _line_total(wrapped: Array[PackedStringArray]) -> int:
+	var total: int = 0
+	for lines in wrapped:
+		total += lines.size()
+	return maxi(total, 1)
+
+# A paragraph that wraps and leaves one word alone on its last line.
+static func _ends_on_lone_word(wrapped: Array[PackedStringArray]) -> bool:
+	for lines in wrapped:
+		if lines.size() > 1 and not lines[lines.size() - 1].contains(" "):
+			return true
+	return false
+
+# What `lines` lines of rules text actually take: the font's own line
+# box each, plus the line_separation _apply_rules_font_size() sets
+# between them - measured, so a block that "fits" never touches the art
+# or the type label.
+func _rules_block_height(font_size: int, lines: int) -> float:
+	var line_box: float = rules_font.get_height(font_size) if rules_font != null else float(font_size) * 1.2
+	var separation: float = float(roundi(float(font_size) * (rules_line_height - 1.0)))
+	return float(lines) * line_box + float(maxi(lines - 1, 0)) * separation
+
+# The description's authored lines - each a paragraph, set apart by
+# rules_paragraph_gap_px.
+func _rules_paragraph_count() -> int:
+	if card_data == null or card_data.description.is_empty():
 		return 1
-	var line_height: float = rules_font.get_height(font_size)
-	var plain: String = _strip_markers(_resolve_tokens(card_data.description))
-	var total: float = rules_font.get_multiline_string_size(plain, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, -1, TextServer.BREAK_WORD_BOUND | TextServer.BREAK_MANDATORY).y
-	return maxi(roundi(total / maxf(line_height, 1.0)), 1)
+	return card_data.description.strip_edges().split("\n").size()
 
 # Once per card name per session: the layout re-runs on every live
 # refresh, and a warning per refresh would bury the log.
