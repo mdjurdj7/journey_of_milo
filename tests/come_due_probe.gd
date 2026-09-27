@@ -74,7 +74,7 @@ func _check_spend_and_mark() -> void:
 	var mark: Status = _mark(enemy)
 	_expect(mark != null, "...and marks the target")
 	if mark != null:
-		_expect_eq(mark.magnitude, 3, "...with 3 charges")
+		_expect_eq(mark.charges, 3, "...with 3 charges")
 		_expect_eq(mark.label(), "Come Due ×3", "...shown as Come Due ×3")
 	_expect_eq(player.statuses.size(), 0, "...and nothing on the player")
 	player.toll = 5
@@ -160,7 +160,7 @@ func _check_replay_refreshes() -> void:
 	player.toll = 5
 	_play(_card("come_due"), player, [enemy])
 	var mark: Status = _mark(enemy)
-	_expect_eq(mark.magnitude, 3, "Replaying refreshes to 3 charges")
+	_expect_eq(mark.charges, 3, "Replaying refreshes to 3 charges")
 	_expect_eq(mark.stack_count, 1, "...one mark, not a second stack")
 	_expect_eq(enemy.statuses.size(), 1, "...one status on the enemy")
 	player.toll = 5
@@ -255,7 +255,7 @@ func _mark(enemy: Combatant) -> Status:
 
 func _charges(enemy: Combatant) -> int:
 	var mark: Status = _mark(enemy)
-	return mark.magnitude if mark != null else 0
+	return mark.charges if mark != null else 0
 
 # The first damage effect's authored value.
 func _damage(card: CardData) -> int:

@@ -8,11 +8,14 @@ var data: StatusData
 var magnitude: int
 var turns_remaining: int
 var stack_count: int = 1
+# See StatusData.default_charges; 0 on a status that doesn't count them.
+var charges: int = 0
 
 func _init(status_data: StatusData) -> void:
 	data = status_data
 	magnitude = status_data.default_magnitude
 	turns_remaining = status_data.default_duration_turns
+	charges = status_data.default_charges
 
 func apply_stack() -> void:
 	stack_count += 1
@@ -21,6 +24,7 @@ func apply_stack() -> void:
 			stack_count = 1
 			magnitude = data.default_magnitude
 			turns_remaining = data.default_duration_turns
+			charges = data.default_charges
 		StatusData.StackRule.REFRESH_DURATION:
 			turns_remaining = data.default_duration_turns
 		StatusData.StackRule.ADD_MAGNITUDE:
@@ -35,10 +39,9 @@ func tick_duration() -> void:
 	if turns_remaining > 0:
 		turns_remaining -= 1
 
-# Whether magnitude counts charges (StatusData.attack_bonus_against_holder)
-# rather than a size.
+# Whether this status counts charges (StatusData.default_charges).
 func has_charges() -> bool:
-	return data != null and data.attack_bonus_against_holder > 0
+	return data != null and data.default_charges > 0
 
 # How this status reads in a standing row: its name, then its charges
 # when it counts them - down to "×1", since the last one still matters -
@@ -47,7 +50,7 @@ func label() -> String:
 	if data == null:
 		return ""
 	if has_charges():
-		return "%s ×%d" % [data.display_name, magnitude]
+		return "%s ×%d" % [data.display_name, charges]
 	if stack_count > 1:
 		return "%s ×%d" % [data.display_name, stack_count]
 	return data.display_name
@@ -125,13 +128,40 @@ static func attack_bonus(statuses: Array[Status], critical: bool) -> int:
 static func spend_mark_bonus(statuses: Array[Status]) -> int:
 	var total: int = 0
 	for active in statuses.duplicate():
-		if not active.has_charges() or active.magnitude <= 0:
+		if active.data.attack_bonus_against_holder <= 0 or not active.has_charges() or active.charges <= 0:
 			continue
 		total += active.data.attack_bonus_against_holder
-		active.magnitude -= 1
-		if active.magnitude <= 0:
+		active.charges -= 1
+		if active.charges <= 0:
 			statuses.erase(active)
 	return total
+
+# An enemy's attack against the holder of `statuses` has resolved, every
+# hit of it: each status that lasts only until then (StatusData.consumed_
+# by_attack_against - Deflection) spends a charge, or goes, without them.
+static func consume_after_attack_against(statuses: Array[Status]) -> void:
+	for active in statuses.duplicate():
+		if not active.data.consumed_by_attack_against:
+			continue
+		if active.has_charges():
+			active.charges -= 1
+			if active.charges > 0:
+				continue
+		statuses.erase(active)
+
+# Every status waiting for its holder to be Critical (StatusData.grants_
+# on_critical - No Further) gives way, if `holder` is Critical now: removed,
+# and what it grants applied in its place. Called after each action that
+# can take HP - an enemy's attack, a card, the turn's ticks - so the
+# action that crossed the line is never softened by the grant.
+static func resolve_critical_triggers(holder: Combatant) -> void:
+	if holder == null or not holder.is_critical():
+		return
+	for active in holder.statuses.duplicate():
+		if active.data == null or active.data.grants_on_critical == null:
+			continue
+		holder.statuses.erase(active)
+		apply_to(holder.statuses, active.data.grants_on_critical)
 
 # The status that would stop a lethal enemy hit on a player who was
 # `was_critical` before it, or null.

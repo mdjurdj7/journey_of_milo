@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/deflection.tres" id="2_deflection"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "no_further"
+display_name = "No Further"
+description = "When you next enter Critical, gain 2 Deflections. Then it is gone."
+category = 2
+default_duration_turns = -1
+stack_rule = 3
+grants_on_critical = ExtResource("2_deflection")

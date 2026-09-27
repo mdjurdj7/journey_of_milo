@@ -25,8 +25,8 @@ enum StackRule { REFRESH_DURATION, ADD_MAGNITUDE, REFRESH_AND_ADD, IGNORE, RESET
 # magnitude; IGNORE does nothing at all to magnitude or duration (the
 # existing instance just keeps running), though stack_count still climbs
 # for those four. RESET puts the status back as if freshly applied -
-# default magnitude and duration, one stack - a refresh, never a pile-up
-# (Come Due's charges). Appended: an inserted value would rewrite every
+# default magnitude, duration and charges, one stack - a refresh, never a
+# pile-up (Come Due, Deflection). Appended: an inserted value would rewrite every
 # .tres that stores one of these as an integer.
 
 const DURATION_UNTIL_REMOVED := -1
@@ -48,6 +48,13 @@ const DURATION_UNTIL_TRIGGERED := -2
 @export var category: Category = Category.INFORMATIONAL
 @export var default_magnitude: int = 0
 @export var default_duration_turns: int = 1
+# How many times this status can be spent before it's gone - counted on
+# Status.charges, apart from magnitude (which a MODIFIER needs for its
+# own number). 0 = not a charge status. What spends one is the status's
+# own rule: an Attack on its holder (attack_bonus_against_holder - Come
+# Due), or an enemy attack against its holder (consumed_by_attack_against
+# - Deflection). Shown as "Name ×N" down to ×1 (Status.label()).
+@export var default_charges: int = 0
 @export var clears_on_trigger: bool = false
 # Made REAL this pass (the old project's own version was decorative - see
 # Phase 1 report's flagged items): status.gd's consume_triggered() removes
@@ -79,9 +86,8 @@ const DURATION_UNTIL_TRIGGERED := -2
 # HOLDER - an enemy - while it's up (Come Due). Once per Attack card, like
 # the attack bonus (EffectContext.take_mark_bonus()), and to the holder
 # alone: an all-enemies Attack pays it to this enemy, not its neighbours.
-# Each Attack card that lands on the holder spends one charge - magnitude
-# is the charge count, default_magnitude to start - and the status is
-# gone at 0. Pair it with DURATION_UNTIL_REMOVED so no turn takes it
+# Each Attack card that lands on the holder spends one charge (default_
+# charges to start) and the status is gone at 0. Pair it with DURATION_UNTIL_REMOVED so no turn takes it
 # first. 0 = none.
 @export var attack_bonus_against_holder: int = 0
 
@@ -92,6 +98,22 @@ const DURATION_UNTIL_TRIGGERED := -2
 # in place (EnemyTurn.take_turn()). Pair it with DURATION_UNTIL_TRIGGERED
 # so the turn counter never takes it first.
 @export var consumed_by_own_attack: bool = false
+
+# The mirror of consumed_by_own_attack, for a status on the one being
+# attacked: spent once an enemy ATTACK against its holder has resolved -
+# after every hit of it, so a status that softens that attack (Deflection)
+# softens all of it - whether or not any damage got through. One charge
+# per attack for a charge status, the whole status otherwise. A Defend, a
+# Burrow or an interrupted attack leave it in place (EnemyTurn.take_turn()).
+@export var consumed_by_attack_against: bool = false
+
+# A status that waits for its holder to be Critical (No Further): the
+# first time the holder is Critical after an action - an enemy's attack,
+# a card, a turn's ticks (Status.resolve_critical_triggers()) - it is
+# removed and this status applied in its place. After the action, so the
+# blow that crossed the line is never softened by what it grants. Applied
+# while already Critical, it gives way at once, at the end of that card.
+@export var grants_on_critical: StatusData = null
 
 # The Refuse the End rule: an ENEMY hit that would take the player to 0
 # HP while they're Critical leaves them at 1 instead, and removes this

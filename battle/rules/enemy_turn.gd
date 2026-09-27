@@ -97,6 +97,12 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# lasted only until then (Braced on this enemy) is spent -
 				# even if the player's block ate all of it.
 				Status.consume_after_attack(combatant.statuses)
+				# ...and one on the player that lasted only until an attack
+				# against them resolved (Deflection) spends a charge.
+				Status.consume_after_attack_against(player.statuses)
+				# Only now can the attack's HP loss grant anything (No
+				# Further): after the attack, so it never softens itself.
+				Status.resolve_critical_triggers(player)
 				result["damage_to_hp"] = total_to_hp
 				if total_to_hp > 0:
 					player.took_damage_this_turn = true

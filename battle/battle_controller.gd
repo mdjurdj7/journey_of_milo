@@ -506,6 +506,8 @@ func _start_player_turn() -> void:
 			toll_changed.emit(player.toll)
 	)
 	Status.remove_expired(player.statuses)
+	# A tick that took them into Critical counts like any other HP loss.
+	Status.resolve_critical_triggers(player)
 	status_changed.emit()
 	# The enemy turn may have buried or surfaced someone.
 	_push_enemy_target_available()

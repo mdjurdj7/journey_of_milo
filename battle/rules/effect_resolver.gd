@@ -66,6 +66,11 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 		var resolver: Object = _get_resolver(effect.effect_type)
 		if resolver != null:
 			resolver.resolve(effect, ctx)
+	# After the whole card: its own HP cost (self-damage, the stance's
+	# price) may have made the player Critical, and a status waiting for
+	# that (No Further) gives way now - as does one this card just applied
+	# while they were already there.
+	Status.resolve_critical_triggers(ctx.player)
 
 # Whether the rules forbid playing this card right now, whatever its
 # energy: it spends a fixed Toll the player doesn't hold (SPEND_TOLL - Come
