@@ -20,6 +20,7 @@ const CASES := 12
 # last word (CardView.rules_min_air_px). A card that moves here has
 # changed its wording - or needs to.
 const SHRUNK_RULES: Dictionary = {
+	"Come Due": 13,
 	"Cornered": 14,
 	"Last Resort": 14,
 	"Last Wager": 13,

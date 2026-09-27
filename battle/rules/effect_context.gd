@@ -30,6 +30,9 @@ var card_is_attack: bool = false
 # Whether this card's attack bonus has been handed out already - see
 # take_attack_bonus(). Cleared per card by resolve_card().
 var attack_bonus_taken: bool = false
+# The enemies whose mark this card has already been paid (take_mark_
+# bonus()). Cleared per card by resolve_card().
+var mark_bonus_paid: Array[Combatant] = []
 
 # HP a card still in hand will have paid before its conditions are read -
 # its own self-damage ahead of them, and the stance's per-Attack cost. Set
@@ -65,6 +68,18 @@ func take_attack_bonus() -> int:
 		return 0
 	attack_bonus_taken = true
 	return AttackBonus.for_player(player, player.hp)
+
+# The extra damage this Attack card deals to `enemy` for the marks it
+# carries (StatusData.attack_bonus_against_holder - Come Due), ONCE per
+# card per enemy, like the attack bonus: the first damage effect to land
+# on it gets the bonus and spends a charge of each mark, every later one
+# 0. Per enemy, so an all-enemies Attack pays it to the marked enemy
+# alone. 0 on anything but an ATTACK, which spends nothing.
+func take_mark_bonus(enemy: Combatant) -> int:
+	if not card_is_attack or enemy == null or mark_bonus_paid.has(enemy):
+		return 0
+	mark_bonus_paid.append(enemy)
+	return Status.spend_mark_bonus(enemy.statuses)
 
 # Every Block the player gains goes through here, so a stance that
 # forbids it (Last Resort) is asked in one place. Returns what was gained.

@@ -13,8 +13,12 @@ class_name TollDamageEffect
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	var consumed := ctx.player.toll
 	ctx.player.toll = 0
-	var base: int = consumed + ctx.take_attack_bonus()
-	if base <= 0 or ctx.target == null:
+	if ctx.target == null:
+		return
+	# A mark on the target (Come Due) adds to the blow, once per card, as
+	# on any damage effect - so even a Toll-less Reckoning lands it.
+	var base: int = consumed + ctx.take_attack_bonus() + ctx.take_mark_bonus(ctx.target)
+	if base <= 0:
 		return
 	var amount: int = Status.apply_modifiers(base, ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 	var incoming: int = Status.apply_modifiers(amount, ctx.target.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)

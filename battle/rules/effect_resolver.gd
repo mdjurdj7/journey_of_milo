@@ -30,6 +30,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.APPLY_STATUS_TO_TARGET: "res://battle/rules/effects/apply_status_to_target_effect.gd",
 	CardEffect.EffectType.APPLY_STANCE: "res://battle/rules/effects/apply_stance_effect.gd",
 	CardEffect.EffectType.TOLL_HEAL: "res://battle/rules/effects/toll_heal_effect.gd",
+	CardEffect.EffectType.SPEND_TOLL: "res://battle/rules/effects/spend_toll_effect.gd",
 }
 
 var _cache: Dictionary = {}
@@ -49,6 +50,7 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	ctx.killed_this_card = false
 	ctx.card_is_attack = card.card_type == CardData.CardType.ATTACK
 	ctx.attack_bonus_taken = false
+	ctx.mark_bonus_paid.clear()
 	if ctx.card_is_attack and ctx.player.stance != null and not ctx.enemies.is_empty():
 		ctx.pay_stance_attack_cost(Stance.attack_hp_loss(ctx.player.stance))
 	for effect in card.effects:
@@ -66,13 +68,17 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 			resolver.resolve(effect, ctx)
 
 # Whether the rules forbid playing this card right now, whatever its
-# energy: it would apply a once-per-combat status that is already up or
+# energy: it spends a fixed Toll the player doesn't hold (SPEND_TOLL - Come
+# Due), or it would apply a once-per-combat status that is already up or
 # has already fired this fight (Refuse the End). Read by BattleController.
-# request_play() and by the hand, which fades the card - so a spent copy
-# shows it can't be played rather than being taken and doing nothing.
+# request_play() and by the hand, which fades the card - so a copy that
+# can't be paid for shows it rather than being taken and doing nothing.
 static func card_blocked(card: CardData, player: Combatant) -> bool:
 	if card == null or player == null:
 		return false
+	for effect in card.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.SPEND_TOLL and player.toll < effect.toll_cost:
+			return true
 	for effect in card.effects:
 		if effect == null or effect.effect_type != CardEffect.EffectType.APPLY_STATUS:
 			continue

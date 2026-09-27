@@ -20,7 +20,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	# scales outgoing damage scales the whole blow, bonus included, rather
 	# than only the part the card authored. Taken once per card: a second
 	# damage effect on the same Attack gets 0 (take_attack_bonus()).
-	var amount: int = Status.apply_modifiers(base + ctx.take_attack_bonus(), ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+	var blow: int = base + ctx.take_attack_bonus()
 
 	var targets: Array[Combatant] = []
 	if effect.target_scope == CardEffect.TargetScope.ALL_ENEMIES:
@@ -29,6 +29,10 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 		targets = [ctx.target]
 
 	for enemy in targets:
+		# A mark on this enemy (Come Due) adds to the blow against it
+		# alone, once per card - so it's per target, and like the attack
+		# bonus it goes in before the modifiers.
+		var amount: int = Status.apply_modifiers(blow + ctx.take_mark_bonus(enemy), ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 		var incoming: int = Status.apply_modifiers(amount, enemy.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
 		var result := DamagePipeline.resolve(incoming, enemy)
 		if enemy.hp <= 0:

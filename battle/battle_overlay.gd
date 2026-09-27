@@ -314,7 +314,8 @@ func _on_stance_changed(stance: Stance) -> void:
 # is the only place that knows a Stance/Status has a display_name or a
 # stack count, so HPBar can stay a thing that draws text it is handed.
 # Names are shown as authored, in title case (Self-Eater, Last Resort),
-# with the stack count after them once there is more than one.
+# with the stack count after them once there is more than one - or the
+# charges left, for a status that counts them (Status.label()).
 func _refresh_standing_row() -> void:
 	var stance: Stance = battle_controller.player.stance
 	var stance_text: String = ""
@@ -326,10 +327,7 @@ func _refresh_standing_row() -> void:
 	for active: Status in battle_controller.player.statuses:
 		if active.data == null:
 			continue
-		var text: String = active.data.display_name
-		if active.stack_count > 1:
-			text += " ×%d" % active.stack_count
-		status_texts.append(text)
+		status_texts.append(active.label())
 	_field_hp_bar.set_standing_row(stance_text, status_texts)
 
 # Block moved somewhere (a card, a turn start, an enemy's own guard) -
@@ -341,6 +339,7 @@ func _on_status_changed() -> void:
 		var status: EnemyStatus = _enemy_statuses[enemy]
 		if status != null and is_instance_valid(status):
 			status.set_block(battle_controller.get_enemy_block(enemy))
+			status.set_status_row(battle_controller.get_enemy_status_labels(enemy))
 
 func _on_turn_phase_changed(player_turn: bool) -> void:
 	_player_turn = player_turn

@@ -535,6 +535,20 @@ func get_enemy_block(enemy: FieldEnemy) -> int:
 		return 0
 	return combatant.block
 
+# This enemy's statuses as its EnemyStatus row reads them (Status.label())
+# - read by BattleOverlay on status_changed. Empty for a dead/unknown
+# enemy: whatever it held went with it.
+func get_enemy_status_labels(enemy: FieldEnemy) -> PackedStringArray:
+	var labels := PackedStringArray()
+	var combatant: Combatant = _combatants.get(enemy)
+	if combatant == null or combatant.hp <= 0:
+		return labels
+	for active: Status in combatant.statuses:
+		var text: String = active.label()
+		if not text.is_empty():
+			labels.append(text)
+	return labels
+
 # The living enemies a card can reach - not the buried (Combatant.
 # buried). What every card's context carries as ctx.enemies.
 func _hittable_enemy_combatants() -> Array[Combatant]:

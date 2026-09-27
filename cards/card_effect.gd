@@ -15,7 +15,7 @@ enum EffectType {
 	TOLL_RETALIATE, SELF_DAMAGE_TOLL, TOLL_THRESHOLD_DAMAGE, DAMAGE_ALL,
 	APPLY_STATUS, FIRST_CARD_DAMAGE, TOLL_FRACTION_DAMAGE_ALL,
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
-	APPLY_STANCE, TOLL_HEAL,
+	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL,
 }
 
 # When the effect resolves, or with what number. Three modes, told apart
@@ -69,7 +69,10 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 @export var target_scope: TargetScope = TargetScope.TARGET
 
 @export var toll_cost: int = 0
-# Fixed Toll spent by TOLL_BLOCK/TOLL_RETALIATE. Unused by every other type.
+# Fixed Toll spent by TOLL_BLOCK/TOLL_RETALIATE, and by SPEND_TOLL - which
+# also REQUIRES it: a card carrying a SPEND_TOLL can't be played on less
+# (EffectResolver.card_blocked()). TOLL_HEAL reads it as a cap. Unused by
+# every other type.
 
 @export var stance_data: StanceData = null
 # Read by APPLY_STANCE only. The stance a STANCE card takes - or deepens,

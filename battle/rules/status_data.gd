@@ -18,13 +18,16 @@ enum ModifierOperation { ADD, MULTIPLY }
 # to the running damage total; MULTIPLY treats magnitude as a PERCENTAGE
 # (-50 means "half", 50 means "+50%") rather than a raw multiplier.
 
-enum StackRule { REFRESH_DURATION, ADD_MAGNITUDE, REFRESH_AND_ADD, IGNORE }
+enum StackRule { REFRESH_DURATION, ADD_MAGNITUDE, REFRESH_AND_ADD, IGNORE, RESET }
 # What happens when this exact StatusData is applied again while already
 # active on the same combatant - see Status.apply_stack(). REFRESH_
 # DURATION resets the clock only; ADD_MAGNITUDE/REFRESH_AND_ADD also grow
 # magnitude; IGNORE does nothing at all to magnitude or duration (the
 # existing instance just keeps running), though stack_count still climbs
-# regardless of which rule is chosen.
+# for those four. RESET puts the status back as if freshly applied -
+# default magnitude and duration, one stack - a refresh, never a pile-up
+# (Come Due's charges). Appended: an inserted value would rewrite every
+# .tres that stores one of these as an integer.
 
 const DURATION_UNTIL_REMOVED := -1
 # A status with this exact duration never expires on its own - something
@@ -71,6 +74,16 @@ const DURATION_UNTIL_TRIGGERED := -2
 @export var attack_damage_bonus: int = 0
 # The bonus above only while the player is Critical.
 @export var bonus_requires_critical: bool = false
+
+# Extra damage each of the player's Attack cards deals to this status's
+# HOLDER - an enemy - while it's up (Come Due). Once per Attack card, like
+# the attack bonus (EffectContext.take_mark_bonus()), and to the holder
+# alone: an all-enemies Attack pays it to this enemy, not its neighbours.
+# Each Attack card that lands on the holder spends one charge - magnitude
+# is the charge count, default_magnitude to start - and the status is
+# gone at 0. Pair it with DURATION_UNTIL_REMOVED so no turn takes it
+# first. 0 = none.
+@export var attack_bonus_against_holder: int = 0
 
 # Removed from its holder once the holder's own ATTACK has resolved -
 # after every hit of it, so a status that softens that attack (Braced, on

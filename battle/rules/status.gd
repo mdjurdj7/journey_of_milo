@@ -17,6 +17,10 @@ func _init(status_data: StatusData) -> void:
 func apply_stack() -> void:
 	stack_count += 1
 	match data.stack_rule:
+		StatusData.StackRule.RESET:
+			stack_count = 1
+			magnitude = data.default_magnitude
+			turns_remaining = data.default_duration_turns
 		StatusData.StackRule.REFRESH_DURATION:
 			turns_remaining = data.default_duration_turns
 		StatusData.StackRule.ADD_MAGNITUDE:
@@ -30,6 +34,23 @@ func apply_stack() -> void:
 func tick_duration() -> void:
 	if turns_remaining > 0:
 		turns_remaining -= 1
+
+# Whether magnitude counts charges (StatusData.attack_bonus_against_holder)
+# rather than a size.
+func has_charges() -> bool:
+	return data != null and data.attack_bonus_against_holder > 0
+
+# How this status reads in a standing row: its name, then its charges
+# when it counts them - down to "×1", since the last one still matters -
+# or its stacks once there is more than one.
+func label() -> String:
+	if data == null:
+		return ""
+	if has_charges():
+		return "%s ×%d" % [data.display_name, magnitude]
+	if stack_count > 1:
+		return "%s ×%d" % [data.display_name, stack_count]
+	return data.display_name
 
 func is_expired() -> bool:
 	if turns_remaining == StatusData.DURATION_UNTIL_REMOVED or turns_remaining == StatusData.DURATION_UNTIL_TRIGGERED:
@@ -95,6 +116,21 @@ static func attack_bonus(statuses: Array[Status], critical: bool) -> int:
 		if active.data.bonus_requires_critical and not critical:
 			continue
 		total += active.data.attack_damage_bonus * active.stack_count
+	return total
+
+# One Attack card is landing on the holder of `statuses`: the extra damage
+# every mark on it grants (StatusData.attack_bonus_against_holder), each
+# spending one charge and leaving once it has none. Called at most once
+# per Attack card per enemy - EffectContext.take_mark_bonus() keeps that.
+static func spend_mark_bonus(statuses: Array[Status]) -> int:
+	var total: int = 0
+	for active in statuses.duplicate():
+		if not active.has_charges() or active.magnitude <= 0:
+			continue
+		total += active.data.attack_bonus_against_holder
+		active.magnitude -= 1
+		if active.magnitude <= 0:
+			statuses.erase(active)
 	return total
 
 # The status that would stop a lethal enemy hit on a player who was

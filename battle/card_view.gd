@@ -910,7 +910,7 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 			continue
 		match effect.effect_type:
 			CardEffect.EffectType.TOLL_DAMAGE, CardEffect.EffectType.TOLL_BLOCK, CardEffect.EffectType.TOLL_RETALIATE, \
-			CardEffect.EffectType.SELF_DAMAGE_TOLL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_FRACTION_DAMAGE_ALL, 			CardEffect.EffectType.TOLL_HEAL:
+			CardEffect.EffectType.SELF_DAMAGE_TOLL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_FRACTION_DAMAGE_ALL, 			CardEffect.EffectType.TOLL_HEAL, CardEffect.EffectType.SPEND_TOLL:
 				return KeylineType.TOLL
 	# Read off card_type, not off the effect: a stance is a stance because
 	# of what it LEAVES BEHIND, and the effect that applies it is the same

@@ -86,6 +86,18 @@ class_name EnemyStatus
 @export_range(0.0, 1.0) var block_readout_alpha: float = 0.7
 @export var block_hp_gap_px: float = 16.0
 
+@export_group("Status Row")
+# The enemy's statuses (Braced, Come Due ×3), left to right under the bar
+# in battle - the same row the player's HPBar draws under its own, in the
+# same type, handed ready-made labels (Status.label()). Drawn below the
+# readout without growing it, so the bar never moves on the enemy when a
+# status comes or goes. Nothing at all when empty.
+@export var status_row_font_size_px: int = 10
+@export_range(0.0, 1.0) var status_row_tracking_em: float = 0.16
+@export_range(0.0, 1.0) var status_row_alpha: float = 0.7
+@export var status_row_gap_px: float = 6.0
+@export var status_row_item_gap_px: float = 14.0
+
 @export_group("Distance Scale")
 @export var min_scale: float = 0.6
 @export var max_scale: float = 1.0
@@ -105,6 +117,9 @@ var _visibility: HoverFadeVisibility = null
 # Cached theme ink (see refresh_style()).
 var _ink: Color = Color.BLACK
 var _name_font_tracked: Font = null
+var _status_font_tracked: Font = null
+# The status row's labels - see set_status_row().
+var _status_texts: PackedStringArray = PackedStringArray()
 
 # 0 = field style, 1 = battle style - see HPBar._battle_blend's own doc,
 # same mechanism.
@@ -270,6 +285,19 @@ func _draw() -> void:
 		var block_top: float = bar_top - block_gap_px - block_thickness_px
 		draw_rect(Rect2(left, block_top, length, block_thickness_px), ink)
 
+	_draw_status_row(bar_top + battle_bar_height + status_row_gap_px, left)
+
+func _draw_status_row(top: float, left: float) -> void:
+	if _status_texts.is_empty() or _status_font_tracked == null:
+		return
+	var color: Color = _ink
+	color.a = status_row_alpha * _battle_blend
+	var baseline: float = top + _status_font_tracked.get_ascent(status_row_font_size_px)
+	var x: float = left
+	for text in _status_texts:
+		x += InkType.draw_run(self, _status_font_tracked, text, Vector2(x, baseline), status_row_font_size_px, color)
+		x += status_row_item_gap_px
+
 func _enemy_name() -> String:
 	if target == null or not is_instance_valid(target) or target.enemy_data == null:
 		return ""
@@ -303,6 +331,7 @@ func refresh_style() -> void:
 
 	_ink = get_theme_color("ink", "Battle")
 	_name_font_tracked = InkType.tracked(name_font, battle_name_size_px, battle_name_tracking_em)
+	_status_font_tracked = InkType.tracked(InkType.text_bold_font(), status_row_font_size_px, status_row_tracking_em)
 	queue_redraw()
 
 func _build_bar_style(color: Color) -> StyleBoxFlat:
@@ -351,6 +380,13 @@ func set_block(block: int) -> void:
 	_block = maxi(block, 0)
 	_apply_layout()
 
+# Called by BattleOverlay alongside set_block(), with every active status's
+# label in the order the rules hold them (empty clears the row) - battle-
+# only, like the block.
+func set_status_row(texts: PackedStringArray) -> void:
+	_status_texts = texts
+	queue_redraw()
+
 # Called by BattleOverlay when this enemy's fight starts/ends (see its own
 # _create_enemy_statuses()/_finish_battle()) - bypasses the field hover/
 # hold/low-hp visibility rules entirely while true (see HoverFadeVisibility
@@ -364,6 +400,7 @@ func enter_battle(duration: float) -> void:
 func exit_battle(duration: float) -> void:
 	_in_battle = false
 	_block = 0
+	_status_texts = PackedStringArray()
 	_tween_battle_blend(0.0, duration)
 
 func _tween_battle_blend(target_blend: float, duration: float) -> void:
