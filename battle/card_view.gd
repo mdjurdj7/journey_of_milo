@@ -92,6 +92,9 @@ const TOKEN_TOLL := "{toll}"
 # What a TOLL_HEAL would heal for at that Toll: half of whatever it can
 # actually spend, capped. Debt Forgiven's own preview.
 const TOKEN_TOLL_HEAL := "{toll_heal}"
+# The blank border Godot's glyph rasteriser puts round every glyph
+# bitmap - an engine fact, not a tunable. See _cap_top().
+const GLYPH_RECT_MARGIN_PX := 1.0
 
 @export var card_size: Vector2 = Vector2(200.0, 280.0)
 
@@ -208,7 +211,13 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @export var art_field_size: Vector2 = Vector2(176.0, 146.0)
 @export var field_rules_gap: float = 8.0
 @export var rules_footer_gap: float = 8.0
-@export var footer_rule_gap: float = 6.0
+# The footer is placed by INK, like the header: the type label's
+# baseline sits footer_bottom_ink_px above the face's bottom edge (its
+# small caps have no descenders, so that is the ink's bottom), and the
+# rule's lower edge footer_rule_ink_gap_px above the caps' tops
+# (_cap_top()), rounded to a whole pixel.
+@export var footer_rule_ink_gap_px: float = 4.0
+@export var footer_bottom_ink_px: float = 6.0
 @export var glyph_size_px: float = 36.0
 @export var glyph_line_width_px: float = 3.5
 # The glyph's faint secondary stroke (the second chevron, the shield's
@@ -1042,7 +1051,7 @@ func _apply_style() -> void:
 	if rules_font_bold != null:
 		type_label.add_theme_font_override("font", _spaced_bold(type_label_font_size_px, type_label_letter_spacing_em))
 	type_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	type_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	type_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 
 func _apply_rules_font_size(font_size: int) -> void:
 	rules_text.add_theme_font_size_override("normal_font_size", font_size)
@@ -1115,7 +1124,9 @@ func _apply_layout() -> void:
 	var type_height: float = _line_height(type_label, type_label_font_size_px)
 	var art_top: float = header_height + header_field_gap
 	var rules_top: float = art_top + art_field_size.y + field_rules_gap
-	var rules_bottom: float = card_size.y - outer_margin - type_height - footer_rule_gap - 1.0 - rules_footer_gap
+	var type_baseline: float = card_size.y - footer_bottom_ink_px
+	var rule_top: float = roundf(type_baseline + _cap_top(type_label, type_label_font_size_px) - footer_rule_ink_gap_px - 1.0)
+	var rules_bottom: float = rule_top - rules_footer_gap
 	var available: float = rules_bottom - rules_top
 	var font_size: int = 15
 	var lines: int = 1
@@ -1182,10 +1193,11 @@ func _apply_layout() -> void:
 	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
 	name_label.clip_text = true
 
-	# Footer: type label at the bottom of the face, the rule above it.
-	type_label.position = Vector2(outer_margin, face.y - outer_margin - type_height)
+	# Footer: type label at the bottom of the face, the rule above it -
+	# both moved down with the face when it grows.
+	type_label.position = Vector2(outer_margin, _top_for_baseline(type_label, type_label_font_size_px, type_baseline + growth))
 	type_label.size = Vector2(card_size.x - outer_margin * 2.0, type_height)
-	footer_rule.position = Vector2(outer_margin, type_label.position.y - footer_rule_gap - 1.0)
+	footer_rule.position = Vector2(outer_margin, rule_top + growth)
 	footer_rule.size = Vector2(card_size.x - outer_margin * 2.0, 1.0)
 
 	art_field.position = Vector2(outer_margin, art_top)
@@ -1212,6 +1224,21 @@ func _top_for_baseline(label: Label, font_size: int, baseline: float) -> float:
 	if font == null:
 		return baseline - float(font_size)
 	return baseline - font.get_ascent(font_size)
+
+# How far above the baseline this label's font inks a flat capital
+# (negative = up), from the glyph itself - the line box's ascent
+# overstates it. An "H", not the label's own text, so every type's
+# footer lands on the same pixel whatever its round letters overshoot.
+# The glyph's offset is its bitmap's, which the rasteriser pads by
+# GLYPH_RECT_MARGIN_PX on every side; the ink starts inside that.
+func _cap_top(label: Label, font_size: int) -> float:
+	var font: Font = label.get_theme_font("font")
+	if font == null:
+		return -float(font_size) * 0.7
+	var ts: TextServer = TextServerManager.get_primary_interface()
+	var rid: RID = font.get_rids()[0]
+	var glyph: int = ts.font_get_glyph_index(rid, font_size, "H".unicode_at(0), 0)
+	return ts.font_get_glyph_offset(rid, Vector2i(font_size, 0), glyph).y + GLYPH_RECT_MARGIN_PX
 
 # One line's real height for this label's font at this size, rounded up
 # so the Label always fits a whole line.

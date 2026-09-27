@@ -21,7 +21,7 @@ const CASES := 12
 const SHRUNK_RULES: Dictionary = {
 	"Last Resort": 14,
 	"Last Wager": 13,
-	"Refuse the End": 12,
+	"Refuse the End": 13,
 }
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
@@ -258,9 +258,13 @@ func _check_face_layout() -> void:
 			_expect(view.header_baseline_px + _ink_top(view.cost_label, view.cost_font_size_px) >= view.keyline.position.y + view.keyline.size.y, "%s's numeral clears the keyline" % card.card_name)
 
 	var footer_y: float = view.footer_rule.position.y
+	# The footer by ink: the type label's baseline 6 px off the bottom
+	# edge, the rule 4 px clear above its caps.
+	_expect_eq(footer_y, 264.0, "The footer rule sits at y 264")
+	_expect_eq(view.type_label.position.y + view.type_label.get_theme_font("font").get_ascent(view.type_label_font_size_px), 274.0, "...the type label's baseline at y 274")
 	var long_card := CardData.new()
 	long_card.card_name = "Probe Long"
-	long_card.description = "Lose 2 HP. Draw 1. Gain 5 Toll. Deal 6 damage to all enemies. Gain 8 block. Heal 3 HP. If this kills, gain 1 energy."
+	long_card.description = "Lose 2 HP. Draw 1. Gain 5 Toll. Deal 6 damage to all enemies. Gain 8 block. Heal 3 HP. If this kills, gain 1 energy. Exhaust a card in your hand."
 	view.set_card_data(long_card)
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), view.rules_font_sizes[view.rules_font_sizes.size() - 1], "Overlong text sits at the floor size")
 	_expect(view.size.y > view.card_size.y, "...and the card grows (%s)" % str(view.size))
