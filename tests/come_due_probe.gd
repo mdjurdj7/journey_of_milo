@@ -50,7 +50,7 @@ func _check_card_data() -> void:
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "...is Uncommon")
 	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
-	_expect(card.art == null, "...has no art yet (the glyph stands in)")
+	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Come Due.png", "...carries its art")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...and its face reads TOLL")
 	_completed += 1
 

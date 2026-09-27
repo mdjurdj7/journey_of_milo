@@ -27,8 +27,8 @@ const SHRUNK_RULES: Dictionary = {
 }
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
-# The cards with art, by file - the starters and Carve. Every other card
-# has none yet.
+# The cards with art, by file - the starters, Carve and Come Due. Every
+# other card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
 	"bite_down": "res://cards/art/Wanderer/Bite Down.png",
@@ -36,6 +36,7 @@ const CARD_ART: Dictionary = {
 	"reckoning": "res://cards/art/Wanderer/Reckoning.png",
 	"down_payment": "res://cards/art/Wanderer/Down Payment.png",
 	"carve": "res://cards/art/Wanderer/Carve.png",
+	"come_due": "res://cards/art/Wanderer/Come Due.png",
 }
 
 var _failures: int = 0
