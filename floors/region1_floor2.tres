@@ -15,6 +15,7 @@
 [ext_resource type="Resource" path="res://cards/pools/belongings_pool.tres" id="10_belongings_pool"]
 [ext_resource type="PackedScene" path="res://field/bundle_prop.tscn" id="14_bundle"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/siltjaw.tres" id="16_siltjaw"]
+[ext_resource type="PackedScene" path="res://field/rock_shelf.tscn" id="19_rock_shelf"]
 [ext_resource type="Texture2D" uid="uid://nkw6gcc8t1ld" path="res://assets/field/masks/Map3_rock_x1.25_shelf.png" id="17_map3_rock"]
 
 [sub_resource type="Resource" id="FloorEnemy_sputter"]
@@ -76,6 +77,15 @@ scene = ExtResource("14_bundle")
 position = Vector3(-17.875, 0, -18.375)
 pool = ExtResource("10_belongings_pool")
 
+[sub_resource type="Resource" id="FloorProp_rock_shelf"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("19_rock_shelf")
+position = Vector3(-4.586, 0, -24.354)
+overrides = {
+"low_side": Vector2(1, 0),
+"outline": PackedVector2Array(3.05, 0, 3, 1.44, 1.75, 2.2, 0.55, 2.41, -0.61, 2.67, -1.45, 1.82, -2.06, 0.99, -2.96, 0, -3.27, -1.58, -2.44, -3.06, -0.78, -3.41, 0.62, -2.72, 1.64, -2.05, 2.61, -1.26)
+}
+
 [sub_resource type="Resource" id="FloorProp_alcove_cache"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("9_belongings_cache")
@@ -96,9 +106,8 @@ caustic_strength = 0.12
 relief_extent = Vector2(125, 88)
 relief_subdivisions = Vector2i(356, 251)
 enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_crab_dragonfly"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3"), SubResource("FloorEnemy_siltjaw")])
-props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_bundle"), SubResource("FloorProp_alcove_cache")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_bundle"), SubResource("FloorProp_alcove_cache"), SubResource("FloorProp_rock_shelf")])
 patrols = Array[ExtResource("12_floor_patrol")]([SubResource("FloorPatrol_island")])
-ledges = Array[PackedVector2Array]([PackedVector2Array(-5.538, -25.350, -5.664, -25.000, -5.679, -24.650, -5.620, -24.300, -5.547, -23.950, -5.400, -23.631, -5.100, -23.359, -4.904, -23.050, -4.806, -22.700, -4.781, -22.350, -4.754, -22.000, -4.565, -21.650, -4.322, -21.350, -4.000, -21.182, -3.650, -21.281, -3.359, -21.500, -3.058, -21.750, -2.800, -22.039, -2.737, -22.400, -2.741, -22.750, -2.737, -22.850)])
 exit_kind = 1
 gate_distance_beyond_enemy = 7.5
 wear_path_mid_offset = 1.875

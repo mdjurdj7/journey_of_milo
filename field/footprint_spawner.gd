@@ -196,12 +196,21 @@ func _spawn_footprint(bone_world: Vector3) -> void:
 	footfall.emit(bone_world)
 
 	var local_xz: Vector3 = _ground.to_local(Vector3(bone_world.x, 0.0, bone_world.z))
-	var wetness: float = _ground.get_wetness_at(Vector2(local_xz.x, local_xz.z))
-	if wetness >= water_wetness_threshold:
-		return # standing water - nothing solid to leave a mark in
-
-	var height: float = _ground.get_height_at(Vector2(local_xz.x, local_xz.z))
-	var normal: Vector3 = _sample_normal(local_xz.x, local_xz.z)
+	# On a RockShelf the print lies on its plate - dry, whatever the sand
+	# under the stone is doing.
+	var shelf: RockShelf = _ground.get_walk_surface_at(Vector2(local_xz.x, local_xz.z))
+	var wetness: float = 0.0
+	var height: float
+	var normal: Vector3
+	if shelf != null:
+		height = shelf.get_top_height_at(Vector2(bone_world.x, bone_world.z))
+		normal = shelf.get_top_normal_at(Vector2(bone_world.x, bone_world.z))
+	else:
+		wetness = _ground.get_wetness_at(Vector2(local_xz.x, local_xz.z))
+		if wetness >= water_wetness_threshold:
+			return # standing water - nothing solid to leave a mark in
+		height = _ground.get_height_at(Vector2(local_xz.x, local_xz.z))
+		normal = _sample_normal(local_xz.x, local_xz.z)
 	var facing: Vector3 = -_wanderer.global_transform.basis.z
 
 	var slot: int = _acquire_pool_slot()

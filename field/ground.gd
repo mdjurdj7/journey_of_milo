@@ -1374,6 +1374,37 @@ func _shader_channel_delta(world_xz: Vector2) -> float:
 		return 0.0
 	return channel.depth * factor * _channel_bar_mask(channel, world_xz) * (float(_channel_live_amounts[0]) - channel.amount) * _relief_edge_fade_factor(world_xz)
 
+# What he stands on at a (local) XZ: the highest walk surface standing
+# over the sand there (a RockShelf - RockShelf.WALK_SURFACE_GROUP), or
+# null when it's the sand itself. His footprints read its plate.
+func get_walk_surface_at(local_xz: Vector2) -> RockShelf:
+	if not is_inside_tree():
+		return null
+	var world: Vector3 = to_global(Vector3(local_xz.x, 0.0, local_xz.y))
+	var best: RockShelf = null
+	var best_height: float = -INF
+	for node in get_tree().get_nodes_in_group(RockShelf.WALK_SURFACE_GROUP):
+		var shelf := node as RockShelf
+		if shelf == null:
+			continue
+		var height: float = shelf.get_top_height_at(Vector2(world.x, world.z))
+		if height > best_height:
+			best_height = height
+			best = shelf
+	return best
+
+# The height, local, of what he stands on at a (local) XZ: the drawn sand
+# (get_visible_height_at()) or a walk surface over it, whichever is
+# higher. What the Wanderer's ground hold compares his feet against.
+func get_walk_height_at(local_xz: Vector2) -> float:
+	var height: float = get_visible_height_at(local_xz)
+	var shelf: RockShelf = get_walk_surface_at(local_xz)
+	if shelf == null:
+		return height
+	var world: Vector3 = to_global(Vector3(local_xz.x, 0.0, local_xz.y))
+	var top: float = to_local(Vector3(world.x, shelf.get_top_height_at(Vector2(world.x, world.z)), world.z)).y
+	return maxf(height, top)
+
 # The height of the surface as DRAWN at a world XZ: the relief mesh's own
 # triangles (the baked heights, interpolated exactly as the mesh is
 # triangulated - see _build_relief_indices()) plus the channel delta the
