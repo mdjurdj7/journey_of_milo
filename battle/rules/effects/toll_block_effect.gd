@@ -7,7 +7,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	# Clamped: spending more Toll than is held used to leave it negative,
 	# which then read as a debt every later Toll effect had to climb out
 	# of. Spend what there is.
-	ctx.player.toll = maxi(ctx.player.toll - effect.toll_cost, 0)
+	ctx.spend_toll(effect.toll_cost)
 	var block_gained := effect.value
 	if ctx.player.hp < ctx.player.max_hp / 2.0:
 		block_gained *= 2

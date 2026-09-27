@@ -9,5 +9,5 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 		return
 	if Status.find_in(ctx.player.statuses, effect.status_data) != null:
 		return
-	ctx.player.toll -= effect.toll_cost
+	ctx.spend_toll(effect.toll_cost)
 	Status.apply_to(ctx.player.statuses, effect.status_data)

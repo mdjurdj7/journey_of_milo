@@ -8,8 +8,7 @@ class_name TollFractionDamageAllEffect
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	if ctx.enemies.is_empty():
 		return
-	var spent: int = floori(ctx.player.toll * effect.toll_fraction)
-	ctx.player.toll -= spent
+	var spent: int = ctx.spend_toll(floori(ctx.player.toll * effect.toll_fraction))
 	if spent <= 0:
 		return
 	var amount: int = Status.apply_modifiers(spent, ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)

@@ -11,8 +11,7 @@ class_name TollDamageEffect
 # Dying Light) lands on it once, as on any damage effect, before the
 # status modifiers - with no Toll at all the blow is the bonus alone.
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
-	var consumed := ctx.player.toll
-	ctx.player.toll = 0
+	var consumed: int = ctx.spend_toll(ctx.player.toll)
 	if ctx.target == null:
 		return
 	# A mark on the target (Come Due) adds to the blow, once per card, as

@@ -30,6 +30,9 @@ var card_is_attack: bool = false
 # Whether this card's attack bonus has been handed out already - see
 # take_attack_bonus(). Cleared per card by resolve_card().
 var attack_bonus_taken: bool = false
+# Whether this card has actually spent Toll (spend_toll()) - what hurries
+# a countdown, once per card. Cleared per card by resolve_card().
+var toll_spent_this_card: bool = false
 # The enemies whose mark this card has already been paid (take_mark_
 # bonus()). Cleared per card by resolve_card().
 var mark_bonus_paid: Array[Combatant] = []
@@ -68,6 +71,19 @@ func take_attack_bonus() -> int:
 		return 0
 	attack_bonus_taken = true
 	return AttackBonus.for_player(player, player.hp)
+
+# Every Toll a card spends goes through here: at most what is held, so
+# Toll never goes below 0, and anything spent at all marks the card as
+# having spent Toll (toll_spent_this_card - Sentence's hurry, once per
+# card however much). Returns what was actually spent. Gaining Toll, or
+# losing it any other way (the floor's reset), never comes here.
+func spend_toll(amount: int) -> int:
+	var spent: int = clampi(amount, 0, maxi(player.toll, 0))
+	if spent <= 0:
+		return 0
+	player.toll -= spent
+	toll_spent_this_card = true
+	return spent
 
 # The extra damage this Attack card deals to `enemy` for the marks it
 # carries (StatusData.attack_bonus_against_holder - Come Due), ONCE per

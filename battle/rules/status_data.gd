@@ -115,6 +115,20 @@ const DURATION_UNTIL_TRIGGERED := -2
 # while already Critical, it gives way at once, at the end of that card.
 @export var grants_on_critical: StatusData = null
 
+# A countdown (Sentence): turns_remaining counts the turns left - ticked
+# on its holder's turn like any duration - and when it reaches 0 the
+# status goes off, dealing this to its holder and leaving (Status.
+# resolve_countdowns()). Not an Attack and not a card's blow: no attack
+# bonus, no mark, no Grace - only what softens any damage the holder takes
+# (its incoming modifiers, its block). Shown as "Name N", the turns left.
+# 0 = not a countdown.
+@export var countdown_damage: int = 0
+# A countdown that spending Toll hurries: each card that actually spends
+# Toll takes one turn off it, whatever the amount (EffectContext.spend_
+# toll(), Status.advance_on_toll_spend()) - and at 0 it goes off then and
+# there, in the player's turn.
+@export var toll_spend_advances: bool = false
+
 # The Refuse the End rule: an ENEMY hit that would take the player to 0
 # HP while they're Critical leaves them at 1 instead, and removes this
 # status (EnemyTurn.take_turn()). Self-inflicted loss never reaches it -

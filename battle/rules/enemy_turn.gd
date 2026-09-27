@@ -45,11 +45,15 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false}
+	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0}
 
 	Status.tick_all(combatant.statuses, func(amount: int) -> void:
 		combatant.hp = max(combatant.hp - amount, 0)
 	)
+	# The tick just took a turn off every countdown (Sentence): one that
+	# ran out goes off now, before this enemy acts - and if it kills, the
+	# turn ends here. The HP it took is the controller's to report.
+	result["countdown_damage"] = Status.resolve_countdowns(combatant)
 
 	if combatant.hp <= 0 or data.intents.is_empty():
 		return result

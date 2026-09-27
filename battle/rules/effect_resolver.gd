@@ -51,6 +51,7 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	ctx.card_is_attack = card.card_type == CardData.CardType.ATTACK
 	ctx.attack_bonus_taken = false
 	ctx.mark_bonus_paid.clear()
+	ctx.toll_spent_this_card = false
 	if ctx.card_is_attack and ctx.player.stance != null and not ctx.enemies.is_empty():
 		ctx.pay_stance_attack_cost(Stance.attack_hp_loss(ctx.player.stance))
 	for effect in card.effects:
@@ -66,6 +67,16 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 		var resolver: Object = _get_resolver(effect.effect_type)
 		if resolver != null:
 			resolver.resolve(effect, ctx)
+	# After the whole card, once however much it spent: Toll spent hurries
+	# every countdown that listens for it (Sentence), and one that reaches
+	# 0 goes off now, in the player's turn - reported as damage, never as
+	# the card's own blow.
+	if ctx.toll_spent_this_card:
+		for enemy in ctx.enemies:
+			Status.advance_on_toll_spend(enemy)
+			var taken: int = Status.resolve_countdowns(enemy)
+			if taken > 0:
+				ctx.report_damage(enemy, taken, "status")
 	# After the whole card: its own HP cost (self-damage, the stance's
 	# price) may have made the player Critical, and a status waiting for
 	# that (No Further) gives way now - as does one this card just applied

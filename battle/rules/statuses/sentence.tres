@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "sentence"
+display_name = "Sentence"
+description = "Deals 40 damage at 0. Spending Toll reduces the countdown by 1."
+category = 2
+default_duration_turns = 4
+stack_rule = 4
+countdown_damage = 40
+toll_spend_advances = true

@@ -370,7 +370,9 @@ func _run_enemy_turn() -> void:
 	toll_changed.emit(player.toll)
 
 func _run_sequential_turn() -> void:
-	for enemy in enemies:
+	# A copy: a countdown that goes off (Sentence) can kill an enemy mid-
+	# loop, and _drop_enemy() takes it out of `enemies`.
+	for enemy in enemies.duplicate():
 		var combatant: Combatant = _combatants.get(enemy)
 		if combatant == null or combatant.hp <= 0:
 			continue
@@ -379,6 +381,11 @@ func _run_sequential_turn() -> void:
 			continue
 		enemy_acting.emit(enemy)
 		var result := EnemyTurn.take_turn(combatant, data, player)
+		# Killed by its own countdown before it could act: reported, dropped,
+		# and nothing more of this enemy's turn plays out.
+		if _report_countdown(enemy, combatant, result):
+			status_changed.emit()
+			continue
 		if result["attacked"]:
 			var snap_delay: float = enemy.play_attack_snap(_wanderer)
 			if snap_delay > 0.0:
@@ -410,12 +417,15 @@ func _run_simultaneous_turn() -> void:
 	var acting: Array[FieldEnemy] = []
 	var results: Dictionary = {} # FieldEnemy -> take_turn() result
 	var longest_snap: float = 0.0
-	for enemy in enemies:
+	# A copy, as in _run_sequential_turn(): a countdown can drop an enemy.
+	for enemy in enemies.duplicate():
 		var combatant: Combatant = _combatants.get(enemy)
 		if combatant == null or combatant.hp <= 0 or enemy.enemy_data == null:
 			continue
 		enemy_acting.emit(enemy)
 		results[enemy] = EnemyTurn.take_turn(combatant, enemy.enemy_data, player)
+		if _report_countdown(enemy, combatant, results[enemy]):
+			continue
 		acting.append(enemy)
 		if results[enemy]["attacked"]:
 			longest_snap = maxf(longest_snap, enemy.play_attack_snap(_wanderer))
@@ -429,6 +439,16 @@ func _run_simultaneous_turn() -> void:
 	status_changed.emit()
 	for enemy in acting:
 		enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
+
+# A countdown that went off at the start of this enemy's turn (Sentence -
+# EnemyTurn.take_turn()'s "countdown_damage"), reported as the player's
+# damage but not a card's. True when it killed the enemy, which is then
+# already dropped.
+func _report_countdown(enemy: FieldEnemy, combatant: Combatant, result: Dictionary) -> bool:
+	var taken: int = result.get("countdown_damage", 0)
+	if taken > 0:
+		_report_damage("player", combatant, taken, "status")
+	return combatant.hp <= 0
 
 # The hit as the view hears it, once the lunge has landed: the damage
 # that reached HP, and any Grace it opened.

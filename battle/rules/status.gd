@@ -43,12 +43,20 @@ func tick_duration() -> void:
 func has_charges() -> bool:
 	return data != null and data.default_charges > 0
 
-# How this status reads in a standing row: its name, then its charges
-# when it counts them - down to "×1", since the last one still matters -
-# or its stacks once there is more than one.
+# Whether this status counts down to going off (StatusData.countdown_
+# damage) - its turns_remaining is then the countdown.
+func has_countdown() -> bool:
+	return data != null and data.countdown_damage > 0
+
+# How this status reads in a standing row: its name, then - for a
+# countdown - the turns left ("Sentence 4": a count, not a quantity, so no
+# ×), or its charges when it counts them - down to "×1", since the last
+# one still matters - or its stacks once there is more than one.
 func label() -> String:
 	if data == null:
 		return ""
+	if has_countdown():
+		return "%s %d" % [data.display_name, turns_remaining]
 	if has_charges():
 		return "%s ×%d" % [data.display_name, charges]
 	if stack_count > 1:
@@ -148,6 +156,30 @@ static func consume_after_attack_against(statuses: Array[Status]) -> void:
 			if active.charges > 0:
 				continue
 		statuses.erase(active)
+
+# Every countdown on `holder` that has run out (StatusData.countdown_
+# damage, turns_remaining at 0) goes off: removed, then its damage dealt
+# to the holder through its incoming modifiers and the damage pipeline
+# (block, absorb, HP) - never as an Attack. Returns the HP it took, for
+# the caller to report.
+static func resolve_countdowns(holder: Combatant) -> int:
+	var taken: int = 0
+	for active in holder.statuses.duplicate():
+		if not active.has_countdown() or active.turns_remaining > 0:
+			continue
+		holder.statuses.erase(active)
+		var amount: int = apply_modifiers(active.data.countdown_damage, holder.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
+		taken += DamagePipeline.resolve(amount, holder)["damage_to_hp"]
+	return taken
+
+# The player just spent Toll - once per card, whatever the amount (see
+# EffectContext.spend_toll()): every countdown on `holder` that Toll
+# hurries (StatusData.toll_spend_advances) takes a turn off. What reaches
+# 0 goes off at the caller's resolve_countdowns().
+static func advance_on_toll_spend(holder: Combatant) -> void:
+	for active in holder.statuses:
+		if active.data != null and active.data.toll_spend_advances and active.has_countdown() and active.turns_remaining > 0:
+			active.turns_remaining -= 1
 
 # Every status waiting for its holder to be Critical (StatusData.grants_
 # on_critical - No Further) gives way, if `holder` is Critical now: removed,

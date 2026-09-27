@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RewardPool" load_steps=19 format=3]
+[gd_resource type="Resource" script_class="RewardPool" load_steps=20 format=3]
 
 [ext_resource type="Script" path="res://cards/reward_pool.gd" id="1_reward_pool"]
 [ext_resource type="Resource" path="res://cards/data/carve.tres" id="2_carve"]
@@ -18,10 +18,11 @@
 [ext_resource type="Resource" path="res://cards/data/with_regards.tres" id="16_with_regards"]
 [ext_resource type="Resource" path="res://cards/data/come_due.tres" id="17_come_due"]
 [ext_resource type="Resource" path="res://cards/data/no_further.tres" id="18_no_further"]
+[ext_resource type="Resource" path="res://cards/data/sentence.tres" id="19_sentence"]
 
 [resource]
 script = ExtResource("1_reward_pool")
-entries = Array[ExtResource("2_carve")]([ExtResource("2_carve"), ExtResource("3_endure"), ExtResource("4_hold_fast"), ExtResource("5_reprisal"), ExtResource("6_open_wound"), ExtResource("7_debt_forgiven"), ExtResource("8_self_eater"), ExtResource("9_cornered"), ExtResource("10_unbroken"), ExtResource("11_dying_light"), ExtResource("12_last_wager"), ExtResource("13_refuse_the_end"), ExtResource("14_last_resort"), ExtResource("15_blood_arc"), ExtResource("16_with_regards"), ExtResource("17_come_due"), ExtResource("18_no_further")])
+entries = Array[ExtResource("2_carve")]([ExtResource("2_carve"), ExtResource("3_endure"), ExtResource("4_hold_fast"), ExtResource("5_reprisal"), ExtResource("6_open_wound"), ExtResource("7_debt_forgiven"), ExtResource("8_self_eater"), ExtResource("9_cornered"), ExtResource("10_unbroken"), ExtResource("11_dying_light"), ExtResource("12_last_wager"), ExtResource("13_refuse_the_end"), ExtResource("14_last_resort"), ExtResource("15_blood_arc"), ExtResource("16_with_regards"), ExtResource("17_come_due"), ExtResource("18_no_further"), ExtResource("19_sentence")])
 weights = Array[float]([])
 enemy_bias = {}
 enemy_bias_multiplier = 2.0

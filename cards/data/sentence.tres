@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/sentence.tres" id="3_sentence"]
+[ext_resource type="Texture2D" uid="uid://dkt01wo6ft824" path="res://cards/art/Wanderer/Sentence.png" id="9_art"]
+
+[sub_resource type="Resource" id="CardEffect_apply_status_to_target"]
+script = ExtResource("2_card_effect")
+effect_type = 18
+status_data = ExtResource("3_sentence")
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Sentence"
+rarity = 3
+cost = 2
+card_type = 1
+target_type = 0
+description = "In 4 turns, deal 40 damage.
+Spending Toll reduces the countdown by 1."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status_to_target")])
+art = ExtResource("9_art")
