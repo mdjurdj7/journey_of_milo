@@ -1,0 +1,1308 @@
+{
+  "export_info": {
+    "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards the Wanderer can obtain (flagged pool_class = neutral). card_text is the face as shown outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
+    "generated_from": [
+      "res://cards/data/*.tres",
+      "res://cards/neutral/*.tres",
+      "res://run/data/wanderer.tres",
+      "res://cards/pools/wanderer_pool.tres",
+      "res://cards/pools/belongings_pool.tres",
+      "res://field/keeper.tscn"
+    ],
+    "rarity": "No rarity field exists on CardData; reward rolls are weighted by RewardPool.weights, which are empty (every entry weight 1.0).",
+    "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
+  },
+  "summary": {
+    "total_unique_wanderer_cards": 19,
+    "total_unique_neutral_cards_obtainable_by_wanderer": 3,
+    "starting_deck": {
+      "total_cards": 10,
+      "composition": [
+        {
+          "name": "Slash",
+          "file_path": "res://cards/data/slash.tres",
+          "count": 4
+        },
+        {
+          "name": "Bite Down",
+          "file_path": "res://cards/data/bite_down.tres",
+          "count": 2
+        },
+        {
+          "name": "Brace",
+          "file_path": "res://cards/data/brace.tres",
+          "count": 2
+        },
+        {
+          "name": "Reckoning",
+          "file_path": "res://cards/data/reckoning.tres",
+          "count": 1
+        },
+        {
+          "name": "Down Payment",
+          "file_path": "res://cards/data/down_payment.tres",
+          "count": 1
+        }
+      ]
+    },
+    "reward_pool": {
+      "file_path": "res://cards/pools/wanderer_pool.tres",
+      "count": 13,
+      "cards": [
+        "Carve",
+        "Endure",
+        "Hold Fast",
+        "Reprisal",
+        "Open Wound",
+        "Debt Forgiven",
+        "Self-Eater",
+        "Cornered",
+        "Unbroken",
+        "Dying Light",
+        "Last Wager",
+        "Refuse the End",
+        "Last Resort"
+      ],
+      "weights": "all 1.0 (weights array empty)"
+    },
+    "wanderer_card_types": {
+      "ATTACK": 8,
+      "SKILL": 7,
+      "POWER": 2,
+      "STANCE": 2
+    },
+    "implemented_but_not_obtainable": [
+      "With Regards"
+    ],
+    "keywords_and_mechanics": [
+      {
+        "name": "Energy",
+        "rule": "Per-turn resource that pays a card's cost; 3 per turn."
+      },
+      {
+        "name": "Toll",
+        "rule": "Wanderer resource: 1 Toll per 1 HP of self-inflicted loss (self-damage, status ticks, stance prices), never from enemy hits. Resets each fight. Spent by Reckoning and Debt Forgiven."
+      },
+      {
+        "name": "Grace",
+        "rule": "Wanderer passive: unblocked enemy damage opens recoverable HP (capped by the largest single hit); damage you deal on your next turn takes it back 1:1; lost at the end of that turn. Self-damage never opens it."
+      },
+      {
+        "name": "Critical",
+        "rule": "HP at or below 30% of max HP (CharacterData.critical_hp_fraction). Checked live when an effect resolves."
+      },
+      {
+        "name": "Block",
+        "rule": "Absorbs damage before HP; resets at the start of your turn. Last Resort prevents gaining it."
+      },
+      {
+        "name": "Self-damage",
+        "rule": "Bypasses block and absorb, makes Toll, opens no Grace, can kill (Down Payment's never takes you below 1)."
+      },
+      {
+        "name": "Stance",
+        "rule": "One stance type at a time, for the rest of the fight. Another copy of the held stance adds a stack; a different stance replaces it at 1. Played stance cards leave the deck's rotation for the fight."
+      },
+      {
+        "name": "Power",
+        "rule": "Applies a lasting status for the fight; coexists with the stance and other powers. Played power cards leave the deck's rotation for the fight."
+      },
+      {
+        "name": "Attack bonus",
+        "rule": "Flat extra damage from the stance (x stacks) and Dying Light, paid once per Attack card on its first damage effect - Reckoning included."
+      },
+      {
+        "name": "Braced (enemy)",
+        "rule": "Brace's debuff: the enemy's next attack deals 50% less, every hit halved; gone once that attack resolves, even fully blocked."
+      }
+    ]
+  },
+  "cards": [
+    {
+      "name": "Bite Down",
+      "file_path": "res://cards/data/bite_down.tres",
+      "pool_class": "wanderer",
+      "card_type": "ATTACK",
+      "face_type_label": "STRIKE",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Deal 8 damage.\nLose 2 HP.\n(−2 HP)",
+      "card_text_template": "Deal {damage} damage.\nLose {hp_cost} HP.",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "DAMAGE",
+          "plain_english": "Deal 8 damage to the target."
+        },
+        {
+          "type": "SELF_DAMAGE",
+          "plain_english": "Lose 2 HP: bypasses block and absorb, makes 1 Toll per HP lost, opens no Grace, and can kill."
+        }
+      ],
+      "keywords": [
+        "HP",
+        "Toll"
+      ],
+      "self_hp_cost": 2,
+      "base_damage": 8,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": 2,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "damage",
+          "rule": "Attacks add the attack bonus once per card (held stance, x stacks, plus Dying Light while Critical); Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "default_displayed": "no bonus outside a fight"
+        }
+      ],
+      "battle_animation": "Slash",
+      "upgrade_data": null,
+      "starting_deck_count": 2,
+      "in_reward_pool": false,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "starting_deck"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Brace",
+      "file_path": "res://cards/data/brace.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "GUARD",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Target enemy's next Attack deals 50% less damage.",
+      "card_text_template": "Target enemy's next Attack deals 50% less damage.",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "APPLY_STATUS_TO_TARGET",
+          "plain_english": "Apply Braced to the target enemy: This enemy's next attack deals 50% less damage - every hit of it. Gone once that attack lands, blocked or not; anything else it does first leaves it in place."
+        }
+      ],
+      "keywords": [],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": {
+        "id": "braced",
+        "name": "Braced",
+        "description": "This enemy's next attack deals 50% less damage - every hit of it. Gone once that attack lands, blocked or not; anything else it does first leaves it in place.",
+        "file_path": "res://battle/rules/statuses/braced.tres",
+        "duration": "until triggered",
+        "stack_rule": "REFRESH_DURATION",
+        "modifier": "outgoing multiply -50%",
+        "consumed_by_holders_attack": true,
+        "applied_to": "target enemy"
+      },
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [],
+      "battle_animation": "Brace",
+      "upgrade_data": null,
+      "starting_deck_count": 2,
+      "in_reward_pool": false,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "starting_deck"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Carve",
+      "file_path": "res://cards/data/carve.tres",
+      "pool_class": "wanderer",
+      "card_type": "ATTACK",
+      "face_type_label": "STRIKE",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Deal 6 damage to all enemies.",
+      "card_text_template": "Deal {damage} damage to all enemies.",
+      "targeting": "all_enemies",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "DAMAGE",
+          "plain_english": "Deal 6 damage to all enemies."
+        }
+      ],
+      "keywords": [],
+      "self_hp_cost": 0,
+      "base_damage": 6,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "damage",
+          "rule": "Attacks add the attack bonus once per card (held stance, x stacks, plus Dying Light while Critical); Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "default_displayed": "no bonus outside a fight"
+        }
+      ],
+      "battle_animation": "Slash",
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Cornered",
+      "file_path": "res://cards/data/cornered.tres",
+      "pool_class": "wanderer",
+      "card_type": "ATTACK",
+      "face_type_label": "STRIKE",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Deal 8 damage. Critical: deal 16.",
+      "card_text_template": "{else}Deal {damage} damage.{/else} {if}Critical: deal {alt_damage}.{/if}",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "DAMAGE",
+          "plain_english": "Deal 8 damage to the target; if you are Critical, 16 damage instead."
+        }
+      ],
+      "keywords": [
+        "Critical"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": 8,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": {
+        "rule": "Critical = HP at or below 30% of max HP, checked when the effect resolves (after any HP this card paid first).",
+        "effect": "DAMAGE",
+        "normal_value": 8,
+        "critical_value": 16
+      },
+      "dynamic_values": [
+        {
+          "field": "damage",
+          "rule": "8 normally, 16 while Critical; each half of the face previews its own state in battle.",
+          "default_displayed": "8 / 16"
+        },
+        {
+          "field": "damage",
+          "rule": "Attacks add the attack bonus once per card (held stance, x stacks, plus Dying Light while Critical); Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "default_displayed": "no bonus outside a fight"
+        }
+      ],
+      "battle_animation": "Slash",
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Debt Forgiven",
+      "file_path": "res://cards/data/debt_forgiven.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "TOLL",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Spend up to 10 Toll.\r\nHeal 0 HP.",
+      "card_text_template": "Spend up to 10 Toll.\r\nHeal {toll_heal} HP.",
+      "targeting": "self",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "TOLL_HEAL",
+          "plain_english": "Spend up to 10 Toll; heal half of what was spent (rounded down), at most 5 HP."
+        }
+      ],
+      "keywords": [
+        "Toll",
+        "Heal",
+        "HP"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": "up to 10 Toll",
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "heal",
+          "rule": "Heal = half the Toll actually spent (rounded down), max 5.",
+          "default_displayed": 0
+        }
+      ],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Down Payment",
+      "file_path": "res://cards/data/down_payment.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "TOLL",
+      "energy_cost": 0,
+      "rarity": null,
+      "card_text": "Lose 1 HP.\r\nGain 5 Toll.\n(−1 HP)",
+      "card_text_template": "Lose {hp_cost} HP.\r\nGain 5 Toll.",
+      "targeting": "self",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "SELF_DAMAGE_TOLL",
+          "plain_english": "Lose up to 1 HP (never below 1), then top Toll up so this card makes 5 Toll in total."
+        }
+      ],
+      "keywords": [
+        "Toll",
+        "HP"
+      ],
+      "self_hp_cost": 1,
+      "base_damage": null,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": 5,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 1,
+      "in_reward_pool": false,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "starting_deck"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Dying Light",
+      "file_path": "res://cards/data/dying_light.tres",
+      "pool_class": "wanderer",
+      "card_type": "POWER",
+      "face_type_label": "POWER",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "While Critical, your Attacks deal 3 more damage.",
+      "card_text_template": "While Critical, your Attacks deal 3 more damage.",
+      "targeting": "self",
+      "removal_after_play": "leaves rotation for the rest of the fight (stances and powers always do)",
+      "effects": [
+        {
+          "type": "APPLY_STATUS",
+          "plain_english": "Gain Dying Light: While Critical, your Attacks deal 3 more damage. Stacks."
+        }
+      ],
+      "keywords": [
+        "Critical",
+        "Power"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": "Power: its status stays for the rest of the fight (or until consumed); coexists with the stance and other powers.",
+      "stance_effect": null,
+      "power_effect": {
+        "id": "dying_light",
+        "name": "Dying Light",
+        "description": "While Critical, your Attacks deal 3 more damage. Stacks.",
+        "file_path": "res://battle/rules/statuses/dying_light.tres",
+        "duration": "rest of combat",
+        "stack_rule": "IGNORE",
+        "attack_damage_bonus_per_stack": 3,
+        "bonus_requires_critical": true,
+        "applied_to": "self"
+      },
+      "critical_condition": {
+        "rule": "Bonus applies only while Critical (HP at or below 30% of max), switching on and off live."
+      },
+      "dynamic_values": [],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Endure",
+      "file_path": "res://cards/data/endure.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "GUARD",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Gain 8 block.",
+      "card_text_template": "Gain {block} block.",
+      "targeting": "self",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "BLOCK",
+          "plain_english": "Gain 8 block."
+        }
+      ],
+      "keywords": [
+        "Block"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": 8,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "block",
+          "rule": "Shows and gives 0 while Last Resort is held.",
+          "default_displayed": 8
+        }
+      ],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": true,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool",
+        "belongings_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Hold Fast",
+      "file_path": "res://cards/data/hold_fast.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "GUARD",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Gain 5 block. Lose 2 HP.\r\nDraw 1.\n(−2 HP)",
+      "card_text_template": "Gain {block} block. Lose {hp_cost} HP.\r\nDraw {draw}.",
+      "targeting": "self",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "BLOCK",
+          "plain_english": "Gain 5 block."
+        },
+        {
+          "type": "SELF_DAMAGE",
+          "plain_english": "Lose 2 HP: bypasses block and absorb, makes 1 Toll per HP lost, opens no Grace, and can kill."
+        },
+        {
+          "type": "DRAW",
+          "plain_english": "Draw 1 card."
+        }
+      ],
+      "keywords": [
+        "Block",
+        "Draw",
+        "HP",
+        "Toll"
+      ],
+      "self_hp_cost": 2,
+      "base_damage": null,
+      "base_block": 5,
+      "draw": 1,
+      "energy_gain": null,
+      "toll_gain": 2,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "block",
+          "rule": "Shows and gives 0 while Last Resort is held.",
+          "default_displayed": 5
+        }
+      ],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": true,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool",
+        "belongings_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Last Resort",
+      "file_path": "res://cards/data/last_resort.tres",
+      "pool_class": "wanderer",
+      "card_type": "STANCE",
+      "face_type_label": "STANCE",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "While Critical, your Attacks deal 6 more. You can't gain block.",
+      "card_text_template": "While Critical, your Attacks deal 6 more. You can't gain block.",
+      "targeting": "self",
+      "removal_after_play": "leaves rotation for the rest of the fight (stances and powers always do)",
+      "effects": [
+        {
+          "type": "APPLY_STANCE",
+          "plain_english": "Enter the Last Resort stance: While Critical, your Attacks deal 6 more. You can't gain block."
+        }
+      ],
+      "keywords": [
+        "Critical",
+        "Block",
+        "Stance"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": "Stance for the rest of the fight (one stance type at a time; replay stacks, a different stance replaces).",
+      "stance_effect": {
+        "id": "last_resort",
+        "name": "Last Resort",
+        "description": "While Critical, your Attacks deal 6 more. You can't gain block.",
+        "file_path": "res://battle/rules/stances/last_resort.tres",
+        "per_stack": {
+          "attack_damage_bonus": 6,
+          "attack_hp_loss": 0
+        },
+        "bonus_requires_critical": true,
+        "prevents_block_gain": true,
+        "duration_turns": "rest of combat",
+        "stacking": "Another copy of this stance adds a stack (numbers scale per stack); a different stance replaces it at 1 stack."
+      },
+      "power_effect": null,
+      "critical_condition": {
+        "rule": "Attack bonus applies only while Critical (HP at or below 30% of max), switching on and off live."
+      },
+      "dynamic_values": [],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Last Wager",
+      "file_path": "res://cards/data/last_wager.tres",
+      "pool_class": "wanderer",
+      "card_type": "ATTACK",
+      "face_type_label": "STRIKE",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Lose 4 HP.\nDeal 16 damage. Critical: deal 26.\n(−4 HP)",
+      "card_text_template": "Lose {hp_cost} HP.\n{else}Deal {damage} damage.{/else} {if}Critical: deal {alt_damage}.{/if}",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "SELF_DAMAGE",
+          "plain_english": "Lose 4 HP: bypasses block and absorb, makes 1 Toll per HP lost, opens no Grace, and can kill."
+        },
+        {
+          "type": "DAMAGE",
+          "plain_english": "Deal 16 damage to the target; if you are Critical, 26 damage instead."
+        }
+      ],
+      "keywords": [
+        "Critical",
+        "HP",
+        "Toll"
+      ],
+      "self_hp_cost": 4,
+      "base_damage": 16,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": 4,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": {
+        "rule": "Critical = HP at or below 30% of max HP, checked when the effect resolves (after any HP this card paid first).",
+        "effect": "DAMAGE",
+        "normal_value": 16,
+        "critical_value": 26
+      },
+      "dynamic_values": [
+        {
+          "field": "damage",
+          "rule": "16 normally, 26 while Critical; each half of the face previews its own state in battle.",
+          "default_displayed": "16 / 26"
+        },
+        {
+          "field": "damage",
+          "rule": "Attacks add the attack bonus once per card (held stance, x stacks, plus Dying Light while Critical); Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "default_displayed": "no bonus outside a fight"
+        }
+      ],
+      "battle_animation": "Slash",
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Open Wound",
+      "file_path": "res://cards/data/open_wound.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "UTILITY",
+      "energy_cost": 0,
+      "rarity": null,
+      "card_text": "Lose 2 HP.\r\nDraw 1.\n(−2 HP)",
+      "card_text_template": "Lose {hp_cost} HP.\r\nDraw {draw}.",
+      "targeting": "self",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "SELF_DAMAGE",
+          "plain_english": "Lose 2 HP: bypasses block and absorb, makes 1 Toll per HP lost, opens no Grace, and can kill."
+        },
+        {
+          "type": "DRAW",
+          "plain_english": "Draw 1 card."
+        }
+      ],
+      "keywords": [
+        "Draw",
+        "HP",
+        "Toll"
+      ],
+      "self_hp_cost": 2,
+      "base_damage": null,
+      "base_block": null,
+      "draw": 1,
+      "energy_gain": null,
+      "toll_gain": 2,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Reckoning",
+      "file_path": "res://cards/data/reckoning.tres",
+      "pool_class": "wanderer",
+      "card_type": "ATTACK",
+      "face_type_label": "TOLL",
+      "energy_cost": 2,
+      "rarity": null,
+      "card_text": "Spend all Toll.\r\nDeal 0 damage.",
+      "card_text_template": "Spend all Toll.\r\nDeal {toll} damage.",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "TOLL_DAMAGE",
+          "plain_english": "Spend all Toll; deal that much damage to the target (plus the attack bonus)."
+        }
+      ],
+      "keywords": [
+        "Toll"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": "all current Toll",
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "damage",
+          "rule": "Damage = all Toll held when it resolves (Toll made by Self-Eater's HP price on this same play counts), plus the attack bonus once, then damage modifiers.",
+          "default_displayed": 0
+        },
+        {
+          "field": "damage",
+          "rule": "Attacks add the attack bonus once per card (held stance, x stacks, plus Dying Light while Critical); Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "default_displayed": "no bonus outside a fight"
+        }
+      ],
+      "battle_animation": "Slash",
+      "upgrade_data": null,
+      "starting_deck_count": 1,
+      "in_reward_pool": false,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "starting_deck"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Refuse the End",
+      "file_path": "res://cards/data/refuse_the_end.tres",
+      "pool_class": "wanderer",
+      "card_type": "POWER",
+      "face_type_label": "POWER",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Once per fight: if an enemy would kill you while Critical, survive at 1 HP.",
+      "card_text_template": "Once per fight: if an enemy would kill you while Critical, survive at 1 HP.",
+      "targeting": "self",
+      "removal_after_play": "leaves rotation for the rest of the fight (stances and powers always do)",
+      "effects": [
+        {
+          "type": "APPLY_STATUS",
+          "plain_english": "Gain Refuse the End: If an enemy hit would kill you while Critical, survive at 1 HP instead. Then it is gone, for the rest of the fight."
+        }
+      ],
+      "keywords": [
+        "Critical",
+        "HP",
+        "Power"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": "Power: its status stays for the rest of the fight (or until consumed); coexists with the stance and other powers.",
+      "stance_effect": null,
+      "power_effect": {
+        "id": "refuse_the_end",
+        "name": "Refuse the End",
+        "description": "If an enemy hit would kill you while Critical, survive at 1 HP instead. Then it is gone, for the rest of the fight.",
+        "file_path": "res://battle/rules/statuses/refuse_the_end.tres",
+        "duration": "until triggered",
+        "stack_rule": "IGNORE",
+        "prevents_lethal_while_critical": true,
+        "once_per_combat": true,
+        "applied_to": "self"
+      },
+      "critical_condition": {
+        "rule": "Triggers only if you were already Critical (HP at or below 30% of max) before the lethal enemy hit."
+      },
+      "dynamic_values": [],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Reprisal",
+      "file_path": "res://cards/data/reprisal.tres",
+      "pool_class": "wanderer",
+      "card_type": "ATTACK",
+      "face_type_label": "STRIKE",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Deal 6 damage. With Grace: deal 12.",
+      "card_text_template": "{else}Deal {damage} damage.{/else} {if}With Grace: deal {alt_damage}.{/if}",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "DAMAGE",
+          "plain_english": "Deal 6 damage to the target; if you have Grace open, 12 damage instead."
+        }
+      ],
+      "keywords": [
+        "Grace"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": 6,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "damage",
+          "rule": "Attacks add the attack bonus once per card (held stance, x stacks, plus Dying Light while Critical); Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "default_displayed": "no bonus outside a fight"
+        }
+      ],
+      "battle_animation": "Slash",
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Self-Eater",
+      "file_path": "res://cards/data/self_eater.tres",
+      "pool_class": "wanderer",
+      "card_type": "STANCE",
+      "face_type_label": "STANCE",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Your Attacks deal 3 more and cost 2 HP.",
+      "card_text_template": "Your Attacks deal 3 more and cost 2 HP.",
+      "targeting": "self",
+      "removal_after_play": "leaves rotation for the rest of the fight (stances and powers always do)",
+      "effects": [
+        {
+          "type": "APPLY_STANCE",
+          "plain_english": "Enter the Self-Eater stance: Your Attacks deal 3 more and cost 2 HP."
+        }
+      ],
+      "keywords": [
+        "HP",
+        "Stance"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": "Stance for the rest of the fight (one stance type at a time; replay stacks, a different stance replaces).",
+      "stance_effect": {
+        "id": "self_eater",
+        "name": "Self-Eater",
+        "description": "Your Attacks deal 3 more and cost 2 HP.",
+        "file_path": "res://battle/rules/stances/self_eater.tres",
+        "per_stack": {
+          "attack_damage_bonus": 3,
+          "attack_hp_loss": 2
+        },
+        "bonus_requires_critical": false,
+        "prevents_block_gain": false,
+        "duration_turns": "rest of combat",
+        "stacking": "Another copy of this stance adds a stack (numbers scale per stack); a different stance replaces it at 1 stack."
+      },
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Slash",
+      "file_path": "res://cards/data/slash.tres",
+      "pool_class": "wanderer",
+      "card_type": "ATTACK",
+      "face_type_label": "STRIKE",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Deal 5 damage.",
+      "card_text_template": "Deal {damage} damage.",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "DAMAGE",
+          "plain_english": "Deal 5 damage to the target."
+        }
+      ],
+      "keywords": [],
+      "self_hp_cost": 0,
+      "base_damage": 5,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "damage",
+          "rule": "Attacks add the attack bonus once per card (held stance, x stacks, plus Dying Light while Critical); Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "default_displayed": "no bonus outside a fight"
+        }
+      ],
+      "battle_animation": "Slash",
+      "upgrade_data": null,
+      "starting_deck_count": 4,
+      "in_reward_pool": false,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "starting_deck"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Unbroken",
+      "file_path": "res://cards/data/unbroken.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "GUARD",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Gain 7 block. Critical: gain 13.",
+      "card_text_template": "{else}Gain {block} block.{/else} {if}Critical: gain {alt_block}.{/if}",
+      "targeting": "self",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "BLOCK",
+          "plain_english": "Gain 7 block; if you are Critical, 13 block instead."
+        }
+      ],
+      "keywords": [
+        "Critical",
+        "Block"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": 7,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": {
+        "rule": "Critical = HP at or below 30% of max HP, checked when the effect resolves (after any HP this card paid first).",
+        "effect": "BLOCK",
+        "normal_value": 7,
+        "critical_value": 13
+      },
+      "dynamic_values": [
+        {
+          "field": "block",
+          "rule": "7 normally, 13 while Critical; each half of the face previews its own state in battle.",
+          "default_displayed": "7 / 13"
+        },
+        {
+          "field": "block",
+          "rule": "Shows and gives 0 while Last Resort is held.",
+          "default_displayed": 7
+        }
+      ],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "With Regards",
+      "file_path": "res://cards/data/with_regards.tres",
+      "pool_class": "wanderer",
+      "card_type": "ATTACK",
+      "face_type_label": "STRIKE",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Deal 8 damage.\r\nIf this kills, gain 1 energy.",
+      "card_text_template": "Deal {damage} damage.\r\nIf this kills, gain 1 energy.",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "DAMAGE",
+          "plain_english": "Deal 8 damage to the target."
+        },
+        {
+          "type": "GAIN_ENERGY",
+          "plain_english": "If this card's damage killed its target: gain 1 energy."
+        }
+      ],
+      "keywords": [
+        "Energy"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": 8,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": 1,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "damage",
+          "rule": "Attacks add the attack bonus once per card (held stance, x stacks, plus Dying Light while Critical); Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "default_displayed": "no bonus outside a fight"
+        }
+      ],
+      "battle_animation": "Slash",
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": false,
+      "in_belongings_pool": false,
+      "in_keeper_pool": false,
+      "obtainable_from": [],
+      "not_obtainable_in_play": true
+    },
+    {
+      "name": "Left Hand",
+      "file_path": "res://cards/neutral/left_hand.tres",
+      "pool_class": "neutral",
+      "card_type": "ATTACK",
+      "face_type_label": "STRIKE",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Deal 6 damage. First card this turn: deal 10.",
+      "card_text_template": "{else}Deal {damage} damage.{/else} {if}First card this turn: deal {alt_damage}.{/if}",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "FIRST_CARD_DAMAGE",
+          "plain_english": "Deal 6 damage to the target; if it is the first card played this turn, 10 damage instead."
+        }
+      ],
+      "keywords": [],
+      "self_hp_cost": 0,
+      "base_damage": 6,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "damage",
+          "rule": "Attacks add the attack bonus once per card (held stance, x stacks, plus Dying Light while Critical); Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "default_displayed": "no bonus outside a fight"
+        }
+      ],
+      "battle_animation": "Slash",
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": false,
+      "in_belongings_pool": true,
+      "in_keeper_pool": true,
+      "obtainable_from": [
+        "belongings_pool",
+        "keeper_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Second Thoughts",
+      "file_path": "res://cards/neutral/second_thoughts.tres",
+      "pool_class": "neutral",
+      "card_type": "SKILL",
+      "face_type_label": "UTILITY",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Draw 2.",
+      "card_text_template": "Draw {draw}.",
+      "targeting": "self",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "DRAW",
+          "plain_english": "Draw 2 cards."
+        }
+      ],
+      "keywords": [
+        "Draw"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": 2,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": false,
+      "in_belongings_pool": true,
+      "in_keeper_pool": true,
+      "obtainable_from": [
+        "belongings_pool",
+        "keeper_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Untouched",
+      "file_path": "res://cards/neutral/untouched.tres",
+      "pool_class": "neutral",
+      "card_type": "SKILL",
+      "face_type_label": "GUARD",
+      "energy_cost": 1,
+      "rarity": null,
+      "card_text": "Gain 4 block. Undamaged last turn: 4 more.",
+      "card_text_template": "Gain {block} block. {if}Undamaged last turn: {bonus_block} more.{/if}",
+      "targeting": "self",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "UNDAMAGED_BLOCK",
+          "plain_english": "Gain 4 block; if you lost no HP during your previous turn, 4 more."
+        }
+      ],
+      "keywords": [
+        "Block"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": 4,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "block",
+          "rule": "Shows and gives 0 while Last Resort is held.",
+          "default_displayed": 4
+        }
+      ],
+      "battle_animation": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": false,
+      "in_belongings_pool": true,
+      "in_keeper_pool": true,
+      "obtainable_from": [
+        "belongings_pool",
+        "keeper_pool"
+      ],
+      "not_obtainable_in_play": false
+    }
+  ]
+}
