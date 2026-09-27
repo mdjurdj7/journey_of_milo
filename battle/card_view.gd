@@ -172,6 +172,21 @@ const TOKEN_TOLL_HEAL := "{toll_heal}"
 @export var bonus_in_seconds: float = 0.2
 @export var bonus_out_seconds: float = 0.15
 
+@export_group("Art Rule")
+# An ink rule round the art field, drawn over the image's outermost
+# pixels so it sits tight to it - the field's rect and radius, not a
+# pixel bigger. On every card, art or glyph: it frames the panel, not
+# the picture.
+@export var art_rule_width_px: int = 1
+@export var art_rule_color: Color = Color(0.165, 0.165, 0.18)
+# A second rule outside the first, in the card's keyline colour, for
+# trying the panel with a double edge. art_outer_rule_inset_px is the
+# gap between the two rules; the outer one's corners stay concentric
+# with the field's.
+@export var art_outer_rule_enabled: bool = false
+@export var art_outer_rule_inset_px: int = 3
+@export var art_outer_rule_width_px: int = 1
+
 @export_group("Layout")
 @export var outer_margin: float = 12.0
 @export var keyline_height: float = 2.0
@@ -285,6 +300,10 @@ var _bonus_corner_blend: float = 0.0
 var _bonus_corner_tween: Tween = null
 var _bonus_corner: Control = null
 var _art_style: StyleBoxFlat = null
+# Draws the art rules - a Control over the whole face made in _ready(),
+# like _bonus_corner, so the rules draw above the image instead of being
+# clipped into it by the field.
+var _art_rule: Control = null
 var _hp_cost: int = 0
 var _rest_offset_y: float = 0.0
 # How far down from this card's own local origin "at rest" actually sits -
@@ -330,6 +349,11 @@ func _ready() -> void:
 		art_rect.material = load(art_material_path) as Material
 	art_rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	art_rect.visible = false
+	_art_rule = Control.new()
+	_art_rule.name = "ArtRule"
+	_art_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_art_rule.draw.connect(_draw_art_rule)
+	add_child(_art_rule)
 	_bonus_corner = Control.new()
 	_bonus_corner.name = "BonusCorner"
 	_bonus_corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -570,6 +594,27 @@ func _draw_bonus_corner() -> void:
 		right_angle + Vector2(0.0, leg),
 	])
 	_bonus_corner.draw_colored_polygon(points, ink_color)
+
+# The inner rule on the art field's own rect and radius, drawn inward
+# from its edge; the outer one art_outer_rule_inset_px beyond it, its
+# radius grown by the same distance so the corners stay concentric.
+func _draw_art_rule() -> void:
+	var field := Rect2(art_field.position, art_field.size)
+	if art_rule_width_px > 0:
+		_art_rule.draw_style_box(_rule_style(art_rule_color, art_rule_width_px, art_field_radius), field)
+	if art_outer_rule_enabled and art_outer_rule_width_px > 0 and card_data != null:
+		var grow: int = art_outer_rule_inset_px + art_outer_rule_width_px
+		_art_rule.draw_style_box(_rule_style(_keyline_color(), art_outer_rule_width_px, art_field_radius + grow), field.grow(float(grow)))
+
+func _rule_style(color: Color, width: int, radius: int) -> StyleBoxFlat:
+	var style := _rounded_style(Color(0, 0, 0, 0), radius)
+	style.draw_center = false
+	style.border_color = color
+	style.border_width_left = width
+	style.border_width_top = width
+	style.border_width_right = width
+	style.border_width_bottom = width
+	return style
 
 # The art panel's tint. One StyleBoxFlat kept, not rebuilt per call.
 func _apply_panel_color() -> void:
@@ -1051,6 +1096,8 @@ func _apply_type_style() -> void:
 	keyline.color = _keyline_color()
 	_apply_panel_color()
 	glyph.queue_redraw()
+	if _art_rule != null:
+		_art_rule.queue_redraw()
 
 # --- Layout ---
 
@@ -1094,6 +1141,10 @@ func _apply_layout() -> void:
 		_bonus_corner.position = Vector2.ZERO
 		_bonus_corner.size = face
 		_bonus_corner.queue_redraw()
+	if _art_rule != null:
+		_art_rule.position = Vector2.ZERO
+		_art_rule.size = face
+		_art_rule.queue_redraw()
 
 	# Keyline inside the frame, inset past the corner radius so it never
 	# pokes out of the rounded corners.
