@@ -189,6 +189,17 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 @export var art_outer_rule_enabled: bool = false
 @export var art_outer_rule_inset_px: int = 3
 @export var art_outer_rule_width_px: int = 1
+# The card's rarity (CardData.rarity), as a rule directly outside the ink
+# rule - on the card's bone, never over the art - its corners concentric
+# with the field's. Muted on purpose: noticeable when three reward cards
+# sit side by side, quiet in a hand. Common and UNSET draw nothing, so
+# most cards look as they always have; a transparent colour or a width
+# of 0 turns a tier off.
+@export var rarity_rule_uncommon: Color = Color(0.52, 0.58, 0.64)
+@export var rarity_rule_rare: Color = Color(0.70, 0.57, 0.33)
+@export var rarity_rule_ultra_rare: Color = Color(0.86, 0.78, 0.58)
+@export var rarity_rule_width_px: int = 2
+@export var rarity_rule_ultra_rare_width_px: int = 3
 
 @export_group("Layout")
 @export var outer_margin: float = 12.0
@@ -611,9 +622,32 @@ func _draw_art_rule() -> void:
 	var field := Rect2(art_field.position, art_field.size)
 	if art_rule_width_px > 0:
 		_art_rule.draw_style_box(_rule_style(art_rule_color, art_rule_width_px, art_field_radius), field)
+	var rarity_color: Color = _rarity_rule_color()
+	var rarity_width: int = _rarity_rule_width()
+	if rarity_width > 0 and rarity_color.a > 0.0:
+		_art_rule.draw_style_box(_rule_style(rarity_color, rarity_width, art_field_radius + rarity_width), field.grow(float(rarity_width)))
 	if art_outer_rule_enabled and art_outer_rule_width_px > 0 and card_data != null:
 		var grow: int = art_outer_rule_inset_px + art_outer_rule_width_px
 		_art_rule.draw_style_box(_rule_style(_keyline_color(), art_outer_rule_width_px, art_field_radius + grow), field.grow(float(grow)))
+
+# The rarity rule's colour for this card: transparent (none) for Common,
+# UNSET, or no card at all.
+func _rarity_rule_color() -> Color:
+	if card_data == null:
+		return Color(0, 0, 0, 0)
+	match card_data.rarity:
+		CardData.CardRarity.UNCOMMON:
+			return rarity_rule_uncommon
+		CardData.CardRarity.RARE:
+			return rarity_rule_rare
+		CardData.CardRarity.ULTRA_RARE:
+			return rarity_rule_ultra_rare
+	return Color(0, 0, 0, 0)
+
+func _rarity_rule_width() -> int:
+	if card_data != null and card_data.rarity == CardData.CardRarity.ULTRA_RARE:
+		return rarity_rule_ultra_rare_width_px
+	return rarity_rule_width_px
 
 func _rule_style(color: Color, width: int, radius: int) -> StyleBoxFlat:
 	var style := _rounded_style(Color(0, 0, 0, 0), radius)
