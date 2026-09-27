@@ -20,6 +20,8 @@ signal deck_changed()
 # Emits the NEW TOTAL, not the delta - same shape player_hp_changed uses,
 # and what a readout actually wants to draw.
 signal gold_changed(amount: int)
+# The new total, like gold_changed.
+signal toll_changed(amount: int)
 
 var player_hp: int = 0
 var player_max_hp: int = 0
@@ -39,6 +41,15 @@ var deck: Array[CardData] = []
 # the same way HP and the deck are - nothing writes this field directly,
 # so nothing can change it without the readouts hearing.
 var gold: int = 0
+
+# The Wanderer's Toll. Per FLOOR, not per fight: it carries from one
+# combat to the next on the same floor (won or escaped) and goes back to
+# 0 at the floor advance (RegionField._on_floor_exited()) and in
+# new_run(). The one copy - the player's Combatant reads and writes this
+# through its own toll property (see Combatant.run_toll_owner), so no
+# battle-end path has anything to write back. Mutated only through
+# set_toll().
+var toll: int = 0
 
 var character: CharacterData = null
 
@@ -83,6 +94,7 @@ func new_run(starting_character: CharacterData) -> void:
 	run_seed = randi()
 	rng.seed = run_seed
 	gold = 0
+	toll = 0
 	player_max_hp = starting_character.max_hp
 	player_hp = player_max_hp
 	deck = _build_starting_deck(starting_character)
@@ -104,6 +116,7 @@ func new_run(starting_character: CharacterData) -> void:
 	player_hp_changed.emit(player_hp, player_max_hp)
 	deck_changed.emit()
 	gold_changed.emit(gold)
+	toll_changed.emit(toll)
 
 func _build_starting_deck(starting_character: CharacterData) -> Array[CardData]:
 	var cards: Array[CardData] = []
@@ -160,6 +173,15 @@ func spend_gold(amount: int) -> bool:
 	gold -= amount
 	gold_changed.emit(gold)
 	return true
+
+# Floored at 0: an overspend clamps rather than leaving a debt. Emits only
+# on a real change.
+func set_toll(value: int) -> void:
+	var clamped: int = maxi(value, 0)
+	if clamped == toll:
+		return
+	toll = clamped
+	toll_changed.emit(toll)
 
 # The run's one card-grant path (rewards, the Keeper's offer, a find on
 # the sand). The deck holds a COPY, never the pool's own resource - the

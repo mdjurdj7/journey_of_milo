@@ -116,7 +116,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 
 	_field_hp_bar = field_hp_bar
 	_field_hp_bar.enter_battle(battle_transition_time)
-	_field_hp_bar.show_toll(0)
+	# Toll is the floor's, not the fight's: it opens on what was carried in.
+	_field_hp_bar.show_toll(RunState.toll)
 	_field_deck_panel = field_deck_panel
 	_field_deck_panel.visible = false
 

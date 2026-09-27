@@ -20,7 +20,27 @@ var stance: Stance = null
 # Left at their defaults, unused, on an enemy Combatant - same "empty
 # means unaffected" idiom the old project used throughout EnemyData/
 # CardEffect.
-var toll: int = 0
+#
+# Toll is the one that outlives the fight: on the run's player (run_toll_
+# owner, the RunState autoload, handed in by BattleController.setup()) it
+# IS the owner's toll - read and written straight through, so every
+# effect's `player.toll += n` lands on the floor's Toll with nothing to
+# copy back at battle end. Anything else (an enemy, a bare Combatant in a
+# probe) keeps its own local value. Held as a Node rather than named, so
+# this script compiles where the autoload isn't registered yet (the
+# headless probes).
+var run_toll_owner: Node = null
+var _local_toll: int = 0
+var toll: int:
+	get:
+		if run_toll_owner != null:
+			return run_toll_owner.get(&"toll") as int
+		return _local_toll
+	set(value):
+		if run_toll_owner != null:
+			run_toll_owner.call(&"set_toll", value)
+		else:
+			_local_toll = value
 var energy: int = 0
 var max_energy: int = 3
 # Grace: HP an enemy took that this player can still take back, and how

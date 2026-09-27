@@ -955,6 +955,15 @@ func _setup_field_hud() -> void:
 				enemy.enemy_status.refresh_style()
 	deck_panel.show_whole_deck(RunState.deck)
 	RunState.deck_changed.connect(func() -> void: deck_panel.show_whole_deck(RunState.deck))
+	# TOLL beside DECK, styled from the same theme (set before it enters the
+	# tree, so its _ready() reads this region's ink); RunState.toll_changed
+	# keeps it current from here - see TollLine.
+	var toll_line := TollLine.new()
+	toll_line.name = "TollLine"
+	toll_line.theme = deck_panel.theme
+	deck_panel.get_parent().add_child(toll_line)
+	toll_line.set_toll(RunState.toll)
+	toll_line.sit_beside(deck_panel)
 	hp_bar.set_target(wanderer)
 
 # Parents a FieldEnemy's own persistent HP display under this field's HUD
@@ -1086,8 +1095,9 @@ func get_wall_rect() -> Rect2:
 #
 # What carries is whatever lives on RunState (deck, HP, gold, the rng's
 # state) - an autoload, untouched by the reload; the guarded new_run()
-# in _ready() is what keeps it from being reset. Toll and Grace are per
-# combat and live in BattleController, gone with the fight. Past the
+# in _ready() is what keeps it from being reset. Toll lives there too but
+# is the floor's: it goes back to 0 here, as the floor index moves.
+# Grace is per combat and lives on the fight's Combatant. Past the
 # region's last floor there is nothing yet: say so and go round to floor
 # 1 again (the once-per-run findings stay spent, as they should).
 func _on_floor_exited() -> void:
@@ -1114,6 +1124,7 @@ func _on_floor_exited() -> void:
 		RunState.current_floor_index = 0
 	else:
 		RunState.current_floor_index += 1
+	RunState.set_toll(0)
 	print("RegionField: floor_exited, current_floor_index = %d" % RunState.current_floor_index)
 	get_tree().reload_current_scene()
 
