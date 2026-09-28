@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
 [ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
 [ext_resource type="AudioStream" uid="uid://cv4ojiaajic3y" path="res://assets/audio/enemies_old/Works_Wardling/Ragged Breath.mp3" id="3_ragged_breath"]
+[ext_resource type="AudioStream" uid="uid://bnvfgx6j66j30" path="res://assets/audio/combat_old/hit.wav" id="4_hit"]
 
 [sub_resource type="Resource" id="EnemyIntent_first"]
 script = ExtResource("2_intent")
@@ -21,6 +22,8 @@ script = ExtResource("1_enemy_data")
 enemy_name = "Wardling"
 max_hp = 90
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_first"), SubResource("EnemyIntent_second"), SubResource("EnemyIntent_third")])
+; Placeholder: hit.wav is 8-bit and one take - replace with a proper body hit, 2-3 takes.
+contact_sounds = Array[AudioStream]([ExtResource("4_hit")])
 escalation_multipliers = Array[float]([1.0, 1.3, 1.6, 2.0])
 escalation_stage_length = 2
 pain_turn_hp_threshold = 0.5
