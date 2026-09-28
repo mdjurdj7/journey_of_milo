@@ -10,15 +10,19 @@ type = 2
 [sub_resource type="Resource" id="EnemyIntent_charge"]
 script = ExtResource("2_intent")
 value = 14
-interrupt_threshold = 12
+interrupt_threshold = 14
 on_interrupt = SubResource("EnemyIntent_burrow")
 rear_while_queued = true
+
+[sub_resource type="Resource" id="EnemyIntent_snap"]
+script = ExtResource("2_intent")
+value = 6
 
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Siltjaw"
-max_hp = 42
-intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_charge")])
+max_hp = 38
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_snap"), SubResource("EnemyIntent_charge")])
 model_scene_path = "res://assets/models/enemies/Siltjaw/Siltjaw.glb"
 model_scale = 1.3356
 model_yaw_offset_degrees = 180.0

@@ -67,6 +67,10 @@ func _initialize() -> void:
 	var data := load(SILTJAW_PATH) as EnemyData
 	var siltjaw := Combatant.new(data.max_hp)
 	EnemyTurn.pick_initial_intent(siltjaw, data)
+	# It opens on Snap, which can't be broken - the gauge is the Charge's,
+	# so step the loop on to it.
+	while EnemyTurn.current_intent(siltjaw, data).interrupt_threshold <= 0:
+		siltjaw.current_intent_index += 1
 	var player := Combatant.new(PLAYER_HP)
 	var threshold: int = EnemyTurn.current_intent(siltjaw, data).interrupt_threshold
 	var frames: Array[Dictionary] = [
