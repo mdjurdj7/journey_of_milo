@@ -90,6 +90,11 @@ var damage_taken_this_turn: int = 0
 # steps past it from here on - see EnemyTurn.leave_pack(). Set by
 # BattleController; never cleared, a pack doesn't regroup mid-fight.
 var pack_alone: bool = false
+# Turns this enemy has taken this fight - every EnemyTurn.take_turn() it
+# runs, a cancelled one included. The turn it is about to take is
+# turns_taken + 1, which is what escalation reads (EnemyTurn.intent_
+# value()). Per fight, like everything here.
+var turns_taken: int = 0
 
 func _init(starting_hp: int = 1) -> void:
 	hp = starting_hp

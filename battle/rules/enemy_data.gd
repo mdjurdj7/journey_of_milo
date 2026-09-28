@@ -3,8 +3,8 @@ class_name EnemyData
 
 # Trimmed hard from the old project's enemy_data.gd - name, max HP, a
 # move list, and (since the dragonfly) which body to wear on the field.
-# No escalation/pain-turn/charge/growth/escape/encounter-linked/mark
-# fields - all out of scope, see DESIGN.md. A FieldEnemy references one
+# Escalation is back (the Wardling's); no charge/growth/escape/encounter-
+# linked/mark fields - out of scope, see DESIGN.md. A FieldEnemy references one
 # of these (field_enemy.gd's own enemy_data export).
 
 @export var enemy_name: String = ""
@@ -22,6 +22,15 @@ class_name EnemyData
 # a fresh independent weighted pick every turn, repeats allowed (subject
 # to each intent's own no_immediate_repeat/turn_one_locked) - see
 # enemy_turn.gd.
+
+# Escalation: an ATTACK's value times the multiplier of the stage its turn
+# falls in - stage (turn - 1) / escalation_stage_length, the last one held
+# once the fight outruns them - rounded (EnemyTurn.intent_value()). Before
+# any status modifier, and the same call feeds the intent preview, so the
+# number shown is the number that lands. Empty (every enemy by default)
+# is no escalation.
+@export var escalation_multipliers: Array[float] = []
+@export var escalation_stage_length: int = 2
 
 # The field body. RegionField copies these onto the FieldEnemy it
 # spawns for this data (RegionField._spawn_floor_enemies()), the same

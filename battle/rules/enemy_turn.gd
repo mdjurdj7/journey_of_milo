@@ -81,7 +81,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# between what block ate and what reached HP.
 				var largest_hit: int = 0
 				for _hit in maxi(intent.hits, 1):
-					var amount: int = Status.apply_modifiers(intent.value, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+					var amount: int = Status.apply_modifiers(intent_value(combatant, data, intent), combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 					amount = Status.apply_modifiers(amount, player.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
 					Status.consume_triggered(player.statuses)
 					# Critical is judged BEFORE the hit: Refuse the End saves a
@@ -118,6 +118,9 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 			EnemyIntent.IntentType.BURROW:
 				result["surfaced"] = true
 
+	# Counted whatever the turn did - an interrupted or cancelled one too -
+	# so escalation keeps its own clock.
+	combatant.turns_taken += 1
 	Status.remove_expired(combatant.statuses)
 	if combatant.hp > 0:
 		# An interjection resolved leaves the loop where it was - the loop
@@ -155,6 +158,11 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	if intent == null:
 		return {}
 	var preview: Dictionary = {"type": intent.type, "hits": 1, "per_hit": intent.value, "damage_to_hp": 0, "lethal": false}
+	# An escalating enemy says where it stands: the stage of the turn it is
+	# about to take, 0-based, out of how many (the intent's pips).
+	if not data.escalation_multipliers.is_empty():
+		preview["escalation_stage"] = escalation_stage(combatant, data)
+		preview["escalation_stages"] = data.escalation_multipliers.size()
 	if intent.type != EnemyIntent.IntentType.ATTACK:
 		return preview
 	if intent.interrupt_threshold > 0:
@@ -169,7 +177,7 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	var guard_left: bool = true
 	var hits: int = maxi(intent.hits, 1)
 	for hit in hits:
-		var amount: int = Status.apply_modifiers(intent.value, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+		var amount: int = Status.apply_modifiers(intent_value(combatant, data, intent), combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 		amount = Status.apply_modifiers(amount, player_statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
 		if hit == 0:
 			preview["per_hit"] = amount
@@ -189,6 +197,25 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	preview["damage_to_hp"] = total_to_hp
 	preview["lethal"] = hp <= 0 and not bool(preview.get("interrupted", false))
 	return preview
+
+# The escalation stage of the turn this enemy is about to take (turns_
+# taken + 1): (turn - 1) / escalation_stage_length, held at the last
+# stage. 0 for an enemy that doesn't escalate.
+static func escalation_stage(combatant: Combatant, data: EnemyData) -> int:
+	if data == null or data.escalation_multipliers.is_empty():
+		return 0
+	var turn: int = combatant.turns_taken + 1
+	return mini((turn - 1) / maxi(data.escalation_stage_length, 1), data.escalation_multipliers.size() - 1)
+
+# What `intent` is worth on the turn this enemy is about to take: an
+# ATTACK's value times its escalation stage's multiplier, rounded - before
+# any status modifier. The one number take_turn() lands and preview_
+# intent() shows. Anything else, and any enemy without escalation, is the
+# value as authored.
+static func intent_value(combatant: Combatant, data: EnemyData, intent: EnemyIntent) -> int:
+	if intent.type != EnemyIntent.IntentType.ATTACK or data == null or data.escalation_multipliers.is_empty():
+		return intent.value
+	return roundi(float(intent.value) * data.escalation_multipliers[escalation_stage(combatant, data)])
 
 # Unblocked damage becomes Grace. Accumulates ACROSS the whole enemy
 # turn rather than per enemy: the cap is the window's, so two enemies
