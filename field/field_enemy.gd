@@ -150,6 +150,9 @@ var _contacted: bool = false
 var _contact_player: AudioStreamPlayer3D = null
 # A watcher has noticed the Wanderer and turned (see Field Behaviour).
 var _noticed: bool = false
+# The facing turn running now, if any (_turn_to()) - stopped when a new
+# one starts, so two turns never pull on rotation.y at once.
+var _face_tween: Tween = null
 # Made on the first pain turn (play_pain_turn_sound()); none before.
 var _pain_player: AudioStreamPlayer3D = null
 var _contact_pool := SoundPool.new()
@@ -848,12 +851,19 @@ func face_toward_point(point: Vector3, duration: float) -> void:
 	# Same verified direction<->angle convention as Wanderer._angle_from_
 	# direction()/_forward_from_angle().
 	var face_angle := atan2(-to_target.x, -to_target.z)
-	var target_angle := rotation.y + wrapf(face_angle - rotation.y, -PI, PI)
+	_turn_to(face_angle, duration)
 
-	var tween := create_tween()
-	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(self, "rotation:y", target_angle, duration)
+# One eased facing turn to `angle` the short way round, through the battle
+# freeze. A turn still running - a watcher's notice caught by contact - is
+# stopped first and the new one starts from wherever it had got to.
+func _turn_to(angle: float, duration: float) -> void:
+	if _face_tween != null and _face_tween.is_valid():
+		_face_tween.kill()
+	var target_angle := rotation.y + wrapf(angle - rotation.y, -PI, PI)
+	_face_tween = create_tween()
+	_face_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_face_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_face_tween.tween_property(self, "rotation:y", target_angle, duration)
 
 # Called by RegionField on contact for a cluster member that isn't the
 # one the Wanderer squares up to (see its _place_cluster_line()): tweens
@@ -879,11 +889,7 @@ func return_to_field_pose(duration: float) -> void:
 		return
 	_has_field_pose = false
 	_tween_to(_field_position, duration)
-	var target_angle := rotation.y + wrapf(_field_yaw - rotation.y, -PI, PI)
-	var tween := create_tween()
-	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	tween.tween_property(self, "rotation:y", target_angle, duration)
+	_turn_to(_field_yaw, duration)
 
 # The XZ where this enemy stands when not stepped into a line - its
 # authored spot - for anything that must clear its contact area after it
