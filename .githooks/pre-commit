@@ -1,0 +1,39 @@
+#!/bin/sh
+# Every new script/shader must come with its Godot .uid sidecar - staged
+# in the same commit or already tracked. Otherwise a teammate's editor
+# makes its own, and the later .uid commit blocks their pull.
+# Generate: the Godot 4.7.1 main executable (not the _console wrapper)
+# with --headless --path . --import
+# Enable once per machine: git config core.hooksPath .githooks
+
+missing=""
+files=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACR -- '*.gd' '*.gdshader' '*.gdshaderinc')
+while IFS= read -r f; do
+	[ -z "$f" ] && continue
+	# Godot skips folders under a .gdignore (reference/): no .uid there.
+	dir=$(dirname "$f")
+	skip=""
+	while [ "$dir" != "." ]; do
+		if git cat-file -e ":$dir/.gdignore" 2>/dev/null; then
+			skip=1
+			break
+		fi
+		dir=$(dirname "$dir")
+	done
+	[ -n "$skip" ] && continue
+	# In the index = staged now or already tracked (a staged delete fails).
+	if ! git cat-file -e ":$f.uid" 2>/dev/null; then
+		missing="$missing
+  $f.uid"
+	fi
+done <<EOF
+$files
+EOF
+
+if [ -n "$missing" ]; then
+	echo "pre-commit: missing .uid for new script/shader:$missing"
+	echo "Run the Godot 4.7.1 main executable with --headless --path . --import,"
+	echo "then stage each .uid by path in this same commit."
+	exit 1
+fi
+exit 0

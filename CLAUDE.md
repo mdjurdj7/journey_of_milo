@@ -13,6 +13,14 @@
   WIP, commit only my files and tell me.
 - Run `git status` before staging; the tree often has WIP files
   that must not be committed.
+- New scripts and shaders (.gd, .gdshader, .gdshaderinc) ship with
+  their .uid. After creating one, run the Godot 4.7.1 main executable
+  (not the _console wrapper) with `--headless --path . --import`,
+  confirm the .uid exists, and stage it by path in the same commit as
+  the file. The .githooks/pre-commit hook rejects a commit that misses
+  one (enable per machine: `git config core.hooksPath .githooks`).
+- Don't stage default_bus_layout.tres unless a bus change was
+  intended; revert stray edits from the editor's Audio panel.
 
 ## Godot conventions
 - Godot 4.7.1, GDScript.
