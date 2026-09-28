@@ -4,13 +4,12 @@
 
 [resource]
 script = ExtResource("1_status_data")
-id = "deflection"
-display_name = "Deflection"
-description = "Take {percent}% less damage from the next {charges} enemy Attack{s}."
+id = "no_further_armed"
+display_name = "No Further — Ready"
+description = "The next enemy Attack deals 0 damage."
 category = 1
-default_magnitude = -50
+default_magnitude = -100
 default_duration_turns = -1
-default_charges = 2
 modifier_target = 0
 modifier_operation = 1
 stack_rule = 4

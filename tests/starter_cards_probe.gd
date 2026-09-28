@@ -24,6 +24,7 @@ const SHRUNK_RULES: Dictionary = {
 	"Cornered": 14,
 	"Last Resort": 14,
 	"Last Wager": 13,
+	"No Further": 12,
 	"Sentence": 13,
 }
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"

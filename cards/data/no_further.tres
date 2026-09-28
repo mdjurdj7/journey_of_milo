@@ -17,7 +17,7 @@ rarity = 3
 cost = 1
 card_type = 3
 target_type = 1
-description = "Next time you enter Critical, gain 2 Deflection.
+description = "When you next enter Critical, the next enemy Attack deals 0 damage.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
 removal_scope = 1

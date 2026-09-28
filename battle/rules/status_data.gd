@@ -26,7 +26,7 @@ enum StackRule { REFRESH_DURATION, ADD_MAGNITUDE, REFRESH_AND_ADD, IGNORE, RESET
 # existing instance just keeps running), though stack_count still climbs
 # for those four. RESET puts the status back as if freshly applied -
 # default magnitude, duration and charges, one stack - a refresh, never a
-# pile-up (Come Due, Deflection). Appended: an inserted value would rewrite every
+# pile-up (Come Due, No Further armed). Appended: an inserted value would rewrite every
 # .tres that stores one of these as an integer.
 
 const DURATION_UNTIL_REMOVED := -1
@@ -61,8 +61,9 @@ const DURATION_UNTIL_TRIGGERED := -2
 # Status.charges, apart from magnitude (which a MODIFIER needs for its
 # own number). 0 = not a charge status. What spends one is the status's
 # own rule: an Attack on its holder (attack_bonus_against_holder - Come
-# Due), or an enemy attack against its holder (consumed_by_attack_against
-# - Deflection). Shown as "Name ×N" down to ×1 (Status.label()).
+# Due), or an enemy attack against its holder (consumed_by_attack_against,
+# on a status that has charges). Shown as "Name ×N" down to ×1 (Status.
+# label()).
 @export var default_charges: int = 0
 @export var clears_on_trigger: bool = false
 # Made REAL this pass (the old project's own version was decorative - see
@@ -110,7 +111,7 @@ const DURATION_UNTIL_TRIGGERED := -2
 
 # The mirror of consumed_by_own_attack, for a status on the one being
 # attacked: spent once an enemy ATTACK against its holder has resolved -
-# after every hit of it, so a status that softens that attack (Deflection)
+# after every hit of it, so a status that softens that attack (No Further)
 # softens all of it - whether or not any damage got through. One charge
 # per attack for a charge status, the whole status otherwise. A Defend, a
 # Burrow or an interrupted attack leave it in place (EnemyTurn.take_turn()).

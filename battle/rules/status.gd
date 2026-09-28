@@ -190,7 +190,7 @@ static func spend_mark_bonus(statuses: Array[Status]) -> int:
 
 # An enemy's attack against the holder of `statuses` has resolved, every
 # hit of it: each status that lasts only until then (StatusData.consumed_
-# by_attack_against - Deflection) spends a charge, or goes, without them.
+# by_attack_against - No Further, armed) spends a charge, or goes, without them.
 static func consume_after_attack_against(statuses: Array[Status]) -> void:
 	for active in statuses.duplicate():
 		if not active.data.consumed_by_attack_against:

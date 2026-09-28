@@ -113,7 +113,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# even if the player's block ate all of it.
 				Status.consume_after_attack(combatant.statuses)
 				# ...and one on the player that lasted only until an attack
-				# against them resolved (Deflection) spends a charge.
+				# against them resolved (No Further's) goes, or spends a charge.
 				Status.consume_after_attack_against(player.statuses)
 				# Only now can the attack's HP loss grant anything (No
 				# Further): after the attack, so it never softens itself.
