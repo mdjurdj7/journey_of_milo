@@ -42,6 +42,13 @@ class_name EnemyData
 @export var pain_turn_line: String = ""
 @export var pain_turn_sound: AudioStream = null
 
+# Elite-tier content (the Wardling). A tag only for now - nothing rolls or
+# rewards on it yet.
+@export var is_elite: bool = false
+# Said where it stood, in the world voice, as it dies (RegionField._on_
+# enemy_defeated()). Empty = nothing.
+@export var defeat_line: String = ""
+
 # The field body. RegionField copies these onto the FieldEnemy it
 # spawns for this data (RegionField._spawn_floor_enemies()), the same
 # way it hands over `required`/`group`; FieldEnemy._spawn_model() does
@@ -80,3 +87,11 @@ class_name EnemyData
 # enemy's; a roaming one wants its own body's size, so drifting past him
 # never reaches out and takes him.
 @export var contact_radius_m: float = 2.0
+# How it behaves on the field before a fight. DEFAULT: stands as placed.
+# WATCHER: stands as placed until the Wanderer comes within notice_radius_
+# m, then turns to face him once, over notice_turn_seconds (eased), and
+# holds - no other motion, no following, no second turn.
+enum FieldBehaviour { DEFAULT, WATCHER }
+@export var field_behaviour: FieldBehaviour = FieldBehaviour.DEFAULT
+@export var notice_radius_m: float = 8.0
+@export var notice_turn_seconds: float = 2.0

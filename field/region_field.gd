@@ -727,6 +727,9 @@ func _spawn_floor_enemies() -> void:
 		enemy.rest_height = entry.enemy_data.rest_height_m
 		enemy.battle_hover = entry.enemy_data.battle_hover_m
 		enemy.contact_radius = entry.enemy_data.contact_radius_m
+		enemy.notice_radius = entry.enemy_data.notice_radius_m
+		enemy.notice_turn_seconds = entry.enemy_data.notice_turn_seconds
+		enemy.field_behaviour = entry.enemy_data.field_behaviour
 		enemy.face_shore_at_spawn = false
 		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)
 		enemy.rotation.y = deg_to_rad(entry.yaw_degrees)
@@ -1345,6 +1348,10 @@ func _on_enemy_defeated(enemy: FieldEnemy, overlay: BattleOverlay) -> void:
 	# Dead from here whichever path frees it - no contact, no cluster
 	# roster, no gate waiting on it (see FieldEnemy.mark_defeated()).
 	enemy.mark_defeated()
+	# Its defeat line, where it stood - anchored to the body, which the
+	# line leaves in place if it goes first.
+	if enemy.enemy_data != null:
+		_say_near_enemy(enemy, enemy.enemy_data.defeat_line)
 	if overlay.battle_controller.enemies.is_empty() and not enemy.is_battle_hovering():
 		return
 	enemy.settle_and_free()

@@ -1,0 +1,35 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
+[ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
+[ext_resource type="AudioStream" uid="uid://cv4ojiaajic3y" path="res://assets/audio/enemies_old/Works_Wardling/Ragged Breath.mp3" id="3_ragged_breath"]
+
+[sub_resource type="Resource" id="EnemyIntent_first"]
+script = ExtResource("2_intent")
+value = 9
+
+[sub_resource type="Resource" id="EnemyIntent_second"]
+script = ExtResource("2_intent")
+value = 5
+
+[sub_resource type="Resource" id="EnemyIntent_third"]
+script = ExtResource("2_intent")
+value = 11
+
+[resource]
+script = ExtResource("1_enemy_data")
+enemy_name = "Wardling"
+max_hp = 90
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_first"), SubResource("EnemyIntent_second"), SubResource("EnemyIntent_third")])
+escalation_multipliers = Array[float]([1.0, 1.3, 1.6, 2.0])
+escalation_stage_length = 2
+pain_turn_hp_threshold = 0.5
+pain_turn_line = "A ragged breath. It isn't moving."
+pain_turn_sound = ExtResource("3_ragged_breath")
+is_elite = true
+defeat_line = "The Wardling is still."
+model_scene_path = "res://assets/models/enemies/Wardling/Wardling.glb"
+model_scale = 1.68
+field_behaviour = 1
+notice_radius_m = 8.0
+notice_turn_seconds = 2.0

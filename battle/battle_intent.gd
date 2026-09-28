@@ -100,6 +100,25 @@ class_name BattleIntent
 		_apply_layout()
 @export_group("")
 
+# An escalating enemy's stage (the preview's escalation_stage/_stages):
+# one small square per stage in a row under everything else, the stages
+# reached filled in ink, the rest a hairline outline. Only for an enemy
+# that escalates - no pips, no space for them.
+@export_group("Escalation Pips")
+@export var pip_size_px: float = 5.0:
+	set(value):
+		pip_size_px = value
+		_apply_layout()
+@export var pip_gap_px: float = 4.0:
+	set(value):
+		pip_gap_px = value
+		_apply_layout()
+@export var pip_top_gap_px: float = 6.0:
+	set(value):
+		pip_top_gap_px = value
+		_apply_layout()
+@export_group("")
+
 var target: FieldEnemy = null
 var _label: Label = null
 # Content geometry from _apply_layout(), for _draw().
@@ -118,6 +137,10 @@ var _interrupted: bool = false
 var _ring_fill: float = 0.0
 var _ring_centre: Vector2 = Vector2.ZERO
 var _rule_top: float = 0.0
+# The escalation pips: how many, how many filled, where the row's top is.
+var _pip_count: int = 0
+var _pip_filled: int = 0
+var _pip_top: float = 0.0
 # "Revealed" is the overlay's say (frame settled, not acting); the display
 # is only visible when revealed AND it has something to show.
 var _revealed: bool = false
@@ -187,6 +210,8 @@ func show_intent(preview: Dictionary) -> void:
 		var threshold: int = int(preview.get("threshold", 0))
 		var left: int = int(preview.get("threshold_left", 0))
 		_threshold_label.text = str(left) if _has_threshold else ""
+		_pip_count = int(preview.get("escalation_stages", 0))
+		_pip_filled = mini(int(preview.get("escalation_stage", 0)) + 1, _pip_count)
 		_ring_fill = 1.0 if _interrupted else (clampf(float(threshold - left) / float(threshold), 0.0, 1.0) if threshold > 0 else 0.0)
 	_apply_layout()
 	_update_visibility()
@@ -224,6 +249,10 @@ func _apply_layout() -> void:
 	if _has_threshold:
 		content_width = maxf(content_width, ring_box)
 		content_height += ring_top_gap_px + ring_box
+	if _pip_count > 0:
+		content_width = maxf(content_width, _pips_width())
+		_pip_top = content_height + pip_top_gap_px
+		content_height = _pip_top + pip_size_px
 
 	size = Vector2(content_width, content_height)
 	pivot_offset = size / 2.0
@@ -270,6 +299,8 @@ func _draw() -> void:
 	_stroke(points, hairline_alpha if _interrupted else 1.0)
 	if _has_threshold:
 		_draw_ring()
+	if _pip_count > 0:
+		_draw_pips(ink)
 
 	var rule_thickness: float = lethal_rule_px if _lethal else hairline_thickness_px
 	var rule_color: Color = ink
@@ -277,6 +308,22 @@ func _draw() -> void:
 		rule_color.a = hairline_alpha
 	var rule_left: float = (size.x - hairline_width_px) * 0.5
 	draw_rect(Rect2(rule_left, _rule_top, hairline_width_px, rule_thickness), rule_color)
+
+func _pips_width() -> float:
+	return float(_pip_count) * pip_size_px + float(maxi(_pip_count - 1, 0)) * pip_gap_px
+
+# The pips, centred: the reached stages filled in ink, the rest outlined
+# in ink at hairline_alpha - one hairline wide, like the rule.
+func _draw_pips(ink: Color) -> void:
+	var left: float = roundf((size.x - _pips_width()) * 0.5)
+	var faint: Color = ink
+	faint.a = hairline_alpha
+	for i in _pip_count:
+		var rect := Rect2(left + float(i) * (pip_size_px + pip_gap_px), _pip_top, pip_size_px, pip_size_px)
+		if i < _pip_filled:
+			draw_rect(rect, ink)
+		else:
+			draw_rect(rect, faint, false, hairline_thickness_px)
 
 # The threshold gauge: the whole track at hairline ink, then the fill in
 # full ink from ring_start_degrees clockwise (screen angles grow
