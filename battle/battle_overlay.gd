@@ -330,6 +330,19 @@ func _refresh_standing_row() -> void:
 		status_texts.append(active.label())
 	_field_hp_bar.set_standing_row(stance_text, status_texts)
 
+	# The hover reveal: what each of those does now, in the row's order.
+	var reveal_names := PackedStringArray()
+	var reveal_lines := PackedStringArray()
+	if stance != null and stance.data != null and not stance.data.description.is_empty():
+		reveal_names.append(stance.data.display_name)
+		reveal_lines.append(stance.describe())
+	for active: Status in battle_controller.player.statuses:
+		if active.data == null or active.data.description.is_empty():
+			continue
+		reveal_names.append(active.data.display_name)
+		reveal_lines.append(active.describe())
+	_field_hp_bar.set_reveal_lines(reveal_names, reveal_lines)
+
 # Block moved somewhere (a card, a turn start, an enemy's own guard) -
 # every readout's segment follows.
 func _on_status_changed() -> void:
@@ -340,6 +353,14 @@ func _on_status_changed() -> void:
 		if status != null and is_instance_valid(status):
 			status.set_block(battle_controller.get_enemy_block(enemy))
 			status.set_status_row(battle_controller.get_enemy_status_labels(enemy))
+			var reveal_names := PackedStringArray()
+			var reveal_lines := PackedStringArray()
+			for active: Status in battle_controller.get_enemy_statuses(enemy):
+				if active.data == null or active.data.description.is_empty():
+					continue
+				reveal_names.append(active.data.display_name)
+				reveal_lines.append(active.describe())
+			status.set_reveal_lines(reveal_names, reveal_lines)
 
 func _on_turn_phase_changed(player_turn: bool) -> void:
 	_player_turn = player_turn
@@ -440,9 +461,13 @@ func _debug_print_enemy_bar_gaps() -> void:
 		# (the cards sit well below it - see HandContainer.get_rest_top_y()).
 		var gap: float = hand_container.get_rest_top_y() - bar_bottom.y
 		print("BattleOverlay: enemy '%s' HP readout bottom-to-hand gap = %.1f px" % [enemy.enemy_id, gap])
+		# What a hover reveal has to fit in: from a one-line status row's
+		# bottom to the resting cards.
+		print("BattleOverlay: enemy '%s' status row bottom-to-hand gap = %.1f px" % [enemy.enemy_id, hand_container.get_rest_top_y() - status.get_status_row_bottom_y()])
 	if _field_hp_bar != null:
 		var hp_bottom: float = (_field_hp_bar.get_global_transform() * Vector2(0.0, _field_hp_bar.size.y)).y
 		print("BattleOverlay: Wanderer HP readout bottom-to-hand gap = %.1f px" % (hand_container.get_rest_top_y() - hp_bottom))
+		print("BattleOverlay: Wanderer status row bottom-to-hand gap = %.1f px" % (hand_container.get_rest_top_y() - _field_hp_bar.get_status_row_bottom_y()))
 
 func _spawn_floating_number(value: int, screen_pos: Vector2) -> void:
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber

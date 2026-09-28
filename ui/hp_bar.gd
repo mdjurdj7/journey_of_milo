@@ -104,6 +104,46 @@ class_name HPBar
 @export var row_glyph_size_px: float = 9.0
 @export var row_glyph_gap_px: float = 5.0
 @export var row_glyph_line_width_px: float = 1.3
+
+@export_group("Status Reveal")
+# Hovering the HP readout - block shield, numerals, bar and standing row,
+# not Toll - in battle shows what the stance and each status do, one
+# entry each, this far under the row (or the bar, with no row) and
+# wrapped at battle_width, fading in and out over reveal_fade_time, ink
+# at reveal_line_alpha, in the card's rules type at reveal_font_size_px
+# (the faces are StatusReveal's - see the "StatusReveal" child's doc).
+@export var reveal_gap_px: float = 6.0:
+	set(value):
+		reveal_gap_px = value
+		if is_node_ready():
+			_apply_layout()
+@export var reveal_fade_time: float = 0.12:
+	set(value):
+		reveal_fade_time = value
+		if _reveal != null:
+			_reveal.set_fade_time(value)
+@export_range(0.0, 1.0) var reveal_line_alpha: float = 0.92:
+	set(value):
+		reveal_line_alpha = value
+		if _reveal != null:
+			_reveal.set_line_alpha(value)
+@export var reveal_font_size_px: int = 13:
+	set(value):
+		reveal_font_size_px = value
+		if _reveal != null:
+			_reveal.set_font_size_px(value)
+# Line pitch in ems, as CardView.rules_line_height.
+@export var reveal_line_height: float = 1.28:
+	set(value):
+		reveal_line_height = value
+		if _reveal != null:
+			_reveal.set_line_height(value)
+# Extra space between two entries, on top of the line pitch.
+@export var reveal_entry_gap_px: float = 4.0:
+	set(value):
+		reveal_entry_gap_px = value
+		if _reveal != null:
+			_reveal.set_entry_gap_px(value)
 @export_group("")
 @export var battle_scale: float = 1.0
 
@@ -187,6 +227,8 @@ var _grace: int = 0
 # draw. Each entry: {"text": String, "glyph": bool}.
 var _row_items: Array[Dictionary] = []
 var _row_font_tracked: Font = null
+# What the row's entries do, shown on hover - see set_reveal_lines().
+var _reveal: StatusReveal = null
 var _toll: int = 0
 var _toll_visible: bool = false
 var _toll_pop: float = 1.0
@@ -261,6 +303,15 @@ func _ready() -> void:
 	_field_tick.name = "CriticalTick"
 	_field_tick.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_bar_background.add_child(_field_tick)
+
+	_reveal = StatusReveal.new()
+	_reveal.name = "StatusReveal"
+	_reveal.set_fade_time(reveal_fade_time)
+	_reveal.set_line_alpha(reveal_line_alpha)
+	_reveal.set_font_size_px(reveal_font_size_px)
+	_reveal.set_line_height(reveal_line_height)
+	_reveal.set_entry_gap_px(reveal_entry_gap_px)
+	add_child(_reveal)
 
 	_apply_layout()
 	refresh_style()
@@ -376,7 +427,29 @@ func _apply_layout() -> void:
 	_numbers_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_numbers_label.modulate.a = field_alpha
 
+	if _reveal != null:
+		_reveal.position = Vector2(_block_readout_width(), _battle_content_size().y + reveal_gap_px)
+		_reveal.set_wrap_width(battle_width)
+
 	queue_redraw()
+
+# Where a standing row's bottom sits in canvas pixels, whether or not one
+# is up yet - for BattleOverlay's one-shot clearance print, which runs
+# before any stance or status lands.
+func get_status_row_bottom_y() -> float:
+	var bottom: float = _battle_bar_top() + battle_bar_height
+	if _row_font_tracked != null:
+		bottom += row_gap_px + _row_font_tracked.get_height(row_font_size_px)
+	return (get_global_transform() * Vector2(0.0, bottom)).y
+
+# Whether the cursor is on the drawn HP readout, block shield to standing
+# row (Toll is its own readout) - polled, never a mouse event, so the
+# targeting raycast underneath gets every click. A card or button under
+# the cursor wins.
+func _is_readout_hovered() -> bool:
+	if get_viewport().gui_get_hovered_control() != null:
+		return false
+	return Rect2(0.0, 0.0, _block_readout_width() + battle_width, _battle_content_size().y).has_point(get_local_mouse_position())
 
 # The battle readout, at _battle_blend alpha over the fading field nodes.
 # One baseline for the row: numeral, then " / max" run on at its smaller
@@ -532,6 +605,8 @@ func refresh_style() -> void:
 	# uses, so the row reads as the same voice as "STRIKE"/"GUARD".
 	_row_font_tracked = InkType.tracked(InkType.text_bold_font(), row_font_size_px, row_tracking_em)
 	_toll_label_tracked = InkType.tracked(name_font, toll_label_size_px, toll_label_tracking_em)
+	if _reveal != null:
+		_reveal.set_ink(_ink)
 	_apply_critical_colors()
 	_apply_layout()
 
@@ -566,6 +641,9 @@ func _physics_process(delta: float) -> void:
 	var hovered: bool = not _in_battle and HoverRaycast.is_hovering(get_viewport(), _wanderer)
 	var low_hp: bool = _current_fraction <= low_hp_fraction
 	_visibility.update(delta, hovered, low_hp, _in_battle)
+
+	# Only once the battle style is fully in - never mid-transition.
+	_reveal.set_revealed(_in_battle and _battle_blend >= 1.0 and _is_readout_hovered())
 
 func _hp_fraction(current: int, max_hp: int) -> float:
 	if max_hp <= 0:
@@ -681,6 +759,14 @@ func set_standing_row(stance_text: String, status_texts: PackedStringArray) -> v
 
 func clear_standing_row() -> void:
 	set_standing_row("", PackedStringArray())
+	set_reveal_lines(PackedStringArray(), PackedStringArray())
+
+# Called by BattleOverlay alongside set_standing_row(): the stance's and
+# each status's name and what it does now (Stance.describe()/Status.
+# describe()), in the row's order - the hover reveal.
+func set_reveal_lines(names: PackedStringArray, lines: PackedStringArray) -> void:
+	if _reveal != null:
+		_reveal.set_lines(names, lines)
 
 # Called by BattleOverlay.enter_battle()/_finish_battle() - bypasses the
 # field hover/hold/low-hp visibility rules entirely while true (see
@@ -695,6 +781,8 @@ func enter_battle(duration: float) -> void:
 func exit_battle(duration: float) -> void:
 	_in_battle = false
 	_block = 0
+	if _reveal != null:
+		_reveal.clear()
 	_tween_battle_blend(0.0, duration)
 
 # Called by BattleOverlay.enter_battle() - puts the Toll block on. The

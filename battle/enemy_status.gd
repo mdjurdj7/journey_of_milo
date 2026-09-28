@@ -98,6 +98,46 @@ class_name EnemyStatus
 @export var status_row_gap_px: float = 6.0
 @export var status_row_item_gap_px: float = 14.0
 
+@export_group("Status Reveal")
+# Hovering the readout - name, numerals, bar and status row - in battle
+# shows what each status does, one entry each, this far under the status
+# row (or the bar, with no row) and wrapped at battle_width, fading in and
+# out over reveal_fade_time, ink at reveal_line_alpha, in the card's rules
+# type at reveal_font_size_px (the faces are StatusReveal's - see the
+# "StatusReveal" child's doc).
+@export var reveal_gap_px: float = 6.0:
+	set(value):
+		reveal_gap_px = value
+		if _is_ready:
+			_apply_layout()
+@export var reveal_fade_time: float = 0.12:
+	set(value):
+		reveal_fade_time = value
+		if _reveal != null:
+			_reveal.set_fade_time(value)
+@export_range(0.0, 1.0) var reveal_line_alpha: float = 0.92:
+	set(value):
+		reveal_line_alpha = value
+		if _reveal != null:
+			_reveal.set_line_alpha(value)
+@export var reveal_font_size_px: int = 13:
+	set(value):
+		reveal_font_size_px = value
+		if _reveal != null:
+			_reveal.set_font_size_px(value)
+# Line pitch in ems, as CardView.rules_line_height.
+@export var reveal_line_height: float = 1.28:
+	set(value):
+		reveal_line_height = value
+		if _reveal != null:
+			_reveal.set_line_height(value)
+# Extra space between two statuses' entries, on top of the line pitch.
+@export var reveal_entry_gap_px: float = 4.0:
+	set(value):
+		reveal_entry_gap_px = value
+		if _reveal != null:
+			_reveal.set_entry_gap_px(value)
+
 @export_group("Distance Scale")
 @export var min_scale: float = 0.6
 @export var max_scale: float = 1.0
@@ -120,6 +160,8 @@ var _name_font_tracked: Font = null
 var _status_font_tracked: Font = null
 # The status row's labels - see set_status_row().
 var _status_texts: PackedStringArray = PackedStringArray()
+# What the statuses do, shown on hover - see set_reveal_lines().
+var _reveal: StatusReveal = null
 
 # 0 = field style, 1 = battle style - see HPBar._battle_blend's own doc,
 # same mechanism.
@@ -156,6 +198,14 @@ func _ready() -> void:
 	process_physics_priority = 1
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_visibility = HoverFadeVisibility.new(self, fade_time, hp_change_hold_time)
+	_reveal = StatusReveal.new()
+	_reveal.name = "StatusReveal"
+	_reveal.set_fade_time(reveal_fade_time)
+	_reveal.set_line_alpha(reveal_line_alpha)
+	_reveal.set_font_size_px(reveal_font_size_px)
+	_reveal.set_line_height(reveal_line_height)
+	_reveal.set_entry_gap_px(reveal_entry_gap_px)
+	add_child(_reveal)
 
 	_apply_layout()
 	refresh_style()
@@ -251,6 +301,10 @@ func _apply_layout() -> void:
 	hp_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hp_label.modulate.a = field_alpha
 
+	if _reveal != null:
+		_reveal.position = Vector2(_block_readout_width(), _status_row_bottom() + reveal_gap_px)
+		_reveal.set_wrap_width(battle_width)
+
 	queue_redraw()
 
 # The battle readout, at _battle_blend alpha over the fading field nodes -
@@ -298,6 +352,32 @@ func _draw_status_row(top: float, left: float) -> void:
 		x += InkType.draw_run(self, _status_font_tracked, text, Vector2(x, baseline), status_row_font_size_px, color)
 		x += status_row_item_gap_px
 
+# The bottom of the battle readout as drawn: the status row's, or the
+# bar's with no row. The row hangs below this control's size (see its
+# doc), so this can be past size.y.
+func _status_row_bottom() -> float:
+	return _status_row_bottom_for(not _status_texts.is_empty())
+
+func _status_row_bottom_for(with_row: bool) -> float:
+	var bottom: float = _numeral_ascent() + _numeral_descent() + battle_row_gap + battle_bar_height
+	if with_row and _status_font_tracked != null:
+		bottom += status_row_gap_px + _status_font_tracked.get_height(status_row_font_size_px)
+	return bottom
+
+# Where a status row's bottom sits in canvas pixels, whether or not one is
+# up yet - for BattleOverlay's one-shot clearance print, which runs before
+# any status lands.
+func get_status_row_bottom_y() -> float:
+	return (get_global_transform() * Vector2(0.0, _status_row_bottom_for(true))).y
+
+# Whether the cursor is on the drawn readout, block shield to status row -
+# polled, never a mouse event, so the targeting raycast underneath gets
+# every click. A card or button under the cursor wins.
+func _is_readout_hovered() -> bool:
+	if get_viewport().gui_get_hovered_control() != null:
+		return false
+	return Rect2(0.0, 0.0, size.x, _status_row_bottom()).has_point(get_local_mouse_position())
+
 func _enemy_name() -> String:
 	if target == null or not is_instance_valid(target) or target.enemy_data == null:
 		return ""
@@ -332,7 +412,8 @@ func refresh_style() -> void:
 	_ink = get_theme_color("ink", "Battle")
 	_name_font_tracked = InkType.tracked(name_font, battle_name_size_px, battle_name_tracking_em)
 	_status_font_tracked = InkType.tracked(InkType.text_bold_font(), status_row_font_size_px, status_row_tracking_em)
-	queue_redraw()
+	_reveal.set_ink(_ink)
+	_apply_layout()
 
 func _build_bar_style(color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
@@ -385,7 +466,15 @@ func set_block(block: int) -> void:
 # only, like the block.
 func set_status_row(texts: PackedStringArray) -> void:
 	_status_texts = texts
-	queue_redraw()
+	# The row's height places the reveal under it.
+	if _is_ready:
+		_apply_layout()
+
+# Called by BattleOverlay alongside set_status_row(): each status's name
+# and what it does now (Status.describe()), same order - the hover reveal.
+func set_reveal_lines(names: PackedStringArray, lines: PackedStringArray) -> void:
+	if _reveal != null:
+		_reveal.set_lines(names, lines)
 
 # Called by BattleOverlay when this enemy's fight starts/ends (see its own
 # _create_enemy_statuses()/_finish_battle()) - bypasses the field hover/
@@ -401,6 +490,8 @@ func exit_battle(duration: float) -> void:
 	_in_battle = false
 	_block = 0
 	_status_texts = PackedStringArray()
+	if _reveal != null:
+		_reveal.clear()
 	_tween_battle_blend(0.0, duration)
 
 func _tween_battle_blend(target_blend: float, duration: float) -> void:
@@ -440,3 +531,6 @@ func _physics_process(delta: float) -> void:
 	var hovered: bool = not _in_battle and HoverRaycast.is_hovering(get_viewport(), target)
 	var low_hp: bool = _current_hp_fraction() <= low_hp_fraction
 	_visibility.update(delta, hovered, low_hp, _in_battle)
+
+	# Only once the battle style is fully in - never mid-transition.
+	_reveal.set_revealed(_in_battle and _battle_blend >= 1.0 and _is_readout_hovered())
