@@ -107,6 +107,34 @@ class_name HPBar
 @export_group("")
 @export var battle_scale: float = 1.0
 
+@export_group("Critical")
+# While the Wanderer is Critical (Combatant.critical_at(), read with the
+# character's own critical_hp_fraction - the fight's rule, not a copy),
+# the HP numeral and the bar's fill turn this colour, in both styles -
+# the field's whole "58/70" label with them. Everything else on the
+# readout stays ink. Eased over critical_fade_time on a crossing either
+# way; no pulse, no glow.
+@export var critical_color: Color = Color(0.46, 0.14, 0.13):
+	set(value):
+		critical_color = value
+		_apply_critical_colors()
+# A hairline across the bar at the Critical line, shown at every HP, in
+# the track's ink at this alpha. It overhangs the bar by critical_tick_
+# overhang_px above and below, so it still reads where the fill covers it.
+@export_range(0.0, 1.0) var critical_tick_alpha: float = 0.5:
+	set(value):
+		critical_tick_alpha = value
+		_apply_critical_colors()
+@export var critical_tick_overhang_px: float = 2.0:
+	set(value):
+		critical_tick_overhang_px = value
+		if is_node_ready():
+			_apply_layout()
+# Read at each crossing, so an edit takes on the next one.
+@export var critical_fade_time: float = 0.2:
+	set(value):
+		critical_fade_time = maxf(value, 0.0)
+
 @export_group("Block Readout")
 # While block is up, the card's open-shield glyph with the block value
 # centred inside it sits to the LEFT of the HP numeral, both ink at
@@ -172,6 +200,20 @@ var _in_battle: bool = false
 var _visibility: HoverFadeVisibility = null
 # Cached theme ink/bone (see refresh_style()).
 var _ink: Color = Color.BLACK
+# The field style's own colours, cached by refresh_style() so the
+# Critical blend can move them and come back: the fill's stylebox and
+# ink, the label's ink, the track's colour (the tick's).
+var _field_fill_style: StyleBoxFlat = null
+var _field_fill_color: Color = Color.BLACK
+var _field_text_color: Color = Color.BLACK
+var _field_track_color: Color = Color.WHITE
+# Critical now (see _refresh_critical()), and how far the numeral and
+# fill have eased toward critical_color: 0 ink, 1 critical_color.
+var _critical: bool = false
+var _critical_blend: float = 0.0
+var _critical_tween: Tween = null
+# The field style's tick - a child of BarBackground, over the fill.
+var _field_tick: ColorRect = null
 var _name_font_tracked: Font = null
 
 # 0 = field style, 1 = battle style. Tweened by enter_battle()/exit_battle()
@@ -210,6 +252,15 @@ func _ready() -> void:
 	_current_fraction = _hp_fraction(_current_hp, _max_hp)
 	_displayed_fraction = _current_fraction
 	_refresh_numbers(_current_hp, _max_hp)
+	# Arrives already in the right colour - a run that loads Critical
+	# doesn't fade into it.
+	_critical = _is_critical()
+	_critical_blend = 1.0 if _critical else 0.0
+
+	_field_tick = ColorRect.new()
+	_field_tick.name = "CriticalTick"
+	_field_tick.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_bar_background.add_child(_field_tick)
 
 	_apply_layout()
 	refresh_style()
@@ -312,6 +363,10 @@ func _apply_layout() -> void:
 	_bar_fill.size = Vector2(bar_size.x * _displayed_fraction, bar_size.y)
 	_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
 
+	if _field_tick != null:
+		_field_tick.position = Vector2(roundf(bar_size.x * _critical_fraction()), -critical_tick_overhang_px)
+		_field_tick.size = Vector2(1.0, bar_size.y + critical_tick_overhang_px * 2.0)
+
 	var numbers_top: float = bar_size.y + row_gap
 	_numbers_label.position = Vector2(0.0, numbers_top)
 	_numbers_label.size = Vector2(bar_size.x, numbers_line_height)
@@ -338,10 +393,13 @@ func _draw() -> void:
 	var track: Color = _ink
 	track.a = battle_track_alpha * _battle_blend
 
+	# The numeral and the fill only: ink eased toward critical_color.
+	var hp_ink: Color = ink.lerp(Color(critical_color, ink.a), _critical_blend)
+
 	var baseline: float = _battle_top_pad() + _numeral_ascent()
 	_draw_block_readout(baseline, ink)
 	var left: float = _block_readout_width()
-	var x: float = left + InkType.draw_run(self, numeral_font, str(_current_hp), Vector2(left, baseline), battle_numeral_size_px, ink)
+	var x: float = left + InkType.draw_run(self, numeral_font, str(_current_hp), Vector2(left, baseline), battle_numeral_size_px, hp_ink)
 	InkType.draw_run(self, numeral_font, battle_max_prefix + str(_max_hp), Vector2(x, baseline), battle_max_size_px, secondary)
 
 	var name_text: String = _character_name()
@@ -351,7 +409,12 @@ func _draw() -> void:
 
 	var bar_top: float = _battle_bar_top()
 	draw_rect(Rect2(left, bar_top, battle_width, battle_bar_height), track)
-	draw_rect(Rect2(left, bar_top, battle_width * _displayed_fraction, battle_bar_height), ink)
+	draw_rect(Rect2(left, bar_top, battle_width * _displayed_fraction, battle_bar_height), hp_ink)
+	# The Critical line, after the fill, overhanging the bar.
+	var tick_color: Color = _ink
+	tick_color.a = critical_tick_alpha * _battle_blend
+	var tick_x: float = roundf(left + battle_width * _critical_fraction())
+	draw_rect(Rect2(tick_x, bar_top - critical_tick_overhang_px, 1.0, battle_bar_height + critical_tick_overhang_px * 2.0), tick_color)
 
 	# Pinned to _displayed_fraction, so it stays welded to the filled end
 	# while the bar eases toward a new HP value rather than briefly
@@ -452,7 +515,11 @@ func refresh_style() -> void:
 	var outline_color: Color = get_theme_color("panel_color", "CardFace")
 
 	_bar_background.add_theme_stylebox_override("panel", _build_bar_style(track_color))
-	_bar_fill.add_theme_stylebox_override("panel", _build_bar_style(text_color))
+	_field_fill_style = _build_bar_style(text_color)
+	_bar_fill.add_theme_stylebox_override("panel", _field_fill_style)
+	_field_fill_color = text_color
+	_field_text_color = text_color
+	_field_track_color = track_color
 
 	_numbers_label.add_theme_color_override("font_color", text_color)
 	_numbers_label.add_theme_color_override("font_outline_color", outline_color)
@@ -465,6 +532,7 @@ func refresh_style() -> void:
 	# uses, so the row reads as the same voice as "STRIKE"/"GUARD".
 	_row_font_tracked = InkType.tracked(InkType.text_bold_font(), row_font_size_px, row_tracking_em)
 	_toll_label_tracked = InkType.tracked(name_font, toll_label_size_px, toll_label_tracking_em)
+	_apply_critical_colors()
 	_apply_layout()
 
 func _build_bar_style(color: Color) -> StyleBoxFlat:
@@ -511,6 +579,56 @@ func _on_player_hp_changed(current: int, max_hp: int) -> void:
 	_current_fraction = _hp_fraction(current, max_hp)
 	_tween_bar_to(_current_fraction)
 	_visibility.notify_hp_changed()
+	_refresh_critical()
+
+# Whether the Wanderer is Critical at the HP the run holds now - the
+# fight's own rule (Combatant.critical_at()) with the character's own
+# fraction, so this can't drift from what the cards read.
+func _is_critical() -> bool:
+	if RunState.character == null:
+		return false
+	return Combatant.critical_at(RunState.player_hp, RunState.player_max_hp, RunState.character.critical_hp_fraction)
+
+# Where the Critical line sits along the bar: max HP x the character's
+# fraction, over max HP.
+func _critical_fraction() -> float:
+	if RunState.character == null:
+		return 0.0
+	return clampf(RunState.character.critical_hp_fraction, 0.0, 1.0)
+
+# Re-read on every HP or max-HP change: a crossing either way eases the
+# numeral and fill over critical_fade_time; no crossing, nothing moves.
+func _refresh_critical() -> void:
+	var critical: bool = _is_critical()
+	if critical == _critical:
+		return
+	_critical = critical
+	if _critical_tween != null:
+		_critical_tween.kill()
+	var target: float = 1.0 if critical else 0.0
+	if critical_fade_time <= 0.0:
+		_set_critical_blend(target)
+		return
+	_critical_tween = create_tween()
+	_critical_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_critical_tween.tween_method(_set_critical_blend, _critical_blend, target, critical_fade_time)
+
+func _set_critical_blend(value: float) -> void:
+	_critical_blend = value
+	_apply_critical_colors()
+
+# The Critical blend and the tick, applied: the field's fill and whole
+# label, and the tick's colour; the battle style reads the blend in
+# _draw().
+func _apply_critical_colors() -> void:
+	if not is_node_ready():
+		return
+	if _field_fill_style != null:
+		_field_fill_style.bg_color = _field_fill_color.lerp(critical_color, _critical_blend)
+	_numbers_label.add_theme_color_override("font_color", _field_text_color.lerp(critical_color, _critical_blend))
+	if _field_tick != null:
+		_field_tick.color = Color(_field_track_color, critical_tick_alpha)
+	queue_redraw()
 
 func _refresh_numbers(current: int, max_hp: int) -> void:
 	_numbers_label.text = "%d/%d" % [current, max_hp]

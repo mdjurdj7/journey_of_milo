@@ -102,4 +102,10 @@ func is_critical() -> bool:
 # a card face can ask about the HP it WILL have once its own costs are
 # paid (see EffectContext.preview_hp_cost).
 func is_critical_at(at_hp: int) -> bool:
-	return float(at_hp) <= max_hp * critical_hp_fraction
+	return critical_at(at_hp, max_hp, critical_hp_fraction)
+
+# The Critical rule itself, for any HP, max HP and fraction - static so a
+# readout with no Combatant to ask (HPBar, on the field) reads the same
+# line the fight does. Everything else goes through is_critical_at().
+static func critical_at(at_hp: int, of_max_hp: int, fraction: float) -> bool:
+	return float(at_hp) <= of_max_hp * fraction
