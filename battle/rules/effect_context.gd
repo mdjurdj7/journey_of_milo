@@ -64,7 +64,7 @@ var on_damage: Callable = Callable()
 # The attack bonus (AttackBonus) for the card being resolved, ONCE: the
 # first damage effect to ask gets it, every later one 0 - the bonus is per
 # Attack card, not per hit. Read when that effect resolves, so Critical
-# is judged after whatever the card paid before it (Last Wager's HP). 0 on
+# is judged after whatever the card paid before it (Self-Eater's HP). 0 on
 # anything but an ATTACK.
 func take_attack_bonus() -> int:
 	if not card_is_attack or attack_bonus_taken:

@@ -496,7 +496,7 @@ func _refresh_dynamic_text() -> void:
 	hp_cost_label.visible = _hp_cost > 0
 	var was: CardBonus.State = _bonus_state
 	# Read at the HP the card will have once its own costs are paid, so a
-	# Critical clause the payment itself reaches (Last Wager) already shows.
+	# Critical clause the payment itself reaches (Self-Eater's) already shows.
 	_bonus_state = CardBonus.state(card_data, _bonus_context.for_card_preview(_upfront_hp_cost())) if _bonus_context != null else CardBonus.State.NONE
 	rules_text.text = _style_bonus_clauses(_format_rules(_resolve_tokens(card_data.description)))
 	if _bonus_state != was:
@@ -979,10 +979,10 @@ func _derive_hp_cost(data: CardData) -> int:
 # The HP paid before this card's first conditional or damage effect reads
 # anything: the stance's per-Attack cost (paid before any effect, see
 # EffectResolver.resolve_card()) and the card's own self-damage authored
-# ahead of it (Last Wager's). What the face judges Critical against, so
+# ahead of it (none is, now). What the face judges Critical against, so
 # it shows the number the card will land for, not the one it would at the
-# HP held now. Self-damage authored after (Bite Down's) is paid too late
-# to count.
+# HP held now. Self-damage authored after (Bite Down's, Last Wager's - the
+# Wanderer's attack-then-pay convention) is paid too late to count.
 func _upfront_hp_cost() -> int:
 	var total: int = 0
 	if card_data.card_type == CardData.CardType.ATTACK:

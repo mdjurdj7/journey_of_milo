@@ -12,7 +12,7 @@ extends SceneTree
 
 const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
-const CASES := 11
+const CASES := 12
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const SAFETY_SECONDS := 60.0
 
@@ -31,6 +31,7 @@ func _initialize() -> void:
 	_check_cornered()
 	_check_unbroken()
 	_check_last_wager()
+	_check_last_wager_bonus()
 	_check_dying_light()
 	_check_last_resort()
 	_check_bonus_once_per_card()
@@ -73,17 +74,61 @@ func _check_unbroken() -> void:
 	_expect_eq(player.block, 13, "Unbroken while Critical")
 	_completed += 1
 
+# Last Wager attacks first and pays after, like Bite Down: Critical is
+# judged at the HP held when it is played, so its own 4 HP can make the
+# player Critical but never upgrades the blow that paid it.
 func _check_last_wager() -> void:
 	var card: CardData = _card("last_wager")
-	var player: Combatant = _player(25)
-	_expect_eq(_deal(card, player), 26, "Last Wager: 25 -> 21 pays into Critical")
-	_expect_eq(player.hp, 21, "Last Wager costs 4 HP")
+	var player: Combatant = _player(30)
+	_expect_eq(_deal(card, player), 16, "Last Wager above the line deals 16")
+	_expect_eq(player.hp, 26, "...then loses 4 HP")
 	_expect_eq(player.toll, 4, "Last Wager makes 4 Toll")
+
+	player = _player(25)
+	_expect_eq(_deal(card, player), 16, "Last Wager at 25: its 4 HP reaches Critical, the blow stays 16")
+	_expect_eq(player.hp, 21, "...ends at 21")
+	_expect(player.is_critical(), "...and Critical afterward")
+
+	player = _player(21)
+	_expect_eq(_deal(card, player), 26, "Last Wager already Critical deals 26")
+	_expect_eq(player.hp, 17, "...then loses 4 HP")
+	_expect_eq(player.toll, 4, "...and makes 4 Toll")
+
+	# The order itself: the blow is reported before the payment.
 	player = _player(30)
-	_expect_eq(_deal(card, player), 16, "Last Wager: 30 -> 26 stays above")
+	var enemy := Combatant.new(100)
+	var ctx: EffectContext = _ctx(player, enemy)
+	var reports: Array[String] = []
+	ctx.on_damage = func(who: Combatant, amount: int, kind: String) -> void:
+		reports.append("%s %d %s" % ["player" if who == player else "enemy", amount, kind])
+	_resolver.resolve_card(card, ctx)
+	_expect_eq(reports, ["enemy 16 card", "player 4 self"] as Array[String], "Last Wager: damage first, HP second")
+
+	# The payment can still kill - after the blow has landed.
 	player = _player(3)
-	_deal(card, player)
-	_expect_eq(player.hp, 0, "Last Wager at 3 HP kills, like Bite Down")
+	enemy = Combatant.new(16)
+	_play(card, player, enemy)
+	_expect_eq(enemy.hp, 0, "Last Wager at 3 HP still lands its 16")
+	_expect_eq(player.hp, 0, "...then the 4 HP kills, like Bite Down")
+	_completed += 1
+
+# Last Wager's attack bonus goes through the normal pipeline, read in the
+# same state as its Critical clause: before the payment.
+func _check_last_wager_bonus() -> void:
+	var card: CardData = _card("last_wager")
+	var player: Combatant = _player(50)
+	_play(_card("self_eater"), player, null)
+	_expect_eq(_deal(card, player), 19, "Last Wager under Self-Eater: 16 + 3")
+	_expect_eq(player.hp, 44, "...Self-Eater's 2 and Last Wager's 4 paid")
+	_expect_eq(player.toll, 6, "...and made into 6 Toll")
+
+	player = _player(25)
+	_play(_card("last_resort"), player, null)
+	_play(_card("dying_light"), player, null)
+	_expect_eq(_deal(card, player), 16, "Last Wager at 25 under Last Resort + Dying Light: no Critical bonus yet")
+	_expect_eq(player.hp, 21, "...Critical only after")
+	_expect_eq(_deal(card, player), 35, "Last Wager at 21 under both: 26 + 6 + 3")
+	_expect_eq(player.hp, 17, "...then loses 4 HP")
 	_completed += 1
 
 func _check_dying_light() -> void:
@@ -184,15 +229,17 @@ func _check_refuse_the_end() -> void:
 	_expect(Status.find_in(player.statuses, power.effects[0].status_data) != null, "Guard untouched by self-damage")
 	_completed += 1
 
-# The face's reading: Last Wager goes LIVE when its own 4 HP would reach
-# Critical - the preview copy judges Critical after the card's costs.
+# The face's reading: Last Wager's 4 HP is paid after its blow, so it
+# goes LIVE only when the player is Critical already - not when its own
+# payment would get them there.
 func _check_preview() -> void:
 	var card: CardData = _card("last_wager")
 	var player: Combatant = _player(25)
-	var ctx: EffectContext = _ctx(player, null).for_card_preview(4)
-	_expect_eq(CardBonus.state(card, ctx), CardBonus.State.LIVE, "Last Wager previews LIVE at 25")
+	var ctx: EffectContext = _ctx(player, null).for_card_preview(0)
+	_expect_eq(CardBonus.state(card, ctx), CardBonus.State.DORMANT, "Last Wager previews DORMANT at 25")
+	player.hp = 21
+	_expect_eq(CardBonus.state(card, ctx), CardBonus.State.LIVE, "Last Wager previews LIVE at 21")
 	player.hp = 30
-	_expect_eq(CardBonus.state(card, ctx), CardBonus.State.DORMANT, "Last Wager previews DORMANT at 30")
 	_expect_eq(AttackBonus.for_player(player, 21), 0, "No bonus with nothing held")
 	_completed += 1
 
@@ -231,8 +278,12 @@ func _check_faces() -> void:
 
 	player.hp = 25
 	face = await _face("last_wager", player)
-	_expect(face.contains("Deal 16 damage"), "Last Wager's {else} half: " + face)
+	_expect(face.begins_with("Deal 16 damage"), "Last Wager's {else} half, first: " + face)
 	_expect(face.contains("deal 35"), "Last Wager's {if} half (26 + 6 + 3): " + face)
+	_expect(face.ends_with("Lose 4 HP."), "Last Wager's HP line, last: " + face)
+	_expect_eq(await _face_state("last_wager", player), CardBonus.State.DORMANT, "Last Wager's face DORMANT at 25")
+	player.hp = 21
+	_expect_eq(await _face_state("last_wager", player), CardBonus.State.LIVE, "Last Wager's face LIVE at 21")
 
 	face = await _face("unbroken", player)
 	_expect(face.contains("Gain 0 block") and face.contains("gain 0"), "Unbroken under Last Resort: " + face)
@@ -265,6 +316,19 @@ func _face(card_name: String, player: Combatant) -> String:
 	var text: String = regex.sub(view.rules_text.text, "", true)
 	view.queue_free()
 	return text
+
+# The LIVE/DORMANT reading a battle-hand face shows for `card_name`.
+func _face_state(card_name: String, player: Combatant) -> CardBonus.State:
+	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(view)
+	await process_frame
+	view.set_stance(player.stance)
+	view.set_toll(player.toll)
+	view.set_bonus_context(_ctx(player, null))
+	view.set_card_data(_card(card_name))
+	var state: CardBonus.State = view._bonus_state
+	view.queue_free()
+	return state
 
 func _player(hp: int) -> Combatant:
 	var player := Combatant.new(MAX_HP)
