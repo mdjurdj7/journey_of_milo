@@ -21,3 +21,4 @@ description = "In 4 turns, deal 40 damage.
 Spending Toll reduces the countdown by 1."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status_to_target")])
 art = ExtResource("9_art")
+play_sound_path = "res://assets/audio/cards/Sentence/Sentence.mp3"
