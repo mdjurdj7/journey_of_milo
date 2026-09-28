@@ -6,7 +6,7 @@
 script = ExtResource("1_status_data")
 id = "dying_light"
 display_name = "Dying Light"
-description = "While Critical, your Attacks deal 3 more damage. Stacks."
+description = "While Critical, your Attacks deal {bonus} more damage."
 category = 2
 default_duration_turns = -1
 stack_rule = 3

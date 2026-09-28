@@ -41,9 +41,18 @@ const DURATION_UNTIL_TRIGGERED := -2
 @export var id: String = ""
 @export var display_name: String = ""
 @export_multiline var description: String = ""
-# Rules text, not flavor - what this status actually does, including its
-# consumption rule where relevant (see braced.tres: gone once the
-# enemy's next attack lands, whether or not it deals damage).
+# Rules text, not flavor - one short sentence in card voice saying what
+# this status does, shown when its holder's battle readout is hovered
+# (Status.describe()). A template: these tokens are filled from the live
+# Status, so the numbers move as it's spent -
+#   {charges}  charges left              {turns}  turns left (a countdown's)
+#   {stacks}   stack_count               {percent}  |magnitude| (a MULTIPLY %)
+#   {mark}     attack_bonus_against_holder
+#   {bonus}    attack_damage_bonus × stacks
+#   {damage}   countdown_damage          {grant}  grants_on_critical's charges
+#   {s}        "s" unless the count token before it is 1 ("Attack{s}")
+# An unknown token is left standing. "It" is the enemy holding it, "you"
+# the player.
 
 @export var category: Category = Category.INFORMATIONAL
 @export var default_magnitude: int = 0

@@ -7,7 +7,7 @@
 script = ExtResource("1_status_data")
 id = "no_further"
 display_name = "No Further"
-description = "When you next enter Critical, gain 2 Deflections. Then it is gone."
+description = "Next time you enter Critical, gain {grant} Deflection."
 category = 2
 default_duration_turns = -1
 stack_rule = 3

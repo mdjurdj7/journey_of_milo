@@ -6,7 +6,7 @@
 script = ExtResource("1_status_data")
 id = "come_due"
 display_name = "Come Due"
-description = "Your next 3 Attacks against this enemy deal 4 more damage."
+description = "+{mark} damage on your next {charges} Attack{s} against it."
 category = 2
 default_charges = 3
 default_duration_turns = -1

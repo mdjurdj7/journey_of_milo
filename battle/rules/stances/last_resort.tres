@@ -6,7 +6,7 @@
 script = ExtResource("1_stance_data")
 id = "last_resort"
 display_name = "Last Resort"
-description = "While Critical, your Attacks deal 6 more. You can't gain block."
+description = "While Critical, your Attacks deal {bonus} more. You can't gain block."
 attack_damage_bonus = 6
 duration_turns = 0
 bonus_requires_critical = true

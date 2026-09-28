@@ -34,6 +34,19 @@ static func apply_to(combatant: Combatant, stance_data: StanceData) -> Stance:
 		combatant.stance = Stance.new(stance_data)
 	return combatant.stance
 
+# What this stance does right now, in rules voice: StanceData.description
+# with its tokens filled from the stacks held (see the token list there;
+# Status.fill_template() does the filling).
+func describe() -> String:
+	if data == null:
+		return ""
+	return Status.fill_template(data.description, {
+		"stacks": stacks,
+		"turns": turns_left,
+		"bonus": data.attack_damage_bonus * stacks,
+		"hp_loss": data.attack_hp_loss * stacks,
+	})
+
 # Extra damage this stance adds to an Attack, all stacks counted. 0 with
 # no stance, which is every fight for a player who hasn't taken one - and
 # 0 when the stance wants Critical and `critical` says the player isn't.

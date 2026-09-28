@@ -25,6 +25,13 @@ class_name StanceData
 
 @export var id: String = ""
 @export var display_name: String = ""
+# Rules text in card voice, one short sentence, shown when the Wanderer's
+# battle readout is hovered (Stance.describe()). A template, filled from
+# the stance held - the same filling statuses use (Status.fill_template()):
+#   {bonus}    attack_damage_bonus × stacks
+#   {hp_loss}  attack_hp_loss × stacks
+#   {stacks}   stacks held               {turns}  turns left
+#   {s}        "s" unless the count token before it is 1
 @export_multiline var description: String = ""
 
 # What playing an ATTACK costs and gives, per stack. The HP loss is

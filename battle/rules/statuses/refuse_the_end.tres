@@ -6,7 +6,7 @@
 script = ExtResource("1_status_data")
 id = "refuse_the_end"
 display_name = "Refuse the End"
-description = "If an enemy hit would kill you while Critical, survive at 1 HP instead. Then it is gone, for the rest of the fight."
+description = "If an enemy would kill you while Critical, survive at 1 HP."
 category = 2
 default_duration_turns = -2
 stack_rule = 3

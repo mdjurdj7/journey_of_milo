@@ -6,7 +6,7 @@
 script = ExtResource("1_status_data")
 id = "deflection"
 display_name = "Deflection"
-description = "The next enemy Attack deals 50% less damage. Consumes 1."
+description = "Take {percent}% less damage from the next {charges} enemy Attack{s}."
 category = 1
 default_magnitude = -50
 default_duration_turns = -1

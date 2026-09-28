@@ -63,6 +63,50 @@ func label() -> String:
 		return "%s ×%d" % [data.display_name, stack_count]
 	return data.display_name
 
+# What this status does right now, in rules voice: StatusData.description
+# with its tokens filled from this instance's live numbers (see the token
+# list on StatusData.description). Read by the battle readouts' reveal.
+func describe() -> String:
+	if data == null:
+		return ""
+	var grant: int = data.grants_on_critical.default_charges if data.grants_on_critical != null else 0
+	return fill_template(data.description, {
+		"charges": charges,
+		"turns": turns_remaining,
+		"stacks": stack_count,
+		"percent": absi(magnitude),
+		"mark": data.attack_bonus_against_holder,
+		"bonus": data.attack_damage_bonus * stack_count,
+		"damage": data.countdown_damage,
+		"grant": grant,
+	})
+
+# Replaces each {token} in `text` with its value from `values`, and each
+# {s} with "s" unless the nearest count token before it is 1 - so a
+# template's noun follows its number ("1 Attack", "2 Attacks"). A token
+# with no value is left standing, the way a card's is, so a mis-authored
+# template reads as wrong rather than quietly printing 0. Shared with
+# Stance.describe().
+static func fill_template(text: String, values: Dictionary) -> String:
+	var regex := RegEx.new()
+	regex.compile("\\{(\\w+)\\}")
+	var result: String = ""
+	var last_count: int = 0
+	var cursor: int = 0
+	for match_result: RegExMatch in regex.search_all(text):
+		result += text.substr(cursor, match_result.get_start() - cursor)
+		cursor = match_result.get_end()
+		var token: String = match_result.get_string(1)
+		if token == "s":
+			result += "" if last_count == 1 else "s"
+		elif values.has(token):
+			var value: int = int(values[token])
+			last_count = value
+			result += str(value)
+		else:
+			result += match_result.get_string()
+	return result + text.substr(cursor)
+
 func is_expired() -> bool:
 	if turns_remaining == StatusData.DURATION_UNTIL_REMOVED or turns_remaining == StatusData.DURATION_UNTIL_TRIGGERED:
 		return false

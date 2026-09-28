@@ -6,7 +6,7 @@
 script = ExtResource("1_status_data")
 id = "braced"
 display_name = "Braced"
-description = "This enemy's next attack deals 50% less damage - every hit of it. Gone once that attack lands, blocked or not; anything else it does first leaves it in place."
+description = "Its next Attack deals {percent}% less damage."
 category = 1
 default_magnitude = -50
 default_duration_turns = -2
