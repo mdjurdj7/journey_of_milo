@@ -120,6 +120,14 @@ enum RewardMode { SCREEN, WORLD }
 @export var hold_line_world_line_head_clearance: float = 0.35
 @export_group("")
 
+# An enemy's own world-voice lines (its pain turn's - EnemyData.pain_turn_
+# line - and its defeat's): said near it, this far above its head, held
+# this long.
+@export_group("Enemy Lines")
+@export var enemy_world_line_seconds: float = 3.0
+@export var enemy_world_line_head_clearance: float = 0.35
+@export_group("")
+
 # See hold_line_world_line - per run, not per floor or per scene load (a
 # floor change is a reload).
 static var _hold_line_spoken: bool = false
@@ -1288,6 +1296,7 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# Only reachable now - enter_battle() is what creates battle_controller
 	# (see Wanderer.bind_to_battle()'s own doc).
 	overlay.battle_controller.enemy_defeated.connect(_on_enemy_defeated.bind(overlay))
+	overlay.battle_controller.enemy_pain_turn.connect(_on_enemy_pain_turn)
 	wanderer.bind_to_battle(overlay.battle_controller)
 
 # The Wanderer's stance distance from `from` (the anchor's spot) along
@@ -1339,6 +1348,23 @@ func _on_enemy_defeated(enemy: FieldEnemy, overlay: BattleOverlay) -> void:
 	if overlay.battle_controller.enemies.is_empty() and not enemy.is_battle_hovering():
 		return
 	enemy.settle_and_free()
+
+# The pain turn has just been set: its sound, and its line near it.
+func _on_enemy_pain_turn(enemy: FieldEnemy) -> void:
+	if enemy == null or enemy.enemy_data == null:
+		return
+	enemy.play_pain_turn_sound()
+	_say_near_enemy(enemy, enemy.enemy_data.pain_turn_line)
+
+# One of an enemy's world-voice lines, over its head (see Enemy Lines).
+func _say_near_enemy(enemy: FieldEnemy, text: String) -> void:
+	if text.is_empty():
+		return
+	var line := WorldVoiceLine.on_hud(get_node_or_null(^"FieldHUD"))
+	if line == null:
+		push_warning("RegionField: no FieldHUD to say an enemy's line on.")
+		return
+	line.show_line_near(text, enemy_world_line_seconds, enemy, Vector3.UP * (enemy.get_head_height() + enemy_world_line_head_clearance))
 
 func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay) -> void:
 	wanderer.unbind_battle()

@@ -45,7 +45,7 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0}
+	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false}
 
 	Status.tick_all(combatant.statuses, func(amount: int) -> void:
 		combatant.hp = max(combatant.hp - amount, 0)
@@ -58,9 +58,20 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 	if combatant.hp <= 0 or data.intents.is_empty():
 		return result
 
+	# A drop below the pain line since the player's turn - that turn's own
+	# drops are caught as they land (BattleController._report_damage()) -
+	# or from the countdown just now: this turn's action is the one
+	# cancelled.
+	result["pain_turn_triggered"] = check_pain_turn(combatant, data)
+
 	var intent := current_intent(combatant, data)
 	var interjected: bool = combatant.interjected_intent != null
-	if is_interrupted(combatant, intent):
+	if combatant.pain_turn_pending:
+		# The pain turn: nothing resolves and nothing is queued in its
+		# place - the loop moves on and the turn is counted, as if it had.
+		combatant.pain_turn_pending = false
+		result["pain_turn"] = true
+	elif is_interrupted(combatant, intent):
 		result["interrupted"] = true
 	elif intent != null:
 		match intent.type:
@@ -163,6 +174,12 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	if not data.escalation_multipliers.is_empty():
 		preview["escalation_stage"] = escalation_stage(combatant, data)
 		preview["escalation_stages"] = data.escalation_multipliers.size()
+	# The action a pain turn has cancelled: shown, but it won't resolve -
+	# no number, never lethal.
+	if combatant.pain_turn_pending:
+		preview["pain_turn"] = true
+		preview["per_hit"] = 0
+		return preview
 	if intent.type != EnemyIntent.IntentType.ATTACK:
 		return preview
 	if intent.interrupt_threshold > 0:
@@ -197,6 +214,19 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	preview["damage_to_hp"] = total_to_hp
 	preview["lethal"] = hp <= 0 and not bool(preview.get("interrupted", false))
 	return preview
+
+# The pain turn's trigger (EnemyData.pain_turn_hp_threshold): the first
+# time this living enemy's HP is strictly below that fraction of its max,
+# its next action is cancelled - once per fight. True only on the call
+# that sets it, for the caller to announce.
+static func check_pain_turn(combatant: Combatant, data: EnemyData) -> bool:
+	if data == null or data.pain_turn_hp_threshold <= 0.0 or combatant.pain_turn_used or combatant.hp <= 0:
+		return false
+	if float(combatant.hp) >= float(combatant.max_hp) * data.pain_turn_hp_threshold:
+		return false
+	combatant.pain_turn_used = true
+	combatant.pain_turn_pending = true
+	return true
 
 # The escalation stage of the turn this enemy is about to take (turns_
 # taken + 1): (turn - 1) / escalation_stage_length, held at the last

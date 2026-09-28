@@ -32,6 +32,16 @@ class_name EnemyData
 @export var escalation_multipliers: Array[float] = []
 @export var escalation_stage_length: int = 2
 
+# The pain turn: the first time this enemy's HP falls below this fraction
+# of its max (strictly below), its queued action is cancelled - it does
+# nothing that turn - once per fight (EnemyTurn.check_pain_turn()). The
+# loop and the turn count carry on; escalation isn't reset. The line is
+# said near it and the sound played as it happens. 0 (every enemy by
+# default) is none.
+@export_range(0.0, 1.0, 0.01) var pain_turn_hp_threshold: float = 0.0
+@export var pain_turn_line: String = ""
+@export var pain_turn_sound: AudioStream = null
+
 # The field body. RegionField copies these onto the FieldEnemy it
 # spawns for this data (RegionField._spawn_floor_enemies()), the same
 # way it hands over `required`/`group`; FieldEnemy._spawn_model() does

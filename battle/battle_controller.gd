@@ -59,6 +59,10 @@ signal damage_dealt(source: Variant, target: Variant, amount: int, kind: String)
 # drops the member's displays on this; RegionField takes it off the
 # field.
 signal enemy_defeated(enemy: FieldEnemy)
+# An enemy's pain turn has just been set (EnemyTurn.check_pain_turn()):
+# its next action is cancelled. For the line and the sound; the intent's
+# own change comes through enemy_intent_changed.
+signal enemy_pain_turn(enemy: FieldEnemy)
 signal battle_won()
 signal battle_lost()
 
@@ -386,6 +390,8 @@ func _run_sequential_turn() -> void:
 		if _report_countdown(enemy, combatant, result):
 			status_changed.emit()
 			continue
+		if result["pain_turn_triggered"]:
+			enemy_pain_turn.emit(enemy)
 		if result["attacked"]:
 			var snap_delay: float = enemy.play_attack_snap(_wanderer)
 			if snap_delay > 0.0:
@@ -426,6 +432,8 @@ func _run_simultaneous_turn() -> void:
 		results[enemy] = EnemyTurn.take_turn(combatant, enemy.enemy_data, player)
 		if _report_countdown(enemy, combatant, results[enemy]):
 			continue
+		if results[enemy]["pain_turn_triggered"]:
+			enemy_pain_turn.emit(enemy)
 		acting.append(enemy)
 		if results[enemy]["attacked"]:
 			longest_snap = maxf(longest_snap, enemy.play_attack_snap(_wanderer))
@@ -644,6 +652,11 @@ func _report_damage(source: Variant, target_combatant: Combatant, amount: int, k
 			enemy_hp_changed.emit(enemy, target_combatant.hp, target_combatant.max_hp)
 			if target_combatant.hp <= 0:
 				_drop_enemy(enemy)
+			elif EnemyTurn.check_pain_turn(target_combatant, enemy.enemy_data):
+				# Below its pain line on the player's turn: the action it
+				# shows now is the one cancelled.
+				enemy_pain_turn.emit(enemy)
+				enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
 
 # The enemy is dead: out of the lists first (so no later preview/turn/
 # rect pass touches a node that may be freed), then told. The hover

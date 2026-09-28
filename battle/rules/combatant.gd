@@ -95,6 +95,10 @@ var pack_alone: bool = false
 # turns_taken + 1, which is what escalation reads (EnemyTurn.intent_
 # value()). Per fight, like everything here.
 var turns_taken: int = 0
+# The pain turn (EnemyData.pain_turn_hp_threshold): it has happened this
+# fight, and its cancelled action is still to come.
+var pain_turn_used: bool = false
+var pain_turn_pending: bool = false
 
 func _init(starting_hp: int = 1) -> void:
 	hp = starting_hp

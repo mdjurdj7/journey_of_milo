@@ -79,6 +79,12 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export var contact_volume_variance_db: float = 1.0
 @export var contact_pitch_variance: float = 0.04
 
+# The pain turn's sound (EnemyData.pain_turn_sound), played from this body
+# when the turn is set - read at play time.
+@export_group("Pain Sound")
+@export var pain_volume_db: float = -4.0
+@export_group("")
+
 # How a member of a cluster leaves a fight it didn't end (see settle_and_
 # free()): the model sinks its own height into the sand over settle_time,
 # then the node goes. Unused by a fight's last kill, which RegionField
@@ -128,6 +134,8 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 
 var _contacted: bool = false
 var _contact_player: AudioStreamPlayer3D = null
+# Made on the first pain turn (play_pain_turn_sound()); none before.
+var _pain_player: AudioStreamPlayer3D = null
 var _contact_pool := SoundPool.new()
 # BaseMaterial3D, not StandardMaterial3D: Godot's glTF importer can produce
 # either it or an ORMMaterial3D for a material with a combined metallic-
@@ -561,6 +569,21 @@ func _spawn_contact_audio() -> void:
 	_contact_player.bus = &"SFX"
 	_contact_player.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_contact_player)
+
+# EnemyData.pain_turn_sound, once, from this body - on the SFX bus and
+# through the battle freeze, like the contact sound. Nothing without one.
+func play_pain_turn_sound() -> void:
+	if enemy_data == null or enemy_data.pain_turn_sound == null:
+		return
+	if _pain_player == null:
+		_pain_player = AudioStreamPlayer3D.new()
+		_pain_player.name = "PainAudio"
+		_pain_player.bus = &"SFX"
+		_pain_player.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(_pain_player)
+	_pain_player.stream = enemy_data.pain_turn_sound
+	_pain_player.volume_db = pain_volume_db
+	_pain_player.play()
 
 func play_contact_sound() -> void:
 	var clip: AudioStream = _contact_pool.next()

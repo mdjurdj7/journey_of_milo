@@ -176,7 +176,12 @@ func show_intent(preview: Dictionary) -> void:
 		if _type == EnemyIntent.IntentType.BURROW:
 			_label.text = ""
 		_has_threshold = preview.has("threshold")
-		_interrupted = bool(preview.get("interrupted", false))
+		# A pain turn's cancelled action reads as interrupted, with no
+		# number: it won't land at all.
+		var pain_turn: bool = bool(preview.get("pain_turn", false))
+		if pain_turn:
+			_label.text = ""
+		_interrupted = pain_turn or bool(preview.get("interrupted", false))
 		# The numeral counts down to 0 and stays; the gauge fills with
 		# what has been dealt, full once the threshold is met.
 		var threshold: int = int(preview.get("threshold", 0))
