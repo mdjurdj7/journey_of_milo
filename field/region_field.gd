@@ -975,6 +975,13 @@ func _setup_field_hud() -> void:
 	deck_panel.get_parent().add_child(toll_line)
 	toll_line.set_toll(RunState.toll)
 	toll_line.sit_beside(deck_panel)
+	# KEEPSAKE beside TOLL, the same way; hidden while the slot is empty,
+	# and RunState.keepsake_changed keeps it current - see KeepsakeLine.
+	var keepsake_line := KeepsakeLine.new()
+	keepsake_line.name = "KeepsakeLine"
+	keepsake_line.theme = deck_panel.theme
+	deck_panel.get_parent().add_child(keepsake_line)
+	keepsake_line.sit_beside(toll_line)
 	hp_bar.set_target(wanderer)
 
 # Parents a FieldEnemy's own persistent HP display under this field's HUD
