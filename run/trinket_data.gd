@@ -29,13 +29,27 @@ class_name TrinketData
 #   {heal}   heal_on_win             {draw}  opening_draw_bonus
 #   {s}      "s" unless the count token before it is 1
 @export_multiline var description: String = ""
+# The shortened line for where it's shown small - the "currently held"
+# strip on KeepsakeOffer. The same tokens as description. Empty = the
+# full description.
+@export_multiline var short_description: String = ""
+# The object itself, isolated on a transparent background, square - drawn
+# large on KeepsakeOffer and small in its held strip, and there for any
+# other place that shows the keepsake. Null = no picture; nothing breaks.
+@export var art: Texture2D = null
 @export var combat_start_status: StatusData = null
 @export var heal_on_win: int = 0
 @export var opening_draw_bonus: int = 0
 
 func describe() -> String:
+	return _fill(description)
+
+func describe_short() -> String:
+	return _fill(short_description) if not short_description.is_empty() else describe()
+
+func _fill(template: String) -> String:
 	var status: StatusData = combat_start_status
-	return Status.fill_template(description, {
+	return Status.fill_template(template, {
 		"bonus": status.attack_damage_bonus if status != null else 0,
 		"toll": status.self_loss_toll_bonus if status != null else 0,
 		"heal": heal_on_win,

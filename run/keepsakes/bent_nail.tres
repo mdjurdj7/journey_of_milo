@@ -1,7 +1,8 @@
-[gd_resource type="Resource" script_class="TrinketData" load_steps=3 format=3]
+[gd_resource type="Resource" script_class="TrinketData" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/keen.tres" id="2_status"]
+[ext_resource type="Texture2D" path="res://assets/textures/keepsakes/bent_nail.png" id="9_art"]
 
 [resource]
 script = ExtResource("1_trinket_data")
@@ -9,3 +10,5 @@ id = &"bent_nail"
 display_name = "Bent Nail"
 description = "At the start of each combat, +{bonus} damage on your next Attack."
 combat_start_status = ExtResource("2_status")
+short_description = "+{bonus} damage on the first Attack each combat."
+art = ExtResource("9_art")
