@@ -328,6 +328,8 @@ var _fight_fallen: Array[EnemyData] = []
 # A keepsake rolled on the last win, waiting for the normal reward to
 # close before it's offered (_open_pending_keepsake_offer()).
 var _pending_keepsake: TrinketData = null
+# Who left it - the enemy's name, for the offer's quiet source line.
+var _pending_keepsake_source: String = ""
 var _floor_cleared_emitted: bool = false
 # Debug builds only (_setup_debug_row()): the field's F1 row, and which
 # of debug_keepsake_paths its button grants next.
@@ -1611,6 +1613,7 @@ func _roll_keepsake_drop(won_against: Array[EnemyData]) -> void:
 			continue
 		RunState.note_keepsake_offered(drop)
 		_pending_keepsake = drop
+		_pending_keepsake_source = data.enemy_name
 		print("RegionField: '%s' left the keepsake '%s'." % [data.enemy_name, drop.display_name])
 		return
 
@@ -1619,13 +1622,15 @@ func _open_pending_keepsake_offer() -> void:
 		return
 	var trinket: TrinketData = _pending_keepsake
 	_pending_keepsake = null
-	open_keepsake_offer(trinket)
+	open_keepsake_offer(trinket, _pending_keepsake_source)
 
 # A keepsake offered over the field, under the belongings screen's own
-# scrim and freeze: TAKE / LEAVE on an empty slot, TAKE / KEEP on a full
-# one (KeepsakeOffer). False while a fight is open or the field is
-# already frozen under another screen.
-func open_keepsake_offer(trinket: TrinketData) -> bool:
+# scrim and freeze: TAKE / LEAVE on an empty slot, TAKE / KEEP CURRENT on
+# a full one (KeepsakeOffer). `source` names who dropped it ("Wardling"),
+# shown as a quiet line under its name; empty for a keepsake with no
+# named source (the debug grant, later the Keeper or a shop). False while
+# a fight is open or the field is already frozen under another screen.
+func open_keepsake_offer(trinket: TrinketData, source: String = "") -> bool:
 	if trinket == null or _battle_open or not can_process():
 		return false
 	var scene := load(keepsake_offer_scene_path) as PackedScene
@@ -1633,7 +1638,7 @@ func open_keepsake_offer(trinket: TrinketData) -> bool:
 		push_warning("RegionField: could not load %s; no keepsake offer." % keepsake_offer_scene_path)
 		return false
 	var offer := scene.instantiate() as KeepsakeOffer
-	offer.setup(trinket, RunState.keepsake)
+	offer.setup(trinket, RunState.keepsake, source)
 	offer.closed.connect(_on_keepsake_offer_closed)
 	if _loot_screen != null and is_instance_valid(_loot_screen):
 		_loot_screen.close()
