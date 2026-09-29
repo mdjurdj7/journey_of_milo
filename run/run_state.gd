@@ -22,6 +22,8 @@ signal deck_changed()
 signal gold_changed(amount: int)
 # The new total, like gold_changed.
 signal toll_changed(amount: int)
+# The keepsake slot changed - the new one, or null for empty.
+signal keepsake_changed(keepsake: TrinketData)
 
 var player_hp: int = 0
 var player_max_hp: int = 0
@@ -51,6 +53,16 @@ var gold: int = 0
 # has anything to write back. Mutated only through set_toll().
 var toll: int = 0
 
+# The one keepsake slot - a TrinketData, or null. Never more than one:
+# a second is a choice (take it and leave this, or keep this and leave
+# it - KeepsakeOffer), never a stack. Survives every fight and floor, as
+# everything here does; new_run() empties it. Changed only through
+# equip_keepsake().
+var keepsake: TrinketData = null
+# The ids of every keepsake offered this run, taken or left - what a
+# unique_per_run table entry is kept out by (KeepsakeTable.roll()).
+var keepsakes_offered: Array[StringName] = []
+
 var character: CharacterData = null
 
 var current_region_index: int = 0
@@ -59,9 +71,9 @@ var current_floor_index: int = 0
 # The zone intro (ZoneIntro, played by RegionField) is owed exactly once,
 # by the first floor of a NEW run: new_run() raises this and RegionField
 # consumes it (reads and clears) in its _ready(). A floor change
-# (reload_current_scene()) and the RunOver restart (change_scene back to
-# the field) never call new_run(), so neither raises it - the intro is a
-# run's first frame, not a floor's.
+# (reload_current_scene()) never calls new_run(), so it never raises it -
+# the intro is a run's first frame, not a floor's. The RunOver restart
+# does call new_run() (RunOver._on_restart_pressed()): a new run.
 var run_opening_pending: bool = false
 
 # Raised by the boot scene (TitleScreen) alone, consumed by RegionField's
@@ -95,6 +107,8 @@ func new_run(starting_character: CharacterData) -> void:
 	rng.seed = run_seed
 	gold = 0
 	toll = 0
+	keepsake = null
+	keepsakes_offered.clear()
 	player_max_hp = starting_character.max_hp
 	player_hp = player_max_hp
 	deck = _build_starting_deck(starting_character)
@@ -117,6 +131,7 @@ func new_run(starting_character: CharacterData) -> void:
 	deck_changed.emit()
 	gold_changed.emit(gold)
 	toll_changed.emit(toll)
+	keepsake_changed.emit(keepsake)
 
 func _build_starting_deck(starting_character: CharacterData) -> Array[CardData]:
 	var cards: Array[CardData] = []
@@ -191,6 +206,34 @@ func set_toll(value: int) -> void:
 		return
 	toll = clamped
 	toll_changed.emit(toll)
+
+# The slot's one mutator: `trinket` in, whatever was there left behind.
+# null empties it. Emits only on a real change.
+func equip_keepsake(trinket: TrinketData) -> void:
+	if trinket == keepsake:
+		return
+	keepsake = trinket
+	keepsake_changed.emit(keepsake)
+
+# Acquiring a keepsake: an empty slot takes it at once (true); a full one
+# changes nothing (false) - the caller offers the take-or-keep choice.
+func acquire_keepsake(trinket: TrinketData) -> bool:
+	if trinket == null or keepsake != null:
+		return false
+	equip_keepsake(trinket)
+	return true
+
+# A keepsake has been put in front of the player - remembered for the
+# run whether they take it or not (see keepsakes_offered).
+func note_keepsake_offered(trinket: TrinketData) -> void:
+	if trinket != null and not keepsakes_offered.has(trinket.id):
+		keepsakes_offered.append(trinket.id)
+
+# A fight was won (not escaped): the keepsake's heal_on_win, if any.
+# Called by RegionField._on_battle_finished()'s WIN branch.
+func settle_keepsake_win() -> void:
+	if keepsake != null:
+		heal(keepsake.heal_on_win)
 
 # The run's one card-grant path (rewards, the Keeper's offer, a find on
 # the sand). The deck holds a COPY, never the pool's own resource - the

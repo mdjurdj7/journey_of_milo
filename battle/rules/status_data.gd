@@ -145,6 +145,13 @@ const DURATION_UNTIL_TRIGGERED := -2
 # that goes through DamagePipeline.apply_bypass(), which doesn't ask.
 @export var prevents_lethal_while_critical: bool = false
 
+# Extra Toll the next time its holder loses HP to their own effect (a
+# card's self-damage, a stance's price, a status tick) - on top of the
+# Toll that loss accrues anyway, never from an enemy's hit. Spends one
+# charge each time it pays; at 0 charges it's gone (Status.take_self_
+# loss_toll_bonus(), from Combatant.gain_self_loss_toll()). 0 = none.
+@export var self_loss_toll_bonus: int = 0
+
 # Can be held at most once per fight: while it's active, or once it has
 # fired (Combatant.spent_statuses), a card that would apply it can't be
 # played (EffectResolver.card_blocked()).

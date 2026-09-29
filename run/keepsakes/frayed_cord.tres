@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="TrinketData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/frayed.tres" id="2_status"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"frayed_cord"
+display_name = "Frayed Cord"
+description = "The first time each combat you lose HP to your own effect, gain {toll} extra Toll."
+combat_start_status = ExtResource("2_status")
