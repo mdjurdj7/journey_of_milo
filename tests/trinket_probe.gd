@@ -16,7 +16,7 @@ extends SceneTree
 # the RunState autoload (RegionField, BattleController, KeepsakeOffer):
 # a SceneTree script compiles before the autoloads register.
 
-const CASES := 21
+const CASES := 22
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 const KEEPSAKE_OFFER_SCENE_PATH := "res://battle/keepsake_offer.tscn"
@@ -59,6 +59,7 @@ func _initialize() -> void:
 	_check_frayed_cord_self_loss()
 	_check_frayed_cord_not_enemy_damage()
 	_check_descriptions()
+	_check_art()
 	_check_never_in_card_rewards()
 	_check_wardling_table_guaranteed()
 	await _check_combat_start_and_worn_page()
@@ -104,7 +105,7 @@ func _check_offer_take_replaces() -> void:
 	var shell: TrinketData = load(WHITE_SHELL_PATH)
 	_run_state.call("equip_keepsake", nail)
 	var offer: Node = await _open_offer(shell, nail)
-	_expect_eq(_choice_label(offer, 1), "KEEP", "A full slot offers TAKE / KEEP")
+	_expect_eq(_choice_label(offer, 1), "KEEP CURRENT", "A full slot offers TAKE / KEEP CURRENT")
 	offer.call("_activate", 0)
 	await process_frame
 	_expect(_keepsake() == shell, "TAKE replaces: White Shell held, Bent Nail left behind")
@@ -119,7 +120,7 @@ func _check_offer_keep_leaves_new() -> void:
 	var offer: Node = await _open_offer(shell, nail)
 	offer.call("_activate", 1)
 	await process_frame
-	_expect(_keepsake() == nail, "KEEP leaves the new one behind: Bent Nail still held")
+	_expect(_keepsake() == nail, "KEEP CURRENT leaves the new one behind: Bent Nail still held")
 	# An empty slot's offer is TAKE / LEAVE, and LEAVE leaves it empty.
 	_run_state.call("equip_keepsake", null)
 	offer = await _open_offer(shell, null)
@@ -238,6 +239,17 @@ func _check_descriptions() -> void:
 		var trinket: TrinketData = load(path)
 		print("   ", trinket.display_name, ": ", trinket.describe())
 		_expect(not trinket.describe().contains("{"), "%s's description has no unfilled token" % trinket.display_name)
+	_completed += 1
+
+# Every prototype keepsake has its object art: a square texture, for the
+# offer's large view and its small held strip alike.
+func _check_art() -> void:
+	for path in [BENT_NAIL_PATH, WHITE_SHELL_PATH, FRAYED_CORD_PATH, WORN_PAGE_PATH]:
+		var trinket: TrinketData = load(path)
+		_expect(trinket.art != null, "%s has art" % trinket.display_name)
+		if trinket.art != null:
+			_expect_eq(trinket.art.get_width(), trinket.art.get_height(), "...square")
+		_expect(not trinket.describe_short().is_empty() and not trinket.describe_short().contains("{"), "%s has a filled short line" % trinket.display_name)
 	_completed += 1
 
 # Card rewards draw from RewardPools, and a pool holds CardData. No
@@ -394,9 +406,12 @@ func _check_wardling_drop_offered() -> void:
 	_expect(offer != null, "The keepsake offer follows the reward")
 	if offer != null:
 		_expect_eq(_choice_label(offer, 1), "LEAVE", "...TAKE / LEAVE with an empty slot")
+		_expect_eq(str(offer.get("_source")), "Wardling", "...its source line names the Wardling")
+		_expect(not _field.can_process(), "...over a frozen field")
 		offer.call("_activate", 0)
 		await process_frame
 		_expect(_keepsake() != null and StringName(_keepsake().id) == StringName(offered[0]), "TAKE equips the offered keepsake")
+		_expect(_field.can_process(), "...and the field is live again once it closes")
 	await _teardown()
 	# A Sputter leaves none.
 	controller = await _start_fight(0, &"")
@@ -427,8 +442,11 @@ func _check_debug_row() -> void:
 		var offer: Node = _child_with_script(_field, "keepsake_offer.gd")
 		_expect(offer != null, "A second grant into a full slot opens the replace-or-keep offer")
 		if offer != null:
-			offer.call("_activate", 1)
+			_expect_eq(str(offer.get("_source")), "", "...with no source line - the grant has no named source")
+			offer.call("_activate", 0)
 			await process_frame
+			var line: Node = _field.get_node("FieldHUD/KeepsakeLine")
+			_expect_eq(str(line.get("_value_text")), "White Shell", "After TAKE replaces it, the KEEPSAKE line names the new one")
 	await _teardown()
 	_completed += 1
 
