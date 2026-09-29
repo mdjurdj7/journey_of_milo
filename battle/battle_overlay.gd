@@ -341,6 +341,12 @@ func _refresh_standing_row() -> void:
 			continue
 		reveal_names.append(active.data.display_name)
 		reveal_lines.append(active.describe())
+	# The keepsake last: not a status, but what it does is part of what the
+	# Wanderer carries into this fight (TrinketData.describe()).
+	var keepsake: TrinketData = RunState.keepsake
+	if keepsake != null:
+		reveal_names.append(keepsake.display_name)
+		reveal_lines.append(keepsake.describe())
 	_field_hp_bar.set_reveal_lines(reveal_names, reveal_lines)
 
 # Block moved somewhere (a card, a turn start, an enemy's own guard) -

@@ -170,14 +170,17 @@ so it doesn't get silently reinvented or silently forgotten.
   samples the sand once. (2026-09-25, Siltjaw rules pass; 2026-09-26,
   roam removed.)
 - **The focus-language drawing is copied, not shared.** The title menu,
-  `RewardScreen`, `LootScreen` and now `BelongingsScreen` each draw the
-  same focus language (utility grey at rest, bone or ink plus a short
-  hairline to the left when focused); the three screens each carry
-  their own outlined-text helper, and `RewardScreen` and
-  `BelongingsScreen` each build their own scrim. Extracting one helper means touching
-  the reward screen, which was out of scope for the alcove belongings
-  pass, so the fourth copy went in as a copy. Extract when one of those
-  screens is next open for work. (2026-09-26, alcove belongings.)
+  `RewardScreen`, `LootScreen`, `BelongingsScreen` and now
+  `KeepsakeOffer` each draw the same focus language (utility grey at
+  rest, bone or ink plus a short hairline to the left when focused);
+  the four screens each carry their own outlined-text helper, and
+  `RewardScreen`, `BelongingsScreen` and `KeepsakeOffer` each build
+  their own scrim. Extracting one helper means touching the reward
+  screen, which was out of scope for the alcove belongings pass, so the
+  fourth copy went in as a copy; the keepsake prototype added the fifth
+  the same way. `TroughChoice`, in progress in another session, will be
+  the sixth. Extracting the shared helper is the next task once both
+  have landed. (2026-09-26, alcove belongings; 2026-09-28, keepsakes.)
 - **Floor 3 (Map4) is a walkable shell, not a finished floor.** One
   placeholder Sputter stands on the required fight at (-3, -9) so the
   gate has an enemy to measure from and the line something to lift on;
