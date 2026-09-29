@@ -50,6 +50,7 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {mark}     attack_bonus_against_holder
 #   {bonus}    attack_damage_bonus × stacks
 #   {damage}   countdown_damage          {grant}  grants_on_critical's charges
+#   {toll}     self_loss_toll_bonus
 #   {s}        "s" unless the count token before it is 1 ("Attack{s}")
 # An unknown token is left standing. "It" is the enemy holding it, "you"
 # the player.

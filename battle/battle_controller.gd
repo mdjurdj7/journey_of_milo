@@ -113,6 +113,11 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	player.grace_window_turns = RunState.character.grace_window_turns
 	player.critical_hp_fraction = RunState.character.critical_hp_fraction
 	player.energy = player.max_energy
+	# The keepsake's part in the fight opening (see TrinketData): its
+	# status on the Wanderer now, its extra cards in the opening draw below.
+	var keepsake: TrinketData = RunState.keepsake
+	if keepsake != null:
+		keepsake.apply_combat_start(player.statuses)
 
 	_combatants.clear()
 	var enemy_names: Array[String] = []
@@ -142,9 +147,12 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		var combatant: Combatant = _combatants[enemy]
 		enemy_hp_changed.emit(enemy, combatant.hp, combatant.max_hp)
 
+	# A status the keepsake opened the fight with shows from the first frame.
+	status_changed.emit()
 	_push_enemy_target_available()
 	energy_changed.emit(player.energy)
-	_hand_container.draw_cards(turn_draw_amount)
+	var opening_bonus: int = maxi(keepsake.opening_draw_bonus, 0) if keepsake != null else 0
+	_hand_container.draw_cards(turn_draw_amount + opening_bonus)
 	_emit_intent_previews()
 	# Each body takes the pose of what it opens on - under way through the
 	# camera's swing, so a rear is held by the time the frame settles.
@@ -528,7 +536,7 @@ func _start_player_turn() -> void:
 	Status.tick_all(player.statuses, func(amount: int) -> void:
 		var lost := DamagePipeline.apply_bypass(amount, player)
 		if lost > 0:
-			player.toll += lost
+			player.gain_self_loss_toll(lost)
 			RunState.lose_hp(lost)
 			hp_changed.emit(player.hp, player.max_hp)
 			toll_changed.emit(player.toll)

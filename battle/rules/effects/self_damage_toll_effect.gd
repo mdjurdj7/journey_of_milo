@@ -11,7 +11,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	if floored_loss > 0:
 		var lost := DamagePipeline.apply_bypass(floored_loss, ctx.player)
 		if lost > 0:
-			ctx.player.toll += lost
+			ctx.player.gain_self_loss_toll(lost)
 			ctx.player.took_damage_this_turn = true
 			ctx.report_damage(ctx.player, lost, "self")
 	var actual_lost := before - ctx.player.hp

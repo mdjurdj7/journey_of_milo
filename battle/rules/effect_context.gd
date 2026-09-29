@@ -70,7 +70,11 @@ func take_attack_bonus() -> int:
 	if not card_is_attack or attack_bonus_taken:
 		return 0
 	attack_bonus_taken = true
-	return AttackBonus.for_player(player, player.hp)
+	var bonus: int = AttackBonus.for_player(player, player.hp)
+	# A charged bonus ("+3 on your next Attack") is spent by the card that
+	# took it - whether or not the blow lands on anyone.
+	Status.spend_attack_bonus_charges(player.statuses, player.is_critical())
+	return bonus
 
 # Every Toll a card spends goes through here: at most what is held, so
 # Toll never goes below 0, and anything spent at all marks the card as
@@ -134,7 +138,7 @@ func pay_stance_attack_cost(amount: int) -> void:
 		return
 	var lost: int = DamagePipeline.apply_bypass(amount, player)
 	if lost > 0:
-		player.toll += lost
+		player.gain_self_loss_toll(lost)
 		player.took_damage_this_turn = true
 		report_damage(player, lost, "self")
 

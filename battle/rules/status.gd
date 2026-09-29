@@ -79,6 +79,7 @@ func describe() -> String:
 		"bonus": data.attack_damage_bonus * stack_count,
 		"damage": data.countdown_damage,
 		"grant": grant,
+		"toll": data.self_loss_toll_bonus,
 	})
 
 # Replaces each {token} in `text` with its value from `values`, and each
@@ -171,6 +172,39 @@ static func attack_bonus(statuses: Array[Status], critical: bool) -> int:
 		if active.data.bonus_requires_critical and not critical:
 			continue
 		total += active.data.attack_damage_bonus * active.stack_count
+	return total
+
+# One Attack card has taken its attack bonus (EffectContext.take_attack_
+# bonus()): every status whose bonus that paid and that counts charges -
+# "+3 on your next Attack" - spends one, and goes at 0. The same gate as
+# attack_bonus() above, so a bonus that waits for Critical spends nothing
+# while it isn't paid. A status without charges (Dying Light) is never
+# touched.
+static func spend_attack_bonus_charges(statuses: Array[Status], critical: bool) -> void:
+	for active in statuses.duplicate():
+		if active.data == null or active.data.attack_damage_bonus == 0 or not active.has_charges():
+			continue
+		if active.data.bonus_requires_critical and not critical:
+			continue
+		active.charges -= 1
+		if active.charges <= 0:
+			statuses.erase(active)
+
+# Its holder just lost HP to their own effect: the extra Toll every
+# status that pays for that grants (StatusData.self_loss_toll_bonus),
+# each spending a charge when it counts them and going at 0. Called only
+# from Combatant.gain_self_loss_toll() - self-inflicted loss, never an
+# enemy's hit.
+static func take_self_loss_toll_bonus(statuses: Array[Status]) -> int:
+	var total: int = 0
+	for active in statuses.duplicate():
+		if active.data == null or active.data.self_loss_toll_bonus <= 0:
+			continue
+		total += active.data.self_loss_toll_bonus
+		if active.has_charges():
+			active.charges -= 1
+			if active.charges <= 0:
+				statuses.erase(active)
 	return total
 
 # One Attack card is landing on the holder of `statuses`: the extra damage

@@ -1411,6 +1411,8 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 
 	match outcome:
 		BattleOverlay.Outcome.WIN:
+			# A win, not an escape: the keepsake's heal_on_win, if any.
+			RunState.settle_keepsake_win()
 			# The reward lands where the last of them fell. Read off the
 			# body still standing when there is one (the last kill, or a
 			# debug win with nobody hurt) BEFORE it is freed - the spread

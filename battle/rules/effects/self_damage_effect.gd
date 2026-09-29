@@ -6,7 +6,7 @@ class_name SelfDamageEffect
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	var lost := DamagePipeline.apply_bypass(effect.value, ctx.player)
 	if lost > 0:
-		ctx.player.toll += lost
+		ctx.player.gain_self_loss_toll(lost)
 		ctx.player.took_damage_this_turn = true
 		ctx.report_damage(ctx.player, lost, "self")
 	# Bite Down's own self-damage-before-weapon-reflect timing gap (Phase 1
