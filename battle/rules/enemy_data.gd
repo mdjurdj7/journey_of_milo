@@ -48,6 +48,10 @@ class_name EnemyData
 # Said where it stood, in the world voice, as it dies (RegionField._on_
 # enemy_defeated()). Empty = nothing.
 @export var defeat_line: String = ""
+# What this enemy can leave as a keepsake - its own table, offered after
+# a won fight's normal reward (RegionField._roll_keepsake_drop()). Null =
+# none, which is every enemy but the Wardling today.
+@export var keepsake_table: KeepsakeTable = null
 
 # The field body. RegionField copies these onto the FieldEnemy it
 # spawns for this data (RegionField._spawn_floor_enemies()), the same

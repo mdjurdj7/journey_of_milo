@@ -42,6 +42,22 @@ enum RewardMode { SCREEN, WORLD }
 @export var loot_screen_scene_path: String = "res://battle/loot_screen.tscn"
 # What a BelongingsCache opens into (see open_belongings_screen()).
 @export var belongings_screen_scene_path: String = "res://battle/belongings_screen.tscn"
+# What a keepsake is offered in (see open_keepsake_offer()).
+@export var keepsake_offer_scene_path: String = "res://battle/keepsake_offer.tscn"
+# Debug builds only: the field's F1 row and its Keepsake button, which
+# grants these in turn (see _on_debug_keepsake_pressed()). Paths, loaded
+# at the press.
+@export var debug_keepsake_paths: PackedStringArray = PackedStringArray([
+	"res://run/keepsakes/bent_nail.tres",
+	"res://run/keepsakes/white_shell.tres",
+	"res://run/keepsakes/frayed_cord.tres",
+	"res://run/keepsakes/worn_page.tres",
+])
+@export var debug_row_position: Vector2 = Vector2(520.0, 40.0):
+	set(value):
+		debug_row_position = value
+		if _debug_row != null:
+			_debug_row.position = debug_row_position
 # Held back until the battle framing has gone: the cards should appear on
 # an ordinary field view, not under the battle camera mid-swing-out.
 # Raised to the camera rig's own battle_transition_time when that's
@@ -305,7 +321,19 @@ var _line_stance_spacing: float = 0.0
 var _battle_members: Array[FieldEnemy] = []
 var _last_fallen_at: Vector3 = Vector3.ZERO
 var _last_fallen_data: EnemyData = null
+# Every enemy killed in the fight in progress - what a keepsake drop is
+# rolled from on the win (_roll_keepsake_drop()). Cleared as each fight
+# ends, whatever the outcome.
+var _fight_fallen: Array[EnemyData] = []
+# A keepsake rolled on the last win, waiting for the normal reward to
+# close before it's offered (_open_pending_keepsake_offer()).
+var _pending_keepsake: TrinketData = null
 var _floor_cleared_emitted: bool = false
+# Debug builds only (_setup_debug_row()): the field's F1 row, and which
+# of debug_keepsake_paths its button grants next.
+var _debug_row: HBoxContainer = null
+var _debug_keepsake_button: Button = null
+var _debug_keepsake_index: int = 0
 # One PackPatrol per FloorData.patrols entry - see _spawn_floor_patrols().
 var _patrols: Array[PackPatrol] = []
 
@@ -422,6 +450,8 @@ func _ready() -> void:
 
 	_setup_exit_gate()
 	_setup_field_hud()
+	if OS.is_debug_build():
+		_setup_debug_row()
 	_build_boundary()
 	_setup_exit_gate_channel()
 
@@ -483,6 +513,13 @@ func _ready() -> void:
 # camera ray hits. Never reached while frozen for battle (PROCESS_MODE_
 # DISABLED gates input too), nor for clicks a HUD control has stopped.
 func _unhandled_input(event: InputEvent) -> void:
+	# The debug row's toggle - only where the row exists (debug builds).
+	# In a fight this node is frozen and the battle's own F1 row answers.
+	var key := event as InputEventKey
+	if _debug_row != null and key != null and key.pressed and not key.echo and key.keycode == KEY_F1:
+		_debug_row.visible = not _debug_row.visible
+		get_viewport().set_input_as_handled()
+		return
 	if not (event is InputEventMouseButton) or not event.pressed:
 		return
 	if event.button_index != MOUSE_BUTTON_LEFT and event.button_index != MOUSE_BUTTON_RIGHT:
@@ -1352,6 +1389,7 @@ func _start_battle_hover(members: Array[FieldEnemy]) -> void:
 func _on_enemy_defeated(enemy: FieldEnemy, overlay: BattleOverlay) -> void:
 	_last_fallen_at = enemy.global_position
 	_last_fallen_data = enemy.enemy_data
+	_fight_fallen.append(enemy.enemy_data)
 	# Dead from here whichever path frees it - no contact, no cluster
 	# roster, no gate waiting on it (see FieldEnemy.mark_defeated()).
 	enemy.mark_defeated()
@@ -1430,6 +1468,15 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 			if not standing.is_empty():
 				fell_at = standing[0].global_position
 				fell_to = standing[0].enemy_data
+			# Everyone the fight was won against - the killed, and any still
+			# standing on a debug win - can leave a keepsake, offered once the
+			# normal reward has closed.
+			var won_against: Array[EnemyData] = _fight_fallen.duplicate()
+			for member in standing:
+				# The last kill is left standing for its fold - counted once.
+				if not member.is_defeated():
+					won_against.append(member.enemy_data)
+			_roll_keepsake_drop(won_against)
 			for member in standing:
 				# The last kill folding from the air frees itself.
 				if member.is_settling():
@@ -1458,6 +1505,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 				member.exit_battle_hover()
 		BattleOverlay.Outcome.LOSE:
 			get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
+	_fight_fallen.clear()
 
 # Is a fight the floor demands still standing? FloorEnemy.required,
 # mirrored onto each FieldEnemy; a body queued for deletion is already
@@ -1490,7 +1538,10 @@ func _nearest_required_enemy(from: Vector3) -> FieldEnemy:
 # the time this resumes that node is freed.
 func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	var floor_data := get_floor_data()
-	if floor_data == null or floor_data.reward_pool == null:
+	var has_pool: bool = floor_data != null and floor_data.reward_pool != null
+	# No card reward to wait for: a keepsake rolled on this win is still
+	# offered, after the same beat.
+	if not has_pool and _pending_keepsake == null:
 		return
 	var delay: float = reward_spread_delay_sec
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
@@ -1500,7 +1551,12 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	# The floor can be left, or the run ended, during that beat.
 	if not is_inside_tree():
 		return
+	if not has_pool:
+		_open_pending_keepsake_offer()
+		return
 	if reward_mode == RewardMode.SCREEN:
+		# The keepsake follows when the screen closes (_on_reward_screen_
+		# closed()).
 		_open_reward_screen()
 		return
 	var scene := load(reward_spread_scene_path) as PackedScene
@@ -1513,6 +1569,8 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	spread.roll_by_rarity = true
 	add_child(spread)
 	spread.global_position = fell_at
+	# The cards are on the sand, nothing to close: the keepsake at once.
+	_open_pending_keepsake_offer()
 
 # The interim reward list, over the field. The field goes back under the
 # same process-mode freeze the battle used - which is also what stops
@@ -1537,6 +1595,108 @@ func _open_reward_screen() -> void:
 
 func _on_reward_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
+	_open_pending_keepsake_offer()
+
+# A won fight's keepsake: the first enemy it was won against whose own
+# table (EnemyData.keepsake_table) drops something - never the one held,
+# never a unique one already offered - drawn from the run's generator
+# and held for after the normal reward. Offered is offered: it counts
+# against unique_per_run whether it's then taken or left.
+func _roll_keepsake_drop(won_against: Array[EnemyData]) -> void:
+	for data in won_against:
+		if data == null or data.keepsake_table == null:
+			continue
+		var drop: TrinketData = data.keepsake_table.roll(RunState.rng, RunState.keepsake, RunState.keepsakes_offered)
+		if drop == null:
+			continue
+		RunState.note_keepsake_offered(drop)
+		_pending_keepsake = drop
+		print("RegionField: '%s' left the keepsake '%s'." % [data.enemy_name, drop.display_name])
+		return
+
+func _open_pending_keepsake_offer() -> void:
+	if _pending_keepsake == null:
+		return
+	var trinket: TrinketData = _pending_keepsake
+	_pending_keepsake = null
+	open_keepsake_offer(trinket)
+
+# A keepsake offered over the field, under the belongings screen's own
+# scrim and freeze: TAKE / LEAVE on an empty slot, TAKE / KEEP on a full
+# one (KeepsakeOffer). False while a fight is open or the field is
+# already frozen under another screen.
+func open_keepsake_offer(trinket: TrinketData) -> bool:
+	if trinket == null or _battle_open or not can_process():
+		return false
+	var scene := load(keepsake_offer_scene_path) as PackedScene
+	if scene == null:
+		push_warning("RegionField: could not load %s; no keepsake offer." % keepsake_offer_scene_path)
+		return false
+	var offer := scene.instantiate() as KeepsakeOffer
+	offer.setup(trinket, RunState.keepsake)
+	offer.closed.connect(_on_keepsake_offer_closed)
+	if _loot_screen != null and is_instance_valid(_loot_screen):
+		_loot_screen.close()
+	process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(offer)
+	return true
+
+func _on_keepsake_offer_closed(_taken: bool) -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT
+
+# Debug builds only: a row of debug buttons on the field HUD in the
+# battle row's style (BattleTheme's DebugButton), hidden until F1. One
+# button today - Keepsake. It goes with the DECK line when a fight hides
+# that, so it never sits over a battle.
+func _setup_debug_row() -> void:
+	var hud := get_node_or_null(^"FieldHUD") as CanvasLayer
+	if hud == null:
+		return
+	_debug_row = HBoxContainer.new()
+	_debug_row.name = "DebugRow"
+	_debug_row.theme = deck_panel.theme
+	_debug_row.position = debug_row_position
+	_debug_row.visible = false
+	_debug_keepsake_button = Button.new()
+	_debug_keepsake_button.name = "KeepsakeButton"
+	_debug_keepsake_button.theme_type_variation = &"DebugButton"
+	_debug_keepsake_button.pressed.connect(_on_debug_keepsake_pressed)
+	_debug_row.add_child(_debug_keepsake_button)
+	hud.add_child(_debug_row)
+	deck_panel.visibility_changed.connect(func() -> void:
+		if not deck_panel.visible:
+			_debug_row.visible = false)
+	_refresh_debug_keepsake_button()
+
+# Grants the next of debug_keepsake_paths, skipping the one held: into an
+# empty slot at once, or - the slot full - through the take-or-keep offer.
+func _on_debug_keepsake_pressed() -> void:
+	if debug_keepsake_paths.is_empty() or _battle_open or not can_process():
+		return
+	var trinket: TrinketData = _next_debug_keepsake()
+	if trinket == null:
+		return
+	if not RunState.acquire_keepsake(trinket):
+		open_keepsake_offer(trinket)
+	_refresh_debug_keepsake_button()
+
+func _next_debug_keepsake() -> TrinketData:
+	for _attempt in debug_keepsake_paths.size():
+		var trinket := load(debug_keepsake_paths[_debug_keepsake_index]) as TrinketData
+		_debug_keepsake_index = (_debug_keepsake_index + 1) % debug_keepsake_paths.size()
+		if trinket != null and trinket != RunState.keepsake:
+			return trinket
+	return null
+
+# The button says what it grants next.
+func _refresh_debug_keepsake_button() -> void:
+	if _debug_keepsake_button == null or debug_keepsake_paths.is_empty():
+		return
+	var index: int = _debug_keepsake_index % debug_keepsake_paths.size()
+	var next := load(debug_keepsake_paths[index]) as TrinketData
+	if next == RunState.keepsake:
+		next = load(debug_keepsake_paths[(index + 1) % debug_keepsake_paths.size()]) as TrinketData
+	_debug_keepsake_button.text = "Keepsake: %s" % (next.display_name if next != null else "?")
 
 # A belongings cache's choice, over the field under the reward screen's
 # own freeze (see _open_reward_screen()) - the camera holds where it is

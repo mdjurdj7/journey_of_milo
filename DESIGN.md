@@ -169,6 +169,12 @@ so it doesn't get silently reinvented or silently forgotten.
   roams: it stands at a fixed spot on floor 2's flats, and its mound
   samples the sand once. (2026-09-25, Siltjaw rules pass; 2026-09-26,
   roam removed.)
+- **The battle debug row isn't gated to debug builds.** `BattleOverlay`'s
+  `DebugRow` (Win/Lose/Escape/Draw/Discard) is only hidden by default,
+  and F1 shows it in any build, release included. The field's F1 row
+  (RegionField, the Keepsake button) exists only when
+  `OS.is_debug_build()`; the battle row was left as it is. Gate it the
+  same way before a release build. (2026-09-28, keepsakes.)
 - **The focus-language drawing is copied, not shared.** The title menu,
   `RewardScreen`, `LootScreen`, `BelongingsScreen` and now
   `KeepsakeOffer` each draw the same focus language (utility grey at
