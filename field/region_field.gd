@@ -1106,8 +1106,8 @@ func get_wall_rect() -> Rect2:
 #
 # What carries is whatever lives on RunState (deck, HP, gold, the rng's
 # state) - an autoload, untouched by the reload; the guarded new_run()
-# in _ready() is what keeps it from being reset. Toll lives there too but
-# is the floor's: it goes back to 0 here, as the floor index moves.
+# in _ready() is what keeps it from being reset. Toll lives there too and
+# carries, down to the character's cap (RunState.carry_toll()).
 # Grace is per combat and lives on the fight's Combatant. Past the
 # region's last floor there is nothing yet: say so and go round to floor
 # 1 again (the once-per-run findings stay spent, as they should).
@@ -1135,7 +1135,7 @@ func _on_floor_exited() -> void:
 		RunState.current_floor_index = 0
 	else:
 		RunState.current_floor_index += 1
-	RunState.set_toll(0)
+	RunState.carry_toll()
 	print("RegionField: floor_exited, current_floor_index = %d" % RunState.current_floor_index)
 	get_tree().reload_current_scene()
 
@@ -1374,6 +1374,8 @@ func _say_near_enemy(enemy: FieldEnemy, text: String) -> void:
 	line.show_line_near(text, enemy_world_line_seconds, enemy, Vector3.UP * (enemy.get_head_height() + enemy_world_line_head_clearance))
 
 func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay) -> void:
+	# Whatever the fight ended on, only up to the cap carries on.
+	RunState.carry_toll()
 	wanderer.unbind_battle()
 	_apply_consumed_removals(overlay.battle_controller.deck)
 	overlay.queue_free()

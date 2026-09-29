@@ -44,3 +44,8 @@ enum GraceCapMode { LARGEST_HIT, SUM }
 # Resort) read - see Combatant.is_critical_at(). 0.3 is a playtest
 # starting point, not a settled number.
 @export_range(0.0, 1.0, 0.01) var critical_hp_fraction: float = 0.3
+
+# The most Toll this character keeps once a fight is over: whatever it
+# ends on, it carries min(Toll, this) into the next fight and across a
+# floor advance (RunState.carry_toll()). In a fight Toll runs free.
+@export var toll_carry_cap: int = 5

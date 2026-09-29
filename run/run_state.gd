@@ -42,13 +42,13 @@ var deck: Array[CardData] = []
 # so nothing can change it without the readouts hearing.
 var gold: int = 0
 
-# The Wanderer's Toll. Per FLOOR, not per fight: it carries from one
-# combat to the next on the same floor (won or escaped) and goes back to
-# 0 at the floor advance (RegionField._on_floor_exited()) and in
-# new_run(). The one copy - the player's Combatant reads and writes this
-# through its own toll property (see Combatant.run_toll_owner), so no
-# battle-end path has anything to write back. Mutated only through
-# set_toll().
+# The Wanderer's Toll. It carries from one combat to the next - won or
+# escaped - and across a floor advance, but only up to the character's
+# toll_carry_cap: each fight's end and each floor advance keep min(Toll,
+# cap) (carry_toll()). In a fight it runs free. new_run() starts it at 0.
+# The one copy - the player's Combatant reads and writes this through its
+# own toll property (see Combatant.run_toll_owner), so no battle-end path
+# has anything to write back. Mutated only through set_toll().
 var toll: int = 0
 
 var character: CharacterData = null
@@ -173,6 +173,15 @@ func spend_gold(amount: int) -> bool:
 	gold -= amount
 	gold_changed.emit(gold)
 	return true
+
+# Toll between fights: what's held, down to the character's toll_carry_
+# cap if it's over. Called as each fight ends (RegionField._on_battle_
+# finished(), any outcome) and at the floor advance (RegionField._on_
+# floor_exited()). Nothing without a character.
+func carry_toll() -> void:
+	if character == null:
+		return
+	set_toll(mini(toll, maxi(character.toll_carry_cap, 0)))
 
 # Floored at 0: an overspend clamps rather than leaving a debt. Emits only
 # on a real change.

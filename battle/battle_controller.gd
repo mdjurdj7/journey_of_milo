@@ -106,7 +106,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 
 	player = Combatant.new(RunState.player_max_hp)
 	player.hp = RunState.player_hp
-	# Toll carries between fights on a floor - see RunState.toll.
+	# Toll carries between fights, up to a cap - see RunState.toll.
 	player.run_toll_owner = RunState
 	player.has_grace = RunState.character.has_grace
 	player.grace_cap_mode = RunState.character.grace_cap_mode
