@@ -1,12 +1,25 @@
 extends SceneTree
 
-# Headless probe for the bundle's roll. Loads floor 2's own FloorData,
-# finds its bundle prop, instantiates that scene the way RegionField does
-# (overrides applied, never added to the tree) and rolls it once per seed
-# for SEED_COUNT seeds, with the same arguments RegionField._setup_
-# bundle() passes. Asserts the split is near 80/15/5, that gold stays
-# inside the floor's range x the bundle's multiplier, and that every card
-# comes from the pool it should.
+# Headless probe for the belongings rolls, in two parts.
+#
+# The bundle: no floor carries a BundleProp since floor 2's island bundle
+# became the trough, so this instances bundle_prop.tscn directly and
+# gives it what that placement gave it - the belongings pool, floor 2's
+# gold range and rare pool - then rolls it once per seed for SEED_COUNT
+# seeds, with the arguments RegionField._setup_bundle() passes. Asserts
+# the split is near 80/15/5, that gold stays inside the floor's range x
+# the bundle's multiplier, and that every card comes from the pool it
+# should.
+#
+# The cache: loads floor 2's own FloorData, finds its alcove cache
+# (BelongingsCache), instantiates that scene the way RegionField does
+# (overrides applied, never added to the tree) and rolls it once per seed,
+# with the arguments RegionField._setup_belongings_cache() passes. Asserts
+# every roll fills all three columns, that the shown card comes from the
+# pool, the closed card from the rare source (the pool while the floor's
+# rare_pool is empty) and never the shown card's twin from the same
+# draw, and that gold stays inside the floor's range x the cache's
+# multiplier.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/bundle_roll_probe.gd
 #
@@ -20,6 +33,9 @@ extends SceneTree
 
 const FLOOR_PATH := "res://floors/region1_floor2.tres"
 const BUNDLE_SCENE_PATH := "res://field/bundle_prop.tscn"
+# What floor 2's island bundle drew from before it became the trough.
+const BUNDLE_POOL_PATH := "res://cards/pools/belongings_pool.tres"
+const CACHE_SCENE_PATH := "res://field/belongings_cache.tscn"
 const SEED_COUNT := 10000
 # About four standard deviations at 10,000 rolls.
 const SHARE_TOLERANCE := {"gold": 0.017, "card": 0.015, "rare": 0.009}
@@ -29,22 +45,13 @@ var _failures: int = 0
 
 func _initialize() -> void:
 	var floor_data: Resource = load(FLOOR_PATH)
-	var entry: Resource = null
-	for prop: Resource in floor_data.get("props"):
-		var scene: PackedScene = prop.get("scene")
-		if scene != null and scene.resource_path == BUNDLE_SCENE_PATH:
-			entry = prop
-			break
-	if entry == null:
-		_fail("floor 2 has no bundle prop")
-		_finish()
-		return
+	_probe_bundle(floor_data)
+	_probe_cache(floor_data)
+	_finish()
 
-	var bundle: Node = (entry.get("scene") as PackedScene).instantiate()
-	var overrides: Dictionary = entry.get("overrides")
-	for key: String in overrides:
-		bundle.set(key, overrides[key])
-	var pool: Resource = entry.get("pool") if entry.get("pool") != null else floor_data.get("reward_pool")
+func _probe_bundle(floor_data: Resource) -> void:
+	var bundle: Node = (load(BUNDLE_SCENE_PATH) as PackedScene).instantiate()
+	var pool: Resource = load(BUNDLE_POOL_PATH)
 	var rare_pool: Resource = floor_data.get("rare_pool")
 	var rare_source: Resource = rare_pool if rare_pool != null and not (rare_pool.get("entries") as Array).is_empty() else pool
 	var gold_min: int = floor_data.get("gold_min")
@@ -52,7 +59,7 @@ func _initialize() -> void:
 	var multiplier: float = bundle.get("gold_multiplier")
 	var lowest: int = maxi(roundi(float(mini(gold_min, gold_max)) * multiplier), 1)
 	var highest: int = maxi(roundi(float(maxi(gold_min, gold_max)) * multiplier), 1)
-	print("bundle at %s: pool %s, rare pool %s, gold %d..%d x %.2f -> %d..%d" % [entry.get("position"), pool.resource_path, "none (falls back)" if rare_source == pool else rare_pool.resource_path, gold_min, gold_max, multiplier, lowest, highest])
+	print("bundle (instanced): pool %s, rare pool %s, gold %d..%d x %.2f -> %d..%d" % [pool.resource_path, "none (falls back)" if rare_source == pool else rare_pool.resource_path, gold_min, gold_max, multiplier, lowest, highest])
 
 	var counts := {"gold": 0, "card": 0, "rare": 0}
 	var gold_seen_min: int = 1 << 30
@@ -70,17 +77,17 @@ func _initialize() -> void:
 				gold_seen_min = mini(gold_seen_min, amount)
 				gold_seen_max = maxi(gold_seen_max, amount)
 				if amount < lowest or amount > highest:
-					_fail("seed %d: %d gold, outside %d..%d" % [seed_value, amount, lowest, highest])
+					_fail("bundle seed %d: %d gold, outside %d..%d" % [seed_value, amount, lowest, highest])
 			2:
 				counts["card"] += 1
 				if not (pool.get("entries") as Array).has(card):
-					_fail("seed %d: card '%s' is not in the bundle's pool" % [seed_value, card.resource_path])
+					_fail("bundle seed %d: card '%s' is not in the bundle's pool" % [seed_value, card.resource_path])
 			3:
 				counts["rare"] += 1
 				if not (rare_source.get("entries") as Array).has(card):
-					_fail("seed %d: rare card '%s' is not in the rare source" % [seed_value, card.resource_path])
+					_fail("bundle seed %d: rare card '%s' is not in the rare source" % [seed_value, card.resource_path])
 			_:
-				_fail("seed %d: the bundle rolled nothing" % seed_value)
+				_fail("bundle seed %d: the bundle rolled nothing" % seed_value)
 	bundle.free()
 
 	for kind: String in ["gold", "card", "rare"]:
@@ -90,7 +97,63 @@ func _initialize() -> void:
 		if not ok:
 			_failures += 1
 	print("  gold seen %d..%d" % [gold_seen_min, gold_seen_max])
-	_finish()
+
+func _probe_cache(floor_data: Resource) -> void:
+	var entry: Resource = null
+	for prop: Resource in floor_data.get("props"):
+		var scene: PackedScene = prop.get("scene")
+		if scene != null and scene.resource_path == CACHE_SCENE_PATH:
+			entry = prop
+			break
+	if entry == null:
+		_fail("floor 2 has no belongings cache prop")
+		return
+
+	var cache: Node = (entry.get("scene") as PackedScene).instantiate()
+	var overrides: Dictionary = entry.get("overrides")
+	for key: String in overrides:
+		cache.set(key, overrides[key])
+	var pool: Resource = entry.get("pool") if entry.get("pool") != null else floor_data.get("reward_pool")
+	var rare_pool: Resource = floor_data.get("rare_pool")
+	var rare: bool = rare_pool != null and not (rare_pool.get("entries") as Array).is_empty()
+	var rare_source: Resource = rare_pool if rare else pool
+	var gold_min: int = floor_data.get("gold_min")
+	var gold_max: int = floor_data.get("gold_max")
+	var multiplier: float = cache.get("gold_multiplier")
+	var lowest: int = maxi(roundi(float(mini(gold_min, gold_max)) * multiplier), 1)
+	var highest: int = maxi(roundi(float(maxi(gold_min, gold_max)) * multiplier), 1)
+	print("cache at %s: pool %s, rare pool %s, gold %d..%d x %.2f -> %d..%d" % [entry.get("position"), pool.resource_path, rare_pool.resource_path if rare else "none (falls back)", gold_min, gold_max, multiplier, lowest, highest])
+
+	var gold_seen_min: int = 1 << 30
+	var gold_seen_max: int = 0
+	var twins: int = 0
+	var rng := RandomNumberGenerator.new()
+	for seed_value in SEED_COUNT:
+		rng.seed = seed_value
+		cache.call("roll", rng, gold_min, gold_max, pool, rare_pool)
+		var shown: Resource = cache.get("shown_card")
+		var closed: Resource = cache.get("closed_card")
+		var amount: int = cache.get("gold")
+		if shown == null:
+			_fail("cache seed %d: the shown card rolled nothing" % seed_value)
+		elif not (pool.get("entries") as Array).has(shown):
+			_fail("cache seed %d: shown card '%s' is not in the cache's pool" % [seed_value, shown.resource_path])
+		if closed == null:
+			_fail("cache seed %d: the closed card rolled nothing" % seed_value)
+		elif not (rare_source.get("entries") as Array).has(closed):
+			_fail("cache seed %d: closed card '%s' is not in the rare source" % [seed_value, closed.resource_path])
+		if not rare and shown != null and shown == closed:
+			twins += 1
+		gold_seen_min = mini(gold_seen_min, amount)
+		gold_seen_max = maxi(gold_seen_max, amount)
+		if amount < lowest or amount > highest:
+			_fail("cache seed %d: %d gold, outside %d..%d" % [seed_value, amount, lowest, highest])
+	cache.free()
+
+	# One pool, one two-card draw: the case and the bedroll never match.
+	if twins > 0:
+		_fail("%d rolls put the same card in the case and the bedroll" % twins)
+	print("  gold seen %d..%d, same-card rolls %d" % [gold_seen_min, gold_seen_max, twins])
 
 func _fail(message: String) -> void:
 	_failures += 1
