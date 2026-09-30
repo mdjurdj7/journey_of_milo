@@ -75,6 +75,9 @@ dwell_max_seconds = 5.0
 script = ExtResource("3_floor_prop")
 scene = ExtResource("20_trough")
 position = Vector3(-15.052, 0, -19.878)
+overrides = {
+"trough_yaw_degrees": 45.0
+}
 
 [sub_resource type="Resource" id="FloorProp_rock_shelf"]
 script = ExtResource("3_floor_prop")
