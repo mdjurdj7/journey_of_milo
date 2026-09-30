@@ -211,7 +211,11 @@ so it doesn't get silently reinvented or silently forgotten.
 - **Battle-line placement ignores static props; enemies can be placed
   inside props** (seen with the floor 2 trough and the dragonfly patrol).
   `_place_cluster_line()` and the patrol's perches only avoid wet sand, so
-  the island pack's line and perches pass through the trough (at its
-  yaw 150, back edge up, about 8 of 36 settled battle frames intersect
-  it in an offline 3D check). Follow-up: have battle placement avoid
-  static prop footprints. (2026-09-29, trough.)
+  the island pack's line and perches pass through the trough. The trough
+  now stands at yaw 45 (basin facing southeast, readable from the
+  southern approach; back edge still up); its overlap was re-measured
+  with a different offline 3D check - about 10 of 36 settled battle
+  frames intersect it, ignoring single-point touches - which is not
+  comparable to the earlier "about 8 of 36" at yaw 150. Follow-up: have
+  battle placement avoid static prop footprints. (2026-09-29, trough;
+  yaw 2026-09-30.)
