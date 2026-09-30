@@ -901,6 +901,8 @@ func _spawn_floor_props() -> void:
 			_setup_bundle(prop as BundleProp, entry, floor_data)
 		elif prop is BelongingsCache:
 			_setup_belongings_cache(prop as BelongingsCache, entry, floor_data, id)
+		elif prop is TroughProp:
+			(prop as TroughProp).trough_id = id
 		# A child prop's position is local to its parent (a perch); a top-
 		# level one's is an XZ offset from spawn, grounded by the prop.
 		var placement: Vector3 = entry.position if entry.parent_index >= 0 else Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.z)

@@ -116,13 +116,15 @@ func new_run(starting_character: CharacterData) -> void:
 	current_floor_index = 0
 	# Field findings (a Hull's one-time world line, a Bird's one-time
 	# flight, the Keeper's one-time offer, a belongings cache's one
-	# choice) are remembered per run in their own static sets - see
-	# Hull._findings_shown / Bird._flown / Keeper._offers_made /
-	# BelongingsCache._spent - so a new run starts with none of them spent.
+	# choice, a trough's one drink) are remembered per run in their own
+	# static sets - see Hull._findings_shown / Bird._flown / Keeper._
+	# offers_made / BelongingsCache._spent / TroughProp._drunk - so a new
+	# run starts with none of them spent.
 	Hull.reset_findings()
 	Bird.reset_flights()
 	Keeper.reset_offers()
 	BelongingsCache.reset_spent()
+	TroughProp.reset_drunk()
 	# The LINE exit's world line is said once per run, the same way - see
 	# RegionField.hold_line_world_line.
 	RegionField.reset_hold_line_spoken()

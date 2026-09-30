@@ -199,3 +199,19 @@ so it doesn't get silently reinvented or silently forgotten.
   mass beside the finding's (0.6 m2) are all in the walking frame from
   the route; the east shoulder's (1.8 m2) only from the elite flat.
   (2026-09-26, floor 3.)
+- **A bundle's once-only state doesn't survive a revisit.** `BundleProp`
+  tracks taken (`is_opened`) and its line (`_line_shown`) on the node,
+  and the region wraps back to floor 1 without a new run
+  (`RegionField._on_floor_exited()`), so on a second pass a bundle would
+  roll again and could be taken twice. The fix is Hull's, Keeper's and
+  `TroughProp`'s static set keyed by the spawner's `floor path#index`,
+  cleared by `RunState.new_run()`. No floor carries a bundle since floor
+  2's became the trough, so it waits for the next one. (2026-09-29,
+  trough.)
+- **Battle-line placement ignores static props; enemies can be placed
+  inside props** (seen with the floor 2 trough and the dragonfly patrol).
+  `_place_cluster_line()` and the patrol's perches only avoid wet sand, so
+  the island pack's line and perches pass through the trough (at its
+  yaw 150, back edge up, about 8 of 36 settled battle frames intersect
+  it in an offline 3D check). Follow-up: have battle placement avoid
+  static prop footprints. (2026-09-29, trough.)

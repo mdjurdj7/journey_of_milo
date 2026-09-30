@@ -84,6 +84,7 @@ Anything with colour baked in — the keeper's texture, the Wanderer's — does 
 |---|---|---|
 | Wanderer texture | field | class model; retune by regeneration |
 | Keeper texture | opening floor | tint multiply available |
+| Water Shrine texture (the trough) | floor 2 island | the model's own albedo, water painted in; no tint |
 
 If this list grows past half a dozen, the palette pass has quietly become a regeneration pass.
 
