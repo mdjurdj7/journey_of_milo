@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="TrinketData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"departure_stub"
+display_name = "Departure Stub"
+flavor_text = "The number is still legible."
+description = "Draw {draw} extra card{s} on your first turn of each combat."
+short_description = "+{draw} card on the first turn of each combat."
+opening_draw_bonus = 1

@@ -19,21 +19,24 @@ class_name Keeper
 # a small capsule StaticBody3D so the Wanderer walks around her, not
 # through.
 #
-# Her act: she holds a card out. One is rolled from keeper_pool per run
-# (_pool_pick) and spawned as a WorldCard in her hand at keeper_hand_
-# offset - small and unreadable from a distance, lifting and becoming
-# readable when the Wanderer comes inside its own lift_radius, and
-# granted by clicking it. See field/world_card.gd for all of that; this
-# node only decides WHICH card and what taking means.
+# Her act: she holds a keepsake out - someone else's. One is rolled from
+# keeper_pool (her own KeepsakeTable, not an enemy's) per run (_pool_
+# pick) and spawned as a WorldKeepsake in her hand at keeper_hand_offset -
+# a small square from a distance, opening into an inspection plaque
+# beside her when the Wanderer comes inside its lift_radius, and resolved
+# only by a click on it. See field/world_keepsake.gd for all of that,
+# including taking and replacing; this node only decides WHICH keepsake
+# and what resolving means. What a keepsake does is the run's and the
+# fight's business (TrinketData's hooks), never hers.
 #
-# Taking is the offer. The static seen-set (_offers_made, cleared by
-# RunState.new_run() via reset_offers()) is written when the card is
-# TAKEN, not when she is approached, so a player who walks away finds it
-# still in her hand - on this floor and on any later one - and only
-# taking it ever ends the offer.
+# Resolving is the offer. The static seen-set (_offers_made, cleared by
+# RunState.new_run() via reset_offers()) is written when the plaque is
+# RESOLVED - taken, or left for the one already held - not when she is
+# approached, so a player who walks away finds it still in her hand, on
+# this floor and on any later one.
 #
-# Her line follows the same fact: approach_line while the card is still
-# there, return_line once it's gone, on every approach either way. Two
+# Her line follows the same fact: approach_line while she still holds it
+# out, return_line once it's gone, on every approach either way. Two
 # different beats rather than one line replayed - the shape the old
 # project's NPCData.dialogue_text/post_interaction_text established (see
 # reference/old_project/deck-builder/npc_data.gd) - shown through the
@@ -100,17 +103,14 @@ enum FaceDirection { SEAWARD, INLAND, LEFT, RIGHT }
 		approach_radius = value
 		if _approach_shape != null:
 			_approach_shape.radius = maxf(approach_radius, 0.0)
-# What she can hold out. One is rolled per RUN (not per floor - see
-# _pool_pick) and held in her hand as a WorldCard; taking it is the
-# grant. Class-agnostic resources, so they live in cards/neutral/ rather
-# than under any class folder.
-@export var keeper_pool: Array[CardData] = []
-# Forces which card she holds instead of rolling from keeper_pool. Null
-# (the default) rolls. This used to be the card she granted on approach;
-# approaching no longer grants anything, so it is a dev/authoring
-# override now, not the mechanism.
-@export var offered_card: CardData = null
-# Where the card sits, in THIS node's space - not the model's. The model
+# What she can hold out: her own table (run/keepsakes/keeper/), separate
+# from every enemy's. One is rolled per RUN (not per floor - see _pool_
+# pick) from RunState.rng and held in her hand as a WorldKeepsake.
+@export var keeper_pool: KeepsakeTable = null
+# Forces which keepsake she holds instead of rolling from keeper_pool.
+# Null (the default) rolls. A dev/authoring override, not the mechanism.
+@export var offered_keepsake: TrinketData = null
+# Where the keepsake sits, in THIS node's space - not the model's. The model
 # child carries model_yaw_offset_degrees (180), so a point measured off
 # the mesh has to be turned through that to get here: (x, y, z) becomes
 # (-x, y, -z). Getting this wrong is what put the previous value in open
@@ -131,7 +131,7 @@ enum FaceDirection { SEAWARD, INLAND, LEFT, RIGHT }
 # measurement above is still what the number is derived FROM, so put it
 # back if the camera pitch ever changes.
 @export var keeper_hand_offset: Vector3 = Vector3(0.213, 0.80, -0.45)
-@export var world_card_scene_path: String = "res://field/world_card.tscn"
+@export var world_keepsake_script_path: String = "res://field/world_keepsake.gd"
 @export_group("")
 
 # World voice, not dialogue: no quotes, no name label, no speech framing
@@ -142,7 +142,7 @@ enum FaceDirection { SEAWARD, INLAND, LEFT, RIGHT }
 # marks the first one a placeholder, so it's inherited text rather than
 # settled text. Empty either line and that beat stays silent.
 @export_group("World Voice")
-# The first approach of the run - shown with the card offer.
+# Every approach while she still holds the keepsake out.
 @export_multiline var approach_line: String = "She holds something out. It was not hers."
 # Every approach after the first. No seen-set of its own, on purpose:
 # "you've already taken it" is a standing state, not a one-off event, so
@@ -257,23 +257,27 @@ enum FaceDirection { SEAWARD, INLAND, LEFT, RIGHT }
 @export var ground_path: NodePath = ^"../Ground"
 @export var region_field_path: NodePath = ^".."
 
-# Keepers whose card has been TAKEN this run, keyed by _offer_id() -
-# static so it survives the reload_current_scene() a floor exit does.
-# Cleared by RunState.new_run() via reset_offers() (kept that name: it's
-# what run_state.gd calls). Taking is what writes this, not approaching:
-# the card sits in her hand until the player actually takes it, so a
-# player who walks away still finds it there, and her line still says she
-# is holding something out.
+# Keepers whose offer has been RESOLVED this run (taken, or left for the
+# one held), keyed by _offer_id() - static so it survives the
+# reload_current_scene() a floor exit does. Cleared by RunState.new_run()
+# via reset_offers(). Resolving is what writes this, not approaching: the
+# keepsake stays in her hand until the player chooses, so a player who
+# walks away still finds it there.
 static var _offers_made: Dictionary = {}
 
-# The card rolled for THIS run, shared by every Keeper instance and held
-# across the scene reload a floor exit does - roll once per run, not once
-# per _ready(), or walking out and back would reroll her offer.
-static var _pool_pick: CardData = null
+# The keepsake rolled for THIS run, shared by every Keeper instance and
+# held across the scene reload a floor exit does - roll once per run, not
+# once per _ready(), or walking out and back would reroll her offer.
+# _pool_rolled records that the roll happened even when it came up empty,
+# so an exhausted table isn't re-rolled (and the run's rng re-drawn) on
+# every reload.
+static var _pool_pick: TrinketData = null
+static var _pool_rolled: bool = false
 
 static func reset_offers() -> void:
 	_offers_made.clear()
 	_pool_pick = null
+	_pool_rolled = false
 
 var _model: Node3D = null
 # Normally the ShaderMaterial from keeper_wind.gdshader; a plain
@@ -288,8 +292,9 @@ var _collision_shape: CapsuleShape3D = null
 var _collision_shape_node: CollisionShape3D = null
 var _approach_area: Area3D = null
 var _approach_shape: SphereShape3D = null
-# The card in her hand this run, or null once taken (or never spawned).
-var _world_card: WorldCard = null
+# The keepsake in her hand this run, or null once resolved (or never
+# spawned).
+var _world_keepsake: WorldKeepsake = null
 var _ready_done: bool = false
 
 func _ready() -> void:
@@ -297,7 +302,7 @@ func _ready() -> void:
 	_spawn_collision()
 	_spawn_approach_area()
 	_spawn_contact_shadow()
-	_spawn_world_card()
+	_spawn_world_keepsake()
 	_ready_done = true
 	_apply_facing()
 
@@ -500,16 +505,19 @@ func set_floor_placement(world_position: Vector3, yaw: float, _roll: float) -> v
 	position = Vector3(world_position.x, 0.0, world_position.z)
 	face_yaw_offset_degrees = yaw
 
-# Which line she says follows whether the card is still in her hand, not
-# how many times she has been approached: approach_line while the offer
-# stands, return_line once it has been taken. So a player who walks away
-# without taking hears "she holds something out" again on their way back,
-# which is true - she is still holding it - and only taking it ever
-# switches her to "still facing out".
+# Which line she says follows whether the keepsake is still in her hand,
+# not how many times she has been approached: approach_line while the
+# offer stands, return_line once it has been resolved - or if there was
+# never anything to hold out. So a player who walks away without choosing
+# hears "she holds something out" again on their way back, which is true.
 func _on_approach_body_entered(body: Node3D) -> void:
 	if not body.is_in_group("wanderer"):
 		return
-	_show_line(return_line if _offers_made.has(_offer_id()) else approach_line)
+	_show_line(approach_line if is_offering() else return_line)
+
+# Whether she is holding a keepsake out right now.
+func is_offering() -> bool:
+	return _world_keepsake != null and is_instance_valid(_world_keepsake) and not _offers_made.has(_offer_id())
 
 # Her line on the field's one WorldVoiceLine - the same lazy on_hud()
 # lookup, the same fade-hold-fade, the same FieldHUD a Hull's finding
@@ -530,62 +538,53 @@ func _show_line(line_text: String) -> void:
 	line.fade_out_seconds = fade_seconds
 	line.show_line(line_text, hold_seconds)
 
-# The card in her hand, if this run's hasn't been taken yet. Spawned as a
-# WorldCard child so it inherits her transform - keeper_hand_offset is
-# then a plain local position, and re-facing her carries the card round
-# with her for free.
-func _spawn_world_card() -> void:
+# The keepsake in her hand, if this run's offer hasn't been resolved yet.
+# Spawned as a WorldKeepsake child so it inherits her transform -
+# keeper_hand_offset is then a plain local position, and re-facing her
+# carries it round with her for free.
+func _spawn_world_keepsake() -> void:
 	if _offers_made.has(_offer_id()):
 		return
-	var picked: CardData = _pick_card()
+	var picked: TrinketData = _pick_keepsake()
 	if picked == null:
-		push_warning("Keeper '%s': keeper_pool is empty and offered_card is null; nothing to hold out." % name)
+		push_warning("Keeper '%s': nothing to hold out - keeper_pool is unset or has no keepsake left to offer this run, and offered_keepsake is null." % name)
 		return
-	var scene := load(world_card_scene_path) as PackedScene
-	if scene == null:
-		push_warning("Keeper '%s': could not load %s; no card in hand." % [name, world_card_scene_path])
+	var script := load(world_keepsake_script_path) as Script
+	if script == null:
+		push_warning("Keeper '%s': could not load %s; nothing in her hand." % [name, world_keepsake_script_path])
 		return
-	_world_card = scene.instantiate() as WorldCard
-	_world_card.name = "WorldCard"
-	_world_card.card = picked
-	_world_card.position = keeper_hand_offset
-	# WorldCard resolves FieldHUD/DeckPanel from here; it sits one level
-	# deeper than this node, so RegionField is one step further up than
-	# this node's own region_field_path says - derived from that path
-	# rather than typed, so wherever she is spawned (under the field's
-	# Props node, from FloorData) the card's flight target still resolves.
-	_world_card.region_field_path = NodePath("../%s" % str(region_field_path))
-	_world_card.taken.connect(_on_world_card_taken)
-	add_child(_world_card)
+	_world_keepsake = script.new() as WorldKeepsake
+	_world_keepsake.name = "WorldKeepsake"
+	_world_keepsake.keepsake = picked
+	_world_keepsake.position = keeper_hand_offset
+	_world_keepsake.resolved.connect(_on_world_keepsake_resolved)
+	add_child(_world_keepsake)
 
-# offered_card forces the pick; otherwise roll once per run and remember
-# it. Draws from RunState.rng, the run's own seeded generator, so which
-# card she holds belongs to the run's sequence rather than to whenever
-# the scene happened to load.
-func _pick_card() -> CardData:
-	if offered_card != null:
-		return offered_card
-	if _pool_pick != null:
+# offered_keepsake forces the pick; otherwise roll once per run and
+# remember it (an empty roll included). Draws from RunState.rng, the run's
+# own seeded generator, through her table's own roll(): never the one
+# held, never a unique entry already offered this run. Null when there is
+# nothing left - never a duplicate, never a card in its place.
+func _pick_keepsake() -> TrinketData:
+	if offered_keepsake != null:
+		return offered_keepsake
+	if _pool_rolled:
 		return _pool_pick
-	if keeper_pool.is_empty():
+	_pool_rolled = true
+	if keeper_pool == null:
 		return null
-	_pool_pick = keeper_pool[RunState.rng.randi() % keeper_pool.size()]
+	_pool_pick = keeper_pool.roll(RunState.rng, RunState.keepsake, RunState.keepsakes_offered)
 	return _pool_pick
 
-# Taking is the offer: RunState.add_card() already ran inside WorldCard
-# (the run's one card-grant path - the starting Belongings come from
-# CharacterData.starting_deck_counts in RunState.new_run(), and the battle
-# hand is dealt from the deck by BattleController.setup(), so the card is
-# in the deck for the next fight and shows in the field DeckPanel at once
-# via deck_changed). All that's left here is to remember it happened, so
-# her line switches and the card doesn't come back on the next floor.
-func _on_world_card_taken(card_data: CardData) -> void:
+# Resolved: WorldKeepsake has already equipped it (or left it, for the
+# one held) and noted it offered. All that's left here is to remember it
+# happened, so her line switches and it doesn't come back on the next
+# floor.
+func _on_world_keepsake_resolved(taken: bool) -> void:
 	_offers_made[_offer_id()] = true
-	_world_card = null
-	# The card that was actually taken - NOT offered_card, which is the
-	# optional authoring override and is null on every normal run, since
-	# the card comes from keeper_pool.
-	print("Keeper '%s': offered '%s'." % [name, card_data.card_name])
+	var keepsake: TrinketData = _world_keepsake.keepsake if _world_keepsake != null else null
+	_world_keepsake = null
+	print("Keeper '%s': offered '%s' - %s." % [name, keepsake.display_name if keepsake != null else "?", "taken" if taken else "left"])
 
 # The facing yaw: face_direction relative to the field's forward, plus
 # face_yaw_offset_degrees - same direction<->angle convention as Hull.

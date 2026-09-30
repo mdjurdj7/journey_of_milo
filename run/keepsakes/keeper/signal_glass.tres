@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="TrinketData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"signal_glass"
+display_name = "Signal Glass"
+flavor_text = "It still catches something."
+description = "At the start of each combat, gain {block} Block."
+short_description = "+{block} Block at the start of each combat."
+combat_start_block = 3

@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="TrinketData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"pressed_flower"
+display_name = "Pressed Flower"
+flavor_text = "It grew here."
+description = "After each combat you win, heal {heal} HP."
+short_description = "Heal {heal} HP after each win."
+heal_on_win = 1

@@ -1,0 +1,39 @@
+[gd_resource type="Resource" script_class="KeepsakeTable" load_steps=15 format=3]
+
+[ext_resource type="Script" path="res://run/keepsake_table.gd" id="1_table"]
+[ext_resource type="Script" path="res://run/keepsake_entry.gd" id="2_entry"]
+[ext_resource type="Resource" path="res://run/keepsakes/keeper/house_key.tres" id="3_house_key"]
+[ext_resource type="Resource" path="res://run/keepsakes/keeper/wrapped_sweet.tres" id="4_wrapped_sweet"]
+[ext_resource type="Resource" path="res://run/keepsakes/keeper/blue_fastener.tres" id="5_blue_fastener"]
+[ext_resource type="Resource" path="res://run/keepsakes/keeper/departure_stub.tres" id="6_departure_stub"]
+[ext_resource type="Resource" path="res://run/keepsakes/keeper/signal_glass.tres" id="7_signal_glass"]
+[ext_resource type="Resource" path="res://run/keepsakes/keeper/pressed_flower.tres" id="8_pressed_flower"]
+
+[sub_resource type="Resource" id="KeepsakeEntry_house_key"]
+script = ExtResource("2_entry")
+trinket = ExtResource("3_house_key")
+
+[sub_resource type="Resource" id="KeepsakeEntry_wrapped_sweet"]
+script = ExtResource("2_entry")
+trinket = ExtResource("4_wrapped_sweet")
+
+[sub_resource type="Resource" id="KeepsakeEntry_blue_fastener"]
+script = ExtResource("2_entry")
+trinket = ExtResource("5_blue_fastener")
+
+[sub_resource type="Resource" id="KeepsakeEntry_departure_stub"]
+script = ExtResource("2_entry")
+trinket = ExtResource("6_departure_stub")
+
+[sub_resource type="Resource" id="KeepsakeEntry_signal_glass"]
+script = ExtResource("2_entry")
+trinket = ExtResource("7_signal_glass")
+
+[sub_resource type="Resource" id="KeepsakeEntry_pressed_flower"]
+script = ExtResource("2_entry")
+trinket = ExtResource("8_pressed_flower")
+
+[resource]
+script = ExtResource("1_table")
+entries = Array[ExtResource("2_entry")]([SubResource("KeepsakeEntry_house_key"), SubResource("KeepsakeEntry_wrapped_sweet"), SubResource("KeepsakeEntry_blue_fastener"), SubResource("KeepsakeEntry_departure_stub"), SubResource("KeepsakeEntry_signal_glass"), SubResource("KeepsakeEntry_pressed_flower")])
+guaranteed = true

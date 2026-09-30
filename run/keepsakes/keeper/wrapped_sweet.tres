@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="TrinketData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"wrapped_sweet"
+display_name = "Wrapped Sweet"
+flavor_text = "Saved for later."
+description = "After each combat you win, if you lost HP during it, heal {loss_heal} HP."
+short_description = "Heal {loss_heal} HP after a win you were hurt in."
+heal_on_win_after_loss = 2
