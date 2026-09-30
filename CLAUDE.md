@@ -19,6 +19,8 @@
   confirm the .uid exists, and stage it by path in the same commit as
   the file. The .githooks/pre-commit hook rejects a commit that misses
   one (enable per machine: `git config core.hooksPath .githooks`).
+- The .githooks/ folder also carries the Git LFS hooks, so pushes
+  upload LFS objects; git-lfs must be installed on every machine.
 - Don't stage default_bus_layout.tres unless a bus change was
   intended; revert stray edits from the editor's Audio panel.
 
