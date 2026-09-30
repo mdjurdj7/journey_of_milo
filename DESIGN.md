@@ -53,10 +53,12 @@ so it doesn't get silently reinvented or silently forgotten.
 - **A card pool scan must take an explicit folder list, never "everything
   under `cards/`".** There is no pool scan today (decks come from
   `CharacterData.starting_deck_counts`, by explicit reference), so the
-  question is only which shape the first one takes. `cards/neutral/` now
-  holds class-agnostic cards the Keeper hands out (Left Hand, Untouched,
-  Second Thoughts) - they are hers to give, not reward or shop stock, and
-  a scan rooted at `cards/` would sweep them into both. The old project
+  question is only which shape the first one takes. `cards/neutral/`
+  holds class-agnostic cards the Keeper used to hand out (Left Hand,
+  Untouched, Second Thoughts) - not reward or shop stock, and a scan
+  rooted at `cards/` would sweep them into both. Since 2026-09-30 she
+  offers a keepsake instead and nothing references the three; they stay
+  on disk, unused, until they are given a home or removed. The old project
   hit exactly this and solved it by hiding the cards in a subfolder its
   flat, non-recursive scan happened to miss (`npc_offers/`, see
   `reference/old_project/deck-builder/docs/DESIGN.md`) - a guard that
@@ -225,3 +227,36 @@ so it doesn't get silently reinvented or silently forgotten.
   equipment, keepsakes, workbenches or shrines), what things cost, and
   how often it drops are not designed. Nothing in the build yet grants,
   holds or spends it. (2026-09-30, Glassbone docs.)
+- **Signal Glass shows no future intent.** Its intended effect was to
+  preview each enemy's intent after the current one. The intent
+  architecture doesn't support that cleanly: erratic enemies (Sputter)
+  roll their next intent with the unseeded global `randf()` only when
+  they advance (`EnemyTurn._advance_intent()`); an interrupt, an
+  interjected intent, a lone pack member's skip or a pain turn can
+  replace the next one; and `battle_intent.gd` shows one intent per
+  enemy. It ships as +3 Block at the start of combat
+  (`TrinketData.combat_start_block`). Revisit if intents ever become
+  pre-rolled for their own reasons. (2026-09-30, Keeper keepsakes.)
+- **The keepsake plaque's flavour line is a slanted upright face.** The
+  project ships no italic font, so `WorldKeepsake` leans AlegreyaSans
+  through `FontVariation.variation_transform` (`flavor_slant`, 0.2). It
+  hasn't been seen in a live instance yet; if the lean reads wrong or
+  goes the wrong way, flip the sign or ship an AlegreyaSans Italic and
+  point the plaque at it. The empty art square is a placeholder until the
+  six Keeper keepsakes have object art (`TrinketData.art`). (2026-09-30,
+  Keeper keepsakes.)
+- **Leaving the Keeper's keepsake is final.** With a keepsake already held,
+  her plaque offers REPLACE <held> / KEEP <held>. KEEP resolves the offer
+  the way KeepsakeOffer's KEEP CURRENT does: her keepsake is gone for the
+  run and she won't hold it out again. Walking away without choosing
+  resolves nothing. Revisit if KEEP should leave it in her hand instead.
+  (2026-09-30, Keeper keepsakes.)
+- **The Keeper's plaque can cover the Wanderer.** `WorldKeepsake` always
+  sits to the Keeper's screen-right (`screen_gap_px` 40 past her
+  silhouette). Measured in 1080p stills with him 1.2 m from her on eight
+  sides, it clears him from the spawn side and three others, but covers
+  part of him on the four sides 90-225 degrees round from the spawn side,
+  where he stands to her screen-right. A wider gap can't fix that.
+  Accepted for now. The options are placing it past whichever figure is
+  further right, or flipping it to her left. (2026-09-30, Keeper
+  keepsakes.)
