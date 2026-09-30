@@ -72,6 +72,18 @@ var spent_statuses: Array[StatusData] = []
 # yet - set here, where a loss is counted but no enemy is in reach, and
 # spent by EffectContext.resolve_pending_drain() right after the loss.
 var pending_drain: int = 0
+# The keepsake's free card (TrinketData.first_card_free): while true, the
+# next card played costs 0 Energy. Set by BattleController.setup(), spent
+# by the play itself (_resolve_play()) - never by a hover, a face, or a
+# target armed and cancelled. Per fight, like everything here.
+var first_card_free: bool = false
+# The keepsake's Critical-entry Block (TrinketData.critical_entry_block)
+# and whether it is still waiting: armed only while this fighter is seen
+# OUT of Critical, so opening a fight already there doesn't count as
+# entering it - see resolve_critical_entry(). Once fired, spent for the
+# fight (critical_entry_block drops to 0).
+var critical_entry_block: int = 0
+var critical_entry_armed: bool = false
 
 # --- Enemy-only ---
 #
@@ -142,4 +154,25 @@ static func critical_at(at_hp: int, of_max_hp: int, fraction: float) -> bool:
 func energy_cost(card: CardData) -> int:
 	if card == null:
 		return 0
-	return card.cost
+	return 0 if first_card_free else card.cost
+
+# The Critical-entry edge, checked wherever Critical is (Status.resolve_
+# critical_triggers(), after each action that can move HP). Out of
+# Critical arms it; in Critical while armed fires it once: ordinary Block,
+# through the same stance rule a card's Block obeys, and spent for the
+# fight either way. Returns the Block gained.
+func resolve_critical_entry() -> int:
+	if critical_entry_block <= 0:
+		return 0
+	if not is_critical():
+		critical_entry_armed = true
+		return 0
+	if not critical_entry_armed:
+		return 0
+	var amount: int = critical_entry_block
+	critical_entry_block = 0
+	critical_entry_armed = false
+	if Stance.prevents_block_gain(stance):
+		return 0
+	block += amount
+	return amount

@@ -62,6 +62,12 @@ var keepsake: TrinketData = null
 # The ids of every keepsake offered this run, taken or left - what a
 # unique_per_run table entry is kept out by (KeepsakeTable.roll()).
 var keepsakes_offered: Array[StringName] = []
+# HP actually lost since the fight in progress (or the last one) opened -
+# what lose_hp() really took, never the damage that was attempted, from
+# any source: an enemy's hit, the Wanderer's own self-damage, a status
+# tick. Zeroed by begin_combat() from BattleController.setup(); read by
+# settle_keepsake_win() for heal_on_win_after_loss.
+var hp_lost_this_combat: int = 0
 
 var character: CharacterData = null
 
@@ -109,6 +115,7 @@ func new_run(starting_character: CharacterData) -> void:
 	toll = 0
 	keepsake = null
 	keepsakes_offered.clear()
+	hp_lost_this_combat = 0
 	player_max_hp = starting_character.max_hp
 	player_hp = player_max_hp
 	deck = _build_starting_deck(starting_character)
@@ -158,7 +165,9 @@ func _build_starting_deck(starting_character: CharacterData) -> Array[CardData]:
 func lose_hp(amount: int) -> void:
 	if amount <= 0:
 		return
+	var before: int = player_hp
 	player_hp = clampi(player_hp - amount, 0, player_max_hp)
+	hp_lost_this_combat += before - player_hp
 	player_hp_changed.emit(player_hp, player_max_hp)
 
 func heal(amount: int) -> void:
@@ -231,11 +240,21 @@ func note_keepsake_offered(trinket: TrinketData) -> void:
 	if trinket != null and not keepsakes_offered.has(trinket.id):
 		keepsakes_offered.append(trinket.id)
 
-# A fight was won (not escaped): the keepsake's heal_on_win, if any.
-# Called by RegionField._on_battle_finished()'s WIN branch.
+# A fight is opening: nothing lost in it yet.
+func begin_combat() -> void:
+	hp_lost_this_combat = 0
+
+# A fight was won (not escaped): the keepsake's heal_on_win, and its
+# heal_on_win_after_loss if the fight actually cost HP - one heal, so the
+# max-HP cap applies to the sum. Called by RegionField._on_battle_
+# finished()'s WIN branch.
 func settle_keepsake_win() -> void:
-	if keepsake != null:
-		heal(keepsake.heal_on_win)
+	if keepsake == null:
+		return
+	var amount: int = keepsake.heal_on_win
+	if hp_lost_this_combat > 0:
+		amount += keepsake.heal_on_win_after_loss
+	heal(amount)
 
 # The run's one card-grant path (rewards, the Keeper's offer, a find on
 # the sand). The deck holds a COPY, never the pool's own resource - the

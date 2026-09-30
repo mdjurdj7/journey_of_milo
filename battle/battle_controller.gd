@@ -113,11 +113,21 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	player.grace_window_turns = RunState.character.grace_window_turns
 	player.critical_hp_fraction = RunState.character.critical_hp_fraction
 	player.energy = player.max_energy
+	# Nothing lost in this fight yet (RunState.hp_lost_this_combat).
+	RunState.begin_combat()
 	# The keepsake's part in the fight opening (see TrinketData): its
-	# status on the Wanderer now, its extra cards in the opening draw below.
+	# status and Block on the Wanderer now, its free card and Critical-
+	# entry Block armed, its extra cards in the opening draw below. The
+	# first turn opens without _start_player_turn()'s Block reset, so the
+	# opening Block stands until the first enemy turn is over.
 	var keepsake: TrinketData = RunState.keepsake
 	if keepsake != null:
 		keepsake.apply_combat_start(player.statuses)
+		player.block += maxi(keepsake.combat_start_block, 0)
+		player.first_card_free = keepsake.first_card_free
+		player.critical_entry_block = maxi(keepsake.critical_entry_block, 0)
+		# Opening already Critical is not entering it.
+		player.critical_entry_armed = not player.is_critical()
 
 	_combatants.clear()
 	var enemy_names: Array[String] = []
@@ -267,6 +277,10 @@ func end_turn() -> void:
 func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	var card: CardData = card_view.card_data
 	player.energy -= player.energy_cost(card)
+	# The play is committed: a free card (House Key) is spent here, before
+	# card_played re-reads the hand's faces - never on a hover, a face or
+	# a cancelled target.
+	player.first_card_free = false
 	_input_locked = true
 	# Counted at commit, before anyone hears of the play - so a face that
 	# re-reads itself on card_played sees this card as played. The card's

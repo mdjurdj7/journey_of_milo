@@ -305,9 +305,15 @@ static func advance_on_toll_spend(holder: Combatant) -> void:
 # on_critical - No Further) gives way, if `holder` is Critical now: removed,
 # and what it grants applied in its place. Called after each action that
 # can take HP - an enemy's attack, a card, the turn's ticks - so the
-# action that crossed the line is never softened by the grant.
+# action that crossed the line is never softened by the grant. The
+# keepsake's Critical-entry Block is judged at the same beat (Combatant.
+# resolve_critical_entry()), and needs to see the holder OUT of Critical
+# too, so it goes before the early return.
 static func resolve_critical_triggers(holder: Combatant) -> void:
-	if holder == null or not holder.is_critical():
+	if holder == null:
+		return
+	holder.resolve_critical_entry()
+	if not holder.is_critical():
 		return
 	for active in holder.statuses.duplicate():
 		if active.data == null or active.data.grants_on_critical == null:
