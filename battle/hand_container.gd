@@ -313,7 +313,10 @@ func _can_play(card: CardData, energy: int) -> bool:
 	# card (EffectResolver.card_blocked()). No context yet = nothing to ask.
 	if _bonus_context != null and EffectResolver.card_blocked(card, _bonus_context.player):
 		return false
-	return card.cost <= energy
+	# The fight's own reading of the cost (Combatant.energy_cost()), once
+	# there's a context to ask.
+	var cost: int = _bonus_context.player.energy_cost(card) if _bonus_context != null else card.cost
+	return cost <= energy
 
 # Every slot's CardView, in hand order.
 func _card_views() -> Array[CardView]:

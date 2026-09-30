@@ -135,3 +135,11 @@ func is_critical_at(at_hp: int) -> bool:
 # line the fight does. Everything else goes through is_critical_at().
 static func critical_at(at_hp: int, of_max_hp: int, fraction: float) -> bool:
 	return float(at_hp) <= of_max_hp * fraction
+
+# What `card` costs this fighter in Energy right now - the one reading of
+# a card's cost the fight uses: affordability, the spend, the hand's fade
+# and the face's number all ask here. CardData.cost itself never changes.
+func energy_cost(card: CardData) -> int:
+	if card == null:
+		return 0
+	return card.cost

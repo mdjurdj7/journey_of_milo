@@ -442,7 +442,7 @@ func _ready() -> void:
 func set_card_data(data: CardData) -> void:
 	card_data = data
 	name_label.text = data.card_name
-	cost_label.text = str(data.cost)
+	cost_label.text = str(_displayed_cost())
 	_keyline_type = _derive_keyline_type(data)
 	# Art replaces the glyph rather than sitting on it.
 	art_rect.texture = data.art
@@ -468,8 +468,16 @@ func set_bonus_context(ctx: EffectContext) -> void:
 	_bonus_context = ctx
 	if card_data == null:
 		return
+	cost_label.text = str(_displayed_cost())
 	_refresh_dynamic_text()
 	_apply_layout()
+
+# The Energy the fight would take for this card now (Combatant.energy_
+# cost()) in a battle hand; its printed cost anywhere else.
+func _displayed_cost() -> int:
+	if _bonus_context != null and _bonus_context.player != null:
+		return _bonus_context.player.energy_cost(card_data)
+	return card_data.cost
 
 func set_toll(toll: int) -> void:
 	var value: int = maxi(toll, 0)

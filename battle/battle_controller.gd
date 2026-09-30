@@ -202,7 +202,7 @@ func request_play(card_view: CardView) -> void:
 	if _input_locked or _pending_card_view != null or card_view.card_data == null:
 		return
 	var card: CardData = card_view.card_data
-	if card.cost > player.energy:
+	if player.energy_cost(card) > player.energy:
 		return
 	# A once-per-combat power already up or already spent (Refuse the End)
 	# - the hand shows it faded, and this is the rule behind the fade.
@@ -266,7 +266,7 @@ func end_turn() -> void:
 # armed while this is in flight.
 func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	var card: CardData = card_view.card_data
-	player.energy -= card.cost
+	player.energy -= player.energy_cost(card)
 	_input_locked = true
 	# Counted at commit, before anyone hears of the play - so a face that
 	# re-reads itself on card_played sees this card as played. The card's
