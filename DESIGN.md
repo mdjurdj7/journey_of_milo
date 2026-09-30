@@ -219,3 +219,9 @@ so it doesn't get silently reinvented or silently forgotten.
   comparable to the earlier "about 8 of 36" at yaw 150. Follow-up: have
   battle placement avoid static prop footprints. (2026-09-29, trough;
   yaw 2026-09-30.)
+- **Glassbone's upgrade economy is deferred.** Glassbone is the single
+  material reward (Glassbone x1; Framework §3), kept apart from gold,
+  which stays the currency. What it is spent on (tempering cards,
+  equipment, keepsakes, workbenches or shrines), what things cost, and
+  how often it drops are not designed. Nothing in the build yet grants,
+  holds or spends it. (2026-09-30, Glassbone docs.)

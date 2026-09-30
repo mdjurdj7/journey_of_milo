@@ -86,7 +86,7 @@ Varies by region. Fog is a Region 1 device; it is not the whole game.
 
 ## 18. Anti-Goals
 
-Photorealism; generic AAA fantasy rendering; hyper-detail everywhere; crisp distant scenery; oversaturation; teal/orange as default; pure-black shadows; constant dramatic lighting; constant fog; constant ruins; constant Gothic; clutter; filling empty space because it exists; a glowing focal point in every scene; characters vanishing into busy backgrounds; **UI that looks like a menu on top of the world.**
+Photorealism; generic AAA fantasy rendering; hyper-detail everywhere; crisp distant scenery; oversaturation; teal/orange as default; pure-black shadows; constant dramatic lighting; constant fog; constant ruins; constant Gothic; clutter; filling empty space because it exists; a glowing focal point in every scene; glowing, crystalline or iridescent materials; characters vanishing into busy backgrounds; **UI that looks like a menu on top of the world.**
 
 > **Do not equate visual complexity with visual quality.**
 
@@ -103,6 +103,7 @@ Photorealism; generic AAA fantasy rendering; hyper-detail everywhere; crisp dist
 - **Ground:** painted landmass mask (30 px/m; white = sand; blurred edge) plus an optional elevation layer; height is a deterministic function of position.
 - **Water:** one plane; depth-tinted and absorbing; seabed and caustics visible through the shallows; a thin foam line; swash on open shores only; pools still.
 - **Props flat-shaded, characters textured.** Props take the shared flat material with a tint a step darker than sand; silvered wood leans slightly warm, never brown.
+- **Glassbone is the one material exception** to the shared prop material (Region Progression §2). It takes its own restrained material: milky white to pale grey; faint blue only at thin edges; partly translucent only where it is thin; no glow, no iridescence, no rainbow refraction, nothing that reads as fantasy crystal or alien technology. Its value stays close to the ground it lies on, so it never becomes the focal point. It is strange because of what it is and how often it turns up, not because it looks magical.
 - **Fog** 14 → 28 m in the sky colour; the **tower** renders unfogged as a silhouette a few percent darker than the sky, visible only in the battle frame and at thresholds.
 - **Palette (Region 1, before tonemap):** dry sand (0.74, 0.70, 0.60); wet sand × ~0.72; water shallow (0.54, 0.60, 0.61), deep (0.26, 0.36, 0.41); fog/sky (0.86, 0.87, 0.86); UI ink (0.165, 0.165, 0.18), bone (0.94, 0.91, 0.86); type keylines strike (0.62, 0.56, 0.49), guard (0.49, 0.56, 0.59), toll (0.54, 0.50, 0.58), utility (0.58, 0.58, 0.60), stance (0.52, 0.46, 0.56).
 - **Type:** Spectral for world voice and card names; Alegreya Sans for system voice; one tracking value (0.16 em) for all caps labels.

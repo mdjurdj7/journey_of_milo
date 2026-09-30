@@ -52,6 +52,8 @@ These follow directly from the premise and should constrain every asset and enco
 
 **Enemies are what stayed.** Three categories exist in this world: the ones still going, the ones that cannot hear it, and the ones that refused. The last two have been alone in a world they were told was over for a very long time. That is the enemy population, and it requires no separate justification.
 
+**One material is everywhere.** *Glassbone*: a pale, semi-translucent material found throughout the world as splinters, plates, fused seams and worked fragments. Splinters and plates are the forms it takes, not the pieces of something broken. In some places it looks grown, in others made; it resembles mineral, ceramic, bone or glass without clearly being any of them. It is unusually light, hard, and difficult to break. It turns up in every region in different forms: at the tide's edge, in seams under dunes and earth, worked into tools, keepsakes and buildings in old settlements, and near altered ground and structures associated with the tower. Different regions show different uses of it. It is environmental evidence before it is understood: the player should wonder what it is and why it is everywhere. Nothing explains it, and nothing says it comes from the tower (see §6).
+
 ---
 
 ## 3. Organizing principle
@@ -200,6 +202,8 @@ Roguelike players read an optional boss as a reward node. If the player kills hi
 A beast guarding the summit is explicitly rejected: it imports a genre convention into a premise that is not about being opposed.
 
 **Whether the traveller encounter and the final encounter are the same event.** If the traveller is the last thing in the game, the ending is human and small. If something else follows him, he becomes the penultimate beat. **Not decided.**
+
+**What is Glassbone, and does it belong with the tower?** It should suggest a connection to the same event or force as the tower without stating one. Whether it is grown or made, where it comes from, and whether it is part of the tower's material language (§4, Region 4) are all open. **Not decided.**
 
 **Does the run start at a threshold?** If the character arrived from somewhere that still has things in it, Region 1 is a boundary crossing rather than a starting point. Cheap to establish, significant implication.
 

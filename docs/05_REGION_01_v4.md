@@ -117,6 +117,10 @@ Interim: a static screen over the dimmed field — *Left behind* — offering go
 
 Someone's pack, set down. Walk up, a line, and one choice: what's inside (a card from the belongings pool), the coin, or leave it. You take one thing. The register is **intrusion**, and the owner is not dead, merely gone.
 
+### Glassbone
+
+A quiet oddity here, never a theme (Region Progression §2). Small pale fragments at the tide's edge; now and then a fragment among belongings or as an elite's reward (**Glassbone ×1**, Framework §3); a thin exposed seam in sand or rock. Few, small, and unremarked: the player notices it, and nothing explains it.
+
 ### Standing pools
 
 Water the tide left, still (no swash, no foam), sky in it, caustics on the bottom, a wet rim. Something is usually beside one. Painted into the mask as enclosed water.
@@ -164,6 +168,7 @@ Enemies stand still, often facing away from the player — a crab looking at a p
 - No humanoid merchant
 - No room that reads as arranged, guarded, or prepared for the player
 - No props that explain: a crab beside a pool, not a crab among rocks
+- No Glassbone as a focal point or a reveal: small pieces, a thin seam, never glowing
 
 ---
 

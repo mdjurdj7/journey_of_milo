@@ -53,6 +53,7 @@
 - Download glb, **Resize to real height**, origin **Bottom** (feet/keel at y 0).
 - In engine: the shared flat material, tinted a step darker than sand (hulls (0.50, 0.47, 0.42); the cormorant (0.28, 0.29, 0.31)). Silhouette is all that survives.
 - Age is placement: sink 0.3 × height, roll 8–12°, low side toward the water. Never damage.
+- **Glassbone** is the one exception to the shared flat material (Bible §20): its own restrained material, with its values set when the first piece is built.
 
 ### Characters (the Wanderer, the keeper)
 - Textured. Albedo only (roughness 1, specular 0, no normal map), double-sided where the glb says so. Wind on cloth/hair by vertex shader masks (height bands; luma for hair).
