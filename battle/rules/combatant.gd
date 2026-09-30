@@ -68,6 +68,10 @@ var critical_hp_fraction: float = 0.3
 # per_combat) - what keeps a second copy of the card from re-arming one.
 # Per fight, like everything else here.
 var spent_statuses: Array[StatusData] = []
+# Drain a counter (The Return) has handed over and nothing has resolved
+# yet - set here, where a loss is counted but no enemy is in reach, and
+# spent by EffectContext.resolve_pending_drain() right after the loss.
+var pending_drain: int = 0
 
 # --- Enemy-only ---
 #
@@ -108,11 +112,14 @@ func _init(starting_hp: int = 1) -> void:
 # stance's price, a status tick: the Toll it accrues, 1 per HP, plus any
 # status that pays extra for it (Status.take_self_loss_toll_bonus()).
 # Every self-inflicted loss comes through here; an enemy's hit never
-# does, which is the whole of the rule that Toll is self-inflicted.
+# does, which is the whole of the rule that Toll is self-inflicted - and
+# of what a self-loss counter counts, once per call (Status.count_self_
+# loss()).
 func gain_self_loss_toll(lost: int) -> void:
 	if lost <= 0:
 		return
 	toll += lost + Status.take_self_loss_toll_bonus(statuses)
+	pending_drain += Status.count_self_loss(statuses)
 
 func is_critical() -> bool:
 	return is_critical_at(hp)

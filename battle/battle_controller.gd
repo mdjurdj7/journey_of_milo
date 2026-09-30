@@ -541,6 +541,18 @@ func _start_player_turn() -> void:
 			hp_changed.emit(player.hp, player.max_hp)
 			toll_changed.emit(player.toll)
 	)
+	# A tick is a loss to their own effect like any other: one that sets a
+	# counter off (The Return) Drains now, in a context of its own - no
+	# card is resolving to carry it.
+	if player.pending_drain > 0:
+		var ctx := EffectContext.new()
+		ctx.player = player
+		ctx.enemies = _hittable_enemy_combatants()
+		ctx.deck = deck
+		ctx.on_heal = _on_card_heal
+		ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
+			_report_damage("player", target_combatant, amount, kind)
+		ctx.resolve_pending_drain()
 	Status.remove_expired(player.statuses)
 	# A tick that took them into Critical counts like any other HP loss.
 	Status.resolve_critical_triggers(player)

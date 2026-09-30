@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/the_return.tres" id="3_the_return"]
+[ext_resource type="Texture2D" uid="uid://dfglgd382lqfe" path="res://cards/art/Wanderer/The Return.png" id="9_art"]
+
+[sub_resource type="Resource" id="CardEffect_apply_status"]
+script = ExtResource("2_card_effect")
+effect_type = 12
+status_data = ExtResource("3_the_return")
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "The Return"
+rarity = 3
+cost = 1
+card_type = 3
+target_type = 1
+description = "After you damage yourself 5 times, Drain 10 from all enemies.
+Reset the count."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
+art = ExtResource("9_art")

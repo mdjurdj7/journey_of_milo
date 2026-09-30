@@ -26,11 +26,12 @@ const SHRUNK_RULES: Dictionary = {
 	"Last Wager": 13,
 	"No Further": 12,
 	"Sentence": 13,
+	"The Return": 13,
 }
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # The cards with art, by file - the starters, Carve, Come Due, No Further,
-# Sentence and Last Wager. Every other card has none yet.
+# Sentence, Last Wager and The Return. Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
 	"bite_down": "res://cards/art/Wanderer/Bite Down.png",
@@ -42,6 +43,7 @@ const CARD_ART: Dictionary = {
 	"no_further": "res://cards/art/Wanderer/No Further.png",
 	"sentence": "res://cards/art/Wanderer/Sentence.png",
 	"last_wager": "res://cards/art/Wanderer/Last Wager.png",
+	"the_return": "res://cards/art/Wanderer/The Return.png",
 }
 
 var _failures: int = 0

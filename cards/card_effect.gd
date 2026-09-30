@@ -1,7 +1,7 @@
 extends Resource
 class_name CardEffect
 
-# Nineteen effect types, ported from the old project's card_effect.gd -
+# Effect types, first ported from the old project's card_effect.gd -
 # resolved by battle/rules/effect_resolver.gd via a per-type script under
 # battle/rules/effects/, not a match/switch. TOLL_THRESHOLD_DAMAGE,
 # FIRST_CARD_DAMAGE, and DAMAGE_ALL are kept as names (old authoring
@@ -15,7 +15,7 @@ enum EffectType {
 	TOLL_RETALIATE, SELF_DAMAGE_TOLL, TOLL_THRESHOLD_DAMAGE, DAMAGE_ALL,
 	APPLY_STATUS, FIRST_CARD_DAMAGE, TOLL_FRACTION_DAMAGE_ALL,
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
-	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL,
+	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL, DRAIN,
 }
 
 # When the effect resolves, or with what number. Three modes, told apart

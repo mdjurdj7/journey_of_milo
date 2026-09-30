@@ -51,6 +51,8 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {bonus}    attack_damage_bonus × stacks
 #   {damage}   countdown_damage          {grant}  grants_on_critical's charges
 #   {toll}     self_loss_toll_bonus
+#   {progress} a counter's losses so far  {count}  self_loss_trigger_count
+#   {drain}    self_loss_trigger_drain × stacks
 #   {s}        "s" unless the count token before it is 1 ("Attack{s}")
 # An unknown token is left standing. "It" is the enemy holding it, "you"
 # the player.
@@ -152,6 +154,17 @@ const DURATION_UNTIL_TRIGGERED := -2
 # charge each time it pays; at 0 charges it's gone (Status.take_self_
 # loss_toll_bonus(), from Combatant.gain_self_loss_toll()). 0 = none.
 @export var self_loss_toll_bonus: int = 0
+
+# A counter on its holder's own HP losses (The Return): every loss to
+# their own effect - one per loss, however much HP it took - advances
+# Status.progress, and the one that reaches this goes off: Drain
+# self_loss_trigger_drain × stacks from every enemy, and the count starts
+# again. Counted in Combatant.gain_self_loss_toll(), so an enemy's hit
+# never counts. Shown as "Name N/M". 0 = not a counter.
+@export var self_loss_trigger_count: int = 0
+# What each stack Drains when the counter above goes off - one Drain of
+# the stacks' total, not one per stack (DrainEffect.drain()).
+@export var self_loss_trigger_drain: int = 0
 
 # Can be held at most once per fight: while it's active, or once it has
 # fired (Combatant.spent_statuses), a card that would apply it can't be

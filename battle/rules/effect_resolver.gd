@@ -31,6 +31,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.APPLY_STANCE: "res://battle/rules/effects/apply_stance_effect.gd",
 	CardEffect.EffectType.TOLL_HEAL: "res://battle/rules/effects/toll_heal_effect.gd",
 	CardEffect.EffectType.SPEND_TOLL: "res://battle/rules/effects/spend_toll_effect.gd",
+	CardEffect.EffectType.DRAIN: "res://battle/rules/effects/drain_effect.gd",
 }
 
 var _cache: Dictionary = {}
@@ -54,6 +55,9 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	ctx.toll_spent_this_card = false
 	if ctx.card_is_attack and ctx.player.stance != null and not ctx.enemies.is_empty():
 		ctx.pay_stance_attack_cost(Stance.attack_hp_loss(ctx.player.stance))
+		# The price can be the loss that sets off a counter (The Return):
+		# its Drain lands now, before the Attack it was paid for.
+		ctx.resolve_pending_drain()
 	for effect in card.effects:
 		# The gate lives HERE, not in each resolver - it used to be checked
 		# only inside damage_effect.gd, so a condition on any other effect
@@ -67,6 +71,9 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 		var resolver: Object = _get_resolver(effect.effect_type)
 		if resolver != null:
 			resolver.resolve(effect, ctx)
+		# Straight after the loss that set a counter off, before the next
+		# effect - Blood Arc's Drain lands before its own sweep.
+		ctx.resolve_pending_drain()
 	# After the whole card, once however much it spent: Toll spent hurries
 	# every countdown that listens for it (Sentence), and one that reaches
 	# 0 goes off now, in the player's turn - reported as damage, never as

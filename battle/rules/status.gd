@@ -10,6 +10,10 @@ var turns_remaining: int
 var stack_count: int = 1
 # See StatusData.default_charges; 0 on a status that doesn't count them.
 var charges: int = 0
+# See StatusData.self_loss_trigger_count: the losses counted toward the
+# next Drain, 0 up to one short of the count. Kept across a stack - a
+# second copy joins the count, it doesn't restart it.
+var progress: int = 0
 
 func _init(status_data: StatusData) -> void:
 	data = status_data
@@ -48,13 +52,31 @@ func has_charges() -> bool:
 func has_countdown() -> bool:
 	return data != null and data.countdown_damage > 0
 
+# Whether this status counts its holder's own HP losses toward a Drain
+# (StatusData.self_loss_trigger_count).
+func has_self_loss_counter() -> bool:
+	return data != null and data.self_loss_trigger_count > 0
+
+# What this counter Drains when it goes off: every stack's share, as one
+# number.
+func trigger_drain() -> int:
+	if data == null:
+		return 0
+	return data.self_loss_trigger_drain * stack_count
+
 # How this status reads in a standing row: its name, then - for a
 # countdown - the turns left ("Sentence 4": a count, not a quantity, so no
 # ×), or its charges when it counts them - down to "×1", since the last
-# one still matters - or its stacks once there is more than one.
+# one still matters - or its stacks once there is more than one. A
+# counter reads its progress after that ("The Return ×2 3/5").
 func label() -> String:
 	if data == null:
 		return ""
+	if has_self_loss_counter():
+		var title: String = data.display_name
+		if stack_count > 1:
+			title = "%s ×%d" % [title, stack_count]
+		return "%s %d/%d" % [title, progress, data.self_loss_trigger_count]
 	if has_countdown():
 		return "%s %d" % [data.display_name, turns_remaining]
 	if has_charges():
@@ -80,6 +102,9 @@ func describe() -> String:
 		"damage": data.countdown_damage,
 		"grant": grant,
 		"toll": data.self_loss_toll_bonus,
+		"progress": progress,
+		"count": data.self_loss_trigger_count,
+		"drain": trigger_drain(),
 	})
 
 # Replaces each {token} in `text` with its value from `values`, and each
@@ -206,6 +231,23 @@ static func take_self_loss_toll_bonus(statuses: Array[Status]) -> int:
 			if active.charges <= 0:
 				statuses.erase(active)
 	return total
+
+# Its holder just lost HP to their own effect - once per loss, however
+# much it took: every counter (StatusData.self_loss_trigger_count) moves
+# on one, and each that reaches its count starts again and hands over its
+# Drain. Returns the Drain now due, summed - for the caller to resolve
+# once there are enemies to hit (EffectContext.resolve_pending_drain()).
+# Called only from Combatant.gain_self_loss_toll().
+static func count_self_loss(statuses: Array[Status]) -> int:
+	var due: int = 0
+	for active in statuses:
+		if not active.has_self_loss_counter():
+			continue
+		active.progress += 1
+		if active.progress >= active.data.self_loss_trigger_count:
+			active.progress = 0
+			due += active.trigger_drain()
+	return due
 
 # One Attack card is landing on the holder of `statuses`: the extra damage
 # every mark on it grants (StatusData.attack_bonus_against_holder), each

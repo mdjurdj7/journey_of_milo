@@ -142,6 +142,27 @@ func pay_stance_attack_cost(amount: int) -> void:
 		player.took_damage_this_turn = true
 		report_damage(player, lost, "self")
 
+# The Drain a self-loss counter has handed over (Combatant.pending_
+# drain), resolved now, as one Drain from every enemy in reach - called
+# right after anything that can lose the player HP to their own effect.
+# Never on a dead player: a loss that killed them is not undone by the
+# counter it completed. What it kills leaves `enemies`, and `target` when
+# it was the target, so the rest of the card doesn't strike a body.
+func resolve_pending_drain() -> void:
+	var amount: int = player.pending_drain
+	player.pending_drain = 0
+	if amount <= 0 or player.hp <= 0:
+		return
+	if not DrainEffect.drain(amount, enemies, self):
+		return
+	var living: Array[Combatant] = []
+	for enemy in enemies:
+		if enemy.hp > 0:
+			living.append(enemy)
+	enemies = living
+	if target != null and target.hp <= 0:
+		target = null
+
 # Heals the player and reports it. Callers mutate through this rather
 # than touching hp directly, so the run's HP can't drift from the
 # fight's - it silently did for HEAL before this existed.
