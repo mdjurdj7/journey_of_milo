@@ -31,6 +31,12 @@ signal battle_finished(outcome: Outcome)
 @export var corner_margin_px: float = 40.0
 # Between a stack and the pile line under it.
 @export var stack_gap_px: float = 10.0
+# Between the DECK line and the keepsake row under it - the row sits in
+# the corner margin, so nothing above it moves.
+@export var keepsake_row_gap_px: float = 4.0:
+	set(value):
+		keepsake_row_gap_px = value
+		_layout_corners()
 
 @onready var end_turn_button: EndTurnButton = $EndTurnButton
 @onready var hand_container: HandContainer = $HandContainer
@@ -56,6 +62,7 @@ var _card_override_player: AudioStreamPlayer = null
 var _resources: BattleResources = null
 var _deck_readout: DeckPanel = null
 var _discard_readout: DeckPanel = null
+var _keepsake_row: KeepsakeRow = null
 # The theme's current value set (see enter_battle()/_flip_dark_world()).
 var _on_dark_world: bool = false
 # End Turn is enabled only while both hold - see _update_end_turn().
@@ -179,6 +186,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 
 	_deck_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DRAW)
 	_discard_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DISCARD)
+	_refresh_keepsake_row()
+	RunState.keepsake_changed.connect(func(_keepsake: TrinketData) -> void: _refresh_keepsake_row())
 	_layout_corners()
 
 	var target_line := TargetLine.new()
@@ -213,11 +222,26 @@ func _create_corner_readouts() -> void:
 	_discard_readout = DeckPanel.new()
 	_discard_readout.align_right = true
 	add_child(_discard_readout)
+	_keepsake_row = KeepsakeRow.new()
+	add_child(_keepsake_row)
+
+# The keepsakes with no in-combat counter go in the row under DECK; one
+# whose status counts is a counter line under the HP bar instead (see
+# _refresh_standing_row()). One slot today (RunState.keepsake).
+func _refresh_keepsake_row() -> void:
+	var quiet: Array[TrinketData] = []
+	var keepsake: TrinketData = RunState.keepsake
+	if keepsake != null:
+		var status: StatusData = keepsake.combat_start_status
+		if status == null or status.self_loss_trigger_count <= 0:
+			quiet.append(keepsake)
+	_keepsake_row.set_keepsakes(quiet)
 
 # Bottom-left: DECK line flush in the corner, the resource stack
-# stack_gap_px above it. Bottom-right: DISCARD line flush in the corner,
-# End Turn's rule stack_gap_px above it. Each readout keeps its own
-# corner edge when its text changes size (see their _relayout()s), so
+# stack_gap_px above it, and the keepsake row keepsake_row_gap_px under
+# it, in the corner margin. Bottom-right: DISCARD line flush in the
+# corner, End Turn's rule stack_gap_px above it. Each readout keeps its
+# own corner edge when its text changes size (see their _relayout()s), so
 # this only needs re-running on a viewport resize.
 func _layout_corners() -> void:
 	if _resources == null or _deck_readout == null or _discard_readout == null:
@@ -228,6 +252,10 @@ func _layout_corners() -> void:
 	_deck_readout.position = Vector2(corner_margin_px, bottom - _deck_readout.size.y)
 	var stack_bottom: float = _deck_readout.position.y - stack_gap_px
 	_resources.position = Vector2(corner_margin_px, stack_bottom - _resources.size.y)
+	if _keepsake_row != null:
+		_keepsake_row.position = Vector2(corner_margin_px, bottom + keepsake_row_gap_px)
+		# Its hover text sits over the whole stack, never on DECK or the pips.
+		_keepsake_row.set_reveal_floor_y(_resources.global_position.y)
 
 	_discard_readout.position = Vector2(right - _discard_readout.size.x, bottom - _discard_readout.size.y)
 	var end_turn_rule_bottom: float = _discard_readout.position.y - stack_gap_px
@@ -500,6 +528,8 @@ func _flip_dark_world() -> void:
 		_deck_readout.refresh_style()
 	if _discard_readout != null:
 		_discard_readout.refresh_style()
+	if _keepsake_row != null:
+		_keepsake_row.refresh_style()
 	end_turn_button.refresh_style()
 	print("BattleOverlay: ui_on_dark_world (debug flip) = %s" % str(_on_dark_world))
 
