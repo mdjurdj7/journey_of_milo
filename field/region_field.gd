@@ -330,6 +330,10 @@ var _fight_fallen: Array[EnemyData] = []
 var _pending_keepsake: TrinketData = null
 # Who left it - the enemy's name, for the offer's quiet source line.
 var _pending_keepsake_source: String = ""
+# Glassbone the last win left (EnemyData.glassbone_reward, summed over
+# everyone it was won against), waiting for the reward screen to offer it
+# as its own TAKE line. Handed over and zeroed as the screen opens.
+var _pending_glassbone: int = 0
 var _floor_cleared_emitted: bool = false
 # Debug builds only (_setup_debug_row()): the field's F1 row, and which
 # of debug_keepsake_paths its button grants next.
@@ -1023,6 +1027,14 @@ func _setup_field_hud() -> void:
 	keepsake_line.theme = deck_panel.theme
 	deck_panel.get_parent().add_child(keepsake_line)
 	keepsake_line.sit_beside(toll_line)
+	# GLASSBONE after KEEPSAKE (beside TOLL while the slot is empty - see
+	# InkLine._follow()); hidden until the first piece is taken, and
+	# RunState.glassbone_changed keeps it current - see GlassboneLine.
+	var glassbone_line := GlassboneLine.new()
+	glassbone_line.name = "GlassboneLine"
+	glassbone_line.theme = deck_panel.theme
+	deck_panel.get_parent().add_child(glassbone_line)
+	glassbone_line.sit_beside(keepsake_line)
 	hp_bar.set_target(wanderer)
 
 # Parents a FieldEnemy's own persistent HP display under this field's HUD
@@ -1481,6 +1493,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 				if not member.is_defeated():
 					won_against.append(member.enemy_data)
 			_roll_keepsake_drop(won_against)
+			_pending_glassbone = _glassbone_left_by(won_against)
 			for member in standing:
 				# The last kill folding from the air frees itself.
 				if member.is_settling():
@@ -1545,7 +1558,7 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	var has_pool: bool = floor_data != null and floor_data.reward_pool != null
 	# No card reward to wait for: a keepsake rolled on this win is still
 	# offered, after the same beat.
-	if not has_pool and _pending_keepsake == null:
+	if not has_pool and _pending_keepsake == null and _pending_glassbone <= 0:
 		return
 	var delay: float = reward_spread_delay_sec
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
@@ -1555,10 +1568,10 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	# The floor can be left, or the run ended, during that beat.
 	if not is_inside_tree():
 		return
-	if not has_pool:
+	if not has_pool and _pending_glassbone <= 0:
 		_open_pending_keepsake_offer()
 		return
-	if reward_mode == RewardMode.SCREEN:
+	if reward_mode == RewardMode.SCREEN or not has_pool:
 		# The keepsake follows when the screen closes (_on_reward_screen_
 		# closed()).
 		_open_reward_screen()
@@ -1567,6 +1580,11 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	if scene == null:
 		push_warning("RegionField: could not load %s; no reward spread." % reward_spread_scene_path)
 		return
+	if _pending_glassbone > 0:
+		# The spread lays cards on the sand and has no piece of its own
+		# yet; the Glassbone is not offered there (see DESIGN.md).
+		push_warning("RegionField: %d Glassbone left by this win is not offered in RewardMode.SPREAD yet." % _pending_glassbone)
+		_pending_glassbone = 0
 	var spread := scene.instantiate() as RewardSpread
 	spread.pool = floor_data.reward_pool
 	spread.enemy = fell_to
@@ -1589,10 +1607,14 @@ func _open_reward_screen() -> void:
 		return
 	var screen := scene.instantiate() as RewardScreen
 	# Only reached through _spawn_reward_spread(), which has already checked
-	# the floor and its pool.
+	# the floor, and that there is a pool or Glassbone to offer.
 	var floor_data := get_floor_data()
-	var gold: int = RunState.rng.randi_range(mini(floor_data.gold_min, floor_data.gold_max), maxi(floor_data.gold_min, floor_data.gold_max))
-	screen.setup(gold, floor_data.reward_pool, deck_panel)
+	# A floor with no pool opens this only for Glassbone: no gold, no card.
+	var gold: int = 0
+	if floor_data.reward_pool != null:
+		gold = RunState.rng.randi_range(mini(floor_data.gold_min, floor_data.gold_max), maxi(floor_data.gold_min, floor_data.gold_max))
+	screen.setup(gold, floor_data.reward_pool, deck_panel, _pending_glassbone)
+	_pending_glassbone = 0
 	screen.closed.connect(_on_reward_screen_closed)
 	add_child(screen)
 	process_mode = Node.PROCESS_MODE_DISABLED
@@ -1618,6 +1640,15 @@ func _roll_keepsake_drop(won_against: Array[EnemyData]) -> void:
 		_pending_keepsake_source = data.enemy_name
 		print("RegionField: '%s' left the keepsake '%s'." % [data.enemy_name, drop.display_name])
 		return
+
+# The Glassbone a win leaves: every enemy's EnemyData.glassbone_reward,
+# summed, whatever else they left.
+func _glassbone_left_by(won_against: Array[EnemyData]) -> int:
+	var total: int = 0
+	for data in won_against:
+		if data != null:
+			total += maxi(data.glassbone_reward, 0)
+	return total
 
 func _open_pending_keepsake_offer() -> void:
 	if _pending_keepsake == null:

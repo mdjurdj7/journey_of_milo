@@ -33,6 +33,7 @@ pain_turn_sound = ExtResource("3_ragged_breath")
 is_elite = true
 defeat_line = "The Wardling is still."
 keepsake_table = ExtResource("5_keepsakes")
+glassbone_reward = 1
 model_scene_path = "res://assets/models/enemies/Wardling/Wardling.glb"
 model_scale = 1.68
 model_yaw_offset_degrees = -90.0

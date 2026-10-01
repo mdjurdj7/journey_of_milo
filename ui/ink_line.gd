@@ -5,7 +5,8 @@ class_name InkLine
 # label_alpha) and a value right after it in Alegreya Sans Regular at
 # full ink - the same shape as the DeckPanel's DECK line these sit
 # beside. Drawn, not boxed; sized to its own text. The base of TollLine
-# ("TOLL n") and KeepsakeLine ("KEEPSAKE name"); a subclass sets its
+# ("TOLL n"), KeepsakeLine ("KEEPSAKE name") and GlassboneLine
+# ("GLASSBONE n"); a subclass sets its
 # label and feeds its value through set_value_text().
 #
 # RegionField creates each in _setup_field_hud() and hands it the line to
@@ -16,6 +17,11 @@ class_name InkLine
 #
 # Reads the theme's Battle/ink token, so it inverts with the on-pale/
 # on-dark value set (see BattleTheme) - re-read via refresh_style().
+
+# This line has just re-followed the line it sits beside - so a line
+# sitting beside THIS one re-follows too, even when nothing about this one
+# changed (a hidden KEEPSAKE staying hidden as the row goes for a fight).
+signal followed()
 
 @export var label_text: String = "":
 	set(value):
@@ -73,9 +79,13 @@ func sit_beside(line: Control) -> void:
 	if _beside != null:
 		_beside.item_rect_changed.disconnect(_follow)
 		_beside.visibility_changed.disconnect(_follow)
+		if _beside is InkLine:
+			(_beside as InkLine).followed.disconnect(_follow)
 	_beside = line
 	_beside.item_rect_changed.connect(_follow)
 	_beside.visibility_changed.connect(_follow)
+	if _beside is InkLine:
+		(_beside as InkLine).followed.connect(_follow)
 	_follow()
 
 # Re-reads the theme's ink and rebuilds the tracked label font - called
@@ -107,8 +117,19 @@ func _relayout() -> void:
 func _follow() -> void:
 	if _beside == null or not is_instance_valid(_beside):
 		return
-	visible = _beside.visible and _is_shown()
-	position = Vector2(_beside.position.x + _beside.size.x + beside_gap_px, _beside.position.y + _beside.size.y - size.y)
+	# A line that has hidden itself (_is_shown() false - KEEPSAKE with an
+	# empty slot) gives up its place: this one sits where it would have,
+	# beside whatever it sits beside. A line hidden with the whole field
+	# row for a fight still takes this one with it.
+	var anchor: Control = _beside
+	while anchor is InkLine and not (anchor as InkLine)._is_shown():
+		var next: Control = (anchor as InkLine)._beside
+		if next == null or not is_instance_valid(next):
+			break
+		anchor = next
+	visible = anchor.visible and _is_shown()
+	position = Vector2(anchor.position.x + anchor.size.x + beside_gap_px, anchor.position.y + anchor.size.y - size.y)
+	followed.emit()
 
 func _draw() -> void:
 	if _label_font_tracked == null or count_font == null:

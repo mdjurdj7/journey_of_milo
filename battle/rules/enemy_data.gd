@@ -52,6 +52,11 @@ class_name EnemyData
 # a won fight's normal reward (RegionField._roll_keepsake_drop()). Null =
 # none, which is every enemy but the Wardling today.
 @export var keepsake_table: KeepsakeTable = null
+# Glassbone this enemy leaves on a won fight, offered as its own TAKE line
+# on the reward screen beside the gold and the card (RegionField._open_
+# reward_screen()); left behind if the player walks on. 0 = none, which is
+# every enemy but the Wardling today.
+@export var glassbone_reward: int = 0
 
 # The field body. RegionField copies these onto the FieldEnemy it
 # spawns for this data (RegionField._spawn_floor_enemies()), the same

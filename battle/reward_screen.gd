@@ -124,6 +124,23 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 @export var card_flight_end_scale: float = 0.12
 @export_group("")
 
+@export_group("Glassbone")
+# "Glassbone ×1": the material a win can leave (EnemyData.glassbone_
+# reward), its own TAKE line under the gold; left behind on WALK ON.
+@export var glassbone_item_format: String = "Glassbone ×%d"
+# A texture drawn before the line's text once Glassbone has art; empty
+# = the placeholder shard, a hairline outline in the line's own colour.
+@export var glassbone_icon_path: String = ""
+# The icon's (or shard's) height as a fraction of item_size_px, and the
+# gap between it and the text.
+@export_range(0.2, 2.0) var glassbone_icon_size_em: float = 0.9
+@export var glassbone_icon_gap_px: float = 10.0
+@export var glassbone_glyph_width_px: float = 1.0
+# The gold take's sound, under it - there is no Glassbone take of its own
+# yet.
+@export var glassbone_volume_db: float = -24.0
+@export_group("")
+
 enum Mode { LIST, CHOICE }
 
 # One offer. `taken` covers skipped too: an offer that has been answered,
@@ -132,11 +149,16 @@ class RewardLine:
 	var id: String
 	var item: String
 	var action: String
+	# Drawn before the item text: a texture, or the drawn shard when
+	# shard_glyph is set and there is none. Neither = text only.
+	var icon: Texture2D = null
+	var shard_glyph: bool = false
 	var taken: bool = false
 	var rect: Rect2 = Rect2()
 
 var _lines: Array[RewardLine] = []
 var _gold: int = 0
+var _glassbone: int = 0
 var _pool: RewardPool = null
 var _deck_panel: Control = null
 var _mode: int = Mode.LIST
@@ -167,10 +189,12 @@ var _list_mouse_on: int = -1
 var _decline_top_px: float = 0.0
 
 # gold is what this fight rolled; pool is the floor's own, already
-# chosen; deck_panel is where a taken card flies to. Called by
-# RegionField before the screen is added to the tree.
-func setup(gold: int, pool: RewardPool, deck_panel: Control) -> void:
+# chosen; deck_panel is where a taken card flies to; glassbone is what
+# the fight's enemies left (0 = no line). Called by RegionField before
+# the screen is added to the tree.
+func setup(gold: int, pool: RewardPool, deck_panel: Control, glassbone: int = 0) -> void:
 	_gold = gold
+	_glassbone = glassbone
 	_pool = pool
 	_deck_panel = deck_panel
 
@@ -215,6 +239,15 @@ func _build_lines() -> void:
 		gold_line.item = "%d gold" % _gold
 		gold_line.action = "TAKE"
 		_lines.append(gold_line)
+	if _glassbone > 0:
+		var glassbone_line := RewardLine.new()
+		glassbone_line.id = "glassbone"
+		glassbone_line.item = glassbone_item_format % _glassbone
+		glassbone_line.action = "TAKE"
+		if not glassbone_icon_path.is_empty():
+			glassbone_line.icon = load(glassbone_icon_path) as Texture2D
+		glassbone_line.shard_glyph = glassbone_line.icon == null
+		_lines.append(glassbone_line)
 	if _pool != null and not _pool.entries.is_empty():
 		var card_line := RewardLine.new()
 		card_line.id = "card"
@@ -298,7 +331,8 @@ func _draw_column() -> void:
 		var color: Color = bone
 		if line.taken:
 			color.a = taken_alpha
-		_text(_item_font, line.item, Vector2(left, text_baseline), item_size_px, color)
+		var item_left: float = left + _draw_line_icon(line, left, text_baseline, color)
+		_text(_item_font, line.item, Vector2(item_left, text_baseline), item_size_px, color)
 		var action_width: float = InkType.width(_action_font, line.action, action_size_px)
 		var action_left: float = left + column_width - action_width
 		var focused: bool = _hovered == index and not line.taken
@@ -327,6 +361,32 @@ func _draw_column() -> void:
 	_text(_dismiss_font, dismiss_text, Vector2(walk_on_left, walk_on_baseline), dismiss_size_px, bone if walk_on_focused else choice_unfocused_color)
 	if walk_on_focused:
 		_draw_hairline(walk_on_left, walk_on_baseline, dismiss_size_px)
+
+# A line's icon, or its placeholder shard, sitting on the text's
+# baseline at `left`. Returns how far the text moves right for it: 0 when
+# the line has neither.
+func _draw_line_icon(line: RewardLine, left: float, baseline: float, color: Color) -> float:
+	var height: float = float(item_size_px) * glassbone_icon_size_em
+	var top: float = baseline - height
+	if line.icon != null:
+		var icon_size: Vector2 = line.icon.get_size()
+		var width: float = height * (icon_size.x / maxf(icon_size.y, 1.0))
+		_draw_layer.draw_texture_rect(line.icon, Rect2(left, top, width, height), false, color)
+		return width + glassbone_icon_gap_px
+	if not line.shard_glyph:
+		return 0.0
+	# A narrow, uneven splinter in outline - drawn in the same hand as the
+	# other glyphs, filled by nothing, lit by nothing.
+	var width: float = height * 0.5
+	var points := PackedVector2Array([
+		Vector2(left + width * 0.45, top),
+		Vector2(left + width, top + height * 0.3),
+		Vector2(left + width * 0.7, top + height),
+		Vector2(left, top + height * 0.66),
+		Vector2(left + width * 0.45, top),
+	])
+	_draw_layer.draw_polyline(points, color, glassbone_glyph_width_px, true)
+	return width + glassbone_icon_gap_px
 
 # The focus hairline: choice_hairline_length_px long, choice_hairline_
 # gap_px left of a label starting at label_left, at the caps' middle.
@@ -531,6 +591,14 @@ func _take_line(index: int) -> void:
 			RunState.add_gold(_gold)
 			TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, gold_volume_db, "GoldTakeAudio", "RewardScreen")
 			print("RewardScreen: took %d gold (run total %d)." % [_gold, RunState.gold])
+			line.taken = true
+			_hovered = -1
+			_draw_layer.queue_redraw()
+			_close_if_spent()
+		"glassbone":
+			RunState.add_glassbone(_glassbone)
+			TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, glassbone_volume_db, "GlassboneTakeAudio", "RewardScreen")
+			print("RewardScreen: took %d Glassbone (run total %d)." % [_glassbone, RunState.glassbone])
 			line.taken = true
 			_hovered = -1
 			_draw_layer.queue_redraw()

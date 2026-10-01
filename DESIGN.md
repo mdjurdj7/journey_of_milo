@@ -260,3 +260,11 @@ so it doesn't get silently reinvented or silently forgotten.
   Accepted for now. The options are placing it past whichever figure is
   further right, or flipping it to her left. (2026-09-30, Keeper
   keepsakes.)
+- **Glassbone has no art and no world-placed reward yet.** The reward
+  screen's Glassbone line draws a placeholder shard (a hairline outline
+  in the line's own colour) until `RewardScreen.glassbone_icon_path`
+  names a texture, and the take borrows the gold sound under it.
+  `RewardMode.SPREAD` (cards on the sand) has no Glassbone piece, so a
+  win there leaves the Glassbone unoffered, with a warning; the SCREEN
+  default offers it. When the spread becomes the default it needs a
+  piece to walk to. (2026-09-30, Glassbone phase 1.)

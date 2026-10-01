@@ -21,6 +21,8 @@ signal deck_changed()
 # and what a readout actually wants to draw.
 signal gold_changed(amount: int)
 # The new total, like gold_changed.
+signal glassbone_changed(amount: int)
+# The new total, like gold_changed.
 signal toll_changed(amount: int)
 # The keepsake slot changed - the new one, or null for empty.
 signal keepsake_changed(keepsake: TrinketData)
@@ -43,6 +45,14 @@ var deck: Array[CardData] = []
 # the same way HP and the deck are - nothing writes this field directly,
 # so nothing can change it without the readouts hearing.
 var gold: int = 0
+
+# Glassbone, the one material: pieces taken this run, for a later
+# modification system (nothing spends it yet). Not money - gold is that.
+# Carries across every fight and floor, as everything here does;
+# new_run() starts it at 0. Mutated only through add_glassbone()/
+# spend_glassbone(), so it never goes below 0 and the readout always
+# hears.
+var glassbone: int = 0
 
 # The Wanderer's Toll. It carries from one combat to the next - won or
 # escaped - and across a floor advance, but only up to the character's
@@ -112,6 +122,7 @@ func new_run(starting_character: CharacterData) -> void:
 	run_seed = randi()
 	rng.seed = run_seed
 	gold = 0
+	glassbone = 0
 	toll = 0
 	keepsake = null
 	keepsakes_offered.clear()
@@ -139,6 +150,7 @@ func new_run(starting_character: CharacterData) -> void:
 	player_hp_changed.emit(player_hp, player_max_hp)
 	deck_changed.emit()
 	gold_changed.emit(gold)
+	glassbone_changed.emit(glassbone)
 	toll_changed.emit(toll)
 	keepsake_changed.emit(keepsake)
 
@@ -198,6 +210,20 @@ func spend_gold(amount: int) -> bool:
 		return false
 	gold -= amount
 	gold_changed.emit(gold)
+	return true
+
+func add_glassbone(amount: int) -> void:
+	if amount <= 0:
+		return
+	glassbone += amount
+	glassbone_changed.emit(glassbone)
+
+# spend_gold()'s contract: all of it or nothing.
+func spend_glassbone(amount: int) -> bool:
+	if amount <= 0 or glassbone < amount:
+		return false
+	glassbone -= amount
+	glassbone_changed.emit(glassbone)
 	return true
 
 # Toll between fights: what's held, down to the character's toll_carry_
