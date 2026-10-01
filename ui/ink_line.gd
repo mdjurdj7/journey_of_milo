@@ -5,8 +5,8 @@ class_name InkLine
 # label_alpha) and a value right after it in Alegreya Sans Regular at
 # full ink - the same shape as the DeckPanel's DECK line these sit
 # beside. Drawn, not boxed; sized to its own text. The base of TollLine
-# ("TOLL n"), KeepsakeLine ("KEEPSAKE name") and GlassboneLine
-# ("GLASSBONE n"); a subclass sets its
+# ("TOLL n"), KeepsakeLine ("KEEPSAKE name"), GlassboneLine
+# ("GLASSBONE n") and GoldLine ("GOLD n"); a subclass sets its
 # label and feeds its value through set_value_text().
 #
 # RegionField creates each in _setup_field_hud() and hands it the line to

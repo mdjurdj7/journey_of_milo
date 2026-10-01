@@ -1035,6 +1035,14 @@ func _setup_field_hud() -> void:
 	glassbone_line.theme = deck_panel.theme
 	deck_panel.get_parent().add_child(glassbone_line)
 	glassbone_line.sit_beside(keepsake_line)
+	# GOLD at the end of the row, after GLASSBONE (beside whatever is shown
+	# before it); always shown, and RunState.gold_changed counts it to each
+	# new total - see GoldLine.
+	var gold_line := GoldLine.new()
+	gold_line.name = "GoldLine"
+	gold_line.theme = deck_panel.theme
+	deck_panel.get_parent().add_child(gold_line)
+	gold_line.sit_beside(glassbone_line)
 	hp_bar.set_target(wanderer)
 
 # Parents a FieldEnemy's own persistent HP display under this field's HUD
