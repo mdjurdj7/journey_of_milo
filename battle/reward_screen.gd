@@ -128,12 +128,15 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 # "Glassbone ×1": the material a win can leave (EnemyData.glassbone_
 # reward), its own TAKE line under the gold; left behind on WALK ON.
 @export var glassbone_item_format: String = "Glassbone ×%d"
-# A texture drawn before the line's text once Glassbone has art; empty
-# = the placeholder shard, a hairline outline in the line's own colour.
-@export var glassbone_icon_path: String = ""
+# The art drawn before the line's text, at its own colours and aspect
+# (only the line's fade reaches it); empty = the placeholder shard, a
+# hairline outline in the line's own colour.
+@export var glassbone_icon_path: String = "res://assets/ui/Rewards/Glassbone.png"
 # The icon's (or shard's) height as a fraction of item_size_px, and the
-# gap between it and the text.
-@export_range(0.2, 2.0) var glassbone_icon_size_em: float = 0.9
+# gap between it and the text. 1.25 of the 26 px item is about 32 px at
+# 1080p: the sliver runs corner to corner, so its square reads smaller
+# than a glyph of the same height.
+@export_range(0.2, 2.0) var glassbone_icon_size_em: float = 1.25
 @export var glassbone_icon_gap_px: float = 10.0
 @export var glassbone_glyph_width_px: float = 1.0
 # The gold take's sound, under it - there is no Glassbone take of its own
@@ -223,6 +226,9 @@ func _ready() -> void:
 
 	_draw_layer = Control.new()
 	_draw_layer.name = "Column"
+	# The Glassbone art is drawn far under its source size - sampled from
+	# its mipmaps, like the card and keepsake art.
+	_draw_layer.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_draw_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_draw_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	_draw_layer.gui_input.connect(_on_gui_input)
@@ -362,16 +368,19 @@ func _draw_column() -> void:
 	if walk_on_focused:
 		_draw_hairline(walk_on_left, walk_on_baseline, dismiss_size_px)
 
-# A line's icon, or its placeholder shard, sitting on the text's
-# baseline at `left`. Returns how far the text moves right for it: 0 when
-# the line has neither.
+# A line's icon, centred on the text's caps, or its placeholder shard,
+# sitting on the text's baseline, at `left`. Returns how far the text
+# moves right for it: 0 when the line has neither.
 func _draw_line_icon(line: RewardLine, left: float, baseline: float, color: Color) -> float:
 	var height: float = float(item_size_px) * glassbone_icon_size_em
 	var top: float = baseline - height
 	if line.icon != null:
 		var icon_size: Vector2 = line.icon.get_size()
 		var width: float = height * (icon_size.x / maxf(icon_size.y, 1.0))
-		_draw_layer.draw_texture_rect(line.icon, Rect2(left, top, width, height), false, color)
+		var mid: float = baseline - float(item_size_px) * 0.35
+		# The art keeps its own colours; a taken line fades it with the text.
+		var tint := Color(1.0, 1.0, 1.0, color.a)
+		_draw_layer.draw_texture_rect(line.icon, Rect2(left, mid - height * 0.5, width, height), false, tint)
 		return width + glassbone_icon_gap_px
 	if not line.shard_glyph:
 		return 0.0

@@ -145,7 +145,7 @@ func _check_wardling_take() -> void:
 			var line: RefCounted = (reward.get("_lines") as Array)[index]
 			_expect_eq(str(line.get("item")), "Glassbone ×1", "...the line reads Glassbone ×1")
 			_expect_eq(str(line.get("action")), "TAKE", "...with TAKE")
-			_expect(line.get("shard_glyph") == true and line.get("icon") == null, "...drawn with the placeholder shard (no icon art yet)")
+			_expect(line.get("icon") != null and line.get("shard_glyph") == false, "...drawn with the Glassbone art, not the placeholder shard")
 			var gold_before: int = int(_run_state.get("gold"))
 			var deck_before: int = (_run_state.get("deck") as Array).size()
 			reward.call("_take_line", index)
