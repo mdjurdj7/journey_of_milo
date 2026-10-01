@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_status_data")
 id = "frayed"
-display_name = "Frayed"
+display_name = "Frayed Cord"
 description = "The next time you lose HP to your own effect, gain {toll} extra Toll."
 category = 2
 default_charges = 1

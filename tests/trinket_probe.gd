@@ -149,7 +149,7 @@ func _check_bent_nail() -> void:
 	var enemy := Combatant.new(100)
 	nail.apply_combat_start(player.statuses)
 	_expect_eq(player.statuses.size(), 1, "Bent Nail opens the fight with one status")
-	_expect_eq(player.statuses[0].label(), "Keen ×1", "...shown as Keen ×1")
+	_expect_eq(player.statuses[0].label(), "Bent Nail ×1", "...shown as Bent Nail ×1")
 	_play(BITE_DOWN_PATH, player, enemy)
 	_expect_eq(enemy.hp, 100 - 11, "The first Attack deals 8 + 3")
 	_expect(player.statuses.is_empty(), "...and spends the status")

@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_status_data")
 id = "keen"
-display_name = "Keen"
+display_name = "Bent Nail"
 description = "+{bonus} damage on your next Attack."
 category = 2
 default_charges = 1
