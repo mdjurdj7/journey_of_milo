@@ -63,7 +63,7 @@ func _initialize() -> void:
 func _check_card_data() -> void:
 	var card: CardData = _card("the_return")
 	_expect_eq(card.card_name, "The Return", "The card is named The Return")
-	_expect_eq(card.cost, 1, "...costs 1")
+	_expect_eq(card.cost, 2, "...costs 2")
 	_expect_eq(card.card_type, CardData.CardType.POWER, "...is a Power")
 	_expect_eq(card.rarity, CardData.CardRarity.RARE, "...is Rare")
 	_expect_eq(card.target_type, CardData.TargetType.SELF, "...targets the player")
