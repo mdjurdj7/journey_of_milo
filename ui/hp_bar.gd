@@ -96,14 +96,38 @@ class_name HPBar
 # statuses are transient and follow it. A stance shows its own glyph and
 # name; a status shows its name and, when stacked, a multiplier.
 @export_group("Standing Row")
-@export var row_font_size_px: int = 10
-@export_range(0.0, 1.0) var row_tracking_em: float = 0.16
-@export_range(0.0, 1.0) var row_alpha: float = 0.7
-@export var row_gap_px: float = 6.0
-@export var row_item_gap_px: float = 14.0
-@export var row_glyph_size_px: float = 9.0
-@export var row_glyph_gap_px: float = 5.0
-@export var row_glyph_line_width_px: float = 1.3
+@export var row_font_size_px: int = 10:
+	set(value):
+		row_font_size_px = value
+		_refresh_row_font()
+@export_range(0.0, 1.0) var row_tracking_em: float = 0.16:
+	set(value):
+		row_tracking_em = value
+		_refresh_row_font()
+@export_range(0.0, 1.0) var row_alpha: float = 0.7:
+	set(value):
+		row_alpha = value
+		queue_redraw()
+@export var row_gap_px: float = 6.0:
+	set(value):
+		row_gap_px = value
+		_relayout_if_ready()
+@export var row_item_gap_px: float = 14.0:
+	set(value):
+		row_item_gap_px = value
+		queue_redraw()
+@export var row_glyph_size_px: float = 9.0:
+	set(value):
+		row_glyph_size_px = value
+		queue_redraw()
+@export var row_glyph_gap_px: float = 5.0:
+	set(value):
+		row_glyph_gap_px = value
+		queue_redraw()
+@export var row_glyph_line_width_px: float = 1.3:
+	set(value):
+		row_glyph_line_width_px = value
+		queue_redraw()
 
 @export_group("Status Reveal")
 # Hovering the HP readout - block shield, numerals, bar and standing row,
@@ -609,6 +633,18 @@ func refresh_style() -> void:
 		_reveal.set_ink(_ink)
 	_apply_critical_colors()
 	_apply_layout()
+
+# The row's tracked face, rebuilt for a live edit of its size or tracking
+# (refresh_style() builds it the first time).
+func _refresh_row_font() -> void:
+	if not is_node_ready():
+		return
+	_row_font_tracked = InkType.tracked(InkType.text_bold_font(), row_font_size_px, row_tracking_em)
+	_apply_layout()
+
+func _relayout_if_ready() -> void:
+	if is_node_ready():
+		_apply_layout()
 
 func _build_bar_style(color: Color) -> StyleBoxFlat:
 	var style := StyleBoxFlat.new()
