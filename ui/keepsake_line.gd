@@ -2,7 +2,7 @@ extends InkLine
 class_name KeepsakeLine
 
 # The field HUD's keepsake: "KEEPSAKE name" as a line of ink beside the
-# TOLL line (see InkLine for the shape, the style and the following).
+# GOLD line (see InkLine for the shape, the style and the following).
 # Hidden while the slot is empty. No icon, no box, no rarity colour.
 #
 # Hovering it reveals what the keepsake does - TrinketData.describe(),
@@ -11,7 +11,7 @@ class_name KeepsakeLine
 # event, so the click under it still moves the Wanderer; a Control under
 # the cursor wins, as on HPBar.
 #
-# RegionField creates it in _setup_field_hud() and hands it the TOLL line
+# RegionField creates it in _setup_field_hud() and hands it the GOLD line
 # (sit_beside()); RunState.keepsake_changed keeps it current.
 
 @export_group("Reveal")

@@ -2,8 +2,10 @@ extends SceneTree
 
 # Headless probe for the field HUD's GOLD line: it shows the run's gold
 # as it stands when the field loads, add_gold() sets its target at once,
-# the count-up lands on the exact total (a second add mid-count included),
-# and it sits at the end of the row, on TOLL's bottom edge.
+# the count-up eases out and lands on the exact total (a second add
+# mid-count included), a spend snaps, a count_up_time edit mid-count
+# re-targets the running count, and it sits between TOLL and KEEPSAKE -
+# DECK, TOLL, GOLD, KEEPSAKE, GLASSBONE - on TOLL's bottom edge.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/gold_line_probe.gd
 #
@@ -13,7 +15,8 @@ extends SceneTree
 # anything that names the RunState autoload (RegionField, the HUD lines):
 # a SceneTree script compiles before the autoloads register.
 
-const CASES := 3
+const CASES := 5
+const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SAFETY_SECONDS := 120.0
@@ -31,6 +34,8 @@ func _initialize() -> void:
 	_run_state = root.get_node("RunState")
 	await _check_starting_value()
 	await _check_count_up()
+	await _check_spend_snaps()
+	await _check_retime_retargets()
 	await _check_row_place()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
@@ -70,6 +75,8 @@ func _check_count_up() -> void:
 	await create_timer(count_time * 0.4).timeout
 	var mid: int = int(str(line.get("_value_text")))
 	_expect(mid > 0 and mid < 37, "...the numeral is counting (%d mid-way)" % mid)
+	# Ease-out cubic is ~78% of the way at 40% of the time; linear is 40%.
+	_expect(mid >= 22, "...eased out, well past the linear 40%% by 40%% of the time (%d of 37)" % mid)
 	await create_timer(count_time + 0.3).timeout
 	_expect_eq(str(line.get("_value_text")), "37", "...and lands on exactly 37")
 	_run_state.call("add_gold", 18)
@@ -83,20 +90,75 @@ func _check_count_up() -> void:
 	await _teardown()
 	_completed += 1
 
-# The end of the row: past TOLL with KEEPSAKE and GLASSBONE hidden, past
-# GLASSBONE once that shows, on TOLL's bottom edge.
+# A spend snaps - after a count has landed, and mid-count too (a total
+# below the count's target ends the count on the spot).
+func _check_spend_snaps() -> void:
+	_new_run()
+	await _load_field()
+	var line: Control = _gold_line()
+	var count_time: float = float(line.get("count_up_time"))
+	_run_state.call("add_gold", 40)
+	await create_timer(count_time + 0.3).timeout
+	_expect_eq(str(line.get("_value_text")), "40", "40 counted in")
+	_expect(bool(_run_state.call("spend_gold", 15)), "spend_gold(15) goes through")
+	_expect_eq(str(line.get("_value_text")), "25", "...and the numeral snaps to 25 at once")
+	_run_state.call("add_gold", 30)
+	await create_timer(count_time * 0.3).timeout
+	_expect(bool(_run_state.call("spend_gold", 50)), "spend_gold(50) mid-count goes through")
+	_expect_eq(str(line.get("_value_text")), "5", "...and snaps to 5 at once")
+	await create_timer(count_time + 0.3).timeout
+	_expect_eq(str(line.get("_value_text")), "5", "...staying at 5, the old count gone")
+	await _teardown()
+	_completed += 1
+
+# A count_up_time edit (the Remote tab) mid-count re-targets the running
+# count: from where the numeral stands, over the new time, landing on the
+# exact total.
+func _check_retime_retargets() -> void:
+	_new_run()
+	await _load_field()
+	var line: Control = _gold_line()
+	line.set("count_up_time", 3.0)
+	_run_state.call("add_gold", 50)
+	await create_timer(0.3).timeout
+	var mid: int = int(str(line.get("_value_text")))
+	_expect(mid > 0 and mid < 50, "Counting to 50 over 3 s (%d at 0.3 s)" % mid)
+	line.set("count_up_time", 0.2)
+	await process_frame
+	_expect(int(str(line.get("_value_text"))) >= mid, "...the re-timed count starts from where it stood, not 0")
+	await create_timer(0.5).timeout
+	_expect_eq(str(line.get("_value_text")), "50", "...and lands on exactly 50 over the new 0.2 s")
+	_expect_eq(int(line.get("_target")), 50, "...its target still 50")
+	await _teardown()
+	_completed += 1
+
+# The row is DECK, TOLL, GOLD, KEEPSAKE, GLASSBONE: GOLD right beside
+# TOLL and never moving as KEEPSAKE and GLASSBONE come; KEEPSAKE past
+# GOLD; GLASSBONE past GOLD with the slot empty and past KEEPSAKE once one
+# is held; all on TOLL's bottom edge.
 func _check_row_place() -> void:
 	_new_run()
 	await _load_field()
 	var line: Control = _gold_line()
 	var toll_line: Control = _field.get_node("FieldHUD/TollLine")
+	var keepsake_line: Control = _field.get_node("FieldHUD/KeepsakeLine")
 	var glassbone_line: Control = _field.get_node("FieldHUD/GlassboneLine")
 	var toll_right: float = toll_line.position.x + toll_line.size.x
-	_expect(line.position.x > toll_right and line.position.x < toll_right + 40.0, "GOLD sits right beside TOLL while KEEPSAKE and GLASSBONE are hidden")
+	_expect(line.visible, "GOLD shows with KEEPSAKE and GLASSBONE hidden")
+	_expect(line.position.x > toll_right and line.position.x < toll_right + 40.0, "GOLD sits right beside TOLL")
+	var gold_x: float = line.position.x
+	var gold_right: float = line.position.x + line.size.x
 	_run_state.call("add_glassbone", 1)
 	await process_frame
-	_expect(line.position.x > glassbone_line.position.x + glassbone_line.size.x, "...and moves past GLASSBONE once it shows")
-	_expect_eq(line.position.y + line.size.y, toll_line.position.y + toll_line.size.y, "...on the same bottom edge as TOLL")
+	_expect(glassbone_line.position.x > gold_right and glassbone_line.position.x < gold_right + 40.0, "GLASSBONE sits right beside GOLD while the keepsake slot is empty")
+	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))
+	await process_frame
+	_expect(keepsake_line.visible, "KEEPSAKE shows once one is held")
+	_expect(keepsake_line.position.x > gold_right and keepsake_line.position.x < gold_right + 40.0, "...right beside GOLD")
+	_expect(glassbone_line.position.x > keepsake_line.position.x + keepsake_line.size.x, "...and GLASSBONE moves past KEEPSAKE")
+	_expect_eq(line.position.x, gold_x, "GOLD never moved")
+	_expect_eq(line.position.y + line.size.y, toll_line.position.y + toll_line.size.y, "GOLD on the same bottom edge as TOLL")
+	_expect_eq(keepsake_line.position.y + keepsake_line.size.y, toll_line.position.y + toll_line.size.y, "...and KEEPSAKE")
 	await _teardown()
 	_completed += 1
 

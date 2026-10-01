@@ -3,7 +3,7 @@ class_name GlassboneLine
 
 # The field HUD's Glassbone: "GLASSBONE n" as a line of ink after the
 # KEEPSAKE line (see InkLine for the shape, the style and the following;
-# with no keepsake it sits beside TOLL instead). Hidden until the run has
+# with no keepsake it sits beside GOLD instead). Hidden until the run has
 # taken its first piece - the HUD doesn't advertise the material before
 # the player has found any. No icon on the HUD; the reward line carries
 # the shard.

@@ -210,21 +210,22 @@ func _check_sputter_leaves_none() -> void:
 	_completed += 1
 
 # GLASSBONE: hidden on 0, shown from the first piece with its count,
-# beside TOLL while the keepsake slot is empty and beside KEEPSAKE once
+# beside GOLD while the keepsake slot is empty and beside KEEPSAKE once
 # one is held.
 func _check_hud_line() -> void:
 	_new_run()
 	await _load_field(0)
 	var line: Control = _field.get_node("FieldHUD/GlassboneLine")
 	var toll_line: Control = _field.get_node("FieldHUD/TollLine")
+	var gold_line: Control = _field.get_node("FieldHUD/GoldLine")
 	var keepsake_line: Control = _field.get_node("FieldHUD/KeepsakeLine")
 	_expect(not line.visible, "GLASSBONE is hidden on 0")
 	_run_state.call("add_glassbone", 1)
 	_expect(line.visible, "...shown from the first piece")
 	_expect_eq(str(line.get("_value_text")), "1", "...reading 1")
 	_expect_eq(str(line.get("label_text")), "GLASSBONE", "...under the label GLASSBONE")
-	var toll_right: float = toll_line.position.x + toll_line.size.x
-	_expect(line.position.x > toll_right and line.position.x < toll_right + 40.0, "...right beside TOLL while the keepsake slot is empty")
+	var gold_right: float = gold_line.position.x + gold_line.size.x
+	_expect(line.position.x > gold_right and line.position.x < gold_right + 40.0, "...right beside GOLD while the keepsake slot is empty")
 	_run_state.call("add_glassbone", 1)
 	_expect_eq(str(line.get("_value_text")), "2", "...and follows the count (2)")
 	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))

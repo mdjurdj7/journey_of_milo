@@ -1020,29 +1020,29 @@ func _setup_field_hud() -> void:
 	deck_panel.get_parent().add_child(toll_line)
 	toll_line.set_toll(RunState.toll)
 	toll_line.sit_beside(deck_panel)
-	# KEEPSAKE beside TOLL, the same way; hidden while the slot is empty,
-	# and RunState.keepsake_changed keeps it current - see KeepsakeLine.
+	# GOLD beside TOLL, the same way; always shown, and RunState.gold_changed
+	# counts it up to each new total - see GoldLine. Ahead of KEEPSAKE and
+	# GLASSBONE, which hide themselves when empty, so it never moves.
+	var gold_line := GoldLine.new()
+	gold_line.name = "GoldLine"
+	gold_line.theme = deck_panel.theme
+	deck_panel.get_parent().add_child(gold_line)
+	gold_line.sit_beside(toll_line)
+	# KEEPSAKE beside GOLD; hidden while the slot is empty, and
+	# RunState.keepsake_changed keeps it current - see KeepsakeLine.
 	var keepsake_line := KeepsakeLine.new()
 	keepsake_line.name = "KeepsakeLine"
 	keepsake_line.theme = deck_panel.theme
 	deck_panel.get_parent().add_child(keepsake_line)
-	keepsake_line.sit_beside(toll_line)
-	# GLASSBONE after KEEPSAKE (beside TOLL while the slot is empty - see
-	# InkLine._follow()); hidden until the first piece is taken, and
+	keepsake_line.sit_beside(gold_line)
+	# GLASSBONE last, after KEEPSAKE (beside GOLD while the slot is empty -
+	# see InkLine._follow()); hidden until the first piece is taken, and
 	# RunState.glassbone_changed keeps it current - see GlassboneLine.
 	var glassbone_line := GlassboneLine.new()
 	glassbone_line.name = "GlassboneLine"
 	glassbone_line.theme = deck_panel.theme
 	deck_panel.get_parent().add_child(glassbone_line)
 	glassbone_line.sit_beside(keepsake_line)
-	# GOLD at the end of the row, after GLASSBONE (beside whatever is shown
-	# before it); always shown, and RunState.gold_changed counts it to each
-	# new total - see GoldLine.
-	var gold_line := GoldLine.new()
-	gold_line.name = "GoldLine"
-	gold_line.theme = deck_panel.theme
-	deck_panel.get_parent().add_child(gold_line)
-	gold_line.sit_beside(glassbone_line)
 	hp_bar.set_target(wanderer)
 
 # Parents a FieldEnemy's own persistent HP display under this field's HUD
