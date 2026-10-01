@@ -251,14 +251,15 @@ so it doesn't get silently reinvented or silently forgotten.
   run and she won't hold it out again. Walking away without choosing
   resolves nothing. Revisit if KEEP should leave it in her hand instead.
   (2026-09-30, Keeper keepsakes.)
-- **The Keeper's plaque can cover the Wanderer.** `WorldKeepsake` always
-  sits to the Keeper's screen-right (`screen_gap_px` 40 past her
-  silhouette). Measured in 1080p stills with him 1.2 m from her on eight
-  sides, it clears him from the spawn side and three others, but covers
-  part of him on the four sides 90-225 degrees round from the spawn side,
-  where he stands to her screen-right. A wider gap can't fix that.
-  Accepted for now. The options are placing it past whichever figure is
-  further right, or flipping it to her left. (2026-09-30, Keeper
+- **The Keeper's plaque flips sides to stay off the Wanderer.**
+  `WorldKeepsake` stands on her screen-right unless he is on her
+  screen-right as it lifts, when it stands on her screen-left
+  (`_choose_side()`: his origin's projected x against hers). The side is
+  chosen once per lift and held until the plaque is back in her hand, so
+  it never swaps while he moves in front of it. `screen_gap_px` (40) is
+  measured from her meshes' projected bounds, which take in her hair
+  tips from any angle. In 1080p stills with him 1.2 m from her on eight
+  sides, neither figure is covered on any of them. (2026-09-30, Keeper
   keepsakes.)
 - **Glassbone has no art and no world-placed reward yet.** The reward
   screen's Glassbone line draws a placeholder shard (a hairline outline
