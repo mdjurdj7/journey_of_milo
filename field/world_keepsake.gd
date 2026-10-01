@@ -10,7 +10,7 @@ class_name WorldKeepsake
 #          rather than card-shaped. Something is being held out.
 #   NEAR - inside lift_radius the square hands over to a plaque on a
 #          CanvasLayer, growing out of the square's own projected size and
-#          position to the RIGHT of the holder's silhouette, level with her
+#          position beside the holder's silhouette, level with her
 #          - never over her, never full-screen, the camera untouched.
 #
 # The plaque is an inspection, not a card: no cost, no type, no rarity,
@@ -62,15 +62,18 @@ const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 	set(value):
 		anchor_offset = value
 		_apply_quad()
-# The plaque's LEFT edge lands this many pixels right of the holder's
-# projected silhouette edge, its bottom edge on a point near_bottom_height
-# above her feet - WorldCard's placement rule and its reasons. 40, not
-# WorldCard's 16: at lifted_scale 1.0 the plaque's edge met the Keeper's
-# hair tips, which reach past the measured half-width (1080p stills,
-# 2026-09-30).
+# The plaque stands this many pixels clear of the holder's projected
+# silhouette edge, its bottom edge on a point near_bottom_height above
+# her feet - WorldCard's placement rule and its reasons. Her screen-right
+# by default; her screen-left when the Wanderer is on her screen-right,
+# so it never sits over him (see _choose_side()). Her edge is her
+# meshes' bounds projected (see _silhouette_edge()), not a half-width
+# off her origin, so her hair tips are inside it from every angle.
 @export var screen_gap_px: float = 40.0
 @export var near_bottom_height: float = 0.15
-# 0 = measured once from holder_path's meshes (WorldCard's rule).
+# 0 (the default) = her edge is her meshes' own bounds, measured once
+# and projected each frame. Set non-zero to place from her origin plus
+# this many metres instead (WorldCard's rule).
 @export var holder_half_width: float = 0.0
 @export var holder_path: NodePath = ^".."
 @export var lift_radius: float = 2.5
@@ -252,8 +255,15 @@ var _wanderer: Node3D = null
 var _lift: float = 0.0
 var _lift_tween: Tween = null
 var _near: bool = false
+# Which side of her the lifted plaque stands: 1 her screen-right, -1 her
+# screen-left. Chosen once as it lifts (_choose_side()) and held until it
+# lowers, so it never swaps sides while he moves about in front of it.
+var _side: int = 1
 var _resolving: bool = false
-var _holder_half_width: float = 0.0
+# Her meshes' bounds in her own space - the figure's, not the shadow
+# disc or this node's square. Measured once: the model doesn't change
+# size, and the hem wind only moves vertices.
+var _holder_box: AABB = AABB()
 
 var _name_font: Font = null
 var _text_font: Font = null
@@ -301,7 +311,7 @@ func _ready() -> void:
 	# (a Wardling's drop taken between visits).
 	RunState.keepsake_changed.connect(_on_keepsake_changed)
 	_wanderer = _find_wanderer()
-	_holder_half_width = _measure_holder_half_width()
+	_holder_box = _measure_holder_box()
 
 func _on_keepsake_changed(_held_now: TrinketData) -> void:
 	_layout()
@@ -477,20 +487,20 @@ func _find_wanderer() -> Node3D:
 	var found: Array[Node] = get_tree().get_nodes_in_group("wanderer")
 	return found[0] as Node3D if not found.is_empty() else null
 
-func _measure_holder_half_width() -> float:
-	if holder_half_width > 0.0:
-		return holder_half_width
+func _measure_holder_box() -> AABB:
 	var holder := get_node_or_null(holder_path) as Node3D
 	if holder == null:
-		return 0.0
-	var widest: float = 0.0
+		return AABB()
+	var union := AABB()
+	var have: bool = false
 	for node in holder.find_children("*", "MeshInstance3D", true, false):
 		var mesh_instance := node as MeshInstance3D
 		if mesh_instance.mesh == null or mesh_instance is ContactShadow or is_ancestor_of(mesh_instance):
 			continue
 		var box: AABB = holder.global_transform.affine_inverse() * (mesh_instance.global_transform * mesh_instance.get_aabb())
-		widest = maxf(widest, maxf(absf(box.position.x), absf(box.position.x + box.size.x)))
-	return widest
+		union = box if not have else union.merge(box)
+		have = true
+	return union
 
 func anchor_position() -> Vector3:
 	return global_transform * anchor_offset
@@ -528,7 +538,7 @@ func _apply_transform(camera: Camera3D, anchor: Vector3) -> void:
 	var anchor_screen: Vector2 = camera.unproject_position(anchor)
 	var half: Vector2 = _plaque_size * final_scale / 2.0
 	var near_centre: Vector2 = Vector2(
-		_silhouette_right_edge(camera, pixels_per_metre) + screen_gap_px + half.x,
+		_silhouette_edge(camera, pixels_per_metre, _side) + float(_side) * (screen_gap_px + half.x),
 		camera.unproject_position(_holder_feet() + Vector3.UP * near_bottom_height).y - half.y)
 	_plaque.position = (anchor_screen.lerp(near_centre, _lift) - half).round()
 
@@ -545,11 +555,31 @@ func _holder_feet() -> Vector3:
 	var holder := get_node_or_null(holder_path) as Node3D
 	return holder.global_position if holder != null else anchor_position()
 
-func _silhouette_right_edge(camera: Camera3D, pixels_per_metre: float) -> float:
+# Screen x of the holder's edge on `side` (1 right, -1 left): the
+# outermost of her bounds' eight corners, projected. Origin plus
+# holder_half_width when that's set; the anchor with no holder.
+func _silhouette_edge(camera: Camera3D, pixels_per_metre: float, side: int) -> float:
 	var holder := get_node_or_null(holder_path) as Node3D
 	if holder == null:
 		return camera.unproject_position(anchor_position()).x
-	return camera.unproject_position(holder.global_position).x + _holder_half_width * pixels_per_metre
+	if holder_half_width > 0.0 or not _holder_box.has_volume():
+		return camera.unproject_position(holder.global_position).x + float(side) * holder_half_width * pixels_per_metre
+	var edge: float = camera.unproject_position(holder.global_transform * _holder_box.get_endpoint(0)).x
+	for corner in range(1, 8):
+		var x: float = camera.unproject_position(holder.global_transform * _holder_box.get_endpoint(corner)).x
+		edge = maxf(edge, x) if side > 0 else minf(edge, x)
+	return edge
+
+# Her screen-right unless the Wanderer stands to her screen-right - his
+# origin's projection against hers - in which case her screen-left.
+func _choose_side() -> void:
+	_side = 1
+	var camera := get_viewport().get_camera_3d()
+	var holder := get_node_or_null(holder_path) as Node3D
+	if camera == null or holder == null or _wanderer == null or not is_instance_valid(_wanderer):
+		return
+	if camera.unproject_position(_wanderer.global_position).x > camera.unproject_position(holder.global_position).x:
+		_side = -1
 
 func _pixels_per_metre(camera: Camera3D, target: Vector3) -> float:
 	var right: Vector3 = camera.global_transform.basis.x
@@ -563,6 +593,10 @@ func _set_near(near: bool) -> void:
 		# The slot may have changed since she was last approached.
 		_focus = Choice.TAKE
 		_layout()
+		# Only from the square: a plaque still on its way down keeps its
+		# side if he steps back in, rather than jumping across her.
+		if _lift <= 0.001:
+			_choose_side()
 	if _lift_tween != null and _lift_tween.is_valid():
 		_lift_tween.kill()
 	_lift_tween = create_tween()
