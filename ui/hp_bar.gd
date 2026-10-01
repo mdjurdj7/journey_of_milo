@@ -92,9 +92,12 @@ class_name HPBar
 # applying and expiring invisibly. Built as the general row rather than
 # as a stance widget, so a status only has to exist to be shown.
 #
-# Order is deliberate: the stance is a standing bargain and comes first,
-# statuses are transient and follow it. A stance shows its own glyph and
-# name; a status shows its name and, when stacked, a multiplier.
+# One line per live effect, top to bottom, in the order BattleOverlay
+# hands them over (the stance, then the powers and statuses, then the
+# counters). A stance shows its own glyph and name; a status its label;
+# a counter its n/m with a progress hairline under it; a spent once-per-
+# combat effect stays as a line at row_spent_alpha. No rules text at
+# rest - hovering one line reveals what that one does.
 @export_group("Standing Row")
 @export var row_font_size_px: int = 10:
 	set(value):
@@ -112,10 +115,27 @@ class_name HPBar
 	set(value):
 		row_gap_px = value
 		_relayout_if_ready()
-@export var row_item_gap_px: float = 14.0:
+# Between one line's descent and the next line's ascent.
+@export var row_line_gap_px: float = 5.0:
 	set(value):
-		row_item_gap_px = value
+		row_line_gap_px = value
+		_relayout_if_ready()
+# A spent once-per-combat line's ink - grey, still there.
+@export_range(0.0, 1.0) var row_spent_alpha: float = 0.32:
+	set(value):
+		row_spent_alpha = value
 		queue_redraw()
+# A counter line's progress: a hairline the readout's width this far under
+# its text, the track at battle_track_alpha (the HP track's), filled to
+# n/m in the line's ink.
+@export var counter_hairline_gap_px: float = 3.0:
+	set(value):
+		counter_hairline_gap_px = value
+		_relayout_if_ready()
+@export var counter_hairline_px: float = 1.0:
+	set(value):
+		counter_hairline_px = value
+		_relayout_if_ready()
 @export var row_glyph_size_px: float = 9.0:
 	set(value):
 		row_glyph_size_px = value
@@ -130,12 +150,15 @@ class_name HPBar
 		queue_redraw()
 
 @export_group("Status Reveal")
-# Hovering the HP readout - block shield, numerals, bar and standing row,
-# not Toll - in battle shows what the stance and each status do, one
-# entry each, this far under the row (or the bar, with no row) and
-# wrapped at battle_width, fading in and out over reveal_fade_time, ink
-# at reveal_line_alpha, in the card's rules type at reveal_font_size_px
-# (the faces are StatusReveal's - see the "StatusReveal" child's doc).
+# Hovering one line of the standing row in battle shows what that one
+# effect does, this far under the whole readout and wrapped at
+# battle_width, fading in and out over reveal_fade_time, ink at
+# reveal_line_alpha, in the card's rules type at reveal_font_size_px (the
+# faces are StatusReveal's - see the "StatusReveal" child's doc). When
+# that would leave less than min_hand_clearance_px above the resting hand
+# (set_hand_top_y()), it goes to the readout's LEFT instead: right-
+# aligned, ending side_gap_px short of the readout's left edge, top-
+# aligned with the hovered line - never above, over the Wanderer.
 @export var reveal_gap_px: float = 6.0:
 	set(value):
 		reveal_gap_px = value
@@ -168,6 +191,14 @@ class_name HPBar
 		reveal_entry_gap_px = value
 		if _reveal != null:
 			_reveal.set_entry_gap_px(value)
+@export var min_hand_clearance_px: float = 8.0:
+	set(value):
+		min_hand_clearance_px = value
+		_place_reveal()
+@export var side_gap_px: float = 12.0:
+	set(value):
+		side_gap_px = value
+		_place_reveal()
 @export_group("")
 @export var battle_scale: float = 1.0
 
@@ -248,11 +279,16 @@ var _block: int = 0
 var _grace: int = 0
 # The row's contents, as flat display data rather than rules objects -
 # this node never reaches into a Stance or a Status, it is handed what to
-# draw. Each entry: {"text": String, "glyph": bool}.
+# draw. Each entry - see set_standing_row().
 var _row_items: Array[Dictionary] = []
 var _row_font_tracked: Font = null
-# What the row's entries do, shown on hover - see set_reveal_lines().
+# What the hovered line's entry does - see _update_reveal().
 var _reveal: StatusReveal = null
+# The row line under the cursor, or -1.
+var _hovered_line: int = -1
+# The resting hand's top edge in canvas pixels, or < 0 unknown (always
+# under the readout then) - see set_hand_top_y().
+var _hand_top_y: float = -1.0
 var _toll: int = 0
 var _toll_visible: bool = false
 var _toll_pop: float = 1.0
@@ -402,10 +438,42 @@ func _battle_content_size() -> Vector2:
 	var width: float = _block_readout_width() + battle_width
 	if _toll_visible:
 		width += toll_gap_px + _toll_block_width()
-	var row_height: float = 0.0
-	if not _row_items.is_empty() and _row_font_tracked != null:
-		row_height = row_gap_px + _row_font_tracked.get_height(row_font_size_px)
-	return Vector2(width, _battle_bar_top() + battle_bar_height + row_height)
+	return Vector2(width, _row_top() + _row_height())
+
+func _row_top() -> float:
+	return _battle_bar_top() + battle_bar_height + row_gap_px
+
+func _line_text_height() -> float:
+	return _row_font_tracked.get_height(row_font_size_px) if _row_font_tracked != null else float(row_font_size_px)
+
+# One line's own height: its text, and a counter's hairline under it.
+func _line_height(item: Dictionary) -> float:
+	var height: float = _line_text_height()
+	if int(item.get("count", 0)) > 0:
+		height += counter_hairline_gap_px + counter_hairline_px
+	return height
+
+# Every line and the gaps between them. With none, minus row_gap_px -
+# nothing reserved under the bar.
+func _row_height() -> float:
+	if _row_items.is_empty():
+		return -row_gap_px
+	var height: float = 0.0
+	for item: Dictionary in _row_items:
+		height += _line_height(item)
+	return height + row_line_gap_px * float(_row_items.size() - 1)
+
+# Each line's band, readout-wide, half a line gap above and below so the
+# bands meet and the cursor never falls between two lines.
+func _line_rects() -> Array[Rect2]:
+	var rects: Array[Rect2] = []
+	var y: float = _row_top()
+	var left: float = _block_readout_width()
+	for item: Dictionary in _row_items:
+		var height: float = _line_height(item)
+		rects.append(Rect2(left, y - row_line_gap_px * 0.5, battle_width, height + row_line_gap_px))
+		y += height + row_line_gap_px
+	return rects
 
 # The point of this control that sits on the unprojected anchor (and
 # that DistanceScale scales about): the field layout's centre, or the HP
@@ -452,8 +520,8 @@ func _apply_layout() -> void:
 	_numbers_label.modulate.a = field_alpha
 
 	if _reveal != null:
-		_reveal.position = Vector2(_block_readout_width(), _battle_content_size().y + reveal_gap_px)
 		_reveal.set_wrap_width(battle_width)
+		_place_reveal()
 
 	queue_redraw()
 
@@ -461,19 +529,23 @@ func _apply_layout() -> void:
 # is up yet - for BattleOverlay's one-shot clearance print, which runs
 # before any stance or status lands.
 func get_status_row_bottom_y() -> float:
-	var bottom: float = _battle_bar_top() + battle_bar_height
-	if _row_font_tracked != null:
-		bottom += row_gap_px + _row_font_tracked.get_height(row_font_size_px)
+	var bottom: float = _row_top() + _row_height()
+	if _row_items.is_empty():
+		bottom += row_gap_px + _line_text_height()
 	return (get_global_transform() * Vector2(0.0, bottom)).y
 
-# Whether the cursor is on the drawn HP readout, block shield to standing
-# row (Toll is its own readout) - polled, never a mouse event, so the
-# targeting raycast underneath gets every click. A card or button under
-# the cursor wins.
-func _is_readout_hovered() -> bool:
+# Which row line the cursor is on, or -1 - polled, never a mouse event,
+# so the targeting raycast underneath gets every click. A card or button
+# under the cursor wins.
+func _line_under_mouse() -> int:
 	if get_viewport().gui_get_hovered_control() != null:
-		return false
-	return Rect2(0.0, 0.0, _block_readout_width() + battle_width, _battle_content_size().y).has_point(get_local_mouse_position())
+		return -1
+	var mouse: Vector2 = get_local_mouse_position()
+	var rects: Array[Rect2] = _line_rects()
+	for i in rects.size():
+		if rects[i].has_point(mouse):
+			return i
+	return -1
 
 # The battle readout, at _battle_blend alpha over the fading field nodes.
 # One baseline for the row: numeral, then " / max" run on at its smaller
@@ -540,22 +612,37 @@ func _draw() -> void:
 # baseline toll_rule_gap_px above the rule, the rule on the bar's rows,
 # as wide as the block. The numeral pops about its baseline-left corner
 # on a change so the label and rule hold still.
-# Stance then statuses, left to right under the bar. Nothing at all when
+# One line per entry, top to bottom under the bar. Nothing at all when
 # empty - no label, no placeholder, no reserved gap.
 func _draw_standing_row(top: float, left: float) -> void:
 	if _row_items.is_empty() or _row_font_tracked == null:
 		return
-	var color: Color = _ink
-	color.a = row_alpha * _battle_blend
 	var ascent: float = _row_font_tracked.get_ascent(row_font_size_px)
-	var baseline: float = top + ascent
-	var x: float = left
+	var y: float = top
 	for item: Dictionary in _row_items:
+		var color: Color = _ink
+		color.a = (row_spent_alpha if item.get("spent", false) else row_alpha) * _battle_blend
+		var baseline: float = y + ascent
+		var x: float = left
 		if item.get("glyph", false):
 			_draw_stance_glyph(Vector2(x, baseline - ascent * 0.5), color)
 			x += row_glyph_size_px + row_glyph_gap_px
-		x += InkType.draw_run(self, _row_font_tracked, String(item["text"]), Vector2(x, baseline), row_font_size_px, color)
-		x += row_item_gap_px
+		InkType.draw_run(self, _row_font_tracked, String(item.get("text", "")), Vector2(x, baseline), row_font_size_px, color)
+		var count: int = int(item.get("count", 0))
+		if count > 0:
+			var fraction: float = float(int(item.get("progress", 0))) / float(count)
+			_draw_counter_hairline(y + _line_text_height() + counter_hairline_gap_px, left, fraction, color)
+		y += _line_height(item) + row_line_gap_px
+
+# The readout-wide progress hairline under a counter line: the track at
+# the HP track's alpha, filled to `fraction` in the line's ink.
+func _draw_counter_hairline(top: float, left: float, fraction: float, color: Color) -> void:
+	var track: Color = _ink
+	track.a = battle_track_alpha * _battle_blend
+	draw_rect(Rect2(left, top, battle_width, counter_hairline_px), track)
+	var filled: float = battle_width * clampf(fraction, 0.0, 1.0)
+	if filled > 0.0:
+		draw_rect(Rect2(left, top, filled, counter_hairline_px), color)
 
 # The stance mark: a ring with a bite out of its lower right - a thing
 # consuming itself. Drawn rather than authored so it scales with the row
@@ -679,7 +766,41 @@ func _physics_process(delta: float) -> void:
 	_visibility.update(delta, hovered, low_hp, _in_battle)
 
 	# Only once the battle style is fully in - never mid-transition.
-	_reveal.set_revealed(_in_battle and _battle_blend >= 1.0 and _is_readout_hovered())
+	_update_reveal(_line_under_mouse() if _in_battle and _battle_blend >= 1.0 else -1)
+
+# Shows the hovered line's entry alone, or nothing. Re-placed every tick
+# while shown - the bar follows the camera, and with it the clearance.
+func _update_reveal(line: int) -> void:
+	if line >= _row_items.size():
+		line = -1
+	if line != _hovered_line:
+		_hovered_line = line
+		if line >= 0:
+			var item: Dictionary = _row_items[line]
+			_reveal.set_lines(PackedStringArray([String(item.get("name", ""))]), PackedStringArray([String(item.get("rules", ""))]))
+	if _hovered_line >= 0:
+		_place_reveal()
+	_reveal.set_revealed(_hovered_line >= 0 and not String(_row_items[_hovered_line].get("rules", "")).is_empty())
+
+# Under the whole readout when it clears the resting hand by
+# min_hand_clearance_px; otherwise to its left, beside the hovered line
+# (see the Status Reveal group's doc).
+func _place_reveal() -> void:
+	if _reveal == null or not is_node_ready():
+		return
+	var below := Vector2(_block_readout_width(), _battle_content_size().y + reveal_gap_px)
+	var fits: bool = true
+	if _hand_top_y >= 0.0:
+		var bottom: float = (get_global_transform() * Vector2(0.0, below.y + _reveal.size.y)).y
+		fits = _hand_top_y - bottom >= min_hand_clearance_px
+	var rects: Array[Rect2] = _line_rects()
+	if fits or _hovered_line < 0 or _hovered_line >= rects.size():
+		_reveal.set_align_right(false)
+		_reveal.position = below
+		return
+	_reveal.set_align_right(true)
+	var line_top: float = rects[_hovered_line].position.y + row_line_gap_px * 0.5
+	_reveal.position = Vector2(-side_gap_px - battle_width, line_top)
 
 func _hp_fraction(current: int, max_hp: int) -> float:
 	if max_hp <= 0:
@@ -778,31 +899,34 @@ func update_grace(grace: int) -> void:
 func hide_grace() -> void:
 	update_grace(0)
 
-# The standing row's contents, pushed by BattleOverlay on the
-# controller's stance_changed/status_changed. `stance_text` is empty when
-# no stance is held; `status_texts` is every active status's label, in the
-# order the rules hold them. This node does no rules reading of its own -
-# it is handed strings, which is why it needs no knowledge of stacking
-# rules or status categories.
-func set_standing_row(stance_text: String, status_texts: PackedStringArray) -> void:
-	_row_items.clear()
-	if not stance_text.is_empty():
-		_row_items.append({"text": stance_text, "glyph": true})
-	for text in status_texts:
-		if not text.is_empty():
-			_row_items.append({"text": text, "glyph": false})
+# The standing row's lines, top to bottom, pushed by BattleOverlay on the
+# controller's stance_changed/status_changed. This node does no rules
+# reading of its own - it is handed what to draw, which is why it needs
+# no knowledge of stacking rules or status categories. Each entry:
+#   "text"           the line as drawn ("The Return 2/5")
+#   "glyph"          the stance mark before it
+#   "count"          > 0 for a counter, with "progress" of it - the hairline
+#   "spent"          a spent once-per-combat effect, at row_spent_alpha
+#   "name", "rules"  its hover reveal: the name and what it does now
+#                    (Stance.describe()/Status.describe())
+func set_standing_row(items: Array[Dictionary]) -> void:
+	_row_items = items.duplicate()
+	# Re-read on the next tick, against the new lines - the same line may
+	# now say something else. A reveal already up stays up meanwhile.
+	_hovered_line = -1
 	_apply_layout()
 
 func clear_standing_row() -> void:
-	set_standing_row("", PackedStringArray())
-	set_reveal_lines(PackedStringArray(), PackedStringArray())
-
-# Called by BattleOverlay alongside set_standing_row(): the stance's and
-# each status's name and what it does now (Stance.describe()/Status.
-# describe()), in the row's order - the hover reveal.
-func set_reveal_lines(names: PackedStringArray, lines: PackedStringArray) -> void:
+	set_standing_row([] as Array[Dictionary])
 	if _reveal != null:
-		_reveal.set_lines(names, lines)
+		_reveal.set_lines(PackedStringArray(), PackedStringArray())
+
+# The resting hand's top edge in canvas pixels (HandContainer.get_rest_
+# top_y()), which the reveal under the readout keeps clear of - pushed by
+# BattleOverlay.
+func set_hand_top_y(y: float) -> void:
+	_hand_top_y = y
+	_place_reveal()
 
 # Called by BattleOverlay.enter_battle()/_finish_battle() - bypasses the
 # field hover/hold/low-hp visibility rules entirely while true (see

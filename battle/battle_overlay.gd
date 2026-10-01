@@ -199,6 +199,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	# rest" - measuring mid-transition would read a bar that hasn't
 	# finished growing yet) - see _debug_print_enemy_bar_gaps()'s own doc.
 	get_tree().create_timer(battle_transition_time).timeout.connect(_debug_print_enemy_bar_gaps)
+	# What the HP readout's hover reveal keeps clear of - the hand at rest.
+	get_tree().create_timer(battle_transition_time).timeout.connect(func() -> void: _field_hp_bar.set_hand_top_y(hand_container.get_rest_top_y()))
 
 # The bottom-left resource stack and the two pile lines - this overlay's
 # own children, freed with it. Bound/placed once the controller's Deck
@@ -310,44 +312,39 @@ func _on_stance_changed(stance: Stance) -> void:
 	# The hand's faces move with it - see HandContainer.set_stance().
 	hand_container.set_stance(stance)
 
-# Turns the player's rules state into the strings the row draws - this
-# is the only place that knows a Stance/Status has a display_name or a
-# stack count, so HPBar can stay a thing that draws text it is handed.
-# Names are shown as authored, in title case (Self-Eater, Last Resort),
-# with the stack count after them once there is more than one - or the
-# charges left, for a status that counts them (Status.label()).
+# Turns the player's rules state into the lines the row draws - this is
+# the only place that knows a Stance/Status has a display_name or a stack
+# count, so HPBar can stay a thing that draws what it is handed (see
+# HPBar.set_standing_row()). One line each, top to bottom: the stance
+# ("Self-Eater ×2" once stacked); every status in the order it was
+# applied, as Status.label() reads it; the once-per-combat effects already
+# spent this fight, grey; then the counters ("The Return 2/5"), with
+# their progress. Names as authored, in title case.
 func _refresh_standing_row() -> void:
-	var stance: Stance = battle_controller.player.stance
-	var stance_text: String = ""
+	var player: Combatant = battle_controller.player
+	var lines: Array[Dictionary] = []
+	var stance: Stance = player.stance
 	if stance != null and stance.data != null:
-		stance_text = stance.data.display_name
+		var stance_text: String = stance.data.display_name
 		if stance.stacks > 1:
 			stance_text += " ×%d" % stance.stacks
-	var status_texts := PackedStringArray()
-	for active: Status in battle_controller.player.statuses:
+		lines.append({"text": stance_text, "glyph": true, "name": stance.data.display_name, "rules": stance.describe()})
+	var counters: Array[Dictionary] = []
+	for active: Status in player.statuses:
 		if active.data == null:
 			continue
-		status_texts.append(active.label())
-	_field_hp_bar.set_standing_row(stance_text, status_texts)
-
-	# The hover reveal: what each of those does now, in the row's order.
-	var reveal_names := PackedStringArray()
-	var reveal_lines := PackedStringArray()
-	if stance != null and stance.data != null and not stance.data.description.is_empty():
-		reveal_names.append(stance.data.display_name)
-		reveal_lines.append(stance.describe())
-	for active: Status in battle_controller.player.statuses:
-		if active.data == null or active.data.description.is_empty():
-			continue
-		reveal_names.append(active.data.display_name)
-		reveal_lines.append(active.describe())
-	# The keepsake last: not a status, but what it does is part of what the
-	# Wanderer carries into this fight (TrinketData.describe()).
-	var keepsake: TrinketData = RunState.keepsake
-	if keepsake != null:
-		reveal_names.append(keepsake.display_name)
-		reveal_lines.append(keepsake.describe())
-	_field_hp_bar.set_reveal_lines(reveal_names, reveal_lines)
+		var line: Dictionary = {"text": active.label(), "name": active.data.display_name, "rules": active.describe()}
+		if active.has_self_loss_counter():
+			line["count"] = active.data.self_loss_trigger_count
+			line["progress"] = active.progress
+			counters.append(line)
+		else:
+			lines.append(line)
+	for spent: StatusData in player.spent_statuses:
+		lines.append({"text": spent.display_name, "spent": true, "name": spent.display_name, "rules": Status.new(spent).describe()})
+	lines.append_array(counters)
+	_field_hp_bar.set_standing_row(lines)
+	_field_hp_bar.set_hand_top_y(hand_container.get_rest_top_y())
 
 # Block moved somewhere (a card, a turn start, an enemy's own guard) -
 # every readout's segment follows.

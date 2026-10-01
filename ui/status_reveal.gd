@@ -30,6 +30,7 @@ var _line_height: float = 1.28
 # Extra space between two entries, on top of the line pitch, so a wrapped
 # sentence reads apart from the next status's.
 var _entry_gap_px: float = 4.0
+var _align_right: bool = false
 
 @export var text_font: Font = load("res://assets/fonts/AlegreyaSans-Regular.ttf"):
 	set(value):
@@ -92,6 +93,14 @@ func set_line_height(line_height: float) -> void:
 func set_entry_gap_px(entry_gap_px: float) -> void:
 	_entry_gap_px = entry_gap_px
 	_rebuild()
+
+# Every line flush right in the wrap width instead of left - for a host
+# that sets this beside its readout's left edge (HPBar's flip).
+func set_align_right(align_right: bool) -> void:
+	if align_right == _align_right:
+		return
+	_align_right = align_right
+	queue_redraw()
 
 func set_revealed(revealed: bool) -> void:
 	if revealed == _shown:
@@ -160,6 +169,9 @@ func _draw() -> void:
 	var y: float = 0.0
 	for paragraph in _paragraphs:
 		for line_index in paragraph.get_line_count():
-			paragraph.draw_line(get_canvas_item(), Vector2(0.0, y), line_index, color)
+			# draw_line() ignores the paragraph's own alignment - flush
+			# right is placed by hand.
+			var x: float = _wrap_width - paragraph.get_line_width(line_index) if _align_right else 0.0
+			paragraph.draw_line(get_canvas_item(), Vector2(x, y), line_index, color)
 			y += _line_pitch()
 		y += _entry_gap_px
