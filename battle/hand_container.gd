@@ -15,6 +15,12 @@ signal play_animation_finished(card_data: CardData)
 # A card was lifted into the armed position / returned or played from it -
 # BattleOverlay disables End Turn while one is armed.
 signal armed_changed(armed: bool)
+# The resting row's composition changed (draw, discard, play) or it was
+# re-laid out - get_rest_left_x() may have moved. `duration` is how long
+# the hand's own glide takes (0 for a snap); the glide is EASE_OUT /
+# TRANS_CUBIC. Not emitted for hover; arming and disarming leave the
+# rest count alone, so the x read back is unchanged.
+signal rest_left_changed(duration: float)
 
 # Must match CardView.card_size (200 x 280 at 1x).
 @export var card_size: Vector2 = Vector2(200.0, 280.0)
@@ -487,19 +493,16 @@ func _reflow_hand(animate: bool = true, duration: float = -1.0) -> void:
 		if slot != _armed_slot:
 			slots.append(slot)
 	var count: int = slots.size()
-	if count == 0:
-		return
 	if duration < 0.0:
 		duration = reflow_duration_sec
+	rest_left_changed.emit(duration if animate else 0.0)
+	if count == 0:
+		return
 
 	var scale_factor: float = _compute_scale_factor(count)
 	var scaled_card_size: Vector2 = card_size * scale_factor
 
-	var spacing_x: float
-	if count > fan_gap_max_cards:
-		spacing_x = scaled_card_size.x * (1.0 - fan_overlap)
-	else:
-		spacing_x = scaled_card_size.x + fan_gap
+	var spacing_x: float = _row_spacing(count, scaled_card_size.x)
 
 	var total_width: float = scaled_card_size.x + spacing_x * float(count - 1)
 	var start_center_x: float = size.x / 2.0 - total_width / 2.0 + scaled_card_size.x / 2.0
@@ -545,6 +548,47 @@ func _reflow_hand(animate: bool = true, duration: float = -1.0) -> void:
 			slot.z_index = index
 
 		index += 1
+
+# Centre-to-centre spacing for a row of `count` cards `scaled_width` wide
+# - see fan_overlap/fan_gap_max_cards.
+func _row_spacing(count: int, scaled_width: float) -> float:
+	if count > fan_gap_max_cards:
+		return scaled_width * (1.0 - fan_overlap)
+	return scaled_width + fan_gap
+
+# Global x of the leftmost resting card's left edge at canvas row
+# `at_global_y` - what BattleOverlay keeps the energy readout a gap left
+# of. Worked out from the layout, never read off the live slot, so a hover
+# lift, the armed travel or a glide in flight never moves it: the armed
+# card counts as still in the row (the readout holds through arm and
+# disarm, moving only when a card is played), and an empty hand reads as
+# one card. The left edge leans with the card's tilt about the slot's
+# bottom-centre pivot, so it's taken at the asked row, clamped to the
+# card's own height.
+func get_rest_left_x(at_global_y: float) -> float:
+	var count: int = maxi(_slots.size(), 1)
+	var scale_factor: float = _compute_scale_factor(count)
+	var scaled_card_size: Vector2 = card_size * scale_factor
+	var total_width: float = scaled_card_size.x + _row_spacing(count, scaled_card_size.x) * float(count - 1)
+	var slot_position := Vector2(size.x / 2.0 - total_width / 2.0, 0.0)
+	var theta: float = 0.0
+	if count > 1:
+		theta = deg_to_rad(-fan_max_rotation_degrees)
+	# t = -1 lifts nothing (see _reflow_hand()); a lone card sits at t = 0.
+	if count == 1:
+		slot_position.y = -fan_arc_height
+	var pivot := Vector2(scaled_card_size.x / 2.0, scaled_card_size.y)
+	# The CardView in the slot: card_size, scaled by scale_factor about its
+	# own bottom centre, its top at the rest offset.
+	var rest_offset_y: float = card_size.y - hand_rest_visible_height
+	var edge_x: float = card_size.x / 2.0 - card_size.x * scale_factor / 2.0
+	var bottom_y: float = rest_offset_y + card_size.y
+	var top_y: float = bottom_y - card_size.y * scale_factor
+	var origin: Vector2 = global_position + slot_position + pivot
+	# Slot-local y on the edge that lands on the asked row, undoing the tilt.
+	var local_y: float = pivot.y + (at_global_y - origin.y - sin(theta) * (edge_x - pivot.x)) / cos(theta)
+	local_y = clampf(local_y, top_y, bottom_y)
+	return origin.x + cos(theta) * (edge_x - pivot.x) - sin(theta) * (local_y - pivot.y)
 
 # hand_card_scale is the base factor (a card in hand is never full
 # card_size, regardless of count); this only shrinks further, on top of
