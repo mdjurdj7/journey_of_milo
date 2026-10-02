@@ -494,13 +494,17 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 # reared while an intent that asks for it (EnemyIntent.rear_while_
 # queued) is queued, not yet broken (its interrupt threshold met) and the
 # enemy is above the sand; flat otherwise. Returns how long the change
-# takes; 0 when there is none.
+# takes; 0 when there is none. A plain attack queued above the sand asks
+# for the tell (FieldEnemy.set_poised()), cosmetic and not waited on.
 func _pose_for_intent(enemy: FieldEnemy) -> float:
 	var combatant: Combatant = _combatants.get(enemy)
 	var rear: bool = false
+	var poised: bool = false
 	if combatant != null and combatant.hp > 0 and not combatant.buried and enemy.enemy_data != null:
 		var intent: EnemyIntent = EnemyTurn.current_intent(combatant, enemy.enemy_data)
 		rear = intent != null and intent.rear_while_queued and not EnemyTurn.is_interrupted(combatant, intent)
+		poised = intent != null and intent.type == EnemyIntent.IntentType.ATTACK and not intent.rear_while_queued
+	enemy.set_poised(poised)
 	return enemy.set_rearing(rear)
 
 # An interrupted enemy going under, or a buried one coming up, on the

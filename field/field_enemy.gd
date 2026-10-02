@@ -270,6 +270,13 @@ func set_rearing(on: bool) -> float:
 		return 0.0
 	return float(_attachment.call("set_rearing", on))
 
+# The tell a queued Snap may hold (RearPose.set_poised() - shown only
+# with its hold_tell on); a body with no such attachment ignores it.
+func set_poised(on: bool) -> void:
+	if _attachment == null or not _attachment.has_method("set_poised") or _settling:
+		return
+	_attachment.call("set_poised", on)
+
 # How much higher a rear has put the top of the body, metres.
 func _rear_lift() -> float:
 	if _attachment == null or not _attachment.has_method("get_rear_lift"):
@@ -781,7 +788,9 @@ func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spre
 # point in the lunge BattleController._run_enemy_turn() awaits before
 # reporting the hit - rather than the tween's own total duration, since
 # the return leg keeps playing (cosmetically) after the hit has already
-# landed.
+# landed. An attachment that winds up first (RearPose.play_windup(), the
+# Siltjaw's Snap) holds the lunge back by its wind-up, and that is added
+# to the wait.
 func play_attack_snap(target: Node3D) -> float:
 	if target == null:
 		return 0.0
@@ -795,15 +804,20 @@ func play_attack_snap(target: Node3D) -> float:
 	# The wings beat as the lunge starts (DragonflyWings.start_flap()).
 	if _attachment != null and _attachment.has_method("start_flap"):
 		_attachment.call("start_flap")
+	var windup: float = 0.0
+	if _attachment != null and _attachment.has_method("play_windup"):
+		windup = float(_attachment.call("play_windup", attack_snap_out_time))
 
 	var tween := create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	if windup > 0.0:
+		tween.tween_interval(windup)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "global_position", lunge_position, attack_snap_out_time)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.tween_property(self, "global_position", base_position, attack_snap_return_time)
 
-	return attack_snap_out_time
+	return windup + attack_snap_out_time
 
 # Called by region_field.gd on contact. Yaws to face target over duration,
 # taking the short way around. RegionField's contact freeze stops nothing
@@ -1012,6 +1026,7 @@ func exit_battle_hover() -> void:
 		return
 	_hovering = false
 	set_rearing(false)
+	set_poised(false)
 	var tween: Tween = _tween_hover(0.0, 0.0, battle_settle_seconds, Tween.EASE_IN_OUT)
 	tween.tween_callback(_on_hover_landed)
 

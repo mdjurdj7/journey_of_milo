@@ -54,6 +54,23 @@ class_name RearPose
 # the rear's own fraction, so they track it - same curve, same timing -
 # opening as the head lifts and closing as it drops, whether the charge
 # lands, breaks or the burrow follows.
+#
+# The Snap winds up on the same bones (play_windup(), from FieldEnemy.
+# play_attack_snap()): the front rises by head_raise_degrees and the jaws
+# open - spreading by jaw_open_degrees and lifting their tips by
+# jaw_lift_degrees about each hinge's own across axis, the part a side-on
+# frame sees - over windup_time; the lunge starts as that ends, the jaws
+# snap shut over snap_time to close on the frame the hit lands, and the
+# head settles over settle_time. The front stands at whichever is higher
+# of the rear and the wind-up, and the jaws spread by whichever is wider,
+# so the charge looks as it did and a settle hands over to a rear without
+# a jump; the lift is the wind-up's alone. A body already reared (the
+# charge landing) doesn't wind up. get_rear_lift() counts the rear only,
+# so the camera's fit and the intent hold still through a Snap.
+#
+# With hold_tell on, a queued Snap holds tell_fraction of the wind-up -
+# head part raised, jaws slightly parted - through the player's turn
+# (set_poised(), from BattleController._pose_for_intent()).
 
 # How far the front comes up, degrees.
 @export_range(0.0, 90.0, 0.5) var rear_degrees: float = 45.0:
@@ -147,6 +164,44 @@ class_name RearPose
 		jaw_midline_m = value
 		_rebuild()
 
+@export_group("Attack")
+# The Snap's wind-up at its full: how far the front rises, how far each
+# jaw spreads out and how far its tip lifts, degrees.
+@export_range(0.0, 90.0, 0.5) var head_raise_degrees: float = 12.0:
+	set(value):
+		head_raise_degrees = value
+		_apply_pose()
+@export var jaw_open_degrees: float = 25.0:
+	set(value):
+		jaw_open_degrees = value
+		_apply_pose()
+@export var jaw_lift_degrees: float = 20.0:
+	set(value):
+		jaw_lift_degrees = value
+		_apply_pose()
+# Up and open before the lunge (eased in and out); the jaws shutting,
+# ending as the lunge lands (eased in); the head back down after the hit.
+# Read at each wind-up, so an edit takes on the next Snap.
+@export var windup_time: float = 0.35:
+	set(value):
+		windup_time = value
+@export var snap_time: float = 0.08:
+	set(value):
+		snap_time = value
+@export var settle_time: float = 0.3:
+	set(value):
+		settle_time = value
+# Hold tell_fraction of the wind-up while a Snap is queued (see the
+# header). Off by default.
+@export var hold_tell: bool = false:
+	set(value):
+		hold_tell = value
+		_apply_tell()
+@export_range(0.0, 1.0, 0.01) var tell_fraction: float = 0.4:
+	set(value):
+		tell_fraction = value
+		_apply_tell()
+
 var _mesh_instance: MeshInstance3D = null
 var _source_mesh: Mesh = null
 var _skeleton: Skeleton3D = null
@@ -178,6 +233,16 @@ var _breath_stop: float = 1.0
 var _rng := RandomNumberGenerator.new()
 # The jaws' hinges in mesh space: [right (+_axis), left].
 var _jaw_pivots: Array[Vector3] = [Vector3.ZERO, Vector3.ZERO]
+# The wind-up now, as fractions of the full one: the head's raise and the
+# jaws' opening (spread and lift together), moved apart since the jaws
+# snap while the head is still up.
+var _head_windup: float = 0.0
+var _jaw_windup: float = 0.0
+# Whether a queued Snap asks for the tell, and the wind-up and its settle
+# while they run (set_poised() leaves the pose to the settle then).
+var _poised: bool = false
+var _attacking: bool = false
+var _windup_tween: Tween = null
 
 func _ready() -> void:
 	var model := get_parent() as Node3D
@@ -383,6 +448,7 @@ func _rebuild() -> void:
 	_measure()
 	_set_angle(_angle)
 	_apply_breath()
+	_apply_tell()
 
 # At rear_degrees: how far the body's top rises - one pass over the
 # vertices, the same linear blend the GPU does.
@@ -399,26 +465,118 @@ func _measure() -> void:
 		top_reared = maxf(top_reared, v.lerp(reared, _weights[i]).dot(_up))
 	_full_extra = (top_reared - top_flat) * _metres_per_unit
 
-# The front bone at `degrees` about the bend axis, on the pivot (its
-# rest), and the jaws open by the same fraction of the rear.
+# The rear at `degrees`, and the pose redrawn.
 func _set_angle(degrees: float) -> void:
 	_angle = degrees
+	_apply_pose()
+
+# The front bone about the bend axis, on the pivot (its rest), at the
+# higher of the rear and the wind-up's raise; the jaws spread by the
+# wider of the rear's share of jaw_degrees and the wind-up's, and lifted
+# by the wind-up's share of jaw_lift_degrees.
+func _apply_pose() -> void:
 	if _skeleton == null or _skeleton.get_bone_count() < 2:
 		return
 	_skeleton.set_bone_pose_position(0, Vector3.ZERO)
 	_skeleton.set_bone_pose_rotation(0, Quaternion.IDENTITY)
 	_skeleton.set_bone_pose_position(1, _pivot)
-	_skeleton.set_bone_pose_rotation(1, Quaternion(_axis, deg_to_rad(degrees)))
+	var front: float = maxf(_angle, head_raise_degrees * _head_windup)
+	_skeleton.set_bone_pose_rotation(1, Quaternion(_axis, deg_to_rad(front)))
 	if _skeleton.get_bone_count() < 5:
 		return
-	# The jaws track the rear. About the head's own up; a turn of -angle
-	# takes a tip ahead of the hinge toward +_axis (up x forward is
-	# -_axis), so the right jaw turns by -open and the left by +open.
-	var fraction: float = clampf(degrees / rear_degrees, 0.0, 1.0) if rear_degrees > 0.0 else 0.0
-	var open: float = deg_to_rad(jaw_degrees * fraction)
+	# About the head's own up; a turn of -angle takes a tip ahead of the
+	# hinge toward +_axis (up x forward is -_axis), so the right jaw turns
+	# by -open and the left by +open. The lift turns about _axis first -
+	# positive raises a tip ahead of its hinge, as the rear does - so it
+	# stays a lift whichever way the spread then takes it.
+	var fraction: float = clampf(_angle / rear_degrees, 0.0, 1.0) if rear_degrees > 0.0 else 0.0
+	var open: float = deg_to_rad(maxf(jaw_degrees * fraction, jaw_open_degrees * _jaw_windup))
+	var lift := Quaternion(_axis, deg_to_rad(jaw_lift_degrees * _jaw_windup))
 	for side in 2:
 		_skeleton.set_bone_pose_position(3 + side, _jaw_pivots[side] - _pivot)
-		_skeleton.set_bone_pose_rotation(3 + side, Quaternion(_up, -open if side == 0 else open))
+		_skeleton.set_bone_pose_rotation(3 + side, Quaternion(_up, -open if side == 0 else open) * lift)
+
+# FieldEnemy.play_attack_snap(), before its lunge: the wind-up, the snap
+# timed to end land_after seconds after the wind-up does (the lunge's
+# own landing), then the settle. Returns how long the lunge waits - 0
+# for a body already reared (the charge) or not yet skinned.
+func play_windup(land_after: float) -> float:
+	if not _ready_done or _skeleton == null or _target > 0.0:
+		return 0.0
+	var windup: float = maxf(windup_time, 0.0)
+	var snap: float = maxf(snap_time, 0.0)
+	if _windup_tween != null and _windup_tween.is_valid():
+		_windup_tween.kill()
+	_attacking = true
+	_windup_tween = create_tween()
+	_windup_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_windup_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_windup_tween.tween_method(_set_head_windup, _head_windup, 1.0, windup)
+	_windup_tween.parallel().tween_method(_set_jaw_windup, _jaw_windup, 1.0, windup)
+	# Held open until the snap has just long enough left to close on the
+	# landing (a snap longer than the lunge starts as the wind-up ends).
+	var hold: float = maxf(land_after - snap, 0.0)
+	if hold > 0.0:
+		_windup_tween.tween_interval(hold)
+	_windup_tween.set_ease(Tween.EASE_IN)
+	_windup_tween.tween_method(_set_jaw_windup, 1.0, 0.0, snap)
+	_windup_tween.set_ease(Tween.EASE_IN_OUT)
+	_windup_tween.tween_method(_settle_step, 0.0, 1.0, maxf(settle_time, 0.0))
+	_windup_tween.tween_callback(_end_windup)
+	return windup
+
+func _set_head_windup(value: float) -> void:
+	_head_windup = value
+	_apply_pose()
+
+func _set_jaw_windup(value: float) -> void:
+	_jaw_windup = value
+	_apply_pose()
+
+# The settle, t from 0 to 1: the head down from full and the jaws up from
+# shut, both to the tell's level - read live, so a tell asked for mid-
+# settle is where it ends.
+func _settle_step(t: float) -> void:
+	var level: float = _tell_level()
+	_head_windup = lerpf(1.0, level, t)
+	_jaw_windup = lerpf(0.0, level, t)
+	_apply_pose()
+
+func _end_windup() -> void:
+	_attacking = false
+	_apply_tell()
+
+# BattleController._pose_for_intent(): whether a Snap is queued. Shows
+# only with hold_tell on.
+func set_poised(on: bool) -> void:
+	_poised = on
+	_apply_tell()
+
+func _tell_level() -> float:
+	return tell_fraction if hold_tell and _poised else 0.0
+
+# The held pose eased to the tell's level - up over windup_time, down
+# over settle_time - unless a wind-up is running, whose settle reads the
+# level itself.
+func _apply_tell() -> void:
+	if not _ready_done or _attacking:
+		return
+	var level: float = _tell_level()
+	if is_equal_approx(level, _head_windup) and is_equal_approx(level, _jaw_windup):
+		return
+	if _windup_tween != null and _windup_tween.is_valid():
+		_windup_tween.kill()
+	var seconds: float = maxf(windup_time if level > _head_windup else settle_time, 0.0)
+	if seconds <= 0.0:
+		_head_windup = level
+		_jaw_windup = level
+		_apply_pose()
+		return
+	_windup_tween = create_tween()
+	_windup_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_windup_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_windup_tween.tween_method(_set_head_windup, _head_windup, level, seconds)
+	_windup_tween.parallel().tween_method(_set_jaw_windup, _jaw_windup, level, seconds)
 
 # 1 for each vertex of the mesh's largest piece - connected by its
 # triangles, or sharing a position with a vertex that is (a UV seam
