@@ -961,14 +961,15 @@ func _setup_bundle(bundle: BundleProp, entry: FloorProp, floor_data: FloorData) 
 	bundle.roll(RunState.rng, floor_data.gold_min, floor_data.gold_max, pool, floor_data.rare_pool)
 
 # A belongings cache's one roll, at floor load from the run's own
-# generator, the same pools as a bundle's (see BelongingsCache.roll()),
-# plus its once-per-run id and the prop's own line when it names one.
+# generator - the pack's card from the prop's pool, the floor's reward
+# pool when it names none (see BelongingsCache.roll()) - plus its once-
+# per-run id and the prop's own line when it names one.
 func _setup_belongings_cache(cache: BelongingsCache, entry: FloorProp, floor_data: FloorData, id: String) -> void:
 	var pool: RewardPool = entry.pool if entry.pool != null else floor_data.reward_pool
 	cache.cache_id = id
 	if not entry.world_line.is_empty():
 		cache.world_line = entry.world_line
-	cache.roll(RunState.rng, floor_data.gold_min, floor_data.gold_max, pool, floor_data.rare_pool)
+	cache.roll(RunState.rng, pool)
 
 # A world point seated on the relief plus `clearance` - same to_local()-
 # first idiom RewardSpread/Keeper use, since get_height_at() works in
@@ -1756,7 +1757,8 @@ func open_belongings_screen(cache: BelongingsCache) -> bool:
 		push_warning("RegionField: could not load %s; no belongings screen." % belongings_screen_scene_path)
 		return false
 	var screen := scene.instantiate() as BelongingsScreen
-	screen.setup(cache.world_line, cache.shown_card, cache.gold, cache.closed_card, cache.object_scene_paths, cache.object_scales, deck_panel)
+	cache.ensure_keepsake()
+	screen.setup(cache.world_line, cache.coin_amount, cache.card, cache.keepsake, cache.glassbone_slot, cache.glassbone_amount, cache.object_scene_paths, cache.object_scales, deck_panel)
 	screen.closed.connect(_on_belongings_screen_closed.bind(cache))
 	if _loot_screen != null and is_instance_valid(_loot_screen):
 		_loot_screen.close()

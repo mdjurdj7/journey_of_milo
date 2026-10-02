@@ -4,14 +4,17 @@ class_name BelongingsCache
 # Three things set down together - a case, a pack, a bedroll - and one
 # choice between them, made on a screen (BelongingsScreen) rather than at
 # the things themselves. The sand carries the three objects; the screen
-# carries the choice, showing each object and nothing of what is in it.
+# carries the choice, showing each object - what is in it shows only once
+# it is taken.
 #
-# What the three hold is rolled once, when the floor loads (RegionField.
-# _spawn_floor_props() calls roll() from the run's own generator): the
-# case a card from the prop's pool, the pack the gold, the bedroll a card
-# from the floor's rare_pool - the belongings pool while that is empty,
-# drawn in one roll with the case's so the two always differ. None of it
-# changes after.
+# Each object holds one kind of thing, always the same one: the case
+# coin (coin_amount), the pack a card from the prop's pool, the bedroll a
+# keepsake from keepsake_table. The card, and whether one of the three
+# also holds Glassbone (glassbone_chance, which one picked at random),
+# are rolled once, when the floor loads (RegionField._spawn_floor_props()
+# calls roll() from the run's own generator). The keepsake is drawn the
+# first time the screen opens (ensure_keepsake()), as the Keeper draws
+# hers, so it is never the one held by then. None of it changes after.
 #
 # Walking within trigger_radius of this node (on the ground plane) opens
 # the screen through RegionField.open_belongings_screen(), once. Taking or
@@ -23,8 +26,9 @@ class_name BelongingsCache
 #
 # The objects are BelongingsObjects: the model on the hulls' flat
 # material and tint, grounded by its bbox, solid, and inert - nothing
-# opens them from the field and they say nothing. Object i is column i:
-# the case (the card), the pack (the gold), the bedroll (the unknown).
+# opens them from the field and they say nothing. Object i is column i
+# (BelongingsScreen.Slot): the case (the coin), the pack (the card), the
+# bedroll (the keepsake).
 
 @export_group("Objects")
 # The three models, in column order: the case, the pack, the bedroll.
@@ -76,13 +80,23 @@ class_name BelongingsCache
 # The line at the top of the screen - FloorProp.world_line replaces it
 # when set.
 @export_multiline var world_line: String = "Three packs, set down out of the wind. Nobody came back."
-# On the floor's own gold range (FloorData.gold_min/gold_max) - the
-# bundle's own multiplier.
-@export var gold_multiplier: float = 1.5
 # Whether a take sinks the taken column's object, and whether a decline
 # sinks all three. Read when the screen closes.
 @export var sink_taken_object: bool = true
 @export var sink_on_decline: bool = false
+@export_group("")
+
+@export_group("Contents")
+# What the case holds. Read when the screen opens.
+@export var coin_amount: int = 45
+# What the bedroll draws from - never the keepsake held (KeepsakeTable.
+# roll()). Read when the screen first opens.
+@export var keepsake_table: KeepsakeTable = null
+# The chance, per cache, that one of the three (any, equally) also holds
+# glassbone_amount Glassbone, taken with it. The chance is read by roll(),
+# the amount when the screen opens.
+@export_range(0.0, 1.0, 0.01) var glassbone_chance: float = 0.25
+@export var glassbone_amount: int = 1
 @export_group("")
 
 @export var ground_path: NodePath = ^"../../Ground"
@@ -91,14 +105,17 @@ class_name BelongingsCache
 # the floor resource's path plus the prop's index.
 @export var cache_id: String = ""
 
-# Rolled by roll(); null / 0 = that column is left out.
-var shown_card: CardData = null
-var gold: int = 0
-var closed_card: CardData = null
+# The card and glassbone_slot rolled by roll(), the keepsake by ensure_
+# keepsake(). null = that column is left out; glassbone_slot is the column
+# that also holds Glassbone, -1 for none.
+var card: CardData = null
+var keepsake: TrinketData = null
+var glassbone_slot: int = -1
 
 var _objects: Array[BelongingsObject] = []
 var _wanderer: Node3D = null
 var _opened: bool = false
+var _keepsake_rolled: bool = false
 
 # cache_id -> PackedInt32Array of the objects that sank. Present = spent.
 static var _spent: Dictionary = {}
@@ -106,20 +123,28 @@ static var _spent: Dictionary = {}
 static func reset_spent() -> void:
 	_spent.clear()
 
-func roll(rng: RandomNumberGenerator, gold_min: int, gold_max: int, pool: RewardPool, rare_pool: RewardPool) -> void:
-	var rare: bool = rare_pool != null and not rare_pool.entries.is_empty()
+func roll(rng: RandomNumberGenerator, pool: RewardPool) -> void:
 	var cards: Array[CardData] = []
 	if pool != null:
-		cards = pool.roll(1 if rare else 2, rng, null)
-	shown_card = cards[0] if cards.size() > 0 else null
-	closed_card = cards[1] if cards.size() > 1 else null
-	if rare:
-		var rare_cards: Array[CardData] = rare_pool.roll(1, rng, null)
-		closed_card = rare_cards[0] if not rare_cards.is_empty() else null
-	if shown_card == null or closed_card == null:
-		push_warning("BelongingsCache '%s': a card slot rolled nothing; that column is left out." % name)
-	var base: int = rng.randi_range(mini(gold_min, gold_max), maxi(gold_min, gold_max))
-	gold = maxi(roundi(float(base) * gold_multiplier), 1)
+		cards = pool.roll(1, rng, null)
+	card = cards[0] if not cards.is_empty() else null
+	if card == null:
+		push_warning("BelongingsCache '%s': the pack's card rolled nothing; that column is left out." % name)
+	var has_glassbone: bool = rng.randf() < glassbone_chance
+	glassbone_slot = rng.randi_range(0, object_scene_paths.size() - 1) if has_glassbone else -1
+
+# The bedroll's keepsake, drawn once, from the run's generator - never the
+# keepsake held as the screen first opens.
+func ensure_keepsake() -> void:
+	if _keepsake_rolled:
+		return
+	roll_keepsake(RunState.rng, RunState.keepsake, RunState.keepsakes_offered)
+
+func roll_keepsake(rng: RandomNumberGenerator, equipped: TrinketData, offered: Array[StringName]) -> void:
+	_keepsake_rolled = true
+	keepsake = keepsake_table.roll(rng, equipped, offered) if keepsake_table != null else null
+	if keepsake == null:
+		push_warning("BelongingsCache '%s': the bedroll's keepsake rolled nothing; that column is left out." % name)
 
 # FloorProp's placement (RegionField._spawn_floor_props()): XZ here, the
 # objects ground themselves; yaw onto yaw_degrees.

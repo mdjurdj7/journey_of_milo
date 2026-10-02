@@ -24,8 +24,11 @@ class_name BelongingsScreen
 # focused until the mouse or a key says so. WALK ON keeps the text form
 # of the language (grey at rest, bone and a hairline to its left).
 #
-# Taking one grants it through RunState and plays the take's sound; with
-# reveal_card_on_take a card then flies from the column to the
+# Each column holds one kind of thing (Slot): the case the coin, the pack
+# a card, the bedroll a keepsake - and any one of them may also hold
+# Glassbone, taken with it. Taking one grants it through RunState (a
+# keepsake into the slot, whatever was held gone) and plays the take's
+# sound; with reveal_card_on_take a card then flies from the column to the
 # Belongings panel - after the choice, as every other take in the game
 # does - and the screen closes when it lands. WALK ON, ui_cancel, a right
 # click anywhere and a fresh press of a move key all decline - the move
@@ -40,7 +43,8 @@ class_name BelongingsScreen
 # The column taken, or -1 for a decline.
 signal closed(taken: int)
 
-enum Slot { CARD, GOLD, CLOSED }
+# Column order - the case, the pack, the bedroll (BelongingsCache).
+enum Slot { GOLD, CARD, KEEPSAKE }
 
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
@@ -204,15 +208,21 @@ const DISMISS := SLOT_COUNT
 @export var reveal_card_on_take: bool = true
 @export var take_volume_db: float = -18.0
 @export var gold_volume_db: float = -20.0
+# Glassbone has no take sound of its own: the gold take, under it
+# (RewardScreen.glassbone_volume_db).
+@export var glassbone_volume_db: float = -24.0
+@export var keepsake_volume_db: float = -18.0
 @export var card_flight_scale: float = 1.0
 @export var card_flight_duration_sec: float = 0.45
 @export var card_flight_end_scale: float = 0.12
 @export_group("")
 
 var _line: String = ""
-var _card: CardData = null
 var _gold: int = 0
-var _closed_card: CardData = null
+var _card: CardData = null
+var _keepsake: TrinketData = null
+var _glassbone_slot: int = -1
+var _glassbone_amount: int = 0
 var _object_paths: PackedStringArray = PackedStringArray()
 var _object_scales: PackedFloat32Array = PackedFloat32Array()
 var _deck_panel: Control = null
@@ -239,15 +249,18 @@ var _mouse_on: int = -1
 var _done: bool = false
 var _opened_msec: int = 0
 
-# Called by RegionField before the screen enters the tree. card and
-# closed_card may be null and gold 0 - that column is then left out.
+# Called by RegionField before the screen enters the tree. gold may be 0
+# and card or keepsake null - that column is then left out. glassbone_slot
+# is the column that also holds glassbone_amount Glassbone, -1 for none.
 # object_paths are the three models and object_scales their scales, column
 # order - the same scales the cache puts on the sand.
-func setup(line: String, card: CardData, gold: int, closed_card: CardData, object_paths: PackedStringArray, object_scales: PackedFloat32Array, deck_panel: Control) -> void:
+func setup(line: String, gold: int, card: CardData, keepsake: TrinketData, glassbone_slot: int, glassbone_amount: int, object_paths: PackedStringArray, object_scales: PackedFloat32Array, deck_panel: Control) -> void:
 	_line = line
-	_card = card
 	_gold = gold
-	_closed_card = closed_card
+	_card = card
+	_keepsake = keepsake
+	_glassbone_slot = glassbone_slot
+	_glassbone_amount = glassbone_amount
 	_object_paths = object_paths
 	_object_scales = object_scales
 	_deck_panel = deck_panel
@@ -295,13 +308,17 @@ func _refresh() -> void:
 
 func _has_slot(slot: int) -> bool:
 	match slot:
-		Slot.CARD:
-			return _card != null
 		Slot.GOLD:
 			return _gold > 0
-		Slot.CLOSED:
-			return _closed_card != null
+		Slot.CARD:
+			return _card != null
+		Slot.KEEPSAKE:
+			return _keepsake != null
 	return false
+
+# The Glassbone a column holds alongside its own thing, 0 for none.
+func _glassbone_in(slot: int) -> int:
+	return maxi(_glassbone_amount, 0) if slot == _glassbone_slot and _has_slot(slot) else 0
 
 # The columns that hold something, left to right.
 func _present_slots() -> Array[int]:
@@ -373,12 +390,12 @@ func _build_render() -> void:
 # A column with no model is a column with nothing to take.
 func _drop_slot(slot: int) -> void:
 	match slot:
-		Slot.CARD:
-			_card = null
 		Slot.GOLD:
 			_gold = 0
-		Slot.CLOSED:
-			_closed_card = null
+		Slot.CARD:
+			_card = null
+		Slot.KEEPSAKE:
+			_keepsake = null
 
 func _render_objects() -> void:
 	if _viewport == null or _camera == null:
@@ -559,6 +576,11 @@ func _activate(index: int) -> void:
 		return
 	_done = true
 	_draw_layer.queue_redraw()
+	var glassbone: int = _glassbone_in(index)
+	if glassbone > 0:
+		RunState.add_glassbone(glassbone)
+		TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, glassbone_volume_db, "GlassboneTakeAudio", "BelongingsScreen")
+		print("BelongingsScreen: took %d Glassbone with it (run total %d)." % [glassbone, RunState.glassbone])
 	match index:
 		Slot.GOLD:
 			RunState.add_gold(_gold)
@@ -567,8 +589,14 @@ func _activate(index: int) -> void:
 			_finish(index)
 		Slot.CARD:
 			_take_card(_card, index)
-		Slot.CLOSED:
-			_take_card(_closed_card, index)
+		Slot.KEEPSAKE:
+			var held: TrinketData = RunState.keepsake
+			# Offered once it is seen - here, as it is taken.
+			RunState.note_keepsake_offered(_keepsake)
+			RunState.equip_keepsake(_keepsake)
+			TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, keepsake_volume_db, "KeepsakeTakeAudio", "BelongingsScreen")
+			print("BelongingsScreen: took '%s'%s." % [_keepsake.display_name, " (left '%s')" % held.display_name if held != null else ""])
+			_finish(index)
 
 func _take_card(card_data: CardData, index: int) -> void:
 	RunState.add_card(card_data)
