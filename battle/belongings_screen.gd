@@ -8,12 +8,15 @@ class_name BelongingsScreen
 # holds where it was, and this layer runs ALWAYS on layer 100.
 #
 # At the top, the cache's one world-voice line in Spectral, bone over
-# the scrim with the reward screen's ink outline - no box, no quotes.
-# Under it three columns side by side, and each column is its object
-# alone - the case, the pack, the bedroll, rendered from their models
-# (see _build_render()). Nothing of what is inside is drawn or named:
-# no card, no gold, no label, no hover preview. A column whose slot
-# rolled nothing is not drawn and cannot be focused.
+# the scrim with the reward screen's ink outline - no box, no quotes -
+# and under it the rule, TAKE ONE, in the system voice's tracked caps.
+# Under that three columns side by side, each its object alone - the
+# case, the pack, the bedroll, rendered from their models (see _build_
+# render()). The kind of thing each holds is fixed (Slot) - the case
+# coin, the pack a card, the bedroll a keepsake, any one of them perhaps
+# Glassbone too - but which thing is a mystery until it's taken: nothing
+# of what is inside is drawn or named before. A column whose slot rolled
+# nothing is not drawn and cannot be focused.
 #
 # The focus language is on the object itself, the title menu's two
 # states carried over: at rest the object is drawn down in the utility
@@ -24,17 +27,37 @@ class_name BelongingsScreen
 # focused until the mouse or a key says so. WALK ON keeps the text form
 # of the language (grey at rest, bone and a hairline to its left).
 #
-# Each column holds one kind of thing (Slot): the case the coin, the pack
-# a card, the bedroll a keepsake - and any one of them may also hold
-# Glassbone, taken with it. Taking one grants it through RunState (a
-# keepsake into the slot, whatever was held gone) and plays the take's
-# sound; with reveal_card_on_take a card then flies from the column to the
-# Belongings panel - after the choice, as every other take in the game
-# does - and the screen closes when it lands. WALK ON, ui_cancel, a right
-# click anywhere and a fresh press of a move key all decline - the move
-# keys only after move_decline_delay_sec, so a key held down while
-# walking in doesn't count. Declining is final, as the reward screen's
-# skip is: the cache is spent either way (see BelongingsCache).
+# Taking one is the reveal. The taken column stays full bone with its
+# hairline, the other two dim (dimmed_modulate), TAKE ONE and WALK ON go,
+# and what was inside shows on the screen itself, in full bone - the
+# field HUD under the scrim only echoes it:
+#   the case     "+45 gold"
+#   the pack     its card, lifted at the deck view's inspect size (card_
+#                inspect_scale) over the screen
+#   the bedroll  its keepsake's name and rules line (TrinketData.
+#                describe())
+# and "+ Glassbone ×1" under whichever carried it. Everything is granted
+# through RunState as it's revealed, and the take's sound plays; the
+# reveal holds for result_hold_time, then a card flies to the Belongings
+# panel (reveal_card_on_take) and the screen closes as it lands, anything
+# else closes at once. The bedroll's keepsake counts as offered (RunState.
+# note_keepsake_offered()) only here, once it has been seen.
+#
+# The bedroll taken with the keepsake slot already full: the reveal shows
+# the new keepsake and asks, under it, REPLACE <held> or KEEP <held>, in
+# the WALK ON form of the focus language - and holds, with no timeout,
+# until one is chosen. REPLACE puts the new one in the slot; KEEP leaves
+# it behind. Either closes the screen, and the take is spent either way
+# (Glassbone the bedroll carried is granted with the reveal, before the
+# question). The mouse focuses by hovering and chooses by clicking;
+# ui_up/ui_down/ui_left/ui_right move between the two, ui_accept chooses,
+# ui_cancel and a right click are KEEP.
+#
+# Before a take, WALK ON, ui_cancel, a right click anywhere and a fresh
+# press of a move key all decline and grant nothing - the move keys only
+# after move_decline_delay_sec, so a key held down while walking in
+# doesn't count. Declining is final, as the reward screen's skip is: the
+# cache is spent either way (see BelongingsCache).
 #
 # The scrim, the outlined text and the hairline are copies of
 # RewardScreen's own - the shared focus-drawing extraction is deferred
@@ -45,6 +68,8 @@ signal closed(taken: int)
 
 # Column order - the case, the pack, the bedroll (BelongingsCache).
 enum Slot { GOLD, CARD, KEEPSAKE }
+# The full-slot question's two answers, top to bottom.
+enum Choice { REPLACE, KEEP }
 
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
@@ -80,9 +105,19 @@ const DISMISS := SLOT_COUNT
 		line_size_px = value
 		_refresh()
 # The line's centre, as a fraction of the viewport height.
-@export_range(0.0, 1.0) var line_centre_fraction: float = 0.12:
+@export_range(0.0, 1.0) var line_centre_fraction: float = 0.08:
 	set(value):
 		line_centre_fraction = value
+		_refresh()
+# The rule, in the choices' tracked caps (label_size_px, label_tracking_
+# em), its baseline this far under the world line's.
+@export var take_one_text: String = "TAKE ONE":
+	set(value):
+		take_one_text = value
+		_refresh()
+@export var take_one_gap_px: float = 40.0:
+	set(value):
+		take_one_gap_px = value
 		_refresh()
 @export_group("")
 
@@ -96,9 +131,10 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		column_gap_px = value
 		_refresh()
-# The columns' centre, as a fraction of the viewport height - above the
-# frozen Wanderer, whose head the field camera keeps near y 0.57.
-@export_range(0.0, 1.0) var columns_centre_fraction: float = 0.40:
+# The columns' centre, as a fraction of the viewport height - high
+# enough that the lines under them clear the frozen Wanderer, whose head
+# the field camera keeps near y 0.57.
+@export_range(0.0, 1.0) var columns_centre_fraction: float = 0.28:
 	set(value):
 		columns_centre_fraction = value
 		_refresh()
@@ -116,6 +152,101 @@ const DISMISS := SLOT_COUNT
 @export var rest_modulate: Color = Color(0.62, 0.64, 0.70, 1.0):
 	set(value):
 		rest_modulate = value
+		_refresh()
+@export_group("")
+
+@export_group("Reveal")
+# What the taken column held, under it in Alegreya Sans: the first
+# baseline this far under the column's square, each line after one pitch
+# further.
+@export var contents_size_px: int = 21:
+	set(value):
+		contents_size_px = value
+		_rebuild_fonts()
+@export var contents_gap_px: float = 44.0:
+	set(value):
+		contents_gap_px = value
+		_refresh()
+@export var contents_pitch_px: float = 27.0:
+	set(value):
+		contents_pitch_px = value
+		_refresh()
+@export var gold_format: String = "+%d gold":
+	set(value):
+		gold_format = value
+		_refresh()
+@export var glassbone_format: String = "+ Glassbone ×%d":
+	set(value):
+		glassbone_format = value
+		_refresh()
+# The keepsake's rules line, wrapped to this width and centred line by
+# line under its name.
+@export var rules_size_px: int = 17:
+	set(value):
+		rules_size_px = value
+		_rebuild_fonts()
+@export var rules_width_px: float = 320.0:
+	set(value):
+		rules_width_px = value
+		_rebuild_fonts()
+@export var rules_pitch_px: float = 22.0:
+	set(value):
+		rules_pitch_px = value
+		_refresh()
+@export_group("")
+
+@export_group("Full Slot")
+# The bedroll's question when the slot is full: each choice this word in
+# the choices' tracked caps at choice_word_size_px, then the held
+# keepsake's name - REPLACE first, KEEP under it, the first baseline
+# choice_gap_px below where a next line of the reveal would sit, the
+# second one choice_pitch_px further. Focused, a choice is bone with the hairline to its
+# left; at rest, the utility grey.
+@export var replace_text: String = "REPLACE":
+	set(value):
+		replace_text = value
+		_refresh()
+@export var keep_text: String = "KEEP":
+	set(value):
+		keep_text = value
+		_refresh()
+@export var choice_word_size_px: int = 17:
+	set(value):
+		choice_word_size_px = value
+		_rebuild_fonts()
+@export var choice_gap_px: float = 16.0:
+	set(value):
+		choice_gap_px = value
+		_refresh()
+@export var choice_pitch_px: float = 34.0:
+	set(value):
+		choice_pitch_px = value
+		_refresh()
+@export_group("")
+
+@export_group("Card Inspect")
+# The pack's card, revealed: lifted at the deck view's inspect size
+# (DeckView.inspect_scale), centred on the pack's column, its centre at
+# this fraction of the viewport height. A Glassbone line hangs under it.
+@export var card_inspect_scale: float = 2.2:
+	set(value):
+		card_inspect_scale = value
+		_refresh()
+@export_range(0.0, 1.0) var card_inspect_centre_fraction: float = 0.47:
+	set(value):
+		card_inspect_centre_fraction = value
+		_refresh()
+@export_group("")
+
+@export_group("Result")
+# Seconds the reveal holds before the screen closes (a card flies
+# first). Read on the take. The full-slot question has no timeout.
+@export var result_hold_time: float = 1.2
+# The two columns not taken, through the reveal: their objects at this
+# multiple of the bone render.
+@export var dimmed_modulate: Color = Color(0.62, 0.64, 0.70, 0.35):
+	set(value):
+		dimmed_modulate = value
 		_refresh()
 @export_group("")
 
@@ -212,7 +343,6 @@ const DISMISS := SLOT_COUNT
 # (RewardScreen.glassbone_volume_db).
 @export var glassbone_volume_db: float = -24.0
 @export var keepsake_volume_db: float = -18.0
-@export var card_flight_scale: float = 1.0
 @export var card_flight_duration_sec: float = 0.45
 @export var card_flight_end_scale: float = 0.12
 @export_group("")
@@ -226,11 +356,21 @@ var _glassbone_amount: int = 0
 var _object_paths: PackedStringArray = PackedStringArray()
 var _object_scales: PackedFloat32Array = PackedFloat32Array()
 var _deck_panel: Control = null
+# The keepsake held as the screen opened - what the bedroll's keepsake
+# would replace (the full-slot question).
+var _held: TrinketData = null
 
 var _scrim: ColorRect = null
 var _draw_layer: Control = null
 var _line_font: Font = null
 var _label_font: Font = null
+var _contents_font: Font = null
+var _choice_font: Font = null
+var _rules_font: Font = null
+# The bedroll keepsake's rules line, wrapped to rules_width_px.
+var _rules: TextParagraph = null
+# The pack's card while it's lifted (_sync_card_lift()), else null.
+var _lifted: CardView = null
 
 var _viewport: SubViewport = null
 var _camera: Camera3D = null
@@ -248,6 +388,16 @@ var _focus: int = -1
 var _mouse_on: int = -1
 var _done: bool = false
 var _opened_msec: int = 0
+# The column taken, through its reveal; -1 before. _flying once a
+# taken card has left for the Belongings panel - nothing else is drawn.
+var _taken: int = -1
+var _flying: bool = false
+# The full-slot question (Choice), open after the bedroll's reveal: its
+# focus and what the mouse is over, as _focus and _mouse_on are for the
+# columns.
+var _asking: bool = false
+var _choice_focus: int = -1
+var _choice_mouse_on: int = -1
 
 # Called by RegionField before the screen enters the tree. gold may be 0
 # and card or keepsake null - that column is then left out. glassbone_slot
@@ -271,6 +421,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 100
 	_opened_msec = Time.get_ticks_msec()
+	_held = RunState.keepsake
 	_rebuild_fonts()
 
 	_scrim = ColorRect.new()
@@ -300,11 +451,20 @@ func _ready() -> void:
 func _rebuild_fonts() -> void:
 	_line_font = InkType.numeral_font()
 	_label_font = InkType.tracked(InkType.text_bold_font(), label_size_px, label_tracking_em)
+	_contents_font = InkType.text_font()
+	_choice_font = InkType.tracked(InkType.text_bold_font(), choice_word_size_px, label_tracking_em)
+	_rules_font = InkType.text_font()
+	_rules = null
+	if _keepsake != null:
+		_rules = TextParagraph.new()
+		_rules.width = rules_width_px
+		_rules.add_string(_keepsake.describe(), _rules_font, rules_size_px)
 	_refresh()
 
 func _refresh() -> void:
 	if _draw_layer != null:
 		_draw_layer.queue_redraw()
+	_place_lift()
 
 func _has_slot(slot: int) -> bool:
 	match slot:
@@ -460,33 +620,157 @@ func _text(font: Font, text: String, origin: Vector2, size_px: int, color: Color
 		_draw_layer.draw_string_outline(font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, text_outline_px, outline)
 	InkType.draw_run(_draw_layer, font, text, origin, size_px, color)
 
+# Centred on x, baseline y.
+func _text_centred(font: Font, text: String, x: float, y: float, size_px: int, color: Color) -> void:
+	_text(font, text, Vector2(roundf(x - InkType.width(font, text, size_px) / 2.0), y), size_px, color)
+
 func _draw_columns() -> void:
-	# Once a take is under way the choice has closed: only a flying card
-	# (a child of this layer) is left over the scrim.
-	if _done:
+	# Once a taken card is flying the choice has closed: only the card (a
+	# child of this layer) is left over the scrim.
+	if _flying:
 		return
 	var line_width: float = InkType.width(_line_font, _line, line_size_px)
 	var line_baseline: float = roundf(_draw_layer.size.y * line_centre_fraction + float(line_size_px) * 0.35)
 	_text(_line_font, _line, Vector2(roundf((_draw_layer.size.x - line_width) / 2.0), line_baseline), line_size_px, bone)
+	if _taken < 0:
+		_text_centred(_label_font, take_one_text, _draw_layer.size.x / 2.0, roundf(line_baseline + take_one_gap_px), label_size_px, bone)
 
 	var texture: Texture2D = _viewport.get_texture() if _viewport != null else null
 	for slot in _present_slots():
 		var rect: Rect2 = _column_rect(slot)
-		var focused: bool = _focus == slot
+		var lit: bool = _is_lit(slot)
+		var tint: Color = rest_modulate
+		if lit:
+			tint = Color.WHITE
+		elif _taken >= 0:
+			tint = dimmed_modulate
 		if texture != null:
 			var source := Rect2(float(slot * render_cell_px), 0.0, float(render_cell_px), float(render_cell_px))
-			_draw_layer.draw_texture_rect_region(texture, rect, source, Color.WHITE if focused else rest_modulate)
-		if focused:
+			_draw_layer.draw_texture_rect_region(texture, rect, source, tint)
+		if lit:
 			var y: float = rect.end.y + object_hairline_gap_px
 			_draw_layer.draw_rect(Rect2(roundf(rect.get_center().x - object_hairline_length_px / 2.0), y, object_hairline_length_px, hairline_thickness_px), bone)
 
+	if _taken >= 0:
+		_reveal(_taken, true)
+		if _asking:
+			for choice in [Choice.REPLACE, Choice.KEEP]:
+				_draw_choice(choice)
+		return
 	var dismiss_focused: bool = _focus == DISMISS
 	var dismiss_left: float = _dismiss_label_left()
 	_text(_label_font, dismiss_text, Vector2(dismiss_left, _dismiss_baseline()), label_size_px, bone if dismiss_focused else unfocused_color)
 	if dismiss_focused:
-		var mid: float = _dismiss_baseline() - float(label_size_px) * 0.35
-		var left: float = dismiss_left - hairline_gap_px - hairline_length_px
-		_draw_layer.draw_rect(Rect2(left, mid - hairline_thickness_px * 0.5, hairline_length_px, hairline_thickness_px), bone)
+		_hairline_left_of(dismiss_left, _dismiss_baseline(), label_size_px)
+
+# The focus language's text form: the short hairline to the left of a
+# label at `left`, at its mid-height.
+func _hairline_left_of(left: float, baseline: float, size_px: int) -> void:
+	var mid: float = baseline - float(size_px) * 0.35
+	_draw_layer.draw_rect(Rect2(left - hairline_gap_px - hairline_length_px, mid - hairline_thickness_px * 0.5, hairline_length_px, hairline_thickness_px), bone)
+
+# Full bone: the focused column before the take, the taken one after.
+func _is_lit(slot: int) -> bool:
+	return slot == _taken if _taken >= 0 else slot == _focus
+
+# What the taken column held, line by line in full bone under it - or,
+# for the pack, under its lifted card, the card speaking for itself.
+# Drawn when `draw`; either way, returns where a next line's baseline
+# would sit (the full-slot question hangs from it).
+func _reveal(slot: int, draw: bool) -> float:
+	var rect: Rect2 = _column_rect(slot)
+	var x: float = rect.get_center().x
+	var y: float = rect.end.y + contents_gap_px
+	match slot:
+		Slot.GOLD:
+			if draw:
+				_text_centred(_contents_font, gold_format % _gold, x, y, contents_size_px, bone)
+			y += contents_pitch_px
+		Slot.CARD:
+			var lift: Rect2 = _lift_rect()
+			if lift.has_area():
+				y = lift.end.y + contents_gap_px
+		Slot.KEEPSAKE:
+			if draw:
+				_text_centred(_contents_font, _keepsake.display_name, x, y, contents_size_px, bone)
+			y += contents_pitch_px
+			# Each rules line centred by its own width - a paragraph line
+			# draws unaligned.
+			if _rules != null:
+				var text: String = _keepsake.describe()
+				for line_index in _rules.get_line_count():
+					if draw:
+						var span: Vector2i = _rules.get_line_range(line_index)
+						_text_centred(_rules_font, text.substr(span.x, span.y - span.x).strip_edges(), x, y, rules_size_px, bone)
+					y += rules_pitch_px
+	var glassbone: int = _glassbone_in(slot)
+	if glassbone > 0:
+		if draw:
+			_text_centred(_contents_font, glassbone_format % glassbone, x, y, contents_size_px, bone)
+		y += contents_pitch_px
+	return y
+
+# --- The full-slot question ---
+
+# Each choice is its word in the choices' caps, a space and the held
+# keepsake's name, centred under the bedroll.
+func _choice_baseline(choice: int) -> float:
+	return roundf(_reveal(Slot.KEEPSAKE, false) + choice_gap_px + float(choice) * choice_pitch_px)
+
+func _choice_word(choice: int) -> String:
+	return replace_text if choice == Choice.REPLACE else keep_text
+
+func _choice_width(choice: int) -> float:
+	var gap: float = InkType.width(_contents_font, " ", contents_size_px)
+	return InkType.width(_choice_font, _choice_word(choice), choice_word_size_px) + gap + InkType.width(_contents_font, _held.display_name, contents_size_px)
+
+func _choice_left(choice: int) -> float:
+	return roundf(_column_rect(Slot.KEEPSAKE).get_center().x - _choice_width(choice) / 2.0)
+
+# The choice and the hairline's room to its left.
+func _choice_rect(choice: int) -> Rect2:
+	var left: float = _choice_left(choice) - hairline_gap_px - hairline_length_px
+	var right: float = _choice_left(choice) + _choice_width(choice)
+	return Rect2(left, _choice_baseline(choice) - float(contents_size_px), right - left, float(contents_size_px) * 1.3)
+
+func _draw_choice(choice: int) -> void:
+	var focused: bool = _choice_focus == choice
+	var color: Color = bone if focused else unfocused_color
+	var left: float = _choice_left(choice)
+	var baseline: float = _choice_baseline(choice)
+	var word: String = _choice_word(choice)
+	var word_width: float = InkType.width(_choice_font, word, choice_word_size_px)
+	_text(_choice_font, word, Vector2(left, baseline), choice_word_size_px, color)
+	_text(_contents_font, _held.display_name, Vector2(left + word_width + InkType.width(_contents_font, " ", contents_size_px), baseline), contents_size_px, color)
+	if focused:
+		_hairline_left_of(left, baseline, choice_word_size_px)
+
+# --- The pack's card ---
+
+# Where the lifted card sits: centred on the pack's column, at card_
+# inspect_scale. Empty while nothing is lifted.
+func _lift_rect() -> Rect2:
+	if _lifted == null or _draw_layer == null:
+		return Rect2()
+	var size: Vector2 = _lifted.card_size * card_inspect_scale
+	var centre := Vector2(_column_rect(Slot.CARD).get_center().x, _draw_layer.size.y * card_inspect_centre_fraction)
+	return Rect2((centre - size / 2.0).round(), size)
+
+# The card is up through the pack's own reveal, until it flies.
+func _sync_card_lift() -> void:
+	var wanted: bool = _card != null and not _flying and _taken == Slot.CARD
+	if wanted and _lifted == null:
+		_lifted = _new_card_view(_card)
+		_place_lift()
+	elif not wanted and _lifted != null:
+		_lifted.queue_free()
+		_lifted = null
+
+func _place_lift() -> void:
+	if _lifted == null or _flying:
+		return
+	_lifted.scale = Vector2.ONE * card_inspect_scale
+	_lifted.position = _lift_rect().position
 
 # --- Input ---
 
@@ -504,7 +788,22 @@ func _set_focus(index: int) -> void:
 	_focus = index
 	_draw_layer.queue_redraw()
 
+func _choice_hit(position: Vector2) -> int:
+	for choice in [Choice.REPLACE, Choice.KEEP]:
+		if _choice_rect(choice).has_point(position):
+			return choice
+	return -1
+
+func _set_choice_focus(choice: int) -> void:
+	if choice == _choice_focus:
+		return
+	_choice_focus = choice
+	_draw_layer.queue_redraw()
+
 func _on_gui_input(event: InputEvent) -> void:
+	if _asking:
+		_on_choice_gui_input(event)
+		return
 	if _done:
 		return
 	var motion := event as InputEventMouseMotion
@@ -529,7 +828,35 @@ func _on_gui_input(event: InputEvent) -> void:
 			_activate(index)
 		_draw_layer.accept_event()
 
+# The full-slot question's mouse: hover focuses, a click answers, a right
+# click anywhere is KEEP.
+func _on_choice_gui_input(event: InputEvent) -> void:
+	var motion := event as InputEventMouseMotion
+	if motion != null:
+		var under: int = _choice_hit(motion.position)
+		if under != _choice_mouse_on:
+			if under >= 0:
+				_set_choice_focus(under)
+			elif _choice_focus == _choice_mouse_on:
+				_set_choice_focus(-1)
+			_choice_mouse_on = under
+		return
+	var button := event as InputEventMouseButton
+	if button == null or not button.pressed:
+		return
+	if button.button_index == MOUSE_BUTTON_RIGHT:
+		_answer(Choice.KEEP)
+		_draw_layer.accept_event()
+	elif button.button_index == MOUSE_BUTTON_LEFT:
+		var choice: int = _choice_hit(button.position)
+		if choice >= 0:
+			_answer(choice)
+		_draw_layer.accept_event()
+
 func _unhandled_input(event: InputEvent) -> void:
+	if _asking:
+		_on_choice_key(event)
+		return
 	if _done:
 		return
 	var slots: Array[int] = _present_slots()
@@ -556,6 +883,20 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	get_viewport().set_input_as_handled()
 
+# The full-slot question's keys: any arrow moves between the two (from
+# nothing, to REPLACE), ui_accept answers, ui_cancel is KEEP.
+func _on_choice_key(event: InputEvent) -> void:
+	if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
+		_set_choice_focus(Choice.KEEP if _choice_focus == Choice.REPLACE else Choice.REPLACE)
+	elif event.is_action_pressed("ui_accept"):
+		if _choice_focus >= 0:
+			_answer(_choice_focus)
+	elif event.is_action_pressed("ui_cancel"):
+		_answer(Choice.KEEP)
+	else:
+		return
+	get_viewport().set_input_as_handled()
+
 # A fresh press (never an echo) of one of the Wanderer's move keys.
 func _is_move_press(event: InputEvent) -> bool:
 	for action: StringName in [&"move_left", &"move_right", &"move_forward", &"move_back"]:
@@ -563,7 +904,10 @@ func _is_move_press(event: InputEvent) -> bool:
 			return true
 	return false
 
-# The one gate: the first activation wins.
+# The one gate: the first activation wins. A take reveals that column's
+# contents and grants them - with its Glassbone - and nothing else; the
+# reveal then holds. The bedroll with the slot full grants its Glassbone
+# only, and asks (_answer()).
 func _activate(index: int) -> void:
 	if _done:
 		return
@@ -575,7 +919,7 @@ func _activate(index: int) -> void:
 	if not _has_slot(index):
 		return
 	_done = true
-	_draw_layer.queue_redraw()
+	_taken = index
 	var glassbone: int = _glassbone_in(index)
 	if glassbone > 0:
 		RunState.add_glassbone(glassbone)
@@ -586,45 +930,75 @@ func _activate(index: int) -> void:
 			RunState.add_gold(_gold)
 			TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, gold_volume_db, "GoldTakeAudio", "BelongingsScreen")
 			print("BelongingsScreen: took %d gold (run total %d)." % [_gold, RunState.gold])
-			_finish(index)
 		Slot.CARD:
-			_take_card(_card, index)
+			RunState.add_card(_card)
+			TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "BelongingsScreen")
+			print("BelongingsScreen: took '%s' (deck now %d)." % [_card.card_name, RunState.deck.size()])
 		Slot.KEEPSAKE:
-			var held: TrinketData = RunState.keepsake
-			# Offered once it is seen - here, as it is taken.
+			# Offered once it is seen - here, at the reveal.
 			RunState.note_keepsake_offered(_keepsake)
-			RunState.equip_keepsake(_keepsake)
-			TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, keepsake_volume_db, "KeepsakeTakeAudio", "BelongingsScreen")
-			print("BelongingsScreen: took '%s'%s." % [_keepsake.display_name, " (left '%s')" % held.display_name if held != null else ""])
-			_finish(index)
-
-func _take_card(card_data: CardData, index: int) -> void:
-	RunState.add_card(card_data)
-	TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "BelongingsScreen")
-	print("BelongingsScreen: took '%s' (deck now %d)." % [card_data.card_name, RunState.deck.size()])
-	var view: CardView = _new_card_view(card_data, index) if reveal_card_on_take else null
-	if view == null:
-		_finish(index)
+			_held = RunState.keepsake
+			if _held != null:
+				_asking = true
+				print("BelongingsScreen: found '%s'; asking whether to replace '%s'." % [_keepsake.display_name, _held.display_name])
+			else:
+				RunState.equip_keepsake(_keepsake)
+				TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, keepsake_volume_db, "KeepsakeTakeAudio", "BelongingsScreen")
+				print("BelongingsScreen: took '%s'." % _keepsake.display_name)
+	_sync_card_lift()
+	_draw_layer.queue_redraw()
+	if _asking:
 		return
+	var hold: Tween = create_tween()
+	hold.tween_interval(maxf(result_hold_time, 0.0))
+	hold.tween_callback(_end_hold)
+
+# The full-slot question answered - the first answer wins. REPLACE puts
+# the bedroll's keepsake in the slot, whatever was held gone; KEEP leaves
+# it behind. Either closes the screen; the take is spent either way.
+func _answer(choice: int) -> void:
+	if not _asking:
+		return
+	_asking = false
+	if choice == Choice.REPLACE:
+		RunState.equip_keepsake(_keepsake)
+		TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, keepsake_volume_db, "KeepsakeTakeAudio", "BelongingsScreen")
+		print("BelongingsScreen: took '%s' (left '%s')." % [_keepsake.display_name, _held.display_name])
+	else:
+		print("BelongingsScreen: left '%s' (kept '%s')." % [_keepsake.display_name, _held.display_name])
+	_finish(Slot.KEEPSAKE)
+
+# The hold is over: a taken card flies to the Belongings panel and the
+# screen closes as it lands; anything else closes now.
+func _end_hold() -> void:
+	var view: CardView = _lifted if _taken == Slot.CARD and reveal_card_on_take else null
+	if view == null:
+		_finish(_taken)
+		return
+	_flying = true
+	_lifted = null
+	_draw_layer.queue_redraw()
+	var taken: int = _taken
 	var tween: Tween = TakeFeedback.fly_to(self, view, _deck_panel_centre(), card_flight_duration_sec, card_flight_end_scale)
 	tween.chain().tween_callback(func() -> void:
-		_finish(index))
+		_finish(taken))
 
-# The taken card, for its flight only: centred on the column it came
-# from, not interactive, scaled about its top-left so TakeFeedback.
-# fly_to()'s placement holds.
-func _new_card_view(card_data: CardData, slot: int) -> CardView:
+# The pack's card at inspect size: not interactive anywhere on its face,
+# and scaled about its top-left so TakeFeedback.fly_to()'s placement
+# holds.
+func _new_card_view(card_data: CardData) -> CardView:
 	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
 	if scene == null:
+		push_warning("BelongingsScreen: could not load %s; no card shown." % CARD_VIEW_SCENE_PATH)
 		return null
 	var view := scene.instantiate() as CardView
 	view.hover_enabled = false
 	_draw_layer.add_child(view)
 	view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in view.find_children("*", "Control", true, false):
+		(child as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
 	view.pivot_offset = Vector2.ZERO
 	view.set_card_data(card_data)
-	view.scale = Vector2.ONE * card_flight_scale
-	view.position = (_column_rect(slot).get_center() - view.card_size * card_flight_scale / 2.0).round()
 	return view
 
 func _deck_panel_centre() -> Vector2:
