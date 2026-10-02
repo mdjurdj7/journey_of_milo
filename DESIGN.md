@@ -189,6 +189,10 @@ so it doesn't get silently reinvented or silently forgotten.
   the same way. `TroughChoice`, in progress in another session, will be
   the sixth. Extracting the shared helper is the next task once both
   have landed. (2026-09-26, alcove belongings; 2026-09-28, keepsakes.)
+  `CardCompendium`'s BACK (the title's Cards screen) is one more copy -
+  the title menu's ink item and hairline - and its click-to-inspect is
+  DeckView's lift copied without the dim; both go with the extraction.
+  (2026-10-02, card compendium.)
 - **Floor 3 (Map4) is a walkable shell, not a finished floor.** One
   placeholder Sputter stands on the required fight at (-3, -9) so the
   gate has an enemy to measure from and the line something to lift on;

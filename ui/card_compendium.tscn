@@ -1,0 +1,55 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://ui/card_compendium.gd" id="1_card_compendium"]
+
+[node name="CardCompendium" type="CanvasLayer"]
+layer = 5
+script = ExtResource("1_card_compendium")
+
+[node name="Page" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="BackItem" type="Control" parent="Page"]
+layout_mode = 0
+
+[node name="Hairline" type="ColorRect" parent="Page/BackItem"]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Page/BackItem"]
+layout_mode = 0
+mouse_filter = 2
+text = "BACK"
+
+[node name="Scroll" type="ScrollContainer" parent="Page"]
+layout_mode = 0
+
+[node name="Margin" type="MarginContainer" parent="Page/Scroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="Sections" type="VBoxContainer" parent="Page/Scroll/Margin"]
+layout_mode = 2
+
+[node name="InspectLayer" type="Control" parent="Page"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="Catcher" type="Control" parent="Page/InspectLayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
