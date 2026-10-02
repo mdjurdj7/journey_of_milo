@@ -44,6 +44,7 @@ const CARD_ART: Dictionary = {
 	"sentence": "res://cards/art/Wanderer/Sentence.png",
 	"last_wager": "res://cards/art/Wanderer/Last Wager.png",
 	"the_return": "res://cards/art/Wanderer/The Return.png",
+	"blood_arc": "res://cards/art/Wanderer/Blood Arc.png",
 }
 
 var _failures: int = 0
