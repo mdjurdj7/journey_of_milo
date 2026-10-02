@@ -2,7 +2,7 @@ extends CanvasLayer
 class_name TitleMenu
 
 # The title's type and menu, on the world: the game's title in Spectral
-# Light and two items in the HUD's tracked caps (InkType.tracked(), like
+# Light and three items in the HUD's tracked caps (InkType.tracked(), like
 # every caps label), the utility grey when unfocused, full ink with a
 # short hairline to its left when focused. No background - the world
 # behind is the zone intro's frame zero (ZoneIntro's TITLE_HOLD: the
@@ -12,12 +12,16 @@ class_name TitleMenu
 #
 # Focus is this script's own index, not Godot's Control focus: ui_up/
 # ui_down move it (wrapping), ui_accept activates, the mouse moves it by
-# hovering and activates by clicking. Start has it on load. The first
-# activation wins - every input path returns early after it - and what
-# it asks for goes out as a signal: start_requested (ZoneIntro then calls
-# lock() and fade_out(), and runs the intro) or exit_requested (Exit is
-# hidden where quitting means nothing, on the web). The press that
-# activated is consumed here; its release is all that reaches the field.
+# hovering and activates by clicking. Start has it on load. Start and
+# Exit end the menu: the first of them wins - every input path returns
+# early after it - and what it asks for goes out as a signal:
+# start_requested (ZoneIntro then calls lock() and fade_out(), and runs
+# the intro) or exit_requested (Exit is hidden where quitting means
+# nothing, on the web). Cards doesn't end it and doesn't lock: it opens a
+# CardCompendium as this node's child with the column hidden, input here
+# held off while it is open, and its close shows the column again with
+# focus still on Cards. The press that activated is consumed here; its
+# release is all that reaches the field.
 #
 # Every size is authored for a 1080-high viewport and scaled by the
 # viewport height; the layout is redone on every resize.
@@ -28,7 +32,8 @@ signal exit_requested
 const TITLE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 
-enum Item { START, EXIT }
+# In menu order - each value is its item's index in _items.
+enum Item { START, CARDS, EXIT }
 
 @export var game_title: String = "The Journey of Milo":
 	set(value):
@@ -120,10 +125,13 @@ enum Item { START, EXIT }
 # How long the column takes to fade once Start is taken (fade_out()'s
 # default).
 @export var start_delay_seconds: float = 0.3
+# What Cards opens (a CardCompendium), loaded at each open.
+@export var compendium_scene_path: String = "res://ui/card_compendium.tscn"
 
 @onready var column: Control = $Column
 @onready var title_label: Label = $Column/TitleLabel
 @onready var start_item: Control = $Column/StartItem
+@onready var cards_item: Control = $Column/CardsItem
 @onready var exit_item: Control = $Column/ExitItem
 
 # In menu order; an item hidden for the platform (Exit on web) is left
@@ -131,11 +139,13 @@ enum Item { START, EXIT }
 var _items: Array[Control] = []
 var _focused: int = Item.START
 var _activated: bool = false
+# The open card compendium, or null - input here waits while it is set.
+var _compendium: CardCompendium = null
 # The running column fade, in or out - one at a time.
 var _fade_tween: Tween = null
 
 func _ready() -> void:
-	_items = [start_item, exit_item]
+	_items = [start_item, cards_item, exit_item]
 	if OS.has_feature("web"):
 		exit_item.visible = false
 	for index in _items.size():
@@ -247,7 +257,7 @@ func _focusable() -> Array[int]:
 	return indices
 
 func _set_focus(index: int) -> void:
-	if _activated or index == _focused or not _items[index].visible:
+	if _activated or _compendium != null or index == _focused or not _items[index].visible:
 		return
 	_focused = index
 	_apply_focus()
@@ -261,7 +271,7 @@ func _move_focus(step: int) -> void:
 	_set_focus(indices[posmod(at + step, indices.size())])
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _activated:
+	if _activated or _compendium != null:
 		return
 	if event.is_action_pressed("ui_down"):
 		_move_focus(1)
@@ -277,7 +287,7 @@ func _on_item_mouse_entered(index: int) -> void:
 	_set_focus(index)
 
 func _on_item_gui_input(event: InputEvent, index: int) -> void:
-	if _activated:
+	if _activated or _compendium != null:
 		return
 	var button := event as InputEventMouseButton
 	if button == null or not button.pressed or button.button_index != MOUSE_BUTTON_LEFT:
@@ -286,10 +296,15 @@ func _on_item_gui_input(event: InputEvent, index: int) -> void:
 	_activate(index)
 	get_viewport().set_input_as_handled()
 
-# The one gate: the first activation wins and everything after it is
-# ignored, whichever device it came from.
+# The one gate: the first activation of Start or Exit wins and everything
+# after it is ignored, whichever device it came from. Cards passes
+# through without locking - the menu comes back when the compendium
+# closes.
 func _activate(index: int) -> void:
-	if _activated:
+	if _activated or _compendium != null:
+		return
+	if index == Item.CARDS:
+		_open_compendium()
 		return
 	lock()
 	match index:
@@ -297,3 +312,27 @@ func _activate(index: int) -> void:
 			start_requested.emit()
 		Item.EXIT:
 			exit_requested.emit()
+
+# --- the card compendium ------------------------------------------------
+
+# The compendium over the held frame, the column hidden under it. A
+# child, so it runs through ZoneIntro's freeze as this node does.
+func _open_compendium() -> void:
+	var scene := load(compendium_scene_path) as PackedScene
+	if scene == null:
+		push_warning("TitleMenu: could not load %s; Cards does nothing." % compendium_scene_path)
+		return
+	var compendium := scene.instantiate() as CardCompendium
+	if compendium == null:
+		push_warning("TitleMenu: %s is not a CardCompendium; Cards does nothing." % compendium_scene_path)
+		return
+	_compendium = compendium
+	compendium.closed.connect(_on_compendium_closed)
+	column.visible = false
+	add_child(compendium)
+
+# Back to the menu as it was left: the column shown, focus on Cards.
+func _on_compendium_closed() -> void:
+	_compendium = null
+	column.visible = true
+	_apply_focus()

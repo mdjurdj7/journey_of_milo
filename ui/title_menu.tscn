@@ -30,6 +30,17 @@ mouse_filter = 2
 layout_mode = 0
 text = "START GAME"
 
+[node name="CardsItem" type="Control" parent="Column"]
+layout_mode = 0
+
+[node name="Hairline" type="ColorRect" parent="Column/CardsItem"]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Column/CardsItem"]
+layout_mode = 0
+text = "CARDS"
+
 [node name="ExitItem" type="Control" parent="Column"]
 layout_mode = 0
 
