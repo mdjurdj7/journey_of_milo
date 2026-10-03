@@ -57,6 +57,7 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {drain}    self_loss_trigger_drain × stacks
 #   {hp}       replacement_hp_cost       {min_cost} replaces_cost_at_least
 #   {alone_bonus} grants_when_alone's attack_damage_bonus (what it turns into)
+#   {reduction} next_card_cost_reduction × stacks
 #   {s}        "s" unless the count token before it is 1 ("Attack{s}")
 # An unknown token is left standing. "It" is the enemy holding it, "you"
 # the player.
@@ -215,3 +216,13 @@ const DURATION_UNTIL_TRIGGERED := -2
 # not a cost replacement.
 @export var replaces_cost_at_least: int = 0
 @export var replacement_hp_cost: int = 0
+
+# A cost reduction (Leverage): the next card played costs this much less
+# Energy per stack, never below 0 - after House Key's free card, before a
+# cost replacement judges what's left (Combatant.energy_cost()). Any card
+# spends it, whatever it costs, and the whole status goes; a card that
+# applies this same status adds to it instead, so two in a row reduce one
+# card by both (Status.spend_cost_reduction(), at the play's commit in
+# BattleController._resolve_play()). Stacks count through stack_count -
+# pair it with StackRule.IGNORE and DURATION_UNTIL_REMOVED. 0 = none.
+@export var next_card_cost_reduction: int = 0

@@ -313,7 +313,8 @@ func end_turn() -> void:
 func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	var card: CardData = card_view.card_data
 	# Read before anything is spent: whether a cost replacement (Collateral)
-	# covers this card depends on the free card still being there.
+	# covers this card depends on the free card and any cost reduction
+	# (Leverage) still being there.
 	var replacement: Status = player.cost_replacement_for(card)
 	var replaced_hp: int = player.replaced_cost_hp(card)
 	player.energy -= player.energy_cost(card)
@@ -321,9 +322,10 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	# card_played re-reads the hand's faces - never on a hover, a face or
 	# a cancelled target. So is a cost replacement's charge; its HP is paid
 	# as the card resolves, before its effects (EffectContext.replaced_
-	# cost_hp).
+	# cost_hp). And a waiting cost reduction, unless this card adds to it.
 	player.first_card_free = false
 	Status.spend_cost_replacement(player.statuses, replacement)
+	Status.spend_cost_reduction(player.statuses, card)
 	_input_locked = true
 	# Counted at commit, before anyone hears of the play - so a face that
 	# re-reads itself on card_played sees this card as played. The card's

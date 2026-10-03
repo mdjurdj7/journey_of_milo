@@ -110,6 +110,7 @@ func describe() -> String:
 		"hp": data.replacement_hp_cost,
 		"min_cost": data.replaces_cost_at_least,
 		"alone_bonus": data.grants_when_alone.attack_damage_bonus if data.grants_when_alone != null else 0,
+		"reduction": data.next_card_cost_reduction * stack_count,
 	})
 
 # Replaces each {token} in `text` with its value from `values`, and each
@@ -242,6 +243,36 @@ static func spend_cost_replacement(statuses: Array[Status], active: Status) -> v
 	active.charges -= 1
 	if active.charges <= 0:
 		statuses.erase(active)
+
+# The Energy every waiting cost reduction (StatusData.next_card_cost_
+# reduction - Leverage) takes off the next card: each one's amount per
+# stack, summed.
+static func cost_reduction(statuses: Array[Status]) -> int:
+	var total: int = 0
+	for active in statuses:
+		if active.data != null and active.data.next_card_cost_reduction > 0:
+			total += active.data.next_card_cost_reduction * active.stack_count
+	return total
+
+# A play has committed: every waiting cost reduction is spent by it,
+# whatever it cost - except one `card` itself applies, which its own
+# APPLY_STATUS is about to add to instead (two Leverages, then a card:
+# that card gets both).
+static func spend_cost_reduction(statuses: Array[Status], card: CardData) -> void:
+	for active in statuses.duplicate():
+		if active.data == null or active.data.next_card_cost_reduction <= 0:
+			continue
+		if _card_applies(card, active.data):
+			continue
+		statuses.erase(active)
+
+static func _card_applies(card: CardData, status_data: StatusData) -> bool:
+	if card == null:
+		return false
+	for effect in card.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS and effect.status_data == status_data:
+			return true
+	return false
 
 # Its holder just lost HP to their own effect: the extra Toll every
 # status that pays for that grants (StatusData.self_loss_toll_bonus),

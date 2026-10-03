@@ -152,16 +152,17 @@ static func critical_at(at_hp: int, of_max_hp: int, fraction: float) -> bool:
 # a card's cost the fight uses: affordability, the spend, the hand's fade
 # and the face's number all ask here. CardData.cost itself never changes.
 #
-# House Key's free card first, then a cost replacement (Collateral) on
-# what's left: a card the free card already took costs 0, which no
-# replacement reaches, so it keeps its charge. A covered card costs 0
-# Energy here and replaced_cost_hp() HP instead.
+# House Key's free card first, then a cost reduction (Leverage), then a
+# cost replacement (Collateral) on what's left: a card the free card or a
+# reduction already took below the replacement's threshold passes it by,
+# so it keeps its charge. A covered card costs 0 Energy here and
+# replaced_cost_hp() HP instead.
 func energy_cost(card: CardData) -> int:
 	if card == null:
 		return 0
 	if cost_replacement_for(card) != null:
 		return 0
-	return 0 if first_card_free else card.cost
+	return _reduced_cost(card)
 
 # The HP `card` costs this fighter in place of its Energy right now - a
 # cost replacement's (StatusData.replacement_hp_cost) when one covers the
@@ -172,11 +173,18 @@ func replaced_cost_hp(card: CardData) -> int:
 	return replacement.data.replacement_hp_cost if replacement != null else 0
 
 # The cost replacement status that covers `card` right now, or null -
-# judged on its Energy after every other modifier (the free card).
+# judged on its Energy after every other modifier (the free card, a cost
+# reduction).
 func cost_replacement_for(card: CardData) -> Status:
 	if card == null:
 		return null
-	return Status.cost_replacement(statuses, 0 if first_card_free else card.cost)
+	return Status.cost_replacement(statuses, _reduced_cost(card))
+
+# `card`'s Energy before any cost replacement: the free card, then every
+# waiting cost reduction (Status.cost_reduction()), never below 0.
+func _reduced_cost(card: CardData) -> int:
+	var base: int = 0 if first_card_free else card.cost
+	return maxi(base - Status.cost_reduction(statuses), 0)
 
 # The Critical-entry edge, checked wherever Critical is (Status.resolve_
 # critical_triggers(), after each action that can move HP). Out of
