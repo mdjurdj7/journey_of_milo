@@ -68,10 +68,10 @@ func _check_unbroken() -> void:
 	var card: CardData = _card("unbroken")
 	var player: Combatant = _player(50)
 	_play(card, player, null)
-	_expect_eq(player.block, 7, "Unbroken above the line")
+	_expect_eq(player.block, 6, "Unbroken above the line")
 	player = _player(10)
 	_play(card, player, null)
-	_expect_eq(player.block, 13, "Unbroken while Critical")
+	_expect_eq(player.block, 11, "Unbroken while Critical")
 	_completed += 1
 
 # Last Wager attacks first and pays after, like Bite Down: Critical is

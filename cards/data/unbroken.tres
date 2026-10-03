@@ -6,9 +6,9 @@
 [sub_resource type="Resource" id="CardEffect_block"]
 script = ExtResource("2_card_effect")
 effect_type = 1
-value = 7
+value = 6
 condition = 7
-alt_value = 13
+alt_value = 11
 
 [resource]
 script = ExtResource("1_card_data")
