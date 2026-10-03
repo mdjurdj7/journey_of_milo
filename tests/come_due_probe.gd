@@ -1,20 +1,23 @@
 extends SceneTree
 
 # Headless probe for Come Due: the Toll it requires and spends, the mark
-# it leaves on an enemy, and how Attacks spend that mark. Rules layer and
-# the real .tres cards, status and pool; no field scene:
+# it leaves on an enemy, and how Attacks spend that mark - and the number
+# a battle-hand face prints for an Attack against a marked target. Rules
+# layer, CardView and the real .tres cards, status and pool; no field
+# scene (come_due_face_probe.gd drives the hover through a real fight):
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/come_due_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 
 const MAX_HP := 70
-const CASES := 13
+const CASES := 17
 const BONUS := 4
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const BELONGINGS_POOL_PATH := "res://cards/pools/belongings_pool.tres"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_CONTROLLER_PATH := "res://battle/battle_controller.gd"
+const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 
 var _failures: int = 0
 var _completed: int = 0
@@ -34,6 +37,10 @@ func _initialize() -> void:
 	_check_death_clears_row()
 	_check_pool()
 	_check_toll_never_negative()
+	await _check_face_reads_mark()
+	await _check_face_is_resolution()
+	await _check_face_reverts()
+	await _check_aoe_face()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -232,6 +239,49 @@ func _check_toll_never_negative() -> void:
 
 # --- Helpers ---
 
+# Slash's face against its target: 9 with Come Due on it, 5 without -
+# and reading it spends nothing.
+func _check_face_reads_mark() -> void:
+	var player: Combatant = _player()
+	var marked: Combatant = _marked(player)
+	_expect_eq(await _face_damage("slash", player, [marked]), 9, "Slash's face reads 9 against a Come Due enemy")
+	_expect_eq(await _face_damage("slash", player, [Combatant.new(100)]), 5, "...and 5 against an unmarked one")
+	_expect_eq(_charges(marked), 3, "...and reading it spends no charge")
+	_completed += 1
+
+# What the face prints is what the card then takes off the marked enemy:
+# Slash, Cornered's base half and Reckoning's Toll blow.
+func _check_face_is_resolution() -> void:
+	for card_name in ["slash", "cornered", "reckoning"]:
+		var player: Combatant = _player()
+		var marked: Combatant = _marked(player)
+		player.toll = 6
+		var face: int = await _face_damage(card_name, player, [marked])
+		_play(_card(card_name), player, [marked])
+		_expect_eq(100 - marked.hp, face, "%s: the face's number is the damage landed" % card_name)
+	_completed += 1
+
+# Three Slashes spend the mark: the face reads 9 before each, and 5 once
+# the last charge is gone.
+func _check_face_reverts() -> void:
+	var player: Combatant = _player()
+	var marked: Combatant = _marked(player)
+	for i in 3:
+		_expect_eq(await _face_damage("slash", player, [marked]), 9, "Slash reads 9 with %d charge(s) left" % (3 - i))
+		_play(_card("slash"), player, [marked])
+	_expect_eq(_charges(marked), 0, "...three Slashes spend all three charges")
+	_expect_eq(await _face_damage("slash", player, [marked]), 5, "...and Slash reads 5 again")
+	_completed += 1
+
+# An all-enemies Attack's face leaves the mark out, even aimed at the
+# marked enemy - the target it names isn't the one it hits.
+func _check_aoe_face() -> void:
+	for card_name in ["carve", "blood_arc"]:
+		var player: Combatant = _player()
+		var marked: Combatant = _marked(player)
+		_expect_eq(await _face_damage(card_name, player, [marked]), _damage(_card(card_name)), "%s's face leaves Come Due out" % card_name)
+	_completed += 1
+
 func _card(card_name: String) -> CardData:
 	return load("res://cards/data/%s.tres" % card_name) as CardData
 
@@ -278,6 +328,23 @@ func _ctx(player: Combatant, enemies: Array[Combatant]) -> EffectContext:
 	ctx.enemies = enemies
 	ctx.target = enemies[enemies.size() - 1] if not enemies.is_empty() else null
 	return ctx
+
+# The number after "Deal" on `card_name`'s battle-hand face read against
+# _ctx(player, enemies) - its damage. -1 with none.
+func _face_damage(card_name: String, player: Combatant, enemies: Array[Combatant]) -> int:
+	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(view)
+	await process_frame
+	view.set_stance(player.stance)
+	view.set_toll(player.toll)
+	view.set_bonus_context(_ctx(player, enemies))
+	view.set_card_data(_card(card_name))
+	var text: String = view.rules_text.get_parsed_text()
+	view.free()
+	var regex := RegEx.new()
+	regex.compile("Deal (\\d+)")
+	var found: RegExMatch = regex.search(text)
+	return int(found.get_string(1)) if found != null else -1
 
 func _play(card: CardData, player: Combatant, enemies: Array[Combatant]) -> void:
 	_resolver.resolve_card(card, _ctx(player, enemies))
