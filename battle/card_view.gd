@@ -17,7 +17,7 @@ class_name CardView
 # rule and a "-N HP" line under it when the card costs HP); the tonal
 # field with the type glyph or the card's art, a fixed rect on every
 # card; the rules text, centred in the space left and stepping its size
-# down to fit; the small-caps type label just inside the inset rule. See
+# down to fit; the small-caps type label just above the bottom edge. See
 # _apply_layout().
 
 signal clicked(card_data: CardData)
@@ -110,24 +110,10 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 @export var ink_color: Color = Color(0.165, 0.165, 0.18)
 @export_range(0.0, 1.0) var frame_alpha: float = 0.88
 @export var corner_radius: int = 6
-# The second printed rule: neutral ink, inset from the frame, its corners
-# concentric with the card's (corner_radius - inset). Drawn by Keyline,
-# under the type, with the card-stock edges below.
-@export var inner_keyline_inset_px: int = 4
-@export var inner_keyline_width_px: int = 1
-@export_range(0.0, 1.0) var inner_keyline_alpha: float = 0.25
 # Card stock: a 1px light just inside the top edge and a 1px shade just
 # inside the bottom one, both between the rounded corners.
 @export var top_highlight_color: Color = Color(1.0, 1.0, 1.0, 0.3)
 @export_range(0.0, 1.0) var bottom_shade_alpha: float = 0.08
-# The inset rule pressed into the stock: a 1px light just below each of
-# its horizontal edges, between the corners, lit from above like the
-# edges (the frame's own is top_highlight_color). Transparent = off.
-@export var frame_impression_light: Color = Color(1.0, 1.0, 1.0, 0.12):
-	set(value):
-		frame_impression_light = value
-		if is_node_ready():
-			keyline.queue_redraw()
 @export var keyline_strike: Color = Color(0.62, 0.56, 0.49)
 @export var keyline_guard: Color = Color(0.49, 0.56, 0.59)
 @export var keyline_toll: Color = Color(0.54, 0.50, 0.58)
@@ -223,7 +209,7 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 @export var type_label_font_size_px: int = 9
 @export_range(0.0, 1.0) var type_label_letter_spacing_em: float = 0.16
 @export_range(0.0, 1.0) var type_label_alpha: float = 0.55
-# Off: the inset rule already bounds the footer. On, it is the hairline
+# Off: the frame already bounds the footer. On, it is the hairline
 # over the type label that the card had before.
 @export var footer_rule_enabled: bool = false
 @export_range(0.0, 1.0) var footer_rule_alpha: float = 0.25
@@ -300,8 +286,8 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 @export var art_field_size: Vector2 = Vector2(176.0, 146.0)
 # The footer is placed by INK, like the header: the type label's
 # baseline sits footer_bottom_ink_px above the face's bottom edge (its
-# small caps have no descenders, so that is the ink's bottom; 9 leaves
-# 4px clear of the inset rule), and the rules area ends at the caps' tops
+# small caps have no descenders, so that is the ink's bottom), and the
+# rules area ends at the caps' tops
 # (_cap_top()) - or at the footer rule, if on, whose lower edge is
 # footer_rule_ink_gap_px above them. Both rounded to a whole pixel.
 @export var footer_rule_ink_gap_px: float = 4.0
@@ -840,24 +826,13 @@ func _draw_paper() -> void:
 	var style := _rounded_style(Color(seed, 1.0, 0.0, 1.0), maxi(corner_radius - int(inset), 0))
 	paper.draw_style_box(style, Rect2(Vector2.ZERO, size).grow(-inset))
 
-# The inset rule and the card-stock edges, under everything on the face:
-# the top light and bottom shade run just inside the frame.
+# The card-stock edges, under everything on the face: the top light and
+# bottom shade run just inside the frame.
 func _draw_keyline() -> void:
 	var face := Rect2(Vector2.ZERO, size)
 	var shade: Color = ink_color
 	shade.a = bottom_shade_alpha
 	_draw_edge_pair(keyline, face.grow(-1.0), float(corner_radius), top_highlight_color, shade)
-	if inner_keyline_width_px > 0:
-		var inset: int = inner_keyline_inset_px
-		var rule: Color = ink_color
-		rule.a = inner_keyline_alpha
-		keyline.draw_style_box(_rule_style(rule, inner_keyline_width_px, maxi(corner_radius - inset, 0)), face.grow(-float(inset)))
-		# One pixel below each horizontal edge: under the top edge's width,
-		# and past the bottom edge.
-		var pressed: Rect2 = face.grow(-float(inset))
-		pressed.position.y += float(inner_keyline_width_px)
-		pressed.size.y += 1.0 - float(inner_keyline_width_px)
-		_draw_edge_pair(keyline, pressed, float(maxi(corner_radius - inset, 0)), frame_impression_light, frame_impression_light)
 
 # A 1px line along the inside top of `rect` and one along its inside
 # bottom, each stopping `radius` short of the corners.

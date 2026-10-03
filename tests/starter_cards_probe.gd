@@ -32,6 +32,9 @@ const SHRUNK_RULES: Dictionary = {
 	"The Return": 13,
 }
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
+# The numeral's ink stays this far below the card's top edge - the room it
+# had beside the inset rule, kept now the rule is gone.
+const NUMERAL_TOP_CLEAR_PX := 5.0
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # The cards with art, by file - the starters, Carve, Cornered, Hold Fast,
 # Come Due, No Further, Sentence, Last Wager, The Return, Blood Arc,
@@ -280,15 +283,15 @@ func _check_face_layout() -> void:
 			_expect(is_attack == (view.type_label.text == "STRIKE"), "%s is %s and labelled %s - every ATTACK reads STRIKE and every STRIKE is an ATTACK" % [card.card_name, CardData.CardType.keys()[card.card_type], view.type_label.text])
 			# The header holds the ledger rule and the "-N HP" line without
 			# adding a row - the HP ink clear of the art field by 4 px - and
-			# the numeral's ink clears the inset rule.
+			# the numeral's ink keeps NUMERAL_TOP_CLEAR_PX off the top edge.
 			if view.hp_cost_label.visible:
 				_expect(view.hp_cost_label.position.y + view.hp_cost_label.get_theme_font("font").get_ascent(view.hp_cost_font_size_px) <= art_top - 4.0, "%s's HP line sits clear of the art" % card.card_name)
 				_expect(view.cost_rule.visible and view.cost_rule.position.y < view.hp_cost_baseline_px + _ink_top(view.hp_cost_label, view.hp_cost_font_size_px), "%s's ledger rule sits over its HP line" % card.card_name)
-			_expect(view.header_baseline_px + _ink_top(view.cost_label, view.cost_font_size_px) >= float(view.inner_keyline_inset_px + view.inner_keyline_width_px), "%s's numeral clears the inset rule" % card.card_name)
+			_expect(view.header_baseline_px + _ink_top(view.cost_label, view.cost_font_size_px) >= NUMERAL_TOP_CLEAR_PX, "%s's numeral sits %.0f px clear of the top edge" % [card.card_name, NUMERAL_TOP_CLEAR_PX])
 
 	var footer_y: float = _type_baseline(view)
 	# The footer by ink: the type label's baseline 9 px off the bottom
-	# edge, 4 px clear of the inset rule.
+	# edge.
 	_expect_eq(footer_y, 271.0, "The type label's baseline sits at y 271")
 	var long_card := CardData.new()
 	long_card.card_name = "Probe Long"
