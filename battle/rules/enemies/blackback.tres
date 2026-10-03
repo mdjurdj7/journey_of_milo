@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
+[ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
+[ext_resource type="AudioStream" uid="uid://bnvfgx6j66j30" path="res://assets/audio/combat_old/hit.wav" id="3_hit"]
+[ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="4_status_data"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/fed.tres" id="5_fed"]
+
+[sub_resource type="Resource" id="EnemyIntent_peck"]
+script = ExtResource("2_intent")
+value = 3
+hits = 2
+
+[sub_resource type="Resource" id="EnemyIntent_lunge"]
+script = ExtResource("2_intent")
+value = 9
+
+[resource]
+script = ExtResource("1_enemy_data")
+enemy_name = "Blackback"
+max_hp = 32
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_peck"), SubResource("EnemyIntent_lunge")])
+starting_statuses = Array[ExtResource("4_status_data")]([ExtResource("5_fed")])
+; Placeholder: the Wardling's 8-bit hit.wav until the gull has its own.
+contact_sounds = Array[AudioStream]([ExtResource("3_hit")])
+; Placeholder body: the Sputter's, at its own scale.
+model_scale = 1.25
+attachment_scene_path = "res://field/sputter_claws.tscn"

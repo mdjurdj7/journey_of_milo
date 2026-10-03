@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/hungry.tres" id="2_hungry"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "fed"
+display_name = "Fed"
+description = "When the other dies, it turns Hungry: +{alone_bonus} damage on each of its Attacks."
+category = 2
+default_duration_turns = -1
+stack_rule = 3
+grants_when_alone = ExtResource("2_hungry")
