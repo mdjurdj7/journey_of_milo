@@ -1,0 +1,372 @@
+#!/usr/bin/env bash
+# Runs the headless probes (tests/*_probe.gd) - all of them, an area's, or
+# the ones a change touches - as parallel headless Godot processes, and
+# says which passed. See CLAUDE.md's Probes section for when to run what.
+#
+#   tools/run_probes.sh --full                    every probe
+#   tools/run_probes.sh --area keywords,face      an area's probes (--list-areas)
+#   tools/run_probes.sh --changed [BASE]          the probes for the files changed
+#                                                 since BASE (default HEAD)
+#   tools/run_probes.sh --probe kill_order        named probes ("_probe" optional)
+#
+# Options:
+#   -j N             parallel probes (default 4). Probes marked serial in
+#                    the table below always run alone, after the rest.
+#   --worktree [DIR] run in the persistent probe worktree (default
+#                    ../journey-of-milo-probe), not this tree: take its lock,
+#                    check out --ref, copy --files over it, and import only
+#                    when .import files or new files came in. Made, with a
+#                    copy of this tree's .godot, the first time.
+#   --ref REF        what the worktree checks out (default: this tree's HEAD)
+#   --files a,b      with --worktree: these working-tree files are copied
+#                    over the checkout (a deleted one is deleted there) - the
+#                    uncommitted change under test. With --changed and no
+#                    --files, the changed files are copied.
+#   --wait MIN       how long to wait for a busy worktree (default 30)
+#   --path DIR       run in DIR instead of this tree (no worktree handling)
+#   --import         run Godot's --import first (--path or this tree)
+#   --logs DIR       where the logs go (default: a fresh temp folder)
+#   --list           print the plan and stop
+#
+# GODOT overrides the engine (default ../Godot_v4.7.1.exe beside the repo:
+# the main executable, not the _console wrapper). Exit code 0 = every
+# probe passed, 1 = a failure, 2 = usage, 3 = the worktree stayed busy.
+
+set -u
+
+REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
+GODOT=${GODOT:-$REPO/../Godot_v4.7.1.exe}
+PROBE_TIMEOUT_SEC=600
+
+# --- The probes: name, seconds on a serial run (2026-10-03), flags ---
+# "serial": runs alone after the parallel batch - set for a probe that
+# proved flaky in parallel. "fixed": run at --fixed-fps 60 (the probe's
+# own header asks for it). The seconds only order the batch, longest first.
+PROBE_TABLE="
+keeper_keepsake_probe 75
+belongings_choice_probe 51
+kill_order_probe 42
+blackback_probe 36
+toll_carry_probe 35
+trinket_probe 35
+collateral_probe 29
+leverage_probe 29
+glassbone_probe 27
+ransom_probe 26
+gold_line_probe 19
+drain_probe 10 fixed
+keyword_probe 9
+come_due_face_probe 7
+hold_line_probe 7 fixed
+card_rarity_probe 5
+come_due_probe 4
+starter_cards_probe 4
+no_further_probe 3
+sentence_probe 3
+the_return_probe 3
+bundle_roll_probe 2
+critical_cards_probe 2
+wardling_probe 2
+siltjaw_probe 1
+"
+
+# --- Areas: which probes guard which part of the game ---
+area_probes() {
+	case "$1" in
+		cards) echo "starter_cards card_rarity" ;;
+		face) echo "starter_cards keyword come_due come_due_face critical_cards" ;;
+		keywords) echo "keyword starter_cards the_return" ;;
+		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order" ;;
+		enemies) echo "blackback siltjaw wardling sentence no_further critical_cards kill_order" ;;
+		field) echo "kill_order drain hold_line toll_carry gold_line glassbone" ;;
+		floor1) echo "kill_order drain" ;;
+		floor2) echo "kill_order hold_line bundle_roll" ;;
+		floor3) echo "kill_order blackback wardling" ;;
+		floors) echo "kill_order drain hold_line bundle_roll blackback wardling" ;;
+		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry" ;;
+		hud) echo "gold_line glassbone" ;;
+		hp_bar) echo "kill_order" ;;
+		ui_inspect) echo "keyword" ;;
+		*) return 1 ;;
+	esac
+}
+AREAS_ALL="cards face keywords rules enemies field floor1 floor2 floor3 floors run hud hp_bar ui_inspect"
+
+# The probes for one changed path; FULL for a path no area covers, nothing
+# for a path no probe can see (docs, tools, the bus layout).
+path_probes() {
+	local path="${1%.uid}"
+	path="${path%.import}"
+	local out=""
+	case "$path" in
+		default_bus_layout.tres|docs/*|*.md|reference/*|tools/*|.githooks/*|.gitignore|.gitattributes) return 0 ;;
+		tests/*_probe.gd) basename "$path" .gd; return 0 ;;
+		tests/*) return 0 ;;
+		cards/data/*.tres|cards/neutral/*.tres)
+			# The starters' probes, and every probe that names this card.
+			local id
+			id=$(basename "$path" .tres)
+			out="$(area_probes cards) $(grep -lw "$id" "$REPO"/tests/*_probe.gd 2>/dev/null | xargs -r -n1 basename | sed 's/\.gd$//')" ;;
+		cards/card_effect.gd|cards/deck.gd) out=$(area_probes rules) ;;
+		cards/*) out=$(area_probes cards) ;;
+		battle/card_view.*|battle/card_paper*|battle/card_art*) out=$(area_probes face) ;;
+		ui/keyword_table.gd|ui/keywords.tres|ui/status_reveal.gd) out=$(area_probes keywords) ;;
+		battle/rules/enemies/*|battle/rules/enemy_turn.gd|battle/rules/enemy_intent.gd) out=$(area_probes enemies) ;;
+		battle/rules/*|battle/battle_controller.gd) out=$(area_probes rules) ;;
+		battle/reward_screen.*|battle/belongings_screen.*|battle/loot_screen.*|battle/keepsake_offer.*|battle/keepsake_row.*|run/*) out=$(area_probes run) ;;
+		field/*) out=$(area_probes field) ;;
+		floors/region1_floor1.tres) out=$(area_probes floor1) ;;
+		floors/region1_floor2.tres) out=$(area_probes floor2) ;;
+		floors/region1_floor3.tres) out=$(area_probes floor3) ;;
+		floors/*) out=$(area_probes floors) ;;
+		ui/hp_bar.*) out=$(area_probes hp_bar) ;;
+		ui/toll_line.gd|ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd) out=$(area_probes hud) ;;
+		ui/deck_view.*|ui/card_compendium.*) out=$(area_probes ui_inspect) ;;
+		*) echo FULL; return 0 ;;
+	esac
+	# The kill-order gate: any script under battle/ or field/.
+	case "$path" in
+		battle/*.gd|field/*.gd) out="$out kill_order" ;;
+	esac
+	echo "$out"
+}
+
+die() { echo "run_probes: $*" >&2; exit 2; }
+
+MODE=""
+AREAS=""
+NAMES=""
+BASE=""
+JOBS=4
+WORKTREE=""
+REF=""
+FILES=""
+WAIT_MIN=30
+PROJECT=""
+DO_IMPORT=0
+LOGS=""
+LIST=0
+
+while [ $# -gt 0 ]; do
+	case "$1" in
+		--full) MODE=full ;;
+		--area) MODE=area; AREAS="${2:?--area needs a list}"; shift ;;
+		--changed) MODE=changed
+			if [ $# -gt 1 ] && [ "${2#-}" = "$2" ]; then BASE="$2"; shift; fi ;;
+		--probe) MODE=probe; NAMES="${2:?--probe needs a list}"; shift ;;
+		-j) JOBS="${2:?-j needs a number}"; shift ;;
+		--worktree)
+			WORKTREE="$REPO/../journey-of-milo-probe"
+			if [ $# -gt 1 ] && [ "${2#-}" = "$2" ]; then WORKTREE="$2"; shift; fi ;;
+		--ref) REF="${2:?--ref needs a commit}"; shift ;;
+		--files) FILES="${2:?--files needs a list}"; shift ;;
+		--wait) WAIT_MIN="${2:?--wait needs minutes}"; shift ;;
+		--path) PROJECT="${2:?--path needs a folder}"; shift ;;
+		--import) DO_IMPORT=1 ;;
+		--logs) LOGS="${2:?--logs needs a folder}"; shift ;;
+		--list) LIST=1 ;;
+		--list-areas) for a in $AREAS_ALL; do printf '%-11s %s\n' "$a" "$(area_probes "$a")"; done; exit 0 ;;
+		-h|--help) sed -n '2,37p' "$0"; exit 0 ;;
+		*) die "unknown option $1 (--help)" ;;
+	esac
+	shift
+done
+[ -n "$MODE" ] || die "say what to run: --full, --area, --changed or --probe (--help)"
+[ -n "$WORKTREE" ] && [ -n "$PROJECT" ] && die "--worktree and --path are exclusive"
+
+# --- What changed (for --changed, and for the HEAD-moved check) ---
+START_HEAD=$(git -C "$REPO" rev-parse HEAD)
+CHANGED=""
+if [ "$MODE" = changed ]; then
+	CHANGED=$( { git -C "$REPO" diff --name-only "${BASE:-HEAD}"; git -C "$REPO" ls-files --others --exclude-standard; } | sort -u)
+fi
+if [ -n "$FILES" ]; then
+	CHANGED=$(printf '%s\n%s\n' "$CHANGED" "$(echo "$FILES" | tr ',' '\n')" | sed '/^$/d' | sort -u)
+fi
+
+# --- Which probes ---
+ALL_PROBES=$(cd "$REPO/tests" && ls *_probe.gd | sed 's/\.gd$//')
+SELECTED=""
+case "$MODE" in
+	full) SELECTED="$ALL_PROBES" ;;
+	area)
+		for a in $(echo "$AREAS" | tr ',' ' '); do
+			p=$(area_probes "$a") || die "no area '$a' (--list-areas)"
+			SELECTED="$SELECTED $p"
+		done ;;
+	probe) SELECTED=$(echo "$NAMES" | tr ',' ' ') ;;
+	changed)
+		[ -n "$CHANGED" ] || { echo "run_probes: nothing changed since ${BASE:-HEAD} - no probes to run"; exit 0; }
+		for f in $CHANGED; do
+			p=$(path_probes "$f")
+			if [ "$p" = FULL ]; then
+				echo "run_probes: $f is in no area - running the full suite"
+				SELECTED="$ALL_PROBES"
+				break
+			fi
+			SELECTED="$SELECTED $p"
+		done ;;
+esac
+# Normalise to *_probe names, drop duplicates, check each exists.
+SELECTED=$(for p in $SELECTED; do p="${p%.gd}"; p="${p%_probe}_probe"; echo "$p"; done | sort -u)
+for p in $SELECTED; do
+	echo "$ALL_PROBES" | grep -qx "$p" || die "no probe tests/$p.gd"
+done
+[ -n "$SELECTED" ] || { echo "run_probes: no probe covers the changed files - nothing to run"; exit 0; }
+
+table_seconds() { echo "$PROBE_TABLE" | awk -v n="$1" '$1 == n { print $2; f = 1 } END { if (!f) print 60 }'; }
+table_flag() { echo "$PROBE_TABLE" | awk -v n="$1" -v f="$2" '$1 == n { for (i = 3; i <= NF; i++) if ($i == f) print "yes" }'; }
+
+# Longest first; serial ones apart.
+PARALLEL=""
+SERIAL=""
+for p in $(for p in $SELECTED; do echo "$(table_seconds "$p") $p"; done | sort -rn | awk '{ print $2 }'); do
+	if [ "$(table_flag "$p" serial)" = yes ]; then SERIAL="$SERIAL $p"; else PARALLEL="$PARALLEL $p"; fi
+done
+
+# --- Where ---
+if [ -n "$WORKTREE" ]; then
+	PROJECT="$WORKTREE"
+	REF="${REF:-$START_HEAD}"
+	# With --changed and no --files, the change under test is what changed.
+	[ -z "$FILES" ] && [ "$MODE" = changed ] && FILES=$(echo "$CHANGED" | grep -vx 'default_bus_layout.tres' | tr '\n' ',')
+fi
+PROJECT="${PROJECT:-$REPO}"
+
+if [ "$LIST" = 1 ]; then
+	echo "project:  $PROJECT"
+	[ -n "$WORKTREE" ] && echo "worktree: check out $(git -C "$REPO" rev-parse --short "$REF"), copy over: ${FILES:-nothing}"
+	[ -n "$CHANGED" ] && echo "changed:  $(echo $CHANGED)"
+	echo "parallel (-j $JOBS):$PARALLEL"
+	[ -n "$SERIAL" ] && echo "serial:  $SERIAL"
+	exit 0
+fi
+
+[ -x "$GODOT" ] || [ -f "$GODOT" ] || die "no Godot at $GODOT (set GODOT)"
+
+# --- The persistent worktree: lock, check out, copy, import if needed ---
+if [ -n "$WORKTREE" ]; then
+	LOCK="$WORKTREE.lock"
+	waited=0
+	while ! mkdir "$LOCK" 2>/dev/null; do
+		holder=$(cat "$LOCK/owner" 2>/dev/null)
+		pid=$(echo "$holder" | awk '{ print $1 }')
+		if [ -n "$pid" ] && ! kill -0 "$pid" 2>/dev/null; then
+			echo "run_probes: clearing a stale lock ($holder)"
+			rm -rf "$LOCK"
+			continue
+		fi
+		if [ "$waited" -ge $((WAIT_MIN * 60)) ]; then
+			echo "run_probes: $WORKTREE is busy ($holder) - gave up after $WAIT_MIN min" >&2
+			exit 3
+		fi
+		[ "$waited" = 0 ] && echo "run_probes: $WORKTREE is busy ($holder) - waiting up to $WAIT_MIN min"
+		sleep 10
+		waited=$((waited + 10))
+	done
+	echo "$$ $(date '+%Y-%m-%d %H:%M:%S') $(basename "$REPO") ref $(git -C "$REPO" rev-parse --short "$REF")" > "$LOCK/owner"
+	trap 'rm -rf "$LOCK"' EXIT
+
+	NEED_IMPORT=0
+	STALE_IMPORTS=""
+	if [ ! -d "$WORKTREE/.git" ] && [ ! -f "$WORKTREE/.git" ]; then
+		echo "run_probes: making $WORKTREE (one-time: a worktree and a copy of .godot)"
+		git -C "$REPO" worktree add --detach "$WORKTREE" "$REF" >/dev/null || die "could not add the worktree"
+		cp -r "$REPO/.godot" "$WORKTREE/" || die "could not copy .godot"
+		NEED_IMPORT=1
+		OLD=$(git -C "$REPO" rev-parse "$REF")
+	else
+		OLD=$(git -C "$WORKTREE" rev-parse HEAD)
+	fi
+	# Back to a clean checkout of REF: last run's copied files go.
+	git -C "$WORKTREE" checkout -q -f --detach "$REF" || die "could not check out $REF"
+	git -C "$WORKTREE" clean -fdq
+	MOVED=$(git -C "$WORKTREE" diff --name-only "$OLD" HEAD)
+	ADDED=$(git -C "$WORKTREE" diff --name-only --diff-filter=A "$OLD" HEAD)
+	for f in $(echo "$FILES" | tr ',' ' '); do
+		if [ -e "$REPO/$f" ]; then
+			mkdir -p "$WORKTREE/$(dirname "$f")"
+			cp "$REPO/$f" "$WORKTREE/$f"
+			git -C "$WORKTREE" cat-file -e "HEAD:$f" 2>/dev/null || ADDED="$ADDED $f"
+		else
+			rm -f "$WORKTREE/$f"
+		fi
+		MOVED="$MOVED $f"
+	done
+	# Import when an import setting or a new file came in. A changed
+	# .import's cached output is deleted first, or the stale one stays.
+	for f in $MOVED; do
+		case "$f" in
+			*.import)
+				NEED_IMPORT=1
+				STALE_IMPORTS="$STALE_IMPORTS $(basename "${f%.import}")" ;;
+		esac
+	done
+	# A new file only matters if Godot scans it: a resource, a script (the
+	# class cache) or an asset - not docs, and not tools/ (.gdignore).
+	for f in $ADDED; do
+		case "$f" in
+			tools/*|docs/*|reference/*|*.md) ;;
+			*.gd|*.gdshader|*.gdshaderinc|*.tscn|*.tres|*.res|*.png|*.jpg|*.svg|*.glb|*.gltf|*.fbx|*.wav|*.ogg|*.mp3|*.ttf|*.otf) NEED_IMPORT=1 ;;
+		esac
+	done
+	for a in $STALE_IMPORTS; do rm -f "$WORKTREE/.godot/imported/$a"-*; done
+	[ "$NEED_IMPORT" = 1 ] && DO_IMPORT=1
+	echo "run_probes: worktree at $(git -C "$WORKTREE" rev-parse --short HEAD)${FILES:+, with $(echo "$FILES" | tr ',' ' ')}"
+fi
+
+LOGS="${LOGS:-$(mktemp -d "${TMPDIR:-/tmp}/run_probes.XXXXXX")}"
+mkdir -p "$LOGS"
+: > "$LOGS/_results.txt"
+
+if [ "$DO_IMPORT" = 1 ]; then
+	echo "run_probes: importing..."
+	( cd "$PROJECT" && timeout 900 "$GODOT" --headless --path . --import > "$LOGS/_import.log" 2>&1 )
+fi
+
+# --- Run ---
+run_one() {
+	local p="$1" ff="" start code dur verdict
+	[ "$(table_flag "$p" fixed)" = yes ] && ff="--fixed-fps 60"
+	start=$(date +%s)
+	( cd "$PROJECT" && timeout "$PROBE_TIMEOUT_SEC" "$GODOT" --headless $ff --path . -s "res://tests/$p.gd" > "$LOGS/$p.log" 2>&1 )
+	code=$?
+	dur=$(( $(date +%s) - start ))
+	if [ "$code" = 0 ] && grep -q "^$p: PASSED" "$LOGS/$p.log"; then verdict=PASS; else verdict=FAIL; fi
+	printf '%-26s %s %4ss%s\n' "$p" "$verdict" "$dur" "$([ "$verdict" = FAIL ] && echo "  (exit $code, $LOGS/$p.log)")" | tee -a "$LOGS/_results.txt"
+}
+
+COUNT=$(echo $SELECTED | wc -w)
+echo "run_probes: $COUNT probe(s) in $PROJECT, -j $JOBS, logs in $LOGS"
+T0=$(date +%s)
+for p in $PARALLEL; do
+	while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do wait -n; done
+	run_one "$p" &
+done
+wait
+for p in $SERIAL; do run_one "$p"; done
+T1=$(date +%s)
+
+FAILED=$(grep -c ' FAIL ' "$LOGS/_results.txt" 2>/dev/null)
+echo "run_probes: $((COUNT - FAILED)) of $COUNT passed in $((T1 - T0))s"
+
+# --- Did HEAD move under the run? ---
+END_HEAD=$(git -C "$REPO" rev-parse HEAD)
+TESTED_HEAD="${REF:+$(git -C "$REPO" rev-parse "$REF")}"
+TESTED_HEAD="${TESTED_HEAD:-$START_HEAD}"
+if [ "$END_HEAD" != "$TESTED_HEAD" ]; then
+	NEW_FILES=$(git -C "$REPO" diff --name-only "$TESTED_HEAD" "$END_HEAD")
+	echo "run_probes: HEAD moved: $(git -C "$REPO" rev-parse --short "$TESTED_HEAD") -> $(git -C "$REPO" rev-parse --short "$END_HEAD"); the new commits touch:"
+	echo "$NEW_FILES" | sed 's/^/    /'
+	OVERLAP=$(echo "$NEW_FILES" | grep -Fx -f <(echo "$CHANGED") 2>/dev/null)
+	if [ -z "$CHANGED" ]; then
+		echo "run_probes: no change set given - compare those against the files under test yourself"
+	elif [ -z "$OVERLAP" ]; then
+		echo "run_probes: none of them are files under test - no rerun needed"
+	else
+		echo "run_probes: they overlap the files under test - rerun on the new HEAD:"
+		echo "$OVERLAP" | sed 's/^/    /'
+	fi
+fi
+
+[ "$FAILED" = 0 ]

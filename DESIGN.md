@@ -60,6 +60,12 @@ so it doesn't get silently reinvented or silently forgotten.
   (2026-09-17, battle UI ink pass. 2026-09-19: the field's deck line moved
   over - DeckPanel is now the one ink line the battle's DECK/DISCARD
   readouts use too.)
+- **The HP bar has no dedicated probe.** `ui/hp_bar.gd` (the field and
+  battle HP readouts, the Toll block off the bar's end) is exercised only
+  by the fights kill_order_probe runs, which is what tools/run_probes.sh
+  maps a change there to; nothing checks its readouts' numbers or layout
+  directly. Write one when the field HUD gets its pass. (2026-10-03,
+  probe runner.)
 - **A card pool scan must take an explicit folder list, never "everything
   under `cards/`".** There is no pool scan today (decks come from
   `CharacterData.starting_deck_counts`, by explicit reference), so the

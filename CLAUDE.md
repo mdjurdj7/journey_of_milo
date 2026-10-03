@@ -24,6 +24,28 @@
 - Don't stage default_bus_layout.tres unless a bus change was
   intended; revert stray edits from the editor's Audio panel.
 
+## Probes
+- Run them with tools/run_probes.sh (--help). It runs headless probes
+  in parallel (-j 4), longest first; probes marked serial in its table
+  run alone afterwards.
+- Per commit: only the probes for what changed -
+  `tools/run_probes.sh --changed` maps the changed files to areas
+  (--list-areas; the map lives in the script) and falls back to the
+  full suite for a path no area covers. `--area` / `--probe` pick by
+  hand; `--list` shows the plan without running.
+- Full suite (`--full`): once before any push, on the exact tree being
+  pushed.
+- If HEAD moves during a run and the new commits touch none of the
+  files under test, don't rerun. The script says which it is.
+- Probe in the persistent worktree, ../journey-of-milo-probe:
+  `--worktree` checks out the commit under test (--ref, default HEAD),
+  copies the uncommitted files under test over it (--files, or the
+  changed files with --changed), and imports only when .import files
+  or new files came in - reusing its .godot rather than copying one
+  per task. One session at a time: the script takes
+  ../journey-of-milo-probe.lock and waits (--wait, default 30 min) or
+  says who holds it.
+
 ## Probe worktrees
 - When testing a change to any .import file in a worktree that copied
   the main tree's .godot cache, first delete that asset's cached

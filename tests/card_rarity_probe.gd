@@ -17,7 +17,10 @@ const CASES := 14
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
-const SAVE_PATH := "user://card_rarity_probe_ultra.tres"
+# user:// is shared by every checkout of the project, so the file is named
+# for this process: two runs at once (parallel probes, another session's
+# suite) never save over or delete each other's.
+const SAVE_PATH_FORMAT := "user://card_rarity_probe_ultra_%d.tres"
 const SEED_COUNT := 500
 
 # The rarity every implemented card must carry. A card on disk that isn't
@@ -125,10 +128,11 @@ func _check_ultra_rare_supported() -> void:
 	var card := CardData.new()
 	card.card_name = "Probe Ultra"
 	card.rarity = CardData.CardRarity.ULTRA_RARE
-	_expect_eq(ResourceSaver.save(card, SAVE_PATH), OK, "An Ultra Rare card saves")
-	var loaded := ResourceLoader.load(SAVE_PATH, "", ResourceLoader.CACHE_MODE_IGNORE) as CardData
+	var save_path: String = SAVE_PATH_FORMAT % OS.get_process_id()
+	_expect_eq(ResourceSaver.save(card, save_path), OK, "An Ultra Rare card saves")
+	var loaded := ResourceLoader.load(save_path, "", ResourceLoader.CACHE_MODE_IGNORE) as CardData
 	_expect(loaded != null and loaded.rarity == CardData.CardRarity.ULTRA_RARE, "...and loads back Ultra Rare")
-	DirAccess.remove_absolute(ProjectSettings.globalize_path(SAVE_PATH))
+	DirAccess.remove_absolute(ProjectSettings.globalize_path(save_path))
 
 	var pool := RewardPool.new()
 	pool.entries = [card]
