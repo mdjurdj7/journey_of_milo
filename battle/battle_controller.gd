@@ -38,6 +38,11 @@ signal status_changed()
 # End Turn in between. Not emitted by setup(): the fight opens on the
 # player's turn.
 signal turn_phase_changed(player_turn: bool)
+# The enemy actually under the cursor while a card is armed - null when
+# it is over none, and when the card is played or cancelled. Never the
+# default target _default_target() lights: what the armed card's face
+# reads against (BattleOverlay._on_hovered_enemy_changed()).
+signal hovered_enemy_changed(enemy: FieldEnemy)
 signal enemy_hp_changed(enemy: FieldEnemy, current: int, max_hp: int)
 # The intent display's two signals. enemy_intent_changed carries
 # EnemyTurn.preview_intent()'s dictionary for that enemy's QUEUED action
@@ -86,6 +91,9 @@ var cards_played_this_turn: int = 0
 var _hand_container: HandContainer
 var _pending_card_view: CardView = null
 var _hovered_enemy: FieldEnemy = null
+# The enemy under the cursor itself, without the default - see
+# hovered_enemy_changed.
+var _cursor_enemy: FieldEnemy = null
 var _enemy_rects: Dictionary = {} # FieldEnemy -> Rect2, see _refresh_enemy_rects()
 var _combatants: Dictionary = {} # FieldEnemy -> Combatant
 var _effect_resolver := EffectResolver.new()
@@ -197,15 +205,26 @@ func is_awaiting_target() -> bool:
 
 # The battle as it stands, for reading a card still in hand: the same
 # shape resolve_card() gets, with cards_played_before_this the count
-# itself (the card hasn't been played) and no target. Read by CardBonus
-# on the card faces (see BattleOverlay._push_bonus_context()); nothing
-# here changes.
+# itself (the card hasn't been played). Its target is the one enemy left
+# to hit when there is only one - every card can only land there - and
+# none with more. Read by CardBonus and the damage numbers on the card
+# faces (see BattleOverlay._push_bonus_context()); nothing here changes.
 func preview_context() -> EffectContext:
 	var ctx := EffectContext.new()
 	ctx.player = player
 	ctx.enemies = _hittable_enemy_combatants()
 	ctx.deck = deck
 	ctx.cards_played_before_this = cards_played_this_turn
+	if ctx.enemies.size() == 1:
+		ctx.target = ctx.enemies[0]
+	return ctx
+
+# preview_context() aimed at `enemy` - what an armed card's face reads
+# while the cursor is over it.
+func preview_context_against(enemy: FieldEnemy) -> EffectContext:
+	var ctx: EffectContext = preview_context()
+	var target: Combatant = _combatants.get(enemy)
+	ctx.target = target
 	return ctx
 
 # Read-only access for TargetLine, which needs the armed card's own view
@@ -244,6 +263,7 @@ func confirm_target(enemy: FieldEnemy) -> void:
 	var card_view := _pending_card_view
 	_pending_card_view = null
 	_clear_hover()
+	_set_cursor_enemy(null)
 	_enemy_rects.clear()
 	_resolve_play(card_view, enemy)
 
@@ -253,6 +273,7 @@ func cancel_target() -> void:
 	_pending_card_view.release()
 	_pending_card_view = null
 	_clear_hover()
+	_set_cursor_enemy(null)
 	_enemy_rects.clear()
 	target_cancelled.emit()
 
@@ -735,6 +756,8 @@ func _drop_enemy(enemy: FieldEnemy) -> void:
 	_enemy_rects.erase(enemy)
 	if _hovered_enemy == enemy:
 		_clear_hover()
+	if _cursor_enemy == enemy:
+		_set_cursor_enemy(null)
 	_mark_lone_pack_members()
 	enemy_defeated.emit(enemy)
 
@@ -841,6 +864,7 @@ func _physics_process(_delta: float) -> void:
 
 func _update_hover(screen_pos: Vector2) -> void:
 	var enemy := _enemy_at(screen_pos)
+	_set_cursor_enemy(enemy)
 	if enemy == null:
 		enemy = _default_target()
 	if enemy == _hovered_enemy:
@@ -849,6 +873,12 @@ func _update_hover(screen_pos: Vector2) -> void:
 	_hovered_enemy = enemy
 	if _hovered_enemy != null:
 		_hovered_enemy.set_highlight(true)
+
+func _set_cursor_enemy(enemy: FieldEnemy) -> void:
+	if enemy == _cursor_enemy:
+		return
+	_cursor_enemy = enemy
+	hovered_enemy_changed.emit(enemy)
 
 func _clear_hover() -> void:
 	if _hovered_enemy != null:

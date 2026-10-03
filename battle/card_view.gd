@@ -531,6 +531,7 @@ func _resolve_tokens(description: String) -> String:
 			# card this is the {else} half: the bonus as if NOT Critical.
 			if card_data.card_type == CardData.CardType.ATTACK:
 				damage += _attack_bonus_for_half(false)
+			damage = _landed(damage, _damage_reaches_all(false))
 			text = text.replace(TOKEN_DAMAGE, str(damage))
 	if text.contains(TOKEN_ALT_DAMAGE) or text.contains(TOKEN_BONUS_DAMAGE):
 		var bonus_damage: int = _bonus_effect_value(card_data, DAMAGE_EFFECT_TYPES)
@@ -538,6 +539,7 @@ func _resolve_tokens(description: String) -> String:
 			# The {if} half's bonus - on a Critical card, as if Critical.
 			if card_data.card_type == CardData.CardType.ATTACK:
 				bonus_damage += _attack_bonus_for_half(true)
+			bonus_damage = _landed(bonus_damage, _damage_reaches_all(true))
 			text = text.replace(TOKEN_ALT_DAMAGE, str(bonus_damage)).replace(TOKEN_BONUS_DAMAGE, str(bonus_damage))
 	# Under a stance that forbids Block (Last Resort) every Block number
 	# reads 0 - what EffectContext.gain_block() will actually give. The
@@ -573,6 +575,33 @@ func _toll_heal_preview() -> int:
 		if effect != null and effect.effect_type == CardEffect.EffectType.TOLL_HEAL:
 			return mini(mini(effect.toll_cost, _toll) / 2, effect.value)
 	return 0
+
+# What a blow the card adds up to `blow` (its value and attack bonus)
+# lands for against the context's target - its mark bonus (Come Due)
+# added, then DamageEffect.landed(), the resolvers' own call. The target
+# is the one enemy of a single-enemy fight, or the enemy an armed card is
+# over (BattleController.preview_context()/preview_context_against());
+# none for an all-enemies effect (`all_enemies`), which reads with the
+# player's own modifiers only. Outside a battle hand, `blow` as it is.
+func _landed(blow: int, all_enemies: bool) -> int:
+	if _bonus_context == null or _bonus_context.player == null:
+		return blow
+	var enemy: Combatant = null if all_enemies else _bonus_context.target
+	var preview: EffectContext = _bonus_context.for_card_preview(_upfront_hp_cost())
+	preview.card_is_attack = card_data.card_type == CardData.CardType.ATTACK
+	return DamageEffect.landed(blow + preview.mark_bonus_for(enemy), _bonus_context.player, enemy)
+
+# Whether the damage effect a token reads - the first one, or with
+# `conditional` the first conditional one, as _effect_value() and
+# _bonus_effect_value() pick them - hits every enemy.
+func _damage_reaches_all(conditional: bool) -> bool:
+	for effect in card_data.effects:
+		if effect == null or not DAMAGE_EFFECT_TYPES.has(effect.effect_type):
+			continue
+		if conditional and effect.condition == CardEffect.Condition.NONE:
+			continue
+		return effect.target_scope == CardEffect.TargetScope.ALL_ENEMIES
+	return false
 
 # The first matching effect's value, or -1 when the card has none - the
 # REPLACEMENT value when the effect's condition is one this face can
@@ -1040,7 +1069,8 @@ func _attack_bonus_for_half(conditional_half: bool) -> int:
 # (Reckoning) it is that blow, as toll_damage_effect.gd will land it: the
 # Toll held, plus the Toll the card's own upfront HP will make (Self-
 # Eater's 2, paid first - never more than the HP there is to lose), plus
-# the attack bonus. Anywhere else, the Toll held.
+# the attack bonus, through _landed() against the target. Anywhere else,
+# the Toll held.
 func _toll_token_value() -> int:
 	for effect in card_data.effects:
 		if effect == null or effect.effect_type != CardEffect.EffectType.TOLL_DAMAGE:
@@ -1049,7 +1079,7 @@ func _toll_token_value() -> int:
 		if _bonus_context != null and _bonus_context.player != null:
 			made = mini(made, _bonus_context.player.hp)
 		var bonus: int = _attack_bonus_preview() if card_data.card_type == CardData.CardType.ATTACK else 0
-		return _toll + made + bonus
+		return _landed(_toll + made + bonus, false)
 	return _toll
 
 # The attack bonus this Attack would get if played now - AttackBonus, the

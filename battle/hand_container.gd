@@ -299,6 +299,12 @@ func set_bonus_context(ctx: EffectContext) -> void:
 	for card_view in _card_views():
 		card_view.set_bonus_context(ctx)
 
+# One face read against its own context - the armed card's, aimed at the
+# enemy under the cursor (BattleOverlay._on_hovered_enemy_changed()). Not
+# kept: the next set_bonus_context() puts that face back with the rest.
+func set_card_bonus_context(card_view: CardView, ctx: EffectContext) -> void:
+	card_view.set_bonus_context(ctx)
+
 func update_playable(energy: int) -> void:
 	_last_energy = energy
 	for slot in _slots:

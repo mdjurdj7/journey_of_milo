@@ -196,6 +196,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.toll_changed.connect(func(_toll: int) -> void: _push_bonus_context())
 	# A power taken (Dying Light) moves every Attack's printed damage.
 	battle_controller.status_changed.connect(func() -> void: _push_bonus_context())
+	# The armed card's damage reads against the enemy under the cursor.
+	battle_controller.hovered_enemy_changed.connect(_on_hovered_enemy_changed)
 	battle_controller.setup(hand_container, enemy_list, wanderer)
 	_push_bonus_context()
 	get_tree().create_timer(battle_transition_time).timeout.connect(_reveal_enemy_intents)
@@ -473,6 +475,16 @@ func _push_bonus_context() -> void:
 	if battle_controller == null:
 		return
 	hand_container.set_bonus_context(battle_controller.preview_context())
+
+# The hand back to the battle as it stands, then - while a card is armed
+# and the cursor is over an enemy - that card's face aimed at it. Over no
+# enemy, or once the card is played or cancelled, every face reads the
+# base context again.
+func _on_hovered_enemy_changed(enemy: FieldEnemy) -> void:
+	_push_bonus_context()
+	var armed: CardView = battle_controller.get_pending_card_view()
+	if armed != null and enemy != null:
+		hand_container.set_card_bonus_context(armed, battle_controller.preview_context_against(enemy))
 
 func _on_card_armed_changed(armed: bool) -> void:
 	_card_armed = armed
