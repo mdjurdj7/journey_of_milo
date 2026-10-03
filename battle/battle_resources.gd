@@ -1,8 +1,9 @@
 extends Control
 class_name BattleResources
 
-# The player's energy, fixed bottom-left of the battle overlay
-# (BattleOverlay places it; the DECK line - a DeckPanel - sits beneath).
+# The player's energy, bottom-left of the battle overlay beside the hand
+# (BattleOverlay places it: a gap left of the leftmost resting card, its
+# numeral's top level with that card's cost numeral).
 # An instrument readout in ink, drawn: the current value as a large
 # numeral with "ENERGY" tracked on its baseline (the way TOLL sits beside
 # its numeral, see HPBar), and under them a tally - one short rule per
@@ -78,6 +79,8 @@ class_name BattleResources
 		tally_max_points = value
 		_relayout()
 
+const GLYPH_RECT_MARGIN_PX := 1.0
+
 var _energy: int = 0
 var _max_energy: int = 0
 var _ink: Color = Color.BLACK
@@ -132,14 +135,36 @@ func _content_size() -> Vector2:
 		height += tally_baseline_gap_px + tally_thickness_px
 	return Vector2(width, height)
 
-# Sized to its content; the bottom-left corner stays put (BattleOverlay
-# anchors this by its bottom edge).
+# Where the numeral's ink starts, from this readout's top: the tallest
+# figure's top (figure_ink_top()), so it holds whatever the digit.
+# BattleOverlay lines this up with the leftmost hand card's cost numeral.
+func numeral_ink_top() -> float:
+	if numeral_font == null:
+		return 0.0
+	return _numeral_ascent() + figure_ink_top(numeral_font, numeral_size_px)
+
+# How far above the baseline `font` inks its tallest figure at size_px
+# (negative = up), from the glyphs themselves - the line box's ascent
+# overstates it. The glyph's offset is its bitmap's, which the
+# rasteriser pads by GLYPH_RECT_MARGIN_PX on every side (CardView's
+# _cap_top() reads its "H" the same way).
+static func figure_ink_top(font: Font, size_px: int) -> float:
+	var ts: TextServer = TextServerManager.get_primary_interface()
+	var rid: RID = font.get_rids()[0]
+	var glyph_size := Vector2i(size_px, 0)
+	var top: float = 0.0
+	for figure in "0123456789":
+		var glyph: int = ts.font_get_glyph_index(rid, size_px, figure.unicode_at(0), 0)
+		ts.font_render_glyph(rid, glyph_size, glyph)
+		top = minf(top, ts.font_get_glyph_offset(rid, glyph_size, glyph).y + GLYPH_RECT_MARGIN_PX)
+	return top
+
+# Sized to its content; the top-left corner stays put - BattleOverlay
+# places this by its numeral's top (see numeral_ink_top()).
 func _relayout() -> void:
 	if not is_inside_tree():
 		return
-	var bottom: float = position.y + size.y
 	size = _content_size()
-	position.y = bottom - size.y
 	queue_redraw()
 
 func _draw() -> void:

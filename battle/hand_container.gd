@@ -137,6 +137,8 @@ var _bonus_context: EffectContext = null
 var _last_energy: int = -1
 # Set by BattleController - see set_enemy_target_available().
 var _enemy_target_available: bool = true
+# The cost numeral's layout with an empty hand - see _cost_reference_card().
+var _reference_card: CardView = null
 
 # No longer a Container (HBoxContainer defaulted this to IGNORE on its
 # own) - the arc leaves real gaps between/around fanned cards where the
@@ -589,6 +591,50 @@ func get_rest_left_x(at_global_y: float) -> float:
 	var local_y: float = pivot.y + (at_global_y - origin.y - sin(theta) * (edge_x - pivot.x)) / cos(theta)
 	local_y = clampf(local_y, top_y, bottom_y)
 	return origin.x + cos(theta) * (edge_x - pivot.x) - sin(theta) * (local_y - pivot.y)
+
+# Global y of the top of the leftmost resting card's cost numeral - what
+# BattleOverlay levels the energy readout's numeral with. The same layout
+# get_rest_left_x() reads, never the live slot: the armed card still
+# counts, an empty hand reads as one card, and hover never moves it. The
+# top is the cost font's tallest figure (BattleResources.figure_ink_top()),
+# so it holds whatever the cost, taken at the numeral's horizontal middle
+# and carried through the card's scale, its rest offset, the slot's lift
+# (a lone card's arc; none at the row's left end) and its tilt.
+func get_rest_cost_top_y() -> float:
+	var count: int = maxi(_slots.size(), 1)
+	var scale_factor: float = _compute_scale_factor(count)
+	var scaled_card_size: Vector2 = card_size * scale_factor
+	var theta: float = 0.0
+	if count > 1:
+		theta = deg_to_rad(-fan_max_rotation_degrees)
+	var lift: float = fan_arc_height if count == 1 else 0.0
+	var pivot := Vector2(scaled_card_size.x / 2.0, scaled_card_size.y)
+	var card: CardView = _cost_reference_card()
+	var cost_font: Font = card.cost_font
+	var figure_width: float = InkType.width(cost_font, "0", card.cost_font_size_px)
+	# Card-local, at 1x: the numeral is right-aligned to the outer margin.
+	var point := Vector2(card_size.x - card.outer_margin - figure_width / 2.0, card.header_baseline_px + BattleResources.figure_ink_top(cost_font, card.cost_font_size_px))
+	# Into the slot: scaled about the card's bottom centre, at the rest
+	# offset.
+	var card_pivot := Vector2(card_size.x / 2.0, card_size.y)
+	var slot_point: Vector2 = Vector2(0.0, card_size.y - hand_rest_visible_height) + card_pivot + (point - card_pivot) * scale_factor
+	var delta: Vector2 = slot_point - pivot
+	return global_position.y - lift + pivot.y + sin(theta) * delta.x + cos(theta) * delta.y
+
+# A CardView to read the cost numeral's layout from: the leftmost slot's,
+# or - with an empty hand - one kept aside, never in the tree.
+func _cost_reference_card() -> CardView:
+	if not _slots.is_empty() and _slots[0].get_child_count() > 0:
+		var card: CardView = _slots[0].get_child(0) as CardView
+		if card != null:
+			return card
+	if _reference_card == null:
+		_reference_card = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
+	return _reference_card
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_PREDELETE and _reference_card != null:
+		_reference_card.free()
 
 # hand_card_scale is the base factor (a card in hand is never full
 # card_size, regardless of count); this only shrinks further, on top of
