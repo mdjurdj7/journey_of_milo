@@ -195,8 +195,8 @@ func _check_others_untouched() -> void:
 func _check_floor_3() -> void:
 	var floor_data := load(FLOOR_3_PATH) as Resource
 	var enemies: Array = floor_data.get("enemies")
-	_expect_eq(enemies.size(), 2, "Floor 3 has two enemies")
-	_expect_eq((enemies[0].get("enemy_data") as EnemyData).enemy_name, "Sputter", "...the required Sputter first - the gate measures from it")
+	_expect_eq(enemies.size(), 3, "Floor 3 has three enemies")
+	_expect_eq((enemies[0].get("enemy_data") as EnemyData).enemy_name, "Blackback", "...the required Blackback first - the gate measures from it")
 	var entry: Resource = enemies[1]
 	_expect_eq((entry.get("enemy_data") as EnemyData).enemy_name, "Wardling", "...then the Wardling")
 	_expect_eq(entry.get("position"), Vector2(21.267, -13.5), "...on the east lobe at (21.267, -13.5)")
