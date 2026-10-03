@@ -25,6 +25,7 @@ const SHRUNK_RULES: Dictionary = {
 	"Cornered": 14,
 	"Last Resort": 14,
 	"Last Wager": 13,
+	"Leverage": 12,
 	"No Further": 12,
 	"Sentence": 13,
 	"The Return": 13,
@@ -32,7 +33,8 @@ const SHRUNK_RULES: Dictionary = {
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # The cards with art, by file - the starters, Carve, Come Due, No Further,
-# Sentence, Last Wager, The Return, Blood Arc, Collateral and Ransom.
+# Sentence, Last Wager, The Return, Blood Arc, Collateral, Ransom and
+# Leverage.
 # Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
@@ -49,6 +51,7 @@ const CARD_ART: Dictionary = {
 	"blood_arc": "res://cards/art/Wanderer/Blood Arc.png",
 	"collateral": "res://cards/art/Wanderer/Collateral.png",
 	"ransom": "res://cards/art/Wanderer/Ransom.png",
+	"leverage": "res://cards/art/Wanderer/Leverage.png",
 }
 
 var _failures: int = 0
