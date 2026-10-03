@@ -31,6 +31,10 @@
   "crest_width_m": 1.0,
   "outer_falloff_m": 4.0
  },
+ "outer_ground": {
+  "edge_at_m": 2.5,
+  "edge_width_m": 0.3
+ },
  "ledge_barrier_world_xz": [
   [
    0.3,

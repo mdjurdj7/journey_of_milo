@@ -1,3 +1,6 @@
+# Floor 3's ground from floor3_walkable_sample.png. Run from this folder.
+# Needs Python 3 with numpy, scipy, scikit-image and Pillow:
+#   python -m pip install --user numpy scipy scikit-image pillow
 import json, numpy as np
 from PIL import Image
 from scipy.ndimage import distance_transform_edt, gaussian_filter
@@ -12,6 +15,8 @@ FACE_W = 2.0                   # inner face width (m) -> ~31 deg mean slope, und
 CREST_W = 1.0                  # flat-ish crest width (m)
 OUTER_FALL = 4.0               # outer slope down to the outer ground (m)
 BARRIER_IN = 0.4               # ledge barrier sits this far up the inner face (m)
+OUTER_EDGE_AT = FACE_W + 0.5 * CREST_W   # outer ground starts at the crest centreline (m past the walkable edge)
+OUTER_EDGE_WIDTH = 0.3         # the whole outer-ground transition (m)
 
 src = np.array(Image.open("floor3_walkable_sample.png").convert("RGB")).astype(int)
 H, W, _ = src.shape
@@ -45,6 +50,13 @@ rock = (o > 0) & (o < FACE_W + 1.0)
 rock = gaussian_filter(rock.astype(np.float32), 2.0)
 Image.fromarray((np.clip(rock, 0, 1) * 255).astype(np.uint8), "L").save("../../region1_floor3_rock.png")
 
+# outer ground: 0 on the walkable area, the inner face and the crest's inner
+# half, 1 past the crest centreline - a smoothstep OUTER_EDGE_WIDTH wide, no
+# blur after it. 1 along every canvas edge, which the shader extends past it.
+t = np.clip((o - OUTER_EDGE_AT) / OUTER_EDGE_WIDTH + 0.5, 0, 1)
+outer_ground = t * t * (3 - 2 * t)
+Image.fromarray((outer_ground * 255 + 0.5).astype(np.uint8), "L").save("../../region1_floor3_outer.png")
+
 # landmass: all land (dry floor, no water)
 Image.fromarray(np.full((H, W), 255, np.uint8), "L").save("../../region1_floor3_landmass.png")
 
@@ -74,6 +86,7 @@ layout = {
     "assumed_elevation_max_height_m": ELEV_MAX,
     "heights_m": {"outer_ground": 0.0, "walkable_floor": BASE_WALK, "ridge_crest": BASE_WALK + CREST_RISE},
     "ridge": {"inner_face_width_m": FACE_W, "crest_width_m": CREST_W, "outer_falloff_m": OUTER_FALL},
+    "outer_ground": {"edge_at_m": OUTER_EDGE_AT, "edge_width_m": OUTER_EDGE_WIDTH},
     "ledge_barrier_world_xz": ledge,
     "note": "World XZ in metres relative to spawn; +X right, +Z toward the bottom of the image (south). Forward/exit is toward -Z.",
 }
