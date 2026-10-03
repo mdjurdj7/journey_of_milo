@@ -1129,11 +1129,31 @@ func _rounded_style(bg: Color, radius: int) -> StyleBoxFlat:
 	style.shadow_size = 0
 	return style
 
+# The card's text sets in MSDF copies of its fonts, so a card enlarged by
+# Control.scale (inspect 2.2x, hover, armed) keeps crisp glyphs rather than
+# magnifying ones rasterised at 1x. One copy per font, made on first use
+# and shared by every card; the imports themselves stay hinted for the
+# rest of the UI. The copy keeps the import's msdf_pixel_range (8) - card
+# text has no outline, so that clears 2x the widest one. The rules fit
+# (_rules_wrap(), _rules_block_height(), _cap_top()) still measures the
+# hinted fonts, so every card keeps the rules size it had; at that size
+# the MSDF copies break every current card's rules on the same words.
+static var _msdf_fonts: Dictionary[Font, Font] = {}
+
+static func _msdf(font: Font) -> Font:
+	if not font is FontFile:
+		return font
+	if not _msdf_fonts.has(font):
+		var copy := font.duplicate() as FontFile
+		copy.multichannel_signed_distance_field = true
+		_msdf_fonts[font] = copy
+	return _msdf_fonts[font]
+
 # A Bold variation with letter spacing in em (FontVariation.spacing_glyph
 # is whole pixels, so this rounds at the given size).
 func _spaced_bold(font_size: int, spacing_em: float) -> Font:
 	var variation := FontVariation.new()
-	variation.base_font = rules_font_bold
+	variation.base_font = _msdf(rules_font_bold)
 	variation.spacing_glyph = roundi(float(font_size) * spacing_em)
 	return variation
 
@@ -1157,12 +1177,12 @@ func _apply_style() -> void:
 	name_label.add_theme_color_override("font_color", ink_color)
 	name_label.add_theme_font_size_override("font_size", name_font_size_px)
 	if name_font != null:
-		name_label.add_theme_font_override("font", name_font)
+		name_label.add_theme_font_override("font", _msdf(name_font))
 
 	cost_label.add_theme_color_override("font_color", ink_color)
 	cost_label.add_theme_font_size_override("font_size", cost_font_size_px)
 	if cost_font != null:
-		cost_label.add_theme_font_override("font", cost_font)
+		cost_label.add_theme_font_override("font", _msdf(cost_font))
 
 	var hp_ink: Color = ink_color
 	hp_ink.a = hp_cost_alpha
@@ -1186,9 +1206,9 @@ func _apply_style() -> void:
 	rules_ink.a = rules_alpha
 	rules_text.add_theme_color_override("default_color", rules_ink)
 	if rules_font != null:
-		rules_text.add_theme_font_override("normal_font", rules_font)
+		rules_text.add_theme_font_override("normal_font", _msdf(rules_font))
 	if rules_font_bold != null:
-		rules_text.add_theme_font_override("bold_font", rules_font_bold)
+		rules_text.add_theme_font_override("bold_font", _msdf(rules_font_bold))
 	_apply_rules_font_size(rules_font_sizes[0] if not rules_font_sizes.is_empty() else 15)
 
 	var rule_ink: Color = ink_color
@@ -1278,7 +1298,7 @@ func _apply_layout() -> void:
 	var art_top: float = header_height + header_field_gap
 	var rules_top: float = art_top + art_field_size.y + field_rules_gap
 	var type_baseline: float = card_size.y - footer_bottom_ink_px
-	var caps_top: float = roundf(type_baseline + _cap_top(type_label, type_label_font_size_px))
+	var caps_top: float = roundf(type_baseline + _cap_top(rules_font_bold, type_label_font_size_px))
 	var rule_top: float = caps_top - footer_rule_ink_gap_px - 1.0
 	var rules_bottom: float = (rule_top if footer_rule_enabled else caps_top) - rules_footer_gap
 	var available: float = rules_bottom - rules_top
@@ -1396,14 +1416,13 @@ func _top_for_baseline(label: Label, font_size: int, baseline: float) -> float:
 		return baseline - float(font_size)
 	return baseline - font.get_ascent(font_size)
 
-# How far above the baseline this label's font inks a flat capital
+# How far above the baseline `font` (hinted - see _msdf()) inks a flat capital
 # (negative = up), from the glyph itself - the line box's ascent
 # overstates it. An "H", not the label's own text, so every type's
 # footer lands on the same pixel whatever its round letters overshoot.
 # The glyph's offset is its bitmap's, which the rasteriser pads by
 # GLYPH_RECT_MARGIN_PX on every side; the ink starts inside that.
-func _cap_top(label: Label, font_size: int) -> float:
-	var font: Font = label.get_theme_font("font")
+func _cap_top(font: Font, font_size: int) -> float:
 	if font == null:
 		return -float(font_size) * 0.7
 	var ts: TextServer = TextServerManager.get_primary_interface()
