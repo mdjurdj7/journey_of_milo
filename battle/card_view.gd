@@ -185,18 +185,31 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # downward rather than shrinking further (_warn_overlong() says so). A
 # card that lands below the first size is saying too much.
 @export var rules_font_sizes: Array[int] = [15, 14, 13, 12]
-@export var rules_line_height: float = 1.28
+# One vertical rhythm for the rules text, read by the label and the
+# fitter alike (_rules_metrics()). Line pitch: this many ems, rounded to a
+# whole pixel and never under the font's own line box.
+@export var rules_line_spacing: float = 1.15:
+	set(value):
+		rules_line_spacing = value
+		_relayout()
 # Extra space between the description's authored lines ("Deal 8 damage."
-# / "Lose 2 HP."), on top of the line spacing, so clauses read apart
-# from mere wrapping.
-@export var rules_paragraph_gap_px: int = 4
-# The rules block is centred in its space, this much above true centre.
-@export var rules_optical_lift_px: float = 2.0
-# A size is taken only if it leaves at least this much of the space
-# spare (split above and below the centred block) and no authored line
-# wraps to a lone last word ("26."); otherwise the next size is tried.
-# If no size is that clean, the first that fits at all is used.
-@export var rules_min_air_px: float = 4.0
+# / "Lose 2 HP."), as a fraction of the line pitch, rounded to a whole
+# pixel - enough to read clauses apart from mere wrapping, not a blank
+# line.
+@export var rules_paragraph_gap: float = 0.2:
+	set(value):
+		rules_paragraph_gap = value
+		_relayout()
+# The rules block is centred between the art field's bottom and the type
+# label's caps (or the footer rule, if on), with at least this much clear
+# above and below it. A size is taken only if it fits inside those
+# margins and no authored line wraps to a lone last word ("26.");
+# otherwise the next size is tried. If no size is that clean, the first
+# that fits at all is used.
+@export var rules_margin_px: float = 6.0:
+	set(value):
+		rules_margin_px = value
+		_relayout()
 @export_range(0.0, 1.0) var rules_alpha: float = 0.92
 @export var type_label_font_size_px: int = 9
 @export_range(0.0, 1.0) var type_label_letter_spacing_em: float = 0.16
@@ -268,15 +281,12 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # rules text - art is painted for this window, so it never gives way.
 # Its top is header_height + header_field_gap.
 @export var art_field_size: Vector2 = Vector2(176.0, 146.0)
-@export var field_rules_gap: float = 8.0
-@export var rules_footer_gap: float = 6.0
 # The footer is placed by INK, like the header: the type label's
 # baseline sits footer_bottom_ink_px above the face's bottom edge (its
 # small caps have no descenders, so that is the ink's bottom; 9 leaves
-# 4px clear of the inset rule), and the rules text ends rules_footer_gap
-# above the caps' tops (_cap_top()) - or above the footer rule, if on,
-# whose lower edge is footer_rule_ink_gap_px above them. Both rounded to
-# a whole pixel.
+# 4px clear of the inset rule), and the rules area ends at the caps' tops
+# (_cap_top()) - or at the footer rule, if on, whose lower edge is
+# footer_rule_ink_gap_px above them. Both rounded to a whole pixel.
 @export var footer_rule_ink_gap_px: float = 4.0
 @export var footer_bottom_ink_px: float = 9.0
 @export var glyph_size_px: float = 36.0
@@ -339,6 +349,12 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 @export var keyword_reveal_font_size_px: int = 13:
 	set(value):
 		keyword_reveal_font_size_px = value
+		_apply_keyword_reveal_style()
+# The definition's line pitch, in ems - the readouts' own (StatusReveal),
+# not the card's rules rhythm.
+@export var keyword_reveal_line_height: float = 1.28:
+	set(value):
+		keyword_reveal_line_height = value
 		_apply_keyword_reveal_style()
 # Screen pixels between the definition and the card's edge, above or
 # below.
@@ -1123,7 +1139,7 @@ func _apply_keyword_reveal_style() -> void:
 		return
 	_keyword_reveal.set_ink(keyword_reveal_ink)
 	_keyword_reveal.set_font_size_px(keyword_reveal_font_size_px)
-	_keyword_reveal.set_line_height(rules_line_height)
+	_keyword_reveal.set_line_height(keyword_reveal_line_height)
 	_keyword_reveal.set_fade_time(keyword_reveal_fade_sec)
 	_place_keyword_reveal()
 
@@ -1397,10 +1413,11 @@ func _rounded_style(bg: Color, radius: int) -> StyleBoxFlat:
 # magnifying ones rasterised at 1x. One copy per font, made on first use
 # and shared by every card; the imports themselves stay hinted for the
 # rest of the UI. The copy keeps the import's msdf_pixel_range (8) - card
-# text has no outline, so that clears 2x the widest one. The rules fit
-# (_rules_wrap(), _rules_block_height(), _cap_top()) still measures the
-# hinted fonts, so every card keeps the rules size it had; at that size
-# the MSDF copies break every current card's rules on the same words.
+# text has no outline, so that clears 2x the widest one. The rules fit's
+# word breaks and the footer's cap top (_rules_wrap(), _cap_top()) still
+# measure the hinted fonts; at each card's size the MSDF copies break its
+# rules on the same words. Only the line box (rules_metrics()) is read
+# from the MSDF copy, since that is the height the label lays out.
 static var _msdf_fonts: Dictionary[Font, Font] = {}
 
 static func _msdf(font: Font) -> Font:
@@ -1464,7 +1481,8 @@ func _apply_style() -> void:
 	rules_text.fit_content = false
 	rules_text.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	rules_text.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	rules_text.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	# Top: _apply_layout() centres the block itself, on its own measure.
+	rules_text.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	var rules_ink: Color = ink_color
 	rules_ink.a = rules_alpha
 	rules_text.add_theme_color_override("default_color", rules_ink)
@@ -1489,12 +1507,40 @@ func _apply_style() -> void:
 	type_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 
 func _apply_rules_font_size(font_size: int) -> void:
+	var metrics: Vector3i = rules_metrics(font_size)
 	rules_text.add_theme_font_size_override("normal_font_size", font_size)
 	rules_text.add_theme_font_size_override("bold_font_size", font_size)
-	# line_separation is the EXTRA pixels between lines; the font's own
-	# line is ~1.0 em, so this puts the total near rules_line_height em.
-	rules_text.add_theme_constant_override("line_separation", roundi(float(font_size) * (rules_line_height - 1.0)))
-	rules_text.add_theme_constant_override("paragraph_separation", rules_paragraph_gap_px)
+	rules_text.add_theme_constant_override("line_separation", metrics.y)
+	rules_text.add_theme_constant_override("paragraph_separation", metrics.z)
+
+# The rules rhythm at `font_size`, in whole pixels, as (line box, line
+# separation, paragraph gap) - the one source for both the label's theme
+# constants and the fitter's rules_block_height(), so the two can't
+# drift. The line box is what RichTextLabel lays each line out at: the
+# DRAWN (MSDF) font's height, rounded up - regular and bold share it.
+# The pitch (box + separation) is rules_line_spacing ems, rounded, and
+# never under the box; the gap is rules_paragraph_gap of that pitch.
+func rules_metrics(font_size: int) -> Vector3i:
+	var drawn: Font = _msdf(rules_font) if rules_font != null else null
+	var box: int = ceili(drawn.get_height(font_size)) if drawn != null else ceili(float(font_size) * 1.2)
+	var pitch: int = maxi(roundi(float(font_size) * rules_line_spacing), box)
+	return Vector3i(box, pitch - box, roundi(rules_paragraph_gap * float(pitch)))
+
+# The rules block's height at `font_size`: `lines` line boxes, the
+# separation between each pair, and a paragraph gap between each pair of
+# `paragraphs` - from the top of the first line's box to the bottom of
+# the last's. What RichTextLabel lays out, less what it counts after the
+# last line (_rules_trailing()).
+func rules_block_height(font_size: int, lines: int, paragraphs: int) -> float:
+	var metrics: Vector3i = rules_metrics(font_size)
+	return float(lines * metrics.x + maxi(lines - 1, 0) * metrics.y + maxi(paragraphs - 1, 0) * metrics.z)
+
+# What RichTextLabel's content height counts after the last line: its
+# line separation and paragraph separation both follow every line and
+# paragraph, the last included.
+func _rules_trailing(font_size: int) -> float:
+	var metrics: Vector3i = rules_metrics(font_size)
+	return float(metrics.y + metrics.z)
 
 # The frame: 1px ink at frame_alpha at rest, hover_frame_width_px full
 # ink lifted; or the override edge if a caller asked for one.
@@ -1546,42 +1592,47 @@ func _apply_type_style() -> void:
 
 # --- Layout ---
 
+# A rules spacing export moved: lay the face out again, if it's up.
+func _relayout() -> void:
+	if is_node_ready():
+		_apply_style()
+		_apply_layout()
+
 # Vertical stack at 1x. The name holds one line beside the cost (a
 # longer one is clipped and warned about); the art field is the fixed
-# art_field_size rect under the header; the rules text takes the space
-# between it and the footer at the first of rules_font_sizes that fits.
-# Past the last size the card grows downward by what the text still
-# needs - the face only: its containers keep card_size, and no current
-# card gets there. Decided once at 1x; hover, armed and inspect scale the
-# whole card.
+# art_field_size rect under the header; the rules text is centred in the
+# area between the art field and the footer (rules_area()), at the first
+# of rules_font_sizes that fits inside its margins. Past the last size
+# the card grows downward by what the text still needs - the face only:
+# its containers keep card_size, and no current card gets there. Decided
+# once at 1x; hover, armed and inspect scale the whole card.
 func _apply_layout() -> void:
 	# Rules text first: the face's height depends on it.
 	var rules_width: float = card_size.x - outer_margin * 2.0
 	var type_height: float = _line_height(type_label, type_label_font_size_px)
 	var art_top: float = header_height + header_field_gap
-	var rules_top: float = art_top + art_field_size.y + field_rules_gap
 	var type_baseline: float = card_size.y - footer_bottom_ink_px
 	var caps_top: float = roundf(type_baseline + _cap_top(rules_font_bold, type_label_font_size_px))
 	var rule_top: float = caps_top - footer_rule_ink_gap_px - 1.0
-	var rules_bottom: float = (rule_top if footer_rule_enabled else caps_top) - rules_footer_gap
-	var available: float = rules_bottom - rules_top
-	var paragraph_gaps: float = float(_rules_paragraph_count() - 1) * float(rules_paragraph_gap_px)
+	var area: Vector2 = rules_area()
+	var available: float = area.y - area.x - rules_margin_px * 2.0
+	var paragraphs: int = _rules_paragraph_count()
 	var font_size: int = rules_font_sizes[rules_font_sizes.size() - 1] if not rules_font_sizes.is_empty() else 15
 	var first_fit: int = -1
 	for candidate in rules_font_sizes:
 		var wrapped: Array[PackedStringArray] = _rules_wrap(candidate, rules_width)
-		var height: float = _rules_block_height(candidate, _line_total(wrapped)) + paragraph_gaps
+		var height: float = rules_block_height(candidate, _line_total(wrapped), paragraphs)
 		if height > available:
 			continue
 		if first_fit < 0:
 			first_fit = candidate
-		if available - height >= rules_min_air_px and not _ends_on_lone_word(wrapped):
+		if not _ends_on_lone_word(wrapped):
 			first_fit = candidate
 			break
 	if first_fit >= 0:
 		font_size = first_fit
 	var lines: int = _line_total(_rules_wrap(font_size, rules_width))
-	var rules_height: float = _rules_block_height(font_size, lines) + paragraph_gaps
+	var rules_height: float = rules_block_height(font_size, lines, paragraphs)
 	var growth: float = maxf(ceilf(rules_height - available), 0.0)
 	if growth > 0.0:
 		_warn_overlong(lines, font_size)
@@ -1660,10 +1711,22 @@ func _apply_layout() -> void:
 	glyph.size = art_field.size
 	glyph.queue_redraw()
 
-	# Centred in its space (see _apply_style()), lifted a touch above true
-	# centre.
-	rules_text.position = Vector2(outer_margin, rules_top - rules_optical_lift_px)
-	rules_text.size = Vector2(rules_width, rules_bottom + growth - rules_top)
+	# Top-aligned (see _apply_style()) and placed here, at true centre of
+	# the area - which grows with the face. The label is as tall as its
+	# own content, the separations it counts after the last line included
+	# (_rules_trailing()), so it centres nothing itself and clips nothing.
+	var block_top: float = area.x + rules_margin_px + maxf((available + growth - rules_height) / 2.0, 0.0)
+	rules_text.position = Vector2(outer_margin, block_top)
+	rules_text.size = Vector2(rules_width, rules_height + _rules_trailing(font_size))
+
+# The rules area at 1x, as (top, bottom): from the art field's bottom to
+# the type label's caps - or to the footer rule, if on. The face's
+# growth past the last size is not in it.
+func rules_area() -> Vector2:
+	var top: float = header_height + header_field_gap + art_field_size.y
+	var caps_top: float = roundf(card_size.y - footer_bottom_ink_px + _cap_top(rules_font_bold, type_label_font_size_px))
+	var bottom: float = caps_top - footer_rule_ink_gap_px - 1.0 if footer_rule_enabled else caps_top
+	return Vector2(top, bottom)
 
 func _string_width(label: Label, font_size: int) -> float:
 	var font: Font = label.get_theme_font("font")
@@ -1753,17 +1816,8 @@ static func _ends_on_lone_word(wrapped: Array[PackedStringArray]) -> bool:
 			return true
 	return false
 
-# What `lines` lines of rules text actually take: the font's own line
-# box each, plus the line_separation _apply_rules_font_size() sets
-# between them - measured, so a block that "fits" never touches the art
-# or the type label.
-func _rules_block_height(font_size: int, lines: int) -> float:
-	var line_box: float = rules_font.get_height(font_size) if rules_font != null else float(font_size) * 1.2
-	var separation: float = float(roundi(float(font_size) * (rules_line_height - 1.0)))
-	return float(lines) * line_box + float(maxi(lines - 1, 0)) * separation
-
 # The description's authored lines - each a paragraph, set apart by
-# rules_paragraph_gap_px.
+# rules_paragraph_gap.
 func _rules_paragraph_count() -> int:
 	if card_data == null or card_data.description.is_empty():
 		return 1

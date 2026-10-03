@@ -30,7 +30,7 @@ class_name KeepsakeLine
 		reveal_font_size_px = value
 		if _reveal != null:
 			_reveal.set_font_size_px(value)
-# Line pitch in ems, as CardView.rules_line_height.
+# Line pitch in ems, as CardView.keyword_reveal_line_height.
 @export var reveal_line_height: float = 1.28:
 	set(value):
 		reveal_line_height = value

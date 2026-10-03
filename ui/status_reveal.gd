@@ -25,7 +25,7 @@ class_name StatusReveal
 var _fade_time: float = 0.12
 var _line_alpha: float = 0.92
 var _font_size_px: int = 13
-# Line pitch in ems, as CardView.rules_line_height.
+# Line pitch in ems, as CardView.keyword_reveal_line_height.
 var _line_height: float = 1.28
 # Extra space between two entries, on top of the line pitch, so a wrapped
 # sentence reads apart from the next status's.

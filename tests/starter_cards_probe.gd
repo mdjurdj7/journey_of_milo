@@ -16,18 +16,15 @@ const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_CONTROLLER_PATH := "res://battle/battle_controller.gd"
 const CASES := 12
 # The rules text size each card lands at outside a fight; any card not
-# listed fits at the first size, 15, cleanly - room to spare and no lone
-# last word (CardView.rules_min_air_px). A card that moves here has
-# changed its wording - or needs to.
+# listed fits at the first size, 15, cleanly - inside the rules margins
+# (CardView.rules_margin_px) and no lone last word. A card that moves
+# here has changed its wording - or needs to.
 const SHRUNK_RULES: Dictionary = {
 	"Collateral": 13,
-	"Come Due": 13,
 	"Cornered": 14,
 	"Last Resort": 14,
 	"Last Wager": 13,
-	"Leverage": 12,
 	"No Further": 12,
-	"Sentence": 13,
 	"The Return": 13,
 }
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
@@ -270,6 +267,7 @@ func _check_face_layout() -> void:
 			_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), SHRUNK_RULES.get(card.card_name, 15), "%s's rules size" % card.card_name)
 			_expect_eq(view.size, view.card_size, "%s keeps the card's size" % card.card_name)
 			_expect(view.rules_text.position.y + view.rules_text.size.y <= _type_baseline(view) + _ink_top(view.type_label, view.type_label_font_size_px), "%s's text ends above the type label" % card.card_name)
+			_check_rules_block(view, card.card_name)
 			# The header holds the ledger rule and the "-N HP" line without
 			# adding a row - the HP ink clear of the art field by 4 px - and
 			# the numeral's ink clears the inset rule.
@@ -284,12 +282,13 @@ func _check_face_layout() -> void:
 	_expect_eq(footer_y, 271.0, "The type label's baseline sits at y 271")
 	var long_card := CardData.new()
 	long_card.card_name = "Probe Long"
-	long_card.description = "Lose 2 HP. Draw 1. Gain 5 Toll. Deal 6 damage to all enemies. Gain 8 block. Heal 3 HP. If this kills, gain 1 energy. Exhaust a card in your hand."
+	long_card.description = "Lose 2 HP. Draw 1. Gain 5 Toll. Deal 6 damage to all enemies. Gain 8 block. Heal 3 HP. If this kills, gain 1 energy. Exhaust a card in your hand. Discard 2 cards, then draw 2. Next turn, gain 1 energy."
 	view.set_card_data(long_card)
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), view.rules_font_sizes[view.rules_font_sizes.size() - 1], "Overlong text sits at the floor size")
 	_expect(view.size.y > view.card_size.y, "...and the card grows (%s)" % str(view.size))
 	_expect_eq(_type_baseline(view) - (view.size.y - view.card_size.y), footer_y, "...its footer moving down with it")
 	_expect_eq(Rect2(view.art_field.position, view.art_field.size), art_rect, "...its art field unmoved")
+	_check_rules_block(view, long_card.card_name)
 
 	var long_name := CardData.new()
 	long_name.card_name = "A Name Far Too Long To Sit Beside Its Cost"
@@ -300,6 +299,28 @@ func _check_face_layout() -> void:
 	_expect_eq(view.size, view.card_size, "A short card back at card_size after a grown one")
 	view.queue_free()
 	_completed += 1
+
+# The rules block as the label lays it out - its content height, less
+# the separations it counts after the last line - is the height the
+# fitter modelled (CardView.rules_block_height()), and it sits at true
+# centre of the rules area: equal margins above and below, each at least
+# rules_margin_px.
+func _check_rules_block(view: CardView, card_name: String) -> void:
+	var label: RichTextLabel = view.rules_text
+	var font_size: int = label.get_theme_font_size("normal_font_size")
+	var metrics: Vector3i = view.rules_metrics(font_size)
+	var laid_out: float = float(label.get_content_height() - metrics.y - metrics.z)
+	var model: float = view.rules_block_height(font_size, label.get_line_count(), _paragraphs(view))
+	_expect_eq(laid_out, model, "%s's rules block lays out at the height the fitter modelled" % card_name)
+	var area: Vector2 = view.rules_area()
+	var above: float = label.position.y - area.x
+	var below: float = area.y + (view.size.y - view.card_size.y) - (label.position.y + laid_out)
+	_expect(is_equal_approx(above, below), "%s's rules margins match (%.1f above, %.1f below)" % [card_name, above, below])
+	_expect(above >= view.rules_margin_px, "%s's rules margins are at least %.0f px (%.1f)" % [card_name, view.rules_margin_px, above])
+
+# The description's authored lines, as CardView counts its paragraphs.
+func _paragraphs(view: CardView) -> int:
+	return view.card_data.description.strip_edges().split("\n").size()
 
 func _type_baseline(view: CardView) -> float:
 	return view.type_label.position.y + view.type_label.get_theme_font("font").get_ascent(view.type_label_font_size_px)
