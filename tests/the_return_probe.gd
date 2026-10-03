@@ -68,7 +68,7 @@ func _check_card_data() -> void:
 	_expect_eq(card.rarity, CardData.CardRarity.RARE, "...is Rare")
 	_expect_eq(card.target_type, CardData.TargetType.SELF, "...targets the player")
 	_expect_eq(card.removal_scope, CardData.RemovalScope.NONE, "...leaves rotation as a Power does, nothing more")
-	_expect_eq(card.description, "After you damage yourself 5 times, Drain 10 from all enemies.\nReset the count.", "...and says so")
+	_expect_eq(card.description, "Every 5 times you damage yourself:\nDrain 10 from all enemies.", "...and says so")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...and carries its art")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.POWER, "...and its face reads POWER")
 	_expect(CardView.KEYWORDS.has("Drain"), "Drain is a bold rules keyword")
@@ -83,7 +83,7 @@ func _check_play_creates_counter() -> void:
 	var player: Combatant = _player(50)
 	_play(_card("the_return"), player, [_enemy(100)])
 	_expect_eq(_labels(player), ["The Return 0/5"] as Array[String], "Played, it reads The Return 0/5")
-	_expect_eq(player.statuses[0].describe(), "Each 5 times you damage yourself, Drain 10 from all enemies.", "...and its reveal says what it counts")
+	_expect_eq(player.statuses[0].describe(), "Every 5 times you damage yourself:\nDrain 10 from all enemies.", "...and its reveal says what it counts")
 	_completed += 1
 
 func _check_first_four_count() -> void:
@@ -228,7 +228,7 @@ func _check_stacks_share_one_counter() -> void:
 		_expect_eq(enemy.hp, 80, "Two copies Drain 20 from every enemy")
 	_expect_eq(_kinds().count("drain"), 2, "...as one Drain, not two")
 	_expect_eq(player.hp, 45, "...heal capped at 20 in total, not 40 (30 - 5 + 20)")
-	_expect_eq(player.statuses[0].describe(), "Each 5 times you damage yourself, Drain 20 from all enemies.", "...and the reveal reads Drain 20")
+	_expect_eq(player.statuses[0].describe(), "Every 5 times you damage yourself:\nDrain 20 from all enemies.", "...and the reveal reads Drain 20")
 	_play(_card("the_return"), player, [_enemy(100)])
 	var third: Combatant = _enemy(100)
 	_losses(player, [third], COUNT)

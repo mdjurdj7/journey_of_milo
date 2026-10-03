@@ -6,7 +6,8 @@
 script = ExtResource("1_status_data")
 id = "the_return"
 display_name = "The Return"
-description = "Each {count} times you damage yourself, Drain {drain} from all enemies."
+description = "Every {count} times you damage yourself:
+Drain {drain} from all enemies."
 category = 2
 default_duration_turns = -1
 stack_rule = 3
