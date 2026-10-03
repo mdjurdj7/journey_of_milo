@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/stances/self_eater.tres" id="3_self_eater"]
+[ext_resource type="Texture2D" uid="uid://ji70h8uwp5w0" path="res://cards/art/Wanderer/Self-Eater.png" id="4_art"]
 
 [sub_resource type="Resource" id="CardEffect_apply_stance"]
 script = ExtResource("2_card_effect")
@@ -19,3 +20,4 @@ target_type = 1
 description = "Your Attacks deal 3 more and cost 2 HP."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_stance")])
 play_sound_path = "res://assets/audio/cards/self_eater_play.wav"
+art = ExtResource("4_art")
