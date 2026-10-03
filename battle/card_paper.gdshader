@@ -2,31 +2,48 @@ shader_type canvas_item;
 
 // The card's paper (CardView's Paper node), through the one shared
 // battle/card_paper_material.tres - tune it there and every card follows,
-// live. Uncoated stock, not aged paper: the bone moves by a hair, in two
-// layers tuned apart, and nothing else - no speckle, fibre or stain.
+// live. Worn uncoated stock: the bone moves by a hair and darkens a touch
+// where hands have held it, and nothing else - no speckle, stain or burn.
 //   grain: an unevenness in tone with a finer tooth mixed in.
 //   tonal variation: a broad drift in paper density, one to three soft
 //   shifts across a card's width.
-// Each strength is that layer's peak swing in brightness (0.015 = +-1.5%)
-// about the bone; 0 turns the layer off, both 0 is the flat bone.
+//   edge tone: the outer few pixels slightly darker and warmer, fading
+//   smoothly inward, its width wandering along the edge.
+// Each strength is that layer's peak swing in brightness (0.012 = +-1.2%)
+// about the bone; 0 turns the layer off, all 0 is the flat bone.
 //
-// CardView draws the face as a rounded box whose alpha is the corner mask
-// and whose red channel carries the card's seed, so no two cards are cut
-// from the same place on the sheet. The noise is in the card's own
-// pixels, so it scales and moves with the card and never swims.
+// CardView draws the face as a rounded box whose alpha is the corner mask,
+// whose red channel carries the card's seed (so no two copies are cut from
+// the same place on the sheet) and whose green channel turns the edge tone
+// on (the keepsake panel, which shares this paper, leaves it off). The box's
+// UVs run 0-1 over its rect, which is how the edge is found. The noise is in
+// the card's own pixels, so it moves with the card and never swims.
 
-uniform float paper_grain_strength : hint_range(0.0, 0.1) = 0.015;
-uniform float paper_tonal_variation_strength : hint_range(0.0, 0.1) = 0.01;
+uniform float paper_grain_strength : hint_range(0.0, 0.1) = 0.012;
+uniform float paper_tonal_variation_strength : hint_range(0.0, 0.1) = 0.008;
 // The card's field colour - CardView.field_color. Keep the two matched.
 uniform vec4 bone : source_color = vec4(0.94, 0.91, 0.86, 1.0);
-// The tone's wavelength and the tooth's, in 1x card pixels, and how much
-// of the swing is tooth.
+// The tone's wavelength in 1x card pixels, and how much of the swing is
+// tooth.
 uniform float tone_scale_px = 70.0;
-uniform float tooth_scale_px = 2.5;
 uniform float tooth_weight : hint_range(0.0, 1.0) = 0.35;
+// The tooth's wavelength in SCREEN pixels: it steps between octaves of the
+// card's own noise as the card scales, so it stays this fine in a hand at
+// 0.95 and inspected at 2.2 alike instead of blowing up with the card.
+uniform float tooth_screen_px = 2.5;
 // The tonal drift's longest wavelength in 1x card pixels - 220 on a
 // 200 px card is one to three soft shifts across it.
 uniform float tonal_scale_px = 220.0;
+// Handled edges: how far in the tone reaches (1x card pixels), how much
+// darker it is at the very edge, and the warm multiply it leans toward
+// there (white = no warmth). The width wanders by edge_tone_wander along
+// the edge, a little differently on every card.
+uniform float edge_tone_width_px = 6.0;
+uniform float edge_tone_strength : hint_range(0.0, 0.2) = 0.03;
+uniform vec4 edge_tone_warmth : source_color = vec4(1.0, 0.985, 0.955, 1.0);
+uniform float edge_tone_wander : hint_range(0.0, 1.0) = 0.25;
+// The face box's corner radius - CardView's corner_radius less the frame.
+uniform float edge_corner_radius_px = 5.0;
 
 varying vec2 local;
 
@@ -52,8 +69,21 @@ void vertex() {
 
 void fragment() {
 	vec2 p = local + vec2(COLOR.r * 917.0, COLOR.r * 313.0);
+	// Screen pixels per card pixel, whatever the card's scale or turn.
+	vec2 dx = dFdx(local);
+	vec2 dy = dFdy(local);
+	vec2 uv_dx = dFdx(UV);
+	vec2 uv_dy = dFdy(UV);
+	float card_px_per_screen = sqrt(max(abs(dx.x * dy.y - dx.y * dy.x), 1e-6));
+	// The tooth: two neighbouring octaves of card-anchored noise, crossfaded
+	// by the card's scale and renormalised so the swing holds mid-fade.
+	float level = log2(tooth_screen_px * card_px_per_screen);
+	float octave = floor(level);
+	float t = level - octave;
+	float fine = exp2(octave);
+	float tooth = mix(value_noise(p / fine + 31.0), value_noise(p / (fine * 2.0) + 57.0), t);
+	tooth /= sqrt((1.0 - t) * (1.0 - t) + t * t);
 	float tone = value_noise(p / tone_scale_px) * 0.65 + value_noise(p / (tone_scale_px * 0.37) + 17.0) * 0.35;
-	float tooth = value_noise(p / tooth_scale_px);
 	float grain = mix(tone, tooth, tooth_weight);
 	// The drift is three slow plane waves, each card turning and phasing
 	// them by its seed - smooth by construction, with none of value
@@ -68,5 +98,19 @@ void fragment() {
 	}
 	drift /= 2.1;
 	float swing = grain * paper_grain_strength + drift * paper_tonal_variation_strength;
-	COLOR = vec4(clamp(bone.rgb * (1.0 + swing), 0.0, 1.0), COLOR.a);
+	vec3 paper = bone.rgb * (1.0 + swing);
+	// Edge tone, by distance in from the rounded edge: the box's size in
+	// card pixels is how far `local` moves per unit of UV.
+	if (COLOR.g > 0.5 && edge_tone_strength > 0.0 && edge_tone_width_px > 0.0) {
+		vec2 face = vec2(abs(dx.x) + abs(dy.x), abs(dx.y) + abs(dy.y))
+			/ max(abs(uv_dx) + abs(uv_dy), vec2(1e-6));
+		vec2 half_face = face * 0.5;
+		vec2 q = abs((UV - 0.5) * face) - (half_face - edge_corner_radius_px);
+		float inside = -(length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - edge_corner_radius_px);
+		float width = edge_tone_width_px * (1.0 + edge_tone_wander * value_noise(p / 40.0 + 91.0));
+		float wear = 1.0 - smoothstep(0.0, width, inside);
+		wear *= wear;
+		paper *= mix(vec3(1.0), edge_tone_warmth.rgb * (1.0 - edge_tone_strength), wear);
+	}
+	COLOR = vec4(clamp(paper, 0.0, 1.0), COLOR.a);
 }

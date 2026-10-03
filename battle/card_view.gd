@@ -119,6 +119,14 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # inside the bottom one, both between the rounded corners.
 @export var top_highlight_color: Color = Color(1.0, 1.0, 1.0, 0.3)
 @export_range(0.0, 1.0) var bottom_shade_alpha: float = 0.08
+# The inset rule pressed into the stock: a 1px light just below each of
+# its horizontal edges, between the corners, lit from above like the
+# edges (the frame's own is top_highlight_color). Transparent = off.
+@export var frame_impression_light: Color = Color(1.0, 1.0, 1.0, 0.12):
+	set(value):
+		frame_impression_light = value
+		if is_node_ready():
+			keyline.queue_redraw()
 @export var keyline_strike: Color = Color(0.62, 0.56, 0.49)
 @export var keyline_guard: Color = Color(0.49, 0.56, 0.59)
 @export var keyline_toll: Color = Color(0.54, 0.50, 0.58)
@@ -150,9 +158,9 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # that resource moves every face at once, live.
 @export_file("*.tres") var art_material_path: String = "res://battle/card_art_material.tres"
 # The paper under everything on the face (battle/card_paper.gdshader):
-# one material SHARED by every card, like the art's. Its two strengths,
-# paper_grain_strength and paper_tonal_variation_strength, are the whole
-# game's card stock; both 0 is flat bone.
+# one material SHARED by every card, like the art's. Its strengths -
+# paper_grain_strength, paper_tonal_variation_strength and
+# edge_tone_strength - are the whole game's card stock; all 0 is flat bone.
 @export_file("*.tres") var paper_material_path: String = "res://battle/card_paper_material.tres"
 # The two shadows, lit from above: a contact hairline (1px down, 18%) and
 # a soft shadow thrown down the page (10px, 14%, 3px down). A lifted card
@@ -244,6 +252,14 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # and a light along the bottom, between the corners. Transparent = off.
 @export var art_inset_shade: Color = Color(0.165, 0.165, 0.18, 0.15)
 @export var art_inset_light: Color = Color(1.0, 1.0, 1.0, 0.12)
+# The art rule pressed into the stock: a 1px light on the bone just below
+# the outermost rule round the field (the rarity rule, where there is one),
+# between the corners. Transparent = off.
+@export var art_impression_light: Color = Color(1.0, 1.0, 1.0, 0.14):
+	set(value):
+		art_impression_light = value
+		if _art_rule != null:
+			_art_rule.queue_redraw()
 # A second rule outside the first, in the card's keyline colour, for
 # trying the panel with a double edge. art_outer_rule_inset_px is the
 # gap between the two rules; the outer one's corners stay concentric
@@ -793,19 +809,34 @@ func _draw_art_rule() -> void:
 	_draw_edge_pair(_art_rule, field.grow(-float(art_rule_width_px)), float(art_field_radius), art_inset_shade, art_inset_light)
 	var rarity_color: Color = _rarity_rule_color()
 	var rarity_width: int = _rarity_rule_width()
+	# How far past the field the outermost rule reaches (0: the ink rule).
+	var outermost: int = 0
 	if rarity_width > 0 and rarity_color.a > 0.0:
 		_art_rule.draw_style_box(_rule_style(rarity_color, rarity_width, art_field_radius + rarity_width), field.grow(float(rarity_width)))
+		outermost = rarity_width
 	if art_outer_rule_enabled and art_outer_rule_width_px > 0 and card_data != null:
 		var grow: int = art_outer_rule_inset_px + art_outer_rule_width_px
 		_art_rule.draw_style_box(_rule_style(_keyline_color(), art_outer_rule_width_px, art_field_radius + grow), field.grow(float(grow)))
+		outermost = maxi(outermost, grow)
+	if art_rule_width_px > 0 or outermost > 0:
+		# The rect's bottom one pixel past the rule's, so the edge pair's
+		# bottom line lands on the bone just under it.
+		var pressed: Rect2 = field.grow(float(outermost))
+		pressed.size.y += 1.0
+		_draw_edge_pair(_art_rule, pressed, float(art_field_radius + outermost), Color(0, 0, 0, 0), art_impression_light)
 
 # The face inside the frame as one rounded box for the paper shader: its
-# alpha is the corner mask, its red channel this card's seed (from the
-# name, so a card is always cut from the same place on the sheet).
+# alpha is the corner mask, its red channel this card's seed and its green
+# 1 to turn the edge tone on. The seed is the name mixed with this copy's
+# CardData - the same object in the hand, the deck view and belongings - so
+# a copy is always cut from the same place on the sheet, and two copies of
+# one card from different places.
 func _draw_paper() -> void:
-	var seed: float = float(absi(card_data.card_name.hash()) % 1000) / 1000.0 if card_data != null else 0.0
+	var seed: float = 0.0
+	if card_data != null:
+		seed = float(absi(hash([card_data.card_name, card_data.get_instance_id()])) % 4096) / 4096.0
 	var inset: float = float(_card_style.border_width_top) if _card_style != null else 1.0
-	var style := _rounded_style(Color(seed, 0.0, 0.0, 1.0), maxi(corner_radius - int(inset), 0))
+	var style := _rounded_style(Color(seed, 1.0, 0.0, 1.0), maxi(corner_radius - int(inset), 0))
 	paper.draw_style_box(style, Rect2(Vector2.ZERO, size).grow(-inset))
 
 # The inset rule and the card-stock edges, under everything on the face:
@@ -820,6 +851,12 @@ func _draw_keyline() -> void:
 		var rule: Color = ink_color
 		rule.a = inner_keyline_alpha
 		keyline.draw_style_box(_rule_style(rule, inner_keyline_width_px, maxi(corner_radius - inset, 0)), face.grow(-float(inset)))
+		# One pixel below each horizontal edge: under the top edge's width,
+		# and past the bottom edge.
+		var pressed: Rect2 = face.grow(-float(inset))
+		pressed.position.y += float(inner_keyline_width_px)
+		pressed.size.y += 1.0 - float(inner_keyline_width_px)
+		_draw_edge_pair(keyline, pressed, float(maxi(corner_radius - inset, 0)), frame_impression_light, frame_impression_light)
 
 # A 1px line along the inside top of `rect` and one along its inside
 # bottom, each stopping `radius` short of the corners.
