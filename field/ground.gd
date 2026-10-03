@@ -707,6 +707,13 @@ signal relief_rebuilt
 	set(value):
 		outer_grain_strength = value
 		_apply_uniform("outer_grain_strength", value)
+# How far the bare ground between stones dips, at most, before
+# outer_grain_strength scales it - low keeps the gaps light, so the
+# stones read as loose on the ground rather than set in mortar.
+@export_range(0.0, 1.0) var outer_grain_gap: float = 0.3:
+	set(value):
+		outer_grain_gap = value
+		_apply_uniform("outer_grain_gap", value)
 # On the same canvas as landmass_mask: white = outer ground. Past the
 # canvas its edge pixels carry on (the shader clamps rather than cuts).
 @export var outer_mask: Texture2D = null:
@@ -909,6 +916,7 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("outer_color", outer_color)
 	_apply_uniform("outer_grain_scale", outer_grain_scale)
 	_apply_uniform("outer_grain_strength", outer_grain_strength)
+	_apply_uniform("outer_grain_gap", outer_grain_gap)
 	_push_basin_heights()
 	_push_canvas_paintings()
 	_apply_uniform("pool_threshold", pool_threshold)

@@ -263,6 +263,7 @@ uniform bool rock_mask_ready = false;
 uniform vec4 outer_color : source_color = vec4(0.52, 0.53, 0.48, 1.0);
 uniform float outer_grain_scale = 0.25;
 uniform float outer_grain_strength : hint_range(0.0, 1.0) = 0.12;
+uniform float outer_grain_gap : hint_range(0.0, 1.0) = 0.3;
 uniform sampler2D outer_mask : filter_linear, repeat_disable;
 uniform bool outer_mask_ready = false;
 
@@ -765,17 +766,50 @@ float outer_factor(vec2 world_xz) {
 	return texture(outer_mask, clamp(canvas_uv(world_xz), vec2(0.0), vec2(1.0))).r;
 }
 
-// The outer ground's pebbles, signed around 0 like grain_value(): one
-// Worley cell a pebble, lighter toward its middle, dark in the gaps
-// between cells, and a slow tone shift so neighbours don't all match.
-// Nothing stretched, so it can't read as ripples.
+// One layer of loose stones: a jittered point per unit cell, each with
+// its own radius (0.18-0.48 of a cell) and its own tone, so stones vary
+// in size and many cells leave bare ground between them - not a cell
+// grid tiled edge to edge. Returns (shade, cover): shade is the nearest
+// covering stone's, a little above the ground it lies on (stones catch
+// the light the ground between them doesn't) and lighter toward its
+// middle;
+// cover is 0..1 of "a stone is here", softened over its outer quarter.
+vec2 pebble_layer(vec2 p) {
+	vec2 cell = floor(p);
+	vec2 local = fract(p);
+	float cover = 0.0;
+	float shade = 0.0;
+	for (int y = -1; y <= 1; y++) {
+		for (int x = -1; x <= 1; x++) {
+			vec2 c = cell + vec2(float(x), float(y));
+			vec2 point = vec2(hash(c), hash(c + vec2(17.3, 41.9)));
+			float radius = mix(0.18, 0.48, hash(c + vec2(5.2, 9.1)));
+			float d = length(vec2(float(x), float(y)) + point - local);
+			float here = 1.0 - smoothstep(radius * 0.75, radius, d);
+			if (here > cover) {
+				cover = here;
+				float dome = 1.0 - clamp(d / radius, 0.0, 1.0);
+				float tone = hash(c + vec2(31.7, 2.3)) * 2.0 - 1.0;
+				shade = 0.3 + (dome - 0.5) * 0.6 + tone * 0.5;
+			}
+		}
+	}
+	return vec2(shade, cover);
+}
+
+// The outer ground's pebbles, signed around 0 like grain_value(): loose
+// stones of two sizes (outer_grain_scale, and a smaller scatter at 0.45
+// of it) lying on bare ground. Between stones the ground dips by
+// outer_grain_gap at most, broken up by a value noise so the gaps are
+// uneven rather than a drawn outline. Nothing stretched, so it can't
+// read as ripples.
 float pebble_value(vec2 world_xz) {
 	vec2 p = world_xz / max(outer_grain_scale, 0.001);
-	vec2 f = worley_f1_f2(p);
-	float dome = 1.0 - clamp(f.x / 0.7, 0.0, 1.0);
-	float gap = 1.0 - smoothstep(0.0, 0.18, f.y - f.x);
-	float tone = value_noise(p * 0.5 + vec2(7.1, 3.7)) * 2.0 - 1.0;
-	return clamp((dome - 0.4) * 0.8 + tone * 0.4 - gap * 0.8, -1.0, 1.0);
+	vec2 large = pebble_layer(p);
+	vec2 small = pebble_layer(p / 0.45 + vec2(13.7, 5.9));
+	float gap = -outer_grain_gap * value_noise(p * 1.7 + vec2(3.1, 8.4));
+	float ground = mix(gap, small.x, small.y);
+	return clamp(mix(ground, large.x, large.y), -1.0, 1.0);
 }
 
 // 0..1 of "this sand is walked". Procedural band and painted mask by
