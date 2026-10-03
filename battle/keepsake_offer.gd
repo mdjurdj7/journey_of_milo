@@ -8,8 +8,7 @@ class_name KeepsakeOffer
 # this layer runs ALWAYS on layer 100.
 #
 # The panel is card stock - the card's bone paper (card_paper_material),
-# a charcoal frame with the card's inset keyline, a soft shadow - and
-# reads top to bottom:
+# a charcoal frame, a soft shadow - and reads top to bottom:
 #   KEEPSAKE FOUND   small tracked caps, a printed rule under it
 #   the object       TrinketData.art, large and centred - the first thing
 #                    the eye lands on - over a soft contact shadow
@@ -75,15 +74,6 @@ const PAPER_MATERIAL_PATH := "res://battle/card_paper_material.tres"
 @export_range(0.0, 1.0) var frame_alpha: float = 0.88:
 	set(value):
 		frame_alpha = value
-		_refresh()
-# The card's second printed rule, inset from the frame.
-@export var keyline_inset_px: int = 5:
-	set(value):
-		keyline_inset_px = value
-		_refresh()
-@export_range(0.0, 1.0) var keyline_alpha: float = 0.25:
-	set(value):
-		keyline_alpha = value
 		_refresh()
 # The thin rules between the panel's sections.
 @export_range(0.0, 1.0) var rule_alpha: float = 0.25:
@@ -520,12 +510,6 @@ func _draw_face() -> void:
 	frame.border_color = Color(ink, frame_alpha)
 	frame.set_corner_radius_all(corner_radius_px)
 	_face.draw_style_box(frame, face_rect)
-	var keyline := StyleBoxFlat.new()
-	keyline.draw_center = false
-	keyline.set_border_width_all(1)
-	keyline.border_color = Color(ink, keyline_alpha)
-	keyline.set_corner_radius_all(maxi(corner_radius_px - keyline_inset_px, 0))
-	_face.draw_style_box(keyline, face_rect.grow(-float(keyline_inset_px)))
 
 	var label: Color = Color(ink, label_alpha)
 	_text_centred(_face, _header_font, header_text, header_baseline_px, header_size_px, label)
