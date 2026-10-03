@@ -18,7 +18,7 @@ enum ModifierOperation { ADD, MULTIPLY }
 # to the running damage total; MULTIPLY treats magnitude as a PERCENTAGE
 # (-50 means "half", 50 means "+50%") rather than a raw multiplier.
 
-enum StackRule { REFRESH_DURATION, ADD_MAGNITUDE, REFRESH_AND_ADD, IGNORE, RESET }
+enum StackRule { REFRESH_DURATION, ADD_MAGNITUDE, REFRESH_AND_ADD, IGNORE, RESET, ADD_CHARGES }
 # What happens when this exact StatusData is applied again while already
 # active on the same combatant - see Status.apply_stack(). REFRESH_
 # DURATION resets the clock only; ADD_MAGNITUDE/REFRESH_AND_ADD also grow
@@ -26,8 +26,10 @@ enum StackRule { REFRESH_DURATION, ADD_MAGNITUDE, REFRESH_AND_ADD, IGNORE, RESET
 # existing instance just keeps running), though stack_count still climbs
 # for those four. RESET puts the status back as if freshly applied -
 # default magnitude, duration and charges, one stack - a refresh, never a
-# pile-up (Come Due, No Further armed). Appended: an inserted value would rewrite every
-# .tres that stores one of these as an integer.
+# pile-up (Come Due, No Further armed). ADD_CHARGES adds default_charges
+# to the charges still waiting and leaves the rest alone - each copy
+# covers one more use (Collateral). Appended: an inserted value would
+# rewrite every .tres that stores one of these as an integer.
 
 const DURATION_UNTIL_REMOVED := -1
 # A status with this exact duration never expires on its own - something
@@ -53,6 +55,7 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {toll}     self_loss_toll_bonus
 #   {progress} a counter's losses so far  {count}  self_loss_trigger_count
 #   {drain}    self_loss_trigger_drain × stacks
+#   {hp}       replacement_hp_cost       {min_cost} replaces_cost_at_least
 #   {s}        "s" unless the count token before it is 1 ("Attack{s}")
 # An unknown token is left standing. "It" is the enemy holding it, "you"
 # the player.
@@ -170,3 +173,15 @@ const DURATION_UNTIL_TRIGGERED := -2
 # fired (Combatant.spent_statuses), a card that would apply it can't be
 # played (EffectResolver.card_blocked()).
 @export var once_per_combat: bool = false
+
+# A cost replacement (Collateral): while a charge is waiting, the next
+# card whose Energy cost - after every other modifier, House Key's free
+# card included - is at least this costs 0 Energy and replacement_hp_cost
+# HP instead, and spends a charge. Cheaper cards pass it by and leave the
+# charge. The HP is paid as the card resolves, before its effects, the
+# way a stance's per-Attack cost is (EffectResolver.resolve_card()); the
+# charge is spent when the play commits (BattleController._resolve_
+# play()). Read through Combatant.energy_cost()/replaced_cost_hp(). 0 =
+# not a cost replacement.
+@export var replaces_cost_at_least: int = 0
+@export var replacement_hp_cost: int = 0

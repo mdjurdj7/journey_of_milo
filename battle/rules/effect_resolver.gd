@@ -53,8 +53,16 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	ctx.attack_bonus_taken = false
 	ctx.mark_bonus_paid.clear()
 	ctx.toll_spent_this_card = false
+	# A cost replacement's HP (Collateral), first of all - it is this
+	# card's price. A price that kills ends the card: none of its effects
+	# resolve, and the fight ends as a defeat.
+	if ctx.replaced_cost_hp > 0:
+		ctx.pay_upfront_hp_cost(ctx.replaced_cost_hp)
+		ctx.resolve_pending_drain()
+		if ctx.player.hp <= 0:
+			return
 	if ctx.card_is_attack and ctx.player.stance != null and not ctx.enemies.is_empty():
-		ctx.pay_stance_attack_cost(Stance.attack_hp_loss(ctx.player.stance))
+		ctx.pay_upfront_hp_cost(Stance.attack_hp_loss(ctx.player.stance))
 		# The price can be the loss that sets off a counter (The Return):
 		# its Drain lands now, before the Attack it was paid for.
 		ctx.resolve_pending_drain()

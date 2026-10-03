@@ -58,7 +58,10 @@ const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain"]
 #
 # {hp_cost} is the exception that reads across effects rather than from
 # one: it's the same sum the "-N HP" line shows (see _derive_hp_cost()),
-# stance included.
+# stance included - all but a cost replacement's HP (Collateral), which
+# the line adds and the text doesn't: the text says what the card does,
+# and Collateral's price isn't the card's own ("Lose 2 HP" on Blood Arc
+# stays 2 while its line reads -7).
 const TOKEN_DAMAGE := "{damage}"
 const TOKEN_BLOCK := "{block}"
 # The number a conditional clause is FOR (CardBonus.bonus_value(): the
@@ -500,8 +503,11 @@ func set_stance(stance: Stance) -> void:
 # and the HP cost line. Re-run whenever the card or the stance changes.
 func _refresh_dynamic_text() -> void:
 	_hp_cost = _derive_hp_cost(card_data)
-	hp_cost_label.text = "−%d HP" % _hp_cost if _hp_cost > 0 else ""
-	hp_cost_label.visible = _hp_cost > 0
+	# The line is everything playing it costs in HP, a cost replacement's
+	# included - {hp_cost} leaves that out (see TOKEN_HP_COST's doc).
+	var line_hp: int = _hp_cost + _replaced_cost_hp()
+	hp_cost_label.text = "−%d HP" % line_hp if line_hp > 0 else ""
+	hp_cost_label.visible = line_hp > 0
 	var was: CardBonus.State = _bonus_state
 	# Read at the HP the card will have once its own costs are paid, so a
 	# Critical clause the payment itself reaches (Self-Eater's) already shows.
@@ -984,15 +990,23 @@ func _derive_hp_cost(data: CardData) -> int:
 		total += Stance.attack_hp_loss(_stance)
 	return total
 
+# The HP a cost replacement (Collateral) takes for this card in place of
+# its Energy, as the fight would read it now (Combatant.replaced_cost_
+# hp()); 0 outside a battle hand.
+func _replaced_cost_hp() -> int:
+	if _bonus_context == null or _bonus_context.player == null:
+		return 0
+	return _bonus_context.player.replaced_cost_hp(card_data)
+
 # The HP paid before this card's first conditional or damage effect reads
-# anything: the stance's per-Attack cost (paid before any effect, see
-# EffectResolver.resolve_card()) and the card's own self-damage authored
-# ahead of it (none is, now). What the face judges Critical against, so
-# it shows the number the card will land for, not the one it would at the
-# HP held now. Self-damage authored after (Bite Down's, Last Wager's - the
+# anything: a cost replacement's HP and the stance's per-Attack cost
+# (both paid before any effect, see EffectResolver.resolve_card()) and
+# the card's own self-damage authored ahead of it (none is, now). What
+# the face judges Critical against, so it shows the number the card will
+# land for, not the one it would at the HP held now. Self-damage authored after (Bite Down's, Last Wager's - the
 # Wanderer's attack-then-pay convention) is paid too late to count.
 func _upfront_hp_cost() -> int:
-	var total: int = 0
+	var total: int = _replaced_cost_hp()
 	if card_data.card_type == CardData.CardType.ATTACK:
 		total += Stance.attack_hp_loss(_stance)
 	for effect in card_data.effects:

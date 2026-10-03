@@ -44,6 +44,13 @@ var mark_bonus_paid: Array[Combatant] = []
 # Condition.CRITICAL alone.
 var preview_hp_cost: int = 0
 
+# HP this card costs in place of its Energy - a cost replacement's
+# (Collateral, Combatant.replaced_cost_hp()), read by the controller when
+# the play committed, since its charge is spent then. Paid by
+# EffectResolver.resolve_card() before anything else on the card. 0 for
+# every card nothing covered.
+var replaced_cost_hp: int = 0
+
 # Did this card's damage finish something off? Set by damage_effect.gd,
 # cleared per card by EffectResolver.resolve_card(), read by
 # Condition.TARGET_KILLED - the one condition that depends on what an
@@ -129,11 +136,12 @@ func report_damage(target_combatant: Combatant, amount: int, kind: String) -> vo
 # lands, never past max HP and never more Grace than is left. Silent and
 # free when the player has none open, which is every fight for a class
 # without the passive.
-# The HP an Attack costs while a stance is held. Self-inflicted, so it
-# takes the same route SELF_DAMAGE does: past block and absorb, accruing
-# Toll, reported as "self" - and opening no Grace, because Grace only
-# ever opens on an enemy's hit.
-func pay_stance_attack_cost(amount: int) -> void:
+# HP a card costs before its effects: the stance's per-Attack price, or
+# what a cost replacement (Collateral) takes in place of Energy.
+# Self-inflicted, so it takes the same route SELF_DAMAGE does: past block
+# and absorb, accruing Toll, reported as "self" - and opening no Grace,
+# because Grace only ever opens on an enemy's hit.
+func pay_upfront_hp_cost(amount: int) -> void:
 	if amount <= 0:
 		return
 	var lost: int = DamagePipeline.apply_bypass(amount, player)

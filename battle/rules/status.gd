@@ -38,6 +38,8 @@ func apply_stack() -> void:
 			magnitude += data.default_magnitude
 		StatusData.StackRule.IGNORE:
 			pass
+		StatusData.StackRule.ADD_CHARGES:
+			charges += data.default_charges
 
 func tick_duration() -> void:
 	if turns_remaining > 0:
@@ -105,6 +107,8 @@ func describe() -> String:
 		"progress": progress,
 		"count": data.self_loss_trigger_count,
 		"drain": trigger_drain(),
+		"hp": data.replacement_hp_cost,
+		"min_cost": data.replaces_cost_at_least,
 	})
 
 # Replaces each {token} in `text` with its value from `values`, and each
@@ -214,6 +218,29 @@ static func spend_attack_bonus_charges(statuses: Array[Status], critical: bool) 
 		active.charges -= 1
 		if active.charges <= 0:
 			statuses.erase(active)
+
+# The cost replacement (StatusData.replaces_cost_at_least - Collateral)
+# that would take a card costing `energy_cost` - its Energy after every
+# other modifier - or null: one with a charge waiting whose threshold
+# the cost reaches. The first such, in the order they were applied.
+static func cost_replacement(statuses: Array[Status], energy_cost: int) -> Status:
+	for active in statuses:
+		if active.data == null or active.data.replaces_cost_at_least <= 0:
+			continue
+		if not active.has_charges() or active.charges <= 0:
+			continue
+		if energy_cost >= active.data.replaces_cost_at_least:
+			return active
+	return null
+
+# A play that cost_replacement() covered has committed: one charge spent,
+# and the status gone at 0.
+static func spend_cost_replacement(statuses: Array[Status], active: Status) -> void:
+	if active == null:
+		return
+	active.charges -= 1
+	if active.charges <= 0:
+		statuses.erase(active)
 
 # Its holder just lost HP to their own effect: the extra Toll every
 # status that pays for that grants (StatusData.self_loss_toll_bonus),
