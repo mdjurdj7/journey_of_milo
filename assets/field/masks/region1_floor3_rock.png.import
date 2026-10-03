@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://b1h7aevwtvt7x"
-path="res://.godot/imported/Map4_mask.png-b06a8993d4aec08c591905e6b83c4f77.ctex"
+uid="uid://b11iijtr4iiuc"
+path="res://.godot/imported/region1_floor3_rock.png-cc0bb5032dc4c68e6621791fc7c9ec2c.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/field/masks/Map4_mask.png"
-dest_files=["res://.godot/imported/Map4_mask.png-b06a8993d4aec08c591905e6b83c4f77.ctex"]
+source_file="res://assets/field/masks/region1_floor3_rock.png"
+dest_files=["res://.godot/imported/region1_floor3_rock.png-cc0bb5032dc4c68e6621791fc7c9ec2c.ctex"]
 
 [params]
 

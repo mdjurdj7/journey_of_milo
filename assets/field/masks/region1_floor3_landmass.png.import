@@ -2,16 +2,16 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://dk62pc7a68fir"
-path="res://.godot/imported/Map4_elev.png-e2a5d7739d43c1fc5eccc514128cf56e.ctex"
+uid="uid://bw4x3nuovvksn"
+path="res://.godot/imported/region1_floor3_landmass.png-7ae6a9bb8677c691a2a9ac41f6ab96f2.ctex"
 metadata={
 "vram_texture": false
 }
 
 [deps]
 
-source_file="res://assets/field/masks/Map4_elev.png"
-dest_files=["res://.godot/imported/Map4_elev.png-e2a5d7739d43c1fc5eccc514128cf56e.ctex"]
+source_file="res://assets/field/masks/region1_floor3_landmass.png"
+dest_files=["res://.godot/imported/region1_floor3_landmass.png-7ae6a9bb8677c691a2a9ac41f6ab96f2.ctex"]
 
 [params]
 
