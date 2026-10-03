@@ -141,6 +141,26 @@ const DURATION_UNTIL_TRIGGERED := -2
 # status applied in its place - once, a pack doesn't regroup. Null = none.
 @export var grants_when_alone: StatusData = null
 
+# A status that waits for its holder's next turn (Ransom): at the start of
+# the player's turn, after the ticks (BattleController._start_player_
+# turn(), Status.resolve_turn_start_triggers()), it is removed and this
+# status applied in its place. Pair it with DURATION_UNTIL_REMOVED so no
+# tick takes it first. Null = none.
+@export var grants_on_turn_start: StatusData = null
+
+# Gone the moment its holder's turn ends (BattleController.end_turn(),
+# Status.remove_at_turn_end()) - "this turn" means the player's turn, not
+# the enemy's that follows. Pair it with DURATION_UNTIL_REMOVED so no
+# tick takes it first.
+@export var ends_at_turn_end: bool = false
+
+# While this is up, every Attack card the player plays Drains: after its
+# last effect it heals the HP its hits took from enemies - not a killing
+# blow's overkill, and less whatever Grace already reclaimed from each
+# hit (EffectContext.record_hit(), EffectResolver.resolve_card()). No
+# number of its own: what the Attack lands is what it heals.
+@export var attacks_drain: bool = false
+
 # A countdown (Sentence): turns_remaining counts the turns left - ticked
 # on its holder's turn like any duration - and when it reaches 0 the
 # status goes off, dealing this to its holder and leaving (Status.

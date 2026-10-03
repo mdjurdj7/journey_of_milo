@@ -53,6 +53,7 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	ctx.attack_bonus_taken = false
 	ctx.mark_bonus_paid.clear()
 	ctx.toll_spent_this_card = false
+	ctx.hp_dealt_this_card = 0
 	# A cost replacement's HP (Collateral), first of all - it is this
 	# card's price. A price that kills ends the card: none of its effects
 	# resolve, and the fight ends as a defeat.
@@ -92,6 +93,14 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 			var taken: int = Status.resolve_countdowns(enemy)
 			if taken > 0:
 				ctx.report_damage(enemy, taken, "status")
+	# After the card's last effect, once: an Attack played while its
+	# Attacks Drain (Ransom) heals what its own hits took, net of Grace
+	# (EffectContext.record_hit()) - all of them summed for an all-enemies
+	# Attack. Never a countdown going off or a counter's Drain: neither is
+	# the Attack's blow. Before the Critical triggers below, so a heal that
+	# lifts the player out of Critical is seen there.
+	if ctx.card_is_attack and Status.attacks_drain(ctx.player.statuses):
+		ctx.heal(ctx.hp_dealt_this_card)
 	# After the whole card: its own HP cost (self-damage, the stance's
 	# price) may have made the player Critical, and a status waiting for
 	# that (No Further) gives way now - as does one this card just applied

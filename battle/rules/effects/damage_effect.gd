@@ -32,12 +32,13 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 		# A mark on this enemy (Come Due) adds to the blow against it
 		# alone, once per card - so it's per target, and like the attack
 		# bonus it goes in before the modifiers.
+		var hp_before: int = enemy.hp
 		var result := DamagePipeline.resolve(landed(blow + ctx.take_mark_bonus(enemy), ctx.player, enemy), enemy)
 		if enemy.hp <= 0:
 			ctx.killed_this_card = true
 		if result["damage_to_hp"] > 0:
 			ctx.report_damage(enemy, result["damage_to_hp"], "card")
-			ctx.grace_reclaim(result["damage_to_hp"])
+			ctx.record_hit(hp_before - enemy.hp, ctx.grace_reclaim(result["damage_to_hp"]))
 
 # The number one blow lands for once the statuses have had their say -
 # the attacker's outgoing modifiers, then `enemy`'s incoming ones - ahead

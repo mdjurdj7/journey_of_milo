@@ -58,6 +58,13 @@ var replaced_cost_hp: int = 0
 # existed.
 var killed_this_card: bool = false
 
+# HP this card's hits took from enemies, net of Grace: each hit adds the
+# HP the enemy actually lost (no overkill) less what Grace reclaimed from
+# that hit, never below 0 (record_hit()). What an Attack Drains for while
+# StatusData.attacks_drain is up (EffectResolver.resolve_card()). Cleared
+# per card by resolve_card().
+var hp_dealt_this_card: int = 0
+
 # HP put back by a card (HEAL, TOLL_HEAL). The rules mutate the
 # Combatant; this is how battle_controller.gd learns to mirror it onto
 # the run's own HP and tell the readouts - the same split report_damage()
@@ -190,14 +197,25 @@ func heal(amount: int) -> void:
 	if gained > 0 and on_heal.is_valid():
 		on_heal.call(gained)
 
-func grace_reclaim(damage_to_hp: int) -> void:
+# Returns what it reclaimed, so a Drain on the same hit (record_hit())
+# heals only the rest.
+func grace_reclaim(damage_to_hp: int) -> int:
 	if damage_to_hp <= 0 or player.grace <= 0:
-		return
+		return 0
 	var reclaimed: int = mini(damage_to_hp, player.grace)
 	reclaimed = mini(reclaimed, player.max_hp - player.hp)
 	if reclaimed <= 0:
-		return
+		return 0
 	player.grace -= reclaimed
 	player.hp += reclaimed
 	if on_grace_reclaimed.is_valid():
 		on_grace_reclaimed.call(reclaimed)
+	return reclaimed
+
+# One hit of this card's has landed: `hp_lost` is the HP the enemy
+# actually lost (its HP before less after - no overkill), `reclaimed`
+# what Grace took back from that same hit. Adds the remainder to
+# hp_dealt_this_card - so Grace and an Attack's Drain never both heal
+# for the same point of damage.
+func record_hit(hp_lost: int, reclaimed: int) -> void:
+	hp_dealt_this_card += maxi(hp_lost - reclaimed, 0)

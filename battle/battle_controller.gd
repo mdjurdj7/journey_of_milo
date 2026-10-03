@@ -288,6 +288,11 @@ func end_turn() -> void:
 	# same beat Grace closes on.
 	if Stance.tick(player):
 		stance_changed.emit(player.stance)
+	# A status that lasts only the player's turn (Ransom's Drain) ends with
+	# it, before the enemy turn - the readout never claims "this turn" for
+	# the enemy's.
+	Status.remove_at_turn_end(player.statuses)
+	status_changed.emit()
 	await _run_enemy_turn()
 	_input_locked = false
 	if not _check_battle_end():
@@ -613,6 +618,9 @@ func _start_player_turn() -> void:
 			_report_damage("player", target_combatant, amount, kind)
 		ctx.resolve_pending_drain()
 	Status.remove_expired(player.statuses)
+	# What was waiting for this turn (Ransom) takes hold now, after the
+	# ticks.
+	Status.resolve_turn_start_triggers(player.statuses)
 	# A tick that took them into Critical counts like any other HP loss.
 	Status.resolve_critical_triggers(player)
 	status_changed.emit()

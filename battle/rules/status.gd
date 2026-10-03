@@ -378,6 +378,30 @@ static func resolve_alone_triggers(holder: Combatant) -> bool:
 		changed = true
 	return changed
 
+# Its holder's turn has started: every status waiting for that
+# (StatusData.grants_on_turn_start - Ransom) is removed and its grant
+# applied in its place.
+static func resolve_turn_start_triggers(statuses: Array[Status]) -> void:
+	for active in statuses.duplicate():
+		if active.data == null or active.data.grants_on_turn_start == null:
+			continue
+		statuses.erase(active)
+		apply_to(statuses, active.data.grants_on_turn_start)
+
+# Its holder's turn has ended: every status that lasts only that turn
+# (StatusData.ends_at_turn_end) is gone.
+static func remove_at_turn_end(statuses: Array[Status]) -> void:
+	for active in statuses.duplicate():
+		if active.data != null and active.data.ends_at_turn_end:
+			statuses.erase(active)
+
+# Whether an Attack played now Drains (StatusData.attacks_drain).
+static func attacks_drain(statuses: Array[Status]) -> bool:
+	for active in statuses:
+		if active.data != null and active.data.attacks_drain:
+			return true
+	return false
+
 # The status that would stop a lethal enemy hit on a player who was
 # `was_critical` before it, or null.
 static func lethal_guard(statuses: Array[Status], was_critical: bool) -> Status:
