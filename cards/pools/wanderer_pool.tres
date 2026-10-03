@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RewardPool" load_steps=21 format=3]
+[gd_resource type="Resource" script_class="RewardPool" load_steps=22 format=3]
 
 [ext_resource type="Script" path="res://cards/reward_pool.gd" id="1_reward_pool"]
 [ext_resource type="Resource" path="res://cards/data/carve.tres" id="2_carve"]
@@ -20,10 +20,11 @@
 [ext_resource type="Resource" path="res://cards/data/sentence.tres" id="19_sentence"]
 [ext_resource type="Resource" path="res://cards/data/the_return.tres" id="20_the_return"]
 [ext_resource type="Resource" path="res://cards/data/collateral.tres" id="21_collateral"]
+[ext_resource type="Resource" path="res://cards/data/ransom.tres" id="22_ransom"]
 
 [resource]
 script = ExtResource("1_reward_pool")
-entries = Array[ExtResource("2_carve")]([ExtResource("2_carve"), ExtResource("4_hold_fast"), ExtResource("5_reprisal"), ExtResource("6_open_wound"), ExtResource("7_debt_forgiven"), ExtResource("8_self_eater"), ExtResource("9_cornered"), ExtResource("10_unbroken"), ExtResource("11_dying_light"), ExtResource("12_last_wager"), ExtResource("13_refuse_the_end"), ExtResource("14_last_resort"), ExtResource("15_blood_arc"), ExtResource("16_with_regards"), ExtResource("17_come_due"), ExtResource("18_no_further"), ExtResource("19_sentence"), ExtResource("20_the_return"), ExtResource("21_collateral")])
+entries = Array[ExtResource("2_carve")]([ExtResource("2_carve"), ExtResource("4_hold_fast"), ExtResource("5_reprisal"), ExtResource("6_open_wound"), ExtResource("7_debt_forgiven"), ExtResource("8_self_eater"), ExtResource("9_cornered"), ExtResource("10_unbroken"), ExtResource("11_dying_light"), ExtResource("12_last_wager"), ExtResource("13_refuse_the_end"), ExtResource("14_last_resort"), ExtResource("15_blood_arc"), ExtResource("16_with_regards"), ExtResource("17_come_due"), ExtResource("18_no_further"), ExtResource("19_sentence"), ExtResource("20_the_return"), ExtResource("21_collateral"), ExtResource("22_ransom")])
 weights = Array[float]([])
 enemy_bias = {}
 enemy_bias_multiplier = 2.0

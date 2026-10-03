@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/ransom_active.tres" id="2_ransom_active"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "ransom"
+display_name = "Ransom"
+description = "Next turn, your Attacks Drain."
+category = 2
+default_duration_turns = -1
+stack_rule = 4
+grants_on_turn_start = ExtResource("2_ransom_active")

@@ -1,0 +1,24 @@
+[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/ransom.tres" id="3_ransom"]
+[ext_resource type="Texture2D" uid="uid://bfvsqkx4c86oy" path="res://cards/art/Wanderer/Ransom.png" id="9_art"]
+
+[sub_resource type="Resource" id="CardEffect_apply_status"]
+script = ExtResource("2_card_effect")
+effect_type = 12
+status_data = ExtResource("3_ransom")
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Ransom"
+rarity = 3
+cost = 3
+card_type = 1
+target_type = 1
+description = "Next turn, your Attacks Drain.
+Spent."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
+removal_scope = 1
+art = ExtResource("9_art")
