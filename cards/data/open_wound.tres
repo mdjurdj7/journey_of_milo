@@ -19,6 +19,5 @@ card_name = "Open Wound"
 rarity = 2
 card_type = 1
 target_type = 1
-description = "Lose {hp_cost} HP.
-Draw {draw}."
+description = "Draw {draw}."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_self"), SubResource("E_draw")])

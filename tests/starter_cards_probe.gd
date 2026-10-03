@@ -14,7 +14,11 @@ extends SceneTree
 
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_CONTROLLER_PATH := "res://battle/battle_controller.gd"
-const CASES := 12
+const CASES := 13
+# Cards whose one status prints as two lines - a rule written as two
+# sentences (Sentence's countdown and its hurry; The Return's count and
+# its Drain). Every other status-applying effect is one line.
+const TWO_LINE_STATUS_CARDS: Array[String] = ["Sentence", "The Return"]
 # The rules text size each card lands at outside a fight; any card not
 # listed fits at the first size, 15, cleanly - inside the rules margins
 # (CardView.rules_margin_px) and no lone last word. A card that moves
@@ -72,6 +76,7 @@ func _initialize() -> void:
 	_check_lasting_cards_leave_rotation()
 	await _check_starter_art()
 	await _check_face_layout()
+	await _check_rules_text_pattern()
 	if _completed != CASES:
 		_failures += 1
 		print("FAIL: only %d of %d cases ran to the end" % [_completed, CASES])
@@ -354,6 +359,74 @@ func _check_lasting_cards_leave_rotation() -> void:
 			_expect(deck.discard_pile.has(card) and not deck.exhaust_pile.has(card), "%s is discarded as before" % card.card_name)
 	(controller as Node).free()
 	_completed += 1
+
+# The rules-text pattern every card follows, so a new one can't drift:
+#   - HP paid before any other effect is the cost badge's alone - the
+#     text never says "Lose X HP" for it;
+#   - HP paid after another effect stays in the text where it happens,
+#     as "Then lose X HP." with the effect's own number;
+#   - any HP the card costs shows in the badge;
+#   - one line per resolution step, in order - TOLL_DAMAGE and TOLL_HEAL
+#     spend and then act (2), SELF_DAMAGE_TOLL's line is its Toll (the
+#     HP is the badge's), a conditional upgrade shares its effect's line,
+#     and TWO_LINE_STATUS_CARDS' status takes 2 - and "Spent." last.
+func _check_rules_text_pattern() -> void:
+	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(view)
+	await process_frame
+	var lose_regex := RegEx.new()
+	lose_regex.compile("\\bLose (\\d+|\\{hp_cost\\}) HP")
+	for dir in CARD_DIRS:
+		for file in DirAccess.get_files_at(dir):
+			if not file.ends_with(".tres"):
+				continue
+			var card := load(dir + file) as CardData
+			var lines: PackedStringArray = card.description.strip_edges().split("\n")
+			var expected: int = 0
+			var upfront: bool = true
+			var hp_total: int = 0
+			var upfront_hp: int = 0
+			for effect in card.effects:
+				var self_loss: bool = effect.effect_type == CardEffect.EffectType.SELF_DAMAGE or effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL
+				if self_loss:
+					hp_total += effect.value
+				if self_loss and upfront:
+					upfront_hp += effect.value
+					# Its Toll is still something the card does.
+					if effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL:
+						expected += 1
+					continue
+				upfront = false
+				if self_loss:
+					var at: String = lines[expected] if expected < lines.size() else "(none)"
+					_expect_eq(at, "Then lose %d HP." % effect.value, "%s's HP after another effect reads on its own line %d" % [card.card_name, expected + 1])
+					expected += 1
+					continue
+				expected += _lines_for(effect, card)
+			if upfront_hp > 0:
+				_expect(lose_regex.search(card.description) == null, "%s's upfront HP is the badge's alone, not its text: %s" % [card.card_name, card.description])
+			var spent: bool = card.removal_scope != CardData.RemovalScope.NONE
+			if spent:
+				expected += 1
+				_expect_eq(lines[lines.size() - 1], "Spent.", "%s ends on Spent." % card.card_name)
+			_expect_eq(Array(lines).count("Spent."), 1 if spent else 0, "%s says Spent. %s" % [card.card_name, "once" if spent else "nowhere"])
+			_expect_eq(lines.size(), expected, "%s has a line per step (%s)" % [card.card_name, card.description.replace("\n", " / ")])
+			view.set_card_data(card)
+			if hp_total > 0:
+				_expect(view.hp_cost_label.visible and view.hp_cost_label.text == "−%d HP" % hp_total, "%s's badge shows its %d HP (%s)" % [card.card_name, hp_total, view.hp_cost_label.text])
+			else:
+				_expect(not view.hp_cost_label.visible, "%s shows no HP badge" % card.card_name)
+	view.free()
+	_completed += 1
+
+# The rules lines one effect takes - see _check_rules_text_pattern().
+func _lines_for(effect: CardEffect, card: CardData) -> int:
+	match effect.effect_type:
+		CardEffect.EffectType.TOLL_DAMAGE, CardEffect.EffectType.TOLL_HEAL:
+			return 2
+		CardEffect.EffectType.APPLY_STATUS, CardEffect.EffectType.APPLY_STATUS_TO_TARGET:
+			return 2 if TWO_LINE_STATUS_CARDS.has(card.card_name) else 1
+	return 1
 
 # --- Helpers ---
 

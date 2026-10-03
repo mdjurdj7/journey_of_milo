@@ -21,7 +21,7 @@ cost = 1
 card_type = 0
 target_type = 0
 description = "Deal {damage} damage.
-Lose {hp_cost} HP."
+Then lose 2 HP."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage"), SubResource("CardEffect_self_damage")])
 battle_animation = &"Slash"
 art = ExtResource("9_art")

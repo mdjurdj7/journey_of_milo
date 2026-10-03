@@ -207,8 +207,8 @@ func _check_critical_entry() -> void:
 	_completed += 1
 
 # Faces while the charge waits, and after it's spent: a covered card
-# reads 0 and the payment on its "-N HP" line; Blood Arc's own {hp_cost}
-# text stays its own loss.
+# reads 0 and the payment on its "-N HP" line. Blood Arc's own loss is
+# upfront, so it's the badge's alone - its text never names it.
 func _check_faces() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -220,7 +220,7 @@ func _check_faces() -> void:
 		await _play(controller, await _deal(controller, COLLATERAL_PATH))
 		_expect_eq(_face(controller, reckoning), ["0", "−5 HP"], "With a charge waiting, Reckoning reads 0 and −5 HP")
 		_expect_eq(_face(controller, blood_arc), ["0", "−%d HP" % (own_loss + 5)], "...Blood Arc 0 and its own loss plus 5")
-		_expect(_rules_text(controller, blood_arc).contains("Lose %d HP" % own_loss), "...while its text still says its own %d" % own_loss)
+		_expect(not _rules_text(controller, blood_arc).contains("HP"), "...while its text names no HP: the badge carries it all")
 		_expect_eq(_face(controller, slash), ["1", ""], "...and Slash is untouched")
 		await _play(controller, reckoning, _field_enemy(controller))
 		_expect_eq(_face(controller, blood_arc), ["2", "−%d HP" % own_loss], "Once spent, Blood Arc reads 2 and its own loss again")

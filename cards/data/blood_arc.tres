@@ -21,8 +21,7 @@ rarity = 2
 cost = 2
 card_type = 0
 target_type = 2
-description = "Lose {hp_cost} HP.
-Deal {damage} damage to all enemies."
+description = "Deal {damage} damage to all enemies."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_self_damage"), SubResource("CardEffect_damage")])
 battle_animation = &"Slash"
 impact_time = 0.55

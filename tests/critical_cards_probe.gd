@@ -280,7 +280,7 @@ func _check_faces() -> void:
 	face = await _face("last_wager", player)
 	_expect(face.begins_with("Deal 16 damage"), "Last Wager's {else} half, first: " + face)
 	_expect(face.contains("deal 35"), "Last Wager's {if} half (26 + 6 + 3): " + face)
-	_expect(face.ends_with("Lose 4 HP."), "Last Wager's HP line, last: " + face)
+	_expect(face.ends_with("Then lose 4 HP."), "Last Wager's HP line, last, after the blow: " + face)
 	_expect_eq(await _face_state("last_wager", player), CardBonus.State.DORMANT, "Last Wager's face DORMANT at 25")
 	player.hp = 21
 	_expect_eq(await _face_state("last_wager", player), CardBonus.State.LIVE, "Last Wager's face LIVE at 21")
