@@ -87,10 +87,14 @@ area_probes() {
 		hud) echo "gold_line glassbone" ;;
 		hp_bar) echo "kill_order" ;;
 		ui_inspect) echo "keyword" ;;
+		# The fight's own UI: every probe that plays a real fight (which
+		# builds the battle overlay and its hand), plus the rules probes
+		# whose readouts and faces it shows.
+		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback collateral glassbone keeper_keepsake leverage ransom toll_carry trinket" ;;
 		*) return 1 ;;
 	esac
 }
-AREAS_ALL="cards face keywords rules enemies field floor1 floor2 floor3 floors run hud hp_bar ui_inspect"
+AREAS_ALL="cards face keywords rules enemies field floor1 floor2 floor3 floors run hud hp_bar ui_inspect battle_ui"
 
 # The probes for one changed path; FULL for a path no area covers, nothing
 # for a path no probe can see (docs, tools, the bus layout).
@@ -122,6 +126,7 @@ path_probes() {
 		ui/hp_bar.*) out=$(area_probes hp_bar) ;;
 		ui/toll_line.gd|ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd) out=$(area_probes hud) ;;
 		ui/deck_view.*|ui/card_compendium.*) out=$(area_probes ui_inspect) ;;
+		battle/battle_overlay.*|battle/battle_feedback.*|battle/battle_intent.*|battle/battle_resources.*|battle/end_turn_button.*|battle/enemy_status.*|battle/floating_number.*|battle/hand_container.*|battle/take_feedback.*|battle/target_line.*) out=$(area_probes battle_ui) ;;
 		*) echo FULL; return 0 ;;
 	esac
 	# The kill-order gate: any script under battle/ or field/.
