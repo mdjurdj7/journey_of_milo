@@ -46,7 +46,6 @@ var _lines: PackedStringArray = PackedStringArray()
 var _wrap_width: float = 160.0
 var _ink: Color = Color.BLACK
 var _paragraphs: Array[TextParagraph] = []
-var _keyword_regex: RegEx = null
 # 0 hidden, 1 shown - tweened by set_revealed().
 var _reveal: float = 0.0
 var _shown: bool = false
@@ -148,11 +147,8 @@ func _build_paragraph(entry_name: String, line: String) -> TextParagraph:
 	var paragraph := TextParagraph.new()
 	paragraph.width = _wrap_width
 	paragraph.add_string(entry_name + ": ", text_bold_font, _font_size_px)
-	if _keyword_regex == null:
-		_keyword_regex = RegEx.new()
-		_keyword_regex.compile("\\b(%s)\\b" % "|".join(CardView.KEYWORDS))
 	var cursor: int = 0
-	for keyword: RegExMatch in _keyword_regex.search_all(line):
+	for keyword: RegExMatch in KeywordTable.shared().pattern().search_all(line):
 		if keyword.get_start() > cursor:
 			paragraph.add_string(line.substr(cursor, keyword.get_start() - cursor), text_font, _font_size_px)
 		paragraph.add_string(keyword.get_string(), text_bold_font, _font_size_px)

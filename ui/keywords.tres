@@ -9,5 +9,6 @@ entries = Dictionary[String, String]({
 "Grace": "After enemy hits get through your Block, damage you deal on your next turn wins HP back, up to the largest hit.",
 "Critical": "At or below {threshold}% of your max HP.",
 "Drain": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one.",
-"Spent": "Removed for the rest of this fight once played."
+"Spent": "Removed for the rest of this fight once played.",
+"Attack": "A card marked STRIKE, or an enemy's damaging move. Some effects only apply to Attacks."
 })

@@ -26,7 +26,7 @@ const TWO_LINE_STATUS_CARDS: Array[String] = ["Sentence", "The Return"]
 const SHRUNK_RULES: Dictionary = {
 	"Collateral": 13,
 	"Cornered": 14,
-	"Last Resort": 14,
+	"Last Resort": 13,
 	"Last Wager": 13,
 	"No Further": 12,
 	"The Return": 13,

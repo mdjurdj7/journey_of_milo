@@ -1109,8 +1109,7 @@ func keyword_rects() -> Array[Dictionary]:
 	var regular: Font = rules_text.get_theme_font("normal_font")
 	var bold: Font = rules_text.get_theme_font("bold_font")
 	var font_size: int = rules_text.get_theme_font_size("normal_font_size")
-	var keyword := RegEx.new()
-	keyword.compile("\\b(%s)\\b" % "|".join(PackedStringArray(KEYWORDS)))
+	var keyword: RegEx = KeywordTable.shared().pattern()
 	var matches: Array[RegExMatch] = keyword.search_all(text)
 	if matches.is_empty():
 		return found
@@ -1129,7 +1128,7 @@ func keyword_rects() -> Array[Dictionary]:
 				continue
 			var x: float = left + _shaped_width(text, start, found_match.get_start(), matches, regular, bold, font_size)
 			var width: float = bold.get_string_size(found_match.get_string(), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
-			found.append({"keyword": found_match.get_string(), "rect": Rect2(x, y, width, height).grow(KEYWORD_HIT_PAD_PX)})
+			found.append({"keyword": found_match.get_string(1), "rect": Rect2(x, y, width, height).grow(KEYWORD_HIT_PAD_PX)})
 	return found
 
 # The width of text[from, to) on one line, keywords in Bold as drawn.
@@ -1395,15 +1394,11 @@ static func _type_label_text(keyline_type: KeylineType) -> String:
 		_:
 			return "STRIKE"
 
-# Escapes the description for BBCode and sets every KEYWORDS entry in
-# bold, whole words only.
+# Escapes the description for BBCode and sets every keyword in bold, as
+# written - whole words, plurals included (KeywordTable.pattern()).
 static func _format_rules(description: String) -> String:
 	var escaped: String = description.replace("[", "[lb]")
-	for keyword in KEYWORDS:
-		var regex := RegEx.new()
-		regex.compile("\\b%s\\b" % keyword)
-		escaped = regex.sub(escaped, "[b]%s[/b]" % keyword, true)
-	return escaped
+	return KeywordTable.shared().pattern().sub(escaped, "[b]$0[/b]", true)
 
 # --- Style ---
 
@@ -1812,7 +1807,7 @@ func _wrapped_line_count(label: Label, font_size: int, width: float) -> int:
 	return maxi(roundi(total / maxf(line_height, 1.0)), 1)
 
 # The rules text as the face breaks it: per authored line (paragraph),
-# the lines it wraps to. Shaped with the bold face on KEYWORDS, the way
+# the lines it wraps to. Shaped with the bold face on keywords, the way
 # the RichTextLabel sets them, and broken as its WORD_SMART does - a
 # bold "Critical" is wide enough to move a wrap.
 func _rules_wrap(font_size: int, width: float) -> Array[PackedStringArray]:
@@ -1820,8 +1815,7 @@ func _rules_wrap(font_size: int, width: float) -> Array[PackedStringArray]:
 	if card_data == null or rules_font == null or card_data.description.is_empty():
 		return wrapped
 	var bold: Font = rules_font_bold if rules_font_bold != null else rules_font
-	var keyword := RegEx.new()
-	keyword.compile("\\b(%s)\\b" % "|".join(PackedStringArray(KEYWORDS)))
+	var keyword: RegEx = KeywordTable.shared().pattern()
 	var plain: String = _strip_markers(_resolve_tokens(card_data.description)).strip_edges()
 	for text in plain.split("\n"):
 		var paragraph := TextParagraph.new()

@@ -27,13 +27,15 @@ const NO_FURTHER_PATH := "res://cards/data/no_further.tres"
 const CORNERED_PATH := "res://cards/data/cornered.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
-const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent"]
+const SELF_EATER_PATH := "res://cards/data/self_eater.tres"
+const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Attack"]
 const DEFINITIONS: Dictionary = {
 	"Toll": "Gained when you lose HP to your own effects. Up to 5 carries over after a fight.",
 	"Grace": "After enemy hits get through your Block, damage you deal on your next turn wins HP back, up to the largest hit.",
 	"Critical": "At or below 30% of your max HP.",
 	"Drain": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one.",
 	"Spent": "Removed for the rest of this fight once played.",
+	"Attack": "A card marked STRIKE, or an enemy's damaging move. Some effects only apply to Attacks.",
 }
 const SCALES: Array[float] = [0.95, 1.15, 2.2]
 const ENEMY_HP := 999
@@ -84,6 +86,11 @@ func _check_table() -> void:
 		_expect(not table.definition(word).contains("{"), "...with every token filled")
 	_expect_eq(table.definition("Block"), "", "A word that isn't a keyword defines nothing")
 	_expect(CardView._format_rules("Spent.").contains("[b]Spent[/b]"), "Spent is set in bold")
+	# A keyword's plural is the keyword: bold as written, its definition
+	# the singular's. Only a plural - a longer word isn't one.
+	_expect_eq(CardView._format_rules("Your Attacks deal 3 more."), "Your [b]Attacks[/b] deal 3 more.", "Attacks is set in bold, as written")
+	_expect_eq(table.definition("Attacks"), DEFINITIONS["Attack"], "...and reads Attack's definition")
+	_expect_eq(CardView._format_rules("Attacker."), "Attacker.", "Attacker isn't a keyword")
 	_completed += 1
 
 # Critical's threshold and Toll's carry read the run's character as it
@@ -112,22 +119,34 @@ func _check_hit_test() -> void:
 	var words: Array[String] = []
 	for entry: Dictionary in rects:
 		words.append(String(entry["keyword"]))
-	_expect_eq(words, ["Critical", "Spent"] as Array[String], "No Further's keywords, in text order")
+	_expect_eq(words, ["Critical", "Attack", "Spent"] as Array[String], "No Further's keywords, in text order")
 	var rules: Rect2 = view.rules_text.get_rect().grow(4.0)
 	for entry: Dictionary in rects:
 		var rect: Rect2 = entry["rect"]
 		_expect(rules.encloses(rect), "%s's rect %s sits in the rules text %s" % [entry["keyword"], rect, rules])
 		_expect_eq(view.keyword_at(rect.get_center()), entry["keyword"], "...and is found at its centre")
-	var spent: Rect2 = rects[1]["rect"] if rects.size() > 1 else Rect2()
-	var critical: Rect2 = rects[0]["rect"] if not rects.is_empty() else Rect2()
+	var spent: Rect2 = _rect_of(rects, "Spent")
+	var critical: Rect2 = _rect_of(rects, "Critical")
 	_expect(critical.position.y < spent.position.y, "Critical's line sits above Spent's")
 	_expect_eq(view.keyword_at(Vector2(view.size.x / 2.0, 20.0)), "", "The name line finds no keyword")
-	_expect_eq(view.keyword_at(Vector2(spent.position.x - 30.0, critical.get_center().y)), "", "Beside Critical, nothing")
+	_expect_eq(view.keyword_at(Vector2(critical.position.x - 6.0, critical.get_center().y)), "", "Beside Critical, nothing")
 	var cornered: CardView = await _card_view(CORNERED_PATH)
 	var found: Array[String] = []
 	for entry: Dictionary in cornered.keyword_rects():
 		found.append(String(entry["keyword"]))
 	_expect_eq(found, ["Critical"] as Array[String], "Cornered's one keyword")
+	# A plural on the face: Self-Eater's "Attacks" is found as Attack, its
+	# rect over the whole word as written.
+	var self_eater: CardView = await _card_view(SELF_EATER_PATH)
+	var plural: Array[Dictionary] = self_eater.keyword_rects()
+	_expect_eq(plural.size(), 1, "Self-Eater has one keyword")
+	if not plural.is_empty():
+		var attacks: Rect2 = plural[0]["rect"]
+		_expect_eq(String(plural[0]["keyword"]), "Attack", "...its \"Attacks\" resolving to Attack")
+		_expect_eq(self_eater.keyword_at(attacks.get_center()), "Attack", "...found at its centre")
+		var bold: Font = self_eater.rules_text.get_theme_font("bold_font")
+		var font_size: int = self_eater.rules_text.get_theme_font_size("normal_font_size")
+		_expect(attacks.size.x >= bold.get_string_size("Attacks", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x, "...its rect as wide as \"Attacks\" (%.1f)" % attacks.size.x)
 	_free_views()
 	_completed += 1
 
@@ -308,6 +327,13 @@ func _find_view(host: Node, card_name: String) -> CardView:
 	return null
 
 var _views: Array[CardView] = []
+
+# The rect of the first `keyword` in a face's keyword_rects().
+func _rect_of(rects: Array[Dictionary], keyword: String) -> Rect2:
+	for entry: Dictionary in rects:
+		if String(entry["keyword"]) == keyword:
+			return entry["rect"]
+	return Rect2()
 
 func _card_view(path: String) -> CardView:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView

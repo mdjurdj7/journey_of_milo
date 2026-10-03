@@ -4,7 +4,8 @@ class_name KeywordTable
 # The rules keywords, in one place: every word here is set in bold on a
 # card face (CardView.KEYWORDS) and in a status reveal, and hovering it
 # on a card shows its definition above the card. A new keyword is one
-# entry here and nothing else.
+# entry here and nothing else. Each matches as a whole word and as its
+# plural ("Attacks"), which resolves to the same entry - see pattern().
 #
 # Definitions are templates, filled from the live rules numbers by
 # Status.fill_template() - so they move when the character's numbers do:
@@ -21,6 +22,7 @@ const FALLBACK_CHARACTER_PATH := "res://run/data/wanderer.tres"
 @export var entries: Dictionary[String, String] = {}
 
 static var _shared: KeywordTable = null
+var _pattern: RegEx = null
 
 # The table every face and reveal reads - loaded once.
 static func shared() -> KeywordTable:
@@ -36,9 +38,26 @@ func keywords() -> Array[String]:
 	words.assign(entries.keys())
 	return words
 
-# `keyword`'s definition with its numbers filled in; "" for a word that
-# isn't a keyword.
+# The one pattern every reader of the keywords matches with - the face's
+# bolding, its hover rects, the rules fit's shaping and the status reveal:
+# any keyword as a whole word, case-sensitive, with an optional plural
+# "s". The whole match is the text as written ("Attacks"); group 1 is
+# the keyword it resolves to ("Attack"). Compiled once.
+func pattern() -> RegEx:
+	if _pattern == null:
+		_pattern = RegEx.new()
+		# No keywords matches nothing, not every empty string.
+		if entries.is_empty():
+			_pattern.compile("(?!)")
+			return _pattern
+		_pattern.compile("\\b(%s)s?\\b" % "|".join(PackedStringArray(keywords())))
+	return _pattern
+
+# `keyword`'s definition with its numbers filled in - a plural ("Attacks")
+# reads its keyword's - and "" for a word that isn't a keyword.
 func definition(keyword: String) -> String:
+	if not entries.has(keyword) and keyword.ends_with("s"):
+		keyword = keyword.left(-1)
 	if not entries.has(keyword):
 		return ""
 	return Status.fill_template(entries[keyword], live_values())
