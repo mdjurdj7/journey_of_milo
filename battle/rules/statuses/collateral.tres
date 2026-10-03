@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "collateral"
+display_name = "Collateral"
+description = "Pay {hp} HP instead of Energy for your next {charges} card{s} costing {min_cost} or more."
+category = 2
+default_charges = 1
+default_duration_turns = -1
+stack_rule = 5
+replaces_cost_at_least = 2
+replacement_hp_cost = 5

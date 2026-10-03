@@ -20,6 +20,7 @@ const CASES := 12
 # last word (CardView.rules_min_air_px). A card that moves here has
 # changed its wording - or needs to.
 const SHRUNK_RULES: Dictionary = {
+	"Collateral": 13,
 	"Come Due": 13,
 	"Cornered": 14,
 	"Last Resort": 14,
@@ -31,7 +32,8 @@ const SHRUNK_RULES: Dictionary = {
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # The cards with art, by file - the starters, Carve, Come Due, No Further,
-# Sentence, Last Wager and The Return. Every other card has none yet.
+# Sentence, Last Wager, The Return, Blood Arc and Collateral. Every other
+# card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
 	"bite_down": "res://cards/art/Wanderer/Bite Down.png",
@@ -45,6 +47,7 @@ const CARD_ART: Dictionary = {
 	"last_wager": "res://cards/art/Wanderer/Last Wager.png",
 	"the_return": "res://cards/art/Wanderer/The Return.png",
 	"blood_arc": "res://cards/art/Wanderer/Blood Arc.png",
+	"collateral": "res://cards/art/Wanderer/Collateral.png",
 }
 
 var _failures: int = 0
