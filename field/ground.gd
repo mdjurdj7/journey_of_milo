@@ -686,6 +686,34 @@ signal relief_rebuilt
 		rock_mask = value
 		_push_canvas_paintings()
 @export_group("")
+
+# Outer ground: past the walkable floor's ridge, a different surface -
+# flat outer_color with a coarse pebble grain and none of the sand's
+# grain, speckle, drift lines or ripples - so the edge of the floor reads
+# from the field camera, where height doesn't. Where outer_mask says so;
+# no mask, no outer ground anywhere. See ground.gdshader's own block.
+@export_group("Outer Ground")
+@export var outer_color: Color = Color(0.52, 0.53, 0.48):
+	set(value):
+		outer_color = value
+		_apply_uniform("outer_color", value)
+# Metres per pebble (a Worley cell), and how far the pebbles shift the
+# value either way.
+@export var outer_grain_scale: float = 0.25:
+	set(value):
+		outer_grain_scale = value
+		_apply_uniform("outer_grain_scale", value)
+@export_range(0.0, 1.0) var outer_grain_strength: float = 0.12:
+	set(value):
+		outer_grain_strength = value
+		_apply_uniform("outer_grain_strength", value)
+# On the same canvas as landmass_mask: white = outer ground. Past the
+# canvas its edge pixels carry on (the shader clamps rather than cuts).
+@export var outer_mask: Texture2D = null:
+	set(value):
+		outer_mask = value
+		_push_canvas_paintings()
+@export_group("")
 @export var region_field_path: NodePath = ^".."
 @export var sea_path: NodePath = ^"../Sea"
 
@@ -878,6 +906,9 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("rock_slope_blend", rock_slope_blend)
 	_apply_uniform("basin_color", basin_color)
 	_apply_uniform("basin_tint_strength", basin_tint_strength)
+	_apply_uniform("outer_color", outer_color)
+	_apply_uniform("outer_grain_scale", outer_grain_scale)
+	_apply_uniform("outer_grain_strength", outer_grain_strength)
 	_push_basin_heights()
 	_push_canvas_paintings()
 	_apply_uniform("pool_threshold", pool_threshold)
@@ -946,7 +977,7 @@ func set_wear_path(start_point: Vector3, mid_point: Vector3, end_point: Vector3)
 	_apply_uniform("wear_end", Vector2(end_point.x, end_point.z))
 
 # The paintings the shader samples on the landmass canvas (wear_mask,
-# rock_mask) and the canvas's image->world mapping, matching
+# rock_mask, outer_mask) and the canvas's image->world mapping, matching
 # _mask_world_to_pixel() exactly so each lines up with a landmass mask
 # painted on the same canvas. The mapping is pushed as the spawn point
 # plus the two image axes rather than a matrix, so the shader can do the
@@ -955,15 +986,22 @@ func set_wear_path(start_point: Vector3, mid_point: Vector3, end_point: Vector3)
 func _push_canvas_paintings() -> void:
 	_apply_uniform("wear_mask_ready", wear_mask != null)
 	_apply_uniform("rock_mask_ready", rock_mask != null)
+	_apply_uniform("outer_mask_ready", outer_mask != null)
 	if wear_mask != null:
 		_apply_uniform("wear_mask", wear_mask)
 	if rock_mask != null:
 		_apply_uniform("rock_mask", rock_mask)
+	if outer_mask != null:
+		_apply_uniform("outer_mask", outer_mask)
 	var sized: Texture2D = wear_mask if wear_mask != null else rock_mask
+	if sized == null:
+		sized = outer_mask
 	if sized == null:
 		return
 	if wear_mask != null and rock_mask != null and wear_mask.get_size() != rock_mask.get_size():
 		push_warning("Ground: wear_mask is %s but rock_mask is %s - paintings must share the landmass canvas; rock is mapped by the wear mask's size." % [wear_mask.get_size(), rock_mask.get_size()])
+	if outer_mask != null and outer_mask.get_size() != sized.get_size():
+		push_warning("Ground: outer_mask is %s but the canvas is %s - paintings must share the landmass canvas; outer ground is mapped by the canvas's size." % [outer_mask.get_size(), sized.get_size()])
 	_ensure_landmass_refs()
 	var forward: Vector2 = _landmass_forward_xz
 	var right: Vector2 = Vector2(-forward.y, forward.x)

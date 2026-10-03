@@ -250,6 +250,22 @@ uniform float rock_slope_blend = 12.0;
 uniform sampler2D rock_mask : filter_linear, repeat_disable;
 uniform bool rock_mask_ready = false;
 
+// --- Outer ground ---
+//
+// Out of bounds as a surface, not a height: where outer_mask is white the
+// sand base gives way to outer_color, under a coarse pebble grain
+// (outer_grain_scale metres a pebble, outer_grain_strength either way)
+// and without the sand's own grain, speckle, drift lines or ripples.
+// Over the basin tint, which it replaces rather than darkens; under rock,
+// which keeps its face exactly as before. Past the canvas the mask's edge
+// pixels carry on (see outer_factor()). No mask, no outer ground: every
+// term below is then mix(x, y, 0) or x * 1.
+uniform vec4 outer_color : source_color = vec4(0.52, 0.53, 0.48, 1.0);
+uniform float outer_grain_scale = 0.25;
+uniform float outer_grain_strength : hint_range(0.0, 1.0) = 0.12;
+uniform sampler2D outer_mask : filter_linear, repeat_disable;
+uniform bool outer_mask_ready = false;
+
 // The landmass canvas's image->world mapping, shared by every painting on
 // it the shader samples (wear_mask, rock_mask) - see canvas_uv().
 uniform vec2 canvas_spawn = vec2(0.0);
@@ -739,6 +755,29 @@ float rock_factor(vec2 world_xz, float world_up) {
 	return ramp * canvas_sample(rock_mask, world_xz);
 }
 
+// 0..1 of "this is outer ground" (see outer_color's doc). Clamped to the
+// canvas rather than cut at it like canvas_sample(): the painting is
+// white along every edge, so the outer ground runs on past it.
+float outer_factor(vec2 world_xz) {
+	if (!outer_mask_ready) {
+		return 0.0;
+	}
+	return texture(outer_mask, clamp(canvas_uv(world_xz), vec2(0.0), vec2(1.0))).r;
+}
+
+// The outer ground's pebbles, signed around 0 like grain_value(): one
+// Worley cell a pebble, lighter toward its middle, dark in the gaps
+// between cells, and a slow tone shift so neighbours don't all match.
+// Nothing stretched, so it can't read as ripples.
+float pebble_value(vec2 world_xz) {
+	vec2 p = world_xz / max(outer_grain_scale, 0.001);
+	vec2 f = worley_f1_f2(p);
+	float dome = 1.0 - clamp(f.x / 0.7, 0.0, 1.0);
+	float gap = 1.0 - smoothstep(0.0, 0.18, f.y - f.x);
+	float tone = value_noise(p * 0.5 + vec2(7.1, 3.7)) * 2.0 - 1.0;
+	return clamp((dome - 0.4) * 0.8 + tone * 0.4 - gap * 0.8, -1.0, 1.0);
+}
+
 // 0..1 of "this sand is walked". Procedural band and painted mask by
 // max(), then gated: nothing below sea level, nothing in the wet band,
 // and a fade through the last wear_shore_fade metres before the drawn
@@ -807,6 +846,11 @@ void fragment() {
 	float basin_t = clamp((v_world_height - basin_height_low) / max(basin_height_high - basin_height_low, 0.001), 0.0, 1.0);
 	float basin = basin_tint_strength * (1.0 - smoothstep(0.0, 1.0, basin_t));
 	vec3 sand_base = mix(dry_color.rgb, basin_color.rgb, basin);
+	// Outer ground over the (basin-tinted) sand, under rock - see
+	// outer_color's doc.
+	float outer = outer_factor(v_world_xz);
+	float sand_detail = 1.0 - outer;
+	sand_base = mix(sand_base, outer_color.rgb, outer);
 	vec3 dry = mix(sand_base, rock_color.rgb, rock) * distance_tint;
 	vec3 wet = dry * wet_darken;
 
@@ -831,9 +875,14 @@ void fragment() {
 	// grainy - by the same sand_wetness driving the dry/wet blend above,
 	// and quieted again on a walked band, which is packed for the same
 	// reason.
-	float grain_suppression = (1.0 - sand_wetness) * wear_smoothing;
+	float grain_suppression = (1.0 - sand_wetness) * wear_smoothing * sand_detail;
 	float grain = grain_value(v_world_xz) * grain_strength * grain_suppression;
 	sand_albedo *= 1.0 + grain;
+
+	// The outer ground's own pebbles, in place of the sand grain.
+	if (outer > 0.0) {
+		sand_albedo *= 1.0 + pebble_value(v_world_xz) * outer_grain_strength * outer * (1.0 - rock);
+	}
 
 	// The speckle is shell and dark grains in sand - not on stone.
 	float speckle = speckle_mask(v_world_xz) * speckle_darken * grain_suppression * (1.0 - rock);
@@ -847,14 +896,14 @@ void fragment() {
 	// lighten it - the hue nudge survives, the value can only go down.
 	float drift = drift_line_mask(v_world_xz, v_world_height);
 	vec3 drift_target = min(drift_line_color.rgb, sand_albedo);
-	sand_albedo = mix(sand_albedo, drift_target, clamp(drift * drift_line_strength * detail_boost, 0.0, 1.0));
+	sand_albedo = mix(sand_albedo, drift_target, clamp(drift * drift_line_strength * detail_boost * sand_detail, 0.0, 1.0));
 
 	// Ripple marks: a brightness shift in wet sand only - darken-only
 	// (the signed noise is remapped to [0, 1] and subtracted), so ripples
 	// can never lift wet sand back toward the dry value. Multiplicative,
 	// same hue-preserving reasoning as grain/speckle above. Boosted under
 	// water like the drift lines.
-	float ripple = (0.5 + 0.5 * ripple_mask(v_world_xz, v_world_height)) * ripple_strength * detail_boost * sand_wetness * wear_smoothing;
+	float ripple = (0.5 + 0.5 * ripple_mask(v_world_xz, v_world_height)) * ripple_strength * detail_boost * sand_wetness * wear_smoothing * sand_detail;
 	sand_albedo *= 1.0 - clamp(ripple, 0.0, 1.0);
 
 	// The band itself: a flat multiplicative darkening, hue preserved like

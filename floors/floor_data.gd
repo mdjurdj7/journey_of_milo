@@ -33,6 +33,11 @@ class_name FloorData
 # stone here where it is steep (Ground.rock_mask). Null = no rock on the
 # floor, however steep its sand.
 @export var rock_mask: Texture2D = null
+# Optional out-of-bounds ground on the same canvas: white = the outer
+# surface (Ground.outer_mask) - its own colour and pebbles, so the floor's
+# edge reads by surface where height doesn't. Null = sand everywhere, as
+# every floor had it before.
+@export var outer_mask: Texture2D = null
 # Normalized image coords of the pixel that sits on `spawn`.
 @export var mask_origin: Vector2 = Vector2(0.5, 0.5)
 # Ground.landmass_mask_beyond_is_land: past every edge of `mask` is land,
