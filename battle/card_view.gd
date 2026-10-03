@@ -45,7 +45,7 @@ signal disarmed
 enum KeylineType { STRIKE, GUARD, TOLL, UTILITY, STANCE, POWER }
 
 # Rules-text words set in bold. Whole-word, case-sensitive.
-const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain"]
+const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent"]
 
 # Numbers a card's text can defer to its own effects, so the face shows
 # what the card will ACTUALLY do rather than what it did when it was
