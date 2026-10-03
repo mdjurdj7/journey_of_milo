@@ -37,13 +37,18 @@ so it doesn't get silently reinvented or silently forgotten.
   shore gate). The sea side only needs the same five uniforms pushed to
   its material and a mask-mode branch in `landmass_distance()`; still not
   built. (2026-09-16, swash.)
-- **CardData.CardType should gain TOLL and rename SKILL to GUARD.** The
-  card face's keyline/field/type label (strike / guard / toll) is
-  derived in `CardView._derive_keyline_type()`: any Toll-mechanic effect
-  (`TOLL_*`, `SELF_DAMAGE_TOLL`) makes a toll card, otherwise SKILL is
-  guard and ATTACK is strike. Once CardType carries the three real
-  values that derivation goes away and the face reads `card_type`
-  directly. Card data untouched for now. (2026-09-17, ink-on-bone card.)
+- **Card faces keep thematic labels; CardType stays mechanical.** The
+  face's type label, field tint and glyph show a thematic category
+  (STRIKE / GUARD / TOLL / UTILITY / STANCE / POWER), derived in
+  `CardView._derive_keyline_type()`; `CardData.CardType` (ATTACK / SKILL
+  / STANCE / POWER) stays what the rules read. The old plan to give
+  CardType a TOLL value and rename SKILL to GUARD is dropped - on a card
+  with art the label is the only place the category shows, and the
+  rules only ever ask "is it an Attack?". The one bridge: ATTACK <=>
+  STRIKE, both ways, so the label tells a reader which cards the "your
+  Attacks" effects touch. `tests/starter_cards_probe.gd` enforces it.
+  Reckoning, a Toll spender that resolves as an Attack, reads STRIKE.
+  (2026-10-03; replaces the 2026-09-17 rename plan.)
 - **Field HUD still speaks the old panel language.** The battle UI is
   ink on the world (BattleTheme's `Battle/ink`/`bone` tokens - HP
   readouts' battle style, BattleIntent, BattleResources, End Turn, the

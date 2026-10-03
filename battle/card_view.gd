@@ -36,9 +36,10 @@ signal lowered
 signal armed
 signal disarmed
 
-# Card type from the rules' point of view (strike / guard / toll /
-# utility), derived in _derive_keyline_type() - see DESIGN.md's note on
-# why this isn't CardData.CardType yet. Appended rather than inserted, as
+# The card's thematic category (strike / guard / toll / utility /
+# stance / power), derived in _derive_keyline_type() - shown as the type
+# label, the field's tint and the glyph; see DESIGN.md on why it stays
+# beside CardData.CardType rather than replacing it. Appended rather than inserted, as
 # a habit: nothing serialises this today (it's derived every time a card
 # is shown, never authored), but the enum sits next to CardEffect's own,
 # where an inserted value silently rewrites existing .tres data.
@@ -1218,10 +1219,13 @@ func _screen_rect() -> Rect2:
 
 # --- Derivations from CardData ---
 
-# Strike / guard / toll / utility from what the card does. Any Toll-
-# mechanic effect makes it a toll card first, whatever else it does.
-# Otherwise ATTACK is strike, and SKILL splits on whether the card
-# actually defends the player: raising block (BLOCK/UNDAMAGED_BLOCK),
+# Strike / guard / toll / utility from what the card does. Every ATTACK
+# is a strike and every strike an ATTACK, whatever it spends (Reckoning
+# spends Toll): the label is where a reader learns which cards the
+# "your Attacks" effects touch (tests/starter_cards_probe.gd holds the
+# rule). Otherwise any Toll-mechanic effect makes a toll card, whatever
+# else it does, and SKILL splits on whether the card actually defends
+# the player: raising block (BLOCK/UNDAMAGED_BLOCK),
 # adding absorb, or putting a damage-reducing status on HER. Everything
 # else is utility - draw, energy, anything that changes the shape of the
 # turn rather than the damage in it.
@@ -1230,10 +1234,9 @@ func _screen_rect() -> Rect2:
 # name (see _is_defensive_status), so a second Braced-like status is
 # classified the day it is authored, with nothing to remember here.
 #
-# Interim - see DESIGN.md: CardType should grow TOLL and rename SKILL to
-# GUARD, at which point the strike/guard/toll part becomes a straight
-# read of card_type and only the guard/utility split stays derived.
 static func _derive_keyline_type(data: CardData) -> KeylineType:
+	if data.card_type == CardData.CardType.ATTACK:
+		return KeylineType.STRIKE
 	for effect in data.effects:
 		if effect == null:
 			continue
@@ -1265,8 +1268,7 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 					# kill, the opposite of guard.
 					if _is_disarming_status(effect.status_data):
 						return KeylineType.GUARD
-		return KeylineType.UTILITY
-	return KeylineType.STRIKE
+	return KeylineType.UTILITY
 
 # A status that reduces the damage its holder takes. Both modifier
 # operations reduce on a NEGATIVE magnitude - ADD adds it, MULTIPLY adds

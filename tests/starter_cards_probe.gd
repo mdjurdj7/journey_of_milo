@@ -274,6 +274,10 @@ func _check_face_layout() -> void:
 			_expect_eq(view.size, view.card_size, "%s keeps the card's size" % card.card_name)
 			_expect(view.rules_text.position.y + view.rules_text.size.y <= _type_baseline(view) + _ink_top(view.type_label, view.type_label_font_size_px), "%s's text ends above the type label" % card.card_name)
 			_check_rules_block(view, card.card_name)
+			# ATTACK <=> STRIKE, both ways: the label is how a reader knows
+			# which cards the "your Attacks" effects touch (DESIGN.md).
+			var is_attack: bool = card.card_type == CardData.CardType.ATTACK
+			_expect(is_attack == (view.type_label.text == "STRIKE"), "%s is %s and labelled %s - every ATTACK reads STRIKE and every STRIKE is an ATTACK" % [card.card_name, CardData.CardType.keys()[card.card_type], view.type_label.text])
 			# The header holds the ledger rule and the "-N HP" line without
 			# adding a row - the HP ink clear of the art field by 4 px - and
 			# the numeral's ink clears the inset rule.
