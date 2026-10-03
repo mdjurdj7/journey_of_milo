@@ -486,6 +486,9 @@ func _ready() -> void:
 	_keyword_reveal.z_as_relative = false
 	_keyword_reveal.z_index = KEYWORD_REVEAL_Z_INDEX
 	add_child(_keyword_reveal)
+	# A fade set before this existed (set_playable()) is taken back out
+	# here, as set_playable() does from now on.
+	_keyword_reveal.modulate.a = 1.0 / maxf(modulate.a, 0.01)
 	_apply_keyword_reveal_style()
 	set_process(false)
 	_apply_style()
@@ -855,6 +858,10 @@ func _apply_panel_color() -> void:
 func set_playable(playable: bool) -> void:
 	_playable = playable
 	modulate.a = 1.0 if playable else unplayable_alpha
+	# The keyword definition is the card's child and inherits that fade;
+	# it reads at full ink regardless, so it takes the fade back out.
+	if _keyword_reveal != null:
+		_keyword_reveal.modulate.a = 1.0 / maxf(modulate.a, 0.01)
 
 # The scale this card sits at when neither hovered nor armed - set by
 # HandContainer's reflow (and DeckView), never by this card itself.

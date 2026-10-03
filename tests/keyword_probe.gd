@@ -17,7 +17,7 @@ extends SceneTree
 # inspect cases open the real DeckView and compendium. Untyped against
 # anything that names the RunState autoload.
 
-const CASES := 8
+const CASES := 9
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
@@ -55,6 +55,7 @@ func _initialize() -> void:
 	_check_live_values()
 	await _check_hit_test()
 	await _check_hit_test_scales()
+	await _check_full_ink_when_faded()
 	await _check_hand_gating()
 	await _check_hand_above()
 	await _check_deck_view_below()
@@ -145,6 +146,27 @@ func _check_hit_test_scales() -> void:
 		var on_screen: Vector2 = view.get_global_transform() * centre
 		var back: Vector2 = view.get_global_transform().affine_inverse() * on_screen
 		_expect_eq(view.keyword_at(back), "Spent", "At %.2f, the point on screen over Spent finds it" % card_scale)
+	_free_views()
+	_completed += 1
+
+# An unplayable card fades - the definition doesn't: the card's alpha
+# and the definition's own multiply back to full ink.
+func _check_full_ink_when_faded() -> void:
+	var view: CardView = await _card_view(NO_FURTHER_PATH)
+	var reveal: Control = view.get_node("KeywordReveal")
+	view.set_playable(false)
+	_expect(is_equal_approx(view.modulate.a, view.unplayable_alpha), "An unplayable card keeps its fade")
+	_expect(is_equal_approx(view.modulate.a * reveal.modulate.a, 1.0), "...and its definition reads at full ink (%.3f)" % (view.modulate.a * reveal.modulate.a))
+	view.set_playable(true)
+	_expect(is_equal_approx(reveal.modulate.a, 1.0), "Playable again: the definition at its own 1")
+	_free_views()
+	var faded: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
+	faded.modulate.a = faded.unplayable_alpha
+	root.add_child(faded)
+	_views.append(faded)
+	await process_frame
+	var late: Control = faded.get_node("KeywordReveal")
+	_expect(is_equal_approx(faded.modulate.a * late.modulate.a, 1.0), "A fade set before _ready() is taken out too")
 	_free_views()
 	_completed += 1
 
