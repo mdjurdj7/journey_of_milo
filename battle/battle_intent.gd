@@ -24,7 +24,10 @@ class_name BattleIntent
 # and the attack pair dims to hairline ink - it won't land. The whole
 # stack still ends at the anchor, so the attack line sits a ring higher.
 # A BURROW (buried - it does nothing this turn) is its glyph alone: there
-# is no number coming.
+# is no number coming. A HEAL_ALLY (the Nipper's Forage) is a plus beside
+# the HP its packmates will heal. A multi-hit attack whose hits differ (a
+# once-per-Attack bonus on the first - Hungry) reads hit by hit, "7 + 3",
+# not "N x M".
 #
 # One per enemy, created by BattleOverlay for the fight (its child, so it
 # dies with the overlay - nothing of this exists on the field). Anchored
@@ -196,6 +199,12 @@ func show_intent(preview: Dictionary) -> void:
 		var hits: int = int(preview.get("hits", 1))
 		var per_hit: int = int(preview.get("per_hit", 0))
 		_label.text = ("%d×%d" % [hits, per_hit]) if hits > 1 else str(per_hit)
+		var hit_amounts: Array = preview.get("hit_amounts", [])
+		if hits > 1 and hit_amounts.size() == hits and hit_amounts.count(hit_amounts[0]) != hits:
+			var parts := PackedStringArray()
+			for amount: Variant in hit_amounts:
+				parts.append(str(int(amount)))
+			_label.text = " + ".join(parts)
 		if _type == EnemyIntent.IntentType.BURROW:
 			_label.text = ""
 		_has_threshold = preview.has("threshold")
@@ -364,7 +373,9 @@ func _stroke(points: PackedVector2Array, alpha: float) -> void:
 # ATTACK: a chevron pointing right with a short shaft - an arrow, the
 # action coming at you. DEFEND: an open shield - flat top, sides, a point
 # at the bottom, closed. BURROW: a mound on a ground line - the swell it
-# pushes up under the sand. All fit a square of half-size r about centre.
+# pushes up under the sand. HEAL_ALLY: a plus - one stroke, out along
+# the bar and back to cross it. All fit a square of half-size r about
+# centre.
 func _glyph_points(centre: Vector2, r: float) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	match _type:
@@ -388,6 +399,12 @@ func _glyph_points(centre: Vector2, r: float) -> PackedVector2Array:
 				var angle: float = PI - PI * float(step) / float(arc_steps)
 				points.append(centre + Vector2(cos(angle) * r * 0.6, r * 0.45 - sin(angle) * r * 0.7))
 			points.append(centre + Vector2(r, r * 0.45))
+		EnemyIntent.IntentType.HEAL_ALLY:
+			points.append(centre + Vector2(-r * 0.8, 0.0))
+			points.append(centre + Vector2(r * 0.8, 0.0))
+			points.append(centre)
+			points.append(centre + Vector2(0.0, -r * 0.8))
+			points.append(centre + Vector2(0.0, r * 0.8))
 	return points
 
 # Whether the Wanderer is to the screen-left of the enemy right now -

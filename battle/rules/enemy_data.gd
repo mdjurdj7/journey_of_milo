@@ -10,6 +10,10 @@ class_name EnemyData
 @export var enemy_name: String = ""
 @export var max_hp: int = 1
 @export var intents: Array[EnemyIntent] = []
+# Statuses it holds from the first frame of every fight, applied as the
+# fight starts (BattleController) - a passive, shown and revealed like
+# any status (the Blackback's Fed). Empty (every enemy by default) = none.
+@export var starting_statuses: Array[StatusData] = []
 # The sound of a card's hit landing on this creature (its shell, its
 # hide), played by its FieldEnemy on the hit frame - takes dealt
 # round-robin (see SoundPool); one take is fine.

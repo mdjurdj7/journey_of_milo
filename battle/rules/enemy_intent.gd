@@ -13,11 +13,18 @@ class_name EnemyIntent
 # it can't be targeted and takes no damage (Combatant.buried, kept in
 # step by EnemyTurn) - and its turn does nothing; it surfaces at the end
 # of it. Reached as an ATTACK's on_interrupt (below), not from the loop.
-enum IntentType { ATTACK, DEFEND, BURROW }
+#
+# HEAL_ALLY: no damage - each living packmate (FieldEnemy.group) heals
+# `value` HP, capped at its max (BattleController._heal_packmates()). A
+# pack move, like a simultaneous one: alone, the enemy steps past it
+# (EnemyTurn.leave_pack()). The Nipper's Forage. Appended: an inserted
+# value would rewrite every .tres that stores one of these as an integer.
+enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY }
 
 @export var type: IntentType = IntentType.ATTACK
 @export var value: int = 0
-# Damage dealt PER HIT if ATTACK, block gained if DEFEND.
+# Damage dealt PER HIT if ATTACK, block gained if DEFEND, HP each living
+# packmate heals if HEAL_ALLY.
 
 @export var hits: int = 1
 # ATTACK only: how many separate hits of `value` this intent lands in one

@@ -56,6 +56,7 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {progress} a counter's losses so far  {count}  self_loss_trigger_count
 #   {drain}    self_loss_trigger_drain × stacks
 #   {hp}       replacement_hp_cost       {min_cost} replaces_cost_at_least
+#   {alone_bonus} grants_when_alone's attack_damage_bonus (what it turns into)
 #   {s}        "s" unless the count token before it is 1 ("Attack{s}")
 # An unknown token is left standing. "It" is the enemy holding it, "you"
 # the player.
@@ -93,7 +94,10 @@ const DURATION_UNTIL_TRIGGERED := -2
 # Extra damage per stack each Attack card deals while this is up (Dying
 # Light). Once per Attack card, like a stance's bonus - not a MODIFIER,
 # which would land on every damage the player deals (a Toll spend
-# included). Summed with the stance's by AttackBonus. 0 = none.
+# included). Summed with the stance's by AttackBonus. On an enemy
+# (Hungry) the same once per Attack: added to the first hit of each of
+# its ATTACK intents, never to every hit (EnemyTurn.hit_amount()). 0 =
+# none.
 @export var attack_damage_bonus: int = 0
 # The bonus above only while the player is Critical.
 @export var bonus_requires_critical: bool = false
@@ -130,6 +134,12 @@ const DURATION_UNTIL_TRIGGERED := -2
 # blow that crossed the line is never softened by what it grants. Applied
 # while already Critical, it gives way at once, at the end of that card.
 @export var grants_on_critical: StatusData = null
+
+# A status that waits for its holder - an enemy - to be the last of its
+# pack (Fed): the moment no packmate is left living in the fight
+# (Combatant.pack_alone, EnemyTurn.leave_pack()) it is removed and this
+# status applied in its place - once, a pack doesn't regroup. Null = none.
+@export var grants_when_alone: StatusData = null
 
 # A countdown (Sentence): turns_remaining counts the turns left - ticked
 # on its holder's turn like any duration - and when it reaches 0 the

@@ -109,6 +109,7 @@ func describe() -> String:
 		"drain": trigger_drain(),
 		"hp": data.replacement_hp_cost,
 		"min_cost": data.replaces_cost_at_least,
+		"alone_bonus": data.grants_when_alone.attack_damage_bonus if data.grants_when_alone != null else 0,
 	})
 
 # Replaces each {token} in `text` with its value from `values`, and each
@@ -347,6 +348,22 @@ static func resolve_critical_triggers(holder: Combatant) -> void:
 			continue
 		holder.statuses.erase(active)
 		apply_to(holder.statuses, active.data.grants_on_critical)
+
+# Its holder - an enemy - has just become the last of its pack
+# (EnemyTurn.leave_pack()): every status waiting for that (StatusData.
+# grants_when_alone - Fed) is removed and its grant applied in its place.
+# True when anything changed, for the readout to catch up.
+static func resolve_alone_triggers(holder: Combatant) -> bool:
+	if holder == null:
+		return false
+	var changed: bool = false
+	for active in holder.statuses.duplicate():
+		if active.data == null or active.data.grants_when_alone == null:
+			continue
+		holder.statuses.erase(active)
+		apply_to(holder.statuses, active.data.grants_when_alone)
+		changed = true
+	return changed
 
 # The status that would stop a lethal enemy hit on a player who was
 # `was_critical` before it, or null.

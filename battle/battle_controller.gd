@@ -136,6 +136,11 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		var combatant := Combatant.new(data.max_hp if data != null else 1)
 		if data != null:
 			EnemyTurn.pick_initial_intent(combatant, data)
+			# Its passives (the Blackback's Fed), before the pack check
+			# below can turn one.
+			for status_data: StatusData in data.starting_statuses:
+				if status_data != null:
+					Status.apply_to(combatant.statuses, status_data)
 			enemy_names.append(data.enemy_name)
 		_combatants[enemy] = combatant
 	# A pack met with one member left (the rest killed in an earlier fight
@@ -176,7 +181,12 @@ func get_intent_preview(enemy: FieldEnemy) -> Dictionary:
 	var data: EnemyData = enemy.enemy_data if enemy != null else null
 	if combatant == null or data == null or combatant.hp <= 0:
 		return {}
-	return EnemyTurn.preview_intent(combatant, data, player)
+	var preview: Dictionary = EnemyTurn.preview_intent(combatant, data, player)
+	# A heal for packmates shows what it will actually heal - the same
+	# call the turn makes, without applying it.
+	if int(preview.get("type", -1)) == EnemyIntent.IntentType.HEAL_ALLY and not bool(preview.get("pain_turn", false)):
+		preview["per_hit"] = _heal_packmates(enemy, int(preview["per_hit"]), false)
+	return preview
 
 func _emit_intent_previews() -> void:
 	for enemy in enemies:
@@ -438,6 +448,8 @@ func _run_sequential_turn() -> void:
 		var burrow_delay: float = _play_burrow_for(enemy, result)
 		if burrow_delay > 0.0:
 			await get_tree().create_timer(burrow_delay).timeout
+		if result["heal_allies"] > 0:
+			_heal_packmates(enemy, result["heal_allies"], true)
 		status_changed.emit()
 		# The pose of what comes next, landing on the beat the intent shows.
 		var pose_delay: float = _pose_for_intent(enemy)
@@ -728,10 +740,12 @@ func _drop_enemy(enemy: FieldEnemy) -> void:
 
 # Every living enemy with no living packmate left in the fight (none
 # sharing its FieldEnemy.group - an ungrouped enemy has none) stops using
-# its pack move (EnemyTurn.leave_pack()): the island's last dragonfly
-# bites instead of Swarming alone. A queued Swarm that gives way is shown
-# at once. Living by HP, not by the list - a card that kills several
-# drops them one at a time, and the ones still to go are already dead.
+# its pack moves and turns what waits for that (EnemyTurn.leave_pack()):
+# the island's last dragonfly bites instead of Swarming alone, the
+# Nipper stops foraging, the Blackback turns Hungry. A queued move that
+# gives way, or a status that turns, is shown at once. Living by HP, not
+# by the list - a card that kills several drops them one at a time, and
+# the ones still to go are already dead.
 func _mark_lone_pack_members() -> void:
 	for enemy in enemies:
 		var combatant: Combatant = _combatants.get(enemy)
@@ -740,7 +754,29 @@ func _mark_lone_pack_members() -> void:
 		if _has_living_packmate(enemy):
 			continue
 		if EnemyTurn.leave_pack(combatant, enemy.enemy_data):
+			status_changed.emit()
 			enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
+
+# A HEAL_ALLY's heal (the Nipper's Forage): each living packmate of
+# `enemy` heals `amount`, capped at its max. Returns the HP healed in
+# all; `apply` false only measures it - the intent preview's number, from
+# the same call the turn makes.
+func _heal_packmates(enemy: FieldEnemy, amount: int, apply: bool) -> int:
+	if enemy == null or enemy.group == &"" or amount <= 0:
+		return 0
+	var healed: int = 0
+	for other in enemies:
+		if other == enemy or other.group != enemy.group:
+			continue
+		var combatant: Combatant = _combatants.get(other)
+		if combatant == null or combatant.hp <= 0:
+			continue
+		var heal: int = mini(amount, maxi(combatant.max_hp - combatant.hp, 0))
+		healed += heal
+		if apply and heal > 0:
+			combatant.hp += heal
+			enemy_hp_changed.emit(other, combatant.hp, combatant.max_hp)
+	return healed
 
 func _has_living_packmate(enemy: FieldEnemy) -> bool:
 	if enemy.group == &"":

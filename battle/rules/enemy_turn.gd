@@ -45,7 +45,7 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false}
+	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "heal_allies": 0}
 
 	Status.tick_all(combatant.statuses, func(amount: int) -> void:
 		combatant.hp = max(combatant.hp - amount, 0)
@@ -91,9 +91,8 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# and DamagePipeline is the only thing that knows the split
 				# between what block ate and what reached HP.
 				var largest_hit: int = 0
-				for _hit in maxi(intent.hits, 1):
-					var amount: int = Status.apply_modifiers(intent_value(combatant, data, intent), combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
-					amount = Status.apply_modifiers(amount, player.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
+				for hit in maxi(intent.hits, 1):
+					var amount: int = hit_amount(combatant, data, intent, hit, player.statuses)
 					Status.consume_triggered(player.statuses)
 					# Critical is judged BEFORE the hit: Refuse the End saves a
 					# player who was already there, not one this hit put there.
@@ -128,6 +127,10 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				result["block_gained"] = intent.value
 			EnemyIntent.IntentType.BURROW:
 				result["surfaced"] = true
+			EnemyIntent.IntentType.HEAL_ALLY:
+				# Its packmates are the controller's to heal - this side
+				# knows only this enemy.
+				result["heal_allies"] = intent.value
 
 	# Counted whatever the turn did - an interrupted or cancelled one too -
 	# so escalation keeps its own clock.
@@ -154,7 +157,10 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 # block/absorb wear-down of DamagePipeline.resolve() replayed on local
 # counters. Keys: "type" (EnemyIntent.IntentType), "hits", "per_hit"
 # (the first hit's modified damage - what "N x M" shows - or the block
-# gained for DEFEND), "damage_to_hp" (total that would reach HP through
+# gained for DEFEND, or the heal each packmate takes for HEAL_ALLY, as
+# authored: BattleController caps it at what they're missing),
+# "hit_amounts" (every hit's modified damage, in order - unequal when a
+# once-per-Attack bonus lands on the first), "damage_to_hp" (total that would reach HP through
 # block and absorb), "lethal" (it would take the player to 0 - replayed
 # hit by hit on a local HP, so a lethal guard that would leave them at 1
 # (Status.refuse_lethal()) keeps it off). Empty when the enemy has no
@@ -193,9 +199,10 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	var hp: int = player.hp
 	var guard_left: bool = true
 	var hits: int = maxi(intent.hits, 1)
+	var hit_amounts: Array[int] = []
 	for hit in hits:
-		var amount: int = Status.apply_modifiers(intent_value(combatant, data, intent), combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
-		amount = Status.apply_modifiers(amount, player_statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
+		var amount: int = hit_amount(combatant, data, intent, hit, player_statuses)
+		hit_amounts.append(amount)
 		if hit == 0:
 			preview["per_hit"] = amount
 		Status.consume_triggered(player_statuses)
@@ -211,6 +218,7 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 			hp = 1
 			guard_left = false
 	preview["hits"] = hits
+	preview["hit_amounts"] = hit_amounts
 	preview["damage_to_hp"] = total_to_hp
 	preview["lethal"] = hp <= 0 and not bool(preview.get("interrupted", false))
 	return preview
@@ -247,6 +255,19 @@ static func intent_value(combatant: Combatant, data: EnemyData, intent: EnemyInt
 		return intent.value
 	return roundi(float(intent.value) * data.escalation_multipliers[escalation_stage(combatant, data)])
 
+# One hit of an ATTACK, before block: the intent's value (escalated),
+# plus - on the first hit only - this enemy's once-per-Attack bonus
+# (StatusData.attack_damage_bonus - Hungry), then its outgoing modifiers
+# and the player's incoming ones. The one number take_turn() lands and
+# preview_intent() shows, hit by hit; `player_statuses` is the player's
+# list or the preview's copy of it.
+static func hit_amount(combatant: Combatant, data: EnemyData, intent: EnemyIntent, hit: int, player_statuses: Array[Status]) -> int:
+	var amount: int = intent_value(combatant, data, intent)
+	if hit == 0:
+		amount += Status.attack_bonus(combatant.statuses, combatant.is_critical())
+	amount = Status.apply_modifiers(amount, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+	return Status.apply_modifiers(amount, player_statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
+
 # Unblocked damage becomes Grace. Accumulates ACROSS the whole enemy
 # turn rather than per enemy: the cap is the window's, so two enemies
 # hitting for 5 and 8 leave 8 under LARGEST_HIT and 13 under SUM. Called
@@ -275,18 +296,27 @@ static func _sync_buried(combatant: Combatant, data: EnemyData) -> void:
 	var intent := current_intent(combatant, data)
 	combatant.buried = intent != null and intent.type == EnemyIntent.IntentType.BURROW
 
-# The last of its pack (Combatant.pack_alone, from now on): a queued
-# simultaneous intent gives way to the next one in the loop that isn't,
-# as if it had been played. An interjection is left where it is. Returns
-# whether the queued intent changed, for the display to catch up.
+# The last of its pack (Combatant.pack_alone, from now on): a status
+# waiting for that (Fed) gives way to its grant (Status.resolve_alone_
+# triggers()), and a queued pack move (is_pack_move()) gives way to the
+# next intent in the loop that isn't, as if it had been played. An
+# interjection is left where it is. Returns whether the queued intent's
+# number or the statuses changed, for the display to catch up.
 static func leave_pack(combatant: Combatant, data: EnemyData) -> bool:
 	combatant.pack_alone = true
+	var changed: bool = Status.resolve_alone_triggers(combatant)
 	var queued: EnemyIntent = current_intent(combatant, data)
-	if combatant.interjected_intent != null or queued == null or not queued.simultaneous:
-		return false
+	if combatant.interjected_intent != null or queued == null or not is_pack_move(queued):
+		return changed
 	_advance_intent(combatant, data)
 	_sync_buried(combatant, data)
 	return true
+
+# A move only a pack makes - dropped from the loop once the enemy is the
+# last of its pack: the dragonflies' simultaneous Swarm, and a heal for
+# packmates (HEAL_ALLY - the Nipper's Forage).
+static func is_pack_move(intent: EnemyIntent) -> bool:
+	return intent != null and (intent.simultaneous or intent.type == EnemyIntent.IntentType.HEAL_ALLY)
 
 static func _advance_intent(combatant: Combatant, data: EnemyData) -> void:
 	if data.intents.is_empty():
@@ -298,7 +328,7 @@ static func _advance_intent(combatant: Combatant, data: EnemyData) -> void:
 	# a loop of nothing else still queues something.
 	for _step in data.intents.size():
 		combatant.current_intent_index = (combatant.current_intent_index + 1) % data.intents.size()
-		if not combatant.pack_alone or not data.intents[combatant.current_intent_index].simultaneous:
+		if not combatant.pack_alone or not is_pack_move(data.intents[combatant.current_intent_index]):
 			return
 
 static func _pick_erratic_intent_index(data: EnemyData, previous_index: int, pack_alone: bool) -> int:
@@ -307,7 +337,7 @@ static func _pick_erratic_intent_index(data: EnemyData, previous_index: int, pac
 		var intent := data.intents[i]
 		if i == previous_index and intent.no_immediate_repeat:
 			continue
-		if pack_alone and intent.simultaneous:
+		if pack_alone and is_pack_move(intent):
 			continue
 		weights[i] = intent.erratic_weight
 	return _weighted_pick(weights, previous_index)
