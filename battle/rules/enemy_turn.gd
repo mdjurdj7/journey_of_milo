@@ -45,7 +45,7 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "heal_allies": 0}
+	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "heal_allies": 0, "saved_heal": 0}
 
 	Status.tick_all(combatant.statuses, func(amount: int) -> void:
 		combatant.hp = max(combatant.hp - amount, 0)
@@ -100,11 +100,14 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 					var was_critical: bool = player.is_critical()
 					var damage_result := DamagePipeline.resolve(amount, player)
 					var to_hp: int = damage_result["damage_to_hp"]
-					# Left at 1 HP, what reached HP is what was actually lost -
-					# the number the run's HP, the floating number and Grace
-					# all take from here.
+					# Saved, what reached HP is what was actually lost - the
+					# number the run's HP, the floating number and Grace all
+					# take from here - and a save that left them higher than
+					# before the hit (survive HP over what they had) lost
+					# nothing and is a heal: "saved_heal", for the run's HP.
 					if Status.refuse_lethal(player, was_critical):
-						to_hp = hp_before - player.hp
+						to_hp = maxi(hp_before - player.hp, 0)
+						result["saved_heal"] += maxi(player.hp - hp_before, 0)
 					total_to_hp += to_hp
 					largest_hit = maxi(largest_hit, to_hp)
 				# The attack has resolved, every hit of it: a status that
@@ -162,9 +165,9 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 # "hit_amounts" (every hit's modified damage, in order - unequal when a
 # once-per-Attack bonus lands on the first), "damage_to_hp" (total that would reach HP through
 # block and absorb), "lethal" (it would take the player to 0 - replayed
-# hit by hit on a local HP, so a lethal guard that would leave them at 1
-# (Status.refuse_lethal()) keeps it off). Empty when the enemy has no
-# intent.
+# hit by hit on a local HP, so a lethal guard keeps it off: each hit it
+# would save puts them at its survive HP, as many saves as it has
+# charges - Status.refuse_lethal()). Empty when the enemy has no intent.
 #
 # An ATTACK with an interrupt_threshold also carries "threshold" (the
 # authored number), "threshold_left" (what the player still has to deal
@@ -197,7 +200,7 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	var absorb: int = player.absorb
 	var total_to_hp: int = 0
 	var hp: int = player.hp
-	var guard_left: bool = true
+	var saves_used: int = 0
 	var hits: int = maxi(intent.hits, 1)
 	var hit_amounts: Array[int] = []
 	for hit in hits:
@@ -214,9 +217,11 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 		total_to_hp += after_block - absorbed
 		var was_critical: bool = player.is_critical_at(hp)
 		hp -= after_block - absorbed
-		if hp <= 0 and guard_left and Status.lethal_guard(player_statuses, was_critical) != null:
-			hp = 1
-			guard_left = false
+		if hp <= 0:
+			var guard: Status = Status.lethal_guard(player_statuses, was_critical)
+			if guard != null and saves_used < guard.charges:
+				hp = guard.data.survive_hp(player.max_hp, player.critical_hp_fraction)
+				saves_used += 1
 	preview["hits"] = hits
 	preview["hit_amounts"] = hit_amounts
 	preview["damage_to_hp"] = total_to_hp

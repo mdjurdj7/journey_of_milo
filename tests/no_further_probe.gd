@@ -201,7 +201,7 @@ func _check_other_powers_unchanged() -> void:
 	var player: Combatant = _player(15)
 	_play("dying_light", player)
 	_play("refuse_the_end", player)
-	_expect_eq(_labels(player), ["Dying Light", "Refuse the End"] as Array[String], "Dying Light and Refuse the End stay put while Critical")
+	_expect_eq(_labels(player), ["Dying Light", "Refuse the End ×1"] as Array[String], "Dying Light and Refuse the End (one save, ×1) stay put while Critical")
 	_completed += 1
 
 # The crossing blow is never softened by what it arms, even a multi-hit one:

@@ -243,8 +243,8 @@ func request_play(card_view: CardView) -> void:
 	var card: CardData = card_view.card_data
 	if player.energy_cost(card) > player.energy:
 		return
-	# A once-per-combat power already up or already spent (Refuse the End)
-	# - the hand shows it faded, and this is the rule behind the fade.
+	# A fixed Toll the player doesn't hold (Come Due) - the hand shows it
+	# faded, and this is the rule behind the fade.
 	if EffectResolver.card_blocked(card, player):
 		return
 	# Every enemy buried: an enemy-target card has nothing to land on.
@@ -534,6 +534,12 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 	if result["damage_to_hp"] > 0:
 		RunLogger.log_damage_taken(result["damage_to_hp"])
 		_report_damage(enemy, player, result["damage_to_hp"], "attack")
+	# A lethal guard that left the player above where the hit found them
+	# (Refuse the End's survive HP): the run's HP follows, the way a card's
+	# heal does - HP only, no Toll.
+	if result["saved_heal"] > 0:
+		RunState.heal(result["saved_heal"])
+		hp_changed.emit(player.hp, player.max_hp)
 	if result["grace_opened"] > 0:
 		RunLogger.log_grace_opened(result["grace_opened"], player.grace)
 		grace_changed.emit(player.grace)

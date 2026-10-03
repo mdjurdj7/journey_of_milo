@@ -64,9 +64,9 @@ var took_damage_last_turn: bool = false
 # critical_hp_fraction over it. Read through is_critical_at(), never
 # compared against hp directly, so the rule lives in one place.
 var critical_hp_fraction: float = 0.3
-# Once-per-combat statuses that have fired this fight (StatusData.once_
-# per_combat) - what keeps a second copy of the card from re-arming one.
-# Per fight, like everything else here.
+# Lethal guards that have fired their last charge this fight (Refuse the
+# End - Status.refuse_lethal()), each once: the readout's spent line. A
+# copy played since arms it again. Per fight, like everything else here.
 var spent_statuses: Array[StatusData] = []
 # Drain a counter (The Return) has handed over and nothing has resolved
 # yet - set here, where a loss is counted but no enemy is in reach, and

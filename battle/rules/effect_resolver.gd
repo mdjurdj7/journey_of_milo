@@ -109,8 +109,7 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 
 # Whether the rules forbid playing this card right now, whatever its
 # energy: it spends a fixed Toll the player doesn't hold (SPEND_TOLL - Come
-# Due), or it would apply a once-per-combat status that is already up or
-# has already fired this fight (Refuse the End). Read by BattleController.
+# Due). Read by BattleController.
 # request_play() and by the hand, which fades the card - so a copy that
 # can't be paid for shows it rather than being taken and doing nothing.
 static func card_blocked(card: CardData, player: Combatant) -> bool:
@@ -118,14 +117,6 @@ static func card_blocked(card: CardData, player: Combatant) -> bool:
 		return false
 	for effect in card.effects:
 		if effect != null and effect.effect_type == CardEffect.EffectType.SPEND_TOLL and player.toll < effect.toll_cost:
-			return true
-	for effect in card.effects:
-		if effect == null or effect.effect_type != CardEffect.EffectType.APPLY_STATUS:
-			continue
-		var data: StatusData = effect.status_data
-		if data == null or not data.once_per_combat:
-			continue
-		if Status.find_in(player.statuses, data) != null or player.spent_statuses.has(data):
 			return true
 	return false
 

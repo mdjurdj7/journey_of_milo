@@ -58,6 +58,7 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {hp}       replacement_hp_cost       {min_cost} replaces_cost_at_least
 #   {alone_bonus} grants_when_alone's attack_damage_bonus (what it turns into)
 #   {reduction} next_card_cost_reduction × stacks
+#   {survive_hp} survive_hp() for the holder (only with one - describe(holder))
 #   {s}        "s" unless the count token before it is 1 ("Attack{s}")
 # An unknown token is left standing. "It" is the enemy holding it, "you"
 # the player.
@@ -177,10 +178,16 @@ const DURATION_UNTIL_TRIGGERED := -2
 @export var toll_spend_advances: bool = false
 
 # The Refuse the End rule: an ENEMY hit that would take the player to 0
-# HP while they're Critical leaves them at 1 instead, and removes this
-# status (EnemyTurn.take_turn()). Self-inflicted loss never reaches it -
-# that goes through DamagePipeline.apply_bypass(), which doesn't ask.
+# HP while they're Critical leaves them at survive_hp() instead - raised
+# to it from below - and spends one of this status's charges, each copy
+# played adding one (EnemyTurn.take_turn(), Status.refuse_lethal()).
+# Self-inflicted loss never reaches it - that goes through
+# DamagePipeline.apply_bypass(), which doesn't ask.
 @export var prevents_lethal_while_critical: bool = false
+# Where a lethal guard leaves the player, as a fraction of max HP -
+# rounded down, at least 1, and always still Critical (survive_hp()).
+# Read only with prevents_lethal_while_critical.
+@export_range(0.0, 1.0, 0.01) var survive_fraction: float = 0.15
 
 # Extra Toll the next time its holder loses HP to their own effect (a
 # card's self-damage, a stance's price, a status tick) - on top of the
@@ -200,10 +207,6 @@ const DURATION_UNTIL_TRIGGERED := -2
 # the stacks' total, not one per stack (DrainEffect.drain()).
 @export var self_loss_trigger_drain: int = 0
 
-# Can be held at most once per fight: while it's active, or once it has
-# fired (Combatant.spent_statuses), a card that would apply it can't be
-# played (EffectResolver.card_blocked()).
-@export var once_per_combat: bool = false
 
 # A cost replacement (Collateral): while a charge is waiting, the next
 # card whose Energy cost - after every other modifier, House Key's free
@@ -226,3 +229,14 @@ const DURATION_UNTIL_TRIGGERED := -2
 # BattleController._resolve_play()). Stacks count through stack_count -
 # pair it with StackRule.IGNORE and DURATION_UNTIL_REMOVED. 0 = none.
 @export var next_card_cost_reduction: int = 0
+
+# The HP a lethal guard leaves its holder at, for their max HP and
+# Critical line: survive_fraction of max HP, rounded down, at least 1 -
+# and if that would sit above the Critical line, the highest HP still on
+# it (70 max HP: 10; a fraction past the line at 70: 21). The epsilon
+# keeps a product that should be whole (0.29 x 100) off the floor below.
+func survive_hp(max_hp: int, critical_fraction: float) -> int:
+	var hp: int = maxi(floori(max_hp * survive_fraction + 0.0001), 1)
+	if not Combatant.critical_at(hp, max_hp, critical_fraction):
+		hp = maxi(floori(max_hp * critical_fraction + 0.0001), 1)
+	return hp

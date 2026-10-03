@@ -12,7 +12,7 @@ extends SceneTree
 
 const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
-const CASES := 12
+const CASES := 14
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const SAFETY_SECONDS := 60.0
 
@@ -36,9 +36,11 @@ func _initialize() -> void:
 	_check_last_resort()
 	_check_bonus_once_per_card()
 	_check_refuse_the_end()
+	_check_refuse_the_end_copies()
 	_check_preview()
 	_check_reckoning()
 	await _check_faces()
+	await _check_refuse_the_end_face()
 	if _completed != CASES:
 		_failures += 1
 		print("FAIL: only %d of %d cases ran to the end" % [_completed, CASES])
@@ -195,24 +197,58 @@ func _check_bonus_once_per_card() -> void:
 	_expect_eq(_deal(card, player), 19, "Two-hit Attack: 5 + 9 bonus + 5")
 	_completed += 1
 
+# Refuse the End: an enemy's lethal hit on a player who was Critical
+# before it leaves them at 15% of max HP - 10 of 70 - raised to it from
+# below, and spends one save. Never from above the line, never for
+# self-inflicted loss.
 func _check_refuse_the_end() -> void:
 	var power: CardData = _card("refuse_the_end")
-	var player: Combatant = _player(10)
+	var guard: StatusData = power.effects[0].status_data
+	_expect_eq(power.removal_scope, CardData.RemovalScope.SPENT, "Refuse the End is Spent")
+	_expect_eq(guard.survive_hp(70, CRITICAL_FRACTION), 10, "It survives at 10 at 70 max HP")
+	_expect_eq(guard.survive_hp(100, CRITICAL_FRACTION), 15, "...15 at 100")
+	_expect_eq(guard.survive_hp(4, CRITICAL_FRACTION), 1, "...at least 1 (4 max HP)")
+	# Never above the Critical line: a fraction past it clamps to its top.
+	var greedy: StatusData = guard.duplicate()
+	greedy.survive_fraction = 0.5
+	_expect_eq(greedy.survive_hp(70, CRITICAL_FRACTION), 21, "A fraction past the line clamps to the highest Critical HP: 21 at 70")
+	_expect_eq(greedy.survive_hp(40, CRITICAL_FRACTION), 12, "...12 at 40")
+	for max_hp: int in [10, 37, 70, 101]:
+		var top: int = greedy.survive_hp(max_hp, CRITICAL_FRACTION)
+		_expect(Combatant.critical_at(top, max_hp, CRITICAL_FRACTION) and not Combatant.critical_at(top + 1, max_hp, CRITICAL_FRACTION), "...at %d max HP: %d, the top of the line" % [max_hp, top])
+
+	# Saved from below its survive HP: raised to it, nothing lost.
+	var player: Combatant = _player(5)
 	_play(power, player, null)
-	_expect(EffectResolver.card_blocked(power, player), "A second copy can't be played while armed")
 	var data: EnemyData = _attacker(30)
 	var enemy: Combatant = _enemy(data)
-	var preview: Dictionary = EnemyTurn.preview_intent(enemy, data, player)
-	_expect(not bool(preview["lethal"]), "Intent isn't lethal while the guard would hold")
+	_expect(not bool(EnemyTurn.preview_intent(enemy, data, player)["lethal"]), "Intent isn't lethal while a save is armed")
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(player.hp, 1, "Refuse the End leaves 1 HP")
-	_expect_eq(int(result["damage_to_hp"]), 9, "Reported loss is what was actually lost")
-	_expect(Status.find_in(player.statuses, power.effects[0].status_data) == null, "Refuse the End is gone once spent")
-	_expect(EffectResolver.card_blocked(power, player), "Spent: another copy can't re-arm it")
-	preview = EnemyTurn.preview_intent(enemy, data, player)
-	_expect(bool(preview["lethal"]), "Intent lethal again once spent")
+	_expect_eq(player.hp, 10, "Saved from 5: raised to 10")
+	_expect_eq(int(result["damage_to_hp"]), 0, "...nothing lost")
+	_expect_eq(int(result["saved_heal"]), 5, "...the 5 it rose reported as a heal, for the run's HP")
+	_expect(Status.find_in(player.statuses, guard) == null, "Its one save spent, it's gone")
+	_expect(player.spent_statuses.has(guard), "...and reads as spent")
+	_expect(bool(EnemyTurn.preview_intent(enemy, data, player)["lethal"]), "Intent lethal again once spent")
 	EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(player.hp, 0, "Second lethal hit kills")
+	_expect_eq(player.hp, 0, "The next lethal hit kills")
+
+	# Saved from above it: the hit takes them down to it.
+	player = _player(18)
+	_play(power, player, null)
+	result = EnemyTurn.take_turn(enemy, data, player)
+	_expect_eq(player.hp, 10, "Saved from 18: left at 10")
+	_expect_eq(int(result["damage_to_hp"]), 8, "...the 8 it lost reported")
+	_expect_eq(int(result["saved_heal"]), 0, "...and no heal")
+
+	# The preview knows where a save leaves them - 10, not 1: from 5, two
+	# hits of 9 are saved then survived; two of 10 are saved then lethal.
+	player = _player(5)
+	_play(power, player, null)
+	var nines: EnemyData = _attacker_hits(9, 2)
+	_expect(not bool(EnemyTurn.preview_intent(_enemy(nines), nines, player)["lethal"]), "Saved at 10, a second hit of 9 isn't lethal")
+	var tens: EnemyData = _attacker_hits(10, 2)
+	_expect(bool(EnemyTurn.preview_intent(_enemy(tens), tens, player)["lethal"]), "...a second hit of 10 is")
 
 	# Not Critical before the hit: no save.
 	player = _player(50)
@@ -226,7 +262,69 @@ func _check_refuse_the_end() -> void:
 	_play(power, player, null)
 	_deal(_card("last_wager"), player)
 	_expect_eq(player.hp, 0, "Self-damage isn't saved")
-	_expect(Status.find_in(player.statuses, power.effects[0].status_data) != null, "Guard untouched by self-damage")
+	_expect(Status.find_in(player.statuses, guard) != null, "Guard untouched by self-damage")
+	_completed += 1
+
+# Each copy arms one save: two played give two in one fight - both spent
+# by one two-hit attack, a lethal hit each - and a copy played after they
+# fired arms another. The standing row counts them.
+func _check_refuse_the_end_copies() -> void:
+	var power: CardData = _card("refuse_the_end")
+	var guard: StatusData = power.effects[0].status_data
+	var player: Combatant = _player(5)
+	_play(power, player, null)
+	_expect(not EffectResolver.card_blocked(power, player), "A second copy can be played while one is armed")
+	_play(power, player, null)
+	var armed: Status = Status.find_in(player.statuses, guard)
+	_expect(armed != null and armed.charges == 2, "Two copies: two saves armed")
+	if armed != null:
+		_expect_eq(armed.label(), "Refuse the End ×2", "...read as \"Refuse the End ×2\"")
+	var twice: EnemyData = _attacker_hits(30, 2)
+	var enemy: Combatant = _enemy(twice)
+	_expect(not bool(EnemyTurn.preview_intent(enemy, twice, player)["lethal"]), "Two lethal hits preview as survived with two saves")
+	EnemyTurn.take_turn(enemy, twice, player)
+	_expect_eq(player.hp, 10, "...and are: both saved, at 10")
+	_expect(Status.find_in(player.statuses, guard) == null, "Both saves spent")
+	_expect_eq(player.spent_statuses.count(guard), 1, "...one spent line, however many fired")
+	_play(power, player, null)
+	armed = Status.find_in(player.statuses, guard)
+	_expect(armed != null and armed.charges == 1, "A copy played after they fired arms one more")
+	if armed != null:
+		_expect_eq(armed.label(), "Refuse the End ×1", "...read as \"Refuse the End ×1\"")
+	_expect(bool(EnemyTurn.preview_intent(enemy, twice, player)["lethal"]), "One save against two lethal hits: lethal")
+	var once: EnemyData = _attacker(30)
+	enemy = _enemy(once)
+	EnemyTurn.take_turn(enemy, once, player)
+	_expect_eq(player.hp, 10, "The third save holds, at 10")
+	EnemyTurn.take_turn(enemy, once, player)
+	_expect_eq(player.hp, 0, "...and with none left the next lethal hit kills")
+	_completed += 1
+
+# The face and the readout print the live survive HP: the fight's player
+# in a battle hand, the run's max HP anywhere else - and the readout says
+# what the card says.
+func _check_refuse_the_end_face() -> void:
+	var power: CardData = _card("refuse_the_end")
+	var guard: StatusData = power.effects[0].status_data
+	var player: Combatant = _player(5)
+	var face: String = await _face("refuse_the_end", player)
+	_expect_eq(face, "The next time an enemy would kill you while Critical, survive at 10 HP.\nSpent.", "The face in battle, at 70 max HP")
+	var small := Combatant.new(40)
+	small.hp = 5
+	small.critical_hp_fraction = CRITICAL_FRACTION
+	face = await _face("refuse_the_end", small)
+	_expect(face.contains("survive at 6 HP"), "...at 40 max HP: 6 - " + face)
+	var run_state: Node = root.get_node_or_null(^"RunState")
+	var run_max: int = int(run_state.get(&"player_max_hp")) if run_state != null else 0
+	if run_state != null:
+		run_state.set(&"player_max_hp", 100)
+	face = await _face_out_of_battle("refuse_the_end")
+	_expect(face.contains("survive at 15 HP"), "Out of battle, for the run's 100 max HP: 15 - " + face)
+	if run_state != null:
+		run_state.set(&"player_max_hp", run_max)
+	_play(power, small, null)
+	var armed: Status = Status.find_in(small.statuses, guard)
+	_expect(armed != null and armed.describe(small) == "The next time an enemy would kill you while Critical, survive at 6 HP.", "The readout says what the card says, its number the holder's")
 	_completed += 1
 
 # The face's reading: Last Wager's 4 HP is paid after its blow, so it
@@ -317,6 +415,19 @@ func _face(card_name: String, player: Combatant) -> String:
 	view.queue_free()
 	return text
 
+# The rules text a face shows for `card_name` outside a battle hand (the
+# deck view, the compendium) - no fight to read, colour tags stripped.
+func _face_out_of_battle(card_name: String) -> String:
+	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(view)
+	await process_frame
+	view.set_card_data(_card(card_name))
+	var regex := RegEx.new()
+	regex.compile("\\[/?[a-z]+(=[^\\]]*)?\\]")
+	var text: String = regex.sub(view.rules_text.text, "", true)
+	view.queue_free()
+	return text
+
 # The LIVE/DORMANT reading a battle-hand face shows for `card_name`.
 func _face_state(card_name: String, player: Combatant) -> CardBonus.State:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
@@ -346,6 +457,12 @@ func _attacker(damage: int) -> EnemyData:
 	var data := EnemyData.new()
 	data.max_hp = 50
 	data.intents = [intent]
+	return data
+
+# One ATTACK intent of `hits` hits, `damage` each.
+func _attacker_hits(damage: int, hits: int) -> EnemyData:
+	var data: EnemyData = _attacker(damage)
+	data.intents[0].hits = hits
 	return data
 
 func _enemy(data: EnemyData) -> Combatant:

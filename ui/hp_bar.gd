@@ -120,7 +120,7 @@ class_name HPBar
 	set(value):
 		row_line_gap_px = value
 		_relayout_if_ready()
-# A spent once-per-combat line's ink - grey, still there.
+# A spent guard's line ink (Refuse the End fired) - grey, still there.
 @export_range(0.0, 1.0) var row_spent_alpha: float = 0.32:
 	set(value):
 		row_spent_alpha = value
@@ -906,7 +906,7 @@ func hide_grace() -> void:
 #   "text"           the line as drawn ("The Return 2/5")
 #   "glyph"          the stance mark before it
 #   "count"          > 0 for a counter, with "progress" of it - the hairline
-#   "spent"          a spent once-per-combat effect, at row_spent_alpha
+#   "spent"          a guard spent this fight, at row_spent_alpha
 #   "name", "rules"  its hover reveal: the name and what it does now
 #                    (Stance.describe()/Status.describe())
 func set_standing_row(items: Array[Dictionary]) -> void:

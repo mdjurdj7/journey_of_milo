@@ -417,8 +417,8 @@ func _on_stance_changed(stance: Stance) -> void:
 # count, so HPBar can stay a thing that draws what it is handed (see
 # HPBar.set_standing_row()). One line each, top to bottom: the stance
 # ("Self-Eater ×2" once stacked); every status in the order it was
-# applied, as Status.label() reads it; the once-per-combat effects already
-# spent this fight, grey; then the counters ("The Return 2/5"), with
+# applied, as Status.label() reads it; the guards already spent this
+# fight and not armed again, grey; then the counters ("The Return 2/5"), with
 # their progress. Names as authored, in title case.
 func _refresh_standing_row() -> void:
 	var player: Combatant = battle_controller.player
@@ -433,15 +433,19 @@ func _refresh_standing_row() -> void:
 	for active: Status in player.statuses:
 		if active.data == null:
 			continue
-		var line: Dictionary = {"text": active.label(), "name": active.data.display_name, "rules": active.describe()}
+		var line: Dictionary = {"text": active.label(), "name": active.data.display_name, "rules": active.describe(player)}
 		if active.has_self_loss_counter():
 			line["count"] = active.data.self_loss_trigger_count
 			line["progress"] = active.progress
 			counters.append(line)
 		else:
 			lines.append(line)
+	# A spent status reads as spent - unless a copy played since has armed
+	# it again (Refuse the End), when the live line says it all.
 	for spent: StatusData in player.spent_statuses:
-		lines.append({"text": spent.display_name, "spent": true, "name": spent.display_name, "rules": Status.new(spent).describe()})
+		if Status.find_in(player.statuses, spent) != null:
+			continue
+		lines.append({"text": spent.display_name, "spent": true, "name": spent.display_name, "rules": Status.new(spent).describe(player)})
 	lines.append_array(counters)
 	_field_hp_bar.set_standing_row(lines)
 	_field_hp_bar.set_hand_top_y(hand_container.get_rest_top_y())

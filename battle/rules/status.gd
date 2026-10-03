@@ -90,11 +90,13 @@ func label() -> String:
 # What this status does right now, in rules voice: StatusData.description
 # with its tokens filled from this instance's live numbers (see the token
 # list on StatusData.description). Read by the battle readouts' reveal.
-func describe() -> String:
+# `holder`, when given, fills what depends on who holds it - a lethal
+# guard's {survive_hp}.
+func describe(holder: Combatant = null) -> String:
 	if data == null:
 		return ""
 	var grant: int = data.grants_on_critical.default_charges if data.grants_on_critical != null else 0
-	return fill_template(data.description, {
+	var values: Dictionary = {
 		"charges": charges,
 		"turns": turns_remaining,
 		"stacks": stack_count,
@@ -111,7 +113,10 @@ func describe() -> String:
 		"min_cost": data.replaces_cost_at_least,
 		"alone_bonus": data.grants_when_alone.attack_damage_bonus if data.grants_when_alone != null else 0,
 		"reduction": data.next_card_cost_reduction * stack_count,
-	})
+	}
+	if holder != null:
+		values["survive_hp"] = data.survive_hp(holder.max_hp, holder.critical_hp_fraction)
+	return fill_template(data.description, values)
 
 # Replaces each {token} in `text` with its value from `values`, and each
 # {s} with "s" unless the nearest count token before it is 1 - so a
@@ -444,19 +449,22 @@ static func lethal_guard(statuses: Array[Status], was_critical: bool) -> Status:
 	return null
 
 # An enemy hit just took `player` to 0 HP. If they were Critical before it
-# and hold a lethal guard, they're left at 1 HP and the guard is spent -
-# removed, and recorded when it's once per combat. Returns whether it
-# fired.
+# and hold a lethal guard, they're left at its survive HP (StatusData.
+# survive_hp()) and one of its charges is spent - one per copy played. The
+# last charge removes it, recorded once in spent_statuses for the
+# readout. Returns whether it fired.
 static func refuse_lethal(player: Combatant, was_critical: bool) -> bool:
 	if player.hp > 0:
 		return false
 	var guard: Status = lethal_guard(player.statuses, was_critical)
 	if guard == null:
 		return false
-	player.hp = 1
-	player.statuses.erase(guard)
-	if guard.data.once_per_combat:
-		player.spent_statuses.append(guard.data)
+	player.hp = guard.data.survive_hp(player.max_hp, player.critical_hp_fraction)
+	guard.charges -= 1
+	if guard.charges <= 0:
+		player.statuses.erase(guard)
+		if not player.spent_statuses.has(guard.data):
+			player.spent_statuses.append(guard.data)
 	return true
 
 # The holder's own attack has resolved: every status that lasts only until

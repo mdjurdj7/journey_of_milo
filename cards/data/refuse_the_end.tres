@@ -16,5 +16,7 @@ rarity = 3
 cost = 1
 card_type = 3
 target_type = 1
-description = "Once per fight: if an enemy would kill you while Critical, survive at 1 HP."
+description = "The next time an enemy would kill you while Critical, survive at {survive_hp} HP.
+Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
+removal_scope = 1

@@ -99,6 +99,10 @@ const TOKEN_TOLL := "{toll}"
 # What a TOLL_HEAL would heal for at that Toll: half of whatever it can
 # actually spend, capped. Debt Forgiven's own preview.
 const TOKEN_TOLL_HEAL := "{toll_heal}"
+# Where a lethal guard the card applies would leave the player (Refuse the
+# End - StatusData.survive_hp()): for the fight's player in a battle hand,
+# for the run's max HP anywhere else.
+const TOKEN_SURVIVE_HP := "{survive_hp}"
 # The blank border Godot's glyph rasteriser puts round every glyph
 # bitmap - an engine fact, not a tunable. See _cap_top().
 const GLYPH_RECT_MARGIN_PX := 1.0
@@ -639,7 +643,40 @@ func _resolve_tokens(description: String) -> String:
 		text = text.replace(TOKEN_TOLL, str(_toll_token_value()))
 	if text.contains(TOKEN_TOLL_HEAL):
 		text = text.replace(TOKEN_TOLL_HEAL, str(_toll_heal_preview()))
+	if text.contains(TOKEN_SURVIVE_HP):
+		var survive: int = _survive_hp_preview()
+		if survive > 0:
+			text = text.replace(TOKEN_SURVIVE_HP, str(survive))
 	return text
+
+# The survive HP of the lethal guard this card applies: for the fight's
+# player in a battle hand (its bonus context), otherwise for the run's
+# max HP and Critical line - the Wanderer's data before a run starts (the
+# title's compendium). The autoload is looked up by path, as KeywordTable
+# does. 0 with no such guard, which leaves the token standing.
+func _survive_hp_preview() -> int:
+	var guard: StatusData = null
+	for effect in card_data.effects:
+		if effect != null and effect.status_data != null and effect.status_data.prevents_lethal_while_critical:
+			guard = effect.status_data
+	if guard == null:
+		return 0
+	if _bonus_context != null and _bonus_context.player != null:
+		return guard.survive_hp(_bonus_context.player.max_hp, _bonus_context.player.critical_hp_fraction)
+	var max_hp: int = 0
+	var character: CharacterData = null
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var run_state: Node = tree.root.get_node_or_null(^"RunState") if tree != null else null
+	if run_state != null:
+		max_hp = int(run_state.get(&"player_max_hp"))
+		character = run_state.get(&"character") as CharacterData
+	if character == null:
+		character = load(KeywordTable.FALLBACK_CHARACTER_PATH) as CharacterData
+	if character == null:
+		return 0
+	if max_hp <= 0:
+		max_hp = character.max_hp
+	return guard.survive_hp(max_hp, character.critical_hp_fraction)
 
 # What this card's TOLL_HEAL would actually heal at the Toll now held -
 # the same arithmetic toll_heal_effect.gd does, so the face can't promise
