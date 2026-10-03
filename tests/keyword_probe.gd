@@ -27,15 +27,13 @@ const NO_FURTHER_PATH := "res://cards/data/no_further.tres"
 const CORNERED_PATH := "res://cards/data/cornered.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
-const SELF_EATER_PATH := "res://cards/data/self_eater.tres"
-const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Attack"]
+const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent"]
 const DEFINITIONS: Dictionary = {
 	"Toll": "Gained when you lose HP to your own effects. Up to 5 carries over after a fight.",
 	"Grace": "After enemy hits get through your Block, damage you deal on your next turn wins HP back, up to the largest hit.",
 	"Critical": "At or below 30% of your max HP.",
 	"Drain": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one.",
 	"Spent": "Removed for the rest of this fight once played.",
-	"Attack": "A card marked STRIKE, or an enemy's damaging move. Some effects only apply to Attacks.",
 }
 const SCALES: Array[float] = [0.95, 1.15, 2.2]
 const ENEMY_HP := 999
@@ -88,9 +86,10 @@ func _check_table() -> void:
 	_expect(CardView._format_rules("Spent.").contains("[b]Spent[/b]"), "Spent is set in bold")
 	# A keyword's plural is the keyword: bold as written, its definition
 	# the singular's. Only a plural - a longer word isn't one.
-	_expect_eq(CardView._format_rules("Your Attacks deal 3 more."), "Your [b]Attacks[/b] deal 3 more.", "Attacks is set in bold, as written")
-	_expect_eq(table.definition("Attacks"), DEFINITIONS["Attack"], "...and reads Attack's definition")
-	_expect_eq(CardView._format_rules("Attacker."), "Attacker.", "Attacker isn't a keyword")
+	_expect_eq(CardView._format_rules("It Drains twice."), "It [b]Drains[/b] twice.", "Drains is set in bold, as written")
+	_expect_eq(table.definition("Drains"), DEFINITIONS["Drain"], "...and reads Drain's definition")
+	_expect_eq(CardView._format_rules("Draining."), "Draining.", "Draining isn't a keyword")
+	_expect_eq(CardView._format_rules("Your Attacks deal 3 more."), "Your Attacks deal 3 more.", "Attack is plain text, not a keyword")
 	_completed += 1
 
 # Critical's threshold and Toll's carry read the run's character as it
@@ -119,7 +118,7 @@ func _check_hit_test() -> void:
 	var words: Array[String] = []
 	for entry: Dictionary in rects:
 		words.append(String(entry["keyword"]))
-	_expect_eq(words, ["Critical", "Attack", "Spent"] as Array[String], "No Further's keywords, in text order")
+	_expect_eq(words, ["Critical", "Spent"] as Array[String], "No Further's keywords, in text order")
 	var rules: Rect2 = view.rules_text.get_rect().grow(4.0)
 	for entry: Dictionary in rects:
 		var rect: Rect2 = entry["rect"]
@@ -135,18 +134,22 @@ func _check_hit_test() -> void:
 	for entry: Dictionary in cornered.keyword_rects():
 		found.append(String(entry["keyword"]))
 	_expect_eq(found, ["Critical"] as Array[String], "Cornered's one keyword")
-	# A plural on the face: Self-Eater's "Attacks" is found as Attack, its
-	# rect over the whole word as written.
-	var self_eater: CardView = await _card_view(SELF_EATER_PATH)
-	var plural: Array[Dictionary] = self_eater.keyword_rects()
-	_expect_eq(plural.size(), 1, "Self-Eater has one keyword")
+	# A plural on the face: no card prints one today, so a probe-only card
+	# reads "Drains" - found as Drain, its rect over the whole word as
+	# written.
+	var drains_card := CardData.new()
+	drains_card.card_name = "Probe Drains"
+	drains_card.description = "Your next hit Drains."
+	var plural_view: CardView = await _card_view_of(drains_card)
+	var plural: Array[Dictionary] = plural_view.keyword_rects()
+	_expect_eq(plural.size(), 1, "The probe card has one keyword")
 	if not plural.is_empty():
-		var attacks: Rect2 = plural[0]["rect"]
-		_expect_eq(String(plural[0]["keyword"]), "Attack", "...its \"Attacks\" resolving to Attack")
-		_expect_eq(self_eater.keyword_at(attacks.get_center()), "Attack", "...found at its centre")
-		var bold: Font = self_eater.rules_text.get_theme_font("bold_font")
-		var font_size: int = self_eater.rules_text.get_theme_font_size("normal_font_size")
-		_expect(attacks.size.x >= bold.get_string_size("Attacks", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x, "...its rect as wide as \"Attacks\" (%.1f)" % attacks.size.x)
+		var drains: Rect2 = plural[0]["rect"]
+		_expect_eq(String(plural[0]["keyword"]), "Drain", "...its \"Drains\" resolving to Drain")
+		_expect_eq(plural_view.keyword_at(drains.get_center()), "Drain", "...found at its centre")
+		var bold: Font = plural_view.rules_text.get_theme_font("bold_font")
+		var font_size: int = plural_view.rules_text.get_theme_font_size("normal_font_size")
+		_expect(drains.size.x >= bold.get_string_size("Drains", HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x, "...its rect as wide as \"Drains\" (%.1f)" % drains.size.x)
 	_free_views()
 	_completed += 1
 
@@ -336,11 +339,14 @@ func _rect_of(rects: Array[Dictionary], keyword: String) -> Rect2:
 	return Rect2()
 
 func _card_view(path: String) -> CardView:
+	return await _card_view_of(load(path) as CardData)
+
+func _card_view_of(data: CardData) -> CardView:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
 	root.add_child(view)
 	# _ready() first: before the tree's first frame it hasn't run yet.
 	await process_frame
-	view.set_card_data(load(path) as CardData)
+	view.set_card_data(data)
 	_views.append(view)
 	await _frames(3)
 	return view
