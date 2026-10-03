@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://bpbe8pfqdlvsf" path="res://cards/art/Wanderer/Hold Fast.png" id="9_art"]
 
 [sub_resource type="Resource" id="E_block"]
 script = ExtResource("2_card_effect")
@@ -28,3 +29,4 @@ target_type = 1
 description = "Gain {block} block. Lose {hp_cost} HP.
 Draw {draw}."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_block"), SubResource("E_self"), SubResource("E_draw")])
+art = ExtResource("9_art")
