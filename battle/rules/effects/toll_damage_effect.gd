@@ -19,9 +19,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	var base: int = consumed + ctx.take_attack_bonus() + ctx.take_mark_bonus(ctx.target)
 	if base <= 0:
 		return
-	var amount: int = Status.apply_modifiers(base, ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
-	var incoming: int = Status.apply_modifiers(amount, ctx.target.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
-	var result := DamagePipeline.resolve(incoming, ctx.target)
+	var result := DamagePipeline.resolve(DamageEffect.landed(base, ctx.player, ctx.target), ctx.target)
 	if result["damage_to_hp"] > 0:
 		ctx.report_damage(ctx.target, result["damage_to_hp"], "card")
 		ctx.grace_reclaim(result["damage_to_hp"])

@@ -108,6 +108,13 @@ func take_mark_bonus(enemy: Combatant) -> int:
 	mark_bonus_paid.append(enemy)
 	return Status.spend_mark_bonus(enemy.statuses)
 
+# What take_mark_bonus() would pay this card against `enemy`, spending
+# nothing - the card face's reading of the same gate.
+func mark_bonus_for(enemy: Combatant) -> int:
+	if not card_is_attack or enemy == null or mark_bonus_paid.has(enemy):
+		return 0
+	return Status.mark_bonus(enemy.statuses)
+
 # Every Block the player gains goes through here, so a stance that
 # forbids it (Last Resort) is asked in one place. Returns what was gained.
 func gain_block(amount: int) -> int:

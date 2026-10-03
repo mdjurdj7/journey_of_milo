@@ -277,20 +277,33 @@ static func count_self_loss(statuses: Array[Status]) -> int:
 			due += active.trigger_drain()
 	return due
 
-# One Attack card is landing on the holder of `statuses`: the extra damage
-# every mark on it grants (StatusData.attack_bonus_against_holder), each
-# spending one charge and leaving once it has none. Called at most once
-# per Attack card per enemy - EffectContext.take_mark_bonus() keeps that.
-static func spend_mark_bonus(statuses: Array[Status]) -> int:
+# The extra damage one Attack card would deal the holder of `statuses`
+# for every mark on it (StatusData.attack_bonus_against_holder - Come
+# Due) with a charge left. Read only: what a card face previews, and what
+# spend_mark_bonus() below pays and then spends.
+static func mark_bonus(statuses: Array[Status]) -> int:
 	var total: int = 0
+	for active in statuses:
+		if _pays_mark_bonus(active):
+			total += active.data.attack_bonus_against_holder
+	return total
+
+# One Attack card is landing on the holder of `statuses`: mark_bonus(),
+# with each mark that paid it spending one charge and leaving once it has
+# none. Called at most once per Attack card per enemy - EffectContext.
+# take_mark_bonus() keeps that.
+static func spend_mark_bonus(statuses: Array[Status]) -> int:
+	var total: int = mark_bonus(statuses)
 	for active in statuses.duplicate():
-		if active.data.attack_bonus_against_holder <= 0 or not active.has_charges() or active.charges <= 0:
+		if not _pays_mark_bonus(active):
 			continue
-		total += active.data.attack_bonus_against_holder
 		active.charges -= 1
 		if active.charges <= 0:
 			statuses.erase(active)
 	return total
+
+static func _pays_mark_bonus(active: Status) -> bool:
+	return active.data.attack_bonus_against_holder > 0 and active.has_charges() and active.charges > 0
 
 # An enemy's attack against the holder of `statuses` has resolved, every
 # hit of it: each status that lasts only until then (StatusData.consumed_

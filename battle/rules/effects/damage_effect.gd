@@ -32,11 +32,22 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 		# A mark on this enemy (Come Due) adds to the blow against it
 		# alone, once per card - so it's per target, and like the attack
 		# bonus it goes in before the modifiers.
-		var amount: int = Status.apply_modifiers(blow + ctx.take_mark_bonus(enemy), ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
-		var incoming: int = Status.apply_modifiers(amount, enemy.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
-		var result := DamagePipeline.resolve(incoming, enemy)
+		var result := DamagePipeline.resolve(landed(blow + ctx.take_mark_bonus(enemy), ctx.player, enemy), enemy)
 		if enemy.hp <= 0:
 			ctx.killed_this_card = true
 		if result["damage_to_hp"] > 0:
 			ctx.report_damage(enemy, result["damage_to_hp"], "card")
 			ctx.grace_reclaim(result["damage_to_hp"])
+
+# The number one blow lands for once the statuses have had their say -
+# the attacker's outgoing modifiers, then `enemy`'s incoming ones - ahead
+# of block and the damage pipeline. `blow` is everything the card itself
+# adds up to: its value, the attack bonus and the mark bonus. A null
+# `enemy` (a card face with no one to read against) skips the incoming
+# half. The resolvers and the card face both call this, so the face can't
+# print a number the rules won't land.
+static func landed(blow: int, player: Combatant, enemy: Combatant) -> int:
+	var amount: int = Status.apply_modifiers(blow, player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+	if enemy == null:
+		return amount
+	return Status.apply_modifiers(amount, enemy.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
