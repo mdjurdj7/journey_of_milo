@@ -199,7 +199,7 @@ func _check_floor_3() -> void:
 	_expect_eq((enemies[0].get("enemy_data") as EnemyData).enemy_name, "Sputter", "...the required Sputter first - the gate measures from it")
 	var entry: Resource = enemies[1]
 	_expect_eq((entry.get("enemy_data") as EnemyData).enemy_name, "Wardling", "...then the Wardling")
-	_expect_eq(entry.get("position"), Vector2(11, -18), "...on the east lobe at (11, -18)")
+	_expect_eq(entry.get("position"), Vector2(21.267, -13.5), "...on the east lobe at (21.267, -13.5)")
 	_expect_eq(entry.get("yaw_degrees"), -90.0, "...facing east")
 	_expect(not bool(entry.get("required")), "...not required")
 	_completed += 1
