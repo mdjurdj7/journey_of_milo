@@ -126,6 +126,7 @@ const DISMISS := SLOT_COUNT
 @export var column_px: float = 300.0:
 	set(value):
 		column_px = value
+		_render_objects()
 		_refresh()
 @export var column_gap_px: float = 40.0:
 	set(value):
@@ -290,7 +291,14 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		ambient_energy = value
 		_render_objects()
-@export var render_cell_px: int = 384
+# Each cell renders at its column's on-screen size - column_px times the
+# window's stretch scale - so the objects draw 1:1 at any window size,
+# re-rendered when the window changes. Capped here (768 covers a 5K
+# fullscreen).
+@export var render_cell_max_px: int = 768:
+	set(value):
+		render_cell_max_px = value
+		_render_objects()
 @export_group("")
 
 @export_group("Choices")
@@ -373,6 +381,7 @@ var _rules: TextParagraph = null
 var _lifted: CardView = null
 
 var _viewport: SubViewport = null
+var _cell_px: int = 1
 var _camera: Camera3D = null
 var _light: DirectionalLight3D = null
 var _environment: Environment = null
@@ -503,9 +512,11 @@ func _build_render() -> void:
 	_viewport.own_world_3d = true
 	_viewport.transparent_bg = true
 	_viewport.msaa_3d = Viewport.MSAA_4X
-	_viewport.size = Vector2i(render_cell_px * SLOT_COUNT, render_cell_px)
+	_cell_px = _render_cell_size()
+	_viewport.size = Vector2i(_cell_px * SLOT_COUNT, _cell_px)
 	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(_viewport)
+	get_viewport().size_changed.connect(_render_objects)
 
 	_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
 	for slot in SLOT_COUNT:
@@ -581,11 +592,18 @@ func _render_objects() -> void:
 	_light.light_energy = light_energy
 	_light.rotation = Vector3(deg_to_rad(light_pitch_degrees), deg_to_rad(light_yaw_degrees), 0.0)
 	_environment.ambient_light_energy = ambient_energy
+	_cell_px = _render_cell_size()
+	_viewport.size = Vector2i(_cell_px * SLOT_COUNT, _cell_px)
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	_refresh()
 
 func _scale_of(slot: int) -> float:
 	return _object_scales[slot] if slot < _object_scales.size() else 1.0
+
+# One column's on-screen size in window pixels (see render_cell_max_px).
+func _render_cell_size() -> int:
+	var stretch: float = get_viewport().get_final_transform().get_scale().x if is_inside_tree() else 1.0
+	return clampi(ceili(column_px * stretch), 1, maxi(render_cell_max_px, 1))
 
 # --- Layout ---
 
@@ -645,7 +663,7 @@ func _draw_columns() -> void:
 		elif _taken >= 0:
 			tint = dimmed_modulate
 		if texture != null:
-			var source := Rect2(float(slot * render_cell_px), 0.0, float(render_cell_px), float(render_cell_px))
+			var source := Rect2(float(slot * _cell_px), 0.0, float(_cell_px), float(_cell_px))
 			_draw_layer.draw_texture_rect_region(texture, rect, source, tint)
 		if lit:
 			var y: float = rect.end.y + object_hairline_gap_px
