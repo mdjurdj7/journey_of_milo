@@ -44,8 +44,10 @@ signal disarmed
 # where an inserted value silently rewrites existing .tres data.
 enum KeylineType { STRIKE, GUARD, TOLL, UTILITY, STANCE, POWER }
 
-# Rules-text words set in bold. Whole-word, case-sensitive.
-const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent"]
+# Rules-text words set in bold. Whole-word, case-sensitive. The keyword
+# table's words (KeywordTable) - the same table that defines them on
+# hover, so a word is bold exactly when it has a definition.
+static var KEYWORDS: Array[String] = KeywordTable.shared().keywords()
 
 # Numbers a card's text can defer to its own effects, so the face shows
 # what the card will ACTUALLY do rather than what it did when it was
@@ -322,6 +324,33 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # alike, no grey overlay.
 @export_range(0.0, 1.0) var unplayable_alpha: float = 0.42
 
+@export_group("Keyword Reveal")
+# Hovering a bold keyword on this face shows its definition (Keyword-
+# Table) just above a hand card - below one up for inspection - in the
+# status reveal's type - a
+# StatusReveal of the card's own, drawn at screen size whatever the
+# card's scale. Shown on a lifted hand card (never while it or any other
+# card is armed) and wherever a host turns inspect on (set_keyword_
+# inspect()); fades out when the cursor leaves the word.
+@export var keyword_reveal_ink: Color = Color(0.165, 0.165, 0.18):
+	set(value):
+		keyword_reveal_ink = value
+		_apply_keyword_reveal_style()
+@export var keyword_reveal_font_size_px: int = 13:
+	set(value):
+		keyword_reveal_font_size_px = value
+		_apply_keyword_reveal_style()
+# Screen pixels between the definition and the card's edge, above or
+# below.
+@export var keyword_reveal_gap_px: float = 8.0:
+	set(value):
+		keyword_reveal_gap_px = value
+		_place_keyword_reveal()
+@export var keyword_reveal_fade_sec: float = 0.12:
+	set(value):
+		keyword_reveal_fade_sec = value
+		_apply_keyword_reveal_style()
+
 @export_group("Edge Override")
 # Every card gets the 1px ink frame by default. This is an escape hatch
 # for a caller that wants a DIFFERENT, fixed edge instead (DeckView's own
@@ -393,6 +422,21 @@ var _base_scale: float = 1.0
 # hover entirely (no second lift).
 var _hover_suppressed: bool = false
 var _scale_tween: Tween = null
+# The keyword definition above the card - made in _ready(), top_level so
+# it ignores this card's scale. Which keyword it shows ("" = none), and
+# whether a host has this card up for inspection (set_keyword_inspect()).
+var _keyword_reveal: StatusReveal = null
+var _hovered_keyword: String = ""
+var _keyword_inspect: bool = false
+# The shown definition's width on one line - the reveal wraps at the
+# narrower of this and the card, so a short one centres on the card
+# (StatusReveal sets its lines flush left in its wrap width).
+var _keyword_line_width: float = 0.0
+# Over the reveal's z: above an armed card (HandContainer's 1001).
+const KEYWORD_REVEAL_Z_INDEX := 1100
+# A keyword's hover rect reaches this far past its ink, in card pixels -
+# the measured span is shaped, not read from the drawn glyphs.
+const KEYWORD_HIT_PAD_PX := 2.0
 
 func _ready() -> void:
 	size = card_size
@@ -436,6 +480,14 @@ func _ready() -> void:
 	_bonus_corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_bonus_corner.draw.connect(_draw_bonus_corner)
 	add_child(_bonus_corner)
+	_keyword_reveal = StatusReveal.new()
+	_keyword_reveal.name = "KeywordReveal"
+	_keyword_reveal.top_level = true
+	_keyword_reveal.z_as_relative = false
+	_keyword_reveal.z_index = KEYWORD_REVEAL_Z_INDEX
+	add_child(_keyword_reveal)
+	_apply_keyword_reveal_style()
+	set_process(false)
 	_apply_style()
 	_apply_layout()
 	mouse_entered.connect(_on_mouse_entered)
@@ -814,6 +866,8 @@ func set_base_scale(base_scale: float) -> void:
 # HandContainer: true while any card in the hand is armed.
 func set_hover_suppressed(suppressed: bool) -> void:
 	_hover_suppressed = suppressed
+	if suppressed:
+		clear_keyword_hover()
 	if suppressed and _hovering and not _armed:
 		_lower_from_hover()
 
@@ -842,6 +896,7 @@ func set_rest_offset(offset_y: float) -> void:
 func lift_and_hold() -> void:
 	_armed = true
 	_armed_at_msec = Time.get_ticks_msec()
+	clear_keyword_hover()
 	_set_lifted_look(true)
 	_tween_to(_rest_offset_y, armed_duration_sec)
 	_tween_scale(armed_scale, armed_duration_sec)
@@ -891,6 +946,7 @@ func _on_mouse_entered() -> void:
 
 func _on_mouse_exited() -> void:
 	_hovering = false
+	clear_keyword_hover()
 	if hover_enabled and not _armed and not _hover_suppressed:
 		_lower_from_hover()
 
@@ -929,6 +985,176 @@ func _tween_scale(target: float, duration: float) -> void:
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		clicked.emit(card_data)
+	elif event is InputEventMouseMotion:
+		# Read, never accepted: the hand, the lift and arming see the
+		# motion exactly as before.
+		update_keyword_hover()
+
+# --- Keyword reveal ---
+
+# A host showing this card for inspection (DeckView and the compendium's
+# lifted card, the reward choice, the belongings reveal) turns keyword
+# definitions on for it - and off again when the card goes back.
+func set_keyword_inspect(on: bool) -> void:
+	_keyword_inspect = on
+	if not on:
+		clear_keyword_hover()
+
+# Re-reads which keyword, if any, is under the mouse and shows its
+# definition, or fades it. Called on this card's own motion events, and
+# by a host whose cards don't take the mouse (BelongingsScreen).
+func update_keyword_hover() -> void:
+	var word: String = keyword_at(get_local_mouse_position()) if keyword_hover_allowed() else ""
+	_show_keyword(word)
+
+func clear_keyword_hover() -> void:
+	_show_keyword("")
+
+# Whether a definition may show now: on a hover-lifted hand card while
+# nothing is armed, or on a card a host has up for inspection - never on
+# an armed card.
+func keyword_hover_allowed() -> bool:
+	if card_data == null or _armed:
+		return false
+	if _keyword_inspect:
+		return true
+	return hover_enabled and _hovering and not _hover_suppressed
+
+# The keyword whose definition is up, "" for none.
+func get_hovered_keyword() -> String:
+	return _hovered_keyword
+
+# The bold keyword at `local_pos` (this card's own, unscaled pixels), or
+# "".
+func keyword_at(local_pos: Vector2) -> String:
+	for entry: Dictionary in keyword_rects():
+		var rect: Rect2 = entry["rect"]
+		if rect.has_point(local_pos):
+			return String(entry["keyword"])
+	return ""
+
+# Every bold keyword on the face and the rect it covers, in this card's
+# own unscaled pixels - [{"keyword": String, "rect": Rect2}], in text
+# order - so a hit test holds at any scale. Measured from the rules
+# label's own layout (its lines' character ranges, offsets and widths;
+# it centres both ways), with the span before the word on its line
+# shaped in the label's fonts at its size: RichTextLabel reports no
+# per-character positions.
+func keyword_rects() -> Array[Dictionary]:
+	var found: Array[Dictionary] = []
+	if card_data == null or rules_text == null or KEYWORDS.is_empty():
+		return found
+	var text: String = rules_text.get_parsed_text()
+	var regular: Font = rules_text.get_theme_font("normal_font")
+	var bold: Font = rules_text.get_theme_font("bold_font")
+	var font_size: int = rules_text.get_theme_font_size("normal_font_size")
+	var keyword := RegEx.new()
+	keyword.compile("\\b(%s)\\b" % "|".join(PackedStringArray(KEYWORDS)))
+	var matches: Array[RegExMatch] = keyword.search_all(text)
+	if matches.is_empty():
+		return found
+	var top: float = rules_text.position.y + maxf((rules_text.size.y - float(rules_text.get_content_height())) / 2.0, 0.0)
+	for line in rules_text.get_line_count():
+		var span: Vector2i = rules_text.get_line_range(line)
+		# A wrapped line's break space, or a paragraph's newline, isn't drawn.
+		var start: int = span.x
+		while start < span.y and (text[start] == " " or text[start] == "\n"):
+			start += 1
+		var left: float = rules_text.position.x + (rules_text.size.x - float(rules_text.get_line_width(line))) / 2.0
+		var y: float = top + rules_text.get_line_offset(line)
+		var height: float = float(rules_text.get_line_height(line))
+		for found_match in matches:
+			if found_match.get_start() < start or found_match.get_end() > span.y:
+				continue
+			var x: float = left + _shaped_width(text, start, found_match.get_start(), matches, regular, bold, font_size)
+			var width: float = bold.get_string_size(found_match.get_string(), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
+			found.append({"keyword": found_match.get_string(), "rect": Rect2(x, y, width, height).grow(KEYWORD_HIT_PAD_PX)})
+	return found
+
+# The width of text[from, to) on one line, keywords in Bold as drawn.
+static func _shaped_width(text: String, from: int, to: int, matches: Array[RegExMatch], regular: Font, bold: Font, font_size: int) -> float:
+	var line := TextLine.new()
+	var at: int = from
+	for found_match in matches:
+		if found_match.get_end() <= from or found_match.get_start() >= to:
+			continue
+		var bold_from: int = maxi(found_match.get_start(), from)
+		var bold_to: int = mini(found_match.get_end(), to)
+		if bold_from > at:
+			line.add_string(text.substr(at, bold_from - at), regular, font_size)
+		line.add_string(text.substr(bold_from, bold_to - bold_from), bold, font_size)
+		at = bold_to
+	if to > at:
+		line.add_string(text.substr(at, to - at), regular, font_size)
+	return line.get_line_width()
+
+func _show_keyword(word: String) -> void:
+	if word == _hovered_keyword or _keyword_reveal == null:
+		return
+	_hovered_keyword = word
+	set_process(not word.is_empty())
+	if word.is_empty():
+		_keyword_reveal.set_revealed(false)
+		return
+	var definition: String = KeywordTable.shared().definition(word)
+	var line := TextLine.new()
+	line.add_string(word + ": ", _keyword_reveal.text_bold_font, keyword_reveal_font_size_px)
+	line.add_string(definition, _keyword_reveal.text_font, keyword_reveal_font_size_px)
+	_keyword_line_width = ceilf(line.get_line_width()) + 1.0
+	_keyword_reveal.set_wrap_width(_reveal_width(_screen_rect()))
+	_keyword_reveal.set_lines(PackedStringArray([word]), PackedStringArray([definition]))
+	_place_keyword_reveal()
+	_keyword_reveal.set_revealed(true)
+
+# Follows the card while a definition is up - a hover lift or an inspect
+# tween can still be moving it.
+func _process(_delta: float) -> void:
+	_place_keyword_reveal()
+
+func _apply_keyword_reveal_style() -> void:
+	if _keyword_reveal == null:
+		return
+	_keyword_reveal.set_ink(keyword_reveal_ink)
+	_keyword_reveal.set_font_size_px(keyword_reveal_font_size_px)
+	_keyword_reveal.set_line_height(rules_line_height)
+	_keyword_reveal.set_fade_time(keyword_reveal_fade_sec)
+	_place_keyword_reveal()
+
+# Centred on the card as it stands on screen, no wider than it,
+# keyword_reveal_gap_px off its edge: above a hand card, where the field
+# is open; below a card up for inspection (set_keyword_inspect()), which
+# sits centred with the browse grid or the screen's own lines above it.
+# Kept inside the viewport.
+func _place_keyword_reveal() -> void:
+	if _keyword_reveal == null or not is_inside_tree():
+		return
+	var rect: Rect2 = _screen_rect()
+	_keyword_reveal.set_wrap_width(_reveal_width(rect))
+	var at := Vector2(rect.get_center().x - _keyword_reveal.size.x / 2.0, rect.end.y + keyword_reveal_gap_px)
+	if not keyword_reveal_below():
+		at.y = rect.position.y - keyword_reveal_gap_px - _keyword_reveal.size.y
+	var view: Rect2 = get_viewport_rect()
+	at.x = clampf(at.x, view.position.x, maxf(view.end.x - _keyword_reveal.size.x, view.position.x))
+	at.y = clampf(at.y, view.position.y, maxf(view.end.y - _keyword_reveal.size.y, view.position.y))
+	_keyword_reveal.global_position = at.round()
+
+# The definition's wrap width: its own line, or the card's width when
+# that's narrower.
+func _reveal_width(card_rect: Rect2) -> float:
+	return minf(card_rect.size.x, _keyword_line_width) if _keyword_line_width > 0.0 else card_rect.size.x
+
+# Whether the definition goes under the card rather than over it - on a
+# card a host has up for inspection.
+func keyword_reveal_below() -> bool:
+	return _keyword_inspect
+
+# This card's face on its canvas, after every scale, lift and turn.
+func _screen_rect() -> Rect2:
+	var xf: Transform2D = get_global_transform()
+	var rect := Rect2(xf * Vector2.ZERO, Vector2.ZERO)
+	for corner: Vector2 in [Vector2(size.x, 0.0), size, Vector2(0.0, size.y)]:
+		rect = rect.expand(xf * corner)
+	return rect
 
 # --- Derivations from CardData ---
 

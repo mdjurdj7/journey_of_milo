@@ -652,6 +652,9 @@ func _open_choice() -> void:
 		card_view.set_rest_offset(top)
 		card_view.pivot_offset = card_size / 2.0
 		card_view.set_card_data(rolled[index])
+		# The choice is an inspection: its keywords define themselves on
+		# hover.
+		card_view.set_keyword_inspect(true)
 		card_view.clicked.connect(_on_choice_clicked.bind(card_view))
 		card_view.mouse_entered.connect(_on_choice_card_mouse_entered.bind(index))
 		card_view.mouse_exited.connect(_on_choice_card_mouse_exited.bind(index))

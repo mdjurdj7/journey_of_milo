@@ -519,6 +519,8 @@ func _begin_inspect(card_view: CardView, slot: Control) -> void:
 	_inspected = card_view
 	_inspect_slot = slot
 	inspect_layer.visible = true
+	# Up for inspection: its keywords define themselves on hover.
+	card_view.set_keyword_inspect(true)
 	var lifted_scale: float = inspect_scale * _ui_scale
 	var centre: Vector2 = (get_viewport().get_visible_rect().size - card_view.card_size * lifted_scale) / 2.0
 	_tween_inspect(card_view, centre, lifted_scale, inspect_receded_alpha)
@@ -530,6 +532,7 @@ func _end_inspect() -> void:
 	var slot: Control = _inspect_slot
 	_inspected = null
 	_inspect_slot = null
+	card_view.set_keyword_inspect(false)
 	_tween_inspect(card_view, slot.global_position, card_scale * _ui_scale, 1.0)
 	_inspect_tween.tween_callback(func() -> void:
 		if is_instance_valid(card_view) and is_instance_valid(slot):

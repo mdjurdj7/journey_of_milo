@@ -779,6 +779,9 @@ func _sync_card_lift() -> void:
 	var wanted: bool = _card != null and not _flying and _taken == Slot.CARD
 	if wanted and _lifted == null:
 		_lifted = _new_card_view(_card)
+		# Up for inspection: its keywords define themselves on hover.
+		if _lifted != null:
+			_lifted.set_keyword_inspect(true)
 		_place_lift()
 	elif not wanted and _lifted != null:
 		_lifted.queue_free()
@@ -819,6 +822,10 @@ func _set_choice_focus(choice: int) -> void:
 	_draw_layer.queue_redraw()
 
 func _on_gui_input(event: InputEvent) -> void:
+	# The lifted card takes no mouse of its own (_new_card_view()), so
+	# its keyword hover reads the motion here.
+	if event is InputEventMouseMotion and _lifted != null:
+		_lifted.update_keyword_hover()
 	if _asking:
 		_on_choice_gui_input(event)
 		return
@@ -995,6 +1002,7 @@ func _end_hold() -> void:
 		return
 	_flying = true
 	_lifted = null
+	view.set_keyword_inspect(false)
 	_draw_layer.queue_redraw()
 	var taken: int = _taken
 	var tween: Tween = TakeFeedback.fly_to(self, view, _deck_panel_centre(), card_flight_duration_sec, card_flight_end_scale)
