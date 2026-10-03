@@ -11,6 +11,11 @@ so it doesn't get silently reinvented or silently forgotten.
   rules layer (`cards/card_data.gd`). No current card needs them - revisit
   once a real card actually wants a chain-shaped payoff, not before.
   (2026-09-11, rules-layer port.)
+- **Endure out of the Wanderer reward pool, for now.** Taken out of
+  `cards/pools/wanderer_pool.tres`; the card itself (`cards/data/
+  endure.tres`) is untouched and still in the belongings pool. Put it
+  back by re-adding the entry (and Endure to `card_rarity_probe.gd`'s
+  EXPECTED_POOL, count back to 20). (2026-10-03.)
 
 ## Deferred
 
