@@ -24,6 +24,13 @@
 - Don't stage default_bus_layout.tres unless a bus change was
   intended; revert stray edits from the editor's Audio panel.
 
+## Probe worktrees
+- When testing a change to any .import file in a worktree that copied
+  the main tree's .godot cache, first delete that asset's cached
+  entries in the worktree (.godot/imported/<file>-*), so --import
+  re-imports it with the new settings. Otherwise the stale import
+  stays and the probes test the old settings.
+
 ## Godot conventions
 - Godot 4.7.1, GDScript.
 - All tunable values are `@export`. No hardcoded balance numbers.
