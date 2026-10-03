@@ -5,6 +5,7 @@
 [ext_resource type="Texture2D" uid="uid://bw4x3nuovvksn" path="res://assets/field/masks/region1_floor3_landmass.png" id="3_landmass"]
 [ext_resource type="Texture2D" uid="uid://b1fuvnuo1mp7w" path="res://assets/field/masks/region1_floor3_elev.png" id="4_elev"]
 [ext_resource type="Texture2D" uid="uid://b11iijtr4iiuc" path="res://assets/field/masks/region1_floor3_rock.png" id="5_rock"]
+[ext_resource type="Texture2D" uid="uid://bp5nfs0o8ydnq" path="res://assets/field/masks/region1_floor3_outer.png" id="11_outer"]
 [ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="6_sputter"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/wardling.tres" id="10_wardling"]
@@ -27,6 +28,7 @@ mask = ExtResource("3_landmass")
 elevation_mask = ExtResource("4_elev")
 elevation_max_height = 1.8
 rock_mask = ExtResource("5_rock")
+outer_mask = ExtResource("11_outer")
 mask_origin = Vector2(0.37091, 0.79825)
 mask_beyond_is_land = true
 interior_height = 0.45
