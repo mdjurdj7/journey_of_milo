@@ -162,6 +162,16 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # paper_grain_strength, paper_tonal_variation_strength and
 # edge_tone_strength - are the whole game's card stock; all 0 is flat bone.
 @export_file("*.tres") var paper_material_path: String = "res://battle/card_paper_material.tres"
+# The paper runs this far past the card's rect - past the ink frame, which
+# sits on it as a printed line - and the shader frays its edge back by up
+# to the material's fray_side_px / fray_corner_px, so keep this above
+# both. The hit area, the layout and card_size stay the card's rect; only
+# the paper and the shadows under it reach out. 0 = the paper ends at the
+# frame's outer edge, unfrayed.
+@export var paper_margin_px: int = 2:
+	set(value):
+		paper_margin_px = value
+		_relayout()
 # The two shadows, lit from above: a contact hairline (1px down, 18%) and
 # a soft shadow thrown down the page (10px, 14%, 3px down). A lifted card
 # (see Hover) throws the soft one further and lighter, and the contact
@@ -825,24 +835,31 @@ func _draw_art_rule() -> void:
 		pressed.size.y += 1.0
 		_draw_edge_pair(_art_rule, pressed, float(art_field_radius + outermost), Color(0, 0, 0, 0), art_impression_light)
 
-# The face inside the frame as one rounded box for the paper shader: its
-# alpha is the corner mask, its red channel this card's seed and its green
-# 1 to turn the edge tone on. The seed is the name mixed with this copy's
-# CardData - the same object in the hand, the deck view and belongings - so
-# a copy is always cut from the same place on the sheet, and two copies of
-# one card from different places.
+# The paper as one rounded box for the shader, paper_margin_px past the
+# card's rect, its corners concentric with the card's: its alpha is the
+# corner mask, its red channel this card's seed, its green the box's
+# corner radius / 32 and its blue the margin / 8 - non-zero green is what
+# turns the edge tone and fray on (the keepsake panel sends 0). The seed
+# is the name mixed with this copy's CardData - the same object in the
+# hand, the deck view and belongings - so a copy is always cut from the
+# same place on the sheet, and two copies of one card from different
+# places.
 func _draw_paper() -> void:
 	var seed: float = 0.0
 	if card_data != null:
 		seed = float(absi(hash([card_data.card_name, card_data.get_instance_id()])) % 4096) / 4096.0
-	var inset: float = float(_card_style.border_width_top) if _card_style != null else 1.0
-	var style := _rounded_style(Color(seed, 1.0, 0.0, 1.0), maxi(corner_radius - int(inset), 0))
-	paper.draw_style_box(style, Rect2(Vector2.ZERO, size).grow(-inset))
+	var radius: int = corner_radius + paper_margin_px
+	var style := _rounded_style(Color(seed, float(radius) / 32.0, float(paper_margin_px) / 8.0, 1.0), radius)
+	paper.draw_style_box(style, Rect2(Vector2.ZERO, size).grow(float(paper_margin_px)))
 
-# The inset rule and the card-stock edges, under everything on the face:
-# the top light and bottom shade run just inside the frame.
+# The ink frame, the inset rule and the card-stock edges, under
+# everything else on the face and over the paper: the frame is printed on
+# the stock (_card_style, kept by _apply_frame()), the top light and
+# bottom shade run just inside it.
 func _draw_keyline() -> void:
 	var face := Rect2(Vector2.ZERO, size)
+	if _card_style != null:
+		keyline.draw_style_box(_card_style, face)
 	var shade: Color = ink_color
 	shade.a = bottom_shade_alpha
 	_draw_edge_pair(keyline, face.grow(-1.0), float(corner_radius), top_highlight_color, shade)
@@ -1475,17 +1492,20 @@ func _spaced_bold(font_size: int, spacing_em: float) -> Font:
 	return variation
 
 func _apply_style() -> void:
+	# The Panel draws nothing of its own: the paper is the face, and the
+	# frame (_card_style, border only) is drawn by Keyline over it.
 	_card_style = _rounded_style(field_color, corner_radius)
-	add_theme_stylebox_override("panel", _card_style)
+	_card_style.draw_center = false
+	add_theme_stylebox_override("panel", StyleBoxEmpty.new())
 	_apply_frame(false)
 
 	# Shadows: two transparent panels behind the face, each carrying one
 	# of the shadows (StyleBoxFlat has a single shadow).
-	var hairline := _rounded_style(Color(0, 0, 0, 0), corner_radius)
+	var hairline := _rounded_style(Color(0, 0, 0, 0), corner_radius + paper_margin_px)
 	hairline.shadow_size = 1
 	hairline.shadow_offset = Vector2(0.0, 1.0)
 	shadow_hairline.add_theme_stylebox_override("panel", hairline)
-	var soft := _rounded_style(Color(0, 0, 0, 0), corner_radius)
+	var soft := _rounded_style(Color(0, 0, 0, 0), corner_radius + paper_margin_px)
 	soft.shadow_size = shadow_soft_size_px
 	soft.shadow_offset = Vector2(0.0, shadow_soft_offset_px)
 	shadow_soft.add_theme_stylebox_override("panel", soft)
@@ -1598,6 +1618,8 @@ func _apply_frame(lifted_look: bool) -> void:
 	_card_style.border_width_right = width
 	_card_style.border_width_bottom = width
 	_card_style.border_color = color
+	if is_node_ready():
+		keyline.queue_redraw()
 
 func _apply_shadows(lifted_look: bool) -> void:
 	var hairline := shadow_hairline.get_theme_stylebox("panel") as StyleBoxFlat
@@ -1677,10 +1699,12 @@ func _apply_layout() -> void:
 	var face: Vector2 = Vector2(card_size.x, card_size.y + growth)
 	size = face
 
-	shadow_soft.position = Vector2.ZERO
-	shadow_soft.size = face
-	shadow_hairline.position = Vector2.ZERO
-	shadow_hairline.size = face
+	# The shadows are cast by the paper, so they take its margin.
+	var paper_rect := Rect2(Vector2.ZERO, face).grow(float(paper_margin_px))
+	shadow_soft.position = paper_rect.position
+	shadow_soft.size = paper_rect.size
+	shadow_hairline.position = paper_rect.position
+	shadow_hairline.size = paper_rect.size
 	if _bonus_corner != null:
 		_bonus_corner.position = Vector2.ZERO
 		_bonus_corner.size = face

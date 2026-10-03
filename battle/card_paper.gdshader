@@ -9,15 +9,20 @@ shader_type canvas_item;
 //   shifts across a card's width.
 //   edge tone: the outer few pixels slightly darker and warmer, fading
 //   smoothly inward, its width wandering along the edge.
+//   fray: the paper runs a little past the printed ink frame and its edge
+//   is pulled back raggedly - worst at the corners, and only where the
+//   card is big enough on screen for it to read as paper, not glitch.
 // Each strength is that layer's peak swing in brightness (0.012 = +-1.2%)
 // about the bone; 0 turns the layer off, all 0 is the flat bone.
 //
-// CardView draws the face as a rounded box whose alpha is the corner mask,
+// CardView draws the paper as a rounded box whose alpha is the corner mask,
 // whose red channel carries the card's seed (so no two copies are cut from
-// the same place on the sheet) and whose green channel turns the edge tone
-// on (the keepsake panel, which shares this paper, leaves it off). The box's
-// UVs run 0-1 over its rect, which is how the edge is found. The noise is in
-// the card's own pixels, so it moves with the card and never swims.
+// the same place on the sheet), whose green is the box's corner radius / 32
+// and whose blue is how far it runs past the frame / 8 (CardView.paper_
+// margin_px). Green 0 - the keepsake panel, which shares this paper - is
+// no edge tone and no fray. The box's UVs run 0-1 over its rect, which is
+// how the edge is found. The noise is in the card's own pixels, so it
+// moves with the card and never swims.
 
 uniform float paper_grain_strength : hint_range(0.0, 0.1) = 0.012;
 uniform float paper_tonal_variation_strength : hint_range(0.0, 0.1) = 0.008;
@@ -34,7 +39,8 @@ uniform float tooth_screen_px = 2.5;
 // The tonal drift's longest wavelength in 1x card pixels - 220 on a
 // 200 px card is one to three soft shifts across it.
 uniform float tonal_scale_px = 220.0;
-// Handled edges: how far in the tone reaches (1x card pixels), how much
+// Handled edges: how far in from the frame's outer edge the tone reaches
+// (1x card pixels; the paper past the frame is all edge), how much
 // darker it is at the very edge, and the warm multiply it leans toward
 // there (white = no warmth). The width wanders by edge_tone_wander along
 // the edge, a little differently on every card.
@@ -42,8 +48,15 @@ uniform float edge_tone_width_px = 6.0;
 uniform float edge_tone_strength : hint_range(0.0, 0.2) = 0.03;
 uniform vec4 edge_tone_warmth : source_color = vec4(1.0, 0.985, 0.955, 1.0);
 uniform float edge_tone_wander : hint_range(0.0, 1.0) = 0.25;
-// The face box's corner radius - CardView's corner_radius less the frame.
-uniform float edge_corner_radius_px = 5.0;
+// Fray: the most the paper's edge is pulled back, in 1x card pixels,
+// along the sides and at the corners - keep both under CardView's paper_
+// margin_px so the frame always sits on paper. Seeded per card. It fades
+// in with the card's on-screen scale, from nothing at fray_scale_from to
+// full at fray_scale_full.
+uniform float fray_side_px : hint_range(0.0, 4.0) = 1.0;
+uniform float fray_corner_px : hint_range(0.0, 4.0) = 1.5;
+uniform float fray_scale_from = 0.9;
+uniform float fray_scale_full = 1.6;
 
 varying vec2 local;
 
@@ -101,16 +114,33 @@ void fragment() {
 	vec3 paper = bone.rgb * (1.0 + swing);
 	// Edge tone, by distance in from the rounded edge: the box's size in
 	// card pixels is how far `local` moves per unit of UV.
-	if (COLOR.g > 0.5 && edge_tone_strength > 0.0 && edge_tone_width_px > 0.0) {
+	float alpha = COLOR.a;
+	if (COLOR.g > 0.0) {
+		float radius = COLOR.g * 32.0;
+		float margin = COLOR.b * 8.0;
 		vec2 face = vec2(abs(dx.x) + abs(dy.x), abs(dx.y) + abs(dy.y))
 			/ max(abs(uv_dx) + abs(uv_dy), vec2(1e-6));
 		vec2 half_face = face * 0.5;
-		vec2 q = abs((UV - 0.5) * face) - (half_face - edge_corner_radius_px);
-		float inside = -(length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - edge_corner_radius_px);
-		float width = edge_tone_width_px * (1.0 + edge_tone_wander * value_noise(p / 40.0 + 91.0));
-		float wear = 1.0 - smoothstep(0.0, width, inside);
-		wear *= wear;
-		paper *= mix(vec3(1.0), edge_tone_warmth.rgb * (1.0 - edge_tone_strength), wear);
+		vec2 q = abs((UV - 0.5) * face) - (half_face - radius);
+		float inside = -(length(max(q, 0.0)) + min(max(q.x, q.y), 0.0) - radius);
+		if (edge_tone_strength > 0.0 && edge_tone_width_px > 0.0) {
+			float width = edge_tone_width_px * (1.0 + edge_tone_wander * value_noise(p / 40.0 + 91.0));
+			float wear = 1.0 - smoothstep(0.0, width, inside - margin);
+			wear *= wear;
+			paper *= mix(vec3(1.0), edge_tone_warmth.rgb * (1.0 - edge_tone_strength), wear);
+		}
+		if (margin > 0.0) {
+			// How far in the edge is pulled back here: a ragged seeded
+			// amount, the corner cap in the rounded corners and the side
+			// cap along the straights.
+			float corner = smoothstep(-2.0, 2.0, min(q.x, q.y));
+			float cap = mix(fray_side_px, fray_corner_px, corner);
+			cap *= smoothstep(fray_scale_from, fray_scale_full, 1.0 / card_px_per_screen);
+			float ragged = 0.5 + 0.5 * (value_noise(p / 3.0 + 7.0) * 0.6 + value_noise(p / 1.1 + 3.0) * 0.4);
+			float pulled = cap * clamp(ragged, 0.0, 1.0);
+			float aa = 0.5 * card_px_per_screen;
+			alpha *= smoothstep(pulled - aa, pulled + aa, inside);
+		}
 	}
-	COLOR = vec4(clamp(paper, 0.0, 1.0), COLOR.a);
+	COLOR = vec4(clamp(paper, 0.0, 1.0), alpha);
 }
