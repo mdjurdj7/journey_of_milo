@@ -125,11 +125,3 @@ class_name EnemyData
 # enemy's; a roaming one wants its own body's size, so drifting past him
 # never reaches out and takes him.
 @export var contact_radius_m: float = 2.0
-# How it behaves on the field before a fight. DEFAULT: stands as placed.
-# WATCHER: stands as placed until the Wanderer comes within notice_radius_
-# m, then turns to face him once, over notice_turn_seconds (eased), and
-# holds - no other motion, no following, no second turn.
-enum FieldBehaviour { DEFAULT, WATCHER }
-@export var field_behaviour: FieldBehaviour = FieldBehaviour.DEFAULT
-@export var notice_radius_m: float = 8.0
-@export var notice_turn_seconds: float = 2.0

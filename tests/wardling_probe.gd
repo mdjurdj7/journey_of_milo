@@ -17,6 +17,7 @@ const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
 const SOUND_PATH := "res://assets/audio/enemies_old/Works_Wardling/Ragged Breath.mp3"
 const MODEL_PATH := "res://assets/models/enemies/Wardling/Wardling.glb"
 const POST_SCENE_PATH := "res://field/hitching_post.tscn"
+const HEAD_TURN_PATH := "res://field/head_turn.tscn"
 # Turns 1-9: 9, 5, 11 looping, times 1.0 / 1.3 / 1.6 / 2.0 by twos, held
 # at 2.0 - roundi(11 x 1.3) = 14, roundi(9 x 1.3) = 12, roundi(11 x 1.6)
 # = 18.
@@ -60,9 +61,11 @@ func _check_data() -> void:
 	_expect_eq(data.model_scale, 1.68, "...at 1.68")
 	_expect_eq(data.contact_radius_m, 2.0, "...the default contact radius")
 	_expect_eq(data.harness_point, Vector3(-0.25, 1.15, 0.0), "...a harness for the hitching post's rope")
-	_expect_eq(data.field_behaviour, EnemyData.FieldBehaviour.WATCHER, "...a watcher on the field")
-	_expect_eq(data.notice_radius_m, 8.0, "...noticing at 8 m")
-	_expect_eq(data.notice_turn_seconds, 2.0, "...turning over 2 s")
+	_expect_eq(data.attachment_scene_path, HEAD_TURN_PATH, "...turns its head, not its body (HeadTurn)")
+	var head_turn: Node = (load(HEAD_TURN_PATH) as PackedScene).instantiate()
+	_expect_eq(head_turn.get("max_angle_degrees"), 70.0, "...up to 70 degrees either side")
+	_expect_eq(head_turn.get("neck_bones"), 4, "...bent over four neck bones")
+	head_turn.free()
 	for intent in data.intents:
 		_expect_eq(intent.type, EnemyIntent.IntentType.ATTACK, "Every intent is an Attack")
 		_expect_eq(intent.hits, 1, "...of one hit")
@@ -191,7 +194,7 @@ func _check_others_untouched() -> void:
 		enemy.hp = 1
 		_expect(not EnemyTurn.check_pain_turn(enemy, data), "%s never has a pain turn" % data.enemy_name)
 		_expect(not data.is_elite, "%s isn't elite" % data.enemy_name)
-		_expect_eq(data.field_behaviour, EnemyData.FieldBehaviour.DEFAULT, "%s stands as placed" % data.enemy_name)
+		_expect(data.attachment_scene_path != HEAD_TURN_PATH, "%s turns no head" % data.enemy_name)
 	_completed += 1
 
 func _check_floor_3() -> void:

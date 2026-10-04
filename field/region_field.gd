@@ -771,9 +771,6 @@ func _spawn_floor_enemies() -> void:
 		enemy.rest_height = entry.enemy_data.rest_height_m
 		enemy.battle_hover = entry.enemy_data.battle_hover_m
 		enemy.contact_radius = entry.enemy_data.contact_radius_m
-		enemy.notice_radius = entry.enemy_data.notice_radius_m
-		enemy.notice_turn_seconds = entry.enemy_data.notice_turn_seconds
-		enemy.field_behaviour = entry.enemy_data.field_behaviour
 		enemy.harness_point = entry.enemy_data.harness_point
 		enemy.face_shore_at_spawn = false
 		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)

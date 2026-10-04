@@ -86,20 +86,6 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 
 # The pain turn's sound (EnemyData.pain_turn_sound), played from this body
 # when the turn is set - read at play time.
-# The field behaviour (EnemyData.field_behaviour, copied on by RegionField
-# with the notice radius and turn time): a WATCHER turns to face the
-# Wanderer once he comes within notice_radius, over notice_turn_seconds,
-# eased (face_toward()), and never moves again before a fight.
-@export_group("Field Behaviour")
-@export var field_behaviour: EnemyData.FieldBehaviour = EnemyData.FieldBehaviour.DEFAULT:
-	set(value):
-		field_behaviour = value
-		if is_node_ready():
-			set_physics_process(_watching())
-@export var notice_radius: float = 8.0
-@export var notice_turn_seconds: float = 2.0
-@export_group("")
-
 @export_group("Pain Sound")
 @export var pain_volume_db: float = -4.0
 @export_group("")
@@ -159,8 +145,6 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 
 var _contacted: bool = false
 var _contact_player: AudioStreamPlayer3D = null
-# A watcher has noticed the Wanderer and turned (see Field Behaviour).
-var _noticed: bool = false
 # The facing turn running now, if any (_turn_to()) - stopped when a new
 # one starts, so two turns never pull on rotation.y at once.
 var _face_tween: Tween = null
@@ -364,8 +348,6 @@ func _ready() -> void:
 	contact_area.body_exited.connect(_on_body_exited)
 	# _process() is the flight's own; nothing runs there on the ground.
 	set_process(false)
-	# _physics_process() is a watcher's own, until it has noticed.
-	set_physics_process(_watching())
 
 	_spawn_model()
 	_spawn_enemy_status()
@@ -899,26 +881,6 @@ func face_toward(target: Node3D, duration: float) -> void:
 # The same yaw, to a world point - where the Wanderer is GOING to stand
 # when a cluster's line puts him somewhere other than where contact
 # happened (see RegionField._on_enemy_contacted()).
-# A watcher still waiting to notice, and free to.
-func _watching() -> bool:
-	return field_behaviour == EnemyData.FieldBehaviour.WATCHER and not _noticed and not _contacted and not _defeated
-
-# The watcher's one notice: the Wanderer within notice_radius, it turns to
-# him once and stops looking. The field's freeze stops this with the rest.
-func _physics_process(_delta: float) -> void:
-	if not _watching():
-		set_physics_process(false)
-		return
-	var wanderer := get_tree().get_first_node_in_group("wanderer") as Node3D
-	if wanderer == null:
-		return
-	var offset := Vector2(wanderer.global_position.x - global_position.x, wanderer.global_position.z - global_position.z)
-	if offset.length() > notice_radius:
-		return
-	_noticed = true
-	set_physics_process(false)
-	face_toward(wanderer, notice_turn_seconds)
-
 func face_toward_point(point: Vector3, duration: float) -> void:
 	var to_target := Vector3(point.x - global_position.x, 0.0, point.z - global_position.z)
 	if to_target.length() < 0.0001:
@@ -930,7 +892,7 @@ func face_toward_point(point: Vector3, duration: float) -> void:
 	_turn_to(face_angle, duration)
 
 # One eased facing turn to `angle` the short way round, through the battle
-# freeze. A turn still running - a watcher's notice caught by contact - is
+# freeze. A turn still running - an escape's turn back caught by contact - is
 # stopped first and the new one starts from wherever it had got to.
 func _turn_to(angle: float, duration: float) -> void:
 	if _face_tween != null and _face_tween.is_valid():
