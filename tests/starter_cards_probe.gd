@@ -42,8 +42,8 @@ const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # The cards with art, by file - the starters, Carve, Cornered, Hold Fast,
 # Come Due, No Further, Sentence, Last Wager, The Return, Blood Arc,
 # Collateral, Ransom, Leverage, Self-Eater, Unbroken, Small Price, Bide,
-# Deny, Refuse the End, With Regards, Debt Forgiven, Last Resort and
-# Dying Light.
+# Deny, Refuse the End, With Regards, Debt Forgiven, Last Resort, Dying
+# Light and Blood Advance.
 # Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
@@ -73,6 +73,7 @@ const CARD_ART: Dictionary = {
 	"debt_forgiven": "res://cards/art/Wanderer/Debt Forgiven.png",
 	"last_resort": "res://cards/art/Wanderer/Last Resort.png",
 	"dying_light": "res://cards/art/Wanderer/Dying Light.png",
+	"blood_advance": "res://cards/art/Wanderer/Blood Advance.png",
 }
 
 var _failures: int = 0
