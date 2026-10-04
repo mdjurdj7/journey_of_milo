@@ -37,6 +37,35 @@ is in the cards that pay - HP, Toll, or a Critical state. Not every card
 must; Commons can be plain tools (Slash, Carve, Brace, Bide).
 (2026-10-04, with Bide.)
 
+## Run log
+
+RunLogger (`run/run_logger.gd`) writes one JSON-lines file per run to
+user://runs/ (%APPDATA%\Godot\app_userdata\Journey of Milo\runs\), a line
+per event, flushed as written: run_start (with the short git commit read
+from .git, "unknown" without one), floor_entered, fight_start, fight_end
+(the fight's sums and every card played), the reward-side choices, and
+run_end. `tools/summarise_runs.py` reads the folder (`--since` a date or
+a commit). Switched by `RegionField.run_logging_enabled`; never draws
+from any generator; off in a headless instance unless a probe gives it a
+folder (run_log_probe). (2026-10-04.)
+
+- **Card HP split.** A played card's HP is `hp_cost` (its price: the
+  stance's, Collateral's swap - `EffectContext.pay_upfront_hp_cost()`)
+  and `hp_effect` (its own self-damage effects).
+- **Pick rate is fight rewards only.** Belongings, bundle and find offers
+  are counted in their own columns. A bundle or a find is logged only
+  when taken (opening one and walking away is not an offer the log
+  sees), and a RewardSpread's cards left on the sand log nothing.
+- **"won" is unused** until a region-end fight exists: the region's last
+  floor wraps to the first, and floor_entered carries a `lap` count
+  (`RunState.region_lap`) instead.
+- **A run with no fight and no choice is deleted** at its end (quitting
+  from the title). A run with no run_end line - the editor's Stop, a
+  crash - is "unfinished" in the summary.
+- **Debug outcomes** (the battle's F1 row WIN/LOSE/ESCAPE) are marked
+  `debug: true`; the summary leaves them out unless `--include-debug`.
+  Escape exists only there today.
+
 ## Parked
 
 - **Chain roles (Opener/Closer, chain payoffs).** The old project's

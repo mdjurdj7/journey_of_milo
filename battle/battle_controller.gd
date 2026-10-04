@@ -172,6 +172,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 
 	_combatants.clear()
 	var enemy_names: Array[String] = []
+	var enemy_ids: Array[String] = []
 	for enemy in enemies:
 		var data: EnemyData = enemy.enemy_data
 		var combatant := Combatant.new(data.max_hp if data != null else 1)
@@ -183,12 +184,21 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 				if status_data != null:
 					Status.apply_to(combatant.statuses, status_data)
 			enemy_names.append(data.enemy_name)
+			# Two enemies can share a name (the Dragonflies) - the file
+			# tells them apart in the log.
+			enemy_ids.append(data.resource_path.get_file().get_basename())
 		_combatants[enemy] = combatant
 	# A pack met with one member left (the rest killed in an earlier fight
 	# it was escaped from) opens without its pack move.
 	_mark_lone_pack_members()
 
-	RunLogger.log_battle_start(enemy_names)
+	RunLogger.fight_start(RunLogger.encounter_key(enemy_names), enemy_ids, RunState.run_snapshot())
+	for enemy in enemies:
+		var logged: Combatant = _combatants[enemy]
+		RunLogger.enemy_hp_seen(logged.get_instance_id(), logged.hp)
+	if keepsake != null:
+		RunLogger.block_gained(maxi(keepsake.combat_start_block, 0))
+	RunLogger.turn_started()
 
 	deck = Deck.new(RunState.deck)
 	deck.drawn.connect(func(_card: CardData) -> void: hand_changed.emit())
@@ -495,7 +505,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	# (Leverage) still being there.
 	var replacement: Status = player.cost_replacement_for(card)
 	var replaced_hp: int = player.replaced_cost_hp(card)
-	player.energy -= player.energy_cost(card)
+	var energy_paid: int = player.energy_cost(card)
+	player.energy -= energy_paid
 	# The play is committed: a free card (House Key) is spent here, before
 	# card_played re-reads the hand's faces - never on a hover, a face or
 	# a cancelled target. So is a cost replacement's charge; its HP is paid
@@ -513,7 +524,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	# own context carries the count from before it (below).
 	cards_played_this_turn += 1
 
-	RunLogger.log_card_played(card.card_name)
+	var target_name: String = target_enemy.enemy_data.enemy_name if target_enemy != null and target_enemy.enemy_data != null else ""
+	RunLogger.card_started(card.card_name, energy_paid, target_name)
 	card_played.emit(card, target_enemy)
 	_hand_container.play_card(card, _screen_pos_for(target_enemy))
 
@@ -554,6 +566,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		_hand_container.release_views([consume_view] as Array[CardView])
 
 	_effect_resolver.resolve_card(card, ctx)
+	RunLogger.card_finished()
 	# Taken, deepened or replaced by the card just played - and the card
 	# faces need to know either way, since a stance changes what the hand
 	# says it will do.
@@ -733,17 +746,17 @@ func _report_countdown(enemy: FieldEnemy, combatant: Combatant, result: Dictiona
 # The hit as the view hears it, once the lunge has landed: the damage
 # that reached HP, and any Grace it opened.
 func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
+	RunLogger.block_used(result["blocked"], result["absorbed"])
 	if result["damage_to_hp"] > 0:
-		RunLogger.log_damage_taken(result["damage_to_hp"])
 		_report_damage(enemy, player, result["damage_to_hp"], "attack")
 	# A lethal guard that left the player above where the hit found them
 	# (Refuse the End's survive HP): the run's HP follows, the way a card's
 	# heal does - HP only, no Toll.
 	if result["saved_heal"] > 0:
-		RunState.heal(result["saved_heal"])
+		_heal_run_hp(result["saved_heal"])
 		hp_changed.emit(player.hp, player.max_hp)
 	if result["grace_opened"] > 0:
-		RunLogger.log_grace_opened(result["grace_opened"], player.grace)
+		RunLogger.grace_opened(result["grace_opened"])
 		grace_changed.emit(player.grace)
 
 # The body's pose for its queued intent (FieldEnemy.set_rearing()):
@@ -797,6 +810,7 @@ func _all_living_simultaneous() -> bool:
 	return living > 1
 
 func _start_player_turn() -> void:
+	RunLogger.turn_started()
 	player.block = 0
 	# The refill, and Dying Light's 1 if the turn begins Critical - judged
 	# here, before any tick, so entering Critical later gives nothing
@@ -814,7 +828,7 @@ func _start_player_turn() -> void:
 		var lost := DamagePipeline.apply_bypass(amount, player)
 		if lost > 0:
 			player.gain_self_loss_toll(lost)
-			RunState.lose_hp(lost)
+			_lose_run_hp(lost, "status")
 			hp_changed.emit(player.hp, player.max_hp)
 			toll_changed.emit(player.toll)
 	)
@@ -854,11 +868,9 @@ func _start_player_turn() -> void:
 
 func _check_battle_end() -> bool:
 	if player.hp <= 0:
-		RunLogger.log_battle_end("defeat", player.energy)
 		battle_lost.emit()
 		return true
 	if _living_enemy_combatants().is_empty():
-		RunLogger.log_battle_end("victory", player.energy)
 		battle_won.emit()
 		return true
 	return false
@@ -931,12 +943,13 @@ func _living_enemy_combatants() -> Array[Combatant]:
 # is - RunState.heal() touches HP and nothing else, so this generates no
 # Toll and undoes none.
 func _on_card_heal(amount: int) -> void:
-	RunState.heal(amount)
+	_heal_run_hp(amount)
 	hp_changed.emit(player.hp, player.max_hp)
 
 func _on_grace_reclaimed(amount: int) -> void:
+	var before: int = RunState.player_hp
 	RunState.heal(amount)
-	RunLogger.log_grace_reclaimed(amount, player.grace)
+	RunLogger.grace_reclaimed(RunState.player_hp - before)
 	hp_changed.emit(player.hp, player.max_hp)
 	grace_changed.emit(player.grace)
 
@@ -951,7 +964,7 @@ func _close_grace_window() -> void:
 	player.grace_turns_left -= 1
 	if player.grace_turns_left > 0:
 		return
-	RunLogger.log_grace_lost(player.grace)
+	RunLogger.grace_lost(player.grace)
 	player.grace = 0
 	grace_changed.emit(0)
 
@@ -962,12 +975,17 @@ func _report_block(target_combatant: Combatant, _blocked: int, damage_to_hp: int
 		enemy_hit_blocked.emit(enemy, damage_to_hp <= 0)
 
 func _report_damage(source: Variant, target_combatant: Combatant, amount: int, kind: String) -> void:
-	RunLogger.log_damage_dealt(amount)
 	if target_combatant == player:
 		damage_dealt.emit(source, "player", amount, kind)
-		RunState.lose_hp(amount)
+		# The log's source: the enemy by name, else the kind ("self",
+		# "status").
+		var source_name: String = kind
+		if source is FieldEnemy and (source as FieldEnemy).enemy_data != null:
+			source_name = (source as FieldEnemy).enemy_data.enemy_name
+		_lose_run_hp(amount, source_name)
 		hp_changed.emit(player.hp, player.max_hp)
 	else:
+		RunLogger.damage_dealt(target_combatant.get_instance_id(), amount, target_combatant.hp)
 		var enemy := _field_enemy_for(target_combatant)
 		damage_dealt.emit(source, enemy, amount, kind)
 		if enemy != null:
@@ -979,6 +997,19 @@ func _report_damage(source: Variant, target_combatant: Combatant, amount: int, k
 				# shows now is the one cancelled.
 				enemy_pain_turn.emit(enemy)
 				enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
+
+# The run's HP down by `amount`, and the log told what it actually lost
+# (lose_hp() floors at 0) and to what.
+func _lose_run_hp(amount: int, source: String) -> void:
+	var before: int = RunState.player_hp
+	RunState.lose_hp(amount)
+	RunLogger.player_hp_lost(before - RunState.player_hp, source)
+
+# The run's HP up, the log told what it actually got back.
+func _heal_run_hp(amount: int) -> void:
+	var before: int = RunState.player_hp
+	RunState.heal(amount)
+	RunLogger.player_healed(RunState.player_hp - before)
 
 # The enemy is dead: out of the lists first (so no later preview/turn/
 # rect pass touches a node that may be freed), then told. The hover
@@ -1037,6 +1068,7 @@ func _heal_packmates(enemy: FieldEnemy, amount: int, apply: bool) -> int:
 		healed += heal
 		if apply and heal > 0:
 			combatant.hp += heal
+			RunLogger.enemy_hp_seen(combatant.get_instance_id(), combatant.hp)
 			enemy_hp_changed.emit(other, combatant.hp, combatant.max_hp)
 	return healed
 

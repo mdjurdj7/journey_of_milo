@@ -225,6 +225,8 @@ var _mode: int = Mode.LIST
 var _hovered: int = -1
 var _card_views: Array[CardView] = []
 var _taking_card: bool = false
+# The cards the open choice rolled, for the run log.
+var _offered: Array[CardData] = []
 # The card row's rect in Column pixels while a choice is open - what the
 # choice header, its dismiss and the dismiss hit-test hang off.
 var _choice_row: Rect2 = Rect2()
@@ -656,6 +658,8 @@ func _on_dismiss() -> void:
 	if _mode == Mode.CHOICE:
 		# Skipping is final: the offer is spent whether or not a card was
 		# taken, so the line is struck exactly as taking would.
+		if not _taking_card:
+			RunLogger.reward_cards("fight", _offered, null)
 		_finish_card_line()
 		return
 	close()
@@ -667,6 +671,7 @@ func _take_line(index: int) -> void:
 	match line.id:
 		"gold":
 			RunState.add_gold(_gold)
+			RunLogger.event("reward_gold", {"source": "fight", "amount": _gold, "gold_after": RunState.gold})
 			TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, gold_volume_db, "GoldTakeAudio", "RewardScreen")
 			print("RewardScreen: took %d gold (run total %d)." % [_gold, RunState.gold])
 			line.taken = true
@@ -675,6 +680,7 @@ func _take_line(index: int) -> void:
 			_close_if_spent()
 		"glassbone":
 			RunState.add_glassbone(_glassbone)
+			RunLogger.event("reward_glassbone", {"source": "fight", "amount": _glassbone, "glassbone_after": RunState.glassbone})
 			TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, glassbone_volume_db, "GlassboneTakeAudio", "RewardScreen")
 			print("RewardScreen: took %d Glassbone (run total %d)." % [_glassbone, RunState.glassbone])
 			line.taken = true
@@ -689,6 +695,7 @@ func _take_line(index: int) -> void:
 func _open_choice() -> void:
 	# A fight's reward, so tier first - see RewardPool.roll_by_rarity().
 	var rolled: Array[CardData] = _pool.roll_by_rarity(choice_count, RunState.rng)
+	_offered = rolled.duplicate()
 	if rolled.is_empty():
 		_finish_card_line()
 		return
@@ -810,6 +817,7 @@ func _on_choice_clicked(card_data: CardData, card_view: CardView) -> void:
 		return
 	_taking_card = true
 	RunState.add_card(card_data)
+	RunLogger.reward_cards("fight", _offered, card_data)
 	TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "RewardScreen")
 	print("RewardScreen: took '%s' (deck now %d)." % [card_data.card_name, RunState.deck.size()])
 	for other in _card_views:

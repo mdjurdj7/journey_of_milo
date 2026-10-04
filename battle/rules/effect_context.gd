@@ -141,6 +141,7 @@ func gain_block(amount: int) -> int:
 	if amount <= 0 or Stance.prevents_block_gain(player.stance):
 		return 0
 	player.block += amount
+	RunLogger.block_gained(amount)
 	return amount
 
 # This context for reading one card still in hand whose costs come to
@@ -182,6 +183,8 @@ func pay_upfront_hp_cost(amount: int) -> void:
 	if lost > 0:
 		player.gain_self_loss_toll(lost)
 		player.took_damage_this_turn = true
+		# The price, split out of the "self" loss for the run log.
+		RunLogger.hp_cost_paid(lost)
 		report_damage(player, lost, "self")
 
 # The Drain a self-loss counter has handed over (Combatant.pending_

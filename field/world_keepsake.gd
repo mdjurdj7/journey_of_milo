@@ -665,6 +665,12 @@ func _activate(index: int) -> void:
 	var held: TrinketData = _held()
 	RunState.note_keepsake_offered(keepsake)
 	var taken: bool = index == Choice.TAKE
+	RunLogger.event("keepsake_offer", {
+		"source": "Keeper",
+		"offered": RunLogger.keepsake_id(keepsake),
+		"held": RunLogger.keepsake_id(held),
+		"taken": taken,
+	})
 	if taken:
 		RunState.equip_keepsake(keepsake)
 		TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "KeepsakeTakeAudio", "WorldKeepsake")

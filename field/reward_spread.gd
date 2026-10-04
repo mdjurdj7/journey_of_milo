@@ -119,6 +119,8 @@ func _spawn_cards() -> void:
 		var card := scene.instantiate() as WorldCard
 		card.name = "RewardCard%d" % index
 		card.card = rolled[index]
+		# The three are one offer, logged here when one is taken.
+		card.log_source = ""
 		# This node decides the lift for the group - see the class doc.
 		card.lift_radius_enabled = false
 		# No holder: the silhouette gap and the near-state bottom edge both
@@ -216,7 +218,12 @@ func _notification(what: int) -> void:
 # One was taken (it has already granted itself through RunState.add_card
 # and is flying to the deck count). The others are put back down and
 # faded; this node frees once every card has gone.
-func _on_card_taken(_card_data: CardData, taken_card: WorldCard) -> void:
+func _on_card_taken(card_data: CardData, taken_card: WorldCard) -> void:
+	var offered: Array[CardData] = []
+	for card in _cards:
+		if is_instance_valid(card):
+			offered.append(card.card)
+	RunLogger.reward_cards("fight", offered, card_data)
 	_spent = true
 	for card in _cards:
 		if card != taken_card and is_instance_valid(card):

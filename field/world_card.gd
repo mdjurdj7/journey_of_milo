@@ -149,6 +149,10 @@ const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 # Belongings count it is about to increment. Without it the flight still
 # plays, just straight down off the bottom of the frame.
 @export var region_field_path: NodePath = ^"../.."
+# What the run log calls this card's take ("find": one on the sand). Empty
+# when its owner logs the choice itself - a RewardSpread's three are one
+# offer (RewardSpread._on_card_taken()).
+@export var log_source: String = "find"
 @export_group("")
 
 var _card_view: CardView = null
@@ -533,6 +537,8 @@ func _take() -> void:
 		return
 	_taking = true
 	RunState.add_card(card)
+	if not log_source.is_empty():
+		RunLogger.reward_cards(log_source, [card] as Array[CardData], card)
 	TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "WorldCard")
 	taken.emit(card)
 	_fly_to_deck()

@@ -44,6 +44,14 @@ enum RewardMode { SCREEN, WORLD }
 @export var belongings_screen_scene_path: String = "res://battle/belongings_screen.tscn"
 # What a keepsake is offered in (see open_keepsake_offer()).
 @export var keepsake_offer_scene_path: String = "res://battle/keepsake_offer.tscn"
+# The run log (RunLogger - one JSON-lines file per run under user://runs/).
+# Never touches play; off, nothing is written. A headless instance never
+# logs, whatever this says - see RunLogger.
+@export var run_logging_enabled: bool = true:
+	set(value):
+		run_logging_enabled = value
+		RunLogger.enabled = value
+
 # Debug builds only: the field's F1 row and its Keepsake button, which
 # grants these in turn (see _on_debug_keepsake_pressed()). Paths, loaded
 # at the press.
@@ -437,8 +445,10 @@ func _ready() -> void:
 	# run-start flow (e.g. a character-select screen) replaces this call
 	# site later without RunState itself needing to change. Must run before
 	# anything below reads RunState.deck.
+	RunLogger.enabled = run_logging_enabled
 	if RunState.character == null:
 		RunState.new_run(load(STARTING_CHARACTER_PATH) as CharacterData)
+	RunLogger.floor_entered(RunState.run_snapshot())
 
 	# Ensures forward is computed (and printed) even if no child asked for
 	# it first; a no-op if one already did.
@@ -648,6 +658,7 @@ func _physics_process(delta: float) -> void:
 	RunState.lose_hp(whole_damage)
 	if RunState.player_hp <= 0:
 		_run_lost_to_wading = true
+		RunState.log_run_end("drowned")
 		get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
 
 # The field's forward direction: normalized XZ vector from the
@@ -1211,6 +1222,7 @@ func _on_floor_exited() -> void:
 	if RunState.current_floor_index + 1 >= floor_count:
 		print("RegionField: end of region - back to floor 1 for now")
 		RunState.current_floor_index = 0
+		RunState.region_lap += 1
 	else:
 		RunState.current_floor_index += 1
 	RunState.carry_toll()
@@ -1460,6 +1472,9 @@ func _say_near_enemy(enemy: FieldEnemy, text: String) -> void:
 	line.show_line_near(text, enemy_world_line_seconds, enemy, Vector3.UP * (enemy.get_head_height() + enemy_world_line_head_clearance))
 
 func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay) -> void:
+	# The fight's log line first - HP and Toll as the fight left them,
+	# before the carry and any keepsake heal.
+	RunLogger.fight_end(String(BattleOverlay.Outcome.find_key(outcome)).to_lower(), overlay.finished_by_debug, RunState.player_hp, RunState.toll)
 	# Whatever the fight ended on, only up to the cap carries on.
 	RunState.carry_toll()
 	wanderer.unbind_battle()
@@ -1546,6 +1561,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 				member.return_to_field_pose(return_time)
 				member.exit_battle_hover()
 		BattleOverlay.Outcome.LOSE:
+			RunState.log_run_end("died")
 			get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
 	_fight_fallen.clear()
 

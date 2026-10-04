@@ -242,8 +242,11 @@ func _activate(index: int) -> void:
 	if _done:
 		return
 	_done = true
-	if index == Item.DRINK and _trough != null and is_instance_valid(_trough):
+	var hp_before: int = RunState.player_hp
+	var drank: bool = index == Item.DRINK and _trough != null and is_instance_valid(_trough)
+	if drank:
 		_trough.drink()
+	RunLogger.event("trough", {"drank": drank, "hp_before": hp_before, "hp_after": RunState.player_hp})
 	close()
 
 func close() -> void:

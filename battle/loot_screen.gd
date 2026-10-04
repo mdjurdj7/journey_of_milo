@@ -329,6 +329,7 @@ func _activate(index: int) -> void:
 	_done = true
 	if _bundle.contents_card != null:
 		RunState.add_card(_bundle.contents_card)
+		RunLogger.reward_cards("bundle", [_bundle.contents_card] as Array[CardData], _bundle.contents_card)
 		TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "LootScreen")
 		print("LootScreen: took '%s' (deck now %d)." % [_bundle.contents_card.card_name, RunState.deck.size()])
 		_bundle.mark_taken()
@@ -337,6 +338,7 @@ func _activate(index: int) -> void:
 			return
 	else:
 		RunState.add_gold(_bundle.contents_gold)
+		RunLogger.event("reward_gold", {"source": "bundle", "amount": _bundle.contents_gold, "gold_after": RunState.gold})
 		TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, gold_volume_db, "GoldTakeAudio", "LootScreen")
 		print("LootScreen: took %d gold (run total %d)." % [_bundle.contents_gold, RunState.gold])
 		_bundle.mark_taken()

@@ -660,6 +660,12 @@ func _activate(index: int) -> void:
 	if _done:
 		return
 	_done = true
+	RunLogger.event("keepsake_offer", {
+		"source": RunLogger.or_null(_source),
+		"offered": RunLogger.keepsake_id(_offered),
+		"held": RunLogger.keepsake_id(_held),
+		"taken": index == Choice.TAKE,
+	})
 	if index == Choice.TAKE:
 		RunState.equip_keepsake(_offered)
 		TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "KeepsakeTakeAudio", "KeepsakeOffer")

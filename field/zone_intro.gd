@@ -331,6 +331,7 @@ func start_from_title() -> void:
 	debug_title_hold = false
 
 func _on_menu_exit_requested() -> void:
+	RunState.log_run_end("quit")
 	get_tree().quit()
 
 func is_playing() -> bool:

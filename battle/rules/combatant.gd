@@ -224,4 +224,5 @@ func resolve_critical_entry() -> int:
 	if Stance.prevents_block_gain(stance):
 		return 0
 	block += amount
+	RunLogger.block_gained(amount)
 	return amount

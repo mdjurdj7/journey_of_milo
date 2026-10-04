@@ -45,7 +45,7 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false}
+	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "blocked": 0, "absorbed": 0}
 
 	Status.tick_all(combatant.statuses, func(amount: int) -> void:
 		combatant.hp = max(combatant.hp - amount, 0)
@@ -111,6 +111,9 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 					var was_critical: bool = player.is_critical()
 					var damage_result := DamagePipeline.resolve(amount, player)
 					var to_hp: int = damage_result["damage_to_hp"]
+					# What the player's block and absorb took, for the run log.
+					result["blocked"] += damage_result["blocked"]
+					result["absorbed"] += damage_result["absorbed"]
 					# Saved, what reached HP is what was actually lost - the
 					# number the run's HP, the floating number and Grace all
 					# take from here - and a save that left them higher than

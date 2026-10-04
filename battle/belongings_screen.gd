@@ -939,6 +939,7 @@ func _activate(index: int) -> void:
 	if index == DISMISS:
 		_done = true
 		print("BelongingsScreen: walked on.")
+		_log_choice(-1, 0, null)
 		_finish(-1)
 		return
 	if not _has_slot(index):
@@ -953,10 +954,12 @@ func _activate(index: int) -> void:
 	match index:
 		Slot.GOLD:
 			RunState.add_gold(_gold)
+			_log_choice(index, glassbone, null)
 			TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, gold_volume_db, "GoldTakeAudio", "BelongingsScreen")
 			print("BelongingsScreen: took %d gold (run total %d)." % [_gold, RunState.gold])
 		Slot.CARD:
 			RunState.add_card(_card)
+			_log_choice(index, glassbone, null)
 			TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "BelongingsScreen")
 			print("BelongingsScreen: took '%s' (deck now %d)." % [_card.card_name, RunState.deck.size()])
 		Slot.KEEPSAKE:
@@ -968,6 +971,7 @@ func _activate(index: int) -> void:
 				print("BelongingsScreen: found '%s'; asking whether to replace '%s'." % [_keepsake.display_name, _held.display_name])
 			else:
 				RunState.equip_keepsake(_keepsake)
+				_log_choice(index, glassbone, null)
 				TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, keepsake_volume_db, "KeepsakeTakeAudio", "BelongingsScreen")
 				print("BelongingsScreen: took '%s'." % _keepsake.display_name)
 	_sync_card_lift()
@@ -985,6 +989,7 @@ func _answer(choice: int) -> void:
 	if not _asking:
 		return
 	_asking = false
+	_log_choice(Slot.KEEPSAKE, _glassbone_in(Slot.KEEPSAKE), choice == Choice.REPLACE)
 	if choice == Choice.REPLACE:
 		RunState.equip_keepsake(_keepsake)
 		TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, keepsake_volume_db, "KeepsakeTakeAudio", "BelongingsScreen")
@@ -992,6 +997,26 @@ func _answer(choice: int) -> void:
 	else:
 		print("BelongingsScreen: left '%s' (kept '%s')." % [_keepsake.display_name, _held.display_name])
 	_finish(Slot.KEEPSAKE)
+
+# The choice, for the run log: what each column held, which was taken
+# (-1 walked on), the Glassbone that came with it, and - when the slot
+# was full - whether the bedroll's keepsake replaced the one held (null
+# when there was nothing to replace).
+func _log_choice(taken: int, glassbone_taken: int, replaced: Variant) -> void:
+	var glassbone_slot: String = String(Slot.find_key(_glassbone_slot)).to_lower() if _glassbone_slot >= 0 else ""
+	var offered: Dictionary = {
+		"gold": _gold if _has_slot(Slot.GOLD) else 0,
+		"card": RunLogger.or_null(_card.card_name if _has_slot(Slot.CARD) else ""),
+		"keepsake": RunLogger.keepsake_id(_keepsake if _has_slot(Slot.KEEPSAKE) else null),
+		"glassbone": {"slot": RunLogger.or_null(glassbone_slot), "amount": maxi(_glassbone_amount, 0)},
+	}
+	RunLogger.event("belongings", {
+		"offered": offered,
+		"taken": RunLogger.or_null(String(Slot.find_key(taken)).to_lower() if taken >= 0 else ""),
+		"glassbone_taken": glassbone_taken,
+		"held_before": RunLogger.keepsake_id(_held),
+		"replaced": replaced,
+	})
 
 # The hold is over: a taken card flies to the Belongings panel and the
 # screen closes as it lands; anything else closes now.

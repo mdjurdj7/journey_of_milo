@@ -83,6 +83,10 @@ var character: CharacterData = null
 
 var current_region_index: int = 0
 var current_floor_index: int = 0
+# How many times this run has gone round the region - its last floor
+# wraps to the first until a region-end fight exists (RegionField._on_
+# floor_exited()). For the run log's floor_entered; new_run() zeroes it.
+var region_lap: int = 0
 
 # The zone intro (ZoneIntro, played by RegionField) is owed exactly once,
 # by the first floor of a NEW run: new_run() raises this and RegionField
@@ -115,6 +119,9 @@ var run_seed: int = 0
 # game start) - see its own doc for why a proper run-start flow (a
 # character-select screen, etc.) isn't wired up yet.
 func new_run(starting_character: CharacterData) -> void:
+	# A run never ended (a probe's second run, say) is closed first.
+	if RunLogger.is_run_open():
+		log_run_end("abandoned")
 	character = starting_character
 	# Fresh seed per run, recorded rather than thrown away. randi() is
 	# fine as the SOURCE of a seed - it's the one roll that doesn't need
@@ -132,6 +139,7 @@ func new_run(starting_character: CharacterData) -> void:
 	deck = _build_starting_deck(starting_character)
 	current_region_index = 0
 	current_floor_index = 0
+	region_lap = 0
 	# Field findings (a Hull's one-time world line, a Bird's one-time
 	# flight, the Keeper's one-time offer, a belongings cache's one
 	# choice, a trough's one drink) are remembered per run in their own
@@ -153,6 +161,36 @@ func new_run(starting_character: CharacterData) -> void:
 	glassbone_changed.emit(glassbone)
 	toll_changed.emit(toll)
 	keepsake_changed.emit(keepsake)
+	RunLogger.start_run(run_seed, starting_character.character_name, run_snapshot())
+
+# The run as the log records it (RunLogger): HP, purse, Toll, the deck as
+# card counts, the keepsake's id, and where in the run.
+func run_snapshot() -> Dictionary:
+	var counts: Dictionary = {}
+	for card in deck:
+		counts[card.card_name] = int(counts.get(card.card_name, 0)) + 1
+	return {
+		"hp": player_hp,
+		"max_hp": player_max_hp,
+		"gold": gold,
+		"glassbone": glassbone,
+		"toll": toll,
+		"deck_size": deck.size(),
+		"deck": counts,
+		"keepsake": RunLogger.keepsake_id(keepsake),
+		"region": current_region_index,
+		"floor": current_floor_index,
+		"lap": region_lap,
+	}
+
+# The run is over, for the log: died, drowned, quit or abandoned.
+func log_run_end(cause: String) -> void:
+	RunLogger.end_run(cause, run_snapshot())
+
+# The window closing is a quit - the line goes before the tree does.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		log_run_end("quit")
 
 func _build_starting_deck(starting_character: CharacterData) -> Array[CardData]:
 	var cards: Array[CardData] = []
@@ -241,6 +279,7 @@ func set_toll(value: int) -> void:
 	var clamped: int = maxi(value, 0)
 	if clamped == toll:
 		return
+	RunLogger.toll_changed(toll, clamped)
 	toll = clamped
 	toll_changed.emit(toll)
 

@@ -55,6 +55,7 @@ deny_probe 40
 dying_light_probe 40
 leverage_probe 29
 glassbone_probe 27
+run_log_probe 30
 ransom_probe 26
 gold_line_probe 19
 armored_contact_probe 10
@@ -80,21 +81,21 @@ area_probes() {
 		cards) echo "starter_cards card_rarity" ;;
 		face) echo "starter_cards keyword come_due come_due_face critical_cards" ;;
 		keywords) echo "keyword starter_cards the_return" ;;
-		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light" ;;
+		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log" ;;
 		enemies) echo "blackback siltjaw wardling sentence no_further critical_cards kill_order armored_contact deny" ;;
-		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact" ;;
+		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log" ;;
 		floor1) echo "kill_order drain" ;;
 		floor2) echo "kill_order hold_line bundle_roll" ;;
 		floor3) echo "kill_order blackback wardling" ;;
 		floors) echo "kill_order drain hold_line bundle_roll blackback wardling" ;;
-		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry" ;;
+		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log" ;;
 		hud) echo "gold_line glassbone" ;;
 		hp_bar) echo "kill_order" ;;
 		ui_inspect) echo "keyword" ;;
 		# The fight's own UI: every probe that plays a real fight (which
 		# builds the battle overlay and its hand), plus the rules probes
 		# whose readouts and faces it shows.
-		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light" ;;
+		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log" ;;
 		*) return 1 ;;
 	esac
 }
@@ -121,7 +122,7 @@ path_probes() {
 		ui/keyword_table.gd|ui/keywords.tres|ui/status_reveal.gd) out=$(area_probes keywords) ;;
 		battle/rules/enemies/*|battle/rules/enemy_turn.gd|battle/rules/enemy_intent.gd) out=$(area_probes enemies) ;;
 		battle/rules/*|battle/battle_controller.gd) out=$(area_probes rules) ;;
-		battle/reward_screen.*|battle/belongings_screen.*|battle/loot_screen.*|battle/keepsake_offer.*|battle/keepsake_row.*|run/*) out=$(area_probes run) ;;
+		battle/reward_screen.*|battle/belongings_screen.*|battle/loot_screen.*|battle/keepsake_offer.*|battle/keepsake_row.*|battle/trough_choice.*|run/*) out=$(area_probes run) ;;
 		field/*) out=$(area_probes field) ;;
 		floors/region1_floor1.tres) out=$(area_probes floor1) ;;
 		floors/region1_floor2.tres) out=$(area_probes floor2) ;;

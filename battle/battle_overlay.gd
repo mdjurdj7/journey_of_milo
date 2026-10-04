@@ -82,6 +82,9 @@ signal battle_finished(outcome: Outcome)
 @onready var discard_button: Button = $DebugRow/DiscardButton
 
 var battle_controller: BattleController
+# The fight was ended from the debug row, not by its own rules - see
+# _finish_debug().
+var finished_by_debug: bool = false
 # The fight's hit reactions - kept to read a play effect's pacing for the
 # damage numbers (BattleFeedback.reaction_delay()).
 var _battle_feedback: BattleFeedback = null
@@ -133,9 +136,9 @@ func _ready() -> void:
 	for button: Button in [win_button, lose_button, escape_button, draw_button, discard_button]:
 		button.theme_type_variation = &"DebugButton"
 
-	win_button.pressed.connect(func() -> void: _finish_battle(Outcome.WIN))
-	lose_button.pressed.connect(func() -> void: _finish_battle(Outcome.LOSE))
-	escape_button.pressed.connect(func() -> void: _finish_battle(Outcome.ESCAPE))
+	win_button.pressed.connect(func() -> void: _finish_debug(Outcome.WIN))
+	lose_button.pressed.connect(func() -> void: _finish_debug(Outcome.LOSE))
+	escape_button.pressed.connect(func() -> void: _finish_debug(Outcome.ESCAPE))
 	draw_button.pressed.connect(func() -> void: hand_container.draw_cards(5))
 	discard_button.pressed.connect(func() -> void: hand_container.discard_hand())
 
@@ -647,6 +650,12 @@ func _screen_pos_for_damage_target(target: Variant) -> Vector2:
 	# reach) - anchor near the field HP bar instead of unprojecting a
 	# Wanderer position this overlay has no reference to.
 	return _field_hp_bar.global_position + Vector2(_field_hp_bar.size.x / 2.0, _field_hp_bar.size.y + 20.0)
+
+# The debug row's WIN/LOSE/ESCAPE: the same ending, marked as not the
+# fight's own (finished_by_debug) for the run log.
+func _finish_debug(outcome: Outcome) -> void:
+	finished_by_debug = true
+	_finish_battle(outcome)
 
 # The one path every battle-ending trigger (WIN/LOSE/ESCAPE debug buttons,
 # battle_controller.battle_won/battle_lost) now goes through, rather than
