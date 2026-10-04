@@ -15,7 +15,7 @@ extends SceneTree
 # (Keeper, WorldKeepsake, RegionField, BattleController): a SceneTree
 # script compiles before the autoloads register.
 
-const CASES := 17
+const CASES := 18
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const KEEPER_SCENE_PATH := "res://field/keeper.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
@@ -51,6 +51,7 @@ func _initialize() -> void:
 	_check_roll_uses_run_rng()
 	_check_exhausted_pool()
 	_check_descriptions()
+	_check_art()
 	await _check_approach_grants_nothing()
 	await _check_take_into_empty_slot()
 	await _check_replace()
@@ -75,6 +76,19 @@ func _initialize() -> void:
 		quit(1)
 
 # --- Her table ---
+
+# Each of her six has its object art: the 1024 square the drops' PNGs
+# are, imported from SVG with mipmaps (the plaque draws it at 72 px).
+func _check_art() -> void:
+	for path in [HOUSE_KEY_PATH, WRAPPED_SWEET_PATH, BLUE_FASTENER_PATH, DEPARTURE_STUB_PATH, SIGNAL_GLASS_PATH, PRESSED_FLOWER_PATH]:
+		var trinket: TrinketData = load(path)
+		_expect(trinket.art != null, "%s has art" % trinket.display_name)
+		if trinket.art == null:
+			continue
+		_expect_eq(trinket.art.resource_path, "res://assets/textures/keepsakes/%s.svg" % trinket.id, "...its own SVG")
+		_expect_eq([trinket.art.get_width(), trinket.art.get_height()], [1024, 1024], "...1024 square")
+		_expect(trinket.art.get_image().has_mipmaps(), "...with mipmaps")
+	_completed += 1
 
 func _check_table() -> void:
 	var table: KeepsakeTable = load(KEEPER_TABLE_PATH)

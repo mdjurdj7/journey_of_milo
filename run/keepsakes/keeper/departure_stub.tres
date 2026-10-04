@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="TrinketData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="TrinketData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+[ext_resource type="Texture2D" path="res://assets/textures/keepsakes/departure_stub.svg" id="9_art"]
 
 [resource]
 script = ExtResource("1_trinket_data")
@@ -10,3 +11,4 @@ flavor_text = "The number is still legible."
 description = "Draw {draw} extra card{s} on your first turn of each combat."
 short_description = "+{draw} card on the first turn of each combat."
 opening_draw_bonus = 1
+art = ExtResource("9_art")

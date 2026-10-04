@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="TrinketData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="TrinketData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+[ext_resource type="Texture2D" path="res://assets/textures/keepsakes/pressed_flower.svg" id="9_art"]
 
 [resource]
 script = ExtResource("1_trinket_data")
@@ -10,3 +11,4 @@ flavor_text = "It grew here."
 description = "After each combat you win, heal {heal} HP."
 short_description = "Heal {heal} HP after each win."
 heal_on_win = 1
+art = ExtResource("9_art")

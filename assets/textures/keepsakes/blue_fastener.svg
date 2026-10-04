@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<g transform="translate(512 512) scale(1.020) translate(-587 -500)">
+<g transform="rotate(-24 512 512)">
+<path d="M560,560 C620,640 700,650 760,720 C800,768 790,820 840,850" fill="none" stroke="#2a2a2e" stroke-width="34" stroke-linecap="round"/>
+<path d="M560,560 C620,640 700,650 760,720 C800,768 790,820 840,850" fill="none" stroke="#ddd4c4" stroke-width="12" stroke-linecap="round"/>
+<defs><clipPath id="fastener"><ellipse cx="512" cy="500" rx="300" ry="250" fill="#000"/></clipPath></defs>
+<ellipse cx="512" cy="500" rx="300" ry="250" fill="#617386"/>
+<g clip-path="url(#fastener)"><g transform="translate(-26 -22)"><ellipse cx="512" cy="500" rx="300" ry="250" fill="#7d8fa0"/></g></g>
+<ellipse cx="512" cy="500" rx="300" ry="250" fill="none" stroke="#2a2a2e" stroke-width="11"/>
+<ellipse cx="505" cy="494" rx="212" ry="172" fill="none" stroke="#5a6a7b" stroke-width="7"/>
+<path d="M290,420 A300,250 0 0 1 560,252" fill="none" stroke="#a4b2c0" stroke-width="7" stroke-linecap="round"/>
+<line x1="452" y1="440" x2="562" y2="550" stroke="#2a2a2e" stroke-width="36" stroke-linecap="round"/>
+<line x1="562" y1="440" x2="452" y2="550" stroke="#2a2a2e" stroke-width="36" stroke-linecap="round"/>
+<line x1="452" y1="440" x2="562" y2="550" stroke="#ddd4c4" stroke-width="14" stroke-linecap="round"/>
+<line x1="562" y1="440" x2="452" y2="550" stroke="#ddd4c4" stroke-width="14" stroke-linecap="round"/>
+<circle cx="452" cy="440" r="24" fill="#46525e" stroke="#2a2a2e" stroke-width="9"/>
+<circle cx="562" cy="440" r="24" fill="#46525e" stroke="#2a2a2e" stroke-width="9"/>
+<circle cx="452" cy="550" r="24" fill="#46525e" stroke="#2a2a2e" stroke-width="9"/>
+<circle cx="562" cy="550" r="24" fill="#46525e" stroke="#2a2a2e" stroke-width="9"/>
+</g>
+</g>
+</svg>

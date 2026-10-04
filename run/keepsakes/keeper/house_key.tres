@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="TrinketData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="TrinketData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+[ext_resource type="Texture2D" path="res://assets/textures/keepsakes/house_key.svg" id="9_art"]
 
 [resource]
 script = ExtResource("1_trinket_data")
@@ -10,3 +11,4 @@ flavor_text = "Someone meant to need it again."
 description = "The first card you play each combat costs 0 Energy."
 short_description = "First card each combat costs 0."
 first_card_free = true
+art = ExtResource("9_art")

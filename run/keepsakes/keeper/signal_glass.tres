@@ -1,6 +1,7 @@
-[gd_resource type="Resource" script_class="TrinketData" load_steps=2 format=3]
+[gd_resource type="Resource" script_class="TrinketData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+[ext_resource type="Texture2D" path="res://assets/textures/keepsakes/signal_glass.svg" id="9_art"]
 
 [resource]
 script = ExtResource("1_trinket_data")
@@ -10,3 +11,4 @@ flavor_text = "It still catches something."
 description = "At the start of each combat, gain {block} Block."
 short_description = "+{block} Block at the start of each combat."
 combat_start_block = 3
+art = ExtResource("9_art")

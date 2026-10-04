@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+<g transform="translate(512 512) scale(1.200) translate(-487 -530)">
+<g transform="rotate(35 512 512)">
+<path d="M722,540 L846,540 L846,676 L812,676 L812,640 L786,640 L786,676 L754,676 L754,612 L722,612 Z" fill="#686460" stroke="#2a2a2e" stroke-width="11" stroke-linejoin="round"/>
+<path d="M722,540 L846,540 L846,566 L722,566 Z" fill="#484444"/>
+<path d="M722,540 L846,540 L846,676 L812,676 L812,640 L786,640 L786,676 L754,676 L754,612 L722,612 Z" fill="none" stroke="#2a2a2e" stroke-width="11" stroke-linejoin="round"/>
+<rect x="372" y="484" width="492" height="56" rx="8" fill="#686460" stroke="#2a2a2e" stroke-width="11" stroke-linejoin="round"/>
+<line x1="410" y1="500" x2="840" y2="500" stroke="#94908c" stroke-width="7" stroke-linecap="round"/>
+<circle cx="420" cy="506" r="4" fill="#4a4646"/>
+<circle cx="457" cy="513" r="4" fill="#4a4646"/>
+<circle cx="483" cy="520" r="4" fill="#4a4646"/>
+<circle cx="520" cy="527" r="4" fill="#4a4646"/>
+<circle cx="546" cy="512" r="4" fill="#4a4646"/>
+<circle cx="583" cy="519" r="4" fill="#4a4646"/>
+<circle cx="609" cy="526" r="4" fill="#4a4646"/>
+<circle cx="646" cy="511" r="4" fill="#4a4646"/>
+<circle cx="672" cy="518" r="4" fill="#4a4646"/>
+<circle cx="709" cy="525" r="4" fill="#4a4646"/>
+<circle cx="735" cy="510" r="4" fill="#4a4646"/>
+<circle cx="761" cy="517" r="4" fill="#4a4646"/>
+<circle cx="798" cy="524" r="4" fill="#4a4646"/>
+<circle cx="824" cy="509" r="4" fill="#4a4646"/>
+<rect x="352" y="462" width="44" height="100" rx="6" fill="#484444" stroke="#2a2a2e" stroke-width="11" stroke-linejoin="round"/>
+<line x1="374" y1="476" x2="374" y2="548" stroke="#94908c" stroke-width="5" stroke-linecap="round" opacity="0.6"/>
+<path d="M250,372 A128,140 0 1 1 249.9,372 Z M250,452 A56,60 0 1 0 250.1,452 Z" fill="#686460" fill-rule="evenodd" stroke="#2a2a2e" stroke-width="11" stroke-linejoin="round"/>
+<path d="M122,512 A128,140 0 0 0 378,512 L306,512 A56,60 0 0 1 194,512 Z" fill="#484444"/>
+<path d="M168,430 A110,122 0 0 1 300,390" fill="none" stroke="#94908c" stroke-width="7" stroke-linecap="round"/>
+<path d="M250,372 A128,140 0 1 1 249.9,372 Z M250,452 A56,60 0 1 0 250.1,452 Z" fill="none" fill-rule="evenodd" stroke="#2a2a2e" stroke-width="11" stroke-linejoin="round"/>
+</g>
+</g>
+</svg>
