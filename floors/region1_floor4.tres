@@ -1,0 +1,52 @@
+[gd_resource type="Resource" script_class="FloorData" format=3]
+
+[ext_resource type="Script" uid="uid://8yxy7cpevuvt" path="res://floors/floor_data.gd" id="1_floor_data"]
+[ext_resource type="Script" uid="uid://eby4csrr8fpj" path="res://floors/floor_enemy.gd" id="2_floor_enemy"]
+[ext_resource type="Texture2D" uid="uid://cpdtg84kelh5v" path="res://assets/field/masks/region1_floor4_landmass.png" id="3_landmass"]
+[ext_resource type="Texture2D" uid="uid://i12jck4vq70m" path="res://assets/field/masks/region1_floor4_elev.png" id="4_elev"]
+[ext_resource type="Texture2D" uid="uid://cjugv1bpuyn0f" path="res://assets/field/masks/region1_floor4_rock.png" id="5_rock"]
+[ext_resource type="Texture2D" uid="uid://bxonpojwlb3st" path="res://assets/field/masks/region1_floor4_outer.png" id="6_outer"]
+[ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="7_sputter"]
+[ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="8_wanderer_pool"]
+
+[sub_resource type="Resource" id="FloorEnemy_required"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("7_sputter")
+position = Vector2(-18.0, -43.0)
+yaw_degrees = -135.0
+
+[sub_resource type="Resource" id="FloorEnemy_optional"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("7_sputter")
+position = Vector2(-23.0, -24.0)
+yaw_degrees = 180.0
+required = false
+
+[resource]
+script = ExtResource("1_floor_data")
+mask = ExtResource("3_landmass")
+elevation_mask = ExtResource("4_elev")
+elevation_max_height = 3.0
+rock_mask = ExtResource("5_rock")
+outer_mask = ExtResource("6_outer")
+mask_origin = Vector2(0.56818, 0.78947)
+mask_beyond_is_land = true
+interior_height = 0.5
+relief_amplitude = 0.25
+caustic_strength = 0.0
+basin_color = Color(0.6, 0.57, 0.5, 1)
+basin_tint_strength = 1.0
+basin_tint_heights = Vector2(0.25, 1.6)
+wear_darken = 0.42
+relief_extent = Vector2(112, 124)
+relief_subdivisions = Vector2i(320, 354)
+ambience_sea_db = -16.0
+ambience_wind_db = 3.0
+ambience_sea_lowpass_hz = 1500.0
+exit_direction = Vector2(-0.9613, -0.2756)
+enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_required"), SubResource("FloorEnemy_optional")])
+ledges = Array[PackedVector2Array]([PackedVector2Array(0.467, 8.383, -0.933, 8.317, -2.367, 7.783, -3.583, 6.8, -4.45, 5.533, -4.75, 4.633, -4.883, 3.733, -4.85, -3.9, -4.917, -4.5, -5.1, -4.85, -5.567, -5.083, -9.167, -5.783, -11.5, -6.483, -14.7, -7.75, -17.133, -8.983, -19.633, -10.65, -22.0, -12.517, -24.35, -14.9, -26.083, -17.167, -27.617, -19.933, -28.683, -22.8, -29.35, -26.333, -29.45, -29.233, -29.017, -32.033, -28.017, -35.1, -26.55, -38.067, -25.617, -39.5, -24.317, -41.1, -24.117, -41.433, -24.117, -41.7, -25.2, -42.15, -35.867, -44.95, -38.933, -45.083, -40.167, -45.417, -41.133, -45.917, -42.083, -46.767, -42.65, -47.567, -43.117, -48.633, -43.35, -50.2, -43.15, -51.367, -42.75, -52.267, -42.183, -53.033, -40.9, -54.117, -39.867, -54.617, -38.833, -54.883, -36.967, -54.883, -34.433, -54.017, -21.1, -50.55, -20.267, -50.25, -19.167, -49.583, -18.25, -48.6, -17.367, -47.15, -17.067, -47.15, -14.6, -48.35, -10.7, -49.817, -7.8, -50.55, -4.9, -51.117, -1.4, -51.383, 2.167, -51.35, 4.867, -51.083, 8.367, -50.417, 10.767, -49.783, 14.3, -48.417, 16.4, -47.417, 18.633, -46.083, 20.8, -44.583, 22.033, -43.517, 24.383, -41.067, 26.017, -38.833, 27.05, -37.1, 28.217, -34.5, 28.95, -31.933, 29.35, -29.2, 29.317, -26.633, 28.95, -23.9, 28.15, -21.3, 26.983, -18.633, 25.517, -16.4, 23.817, -14.333, 20.533, -11.283, 18.667, -9.883, 15.067, -7.95, 12.433, -6.817, 9.533, -5.883, 5.733, -5.05, 5.117, -4.7, 4.983, -4.133, 4.883, 3.3, 4.55, 5.1, 3.95, 6.267, 2.9, 7.383, 1.767, 8.05, 0.467, 8.383), PackedVector2Array(2.517, -15.433, 5.267, -15.65, 8.167, -16.317, 11.067, -17.45, 13.233, -18.65, 15.183, -20.333, 17.017, -22.7, 18.05, -24.8, 18.317, -25.733, 18.35, -26.6, 16.733, -25.65, 15.933, -25.45, 15.167, -25.45, 14.1, -25.75, 13.367, -26.183, 12.55, -26.967, 12.117, -27.6, 11.617, -28.933, 11.517, -30.167, 11.783, -31.567, 12.217, -32.567, 12.75, -33.3, 13.633, -34.05, 14.567, -34.45, 15.733, -34.617, 15.883, -34.733, 15.383, -35.467, 14.433, -36.35, 12.0, -38.05, 10.3, -38.917, 8.933, -39.45, 7.133, -39.95, 4.2, -40.517, 1.733, -40.583, -0.033, -40.483, -3.867, -39.817, -6.167, -39.017, -8.933, -37.517, -10.967, -35.883, -12.383, -34.267, -13.75, -32.033, -14.383, -30.2, -14.583, -28.833, -14.583, -27.7, -14.283, -25.7, -13.55, -23.633, -12.383, -21.7, -10.667, -19.883, -8.6, -18.35, -6.067, -17.017, -3.533, -16.15, -0.4, -15.517, 2.517, -15.433)])
+exit_kind = 1
+gate_distance_beyond_enemy = 14.3
+wear_path_override = PackedVector2Array(0.0, 0.0, 0.0, -6.0, -10.0, -13.0, -21.0, -25.0, -20.0, -38.0, -18.0, -43.0, -27.0, -47.0, -37.0, -50.0)
+reward_pool = ExtResource("8_wanderer_pool")

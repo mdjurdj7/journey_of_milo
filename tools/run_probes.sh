@@ -65,6 +65,7 @@ drain_probe 10 fixed
 keyword_probe 9
 come_due_face_probe 7
 hold_line_probe 7 fixed
+floor4_probe 40 fixed
 card_rarity_probe 5
 come_due_probe 4
 starter_cards_probe 4
@@ -89,7 +90,8 @@ area_probes() {
 		floor1) echo "kill_order drain" ;;
 		floor2) echo "kill_order hold_line bundle_roll" ;;
 		floor3) echo "kill_order blackback wardling" ;;
-		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path" ;;
+		floor4) echo "kill_order floor4 wear_path" ;;
+		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4" ;;
 		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord" ;;
 		hud) echo "gold_line glassbone" ;;
 		hp_bar) echo "kill_order" ;;
@@ -101,7 +103,7 @@ area_probes() {
 		*) return 1 ;;
 	esac
 }
-AREAS_ALL="cards face keywords rules enemies field floor1 floor2 floor3 floors run hud hp_bar ui_inspect battle_ui"
+AREAS_ALL="cards face keywords rules enemies field floor1 floor2 floor3 floor4 floors run hud hp_bar ui_inspect battle_ui"
 
 # The probes for one changed path; FULL for a path no area covers, nothing
 # for a path no probe can see (docs, tools, the bus layout).
@@ -131,11 +133,13 @@ path_probes() {
 		floors/region1_floor1.tres) out=$(area_probes floor1) ;;
 		floors/region1_floor2.tres) out=$(area_probes floor2) ;;
 		floors/region1_floor3.tres) out=$(area_probes floor3) ;;
+		floors/region1_floor4.tres) out=$(area_probes floor4) ;;
 		floors/*) out=$(area_probes floors) ;;
 		# Prop and environment models stand on the floors that place them.
 		assets/models/props/*|assets/Environment/*) out=$(area_probes floors) ;;
 		# Floor 3's generated ground and the generator's sources.
 		assets/field/masks/region1_floor3_*|assets/field/masks/source/floor3/*) out=$(area_probes floor3) ;;
+		assets/field/masks/region1_floor4_*|assets/field/masks/source/floor4/*) out=$(area_probes floor4) ;;
 		ui/hp_bar.*) out=$(area_probes hp_bar) ;;
 		ui/toll_line.gd|ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd) out=$(area_probes hud) ;;
 		ui/deck_view.*|ui/card_compendium.*) out=$(area_probes ui_inspect) ;;
