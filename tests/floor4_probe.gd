@@ -16,8 +16,9 @@ extends SceneTree
 #            won, the line lifts and he walks out - the last floor, so the
 #            run wraps to floor 1
 #
-# The routes keep well clear of the optional fight (its contact area is
-# 2 m), so the only fight either starts is the required one.
+# The routes keep clear of the optional fight (its contact area is 2 m;
+# the west side passes it at 3 m), so the only fight either starts is the
+# required one.
 #
 #   Godot_v4.7.1.exe --headless --fixed-fps 60 --path . -s res://tests/floor4_probe.gd
 #
@@ -33,20 +34,23 @@ const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FLOOR_INDEX := 3
-const REQUIRED_AT := Vector2(-18.0, -43.0)
-const OPTIONAL_AT := Vector2(-23.0, -24.0)
-const WEST: Array[Vector2] = [Vector2(0, -6), Vector2(-8, -13), Vector2(-17, -22), Vector2(-18, -30), Vector2(-20, -37)]
-const EAST: Array[Vector2] = [Vector2(0, -6), Vector2(9, -12), Vector2(19, -18), Vector2(24, -28), Vector2(21, -38), Vector2(10, -46), Vector2(-4, -47), Vector2(-12, -45)]
+const REQUIRED_AT := Vector2(-13.5, -32.267)
+const OPTIONAL_AT := Vector2(-17.267, -18.0)
+const WEST: Array[Vector2] = [Vector2(0, -4.5), Vector2(-6, -9), Vector2(-11.5, -13), Vector2(-14.2, -18), Vector2(-15.5, -24), Vector2(-16.5, -28)]
+const EAST: Array[Vector2] = [Vector2(0, -4.5), Vector2(7, -9), Vector2(14, -12.5), Vector2(17.5, -19), Vector2(17.5, -26), Vector2(14.5, -31.5), Vector2(7, -34), Vector2(0, -35), Vector2(-7, -34.5), Vector2(-10, -33.5)]
 # Metres short of a waypoint that count as there.
 const REACH_M := 1.0
 const WAYPOINT_SECONDS := 12.0
 const FIGHT_SECONDS := 8.0
 const DUNE_SECONDS := 8.0
 # How far onto the dune he may get: its walkable edge where each walk
-# meets it (x -14.97 at z -28 from the west, z -15.10 at x 0 from the
+# meets it (x -13.37 at z -21 from the west, z -11.43 at x 0 from the
 # south) plus the ledge barrier's 0.4 m up its face and 0.1 m to spare.
-const DUNE_WEST_LIMIT_X := -14.47
-const DUNE_SOUTH_LIMIT_Z := -15.60
+const DUNE_WEST_LIMIT_X := -12.87
+const DUNE_SOUTH_LIMIT_Z := -11.93
+# The optional fight's contact area is 2 m; the narrow west side passes
+# it at 3 m, the middle of the ring.
+const OPTIONAL_CLEARANCE_M := 3.0
 const OVERSHOOT_LIMIT_M := 0.02
 const SAFETY_SECONDS := 400.0
 
@@ -103,7 +107,7 @@ func _check_data() -> void:
 func _check_route(label: String, waypoints: Array[Vector2]) -> void:
 	await _load()
 	for point in waypoints:
-		_expect(_distance_2d(point, OPTIONAL_AT) > 4.0, "%s: waypoint %s keeps clear of the optional fight" % [label, point])
+		_expect(_distance_2d(point, OPTIONAL_AT) >= OPTIONAL_CLEARANCE_M, "%s: waypoint %s keeps clear of the optional fight" % [label, point])
 		var reached: bool = await _walk_to(point)
 		_expect(reached, "%s: reaches %s (stopped at %s)" % [label, point, _at()])
 		if not reached:
@@ -128,15 +132,15 @@ func _check_route(label: String, waypoints: Array[Vector2]) -> void:
 # Straight across the dune from either side: he never gets over it.
 func _check_dune() -> void:
 	await _load()
-	await _place(Vector2(-18, -28))
-	_wanderer.call("set_move_target", _world(Vector2(23, -28)))
+	await _place(Vector2(-17.5, -21))
+	_wanderer.call("set_move_target", _world(Vector2(17, -21)))
 	var furthest_x: float = -INF
 	for i in int(DUNE_SECONDS * 60.0):
 		await physics_frame
 		furthest_x = maxf(furthest_x, _at().x)
 	_expect(furthest_x < DUNE_WEST_LIMIT_X, "From the west side straight east: held at the dune's foot (furthest x %.2f)" % furthest_x)
-	await _place(Vector2(0, -12))
-	_wanderer.call("set_move_target", _world(Vector2(0, -44)))
+	await _place(Vector2(0, -6))
+	_wanderer.call("set_move_target", _world(Vector2(0, -35)))
 	var furthest_z: float = INF
 	for i in int(DUNE_SECONDS * 60.0):
 		await physics_frame
@@ -155,9 +159,9 @@ func _check_exit() -> void:
 	var exited: Array[bool] = [false]
 	gate.connect("floor_exited", func() -> void: exited[0] = true)
 	_expect(bool(_wanderer.call("has_hold_line")), "Floor 4 holds a line while the required fight stands")
-	await _place(Vector2(-21, -39))
-	_expect(await _walk_to(Vector2(-24, -45)), "...walks to the mouth of the exit neck (stopped at %s)" % _at())
-	_wanderer.call("set_move_target", _world(Vector2(-40, -51)))
+	await _place(Vector2(-16, -27.5))
+	_expect(await _walk_to(Vector2(-17.5, -34)), "...walks to the mouth of the exit neck (stopped at %s)" % _at())
+	_wanderer.call("set_move_target", _world(Vector2(-29.5, -38.5)))
 	var worst: float = -INF
 	for i in int(WAYPOINT_SECONDS * 60.0):
 		await physics_frame
@@ -189,7 +193,7 @@ func _check_exit() -> void:
 			await physics_frame
 		_expect(not bool(_wanderer.call("has_hold_line")), "Won: the line lifts")
 		var floor_before: int = int(_run_state.get("current_floor_index"))
-		_wanderer.call("set_move_target", _world(Vector2(-40, -51)))
+		_wanderer.call("set_move_target", _world(Vector2(-29.5, -38.5)))
 		for i in int(WAYPOINT_SECONDS * 60.0):
 			await physics_frame
 			if exited[0]:

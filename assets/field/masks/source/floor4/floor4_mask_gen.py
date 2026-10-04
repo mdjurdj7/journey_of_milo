@@ -22,13 +22,13 @@ OUTER_EDGE_AT = FACE_W + 0.5 * CREST_W   # outer ground starts at the crest cent
 OUTER_EDGE_WIDTH = 0.3         # the whole outer-ground transition (m)
 DUNE_TOP = 2.8         # central dune summit height (m), 2.4 m above the walk
 BARRIER_IN = 0.4       # ledge barrier sits this far up each face (m)
-ROCK_CENTRE = (-30.0, -55.5)   # world xz of the first exposed rock (north face of the exit neck)
-ROCK_RADIUS = 4.5
+ROCK_CENTRE = (-22.5, -41.6)   # world xz of the first exposed rock (north face of the exit neck)
+ROCK_RADIUS = 3.4
 MASKS_OUT = "../../"   # the runtime masks: assets/field/masks/
 OUT = "./"             # the layout and the preview stay beside the sources
 # The worn band (FloorData.wear_path_override, 3 to 8 points): spawn, north out of the
 # entry neck, round the dune's west side, past the required fight, out along the exit neck.
-WEAR_WORLD = [(0, 0), (0, -6), (-10, -13), (-21, -25), (-20, -38), (-18, -43), (-27, -47), (-37, -50)]
+WEAR_WORLD = [(0, 0), (0, -4.5), (-6.5, -9.0), (-17.5, -18.0), (-16.5, -27.0), (-13.5, -32.267), (-20.0, -35.0), (-27.767, -37.5)]
 FONT = "../../../../fonts/AlegreyaSans-Regular.ttf"
 
 src = np.array(Image.open("floor4_walkable_sample.png").convert("RGB")).astype(int)
@@ -101,10 +101,10 @@ def width_at(x, z, win=4.0):
     cx, cy = from_world(x, z); s = int(win * PX)
     return round(2 * float(dt[int(cy) - s:int(cy) + s, int(cx) - s:int(cx) + s].max()), 1)
 meas = {
-    "west_side_width_m": width_at(-22, -28), "east_side_width_m": width_at(23, -26),
-    "east_narrows_width_m": width_at(26, -18, 2.5), "north_width_m": width_at(0, -46),
-    "south_width_m": width_at(0, -10), "exit_neck_width_m": width_at(-30, -48, 2.5),
-    "west_to_east_across_dune_m": round(float((from_world(23, -28)[0] - from_world(-22, -28)[0]) / PX), 1),
+    "west_side_width_m": width_at(-16.5, -21), "east_side_width_m": width_at(17.25, -19.5),
+    "east_narrows_width_m": width_at(19.5, -13.5, 2.5), "north_width_m": width_at(0, -34.5),
+    "south_width_m": width_at(0, -7.5), "exit_neck_width_m": width_at(-22.5, -36, 2.5),
+    "west_to_east_across_dune_m": round(float((from_world(17.25, -21)[0] - from_world(-16.5, -21)[0]) / PX), 1),
     "dune_size_m": [round(float(np.ptp(np.nonzero(dune)[1]) / PX), 1), round(float(np.ptp(np.nonzero(dune)[0]) / PX), 1)],
 }
 layout = {
@@ -152,7 +152,7 @@ for k, (x, y) in dots.items():
     dr.ellipse([x - 14, y - 14, x + 14, y + 14], fill=colours[k], outline=(20, 20, 20), width=2)
     dr.text((x + offs[k][0], y + offs[k][1]), labels[k], fill=(25, 25, 25), font=font)
 rx, ry = from_world(*ROCK_CENTRE); dr.text((rx - 40, ry - 50), "ROCK", fill=(25, 25, 25), font=font)
-dr.text(from_world(-6, -30), "CENTRAL DUNE", fill=(60, 50, 35), font=font)
+dr.text(from_world(-4.5, -22.5), "CENTRAL DUNE", fill=(60, 50, 35), font=font)
 bx, by = 60, H - 90
 dr.rectangle([bx, by, bx + 10 * PX, by + 10], fill=(30, 30, 30)); dr.text((bx, by + 18), "10 m", fill=(30, 30, 30), font=font)
 dr.text((W - 120, 40), "N ↑", fill=(30, 30, 30), font=font)
