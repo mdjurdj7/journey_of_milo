@@ -36,4 +36,31 @@ if [ -n "$missing" ]; then
 	echo "then stage each .uid by path in this same commit."
 	exit 1
 fi
+
+# Card art imports Lossless, with no size limit and mipmaps on - the
+# addons/card_art_import plugin sets that in the editor; this catches a
+# card image's .import staged without it (an editor without the plugin,
+# or one that rewrote the file with defaults).
+wrong=""
+imports=$(git -c core.quotePath=false diff --cached --name-only --diff-filter=ACMR -- 'cards/art/*.import')
+while IFS= read -r f; do
+	[ -z "$f" ] && continue
+	staged=$(git show ":$f" 2>/dev/null)
+	ok=1
+	for want in 'compress/mode=0' 'process/size_limit=0' 'mipmaps/generate=true'; do
+		echo "$staged" | grep -qx "$want" || ok=""
+	done
+	if [ -z "$ok" ]; then
+		wrong="$wrong
+  $f"
+	fi
+done <<EOF
+$imports
+EOF
+
+if [ -n "$wrong" ]; then
+	echo "pre-commit: card art not imported Lossless, size limit 0, mipmaps on:$wrong"
+	echo "Set those in the Import dock (or let the Card Art Import plugin do it), reimport, and stage again."
+	exit 1
+fi
 exit 0
