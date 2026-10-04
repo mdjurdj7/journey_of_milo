@@ -221,11 +221,12 @@ const DURATION_UNTIL_TRIGGERED := -2
 
 # A cost reduction (Leverage): the next card played costs this much less
 # Energy per stack, never below 0 - after House Key's free card, before a
-# cost replacement judges what's left (Combatant.energy_cost()). Any card
-# spends it, whatever it costs, and the whole status goes; a card that
-# applies this same status adds to it instead, so two in a row reduce one
-# card by both (Status.spend_cost_reduction(), at the play's commit in
-# BattleController._resolve_play()). Stacks count through stack_count -
+# cost replacement judges what's left (Combatant.energy_cost()). The next
+# card costing at least 1 Energy spends it, and the whole status goes; a
+# 0-cost card passes it by (Combatant.takes_next_card_discount()), and a
+# card that applies this same status adds to it instead, so two in a row
+# reduce one card by both (Status.spend_cost_reduction(), at the play's
+# commit in BattleController._resolve_play()). Stacks count through stack_count -
 # pair it with StackRule.IGNORE and DURATION_UNTIL_REMOVED. 0 = none.
 @export var next_card_cost_reduction: int = 0
 

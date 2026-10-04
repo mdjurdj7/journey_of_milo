@@ -22,6 +22,7 @@ const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const KEEPER_TABLE_PATH := "res://run/keepsakes/keeper/keeper_keepsakes.tres"
 const WARDLING_TABLE_PATH := "res://run/keepsakes/wardling_keepsakes.tres"
 const HOUSE_KEY_PATH := "res://run/keepsakes/keeper/house_key.tres"
+const SLASH_PATH := "res://cards/data/slash.tres"
 const WRAPPED_SWEET_PATH := "res://run/keepsakes/keeper/wrapped_sweet.tres"
 const BLUE_FASTENER_PATH := "res://run/keepsakes/keeper/blue_fastener.tres"
 const DEPARTURE_STUB_PATH := "res://run/keepsakes/keeper/departure_stub.tres"
@@ -362,8 +363,8 @@ func _check_house_key() -> void:
 	await _teardown()
 	_completed += 1
 
-# The next fight opens with it again - and a 0-cost first card spends it
-# like any other first card.
+# The next fight opens with it again - and a 0-cost first card passes it
+# by: the free card waits for the first card that costs something.
 func _check_house_key_resets_and_zero_cost() -> void:
 	_new_run()
 	_run_state.call("equip_keepsake", load(HOUSE_KEY_PATH))
@@ -373,8 +374,9 @@ func _check_house_key_resets_and_zero_cost() -> void:
 		var player: Combatant = controller.get("player")
 		var views: Array = controller.get("_hand_container").call("_card_views")
 		controller.call("request_play", views[0])
-		_expect(not player.first_card_free, "A 0-cost first card is the first card: the charge is spent")
+		_expect(player.first_card_free, "A 0-cost first card passes the free card by: it waits")
 		_expect_eq(player.energy, 3, "...Energy 3, unchanged")
+		_expect_eq(player.energy_cost(load(SLASH_PATH) as CardData), 0, "...and the next card that costs something would take it")
 		await create_timer(1.0).timeout
 	await _teardown()
 	_set_deck(DOWN_PAYMENT_PATH, -1)

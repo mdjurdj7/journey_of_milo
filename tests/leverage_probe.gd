@@ -3,8 +3,8 @@ extends SceneTree
 # Headless probe for Leverage - the card, its status and the cost
 # reduction behind them (StatusData.next_card_cost_reduction): it spends
 # 5 Toll like Come Due (and can't be played on less), and the next card
-# played - of any cost, on any later turn - costs 2 less Energy, never
-# below 0. Two Leverages before another card give that card both. House
+# played that costs at least 1 Energy - on any later turn - costs 2 less,
+# never below 0; a 0-cost card passes it by and leaves it waiting. Two Leverages before another card give that card both. House
 # Key's free card comes first and a cost replacement (Collateral) judges
 # what's left, so a card Leverage takes below 2 leaves its charge.
 #
@@ -53,7 +53,7 @@ func _initialize() -> void:
 	await _check_toll()
 	await _check_not_enough_toll()
 	await _check_next_card_only()
-	await _check_any_card_spends_it()
+	await _check_zero_cost_passes_by()
 	await _check_persists_then_ends()
 	await _check_two_stack()
 	await _check_collateral_order()
@@ -158,17 +158,24 @@ func _check_next_card_only() -> void:
 	await _teardown()
 	_completed += 1
 
-# Any other card spends it, a 0-cost one included - Collateral here, with
-# nothing for the reduction to take off.
-func _check_any_card_spends_it() -> void:
+# A 0-cost card passes it by - Collateral here, with nothing for the
+# reduction to take off - and it waits for the next card that costs
+# something, which takes it.
+func _check_zero_cost_passes_by() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var player: Combatant = controller.get("player")
 		player.toll = 5
 		await _play(controller, await _deal(controller, LEVERAGE_PATH))
 		await _play(controller, await _deal(controller, COLLATERAL_PATH))
-		_expect_eq(_status_label(player), "", "A 0-cost Collateral spends Leverage")
+		_expect_eq(_status_label(player), "Leverage", "A 0-cost Collateral leaves Leverage waiting")
 		_expect_eq(_collateral_label(player), "Collateral ×1", "...and its own charge waits")
+		_expect_eq(player.energy, 3, "...Energy 3, unchanged")
+		var slash: CardData = await _deal(controller, SLASH_PATH)
+		_expect_eq(player.energy_cost(slash), 0, "The Slash after it reads 0")
+		await _play(controller, slash, _field_enemy(controller))
+		_expect_eq(player.energy, 3, "...costs no Energy")
+		_expect_eq(_status_label(player), "", "...and spends Leverage")
 	await _teardown()
 	_completed += 1
 

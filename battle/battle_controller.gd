@@ -334,9 +334,12 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	# a cancelled target. So is a cost replacement's charge; its HP is paid
 	# as the card resolves, before its effects (EffectContext.replaced_
 	# cost_hp). And a waiting cost reduction, unless this card adds to it.
-	player.first_card_free = false
+	# A 0-cost card spends neither discount: they wait for the next card
+	# that costs something (Combatant.takes_next_card_discount()).
+	if Combatant.takes_next_card_discount(card):
+		player.first_card_free = false
+		Status.spend_cost_reduction(player.statuses, card)
 	Status.spend_cost_replacement(player.statuses, replacement)
-	Status.spend_cost_reduction(player.statuses, card)
 	_input_locked = true
 	# Counted at commit, before anyone hears of the play - so a face that
 	# re-reads itself on card_played sees this card as played. The card's

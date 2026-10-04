@@ -73,9 +73,11 @@ var spent_statuses: Array[StatusData] = []
 # spent by EffectContext.resolve_pending_drain() right after the loss.
 var pending_drain: int = 0
 # The keepsake's free card (TrinketData.first_card_free): while true, the
-# next card played costs 0 Energy. Set by BattleController.setup(), spent
-# by the play itself (_resolve_play()) - never by a hover, a face, or a
-# target armed and cancelled. Per fight, like everything here.
+# next card played that costs at least 1 Energy costs 0 - a 0-cost card
+# passes it by (takes_next_card_discount()). Set by BattleController.
+# setup(), spent by the play itself (_resolve_play()) - never by a hover,
+# a face, or a target armed and cancelled. Per fight, like everything
+# here.
 var first_card_free: bool = false
 # The keepsake's Critical-entry Block (TrinketData.critical_entry_block)
 # and whether it is still waiting: armed only while this fighter is seen
@@ -156,7 +158,9 @@ static func critical_at(at_hp: int, of_max_hp: int, fraction: float) -> bool:
 # cost replacement (Collateral) on what's left: a card the free card or a
 # reduction already took below the replacement's threshold passes it by,
 # so it keeps its charge. A covered card costs 0 Energy here and
-# replaced_cost_hp() HP instead.
+# replaced_cost_hp() HP instead. The free card and the reduction are
+# "your next card" discounts: a card that costs 0 takes neither and
+# leaves both waiting (takes_next_card_discount()).
 func energy_cost(card: CardData) -> int:
 	if card == null:
 		return 0
@@ -181,10 +185,19 @@ func cost_replacement_for(card: CardData) -> Status:
 	return Status.cost_replacement(statuses, _reduced_cost(card))
 
 # `card`'s Energy before any cost replacement: the free card, then every
-# waiting cost reduction (Status.cost_reduction()), never below 0.
+# waiting cost reduction (Status.cost_reduction()), never below 0. A
+# 0-cost card is 0 with neither.
 func _reduced_cost(card: CardData) -> int:
+	if not takes_next_card_discount(card):
+		return maxi(card.cost, 0)
 	var base: int = 0 if first_card_free else card.cost
 	return maxi(base - Status.cost_reduction(statuses), 0)
+
+# Whether `card` is the one a "your next card" discount (the free card,
+# a cost reduction) lands on and is spent by: any card costing at least
+# 1 Energy. A 0-cost card has nothing to discount and passes them by.
+static func takes_next_card_discount(card: CardData) -> bool:
+	return card != null and card.cost >= 1
 
 # The Critical-entry edge, checked wherever Critical is (Status.resolve_
 # critical_triggers(), after each action that can move HP). Out of

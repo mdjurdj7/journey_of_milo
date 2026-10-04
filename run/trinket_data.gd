@@ -25,8 +25,9 @@ class_name TrinketData
 #   combat_start_block   Block as each fight opens (BattleController.
 #                        setup()) - ordinary Block, gone at the first
 #                        turn reset like any other
-#   first_card_free      the fight's first card played costs 0 Energy
-#                        (Combatant.energy_cost(), spent on the play)
+#   first_card_free      the fight's first card played that costs at
+#                        least 1 Energy costs 0 (Combatant.energy_cost(),
+#                        spent on that play; 0-cost cards pass it by)
 #   critical_entry_block Block the first time each fight the Wanderer
 #                        crosses INTO Critical (Combatant.resolve_
 #                        critical_entry()) - not for starting there

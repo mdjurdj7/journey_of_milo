@@ -259,10 +259,11 @@ static func cost_reduction(statuses: Array[Status]) -> int:
 			total += active.data.next_card_cost_reduction * active.stack_count
 	return total
 
-# A play has committed: every waiting cost reduction is spent by it,
-# whatever it cost - except one `card` itself applies, which its own
-# APPLY_STATUS is about to add to instead (two Leverages, then a card:
-# that card gets both).
+# A play of a card costing at least 1 Energy has committed (BattleController
+# asks Combatant.takes_next_card_discount() first - a 0-cost card spends
+# nothing): every waiting cost reduction is spent by it - except one
+# `card` itself applies, which its own APPLY_STATUS is about to add to
+# instead (two Leverages, then a card: that card gets both).
 static func spend_cost_reduction(statuses: Array[Status], card: CardData) -> void:
 	for active in statuses.duplicate():
 		if active.data == null or active.data.next_card_cost_reduction <= 0:
