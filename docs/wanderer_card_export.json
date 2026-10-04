@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the three in the belongings pool, and Endure, which no pool offers. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at fa78b05, Reprisal removed",
+    "generated": "2026-10-04, from the live data at 923bfdb",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -109,7 +109,6 @@
       "Endure"
     ],
     "missing_art": [
-      "Debt Forgiven",
       "Dying Light",
       "Last Resort"
     ],
@@ -743,7 +742,7 @@
           "default_displayed": 1
         }
       ],
-      "art_path": null,
+      "art_path": "res://cards/art/Wanderer/Debt Forgiven.png",
       "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
