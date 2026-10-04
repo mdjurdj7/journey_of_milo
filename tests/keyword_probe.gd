@@ -17,7 +17,7 @@ extends SceneTree
 # inspect cases open the real DeckView and compendium. Untyped against
 # anything that names the RunState autoload.
 
-const CASES := 9
+const CASES := 10
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
@@ -55,6 +55,7 @@ func _initialize() -> void:
 	_check_live_values()
 	await _check_hit_test()
 	await _check_hit_test_scales()
+	await _check_strike_label()
 	await _check_full_ink_when_faded()
 	await _check_hand_gating()
 	await _check_hand_above()
@@ -168,6 +169,29 @@ func _check_hit_test_scales() -> void:
 		var on_screen: Vector2 = view.get_global_transform() * centre
 		var back: Vector2 = view.get_global_transform().affine_inverse() * on_screen
 		_expect_eq(view.keyword_at(back), "Spent", "At %.2f, the point on screen over Spent finds it" % card_scale)
+	_free_views()
+	_completed += 1
+
+# The STRIKE type label answers like a keyword - only the word, not the
+# label's whole width - and shows "An Attack card." through the same
+# reveal; a card of another type has nothing there, and the word is no
+# KeywordTable entry (so it is never bolded in rules text).
+func _check_strike_label() -> void:
+	var slash: CardView = await _card_view(SLASH_PATH)
+	var label: Rect2 = slash.strike_label_rect()
+	_expect(label.has_area(), "Slash has a STRIKE label rect (%s)" % label)
+	_expect(slash.type_label.get_rect().grow(4.0).encloses(label), "...inside its type label %s" % slash.type_label.get_rect())
+	_expect(label.size.x < slash.type_label.size.x * 0.6, "...only as wide as the word (%.1f of %.1f)" % [label.size.x, slash.type_label.size.x])
+	_expect_eq(slash.keyword_at(label.get_center()), CardView.STRIKE_LABEL_WORD, "...and the word answers STRIKE")
+	_expect_eq(slash.keyword_at(Vector2(label.position.x - 8.0, label.get_center().y)), "", "Beside the word, nothing")
+	slash.call("_show_keyword", CardView.STRIKE_LABEL_WORD)
+	var reveal: Node = slash.get_node("KeywordReveal")
+	_expect_eq(Array(reveal.get("_lines")), ["An Attack card."], "The reveal reads \"An Attack card.\"")
+	_expect_eq(Array(reveal.get("_names")), [CardView.STRIKE_LABEL_WORD], "...led by STRIKE")
+	_expect(not KeywordTable.shared().keywords().has(CardView.STRIKE_LABEL_WORD) and not KeywordTable.shared().keywords().has("Strike"), "STRIKE is not a KeywordTable word")
+	var brace: CardView = await _card_view(BRACE_PATH)
+	_expect(not brace.strike_label_rect().has_area(), "Brace (GUARD) has no STRIKE rect")
+	_expect_eq(brace.keyword_at(brace.type_label.get_rect().get_center()), "", "...and its type label answers nothing")
 	_free_views()
 	_completed += 1
 

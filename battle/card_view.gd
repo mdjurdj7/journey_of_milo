@@ -406,6 +406,11 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 	set(value):
 		keyword_reveal_fade_sec = value
 		_apply_keyword_reveal_style()
+# Hovering the STRIKE type label shows this, the way a keyword shows its
+# definition - an enemy's rule can turn on which cards are Attacks (the
+# Dunecur's Roused). Its own text, not a KeywordTable entry, so the word
+# is never bolded in rules text. Read when the reveal opens.
+@export_multiline var strike_label_definition: String = "An Attack card."
 
 @export_group("Edge Override")
 # Every card gets the 1px ink frame by default. This is an escape hatch
@@ -497,6 +502,9 @@ const KEYWORD_REVEAL_Z_INDEX := 1100
 # A keyword's hover rect reaches this far past its ink, in card pixels -
 # the measured span is shaped, not read from the drawn glyphs.
 const KEYWORD_HIT_PAD_PX := 2.0
+# What keyword_at() answers over the STRIKE type label, and the word its
+# reveal leads with.
+const STRIKE_LABEL_WORD := "STRIKE"
 
 func _ready() -> void:
 	size = card_size
@@ -1193,14 +1201,29 @@ func keyword_hover_allowed() -> bool:
 func get_hovered_keyword() -> String:
 	return _hovered_keyword
 
-# The bold keyword at `local_pos` (this card's own, unscaled pixels), or
-# "".
+# The bold keyword at `local_pos` (this card's own, unscaled pixels) -
+# or STRIKE_LABEL_WORD over a STRIKE card's type label - or "".
 func keyword_at(local_pos: Vector2) -> String:
 	for entry: Dictionary in keyword_rects():
 		var rect: Rect2 = entry["rect"]
 		if rect.has_point(local_pos):
 			return String(entry["keyword"])
+	if strike_label_rect().has_point(local_pos):
+		return STRIKE_LABEL_WORD
 	return ""
+
+# The STRIKE type label's drawn text and the hit pad round it, in this
+# card's own unscaled pixels - the label is centred across the card, so
+# only the word itself answers. Empty on any other type.
+func strike_label_rect() -> Rect2:
+	if card_data == null or _keyline_type != KeylineType.STRIKE or type_label == null:
+		return Rect2()
+	var font: Font = type_label.get_theme_font("font")
+	if font == null:
+		return Rect2()
+	var width: float = font.get_string_size(type_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, type_label_font_size_px).x
+	var left: float = type_label.position.x + (type_label.size.x - width) / 2.0
+	return Rect2(left, type_label.position.y, width, type_label.size.y).grow(KEYWORD_HIT_PAD_PX)
 
 # Every bold keyword on the face and the rect it covers, in this card's
 # own unscaled pixels - [{"keyword": String, "rect": Rect2}], in text
@@ -1264,7 +1287,7 @@ func _show_keyword(word: String) -> void:
 	if word.is_empty():
 		_keyword_reveal.set_revealed(false)
 		return
-	var definition: String = KeywordTable.shared().definition(word)
+	var definition: String = strike_label_definition if word == STRIKE_LABEL_WORD else KeywordTable.shared().definition(word)
 	var line := TextLine.new()
 	line.add_string(word + ": ", _keyword_reveal.text_bold_font, keyword_reveal_font_size_px)
 	line.add_string(definition, _keyword_reveal.text_font, keyword_reveal_font_size_px)
