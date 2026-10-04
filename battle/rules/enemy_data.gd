@@ -59,6 +59,14 @@ class_name EnemyData
 @export var pain_turn_line: String = ""
 @export var pain_turn_sound: AudioStream = null
 
+# A sound this enemy makes when it gains status_gained_sound_on in a
+# fight (BattleController.enemy_status_gained - the Blackback turning
+# Hungry): played once from its body (FieldEnemy.show_status()), never
+# for the statuses a fight opens with. Null (every enemy by default) or
+# no status = none.
+@export var status_gained_sound: AudioStream = null
+@export var status_gained_sound_on: StatusData = null
+
 # Elite-tier content (the Wardling). A tag only for now - nothing rolls or
 # rewards on it yet.
 @export var is_elite: bool = false

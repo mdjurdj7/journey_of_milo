@@ -2,7 +2,10 @@
 
 [ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
 [ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
-[ext_resource type="AudioStream" uid="uid://bnvfgx6j66j30" path="res://assets/audio/combat_old/hit.wav" id="3_hit"]
+[ext_resource type="AudioStream" uid="uid://fcgrewh73065" path="res://assets/audio/enemies/Stork/hit_1.mp3" id="3_hit_1"]
+[ext_resource type="AudioStream" uid="uid://dwb6evhuycum6" path="res://assets/audio/enemies/Stork/hit_2.mp3" id="7_hit_2"]
+[ext_resource type="AudioStream" uid="uid://wtmddfpj6muy" path="res://assets/audio/enemies/Stork/hiss_1.mp3" id="8_hiss"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/hungry.tres" id="9_hungry"]
 [ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="4_status_data"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/fed.tres" id="5_fed"]
 
@@ -21,8 +24,9 @@ enemy_name = "Blackback"
 max_hp = 40
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_peck"), SubResource("EnemyIntent_lunge")])
 starting_statuses = Array[ExtResource("4_status_data")]([ExtResource("5_fed")])
-; Placeholder: the Wardling's 8-bit hit.wav until the gull has its own.
-contact_sounds = Array[AudioStream]([ExtResource("3_hit")])
+contact_sounds = Array[AudioStream]([ExtResource("3_hit_1"), ExtResource("7_hit_2")])
+status_gained_sound = ExtResource("8_hiss")
+status_gained_sound_on = ExtResource("9_hungry")
 ; The marabou: 0.014 glb units tall at the feet-origin, x92.9 -> 1.3 m standing.
 model_scene_path = "res://assets/models/enemies/Stork/Stork.glb"
 model_scale = 92.9

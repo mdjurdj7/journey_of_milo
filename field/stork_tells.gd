@@ -21,6 +21,8 @@ class_name StorkTells
 # for clatter_seconds, and the lunge waits for it. The model has no
 # skeleton or separate bill, so it's the whole body. Runs in _process at
 # PROCESS_MODE_ALWAYS, like RearPose: the field is frozen through a fight.
+# clatter_sound plays as it starts, from the body, on the SFX bus; it may
+# run on past clatter_seconds, under the lunge.
 
 const SAC_SHADER_PATH := "res://field/stork_sac.gdshader"
 
@@ -71,6 +73,13 @@ const SAC_SHADER_PATH := "res://field/stork_sac.gdshader"
 # of tilt.
 @export var clatter_shake_m: float = 0.018
 @export var clatter_tilt_degrees: float = 2.5
+# The bill's sound, from its first frame. Null = a silent clatter.
+@export var clatter_sound: AudioStream = null
+@export var clatter_volume_db: float = -4.0:
+	set(value):
+		clatter_volume_db = value
+		if _clatter_player != null:
+			_clatter_player.volume_db = clatter_volume_db
 
 var _body: MeshInstance3D = null
 var _sac: ShaderMaterial = null
@@ -80,6 +89,8 @@ var _fade: Tween = null
 var _clatter_left: float = 0.0
 var _rest: Transform3D = Transform3D.IDENTITY
 var _random := RandomNumberGenerator.new()
+# The clatter's player (clatter_volume_db) - made on the first clatter.
+var _clatter_player: AudioStreamPlayer3D = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -129,7 +140,20 @@ func play_windup(_out_time: float) -> float:
 		return 0.0
 	_clatter_left = clatter_seconds
 	set_process(true)
+	_play_clatter_sound()
 	return clatter_seconds
+
+func _play_clatter_sound() -> void:
+	if clatter_sound == null:
+		return
+	if _clatter_player == null:
+		_clatter_player = AudioStreamPlayer3D.new()
+		_clatter_player.name = "ClatterAudio"
+		_clatter_player.bus = &"SFX"
+		_clatter_player.volume_db = clatter_volume_db
+		add_child(_clatter_player)
+	_clatter_player.stream = clatter_sound
+	_clatter_player.play()
 
 func _process(delta: float) -> void:
 	if _body == null:

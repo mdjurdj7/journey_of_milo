@@ -7,7 +7,9 @@ extends SceneTree
 # healing the Blackback 8 up to its max and giving way to Nip once the
 # Blackback is dead, and every turn's intent preview equal to what the
 # turn resolves. Floor 3 keeps the Blackback first, where the Sputter
-# stood, so the LINE exit measures from the same place.
+# stood, so the LINE exit measures from the same place. Its sounds: two
+# contact takes, the bill clatter with each windup, and the hiss once as
+# it turns Hungry - never at a fight's opening.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/blackback_probe.gd
 #
@@ -28,6 +30,7 @@ const NIPPER_PATH := "res://battle/rules/enemies/nipper.tres"
 const FED_PATH := "res://battle/rules/statuses/fed.tres"
 const HUNGRY_PATH := "res://battle/rules/statuses/hungry.tres"
 const CARVE_PATH := "res://cards/data/carve.tres"
+const STORK_AUDIO := "res://assets/audio/enemies/Stork/"
 const FLOOR_3 := 2
 const PLAYER_HP := 999
 const TURNS := 8
@@ -87,6 +90,12 @@ func _check_data() -> void:
 	_expect_eq(blackback.model_scene_path, "res://assets/models/enemies/Stork/Stork.glb", "Blackback is the marabou")
 	_expect_eq(blackback.model_scale, 92.9, "...at 92.9 - 1.3 m standing")
 	_expect_eq(blackback.attachment_scene_path, "res://field/stork_tells.tscn", "...with its tells (sac, clatter)")
+	var takes: Array[String] = []
+	for take in blackback.contact_sounds:
+		takes.append(take.resource_path if take != null else "<none>")
+	_expect_eq(takes, [STORK_AUDIO + "hit_1.mp3", STORK_AUDIO + "hit_2.mp3"] as Array[String], "...its contact takes hit_1 and hit_2")
+	_expect(blackback.status_gained_sound != null and blackback.status_gained_sound.resource_path == STORK_AUDIO + "hiss_1.mp3", "...the hiss as its status sound")
+	_expect(blackback.status_gained_sound_on == load(HUNGRY_PATH), "...played on Hungry")
 	_expect_eq(nipper.model_scale, 0.625, "Nipper still wears the Sputter, at 0.625")
 	var fed := Status.new(load(FED_PATH) as StatusData)
 	_expect_eq(fed.describe(), "When the other dies, it turns Hungry: each hit of its Attacks deals 3 more.", "Fed's reveal line")
@@ -159,6 +168,10 @@ func _check_fight_opens() -> void:
 				_expect(is_equal_approx(_sac_grey(tells), (tells as StorkTells).fed_desaturation), "...its sac grey while it's Fed (%.2f)" % _sac_grey(tells))
 				var windup: float = (tells as StorkTells).play_windup(0.1)
 				_expect(windup > 0.0 and is_equal_approx(windup, (tells as StorkTells).clatter_seconds), "...and each attack waits on its bill clatter (%.2f s)" % windup)
+				var clatter: AudioStreamPlayer3D = tells.get("_clatter_player")
+				_expect(clatter != null and clatter.playing and clatter.stream != null and clatter.stream.resource_path == STORK_AUDIO + "clatter_1.mp3", "...which sounds: clatter_1")
+				_expect(clatter != null and clatter.bus == &"SFX", "...the clatter on the SFX bus")
+			_expect(blackback.get("_status_player") == null, "...and no hiss as the fight opens Fed")
 		if nipper != null:
 			_expect_eq(_combatant(controller, nipper).statuses.size(), 0, "The Nipper holds nothing")
 	await _teardown()
@@ -201,6 +214,9 @@ func _check_nipper_dies_first() -> void:
 		_kill(controller, _member(controller, "Nipper"))
 		_expect_eq(controller.call("get_enemy_status_labels", blackback), PackedStringArray(["Hungry"]), "Nipper dead: Fed is Hungry")
 		_expect(gained.size() == 1 and gained[0][0] == blackback and gained[0][1] == load(HUNGRY_PATH), "...told once, to its body: it gained Hungry (%d told)" % gained.size())
+		var hiss: AudioStreamPlayer3D = blackback.get("_status_player")
+		_expect(hiss != null and hiss.playing and hiss.stream != null and hiss.stream.resource_path == STORK_AUDIO + "hiss_1.mp3", "...and it hisses (hiss_1)")
+		_expect(hiss != null and hiss.bus == &"SFX", "...on the SFX bus")
 		var tells: Node = blackback.get("_attachment")
 		if tells is StorkTells:
 			await create_timer((tells as StorkTells).fade_seconds + 0.2).timeout

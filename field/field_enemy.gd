@@ -101,6 +101,12 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export var pain_volume_db: float = -4.0
 @export_group("")
 
+# EnemyData.status_gained_sound, played from this body as it gains that
+# status - read at play time.
+@export_group("Status Sound")
+@export var status_gained_volume_db: float = -4.0
+@export_group("")
+
 # How a member of a cluster leaves a fight it didn't end (see settle_and_
 # free()): the model sinks its own height into the sand over settle_time,
 # then the node goes. Unused by a fight's last kill, which RegionField
@@ -157,6 +163,8 @@ var _noticed: bool = false
 var _face_tween: Tween = null
 # Made on the first pain turn (play_pain_turn_sound()); none before.
 var _pain_player: AudioStreamPlayer3D = null
+# Made on the first status_gained_sound (show_status()); none before.
+var _status_player: AudioStreamPlayer3D = null
 var _contact_pool := SoundPool.new()
 var _armored_contact_pool := SoundPool.new()
 # BaseMaterial3D, not StandardMaterial3D: Godot's glTF importer can produce
@@ -604,10 +612,28 @@ func _spawn_contact_audio() -> void:
 
 # A status this enemy holds, for its body's tells: handed to the
 # attachment if it shows statuses (StorkTells - the marabou's sac).
-# `animate` false at a fight's opening, where it's set at once.
+# `animate` false at a fight's opening, where it's set at once. One
+# gained mid-fight (`animate`) that EnemyData names plays its sound.
 func show_status(status: StatusData, animate: bool) -> void:
-	if status != null and _attachment != null and _attachment.has_method("show_status"):
+	if status == null:
+		return
+	if _attachment != null and _attachment.has_method("show_status"):
 		_attachment.call("show_status", status, animate)
+	if animate and enemy_data != null and enemy_data.status_gained_sound != null and status == enemy_data.status_gained_sound_on:
+		_play_status_gained_sound()
+
+# EnemyData.status_gained_sound, from this body - on the SFX bus and
+# through the battle freeze, like the pain turn's.
+func _play_status_gained_sound() -> void:
+	if _status_player == null:
+		_status_player = AudioStreamPlayer3D.new()
+		_status_player.name = "StatusAudio"
+		_status_player.bus = &"SFX"
+		_status_player.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(_status_player)
+	_status_player.stream = enemy_data.status_gained_sound
+	_status_player.volume_db = status_gained_volume_db
+	_status_player.play()
 
 # EnemyData.pain_turn_sound, once, from this body - on the SFX bus and
 # through the battle freeze, like the contact sound. Nothing without one.
