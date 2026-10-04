@@ -422,6 +422,14 @@ func _points_left() -> bool:
 		return false
 	return camera.unproject_position(wanderer.global_position).x < camera.unproject_position(target.global_position).x
 
+# The world height of this readout's bottom edge - its anchor, which it
+# sits on. INF with no target. Read by a play effect that has to stay
+# under the readouts (BrushStrokeEffect, through BattleOverlay).
+func anchor_height() -> float:
+	if target == null or not is_instance_valid(target):
+		return INF
+	return target.global_position.y + _anchor_offset().y
+
 # The anchor: the enemy's own head plus head_margin.
 func _anchor_offset() -> Vector3:
 	var head: float = target.get_head_height() if target != null else 0.0

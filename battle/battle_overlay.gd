@@ -210,9 +210,10 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	_battle_feedback.setup(wanderer, on_dark_world)
 	battle_controller.damage_dealt.connect(_battle_feedback.on_damage_dealt)
 	# A card's play effect (Blood Arc's stroke) goes down before its hits
-	# report, over the enemies it can hit.
+	# report, over the enemies it can hit - and under their intent
+	# readouts, the lowest of whose bottom edges it is handed.
 	battle_controller.card_impact.connect(func(card: CardData) -> void:
-		_battle_feedback.on_card_impact(card, battle_controller.enemies))
+		_battle_feedback.on_card_impact(card, battle_controller.enemies, _lowest_intent_height()))
 
 	_deck_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DRAW)
 	_discard_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DISCARD)
@@ -535,6 +536,15 @@ func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
 # Placeholder-only: shows whatever amount actually landed, no distinction
 # between damage/self-damage/attack kinds yet - see this pass's own
 # out-of-scope note (no real effect polish beyond the numbers themselves).
+# The world height of the lowest enemy intent readout's bottom edge (INF
+# with none) - the ceiling a play effect stays under.
+func _lowest_intent_height() -> float:
+	var lowest: float = INF
+	for intent: BattleIntent in _enemy_intents.values():
+		if intent != null and is_instance_valid(intent):
+			lowest = minf(lowest, intent.anchor_height())
+	return lowest
+
 # The number waits with its enemy's hit reaction when a play effect paces
 # them (BattleFeedback.reaction_delay()) - on scaled time, like the
 # reaction - and is placed when it shows.

@@ -9,8 +9,11 @@ class_name BrushStrokeEffect
 # A card names its effect scene in CardData.play_effect_scene_path; a new
 # effect is a new .tscn of this script with other settings, no code.
 # BattleFeedback instances it on the card's impact and calls:
-#   setup(origin, targets)  the Wanderer and the enemies the card hits -
-#                           builds the stroke there and plays it
+#   setup(origin, targets, ceiling_y)
+#                           the Wanderer, the enemies the card hits and
+#                           the world height it must stay under (the
+#                           lowest intent readout) - builds the stroke
+#                           there and plays it
 #   arrival_delay(target)   seconds after the impact the stroke reaches
 #                           `target` - when its hit reaction lands
 # Everything is read from the live bodies when it plays, in world space,
@@ -60,7 +63,8 @@ const SHADER_PATH := "res://battle/effects/brush_stroke.gdshader"
 	set(value):
 		width = value
 		_rebuild()
-# ARC: how far the middle rises above the two ends, metres.
+# ARC: how far the middle rises above the two ends, metres, at most - it
+# rises less where that would reach the ceiling (readout_margin).
 @export var arc_height: float = 0.9:
 	set(value):
 		arc_height = value
@@ -80,6 +84,13 @@ const SHADER_PATH := "res://battle/effects/brush_stroke.gdshader"
 @export var reach_past: float = 0.6:
 	set(value):
 		reach_past = value
+		_rebuild()
+# How far under the ceiling (the lowest enemy intent readout's bottom
+# edge, handed to setup()) the stroke's top edge stays, metres - in any
+# framing it never crosses a readout.
+@export var readout_margin: float = 0.15:
+	set(value):
+		readout_margin = value
 		_rebuild()
 # Brought toward the camera this far past the widest target, metres, so it
 # reads over the bodies rather than through them.
@@ -104,6 +115,7 @@ var _material: ShaderMaterial = null
 var _mesh_instance: MeshInstance3D = null
 var _origin: Node3D = null
 var _targets: Array[Node3D] = []
+var _ceiling_y: float = INF
 # The battle line the stroke runs along: start point, unit direction, and
 # the targets' span on it (stroke start/end distances from the origin).
 var _line_origin: Vector3 = Vector3.ZERO
@@ -123,10 +135,12 @@ func _ready() -> void:
 	_mesh_instance.material_override = _material
 	add_child(_mesh_instance)
 
-# Builds the stroke over `targets`, struck from `origin`, and plays it:
-# sweep, hold, fade, then frees itself.
-func setup(origin: Node3D, targets: Array[Node3D]) -> void:
+# Builds the stroke over `targets`, struck from `origin`, its top edge kept
+# readout_margin under `ceiling_y`, and plays it: sweep, hold, fade, then
+# frees itself.
+func setup(origin: Node3D, targets: Array[Node3D], ceiling_y: float = INF) -> void:
 	_origin = origin
+	_ceiling_y = ceiling_y
 	_targets.clear()
 	for target in targets:
 		if is_instance_valid(target):
@@ -181,6 +195,12 @@ func _path_points() -> PackedVector3Array:
 	_span_start = near - reach_before
 	_span_end = far + reach_past
 	var end_y: float = feet + tallest * end_height_fraction
+	# The highest the centre line may go: its top edge readout_margin under
+	# the ceiling. The ends come down to it if need be; the rise is what's
+	# left, up to arc_height.
+	var top_y: float = _ceiling_y - readout_margin - width * 0.5
+	end_y = minf(end_y, top_y)
+	var rise: float = clampf(top_y - end_y, 0.0, arc_height)
 	var depth: Vector3 = _plane_normal() * (widest + toward_camera)
 	var points := PackedVector3Array()
 	match path:
@@ -188,7 +208,7 @@ func _path_points() -> PackedVector3Array:
 			for i in segments + 1:
 				var t: float = float(i) / float(segments)
 				var along: float = lerpf(_span_start, _span_end, t)
-				var lift: float = 4.0 * t * (1.0 - t) * arc_height
+				var lift: float = 4.0 * t * (1.0 - t) * rise
 				var point: Vector3 = _line_origin + _line_dir * along + depth
 				point.y = end_y + lift
 				points.append(point)

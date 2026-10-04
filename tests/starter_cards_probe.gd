@@ -476,7 +476,18 @@ func _check_blood_arc_effect() -> void:
 	var to_far: float = effect.arrival_delay(far)
 	_expect(0.0 < to_near and to_near < to_far and to_far < effect.sweep_time, "...and reaches the near enemy first, both within its %.2f s sweep (%.3f, %.3f)" % [effect.sweep_time, to_near, to_far])
 	_expect(_card("slash").play_effect_scene_path.is_empty(), "Slash names none - its hits keep their slash marks")
-	for node: Node3D in [wanderer, near, far, effect]:
+	# Under a ceiling - the lowest intent readout's bottom edge - its top
+	# edge stays readout_margin below it.
+	var low := scene.instantiate() as BrushStrokeEffect
+	root.add_child(low)
+	await process_frame
+	low.setup(wanderer, targets, 2.0)
+	var top: float = -INF
+	for child in low.get_children():
+		if child is MeshInstance3D and (child as MeshInstance3D).mesh != null:
+			top = (child as MeshInstance3D).get_aabb().end.y
+	_expect(top <= 2.0 - low.readout_margin + 0.001, "...and stays %.2f m under the intent readouts (top %.3f under a ceiling at 2.0)" % [low.readout_margin, top])
+	for node: Node3D in [wanderer, near, far, effect, low]:
 		node.free()
 	_completed += 1
 

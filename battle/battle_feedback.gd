@@ -91,8 +91,9 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, _kind: Strin
 
 # A card has landed (BattleController.card_impact, before its effects
 # resolve): its play effect, if it names one, is laid over `targets` from
-# the Wanderer, and paces this frame's hit reactions.
-func on_card_impact(card: CardData, targets: Array[FieldEnemy]) -> void:
+# the Wanderer, kept under `ceiling_y` (the lowest intent readout's world
+# height), and paces this frame's hit reactions.
+func on_card_impact(card: CardData, targets: Array[FieldEnemy], ceiling_y: float = INF) -> void:
 	if card == null or card.play_effect_scene_path.is_empty() or _wanderer == null:
 		return
 	var scene := load(card.play_effect_scene_path) as PackedScene
@@ -109,7 +110,7 @@ func on_card_impact(card: CardData, targets: Array[FieldEnemy]) -> void:
 	for enemy in targets:
 		if is_instance_valid(enemy):
 			struck.append(enemy)
-	effect.call("setup", _wanderer, struck)
+	effect.call("setup", _wanderer, struck, ceiling_y)
 	_effect = effect
 	_release_effect.call_deferred()
 
