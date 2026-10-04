@@ -105,7 +105,6 @@ func describe(holder: Combatant = null) -> String:
 		"bonus": data.attack_damage_bonus * stack_count,
 		"damage": data.countdown_damage,
 		"grant": grant,
-		"toll": data.self_loss_toll_bonus,
 		"progress": progress,
 		"count": data.self_loss_trigger_count,
 		"drain": trigger_drain(),
@@ -298,23 +297,6 @@ static func _card_applies(card: CardData, status_data: StatusData) -> bool:
 		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS and effect.status_data == status_data:
 			return true
 	return false
-
-# Its holder just lost HP to their own effect: the extra Toll every
-# status that pays for that grants (StatusData.self_loss_toll_bonus),
-# each spending a charge when it counts them and going at 0. Called only
-# from Combatant.gain_self_loss_toll() - self-inflicted loss, never an
-# enemy's hit.
-static func take_self_loss_toll_bonus(statuses: Array[Status]) -> int:
-	var total: int = 0
-	for active in statuses.duplicate():
-		if active.data == null or active.data.self_loss_toll_bonus <= 0:
-			continue
-		total += active.data.self_loss_toll_bonus
-		if active.has_charges():
-			active.charges -= 1
-			if active.charges <= 0:
-				statuses.erase(active)
-	return total
 
 # Its holder just lost HP to their own effect - once per loss, however
 # much it took: every counter (StatusData.self_loss_trigger_count) moves

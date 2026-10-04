@@ -52,7 +52,6 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {mark}     attack_bonus_against_holder
 #   {bonus}    attack_damage_bonus × stacks
 #   {damage}   countdown_damage          {grant}  grants_on_critical's charges
-#   {toll}     self_loss_toll_bonus
 #   {progress} a counter's losses so far  {count}  self_loss_trigger_count
 #   {drain}    self_loss_trigger_drain × stacks
 #   {hp}       replacement_hp_cost       {min_cost} replaces_cost_at_least
@@ -208,13 +207,6 @@ const DURATION_UNTIL_TRIGGERED := -2
 # rounded down, at least 1, and always still Critical (survive_hp()).
 # Read only with prevents_lethal_while_critical.
 @export_range(0.0, 1.0, 0.01) var survive_fraction: float = 0.15
-
-# Extra Toll the next time its holder loses HP to their own effect (a
-# card's self-damage, a stance's price, a status tick) - on top of the
-# Toll that loss accrues anyway, never from an enemy's hit. Spends one
-# charge each time it pays; at 0 charges it's gone (Status.take_self_
-# loss_toll_bonus(), from Combatant.gain_self_loss_toll()). 0 = none.
-@export var self_loss_toll_bonus: int = 0
 
 # A counter on its holder's own HP losses (The Return): every loss to
 # their own effect - one per loss, however much HP it took - advances

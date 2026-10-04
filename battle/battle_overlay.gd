@@ -25,9 +25,10 @@ signal battle_finished(outcome: Outcome)
 
 @export_group("Choice Prompt")
 # An open hand choice says what it wants in one tracked-caps ink line,
-# this far above the armed card (BattleController.hand_choice_*): its
-# verb (SET ASIDE, CONSUME), the count marked, the cap, and the card to
-# click to confirm.
+# this far above the armed card, or above the hand for the end-of-turn
+# keep (BattleController.hand_choice_*): its verb (SET ASIDE, CONSUME,
+# KEEP), the count marked, the cap, and what to click to confirm (the
+# armed card, or END TURN).
 @export var choice_prompt_format: String = "%s %d / %d  ·  CLICK %s TO CONFIRM"
 @export var choice_prompt_font_size_px: int = 13:
 	set(value):
@@ -546,8 +547,8 @@ func _on_card_armed_changed(armed: bool) -> void:
 func _update_end_turn() -> void:
 	end_turn_button.set_enabled(_player_turn and not _card_armed)
 
-func _on_hand_choice_started(card: CardData, _cap: int, verb: String) -> void:
-	_choice_card_name = card.card_name
+func _on_hand_choice_started(confirm_label: String, _cap: int, verb: String) -> void:
+	_choice_card_name = confirm_label
 	_choice_verb = verb
 	if _choice_prompt == null:
 		_choice_prompt = Label.new()
@@ -577,15 +578,19 @@ func _style_choice_prompt() -> void:
 	_choice_prompt.add_theme_color_override("font_color", get_theme_color("ink", "Battle"))
 
 # Centred over the armed card's top edge, followed every frame while the
-# card travels to its armed pose.
+# card travels to its armed pose. With no card armed (the end-of-turn
+# keep), centred over the hand's resting top edge instead.
 func _place_choice_prompt() -> void:
 	if _choice_prompt == null or not _choice_prompt.visible or battle_controller == null:
 		return
 	var card: CardView = battle_controller.get_choosing_card_view()
-	if card == null:
-		return
-	var rect: Rect2 = card.get_global_rect()
-	_choice_prompt.global_position = Vector2(rect.get_center().x - _choice_prompt.size.x / 2.0, rect.position.y - choice_prompt_gap_px - _choice_prompt.size.y)
+	var centre_x: float = hand_container.get_global_rect().get_center().x
+	var top_y: float = hand_container.get_rest_top_y()
+	if card != null:
+		var rect: Rect2 = card.get_global_rect()
+		centre_x = rect.get_center().x
+		top_y = rect.position.y
+	_choice_prompt.global_position = Vector2(centre_x - _choice_prompt.size.x / 2.0, top_y - choice_prompt_gap_px - _choice_prompt.size.y)
 
 func _process(_delta: float) -> void:
 	_place_choice_prompt()

@@ -31,6 +31,10 @@ class_name TrinketData
 #   critical_entry_block Block the first time each fight the Wanderer
 #                        crosses INTO Critical (Combatant.resolve_
 #                        critical_entry()) - not for starting there
+#   end_turn_keep        how many hand cards he may keep at the end of
+#                        each of his turns: End Turn opens a choice of 0
+#                        to this many first (BattleController.end_turn()),
+#                        and the kept ones skip the discard
 
 @export var id: StringName = &""
 @export var display_name: String = ""
@@ -38,10 +42,10 @@ class_name TrinketData
 # Wanderer's battle reveal and on the offer. A template (Status.fill_
 # template()), filled from this trinket's own numbers -
 #   {bonus}  combat_start_status's attack_damage_bonus
-#   {toll}   combat_start_status's self_loss_toll_bonus
 #   {heal}   heal_on_win             {draw}  opening_draw_bonus
 #   {loss_heal}  heal_on_win_after_loss
 #   {block}  combat_start_block      {critical_block}  critical_entry_block
+#   {keep}   end_turn_keep
 #   {s}      "s" unless the count token before it is 1
 @export_multiline var description: String = ""
 # The shortened line for where it's shown small - the "currently held"
@@ -62,6 +66,7 @@ class_name TrinketData
 @export var combat_start_block: int = 0
 @export var first_card_free: bool = false
 @export var critical_entry_block: int = 0
+@export var end_turn_keep: int = 0
 
 func describe() -> String:
 	return _fill(description)
@@ -73,12 +78,12 @@ func _fill(template: String) -> String:
 	var status: StatusData = combat_start_status
 	return Status.fill_template(template, {
 		"bonus": status.attack_damage_bonus if status != null else 0,
-		"toll": status.self_loss_toll_bonus if status != null else 0,
 		"heal": heal_on_win,
 		"draw": opening_draw_bonus,
 		"loss_heal": heal_on_win_after_loss,
 		"block": combat_start_block,
 		"critical_block": critical_entry_block,
+		"keep": end_turn_keep,
 	})
 
 # The fight is opening: this trinket's status, if it has one, onto the

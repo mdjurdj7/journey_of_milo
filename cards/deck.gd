@@ -49,8 +49,15 @@ func discard(card: CardData) -> void:
 	discard_pile.append(card)
 	discarded.emit(card)
 
-func discard_hand() -> void:
+# Every hand card to the discard pile but `keep` (the end-of-turn keep) -
+# one occurrence each, so keeping one of two copies discards the other.
+func discard_hand(keep: Array[CardData] = []) -> void:
+	var keeping: Array[CardData] = keep.duplicate()
 	for card in hand.duplicate():
+		var index: int = keeping.find(card)
+		if index >= 0:
+			keeping.remove_at(index)
+			continue
 		discard(card)
 
 # `cards` leave the hand for set_aside_pile - one occurrence each; a card

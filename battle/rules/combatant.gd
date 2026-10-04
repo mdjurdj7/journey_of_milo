@@ -129,8 +129,7 @@ func _init(starting_hp: int = 1) -> void:
 	max_hp = starting_hp
 
 # HP just lost to this fighter's own effect - a card's self-damage, a
-# stance's price, a status tick: the Toll it accrues, 1 per HP, plus any
-# status that pays extra for it (Status.take_self_loss_toll_bonus()).
+# stance's price, a status tick: the Toll it accrues, 1 per HP.
 # Every self-inflicted loss comes through here; an enemy's hit never
 # does, which is the whole of the rule that Toll is self-inflicted - and
 # of what a self-loss counter counts, once per call (Status.count_self_
@@ -138,7 +137,7 @@ func _init(starting_hp: int = 1) -> void:
 func gain_self_loss_toll(lost: int) -> void:
 	if lost <= 0:
 		return
-	toll += lost + Status.take_self_loss_toll_bonus(statuses)
+	toll += lost
 	pending_drain += Status.count_self_loss(statuses)
 
 func is_critical() -> bool:

@@ -51,6 +51,7 @@ toll_carry_probe 35
 trinket_probe 35
 collateral_probe 29
 bide_probe 30
+frayed_cord_probe 30
 deny_probe 40
 dying_light_probe 40
 leverage_probe 29
@@ -78,24 +79,24 @@ siltjaw_probe 1
 # --- Areas: which probes guard which part of the game ---
 area_probes() {
 	case "$1" in
-		cards) echo "starter_cards card_rarity" ;;
+		cards) echo "starter_cards card_rarity frayed_cord" ;;
 		face) echo "starter_cards keyword come_due come_due_face critical_cards" ;;
 		keywords) echo "keyword starter_cards the_return" ;;
-		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log" ;;
+		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord" ;;
 		enemies) echo "blackback siltjaw wardling sentence no_further critical_cards kill_order armored_contact deny" ;;
 		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log" ;;
 		floor1) echo "kill_order drain" ;;
 		floor2) echo "kill_order hold_line bundle_roll" ;;
 		floor3) echo "kill_order blackback wardling" ;;
 		floors) echo "kill_order drain hold_line bundle_roll blackback wardling" ;;
-		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log" ;;
+		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord" ;;
 		hud) echo "gold_line glassbone" ;;
 		hp_bar) echo "kill_order" ;;
 		ui_inspect) echo "keyword" ;;
 		# The fight's own UI: every probe that plays a real fight (which
 		# builds the battle overlay and its hand), plus the rules probes
 		# whose readouts and faces it shows.
-		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log" ;;
+		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord" ;;
 		*) return 1 ;;
 	esac
 }

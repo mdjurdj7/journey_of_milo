@@ -16,7 +16,7 @@ extends SceneTree
 # the RunState autoload (RegionField, BattleController, KeepsakeOffer):
 # a SceneTree script compiles before the autoloads register.
 
-const CASES := 22
+const CASES := 21
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 const KEEPSAKE_OFFER_SCENE_PATH := "res://battle/keepsake_offer.tscn"
@@ -56,8 +56,7 @@ func _initialize() -> void:
 	_check_bent_nail()
 	_check_bent_nail_spent_while_buried()
 	_check_stance_bonus_beside_keen()
-	_check_frayed_cord_self_loss()
-	_check_frayed_cord_not_enemy_damage()
+	_check_frayed_cord_data()
 	_check_descriptions()
 	_check_art()
 	_check_never_in_card_rewards()
@@ -195,47 +194,24 @@ func _check_stance_bonus_beside_keen() -> void:
 	_expect(player.stance != null and player.stance.data.id == "last_resort", "...Last Resort still up")
 	_completed += 1
 
-func _check_frayed_cord_self_loss() -> void:
+# Frayed Cord keeps a card at the end of the turn: no status at all, just
+# its end_turn_keep (frayed_cord_probe plays the keep through).
+func _check_frayed_cord_data() -> void:
 	var cord: TrinketData = load(FRAYED_CORD_PATH)
-	var player := _player(50)
-	var enemy := Combatant.new(100)
-	cord.apply_combat_start(player.statuses)
-	_play(BITE_DOWN_PATH, player, enemy)
-	_expect_eq(player.toll, 4, "The first Bite Down: 2 Toll + 2 extra")
-	_expect(player.statuses.is_empty(), "...and Frayed is spent")
-	_play(BITE_DOWN_PATH, player, enemy)
-	_expect_eq(player.toll, 6, "The second Bite Down: the normal 2")
-	# SELF_DAMAGE_TOLL's fixed total gets the bonus on top.
-	var paying := _player(50)
-	cord.apply_combat_start(paying.statuses)
-	_play(DOWN_PAYMENT_PATH, paying, null)
-	_expect_eq(paying.toll, 7, "Down Payment with Frayed: its 5 Toll + 2 extra")
-	_completed += 1
-
-func _check_frayed_cord_not_enemy_damage() -> void:
-	var cord: TrinketData = load(FRAYED_CORD_PATH)
-	var data: EnemyData = load(SPUTTER_PATH)
+	_expect_eq(cord.end_turn_keep, 1, "Frayed Cord keeps 1 card at the end of the turn")
+	_expect(cord.combat_start_status == null, "...and opens a fight with no status")
 	var player := _player(50)
 	cord.apply_combat_start(player.statuses)
-	var enemy := Combatant.new(data.max_hp)
-	EnemyTurn.pick_initial_intent(enemy, data)
-	var hit: bool = false
-	for turn in 6:
-		var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
-		if int(result.get("damage_to_hp", 0)) > 0:
-			hit = true
-	_expect(hit, "The Sputter's turns land at least one hit (the check means something)")
-	_expect_eq(player.toll, 0, "Enemy hits give no Toll with Frayed Cord")
-	_expect_eq(player.statuses.size(), 1, "...and Frayed is still waiting")
+	_expect(player.statuses.is_empty(), "...so the Wanderer's row stays empty")
 	_completed += 1
 
 func _check_descriptions() -> void:
 	var keen := Status.new((load(BENT_NAIL_PATH) as TrinketData).combat_start_status)
-	var frayed := Status.new((load(FRAYED_CORD_PATH) as TrinketData).combat_start_status)
 	print("   Keen: ", keen.describe())
-	print("   Frayed: ", frayed.describe())
 	_expect_eq(keen.describe(), "+3 damage on your next Attack.", "Keen's live description")
-	_expect_eq(frayed.describe(), "The next time you lose HP to your own effect, gain 2 extra Toll.", "Frayed's live description")
+	var cord: TrinketData = load(FRAYED_CORD_PATH)
+	_expect_eq(cord.describe(), "At the end of your turn, you may keep 1 card in your hand.", "Frayed Cord's description")
+	_expect_eq(cord.describe_short(), "Keep 1 card at the end of each turn.", "...and its short line")
 	for path in [BENT_NAIL_PATH, WHITE_SHELL_PATH, FRAYED_CORD_PATH, WORN_PAGE_PATH]:
 		var trinket: TrinketData = load(path)
 		print("   ", trinket.display_name, ": ", trinket.describe())
@@ -278,23 +254,16 @@ func _check_wardling_table_guaranteed() -> void:
 		_completed += 1
 		return
 	_expect(table.guaranteed, "...its drop is guaranteed")
-	_expect_eq(table.entries.size(), 4, "...the four prototype trinkets")
-	for entry in table.entries:
-		_expect_eq(entry.weight, 1.0, "...%s weighted equally" % entry.trinket.display_name)
+	_expect_eq(table.entries.size(), 1, "...one entry: its signature")
+	var cord: TrinketData = load(FRAYED_CORD_PATH)
+	_expect(table.entries.size() == 1 and table.entries[0].trinket == cord, "...Frayed Cord")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	var none: Array[StringName] = []
-	var seen: Dictionary = {}
-	for i in 400:
-		var drop: TrinketData = table.roll(rng, null, none)
-		_expect(drop != null, "Roll %d with an empty slot drops something" % i)
-		if drop != null:
-			seen[drop.id] = true
-	_expect_eq(seen.size(), 4, "All four come up")
-	for entry in table.entries:
-		for i in 50:
-			var drop: TrinketData = table.roll(rng, entry.trinket, none)
-			_expect(drop != null and drop != entry.trinket, "Holding %s: a drop, never %s" % [entry.trinket.display_name, entry.trinket.display_name])
+	for i in 50:
+		_expect(table.roll(rng, null, none) == cord, "Roll %d with an empty slot: Frayed Cord" % i)
+		_expect(table.roll(rng, load(BENT_NAIL_PATH), none) == cord, "Roll %d holding Bent Nail: Frayed Cord" % i)
+		_expect(table.roll(rng, cord, none) == null, "Roll %d holding Frayed Cord already: nothing" % i)
 	_expect(load(SPUTTER_PATH).get("keepsake_table") == null, "The Sputter has no table")
 	_completed += 1
 
@@ -340,6 +309,11 @@ func _check_white_shell_win_not_escape() -> void:
 	_expect(_keepsake() == load(WHITE_SHELL_PATH), "The keepsake persists across both fights")
 	_completed += 1
 
+# Frayed Cord in a real fight: no status on the Wanderer, and End Turn
+# opens the keep instead of ending the turn - cancelled here, the turn
+# goes on (frayed_cord_probe plays the keep itself through). Beside it, a
+# status tick still pays its Toll as self-inflicted HP loss, 1 a tick -
+# with nothing extra now that no keepsake pays for it.
 func _check_frayed_cord_tick() -> void:
 	_new_run()
 	_run_state.call("equip_keepsake", load(FRAYED_CORD_PATH))
@@ -351,22 +325,22 @@ func _check_frayed_cord_tick() -> void:
 	var controller: Node = await _start_fight(0, &"")
 	if controller != null:
 		var player: Combatant = controller.get("player")
+		_expect(player.statuses.is_empty(), "With Frayed Cord, the fight opens with no status on the Wanderer")
+		controller.call("end_turn")
+		_expect(bool(controller.get("_keep_choice_open")), "...and End Turn opens the keep rather than ending the turn")
+		_expect_eq(_hand_size(controller), 5, "...the hand still whole")
+		controller.call("cancel_choice")
+		_expect(not bool(controller.get("_keep_choice_open")) and not bool(controller.get("_input_locked")), "...and a cancel goes back to the turn")
 		Status.apply_to(player.statuses, tick)
 		var hand: Node = controller.get("_hand_container")
 		var before: int = int(_run_state.get("toll"))
 		hand.call("discard_hand")
 		controller.call("_start_player_turn")
-		_expect_eq(int(_run_state.get("toll")) - before, 1 + 2, "A status tick is self-inflicted: its 1 Toll + Frayed's 2, the first time")
+		_expect_eq(int(_run_state.get("toll")) - before, 1, "A status tick is self-inflicted: its 1 Toll")
 		before = int(_run_state.get("toll"))
 		hand.call("discard_hand")
 		controller.call("_start_player_turn")
-		_expect_eq(int(_run_state.get("toll")) - before, 1, "...the next tick: 1, the bonus spent for this combat")
-	await _teardown()
-	# A new fight opens with Frayed again.
-	controller = await _start_fight(0, &"")
-	if controller != null:
-		var player: Combatant = controller.get("player")
-		_expect_eq(player.statuses.size(), 1, "The next fight opens with Frayed again")
+		_expect_eq(int(_run_state.get("toll")) - before, 1, "...and 1 again the next tick")
 	await _teardown()
 	_completed += 1
 

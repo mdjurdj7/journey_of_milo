@@ -1,10 +1,9 @@
-[gd_resource type="Resource" script_class="KeepsakeTable" load_steps=11 format=3]
+[gd_resource type="Resource" script_class="KeepsakeTable" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://run/keepsake_table.gd" id="1_table"]
 [ext_resource type="Script" path="res://run/keepsake_entry.gd" id="2_entry"]
 [ext_resource type="Resource" path="res://run/keepsakes/bent_nail.tres" id="3_bent_nail"]
 [ext_resource type="Resource" path="res://run/keepsakes/white_shell.tres" id="4_white_shell"]
-[ext_resource type="Resource" path="res://run/keepsakes/frayed_cord.tres" id="5_frayed_cord"]
 [ext_resource type="Resource" path="res://run/keepsakes/worn_page.tres" id="6_worn_page"]
 
 [sub_resource type="Resource" id="KeepsakeEntry_bent_nail"]
@@ -15,15 +14,11 @@ trinket = ExtResource("3_bent_nail")
 script = ExtResource("2_entry")
 trinket = ExtResource("4_white_shell")
 
-[sub_resource type="Resource" id="KeepsakeEntry_frayed_cord"]
-script = ExtResource("2_entry")
-trinket = ExtResource("5_frayed_cord")
-
 [sub_resource type="Resource" id="KeepsakeEntry_worn_page"]
 script = ExtResource("2_entry")
 trinket = ExtResource("6_worn_page")
 
 [resource]
 script = ExtResource("1_table")
-entries = Array[ExtResource("2_entry")]([SubResource("KeepsakeEntry_bent_nail"), SubResource("KeepsakeEntry_white_shell"), SubResource("KeepsakeEntry_frayed_cord"), SubResource("KeepsakeEntry_worn_page")])
+entries = Array[ExtResource("2_entry")]([SubResource("KeepsakeEntry_bent_nail"), SubResource("KeepsakeEntry_white_shell"), SubResource("KeepsakeEntry_worn_page")])
 guaranteed = true

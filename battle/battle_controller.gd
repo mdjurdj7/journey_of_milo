@@ -19,11 +19,13 @@ signal card_swing(card: CardData)
 signal hand_changed()
 signal target_requested(card: CardData)
 signal target_cancelled()
-# A hand choice (see _begin_choice()) - Bide's set-aside, or Deny's pick
-# among cards tied for most expensive: opened with up to `cap` cards to
-# mark and the verb that names what happens to them, the count marked as
-# it moves, and closed (confirmed, or cancelled with nothing spent).
-signal hand_choice_started(card: CardData, cap: int, verb: String)
+# A hand choice (see _begin_choice()) - Bide's set-aside, Deny's pick
+# among cards tied for most expensive, or the keep a keepsake allows at
+# the end of the turn (_begin_keep_choice()): opened with up to `cap`
+# cards to mark, the verb that names what happens to them and what to
+# click to confirm (the armed card's name, or END TURN), the count marked
+# as it moves, and closed (confirmed, or cancelled with nothing spent).
+signal hand_choice_started(confirm_label: String, cap: int, verb: String)
 signal hand_choice_changed(marked: int, cap: int)
 signal hand_choice_ended()
 
@@ -120,6 +122,11 @@ var _choice_cap: int = 0
 # or CONSUME (Deny's tie - exactly cap, the tied cards only).
 var _choice_kind: CardEffect.EffectType = CardEffect.EffectType.SET_ASIDE
 var _choice_eligible: Array[CardView] = []
+# The end-of-turn keep is open (see _begin_keep_choice()): a choice with
+# no armed card, confirmed by End Turn. How many cards the held keepsake
+# lets the hand keep (TrinketData.end_turn_keep), read as the fight opens.
+var _keep_choice_open: bool = false
+var _end_turn_keep: int = 0
 # The hand card a CONSUME card (Deny) will take, picked before its target
 # is: marked in the hand while the target is chosen, taken as it resolves.
 var _pending_consume_view: CardView = null
@@ -167,6 +174,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		player.block += maxi(keepsake.combat_start_block, 0)
 		player.first_card_free = keepsake.first_card_free
 		player.critical_entry_block = maxi(keepsake.critical_entry_block, 0)
+		_end_turn_keep = maxi(keepsake.end_turn_keep, 0)
 		# Opening already Critical is not entering it.
 		player.critical_entry_armed = not player.is_critical()
 
@@ -288,7 +296,7 @@ func get_choosing_card_view() -> CardView:
 	return _choosing_card_view
 
 func request_play(card_view: CardView) -> void:
-	if _input_locked or _pending_card_view != null or _choosing_card_view != null or card_view.card_data == null:
+	if _input_locked or _pending_card_view != null or _choice_open() or card_view.card_data == null:
 		return
 	var card: CardData = card_view.card_data
 	if player.energy_cost(card) > player.energy:
@@ -386,11 +394,34 @@ func _begin_choice(card_view: CardView, cap: int, kind: CardEffect.EffectType, e
 	_choice_eligible = eligible
 	card_view.lift_and_hold(true)
 	_hand_container.begin_choice(card_view, eligible)
-	hand_choice_started.emit(card_view.card_data, cap, "CONSUME" if kind == CardEffect.EffectType.CONSUME else "SET ASIDE")
+	hand_choice_started.emit(card_view.card_data.card_name, cap, "CONSUME" if kind == CardEffect.EffectType.CONSUME else "SET ASIDE")
 	hand_choice_changed.emit(0, cap)
 
+# Whether a hand choice is open - an armed card's, or the end-of-turn keep.
+func _choice_open() -> bool:
+	return _choosing_card_view != null or _keep_choice_open
+
+# The end-of-turn keep (TrinketData.end_turn_keep - Frayed Cord): End Turn
+# opens it before anything of the turn ends, Bide's mode with no card
+# armed - 0 to `cap` hand cards marked, End Turn (or Enter/Space) to
+# confirm, right-click/Esc back to the turn with nothing ended. Asked
+# whenever the hand holds a card, even one. False, and nothing opened,
+# when the keepsake keeps none or the hand is empty.
+func _begin_keep_choice() -> bool:
+	var cap: int = mini(_end_turn_keep, deck.hand.size())
+	if cap <= 0:
+		return false
+	_keep_choice_open = true
+	_choice_marked.clear()
+	_choice_cap = cap
+	_choice_eligible = []
+	_hand_container.begin_choice(null)
+	hand_choice_started.emit("END TURN", cap, "KEEP")
+	hand_choice_changed.emit(0, cap)
+	return true
+
 func toggle_choice(card_view: CardView) -> void:
-	if _choosing_card_view == null or card_view == _choosing_card_view:
+	if not _choice_open() or card_view == _choosing_card_view:
 		return
 	if not _choice_eligible.is_empty() and not _choice_eligible.has(card_view):
 		return
@@ -405,6 +436,13 @@ func toggle_choice(card_view: CardView) -> void:
 	hand_choice_changed.emit(_choice_marked.size(), _choice_cap)
 
 func confirm_choice() -> void:
+	if _keep_choice_open:
+		var kept: Array[CardData] = []
+		for view in _choice_marked:
+			kept.append(view.card_data)
+		_close_choice()
+		_finish_turn(kept)
+		return
 	if _choosing_card_view == null:
 		return
 	var card_view: CardView = _choosing_card_view
@@ -422,6 +460,9 @@ func confirm_choice() -> void:
 	_resolve_play(card_view, null, chosen)
 
 func cancel_choice() -> void:
+	if _keep_choice_open:
+		_close_choice()
+		return
 	if _choosing_card_view == null:
 		return
 	var card_view: CardView = _choosing_card_view
@@ -431,6 +472,7 @@ func cancel_choice() -> void:
 # `keep` stays marked (Deny's pick, waiting on its target).
 func _close_choice(keep: CardView = null) -> void:
 	_choosing_card_view = null
+	_keep_choice_open = false
 	_choice_marked.clear()
 	_choice_cap = 0
 	_choice_eligible = []
@@ -464,13 +506,26 @@ func cancel_target() -> void:
 	_enemy_rects.clear()
 	target_cancelled.emit()
 
+# End Turn: with a keepsake that keeps cards and a card in hand, the keep
+# choice first (_begin_keep_choice()) - and End Turn again confirms it.
 func end_turn() -> void:
 	if _input_locked:
 		return
+	if _keep_choice_open:
+		confirm_choice()
+		return
 	cancel_choice()
+	if _begin_keep_choice():
+		return
+	await _finish_turn([])
+
+# The turn ends: the hand discarded but for `keep` (the end-of-turn keep's
+# cards, which stay for the next turn's draw to land on top of), Grace
+# closed, stance and turn statuses aged, the enemy turn, the next turn.
+func _finish_turn(keep: Array[CardData]) -> void:
 	_input_locked = true
 	turn_phase_changed.emit(false)
-	_hand_container.discard_hand()
+	_hand_container.discard_hand(keep)
 	_close_grace_window()
 	# A stance with a duration ages on the player's own turn ending, the
 	# same beat Grace closes on.
@@ -1098,7 +1153,7 @@ func _screen_pos_for(target: FieldEnemy) -> Vector2:
 	return overlay_size / 2.0 + self_play_screen_offset
 
 func _on_card_view_clicked(card_view: CardView) -> void:
-	if _choosing_card_view != null:
+	if _choice_open():
 		if card_view == _choosing_card_view:
 			confirm_choice()
 		else:
@@ -1112,7 +1167,7 @@ func _on_card_view_clicked(card_view: CardView) -> void:
 # Esc) - everything else (movement, camera, ...) is untouched - and
 # already frozen by RegionField anyway.
 func _unhandled_input(event: InputEvent) -> void:
-	if _choosing_card_view != null:
+	if _choice_open():
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 			cancel_choice()
 			get_viewport().set_input_as_handled()
