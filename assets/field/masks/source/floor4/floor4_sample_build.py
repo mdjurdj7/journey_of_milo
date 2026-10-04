@@ -1,8 +1,8 @@
 # Builds floor4_walkable_sample.png: white = walkable, black = not, coloured dots = markers.
 # The loop at 0.75 of its first size round spawn, the dune sized for a ring ~7-9 m wide,
 # so the field camera's frame holds a wall on either hand: a south entry neck, the loop
-# round the central dune, the collector's bay in its east flank, the rejoin, the exit
-# neck west.
+# round the central dune, the optional fight's alcove off the west side, the
+# collector's bay in its east flank, the rejoin, the exit neck west.
 import numpy as np
 from PIL import Image, ImageDraw
 from scipy.ndimage import gaussian_filter
@@ -27,6 +27,7 @@ walk |= capsule(s((-22, -46)), s((-37, -50)), 4.2 * S)   # exit neck heading wes
 walk |= ellipse(s((-38, -50)), 5.0 * S, 4.6 * S)     # exit lobe beyond the gate line
 walk &= ~ellipse((0.6, -21.0), 14.0, 9.6)            # the central dune (impassable), for a ~8 m ring
 walk |= ellipse((11.0, -22.5), 2.7, 3.2)             # collector's bay tucked into the dune's east flank
+walk |= ellipse((-23.6, -21.2), 3.4, 3.3)            # the optional fight's alcove in the west wall, off the walking line
 walk &= ~ellipse(s((32, -19)), 4.5 * S, 4.0 * S)     # ridge bump: the east side winds and narrows
 walk &= ~ellipse(s((-31.5, -36)), 3.0 * S, 4.0 * S)  # small west bump so the west edge isn't a perfect arc
 
@@ -42,7 +43,7 @@ markers = {  # world xz -> colour (read back by the generator)
     "exit": (s((-37, -50)), (0, 255, 0)),
     "required_fight": (s((-18, -43)), (0, 0, 255)),
     "collector": ((11.0, -22.5), (255, 255, 0)),
-    "optional_fight": (s((-23, -24)), (255, 0, 255)),
+    "optional_fight": ((-24.4, -21.6), (255, 0, 255)),
     "dig_site": (s((21, -42)), (0, 255, 255)),
 }
 for name, (w, col) in markers.items():

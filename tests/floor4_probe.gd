@@ -15,10 +15,12 @@ extends SceneTree
 #            stands: he comes to rest on the gate line and the floor holds;
 #            won, the line lifts and he walks out - the last floor, so the
 #            run wraps to floor 1
+#   alcove - the optional fight's alcove off the west side: walked into
+#            from the route, it starts that fight and only it
 #
-# The routes keep clear of the optional fight (its contact area is 2 m;
-# the west side passes it at 3 m), so the only fight either starts is the
-# required one.
+# The optional fight stands in its alcove, off the walking line: every leg
+# of both routes passes its 2 m contact area at least 4 m clear, and it
+# never fires - the only fight a route starts is the required one.
 #
 #   Godot_v4.7.1.exe --headless --fixed-fps 60 --path . -s res://tests/floor4_probe.gd
 #
@@ -26,7 +28,7 @@ extends SceneTree
 # Untyped against the project's own classes (get()/call() only), for the
 # autoload reason kill_order_probe.gd's own header gives.
 
-const CASES := 5
+const CASES := 6
 const REGION_PATH := "res://floors/region1.tres"
 const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
 const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
@@ -35,8 +37,8 @@ const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FLOOR_INDEX := 3
 const REQUIRED_AT := Vector2(-13.5, -32.267)
-const OPTIONAL_AT := Vector2(-17.267, -18.0)
-const WEST: Array[Vector2] = [Vector2(0, -4.5), Vector2(-6, -9), Vector2(-11.5, -13), Vector2(-14.2, -18), Vector2(-15.5, -24), Vector2(-16.5, -28)]
+const OPTIONAL_AT := Vector2(-24.4, -21.6)
+const WEST: Array[Vector2] = [Vector2(0, -4.5), Vector2(-6, -9), Vector2(-11.5, -13), Vector2(-16.5, -18), Vector2(-16.8, -24), Vector2(-16.5, -28)]
 const EAST: Array[Vector2] = [Vector2(0, -4.5), Vector2(7, -9), Vector2(14, -12.5), Vector2(17.5, -19), Vector2(17.5, -26), Vector2(14.5, -31.5), Vector2(7, -34), Vector2(0, -35), Vector2(-7, -34.5), Vector2(-10, -33.5)]
 # Metres short of a waypoint that count as there.
 const REACH_M := 1.0
@@ -48,9 +50,13 @@ const DUNE_SECONDS := 8.0
 # south) plus the ledge barrier's 0.4 m up its face and 0.1 m to spare.
 const DUNE_WEST_LIMIT_X := -12.87
 const DUNE_SOUTH_LIMIT_Z := -11.93
-# The optional fight's contact area is 2 m; the narrow west side passes
-# it at 3 m, the middle of the ring.
-const OPTIONAL_CLEARANCE_M := 3.0
+# The optional fight's contact area, and how far clear of it every leg of
+# a route stays.
+const CONTACT_RADIUS_M := 2.0
+const OPTIONAL_CLEARANCE_M := 4.0
+# From the west side into the alcove: its mouth, 3.4 m short of the fight.
+const ALCOVE_FROM := Vector2(-16.8, -21)
+const ALCOVE_MOUTH := Vector2(-21.0, -21.4)
 const OVERSHOOT_LIMIT_M := 0.02
 const SAFETY_SECONDS := 400.0
 
@@ -74,6 +80,7 @@ func _initialize() -> void:
 	await _check_route("east", EAST)
 	await _check_dune()
 	await _check_exit()
+	await _check_alcove()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -95,7 +102,7 @@ func _check_data() -> void:
 	_expect_eq(enemies.size(), 2, "...two fights")
 	if enemies.size() == 2:
 		_expect(bool(enemies[0].get("required")) and enemies[0].get("position") == REQUIRED_AT, "...the required one first, at the rejoin")
-		_expect(not bool(enemies[1].get("required")) and enemies[1].get("position") == OPTIONAL_AT, "...the optional one on the west side")
+		_expect(not bool(enemies[1].get("required")) and enemies[1].get("position") == OPTIONAL_AT, "...the optional one in its alcove off the west side")
 		for entry in enemies:
 			_expect((entry.get("enemy_data") as Resource).resource_path == SPUTTER_PATH, "...both the Sputter placeholder")
 	_expect_eq((data.get("ledges") as Array).size(), 2, "...two ledge rings: the boundary and the dune")
@@ -106,8 +113,16 @@ func _check_data() -> void:
 # the fight itself walked into.
 func _check_route(label: String, waypoints: Array[Vector2]) -> void:
 	await _load()
+	var leg_start: Vector2 = Vector2.ZERO
 	for point in waypoints:
-		_expect(_distance_2d(point, OPTIONAL_AT) >= OPTIONAL_CLEARANCE_M, "%s: waypoint %s keeps clear of the optional fight" % [label, point])
+		var clear: float = _segment_distance(OPTIONAL_AT, leg_start, point) - CONTACT_RADIUS_M
+		_expect(clear >= OPTIONAL_CLEARANCE_M, "%s: the leg to %s passes the optional fight's contact area %.1f m clear (>= %.1f)" % [label, point, clear, OPTIONAL_CLEARANCE_M])
+		leg_start = point
+	var optional: Node = _optional_enemy()
+	var fired: Array[bool] = [false]
+	if optional != null:
+		optional.connect("contacted", func(_enemy: Node) -> void: fired[0] = true)
+	for point in waypoints:
 		var reached: bool = await _walk_to(point)
 		_expect(reached, "%s: reaches %s (stopped at %s)" % [label, point, _at()])
 		if not reached:
@@ -126,6 +141,30 @@ func _check_route(label: String, waypoints: Array[Vector2]) -> void:
 			var overlay: Node = _field.get_node("BattleLayer").get_child(0)
 			var members: Array = overlay.get("battle_controller").get("enemies")
 			_expect(members.size() == 1 and members[0] == required, "%s: ...and only it" % label)
+	_expect(not fired[0], "%s: the optional fight never fires" % label)
+	await _unload()
+	_completed += 1
+
+# The alcove is reachable: from the west side to its mouth, then on into
+# the optional fight, which starts with it alone.
+func _check_alcove() -> void:
+	await _load()
+	await _place(ALCOVE_FROM)
+	var reached: bool = await _walk_to(ALCOVE_MOUTH)
+	_expect(reached, "The alcove's mouth is reachable from the west side (stopped at %s)" % _at())
+	var optional: Node = _optional_enemy()
+	if optional != null:
+		_wanderer.call("set_move_target_enemy", optional)
+		var started: bool = false
+		for i in int(FIGHT_SECONDS * 60.0):
+			await physics_frame
+			if _field.get_node("BattleLayer").get_child_count() > 0:
+				started = true
+				break
+		_expect(started, "...and walking on into the alcove meets the optional fight")
+		if started:
+			var members: Array = _field.get_node("BattleLayer").get_child(0).get("battle_controller").get("enemies")
+			_expect(members.size() == 1 and members[0] == optional, "...and only it")
 	await _unload()
 	_completed += 1
 
@@ -269,6 +308,19 @@ func _walk_to(point: Vector2) -> bool:
 		if not bool(_wanderer.call("has_move_target")) and i > 10:
 			break
 	return _distance_2d(_at(), point) <= REACH_M
+
+func _optional_enemy() -> Node:
+	for node in get_nodes_in_group("enemies"):
+		if not bool(node.get("required")):
+			return node
+	_fail("no optional enemy on floor 4")
+	return null
+
+# Distance from `p` to the segment a-b.
+func _segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
+	var ab: Vector2 = b - a
+	var t: float = clampf((p - a).dot(ab) / maxf(ab.length_squared(), 1.0e-6), 0.0, 1.0)
+	return p.distance_to(a + ab * t)
 
 func _required_enemy() -> Node:
 	for node in get_nodes_in_group("enemies"):
