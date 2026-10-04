@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the three in the belongings pool, and Endure, which no pool offers. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at c823307 plus two card arts",
+    "generated": "2026-10-04, from the live data at fa78b05, Reprisal removed",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 28,
+    "total_unique_wanderer_cards": 27,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,11 +51,10 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 23,
+      "count": 22,
       "cards": [
         "Carve",
         "Hold Fast",
-        "Reprisal",
         "Small Price",
         "Debt Forgiven",
         "Self-Eater",
@@ -78,7 +77,7 @@
         "Deny"
       ],
       "by_rarity": {
-        "COMMON": 7,
+        "COMMON": 6,
         "UNCOMMON": 9,
         "RARE": 7
       },
@@ -97,12 +96,12 @@
     },
     "wanderer_card_types": {
       "SKILL": 13,
-      "ATTACK": 9,
+      "ATTACK": 8,
       "POWER": 4,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
-      "COMMON": 11,
+      "COMMON": 10,
       "UNCOMMON": 10,
       "RARE": 7
     },
@@ -112,8 +111,7 @@
     "missing_art": [
       "Debt Forgiven",
       "Dying Light",
-      "Last Resort",
-      "Reprisal"
+      "Last Resort"
     ],
     "neutral_cards_missing_art": [
       "Endure",
@@ -707,15 +705,15 @@
       "face_type_label": "TOLL",
       "energy_cost": 1,
       "rarity": "UNCOMMON",
-      "card_text": "Spend up to 10 Toll.\nHeal 0 HP.",
+      "card_text": "Spend up to 20 Toll.\nHeal 1 HP per 2 Toll spent.",
       "face_hp_line": null,
-      "card_text_template": "Spend up to 10 Toll.\nHeal {toll_heal} HP.",
+      "card_text_template": "Spend up to 20 Toll.\n{battle}Heal {toll_heal} HP.{/battle}{outside}Heal 1 HP per 2 Toll spent.{/outside}",
       "targeting": "self",
       "removal_after_play": "discard pile",
       "effects": [
         {
           "type": "TOLL_HEAL",
-          "plain_english": "Spend up to 10 Toll; heal half of what was spent (rounded down), at most 5 HP."
+          "plain_english": "Spend up to 20 Toll - only the even amount it converts, so an odd point stays held - and heal 1 HP per 2 spent, at most 10 HP."
         }
       ],
       "keywords": [
@@ -727,7 +725,7 @@
       "draw": null,
       "energy_gain": null,
       "toll_gain": null,
-      "toll_spend": "up to 10 Toll",
+      "toll_spend": "up to 20 Toll",
       "persistent_effect": null,
       "stance_effect": null,
       "power_effect": null,
@@ -736,7 +734,7 @@
       "dynamic_values": [
         {
           "field": "heal",
-          "rule": "Heal = half the Toll actually spent (rounded down), max 5.",
+          "rule": "Heal = 1 HP per 2 Toll spent (it spends only an even amount), max 10. Outside a fight the face states the rule instead.",
           "default_displayed": 0
         },
         {
@@ -1368,9 +1366,9 @@
       "face_type_label": "STRIKE",
       "energy_cost": 2,
       "rarity": "UNCOMMON",
-      "card_text": "Spend all Toll.\nDeal 0 damage.",
+      "card_text": "Spend all Toll.\nDeal that much damage.",
       "face_hp_line": null,
-      "card_text_template": "Spend all Toll.\nDeal {toll} damage.",
+      "card_text_template": "Spend all Toll.\n{battle}Deal {toll} damage.{/battle}{outside}Deal that much damage.{/outside}",
       "targeting": "enemy",
       "removal_after_play": "discard pile",
       "effects": [
@@ -1482,70 +1480,6 @@
       "art_path": "res://cards/art/Wanderer/Refuse the End.png",
       "rules_font_px": 13,
       "battle_animation": null,
-      "play_effect_scene_path": null,
-      "upgrade_data": null,
-      "starting_deck_count": 0,
-      "in_reward_pool": true,
-      "in_belongings_pool": false,
-      "obtainable_from": [
-        "wanderer_reward_pool"
-      ],
-      "not_obtainable_in_play": false
-    },
-    {
-      "name": "Reprisal",
-      "file_path": "res://cards/data/reprisal.tres",
-      "pool_class": "wanderer",
-      "card_type": "ATTACK",
-      "face_type_label": "STRIKE",
-      "energy_cost": 1,
-      "rarity": "COMMON",
-      "card_text": "Deal 6 damage. With Grace: deal 12.",
-      "face_hp_line": null,
-      "card_text_template": "{else}Deal {damage} damage.{/else} {if}With Grace: deal {alt_damage}.{/if}",
-      "targeting": "enemy",
-      "removal_after_play": "discard pile",
-      "effects": [
-        {
-          "type": "DAMAGE",
-          "plain_english": "Deal 6 damage to the target; if you have Grace open, 12 damage instead."
-        }
-      ],
-      "keywords": [
-        "Grace"
-      ],
-      "self_hp_cost": 0,
-      "base_damage": 6,
-      "base_block": null,
-      "draw": null,
-      "energy_gain": null,
-      "toll_gain": null,
-      "toll_spend": null,
-      "persistent_effect": null,
-      "stance_effect": null,
-      "power_effect": null,
-      "status_effect": null,
-      "critical_condition": null,
-      "dynamic_values": [
-        {
-          "field": "damage",
-          "rule": "6 normally, 12 with Grace open; the face previews the live state in battle.",
-          "default_displayed": "6 / 12"
-        },
-        {
-          "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus Dying Light (+3 per stack while Critical). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
-          "default_displayed": "no bonus outside a fight"
-        },
-        {
-          "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
-          "default_displayed": 1
-        }
-      ],
-      "art_path": null,
-      "rules_font_px": 15,
-      "battle_animation": "Slash",
       "play_effect_scene_path": null,
       "upgrade_data": null,
       "starting_deck_count": 0,

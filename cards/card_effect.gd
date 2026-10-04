@@ -23,7 +23,7 @@ enum EffectType {
 #   GATE    - alt_value and bonus_value both 0: condition false and the
 #             effect doesn't resolve at all (With Regards' energy).
 #   REPLACE - alt_value set: false uses `value`, true `alt_value`;
-#             something always resolves (Left Hand, Reprisal). The old
+#             something always resolves (Left Hand). The old
 #             project's TOLL_THRESHOLD_DAMAGE/FIRST_CARD_DAMAGE shape,
 #             which its .tres files carried as threshold_value.
 #   ADD     - bonus_value set: true adds bonus_value on top of `value`;

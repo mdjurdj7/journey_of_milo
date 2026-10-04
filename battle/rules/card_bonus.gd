@@ -5,7 +5,7 @@ class_name CardBonus
 # card face. A CardEffect with a condition is one of three things, told
 # apart HERE and nowhere else from its fields:
 #   REPLACE - alt_value set: the condition picks alt_value over value,
-#             something always resolves (Left Hand, Reprisal).
+#             something always resolves (Left Hand).
 #   ADD     - bonus_value set: the condition adds bonus_value on top of
 #             value, something always resolves (Untouched).
 #   GATE    - neither: the condition decides whether the effect resolves

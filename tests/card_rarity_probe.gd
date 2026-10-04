@@ -32,7 +32,6 @@ const EXPECTED_RARITY: Dictionary = {
 	"Carve": CardData.CardRarity.COMMON,
 	"Endure": CardData.CardRarity.COMMON,
 	"Hold Fast": CardData.CardRarity.COMMON,
-	"Reprisal": CardData.CardRarity.COMMON,
 	"Cornered": CardData.CardRarity.COMMON,
 	"Unbroken": CardData.CardRarity.COMMON,
 	"Small Price": CardData.CardRarity.COMMON,
@@ -61,7 +60,7 @@ const EXPECTED_RARITY: Dictionary = {
 }
 
 const EXPECTED_POOL: Array[String] = [
-	"Carve", "Hold Fast", "Reprisal", "Small Price", "Debt Forgiven",
+	"Carve", "Hold Fast", "Small Price", "Debt Forgiven",
 	"Self-Eater", "Cornered", "Unbroken", "Dying Light", "Last Wager",
 	"Refuse the End", "Last Resort", "Blood Arc", "With Regards", "Come Due",
 	"No Further", "Sentence", "The Return", "Collateral", "Ransom", "Leverage",
@@ -149,7 +148,7 @@ func _check_pool_membership() -> void:
 	var names: Array[String] = []
 	for card in pool.entries:
 		names.append(card.card_name)
-	_expect_eq(names.size(), 23, "Wanderer pool holds 23 cards")
+	_expect_eq(names.size(), 22, "Wanderer pool holds 22 cards")
 	for card_name in EXPECTED_POOL:
 		_expect(names.has(card_name), "%s is in the Wanderer pool" % card_name)
 	for card_name in STARTER_ONLY:
