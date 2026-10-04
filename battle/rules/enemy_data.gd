@@ -18,6 +18,12 @@ class_name EnemyData
 # hide), played by its FieldEnemy on the hit frame - takes dealt
 # round-robin (see SoundPool); one take is fine.
 @export var contact_sounds: Array[AudioStream] = []
+# Each contact play's pitch scale is drawn from 1 +/- this, so repeated
+# takes don't sound identical. Read by FieldEnemy at play time.
+@export_range(0.0, 0.5, 0.01) var pitch_jitter: float = 0.06:
+	set(value):
+		pitch_jitter = value
+		emit_changed()
 # The enemy's attack pattern. Fixed enemies step through this in order,
 # looping; erratic ones (see below) pick freely each turn instead.
 

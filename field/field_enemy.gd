@@ -73,11 +73,11 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 # BattleFeedback._react_to_card_hit() (with the flash, recoil and damage
 # number). Levels: the takes are normalised to -6 dBFS; at the battle
 # camera's ~10.6 m the 3D attenuation takes ~0.5 dB, so -4 peaks about
-# -10.5 dBFS at the listener - the loudest thing in a strike.
+# -10.5 dBFS at the listener - the loudest thing in a strike. Pitch
+# varies per play by enemy_data.pitch_jitter.
 @export_group("Contact Sound")
 @export var contact_volume_db: float = -4.0
 @export var contact_volume_variance_db: float = 1.0
-@export var contact_pitch_variance: float = 0.04
 
 # The pain turn's sound (EnemyData.pain_turn_sound), played from this body
 # when the turn is set - read at play time.
@@ -625,7 +625,7 @@ func play_contact_sound() -> void:
 	if clip == null or _contact_player == null:
 		return
 	_contact_player.stream = clip
-	_contact_player.pitch_scale = 1.0 + randf_range(-contact_pitch_variance, contact_pitch_variance)
+	_contact_player.pitch_scale = 1.0 + randf_range(-enemy_data.pitch_jitter, enemy_data.pitch_jitter)
 	_contact_player.volume_db = contact_volume_db + randf_range(-contact_volume_variance_db, contact_volume_variance_db)
 	_contact_player.play()
 
