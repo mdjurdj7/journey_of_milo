@@ -84,6 +84,10 @@ const DURATION_UNTIL_TRIGGERED := -2
 @export var modifier_target: ModifierTarget = ModifierTarget.INCOMING_DAMAGE
 @export var modifier_operation: ModifierOperation = ModifierOperation.ADD
 @export var stack_rule: StackRule = StackRule.REFRESH_DURATION
+# The most stacks it holds: a copy applied at the cap changes nothing
+# else about the count (Status.apply_stack()). Roused stops at 4. 0 = no
+# cap.
+@export var max_stacks: int = 0
 
 # Which Wanderer battle clip to hold (LOOP_LINEAR) for as long as this
 # status is active on the player - empty (default) means no held pose.

@@ -40,6 +40,8 @@ func apply_stack() -> void:
 			pass
 		StatusData.StackRule.ADD_CHARGES:
 			charges += data.default_charges
+	if data.max_stacks > 0:
+		stack_count = mini(stack_count, data.max_stacks)
 
 func tick_duration() -> void:
 	if turns_remaining > 0:

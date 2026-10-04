@@ -223,7 +223,7 @@ func show_intent(preview: Dictionary) -> void:
 			for amount: Variant in hit_amounts:
 				parts.append(str(int(amount)))
 			_label.text = " + ".join(parts)
-		if _type == EnemyIntent.IntentType.BURROW:
+		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.WATCH:
 			_label.text = ""
 		_has_threshold = preview.has("threshold")
 		# A pain turn's cancelled action reads as interrupted, with no
@@ -326,6 +326,8 @@ func _draw() -> void:
 		for i in points.size():
 			points[i] = Vector2(2.0 * glyph_centre.x - points[i].x, points[i].y)
 	_stroke(points, hairline_alpha if _interrupted else 1.0)
+	if _type == EnemyIntent.IntentType.WATCH:
+		_draw_pupil(glyph_centre, _glyph_size * 0.5, hairline_alpha if _interrupted else 1.0)
 	if _has_threshold:
 		_draw_ring()
 	if _pip_count > 0:
@@ -384,6 +386,17 @@ func _draw_ring() -> void:
 	draw_arc(_ring_centre, fill_radius, start, end, fill_segments, outline, outline_width, true)
 	draw_arc(_ring_centre, fill_radius, start, end, fill_segments, ink, ring_stroke_px, true)
 
+# WATCH's pupil: a filled dot in the eye, ink over its bone outline like
+# a stroke.
+func _draw_pupil(centre: Vector2, r: float, alpha: float) -> void:
+	var ink: Color = get_theme_color("ink", "Battle")
+	var outline: Color = get_theme_color("bone", "Battle")
+	ink.a *= alpha
+	outline.a *= alpha
+	var radius: float = r * 0.24
+	draw_circle(centre, radius + float(outline_size_px), outline, true, -1.0, true)
+	draw_circle(centre, radius, ink, true, -1.0, true)
+
 # One glyph stroke in the numeral's ink over its bone outline, at alpha.
 func _stroke(points: PackedVector2Array, alpha: float) -> void:
 	if points.size() < 2:
@@ -399,8 +412,9 @@ func _stroke(points: PackedVector2Array, alpha: float) -> void:
 # action coming at you. DEFEND: an open shield - flat top, sides, a point
 # at the bottom, closed. BURROW: a mound on a ground line - the swell it
 # pushes up under the sand. HEAL_ALLY: a plus - one stroke, out along
-# the bar and back to cross it. All fit a square of half-size r about
-# centre.
+# the bar and back to cross it. WATCH: an open eye - an almond, upper lid
+# and lower, closed at the corners, its pupil a dot (_draw_pupil()). All
+# fit a square of half-size r about centre.
 func _glyph_points(centre: Vector2, r: float) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	match _type:
@@ -430,6 +444,14 @@ func _glyph_points(centre: Vector2, r: float) -> PackedVector2Array:
 			points.append(centre)
 			points.append(centre + Vector2(0.0, -r * 0.8))
 			points.append(centre + Vector2(0.0, r * 0.8))
+		EnemyIntent.IntentType.WATCH:
+			var lid_steps: int = 10
+			for step in lid_steps + 1:
+				var t: float = float(step) / float(lid_steps)
+				points.append(centre + Vector2(lerpf(-r, r, t), -sin(t * PI) * r * 0.55))
+			for step in range(1, lid_steps + 1):
+				var t: float = float(step) / float(lid_steps)
+				points.append(centre + Vector2(lerpf(r, -r, t), sin(t * PI) * r * 0.55))
 	return points
 
 # Whether the Wanderer is to the screen-left of the enemy right now -

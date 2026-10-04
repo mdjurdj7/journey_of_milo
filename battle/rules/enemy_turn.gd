@@ -148,6 +148,9 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# Its packmates are the controller's to heal - this side
 				# knows only this enemy.
 				result["heal_allies"] = intent.value
+			EnemyIntent.IntentType.WATCH:
+				# Nothing happens: the turn is watched through.
+				pass
 
 	# Counted whatever the turn did - an interrupted or cancelled one too -
 	# so escalation keeps its own clock.
@@ -248,6 +251,21 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	preview["damage_to_hp"] = 0 if denied else total_to_hp
 	preview["lethal"] = hp <= 0 and not bool(preview.get("interrupted", false)) and not denied
 	return preview
+
+# One Attack card has been played against this living enemy: while its
+# queued intent counts them (EnemyIntent.counts_attack_cards - the
+# Dunecur's Rush), a stack of its attack_card_status (Roused), up to that
+# status's max_stacks. A Denied Rush still has it queued, and what it
+# gained stays until a Rush lands (StatusData.consumed_by_own_attack).
+# True when it gained a stack, for the display to catch up.
+static func take_attack_card(combatant: Combatant, data: EnemyData) -> bool:
+	if combatant == null or data == null or data.attack_card_status == null or combatant.hp <= 0:
+		return false
+	var intent: EnemyIntent = current_intent(combatant, data)
+	if intent == null or not intent.counts_attack_cards:
+		return false
+	Status.apply_to(combatant.statuses, data.attack_card_status)
+	return true
 
 # Whether this enemy's next turn is skipped (Denied).
 static func is_denied(combatant: Combatant) -> bool:

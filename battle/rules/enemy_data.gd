@@ -14,6 +14,10 @@ class_name EnemyData
 # fight starts (BattleController) - a passive, shown and revealed like
 # any status (the Blackback's Fed). Empty (every enemy by default) = none.
 @export var starting_statuses: Array[StatusData] = []
+# The status it gains, one stack per Attack card played against it while
+# an intent with counts_attack_cards is queued (EnemyTurn.take_attack_
+# card()) - the Dunecur's Roused. Null (every enemy by default) = none.
+@export var attack_card_status: StatusData = null
 # The sound of a card's hit landing on this creature (its shell, its
 # hide), played by its FieldEnemy on the hit frame - takes dealt
 # at random, never the same take twice running (SoundPool.next_random());

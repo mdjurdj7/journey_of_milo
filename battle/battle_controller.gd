@@ -621,6 +621,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		_hand_container.release_views([consume_view] as Array[CardView])
 
 	_effect_resolver.resolve_card(card, ctx)
+	_count_attack_card(card, ctx)
 	RunLogger.card_finished()
 	# Taken, deepened or replaced by the card just played - and the card
 	# faces need to know either way, since a stance changes what the hand
@@ -642,6 +643,27 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 
 	_input_locked = false
 	_check_battle_end()
+
+# An Attack card has been played: each enemy it was played against - its
+# target, and every enemy it could hit when one of its effects hits all
+# of them - counts it once (EnemyTurn.take_attack_card(), the Dunecur's
+# Roused). Skills, Powers and Stances never count.
+func _count_attack_card(card: CardData, ctx: EffectContext) -> void:
+	if card.card_type != CardData.CardType.ATTACK:
+		return
+	var against: Array[Combatant] = []
+	if ctx.target != null:
+		against.append(ctx.target)
+	for effect in card.effects:
+		if effect != null and effect.target_scope == CardEffect.TargetScope.ALL_ENEMIES:
+			for combatant in ctx.enemies:
+				if not against.has(combatant):
+					against.append(combatant)
+			break
+	for enemy in enemies:
+		var combatant: Combatant = _combatants.get(enemy)
+		if against.has(combatant):
+			EnemyTurn.take_attack_card(combatant, enemy.enemy_data)
 
 # CardData.impact_time's own clamp: a clip shorter than the authored
 # impact_time fires at the clip's own end instead of after it's already

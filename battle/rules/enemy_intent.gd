@@ -19,7 +19,10 @@ class_name EnemyIntent
 # pack move, like a simultaneous one: alone, the enemy steps past it
 # (EnemyTurn.leave_pack()). The Nipper's Forage. Appended: an inserted
 # value would rewrite every .tres that stores one of these as an integer.
-enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY }
+#
+# WATCH: the turn does nothing at all - no damage, no block - and the
+# display shows its glyph alone, an open eye. The Dunecur's Watch.
+enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH }
 
 @export var type: IntentType = IntentType.ATTACK
 @export var value: int = 0
@@ -69,6 +72,13 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY }
 # a BURROW. Null = the interrupted turn is simply lost.
 
 @export var rear_while_queued: bool = false
+
+@export var counts_attack_cards: bool = false
+# While this intent is queued, each Attack card the player plays against
+# the enemy - once per card, a multi-target Attack included when it's
+# among the targets - adds a stack of its EnemyData.attack_card_status
+# (BattleController._resolve_play(), EnemyTurn.take_attack_card()). The
+# Dunecur's Rush, which Roused feeds. False for every other.
 # The body rears for as long as this intent is queued and the enemy is
 # above the sand - the front up off it, held, dropping back once the
 # intent has resolved or been interrupted (BattleController._pose_for_
