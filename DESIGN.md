@@ -32,6 +32,11 @@ plain resource back, with no condition or build-around. Small Price
 (formerly Open Wound - lose 2 HP, draw 1) and Down Payment (lose 1 HP,
 gain 5 Toll) moved from Uncommon to Common on that rule. (2026-10-04.)
 
+The Wanderer's card rule (02_GAME_FRAMEWORK §3): the Wanderer's identity
+is in the cards that pay - HP, Toll, or a Critical state. Not every card
+must; Commons can be plain tools (Slash, Carve, Brace, Bide).
+(2026-10-04, with Bide.)
+
 ## Parked
 
 - **Chain roles (Opener/Closer, chain payoffs).** The old project's
@@ -103,8 +108,9 @@ gain 5 Toll) moved from Uncommon to Common on that rule. (2026-10-04.)
   holds class-agnostic cards the Keeper used to hand out (Left Hand,
   Untouched, Second Thoughts) - not reward or shop stock, and a scan
   rooted at `cards/` would sweep them into both. Since 2026-09-30 she
-  offers a keepsake instead and nothing references the three; they stay
-  on disk, unused, until they are given a home or removed. The old project
+  offers a keepsake instead; the three are now floor 2's belongings
+  stock, with Hold Fast (`cards/pools/belongings_pool.tres`), and nowhere
+  else. The old project
   hit exactly this and solved it by hiding the cards in a subfolder its
   flat, non-recursive scan happened to miss (`npc_offers/`, see
   `reference/old_project/deck-builder/docs/DESIGN.md`) - a guard that
