@@ -186,10 +186,15 @@ done
 [ -n "$WORKTREE" ] && [ -n "$PROJECT" ] && die "--worktree and --path are exclusive"
 
 # --- What changed (for --changed, and for the HEAD-moved check) ---
+# Every path list below is one path per line - never split on spaces, so
+# a path with one ("cards/art/Wanderer/Hold Fast.png") stays whole: read
+# with `while IFS= read -r`, never `for f in $LIST`. git is asked not to
+# quote unusual paths (core.quotePath), so they come out as on disk.
+gitq() { git -c core.quotePath=false "$@"; }
 START_HEAD=$(git -C "$REPO" rev-parse HEAD)
 CHANGED=""
 if [ "$MODE" = changed ]; then
-	CHANGED=$( { git -C "$REPO" diff --name-only "${BASE:-HEAD}"; git -C "$REPO" ls-files --others --exclude-standard; } | sort -u)
+	CHANGED=$( { gitq -C "$REPO" diff --name-only "${BASE:-HEAD}"; gitq -C "$REPO" ls-files --others --exclude-standard; } | sort -u)
 fi
 if [ -n "$FILES" ]; then
 	CHANGED=$(printf '%s\n%s\n' "$CHANGED" "$(echo "$FILES" | tr ',' '\n')" | sed '/^$/d' | sort -u)
@@ -208,7 +213,8 @@ case "$MODE" in
 	probe) SELECTED=$(echo "$NAMES" | tr ',' ' ') ;;
 	changed)
 		[ -n "$CHANGED" ] || { echo "run_probes: nothing changed since ${BASE:-HEAD} - no probes to run"; exit 0; }
-		for f in $CHANGED; do
+		while IFS= read -r f; do
+			[ -n "$f" ] || continue
 			p=$(path_probes "$f")
 			if [ "$p" = FULL ]; then
 				echo "run_probes: $f is in no area - running the full suite"
@@ -216,7 +222,7 @@ case "$MODE" in
 				break
 			fi
 			SELECTED="$SELECTED $p"
-		done ;;
+		done <<< "$CHANGED" ;;
 esac
 # Normalise to *_probe names, drop duplicates, check each exists.
 SELECTED=$(for p in $SELECTED; do p="${p%.gd}"; p="${p%_probe}_probe"; echo "$p"; done | sort -u)
@@ -247,7 +253,7 @@ PROJECT="${PROJECT:-$REPO}"
 if [ "$LIST" = 1 ]; then
 	echo "project:  $PROJECT"
 	[ -n "$WORKTREE" ] && echo "worktree: check out $(git -C "$REPO" rev-parse --short "$REF"), copy over: ${FILES:-nothing}"
-	[ -n "$CHANGED" ] && echo "changed:  $(echo $CHANGED)"
+	[ -n "$CHANGED" ] && echo "changed:  $(while IFS= read -r f; do printf "'%s' " "$f"; done <<< "$CHANGED")"
 	echo "parallel (-j $JOBS):$PARALLEL"
 	[ -n "$SERIAL" ] && echo "serial:  $SERIAL"
 	exit 0
@@ -292,38 +298,41 @@ if [ -n "$WORKTREE" ]; then
 	# Back to a clean checkout of REF: last run's copied files go.
 	git -C "$WORKTREE" checkout -q -f --detach "$REF" || die "could not check out $REF"
 	git -C "$WORKTREE" clean -fdq
-	MOVED=$(git -C "$WORKTREE" diff --name-only "$OLD" HEAD)
-	ADDED=$(git -C "$WORKTREE" diff --name-only --diff-filter=A "$OLD" HEAD)
-	for f in $(echo "$FILES" | tr ',' ' '); do
+	MOVED=$(gitq -C "$WORKTREE" diff --name-only "$OLD" HEAD)
+	ADDED=$(gitq -C "$WORKTREE" diff --name-only --diff-filter=A "$OLD" HEAD)
+	while IFS= read -r f; do
+		[ -n "$f" ] || continue
 		if [ -e "$REPO/$f" ]; then
 			mkdir -p "$WORKTREE/$(dirname "$f")"
 			cp "$REPO/$f" "$WORKTREE/$f"
-			git -C "$WORKTREE" cat-file -e "HEAD:$f" 2>/dev/null || ADDED="$ADDED $f"
+			git -C "$WORKTREE" cat-file -e "HEAD:$f" 2>/dev/null || ADDED=$(printf '%s\n%s' "$ADDED" "$f")
 		else
 			rm -f "$WORKTREE/$f"
 		fi
-		MOVED="$MOVED $f"
-	done
+		MOVED=$(printf '%s\n%s' "$MOVED" "$f")
+	done <<< "$(echo "$FILES" | tr ',' '\n')"
 	# Import when an import setting or a new file came in. A changed
 	# .import's cached output is deleted first, or the stale one stays.
-	for f in $MOVED; do
+	while IFS= read -r f; do
 		case "$f" in
 			*.import)
 				NEED_IMPORT=1
-				STALE_IMPORTS="$STALE_IMPORTS $(basename "${f%.import}")" ;;
+				STALE_IMPORTS=$(printf '%s\n%s' "$STALE_IMPORTS" "$(basename "${f%.import}")") ;;
 		esac
-	done
+	done <<< "$MOVED"
 	# A new file only matters if Godot scans it: a resource, a script (the
 	# class cache) or an asset - not docs, and not tools/ (.gdignore).
-	for f in $ADDED; do
+	while IFS= read -r f; do
 		case "$f" in
 			tools/*|docs/*|reference/*|*.md) ;;
 			*.gd|*.gdshader|*.gdshaderinc|*.tscn|*.tres|*.res|*.png|*.jpg|*.svg|*.glb|*.gltf|*.fbx|*.wav|*.ogg|*.mp3|*.ttf|*.otf) NEED_IMPORT=1 ;;
 		esac
-	done
-	for a in $STALE_IMPORTS; do rm -f "$WORKTREE/.godot/imported/$a"-*; done
+	done <<< "$ADDED"
+	while IFS= read -r a; do
+		[ -n "$a" ] && rm -f "$WORKTREE/.godot/imported/$a"-*
+	done <<< "$STALE_IMPORTS"
 	[ "$NEED_IMPORT" = 1 ] && DO_IMPORT=1
-	echo "run_probes: worktree at $(git -C "$WORKTREE" rev-parse --short HEAD)${FILES:+, with $(echo "$FILES" | tr ',' ' ')}"
+	echo "run_probes: worktree at $(git -C "$WORKTREE" rev-parse --short HEAD)${FILES:+, with $(echo "$FILES" | tr ',' '\n' | while IFS= read -r f; do [ -n "$f" ] && printf "'%s' " "$f"; done)}"
 fi
 
 LOGS="${LOGS:-$(mktemp -d "${TMPDIR:-/tmp}/run_probes.XXXXXX")}"
@@ -366,7 +375,7 @@ END_HEAD=$(git -C "$REPO" rev-parse HEAD)
 TESTED_HEAD="${REF:+$(git -C "$REPO" rev-parse "$REF")}"
 TESTED_HEAD="${TESTED_HEAD:-$START_HEAD}"
 if [ "$END_HEAD" != "$TESTED_HEAD" ]; then
-	NEW_FILES=$(git -C "$REPO" diff --name-only "$TESTED_HEAD" "$END_HEAD")
+	NEW_FILES=$(gitq -C "$REPO" diff --name-only "$TESTED_HEAD" "$END_HEAD")
 	echo "run_probes: HEAD moved: $(git -C "$REPO" rev-parse --short "$TESTED_HEAD") -> $(git -C "$REPO" rev-parse --short "$END_HEAD"); the new commits touch:"
 	echo "$NEW_FILES" | sed 's/^/    /'
 	OVERLAP=$(echo "$NEW_FILES" | grep -Fx -f <(echo "$CHANGED") 2>/dev/null)
