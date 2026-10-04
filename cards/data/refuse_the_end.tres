@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
 
 [ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/refuse_the_end.tres" id="3_refuse_the_end"]
+[ext_resource type="Texture2D" uid="uid://dn7t6ovpuvjn5" path="res://cards/art/Wanderer/Refuse the End.png" id="4_art"]
 
 [sub_resource type="Resource" id="CardEffect_apply_status"]
 script = ExtResource("2_card_effect")
@@ -19,4 +20,5 @@ target_type = 1
 description = "The next time an enemy would kill you while Critical, survive at {survive_hp} HP.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
+art = ExtResource("4_art")
 removal_scope = 1
