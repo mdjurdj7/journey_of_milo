@@ -1832,9 +1832,9 @@ func _on_loot_screen_closed(screen: LootScreen) -> void:
 
 # Points the ground's walked band along the route the floor actually
 # takes: out of spawn, past the enemy, to the gate - or along the floor's
-# own three points when it overrides that (FloorData.wear_path_override).
-# Ground knows none of those - it takes three world points and draws a
-# band through them (see Ground.set_wear_path()), so a floor with a
+# own 3 to 8 points when it overrides that (FloorData.wear_path_override).
+# Ground knows none of those - it takes world points and draws a band
+# through them (see Ground.set_wear_path()), so a floor with a
 # different shape re-aims it by calling this with different points rather
 # than by editing a shader. Called from _setup_exit_gate(), the first
 # moment the gate's own position is final.
@@ -1850,11 +1850,10 @@ func _aim_wear_path(enemy: FieldEnemy) -> void:
 		return
 	var spawn: Vector3 = get_spawn_position()
 	if floor_data.wear_path_override.size() >= 3:
-		var points: PackedVector2Array = floor_data.wear_path_override
-		ground.set_wear_path(
-			spawn + Vector3(points[0].x, 0.0, points[0].y),
-			spawn + Vector3(points[1].x, 0.0, points[1].y),
-			spawn + Vector3(points[2].x, 0.0, points[2].y))
+		var points := PackedVector2Array()
+		for offset in floor_data.wear_path_override:
+			points.append(Vector2(spawn.x + offset.x, spawn.z + offset.y))
+		ground.set_wear_path(points)
 		return
 	# The middle point is pushed off the enemy along the exit's right, so
 	# the band bends past the standing pool painted beside the crab rather
@@ -1862,7 +1861,8 @@ func _aim_wear_path(enemy: FieldEnemy) -> void:
 	# quarter turn, not world +X, so this holds for any exit.
 	var right: Vector3 = get_exit_direction().cross(Vector3.UP).normalized()
 	var mid: Vector3 = enemy.global_position + right * floor_data.wear_path_mid_offset
-	ground.set_wear_path(spawn, mid, gate.global_position)
+	ground.set_wear_path(PackedVector2Array([
+		Vector2(spawn.x, spawn.z), Vector2(mid.x, mid.z), Vector2(gate.global_position.x, gate.global_position.z)]))
 
 # The Ambience bus toward `to_db` over `seconds` - one tween, the last
 # call wins, and it runs through this node's own battle freeze (TWEEN_

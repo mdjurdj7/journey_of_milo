@@ -192,11 +192,13 @@ uniform float underwater_detail_boost = 1.5;
 // Ground.set_wear_path()), and an optional painted wear_mask on the same
 // rect as the landmass mask. Either alone is enough; neither is required.
 uniform bool wear_enabled = false;
-// The three world-XZ points the band runs through. wear_mid is passed
-// THROUGH, not used as a raw Bezier handle - see wear_curve_point().
-uniform vec2 wear_start = vec2(0.0);
-uniform vec2 wear_mid = vec2(0.0);
-uniform vec2 wear_end = vec2(0.0);
+// The world-XZ points the band runs through, wear_point_count of them (3
+// to WEAR_MAX_POINTS). Three: start, a point passed THROUGH (not a raw
+// Bezier handle) and end - one quadratic, wear_curve_point(). More: a
+// Catmull-Rom chain through every one of them, wear_chain_point().
+const int WEAR_MAX_POINTS = 8;
+uniform vec2 wear_points[8];
+uniform int wear_point_count = 3;
 uniform float wear_half_width = 2.5;
 // Low-frequency wobble on the band's own edge, so it never reads as a
 // ruled boundary. Metres, applied to the distance before the falloff.
@@ -694,30 +696,67 @@ void vertex() {
 	v_world_height = world_pos.y;
 }
 
-// The band's centreline, as a quadratic Bezier that PASSES THROUGH
-// wear_mid at t=0.5 rather than merely leaning toward it: solving
+// The three-point centreline, as a quadratic Bezier that PASSES THROUGH
+// the middle point at t=0.5 rather than merely leaning toward it: solving
 // B(0.5) = mid for the handle gives c = 2*mid - (start + end)/2, so the
 // crab really is on the path rather than just near it.
 vec2 wear_curve_point(float t) {
+	vec2 wear_start = wear_points[0];
+	vec2 wear_mid = wear_points[1];
+	vec2 wear_end = wear_points[2];
 	vec2 c = 2.0 * wear_mid - 0.5 * (wear_start + wear_end);
 	float u = 1.0 - t;
 	return u * u * wear_start + 2.0 * u * t * c + t * t * wear_end;
 }
 
-// Distance from an XZ to that curve, as the minimum over a polyline
+// A longer centreline, through every point: the uniform Catmull-Rom span
+// from point `i` to point i+1 at t, its outer neighbours clamped to the
+// ends (the first and last points doubled).
+vec2 wear_chain_point(int i, float t) {
+	int last = wear_point_count - 1;
+	vec2 p0 = wear_points[max(i - 1, 0)];
+	vec2 p1 = wear_points[i];
+	vec2 p2 = wear_points[min(i + 1, last)];
+	vec2 p3 = wear_points[min(i + 2, last)];
+	float t2 = t * t;
+	return 0.5 * (2.0 * p1 + (p2 - p0) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 + (3.0 * p1 - p0 - 3.0 * p2 + p3) * t2 * t);
+}
+
+// Distance from p to the segment a-b.
+float wear_segment_distance(vec2 p, vec2 a, vec2 b) {
+	vec2 ab = b - a;
+	float h = clamp(dot(p - a, ab) / max(dot(ab, ab), 1.0e-6), 0.0, 1.0);
+	return length(p - a - ab * h);
+}
+
+// Distance from an XZ to the centreline, as the minimum over a polyline
 // approximation. Point-to-SEGMENT rather than point-to-sample, so 16
 // steps are enough to stay smooth at this half-width - sampling points
-// alone would scallop the band's edge wherever the curve bends.
+// alone would scallop the band's edge wherever the curve bends. A chain
+// takes WEAR_CHAIN_STEPS per span.
 const int WEAR_SEGMENTS = 16;
+const int WEAR_CHAIN_STEPS = 8;
 float wear_distance(vec2 p) {
 	float best = 1.0e20;
-	vec2 prev = wear_curve_point(0.0);
-	for (int i = 1; i <= WEAR_SEGMENTS; i++) {
-		vec2 cur = wear_curve_point(float(i) / float(WEAR_SEGMENTS));
-		vec2 ab = cur - prev;
-		float h = clamp(dot(p - prev, ab) / max(dot(ab, ab), 1.0e-6), 0.0, 1.0);
-		best = min(best, length(p - prev - ab * h));
-		prev = cur;
+	if (wear_point_count <= 3) {
+		vec2 prev = wear_curve_point(0.0);
+		for (int i = 1; i <= WEAR_SEGMENTS; i++) {
+			vec2 cur = wear_curve_point(float(i) / float(WEAR_SEGMENTS));
+			best = min(best, wear_segment_distance(p, prev, cur));
+			prev = cur;
+		}
+		return best;
+	}
+	for (int span = 0; span < WEAR_MAX_POINTS - 1; span++) {
+		if (span >= wear_point_count - 1) {
+			break;
+		}
+		vec2 prev = wear_points[span];
+		for (int i = 1; i <= WEAR_CHAIN_STEPS; i++) {
+			vec2 cur = wear_chain_point(span, float(i) / float(WEAR_CHAIN_STEPS));
+			best = min(best, wear_segment_distance(p, prev, cur));
+			prev = cur;
+		}
 	}
 	return best;
 }

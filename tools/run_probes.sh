@@ -52,6 +52,7 @@ trinket_probe 35
 collateral_probe 29
 bide_probe 30
 frayed_cord_probe 30
+wear_path_probe 12
 deny_probe 40
 dying_light_probe 40
 leverage_probe 29
@@ -84,11 +85,11 @@ area_probes() {
 		keywords) echo "keyword starter_cards the_return" ;;
 		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord" ;;
 		enemies) echo "blackback siltjaw wardling sentence no_further critical_cards kill_order armored_contact deny" ;;
-		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log" ;;
+		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path" ;;
 		floor1) echo "kill_order drain" ;;
 		floor2) echo "kill_order hold_line bundle_roll" ;;
 		floor3) echo "kill_order blackback wardling" ;;
-		floors) echo "kill_order drain hold_line bundle_roll blackback wardling" ;;
+		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path" ;;
 		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord" ;;
 		hud) echo "gold_line glassbone" ;;
 		hp_bar) echo "kill_order" ;;

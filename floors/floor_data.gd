@@ -138,9 +138,11 @@ enum ExitKind { CHANNEL, LINE }
 # How far the worn band's middle point sits off the enemy along the
 # exit's right (RegionField._aim_wear_path()).
 @export var wear_path_mid_offset: float = 1.5
-# Optional: three world-XZ points relative to spawn (start, through,
-# end) that replace the derived spawn -> enemy -> gate band outright.
-# Empty (the default) = derived.
+# Optional: world-XZ points relative to spawn that replace the derived
+# spawn -> enemy -> gate band outright. Three (start, through, end): one
+# curve, as the derived band is. Four to eight: a smooth curve through
+# every one of them, for a route that turns more than once (floor 4's
+# loop). Empty (the default) = derived.
 @export var wear_path_override: PackedVector2Array = PackedVector2Array()
 
 @export_group("Rewards")

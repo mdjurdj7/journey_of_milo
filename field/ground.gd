@@ -974,15 +974,27 @@ func set_swash_source(noise: Texture2D, period: float, phase_noise_scale: float,
 func set_sea_time(sea_time: float) -> void:
 	_apply_uniform("sea_time", sea_time)
 
-# The walked band's centreline, in world XZ: where it starts, a point it
-# passes THROUGH, and where it ends. Called by RegionField once the gate
-# has its final position (see its _setup_exit_gate()) - this node has no
-# idea those are spawn, the crab and the neck, which is why the band can
-# be re-aimed per floor without touching the ground at all.
-func set_wear_path(start_point: Vector3, mid_point: Vector3, end_point: Vector3) -> void:
-	_apply_uniform("wear_start", Vector2(start_point.x, start_point.z))
-	_apply_uniform("wear_mid", Vector2(mid_point.x, mid_point.z))
-	_apply_uniform("wear_end", Vector2(end_point.x, end_point.z))
+# The walked band's centreline, in world XZ, from its start to its end
+# through every point between. Three points: start, a point it passes
+# THROUGH, end - one curve. Four to WEAR_MAX_POINTS: a smooth chain
+# through all of them (see ground.gdshader's wear block). Called by
+# RegionField once the gate has its final position (see its _setup_exit_
+# gate()) - this node has no idea those are spawn, the crab and the neck,
+# which is why the band can be re-aimed per floor without touching the
+# ground at all. Past WEAR_MAX_POINTS the rest are dropped, with a warning.
+const WEAR_MAX_POINTS := 8
+
+func set_wear_path(points: PackedVector2Array) -> void:
+	if points.size() < 3:
+		push_warning("Ground: a worn band needs at least 3 points (got %d); not drawn." % points.size())
+		return
+	var used: PackedVector2Array = points.slice(0, WEAR_MAX_POINTS)
+	if points.size() > WEAR_MAX_POINTS:
+		push_warning("Ground: a worn band takes at most %d points (got %d); the rest are dropped." % [WEAR_MAX_POINTS, points.size()])
+	var padded: PackedVector2Array = used.duplicate()
+	padded.resize(WEAR_MAX_POINTS)
+	_apply_uniform("wear_points", padded)
+	_apply_uniform("wear_point_count", used.size())
 
 # The paintings the shader samples on the landmass canvas (wear_mask,
 # rock_mask, outer_mask) and the canvas's image->world mapping, matching
