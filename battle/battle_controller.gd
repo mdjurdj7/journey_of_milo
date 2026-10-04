@@ -55,6 +55,11 @@ signal enemy_hp_changed(enemy: FieldEnemy, current: int, max_hp: int)
 signal enemy_intent_changed(enemy: FieldEnemy, preview: Dictionary)
 signal enemy_acting(enemy: FieldEnemy)
 signal damage_dealt(source: Variant, target: Variant, amount: int, kind: String)
+# The player's hit on `enemy` met its block, judged as the hit landed,
+# before the block was spent. `absorbed`: the block took all of it - no
+# damage_dealt follows. Otherwise this hit's damage_dealt comes right
+# after, in the same call.
+signal enemy_hit_blocked(enemy: FieldEnemy, absorbed: bool)
 # source/target are each either the String "player" or a FieldEnemy node -
 # whichever combatant actually dealt/received the hit.
 # An enemy's HP reached 0. Fires right after that hit's own damage_dealt/
@@ -365,6 +370,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	ctx.on_heal = _on_card_heal
 	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
 		_report_damage("player", target_combatant, amount, kind)
+	ctx.on_block = _report_block
 
 	_effect_resolver.resolve_card(card, ctx)
 	# Taken, deepened or replaced by the card just played - and the card
@@ -630,6 +636,7 @@ func _start_player_turn() -> void:
 		ctx.on_heal = _on_card_heal
 		ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
 			_report_damage("player", target_combatant, amount, kind)
+		ctx.on_block = _report_block
 		ctx.resolve_pending_drain()
 	Status.remove_expired(player.statuses)
 	# What was waiting for this turn (Ransom) takes hold now, after the
@@ -749,6 +756,12 @@ func _close_grace_window() -> void:
 	RunLogger.log_grace_lost(player.grace)
 	player.grace = 0
 	grace_changed.emit(0)
+
+# EffectContext.on_block: a hit of the player's met an enemy's block.
+func _report_block(target_combatant: Combatant, _blocked: int, damage_to_hp: int) -> void:
+	var enemy := _field_enemy_for(target_combatant)
+	if enemy != null:
+		enemy_hit_blocked.emit(enemy, damage_to_hp <= 0)
 
 func _report_damage(source: Variant, target_combatant: Combatant, amount: int, kind: String) -> void:
 	RunLogger.log_damage_dealt(amount)

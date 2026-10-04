@@ -19,6 +19,12 @@ class_name EnemyData
 # at random, never the same take twice running (SoundPool.next_random());
 # one take is fine.
 @export var contact_sounds: Array[AudioStream] = []
+# Played instead of contact_sounds when the hit meets this creature's
+# block - judged per hit as it lands, before the block is spent, whether
+# the block takes all of it or the hit breaks through (BattleController.
+# enemy_hit_blocked). Its own pool, picked the same way. Empty (every
+# enemy by default) = contact_sounds always.
+@export var armored_contact_sounds: Array[AudioStream] = []
 # Each contact play's pitch scale is drawn from 1 +/- this, so repeated
 # takes don't sound identical. Read by FieldEnemy at play time.
 @export_range(0.0, 0.5, 0.01) var pitch_jitter: float = 0.06:

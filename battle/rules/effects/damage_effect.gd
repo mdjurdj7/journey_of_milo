@@ -36,6 +36,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 		var result := DamagePipeline.resolve(landed(blow + ctx.take_mark_bonus(enemy), ctx.player, enemy), enemy)
 		if enemy.hp <= 0:
 			ctx.killed_this_card = true
+		ctx.report_block(enemy, result)
 		if result["damage_to_hp"] > 0:
 			ctx.report_damage(enemy, result["damage_to_hp"], "card")
 			ctx.record_hit(hp_before - enemy.hp, ctx.grace_reclaim(result["damage_to_hp"]))

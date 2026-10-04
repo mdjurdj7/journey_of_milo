@@ -15,6 +15,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	for enemy in ctx.enemies:
 		var incoming: int = Status.apply_modifiers(amount, enemy.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
 		var result := DamagePipeline.resolve(incoming, enemy)
+		ctx.report_block(enemy, result)
 		if result["damage_to_hp"] > 0:
 			ctx.report_damage(enemy, result["damage_to_hp"], "card")
 			ctx.grace_reclaim(result["damage_to_hp"])

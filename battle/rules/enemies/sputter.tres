@@ -2,9 +2,10 @@
 
 [ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
 [ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
-[ext_resource type="AudioStream" uid="uid://co5jagvmbnmkr" path="res://assets/audio/enemies/Sputter/hit_shell_1.mp3" id="3_hit_shell"]
+[ext_resource type="AudioStream" uid="uid://bqhk7amkael6o" path="res://assets/audio/enemies/Sputter/hit_shell_1.mp3" id="3_hit_shell"]
 [ext_resource type="AudioStream" uid="uid://ctbnpo2j3ocnc" path="res://assets/audio/enemies/Sputter/hit_shell_2.mp3" id="4_hit_shell_2"]
 [ext_resource type="AudioStream" uid="uid://c2g4kb3njm4pa" path="res://assets/audio/enemies/Sputter/hit_shell_3.mp3" id="5_hit_shell_3"]
+[ext_resource type="AudioStream" uid="uid://co5jagvmbnmkr" path="res://assets/audio/enemies/Sputter/hit_armor.mp3" id="6_hit_armor"]
 
 [sub_resource type="Resource" id="EnemyIntent_block"]
 script = ExtResource("2_intent")
@@ -29,6 +30,7 @@ enemy_name = "Sputter"
 max_hp = 45
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_block"), SubResource("EnemyIntent_strike"), SubResource("EnemyIntent_scissor")])
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell"), ExtResource("4_hit_shell_2"), ExtResource("5_hit_shell_3")])
+armored_contact_sounds = Array[AudioStream]([ExtResource("6_hit_armor")])
 erratic_intent_selection = true
 model_scale = 1.25
 attachment_scene_path = "res://field/sputter_claws.tscn"

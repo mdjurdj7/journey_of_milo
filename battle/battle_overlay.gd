@@ -209,6 +209,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	add_child(_battle_feedback)
 	_battle_feedback.setup(wanderer, on_dark_world)
 	battle_controller.damage_dealt.connect(_battle_feedback.on_damage_dealt)
+	battle_controller.enemy_hit_blocked.connect(_battle_feedback.on_enemy_hit_blocked)
 	# A card's play effect (Blood Arc's stroke) goes down before its hits
 	# report, over the enemies it can hit - and under their intent
 	# readouts, the lowest of whose bottom edges it is handed.

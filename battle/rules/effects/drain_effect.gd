@@ -37,6 +37,7 @@ static func drain(amount: int, targets: Array[Combatant], ctx: EffectContext) ->
 		dealt += hp_before - enemy.hp
 		if enemy.hp <= 0:
 			killed = true
+		ctx.report_block(enemy, result)
 		if damage_to_hp > 0:
 			ctx.report_damage(enemy, damage_to_hp, "drain")
 	ctx.heal(mini(dealt, amount))

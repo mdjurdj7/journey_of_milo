@@ -16,6 +16,12 @@ class_name BattleFeedback
 # scaled time, so a hit-stop holds stroke and reactions alike. The hits
 # themselves, HP and kills, still land at the impact; only how they look
 # is paced. Such a card's hits draw no slash mark: the stroke is its mark.
+#
+# The other: a card hit that meets an enemy's block (BattleController.
+# enemy_hit_blocked). One the block takes whole reports no damage, so it
+# reacts here - the armored contact sound and a reduced recoil, nothing
+# else (no flash, number, hit-stop or shake). One that breaks through
+# reacts as any hit does, with the armored sound.
 
 const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 
@@ -29,6 +35,9 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 @export var recoil_tilt_degrees: float = 8.0
 @export var recoil_out_time: float = 0.08
 @export var recoil_return_time: float = 0.25
+# A hit the enemy's block takes whole recoils this fraction of a full
+# hit's distance and tilt.
+@export_range(0.0, 1.0, 0.05) var absorbed_recoil_fraction: float = 0.5
 
 @export_group("Slash Mark")
 @export var slash_mark_length: float = 1.2
@@ -58,6 +67,9 @@ var _on_dark_world: bool = false
 # cleared at the end of that frame, so only that card's own hits (which
 # all report in the same frame) are paced by it.
 var _effect: Node3D = null
+# Enemies whose next reported hit met their block (enemy_hit_blocked,
+# not absorbed) - set and read in the same call, so never stale.
+var _met_block: Dictionary[FieldEnemy, bool] = {}
 
 func setup(wanderer: Wanderer, on_dark_world: bool) -> void:
 	_wanderer = wanderer
@@ -76,12 +88,14 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, _kind: Strin
 	if target is FieldEnemy:
 		# Read now, in the hit's own frame - the effect lets go at its end.
 		var slash: bool = not _effect_active()
+		var armored: bool = _met_block.has(target)
+		_met_block.erase(target)
 		var delay: float = reaction_delay(target)
 		if delay > 0.0:
 			await get_tree().create_timer(delay).timeout
 			if not is_instance_valid(target):
 				return
-		_react_to_card_hit(target as FieldEnemy, slash)
+		_react_to_card_hit(target as FieldEnemy, slash, armored)
 		if amount >= hit_stop_threshold:
 			_apply_hit_stop()
 	elif source is FieldEnemy:
@@ -127,11 +141,32 @@ func _effect_active() -> bool:
 func _release_effect() -> void:
 	_effect = null
 
-func _react_to_card_hit(enemy: FieldEnemy, slash: bool = true) -> void:
+# BattleController.enemy_hit_blocked: a hit that broke through is marked
+# for its damage_dealt, which follows at once; one the block took whole
+# reacts here, paced by a play effect like any hit.
+func on_enemy_hit_blocked(enemy: FieldEnemy, absorbed: bool) -> void:
+	if not absorbed:
+		_met_block[enemy] = true
+		return
+	var delay: float = reaction_delay(enemy)
+	if delay > 0.0:
+		await get_tree().create_timer(delay).timeout
+		if not is_instance_valid(enemy):
+			return
+	_react_to_absorbed_hit(enemy)
+
+func _react_to_absorbed_hit(enemy: FieldEnemy) -> void:
 	if _wanderer == null:
 		return
 	var attack_direction: Vector3 = enemy.global_position - _wanderer.global_position
-	enemy.play_contact_sound()
+	enemy.play_contact_sound(true)
+	enemy.play_hit_recoil(attack_direction, recoil_distance * absorbed_recoil_fraction, recoil_tilt_degrees * absorbed_recoil_fraction, recoil_out_time, recoil_return_time)
+
+func _react_to_card_hit(enemy: FieldEnemy, slash: bool = true, armored: bool = false) -> void:
+	if _wanderer == null:
+		return
+	var attack_direction: Vector3 = enemy.global_position - _wanderer.global_position
+	enemy.play_contact_sound(armored)
 	enemy.play_hit_flash(flash_color, flash_rise_time, flash_fall_time)
 	enemy.play_hit_recoil(attack_direction, recoil_distance, recoil_tilt_degrees, recoil_out_time, recoil_return_time)
 	enemy.spawn_sand_puff(sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity, sand_puff_spread_degrees)

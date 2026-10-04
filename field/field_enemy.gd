@@ -75,7 +75,8 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 # number). Levels: the takes are normalised to -6 dBFS; at the battle
 # camera's ~10.6 m the 3D attenuation takes ~0.5 dB, so -4 peaks about
 # -10.5 dBFS at the listener - the loudest thing in a strike. Pitch
-# varies per play by enemy_data.pitch_jitter.
+# varies per play by enemy_data.pitch_jitter. A hit that meets block
+# draws from enemy_data.armored_contact_sounds instead, when it has any.
 @export_group("Contact Sound")
 @export var contact_volume_db: float = -4.0
 @export var contact_volume_variance_db: float = 1.0
@@ -157,6 +158,7 @@ var _face_tween: Tween = null
 # Made on the first pain turn (play_pain_turn_sound()); none before.
 var _pain_player: AudioStreamPlayer3D = null
 var _contact_pool := SoundPool.new()
+var _armored_contact_pool := SoundPool.new()
 # BaseMaterial3D, not StandardMaterial3D: Godot's glTF importer can produce
 # either it or an ORMMaterial3D for a material with a combined metallic-
 # roughness texture (both are BaseMaterial3D siblings, not one a subclass
@@ -593,6 +595,7 @@ func play_hit_flash(flash_color: Color, rise_time: float, fall_time: float) -> v
 func _spawn_contact_audio() -> void:
 	if enemy_data != null:
 		_contact_pool.set_clips(enemy_data.contact_sounds)
+		_armored_contact_pool.set_clips(enemy_data.armored_contact_sounds)
 	_contact_player = AudioStreamPlayer3D.new()
 	_contact_player.name = "ContactAudio"
 	_contact_player.bus = &"SFX"
@@ -621,8 +624,11 @@ func play_pain_turn_sound() -> void:
 	_pain_player.volume_db = pain_volume_db
 	_pain_player.play()
 
-func play_contact_sound() -> void:
-	var clip: AudioStream = _contact_pool.next_random()
+# `armored`: the hit met this creature's block - its armored takes, if
+# it has any, else the usual ones.
+func play_contact_sound(armored: bool = false) -> void:
+	var pool: SoundPool = _armored_contact_pool if armored and not _armored_contact_pool.is_empty() else _contact_pool
+	var clip: AudioStream = pool.next_random()
 	if clip == null or _contact_player == null:
 		return
 	_contact_player.stream = clip

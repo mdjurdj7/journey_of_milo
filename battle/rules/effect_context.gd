@@ -75,6 +75,11 @@ var on_damage: Callable = Callable()
 # Called as on_damage.call(target_combatant, amount, kind) whenever an
 # effect actually lands damage.
 
+var on_block: Callable = Callable()
+# Called as on_block.call(target_combatant, blocked, damage_to_hp) when a
+# hit on an enemy meets its block - before that hit's on_damage, which
+# only follows if some of it got through (damage_to_hp > 0).
+
 # The attack bonus (AttackBonus) for the card being resolved, ONCE: the
 # first damage effect to ask gets it, every later one 0 - the bonus is per
 # Attack card, not per hit. Read when that effect resolves, so Critical
@@ -145,6 +150,13 @@ func for_card_preview(hp_cost: int) -> EffectContext:
 func report_damage(target_combatant: Combatant, amount: int, kind: String) -> void:
 	if on_damage.is_valid():
 		on_damage.call(target_combatant, amount, kind)
+
+# A hit on an enemy's DamagePipeline result: tells on_block if its block
+# took any of it. Call before that hit's report_damage().
+func report_block(target_combatant: Combatant, result: Dictionary) -> void:
+	var blocked: int = result["blocked"]
+	if blocked > 0 and on_block.is_valid():
+		on_block.call(target_combatant, blocked, int(result["damage_to_hp"]))
 
 # Damage this player just dealt takes Grace back 1:1, per hit as it
 # lands, never past max HP and never more Grace than is left. Silent and

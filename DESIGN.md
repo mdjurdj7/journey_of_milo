@@ -158,10 +158,13 @@ at the card's impact. Blood Arc's arc (#461613, 0.9) is the first.
   place (`CardData.rarity`); the visual treatment is its own pass.
   (2026-09-26, card rarity.)
 - **The Dragonfly borrows the Sputter's hit sound.** `battle/rules/
-  enemies/dragonfly.tres` names `hit_shell_1.mp3` in `contact_sounds` -
-  a TODO placeholder, not a choice: a 14 HP insect should not crack like
-  a shell. Replace when it has takes of its own; nothing else references
-  the file through the dragonfly. (2026-09-21, dragonfly rules.)
+  enemies/dragonfly.tres` and `dragonfly_lone.tres` name the Sputter's
+  crack in `contact_sounds` - a TODO placeholder, not a choice: a 14 HP
+  insect should not crack like a shell. The file was `hit_shell_1.mp3`
+  and is now `hit_armor.mp3`, the Sputter's armoured-hit sound, under
+  the same ID, so the dragonflies sound as they did. They need contact
+  takes of their own. (2026-09-21, dragonfly rules; 2026-10-04,
+  renamed.)
 - **A cluster's contact zone is the union of its members' own contact
   spheres, not one merged shape.** Contact with any member starts the
   fight with every member of its `FloorEnemy.group` still standing

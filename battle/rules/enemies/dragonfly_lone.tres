@@ -2,7 +2,7 @@
 
 [ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
 [ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
-[ext_resource type="AudioStream" uid="uid://co5jagvmbnmkr" path="res://assets/audio/enemies/Sputter/hit_shell_1.mp3" id="3_hit_shell"]
+[ext_resource type="AudioStream" uid="uid://co5jagvmbnmkr" path="res://assets/audio/enemies/Sputter/hit_armor.mp3" id="3_hit_armor"]
 
 [sub_resource type="Resource" id="EnemyIntent_bite"]
 script = ExtResource("2_intent")
@@ -13,7 +13,7 @@ script = ExtResource("1_enemy_data")
 enemy_name = "Dragonfly"
 max_hp = 14
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_bite")])
-contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell")])
+contact_sounds = Array[AudioStream]([ExtResource("3_hit_armor")])
 model_scene_path = "res://assets/models/enemies/Dragonfly/Dragonfly_body.glb"
 model_scale = 0.44
 model_yaw_offset_degrees = 180.0
