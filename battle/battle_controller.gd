@@ -19,6 +19,12 @@ signal card_swing(card: CardData)
 signal hand_changed()
 signal target_requested(card: CardData)
 signal target_cancelled()
+# Bide's choice (a SET_ASIDE card - see request_play()): opened with up to
+# `cap` other hand cards to mark, the count marked as it moves, and closed
+# (confirmed into the play, or cancelled with nothing spent).
+signal hand_choice_started(card: CardData, cap: int)
+signal hand_choice_changed(marked: int, cap: int)
+signal hand_choice_ended()
 
 # --- Rules-facing signals - the overlay/FloatingNumber react to these only. ---
 signal hp_changed(current: int, max_hp: int)
@@ -101,6 +107,11 @@ var cards_played_this_turn: int = 0
 
 var _hand_container: HandContainer
 var _pending_card_view: CardView = null
+# The SET_ASIDE card armed while its choice is open, the other hand cards
+# marked for it, and how many may be - see _begin_choice().
+var _choosing_card_view: CardView = null
+var _choice_marked: Array[CardView] = []
+var _choice_cap: int = 0
 var _hovered_enemy: FieldEnemy = null
 # The enemy under the cursor itself, without the default - see
 # hovered_enemy_changed.
@@ -171,6 +182,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	deck = Deck.new(RunState.deck)
 	deck.drawn.connect(func(_card: CardData) -> void: hand_changed.emit())
 	deck.discarded.connect(func(_card: CardData) -> void: hand_changed.emit())
+	deck.set_aside_changed.connect(func() -> void: hand_changed.emit())
 	_hand_container.set_deck(deck)
 	_hand_container.card_clicked.connect(_on_card_view_clicked)
 	_hand_container.play_animation_finished.connect(_on_play_animation_finished)
@@ -248,8 +260,14 @@ func get_pending_card_view() -> CardView:
 func get_hovered_enemy() -> FieldEnemy:
 	return _hovered_enemy
 
+func is_choosing() -> bool:
+	return _choosing_card_view != null
+
+func get_choosing_card_view() -> CardView:
+	return _choosing_card_view
+
 func request_play(card_view: CardView) -> void:
-	if _input_locked or _pending_card_view != null or card_view.card_data == null:
+	if _input_locked or _pending_card_view != null or _choosing_card_view != null or card_view.card_data == null:
 		return
 	var card: CardData = card_view.card_data
 	if player.energy_cost(card) > player.energy:
@@ -261,12 +279,78 @@ func request_play(card_view: CardView) -> void:
 	# Every enemy buried: an enemy-target card has nothing to land on.
 	if card.target_type == CardData.TargetType.ENEMY and _hittable_enemy_combatants().is_empty():
 		return
+	# A SET_ASIDE card (Bide) asks which cards first, unless there is
+	# nothing else in the hand to choose - then it just plays.
+	var cap: int = _set_aside_cap(card)
+	if cap > 0:
+		_begin_choice(card_view, cap)
+		return
 	if card.target_type == CardData.TargetType.ENEMY:
 		_pending_card_view = card_view
 		card_view.lift_and_hold()
 		target_requested.emit(card)
 	else:
 		_resolve_play(card_view, null)
+
+# How many cards a SET_ASIDE card may set aside right now: its number,
+# capped at the other cards in the hand. 0 for every other card.
+func _set_aside_cap(card: CardData) -> int:
+	var value: int = 0
+	for effect in card.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.SET_ASIDE:
+			value += effect.value
+	if value <= 0:
+		return 0
+	return mini(value, maxi(deck.hand.size() - 1, 0))
+
+# Bide's choice, opened: the card arms the way a targeting card does (the
+# hand stops hovering, End Turn greys), then the other cards wake up to be
+# clicked - each click marks or unmarks one, up to `cap`; a click past the
+# cap does nothing. Clicking the armed card again, Enter or Space confirm
+# (with 0 to `cap` marked); right-click or Esc cancel with nothing spent.
+func _begin_choice(card_view: CardView, cap: int) -> void:
+	_choosing_card_view = card_view
+	_choice_marked.clear()
+	_choice_cap = cap
+	card_view.lift_and_hold(true)
+	_hand_container.begin_choice(card_view)
+	hand_choice_started.emit(card_view.card_data, cap)
+	hand_choice_changed.emit(0, cap)
+
+func toggle_choice(card_view: CardView) -> void:
+	if _choosing_card_view == null or card_view == _choosing_card_view:
+		return
+	if _choice_marked.has(card_view):
+		_choice_marked.erase(card_view)
+		card_view.set_marked(false)
+	elif _choice_marked.size() < _choice_cap:
+		_choice_marked.append(card_view)
+		card_view.set_marked(true)
+	else:
+		return
+	hand_choice_changed.emit(_choice_marked.size(), _choice_cap)
+
+func confirm_choice() -> void:
+	if _choosing_card_view == null:
+		return
+	var card_view: CardView = _choosing_card_view
+	var chosen: Array[CardView] = _choice_marked.duplicate()
+	_close_choice()
+	_resolve_play(card_view, null, chosen)
+
+func cancel_choice() -> void:
+	if _choosing_card_view == null:
+		return
+	var card_view: CardView = _choosing_card_view
+	_close_choice()
+	card_view.release()
+
+func _close_choice() -> void:
+	_choosing_card_view = null
+	_choice_marked.clear()
+	_choice_cap = 0
+	_hand_container.end_choice()
+	hand_choice_ended.emit()
 
 func confirm_target(enemy: FieldEnemy) -> void:
 	if _pending_card_view == null:
@@ -291,6 +375,7 @@ func cancel_target() -> void:
 func end_turn() -> void:
 	if _input_locked:
 		return
+	cancel_choice()
 	_input_locked = true
 	turn_phase_changed.emit(false)
 	_hand_container.discard_hand()
@@ -321,7 +406,7 @@ func end_turn() -> void:
 # the swing with no rewiring - only the wait moved. _input_locked (set
 # by the caller path this always runs on) keeps a second card from being
 # armed while this is in flight.
-func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
+func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_views: Array[CardView] = []) -> void:
 	var card: CardData = card_view.card_data
 	# Read before anything is spent: whether a cost replacement (Collateral)
 	# covers this card depends on the free card and any cost reduction
@@ -374,6 +459,13 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy) -> void:
 	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
 		_report_damage("player", target_combatant, amount, kind)
 	ctx.on_block = _report_block
+	# Bide's chosen cards: their own views leave the hand just before the
+	# Deck sets their cards aside, so the marked copy is the one that goes.
+	for view in set_aside_views:
+		if is_instance_valid(view) and view.card_data != null:
+			ctx.set_aside_choice.append(view.card_data)
+	if not set_aside_views.is_empty():
+		_hand_container.release_views(set_aside_views)
 
 	_effect_resolver.resolve_card(card, ctx)
 	# Taken, deepened or replaced by the card just played - and the card
@@ -656,6 +748,11 @@ func _start_player_turn() -> void:
 
 	if not _check_battle_end():
 		_hand_container.draw_cards(turn_draw_amount)
+		# Bide's set-aside cards come back after the draw, so it draws as
+		# many as ever; the readout's "Set aside" line goes with them.
+		if not deck.set_aside_pile.is_empty():
+			deck.return_set_aside()
+			status_changed.emit()
 
 func _check_battle_end() -> bool:
 	if player.hp <= 0:
@@ -871,12 +968,32 @@ func _screen_pos_for(target: FieldEnemy) -> Vector2:
 	return overlay_size / 2.0 + self_play_screen_offset
 
 func _on_card_view_clicked(card_view: CardView) -> void:
+	if _choosing_card_view != null:
+		if card_view == _choosing_card_view:
+			confirm_choice()
+		else:
+			toggle_choice(card_view)
+		return
 	request_play(card_view)
 
-# Gated on awaiting-target: this controller only reacts to input while a
-# card is armed and waiting for an enemy click, everything else (movement,
-# camera, ...) is untouched - and already frozen by RegionField anyway.
+# Gated on awaiting-target or Bide's open choice: this controller only
+# reacts to input while a card is armed - waiting for an enemy click, or
+# for its choice to be confirmed (Enter/Space) or cancelled (right-click/
+# Esc) - everything else (movement, camera, ...) is untouched - and
+# already frozen by RegionField anyway.
 func _unhandled_input(event: InputEvent) -> void:
+	if _choosing_card_view != null:
+		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
+			cancel_choice()
+			get_viewport().set_input_as_handled()
+		elif event is InputEventKey and event.pressed and not event.echo:
+			if event.keycode == KEY_ESCAPE:
+				cancel_choice()
+				get_viewport().set_input_as_handled()
+			elif event.keycode == KEY_ENTER or event.keycode == KEY_KP_ENTER or event.keycode == KEY_SPACE:
+				confirm_choice()
+				get_viewport().set_input_as_handled()
+		return
 	if _pending_card_view == null:
 		return
 

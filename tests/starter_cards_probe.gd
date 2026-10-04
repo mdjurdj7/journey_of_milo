@@ -24,6 +24,7 @@ const TWO_LINE_STATUS_CARDS: Array[String] = ["Sentence", "The Return"]
 # (CardView.rules_margin_px) and no lone last word. A card that moves
 # here has changed its wording - or needs to.
 const SHRUNK_RULES: Dictionary = {
+	"Bide": 14,
 	"Collateral": 13,
 	"Cornered": 14,
 	"Last Resort": 14,
@@ -39,7 +40,8 @@ const NUMERAL_TOP_CLEAR_PX := 5.0
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # The cards with art, by file - the starters, Carve, Cornered, Hold Fast,
 # Come Due, No Further, Sentence, Last Wager, The Return, Blood Arc,
-# Collateral, Ransom, Leverage, Self-Eater, Unbroken and Small Price.
+# Collateral, Ransom, Leverage, Self-Eater, Unbroken, Small Price and
+# Bide.
 # Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
@@ -62,6 +64,7 @@ const CARD_ART: Dictionary = {
 	"self_eater": "res://cards/art/Wanderer/Self-Eater.png",
 	"unbroken": "res://cards/art/Wanderer/Unbroken.png",
 	"small_price": "res://cards/art/Wanderer/Small Price.png",
+	"bide": "res://cards/art/Wanderer/Bide.png",
 }
 
 var _failures: int = 0

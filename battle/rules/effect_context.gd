@@ -14,6 +14,10 @@ var target: Combatant = null
 # A buried enemy is left out, so an all-enemies effect never counts it.
 var enemies: Array[Combatant] = []
 var deck: Deck
+# The cards the player chose from the hand for a SET_ASIDE (Bide), picked
+# before the play committed (BattleController's choose mode). Empty for
+# every other card, and for a Bide played with none chosen.
+var set_aside_choice: Array[CardData] = []
 # Cards committed this turn BEFORE the one this context is for - what
 # Condition.FIRST_CARD_THIS_TURN reads. The controller counts a card at
 # commit, so for the card resolving this is its count minus one; for a

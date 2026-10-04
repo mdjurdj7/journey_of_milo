@@ -170,13 +170,43 @@ func set_deck(deck: Deck) -> void:
 	if _deck != null:
 		_deck.drawn.disconnect(_on_deck_changed)
 		_deck.discarded.disconnect(_on_deck_changed)
+		_deck.set_aside_changed.disconnect(_sync_with_deck)
 	_deck = deck
 	_deck.drawn.connect(_on_deck_changed)
 	_deck.discarded.connect(_on_deck_changed)
+	_deck.set_aside_changed.connect(_sync_with_deck)
 	_sync_with_deck()
 
 func _on_deck_changed(_card: CardData) -> void:
 	_sync_with_deck()
+
+# Bide's choice opened with `chooser` armed (BattleController's choose
+# mode): the arming suppressed every other card's hover, but here they
+# are what gets clicked, so hover comes back for them.
+func begin_choice(chooser: CardView) -> void:
+	for view in _card_views():
+		if view != chooser:
+			view.set_hover_suppressed(false)
+
+# The choice closed (confirmed or cancelled): every mark comes off.
+func end_choice() -> void:
+	for view in _card_views():
+		view.set_marked(false)
+
+# The chosen cards' own slots leave the hand now - called right before
+# the Deck sets their cards aside, so with two copies of a card in hand
+# the one that goes is the one that was marked, not whichever the sync
+# would match first (play_card() takes its slot out the same way).
+func release_views(views: Array[CardView]) -> void:
+	for slot in _slots.duplicate():
+		var view: CardView = slot.get_child(0) as CardView
+		if view == null or not views.has(view):
+			continue
+		_slots.erase(slot)
+		_slot_cards.erase(slot)
+		_forget_slot(slot)
+		_collapse_and_remove(slot)
+	_reflow_hand()
 
 # The one way the hand's contents change: the Deck's hand is the truth,
 # and the slots are brought to match it - a slot for every card the

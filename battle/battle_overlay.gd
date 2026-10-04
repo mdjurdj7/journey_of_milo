@@ -23,6 +23,25 @@ signal battle_finished(outcome: Outcome)
 # loudness differ.
 @export var card_override_volume_db: float = -16.0
 
+@export_group("Choice Prompt")
+# Bide's open choice says what it wants in one tracked-caps ink line, this
+# far above the armed card (BattleController.hand_choice_*): the count
+# marked, the cap, and the card to click to confirm.
+@export var choice_prompt_format: String = "SET ASIDE %d / %d  ·  CLICK %s TO CONFIRM"
+@export var choice_prompt_font_size_px: int = 13:
+	set(value):
+		choice_prompt_font_size_px = value
+		_style_choice_prompt()
+@export var choice_prompt_tracking_em: float = 0.16:
+	set(value):
+		choice_prompt_tracking_em = value
+		_style_choice_prompt()
+@export var choice_prompt_gap_px: float = 12.0
+# The readout's line for Bide's set-aside cards while they wait, and the
+# reveal under it that names them.
+@export var set_aside_line_format: String = "Set aside %d"
+@export var set_aside_reveal_format: String = "Back in your hand at the start of your next turn: %s."
+
 @export_group("Corners")
 # The fixed readouts' inset from the viewport's edges: bottom-left the
 # DECK line, bottom-right End Turn with the DISCARD line beneath it - see
@@ -92,6 +111,10 @@ var _on_dark_world: bool = false
 # End Turn is enabled only while both hold - see _update_end_turn().
 var _player_turn: bool = true
 var _card_armed: bool = false
+# Bide's choice prompt (choice_prompt_*), and the name of the card whose
+# choice is open - null/empty while none is.
+var _choice_prompt: Label = null
+var _choice_card_name: String = ""
 
 func _ready() -> void:
 	# RegionField freezes itself (and, by inheritance, this whole overlay -
@@ -188,6 +211,9 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.battle_won.connect(func() -> void: _finish_battle(Outcome.WIN))
 	battle_controller.battle_lost.connect(func() -> void: _finish_battle(Outcome.LOSE))
 	hand_container.armed_changed.connect(_on_card_armed_changed)
+	battle_controller.hand_choice_started.connect(_on_hand_choice_started)
+	battle_controller.hand_choice_changed.connect(_on_hand_choice_changed)
+	battle_controller.hand_choice_ended.connect(_on_hand_choice_ended)
 	# The hand's conditionals re-read on exactly the signals that can move
 	# one - never per frame. card_played fires after the play is counted,
 	# turn_phase_changed(true) after the count resets and last turn's
@@ -456,6 +482,14 @@ func _refresh_standing_row() -> void:
 			continue
 		lines.append({"text": spent.display_name, "spent": true, "name": spent.display_name, "rules": Status.new(spent).describe(player)})
 	lines.append_array(counters)
+	# Bide's cards, waiting for next turn - named in the reveal, so they
+	# don't read as gone.
+	var waiting: Array[CardData] = battle_controller.deck.set_aside_pile if battle_controller.deck != null else []
+	if not waiting.is_empty():
+		var names: PackedStringArray = []
+		for card in waiting:
+			names.append(card.card_name)
+		lines.append({"text": set_aside_line_format % waiting.size(), "name": "Set aside", "rules": set_aside_reveal_format % ", ".join(names)})
 	_field_hp_bar.set_standing_row(lines)
 	_field_hp_bar.set_hand_top_y(hand_container.get_rest_top_y())
 
@@ -505,6 +539,49 @@ func _on_card_armed_changed(armed: bool) -> void:
 
 func _update_end_turn() -> void:
 	end_turn_button.set_enabled(_player_turn and not _card_armed)
+
+func _on_hand_choice_started(card: CardData, _cap: int) -> void:
+	_choice_card_name = card.card_name
+	if _choice_prompt == null:
+		_choice_prompt = Label.new()
+		_choice_prompt.name = "ChoicePrompt"
+		_choice_prompt.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_choice_prompt)
+	_style_choice_prompt()
+	_choice_prompt.visible = true
+
+func _on_hand_choice_changed(marked: int, cap: int) -> void:
+	if _choice_prompt == null:
+		return
+	_choice_prompt.text = choice_prompt_format % [marked, cap, _choice_card_name.to_upper()]
+	_choice_prompt.size = Vector2.ZERO
+	_place_choice_prompt()
+
+func _on_hand_choice_ended() -> void:
+	_choice_card_name = ""
+	if _choice_prompt != null:
+		_choice_prompt.visible = false
+
+func _style_choice_prompt() -> void:
+	if _choice_prompt == null:
+		return
+	_choice_prompt.add_theme_font_override("font", InkType.tracked(InkType.text_bold_font(), choice_prompt_font_size_px, choice_prompt_tracking_em))
+	_choice_prompt.add_theme_font_size_override("font_size", choice_prompt_font_size_px)
+	_choice_prompt.add_theme_color_override("font_color", get_theme_color("ink", "Battle"))
+
+# Centred over the armed card's top edge, followed every frame while the
+# card travels to its armed pose.
+func _place_choice_prompt() -> void:
+	if _choice_prompt == null or not _choice_prompt.visible or battle_controller == null:
+		return
+	var card: CardView = battle_controller.get_choosing_card_view()
+	if card == null:
+		return
+	var rect: Rect2 = card.get_global_rect()
+	_choice_prompt.global_position = Vector2(rect.get_center().x - _choice_prompt.size.x / 2.0, rect.position.y - choice_prompt_gap_px - _choice_prompt.size.y)
+
+func _process(_delta: float) -> void:
+	_place_choice_prompt()
 
 func _on_target_requested(_card: CardData) -> void:
 	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)

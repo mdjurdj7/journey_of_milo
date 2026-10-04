@@ -86,6 +86,8 @@ const MARK_IF_CLOSE := "{/if}"
 const MARK_ELSE_OPEN := "{else}"
 const MARK_ELSE_CLOSE := "{/else}"
 const TOKEN_DRAW := "{draw}"
+# How many cards a SET_ASIDE (Bide) sets aside - its value.
+const TOKEN_SET_ASIDE := "{set_aside}"
 const TOKEN_HP_COST := "{hp_cost}"
 # The effect types {damage}/{alt_damage} and {block}/{alt_block} read.
 const DAMAGE_EFFECT_TYPES: Array = [CardEffect.EffectType.DAMAGE, CardEffect.EffectType.FIRST_CARD_DAMAGE,
@@ -326,6 +328,10 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # scales.
 @export var armed_scale: float = 1.2
 @export_range(0.0, 1.0) var armed_bottom_y_fraction: float = 0.86
+# Armed for a hand choice (Bide's set-aside, lift_and_hold(true)): higher,
+# clear of the resting hand, so every card it asks about stays in sight
+# and in reach of the cursor.
+@export_range(0.0, 1.0) var choice_armed_bottom_y_fraction: float = 0.66
 @export var armed_duration_sec: float = 0.18
 # Lifted (hover or armed), the frame goes to full ink at this width - 1:
 # the lift is said by the shadow, not by a heavier edge.
@@ -337,6 +343,23 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # An armed (selected) card holds its lifted pose at least this long
 # before release() may lower it, so a quick cancel still reads.
 @export var selected_hold_sec: float = 0.5
+# Marked (chosen for Bide's set-aside, set_marked()): the card lifts this
+# far above rest (1x px, like hover_lift) and holds there through hover,
+# with a hairline of the battle ink across its width this far above its
+# top edge. No box, no glow.
+@export var mark_lift: float = 44.0:
+	set(value):
+		mark_lift = value
+		if _marked:
+			_tween_to(_rest_offset_y - mark_lift * _base_scale, hover_duration_sec)
+@export var mark_rule_gap_px: float = 6.0:
+	set(value):
+		mark_rule_gap_px = value
+		_place_mark_rule()
+@export var mark_rule_width_px: float = 1.0:
+	set(value):
+		mark_rule_width_px = value
+		_place_mark_rule()
 # Unplayable (can't afford): the whole card fades to this - ink and bone
 # alike, no grey overlay.
 @export_range(0.0, 1.0) var unplayable_alpha: float = 0.42
@@ -401,6 +424,10 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 
 var card_data: CardData
 var _armed: bool = false
+# Armed for a hand choice - the higher pose (choice_armed_bottom_y_fraction).
+var _armed_for_choice: bool = false
+var _marked: bool = false
+var _mark_rule: ColorRect = null
 var _armed_at_msec: int = 0
 var _playable: bool = true
 var _keyline_type: KeylineType = KeylineType.STRIKE
@@ -637,6 +664,10 @@ func _resolve_tokens(description: String) -> String:
 		var draw: int = _effect_value(card_data, [CardEffect.EffectType.DRAW])
 		if draw >= 0:
 			text = text.replace(TOKEN_DRAW, str(draw))
+	if text.contains(TOKEN_SET_ASIDE):
+		var set_aside: int = _effect_value(card_data, [CardEffect.EffectType.SET_ASIDE])
+		if set_aside >= 0:
+			text = text.replace(TOKEN_SET_ASIDE, str(set_aside))
 	if text.contains(TOKEN_HP_COST):
 		text = text.replace(TOKEN_HP_COST, str(_hp_cost))
 	if text.contains(TOKEN_TOLL):
@@ -948,7 +979,8 @@ func set_hover_suppressed(suppressed: bool) -> void:
 # HandContainer to move the slot to.
 func get_armed_bottom_centre() -> Vector2:
 	var view_size: Vector2 = get_viewport().get_visible_rect().size
-	return Vector2(view_size.x / 2.0, view_size.y * armed_bottom_y_fraction)
+	var fraction: float = choice_armed_bottom_y_fraction if _armed_for_choice else armed_bottom_y_fraction
+	return Vector2(view_size.x / 2.0, view_size.y * fraction)
 
 # Called once by HandContainer right after this card enters the row - sets
 # where "at rest" actually is and snaps there immediately (not tweened;
@@ -965,9 +997,11 @@ func set_rest_offset(offset_y: float) -> void:
 # passes over it. The card drops its hover lift (the slot is about to
 # travel to armed_position - see HandContainer._on_card_armed()), scales
 # to armed_scale, keeps the hover frame weight, and holds at least
-# selected_hold_sec before release() may return it.
-func lift_and_hold() -> void:
+# selected_hold_sec before release() may return it. `for_choice` (Bide's
+# set-aside choice) arms it in the higher pose, clear of the hand.
+func lift_and_hold(for_choice: bool = false) -> void:
 	_armed = true
+	_armed_for_choice = for_choice
 	_armed_at_msec = Time.get_ticks_msec()
 	clear_keyword_hover()
 	_set_lifted_look(true)
@@ -1014,14 +1048,49 @@ func set_hovered(hovered: bool) -> void:
 
 func _on_mouse_entered() -> void:
 	_hovering = true
-	if hover_enabled and not _armed and not _hover_suppressed:
+	if hover_enabled and not _armed and not _marked and not _hover_suppressed:
 		_raise_for_hover(hover_duration_sec)
 
 func _on_mouse_exited() -> void:
 	_hovering = false
 	clear_keyword_hover()
-	if hover_enabled and not _armed and not _hover_suppressed:
+	if hover_enabled and not _armed and not _marked and not _hover_suppressed:
 		_lower_from_hover()
+
+# Chosen (or unchosen) for Bide's set-aside while its choice is open
+# (BattleController's choose mode): lifted mark_lift above rest at its
+# base scale, the hairline above it, held through hover. Unmarked, it
+# settles back - as a plain hover if the cursor is still over it.
+func set_marked(marked: bool) -> void:
+	if marked == _marked:
+		return
+	_marked = marked
+	if _mark_rule == null:
+		_mark_rule = ColorRect.new()
+		_mark_rule.name = "MarkRule"
+		_mark_rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		add_child(_mark_rule)
+		_place_mark_rule()
+	_mark_rule.color = get_theme_color("ink", "Battle") if has_theme_color("ink", "Battle") else ink_color
+	_mark_rule.visible = marked
+	if marked:
+		_set_lifted_look(true)
+		_tween_to(_rest_offset_y - mark_lift * _base_scale, hover_duration_sec)
+		_tween_scale(_base_scale, hover_duration_sec)
+		lifted.emit()
+	elif _hovering and hover_enabled and not _hover_suppressed:
+		_raise_for_hover(hover_duration_sec)
+	else:
+		_lower_from_hover()
+
+func is_marked() -> bool:
+	return _marked
+
+func _place_mark_rule() -> void:
+	if _mark_rule == null:
+		return
+	_mark_rule.position = Vector2(outer_margin, -mark_rule_gap_px - mark_rule_width_px)
+	_mark_rule.size = Vector2(card_size.x - outer_margin * 2.0, mark_rule_width_px)
 
 # Hover: lift in place and grow about the bottom centre, over the
 # neighbours (HandContainer raises the slot's z on lifted).

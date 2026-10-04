@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards the Wanderer can obtain (flagged pool_class = neutral). card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at HEAD 9fc9509",
+    "generated": "2026-10-04, from the live data at e22514a plus Bide",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 27,
+    "total_unique_wanderer_cards": 28,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 21,
+      "count": 22,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -73,11 +73,12 @@
         "The Return",
         "Collateral",
         "Ransom",
-        "Leverage"
+        "Leverage",
+        "Bide"
       ],
       "by_rarity": {
+        "COMMON": 7,
         "UNCOMMON": 8,
-        "COMMON": 6,
         "RARE": 7
       },
       "weights": "all 1.0 (weights array empty)"
@@ -94,13 +95,13 @@
       "where": "floor 2's belongings (a RewardSpread prop on region1_floor2.tres)"
     },
     "wanderer_card_types": {
+      "SKILL": 13,
       "ATTACK": 9,
-      "SKILL": 12,
       "POWER": 4,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
-      "COMMON": 11,
+      "COMMON": 12,
       "UNCOMMON": 9,
       "RARE": 7
     },
@@ -122,6 +123,7 @@
       "Untouched"
     ],
     "rules_text_below_15px": {
+      "Bide": 14,
       "Collateral": 13,
       "Cornered": 14,
       "Last Resort": 14,
@@ -194,6 +196,62 @@
     ]
   },
   "cards": [
+    {
+      "name": "Bide",
+      "file_path": "res://cards/data/bide.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "UTILITY",
+      "energy_cost": 0,
+      "rarity": "COMMON",
+      "card_text": "Set aside 2 cards until next turn.\nDraw 1.",
+      "face_hp_line": null,
+      "card_text_template": "Set aside {set_aside} cards until next turn.\nDraw {draw}.",
+      "targeting": "self",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "SET_ASIDE",
+          "plain_english": "Choose up to 2 other cards in your hand (fewer if it holds fewer; 0 is allowed): they leave it and return at the start of your next turn, after the normal draw, which they don't count against. A hand past its limit sends the overflow to the discard."
+        },
+        {
+          "type": "DRAW",
+          "plain_english": "Draw 1 card."
+        }
+      ],
+      "keywords": [],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": 1,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "status_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "cost",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "default_displayed": 0
+        }
+      ],
+      "art_path": "res://cards/art/Wanderer/Bide.png",
+      "rules_font_px": 14,
+      "battle_animation": null,
+      "play_effect_scene_path": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
     {
       "name": "Bite Down",
       "file_path": "res://cards/data/bite_down.tres",
