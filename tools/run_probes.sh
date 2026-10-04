@@ -301,10 +301,13 @@ if [ -n "$WORKTREE" ]; then
 	else
 		OLD=$(git -C "$WORKTREE" rev-parse HEAD)
 	fi
-	# Back to a clean checkout of REF: last run's copied files go.
+	# Back to a clean checkout of REF: last run's copied files go - and
+	# count as changed, since their imported copies are last run's.
+	LEFTOVER=$(gitq -C "$WORKTREE" status --porcelain -z --untracked-files=all 2>/dev/null | tr '\0' '\n' | cut -c4-)
 	git -C "$WORKTREE" checkout -q -f --detach "$REF" || die "could not check out $REF"
 	git -C "$WORKTREE" clean -fdq
 	MOVED=$(gitq -C "$WORKTREE" diff --name-only "$OLD" HEAD)
+	MOVED=$(printf '%s\n%s' "$MOVED" "$LEFTOVER")
 	ADDED=$(gitq -C "$WORKTREE" diff --name-only --diff-filter=A "$OLD" HEAD)
 	while IFS= read -r f; do
 		[ -n "$f" ] || continue
@@ -317,13 +320,16 @@ if [ -n "$WORKTREE" ]; then
 		fi
 		MOVED=$(printf '%s\n%s' "$MOVED" "$f")
 	done <<< "$(echo "$FILES" | tr ',' '\n')"
-	# Import when an import setting or a new file came in. A changed
-	# .import's cached output is deleted first, or the stale one stays.
+	# Import when an import setting, an imported asset's contents or a new
+	# file came in. A changed .import's cached output is deleted first, or
+	# the stale one stays; a changed asset under an unchanged .import is
+	# re-imported by Godot itself (its source md5 no longer matches).
 	while IFS= read -r f; do
 		case "$f" in
 			*.import)
 				NEED_IMPORT=1
 				STALE_IMPORTS=$(printf '%s\n%s' "$STALE_IMPORTS" "$(basename "${f%.import}")") ;;
+			*.png|*.jpg|*.jpeg|*.webp|*.svg|*.exr|*.hdr|*.glb|*.gltf|*.fbx|*.blend|*.obj|*.wav|*.mp3|*.ogg|*.ttf|*.otf|*.csv) NEED_IMPORT=1 ;;
 		esac
 	done <<< "$MOVED"
 	# A new file only matters if Godot scans it: a resource, a script (the
