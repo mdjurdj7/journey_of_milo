@@ -122,7 +122,7 @@ path_probes() {
 		ui/keyword_table.gd|ui/keywords.tres|ui/status_reveal.gd) out=$(area_probes keywords) ;;
 		battle/rules/enemies/*|battle/rules/enemy_turn.gd|battle/rules/enemy_intent.gd) out=$(area_probes enemies) ;;
 		battle/rules/*|battle/battle_controller.gd) out=$(area_probes rules) ;;
-		battle/reward_screen.*|battle/belongings_screen.*|battle/loot_screen.*|battle/keepsake_offer.*|battle/keepsake_row.*|battle/trough_choice.*|run/*) out=$(area_probes run) ;;
+		battle/reward_screen.*|battle/belongings_screen.*|battle/loot_screen.*|battle/keepsake_offer.*|battle/keepsake_row.*|battle/trough_choice.*|run/*|assets/textures/keepsakes/*) out=$(area_probes run) ;;
 		field/*) out=$(area_probes field) ;;
 		floors/region1_floor1.tres) out=$(area_probes floor1) ;;
 		floors/region1_floor2.tres) out=$(area_probes floor2) ;;
