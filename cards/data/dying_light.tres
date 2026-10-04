@@ -16,5 +16,5 @@ rarity = 3
 cost = 1
 card_type = 3
 target_type = 1
-description = "While Critical, your Attacks deal 3 more damage."
+description = "While Critical, gain 1 Energy at the start of your turn."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])

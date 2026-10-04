@@ -6,9 +6,9 @@
 script = ExtResource("1_status_data")
 id = "dying_light"
 display_name = "Dying Light"
-description = "While Critical, your Attacks deal {bonus} more damage."
+description = "While Critical, gain {energy} Energy at the start of your turn."
 category = 2
 default_duration_turns = -1
 stack_rule = 3
-attack_damage_bonus = 3
-bonus_requires_critical = true
+turn_start_energy_while_critical = 1
+blocks_reapply_while_held = true

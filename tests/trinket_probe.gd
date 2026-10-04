@@ -27,7 +27,7 @@ const FRAYED_CORD_PATH := "res://run/keepsakes/frayed_cord.tres"
 const WORN_PAGE_PATH := "res://run/keepsakes/worn_page.tres"
 const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
-const DYING_LIGHT_PATH := "res://battle/rules/statuses/dying_light.tres"
+const LAST_RESORT_PATH := "res://cards/data/last_resort.tres"
 const BITE_DOWN_PATH := "res://cards/data/bite_down.tres"
 const BLOOD_ARC_PATH := "res://cards/data/blood_arc.tres"
 const DOWN_PAYMENT_PATH := "res://cards/data/down_payment.tres"
@@ -55,7 +55,7 @@ func _initialize() -> void:
 	_check_new_run_clears()
 	_check_bent_nail()
 	_check_bent_nail_spent_while_buried()
-	_check_dying_light_unchanged()
+	_check_stance_bonus_beside_keen()
 	_check_frayed_cord_self_loss()
 	_check_frayed_cord_not_enemy_damage()
 	_check_descriptions()
@@ -174,24 +174,25 @@ func _check_bent_nail_spent_while_buried() -> void:
 	_expect_eq(buried.hp, 100, "...while dealing nothing")
 	_completed += 1
 
-func _check_dying_light_unchanged() -> void:
-	var dying_light: StatusData = load(DYING_LIGHT_PATH)
+# A bonus with no charges (Last Resort's, while Critical) pays every
+# Attack and is never spent; beside Bent Nail's Keen, both pay the first
+# and Last Resort alone after.
+func _check_stance_bonus_beside_keen() -> void:
 	var player := _player(50)
 	player.hp = 10
 	var enemy := Combatant.new(100)
-	Status.apply_to(player.statuses, dying_light)
+	_play(LAST_RESORT_PATH, player, enemy)
 	_play(BITE_DOWN_PATH, player, enemy)
 	_play(BITE_DOWN_PATH, player, enemy)
-	_expect_eq(enemy.hp, 100 - 11 - 11, "Dying Light pays +3 on every Attack while Critical, as before")
-	_expect(Status.find_in(player.statuses, dying_light) != null, "...and is never spent - it has no charges")
-	# With Bent Nail's status beside it: both on the first, Dying Light alone after.
+	_expect_eq(enemy.hp, 100 - 14 - 14, "Last Resort pays +6 on every Attack while Critical")
+	_expect(player.stance != null and player.stance.data.id == "last_resort", "...and is never spent - it has no charges")
 	var nail: TrinketData = load(BENT_NAIL_PATH)
 	nail.apply_combat_start(player.statuses)
 	enemy.hp = 100
 	_play(BITE_DOWN_PATH, player, enemy)
 	_play(BITE_DOWN_PATH, player, enemy)
-	_expect_eq(enemy.hp, 100 - 14 - 11, "Beside Keen: 8 + 3 + 3, then 8 + 3")
-	_expect(Status.find_in(player.statuses, dying_light) != null, "...Dying Light still up")
+	_expect_eq(enemy.hp, 100 - 17 - 14, "Beside Keen: 8 + 6 + 3, then 8 + 6")
+	_expect(player.stance != null and player.stance.data.id == "last_resort", "...Last Resort still up")
 	_completed += 1
 
 func _check_frayed_cord_self_loss() -> void:

@@ -225,7 +225,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.grace_changed.connect(func(_grace: int) -> void: _push_bonus_context())
 	battle_controller.hp_changed.connect(func(_current: int, _max_hp: int) -> void: _push_bonus_context())
 	battle_controller.toll_changed.connect(func(_toll: int) -> void: _push_bonus_context())
-	# A power taken (Dying Light) moves every Attack's printed damage.
+	# A status taken (Keen, a keepsake's) moves every Attack's printed damage.
 	battle_controller.status_changed.connect(func() -> void: _push_bonus_context())
 	# The armed card's damage reads against the enemy under the cursor.
 	battle_controller.hovered_enemy_changed.connect(_on_hovered_enemy_changed)

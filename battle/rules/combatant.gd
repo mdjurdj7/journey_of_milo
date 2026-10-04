@@ -43,6 +43,12 @@ var toll: int:
 			_local_toll = value
 var energy: int = 0
 var max_energy: int = 3
+
+# The Energy a turn starts with: the refill, plus what a status adds for
+# a turn begun Critical (Dying Light) - Critical judged now, as it
+# refills (BattleController._start_player_turn()).
+func turn_start_energy() -> int:
+	return max_energy + Status.turn_start_energy(statuses, is_critical())
 # Grace: HP an enemy took that this player can still take back, and how
 # many of their turns are left to do it in. Per FIGHT, not per run - a
 # Combatant is rebuilt by BattleController.setup() every battle, so

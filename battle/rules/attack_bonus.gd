@@ -2,7 +2,7 @@ extends RefCounted
 class_name AttackBonus
 
 # The flat extra damage ONE Attack card deals: the stance's bonus plus
-# every status's (Self-Eater, Last Resort, Dying Light), each gated on
+# every status's (Self-Eater, Last Resort, Keen), each gated on
 # Critical where its data says so. Once per Attack card, not per hit or
 # per damage effect - EffectContext.take_attack_bonus() hands it to the
 # card's first damage effect and nothing after. The resolver and the card

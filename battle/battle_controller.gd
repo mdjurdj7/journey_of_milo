@@ -798,7 +798,10 @@ func _all_living_simultaneous() -> bool:
 
 func _start_player_turn() -> void:
 	player.block = 0
-	player.energy = player.max_energy
+	# The refill, and Dying Light's 1 if the turn begins Critical - judged
+	# here, before any tick, so entering Critical later gives nothing
+	# until the next turn starts.
+	player.energy = player.turn_start_energy()
 	cards_played_this_turn = 0
 	# A fresh turn for every interrupt threshold.
 	player.damage_taken_this_turn = 0

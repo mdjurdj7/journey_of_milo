@@ -152,14 +152,13 @@ func _check_hurried_to_zero_resolves_now() -> void:
 	_expect_eq(_label_of(enemy, "sentence"), "", "...and Sentence is gone")
 	_completed += 1
 
-# The 40 is no Attack: no attack bonus from a stance or Dying Light, even
-# Critical, where both would pay.
+# The 40 is no Attack: no attack bonus from a stance, even Critical,
+# where Last Resort would pay.
 func _check_not_an_attack() -> void:
 	var player: Combatant = _player()
 	player.hp = 15
-	_play("dying_light", player, [Combatant.new(100)])
-	_play("self_eater", player, [Combatant.new(100)])
-	_expect(AttackBonus.for_player(player, player.hp) > 0, "Critical under Dying Light and Self-Eater, an Attack would get more (%d)" % AttackBonus.for_player(player, player.hp))
+	_play("last_resort", player, [Combatant.new(100)])
+	_expect(AttackBonus.for_player(player, player.hp) > 0, "Critical under Last Resort, an Attack would get more (%d)" % AttackBonus.for_player(player, player.hp))
 	var enemy := Combatant.new(100)
 	_play("sentence", player, [enemy])
 	var data: EnemyData = _defender()

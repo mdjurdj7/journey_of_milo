@@ -15,7 +15,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	# blocked twice.
 	var base: int = CardBonus.resolved_value(effect, ctx)
 
-	# The attack bonus (stance, Dying Light) is part of the attack's own
+	# The attack bonus (stance, Keen) is part of the attack's own
 	# number, so it goes in BEFORE the status modifiers - a status that
 	# scales outgoing damage scales the whole blow, bonus included, rather
 	# than only the part the card authored. Taken once per card: a second

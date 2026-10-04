@@ -13,7 +13,7 @@ extends SceneTree
 
 const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
-const CASES := 14
+const CASES := 13
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
@@ -85,7 +85,6 @@ func _initialize() -> void:
 	_check_blood_arc_basics()
 	_check_blood_arc_order()
 	_check_blood_arc_self_eater()
-	_check_blood_arc_dying_light()
 	_check_blood_arc_last_resort()
 	_check_with_regards()
 	_check_starting_deck()
@@ -294,33 +293,6 @@ func _check_blood_arc_self_eater() -> void:
 	_expect_eq(player.toll, 5, "...all Toll")
 	_expect_eq(enemies[0].hp, 88, "Self-Eater +3 on Blood Arc: 12")
 	_expect_eq(enemies[1].hp, 88, "...to every enemy")
-
-	# Self-Eater and Blood Arc together pay 26 -> 21 into Critical, where
-	# Dying Light lights for the blow.
-	player = _player(26)
-	_play_into(_card("dying_light"), player, [Combatant.new(100)])
-	_play_into(_card("self_eater"), player, [Combatant.new(100)])
-	enemies = [Combatant.new(100), Combatant.new(100)]
-	_play_into(card, player, enemies)
-	_expect_eq(player.hp, 21, "26 - 2 - 3 = 21")
-	_expect_eq(enemies[0].hp, 85, "Self-Eater + Dying Light paid into: 9 + 3 + 3")
-	_expect_eq(enemies[1].hp, 85, "...to every enemy")
-	_completed += 1
-
-func _check_blood_arc_dying_light() -> void:
-	var card: CardData = _card("blood_arc")
-	var player: Combatant = _player(24)
-	_play_into(_card("dying_light"), player, [Combatant.new(100)])
-	var enemies: Array[Combatant] = [Combatant.new(100), Combatant.new(100)]
-	_play_into(card, player, enemies)
-	_expect_eq(enemies[0].hp, 88, "Blood Arc pays 24 -> 21, Dying Light +3: 12")
-	_expect_eq(enemies[1].hp, 88, "...to every enemy")
-
-	player = _player(30)
-	_play_into(_card("dying_light"), player, [Combatant.new(100)])
-	enemies = [Combatant.new(100)]
-	_play_into(card, player, enemies)
-	_expect_eq(enemies[0].hp, 91, "30 -> 27 stays above: no Dying Light")
 	_completed += 1
 
 func _check_blood_arc_last_resort() -> void:

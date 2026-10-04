@@ -1447,7 +1447,7 @@ func _upfront_hp_cost() -> int:
 # The attack bonus one half of the face prints. On a card whose damage is
 # conditional on Critical, each half is read in its own state - the {if}
 # half as if Critical, the {else} half as if not - so neither inherits a
-# bonus (Last Resort, Dying Light) that needs the other. Any other card
+# bonus (Last Resort) that needs the other. Any other card
 # prints the bonus as it stands (_attack_bonus_preview()).
 func _attack_bonus_for_half(conditional_half: bool) -> int:
 	if _bonus_context == null or _bonus_context.player == null:

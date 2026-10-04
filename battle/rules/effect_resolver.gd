@@ -134,11 +134,15 @@ static func has_target(card: CardData, enemies: Array[Combatant]) -> bool:
 			return true
 	return false
 
+# Also a card applying a status the player already holds that allows one
+# at a time (StatusData.blocks_reapply_while_held - Dying Light).
 static func card_blocked(card: CardData, player: Combatant) -> bool:
 	if card == null or player == null:
 		return false
 	for effect in card.effects:
 		if effect != null and effect.effect_type == CardEffect.EffectType.SPEND_TOLL and player.toll < effect.toll_cost:
+			return true
+		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS and effect.status_data != null and effect.status_data.blocks_reapply_while_held and Status.find_in(player.statuses, effect.status_data) != null:
 			return true
 	return false
 

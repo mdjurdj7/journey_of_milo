@@ -113,6 +113,7 @@ func describe(holder: Combatant = null) -> String:
 		"min_cost": data.replaces_cost_at_least,
 		"alone_bonus": data.grants_when_alone.attack_damage_bonus if data.grants_when_alone != null else 0,
 		"reduction": data.next_card_cost_reduction * stack_count,
+		"energy": data.turn_start_energy_while_critical,
 	}
 	if holder != null:
 		values["survive_hp"] = data.survive_hp(holder.max_hp, holder.critical_hp_fraction)
@@ -168,6 +169,17 @@ static func find_in(statuses: Array[Status], status_data: StatusData) -> Status:
 			return active
 	return null
 
+# The Energy `statuses` add at the start of a turn begun Critical (or
+# not - `critical`): StatusData.turn_start_energy_while_critical, summed.
+static func turn_start_energy(statuses: Array[Status], critical: bool) -> int:
+	if not critical:
+		return 0
+	var total: int = 0
+	for active in statuses:
+		if active.data != null:
+			total += active.data.turn_start_energy_while_critical
+	return total
+
 # The status that skips its holder's next turn (StatusData.skips_next_
 # turn - Denied), or null.
 static func skip_turn_status(statuses: Array[Status]) -> Status:
@@ -222,8 +234,7 @@ static func attack_bonus(statuses: Array[Status], critical: bool) -> int:
 # bonus()): every status whose bonus that paid and that counts charges -
 # "+3 on your next Attack" - spends one, and goes at 0. The same gate as
 # attack_bonus() above, so a bonus that waits for Critical spends nothing
-# while it isn't paid. A status without charges (Dying Light) is never
-# touched.
+# while it isn't paid. A status without charges is never touched.
 static func spend_attack_bonus_charges(statuses: Array[Status], critical: bool) -> void:
 	for active in statuses.duplicate():
 		if active.data == null or active.data.attack_damage_bonus == 0 or not active.has_charges():

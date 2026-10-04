@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the three in the belongings pool, and Endure, which no pool offers. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 923bfdb",
+    "generated": "2026-10-04, from the live data at 08d0bce plus the new Dying Light",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -172,7 +172,7 @@
       },
       {
         "name": "Attack bonus",
-        "rule": "Flat extra damage from the stance (x stacks) and Dying Light, paid once per Attack card on its first damage effect - Reckoning included."
+        "rule": "Flat extra damage from the stance (x stacks) and a keepsake's status (Keen), paid once per Attack card on its first damage effect - Reckoning included."
       },
       {
         "name": "Marks (Come Due)",
@@ -292,7 +292,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus Dying Light (+3 per stack while Critical). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -353,7 +353,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus Dying Light (+3 per stack while Critical). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -472,7 +472,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus Dying Light (+3 per stack while Critical). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -674,7 +674,7 @@
         },
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus Dying Light (+3 per stack while Critical). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -884,15 +884,15 @@
       "face_type_label": "POWER",
       "energy_cost": 1,
       "rarity": "RARE",
-      "card_text": "While Critical, your Attacks deal 3 more damage.",
+      "card_text": "While Critical, gain 1 Energy at the start of your turn.",
       "face_hp_line": null,
-      "card_text_template": "While Critical, your Attacks deal 3 more damage.",
+      "card_text_template": "While Critical, gain 1 Energy at the start of your turn.",
       "targeting": "self",
       "removal_after_play": "leaves rotation for the rest of the fight (stances and powers always do)",
       "effects": [
         {
           "type": "APPLY_STATUS",
-          "plain_english": "Apply Dying Light to yourself: While Critical, your Attacks deal 3 more damage."
+          "plain_english": "Apply Dying Light to yourself: While Critical, gain 1 Energy at the start of your turn."
         }
       ],
       "keywords": [
@@ -910,17 +910,17 @@
       "power_effect": {
         "id": "dying_light",
         "name": "Dying Light",
-        "description": "While Critical, your Attacks deal 3 more damage.",
+        "description": "While Critical, gain 1 Energy at the start of your turn.",
         "file_path": "res://battle/rules/statuses/dying_light.tres",
         "duration": "until removed (rest of combat unless spent)",
         "stack_rule": "IGNORE",
         "applied_to": "self",
-        "attack_damage_bonus_per_stack": 3,
-        "bonus_requires_critical": true
+        "turn_start_energy_while_critical": 1,
+        "one_at_a_time": true
       },
       "status_effect": null,
       "critical_condition": {
-        "rule": "Bonus applies only while Critical (HP at or below 30% of max), switching on and off live."
+        "rule": "Judged at the start of your turn, as Energy refills: Critical then (HP at or below 30% of max) gives the extra Energy; entering Critical later in the turn gives nothing until the next turn starts."
       },
       "dynamic_values": [
         {
@@ -1127,7 +1127,7 @@
         },
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus Dying Light (+3 per stack while Critical). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -1399,7 +1399,7 @@
         },
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus Dying Light (+3 per stack while Critical). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -1653,7 +1653,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus Dying Light (+3 per stack while Critical). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -1903,7 +1903,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus Dying Light (+3 per stack while Critical). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -2020,7 +2020,7 @@
         },
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus Dying Light (+3 per stack while Critical). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {

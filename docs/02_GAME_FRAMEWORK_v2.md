@@ -50,7 +50,7 @@ Multi-enemy encounters are a cluster sharing one contact zone; all members stand
 
 **Stances** are a card type: ongoing per-combat effects, one stance type active at a time. Another copy of the stance already held adds a stack, and its numbers scale with stacks (Self-Eater ×2: Attacks deal 6 more and cost 4 HP). A different stance removes every stack of the old one and starts at 1. A played stance card leaves the deck's rotation for the rest of the fight, so each stack is one physical copy. Self-Eater: your Attacks deal 3 more and cost 2 HP (the HP loss is self-inflicted and makes Toll). Last Resort: while Critical, your Attacks deal 6 more; you cannot gain Block.
 
-**Powers** are a card type: a lasting per-combat effect that is not a stance. Powers coexist with the stance and with each other, and a played Power leaves the deck's rotation for the rest of the fight. Dying Light (stacks); Refuse the End (once per combat, never re-armed).
+**Powers** are a card type: a lasting per-combat effect that is not a stance. Powers coexist with the stance and with each other, and a played Power leaves the deck's rotation for the rest of the fight. Dying Light (one at a time: while it's held, another copy can't be played); Refuse the End (once per combat, never re-armed).
 
 **Block** absorbs before HP; **absorb** persists longer. If an HP-adjacent mechanic must be cut for complexity, absorb goes before Grace.
 

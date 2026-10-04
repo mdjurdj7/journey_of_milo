@@ -8,7 +8,7 @@ class_name TollDamageEffect
 # Toll spent here.
 #
 # Reckoning is an Attack, so the attack bonus (AttackBonus - stance,
-# Dying Light) lands on it once, as on any damage effect, before the
+# Keen) lands on it once, as on any damage effect, before the
 # status modifiers - with no Toll at all the blow is the bonus alone.
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	var consumed: int = ctx.spend_toll(ctx.player.toll)

@@ -130,6 +130,17 @@ const DURATION_UNTIL_TRIGGERED := -2
 # targeted by another card applying it (BattleController).
 @export var skips_next_turn: bool = false
 
+# Energy its holder gains at the start of each of their turns, on top of
+# the refill, if they are Critical at that moment (Dying Light) - judged
+# as the Energy refills (Combatant.turn_start_energy()); entering Critical
+# later in the turn gives nothing until the next one starts. 0 = none.
+@export var turn_start_energy_while_critical: int = 0
+
+# While its holder has it, a card that applies it can't be played - the
+# face fades like an unplayable one (EffectResolver.card_blocked()) - so
+# it never stacks: one at a time (Dying Light).
+@export var blocks_reapply_while_held: bool = false
+
 # The mirror of consumed_by_own_attack, for a status on the one being
 # attacked: spent once an enemy ATTACK against its holder has resolved -
 # after every hit of it, so a status that softens that attack (No Further)

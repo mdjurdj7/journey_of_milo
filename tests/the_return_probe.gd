@@ -167,14 +167,13 @@ func _check_heal_capped_at_max_hp() -> void:
 	_expect_eq(player.hp, MAX_HP, "The heal stops at max HP (70 - 5 + 5, not + 10)")
 	_completed += 1
 
-# Self-Eater's bonus, Dying Light's at Critical, Keen's charge: none of it
-# lands on a Drain, and none of it is spent by one.
+# Self-Eater's bonus and Keen's charge: none of it lands on a Drain, and
+# none of it is spent by one.
 func _check_not_an_attack() -> void:
 	var player: Combatant = _armed(20)
 	_play(_card("self_eater"), player, [_enemy(100)])
-	_play(_card("dying_light"), player, [_enemy(100)])
 	Status.apply_to(player.statuses, load(KEEN_PATH) as StatusData)
-	_expect(AttackBonus.for_player(player, player.hp) > 0, "Self-Eater, Dying Light and Keen are up, and an Attack would get a bonus")
+	_expect(AttackBonus.for_player(player, player.hp) > 0, "Self-Eater and Keen are up, and an Attack would get a bonus")
 	var enemy: Combatant = _enemy(100)
 	_losses(player, [enemy], COUNT)
 	_expect_eq(enemy.hp, 90, "...but the Drain deals 10 flat")

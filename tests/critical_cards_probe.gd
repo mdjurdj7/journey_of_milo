@@ -126,25 +126,30 @@ func _check_last_wager_bonus() -> void:
 
 	player = _player(25)
 	_play(_card("last_resort"), player, null)
-	_play(_card("dying_light"), player, null)
-	_expect_eq(_deal(card, player), 16, "Last Wager at 25 under Last Resort + Dying Light: no Critical bonus yet")
+	_expect_eq(_deal(card, player), 16, "Last Wager at 25 under Last Resort: no Critical bonus yet")
 	_expect_eq(player.hp, 21, "...Critical only after")
-	_expect_eq(_deal(card, player), 35, "Last Wager at 21 under both: 26 + 6 + 3")
+	_expect_eq(_deal(card, player), 32, "Last Wager at 21 under Last Resort: 26 + 6")
 	_expect_eq(player.hp, 17, "...then loses 4 HP")
 	_completed += 1
 
+# Dying Light is Energy now, not damage: Critical at a turn's start gives
+# 1 more (Combatant.turn_start_energy()), nothing above the line; it adds
+# no attack bonus; and a second copy can't be played while it's held.
+# The fight itself (the refill, entering Critical mid-turn, the faded
+# face) is dying_light_probe's.
 func _check_dying_light() -> void:
 	var power: CardData = _card("dying_light")
 	var cornered: CardData = _card("cornered")
 	var player: Combatant = _player(50)
+	_expect_eq(player.turn_start_energy(), 3, "No Dying Light: a turn starts on 3")
 	_play(power, player, null)
-	_expect_eq(_deal(cornered, player), 8, "Dying Light off above the line")
+	_expect_eq(player.turn_start_energy(), 3, "Dying Light above the line: still 3")
 	player.hp = 20
-	_expect_eq(_deal(cornered, player), 19, "Dying Light +3 while Critical")
-	_play(power, player, null)
-	_expect_eq(_deal(cornered, player), 22, "Two Dying Lights +6")
-	player.hp = 40
-	_expect_eq(_deal(cornered, player), 8, "Dying Light off again once HP climbs back")
+	_expect_eq(player.turn_start_energy(), 4, "Dying Light while Critical: 4")
+	_expect_eq(_deal(cornered, player), 16, "...and no attack bonus: Cornered's Critical 16, nothing added")
+	_expect(EffectResolver.card_blocked(power, player), "A second Dying Light can't be played while one is held")
+	_expect_eq(Status.new(load("res://battle/rules/statuses/dying_light.tres") as StatusData).describe(), "While Critical, gain 1 Energy at the start of your turn.", "Its readout line matches the card")
+	_expect_eq(power.description, "While Critical, gain 1 Energy at the start of your turn.", "...and the card says so")
 	_completed += 1
 
 func _check_last_resort() -> void:
@@ -163,7 +168,7 @@ func _check_last_resort() -> void:
 	_play(_card("unbroken"), player, null)
 	_expect_eq(player.block, 5, "No Block gained under Last Resort")
 	_play(_card("dying_light"), player, null)
-	_expect_eq(_deal(cornered, player), 31, "Last Resort ×2 and Dying Light together")
+	_expect_eq(_deal(cornered, player), 28, "Dying Light beside Last Resort ×2 adds no damage")
 	_play(_card("self_eater"), player, null)
 	_expect_eq(player.stance.data.id, "self_eater", "Self-Eater replaces Last Resort")
 	_expect_eq(player.stance.stacks, 1, "...every stack of it gone, Self-Eater at 1")
@@ -181,12 +186,11 @@ func _check_last_resort() -> void:
 	_expect_eq(player.toll, 4, "...and makes 4 Toll")
 	_completed += 1
 
-# A two-hit Attack under Last Resort + Dying Light at Critical takes the
-# bonus once, on its first damage effect.
+# A two-hit Attack under Last Resort at Critical takes the bonus once, on
+# its first damage effect.
 func _check_bonus_once_per_card() -> void:
 	var player: Combatant = _player(20)
 	_play(_card("last_resort"), player, null)
-	_play(_card("dying_light"), player, null)
 	var card := CardData.new()
 	card.card_type = CardData.CardType.ATTACK
 	for i in 2:
@@ -194,7 +198,7 @@ func _check_bonus_once_per_card() -> void:
 		hit.effect_type = CardEffect.EffectType.DAMAGE
 		hit.value = 5
 		card.effects.append(hit)
-	_expect_eq(_deal(card, player), 19, "Two-hit Attack: 5 + 9 bonus + 5")
+	_expect_eq(_deal(card, player), 16, "Two-hit Attack: 5 + 6 bonus + 5")
 	_completed += 1
 
 # Refuse the End: an enemy's lethal hit on a player who was Critical
@@ -355,9 +359,8 @@ func _check_reckoning() -> void:
 
 	player = _player(20)
 	_play(_card("last_resort"), player, null)
-	_play(_card("dying_light"), player, null)
 	player.toll = 4
-	_expect_eq(_deal(card, player), 13, "Reckoning at Critical: 4 + 6 + 3")
+	_expect_eq(_deal(card, player), 10, "Reckoning at Critical: 4 + 6")
 	player.toll = 4
 	player.hp = 40
 	_expect_eq(_deal(card, player), 4, "Reckoning above the line: Toll only")
@@ -369,15 +372,14 @@ func _check_reckoning() -> void:
 func _check_faces() -> void:
 	var player: Combatant = _player(20)
 	_play(_card("last_resort"), player, null)
-	_play(_card("dying_light"), player, null)
 	var face: String = await _face("cornered", player)
 	_expect(face.contains("Deal 8 damage"), "Cornered's {else} half without Critical bonuses: " + face)
-	_expect(face.contains("deal 25"), "Cornered's {if} half with them (16 + 6 + 3): " + face)
+	_expect(face.contains("deal 22"), "Cornered's {if} half with them (16 + 6): " + face)
 
 	player.hp = 25
 	face = await _face("last_wager", player)
 	_expect(face.begins_with("Deal 16 damage"), "Last Wager's {else} half, first: " + face)
-	_expect(face.contains("deal 35"), "Last Wager's {if} half (26 + 6 + 3): " + face)
+	_expect(face.contains("deal 32"), "Last Wager's {if} half (26 + 6): " + face)
 	_expect(face.ends_with("Then lose 4 HP."), "Last Wager's HP line, last, after the blow: " + face)
 	_expect_eq(await _face_state("last_wager", player), CardBonus.State.DORMANT, "Last Wager's face DORMANT at 25")
 	player.hp = 21

@@ -52,6 +52,7 @@ trinket_probe 35
 collateral_probe 29
 bide_probe 30
 deny_probe 40
+dying_light_probe 40
 leverage_probe 29
 glassbone_probe 27
 ransom_probe 26
@@ -79,7 +80,7 @@ area_probes() {
 		cards) echo "starter_cards card_rarity" ;;
 		face) echo "starter_cards keyword come_due come_due_face critical_cards" ;;
 		keywords) echo "keyword starter_cards the_return" ;;
-		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny" ;;
+		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light" ;;
 		enemies) echo "blackback siltjaw wardling sentence no_further critical_cards kill_order armored_contact deny" ;;
 		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact" ;;
 		floor1) echo "kill_order drain" ;;
@@ -93,7 +94,7 @@ area_probes() {
 		# The fight's own UI: every probe that plays a real fight (which
 		# builds the battle overlay and its hand), plus the rules probes
 		# whose readouts and faces it shows.
-		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny" ;;
+		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light" ;;
 		*) return 1 ;;
 	esac
 }
