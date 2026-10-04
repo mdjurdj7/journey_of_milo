@@ -70,17 +70,30 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 # From the last line's bottom edge to WALK ON's baseline, before any push
 # clear of the Wanderer.
 @export var dismiss_gap_px: float = 72.0
+# The furthest WALK ON drops below the last line to clear the Wanderer.
+@export var dismiss_max_drop_px: float = 120.0
 @export_group("")
 
 @export_group("Card Choice")
 # The cards: a level row, no container, positioned outright under the
-# Column control (see _open_choice()) - equal size, no rotation, centred
-# on the viewport's width with the row's centre line at choice_row_
-# centre_fraction of its height. TAKE ONE sits above the row (baseline
-# reward_header_gap above the cards' top edge), NONE OF THESE below it
-# (reward_decline_gap of clear space under the cards' bottom edge, and
-# never over the Wanderer - see _decline_top()), both centred on the row,
-# both in the tracked caps the loot window's choices use.
+# Column control (see _layout_choice()) - equal size, no rotation, at
+# choice_card_scale with card_gap_fraction of a card's width between
+# them, centred on the viewport's width with the row's centre line at
+# choice_row_centre_fraction of its height. TAKE ONE sits above the row
+# (baseline reward_header_gap above the cards' top edge), NONE OF THESE
+# below it (reward_decline_gap of clear space under the cards' bottom
+# edge - room for a hovered card's growth and its keyword's definition -
+# dropping further only to clear the Wanderer, and never past twice that
+# gap - see _decline_top()), both centred on the row, both in the
+# tracked caps the loot window's choices use. While the choice is open
+# the scrim deepens to choice_scrim_alpha, so the cards are the
+# foreground; the list keeps scrim_color.
+#
+# Every size here is at 1080p. The whole offer - cards, gaps, labels -
+# scales by one fit factor: the window's height over choice_reference_
+# height, held lower where the row would pass choice_max_width_fraction
+# of the width or the offer choice_max_height_fraction of the height
+# (_choice_fit()), so it stays centred and whole at any window size.
 #
 # NONE OF THESE and the three cards are one focus set in the title
 # menu's language: the decline line in the utility grey at rest, full
@@ -92,12 +105,47 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 # Nothing is focused until the mouse or a key says so.
 @export var choice_header_text: String = "TAKE ONE"
 @export var choice_count: int = 3
-@export var card_gap_px: float = 26.0
-@export_range(0.0, 1.0) var choice_row_centre_fraction: float = 0.46
-@export var reward_header_gap: float = 40.0
-@export var reward_decline_gap: float = 60.0
+@export_range(1.0, 2.2) var choice_card_scale: float = 1.7:
+	set(value):
+		choice_card_scale = value
+		_relayout_choice()
+@export_range(0.0, 1.0) var card_gap_fraction: float = 0.33:
+	set(value):
+		card_gap_fraction = value
+		_relayout_choice()
+@export_range(0.0, 1.0) var choice_row_centre_fraction: float = 0.46:
+	set(value):
+		choice_row_centre_fraction = value
+		_relayout_choice()
+@export var reward_header_gap: float = 48.0:
+	set(value):
+		reward_header_gap = value
+		_relayout_choice()
+@export var reward_decline_gap: float = 100.0:
+	set(value):
+		reward_decline_gap = value
+		_relayout_choice()
+@export_range(0.0, 1.0) var choice_scrim_alpha: float = 0.62:
+	set(value):
+		choice_scrim_alpha = value
+		_apply_scrim()
+@export var choice_reference_height: float = 1080.0:
+	set(value):
+		choice_reference_height = value
+		_relayout_choice()
+@export_range(0.1, 1.0) var choice_max_width_fraction: float = 0.9:
+	set(value):
+		choice_max_width_fraction = value
+		_relayout_choice()
+@export_range(0.1, 1.0) var choice_max_height_fraction: float = 0.92:
+	set(value):
+		choice_max_height_fraction = value
+		_relayout_choice()
 @export var choice_dismiss_text: String = "NONE OF THESE"
-@export var choice_label_size_px: int = 22
+@export var choice_label_size_px: int = 22:
+	set(value):
+		choice_label_size_px = value
+		_relayout_choice()
 @export_range(0.0, 1.0) var choice_label_tracking_em: float = 0.16
 # The title menu's unfocused item: CardView's keyline_utility.
 @export var choice_unfocused_color: Color = Color(0.58, 0.58, 0.60, 1.0)
@@ -106,8 +154,8 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 @export var choice_hairline_thickness_px: float = 1.0
 # Where NONE OF THESE or WALK ON would cross the Wanderer's projected
 # silhouette, it drops to this far below his feet - never up, and never
-# more than reward_decline_gap x 2 below the row or the last line (see
-# _below_wanderer()).
+# further than twice reward_decline_gap below the row, or dismiss_max_
+# drop_px below the last line (see _below_wanderer()).
 @export var decline_wanderer_clearance_px: float = 16.0
 # His height, for the projected silhouette the decline line must clear.
 @export var wanderer_height_m: float = 1.8
@@ -171,6 +219,12 @@ var _taking_card: bool = false
 # The card row's rect in Column pixels while a choice is open - what the
 # choice header, its dismiss and the dismiss hit-test hang off.
 var _choice_row: Rect2 = Rect2()
+# The open choice's fit factor (_choice_fit()) and what it makes of the
+# 1080p sizes: the labels' pixel size and the two gaps.
+var _choice_fit_scale: float = 1.0
+var _choice_label_px: int = 22
+var _header_gap_px: float = 48.0
+var _decline_gap_px: float = 100.0
 
 var _draw_layer: Control = null
 var _scrim: ColorRect = null
@@ -234,6 +288,8 @@ func _ready() -> void:
 	_draw_layer.gui_input.connect(_on_gui_input)
 	_draw_layer.draw.connect(_draw_column)
 	add_child(_draw_layer)
+	# A window resized under an open choice lays it out again.
+	_draw_layer.resized.connect(_relayout_choice)
 
 	_build_lines()
 
@@ -288,11 +344,11 @@ func _walk_on_label_left() -> float:
 	return roundf(_column_left() + (column_width - InkType.width(_dismiss_font, dismiss_text, dismiss_size_px)) / 2.0)
 
 # dismiss_gap_px under the last line (to the baseline), pushed below the
-# Wanderer where it would cross him, never more than reward_decline_gap
-# x 2 below the last line.
+# Wanderer where it would cross him, never more than dismiss_max_drop_px
+# below the last line.
 func _walk_on_top() -> float:
 	var bottom: float = _last_line_bottom()
-	return _below_wanderer(bottom + dismiss_gap_px - float(dismiss_size_px), float(dismiss_size_px) * 1.3, bottom + reward_decline_gap * 2.0)
+	return _below_wanderer(bottom + dismiss_gap_px - float(dismiss_size_px), float(dismiss_size_px) * 1.3, bottom + dismiss_max_drop_px)
 
 # WALK ON's hit rect: the label and the hairline's room to its left.
 func _walk_on_rect() -> Rect2:
@@ -405,21 +461,21 @@ func _draw_hairline(label_left: float, baseline: float, size_px: int) -> void:
 	_draw_layer.draw_rect(Rect2(hairline_left, mid - choice_hairline_thickness_px * 0.5, choice_hairline_length_px, choice_hairline_thickness_px), bone)
 
 func _draw_choice() -> void:
-	var width: float = InkType.width(_choice_font, choice_header_text, choice_label_size_px)
-	var baseline: float = _choice_row.position.y - reward_header_gap
-	_text(_choice_font, choice_header_text, Vector2(_choice_row.position.x + (_choice_row.size.x - width) / 2.0, baseline), choice_label_size_px, bone)
+	var width: float = InkType.width(_choice_font, choice_header_text, _choice_label_px)
+	var baseline: float = roundf(_choice_row.position.y - _header_gap_px)
+	_text(_choice_font, choice_header_text, Vector2(roundf(_choice_row.position.x + (_choice_row.size.x - width) / 2.0), baseline), _choice_label_px, bone)
 
 	var focused: bool = _choice_focus == _decline_index()
 	var label_left: float = _decline_label_left()
-	var decline_baseline: float = _decline_top_px + float(choice_label_size_px)
-	_text(_choice_font, choice_dismiss_text, Vector2(label_left, decline_baseline), choice_label_size_px, bone if focused else choice_unfocused_color)
+	var decline_baseline: float = _decline_top_px + float(_choice_label_px)
+	_text(_choice_font, choice_dismiss_text, Vector2(label_left, decline_baseline), _choice_label_px, bone if focused else choice_unfocused_color)
 	if focused:
-		_draw_hairline(label_left, decline_baseline, choice_label_size_px)
+		_draw_hairline(label_left, decline_baseline, _choice_label_px)
 
 # The decline label is centred on the row; its hairline hangs off to the
 # left of that.
 func _decline_label_left() -> float:
-	var label_width: float = InkType.width(_choice_font, choice_dismiss_text, choice_label_size_px)
+	var label_width: float = InkType.width(_choice_font, choice_dismiss_text, _choice_label_px)
 	return roundf(_choice_row.position.x + (_choice_row.size.x - label_width) / 2.0)
 
 # The decline line's hit rect: the label and the hairline's room to its
@@ -427,13 +483,14 @@ func _decline_label_left() -> float:
 func _decline_rect() -> Rect2:
 	var label_left: float = _decline_label_left()
 	var left: float = label_left - choice_hairline_gap_px - choice_hairline_length_px
-	var right: float = label_left + InkType.width(_choice_font, choice_dismiss_text, choice_label_size_px)
-	return Rect2(left, _decline_top_px, right - left, float(choice_label_size_px) * 1.3)
+	var right: float = label_left + InkType.width(_choice_font, choice_dismiss_text, _choice_label_px)
+	return Rect2(left, _decline_top_px, right - left, float(_choice_label_px) * 1.3)
 
-# reward_decline_gap under the row, kept clear of the Wanderer.
+# reward_decline_gap (fitted) under the row, kept clear of the Wanderer -
+# only within the space under the row, never back up onto the cards.
 func _decline_top() -> float:
 	var bottom: float = _choice_row.end.y
-	return _below_wanderer(bottom + reward_decline_gap, float(choice_label_size_px) * 1.3, bottom + reward_decline_gap * 2.0)
+	return _below_wanderer(bottom + _decline_gap_px, float(_choice_label_px) * 1.3, bottom + _decline_gap_px * 2.0)
 
 # A line of caps `line_height` tall, wanted at `top`: where it would cross
 # the Wanderer's projected silhouette (feet to wanderer_height_m, grown by
@@ -630,15 +687,6 @@ func _open_choice() -> void:
 		push_warning("RewardScreen: could not load %s; skipping the choice." % CARD_VIEW_SCENE_PATH)
 		_finish_card_line()
 		return
-	var reference := scene.instantiate() as CardView
-	var card_size: Vector2 = reference.card_size
-	reference.free()
-
-	# Whole pixels, so the card faces don't land on half-pixel edges.
-	var span: float = float(rolled.size()) * card_size.x + float(rolled.size() - 1) * card_gap_px
-	var start_x: float = roundf((_draw_layer.size.x - span) / 2.0)
-	var top: float = roundf(_draw_layer.size.y * choice_row_centre_fraction - card_size.y * 0.5)
-	_choice_row = Rect2(start_x, top, span, card_size.y)
 	for index in rolled.size():
 		var card_view := scene.instantiate() as CardView
 		# Hover grows the card in place, about its own centre, and moves
@@ -646,11 +694,10 @@ func _open_choice() -> void:
 		# measured from its rest offset - here rest IS the row), and the
 		# pivot set AFTER add_child(), since CardView._ready() puts a
 		# hover-enabled card's pivot at its bottom centre for the hand.
+		# Placed and scaled by _layout_choice(), below.
 		card_view.hover_lift = 0.0
-		card_view.position = Vector2(start_x + float(index) * (card_size.x + card_gap_px), top)
 		_draw_layer.add_child(card_view)
-		card_view.set_rest_offset(top)
-		card_view.pivot_offset = card_size / 2.0
+		card_view.pivot_offset = card_view.card_size / 2.0
 		card_view.set_card_data(rolled[index])
 		# The choice is an inspection: its keywords define themselves on
 		# hover.
@@ -661,8 +708,74 @@ func _open_choice() -> void:
 		_card_views.append(card_view)
 	_choice_focus = -1
 	_decline_hovered = false
+	_layout_choice()
+	_apply_scrim()
+
+# The open choice laid out for the window it's in: the fit factor, the
+# cards placed and scaled (their base scale, so a hover grows from it),
+# the labels' size and gaps, and NONE OF THESE's place. Whole pixels,
+# so the card faces don't land on half-pixel edges.
+func _layout_choice() -> void:
+	if _card_views.is_empty() or _draw_layer == null:
+		return
+	var card_size: Vector2 = _card_views[0].card_size
+	var count: int = _card_views.size()
+	_choice_fit_scale = _choice_fit(card_size, count)
+	var card_scale: float = choice_card_scale * _choice_fit_scale
+	var card: Vector2 = card_size * card_scale
+	var gap: float = card.x * card_gap_fraction
+	var span: float = float(count) * card.x + float(count - 1) * gap
+	var start_x: float = roundf((_draw_layer.size.x - span) / 2.0)
+	var top: float = roundf(_draw_layer.size.y * choice_row_centre_fraction - card.y * 0.5)
+	_choice_row = Rect2(start_x, top, span, card.y)
+	# A card scales about its centre (its pivot), so its control sits that
+	# far up and in from the rect the scaled face fills.
+	var pivot_shift: Vector2 = (card_size * 0.5) * (card_scale - 1.0)
+	for index in count:
+		var card_view: CardView = _card_views[index]
+		if not is_instance_valid(card_view):
+			continue
+		var face_left: float = roundf(start_x + float(index) * (card.x + gap))
+		card_view.position = Vector2(face_left, top) + pivot_shift
+		card_view.set_rest_offset(card_view.position.y)
+		card_view.set_base_scale(card_scale)
+	_choice_label_px = maxi(roundi(float(choice_label_size_px) * _choice_fit_scale), 1)
+	_choice_font = InkType.tracked(InkType.text_bold_font(), _choice_label_px, choice_label_tracking_em)
+	_header_gap_px = reward_header_gap * _choice_fit_scale
+	_decline_gap_px = reward_decline_gap * _choice_fit_scale
 	_decline_top_px = _decline_top()
 	_draw_layer.queue_redraw()
+
+# The one factor the whole offer scales by: the window's height against
+# choice_reference_height, held lower where the row would be wider than
+# choice_max_width_fraction of the window, or the offer - TAKE ONE, its
+# gap, the row, NONE OF THESE at its furthest - taller than choice_max_
+# height_fraction of it.
+func _choice_fit(card_size: Vector2, count: int) -> float:
+	var window: Vector2 = _draw_layer.size
+	var fit: float = window.y / maxf(choice_reference_height, 1.0)
+	var card: Vector2 = card_size * choice_card_scale
+	var span: float = float(count) * card.x + float(count - 1) * card.x * card_gap_fraction
+	if span > 0.0:
+		fit = minf(fit, window.x * choice_max_width_fraction / span)
+	var stack: float = float(choice_label_size_px) + reward_header_gap + card.y + reward_decline_gap * 2.0 + float(choice_label_size_px) * 1.3
+	if stack > 0.0:
+		fit = minf(fit, window.y * choice_max_height_fraction / stack)
+	return maxf(fit, 0.01)
+
+func _relayout_choice() -> void:
+	if is_node_ready() and _mode == Mode.CHOICE and not _taking_card:
+		_layout_choice()
+
+# The scrim: deeper while the card choice is open, the list's own
+# otherwise.
+func _apply_scrim() -> void:
+	if _scrim == null:
+		return
+	var colour: Color = scrim_color
+	if _mode == Mode.CHOICE:
+		colour.a = choice_scrim_alpha
+	_scrim.color = colour
 
 func _on_choice_clicked(card_data: CardData, card_view: CardView) -> void:
 	if _taking_card:
@@ -704,6 +817,7 @@ func _finish_card_line() -> void:
 	_list_mouse_on = -1
 	_taking_card = false
 	_mode = Mode.LIST
+	_apply_scrim()
 	for line in _lines:
 		if line.id == "card":
 			line.taken = true
