@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://cqyaqofa8rbky" path="res://cards/art/Wanderer/Debt Forgiven.png" id="3_art"]
 
 [sub_resource type="Resource" id="E_toll_heal"]
 script = ExtResource("2_card_effect")
@@ -19,3 +20,4 @@ target_type = 1
 description = "Spend up to 20 Toll.
 {battle}Heal {toll_heal} HP.{/battle}{outside}Heal 1 HP per 2 Toll spent.{/outside}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_toll_heal")])
+art = ExtResource("3_art")

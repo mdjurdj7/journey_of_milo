@@ -42,7 +42,7 @@ const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # The cards with art, by file - the starters, Carve, Cornered, Hold Fast,
 # Come Due, No Further, Sentence, Last Wager, The Return, Blood Arc,
 # Collateral, Ransom, Leverage, Self-Eater, Unbroken, Small Price, Bide,
-# Deny, Refuse the End and With Regards.
+# Deny, Refuse the End, With Regards and Debt Forgiven.
 # Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
@@ -69,6 +69,7 @@ const CARD_ART: Dictionary = {
 	"deny": "res://cards/art/Wanderer/Deny.png",
 	"refuse_the_end": "res://cards/art/Wanderer/Refuse the End.png",
 	"with_regards": "res://cards/art/Wanderer/With Regards.png",
+	"debt_forgiven": "res://cards/art/Wanderer/Debt Forgiven.png",
 }
 
 var _failures: int = 0
