@@ -16,7 +16,7 @@ cost = 2
 card_type = 0
 target_type = 0
 description = "Spend all Toll.
-Deal {toll} damage."
+{battle}Deal {toll} damage.{/battle}{outside}Deal that much damage.{/outside}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_toll_damage")])
 battle_animation = &"Slash"
 art = ExtResource("9_art")

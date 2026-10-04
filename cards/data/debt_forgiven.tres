@@ -6,8 +6,8 @@
 [sub_resource type="Resource" id="E_toll_heal"]
 script = ExtResource("2_card_effect")
 effect_type = 20
-value = 5
-toll_cost = 10
+value = 10
+toll_cost = 20
 
 [resource]
 script = ExtResource("1_card_data")
@@ -16,6 +16,6 @@ rarity = 2
 cost = 1
 card_type = 1
 target_type = 1
-description = "Spend up to 10 Toll.
-Heal {toll_heal} HP."
+description = "Spend up to 20 Toll.
+{battle}Heal {toll_heal} HP.{/battle}{outside}Heal 1 HP per 2 Toll spent.{/outside}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_toll_heal")])

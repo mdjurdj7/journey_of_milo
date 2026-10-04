@@ -14,7 +14,7 @@ extends SceneTree
 
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_CONTROLLER_PATH := "res://battle/battle_controller.gd"
-const CASES := 14
+const CASES := 15
 # Cards whose one status prints as two lines - a rule written as two
 # sentences (Sentence's countdown and its hurry; The Return's count and
 # its Drain). Every other status-applying effect is one line.
@@ -91,6 +91,7 @@ func _initialize() -> void:
 	await _check_starter_art()
 	await _check_face_layout()
 	await _check_rules_text_pattern()
+	await _check_toll_cards()
 	await _check_blood_arc_effect()
 	if _completed != CASES:
 		_failures += 1
@@ -436,6 +437,44 @@ func _check_rules_text_pattern() -> void:
 			else:
 				_expect(not view.hp_cost_label.visible, "%s shows no HP badge" % card.card_name)
 	view.free()
+	_completed += 1
+
+# Debt Forgiven spends up to 20 Toll and heals 1 HP per 2 spent, rounded
+# down; it and Reckoning say their rule outside a fight and their live
+# number in a battle hand (CardView's {battle}/{outside} blocks).
+func _check_toll_cards() -> void:
+	var debt: CardData = _card("debt_forgiven")
+	for case: Array in [[30, 20, 10], [20, 20, 10], [7, 7, 3], [1, 1, 0]]:
+		var player: Combatant = _player(40)
+		player.max_hp = 70
+		player.toll = case[0]
+		var ctx := EffectContext.new()
+		ctx.player = player
+		ctx.enemies = [Combatant.new(100)] as Array[Combatant]
+		_resolver.resolve_card(debt, ctx)
+		_expect_eq(case[0] - player.toll, case[1], "Debt Forgiven on %d Toll spends %d" % [case[0], case[1]])
+		_expect_eq(player.hp - 40, case[2], "...and heals %d" % case[2])
+	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(view)
+	await process_frame
+	view.set_card_data(debt)
+	_expect_eq(view.rules_text.get_parsed_text(), "Spend up to 20 Toll.\nHeal 1 HP per 2 Toll spent.", "Debt Forgiven outside a fight says its rule")
+	view.set_card_data(_card("reckoning"))
+	_expect_eq(view.rules_text.get_parsed_text(), "Spend all Toll.\nDeal that much damage.", "Reckoning outside a fight says its rule")
+	view.free()
+	var hand_view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(hand_view)
+	await process_frame
+	var battle := EffectContext.new()
+	battle.player = _player(40)
+	battle.player.toll = 13
+	hand_view.set_bonus_context(battle)
+	hand_view.set_toll(13)
+	hand_view.set_card_data(debt)
+	_expect_eq(hand_view.rules_text.get_parsed_text(), "Spend up to 20 Toll.\nHeal 6 HP.", "In a battle hand on 13 Toll it reads its live heal, 6")
+	hand_view.set_card_data(_card("reckoning"))
+	_expect_eq(hand_view.rules_text.get_parsed_text(), "Spend all Toll.\nDeal 13 damage.", "...and Reckoning its live 13")
+	hand_view.free()
 	_completed += 1
 
 # The rules lines one effect takes - see _check_rules_text_pattern().

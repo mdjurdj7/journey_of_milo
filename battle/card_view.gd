@@ -85,6 +85,16 @@ const MARK_IF_OPEN := "{if}"
 const MARK_IF_CLOSE := "{/if}"
 const MARK_ELSE_OPEN := "{else}"
 const MARK_ELSE_CLOSE := "{/else}"
+# A card whose live number means nothing outside a fight (Reckoning's
+# Toll, Debt Forgiven's heal - 0 with no Toll held) says it two ways:
+# {battle}...{/battle} only in a battle hand (a bonus context), live;
+# {outside}...{/outside} everywhere else - the compendium, the deck view,
+# rewards, belongings - as the rule. Keep both on one line, so the line
+# count and the fit read the same in either.
+const MARK_BATTLE_OPEN := "{battle}"
+const MARK_BATTLE_CLOSE := "{/battle}"
+const MARK_OUTSIDE_OPEN := "{outside}"
+const MARK_OUTSIDE_CLOSE := "{/outside}"
 const TOKEN_DRAW := "{draw}"
 # How many cards a SET_ASIDE (Bide) sets aside - its value.
 const TOKEN_SET_ASIDE := "{set_aside}"
@@ -626,7 +636,7 @@ func _refresh_dynamic_text() -> void:
 # a mis-authored card reads as obviously wrong on its face instead of
 # quietly claiming it deals nothing.
 func _resolve_tokens(description: String) -> String:
-	var text: String = description
+	var text: String = _select_context(description)
 	if text.contains(TOKEN_DAMAGE):
 		var damage: int = _effect_value(card_data, DAMAGE_EFFECT_TYPES)
 		if damage >= 0:
@@ -813,6 +823,23 @@ func _style_bonus_clauses(bbcode: String) -> String:
 
 # The description with its markers stripped - what the face reads as
 # plain text, for measuring.
+# `description` with the {battle}/{outside} block this face isn't showing
+# taken out and the kept one's markers dropped - in a battle hand when it
+# has a bonus context.
+func _select_context(description: String) -> String:
+	var in_battle: bool = _bonus_context != null
+	var drop_open: String = MARK_OUTSIDE_OPEN if in_battle else MARK_BATTLE_OPEN
+	var drop_close: String = MARK_OUTSIDE_CLOSE if in_battle else MARK_BATTLE_CLOSE
+	var text: String = description
+	var start: int = text.find(drop_open)
+	while start >= 0:
+		var end: int = text.find(drop_close, start)
+		if end < 0:
+			break
+		text = text.substr(0, start) + text.substr(end + drop_close.length())
+		start = text.find(drop_open)
+	return text.replace(MARK_BATTLE_OPEN, "").replace(MARK_BATTLE_CLOSE, "").replace(MARK_OUTSIDE_OPEN, "").replace(MARK_OUTSIDE_CLOSE, "")
+
 static func _strip_markers(text: String) -> String:
 	return text.replace(MARK_IF_OPEN, "").replace(MARK_IF_CLOSE, "").replace(MARK_ELSE_OPEN, "").replace(MARK_ELSE_CLOSE, "")
 
