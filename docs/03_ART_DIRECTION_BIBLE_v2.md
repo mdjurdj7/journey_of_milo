@@ -107,6 +107,7 @@ Photorealism; generic AAA fantasy rendering; hyper-detail everywhere; crisp dist
 - **Fog** 14 → 28 m in the sky colour; the **tower** renders unfogged as a silhouette a few percent darker than the sky, visible only in the battle frame and at thresholds.
 - **Palette (Region 1, before tonemap):** dry sand (0.74, 0.70, 0.60); wet sand × ~0.72; water shallow (0.54, 0.60, 0.61), deep (0.26, 0.36, 0.41); fog/sky (0.86, 0.87, 0.86); UI ink (0.165, 0.165, 0.18), bone (0.94, 0.91, 0.86); type keylines strike (0.62, 0.56, 0.49), guard (0.49, 0.56, 0.59), toll (0.54, 0.50, 0.58), utility (0.58, 0.58, 0.60), stance (0.52, 0.46, 0.56).
 - **Type:** Spectral for world voice and card names; Alegreya Sans for system voice; one tracking value (0.16 em) for all caps labels.
+- **Combat effects are ink strokes:** matte, brush-like, in ink or deep maroon, revealed by a sweep and faded out. No glow, no emission brighter than the scene, no particles or sparkle.
 
 ## 21. Production Checklist
 

@@ -8,6 +8,14 @@ class_name BattleFeedback
 # already lands in sync with the swing without needing any timing/replay
 # logic of its own here - this owns the tunables and the "which effects
 # for which side" branching only.
+#
+# The one exception is a card with a play effect (CardData.play_effect_
+# scene_path - Blood Arc's ink stroke): on_card_impact() lays it over the
+# fight, and each enemy's reaction to that card's hit waits until the
+# stroke reaches it (reaction_delay(), the effect's arrival_delay()) - on
+# scaled time, so a hit-stop holds stroke and reactions alike. The hits
+# themselves, HP and kills, still land at the impact; only how they look
+# is paced. Such a card's hits draw no slash mark: the stroke is its mark.
 
 const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 
@@ -46,6 +54,10 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 
 var _wanderer: Wanderer = null
 var _on_dark_world: bool = false
+# The play effect of the card resolving right now - set at its impact and
+# cleared at the end of that frame, so only that card's own hits (which
+# all report in the same frame) are paced by it.
+var _effect: Node3D = null
 
 func setup(wanderer: Wanderer, on_dark_world: bool) -> void:
 	_wanderer = wanderer
@@ -62,7 +74,14 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, _kind: Strin
 		return
 
 	if target is FieldEnemy:
-		_react_to_card_hit(target as FieldEnemy)
+		# Read now, in the hit's own frame - the effect lets go at its end.
+		var slash: bool = not _effect_active()
+		var delay: float = reaction_delay(target)
+		if delay > 0.0:
+			await get_tree().create_timer(delay).timeout
+			if not is_instance_valid(target):
+				return
+		_react_to_card_hit(target as FieldEnemy, slash)
 		if amount >= hit_stop_threshold:
 			_apply_hit_stop()
 	elif source is FieldEnemy:
@@ -70,7 +89,44 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, _kind: Strin
 
 	_shake_camera(amount)
 
-func _react_to_card_hit(enemy: FieldEnemy) -> void:
+# A card has landed (BattleController.card_impact, before its effects
+# resolve): its play effect, if it names one, is laid over `targets` from
+# the Wanderer, and paces this frame's hit reactions.
+func on_card_impact(card: CardData, targets: Array[FieldEnemy]) -> void:
+	if card == null or card.play_effect_scene_path.is_empty() or _wanderer == null:
+		return
+	var scene := load(card.play_effect_scene_path) as PackedScene
+	if scene == null:
+		push_warning("BattleFeedback: could not load %s; no play effect." % card.play_effect_scene_path)
+		return
+	var effect := scene.instantiate() as Node3D
+	if effect == null:
+		return
+	# Under this node, not the field's: RegionField is frozen through a
+	# fight, and the stroke's tweens have to run. It goes with the fight.
+	add_child(effect)
+	var struck: Array[Node3D] = []
+	for enemy in targets:
+		if is_instance_valid(enemy):
+			struck.append(enemy)
+	effect.call("setup", _wanderer, struck)
+	_effect = effect
+	_release_effect.call_deferred()
+
+# Seconds after the impact `target`'s reaction to this frame's hit waits:
+# the play effect's arrival at it, 0 with none.
+func reaction_delay(target: Variant) -> float:
+	if not _effect_active() or not (target is FieldEnemy):
+		return 0.0
+	return float(_effect.call("arrival_delay", target))
+
+func _effect_active() -> bool:
+	return _effect != null and is_instance_valid(_effect)
+
+func _release_effect() -> void:
+	_effect = null
+
+func _react_to_card_hit(enemy: FieldEnemy, slash: bool = true) -> void:
 	if _wanderer == null:
 		return
 	var attack_direction: Vector3 = enemy.global_position - _wanderer.global_position
@@ -78,7 +134,8 @@ func _react_to_card_hit(enemy: FieldEnemy) -> void:
 	enemy.play_hit_flash(flash_color, flash_rise_time, flash_fall_time)
 	enemy.play_hit_recoil(attack_direction, recoil_distance, recoil_tilt_degrees, recoil_out_time, recoil_return_time)
 	enemy.spawn_sand_puff(sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity, sand_puff_spread_degrees)
-	enemy.spawn_slash_mark(attack_direction, _slash_mark_color(), slash_mark_length, slash_mark_width, slash_mark_chest_height, slash_mark_grow_time, slash_mark_fade_time)
+	if slash:
+		enemy.spawn_slash_mark(attack_direction, _slash_mark_color(), slash_mark_length, slash_mark_width, slash_mark_chest_height, slash_mark_grow_time, slash_mark_fade_time)
 
 func _react_to_enemy_attack(enemy: FieldEnemy) -> void:
 	if _wanderer == null:

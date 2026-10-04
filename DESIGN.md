@@ -4,6 +4,18 @@ Parked decisions and deferred items - see CLAUDE.md's own pointer to this
 file. Not a full design document, just what's been consciously set aside
 so it doesn't get silently reinvented or silently forgotten.
 
+## Combat effects
+
+Combat effects are ink strokes: matte, brush-like, in ink or deep maroon,
+revealed by a sweep and faded out. No glow, no emission brighter than the
+scene, no particles or sparkle. One reusable stroke builds them
+(`battle/effects/brush_stroke_effect.gd`, a ribbon along a path - an arc
+today); a card names its effect scene in `CardData.play_effect_scene_path`
+and a new effect is a new .tscn with different settings. The stroke paces
+the hit reactions it passes; the hits themselves, HP and kills, still land
+at the card's impact. Blood Arc's arc (#461613, 0.9) is the first.
+(2026-10-03.)
+
 ## Parked
 
 - **Chain roles (Opener/Closer, chain payoffs).** The old project's

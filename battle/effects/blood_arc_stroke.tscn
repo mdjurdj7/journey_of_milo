@@ -1,0 +1,11 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/effects/brush_stroke_effect.gd" id="1_stroke"]
+
+[node name="BloodArcStroke" type="Node3D"]
+script = ExtResource("1_stroke")
+ink_color = Color(0.275, 0.086, 0.075, 1)
+opacity = 0.9
+sweep_time = 0.16
+hold_time = 0.15
+fade_time = 0.35

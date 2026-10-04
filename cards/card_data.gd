@@ -75,6 +75,13 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 # stance ending), and never outside a battle hand.
 @export_file("*.wav", "*.mp3", "*.ogg") var play_sound_path: String = ""
 
+# This card's play effect: a scene (a BrushStrokeEffect - an ink stroke
+# over the fight) BattleFeedback instances at the card's impact; it paces
+# the enemies' hit reactions as it passes them, and the card's hits skip
+# the per-enemy slash mark. Empty (default) means none - the slash marks
+# as before. A path, loaded with load() at play time.
+@export_file("*.tscn") var play_effect_scene_path: String = ""
+
 # The four real tiers, lowest first - UNSET left out. What a rarity roll
 # walks and what a probe checks a card's tag against.
 static func rarity_tiers() -> Array[CardRarity]:

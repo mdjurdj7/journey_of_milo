@@ -25,4 +25,5 @@ description = "Deal {damage} damage to all enemies."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_self_damage"), SubResource("CardEffect_damage")])
 battle_animation = &"Slash"
 impact_time = 0.55
+play_effect_scene_path = "res://battle/effects/blood_arc_stroke.tscn"
 art = ExtResource("9_art")

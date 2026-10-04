@@ -62,6 +62,9 @@ signal battle_finished(outcome: Outcome)
 @onready var discard_button: Button = $DebugRow/DiscardButton
 
 var battle_controller: BattleController
+# The fight's hit reactions - kept to read a play effect's pacing for the
+# damage numbers (BattleFeedback.reaction_delay()).
+var _battle_feedback: BattleFeedback = null
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
 # One BattleIntent per enemy for this fight - children of this overlay,
 # so they're freed with it and nothing of them exists on the field.
@@ -202,10 +205,14 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	_push_bonus_context()
 	get_tree().create_timer(battle_transition_time).timeout.connect(_reveal_enemy_intents)
 
-	var battle_feedback := BattleFeedback.new()
-	add_child(battle_feedback)
-	battle_feedback.setup(wanderer, on_dark_world)
-	battle_controller.damage_dealt.connect(battle_feedback.on_damage_dealt)
+	_battle_feedback = BattleFeedback.new()
+	add_child(_battle_feedback)
+	_battle_feedback.setup(wanderer, on_dark_world)
+	battle_controller.damage_dealt.connect(_battle_feedback.on_damage_dealt)
+	# A card's play effect (Blood Arc's stroke) goes down before its hits
+	# report, over the enemies it can hit.
+	battle_controller.card_impact.connect(func(card: CardData) -> void:
+		_battle_feedback.on_card_impact(card, battle_controller.enemies))
 
 	_deck_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DRAW)
 	_discard_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DISCARD)
@@ -528,7 +535,15 @@ func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
 # Placeholder-only: shows whatever amount actually landed, no distinction
 # between damage/self-damage/attack kinds yet - see this pass's own
 # out-of-scope note (no real effect polish beyond the numbers themselves).
+# The number waits with its enemy's hit reaction when a play effect paces
+# them (BattleFeedback.reaction_delay()) - on scaled time, like the
+# reaction - and is placed when it shows.
 func _on_damage_dealt(_source: Variant, target: Variant, amount: int, _kind: String) -> void:
+	var delay: float = _battle_feedback.reaction_delay(target) if _battle_feedback != null else 0.0
+	if delay > 0.0:
+		await get_tree().create_timer(delay).timeout
+		if target is Object and not is_instance_valid(target):
+			return
 	_spawn_floating_number(amount, _screen_pos_for_damage_target(target))
 
 func _screen_pos_for_damage_target(target: Variant) -> Vector2:

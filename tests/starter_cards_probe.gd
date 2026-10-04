@@ -14,7 +14,7 @@ extends SceneTree
 
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_CONTROLLER_PATH := "res://battle/battle_controller.gd"
-const CASES := 13
+const CASES := 14
 # Cards whose one status prints as two lines - a rule written as two
 # sentences (Sentence's countdown and its hurry; The Return's count and
 # its Drain). Every other status-applying effect is one line.
@@ -82,6 +82,7 @@ func _initialize() -> void:
 	await _check_starter_art()
 	await _check_face_layout()
 	await _check_rules_text_pattern()
+	await _check_blood_arc_effect()
 	if _completed != CASES:
 		_failures += 1
 		print("FAIL: only %d of %d cases ran to the end" % [_completed, CASES])
@@ -443,6 +444,41 @@ func _player(hp: int) -> Combatant:
 	var player := Combatant.new(70)
 	player.hp = hp
 	return player
+
+# Blood Arc's play effect: an ink stroke (BrushStrokeEffect) that builds
+# over the enemies it hits and reaches them in battle-line order - the
+# near one first, both inside its sweep - whatever order they're listed.
+func _check_blood_arc_effect() -> void:
+	var card: CardData = _card("blood_arc")
+	_expect(not card.play_effect_scene_path.is_empty(), "Blood Arc names a play effect")
+	var scene := load(card.play_effect_scene_path) as PackedScene
+	var effect := scene.instantiate() as BrushStrokeEffect if scene != null else null
+	_expect(effect != null, "...a BrushStrokeEffect scene")
+	if effect == null:
+		_completed += 1
+		return
+	var wanderer := Node3D.new()
+	var near := Node3D.new()
+	var far := Node3D.new()
+	for node: Node3D in [wanderer, near, far, effect]:
+		root.add_child(node)
+	near.global_position = Vector3(4.0, 0.0, 0.0)
+	far.global_position = Vector3(7.0, 0.0, 0.0)
+	await process_frame
+	var targets: Array[Node3D] = [far, near]
+	effect.setup(wanderer, targets)
+	var built: bool = false
+	for child in effect.get_children():
+		if child is MeshInstance3D and (child as MeshInstance3D).mesh != null:
+			built = (child as MeshInstance3D).mesh.get_surface_count() > 0
+	_expect(built, "...which builds its ribbon over them")
+	var to_near: float = effect.arrival_delay(near)
+	var to_far: float = effect.arrival_delay(far)
+	_expect(0.0 < to_near and to_near < to_far and to_far < effect.sweep_time, "...and reaches the near enemy first, both within its %.2f s sweep (%.3f, %.3f)" % [effect.sweep_time, to_near, to_far])
+	_expect(_card("slash").play_effect_scene_path.is_empty(), "Slash names none - its hits keep their slash marks")
+	for node: Node3D in [wanderer, near, far, effect]:
+		node.free()
+	_completed += 1
 
 func _card(card_name: String) -> CardData:
 	return load("res://cards/data/%s.tres" % card_name) as CardData
