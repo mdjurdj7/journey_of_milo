@@ -204,14 +204,14 @@ func _check_floor_3() -> void:
 	_expect_eq((enemies[0].get("enemy_data") as EnemyData).enemy_name, "Blackback", "...the required Blackback first - the gate measures from it")
 	var entry: Resource = enemies[1]
 	_expect_eq((entry.get("enemy_data") as EnemyData).enemy_name, "Wardling", "...then the Wardling")
-	_expect_eq(entry.get("position"), Vector2(21.267, -13.5), "...on the east lobe at (21.267, -13.5)")
+	_expect_eq(entry.get("position"), Vector2(17.6, -13.6), "...in the east lobe at (17.6, -13.6)")
 	_expect_eq(entry.get("face_prop_index"), 0, "...facing the floor's first prop")
 	_expect_eq(entry.get("yaw_degrees"), 0.0, "...straight at it")
 	_expect(not bool(entry.get("required")), "...not required")
 	var props: Array = floor_data.get("props")
 	_expect_eq(props.size(), 1, "Floor 3 has one prop")
 	_expect_eq((props[0].get("scene") as PackedScene).resource_path, POST_SCENE_PATH, "...the hitching post")
-	_expect_eq(props[0].get("position"), Vector3(19.661, 0.0, -15.794), "...north-west of the Wardling, 2.8 m off")
+	_expect_eq(props[0].get("position"), Vector3(15.879, 0.0, -16.057), "...north-west of the Wardling, 3.0 m off")
 	_expect_eq((props[0].get("overrides") as Dictionary).get("tether_enemy_index"), 1, "...its rope tied to the Wardling")
 	_completed += 1
 

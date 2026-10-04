@@ -28,6 +28,37 @@ exit_ = dot((g > 200) & (r < 80) & (b < 80))
 elite = dot((r > 200) & (g > 200) & (b < 80))
 walk = (src.sum(-1) > 3*127)            # white or any coloured dot = walkable
 
+# The east lobe (the Wardling's) is drawn here, not painted: the painted
+# lobe past LOBE_CUT_X goes, the neck runs on at its own width to the
+# lobe's centre, and an ellipse round that centre is the lobe; the joins
+# are filleted LOBE_FILLET round, within a window round the lobe only.
+# World metres from spawn (+Z south). The elite dot moves to ELITE_WORLD.
+# The lobe is ~7 m deep from the neck's end, its south edge on the neck's
+# own line, its north edge out far enough for the hitching post.
+LOBE_CUT_X = 14.6              # where the painted neck starts widening into the old lobe
+LOBE_CENTRE = (18.1, -14.4)
+LOBE_RADII = (3.5, 4.17)       # x (east-west), z (north-south)
+LOBE_FILLET = 1.0
+ELITE_WORLD = (17.6, -13.6)
+from scipy.ndimage import label, binary_closing
+def px_of(wx, wz):
+    return (spawn[0] + wx * PX, spawn[1] + wz * PX)
+yy, xx = np.mgrid[0:H, 0:W]
+cut_px = spawn[0] + LOBE_CUT_X * PX
+lab, _ = label(walk & (xx >= cut_px))
+walk = walk & ~(lab == lab[int(round(elite[1])), int(round(elite[0]))])
+cx, cz = px_of(*LOBE_CENTRE)
+col = walk[:, int(cut_px) - 1]
+top = bot = int(round(cz))
+while col[top - 1]: top -= 1
+while col[bot + 1]: bot += 1
+neck = (xx >= cut_px - 1) & (xx <= cx) & (yy >= top) & (yy <= bot)
+lobe = ((xx - cx) / (LOBE_RADII[0] * PX)) ** 2 + ((yy - cz) / (LOBE_RADII[1] * PX)) ** 2 <= 1.0
+walk = walk | neck | lobe
+window = (xx > cut_px - 2 * PX) & (np.abs(yy - cz) < (LOBE_RADII[1] + 1.5) * PX)
+walk = np.where(window, binary_closing(walk, structure=disk(int(LOBE_FILLET * PX))), walk)
+elite = px_of(*ELITE_WORLD)
+
 # signed distance in metres: >0 outside the walkable area
 d_out = distance_transform_edt(~walk) / PX
 d_in = distance_transform_edt(walk) / PX
@@ -87,6 +118,7 @@ layout = {
     "heights_m": {"outer_ground": 0.0, "walkable_floor": BASE_WALK, "ridge_crest": BASE_WALK + CREST_RISE},
     "ridge": {"inner_face_width_m": FACE_W, "crest_width_m": CREST_W, "outer_falloff_m": OUTER_FALL},
     "outer_ground": {"edge_at_m": OUTER_EDGE_AT, "edge_width_m": OUTER_EDGE_WIDTH},
+    "east_lobe": {"cut_x_m": LOBE_CUT_X, "centre_world_xz": list(LOBE_CENTRE), "radii_m": list(LOBE_RADII), "fillet_m": LOBE_FILLET},
     "ledge_barrier_world_xz": ledge,
     "note": "World XZ in metres relative to spawn; +X right, +Z toward the bottom of the image (south). Forward/exit is toward -Z.",
 }
