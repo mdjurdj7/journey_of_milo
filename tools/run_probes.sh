@@ -126,6 +126,9 @@ path_probes() {
 		ui/hp_bar.*) out=$(area_probes hp_bar) ;;
 		ui/toll_line.gd|ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd) out=$(area_probes hud) ;;
 		ui/deck_view.*|ui/card_compendium.*) out=$(area_probes ui_inspect) ;;
+		# A play effect: the fight's UI probes, and starter_cards, which
+		# checks Blood Arc's stroke.
+		battle/effects/*) out="$(area_probes battle_ui) starter_cards" ;;
 		battle/battle_overlay.*|battle/battle_feedback.*|battle/battle_intent.*|battle/battle_resources.*|battle/end_turn_button.*|battle/enemy_status.*|battle/floating_number.*|battle/hand_container.*|battle/take_feedback.*|battle/target_line.*) out=$(area_probes battle_ui) ;;
 		*) echo FULL; return 0 ;;
 	esac
