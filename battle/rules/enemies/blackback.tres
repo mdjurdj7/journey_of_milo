@@ -8,17 +8,17 @@
 
 [sub_resource type="Resource" id="EnemyIntent_peck"]
 script = ExtResource("2_intent")
-value = 3
+value = 4
 hits = 2
 
 [sub_resource type="Resource" id="EnemyIntent_lunge"]
 script = ExtResource("2_intent")
-value = 9
+value = 12
 
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Blackback"
-max_hp = 32
+max_hp = 40
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_peck"), SubResource("EnemyIntent_lunge")])
 starting_statuses = Array[ExtResource("4_status_data")]([ExtResource("5_fed")])
 ; Placeholder: the Wardling's 8-bit hit.wav until the gull has its own.

@@ -97,9 +97,8 @@ const DURATION_UNTIL_TRIGGERED := -2
 # Light). Once per Attack card, like a stance's bonus - not a MODIFIER,
 # which would land on every damage the player deals (a Toll spend
 # included). Summed with the stance's by AttackBonus. On an enemy
-# (Hungry) the same once per Attack: added to the first hit of each of
-# its ATTACK intents, never to every hit (EnemyTurn.hit_amount()). 0 =
-# none.
+# (Hungry) it is per hit instead: added to every hit of its ATTACK
+# intents, before any modifier (EnemyTurn.hit_amount()). 0 = none.
 @export var attack_damage_bonus: int = 0
 # The bonus above only while the player is Critical.
 @export var bonus_requires_critical: bool = false

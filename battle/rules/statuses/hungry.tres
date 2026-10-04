@@ -6,8 +6,8 @@
 script = ExtResource("1_status_data")
 id = "hungry"
 display_name = "Hungry"
-description = "+{bonus} damage on each of its Attacks."
+description = "Each hit of its Attacks deals {bonus} more."
 category = 2
 default_duration_turns = -1
 stack_rule = 3
-attack_damage_bonus = 4
+attack_damage_bonus = 3

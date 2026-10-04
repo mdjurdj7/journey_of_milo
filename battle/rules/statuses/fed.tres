@@ -7,7 +7,7 @@
 script = ExtResource("1_status_data")
 id = "fed"
 display_name = "Fed"
-description = "When the other dies, it turns Hungry: +{alone_bonus} damage on each of its Attacks."
+description = "When the other dies, it turns Hungry: each hit of its Attacks deals {alone_bonus} more."
 category = 2
 default_duration_turns = -1
 stack_rule = 3

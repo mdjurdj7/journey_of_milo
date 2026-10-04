@@ -26,8 +26,8 @@ class_name BattleIntent
 # A BURROW (buried - it does nothing this turn) is its glyph alone: there
 # is no number coming. A HEAL_ALLY (the Nipper's Forage) is a plus beside
 # the HP its packmates will heal. A multi-hit attack whose hits differ (a
-# once-per-Attack bonus on the first - Hungry) reads hit by hit, "7 + 3",
-# not "N x M".
+# status on the player the first hit consumes - No Further's 0) reads hit
+# by hit, "0 + 4", not "N x M".
 #
 # One per enemy, created by BattleOverlay for the fight (its child, so it
 # dies with the overlay - nothing of this exists on the field). Anchored

@@ -2,9 +2,9 @@ extends SceneTree
 
 # Headless probe for floor 3's required pair, the Blackback and the
 # Nipper: their loops, the Blackback's Fed from the first frame turning
-# Hungry once when the Nipper dies (a Carve's kill included), Hungry's +4
-# once per Attack not per hit (Peck 10, Lunge 13), the Nipper's Forage
-# healing the Blackback 4 up to its max and giving way to Nip once the
+# Hungry once when the Nipper dies (a Carve's kill included), Hungry's +3
+# on every hit of its Attacks (Peck 2x7, Lunge 15), the Nipper's Forage
+# healing the Blackback 8 up to its max and giving way to Nip once the
 # Blackback is dead, and every turn's intent preview equal to what the
 # turn resolves. Floor 3 keeps the Blackback first, where the Sputter
 # stood, so the LINE exit measures from the same place.
@@ -66,21 +66,21 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var blackback := load(BLACKBACK_PATH) as EnemyData
 	var nipper := load(NIPPER_PATH) as EnemyData
-	_expect_eq(blackback.max_hp, 32, "Blackback: 32 HP")
-	_expect_eq(nipper.max_hp, 14, "Nipper: 14 HP")
+	_expect_eq(blackback.max_hp, 40, "Blackback: 40 HP")
+	_expect_eq(nipper.max_hp, 16, "Nipper: 16 HP")
 	_expect(not blackback.erratic_intent_selection and not nipper.erratic_intent_selection, "Both loop in order")
 	var b := _enemy(blackback)
 	var seen: Array[String] = []
 	for turn in 5:
 		seen.append(_intent_name(EnemyTurn.current_intent(b, blackback)))
 		EnemyTurn._advance_intent(b, blackback)
-	_expect_eq(seen, ["3x2", "9", "3x2", "9", "3x2"] as Array[String], "Blackback: Peck 3x2, Lunge 9, repeating")
+	_expect_eq(seen, ["4x2", "12", "4x2", "12", "4x2"] as Array[String], "Blackback: Peck 4x2, Lunge 12, repeating")
 	var n := _enemy(nipper)
 	seen.clear()
 	for turn in 7:
 		seen.append(_intent_name(EnemyTurn.current_intent(n, nipper)))
 		EnemyTurn._advance_intent(n, nipper)
-	_expect_eq(seen, ["3", "3", "heal 4", "3", "3", "heal 4", "3"] as Array[String], "Nipper: Nip 3, Nip 3, Forage 4, repeating")
+	_expect_eq(seen, ["3", "3", "heal 8", "3", "3", "heal 8", "3"] as Array[String], "Nipper: Nip 3, Nip 3, Forage 8, repeating")
 	_expect_eq(blackback.starting_statuses.size(), 1, "Blackback holds one passive")
 	_expect(blackback.starting_statuses[0] == load(FED_PATH), "...Fed")
 	_expect(nipper.starting_statuses.is_empty(), "Nipper holds none")
@@ -89,27 +89,33 @@ func _check_data() -> void:
 	_expect_eq(blackback.attachment_scene_path, "res://field/stork_tells.tscn", "...with its tells (sac, clatter)")
 	_expect_eq(nipper.model_scale, 0.625, "Nipper still wears the Sputter, at 0.625")
 	var fed := Status.new(load(FED_PATH) as StatusData)
-	_expect_eq(fed.describe(), "When the other dies, it turns Hungry: +4 damage on each of its Attacks.", "Fed's reveal line")
+	_expect_eq(fed.describe(), "When the other dies, it turns Hungry: each hit of its Attacks deals 3 more.", "Fed's reveal line")
 	var hungry := Status.new(load(HUNGRY_PATH) as StatusData)
-	_expect_eq(hungry.describe(), "+4 damage on each of its Attacks.", "Hungry's reveal line")
+	_expect_eq(hungry.describe(), "Each hit of its Attacks deals 3 more.", "Hungry's reveal line")
 	_completed += 1
 
-# Rules only: Hungry's +4 lands once per Attack, on the first hit - Peck
-# 7 + 3 = 10, Lunge 13 - previewed and resolved alike; Fed adds nothing.
+# Rules only: Hungry's +3 lands on every hit of its Attacks - Peck 2x7,
+# Lunge 15 - previewed and resolved alike, and block is worn down hit by
+# hit; Fed adds nothing (Peck 2x4, Lunge 12).
 func _check_hungry_per_attack() -> void:
 	var data := load(BLACKBACK_PATH) as EnemyData
 	var fed_peck := _peck_against(data, FED_PATH)
-	_expect_eq(fed_peck, [6, 6, [3, 3]], "Fed: Peck 3 + 3 = 6, previewed and resolved")
+	_expect_eq(fed_peck, [8, 8, [4, 4]], "Fed: Peck 2x4 = 8, previewed and resolved")
 	var hungry_peck := _peck_against(data, HUNGRY_PATH)
-	_expect_eq(hungry_peck, [10, 10, [7, 3]], "Hungry: Peck 7 + 3 = 10, previewed and resolved")
-	var b := _enemy(data)
-	Status.apply_to(b.statuses, load(HUNGRY_PATH) as StatusData)
-	EnemyTurn._advance_intent(b, data)
-	var player := Combatant.new(PLAYER_HP)
-	var preview: Dictionary = EnemyTurn.preview_intent(b, data, player)
-	var result: Dictionary = EnemyTurn.take_turn(b, data, player)
-	_expect_eq(int(preview["damage_to_hp"]), 13, "Hungry: Lunge previews 13")
-	_expect_eq(int(result["damage_to_hp"]), 13, "...and lands 13")
+	_expect_eq(hungry_peck, [14, 14, [7, 7]], "Hungry: Peck 2x7 = 14, previewed and resolved")
+	# Against 10 block: the first 7 is all blocked, the second meets the 3
+	# left and 4 gets through - previewed and resolved alike.
+	var hungry_b := _enemy(data)
+	Status.apply_to(hungry_b.statuses, load(HUNGRY_PATH) as StatusData)
+	var guarded := Combatant.new(PLAYER_HP)
+	guarded.block = 10
+	var guarded_preview: Dictionary = EnemyTurn.preview_intent(hungry_b, data, guarded)
+	var guarded_result: Dictionary = EnemyTurn.take_turn(hungry_b, data, guarded)
+	_expect_eq(int(guarded_preview["damage_to_hp"]), 4, "Hungry Peck into 10 block: 7 blocked, then 3 of 7 - 4 through, previewed")
+	_expect_eq(int(guarded_result["damage_to_hp"]), 4, "...and landed")
+	_expect_eq(guarded.block, 0, "...the block worn to 0")
+	_expect_eq(_lunge_against(data, FED_PATH), [12, 12], "Fed: Lunge 12, previewed and resolved")
+	_expect_eq(_lunge_against(data, HUNGRY_PATH), [15, 15], "Hungry: Lunge 12 + 3 = 15, previewed and resolved")
 	_completed += 1
 
 # Floor 3: the Blackback first at (-3, -9), where the Sputter stood (the
@@ -144,6 +150,7 @@ func _check_fight_opens() -> void:
 		if blackback != null:
 			var labels: PackedStringArray = controller.call("get_enemy_status_labels", blackback)
 			_expect_eq(labels, PackedStringArray(["Fed"]), "Turn 1: the Blackback's row reads Fed")
+			_expect_eq(_intent_text(controller, blackback), "2×4", "...and its Peck reads 2×4")
 			var bar: Node = blackback.get("enemy_status")
 			_expect(bar != null and _shows(bar, "Fed"), "...its readout shows it")
 			var tells: Node = blackback.get("_attachment")
@@ -159,7 +166,7 @@ func _check_fight_opens() -> void:
 
 # Both alive, eight turns: every turn the previews are what lands - the
 # player's loss is their damage summed, the Blackback's gain is the
-# Forage's number - and the Forage heals 4, then only up to the max.
+# Forage's number - and the Forage heals 8, then only up to the max.
 func _check_both_alive_turns() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -170,20 +177,20 @@ func _check_both_alive_turns() -> void:
 		b.hp = 20
 		var heals: Array[int] = []
 		for turn in TURNS:
-			# The second Forage meets a Blackback 2 short of its max.
+			# The second Forage meets a Blackback 6 short of its max.
 			if turn == 5:
-				b.hp = 30
+				b.hp = 34
 			var forage: bool = EnemyTurn.current_intent(n, nipper.get("enemy_data")).type == EnemyIntent.IntentType.HEAL_ALLY
 			var outcome: Array = await _turn(controller, turn)
 			if forage:
 				heals.append(outcome[1])
-		_expect_eq(heals, [4, 2] as Array[int], "Forage heals the Blackback 4, then 2 to its max of 32")
-		_expect_eq(b.hp, 32, "...the Blackback at 32")
+		_expect_eq(heals, [8, 6] as Array[int], "Forage heals the Blackback 8, then 6 to its max of 40")
+		_expect_eq(b.hp, 40, "...the Blackback at 40")
 	await _teardown()
 	_completed += 1
 
 # The Nipper killed first: Fed becomes Hungry at once, once - the next
-# Peck previews and lands 10, the Lunge 13, and nothing turns twice.
+# Peck previews and lands 2x7, the Lunge 15, and nothing turns twice.
 func _check_nipper_dies_first() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -201,14 +208,15 @@ func _check_nipper_dies_first() -> void:
 		var bar: Node = blackback.get("enemy_status")
 		_expect(bar != null and _shows(bar, "Hungry"), "...its readout shows it")
 		var preview: Dictionary = controller.call("get_intent_preview", blackback)
-		_expect_eq(preview.get("hit_amounts"), [7, 3], "...the Peck shows 7 + 3")
-		_expect_eq(int(preview["damage_to_hp"]), 10, "...10 in all")
+		_expect_eq(preview.get("hit_amounts"), [7, 7], "...the Peck is 7 and 7")
+		_expect_eq(_intent_text(controller, blackback), "2×7", "...and reads 2×7 - per hit, never \"a + b\"")
+		_expect_eq(int(preview["damage_to_hp"]), 14, "...14 in all")
 		var landed: Array[int] = []
 		for turn in TURNS:
 			var outcome: Array = await _turn(controller, turn)
 			landed.append(outcome[0])
 			controller.call("_mark_lone_pack_members")
-		_expect_eq(landed, [10, 13, 10, 13, 10, 13, 10, 13] as Array[int], "Hungry: Peck 10, Lunge 13, every turn")
+		_expect_eq(landed, [14, 15, 14, 15, 14, 15, 14, 15] as Array[int], "Hungry: Peck 2x7 = 14, Lunge 15, every turn")
 		_expect_eq(b.statuses.size(), 1, "...one status, Hungry alone")
 		_expect_eq(b.statuses[0].stack_count, 1, "...turned once")
 	await _teardown()
@@ -254,7 +262,7 @@ func _check_carve_kills_nipper() -> void:
 			controller.call("confirm_target", blackback)
 		await create_timer(2.0).timeout
 		_expect_eq((controller.get("enemies") as Array).size(), 1, "Carve kills the Nipper")
-		_expect_eq(b.hp, 26, "...and cuts the Blackback to 26")
+		_expect_eq(b.hp, 34, "...and cuts the Blackback to 34")
 		var hungry: int = 0
 		for active: Status in b.statuses:
 			_expect(active.data.id != "fed", "...no Fed left")
@@ -349,6 +357,13 @@ func _kill(controller: Node, member: Node) -> void:
 	combatant.hp = 0
 	controller.call("_report_damage", "player", combatant, 99, "card")
 
+# What `member`'s intent readout says now (BattleIntent's number).
+func _intent_text(controller: Node, member: Node) -> String:
+	var intents: Dictionary = controller.get_parent().get("_enemy_intents")
+	var intent: Node = intents.get(member)
+	var label: Label = intent.get("_label") if intent != null else null
+	return label.text if label != null else ""
+
 # How grey the marabou's sac is now (its pass's grey_amount).
 func _sac_grey(tells: Node) -> float:
 	var sac: ShaderMaterial = tells.get("_sac")
@@ -385,6 +400,17 @@ func _peck_against(data: EnemyData, status_path: String) -> Array:
 	var preview: Dictionary = EnemyTurn.preview_intent(b, data, player)
 	var result: Dictionary = EnemyTurn.take_turn(b, data, player)
 	return [int(preview["damage_to_hp"]), int(result["damage_to_hp"]), preview["hit_amounts"]]
+
+# The Lunge (the loop's second move) against a Blackback holding
+# `status_path`: [what the preview said reaches HP, what landed].
+func _lunge_against(data: EnemyData, status_path: String) -> Array:
+	var b := _enemy(data)
+	Status.apply_to(b.statuses, load(status_path) as StatusData)
+	EnemyTurn._advance_intent(b, data)
+	var player := Combatant.new(PLAYER_HP)
+	var preview: Dictionary = EnemyTurn.preview_intent(b, data, player)
+	var result: Dictionary = EnemyTurn.take_turn(b, data, player)
+	return [int(preview["damage_to_hp"]), int(result["damage_to_hp"])]
 
 func _teardown() -> void:
 	if _field != null:

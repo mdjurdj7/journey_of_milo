@@ -163,7 +163,8 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 # gained for DEFEND, or the heal each packmate takes for HEAL_ALLY, as
 # authored: BattleController caps it at what they're missing),
 # "hit_amounts" (every hit's modified damage, in order - unequal when a
-# once-per-Attack bonus lands on the first), "damage_to_hp" (total that would reach HP through
+# status on the player is consumed by the first hit, as No Further's 0
+# is), "damage_to_hp" (total that would reach HP through
 # block and absorb), "lethal" (it would take the player to 0 - replayed
 # hit by hit on a local HP, so a lethal guard keeps it off: each hit it
 # would save puts them at its survive HP, as many saves as it has
@@ -261,15 +262,14 @@ static func intent_value(combatant: Combatant, data: EnemyData, intent: EnemyInt
 	return roundi(float(intent.value) * data.escalation_multipliers[escalation_stage(combatant, data)])
 
 # One hit of an ATTACK, before block: the intent's value (escalated),
-# plus - on the first hit only - this enemy's once-per-Attack bonus
-# (StatusData.attack_damage_bonus - Hungry), then its outgoing modifiers
-# and the player's incoming ones. The one number take_turn() lands and
+# plus this enemy's attack bonus - on every hit (StatusData.attack_
+# damage_bonus - Hungry) - then its outgoing modifiers and the player's
+# incoming ones, so a modifier always reads the bonus in. The one number take_turn() lands and
 # preview_intent() shows, hit by hit; `player_statuses` is the player's
 # list or the preview's copy of it.
 static func hit_amount(combatant: Combatant, data: EnemyData, intent: EnemyIntent, hit: int, player_statuses: Array[Status]) -> int:
 	var amount: int = intent_value(combatant, data, intent)
-	if hit == 0:
-		amount += Status.attack_bonus(combatant.statuses, combatant.is_critical())
+	amount += Status.attack_bonus(combatant.statuses, combatant.is_critical())
 	amount = Status.apply_modifiers(amount, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 	return Status.apply_modifiers(amount, player_statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
 
