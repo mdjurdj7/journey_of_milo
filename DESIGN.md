@@ -25,6 +25,13 @@ the hit reactions it passes; the hits themselves, HP and kills, still land
 at the card's impact. Blood Arc's arc (#461613, 0.9) is the first.
 (2026-10-03.)
 
+## Card rarity
+
+A simple HP-for-resource trade is a Common: lose a little HP, get one
+plain resource back, with no condition or build-around. Small Price
+(formerly Open Wound - lose 2 HP, draw 1) moved from Uncommon to
+Common on that rule. (2026-10-04.)
+
 ## Parked
 
 - **Chain roles (Opener/Closer, chain payoffs).** The old project's

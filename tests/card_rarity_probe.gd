@@ -35,9 +35,9 @@ const EXPECTED_RARITY: Dictionary = {
 	"Reprisal": CardData.CardRarity.COMMON,
 	"Cornered": CardData.CardRarity.COMMON,
 	"Unbroken": CardData.CardRarity.COMMON,
+	"Small Price": CardData.CardRarity.COMMON,
 	"Reckoning": CardData.CardRarity.UNCOMMON,
 	"Down Payment": CardData.CardRarity.UNCOMMON,
-	"Open Wound": CardData.CardRarity.UNCOMMON,
 	"Debt Forgiven": CardData.CardRarity.UNCOMMON,
 	"Self-Eater": CardData.CardRarity.UNCOMMON,
 	"Last Wager": CardData.CardRarity.UNCOMMON,
@@ -59,7 +59,7 @@ const EXPECTED_RARITY: Dictionary = {
 }
 
 const EXPECTED_POOL: Array[String] = [
-	"Carve", "Hold Fast", "Reprisal", "Open Wound", "Debt Forgiven",
+	"Carve", "Hold Fast", "Reprisal", "Small Price", "Debt Forgiven",
 	"Self-Eater", "Cornered", "Unbroken", "Dying Light", "Last Wager",
 	"Refuse the End", "Last Resort", "Blood Arc", "With Regards", "Come Due",
 	"No Further", "Sentence", "The Return", "Collateral", "Ransom", "Leverage",

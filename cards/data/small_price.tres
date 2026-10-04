@@ -15,8 +15,8 @@ value = 1
 
 [resource]
 script = ExtResource("1_card_data")
-card_name = "Open Wound"
-rarity = 2
+card_name = "Small Price"
+rarity = 1
 card_type = 1
 target_type = 1
 description = "Draw {draw}."
