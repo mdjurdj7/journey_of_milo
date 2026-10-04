@@ -29,8 +29,8 @@ at the card's impact. Blood Arc's arc (#461613, 0.9) is the first.
 
 A simple HP-for-resource trade is a Common: lose a little HP, get one
 plain resource back, with no condition or build-around. Small Price
-(formerly Open Wound - lose 2 HP, draw 1) moved from Uncommon to
-Common on that rule. (2026-10-04.)
+(formerly Open Wound - lose 2 HP, draw 1) and Down Payment (lose 1 HP,
+gain 5 Toll) moved from Uncommon to Common on that rule. (2026-10-04.)
 
 ## Parked
 
