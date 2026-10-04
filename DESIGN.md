@@ -365,3 +365,13 @@ folder (run_log_probe). (2026-10-04.)
   win there leaves the Glassbone unoffered, with a warning; the SCREEN
   default offers it. When the spread becomes the default it needs a
   piece to walk to. (2026-09-30, Glassbone phase 1.)
+- **The Dunecur is placeholder in body, voice and bones.** Its glb's
+  flank patchwork and shoulder flaps aren't intended and the model is
+  being redone, so its crest (flat at Roused 0, a step up per stack,
+  settling after the Rush) and its head-low feeding pose - both planned
+  as one CodeSkin attachment, `DunecurPose`, a region along the spine and
+  a neck dip that lifts for the fight - wait for the new model. Its
+  `contact_sounds` borrow the old `combat_old/hit.wav` the Wardling uses.
+  The bones it feeds over (`BoneScatter`, floor 4) are primitives -
+  capsules, ovoids, drums - until bone models exist; `model_paths` takes
+  one glb per piece kind and swaps them in. (2026-10-04, Dunecur.)

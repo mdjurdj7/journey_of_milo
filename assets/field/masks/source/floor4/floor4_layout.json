@@ -18,8 +18,8 @@
    -37.5
   ],
   "required_fight": [
-   -13.5,
-   -32.267
+   -18.5,
+   -35.0
   ],
   "collector": [
    11.0,
@@ -68,11 +68,11 @@
    -27.0
   ],
   [
-   -13.5,
-   -32.267
+   -16.0,
+   -31.5
   ],
   [
-   -20.0,
+   -18.5,
    -35.0
   ],
   [
@@ -716,5 +716,5 @@
    ]
   ]
  ],
- "note": "World XZ in metres relative to spawn; +X right (east), +Z toward the image bottom (south). Two closed ledge rings: [0] the outer boundary, [1] the central dune. The required fight sits where both routes rejoin, before the exit neck, so either side can reach it. The worn band runs spawn -> west side -> required fight -> exit (wear_path_world_xz). The collector and the dig site are reserved spots only - nothing reads them yet."
+ "note": "World XZ in metres relative to spawn; +X right (east), +Z toward the image bottom (south). Two closed ledge rings: [0] the outer boundary, [1] the central dune. The required fight stands at the mouth of the exit neck, past the rejoin, so either side reaches it and nothing reaches the exit without it. The worn band runs spawn -> west side -> required fight -> exit (wear_path_world_xz). The collector and the dig site are reserved spots only - nothing reads them yet."
 }

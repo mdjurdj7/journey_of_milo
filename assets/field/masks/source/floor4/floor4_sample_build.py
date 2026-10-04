@@ -2,7 +2,8 @@
 # The loop at 0.75 of its first size round spawn, the dune sized for a ring ~7-9 m wide,
 # so the field camera's frame holds a wall on either hand: a south entry neck, the loop
 # round the central dune, the optional fight's alcove off the west side, the
-# collector's bay in its east flank, the rejoin, the exit neck west.
+# collector's bay in its east flank, the rejoin, the exit neck west with the required
+# fight at its mouth.
 import numpy as np
 from PIL import Image, ImageDraw
 from scipy.ndimage import gaussian_filter
@@ -41,7 +42,7 @@ d = ImageDraw.Draw(img)
 markers = {  # world xz -> colour (read back by the generator)
     "spawn": ((0, 0), (255, 0, 0)),
     "exit": (s((-37, -50)), (0, 255, 0)),
-    "required_fight": (s((-18, -43)), (0, 0, 255)),
+    "required_fight": ((-18.5, -35.0), (0, 0, 255)),    # the Dunecur, at the mouth of the exit neck
     "collector": ((11.0, -22.5), (255, 255, 0)),
     "optional_fight": ((-24.4, -21.6), (255, 0, 255)),
     "dig_site": (s((21, -42)), (0, 255, 255)),

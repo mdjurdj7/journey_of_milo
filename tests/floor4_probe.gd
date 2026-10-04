@@ -6,15 +6,16 @@ extends SceneTree
 # through the physics, as a player would:
 #
 #   west   - spawn, out of the entry neck, round the dune's west side, to
-#            the required fight: contact starts it
+#            the required fight - the Dunecur at the mouth of the exit neck,
+#            over its bones: contact starts it
 #   east   - the same by the east side: the narrows, past the collector's
 #            bay, the north arc
 #   dune   - straight at the far side across the dune, from the west and
 #            from the south: he never gets over it
-#   exit   - from the west side toward the exit while the required fight
-#            stands: he comes to rest on the gate line and the floor holds;
-#            won, the line lifts and he walks out - the last floor, so the
-#            run wraps to floor 1
+#   exit   - past the Dunecur (put there - his 3 m contact area all but
+#            fills the neck) toward the exit while he stands: he comes to
+#            rest on the gate line and the floor holds; won, the line lifts
+#            and he walks out - the last floor, so the run wraps to floor 1
 #   alcove - the optional fight's alcove off the west side: walked into
 #            from the route, it starts that fight and only it
 #
@@ -28,15 +29,23 @@ extends SceneTree
 # Untyped against the project's own classes (get()/call() only), for the
 # autoload reason kill_order_probe.gd's own header gives.
 
-const CASES := 6
+const CASES := 7
 const REGION_PATH := "res://floors/region1.tres"
 const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
 const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
+const DUNECUR_PATH := "res://battle/rules/enemies/dunecur.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FLOOR_INDEX := 3
-const REQUIRED_AT := Vector2(-13.5, -32.267)
+const REQUIRED_AT := Vector2(-18.5, -35.0)
+const BONES_AT := Vector2(-19.73, -35.422)
+const EXIT_DIRECTION := Vector2(-0.9459, -0.3245)
+const GATE_DISTANCE_M := 7.0
+# Past the Dunecur, 3.9 m on toward the gate - outside his contact area.
+const PAST_REQUIRED := Vector2(-22.2, -36.3)
+# Every bone this far short of the gate line, at least.
+const BONES_GATE_CLEARANCE_M := 3.0
 const OPTIONAL_AT := Vector2(-24.4, -21.6)
 const WEST: Array[Vector2] = [Vector2(0, -4.5), Vector2(-6, -9), Vector2(-11.5, -13), Vector2(-16.5, -18), Vector2(-16.8, -24), Vector2(-16.5, -28)]
 const EAST: Array[Vector2] = [Vector2(0, -4.5), Vector2(7, -9), Vector2(14, -12.5), Vector2(17.5, -19), Vector2(17.5, -26), Vector2(14.5, -31.5), Vector2(7, -34), Vector2(0, -35), Vector2(-7, -34.5), Vector2(-10, -33.5)]
@@ -81,6 +90,7 @@ func _initialize() -> void:
 	await _check_dune()
 	await _check_exit()
 	await _check_alcove()
+	await _check_feeding_spot()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -101,10 +111,14 @@ func _check_data() -> void:
 	var enemies: Array = data.get("enemies")
 	_expect_eq(enemies.size(), 2, "...two fights")
 	if enemies.size() == 2:
-		_expect(bool(enemies[0].get("required")) and enemies[0].get("position") == REQUIRED_AT, "...the required one first, at the rejoin")
+		_expect(bool(enemies[0].get("required")) and enemies[0].get("position") == REQUIRED_AT, "...the required one first, at the mouth of the exit neck")
+		_expect((enemies[0].get("enemy_data") as Resource).resource_path == DUNECUR_PATH, "...the Dunecur")
+		_expect_eq(int(enemies[0].get("face_prop_index")), 0, "...facing the bones")
 		_expect(not bool(enemies[1].get("required")) and enemies[1].get("position") == OPTIONAL_AT, "...the optional one in its alcove off the west side")
-		for entry in enemies:
-			_expect((entry.get("enemy_data") as Resource).resource_path == SPUTTER_PATH, "...both the Sputter placeholder")
+		_expect((enemies[1].get("enemy_data") as Resource).resource_path == SPUTTER_PATH, "...the Sputter placeholder")
+	var props: Array = data.get("props")
+	_expect(props.size() == 1 and (props[0].get("scene") as Resource).resource_path == "res://field/bone_scatter.tscn", "...one prop: the bones")
+	_expect(data.get("exit_direction") == EXIT_DIRECTION and is_equal_approx(float(data.get("gate_distance_beyond_enemy")), GATE_DISTANCE_M), "...the gate 7 m on along the exit neck")
 	_expect_eq((data.get("ledges") as Array).size(), 2, "...two ledge rings: the boundary and the dune")
 	_expect_eq((data.get("wear_path_override") as PackedVector2Array).size(), 8, "...an 8-point worn band")
 	_completed += 1
@@ -198,8 +212,8 @@ func _check_exit() -> void:
 	var exited: Array[bool] = [false]
 	gate.connect("floor_exited", func() -> void: exited[0] = true)
 	_expect(bool(_wanderer.call("has_hold_line")), "Floor 4 holds a line while the required fight stands")
-	await _place(Vector2(-16, -27.5))
-	_expect(await _walk_to(Vector2(-17.5, -34)), "...walks to the mouth of the exit neck (stopped at %s)" % _at())
+	await _place(PAST_REQUIRED)
+	_expect(_field.get_node("BattleLayer").get_child_count() == 0, "...put past the Dunecur, no fight starts")
 	_wanderer.call("set_move_target", _world(Vector2(-29.5, -38.5)))
 	var worst: float = -INF
 	for i in int(WAYPOINT_SECONDS * 60.0):
@@ -208,6 +222,7 @@ func _check_exit() -> void:
 	_expect(worst <= OVERSHOOT_LIMIT_M, "...he never crosses the gate line (worst %+.3f m)" % worst)
 	_expect(worst > -0.5, "...he comes to rest on it (%+.3f m)" % worst)
 	_expect(not exited[0], "...and the floor doesn't exit")
+	_expect(_field.get_node("BattleLayer").get_child_count() == 0, "...nor does walking on from past him start the fight")
 	# The fight, won.
 	var required: Node = _required_enemy()
 	_field.call_deferred("_on_enemy_contacted", required)
@@ -252,6 +267,45 @@ func _check_exit() -> void:
 		if reloaded != null and reloaded != _field:
 			reloaded.queue_free()
 		current_scene = null
+	await _unload()
+	_completed += 1
+
+# The Dunecur over his bones: where he stands, facing them (the exit
+# neck's way, his back to the approach), his 3 m contact area; the gate
+# 7 m on, the bones all on the near side of it.
+func _check_feeding_spot() -> void:
+	await _load()
+	var required: Node3D = _required_enemy() as Node3D
+	var gate: Node3D = _field.get_node("ExitGate")
+	var bones: Array[Node] = _field.find_children("*", "BoneScatter", true, false)
+	_expect_eq(bones.size(), 1, "One bone scatter on floor 4")
+	if required != null and bones.size() == 1:
+		var at: Vector2 = Vector2(required.global_position.x - _spawn.x, required.global_position.z - _spawn.z)
+		_expect(at.distance_to(REQUIRED_AT) < 0.01, "The Dunecur stands at %s (%s)" % [REQUIRED_AT, at])
+		var scatter: Node3D = bones[0] as Node3D
+		var to_bones := Vector2(scatter.global_position.x - required.global_position.x, scatter.global_position.z - required.global_position.z).normalized()
+		var facing: Vector3 = -required.global_transform.basis.z
+		var forward := Vector2(facing.x, facing.z).normalized()
+		_expect(forward.dot(to_bones) > 0.999, "...facing his bones (%s)" % forward)
+		_expect(forward.dot(EXIT_DIRECTION.normalized()) > 0.99, "...down the exit neck, his back to the approach")
+		_expect_eq(float(required.get("contact_radius")), 3.0, "...his contact area 3 m")
+		var gate_at := Vector2(gate.global_position.x - _spawn.x, gate.global_position.z - _spawn.z)
+		_expect(gate_at.distance_to(REQUIRED_AT + EXIT_DIRECTION.normalized() * GATE_DISTANCE_M) < 0.01, "The gate stands 7 m past him (%s)" % gate_at)
+		var gate_forward: Vector3 = -gate.global_transform.basis.z
+		var pieces: PackedVector3Array = scatter.call("get_piece_positions")
+		_expect_eq(pieces.size(), 12, "...twelve bones")
+		var nearest: float = INF
+		for piece in pieces:
+			nearest = minf(nearest, -(piece - gate.global_position).dot(Vector3(gate_forward.x, 0.0, gate_forward.z).normalized()))
+		_expect(nearest >= BONES_GATE_CLEARANCE_M, "...all of them %.1f m or more short of the gate line (nearest %.2f)" % [BONES_GATE_CLEARANCE_M, nearest])
+		var ground: Node3D = _field.get_node("Ground")
+		var worst_sink: float = INF
+		for piece in pieces:
+			var local: Vector3 = ground.to_local(piece)
+			worst_sink = minf(worst_sink, piece.y - float(ground.call("get_height_at", Vector2(local.x, local.z))))
+		_expect(worst_sink > -0.05, "...each sunk only part way into the sand (lowest centre %+.3f m)" % worst_sink)
+		var band: PackedVector2Array = (load(FLOOR_4_PATH) as Resource).get("wear_path_override")
+		_expect(band.has(REQUIRED_AT), "The worn band runs through him")
 	await _unload()
 	_completed += 1
 

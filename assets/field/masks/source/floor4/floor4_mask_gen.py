@@ -28,7 +28,7 @@ MASKS_OUT = "../../"   # the runtime masks: assets/field/masks/
 OUT = "./"             # the layout and the preview stay beside the sources
 # The worn band (FloorData.wear_path_override, 3 to 8 points): spawn, north out of the
 # entry neck, round the dune's west side, past the required fight, out along the exit neck.
-WEAR_WORLD = [(0, 0), (0, -4.5), (-6.5, -9.0), (-17.5, -18.0), (-16.5, -27.0), (-13.5, -32.267), (-20.0, -35.0), (-27.767, -37.5)]
+WEAR_WORLD = [(0, 0), (0, -4.5), (-6.5, -9.0), (-17.5, -18.0), (-16.5, -27.0), (-16.0, -31.5), (-18.5, -35.0), (-27.767, -37.5)]
 FONT = "../../../../fonts/AlegreyaSans-Regular.ttf"
 
 src = np.array(Image.open("floor4_walkable_sample.png").convert("RGB")).astype(int)
@@ -120,7 +120,7 @@ layout = {
     "rock_world_xz": list(ROCK_CENTRE), "rock_radius_m": ROCK_RADIUS,
     "measurements": meas,
     "ledges_world_xz": ledges,
-    "note": "World XZ in metres relative to spawn; +X right (east), +Z toward the image bottom (south). Two closed ledge rings: [0] the outer boundary, [1] the central dune. The required fight sits where both routes rejoin, before the exit neck, so either side can reach it. The worn band runs spawn -> west side -> required fight -> exit (wear_path_world_xz). The collector and the dig site are reserved spots only - nothing reads them yet.",
+    "note": "World XZ in metres relative to spawn; +X right (east), +Z toward the image bottom (south). Two closed ledge rings: [0] the outer boundary, [1] the central dune. The required fight stands at the mouth of the exit neck, past the rejoin, so either side reaches it and nothing reaches the exit without it. The worn band runs spawn -> west side -> required fight -> exit (wear_path_world_xz). The collector and the dig site are reserved spots only - nothing reads them yet.",
 }
 json.dump(layout, open(OUT + "floor4_layout.json", "w"), indent=1)
 
