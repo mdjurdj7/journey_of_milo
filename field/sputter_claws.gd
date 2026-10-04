@@ -16,9 +16,9 @@ class_name SputterClaws
 #
 # How: at spawn the body mesh is rebuilt once with bone weights (every
 # vertex on bone 0, "Body"; every vertex of a selected piece on bone 1,
-# "Finger") and given a generated Skeleton3D, so the GPU does the
-# turning. The body's material is untouched, so the hover highlight and
-# the hit flash still tint the whole crab.
+# "Finger") and given a generated Skeleton3D (CodeSkin), so the GPU does
+# the turning. The body's material is untouched, so the hover highlight
+# and the hit flash still tint the whole crab.
 #
 # Selection: a piece belongs to the finger when its centroid lies inside
 # the finger box. The box is in GLB UNITS in the glb's own space (head
@@ -91,12 +91,8 @@ const FINGER_BONE := 1
 		claw_interval_max = value
 		_redraw_wait()
 
-var _mesh_instance: MeshInstance3D = null
+var _skin: CodeSkin = null
 var _skeleton: Skeleton3D = null
-var _skinned_mesh: ArrayMesh = null
-var _source_material: Material = null
-# Surface 0 of the glb's mesh, as surface_get_arrays() gives it.
-var _arrays: Array = []
 # Per vertex, which piece it belongs to; per piece, its centroid.
 var _piece_of: PackedInt32Array = PackedInt32Array()
 var _piece_centroids: PackedVector3Array = PackedVector3Array()
@@ -115,23 +111,14 @@ var _last_angle: float = 0.0
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_rng.randomize()
-	var parent := get_parent() as Node3D
-	if parent == null:
-		push_warning("SputterClaws: no model root above; the claws stay still.")
+	_skin = CodeSkin.on_body(get_parent() as Node3D, self, "ClawSkeleton", "SputterClaws")
+	if _skin == null:
 		return
-	for node in parent.find_children("*", "MeshInstance3D", true, false):
-		_mesh_instance = node as MeshInstance3D
-		break
-	if _mesh_instance == null or _mesh_instance.mesh == null:
-		push_warning("SputterClaws: no body mesh under the model root; the claws stay still.")
-		return
-	var mesh: Mesh = _mesh_instance.mesh
-	if mesh.get_surface_count() != 1:
-		push_warning("SputterClaws: the body mesh has %d surfaces; only the first is rigged." % mesh.get_surface_count())
-	_arrays = mesh.surface_get_arrays(0)
-	_source_material = mesh.surface_get_material(0)
+	_skeleton = _skin.skeleton
 	_find_pieces()
-	_build_skeleton()
+	# Two bones, both at rest where the mesh is: the finger's pose carries
+	# the whole hinge turn (see _apply_pose()), so the binds never change.
+	_skin.set_bones(PackedStringArray(["Body", "Finger"]), PackedInt32Array([-1, -1]), [Transform3D.IDENTITY, Transform3D.IDENTITY] as Array[Transform3D])
 	_ready_done = true
 	_redraw_wait()
 	_apply_selection()
@@ -164,8 +151,8 @@ func _redraw_wait() -> void:
 # normal seams), then joins every triangle's corners: what is left
 # connected is one piece.
 func _find_pieces() -> void:
-	var vertices: PackedVector3Array = _arrays[Mesh.ARRAY_VERTEX]
-	var indices: PackedInt32Array = _arrays[Mesh.ARRAY_INDEX]
+	var vertices: PackedVector3Array = _skin.get_vertices()
+	var indices: PackedInt32Array = _skin.arrays[Mesh.ARRAY_INDEX]
 	var count: int = vertices.size()
 	var parent_of := PackedInt32Array()
 	parent_of.resize(count)
@@ -206,28 +193,12 @@ func _root(parent_of: PackedInt32Array, index: int) -> int:
 		at = parent_of[at]
 	return at
 
-# Two bones, both at rest where the mesh is: the finger's pose carries the
-# whole hinge turn (see _apply_pose()), so the binds never change.
-func _build_skeleton() -> void:
-	_skeleton = Skeleton3D.new()
-	_skeleton.name = "ClawSkeleton"
-	_skeleton.add_bone("Body")
-	_skeleton.add_bone("Finger")
-	# Through the freeze with the rest of this node.
-	_skeleton.process_mode = Node.PROCESS_MODE_ALWAYS
-	_mesh_instance.add_child(_skeleton)
-	var skin := Skin.new()
-	skin.add_bind(BODY_BONE, Transform3D.IDENTITY)
-	skin.add_bind(FINGER_BONE, Transform3D.IDENTITY)
-	_mesh_instance.skin = skin
-	_mesh_instance.skeleton = _mesh_instance.get_path_to(_skeleton)
-
 # The finger's pieces from the box, the mesh re-weighted to them, and the
 # hinge derived from them.
 func _apply_selection() -> void:
 	if not _ready_done:
 		return
-	var vertices: PackedVector3Array = _arrays[Mesh.ARRAY_VERTEX]
+	var vertices: PackedVector3Array = _skin.get_vertices()
 	var box := AABB(finger_box_min, finger_box_max - finger_box_min).abs()
 	var chosen: Array[bool] = []
 	chosen.resize(_piece_centroids.size())
@@ -247,13 +218,7 @@ func _apply_selection() -> void:
 		weights[index * 4] = 1.0
 		if moves:
 			finger.append(vertices[index])
-	var arrays: Array = _arrays.duplicate()
-	arrays[Mesh.ARRAY_BONES] = bones
-	arrays[Mesh.ARRAY_WEIGHTS] = weights
-	_skinned_mesh = ArrayMesh.new()
-	_skinned_mesh.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-	_skinned_mesh.surface_set_material(0, _source_material)
-	_mesh_instance.mesh = _skinned_mesh
+	_skin.apply_weights(bones, weights)
 	print("SputterClaws: %d piece(s), %d vertices on the finger." % [chosen_count, finger.size()])
 	if finger.is_empty():
 		push_warning("SputterClaws: no piece's centroid is inside the finger box; nothing moves.")

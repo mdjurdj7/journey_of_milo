@@ -9,7 +9,7 @@ class_name RearPose
 # (see FieldEnemy.set_rearing(), driven by BattleController).
 #
 # Procedural, no clips: at _ready() the body's own mesh is skinned once
-# onto a two-bone Skeleton3D made here. Every vertex behind the pivot
+# onto a two-bone Skeleton3D made here (CodeSkin). Every vertex behind the pivot
 # follows the still root bone; every vertex ahead of it follows a
 # "front" bone whose rest sits on the pivot; across bend_blend_m at the
 # pivot the weight blends from one to the other, so the body bends there
@@ -202,8 +202,7 @@ class_name RearPose
 		tell_fraction = value
 		_apply_tell()
 
-var _mesh_instance: MeshInstance3D = null
-var _source_mesh: Mesh = null
+var _skin: CodeSkin = null
 var _skeleton: Skeleton3D = null
 # In the mesh's own space: the pivot, the bend axis (forward x up, so a
 # positive angle lifts the front) and up; metres per mesh unit.
@@ -245,21 +244,10 @@ var _attacking: bool = false
 var _windup_tween: Tween = null
 
 func _ready() -> void:
-	var model := get_parent() as Node3D
-	if model == null:
+	_skin = CodeSkin.on_body(get_parent() as Node3D, self, "RearSkeleton", "RearPose")
+	if _skin == null:
 		return
-	for node in model.find_children("*", "MeshInstance3D", true, false):
-		var mi := node as MeshInstance3D
-		if mi.mesh != null and not is_ancestor_of(mi):
-			_mesh_instance = mi
-			break
-	if _mesh_instance == null:
-		push_warning("RearPose: no mesh under '%s' to rear; nothing to do." % model.name)
-		return
-	_source_mesh = _mesh_instance.mesh
-	_skeleton = Skeleton3D.new()
-	_skeleton.name = "RearSkeleton"
-	add_child(_skeleton)
+	_skeleton = _skin.skeleton
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	_rng.randomize()
 	# Arrives at rest: the first breath waits out a drawn rest.
@@ -276,7 +264,7 @@ func _process(delta: float) -> void:
 	_breath_elapsed += delta
 	if _breath_elapsed >= _breath_length:
 		_draw_breath()
-	if _mesh_instance.is_visible_in_tree() or _breath_stop <= 0.0:
+	if _skin.mesh_instance.is_visible_in_tree() or _breath_stop <= 0.0:
 		_apply_breath()
 	if _breath_stop <= 0.0:
 		set_process(false)
@@ -347,15 +335,14 @@ func _rebuild() -> void:
 	var body := get_parent().get_parent() as Node3D
 	if body == null:
 		return
-	var to_body: Transform3D = body.global_transform.affine_inverse() * _mesh_instance.global_transform
+	var to_body: Transform3D = body.global_transform.affine_inverse() * _skin.mesh_instance.global_transform
 	var from_body: Basis = to_body.basis.inverse()
 	var forward: Vector3 = (from_body * Vector3.FORWARD).normalized()
 	_up = (from_body * Vector3.UP).normalized()
 	_axis = forward.cross(_up).normalized()
 	_metres_per_unit = to_body.basis.get_scale().x
 
-	var surface: Array = _source_mesh.surface_get_arrays(0)
-	_vertices = surface[Mesh.ARRAY_VERTEX]
+	_vertices = _skin.get_vertices()
 	var front_lo: float = INF
 	var front_hi: float = -INF
 	var floor_level: float = INF
@@ -389,7 +376,7 @@ func _rebuild() -> void:
 	var jaw_root: float = middle + jaw_root_forward_m / _metres_per_unit
 	var jaw_half: float = maxf(jaw_root_blend_m, 0.001) * 0.5 / _metres_per_unit
 	var midline: float = maxf(jaw_midline_m, 0.0001) / _metres_per_unit
-	var main_piece: PackedByteArray = _main_piece(surface[Mesh.ARRAY_INDEX])
+	var main_piece: PackedByteArray = _main_piece(_skin.arrays[Mesh.ARRAY_INDEX])
 	_weights.resize(_vertices.size())
 	var bones := PackedInt32Array()
 	var bone_weights := PackedFloat32Array()
@@ -412,39 +399,20 @@ func _rebuild() -> void:
 		bone_weights[i * 4 + 1] = w - jaw
 		bone_weights[i * 4 + 2] = breath
 		bone_weights[i * 4 + 3] = jaw
-	surface[Mesh.ARRAY_BONES] = bones
-	surface[Mesh.ARRAY_WEIGHTS] = bone_weights
-	var skinned := ArrayMesh.new()
-	skinned.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface)
-	skinned.surface_set_material(0, _source_mesh.surface_get_material(0))
-	_mesh_instance.mesh = skinned
+	_skin.apply_weights(bones, bone_weights)
 
-	_skeleton.clear_bones()
-	_skeleton.add_bone("body")
-	_skeleton.add_bone("front")
-	_skeleton.set_bone_parent(1, 0)
-	_skeleton.set_bone_rest(0, Transform3D.IDENTITY)
-	_skeleton.set_bone_rest(1, Transform3D(Basis.IDENTITY, _pivot))
-	_skeleton.add_bone("breath")
-	_skeleton.set_bone_parent(2, 0)
-	_skeleton.set_bone_rest(2, _breath_rest)
-	# The jaws ride the front bone, so they lift with the rear and open on
-	# top of it.
-	for side in 2:
-		_skeleton.add_bone(["jaw_right", "jaw_left"][side])
-		_skeleton.set_bone_parent(3 + side, 1)
-		_skeleton.set_bone_rest(3 + side, Transform3D(Basis.IDENTITY, _jaw_pivots[side] - _pivot))
-	var skin := Skin.new()
-	skin.add_bind(0, Transform3D.IDENTITY)
-	skin.add_bind(1, Transform3D(Basis.IDENTITY, _pivot).affine_inverse())
-	skin.add_bind(2, _breath_rest.affine_inverse())
-	skin.add_bind(3, Transform3D(Basis.IDENTITY, _jaw_pivots[0]).affine_inverse())
-	skin.add_bind(4, Transform3D(Basis.IDENTITY, _jaw_pivots[1]).affine_inverse())
-	# The skeleton in the mesh's own space, so bind, rest and vertex all
-	# share one frame.
-	_skeleton.global_transform = _mesh_instance.global_transform
-	_mesh_instance.skin = skin
-	_mesh_instance.skeleton = _mesh_instance.get_path_to(_skeleton)
+	# The breath hangs off the still root; the jaws ride the front bone, so
+	# they lift with the rear and open on top of it.
+	_skin.set_bones(
+		PackedStringArray(["body", "front", "breath", "jaw_right", "jaw_left"]),
+		PackedInt32Array([-1, 0, 0, 1, 1]),
+		[
+			Transform3D.IDENTITY,
+			Transform3D(Basis.IDENTITY, _pivot),
+			_breath_rest,
+			Transform3D(Basis.IDENTITY, _jaw_pivots[0] - _pivot),
+			Transform3D(Basis.IDENTITY, _jaw_pivots[1] - _pivot),
+		] as Array[Transform3D])
 	_measure()
 	_set_angle(_angle)
 	_apply_breath()
