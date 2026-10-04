@@ -1370,6 +1370,13 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# (see Wanderer.bind_to_battle()'s own doc).
 	overlay.battle_controller.enemy_defeated.connect(_on_enemy_defeated.bind(overlay))
 	overlay.battle_controller.enemy_pain_turn.connect(_on_enemy_pain_turn)
+	overlay.battle_controller.enemy_status_gained.connect(func(member: FieldEnemy, status: StatusData) -> void:
+		member.show_status(status, true))
+	# The fight's opening statuses (the Blackback's Fed) - applied before
+	# anyone could hear of them - shown on the bodies at once.
+	for member: FieldEnemy in overlay.battle_controller.enemies:
+		for active: Status in overlay.battle_controller.get_enemy_statuses(member):
+			member.show_status(active.data, false)
 	wanderer.bind_to_battle(overlay.battle_controller)
 
 # The Wanderer's stance distance from `from` (the anchor's spot) along

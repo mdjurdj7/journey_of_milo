@@ -84,8 +84,10 @@ func _check_data() -> void:
 	_expect_eq(blackback.starting_statuses.size(), 1, "Blackback holds one passive")
 	_expect(blackback.starting_statuses[0] == load(FED_PATH), "...Fed")
 	_expect(nipper.starting_statuses.is_empty(), "Nipper holds none")
-	_expect_eq(blackback.model_scale, 1.25, "Blackback wears the Sputter at its own scale")
-	_expect_eq(nipper.model_scale, 0.625, "Nipper wears it at half that")
+	_expect_eq(blackback.model_scene_path, "res://assets/models/enemies/Stork/Stork.glb", "Blackback is the marabou")
+	_expect_eq(blackback.model_scale, 92.9, "...at 92.9 - 1.3 m standing")
+	_expect_eq(blackback.attachment_scene_path, "res://field/stork_tells.tscn", "...with its tells (sac, clatter)")
+	_expect_eq(nipper.model_scale, 0.625, "Nipper still wears the Sputter, at 0.625")
 	var fed := Status.new(load(FED_PATH) as StatusData)
 	_expect_eq(fed.describe(), "When the other dies, it turns Hungry: +4 damage on each of its Attacks.", "Fed's reveal line")
 	var hungry := Status.new(load(HUNGRY_PATH) as StatusData)
@@ -144,6 +146,12 @@ func _check_fight_opens() -> void:
 			_expect_eq(labels, PackedStringArray(["Fed"]), "Turn 1: the Blackback's row reads Fed")
 			var bar: Node = blackback.get("enemy_status")
 			_expect(bar != null and _shows(bar, "Fed"), "...its readout shows it")
+			var tells: Node = blackback.get("_attachment")
+			_expect(tells is StorkTells, "The marabou wears its tells")
+			if tells is StorkTells:
+				_expect(is_equal_approx(_sac_grey(tells), (tells as StorkTells).fed_desaturation), "...its sac grey while it's Fed (%.2f)" % _sac_grey(tells))
+				var windup: float = (tells as StorkTells).play_windup(0.1)
+				_expect(windup > 0.0 and is_equal_approx(windup, (tells as StorkTells).clatter_seconds), "...and each attack waits on its bill clatter (%.2f s)" % windup)
 		if nipper != null:
 			_expect_eq(_combatant(controller, nipper).statuses.size(), 0, "The Nipper holds nothing")
 	await _teardown()
@@ -181,8 +189,15 @@ func _check_nipper_dies_first() -> void:
 	if controller != null:
 		var blackback: Node = _member(controller, "Blackback")
 		var b: Combatant = _combatant(controller, blackback)
+		var gained: Array = []
+		controller.connect("enemy_status_gained", func(member: Node, status: StatusData) -> void: gained.append([member, status]))
 		_kill(controller, _member(controller, "Nipper"))
 		_expect_eq(controller.call("get_enemy_status_labels", blackback), PackedStringArray(["Hungry"]), "Nipper dead: Fed is Hungry")
+		_expect(gained.size() == 1 and gained[0][0] == blackback and gained[0][1] == load(HUNGRY_PATH), "...told once, to its body: it gained Hungry (%d told)" % gained.size())
+		var tells: Node = blackback.get("_attachment")
+		if tells is StorkTells:
+			await create_timer((tells as StorkTells).fade_seconds + 0.2).timeout
+			_expect(is_equal_approx(_sac_grey(tells), 0.0), "...and its sac's red is back (%.2f)" % _sac_grey(tells))
 		var bar: Node = blackback.get("enemy_status")
 		_expect(bar != null and _shows(bar, "Hungry"), "...its readout shows it")
 		var preview: Dictionary = controller.call("get_intent_preview", blackback)
@@ -333,6 +348,11 @@ func _kill(controller: Node, member: Node) -> void:
 	var combatant: Combatant = _combatant(controller, member)
 	combatant.hp = 0
 	controller.call("_report_damage", "player", combatant, 99, "card")
+
+# How grey the marabou's sac is now (its pass's grey_amount).
+func _sac_grey(tells: Node) -> float:
+	var sac: ShaderMaterial = tells.get("_sac")
+	return float(sac.get_shader_parameter("grey_amount")) if sac != null else -1.0
 
 func _shows(bar: Node, text: String) -> bool:
 	var row: Variant = bar.get("_status_texts")

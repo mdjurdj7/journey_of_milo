@@ -68,6 +68,12 @@ signal enemy_defeated(enemy: FieldEnemy)
 # its next action is cancelled. For the line and the sound; the intent's
 # own change comes through enemy_intent_changed.
 signal enemy_pain_turn(enemy: FieldEnemy)
+# An enemy has just gained a status mid-fight - one turned into another
+# by leaving its pack (the Blackback's Fed into Hungry, when the Nipper
+# dies). For its body's tells (StorkTells' sac); the readouts take the
+# change through status_changed. A fight's opening statuses aren't sent:
+# they're read at its start (RegionField).
+signal enemy_status_gained(enemy: FieldEnemy, status: StatusData)
 signal battle_won()
 signal battle_lost()
 
@@ -792,7 +798,13 @@ func _mark_lone_pack_members() -> void:
 			continue
 		if _has_living_packmate(enemy):
 			continue
+		var held: Array[StatusData] = []
+		for active: Status in combatant.statuses:
+			held.append(active.data)
 		if EnemyTurn.leave_pack(combatant, enemy.enemy_data):
+			for active: Status in combatant.statuses:
+				if active.data != null and not held.has(active.data):
+					enemy_status_gained.emit(enemy, active.data)
 			status_changed.emit()
 			enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
 

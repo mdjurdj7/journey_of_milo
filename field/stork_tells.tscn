@@ -1,0 +1,10 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://field/stork_tells.gd" id="1_stork_tells"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/fed.tres" id="2_fed"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/hungry.tres" id="3_hungry"]
+
+[node name="StorkTells" type="Node3D"]
+script = ExtResource("1_stork_tells")
+grey_status = ExtResource("2_fed")
+red_status = ExtResource("3_hungry")

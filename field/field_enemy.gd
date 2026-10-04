@@ -598,6 +598,13 @@ func _spawn_contact_audio() -> void:
 	_contact_player.process_mode = Node.PROCESS_MODE_ALWAYS
 	add_child(_contact_player)
 
+# A status this enemy holds, for its body's tells: handed to the
+# attachment if it shows statuses (StorkTells - the marabou's sac).
+# `animate` false at a fight's opening, where it's set at once.
+func show_status(status: StatusData, animate: bool) -> void:
+	if status != null and _attachment != null and _attachment.has_method("show_status"):
+		_attachment.call("show_status", status, animate)
+
 # EnemyData.pain_turn_sound, once, from this body - on the SFX bus and
 # through the battle freeze, like the contact sound. Nothing without one.
 func play_pain_turn_sound() -> void:
