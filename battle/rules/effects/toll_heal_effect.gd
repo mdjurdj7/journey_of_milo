@@ -6,11 +6,14 @@ class_name TollHealEffect
 # Toll spend in the set: TOLL_DAMAGE takes all of it, TOLL_FRACTION_DAMAGE
 # _ALL takes a share, TOLL_BLOCK takes a fixed amount.
 #
-# Integer division on purpose: an odd Toll spend rounds the heal down, so
-# spending 7 heals 3 and the leftover point buys nothing. That's the
-# card's own bargain, not a rounding accident.
+# It spends only what it converts: an even amount, 2 Toll per HP, never
+# past what `value` HP takes. An odd point is left held, not spent for
+# nothing - on 13 Toll it spends 12, heals 6 and leaves 1. One Toll alone
+# spends nothing at all (so it hurries no Sentence).
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
-	var spent: int = ctx.spend_toll(effect.toll_cost)
+	var convertible: int = mini(mini(effect.toll_cost, ctx.player.toll), effect.value * 2)
+	convertible -= convertible % 2
+	var spent: int = ctx.spend_toll(convertible)
 	if spent <= 0:
 		return
 	var healed: int = mini(spent / 2, effect.value)

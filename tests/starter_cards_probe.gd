@@ -439,12 +439,15 @@ func _check_rules_text_pattern() -> void:
 	view.free()
 	_completed += 1
 
-# Debt Forgiven spends up to 20 Toll and heals 1 HP per 2 spent, rounded
-# down; it and Reckoning say their rule outside a fight and their live
+# Debt Forgiven spends up to 20 Toll and heals 1 HP per 2 spent - only
+# the even amount it converts, so an odd point stays held; it and
+# Reckoning say their rule outside a fight and their live
 # number in a battle hand (CardView's {battle}/{outside} blocks).
 func _check_toll_cards() -> void:
 	var debt: CardData = _card("debt_forgiven")
-	for case: Array in [[30, 20, 10], [20, 20, 10], [7, 7, 3], [1, 1, 0]]:
+	# Toll held, spent, healed - only the even amount it converts is
+	# spent: 13 spends 12, heals 6 and leaves 1.
+	for case: Array in [[30, 20, 10], [20, 20, 10], [13, 12, 6], [7, 6, 3], [1, 0, 0]]:
 		var player: Combatant = _player(40)
 		player.max_hp = 70
 		player.toll = case[0]
