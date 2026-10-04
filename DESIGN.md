@@ -47,8 +47,9 @@ must; Commons can be plain tools (Slash, Carve, Brace, Bide).
 - **Endure out of every Wanderer card pool, for now.** Taken out of
   `cards/pools/wanderer_pool.tres` (2026-10-03) and then out of
   `cards/pools/belongings_pool.tres`, the floor-2 belongings and
-  Keeper pool (2026-10-04). The card itself (`cards/data/endure.tres`)
-  is untouched, and the probes that play it directly still do. Put it
+  Keeper pool (2026-10-04). The card's data is untouched; its file moved
+  to `cards/neutral/endure.tres` (2026-10-04), so the compendium files it
+  under Neutral. The probes that play it directly still do. Put it
   back by re-adding the entries (and Endure to `card_rarity_probe.gd`'s
   EXPECTED_POOL, count back to 20).
 

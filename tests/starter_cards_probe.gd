@@ -496,8 +496,12 @@ func _check_blood_arc_effect() -> void:
 		node.free()
 	_completed += 1
 
+# A card by file name - the Wanderer's, else a neutral one (Endure).
 func _card(card_name: String) -> CardData:
-	return load("res://cards/data/%s.tres" % card_name) as CardData
+	var path: String = "res://cards/data/%s.tres" % card_name
+	if not ResourceLoader.exists(path):
+		path = "res://cards/neutral/%s.tres" % card_name
+	return load(path) as CardData
 
 func _attack(damage: int, hits: int) -> EnemyIntent:
 	var intent := EnemyIntent.new()

@@ -32,7 +32,7 @@ extends SceneTree
 
 const SCREEN_SCENE_PATH := "res://battle/belongings_screen.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
-const CARD_PATH := "res://cards/data/endure.tres"
+const CARD_PATH := "res://cards/neutral/endure.tres"
 const OFFERED_PATH := "res://run/keepsakes/frayed_cord.tres"
 const HELD_PATH := "res://run/keepsakes/bent_nail.tres"
 const OBJECT_PATHS := [

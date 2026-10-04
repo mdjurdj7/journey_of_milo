@@ -282,8 +282,12 @@ func _check_aoe_face() -> void:
 		_expect_eq(await _face_damage(card_name, player, [marked]), _damage(_card(card_name)), "%s's face leaves Come Due out" % card_name)
 	_completed += 1
 
+# A card by file name - the Wanderer's, else a neutral one (Endure).
 func _card(card_name: String) -> CardData:
-	return load("res://cards/data/%s.tres" % card_name) as CardData
+	var path: String = "res://cards/data/%s.tres" % card_name
+	if not ResourceLoader.exists(path):
+		path = "res://cards/neutral/%s.tres" % card_name
+	return load(path) as CardData
 
 func _player() -> Combatant:
 	var player := Combatant.new(MAX_HP)

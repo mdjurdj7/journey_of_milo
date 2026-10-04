@@ -293,8 +293,12 @@ func _check_pool() -> void:
 
 # --- Helpers ---
 
+# A card by file name - the Wanderer's, else a neutral one (Endure).
 func _card(card_name: String) -> CardData:
-	return load("res://cards/data/%s.tres" % card_name) as CardData
+	var path: String = "res://cards/data/%s.tres" % card_name
+	if not ResourceLoader.exists(path):
+		path = "res://cards/neutral/%s.tres" % card_name
+	return load(path) as CardData
 
 func _player() -> Combatant:
 	var player := Combatant.new(MAX_HP)
