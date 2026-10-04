@@ -25,6 +25,7 @@ signal closed()
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
+const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 
 @export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.40)
 # Bone - the on-dark ink of the theme's own pair.
@@ -169,6 +170,14 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 # card take (RMS about -23 against -26 at the same -6 dBFS peak), so -20
 # sits it at or just under the card take by ear.
 @export var gold_volume_db: float = -20.0
+# The card choice opening - once, as TAKE ONE and its cards appear; never
+# for the LEFT BEHIND list, and not on NONE OF THESE. 2D on the SFX bus,
+# under the battle's card-play cue (-16) at the same -6 dBFS peak.
+@export var choice_open_volume_db: float = -20.0:
+	set(value):
+		choice_open_volume_db = value
+		if _choice_open_player != null:
+			_choice_open_player.volume_db = choice_open_volume_db
 @export var card_flight_end_scale: float = 0.12
 @export_group("")
 
@@ -228,6 +237,9 @@ var _decline_gap_px: float = 100.0
 
 var _draw_layer: Control = null
 var _scrim: ColorRect = null
+# The choice-opening cue's player (choice_open_volume_db) - one, kept, so
+# the volume's setter reaches it.
+var _choice_open_player: AudioStreamPlayer = null
 var _item_font: Font = null
 var _header_font: Font = null
 var _action_font: Font = null
@@ -710,6 +722,22 @@ func _open_choice() -> void:
 	_decline_hovered = false
 	_layout_choice()
 	_apply_scrim()
+	_play_choice_open()
+
+# The choice-opening cue, once per choice opened. Made on first use.
+func _play_choice_open() -> void:
+	if _choice_open_player == null:
+		var stream := load(CHOICE_OPEN_SFX_PATH) as AudioStream
+		if stream == null:
+			push_warning("RewardScreen: choice cue failed to load (%s); silent." % CHOICE_OPEN_SFX_PATH)
+			return
+		_choice_open_player = AudioStreamPlayer.new()
+		_choice_open_player.name = "ChoiceOpenAudio"
+		_choice_open_player.bus = &"SFX"
+		_choice_open_player.stream = stream
+		_choice_open_player.volume_db = choice_open_volume_db
+		add_child(_choice_open_player)
+	_choice_open_player.play()
 
 # The open choice laid out for the window it's in: the fit factor, the
 # cards placed and scaled (their base scale, so a hover grows from it),
