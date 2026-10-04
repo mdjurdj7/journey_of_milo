@@ -18,6 +18,10 @@ var deck: Deck
 # before the play committed (BattleController's choose mode). Empty for
 # every other card, and for a Bide played with none chosen.
 var set_aside_choice: Array[CardData] = []
+# The hand card a CONSUME (Deny) takes: the most expensive other card,
+# picked - or chosen among a tie - before the play committed (Battle
+# Controller). Null when there was none to take.
+var consume_choice: CardData = null
 # Cards committed this turn BEFORE the one this context is for - what
 # Condition.FIRST_CARD_THIS_TURN reads. The controller counts a card at
 # commit, so for the card resolving this is its count minus one; for a

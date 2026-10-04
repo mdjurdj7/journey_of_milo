@@ -180,18 +180,28 @@ func set_deck(deck: Deck) -> void:
 func _on_deck_changed(_card: CardData) -> void:
 	_sync_with_deck()
 
-# Bide's choice opened with `chooser` armed (BattleController's choose
+# A hand choice opened with `chooser` armed (BattleController's choose
 # mode): the arming suppressed every other card's hover, but here they
-# are what gets clicked, so hover comes back for them.
-func begin_choice(chooser: CardView) -> void:
+# are what gets clicked, so hover comes back for them - for `eligible`
+# alone when it names any (Deny's tie), the rest staying still.
+func begin_choice(chooser: CardView, eligible: Array[CardView] = []) -> void:
 	for view in _card_views():
-		if view != chooser:
+		if view != chooser and (eligible.is_empty() or eligible.has(view)):
 			view.set_hover_suppressed(false)
 
-# The choice closed (confirmed or cancelled): every mark comes off.
-func end_choice() -> void:
+# The choice closed (confirmed or cancelled): every mark comes off but
+# `keep`'s (Deny's pick, waiting on its target), and while a card is
+# still armed the rest of the hand goes back to not hovering.
+func end_choice(keep: CardView = null) -> void:
 	for view in _card_views():
-		view.set_marked(false)
+		if view != keep:
+			view.set_marked(false)
+	if _armed_slot == null:
+		return
+	var armed_view: CardView = _armed_slot.get_child(0) as CardView
+	for view in _card_views():
+		if view != armed_view:
+			view.set_hover_suppressed(true)
 
 # The chosen cards' own slots leave the hand now - called right before
 # the Deck sets their cards aside, so with two copies of a card in hand
@@ -352,6 +362,10 @@ func set_enemy_target_available(available: bool) -> void:
 
 func _can_play(card: CardData, energy: int) -> bool:
 	if card.target_type == CardData.TargetType.ENEMY and not _enemy_target_available:
+		return false
+	# An enemy-target card with no enemy it may land on (Deny, every one
+	# left already Denied) fades too - the same rule targeting reads.
+	if card.target_type == CardData.TargetType.ENEMY and _bonus_context != null and not EffectResolver.has_target(card, _bonus_context.enemies):
 		return false
 	# A card the rules block - a fixed Toll not held (Come Due) - fades like
 	# an unaffordable one (EffectResolver.card_blocked()). No context yet =

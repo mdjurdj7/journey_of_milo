@@ -45,7 +45,7 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "heal_allies": 0, "saved_heal": 0}
+	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false}
 
 	Status.tick_all(combatant.statuses, func(amount: int) -> void:
 		combatant.hp = max(combatant.hp - amount, 0)
@@ -66,11 +66,22 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 
 	var intent := current_intent(combatant, data)
 	var interjected: bool = combatant.interjected_intent != null
+	# Denied (Deny - StatusData.skips_next_turn): spent by this turn
+	# whatever happens, so it never carries over - a pain turn landing on
+	# the same turn takes it too.
+	var denied: Status = Status.skip_turn_status(combatant.statuses)
+	if denied != null:
+		combatant.statuses.erase(denied)
+		result["denied"] = true
 	if combatant.pain_turn_pending:
 		# The pain turn: nothing resolves and nothing is queued in its
 		# place - the loop moves on and the turn is counted, as if it had.
 		combatant.pain_turn_pending = false
 		result["pain_turn"] = true
+	elif denied != null:
+		# Denied: the same as a pain turn - the move is lost, not delayed;
+		# an interruptible one isn't "interrupted", so nothing is queued.
+		pass
 	elif is_interrupted(combatant, intent):
 		result["interrupted"] = true
 	elif intent != null:
@@ -190,6 +201,12 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 		preview["pain_turn"] = true
 		preview["per_hit"] = 0
 		return preview
+	# Denied: the move keeps its number - the display shows what was
+	# denied, struck through - but it won't resolve, so it reaches nothing
+	# and is never lethal.
+	var denied: bool = is_denied(combatant)
+	if denied:
+		preview["denied"] = true
 	if intent.type != EnemyIntent.IntentType.ATTACK:
 		return preview
 	if intent.interrupt_threshold > 0:
@@ -225,9 +242,13 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 				saves_used += 1
 	preview["hits"] = hits
 	preview["hit_amounts"] = hit_amounts
-	preview["damage_to_hp"] = total_to_hp
-	preview["lethal"] = hp <= 0 and not bool(preview.get("interrupted", false))
+	preview["damage_to_hp"] = 0 if denied else total_to_hp
+	preview["lethal"] = hp <= 0 and not bool(preview.get("interrupted", false)) and not denied
 	return preview
+
+# Whether this enemy's next turn is skipped (Denied).
+static func is_denied(combatant: Combatant) -> bool:
+	return Status.skip_turn_status(combatant.statuses) != null
 
 # The pain turn's trigger (EnemyData.pain_turn_hp_threshold): the first
 # time this living enemy's HP is strictly below that fraction of its max,

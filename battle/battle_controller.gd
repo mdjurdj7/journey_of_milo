@@ -19,10 +19,11 @@ signal card_swing(card: CardData)
 signal hand_changed()
 signal target_requested(card: CardData)
 signal target_cancelled()
-# Bide's choice (a SET_ASIDE card - see request_play()): opened with up to
-# `cap` other hand cards to mark, the count marked as it moves, and closed
-# (confirmed into the play, or cancelled with nothing spent).
-signal hand_choice_started(card: CardData, cap: int)
+# A hand choice (see _begin_choice()) - Bide's set-aside, or Deny's pick
+# among cards tied for most expensive: opened with up to `cap` cards to
+# mark and the verb that names what happens to them, the count marked as
+# it moves, and closed (confirmed, or cancelled with nothing spent).
+signal hand_choice_started(card: CardData, cap: int, verb: String)
 signal hand_choice_changed(marked: int, cap: int)
 signal hand_choice_ended()
 
@@ -89,6 +90,9 @@ signal battle_won()
 signal battle_lost()
 
 @export var turn_draw_amount: int = 5
+# A Denied enemy's skipped turn holds this long (seconds), its Denied gone
+# from the readout, so the skip reads - it has no lunge to wait on.
+@export var denied_beat_sec: float = 0.5
 # See card_swing.
 @export var swing_lead_seconds: float = 0.04
 @export var enemy_head_height: float = 1.8
@@ -112,6 +116,13 @@ var _pending_card_view: CardView = null
 var _choosing_card_view: CardView = null
 var _choice_marked: Array[CardView] = []
 var _choice_cap: int = 0
+# What the open choice is for: SET_ASIDE (Bide - 0 to cap, any other card)
+# or CONSUME (Deny's tie - exactly cap, the tied cards only).
+var _choice_kind: CardEffect.EffectType = CardEffect.EffectType.SET_ASIDE
+var _choice_eligible: Array[CardView] = []
+# The hand card a CONSUME card (Deny) will take, picked before its target
+# is: marked in the hand while the target is chosen, taken as it resolves.
+var _pending_consume_view: CardView = null
 var _hovered_enemy: FieldEnemy = null
 # The enemy under the cursor itself, without the default - see
 # hovered_enemy_changed.
@@ -276,21 +287,67 @@ func request_play(card_view: CardView) -> void:
 	# faded, and this is the rule behind the fade.
 	if EffectResolver.card_blocked(card, player):
 		return
-	# Every enemy buried: an enemy-target card has nothing to land on.
-	if card.target_type == CardData.TargetType.ENEMY and _hittable_enemy_combatants().is_empty():
+	# Every enemy buried - or, for Deny, every one already Denied: an
+	# enemy-target card has nothing to land on.
+	if card.target_type == CardData.TargetType.ENEMY and not _has_valid_target(card):
 		return
 	# A SET_ASIDE card (Bide) asks which cards first, unless there is
 	# nothing else in the hand to choose - then it just plays.
 	var cap: int = _set_aside_cap(card)
 	if cap > 0:
-		_begin_choice(card_view, cap)
+		_begin_choice(card_view, cap, CardEffect.EffectType.SET_ASIDE)
 		return
+	# A CONSUME card (Deny) takes the most expensive other card: picked
+	# now, or chosen first when several tie; none to take is fine.
+	if _has_effect(card, CardEffect.EffectType.CONSUME):
+		var others: Array[CardView] = _other_hand_views(card_view)
+		var others_data: Array[CardData] = []
+		for view in others:
+			others_data.append(view.card_data)
+		var picks: Array[int] = ConsumeEffect.candidates(others_data)
+		if picks.size() > 1:
+			var tied: Array[CardView] = []
+			for i in picks:
+				tied.append(others[i])
+			_begin_choice(card_view, 1, CardEffect.EffectType.CONSUME, tied)
+			return
+		if picks.size() == 1:
+			_pending_consume_view = others[picks[0]]
+			_pending_consume_view.set_marked(true)
+	_arm_or_play(card_view)
+
+# The card goes on: an enemy-target card arms for its target (from
+# wherever it is held), any other resolves now.
+func _arm_or_play(card_view: CardView) -> void:
+	var card: CardData = card_view.card_data
 	if card.target_type == CardData.TargetType.ENEMY:
 		_pending_card_view = card_view
-		card_view.lift_and_hold()
+		card_view.lift_and_hold(card_view == _choosing_card_view or _pending_consume_view != null)
 		target_requested.emit(card)
 	else:
 		_resolve_play(card_view, null)
+
+func _has_effect(card: CardData, type: CardEffect.EffectType) -> bool:
+	for effect in card.effects:
+		if effect != null and effect.effect_type == type:
+			return true
+	return false
+
+# The hand's views other than `card_view`, in hand order.
+func _other_hand_views(card_view: CardView) -> Array[CardView]:
+	var others: Array[CardView] = []
+	for view: CardView in _hand_container.call("_card_views"):
+		if view != card_view and view.card_data != null:
+			others.append(view)
+	return others
+
+# Whether `card` may land on `combatant` (EffectResolver.can_target() -
+# not buried, and Deny not on the already Denied).
+func _can_target(card: CardData, combatant: Combatant) -> bool:
+	return EffectResolver.can_target(card, combatant)
+
+func _has_valid_target(card: CardData) -> bool:
+	return EffectResolver.has_target(card, _hittable_enemy_combatants())
 
 # How many cards a SET_ASIDE card may set aside right now: its number,
 # capped at the other cards in the hand. 0 for every other card.
@@ -303,22 +360,29 @@ func _set_aside_cap(card: CardData) -> int:
 		return 0
 	return mini(value, maxi(deck.hand.size() - 1, 0))
 
-# Bide's choice, opened: the card arms the way a targeting card does (the
-# hand stops hovering, End Turn greys), then the other cards wake up to be
-# clicked - each click marks or unmarks one, up to `cap`; a click past the
-# cap does nothing. Clicking the armed card again, Enter or Space confirm
-# (with 0 to `cap` marked); right-click or Esc cancel with nothing spent.
-func _begin_choice(card_view: CardView, cap: int) -> void:
+# A hand choice, opened: the card arms the way a targeting card does (the
+# hand stops hovering, End Turn greys), then the cards it may take wake up
+# to be clicked - each click marks or unmarks one, up to `cap`; a click
+# past the cap, or on a card it may not take, does nothing. Clicking the
+# armed card again, Enter or Space confirm; right-click or Esc cancel with
+# nothing spent. Bide's (SET_ASIDE) takes 0 to `cap` of any other card.
+# Deny's (CONSUME) takes exactly `cap` of `eligible` - the cards tied for
+# most expensive - and goes on to its target once confirmed.
+func _begin_choice(card_view: CardView, cap: int, kind: CardEffect.EffectType, eligible: Array[CardView] = []) -> void:
 	_choosing_card_view = card_view
 	_choice_marked.clear()
 	_choice_cap = cap
+	_choice_kind = kind
+	_choice_eligible = eligible
 	card_view.lift_and_hold(true)
-	_hand_container.begin_choice(card_view)
-	hand_choice_started.emit(card_view.card_data, cap)
+	_hand_container.begin_choice(card_view, eligible)
+	hand_choice_started.emit(card_view.card_data, cap, "CONSUME" if kind == CardEffect.EffectType.CONSUME else "SET ASIDE")
 	hand_choice_changed.emit(0, cap)
 
 func toggle_choice(card_view: CardView) -> void:
 	if _choosing_card_view == null or card_view == _choosing_card_view:
+		return
+	if not _choice_eligible.is_empty() and not _choice_eligible.has(card_view):
 		return
 	if _choice_marked.has(card_view):
 		_choice_marked.erase(card_view)
@@ -335,6 +399,15 @@ func confirm_choice() -> void:
 		return
 	var card_view: CardView = _choosing_card_view
 	var chosen: Array[CardView] = _choice_marked.duplicate()
+	if _choice_kind == CardEffect.EffectType.CONSUME:
+		# Exactly one of the tied cards, then on to the target, the
+		# chosen card staying marked while it waits.
+		if chosen.size() != _choice_cap:
+			return
+		_pending_consume_view = chosen[0]
+		_close_choice(_pending_consume_view)
+		_arm_or_play(card_view)
+		return
 	_close_choice()
 	_resolve_play(card_view, null, chosen)
 
@@ -345,28 +418,37 @@ func cancel_choice() -> void:
 	_close_choice()
 	card_view.release()
 
-func _close_choice() -> void:
+# `keep` stays marked (Deny's pick, waiting on its target).
+func _close_choice(keep: CardView = null) -> void:
 	_choosing_card_view = null
 	_choice_marked.clear()
 	_choice_cap = 0
-	_hand_container.end_choice()
+	_choice_eligible = []
+	_hand_container.end_choice(keep)
 	hand_choice_ended.emit()
 
 func confirm_target(enemy: FieldEnemy) -> void:
 	if _pending_card_view == null:
 		return
+	if not _can_target(_pending_card_view.card_data, _combatants.get(enemy)):
+		return
 	var card_view := _pending_card_view
+	var consume_view: CardView = _pending_consume_view
 	_pending_card_view = null
+	_pending_consume_view = null
 	_clear_hover()
 	_set_cursor_enemy(null)
 	_enemy_rects.clear()
-	_resolve_play(card_view, enemy)
+	_resolve_play(card_view, enemy, [], consume_view)
 
 func cancel_target() -> void:
 	if _pending_card_view == null:
 		return
 	_pending_card_view.release()
 	_pending_card_view = null
+	if _pending_consume_view != null and is_instance_valid(_pending_consume_view):
+		_pending_consume_view.set_marked(false)
+	_pending_consume_view = null
 	_clear_hover()
 	_set_cursor_enemy(null)
 	_enemy_rects.clear()
@@ -406,7 +488,7 @@ func end_turn() -> void:
 # the swing with no rewiring - only the wait moved. _input_locked (set
 # by the caller path this always runs on) keeps a second card from being
 # armed while this is in flight.
-func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_views: Array[CardView] = []) -> void:
+func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_views: Array[CardView] = [], consume_view: CardView = null) -> void:
 	var card: CardData = card_view.card_data
 	# Read before anything is spent: whether a cost replacement (Collateral)
 	# covers this card depends on the free card and any cost reduction
@@ -466,6 +548,10 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 			ctx.set_aside_choice.append(view.card_data)
 	if not set_aside_views.is_empty():
 		_hand_container.release_views(set_aside_views)
+	# Deny's pick: its own view leaves the hand as the Deck spends it.
+	if consume_view != null and is_instance_valid(consume_view) and consume_view.card_data != null:
+		ctx.consume_choice = consume_view.card_data
+		_hand_container.release_views([consume_view] as Array[CardView])
 
 	_effect_resolver.resolve_card(card, ctx)
 	# Taken, deepened or replaced by the card just played - and the card
@@ -567,6 +653,12 @@ func _run_sequential_turn() -> void:
 			continue
 		if result["pain_turn_triggered"]:
 			enemy_pain_turn.emit(enemy)
+		# Denied: no move to watch - the readout loses its Denied, and the
+		# turn holds a beat so the skip reads.
+		if result["denied"]:
+			status_changed.emit()
+			if denied_beat_sec > 0.0:
+				await get_tree().create_timer(denied_beat_sec).timeout
 		if result["attacked"]:
 			var snap_delay: float = enemy.play_attack_snap(_wanderer)
 			if snap_delay > 0.0:
@@ -576,7 +668,7 @@ func _run_sequential_turn() -> void:
 		# from there. A broken one is already down - it dropped on the card
 		# that broke it (_resolve_play()), so this waits on nothing and the
 		# burrow follows at once.
-		if result["attacked"] or result["interrupted"]:
+		if result["attacked"] or result["interrupted"] or result["denied"]:
 			var drop_delay: float = enemy.set_rearing(false)
 			if drop_delay > 0.0:
 				await get_tree().create_timer(drop_delay).timeout
@@ -614,6 +706,9 @@ func _run_simultaneous_turn() -> void:
 		acting.append(enemy)
 		if results[enemy]["attacked"]:
 			longest_snap = maxf(longest_snap, enemy.play_attack_snap(_wanderer))
+		# A Denied member sits the shared move out, on the same beat.
+		if results[enemy]["denied"]:
+			longest_snap = maxf(longest_snap, denied_beat_sec)
 		longest_snap = maxf(longest_snap, _play_burrow_for(enemy, results[enemy]))
 	if longest_snap > 0.0:
 		await get_tree().create_timer(longest_snap).timeout
@@ -663,7 +758,7 @@ func _pose_for_intent(enemy: FieldEnemy) -> float:
 	var poised: bool = false
 	if combatant != null and combatant.hp > 0 and not combatant.buried and enemy.enemy_data != null:
 		var intent: EnemyIntent = EnemyTurn.current_intent(combatant, enemy.enemy_data)
-		rear = intent != null and intent.rear_while_queued and not EnemyTurn.is_interrupted(combatant, intent)
+		rear = intent != null and intent.rear_while_queued and not EnemyTurn.is_interrupted(combatant, intent) and not EnemyTurn.is_denied(combatant)
 		poised = intent != null and intent.type == EnemyIntent.IntentType.ATTACK and not intent.rear_while_queued
 	enemy.set_poised(poised)
 	return enemy.set_rearing(rear)
@@ -1083,8 +1178,11 @@ func _refresh_enemy_rects() -> void:
 			continue
 		var combatant: Combatant = _combatants.get(enemy)
 		# The buried can't be targeted: no rect, so no click, hover or
-		# default target lands on one.
+		# default target lands on one - nor, for the armed card, one it
+		# may not land on (Deny on the already Denied).
 		if combatant == null or combatant.hp <= 0 or combatant.buried:
+			continue
+		if _pending_card_view != null and not _can_target(_pending_card_view.card_data, combatant):
 			continue
 		var rect: Rect2 = enemy.get_screen_rect(camera, target_padding_px)
 		if rect.size == Vector2.ZERO:

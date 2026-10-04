@@ -24,10 +24,11 @@ signal battle_finished(outcome: Outcome)
 @export var card_override_volume_db: float = -16.0
 
 @export_group("Choice Prompt")
-# Bide's open choice says what it wants in one tracked-caps ink line, this
-# far above the armed card (BattleController.hand_choice_*): the count
-# marked, the cap, and the card to click to confirm.
-@export var choice_prompt_format: String = "SET ASIDE %d / %d  ·  CLICK %s TO CONFIRM"
+# An open hand choice says what it wants in one tracked-caps ink line,
+# this far above the armed card (BattleController.hand_choice_*): its
+# verb (SET ASIDE, CONSUME), the count marked, the cap, and the card to
+# click to confirm.
+@export var choice_prompt_format: String = "%s %d / %d  ·  CLICK %s TO CONFIRM"
 @export var choice_prompt_font_size_px: int = 13:
 	set(value):
 		choice_prompt_font_size_px = value
@@ -115,6 +116,7 @@ var _card_armed: bool = false
 # choice is open - null/empty while none is.
 var _choice_prompt: Label = null
 var _choice_card_name: String = ""
+var _choice_verb: String = ""
 
 func _ready() -> void:
 	# RegionField freezes itself (and, by inheritance, this whole overlay -
@@ -540,8 +542,9 @@ func _on_card_armed_changed(armed: bool) -> void:
 func _update_end_turn() -> void:
 	end_turn_button.set_enabled(_player_turn and not _card_armed)
 
-func _on_hand_choice_started(card: CardData, _cap: int) -> void:
+func _on_hand_choice_started(card: CardData, _cap: int, verb: String) -> void:
 	_choice_card_name = card.card_name
+	_choice_verb = verb
 	if _choice_prompt == null:
 		_choice_prompt = Label.new()
 		_choice_prompt.name = "ChoicePrompt"
@@ -553,7 +556,7 @@ func _on_hand_choice_started(card: CardData, _cap: int) -> void:
 func _on_hand_choice_changed(marked: int, cap: int) -> void:
 	if _choice_prompt == null:
 		return
-	_choice_prompt.text = choice_prompt_format % [marked, cap, _choice_card_name.to_upper()]
+	_choice_prompt.text = choice_prompt_format % [_choice_verb, marked, cap, _choice_card_name.to_upper()]
 	_choice_prompt.size = Vector2.ZERO
 	_place_choice_prompt()
 

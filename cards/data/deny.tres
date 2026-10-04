@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/denied.tres" id="3_denied"]
+[ext_resource type="Texture2D" uid="uid://1vy6gdh8dkvj" path="res://cards/art/Wanderer/Deny.png" id="4_art"]
+
+[sub_resource type="Resource" id="E_consume"]
+script = ExtResource("2_card_effect")
+effect_type = 24
+value = 1
+
+[sub_resource type="Resource" id="E_deny"]
+script = ExtResource("2_card_effect")
+effect_type = 18
+status_data = ExtResource("3_denied")
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Deny"
+cost = 2
+rarity = 2
+card_type = 1
+target_type = 0
+description = "Consume your costliest card.
+Target enemy skips its next move.
+Spent."
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_consume"), SubResource("E_deny")])
+removal_scope = 1
+art = ExtResource("4_art")
+play_sound_path = "res://assets/audio/cards/Deny/Deny.mp3"

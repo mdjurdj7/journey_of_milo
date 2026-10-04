@@ -168,6 +168,14 @@ static func find_in(statuses: Array[Status], status_data: StatusData) -> Status:
 			return active
 	return null
 
+# The status that skips its holder's next turn (StatusData.skips_next_
+# turn - Denied), or null.
+static func skip_turn_status(statuses: Array[Status]) -> Status:
+	for active in statuses:
+		if active.data != null and active.data.skips_next_turn:
+			return active
+	return null
+
 static func remove_from(statuses: Array[Status], active: Status) -> void:
 	statuses.erase(active)
 

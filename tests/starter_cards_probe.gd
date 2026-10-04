@@ -26,6 +26,7 @@ const TWO_LINE_STATUS_CARDS: Array[String] = ["Sentence", "The Return"]
 const SHRUNK_RULES: Dictionary = {
 	"Bide": 14,
 	"Collateral": 13,
+	"Deny": 13,
 	"Cornered": 14,
 	"Last Resort": 14,
 	"Last Wager": 13,
@@ -40,8 +41,8 @@ const NUMERAL_TOP_CLEAR_PX := 5.0
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # The cards with art, by file - the starters, Carve, Cornered, Hold Fast,
 # Come Due, No Further, Sentence, Last Wager, The Return, Blood Arc,
-# Collateral, Ransom, Leverage, Self-Eater, Unbroken, Small Price and
-# Bide.
+# Collateral, Ransom, Leverage, Self-Eater, Unbroken, Small Price, Bide
+# and Deny.
 # Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
@@ -65,6 +66,7 @@ const CARD_ART: Dictionary = {
 	"unbroken": "res://cards/art/Wanderer/Unbroken.png",
 	"small_price": "res://cards/art/Wanderer/Small Price.png",
 	"bide": "res://cards/art/Wanderer/Bide.png",
+	"deny": "res://cards/art/Wanderer/Deny.png",
 }
 
 var _failures: int = 0

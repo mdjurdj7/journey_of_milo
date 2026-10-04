@@ -120,6 +120,16 @@ const DURATION_UNTIL_TRIGGERED := -2
 # so the turn counter never takes it first.
 @export var consumed_by_own_attack: bool = false
 
+# Its holder's next turn is skipped (Deny's Denied): whatever move is
+# queued doesn't happen and the pattern moves on as if it had - lost, not
+# delayed - and the turn still counts (escalation keeps its clock). Its
+# statuses still tick first, so a countdown can still go off. Removed by
+# that turn, whatever else it does (a pain turn on the same turn spends
+# it too) - it never carries over (EnemyTurn.take_turn()). Pair it with
+# DURATION_UNTIL_TRIGGERED and StackRule.IGNORE. A holder can't be
+# targeted by another card applying it (BattleController).
+@export var skips_next_turn: bool = false
+
 # The mirror of consumed_by_own_attack, for a status on the one being
 # attacked: spent once an enemy ATTACK against its holder has resolved -
 # after every hit of it, so a status that softens that attack (No Further)

@@ -33,6 +33,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.SPEND_TOLL: "res://battle/rules/effects/spend_toll_effect.gd",
 	CardEffect.EffectType.DRAIN: "res://battle/rules/effects/drain_effect.gd",
 	CardEffect.EffectType.SET_ASIDE: "res://battle/rules/effects/set_aside_effect.gd",
+	CardEffect.EffectType.CONSUME: "res://battle/rules/effects/consume_effect.gd",
 }
 
 var _cache: Dictionary = {}
@@ -113,6 +114,26 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 # Due). Read by BattleController.
 # request_play() and by the hand, which fades the card - so a copy that
 # can't be paid for shows it rather than being taken and doing nothing.
+# Whether `card` may land on `combatant`: living and not buried, and - for
+# a card that skips its target's turn (Deny) - not one already holding
+# that status, since it doesn't stack. BattleController's targeting and
+# the hand's fade both ask here.
+static func can_target(card: CardData, combatant: Combatant) -> bool:
+	if combatant == null or combatant.hp <= 0 or combatant.buried:
+		return false
+	for effect in card.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and effect.status_data != null and effect.status_data.skips_next_turn:
+			if Status.skip_turn_status(combatant.statuses) != null:
+				return false
+	return true
+
+# Whether any of `enemies` is one `card` may land on.
+static func has_target(card: CardData, enemies: Array[Combatant]) -> bool:
+	for combatant in enemies:
+		if can_target(card, combatant):
+			return true
+	return false
+
 static func card_blocked(card: CardData, player: Combatant) -> bool:
 	if card == null or player == null:
 		return false

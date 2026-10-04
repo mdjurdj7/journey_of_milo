@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the three in the belongings pool, and Endure, which no pool offers. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at ff051c6, Endure filed as neutral",
+    "generated": "2026-10-04, from the live data at 66b01e9 plus Deny",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 27,
+    "total_unique_wanderer_cards": 28,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 22,
+      "count": 23,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -74,11 +74,12 @@
         "Collateral",
         "Ransom",
         "Leverage",
-        "Bide"
+        "Bide",
+        "Deny"
       ],
       "by_rarity": {
         "COMMON": 7,
-        "UNCOMMON": 8,
+        "UNCOMMON": 9,
         "RARE": 7
       },
       "weights": "all 1.0 (weights array empty)"
@@ -95,14 +96,14 @@
       "where": "floor 2's belongings (a RewardSpread prop on region1_floor2.tres)"
     },
     "wanderer_card_types": {
-      "SKILL": 12,
+      "SKILL": 13,
       "ATTACK": 9,
       "POWER": 4,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
       "COMMON": 11,
-      "UNCOMMON": 9,
+      "UNCOMMON": 10,
       "RARE": 7
     },
     "implemented_but_not_obtainable": [
@@ -126,6 +127,7 @@
       "Bide": 14,
       "Collateral": 13,
       "Cornered": 14,
+      "Deny": 13,
       "Last Resort": 14,
       "Last Wager": 13,
       "No Further": 12,
@@ -188,6 +190,10 @@
       {
         "name": "Countdown (Sentence)",
         "rule": "A status on an enemy that deals its damage when the turns run out; spending Toll takes a turn off."
+      },
+      {
+        "name": "Denied (enemy)",
+        "rule": "Deny's status: the enemy's next move is skipped - lost, not delayed; its pattern advances and the turn still counts, and its statuses still tick. Removed by that turn; doesn't stack, so a Denied enemy can't be targeted by another Deny. Its intent keeps its number, struck through."
       },
       {
         "name": "Braced (enemy)",
@@ -743,6 +749,73 @@
       ],
       "art_path": null,
       "rules_font_px": 15,
+      "battle_animation": null,
+      "play_effect_scene_path": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Deny",
+      "file_path": "res://cards/data/deny.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "UTILITY",
+      "energy_cost": 2,
+      "rarity": "UNCOMMON",
+      "card_text": "Consume your costliest card.\nTarget enemy skips its next move.\nSpent.",
+      "face_hp_line": null,
+      "card_text_template": "Consume your costliest card.\nTarget enemy skips its next move.\nSpent.",
+      "targeting": "enemy",
+      "removal_after_play": "Spent: leaves this fight's rotation once played",
+      "effects": [
+        {
+          "type": "CONSUME",
+          "plain_english": "Consume the other card in hand with the highest printed cost (CardData.cost - discounts never reorder it): it goes to the Spent pile for the rest of this fight. A tie is the player's pick, exactly one, through the hand choice; no other card consumes nothing."
+        },
+        {
+          "type": "APPLY_STATUS_TO_TARGET",
+          "plain_english": "Apply Denied to the target enemy: It skips its next move."
+        }
+      ],
+      "keywords": [
+        "Spent"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "status_effect": {
+        "id": "denied",
+        "name": "Denied",
+        "description": "It skips its next move.",
+        "file_path": "res://battle/rules/statuses/denied.tres",
+        "duration": "until triggered",
+        "stack_rule": "IGNORE",
+        "applied_to": "target enemy",
+        "skips_holders_next_turn": true
+      },
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "cost",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "default_displayed": 2
+        }
+      ],
+      "art_path": "res://cards/art/Wanderer/Deny.png",
+      "rules_font_px": 13,
       "battle_animation": null,
       "play_effect_scene_path": null,
       "upgrade_data": null,

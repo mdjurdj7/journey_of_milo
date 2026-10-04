@@ -64,6 +64,20 @@ class_name BattleIntent
 @export var hairline_thickness_px: float = 1.0
 @export_range(0.0, 1.0) var hairline_alpha: float = 0.45
 @export var hairline_drop_px: float = 4.0
+# A Denied move's strike-through: this thick, this far past the pair at
+# each end, at this fraction of the numeral's line box from its top.
+@export var denied_rule_px: float = 1.0:
+	set(value):
+		denied_rule_px = value
+		queue_redraw()
+@export var denied_rule_overhang_px: float = 3.0:
+	set(value):
+		denied_rule_overhang_px = value
+		queue_redraw()
+@export_range(0.0, 1.0) var denied_rule_y_fraction: float = 0.55:
+	set(value):
+		denied_rule_y_fraction = value
+		queue_redraw()
 # The lethal emphasis: the hairline becomes a full-ink rule this thick.
 @export var lethal_rule_px: float = 2.0
 
@@ -136,6 +150,10 @@ var _lethal: bool = false
 var _threshold_label: Label = null
 var _has_threshold: bool = false
 var _interrupted: bool = false
+# Denied (Deny): the move keeps its number, dimmed like an interrupted
+# one, with denied_rule_px of ink struck through the glyph and numeral.
+var _denied: bool = false
+var _pair_rect: Rect2 = Rect2()
 # How much of the ring is filled, 0..1: dealt this turn over the threshold.
 var _ring_fill: float = 0.0
 var _ring_centre: Vector2 = Vector2.ZERO
@@ -213,7 +231,8 @@ func show_intent(preview: Dictionary) -> void:
 		var pain_turn: bool = bool(preview.get("pain_turn", false))
 		if pain_turn:
 			_label.text = ""
-		_interrupted = pain_turn or bool(preview.get("interrupted", false))
+		_denied = bool(preview.get("denied", false))
+		_interrupted = pain_turn or _denied or bool(preview.get("interrupted", false))
 		# The numeral counts down to 0 and stays; the gauge fills with
 		# what has been dealt, full once the threshold is met.
 		var threshold: int = int(preview.get("threshold", 0))
@@ -267,6 +286,7 @@ func _apply_layout() -> void:
 	pivot_offset = size / 2.0
 
 	var pair_left: float = (content_width - pair_width) * 0.5
+	_pair_rect = Rect2(pair_left, 0.0, pair_width, line_height)
 	_glyph_centre = Vector2(pair_left + _glyph_size * 0.5, line_height * 0.5)
 	_text_rect = Rect2(pair_left + _glyph_size + glyph_numeral_gap_px, 0.0, text_width, line_height)
 	_label.position = _text_rect.position
@@ -310,6 +330,11 @@ func _draw() -> void:
 		_draw_ring()
 	if _pip_count > 0:
 		_draw_pips(ink)
+
+	# Denied: one ink rule through the pair - no glow, colour or icon.
+	if _denied:
+		var strike_y: float = roundf(_pair_rect.position.y + _pair_rect.size.y * denied_rule_y_fraction)
+		draw_rect(Rect2(_pair_rect.position.x - denied_rule_overhang_px, strike_y, _pair_rect.size.x + denied_rule_overhang_px * 2.0, denied_rule_px), ink)
 
 	var rule_thickness: float = lethal_rule_px if _lethal else hairline_thickness_px
 	var rule_color: Color = ink
