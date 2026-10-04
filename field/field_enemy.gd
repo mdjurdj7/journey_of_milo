@@ -68,7 +68,8 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export var attack_snap_return_time: float = 0.2
 
 # The sound of a card's hit landing on this creature - enemy_data.
-# contact_sounds dealt round-robin (SoundPool) through one
+# contact_sounds picked at random, never the last take twice running
+# (SoundPool.next_random()), through one
 # AudioStreamPlayer3D on the SFX bus, played on the hit frame by
 # BattleFeedback._react_to_card_hit() (with the flash, recoil and damage
 # number). Levels: the takes are normalised to -6 dBFS; at the battle
@@ -621,7 +622,7 @@ func play_pain_turn_sound() -> void:
 	_pain_player.play()
 
 func play_contact_sound() -> void:
-	var clip: AudioStream = _contact_pool.next()
+	var clip: AudioStream = _contact_pool.next_random()
 	if clip == null or _contact_player == null:
 		return
 	_contact_player.stream = clip

@@ -16,7 +16,8 @@ class_name EnemyData
 @export var starting_statuses: Array[StatusData] = []
 # The sound of a card's hit landing on this creature (its shell, its
 # hide), played by its FieldEnemy on the hit frame - takes dealt
-# round-robin (see SoundPool); one take is fine.
+# at random, never the same take twice running (SoundPool.next_random());
+# one take is fine.
 @export var contact_sounds: Array[AudioStream] = []
 # Each contact play's pitch scale is drawn from 1 +/- this, so repeated
 # takes don't sound identical. Read by FieldEnemy at play time.
