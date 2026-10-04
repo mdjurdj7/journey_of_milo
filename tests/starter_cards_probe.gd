@@ -39,7 +39,7 @@ const NUMERAL_TOP_CLEAR_PX := 5.0
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # The cards with art, by file - the starters, Carve, Cornered, Hold Fast,
 # Come Due, No Further, Sentence, Last Wager, The Return, Blood Arc,
-# Collateral, Ransom, Leverage and Self-Eater.
+# Collateral, Ransom, Leverage, Self-Eater and Unbroken.
 # Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
@@ -60,6 +60,7 @@ const CARD_ART: Dictionary = {
 	"ransom": "res://cards/art/Wanderer/Ransom.png",
 	"leverage": "res://cards/art/Wanderer/Leverage.png",
 	"self_eater": "res://cards/art/Wanderer/Self-Eater.png",
+	"unbroken": "res://cards/art/Wanderer/Unbroken.png",
 }
 
 var _failures: int = 0
