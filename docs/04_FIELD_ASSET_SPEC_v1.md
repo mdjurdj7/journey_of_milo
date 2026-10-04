@@ -64,7 +64,7 @@
 
 ## 4. Sound
 
-- Short SFX as **WAV**, trimmed to within a few ms of the first transient, tail cut where it falls below hearing, no fade, **normalised to −6 dBFS**; high-pass whooshes at ~120 Hz.
+- Short SFX as **WAV or MP3** (either is fine), trimmed to within a few ms of the first transient, tail cut where it falls below hearing, no fade, **normalised to −6 dBFS** peak, **mono** for positional sounds (anything played from a body in the world); high-pass whooshes at ~120 Hz.
 - Mix in engine on an SFX bus: swing ≈ −20 dBFS at the listener (felt, not heard), card play ≈ −16, contact ≈ −13. Contact sounds belong to the enemy by material (`hit_shell`); the swing to the Wanderer; card play is 2D.
 - Two or three takes per sound, round-robin, never the same take twice running.
 - Ambience beds: 25–40 s seamless loops, −12 dBFS, different lengths so they don't phase.

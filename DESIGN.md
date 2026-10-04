@@ -4,6 +4,15 @@ Parked decisions and deferred items - see CLAUDE.md's own pointer to this
 file. Not a full design document, just what's been consciously set aside
 so it doesn't get silently reinvented or silently forgotten.
 
+## Audio format
+
+Short SFX may be WAV or MP3: the format isn't a spec issue
+(04_FIELD_ASSET_SPEC §4). What the spec holds them to is unchanged and
+still checked on every new sound - trimmed to within a few ms of the
+first transient, normalised to −6 dBFS peak, and mono for a positional
+sound (one played from a body in the world). (2026-10-03; the spec said
+WAV only, while most of the project's sounds were already MP3.)
+
 ## Combat effects
 
 Combat effects are ink strokes: matte, brush-like, in ink or deep maroon,
