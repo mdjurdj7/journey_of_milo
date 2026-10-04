@@ -16,6 +16,7 @@ const DRAGONFLY_PATH := "res://battle/rules/enemies/dragonfly.tres"
 const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
 const SOUND_PATH := "res://assets/audio/enemies_old/Works_Wardling/Ragged Breath.mp3"
 const MODEL_PATH := "res://assets/models/enemies/Wardling/Wardling.glb"
+const POST_SCENE_PATH := "res://field/hitching_post.tscn"
 # Turns 1-9: 9, 5, 11 looping, times 1.0 / 1.3 / 1.6 / 2.0 by twos, held
 # at 2.0 - roundi(11 x 1.3) = 14, roundi(9 x 1.3) = 12, roundi(11 x 1.6)
 # = 18.
@@ -58,6 +59,7 @@ func _check_data() -> void:
 	_expect_eq(data.model_scene_path, MODEL_PATH, "...wears its own model")
 	_expect_eq(data.model_scale, 1.68, "...at 1.68")
 	_expect_eq(data.contact_radius_m, 2.0, "...the default contact radius")
+	_expect_eq(data.harness_point, Vector3(-0.25, 1.15, 0.0), "...a harness for the hitching post's rope")
 	_expect_eq(data.field_behaviour, EnemyData.FieldBehaviour.WATCHER, "...a watcher on the field")
 	_expect_eq(data.notice_radius_m, 8.0, "...noticing at 8 m")
 	_expect_eq(data.notice_turn_seconds, 2.0, "...turning over 2 s")
@@ -200,8 +202,14 @@ func _check_floor_3() -> void:
 	var entry: Resource = enemies[1]
 	_expect_eq((entry.get("enemy_data") as EnemyData).enemy_name, "Wardling", "...then the Wardling")
 	_expect_eq(entry.get("position"), Vector2(21.267, -13.5), "...on the east lobe at (21.267, -13.5)")
-	_expect_eq(entry.get("yaw_degrees"), -90.0, "...facing east")
+	_expect_eq(entry.get("face_prop_index"), 0, "...facing the floor's first prop")
+	_expect_eq(entry.get("yaw_degrees"), 0.0, "...straight at it")
 	_expect(not bool(entry.get("required")), "...not required")
+	var props: Array = floor_data.get("props")
+	_expect_eq(props.size(), 1, "Floor 3 has one prop")
+	_expect_eq((props[0].get("scene") as PackedScene).resource_path, POST_SCENE_PATH, "...the hitching post")
+	_expect_eq(props[0].get("position"), Vector3(19.661, 0.0, -15.794), "...north-west of the Wardling, 2.8 m off")
+	_expect_eq((props[0].get("overrides") as Dictionary).get("tether_enemy_index"), 1, "...its rope tied to the Wardling")
 	_completed += 1
 
 # --- Helpers ---

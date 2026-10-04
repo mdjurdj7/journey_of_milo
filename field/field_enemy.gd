@@ -33,6 +33,9 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 # materials() those lighten and flash with the body's. Empty = none.
 @export_file("*.tscn") var attachment_scene_path: String = ""
 @export var model_ground_offset: float = 0.0
+# EnemyData.harness_point, copied the same way: where a rope is tied to
+# this body, glb units (see get_harness_point()).
+@export var harness_point: Vector3 = Vector3.ZERO
 # Off for an enemy placed from FloorData (RegionField._spawn_floor_
 # enemies()), whose yaw is authored outright - the crab beside the pool
 # faces where it faces.
@@ -206,6 +209,10 @@ var _defeated: bool = false
 var _field_position: Vector3 = Vector3.ZERO
 var _field_yaw: float = 0.0
 var _has_field_pose: bool = false
+# Facing a prop as placed (FloorEnemy.face_prop_index, set_prop_facing()):
+# the yaw that faces it, which an escape turns back to.
+var _faces_prop: bool = false
+var _prop_yaw: float = 0.0
 # In the air (fly_to() until it lands): the flight tween drives
 # _flight_xz and _hover, and _process() puts the body at that XZ, hover
 # above the relief there, turned toward _flight_heading. The contact
@@ -267,6 +274,21 @@ func get_head_height() -> float:
 
 func get_half_width() -> float:
 	return _model_half_width
+
+# harness_point in the world, through the model's scale, yaw, grounding,
+# lift and settle - where a HitchingPost's rope ends. The body's own
+# position before the model has spawned.
+func get_harness_point() -> Vector3:
+	if _model == null:
+		return global_position
+	return _model.global_transform * harness_point
+
+# RegionField at spawn, for a FloorEnemy with face_prop_index: face `yaw`
+# (the angle toward that prop) now, and again after an escape.
+func set_prop_facing(yaw: float) -> void:
+	_faces_prop = true
+	_prop_yaw = yaw
+	rotation.y = yaw
 
 func get_model_aabb() -> AABB:
 	return AABB(_model_aabb.position + Vector3.UP * get_body_lift(), _model_aabb.size + Vector3.UP * _rear_lift())
@@ -937,9 +959,12 @@ func step_to(spot: Vector3, duration: float) -> void:
 	_tween_to(spot, duration, delay)
 
 # The escape's counterpart: back to where it stood and faced before the
-# fight, over duration. No-op for a body that never stepped.
+# fight, over duration. A body that never stepped stays where it is - and
+# turns back to its prop if it faces one (the Wardling, his post).
 func return_to_field_pose(duration: float) -> void:
 	if not _has_field_pose:
+		if _faces_prop:
+			_turn_to(_prop_yaw, duration)
 		return
 	_has_field_pose = false
 	_tween_to(_field_position, duration)

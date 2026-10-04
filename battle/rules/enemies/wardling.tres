@@ -37,6 +37,7 @@ glassbone_reward = 1
 model_scene_path = "res://assets/models/enemies/Wardling/Wardling.glb"
 model_scale = 1.68
 model_yaw_offset_degrees = -90.0
+harness_point = Vector3(-0.25, 1.15, 0)
 field_behaviour = 1
 notice_radius_m = 8.0
 notice_turn_seconds = 2.0

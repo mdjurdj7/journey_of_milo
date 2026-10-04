@@ -774,9 +774,20 @@ func _spawn_floor_enemies() -> void:
 		enemy.notice_radius = entry.enemy_data.notice_radius_m
 		enemy.notice_turn_seconds = entry.enemy_data.notice_turn_seconds
 		enemy.field_behaviour = entry.enemy_data.field_behaviour
+		enemy.harness_point = entry.enemy_data.harness_point
 		enemy.face_shore_at_spawn = false
 		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)
 		enemy.rotation.y = deg_to_rad(entry.yaw_degrees)
+		if entry.face_prop_index >= 0:
+			if entry.face_prop_index < floor_data.props.size() and floor_data.props[entry.face_prop_index] != null:
+				# Toward the prop's spawn-relative spot, the yaw on top - the
+				# same direction<->angle convention as FieldEnemy.face_toward().
+				var prop_position: Vector3 = floor_data.props[entry.face_prop_index].position
+				var toward := Vector2(prop_position.x - entry.position.x, prop_position.z - entry.position.y)
+				if toward.length() > 0.0001:
+					enemy.set_prop_facing(atan2(-toward.x, -toward.y) + deg_to_rad(entry.yaw_degrees))
+			else:
+				push_warning("RegionField: floor enemy %d faces prop %d, which isn't on the floor; yaw as authored." % [index, entry.face_prop_index])
 		add_child(enemy)
 
 # The floor's routes (FloorPatrol), one PackPatrol each, direct children

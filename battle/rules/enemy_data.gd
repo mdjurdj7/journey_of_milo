@@ -104,6 +104,10 @@ class_name EnemyData
 # own materials but rides the body's grounding, yaw, scale and settle.
 # Empty = nothing attached.
 @export_file("*.tscn") var attachment_scene_path: String = ""
+# Where a rope is tied to this body, glb units in the glb's own space -
+# the Wardling's harness, which floor 3's HitchingPost ties its rope to
+# (FieldEnemy.get_harness_point()). Unused by a body nothing is tied to.
+@export var harness_point: Vector3 = Vector3.ZERO
 # Metres the body stands clear of the sand in the field, applied after
 # its AABB grounding - legs the mesh doesn't carry (the dragonfly's
 # 0.12). Its contact shadow stays on the sand. 0 = the mesh's own feet.

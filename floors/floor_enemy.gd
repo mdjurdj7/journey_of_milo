@@ -17,6 +17,11 @@ class_name FloorEnemy
 # Authored outright rather than derived from "seaward": the crab beside
 # the pool faces where it faces.
 @export var yaw_degrees: float = 0.0
+# Index into the same floor's props of a prop this body faces - the
+# Wardling and his hitching post. Set: the yaw is toward that prop, with
+# yaw_degrees on top, and after an escape the body turns back to it
+# (FieldEnemy.set_prop_facing()). -1 = yaw_degrees alone, as authored.
+@export var face_prop_index: int = -1
 # Whether this enemy stands between the Wanderer and the gate: the floor
 # is cleared (RegionField.floor_cleared, the ExitGate opens) once no
 # required enemy is left standing. False = an optional fight, there to be
