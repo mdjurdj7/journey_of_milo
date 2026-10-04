@@ -32,11 +32,13 @@ at the card's impact. Blood Arc's arc (#461613, 0.9) is the first.
   rules layer (`cards/card_data.gd`). No current card needs them - revisit
   once a real card actually wants a chain-shaped payoff, not before.
   (2026-09-11, rules-layer port.)
-- **Endure out of the Wanderer reward pool, for now.** Taken out of
-  `cards/pools/wanderer_pool.tres`; the card itself (`cards/data/
-  endure.tres`) is untouched and still in the belongings pool. Put it
-  back by re-adding the entry (and Endure to `card_rarity_probe.gd`'s
-  EXPECTED_POOL, count back to 20). (2026-10-03.)
+- **Endure out of every Wanderer card pool, for now.** Taken out of
+  `cards/pools/wanderer_pool.tres` (2026-10-03) and then out of
+  `cards/pools/belongings_pool.tres`, the floor-2 belongings and
+  Keeper pool (2026-10-04). The card itself (`cards/data/endure.tres`)
+  is untouched, and the probes that play it directly still do. Put it
+  back by re-adding the entries (and Endure to `card_rarity_probe.gd`'s
+  EXPECTED_POOL, count back to 20).
 
 ## Deferred
 
