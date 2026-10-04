@@ -399,6 +399,8 @@ func _enter_tree() -> void:
 		ground.slope_tint_blend = floor_data.slope_tint_blend
 		ground.crest_light_strength = floor_data.crest_light_strength
 		ground.crest_min_height = floor_data.crest_min_height
+		ground.slope_tint_fade_height = floor_data.slope_tint_fade_height
+		ground.slope_tint_fade_width = floor_data.slope_tint_fade_width
 		ground.wind_ripple_angle = floor_data.wind_ripple_angle
 		ground.wind_ripple_scale = floor_data.wind_ripple_scale
 		ground.wind_ripple_strength = floor_data.wind_ripple_strength

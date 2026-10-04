@@ -73,13 +73,18 @@ class_name FloorData
 # slope_tint_strength - wind-packed sand, so a slope reads by value even
 # where the sun shades it like flat ground - and flat ground over
 # crest_min_height metres above the land level lighter by
-# crest_light_strength. Strengths 0 (the default) are off.
+# crest_light_strength. Strengths 0 (the default) are off. The tint fades
+# out from slope_tint_fade_height metres over the land level (the same
+# reference as crest_min_height - the walk floor plus its own lift) to gone
+# slope_tint_fade_width higher; width 0 (the default) never fades.
 @export var slope_tint_color: Color = Color(0.58, 0.57, 0.53)
 @export_range(0.0, 1.0) var slope_tint_strength: float = 0.0
 @export var slope_tint_min: float = 8.0
 @export var slope_tint_blend: float = 12.0
 @export_range(0.0, 1.0) var crest_light_strength: float = 0.0
 @export var crest_min_height: float = 1.0
+@export var slope_tint_fade_height: float = 0.0
+@export var slope_tint_fade_width: float = 0.0
 # Ground's Wind Ripples, for this floor: one direction across the dry open
 # sand (degrees from +X toward +Z), crest-to-crest metres, strength and
 # warp. Strength 0 (the default) is off.

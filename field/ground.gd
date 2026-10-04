@@ -691,8 +691,10 @@ signal relief_rebuilt
 # past slope_tint_min degrees blend toward slope_tint_color (full
 # slope_tint_blend further on) at slope_tint_strength; flat ground over
 # crest_min_height metres above the floor's land level lightens by
-# crest_light_strength. Both strengths 0 (the default) are off. Per floor,
-# from FloorData.
+# crest_light_strength. Both strengths 0 (the default) are off. The tint
+# fades out from slope_tint_fade_height metres over the land level to
+# gone slope_tint_fade_width higher; width 0 (the default) never fades.
+# Per floor, from FloorData.
 @export_group("Slope Tint")
 @export var slope_tint_color: Color = Color(0.58, 0.57, 0.53):
 	set(value):
@@ -718,6 +720,14 @@ signal relief_rebuilt
 	set(value):
 		crest_min_height = value
 		_push_basin_heights()
+@export var slope_tint_fade_height: float = 0.0:
+	set(value):
+		slope_tint_fade_height = value
+		_push_basin_heights()
+@export var slope_tint_fade_width: float = 0.0:
+	set(value):
+		slope_tint_fade_width = value
+		_apply_uniform("slope_tint_fade_width", value)
 @export_group("")
 
 # Wind ripples on dry open sand - see ground.gdshader's own doc: the
@@ -903,8 +913,8 @@ func _push_sea_level_uniform() -> void:
 	_apply_uniform("sea_level", sea.sea_level if sea else 0.0)
 	_push_basin_heights()
 
-# basin_tint_heights and crest_min_height onto the shader as world
-# heights: over the floor's own land level, which needs the Sea's
+# basin_tint_heights, crest_min_height and slope_tint_fade_height onto
+# the shader as world heights: over the floor's own land level, which needs the Sea's
 # sea_level (0 without a Sea).
 func _push_basin_heights() -> void:
 	var sea: Sea = null
@@ -914,6 +924,7 @@ func _push_basin_heights() -> void:
 	_apply_uniform("basin_height_low", land_level + basin_tint_heights.x)
 	_apply_uniform("basin_height_high", land_level + basin_tint_heights.y)
 	_apply_uniform("crest_min_height", land_level + crest_min_height)
+	_apply_uniform("slope_tint_fade_height", land_level + slope_tint_fade_height)
 
 # Boot-time sanity check: if the dry interior's own height doesn't clear
 # sea_level by more than relief's own fine-detail noise plus the sea's
@@ -974,6 +985,7 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("slope_tint_min", slope_tint_min)
 	_apply_uniform("slope_tint_blend", slope_tint_blend)
 	_apply_uniform("crest_light_strength", crest_light_strength)
+	_apply_uniform("slope_tint_fade_width", slope_tint_fade_width)
 	_apply_uniform("wind_ripple_angle", wind_ripple_angle)
 	_apply_uniform("wind_ripple_scale", wind_ripple_scale)
 	_apply_uniform("wind_ripple_strength", wind_ripple_strength)

@@ -263,6 +263,13 @@ uniform float slope_tint_min = 8.0;
 uniform float slope_tint_blend = 12.0;
 uniform float crest_light_strength = 0.0;
 uniform float crest_min_height = 1.0;
+// The slope tint fades out with height: from slope_tint_fade_height (world
+// metres - Ground converts its own, over the floor's land level) to full
+// off slope_tint_fade_width higher, so low faces keep it and a high
+// rolling top stays clean - and reads to the crest light as flat. Width 0
+// (the default) is off: the tint holds at any height.
+uniform float slope_tint_fade_height = 0.0;
+uniform float slope_tint_fade_width = 0.0;
 // Wind ripples on dry open sand: a fine wave along one world direction,
 // wind_ripple_angle degrees from +X toward +Z (its crests run across it),
 // wind_ripple_scale metres crest to crest, warped by slow noise
@@ -969,8 +976,12 @@ void fragment() {
 	float world_up = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz).y;
 	float slope_degrees = degrees(acos(clamp(world_up, -1.0, 1.0)));
 	float slope_t = smoothstep(slope_tint_min, slope_tint_min + max(slope_tint_blend, 0.001), slope_degrees);
-	sand_base = mix(sand_base, slope_tint_color.rgb, slope_t * slope_tint_strength * sand_detail);
-	float crest_t = (1.0 - slope_t) * smoothstep(crest_min_height, crest_min_height + 0.25, v_world_height) * sand_detail;
+	float slope_tint_t = slope_t;
+	if (slope_tint_fade_width > 0.0) {
+		slope_tint_t *= 1.0 - smoothstep(slope_tint_fade_height, slope_tint_fade_height + slope_tint_fade_width, v_world_height);
+	}
+	sand_base = mix(sand_base, slope_tint_color.rgb, slope_tint_t * slope_tint_strength * sand_detail);
+	float crest_t = (1.0 - slope_tint_t) * smoothstep(crest_min_height, crest_min_height + 0.25, v_world_height) * sand_detail;
 	sand_base *= 1.0 + crest_light_strength * crest_t;
 	vec3 dry = mix(sand_base, rock_color.rgb, rock) * distance_tint;
 	vec3 wet = dry * wet_darken;
