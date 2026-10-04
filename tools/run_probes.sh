@@ -127,6 +127,8 @@ path_probes() {
 		floors/region1_floor2.tres) out=$(area_probes floor2) ;;
 		floors/region1_floor3.tres) out=$(area_probes floor3) ;;
 		floors/*) out=$(area_probes floors) ;;
+		# Prop and environment models stand on the floors that place them.
+		assets/models/props/*|assets/Environment/*) out=$(area_probes floors) ;;
 		ui/hp_bar.*) out=$(area_probes hp_bar) ;;
 		ui/toll_line.gd|ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd) out=$(area_probes hud) ;;
 		ui/deck_view.*|ui/card_compendium.*) out=$(area_probes ui_inspect) ;;
