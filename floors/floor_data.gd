@@ -68,6 +68,25 @@ class_name FloorData
 # Ground.wear_darken for this floor: how much darker the worn band is than
 # the ground under it. 0.24 is the region's own value.
 @export_range(0.0, 1.0) var wear_darken: float = 0.24
+# Ground's Slope Tint, for this floor: faces past slope_tint_min degrees
+# toward slope_tint_color (full slope_tint_blend further on) at
+# slope_tint_strength - wind-packed sand, so a slope reads by value even
+# where the sun shades it like flat ground - and flat ground over
+# crest_min_height metres above the land level lighter by
+# crest_light_strength. Strengths 0 (the default) are off.
+@export var slope_tint_color: Color = Color(0.58, 0.57, 0.53)
+@export_range(0.0, 1.0) var slope_tint_strength: float = 0.0
+@export var slope_tint_min: float = 8.0
+@export var slope_tint_blend: float = 12.0
+@export_range(0.0, 1.0) var crest_light_strength: float = 0.0
+@export var crest_min_height: float = 1.0
+# Ground's Wind Ripples, for this floor: one direction across the dry open
+# sand (degrees from +X toward +Z), crest-to-crest metres, strength and
+# warp. Strength 0 (the default) is off.
+@export var wind_ripple_angle: float = 30.0
+@export var wind_ripple_scale: float = 0.45
+@export_range(0.0, 0.5) var wind_ripple_strength: float = 0.0
+@export var wind_ripple_warp: float = 0.5
 # The relief mesh's own size and density, onto Ground's exports of the
 # same names - a floor whose painted land runs past the default extent
 # (Z -35..35 at 100 x 70, centred on spawn) needs its own, or the land
@@ -92,6 +111,11 @@ class_name FloorData
 @export var ambience_sea_db: float = 0.0
 @export var ambience_wind_db: float = 0.0
 @export var ambience_sea_lowpass_hz: float = 20000.0
+# The depth fog for this floor, camera metres (RegionSky.fog_depth_begin /
+# fog_depth_end): from begin to full at end. 0 for either (the default)
+# keeps the region's own.
+@export var fog_depth_begin: float = 0.0
+@export var fog_depth_end: float = 0.0
 
 @export_group("Layout")
 # The Wanderer's start, world XZ. Every floor so far spawns at the

@@ -249,6 +249,31 @@ uniform float basin_height_high = 1.0;
 uniform vec4 rock_color : source_color = vec4(0.56, 0.59, 0.50, 1.0);
 uniform float rock_slope_min = 22.0;
 uniform float rock_slope_blend = 12.0;
+// Slopes read by value: past slope_tint_min degrees of slope the sand
+// blends toward slope_tint_color - wind-packed sand on a face, darker and
+// cooler than the open floor - full by slope_tint_blend further on, at
+// slope_tint_strength. Flat ground standing above crest_min_height (world
+// metres - Ground converts its own, which are over the floor's land
+// level) lightens by crest_light_strength: the crests and the dune's top
+// read as a line above the faces. Under the rock blend, so stone still
+// wins where the rock mask lets it. Both 0 by default (off): per floor.
+uniform vec4 slope_tint_color : source_color = vec4(0.58, 0.57, 0.53, 1.0);
+uniform float slope_tint_strength = 0.0;
+uniform float slope_tint_min = 8.0;
+uniform float slope_tint_blend = 12.0;
+uniform float crest_light_strength = 0.0;
+uniform float crest_min_height = 1.0;
+// Wind ripples on dry open sand: a fine wave along one world direction,
+// wind_ripple_angle degrees from +X toward +Z (its crests run across it),
+// wind_ripple_scale metres crest to crest, warped by slow noise
+// (wind_ripple_warp) so it is never ruled. A value shift of up to
+// wind_ripple_strength, gone on slopes, on the worn band, on wet sand and
+// outer ground, and with distance before it can shimmer. 0 (the default)
+// is off: per floor.
+uniform float wind_ripple_strength = 0.0;
+uniform float wind_ripple_angle = 30.0;
+uniform float wind_ripple_scale = 0.45;
+uniform float wind_ripple_warp = 0.5;
 uniform sampler2D rock_mask : filter_linear, repeat_disable;
 uniform bool rock_mask_ready = false;
 
@@ -939,6 +964,14 @@ void fragment() {
 	float outer = outer_factor(v_world_xz);
 	float sand_detail = 1.0 - outer;
 	sand_base = mix(sand_base, outer_color.rgb, outer);
+	// Slopes by value (see slope_tint_color's doc): the face toward the
+	// packed tint, flat high ground lighter. Never on outer ground.
+	float world_up = normalize((INV_VIEW_MATRIX * vec4(NORMAL, 0.0)).xyz).y;
+	float slope_degrees = degrees(acos(clamp(world_up, -1.0, 1.0)));
+	float slope_t = smoothstep(slope_tint_min, slope_tint_min + max(slope_tint_blend, 0.001), slope_degrees);
+	sand_base = mix(sand_base, slope_tint_color.rgb, slope_t * slope_tint_strength * sand_detail);
+	float crest_t = (1.0 - slope_t) * smoothstep(crest_min_height, crest_min_height + 0.25, v_world_height) * sand_detail;
+	sand_base *= 1.0 + crest_light_strength * crest_t;
 	vec3 dry = mix(sand_base, rock_color.rgb, rock) * distance_tint;
 	vec3 wet = dry * wet_darken;
 
@@ -966,6 +999,20 @@ void fragment() {
 	float grain_suppression = (1.0 - sand_wetness) * wear_smoothing * sand_detail;
 	float grain = grain_value(v_world_xz) * grain_strength * grain_suppression;
 	sand_albedo *= 1.0 + grain;
+
+	// Wind ripples (see wind_ripple_strength's doc): squared so the crests
+	// are narrower than the troughs, faded out on slopes and - through
+	// grain_suppression - on wet sand, the worn band and outer ground, and
+	// wherever a ripple would be under a pixel or two wide.
+	if (wind_ripple_strength > 0.0) {
+		vec2 wind_dir = vec2(cos(radians(wind_ripple_angle)), sin(radians(wind_ripple_angle)));
+		float wind_warp = (value_noise(v_world_xz * 0.12) - 0.5) * 2.0 * wind_ripple_warp;
+		float wind_phase = dot(v_world_xz, wind_dir) / max(wind_ripple_scale, 0.01) + wind_warp * 3.0;
+		float wind_aa = 1.0 - smoothstep(0.25, 0.5, fwidth(wind_phase));
+		float wind_wave = sin(wind_phase * 6.2831853);
+		wind_wave *= abs(wind_wave);
+		sand_albedo *= 1.0 + wind_ripple_strength * wind_wave * wind_aa * (1.0 - slope_t) * grain_suppression;
+	}
 
 	// The outer ground's own pebbles, in place of the sand grain.
 	if (outer > 0.0) {

@@ -687,6 +687,62 @@ signal relief_rebuilt
 		_push_canvas_paintings()
 @export_group("")
 
+# Slopes read by value - see ground.gdshader's slope tint block. Faces
+# past slope_tint_min degrees blend toward slope_tint_color (full
+# slope_tint_blend further on) at slope_tint_strength; flat ground over
+# crest_min_height metres above the floor's land level lightens by
+# crest_light_strength. Both strengths 0 (the default) are off. Per floor,
+# from FloorData.
+@export_group("Slope Tint")
+@export var slope_tint_color: Color = Color(0.58, 0.57, 0.53):
+	set(value):
+		slope_tint_color = value
+		_apply_uniform("slope_tint_color", value)
+@export_range(0.0, 1.0) var slope_tint_strength: float = 0.0:
+	set(value):
+		slope_tint_strength = value
+		_apply_uniform("slope_tint_strength", value)
+@export var slope_tint_min: float = 8.0:
+	set(value):
+		slope_tint_min = value
+		_apply_uniform("slope_tint_min", value)
+@export var slope_tint_blend: float = 12.0:
+	set(value):
+		slope_tint_blend = value
+		_apply_uniform("slope_tint_blend", value)
+@export_range(0.0, 1.0) var crest_light_strength: float = 0.0:
+	set(value):
+		crest_light_strength = value
+		_apply_uniform("crest_light_strength", value)
+@export var crest_min_height: float = 1.0:
+	set(value):
+		crest_min_height = value
+		_push_basin_heights()
+@export_group("")
+
+# Wind ripples on dry open sand - see ground.gdshader's own doc: the
+# angle (degrees from +X toward +Z) the wind runs along, crest-to-crest
+# metres, the value shift at most, and the slow warp. Strength 0 (the
+# default) is off. Per floor, from FloorData.
+@export_group("Wind Ripples")
+@export var wind_ripple_angle: float = 30.0:
+	set(value):
+		wind_ripple_angle = value
+		_apply_uniform("wind_ripple_angle", value)
+@export var wind_ripple_scale: float = 0.45:
+	set(value):
+		wind_ripple_scale = value
+		_apply_uniform("wind_ripple_scale", value)
+@export_range(0.0, 0.5) var wind_ripple_strength: float = 0.0:
+	set(value):
+		wind_ripple_strength = value
+		_apply_uniform("wind_ripple_strength", value)
+@export var wind_ripple_warp: float = 0.5:
+	set(value):
+		wind_ripple_warp = value
+		_apply_uniform("wind_ripple_warp", value)
+@export_group("")
+
 # Outer ground: past the walkable floor's ridge, a different surface -
 # flat outer_color with a coarse pebble grain and none of the sand's
 # grain, speckle, drift lines or ripples - so the edge of the floor reads
@@ -847,8 +903,9 @@ func _push_sea_level_uniform() -> void:
 	_apply_uniform("sea_level", sea.sea_level if sea else 0.0)
 	_push_basin_heights()
 
-# basin_tint_heights onto the shader as world heights: over the floor's
-# own land level, which needs the Sea's sea_level (0 without a Sea).
+# basin_tint_heights and crest_min_height onto the shader as world
+# heights: over the floor's own land level, which needs the Sea's
+# sea_level (0 without a Sea).
 func _push_basin_heights() -> void:
 	var sea: Sea = null
 	if is_inside_tree():
@@ -856,6 +913,7 @@ func _push_basin_heights() -> void:
 	var land_level: float = (sea.sea_level if sea else 0.0) + landmass_interior_height
 	_apply_uniform("basin_height_low", land_level + basin_tint_heights.x)
 	_apply_uniform("basin_height_high", land_level + basin_tint_heights.y)
+	_apply_uniform("crest_min_height", land_level + crest_min_height)
 
 # Boot-time sanity check: if the dry interior's own height doesn't clear
 # sea_level by more than relief's own fine-detail noise plus the sea's
@@ -911,6 +969,15 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("rock_color", rock_color)
 	_apply_uniform("rock_slope_min", rock_slope_min)
 	_apply_uniform("rock_slope_blend", rock_slope_blend)
+	_apply_uniform("slope_tint_color", slope_tint_color)
+	_apply_uniform("slope_tint_strength", slope_tint_strength)
+	_apply_uniform("slope_tint_min", slope_tint_min)
+	_apply_uniform("slope_tint_blend", slope_tint_blend)
+	_apply_uniform("crest_light_strength", crest_light_strength)
+	_apply_uniform("wind_ripple_angle", wind_ripple_angle)
+	_apply_uniform("wind_ripple_scale", wind_ripple_scale)
+	_apply_uniform("wind_ripple_strength", wind_ripple_strength)
+	_apply_uniform("wind_ripple_warp", wind_ripple_warp)
 	_apply_uniform("basin_color", basin_color)
 	_apply_uniform("basin_tint_strength", basin_tint_strength)
 	_apply_uniform("outer_color", outer_color)

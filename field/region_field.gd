@@ -393,6 +393,21 @@ func _enter_tree() -> void:
 		ground.basin_tint_strength = floor_data.basin_tint_strength
 		ground.basin_tint_heights = floor_data.basin_tint_heights
 		ground.wear_darken = floor_data.wear_darken
+		ground.slope_tint_color = floor_data.slope_tint_color
+		ground.slope_tint_strength = floor_data.slope_tint_strength
+		ground.slope_tint_min = floor_data.slope_tint_min
+		ground.slope_tint_blend = floor_data.slope_tint_blend
+		ground.crest_light_strength = floor_data.crest_light_strength
+		ground.crest_min_height = floor_data.crest_min_height
+		ground.wind_ripple_angle = floor_data.wind_ripple_angle
+		ground.wind_ripple_scale = floor_data.wind_ripple_scale
+		ground.wind_ripple_strength = floor_data.wind_ripple_strength
+		ground.wind_ripple_warp = floor_data.wind_ripple_warp
+	# The floor's own depth fog over the region's, when it names one.
+	var sky := get_node_or_null(sky_path) as RegionSky
+	if sky != null and floor_data != null and floor_data.fog_depth_begin > 0.0 and floor_data.fog_depth_end > floor_data.fog_depth_begin:
+		sky.fog_depth_begin = floor_data.fog_depth_begin
+		sky.fog_depth_end = floor_data.fog_depth_end
 	if floor_data != null:
 		wade_drain_enabled = floor_data.wade_drain_enabled
 	# The floor's ambience balance onto the Sea before its _ready() spawns
