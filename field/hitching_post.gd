@@ -30,7 +30,9 @@ class_name HitchingPost
 #
 # On his death the body goes (freed with the win, or sinking): the rope
 # stays tied to the ring and its loose end drops, over rope_drop_seconds,
-# to the sand under where the harness was, and lies there slack.
+# to the sand under where the harness was, and lies there slack - easing
+# into a loose sideways curve (rope_ground_wander_m) as it falls. The
+# curve's shape is this post's own, drawn once, so it never crawls.
 
 const MODEL_SCENE_PATH := "res://assets/models/props/hitching_post/hitching_post.glb"
 
@@ -95,12 +97,19 @@ const MODEL_SCENE_PATH := "res://assets/models/props/hitching_post/hitching_post
 	set(value):
 		rope_sides = value
 		_rope_dirty = true
-@export var rope_color: Color = Color(0.13, 0.12, 0.11):
+# Weathered rope, a step darker than the post.
+@export var rope_color: Color = Color(0.36, 0.34, 0.31):
 	set(value):
 		rope_color = value
 		if _rope_material != null:
 			_rope_material.albedo_color = value
 @export var rope_drop_seconds: float = 0.5
+# Dropped, the rope lies in a loose, uneven curve: at most this far to
+# either side of the straight line from the ring to its loose end, metres.
+@export var rope_ground_wander_m: float = 0.35:
+	set(value):
+		rope_ground_wander_m = value
+		_rope_dirty = true
 @export_group("")
 
 @export var ground_path: NodePath = ^"../../Ground"
@@ -130,6 +139,8 @@ var _has_harness: bool = false
 var _dropping: bool = false
 var _drop_elapsed: float = 0.0
 var _drop_to: Vector3 = Vector3.ZERO
+# The lying curve's shape: two waves' phases and a bias to one side.
+var _wander_shape: Vector3 = Vector3.ZERO
 
 # FloorProp's placement (RegionField._spawn_floor_props()): XZ here, Y
 # from the relief; the entry's yaw on top of the ring's facing.
@@ -140,6 +151,9 @@ func set_floor_placement(world_position: Vector3, yaw: float, _roll: float) -> v
 func _ready() -> void:
 	# The rope follows the body through the battle freeze.
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash(name)
+	_wander_shape = Vector3(rng.randf_range(0.0, TAU), rng.randf_range(0.0, TAU), rng.randf_range(-1.0, 1.0))
 	_spawn_model()
 	_spawn_rope()
 	_find_enemy()
@@ -324,6 +338,9 @@ func _rope_points(a: Vector3, b: Vector3) -> PackedVector3Array:
 	var catenary_a: float = 1.0
 	var x0: float = 0.0
 	var direction: Vector3 = across / h if h > 0.0 else Vector3.ZERO
+	# Sideways, for the dropped rope's curve, grown in as it falls.
+	var sideways: Vector3 = Vector3(-direction.z, 0.0, direction.x)
+	var wander: float = rope_ground_wander_m * _drop_fraction() if _dropping else 0.0
 	if not taut:
 		# sinh(z) / z = sqrt(L^2 - v^2) / h, z = h / 2a, by bisection.
 		var target: float = sqrt(_rope_length * _rope_length - v * v) / h
@@ -346,6 +363,10 @@ func _rope_points(a: Vector3, b: Vector3) -> PackedVector3Array:
 			var x: float = t * h
 			var y: float = catenary_a * (cosh((x - x0) / catenary_a) - cosh(x0 / catenary_a))
 			point = a + direction * x + Vector3.UP * y
+		if wander != 0.0:
+			# Pinned at both ends; two waves and a bias make it uneven.
+			var shape: float = 0.55 * sin(TAU * 1.3 * t + _wander_shape.x) + 0.35 * sin(TAU * 2.7 * t + _wander_shape.y) + 0.45 * _wander_shape.z
+			point += sideways * (wander * sin(PI * t) * shape)
 		var floor_y: float = _ground_height(point) + rope_radius
 		if point.y < floor_y:
 			point.y = floor_y
