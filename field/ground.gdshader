@@ -280,11 +280,22 @@ uniform vec2 canvas_metres = vec2(1.0);
 varying vec2 v_world_xz;
 varying float v_world_height;
 
-// Textureless value noise, ~[0,1].
+// Textureless value noise, ~[0,1]. hash() takes a lattice point (whole
+// numbers, as value_noise() hands it) and hashes it as integers, PCG-style,
+// so every cell sharing a corner gets exactly the same value there. The
+// float hash this replaced (fract(p * vec2(123.34, 456.21)) and on)
+// magnified the last bit of its input - one ulp moved a corner from 0.54
+// to 0.78 - and neighbouring cells reach a corner by different arithmetic
+// (floor(p) against i + 1), so the noise stepped along its lattice lines:
+// straight seams in every pattern built on it, plainest along the worn
+// band's edge wobble.
 float hash(vec2 p) {
-	p = fract(p * vec2(123.34, 456.21));
-	p += dot(p, p + 45.32);
-	return fract(p.x * p.y);
+	uvec2 q = uvec2(ivec2(floor(p + 0.5)) + ivec2(1 << 20));
+	uint h = q.x * 1597334677u ^ q.y * 3812015801u;
+	h = h * 747796405u + 2891336453u;
+	h = ((h >> ((h >> 28u) + 4u)) ^ h) * 277803737u;
+	h = (h >> 22u) ^ h;
+	return float(h) * (1.0 / 4294967295.0);
 }
 
 float value_noise(vec2 p) {
@@ -594,8 +605,12 @@ float caustic_web(vec2 world_xz, float time) {
 // values equal again. channel_factor()/channel_bar_mask()/relief_edge_
 // fade_factor() below are ports of ground.gd's _channel_factor()/
 // _channel_bar_mask()/_relief_edge_fade_factor(), byte-for-byte in their
-// math, over the same value_noise() ground.gd's _value_noise() mirrors -
-// so the animated surface lands exactly where the next bake puts it.
+// math - so the animated surface lands where the next bake puts it. Not
+// exactly at the channel's noisy edge: value_noise() here hashes as
+// integers and ground.gd's _value_noise() in 64-bit floats, so the edge
+// wander (channel_edge_noise_amplitude) can differ between the two - as
+// it already did before, when both ran the float hash at different
+// precisions (see ground.gd's _hash()).
 // Pushed by Ground._push_channel_uniforms().
 uniform bool channel_enabled = false;
 uniform vec2 channel_centre = vec2(0.0);

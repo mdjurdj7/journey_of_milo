@@ -1159,6 +1159,15 @@ func is_built() -> bool:
 func get_landmass_bounds() -> Rect2:
 	return _mask_land_bounds
 
+# The relief's own value noise, on the CPU. It no longer mirrors ground.
+# gdshader's: the shader hashes lattice points as integers (exact - its old
+# float hash stepped along the lattice lines on the GPU), while this keeps
+# the float hash, which in GDScript's 64-bit floats never matched the
+# GPU's 32-bit run of it anyway (88% of lattice points differed). Nothing
+# needs the two to agree today - the relief bumps and the SDF shoreline
+# noise are CPU-only, and the wet patches that would show a mismatch are
+# off. Porting the integer hash here would make them match exactly, but it
+# reshapes every floor's surface bumps by up to relief_amplitude.
 func _hash(p: Vector2) -> float:
 	var x: float = fposmod(p.x * 123.34, 1.0)
 	var y: float = fposmod(p.y * 456.21, 1.0)
