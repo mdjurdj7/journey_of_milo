@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://d3duvvyyy6vcu" path="res://cards/art/Wanderer/Small Price.png" id="3_art"]
 
 [sub_resource type="Resource" id="E_self"]
 script = ExtResource("2_card_effect")
@@ -21,3 +22,4 @@ card_type = 1
 target_type = 1
 description = "Draw {draw}."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_self"), SubResource("E_draw")])
+art = ExtResource("3_art")
