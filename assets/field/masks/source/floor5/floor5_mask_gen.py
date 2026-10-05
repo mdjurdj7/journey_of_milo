@@ -21,7 +21,15 @@ LEDGE_TOL = 0.08
 # walk-floor height (m) against world z (north negative): foot, long climb, rock shelf, crest flat, drop to exit
 WALK_PROFILE = [(8.0, 0.4), (0.0, 0.4), (-29.5, 2.4), (-30.5, 2.45), (-33.0, 3.4), (-34.0, 3.45),
                 (-49.0, 3.45), (-60.0, 2.45), (-70.0, 2.45)]
-SHELF_Z = (-34.5, -29.0)  # the exposed rock shelf band (world z range)
+SHELF_Z = (-34.5, -29.0)  # the exposed rock shelf band's outer reach (world z range)
+# The shelf's stone edges wobble along x so it emerges irregularly from the sand, not as a stripe:
+# each edge sits on the contour where the shelf turns steep enough for stone (rock_slope_min 10 deg,
+# z -30.3 south and -33.4 north), moved +-SHELF_WOBBLE m by low-frequency noise and feathered over
+# SHELF_FEATHER m. Pulled in, an edge trims at most ~1 m of the margin; the steepest line
+# (z ~-31.9) is covered everywhere.
+SHELF_EDGE_Z = (-33.4, -30.3)
+SHELF_WOBBLE, SHELF_FEATHER = 1.0, 1.0
+SHELF_WAVES_M = (13.0, 7.0)   # wavelengths along x of the two noise terms (the second at half weight)
 ROCKY_FROM_Z = -28.0      # boundary faces north of this may show rock (the crest is the region's first bare rock)
 _sp = json.load(open("floor5_sample_params.json"))
 POCKET = (_sp["pocket"][0], _sp["pocket"][1], 4.5)  # the side pocket's outcrop: centre x, z and radius for rock on its walls
@@ -68,11 +76,22 @@ Image.fromarray((elev * 255 + 0.5).astype(np.uint8), "L").save(os.path.join(OUT,
 Image.fromarray(np.full((H, W), 255, np.uint8), "L").save(os.path.join(OUT, "region1_floor5_landmass.png"))
 
 # rock: the shelf band, the boundary faces around the crest, and the side pocket's walls
-shelf = (wz <= SHELF_Z[1]) & (wz >= SHELF_Z[0]) & (o < FACE_W + 1.0)   # walkable band and its boundary faces only
+rng_shelf = np.random.default_rng(11)
+def edge_noise():   # +-1 along x, low frequency
+    ph = rng_shelf.uniform(0, 2 * np.pi, len(SHELF_WAVES_M))
+    n = sum(w * np.sin(2 * np.pi * wx / L + p) for w, L, p in zip((1.0, 0.5), SHELF_WAVES_M, ph))
+    return n / 1.5
+south_edge = SHELF_EDGE_Z[1] + SHELF_WOBBLE * edge_noise()
+north_edge = SHELF_EDGE_Z[0] + SHELF_WOBBLE * edge_noise()
+def feather(t):
+    t = np.clip(t, 0, 1); return t * t * (3 - 2 * t)
+shelf_band = feather((south_edge + SHELF_FEATHER / 2 - wz) / SHELF_FEATHER) * feather((wz - north_edge + SHELF_FEATHER / 2) / SHELF_FEATHER)
+shelf_band *= (wz <= SHELF_Z[1]) & (wz >= SHELF_Z[0]) & (o < FACE_W + 1.0)   # walkable band and its boundary faces only
 crest_faces = (~walk) & (o < FACE_W + 1.0) & (wz <= ROCKY_FROM_Z)
 pcx, pcz, pr = POCKET
 pocket_walls = (~walk) & (o < FACE_W + 1.0) & (np.hypot(wx - pcx, wz - pcz) <= pr)
-rock = gaussian_filter((shelf | crest_faces | pocket_walls).astype(np.float32), 0.4 * PX)
+rock = np.maximum(gaussian_filter((crest_faces | pocket_walls).astype(np.float32), 0.4 * PX),
+                  gaussian_filter(shelf_band.astype(np.float32), 0.4 * PX))
 Image.fromarray((np.clip(rock, 0, 1) * 255).astype(np.uint8), "L").save(os.path.join(OUT, "region1_floor5_rock.png"))
 
 # outer: out-of-bounds ground beyond the boundary crest centreline (floor 3's smoothstep)
