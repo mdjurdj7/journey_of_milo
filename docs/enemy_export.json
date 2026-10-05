@@ -780,7 +780,7 @@
       "file": "res://battle/rules/enemies/dunecur.tres",
       "hp": 55,
       "elite": false,
-      "mechanic_summary": "Watches, Rushes for 7, then Recovers 5 Block; every Attack card played against it while Rush is coming adds 2 to that Rush, up to +8. Teaches holding Attacks on the Rush turn and hitting on Watch and Recover.",
+      "mechanic_summary": "Snarls for 6, then Rushes for 10; every Attack card played against it while Rush is coming adds 2 to that Rush, up to +8. Teaches holding Attacks on the Rush turn and hitting while it Snarls.",
       "field": {
         "model": "res://assets/models/enemies/Dunecur/Dunecur.glb",
         "model_is_default": false,
@@ -801,28 +801,25 @@
         "selection": "loop (in order)",
         "intents": [
           {
-            "name": "Watch",
-            "type": "WATCH"
+            "name": "Snarl",
+            "type": "ATTACK",
+            "damage_per_hit": 6,
+            "hits": 1
           },
           {
             "name": "Rush",
             "type": "ATTACK",
-            "damage_per_hit": 7,
+            "damage_per_hit": 10,
             "hits": 1,
             "counts_attack_cards": {
               "status": "roused",
               "bonus_per_card": 2,
               "max_stacks": 4,
               "damage_range": [
-                7,
-                15
+                10,
+                18
               ]
             }
-          },
-          {
-            "name": "Recover",
-            "type": "DEFEND",
-            "block": 5
           }
         ],
         "modified_by": [],

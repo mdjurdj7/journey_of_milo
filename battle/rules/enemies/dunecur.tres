@@ -1,33 +1,27 @@
-[gd_resource type="Resource" script_class="EnemyData" load_steps=8 format=3]
+[gd_resource type="Resource" script_class="EnemyData" load_steps=7 format=3]
 
 [ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
 [ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/roused.tres" id="3_roused"]
 [ext_resource type="AudioStream" uid="uid://bnvfgx6j66j30" path="res://assets/audio/combat_old/hit.wav" id="4_hit"]
 
-[sub_resource type="Resource" id="EnemyIntent_watch"]
+[sub_resource type="Resource" id="EnemyIntent_snarl"]
 script = ExtResource("2_intent")
-intent_name = "Watch"
-type = 4
+intent_name = "Snarl"
+value = 6
 
 [sub_resource type="Resource" id="EnemyIntent_rush"]
 script = ExtResource("2_intent")
 intent_name = "Rush"
-value = 7
+value = 10
 counts_attack_cards = true
-
-[sub_resource type="Resource" id="EnemyIntent_recover"]
-script = ExtResource("2_intent")
-intent_name = "Recover"
-type = 1
-value = 5
 
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Dunecur"
-mechanic_summary = "Watches, Rushes for 7, then Recovers 5 Block; every Attack card played against it while Rush is coming adds 2 to that Rush, up to +8. Teaches holding Attacks on the Rush turn and hitting on Watch and Recover."
+mechanic_summary = "Snarls for 6, then Rushes for 10; every Attack card played against it while Rush is coming adds 2 to that Rush, up to +8. Teaches holding Attacks on the Rush turn and hitting while it Snarls."
 max_hp = 55
-intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_watch"), SubResource("EnemyIntent_rush"), SubResource("EnemyIntent_recover")])
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_snarl"), SubResource("EnemyIntent_rush")])
 attack_card_status = ExtResource("3_roused")
 contact_sounds = Array[AudioStream]([ExtResource("4_hit")])
 model_scene_path = "res://assets/models/enemies/Dunecur/Dunecur.glb"
