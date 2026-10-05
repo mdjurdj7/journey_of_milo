@@ -17,7 +17,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 10
+const CASES := 11
 const DUNECUR_PATH := "res://battle/rules/enemies/dunecur.tres"
 const ROUSED_PATH := "res://battle/rules/statuses/roused.tres"
 const DENIED_PATH := "res://battle/rules/statuses/denied.tres"
@@ -57,6 +57,7 @@ func _initialize() -> void:
 	await _check_fight_carve()
 	await _check_fight_skill()
 	await _check_fight_strike_hover()
+	await _check_crest()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -290,6 +291,72 @@ func _check_fight_strike_hover() -> void:
 			var rect: Rect2 = view.call("strike_label_rect")
 			_expect_eq(view.call("keyword_at", rect.get_center()), "STRIKE", "A Slash in hand answers STRIKE over its type label")
 			_expect_eq(view.get("strike_label_definition"), "An Attack card.", "...defined as \"An Attack card.\"")
+	await _teardown()
+	_completed += 1
+
+# The crest and the head (DunecurPose): in the field the head is down
+# feeding and the crest flat; the fight lifts the head; set_roused() puts
+# the crest at its step per stack - 70, 52.5, 35, 17.5, 0 degrees of fold -
+# and so do Slashes on the Rush through the controller, the landed Rush
+# folding it flat again.
+func _check_crest() -> void:
+	_run_state.call("new_run", load(CHARACTER_PATH))
+	var cards: Array[CardData] = []
+	for i in 10:
+		cards.append((load(SLASH_PATH) as CardData).duplicate() as CardData)
+	_run_state.set("deck", cards)
+	_run_state.set("player_max_hp", PLAYER_HP)
+	_run_state.set("player_hp", PLAYER_HP)
+	_run_state.set("current_floor_index", FLOOR_4)
+	_run_state.set("run_opening_pending", false)
+	_run_state.set("title_pending", false)
+	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(_field)
+	await create_timer(1.5).timeout
+	var dunecur: Node = null
+	for node in get_nodes_in_group("enemies"):
+		if (node.get("enemy_data") as Resource).resource_path == DUNECUR_PATH:
+			dunecur = node
+	var poses: Array[Node] = dunecur.find_children("*", "DunecurPose", true, false) if dunecur != null else []
+	if poses.size() != 1:
+		_fail("the Dunecur has no DunecurPose")
+		await _teardown()
+		_completed += 1
+		return
+	var pose: Node = poses[0]
+	var flat: float = float(pose.get("flat_fold_degrees"))
+	var step: float = float(pose.get("rise_per_stack_degrees"))
+	_expect(is_equal_approx(flat, 70.0) and is_equal_approx(step, 17.5), "Flat is a 70 degree fold, 17.5 a stack")
+	_expect(is_equal_approx(float(pose.call("get_head_dip_degrees")), float(pose.get("feed_dip_degrees"))), "In the field his head is down, feeding (%.1f)" % float(pose.call("get_head_dip_degrees")))
+	_expect(is_equal_approx(float(pose.call("get_crest_fold_degrees")), flat), "...and his crest flat")
+	dunecur.call("set_roused", 4)
+	await create_timer(0.6).timeout
+	_expect(is_equal_approx(float(pose.call("get_crest_fold_degrees")), flat), "Roused out of a fight: the crest stays flat")
+	dunecur.call("set_roused", 0)
+	_field.call_deferred("_on_enemy_contacted", dunecur)
+	await create_timer(2.5).timeout
+	var layer: Node = _field.get_node("BattleLayer")
+	if layer.get_child_count() == 0:
+		_fail("no fight started on floor 4")
+	else:
+		var controller: Node = layer.get_child(0).get("battle_controller")
+		_expect(is_equal_approx(float(pose.call("get_head_dip_degrees")), 0.0), "The fight lifts his head (%.1f)" % float(pose.call("get_head_dip_degrees")))
+		var folds: Array[float] = []
+		for stacks in 5:
+			dunecur.call("set_roused", stacks)
+			await create_timer(float(pose.get("crest_ease_seconds")) + 0.15).timeout
+			folds.append(snappedf(float(pose.call("get_crest_fold_degrees")), 0.01))
+		_expect_eq(folds, [70.0, 52.5, 35.0, 17.5, 0.0] as Array[float], "set_roused() puts the crest at its step per stack")
+		dunecur.call("set_roused", 0)
+		await _end_turn(controller)
+		var targets: Array[float] = [float(pose.call("get_crest_target_degrees"))]
+		for card in 4:
+			await _play_first(controller, dunecur)
+			targets.append(float(pose.call("get_crest_target_degrees")))
+		_expect_eq(targets, [70.0, 52.5, 35.0, 17.5, 0.0] as Array[float], "Slashes on the Rush raise it a step a card")
+		await _end_turn(controller)
+		await create_timer(float(pose.get("crest_ease_seconds")) + 0.15).timeout
+		_expect(is_equal_approx(float(pose.call("get_crest_fold_degrees")), flat), "The Rush landed: it settles flat")
 	await _teardown()
 	_completed += 1
 

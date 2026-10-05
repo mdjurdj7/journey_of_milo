@@ -808,6 +808,7 @@ func _run_simultaneous_turn() -> void:
 			_report_enemy_attack(enemy, result)
 	status_changed.emit()
 	for enemy in acting:
+		_show_roused(enemy)
 		enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
 
 # A countdown that went off at the start of this enemy's turn (Sentence -
@@ -851,7 +852,19 @@ func _pose_for_intent(enemy: FieldEnemy) -> float:
 		rear = intent != null and intent.rear_while_queued and not EnemyTurn.is_interrupted(combatant, intent) and not EnemyTurn.is_denied(combatant)
 		poised = intent != null and intent.type == EnemyIntent.IntentType.ATTACK and not intent.rear_while_queued
 	enemy.set_poised(poised)
+	_show_roused(enemy)
 	return enemy.set_rearing(rear)
+
+# The body shows the stacks of its attack_card_status it holds (the
+# Dunecur's crest, FieldEnemy.set_roused()) - after each card, each enemy
+# turn and at the fight's start, with the intent pose.
+func _show_roused(enemy: FieldEnemy) -> void:
+	var combatant: Combatant = _combatants.get(enemy)
+	var data: EnemyData = enemy.enemy_data
+	if combatant == null or data == null or data.attack_card_status == null:
+		return
+	var held: Status = Status.find_in(combatant.statuses, data.attack_card_status)
+	enemy.set_roused(held.stack_count if held != null and combatant.hp > 0 else 0)
 
 # An interrupted enemy going under, or a buried one coming up, on the
 # field body (FieldEnemy.play_burrow()) - how long that takes, for the

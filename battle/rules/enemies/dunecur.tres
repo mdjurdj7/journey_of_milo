@@ -29,4 +29,5 @@ contact_sounds = Array[AudioStream]([ExtResource("4_hit")])
 model_scene_path = "res://assets/models/enemies/Dunecur/Dunecur.glb"
 model_scale = 1.34
 model_yaw_offset_degrees = 180.0
+attachment_scene_path = "res://field/dunecur_pose.tscn"
 contact_radius_m = 3.0

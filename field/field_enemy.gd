@@ -287,6 +287,13 @@ func set_rearing(on: bool) -> float:
 		return 0.0
 	return float(_attachment.call("set_rearing", on))
 
+# How many stacks of Roused it holds (the Dunecur's crest, DunecurPose.
+# set_roused()); a body with no such attachment ignores it.
+func set_roused(stacks: int) -> void:
+	if _attachment == null or not _attachment.has_method("set_roused"):
+		return
+	_attachment.call("set_roused", stacks)
+
 # The tell a queued Snap may hold (RearPose.set_poised() - shown only
 # with its hold_tell on); a body with no such attachment ignores it.
 func set_poised(on: bool) -> void:
