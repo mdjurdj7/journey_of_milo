@@ -21,15 +21,21 @@ LEDGE_TOL = 0.08
 # walk-floor height (m) against world z (north negative): foot, long climb, rock shelf, crest flat, drop to exit
 WALK_PROFILE = [(8.0, 0.4), (0.0, 0.4), (-29.5, 2.4), (-30.5, 2.45), (-33.0, 3.4), (-34.0, 3.45),
                 (-49.0, 3.45), (-60.0, 2.45), (-70.0, 2.45)]
-SHELF_Z = (-34.5, -29.0)  # the exposed rock shelf band's outer reach (world z range)
-# The shelf's stone edges wobble along x so it emerges irregularly from the sand, not as a stripe:
-# each edge sits on the contour where the shelf turns steep enough for stone (rock_slope_min 10 deg,
-# z -30.3 south and -33.4 north), moved +-SHELF_WOBBLE m by low-frequency noise and feathered over
-# SHELF_FEATHER m. Pulled in, an edge trims at most ~1 m of the margin; the steepest line
-# (z ~-31.9) is covered everywhere.
-SHELF_EDGE_Z = (-33.4, -30.3)
-SHELF_WOBBLE, SHELF_FEATHER = 1.0, 1.0
-SHELF_WAVES_M = (13.0, 7.0)   # wavelengths along x of the two noise terms (the second at half weight)
+SHELF_Z = (-34.5, -28.0)  # the exposed rock shelf band's outer reach (world z range)
+# The shelf wanders in the ground itself, so its slope contour - and the stone, which shows only past
+# rock_slope_min - is irregular: WALK_PROFILE's shelf (SHELF_RISE m over z -30.5..-33) is taken out of
+# the profile and laid back per x, its centre moved SHELF_SHIFT (mean, amplitude; south +) and its
+# half-width scaled by 1 +- SHELF_STEEP_VAR, both by low-frequency noise along x. Its top never passes
+# CREST_START_Z, so the crest flat and the climb below z -28 keep their heights.
+SHELF_RISE, SHELF_CENTRE_Z, SHELF_HALF_M = 0.95, -31.75, 1.25
+SHELF_SHIFT = (0.25, 1.25)    # centre moves -1.0..+1.5 m in z
+SHELF_STEEP_VAR = 0.25        # half-width 0.94..1.56 m: some stretches steeper, some gentler
+CREST_START_Z = -34.0
+SHELF_WAVES_M = {"shift": (16.0, 9.0), "steep": (11.0, 6.0)}   # wavelengths along x (second term at half weight)
+# The rock mask covers the shelf's ramp SHELF_MARGIN m either side, feathered over SHELF_FEATHER m,
+# with small sand gaps on it (x along the shelf, radius m) so stone shows through sand, not as one ledge.
+SHELF_MARGIN, SHELF_FEATHER = 0.5, 1.0
+SHELF_GAPS = [(-3.0, 0.85), (3.5, 0.75), (7.5, 0.95)]
 ROCKY_FROM_Z = -28.0      # boundary faces north of this may show rock (the crest is the region's first bare rock)
 _sp = json.load(open("floor5_sample_params.json"))
 POCKET = (_sp["pocket"][0], _sp["pocket"][1], 4.5)  # the side pocket's outcrop: centre x, z and radius for rock on its walls
@@ -61,6 +67,14 @@ wz = (yy - spawn[1]) / PX
 wx = (xx - spawn[0]) / PX
 pz, ph = zip(*WALK_PROFILE)
 walk_h = np.interp(-wz, -np.array(pz), np.array(ph)).astype(np.float32)   # local walk-floor height by z
+rng_shelf = np.random.default_rng(11)
+def x_noise(waves):   # about +-1 along x, low frequency
+    phase = rng_shelf.uniform(0, 2 * np.pi, len(waves))
+    return sum(w * np.sin(2 * np.pi * wx[0] / L + p) for w, L, p in zip((1.0, 0.5), waves, phase)) / 1.5
+shelf_c = SHELF_CENTRE_Z + SHELF_SHIFT[0] + SHELF_SHIFT[1] * x_noise(SHELF_WAVES_M["shift"])   # per column
+shelf_half = np.minimum(SHELF_HALF_M * (1 + SHELF_STEEP_VAR * x_noise(SHELF_WAVES_M["steep"])), shelf_c - CREST_START_Z)
+def shelf_ramp(c, half): return np.clip((c + half - wz) / (2 * half), 0, 1)   # 0 below the shelf, 1 above
+walk_h += SHELF_RISE * (shelf_ramp(shelf_c[None, :], shelf_half[None, :]) - shelf_ramp(SHELF_CENTRE_Z, SHELF_HALF_M))
 walk_h = gaussian_filter(walk_h, sigma=0.8 * PX)                           # round the profile's corners
 
 o = distance_transform_edt(~walk) / PX
@@ -76,16 +90,14 @@ Image.fromarray((elev * 255 + 0.5).astype(np.uint8), "L").save(os.path.join(OUT,
 Image.fromarray(np.full((H, W), 255, np.uint8), "L").save(os.path.join(OUT, "region1_floor5_landmass.png"))
 
 # rock: the shelf band, the boundary faces around the crest, and the side pocket's walls
-rng_shelf = np.random.default_rng(11)
-def edge_noise():   # +-1 along x, low frequency
-    ph = rng_shelf.uniform(0, 2 * np.pi, len(SHELF_WAVES_M))
-    n = sum(w * np.sin(2 * np.pi * wx / L + p) for w, L, p in zip((1.0, 0.5), SHELF_WAVES_M, ph))
-    return n / 1.5
-south_edge = SHELF_EDGE_Z[1] + SHELF_WOBBLE * edge_noise()
-north_edge = SHELF_EDGE_Z[0] + SHELF_WOBBLE * edge_noise()
 def feather(t):
     t = np.clip(t, 0, 1); return t * t * (3 - 2 * t)
+south_edge = (shelf_c + shelf_half + SHELF_MARGIN)[None, :]
+north_edge = (shelf_c - shelf_half - SHELF_MARGIN)[None, :]
 shelf_band = feather((south_edge + SHELF_FEATHER / 2 - wz) / SHELF_FEATHER) * feather((wz - north_edge + SHELF_FEATHER / 2) / SHELF_FEATHER)
+for gx, gr in SHELF_GAPS:   # sand gaps, centred on the shelf's own line at gx
+    gz = float(np.interp(gx, wx[0], shelf_c))
+    shelf_band *= feather((np.hypot(wx - gx, wz - gz) - gr + 0.15) / 0.3)
 shelf_band *= (wz <= SHELF_Z[1]) & (wz >= SHELF_Z[0]) & (o < FACE_W + 1.0)   # walkable band and its boundary faces only
 crest_faces = (~walk) & (o < FACE_W + 1.0) & (wz <= ROCKY_FROM_Z)
 pcx, pcz, pr = POCKET
@@ -149,7 +161,7 @@ layout = {
     "ledges_world_xz": ledges,
     "note": "World XZ in metres relative to spawn; +X east, +Z south (north is negative). One closed ledge ring "
             "(the outer boundary). The walk floor rises from 0.4 m at spawn to 3.45 m on the crest; the rock shelf "
-            "is the steep step at z -30.5 to -33. Exit direction is north (0, -1); the gate sits beyond the region-end fight.",
+            "is the steep step at z -30.5 to -33, moved -1.0..+1.5 m along x. Exit direction is north (0, -1); the gate sits beyond the region-end fight.",
 }
 json.dump(layout, open("floor5_layout.json", "w"), indent=1)
 

@@ -67,7 +67,7 @@
  ],
  "shelf_z": [
   -34.5,
-  -29.0
+  -28.0
  ],
  "ridge": {
   "crest_rise_above_walk_m": 1.2,
@@ -126,14 +126,14 @@
    "exit": 2.45
   },
   "max_slope_deg": {
-   "climb_z0_to_-28": 3.9,
-   "shelf_z-28_to_-35": 18.4,
+   "climb_z0_to_-28": 4.1,
+   "shelf_z-28_to_-35": 19.8,
    "crest_z-36_to_-48": 0.6,
    "descent_z-50_to_-60": 5.2
   },
   "crest_flat_m": [
    20.7,
-   15.6
+   16.3
   ],
   "route_length_spawn_to_fight_m": 42.0,
   "route_length_fight_to_exit_m": 18.0
@@ -482,5 +482,5 @@
    ]
   ]
  ],
- "note": "World XZ in metres relative to spawn; +X east, +Z south (north is negative). One closed ledge ring (the outer boundary). The walk floor rises from 0.4 m at spawn to 3.45 m on the crest; the rock shelf is the steep step at z -30.5 to -33. Exit direction is north (0, -1); the gate sits beyond the region-end fight."
+ "note": "World XZ in metres relative to spawn; +X east, +Z south (north is negative). One closed ledge ring (the outer boundary). The walk floor rises from 0.4 m at spawn to 3.45 m on the crest; the rock shelf is the steep step at z -30.5 to -33, moved -1.0..+1.5 m along x. Exit direction is north (0, -1); the gate sits beyond the region-end fight."
 }
