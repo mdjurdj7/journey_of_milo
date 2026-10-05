@@ -27,6 +27,9 @@
 #   --import         run Godot's --import first (--path or this tree)
 #   --logs DIR       where the logs go (default: a fresh temp folder)
 #   --list           print the plan and stop
+#   --moved A[..B]   with --list: also print what the HEAD-moved check
+#                    would say had commits A..B (B default HEAD) landed
+#                    during this run - a dry run of that check
 #
 # GODOT overrides the engine (default ../Godot_v4.7.1.exe beside the repo:
 # the main executable, not the _console wrapper). Exit code 0 = every
@@ -187,6 +190,7 @@ PROJECT=""
 DO_IMPORT=0
 LOGS=""
 LIST=0
+MOVED=""
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -206,14 +210,16 @@ while [ $# -gt 0 ]; do
 		--import) DO_IMPORT=1 ;;
 		--logs) LOGS="${2:?--logs needs a folder}"; shift ;;
 		--list) LIST=1 ;;
+		--moved) MOVED="${2:?--moved needs a commit or range}"; shift ;;
 		--list-areas) for a in $AREAS_ALL; do printf '%-11s %s\n' "$a" "$(area_probes "$a")"; done; exit 0 ;;
-		-h|--help) sed -n '2,37p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,36p' "$0"; exit 0 ;;
 		*) die "unknown option $1 (--help)" ;;
 	esac
 	shift
 done
 [ -n "$MODE" ] || die "say what to run: --full, --area, --changed or --probe (--help)"
 [ -n "$WORKTREE" ] && [ -n "$PROJECT" ] && die "--worktree and --path are exclusive"
+[ -n "$MOVED" ] && [ "$LIST" = 0 ] && die "--moved is a dry run of the HEAD-moved check: use it with --list"
 
 # --- What changed (for --changed, and for the HEAD-moved check) ---
 # Every path list below is one path per line - never split on spaces, so
@@ -232,6 +238,31 @@ fi
 
 # --- Which probes ---
 ALL_PROBES=$(cd "$REPO/tests" && ls *_probe.gd | sed 's/\.gd$//')
+
+# Probe names as *_probe, one per line, sorted, no duplicates.
+normalise_probes() { for p in "$@"; do p="${p%.gd}"; p="${p%_probe}_probe"; echo "$p"; done | sort -u; }
+
+# The probes a list of paths (one per line) maps to, by path_probes() -
+# what --changed runs and what the HEAD-moved check asks about. Sets
+# MAPPED (normalised) and MAPPED_FULL: the first path no area covers,
+# which maps to the full suite, or empty.
+map_paths() {
+	MAPPED=""
+	MAPPED_FULL=""
+	local f p all=""
+	while IFS= read -r f; do
+		[ -n "$f" ] || continue
+		p=$(path_probes "$f")
+		if [ "$p" = FULL ]; then
+			MAPPED_FULL="$f"
+			MAPPED=$(normalise_probes $ALL_PROBES)
+			return
+		fi
+		all="$all $p"
+	done <<< "$1"
+	MAPPED=$(normalise_probes $all)
+}
+
 SELECTED=""
 case "$MODE" in
 	full) SELECTED="$ALL_PROBES" ;;
@@ -243,23 +274,37 @@ case "$MODE" in
 	probe) SELECTED=$(echo "$NAMES" | tr ',' ' ') ;;
 	changed)
 		[ -n "$CHANGED" ] || { echo "run_probes: nothing changed since ${BASE:-HEAD} - no probes to run"; exit 0; }
-		while IFS= read -r f; do
-			[ -n "$f" ] || continue
-			p=$(path_probes "$f")
-			if [ "$p" = FULL ]; then
-				echo "run_probes: $f is in no area - running the full suite"
-				SELECTED="$ALL_PROBES"
-				break
-			fi
-			SELECTED="$SELECTED $p"
-		done <<< "$CHANGED" ;;
+		map_paths "$CHANGED"
+		[ -n "$MAPPED_FULL" ] && echo "run_probes: $MAPPED_FULL is in no area - running the full suite"
+		SELECTED="$MAPPED" ;;
 esac
 # Normalise to *_probe names, drop duplicates, check each exists.
-SELECTED=$(for p in $SELECTED; do p="${p%.gd}"; p="${p%_probe}_probe"; echo "$p"; done | sort -u)
+SELECTED=$(normalise_probes $SELECTED)
 for p in $SELECTED; do
 	echo "$ALL_PROBES" | grep -qx "$p" || die "no probe tests/$p.gd"
 done
 [ -n "$SELECTED" ] || { echo "run_probes: no probe covers the changed files - nothing to run"; exit 0; }
+
+# Commits TESTED..END landed while this run tested TESTED. Their files are
+# mapped the way --changed maps them (map_paths()); if any maps to a probe
+# in this run, that probe's result is for an older tree - rerun it on the
+# new HEAD. A file no probe can see (docs, *.md) never asks for one; a
+# file in no area maps to every probe, so it always does.
+report_head_moved() {
+	local tested="$1" end="$2" new_files hit
+	new_files=$(gitq -C "$REPO" diff --name-only "$tested" "$end")
+	echo "run_probes: HEAD moved: $(git -C "$REPO" rev-parse --short "$tested") -> $(git -C "$REPO" rev-parse --short "$end"); the new commits touch:"
+	echo "$new_files" | sed 's/^/    /'
+	map_paths "$new_files"
+	hit=$(comm -12 <(echo "$SELECTED" | sed '/^$/d') <(echo "$MAPPED" | sed '/^$/d'))
+	if [ -z "$hit" ]; then
+		echo "run_probes: none of them map to a probe in this run - no rerun needed"
+	else
+		[ -n "$MAPPED_FULL" ] && echo "run_probes: $MAPPED_FULL is in no area, so it maps to every probe"
+		echo "run_probes: rerun needed on the new HEAD - they map to these probes in this run:"
+		echo "$hit" | sed 's/^/    /'
+	fi
+}
 
 table_seconds() { echo "$PROBE_TABLE" | awk -v n="$1" '$1 == n { print $2; f = 1 } END { if (!f) print 60 }'; }
 table_flag() { echo "$PROBE_TABLE" | awk -v n="$1" -v f="$2" '$1 == n { for (i = 3; i <= NF; i++) if ($i == f) print "yes" }'; }
@@ -286,6 +331,15 @@ if [ "$LIST" = 1 ]; then
 	[ -n "$CHANGED" ] && echo "changed:  $(while IFS= read -r f; do printf "'%s' " "$f"; done <<< "$CHANGED")"
 	echo "parallel (-j $JOBS):$PARALLEL"
 	[ -n "$SERIAL" ] && echo "serial:  $SERIAL"
+	if [ -n "$MOVED" ]; then
+		from="${MOVED%%..*}"
+		to=HEAD
+		[ "$from" != "$MOVED" ] && to="${MOVED#*..}"
+		git -C "$REPO" rev-parse -q --verify "$from^{commit}" > /dev/null || die "--moved: no commit '$from'"
+		git -C "$REPO" rev-parse -q --verify "${to:-HEAD}^{commit}" > /dev/null || die "--moved: no commit '$to'"
+		echo "if $from..${to:-HEAD} landed during this run:"
+		report_head_moved "$from" "${to:-HEAD}"
+	fi
 	exit 0
 fi
 
@@ -411,18 +465,7 @@ END_HEAD=$(git -C "$REPO" rev-parse HEAD)
 TESTED_HEAD="${REF:+$(git -C "$REPO" rev-parse "$REF")}"
 TESTED_HEAD="${TESTED_HEAD:-$START_HEAD}"
 if [ "$END_HEAD" != "$TESTED_HEAD" ]; then
-	NEW_FILES=$(gitq -C "$REPO" diff --name-only "$TESTED_HEAD" "$END_HEAD")
-	echo "run_probes: HEAD moved: $(git -C "$REPO" rev-parse --short "$TESTED_HEAD") -> $(git -C "$REPO" rev-parse --short "$END_HEAD"); the new commits touch:"
-	echo "$NEW_FILES" | sed 's/^/    /'
-	OVERLAP=$(echo "$NEW_FILES" | grep -Fx -f <(echo "$CHANGED") 2>/dev/null)
-	if [ -z "$CHANGED" ]; then
-		echo "run_probes: no change set given - compare those against the files under test yourself"
-	elif [ -z "$OVERLAP" ]; then
-		echo "run_probes: none of them are files under test - no rerun needed"
-	else
-		echo "run_probes: they overlap the files under test - rerun on the new HEAD:"
-		echo "$OVERLAP" | sed 's/^/    /'
-	fi
+	report_head_moved "$TESTED_HEAD" "$END_HEAD"
 fi
 
 [ "$FAILED" = 0 ]
