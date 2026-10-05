@@ -118,3 +118,5 @@ ambience_sea_db = -3.0
 ambience_wind_db = 1.0
 ambience_sea_lowpass_hz = 7000.0
 reward_pool = ExtResource("7_wanderer_pool")
+gold_min = 12
+gold_max = 18

@@ -72,3 +72,5 @@ exit_kind = 1
 gate_distance_beyond_enemy = 32.0
 wear_path_override = PackedVector2Array(0, 0, 0, -16.5, 24.1, -33.5)
 reward_pool = ExtResource("7_wanderer_pool")
+gold_min = 15
+gold_max = 22

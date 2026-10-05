@@ -67,3 +67,5 @@ props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_hull1"), SubR
 gate_bar_axis_offset = 0.85
 wear_path_override = null
 reward_pool = ExtResource("10_wanderer_pool")
+gold_min = 10
+gold_max = 15

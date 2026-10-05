@@ -30,7 +30,7 @@
           "rewards": {
             "gold": [
               10,
-              18
+              15
             ],
             "card_pool": "res://cards/pools/wanderer_pool.tres",
             "cards_offered": 3,
@@ -86,7 +86,7 @@
           "file": "res://floors/region1_floor2.tres",
           "rewards": {
             "gold": [
-              10,
+              12,
               18
             ],
             "card_pool": "res://cards/pools/wanderer_pool.tres",
@@ -256,8 +256,8 @@
           "file": "res://floors/region1_floor3.tres",
           "rewards": {
             "gold": [
-              10,
-              18
+              15,
+              22
             ],
             "card_pool": "res://cards/pools/wanderer_pool.tres",
             "cards_offered": 3,
@@ -363,8 +363,8 @@
           "file": "res://floors/region1_floor4.tres",
           "rewards": {
             "gold": [
-              10,
-              18
+              18,
+              25
             ],
             "card_pool": "res://cards/pools/wanderer_pool.tres",
             "cards_offered": 3,
@@ -453,8 +453,8 @@
           "file": "res://floors/region1_floor5.tres",
           "rewards": {
             "gold": [
-              10,
-              18
+              35,
+              45
             ],
             "card_pool": "res://cards/pools/wanderer_pool.tres",
             "cards_offered": 3,
