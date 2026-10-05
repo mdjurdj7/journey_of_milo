@@ -121,6 +121,14 @@ signal floor_exited
 # Furthest the fit looks either side of the trigger line's centre before
 # giving up - wider than any neck this region paints.
 @export var trigger_fit_max_half_width: float = 40.0
+# How far below the ground at its centre the fitted trigger's floor sits.
+# fit_trigger_to_land() stands the box on the ground there, so an exit
+# that is high up (floor 5's, ~3 m) is walked into rather than over; a
+# gate standing alone keeps its floor at its own origin.
+@export var trigger_ground_margin: float = 0.5:
+	set(value):
+		trigger_ground_margin = value
+		_rebuild()
 # BlockContactArea is padded this much larger than the physical blocker on
 # every axis (see _build_blocker()'s own doc) - sized exactly to the
 # blocker's own footprint, a Wanderer capsule grazing the solid collision
@@ -153,6 +161,10 @@ var _channel_width: float = 14.0
 var _channel_amount: float = 1.0
 # LINE only: who holds the line (setup_hold_line()), so open() can lift it.
 var _hold_wanderer: Wanderer = null
+# The ground at the trigger's centre, metres above the gate's own origin,
+# once fit_trigger_to_land() has read it - see trigger_ground_margin.
+var _trigger_seated: bool = false
+var _trigger_ground_y: float = 0.0
 
 @onready var blocker: StaticBody3D = $Blocker
 @onready var blocker_shape: CollisionShape3D = $Blocker/CollisionShape3D
@@ -289,7 +301,8 @@ func _build_trigger() -> void:
 	var shape := BoxShape3D.new()
 	shape.size = trigger_size
 	trigger_shape.shape = shape
-	trigger_area.position = Vector3(trigger_across_offset, trigger_size.y / 2.0, -trigger_forward_offset)
+	var floor_y: float = _trigger_ground_y - trigger_ground_margin if _trigger_seated else 0.0
+	trigger_area.position = Vector3(trigger_across_offset, floor_y + trigger_size.y / 2.0, -trigger_forward_offset)
 
 # Called by RegionField once this node is placed and Ground is built,
 # BEFORE the channel is registered (the channel turns everything past the
@@ -329,9 +342,11 @@ func fit_trigger_to_land(ground: Ground) -> void:
 		hi += 1
 	var left_edge: float = float(lo - count) * step - trigger_land_margin
 	var right_edge: float = float(hi - count) * step + trigger_land_margin
+	_trigger_ground_y = ground.get_height_at(centre + right * ((left_edge + right_edge) * 0.5)) - global_position.y
+	_trigger_seated = true
 	trigger_across_offset = (left_edge + right_edge) * 0.5
 	trigger_size = Vector3(right_edge - left_edge, trigger_size.y, trigger_size.z)
-	print("ExitGate: trigger fitted to the land at its line - %.1f m across (land %.1f m, +%.1f m each side), centred %+.2f m across from the gate line" % [trigger_size.x, float(hi - lo) * step, trigger_land_margin, trigger_across_offset])
+	print("ExitGate: trigger fitted to the land at its line - %.1f m across (land %.1f m, +%.1f m each side), centred %+.2f m across from the gate line, standing on the ground %+.2f m from the gate" % [trigger_size.x, float(hi - lo) * step, trigger_land_margin, trigger_across_offset, _trigger_ground_y])
 
 # Called once by RegionField when floor_cleared fires (see its own doc) -
 # this node never watches for that condition itself. _open guards against
