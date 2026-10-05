@@ -8,20 +8,24 @@
 
 [sub_resource type="Resource" id="EnemyIntent_nip_1"]
 script = ExtResource("2_intent")
+intent_name = "Nip"
 value = 3
 
 [sub_resource type="Resource" id="EnemyIntent_nip_2"]
 script = ExtResource("2_intent")
+intent_name = "Nip"
 value = 3
 
 [sub_resource type="Resource" id="EnemyIntent_forage"]
 script = ExtResource("2_intent")
+intent_name = "Forage"
 type = 3
 value = 8
 
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Nipper"
+mechanic_summary = "Nips for 3 twice, then Forages: each living packmate heals 8. Teaches kill order - it keeps the Blackback topped up, but killing it first turns the Blackback Hungry."
 max_hp = 16
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_nip_1"), SubResource("EnemyIntent_nip_2"), SubResource("EnemyIntent_forage")])
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell"), ExtResource("4_hit_shell_2"), ExtResource("5_hit_shell_3")])

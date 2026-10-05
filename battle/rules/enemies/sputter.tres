@@ -9,6 +9,7 @@
 
 [sub_resource type="Resource" id="EnemyIntent_block"]
 script = ExtResource("2_intent")
+intent_name = "Block"
 type = 1
 value = 8
 turn_one_locked = true
@@ -16,10 +17,12 @@ no_immediate_repeat = true
 
 [sub_resource type="Resource" id="EnemyIntent_strike"]
 script = ExtResource("2_intent")
+intent_name = "Strike"
 value = 5
 
 [sub_resource type="Resource" id="EnemyIntent_scissor"]
 script = ExtResource("2_intent")
+intent_name = "Scissor"
 value = 11
 erratic_weight = 0.6
 turn_one_locked = true
@@ -27,6 +30,7 @@ turn_one_locked = true
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Sputter"
+mechanic_summary = "Picks its move fresh each turn - an 8 Block, a 5 Strike or an 11 Scissor - never Block or Scissor on turn one, never Block twice running. Teaches reading the intent every turn instead of learning a pattern."
 max_hp = 45
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_block"), SubResource("EnemyIntent_strike"), SubResource("EnemyIntent_scissor")])
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell"), ExtResource("4_hit_shell_2"), ExtResource("5_hit_shell_3")])

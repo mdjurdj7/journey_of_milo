@@ -8,6 +8,9 @@ class_name EnemyData
 # of these (field_enemy.gd's own enemy_data export).
 
 @export var enemy_name: String = ""
+# One or two plain sentences: what it does and what it teaches. For the
+# enemy export (tests/enemy_export.gd); nothing in a fight shows it.
+@export_multiline var mechanic_summary: String = ""
 @export var max_hp: int = 1
 @export var intents: Array[EnemyIntent] = []
 # Statuses it holds from the first frame of every fight, applied as the

@@ -24,6 +24,9 @@ class_name EnemyIntent
 # display shows its glyph alone, an open eye. The Dunecur's Watch.
 enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH }
 
+# The move's name (the Dunecur's Rush) - for the enemy export (tests/
+# enemy_export.gd) and the design docs; nothing in a fight shows it yet.
+@export var intent_name: String = ""
 @export var type: IntentType = IntentType.ATTACK
 @export var value: int = 0
 # Damage dealt PER HIT if ATTACK, block gained if DEFEND, HP each living

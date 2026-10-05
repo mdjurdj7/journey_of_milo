@@ -44,6 +44,7 @@ PROBE_TIMEOUT_SEC=600
 # own header asks for it). The seconds only order the batch, longest first.
 PROBE_TABLE="
 keeper_keepsake_probe 75
+enemy_export_probe 8
 belongings_choice_probe 51
 kill_order_probe 42
 blackback_probe 36
@@ -88,7 +89,7 @@ area_probes() {
 		face) echo "starter_cards keyword come_due come_due_face critical_cards" ;;
 		keywords) echo "keyword starter_cards the_return" ;;
 		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback" ;;
-		enemies) echo "blackback siltjaw wardling dunecur sentence no_further critical_cards kill_order armored_contact deny" ;;
+		enemies) echo "blackback siltjaw wardling dunecur sentence no_further critical_cards kill_order armored_contact deny enemy_export" ;;
 		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path" ;;
 		floor1) echo "kill_order drain" ;;
 		floor2) echo "kill_order hold_line bundle_roll" ;;
@@ -116,6 +117,8 @@ path_probes() {
 	path="${path%.import}"
 	local out=""
 	case "$path" in
+		# The enemy export, its generator and what it reads.
+		docs/enemy_export.json|tests/enemy_export.gd) echo enemy_export; return 0 ;;
 		default_bus_layout.tres|docs/*|*.md|reference/*|tools/*|.githooks/*|.gitignore|.gitattributes) return 0 ;;
 		tests/*_probe.gd) basename "$path" .gd; return 0 ;;
 		tests/*) return 0 ;;
@@ -129,6 +132,8 @@ path_probes() {
 		battle/card_view.*|battle/card_paper*|battle/card_art*) out=$(area_probes face) ;;
 		ui/keyword_table.gd|ui/keywords.tres|ui/status_reveal.gd) out=$(area_probes keywords) ;;
 		battle/rules/enemies/*|battle/rules/enemy_turn.gd|battle/rules/enemy_intent.gd) out=$(area_probes enemies) ;;
+		battle/rules/statuses/*|battle/rules/enemy_data.gd|battle/rules/status.gd|battle/rules/status_data.gd) out="$(area_probes rules) enemy_export" ;;
+		run/keepsakes/*) out="$(area_probes run) enemy_export" ;;
 		battle/rules/*|battle/battle_controller.gd) out=$(area_probes rules) ;;
 		battle/reward_screen.*|battle/belongings_screen.*|battle/loot_screen.*|battle/keepsake_offer.*|battle/keepsake_row.*|battle/trough_choice.*|run/*) out=$(area_probes run) ;;
 		# Keepsake art: the probes that load keepsakes and their art.
@@ -138,11 +143,12 @@ path_probes() {
 		# The Dunecur's crest and feeding head.
 		field/dunecur_pose.*) out="$(area_probes field) dunecur" ;;
 		field/*) out=$(area_probes field) ;;
-		floors/region1_floor1.tres) out=$(area_probes floor1) ;;
-		floors/region1_floor2.tres) out=$(area_probes floor2) ;;
-		floors/region1_floor3.tres) out=$(area_probes floor3) ;;
-		floors/region1_floor4.tres) out=$(area_probes floor4) ;;
-		floors/region1_floor5.tres) out=$(area_probes floor5) ;;
+		floors/region1_floor1.tres) out="$(area_probes floor1) enemy_export" ;;
+		floors/region1_floor2.tres) out="$(area_probes floor2) enemy_export" ;;
+		floors/region1_floor3.tres) out="$(area_probes floor3) enemy_export" ;;
+		floors/region1_floor4.tres) out="$(area_probes floor4) enemy_export" ;;
+		floors/region1_floor5.tres) out="$(area_probes floor5) enemy_export" ;;
+		floors/*.tres) out="$(area_probes floors) enemy_export" ;;
 		floors/*) out=$(area_probes floors) ;;
 		# Prop and environment models stand on the floors that place them.
 		assets/models/props/*|assets/Environment/*) out=$(area_probes floors) ;;

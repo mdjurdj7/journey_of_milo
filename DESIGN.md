@@ -405,3 +405,15 @@ folder (run_log_probe). (2026-10-04.)
   The bones it feeds over (`BoneScatter`, floor 4) are primitives -
   capsules, ovoids, drums - until bone models exist; `model_paths` takes
   one glb per piece kind and swaps them in. (2026-10-04, Dunecur.)
+- **The card export should be generated, like the enemy export.**
+  `docs/wanderer_card_export.json` is rebuilt by throwaway scripts and
+  committed by hand, so nothing notices when it drifts from the cards.
+  `docs/enemy_export.json` is the pattern to follow: a generator
+  (`tests/enemy_export.gd` - not `tools/`, which is `.gdignore`d, so no
+  class_name or .uid there - a `SceneTree` script whose static `to_json()`
+  writes deterministic output, no date, no commit) and a probe
+  (`tests/enemy_export_probe.gd`) that fails when the committed file differs
+  from what the generator builds now, mapped in `tools/run_probes.sh` to the
+  files it reads. The card export needs a real CardView for its face text
+  and rules font size, so its generator builds one. (2026-10-05, enemy
+  export.)

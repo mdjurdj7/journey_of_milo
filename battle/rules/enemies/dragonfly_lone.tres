@@ -6,11 +6,13 @@
 
 [sub_resource type="Resource" id="EnemyIntent_bite"]
 script = ExtResource("2_intent")
+intent_name = "Bite"
 value = 3
 
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Dragonfly"
+mechanic_summary = "The crab's escort: bites for 3 every turn, on its own clock. Teaches that a weak second body still adds up - deal with it or outpace it."
 max_hp = 14
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_bite")])
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_armor")])

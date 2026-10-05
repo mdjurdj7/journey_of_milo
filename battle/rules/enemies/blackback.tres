@@ -11,16 +11,19 @@
 
 [sub_resource type="Resource" id="EnemyIntent_peck"]
 script = ExtResource("2_intent")
+intent_name = "Peck"
 value = 4
 hits = 2
 
 [sub_resource type="Resource" id="EnemyIntent_lunge"]
 script = ExtResource("2_intent")
+intent_name = "Lunge"
 value = 12
 
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Blackback"
+mechanic_summary = "Alternates Peck (4 x 2) and Lunge (12), and is Fed while its Nipper lives; once alone it turns Hungry and every hit deals 3 more. Hungry adds the most to the two-hit Peck."
 max_hp = 40
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_peck"), SubResource("EnemyIntent_lunge")])
 starting_statuses = Array[ExtResource("4_status_data")]([ExtResource("5_fed")])

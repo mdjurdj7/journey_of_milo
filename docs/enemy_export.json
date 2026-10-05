@@ -1,0 +1,1271 @@
+{
+  "export_info": {
+    "description": "Generated export of every enemy encounter as placed in each FloorData, by region and floor in RegionData order, and every enemy data file once (enemies). Never edit by hand - regenerate it; tests/enemy_export_probe.gd fails when this file is stale.",
+    "regenerate": "Godot_v4.7.1.exe --headless --path . -s res://tests/enemy_export.gd",
+    "generated_from": [
+      "res://field/region_field.tscn (its region)",
+      "res://floors/*.tres (RegionData, FloorData, FloorEnemy, FloorPatrol, FloorProp)",
+      "res://battle/rules/enemies/*.tres (EnemyData, EnemyIntent)",
+      "res://battle/rules/statuses/*.tres (StatusData, resolved through Status.describe())",
+      "res://run/keepsakes/*.tres (KeepsakeTable, TrinketData)",
+      "res://cards/pools/*.tres (RewardPool rarity rates)",
+      "res://battle/reward_screen.tscn (choice_count)"
+    ],
+    "positions": "World XZ offsets from the floor's spawn, metres ([x, z]).",
+    "required": "FloorEnemy.required: the floor is cleared, and its gate opens, once no required enemy stands. A cluster is the entries sharing a FloorEnemy.group; it is required when any member is.",
+    "gate_fight": "The encounter holding FloorData.enemies[0]: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past that enemy, along exit_direction.",
+    "elite": "EnemyData.is_elite - a tag only; nothing rolls or rewards on it. Keepsakes and Glassbone are their own fields.",
+    "rewards": "Gold and the card reward are the floor's (FloorData), the same for every fight on it. Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Glassbone: every member's, summed.",
+    "intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping."
+  },
+  "regions": [
+    {
+      "region": 1,
+      "display_name": "Landfall",
+      "file": "res://floors/region1.tres",
+      "floors": [
+        {
+          "floor": 1,
+          "file": "res://floors/region1_floor1.tres",
+          "rewards": {
+            "gold": [
+              10,
+              18
+            ],
+            "card_pool": "res://cards/pools/wanderer_pool.tres",
+            "cards_offered": 3,
+            "rarity_rates": {
+              "common": 60.0,
+              "uncommon": 30.0,
+              "rare": 9.0,
+              "ultra_rare": 1.0
+            },
+            "bundle_rare_pool": null
+          },
+          "encounters": [
+            {
+              "cluster": null,
+              "names": "Sputter",
+              "required": true,
+              "elite": false,
+              "gate_fight": true,
+              "gate": {
+                "exit_kind": "CHANNEL",
+                "exit_direction": [
+                  0.0,
+                  -1.0
+                ],
+                "gate_distance_beyond_enemy": 6.0,
+                "bar_axis_offset": 0.85,
+                "channel_max_width": 0.0
+              },
+              "patrol": null,
+              "members": [
+                {
+                  "index": 0,
+                  "name": "Sputter",
+                  "enemy_file": "res://battle/rules/enemies/sputter.tres",
+                  "hp": 45,
+                  "required": true,
+                  "anchor": false,
+                  "position": [
+                    -2.25,
+                    -10.73
+                  ],
+                  "yaw_degrees": 8.0,
+                  "face_prop": null
+                }
+              ],
+              "keepsake_drop": null,
+              "glassbone": 0
+            }
+          ]
+        },
+        {
+          "floor": 2,
+          "file": "res://floors/region1_floor2.tres",
+          "rewards": {
+            "gold": [
+              10,
+              18
+            ],
+            "card_pool": "res://cards/pools/wanderer_pool.tres",
+            "cards_offered": 3,
+            "rarity_rates": {
+              "common": 60.0,
+              "uncommon": 30.0,
+              "rare": 9.0,
+              "ultra_rare": 1.0
+            },
+            "bundle_rare_pool": null
+          },
+          "encounters": [
+            {
+              "cluster": "crab",
+              "names": "Sputter + Dragonfly",
+              "required": true,
+              "elite": false,
+              "gate_fight": true,
+              "gate": {
+                "exit_kind": "LINE",
+                "exit_direction": [
+                  0.0,
+                  -1.0
+                ],
+                "gate_distance_beyond_enemy": 7.5,
+                "bar_axis_offset": 0.0,
+                "channel_max_width": 0.0
+              },
+              "patrol": null,
+              "members": [
+                {
+                  "index": 0,
+                  "name": "Sputter",
+                  "enemy_file": "res://battle/rules/enemies/sputter.tres",
+                  "hp": 45,
+                  "required": true,
+                  "anchor": true,
+                  "position": [
+                    1.5,
+                    -21.25
+                  ],
+                  "yaw_degrees": 133.0,
+                  "face_prop": null
+                },
+                {
+                  "index": 1,
+                  "name": "Dragonfly",
+                  "enemy_file": "res://battle/rules/enemies/dragonfly_lone.tres",
+                  "hp": 14,
+                  "required": true,
+                  "anchor": false,
+                  "position": [
+                    0.0,
+                    -22.0
+                  ],
+                  "yaw_degrees": -167.0,
+                  "face_prop": null
+                }
+              ],
+              "keepsake_drop": null,
+              "glassbone": 0
+            },
+            {
+              "cluster": "island",
+              "names": "Dragonfly + Dragonfly + Dragonfly",
+              "required": false,
+              "elite": false,
+              "gate_fight": false,
+              "patrol": {
+                "waypoints": [
+                  [
+                    -16.75,
+                    -20.75
+                  ],
+                  [
+                    -13.0,
+                    -20.375
+                  ],
+                  [
+                    -14.75,
+                    -18.5
+                  ]
+                ],
+                "dwell_seconds": [
+                  2.0,
+                  5.0
+                ]
+              },
+              "members": [
+                {
+                  "index": 2,
+                  "name": "Dragonfly",
+                  "enemy_file": "res://battle/rules/enemies/dragonfly.tres",
+                  "hp": 14,
+                  "required": false,
+                  "anchor": false,
+                  "position": [
+                    -15.25,
+                    -20.5
+                  ],
+                  "yaw_degrees": -113.2,
+                  "face_prop": null
+                },
+                {
+                  "index": 3,
+                  "name": "Dragonfly",
+                  "enemy_file": "res://battle/rules/enemies/dragonfly.tres",
+                  "hp": 14,
+                  "required": false,
+                  "anchor": false,
+                  "position": [
+                    -17.875,
+                    -21.75
+                  ],
+                  "yaw_degrees": -116.6,
+                  "face_prop": null
+                },
+                {
+                  "index": 4,
+                  "name": "Dragonfly",
+                  "enemy_file": "res://battle/rules/enemies/dragonfly.tres",
+                  "hp": 14,
+                  "required": false,
+                  "anchor": false,
+                  "position": [
+                    -17.125,
+                    -20.0
+                  ],
+                  "yaw_degrees": -122.0,
+                  "face_prop": null
+                }
+              ],
+              "keepsake_drop": null,
+              "glassbone": 0
+            },
+            {
+              "cluster": null,
+              "names": "Siltjaw",
+              "required": false,
+              "elite": false,
+              "gate_fight": false,
+              "patrol": null,
+              "members": [
+                {
+                  "index": 5,
+                  "name": "Siltjaw",
+                  "enemy_file": "res://battle/rules/enemies/siltjaw.tres",
+                  "hp": 38,
+                  "required": false,
+                  "anchor": false,
+                  "position": [
+                    5.2,
+                    -7.0
+                  ],
+                  "yaw_degrees": -11.0,
+                  "face_prop": null
+                }
+              ],
+              "keepsake_drop": null,
+              "glassbone": 0
+            }
+          ]
+        },
+        {
+          "floor": 3,
+          "file": "res://floors/region1_floor3.tres",
+          "rewards": {
+            "gold": [
+              10,
+              18
+            ],
+            "card_pool": "res://cards/pools/wanderer_pool.tres",
+            "cards_offered": 3,
+            "rarity_rates": {
+              "common": 60.0,
+              "uncommon": 30.0,
+              "rare": 9.0,
+              "ultra_rare": 1.0
+            },
+            "bundle_rare_pool": null
+          },
+          "encounters": [
+            {
+              "cluster": "blackback",
+              "names": "Blackback + Nipper",
+              "required": true,
+              "elite": false,
+              "gate_fight": true,
+              "gate": {
+                "exit_kind": "LINE",
+                "exit_direction": [
+                  0.8815,
+                  -0.4722
+                ],
+                "gate_distance_beyond_enemy": 32.0,
+                "bar_axis_offset": 0.0,
+                "channel_max_width": 0.0
+              },
+              "patrol": null,
+              "members": [
+                {
+                  "index": 0,
+                  "name": "Blackback",
+                  "enemy_file": "res://battle/rules/enemies/blackback.tres",
+                  "hp": 40,
+                  "required": true,
+                  "anchor": true,
+                  "position": [
+                    -3.0,
+                    -9.0
+                  ],
+                  "yaw_degrees": 18.4,
+                  "face_prop": null
+                },
+                {
+                  "index": 2,
+                  "name": "Nipper",
+                  "enemy_file": "res://battle/rules/enemies/nipper.tres",
+                  "hp": 16,
+                  "required": true,
+                  "anchor": false,
+                  "position": [
+                    -4.66,
+                    -8.45
+                  ],
+                  "yaw_degrees": 18.4,
+                  "face_prop": null
+                }
+              ],
+              "keepsake_drop": null,
+              "glassbone": 0
+            },
+            {
+              "cluster": null,
+              "names": "Wardling",
+              "required": false,
+              "elite": true,
+              "gate_fight": false,
+              "patrol": null,
+              "members": [
+                {
+                  "index": 1,
+                  "name": "Wardling",
+                  "enemy_file": "res://battle/rules/enemies/wardling.tres",
+                  "hp": 90,
+                  "required": false,
+                  "anchor": false,
+                  "position": [
+                    17.6,
+                    -13.6
+                  ],
+                  "yaw_degrees": 0.0,
+                  "face_prop": {
+                    "index": 0,
+                    "scene": "res://field/hitching_post.tscn",
+                    "position": [
+                      15.879,
+                      -16.057
+                    ]
+                  }
+                }
+              ],
+              "keepsake_drop": {
+                "from": "Wardling",
+                "table": "res://run/keepsakes/wardling_keepsakes.tres"
+              },
+              "glassbone": 1
+            }
+          ]
+        },
+        {
+          "floor": 4,
+          "file": "res://floors/region1_floor4.tres",
+          "rewards": {
+            "gold": [
+              10,
+              18
+            ],
+            "card_pool": "res://cards/pools/wanderer_pool.tres",
+            "cards_offered": 3,
+            "rarity_rates": {
+              "common": 60.0,
+              "uncommon": 30.0,
+              "rare": 9.0,
+              "ultra_rare": 1.0
+            },
+            "bundle_rare_pool": null
+          },
+          "encounters": [
+            {
+              "cluster": null,
+              "names": "Dunecur",
+              "required": true,
+              "elite": false,
+              "gate_fight": true,
+              "gate": {
+                "exit_kind": "LINE",
+                "exit_direction": [
+                  -0.9459,
+                  -0.3245
+                ],
+                "gate_distance_beyond_enemy": 7.0,
+                "bar_axis_offset": 0.0,
+                "channel_max_width": 0.0
+              },
+              "patrol": null,
+              "members": [
+                {
+                  "index": 0,
+                  "name": "Dunecur",
+                  "enemy_file": "res://battle/rules/enemies/dunecur.tres",
+                  "hp": 55,
+                  "required": true,
+                  "anchor": false,
+                  "position": [
+                    -18.5,
+                    -35.0
+                  ],
+                  "yaw_degrees": 0.0,
+                  "face_prop": {
+                    "index": 0,
+                    "scene": "res://field/bone_scatter.tscn",
+                    "position": [
+                      -19.73,
+                      -35.422
+                    ]
+                  }
+                }
+              ],
+              "keepsake_drop": null,
+              "glassbone": 0
+            },
+            {
+              "cluster": null,
+              "names": "Sputter",
+              "required": false,
+              "elite": false,
+              "gate_fight": false,
+              "patrol": null,
+              "members": [
+                {
+                  "index": 1,
+                  "name": "Sputter",
+                  "enemy_file": "res://battle/rules/enemies/sputter.tres",
+                  "hp": 45,
+                  "required": false,
+                  "anchor": false,
+                  "position": [
+                    -24.4,
+                    -21.6
+                  ],
+                  "yaw_degrees": 180.0,
+                  "face_prop": null
+                }
+              ],
+              "keepsake_drop": null,
+              "glassbone": 0
+            }
+          ]
+        },
+        {
+          "floor": 5,
+          "file": "res://floors/region1_floor5.tres",
+          "rewards": {
+            "gold": [
+              10,
+              18
+            ],
+            "card_pool": "res://cards/pools/wanderer_pool.tres",
+            "cards_offered": 3,
+            "rarity_rates": {
+              "common": 60.0,
+              "uncommon": 30.0,
+              "rare": 9.0,
+              "ultra_rare": 1.0
+            },
+            "bundle_rare_pool": null
+          },
+          "encounters": [
+            {
+              "cluster": null,
+              "names": "Sputter",
+              "required": true,
+              "elite": false,
+              "gate_fight": true,
+              "gate": {
+                "exit_kind": "LINE",
+                "exit_direction": [
+                  -0.1022,
+                  -0.9948
+                ],
+                "gate_distance_beyond_enemy": 12.0,
+                "bar_axis_offset": 0.0,
+                "channel_max_width": 0.0
+              },
+              "patrol": null,
+              "members": [
+                {
+                  "index": 0,
+                  "name": "Sputter",
+                  "enemy_file": "res://battle/rules/enemies/sputter.tres",
+                  "hp": 45,
+                  "required": true,
+                  "anchor": false,
+                  "position": [
+                    -0.567,
+                    -42.0
+                  ],
+                  "yaw_degrees": 180.0,
+                  "face_prop": null
+                }
+              ],
+              "keepsake_drop": null,
+              "glassbone": 0
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "enemies": [
+    {
+      "name": "Blackback",
+      "file": "res://battle/rules/enemies/blackback.tres",
+      "hp": 40,
+      "elite": false,
+      "mechanic_summary": "Alternates Peck (4 x 2) and Lunge (12), and is Fed while its Nipper lives; once alone it turns Hungry and every hit deals 3 more. Hungry adds the most to the two-hit Peck.",
+      "field": {
+        "model": "res://assets/models/enemies/Stork/Stork.glb",
+        "model_is_default": false,
+        "model_scale": 92.9,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": {
+          "scene": "res://field/stork_tells.tscn",
+          "class": "StorkTells"
+        },
+        "contact_radius_m": 2.0,
+        "rest_height_m": 0.0,
+        "battle_hover_m": 0.0,
+        "buried_on_field": false,
+        "flies_in_battle": false,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Peck",
+            "type": "ATTACK",
+            "damage_per_hit": 4,
+            "hits": 2
+          },
+          {
+            "name": "Lunge",
+            "type": "ATTACK",
+            "damage_per_hit": 12,
+            "hits": 1
+          }
+        ],
+        "modified_by": [
+          {
+            "status": "hungry",
+            "per_hit_bonus": 3,
+            "only_while_critical": false,
+            "attacks_while_held": {
+              "Peck": "7 x 2",
+              "Lunge": "15"
+            }
+          }
+        ],
+        "escalation": null,
+        "pain_turn": null
+      },
+      "statuses": [
+        {
+          "id": "fed",
+          "name": "Fed",
+          "file": "res://battle/rules/statuses/fed.tres",
+          "gained": "starts every fight with it",
+          "description": "When the other dies, it turns Hungry: each hit of its Attacks deals {alone_bonus} more.",
+          "text": "When the other dies, it turns Hungry: each hit of its Attacks deals 3 more.",
+          "fields": {
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "grants_when_alone": "hungry"
+          }
+        },
+        {
+          "id": "hungry",
+          "name": "Hungry",
+          "file": "res://battle/rules/statuses/hungry.tres",
+          "gained": "from Fed, when no packmate is left living",
+          "description": "Each hit of its Attacks deals {bonus} more.",
+          "text": "Each hit of its Attacks deals 3 more.",
+          "fields": {
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "attack_damage_bonus": 3
+          },
+          "gained_sound": "res://assets/audio/enemies/Stork/hiss_1.mp3"
+        }
+      ],
+      "rewards": {
+        "keepsake_table": null,
+        "glassbone": 0,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/enemies/Stork/hit_1.mp3",
+          "res://assets/audio/enemies/Stork/hit_2.mp3"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": {
+          "on": "hungry",
+          "sound": "res://assets/audio/enemies/Stork/hiss_1.mp3"
+        },
+        "attachment": {
+          "StorkTells.clatter_sound": "res://assets/audio/enemies/Stork/clatter_1.mp3"
+        }
+      },
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 3,
+          "cluster": "blackback",
+          "required": true,
+          "gate_fight": true
+        }
+      ]
+    },
+    {
+      "name": "Dragonfly",
+      "file": "res://battle/rules/enemies/dragonfly.tres",
+      "hp": 14,
+      "elite": false,
+      "mechanic_summary": "Bites for 3 twice, then every living dragonfly Swarms together, 4 each, in one beat. Teaches thinning a pack before its shared turn lands all at once.",
+      "field": {
+        "model": "res://assets/models/enemies/Dragonfly/Dragonfly_body.glb",
+        "model_is_default": false,
+        "model_scale": 0.44,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": {
+          "scene": "res://field/dragonfly_wings.tscn",
+          "class": "DragonflyWings"
+        },
+        "contact_radius_m": 2.0,
+        "rest_height_m": 0.12,
+        "battle_hover_m": 0.45,
+        "buried_on_field": false,
+        "flies_in_battle": true,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Bite",
+            "type": "ATTACK",
+            "damage_per_hit": 3,
+            "hits": 1
+          },
+          {
+            "name": "Bite",
+            "type": "ATTACK",
+            "damage_per_hit": 3,
+            "hits": 1
+          },
+          {
+            "name": "Swarm",
+            "type": "ATTACK",
+            "damage_per_hit": 4,
+            "hits": 1,
+            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null
+      },
+      "statuses": [],
+      "rewards": {
+        "keepsake_table": null,
+        "glassbone": 0,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/enemies/Sputter/hit_armor.mp3"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 2,
+          "cluster": "island",
+          "required": false,
+          "gate_fight": false
+        },
+        {
+          "region": 1,
+          "floor": 2,
+          "cluster": "island",
+          "required": false,
+          "gate_fight": false
+        },
+        {
+          "region": 1,
+          "floor": 2,
+          "cluster": "island",
+          "required": false,
+          "gate_fight": false
+        }
+      ]
+    },
+    {
+      "name": "Dragonfly",
+      "file": "res://battle/rules/enemies/dragonfly_lone.tres",
+      "hp": 14,
+      "elite": false,
+      "mechanic_summary": "The crab's escort: bites for 3 every turn, on its own clock. Teaches that a weak second body still adds up - deal with it or outpace it.",
+      "field": {
+        "model": "res://assets/models/enemies/Dragonfly/Dragonfly_body.glb",
+        "model_is_default": false,
+        "model_scale": 0.44,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": {
+          "scene": "res://field/dragonfly_wings.tscn",
+          "class": "DragonflyWings"
+        },
+        "contact_radius_m": 2.0,
+        "rest_height_m": 0.12,
+        "battle_hover_m": 0.45,
+        "buried_on_field": false,
+        "flies_in_battle": true,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Bite",
+            "type": "ATTACK",
+            "damage_per_hit": 3,
+            "hits": 1
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null
+      },
+      "statuses": [],
+      "rewards": {
+        "keepsake_table": null,
+        "glassbone": 0,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/enemies/Sputter/hit_armor.mp3"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 2,
+          "cluster": "crab",
+          "required": true,
+          "gate_fight": true
+        }
+      ]
+    },
+    {
+      "name": "Dunecur",
+      "file": "res://battle/rules/enemies/dunecur.tres",
+      "hp": 55,
+      "elite": false,
+      "mechanic_summary": "Watches, Rushes for 7, then Recovers 5 Block; every Attack card played against it while Rush is coming adds 2 to that Rush, up to +8. Teaches holding Attacks on the Rush turn and hitting on Watch and Recover.",
+      "field": {
+        "model": "res://assets/models/enemies/Dunecur/Dunecur.glb",
+        "model_is_default": false,
+        "model_scale": 1.34,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": {
+          "scene": "res://field/dunecur_pose.tscn",
+          "class": "DunecurPose"
+        },
+        "contact_radius_m": 3.0,
+        "rest_height_m": 0.0,
+        "battle_hover_m": 0.0,
+        "buried_on_field": false,
+        "flies_in_battle": false,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Watch",
+            "type": "WATCH"
+          },
+          {
+            "name": "Rush",
+            "type": "ATTACK",
+            "damage_per_hit": 7,
+            "hits": 1,
+            "counts_attack_cards": {
+              "status": "roused",
+              "bonus_per_card": 2,
+              "max_stacks": 4,
+              "damage_range": [
+                7,
+                15
+              ]
+            }
+          },
+          {
+            "name": "Recover",
+            "type": "DEFEND",
+            "block": 5
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null
+      },
+      "statuses": [
+        {
+          "id": "roused",
+          "name": "Roused",
+          "file": "res://battle/rules/statuses/roused.tres",
+          "gained": "a stack per Attack card played against it while Rush is queued",
+          "description": "Each Attack card played against it adds {bonus_each} damage to its next Rush, up to {max}.",
+          "text": "Each Attack card played against it adds 2 damage to its next Rush, up to 8.",
+          "fields": {
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "max_stacks": 4,
+            "attack_damage_bonus": 2,
+            "consumed_by_own_attack": true
+          }
+        }
+      ],
+      "rewards": {
+        "keepsake_table": null,
+        "glassbone": 0,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/combat_old/hit.wav"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 4,
+          "cluster": null,
+          "required": true,
+          "gate_fight": true
+        }
+      ]
+    },
+    {
+      "name": "Nipper",
+      "file": "res://battle/rules/enemies/nipper.tres",
+      "hp": 16,
+      "elite": false,
+      "mechanic_summary": "Nips for 3 twice, then Forages: each living packmate heals 8. Teaches kill order - it keeps the Blackback topped up, but killing it first turns the Blackback Hungry.",
+      "field": {
+        "model": "res://assets/models/enemies/Sputter/Sputter.glb",
+        "model_is_default": true,
+        "model_scale": 0.625,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": {
+          "scene": "res://field/sputter_claws.tscn",
+          "class": "SputterClaws"
+        },
+        "contact_radius_m": 2.0,
+        "rest_height_m": 0.0,
+        "battle_hover_m": 0.0,
+        "buried_on_field": false,
+        "flies_in_battle": false,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Nip",
+            "type": "ATTACK",
+            "damage_per_hit": 3,
+            "hits": 1
+          },
+          {
+            "name": "Nip",
+            "type": "ATTACK",
+            "damage_per_hit": 3,
+            "hits": 1
+          },
+          {
+            "name": "Forage",
+            "type": "HEAL_ALLY",
+            "heal_each_packmate": 8
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null
+      },
+      "statuses": [],
+      "rewards": {
+        "keepsake_table": null,
+        "glassbone": 0,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/enemies/Sputter/hit_shell_1.mp3",
+          "res://assets/audio/enemies/Sputter/hit_shell_2.mp3",
+          "res://assets/audio/enemies/Sputter/hit_shell_3.mp3"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 3,
+          "cluster": "blackback",
+          "required": true,
+          "gate_fight": true
+        }
+      ]
+    },
+    {
+      "name": "Siltjaw",
+      "file": "res://battle/rules/enemies/siltjaw.tres",
+      "hp": 38,
+      "elite": false,
+      "mechanic_summary": "Buried in the sand on the field. Snaps for 6, then rears for a 14 Charge that breaks if you deal it 14 that turn - broken, it Burrows next turn and can't be hit. Teaches hitting hard into a telegraph, and that breaking it buys a quiet turn.",
+      "field": {
+        "model": "res://assets/models/enemies/Siltjaw/Siltjaw.glb",
+        "model_is_default": false,
+        "model_scale": 1.3356,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": {
+          "scene": "res://field/rear_pose.tscn",
+          "class": "RearPose"
+        },
+        "contact_radius_m": 1.0,
+        "rest_height_m": -0.66,
+        "battle_hover_m": -0.08,
+        "buried_on_field": true,
+        "flies_in_battle": false,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Snap",
+            "type": "ATTACK",
+            "damage_per_hit": 6,
+            "hits": 1
+          },
+          {
+            "name": "Charge",
+            "type": "ATTACK",
+            "damage_per_hit": 14,
+            "hits": 1,
+            "interrupt": {
+              "break_threshold": 14,
+              "on_interrupt": {
+                "name": "Burrow",
+                "type": "BURROW"
+              }
+            },
+            "rears_while_queued": true
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null
+      },
+      "statuses": [],
+      "rewards": {
+        "keepsake_table": null,
+        "glassbone": 0,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 2,
+          "cluster": null,
+          "required": false,
+          "gate_fight": false
+        }
+      ]
+    },
+    {
+      "name": "Sputter",
+      "file": "res://battle/rules/enemies/sputter.tres",
+      "hp": 45,
+      "elite": false,
+      "mechanic_summary": "Picks its move fresh each turn - an 8 Block, a 5 Strike or an 11 Scissor - never Block or Scissor on turn one, never Block twice running. Teaches reading the intent every turn instead of learning a pattern.",
+      "field": {
+        "model": "res://assets/models/enemies/Sputter/Sputter.glb",
+        "model_is_default": true,
+        "model_scale": 1.25,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": {
+          "scene": "res://field/sputter_claws.tscn",
+          "class": "SputterClaws"
+        },
+        "contact_radius_m": 2.0,
+        "rest_height_m": 0.0,
+        "battle_hover_m": 0.0,
+        "buried_on_field": false,
+        "flies_in_battle": false,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "erratic (weighted pick each turn)",
+        "intents": [
+          {
+            "name": "Block",
+            "type": "DEFEND",
+            "block": 8,
+            "erratic_weight": 1.0,
+            "turn_one_locked": true,
+            "no_immediate_repeat": true
+          },
+          {
+            "name": "Strike",
+            "type": "ATTACK",
+            "damage_per_hit": 5,
+            "hits": 1,
+            "erratic_weight": 1.0,
+            "turn_one_locked": false,
+            "no_immediate_repeat": false
+          },
+          {
+            "name": "Scissor",
+            "type": "ATTACK",
+            "damage_per_hit": 11,
+            "hits": 1,
+            "erratic_weight": 0.6,
+            "turn_one_locked": true,
+            "no_immediate_repeat": false
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null
+      },
+      "statuses": [],
+      "rewards": {
+        "keepsake_table": null,
+        "glassbone": 0,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/enemies/Sputter/hit_shell_1.mp3",
+          "res://assets/audio/enemies/Sputter/hit_shell_2.mp3",
+          "res://assets/audio/enemies/Sputter/hit_shell_3.mp3"
+        ],
+        "armored_contact": [
+          "res://assets/audio/enemies/Sputter/hit_armor.mp3"
+        ],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 1,
+          "cluster": null,
+          "required": true,
+          "gate_fight": true
+        },
+        {
+          "region": 1,
+          "floor": 2,
+          "cluster": "crab",
+          "required": true,
+          "gate_fight": true
+        },
+        {
+          "region": 1,
+          "floor": 4,
+          "cluster": null,
+          "required": false,
+          "gate_fight": false
+        },
+        {
+          "region": 1,
+          "floor": 5,
+          "cluster": null,
+          "required": true,
+          "gate_fight": true
+        }
+      ]
+    },
+    {
+      "name": "Wardling",
+      "file": "res://battle/rules/enemies/wardling.tres",
+      "hp": 90,
+      "elite": true,
+      "mechanic_summary": "An elite tied to its post: Shove 9, Stamp 5, Trample 11 in a loop, its attacks growing every two turns (x1.3, x1.6, then x2); the first time it drops below half HP it loses a turn. Teaches racing escalation, and pays a keepsake and Glassbone for it.",
+      "field": {
+        "model": "res://assets/models/enemies/Wardling/Wardling.glb",
+        "model_is_default": false,
+        "model_scale": 1.68,
+        "model_yaw_offset_degrees": -90.0,
+        "attachment": {
+          "scene": "res://field/head_turn.tscn",
+          "class": "HeadTurn"
+        },
+        "contact_radius_m": 2.0,
+        "rest_height_m": 0.0,
+        "battle_hover_m": 0.0,
+        "buried_on_field": false,
+        "flies_in_battle": false,
+        "harness_point": [
+          -0.25,
+          1.15,
+          0.0
+        ]
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Shove",
+            "type": "ATTACK",
+            "damage_per_hit": 9,
+            "hits": 1,
+            "damage_per_hit_by_stage": [
+              9,
+              12,
+              14,
+              18
+            ]
+          },
+          {
+            "name": "Stamp",
+            "type": "ATTACK",
+            "damage_per_hit": 5,
+            "hits": 1,
+            "damage_per_hit_by_stage": [
+              5,
+              7,
+              8,
+              10
+            ]
+          },
+          {
+            "name": "Trample",
+            "type": "ATTACK",
+            "damage_per_hit": 11,
+            "hits": 1,
+            "damage_per_hit_by_stage": [
+              11,
+              14,
+              18,
+              22
+            ]
+          }
+        ],
+        "modified_by": [],
+        "escalation": {
+          "applies_to": "ATTACK damage, rounded",
+          "stage_length_turns": 2,
+          "stages": [
+            {
+              "turns": "1-2",
+              "multiplier": 1.0
+            },
+            {
+              "turns": "3-4",
+              "multiplier": 1.3
+            },
+            {
+              "turns": "5-6",
+              "multiplier": 1.6
+            },
+            {
+              "turns": "7+",
+              "multiplier": 2.0
+            }
+          ]
+        },
+        "pain_turn": {
+          "below_hp_fraction": 0.5,
+          "below_hp": 45.0,
+          "effect": "its queued action is cancelled, once per fight",
+          "line": "A ragged breath. It isn't moving."
+        }
+      },
+      "statuses": [],
+      "rewards": {
+        "keepsake_table": {
+          "file": "res://run/keepsakes/wardling_keepsakes.tres",
+          "guaranteed": true,
+          "drop_chance": 1.0,
+          "entries": [
+            {
+              "keepsake": "Frayed Cord",
+              "id": "frayed_cord",
+              "file": "res://run/keepsakes/frayed_cord.tres",
+              "weight": 1.0,
+              "unique_per_run": false
+            }
+          ]
+        },
+        "glassbone": 1,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "The Wardling is still.",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/combat_old/hit.wav"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": "res://assets/audio/enemies_old/Works_Wardling/Ragged Breath.mp3",
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 3,
+          "cluster": null,
+          "required": false,
+          "gate_fight": false
+        }
+      ]
+    }
+  ]
+}

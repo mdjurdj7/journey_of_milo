@@ -5,10 +5,12 @@
 
 [sub_resource type="Resource" id="EnemyIntent_burrow"]
 script = ExtResource("2_intent")
+intent_name = "Burrow"
 type = 2
 
 [sub_resource type="Resource" id="EnemyIntent_charge"]
 script = ExtResource("2_intent")
+intent_name = "Charge"
 value = 14
 interrupt_threshold = 14
 on_interrupt = SubResource("EnemyIntent_burrow")
@@ -16,11 +18,13 @@ rear_while_queued = true
 
 [sub_resource type="Resource" id="EnemyIntent_snap"]
 script = ExtResource("2_intent")
+intent_name = "Snap"
 value = 6
 
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Siltjaw"
+mechanic_summary = "Buried in the sand on the field. Snaps for 6, then rears for a 14 Charge that breaks if you deal it 14 that turn - broken, it Burrows next turn and can't be hit. Teaches hitting hard into a telegraph, and that breaking it buys a quiet turn."
 max_hp = 38
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_snap"), SubResource("EnemyIntent_charge")])
 model_scene_path = "res://assets/models/enemies/Siltjaw/Siltjaw.glb"

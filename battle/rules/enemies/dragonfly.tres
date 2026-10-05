@@ -6,20 +6,24 @@
 
 [sub_resource type="Resource" id="EnemyIntent_bite_1"]
 script = ExtResource("2_intent")
+intent_name = "Bite"
 value = 3
 
 [sub_resource type="Resource" id="EnemyIntent_bite_2"]
 script = ExtResource("2_intent")
+intent_name = "Bite"
 value = 3
 
 [sub_resource type="Resource" id="EnemyIntent_swarm"]
 script = ExtResource("2_intent")
+intent_name = "Swarm"
 value = 4
 simultaneous = true
 
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Dragonfly"
+mechanic_summary = "Bites for 3 twice, then every living dragonfly Swarms together, 4 each, in one beat. Teaches thinning a pack before its shared turn lands all at once."
 max_hp = 14
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_bite_1"), SubResource("EnemyIntent_bite_2"), SubResource("EnemyIntent_swarm")])
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_armor")])
