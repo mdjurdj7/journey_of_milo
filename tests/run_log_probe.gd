@@ -170,6 +170,7 @@ func _scripted_run(logging: bool) -> Dictionary:
 		offer.call("_activate", 1)
 		await process_frame
 	seen["rng_state"] = (_run_state.get("rng") as RandomNumberGenerator).state
+	seen["end_tally"] = [int(_run_state.get("player_hp")), int(_run_state.get("player_max_hp")), (_run_state.get("deck") as Array).size()]
 	_run_state.call("log_run_end", "quit")
 	await _teardown()
 	return seen
@@ -264,6 +265,8 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	var end: Dictionary = _first(lines, "run_end")
 	_expect_eq(str(end.get("cause")), "quit", "run_end: quit")
 	_expect_eq(int(end.get("fights", 0)), 1, "...after one fight")
+	_expect_eq([int(end.get("fights_won", -1)), int(end.get("floors_crossed", -1))], [1, 0], "...the tally: one fight won, no floor crossed")
+	_expect_eq([int(end.get("hp", -1)), int(end.get("max_hp", -1)), int(end.get("deck_size", -1))], seen.get("end_tally"), "...HP, max HP and deck size as the run stood")
 
 func _expect_card(card: Dictionary, card_name: String, energy: int, hp_cost: int, hp_effect: int) -> void:
 	_expect_eq([str(card.get("card")), int(card.get("energy")), int(card.get("hp_cost")), int(card.get("hp_effect"))], [card_name, energy, hp_cost, hp_effect], "%s: Energy, hp_cost, hp_effect" % card_name)

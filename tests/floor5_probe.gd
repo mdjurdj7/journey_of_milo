@@ -14,7 +14,10 @@ extends SceneTree
 #   exit    - past the region-end fight toward the exit while it stands:
 #             he comes to rest on the gate line and the floor holds; won,
 #             the line lifts and he walks out - the last floor, so the run
-#             wraps to floor 1
+#             ends: run_end "won" logged, the end screen (RunEnd) shown,
+#             and its NEW RUN a fresh run on floor 1
+#   title   - the end screen's TITLE: a fresh run and the boot scene
+#   loop    - loop_region_after_last_floor on: the old wrap to floor 1
 #   pocket  - the side pocket off the climb's west side, where the
 #             finding is reserved: reachable from the climb
 #
@@ -24,12 +27,16 @@ extends SceneTree
 # Untyped against the project's own classes (get()/call() only), for the
 # autoload reason kill_order_probe.gd's own header gives.
 
-const CASES := 5
+const CASES := 7
 const REGION_PATH := "res://floors/region1.tres"
 const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
 const FLOOR_5_PATH := "res://floors/region1_floor5.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
+const RUN_END_SCENE_PATH := "res://run/run_end.tscn"
+const TITLE_SCENE_PATH := "res://run/title_screen.tscn"
+# The exit case's run log, kept for a look afterwards.
+const LOG_DIR := "user://floor5_probe_runs"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FLOOR_INDEX := 4
 const FIGHT_AT := Vector2(-0.567, -42.0)
@@ -79,6 +86,8 @@ func _initialize() -> void:
 	await _check_climb()
 	await _check_descent()
 	await _check_exit()
+	await _check_title()
+	await _check_loop()
 	await _check_pocket()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
@@ -152,8 +161,12 @@ func _check_descent() -> void:
 	_completed += 1
 
 # The exit held while the region-end fight stands, then open once it is
-# won - and floor 5 is the last, so the run wraps to floor 1.
+# won - and floor 5 is the last, so leaving it ends the run, won: run_end
+# "won" logged with the run's tally, the end screen (RunEnd) shown over
+# the fade, and its NEW RUN a fresh run on floor 1.
 func _check_exit() -> void:
+	_clear_log_dir()
+	RunLogger.set_output_dir(LOG_DIR)
 	await _load()
 	var gate: Node3D = _field.get_node("ExitGate")
 	var gate_at := Vector2(gate.global_position.x - _spawn.x, gate.global_position.z - _spawn.z)
@@ -178,44 +191,75 @@ func _check_exit() -> void:
 	_expect(worst > -0.5, "...he comes to rest on it (%+.3f m)" % worst)
 	_expect(not exited[0], "...and the floor doesn't exit")
 	_expect(_field.get_node("BattleLayer").get_child_count() == 0, "...nor does walking on from past it start the fight")
-	# The fight, won.
-	_field.call_deferred("_on_enemy_contacted", fight)
-	for i in 10:
-		await physics_frame
-	var layer: Node = _field.get_node("BattleLayer")
-	if layer.get_child_count() == 0:
-		_fail("the region-end fight didn't start")
-	else:
-		var controller: Node = layer.get_child(0).get("battle_controller")
-		var combatants: Dictionary = controller.get("_combatants")
-		for member in (controller.get("enemies") as Array).duplicate():
-			var combatant: RefCounted = combatants.get(member)
-			combatant.set("hp", 0)
-			controller.call("_report_damage", "player", combatant, 99, "card")
-		controller.call("_check_battle_end")
-		await create_timer(1.6).timeout
-		var reward: Node = _child_with_script(_field, "reward_screen.gd")
-		if reward != null:
-			reward.call("close")
-		for i in 30:
-			await physics_frame
+	if await _win_fight(fight):
 		_expect(not bool(_wanderer.call("has_hold_line")), "Won: the line lifts")
-		var floor_before: int = int(_run_state.get("current_floor_index"))
+		_expect_eq(int(_run_state.get("fights_won")), 1, "...one fight won")
+		await _walk_out(exited)
+		var end: Node = await _await_scene(RUN_END_SCENE_PATH)
+		_expect(end != null, "The last floor left: the run ends on the end screen")
+		_expect_eq(int(_run_state.get("current_floor_index")), FLOOR_INDEX, "...no wrap: the floor index stays on floor 5")
+		_expect_eq(int(_run_state.get("region_lap")), 0, "...and no lap counted")
+		_expect_eq(int(_run_state.get("floors_crossed")), 1, "...one floor crossed (this probe starts on floor 5)")
+		var fade: Node = _root_fade()
+		_expect(fade != null and bool(fade.call("is_opaque")), "...over the fade, still up")
+		var run_end: Dictionary = _last_run_end()
+		_expect_eq(str(run_end.get("cause")), "won", "run_end: won")
+		_expect_eq([int(run_end.get("fights_won", -1)), int(run_end.get("floors_crossed", -1))], [1, 1], "...one fight won, one floor crossed")
+		_expect_eq([int(run_end.get("hp", -1)), int(run_end.get("max_hp", -1)), int(run_end.get("deck_size", -1))], [int(_run_state.get("player_hp")), int(_run_state.get("player_max_hp")), (_run_state.get("deck") as Array).size()], "...HP, max HP and deck size as the run stands")
+		if end != null:
+			var rows: Array = end.call("stat_rows")
+			var labels: Array[String] = []
+			for row in rows:
+				labels.append(str(row[0]))
+			_expect_eq(labels, ["FLOORS CROSSED", "FIGHTS WON", "HP", "DECK", "KEEPSAKE"] as Array[String], "The end screen's stats")
+			_expect_eq(str(rows[0][1]) + "|" + str(rows[1][1]), "1|1", "...floors crossed 1, fights won 1")
+			_expect_eq(str(end.get_node("Column/LineLabel").get("text")), str(end.get("world_line")), "...under its world-voice line")
+			# NEW RUN: a fresh run on floor 1.
+			end.call("_activate", 0)
+			var field: Node = await _await_scene(REGION_SCENE_PATH)
+			_expect(field != null, "NEW RUN: the field loads")
+			_expect_eq([int(_run_state.get("current_floor_index")), int(_run_state.get("floors_crossed")), int(_run_state.get("fights_won"))], [0, 0, 0], "...a fresh run on floor 1, its tally zeroed")
+			_expect(_root_fade() == null or not bool(_root_fade().call("is_opaque")), "...the fade taken down")
+			await _free_current_scene()
+	RunLogger.set_output_dir("")
+	await _unload()
+	_completed += 1
+
+# The end screen's TITLE: a fresh run, then the boot scene - the title
+# held over the field, as at launch.
+func _check_title() -> void:
+	_run_state.call("new_run", load(CHARACTER_PATH))
+	_run_state.set("current_floor_index", FLOOR_INDEX)
+	var end: Node = (load(RUN_END_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(end)
+	current_scene = end
+	for i in 5:
+		await process_frame
+	end.call("_activate", 1)
+	var title: Node = await _await_scene(TITLE_SCENE_PATH)
+	_expect(title != null, "TITLE: the boot scene loads")
+	_expect_eq(int(_run_state.get("current_floor_index")), 0, "...over a fresh run on floor 1")
+	await _await_scene(REGION_SCENE_PATH)
+	await _free_current_scene()
+	_completed += 1
+
+# With loop_region_after_last_floor on, the old wrap: floor 5's exit goes
+# round to floor 1 and counts a lap.
+func _check_loop() -> void:
+	await _load()
+	_field.set("loop_region_after_last_floor", true)
+	var gate: Node3D = _field.get_node("ExitGate")
+	var exited: Array[bool] = [false]
+	gate.connect("floor_exited", func() -> void: exited[0] = true)
+	await _place(PAST_FIGHT)
+	if await _win_fight(_required_enemy()):
 		var lap_before: int = int(_run_state.get("region_lap"))
-		_wanderer.call("set_move_target", _world(EXIT_AT))
-		for i in int(WAYPOINT_SECONDS * 60.0):
-			await physics_frame
-			if exited[0]:
-				break
-		_expect(exited[0], "...and he walks out through the exit neck")
-		_expect_eq(floor_before, FLOOR_INDEX, "...from floor 5")
-		# The look up to the tower and the fade come first (RegionField._on_
-		# floor_exited()), then the floor changes and the scene reloads.
+		await _walk_out(exited)
 		for i in 8 * 60:
 			if int(_run_state.get("current_floor_index")) != FLOOR_INDEX:
 				break
 			await process_frame
-		_expect_eq(int(_run_state.get("current_floor_index")), 0, "...the last floor: the run wraps to floor 1")
+		_expect_eq(int(_run_state.get("current_floor_index")), 0, "Looping: the last floor wraps to floor 1")
 		_expect_eq(int(_run_state.get("region_lap")), lap_before + 1, "...a lap of the region counted")
 		for i in 10:
 			await process_frame
@@ -225,6 +269,79 @@ func _check_exit() -> void:
 		current_scene = null
 	await _unload()
 	_completed += 1
+
+# The required fight started and won outright; false when it never starts.
+func _win_fight(fight: Node) -> bool:
+	_field.call_deferred("_on_enemy_contacted", fight)
+	for i in 10:
+		await physics_frame
+	var layer: Node = _field.get_node("BattleLayer")
+	if layer.get_child_count() == 0:
+		_fail("the region-end fight didn't start")
+		return false
+	var controller: Node = layer.get_child(0).get("battle_controller")
+	var combatants: Dictionary = controller.get("_combatants")
+	for member in (controller.get("enemies") as Array).duplicate():
+		var combatant: RefCounted = combatants.get(member)
+		combatant.set("hp", 0)
+		controller.call("_report_damage", "player", combatant, 99, "card")
+	controller.call("_check_battle_end")
+	await create_timer(1.6).timeout
+	var reward: Node = _child_with_script(_field, "reward_screen.gd")
+	if reward != null:
+		reward.call("close")
+	for i in 30:
+		await physics_frame
+	return true
+
+# On to the exit and through it.
+func _walk_out(exited: Array[bool]) -> void:
+	_wanderer.call("set_move_target", _world(EXIT_AT))
+	for i in int(WAYPOINT_SECONDS * 60.0):
+		await physics_frame
+		if exited[0]:
+			break
+	_expect(exited[0], "...he walks out through the exit neck")
+
+# The current scene once it is `path` (null if it never is): the look up
+# and the fade come first (RegionField._on_floor_exited()).
+func _await_scene(path: String) -> Node:
+	for i in 8 * 60:
+		if current_scene != null and current_scene.scene_file_path == path:
+			return current_scene
+		await process_frame
+	return null
+
+func _free_current_scene() -> void:
+	var scene: Node = current_scene
+	current_scene = null
+	if scene != null and is_instance_valid(scene):
+		scene.queue_free()
+	for i in 5:
+		await process_frame
+
+# The transition's fade (FloorFade), on the tree's root.
+func _root_fade() -> Node:
+	for child in root.get_children():
+		var script: Script = child.get_script()
+		if script != null and str(script.resource_path).ends_with("floor_fade.gd"):
+			return child
+	return null
+
+func _clear_log_dir() -> void:
+	DirAccess.make_dir_recursive_absolute(LOG_DIR)
+	for name in DirAccess.get_files_at(LOG_DIR):
+		DirAccess.remove_absolute(LOG_DIR.path_join(name))
+
+# The last run_end in the probe's log folder.
+func _last_run_end() -> Dictionary:
+	var found: Dictionary = {}
+	for name in DirAccess.get_files_at(LOG_DIR):
+		for raw in FileAccess.get_file_as_string(LOG_DIR.path_join(name)).split("\n", false):
+			var parsed: Variant = JSON.parse_string(raw)
+			if parsed is Dictionary and str((parsed as Dictionary).get("ev")) == "run_end":
+				found = parsed
+	return found
 
 # The side pocket off the climb's west side: the finding's spot reached.
 func _check_pocket() -> void:

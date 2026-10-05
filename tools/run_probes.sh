@@ -138,6 +138,9 @@ path_probes() {
 		battle/rules/statuses/*|battle/rules/enemy_data.gd|battle/rules/status.gd|battle/rules/status_data.gd) out="$(area_probes rules) enemy_export" ;;
 		run/keepsakes/*) out="$(area_probes run) enemy_export" ;;
 		battle/rules/*|battle/battle_controller.gd) out=$(area_probes rules) ;;
+		# The run's won end: the run probes, and floor5_probe, which wins
+		# floor 5 and takes its exit into it.
+		run/run_end.*) out="$(area_probes run) floor5" ;;
 		battle/reward_screen.*|battle/belongings_screen.*|battle/loot_screen.*|battle/keepsake_offer.*|battle/keepsake_row.*|battle/trough_choice.*|run/*) out=$(area_probes run) ;;
 		# Keepsake art: the probes that load keepsakes and their art.
 		assets/textures/keepsakes/*) out="keeper_keepsake trinket belongings_choice" ;;

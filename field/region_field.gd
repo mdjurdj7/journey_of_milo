@@ -3,6 +3,7 @@ class_name RegionField
 
 const BATTLE_OVERLAY_SCENE_PATH := "res://battle/battle_overlay.tscn"
 const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
+const RUN_END_SCENE_PATH := "res://run/run_end.tscn"
 const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 const FIELD_ENEMY_SCENE_PATH := "res://field/field_enemy.tscn"
@@ -51,6 +52,10 @@ enum RewardMode { SCREEN, WORLD }
 	set(value):
 		run_logging_enabled = value
 		RunLogger.enabled = value
+# Leaving the region's last floor ends the run, won (RunEnd); on, it goes
+# round to floor 1 again instead and counts a lap - endless laps, for
+# testing. Read at the exit, so a Remote-tab change holds from the next.
+@export var loop_region_after_last_floor: bool = false
 
 # Debug builds only: the field's F1 row and its Keepsake button, which
 # grants these in turn (see _on_debug_keepsake_pressed()). Paths, loaded
@@ -1217,8 +1222,10 @@ func get_wall_rect() -> Rect2:
 # in _ready() is what keeps it from being reset. Toll lives there too and
 # carries, down to the character's cap (RunState.carry_toll()).
 # Grace is per combat and lives on the fight's Combatant. Past the
-# region's last floor there is nothing yet: say so and go round to floor
-# 1 again (the once-per-run findings stay spent, as they should).
+# region's last floor the run is won: logged, and the end screen (RunEnd)
+# over the fade, which stays up under it. With loop_region_after_last_
+# floor it goes round to floor 1 again instead (the once-per-run findings
+# stay spent, as they should).
 func _on_floor_exited() -> void:
 	if _transitioning:
 		return
@@ -1240,7 +1247,12 @@ func _on_floor_exited() -> void:
 	RunState.floors_crossed += 1
 	var floor_count: int = region.floors.size() if region != null else 0
 	if RunState.current_floor_index + 1 >= floor_count:
-		print("RegionField: end of region - back to floor 1 for now")
+		if not loop_region_after_last_floor:
+			print("RegionField: the region's last floor left - the run is won")
+			RunState.log_run_end("won")
+			get_tree().change_scene_to_file(RUN_END_SCENE_PATH)
+			return
+		print("RegionField: end of region - back to floor 1 (loop_region_after_last_floor)")
 		RunState.current_floor_index = 0
 		RunState.region_lap += 1
 	else:

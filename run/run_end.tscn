@@ -1,0 +1,55 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://run/run_end.gd" id="1_run_end"]
+
+[node name="RunEnd" type="CanvasLayer"]
+layer = 129
+script = ExtResource("1_run_end")
+
+[node name="Background" type="ColorRect" parent="."]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+color = Color(0.86, 0.87, 0.86, 1)
+
+[node name="Column" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="LineLabel" type="Label" parent="Column"]
+layout_mode = 0
+text = "The way goes on."
+
+[node name="Stats" type="Control" parent="Column"]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="NewRunItem" type="Control" parent="Column"]
+layout_mode = 0
+
+[node name="Hairline" type="ColorRect" parent="Column/NewRunItem"]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Column/NewRunItem"]
+layout_mode = 0
+text = "NEW RUN"
+
+[node name="TitleItem" type="Control" parent="Column"]
+layout_mode = 0
+
+[node name="Hairline" type="ColorRect" parent="Column/TitleItem"]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Column/TitleItem"]
+layout_mode = 0
+text = "TITLE"
