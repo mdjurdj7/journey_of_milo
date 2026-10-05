@@ -22,7 +22,7 @@ value = 5
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Dunecur"
-max_hp = 44
+max_hp = 55
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_watch"), SubResource("EnemyIntent_rush"), SubResource("EnemyIntent_recover")])
 attack_card_status = ExtResource("3_roused")
 contact_sounds = Array[AudioStream]([ExtResource("4_hit")])

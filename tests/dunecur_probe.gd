@@ -72,7 +72,7 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var data: EnemyData = _dunecur()
 	_expect_eq(data.enemy_name, "Dunecur", "The Dunecur")
-	_expect_eq(data.max_hp, 44, "...44 HP")
+	_expect_eq(data.max_hp, 55, "...55 HP")
 	_expect(not data.erratic_intent_selection, "...a fixed loop")
 	_expect_eq(data.intents.size(), 3, "...of three moves")
 	if data.intents.size() == 3:
