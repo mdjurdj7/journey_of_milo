@@ -15,7 +15,7 @@ extends SceneTree
 #   exit   - past the Dunecur (put there - his 3 m contact area all but
 #            fills the neck) toward the exit while he stands: he comes to
 #            rest on the gate line and the floor holds; won, the line lifts
-#            and he walks out - the last floor, so the run wraps to floor 1
+#            and he walks out, on to floor 5
 #   alcove - the optional fight's alcove off the west side: walked into
 #            from the route, it starts that fight and only it
 #
@@ -33,6 +33,7 @@ const CASES := 7
 const REGION_PATH := "res://floors/region1.tres"
 const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
 const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
+const FLOOR_5_PATH := "res://floors/region1_floor5.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const DUNECUR_PATH := "res://battle/rules/enemies/dunecur.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
@@ -103,8 +104,8 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var region: Resource = load(REGION_PATH)
 	var floors: Array = region.get("floors")
-	_expect_eq(floors.size(), 4, "Region 1 has four floors")
-	_expect(floors.size() == 4 and floors[2].resource_path == FLOOR_3_PATH and floors[3].resource_path == FLOOR_4_PATH, "...floor 4 after floor 3")
+	_expect_eq(floors.size(), 5, "Region 1 has five floors")
+	_expect(floors.size() == 5 and floors[2].resource_path == FLOOR_3_PATH and floors[3].resource_path == FLOOR_4_PATH and floors[4].resource_path == FLOOR_5_PATH, "...floor 4 after floor 3, before floor 5")
 	var data: Resource = load(FLOOR_4_PATH)
 	_expect_eq(data.get("elevation_max_height"), 3.0, "Floor 4 reads its elevation at 3.0 m")
 	_expect_eq(int(data.get("exit_kind")), 1, "...a LINE gate")
@@ -260,7 +261,7 @@ func _check_exit() -> void:
 			if int(_run_state.get("current_floor_index")) != FLOOR_INDEX:
 				break
 			await process_frame
-		_expect_eq(int(_run_state.get("current_floor_index")), 0, "...the last floor: the run wraps to floor 1")
+		_expect_eq(int(_run_state.get("current_floor_index")), FLOOR_INDEX + 1, "...on to floor 5")
 		for i in 10:
 			await process_frame
 		var reloaded: Node = current_scene

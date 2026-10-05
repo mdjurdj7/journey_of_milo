@@ -88,6 +88,37 @@ folder (run_log_probe). (2026-10-04.)
   the walkable sample. Nothing reads them: there is no collector and no
   dig site yet, so FloorData carries no field for them. Add one when the
   first of them is built, from these positions. (2026-10-04, floor 4.)
+- **Floor 5's finding is a reserved spot only.** Its position lives in
+  `assets/field/masks/source/floor5/floor5_layout.json`
+  (`markers_world_xz.finding`, (-7.167, -15.9), in the side pocket off
+  the climb's west side), placed by the walkable sample. Nothing reads
+  it: what is found there isn't decided, so FloorData carries no field
+  for it. Add one when the finding is built. (2026-10-05, floor 5.)
+- **Height-based ground tints use a fixed land height.** Basin tint,
+  crest light and the slope-tint fade (`basin_tint_heights`,
+  `crest_min_height`, `slope_tint_fade_height`) are all measured from
+  the floor's land level, one height for the whole floor. That suits a
+  flat walk floor; a floor that climbs needs them relative to the local
+  walk floor. Floor 5 (walk floor 0.4 m to 3.45 m) works round it: basin
+  tint off, no fade, crest light from 3.7 m so only the upper ridges
+  light. Revisit when a second climbing floor exists. (2026-10-05.)
+- **Field pieces still built from y 0, harmless on floor 5.** Audited
+  when floor 5 put the walk floor 1-4 m up; ExitGate's trigger was the
+  one that broke and now stands on the ground (d645a41). Still from y 0:
+  the gate's own origin (the first enemy's position, read in RegionField
+  `_ready()` before FieldEnemy grounds itself a frame later); the
+  CHANNEL gate's Blocker and BlockContactArea (0-1.4 m off that origin -
+  a CHANNEL exit on high ground would sit under the sand; floor 5 is
+  LINE, which disables both); the boundary walls (world y -4 to +6 -
+  terrain near 5.6 m at the wall line would let him step over); the
+  escape push (`RegionField`, `wanderer.global_position = target` at the
+  enemy's body height, not the ground's - on a slope he lands in or above
+  the relief and `_hold_above_visible_ground()` corrects it with a
+  warning). And the camera has no terrain collision: side-on in a battle
+  it stands ~2.8 m over the feet, so ground ~3 m above the fight about
+  10 m to the side would hide it - check in play on floor 5's crest. Fix
+  each when a floor needs it: seat on `Ground.get_height_at()`.
+  (2026-10-05, floor 5.)
 
 ## Deferred
 
