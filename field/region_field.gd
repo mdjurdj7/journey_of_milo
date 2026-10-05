@@ -381,6 +381,8 @@ func _enter_tree() -> void:
 		ground.landmass_mask = floor_data.mask
 		ground.wear_mask = floor_data.wear_mask
 		ground.rock_mask = floor_data.rock_mask
+		ground.rock_slope_min = floor_data.rock_slope_min
+		ground.rock_slope_blend = floor_data.rock_slope_blend
 		ground.outer_mask = floor_data.outer_mask
 		ground.elevation_mask = floor_data.elevation_mask
 		ground.landmass_mask_origin = floor_data.mask_origin

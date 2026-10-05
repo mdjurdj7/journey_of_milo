@@ -33,6 +33,13 @@ class_name FloorData
 # stone here where it is steep (Ground.rock_mask). Null = no rock on the
 # floor, however steep its sand.
 @export var rock_mask: Texture2D = null
+# Ground.rock_slope_min / rock_slope_blend for this floor: stone starts
+# past rock_slope_min degrees of slope and is full rock_slope_blend
+# further on, where rock_mask allows it. 22 / 12 are Ground's own, set for
+# faces painted ~1.2 m wide; a floor whose rock is a gentler shelf needs
+# lower.
+@export var rock_slope_min: float = 22.0
+@export var rock_slope_blend: float = 12.0
 # Optional out-of-bounds ground on the same canvas: white = the outer
 # surface (Ground.outer_mask) - its own colour and pebbles, so the floor's
 # edge reads by surface where height doesn't. Null = sand everywhere, as
