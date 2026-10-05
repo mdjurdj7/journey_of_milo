@@ -131,6 +131,10 @@ path_probes() {
 		battle/reward_screen.*|battle/belongings_screen.*|battle/loot_screen.*|battle/keepsake_offer.*|battle/keepsake_row.*|battle/trough_choice.*|run/*) out=$(area_probes run) ;;
 		# Keepsake art: the probes that load keepsakes and their art.
 		assets/textures/keepsakes/*) out="keeper_keepsake trinket belongings_choice" ;;
+		# Enemy bodies: the probes that fight them.
+		assets/models/enemies/*) out=$(area_probes enemies) ;;
+		# The Dunecur's crest and feeding head.
+		field/dunecur_pose.*) out="$(area_probes field) dunecur" ;;
 		field/*) out=$(area_probes field) ;;
 		floors/region1_floor1.tres) out=$(area_probes floor1) ;;
 		floors/region1_floor2.tres) out=$(area_probes floor2) ;;
