@@ -105,6 +105,8 @@ func describe(holder: Combatant = null) -> String:
 		"percent": absi(magnitude),
 		"mark": data.attack_bonus_against_holder,
 		"bonus": data.attack_damage_bonus * stack_count,
+		"bonus_each": data.attack_damage_bonus,
+		"max": data.attack_damage_bonus * data.max_stacks,
 		"damage": data.countdown_damage,
 		"grant": grant,
 		"progress": progress,

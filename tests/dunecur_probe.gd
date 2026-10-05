@@ -95,7 +95,13 @@ func _check_data() -> void:
 		_expect_eq(roused.max_stacks, ROUSED_CAP, "...up to 4 stacks (+8)")
 		_expect(roused.consumed_by_own_attack, "...spent by its own attack")
 		_expect_eq(roused.default_duration_turns, StatusData.DURATION_UNTIL_REMOVED, "...and never by a turn")
-		_expect_eq(roused.description, "Each Attack card played against it adds 2 damage to its next Rush.", "...its hover")
+		# Per card and the cap, whatever the stacks: ×3 still reads +2 / +8.
+		var hover := "Each Attack card played against it adds 2 damage to its next Rush, up to 8."
+		var status := Status.new(roused)
+		_expect_eq(status.describe(), hover, "...its hover")
+		status.apply_stack()
+		status.apply_stack()
+		_expect_eq(status.describe(), hover, "...the same at Roused ×3")
 	_expect_eq(data.contact_radius_m, 3.0, "Its contact area is 3 m")
 	_expect_eq(data.model_scene_path, MODEL_PATH, "...its body the Dunecur glb")
 	_expect(is_equal_approx(data.model_scale, 1.34) and is_equal_approx(data.model_yaw_offset_degrees, 180.0), "...at 1.34, turned 180")

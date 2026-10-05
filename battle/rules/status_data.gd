@@ -51,6 +51,8 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {stacks}   stack_count               {percent}  |magnitude| (a MULTIPLY %)
 #   {mark}     attack_bonus_against_holder
 #   {bonus}    attack_damage_bonus × stacks
+#   {bonus_each} attack_damage_bonus, one stack's worth
+#   {max}      attack_damage_bonus × max_stacks (the bonus at the cap)
 #   {damage}   countdown_damage          {grant}  grants_on_critical's charges
 #   {progress} a counter's losses so far  {count}  self_loss_trigger_count
 #   {drain}    self_loss_trigger_drain × stacks

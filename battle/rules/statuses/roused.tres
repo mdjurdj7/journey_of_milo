@@ -6,7 +6,7 @@
 script = ExtResource("1_status_data")
 id = "roused"
 display_name = "Roused"
-description = "Each Attack card played against it adds 2 damage to its next Rush."
+description = "Each Attack card played against it adds {bonus_each} damage to its next Rush, up to {max}."
 category = 2
 default_duration_turns = -1
 stack_rule = 3
