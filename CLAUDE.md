@@ -35,8 +35,9 @@
   hand; `--list` shows the plan without running.
 - Full suite (`--full`): once before any push, on the exact tree being
   pushed.
-- If HEAD moves during a run and the new commits touch none of the
-  files under test, don't rerun. The script says which it is.
+- If HEAD moves during a run, follow the script's verdict: "rerun
+  needed" means rerun the named probes on the new HEAD before
+  committing.
 - Probe in the persistent worktree, ../journey-of-milo-probe:
   `--worktree` checks out the commit under test (--ref, default HEAD),
   copies the uncommitted files under test over it (--files, or the
