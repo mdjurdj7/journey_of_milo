@@ -140,9 +140,12 @@ static func floor_entered(snapshot: Dictionary) -> void:
 		"keepsake": snapshot.get("keepsake"),
 	})
 
-# The run is over: `cause` is died, drowned, quit or abandoned (a new run
-# started over one never ended). A death names the fight it was in. A run
-# with no fight and no reward choice in it is deleted rather than kept.
+# The run is over: `cause` is won (Region 1's last floor left by its
+# exit), died, drowned, quit or abandoned (a new run started over one
+# never ended). A death names the fight it was in. Every end carries the
+# run's tally - fights won, floors crossed - and where it stood: HP of
+# max, the deck and its size, keepsake, purse. A run with no fight and no
+# reward choice in it is deleted rather than kept.
 static func end_run(cause: String, snapshot: Dictionary) -> void:
 	if _file == null:
 		return
@@ -155,7 +158,11 @@ static func end_run(cause: String, snapshot: Dictionary) -> void:
 		"floor": snapshot.get("floor", 0),
 		"lap": snapshot.get("lap", 0),
 		"fights": _fights,
+		"fights_won": snapshot.get("fights_won", 0),
+		"floors_crossed": snapshot.get("floors_crossed", 0),
 		"hp": snapshot.get("hp", 0),
+		"max_hp": snapshot.get("max_hp", 0),
+		"deck_size": snapshot.get("deck_size", 0),
 		"final_deck": snapshot.get("deck", {}),
 		"keepsake": snapshot.get("keepsake"),
 		"gold": snapshot.get("gold", 0),

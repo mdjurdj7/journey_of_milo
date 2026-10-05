@@ -1237,6 +1237,7 @@ func _on_floor_exited() -> void:
 	var fade := FloorFade.get_or_create(get_tree())
 	await fade.fade_out(_fog_colour(), fade_seconds)
 
+	RunState.floors_crossed += 1
 	var floor_count: int = region.floors.size() if region != null else 0
 	if RunState.current_floor_index + 1 >= floor_count:
 		print("RegionField: end of region - back to floor 1 for now")
@@ -1531,6 +1532,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 
 	match outcome:
 		BattleOverlay.Outcome.WIN:
+			RunState.fights_won += 1
 			# A win, not an escape: the keepsake's heal_on_win, if any.
 			RunState.settle_keepsake_win()
 			# The reward lands where the last of them fell. Read off the

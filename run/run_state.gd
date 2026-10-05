@@ -84,9 +84,16 @@ var character: CharacterData = null
 var current_region_index: int = 0
 var current_floor_index: int = 0
 # How many times this run has gone round the region - its last floor
-# wraps to the first until a region-end fight exists (RegionField._on_
-# floor_exited()). For the run log's floor_entered; new_run() zeroes it.
+# wraps to the first only with RegionField.loop_region_after_last_floor
+# (otherwise leaving it ends the run, won). For the run log's
+# floor_entered; new_run() zeroes it.
 var region_lap: int = 0
+# The run's tally for its end (RunEnd's stats, the log's run_end): floors
+# left by their exit - the last one too, so a straight run of Region 1 is
+# 5 - and fights won (RegionField's WIN outcome, debug wins included).
+# new_run() zeroes both.
+var floors_crossed: int = 0
+var fights_won: int = 0
 
 # The zone intro (ZoneIntro, played by RegionField) is owed exactly once,
 # by the first floor of a NEW run: new_run() raises this and RegionField
@@ -140,6 +147,8 @@ func new_run(starting_character: CharacterData) -> void:
 	current_region_index = 0
 	current_floor_index = 0
 	region_lap = 0
+	floors_crossed = 0
+	fights_won = 0
 	# Field findings (a Hull's one-time world line, a Bird's one-time
 	# flight, the Keeper's one-time offer, a belongings cache's one
 	# choice, a trough's one drink) are remembered per run in their own
@@ -181,9 +190,11 @@ func run_snapshot() -> Dictionary:
 		"region": current_region_index,
 		"floor": current_floor_index,
 		"lap": region_lap,
+		"floors_crossed": floors_crossed,
+		"fights_won": fights_won,
 	}
 
-# The run is over, for the log: died, drowned, quit or abandoned.
+# The run is over, for the log: won, died, drowned, quit or abandoned.
 func log_run_end(cause: String) -> void:
 	RunLogger.end_run(cause, run_snapshot())
 

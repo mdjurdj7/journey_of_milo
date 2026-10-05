@@ -13,6 +13,7 @@ Prints, as plain text:
     pick rate - with belongings, bundle and find offers in their own columns
   - per card: plays per fight it was in the deck for
   - HP at each floor entered, per run and on average
+  - wins: how many runs were won, and each win's tally (run_end cause "won")
 
 The runs folder defaults to user://runs/ for this project:
 %APPDATA%\\Godot\\app_userdata\\Journey of Milo\\runs on Windows,
@@ -130,6 +131,7 @@ def summarise(runs, include_debug):
     floor_rows = []
     floor_hp = defaultdict(list)
     causes = defaultdict(int)
+    wins = []
     debug_left_out = 0
 
     for run in runs:
@@ -179,6 +181,8 @@ def summarise(runs, include_debug):
             elif ev == "run_end":
                 causes[event.get("cause", "?")] += 1
                 ended = True
+                if event.get("cause") == "won":
+                    wins.append((run["name"], event))
         if not ended:
             causes["unfinished"] += 1
         floor_rows.append((run["name"], str(run["start"].get("version", "?")), "  ".join(hp_path)))
@@ -211,6 +215,13 @@ def summarise(runs, include_debug):
         in_deck = fights_in_deck.get(card, 0)
         rows.append((card, in_deck, plays.get(card, 0), "%5.2f" % (plays.get(card, 0) / in_deck) if in_deck else "    -"))
     out.append(table(("card", "fights in deck", "plays", "plays/fight"), rows) if rows else "(no fights)")
+
+    out.append("\nWINS - %d of %d run(s)" % (len(wins), len(runs)))
+    rows = []
+    for name, end in wins:
+        rows.append((name, end.get("floors_crossed", "?"), end.get("fights_won", "?"),
+                     "%s/%s" % (end.get("hp", "?"), end.get("max_hp", "?")), end.get("deck_size", "?"), end.get("keepsake") or "-"))
+    out.append(table(("run", "floors", "fights won", "hp", "deck", "keepsake"), rows) if rows else "(no wins)")
 
     out.append("\nHP AT EACH FLOOR ENTERED (L = lap, F = floor)")
     rows = []
