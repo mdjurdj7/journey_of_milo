@@ -47,6 +47,7 @@ PROBE_TIMEOUT_SEC=600
 # own header asks for it). The seconds only order the batch, longest first.
 PROBE_TABLE="
 keeper_keepsake_probe 75
+elite_reward_probe 30
 enemy_export_probe 8
 belongings_choice_probe 51
 kill_order_probe 42
@@ -93,14 +94,14 @@ area_probes() {
 		keywords) echo "keyword starter_cards the_return" ;;
 		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback" ;;
 		enemies) echo "blackback siltjaw wardling dunecur sentence no_further critical_cards kill_order armored_contact deny enemy_export" ;;
-		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path" ;;
+		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward" ;;
 		floor1) echo "kill_order drain" ;;
 		floor2) echo "kill_order hold_line bundle_roll" ;;
 		floor3) echo "kill_order blackback wardling" ;;
 		floor4) echo "kill_order floor4 wear_path dunecur" ;;
 		floor5) echo "kill_order floor5 wear_path" ;;
 		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur floor5" ;;
-		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord" ;;
+		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord elite_reward" ;;
 		hud) echo "gold_line glassbone" ;;
 		hp_bar) echo "kill_order" ;;
 		ui_inspect) echo "keyword" ;;
@@ -130,6 +131,7 @@ path_probes() {
 			local id
 			id=$(basename "$path" .tres)
 			out="$(area_probes cards) $(grep -lw "$id" "$REPO"/tests/*_probe.gd 2>/dev/null | xargs -r -n1 basename | sed 's/\.gd$//')" ;;
+		cards/reward_pool.gd) out="$(area_probes cards) elite_reward" ;;
 		cards/card_effect.gd|cards/deck.gd) out=$(area_probes rules) ;;
 		cards/*) out=$(area_probes cards) ;;
 		battle/card_view.*|battle/card_paper*|battle/card_art*) out=$(area_probes face) ;;

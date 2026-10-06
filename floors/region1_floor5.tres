@@ -14,6 +14,7 @@ script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("7_sputter")
 position = Vector2(-0.567, -42)
 yaw_degrees = 180.0
+elite_card_rates = true
 
 [resource]
 script = ExtResource("1_floor_data")

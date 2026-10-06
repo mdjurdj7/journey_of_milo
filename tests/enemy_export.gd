@@ -65,7 +65,7 @@ static func build() -> Dictionary:
 			"description": "Generated export of every enemy encounter as placed in each FloorData, by region and floor in RegionData order, and every enemy data file once (enemies). Never edit by hand - regenerate it; tests/enemy_export_probe.gd fails when this file is stale.",
 			"regenerate": REGENERATE,
 			"generated_from": [
-				REGION_SCENE_PATH + " (its region)",
+				REGION_SCENE_PATH + " (its region and elite_gold_multiplier)",
 				"res://floors/*.tres (RegionData, FloorData, FloorEnemy, FloorPatrol, FloorProp)",
 				ENEMY_DIR + "*.tres (EnemyData, EnemyIntent)",
 				"res://battle/rules/statuses/*.tres (StatusData, resolved through Status.describe())",
@@ -76,7 +76,7 @@ static func build() -> Dictionary:
 			"positions": "World XZ offsets from the floor's spawn, metres ([x, z]).",
 			"required": "FloorEnemy.required: the floor is cleared, and its gate opens, once no required enemy stands. A cluster is the entries sharing a FloorEnemy.group; it is required when any member is.",
 			"gate_fight": "The encounter holding FloorData.enemies[0]: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past that enemy, along exit_direction.",
-			"elite": "EnemyData.is_elite - a tag only; nothing rolls or rewards on it. Keepsakes and Glassbone are their own fields.",
+			"elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times RegionField.elite_gold_multiplier (rounded) and rolls its card at the pool's elite rarity rates; a placement marked FloorEnemy.elite_card_rates (floor 5's region-end placeholder) gets the elite rates only. See each encounter's elite_rewards. Keepsakes and Glassbone are their own fields.",
 			"rewards": "Gold and the card reward are the floor's (FloorData), the same for every fight on it. Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Glassbone: every member's, summed.",
 			"intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping.",
 		},
@@ -109,6 +109,12 @@ static func _floor_entry(floor_data: FloorData, region_index: int, floor_index: 
 			"uncommon": pool.uncommon_rate,
 			"rare": pool.rare_rate,
 			"ultra_rare": pool.ultra_rare_rate,
+		} if pool != null else null,
+		"elite_rarity_rates": {
+			"common": pool.elite_common_rate,
+			"uncommon": pool.elite_uncommon_rate,
+			"rare": pool.elite_rare_rate,
+			"ultra_rare": pool.elite_ultra_rare_rate,
 		} if pool != null else null,
 		"bundle_rare_pool": _path(floor_data.rare_pool),
 	}
@@ -162,6 +168,7 @@ static func _encounter_entry(floor_data: FloorData, members: Array) -> Dictionar
 	var cluster: Variant = String(first.group) if first.group != &"" else null
 	var required: bool = false
 	var elite: bool = false
+	var elite_card_rates: bool = false
 	var gate_fight: bool = false
 	var keepsake: Variant = null
 	var glassbone: int = 0
@@ -170,6 +177,7 @@ static func _encounter_entry(floor_data: FloorData, members: Array) -> Dictionar
 		var entry: FloorEnemy = floor_data.enemies[index]
 		var data: EnemyData = entry.enemy_data
 		required = required or entry.required
+		elite_card_rates = elite_card_rates or entry.elite_card_rates
 		gate_fight = gate_fight or index == 0
 		if data != null:
 			elite = elite or data.is_elite
@@ -195,6 +203,11 @@ static func _encounter_entry(floor_data: FloorData, members: Array) -> Dictionar
 			"bar_axis_offset": _num(floor_data.gate_bar_axis_offset),
 			"channel_max_width": _num(floor_data.gate_channel_max_width),
 		}
+	encounter["elite_rewards"] = {
+		"gold_multiplier": _num(_elite_gold_multiplier()) if elite else null,
+		"card_rates": "elite" if elite or elite_card_rates else "normal",
+		"why": "an elite member" if elite else ("FloorEnemy.elite_card_rates" if elite_card_rates else null),
+	}
 	encounter["patrol"] = _patrol_entry(floor_data, first.group)
 	encounter["members"] = member_list
 	encounter["keepsake_drop"] = keepsake
@@ -219,6 +232,7 @@ static func _member_entry(floor_data: FloorData, index: int) -> Dictionary:
 		"hp": data.max_hp if data != null else 0,
 		"required": entry.required,
 		"anchor": entry.anchor,
+		"elite_card_rates": entry.elite_card_rates,
 		"position": _vec2(entry.position),
 		"yaw_degrees": _num(entry.yaw_degrees),
 		"face_prop": face_prop,
@@ -528,6 +542,11 @@ static func _default_model_path() -> String:
 	if script == null:
 		return ""
 	return String(script.get_script_constant_map().get("DEFAULT_MODEL_SCENE_PATH", ""))
+
+# RegionField's elite_gold_multiplier, as its scene sets it.
+static func _elite_gold_multiplier() -> float:
+	var value: Variant = _scene_root_property(REGION_SCENE_PATH, "elite_gold_multiplier")
+	return float(value) if value != null else 1.0
 
 static func _cards_offered() -> int:
 	var value: Variant = _scene_root_property(REWARD_SCREEN_SCENE_PATH, "choice_count")

@@ -27,6 +27,12 @@ class_name FloorEnemy
 # required enemy is left standing. False = an optional fight, there to be
 # chosen or walked past.
 @export var required: bool = true
+# This placement's fight rolls its card reward at the elite rarity rates
+# (RewardPool's Elite rarity rates) though its enemy isn't elite - and
+# only that: no elite gold. Floor 5's region-end placeholder, until the
+# region-end fight exists. A fight with an elite in it (EnemyData.
+# is_elite) rolls them anyway. False = the enemy decides.
+@export var elite_card_rates: bool = false
 # Entries sharing a non-empty id are one cluster: contact with any of
 # them starts one fight with all of them (RegionField._battle_members_
 # for()), and they step into one line for it (FieldEnemy.step_to()). The

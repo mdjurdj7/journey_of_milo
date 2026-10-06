@@ -13,7 +13,7 @@ extends SceneTree
 
 const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
-const CASES := 13
+const CASES := 15
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
@@ -83,6 +83,8 @@ func _initialize() -> void:
 	_check_pick_rarity_renormalises()
 	_check_seeded_rolls()
 	_check_fallback_when_tiers_empty()
+	_check_elite_pick_rarity()
+	_check_elite_seeded_rolls()
 	_check_blood_arc_basics()
 	_check_blood_arc_order()
 	_check_blood_arc_self_eater()
@@ -241,6 +243,58 @@ func _check_fallback_when_tiers_empty() -> void:
 	_expect_eq(rolled.size(), 2, "Two eligible cards: two offered")
 	_expect(not rolled.has(unset), "An UNSET card is never offered")
 	_expect_eq(short.roll(3, _rng(3)).size(), 3, "The flat roll() is untouched by rarity")
+	_completed += 1
+
+# --- Elite rates ---
+
+# The pool's elite rates are 0/75/23/2. Every tier available: no Common at
+# all, each band at its edges; renormalised over what's left when a tier
+# is empty, as the normal rates are; Common only when it's all there is.
+func _check_elite_pick_rarity() -> void:
+	var pool: RewardPool = _pool()
+	_expect_eq([pool.elite_common_rate, pool.elite_uncommon_rate, pool.elite_rare_rate, pool.elite_ultra_rare_rate], [0.0, 75.0, 23.0, 2.0], "Elite rates are 0/75/23/2")
+	_expect_eq(pool.rarity_rate(CardData.CardRarity.RARE, true), 23.0, "rarity_rate(RARE, elite) is 23")
+	var all: Array[CardData.CardRarity] = CardData.rarity_tiers()
+	var cases: Array = [
+		[0.0, CardData.CardRarity.UNCOMMON], [0.7499, CardData.CardRarity.UNCOMMON],
+		[0.75, CardData.CardRarity.RARE], [0.9799, CardData.CardRarity.RARE],
+		[0.98, CardData.CardRarity.ULTRA_RARE], [0.9999, CardData.CardRarity.ULTRA_RARE],
+	]
+	for pair: Array in cases:
+		_expect_eq(pool.pick_rarity(pair[0], all, true), pair[1], "Elite, all tiers, point %.4f" % pair[0])
+	var no_ultra: Array[CardData.CardRarity] = [CardData.CardRarity.COMMON, CardData.CardRarity.UNCOMMON, CardData.CardRarity.RARE]
+	_expect_eq(pool.pick_rarity(0.765, no_ultra, true), CardData.CardRarity.UNCOMMON, "Elite, no Ultra: 0.765 of 98 is Uncommon")
+	_expect_eq(pool.pick_rarity(0.766, no_ultra, true), CardData.CardRarity.RARE, "Elite, no Ultra: 0.766 of 98 is Rare")
+	_expect_eq(pool.pick_rarity(0.9999, no_ultra, true), CardData.CardRarity.RARE, "Elite, no Ultra: the top is Rare")
+	var common_rare: Array[CardData.CardRarity] = [CardData.CardRarity.COMMON, CardData.CardRarity.RARE]
+	_expect_eq(pool.pick_rarity(0.0, common_rare, true), CardData.CardRarity.RARE, "Elite, Common+Rare: Rare from the bottom")
+	_expect_eq(pool.pick_rarity(0.9999, common_rare, true), CardData.CardRarity.RARE, "...to the top")
+	var only_common: Array[CardData.CardRarity] = [CardData.CardRarity.COMMON]
+	_expect_eq(pool.pick_rarity(0.5, only_common, true), CardData.CardRarity.COMMON, "Elite, only Common left: Common, not a lost slot")
+	_expect_eq(pool.pick_rarity(0.0, all), CardData.CardRarity.COMMON, "The normal rates are untouched: 0.0 is still Common")
+	_completed += 1
+
+# The real pool on fixed seeds at the elite rates: three distinct pool
+# cards, never a Common, Rares among them; the same seed the same three.
+func _check_elite_seeded_rolls() -> void:
+	var pool: RewardPool = _pool()
+	var rares: int = 0
+	for seed_value in SEED_COUNT:
+		var rolled: Array[CardData] = pool.roll_by_rarity(3, _rng(seed_value), null, true)
+		if rolled.size() != 3:
+			_fail("elite seed %d: %d cards, not 3" % [seed_value, rolled.size()])
+			continue
+		if rolled[0] == rolled[1] or rolled[0] == rolled[2] or rolled[1] == rolled[2]:
+			_fail("elite seed %d: a card offered twice" % seed_value)
+		for card in rolled:
+			if not pool.entries.has(card):
+				_fail("elite seed %d: %s isn't in the pool" % [seed_value, card.card_name])
+			if card.rarity == CardData.CardRarity.COMMON:
+				_fail("elite seed %d: Common %s offered" % [seed_value, card.card_name])
+			if card.rarity == CardData.CardRarity.RARE:
+				rares += 1
+	_expect(rares > 0, "Elite rolls offer Rares across %d seeds (%d)" % [SEED_COUNT, rares])
+	_expect_eq(pool.roll_by_rarity(3, _rng(42), null, true), pool.roll_by_rarity(3, _rng(42), null, true), "Elite: same seed, same three")
 	_completed += 1
 
 # --- Blood Arc ---

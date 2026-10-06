@@ -37,6 +37,20 @@ is in the cards that pay - HP, Toll, or a Critical state. Not every card
 must; Commons can be plain tools (Slash, Carve, Brace, Bide).
 (2026-10-04, with Bide.)
 
+## Elite rewards
+
+`EnemyData.is_elite` is no longer a tag only. A fight with an elite in it
+pays the floor's gold roll times `RegionField.elite_gold_multiplier`
+(1.5, rounded) and rolls its card reward at the pool's elite rarity
+rates (`RewardPool`'s Elite rarity rates: Common 0 / Uncommon 75 / Rare
+23 / Ultra Rare 2, renormalised over the tiers with a card left, as the
+normal rates are - so Common only when nothing else is). Keepsakes and
+Glassbone stay their own fields (`keepsake_table`, `glassbone_reward`).
+The region-end fight is to roll the same rates; until it exists, floor
+5's placeholder (a Sputter) is placed with `FloorEnemy.elite_card_rates`,
+which gives a fight the elite rates only - not the elite gold. A bundle
+or cache keeps its own flat roll. (2026-10-05.)
+
 ## Run log
 
 RunLogger (`run/run_logger.gd`) writes one JSON-lines file per run to

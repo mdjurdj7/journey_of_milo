@@ -50,6 +50,9 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export var group: StringName = &""
 # FloorEnemy.anchor, mirrored the same way - read at contact.
 @export var anchor: bool = false
+# FloorEnemy.elite_card_rates, mirrored the same way - read as the fight
+# starts (RegionField).
+@export var elite_card_rates: bool = false
 @export var region_field_path: NodePath = ^".."
 @export var ground_path: NodePath = ^"../Ground"
 # The hover highlight and the hit flash both BRIGHTEN: albedo times this,

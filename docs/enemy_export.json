@@ -3,7 +3,7 @@
     "description": "Generated export of every enemy encounter as placed in each FloorData, by region and floor in RegionData order, and every enemy data file once (enemies). Never edit by hand - regenerate it; tests/enemy_export_probe.gd fails when this file is stale.",
     "regenerate": "Godot_v4.7.1.exe --headless --path . -s res://tests/enemy_export.gd",
     "generated_from": [
-      "res://field/region_field.tscn (its region)",
+      "res://field/region_field.tscn (its region and elite_gold_multiplier)",
       "res://floors/*.tres (RegionData, FloorData, FloorEnemy, FloorPatrol, FloorProp)",
       "res://battle/rules/enemies/*.tres (EnemyData, EnemyIntent)",
       "res://battle/rules/statuses/*.tres (StatusData, resolved through Status.describe())",
@@ -14,7 +14,7 @@
     "positions": "World XZ offsets from the floor's spawn, metres ([x, z]).",
     "required": "FloorEnemy.required: the floor is cleared, and its gate opens, once no required enemy stands. A cluster is the entries sharing a FloorEnemy.group; it is required when any member is.",
     "gate_fight": "The encounter holding FloorData.enemies[0]: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past that enemy, along exit_direction.",
-    "elite": "EnemyData.is_elite - a tag only; nothing rolls or rewards on it. Keepsakes and Glassbone are their own fields.",
+    "elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times RegionField.elite_gold_multiplier (rounded) and rolls its card at the pool's elite rarity rates; a placement marked FloorEnemy.elite_card_rates (floor 5's region-end placeholder) gets the elite rates only. See each encounter's elite_rewards. Keepsakes and Glassbone are their own fields.",
     "rewards": "Gold and the card reward are the floor's (FloorData), the same for every fight on it. Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Glassbone: every member's, summed.",
     "intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping."
   },
@@ -40,6 +40,12 @@
               "rare": 9.0,
               "ultra_rare": 1.0
             },
+            "elite_rarity_rates": {
+              "common": 0.0,
+              "uncommon": 75.0,
+              "rare": 23.0,
+              "ultra_rare": 2.0
+            },
             "bundle_rare_pool": null
           },
           "encounters": [
@@ -59,6 +65,11 @@
                 "bar_axis_offset": 0.85,
                 "channel_max_width": 0.0
               },
+              "elite_rewards": {
+                "gold_multiplier": null,
+                "card_rates": "normal",
+                "why": null
+              },
               "patrol": null,
               "members": [
                 {
@@ -68,6 +79,7 @@
                   "hp": 45,
                   "required": true,
                   "anchor": false,
+                  "elite_card_rates": false,
                   "position": [
                     -2.25,
                     -10.73
@@ -97,6 +109,12 @@
               "rare": 9.0,
               "ultra_rare": 1.0
             },
+            "elite_rarity_rates": {
+              "common": 0.0,
+              "uncommon": 75.0,
+              "rare": 23.0,
+              "ultra_rare": 2.0
+            },
             "bundle_rare_pool": null
           },
           "encounters": [
@@ -116,6 +134,11 @@
                 "bar_axis_offset": 0.0,
                 "channel_max_width": 0.0
               },
+              "elite_rewards": {
+                "gold_multiplier": null,
+                "card_rates": "normal",
+                "why": null
+              },
               "patrol": null,
               "members": [
                 {
@@ -125,6 +148,7 @@
                   "hp": 45,
                   "required": true,
                   "anchor": true,
+                  "elite_card_rates": false,
                   "position": [
                     1.5,
                     -21.25
@@ -139,6 +163,7 @@
                   "hp": 14,
                   "required": true,
                   "anchor": false,
+                  "elite_card_rates": false,
                   "position": [
                     0.0,
                     -22.0
@@ -156,6 +181,11 @@
               "required": false,
               "elite": false,
               "gate_fight": false,
+              "elite_rewards": {
+                "gold_multiplier": null,
+                "card_rates": "normal",
+                "why": null
+              },
               "patrol": {
                 "waypoints": [
                   [
@@ -184,6 +214,7 @@
                   "hp": 14,
                   "required": false,
                   "anchor": false,
+                  "elite_card_rates": false,
                   "position": [
                     -15.25,
                     -20.5
@@ -198,6 +229,7 @@
                   "hp": 14,
                   "required": false,
                   "anchor": false,
+                  "elite_card_rates": false,
                   "position": [
                     -17.875,
                     -21.75
@@ -212,6 +244,7 @@
                   "hp": 14,
                   "required": false,
                   "anchor": false,
+                  "elite_card_rates": false,
                   "position": [
                     -17.125,
                     -20.0
@@ -229,6 +262,11 @@
               "required": false,
               "elite": false,
               "gate_fight": false,
+              "elite_rewards": {
+                "gold_multiplier": null,
+                "card_rates": "normal",
+                "why": null
+              },
               "patrol": null,
               "members": [
                 {
@@ -238,6 +276,7 @@
                   "hp": 38,
                   "required": false,
                   "anchor": false,
+                  "elite_card_rates": false,
                   "position": [
                     5.2,
                     -7.0
@@ -267,6 +306,12 @@
               "rare": 9.0,
               "ultra_rare": 1.0
             },
+            "elite_rarity_rates": {
+              "common": 0.0,
+              "uncommon": 75.0,
+              "rare": 23.0,
+              "ultra_rare": 2.0
+            },
             "bundle_rare_pool": null
           },
           "encounters": [
@@ -286,6 +331,11 @@
                 "bar_axis_offset": 0.0,
                 "channel_max_width": 0.0
               },
+              "elite_rewards": {
+                "gold_multiplier": null,
+                "card_rates": "normal",
+                "why": null
+              },
               "patrol": null,
               "members": [
                 {
@@ -295,6 +345,7 @@
                   "hp": 40,
                   "required": true,
                   "anchor": true,
+                  "elite_card_rates": false,
                   "position": [
                     -3.0,
                     -9.0
@@ -309,6 +360,7 @@
                   "hp": 16,
                   "required": true,
                   "anchor": false,
+                  "elite_card_rates": false,
                   "position": [
                     -4.66,
                     -8.45
@@ -326,6 +378,11 @@
               "required": false,
               "elite": true,
               "gate_fight": false,
+              "elite_rewards": {
+                "gold_multiplier": 1.5,
+                "card_rates": "elite",
+                "why": "an elite member"
+              },
               "patrol": null,
               "members": [
                 {
@@ -335,6 +392,7 @@
                   "hp": 90,
                   "required": false,
                   "anchor": false,
+                  "elite_card_rates": false,
                   "position": [
                     17.6,
                     -13.6
@@ -374,6 +432,12 @@
               "rare": 9.0,
               "ultra_rare": 1.0
             },
+            "elite_rarity_rates": {
+              "common": 0.0,
+              "uncommon": 75.0,
+              "rare": 23.0,
+              "ultra_rare": 2.0
+            },
             "bundle_rare_pool": null
           },
           "encounters": [
@@ -393,6 +457,11 @@
                 "bar_axis_offset": 0.0,
                 "channel_max_width": 0.0
               },
+              "elite_rewards": {
+                "gold_multiplier": null,
+                "card_rates": "normal",
+                "why": null
+              },
               "patrol": null,
               "members": [
                 {
@@ -402,6 +471,7 @@
                   "hp": 55,
                   "required": true,
                   "anchor": false,
+                  "elite_card_rates": false,
                   "position": [
                     -18.5,
                     -35.0
@@ -426,6 +496,11 @@
               "required": false,
               "elite": false,
               "gate_fight": false,
+              "elite_rewards": {
+                "gold_multiplier": null,
+                "card_rates": "normal",
+                "why": null
+              },
               "patrol": null,
               "members": [
                 {
@@ -435,6 +510,7 @@
                   "hp": 45,
                   "required": false,
                   "anchor": false,
+                  "elite_card_rates": false,
                   "position": [
                     -24.4,
                     -21.6
@@ -464,6 +540,12 @@
               "rare": 9.0,
               "ultra_rare": 1.0
             },
+            "elite_rarity_rates": {
+              "common": 0.0,
+              "uncommon": 75.0,
+              "rare": 23.0,
+              "ultra_rare": 2.0
+            },
             "bundle_rare_pool": null
           },
           "encounters": [
@@ -483,6 +565,11 @@
                 "bar_axis_offset": 0.0,
                 "channel_max_width": 0.0
               },
+              "elite_rewards": {
+                "gold_multiplier": null,
+                "card_rates": "elite",
+                "why": "FloorEnemy.elite_card_rates"
+              },
               "patrol": null,
               "members": [
                 {
@@ -492,6 +579,7 @@
                   "hp": 45,
                   "required": true,
                   "anchor": false,
+                  "elite_card_rates": true,
                   "position": [
                     -0.567,
                     -42.0

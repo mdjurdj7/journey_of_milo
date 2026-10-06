@@ -76,6 +76,9 @@ enum RewardMode { SCREEN, WORLD }
 # Raised to the camera rig's own battle_transition_time when that's
 # longer, so retuning the blend doesn't leave this stale.
 @export var reward_spread_delay_sec: float = 0.6
+# A fight with an elite in it (EnemyData.is_elite) pays the floor's gold
+# roll times this, rounded. Read when the reward screen opens.
+@export var elite_gold_multiplier: float = 1.5
 
 # Playable boundary, centered on origin. X = width (left/right side
 # edges), Y-component of field_extents = depth along the field's
@@ -347,6 +350,15 @@ var _pending_keepsake_source: String = ""
 # everyone it was won against), waiting for the reward screen to offer it
 # as its own TAKE line. Handed over and zeroed as the screen opens.
 var _pending_glassbone: int = 0
+# The fight in progress has an elite in it (EnemyData.is_elite): elite
+# gold and rates. Its card reward rolls the elite rarity rates - with an
+# elite, or a member placed with FloorEnemy.elite_card_rates. Set as the
+# fight starts, from every member; carried to the last win's reward in
+# the _pending_ pair, as the Glassbone is.
+var _fight_elite: bool = false
+var _fight_elite_rates: bool = false
+var _pending_elite_gold: bool = false
+var _pending_elite_rates: bool = false
 var _floor_cleared_emitted: bool = false
 # Debug builds only (_setup_debug_row()): the field's F1 row, and which
 # of debug_keepsake_paths its button grants next.
@@ -796,6 +808,7 @@ func _spawn_floor_enemies() -> void:
 		enemy.required = entry.required
 		enemy.group = entry.group
 		enemy.anchor = entry.anchor
+		enemy.elite_card_rates = entry.elite_card_rates
 		# The body, from the data's Field Body group - its defaults are
 		# this scene's own values, so a resource that sets none (the
 		# Sputter) wears exactly what it did.
@@ -1366,6 +1379,14 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	var overlay := (load(BATTLE_OVERLAY_SCENE_PATH) as PackedScene).instantiate() as BattleOverlay
 	battle_layer.add_child(overlay)
 	_battle_members = _battle_members_for(enemy)
+	_fight_elite = false
+	_fight_elite_rates = false
+	for member in _battle_members:
+		if member.enemy_data != null and member.enemy_data.is_elite:
+			_fight_elite = true
+		if member.elite_card_rates:
+			_fight_elite_rates = true
+	_fight_elite_rates = _fight_elite_rates or _fight_elite
 	var anchor: FieldEnemy = _battle_members[0]
 	# A patrolling pack stops where it is: pending take-offs dropped, and
 	# any member in the air comes down where it is - the anchor here,
@@ -1567,6 +1588,8 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 					won_against.append(member.enemy_data)
 			_roll_keepsake_drop(won_against)
 			_pending_glassbone = _glassbone_left_by(won_against)
+			_pending_elite_gold = _fight_elite
+			_pending_elite_rates = _fight_elite_rates
 			for member in standing:
 				# The last kill folding from the air frees itself.
 				if member.is_settling():
@@ -1663,6 +1686,9 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	spread.pool = floor_data.reward_pool
 	spread.enemy = fell_to
 	spread.roll_by_rarity = true
+	spread.elite_rates = _pending_elite_rates
+	_pending_elite_gold = false
+	_pending_elite_rates = false
 	add_child(spread)
 	spread.global_position = fell_at
 	# The cards are on the sand, nothing to close: the keepsake at once.
@@ -1687,8 +1713,12 @@ func _open_reward_screen() -> void:
 	var gold: int = 0
 	if floor_data.reward_pool != null:
 		gold = RunState.rng.randi_range(mini(floor_data.gold_min, floor_data.gold_max), maxi(floor_data.gold_min, floor_data.gold_max))
-	screen.setup(gold, floor_data.reward_pool, deck_panel, _pending_glassbone)
+		if _pending_elite_gold:
+			gold = roundi(gold * elite_gold_multiplier)
+	screen.setup(gold, floor_data.reward_pool, deck_panel, _pending_glassbone, _pending_elite_rates)
 	_pending_glassbone = 0
+	_pending_elite_gold = false
+	_pending_elite_rates = false
 	screen.closed.connect(_on_reward_screen_closed)
 	add_child(screen)
 	process_mode = Node.PROCESS_MODE_DISABLED

@@ -220,6 +220,7 @@ var _lines: Array[RewardLine] = []
 var _gold: int = 0
 var _glassbone: int = 0
 var _pool: RewardPool = null
+var _elite_rates: bool = false
 var _deck_panel: Control = null
 var _mode: int = Mode.LIST
 var _hovered: int = -1
@@ -261,13 +262,15 @@ var _decline_top_px: float = 0.0
 
 # gold is what this fight rolled; pool is the floor's own, already
 # chosen; deck_panel is where a taken card flies to; glassbone is what
-# the fight's enemies left (0 = no line). Called by RegionField before
-# the screen is added to the tree.
-func setup(gold: int, pool: RewardPool, deck_panel: Control, glassbone: int = 0) -> void:
+# the fight's enemies left (0 = no line); elite_rates rolls the card at
+# the pool's elite rarity rates. Called by RegionField before the screen
+# is added to the tree.
+func setup(gold: int, pool: RewardPool, deck_panel: Control, glassbone: int = 0, elite_rates: bool = false) -> void:
 	_gold = gold
 	_glassbone = glassbone
 	_pool = pool
 	_deck_panel = deck_panel
+	_elite_rates = elite_rates
 
 func _ready() -> void:
 	# The field is frozen under this (RegionField goes back to
@@ -694,7 +697,7 @@ func _take_line(index: int) -> void:
 
 func _open_choice() -> void:
 	# A fight's reward, so tier first - see RewardPool.roll_by_rarity().
-	var rolled: Array[CardData] = _pool.roll_by_rarity(choice_count, RunState.rng)
+	var rolled: Array[CardData] = _pool.roll_by_rarity(choice_count, RunState.rng, null, _elite_rates)
 	_offered = rolled.duplicate()
 	if rolled.is_empty():
 		_finish_card_line()

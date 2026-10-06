@@ -74,8 +74,10 @@ class_name EnemyData
 @export var status_gained_sound: AudioStream = null
 @export var status_gained_sound_on: StatusData = null
 
-# Elite-tier content (the Wardling). A tag only for now - nothing rolls or
-# rewards on it yet.
+# Elite-tier content (the Wardling). A fight with one in it pays
+# RegionField.elite_gold_multiplier on the floor's gold (rounded) and
+# rolls its card reward at RewardPool's elite rarity rates (RegionField.
+# _open_reward_screen()). Keepsakes and Glassbone are their own fields.
 @export var is_elite: bool = false
 # Said where it stood, in the world voice, as it dies (RegionField._on_
 # enemy_defeated()). Empty = nothing.

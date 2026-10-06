@@ -40,6 +40,15 @@ class_name RewardPool
 @export var uncommon_rate: float = 30.0
 @export var rare_rate: float = 9.0
 @export var ultra_rare_rate: float = 1.0
+# The same, for a fight with an elite in it (EnemyData.is_elite) or a
+# placement marked FloorEnemy.elite_card_rates - roll_by_rarity(...,
+# elite = true). Common 0 = no Common while a higher tier has a card
+# left; renormalised the same way when a tier is empty.
+@export_group("Elite rarity rates")
+@export var elite_common_rate: float = 0.0
+@export var elite_uncommon_rate: float = 75.0
+@export var elite_rare_rate: float = 23.0
+@export var elite_ultra_rare_rate: float = 2.0
 @export_group("")
 
 # `count` distinct cards, weighted, without duplicates within the roll -
@@ -81,7 +90,8 @@ func roll(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null) -> Ar
 # (or ULTRA_RARE, empty today) never costs a slot: this returns fewer
 # than `count` only when the pool itself runs out. An UNSET card is
 # never offered - see CardData.CardRarity.
-func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null) -> Array[CardData]:
+# `elite` rolls the tiers at the elite rates instead.
+func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, elite: bool = false) -> Array[CardData]:
 	var picked: Array[CardData] = []
 	var remaining: Array[int] = []
 	for index in entries.size():
@@ -94,7 +104,7 @@ func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = n
 		for index in remaining:
 			if not available.has(entries[index].rarity):
 				available.append(entries[index].rarity)
-		var tier: CardData.CardRarity = pick_rarity(rng.randf(), available)
+		var tier: CardData.CardRarity = pick_rarity(rng.randf(), available, elite)
 		var in_tier: Array[int] = []
 		for index in remaining:
 			if entries[index].rarity == tier:
@@ -119,25 +129,36 @@ func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = n
 # roll_by_rarity() and handed the point rather than the rng so a probe
 # can land each branch exactly. Available tiers whose rates are all zero
 # fall back to an even split, so a slot is never lost to tuning.
-func pick_rarity(point: float, available: Array[CardData.CardRarity]) -> CardData.CardRarity:
+func pick_rarity(point: float, available: Array[CardData.CardRarity], elite: bool = false) -> CardData.CardRarity:
 	var tiers: Array[CardData.CardRarity] = []
 	var total: float = 0.0
 	for tier in CardData.rarity_tiers():
 		if available.has(tier):
 			tiers.append(tier)
-			total += maxf(rarity_rate(tier), 0.0)
+			total += maxf(rarity_rate(tier, elite), 0.0)
 	if tiers.is_empty():
 		return CardData.CardRarity.UNSET
 	if total <= 0.0:
 		return tiers[mini(int(point * float(tiers.size())), tiers.size() - 1)]
 	var target: float = point * total
 	for tier in tiers:
-		target -= maxf(rarity_rate(tier), 0.0)
+		target -= maxf(rarity_rate(tier, elite), 0.0)
 		if target < 0.0:
 			return tier
 	return tiers[tiers.size() - 1]
 
-func rarity_rate(tier: CardData.CardRarity) -> float:
+func rarity_rate(tier: CardData.CardRarity, elite: bool = false) -> float:
+	if elite:
+		match tier:
+			CardData.CardRarity.COMMON:
+				return elite_common_rate
+			CardData.CardRarity.UNCOMMON:
+				return elite_uncommon_rate
+			CardData.CardRarity.RARE:
+				return elite_rare_rate
+			CardData.CardRarity.ULTRA_RARE:
+				return elite_ultra_rare_rate
+		return 0.0
 	match tier:
 		CardData.CardRarity.COMMON:
 			return common_rate

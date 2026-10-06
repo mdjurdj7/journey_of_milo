@@ -35,6 +35,9 @@ class_name RewardSpread
 # rates until they're given their own. Read once, when the cards are
 # laid out.
 @export var roll_by_rarity: bool = false
+# With roll_by_rarity: the pool's elite rarity rates - a fight with an
+# elite in it (set by RegionField._spawn_reward_spread()).
+@export var elite_rates: bool = false
 
 @export_group("Layout")
 # The fan's own axis, world XZ. Zero (the fight-drop default) = the
@@ -105,7 +108,7 @@ func _find_wanderer() -> Node3D:
 	return found[0] as Node3D if not found.is_empty() else null
 
 func _spawn_cards() -> void:
-	var rolled: Array[CardData] = pool.roll_by_rarity(card_count, RunState.rng, enemy) if roll_by_rarity else pool.roll(card_count, RunState.rng, enemy)
+	var rolled: Array[CardData] = pool.roll_by_rarity(card_count, RunState.rng, enemy, elite_rates) if roll_by_rarity else pool.roll(card_count, RunState.rng, enemy)
 	if rolled.is_empty():
 		return
 	var scene := load(world_card_scene_path) as PackedScene
