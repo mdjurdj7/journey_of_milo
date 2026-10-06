@@ -13,6 +13,16 @@
   WIP, commit only my files and tell me.
 - Run `git status` before staging; the tree often has WIP files
   that must not be committed.
+- Always commit with `git commit -- <paths>`, so files another session
+  has staged can't be included.
+- When more than one Claude Code session works at once, each works in
+  its own git worktree, never in the shared main tree:
+  `git worktree add ../journey-of-milo-<task> -b <task-branch>` (or
+  detached at main). Commit there, then bring the commits onto main
+  (fast-forward or cherry-pick) by explicit path.
+- Never edit shared tools (run_probes.sh, CLAUDE.md) while another
+  session's probe run may be using them; commit such changes quickly
+  and separately.
 - New scripts and shaders (.gd, .gdshader, .gdshaderinc) ship with
   their .uid. After creating one, run the Godot 4.7.1 main executable
   (not the _console wrapper) with `--headless --path . --import`,
