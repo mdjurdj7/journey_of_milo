@@ -8,9 +8,9 @@ class_name RunEnd
 # above it, so the screen is type on the fog - no boxes, no glow. One
 # world-voice line in Spectral; under it, in the system voice, the run's
 # tally - caps labels in the utility grey, values in ink; under that two
-# items in the title's style (TitleMenu): NEW RUN and TITLE, the utility
-# grey when unfocused, full ink with a short hairline to the left when
-# focused. Keyboard and mouse as the title: ui_up/ui_down move focus
+# items in the title's style and with its input (an InkMenu, as TitleMenu
+# has): NEW RUN and TITLE, the utility grey when unfocused, full ink with
+# a short hairline to the left when focused; ui_up/ui_down move focus
 # (wrapping), ui_accept activates, hover focuses, a click activates; the
 # first activation wins.
 #
@@ -156,18 +156,14 @@ enum Item { NEW_RUN, TITLE }
 @onready var new_run_item: Control = $Column/NewRunItem
 @onready var title_item: Control = $Column/TitleItem
 
-var _items: Array[Control] = []
-var _focused: int = Item.NEW_RUN
-var _activated: bool = false
+var _menu: InkMenu = null
 # [label, value] text pairs, read from RunState once on arrival.
 var _stat_rows: Array[PackedStringArray] = []
 
 func _ready() -> void:
-	_items = [new_run_item, title_item]
-	for index in _items.size():
-		var item: Control = _items[index]
-		item.mouse_entered.connect(_on_item_mouse_entered.bind(index))
-		item.gui_input.connect(_on_item_gui_input.bind(index))
+	var items: Array[Control] = [new_run_item, title_item]
+	_menu = InkMenu.new(items, Item.NEW_RUN)
+	_menu.activated.connect(_activate)
 	_stat_rows = stat_rows()
 	get_viewport().size_changed.connect(_relayout)
 	_relayout()
@@ -234,24 +230,11 @@ func _relayout() -> void:
 	stats.size = Vector2(value_x, y)
 
 	var item_size: int = maxi(roundi(float(item_font_size_px) * scale), 1)
-	var item_font: Font = InkType.tracked(caps_font, item_size, tracking_em)
-	var hairline_length: float = hairline_length_px * scale
-	var hairline_gap: float = hairline_gap_px * scale
-	y = stats.position.y + stats.size.y + stats_to_items_gap_px * scale
-	for item in _items:
-		var label := item.get_node(^"Label") as Label
-		var hairline := item.get_node(^"Hairline") as ColorRect
-		label.add_theme_font_override("font", item_font)
-		label.add_theme_font_size_override("font_size", item_size)
-		label.size = label.get_combined_minimum_size()
-		label.position = Vector2(hairline_length + hairline_gap, 0.0)
-		item.position = Vector2(left - hairline_length - hairline_gap, y)
-		item.size = Vector2(label.position.x + label.size.x, label.size.y)
-		hairline.size = Vector2(hairline_length, hairline_thickness_px)
-		hairline.position = Vector2(0.0, (label.size.y - hairline_thickness_px) * 0.5)
-		hairline.color = ink
-		y += label.size.y + item_gap_px * scale
-	_apply_focus()
+	_menu.ink = ink
+	_menu.unfocused_color = utility_grey
+	_menu.lay_out(left, stats.position.y + stats.size.y + stats_to_items_gap_px * scale,
+			InkType.tracked(caps_font, item_size, tracking_em), item_size,
+			hairline_length_px * scale, hairline_gap_px * scale, hairline_thickness_px, item_gap_px * scale)
 
 func _bare_label(text: String, font: Font, size_px: int, color: Color) -> Label:
 	var label := Label.new()
@@ -263,53 +246,18 @@ func _bare_label(text: String, font: Font, size_px: int, color: Color) -> Label:
 	label.size = label.get_combined_minimum_size()
 	return label
 
-func _apply_focus() -> void:
-	for index in _items.size():
-		var item: Control = _items[index]
-		var focused: bool = index == _focused
-		(item.get_node(^"Label") as Label).add_theme_color_override("font_color", ink if focused else utility_grey)
-		(item.get_node(^"Hairline") as ColorRect).visible = focused
-
 # --- input --------------------------------------------------------------
 
-func _set_focus(index: int) -> void:
-	if _activated or index == _focused:
-		return
-	_focused = index
-	_apply_focus()
-
 func _unhandled_input(event: InputEvent) -> void:
-	if _activated:
-		return
-	if event.is_action_pressed("ui_down"):
-		_set_focus(posmod(_focused + 1, _items.size()))
-	elif event.is_action_pressed("ui_up"):
-		_set_focus(posmod(_focused - 1, _items.size()))
-	elif event.is_action_pressed("ui_accept"):
-		_activate(_focused)
-	else:
-		return
-	get_viewport().set_input_as_handled()
-
-func _on_item_mouse_entered(index: int) -> void:
-	_set_focus(index)
-
-func _on_item_gui_input(event: InputEvent, index: int) -> void:
-	if _activated:
-		return
-	var button := event as InputEventMouseButton
-	if button == null or not button.pressed or button.button_index != MOUSE_BUTTON_LEFT:
-		return
-	_set_focus(index)
-	_activate(index)
-	get_viewport().set_input_as_handled()
+	if _menu.handle_input(event):
+		get_viewport().set_input_as_handled()
 
 # The first activation wins. Both start a fresh run - the one just won is
 # already logged and closed - and take the fade down before leaving.
 func _activate(index: int) -> void:
-	if _activated:
+	if _menu.locked:
 		return
-	_activated = true
+	_menu.lock()
 	var character: CharacterData = RunState.character
 	if character == null:
 		character = load(STARTING_CHARACTER_PATH) as CharacterData

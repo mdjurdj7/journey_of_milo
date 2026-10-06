@@ -10,10 +10,11 @@ class_name TitleMenu
 # the tower shows), which is what makes Start immediate and the colour
 # behind the type the rendered fog itself, never a flat rect.
 #
-# Focus is this script's own index, not Godot's Control focus: ui_up/
-# ui_down move it (wrapping), ui_accept activates, the mouse moves it by
-# hovering and activates by clicking. Start has it on load. Start and
-# Exit end the menu: the first of them wins - every input path returns
+# Focus is the items' own index, not Godot's Control focus, kept by an
+# InkMenu (the item drawing and input every menu in this style shares):
+# ui_up/ui_down move it (wrapping), ui_accept activates, the mouse moves
+# it by hovering and activates by clicking. Start has it on load. Start
+# and Exit end the menu: the first of them wins - every input path returns
 # early after it - and what it asks for goes out as a signal:
 # start_requested (ZoneIntro then calls lock() and fade_out(), and runs
 # the intro) or exit_requested (Exit is hidden where quitting means
@@ -32,7 +33,7 @@ signal exit_requested
 const TITLE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 
-# In menu order - each value is its item's index in _items.
+# In menu order - each value is its item's index in the InkMenu.
 enum Item { START, CARDS, EXIT }
 
 @export var game_title: String = "The Journey of Milo":
@@ -134,24 +135,20 @@ enum Item { START, CARDS, EXIT }
 @onready var cards_item: Control = $Column/CardsItem
 @onready var exit_item: Control = $Column/ExitItem
 
-# In menu order; an item hidden for the platform (Exit on web) is left
-# out of _focusable() and so out of the wrap.
-var _items: Array[Control] = []
-var _focused: int = Item.START
-var _activated: bool = false
+# The items in menu order; an item hidden for the platform (Exit on web)
+# is left out of the wrap.
+var _menu: InkMenu = null
 # The open card compendium, or null - input here waits while it is set.
 var _compendium: CardCompendium = null
 # The running column fade, in or out - one at a time.
 var _fade_tween: Tween = null
 
 func _ready() -> void:
-	_items = [start_item, cards_item, exit_item]
 	if OS.has_feature("web"):
 		exit_item.visible = false
-	for index in _items.size():
-		var item: Control = _items[index]
-		item.mouse_entered.connect(_on_item_mouse_entered.bind(index))
-		item.gui_input.connect(_on_item_gui_input.bind(index))
+	var items: Array[Control] = [start_item, cards_item, exit_item]
+	_menu = InkMenu.new(items, Item.START)
+	_menu.activated.connect(_activate)
 	get_viewport().size_changed.connect(_relayout)
 	_relayout()
 	_fade_in()
@@ -178,45 +175,18 @@ func _relayout() -> void:
 	title_label.position = Vector2(left, viewport_size.y * title_y_fraction)
 
 	var item_size: int = maxi(roundi(float(item_font_size_px) * scale), 1)
-	var item_font_tracked: Font = InkType.tracked(item_font, item_size, item_tracking_em)
-	var hairline_length: float = hairline_length_px * scale
-	var hairline_gap: float = hairline_gap_px * scale
-	var y: float = title_label.position.y + title_label.size.y + title_to_items_gap_px * scale
-	for index in _items.size():
-		var item: Control = _items[index]
-		if not item.visible:
-			continue
-		var label := item.get_node(^"Label") as Label
-		var hairline := item.get_node(^"Hairline") as ColorRect
-		label.add_theme_font_override("font", item_font_tracked)
-		label.add_theme_font_size_override("font_size", item_size)
-		label.size = label.get_combined_minimum_size()
-		label.position = Vector2(hairline_length + hairline_gap, 0.0)
-		item.position = Vector2(left - hairline_length - hairline_gap, y)
-		item.size = Vector2(label.position.x + label.size.x, label.size.y)
-		hairline.size = Vector2(hairline_length, hairline_thickness_px)
-		hairline.position = Vector2(0.0, (label.size.y - hairline_thickness_px) * 0.5)
-		hairline.color = ink
-		y += label.size.y + item_gap_px * scale
-	_apply_focus()
-
-# The focused item in ink with its hairline shown; every other in the
-# utility grey with none. Nothing else changes with focus.
-func _apply_focus() -> void:
-	for index in _items.size():
-		var item: Control = _items[index]
-		var label := item.get_node(^"Label") as Label
-		var hairline := item.get_node(^"Hairline") as ColorRect
-		var focused: bool = index == _focused
-		label.add_theme_color_override("font_color", ink if focused else unfocused_color)
-		hairline.visible = focused
+	_menu.ink = ink
+	_menu.unfocused_color = unfocused_color
+	_menu.lay_out(left, title_label.position.y + title_label.size.y + title_to_items_gap_px * scale,
+			InkType.tracked(item_font, item_size, item_tracking_em), item_size,
+			hairline_length_px * scale, hairline_gap_px * scale, hairline_thickness_px, item_gap_px * scale)
 
 # --- the owner's side ---------------------------------------------------
 
 # No input from here on, whatever the device - called by the owner on
 # start_requested (and by _activate() itself first).
 func lock() -> void:
-	_activated = true
+	_menu.lock()
 
 # The column from nothing to full over title_fade_in_seconds, on
 # arrival. Only the look - nothing waits on it.
@@ -249,59 +219,16 @@ func _kill_fade() -> void:
 
 # --- input --------------------------------------------------------------
 
-func _focusable() -> Array[int]:
-	var indices: Array[int] = []
-	for index in _items.size():
-		if _items[index].visible:
-			indices.append(index)
-	return indices
-
-func _set_focus(index: int) -> void:
-	if _activated or _compendium != null or index == _focused or not _items[index].visible:
-		return
-	_focused = index
-	_apply_focus()
-
-# Up/down through the visible items, wrapping at both ends.
-func _move_focus(step: int) -> void:
-	var indices: Array[int] = _focusable()
-	if indices.is_empty():
-		return
-	var at: int = maxi(indices.find(_focused), 0)
-	_set_focus(indices[posmod(at + step, indices.size())])
-
 func _unhandled_input(event: InputEvent) -> void:
-	if _activated or _compendium != null:
-		return
-	if event.is_action_pressed("ui_down"):
-		_move_focus(1)
-	elif event.is_action_pressed("ui_up"):
-		_move_focus(-1)
-	elif event.is_action_pressed("ui_accept"):
-		_activate(_focused)
-	else:
-		return
-	get_viewport().set_input_as_handled()
-
-func _on_item_mouse_entered(index: int) -> void:
-	_set_focus(index)
-
-func _on_item_gui_input(event: InputEvent, index: int) -> void:
-	if _activated or _compendium != null:
-		return
-	var button := event as InputEventMouseButton
-	if button == null or not button.pressed or button.button_index != MOUSE_BUTTON_LEFT:
-		return
-	_set_focus(index)
-	_activate(index)
-	get_viewport().set_input_as_handled()
+	if _menu.handle_input(event):
+		get_viewport().set_input_as_handled()
 
 # The one gate: the first activation of Start or Exit wins and everything
 # after it is ignored, whichever device it came from. Cards passes
 # through without locking - the menu comes back when the compendium
 # closes.
 func _activate(index: int) -> void:
-	if _activated or _compendium != null:
+	if _menu.locked or _compendium != null:
 		return
 	if index == Item.CARDS:
 		_open_compendium()
@@ -327,6 +254,7 @@ func _open_compendium() -> void:
 		push_warning("TitleMenu: %s is not a CardCompendium; Cards does nothing." % compendium_scene_path)
 		return
 	_compendium = compendium
+	_menu.held = true
 	compendium.closed.connect(_on_compendium_closed)
 	column.visible = false
 	add_child(compendium)
@@ -334,5 +262,6 @@ func _open_compendium() -> void:
 # Back to the menu as it was left: the column shown, focus on Cards.
 func _on_compendium_closed() -> void:
 	_compendium = null
+	_menu.held = false
 	column.visible = true
-	_apply_focus()
+	_menu.apply_focus()
