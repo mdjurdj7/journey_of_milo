@@ -123,10 +123,29 @@ signal draw_started(card_data: CardData)
 # A drawn card's size at the DECK readout, as a fraction of its hand size.
 @export_range(0.05, 1.0) var draw_start_scale: float = 0.4
 
-@export_group("Play Tween")
-@export var play_to_target_duration_sec: float = 0.25
-@export var play_to_discard_duration_sec: float = 0.2
-@export var discard_point: Vector2 = Vector2(1750.0, 150.0)
+@export_group("Play Fade")
+# A played card fades out where it is - the armed pose, centre - over
+# this long, its scale easing down to play_fade_end_scale, and goes
+# toward no pile. It starts with the card-play sound (the same frame).
+@export var play_fade_duration: float = 0.16
+# The played card's last scale, on the same footing as CardView.armed_
+# scale (1.2): an armed card ends at exactly this, any other at the same
+# fraction of where it started.
+@export var play_fade_end_scale: float = 1.12
+# When the played card leaves deck.hand for its pile (play_animation_
+# finished) - the old fly-out's 0.25 + 0.2 s, kept apart from the fade so
+# the rules see the card in hand exactly as long as before (see DESIGN.md,
+# Deferred). The DISCARD readout ticks then.
+@export var play_settle_sec: float = 0.45
+
+@export_group("End Of Turn Fade")
+# The end-of-turn discard: each card fades out in place over this long,
+# sinking discard_fade_sink_px, one after another discard_fade_stagger
+# apart. The enemy turn waits for the last (discard_hand() returns how
+# long that is).
+@export var discard_fade_duration: float = 0.16
+@export var discard_fade_stagger: float = 0.03
+@export var discard_fade_sink_px: float = 6.0
 
 var _deck: Deck = null
 # The hand's slots in hand order, each a Control whose only child is a
@@ -171,6 +190,11 @@ var _arrival_tweens: Dictionary = {} # Control (slot) -> Tween
 # When the next drawn card may launch (Time.get_ticks_msec()) - the
 # stagger runs on across draws that come close together.
 var _next_launch_msec: int = 0
+# Set by discard_hand() while the Deck discards: the slots that go then
+# fade in place (_fade_and_remove()), the Nth after N stagger steps,
+# instead of collapsing.
+var _fading_discard: bool = false
+var _fade_index: int = 0
 
 # No longer a Container (HBoxContainer defaulted this to IGNORE on its
 # own) - the arc leaves real gaps between/around fanned cards where the
@@ -287,7 +311,11 @@ func _sync_with_deck() -> void:
 		else:
 			_slot_cards.erase(slot)
 			_forget_slot(slot)
-			_collapse_and_remove(slot)
+			if _fading_discard:
+				_fade_and_remove(slot, discard_fade_stagger * float(_fade_index))
+				_fade_index += 1
+			else:
+				_collapse_and_remove(slot)
 	_slots = kept
 	for card in wanted:
 		var index: int = _arriving_cards.find(card)
@@ -303,11 +331,19 @@ func draw_cards(amount: int) -> void:
 		return
 	_deck.draw(amount)
 
-# `keep`: cards that stay in the hand (the end-of-turn keep).
-func discard_hand(keep: Array[CardData] = []) -> void:
+# `keep`: cards that stay in the hand (the end-of-turn keep). Every other
+# card fades out in place, staggered; returns how long until the last
+# has gone (0 with nothing discarded).
+func discard_hand(keep: Array[CardData] = []) -> float:
 	if _deck == null:
-		return
+		return 0.0
+	_fading_discard = true
+	_fade_index = 0
 	_deck.discard_hand(keep)
+	_fading_discard = false
+	if _fade_index == 0:
+		return 0.0
+	return discard_fade_duration + discard_fade_stagger * float(_fade_index - 1)
 
 func _add_card_view(card: CardData) -> void:
 	var slot := Control.new()
@@ -604,12 +640,20 @@ func _collapse_and_remove(slot: Control) -> void:
 	tween.tween_property(slot, "scale", Vector2.ZERO, discard_collapse_duration_sec)
 	tween.tween_callback(slot.queue_free)
 
-# Runs the hand -> target -> discard travel for a played card, removing its
-# view when done and emitting play_animation_finished. target_screen_pos is
-# wherever the controller decided to aim it (an enemy's unprojected head for
-# an ENEMY-target card, or some up-and-away point for SELF/NONE) - this
-# function doesn't interpret target_type at all, only where it's told to go.
-func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
+# The end-of-turn discard's way out: after `delay`, fades where it rests,
+# sinking a few px - no travel, no pile.
+func _fade_and_remove(slot: Control, delay: float) -> void:
+	var tween: Tween = create_tween()
+	tween.tween_interval(delay)
+	tween.tween_property(slot, "modulate:a", 0.0, discard_fade_duration)
+	tween.parallel().tween_property(slot, "position:y", slot.position.y + discard_fade_sink_px, discard_fade_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_callback(slot.queue_free)
+
+# A played card leaves the hand: it fades out where it is (see play_fade_
+# duration) - discard, Spent or Consumed alike - and play_animation_
+# finished, which moves it to its pile, follows play_settle_sec after the
+# play, whatever the fade. `_target_screen_pos` is no longer travelled to.
+func play_card(card_data: CardData, _target_screen_pos: Vector2) -> void:
 	var slot: Control = null
 	for candidate in _slots:
 		if _slot_cards.get(candidate) == card_data:
@@ -642,14 +686,17 @@ func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
 	get_parent().add_child(slot)
 	slot.global_position = slot_global_pos
 
-	var tween := create_tween()
-	tween.tween_property(slot, "global_position", target_screen_pos - slot.size / 2.0, play_to_target_duration_sec)
-	tween.tween_property(slot, "global_position", discard_point - slot.size / 2.0, play_to_discard_duration_sec)
-	tween.parallel().tween_property(card_view, "modulate:a", 0.0, play_to_discard_duration_sec)
-	tween.tween_callback(func() -> void:
-		slot.queue_free()
-		play_animation_finished.emit(card_data)
-	)
+	var end_scale: Vector2 = card_view.scale * (play_fade_end_scale / card_view.armed_scale)
+	var fade := create_tween()
+	fade.set_parallel(true)
+	fade.tween_property(slot, "modulate:a", 0.0, play_fade_duration)
+	fade.tween_property(card_view, "scale", end_scale, play_fade_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
+	fade.chain().tween_callback(slot.queue_free)
+	# On this node, like the old fly-out: a fight torn down before it ends
+	# never hears of the card, as before.
+	var settle := create_tween()
+	settle.tween_interval(play_settle_sec)
+	settle.tween_callback(func() -> void: play_animation_finished.emit(card_data))
 
 # Lays every current card out on an arc centered on this container's own
 # midpoint: each card's normalized position t (-1 at the leftmost card, 0

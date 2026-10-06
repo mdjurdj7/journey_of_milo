@@ -471,3 +471,14 @@ folder (run_log_probe). (2026-10-04.)
   files it reads. The card export needs a real CardView for its face text
   and rules font size, so its generator builds one. (2026-10-05, enemy
   export.)
+- **A played card's time in hand depends on its impact time.** The played
+  card leaves `deck.hand` for its pile `HandContainer.play_settle_sec`
+  (0.45 s) after the play - the old fly-out's length, kept when the play
+  became a 0.16 s fade so the rules didn't move - while its effects
+  resolve after its impact delay (`CardData.impact_time`, 0.4 by default,
+  clamped to the clip). A card at 0.4 resolves with itself still in hand;
+  the five at 0.55 resolve after it has gone. Only DrawEffect reads that
+  today (the hand cap of 10 counts the played card or not). Fix by moving
+  the card to its pile at one fixed point of the play - right after
+  `resolve_card()` is the natural one - not by timer. (2026-10-06, card
+  draw and fade.)

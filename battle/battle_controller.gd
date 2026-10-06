@@ -525,7 +525,9 @@ func end_turn() -> void:
 func _finish_turn(keep: Array[CardData]) -> void:
 	_input_locked = true
 	turn_phase_changed.emit(false)
-	_hand_container.discard_hand(keep)
+	# The hand fades out in place, card after card; the enemy turn waits
+	# for the last of it (below).
+	var discard_fade: float = _hand_container.discard_hand(keep)
 	_close_grace_window()
 	# A stance with a duration ages on the player's own turn ending, the
 	# same beat Grace closes on.
@@ -536,6 +538,8 @@ func _finish_turn(keep: Array[CardData]) -> void:
 	# the enemy's.
 	Status.remove_at_turn_end(player.statuses)
 	status_changed.emit()
+	if discard_fade > 0.0:
+		await get_tree().create_timer(discard_fade).timeout
 	await _run_enemy_turn()
 	_input_locked = false
 	if not _check_battle_end():
