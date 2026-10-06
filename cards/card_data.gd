@@ -29,10 +29,11 @@ enum CardRarity { UNSET = 0, COMMON = 1, UNCOMMON = 2, RARE = 3, ULTRA_RARE = 4 
 enum RemovalScope { NONE, SPENT, CONSUMED }
 # NONE: goes to the discard pile, reshuffles back in for the rest of the
 # fight like any other card. SPENT and CONSUMED both leave this fight's
-# draw/hand/discard rotation for good (Deck.exhaust_pile) - the old
-# project's further split (CONSUMED also removes the card from the run's
-# deck forever) needs RunState, which isn't ported this pass, so the two
-# behave identically here. See Deck.exhaust()'s own doc.
+# draw/hand/discard rotation for good once played (Deck.exhaust_pile -
+# see Deck.exhaust()'s own doc); a SPENT card is back next fight. A
+# CONSUMED one also leaves RunState.deck for the rest of the run, when
+# the fight it was played in ends, whatever the outcome (RegionField._
+# apply_consumed_removals()). Rules text ends on "Spent." or "Consumed."
 
 # Chain roles (Opener/Closer/chain payoffs) are deliberately not ported -
 # see DESIGN.md's own parked-items note. No current card needs them.

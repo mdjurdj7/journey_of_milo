@@ -58,6 +58,7 @@ const EXPECTED_RARITY: Dictionary = {
 	"Left Hand": CardData.CardRarity.COMMON,
 	"Second Thoughts": CardData.CardRarity.COMMON,
 	"Untouched": CardData.CardRarity.COMMON,
+	"Samphire": CardData.CardRarity.COMMON,
 }
 
 const EXPECTED_POOL: Array[String] = [

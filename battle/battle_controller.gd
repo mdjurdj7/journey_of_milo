@@ -620,7 +620,12 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		ctx.consume_choice = consume_view.card_data
 		_hand_container.release_views([consume_view] as Array[CardView])
 
+	var hp_before_effects: int = player.hp
 	_effect_resolver.resolve_card(card, ctx)
+	# A CONSUMED card leaves the run's deck when this fight ends: its play
+	# is a choice the run log keeps on its own line, whatever the card.
+	if card.removal_scope == CardData.RemovalScope.CONSUMED:
+		RunLogger.event("consumed_play", {"card": card.card_name, "hp_before": hp_before_effects, "hp_after": player.hp})
 	_count_attack_card(card, ctx)
 	RunLogger.card_finished()
 	# Taken, deepened or replaced by the card just played - and the card

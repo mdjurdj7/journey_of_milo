@@ -394,7 +394,8 @@ func _check_lasting_cards_leave_rotation() -> void:
 #   - one line per resolution step, in order - TOLL_DAMAGE and TOLL_HEAL
 #     spend and then act (2), SELF_DAMAGE_TOLL's line is its Toll (the
 #     HP is the badge's), a conditional upgrade shares its effect's line,
-#     and TWO_LINE_STATUS_CARDS' status takes 2 - and "Spent." last.
+#     and TWO_LINE_STATUS_CARDS' status takes 2 - and the scope last:
+#     "Spent." for a SPENT card, "Consumed." for a CONSUMED one.
 func _check_rules_text_pattern() -> void:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(view)
@@ -430,11 +431,14 @@ func _check_rules_text_pattern() -> void:
 				expected += _lines_for(effect, card)
 			if upfront_hp > 0:
 				_expect(lose_regex.search(card.description) == null, "%s's upfront HP is the badge's alone, not its text: %s" % [card.card_name, card.description])
-			var spent: bool = card.removal_scope != CardData.RemovalScope.NONE
-			if spent:
+			var spent: bool = card.removal_scope == CardData.RemovalScope.SPENT
+			var consumed: bool = card.removal_scope == CardData.RemovalScope.CONSUMED
+			if spent or consumed:
 				expected += 1
-				_expect_eq(lines[lines.size() - 1], "Spent.", "%s ends on Spent." % card.card_name)
+				var scope_line: String = "Spent." if spent else "Consumed."
+				_expect_eq(lines[lines.size() - 1], scope_line, "%s ends on %s" % [card.card_name, scope_line])
 			_expect_eq(Array(lines).count("Spent."), 1 if spent else 0, "%s says Spent. %s" % [card.card_name, "once" if spent else "nowhere"])
+			_expect_eq(Array(lines).count("Consumed."), 1 if consumed else 0, "%s says Consumed. %s" % [card.card_name, "once" if consumed else "nowhere"])
 			_expect_eq(lines.size(), expected, "%s has a line per step (%s)" % [card.card_name, card.description.replace("\n", " / ")])
 			view.set_card_data(card)
 			if hp_total > 0:
