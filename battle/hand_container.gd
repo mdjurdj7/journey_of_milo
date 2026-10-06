@@ -794,12 +794,15 @@ func _row_spacing(count: int, scaled_width: float) -> float:
 # of. Worked out from the layout, never read off the live slot, so a hover
 # lift, the armed travel or a glide in flight never moves it: the armed
 # card counts as still in the row (the readout holds through arm and
-# disarm, moving only when a card is played), and an empty hand reads as
-# one card. The left edge leans with the card's tilt about the slot's
+# disarm, moving only when a card is played), a drawn card counts from its
+# launch, not before (so the readout glides a card's worth at each launch,
+# over draw_duration, rather than to the whole draw at once - see
+# _laid_out_count()), and an empty hand reads as one card. The left edge
+# leans with the card's tilt about the slot's
 # bottom-centre pivot, so it's taken at the asked row, clamped to the
 # card's own height.
 func get_rest_left_x(at_global_y: float) -> float:
-	var count: int = maxi(_slots.size(), 1)
+	var count: int = maxi(_laid_out_count(), 1)
 	var scale_factor: float = _compute_scale_factor(count)
 	var scaled_card_size: Vector2 = card_size * scale_factor
 	var total_width: float = scaled_card_size.x + _row_spacing(count, scaled_card_size.x) * float(count - 1)
@@ -826,13 +829,14 @@ func get_rest_left_x(at_global_y: float) -> float:
 # Global y of the top of the leftmost resting card's cost numeral - what
 # BattleOverlay levels the energy readout's numeral with. The same layout
 # get_rest_left_x() reads, never the live slot: the armed card still
-# counts, an empty hand reads as one card, and hover never moves it. The
+# counts, a drawn card only from its launch, an empty hand reads as one
+# card, and hover never moves it. The
 # top is the cost font's tallest figure (BattleResources.figure_ink_top()),
 # so it holds whatever the cost, taken at the numeral's horizontal middle
 # and carried through the card's scale, its rest offset, the slot's lift
 # (a lone card's arc; none at the row's left end) and its tilt.
 func get_rest_cost_top_y() -> float:
-	var count: int = maxi(_slots.size(), 1)
+	var count: int = maxi(_laid_out_count(), 1)
 	var scale_factor: float = _compute_scale_factor(count)
 	var scaled_card_size: Vector2 = card_size * scale_factor
 	var theta: float = 0.0
@@ -851,6 +855,11 @@ func get_rest_cost_top_y() -> float:
 	var slot_point: Vector2 = Vector2(0.0, card_size.y - hand_rest_visible_height) + card_pivot + (point - card_pivot) * scale_factor
 	var delta: Vector2 = slot_point - pivot
 	return global_position.y - lift + pivot.y + sin(theta) * delta.x + cos(theta) * delta.y
+
+# The cards the row's layout holds: every slot but a drawn one still
+# waiting to launch (the armed card included - see get_rest_left_x()).
+func _laid_out_count() -> int:
+	return _slots.size() - _waiting_slots.size()
 
 # A CardView to read the cost numeral's layout from: the leftmost slot's,
 # or - with an empty hand - one kept aside, never in the tree.
