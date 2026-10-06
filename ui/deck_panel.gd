@@ -20,7 +20,7 @@ class_name DeckPanel
 #   the battle DECK line takes over. The list is held by reference;
 #   RegionField re-lays it out on RunState.deck_changed.
 # - bind_to_deck(deck, pile): tracks one pile (DRAW or DISCARD) of a live
-#   battle Deck, updating on its drawn/discarded/shuffled signals - the
+#   battle Deck, updating on its drawn/discarded/shuffled/added signals - the
 #   two instances BattleOverlay creates (DECK bottom-left under
 #   BattleResources, DISCARD bottom-right under End Turn) while the field
 #   instance is hidden. Both are the overlay's children, freed with it.
@@ -137,6 +137,7 @@ func bind_to_deck(deck: Deck, pile: Pile) -> void:
 	deck.drawn.connect(_on_deck_changed)
 	deck.discarded.connect(_on_deck_changed)
 	deck.shuffled.connect(_on_deck_changed)
+	deck.added.connect(_on_deck_changed)
 	_relayout()
 
 func _unbind() -> void:
@@ -144,6 +145,7 @@ func _unbind() -> void:
 		_deck.drawn.disconnect(_on_deck_changed)
 		_deck.discarded.disconnect(_on_deck_changed)
 		_deck.shuffled.disconnect(_on_deck_changed)
+		_deck.added.disconnect(_on_deck_changed)
 	_deck = null
 
 func _on_deck_changed(_card: CardData = null) -> void:

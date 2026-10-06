@@ -67,6 +67,20 @@ enum RewardMode { SCREEN, WORLD }
 	"res://run/keepsakes/frayed_cord.tres",
 	"res://run/keepsakes/worn_page.tres",
 ])
+# Debug builds only: the folders the F1 row's card picker lists - every
+# CardData .tres in each, sorted by card name. Listed through
+# ResourceLoader.list_directory(), which reports an exported build's
+# .tres.remap entries under their original names.
+@export var debug_card_dirs: PackedStringArray = PackedStringArray([
+	"res://cards/data/",
+	"res://cards/neutral/",
+]):
+	set(value):
+		debug_card_dirs = value
+		if _debug_card_picker != null:
+			_debug_card_picker.clear()
+			if _debug_row.visible:
+				_fill_debug_card_picker()
 @export var debug_row_position: Vector2 = Vector2(520.0, 40.0):
 	set(value):
 		debug_row_position = value
@@ -369,6 +383,9 @@ var _floor_cleared_emitted: bool = false
 var _debug_row: HBoxContainer = null
 var _debug_keepsake_button: Button = null
 var _debug_keepsake_index: int = 0
+# The row's card picker, filled from debug_card_dirs the first time the
+# row shows.
+var _debug_card_picker: OptionButton = null
 # One PackPatrol per FloorData.patrols entry - see _spawn_floor_patrols().
 var _patrols: Array[PackPatrol] = []
 
@@ -575,6 +592,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	var key := event as InputEventKey
 	if _debug_row != null and key != null and key.pressed and not key.echo and key.keycode == KEY_F1:
 		_debug_row.visible = not _debug_row.visible
+		if _debug_row.visible and _debug_card_picker.item_count == 0:
+			_fill_debug_card_picker()
 		get_viewport().set_input_as_handled()
 		return
 	if not (event is InputEventMouseButton) or not event.pressed:
@@ -1811,9 +1830,9 @@ func _on_keepsake_offer_closed(_taken: bool) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 
 # Debug builds only: a row of debug buttons on the field HUD in the
-# battle row's style (BattleTheme's DebugButton), hidden until F1. One
-# button today - Keepsake. It goes with the DECK line when a fight hides
-# that, so it never sits over a battle.
+# battle row's style (BattleTheme's DebugButton), hidden until F1 -
+# Keepsake, and a card picker with its Add card. It goes with the DECK
+# line when a fight hides that, so it never sits over a battle.
 func _setup_debug_row() -> void:
 	var hud := get_node_or_null(^"FieldHUD") as CanvasLayer
 	if hud == null:
@@ -1828,6 +1847,16 @@ func _setup_debug_row() -> void:
 	_debug_keepsake_button.theme_type_variation = &"DebugButton"
 	_debug_keepsake_button.pressed.connect(_on_debug_keepsake_pressed)
 	_debug_row.add_child(_debug_keepsake_button)
+	_debug_card_picker = OptionButton.new()
+	_debug_card_picker.name = "CardPicker"
+	_debug_card_picker.theme_type_variation = &"DebugButton"
+	_debug_row.add_child(_debug_card_picker)
+	var add_card_button := Button.new()
+	add_card_button.name = "AddCardButton"
+	add_card_button.theme_type_variation = &"DebugButton"
+	add_card_button.text = "Add card"
+	add_card_button.pressed.connect(_on_debug_add_card_pressed)
+	_debug_row.add_child(add_card_button)
 	hud.add_child(_debug_row)
 	deck_panel.visibility_changed.connect(func() -> void:
 		if not deck_panel.visible:
@@ -1853,6 +1882,33 @@ func _next_debug_keepsake() -> TrinketData:
 		if trinket != null and trinket != RunState.keepsake:
 			return trinket
 	return null
+
+# Every CardData in debug_card_dirs, by card name, each item carrying its
+# card as metadata.
+func _fill_debug_card_picker() -> void:
+	var cards: Array[CardData] = []
+	for dir in debug_card_dirs:
+		for file in ResourceLoader.list_directory(dir):
+			if not file.ends_with(".tres"):
+				continue
+			var card := load(dir.path_join(file)) as CardData
+			if card != null:
+				cards.append(card)
+	cards.sort_custom(func(a: CardData, b: CardData) -> bool: return a.card_name.naturalnocasecmp_to(b.card_name) < 0)
+	for card in cards:
+		_debug_card_picker.add_item(card.card_name)
+		_debug_card_picker.set_item_metadata(_debug_card_picker.item_count - 1, card)
+
+# The picked card into the run's deck, through the one grant path, and
+# into the run log so a run that used it can be left out of tuning.
+func _on_debug_add_card_pressed() -> void:
+	if _battle_open or not can_process() or _debug_card_picker.selected < 0:
+		return
+	var card := _debug_card_picker.get_item_metadata(_debug_card_picker.selected) as CardData
+	if card == null:
+		return
+	RunState.add_card(card)
+	RunLogger.event("debug_card_add", {"card": card.card_name, "context": "field"})
 
 # The button says what it grants next.
 func _refresh_debug_keepsake_button() -> void:

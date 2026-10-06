@@ -344,10 +344,13 @@ func settle_keepsake_win() -> void:
 # two cards: everything that tracks cards by identity (Deck's piles,
 # HandContainer's slots, remove_card() below) counts on every entry
 # being its own object. Appending the shared resource twice made the
-# hand lose a slot each time the second copy was drawn.
-func add_card(card: CardData) -> void:
-	deck.append(card.duplicate() as CardData)
+# hand lose a slot each time the second copy was drawn. Returns that
+# copy, for a caller that must put the same instance into a fight too.
+func add_card(card: CardData) -> CardData:
+	var copy := card.duplicate() as CardData
+	deck.append(copy)
 	deck_changed.emit()
+	return copy
 
 func remove_card(card: CardData) -> void:
 	deck.erase(card)

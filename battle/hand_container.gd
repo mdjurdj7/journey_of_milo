@@ -170,10 +170,12 @@ func set_deck(deck: Deck) -> void:
 	if _deck != null:
 		_deck.drawn.disconnect(_on_deck_changed)
 		_deck.discarded.disconnect(_on_deck_changed)
+		_deck.added.disconnect(_on_deck_changed)
 		_deck.set_aside_changed.disconnect(_sync_with_deck)
 	_deck = deck
 	_deck.drawn.connect(_on_deck_changed)
 	_deck.discarded.connect(_on_deck_changed)
+	_deck.added.connect(_on_deck_changed)
 	_deck.set_aside_changed.connect(_sync_with_deck)
 	_sync_with_deck()
 
@@ -224,7 +226,7 @@ func release_views(views: Array[CardView]) -> void:
 # hand holds (two for a card it holds twice, matched one for one), a
 # collapse for every slot whose card it no longer holds, a fresh view
 # for every card without one - then a single reflow. Called on every
-# drawn/discarded signal and on set_deck(); play_card() takes its own
+# drawn/discarded/added signal and on set_deck(); play_card() takes its own
 # slot out before the Deck hears of the play, so the play's later
 # discard/exhaust changes nothing here. A view is never made or dropped
 # anywhere else.

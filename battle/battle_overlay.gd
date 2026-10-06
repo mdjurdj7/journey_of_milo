@@ -73,6 +73,22 @@ signal battle_finished(outcome: Outcome)
 		keepsake_row_gap_px = value
 		_layout_corners()
 
+@export_group("Debug")
+# The folders the F1 row's card picker lists - every CardData .tres in
+# each, sorted by card name. Listed through ResourceLoader.list_directory(),
+# which reports an exported build's .tres.remap entries under their
+# original names.
+@export var debug_card_dirs: PackedStringArray = PackedStringArray([
+	"res://cards/data/",
+	"res://cards/neutral/",
+]):
+	set(value):
+		debug_card_dirs = value
+		if _debug_card_picker != null:
+			_debug_card_picker.clear()
+			if debug_row.visible:
+				_fill_debug_card_picker()
+
 @onready var end_turn_button: EndTurnButton = $EndTurnButton
 @onready var hand_container: HandContainer = $HandContainer
 @onready var debug_row: Control = $DebugRow
@@ -86,6 +102,9 @@ var battle_controller: BattleController
 # The fight was ended from the debug row, not by its own rules - see
 # _finish_debug().
 var finished_by_debug: bool = false
+# The debug row's card picker, filled from debug_card_dirs the first time
+# the row shows.
+var _debug_card_picker: OptionButton = null
 # The fight's hit reactions - kept to read a play effect's pacing for the
 # damage numbers (BattleFeedback.reaction_delay()).
 var _battle_feedback: BattleFeedback = null
@@ -142,6 +161,16 @@ func _ready() -> void:
 	escape_button.pressed.connect(func() -> void: _finish_debug(Outcome.ESCAPE))
 	draw_button.pressed.connect(func() -> void: hand_container.draw_cards(5))
 	discard_button.pressed.connect(func() -> void: hand_container.discard_hand())
+	_debug_card_picker = OptionButton.new()
+	_debug_card_picker.name = "CardPicker"
+	_debug_card_picker.theme_type_variation = &"DebugButton"
+	debug_row.add_child(_debug_card_picker)
+	var add_card_button := Button.new()
+	add_card_button.name = "AddCardButton"
+	add_card_button.theme_type_variation = &"DebugButton"
+	add_card_button.text = "Add card"
+	add_card_button.pressed.connect(_on_debug_add_card_pressed)
+	debug_row.add_child(add_card_button)
 
 	resized.connect(_layout_corners)
 
@@ -662,6 +691,37 @@ func _finish_debug(outcome: Outcome) -> void:
 	finished_by_debug = true
 	_finish_battle(outcome)
 
+# Every CardData in debug_card_dirs, by card name, each item carrying its
+# card as metadata.
+func _fill_debug_card_picker() -> void:
+	var cards: Array[CardData] = []
+	for dir in debug_card_dirs:
+		for file in ResourceLoader.list_directory(dir):
+			if not file.ends_with(".tres"):
+				continue
+			var card := load(dir.path_join(file)) as CardData
+			if card != null:
+				cards.append(card)
+	cards.sort_custom(func(a: CardData, b: CardData) -> bool: return a.card_name.naturalnocasecmp_to(b.card_name) < 0)
+	for card in cards:
+		_debug_card_picker.add_item(card.card_name)
+		_debug_card_picker.set_item_metadata(_debug_card_picker.item_count - 1, card)
+
+# The picked card into the run's deck (RunState.add_card(), so it outlasts
+# the fight) and that same copy into this fight - the hand, or the top of
+# the draw pile when the hand is full (Deck.add(), never a draw). The
+# same instance in both, so a CONSUMED play still takes it out of the run
+# at the fight's end. Logged, so a run that used it can be left out of
+# tuning.
+func _on_debug_add_card_pressed() -> void:
+	if battle_controller == null or battle_controller.deck == null or _debug_card_picker.selected < 0:
+		return
+	var card := _debug_card_picker.get_item_metadata(_debug_card_picker.selected) as CardData
+	if card == null:
+		return
+	battle_controller.deck.add(RunState.add_card(card))
+	RunLogger.event("debug_card_add", {"card": card.card_name, "context": "battle"})
+
 # The one path every battle-ending trigger (WIN/LOSE/ESCAPE debug buttons,
 # battle_controller.battle_won/battle_lost) now goes through, rather than
 # emitting battle_finished directly - the field readouts have to leave
@@ -744,6 +804,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_F1:
 			debug_row.visible = not debug_row.visible
+			if debug_row.visible and _debug_card_picker.item_count == 0:
+				_fill_debug_card_picker()
 			get_viewport().set_input_as_handled()
 		elif event.keycode == KEY_F2:
 			_flip_dark_world()

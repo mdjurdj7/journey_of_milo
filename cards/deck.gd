@@ -6,6 +6,9 @@ signal discarded(card: CardData)
 signal shuffled()
 # Cards left the hand for set_aside_pile, or came back from it.
 signal set_aside_changed()
+# A card put into the fight from outside it (add()) - never a draw, so
+# nothing that answers a draw hears of it.
+signal added(card: CardData)
 
 @export var hand_size: int = 10
 
@@ -41,6 +44,16 @@ func draw(amount: int) -> void:
 		var card: CardData = draw_pile.pop_back()
 		hand.append(card)
 		drawn.emit(card)
+
+# A card from outside the fight (the F1 row's Add card) straight into
+# the hand, or onto the top of draw_pile - drawn next - when the hand is
+# full. Emits added, not drawn: it isn't a draw.
+func add(card: CardData) -> void:
+	if hand.size() < hand_size:
+		hand.append(card)
+	else:
+		draw_pile.append(card)
+	added.emit(card)
 
 func discard(card: CardData) -> void:
 	if not hand.has(card):
