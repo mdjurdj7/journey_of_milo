@@ -7,6 +7,9 @@ class_name DeckView
 # is currently open" reference (see its _on_deck_view_closed()), so that
 # stays accurate no matter how this instance actually closed.
 signal closed()
+# Pick mode only (pick_mode): the card clicked, emitted just before the
+# view closes. A view that closes without it was cancelled.
+signal card_picked(card: CardData)
 
 # Full-screen dark scrim behind a scrollable grid of CardView instances,
 # sorted by name - browsing only (hover_enabled is turned off on every
@@ -74,6 +77,13 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 # card, not a more useful browse. GridCenterContainer keeps the grid
 # centered whenever fewer than this many columns end up fitting anyway.
 @export var max_columns: int = 7
+
+# Off (every view DeckPanel opens for browsing): a click lifts a card to
+# read, as above. On (DeckPanel.open_picker() - the collector's HAND ONE
+# OVER): a click picks that card instead - card_picked, then close() -
+# and Escape or a click outside the panel closes with no pick, which is
+# the caller's cancel. Read at the click.
+@export var pick_mode: bool = false
 
 @export_group("Panel/Card Contrast")
 # Two ways to make cards read as objects sitting ON this view rather than
@@ -324,7 +334,11 @@ func _unhandled_input(event: InputEvent) -> void:
 # handle. _inspect_busy holds off both for the length of a transition,
 # so a click landing mid-flight can't start a second one on a card that
 # is currently between parents.
-func _on_card_clicked(_card_data: CardData, card_view: CardView, slot: Control) -> void:
+func _on_card_clicked(card_data: CardData, card_view: CardView, slot: Control) -> void:
+	if pick_mode:
+		card_picked.emit(card_data)
+		close()
+		return
 	if _inspect_busy:
 		return
 	if _inspected == card_view:

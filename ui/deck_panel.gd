@@ -256,11 +256,22 @@ func _on_deck_view_closed() -> void:
 # DeckView has no CanvasLayer of its own, so this is what actually puts it
 # above FieldHUD/BattleLayer regardless of which is active right now. The
 # caller owns the returned view's `closed` handling.
-static func open_view(tree: SceneTree, cards: Array[CardData], header_text: String) -> DeckView:
+# `layer_index` lifts it over something higher than the field's own HUD
+# and battle layers (a screen at layer 100); the default is DECK_VIEW_LAYER.
+static func open_view(tree: SceneTree, cards: Array[CardData], header_text: String, layer_index: int = DECK_VIEW_LAYER) -> DeckView:
 	var deck_view := (load(DECK_VIEW_SCENE_PATH) as PackedScene).instantiate() as DeckView
 	var layer := CanvasLayer.new()
-	layer.layer = DECK_VIEW_LAYER
+	layer.layer = layer_index
 	tree.root.add_child(layer)
 	layer.add_child(deck_view)
 	deck_view.open(cards, header_text)
+	return deck_view
+
+# A DeckView that picks rather than browses (DeckView.pick_mode): one card
+# clicked emits card_picked and closes; closing without one is a cancel.
+# At `layer_index`, so it can open over a screen. The caller owns both
+# signals.
+static func open_picker(tree: SceneTree, cards: Array[CardData], header_text: String, layer_index: int) -> DeckView:
+	var deck_view: DeckView = open_view(tree, cards, header_text, layer_index)
+	deck_view.pick_mode = true
 	return deck_view
