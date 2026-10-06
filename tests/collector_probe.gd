@@ -7,6 +7,9 @@ extends SceneTree
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 #
+#   placed   - floor 4's FloorData puts a Collector at (11, -22.5) in the
+#              east bay, facing west (yaw 90), grounded, with its line and
+#              collector_pool, wired to open its screen
 #   data     - collector_pool: the 23 Wanderer pool cards and the three
 #              neutral pool cards, 26, no starter, no Endure, no Samphire;
 #              Samphire in no pool at all; Samphire's own data
@@ -31,7 +34,7 @@ extends SceneTree
 # CollectorScreen, DeckView's panel): a SceneTree script compiles before
 # the autoloads register.
 
-const CASES := 6
+const CASES := 7
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const COLLECTOR_SCENE_PATH := "res://field/collector.tscn"
@@ -63,6 +66,7 @@ func _initialize() -> void:
 	)
 	_run_state = root.get_node("RunState")
 	_check_data()
+	await _check_placed()
 	await _check_screen()
 	await _check_buy()
 	await _check_removal()
@@ -108,6 +112,34 @@ func _check_data() -> void:
 	_expect_eq(samphire.removal_scope, CardData.RemovalScope.CONSUMED, "...Consumed")
 	_expect(samphire.effects.size() == 1 and samphire.effects[0].effect_type == CardEffect.EffectType.HEAL and samphire.effects[0].value == 8, "...one Heal for 8")
 	_expect_eq(samphire.description, "Heal 8.\nConsumed.", "...reading Heal 8. / Consumed.")
+	_completed += 1
+
+# --- Floor 4's own ---
+
+func _check_placed() -> void:
+	_run_state.call("new_run", load(CHARACTER_PATH))
+	_run_state.set("current_floor_index", FLOOR_4)
+	_run_state.set("run_opening_pending", false)
+	_run_state.set("title_pending", false)
+	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(_field)
+	for i in 20:
+		await physics_frame
+	var placed: Array[Node] = get_nodes_in_group("collectors")
+	_expect_eq(placed.size(), 1, "Floor 4 places one collector")
+	if placed.size() == 1:
+		var collector := placed[0] as Node3D
+		var spawn: Vector3 = _field.call("get_spawn_position")
+		var offset := Vector2(collector.global_position.x - spawn.x, collector.global_position.z - spawn.z)
+		_expect(offset.distance_to(Vector2(SPOT.x, SPOT.z)) < 0.01, "...at (11, -22.5) from spawn (got %s)" % offset)
+		_expect(is_equal_approx(rad_to_deg(collector.rotation.y), 90.0), "...facing west, yaw 90")
+		var ground: Node = _field.get_node("Ground")
+		var local: Vector3 = (ground as Node3D).to_local(collector.global_position)
+		_expect(absf(collector.global_position.y - float(ground.call("get_height_at", Vector2(local.x, local.z)))) < 0.01, "...grounded on the relief")
+		_expect_eq(str(collector.get("world_line")), "It is sorting what it has.", "...with its line")
+		_expect_eq((collector.get("stock_pool") as Resource).resource_path, COLLECTOR_POOL_PATH, "...stocked from collector_pool")
+		_expect(collector.is_connected("open_requested", Callable(_field, "open_collector_screen")), "...and wired to open its screen")
+	await _teardown()
 	_completed += 1
 
 # --- The screen ---

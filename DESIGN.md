@@ -95,13 +95,17 @@ folder (run_log_probe). (2026-10-04.)
   under Neutral. The probes that play it directly still do. Put it
   back by re-adding the entries (and Endure to `card_rarity_probe.gd`'s
   EXPECTED_POOL, count back to 20).
-- **Floor 4's collector and dig site are reserved spots only.** Their
-  positions live in `assets/field/masks/source/floor4/floor4_layout.json`
-  (`markers_world_xz`: the collector in its bay on the dune's east flank
-  at (14.5, -30), the dig site on the east arc at (21, -42)), placed by
-  the walkable sample. Nothing reads them: there is no collector and no
-  dig site yet, so FloorData carries no field for them. Add one when the
-  first of them is built, from these positions. (2026-10-04, floor 4.)
+- **Floor 4's dig site is a reserved spot only.** Its position lives in
+  `assets/field/masks/source/floor4/floor4_layout.json`
+  (`markers_world_xz.dig_site`, (15.733, -31.5), on the east arc),
+  placed by the walkable sample. Nothing reads it: there is no dig site
+  yet, so FloorData carries no field for it. Add one when it is built,
+  from this position. The collector's marker, (11.0, -22.5) in its bay
+  on the dune's east flank, is now a FloorProp (a Collector, facing west
+  into the bay - the faint side of the loop). This note had both spots
+  wrong before - (14.5, -30) and (21, -42), the last off the land; the
+  JSON's are the ones the walkable sample paints. (2026-10-04, floor 4;
+  corrected 2026-10-05, the collector.)
 - **Floor 5's finding is a reserved spot only.** Its position lives in
   `assets/field/masks/source/floor5/floor5_layout.json`
   (`markers_world_xz.finding`, (-7.167, -15.9), in the side pocket off
