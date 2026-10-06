@@ -225,6 +225,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	# The fixed corner readouts exist before setup() too, for the same
 	# reason - its energy emission is their first value.
 	_create_corner_readouts()
+	# Drawn cards fly in from the DECK line.
+	hand_container.set_draw_origin(_deck_readout)
 
 	battle_controller = BattleController.new()
 	add_child(battle_controller)

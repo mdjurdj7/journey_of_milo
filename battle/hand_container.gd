@@ -21,6 +21,9 @@ signal armed_changed(armed: bool)
 # TRANS_CUBIC. Not emitted for hover; arming and disarming leave the
 # rest count alone, so the x read back is unchanged.
 signal rest_left_changed(duration: float)
+# A drawn card has left the deck - its arrival flight has just begun
+# (see _launch_arrival()). Once per card, staggered as the flights are.
+signal draw_started(card_data: CardData)
 
 # Must match CardView.card_size (200 x 280 at 1x).
 @export var card_size: Vector2 = Vector2(200.0, 280.0)
@@ -107,6 +110,19 @@ signal rest_left_changed(duration: float)
 		fan_overlap = value
 		_reflow_hand(false)
 
+@export_group("Draw")
+# A drawn card flies from the DECK readout (set_draw_origin()) into its
+# slot over this long, one ease-out, growing from draw_start_scale of its
+# hand size and fading in; the rest of the hand makes room over the same
+# time. Read at each launch, so a Remote-tab edit applies from the next
+# draw.
+@export var draw_duration: float = 0.22
+# Between one drawn card's launch and the next's - a turn's draw, or a
+# draw effect's, comes out one card at a time.
+@export var draw_stagger: float = 0.07
+# A drawn card's size at the DECK readout, as a fraction of its hand size.
+@export_range(0.05, 1.0) var draw_start_scale: float = 0.4
+
 @export_group("Play Tween")
 @export var play_to_target_duration_sec: float = 0.25
 @export var play_to_discard_duration_sec: float = 0.2
@@ -139,6 +155,22 @@ var _last_energy: int = -1
 var _enemy_target_available: bool = true
 # The cost numeral's layout with an empty hand - see _cost_reference_card().
 var _reference_card: CardView = null
+# Where a drawn card's flight starts: the battle's DECK readout, its
+# centre read at each launch - see set_draw_origin().
+var _draw_origin: Control = null
+# Cards the Deck has just drawn, not yet given a view - _sync_with_deck()
+# gives these an arrival flight; any other new card (a set-aside card
+# back, the F1 row's Add card) appears in place.
+var _arriving_cards: Array[CardData] = []
+# Drawn slots waiting their turn to launch: in _slots (the hand holds
+# them) but left out of the layout and unseen until _launch_arrival().
+var _waiting_slots: Dictionary = {} # Control (slot) -> true
+# Each flying slot's scale/fade tween - its position and rotation glide
+# is a reflow tween like any other, so a reflow mid-flight retargets it.
+var _arrival_tweens: Dictionary = {} # Control (slot) -> Tween
+# When the next drawn card may launch (Time.get_ticks_msec()) - the
+# stagger runs on across draws that come close together.
+var _next_launch_msec: int = 0
 
 # No longer a Container (HBoxContainer defaulted this to IGNORE on its
 # own) - the arc leaves real gaps between/around fanned cards where the
@@ -168,12 +200,13 @@ var _armed_slot: Control = null
 
 func set_deck(deck: Deck) -> void:
 	if _deck != null:
-		_deck.drawn.disconnect(_on_deck_changed)
+		_deck.drawn.disconnect(_on_card_drawn)
 		_deck.discarded.disconnect(_on_deck_changed)
 		_deck.added.disconnect(_on_deck_changed)
 		_deck.set_aside_changed.disconnect(_sync_with_deck)
 	_deck = deck
-	_deck.drawn.connect(_on_deck_changed)
+	_arriving_cards.clear()
+	_deck.drawn.connect(_on_card_drawn)
 	_deck.discarded.connect(_on_deck_changed)
 	_deck.added.connect(_on_deck_changed)
 	_deck.set_aside_changed.connect(_sync_with_deck)
@@ -181,6 +214,14 @@ func set_deck(deck: Deck) -> void:
 
 func _on_deck_changed(_card: CardData) -> void:
 	_sync_with_deck()
+
+func _on_card_drawn(card: CardData) -> void:
+	_arriving_cards.append(card)
+	_sync_with_deck()
+
+# The battle's DECK readout - where drawn cards fly in from.
+func set_draw_origin(origin: Control) -> void:
+	_draw_origin = origin
 
 # A hand choice opened with `chooser` armed (BattleController's choose
 # mode): the arming suppressed every other card's hover, but here they
@@ -225,7 +266,9 @@ func release_views(views: Array[CardView]) -> void:
 # and the slots are brought to match it - a slot for every card the
 # hand holds (two for a card it holds twice, matched one for one), a
 # collapse for every slot whose card it no longer holds, a fresh view
-# for every card without one - then a single reflow. Called on every
+# for every card without one - then a single reflow. A drawn card's
+# fresh view waits its turn and flies in from the DECK readout (_queue_
+# arrival()); any other appears in place. Called on every
 # drawn/discarded/added signal and on set_deck(); play_card() takes its own
 # slot out before the Deck hears of the play, so the play's later
 # discard/exhaust changes nothing here. A view is never made or dropped
@@ -247,7 +290,12 @@ func _sync_with_deck() -> void:
 			_collapse_and_remove(slot)
 	_slots = kept
 	for card in wanted:
+		var index: int = _arriving_cards.find(card)
+		if index >= 0:
+			_arriving_cards.remove_at(index)
 		_add_card_view(card)
+		if index >= 0:
+			_queue_arrival(_slots.back())
 	_reflow_hand()
 
 func draw_cards(amount: int) -> void:
@@ -292,6 +340,83 @@ func _add_card_view(card: CardData) -> void:
 
 	_slots.append(slot)
 	_slot_cards[slot] = card
+
+# A drawn slot holds, unseen and out of the layout, until its launch -
+# draw_stagger after the one before it, or the next frame (the readouts
+# are laid out by then). Its card takes no input until it lands.
+func _queue_arrival(slot: Control) -> void:
+	_waiting_slots[slot] = true
+	slot.modulate.a = 0.0
+	(slot.get_child(0) as CardView).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var now: int = Time.get_ticks_msec()
+	var launch_at: int = maxi(now, _next_launch_msec)
+	_next_launch_msec = launch_at + int(draw_stagger * 1000.0)
+	get_tree().create_timer(float(launch_at - now) / 1000.0).timeout.connect(_launch_arrival.bind(slot))
+
+# The slot joins the layout (the hand making room over draw_duration),
+# then starts from the DECK readout's centre - straight, small and clear
+# - and glides to its arc place, growing and fading in on the way.
+func _launch_arrival(slot: Control) -> void:
+	if not is_instance_valid(slot) or not _waiting_slots.has(slot):
+		return
+	_waiting_slots.erase(slot)
+	draw_started.emit(_slot_cards.get(slot))
+	# New to the layout, so this snaps it to its arc target; the others glide.
+	_reflow_hand(true, draw_duration)
+	if _draw_origin == null or not is_instance_valid(_draw_origin):
+		_land(slot)
+		return
+	var target_position: Vector2 = slot.position
+	var target_rotation: float = slot.rotation_degrees
+	# The card's centre in slot space, then the slot placed so that centre,
+	# scaled by draw_start_scale about the slot's pivot, sits on the readout.
+	var card_view: CardView = slot.get_child(0) as CardView
+	var card_centre: Vector2 = card_view.position + card_view.pivot_offset + (card_view.size / 2.0 - card_view.pivot_offset) * card_view.scale
+	var start_global: Vector2 = _draw_origin.get_global_rect().get_center() - slot.pivot_offset - (card_centre - slot.pivot_offset) * draw_start_scale
+	slot.rotation_degrees = 0.0
+	slot.scale = Vector2.ONE * draw_start_scale
+	slot.global_position = start_global
+
+	var glide := create_tween()
+	glide.set_ease(Tween.EASE_OUT)
+	glide.set_trans(Tween.TRANS_CUBIC)
+	glide.set_parallel(true)
+	glide.tween_property(slot, "position", target_position, draw_duration)
+	if not _lifted_slots.has(slot):
+		glide.tween_property(slot, "rotation_degrees", target_rotation, draw_duration)
+	_reflow_tweens[slot] = glide
+
+	var arrival := create_tween()
+	arrival.set_ease(Tween.EASE_OUT)
+	arrival.set_trans(Tween.TRANS_CUBIC)
+	arrival.set_parallel(true)
+	arrival.tween_property(slot, "scale", Vector2.ONE, draw_duration)
+	arrival.tween_property(slot, "modulate:a", 1.0, draw_duration)
+	arrival.chain().tween_callback(_land.bind(slot))
+	_arrival_tweens[slot] = arrival
+
+# Landed (or cut short): full size, opaque, and its card takes input.
+func _land(slot: Control) -> void:
+	_arrival_tweens.erase(slot)
+	slot.scale = Vector2.ONE
+	slot.modulate.a = 1.0
+	var card_view: CardView = slot.get_child(0) as CardView
+	if card_view != null:
+		card_view.mouse_filter = Control.MOUSE_FILTER_STOP
+
+# A card still waiting or in flight that is armed or played (only the
+# rules can, never the mouse) lands on the spot first, so the pose it
+# takes starts from a whole card at its place in the row.
+func _land_now(slot: Control) -> void:
+	if not _waiting_slots.has(slot) and not _arrival_tweens.has(slot):
+		return
+	var tween: Tween = _arrival_tweens.get(slot)
+	if tween != null and tween.is_valid():
+		tween.kill()
+	var was_waiting: bool = _waiting_slots.erase(slot)
+	_land(slot)
+	if was_waiting:
+		_reflow_hand(false)
 
 func _on_card_view_clicked(_card_data: CardData, card_view: CardView) -> void:
 	card_clicked.emit(card_view)
@@ -417,6 +542,7 @@ func _on_card_lowered(slot: Control, card_view: CardView) -> void:
 # it stays a child here, just parked outside the arc, so returning it is
 # a plain reflow.
 func _on_card_armed(slot: Control, card_view: CardView) -> void:
+	_land_now(slot)
 	_armed_slot = slot
 	armed_changed.emit(true)
 	_lifted_slots.erase(slot)
@@ -457,6 +583,11 @@ func _on_card_disarmed(slot: Control, card_view: CardView) -> void:
 
 func _forget_slot(slot: Control) -> void:
 	_kill_reflow_tween(slot)
+	var arrival: Tween = _arrival_tweens.get(slot)
+	if arrival != null and arrival.is_valid():
+		arrival.kill()
+	_arrival_tweens.erase(slot)
+	_waiting_slots.erase(slot)
 	_arc_positions.erase(slot)
 	_arc_rotations.erase(slot)
 	_arc_z_indices.erase(slot)
@@ -486,6 +617,7 @@ func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
 			break
 	if slot == null:
 		return
+	_land_now(slot)
 	_slots.erase(slot)
 	_slot_cards.erase(slot)
 	_forget_slot(slot)
@@ -545,9 +677,10 @@ func play_card(card_data: CardData, target_screen_pos: Vector2) -> void:
 func _reflow_hand(animate: bool = true, duration: float = -1.0) -> void:
 	# The armed slot is laid out as if it weren't there - the fan closes
 	# under it; its own position is _on_card_armed()'s.
+	# So is a drawn slot still waiting to launch - it joins at its launch.
 	var slots: Array[Control] = []
 	for slot in _slots:
-		if slot != _armed_slot:
+		if slot != _armed_slot and not _waiting_slots.has(slot):
 			slots.append(slot)
 	var count: int = slots.size()
 	if duration < 0.0:
