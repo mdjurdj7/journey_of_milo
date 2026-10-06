@@ -13,6 +13,24 @@ first transient, normalised to −6 dBFS peak, and mono for a positional
 sound (one played from a body in the world). (2026-10-03; the spec said
 WAV only, while most of the project's sounds were already MP3.)
 
+## Card draw sound
+
+`assets/audio/ui/card_draw.wav` is the old 2D project's per-card draw
+sound, `reference/old_project/deck-builder/assets/audio/ui/one card
+draw.mp3` (the same bytes as `assets/audio/ui_old/one card draw.mp3`,
+left as is). Processing: decoded from the 128 kbps MP3 (48 kHz stereo);
+the start kept - its soft slide comes about 180 ms before the main
+transient and is what makes it read as a draw, so it is not trimmed to
+the transient as §4 would have it; the tail cut at the first zero
+crossing after 400 ms (past ~325 ms only a −57..−63 dB residue, then the
+file's padding and an end click), no fade; normalised to −6 dBFS peak
+(−4.2 dB); written as 16-bit 48 kHz stereo WAV, 400 ms. It is 2D, on the
+SFX bus at `BattleOverlay.card_draw_volume_db` −22, 6 dB under card play.
+One take only, against §4's two or three: each play's pitch moves by up
+to ±`card_draw_pitch_jitter` (0.05, the old project's ±5%) instead of a
+round-robin. A second or third take would replace the jitter.
+(2026-10-06.)
+
 ## Combat effects
 
 Combat effects are ink strokes: matte, brush-like, in ink or deep maroon,

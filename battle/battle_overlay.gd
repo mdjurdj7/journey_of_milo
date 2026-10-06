@@ -3,6 +3,11 @@ class_name BattleOverlay
 
 const FLOATING_NUMBER_SCENE_PATH := "res://battle/floating_number.tscn"
 const CARD_PLAY_SFX_PATH := "res://assets/audio/ui/card_played.mp3"
+const CARD_DRAW_SFX_PATH := "res://assets/audio/ui/card_draw.wav"
+# Draw-sound voices, oldest stolen: a turn's draw launches a card every
+# 0.07 s and the take rings 0.4 s, so about six overlap. Each voice its
+# own player, so one card's pitch jitter never bends another's.
+const CARD_DRAW_VOICES := 6
 
 enum Outcome { WIN, LOSE, ESCAPE }
 
@@ -22,6 +27,14 @@ signal battle_finished(outcome: Outcome)
 # card play < contact holds, but its own export since the two files'
 # loudness differ.
 @export var card_override_volume_db: float = -16.0
+# The draw sound, once per card as it leaves the deck (HandContainer.
+# draw_started): a -6 dBFS take at -22, 6 dB under card play, so a
+# five-card draw is felt rather than loud. One take only (see DESIGN.md),
+# so each play's pitch moves by up to +-this fraction instead of a
+# round-robin. Both read at each play, so a Remote-tab edit applies from
+# the next card.
+@export var card_draw_volume_db: float = -22.0
+@export_range(0.0, 0.5) var card_draw_pitch_jitter: float = 0.05
 
 @export_group("Choice Prompt")
 # An open hand choice says what it wants in one tracked-caps ink line,
@@ -117,6 +130,8 @@ var _field_hp_bar: HPBar = null
 var _field_deck_panel: DeckPanel = null
 var _battle_transition_time: float = 0.0
 var _card_play_player: AudioStreamPlayer = null
+var _card_draw_players: Array[AudioStreamPlayer] = []
+var _card_draw_next: int = 0
 # The per-card override's player, made on first use - see _on_card_played().
 var _card_override_player: AudioStreamPlayer = null
 var _resources: BattleResources = null
@@ -295,6 +310,18 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	_card_play_player.stream = load(CARD_PLAY_SFX_PATH) as AudioStream
 	if _card_play_player.stream == null:
 		push_warning("BattleOverlay: card-play SFX failed to load (%s); card-play audio disabled." % CARD_PLAY_SFX_PATH)
+
+	var draw_stream := load(CARD_DRAW_SFX_PATH) as AudioStream
+	if draw_stream == null:
+		push_warning("BattleOverlay: card-draw SFX failed to load (%s); card-draw audio disabled." % CARD_DRAW_SFX_PATH)
+	else:
+		for i in CARD_DRAW_VOICES:
+			var player := AudioStreamPlayer.new()
+			player.bus = &"SFX"
+			player.stream = draw_stream
+			add_child(player)
+			_card_draw_players.append(player)
+	hand_container.draw_started.connect(_on_card_draw_started)
 
 	end_turn_button.pressed.connect(func() -> void: battle_controller.end_turn())
 	_update_end_turn()
@@ -653,6 +680,17 @@ func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
 	if _card_play_player != null and _card_play_player.stream != null:
 		_card_play_player.volume_db = card_play_volume_db
 		_card_play_player.play()
+
+# A drawn card leaves the deck: the draw sound, on the next voice, its
+# pitch jittered.
+func _on_card_draw_started(_card: CardData) -> void:
+	if _card_draw_players.is_empty():
+		return
+	var player: AudioStreamPlayer = _card_draw_players[_card_draw_next]
+	_card_draw_next = (_card_draw_next + 1) % _card_draw_players.size()
+	player.volume_db = card_draw_volume_db
+	player.pitch_scale = 1.0 + randf_range(-card_draw_pitch_jitter, card_draw_pitch_jitter)
+	player.play()
 
 # Placeholder-only: shows whatever amount actually landed, no distinction
 # between damage/self-damage/attack kinds yet - see this pass's own
