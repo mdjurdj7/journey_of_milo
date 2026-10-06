@@ -45,7 +45,7 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "blocked": 0, "absorbed": 0}
+	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "stunned": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "phase_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "blocked": 0, "absorbed": 0}
 
 	Status.tick_all(combatant.statuses, func(amount: int) -> void:
 		combatant.hp = max(combatant.hp - amount, 0)
@@ -63,6 +63,9 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 	# or from the countdown just now: this turn's action is the one
 	# cancelled.
 	result["pain_turn_triggered"] = check_pain_turn(combatant, data)
+	# ...and a drop below the phase line, the same way: its status is up
+	# before this turn's move reads it.
+	result["phase_triggered"] = check_phase(combatant, data)
 
 	var intent := current_intent(combatant, data)
 	var interjected: bool = combatant.interjected_intent != null
@@ -84,10 +87,21 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 		pass
 	elif is_interrupted(combatant, intent):
 		result["interrupted"] = true
+		# Broken, what the Attack cards fed it (Goaded) goes with it - the
+		# next one starts from its own number.
+		if intent.counts_attack_cards and data.attack_card_status != null:
+			var fed: Status = Status.find_in(combatant.statuses, data.attack_card_status)
+			if fed != null:
+				Status.remove_from(combatant.statuses, fed)
+		# ...and a stunning one costs it the next move (Stunned).
+		if intent.deny_next_on_interrupt and data.stun_status != null:
+			Status.apply_to(combatant.statuses, data.stun_status)
+			result["stunned"] = true
 	elif intent != null:
 		match intent.type:
 			EnemyIntent.IntentType.ATTACK:
-				# One pass per hit (EnemyIntent.hits, 1 for every enemy so far):
+				# One pass per hit (hit_count() - EnemyIntent.hits, and more off
+				# the rock):
 				# modifiers are re-read each hit, so an Unflinching-shaped
 				# status on the player - consumed by the first hit whether or
 				# not damage reached HP, see status.gd's consume_triggered()
@@ -102,7 +116,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# and DamagePipeline is the only thing that knows the split
 				# between what block ate and what reached HP.
 				var largest_hit: int = 0
-				for hit in maxi(intent.hits, 1):
+				for hit in hit_count(combatant, intent):
 					var amount: int = hit_amount(combatant, data, intent, hit, player.statuses)
 					Status.consume_triggered(player.statuses)
 					# Critical is judged BEFORE the hit: Refuse the End saves a
@@ -225,7 +239,7 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	var total_to_hp: int = 0
 	var hp: int = player.hp
 	var saves_used: int = 0
-	var hits: int = maxi(intent.hits, 1)
+	var hits: int = hit_count(combatant, intent)
 	var hit_amounts: Array[int] = []
 	for hit in hits:
 		var amount: int = hit_amount(combatant, data, intent, hit, player_statuses)
@@ -277,6 +291,16 @@ static func held_back(data: EnemyData, intent: EnemyIntent) -> StatusData:
 		return null
 	return data.attack_card_status
 
+# How many hits an ATTACK lands: EnemyIntent.hits (at least 1), and a
+# multi-hit one gains what its statuses add (StatusData.bonus_hits - Off
+# the rock's Tail Lash) - a single blow stays single. The one count take_
+# turn() lands and preview_intent() shows.
+static func hit_count(combatant: Combatant, intent: EnemyIntent) -> int:
+	var hits: int = maxi(intent.hits, 1)
+	if hits > 1:
+		hits += maxi(Status.bonus_hits(combatant.statuses), 0)
+	return hits
+
 # Whether this enemy's next turn is skipped (Denied).
 static func is_denied(combatant: Combatant) -> bool:
 	return Status.skip_turn_status(combatant.statuses) != null
@@ -292,6 +316,19 @@ static func check_pain_turn(combatant: Combatant, data: EnemyData) -> bool:
 		return false
 	combatant.pain_turn_used = true
 	combatant.pain_turn_pending = true
+	return true
+
+# The phase's trigger (EnemyData.phase_hp_threshold): the first time this
+# living enemy's HP is strictly below that fraction of its max, it gains
+# phase_status - once per fight; nothing is cancelled. True only on the
+# call that grants it, for the caller to announce.
+static func check_phase(combatant: Combatant, data: EnemyData) -> bool:
+	if data == null or data.phase_hp_threshold <= 0.0 or data.phase_status == null or combatant.phase_reached or combatant.hp <= 0:
+		return false
+	if float(combatant.hp) >= float(combatant.max_hp) * data.phase_hp_threshold:
+		return false
+	combatant.phase_reached = true
+	Status.apply_to(combatant.statuses, data.phase_status)
 	return true
 
 # The escalation stage of the turn this enemy is about to take (turns_

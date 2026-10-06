@@ -191,6 +191,15 @@ static func skip_turn_status(statuses: Array[Status]) -> Status:
 			return active
 	return null
 
+# The extra hits `statuses` give a multi-hit attack (StatusData.bonus_
+# hits - Off the rock), summed.
+static func bonus_hits(statuses: Array[Status]) -> int:
+	var total: int = 0
+	for active in statuses:
+		if active.data != null:
+			total += active.data.bonus_hits
+	return total
+
 static func remove_from(statuses: Array[Status], active: Status) -> void:
 	statuses.erase(active)
 

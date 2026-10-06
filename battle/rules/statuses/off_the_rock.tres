@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "off_the_rock"
+display_name = "Off the rock"
+description = "Tail Lash strikes 4 times."
+category = 2
+default_duration_turns = -1
+stack_rule = 3
+bonus_hits = 1

@@ -14,7 +14,7 @@
     "positions": "World XZ offsets from the floor's spawn, metres ([x, z]).",
     "required": "FloorEnemy.required: the floor is cleared, and its gate opens, once no required enemy stands. A cluster is the entries sharing a FloorEnemy.group; it is required when any member is.",
     "gate_fight": "The encounter holding FloorData.enemies[0]: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past that enemy, along exit_direction.",
-    "elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times RegionField.elite_gold_multiplier (rounded) and rolls its card at the pool's elite rarity rates; a placement marked FloorEnemy.elite_card_rates (floor 5's region-end placeholder) gets the elite rates only. See each encounter's elite_rewards. Keepsakes and Glassbone are their own fields.",
+    "elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times RegionField.elite_gold_multiplier (rounded) and rolls its card at the pool's elite rarity rates. A placement marked FloorEnemy.card_reward TOP_TIER_FIRST (floor 5's region-end Greyshelf) offers its cards from the highest tier down instead (RewardPool.roll_top_tier()), at the floor's gold. See each encounter's elite_rewards. Keepsakes and Glassbone are their own fields.",
     "rewards": "Gold and the card reward are the floor's (FloorData), the same for every fight on it. Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Glassbone: every member's, summed.",
     "intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping."
   },
@@ -79,7 +79,7 @@
                   "hp": 45,
                   "required": true,
                   "anchor": false,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     -2.25,
                     -10.73
@@ -148,7 +148,7 @@
                   "hp": 45,
                   "required": true,
                   "anchor": true,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     1.5,
                     -21.25
@@ -163,7 +163,7 @@
                   "hp": 14,
                   "required": true,
                   "anchor": false,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     0.0,
                     -22.0
@@ -214,7 +214,7 @@
                   "hp": 14,
                   "required": false,
                   "anchor": false,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     -15.25,
                     -20.5
@@ -229,7 +229,7 @@
                   "hp": 14,
                   "required": false,
                   "anchor": false,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     -17.875,
                     -21.75
@@ -244,7 +244,7 @@
                   "hp": 14,
                   "required": false,
                   "anchor": false,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     -17.125,
                     -20.0
@@ -276,7 +276,7 @@
                   "hp": 38,
                   "required": false,
                   "anchor": false,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     5.2,
                     -7.0
@@ -345,7 +345,7 @@
                   "hp": 40,
                   "required": true,
                   "anchor": true,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     -3.0,
                     -9.0
@@ -360,7 +360,7 @@
                   "hp": 16,
                   "required": true,
                   "anchor": false,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     -4.66,
                     -8.45
@@ -392,7 +392,7 @@
                   "hp": 90,
                   "required": false,
                   "anchor": false,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     17.6,
                     -13.6
@@ -471,7 +471,7 @@
                   "hp": 55,
                   "required": true,
                   "anchor": false,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     -18.5,
                     -35.0
@@ -510,7 +510,7 @@
                   "hp": 45,
                   "required": false,
                   "anchor": false,
-                  "elite_card_rates": false,
+                  "card_reward": "ROLLED",
                   "position": [
                     -24.4,
                     -21.6
@@ -551,7 +551,7 @@
           "encounters": [
             {
               "cluster": null,
-              "names": "Sputter",
+              "names": "Greyshelf",
               "required": true,
               "elite": false,
               "gate_fight": true,
@@ -567,29 +567,29 @@
               },
               "elite_rewards": {
                 "gold_multiplier": null,
-                "card_rates": "elite",
-                "why": "FloorEnemy.elite_card_rates"
+                "card_rates": "top tier first",
+                "why": "FloorEnemy.card_reward TOP_TIER_FIRST"
               },
               "patrol": null,
               "members": [
                 {
                   "index": 0,
-                  "name": "Sputter",
-                  "enemy_file": "res://battle/rules/enemies/sputter.tres",
-                  "hp": 45,
+                  "name": "Greyshelf",
+                  "enemy_file": "res://battle/rules/enemies/greyshelf.tres",
+                  "hp": 120,
                   "required": true,
                   "anchor": false,
-                  "elite_card_rates": true,
+                  "card_reward": "TOP_TIER_FIRST",
                   "position": [
                     -0.567,
                     -42.0
                   ],
-                  "yaw_degrees": 180.0,
+                  "yaw_degrees": -90.0,
                   "face_prop": null
                 }
               ],
               "keepsake_drop": null,
-              "glassbone": 0
+              "glassbone": 1
             }
           ]
         }
@@ -614,6 +614,7 @@
         },
         "contact_radius_m": 2.0,
         "rest_height_m": 0.0,
+        "sink_m": 0.0,
         "battle_hover_m": 0.0,
         "buried_on_field": false,
         "flies_in_battle": false,
@@ -647,7 +648,8 @@
           }
         ],
         "escalation": null,
-        "pain_turn": null
+        "pain_turn": null,
+        "phase": null
       },
       "statuses": [
         {
@@ -727,6 +729,7 @@
         },
         "contact_radius_m": 2.0,
         "rest_height_m": 0.12,
+        "sink_m": 0.0,
         "battle_hover_m": 0.45,
         "buried_on_field": false,
         "flies_in_battle": true,
@@ -757,7 +760,8 @@
         ],
         "modified_by": [],
         "escalation": null,
-        "pain_turn": null
+        "pain_turn": null,
+        "phase": null
       },
       "statuses": [],
       "rewards": {
@@ -817,6 +821,7 @@
         },
         "contact_radius_m": 2.0,
         "rest_height_m": 0.12,
+        "sink_m": 0.0,
         "battle_hover_m": 0.45,
         "buried_on_field": false,
         "flies_in_battle": true,
@@ -834,7 +839,8 @@
         ],
         "modified_by": [],
         "escalation": null,
-        "pain_turn": null
+        "pain_turn": null,
+        "phase": null
       },
       "statuses": [],
       "rewards": {
@@ -880,6 +886,7 @@
         },
         "contact_radius_m": 3.0,
         "rest_height_m": 0.0,
+        "sink_m": 0.0,
         "battle_hover_m": 0.0,
         "buried_on_field": false,
         "flies_in_battle": false,
@@ -912,7 +919,8 @@
         ],
         "modified_by": [],
         "escalation": null,
-        "pain_turn": null
+        "pain_turn": null,
+        "phase": null
       },
       "statuses": [
         {
@@ -958,6 +966,145 @@
       ]
     },
     {
+      "name": "Greyshelf",
+      "file": "res://battle/rules/enemies/greyshelf.tres",
+      "hp": 120,
+      "elite": false,
+      "mechanic_summary": "Flicks its tongue, then Gapes for 20 — break it by dealing 16 that turn, but every Attack card you play into it adds 2 — then lashes its tail 4 × 3. Off its rock below half HP, the lash strikes four times. Teaches landing one big blow at the right moment.",
+      "field": {
+        "model": "res://assets/models/enemies/Greyshelf/Greyshelf.glb",
+        "model_is_default": false,
+        "model_scale": 1.36,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": {
+          "scene": "res://field/greyshelf_pose.tscn",
+          "class": "GreyshelfPose"
+        },
+        "contact_radius_m": 3.2,
+        "rest_height_m": 0.0,
+        "sink_m": 0.3,
+        "battle_hover_m": 0.0,
+        "buried_on_field": false,
+        "flies_in_battle": false,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Flick",
+            "type": "WATCH"
+          },
+          {
+            "name": "Gape",
+            "type": "ATTACK",
+            "damage_per_hit": 20,
+            "hits": 1,
+            "interrupt": {
+              "break_threshold": 16,
+              "on_interrupt": null,
+              "stuns_with": "stunned",
+              "clears_attack_card_status": true
+            },
+            "rears_while_queued": true,
+            "counts_attack_cards": {
+              "status": "goaded",
+              "bonus_per_card": 2,
+              "max_stacks": 3,
+              "damage_range": [
+                20,
+                26
+              ]
+            }
+          },
+          {
+            "name": "Tail Lash",
+            "type": "ATTACK",
+            "damage_per_hit": 4,
+            "hits": 3,
+            "hits_after_phase": 4
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null,
+        "phase": {
+          "below_hp_fraction": 0.5,
+          "below_hp": 60.0,
+          "gains": "off_the_rock",
+          "effect": "gains the status once per fight; nothing is cancelled"
+        }
+      },
+      "statuses": [
+        {
+          "id": "goaded",
+          "name": "Goaded",
+          "file": "res://battle/rules/statuses/goaded.tres",
+          "gained": "a stack per Attack card played against it while Gape is queued",
+          "description": "Each Attack card played against it adds {bonus_each} damage to its next Gape, up to {max}.",
+          "text": "Each Attack card played against it adds 2 damage to its next Gape, up to 6.",
+          "fields": {
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "max_stacks": 3,
+            "attack_damage_bonus": 2,
+            "consumed_by_own_attack": true
+          }
+        },
+        {
+          "id": "stunned",
+          "name": "Stunned",
+          "file": "res://battle/rules/statuses/stunned.tres",
+          "gained": "when its Gape is broken",
+          "description": "It skips its next move.",
+          "text": "It skips its next move.",
+          "fields": {
+            "default_duration_turns": "until triggered",
+            "stack_rule": "IGNORE",
+            "skips_next_turn": true
+          }
+        },
+        {
+          "id": "off_the_rock",
+          "name": "Off the rock",
+          "file": "res://battle/rules/statuses/off_the_rock.tres",
+          "gained": "once, the first time its HP is below 0.5 of 120",
+          "description": "Tail Lash strikes 4 times.",
+          "text": "Tail Lash strikes 4 times.",
+          "fields": {
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "bonus_hits": 1
+          }
+        }
+      ],
+      "rewards": {
+        "keepsake_table": null,
+        "glassbone": 1,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/combat_old/hit.wav"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 5,
+          "cluster": null,
+          "required": true,
+          "gate_fight": true
+        }
+      ]
+    },
+    {
       "name": "Nipper",
       "file": "res://battle/rules/enemies/nipper.tres",
       "hp": 16,
@@ -974,6 +1121,7 @@
         },
         "contact_radius_m": 2.0,
         "rest_height_m": 0.0,
+        "sink_m": 0.0,
         "battle_hover_m": 0.0,
         "buried_on_field": false,
         "flies_in_battle": false,
@@ -1002,7 +1150,8 @@
         ],
         "modified_by": [],
         "escalation": null,
-        "pain_turn": null
+        "pain_turn": null,
+        "phase": null
       },
       "statuses": [],
       "rewards": {
@@ -1050,6 +1199,7 @@
         },
         "contact_radius_m": 1.0,
         "rest_height_m": -0.66,
+        "sink_m": 0.0,
         "battle_hover_m": -0.08,
         "buried_on_field": true,
         "flies_in_battle": false,
@@ -1074,14 +1224,17 @@
               "on_interrupt": {
                 "name": "Burrow",
                 "type": "BURROW"
-              }
+              },
+              "stuns_with": null,
+              "clears_attack_card_status": false
             },
             "rears_while_queued": true
           }
         ],
         "modified_by": [],
         "escalation": null,
-        "pain_turn": null
+        "pain_turn": null,
+        "phase": null
       },
       "statuses": [],
       "rewards": {
@@ -1125,6 +1278,7 @@
         },
         "contact_radius_m": 2.0,
         "rest_height_m": 0.0,
+        "sink_m": 0.0,
         "battle_hover_m": 0.0,
         "buried_on_field": false,
         "flies_in_battle": false,
@@ -1162,7 +1316,8 @@
         ],
         "modified_by": [],
         "escalation": null,
-        "pain_turn": null
+        "pain_turn": null,
+        "phase": null
       },
       "statuses": [],
       "rewards": {
@@ -1206,13 +1361,6 @@
           "cluster": null,
           "required": false,
           "gate_fight": false
-        },
-        {
-          "region": 1,
-          "floor": 5,
-          "cluster": null,
-          "required": true,
-          "gate_fight": true
         }
       ]
     },
@@ -1233,6 +1381,7 @@
         },
         "contact_radius_m": 2.0,
         "rest_height_m": 0.0,
+        "sink_m": 0.0,
         "battle_hover_m": 0.0,
         "buried_on_field": false,
         "flies_in_battle": false,
@@ -1310,7 +1459,8 @@
           "below_hp": 45.0,
           "effect": "its queued action is cancelled, once per fight",
           "line": "A ragged breath. It isn't moving."
-        }
+        },
+        "phase": null
       },
       "statuses": [],
       "rewards": {

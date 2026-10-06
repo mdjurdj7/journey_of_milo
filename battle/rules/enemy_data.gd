@@ -68,6 +68,19 @@ class_name EnemyData
 @export var pain_turn_line: String = ""
 @export var pain_turn_sound: AudioStream = null
 
+# What a broken intent with deny_next_on_interrupt stuns it with - a status
+# that skips its next turn (StatusData.skips_next_turn - the Greyshelf's
+# Stunned). Null (every enemy by default) = none.
+@export var stun_status: StatusData = null
+
+# The phase: the first time this enemy's HP falls below this fraction of
+# its max (strictly below), it gains phase_status - once per fight, and
+# nothing it does is cancelled (EnemyTurn.check_phase()). Judged where the
+# pain line is. The Greyshelf off its rock. 0 (every enemy by default) or
+# no status is none.
+@export_range(0.0, 1.0, 0.01) var phase_hp_threshold: float = 0.0
+@export var phase_status: StatusData = null
+
 # A sound this enemy makes when it gains status_gained_sound_on in a
 # fight (BattleController.enemy_status_gained - the Blackback turning
 # Hungry): played once from its body (FieldEnemy.show_status()), never
@@ -125,6 +138,11 @@ class_name EnemyData
 # Negative = sunk that far under the sand (the Siltjaw, buried in the
 # field); a fight lifts it to battle_hover_m when the frame settles.
 @export var rest_height_m: float = 0.0
+# Metres the model is set into the ground below its AABB feet, in the
+# field and in a fight alike - still seen, never buried (no mound, unlike
+# a negative rest height): the Greyshelf's belly on its rock. 0 = the
+# mesh's own feet.
+@export var sink_m: float = 0.0
 # Metres above the sand the body hovers at through a fight, from the
 # moment the battle frame settles (FieldEnemy.enter_battle_hover()). 0 =
 # it stays where it stands (the Sputter) - or, under a negative rest

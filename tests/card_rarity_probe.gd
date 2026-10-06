@@ -1,7 +1,8 @@
 extends SceneTree
 
-# Headless probe for card rarity, the fight reward's rarity roll, Blood
-# Arc, and With Regards joining the Wanderer pool. Rules layer, the real
+# Headless probe for card rarity, the fight reward's rarity roll, the
+# region-end fight's top-tier roll, Blood Arc, and With Regards joining
+# the Wanderer pool. Rules layer, the real
 # .tres cards and pool; no field scene:
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/card_rarity_probe.gd
@@ -13,7 +14,7 @@ extends SceneTree
 
 const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
-const CASES := 15
+const CASES := 17
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
@@ -86,6 +87,8 @@ func _initialize() -> void:
 	_check_fallback_when_tiers_empty()
 	_check_elite_pick_rarity()
 	_check_elite_seeded_rolls()
+	_check_top_tier_real_pool()
+	_check_top_tier_prefers_ultra()
 	_check_blood_arc_basics()
 	_check_blood_arc_order()
 	_check_blood_arc_self_eater()
@@ -299,6 +302,69 @@ func _check_elite_seeded_rolls() -> void:
 	_completed += 1
 
 # --- Blood Arc ---
+
+# --- Top tier first (the region-end fight) ---
+
+# The real pool, no Ultra Rare in it: three distinct Rares on every seed,
+# every Rare coming up across them; the same seed the same three.
+func _check_top_tier_real_pool() -> void:
+	var pool: RewardPool = _pool()
+	var offered: Dictionary = {}
+	for seed_value in SEED_COUNT:
+		var rolled: Array[CardData] = pool.roll_top_tier(3, _rng(seed_value))
+		if rolled.size() != 3:
+			_fail("top tier, seed %d: %d cards, not 3" % [seed_value, rolled.size()])
+			continue
+		if rolled[0] == rolled[1] or rolled[0] == rolled[2] or rolled[1] == rolled[2]:
+			_fail("top tier, seed %d: a card offered twice" % seed_value)
+		for card in rolled:
+			offered[card.card_name] = true
+			if card.rarity != CardData.CardRarity.RARE:
+				_fail("top tier, seed %d: %s is not Rare" % [seed_value, card.card_name])
+	var rares: int = 0
+	for card in pool.entries:
+		if card.rarity == CardData.CardRarity.RARE:
+			rares += 1
+	_expect_eq(offered.size(), rares, "Top tier: all %d Rares come up across %d seeds" % [rares, SEED_COUNT])
+	_expect_eq(pool.roll_top_tier(3, _rng(42)), pool.roll_top_tier(3, _rng(42)), "Top tier: same seed, same three")
+	_completed += 1
+
+# Test pools: Ultra Rares first, as many as there are; then Rares fill the
+# rest, then lower; an UNSET card never; fewer only when the pool runs out.
+func _check_top_tier_prefers_ultra() -> void:
+	var ultra_a: CardData = _tagged(CardData.CardRarity.ULTRA_RARE)
+	var ultra_b: CardData = _tagged(CardData.CardRarity.ULTRA_RARE)
+	var mixed := RewardPool.new()
+	mixed.entries = [_tagged(CardData.CardRarity.COMMON), _tagged(CardData.CardRarity.RARE), ultra_a, _tagged(CardData.CardRarity.RARE), _tagged(CardData.CardRarity.UNCOMMON), ultra_b, _tagged(CardData.CardRarity.RARE)]
+	for seed_value in 50:
+		var rolled: Array[CardData] = mixed.roll_top_tier(3, _rng(seed_value))
+		_expect_eq(rolled.size(), 3, "Two Ultra Rares, seed %d: three offered" % seed_value)
+		_expect(rolled.has(ultra_a) and rolled.has(ultra_b), "...both Ultra Rares, seed %d" % seed_value)
+		var rares: int = 0
+		for card in rolled:
+			if card.rarity == CardData.CardRarity.RARE:
+				rares += 1
+		_expect_eq(rares, 1, "...and one Rare fills the third, seed %d" % seed_value)
+	var ultras := RewardPool.new()
+	ultras.entries = [_tagged(CardData.CardRarity.RARE), _tagged(CardData.CardRarity.ULTRA_RARE), _tagged(CardData.CardRarity.ULTRA_RARE), _tagged(CardData.CardRarity.ULTRA_RARE), _tagged(CardData.CardRarity.ULTRA_RARE)]
+	var four: Array[CardData] = ultras.roll_top_tier(3, _rng(5))
+	var all_ultra: bool = four.size() == 3
+	for card in four:
+		all_ultra = all_ultra and card.rarity == CardData.CardRarity.ULTRA_RARE
+	_expect(all_ultra, "Four Ultra Rares: three of them, no Rare")
+	var low := RewardPool.new()
+	var unset := CardData.new()
+	low.entries = [_tagged(CardData.CardRarity.UNCOMMON), unset, _tagged(CardData.CardRarity.RARE), _tagged(CardData.CardRarity.COMMON)]
+	var rolled: Array[CardData] = low.roll_top_tier(3, _rng(9))
+	var tiers: Array = []
+	for card in rolled:
+		tiers.append(card.rarity)
+	_expect_eq(tiers, [CardData.CardRarity.RARE, CardData.CardRarity.UNCOMMON, CardData.CardRarity.COMMON], "One Rare: then Uncommon, then Common fill, in tier order")
+	_expect(not rolled.has(unset), "...an UNSET card never")
+	var two := RewardPool.new()
+	two.entries = [_tagged(CardData.CardRarity.RARE), _tagged(CardData.CardRarity.RARE)]
+	_expect_eq(two.roll_top_tier(3, _rng(1)).size(), 2, "Two eligible cards: two offered")
+	_completed += 1
 
 func _check_blood_arc_basics() -> void:
 	var card: CardData = _card("blood_arc")

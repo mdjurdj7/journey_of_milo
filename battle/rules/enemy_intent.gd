@@ -21,7 +21,7 @@ class_name EnemyIntent
 # value would rewrite every .tres that stores one of these as an integer.
 #
 # WATCH: the turn does nothing at all - no damage, no block - and the
-# display shows its glyph alone, an open eye. The Dunecur's Watch.
+# display shows its glyph alone, an open eye. The Greyshelf's Flick.
 enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH }
 
 # The move's name (the Dunecur's Rush) - for the enemy export (tests/
@@ -36,7 +36,8 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH }
 # ATTACK only: how many separate hits of `value` this intent lands in one
 # turn - each one goes through the player's block/absorb on its own, and
 # one-shot statuses (StatusData.clears_on_trigger) are consumed by the
-# first. BattleIntent shows this as "N x M". 1 for every existing enemy.
+# first. BattleIntent shows this as "N x M". A multi-hit intent gains a
+# status's bonus_hits (EnemyTurn.hit_count()).
 
 @export var erratic_weight: float = 1.0
 # Only consulted when EnemyData.erratic_intent_selection is true - this
@@ -73,6 +74,12 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH }
 # interjection outside the intents loop (Combatant.interjected_intent),
 # which carries on where it was once this has resolved. The Siltjaw's is
 # a BURROW. Null = the interrupted turn is simply lost.
+
+@export var deny_next_on_interrupt: bool = false
+# Interrupted, the enemy is stunned: it gains its EnemyData.stun_status
+# (Stunned - StatusData.skips_next_turn), so the loop's next move is lost
+# the way a Denied one is (EnemyTurn.take_turn()). The Greyshelf's Gape,
+# whose break costs it the Tail Lash. False for every other.
 
 @export var rear_while_queued: bool = false
 

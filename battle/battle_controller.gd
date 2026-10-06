@@ -84,7 +84,7 @@ signal enemy_defeated(enemy: FieldEnemy)
 signal enemy_pain_turn(enemy: FieldEnemy)
 # An enemy has just gained a status mid-fight - one turned into another
 # by leaving its pack (the Blackback's Fed into Hungry, when the Nipper
-# dies). For its body's tells (StorkTells' sac); the readouts take the
+# dies), or its phase's (the Greyshelf off its rock). For its body's tells (StorkTells' sac); the readouts take the
 # change through status_changed. A fight's opening statuses aren't sent:
 # they're read at its start (RegionField).
 signal enemy_status_gained(enemy: FieldEnemy, status: StatusData)
@@ -748,6 +748,8 @@ func _run_sequential_turn() -> void:
 			continue
 		if result["pain_turn_triggered"]:
 			enemy_pain_turn.emit(enemy)
+		if result["phase_triggered"]:
+			enemy_status_gained.emit(enemy, data.phase_status)
 		# Denied: no move to watch - the readout loses its Denied, and the
 		# turn holds a beat so the skip reads.
 		if result["denied"]:
@@ -798,6 +800,8 @@ func _run_simultaneous_turn() -> void:
 			continue
 		if results[enemy]["pain_turn_triggered"]:
 			enemy_pain_turn.emit(enemy)
+		if results[enemy]["phase_triggered"]:
+			enemy_status_gained.emit(enemy, enemy.enemy_data.phase_status)
 		acting.append(enemy)
 		if results[enemy]["attacked"]:
 			longest_snap = maxf(longest_snap, enemy.play_attack_snap(_wanderer))
@@ -1087,11 +1091,18 @@ func _report_damage(source: Variant, target_combatant: Combatant, amount: int, k
 			enemy_hp_changed.emit(enemy, target_combatant.hp, target_combatant.max_hp)
 			if target_combatant.hp <= 0:
 				_drop_enemy(enemy)
-			elif EnemyTurn.check_pain_turn(target_combatant, enemy.enemy_data):
-				# Below its pain line on the player's turn: the action it
-				# shows now is the one cancelled.
-				enemy_pain_turn.emit(enemy)
-				enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
+			else:
+				if EnemyTurn.check_pain_turn(target_combatant, enemy.enemy_data):
+					# Below its pain line on the player's turn: the action it
+					# shows now is the one cancelled.
+					enemy_pain_turn.emit(enemy)
+					enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
+				if EnemyTurn.check_phase(target_combatant, enemy.enemy_data):
+					# Below its phase line: the status is up at once, and the
+					# intent it changes (Off the rock's extra hit) with it.
+					enemy_status_gained.emit(enemy, enemy.enemy_data.phase_status)
+					status_changed.emit()
+					enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
 
 # The run's HP down by `amount`, and the log told what it actually lost
 # (lose_hp() floors at 0) and to what.

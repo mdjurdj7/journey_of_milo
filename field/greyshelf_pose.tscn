@@ -1,0 +1,16 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://field/greyshelf_pose.gd" id="1_greyshelf_pose"]
+
+[node name="GreyshelfPose" type="Node3D"]
+script = ExtResource("1_greyshelf_pose")
+pivot_forward_m = 1.5
+pivot_up_m = 1.09
+region_half_width_m = 0.55
+region_floor_m = 0.78
+region_softness_m = 0.08
+falloff_m = 0.5
+look_range_m = 9.0
+max_angle_degrees = 60.0
+turn_speed_degrees = 45.0
+turn_ease_seconds = 0.8

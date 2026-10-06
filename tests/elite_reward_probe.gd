@@ -4,9 +4,11 @@ extends SceneTree
 # is_elite - the Wardling) pays the floor's gold times RegionField.
 # elite_gold_multiplier, rounded, and rolls its card at the pool's elite
 # rarity rates (no Common while a higher tier has a card); floor 5's
-# region-end placeholder (FloorEnemy.elite_card_rates) gets the elite
-# rates but the floor's own gold; an ordinary fight - alone or a cluster -
-# neither. The reward screen's gold and rates are read straight off it.
+# region-end Greyshelf (FloorEnemy.card_reward TOP_TIER_FIRST) offers
+# three distinct cards from the top tier down - three Rares while Ultra
+# Rare is empty - at the floor's own gold, with its Glassbone; an
+# ordinary fight - alone or a cluster - none of it. The reward screen's
+# gold and rates are read straight off it.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/elite_reward_probe.gd
 #
@@ -25,6 +27,7 @@ const REGION_PATH := "res://floors/region1.tres"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
+const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
 const BLACKBACK_PATH := "res://battle/rules/enemies/blackback.tres"
 const FLOOR_1 := 0
 const FLOOR_3 := 2
@@ -45,7 +48,7 @@ func _initialize() -> void:
 	await _check_wardling()
 	await _check_ordinary(FLOOR_1, SPUTTER_PATH, "The floor 1 Sputter")
 	await _check_ordinary(FLOOR_3, BLACKBACK_PATH, "The Blackback and its Nipper")
-	await _check_region_end_placeholder()
+	await _check_region_end()
 	if _completed != CASES:
 		_failures += 1
 		print("FAIL: only %d of %d cases ran to the end" % [_completed, CASES])
@@ -89,24 +92,43 @@ func _check_ordinary(floor_index: int, enemy_path: String, label: String) -> voi
 		var gold: int = int(reward.get("_gold"))
 		_expect(gold >= span.x and gold <= span.y, "%s pays the floor's gold, %d-%d (got %d)" % [label, span.x, span.y, gold])
 		_expect(not bool(reward.get("_elite_rates")), "...at the normal rates")
+		_expect(not bool(reward.get("_top_tier")), "...not top tier first")
 		reward.call("close")
 	await _teardown()
 	_completed += 1
 
-# Floor 5's region-end placeholder, a Sputter placed with elite_card_
-# rates: elite rates, the floor's own gold - the Sputter isn't elite.
-func _check_region_end_placeholder() -> void:
+# Floor 5's region-end Greyshelf, placed with card_reward TOP_TIER_FIRST:
+# not elite, so the floor's own gold and no elite rates; its card line
+# offers three distinct cards from the top tier down - three Rares while
+# no Ultra Rare exists - and its Glassbone x1 is a line of its own.
+func _check_region_end() -> void:
 	var region: Resource = load(REGION_PATH)
 	var floors: Array = region.get("floors")
 	var placement: Resource = (floors[FLOOR_5].get("enemies") as Array)[0]
-	_expect(bool(placement.get("elite_card_rates")), "Floor 5's placeholder is placed with elite_card_rates")
-	_expect(not bool((placement.get("enemy_data") as Resource).get("is_elite")), "...its Sputter not elite")
-	var reward: Node = await _win(FLOOR_5, SPUTTER_PATH)
+	_expect_eq(int(placement.get("card_reward")), FloorEnemy.CardReward.TOP_TIER_FIRST, "Floor 5's region-end fight is placed TOP_TIER_FIRST")
+	_expect_eq((placement.get("enemy_data") as Resource).resource_path, GREYSHELF_PATH, "...the Greyshelf")
+	_expect(not bool((placement.get("enemy_data") as Resource).get("is_elite")), "...not elite")
+	var reward: Node = await _win(FLOOR_5, GREYSHELF_PATH)
 	if reward != null:
 		var span: Vector2i = _gold_range(FLOOR_5)
 		var gold: int = int(reward.get("_gold"))
 		_expect(gold >= span.x and gold <= span.y, "It pays floor 5's own gold, %d-%d (got %d)" % [span.x, span.y, gold])
-		_expect(bool(reward.get("_elite_rates")), "...at the elite rates")
+		_expect(not bool(reward.get("_elite_rates")), "...not at the elite rates")
+		_expect(bool(reward.get("_top_tier")), "...but top tier first")
+		_expect_eq(int(reward.get("_glassbone")), 1, "...and Glassbone x1")
+		_expect(_line_ids(reward).has("glassbone"), "...on a line of its own")
+		var card_index: int = _line_ids(reward).find("card")
+		_expect(card_index >= 0, "...with a card line")
+		if card_index >= 0:
+			reward.call("_take_line", card_index)
+			var offered: Array = reward.get("_offered")
+			_expect_eq(offered.size(), 3, "...three cards offered")
+			var names: Array[String] = []
+			for card: CardData in offered:
+				_expect_eq(card.rarity, CardData.CardRarity.RARE, "...each a Rare (%s)" % card.card_name)
+				if not names.has(card.card_name):
+					names.append(card.card_name)
+			_expect_eq(names.size(), offered.size(), "...all distinct")
 		reward.call("close")
 	await _teardown()
 	_completed += 1

@@ -31,7 +31,7 @@ const CASES := 7
 const REGION_PATH := "res://floors/region1.tres"
 const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
 const FLOOR_5_PATH := "res://floors/region1_floor5.tres"
-const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
+const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const RUN_END_SCENE_PATH := "res://run/run_end.tscn"
 const TITLE_SCENE_PATH := "res://run/title_screen.tscn"
@@ -114,7 +114,8 @@ func _check_data() -> void:
 	_expect_eq(enemies.size(), 1, "...one fight")
 	if enemies.size() == 1:
 		_expect(bool(enemies[0].get("required")) and enemies[0].get("position") == FIGHT_AT, "...the region-end fight, required, on the crest")
-		_expect((enemies[0].get("enemy_data") as Resource).resource_path == SPUTTER_PATH, "...the Sputter placeholder")
+		_expect((enemies[0].get("enemy_data") as Resource).resource_path == GREYSHELF_PATH, "...the Greyshelf")
+		_expect(is_equal_approx(float(enemies[0].get("yaw_degrees")), -90.0), "...lying across the crest, head east")
 	_expect(data.get("exit_direction") == EXIT_DIRECTION and is_equal_approx(float(data.get("gate_distance_beyond_enemy")), GATE_DISTANCE_M), "...the gate 12 m on along the exit neck")
 	_expect_eq((data.get("ledges") as Array).size(), 1, "...one ledge ring: the boundary")
 	_expect_eq((data.get("wear_path_override") as PackedVector2Array).size(), 7, "...a 7-point worn band")

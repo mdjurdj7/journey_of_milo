@@ -40,9 +40,8 @@ class_name RewardPool
 @export var uncommon_rate: float = 30.0
 @export var rare_rate: float = 9.0
 @export var ultra_rare_rate: float = 1.0
-# The same, for a fight with an elite in it (EnemyData.is_elite) or a
-# placement marked FloorEnemy.elite_card_rates - roll_by_rarity(...,
-# elite = true). Common 0 = no Common while a higher tier has a card
+# The same, for a fight with an elite in it (EnemyData.is_elite) -
+# roll_by_rarity(..., elite = true). Common 0 = no Common while a higher tier has a card
 # left; renormalised the same way when a tier is empty.
 @export_group("Elite rarity rates")
 @export var elite_common_rate: float = 0.0
@@ -93,12 +92,7 @@ func roll(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null) -> Ar
 # `elite` rolls the tiers at the elite rates instead.
 func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, elite: bool = false) -> Array[CardData]:
 	var picked: Array[CardData] = []
-	var remaining: Array[int] = []
-	for index in entries.size():
-		var entry: CardData = entries[index]
-		if entry != null and entry.rarity != CardData.CardRarity.UNSET and _weight_of(index, enemy) > 0.0:
-			remaining.append(index)
-
+	var remaining: Array[int] = _rarity_eligible(enemy)
 	while picked.size() < count and not remaining.is_empty():
 		var available: Array[CardData.CardRarity] = []
 		for index in remaining:
@@ -109,18 +103,33 @@ func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = n
 		for index in remaining:
 			if entries[index].rarity == tier:
 				in_tier.append(index)
-		var total: float = 0.0
-		for index in in_tier:
-			total += _weight_of(index, enemy)
-		var roll_point: float = rng.randf() * total
-		var chosen: int = in_tier[in_tier.size() - 1]
-		for index in in_tier:
-			roll_point -= _weight_of(index, enemy)
-			if roll_point <= 0.0:
-				chosen = index
-				break
+		var chosen: int = _pick_weighted(in_tier, rng, enemy)
 		picked.append(entries[chosen])
 		remaining.erase(chosen)
+	return picked
+
+# The region-end fight's card reward (FloorEnemy.CardReward.TOP_TIER_
+# FIRST): `count` distinct cards from the highest tier first - Ultra Rare -
+# by the same weights and bias, and only when that tier runs dry the next
+# one down fills the rest (Rare, then lower). No rates: the tier order is
+# the rule. Fewer than `count` only when the pool itself runs out; an
+# UNSET card is never offered.
+func roll_top_tier(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null) -> Array[CardData]:
+	var picked: Array[CardData] = []
+	var eligible: Array[int] = _rarity_eligible(enemy)
+	var tiers: Array[CardData.CardRarity] = CardData.rarity_tiers()
+	tiers.reverse()
+	for tier in tiers:
+		var in_tier: Array[int] = []
+		for index in eligible:
+			if entries[index].rarity == tier:
+				in_tier.append(index)
+		while picked.size() < count and not in_tier.is_empty():
+			var chosen: int = _pick_weighted(in_tier, rng, enemy)
+			picked.append(entries[chosen])
+			in_tier.erase(chosen)
+		if picked.size() >= count:
+			break
 	return picked
 
 # Which tier a slot rolls, from `point` in [0, 1) and the tiers that
@@ -169,6 +178,30 @@ func rarity_rate(tier: CardData.CardRarity, elite: bool = false) -> float:
 		CardData.CardRarity.ULTRA_RARE:
 			return ultra_rare_rate
 	return 0.0
+
+# Indices of the entries a rarity roll can offer: a card, tagged (not
+# UNSET), with a weight above 0.
+func _rarity_eligible(enemy: EnemyData) -> Array[int]:
+	var eligible: Array[int] = []
+	for index in entries.size():
+		var entry: CardData = entries[index]
+		if entry != null and entry.rarity != CardData.CardRarity.UNSET and _weight_of(index, enemy) > 0.0:
+			eligible.append(index)
+	return eligible
+
+# One of `candidates` (entry indices, not empty), by weight and bias - one
+# rng draw. The pick inside a tier for roll_by_rarity() and roll_top_
+# tier().
+func _pick_weighted(candidates: Array[int], rng: RandomNumberGenerator, enemy: EnemyData) -> int:
+	var total: float = 0.0
+	for index in candidates:
+		total += _weight_of(index, enemy)
+	var roll_point: float = rng.randf() * total
+	for index in candidates:
+		roll_point -= _weight_of(index, enemy)
+		if roll_point <= 0.0:
+			return index
+	return candidates[candidates.size() - 1]
 
 func _weight_of(index: int, enemy: EnemyData) -> float:
 	var weight: float = weights[index] if index < weights.size() else 1.0

@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "goaded"
+display_name = "Goaded"
+description = "Each Attack card played against it adds {bonus_each} damage to its next Gape, up to {max}."
+category = 2
+default_duration_turns = -1
+stack_rule = 3
+max_stacks = 3
+attack_damage_bonus = 2
+consumed_by_own_attack = true

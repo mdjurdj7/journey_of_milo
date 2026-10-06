@@ -76,7 +76,7 @@ static func build() -> Dictionary:
 			"positions": "World XZ offsets from the floor's spawn, metres ([x, z]).",
 			"required": "FloorEnemy.required: the floor is cleared, and its gate opens, once no required enemy stands. A cluster is the entries sharing a FloorEnemy.group; it is required when any member is.",
 			"gate_fight": "The encounter holding FloorData.enemies[0]: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past that enemy, along exit_direction.",
-			"elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times RegionField.elite_gold_multiplier (rounded) and rolls its card at the pool's elite rarity rates; a placement marked FloorEnemy.elite_card_rates (floor 5's region-end placeholder) gets the elite rates only. See each encounter's elite_rewards. Keepsakes and Glassbone are their own fields.",
+			"elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times RegionField.elite_gold_multiplier (rounded) and rolls its card at the pool's elite rarity rates. A placement marked FloorEnemy.card_reward TOP_TIER_FIRST (floor 5's region-end Greyshelf) offers its cards from the highest tier down instead (RewardPool.roll_top_tier()), at the floor's gold. See each encounter's elite_rewards. Keepsakes and Glassbone are their own fields.",
 			"rewards": "Gold and the card reward are the floor's (FloorData), the same for every fight on it. Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Glassbone: every member's, summed.",
 			"intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping.",
 		},
@@ -168,7 +168,7 @@ static func _encounter_entry(floor_data: FloorData, members: Array) -> Dictionar
 	var cluster: Variant = String(first.group) if first.group != &"" else null
 	var required: bool = false
 	var elite: bool = false
-	var elite_card_rates: bool = false
+	var top_tier: bool = false
 	var gate_fight: bool = false
 	var keepsake: Variant = null
 	var glassbone: int = 0
@@ -177,7 +177,7 @@ static func _encounter_entry(floor_data: FloorData, members: Array) -> Dictionar
 		var entry: FloorEnemy = floor_data.enemies[index]
 		var data: EnemyData = entry.enemy_data
 		required = required or entry.required
-		elite_card_rates = elite_card_rates or entry.elite_card_rates
+		top_tier = top_tier or entry.card_reward == FloorEnemy.CardReward.TOP_TIER_FIRST
 		gate_fight = gate_fight or index == 0
 		if data != null:
 			elite = elite or data.is_elite
@@ -205,8 +205,8 @@ static func _encounter_entry(floor_data: FloorData, members: Array) -> Dictionar
 		}
 	encounter["elite_rewards"] = {
 		"gold_multiplier": _num(_elite_gold_multiplier()) if elite else null,
-		"card_rates": "elite" if elite or elite_card_rates else "normal",
-		"why": "an elite member" if elite else ("FloorEnemy.elite_card_rates" if elite_card_rates else null),
+		"card_rates": "top tier first" if top_tier else ("elite" if elite else "normal"),
+		"why": "FloorEnemy.card_reward TOP_TIER_FIRST" if top_tier else ("an elite member" if elite else null),
 	}
 	encounter["patrol"] = _patrol_entry(floor_data, first.group)
 	encounter["members"] = member_list
@@ -232,7 +232,7 @@ static func _member_entry(floor_data: FloorData, index: int) -> Dictionary:
 		"hp": data.max_hp if data != null else 0,
 		"required": entry.required,
 		"anchor": entry.anchor,
-		"elite_card_rates": entry.elite_card_rates,
+		"card_reward": FloorEnemy.CardReward.keys()[entry.card_reward],
 		"position": _vec2(entry.position),
 		"yaw_degrees": _num(entry.yaw_degrees),
 		"face_prop": face_prop,
@@ -288,6 +288,7 @@ static func _field_entry(data: EnemyData) -> Dictionary:
 		"attachment": attachment,
 		"contact_radius_m": _num(data.contact_radius_m),
 		"rest_height_m": _num(data.rest_height_m),
+		"sink_m": _num(data.sink_m),
 		"battle_hover_m": _num(data.battle_hover_m),
 		"buried_on_field": data.rest_height_m < 0.0,
 		"flies_in_battle": data.battle_hover_m > 0.0,
@@ -319,12 +320,21 @@ static func _moveset_entry(data: EnemyData) -> Dictionary:
 			"effect": "its queued action is cancelled, once per fight",
 			"line": data.pain_turn_line,
 		}
+	var phase: Variant = null
+	if data.phase_hp_threshold > 0.0 and data.phase_status != null:
+		phase = {
+			"below_hp_fraction": _num(data.phase_hp_threshold),
+			"below_hp": _num(data.max_hp * data.phase_hp_threshold),
+			"gains": data.phase_status.id,
+			"effect": "gains the status once per fight; nothing is cancelled",
+		}
 	return {
 		"selection": "erratic (weighted pick each turn)" if data.erratic_intent_selection else "loop (in order)",
 		"intents": intents,
 		"modified_by": _attack_modifiers(data),
 		"escalation": escalation,
 		"pain_turn": pain_turn,
+		"phase": phase,
 	}
 
 # The statuses it can hold that add to every hit of its ATTACKs (Hungry),
@@ -358,6 +368,10 @@ static func _intent_entry(data: EnemyData, intent: EnemyIntent) -> Dictionary:
 		EnemyIntent.IntentType.ATTACK:
 			entry["damage_per_hit"] = intent.value
 			entry["hits"] = intent.hits
+			# A multi-hit attack gains what its phase adds (StatusData.
+			# bonus_hits - EnemyTurn.hit_count()).
+			if intent.hits > 1 and data.phase_status != null and data.phase_status.bonus_hits > 0:
+				entry["hits_after_phase"] = intent.hits + data.phase_status.bonus_hits
 			if not data.escalation_multipliers.is_empty():
 				var by_stage: Array = []
 				for multiplier in data.escalation_multipliers:
@@ -377,6 +391,8 @@ static func _intent_entry(data: EnemyData, intent: EnemyIntent) -> Dictionary:
 		entry["interrupt"] = {
 			"break_threshold": intent.interrupt_threshold,
 			"on_interrupt": _intent_entry(data, intent.on_interrupt) if intent.on_interrupt != null else null,
+			"stuns_with": data.stun_status.id if intent.deny_next_on_interrupt and data.stun_status != null else null,
+			"clears_attack_card_status": intent.counts_attack_cards and data.attack_card_status != null,
 		}
 	if intent.rear_while_queued:
 		entry["rears_while_queued"] = true
@@ -425,6 +441,14 @@ static func _reachable_statuses(data: EnemyData) -> Array:
 			if intent != null and intent.counts_attack_cards:
 				while_queued.append(intent.intent_name)
 		queue.append([data.attack_card_status, "a stack per Attack card played against it while %s is queued" % " / ".join(while_queued)])
+	if data.stun_status != null:
+		var stunning: Array[String] = []
+		for intent in data.intents:
+			if intent != null and intent.deny_next_on_interrupt:
+				stunning.append(intent.intent_name)
+		queue.append([data.stun_status, "when its %s is broken" % " / ".join(stunning)])
+	if data.phase_status != null and data.phase_hp_threshold > 0.0:
+		queue.append([data.phase_status, "once, the first time its HP is below %s of %d" % [str(_num(data.phase_hp_threshold)), data.max_hp]])
 	var reached: Array = []
 	var seen: Array[String] = []
 	while not queue.is_empty():

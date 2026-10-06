@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "stunned"
+display_name = "Stunned"
+description = "It skips its next move."
+category = 2
+default_duration_turns = -2
+stack_rule = 3
+skips_next_turn = true

@@ -6,15 +6,15 @@
 [ext_resource type="Texture2D" uid="uid://d1cxkr8subf31" path="res://assets/field/masks/region1_floor5_elev.png" id="4_elev"]
 [ext_resource type="Texture2D" uid="uid://c7ugocdu7rw56" path="res://assets/field/masks/region1_floor5_rock.png" id="5_rock"]
 [ext_resource type="Texture2D" uid="uid://diar0afkhwqqf" path="res://assets/field/masks/region1_floor5_outer.png" id="6_outer"]
-[ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="7_sputter"]
+[ext_resource type="Resource" path="res://battle/rules/enemies/greyshelf.tres" id="7_greyshelf"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="8_wanderer_pool"]
 
 [sub_resource type="Resource" id="FloorEnemy_region_end"]
 script = ExtResource("2_floor_enemy")
-enemy_data = ExtResource("7_sputter")
+enemy_data = ExtResource("7_greyshelf")
 position = Vector2(-0.567, -42)
-yaw_degrees = 180.0
-elite_card_rates = true
+yaw_degrees = -90.0
+card_reward = 1
 
 [resource]
 script = ExtResource("1_floor_data")

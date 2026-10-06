@@ -135,6 +135,12 @@ const DURATION_UNTIL_TRIGGERED := -2
 # targeted by another card applying it (BattleController).
 @export var skips_next_turn: bool = false
 
+# Extra hits its holder - an enemy - lands with every multi-hit ATTACK
+# (EnemyIntent.hits above 1) while it's up; a single blow stays single
+# (EnemyTurn.hit_count()). Off the rock: the Greyshelf's Tail Lash strikes
+# 4 times. 0 = none.
+@export var bonus_hits: int = 0
+
 # Energy its holder gains at the start of each of their turns, on top of
 # the refill, if they are Critical at that moment (Dying Light) - judged
 # as the Energy refills (Combatant.turn_start_energy()); entering Critical

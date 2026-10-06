@@ -27,12 +27,14 @@ class_name FloorEnemy
 # required enemy is left standing. False = an optional fight, there to be
 # chosen or walked past.
 @export var required: bool = true
-# This placement's fight rolls its card reward at the elite rarity rates
-# (RewardPool's Elite rarity rates) though its enemy isn't elite - and
-# only that: no elite gold. Floor 5's region-end placeholder, until the
-# region-end fight exists. A fight with an elite in it (EnemyData.
-# is_elite) rolls them anyway. False = the enemy decides.
-@export var elite_card_rates: bool = false
+# How this placement's fight offers its cards. ROLLED: each slot rolls a
+# rarity tier at RewardPool's rates (the elite rates with an elite in the
+# fight - EnemyData.is_elite). TOP_TIER_FIRST: the highest tier first,
+# filled downward only when it runs dry (RewardPool.roll_top_tier()) -
+# the region-end fight, floor 5's Greyshelf. Cards only: its gold is the
+# floor's. Appended values only - the .tres stores the integer.
+enum CardReward { ROLLED, TOP_TIER_FIRST }
+@export var card_reward: CardReward = CardReward.ROLLED
 # Entries sharing a non-empty id are one cluster: contact with any of
 # them starts one fight with all of them (RegionField._battle_members_
 # for()), and they step into one line for it (FieldEnemy.step_to()). The

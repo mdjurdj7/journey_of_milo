@@ -71,12 +71,18 @@ func set_bones(names: PackedStringArray, parents: PackedInt32Array, rests: Array
 	mesh_instance.skeleton = mesh_instance.get_path_to(skeleton)
 
 # The mesh rebuilt with four bones and four weights per vertex, the body's
-# material on it.
-func apply_weights(bones: PackedInt32Array, weights: PackedFloat32Array) -> void:
+# material on it. `custom0`, when given, is four floats per vertex a
+# shader pass reads as CUSTOM0 - measured on the rest pose, so it stays
+# on the same skin however the bones move it (GreyshelfPose's throat).
+func apply_weights(bones: PackedInt32Array, weights: PackedFloat32Array, custom0: PackedFloat32Array = PackedFloat32Array()) -> void:
 	var surface: Array = arrays.duplicate()
 	surface[Mesh.ARRAY_BONES] = bones
 	surface[Mesh.ARRAY_WEIGHTS] = weights
+	var flags: int = 0
+	if not custom0.is_empty():
+		surface[Mesh.ARRAY_CUSTOM0] = custom0
+		flags = Mesh.ARRAY_CUSTOM_RGBA_FLOAT << Mesh.ARRAY_FORMAT_CUSTOM0_SHIFT
 	var skinned := ArrayMesh.new()
-	skinned.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface)
+	skinned.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, surface, [], {}, flags)
 	skinned.surface_set_material(0, _material)
 	mesh_instance.mesh = skinned

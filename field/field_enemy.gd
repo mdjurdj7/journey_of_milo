@@ -50,9 +50,9 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export var group: StringName = &""
 # FloorEnemy.anchor, mirrored the same way - read at contact.
 @export var anchor: bool = false
-# FloorEnemy.elite_card_rates, mirrored the same way - read as the fight
+# FloorEnemy.card_reward, mirrored the same way - read as the fight
 # starts (RegionField).
-@export var elite_card_rates: bool = false
+@export var card_reward: FloorEnemy.CardReward = FloorEnemy.CardReward.ROLLED
 @export var region_field_path: NodePath = ^".."
 @export var ground_path: NodePath = ^"../Ground"
 # The hover highlight and the hit flash both BRIGHTEN: albedo times this,
@@ -124,6 +124,15 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 @export var rest_height: float = 0.0:
 	set(value):
 		rest_height = value
+		_apply_model_lift()
+# EnemyData.sink_m, copied the same way: metres the model is set into the
+# ground below its feet, field and fight alike - seen, never buried (no
+# mound, no hiding; a negative rest_height is the burial). The
+# Greyshelf's belly on its rock. Moves the model like the rest; the
+# camera fit and the intent's head height come down with it.
+@export var sink: float = 0.0:
+	set(value):
+		sink = value
 		_apply_model_lift()
 # Above the sand, metres; 0 = this body never leaves the ground in a fight
 # (or, sunk under a negative rest_height, surfaces onto it - the Siltjaw).
@@ -257,7 +266,7 @@ var _model_aabb: AABB = AABB()
 # set_rearing()). Not the bob - the camera's battle fit reads this every
 # frame and must not breathe with it.
 func get_head_height() -> float:
-	return _model_height + rest_height + _lift + _rear_lift()
+	return _model_height + rest_height - sink + _lift + _rear_lift()
 
 func get_half_width() -> float:
 	return _model_half_width
@@ -313,7 +322,7 @@ func _rear_lift() -> float:
 # How far the model sits above its grounded place right now: rest height,
 # hover and bob. What anything anchored to the body adds (EnemyStatus).
 func get_body_lift() -> float:
-	return rest_height + _lift + get_bob_offset()
+	return rest_height - sink + _lift + get_bob_offset()
 
 # The bob alone, for what anchors to the head (BattleIntent), which
 # already has the rest of the lift through get_head_height().

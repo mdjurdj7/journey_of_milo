@@ -4,7 +4,8 @@ extends SceneTree
 # and its helpers, that it lives exactly as long as the run (across a
 # fight, across a floor, gone on a new run), that the Wardling leaves one
 # piece as its own TAKE line on the reward screen - taken, or left behind
-# on WALK ON, never granted on its own - that no other enemy leaves any,
+# on WALK ON, never granted on its own - that no other enemy but the
+# Greyshelf (floor 5's region-end fight, also one) leaves any,
 # that the gold, card and keepsake rewards around it are unchanged, and
 # the field HUD's GLASSBONE line.
 #
@@ -22,6 +23,7 @@ const CASES := 8
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
+const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
 const ENEMIES_DIR := "res://battle/rules/enemies"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
 # Floor 3 (index 2) is the Wardling's; floor 1 (index 0) the lone Sputter's.
@@ -80,7 +82,8 @@ func _check_counting() -> void:
 	_expect_eq(_glassbone(), 0, "A new run resets it to 0")
 	_completed += 1
 
-# Only the Wardling leaves any: 1. Every other enemy's data leaves 0.
+# Only the Wardling and the Greyshelf leave any: 1 each. Every other
+# enemy's data leaves 0.
 func _check_enemy_data() -> void:
 	var dir := DirAccess.open(ENEMIES_DIR)
 	var checked: int = 0
@@ -92,7 +95,7 @@ func _check_enemy_data() -> void:
 		if data == null or data.get("glassbone_reward") == null:
 			continue
 		checked += 1
-		var expected: int = 1 if path == WARDLING_PATH else 0
+		var expected: int = 1 if path == WARDLING_PATH or path == GREYSHELF_PATH else 0
 		_expect_eq(int(data.get("glassbone_reward")), expected, "%s leaves %d Glassbone" % [file, expected])
 	_expect(checked >= 2, "More than one enemy's data was checked (%d)" % checked)
 	_completed += 1

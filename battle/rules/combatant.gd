@@ -123,6 +123,9 @@ var turns_taken: int = 0
 # fight, and its cancelled action is still to come.
 var pain_turn_used: bool = false
 var pain_turn_pending: bool = false
+# The phase (EnemyData.phase_hp_threshold): its status has been gained
+# this fight, so it never is again.
+var phase_reached: bool = false
 
 func _init(starting_hp: int = 1) -> void:
 	hp = starting_hp
