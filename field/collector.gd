@@ -19,8 +19,19 @@ class_name Collector
 # click on the body's padded screen rect with the Wanderer in reach emits
 # open_requested, for RegionField to open the collector's screen with the
 # field locked. Anything else falls through to the field's move click.
+#
+# What it hands over (CollectorScreen): stock_count cards rolled from
+# stock_pool, tier first at the pool's own rates (RewardPool.roll_by_
+# rarity()) from the run's generator, on the first open - then the same
+# stock, minus what was bought, for as long as the floor lasts; never
+# restocked. Beside them one fixed_card (Samphire), one copy. And one
+# removal, once. Every price is an export, overridable per floor through
+# the FloorProp's overrides; a change re-prices an open screen
+# (prices_changed). State lives on this node: a new floor is a new node.
 
 signal open_requested(collector: Collector)
+# A price changed (an export set live) - an open screen redraws.
+signal prices_changed()
 
 const GROUP := &"collectors"
 
@@ -55,6 +66,40 @@ const GROUP := &"collectors"
 
 # What its stock rolls from (FloorProp.pool, set by RegionField).
 @export var stock_pool: RewardPool = null
+
+@export_group("Stock")
+@export var stock_count: int = 5
+# Always stocked beside the roll, one copy, at fixed_price (collector.tscn
+# sets Samphire). Null = no fixed slot.
+@export var fixed_card: CardData = null
+@export_group("")
+
+@export_group("Prices")
+@export var price_common: int = 40:
+	set(value):
+		price_common = value
+		prices_changed.emit()
+@export var price_uncommon: int = 55:
+	set(value):
+		price_uncommon = value
+		prices_changed.emit()
+@export var price_rare: int = 80:
+	set(value):
+		price_rare = value
+		prices_changed.emit()
+@export var price_ultra_rare: int = 120:
+	set(value):
+		price_ultra_rare = value
+		prices_changed.emit()
+@export var fixed_price: int = 30:
+	set(value):
+		fixed_price = value
+		prices_changed.emit()
+@export var removal_price: int = 50:
+	set(value):
+		removal_price = value
+		prices_changed.emit()
+@export_group("")
 # Set by RegionField._spawn_floor_props(): the floor's path plus the
 # prop's index.
 @export var collector_id: String = ""
@@ -72,6 +117,11 @@ var _approach_area: Area3D = null
 var _approach_shape: SphereShape3D = null
 var _ground: Ground = null
 var _wanderer_inside: bool = false
+# The rolled stock, a null where a card was bought; rolled once.
+var _stock: Array[CardData] = []
+var _rolled: bool = false
+var _fixed_taken: bool = false
+var _removal_used: bool = false
 # This visit's line has been said (reset on leaving the radius).
 var _line_said: bool = false
 
@@ -199,6 +249,54 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	get_viewport().set_input_as_handled()
 	open_requested.emit(self)
+
+# --- Stock ---
+
+# The roll, on the first call only (the first open).
+func ensure_stock() -> void:
+	if _rolled:
+		return
+	_rolled = true
+	_stock.clear()
+	if stock_pool == null:
+		push_warning("Collector '%s': no stock pool; nothing rolled." % name)
+		return
+	_stock = stock_pool.roll_by_rarity(stock_count, RunState.rng)
+	var names: Array[String] = []
+	for card in _stock:
+		names.append(card.card_name)
+	print("Collector '%s': stock %s." % [name, ", ".join(names)])
+
+# The rolled stock in its slots, a null for each one bought.
+func get_stock() -> Array[CardData]:
+	return _stock.duplicate()
+
+func take_stock(index: int) -> void:
+	if index >= 0 and index < _stock.size():
+		_stock[index] = null
+
+func is_fixed_available() -> bool:
+	return fixed_card != null and not _fixed_taken
+
+func take_fixed() -> void:
+	_fixed_taken = true
+
+func is_removal_used() -> bool:
+	return _removal_used
+
+func use_removal() -> void:
+	_removal_used = true
+
+# A rolled card's price, by its rarity (an untagged card at Common's).
+func price_of(card: CardData) -> int:
+	match card.rarity:
+		CardData.CardRarity.UNCOMMON:
+			return price_uncommon
+		CardData.CardRarity.RARE:
+			return price_rare
+		CardData.CardRarity.ULTRA_RARE:
+			return price_ultra_rare
+	return price_common
 
 func _say(text: String) -> void:
 	if text.is_empty():

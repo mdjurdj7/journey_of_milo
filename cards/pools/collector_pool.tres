@@ -1,0 +1,36 @@
+[gd_resource type="Resource" script_class="RewardPool" load_steps=28 format=3]
+
+[ext_resource type="Script" path="res://cards/reward_pool.gd" id="1_reward_pool"]
+[ext_resource type="Resource" path="res://cards/data/carve.tres" id="2_carve"]
+[ext_resource type="Resource" path="res://cards/data/hold_fast.tres" id="4_hold_fast"]
+[ext_resource type="Resource" path="res://cards/data/small_price.tres" id="6_small_price"]
+[ext_resource type="Resource" path="res://cards/data/debt_forgiven.tres" id="7_debt_forgiven"]
+[ext_resource type="Resource" path="res://cards/data/self_eater.tres" id="8_self_eater"]
+[ext_resource type="Resource" path="res://cards/data/cornered.tres" id="9_cornered"]
+[ext_resource type="Resource" path="res://cards/data/unbroken.tres" id="10_unbroken"]
+[ext_resource type="Resource" path="res://cards/data/dying_light.tres" id="11_dying_light"]
+[ext_resource type="Resource" path="res://cards/data/last_wager.tres" id="12_last_wager"]
+[ext_resource type="Resource" path="res://cards/data/refuse_the_end.tres" id="13_refuse_the_end"]
+[ext_resource type="Resource" path="res://cards/data/last_resort.tres" id="14_last_resort"]
+[ext_resource type="Resource" path="res://cards/data/blood_arc.tres" id="15_blood_arc"]
+[ext_resource type="Resource" path="res://cards/data/with_regards.tres" id="16_with_regards"]
+[ext_resource type="Resource" path="res://cards/data/come_due.tres" id="17_come_due"]
+[ext_resource type="Resource" path="res://cards/data/no_further.tres" id="18_no_further"]
+[ext_resource type="Resource" path="res://cards/data/sentence.tres" id="19_sentence"]
+[ext_resource type="Resource" path="res://cards/data/the_return.tres" id="20_the_return"]
+[ext_resource type="Resource" path="res://cards/data/collateral.tres" id="21_collateral"]
+[ext_resource type="Resource" path="res://cards/data/ransom.tres" id="22_ransom"]
+[ext_resource type="Resource" path="res://cards/data/leverage.tres" id="23_leverage"]
+[ext_resource type="Resource" path="res://cards/data/bide.tres" id="24_bide"]
+[ext_resource type="Resource" path="res://cards/data/deny.tres" id="25_deny"]
+[ext_resource type="Resource" path="res://cards/data/blood_advance.tres" id="26_blood_advance"]
+[ext_resource type="Resource" uid="uid://c7jcraas74exv" path="res://cards/neutral/left_hand.tres" id="n_left_hand"]
+[ext_resource type="Resource" uid="uid://dka7rqy5ml1mf" path="res://cards/neutral/second_thoughts.tres" id="n_second_thoughts"]
+[ext_resource type="Resource" uid="uid://cjvv17es5rb3e" path="res://cards/neutral/untouched.tres" id="n_untouched"]
+
+[resource]
+script = ExtResource("1_reward_pool")
+entries = Array[ExtResource("2_carve")]([ExtResource("2_carve"), ExtResource("4_hold_fast"), ExtResource("6_small_price"), ExtResource("7_debt_forgiven"), ExtResource("8_self_eater"), ExtResource("9_cornered"), ExtResource("10_unbroken"), ExtResource("11_dying_light"), ExtResource("12_last_wager"), ExtResource("13_refuse_the_end"), ExtResource("14_last_resort"), ExtResource("15_blood_arc"), ExtResource("16_with_regards"), ExtResource("17_come_due"), ExtResource("18_no_further"), ExtResource("19_sentence"), ExtResource("20_the_return"), ExtResource("21_collateral"), ExtResource("22_ransom"), ExtResource("23_leverage"), ExtResource("24_bide"), ExtResource("25_deny"), ExtResource("26_blood_advance"), ExtResource("n_left_hand"), ExtResource("n_second_thoughts"), ExtResource("n_untouched")])
+weights = Array[float]([])
+enemy_bias = {}
+enemy_bias_multiplier = 2.0

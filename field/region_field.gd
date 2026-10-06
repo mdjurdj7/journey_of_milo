@@ -43,6 +43,7 @@ enum RewardMode { SCREEN, WORLD }
 @export var loot_screen_scene_path: String = "res://battle/loot_screen.tscn"
 # What a BelongingsCache opens into (see open_belongings_screen()).
 @export var belongings_screen_scene_path: String = "res://battle/belongings_screen.tscn"
+@export var collector_screen_scene_path: String = "res://battle/collector_screen.tscn"
 # What a keepsake is offered in (see open_keepsake_offer()).
 @export var keepsake_offer_scene_path: String = "res://battle/keepsake_offer.tscn"
 # The run log (RunLogger - one JSON-lines file per run under user://runs/).
@@ -971,6 +972,7 @@ func _spawn_floor_props() -> void:
 			if not entry.world_line.is_empty():
 				collector.world_line = entry.world_line
 			collector.stock_pool = entry.pool
+			collector.open_requested.connect(open_collector_screen)
 		# A child prop's position is local to its parent (a perch); a top-
 		# level one's is an XZ offset from spawn, grounded by the prop.
 		var placement: Vector3 = entry.position if entry.parent_index >= 0 else Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.z)
@@ -1885,6 +1887,28 @@ func _on_belongings_screen_closed(taken: int, cache: BelongingsCache) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 	if is_instance_valid(cache):
 		cache.resolve(taken)
+
+# The collector's screen (CollectorScreen), over the belongings screen's
+# scrim-and-freeze: the field DISABLED under it until it closes. False
+# when a fight or another screen has the field already.
+func open_collector_screen(collector: Collector) -> bool:
+	if _battle_open or not can_process():
+		return false
+	var scene := load(collector_screen_scene_path) as PackedScene
+	if scene == null:
+		push_warning("RegionField: could not load %s; no collector screen." % collector_screen_scene_path)
+		return false
+	var screen := scene.instantiate() as CollectorScreen
+	screen.setup(collector, deck_panel)
+	screen.closed.connect(_on_collector_screen_closed)
+	if _loot_screen != null and is_instance_valid(_loot_screen):
+		_loot_screen.close()
+	process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(screen)
+	return true
+
+func _on_collector_screen_closed() -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT
 
 # A bundle's loot window, beside the bundle on FieldHUD - the field stays
 # live under it (LootScreen closes itself on leaving reach or a freeze).
