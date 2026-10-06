@@ -47,6 +47,7 @@ PROBE_TIMEOUT_SEC=600
 # own header asks for it). The seconds only order the batch, longest first.
 PROBE_TABLE="
 keeper_keepsake_probe 75
+collector_probe 30
 elite_reward_probe 30
 enemy_export_probe 8
 belongings_choice_probe 51
@@ -99,7 +100,7 @@ area_probes() {
 		floor1) echo "kill_order drain" ;;
 		floor2) echo "kill_order hold_line bundle_roll" ;;
 		floor3) echo "kill_order blackback wardling" ;;
-		floor4) echo "kill_order floor4 wear_path dunecur" ;;
+		floor4) echo "kill_order floor4 wear_path dunecur collector" ;;
 		floor5) echo "kill_order floor5 wear_path" ;;
 		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur floor5" ;;
 		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord elite_reward run_lost" ;;
@@ -133,6 +134,9 @@ path_probes() {
 			id=$(basename "$path" .tres)
 			out="$(area_probes cards) $(grep -lw "$id" "$REPO"/tests/*_probe.gd 2>/dev/null | xargs -r -n1 basename | sed 's/\.gd$//')" ;;
 		cards/reward_pool.gd) out="$(area_probes cards) elite_reward" ;;
+		# The collector's stock pool, and its screen.
+		cards/pools/collector_pool.tres) out="$(area_probes cards) collector" ;;
+		battle/collector_screen.*) out=collector ;;
 		cards/card_effect.gd|cards/deck.gd) out=$(area_probes rules) ;;
 		cards/*) out=$(area_probes cards) ;;
 		battle/card_view.*|battle/card_paper*|battle/card_art*) out=$(area_probes face) ;;
@@ -152,6 +156,7 @@ path_probes() {
 		assets/models/enemies/*) out=$(area_probes enemies) ;;
 		# The Dunecur's crest and feeding head.
 		field/dunecur_pose.*) out="$(area_probes field) dunecur" ;;
+		field/collector.*) out="$(area_probes field) collector" ;;
 		field/*) out=$(area_probes field) ;;
 		floors/region1_floor1.tres) out="$(area_probes floor1) enemy_export" ;;
 		floors/region1_floor2.tres) out="$(area_probes floor2) enemy_export" ;;
@@ -168,7 +173,8 @@ path_probes() {
 		assets/field/masks/region1_floor5_*|assets/field/masks/source/floor5/*) out=$(area_probes floor5) ;;
 		ui/hp_bar.*) out=$(area_probes hp_bar) ;;
 		ui/toll_line.gd|ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd) out=$(area_probes hud) ;;
-		ui/deck_view.*|ui/card_compendium.*) out=$(area_probes ui_inspect) ;;
+		ui/deck_view.*) out="$(area_probes ui_inspect) collector" ;;
+		ui/card_compendium.*) out=$(area_probes ui_inspect) ;;
 		# A play effect: the fight's UI probes, and starter_cards, which
 		# checks Blood Arc's stroke.
 		battle/effects/*) out="$(area_probes battle_ui) starter_cards" ;;
