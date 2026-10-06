@@ -35,7 +35,6 @@ signal draw_started(card_data: CardData)
 	set(value):
 		hand_card_scale = value
 		_reflow_hand(false)
-@export var discard_collapse_duration_sec: float = 0.16
 # How long a card's own slot takes to glide to its new arc position/
 # rotation when the hand's composition changes (draw/discard reflowing
 # every other card to make room or close the gap) - the one genuinely new
@@ -138,11 +137,12 @@ signal draw_started(card_data: CardData)
 # Deferred). The DISCARD readout ticks then.
 @export var play_settle_sec: float = 0.45
 
-@export_group("End Of Turn Fade")
-# The end-of-turn discard: each card fades out in place over this long,
-# sinking discard_fade_sink_px, one after another discard_fade_stagger
-# apart. The enemy turn waits for the last (discard_hand() returns how
-# long that is).
+@export_group("Leave Fade")
+# Every card leaving the hand but a played one (which has its own fade
+# above) - a discard, a set-aside, the end-of-turn discard - fades out in
+# place over this long, sinking discard_fade_sink_px. The end-of-turn
+# discard's cards go one after another discard_fade_stagger apart, and
+# the enemy turn waits for the last (discard_hand() returns how long).
 @export var discard_fade_duration: float = 0.16
 @export var discard_fade_stagger: float = 0.03
 @export var discard_fade_sink_px: float = 6.0
@@ -191,8 +191,8 @@ var _arrival_tweens: Dictionary = {} # Control (slot) -> Tween
 # stagger runs on across draws that come close together.
 var _next_launch_msec: int = 0
 # Set by discard_hand() while the Deck discards: the slots that go then
-# fade in place (_fade_and_remove()), the Nth after N stagger steps,
-# instead of collapsing.
+# fade in place (_fade_and_remove()) the Nth after N stagger steps, not
+# all at once.
 var _fading_discard: bool = false
 var _fade_index: int = 0
 
@@ -283,13 +283,13 @@ func release_views(views: Array[CardView]) -> void:
 		_slots.erase(slot)
 		_slot_cards.erase(slot)
 		_forget_slot(slot)
-		_collapse_and_remove(slot)
+		_fade_and_remove(slot, 0.0)
 	_reflow_hand()
 
 # The one way the hand's contents change: the Deck's hand is the truth,
 # and the slots are brought to match it - a slot for every card the
 # hand holds (two for a card it holds twice, matched one for one), a
-# collapse for every slot whose card it no longer holds, a fresh view
+# fade out for every slot whose card it no longer holds, a fresh view
 # for every card without one - then a single reflow. A drawn card's
 # fresh view waits its turn and flies in from the DECK readout (_queue_
 # arrival()); any other appears in place. Called on every
@@ -315,7 +315,7 @@ func _sync_with_deck() -> void:
 				_fade_and_remove(slot, discard_fade_stagger * float(_fade_index))
 				_fade_index += 1
 			else:
-				_collapse_and_remove(slot)
+				_fade_and_remove(slot, 0.0)
 	_slots = kept
 	for card in wanted:
 		var index: int = _arriving_cards.find(card)
@@ -635,13 +635,9 @@ func _kill_reflow_tween(slot: Control) -> void:
 		tween.kill()
 	_reflow_tweens.erase(slot)
 
-func _collapse_and_remove(slot: Control) -> void:
-	var tween: Tween = create_tween()
-	tween.tween_property(slot, "scale", Vector2.ZERO, discard_collapse_duration_sec)
-	tween.tween_callback(slot.queue_free)
-
-# The end-of-turn discard's way out: after `delay`, fades where it rests,
-# sinking a few px - no travel, no pile.
+# A card's way out of the hand (but a play's): after `delay` (the
+# end-of-turn discard's stagger, else 0), fades where it rests, sinking a
+# few px - no travel, no pile.
 func _fade_and_remove(slot: Control, delay: float) -> void:
 	var tween: Tween = create_tween()
 	tween.tween_interval(delay)
