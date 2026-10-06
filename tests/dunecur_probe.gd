@@ -4,9 +4,9 @@ extends SceneTree
 # Rush loop (6, then 10), and Roused - each Attack card played against it
 # while the Rush is queued adds 2 to that Rush, once per card, up to +8
 # (Rush 10 to 18); played while Snarl is queued, nothing; the Rush that
-# lands spends it, even fully blocked; a Denied Rush keeps it, and the
-# Snarl after lands it (Roused counts on any of its attacks). The intent
-# preview climbs with it and always equals what lands. The rules cases drive EnemyTurn on the
+# lands spends it, even fully blocked; a Denied Rush keeps it, the Snarl
+# after neither takes nor spends it, and the next Rush carries it. The
+# intent preview climbs with it and always equals what lands. The rules cases drive EnemyTurn on the
 # real .tres; the fight cases load floor 4 and play real cards through
 # BattleController.request_play(), so Skills and multi-target Attacks
 # are counted the way a player's are.
@@ -166,9 +166,9 @@ func _check_climb_and_cap() -> void:
 	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), RUSH, "The next Rush is 10 again")
 	_completed += 1
 
-# A Denied Rush lands nothing and keeps Roused. Attack cards on the Snarl
-# that follows add nothing, but Roused counts on any of its attacks: the
-# Snarl lands 6 + 4 and spends it, so the next Rush is back to 10.
+# A Denied Rush lands nothing and keeps Roused. The Snarl that follows
+# neither takes it nor spends it - Attack cards on it add nothing, and it
+# lands 6 - so the next Rush carries the kept 2 stacks: 14, then spent.
 func _check_denied_keeps() -> void:
 	var data: EnemyData = _dunecur()
 	var enemy: Combatant = _enemy(data)
@@ -188,12 +188,19 @@ func _check_denied_keeps() -> void:
 	_expect(not EnemyTurn.take_attack_card(enemy, data), "Snarl queued: an Attack card adds nothing")
 	_expect_eq(_roused(enemy), 2, "...Roused still 2")
 	var shown: int = int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"])
-	_expect_eq(shown, SNARL + 2 * ROUSED_BONUS, "The Snarl shows 10 with Roused 2 on it")
+	_expect_eq(shown, SNARL, "The Snarl shows 6, Roused 2 or not")
 	before = player.hp
 	EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(before - player.hp, SNARL + 2 * ROUSED_BONUS, "...and lands 10")
+	_expect_eq(before - player.hp, SNARL, "...and lands 6")
+	_expect_eq(_roused(enemy), 2, "...leaving Roused 2 for the Rush")
+	var rush: int = RUSH + 2 * ROUSED_BONUS
+	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), rush, "The next Rush shows 14")
+	before = player.hp
+	EnemyTurn.take_turn(enemy, data, player)
+	_expect_eq(before - player.hp, rush, "...and lands 14")
 	_expect_eq(_roused(enemy), 0, "...spending Roused")
-	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), RUSH, "The next Rush is back to 10")
+	EnemyTurn.take_turn(enemy, data, player)
+	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), RUSH, "The Rush after is back to 10")
 	_completed += 1
 
 # A Rush the player's Block takes all of still lands, and still spends

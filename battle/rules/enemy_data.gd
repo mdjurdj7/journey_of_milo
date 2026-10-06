@@ -19,7 +19,9 @@ class_name EnemyData
 @export var starting_statuses: Array[StatusData] = []
 # The status it gains, one stack per Attack card played against it while
 # an intent with counts_attack_cards is queued (EnemyTurn.take_attack_
-# card()) - the Dunecur's Roused. Null (every enemy by default) = none.
+# card()) - the Dunecur's Roused. Only those intents add its bonus and
+# spend it; any other attack leaves it waiting (EnemyTurn.held_back()).
+# Null (every enemy by default) = none.
 @export var attack_card_status: StatusData = null
 # The sound of a card's hit landing on this creature (its shell, its
 # hide), played by its FieldEnemy on the hit frame - takes dealt

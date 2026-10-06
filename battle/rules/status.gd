@@ -222,11 +222,15 @@ static func consume_triggered(statuses: Array[Status]) -> void:
 
 # The attack bonus every status on `statuses` grants one Attack card -
 # attack_damage_bonus per stack, skipping the ones that want Critical when
-# `critical` says the player isn't. See AttackBonus.
-static func attack_bonus(statuses: Array[Status], critical: bool) -> int:
+# `critical` says the player isn't. See AttackBonus. `skip`, when given,
+# pays nothing this time (an enemy's attack-card status on an intent that
+# doesn't take it - EnemyTurn.hit_amount()).
+static func attack_bonus(statuses: Array[Status], critical: bool, skip: StatusData = null) -> int:
 	var total: int = 0
 	for active in statuses:
 		if active.data == null or active.data.attack_damage_bonus == 0:
+			continue
+		if skip != null and active.data == skip:
 			continue
 		if active.data.bonus_requires_critical and not critical:
 			continue
@@ -474,10 +478,11 @@ static func refuse_lethal(player: Combatant, was_critical: bool) -> bool:
 	return true
 
 # The holder's own attack has resolved: every status that lasts only until
-# then (StatusData.consumed_by_own_attack - Braced on an enemy) is gone.
-static func consume_after_attack(statuses: Array[Status]) -> void:
+# then (StatusData.consumed_by_own_attack - Braced on an enemy) is gone -
+# but `keep`, which this attack didn't take (EnemyTurn.take_turn()).
+static func consume_after_attack(statuses: Array[Status], keep: StatusData = null) -> void:
 	for active in statuses.duplicate():
-		if active.data.consumed_by_own_attack:
+		if active.data.consumed_by_own_attack and not (keep != null and active.data == keep):
 			statuses.erase(active)
 
 # Applies every active MODIFIER-category status matching `target` to

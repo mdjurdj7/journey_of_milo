@@ -127,7 +127,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# The attack has resolved, every hit of it: a status that
 				# lasted only until then (Braced on this enemy) is spent -
 				# even if the player's block ate all of it.
-				Status.consume_after_attack(combatant.statuses)
+				Status.consume_after_attack(combatant.statuses, held_back(data, intent))
 				# ...and one on the player that lasted only until an attack
 				# against them resolved (No Further's) goes, or spends a charge.
 				Status.consume_after_attack_against(player.statuses)
@@ -267,6 +267,16 @@ static func take_attack_card(combatant: Combatant, data: EnemyData) -> bool:
 	Status.apply_to(combatant.statuses, data.attack_card_status)
 	return true
 
+# The enemy's attack-card status (Roused) belongs to the intents that
+# count Attack cards (the Rush): only they add its bonus and spend it. On
+# any other intent (the Snarl) it is held back - neither paid nor spent -
+# and waits for the next that counts, so a Denied Rush's stacks go into
+# the next Rush. Null when nothing is held back.
+static func held_back(data: EnemyData, intent: EnemyIntent) -> StatusData:
+	if data == null or intent == null or intent.counts_attack_cards:
+		return null
+	return data.attack_card_status
+
 # Whether this enemy's next turn is skipped (Denied).
 static func is_denied(combatant: Combatant) -> bool:
 	return Status.skip_turn_status(combatant.statuses) != null
@@ -305,13 +315,14 @@ static func intent_value(combatant: Combatant, data: EnemyData, intent: EnemyInt
 
 # One hit of an ATTACK, before block: the intent's value (escalated),
 # plus this enemy's attack bonus - on every hit (StatusData.attack_
-# damage_bonus - Hungry) - then its outgoing modifiers and the player's
-# incoming ones, so a modifier always reads the bonus in. The one number take_turn() lands and
-# preview_intent() shows, hit by hit; `player_statuses` is the player's
-# list or the preview's copy of it.
+# damage_bonus - Hungry), less the attack-card status on an intent that
+# doesn't take it (held_back()) - then its outgoing modifiers and the
+# player's incoming ones, so a modifier always reads the bonus in. The
+# one number take_turn() lands and preview_intent() shows, hit by hit;
+# `player_statuses` is the player's list or the preview's copy of it.
 static func hit_amount(combatant: Combatant, data: EnemyData, intent: EnemyIntent, hit: int, player_statuses: Array[Status]) -> int:
 	var amount: int = intent_value(combatant, data, intent)
-	amount += Status.attack_bonus(combatant.statuses, combatant.is_critical())
+	amount += Status.attack_bonus(combatant.statuses, combatant.is_critical(), held_back(data, intent))
 	amount = Status.apply_modifiers(amount, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 	return Status.apply_modifiers(amount, player_statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
 
