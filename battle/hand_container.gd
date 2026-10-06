@@ -15,22 +15,16 @@ signal play_animation_finished(card_data: CardData)
 # A card was lifted into the armed position / returned or played from it -
 # BattleOverlay disables End Turn while one is armed.
 signal armed_changed(armed: bool)
-# The resting row's composition changed (draw, discard, play) or it was
-# re-laid out - get_rest_left_x() may have moved. `duration` is how long
-# the hand's own glide takes (0 for a snap); the glide is EASE_OUT /
-# TRANS_CUBIC. Not emitted for hover; arming and disarming leave the
-# rest count alone, so the x read back is unchanged.
-signal rest_left_changed(duration: float)
 # A drawn card has left the deck - its arrival flight has just begun
 # (see _launch_arrival()). Once per card, staggered as the flights are.
 signal draw_started(card_data: CardData)
 
 # Must match CardView.card_size (200 x 280 at 1x).
 @export var card_size: Vector2 = Vector2(200.0, 280.0)
-# Base display scale for every card in the hand - applied before (and
-# composed with) the further shrink-to-fit factor _compute_scale_factor()
-# derives against hand_max_span, same "smaller than full card_size for
-# this context" role DeckView's own deck_view_card_scale plays there.
+# Display scale for every card in the hand while the row fits between
+# the limits at it - below it only once the gap has closed to hand_min_
+# gap_px (see _row_fit()), same "smaller than full card_size for this
+# context" role DeckView's own deck_view_card_scale plays there.
 @export_range(0.1, 1.0) var hand_card_scale: float = 0.95:
 	set(value):
 		hand_card_scale = value
@@ -59,30 +53,32 @@ signal draw_started(card_data: CardData)
 		for card_view in _card_views():
 			card_view.set_rest_offset(card_size.y - hand_rest_visible_height)
 
-# Row width cap, measured against hand_card_scale-sized cards (not full
-# card_size) - past this, the hand is scaled down further still (see
-# _compute_scale_factor()) so it never runs off-screen regardless of how
-# many cards it holds.
-@export var hand_max_span: float = 1600.0:
+# The row's bounds, viewport x: its leftmost card's drawn edge never
+# left of hand_left_limit_x (the energy readout's side - BattleOverlay
+# sets it, energy_hand_gap_px right of the readout), its rightmost's
+# never right of hand_right_limit_x (clear of END TURN and the DISCARD
+# line, whose left edges sit at 1799 and 1804+ at 1080p). The row is
+# centred between them. See _row_fit() for what gives when it doesn't fit.
+@export var hand_left_limit_x: float = 443.5:
 	set(value):
-		hand_max_span = value
+		hand_left_limit_x = value
+		_reflow_hand(false)
+@export var hand_right_limit_x: float = 1775.0:
+	set(value):
+		hand_right_limit_x = value
+		_reflow_hand(false)
+# The narrowest edge gap the row closes to before its cards shrink.
+@export var hand_min_gap_px: float = 4.0:
+	set(value):
+		hand_min_gap_px = value
 		_reflow_hand(false)
 
 @export_group("Fan")
-# Gap between adjacent cards' edges while the hand holds fan_gap_max_cards
-# or fewer - see fan_overlap below for what replaces this once there are
-# more.
+# Gap between adjacent cards' edges while the row fits between the limits
+# at it - see _row_fit(). Cards never overlap.
 @export var fan_gap: float = 12.0:
 	set(value):
 		fan_gap = value
-		_reflow_hand(false)
-# Above this many cards, adjacent cards switch from fan_gap's fixed edge
-# gap to fan_overlap's proportional overlap instead (see _reflow_hand()'s
-# own spacing_x branch) - at or below it, cards never overlap regardless
-# of fan_overlap's own value.
-@export var fan_gap_max_cards: int = 6:
-	set(value):
-		fan_gap_max_cards = value
 		_reflow_hand(false)
 # Outer cards tilt outward by up to this many degrees - 0 at the hand's
 # own center, ±this at its two ends (see _reflow_hand()'s own t/rotation
@@ -98,15 +94,6 @@ signal draw_started(card_data: CardData)
 @export var fan_arc_height: float = 22.0:
 	set(value):
 		fan_arc_height = value
-		_reflow_hand(false)
-# Fraction of (scaled) card width adjacent cards overlap by once the hand
-# holds more than fan_gap_max_cards cards - below that, cards use
-# fan_gap's normal edge gap instead and never overlap at all. Applies
-# uniformly to every gap in the hand, not just where it'd otherwise
-# overflow hand_max_span.
-@export_range(0.0, 0.9) var fan_overlap: float = 0.15:
-	set(value):
-		fan_overlap = value
 		_reflow_hand(false)
 
 @export_group("Draw")
@@ -172,8 +159,6 @@ var _bonus_context: EffectContext = null
 var _last_energy: int = -1
 # Set by BattleController - see set_enemy_target_available().
 var _enemy_target_available: bool = true
-# The cost numeral's layout with an empty hand - see _cost_reference_card().
-var _reference_card: CardView = null
 # Where a drawn card's flight starts: the battle's DECK readout, its
 # centre read at each launch - see set_draw_origin().
 var _draw_origin: Control = null
@@ -694,16 +679,13 @@ func play_card(card_data: CardData, _target_screen_pos: Vector2) -> void:
 	settle.tween_interval(play_settle_sec)
 	settle.tween_callback(func() -> void: play_animation_finished.emit(card_data))
 
-# Lays every current card out on an arc centered on this container's own
-# midpoint: each card's normalized position t (-1 at the leftmost card, 0
-# at the hand's center, +1 at the rightmost) drives both its rotation
-# (t * fan_max_rotation_degrees) and its vertical lift (a parabola peaking
-# at fan_arc_height when t=0, 0 at the two ends) - see the per-card loop
-# below. Horizontal spacing is fan_overlap of a card's own width once the
-# hand holds more than fan_gap_max_cards cards, fan_gap's normal edge-to-
-# edge gap otherwise (see those exports' own doc). scale_factor (hand_card_
-# scale, further reduced only if that would still exceed hand_max_span)
-# is uniform across the hand regardless of which spacing rule is active.
+# Lays every current card out on an arc centred between hand_left_limit_x
+# and hand_right_limit_x: each card's normalized position t (-1 at the
+# leftmost card, 0 at the hand's center, +1 at the rightmost) drives both
+# its rotation (t * fan_max_rotation_degrees) and its vertical lift (a
+# parabola peaking at fan_arc_height when t=0, 0 at the two ends) - see
+# the per-card loop below. The card scale and edge gap, uniform across
+# the hand, are _row_fit()'s: never an overlap.
 #
 # Called after every draw/discard/play (animate=true, the default -
 # existing slots glide to their updated targets over reflow_duration_sec)
@@ -728,17 +710,17 @@ func _reflow_hand(animate: bool = true, duration: float = -1.0) -> void:
 	var count: int = slots.size()
 	if duration < 0.0:
 		duration = reflow_duration_sec
-	rest_left_changed.emit(duration if animate else 0.0)
 	if count == 0:
 		return
 
-	var scale_factor: float = _compute_scale_factor(count)
+	var fit: Vector2 = _row_fit(count)
+	var scale_factor: float = fit.x
 	var scaled_card_size: Vector2 = card_size * scale_factor
 
-	var spacing_x: float = _row_spacing(count, scaled_card_size.x)
+	var spacing_x: float = scaled_card_size.x + fit.y
 
 	var total_width: float = scaled_card_size.x + spacing_x * float(count - 1)
-	var start_center_x: float = size.x / 2.0 - total_width / 2.0 + scaled_card_size.x / 2.0
+	var start_center_x: float = _row_centre_x() - total_width / 2.0 + scaled_card_size.x / 2.0
 
 	var index := 0
 	for slot: Control in slots:
@@ -746,7 +728,10 @@ func _reflow_hand(animate: bool = true, duration: float = -1.0) -> void:
 		var rotation_degrees: float = t * fan_max_rotation_degrees
 		var lift: float = fan_arc_height * (1.0 - t * t)
 		var card_center_x: float = start_center_x + spacing_x * float(index)
-		var target_position := Vector2(card_center_x - scaled_card_size.x / 2.0, -lift)
+		# The card is drawn centred card_size.x / 2 into its slot (scaled
+		# about its own bottom centre), not at the slot's own centre - so
+		# the slot goes where that puts the drawn card on card_center_x.
+		var target_position := Vector2(card_center_x - card_size.x / 2.0, -lift)
 
 		slot.custom_minimum_size = scaled_card_size
 		# Bottom-center pivot - cards fan out from a shared point below
@@ -782,110 +767,46 @@ func _reflow_hand(animate: bool = true, duration: float = -1.0) -> void:
 
 		index += 1
 
-# Centre-to-centre spacing for a row of `count` cards `scaled_width` wide
-# - see fan_overlap/fan_gap_max_cards.
-func _row_spacing(count: int, scaled_width: float) -> float:
-	if count > fan_gap_max_cards:
-		return scaled_width * (1.0 - fan_overlap)
-	return scaled_width + fan_gap
+# The row's centre, in this control's own space: midway between the two
+# limits (viewport x).
+func _row_centre_x() -> float:
+	return (hand_left_limit_x + hand_right_limit_x) / 2.0 - global_position.x
 
-# Global x of the leftmost resting card's left edge at canvas row
-# `at_global_y` - what BattleOverlay keeps the energy readout a gap left
-# of. Worked out from the layout, never read off the live slot, so a hover
-# lift, the armed travel or a glide in flight never moves it: the armed
-# card counts as still in the row (the readout holds through arm and
-# disarm, moving only when a card is played), a drawn card counts from its
-# launch, not before (so the readout glides a card's worth at each launch,
-# over draw_duration, rather than to the whole draw at once - see
-# _laid_out_count()), and an empty hand reads as one card. The left edge
-# leans with the card's tilt about the slot's
-# bottom-centre pivot, so it's taken at the asked row, clamped to the
-# card's own height.
-func get_rest_left_x(at_global_y: float) -> float:
-	var count: int = maxi(_laid_out_count(), 1)
-	var scale_factor: float = _compute_scale_factor(count)
-	var scaled_card_size: Vector2 = card_size * scale_factor
-	var total_width: float = scaled_card_size.x + _row_spacing(count, scaled_card_size.x) * float(count - 1)
-	var slot_position := Vector2(size.x / 2.0 - total_width / 2.0, 0.0)
-	var theta: float = 0.0
+# The card scale (x) and edge gap (y) for a row of `count` cards between
+# the limits: hand_card_scale at fan_gap while that fits; past it the gap
+# closes, down to hand_min_gap_px; past that the cards shrink until the
+# row fits. Never an overlap, so every cost numeral shows. The limits
+# bound the cards as drawn: the outer cards' tilt reach past their own
+# edges (_tilt_overhang(), at hand_card_scale - a smaller card, its top
+# lower beside the pivot, reaches less) comes off both sides of the span,
+# which keeps the row centred.
+func _row_fit(count: int) -> Vector2:
+	var overhang: Vector2 = _tilt_overhang(hand_card_scale, count)
+	var span: float = hand_right_limit_x - hand_left_limit_x - 2.0 * maxf(overhang.x, overhang.y)
+	var width: float = card_size.x * hand_card_scale
+	var gaps: float = float(count - 1)
+	if float(count) * width + gaps * fan_gap <= span:
+		return Vector2(hand_card_scale, fan_gap)
 	if count > 1:
-		theta = deg_to_rad(-fan_max_rotation_degrees)
-	# t = -1 lifts nothing (see _reflow_hand()); a lone card sits at t = 0.
-	if count == 1:
-		slot_position.y = -fan_arc_height
-	var pivot := Vector2(scaled_card_size.x / 2.0, scaled_card_size.y)
-	# The CardView in the slot: card_size, scaled by scale_factor about its
-	# own bottom centre, its top at the rest offset.
-	var rest_offset_y: float = card_size.y - hand_rest_visible_height
-	var edge_x: float = card_size.x / 2.0 - card_size.x * scale_factor / 2.0
-	var bottom_y: float = rest_offset_y + card_size.y
-	var top_y: float = bottom_y - card_size.y * scale_factor
-	var origin: Vector2 = global_position + slot_position + pivot
-	# Slot-local y on the edge that lands on the asked row, undoing the tilt.
-	var local_y: float = pivot.y + (at_global_y - origin.y - sin(theta) * (edge_x - pivot.x)) / cos(theta)
-	local_y = clampf(local_y, top_y, bottom_y)
-	return origin.x + cos(theta) * (edge_x - pivot.x) - sin(theta) * (local_y - pivot.y)
+		var gap: float = (span - float(count) * width) / gaps
+		if gap >= hand_min_gap_px:
+			return Vector2(hand_card_scale, gap)
+	var card_scale: float = (span - gaps * hand_min_gap_px) / (float(count) * card_size.x)
+	return Vector2(clampf(card_scale, 0.05, hand_card_scale), hand_min_gap_px)
 
-# Global y of the top of the leftmost resting card's cost numeral - what
-# BattleOverlay levels the energy readout's numeral with. The same layout
-# get_rest_left_x() reads, never the live slot: the armed card still
-# counts, a drawn card only from its launch, an empty hand reads as one
-# card, and hover never moves it. The
-# top is the cost font's tallest figure (BattleResources.figure_ink_top()),
-# so it holds whatever the cost, taken at the numeral's horizontal middle
-# and carried through the card's scale, its rest offset, the slot's lift
-# (a lone card's arc; none at the row's left end) and its tilt.
-func get_rest_cost_top_y() -> float:
-	var count: int = maxi(_laid_out_count(), 1)
-	var scale_factor: float = _compute_scale_factor(count)
-	var scaled_card_size: Vector2 = card_size * scale_factor
-	var theta: float = 0.0
-	if count > 1:
-		theta = deg_to_rad(-fan_max_rotation_degrees)
-	var lift: float = fan_arc_height if count == 1 else 0.0
-	var pivot := Vector2(scaled_card_size.x / 2.0, scaled_card_size.y)
-	var card: CardView = _cost_reference_card()
-	var cost_font: Font = card.cost_font
-	var figure_width: float = InkType.width(cost_font, "0", card.cost_font_size_px)
-	# Card-local, at 1x: the numeral is right-aligned to the outer margin.
-	var point := Vector2(card_size.x - card.outer_margin - figure_width / 2.0, card.header_baseline_px + BattleResources.figure_ink_top(cost_font, card.cost_font_size_px))
-	# Into the slot: scaled about the card's bottom centre, at the rest
-	# offset.
-	var card_pivot := Vector2(card_size.x / 2.0, card_size.y)
-	var slot_point: Vector2 = Vector2(0.0, card_size.y - hand_rest_visible_height) + card_pivot + (point - card_pivot) * scale_factor
-	var delta: Vector2 = slot_point - pivot
-	return global_position.y - lift + pivot.y + sin(theta) * delta.x + cos(theta) * delta.y
-
-# The cards the row's layout holds: every slot but a drawn one still
-# waiting to launch (the armed card included - see get_rest_left_x()).
-func _laid_out_count() -> int:
-	return _slots.size() - _waiting_slots.size()
-
-# A CardView to read the cost numeral's layout from: the leftmost slot's,
-# or - with an empty hand - one kept aside, never in the tree.
-func _cost_reference_card() -> CardView:
-	if not _slots.is_empty() and _slots[0].get_child_count() > 0:
-		var card: CardView = _slots[0].get_child(0) as CardView
-		if card != null:
-			return card
-	if _reference_card == null:
-		_reference_card = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
-	return _reference_card
-
-func _notification(what: int) -> void:
-	if what == NOTIFICATION_PREDELETE and _reference_card != null:
-		_reference_card.free()
-
-# hand_card_scale is the base factor (a card in hand is never full
-# card_size, regardless of count); this only shrinks further, on top of
-# that, once even hand_card_scale-sized cards at fan_gap spacing would
-# exceed hand_max_span. natural_width uses fan_gap regardless of the
-# overlap rule above (an approximation, not an exact fit, same as before
-# this feature existed - see fan_overlap's own doc for the actual overlap
-# math this doesn't need to mirror precisely).
-func _compute_scale_factor(count: int) -> float:
-	var base_card_width: float = card_size.x * hand_card_scale
-	var natural_width: float = count * base_card_width + max(count - 1, 0) * fan_gap
-	if natural_width > hand_max_span:
-		return hand_card_scale * (hand_max_span / natural_width)
-	return hand_card_scale
+# How far a row's outer cards reach past their own drawn edges once
+# tilted, left (x) and right (y): the slot turns about its bottom centre,
+# so the card's top corner - above that pivot - leans out. The card is
+# card_size scaled about its own bottom centre, so its edges sit at
+# card_size.x / 2 -+ half its scaled width in the slot. A lone card
+# doesn't tilt.
+func _tilt_overhang(card_scale: float, count: int) -> Vector2:
+	var theta: float = deg_to_rad(fan_max_rotation_degrees) if count > 1 else 0.0
+	var pivot := Vector2(card_size.x * card_scale / 2.0, card_size.y * card_scale)
+	var top: float = (card_size.y - hand_rest_visible_height) + card_size.y * (1.0 - card_scale)
+	var rise: float = maxf(pivot.y - top, 0.0)
+	var left_edge: float = card_size.x / 2.0 - card_size.x * card_scale / 2.0
+	var right_edge: float = card_size.x / 2.0 + card_size.x * card_scale / 2.0
+	var left_x: float = pivot.x + cos(theta) * (left_edge - pivot.x) - sin(theta) * rise
+	var right_x: float = pivot.x + cos(theta) * (right_edge - pivot.x) + sin(theta) * rise
+	return Vector2(maxf(left_edge - left_x, 0.0), maxf(right_x - right_edge, 0.0))

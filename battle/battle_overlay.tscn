@@ -27,7 +27,6 @@ offset_bottom = -20.0
 script = ExtResource("2_hand")
 fan_gap = 18.0
 fan_max_rotation_degrees = 4.0
-fan_overlap = 0.0
 
 [node name="EndTurnButton" type="Button" parent="." unique_id=1869802361]
 layout_mode = 0

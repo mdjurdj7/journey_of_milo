@@ -60,25 +60,25 @@ signal battle_finished(outcome: Outcome)
 @export_group("Corners")
 # The fixed readouts' inset from the viewport's edges: bottom-left the
 # DECK line, bottom-right End Turn with the DISCARD line beneath it - see
-# _layout_corners(). The energy readout (BattleResources) sits beside the
-# hand instead - see _move_energy_readout().
+# _layout_corners(). The energy readout (BattleResources) is pinned at
+# energy_anchor instead.
 @export var corner_margin_px: float = 40.0
 # Between End Turn's rule and the DISCARD line under it.
 @export var stack_gap_px: float = 10.0
-# The energy readout's right edge keeps this far left of the leftmost
-# resting card (see HandContainer.get_rest_left_x()), never closer to the
-# viewport's left edge than corner_margin_px.
+# The energy readout's place, overlay-local and fixed whatever the hand
+# holds: its right edge (x) and its numeral's top (y) - it grows leftward
+# from that edge. The default is where a five-card hand used to put it,
+# beside the leftmost card with its numeral level with that card's cost.
+@export var energy_anchor: Vector2 = Vector2(419.5, 832.1):
+	set(value):
+		energy_anchor = value
+		_apply_energy_anchor()
+# The hand keeps this far right of the readout's edge
+# (HandContainer.hand_left_limit_x, pushed by _apply_energy_anchor()).
 @export var energy_hand_gap_px: float = 24.0:
 	set(value):
 		energy_hand_gap_px = value
-		_move_energy_readout(0.0)
-# The energy numeral's top sits level with the top of the leftmost
-# resting card's cost numeral (HandContainer.get_rest_cost_top_y()), then
-# this much lower (negative = higher).
-@export var energy_align_offset_px: float = 0.0:
-	set(value):
-		energy_align_offset_px = value
-		_move_energy_readout(0.0)
+		_apply_energy_anchor()
 # Between the DECK line and the keepsake row under it - the row sits in
 # the corner margin, so nothing above it moves.
 @export var keepsake_row_gap_px: float = 4.0:
@@ -138,13 +138,6 @@ var _resources: BattleResources = null
 var _deck_readout: DeckPanel = null
 var _discard_readout: DeckPanel = null
 var _keepsake_row: KeepsakeRow = null
-# The energy readout's anchor, overlay-local - its right edge (x) and its
-# numeral's top (y): where it is now and where the hand last asked it to
-# go (NAN until the first placement), and the glide between them - see
-# _move_energy_readout().
-var _energy_anchor: Vector2 = Vector2.ZERO
-var _energy_target_anchor: Vector2 = Vector2(NAN, NAN)
-var _energy_tween: Tween = null
 # The theme's current value set (see enter_battle()/_flip_dark_world()).
 var _on_dark_world: bool = false
 # End Turn is enabled only while both hold - see _update_end_turn().
@@ -188,6 +181,8 @@ func _ready() -> void:
 	debug_row.add_child(add_card_button)
 
 	resized.connect(_layout_corners)
+	# The hand's left limit follows the readout's place from the start.
+	_apply_energy_anchor()
 
 # Reads RegionField's ui_on_dark_world switch and applies the matching
 # value set to this overlay's theme (see ui/battle_theme.gd's own
@@ -342,7 +337,6 @@ func _create_corner_readouts() -> void:
 	# Its size changes with the numeral and the tally; the right edge and
 	# the numeral's top hold.
 	_resources.resized.connect(_apply_energy_anchor)
-	hand_container.rest_left_changed.connect(_move_energy_readout)
 	_deck_readout = DeckPanel.new()
 	add_child(_deck_readout)
 	_discard_readout = DeckPanel.new()
@@ -365,8 +359,8 @@ func _refresh_keepsake_row() -> void:
 
 # Bottom-left: DECK line flush in the corner and the keepsake row
 # keepsake_row_gap_px under it, in the corner margin; the energy readout
-# is placed by the hand (see _move_energy_readout()). Bottom-right: DISCARD line flush in the
-# corner, End Turn's rule stack_gap_px above it. Each readout keeps its
+# at energy_anchor. Bottom-right: DISCARD line flush in the corner, End
+# Turn's rule stack_gap_px above it. Each readout keeps its
 # own corner edge when its text changes size (see their _relayout()s), so
 # this only needs re-running on a viewport resize.
 func _layout_corners() -> void:
@@ -378,57 +372,26 @@ func _layout_corners() -> void:
 	_deck_readout.position = Vector2(corner_margin_px, bottom - _deck_readout.size.y)
 	if _keepsake_row != null:
 		_keepsake_row.position = Vector2(corner_margin_px, bottom + keepsake_row_gap_px)
-	_move_energy_readout(0.0)
+	_apply_energy_anchor()
 
 	_discard_readout.position = Vector2(right - _discard_readout.size.x, bottom - _discard_readout.size.y)
 	var end_turn_rule_bottom: float = _discard_readout.position.y - stack_gap_px
 	end_turn_button.position = Vector2(right - end_turn_button.size.x, end_turn_rule_bottom - end_turn_button.rule_bottom())
 
-# Sends the energy readout to its place beside the hand: its numeral's
-# top level with the leftmost resting card's cost numeral (plus energy_
-# align_offset_px), its right edge energy_hand_gap_px left of that card's
-# edge at the readout's top row. x and y glide together over `duration`
-# with the hand's own EASE_OUT / TRANS_CUBIC, or snap at 0. A glide
-# toward a target it's already heading for is left alone, so arm/disarm
-# reflows don't restart one.
-func _move_energy_readout(duration: float) -> void:
-	if _resources == null or not is_inside_tree():
-		return
-	var numeral_top: float = hand_container.get_rest_cost_top_y() + energy_align_offset_px - global_position.y
-	# The card's edge at the row the readout's top will sit on.
-	var readout_top: float = global_position.y + numeral_top - _resources.numeral_ink_top()
-	var rest_left: float = hand_container.get_rest_left_x(readout_top) - global_position.x
-	var target := Vector2(rest_left - energy_hand_gap_px, numeral_top)
-	# The first placement always snaps - there's nowhere to glide from.
-	if is_nan(_energy_target_anchor.x):
-		duration = 0.0
-	if duration > 0.0 and target == _energy_target_anchor:
-		return
-	_energy_target_anchor = target
-	if _energy_tween != null and _energy_tween.is_valid():
-		_energy_tween.kill()
-	_energy_tween = null
-	if duration <= 0.0:
-		_set_energy_anchor(target)
-		return
-	_energy_tween = create_tween()
-	_energy_tween.set_ease(Tween.EASE_OUT)
-	_energy_tween.set_trans(Tween.TRANS_CUBIC)
-	_energy_tween.tween_method(_set_energy_anchor, _energy_anchor, target, duration)
-
-func _set_energy_anchor(anchor: Vector2) -> void:
-	_energy_anchor = anchor
-	_apply_energy_anchor()
-
-# Right edge held at the anchor's x, left edge clamped to the corner
-# margin - a very wide readout beside a full hand gives up gap, not
-# screen; the numeral's top on the anchor's y, whatever the readout's
-# size. The keepsake row's hover text keeps to the readout's top row, so
-# it never lands on the readout when a full hand brings it over.
+# Right edge held at energy_anchor's x, left edge clamped to the corner
+# margin - a very wide readout gives up its edge, not screen; the
+# numeral's top on the anchor's y, whatever the readout's size. The hand
+# keeps energy_hand_gap_px right of that edge. The keepsake row's hover
+# text keeps to the readout's top row, so it never lands on the readout.
 func _apply_energy_anchor() -> void:
+	# Only when it moves - this also runs on every resize of the readout,
+	# and the limit's setter re-lays the hand out (a snap).
+	var left_limit: float = global_position.x + energy_anchor.x + energy_hand_gap_px
+	if hand_container != null and hand_container.hand_left_limit_x != left_limit:
+		hand_container.hand_left_limit_x = left_limit
 	if _resources == null:
 		return
-	_resources.position = Vector2(maxf(_energy_anchor.x - _resources.size.x, corner_margin_px), _energy_anchor.y - _resources.numeral_ink_top())
+	_resources.position = Vector2(maxf(energy_anchor.x - _resources.size.x, corner_margin_px), energy_anchor.y - _resources.numeral_ink_top())
 	if _keepsake_row != null:
 		_keepsake_row.set_reveal_floor_y(_resources.global_position.y)
 
