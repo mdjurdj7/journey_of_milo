@@ -12,7 +12,7 @@ class_name TitleScreen
 # field; RegionField._ready() consumes the flag and holds the title
 # instead of playing the intro outright. F6 on the field never passes
 # through here, so it keeps starting a run with the intro, no title;
-# RunOver's Restart likewise.
+# the end screen's NEW RUN likewise.
 
 const FIELD_SCENE_PATH := "res://field/region_field.tscn"
 

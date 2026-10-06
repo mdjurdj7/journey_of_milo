@@ -440,8 +440,9 @@ func _check_hud_line() -> void:
 	await _teardown()
 	_completed += 1
 
-# Last: Restart changes the scene. Death leaves a keepsake and Toll; the
-# RunOver screen's Restart starts a new run.
+# Last: NEW RUN changes the scene. Death leaves a keepsake and Toll; the
+# end screen for a loss (run_over.tscn, a RunEnd) starts a new run from
+# its NEW RUN.
 func _check_restart_clears() -> void:
 	_new_run()
 	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))
@@ -449,8 +450,8 @@ func _check_restart_clears() -> void:
 	var run_over: Node = (load(RUN_OVER_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(run_over)
 	await process_frame
-	(run_over.get_node("RestartButton") as Button).pressed.emit()
-	_expect(_keepsake() == null, "Death -> Restart leaves the slot empty")
+	run_over.call("_activate", 0)
+	_expect(_keepsake() == null, "Death -> NEW RUN leaves the slot empty")
 	_expect_eq(int(_run_state.get("toll")), 0, "...and Toll at 0")
 	_completed += 1
 

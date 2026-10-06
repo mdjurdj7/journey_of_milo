@@ -313,6 +313,8 @@ var _wade_drain_accumulator: float = 0.0
 # already in flight (change_scene_to_file doesn't happen mid-frame) can't
 # be re-triggered by another drain tick before it lands.
 var _run_lost_to_wading: bool = false
+# Set by _end_run_lost(): a lost run fades once, whatever else asks.
+var _run_ending: bool = false
 
 # The click mark, created on first use - see ClickMarker.
 var _click_marker: ClickMarker = null
@@ -694,8 +696,7 @@ func _physics_process(delta: float) -> void:
 	RunState.lose_hp(whole_damage)
 	if RunState.player_hp <= 0:
 		_run_lost_to_wading = true
-		RunState.log_run_end("drowned")
-		get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
+		_end_run_lost("drowned")
 
 # The field's forward direction: normalized XZ vector from the
 # Wanderer's spawn to the ForwardMarker. Nothing else should assume an
@@ -1274,6 +1275,20 @@ func _on_floor_exited() -> void:
 	print("RegionField: floor_exited, current_floor_index = %d" % RunState.current_floor_index)
 	get_tree().reload_current_scene()
 
+# A lost run - died in a fight, or drowned: logged, the field frozen (the
+# transition's freeze), the frame faded to the fog over fade_seconds as a
+# floor's exit does, and then the end screen for a loss (RUN_OVER_SCENE_
+# PATH, a RunEnd) over the fade, which stays up under it.
+func _end_run_lost(cause: String) -> void:
+	if _run_ending:
+		return
+	_run_ending = true
+	RunState.log_run_end(cause)
+	process_mode = Node.PROCESS_MODE_DISABLED
+	var fade := FloorFade.get_or_create(get_tree())
+	await fade.fade_out(_fog_colour(), fade_seconds)
+	get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
+
 # The pale the fade goes to: the region's own fog colour, so the frame
 # fills with the same nothing the far field already is.
 func _fog_colour() -> Color:
@@ -1617,8 +1632,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 				member.return_to_field_pose(return_time)
 				member.exit_battle_hover()
 		BattleOverlay.Outcome.LOSE:
-			RunState.log_run_end("died")
-			get_tree().change_scene_to_file(RUN_OVER_SCENE_PATH)
+			_end_run_lost("died")
 	_fight_fallen.clear()
 
 # Is a fight the floor demands still standing? FloorEnemy.required,

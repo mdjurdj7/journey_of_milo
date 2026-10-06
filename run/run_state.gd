@@ -94,19 +94,23 @@ var region_lap: int = 0
 # new_run() zeroes both.
 var floors_crossed: int = 0
 var fights_won: int = 0
+# How the run ended (log_run_end()'s cause: won, died, drowned, quit,
+# abandoned), "" while it runs - what RunEnd reads to say the line for a
+# drowning. new_run() clears it.
+var end_cause: String = ""
 
 # The zone intro (ZoneIntro, played by RegionField) is owed exactly once,
 # by the first floor of a NEW run: new_run() raises this and RegionField
 # consumes it (reads and clears) in its _ready(). A floor change
 # (reload_current_scene()) never calls new_run(), so it never raises it -
-# the intro is a run's first frame, not a floor's. The RunOver restart
-# does call new_run() (RunOver._on_restart_pressed()): a new run.
+# the intro is a run's first frame, not a floor's. The end screen's NEW
+# RUN does call new_run() (RunEnd._activate()): a new run.
 var run_opening_pending: bool = false
 
 # Raised by the boot scene (TitleScreen) alone, consumed by RegionField's
 # _ready(): the field holds the title (ZoneIntro.hold_title() - the intro's
 # frame zero with the TitleMenu over it) instead of playing the intro
-# outright. F6 on the field and a RunOver restart never raise it.
+# outright. F6 on the field and the end screen's NEW RUN never raise it.
 var title_pending: bool = false
 
 # The run's one generator. Everything that rolls something a player could
@@ -149,6 +153,7 @@ func new_run(starting_character: CharacterData) -> void:
 	region_lap = 0
 	floors_crossed = 0
 	fights_won = 0
+	end_cause = ""
 	# Field findings (a Hull's one-time world line, a Bird's one-time
 	# flight, the Keeper's one-time offer, a belongings cache's one
 	# choice, a trough's one drink) are remembered per run in their own
@@ -196,6 +201,7 @@ func run_snapshot() -> Dictionary:
 
 # The run is over, for the log: won, died, drowned, quit or abandoned.
 func log_run_end(cause: String) -> void:
+	end_cause = cause
 	RunLogger.end_run(cause, run_snapshot())
 
 # The window closing is a quit - the line goes before the tree does.

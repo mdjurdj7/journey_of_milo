@@ -1,11 +1,15 @@
 extends CanvasLayer
 class_name RunEnd
 
-# The run's end when it is won: Region 1's last floor left by its exit
-# (RegionField._on_floor_exited(), with loop_region_after_last_floor off).
-# The transition's fade has already taken the frame to the fog colour and
-# stays up (FloorFade, layer 128, on the tree's root); this sits just
-# above it, so the screen is type on the fog - no boxes, no glow. One
+# The run's end, whichever way it went - two scenes on this script: won
+# (run_end.tscn: Region 1's last floor left by its exit, RegionField._on_
+# floor_exited() with loop_region_after_last_floor off) and lost
+# (run_over.tscn: died in a fight or drowned wading, RegionField._end_run_
+# lost()), each with its own line; a drowning says drowned_line when the
+# scene sets one. Either way the fade has already taken the frame to the
+# fog colour and stays up (FloorFade, layer 128, on the tree's root);
+# this sits just above it, so the screen is type on the fog - no boxes,
+# no glow. One
 # world-voice line in Spectral; under it, in the system voice, the run's
 # tally - caps labels in the utility grey, values in ink; under that two
 # items in the title's style and with its input (an InkMenu, as TitleMenu
@@ -14,8 +18,8 @@ class_name RunEnd
 # (wrapping), ui_accept activates, hover focuses, a click activates; the
 # first activation wins.
 #
-# NEW RUN is RunOver's restart: RunState.new_run() with the same
-# character, then the field - floor 1, the zone intro. TITLE starts the
+# NEW RUN is a restart: RunState.new_run() with the same character, then
+# the field - floor 1, the zone intro. TITLE starts the
 # new run the same way and then loads the boot scene (TitleScreen), so the
 # title's Start finds a fresh run exactly as at launch. Either way the
 # fade comes down first, as neither flow expects one up.
@@ -35,6 +39,12 @@ enum Item { NEW_RUN, TITLE }
 @export var world_line: String = "The way goes on.":
 	set(value):
 		world_line = value
+		_relayout_if_ready()
+# Said instead of world_line when the run was drowned (RunState.end_cause);
+# empty, world_line is said for every end.
+@export var drowned_line: String = "":
+	set(value):
+		drowned_line = value
 		_relayout_if_ready()
 
 @export_group("Type")
@@ -183,6 +193,13 @@ static func stat_rows() -> Array[PackedStringArray]:
 		PackedStringArray(["KEEPSAKE", keepsake.display_name if keepsake != null and not keepsake.display_name.is_empty() else "—"]),
 	]
 
+# The line this end says: drowned_line for a drowning when set, else
+# world_line.
+func line_text() -> String:
+	if RunState.end_cause == "drowned" and not drowned_line.is_empty():
+		return drowned_line
+	return world_line
+
 func _relayout_if_ready() -> void:
 	if is_inside_tree() and line_label != null:
 		_relayout()
@@ -196,7 +213,7 @@ func _relayout() -> void:
 	var left: float = viewport_size.x * left_margin_fraction
 
 	var line_size: int = maxi(roundi(float(line_font_size_px) * scale), 1)
-	line_label.text = world_line
+	line_label.text = line_text()
 	line_label.add_theme_font_override("font", line_font)
 	line_label.add_theme_font_size_override("font_size", line_size)
 	line_label.add_theme_color_override("font_color", ink)
@@ -252,8 +269,8 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _menu.handle_input(event):
 		get_viewport().set_input_as_handled()
 
-# The first activation wins. Both start a fresh run - the one just won is
-# already logged and closed - and take the fade down before leaving.
+# The first activation wins. Both start a fresh run - the one that ended
+# is already logged and closed - and take the fade down before leaving.
 func _activate(index: int) -> void:
 	if _menu.locked:
 		return

@@ -73,6 +73,7 @@ come_due_face_probe 7
 hold_line_probe 7 fixed
 floor4_probe 40 fixed
 floor5_probe 20 fixed
+run_lost_probe 12
 dunecur_probe 30
 card_rarity_probe 5
 come_due_probe 4
@@ -94,14 +95,14 @@ area_probes() {
 		keywords) echo "keyword starter_cards the_return" ;;
 		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback" ;;
 		enemies) echo "blackback siltjaw wardling dunecur sentence no_further critical_cards kill_order armored_contact deny enemy_export" ;;
-		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward" ;;
+		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost" ;;
 		floor1) echo "kill_order drain" ;;
 		floor2) echo "kill_order hold_line bundle_roll" ;;
 		floor3) echo "kill_order blackback wardling" ;;
 		floor4) echo "kill_order floor4 wear_path dunecur" ;;
 		floor5) echo "kill_order floor5 wear_path" ;;
 		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur floor5" ;;
-		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord elite_reward" ;;
+		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord elite_reward run_lost" ;;
 		hud) echo "gold_line glassbone" ;;
 		hp_bar) echo "kill_order" ;;
 		ui_inspect) echo "keyword" ;;
@@ -140,9 +141,10 @@ path_probes() {
 		battle/rules/statuses/*|battle/rules/enemy_data.gd|battle/rules/status.gd|battle/rules/status_data.gd) out="$(area_probes rules) enemy_export" ;;
 		run/keepsakes/*) out="$(area_probes run) enemy_export" ;;
 		battle/rules/*|battle/battle_controller.gd) out=$(area_probes rules) ;;
-		# The run's won end: the run probes, and floor5_probe, which wins
-		# floor 5 and takes its exit into it.
-		run/run_end.*) out="$(area_probes run) floor5" ;;
+		# The run's end screens (run_end.gd, its won and lost scenes): the run
+		# probes - run_lost_probe among them, losing both ways - and
+		# floor5_probe, which wins floor 5 and takes its exit into it.
+		run/run_end.*|run/run_over.*) out="$(area_probes run) floor5" ;;
 		battle/reward_screen.*|battle/belongings_screen.*|battle/loot_screen.*|battle/keepsake_offer.*|battle/keepsake_row.*|battle/trough_choice.*|run/*) out=$(area_probes run) ;;
 		# Keepsake art: the probes that load keepsakes and their art.
 		assets/textures/keepsakes/*) out="keeper_keepsake trinket belongings_choice" ;;
