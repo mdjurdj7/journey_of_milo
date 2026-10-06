@@ -46,10 +46,18 @@ rates (`RewardPool`'s Elite rarity rates: Common 0 / Uncommon 75 / Rare
 23 / Ultra Rare 2, renormalised over the tiers with a card left, as the
 normal rates are - so Common only when nothing else is). Keepsakes and
 Glassbone stay their own fields (`keepsake_table`, `glassbone_reward`).
-The region-end fight is to roll the same rates; until it exists, floor
-5's placeholder (a Sputter) is placed with `FloorEnemy.elite_card_rates`,
-which gives a fight the elite rates only - not the elite gold. A bundle
-or cache keeps its own flat roll. (2026-10-05.)
+A bundle or cache keeps its own flat roll. (2026-10-05.)
+
+The region-end fight (floor 5's Greyshelf) is not elite: it pays the
+floor's own gold and its Glassbone x1, and its card reward is set on the
+placement - `FloorEnemy.card_reward = TOP_TIER_FIRST`, which replaced the
+placeholder's `elite_card_rates` - to offer three distinct cards from the
+highest tier down (`RewardPool.roll_top_tier()`): Ultra Rare first, and
+only when that runs dry the next tier fills the rest. With no Ultra Rare
+card yet it offers three Rares; Ultra Rares added to the pool are offered
+first without a change. Skip works as for any fight. Nothing reads a
+"region end" flag - it is the last floor's fight and its placement's
+reward setting. (2026-10-05, Greyshelf.)
 
 ## Run log
 
@@ -423,6 +431,16 @@ folder (run_log_probe). (2026-10-04.)
   The bones it feeds over (`BoneScatter`, floor 4) are primitives -
   capsules, ovoids, drums - until bone models exist; `model_paths` takes
   one glb per piece kind and swaps them in. (2026-10-04, Dunecur.)
+- **The Greyshelf's jaw doesn't open.** Its glb's mouth is sealed - the
+  lip line at the snout is painted, no gap and no interior - so the
+  Gape's tell is `GreyshelfPose`'s rear of the forequarters with the
+  throat swelling and its blue deepening (`field/greyshelf_throat.gdshader`,
+  hue and value only, no glow). A jaw needs a model with a mouth. It lies
+  sunk 0.3 m on the crest (`EnemyData.sink_m`, which lowers the model
+  without burying it the way a negative `rest_height_m` does), and its
+  `contact_sounds` borrow `combat_old/hit.wav`, as the Dunecur and the
+  Wardling do. Its material is the field's for every enemy, normal map
+  included, as the Siltjaw's is. (2026-10-05, Greyshelf.)
 - **The card export should be generated, like the enemy export.**
   `docs/wanderer_card_export.json` is rebuilt by throwaway scripts and
   committed by hand, so nothing notices when it drifts from the cards.
