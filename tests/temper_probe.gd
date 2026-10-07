@@ -34,7 +34,13 @@ const SCANS: Dictionary = {
 const LOG_DIR := "user://temper_probe"
 # Floor 3 (index 2) holds the wagon.
 const WAGON_FLOOR := 2
-const WAGON_OFFSET := Vector2(3.5, -12.5)
+# In the north-west pocket off the stem, set back from its mouth, its
+# long axis along the pocket's curve.
+const WAGON_OFFSET := Vector2(-7.3, -28.1)
+const WAGON_YAW := 153.0
+# Room the Wanderer has round it: footprint to the floor's ledge lines,
+# and the ground this far round it is the floor, not a ridge face.
+const WAGON_EDGE_CLEARANCE := 1.5
 const LEAVE_INDEX := 100002
 const BACK_INDEX := 100001
 const TEMPER_INDEX := 100000
@@ -219,9 +225,10 @@ func _check_faces() -> void:
 	view.free()
 	_completed += 1
 
-# The wagon: floor 3's second prop at (3.5, -12.5) from spawn, grounded
-# by its footprint on the floor (not a ridge face), MAKE_STATIC, its
-# footprint clear of the worn band's visible edge.
+# The wagon: floor 3's second prop at (-7.3, -28.1) from spawn, yaw 153,
+# grounded by its footprint on the floor, WAGON_EDGE_CLEARANCE from every
+# ledge line and on flat floor that far round, MAKE_STATIC, its footprint
+# clear of the worn band's visible edge.
 func _check_wagon_placement() -> void:
 	var wagons: Array[Node] = get_nodes_in_group("wagons")
 	_expect_eq(wagons.size(), 1, "Floor 3 has one wagon")
@@ -232,6 +239,7 @@ func _check_wagon_placement() -> void:
 	var spawn: Vector3 = _field.call("get_spawn_position")
 	var offset := Vector2(wagon.global_position.x - spawn.x, wagon.global_position.z - spawn.z)
 	_expect(offset.distance_to(WAGON_OFFSET) < 0.01, "...at %s from spawn (got %s)" % [WAGON_OFFSET, offset])
+	_expect(is_equal_approx(float(wagon.get("yaw_degrees")), WAGON_YAW), "...yaw %.0f along the pocket's curve" % WAGON_YAW)
 	_expect_eq(wagon.get("world_line"), "A wagon, unhitched. The tools are still on it.", "...with its approach line")
 	var body := wagon.find_child("Collision", true, false) as StaticBody3D
 	_expect(body != null and body.disable_mode == CollisionObject3D.DISABLE_MODE_MAKE_STATIC, "...its collision MAKE_STATIC")
@@ -246,14 +254,33 @@ func _check_wagon_placement() -> void:
 		var under: float = float(ground.call("get_height_at", Vector2(point.x, point.z)))
 		_expect(point.y <= under + 0.01, "...its corner %s on or in the sand (%.3f over it)" % [corner, point.y - under])
 		_expect(point.y >= under - deepest, "...and not buried past its sink and roll (%.3f under)" % [under - point.y])
-	# Off the ridge faces: a metre round its footprint the ground stays
-	# within 0.3 m of its base.
+	# Room to walk round it: every point of its footprint at least
+	# WAGON_EDGE_CLEARANCE from the floor's ledge lines, and the ground that
+	# far round it within 0.3 m of its base - floor, not a ridge face.
+	var footprint: Array[Vector2] = []
+	for u in 5:
+		for v in 9:
+			var local := Vector3(lerpf(-half.x, half.x, float(u) / 4.0), 0, lerpf(-half.y, half.y, float(v) / 8.0))
+			var point: Vector3 = wagon.global_transform * local
+			footprint.append(Vector2(point.x - spawn.x, point.z - spawn.z))
+	var to_ledge: float = INF
+	var ledges: Array = (_field.call("get_floor_data") as Resource).get("ledges")
+	_expect(not ledges.is_empty(), "...floor 3 has its ledge lines")
+	for ledge: PackedVector2Array in ledges:
+		for i in ledge.size() - 1:
+			for p in footprint:
+				to_ledge = minf(to_ledge, _segment_distance(p, ledge[i], ledge[i + 1]))
+	_expect(to_ledge >= WAGON_EDGE_CLEARANCE, "...%.1f m or more from the floor's edge (%.2f m)" % [WAGON_EDGE_CLEARANCE, to_ledge])
 	var flat: bool = true
-	for corner: Vector3 in [Vector3(-half.x - 1.0, 0, -half.y - 1.0), Vector3(half.x + 1.0, 0, -half.y - 1.0), Vector3(-half.x - 1.0, 0, half.y + 1.0), Vector3(half.x + 1.0, 0, half.y + 1.0)]:
+	var ring: float = WAGON_EDGE_CLEARANCE
+	# That far from the footprint: off each side's middle, and off each
+	# corner along its diagonal.
+	var diagonal: float = ring / sqrt(2.0)
+	for corner: Vector3 in [Vector3(-half.x - diagonal, 0, -half.y - diagonal), Vector3(half.x + diagonal, 0, -half.y - diagonal), Vector3(-half.x - diagonal, 0, half.y + diagonal), Vector3(half.x + diagonal, 0, half.y + diagonal), Vector3(-half.x - ring, 0, 0), Vector3(half.x + ring, 0, 0), Vector3(0, 0, -half.y - ring), Vector3(0, 0, half.y + ring)]:
 		var point: Vector3 = wagon.global_transform * corner
 		if absf(float(ground.call("get_height_at", Vector2(point.x, point.z))) - wagon.global_position.y) > 0.3:
 			flat = false
-	_expect(flat, "...on the floor a metre round, off the ridge faces")
+	_expect(flat, "...on flat floor %.1f m round it, off the ridge faces" % ring)
 	var floor_data: Resource = _field.call("get_floor_data")
 	var band: PackedVector2Array = floor_data.get("wear_path_override")
 	var clearance: float = float(ground.get("wear_half_width")) + float(ground.get("wear_edge_noise_amplitude"))
@@ -475,6 +502,11 @@ func _index_of(deck: Array, card_name: String) -> int:
 		if (deck[i] as CardData).card_name == card_name:
 			return i
 	return -1
+
+func _segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
+	var ab: Vector2 = b - a
+	var t: float = clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.000001), 0.0, 1.0)
+	return p.distance_to(a + ab * t)
 
 # Distance to the floor's three-point worn band (Ground's quadratic
 # through its middle point - ground.gdshader's wear_curve_point()).

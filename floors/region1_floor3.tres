@@ -47,8 +47,8 @@ overrides = {
 [sub_resource type="Resource" id="FloorProp_wagon"]
 script = ExtResource("13_floor_prop")
 scene = ExtResource("15_wagon")
-position = Vector3(3.5, 0, -12.5)
-yaw_degrees = 80.0
+position = Vector3(-7.3, 0, -28.1)
+yaw_degrees = 153.0
 roll_degrees = 4.0
 world_line = "A wagon, unhitched. The tools are still on it."
 
