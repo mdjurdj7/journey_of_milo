@@ -103,12 +103,8 @@ var _model_aabb: AABB = AABB()
 var _collision_body: StaticBody3D = null
 var _collision_box: BoxShape3D = null
 var _collision_shape_node: CollisionShape3D = null
-var _approach_area: Area3D = null
-var _approach_shape: SphereShape3D = null
+var _approach: PropApproach = null
 var _ground: Ground = null
-var _wanderer_inside: bool = false
-# This visit's line has been said (reset on leaving the radius).
-var _line_said: bool = false
 var _choice: TroughChoice = null
 
 # FloorProp's placement (RegionField._spawn_floor_props()): XZ here, Y
@@ -122,7 +118,7 @@ func _ready() -> void:
 	add_to_group(GROUP)
 	_apply_yaw()
 	_spawn_model()
-	_spawn_approach_area()
+	_spawn_approach()
 	_ground = get_node_or_null(ground_path) as Ground
 	if _ground == null:
 		push_warning("TroughProp '%s': ground_path did not resolve to a Ground; not grounded." % name)
@@ -212,39 +208,24 @@ func _apply_collision() -> void:
 	var centre: Vector3 = _model_aabb.get_center()
 	_collision_shape_node.position = Vector3(centre.x, height * 0.5, centre.z)
 
-func _spawn_approach_area() -> void:
-	_approach_area = Area3D.new()
-	_approach_area.name = "ApproachArea"
-	_approach_area.monitorable = false
-	_approach_shape = SphereShape3D.new()
-	var shape_node := CollisionShape3D.new()
-	shape_node.shape = _approach_shape
-	_approach_area.add_child(shape_node)
-	add_child(_approach_area)
+# The walk-up and the click (PropApproach). The line waits on is_awake()
+# rather than on entering: the Wanderer may be inside already when the
+# guard falls (the fight was beside the trough).
+func _spawn_approach() -> void:
+	_approach = PropApproach.new()
+	_approach.name = "Approach"
+	_approach.warning_label = "TroughProp"
+	_approach.can_speak = is_awake
+	_approach.on_visit = func() -> void: _say(return_line if is_drunk() else approach_line)
+	_approach.can_open_from = can_open_from
+	_approach.screen_rect = get_screen_rect
+	_approach.open_requested.connect(_on_open_requested)
+	add_child(_approach)
 	_apply_approach_radius()
-	_approach_area.body_entered.connect(_on_approach_body_entered)
-	_approach_area.body_exited.connect(_on_approach_body_exited)
 
 func _apply_approach_radius() -> void:
-	if _approach_shape != null:
-		_approach_shape.radius = maxf(approach_radius, 0.0)
-
-func _on_approach_body_entered(body: Node3D) -> void:
-	if body.is_in_group("wanderer"):
-		_wanderer_inside = true
-
-func _on_approach_body_exited(body: Node3D) -> void:
-	if body.is_in_group("wanderer"):
-		_wanderer_inside = false
-		_line_said = false
-
-# The line waits here rather than in body_entered: the Wanderer may be
-# inside already when the guard falls (the fight was beside the trough).
-# Frozen with the field, so nothing is said over a fight.
-func _physics_process(_delta: float) -> void:
-	if _wanderer_inside and not _line_said and is_awake():
-		_line_said = true
-		_say(return_line if is_drunk() else approach_line)
+	if _approach != null:
+		_approach.set_radius(approach_radius)
 
 func _ground_to_relief() -> void:
 	if _ground == null:
@@ -277,29 +258,13 @@ func can_open_from(from: Vector3) -> bool:
 	return offset.length() <= approach_radius
 
 # RegionField._try_open_bundle()'s click, for the trough: a left click
-# on its padded screen rect with the Wanderer in reach opens the choice;
-# a click on it while its choice is open changes nothing. Anything else
-# falls through to the field's move click. The field's freeze stops
-# this with everything else.
-func _unhandled_input(event: InputEvent) -> void:
-	var button := event as InputEventMouseButton
-	if button == null or not button.pressed or button.button_index != MOUSE_BUTTON_LEFT:
-		return
-	var region_field := get_node_or_null(region_field_path) as RegionField
-	if region_field == null or region_field.wanderer == null:
-		return
-	if not can_open_from(region_field.wanderer.global_position):
-		return
-	var camera := get_viewport().get_camera_3d()
-	if camera == null:
-		return
-	var rect: Rect2 = get_screen_rect(camera, region_field.click_target_padding_px)
-	if rect.size == Vector2.ZERO or not rect.has_point(button.position):
-		return
-	get_viewport().set_input_as_handled()
+# on its padded screen rect with the Wanderer in reach (PropApproach)
+# opens the choice; a click on it while its choice is open changes
+# nothing. Anything else falls through to the field's move click.
+func _on_open_requested() -> void:
 	if _choice != null and is_instance_valid(_choice):
 		return
-	_open_choice(region_field)
+	_open_choice(_approach.get_region_field())
 
 func _open_choice(region_field: RegionField) -> void:
 	var hud := region_field.get_node_or_null(^"FieldHUD") as CanvasLayer
@@ -322,21 +287,13 @@ func drink() -> void:
 	_drunk[_trough_id()] = true
 	RunState.heal(heal_amount)
 	print("TroughProp '%s': drank, +%d HP (now %d/%d)." % [name, heal_amount, RunState.player_hp, RunState.player_max_hp])
-	_line_said = true
+	if _approach != null:
+		_approach.mark_said()
 	_say(drunk_line)
 
 func _say(text: String) -> void:
-	if text.is_empty():
-		return
-	var region_field := get_node_or_null(region_field_path) as Node
-	var hud: Node = region_field.get_node_or_null(^"FieldHUD") if region_field != null else null
-	var line := WorldVoiceLine.on_hud(hud)
-	if line == null:
-		push_warning("TroughProp '%s': no FieldHUD to show its world line on." % name)
-		return
-	line.fade_in_seconds = fade_seconds
-	line.fade_out_seconds = fade_seconds
-	line.show_line(text, hold_seconds)
+	if _approach != null:
+		_approach.say(text, hold_seconds, fade_seconds)
 
 # trough_id if the spawner set one; else the floor's path plus this
 # node's name, which RegionField makes from the prop's index.

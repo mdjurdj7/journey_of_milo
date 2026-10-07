@@ -14,11 +14,12 @@ class_name Collector
 # like the cormorant. Origin at the base, grounded on the relief; a
 # capsule StaticBody3D the Wanderer walks round. No idle animation.
 #
-# The floor 2 trough's trigger (TroughProp): inside approach_radius the
-# world line shows near the body, once per visit into the radius; a left
-# click on the body's padded screen rect with the Wanderer in reach emits
-# open_requested, for RegionField to open the collector's screen with the
-# field locked. Anything else falls through to the field's move click.
+# The floor 2 trough's trigger, shared through PropApproach: inside
+# approach_radius the world line shows near the body, once per visit into
+# the radius; a left click on the body's padded screen rect with the
+# Wanderer in reach emits open_requested, for RegionField to open the
+# collector's screen with the field locked. Anything else falls through
+# to the field's move click.
 #
 # What it hands over (CollectorScreen): stock_count cards rolled from
 # stock_pool, tier first at the pool's own rates (RewardPool.roll_by_
@@ -113,17 +114,13 @@ var _material: StandardMaterial3D = null
 var _collision_body: StaticBody3D = null
 var _collision_shape: CapsuleShape3D = null
 var _collision_node: CollisionShape3D = null
-var _approach_area: Area3D = null
-var _approach_shape: SphereShape3D = null
+var _approach: PropApproach = null
 var _ground: Ground = null
-var _wanderer_inside: bool = false
 # The rolled stock, a null where a card was bought; rolled once.
 var _stock: Array[CardData] = []
 var _rolled: bool = false
 var _fixed_taken: bool = false
 var _removal_used: bool = false
-# This visit's line has been said (reset on leaving the radius).
-var _line_said: bool = false
 
 # FloorProp's placement (RegionField._spawn_floor_props()): XZ here, Y
 # from the relief, the entry's yaw as its facing - for good.
@@ -136,7 +133,7 @@ func _ready() -> void:
 	add_to_group(GROUP)
 	rotation = Vector3(0.0, deg_to_rad(_placement_yaw), 0.0)
 	_spawn_body()
-	_spawn_approach_area()
+	_spawn_approach()
 	_ground = get_node_or_null(ground_path) as Ground
 	if _ground == null:
 		push_warning("Collector '%s': ground_path did not resolve to a Ground; not grounded." % name)
@@ -185,37 +182,22 @@ func _apply_tint() -> void:
 	if _material != null:
 		_material.albedo_color = tint
 
-func _spawn_approach_area() -> void:
-	_approach_area = Area3D.new()
-	_approach_area.name = "ApproachArea"
-	_approach_area.monitorable = false
-	_approach_shape = SphereShape3D.new()
-	var shape_node := CollisionShape3D.new()
-	shape_node.shape = _approach_shape
-	_approach_area.add_child(shape_node)
-	add_child(_approach_area)
+# The walk-up and the click (PropApproach): the line near the body once
+# per visit; a click on the body in reach asks to open.
+func _spawn_approach() -> void:
+	_approach = PropApproach.new()
+	_approach.name = "Approach"
+	_approach.warning_label = "Collector"
+	_approach.on_visit = func() -> void: _say(world_line)
+	_approach.can_open_from = can_open_from
+	_approach.screen_rect = get_screen_rect
+	_approach.open_requested.connect(func() -> void: open_requested.emit(self))
+	add_child(_approach)
 	_apply_approach_radius()
-	_approach_area.body_entered.connect(_on_approach_body_entered)
-	_approach_area.body_exited.connect(_on_approach_body_exited)
 
 func _apply_approach_radius() -> void:
-	if _approach_shape != null:
-		_approach_shape.radius = maxf(approach_radius, 0.0)
-
-func _on_approach_body_entered(body: Node3D) -> void:
-	if body.is_in_group("wanderer"):
-		_wanderer_inside = true
-
-func _on_approach_body_exited(body: Node3D) -> void:
-	if body.is_in_group("wanderer"):
-		_wanderer_inside = false
-		_line_said = false
-
-# Frozen with the field, so nothing is said over a fight or a screen.
-func _physics_process(_delta: float) -> void:
-	if _wanderer_inside and not _line_said:
-		_line_said = true
-		_say(world_line)
+	if _approach != null:
+		_approach.set_radius(approach_radius)
 
 func _ground_to_relief() -> void:
 	if _ground == null:
@@ -228,27 +210,6 @@ func _ground_to_relief() -> void:
 func can_open_from(from: Vector3) -> bool:
 	var offset := Vector3(from.x - global_position.x, 0.0, from.z - global_position.z)
 	return offset.length() <= approach_radius
-
-# The trough's click: a left click on the padded screen rect with the
-# Wanderer in reach asks to open; anything else falls through to the
-# field's move click. The field's freeze stops this with everything else.
-func _unhandled_input(event: InputEvent) -> void:
-	var button := event as InputEventMouseButton
-	if button == null or not button.pressed or button.button_index != MOUSE_BUTTON_LEFT:
-		return
-	var region_field := get_node_or_null(region_field_path) as RegionField
-	if region_field == null or region_field.wanderer == null:
-		return
-	if not can_open_from(region_field.wanderer.global_position):
-		return
-	var camera := get_viewport().get_camera_3d()
-	if camera == null:
-		return
-	var rect: Rect2 = get_screen_rect(camera, region_field.click_target_padding_px)
-	if rect.size == Vector2.ZERO or not rect.has_point(button.position):
-		return
-	get_viewport().set_input_as_handled()
-	open_requested.emit(self)
 
 # --- Stock ---
 
@@ -299,17 +260,8 @@ func price_of(card: CardData) -> int:
 	return price_common
 
 func _say(text: String) -> void:
-	if text.is_empty():
-		return
-	var region_field := get_node_or_null(region_field_path) as Node
-	var hud: Node = region_field.get_node_or_null(^"FieldHUD") if region_field != null else null
-	var line := WorldVoiceLine.on_hud(hud)
-	if line == null:
-		push_warning("Collector '%s': no FieldHUD to show its world line on." % name)
-		return
-	line.fade_in_seconds = fade_seconds
-	line.fade_out_seconds = fade_seconds
-	line.show_line_near(text, hold_seconds, self, Vector3.UP * (body_height + line_clearance_m))
+	if _approach != null:
+		_approach.say_near(text, hold_seconds, fade_seconds, self, Vector3.UP * (body_height + line_clearance_m))
 
 # The body's box on screen, grown by padding_px - TroughProp.get_screen_
 # rect()'s padded rect.
