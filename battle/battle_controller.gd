@@ -207,6 +207,12 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	if keepsake != null:
 		RunLogger.block_gained(maxi(keepsake.combat_start_block, 0))
 	RunLogger.turn_started(player.energy)
+	# The run log's mechanic lines, off the signals the view already hears.
+	if not enemy_pain_turn.is_connected(_log_pain_turn):
+		enemy_pain_turn.connect(_log_pain_turn)
+		enemy_status_gained.connect(_log_status_gained)
+	for enemy in enemies:
+		_log_threshold_queued(enemy)
 
 	deck = Deck.new(RunState.deck)
 	deck.drawn.connect(func(_card: CardData) -> void: hand_changed.emit())
@@ -736,6 +742,64 @@ static func exhausts_on_play(card: CardData) -> bool:
 		return true
 	return card.removal_scope != CardData.RemovalScope.NONE
 
+# --- Run log: mechanics ---
+
+# An enemy as the run log names it: its data's file name.
+func _log_id(enemy: FieldEnemy) -> String:
+	if enemy == null or enemy.enemy_data == null:
+		return ""
+	return enemy.enemy_data.resource_path.get_file().get_basename()
+
+# EnemyTurn.take_turn(), with what the run log wants from around it: the
+# escalation stage the turn is taken at; for an intent with an interrupt
+# threshold (the Siltjaw's Charge, the Greyshelf's Gape), how it went -
+# broken, landed, or skipped by a pain turn or Deny - with what the player
+# dealt this turn, the hit's damage and what reached HP, and the attack-
+# card stacks (Goaded) it carried into resolution; a pain turn spent; and
+# the next intent, when it has a threshold.
+func _take_turn_logged(enemy: FieldEnemy, combatant: Combatant, data: EnemyData) -> Dictionary:
+	var id: String = _log_id(enemy)
+	if not data.escalation_multipliers.is_empty():
+		var stage: int = EnemyTurn.escalation_stage(combatant, data)
+		RunLogger.escalation_stage(combatant.get_instance_id(), id, stage, data.escalation_multipliers[stage])
+	var intent: EnemyIntent = EnemyTurn.current_intent(combatant, data)
+	var threshold: int = intent.interrupt_threshold if intent != null and intent.type == EnemyIntent.IntentType.ATTACK else 0
+	var dealt: int = combatant.damage_taken_this_turn
+	var stacks: int = 0
+	if threshold > 0 and intent.counts_attack_cards and data.attack_card_status != null:
+		var held: Status = Status.find_in(combatant.statuses, data.attack_card_status)
+		stacks = held.stack_count if held != null else 0
+	var result: Dictionary = EnemyTurn.take_turn(combatant, data, player)
+	if result["pain_turn"]:
+		RunLogger.mechanic("pain_turn_spent", {"enemy": id})
+	if threshold > 0:
+		var outcome: String = "broken" if result["interrupted"] else ("landed" if result["attacked"] else ("pain_turn" if result["pain_turn"] else ("denied" if result["denied"] else "none")))
+		var damage: int = 0
+		for hit: Dictionary in result["hits"]:
+			damage += int(hit["damage"])
+		RunLogger.mechanic("threshold_resolved", {"enemy": id, "intent": intent.intent_name, "threshold": threshold, "dealt": dealt, "outcome": outcome, "damage": damage, "to_hp": result["damage_to_hp"], "stacks": stacks})
+	if combatant.hp > 0:
+		_log_threshold_queued(enemy)
+	return result
+
+# The enemy's queued intent has an interrupt threshold: a line saying so.
+func _log_threshold_queued(enemy: FieldEnemy) -> void:
+	var combatant: Combatant = _combatants.get(enemy)
+	if combatant == null or enemy.enemy_data == null:
+		return
+	var intent: EnemyIntent = EnemyTurn.current_intent(combatant, enemy.enemy_data)
+	if intent != null and intent.type == EnemyIntent.IntentType.ATTACK and intent.interrupt_threshold > 0:
+		RunLogger.mechanic("threshold_queued", {"enemy": _log_id(enemy), "intent": intent.intent_name, "threshold": intent.interrupt_threshold})
+
+func _log_pain_turn(enemy: FieldEnemy) -> void:
+	RunLogger.mechanic("pain_turn", {"enemy": _log_id(enemy)})
+
+# Only the phase's own status (Off the rock) - the same signal carries
+# others (a pack's alone grant).
+func _log_status_gained(enemy: FieldEnemy, status: StatusData) -> void:
+	if enemy != null and enemy.enemy_data != null and status != null and status == enemy.enemy_data.phase_status:
+		RunLogger.mechanic("phase", {"enemy": _log_id(enemy), "status": status.id})
+
 # Same shape as _resolve_play()'s own await: EnemyTurn.take_turn() has
 # already mutated combatant/player HP synchronously by the time this
 # awaits anything (rules stay instant), but the report - and everything
@@ -775,7 +839,7 @@ func _run_sequential_turn() -> void:
 		if data == null:
 			continue
 		enemy_acting.emit(enemy)
-		var result := EnemyTurn.take_turn(combatant, data, player)
+		var result := _take_turn_logged(enemy, combatant, data)
 		# Killed by its own countdown before it could act: reported, dropped,
 		# and nothing more of this enemy's turn plays out.
 		if _report_countdown(enemy, combatant, result):
@@ -830,7 +894,7 @@ func _run_simultaneous_turn() -> void:
 		if combatant == null or combatant.hp <= 0 or enemy.enemy_data == null:
 			continue
 		enemy_acting.emit(enemy)
-		results[enemy] = EnemyTurn.take_turn(combatant, enemy.enemy_data, player)
+		results[enemy] = _take_turn_logged(enemy, combatant, enemy.enemy_data)
 		if _report_countdown(enemy, combatant, results[enemy]):
 			continue
 		if results[enemy]["pain_turn_triggered"]:
@@ -1167,6 +1231,7 @@ func _heal_run_hp(amount: int, source: String = "") -> void:
 # rect pass touches a node that may be freed), then told. The hover
 # clears too, or an armed card could keep a sinking body lit.
 func _drop_enemy(enemy: FieldEnemy) -> void:
+	RunLogger.enemy_died(_log_id(enemy))
 	enemies.erase(enemy)
 	_combatants.erase(enemy)
 	_enemy_rects.erase(enemy)

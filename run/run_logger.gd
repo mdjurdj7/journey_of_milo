@@ -40,7 +40,7 @@ const RUNS_DIR := "user://runs"
 const FORMAT_VERSION := 2
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
-const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal"]
+const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic"]
 
 # The switch - RegionField.run_logging_enabled pushes it here.
 static var enabled: bool = true
@@ -102,6 +102,10 @@ static var _toll_spent_by: Dictionary = {}
 # Energy cards took, what was left when it ended (null: it never did - the
 # fight ended in it), and the cards drawn in it.
 static var _turn_log: Array[Dictionary] = []
+# Enemies in the order they died (their ids), and each escalating enemy's
+# highest stage reached (Combatant instance id -> [enemy id, stage]).
+static var _deaths: Array[String] = []
+static var _escalation: Dictionary = {}
 static var _enemy_hp: Dictionary = {} # Combatant instance id -> last HP seen
 static var _cards: Array[Dictionary] = []
 
@@ -260,6 +264,8 @@ static func fight_start(encounter: String, enemy_ids: Array[String], snapshot: D
 	_toll_gained_by = {}
 	_toll_spent_by = {}
 	_turn_log = []
+	_deaths = []
+	_escalation = {}
 	_enemy_hp = {}
 	_cards = []
 	_card_open = false
@@ -306,6 +312,8 @@ static func fight_end(result: String, debug: bool, hp_end: int, toll_end: int) -
 		"block": {"gained": _block_gained, "used": _block_used, "absorb_used": _absorb_used},
 		"toll": {"start": _toll_start, "gained": _toll_gained, "spent": _toll_spent, "end": toll_end, "gained_by_source": _toll_gained_by, "spent_by_source": _toll_spent_by},
 		"turn_log": _turn_log,
+		"deaths": _deaths,
+		"escalation_max": _escalation_max(),
 		"cards": _cards,
 	})
 
@@ -325,6 +333,45 @@ static func turn_ended(energy: int) -> void:
 	var entry: Dictionary = _turn_log.back()
 	if entry["energy_left"] == null:
 		entry["energy_left"] = energy
+
+# --- Mechanics ---
+
+# A mechanic line: `kind` and what it says, on the fight and turn it
+# happened in. Kinds: enemy_died, pain_turn, pain_turn_spent, phase,
+# threshold_queued, threshold_resolved, escalation.
+static func mechanic(kind: String, data: Dictionary) -> void:
+	if not _fight_open:
+		return
+	var line: Dictionary = {"kind": kind, "fight": _fights, "turn": _turn}
+	line.merge(data, true)
+	_write_detail("mechanic", line)
+
+# An enemy died - in order, onto fight_end's deaths too.
+static func enemy_died(enemy_id: String) -> void:
+	if not _fight_open:
+		return
+	_deaths.append(enemy_id)
+	mechanic("enemy_died", {"enemy": enemy_id, "order": _deaths.size()})
+
+# An escalating enemy is about to act at `stage` (0-based): a line the
+# first time each higher stage is reached; fight_end keeps the highest.
+static func escalation_stage(instance: int, enemy_id: String, stage: int, multiplier: float) -> void:
+	if not _fight_open:
+		return
+	var first: bool = not _escalation.has(instance)
+	var seen: int = -1 if first else int((_escalation[instance] as Array)[1])
+	if stage <= seen:
+		return
+	_escalation[instance] = [enemy_id, stage]
+	# Its opening stage (0) is where every escalating enemy starts: not news.
+	if not (first and stage == 0):
+		mechanic("escalation", {"enemy": enemy_id, "stage": stage, "multiplier": multiplier})
+
+static func _escalation_max() -> Dictionary:
+	var by_enemy: Dictionary = {}
+	for entry: Array in _escalation.values():
+		by_enemy[entry[0]] = maxi(int(by_enemy.get(entry[0], 0)), int(entry[1]))
+	return by_enemy
 
 # A card drawn into the hand, on this turn's count.
 static func card_drawn() -> void:
