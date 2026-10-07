@@ -1837,7 +1837,7 @@ func _on_keepsake_offer_closed(_taken: bool) -> void:
 
 # Debug builds only: a row of debug buttons on the field HUD in the
 # battle row's style (BattleTheme's DebugButton), hidden until F1 -
-# Keepsake, and a card picker with its Add card. It goes with the DECK
+# Keepsake, a card picker with its Add card, and +1 Glassbone. It goes with the DECK
 # line when a fight hides that, so it never sits over a battle.
 func _setup_debug_row() -> void:
 	var hud := get_node_or_null(^"FieldHUD") as CanvasLayer
@@ -1863,11 +1863,24 @@ func _setup_debug_row() -> void:
 	add_card_button.text = "Add card"
 	add_card_button.pressed.connect(_on_debug_add_card_pressed)
 	_debug_row.add_child(add_card_button)
+	var glassbone_button := Button.new()
+	glassbone_button.name = "AddGlassboneButton"
+	glassbone_button.theme_type_variation = &"DebugButton"
+	glassbone_button.text = "+1 Glassbone"
+	glassbone_button.pressed.connect(_on_debug_glassbone_pressed)
+	_debug_row.add_child(glassbone_button)
 	hud.add_child(_debug_row)
 	deck_panel.visibility_changed.connect(func() -> void:
 		if not deck_panel.visible:
 			_debug_row.visible = false)
 	_refresh_debug_keepsake_button()
+
+# One piece of Glassbone, through the run's own grant (RunState.add_
+# glassbone()) - a debug button, not a game source.
+func _on_debug_glassbone_pressed() -> void:
+	RunState.add_glassbone(1)
+	RunLogger.event("debug_glassbone_add", {})
+	print("RegionField: debug +1 Glassbone (run total %d)." % RunState.glassbone)
 
 # Grants the next of debug_keepsake_paths, skipping the one held: into an
 # empty slot at once, or - the slot full - through the take-or-keep offer.
