@@ -184,6 +184,13 @@ func _ready() -> void:
 	add_card_button.text = "Add card"
 	add_card_button.pressed.connect(_on_debug_add_card_pressed)
 	debug_row.add_child(add_card_button)
+	if OS.is_debug_build():
+		var energy_button := Button.new()
+		energy_button.name = "AddEnergyButton"
+		energy_button.theme_type_variation = &"DebugButton"
+		energy_button.text = "+1 Energy"
+		energy_button.pressed.connect(_on_debug_add_energy_pressed)
+		debug_row.add_child(energy_button)
 
 	resized.connect(_layout_corners)
 	# The hand's left limit follows the readout's place from the start.
@@ -755,6 +762,17 @@ func _on_debug_add_card_pressed() -> void:
 		return
 	battle_controller.deck.add(RunState.add_card(card))
 	RunLogger.event("debug_card_add", {"card": card.card_name, "context": "battle"})
+
+# Debug builds only: one more Energy this turn, past max if need be, told
+# through the controller's own energy_changed (the readout, the hand's
+# playable faces). Logged, so a run that used it can be left out of
+# tuning.
+func _on_debug_add_energy_pressed() -> void:
+	if battle_controller == null or battle_controller.player == null:
+		return
+	battle_controller.player.energy += 1
+	battle_controller.energy_changed.emit(battle_controller.player.energy)
+	RunLogger.event("debug_energy_add", {})
 
 # The one path every battle-ending trigger (WIN/LOSE/ESCAPE debug buttons,
 # battle_controller.battle_won/battle_lost) now goes through, rather than
