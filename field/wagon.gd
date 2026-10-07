@@ -10,9 +10,11 @@ class_name Wagon
 # A placeholder body until its model exists: one low box, body_length
 # along its own Z by body_width by body_height, in the project's flat
 # matte (Hull's shared material, duplicated) at the hulls' weathered-wood
-# tint. Origin at the base, grounded on the relief, then rolled
-# roll_degrees round its long axis and sunk sink_depth into the sand -
-# age by placement alone, nothing broken. A box StaticBody3D the Wanderer
+# tint. Origin at the base, grounded by its footprint - the base at the
+# mean of the relief under its four bottom corners, pitched along its
+# length to the slope between its two ends, so neither end floats - then
+# rolled roll_degrees round its long axis and sunk sink_depth into the
+# sand: age by placement alone, nothing broken. A box StaticBody3D the Wanderer
 # walks round, MAKE_STATIC so the field's freeze leaves it in the space.
 #
 # The walk-up and the click are PropApproach's, as the collector's are:
@@ -113,8 +115,11 @@ const GROUP := &"wagons"
 @export var ground_path: NodePath = ^"../../Ground"
 @export var region_field_path: NodePath = ^"../.."
 
-# Pose carries the roll and the sink; the body sits on it.
+# Pose carries the pitch, the roll and the sink; the body sits on it.
 var _pose: Node3D = null
+# Radians round the body's own X: the relief's slope along its length,
+# from _ground_to_relief(); 0 until it is grounded.
+var _pitch: float = 0.0
 var _mesh_instance: MeshInstance3D = null
 var _mesh: BoxMesh = null
 var _material: StandardMaterial3D = null
@@ -178,6 +183,7 @@ func _apply_body() -> void:
 	if _collision_shape != null:
 		_collision_shape.size = size
 		_collision_node.position = Vector3(0.0, size.y * 0.5, 0.0)
+	_ground_to_relief()
 
 func _apply_tint() -> void:
 	if _material != null:
@@ -185,12 +191,15 @@ func _apply_tint() -> void:
 
 func _apply_yaw() -> void:
 	rotation = Vector3(0.0, deg_to_rad(yaw_degrees), 0.0)
+	_ground_to_relief()
 
-# The roll round the long axis (Z) at the base centre, and the sink.
+# The relief's pitch round X, then the roll round the long axis (Z), at
+# the base centre, and the sink.
 func _apply_pose() -> void:
 	if _pose == null:
 		return
-	_pose.transform = Transform3D(Basis(Vector3.BACK, deg_to_rad(roll_degrees)), Vector3(0.0, -sink_depth, 0.0))
+	var basis := Basis(Vector3.RIGHT, _pitch) * Basis(Vector3.BACK, deg_to_rad(roll_degrees))
+	_pose.transform = Transform3D(basis, Vector3(0.0, -sink_depth, 0.0))
 
 # The walk-up and the click (PropApproach): the line near the body once
 # per visit; a click on the body in reach asks to open.
@@ -209,11 +218,28 @@ func _apply_approach_radius() -> void:
 	if _approach != null:
 		_approach.set_radius(approach_radius)
 
+# The base at the mean height of the relief under the four bottom
+# corners, pitched to the slope from its back end to its front.
 func _ground_to_relief() -> void:
-	if _ground == null:
+	if _ground == null or not is_inside_tree():
 		return
-	var local_xz: Vector3 = _ground.to_local(Vector3(global_position.x, 0.0, global_position.z))
-	global_position.y = _ground.get_height_at(Vector2(local_xz.x, local_xz.z))
+	var half := Vector2(maxf(body_width, 0.01) * 0.5, maxf(body_length, 0.01) * 0.5)
+	var ends: Array[float] = [0.0, 0.0]
+	for side: float in [-1.0, 1.0]:
+		for end_index in 2:
+			var corner := Vector3(side * half.x, 0.0, (-1.0 if end_index == 0 else 1.0) * half.y)
+			ends[end_index] += _height_under(corner) * 0.5
+	global_position.y = (ends[0] + ends[1]) * 0.5
+	# A positive turn round X lowers +Z: the front end up is a negative one.
+	_pitch = -atan2(ends[1] - ends[0], half.y * 2.0)
+	_apply_pose()
+
+# The relief's height under a point in this wagon's own yawed frame.
+func _height_under(local_point: Vector3) -> float:
+	var flat := Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_degrees)), Vector3(global_position.x, 0.0, global_position.z))
+	var world: Vector3 = flat * local_point
+	var local_xz: Vector3 = _ground.to_local(Vector3(world.x, 0.0, world.z))
+	return _ground.get_height_at(Vector2(local_xz.x, local_xz.z))
 
 # Whether the Wanderer at `from` is in reach (approach_radius, on the
 # ground).
