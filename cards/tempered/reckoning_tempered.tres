@@ -1,9 +1,8 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="CardData" load_steps=4 format=3]
 
 [ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Texture2D" uid="uid://c8b8ykxx7hyu5" path="res://cards/art/Wanderer/Reckoning.png" id="9_art"]
-[ext_resource type="Resource" path="res://cards/tempered/reckoning_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="CardEffect_toll_damage"]
 script = ExtResource("2_card_effect")
@@ -11,9 +10,9 @@ effect_type = 5
 
 [resource]
 script = ExtResource("1_card_data")
-card_name = "Reckoning"
+card_name = "Reckoning+"
 rarity = 2
-cost = 2
+cost = 1
 card_type = 0
 target_type = 0
 description = "Spend all Toll.
@@ -21,4 +20,3 @@ description = "Spend all Toll.
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_toll_damage")])
 battle_animation = &"Slash"
 art = ExtResource("9_art")
-tempered = ExtResource("10_tempered")

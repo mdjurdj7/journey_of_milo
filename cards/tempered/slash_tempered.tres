@@ -1,17 +1,16 @@
-[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://cylsvdmgbtn6h"]
+[gd_resource type="Resource" script_class="CardData" format=3]
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Texture2D" uid="uid://cwypn1c3f6exg" path="res://cards/art/Wanderer/Slash.png" id="9_art"]
-[ext_resource type="Resource" path="res://cards/tempered/slash_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="CardEffect_damage"]
 script = ExtResource("2_card_effect")
-value = 5
+value = 8
 
 [resource]
 script = ExtResource("1_card_data")
-card_name = "Slash"
+card_name = "Slash+"
 rarity = 1
 cost = 1
 target_type = 0
@@ -20,4 +19,3 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")]
 battle_animation = &"Slash"
 impact_time = 0.55
 art = ExtResource("9_art")
-tempered = ExtResource("10_tempered")

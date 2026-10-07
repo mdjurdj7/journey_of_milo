@@ -4,22 +4,26 @@
 [ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/braced.tres" id="3_braced"]
 [ext_resource type="Texture2D" uid="uid://e5tsgsnu68ob" path="res://cards/art/Wanderer/Brace.png" id="9_art"]
-[ext_resource type="Resource" path="res://cards/tempered/brace_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="CardEffect_apply_status_to_target"]
 script = ExtResource("2_card_effect")
 effect_type = 18
 status_data = ExtResource("3_braced")
 
+[sub_resource type="Resource" id="CardEffect_draw"]
+script = ExtResource("2_card_effect")
+effect_type = 3
+value = 1
+
 [resource]
 script = ExtResource("1_card_data")
-card_name = "Brace"
+card_name = "Brace+"
 rarity = 1
 cost = 1
 card_type = 1
 target_type = 0
-description = "Target enemy's next Attack deals 50% less damage."
-effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status_to_target")])
+description = "Target enemy's next Attack deals 50% less damage.
+Draw {draw}."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status_to_target"), SubResource("CardEffect_draw")])
 battle_animation = &"Brace"
 art = ExtResource("9_art")
-tempered = ExtResource("10_tempered")
