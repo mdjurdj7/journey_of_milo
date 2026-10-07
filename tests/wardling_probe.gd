@@ -17,6 +17,7 @@ const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
 const SOUND_PATH := "res://assets/audio/enemies_old/Works_Wardling/Ragged Breath.mp3"
 const MODEL_PATH := "res://assets/models/enemies/Wardling/Wardling.glb"
 const POST_SCENE_PATH := "res://field/hitching_post.tscn"
+const WAGON_SCENE_PATH := "res://field/wagon.tscn"
 const HEAD_TURN_PATH := "res://field/head_turn.tscn"
 # Turns 1-9: 9, 5, 11 looping, times 1.0 / 1.3 / 1.6 / 2.0 by twos, held
 # at 2.0 - roundi(11 x 1.3) = 14, roundi(9 x 1.3) = 12, roundi(11 x 1.6)
@@ -209,10 +210,12 @@ func _check_floor_3() -> void:
 	_expect_eq(entry.get("yaw_degrees"), 0.0, "...straight at it")
 	_expect(not bool(entry.get("required")), "...not required")
 	var props: Array = floor_data.get("props")
-	_expect_eq(props.size(), 1, "Floor 3 has one prop")
-	_expect_eq((props[0].get("scene") as PackedScene).resource_path, POST_SCENE_PATH, "...the hitching post")
+	_expect_eq(props.size(), 2, "Floor 3 has two props")
+	_expect_eq((props[0].get("scene") as PackedScene).resource_path, POST_SCENE_PATH, "...the hitching post first")
 	_expect_eq(props[0].get("position"), Vector3(15.879, 0.0, -16.057), "...north-west of the Wardling, 3.0 m off")
 	_expect_eq((props[0].get("overrides") as Dictionary).get("tether_enemy_index"), 1, "...its rope tied to the Wardling")
+	if props.size() > 1:
+		_expect_eq((props[1].get("scene") as PackedScene).resource_path, WAGON_SCENE_PATH, "...then the wagon")
 	_completed += 1
 
 # --- Helpers ---
