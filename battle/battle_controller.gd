@@ -550,7 +550,8 @@ func _finish_turn(keep: Array[CardData]) -> void:
 #   no slot, not counted toward the hand cap, in no pile; card_played
 #   fires, so a swing starts now; the hand fades the card out.
 # - The fade's end (HandContainer.play_fade_duration): the card goes to its
-#   pile (Deck.settle_play(), exhausts_on_play()) and DISCARD ticks. A card with no battle_animation resolves in this same frame,
+#   pile (Deck.settle_play(), exhausts_on_play()) and DISCARD or SPENT
+#   ticks. A card with no battle_animation resolves in this same frame,
 #   after it - so the cards it draws fly in once it has gone.
 # - A card with a battle_animation resolves at its own impact delay from
 #   the commit instead - min(card.impact_time, the clip's real length, so a

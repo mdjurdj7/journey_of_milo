@@ -3,6 +3,9 @@ class_name Deck
 
 signal drawn(card: CardData)
 signal discarded(card: CardData)
+# A card went to the exhaust pile - Spent for the fight - from the hand
+# (exhaust()) or from its own play (settle_play()).
+signal exhausted(card: CardData)
 signal shuffled()
 # Cards left the hand for set_aside_pile, or came back from it.
 signal set_aside_changed()
@@ -132,6 +135,7 @@ func settle_play(exhaust: bool) -> void:
 		return
 	if exhaust:
 		exhaust_pile.append(playing)
+		exhausted.emit(playing)
 	else:
 		discard_pile.append(playing)
 		discarded.emit(playing)
@@ -147,6 +151,7 @@ func exhaust(card: CardData) -> void:
 		return
 	hand.erase(card)
 	exhaust_pile.append(card)
+	exhausted.emit(card)
 
 # Every discard into the draw pile but the card still being played, which
 # stays where it is - a draw on a card never draws the card itself.
