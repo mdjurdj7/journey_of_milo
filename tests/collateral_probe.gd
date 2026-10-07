@@ -100,8 +100,7 @@ func _check_reckoning() -> void:
 		var reckoning: CardData = await _deal(controller, RECKONING_PATH)
 		await _play(controller, collateral)
 		_expect_eq(player.energy, 3, "Collateral costs no Energy")
-		# Spent once its fly-out lands (BattleController._on_play_animation_
-		# finished()).
+		# Spent from its fade's end (Deck.settle_play()).
 		var exhaust: Array = controller.get("deck").get("exhaust_pile")
 		for i in 180:
 			if exhaust.has(collateral):

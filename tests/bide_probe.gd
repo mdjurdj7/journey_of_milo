@@ -403,9 +403,8 @@ func _bide(controller: Node, bide: CardData, cards: Array) -> void:
 	controller.call("confirm_choice")
 	await _settle(controller)
 
-# Until the play has resolved and its fly-out has landed - the played card
-# reaches the discard only then (BattleController._on_play_animation_
-# finished()).
+# Until the play has resolved - the played card reaches the discard at its
+# fade's end (Deck.settle_play()), before then - and a margin after.
 func _settle(controller: Node) -> void:
 	for i in 600:
 		await process_frame

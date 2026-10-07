@@ -370,22 +370,26 @@ func _ink_top(label: Label, font_size: int) -> float:
 		top = minf(top, ts.font_get_glyph_offset(rid, Vector2i(font_size, 0), glyph).y)
 	return top
 
-# A played stance or power card is exhausted, not discarded; an ordinary
-# card is discarded as before.
+# A played stance or power card is exhausted, not discarded; so is a
+# Spent or Consumed one; an ordinary card is discarded as before - the
+# pile BattleController.exhausts_on_play() names, which Deck.settle_play()
+# puts the played card in.
 func _check_lasting_cards_leave_rotation() -> void:
-	var controller: Object = (load(BATTLE_CONTROLLER_PATH) as GDScript).new()
-	for card_name in ["self_eater", "last_resort", "dying_light", "slash"]:
+	var controller_script := load(BATTLE_CONTROLLER_PATH) as GDScript
+	for card_name in ["self_eater", "last_resort", "dying_light", "blood_advance", "samphire", "slash"]:
 		var card: CardData = _card(card_name)
 		var deck := Deck.new([])
 		deck.hand.append(card)
-		controller.set("deck", deck)
-		controller.call("_on_play_animation_finished", card)
-		var lasting: bool = card.card_type == CardData.CardType.STANCE or card.card_type == CardData.CardType.POWER
-		if lasting:
+		_expect(deck.begin_play(card), "%s's play begins" % card.card_name)
+		_expect(not deck.hand.has(card), "...out of the hand")
+		var exhausts: bool = controller_script.call("exhausts_on_play", card)
+		deck.settle_play(exhausts)
+		deck.end_play()
+		var leaves: bool = card.card_type == CardData.CardType.STANCE or card.card_type == CardData.CardType.POWER or card.removal_scope != CardData.RemovalScope.NONE
+		if leaves:
 			_expect(deck.exhaust_pile.has(card) and not deck.discard_pile.has(card), "%s leaves rotation" % card.card_name)
 		else:
 			_expect(deck.discard_pile.has(card) and not deck.exhaust_pile.has(card), "%s is discarded as before" % card.card_name)
-	(controller as Node).free()
 	_completed += 1
 
 # The rules-text pattern every card follows, so a new one can't drift:

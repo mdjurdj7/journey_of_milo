@@ -529,8 +529,8 @@ func _field_enemy(controller: Node) -> Node:
 func _enemy_combatant(controller: Node) -> Combatant:
 	return (controller.get("_combatants") as Dictionary).values()[0]
 
-# Until the play has resolved and its fly-out has landed - the played card
-# reaches the Spent pile only then.
+# Until the play has resolved - the played card reaches the Spent pile at
+# its fade's end (Deck.settle_play()), before then - and a margin after.
 func _settle(controller: Node) -> void:
 	for i in 600:
 		await process_frame
