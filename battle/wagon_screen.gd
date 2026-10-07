@@ -157,7 +157,7 @@ const LEAVE_INDEX := 100002
 	set(value):
 		arrow_head_degrees = value
 		_refresh()
-@export var arrow_color: Color = Color(0.165, 0.165, 0.18, 1.0):
+@export var arrow_color: Color = Color(0.94, 0.91, 0.86, 1.0):
 	set(value):
 		arrow_color = value
 		_refresh()
@@ -686,11 +686,20 @@ func _draw_overlay() -> void:
 	var half: float = gap * arrow_length_fraction * 0.5
 	var tail := Vector2(roundf(centre.x - half), roundf(centre.y))
 	var tip := Vector2(roundf(centre.x + half), roundf(centre.y))
-	_overlay.draw_line(tail, tip, arrow_color, arrow_width_px, true)
 	var head: float = arrow_head_px * _fit
 	var angle: float = deg_to_rad(arrow_head_degrees)
+	var strokes: Array[PackedVector2Array] = [PackedVector2Array([tail, tip])]
 	for side: float in [-1.0, 1.0]:
-		_overlay.draw_line(tip, tip + Vector2(-cos(angle), side * sin(angle)) * head, arrow_color, arrow_width_px, true)
+		strokes.append(PackedVector2Array([tip, tip + Vector2(-cos(angle), side * sin(angle)) * head]))
+	# The text's ink outline, text_outline_px each side: every stroke's
+	# outline first, so none crosses another stroke's bone at the head.
+	if text_outline_px > 0:
+		var outline: Color = ink
+		outline.a = ink.a * arrow_color.a
+		for stroke in strokes:
+			_overlay.draw_line(stroke[0], stroke[1], outline, arrow_width_px + float(text_outline_px) * 2.0, true)
+	for stroke in strokes:
+		_overlay.draw_line(stroke[0], stroke[1], arrow_color, arrow_width_px, true)
 
 # The world-voice line this state says.
 func get_world_line() -> String:
