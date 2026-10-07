@@ -11,7 +11,6 @@ const HOVER_Z_INDEX := 1000
 const ARMED_Z_INDEX := 1001
 
 signal card_clicked(card_view: CardView)
-signal play_animation_finished(card_data: CardData)
 # A card was lifted into the armed position / returned or played from it -
 # BattleOverlay disables End Turn while one is armed.
 signal armed_changed(armed: bool)
@@ -122,11 +121,6 @@ signal draw_started(card_data: CardData)
 # scale (1.2): an armed card ends at exactly this, any other at the same
 # fraction of where it started.
 @export var play_fade_end_scale: float = 1.12
-# When the played card leaves deck.hand for its pile (play_animation_
-# finished) - the old fly-out's 0.25 + 0.2 s, kept apart from the fade so
-# the rules see the card in hand exactly as long as before (see DESIGN.md,
-# Deferred). The DISCARD readout ticks then.
-@export var play_settle_sec: float = 0.45
 
 @export_group("Leave Fade")
 # Every card leaving the hand but a played one (which has its own fade
@@ -284,9 +278,10 @@ func release_views(views: Array[CardView]) -> void:
 # for every card without one - then a single reflow. A drawn card's
 # fresh view waits its turn and flies in from the DECK readout (_queue_
 # arrival()); any other appears in place. Called on every
-# drawn/discarded/added signal and on set_deck(); play_card() takes its own
-# slot out before the Deck hears of the play, so the play's later
-# discard/exhaust changes nothing here. A view is never made or dropped
+# drawn/discarded/added signal and on set_deck(); a played card is out of
+# deck.hand from its commit (Deck.begin_play()) and play_card() takes its
+# own slot out, so nothing in the play brings it back - a draw it makes
+# included. A view is never made or dropped
 # anywhere else.
 func _sync_with_deck() -> void:
 	if _deck == null:
@@ -659,9 +654,10 @@ func _fade_and_remove(slot: Control, delay: float) -> void:
 	tween.tween_callback(slot.queue_free)
 
 # A played card leaves the hand: it fades out where it is (see play_fade_
-# duration) - discard, Spent or Consumed alike - and play_animation_
-# finished, which moves it to its pile, follows play_settle_sec after the
-# play, whatever the fade. `_target_screen_pos` is no longer travelled to.
+# duration) - discard, Spent or Consumed alike. The Deck has already taken
+# it out of deck.hand (Deck.begin_play()), so no sync brings it back;
+# BattleController puts it in its pile when the fade ends. `_target_
+# screen_pos` is no longer travelled to.
 func play_card(card_data: CardData, _target_screen_pos: Vector2) -> void:
 	var slot: Control = null
 	for candidate in _slots:
@@ -702,11 +698,6 @@ func play_card(card_data: CardData, _target_screen_pos: Vector2) -> void:
 	fade.tween_property(slot, "modulate:a", 0.0, play_fade_duration)
 	fade.tween_property(card_view, "scale", end_scale, play_fade_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	fade.chain().tween_callback(slot.queue_free)
-	# On this node, like the old fly-out: a fight torn down before it ends
-	# never hears of the card, as before.
-	var settle := create_tween()
-	settle.tween_interval(play_settle_sec)
-	settle.tween_callback(func() -> void: play_animation_finished.emit(card_data))
 
 # Lays every current card out on an arc centred between hand_left_limit_x
 # and hand_right_limit_x: each card's normalized position t (-1 at the

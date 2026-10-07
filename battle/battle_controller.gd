@@ -214,7 +214,6 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	deck.set_aside_changed.connect(func() -> void: hand_changed.emit())
 	_hand_container.set_deck(deck)
 	_hand_container.card_clicked.connect(_on_card_view_clicked)
-	_hand_container.play_animation_finished.connect(_on_play_animation_finished)
 
 	hp_changed.emit(player.hp, player.max_hp)
 	toll_changed.emit(player.toll)
@@ -546,11 +545,19 @@ func _finish_turn(keep: Array[CardData]) -> void:
 		_start_player_turn()
 		turn_phase_changed.emit(true)
 
-# card_played fires first (so the swing/fly-out animation starts
-# immediately), then this awaits the card's own impact delay - min(card.
-# impact_time, the clip's real length so a shorter clip still fires at
-# its own end) - before resolving a single effect, 0 with no battle_
-# animation at all. Every existing consumer of the signals below
+# The play, in order (DESIGN.md, the played card out of the hand):
+# - Commit: the cost paid; the card leaves deck.hand (Deck.begin_play()) -
+#   no slot, not counted toward the hand cap, in no pile; card_played
+#   fires, so a swing starts now; the hand fades the card out.
+# - The fade's end (HandContainer.play_fade_duration): the card goes to its
+#   pile (Deck.settle_play(), exhausts_on_play()) and DISCARD ticks. A card with no battle_animation resolves in this same frame,
+#   after it - so the cards it draws fly in once it has gone.
+# - A card with a battle_animation resolves at its own impact delay from
+#   the commit instead - min(card.impact_time, the clip's real length, so a
+#   shorter clip still fires at its own end) - its lunge and hit as before.
+# - Resolved: Deck.end_play(). Until then a reshuffle leaves the card in
+#   the discard, so a draw on it never draws it back.
+# Every existing consumer of the signals below
 # (damage_dealt, hp_changed, enemy_hp_changed, RunState.lose_hp, the
 # floating number, HP bars) already reacts to whichever of them fires
 # once resolve_card() actually runs, so all of that lands in sync with
@@ -585,18 +592,41 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 
 	var target_name: String = target_enemy.enemy_data.enemy_name if target_enemy != null and target_enemy.enemy_data != null else ""
 	RunLogger.card_started(card.card_name, energy_paid, target_name)
+	deck.begin_play(card)
 	card_played.emit(card, target_enemy)
 	_hand_container.play_card(card, _screen_pos_for(target_enemy))
 
-	var delay := _impact_delay_for(card)
-	if delay > 0.0:
-		var lead: float = clampf(swing_lead_seconds, 0.0, delay)
-		if delay - lead > 0.0:
-			await get_tree().create_timer(delay - lead).timeout
-		if card.battle_animation != &"":
+	# Three moments from the commit: the swing's lead (a clip only), the
+	# fade's end (the card to its pile) and the impact (the fade's end
+	# without a clip). In time order; the pile first on a tie.
+	var settle_at: float = maxf(_hand_container.play_fade_duration, 0.0)
+	var has_clip: bool = card.battle_animation != &""
+	var impact_at: float = _impact_delay_for(card) if has_clip else settle_at
+	var swing_at: float = impact_at - clampf(swing_lead_seconds, 0.0, impact_at)
+	var settled: bool = false
+	# As before: a swing only for a clip with a delay to lead into.
+	var swung: bool = not has_clip or impact_at <= 0.0
+	var elapsed: float = 0.0
+	while true:
+		var next: float = impact_at
+		if not settled:
+			next = minf(next, settle_at)
+		if not swung:
+			next = minf(next, swing_at)
+		if next > elapsed:
+			await get_tree().create_timer(next - elapsed).timeout
+			elapsed = next
+		if not settled and settle_at <= elapsed:
+			deck.settle_play(exhausts_on_play(card))
+			settled = true
+		if not swung and swing_at <= elapsed:
 			card_swing.emit(card)
-		if lead > 0.0:
-			await get_tree().create_timer(lead).timeout
+			swung = true
+		if impact_at <= elapsed:
+			break
+	# A clip shorter than the fade: the card still reaches its pile.
+	if not settled:
+		deck.settle_play(exhausts_on_play(card))
 
 	card_impact.emit(card)
 
@@ -626,6 +656,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 
 	var hp_before_effects: int = player.hp
 	_effect_resolver.resolve_card(card, ctx)
+	deck.end_play()
 	# A CONSUMED card leaves the run's deck when this fight ends: its play
 	# is a choice the run log keeps on its own line, whatever the card.
 	if card.removal_scope == CardData.RemovalScope.CONSUMED:
@@ -689,21 +720,16 @@ func _impact_delay_for(card: CardData) -> float:
 			delay = minf(delay, clip_length)
 	return delay
 
-func _on_play_animation_finished(card: CardData) -> void:
-	# A power or a stance has done its work once played - it stays, as a
-	# status or a stance stack - so it leaves rotation for the rest of the
-	# fight, like SPENT, and is back in the deck next fight. For a stance
-	# that is what makes a stack one physical copy: reshuffled, the same
-	# card would stack itself again.
-	var lasting: bool = card.card_type == CardData.CardType.POWER or card.card_type == CardData.CardType.STANCE
-	if lasting and card.removal_scope == CardData.RemovalScope.NONE:
-		deck.exhaust(card)
-		return
-	match card.removal_scope:
-		CardData.RemovalScope.NONE:
-			deck.discard(card)
-		_:
-			deck.exhaust(card)
+# Where a played card goes: the exhaust pile (true) for a SPENT or
+# CONSUMED card, and for a power or a stance - it has done its work once
+# played and stays, as a status or a stance stack, so it leaves rotation
+# for the rest of the fight like SPENT and is back in the deck next fight.
+# For a stance that is what makes a stack one physical copy: reshuffled,
+# the same card would stack itself again. Every other card, the discard.
+static func exhausts_on_play(card: CardData) -> bool:
+	if card.card_type == CardData.CardType.POWER or card.card_type == CardData.CardType.STANCE:
+		return true
+	return card.removal_scope != CardData.RemovalScope.NONE
 
 # Same shape as _resolve_play()'s own await: EnemyTurn.take_turn() has
 # already mutated combatant/player HP synchronously by the time this

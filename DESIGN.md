@@ -43,6 +43,31 @@ the hit reactions it passes; the hits themselves, HP and kills, still land
 at the card's impact. Blood Arc's arc (#461613, 0.9) is the first.
 (2026-10-03.)
 
+## The played card
+
+A played card is out of the hand from the moment the play commits, before
+any of its effects resolve - a rules change: it no longer counts toward
+the hand cap of 10 while it resolves, so Second Thoughts played at 9
+cards ends on 10. The order (`BattleController._resolve_play()`):
+
+- Commit: the cost is paid and the card leaves `deck.hand`
+  (`Deck.begin_play()`) for no pile - no slot in the hand, no room in its
+  row. A swing starts; the card fades where it is.
+- The fade's end (`HandContainer.play_fade_duration`, 0.16 s): the card
+  goes to its pile (`Deck.settle_play()` - the discard, or the exhaust
+  pile for Spent, Consumed, a Power or a Stance) and its readout ticks.
+- A card with no `battle_animation` resolves in that same frame, after
+  it: what it draws flies in once it has gone. A card with one - every
+  Attack, and Brace - resolves at its impact delay from the commit, its
+  lunge and hit unchanged. The rule is the clip, not the card type.
+- Until its effects have resolved (`Deck.end_play()`) a reshuffle leaves
+  the card in the discard, so a draw on a card never draws the card itself.
+
+A Consumed card is in the exhaust pile from the fade's end, so a fight
+that ends on it still takes it out of the run deck. This replaces the
+0.45 s settle timer and closes the deferred item on a card's time in hand
+depending on its impact time. (2026-10-07.)
+
 ## Card rarity
 
 A simple HP-for-resource trade is a Common: lose a little HP, get one
@@ -477,14 +502,3 @@ folder (run_log_probe). (2026-10-04.)
   files it reads. The card export needs a real CardView for its face text
   and rules font size, so its generator builds one. (2026-10-05, enemy
   export.)
-- **A played card's time in hand depends on its impact time.** The played
-  card leaves `deck.hand` for its pile `HandContainer.play_settle_sec`
-  (0.45 s) after the play - the old fly-out's length, kept when the play
-  became a 0.16 s fade so the rules didn't move - while its effects
-  resolve after its impact delay (`CardData.impact_time`, 0.4 by default,
-  clamped to the clip). A card at 0.4 resolves with itself still in hand;
-  the five at 0.55 resolve after it has gone. Only DrawEffect reads that
-  today (the hand cap of 10 counts the played card or not). Fix by moving
-  the card to its pile at one fixed point of the play - right after
-  `resolve_card()` is the natural one - not by timer. (2026-10-06, card
-  draw and fade.)

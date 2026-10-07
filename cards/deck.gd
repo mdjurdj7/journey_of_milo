@@ -21,6 +21,13 @@ var exhaust_pile: Array[CardData] = []
 # by return_set_aside(). A fight that ends first just drops it - each
 # fight's Deck is built fresh from the run's deck.
 var set_aside_pile: Array[CardData] = []
+# The card being played, from its commit (begin_play()) until its effects
+# have resolved (end_play()); null between plays. Out of the hand from the
+# commit - no slot, not counted toward hand_size - and in no pile until
+# settle_play() puts it in its own. While it is still playing, a reshuffle
+# leaves it in the discard pile, so a draw on the card can never draw the
+# card itself.
+var playing: CardData = null
 
 func _init(starting_cards: Array[CardData] = []) -> void:
 	draw_pile = starting_cards.duplicate()
@@ -41,6 +48,9 @@ func draw(amount: int) -> void:
 			if discard_pile.is_empty():
 				return
 			_reshuffle_discard_into_draw()
+			# Only the card being played was there: nothing to draw.
+			if draw_pile.is_empty():
+				return
 		var card: CardData = draw_pile.pop_back()
 		hand.append(card)
 		drawn.emit(card)
@@ -104,6 +114,32 @@ func return_set_aside() -> void:
 		discard_pile.append(card)
 		discarded.emit(card)
 
+# A play commits: `card` leaves the hand - in no pile yet, and no longer
+# counted toward hand_size while its effects resolve. False, and nothing
+# moved, for a card not in the hand.
+func begin_play(card: CardData) -> bool:
+	if not hand.has(card):
+		return false
+	hand.erase(card)
+	playing = card
+	return true
+
+# The playing card into its pile - the exhaust pile when `exhaust`
+# (Spent, Consumed, a Power or a Stance), else the discard pile - with the
+# pile's own signal, so its readout ticks now. Once per play.
+func settle_play(exhaust: bool) -> void:
+	if playing == null or discard_pile.has(playing) or exhaust_pile.has(playing):
+		return
+	if exhaust:
+		exhaust_pile.append(playing)
+	else:
+		discard_pile.append(playing)
+		discarded.emit(playing)
+
+# The play's effects have resolved: from here a reshuffle may take it.
+func end_play() -> void:
+	playing = null
+
 # Removes a card from hand for the rest of this Deck's lifetime (i.e. this
 # fight) - unlike discard(), it never returns via _reshuffle_discard_into_draw().
 func exhaust(card: CardData) -> void:
@@ -112,7 +148,13 @@ func exhaust(card: CardData) -> void:
 	hand.erase(card)
 	exhaust_pile.append(card)
 
+# Every discard into the draw pile but the card still being played, which
+# stays where it is - a draw on a card never draws the card itself.
 func _reshuffle_discard_into_draw() -> void:
+	var held: Array[CardData] = []
+	if playing != null and discard_pile.has(playing):
+		discard_pile.erase(playing)
+		held.append(playing)
 	draw_pile = discard_pile
-	discard_pile = []
+	discard_pile = held
 	shuffle()
