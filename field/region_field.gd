@@ -1890,6 +1890,7 @@ func _on_debug_keepsake_pressed() -> void:
 	var trinket: TrinketData = _next_debug_keepsake()
 	if trinket == null:
 		return
+	RunLogger.event("debug_keepsake", {"keepsake": RunLogger.keepsake_id(trinket)})
 	if not RunState.acquire_keepsake(trinket):
 		open_keepsake_offer(trinket)
 	_refresh_debug_keepsake_button()

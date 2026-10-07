@@ -168,7 +168,9 @@ func _ready() -> void:
 	lose_button.pressed.connect(func() -> void: _finish_debug(Outcome.LOSE))
 	escape_button.pressed.connect(func() -> void: _finish_debug(Outcome.ESCAPE))
 	draw_button.pressed.connect(func() -> void: hand_container.draw_cards(5))
-	discard_button.pressed.connect(func() -> void: hand_container.discard_hand())
+	discard_button.pressed.connect(func() -> void:
+		RunLogger.event("debug_discard_hand", {})
+		hand_container.discard_hand())
 	_debug_card_picker = OptionButton.new()
 	_debug_card_picker.name = "CardPicker"
 	_debug_card_picker.theme_type_variation = &"DebugButton"

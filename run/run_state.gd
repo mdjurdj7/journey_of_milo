@@ -209,6 +209,14 @@ func _notification(what: int) -> void:
 	if what == NOTIFICATION_WM_CLOSE_REQUEST:
 		log_run_end("quit")
 
+# The tree going without a run_end written (a quit that didn't come
+# through the window's close): "stopped". Nothing when one was - the log
+# closes its file on a run_end. The editor's Stop kills the process before
+# this can run; RunLogger closes those runs when the next one starts.
+func _exit_tree() -> void:
+	if RunLogger.is_run_open():
+		log_run_end("stopped")
+
 func _build_starting_deck(starting_character: CharacterData) -> Array[CardData]:
 	var cards: Array[CardData] = []
 	for card_data: CardData in starting_character.starting_deck_counts:

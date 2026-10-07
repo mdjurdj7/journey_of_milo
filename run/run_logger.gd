@@ -24,9 +24,23 @@ class_name RunLogger
 # the reward-side ones written through reward_cards()/event(). A fight is
 # summed here as it runs (damage, block, Toll, Grace, every card played)
 # and written as one fight_end line.
+#
+# A run that touched anything debug - a debug_* event, a fight a debug
+# button ended - carries debug_run on its run_end, so tuning can leave it
+# out. A run that never wrote a run_end (the editor's Stop kills the
+# process outright) is closed with cause "stopped" the next time a run
+# starts in the same folder (_close_unfinished()); a tree that exits
+# without one writes it itself (RunState._exit_tree()).
+#
+# Format 2 (2026-10-07): debug_run and "stopped"; per-hit, self-loss and
+# heal lines; per-turn energy and draws; Toll by source; mechanic events;
+# encounter fields on fight_start.
 
 const RUNS_DIR := "user://runs"
-const FORMAT_VERSION := 1
+const FORMAT_VERSION := 2
+# Lines written inside a fight that aren't choices (_write_detail()) - a
+# run made of nothing else is still an empty one.
+const _DETAIL_EVENTS: Array[String] = []
 
 # The switch - RegionField.run_logging_enabled pushes it here.
 static var enabled: bool = true
@@ -46,6 +60,10 @@ static var _floor: int = 0
 static var _lap: int = 0
 static var _last_encounter: String = ""
 static var _last_fight_debug: bool = false
+# Anything debug happened in this run - see mark_debug().
+static var _debug: bool = false
+# The folders already swept for unfinished runs this session.
+static var _swept_dirs: Dictionary = {}
 
 # --- The fight in progress ---
 static var _fight_open: bool = false
@@ -101,6 +119,9 @@ static func start_run(seed: int, character_name: String, snapshot: Dictionary) -
 		return
 	var dir: String = RUNS_DIR if _output_dir.is_empty() else _output_dir
 	DirAccess.make_dir_recursive_absolute(dir)
+	if not _swept_dirs.has(dir):
+		_swept_dirs[dir] = true
+		_close_unfinished(dir)
 	var stamp: String = Time.get_datetime_string_from_system().replace(":", "-").replace("T", "_")
 	_path = dir.path_join("%s_s%d.jsonl" % [stamp, seed])
 	_file = FileAccess.open(_path, FileAccess.WRITE)
@@ -113,6 +134,7 @@ static func start_run(seed: int, character_name: String, snapshot: Dictionary) -
 	_choices = 0
 	_last_encounter = ""
 	_last_fight_debug = false
+	_debug = false
 	_write("run_start", {
 		"ts": Time.get_datetime_string_from_system(),
 		"version": game_version(),
@@ -167,6 +189,7 @@ static func end_run(cause: String, snapshot: Dictionary) -> void:
 		"keepsake": snapshot.get("keepsake"),
 		"gold": snapshot.get("gold", 0),
 		"glassbone": snapshot.get("glassbone", 0),
+		"debug_run": _debug,
 	})
 	var empty: bool = _fights == 0 and _choices == 0
 	var path: String = _path
@@ -237,6 +260,8 @@ static func fight_end(result: String, debug: bool, hp_end: int, toll_end: int) -
 	_fight_open = false
 	_last_encounter = _encounter
 	_last_fight_debug = debug
+	if debug:
+		_debug = true
 	_write("fight_end", {
 		"fight": _fights,
 		"encounter": _encounter,
@@ -388,6 +413,8 @@ static func reward_cards(source: String, offered: Array[CardData], taken: CardDa
 static func event(ev: String, data: Dictionary) -> void:
 	if _file == null:
 		return
+	if ev.begins_with("debug_"):
+		_debug = true
 	_choices += 1
 	var line: Dictionary = {"region": _region, "floor": _floor, "lap": _lap}
 	line.merge(data, true)
@@ -442,6 +469,71 @@ static func game_version() -> String:
 
 static func _resolve_git_path(base: String, path: String) -> String:
 	return path if path.is_absolute_path() else base.path_join(path).simplify_path()
+
+# --- Unfinished runs ---
+
+# Every run file in `dir` whose last line isn't a run_end gets one, cause
+# "stopped": the process ended without writing it (the editor's Stop kills
+# it outright, so nothing in the game can). It says where the run was last
+# seen, its fight count and whether anything debug happened in it - read
+# back from its own lines - at the time of its last line. A file with no
+# fight and no choice in it is deleted, as end_run() would have.
+static func _close_unfinished(dir: String) -> void:
+	for file_name in DirAccess.get_files_at(dir):
+		if not file_name.ends_with(".jsonl"):
+			continue
+		var path: String = dir.path_join(file_name)
+		var lines: PackedStringArray = FileAccess.get_file_as_string(path).split("
+", false)
+		if lines.is_empty():
+			continue
+		var last: Variant = JSON.parse_string(lines[lines.size() - 1])
+		if last is Dictionary and str((last as Dictionary).get("ev")) == "run_end":
+			continue
+		var seen: Dictionary = {"region": 0, "floor": 0, "lap": 0, "t": 0.0}
+		var fights: int = 0
+		var choices: int = 0
+		var debug: bool = false
+		for raw in lines:
+			var parsed: Variant = JSON.parse_string(raw)
+			if not parsed is Dictionary:
+				continue
+			var line: Dictionary = parsed
+			var ev: String = str(line.get("ev"))
+			for key: String in ["region", "floor", "lap", "t"]:
+				if line.has(key):
+					seen[key] = line[key]
+			# What end_run() keeps a run for: a fight, or any event() line.
+			match ev:
+				"fight_start":
+					fights += 1
+				"run_start", "floor_entered", "fight_end", "run_end":
+					pass
+				_:
+					if not _DETAIL_EVENTS.has(ev):
+						choices += 1
+			if ev.begins_with("debug_") or (ev == "fight_end" and bool(line.get("debug", false))):
+				debug = true
+		if fights == 0 and choices == 0:
+			DirAccess.remove_absolute(path)
+			continue
+		var file := FileAccess.open(path, FileAccess.READ_WRITE)
+		if file == null:
+			continue
+		file.seek_end()
+		file.store_line(JSON.stringify({
+			"v": FORMAT_VERSION,
+			"ev": "run_end",
+			"t": seen["t"],
+			"cause": "stopped",
+			"region": int(seen["region"]),
+			"floor": int(seen["floor"]),
+			"lap": int(seen["lap"]),
+			"fights": fights,
+			"debug_run": debug,
+		}, "", false))
+		file.close()
+		print("RunLogger: closed an unfinished run, %s (stopped)" % file_name)
 
 # --- File ---
 
