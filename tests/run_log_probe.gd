@@ -189,15 +189,20 @@ func _check_log(path: String, seen: Dictionary) -> void:
 			lines.append(parsed)
 	print("---")
 	var events: Array[String] = []
+	# The fight's detail lines (hits, self-losses, heals, mechanics) sit
+	# between its start and its end; the run's own order is the rest.
+	var core: Array[String] = []
 	for line in lines:
 		events.append(str(line.get("ev")))
+		if not RunLogger._DETAIL_EVENTS.has(str(line.get("ev"))):
+			core.append(str(line.get("ev")))
 	print("events: ", events)
-	_expect_eq(events.slice(0, 4), ["run_start", "floor_entered", "fight_start", "fight_end"] as Array[String], "The run opens: run_start, floor_entered, fight_start, fight_end")
+	_expect_eq(core.slice(0, 4), ["run_start", "floor_entered", "fight_start", "fight_end"] as Array[String], "The run opens: run_start, floor_entered, fight_start, fight_end")
 	_expect(events.has("reward_gold"), "The gold taken is logged")
 	_expect(events.has("reward_cards"), "The card choice is logged")
 	_expect_eq(events.back(), "run_end", "run_end is the last line")
 	for line in lines:
-		_expect_eq(int(line.get("v", 0)), 1, "Every line carries the format version")
+		_expect_eq(int(line.get("v", 0)), RunLogger.FORMAT_VERSION, "Every line carries the format version")
 
 	var start: Dictionary = _first(lines, "run_start")
 	_expect(str(start.get("version", "")) != "", "run_start records a version")
@@ -208,6 +213,13 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	_expect_eq(str(fight_start.get("encounter")), "Sputter", "fight_start: the encounter")
 	_expect_eq(fight_start.get("enemies"), ["sputter"], "...its enemies by file")
 	_expect_eq(int(fight_start.get("floor", -1)), 0, "...on floor index 0")
+	# Format 2: the encounter's members and role.
+	var members: Array = fight_start.get("members", [])
+	_expect_eq(members.size(), 1, "fight_start: one member")
+	if not members.is_empty():
+		var member: Dictionary = members[0]
+		_expect_eq([str(member.get("id")), int(member.get("floor_index", -1)), member.get("required"), member.get("elite"), member.get("region_end")], ["sputter", 0, true, false, false], "...the Sputter: floor index 0, required, not elite, not region-end")
+	_expect_eq(str(fight_start.get("role")), "required", "...a required fight")
 
 	var fight: Dictionary = _first(lines, "fight_end")
 	_expect_eq(str(fight.get("result")), "win", "fight_end: a win")
@@ -256,6 +268,52 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	_expect(int(toll.get("spent", 0)) > 0, "Toll spent: Reckoning's")
 	_expect_eq(int(toll.get("start", 0)) + int(toll.get("gained", 0)) - int(toll.get("spent", 0)), int(toll.get("end", -1)), "Toll reconciles: start + gained - spent = end")
 
+	# Format 2: sources, hits, turns.
+	var self_by: Dictionary = taken.get("self_by_source", {})
+	var self_by_ints: Dictionary = {}
+	for key in self_by:
+		self_by_ints[key] = int(self_by[key])
+	_expect_eq(self_by_ints, {"status:collateral": 5, "card:Hold Fast": 2, "card:Blood Arc": 3}, "Self-loss by source: Collateral's price, Hold Fast's and Blood Arc's HP")
+	var self_lines: int = 0
+	var attack_hp: int = 0
+	for line in lines:
+		if str(line.get("ev")) == "self_loss":
+			self_lines += 1
+		if str(line.get("ev")) == "enemy_attack":
+			_expect_eq(str(line.get("enemy")), "sputter", "enemy_attack: the Sputter's")
+			_expect(not str(line.get("intent")).is_empty(), "...naming its intent")
+			var hits_hp: int = 0
+			for hit: Dictionary in line.get("hits", []):
+				hits_hp += int(hit.get("to_hp", 0))
+			_expect_eq(hits_hp, int(line.get("to_hp", -1)), "...its hits adding up to its HP")
+			attack_hp += int(line.get("to_hp", 0))
+	_expect_eq(self_lines, 3, "A self_loss line per self-inflicted loss")
+	_expect_eq(attack_hp, int(by_source.get("Sputter", -1)), "The Sputter's attack lines add up to what it took")
+	var by_intent_sum: int = 0
+	for key in (taken.get("by_intent", {}) as Dictionary):
+		by_intent_sum += int(taken["by_intent"][key])
+	_expect_eq(by_intent_sum, int(by_source.get("Sputter", -1)), "...and so do its intents")
+	var toll_gained_by: Dictionary = toll.get("gained_by_source", {})
+	var toll_gained_sum: int = 0
+	for key in toll_gained_by:
+		toll_gained_sum += int(toll_gained_by[key])
+	_expect_eq(toll_gained_sum, int(toll.get("gained", -1)), "Toll gained by source adds up to the gain")
+	_expect_eq((toll.get("spent_by_source", {}) as Dictionary).get("card:Reckoning"), toll.get("spent"), "...and all of the spend is Reckoning's")
+	if cards.size() >= 2:
+		_expect_eq(int((cards[1] as Dictionary).get("toll_spent", -1)), int(toll.get("spent", -2)), "Reckoning's entry: the Toll it spent")
+	var turn_log: Array = fight.get("turn_log", [])
+	_expect_eq(turn_log.size(), _turns, "turn_log: a line per turn")
+	var spent_energy: int = 0
+	for card: Dictionary in cards:
+		spent_energy += int(card.get("energy"))
+	var logged_energy: int = 0
+	for turn: Dictionary in turn_log:
+		logged_energy += int(turn.get("energy_spent", 0))
+		_expect(turn.get("energy_start") != null and turn.get("energy_left") != null, "...turn %s: Energy at its start and left at its end" % turn.get("turn"))
+		_expect(int(turn.get("drawn", 0)) > 0, "...turn %s: cards drawn" % turn.get("turn"))
+	_expect_eq(logged_energy, spent_energy, "...the Energy it says was spent is the cards'")
+	_expect_eq(fight.get("deaths"), ["sputter"], "deaths: the Sputter")
+
 	var reward: Dictionary = _first(lines, "reward_cards")
 	_expect_eq(str(reward.get("source")), "fight", "reward_cards: from the fight")
 	_expect_eq(reward.get("offered"), seen.get("offered"), "...the cards offered")
@@ -264,6 +322,7 @@ func _check_log(path: String, seen: Dictionary) -> void:
 
 	var end: Dictionary = _first(lines, "run_end")
 	_expect_eq(str(end.get("cause")), "quit", "run_end: quit")
+	_expect_eq(end.get("debug_run"), false, "...not a debug run")
 	_expect_eq(int(end.get("fights", 0)), 1, "...after one fight")
 	_expect_eq([int(end.get("fights_won", -1)), int(end.get("floors_crossed", -1))], [1, 0], "...the tally: one fight won, no floor crossed")
 	_expect_eq([int(end.get("hp", -1)), int(end.get("max_hp", -1)), int(end.get("deck_size", -1))], seen.get("end_tally"), "...HP, max HP and deck size as the run stood")
