@@ -67,9 +67,10 @@ signal battle_finished(outcome: Outcome)
 @export var stack_gap_px: float = 10.0
 # The energy readout's place, overlay-local and fixed whatever the hand
 # holds: its right edge (x) and its numeral's top (y) - it grows leftward
-# from that edge. The default is where a five-card hand used to put it,
-# beside the leftmost card with its numeral level with that card's cost.
-@export var energy_anchor: Vector2 = Vector2(419.5, 832.1):
+# from that edge. x is where a five-card hand used to put it; y raises it
+# clear of the hand - its pips' bottom (y + 63 at 72 px with 18 x 5 pips)
+# 12 px above a hovered card's top at five cards (762.4 at 1080p).
+@export var energy_anchor: Vector2 = Vector2(419.5, 687.4):
 	set(value):
 		energy_anchor = value
 		_apply_energy_anchor()
