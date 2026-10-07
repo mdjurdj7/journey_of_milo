@@ -16,9 +16,9 @@ class_name FloorProp
 @export var position: Vector3 = Vector3.ZERO
 # Onto the prop's own yaw export: Hull.yaw_offset_degrees (on top of its
 # bow-to-sea), Keeper.face_yaw_offset_degrees (on top of face_direction),
-# Bird.perch_yaw_degrees.
+# Bird.perch_yaw_degrees, Wagon.yaw_degrees.
 @export var yaw_degrees: float = 0.0
-# Hull.roll_degrees; ignored by props that don't roll.
+# Hull.roll_degrees, Wagon.roll_degrees; ignored by props that don't roll.
 @export var roll_degrees: float = 0.0
 # Index into the same props array of the prop this one is a child of
 # (the Bird on Hull1), or -1 for a child of the field's Props node. A

@@ -12,6 +12,7 @@
 [ext_resource type="Resource" path="res://battle/rules/enemies/wardling.tres" id="10_wardling"]
 [ext_resource type="Script" uid="uid://bi5wh88prg3u6" path="res://floors/floor_prop.gd" id="13_floor_prop"]
 [ext_resource type="PackedScene" path="res://field/hitching_post.tscn" id="14_hitching_post"]
+[ext_resource type="PackedScene" path="res://field/wagon.tscn" id="15_wagon"]
 
 [sub_resource type="Resource" id="FloorEnemy_blackback"]
 script = ExtResource("2_floor_enemy")
@@ -43,6 +44,14 @@ overrides = {
 "tether_enemy_index": 1
 }
 
+[sub_resource type="Resource" id="FloorProp_wagon"]
+script = ExtResource("13_floor_prop")
+scene = ExtResource("15_wagon")
+position = Vector3(3.5, 0, -12.5)
+yaw_degrees = 80.0
+roll_degrees = 4.0
+world_line = "A wagon, unhitched. The tools are still on it."
+
 [resource]
 script = ExtResource("1_floor_data")
 mask = ExtResource("3_landmass")
@@ -64,7 +73,7 @@ relief_subdivisions = Vector2i(356, 331)
 ambience_sea_db = -9.0
 ambience_wind_db = 2.0
 ambience_sea_lowpass_hz = 3000.0
-props = Array[ExtResource("13_floor_prop")]([SubResource("FloorProp_hitching_post")])
+props = Array[ExtResource("13_floor_prop")]([SubResource("FloorProp_hitching_post"), SubResource("FloorProp_wagon")])
 enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_blackback"), SubResource("FloorEnemy_wardling"), SubResource("FloorEnemy_nipper")])
 ledges = Array[PackedVector2Array]([PackedVector2Array(0.300, 5.583, -1.100, 5.450, -2.533, 4.883, -3.533, 4.117, -4.383, 3.133, -5.050, 1.967, -5.450, 0.800, -5.583, 0.000, -5.617, -2.067, -5.983, -3.633, -6.333, -4.183, -8.000, -5.217, -8.883, -6.067, -9.417, -6.833, -10.017, -8.267, -10.317, -9.600, -10.383, -11.033, -10.117, -12.433, -9.717, -13.500, -9.083, -14.600, -8.300, -15.483, -7.467, -16.117, -5.683, -17.033, -5.417, -17.533, -4.483, -20.600, -4.517, -21.133, -4.933, -21.750, -7.067, -23.583, -8.967, -24.717, -9.917, -25.767, -10.283, -26.500, -10.483, -27.300, -10.417, -28.533, -9.950, -29.700, -8.900, -30.883, -7.967, -31.450, -6.667, -31.817, -5.533, -31.817, -4.500, -31.550, -3.633, -31.117, -2.350, -30.000, -1.300, -28.683, -1.000, -28.517, -0.533, -28.517, 2.567, -30.550, 5.867, -33.083, 7.867, -34.117, 12.633, -35.450, 16.167, -36.717, 21.233, -37.950, 23.133, -38.217, 24.233, -38.217, 25.267, -38.017, 26.400, -37.517, 27.000, -37.083, 27.883, -36.133, 28.350, -35.267, 28.550, -34.533, 28.583, -33.333, 28.450, -32.667, 27.950, -31.467, 27.550, -30.900, 26.900, -30.250, 26.033, -29.650, 16.800, -24.583, 13.500, -22.583, 12.033, -21.350, 9.717, -19.067, 9.217, -18.400, 8.950, -17.767, 9.067, -17.283, 9.633, -17.117, 13.733, -17.150, 14.967, -17.317, 16.233, -18.417, 17.200, -18.850, 18.233, -18.983, 19.467, -18.683, 20.200, -18.250, 21.017, -17.433, 21.583, -16.467, 21.817, -15.800, 21.983, -14.967, 21.983, -13.833, 21.650, -12.500, 21.250, -11.700, 20.850, -11.167, 19.967, -10.383, 18.533, -9.850, 7.500, -9.950, 6.633, -9.750, 6.217, -9.100, 5.950, -7.533, 5.983, -1.267, 5.850, 0.433, 5.517, 1.767, 4.750, 3.133, 3.333, 4.517, 1.867, 5.283, 0.300, 5.583)])
 exit_direction = Vector2(0.8815, -0.4722)

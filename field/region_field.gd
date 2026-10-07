@@ -994,6 +994,10 @@ func _spawn_floor_props() -> void:
 				collector.world_line = entry.world_line
 			collector.stock_pool = entry.pool
 			collector.open_requested.connect(open_collector_screen)
+		elif prop is Wagon:
+			var wagon := prop as Wagon
+			if not entry.world_line.is_empty():
+				wagon.world_line = entry.world_line
 		# A child prop's position is local to its parent (a perch); a top-
 		# level one's is an XZ offset from spawn, grounded by the prop.
 		var placement: Vector3 = entry.position if entry.parent_index >= 0 else Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.z)
