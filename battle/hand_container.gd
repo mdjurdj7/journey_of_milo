@@ -15,6 +15,10 @@ signal play_animation_finished(card_data: CardData)
 # A card was lifted into the armed position / returned or played from it -
 # BattleOverlay disables End Turn while one is armed.
 signal armed_changed(armed: bool)
+# The card whose cost the energy readout previews changed: the armed card
+# if there is one, else the hovered one - never a card that is only
+# marked (a Bide or Deny choice) - or null for none.
+signal cost_focus_changed(card_data: CardData)
 # A drawn card has left the deck - its arrival flight has just begun
 # (see _launch_arrival()). Once per card, staggered as the flights are.
 signal draw_started(card_data: CardData)
@@ -206,6 +210,8 @@ var _lifted_slots: Dictionary = {} # Control (slot) -> true
 # closes under it) and parked at the card's armed_position until
 # disarmed - see _on_card_armed()/_on_card_disarmed().
 var _armed_slot: Control = null
+# The card cost_focus_changed last named (null: none).
+var _focus_card: CardData = null
 
 func set_deck(deck: Deck) -> void:
 	if _deck != null:
@@ -542,12 +548,14 @@ func _card_views() -> Array[CardView]:
 # way reads the same: level and on top of its neighbors.
 func _on_card_lifted(slot: Control, card_view: CardView) -> void:
 	_lifted_slots[slot] = true
+	_refresh_cost_focus()
 	slot.z_index = HOVER_Z_INDEX
 	var tween := create_tween()
 	tween.tween_property(slot, "rotation_degrees", 0.0, card_view.hover_duration_sec)
 
 func _on_card_lowered(slot: Control, card_view: CardView) -> void:
 	_lifted_slots.erase(slot)
+	_refresh_cost_focus()
 	if slot == _armed_slot:
 		return
 	slot.z_index = int(_arc_z_indices.get(slot, 0))
@@ -566,6 +574,7 @@ func _on_card_armed(slot: Control, card_view: CardView) -> void:
 	_land_now(slot)
 	_armed_slot = slot
 	armed_changed.emit(true)
+	_refresh_cost_focus()
 	_lifted_slots.erase(slot)
 	for other in _slots:
 		var other_view: CardView = other.get_child(0) as CardView
@@ -593,6 +602,7 @@ func _on_card_disarmed(slot: Control, card_view: CardView) -> void:
 		return
 	_armed_slot = null
 	armed_changed.emit(false)
+	_refresh_cost_focus()
 	for other in _slots:
 		var other_view: CardView = other.get_child(0) as CardView
 		if other_view != null:
@@ -613,6 +623,24 @@ func _forget_slot(slot: Control) -> void:
 	_arc_rotations.erase(slot)
 	_arc_z_indices.erase(slot)
 	_lifted_slots.erase(slot)
+	_refresh_cost_focus()
+
+# Names the card whose cost the readout previews, when it changes: the
+# armed card wins; else a lifted card that is hovered, not just marked.
+func _refresh_cost_focus() -> void:
+	var card: CardData = null
+	if _armed_slot != null:
+		card = _slot_cards.get(_armed_slot)
+	else:
+		for slot: Control in _lifted_slots:
+			var view: CardView = slot.get_child(0) as CardView
+			if view != null and not view.is_marked():
+				card = _slot_cards.get(slot)
+				break
+	if card == _focus_card:
+		return
+	_focus_card = card
+	cost_focus_changed.emit(card)
 
 func _kill_reflow_tween(slot: Control) -> void:
 	var tween: Tween = _reflow_tweens.get(slot)
@@ -653,6 +681,7 @@ func play_card(card_data: CardData, _target_screen_pos: Vector2) -> void:
 	if _armed_slot == slot:
 		_armed_slot = null
 		armed_changed.emit(false)
+		_refresh_cost_focus()
 		for other in _slots:
 			var other_view: CardView = other.get_child(0) as CardView
 			if other_view != null:

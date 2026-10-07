@@ -130,6 +130,11 @@ var _field_hp_bar: HPBar = null
 var _field_deck_panel: DeckPanel = null
 var _battle_transition_time: float = 0.0
 var _card_play_player: AudioStreamPlayer = null
+# The card whose cost the energy pips preview (HandContainer.cost_focus_
+# changed), and whether a play is holding the preview until its spend
+# lands - see _on_cost_focus_changed().
+var _cost_focus: CardData = null
+var _cost_preview_held: bool = false
 var _card_draw_players: Array[AudioStreamPlayer] = []
 var _card_draw_next: int = 0
 # The per-card override's player, made on first use - see _on_card_played().
@@ -251,6 +256,10 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.enemy_intent_changed.connect(_on_enemy_intent_changed)
 	battle_controller.energy_changed.connect(hand_container.update_playable)
 	battle_controller.energy_changed.connect(_on_energy_changed)
+	hand_container.cost_focus_changed.connect(_on_cost_focus_changed)
+	# A play holds the outlined pips until its energy_changed turns them
+	# spent.
+	battle_controller.card_played.connect(func(_card: CardData, _target: FieldEnemy) -> void: _cost_preview_held = true)
 	battle_controller.status_changed.connect(_on_status_changed)
 	battle_controller.turn_phase_changed.connect(_on_turn_phase_changed)
 	battle_controller.enemy_acting.connect(_on_enemy_acting)
@@ -458,6 +467,28 @@ func _on_enemy_defeated(enemy: FieldEnemy) -> void:
 
 func _on_energy_changed(current: int) -> void:
 	_resources.set_energy(current, battle_controller.player.max_energy)
+	_cost_preview_held = false
+	_refresh_cost_preview()
+
+func _on_cost_focus_changed(card: CardData) -> void:
+	_cost_focus = card
+	_refresh_cost_preview()
+
+# The focused card's cost as outlined pips - the fight's own reading of
+# it (Combatant.energy_cost(): a free card or a cost paid in HP is 0), and
+# only when it can be paid; an unaffordable card is already dimmed. A
+# play holds what it showed until its energy_changed.
+func _refresh_cost_preview() -> void:
+	if _resources == null or battle_controller == null or battle_controller.player == null:
+		return
+	if _cost_preview_held:
+		return
+	var cost: int = 0
+	if _cost_focus != null:
+		cost = battle_controller.player.energy_cost(_cost_focus)
+		if cost > battle_controller.player.energy:
+			cost = 0
+	_resources.set_cost_preview(cost)
 
 func _on_toll_changed(new_toll: int) -> void:
 	_field_hp_bar.update_toll(new_toll)

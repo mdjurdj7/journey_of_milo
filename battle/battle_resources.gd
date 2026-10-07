@@ -10,7 +10,9 @@ class_name BattleResources
 # bar per point of max energy, full ink while available, faint (spent_
 # pip_alpha) once spent, in place; energy above max adds solid pips past
 # a gap. No "/ max": the pips carry capacity. A pip changing state
-# crossfades over pip_fade_sec - no pulse, no flash.
+# crossfades over pip_fade_sec - no pulse, no flash. While a card's cost
+# is previewed (set_cost_preview()), the rightmost available pips it
+# would spend draw as ink outlines, no fill.
 # Toll lives on the Wanderer's own readout (see HPBar), not here.
 #
 # Driven by BattleOverlay from BattleController's energy_changed (current
@@ -82,6 +84,11 @@ class_name BattleResources
 # How long a pip takes to cross from available to spent, or back - and an
 # over-max pip to come or go.
 @export var pip_fade_sec: float = 0.12
+# A previewed pip's outline stroke.
+@export var preview_outline_px: float = 1.5:
+	set(value):
+		preview_outline_px = value
+		queue_redraw()
 
 const GLYPH_RECT_MARGIN_PX := 1.0
 
@@ -93,6 +100,9 @@ var _energy_label_tracked: Font = null
 # (available), easing to its target in _process() - the max row first,
 # then the over-max pips. Empty until the first set_energy(), which snaps.
 var _pip_lit: Array[float] = []
+# How many of the rightmost available pips draw as outlines - a hovered
+# or armed card's cost (BattleOverlay; 0 for none).
+var _cost_preview: int = 0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -123,6 +133,15 @@ func set_energy(current: int, max_energy: int) -> void:
 			_pip_lit[i] = _pip_target(i)
 	set_process(true)
 	_relayout()
+
+# The rightmost `count` available pips draw as outlines - what a card
+# would spend. 0 clears it.
+func set_cost_preview(count: int) -> void:
+	count = maxi(count, 0)
+	if count == _cost_preview:
+		return
+	_cost_preview = count
+	queue_redraw()
 
 # Export setters run before _ready() too - only restyle once in the tree.
 func _restyle() -> void:
@@ -230,9 +249,17 @@ func _draw() -> void:
 	InkType.draw_run(self, _energy_label_tracked, energy_label_text, Vector2(_numeral_width() + numeral_label_gap_px, baseline), energy_label_size_px, label_color)
 
 	# Pips: the max row available or spent in place, then any over-max
-	# ones past the gap - each at its own crossfade.
+	# ones past the gap - each at its own crossfade; the previewed ones as
+	# outlines.
+	var previewed: Dictionary = _previewed_pips()
 	var pip_top: float = baseline + pip_baseline_gap_px
 	for i in _pip_lit.size():
+		var rect := Rect2(_pip_x(i), pip_top, pip_size.x, pip_size.y)
+		if previewed.has(i):
+			# The stroke inside the bar's own bounds.
+			var inset: float = preview_outline_px / 2.0
+			draw_rect(rect.grow(-inset), _ink, false, preview_outline_px)
+			continue
 		var lit: float = _pip_lit[i]
 		var color: Color = _ink
 		if i < _max_energy:
@@ -241,4 +268,15 @@ func _draw() -> void:
 			color.a = lit
 		if color.a <= 0.0:
 			continue
-		draw_rect(Rect2(_pip_x(i), pip_top, pip_size.x, pip_size.y), color)
+		draw_rect(rect, color)
+
+# The pips the cost preview outlines: the rightmost _cost_preview of the
+# available ones - over-max pips first, then the max row from its right.
+func _previewed_pips() -> Dictionary:
+	var previewed: Dictionary = {}
+	var index: int = _pip_lit.size() - 1
+	while index >= 0 and previewed.size() < _cost_preview:
+		if _pip_target(index) >= 1.0:
+			previewed[index] = true
+		index -= 1
+	return previewed
