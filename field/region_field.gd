@@ -44,6 +44,7 @@ enum RewardMode { SCREEN, WORLD }
 # What a BelongingsCache opens into (see open_belongings_screen()).
 @export var belongings_screen_scene_path: String = "res://battle/belongings_screen.tscn"
 @export var collector_screen_scene_path: String = "res://battle/collector_screen.tscn"
+@export var wagon_screen_scene_path: String = "res://battle/wagon_screen.tscn"
 # What a keepsake is offered in (see open_keepsake_offer()).
 @export var keepsake_offer_scene_path: String = "res://battle/keepsake_offer.tscn"
 # The run log (RunLogger - one JSON-lines file per run under user://runs/).
@@ -998,6 +999,7 @@ func _spawn_floor_props() -> void:
 			var wagon := prop as Wagon
 			if not entry.world_line.is_empty():
 				wagon.world_line = entry.world_line
+			wagon.open_requested.connect(open_wagon_screen)
 		# A child prop's position is local to its parent (a perch); a top-
 		# level one's is an XZ offset from spawn, grounded by the prop.
 		var placement: Vector3 = entry.position if entry.parent_index >= 0 else Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.z)
@@ -1970,6 +1972,28 @@ func open_collector_screen(collector: Collector) -> bool:
 	return true
 
 func _on_collector_screen_closed() -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT
+
+# The wagon's screen (WagonScreen), under the collector's scrim-and-freeze:
+# the field DISABLED under it until it closes. False when a fight or
+# another screen has the field already.
+func open_wagon_screen(wagon: Wagon) -> bool:
+	if _battle_open or not can_process():
+		return false
+	var scene := load(wagon_screen_scene_path) as PackedScene
+	if scene == null:
+		push_warning("RegionField: could not load %s; no wagon screen." % wagon_screen_scene_path)
+		return false
+	var screen := scene.instantiate() as WagonScreen
+	screen.setup(wagon)
+	screen.closed.connect(_on_wagon_screen_closed)
+	if _loot_screen != null and is_instance_valid(_loot_screen):
+		_loot_screen.close()
+	process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(screen)
+	return true
+
+func _on_wagon_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 
 # A bundle's loot window, beside the bundle on FieldHUD - the field stays

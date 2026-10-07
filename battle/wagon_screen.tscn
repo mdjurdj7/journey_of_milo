@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/wagon_screen.gd" id="1_wagon_screen"]
+
+[node name="WagonScreen" type="CanvasLayer"]
+script = ExtResource("1_wagon_screen")
