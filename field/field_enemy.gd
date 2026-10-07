@@ -53,6 +53,9 @@ const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 # FloorEnemy.card_reward, mirrored the same way - read as the fight
 # starts (RegionField).
 @export var card_reward: FloorEnemy.CardReward = FloorEnemy.CardReward.ROLLED
+# Where this enemy is in its floor's FloorData.enemies - set at spawn, for
+# the run log's encounter fields. -1 for an enemy placed by hand.
+var floor_index: int = -1
 @export var region_field_path: NodePath = ^".."
 @export var ground_path: NodePath = ^"../Ground"
 # The hover highlight and the hit flash both BRIGHTEN: albedo times this,

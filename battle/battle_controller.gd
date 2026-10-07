@@ -181,6 +181,8 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	_combatants.clear()
 	var enemy_names: Array[String] = []
 	var enemy_ids: Array[String] = []
+	# The run log's encounter fields, one per member (RunLogger.fight_start()).
+	var members: Array[Dictionary] = []
 	for enemy in enemies:
 		var data: EnemyData = enemy.enemy_data
 		var combatant := Combatant.new(data.max_hp if data != null else 1)
@@ -195,12 +197,19 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 			# Two enemies can share a name (the Dragonflies) - the file
 			# tells them apart in the log.
 			enemy_ids.append(data.resource_path.get_file().get_basename())
+			members.append({
+				"id": data.resource_path.get_file().get_basename(),
+				"floor_index": enemy.floor_index,
+				"required": enemy.required,
+				"elite": data.is_elite,
+				"region_end": enemy.card_reward == FloorEnemy.CardReward.TOP_TIER_FIRST,
+			})
 		_combatants[enemy] = combatant
 	# A pack met with one member left (the rest killed in an earlier fight
 	# it was escaped from) opens without its pack move.
 	_mark_lone_pack_members()
 
-	RunLogger.fight_start(RunLogger.encounter_key(enemy_names), enemy_ids, RunState.run_snapshot())
+	RunLogger.fight_start(RunLogger.encounter_key(enemy_names), enemy_ids, RunState.run_snapshot(), members)
 	for enemy in enemies:
 		var logged: Combatant = _combatants[enemy]
 		RunLogger.enemy_hp_seen(logged.get_instance_id(), logged.hp)

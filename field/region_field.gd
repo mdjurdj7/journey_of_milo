@@ -832,6 +832,7 @@ func _spawn_floor_enemies() -> void:
 		enemy.group = entry.group
 		enemy.anchor = entry.anchor
 		enemy.card_reward = entry.card_reward
+		enemy.floor_index = index
 		# The body, from the data's Field Body group - its defaults are
 		# this scene's own values, so a resource that sets none (the
 		# Sputter) wears exactly what it did.
