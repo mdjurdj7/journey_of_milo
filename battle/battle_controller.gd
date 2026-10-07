@@ -206,10 +206,11 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		RunLogger.enemy_hp_seen(logged.get_instance_id(), logged.hp)
 	if keepsake != null:
 		RunLogger.block_gained(maxi(keepsake.combat_start_block, 0))
-	RunLogger.turn_started()
+	RunLogger.turn_started(player.energy)
 
 	deck = Deck.new(RunState.deck)
 	deck.drawn.connect(func(_card: CardData) -> void: hand_changed.emit())
+	deck.drawn.connect(func(_card: CardData) -> void: RunLogger.card_drawn())
 	deck.discarded.connect(func(_card: CardData) -> void: hand_changed.emit())
 	deck.set_aside_changed.connect(func() -> void: hand_changed.emit())
 	_hand_container.set_deck(deck)
@@ -522,6 +523,7 @@ func end_turn() -> void:
 # cards, which stay for the next turn's draw to land on top of), Grace
 # closed, stance and turn statuses aged, the enemy turn, the next turn.
 func _finish_turn(keep: Array[CardData]) -> void:
+	RunLogger.turn_ended(player.energy)
 	_input_locked = true
 	turn_phase_changed.emit(false)
 	# The hand fades out in place, card after card; the enemy turn waits
@@ -944,12 +946,13 @@ func _all_living_simultaneous() -> bool:
 	return living > 1
 
 func _start_player_turn() -> void:
-	RunLogger.turn_started()
 	player.block = 0
 	# The refill, and Dying Light's 1 if the turn begins Critical - judged
 	# here, before any tick, so entering Critical later gives nothing
 	# until the next turn starts.
 	player.energy = player.turn_start_energy()
+	# The run log's turn opens on the refill, before any tick it counts.
+	RunLogger.turn_started(player.energy)
 	cards_played_this_turn = 0
 	# A fresh turn for every interrupt threshold.
 	player.damage_taken_this_turn = 0
@@ -1007,9 +1010,11 @@ func _start_player_turn() -> void:
 
 func _check_battle_end() -> bool:
 	if player.hp <= 0:
+		RunLogger.turn_ended(player.energy)
 		battle_lost.emit()
 		return true
 	if _living_enemy_combatants().is_empty():
+		RunLogger.turn_ended(player.energy)
 		battle_won.emit()
 		return true
 	return false

@@ -95,6 +95,13 @@ static var _block_used: int = 0
 static var _absorb_used: int = 0
 static var _toll_gained: int = 0
 static var _toll_spent: int = 0
+# Toll by what moved it - current_source(), "other" when nothing is known.
+static var _toll_gained_by: Dictionary = {}
+static var _toll_spent_by: Dictionary = {}
+# One entry per player turn: its number, the Energy it opened on, the
+# Energy cards took, what was left when it ended (null: it never did - the
+# fight ended in it), and the cards drawn in it.
+static var _turn_log: Array[Dictionary] = []
 static var _enemy_hp: Dictionary = {} # Combatant instance id -> last HP seen
 static var _cards: Array[Dictionary] = []
 
@@ -108,6 +115,8 @@ static var _card_self_lost: int = 0
 static var _card_dealt: int = 0
 static var _card_block: int = 0
 static var _card_healed: int = 0
+static var _card_toll_gained: int = 0
+static var _card_toll_spent: int = 0
 
 # A probe's folder (user://...), which also lets a headless instance log.
 # Empty puts it back to user://runs/ and the headless guard.
@@ -248,6 +257,9 @@ static func fight_start(encounter: String, enemy_ids: Array[String], snapshot: D
 	_absorb_used = 0
 	_toll_gained = 0
 	_toll_spent = 0
+	_toll_gained_by = {}
+	_toll_spent_by = {}
+	_turn_log = []
 	_enemy_hp = {}
 	_cards = []
 	_card_open = false
@@ -292,14 +304,33 @@ static func fight_end(result: String, debug: bool, hp_end: int, toll_end: int) -
 		"grace": {"opened": _grace_opened, "reclaimed": _grace_reclaimed, "lost": _grace_lost},
 		"damage_dealt": {"total": _dealt, "overkill": _overkill},
 		"block": {"gained": _block_gained, "used": _block_used, "absorb_used": _absorb_used},
-		"toll": {"start": _toll_start, "gained": _toll_gained, "spent": _toll_spent, "end": toll_end},
+		"toll": {"start": _toll_start, "gained": _toll_gained, "spent": _toll_spent, "end": toll_end, "gained_by_source": _toll_gained_by, "spent_by_source": _toll_spent_by},
+		"turn_log": _turn_log,
 		"cards": _cards,
 	})
 
-# The player's turn starts - the opening one included.
-static func turn_started() -> void:
-	if _fight_open:
-		_turn += 1
+# The player's turn starts - the opening one included - on `energy`
+# Energy (after the refill; -1 when the caller doesn't say).
+static func turn_started(energy: int = -1) -> void:
+	if not _fight_open:
+		return
+	_turn += 1
+	_turn_log.append({"turn": _turn, "energy_start": energy if energy >= 0 else null, "energy_spent": 0, "energy_left": null, "drawn": 0})
+
+# The player's turn ends - End Turn, or the fight ending in it - with
+# `energy` left unspent. Once per turn: a later call changes nothing.
+static func turn_ended(energy: int) -> void:
+	if not _fight_open or _turn_log.is_empty():
+		return
+	var entry: Dictionary = _turn_log.back()
+	if entry["energy_left"] == null:
+		entry["energy_left"] = energy
+
+# A card drawn into the hand, on this turn's count.
+static func card_drawn() -> void:
+	if _fight_open and not _turn_log.is_empty():
+		var entry: Dictionary = _turn_log.back()
+		entry["drawn"] = int(entry["drawn"]) + 1
 
 # A card is committed: what it cost in Energy, and who it is aimed at
 # ("" for none). Everything until card_finished() is its doing.
@@ -311,11 +342,16 @@ static func card_started(card_name: String, energy: int, target: String) -> void
 	_card_name = card_name
 	_card_target = target
 	_card_energy = energy
+	if not _turn_log.is_empty():
+		var entry: Dictionary = _turn_log.back()
+		entry["energy_spent"] = int(entry["energy_spent"]) + maxi(energy, 0)
 	_card_hp_cost = 0
 	_card_self_lost = 0
 	_card_dealt = 0
 	_card_block = 0
 	_card_healed = 0
+	_card_toll_gained = 0
+	_card_toll_spent = 0
 
 static func card_finished() -> void:
 	if not _card_open:
@@ -331,6 +367,8 @@ static func card_finished() -> void:
 		"dealt": _card_dealt,
 		"block": _card_block,
 		"healed": _card_healed,
+		"toll_gained": _card_toll_gained,
+		"toll_spent": _card_toll_spent,
 	})
 
 # A card's price in HP (the stance's, a cost replacement's) - also counted
@@ -452,14 +490,24 @@ static func block_used(blocked: int, absorbed: int) -> void:
 	_absorb_used += maxi(absorbed, 0)
 
 # The run's Toll moved (RunState.set_toll()); in a fight, up is gained and
-# down is spent.
+# down is spent - each put down to what is acting (current_source()), and
+# onto the card resolving's own entry.
 static func toll_changed(before: int, after: int) -> void:
 	if not _fight_open or before == after:
 		return
+	var by: String = current_source()
+	if by.is_empty():
+		by = "other"
 	if after > before:
 		_toll_gained += after - before
+		_toll_gained_by[by] = int(_toll_gained_by.get(by, 0)) + after - before
+		if _card_open:
+			_card_toll_gained += after - before
 	else:
 		_toll_spent += before - after
+		_toll_spent_by[by] = int(_toll_spent_by.get(by, 0)) + before - after
+		if _card_open:
+			_card_toll_spent += before - after
 
 # --- Rewards and choices ---
 
