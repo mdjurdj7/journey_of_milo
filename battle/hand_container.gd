@@ -57,13 +57,13 @@ signal draw_started(card_data: CardData)
 		for card_view in _card_views():
 			card_view.set_rest_offset(card_size.y - hand_rest_visible_height)
 
-# The row's bounds, viewport x: its leftmost card's drawn edge never
-# left of hand_left_limit_x (the energy readout's side - BattleOverlay
-# sets it, energy_hand_gap_px right of the readout), its rightmost's
-# never right of hand_right_limit_x (clear of END TURN and the DISCARD
-# line, whose left edges sit at 1799 and 1804+ at 1080p). The row is
-# centred between them. See _row_fit() for what gives when it doesn't fit.
-@export var hand_left_limit_x: float = 443.5:
+# The row's bounds, viewport x: its rightmost card's drawn edge never
+# right of hand_right_limit_x (clear of END TURN and the DISCARD line,
+# whose left edges sit at 1799 and 1804+ at 1080p), its leftmost's never
+# left of hand_left_limit_x - the mirror of it (1920 - 1775), so the row,
+# centred between them, is centred on the screen. See _row_fit() for what
+# gives when it doesn't fit.
+@export var hand_left_limit_x: float = 145.0:
 	set(value):
 		hand_left_limit_x = value
 		_reflow_hand(false)

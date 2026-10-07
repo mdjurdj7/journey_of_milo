@@ -73,12 +73,6 @@ signal battle_finished(outcome: Outcome)
 	set(value):
 		energy_anchor = value
 		_apply_energy_anchor()
-# The hand keeps this far right of the readout's edge
-# (HandContainer.hand_left_limit_x, pushed by _apply_energy_anchor()).
-@export var energy_hand_gap_px: float = 24.0:
-	set(value):
-		energy_hand_gap_px = value
-		_apply_energy_anchor()
 # Between the DECK line and the keepsake row under it - the row sits in
 # the corner margin, so nothing above it moves.
 @export var keepsake_row_gap_px: float = 4.0:
@@ -193,8 +187,6 @@ func _ready() -> void:
 		debug_row.add_child(energy_button)
 
 	resized.connect(_layout_corners)
-	# The hand's left limit follows the readout's place from the start.
-	_apply_energy_anchor()
 
 # Reads RegionField's ui_on_dark_world switch and applies the matching
 # value set to this overlay's theme (see ui/battle_theme.gd's own
@@ -396,15 +388,10 @@ func _layout_corners() -> void:
 
 # Right edge held at energy_anchor's x, left edge clamped to the corner
 # margin - a very wide readout gives up its edge, not screen; the
-# numeral's top on the anchor's y, whatever the readout's size. The hand
-# keeps energy_hand_gap_px right of that edge. The keepsake row's hover
-# text keeps to the readout's top row, so it never lands on the readout.
+# numeral's top on the anchor's y, whatever the readout's size. The
+# keepsake row's hover text keeps to the readout's top row, so it never
+# lands on the readout.
 func _apply_energy_anchor() -> void:
-	# Only when it moves - this also runs on every resize of the readout,
-	# and the limit's setter re-lays the hand out (a snap).
-	var left_limit: float = global_position.x + energy_anchor.x + energy_hand_gap_px
-	if hand_container != null and hand_container.hand_left_limit_x != left_limit:
-		hand_container.hand_left_limit_x = left_limit
 	if _resources == null:
 		return
 	_resources.position = Vector2(maxf(energy_anchor.x - _resources.size.x, corner_margin_px), energy_anchor.y - _resources.numeral_ink_top())
