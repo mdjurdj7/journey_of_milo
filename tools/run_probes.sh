@@ -80,6 +80,7 @@ greyshelf_probe 45
 card_rarity_probe 5
 come_due_probe 4
 starter_cards_probe 4
+temper_probe 13
 no_further_probe 3
 sentence_probe 3
 the_return_probe 3
@@ -100,11 +101,11 @@ area_probes() {
 		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost" ;;
 		floor1) echo "kill_order drain" ;;
 		floor2) echo "kill_order hold_line bundle_roll" ;;
-		floor3) echo "kill_order blackback wardling" ;;
+		floor3) echo "kill_order blackback wardling temper" ;;
 		floor4) echo "kill_order floor4 wear_path dunecur collector" ;;
 		floor5) echo "kill_order floor5 wear_path greyshelf elite_reward" ;;
 		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur floor5 greyshelf" ;;
-		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord elite_reward run_lost" ;;
+		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord elite_reward run_lost temper" ;;
 		hud) echo "gold_line glassbone" ;;
 		hp_bar) echo "kill_order" ;;
 		ui_inspect) echo "keyword" ;;
@@ -138,6 +139,11 @@ path_probes() {
 		# The collector's stock pool, and its screen.
 		cards/pools/collector_pool.tres) out="$(area_probes cards) collector" ;;
 		battle/collector_screen.*) out=collector ;;
+		# Tempering: the wagon's screen, the tempered versions, the field
+		# that names them.
+		battle/wagon_screen.*) out=temper ;;
+		cards/tempered/*) out="$(area_probes cards) temper" ;;
+		cards/card_data.gd) out="$(area_probes cards) temper" ;;
 		cards/card_effect.gd|cards/deck.gd) out=$(area_probes rules) ;;
 		cards/*) out=$(area_probes cards) ;;
 		battle/card_view.*|battle/card_paper*|battle/card_art*) out=$(area_probes face) ;;
@@ -158,6 +164,9 @@ path_probes() {
 		# The Dunecur's crest and feeding head.
 		field/dunecur_pose.*) out="$(area_probes field) dunecur" ;;
 		field/collector.*) out="$(area_probes field) collector" ;;
+		field/wagon.*) out="$(area_probes field) temper" ;;
+		# The walk-up and click the collector, the trough and the wagon share.
+		field/prop_approach.*) out="$(area_probes field) collector temper" ;;
 		# The Greyshelf's head, rear and throat.
 		field/greyshelf_*) out="$(area_probes field) greyshelf" ;;
 		field/*) out=$(area_probes field) ;;
