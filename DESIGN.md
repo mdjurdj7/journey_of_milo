@@ -394,10 +394,16 @@ folder (run_log_probe). (2026-10-04.)
   yaw 2026-09-30.)
 - **Glassbone's upgrade economy is deferred.** Glassbone is the single
   material reward (Glassbone x1; Framework §3), kept apart from gold,
-  which stays the currency. What it is spent on (tempering cards,
-  equipment, keepsakes, workbenches or shrines), what things cost, and
-  how often it drops are not designed. Nothing in the build yet grants,
-  holds or spends it. (2026-09-30, Glassbone docs.)
+  which stays the currency. The run holds it (RunState.glassbone): the
+  Wardling and the Greyshelf leave one each, and a belongings cache
+  sometimes holds one. Its first use is tempering at floor 3's wagon:
+  1 Glassbone (Wagon.temper_cost) swaps a card for its authored tempered
+  version (CardData.tempered, cards/tempered/), once per card - only the
+  five starters have one yet, and the values are provisional. Still not
+  designed: its other uses (equipment, keepsakes, other workbenches or
+  shrines), tempered versions past the starters, undoing a temper, what
+  things cost in the long run, and how often it drops. (2026-09-30,
+  Glassbone docs; tempering 2026-10-07.)
 - **Signal Glass shows no future intent.** Its intended effect was to
   preview each enemy's intent after the current one. The intent
   architecture doesn't support that cleanly: erratic enemies (Sputter)

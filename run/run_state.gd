@@ -46,8 +46,8 @@ var deck: Array[CardData] = []
 # so nothing can change it without the readouts hearing.
 var gold: int = 0
 
-# Glassbone, the one material: pieces taken this run, for a later
-# modification system (nothing spends it yet). Not money - gold is that.
+# Glassbone, the one material: pieces taken this run, spent tempering
+# cards at the wagon (temper_card()). Not money - gold is that.
 # Carries across every fight and floor, as everything here does;
 # new_run() starts it at 0. Mutated only through add_glassbone()/
 # spend_glassbone(), so it never goes below 0 and the readout always
@@ -355,3 +355,25 @@ func add_card(card: CardData) -> CardData:
 func remove_card(card: CardData) -> void:
 	deck.erase(card)
 	deck_changed.emit()
+
+# Tempering (the wagon - WagonScreen): `cost` Glassbone for `card`'s
+# tempered version (CardData.tempered), a fresh copy at the same place in
+# the deck - its own object, as add_card()'s copies are, so a later
+# Consumed removal finds it by identity like any other card. Between
+# fights only: no fight's piles hold the old card. All or nothing, on
+# spend_glassbone()'s terms (a cost under 1 is refused): null, with
+# nothing spent, when the card isn't in the deck, has no tempered
+# version, or the Glassbone isn't there. Returns the new card.
+func temper_card(card: CardData, cost: int) -> CardData:
+	if card == null or card.tempered == null:
+		return null
+	var index: int = deck.find(card)
+	if index < 0:
+		return null
+	if not spend_glassbone(cost):
+		return null
+	var copy := card.tempered.duplicate() as CardData
+	deck[index] = copy
+	deck_changed.emit()
+	RunLogger.event("temper", {"card": card.card_name, "tempered": copy.card_name, "glassbone_after": glassbone})
+	return copy

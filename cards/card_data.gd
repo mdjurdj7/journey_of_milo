@@ -83,6 +83,14 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 # as before. A path, loaded with load() at play time.
 @export_file("*.tscn") var play_effect_scene_path: String = ""
 
+# The authored, stronger version Glassbone works this card into at the
+# wagon (RunState.temper_card()): a card of its own under cards/tempered/
+# - in no pool and no folder scan - its name carrying a "+", its rarity,
+# type and removal scope the original's. Null: this card can't be
+# tempered. Every tempered version leaves its own null, so a card is
+# tempered once only.
+@export var tempered: CardData = null
+
 # The four real tiers, lowest first - UNSET left out. What a rarity roll
 # walks and what a probe checks a card's tag against.
 static func rarity_tiers() -> Array[CardRarity]:
