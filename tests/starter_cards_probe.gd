@@ -39,6 +39,9 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 # had beside the inset rule, kept now the rule is gone.
 const NUMERAL_TOP_CLEAR_PX := 5.0
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
+# The tempered versions (CardData.tempered) - in no class's folder, so only
+# the rules-text pattern reads them here; temper_probe checks the rest.
+const TEMPERED_DIR := "res://cards/tempered/"
 # The cards with art, by file - the starters, Carve, Cornered, Hold Fast,
 # Come Due, No Further, Sentence, Last Wager, The Return, Blood Arc,
 # Collateral, Ransom, Leverage, Self-Eater, Unbroken, Small Price, Bide,
@@ -402,7 +405,7 @@ func _check_rules_text_pattern() -> void:
 	await process_frame
 	var lose_regex := RegEx.new()
 	lose_regex.compile("\\bLose (\\d+|\\{hp_cost\\}) HP")
-	for dir in CARD_DIRS:
+	for dir: String in CARD_DIRS + [TEMPERED_DIR]:
 		for file in DirAccess.get_files_at(dir):
 			if not file.ends_with(".tres"):
 				continue
