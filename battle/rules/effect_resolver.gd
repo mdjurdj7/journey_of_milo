@@ -60,12 +60,13 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	# card's price. A price that kills ends the card: none of its effects
 	# resolve, and the fight ends as a defeat.
 	if ctx.replaced_cost_hp > 0:
-		ctx.pay_upfront_hp_cost(ctx.replaced_cost_hp)
+		ctx.pay_upfront_hp_cost(ctx.replaced_cost_hp, ctx.replaced_cost_source)
 		ctx.resolve_pending_drain()
 		if ctx.player.hp <= 0:
 			return
 	if ctx.card_is_attack and ctx.player.stance != null and not ctx.enemies.is_empty():
-		ctx.pay_upfront_hp_cost(Stance.attack_hp_loss(ctx.player.stance))
+		var stance_id: String = ctx.player.stance.data.id if ctx.player.stance.data != null else ""
+		ctx.pay_upfront_hp_cost(Stance.attack_hp_loss(ctx.player.stance), "stance:" + stance_id)
 		# The price can be the loss that sets off a counter (The Return):
 		# its Drain lands now, before the Attack it was paid for.
 		ctx.resolve_pending_drain()

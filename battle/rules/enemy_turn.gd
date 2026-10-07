@@ -45,9 +45,9 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "stunned": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "phase_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "blocked": 0, "absorbed": 0}
+	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "stunned": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "phase_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "blocked": 0, "absorbed": 0}
 
-	Status.tick_all(combatant.statuses, func(amount: int) -> void:
+	Status.tick_all(combatant.statuses, func(amount: int, _ticking: Status) -> void:
 		combatant.hp = max(combatant.hp - amount, 0)
 	)
 	# The tick just took a turn off every countdown (Sentence): one that
@@ -69,6 +69,8 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 
 	var intent := current_intent(combatant, data)
 	var interjected: bool = combatant.interjected_intent != null
+	# For the run log: which move this was, and each hit of it.
+	result["intent"] = intent.intent_name if intent != null else ""
 	# Denied (Deny - StatusData.skips_next_turn): spent by this turn
 	# whatever happens, so it never carries over - a pain turn landing on
 	# the same turn takes it too.
@@ -138,6 +140,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 						result["saved_heal"] += maxi(player.hp - hp_before, 0)
 					total_to_hp += to_hp
 					largest_hit = maxi(largest_hit, to_hp)
+					(result["hits"] as Array).append({"damage": amount, "blocked": damage_result["blocked"], "absorbed": damage_result["absorbed"], "to_hp": to_hp})
 				# The attack has resolved, every hit of it: a status that
 				# lasted only until then (Braced on this enemy) is spent -
 				# even if the player's block ate all of it.

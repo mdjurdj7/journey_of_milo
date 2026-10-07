@@ -58,6 +58,9 @@ var preview_hp_cost: int = 0
 # EffectResolver.resolve_card() before anything else on the card. 0 for
 # every card nothing covered.
 var replaced_cost_hp: int = 0
+# What that HP is paid to, for the run log: "status:<id>" of the cost
+# replacement. Set with replaced_cost_hp.
+var replaced_cost_source: String = ""
 
 # Did this card's damage finish something off? Set by damage_effect.gd,
 # cleared per card by EffectResolver.resolve_card(), read by
@@ -176,9 +179,13 @@ func report_block(target_combatant: Combatant, result: Dictionary) -> void:
 # Self-inflicted, so it takes the same route SELF_DAMAGE does: past block
 # and absorb, accruing Toll, reported as "self" - and opening no Grace,
 # because Grace only ever opens on an enemy's hit.
-func pay_upfront_hp_cost(amount: int) -> void:
+# `source` names what the price is paid to, for the run log ("stance:
+# <id>", "status:<id>"); the Toll it accrues is put down to it too.
+func pay_upfront_hp_cost(amount: int, source: String = "") -> void:
 	if amount <= 0:
 		return
+	if not source.is_empty():
+		RunLogger.push_source(source)
 	var lost: int = DamagePipeline.apply_bypass(amount, player)
 	if lost > 0:
 		player.gain_self_loss_toll(lost)
@@ -186,6 +193,8 @@ func pay_upfront_hp_cost(amount: int) -> void:
 		# The price, split out of the "self" loss for the run log.
 		RunLogger.hp_cost_paid(lost)
 		report_damage(player, lost, "self")
+	if not source.is_empty():
+		RunLogger.pop_source()
 
 # The Drain a self-loss counter has handed over (Combatant.pending_
 # drain), resolved now, as one Drain from every enemy in reach - called

@@ -285,7 +285,9 @@ func drink() -> void:
 	if is_drunk():
 		return
 	_drunk[_trough_id()] = true
+	var before: int = RunState.player_hp
 	RunState.heal(heal_amount)
+	RunLogger.player_healed(RunState.player_hp - before, "trough")
 	print("TroughProp '%s': drank, +%d HP (now %d/%d)." % [name, heal_amount, RunState.player_hp, RunState.player_max_hp])
 	if _approach != null:
 		_approach.mark_said()

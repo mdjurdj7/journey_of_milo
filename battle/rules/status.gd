@@ -210,10 +210,11 @@ static func remove_from(statuses: Array[Status], active: Status) -> void:
 # statuses - see remove_expired() below, a separate step, so a duration-1
 # MODIFIER status can still be read by apply_modifiers() later in the same
 # turn before it's erased.
+# `deal_damage` is called (amount, the Status ticking) for each tick.
 static func tick_all(statuses: Array[Status], deal_damage: Callable) -> void:
 	for active in statuses.duplicate():
 		if active.data.category == StatusData.Category.TICK and active.magnitude > 0:
-			deal_damage.call(active.magnitude)
+			deal_damage.call(active.magnitude, active)
 		active.tick_duration()
 
 static func remove_expired(statuses: Array[Status]) -> void:

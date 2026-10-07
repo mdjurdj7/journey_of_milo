@@ -40,7 +40,7 @@ const RUNS_DIR := "user://runs"
 const FORMAT_VERSION := 2
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
-const _DETAIL_EVENTS: Array[String] = []
+const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal"]
 
 # The switch - RegionField.run_logging_enabled pushes it here.
 static var enabled: bool = true
@@ -72,8 +72,19 @@ static var _turn: int = 0
 static var _hp_start: int = 0
 static var _toll_start: int = 0
 static var _taken_by: Dictionary = {} # source name -> HP lost to it
+# Self-inflicted HP by what took it: "card:<name>", "stance:<id>",
+# "status:<id>" (a tick, or a cost replacement's price), "drain".
+static var _self_by: Dictionary = {}
+# An enemy's HP taken by its intent: "<enemy id>:<intent name>".
+static var _taken_by_intent: Dictionary = {}
 static var _taken_total: int = 0
 static var _healed: int = 0
+# HP got back by its source - the same keys as _self_by, and
+# "lethal_guard" (a lethal save's survive HP).
+static var _healed_by: Dictionary = {}
+# What the controller says is acting now (push_source()), innermost last;
+# empty, the card resolving is ("card:<name>").
+static var _sources: Array[String] = []
 static var _grace_opened: int = 0
 static var _grace_reclaimed: int = 0
 static var _grace_lost: int = 0
@@ -96,6 +107,7 @@ static var _card_hp_cost: int = 0
 static var _card_self_lost: int = 0
 static var _card_dealt: int = 0
 static var _card_block: int = 0
+static var _card_healed: int = 0
 
 # A probe's folder (user://...), which also lets a headless instance log.
 # Empty puts it back to user://runs/ and the headless guard.
@@ -220,8 +232,12 @@ static func fight_start(encounter: String, enemy_ids: Array[String], snapshot: D
 	_hp_start = snapshot.get("hp", 0)
 	_toll_start = snapshot.get("toll", 0)
 	_taken_by = {}
+	_self_by = {}
+	_taken_by_intent = {}
 	_taken_total = 0
 	_healed = 0
+	_healed_by = {}
+	_sources = []
 	_grace_opened = 0
 	_grace_reclaimed = 0
 	_grace_lost = 0
@@ -270,8 +286,9 @@ static func fight_end(result: String, debug: bool, hp_end: int, toll_end: int) -
 		"turns": _turn,
 		"hp_start": _hp_start,
 		"hp_end": hp_end,
-		"damage_taken": {"total": _taken_total, "by_source": _taken_by},
+		"damage_taken": {"total": _taken_total, "by_source": _taken_by, "self_by_source": _self_by, "by_intent": _taken_by_intent},
 		"healed": _healed,
+		"healed_by_source": _healed_by,
 		"grace": {"opened": _grace_opened, "reclaimed": _grace_reclaimed, "lost": _grace_lost},
 		"damage_dealt": {"total": _dealt, "overkill": _overkill},
 		"block": {"gained": _block_gained, "used": _block_used, "absorb_used": _absorb_used},
@@ -298,6 +315,7 @@ static func card_started(card_name: String, energy: int, target: String) -> void
 	_card_self_lost = 0
 	_card_dealt = 0
 	_card_block = 0
+	_card_healed = 0
 
 static func card_finished() -> void:
 	if not _card_open:
@@ -312,6 +330,7 @@ static func card_finished() -> void:
 		"target": or_null(_card_target),
 		"dealt": _card_dealt,
 		"block": _card_block,
+		"healed": _card_healed,
 	})
 
 # A card's price in HP (the stance's, a cost replacement's) - also counted
@@ -320,8 +339,28 @@ static func hp_cost_paid(amount: int) -> void:
 	if _card_open and amount > 0:
 		_card_hp_cost += amount
 
+# What is acting while it lasts - a status ticking, a stance's price - so
+# a self-loss, a heal or a Toll change in it is put down to it. Pushed and
+# popped in pairs by whoever knows (BattleController, EffectContext).
+static func push_source(source: String) -> void:
+	_sources.append(source)
+
+static func pop_source() -> void:
+	if not _sources.is_empty():
+		_sources.pop_back()
+
+# The source of what is happening now: the innermost pushed, else the card
+# resolving, else "" (nothing known - the caller's own word stands).
+static func current_source() -> String:
+	if not _sources.is_empty():
+		return _sources.back()
+	if _card_open:
+		return "card:" + _card_name
+	return ""
+
 # HP the run actually lost in the fight, and to what: an enemy's name,
-# "self", or "status" (a tick).
+# "self", or "status" (a tick). A self or status loss is also put down to
+# what took it (current_source()) and written on a self_loss line.
 static func player_hp_lost(amount: int, source: String) -> void:
 	if not _fight_open or amount <= 0:
 		return
@@ -329,11 +368,40 @@ static func player_hp_lost(amount: int, source: String) -> void:
 	_taken_by[source] = int(_taken_by.get(source, 0)) + amount
 	if _card_open and source == "self":
 		_card_self_lost += amount
+	if source == "self" or source == "status":
+		var by: String = current_source()
+		if by.is_empty():
+			by = source
+		_self_by[by] = int(_self_by.get(by, 0)) + amount
+		_write_detail("self_loss", {"fight": _fights, "turn": _turn, "source": by, "amount": amount})
 
-# HP the run actually got back in the fight, other than Grace.
-static func player_healed(amount: int) -> void:
-	if _fight_open and amount > 0:
+# HP the run actually got back, other than Grace, and from what: `source`
+# when given, else what is acting now (current_source()), else "other".
+# In a fight it is summed onto fight_end; in or out, a heal line.
+static func player_healed(amount: int, source: String = "") -> void:
+	if amount <= 0:
+		return
+	var by: String = source if not source.is_empty() else current_source()
+	if by.is_empty():
+		by = "other"
+	if _fight_open:
 		_healed += amount
+		_healed_by[by] = int(_healed_by.get(by, 0)) + amount
+		if _card_open:
+			_card_healed += amount
+	_write_detail("heal", {"fight": _fights if _fight_open else null, "turn": _turn if _fight_open else null, "source": by, "amount": amount})
+
+# One enemy attack as it landed: who, which intent, and each hit's damage
+# before block, what block and absorb took, and what reached HP.
+static func enemy_attack(enemy_id: String, intent: String, hits: Array) -> void:
+	if not _fight_open:
+		return
+	var to_hp: int = 0
+	for hit: Dictionary in hits:
+		to_hp += int(hit.get("to_hp", 0))
+	var key: String = "%s:%s" % [enemy_id, intent]
+	_taken_by_intent[key] = int(_taken_by_intent.get(key, 0)) + to_hp
+	_write_detail("enemy_attack", {"fight": _fights, "turn": _turn, "enemy": enemy_id, "intent": intent, "hits": hits, "to_hp": to_hp})
 
 static func grace_opened(amount: int) -> void:
 	if _fight_open and amount > 0:
@@ -548,6 +616,15 @@ static func _write(ev: String, data: Dictionary) -> void:
 	line.merge(data, true)
 	_file.store_line(JSON.stringify(line, "", false))
 	_file.flush()
+
+# A line inside a fight's detail - not a choice, so a run of nothing else
+# is still deleted as empty.
+static func _write_detail(ev: String, data: Dictionary) -> void:
+	if _file == null:
+		return
+	var line: Dictionary = {"region": _region, "floor": _floor, "lap": _lap}
+	line.merge(data, true)
+	_write(ev, line)
 
 static func _close() -> void:
 	if _file != null:

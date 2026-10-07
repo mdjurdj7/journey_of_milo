@@ -638,6 +638,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	ctx.deck = deck
 	ctx.cards_played_before_this = cards_played_this_turn - 1
 	ctx.replaced_cost_hp = replaced_hp
+	if replacement != null and replacement.data != null:
+		ctx.replaced_cost_source = "status:" + replacement.data.id
 	ctx.on_grace_reclaimed = _on_grace_reclaimed
 	ctx.on_heal = _on_card_heal
 	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
@@ -865,13 +867,15 @@ func _report_countdown(enemy: FieldEnemy, combatant: Combatant, result: Dictiona
 # that reached HP, and any Grace it opened.
 func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 	RunLogger.block_used(result["blocked"], result["absorbed"])
+	if enemy.enemy_data != null:
+		RunLogger.enemy_attack(enemy.enemy_data.resource_path.get_file().get_basename(), result["intent"], result["hits"])
 	if result["damage_to_hp"] > 0:
 		_report_damage(enemy, player, result["damage_to_hp"], "attack")
 	# A lethal guard that left the player above where the hit found them
 	# (Refuse the End's survive HP): the run's HP follows, the way a card's
 	# heal does - HP only, no Toll.
 	if result["saved_heal"] > 0:
-		_heal_run_hp(result["saved_heal"])
+		_heal_run_hp(result["saved_heal"], "lethal_guard")
 		hp_changed.emit(player.hp, player.max_hp)
 	if result["grace_opened"] > 0:
 		RunLogger.grace_opened(result["grace_opened"])
@@ -954,13 +958,16 @@ func _start_player_turn() -> void:
 		if combatant != null:
 			combatant.damage_taken_this_turn = 0
 
-	Status.tick_all(player.statuses, func(amount: int) -> void:
+	Status.tick_all(player.statuses, func(amount: int, ticking: Status) -> void:
+		# For the run log: the loss, and its Toll, are this status's.
+		RunLogger.push_source("status:" + (ticking.data.id if ticking.data != null else ""))
 		var lost := DamagePipeline.apply_bypass(amount, player)
 		if lost > 0:
 			player.gain_self_loss_toll(lost)
 			_lose_run_hp(lost, "status")
 			hp_changed.emit(player.hp, player.max_hp)
 			toll_changed.emit(player.toll)
+		RunLogger.pop_source()
 	)
 	# A tick is a loss to their own effect like any other: one that sets a
 	# counter off (The Return) Drains now, in a context of its own - no
@@ -974,7 +981,9 @@ func _start_player_turn() -> void:
 		ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
 			_report_damage("player", target_combatant, amount, kind)
 		ctx.on_block = _report_block
+		RunLogger.push_source("drain")
 		ctx.resolve_pending_drain()
+		RunLogger.pop_source()
 	Status.remove_expired(player.statuses)
 	# What was waiting for this turn (Ransom) takes hold now, after the
 	# ticks.
@@ -1142,11 +1151,12 @@ func _lose_run_hp(amount: int, source: String) -> void:
 	RunState.lose_hp(amount)
 	RunLogger.player_hp_lost(before - RunState.player_hp, source)
 
-# The run's HP up, the log told what it actually got back.
-func _heal_run_hp(amount: int) -> void:
+# The run's HP up, the log told what it actually got back - from `source`,
+# or whatever it says is acting (the card resolving) when that's empty.
+func _heal_run_hp(amount: int, source: String = "") -> void:
 	var before: int = RunState.player_hp
 	RunState.heal(amount)
-	RunLogger.player_healed(RunState.player_hp - before)
+	RunLogger.player_healed(RunState.player_hp - before, source)
 
 # The enemy is dead: out of the lists first (so no later preview/turn/
 # rect pass touches a node that may be freed), then told. The hover

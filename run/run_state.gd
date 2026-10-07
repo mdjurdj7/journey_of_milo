@@ -344,7 +344,9 @@ func settle_keepsake_win() -> void:
 	var amount: int = keepsake.heal_on_win
 	if hp_lost_this_combat > 0:
 		amount += keepsake.heal_on_win_after_loss
+	var before: int = player_hp
 	heal(amount)
+	RunLogger.player_healed(player_hp - before, "keepsake:" + String(keepsake.id))
 
 # The run's one card-grant path (rewards, the Keeper's offer, a find on
 # the sand). The deck holds a COPY, never the pool's own resource - the
