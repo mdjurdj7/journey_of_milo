@@ -21,7 +21,8 @@ class_name EnemyIntent
 # value would rewrite every .tres that stores one of these as an integer.
 #
 # WATCH: the turn does nothing at all - no damage, no block - and the
-# display shows its glyph alone, an open eye. The Greyshelf's Flick.
+# display shows its glyph alone, an open eye. No enemy uses it now (the
+# Greyshelf's Flick was one).
 enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH }
 
 # The move's name (the Dunecur's Rush) - for the enemy export (tests/

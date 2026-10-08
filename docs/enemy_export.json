@@ -970,7 +970,7 @@
       "file": "res://battle/rules/enemies/greyshelf.tres",
       "hp": 120,
       "elite": false,
-      "mechanic_summary": "Flicks its tongue, then Gapes for 20 — break it by dealing 16 that turn, but every Attack card you play into it adds 2 — then lashes its tail 4 × 3. Off its rock below half HP, the lash strikes four times. Teaches landing one big blow at the right moment.",
+      "mechanic_summary": "Lashes its tail 4 × 3, then Gapes for 20, in turn — break the Gape by dealing 16 that turn, but every Attack card you play into it adds 2; broken, it is stunned and loses the Tail Lash after. Off its rock below half HP, the lash strikes four times. Teaches landing one big blow at the right moment.",
       "field": {
         "model": "res://assets/models/enemies/Greyshelf/Greyshelf.glb",
         "model_is_default": false,
@@ -992,8 +992,11 @@
         "selection": "loop (in order)",
         "intents": [
           {
-            "name": "Flick",
-            "type": "WATCH"
+            "name": "Tail Lash",
+            "type": "ATTACK",
+            "damage_per_hit": 4,
+            "hits": 3,
+            "hits_after_phase": 4
           },
           {
             "name": "Gape",
@@ -1016,13 +1019,6 @@
                 26
               ]
             }
-          },
-          {
-            "name": "Tail Lash",
-            "type": "ATTACK",
-            "damage_per_hit": 4,
-            "hits": 3,
-            "hits_after_phase": 4
           }
         ],
         "modified_by": [],
