@@ -68,7 +68,7 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 @export_group("")
 
 @export_group("Art")
-@export var art_size_px: float = 96.0:
+@export var art_size_px: float = 104.0:
 	set(value):
 		art_size_px = value
 		_relayout()

@@ -79,7 +79,7 @@ func _initialize() -> void:
 
 # Each of her six has its object art: the 1024 square the drops' PNGs
 # are, imported from SVG with mipmaps (the plaque's KeepsakeTile draws it
-# in a 96 px window).
+# in a 104 px window).
 func _check_art() -> void:
 	for path in [HOUSE_KEY_PATH, WRAPPED_SWEET_PATH, BLUE_FASTENER_PATH, DEPARTURE_STUB_PATH, SIGNAL_GLASS_PATH, PRESSED_FLOWER_PATH]:
 		var trinket: TrinketData = load(path)

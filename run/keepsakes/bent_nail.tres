@@ -8,7 +8,7 @@
 script = ExtResource("1_trinket_data")
 id = &"bent_nail"
 display_name = "Bent Nail"
-flavor_text = "It held a board that someone took down and stacked."
+flavor_text = "Drawn from a stacked board."
 description = "At the start of each combat, +{bonus} damage on your next Attack."
 combat_start_status = ExtResource("2_status")
 short_description = "+{bonus} damage on the first Attack each combat."

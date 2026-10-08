@@ -7,7 +7,7 @@
 script = ExtResource("1_trinket_data")
 id = &"white_shell"
 display_name = "White Shell"
-flavor_text = "Rinsed and set somewhere high, above the tide line."
+flavor_text = "Rinsed, and set above the tide."
 description = "After each combat you win, heal {heal} HP."
 heal_on_win = 2
 short_description = "Heal {heal} HP after each win."

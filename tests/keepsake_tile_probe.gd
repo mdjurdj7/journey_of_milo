@@ -4,9 +4,9 @@ extends SceneTree
 # and the hosts that are only reachable from the field and the battle:
 #
 #   fit          every keepsake under run/keepsakes/ fits its tile with
-#                the rules at the first (largest) size, at 1x, the
-#                offer's 1.3x and the examine view's 2x, and the tile is
-#                tile_size x tile_scale
+#                the rules at the first (largest) size and its lore on
+#                one line, at 1x, the offer's 1.3x and the examine view's
+#                2x, and the tile is tile_size x tile_scale
 #   placeholder  a keepsake with no art draws the placeholder and fits;
 #                no lore leaves the lore out
 #   no draw      a tile takes nothing from the global generator (the
@@ -86,6 +86,8 @@ func _check_fit() -> void:
 			tile.call("set_keepsake", keepsake)
 			_expect(bool(tile.call("fits")), "%s fits its tile at %.1fx" % [keepsake.display_name, scale])
 			_expect_eq(int(tile.call("get_rules_size_px")), largest, "%s's rules at %.1fx: the largest size" % [keepsake.display_name, scale])
+			var lore: TextParagraph = tile.get("_lore")
+			_expect(lore != null and lore.get_line_count() == 1, "%s's lore at %.1fx: one line (got %d)" % [keepsake.display_name, scale, lore.get_line_count() if lore != null else 0])
 			_expect(not bool(tile.call("uses_placeholder")), "%s has its art" % keepsake.display_name)
 		tile.queue_free()
 	await process_frame
