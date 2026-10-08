@@ -8,11 +8,12 @@ class_name KeepsakeRow
 # status with a self_loss_trigger_count) is a counter line under the HP
 # bar instead, and not here. Drawn, not boxed, sized to its own text.
 #
-# Hovering a name shows what that keepsake does (TrinketData.describe()) in
-# the readouts' rules type - a StatusReveal, left-aligned with the row and
-# sitting reveal_gap_px over set_reveal_floor_y(): the top of the bottom-
-# left stack, so it never lands on DECK or the energy pips. Polled, never
-# a mouse event; a card or button under the cursor wins.
+# Hovering a name shows that keepsake's KeepsakeTile at reveal_tile_scale
+# (the field HUD's hover, the same tile at the same size), left-aligned
+# with the row and sitting reveal_gap_px over set_reveal_floor_y(): the
+# top of the bottom-left stack, so it never lands on DECK or the energy
+# pips. It fades in and out over reveal_fade_time. Polled, never a mouse
+# event; a card or button under the cursor wins.
 #
 # BattleOverlay creates it with the other corner readouts, places it
 # (_layout_corners()) and hands it the keepsakes (set_keepsakes()). Reads
@@ -38,61 +39,35 @@ class_name KeepsakeRow
 		_relayout()
 
 @export_group("Reveal")
-# Between the reveal's last line and the top of the bottom-left stack.
+# Between the tile's bottom and the top of the bottom-left stack.
 @export var reveal_gap_px: float = 10.0:
 	set(value):
 		reveal_gap_px = value
 		_place_reveal()
-@export var reveal_wrap_width_px: float = 190.0:
+@export var reveal_tile_scale: float = 1.0:
 	set(value):
-		reveal_wrap_width_px = value
-		if _reveal != null:
-			_reveal.set_wrap_width(value)
+		reveal_tile_scale = value
 		_place_reveal()
-@export var reveal_fade_time: float = 0.12:
-	set(value):
-		reveal_fade_time = value
-		if _reveal != null:
-			_reveal.set_fade_time(value)
-@export_range(0.0, 1.0) var reveal_line_alpha: float = 0.92:
-	set(value):
-		reveal_line_alpha = value
-		if _reveal != null:
-			_reveal.set_line_alpha(value)
-@export var reveal_font_size_px: int = 13:
-	set(value):
-		reveal_font_size_px = value
-		if _reveal != null:
-			_reveal.set_font_size_px(value)
-		_place_reveal()
-# Line pitch in ems, as CardView.keyword_reveal_line_height.
-@export var reveal_line_height: float = 1.28:
-	set(value):
-		reveal_line_height = value
-		if _reveal != null:
-			_reveal.set_line_height(value)
-		_place_reveal()
+@export var reveal_fade_time: float = 0.12
 @export_group("")
 
 var _keepsakes: Array[TrinketData] = []
 var _ink: Color = Color.BLACK
 var _font_tracked: Font = null
-var _reveal: StatusReveal = null
+var _reveal: KeepsakeTile = null
 # The name under the cursor, or -1.
 var _hovered: int = -1
+# The tile's share of full opacity, 0..1, eased toward the hover.
+var _reveal_alpha: float = 0.0
 # Canvas y the reveal sits over - see set_reveal_floor_y().
 var _reveal_floor_y: float = 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_reveal = StatusReveal.new()
-	_reveal.name = "StatusReveal"
-	_reveal.set_fade_time(reveal_fade_time)
-	_reveal.set_line_alpha(reveal_line_alpha)
-	_reveal.set_font_size_px(reveal_font_size_px)
-	_reveal.set_line_height(reveal_line_height)
-	_reveal.set_wrap_width(reveal_wrap_width_px)
+	_reveal = KeepsakeTile.new()
+	_reveal.name = "Tile"
+	_reveal.visible = false
 	add_child(_reveal)
 	refresh_style()
 
@@ -112,8 +87,6 @@ func set_reveal_floor_y(y: float) -> void:
 func refresh_style() -> void:
 	_ink = get_theme_color("ink", "Battle")
 	_font_tracked = InkType.tracked(InkType.text_bold_font(), font_size_px, tracking_em)
-	if _reveal != null:
-		_reveal.set_ink(_ink)
 	_relayout()
 
 func _refresh_if_ready() -> void:
@@ -148,7 +121,7 @@ func _name_rects() -> Array[Rect2]:
 		x += width + name_gap_px
 	return rects
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	var hovered: int = -1
 	if visible and _font_tracked != null and get_viewport().gui_get_hovered_control() == null:
 		var mouse: Vector2 = get_local_mouse_position()
@@ -157,19 +130,39 @@ func _process(_delta: float) -> void:
 			if rects[i].has_point(mouse):
 				hovered = i
 				break
-	if hovered != _hovered:
-		_hovered = hovered
-		if hovered >= 0:
-			var keepsake: TrinketData = _keepsakes[hovered]
-			_reveal.set_lines(PackedStringArray([keepsake.display_name]), PackedStringArray([keepsake.describe()]))
-			_place_reveal()
-		_reveal.set_revealed(hovered >= 0)
+	_set_hovered(hovered)
+	_advance_reveal(delta)
+
+# The name under the cursor (-1 none) - the tile takes its keepsake; the
+# last one shown stays on it while it fades out.
+func _set_hovered(index: int) -> void:
+	if index == _hovered:
+		return
+	_hovered = index
+	if index >= 0 and index < _keepsakes.size():
+		_reveal.set_keepsake(_keepsakes[index])
+
+# The tile's opacity eased toward the hover over reveal_fade_time.
+func _advance_reveal(delta: float) -> void:
+	var target: float = 1.0 if _hovered >= 0 else 0.0
+	if is_equal_approx(_reveal_alpha, target):
+		return
+	_reveal_alpha = target if reveal_fade_time <= 0.0 else move_toward(_reveal_alpha, target, delta / reveal_fade_time)
+	_place_reveal()
+
+# For probes: the hover's tile.
+func get_tile() -> KeepsakeTile:
+	return _reveal
 
 func _place_reveal() -> void:
 	if _reveal == null or not is_inside_tree():
 		return
+	_reveal.visible = _reveal_alpha > 0.0
+	_reveal.modulate.a = _reveal_alpha
+	if not is_equal_approx(_reveal.tile_scale, reveal_tile_scale):
+		_reveal.tile_scale = reveal_tile_scale
 	var floor_local: float = _reveal_floor_y - global_position.y
-	_reveal.position = Vector2(0.0, floor_local - reveal_gap_px - _reveal.size.y)
+	_reveal.position = Vector2(0.0, roundf(floor_local - reveal_gap_px - _reveal.get_tile_size().y))
 
 func _draw() -> void:
 	if _font_tracked == null:
