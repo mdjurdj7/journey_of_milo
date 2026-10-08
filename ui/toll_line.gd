@@ -1,11 +1,11 @@
 extends InkLine
 class_name TollLine
 
-# The field HUD's Toll: "TOLL n" as a line of ink beside the DeckPanel's
-# DECK line (see InkLine for the shape, the style and the following).
-# Always shown on the field, 0 included.
+# The field HUD's Toll: "TOLL n" as a line of ink after HP, before GOLD
+# (see InkLine for the shape, the style and the following). Always shown
+# on the field, 0 included.
 #
-# RegionField creates it in _setup_field_hud() and hands it the DECK line
+# RegionField creates it in _setup_field_hud() and hands it the HP line
 # (sit_beside()) and the Toll to start on; after that RunState.toll_
 # changed keeps it current. It goes when BattleOverlay hides the field
 # line for a fight (the HPBar's own Toll block reads Toll there) and

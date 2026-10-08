@@ -5,7 +5,7 @@ extends SceneTree
 # the count-up eases out and lands on the exact total (a second add
 # mid-count included), a spend snaps, a count_up_time edit mid-count
 # re-targets the running count, and it sits between TOLL and KEEPSAKE -
-# DECK, TOLL, GOLD, KEEPSAKE, GLASSBONE - on TOLL's bottom edge.
+# DECK, HP, TOLL, GOLD, KEEPSAKE, GLASSBONE - on TOLL's bottom edge.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/gold_line_probe.gd
 #
@@ -132,7 +132,7 @@ func _check_retime_retargets() -> void:
 	await _teardown()
 	_completed += 1
 
-# The row is DECK, TOLL, GOLD, KEEPSAKE, GLASSBONE: GOLD right beside
+# The row is DECK, HP, TOLL, GOLD, KEEPSAKE, GLASSBONE: GOLD right beside
 # TOLL and never moving as KEEPSAKE and GLASSBONE come; KEEPSAKE past
 # GOLD; GLASSBONE past GOLD with the slot empty and past KEEPSAKE once one
 # is held; all on TOLL's bottom edge.
