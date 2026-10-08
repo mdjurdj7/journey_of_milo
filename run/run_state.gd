@@ -54,10 +54,10 @@ var gold: int = 0
 # hears.
 var glassbone: int = 0
 
-# The Wanderer's Toll. It carries from one combat to the next - won or
-# escaped - and across a floor advance, but only up to the character's
-# toll_carry_cap: each fight's end and each floor advance keep min(Toll,
-# cap) (carry_toll()). In a fight it runs free. new_run() starts it at 0.
+# The Wanderer's Toll. It carries in full from one fight to the next on a
+# floor - won or escaped - and across a floor advance only up to the
+# character's toll_carry_cap: the advance keeps min(Toll, cap)
+# (carry_toll()). In a fight it runs free. new_run() starts it at 0.
 # The one copy - the player's Combatant reads and writes this through its
 # own toll property (see Combatant.run_toll_owner), so no battle-end path
 # has anything to write back. Mutated only through set_toll().
@@ -289,10 +289,10 @@ func spend_glassbone(amount: int) -> bool:
 	glassbone_changed.emit(glassbone)
 	return true
 
-# Toll between fights: what's held, down to the character's toll_carry_
-# cap if it's over. Called as each fight ends (RegionField._on_battle_
-# finished(), any outcome) and at the floor advance (RegionField._on_
-# floor_exited()). Nothing without a character.
+# Toll between floors: what's held, down to the character's toll_carry_
+# cap if it's over. Called at the floor advance (RegionField._on_floor_
+# exited()) - a floor's fights hand it on in full. Nothing without a
+# character.
 func carry_toll() -> void:
 	if character == null:
 		return

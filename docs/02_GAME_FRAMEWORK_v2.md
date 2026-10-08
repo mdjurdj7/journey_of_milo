@@ -26,7 +26,7 @@ A floor holds:
 
 **Exits can be anywhere.** A floor declares its exit direction; the gate, the surfaced bar, the worn band and the camera bound key on it. The tower's direction is fixed and separate — a landmark the route bends toward, not an axis.
 
-**Transition.** At the end of the surfaced bar (two steps past the gate line) the field freezes, the camera lifts toward the tower for 0.6 s, the ambience ducks, the frame fades to the fog colour, the next floor loads, and the frame fades back with the Wanderer at the new spawn facing the exit. Deck, HP, gold and RNG state carry (RunState); Toll and Grace are per-combat and do not.
+**Transition.** At the end of the surfaced bar (two steps past the gate line) the field freezes, the camera lifts toward the tower for 0.6 s, the ambience ducks, the frame fades to the fog colour, the next floor loads, and the frame fades back with the Wanderer at the new spawn facing the exit. Deck, HP, gold and RNG state carry (RunState); Toll carries only up to the character's cap (5 for the Wanderer); Grace is per-combat and does not carry.
 
 ## 2. Combat
 
@@ -44,7 +44,7 @@ Multi-enemy encounters are a cluster sharing one contact zone; all members stand
 
 **Energy** is the per-turn cost of playing cards, for every class.
 
-**Toll** (Wanderer) accrues only from self-inflicted HP loss — self-damage effects, status ticks, stances — never from enemy hits. It resets per combat. Reckoning spends it 1:1 for damage; Debt Forgiven spends it for HP; the class pool adds collectors and sinks. *Possible later exception: enemy hits give Toll only while cornered.*
+**Toll** (Wanderer) accrues only from self-inflicted HP loss — self-damage effects, status ticks, stances — never from enemy hits. It carries in full between fights on a floor, and up to the character's cap (5 for the Wanderer) to the next floor. Reckoning spends it 1:1 for damage; Debt Forgiven spends it for HP; the class pool adds collectors and sinks. *Possible later exception: enemy hits give Toll only while cornered.*
 
 **Grace** (Wanderer passive; replaces the old Rally) is survival, not reward. An unblocked enemy hit opens recoverable HP; damage the player deals on their next turn reclaims it 1:1; it is capped per window by the largest single hit and clears at the end of that turn. Self-damage never opens it. Drawn as a pale segment on the HP bar. Cards may later extend the window or raise the cap.
 

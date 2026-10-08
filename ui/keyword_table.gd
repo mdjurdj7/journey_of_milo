@@ -10,7 +10,7 @@ class_name KeywordTable
 # Definitions are templates, filled from the live rules numbers by
 # Status.fill_template() - so they move when the character's numbers do:
 #   {threshold}  the Critical line, as a percent of max HP
-#   {carry}      the Toll a fight's end carries over (toll_carry_cap)
+#   {carry}      the Toll a floor advance carries over (toll_carry_cap)
 # Both read the run's character, or the Wanderer's data outside a run
 # (the title's compendium).
 

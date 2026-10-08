@@ -134,7 +134,7 @@
       },
       {
         "name": "Toll",
-        "rule": "Gained when you lose HP to your own effects. Up to 5 carries over after a fight. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Debt Forgiven, Come Due and Leverage; spending it brings a Sentence a turn closer."
+        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Debt Forgiven, Come Due and Leverage; spending it brings a Sentence a turn closer."
       },
       {
         "name": "Grace",

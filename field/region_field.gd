@@ -1371,8 +1371,8 @@ func _setup_field_hud() -> void:
 	hp_line.name = "HPLine"
 	_add_hud_row_line(hp_line, deck_panel)
 	# No TOLL in the row: the field doesn't show it (it carries between
-	# fights all the same - RunState.carry_toll() - and the battle's own
-	# readout shows it in a fight).
+	# fights all the same - RunState.toll - and the battle's own readout
+	# shows it in a fight).
 	# GOLD beside HP, the same way; always shown - see GoldLine. Ahead of
 	# GLASSBONE and KEEPSAKE, which hide themselves when empty, so it never
 	# moves.
@@ -1582,8 +1582,9 @@ func get_scatter() -> FieldScatter:
 #
 # What carries is whatever lives on RunState (deck, HP, gold, the rng's
 # state) - an autoload, untouched by the reload; the guarded new_run()
-# in _ready() is what keeps it from being reset. Toll lives there too and
-# carries, down to the character's cap (RunState.carry_toll()).
+# in _ready() is what keeps it from being reset. Toll lives there too: in
+# full between a floor's fights, down to the character's cap here
+# (RunState.carry_toll()).
 # Grace is per combat and lives on the fight's Combatant. Past the
 # region's last floor the run is won: logged, and the end screen (RunEnd)
 # over the fade, which stays up under it. With loop_region_after_last_
@@ -1899,10 +1900,9 @@ func _say_near_enemy(enemy: FieldEnemy, text: String) -> void:
 
 func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay) -> void:
 	# The fight's log line first - HP and Toll as the fight left them,
-	# before the carry and any keepsake heal.
+	# before any keepsake heal. Toll carries on in full to the floor's next
+	# fight; only the floor advance trims it (_on_floor_exited()).
 	RunLogger.fight_end(String(BattleOverlay.Outcome.find_key(outcome)).to_lower(), overlay.finished_by_debug, RunState.player_hp, RunState.toll)
-	# Whatever the fight ended on, only up to the cap carries on.
-	RunState.carry_toll()
 	wanderer.unbind_battle()
 	_apply_consumed_removals(overlay.battle_controller.deck)
 	overlay.queue_free()

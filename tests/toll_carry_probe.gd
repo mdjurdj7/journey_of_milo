@@ -1,9 +1,10 @@
 extends SceneTree
 
-# Headless probe for Toll between fights: whatever a fight ends on, only
-# min(Toll, CharacterData.toll_carry_cap) carries - after a win, after an
-# escape, and across a floor advance - and a new run starts at 0. The cap
-# directly, then real fights and a real floor exit on the region scene:
+# Headless probe for Toll between fights: whatever a fight ends on carries
+# in full to the floor's next fight - after a win, after an escape - and
+# only min(Toll, CharacterData.toll_carry_cap) across a floor advance; a
+# new run starts at 0. The cap directly, then real fights and a real floor
+# exit on the region scene:
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/toll_carry_probe.gd
 #
@@ -63,9 +64,10 @@ func _check_new_run() -> void:
 	_expect_eq(_toll_now(), 0, "A new run starts at 0 Toll")
 	_completed += 1
 
-# A won fight on floor 1: ending on 14 keeps 5, ending on 3 keeps 3.
+# A won fight on floor 1: ending on 14 keeps 14, ending on 3 keeps 3 -
+# no cap between a floor's fights.
 func _check_win() -> void:
-	for pair in [[14, 5], [3, 3]]:
+	for pair in [[14, 14], [3, 3]]:
 		_run_state.call("new_run", load(CHARACTER_PATH))
 		_run_state.set("current_floor_index", 0)
 		var field: Node3D = await _load_field()
@@ -88,9 +90,9 @@ func _check_win() -> void:
 		await _teardown(field)
 	_completed += 1
 
-# An escaped fight: ending on 14 keeps 5, ending on 2 keeps 2.
+# An escaped fight: ending on 14 keeps 14, ending on 2 keeps 2.
 func _check_escape() -> void:
-	for pair in [[14, 5], [2, 2]]:
+	for pair in [[14, 14], [2, 2]]:
 		_run_state.call("new_run", load(CHARACTER_PATH))
 		_run_state.set("current_floor_index", 0)
 		var field: Node3D = await _load_field()

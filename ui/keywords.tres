@@ -5,7 +5,7 @@
 [resource]
 script = ExtResource("1_keyword_table")
 entries = Dictionary[String, String]({
-"Toll": "Gained when you lose HP to your own effects. Up to {carry} carries over after a fight.",
+"Toll": "Gained when you lose HP to your own cards. Carries between fights; up to {carry} carries to the next floor.",
 "Grace": "After enemy hits get through your Block, damage you deal on your next turn wins HP back, up to half the largest hit.",
 "Critical": "At or below {threshold}% of your max HP.",
 "Drain": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one.",

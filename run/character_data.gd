@@ -51,7 +51,7 @@ enum GraceCapMode { LARGEST_HIT, SUM }
 # starting point, not a settled number.
 @export_range(0.0, 1.0, 0.01) var critical_hp_fraction: float = 0.3
 
-# The most Toll this character keeps once a fight is over: whatever it
-# ends on, it carries min(Toll, this) into the next fight and across a
-# floor advance (RunState.carry_toll()). In a fight Toll runs free.
+# The most Toll this character takes to the next floor: Toll carries in
+# full between a floor's fights, and the floor advance keeps min(Toll,
+# this) (RunState.carry_toll()). In a fight Toll runs free.
 @export var toll_carry_cap: int = 5
