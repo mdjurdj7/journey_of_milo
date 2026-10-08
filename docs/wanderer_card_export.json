@@ -1926,15 +1926,15 @@
       "face_type_label": "POWER",
       "energy_cost": 2,
       "rarity": "RARE",
-      "card_text": "Every 5 times you damage yourself:\nDrain 10 from all enemies.",
+      "card_text": "Every 3 times you damage yourself:\nDrain 8 from all enemies.",
       "face_hp_line": null,
-      "card_text_template": "Every 5 times you damage yourself:\nDrain 10 from all enemies.",
+      "card_text_template": "Every 3 times you damage yourself:\nDrain 8 from all enemies.",
       "targeting": "self",
       "removal_after_play": "leaves rotation for the rest of the fight (stances and powers always do)",
       "effects": [
         {
           "type": "APPLY_STATUS",
-          "plain_english": "Apply The Return to yourself: Every 5 times you damage yourself:\nDrain 10 from all enemies."
+          "plain_english": "Apply The Return to yourself: Every 3 times you damage yourself:\nDrain 8 from all enemies."
         }
       ],
       "keywords": [
@@ -1952,13 +1952,13 @@
       "power_effect": {
         "id": "the_return",
         "name": "The Return",
-        "description": "Every 5 times you damage yourself:\nDrain 10 from all enemies.",
+        "description": "Every 3 times you damage yourself:\nDrain 8 from all enemies.",
         "file_path": "res://battle/rules/statuses/the_return.tres",
         "duration": "until removed (rest of combat unless spent)",
         "stack_rule": "IGNORE",
         "applied_to": "self",
-        "self_loss_trigger_count": 5,
-        "self_loss_trigger_drain": 10
+        "self_loss_trigger_count": 3,
+        "self_loss_trigger_drain": 8
       },
       "status_effect": null,
       "critical_condition": null,
