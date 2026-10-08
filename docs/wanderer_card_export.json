@@ -1349,15 +1349,15 @@
       "face_type_label": "UTILITY",
       "energy_cost": 3,
       "rarity": "RARE",
-      "card_text": "Next turn, your Attacks Drain.\nSpent.",
+      "card_text": "Next turn, your Attacks heal half the damage dealt.\nSpent.",
       "face_hp_line": null,
-      "card_text_template": "Next turn, your Attacks Drain.\nSpent.",
+      "card_text_template": "Next turn, your Attacks heal half the damage dealt.\nSpent.",
       "targeting": "self",
       "removal_after_play": "Spent: leaves this fight's rotation once played",
       "effects": [
         {
           "type": "APPLY_STATUS",
-          "plain_english": "Apply Ransom to yourself: Next turn, your Attacks Drain."
+          "plain_english": "Apply Ransom to yourself: Next turn, your Attacks heal half the damage dealt."
         }
       ],
       "keywords": [
@@ -1377,7 +1377,7 @@
       "status_effect": {
         "id": "ransom",
         "name": "Ransom",
-        "description": "Next turn, your Attacks Drain.",
+        "description": "Next turn, your Attacks heal half the damage dealt.",
         "file_path": "res://battle/rules/statuses/ransom.tres",
         "duration": "until removed (rest of combat unless spent)",
         "stack_rule": "RESET",
@@ -1385,7 +1385,7 @@
         "grants_on_turn_start": {
           "id": "ransom_active",
           "name": "Ransom",
-          "description": "Your Attacks Drain this turn.",
+          "description": "This turn, your Attacks heal half the damage dealt.",
           "file_path": "res://battle/rules/statuses/ransom_active.tres"
         }
       },

@@ -5,8 +5,9 @@ extends SceneTree
 # turn (StatusData.grants_on_turn_start), its live half makes every
 # Attack Drain (StatusData.attacks_drain) and ends with that turn
 # (StatusData.ends_at_turn_end). An Attack that Drains heals, after its
-# last effect, the HP its hits took - no overkill, net of what Grace
-# reclaimed from each hit (EffectContext.record_hit()).
+# last effect, half the HP its hits took, rounded down (StatusData.
+# ransom_heal_fraction) - no overkill, net of what Grace reclaimed from
+# each hit (EffectContext.record_hit()).
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/ransom_probe.gd
 #
@@ -35,8 +36,8 @@ const COLLATERAL_PATH := "res://cards/data/collateral.tres"
 const COME_DUE_STATUS_PATH := "res://battle/rules/statuses/come_due.tres"
 const SELF_EATER_STANCE_PATH := "res://battle/rules/stances/self_eater.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
-const WAITING_TEXT := "Next turn, your Attacks Drain."
-const ACTIVE_TEXT := "Your Attacks Drain this turn."
+const WAITING_TEXT := "Next turn, your Attacks heal half the damage dealt."
+const ACTIVE_TEXT := "This turn, your Attacks heal half the damage dealt."
 const PLAYER_MAX_HP := 70
 const PLAYER_HP := 40
 const ENEMY_HP := 999
@@ -100,6 +101,7 @@ func _check_data() -> void:
 	_expect_eq(waiting.grants_on_turn_start, active, "The waiting status gives way to the live one at turn start")
 	_expect(not waiting.attacks_drain and not waiting.ends_at_turn_end, "...and does nothing itself")
 	_expect(active.attacks_drain and active.ends_at_turn_end, "The live one Drains and ends with the turn")
+	_expect(is_equal_approx(active.ransom_heal_fraction, 0.5), "...healing half")
 	_expect_eq([waiting.default_duration_turns, active.default_duration_turns], [StatusData.DURATION_UNTIL_REMOVED, StatusData.DURATION_UNTIL_REMOVED], "Neither is aged by the turn counter")
 	var statuses: Array[Status] = []
 	Status.apply_to(statuses, waiting)
@@ -113,9 +115,9 @@ func _check_data() -> void:
 
 # --- Rules ---
 
-# Slash with no block heals exactly what it dealt; block reduces the heal
-# by what it stopped, to 0 when it stops it all. Without the live status,
-# nothing.
+# Slash with no block heals half what it dealt, rounded down; block
+# reduces the heal by what it stopped, to 0 when it stops it all. Without
+# the live status, nothing.
 func _check_heal_and_block() -> void:
 	var player: Combatant = _player(false)
 	var enemy := Combatant.new(ENEMY_HP)
@@ -124,29 +126,29 @@ func _check_heal_and_block() -> void:
 	player = _player()
 	enemy = Combatant.new(ENEMY_HP)
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq(_healed, 5, "Draining, Slash heals the 5 it dealt")
-	_expect_eq(player.hp, PLAYER_HP + 5, "...onto the player's HP")
+	_expect_eq(_healed, 2, "Draining, Slash heals half the 5 it dealt: 2")
+	_expect_eq(player.hp, PLAYER_HP + 2, "...onto the player's HP")
 	enemy.block = 3
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq(_healed, 2, "3 Block: Slash heals the 2 that got through")
+	_expect_eq(_healed, 1, "3 Block: Slash heals half the 2 that got through: 1")
 	enemy.block = 10
 	_resolve(SLASH_PATH, player, [enemy], enemy)
 	_expect_eq(_healed, 0, "Block covering it all: no heal")
 	_completed += 1
 
-# The heal stops at max HP; a killing blow heals the HP that was left, not
-# the overkill.
+# The heal stops at max HP; a killing blow heals half the HP that was
+# left, not the overkill.
 func _check_cap_and_overkill() -> void:
 	var player: Combatant = _player()
-	player.hp = PLAYER_MAX_HP - 2
+	player.hp = PLAYER_MAX_HP - 1
 	var enemy := Combatant.new(ENEMY_HP)
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq(player.hp, PLAYER_MAX_HP, "2 below max, a 5 Drain stops at max HP")
+	_expect_eq(player.hp, PLAYER_MAX_HP, "1 below max, a 5's heal of 2 stops at max HP")
 	player = _player()
 	enemy = Combatant.new(ENEMY_HP)
 	enemy.hp = 3
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq([enemy.hp, _healed], [0, 3], "A 5 that kills a 3-HP enemy heals 3")
+	_expect_eq([enemy.hp, _healed], [0, 1], "A 5 that kills a 3-HP enemy heals half the 3: 1")
 	_completed += 1
 
 # Carve against two enemies, one with 2 Block: one heal, the total.
@@ -157,7 +159,7 @@ func _check_all_enemies() -> void:
 	second.block = 2
 	_resolve(CARVE_PATH, player, [first, second], null)
 	_expect_eq([ENEMY_HP - first.hp, ENEMY_HP - second.hp], [6, 4], "Carve deals 6 and 4 through 2 Block")
-	_expect_eq(_healed, 10, "...and heals the 10, once")
+	_expect_eq(_healed, 5, "...and heals half the 10, once: 5")
 	_completed += 1
 
 # Come Due's mark and the Self-Eater stance's bonus are part of the blow,
@@ -168,7 +170,8 @@ func _check_bonuses() -> void:
 	var come_due: StatusData = load(COME_DUE_STATUS_PATH)
 	Status.apply_to(enemy.statuses, come_due)
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq([ENEMY_HP - enemy.hp, _healed], [5 + come_due.attack_bonus_against_holder, 5 + come_due.attack_bonus_against_holder], "Come Due's +%d: Slash deals and heals 9" % come_due.attack_bonus_against_holder)
+	var marked: int = 5 + come_due.attack_bonus_against_holder
+	_expect_eq([ENEMY_HP - enemy.hp, _healed], [marked, marked / 2], "Come Due's +%d: Slash deals %d and heals %d" % [come_due.attack_bonus_against_holder, marked, marked / 2])
 	player = _player()
 	enemy = Combatant.new(ENEMY_HP)
 	Stance.apply_to(player, load(SELF_EATER_STANCE_PATH))
@@ -176,12 +179,13 @@ func _check_bonuses() -> void:
 	var bonus: int = AttackBonus.for_player(player, player.hp - price)
 	_expect(bonus > 0 and price > 0, "Self-Eater charges HP and adds damage")
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq([ENEMY_HP - enemy.hp, _healed], [5 + bonus, 5 + bonus], "Self-Eater's +%d: Slash deals and heals %d" % [bonus, 5 + bonus])
-	_expect_eq(player.hp, PLAYER_HP - price + 5 + bonus, "...after its %d HP price" % price)
+	_expect_eq([ENEMY_HP - enemy.hp, _healed], [5 + bonus, (5 + bonus) / 2], "Self-Eater's +%d: Slash deals %d and heals %d" % [bonus, 5 + bonus, (5 + bonus) / 2])
+	_expect_eq(player.hp, PLAYER_HP - price + (5 + bonus) / 2, "...after its %d HP price" % price)
 	_completed += 1
 
-# With Grace open, a hit's damage reclaims Grace first; Drain heals only
-# what Grace didn't take back from that hit. Grace itself is unchanged.
+# With Grace open, a hit's damage reclaims Grace first; Drain heals half
+# of only what Grace didn't take back from that hit. Grace itself is
+# unchanged.
 func _check_grace() -> void:
 	var player: Combatant = _player()
 	player.grace = 6
@@ -189,8 +193,8 @@ func _check_grace() -> void:
 	Status.apply_to(enemy.statuses, load(COME_DUE_STATUS_PATH))
 	_resolve(SLASH_PATH, player, [enemy], enemy)
 	_expect_eq(ENEMY_HP - enemy.hp, 9, "Slash with Come Due deals 9")
-	_expect_eq([_reclaimed, _healed], [6, 3], "...Grace +6, Drain +3")
-	_expect_eq([player.hp, player.grace], [PLAYER_HP + 9, 0], "...9 HP back in all, Grace spent")
+	_expect_eq([_reclaimed, _healed], [6, 1], "...Grace +6, Drain half the 3 left: +1")
+	_expect_eq([player.hp, player.grace], [PLAYER_HP + 7, 0], "...7 HP back in all, Grace spent")
 	player = _player()
 	player.grace = 20
 	enemy = Combatant.new(ENEMY_HP)
@@ -198,14 +202,20 @@ func _check_grace() -> void:
 	_expect_eq([_reclaimed, _healed, player.grace], [5, 0, 15], "Grace bigger than the hit: Grace +5, Drain nothing")
 	_completed += 1
 
-# Reckoning, an Attack through its own resolver, Drains too; a Skill under
-# the same status heals nothing.
+# Reckoning, an Attack through its own resolver, Drains too - half, no
+# cap: 27 heals 13; a Skill under the same status heals nothing.
 func _check_reckoning_and_skills() -> void:
 	var player: Combatant = _player()
 	player.toll = 7
 	var enemy := Combatant.new(ENEMY_HP)
 	_resolve(RECKONING_PATH, player, [enemy], enemy)
-	_expect_eq([ENEMY_HP - enemy.hp, _healed], [7, 7], "Reckoning on 7 Toll deals and heals 7")
+	_expect_eq([ENEMY_HP - enemy.hp, _healed], [7, 3], "Reckoning on 7 Toll deals 7 and heals 3")
+	player = _player()
+	player.hp = PLAYER_HP - 20
+	player.toll = 27
+	enemy = Combatant.new(40)
+	_resolve(RECKONING_PATH, player, [enemy], enemy)
+	_expect_eq([40 - enemy.hp, _healed], [27, 13], "Reckoning on 27 Toll deals 27 and heals 13")
 	player = _player()
 	enemy = Combatant.new(ENEMY_HP)
 	_resolve(BRACE_PATH, player, [enemy], null)
@@ -239,7 +249,7 @@ func _check_next_turn_then_ends() -> void:
 		await _play(controller, await _deal(controller, RANSOM_PATH))
 		await _next_turn(controller)
 		_expect_eq(_ransom_lines(controller), [ACTIVE_TEXT], "Next turn the readout: Ransom / " + ACTIVE_TEXT)
-		_expect_eq(_slash_heal(await _slash(controller)), true, "...and Slash heals what it dealt")
+		_expect_eq(_slash_heal(await _slash(controller)), true, "...and Slash heals half what it dealt")
 		await _next_turn(controller)
 		_expect_eq(_ransom_lines(controller), [], "The turn after, no Ransom line")
 		var hit: Array = await _slash(controller)
@@ -261,7 +271,7 @@ func _check_no_stack() -> void:
 		_expect_eq(waiting.stack_count if waiting != null else 0, 1, "...one stack")
 		await _next_turn(controller)
 		_expect_eq(_ransom_lines(controller), [ACTIVE_TEXT], "Next turn: one live line")
-		_expect_eq(_slash_heal(await _slash(controller)), true, "...and Slash heals once, what it dealt")
+		_expect_eq(_slash_heal(await _slash(controller)), true, "...and Slash heals once, half what it dealt")
 	await _teardown()
 	_completed += 1
 
@@ -425,7 +435,7 @@ func _slash(controller: Node) -> Array:
 	return [enemy_before - enemy.hp, player.hp - hp_before]
 
 func _slash_heal(hit: Array) -> bool:
-	if hit[0] <= 0 or hit[1] != hit[0]:
+	if hit[0] <= 0 or hit[1] != int(hit[0]) / 2:
 		_fail("Slash dealt %d and healed %d" % hit)
 		return false
 	return true

@@ -6,9 +6,10 @@
 script = ExtResource("1_status_data")
 id = "ransom_active"
 display_name = "Ransom"
-description = "Your Attacks Drain this turn."
+description = "This turn, your Attacks heal half the damage dealt."
 category = 2
 default_duration_turns = -1
 stack_rule = 4
 ends_at_turn_end = true
 attacks_drain = true
+ransom_heal_fraction = 0.5

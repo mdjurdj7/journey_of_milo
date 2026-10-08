@@ -188,11 +188,15 @@ const DURATION_UNTIL_TRIGGERED := -2
 @export var ends_at_turn_end: bool = false
 
 # While this is up, every Attack card the player plays Drains: after its
-# last effect it heals the HP its hits took from enemies - not a killing
-# blow's overkill, and less whatever Grace already reclaimed from each
-# hit (EffectContext.record_hit(), EffectResolver.resolve_card()). No
-# number of its own: what the Attack lands is what it heals.
+# last effect it heals ransom_heal_fraction of the HP its hits took from
+# enemies, rounded down - not a killing blow's overkill, and less
+# whatever Grace already reclaimed from each hit (EffectContext.record_
+# hit(), EffectResolver.resolve_card()). No cap: what the Attack lands
+# sets the heal.
 @export var attacks_drain: bool = false
+# The share of that HP an Attack heals while attacks_drain is up (Ransom:
+# half). Read with attacks_drain only.
+@export_range(0.0, 1.0, 0.05) var ransom_heal_fraction: float = 0.5
 
 # A countdown (Sentence): turns_remaining counts the turns left - ticked
 # on its holder's turn like any duration - and when it reaches 0 the

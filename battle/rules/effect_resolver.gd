@@ -97,13 +97,14 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 			if taken > 0:
 				ctx.report_damage(enemy, taken, "status")
 	# After the card's last effect, once: an Attack played while its
-	# Attacks Drain (Ransom) heals what its own hits took, net of Grace
+	# Attacks Drain (Ransom) heals its share (StatusData.ransom_heal_
+	# fraction, rounded down) of what its own hits took, net of Grace
 	# (EffectContext.record_hit()) - all of them summed for an all-enemies
 	# Attack. Never a countdown going off or a counter's Drain: neither is
 	# the Attack's blow. Before the Critical triggers below, so a heal that
 	# lifts the player out of Critical is seen there.
 	if ctx.card_is_attack and Status.attacks_drain(ctx.player.statuses):
-		ctx.heal(ctx.hp_dealt_this_card)
+		ctx.heal(floori(float(ctx.hp_dealt_this_card) * Status.attacks_drain_fraction(ctx.player.statuses)))
 	# After the whole card: its own HP cost (self-damage, the stance's
 	# price) may have made the player Critical, and a status waiting for
 	# that (No Further) gives way now - as does one this card just applied

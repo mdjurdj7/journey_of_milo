@@ -458,6 +458,15 @@ static func attacks_drain(statuses: Array[Status]) -> bool:
 			return true
 	return false
 
+# The share of its HP dealt an Attack played now heals - the largest
+# ransom_heal_fraction among the statuses making it Drain; 0 when none is.
+static func attacks_drain_fraction(statuses: Array[Status]) -> float:
+	var fraction: float = 0.0
+	for active in statuses:
+		if active.data != null and active.data.attacks_drain:
+			fraction = maxf(fraction, active.data.ransom_heal_fraction)
+	return fraction
+
 # The status that would stop a lethal enemy hit on a player who was
 # `was_critical` before it, or null.
 static func lethal_guard(statuses: Array[Status], was_critical: bool) -> Status:

@@ -7,7 +7,7 @@
 script = ExtResource("1_status_data")
 id = "ransom"
 display_name = "Ransom"
-description = "Next turn, your Attacks Drain."
+description = "Next turn, your Attacks heal half the damage dealt."
 category = 2
 default_duration_turns = -1
 stack_rule = 4
