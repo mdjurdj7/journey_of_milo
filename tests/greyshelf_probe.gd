@@ -2,8 +2,9 @@ extends SceneTree
 
 # Headless probe for the Greyshelf, floor 5's region-end fight: its Tail
 # Lash -> Gape loop (4 x 3, 20); the Gape breaking at 16 damage dealt that
-# turn, which stuns it (Stunned) so the Tail Lash after is skipped; Goaded - each Attack card played against it while the Gape
-# is queued adds 2, up to +6, the preview always what lands, a Skill
+# turn - it lands nothing, and the Tail Lash after lands as ever; Goaded -
+# each Attack card played against it while the Gape is queued adds 2, up
+# to +6, the preview always what lands, a Skill
 # nothing, and a broken Gape's stacks cleared so the next starts at 20;
 # off its rock below half HP (Off the rock), once - the Tail Lash strikes
 # 4 times, the Gape still one blow. The rules cases drive EnemyTurn on the
@@ -20,7 +21,6 @@ extends SceneTree
 const CASES := 11
 const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
 const GOADED_PATH := "res://battle/rules/statuses/goaded.tres"
-const STUNNED_PATH := "res://battle/rules/statuses/stunned.tres"
 const OFF_THE_ROCK_PATH := "res://battle/rules/statuses/off_the_rock.tres"
 const CONTACT_SOUND_PATH := "res://assets/audio/combat_old/hit.wav"
 const MODEL_PATH := "res://assets/models/enemies/Greyshelf/Greyshelf.glb"
@@ -57,7 +57,7 @@ func _initialize() -> void:
 	_run_state = root.get_node("RunState")
 	_check_data()
 	_check_loop()
-	_check_break_stuns()
+	_check_break()
 	_check_goaded_climb()
 	_check_break_clears_goaded()
 	_check_phase()
@@ -90,16 +90,14 @@ func _check_data() -> void:
 		var gape: EnemyIntent = data.intents[1]
 		_expect(gape.intent_name == "Gape" and gape.type == EnemyIntent.IntentType.ATTACK and gape.value == GAPE and gape.hits == 1, "Gape second, 20 in one blow")
 		_expect_eq(gape.interrupt_threshold, BREAK, "...broken by 16")
-		_expect(gape.counts_attack_cards and gape.deny_next_on_interrupt and gape.rear_while_queued, "...counting Attack cards, stunning when broken, reared")
-		_expect(gape.on_interrupt == null, "...nothing interjected: the stun takes the next move")
+		_expect(gape.counts_attack_cards and gape.rear_while_queued, "...counting Attack cards, reared")
+		_expect(gape.on_interrupt == null, "...nothing interjected: broken, the loop carries on")
 		_expect(lash.intent_name == "Tail Lash" and lash.value == LASH and lash.hits == LASH_HITS, "Tail Lash first, 4 x 3")
 	var goaded: StatusData = data.attack_card_status
 	_expect(goaded != null and goaded.resource_path == GOADED_PATH, "It gains Goaded")
 	if goaded != null:
 		_expect(goaded.display_name == "Goaded" and goaded.attack_damage_bonus == GOADED_BONUS and goaded.max_stacks == GOADED_CAP and goaded.consumed_by_own_attack, "...+2 a stack, up to 3 (+6), spent by its own attack")
 		_expect_eq(Status.new(goaded).describe(), "Each Attack card played against it adds 2 damage to its next Gape, up to 6.", "...its hover")
-	var stunned: StatusData = data.stun_status
-	_expect(stunned != null and stunned.resource_path == STUNNED_PATH and stunned.skips_next_turn and stunned.display_name == "Stunned", "Broken, it is Stunned: its next move skipped")
 	var off: StatusData = data.phase_status
 	_expect(off != null and off.resource_path == OFF_THE_ROCK_PATH and off.bonus_hits == 1, "Below half: Off the rock, one more hit")
 	if off != null:
@@ -129,9 +127,10 @@ func _check_loop() -> void:
 	_expect_eq(seen, ["tail lash 12 x3", "gape 20 x1", "tail lash 12 x3", "gape 20 x1"] as Array[String], "Tail Lash 4 x 3 -> Gape 20, looping")
 	_completed += 1
 
-# 15 dealt on the Gape: it lands. 16: broken - nothing lands, Stunned; the
-# Tail Lash shows struck (denied) and is skipped; then the Gape again.
-func _check_break_stuns() -> void:
+# 15 dealt on the Gape: it lands. 16: broken - nothing lands, and nothing
+# skips its next turn; the Tail Lash previews and lands 4 x 3 as ever;
+# then the Gape again.
+func _check_break() -> void:
 	var data: EnemyData = _greyshelf()
 	var enemy: Combatant = _enemy(data)
 	var player: Combatant = _player()
@@ -148,17 +147,16 @@ func _check_break_stuns() -> void:
 	_expect(bool(preview["interrupted"]) and int(preview["threshold_left"]) == 0 and not bool(preview["lethal"]), "16 dealt: broken, the ring closed")
 	before = player.hp
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
-	_expect(bool(result["interrupted"]) and bool(result["stunned"]) and not bool(result["attacked"]), "The broken Gape doesn't land, and stuns")
+	_expect(bool(result["interrupted"]) and not bool(result["attacked"]), "The broken Gape doesn't land")
 	_expect_eq(player.hp, before, "...nothing lost")
-	_expect(_has(enemy, STUNNED_PATH), "...Stunned")
+	_expect(not _skips_next_turn(enemy), "...and nothing skips its next turn")
 	_expect_eq(EnemyTurn.current_intent(enemy, data).intent_name, "Tail Lash", "...the Tail Lash queued")
 	enemy.damage_taken_this_turn = 0
 	preview = EnemyTurn.preview_intent(enemy, data, player)
-	_expect(bool(preview.get("denied", false)) and int(preview["damage_to_hp"]) == 0, "...shown struck through: it won't land")
+	_expect(not bool(preview.get("denied", false)) and int(preview["damage_to_hp"]) == LASH * LASH_HITS, "...previewed 4 x 3, not struck")
 	result = EnemyTurn.take_turn(enemy, data, player)
-	_expect(bool(result["denied"]) and not bool(result["attacked"]), "The Tail Lash is skipped")
-	_expect_eq(player.hp, before, "...nothing lost")
-	_expect(not _has(enemy, STUNNED_PATH), "...Stunned spent")
+	_expect(bool(result["attacked"]) and not bool(result["denied"]), "The Tail Lash lands")
+	_expect_eq(before - player.hp, LASH * LASH_HITS, "...for 12")
 	_expect_eq(EnemyTurn.current_intent(enemy, data).intent_name, "Gape", "...and the Gape is next")
 	_completed += 1
 
@@ -186,8 +184,8 @@ func _check_goaded_climb() -> void:
 	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), LASH, "...the Tail Lash still 4 a hit")
 	_completed += 1
 
-# Goaded 2 on a Gape that breaks: cleared with it, Stunned; the skipped
-# Tail Lash, and the next Gape is 20.
+# Goaded 2 on a Gape that breaks: cleared with it; the Tail Lash after,
+# and the next Gape is 20.
 func _check_break_clears_goaded() -> void:
 	var data: EnemyData = _greyshelf()
 	var enemy: Combatant = _enemy(data)
@@ -281,8 +279,9 @@ func _check_fight_skill() -> void:
 	_completed += 1
 
 # Slashes until 16 is dealt: the ring closes and the rear drops on that
-# card; its turn - Stunned in the readout, the Tail Lash struck; its next
-# turn takes nothing; then a Gape at 20 again. The tell
+# card; its turn lands nothing and the Tail Lash after is queued as ever,
+# not struck; its next turn lands the Lash's preview; then a Gape at 20
+# again. The tell
 # (GreyshelfPose) holds while the Gape is queued and Goaded deepens it.
 func _check_fight_break() -> void:
 	var controller: Node = await _start_fight(SLASH_PATH)
@@ -312,14 +311,14 @@ func _check_fight_break() -> void:
 		var before: int = player.hp
 		await _end_turn(controller)
 		_expect_eq(player.hp, before, "The broken Gape lands nothing")
-		_expect(_shows(controller, greyshelf, "Stunned"), "...Stunned in the readout")
+		_expect(not _shows(controller, greyshelf, "Stunned"), "...not Stunned")
 		_expect(not _shows(controller, greyshelf, "Goaded"), "...Goaded cleared")
 		var preview: Dictionary = controller.call("get_intent_preview", greyshelf)
-		_expect(bool(preview.get("denied", false)), "...the Tail Lash shown struck")
+		_expect(not bool(preview.get("denied", false)), "...the Tail Lash not struck")
+		_expect_eq(_intent_text(controller, greyshelf), "4×3", "...reading 4×3")
 		before = player.hp
 		await _end_turn(controller)
-		_expect_eq(player.hp, before, "The Tail Lash is skipped")
-		_expect(not _shows(controller, greyshelf, "Stunned"), "...Stunned spent")
+		_expect_eq(before - player.hp, int(preview["damage_to_hp"]), "The Tail Lash lands its preview (%d)" % int(preview["damage_to_hp"]))
 		_expect_eq(EnemyTurn.current_intent(combatant, greyshelf.get("enemy_data")).intent_name, "Gape", "...the Gape next")
 		_expect_eq(_intent_text(controller, greyshelf), "20", "...reading 20")
 	await _teardown()
@@ -405,6 +404,13 @@ func _enemy(data: EnemyData) -> Combatant:
 
 func _player() -> Combatant:
 	return Combatant.new(PLAYER_HP)
+
+# Whether any status on it would skip its next turn (Stunned, Denied).
+func _skips_next_turn(combatant: Combatant) -> bool:
+	for active: Status in combatant.statuses:
+		if active.data != null and active.data.skips_next_turn:
+			return true
+	return false
 
 func _has(combatant: Combatant, path: String) -> bool:
 	for active: Status in combatant.statuses:

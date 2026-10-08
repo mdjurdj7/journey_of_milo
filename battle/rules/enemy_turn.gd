@@ -45,7 +45,7 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "stunned": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "phase_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "blocked": 0, "absorbed": 0}
+	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "phase_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "blocked": 0, "absorbed": 0}
 
 	Status.tick_all(combatant.statuses, func(amount: int, _ticking: Status) -> void:
 		combatant.hp = max(combatant.hp - amount, 0)
@@ -95,10 +95,6 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 			var fed: Status = Status.find_in(combatant.statuses, data.attack_card_status)
 			if fed != null:
 				Status.remove_from(combatant.statuses, fed)
-		# ...and a stunning one costs it the next move (Stunned).
-		if intent.deny_next_on_interrupt and data.stun_status != null:
-			Status.apply_to(combatant.statuses, data.stun_status)
-			result["stunned"] = true
 	elif intent != null:
 		match intent.type:
 			EnemyIntent.IntentType.ATTACK:

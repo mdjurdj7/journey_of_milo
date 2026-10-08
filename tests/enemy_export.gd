@@ -392,7 +392,6 @@ static func _intent_entry(data: EnemyData, intent: EnemyIntent) -> Dictionary:
 		entry["interrupt"] = {
 			"break_threshold": intent.interrupt_threshold,
 			"on_interrupt": _intent_entry(data, intent.on_interrupt) if intent.on_interrupt != null else null,
-			"stuns_with": data.stun_status.id if intent.deny_next_on_interrupt and data.stun_status != null else null,
 			"clears_attack_card_status": intent.counts_attack_cards and data.attack_card_status != null,
 		}
 	if intent.rear_while_queued:
@@ -447,12 +446,6 @@ static func _reachable_statuses(data: EnemyData) -> Array:
 			if intent != null and intent.counts_attack_cards:
 				while_queued.append(intent.intent_name)
 		queue.append([data.attack_card_status, "a stack per Attack card played against it while %s is queued" % " / ".join(while_queued)])
-	if data.stun_status != null:
-		var stunning: Array[String] = []
-		for intent in data.intents:
-			if intent != null and intent.deny_next_on_interrupt:
-				stunning.append(intent.intent_name)
-		queue.append([data.stun_status, "when its %s is broken" % " / ".join(stunning)])
 	if data.phase_status != null and data.phase_hp_threshold > 0.0:
 		queue.append([data.phase_status, "once, the first time its HP is below %s of %d" % [str(_num(data.phase_hp_threshold)), data.max_hp]])
 	var reached: Array = []

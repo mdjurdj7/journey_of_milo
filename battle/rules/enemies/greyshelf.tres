@@ -1,9 +1,8 @@
-[gd_resource type="Resource" script_class="EnemyData" load_steps=9 format=3]
+[gd_resource type="Resource" script_class="EnemyData" load_steps=8 format=3]
 
 [ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
 [ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/goaded.tres" id="3_goaded"]
-[ext_resource type="Resource" path="res://battle/rules/statuses/stunned.tres" id="4_stunned"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/off_the_rock.tres" id="5_off_the_rock"]
 [ext_resource type="AudioStream" uid="uid://bnvfgx6j66j30" path="res://assets/audio/combat_old/hit.wav" id="6_hit"]
 
@@ -12,7 +11,6 @@ script = ExtResource("2_intent")
 intent_name = "Gape"
 value = 20
 interrupt_threshold = 16
-deny_next_on_interrupt = true
 rear_while_queued = true
 counts_attack_cards = true
 
@@ -25,12 +23,11 @@ hits = 3
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Greyshelf"
-mechanic_summary = "Lashes its tail 4 × 3, then Gapes for 20, in turn — break the Gape by dealing 16 that turn, but every Attack card you play into it adds 2; broken, it is stunned and loses the Tail Lash after. Off its rock below half HP, the lash strikes four times. Teaches landing one big blow at the right moment."
+mechanic_summary = "Lashes its tail 4 × 3, then Gapes for 20, in turn — break the Gape by dealing 16 that turn, but every Attack card you play into it adds 2; broken, it lands nothing. Off its rock below half HP, the lash strikes four times. Teaches landing one big blow at the right moment."
 max_hp = 120
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_tail_lash"), SubResource("EnemyIntent_gape")])
 attack_card_status = ExtResource("3_goaded")
 contact_sounds = Array[AudioStream]([ExtResource("6_hit")])
-stun_status = ExtResource("4_stunned")
 phase_hp_threshold = 0.5
 phase_status = ExtResource("5_off_the_rock")
 glassbone_reward = 1

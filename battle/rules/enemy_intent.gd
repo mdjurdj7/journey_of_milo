@@ -82,20 +82,14 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE }
 # which carries on where it was once this has resolved. The Siltjaw's is
 # a BURROW. Null = the interrupted turn is simply lost.
 
-@export var deny_next_on_interrupt: bool = false
-# Interrupted, the enemy is stunned: it gains its EnemyData.stun_status
-# (Stunned - StatusData.skips_next_turn), so the loop's next move is lost
-# the way a Denied one is (EnemyTurn.take_turn()). The Greyshelf's Gape,
-# whose break costs it the Tail Lash. False for every other.
-
 @export var rear_while_queued: bool = false
 
 # The status its enemy holds for exactly as long as this intent is the
 # queued one - applied when it is queued, removed when another is (Status.
 # apply_to / remove_from, kept in step by EnemyTurn with the BURROW's
 # burial). The player's turn always faces the queued intent, so a move
-# lost to Denied, a stun or a pain turn still hands over to the next
-# one's status. The Underfoot: Covered while its Sting is queued, Exposed
+# lost to Denied or a pain turn still hands over to the next one's
+# status. The Underfoot: Covered while its Sting is queued, Exposed
 # while its Rebury is. Null = none.
 @export var status_while_queued: StatusData = null
 

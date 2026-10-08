@@ -68,11 +68,6 @@ class_name EnemyData
 @export var pain_turn_line: String = ""
 @export var pain_turn_sound: AudioStream = null
 
-# What a broken intent with deny_next_on_interrupt stuns it with - a status
-# that skips its next turn (StatusData.skips_next_turn - the Greyshelf's
-# Stunned). Null (every enemy by default) = none.
-@export var stun_status: StatusData = null
-
 # The phase: the first time this enemy's HP falls below this fraction of
 # its max (strictly below), it gains phase_status - once per fight, and
 # nothing it does is cancelled (EnemyTurn.check_phase()). Judged where the

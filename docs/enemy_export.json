@@ -966,7 +966,7 @@
       "file": "res://battle/rules/enemies/greyshelf.tres",
       "hp": 120,
       "elite": false,
-      "mechanic_summary": "Lashes its tail 4 × 3, then Gapes for 20, in turn — break the Gape by dealing 16 that turn, but every Attack card you play into it adds 2; broken, it is stunned and loses the Tail Lash after. Off its rock below half HP, the lash strikes four times. Teaches landing one big blow at the right moment.",
+      "mechanic_summary": "Lashes its tail 4 × 3, then Gapes for 20, in turn — break the Gape by dealing 16 that turn, but every Attack card you play into it adds 2; broken, it lands nothing. Off its rock below half HP, the lash strikes four times. Teaches landing one big blow at the right moment.",
       "field": {
         "model": "res://assets/models/enemies/Greyshelf/Greyshelf.glb",
         "model_is_default": false,
@@ -1003,7 +1003,6 @@
             "interrupt": {
               "break_threshold": 16,
               "on_interrupt": null,
-              "stuns_with": "stunned",
               "clears_attack_card_status": true
             },
             "rears_while_queued": true,
@@ -1042,19 +1041,6 @@
             "max_stacks": 3,
             "attack_damage_bonus": 2,
             "consumed_by_own_attack": true
-          }
-        },
-        {
-          "id": "stunned",
-          "name": "Stunned",
-          "file": "res://battle/rules/statuses/stunned.tres",
-          "gained": "when its Gape is broken",
-          "description": "It skips its next move.",
-          "text": "It skips its next move.",
-          "fields": {
-            "default_duration_turns": "until triggered",
-            "stack_rule": "IGNORE",
-            "skips_next_turn": true
           }
         },
         {
@@ -1220,7 +1206,6 @@
                 "name": "Burrow",
                 "type": "BURROW"
               },
-              "stuns_with": null,
               "clears_attack_card_status": false
             },
             "rears_while_queued": true
