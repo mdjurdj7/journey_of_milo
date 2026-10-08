@@ -25,6 +25,13 @@ class_name DeckPanel
 #   BattleResources, DISCARD bottom-right under End Turn) while the field
 #   instance is hidden. Both are the overlay's children, freed with it.
 #
+# The field instance alone also takes the field HUD row's look:
+# use_row_style() (RegionField) draws it as the row's first item - two
+# card outlines, the count as a Spectral numeral, "DECK" after it, over
+# the bone halo (see HudRowStyle) - and has it draw the row's optional
+# backing fade. The battle lines never get a row style and keep the
+# label-then-count line above.
+#
 # Reads the theme's Battle/ink token, so it inverts with the on-pale/
 # on-dark value set (see BattleTheme) - re-read via refresh_style().
 
@@ -115,6 +122,11 @@ var _label_font_tracked: Font = null
 # closed via this line, a scrim click, or Escape.
 var _deck_view_instance: DeckView = null
 
+# The field HUD row's style, once use_row_style() has switched this line
+# to it; null on the battle lines.
+var _row_style: HudRowStyle = null
+var _backing_texture: GradientTexture2D = null
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_STOP
@@ -124,6 +136,17 @@ func _ready() -> void:
 
 func _exit_tree() -> void:
 	_unbind()
+
+# Draws this line as the field HUD row's first item from here on - the
+# field instance only (see the class doc).
+func use_row_style(row_style: HudRowStyle) -> void:
+	if _row_style != null:
+		_row_style.changed.disconnect(_relayout)
+	_row_style = row_style
+	_row_style.changed.connect(_relayout)
+	if not get_viewport().size_changed.is_connected(queue_redraw):
+		get_viewport().size_changed.connect(queue_redraw)
+	_relayout()
 
 func show_whole_deck(cards: Array[CardData]) -> void:
 	_unbind()
@@ -188,6 +211,8 @@ func _runs() -> Array[PackedStringArray]:
 	return runs
 
 func _line_width() -> float:
+	if _row_style != null:
+		return _row_style.item_width(InkGlyph.Kind.DECK, str(_pile_cards().size()), "", draw_label_text)
 	var width: float = 0.0
 	var runs := _runs()
 	for i in runs.size():
@@ -197,6 +222,8 @@ func _line_width() -> float:
 	return width
 
 func _line_height() -> float:
+	if _row_style != null:
+		return _row_style.row_height()
 	return label_font.get_height(font_size_px) if label_font != null else float(font_size_px)
 
 # Sized to the text; when align_right/align_bottom the control grows
@@ -216,6 +243,10 @@ func _relayout() -> void:
 	queue_redraw()
 
 func _draw() -> void:
+	if _row_style != null:
+		_draw_backing()
+		_row_style.draw_item(self, _ink, InkGlyph.Kind.DECK, str(_pile_cards().size()), "", draw_label_text)
+		return
 	if _label_font_tracked == null or count_font == null:
 		return
 	var label_color: Color = _ink
@@ -229,6 +260,27 @@ func _draw() -> void:
 		x += InkType.draw_run(self, _label_font_tracked, runs[i][0], Vector2(x, baseline), font_size_px, label_color)
 		x += label_count_gap_px
 		x += InkType.draw_run(self, count_font, runs[i][1], Vector2(x, baseline), font_size_px, _ink)
+
+# The row's backing fade (HudRowStyle.hud_backing_alpha, off at 0): ink,
+# strongest at the screen's bottom-left corner, gone by hud_backing_size_px
+# to the right and up. Drawn here, under the row's other items (this line
+# comes first under FieldHUD), and it hides with the row for a fight.
+func _draw_backing() -> void:
+	if _row_style.hud_backing_alpha <= 0.0:
+		return
+	if _backing_texture == null:
+		var gradient := Gradient.new()
+		gradient.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
+		gradient.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+		gradient.add_point(0.45, Color(1.0, 1.0, 1.0, 0.5))
+		_backing_texture = GradientTexture2D.new()
+		_backing_texture.gradient = gradient
+		_backing_texture.fill = GradientTexture2D.FILL_RADIAL
+		_backing_texture.fill_from = Vector2(0.0, 1.0)
+		_backing_texture.fill_to = Vector2(1.0, 1.0)
+	var corner := Vector2(-global_position.x, get_viewport_rect().size.y - global_position.y)
+	var backing_size: Vector2 = _row_style.hud_backing_size_px
+	draw_texture_rect(_backing_texture, Rect2(corner - Vector2(0.0, backing_size.y), backing_size), false, Color(_ink, _row_style.hud_backing_alpha))
 
 func _on_gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

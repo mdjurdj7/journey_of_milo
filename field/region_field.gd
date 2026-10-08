@@ -230,6 +230,14 @@ static func reset_hold_line_spoken() -> void:
 # battle - see ui/battle_theme.gd's own rule: UI is the dark element on a
 # pale world (false, default) and the pale element on a dark one (true).
 @export var ui_on_dark_world: bool = false
+# The field HUD row's one style - every size, gap, alpha and timing of
+# DECK, HP, TOLL, GOLD, GLASSBONE and the keepsake (see HudRowStyle). Its
+# own fields re-lay the row live; a new resource here is handed to every
+# item at once. Empty = HudRowStyle's defaults.
+@export var hud_row_style: HudRowStyle = null:
+	set(value):
+		hud_row_style = value
+		_apply_hud_row_style()
 
 @export_group("Ambience Duck")
 # On enemy contact the Ambience bus (both beds: sea and wind) comes down
@@ -331,6 +339,8 @@ static func reset_hold_line_spoken() -> void:
 @onready var hp_bar: HPBar = $FieldHUD/HPBar
 
 var _forward: Vector3 = Vector3.FORWARD
+# The field HUD row's InkLines after DECK, in order - see _setup_field_hud().
+var _hud_row_lines: Array[InkLine] = []
 var _forward_computed: bool = false
 
 # The floor this scene load is playing - see get_floor_data().
@@ -1310,6 +1320,13 @@ func _setup_field_hud() -> void:
 		for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
 			if enemy.enemy_status != null:
 				enemy.enemy_status.refresh_style()
+	# The row's look: DECK first (the field DeckPanel, switched to the
+	# row's style - its anchor in region_field.tscn stays put, so the card
+	# flights still land on it), then each InkLine beside the one before,
+	# all sharing hud_row_style - see _apply_hud_row_style().
+	if hud_row_style == null:
+		hud_row_style = HudRowStyle.new()
+	deck_panel.use_row_style(hud_row_style)
 	deck_panel.show_whole_deck(RunState.deck)
 	RunState.deck_changed.connect(func() -> void: deck_panel.show_whole_deck(RunState.deck))
 	# HP beside DECK, styled from the same theme (set before it enters the
@@ -1317,41 +1334,52 @@ func _setup_field_hud() -> void:
 	# changed keeps it current from here - see HPLine.
 	var hp_line := HPLine.new()
 	hp_line.name = "HPLine"
-	hp_line.theme = deck_panel.theme
-	deck_panel.get_parent().add_child(hp_line)
-	hp_line.sit_beside(deck_panel)
+	_add_hud_row_line(hp_line, deck_panel)
 	# TOLL beside HP, the same way; RunState.toll_changed keeps it current
 	# - see TollLine.
 	var toll_line := TollLine.new()
 	toll_line.name = "TollLine"
-	toll_line.theme = deck_panel.theme
-	deck_panel.get_parent().add_child(toll_line)
 	toll_line.set_toll(RunState.toll)
-	toll_line.sit_beside(hp_line)
-	# GOLD beside TOLL, the same way; always shown, and RunState.gold_changed
-	# counts it up to each new total - see GoldLine. Ahead of KEEPSAKE and
-	# GLASSBONE, which hide themselves when empty, so it never moves.
+	_add_hud_row_line(toll_line, hp_line)
+	# GOLD beside TOLL, the same way; always shown - see GoldLine. Ahead of
+	# GLASSBONE and KEEPSAKE, which hide themselves when empty, so it never
+	# moves.
 	var gold_line := GoldLine.new()
 	gold_line.name = "GoldLine"
-	gold_line.theme = deck_panel.theme
-	deck_panel.get_parent().add_child(gold_line)
-	gold_line.sit_beside(toll_line)
-	# KEEPSAKE beside GOLD; hidden while the slot is empty, and
-	# RunState.keepsake_changed keeps it current - see KeepsakeLine.
-	var keepsake_line := KeepsakeLine.new()
-	keepsake_line.name = "KeepsakeLine"
-	keepsake_line.theme = deck_panel.theme
-	deck_panel.get_parent().add_child(keepsake_line)
-	keepsake_line.sit_beside(gold_line)
-	# GLASSBONE last, after KEEPSAKE (beside GOLD while the slot is empty -
-	# see InkLine._follow()); hidden until the first piece is taken, and
-	# RunState.glassbone_changed keeps it current - see GlassboneLine.
+	_add_hud_row_line(gold_line, toll_line)
+	# GLASSBONE beside GOLD, the last resource; hidden until the first
+	# piece is taken, and RunState.glassbone_changed keeps it current - see
+	# GlassboneLine.
 	var glassbone_line := GlassboneLine.new()
 	glassbone_line.name = "GlassboneLine"
-	glassbone_line.theme = deck_panel.theme
-	deck_panel.get_parent().add_child(glassbone_line)
-	glassbone_line.sit_beside(keepsake_line)
+	_add_hud_row_line(glassbone_line, gold_line)
+	# KEEPSAKE last, set apart past GLASSBONE (beside GOLD while GLASSBONE
+	# is hidden - see InkLine._follow()); hidden while the slot is empty,
+	# and RunState.keepsake_changed keeps it current - see KeepsakeLine.
+	var keepsake_line := KeepsakeLine.new()
+	keepsake_line.name = "KeepsakeLine"
+	_add_hud_row_line(keepsake_line, glassbone_line)
 	hp_bar.set_target(wanderer)
+
+# One InkLine into the field HUD row: this region's theme (set before it
+# enters the tree, so its _ready() reads this region's ink), the row's
+# style, and the item it sits beside.
+func _add_hud_row_line(line: InkLine, beside: Control) -> void:
+	line.theme = deck_panel.theme
+	deck_panel.get_parent().add_child(line)
+	line.set_style(hud_row_style)
+	line.sit_beside(beside)
+	_hud_row_lines.append(line)
+
+# Hands hud_row_style to every row item - a whole new resource set live
+# (edits to the one already held re-lay the row through its own changed
+# signal).
+func _apply_hud_row_style() -> void:
+	if not is_node_ready() or hud_row_style == null or deck_panel == null:
+		return
+	deck_panel.use_row_style(hud_row_style)
+	for line: InkLine in _hud_row_lines:
+		line.set_style(hud_row_style)
 
 # Parents a FieldEnemy's own persistent HP display under this field's HUD
 # CanvasLayer (a Control needs one as an ancestor to render at all - see

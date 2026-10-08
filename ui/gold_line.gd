@@ -1,11 +1,11 @@
 extends InkLine
 class_name GoldLine
 
-# The field HUD's gold: "GOLD n" as a line of ink after TOLL, before
-# KEEPSAKE and GLASSBONE - those two hide themselves when empty, so GOLD
-# sits ahead of them and never moves when they come or go (see InkLine
-# for the shape, the style and the following). Always shown on the field,
-# 0 included.
+# The field HUD row's gold: a stamped coin (InkGlyph's, the loot
+# screen's mark too), the numeral, "GOLD" - after TOLL, before GLASSBONE
+# and the keepsake, which hide themselves when empty, so GOLD never moves
+# when they come or go (see InkLine for the shape, the style and the
+# following). Always shown on the field, 0 included.
 #
 # A rise counts the numeral up to the new total over count_up_time,
 # eased out, rather than jumping - it lands on the exact total. A fall
@@ -30,6 +30,7 @@ var _count_tween: Tween = null
 
 func _init() -> void:
 	label_text = "GOLD"
+	glyph = InkGlyph.Kind.GOLD
 	_value_text = "0"
 
 func _ready() -> void:

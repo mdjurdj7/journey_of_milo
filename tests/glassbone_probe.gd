@@ -213,8 +213,8 @@ func _check_sputter_leaves_none() -> void:
 	_completed += 1
 
 # GLASSBONE: hidden on 0, shown from the first piece with its count,
-# beside GOLD while the keepsake slot is empty and beside KEEPSAKE once
-# one is held.
+# beside GOLD, the last resource - a keepsake taken after sits past it
+# and doesn't move it.
 func _check_hud_line() -> void:
 	_new_run()
 	await _load_field(0)
@@ -228,13 +228,15 @@ func _check_hud_line() -> void:
 	_expect_eq(str(line.get("_value_text")), "1", "...reading 1")
 	_expect_eq(str(line.get("label_text")), "GLASSBONE", "...under the label GLASSBONE")
 	var gold_right: float = gold_line.position.x + gold_line.size.x
-	_expect(line.position.x > gold_right and line.position.x < gold_right + 40.0, "...right beside GOLD while the keepsake slot is empty")
+	_expect(line.position.x > gold_right and line.position.x < gold_right + 40.0, "...right beside GOLD")
+	var glassbone_x: float = line.position.x
 	_run_state.call("add_glassbone", 1)
 	_expect_eq(str(line.get("_value_text")), "2", "...and follows the count (2)")
 	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))
 	await process_frame
 	_expect(keepsake_line.visible, "KEEPSAKE shows once one is held")
-	_expect(line.position.x > keepsake_line.position.x + keepsake_line.size.x, "...and GLASSBONE moves along past it")
+	_expect(keepsake_line.position.x > line.position.x + line.size.x, "...past GLASSBONE")
+	_expect_eq(line.position.x, glassbone_x, "...and GLASSBONE never moved")
 	_expect_eq(line.position.y + line.size.y, toll_line.position.y + toll_line.size.y, "...on the same bottom edge as TOLL")
 	await _teardown()
 	_completed += 1
@@ -252,7 +254,7 @@ func _check_hud_hides_for_fight() -> void:
 	var line: Control = _field.get_node("FieldHUD/GlassboneLine")
 	var toll_line: Control = _field.get_node("FieldHUD/TollLine")
 	_expect(not toll_line.visible, "TOLL hides for the fight")
-	_expect(not line.visible, "...and GLASSBONE with it (the empty KEEPSAKE between them)")
+	_expect(not line.visible, "...and GLASSBONE with it")
 	_kill_all(controller)
 	await create_timer(1.6).timeout
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")

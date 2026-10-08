@@ -4,8 +4,9 @@ extends SceneTree
 # as it stands when the field loads, add_gold() sets its target at once,
 # the count-up eases out and lands on the exact total (a second add
 # mid-count included), a spend snaps, a count_up_time edit mid-count
-# re-targets the running count, and it sits between TOLL and KEEPSAKE -
-# DECK, HP, TOLL, GOLD, KEEPSAKE, GLASSBONE - on TOLL's bottom edge.
+# re-targets the running count, and it sits between TOLL and GLASSBONE -
+# DECK, HP, TOLL, GOLD, GLASSBONE, then KEEPSAKE set apart - on TOLL's
+# bottom edge.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/gold_line_probe.gd
 #
@@ -132,10 +133,11 @@ func _check_retime_retargets() -> void:
 	await _teardown()
 	_completed += 1
 
-# The row is DECK, HP, TOLL, GOLD, KEEPSAKE, GLASSBONE: GOLD right beside
-# TOLL and never moving as KEEPSAKE and GLASSBONE come; KEEPSAKE past
-# GOLD; GLASSBONE past GOLD with the slot empty and past KEEPSAKE once one
-# is held; all on TOLL's bottom edge.
+# The row is DECK, HP, TOLL, GOLD, GLASSBONE, then KEEPSAKE set apart:
+# GOLD right beside TOLL and never moving as GLASSBONE and KEEPSAKE come;
+# GLASSBONE right beside GOLD; KEEPSAKE hud_keepsake_gap_px past GOLD
+# while GLASSBONE is hidden and past GLASSBONE once it shows; all on
+# TOLL's bottom edge.
 func _check_row_place() -> void:
 	_new_run()
 	await _load_field()
@@ -143,21 +145,25 @@ func _check_row_place() -> void:
 	var toll_line: Control = _field.get_node("FieldHUD/TollLine")
 	var keepsake_line: Control = _field.get_node("FieldHUD/KeepsakeLine")
 	var glassbone_line: Control = _field.get_node("FieldHUD/GlassboneLine")
+	var row_style: Resource = line.get("style")
+	var item_gap: float = float(row_style.get("hud_item_gap_px"))
+	var keepsake_gap: float = float(row_style.get("hud_keepsake_gap_px"))
 	var toll_right: float = toll_line.position.x + toll_line.size.x
-	_expect(line.visible, "GOLD shows with KEEPSAKE and GLASSBONE hidden")
-	_expect(line.position.x > toll_right and line.position.x < toll_right + 40.0, "GOLD sits right beside TOLL")
+	_expect(line.visible, "GOLD shows with GLASSBONE and KEEPSAKE hidden")
+	_expect_eq(line.position.x, toll_right + item_gap, "GOLD sits hud_item_gap_px beside TOLL")
 	var gold_x: float = line.position.x
 	var gold_right: float = line.position.x + line.size.x
-	_run_state.call("add_glassbone", 1)
-	await process_frame
-	_expect(glassbone_line.position.x > gold_right and glassbone_line.position.x < gold_right + 40.0, "GLASSBONE sits right beside GOLD while the keepsake slot is empty")
 	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))
 	await process_frame
 	_expect(keepsake_line.visible, "KEEPSAKE shows once one is held")
-	_expect(keepsake_line.position.x > gold_right and keepsake_line.position.x < gold_right + 40.0, "...right beside GOLD")
-	_expect(glassbone_line.position.x > keepsake_line.position.x + keepsake_line.size.x, "...and GLASSBONE moves past KEEPSAKE")
+	_expect_eq(keepsake_line.position.x, gold_right + keepsake_gap, "...hud_keepsake_gap_px past GOLD while GLASSBONE is hidden")
+	_run_state.call("add_glassbone", 1)
+	await process_frame
+	_expect_eq(glassbone_line.position.x, gold_right + item_gap, "GLASSBONE sits hud_item_gap_px beside GOLD")
+	_expect_eq(keepsake_line.position.x, glassbone_line.position.x + glassbone_line.size.x + keepsake_gap, "...and KEEPSAKE moves to hud_keepsake_gap_px past it")
 	_expect_eq(line.position.x, gold_x, "GOLD never moved")
 	_expect_eq(line.position.y + line.size.y, toll_line.position.y + toll_line.size.y, "GOLD on the same bottom edge as TOLL")
+	_expect_eq(glassbone_line.position.y + glassbone_line.size.y, toll_line.position.y + toll_line.size.y, "...and GLASSBONE")
 	_expect_eq(keepsake_line.position.y + keepsake_line.size.y, toll_line.position.y + toll_line.size.y, "...and KEEPSAKE")
 	await _teardown()
 	_completed += 1

@@ -1,81 +1,68 @@
 extends Control
 class_name InkLine
 
-# One line of field-HUD ink: a tracked caps label (Alegreya Sans Bold at
-# label_alpha) and a value right after it in Alegreya Sans Regular at
-# full ink - the same shape as the DeckPanel's DECK line these sit
-# beside. Drawn, not boxed; sized to its own text. The base of HPLine
-# ("HP 58/70"), TollLine ("TOLL n"), GoldLine ("GOLD n"), KeepsakeLine
-# ("KEEPSAKE name") and GlassboneLine ("GLASSBONE n") - the row's order
-# after DECK; a subclass sets its label and feeds its value through
-# set_value_text().
+# One item of the field HUD row, after the DeckPanel's DECK: a glyph, a
+# numeral in Spectral at full ink, an optional secondary run and a small
+# caps label, over a bone halo - the shape and every size, gap and alpha
+# come from the row's shared HudRowStyle (see its own doc). Drawn, not
+# boxed; sized to its own content. The base of HPLine, TollLine,
+# GoldLine, GlassboneLine and KeepsakeLine - the row's order after DECK,
+# the keepsake set apart at the end; a subclass sets its glyph and label
+# and feeds its value through set_value_text().
 #
-# RegionField creates each in _setup_field_hud() and hands it the line to
-# sit beside (sit_beside()). It follows that line's rect and its
-# visibility, so it goes when BattleOverlay hides the field line for a
-# fight and comes back with it - and a subclass can keep itself hidden
-# on top of that (_is_shown()).
+# RegionField creates each in _setup_field_hud(), hands it the row's
+# style (set_style()) and the item to sit beside (sit_beside()). It
+# follows that item's rect and its visibility, so it goes when
+# BattleOverlay hides the field row for a fight and comes back with it -
+# and a subclass can keep itself hidden on top of that (_is_shown()).
 #
 # Reads the theme's Battle/ink token, so it inverts with the on-pale/
 # on-dark value set (see BattleTheme) - re-read via refresh_style().
 
 # This line has just re-followed the line it sits beside - so a line
 # sitting beside THIS one re-follows too, even when nothing about this one
-# changed (a hidden KEEPSAKE staying hidden as the row goes for a fight).
+# changed (a hidden GLASSBONE staying hidden as the row goes for a fight).
 signal followed()
 
 @export var label_text: String = "":
 	set(value):
 		label_text = value
 		_relayout()
-@export var label_font: Font = InkType.text_bold_font():
+@export var glyph: InkGlyph.Kind = InkGlyph.Kind.NONE:
 	set(value):
-		label_font = value
-		_refresh_if_ready()
-# The value's face - a count (TOLL), a name (KEEPSAKE).
-@export var count_font: Font = InkType.text_font():
-	set(value):
-		count_font = value
-		_refresh_if_ready()
-@export var font_size_px: int = 12:
-	set(value):
-		font_size_px = value
-		_refresh_if_ready()
-# One tracking value for every caps label in the battle UI - see InkType.
-@export var tracking_em: float = 0.16:
-	set(value):
-		tracking_em = value
-		_refresh_if_ready()
-@export_range(0.0, 1.0) var label_alpha: float = 0.62:
-	set(value):
-		label_alpha = value
-		queue_redraw()
-@export var label_count_gap_px: float = 6.0:
-	set(value):
-		label_count_gap_px = value
+		glyph = value
 		_relayout()
-# Space between the line it sits beside's right edge and this line's left.
-@export var beside_gap_px: float = 14.0:
-	set(value):
-		beside_gap_px = value
-		_follow()
+
+# The row's shared style - a default of its own until RegionField hands
+# over the row's (set_style()).
+var style: HudRowStyle = HudRowStyle.new()
 
 var _value_text: String = ""
+var _secondary_text: String = ""
 var _ink: Color = Color.BLACK
-var _label_font_tracked: Font = null
 var _beside: Control = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if not style.changed.is_connected(_relayout):
+		style.changed.connect(_relayout)
 	refresh_style()
+
+func set_style(row_style: HudRowStyle) -> void:
+	if style.changed.is_connected(_relayout):
+		style.changed.disconnect(_relayout)
+	style = row_style
+	style.changed.connect(_relayout)
+	_relayout()
 
 func set_value_text(text: String) -> void:
 	_value_text = text
 	_relayout()
 
-# Sits this line to the right of `line`, bottom edges level, and keeps it
-# there as that line resizes or moves - and shown only while it is.
+# Sits this line to the right of `line`, bottoms (and so baselines) level,
+# and keeps it there as that line resizes or moves - and shown only while
+# it is.
 func sit_beside(line: Control) -> void:
 	if _beside != null:
 		_beside.item_rect_changed.disconnect(_follow)
@@ -89,39 +76,39 @@ func sit_beside(line: Control) -> void:
 		(_beside as InkLine).followed.connect(_follow)
 	_follow()
 
-# Re-reads the theme's ink and rebuilds the tracked label font - called
-# at _ready() and by RegionField right after it applies this region's
-# value set to the shared BattleTheme.
+# Re-reads the theme's ink - called at _ready() and by RegionField right
+# after it applies this region's value set to the shared BattleTheme.
 func refresh_style() -> void:
 	_ink = get_theme_color("ink", "Battle")
-	_label_font_tracked = InkType.tracked(label_font, font_size_px, tracking_em)
 	_relayout()
-
-func _refresh_if_ready() -> void:
-	if is_inside_tree():
-		refresh_style()
 
 # Whether this line has anything to show, beside its line's own
 # visibility. Always, unless a subclass says otherwise.
 func _is_shown() -> bool:
 	return true
 
+# The space between the item this one sits beside and this one.
+func _gap_before() -> float:
+	return style.hud_item_gap_px
+
+func _content_width() -> float:
+	return style.item_width(glyph, _value_text, _secondary_text, label_text)
+
 func _relayout() -> void:
 	if not is_inside_tree():
 		return
-	var width: float = InkType.width(_label_font_tracked, label_text, font_size_px) + label_count_gap_px + InkType.width(count_font, _value_text, font_size_px)
-	var height: float = label_font.get_height(font_size_px) if label_font != null else float(font_size_px)
-	size = Vector2(width, height)
+	size = Vector2(_content_width(), style.row_height())
 	_follow()
 	queue_redraw()
 
 func _follow() -> void:
 	if _beside == null or not is_instance_valid(_beside):
 		return
-	# A line that has hidden itself (_is_shown() false - KEEPSAKE with an
-	# empty slot) gives up its place: this one sits where it would have,
-	# beside whatever it sits beside. A line hidden with the whole field
-	# row for a fight still takes this one with it.
+	# A line that has hidden itself (_is_shown() false - GLASSBONE before
+	# the first piece, KEEPSAKE with an empty slot) gives up its place:
+	# this one sits where it would have, beside whatever it sits beside.
+	# A line hidden with the whole field row for a fight still takes this
+	# one with it.
 	var anchor: Control = _beside
 	while anchor is InkLine and not (anchor as InkLine)._is_shown():
 		var next: Control = (anchor as InkLine)._beside
@@ -129,15 +116,10 @@ func _follow() -> void:
 			break
 		anchor = next
 	visible = anchor.visible and _is_shown()
-	position = Vector2(anchor.position.x + anchor.size.x + beside_gap_px, anchor.position.y + anchor.size.y - size.y)
+	# Every row item is style.row_height() tall with its baseline at the
+	# same depth, so level bottoms are level baselines.
+	position = Vector2(anchor.position.x + anchor.size.x + _gap_before(), anchor.position.y + anchor.size.y - size.y)
 	followed.emit()
 
 func _draw() -> void:
-	if _label_font_tracked == null or count_font == null:
-		return
-	var label_color: Color = _ink
-	label_color.a = label_alpha
-	var baseline: float = label_font.get_ascent(font_size_px)
-	var x: float = InkType.draw_run(self, _label_font_tracked, label_text, Vector2(0.0, baseline), font_size_px, label_color)
-	x += label_count_gap_px
-	InkType.draw_run(self, count_font, _value_text, Vector2(x, baseline), font_size_px, _ink)
+	style.draw_item(self, _ink, glyph, _value_text, _secondary_text, label_text)
