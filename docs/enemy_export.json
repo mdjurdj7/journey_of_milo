@@ -1246,7 +1246,7 @@
       "file": "res://battle/rules/enemies/sputter.tres",
       "hp": 45,
       "elite": false,
-      "mechanic_summary": "Picks its move fresh each turn - an 8 Block, a 5 Strike or an 11 Scissor - never Block or Scissor on turn one, never Block twice running. Teaches reading the intent every turn instead of learning a pattern.",
+      "mechanic_summary": "Picks its move fresh each turn - a 7 Block, a 5 Strike or a 9 Scissor - never Block or Scissor on turn one, never Block twice running. Teaches reading the intent every turn instead of learning a pattern.",
       "field": {
         "model": "res://assets/models/enemies/Sputter/Sputter.glb",
         "model_is_default": true,
@@ -1271,7 +1271,7 @@
           {
             "name": "Block",
             "type": "DEFEND",
-            "block": 8,
+            "block": 7,
             "erratic_weight": 1.0,
             "turn_one_locked": true,
             "no_immediate_repeat": true
@@ -1288,7 +1288,7 @@
           {
             "name": "Scissor",
             "type": "ATTACK",
-            "damage_per_hit": 11,
+            "damage_per_hit": 9,
             "hits": 1,
             "erratic_weight": 0.6,
             "turn_one_locked": true,

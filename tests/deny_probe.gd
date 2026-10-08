@@ -211,11 +211,11 @@ func _check_preview() -> void:
 	var enemy := _enemy(data)
 	enemy.current_intent_index = 2
 	var player := Combatant.new(5)
-	_expect(bool(EnemyTurn.preview_intent(enemy, data, player)["lethal"]), "Scissor 11 into 5 HP reads lethal")
+	_expect(bool(EnemyTurn.preview_intent(enemy, data, player)["lethal"]), "Scissor 9 into 5 HP reads lethal")
 	_deny(enemy)
 	var preview: Dictionary = EnemyTurn.preview_intent(enemy, data, player)
 	_expect(bool(preview.get("denied", false)), "Denied: the preview says so")
-	_expect_eq(int(preview["per_hit"]), 11, "...keeps its number")
+	_expect_eq(int(preview["per_hit"]), 9, "...keeps its number")
 	_expect_eq(int(preview["damage_to_hp"]), 0, "...reaches nothing")
 	_expect(not bool(preview["lethal"]), "...and is never lethal")
 	_completed += 1
