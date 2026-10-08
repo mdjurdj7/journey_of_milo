@@ -55,6 +55,7 @@ kill_order_probe 42
 blackback_probe 36
 toll_carry_probe 35
 trinket_probe 35
+keepsake_tile_probe 20
 collateral_probe 29
 blood_advance_probe 30
 bide_probe 30
@@ -110,8 +111,8 @@ area_probes() {
 		floor4) echo "kill_order floor4 wear_path dunecur collector" ;;
 		floor5) echo "kill_order floor5 wear_path greyshelf elite_reward" ;;
 		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur floor5 greyshelf pathing" ;;
-		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord elite_reward run_lost temper" ;;
-		hud) echo "gold_line glassbone trinket" ;;
+		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake keepsake_tile toll_carry run_log frayed_cord elite_reward run_lost temper" ;;
+		hud) echo "gold_line glassbone trinket keepsake_tile" ;;
 		hp_bar) echo "kill_order" ;;
 		ui_inspect) echo "keyword" ;;
 		# The fight's own UI: every probe that plays a real fight (which
@@ -179,6 +180,8 @@ path_probes() {
 		field/greyshelf_*) out="$(area_probes field) greyshelf" ;;
 		# The enemies' share of the depth fog.
 		field/enemy_fog.*) out="$(area_probes field) enemy_fog" ;;
+		# The Keeper's plaque: her probe and the tile's.
+		field/world_keepsake.*) out="$(area_probes field) keeper_keepsake keepsake_tile" ;;
 		field/*) out=$(area_probes field) ;;
 		floors/region1_floor1.tres) out="$(area_probes floor1) enemy_export" ;;
 		floors/region1_floor2.tres) out="$(area_probes floor2) enemy_export" ;;
@@ -194,6 +197,8 @@ path_probes() {
 		assets/field/masks/region1_floor4_*|assets/field/masks/source/floor4/*) out=$(area_probes floor4) ;;
 		assets/field/masks/region1_floor5_*|assets/field/masks/source/floor5/*) out=$(area_probes floor5) ;;
 		ui/hp_bar.*) out=$(area_probes hp_bar) ;;
+		# The keepsake's tile and examine view: every probe that shows one.
+		ui/keepsake_tile.*|ui/keepsake_examine.*) out="keepsake_tile trinket keeper_keepsake belongings_choice" ;;
 		ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd|ui/hp_line.gd|ui/ink_glyph.gd|ui/hud_row_style.gd) out=$(area_probes hud) ;;
 		# The field's DECK and the battle's DECK/DISCARD lines are all
 		# DeckPanels.
