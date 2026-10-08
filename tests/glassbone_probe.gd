@@ -219,7 +219,7 @@ func _check_hud_line() -> void:
 	_new_run()
 	await _load_field(0)
 	var line: Control = _field.get_node("FieldHUD/GlassboneLine")
-	var toll_line: Control = _field.get_node("FieldHUD/TollLine")
+	var hp_line: Control = _field.get_node("FieldHUD/HPLine")
 	var gold_line: Control = _field.get_node("FieldHUD/GoldLine")
 	var keepsake_line: Control = _field.get_node("FieldHUD/KeepsakeLine")
 	_expect(not line.visible, "GLASSBONE is hidden on 0")
@@ -240,7 +240,7 @@ func _check_hud_line() -> void:
 	_expect(keepsake_line.visible, "KEEPSAKE shows once one is held")
 	_expect(keepsake_line.position.x > line.position.x + line.size.x, "...past GLASSBONE")
 	_expect_eq(line.position.x, glassbone_x, "...and GLASSBONE never moved")
-	_expect_eq(line.position.y + line.size.y, toll_line.position.y + toll_line.size.y, "...on the same bottom edge as TOLL")
+	_expect_eq(line.position.y + line.size.y, hp_line.position.y + hp_line.size.y, "...on the same bottom edge as HP")
 	await _teardown()
 	_completed += 1
 
@@ -255,8 +255,8 @@ func _check_hud_hides_for_fight() -> void:
 		_completed += 1
 		return
 	var line: Control = _field.get_node("FieldHUD/GlassboneLine")
-	var toll_line: Control = _field.get_node("FieldHUD/TollLine")
-	_expect(not toll_line.visible, "TOLL hides for the fight")
+	var hp_line: Control = _field.get_node("FieldHUD/HPLine")
+	_expect(not hp_line.visible, "The row's HP hides for the fight")
 	_expect(not line.visible, "...and GLASSBONE with it")
 	_kill_all(controller)
 	await create_timer(1.6).timeout
@@ -265,7 +265,7 @@ func _check_hud_hides_for_fight() -> void:
 		reward.call("close")
 	for i in 5:
 		await process_frame
-	_expect(toll_line.visible, "TOLL is back after the fight")
+	_expect(hp_line.visible, "HP is back after the fight")
 	_expect(line.visible, "...and GLASSBONE with it")
 	_expect_eq(_glassbone(), 1, "The count came through the fight")
 	await _teardown()

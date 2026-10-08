@@ -5,10 +5,9 @@ extends SceneTree
 # add_gold() sets its target at once, the count eases out and lands on
 # the exact total (a second add mid-count included), a spend counts down
 # the same way, a hud_count_sec edit mid-count re-times the running
-# count, HP / TOLL / DECK count too (and show at once on a load), and
-# GOLD sits between TOLL and GLASSBONE -
-# DECK, HP, TOLL, GOLD, GLASSBONE, then KEEPSAKE set apart - on TOLL's
-# bottom edge.
+# count, HP and DECK count too (and show at once on a load), and GOLD
+# sits between HP and GLASSBONE - DECK, HP, GOLD, GLASSBONE, then
+# KEEPSAKE set apart, no TOLL - on HP's bottom edge.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/gold_line_probe.gd
 #
@@ -144,8 +143,8 @@ func _check_retime_retargets() -> void:
 	await _teardown()
 	_completed += 1
 
-# HP, TOLL and DECK count the same way - and a field loaded on a run
-# already past its starting values shows them at once.
+# HP and DECK count the same way - and a field loaded on a run already
+# past its starting values shows them at once. No TOLL line in the row.
 func _check_other_counts() -> void:
 	_new_run()
 	_run_state.call("lose_hp", 5)
@@ -154,11 +153,10 @@ func _check_other_counts() -> void:
 	var deck_before: int = (_run_state.get("deck") as Array).size()
 	await _load_field()
 	var hp_line: Control = _field.get_node("FieldHUD/HPLine")
-	var toll_line: Control = _field.get_node("FieldHUD/TollLine")
+	_expect(_field.get_node_or_null("FieldHUD/TollLine") == null, "The row has no TOLL")
 	var deck_panel: Control = _field.get_node("FieldHUD/DeckPanel")
 	var count_time: float = _count_sec(hp_line)
 	_expect_eq(str(hp_line.get("_value_text")), str(hp_before), "HP shows %d at once on the load" % hp_before)
-	_expect_eq(str(toll_line.get("_value_text")), "3", "...TOLL 3")
 	_expect_eq(str(deck_panel.call("_row_numeral")), str(deck_before), "...DECK %d" % deck_before)
 	_run_state.call("lose_hp", 20)
 	_run_state.call("set_toll", 13)
@@ -166,33 +164,30 @@ func _check_other_counts() -> void:
 	await create_timer(count_time * 0.4).timeout
 	var hp_mid: int = int(str(hp_line.get("_value_text")))
 	_expect(hp_mid < hp_before and hp_mid > hp_before - 20, "HP counts down (%d mid-way)" % hp_mid)
-	var toll_mid: int = int(str(toll_line.get("_value_text")))
-	_expect(toll_mid > 3 and toll_mid < 13, "...TOLL counts up (%d mid-way)" % toll_mid)
 	await create_timer(count_time + 0.3).timeout
 	_expect_eq(str(hp_line.get("_value_text")), str(hp_before - 20), "...HP lands on exactly %d" % (hp_before - 20))
-	_expect_eq(str(toll_line.get("_value_text")), "13", "...TOLL on exactly 13")
 	_expect_eq(str(deck_panel.call("_row_numeral")), str(deck_before + 1), "...DECK on exactly %d" % (deck_before + 1))
 	await _teardown()
 	_completed += 1
 
-# The row is DECK, HP, TOLL, GOLD, GLASSBONE, then KEEPSAKE set apart:
-# GOLD right beside TOLL and never moving as GLASSBONE and KEEPSAKE come;
+# The row is DECK, HP, GOLD, GLASSBONE, then KEEPSAKE set apart: GOLD
+# right beside HP and never moving as GLASSBONE and KEEPSAKE come;
 # GLASSBONE right beside GOLD; KEEPSAKE hud_keepsake_gap_px past GOLD
-# while GLASSBONE is hidden and past GLASSBONE once it shows; all on
-# TOLL's bottom edge.
+# while GLASSBONE is hidden and past GLASSBONE once it shows; all on HP's
+# bottom edge.
 func _check_row_place() -> void:
 	_new_run()
 	await _load_field()
 	var line: Control = _gold_line()
-	var toll_line: Control = _field.get_node("FieldHUD/TollLine")
+	var hp_line: Control = _field.get_node("FieldHUD/HPLine")
 	var keepsake_line: Control = _field.get_node("FieldHUD/KeepsakeLine")
 	var glassbone_line: Control = _field.get_node("FieldHUD/GlassboneLine")
 	var row_style: Resource = line.get("style")
 	var item_gap: float = float(row_style.get("hud_item_gap_px"))
 	var keepsake_gap: float = float(row_style.get("hud_keepsake_gap_px"))
-	var toll_right: float = toll_line.position.x + toll_line.size.x
+	var hp_right: float = hp_line.position.x + hp_line.size.x
 	_expect(line.visible, "GOLD shows with GLASSBONE and KEEPSAKE hidden")
-	_expect_eq(line.position.x, toll_right + item_gap, "GOLD sits hud_item_gap_px beside TOLL")
+	_expect_eq(line.position.x, hp_right + item_gap, "GOLD sits hud_item_gap_px beside HP")
 	var gold_x: float = line.position.x
 	var gold_right: float = line.position.x + line.size.x
 	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))
@@ -204,9 +199,9 @@ func _check_row_place() -> void:
 	_expect_eq(glassbone_line.position.x, gold_right + item_gap, "GLASSBONE sits hud_item_gap_px beside GOLD")
 	_expect_eq(keepsake_line.position.x, glassbone_line.position.x + glassbone_line.size.x + keepsake_gap, "...and KEEPSAKE moves to hud_keepsake_gap_px past it")
 	_expect_eq(line.position.x, gold_x, "GOLD never moved")
-	_expect_eq(line.position.y + line.size.y, toll_line.position.y + toll_line.size.y, "GOLD on the same bottom edge as TOLL")
-	_expect_eq(glassbone_line.position.y + glassbone_line.size.y, toll_line.position.y + toll_line.size.y, "...and GLASSBONE")
-	_expect_eq(keepsake_line.position.y + keepsake_line.size.y, toll_line.position.y + toll_line.size.y, "...and KEEPSAKE")
+	_expect_eq(line.position.y + line.size.y, hp_line.position.y + hp_line.size.y, "GOLD on the same bottom edge as HP")
+	_expect_eq(glassbone_line.position.y + glassbone_line.size.y, hp_line.position.y + hp_line.size.y, "...and GLASSBONE")
+	_expect_eq(keepsake_line.position.y + keepsake_line.size.y, hp_line.position.y + hp_line.size.y, "...and KEEPSAKE")
 	await _teardown()
 	_completed += 1
 

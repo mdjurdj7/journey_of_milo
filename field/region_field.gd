@@ -242,7 +242,7 @@ static func reset_hold_line_spoken() -> void:
 # pale world (false, default) and the pale element on a dark one (true).
 @export var ui_on_dark_world: bool = false
 # The field HUD row's one style - every size, gap, alpha and timing of
-# DECK, HP, TOLL, GOLD, GLASSBONE and the keepsake (see HudRowStyle). Its
+# DECK, HP, GOLD, GLASSBONE and the keepsake (see HudRowStyle). Its
 # own fields re-lay the row live; a new resource here is handed to every
 # item at once. Empty = HudRowStyle's defaults.
 @export var hud_row_style: HudRowStyle = null:
@@ -1354,18 +1354,15 @@ func _setup_field_hud() -> void:
 	var hp_line := HPLine.new()
 	hp_line.name = "HPLine"
 	_add_hud_row_line(hp_line, deck_panel)
-	# TOLL beside HP, the same way; RunState.toll_changed keeps it current
-	# - see TollLine.
-	var toll_line := TollLine.new()
-	toll_line.name = "TollLine"
-	toll_line.snap_toll(RunState.toll)
-	_add_hud_row_line(toll_line, hp_line)
-	# GOLD beside TOLL, the same way; always shown - see GoldLine. Ahead of
+	# No TOLL in the row: the field doesn't show it (it carries between
+	# fights all the same - RunState.carry_toll() - and the battle's own
+	# readout shows it in a fight).
+	# GOLD beside HP, the same way; always shown - see GoldLine. Ahead of
 	# GLASSBONE and KEEPSAKE, which hide themselves when empty, so it never
 	# moves.
 	var gold_line := GoldLine.new()
 	gold_line.name = "GoldLine"
-	_add_hud_row_line(gold_line, toll_line)
+	_add_hud_row_line(gold_line, hp_line)
 	# GLASSBONE beside GOLD, the last resource; hidden until the first
 	# piece is taken, and RunState.glassbone_changed keeps it current - see
 	# GlassboneLine.

@@ -2,7 +2,7 @@ extends InkLine
 class_name GoldLine
 
 # The field HUD row's gold: a stamped coin (InkGlyph's, the loot
-# screen's mark too), the numeral, "GOLD" - after TOLL, before GLASSBONE
+# screen's mark too), the numeral, "GOLD" - after HP, before GLASSBONE
 # and the keepsake, which hide themselves when empty, so GOLD never moves
 # when they come or go (see InkLine for the shape, the style and the
 # following). Always shown on the field, 0 included.
@@ -10,7 +10,7 @@ class_name GoldLine
 # A change counts the numeral to the new total, up or down (InkLine.
 # count_to()); the floor load shows it at once.
 #
-# RegionField creates it in _setup_field_hud() and hands it the TOLL
+# RegionField creates it in _setup_field_hud() and hands it the HP
 # line (sit_beside()); RunState.gold_changed keeps it current. It goes
 # with the field row when BattleOverlay hides that for a fight.
 

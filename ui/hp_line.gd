@@ -3,7 +3,7 @@ class_name HPLine
 
 # The field HUD row's HP: "58 / 70 HP" - the numeral at full ink, "/ 70"
 # in the smaller grey the HP readout's max uses, no glyph - right after
-# the DeckPanel's DECK, before TOLL (see InkLine for the shape, the style
+# the DeckPanel's DECK, before GOLD (see InkLine for the shape, the style
 # and the following). Always shown on the field, whatever the hover
 # readout under the Wanderer is doing.
 #

@@ -5,7 +5,8 @@ class_name InkLine
 # numeral in Spectral at full ink, an optional secondary run and a small
 # caps label, ink on the world - the shape and every size, gap and alpha
 # come from the row's shared HudRowStyle (see its own doc). Drawn, not
-# boxed; sized to its own content. The base of HPLine, TollLine,
+# boxed; sized to its own content. The base of HPLine, TollLine (out of
+# the row for now - nothing makes one),
 # GoldLine, GlassboneLine and KeepsakeLine - the row's order after DECK,
 # the keepsake set apart at the end; a subclass sets its glyph and label
 # and feeds its value through set_value_text() - or, for a count,
