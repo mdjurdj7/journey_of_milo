@@ -103,6 +103,7 @@ func describe(holder: Combatant = null) -> String:
 		"turns": turns_remaining,
 		"stacks": stack_count,
 		"percent": absi(magnitude),
+		"value": magnitude,
 		"mark": data.attack_bonus_against_holder,
 		"bonus": data.attack_damage_bonus * stack_count,
 		"bonus_each": data.attack_damage_bonus,
@@ -198,6 +199,15 @@ static func bonus_hits(statuses: Array[Status]) -> int:
 	for active in statuses:
 		if active.data != null:
 			total += active.data.bonus_hits
+	return total
+
+# What `statuses` take off their holder's next ATTACK in all (StatusData.
+# reduces_attack_total - Garnished), summed.
+static func attack_total_reduction(statuses: Array[Status]) -> int:
+	var total: int = 0
+	for active in statuses:
+		if active.data != null and active.data.reduces_attack_total:
+			total += maxi(active.magnitude, 0)
 	return total
 
 static func remove_from(statuses: Array[Status], active: Status) -> void:

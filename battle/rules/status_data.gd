@@ -49,6 +49,7 @@ const DURATION_UNTIL_TRIGGERED := -2
 # Status, so the numbers move as it's spent -
 #   {charges}  charges left              {turns}  turns left (a countdown's)
 #   {stacks}   stack_count               {percent}  |magnitude| (a MULTIPLY %)
+#   {value}    magnitude (Garnished's total)
 #   {mark}     attack_bonus_against_holder
 #   {bonus}    attack_damage_bonus × stacks
 #   {bonus_each} attack_damage_bonus, one stack's worth
@@ -124,6 +125,15 @@ const DURATION_UNTIL_TRIGGERED := -2
 # in place (EnemyTurn.take_turn()). Pair it with DURATION_UNTIL_TRIGGERED
 # so the turn counter never takes it first.
 @export var consumed_by_own_attack: bool = false
+
+# Its holder's next ATTACK deals `magnitude` less in all, not per hit
+# (Garnish's Garnished): the hits soak it in order, each down to 0 at
+# most, after every modifier (Braced's 50% first) and before block
+# (EnemyTurn.reduce_hit()). A total, so not a MODIFIER - leave category
+# INFORMATIONAL, or apply_modifiers() would take it off every hit too.
+# Copies add up through StackRule.ADD_MAGNITUDE. Pair it with
+# consumed_by_own_attack and DURATION_UNTIL_TRIGGERED.
+@export var reduces_attack_total: bool = false
 
 # Its holder's next turn is skipped (Deny's Denied): whatever move is
 # queued doesn't happen and the pattern moves on as if it had - lost, not

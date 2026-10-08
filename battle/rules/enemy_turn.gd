@@ -114,8 +114,13 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# and DamagePipeline is the only thing that knows the split
 				# between what block ate and what reached HP.
 				var largest_hit: int = 0
+				# What the attack loses in all (Garnished), soaked hit by hit.
+				var reduction_left: int = Status.attack_total_reduction(combatant.statuses)
 				for hit in hit_count(combatant, intent):
 					var amount: int = hit_amount(combatant, data, intent, hit, player.statuses)
+					var cut: int = reduce_hit(amount, reduction_left)
+					amount -= cut
+					reduction_left -= cut
 					Status.consume_triggered(player.statuses)
 					# Critical is judged BEFORE the hit: Refuse the End saves a
 					# player who was already there, not one this hit put there.
@@ -244,8 +249,12 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	var saves_used: int = 0
 	var hits: int = hit_count(combatant, intent)
 	var hit_amounts: Array[int] = []
+	var reduction_left: int = Status.attack_total_reduction(combatant.statuses)
 	for hit in hits:
 		var amount: int = hit_amount(combatant, data, intent, hit, player_statuses)
+		var cut: int = reduce_hit(amount, reduction_left)
+		amount -= cut
+		reduction_left -= cut
 		hit_amounts.append(amount)
 		if hit == 0:
 			preview["per_hit"] = amount
@@ -365,6 +374,15 @@ static func hit_amount(combatant: Combatant, data: EnemyData, intent: EnemyInten
 	amount += Status.attack_bonus(combatant.statuses, combatant.is_critical(), held_back(data, intent))
 	amount = Status.apply_modifiers(amount, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 	return Status.apply_modifiers(amount, player_statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
+
+# What one hit gives up to the attack's total reduction (Garnished -
+# StatusData.reduces_attack_total) with `reduction_left` still to soak:
+# all of it up to the hit, so a hit lands 0 at the least and the rest
+# passes to the next. Applied to hit_amount(), after every modifier and
+# before block - the one rule take_turn() lands and preview_intent()
+# shows; each caller carries its own reduction_left across the hits.
+static func reduce_hit(amount: int, reduction_left: int) -> int:
+	return clampi(reduction_left, 0, maxi(amount, 0))
 
 # Unblocked damage becomes Grace. Accumulates ACROSS the whole enemy
 # turn rather than per enemy: the cap is the window's, so two enemies
