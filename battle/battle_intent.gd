@@ -407,29 +407,21 @@ func _text_width(label: Label, font_size: int) -> float:
 # attack's spearhead points toward the Wanderer: built pointing
 # screen-right and mirrored about the glyph's centre when the Wanderer is
 # to the left (see _points_left()). The rest are not directional and
-# never flip; until they're inked they are polylines (_stroke()). Beneath both, the hairline - or the lethal rule in its place.
+# never flip. Beneath the pair, the hairline - or the lethal rule in its
+# place.
 func _draw() -> void:
 	if not _has_intent:
 		return
 	var ink: Color = get_theme_color("ink", "Battle")
 	var glyph_centre: Vector2 = _glyph_centre
-	if _type == EnemyIntent.IntentType.ATTACK:
-		var r: float = _glyph_size * 0.5
-		var reach: float = _glyph_width() * 0.5
-		var shapes: Array[PackedVector2Array] = _spearhead(glyph_centre + Vector2(reach, 0.0), Vector2.RIGHT, r * spear_blade_length, r * spear_blade_half_width, glyph_centre + Vector2(-reach, 0.0))
-		if _points_left():
-			for k in shapes.size():
-				var shape: PackedVector2Array = shapes[k]
-				for i in shape.size():
-					shape[i] = Vector2(2.0 * glyph_centre.x - shape[i].x, shape[i].y)
-				shapes[k] = shape
-		_draw_ink(shapes, hairline_alpha if _interrupted else 1.0)
-	else:
-		_stroke(_glyph_points(glyph_centre, _glyph_size * 0.5), hairline_alpha if _interrupted else 1.0)
-	if _type == EnemyIntent.IntentType.WATCH:
-		_draw_pupil(glyph_centre, _glyph_size * 0.5, hairline_alpha if _interrupted else 1.0)
-	if _type == EnemyIntent.IntentType.SETTLE:
-		_stroke(_settle_arrow_points(glyph_centre, _glyph_size * 0.5), hairline_alpha if _interrupted else 1.0)
+	var shapes: Array[PackedVector2Array] = _glyph_shapes(glyph_centre, _glyph_size * 0.5)
+	if _type == EnemyIntent.IntentType.ATTACK and _points_left():
+		for k in shapes.size():
+			var shape: PackedVector2Array = shapes[k]
+			for i in shape.size():
+				shape[i] = Vector2(2.0 * glyph_centre.x - shape[i].x, shape[i].y)
+			shapes[k] = shape
+	_draw_ink(shapes, hairline_alpha if _interrupted else 1.0)
 	if _has_threshold:
 		_draw_ring()
 	if _pip_count > 0:
@@ -488,32 +480,6 @@ func _draw_ring() -> void:
 	draw_arc(_ring_centre, fill_radius, start, end, fill_segments, outline, outline_width, true)
 	draw_arc(_ring_centre, fill_radius, start, end, fill_segments, ink, ring_stroke_px, true)
 
-# WATCH's pupil: a filled dot in the eye, ink over its bone outline like
-# a stroke.
-func _draw_pupil(centre: Vector2, r: float, alpha: float) -> void:
-	var ink: Color = get_theme_color("ink", "Battle")
-	var outline: Color = get_theme_color("bone", "Battle")
-	ink.a *= alpha
-	outline.a *= alpha
-	var radius: float = r * 0.24
-	draw_circle(centre, radius + float(outline_size_px), outline, true, -1.0, true)
-	draw_circle(centre, radius, ink, true, -1.0, true)
-
-# SETTLE's arrow, the glyph's second stroke over its ground line: a short
-# shaft coming down, its head stopping just short of the line - settling
-# onto it, not under it (BURROW's mound is the one that goes under). Out
-# along the shaft and back across the head, one polyline like the
-# chevron's.
-func _settle_arrow_points(centre: Vector2, r: float) -> PackedVector2Array:
-	var tip: Vector2 = centre + Vector2(0.0, r * 0.3)
-	var points := PackedVector2Array()
-	points.append(centre + Vector2(0.0, -r * 0.85))
-	points.append(tip)
-	points.append(centre + Vector2(-r * 0.4, -r * 0.1))
-	points.append(tip)
-	points.append(centre + Vector2(r * 0.4, -r * 0.1))
-	return points
-
 # A spearhead pointing along `direction` (unit) with its point at `tip`:
 # a blade `blade_length` long, its edges near-straight from the point out
 # to its widest, SPEAR_WIDEST_AT of the way back, where it is 2 x
@@ -544,17 +510,6 @@ func _spearhead(tip: Vector2, direction: Vector2, blade_length: float, blade_hal
 	var shaft: PackedVector2Array = _ribbon(PackedVector2Array([butt, butt.lerp(neck, 0.5), neck, widest]), PackedFloat32Array([0.0, 0.5 * spear_shaft_weight, 0.85 * spear_shaft_weight, spear_shaft_weight]))
 	var shapes: Array[PackedVector2Array] = [side_a, shaft]
 	return shapes
-
-# One glyph stroke in the numeral's ink over its bone outline, at alpha.
-func _stroke(points: PackedVector2Array, alpha: float) -> void:
-	if points.size() < 2:
-		return
-	var ink: Color = get_theme_color("ink", "Battle")
-	var outline: Color = get_theme_color("bone", "Battle")
-	ink.a *= alpha
-	outline.a *= alpha
-	draw_polyline(points, outline, glyph_stroke_px + float(outline_size_px) * 2.0, true)
-	draw_polyline(points, ink, glyph_stroke_px, true)
 
 # --- Tapered ink ---
 
@@ -687,48 +642,76 @@ func _keyholed(outer: PackedVector2Array, holes: Array[PackedVector2Array]) -> P
 		polygon = joined
 	return polygon
 
-# The glyphs not yet inked (ATTACK is _spearhead()). DEFEND: an open shield - flat top, sides, a point
-# at the bottom, closed. BURROW: a mound on a ground line - the swell it
-# pushes up under the sand. HEAL_ALLY: a plus - one stroke, out along
-# the bar and back to cross it. WATCH: an open eye - an almond, upper lid
-# and lower, closed at the corners, its pupil a dot (_draw_pupil()).
-# SETTLE: a flat ground line, its down-arrow drawn as a second stroke
-# (_settle_arrow_points()). All fit a square of half-size r about centre.
-func _glyph_points(centre: Vector2, r: float) -> PackedVector2Array:
-	var points := PackedVector2Array()
+# Each type's glyph as ink shapes, all in the same hand: pen strokes
+# (_ribbon()) a full glyph_stroke_px at their body and glyph_taper of it
+# at their fine ends, and the solid parts that go with them. Built in a
+# box r high either side of centre (an ATTACK is _glyph_width() long).
+# ATTACK: a slim spearhead pointing right (_spearhead()) - the action
+# coming at you. DEFEND: a shield in one stroke - up from its point, thick
+# at the shoulders and across the top, down the far side, fining back to
+# the point. BURROW: a mound on a ground line in one stroke - fine at the
+# line's ends, the swell thickest at its crest. HEAL_ALLY: a plus of two
+# strokes, each thick at the crossing and fine at its ends. WATCH: an open
+# eye - an upper lid thickest mid-lid, fine at the corners, a lighter
+# lower lid short of them, and a round pupil. SETTLE: the attack's
+# spearhead turned down, short, settling onto a ground line that is thick
+# at its middle and fine at its ends - stopping short of it, not under it
+# (BURROW's mound is the one that goes under).
+func _glyph_shapes(centre: Vector2, r: float) -> Array[PackedVector2Array]:
+	var shapes: Array[PackedVector2Array] = []
 	match _type:
+		EnemyIntent.IntentType.ATTACK:
+			var reach: float = _glyph_width() * 0.5
+			shapes = _spearhead(centre + Vector2(reach, 0.0), Vector2.RIGHT, r * spear_blade_length, r * spear_blade_half_width, centre + Vector2(-reach, 0.0))
 		EnemyIntent.IntentType.DEFEND:
-			points.append(centre + Vector2(-r * 0.8, -r * 0.9))
-			points.append(centre + Vector2(r * 0.8, -r * 0.9))
-			points.append(centre + Vector2(r * 0.8, r * 0.1))
-			points.append(centre + Vector2(0.0, r * 0.95))
-			points.append(centre + Vector2(-r * 0.8, r * 0.1))
-			points.append(centre + Vector2(-r * 0.8, -r * 0.9))
+			var point: Vector2 = centre + Vector2(0.0, r * 0.95)
+			var right_waist: Vector2 = centre + Vector2(r * 0.78, r * 0.2)
+			shapes.append(_ribbon(PackedVector2Array([
+				point, centre + Vector2(-r * 0.78, r * 0.2), centre + Vector2(-r * 0.78, -r * 0.8),
+				centre + Vector2(r * 0.78, -r * 0.8), right_waist, right_waist.lerp(point, 0.9),
+			]), PackedFloat32Array([0.0, 0.6, 1.0, 0.9, 0.55, 0.0])))
 		EnemyIntent.IntentType.BURROW:
-			points.append(centre + Vector2(-r, r * 0.45))
-			var arc_steps: int = 8
-			for step in arc_steps + 1:
+			var ground: float = r * 0.5
+			var spine := PackedVector2Array([centre + Vector2(-r, ground), centre + Vector2(-r * 0.6, ground)])
+			var factors := PackedFloat32Array([0.0, 0.55])
+			var arc_steps: int = 10
+			for step in range(1, arc_steps):
 				var angle: float = PI - PI * float(step) / float(arc_steps)
-				points.append(centre + Vector2(cos(angle) * r * 0.6, r * 0.45 - sin(angle) * r * 0.7))
-			points.append(centre + Vector2(r, r * 0.45))
+				spine.append(centre + Vector2(cos(angle) * r * 0.6, ground - sin(angle) * r * 0.75))
+				factors.append(lerpf(0.55, 1.0, sin(angle)))
+			spine.append_array(PackedVector2Array([centre + Vector2(r * 0.6, ground), centre + Vector2(r, ground)]))
+			factors.append_array(PackedFloat32Array([0.55, 0.0]))
+			shapes.append(_ribbon(spine, factors))
 		EnemyIntent.IntentType.HEAL_ALLY:
-			points.append(centre + Vector2(-r * 0.8, 0.0))
-			points.append(centre + Vector2(r * 0.8, 0.0))
-			points.append(centre)
-			points.append(centre + Vector2(0.0, -r * 0.8))
-			points.append(centre + Vector2(0.0, r * 0.8))
+			var spindle := PackedFloat32Array([0.0, 1.0, 0.0])
+			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(-r * 0.8, 0.0), centre, centre + Vector2(r * 0.8, 0.0)]), spindle))
+			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(0.0, -r * 0.8), centre, centre + Vector2(0.0, r * 0.8)]), spindle))
 		EnemyIntent.IntentType.WATCH:
-			var lid_steps: int = 10
+			var lid_steps: int = 12
+			var upper := PackedVector2Array()
+			var upper_factors := PackedFloat32Array()
 			for step in lid_steps + 1:
 				var t: float = float(step) / float(lid_steps)
-				points.append(centre + Vector2(lerpf(-r, r, t), -sin(t * PI) * r * 0.55))
-			for step in range(1, lid_steps + 1):
-				var t: float = float(step) / float(lid_steps)
-				points.append(centre + Vector2(lerpf(r, -r, t), sin(t * PI) * r * 0.55))
+				upper.append(centre + Vector2(lerpf(-r, r, t), -sin(t * PI) * r * 0.55))
+				upper_factors.append(sin(t * PI))
+			var lower := PackedVector2Array()
+			var lower_factors := PackedFloat32Array()
+			for step in lid_steps + 1:
+				var u: float = float(step) / float(lid_steps)
+				var t: float = lerpf(0.18, 0.82, u)
+				lower.append(centre + Vector2(lerpf(-r, r, t), sin(t * PI) * r * 0.5))
+				lower_factors.append(0.6 * sin(u * PI))
+			var pupil := PackedVector2Array()
+			for step in 20:
+				var angle: float = TAU * float(step) / 20.0
+				pupil.append(centre + Vector2(cos(angle), sin(angle)) * r * 0.26)
+			shapes.append(_ribbon(upper, upper_factors))
+			shapes.append(_ribbon(lower, lower_factors))
+			shapes.append(pupil)
 		EnemyIntent.IntentType.SETTLE:
-			points.append(centre + Vector2(-r * 0.8, r * 0.6))
-			points.append(centre + Vector2(r * 0.8, r * 0.6))
-	return points
+			shapes = _spearhead(centre + Vector2(0.0, r * 0.25), Vector2.DOWN, r * spear_blade_length * 0.65, r * spear_blade_half_width, centre + Vector2(0.0, -r * 0.95))
+			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(-r * 0.85, r * 0.75), centre + Vector2(0.0, r * 0.75), centre + Vector2(r * 0.85, r * 0.75)]), PackedFloat32Array([0.0, 1.0, 0.0])))
+	return shapes
 
 # Whether the Wanderer is to the screen-left of the enemy right now -
 # compared in screen X at draw time, so the spearhead follows the battle

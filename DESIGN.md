@@ -506,3 +506,14 @@ folder (run_log_probe). (2026-10-04.)
   `contact_sounds` borrow `combat_old/hit.wav`, as the Greyshelf, the
   Dunecur and the Wardling do, until a hit on a sand-covered ray is
   recorded. (2026-10-08, Underfoot.)
+- **The shield and the card glyphs are still line drawings.** The enemy
+  intent glyphs are inked - filled, tapered pen strokes over a bone
+  outline (`BattleIntent._glyph_shapes()`, `_ribbon()`, `_draw_ink()`).
+  Two places that were drawn as "the same hand" weren't moved with them:
+  the block shield beside the HP readouts (`EnemyStatus` and `HPBar`,
+  `block_glyph_line_width_px` - still the old even 3.5 px polyline) and
+  CardView's keyline glyphs (`_draw_glyph()`, polylines with a faint
+  second stroke). Card UI and status icons were out of scope for the
+  intent pass. Ink them when either gets its pass - the helpers are in
+  BattleIntent, to be shared once a second consumer needs them.
+  (2026-10-08, intent glyphs.)
