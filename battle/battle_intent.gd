@@ -219,6 +219,17 @@ class_name BattleIntent
 
 # Where along the spearhead's blade, from its point, it is widest.
 const SPEAR_WIDEST_AT: float = 0.7
+# The ground line under BURROW and SETTLE: a thin stroke, this fraction
+# of the pen's weight, fine at its ends.
+const GROUND_WEIGHT: float = 0.12
+# Its half-length as a multiple of the glyph's half-height: it runs well
+# past what stands on it, so those glyphs are wider than tall.
+const GROUND_REACH: float = 1.4
+# BURROW's mound height, as a fraction of the glyph's half-height.
+const BURROW_MOUND_HEIGHT: float = 0.5
+# How far SETTLE's spear point sinks under its ground line, as a fraction
+# of the blade's length.
+const SETTLE_DIP: float = 0.35
 
 var target: FieldEnemy = null
 var _label: Label = null
@@ -411,9 +422,22 @@ func _cap_height(font: Font) -> float:
 	var padding: float = maxf(top + height, 0.0)
 	return height - padding * 2.0
 
-# The glyph's width: its height, or the spear's length for an ATTACK.
+# A ground line's near half, as a spine at y `ground` below centre: from
+# GROUND_REACH out (fine), to where it reaches GROUND_WEIGHT, in to
+# `inner` (x from centre, negative) - BURROW's and SETTLE's sand.
+func _ground_spine(centre: Vector2, r: float, ground: float, inner: float) -> PackedVector2Array:
+	var reach: float = r * GROUND_REACH
+	return PackedVector2Array([centre + Vector2(-reach, ground), centre + Vector2(-reach * 0.7, ground), centre + Vector2(inner, ground)])
+
+# The glyph's width: its height; the spear's length for an ATTACK; the
+# ground line's for BURROW and SETTLE.
 func _glyph_width() -> float:
-	return _glyph_size * spear_length if _type == EnemyIntent.IntentType.ATTACK else _glyph_size
+	match _type:
+		EnemyIntent.IntentType.ATTACK:
+			return _glyph_size * spear_length
+		EnemyIntent.IntentType.BURROW, EnemyIntent.IntentType.SETTLE:
+			return _glyph_size * GROUND_REACH
+	return _glyph_size
 
 func _text_width(label: Label, font_size: int) -> float:
 	var font: Font = label.get_theme_font("font")
@@ -667,19 +691,18 @@ func _keyholed(outer: PackedVector2Array, holes: Array[PackedVector2Array]) -> P
 # Each type's glyph as ink shapes, all in the same hand: pen strokes
 # (_ribbon()) a full glyph_stroke_px at their body and glyph_taper of it
 # at their fine ends, and the solid parts that go with them. Built in a
-# box r high either side of centre (an ATTACK is _glyph_width() long).
-# ATTACK: a slim spearhead pointing right (_spearhead()) - the action
-# coming at you. DEFEND: a shield in one stroke - up from its point, thick
-# at the shoulders and across the top, down the far side, fining back to
-# the point, in its own lighter pen (shield_stroke_px). BURROW: a mound
-# on a ground line in one stroke - fine at the line's ends, the swell
-# thickest at its crest. HEAL_ALLY: a plus of two
-# strokes, each thick at the crossing and fine at its ends. WATCH: an open
-# eye - an upper lid thickest mid-lid, fine at the corners, a lighter
-# lower lid short of them, and a round pupil. SETTLE: the attack's
-# spearhead turned down, short, settling onto a ground line that is thick
-# at its middle and fine at its ends - stopping short of it, not under it
-# (BURROW's mound is the one that goes under).
+# box r high either side of centre, _glyph_width() wide. ATTACK: a slim
+# spearhead pointing right (_spearhead()) - the action coming at you.
+# DEFEND: a shield in one stroke - up from its point, thick at the
+# shoulders and across the top, down the far side, fining back to the
+# point, in its own lighter pen (shield_stroke_px). BURROW: a low, wide
+# mound on a long, thin ground line, in one stroke thickest at the
+# crest. HEAL_ALLY: a plus of two strokes, each thick at the crossing
+# and fine at its ends. WATCH: an open eye - an upper lid thickest
+# mid-lid, fine at the corners, a lighter lower lid short of them, and a
+# round pupil. SETTLE: the attack's spearhead pointing down, its point
+# sunk SETTLE_DIP through the same ground line and cut off there - going
+# into the sand.
 func _glyph_shapes(centre: Vector2, r: float) -> Array[PackedVector2Array]:
 	var shapes: Array[PackedVector2Array] = []
 	match _type:
@@ -694,16 +717,25 @@ func _glyph_shapes(centre: Vector2, r: float) -> Array[PackedVector2Array]:
 				centre + Vector2(r * 0.78, -r * 0.8), right_waist, right_waist.lerp(point, 0.9),
 			]), PackedFloat32Array([0.0, 0.6, 1.0, 0.9, 0.55, 0.0]), shield_stroke_px))
 		EnemyIntent.IntentType.BURROW:
-			var ground: float = r * 0.5
-			var spine := PackedVector2Array([centre + Vector2(-r, ground), centre + Vector2(-r * 0.6, ground)])
-			var factors := PackedFloat32Array([0.0, 0.55])
-			var arc_steps: int = 10
-			for step in range(1, arc_steps):
-				var angle: float = PI - PI * float(step) / float(arc_steps)
-				spine.append(centre + Vector2(cos(angle) * r * 0.6, ground - sin(angle) * r * 0.75))
-				factors.append(lerpf(0.55, 1.0, sin(angle)))
-			spine.append_array(PackedVector2Array([centre + Vector2(r * 0.6, ground), centre + Vector2(r, ground)]))
-			factors.append_array(PackedFloat32Array([0.55, 0.0]))
+			# The mound is BURROW_MOUND_HEIGHT high at its stroke's centre
+			# and 2.2 x that wide - about 1.6 x its height once the crest's
+			# weight is counted - on the ground line; the pair centred.
+			var height: float = r * BURROW_MOUND_HEIGHT
+			var half_base: float = height * 1.1
+			var ground: float = height * 0.5
+			var spine := _ground_spine(centre, r, ground, -half_base)
+			var factors := PackedFloat32Array([0.0, GROUND_WEIGHT, GROUND_WEIGHT])
+			var mound_steps: int = 16
+			for step in range(1, mound_steps):
+				var x: float = lerpf(-half_base, half_base, float(step) / float(mound_steps))
+				var swell: float = pow(1.0 - pow(x / half_base, 2.0), 0.6)
+				spine.append(centre + Vector2(x, ground - height * swell))
+				factors.append(lerpf(GROUND_WEIGHT, 1.0, swell))
+			var far := _ground_spine(centre, r, ground, -half_base)
+			far.reverse()
+			for i in far.size():
+				spine.append(Vector2(2.0 * centre.x - far[i].x, far[i].y))
+			factors.append_array(PackedFloat32Array([GROUND_WEIGHT, GROUND_WEIGHT, 0.0]))
 			shapes.append(_ribbon(spine, factors))
 		EnemyIntent.IntentType.HEAL_ALLY:
 			var spindle := PackedFloat32Array([0.0, 1.0, 0.0])
@@ -732,8 +764,19 @@ func _glyph_shapes(centre: Vector2, r: float) -> Array[PackedVector2Array]:
 			shapes.append(_ribbon(lower, lower_factors))
 			shapes.append(pupil)
 		EnemyIntent.IntentType.SETTLE:
-			shapes = _spearhead(centre + Vector2(0.0, r * 0.25), Vector2.DOWN, r * spear_blade_length * 0.65, r * spear_blade_half_width, centre + Vector2(0.0, -r * 0.95))
-			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(-r * 0.85, r * 0.75), centre + Vector2(0.0, r * 0.75), centre + Vector2(r * 0.85, r * 0.75)]), PackedFloat32Array([0.0, 1.0, 0.0])))
+			# The spear's point dips SETTLE_DIP through the ground line and
+			# what is under the line is cut away.
+			var ground: float = r * 0.6
+			var sand := PackedVector2Array([centre + Vector2(-r * 2.0, ground), centre + Vector2(r * 2.0, ground), centre + Vector2(r * 2.0, r * 3.0), centre + Vector2(-r * 2.0, r * 3.0)])
+			var blade: float = r * spear_blade_length * 0.65
+			var spear: Array[PackedVector2Array] = _spearhead(centre + Vector2(0.0, ground + blade * SETTLE_DIP), Vector2.DOWN, blade, r * spear_blade_half_width, centre + Vector2(0.0, -r * 1.45))
+			for part in spear:
+				for above: PackedVector2Array in Geometry2D.clip_polygons(part, sand):
+					shapes.append(above)
+			var line := _ground_spine(centre, r, ground, 0.0)
+			line.remove_at(line.size() - 1)
+			line.append_array(PackedVector2Array([Vector2(2.0 * centre.x - line[1].x, ground + centre.y), Vector2(2.0 * centre.x - line[0].x, ground + centre.y)]))
+			shapes.append(_ribbon(line, PackedFloat32Array([0.0, GROUND_WEIGHT, GROUND_WEIGHT, 0.0])))
 	return shapes
 
 # Whether the Wanderer is to the screen-left of the enemy right now -
