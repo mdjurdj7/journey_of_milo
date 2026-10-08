@@ -14,9 +14,9 @@ extends SceneTree
 #   carve_two          - two in one card, then the last alone
 #   carve_three        - all three in one card
 #   last_normal        - two in one card, the last by a single attack
-#   pair_anchor_first  - floor 2's required crab and its dragonfly, the
-#                        crab first
-#   pair_other_first   - the same pair, the dragonfly first
+#   pair_anchor_first  - floor 2's required pair, the Sputter and the
+#                        Underfoot, the Sputter first
+#   pair_other_first   - the same pair, the Underfoot first
 #   floor1_crab        - the one required crab on floor 1
 #
 # and asserts, after the win and the reward beat: no member of the pack
@@ -24,8 +24,8 @@ extends SceneTree
 # outside the fight and none more (the rest of floor 2; none on floor 1),
 # floor_cleared emitted by floor 1's crab and floor 2's pair and NOT by
 # the optional island pack, no fight left open. The pair is contacted at
-# its dragonfly from the west - the dragonfly nearest the Wanderer - and
-# the crab (FloorEnemy.anchor) must still head the line.
+# its Underfoot from the west - the Underfoot nearest the Wanderer - and
+# the Sputter (FloorEnemy.anchor) must still head the line.
 #
 # Run it before committing anything that touches region_field.gd,
 # field_enemy.gd or battle_controller.gd, and say in the commit that it
@@ -96,7 +96,7 @@ func _run_case(order: String, group: StringName, expect_cleared: bool) -> void:
 
 	# The Wanderer stands just east of the easternmost member - the
 	# island's approach - and that member is the contact. The crab's pair
-	# the other way round: west of its westernmost, the dragonfly, so the
+	# the other way round: west of its westernmost, the Underfoot, so the
 	# member he touches is not the one that anchors.
 	var west: bool = group == &"crab"
 	var side: float = -1.0 if west else 1.0
