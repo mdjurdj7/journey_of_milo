@@ -11,6 +11,7 @@ script = ExtResource("2_intent")
 intent_name = "Sting"
 value = 12
 status_while_queued = ExtResource("3_covered")
+rear_while_queued = true
 
 [sub_resource type="Resource" id="EnemyIntent_rebury"]
 script = ExtResource("2_intent")
@@ -30,6 +31,10 @@ contact_sounds = Array[AudioStream]([ExtResource("5_hit")])
 model_scene_path = "res://assets/models/enemies/Underfoot/Underfoot.glb"
 model_scale = 0.744
 model_yaw_offset_degrees = 180.0
+attachment_scene_path = "res://field/underfoot_pose.tscn"
+; Covered: the crown 0.1 m proud of the sand, the rim at it, the tail and
+; the lowered barb under it (UnderfootPose lifts it to 0 Exposed).
+sink_m = 0.09
 contact_radius_m = 1.5
 ; The Sputter's rear 0.535 m + its own nose 0.90 m + 0.4 m clear.
 cluster_gap_m = 1.85

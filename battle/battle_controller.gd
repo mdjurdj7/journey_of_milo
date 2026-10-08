@@ -966,18 +966,24 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 # queued) is queued, not yet broken (its interrupt threshold met) and the
 # enemy is above the sand; flat otherwise. Returns how long the change
 # takes; 0 when there is none. A plain attack queued above the sand asks
-# for the tell (FieldEnemy.set_poised()), cosmetic and not waited on.
+# for the tell (FieldEnemy.set_poised()), cosmetic and not waited on. The
+# status the intent holds it in (EnemyIntent.status_while_queued - the
+# Underfoot's Covered / Exposed) is the body's to show too (FieldEnemy.
+# set_queued_status()), waited on with the rear.
 func _pose_for_intent(enemy: FieldEnemy) -> float:
 	var combatant: Combatant = _combatants.get(enemy)
 	var rear: bool = false
 	var poised: bool = false
+	var held: StatusData = null
 	if combatant != null and combatant.hp > 0 and not combatant.buried and enemy.enemy_data != null:
 		var intent: EnemyIntent = EnemyTurn.current_intent(combatant, enemy.enemy_data)
 		rear = intent != null and intent.rear_while_queued and not EnemyTurn.is_interrupted(combatant, intent) and not EnemyTurn.is_denied(combatant)
 		poised = intent != null and intent.type == EnemyIntent.IntentType.ATTACK and not intent.rear_while_queued
+		held = intent.status_while_queued if intent != null else null
 	enemy.set_poised(poised)
 	_show_roused(enemy)
-	return enemy.set_rearing(rear)
+	var state_delay: float = enemy.set_queued_status(held)
+	return maxf(enemy.set_rearing(rear), state_delay)
 
 # The body shows the stacks of its attack_card_status it holds (the
 # Dunecur's crest, FieldEnemy.set_roused()) - after each card, each enemy

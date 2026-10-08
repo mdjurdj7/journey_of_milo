@@ -1371,11 +1371,14 @@
         "model_is_default": false,
         "model_scale": 0.744,
         "model_yaw_offset_degrees": 180.0,
-        "attachment": null,
+        "attachment": {
+          "scene": "res://field/underfoot_pose.tscn",
+          "class": "UnderfootPose"
+        },
         "contact_radius_m": 1.5,
         "cluster_gap_m": 1.85,
         "rest_height_m": 0.0,
-        "sink_m": 0.0,
+        "sink_m": 0.09,
         "battle_hover_m": 0.0,
         "buried_on_field": false,
         "flies_in_battle": false,
@@ -1389,6 +1392,7 @@
             "type": "ATTACK",
             "damage_per_hit": 12,
             "hits": 1,
+            "rears_while_queued": true,
             "status_while_queued": "covered"
           },
           {

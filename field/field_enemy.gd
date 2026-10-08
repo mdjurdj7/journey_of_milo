@@ -321,6 +321,16 @@ func set_poised(on: bool) -> void:
 		return
 	_attachment.call("set_poised", on)
 
+# The status the queued intent holds its enemy in (EnemyIntent.status_
+# while_queued - the Underfoot's Covered or Exposed), for the body to
+# take its pose (UnderfootPose.set_queued_status()). Returns how long
+# that takes, for the enemy turn to wait on - 0 for a body with no such
+# attachment, or already heading there.
+func set_queued_status(status: StatusData) -> float:
+	if _attachment == null or not _attachment.has_method("set_queued_status") or _settling:
+		return 0.0
+	return float(_attachment.call("set_queued_status", status))
+
 # How much higher a rear has put the top of the body, metres.
 func _rear_lift() -> float:
 	if _attachment == null or not _attachment.has_method("get_rear_lift"):
@@ -921,7 +931,9 @@ func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spre
 # the return leg keeps playing (cosmetically) after the hit has already
 # landed. An attachment that winds up first (RearPose.play_windup(), the
 # Siltjaw's Snap) holds the lunge back by its wind-up, and that is added
-# to the wait.
+# to the wait. An attachment may lunge the body less than attack_snap_
+# distance (UnderfootPose.get_lunge_distance() - its tail strikes, and
+# its nose is close to its packmate's back).
 func play_attack_snap(target: Node3D) -> float:
 	if target == null:
 		return 0.0
@@ -930,7 +942,10 @@ func play_attack_snap(target: Node3D) -> float:
 	direction = direction.normalized() if direction.length() > 0.0001 else -global_transform.basis.z
 
 	var base_position := global_position
-	var lunge_position := base_position + direction * attack_snap_distance
+	var distance: float = attack_snap_distance
+	if _attachment != null and _attachment.has_method("get_lunge_distance"):
+		distance = float(_attachment.call("get_lunge_distance"))
+	var lunge_position := base_position + direction * distance
 
 	# The wings beat as the lunge starts (DragonflyWings.start_flap()).
 	if _attachment != null and _attachment.has_method("start_flap"):
@@ -1120,7 +1135,12 @@ func _kill_flight() -> void:
 # A body sunk under a negative rest_height surfaces here the same way -
 # the lift is the depth it was buried at, up to battle_hover (0: onto the
 # sand) - without the bob or the wings, which are a flyer's.
+#
+# Hovering or not, an attachment that waits for the frame (UnderfootPose.
+# enter_battle_frame() - its barb's first rise) hears of it here.
 func enter_battle_hover(phase: float) -> void:
+	if not _settling and not _defeated and _attachment != null and _attachment.has_method("enter_battle_frame"):
+		_attachment.call("enter_battle_frame")
 	if _hover_lift() <= 0.0 or _hovering or _settling or _defeated or _model == null:
 		return
 	_hovering = true
@@ -1135,7 +1155,12 @@ func is_battle_hovering() -> bool:
 
 # A win or an escape: back down to rest height over battle_settle_
 # seconds, the bob fading out with the lift; the wings land at the end.
+# Hovering or not, an attachment with a fight's pose of its own goes back
+# to the field's (UnderfootPose.exit_battle_frame() - reburied, barb
+# down).
 func exit_battle_hover() -> void:
+	if not _settling and _attachment != null and _attachment.has_method("exit_battle_frame"):
+		_attachment.call("exit_battle_frame")
 	if not _hovering or _settling:
 		return
 	_hovering = false
