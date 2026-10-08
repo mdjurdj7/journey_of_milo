@@ -1106,15 +1106,22 @@ func _setup_field_hud() -> void:
 				enemy.enemy_status.refresh_style()
 	deck_panel.show_whole_deck(RunState.deck)
 	RunState.deck_changed.connect(func() -> void: deck_panel.show_whole_deck(RunState.deck))
-	# TOLL beside DECK, styled from the same theme (set before it enters the
-	# tree, so its _ready() reads this region's ink); RunState.toll_changed
-	# keeps it current from here - see TollLine.
+	# HP beside DECK, styled from the same theme (set before it enters the
+	# tree, so its _ready() reads this region's ink); RunState.player_hp_
+	# changed keeps it current from here - see HPLine.
+	var hp_line := HPLine.new()
+	hp_line.name = "HPLine"
+	hp_line.theme = deck_panel.theme
+	deck_panel.get_parent().add_child(hp_line)
+	hp_line.sit_beside(deck_panel)
+	# TOLL beside HP, the same way; RunState.toll_changed keeps it current
+	# - see TollLine.
 	var toll_line := TollLine.new()
 	toll_line.name = "TollLine"
 	toll_line.theme = deck_panel.theme
 	deck_panel.get_parent().add_child(toll_line)
 	toll_line.set_toll(RunState.toll)
-	toll_line.sit_beside(deck_panel)
+	toll_line.sit_beside(hp_line)
 	# GOLD beside TOLL, the same way; always shown, and RunState.gold_changed
 	# counts it up to each new total - see GoldLine. Ahead of KEEPSAKE and
 	# GLASSBONE, which hide themselves when empty, so it never moves.
