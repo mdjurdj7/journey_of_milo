@@ -1199,6 +1199,25 @@ func get_landmass_distance(world_xz: Vector2) -> float:
 		base = maxf(_landmass_distance(world_xz), _seaward_distance(world_xz.y))
 	return maxf(base, _channel_water_distance(world_xz))
 
+# 0..1: the painted wear (wear_mask) at a world XZ - white is walked -
+# the same bilinear read the shader takes of it on the landmass canvas.
+# Decoded once per texture, on first ask; 0 with no painting, or one not
+# the landmass mask's size. FieldScatter keeps off it.
+func get_wear_mask_at(world_xz: Vector2) -> float:
+	if wear_mask == null or not _mask_ready:
+		return 0.0
+	if _wear_mask_decoded_for != wear_mask:
+		_wear_mask_decoded_for = wear_mask
+		_wear_mask_bytes = PackedByteArray()
+		var image: Image = _decode_l8_image(wear_mask)
+		if image != null and image.get_width() == _mask_width and image.get_height() == _mask_height:
+			_wear_mask_bytes = image.get_data()
+		else:
+			push_warning("Ground: wear_mask isn't the landmass mask's size; not read on the CPU.")
+	if _wear_mask_bytes.is_empty():
+		return 0.0
+	return _canvas_sample(_wear_mask_bytes, world_xz)
+
 # 0..1: is the nearest water to this world XZ a pool rather than the sea?
 # Same bilinear read as _mask_distance_sample(), on the same grid.
 func get_enclosure_at(world_xz: Vector2) -> float:
@@ -1762,6 +1781,9 @@ var _mask_ready: bool = false
 var _mask_bytes: PackedByteArray = PackedByteArray()
 var _mask_width: int = 0
 var _mask_height: int = 0
+# wear_mask decoded for get_wear_mask_at(), and the texture it came from.
+var _wear_mask_bytes: PackedByteArray = PackedByteArray()
+var _wear_mask_decoded_for: Texture2D = null
 # elevation_mask's own luminance bytes on the landmass mask's canvas (same
 # _mask_width x _mask_height, checked at decode), read by _elevation_lift()
 # through the same _canvas_sample(). Empty, with _elevation_ready false,

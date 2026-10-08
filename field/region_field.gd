@@ -380,6 +380,10 @@ var _wall_shoreward: StaticBody3D = null
 # Where the Wanderer can walk (NavGrid), built from this floor's data once
 # the relief and everything on it stand - see _build_nav_grid().
 var _nav: NavGrid = null
+# The floor's ground scatter (FieldScatter), and the worn band's points it
+# keeps off (get_wear_path()).
+var _scatter: FieldScatter = null
+var _wear_path: PackedVector2Array = PackedVector2Array()
 # The HUD row's keepsake - a click on it opens KeepsakeExamine.
 var _keepsake_line: KeepsakeLine = null
 var _nav_build_queued: bool = false
@@ -616,6 +620,9 @@ func _ready() -> void:
 		_setup_debug_row()
 	_build_boundary()
 	_setup_exit_gate_channel()
+	# After the channel: it is water the scatter keeps out of, and every
+	# prop, enemy and the gate it keeps clear of now stands.
+	_spawn_floor_scatter()
 
 	# The Ambience bus at its base - a loss mid-duck or a restart must not
 	# inherit the last scene's level.
@@ -1551,6 +1558,20 @@ func _on_wanderer_hold_line_reached() -> void:
 func get_wall_rect() -> Rect2:
 	return _wall_rect
 
+# The floor's ground scatter (FloorData.scatter_sets), one FieldScatter
+# child that places it all - none when the floor has no sets.
+func _spawn_floor_scatter() -> void:
+	var floor_data := get_floor_data()
+	if floor_data == null or floor_data.scatter_sets.is_empty():
+		return
+	_scatter = FieldScatter.new()
+	_scatter.name = "Scatter"
+	add_child(_scatter)
+	_scatter.setup(self)
+
+func get_scatter() -> FieldScatter:
+	return _scatter
+
 # The threshold, from the ExitGate's trigger at the far end of the bar:
 # the field freezes (the same process-mode freeze battle uses - this
 # node's own coroutine still resumes on the timer/tween signals below,
@@ -2396,6 +2417,7 @@ func _aim_wear_path(enemy: FieldEnemy) -> void:
 		var points := PackedVector2Array()
 		for offset in floor_data.wear_path_override:
 			points.append(Vector2(spawn.x + offset.x, spawn.z + offset.y))
+		_wear_path = points
 		ground.set_wear_path(points)
 		return
 	# The middle point is pushed off the enemy along the exit's right, so
@@ -2404,8 +2426,15 @@ func _aim_wear_path(enemy: FieldEnemy) -> void:
 	# quarter turn, not world +X, so this holds for any exit.
 	var right: Vector3 = get_exit_direction().cross(Vector3.UP).normalized()
 	var mid: Vector3 = enemy.global_position + right * floor_data.wear_path_mid_offset
-	ground.set_wear_path(PackedVector2Array([
-		Vector2(spawn.x, spawn.z), Vector2(mid.x, mid.z), Vector2(gate.global_position.x, gate.global_position.z)]))
+	_wear_path = PackedVector2Array([
+		Vector2(spawn.x, spawn.z), Vector2(mid.x, mid.z), Vector2(gate.global_position.x, gate.global_position.z)])
+	ground.set_wear_path(_wear_path)
+
+# The worn band's points as _aim_wear_path() handed them to Ground, world
+# XZ - the shader keeps them, Ground doesn't; FieldScatter reads them here
+# to keep off the band. Empty before the gate is placed, or with no band.
+func get_wear_path() -> PackedVector2Array:
+	return _wear_path
 
 # The Ambience bus toward `to_db` over `seconds` - one tween, the last
 # call wins, and it runs through this node's own battle freeze (TWEEN_
@@ -2605,6 +2634,13 @@ func _nav_static_shapes(ground: Ground) -> Array[CollisionShape3D]:
 		for child in node.find_children("*", "CollisionShape3D", true, false):
 			shapes.append(child as CollisionShape3D)
 	return shapes
+
+# Every static shape something could stand against - the walk grid's own
+# (_nav_static_shapes()): props, ledges; not the ground, the walls, walk
+# surfaces or the gate's Blocker. FieldScatter keeps its footprints clear.
+func get_obstacle_shapes() -> Array[CollisionShape3D]:
+	var ground := get_node_or_null(ground_path) as Ground
+	return _nav_static_shapes(ground) if ground != null else [] as Array[CollisionShape3D]
 
 # The closed channel's Blocker while it stands.
 func _nav_dynamic_shapes() -> Array[CollisionShape3D]:
