@@ -12,8 +12,10 @@ extends SceneTree
 # The body: in the field Covered with its barb down; in the fight
 # the barb raised exactly while the Sting is queued - its height on a
 # 1080p screen printed - lifted and tilted Exposed after the Sting; after
-# an escape reburied, barb down. The rules cases drive EnemyTurn on the
-# real .tres; the field and fight cases load floor 2.
+# an escape reburied, barb down. The run log's state lines (queued_
+# state): Covered then Exposed, each with what a Slash took off it. The
+# rules cases drive EnemyTurn on the real .tres; the field and fight
+# cases load floor 2.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/underfoot_probe.gd
 #
@@ -35,6 +37,10 @@ const MODEL_PATH := "res://assets/models/enemies/Underfoot/Underfoot.glb"
 const POSE_SCENE_PATH := "res://field/underfoot_pose.tscn"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
+const SLASH_PATH := "res://cards/data/slash.tres"
+# Where the fight case logs its run, when run_probes.sh hands over no
+# folder of this process's own (RunLogger.dir_override()).
+const LOG_DIR := "user://underfoot_probe"
 const FLOOR_2 := 1
 const MAX_HP := 34
 const STING := 12
@@ -216,8 +222,11 @@ func _check_field_body() -> void:
 # The fight: the barb up once the frame settles, the Sting's turn; it
 # lands, and the barb is down, the body Exposed - lifted, tilted toward
 # the camera, the cover off; the Rebury, and it is Covered with the barb
-# up again. The barb's height on a 1080p screen, raised.
+# up again. The barb's height on a 1080p screen, raised. A Slash into it
+# each turn, and the run log's state lines say Covered then Exposed, each
+# with the HP that Slash took.
 func _check_fight_body() -> void:
+	var log_dir: String = _open_log()
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var underfoot: Node = _find(UNDERFOOT_PATH)
@@ -230,6 +239,7 @@ func _check_fight_body() -> void:
 		print("Fight: the raised barb stands %.1f px tall at 1080p" % px)
 		_expect(px >= BARB_MIN_PX, "...clearly above the sand line: %.1f px (at least %d)" % [px, int(BARB_MIN_PX)])
 		var sink_covered: float = float(underfoot.get("sink"))
+		var taken: Array[int] = [await _slash(controller, underfoot, combatant)]
 		await _end_turn(controller)
 		_expect_eq(_state(combatant), "exposed", "The Sting lands: Exposed")
 		_expect(is_zero_approx(float(pose.call("get_barb_raise"))), "...the barb down")
@@ -237,10 +247,18 @@ func _check_fight_body() -> void:
 		_expect(float(underfoot.get("sink")) < sink_covered, "...clear of the sand (sink %.3f)" % float(underfoot.get("sink")))
 		_expect_eq(_intent_text(controller, underfoot), "", "...the Rebury shows no number")
 		_expect(_shows(controller, underfoot, "Exposed"), "...Exposed in its readout")
+		taken.append(await _slash(controller, underfoot, combatant))
 		await _end_turn(controller)
 		_expect_eq(_state(combatant), "covered", "The Rebury: Covered again")
 		_expect(is_zero_approx(float(pose.call("get_exposed"))) and is_equal_approx(float(underfoot.get("sink")), sink_covered), "...settled back, the cover on")
 		_expect(is_equal_approx(float(pose.call("get_barb_raise")), 1.0), "...the barb raised for the next Sting")
+		_expect(taken[0] > 0 and taken[0] < taken[1], "A Slash takes less Covered than Exposed: %d, %d" % [taken[0], taken[1]])
+		var states: Array[String] = []
+		for line: Dictionary in _state_lines(log_dir):
+			states.append("%s %s %d" % [str(line.get("state")), str(line.get("intent")), int(line.get("taken", -1))])
+		print("Run log: ", states)
+		_expect_eq(states.slice(0, 2), ["covered Sting %d" % taken[0], "exposed Rebury %d" % taken[1]] as Array[String], "The run log: Covered then Exposed, each with the damage it took")
+	RunLogger.set_output_dir("")
 	await _teardown()
 	_completed += 1
 
@@ -324,6 +342,10 @@ func _state(enemy: Combatant) -> String:
 
 func _new_run() -> void:
 	_run_state.call("new_run", load(CHARACTER_PATH))
+	var cards: Array[CardData] = []
+	for i in 10:
+		cards.append((load(SLASH_PATH) as CardData).duplicate() as CardData)
+	_run_state.set("deck", cards)
 	_run_state.set("player_max_hp", PLAYER_HP)
 	_run_state.set("player_hp", PLAYER_HP)
 	_run_state.set("current_floor_index", FLOOR_2)
@@ -374,6 +396,50 @@ func _pose(enemy: Node) -> Node:
 func _overlay() -> Node:
 	var layer: Node = _field.get_node("BattleLayer")
 	return layer.get_child(0) if layer.get_child_count() > 0 else null
+
+# A Slash from the hand into `member`, Energy enough; the HP it took.
+func _slash(controller: Node, member: Node, combatant: Combatant) -> int:
+	var player: Combatant = controller.get("player")
+	player.energy = 99
+	var views: Array = controller.get("_hand_container").call("_card_views")
+	if views.is_empty():
+		_fail("no card in hand to play")
+		return 0
+	var before: int = combatant.hp
+	controller.call("request_play", views[0])
+	if bool(controller.call("is_awaiting_target")):
+		controller.call("confirm_target", member)
+	for i in 120:
+		await process_frame
+		if not bool(controller.get("_input_locked")):
+			break
+	await create_timer(0.6).timeout
+	return before - combatant.hp
+
+# The run log into this process's folder - run_probes.sh's, else
+# LOG_DIR - cleared first, so the next run's file is the only one.
+func _open_log() -> String:
+	var dir: String = RunLogger.dir_override() if not RunLogger.dir_override().is_empty() else LOG_DIR
+	DirAccess.make_dir_recursive_absolute(dir)
+	for file_name in DirAccess.get_files_at(dir):
+		DirAccess.remove_absolute(dir.path_join(file_name))
+	RunLogger.set_output_dir(dir)
+	RunLogger.enabled = true
+	return dir
+
+# Every queued_state mechanic line in the folder's run logs, in order.
+func _state_lines(dir: String) -> Array[Dictionary]:
+	var found: Array[Dictionary] = []
+	for file_name in DirAccess.get_files_at(dir):
+		if not file_name.ends_with(".jsonl"):
+			continue
+		for raw in FileAccess.get_file_as_string(dir.path_join(file_name)).split("\n", false):
+			var parsed: Variant = JSON.parse_string(raw)
+			if parsed is Dictionary and str((parsed as Dictionary).get("ev")) == "mechanic" and str((parsed as Dictionary).get("kind")) == "queued_state":
+				found.append(parsed as Dictionary)
+	if found.is_empty():
+		_fail("no queued_state line in the run log at %s" % ProjectSettings.globalize_path(dir))
+	return found
 
 func _end_turn(controller: Node) -> void:
 	await controller.call("end_turn")
