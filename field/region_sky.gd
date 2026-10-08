@@ -47,11 +47,11 @@ signal fog_changed()
 		_apply_fog()
 # The steady-state depth fog, camera metres. A floor's own pair replaces
 # these at load; the zone intro only overrides them (see the class doc).
-@export var fog_depth_begin: float = 14.0:
+@export var fog_depth_begin: float = 22.0:
 	set(value):
 		fog_depth_begin = value
 		_apply_fog()
-@export var fog_depth_end: float = 28.0:
+@export var fog_depth_end: float = 38.0:
 	set(value):
 		fog_depth_end = value
 		_apply_fog()

@@ -372,11 +372,11 @@ const SEA_BUS_NAME := &"Sea"
 	set(value):
 		fog_strength = value
 		_apply_uniform("fog_strength", value)
-@export var fog_near_distance: float = 14.0:
+@export var fog_near_distance: float = 22.0:
 	set(value):
 		fog_near_distance = value
 		_apply_uniform("fog_near_distance", value)
-@export var fog_far_distance: float = 28.0:
+@export var fog_far_distance: float = 38.0:
 	set(value):
 		fog_far_distance = value
 		_apply_uniform("fog_far_distance", value)
