@@ -360,6 +360,8 @@ var _wall_shoreward: StaticBody3D = null
 # the relief and everything on it stand - see _build_nav_grid().
 var _nav: NavGrid = null
 var _nav_build_queued: bool = false
+# Debug builds: the F1 row's Path draw, made on its first toggle.
+var _nav_debug: NavDebugDraw = null
 # The walk in progress, for a replan: where to, and after whom.
 var _nav_goal: Vector3 = Vector3.INF
 var _nav_goal_enemy: FieldEnemy = null
@@ -2042,7 +2044,8 @@ func _on_keepsake_offer_closed(_taken: bool) -> void:
 
 # Debug builds only: a row of debug buttons on the field HUD in the
 # battle row's style (BattleTheme's DebugButton), hidden until F1 -
-# Keepsake, a card picker with its Add card, and +1 Glassbone. It goes with the DECK
+# Keepsake, a card picker with its Add card, +1 Glassbone, and Path (the
+# planned walk and the walk grid near him - NavDebugDraw). It goes with the DECK
 # line when a fight hides that, so it never sits over a battle.
 func _setup_debug_row() -> void:
 	var hud := get_node_or_null(^"FieldHUD") as CanvasLayer
@@ -2074,11 +2077,27 @@ func _setup_debug_row() -> void:
 	glassbone_button.text = "+1 Glassbone"
 	glassbone_button.pressed.connect(_on_debug_glassbone_pressed)
 	_debug_row.add_child(glassbone_button)
+	var path_button := Button.new()
+	path_button.name = "PathButton"
+	path_button.theme_type_variation = &"DebugButton"
+	path_button.text = "Path"
+	path_button.toggle_mode = true
+	path_button.toggled.connect(_on_debug_path_toggled)
+	_debug_row.add_child(path_button)
 	hud.add_child(_debug_row)
 	deck_panel.visibility_changed.connect(func() -> void:
 		if not deck_panel.visible:
 			_debug_row.visible = false)
 	_refresh_debug_keepsake_button()
+
+# The F1 row's Path: the walk drawn (NavDebugDraw), made the first time.
+func _on_debug_path_toggled(on: bool) -> void:
+	if _nav_debug == null:
+		_nav_debug = NavDebugDraw.new()
+		_nav_debug.name = "NavDebugDraw"
+		_nav_debug.setup(self)
+		add_child(_nav_debug)
+	_nav_debug.visible = on
 
 # One piece of Glassbone, through the run's own grant (RunState.add_
 # glassbone()) - a debug button, not a game source.
