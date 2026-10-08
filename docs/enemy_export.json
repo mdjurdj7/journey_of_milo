@@ -1361,6 +1361,97 @@
       ]
     },
     {
+      "name": "Underfoot",
+      "file": "res://battle/rules/enemies/underfoot.tres",
+      "hp": 34,
+      "elite": false,
+      "mechanic_summary": "A stingray under the sand at the waterline, on a two-turn rhythm: Covered (takes 50% less damage) while its Sting (12) is telegraphed, then Exposed (takes 50% more) while it reburies, dealing nothing. The Sting can't be broken — Block or Brace it, work the enemy beside it, and hit the Underfoot when it's Exposed.",
+      "field": {
+        "model": "res://assets/models/enemies/Sputter/Sputter.glb",
+        "model_is_default": true,
+        "model_scale": 1.0,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": null,
+        "contact_radius_m": 1.5,
+        "rest_height_m": 0.0,
+        "sink_m": 0.0,
+        "battle_hover_m": 0.0,
+        "buried_on_field": false,
+        "flies_in_battle": false,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Sting",
+            "type": "ATTACK",
+            "damage_per_hit": 12,
+            "hits": 1,
+            "status_while_queued": "covered"
+          },
+          {
+            "name": "Rebury",
+            "type": "SETTLE",
+            "status_while_queued": "exposed"
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null,
+        "phase": null
+      },
+      "statuses": [
+        {
+          "id": "covered",
+          "name": "Covered",
+          "file": "res://battle/rules/statuses/covered.tres",
+          "gained": "while its Sting is queued",
+          "description": "It takes {percent}% less damage.",
+          "text": "It takes 50% less damage.",
+          "fields": {
+            "category": "MODIFIER",
+            "default_magnitude": -50,
+            "default_duration_turns": "until removed",
+            "modifier_operation": "MULTIPLY",
+            "stack_rule": "IGNORE"
+          }
+        },
+        {
+          "id": "exposed",
+          "name": "Exposed",
+          "file": "res://battle/rules/statuses/exposed.tres",
+          "gained": "while its Rebury is queued",
+          "description": "It takes {percent}% more damage.",
+          "text": "It takes 50% more damage.",
+          "fields": {
+            "category": "MODIFIER",
+            "default_magnitude": 50,
+            "default_duration_turns": "until removed",
+            "modifier_operation": "MULTIPLY",
+            "stack_rule": "IGNORE"
+          }
+        }
+      ],
+      "rewards": {
+        "keepsake_table": null,
+        "glassbone": 0,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/combat_old/hit.wav"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": []
+    },
+    {
       "name": "Wardling",
       "file": "res://battle/rules/enemies/wardling.tres",
       "hp": 70,

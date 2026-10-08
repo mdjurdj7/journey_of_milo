@@ -15,7 +15,7 @@ static func pick_initial_intent(combatant: Combatant, data: EnemyData) -> void:
 		combatant.current_intent_index = _pick_erratic_initial_index(data)
 	else:
 		combatant.current_intent_index = 0
-	_sync_buried(combatant, data)
+	_sync_queued(combatant, data)
 
 # The queued intent: an interjection (an interrupted intent's on_
 # interrupt) when one is waiting, else the loop's own.
@@ -168,6 +168,10 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 			EnemyIntent.IntentType.WATCH:
 				# Nothing happens: the turn is watched through.
 				pass
+			EnemyIntent.IntentType.SETTLE:
+				# Nothing happens here: it settles, and what it holds next
+				# changes with the queued intent (_sync_queued(), below).
+				pass
 
 	# Counted whatever the turn did - an interrupted or cancelled one too -
 	# so escalation keeps its own clock.
@@ -182,7 +186,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 			_advance_intent(combatant, data)
 		if result["interrupted"]:
 			combatant.interjected_intent = intent.on_interrupt
-		_sync_buried(combatant, data)
+		_sync_queued(combatant, data)
 		result["buried"] = combatant.buried
 	return result
 
@@ -391,11 +395,33 @@ static func open_grace(player: Combatant, largest_hit: int, total_to_hp: int) ->
 		player.grace_turns_left = maxi(player.grace_window_turns, 1)
 	return player.grace - before
 
-# Combatant.buried follows the queued intent - under the sand exactly
-# while a BURROW is what comes next.
-static func _sync_buried(combatant: Combatant, data: EnemyData) -> void:
+# What the queued intent says about the enemy, kept in step with it:
+# Combatant.buried - under the sand exactly while a BURROW is what comes
+# next - and the intent's status_while_queued, held exactly while that
+# intent is queued (the Underfoot's Covered, then Exposed): any other
+# intent's is taken off first, so the two never overlap.
+static func _sync_queued(combatant: Combatant, data: EnemyData) -> void:
 	var intent := current_intent(combatant, data)
 	combatant.buried = intent != null and intent.type == EnemyIntent.IntentType.BURROW
+	var held: StatusData = intent.status_while_queued if intent != null else null
+	for queued: StatusData in _queued_statuses(data):
+		if queued == held:
+			continue
+		var active: Status = Status.find_in(combatant.statuses, queued)
+		if active != null:
+			Status.remove_from(combatant.statuses, active)
+	if held != null and Status.find_in(combatant.statuses, held) == null:
+		Status.apply_to(combatant.statuses, held)
+
+# Every status_while_queued this enemy's intents carry - its loop's and
+# their on_interrupt interjections'.
+static func _queued_statuses(data: EnemyData) -> Array[StatusData]:
+	var found: Array[StatusData] = []
+	for intent: EnemyIntent in data.intents:
+		for each: EnemyIntent in [intent, intent.on_interrupt if intent != null else null]:
+			if each != null and each.status_while_queued != null and not found.has(each.status_while_queued):
+				found.append(each.status_while_queued)
+	return found
 
 # The last of its pack (Combatant.pack_alone, from now on): a status
 # waiting for that (Fed) gives way to its grant (Status.resolve_alone_
@@ -410,7 +436,7 @@ static func leave_pack(combatant: Combatant, data: EnemyData) -> bool:
 	if combatant.interjected_intent != null or queued == null or not is_pack_move(queued):
 		return changed
 	_advance_intent(combatant, data)
-	_sync_buried(combatant, data)
+	_sync_queued(combatant, data)
 	return true
 
 # A move only a pack makes - dropped from the loop once the enemy is the

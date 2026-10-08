@@ -23,7 +23,13 @@ class_name EnemyIntent
 # WATCH: the turn does nothing at all - no damage, no block - and the
 # display shows its glyph alone, an open eye. No enemy uses it now (the
 # Greyshelf's Flick was one).
-enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH }
+#
+# SETTLE: the turn does nothing - no damage, no block - and the enemy
+# stays targetable throughout (unlike a BURROW); what changes is what it
+# carries next (status_while_queued, below). The display shows its glyph
+# alone, a short down-arrow settling onto a ground line. The Underfoot's
+# Rebury.
+enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE }
 
 # The move's name (the Dunecur's Rush) - for the enemy export (tests/
 # enemy_export.gd) and the design docs; nothing in a fight shows it yet.
@@ -83,6 +89,15 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH }
 # whose break costs it the Tail Lash. False for every other.
 
 @export var rear_while_queued: bool = false
+
+# The status its enemy holds for exactly as long as this intent is the
+# queued one - applied when it is queued, removed when another is (Status.
+# apply_to / remove_from, kept in step by EnemyTurn with the BURROW's
+# burial). The player's turn always faces the queued intent, so a move
+# lost to Denied, a stun or a pain turn still hands over to the next
+# one's status. The Underfoot: Covered while its Sting is queued, Exposed
+# while its Rebury is. Null = none.
+@export var status_while_queued: StatusData = null
 
 @export var counts_attack_cards: bool = false
 # While this intent is queued, each Attack card the player plays against

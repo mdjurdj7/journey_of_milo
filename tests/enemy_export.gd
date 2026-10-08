@@ -396,6 +396,8 @@ static func _intent_entry(data: EnemyData, intent: EnemyIntent) -> Dictionary:
 		}
 	if intent.rear_while_queued:
 		entry["rears_while_queued"] = true
+	if intent.status_while_queued != null:
+		entry["status_while_queued"] = intent.status_while_queued.id
 	if intent.counts_attack_cards and data.attack_card_status != null:
 		var status: StatusData = data.attack_card_status
 		entry["counts_attack_cards"] = {
@@ -427,14 +429,17 @@ static func _status_entries(data: EnemyData) -> Array:
 	return entries
 
 # [StatusData, how it comes] for each status the enemy can hold, once, in
-# the order it meets them: its starting statuses, its attack-card status,
-# and whatever those turn into (grants_when_alone / grants_on_critical /
+# the order it meets them: its starting statuses, the ones its intents
+# hold while queued, its attack-card status, and whatever those turn into (grants_when_alone / grants_on_critical /
 # grants_on_turn_start).
 static func _reachable_statuses(data: EnemyData) -> Array:
 	var queue: Array = []
 	for status in data.starting_statuses:
 		if status != null:
 			queue.append([status, "starts every fight with it"])
+	for intent in data.intents:
+		if intent != null and intent.status_while_queued != null:
+			queue.append([intent.status_while_queued, "while its %s is queued" % intent.intent_name])
 	if data.attack_card_status != null:
 		var while_queued: Array[String] = []
 		for intent in data.intents:

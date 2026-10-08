@@ -24,7 +24,8 @@ class_name BattleIntent
 # and the attack pair dims to hairline ink - it won't land. The whole
 # stack still ends at the anchor, so the attack line sits a ring higher.
 # A BURROW (buried - it does nothing this turn) is its glyph alone: there
-# is no number coming. A HEAL_ALLY (the Nipper's Forage) is a plus beside
+# is no number coming - and so is a SETTLE (the Underfoot's Rebury), a
+# down-arrow onto a ground line. A HEAL_ALLY (the Nipper's Forage) is a plus beside
 # the HP its packmates will heal. A multi-hit attack whose hits differ (a
 # status on the player the first hit consumes - No Further's 0) reads hit
 # by hit, "0 + 4", not "N x M".
@@ -223,7 +224,7 @@ func show_intent(preview: Dictionary) -> void:
 			for amount: Variant in hit_amounts:
 				parts.append(str(int(amount)))
 			_label.text = " + ".join(parts)
-		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.WATCH:
+		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE:
 			_label.text = ""
 		_has_threshold = preview.has("threshold")
 		# A pain turn's cancelled action reads as interrupted, with no
@@ -328,6 +329,8 @@ func _draw() -> void:
 	_stroke(points, hairline_alpha if _interrupted else 1.0)
 	if _type == EnemyIntent.IntentType.WATCH:
 		_draw_pupil(glyph_centre, _glyph_size * 0.5, hairline_alpha if _interrupted else 1.0)
+	if _type == EnemyIntent.IntentType.SETTLE:
+		_stroke(_settle_arrow_points(glyph_centre, _glyph_size * 0.5), hairline_alpha if _interrupted else 1.0)
 	if _has_threshold:
 		_draw_ring()
 	if _pip_count > 0:
@@ -397,6 +400,21 @@ func _draw_pupil(centre: Vector2, r: float, alpha: float) -> void:
 	draw_circle(centre, radius + float(outline_size_px), outline, true, -1.0, true)
 	draw_circle(centre, radius, ink, true, -1.0, true)
 
+# SETTLE's arrow, the glyph's second stroke over its ground line: a short
+# shaft coming down, its head stopping just short of the line - settling
+# onto it, not under it (BURROW's mound is the one that goes under). Out
+# along the shaft and back across the head, one polyline like the
+# chevron's.
+func _settle_arrow_points(centre: Vector2, r: float) -> PackedVector2Array:
+	var tip: Vector2 = centre + Vector2(0.0, r * 0.3)
+	var points := PackedVector2Array()
+	points.append(centre + Vector2(0.0, -r * 0.85))
+	points.append(tip)
+	points.append(centre + Vector2(-r * 0.4, -r * 0.1))
+	points.append(tip)
+	points.append(centre + Vector2(r * 0.4, -r * 0.1))
+	return points
+
 # One glyph stroke in the numeral's ink over its bone outline, at alpha.
 func _stroke(points: PackedVector2Array, alpha: float) -> void:
 	if points.size() < 2:
@@ -413,8 +431,9 @@ func _stroke(points: PackedVector2Array, alpha: float) -> void:
 # at the bottom, closed. BURROW: a mound on a ground line - the swell it
 # pushes up under the sand. HEAL_ALLY: a plus - one stroke, out along
 # the bar and back to cross it. WATCH: an open eye - an almond, upper lid
-# and lower, closed at the corners, its pupil a dot (_draw_pupil()). All
-# fit a square of half-size r about centre.
+# and lower, closed at the corners, its pupil a dot (_draw_pupil()).
+# SETTLE: a flat ground line, its down-arrow drawn as a second stroke
+# (_settle_arrow_points()). All fit a square of half-size r about centre.
 func _glyph_points(centre: Vector2, r: float) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	match _type:
@@ -452,6 +471,9 @@ func _glyph_points(centre: Vector2, r: float) -> PackedVector2Array:
 			for step in range(1, lid_steps + 1):
 				var t: float = float(step) / float(lid_steps)
 				points.append(centre + Vector2(lerpf(r, -r, t), sin(t * PI) * r * 0.55))
+		EnemyIntent.IntentType.SETTLE:
+			points.append(centre + Vector2(-r * 0.8, r * 0.6))
+			points.append(centre + Vector2(r * 0.8, r * 0.6))
 	return points
 
 # Whether the Wanderer is to the screen-left of the enemy right now -
