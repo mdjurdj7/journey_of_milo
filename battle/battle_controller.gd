@@ -765,8 +765,10 @@ func _log_id(enemy: FieldEnemy) -> String:
 # threshold (the Siltjaw's Charge, the Greyshelf's Gape), how it went -
 # broken, landed, or skipped by a pain turn or Deny - with what the player
 # dealt this turn, the hit's damage and what reached HP, and the attack-
-# card stacks (Goaded) it carried into resolution; a pain turn spent; and
-# the next intent, when it has a threshold.
+# card stacks (Goaded) it carried into resolution; a pain turn spent; the
+# next intent, when it has a threshold; and, for an intent that holds a
+# status while queued (the Underfoot's Covered / Exposed), the state the
+# player's turn just faced and the HP damage it took in it.
 func _take_turn_logged(enemy: FieldEnemy, combatant: Combatant, data: EnemyData) -> Dictionary:
 	var id: String = _log_id(enemy)
 	if not data.escalation_multipliers.is_empty():
@@ -775,6 +777,8 @@ func _take_turn_logged(enemy: FieldEnemy, combatant: Combatant, data: EnemyData)
 	var intent: EnemyIntent = EnemyTurn.current_intent(combatant, data)
 	var threshold: int = intent.interrupt_threshold if intent != null and intent.type == EnemyIntent.IntentType.ATTACK else 0
 	var dealt: int = combatant.damage_taken_this_turn
+	if intent != null and intent.status_while_queued != null:
+		RunLogger.mechanic("queued_state", {"enemy": id, "intent": intent.intent_name, "state": intent.status_while_queued.id, "taken": dealt})
 	var stacks: int = 0
 	if threshold > 0 and intent.counts_attack_cards and data.attack_card_status != null:
 		var held: Status = Status.find_in(combatant.statuses, data.attack_card_status)

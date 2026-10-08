@@ -384,7 +384,7 @@ static func turn_ended(energy: int) -> void:
 
 # A mechanic line: `kind` and what it says, on the fight and turn it
 # happened in. Kinds: enemy_died, pain_turn, pain_turn_spent, phase,
-# threshold_queued, threshold_resolved, escalation.
+# threshold_queued, threshold_resolved, escalation, queued_state.
 static func mechanic(kind: String, data: Dictionary) -> void:
 	if not _fight_open:
 		return
