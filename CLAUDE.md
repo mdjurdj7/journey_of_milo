@@ -20,6 +20,13 @@
   `git worktree add ../journey-of-milo-<task> -b <task-branch>` (or
   detached at main). Commit there, then bring the commits onto main
   (fast-forward or cherry-pick) by explicit path.
+- Never run two sessions in the same working tree. If another session
+  may be active, work in your own `git worktree`. Before editing
+  anything in main, check `git status` and stop if there are changes
+  you didn't make.
+- Never deliberately break code in main, even temporarily: no mutation
+  tests, no backup-and-restore. Breakage tests run only in a throwaway
+  worktree, which you delete afterwards.
 - Never edit shared tools (run_probes.sh, CLAUDE.md) while another
   session's probe run may be using them; commit such changes quickly
   and separately.
