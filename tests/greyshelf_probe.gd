@@ -242,7 +242,7 @@ func _check_fight_gape() -> void:
 		var greyshelf: Node = (controller.get("enemies") as Array)[0]
 		var combatant: Combatant = _combatant(controller, greyshelf)
 		_expect_eq(EnemyTurn.current_intent(combatant, greyshelf.get("enemy_data")).intent_name, "Tail Lash", "The fight opens on the Tail Lash")
-		_expect_eq(_intent_text(controller, greyshelf), "3×4", "...its intent 3×4")
+		_expect_eq(_intent_text(controller, greyshelf), "4×3", "...its intent 4×3")
 		await _end_turn(controller)
 		_expect_eq(_intent_text(controller, greyshelf), "20", "Gape queued: the intent reads 20")
 		_expect_eq(_ring_text(controller, greyshelf), "16", "...its ring 16")
@@ -326,14 +326,14 @@ func _check_fight_break() -> void:
 	_completed += 1
 
 # The Tail Lash queued and the Greyshelf taken below half by the player's
-# damage: Off the rock in the readout at once, the intent from 3×4 (hits
-# × damage, BattleIntent's way) to 4×4.
+# damage: Off the rock in the readout at once, the intent from 4×3
+# (damage × hits, BattleIntent's way) to 4×4.
 func _check_fight_phase() -> void:
 	var controller: Node = await _start_fight(SLASH_PATH)
 	if controller != null:
 		var greyshelf: Node = (controller.get("enemies") as Array)[0]
 		var combatant: Combatant = _combatant(controller, greyshelf)
-		_expect_eq(_intent_text(controller, greyshelf), "3×4", "Tail Lash queued: 3×4")
+		_expect_eq(_intent_text(controller, greyshelf), "4×3", "Tail Lash queued: 4×3")
 		_expect(not _shows(controller, greyshelf, "Off the rock"), "...on its rock")
 		combatant.hp = MAX_HP / 2 + 3
 		await _play_first(controller, greyshelf)

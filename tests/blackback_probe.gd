@@ -159,7 +159,7 @@ func _check_fight_opens() -> void:
 		if blackback != null:
 			var labels: PackedStringArray = controller.call("get_enemy_status_labels", blackback)
 			_expect_eq(labels, PackedStringArray(["Fed"]), "Turn 1: the Blackback's row reads Fed")
-			_expect_eq(_intent_text(controller, blackback), "2×4", "...and its Peck reads 2×4")
+			_expect_eq(_intent_text(controller, blackback), "4×2", "...and its Peck reads 4×2")
 			var bar: Node = blackback.get("enemy_status")
 			_expect(bar != null and _shows(bar, "Fed"), "...its readout shows it")
 			var tells: Node = blackback.get("_attachment")
@@ -225,7 +225,7 @@ func _check_nipper_dies_first() -> void:
 		_expect(bar != null and _shows(bar, "Hungry"), "...its readout shows it")
 		var preview: Dictionary = controller.call("get_intent_preview", blackback)
 		_expect_eq(preview.get("hit_amounts"), [7, 7], "...the Peck is 7 and 7")
-		_expect_eq(_intent_text(controller, blackback), "2×7", "...and reads 2×7 - per hit, never \"a + b\"")
+		_expect_eq(_intent_text(controller, blackback), "7×2", "...and reads 7×2 - per hit, never \"a + b\"")
 		_expect_eq(int(preview["damage_to_hp"]), 14, "...14 in all")
 		var landed: Array[int] = []
 		for turn in TURNS:

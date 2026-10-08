@@ -43,7 +43,7 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE }
 # ATTACK only: how many separate hits of `value` this intent lands in one
 # turn - each one goes through the player's block/absorb on its own, and
 # one-shot statuses (StatusData.clears_on_trigger) are consumed by the
-# first. BattleIntent shows this as "N x M". A multi-hit intent gains a
+# first. BattleIntent shows this as "M×N" (damage × hits). A multi-hit intent gains a
 # status's bonus_hits (EnemyTurn.hit_count()).
 
 @export var erratic_weight: float = 1.0

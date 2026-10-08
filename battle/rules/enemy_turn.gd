@@ -197,7 +197,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 # status list - the Status objects themselves aren't touched), and the
 # block/absorb wear-down of DamagePipeline.resolve() replayed on local
 # counters. Keys: "type" (EnemyIntent.IntentType), "hits", "per_hit"
-# (the first hit's modified damage - what "N x M" shows - or the block
+# (the first hit's modified damage - the M of what "M×N" shows - or the block
 # gained for DEFEND, or the heal each packmate takes for HEAL_ALLY, as
 # authored: BattleController caps it at what they're missing),
 # "hit_amounts" (every hit's modified damage, in order - unequal when a

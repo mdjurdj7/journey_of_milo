@@ -2,11 +2,12 @@ extends Control
 class_name BattleIntent
 
 # The enemy's next action, above its head in the battle frame: an inked
-# glyph for the type beside a numeral for the magnitude - "N x M" for a
-# multi-hit attack (hits x per-hit damage, the MODIFIED per-hit number,
-# see EnemyTurn.preview_intent()). Ink on the world, like the rest of the
-# battle UI: the numeral in Spectral SemiBold in the theme's ink with a
-# 1px bone outline for legibility over the world, the glyph filled ink
+# glyph for the type beside a numeral for the magnitude - "M×N" for a
+# multi-hit attack (the MODIFIED per-hit damage x hits, see
+# EnemyTurn.preview_intent()): the number that lands, then how often.
+# Ink on the world, like the rest of the battle UI: the numeral in
+# Spectral SemiBold in the theme's ink with a 1px bone outline for
+# legibility over the world, the glyph filled ink
 # over the same bone outline - no backing. The numeral leads: the glyph
 # is glyph_cap_fraction of its cap height - the number is the fairness
 # contract, the glyph is only its category. Nothing is drawn under the
@@ -29,7 +30,7 @@ class_name BattleIntent
 # down-arrow onto a ground line. A HEAL_ALLY (the Nipper's Forage) is a plus beside
 # the HP its packmates will heal. A multi-hit attack whose hits differ (a
 # status on the player the first hit consumes - No Further's 0) reads hit
-# by hit, "0 + 4", not "N x M".
+# by hit, "0 + 4", not "M×N".
 #
 # One per enemy, created by BattleOverlay for the fight (its child, so it
 # dies with the overlay - nothing of this exists on the field). Anchored
@@ -287,7 +288,7 @@ func show_intent(preview: Dictionary) -> void:
 		_lethal = bool(preview.get("lethal", false))
 		var hits: int = int(preview.get("hits", 1))
 		var per_hit: int = int(preview.get("per_hit", 0))
-		_label.text = ("%d×%d" % [hits, per_hit]) if hits > 1 else str(per_hit)
+		_label.text = ("%d×%d" % [per_hit, hits]) if hits > 1 else str(per_hit)
 		var hit_amounts: Array = preview.get("hit_amounts", [])
 		if hits > 1 and hit_amounts.size() == hits and hit_amounts.count(hit_amounts[0]) != hits:
 			var parts := PackedStringArray()
