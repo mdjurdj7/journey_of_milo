@@ -552,19 +552,27 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 	rng.seed = hash("%s:%s" % [_floor.resource_path, entry.name])
 	var step: float = maxf(sample_step_m, 0.1)
 	var cells := PackedInt32Array()
+	var polygon := PackedVector2Array()
+	for point in entry.area:
+		polygon.append(_spawn + point)
 	for i in _cell_zone.size():
-		if _centre_allowed(entry, i):
+		if _centre_allowed(entry, i) and (polygon.size() < 3 or Geometry2D.is_point_in_polygon(_grid_point(i), polygon)):
 			cells.append(i)
 	if cells.is_empty():
 		return spots
 	var area: float = float(cells.size()) * step * step
-	var expected: float = area / 100.0 * maxf(entry.clusters_per_100m2, 0.0) * maxf(_floor.scatter_density, 0.0)
-	var target: int = floori(expected + rng.randf())
+	var target: int = 0
+	if entry.cluster_count.x >= 0:
+		target = rng.randi_range(entry.cluster_count.x, maxi(entry.cluster_count.x, entry.cluster_count.y))
+	else:
+		var expected: float = area / 100.0 * maxf(entry.clusters_per_100m2, 0.0) * maxf(_floor.scatter_density, 0.0)
+		target = floori(expected + rng.randf())
 	if target <= 0:
 		return spots
+	var spread_range := Vector2(minf(entry.cluster_spread_m.x, entry.cluster_spread_m.y), maxf(entry.cluster_spread_m.x, entry.cluster_spread_m.y))
 	# Poisson-disc by dart throwing: centres no nearer each other than a
 	# share of the spacing the density would give spread evenly.
-	var spacing: float = maxf(0.6 * sqrt(area / float(target)), entry.cluster_spread_m * 2.0)
+	var spacing: float = maxf(0.6 * sqrt(area / float(target)), spread_range.y * 2.0)
 	var centres: Array[Vector2] = []
 	for attempt in target * 30:
 		if centres.size() >= target:
@@ -580,11 +588,12 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 			centres.append(p)
 	for centre in centres:
 		var count: int = rng.randi_range(mini(entry.items_per_cluster.x, entry.items_per_cluster.y), maxi(entry.items_per_cluster.x, entry.items_per_cluster.y))
+		var spread: float = rng.randf_range(spread_range.x, spread_range.y)
 		var cluster: Array[Vector2] = []
 		for attempt in count * 4:
 			if cluster.size() >= count or (left >= 0 and spots.size() >= left):
 				break
-			var p: Vector2 = centre + Vector2(rng.randfn(0.0, entry.cluster_spread_m), rng.randfn(0.0, entry.cluster_spread_m))
+			var p: Vector2 = centre + Vector2(rng.randfn(0.0, spread), rng.randfn(0.0, spread))
 			# Drawn every attempt, kept or not, so one item's fate never
 			# shifts the next's draws.
 			var keep_roll: float = rng.randf()

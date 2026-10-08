@@ -9,8 +9,11 @@ class_name ScatterEntry
 # tab. Nothing here is per floor: a floor picks its sets.
 #
 # Placement: cluster centres by Poisson-disc over the cells this entry's
-# zones allow, clusters_per_100m2 of that area; items_per_cluster around
-# each, Gaussian over cluster_spread_m, so a cluster thins at its edges.
+# zones allow (inside `area`, when it has one), clusters_per_100m2 of that
+# area - or cluster_count of them; items_per_cluster around each, Gaussian
+# over a spread drawn per cluster from cluster_spread_m, so a cluster thins
+# at its edges. A tight patch (samphire) is a cluster with many items and
+# a small spread.
 # Never on the worn band, in water past wet_edge_m, or inside an
 # exclusion (FieldScatter).
 #
@@ -123,6 +126,12 @@ const ZONE_ROCK_EDGE := 32
 	set(value):
 		wet_edge_m = value
 		emit_changed()
+# Cluster centres only inside this polygon, world XZ from the floor's
+# spawn (a floor's samphire kept to one shore). Empty = anywhere.
+@export var area: PackedVector2Array = PackedVector2Array():
+	set(value):
+		area = value
+		emit_changed()
 # Nothing within this of any enemy - a tideline kept off the water's edge
 # beside a fight. 0 = only the floor's battle-frame exclusions.
 @export var enemy_clearance_m: float = 0.0:
@@ -181,13 +190,21 @@ const ZONE_ROCK_EDGE := 32
 	set(value):
 		clusters_per_100m2 = value
 		emit_changed()
+# Exactly this many clusters, a random count from x to y, instead of the
+# density (the floor's scatter_density doesn't scale it). x below 0 = use
+# the density.
+@export var cluster_count: Vector2i = Vector2i(-1, -1):
+	set(value):
+		cluster_count = value
+		emit_changed()
 # Items in a cluster, from x to y inclusive.
 @export var items_per_cluster: Vector2i = Vector2i(3, 7):
 	set(value):
 		items_per_cluster = value
 		emit_changed()
-# The Gaussian spread of a cluster's items about its centre, metres.
-@export var cluster_spread_m: float = 0.5:
+# The Gaussian spread of a cluster's items about its centre, metres - each
+# cluster's own, at random from x to y.
+@export var cluster_spread_m: Vector2 = Vector2(0.5, 0.5):
 	set(value):
 		cluster_spread_m = value
 		emit_changed()
