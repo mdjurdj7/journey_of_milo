@@ -5,24 +5,24 @@ class_name HPBar
 # both field and battle (one persistent instance, living in FieldHUD -
 # see region_field.gd's own set_target() call). Repositioned every physics
 # tick via unproject, the same shape EnemyStatus already uses for enemies
-# (see that script's own doc) - the anchor point is the Wanderer's own
-# ground position plus ground_offset, not head height, so the offset
-# points DOWN by default. In the field it's also scaled by camera distance
-# each tick (see DistanceScale) so it reads the same relative size across
-# the field's framing; in battle that scale eases to battle_scale (1.0)
-# so the Battle Style's pixel sizes are what actually lands on screen.
+# (see that script's own doc). In the field the bar's top centre sits
+# field_offset_px straight down the screen from the Wanderer's feet, at a
+# constant screen size; in battle the readout centres on his feet plus
+# ground_offset (a world-space drop) at battle_scale, so the Battle
+# Style's pixel sizes are what actually lands on screen.
 #
 # Two styles, blended over the battle transition time rather than
-# snapped: field (the Bar group - a bare bar with current/max centred
-# beneath it, drawn by the child Panels/Label) and battle (the Battle
-# Style group - ink on the world, drawn by _draw() below: a Spectral
+# snapped, both drawn by _draw() below: field (the Field Style group - a
+# bare ink bar with a Spectral numeral and " / max" centred beneath it,
+# over a bone halo so it reads on sand, wet sand and water) and battle
+# (the Battle Style group - ink on the world: a Spectral
 # numeral row with " / max" and the character's name on one baseline, a
 # 3px ink bar beneath over an ink track, a thin ink segment above the
 # bar's left end for block, and - while show_toll() has it on - a Toll
 # block off the bar's right end: a Spectral numeral with "TOLL" beside it
 # on one baseline and a rule in the toll keyline colour beneath, sitting
 # on the HP bar's own rows; nothing boxed). The two cross-fade: the field
-# children fade out as the battle drawing fades in, and this control's
+# drawing fades out as the battle drawing fades in, and this control's
 # own size eases between the two layouts' sizes; the HP block stays
 # centred on the anchor in both, with Toll hanging off to the right (see
 # _anchor_offset()). See enter_battle()/exit_battle() and _battle_blend's
@@ -40,19 +40,54 @@ class_name HPBar
 # faded back out), stays visible below low_hp_fraction, and is always
 # fully visible in battle (see enter_battle()/exit_battle()).
 
+# The battle style's anchor: the Wanderer's feet plus this world-space
+# drop (the field style's is field_offset_px). Read every tick.
 @export var ground_offset: Vector3 = Vector3(0.0, -0.45, 0.0)
 @export var bar_tween_time: float = 0.25
 @export var fade_time: float = 0.15
 @export var hp_change_hold_time: float = 1.5
 @export_range(0.0, 1.0) var low_hp_fraction: float = 0.3
 
-@export_group("Bar")
-@export var bar_size: Vector2 = Vector2(110.0, 5.0)
-@export var bar_corner_radius: int = 2
-@export_range(0.0, 1.0) var track_alpha: float = 0.6
-@export var row_gap: float = 4.0
-@export var numbers_font_size_px: int = 13
-@export var outline_size: int = 1
+# The field readout: the bar on top, the numeral row centred under it -
+# current HP in Spectral at field_numeral_size_px in full ink, " / max"
+# in the battle style's smaller secondary ink (battle_max_size_px at
+# battle_secondary_alpha) - with a bone halo under both runs' ink, as the
+# Block readout's value has. The bar is ink over the battle bar's track
+# (battle_track_alpha). Pixel sizes at 1080p, never scaled by distance.
+@export_group("Field Style")
+@export var field_numeral_size_px: int = 20:
+	set(value):
+		field_numeral_size_px = value
+		_relayout_if_ready()
+@export var field_halo_px: float = 2.0:
+	set(value):
+		field_halo_px = value
+		_relayout_if_ready()
+@export var field_halo_color: Color = Color(0.94, 0.91, 0.86, 1.0):
+	set(value):
+		field_halo_color = value
+		queue_redraw()
+@export var field_bar_width: float = 90.0:
+	set(value):
+		field_bar_width = value
+		_relayout_if_ready()
+@export var field_bar_height: float = 3.0:
+	set(value):
+		field_bar_height = value
+		_relayout_if_ready()
+# Between the bar's bottom and the numeral row's ascent.
+@export var field_row_gap_px: float = 4.0:
+	set(value):
+		field_row_gap_px = value
+		_relayout_if_ready()
+# How far down the screen from the Wanderer's feet the bar's top centre
+# sits - clear of his contact shadow. 20 is where the old world-space drop
+# (0.45 m under the feet, ~33 px at the field camera's 13 m) put the
+# bar's top at scale 1.0.
+@export var field_offset_px: float = 20.0:
+	set(value):
+		field_offset_px = value
+		_relayout_if_ready()
 
 @export_group("Battle Style")
 # The readout's width - numeral row and bar alike.
@@ -206,7 +241,7 @@ class_name HPBar
 # While the Wanderer is Critical (Combatant.critical_at(), read with the
 # character's own critical_hp_fraction - the fight's rule, not a copy),
 # the HP numeral and the bar's fill turn this colour, in both styles -
-# the field's whole "58/70" label with them. Everything else on the
+# the field's numeral with them. Everything else on the
 # readout stays ink. Eased over critical_fade_time on a crossing either
 # way; no pulse, no glow.
 @export var critical_color: Color = Color(0.46, 0.14, 0.13):
@@ -262,16 +297,6 @@ class_name HPBar
 @export var toll_pop_scale: float = 1.15
 @export var toll_pop_time: float = 0.22
 
-@export_group("Distance Scale")
-@export var min_scale: float = 0.6
-@export var max_scale: float = 1.0
-@export var near_scale_distance: float = 3.0
-@export var far_scale_distance: float = 12.0
-
-@onready var _bar_background: Panel = $BarBackground
-@onready var _bar_fill: Panel = $BarBackground/BarFill
-@onready var _numbers_label: Label = $NumbersLabel
-
 var _wanderer: Wanderer = null
 var _current_hp: int = 0
 var _max_hp: int = 1
@@ -302,20 +327,11 @@ var _in_battle: bool = false
 var _visibility: HoverFadeVisibility = null
 # Cached theme ink/bone (see refresh_style()).
 var _ink: Color = Color.BLACK
-# The field style's own colours, cached by refresh_style() so the
-# Critical blend can move them and come back: the fill's stylebox and
-# ink, the label's ink, the track's colour (the tick's).
-var _field_fill_style: StyleBoxFlat = null
-var _field_fill_color: Color = Color.BLACK
-var _field_text_color: Color = Color.BLACK
-var _field_track_color: Color = Color.WHITE
 # Critical now (see _refresh_critical()), and how far the numeral and
 # fill have eased toward critical_color: 0 ink, 1 critical_color.
 var _critical: bool = false
 var _critical_blend: float = 0.0
 var _critical_tween: Tween = null
-# The field style's tick - a child of BarBackground, over the fill.
-var _field_tick: ColorRect = null
 var _name_font_tracked: Font = null
 
 # 0 = field style, 1 = battle style. Tweened by enter_battle()/exit_battle()
@@ -353,16 +369,10 @@ func _ready() -> void:
 	_max_hp = RunState.player_max_hp
 	_current_fraction = _hp_fraction(_current_hp, _max_hp)
 	_displayed_fraction = _current_fraction
-	_refresh_numbers(_current_hp, _max_hp)
 	# Arrives already in the right colour - a run that loads Critical
 	# doesn't fade into it.
 	_critical = _is_critical()
 	_critical_blend = 1.0 if _critical else 0.0
-
-	_field_tick = ColorRect.new()
-	_field_tick.name = "CriticalTick"
-	_field_tick.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bar_background.add_child(_field_tick)
 
 	_reveal = StatusReveal.new()
 	_reveal.name = "StatusReveal"
@@ -376,11 +386,65 @@ func _ready() -> void:
 	_apply_layout()
 	refresh_style()
 
-# --- Field layout (the child nodes) ---
+# --- Field layout (drawn) ---
 
+func _field_numeral_ascent() -> float:
+	return numeral_font.get_ascent(field_numeral_size_px) if numeral_font != null else float(field_numeral_size_px)
+
+func _field_numeral_descent() -> float:
+	return numeral_font.get_descent(field_numeral_size_px) if numeral_font != null else 0.0
+
+# The numeral row's width: current HP, then " / max" at the battle
+# style's smaller size.
+func _field_row_width() -> float:
+	return InkType.width(numeral_font, str(_current_hp), field_numeral_size_px) + InkType.width(numeral_font, battle_max_prefix + str(_max_hp), battle_max_size_px)
+
+# The bar or the row with its halo either side, whichever is wider; the
+# bar, the gap, and the row with its halo under the descent.
 func _field_content_size() -> Vector2:
-	var numbers_line_height: float = numbers_font_size_px * 1.3
-	return Vector2(bar_size.x, bar_size.y + row_gap + numbers_line_height)
+	var halo: float = maxf(field_halo_px, 0.0)
+	var width: float = maxf(field_bar_width, _field_row_width() + halo * 2.0)
+	return Vector2(width, field_bar_height + field_row_gap_px + _field_numeral_ascent() + _field_numeral_descent() + halo)
+
+# The bar's top centre - what sits field_offset_px under the feet.
+func _field_anchor() -> Vector2:
+	return Vector2(roundf(_field_content_size().x * 0.5), 0.0)
+
+# Bar on top, the row centred under it: the halo under both runs first,
+# then the ink. The numeral and the fill take the Critical blend; the
+# tick overhangs the bar as the battle style's does. `alpha` is the
+# field style's share of the cross-fade.
+func _draw_field(alpha: float) -> void:
+	var ink: Color = _ink
+	ink.a = alpha
+	var hp_ink: Color = ink.lerp(Color(critical_color, ink.a), _critical_blend)
+	var secondary: Color = _ink
+	secondary.a = battle_secondary_alpha * alpha
+	var track: Color = _ink
+	track.a = battle_track_alpha * alpha
+
+	var width: float = _field_content_size().x
+	var bar_left: float = roundf((width - field_bar_width) * 0.5)
+	draw_rect(Rect2(bar_left, 0.0, field_bar_width, field_bar_height), track)
+	draw_rect(Rect2(bar_left, 0.0, field_bar_width * _displayed_fraction, field_bar_height), hp_ink)
+	var tick_color: Color = _ink
+	tick_color.a = critical_tick_alpha * alpha
+	var tick_x: float = roundf(bar_left + field_bar_width * _critical_fraction())
+	draw_rect(Rect2(tick_x, -critical_tick_overhang_px, 1.0, field_bar_height + critical_tick_overhang_px * 2.0), tick_color)
+
+	var numeral_text: String = str(_current_hp)
+	var max_text: String = battle_max_prefix + str(_max_hp)
+	var left: float = roundf((width - _field_row_width()) * 0.5)
+	var baseline: float = field_bar_height + field_row_gap_px + _field_numeral_ascent()
+	var max_left: float = left + InkType.width(numeral_font, numeral_text, field_numeral_size_px)
+	if field_halo_px > 0.0:
+		var halo: Color = field_halo_color
+		halo.a *= alpha
+		var halo_size: int = roundi(field_halo_px * 2.0)
+		draw_string_outline(numeral_font, Vector2(left, baseline), numeral_text, HORIZONTAL_ALIGNMENT_LEFT, -1, field_numeral_size_px, halo_size, halo)
+		draw_string_outline(numeral_font, Vector2(max_left, baseline), max_text, HORIZONTAL_ALIGNMENT_LEFT, -1, battle_max_size_px, halo_size, halo)
+	InkType.draw_run(self, numeral_font, numeral_text, Vector2(left, baseline), field_numeral_size_px, hp_ink)
+	InkType.draw_run(self, numeral_font, max_text, Vector2(max_left, baseline), battle_max_size_px, secondary)
 
 # --- Battle layout (drawn) ---
 
@@ -475,49 +539,22 @@ func _line_rects() -> Array[Rect2]:
 		y += height + row_line_gap_px
 	return rects
 
-# The point of this control that sits on the unprojected anchor (and
-# that DistanceScale scales about): the field layout's centre, or the HP
+# The point of this control that sits on the screen anchor (and that
+# battle_scale scales about): the field bar's top centre, or the HP
 # block's centre in battle - Toll hangs off to the right of it, never
 # shifting the bar off the Wanderer.
 func _anchor_offset() -> Vector2:
-	var field_offset: Vector2 = _field_content_size() / 2.0
 	var battle_offset := Vector2(_block_readout_width() + battle_width / 2.0, _battle_content_size().y / 2.0)
-	return field_offset.lerp(battle_offset, _battle_blend)
+	return _field_anchor().lerp(battle_offset, _battle_blend)
 
 # This control's size eases between the two layouts' sizes with the
-# blend (see the class doc) - pivot_offset centres scale (see
-# DistanceScale) on the content's own middle rather than its top-left
-# corner. Re-run on every _battle_blend/_displayed_fraction tween step
-# (see their own doc), not just once.
+# blend (see the class doc) - pivot_offset centres scale on the anchor
+# rather than the top-left corner. Re-run on every _battle_blend/
+# _displayed_fraction tween step (see their own doc), not just once.
 func _apply_layout() -> void:
 	var content_size: Vector2 = _field_content_size().lerp(_battle_content_size(), _battle_blend)
 	size = content_size
 	pivot_offset = _anchor_offset()
-
-	var field_alpha: float = 1.0 - _battle_blend
-	var numbers_line_height: float = numbers_font_size_px * 1.3
-
-	_bar_background.position = Vector2.ZERO
-	_bar_background.size = bar_size
-	_bar_background.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_bar_background.modulate.a = field_alpha
-
-	_bar_fill.position = Vector2.ZERO
-	_bar_fill.size = Vector2(bar_size.x * _displayed_fraction, bar_size.y)
-	_bar_fill.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	if _field_tick != null:
-		_field_tick.position = Vector2(roundf(bar_size.x * _critical_fraction()), -critical_tick_overhang_px)
-		_field_tick.size = Vector2(1.0, bar_size.y + critical_tick_overhang_px * 2.0)
-
-	var numbers_top: float = bar_size.y + row_gap
-	_numbers_label.position = Vector2(0.0, numbers_top)
-	_numbers_label.size = Vector2(bar_size.x, numbers_line_height)
-	_numbers_label.add_theme_font_size_override("font_size", numbers_font_size_px)
-	_numbers_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-	_numbers_label.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
-	_numbers_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_numbers_label.modulate.a = field_alpha
 
 	if _reveal != null:
 		_reveal.set_wrap_width(battle_width)
@@ -547,14 +584,21 @@ func _line_under_mouse() -> int:
 			return i
 	return -1
 
-# The battle readout, at _battle_blend alpha over the fading field nodes.
+# The field readout fading out under the battle readout fading in.
+func _draw() -> void:
+	if numeral_font == null:
+		return
+	if _battle_blend < 1.0:
+		_draw_field(1.0 - _battle_blend)
+	if _battle_blend > 0.0:
+		_draw_battle()
+
+# The battle readout, at _battle_blend alpha.
 # One baseline for the row: numeral, then " / max" run on at its smaller
 # size, the name right-aligned at the readout's width. The bar sits
 # battle_row_gap under the numeral's descent; block is the thin segment
 # in that gap, off the bar's left end.
-func _draw() -> void:
-	if _battle_blend <= 0.0 or numeral_font == null:
-		return
+func _draw_battle() -> void:
 	var ink: Color = _ink
 	ink.a = _battle_blend
 	var secondary: Color = _ink
@@ -689,26 +733,9 @@ func set_target(wanderer: Wanderer) -> void:
 # it applies the region's on-pale/on-dark value set to the shared
 # BattleTheme resource (and by BattleOverlay's F2 flip), same "cached
 # once, refreshed on demand" shape EnemyStatus/DeckPanel/CardView already
-# use rather than tracking the theme resource live. The field style keeps
-# its CardFace tokens; the battle style draws with the Battle ink token.
+# use rather than tracking the theme resource live. Both styles draw with
+# the Battle ink token.
 func refresh_style() -> void:
-	var panel_light_color: Color = get_theme_color("panel_light_color", "CardFace")
-	var track_color: Color = panel_light_color
-	track_color.a = track_alpha
-	var text_color: Color = get_theme_color("text_color", "CardFace")
-	var outline_color: Color = get_theme_color("panel_color", "CardFace")
-
-	_bar_background.add_theme_stylebox_override("panel", _build_bar_style(track_color))
-	_field_fill_style = _build_bar_style(text_color)
-	_bar_fill.add_theme_stylebox_override("panel", _field_fill_style)
-	_field_fill_color = text_color
-	_field_text_color = text_color
-	_field_track_color = track_color
-
-	_numbers_label.add_theme_color_override("font_color", text_color)
-	_numbers_label.add_theme_color_override("font_outline_color", outline_color)
-	_numbers_label.add_theme_constant_override("outline_size", outline_size)
-
 	_ink = get_theme_color("ink", "Battle")
 	_toll_rule_color = get_theme_color("toll_rule", "Battle")
 	_name_font_tracked = InkType.tracked(name_font, battle_name_size_px, battle_name_tracking_em)
@@ -733,16 +760,6 @@ func _relayout_if_ready() -> void:
 	if is_node_ready():
 		_apply_layout()
 
-func _build_bar_style(color: Color) -> StyleBoxFlat:
-	var style := StyleBoxFlat.new()
-	style.bg_color = color
-	style.corner_radius_top_left = bar_corner_radius
-	style.corner_radius_top_right = bar_corner_radius
-	style.corner_radius_bottom_right = bar_corner_radius
-	style.corner_radius_bottom_left = bar_corner_radius
-	style.shadow_size = 0
-	return style
-
 func _physics_process(delta: float) -> void:
 	if _wanderer == null or not is_instance_valid(_wanderer):
 		return
@@ -750,16 +767,20 @@ func _physics_process(delta: float) -> void:
 	if camera == null:
 		return
 
-	var target_position: Vector3 = _wanderer.global_position + ground_offset
-	var screen_pos: Vector2 = camera.unproject_position(target_position)
+	# The field anchor is field_offset_px down the screen from the feet;
+	# the battle anchor is the feet plus ground_offset in the world. The
+	# two ease into each other with the styles.
+	var feet: Vector3 = _wanderer.global_position
+	var field_pos: Vector2 = camera.unproject_position(feet) + Vector2(0.0, field_offset_px)
+	var battle_pos: Vector2 = camera.unproject_position(feet + ground_offset)
+	var screen_pos: Vector2 = field_pos.lerp(battle_pos, _battle_blend)
 	# Whole pixels only - a fractional Control position on a bare bar (no
 	# panel background to visually absorb it) reads as shimmer/jitter on
-	# thin edges, most visibly on the 1px label outline.
+	# thin edges, most visibly on the halo's edge.
 	position = (screen_pos - _anchor_offset()).round()
 
-	var distance: float = camera.global_position.distance_to(target_position)
-	var field_scale: float = DistanceScale.compute_scale(distance, near_scale_distance, far_scale_distance, min_scale, max_scale)
-	scale = Vector2.ONE * lerpf(field_scale, battle_scale, _battle_blend)
+	# A constant screen size in the field; battle_scale in battle.
+	scale = Vector2.ONE * lerpf(1.0, battle_scale, _battle_blend)
 
 	var hovered: bool = not _in_battle and HoverRaycast.is_hovering(get_viewport(), _wanderer)
 	var low_hp: bool = _current_fraction <= low_hp_fraction
@@ -810,7 +831,8 @@ func _hp_fraction(current: int, max_hp: int) -> float:
 func _on_player_hp_changed(current: int, max_hp: int) -> void:
 	_current_hp = current
 	_max_hp = max_hp
-	_refresh_numbers(current, max_hp)
+	# The field row's width follows the digits.
+	_relayout_if_ready()
 	_current_fraction = _hp_fraction(current, max_hp)
 	_tween_bar_to(_current_fraction)
 	_visibility.notify_hp_changed()
@@ -852,21 +874,11 @@ func _set_critical_blend(value: float) -> void:
 	_critical_blend = value
 	_apply_critical_colors()
 
-# The Critical blend and the tick, applied: the field's fill and whole
-# label, and the tick's colour; the battle style reads the blend in
+# The Critical blend and the tick, applied - both styles read them in
 # _draw().
 func _apply_critical_colors() -> void:
 	if not is_node_ready():
 		return
-	if _field_fill_style != null:
-		_field_fill_style.bg_color = _field_fill_color.lerp(critical_color, _critical_blend)
-	_numbers_label.add_theme_color_override("font_color", _field_text_color.lerp(critical_color, _critical_blend))
-	if _field_tick != null:
-		_field_tick.color = Color(_field_track_color, critical_tick_alpha)
-	queue_redraw()
-
-func _refresh_numbers(current: int, max_hp: int) -> void:
-	_numbers_label.text = "%d/%d" % [current, max_hp]
 	queue_redraw()
 
 # Animates _displayed_fraction (not the fill's width directly - see that

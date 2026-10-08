@@ -5,16 +5,3 @@
 [node name="HPBar" type="Control"]
 mouse_filter = 2
 script = ExtResource("1_hp_bar")
-
-[node name="BarBackground" type="Panel" parent="."]
-layout_mode = 0
-mouse_filter = 2
-
-[node name="BarFill" type="Panel" parent="BarBackground"]
-layout_mode = 0
-mouse_filter = 2
-
-[node name="NumbersLabel" type="Label" parent="."]
-layout_mode = 0
-mouse_filter = 2
-text = "0/0"
