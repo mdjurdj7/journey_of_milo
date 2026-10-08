@@ -4,10 +4,11 @@ class_name InkLine
 # One line of field-HUD ink: a tracked caps label (Alegreya Sans Bold at
 # label_alpha) and a value right after it in Alegreya Sans Regular at
 # full ink - the same shape as the DeckPanel's DECK line these sit
-# beside. Drawn, not boxed; sized to its own text. The base of TollLine
-# ("TOLL n"), KeepsakeLine ("KEEPSAKE name"), GlassboneLine
-# ("GLASSBONE n") and GoldLine ("GOLD n"); a subclass sets its
-# label and feeds its value through set_value_text().
+# beside. Drawn, not boxed; sized to its own text. The base of HPLine
+# ("HP 58/70"), TollLine ("TOLL n"), GoldLine ("GOLD n"), KeepsakeLine
+# ("KEEPSAKE name") and GlassboneLine ("GLASSBONE n") - the row's order
+# after DECK; a subclass sets its label and feeds its value through
+# set_value_text().
 #
 # RegionField creates each in _setup_field_hud() and hands it the line to
 # sit beside (sit_beside()). It follows that line's rect and its
