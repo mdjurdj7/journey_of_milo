@@ -449,13 +449,14 @@ func _check_signal_glass() -> void:
 func _check_blue_fastener_self_damage() -> void:
 	_new_run()
 	_run_state.call("equip_keepsake", load(BLUE_FASTENER_PATH))
-	_run_state.set("player_hp", 22)
+	# The Wanderer's 80 max HP puts Critical at 24 and under.
+	_run_state.set("player_hp", 25)
 	var controller: Node = await _start_fight(0, &"")
 	if controller != null:
 		var player: Combatant = controller.get("player")
-		_expect(not player.is_critical(), "22 of 70 is not Critical")
+		_expect(not player.is_critical(), "25 of 80 is not Critical")
 		_play_self_damage(controller)
-		_expect_eq(player.hp, 21, "Down Payment's 1 HP takes it to 21")
+		_expect_eq(player.hp, 24, "Down Payment's 1 HP takes it to 24")
 		_expect_eq(player.block, 6, "...into Critical by self-damage: +6 Block")
 		_play_self_damage(controller)
 		_expect_eq(player.block, 6, "...again, still Critical: no second grant")
