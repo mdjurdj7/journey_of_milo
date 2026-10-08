@@ -56,13 +56,14 @@ func turn_start_energy() -> int:
 # clear. See CharacterData's own Grace doc for the rule.
 var grace: int = 0
 var grace_turns_left: int = 0
-# Defaults only - BattleController.setup() overwrites all three from
+# Defaults only - BattleController.setup() overwrites all four from
 # RunState.character (the run's own CharacterData) the instant a
 # Combatant is created. False on every enemy Combatant, which is what
 # keeps Grace the Wanderer's alone.
 var has_grace: bool = false
 var grace_cap_mode: int = CharacterData.GraceCapMode.LARGEST_HIT
 var grace_window_turns: int = 1
+var grace_open_fraction: float = 0.5
 var took_damage_this_turn: bool = false
 var took_damage_last_turn: bool = false
 # Critical: HP at or below this fraction of max HP. A default only, like

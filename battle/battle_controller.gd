@@ -159,6 +159,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	player.has_grace = RunState.character.has_grace
 	player.grace_cap_mode = RunState.character.grace_cap_mode
 	player.grace_window_turns = RunState.character.grace_window_turns
+	player.grace_open_fraction = RunState.character.grace_open_fraction
 	player.critical_hp_fraction = RunState.character.critical_hp_fraction
 	player.energy = player.max_energy
 	# Nothing lost in this fight yet (RunState.hp_lost_this_combat).

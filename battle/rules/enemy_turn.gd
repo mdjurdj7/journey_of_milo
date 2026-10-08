@@ -375,15 +375,18 @@ static func hit_amount(combatant: Combatant, data: EnemyData, intent: EnemyInten
 # Only reached when damage actually got past block and absorb, and never
 # from DamagePipeline.apply_bypass() - which is the whole of self-damage
 # and status ticks - so a Bite Down opens nothing without being
-# special-cased. Returns how much Grace this call added.
+# special-cased. Each hit opens only grace_open_fraction of itself, rounded
+# down, and the cap scales with it: the largest hit's share, or the share
+# of the turn's sum. Returns how much Grace this call added.
 static func open_grace(player: Combatant, largest_hit: int, total_to_hp: int) -> int:
 	if not player.has_grace:
 		return 0
 	var before: int = player.grace
+	var fraction: float = clampf(player.grace_open_fraction, 0.0, 1.0)
 	if player.grace_cap_mode == CharacterData.GraceCapMode.SUM:
-		player.grace += total_to_hp
+		player.grace += floori(float(total_to_hp) * fraction)
 	else:
-		player.grace = maxi(player.grace, largest_hit)
+		player.grace = maxi(player.grace, floori(float(largest_hit) * fraction))
 	if player.grace > before:
 		player.grace_turns_left = maxi(player.grace_window_turns, 1)
 	return player.grace - before
