@@ -45,24 +45,25 @@
 - Run them with tools/run_probes.sh (--help). It runs headless probes
   in parallel (-j 4), longest first; probes marked serial in its table
   run alone afterwards.
-- Per commit: only the probes for what changed -
-  `tools/run_probes.sh --changed` maps the changed files to areas
-  (--list-areas; the map lives in the script) and falls back to the
-  full suite for a path no area covers. `--area` / `--probe` pick by
-  hand; `--list` shows the plan without running.
-- Full suite (`--full`): once before any push, on the exact tree being
-  pushed.
+- Once per task, at the end - not after each commit: commit in
+  single-concern steps, then run `tools/run_probes.sh --changed
+  <first-commit>^..HEAD` over the task's whole commit range. It maps
+  the changed files to areas (--list-areas; the map lives in the
+  script) and falls back to the full suite for a path no area covers.
+  `--area` / `--probe` pick by hand; `--list` shows the plan without
+  running.
+- If that run fails: fix it, rerun only the failing probes, then the
+  --changed set once more.
+- Full suite (`--full`): once before a push, on the exact tree being
+  pushed - and only when asked to prepare a push.
 - If HEAD moves during a run, follow the script's verdict: "rerun
   needed" means rerun the named probes on the new HEAD before
   committing.
-- Probe in the persistent worktree, ../journey-of-milo-probe:
-  `--worktree` checks out the commit under test (--ref, default HEAD),
-  copies the uncommitted files under test over it (--files, or the
-  changed files with --changed), and imports only when .import files
-  or new files came in - reusing its .godot rather than copying one
-  per task. One session at a time: the script takes
-  ../journey-of-milo-probe.lock and waits (--wait, default 30 min) or
-  says who holds it.
+- Never wait on another session's probe run. Each session runs its own
+  probes in its own worktree (`--path <worktree>`, after `--import`
+  there). The shared ../journey-of-milo-probe (`--worktree`, with its
+  ../journey-of-milo-probe.lock) is only for when no task worktree
+  exists.
 
 ## Probe worktrees
 - When testing a change to any .import file in a worktree that copied
