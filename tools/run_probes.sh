@@ -78,6 +78,7 @@ floor5_probe 20 fixed
 run_lost_probe 12
 dunecur_probe 30
 greyshelf_probe 45
+underfoot_probe 40
 card_rarity_probe 5
 come_due_probe 4
 starter_cards_probe 4
@@ -102,15 +103,15 @@ area_probes() {
 		cards) echo "starter_cards card_rarity frayed_cord" ;;
 		face) echo "starter_cards keyword come_due come_due_face critical_cards card_rarity_finish" ;;
 		keywords) echo "keyword starter_cards the_return" ;;
-		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf play_order grace" ;;
-		enemies) echo "blackback siltjaw wardling dunecur greyshelf sentence no_further critical_cards kill_order armored_contact deny enemy_export" ;;
+		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace" ;;
+		enemies) echo "blackback siltjaw wardling dunecur greyshelf underfoot sentence no_further critical_cards kill_order armored_contact deny enemy_export" ;;
 		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost pathing" ;;
 		floor1) echo "kill_order drain" ;;
-		floor2) echo "kill_order hold_line bundle_roll" ;;
+		floor2) echo "kill_order hold_line bundle_roll underfoot" ;;
 		floor3) echo "kill_order blackback wardling temper" ;;
 		floor4) echo "kill_order floor4 wear_path dunecur collector" ;;
 		floor5) echo "kill_order floor5 wear_path greyshelf elite_reward" ;;
-		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur floor5 greyshelf pathing" ;;
+		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur floor5 greyshelf underfoot pathing" ;;
 		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake keepsake_tile toll_carry run_log frayed_cord elite_reward run_lost temper" ;;
 		hud) echo "gold_line glassbone trinket keepsake_tile" ;;
 		hp_bar) echo "kill_order" ;;
@@ -118,7 +119,7 @@ area_probes() {
 		# The fight's own UI: every probe that plays a real fight (which
 		# builds the battle overlay and its hand), plus the rules probes
 		# whose readouts and faces it shows.
-		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf play_order" ;;
+		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf underfoot play_order" ;;
 		*) return 1 ;;
 	esac
 }
@@ -178,6 +179,8 @@ path_probes() {
 		field/prop_approach.*) out="$(area_probes field) collector temper" ;;
 		# The Greyshelf's head, rear and throat.
 		field/greyshelf_*) out="$(area_probes field) greyshelf" ;;
+		# The Underfoot's cover, barb and tilt.
+		field/underfoot_*) out="$(area_probes field) underfoot" ;;
 		# The enemies' share of the depth fog.
 		field/enemy_fog.*) out="$(area_probes field) enemy_fog" ;;
 		# The Keeper's plaque: her probe and the tile's.
