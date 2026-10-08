@@ -7,7 +7,10 @@ extends SceneTree
 # the sky's fog depth changes, and replaced by an EnemyData.fog_factor_
 # override >= 0. The dragonfly's wings get overlays that keep their alpha
 # cut-out; the Blackback's sac pass stays on the chain, under the fog.
-# Scenery (the Ground) keeps the environment fog.
+# Every pass on every enemy mesh - body, pose passes (the Greyshelf's
+# throat, the Stork's sac), wings, overlays - has scene fog disabled, so
+# the overlay is the only fog on an enemy. Scenery (the Ground) keeps the
+# environment fog.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/enemy_fog_probe.gd
 #
@@ -16,13 +19,16 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload (RegionField,
 # FieldEnemy): a SceneTree script compiles before the autoloads register.
 
-const CASES := 3
+const CASES := 4
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
 const SPUTTER_FLOOR := 0
 const DRAGONFLY_FLOOR := 1
 const BLACKBACK_FLOOR := 2
+const GREYSHELF_FLOOR := 4
+const THROAT_SHADER_PATH := "res://field/greyshelf_throat.gdshader"
+const SAC_SHADER_PATH := "res://field/stork_sac.gdshader"
 const SAFETY_SECONDS := 180.0
 
 var _run_state: Node = null
@@ -39,6 +45,7 @@ func _initialize() -> void:
 	await _check_sputter()
 	await _check_dragonfly_wings()
 	await _check_blackback_chain()
+	await _check_every_pass_unfogged()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -133,7 +140,54 @@ func _check_blackback_chain() -> void:
 	await _teardown()
 	_completed += 1
 
+# Floors 1, 2, 3 and 5 (Sputter, dragonflies, Blackback, Greyshelf):
+# every material pass on every mesh under each enemy model has scene fog
+# off - disable_fog on a BaseMaterial3D, fog_disabled in a shader's
+# render_mode - with the throat and sac passes among those checked.
+func _check_every_pass_unfogged() -> void:
+	var seen_shaders: Dictionary = {}
+	var checked: int = 0
+	for floor_index: int in [SPUTTER_FLOOR, DRAGONFLY_FLOOR, BLACKBACK_FLOOR, GREYSHELF_FLOOR]:
+		await _load_field(floor_index)
+		for enemy: Node in _field.get_tree().get_nodes_in_group("enemies"):
+			var model := enemy.get("_model") as Node3D
+			if model == null:
+				continue
+			for node in model.find_children("*", "MeshInstance3D", true, false):
+				var mesh_instance := node as MeshInstance3D
+				if mesh_instance.mesh == null:
+					continue
+				for surface in mesh_instance.mesh.get_surface_count():
+					var pass_material: Material = mesh_instance.get_active_material(surface)
+					while pass_material != null:
+						checked += 1
+						var shader_material := pass_material as ShaderMaterial
+						if shader_material != null and shader_material.shader != null:
+							seen_shaders[shader_material.shader.resource_path] = true
+						_expect(_fog_off(pass_material), "Floor %d, %s: a pass on %s (%s) has scene fog disabled" % [floor_index + 1, (enemy.get("enemy_data") as Resource).resource_path.get_file(), mesh_instance.name, _describe(pass_material)])
+						pass_material = pass_material.next_pass
+		await _teardown()
+	_expect(checked > 0, "Enemy passes were checked (%d)" % checked)
+	_expect(seen_shaders.has(THROAT_SHADER_PATH), "...the Greyshelf's throat pass among them")
+	_expect(seen_shaders.has(SAC_SHADER_PATH), "...the Stork's sac pass among them")
+	_completed += 1
+
 # --- Helpers ---
+
+func _fog_off(material: Material) -> bool:
+	if material is BaseMaterial3D:
+		return (material as BaseMaterial3D).disable_fog
+	var shader_material := material as ShaderMaterial
+	if shader_material == null or shader_material.shader == null:
+		return false
+	var render_mode := RegEx.create_from_string("render_mode[^;]*[\\s,]fog_disabled[\\s,;]")
+	return render_mode.search(shader_material.shader.code) != null
+
+func _describe(material: Material) -> String:
+	var shader_material := material as ShaderMaterial
+	if shader_material != null and shader_material.shader != null:
+		return shader_material.shader.resource_path
+	return material.get_class()
 
 func _is_fog(material: Material) -> bool:
 	var shader_material := material as ShaderMaterial

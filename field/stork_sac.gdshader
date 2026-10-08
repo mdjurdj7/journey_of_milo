@@ -1,5 +1,8 @@
 shader_type spatial;
-render_mode blend_mix, depth_draw_never, cull_back, specular_disabled;
+// fog_disabled: the body is out of the scene fog and FieldEnemy's
+// enemy_fog.gdshader pass, last on the chain, fogs body and sac
+// alike - scene fog here as well would fade the sac at its own rate.
+render_mode blend_mix, depth_draw_never, cull_back, specular_disabled, fog_disabled;
 
 // The marabou's throat sac greyed (StorkTells): a next pass over the body's
 // own material that lays the body's albedo, desaturated, over the sac and
