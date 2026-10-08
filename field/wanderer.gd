@@ -4,6 +4,9 @@ class_name Wanderer
 # He has come to rest at the hold line (see the Hold Line export group) -
 # once per arrival.
 signal hold_line_reached
+# A planned walk (set_move_path()) has stood still against something for
+# stuck_time with waypoints still ahead - RegionField plans again.
+signal path_stuck
 
 const IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_idle.fbx"
 const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_walking.fbx"
@@ -33,16 +36,20 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 @export var dash_cooldown: float = 1.0
 
 @export_group("Point To Move")
-# A click on the field (see RegionField._unhandled_input()) sets a move
-# target; the Wanderer walks toward it at move_speed, facing the way he
-# walks, and the target clears within arrive_radius of it, the moment
-# any WASD input arrives, or after stuck_time of standing still against
-# something (a hull, a wall) with the target still ahead - no
-# pathfinding, he stops where he's blocked. An enemy target (see
-# set_move_target_enemy()) is followed live until contact starts the
-# fight, which clears it (see enter_battle_stance()).
+# A click on the field (see RegionField._unhandled_input()) is planned
+# round what is in the way (RegionField.plan_path(), NavGrid) and handed
+# here as waypoints (set_move_path()); he walks them in turn at move_speed,
+# facing the way he walks, moving on from each within waypoint_radius, and
+# the walk clears within arrive_radius of the last, the moment any WASD
+# input arrives, or after stuck_time of standing still against something
+# with waypoints still ahead - then path_stuck asks RegionField to plan
+# again. A bare set_move_target() is still a straight walk. An enemy
+# target (see set_move_target_enemy()) is followed live once its path is
+# walked, until contact starts the fight, which clears it (see
+# enter_battle_stance()).
 @export var arrive_radius: float = 0.25
-@export var stuck_time: float = 0.4
+@export var waypoint_radius: float = 0.35
+@export var stuck_time: float = 0.5
 
 @export_group("Step-Up")
 # How tall a ledge/curb the Wanderer can walk straight up onto, and how far
@@ -326,6 +333,10 @@ var _has_move_target: bool = false
 var _move_target: Vector3 = Vector3.ZERO
 var _move_target_enemy: FieldEnemy = null
 var _stuck_timer: float = 0.0
+# The planned walk (set_move_path()): its waypoints, and the one he is
+# walking to. Empty: a straight walk to _move_target.
+var _path: PackedVector3Array = PackedVector3Array()
+var _path_index: int = 0
 
 # True while the ground hold is what he stands on - the drawn surface is
 # above the collision under him (a draining channel) - see _hold_above_
@@ -1356,6 +1367,36 @@ func set_move_target(point: Vector3) -> void:
 	_move_target_enemy = null
 	_has_move_target = true
 	_stuck_timer = 0.0
+	_path = PackedVector3Array()
+
+# A planned walk: `points` from where he stands to the target, in order
+# (RegionField.plan_path()). `keep_enemy`: an enemy target set just before
+# (set_move_target_enemy()) stays the target once the path is walked.
+func set_move_path(points: PackedVector3Array, keep_enemy: bool = false) -> void:
+	if points.is_empty():
+		clear_move_target()
+		return
+	if not keep_enemy:
+		_move_target_enemy = null
+	_path = points
+	# The first point is where he stood when it was planned.
+	_path_index = 1 if points.size() > 1 else 0
+	_move_target = points[points.size() - 1]
+	_has_move_target = true
+	_stuck_timer = 0.0
+
+# The planned walk's remaining waypoints - for the debug draw.
+func get_move_path() -> PackedVector3Array:
+	if not _has_move_target or _path.is_empty():
+		return PackedVector3Array()
+	return _path.slice(_path_index)
+
+# The planned walk's final point, or Vector3.INF with none.
+func get_move_goal() -> Vector3:
+	return _move_target if _has_move_target else Vector3.INF
+
+func get_move_target_enemy() -> FieldEnemy:
+	return _move_target_enemy if _has_move_target else null
 
 # Walks at the enemy's live position until its own contact area starts
 # the fight.
@@ -1364,11 +1405,13 @@ func set_move_target_enemy(enemy: FieldEnemy) -> void:
 	_move_target = enemy.global_position
 	_has_move_target = true
 	_stuck_timer = 0.0
+	_path = PackedVector3Array()
 
 func clear_move_target() -> void:
 	_has_move_target = false
 	_move_target_enemy = null
 	_stuck_timer = 0.0
+	_path = PackedVector3Array()
 
 func has_move_target() -> bool:
 	return _has_move_target
@@ -1443,10 +1486,18 @@ func _hold_at_line(planar_speed: float) -> void:
 func _move_target_direction() -> Vector3:
 	if not _has_move_target:
 		return Vector3.ZERO
-	if _move_target_enemy != null:
-		if not is_instance_valid(_move_target_enemy):
-			clear_move_target()
-			return Vector3.ZERO
+	if _move_target_enemy != null and not is_instance_valid(_move_target_enemy):
+		clear_move_target()
+		return Vector3.ZERO
+	# The planned walk: on to each waypoint in turn, then the last one -
+	# or, chasing an enemy, the enemy itself once they are all walked.
+	while not _path.is_empty() and _path_index < _path.size() - 1:
+		var waypoint: Vector3 = _path[_path_index]
+		var to_waypoint := Vector3(waypoint.x - global_position.x, 0.0, waypoint.z - global_position.z)
+		if to_waypoint.length() > waypoint_radius:
+			return to_waypoint.normalized()
+		_path_index += 1
+	if _move_target_enemy != null and (_path.is_empty() or _path_index >= _path.size() - 1):
 		_move_target = _move_target_enemy.global_position
 	var to_target := Vector3(_move_target.x - global_position.x, 0.0, _move_target.z - global_position.z)
 	if to_target.length() <= arrive_radius:
@@ -1462,7 +1513,13 @@ func _tick_stuck(delta: float, planar_speed: float) -> void:
 	if planar_speed < walk_speed_threshold:
 		_stuck_timer += delta
 		if _stuck_timer >= stuck_time:
-			clear_move_target()
+			var planned: bool = not _path.is_empty()
+			if planned:
+				# RegionField plans again from here (and gives up after a few).
+				_stuck_timer = 0.0
+				path_stuck.emit()
+			else:
+				clear_move_target()
 	else:
 		_stuck_timer = 0.0
 

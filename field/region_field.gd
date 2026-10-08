@@ -277,6 +277,12 @@ static func reset_hold_line_spoken() -> void:
 		_queue_nav_build()
 # The margin an enemy's contact zone is grown by when a path goes round it.
 @export var nav_contact_margin: float = 0.5
+# Stuck on a planned walk (Wanderer.path_stuck): planned again from where
+# he stands, up to this many times in a row before he stops.
+@export var nav_max_replans: int = 2
+# Chasing an enemy that moves (a patrol): the path to it is planned again
+# this often.
+@export var nav_chase_replan_sec: float = 0.5
 @export_group("")
 
 @export var side_wade_margin: float = 4.0:
@@ -349,6 +355,11 @@ var _wall_shoreward: StaticBody3D = null
 # the relief and everything on it stand - see _build_nav_grid().
 var _nav: NavGrid = null
 var _nav_build_queued: bool = false
+# The walk in progress, for a replan: where to, and after whom.
+var _nav_goal: Vector3 = Vector3.INF
+var _nav_goal_enemy: FieldEnemy = null
+var _nav_replans: int = 0
+var _nav_chase_timer: float = 0.0
 var _wall_left: StaticBody3D = null
 var _wall_right: StaticBody3D = null
 # The walls' centre-line rectangle, kept for get_wall_rect().
@@ -593,6 +604,8 @@ func _ready() -> void:
 		ground.relief_rebuilt.connect(_queue_nav_build)
 		if ground.is_built():
 			_queue_nav_build()
+	if wanderer != null:
+		wanderer.path_stuck.connect(_on_wanderer_path_stuck)
 
 	# Last, with the gate placed (the camera's inland limit is set) and the
 	# HUD seeded: the new run's zone intro, once, on the region's first
@@ -654,7 +667,7 @@ func _handle_move_click(screen_pos: Vector2) -> bool:
 
 	var enemy: FieldEnemy = _enemy_under_cursor(camera, screen_pos)
 	if enemy != null:
-		wanderer.set_move_target_enemy(enemy)
+		walk_to_enemy(enemy)
 		_show_click_marker(enemy.global_position)
 		return true
 
@@ -671,9 +684,104 @@ func _handle_move_click(screen_pos: Vector2) -> bool:
 	if hit.is_empty():
 		return false
 	var point: Vector3 = hit["position"]
-	wanderer.set_move_target(point)
+	# A prop with nothing to open (a hull, the hitching post): beside it,
+	# on his side of it.
+	if _nav != null and _is_nav_obstacle(hit.get("collider")):
+		var beside: Vector2 = _nav.nearest_open_toward(Vector2(point.x, point.z), Vector2(wanderer.global_position.x, wanderer.global_position.z))
+		var cell: Vector2i = _nav.world_to_cell(beside)
+		point = Vector3(beside.x, _nav.height_at_cell(cell), beside.y)
+	walk_to(point)
 	_show_click_marker(point)
 	return true
+
+# A static body the walk grid stamps - not the ground, a walk surface or
+# the spawn slab.
+func _is_nav_obstacle(collider: Variant) -> bool:
+	var body := collider as StaticBody3D
+	if body == null or body == get_node_or_null(ground_path) or body is RockShelf or body.name == &"SpawnSlabBody":
+		return false
+	return true
+
+# Walks the Wanderer to `point` round what is in the way (plan_path()) -
+# straight, as before, until the walk grid exists.
+func walk_to(point: Vector3) -> void:
+	_nav_goal = point
+	_nav_goal_enemy = null
+	_nav_replans = 0
+	_walk_planned()
+
+# Walks him to `enemy` round every other enemy's contact zone, and on into
+# its own - the fight starts there.
+func walk_to_enemy(enemy: FieldEnemy) -> void:
+	_nav_goal = enemy.global_position
+	_nav_goal_enemy = enemy
+	_nav_replans = 0
+	_nav_chase_timer = 0.0
+	_walk_planned()
+
+func _walk_planned() -> void:
+	if wanderer == null:
+		return
+	var enemy: FieldEnemy = _nav_goal_enemy if _nav_goal_enemy != null and is_instance_valid(_nav_goal_enemy) else null
+	if enemy != null:
+		_nav_goal = enemy.global_position
+		wanderer.set_move_target_enemy(enemy)
+	if _nav == null:
+		if enemy == null:
+			wanderer.set_move_target(_nav_goal)
+		return
+	var path: PackedVector3Array = plan_path(wanderer.global_position, _nav_goal, enemy)
+	if path.is_empty():
+		if enemy == null:
+			wanderer.clear_move_target()
+		return
+	wanderer.set_move_path(path, enemy != null)
+
+# The planned way from `from` to `to`, world points with `from` first and
+# the reached point last: round every living enemy's contact zone (grown
+# by nav_contact_margin) but `target_enemy`'s and its pack's, and the
+# standing Blocker. Empty when the grid isn't built or nothing can be
+# reached. `with_zones` false plans on the ground alone.
+func plan_path(from: Vector3, to: Vector3, target_enemy: FieldEnemy = null, with_zones: bool = true) -> PackedVector3Array:
+	var points := PackedVector3Array()
+	if _nav == null:
+		return points
+	var zones: Array = []
+	if with_zones:
+		for node in get_tree().get_nodes_in_group("enemies"):
+			var enemy := node as FieldEnemy
+			if enemy == null or enemy.is_defeated() or enemy.is_queued_for_deletion() or enemy == target_enemy:
+				continue
+			# Its pack fights with it: walking into one of them is the same fight.
+			if target_enemy != null and target_enemy.group != &"" and enemy.group == target_enemy.group:
+				continue
+			zones.append([Vector2(enemy.global_position.x, enemy.global_position.z), enemy.contact_radius + nav_contact_margin])
+	var path: PackedVector2Array = _nav.find_path(Vector2(from.x, from.z), Vector2(to.x, to.z), zones, _nav_dynamic_shapes())
+	for i in path.size():
+		var cell: Vector2i = _nav.world_to_cell(path[i])
+		var height: float = from.y if i == 0 else _nav.height_at_cell(cell)
+		points.append(Vector3(path[i].x, height, path[i].y))
+	return points
+
+# Stuck on the way: plan again from here - a few times, then stop.
+func _on_wanderer_path_stuck() -> void:
+	if _nav_replans >= nav_max_replans:
+		wanderer.clear_move_target()
+		return
+	_nav_replans += 1
+	_walk_planned()
+
+func _process(delta: float) -> void:
+	# A chased enemy that moves: its path follows it.
+	if wanderer == null or _nav_goal_enemy == null:
+		return
+	if not is_instance_valid(_nav_goal_enemy) or wanderer.get_move_target_enemy() != _nav_goal_enemy:
+		_nav_goal_enemy = null
+		return
+	_nav_chase_timer += delta
+	if _nav_chase_timer >= nav_chase_replan_sec:
+		_nav_chase_timer = 0.0
+		_walk_planned()
 
 # A left click on a bundle's padded screen rect (the enemy's click
 # padding) with the Wanderer in its reach opens it. Out of reach, or
