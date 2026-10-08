@@ -489,8 +489,8 @@ func refresh_fog() -> void:
 		var base: BaseMaterial3D = _fog_bases[index]
 		overlay.set_shader_parameter("fog_color", sky.fog_color)
 		overlay.set_shader_parameter("fog_energy", sky.fog_light_energy)
-		overlay.set_shader_parameter("fog_begin", sky.fog_depth_begin)
-		overlay.set_shader_parameter("fog_end", sky.fog_depth_end)
+		overlay.set_shader_parameter("fog_begin", sky.current_fog_depth_begin())
+		overlay.set_shader_parameter("fog_end", sky.current_fog_depth_end())
 		overlay.set_shader_parameter("fog_density", sky.fog_density)
 		overlay.set_shader_parameter("fog_factor", clampf(factor, 0.0, 1.0))
 		# An alpha-scissor surface keeps its cut-away part clear of the fog.

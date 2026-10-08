@@ -601,7 +601,9 @@ func _ready() -> void:
 	var fog_sky := get_region_sky()
 	if fog_sky != null:
 		fog_sky.fog_changed.connect(_refresh_enemy_fog)
+		fog_sky.fog_changed.connect(_sync_sea_fog)
 	_refresh_enemy_fog()
+	_sync_sea_fog()
 	_spawn_floor_patrols()
 	_spawn_floor_ledges()
 
@@ -1409,6 +1411,17 @@ func _apply_hud_row_style() -> void:
 # FieldEnemy reads it from its own _ready(), before this node's.
 func get_region_sky() -> RegionSky:
 	return get_node_or_null(sky_path) as RegionSky
+
+# The Sea's own fog copy (its shader is fog_disabled) onto RegionSky's
+# fog as it stands - the one source, override included.
+func _sync_sea_fog() -> void:
+	var sky := get_region_sky()
+	var sea := get_node_or_null(sea_path) as Sea
+	if sky == null or sea == null:
+		return
+	sea.fog_color = sky.fog_color
+	sea.fog_near_distance = sky.current_fog_depth_begin()
+	sea.fog_far_distance = sky.current_fog_depth_end()
 
 # Re-pushes the fog and enemy_fog_factor into every enemy's fog overlay.
 func _refresh_enemy_fog() -> void:

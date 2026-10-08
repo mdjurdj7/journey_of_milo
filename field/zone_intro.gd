@@ -18,13 +18,12 @@ class_name ZoneIntro
 # blend() - the end values are what the rig computes that frame, never
 # stored, so the landing has no pop), and _finish() releases the freeze.
 #
-# "Fog" is two things driven as one: RegionSky's depth fog (fog_depth_
-# begin/end) and the Sea's own copy of it (Sea.fog_near_distance/far_
-# distance - its shader is fog_disabled and reproduces the same curve
-# itself, see sea.gdshader). Both pairs are read at start, run on the
-# same curve to the same values, and put back in _finish() - without the
-# sea's, the water would keep dissolving at the region's 28 m while the
-# sky and sand opened to 100.
+# The fog is borrowed, never stored: the intro drives RegionSky's depth
+# fog through its override (RegionSky.set_fog_override()), which leaves
+# the region's own fog exports alone, and lands on those exports as they
+# stand each frame - so a live edit to RegionSky during the intro is
+# where it lands, and _finish() simply clears the override. The Sea's
+# own copy of the fog follows RegionSky (RegionField._sync_sea_fog()).
 #
 # The freeze is the battle one (RegionField.process_mode DISABLED: no
 # input, no click-to-move, approach areas and enemy contact out of the
@@ -35,8 +34,8 @@ class_name ZoneIntro
 #
 # Both ends - the timeline's own, and a skip (any key/mouse/joypad button
 # press after skip_lockout_seconds, blended out over skip_blend_seconds) -
-# go through the one _finish(), so the end state is identical: fog back
-# to the region's own values, free pose cleared, title and fade gone,
+# go through the one _finish(), so the end state is identical: the fog
+# override cleared (the region's own values), free pose cleared, title and fade gone,
 # Wanderer INHERIT and unlocked, HUD shown, field live.
 #
 # The title screen is this same frame zero, held (TITLE_HOLD, entered by
@@ -241,20 +240,12 @@ var _phase: Phase = Phase.IDLE
 var _ready_done: bool = false
 # Seconds since the first frame of the current play.
 var _clock: float = 0.0
-# The region's own fog - RegionSky's pair and the Sea's - read at
-# _start() and put back by _finish(): the intro only borrows them.
-var _floor_fog_begin: float = 0.0
-var _floor_fog_end: float = 0.0
-var _floor_sea_fog_near: float = 0.0
-var _floor_sea_fog_far: float = 0.0
 # The skip's own blend: from wherever the move, fog and title were when
 # the press landed, to the end state, over skip_blend_seconds.
 var _skip_clock: float = 0.0
 var _skip_from_blend: float = 0.0
 var _skip_from_fog_begin: float = 0.0
 var _skip_from_fog_end: float = 0.0
-var _skip_from_sea_fog_near: float = 0.0
-var _skip_from_sea_fog_far: float = 0.0
 var _skip_from_title_alpha: float = 0.0
 # The floor's sea balance - Sea.floor_offset_db and the low-pass
 # RegionField wrote from FloorData - read at _start() and put back by
@@ -360,12 +351,8 @@ func _start(phase: Phase) -> void:
 	_clock = 0.0
 
 	var sky := _sky()
-	_floor_fog_begin = sky.fog_depth_begin
-	_floor_fog_end = sky.fog_depth_end
 	var sea := _sea()
 	if sea != null:
-		_floor_sea_fog_near = sea.fog_near_distance
-		_floor_sea_fog_far = sea.fog_far_distance
 		_floor_sea_db = sea.floor_offset_db
 	var floor_data: FloorData = _region_field().get_floor_data()
 	_floor_sea_lowpass_hz = floor_data.ambience_sea_lowpass_hz if floor_data != null else 20000.0
@@ -404,8 +391,7 @@ func _process(delta: float) -> void:
 			var camera_rig := _camera_rig()
 			if camera_rig != null:
 				camera_rig.set_free_blend(lerpf(_skip_from_blend, 0.0, s))
-			_set_fog(lerpf(_skip_from_fog_begin, _floor_fog_begin, s), lerpf(_skip_from_fog_end, _floor_fog_end, s),
-				lerpf(_skip_from_sea_fog_near, _floor_sea_fog_near, s), lerpf(_skip_from_sea_fog_far, _floor_sea_fog_far, s))
+			_set_fog(lerpf(_skip_from_fog_begin, _region_fog_begin(), s), lerpf(_skip_from_fog_end, _region_fog_end(), s))
 			_set_title_alpha(lerpf(_skip_from_title_alpha, 0.0, s))
 			if _sea_from_title:
 				_set_sea_open(lerpf(_skip_from_sea_open, 1.0, s))
@@ -440,8 +426,7 @@ func _apply_fog_at(t: float) -> void:
 		_set_sea_open(smoothstep(0.0, 1.0, _progress(t, 0.0, title_fog_open_seconds)))
 	if _fog_from_title and t < title_fog_open_seconds and t < move_start:
 		var s: float = smoothstep(0.0, 1.0, _progress(t, 0.0, title_fog_open_seconds))
-		_set_fog(lerpf(title_fog_begin, fog_depth_begin, s), lerpf(title_fog_end, fog_depth_end, s),
-			lerpf(title_fog_begin, fog_depth_begin, s), lerpf(title_fog_end, fog_depth_end, s))
+		_set_fog(lerpf(title_fog_begin, fog_depth_begin, s), lerpf(title_fog_end, fog_depth_end, s))
 		return
 	_apply_fog(smoothstep(0.0, 1.0, _progress(t, move_start, move_seconds)))
 
@@ -449,7 +434,7 @@ func _apply_fog_at(t: float) -> void:
 # intro's own - what _start() sets and a fog export's setter re-applies.
 func _apply_held_fog() -> void:
 	if _phase == Phase.TITLE_HOLD:
-		_set_fog(title_fog_begin, title_fog_end, title_fog_begin, title_fog_end)
+		_set_fog(title_fog_begin, title_fog_end)
 	else:
 		_apply_fog(0.0)
 
@@ -463,11 +448,8 @@ func _skip() -> void:
 	if camera_rig != null and not camera_rig.has_free_pose():
 		_skip_from_blend = 0.0
 	var sky := _sky()
-	_skip_from_fog_begin = sky.fog_depth_begin if sky != null else _floor_fog_begin
-	_skip_from_fog_end = sky.fog_depth_end if sky != null else _floor_fog_end
-	var sea := _sea()
-	_skip_from_sea_fog_near = sea.fog_near_distance if sea != null else _floor_sea_fog_near
-	_skip_from_sea_fog_far = sea.fog_far_distance if sea != null else _floor_sea_fog_far
+	_skip_from_fog_begin = sky.current_fog_depth_begin() if sky != null else _region_fog_begin()
+	_skip_from_fog_end = sky.current_fog_depth_end() if sky != null else _region_fog_end()
 	_skip_from_title_alpha = _title.modulate.a if _title != null else 0.0
 	_skip_from_sea_open = _sea_open
 	_phase = Phase.SKIPPING
@@ -482,7 +464,9 @@ func _finish() -> void:
 	var camera_rig := _camera_rig()
 	if camera_rig != null:
 		camera_rig.clear_free_pose()
-	_set_fog(_floor_fog_begin, _floor_fog_end, _floor_sea_fog_near, _floor_sea_fog_far)
+	var sky := _sky()
+	if sky != null:
+		sky.clear_fog_override()
 	if _sea_from_title:
 		_set_sea_open(1.0)
 		_sea_from_title = false
@@ -603,24 +587,27 @@ func _apply_pose() -> void:
 	var pitch: float = deg_to_rad(pose_pitch_degrees)
 	camera_rig.set_free_pose(camera_position, yaw, pitch, pose_fov)
 
-# The fog at move progress `s`: 0 = the intro's own, 1 = the region's -
-# the sky's pair and the sea's pair on the same lerp, the sea's from the
-# intro's same begin/end to its own authored values.
+# The fog at move progress `s`: 0 = the intro's own, 1 = the region's,
+# read off RegionSky this frame.
 func _apply_fog(s: float) -> void:
-	_set_fog(lerpf(fog_depth_begin, _floor_fog_begin, s), lerpf(fog_depth_end, _floor_fog_end, s),
-		lerpf(fog_depth_begin, _floor_sea_fog_near, s), lerpf(fog_depth_end, _floor_sea_fog_far, s))
+	_set_fog(lerpf(fog_depth_begin, _region_fog_begin(), s), lerpf(fog_depth_end, _region_fog_end(), s))
 
-# Both fog pairs at once - RegionSky's depth begin/end and the Sea's own
-# near/far (each export's setter pushes it live).
-func _set_fog(sky_begin: float, sky_end: float, sea_near: float, sea_far: float) -> void:
+# The region's steady-state depth fog: RegionSky's exports as they stand
+# now (a floor's own pair, a live edit), never a copy.
+func _region_fog_begin() -> float:
+	var sky := _sky()
+	return sky.fog_depth_begin if sky != null else fog_depth_begin
+
+func _region_fog_end() -> float:
+	var sky := _sky()
+	return sky.fog_depth_end if sky != null else fog_depth_end
+
+# The borrowed depth fog onto RegionSky's override - the Sea and the
+# enemies follow it through RegionSky.fog_changed.
+func _set_fog(begin: float, end: float) -> void:
 	var sky := _sky()
 	if sky != null:
-		sky.fog_depth_begin = sky_begin
-		sky.fog_depth_end = sky_end
-	var sea := _sea()
-	if sea != null:
-		sea.fog_near_distance = sea_near
-		sea.fog_far_distance = sea_far
+		sky.set_fog_override(begin, end)
 
 # The sea bed at opening `s`: 0 = the title's level and low-pass, 1 = the
 # floor's. The cutoff runs in log frequency, so the same curve that opens

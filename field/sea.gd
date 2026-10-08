@@ -358,10 +358,11 @@ const SEA_BUS_NAME := &"Sea"
 
 # Distance fog: the sea material is fog_disabled (see sea.gdshader), so
 # it reproduces the WorldEnvironment's depth fog itself with the same
-# curve and the same unlit blend - keep these equal to the environment's
-# fog_depth_begin / fog_depth_end / fog_color (14 / 28 / (0.86, 0.87,
-# 0.86)) and fog_strength 1.0, and the shore and the water plane fog at
-# the same rate at the same distance. The near-field reflection has its
+# curve and the same unlit blend. fog_color and fog_near/far_distance
+# mirror RegionSky's fog as it stands (RegionField._sync_sea_fog() on
+# every RegionSky.fog_changed), so the shore and the water plane fog at
+# the same rate at the same distance; the values here only stand until
+# the field's first push. fog_strength stays the Sea's own. The near-field reflection has its
 # own, paler sky_reflect_color above.
 @export var fog_color: Color = Color(0.86, 0.87, 0.86):
 	set(value):

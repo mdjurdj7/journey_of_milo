@@ -12,6 +12,13 @@ extends SceneTree
 # the overlay is the only fog on an enemy. Scenery (the Ground) keeps the
 # environment fog.
 #
+# The steady-state fog has one source, RegionSky's exports: after a floor
+# load the Environment's depth fog and the Sea's own copy equal them (a
+# floor's own pair where it names one); an edit to them shows at once and
+# stays; the zone intro's override shows instead while it runs, leaves
+# the exports alone, and on finishing hands back to the exports as they
+# stand - an edit made under it included.
+#
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/enemy_fog_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
@@ -19,7 +26,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload (RegionField,
 # FieldEnemy): a SceneTree script compiles before the autoloads register.
 
-const CASES := 4
+const CASES := 6
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
@@ -27,6 +34,8 @@ const SPUTTER_FLOOR := 0
 const DRAGONFLY_FLOOR := 1
 const BLACKBACK_FLOOR := 2
 const GREYSHELF_FLOOR := 4
+# Floor 4 names its own depth fog (20 / 40 in region1_floor4.tres).
+const OWN_FOG_FLOOR := 3
 const THROAT_SHADER_PATH := "res://field/greyshelf_throat.gdshader"
 const SAC_SHADER_PATH := "res://field/stork_sac.gdshader"
 const SAFETY_SECONDS := 180.0
@@ -46,6 +55,8 @@ func _initialize() -> void:
 	await _check_dragonfly_wings()
 	await _check_blackback_chain()
 	await _check_every_pass_unfogged()
+	await _check_steady_state_fog(SPUTTER_FLOOR)
+	await _check_steady_state_fog(OWN_FOG_FLOOR)
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -199,6 +210,55 @@ func _fog_tail(material: Material) -> ShaderMaterial:
 	while tail.next_pass != null:
 		tail = tail.next_pass
 	return tail as ShaderMaterial if _is_fog(tail) else null
+
+# The one source: a floor load, a live edit, and the zone intro's override.
+func _check_steady_state_fog(floor_index: int) -> void:
+	await _load_field(floor_index)
+	var label: String = "Floor %d" % (floor_index + 1)
+	var sky: Node = _field.call("get_region_sky")
+	var sea: Node = _field.get_node_or_null("Sea")
+	var environment: Environment = sky.get("environment")
+	var floor_data: Resource = _field.call("get_floor_data")
+	var own_begin: float = float(floor_data.get("fog_depth_begin"))
+	var own_end: float = float(floor_data.get("fog_depth_end"))
+	if own_begin > 0.0 and own_end > own_begin:
+		_expect_near(float(sky.get("fog_depth_begin")), own_begin, "%s: the floor's own fog begin on RegionSky" % label)
+		_expect_near(float(sky.get("fog_depth_end")), own_end, "%s: ...and its end" % label)
+	_expect_fog_is(environment, sea, float(sky.get("fog_depth_begin")), float(sky.get("fog_depth_end")), "%s: after load" % label)
+
+	# A Remote-tab edit: on screen at once, and still there later.
+	sky.set("fog_depth_begin", 30.0)
+	sky.set("fog_depth_end", 50.0)
+	_expect_fog_is(environment, sea, 30.0, 50.0, "%s: an edit to RegionSky" % label)
+	for i in 10:
+		await process_frame
+	_expect_fog_is(environment, sea, 30.0, 50.0, "%s: ...still there ten frames on" % label)
+
+	# The zone intro: its override on screen, the exports untouched; an
+	# edit under it is where it lands.
+	var intro: Node = _field.get_node_or_null("ZoneIntro")
+	if intro != null and bool(intro.call("play")):
+		for i in 3:
+			await process_frame
+		_expect(bool(sky.call("has_fog_override")), "%s: the intro borrows the fog through the override" % label)
+		_expect(not is_equal_approx(environment.fog_depth_begin, 30.0), "%s: ...its fog on screen, not the region's" % label)
+		_expect_near(float(sky.get("fog_depth_begin")), 30.0, "%s: ...the region's begin left alone" % label)
+		sky.set("fog_depth_begin", 24.0)
+		_expect(not is_equal_approx(environment.fog_depth_begin, 24.0), "%s: an edit under the intro waits for it" % label)
+		intro.call("_finish")
+		_expect(not bool(sky.call("has_fog_override")), "%s: the intro's finish clears the override" % label)
+		_expect_fog_is(environment, sea, 24.0, 50.0, "%s: ...landing on the region's fog as edited under it" % label)
+	else:
+		_fail("%s: the zone intro would not play" % label)
+	await _teardown()
+	_completed += 1
+
+func _expect_fog_is(environment: Environment, sea: Node, begin: float, end: float, label: String) -> void:
+	_expect_near(environment.fog_depth_begin, begin, "%s: the Environment's fog begin" % label)
+	_expect_near(environment.fog_depth_end, end, "%s: the Environment's fog end" % label)
+	if sea != null:
+		_expect_near(float(sea.get("fog_near_distance")), begin, "%s: the Sea's fog near" % label)
+		_expect_near(float(sea.get("fog_far_distance")), end, "%s: the Sea's fog far" % label)
 
 func _first_enemy() -> Node:
 	var enemies: Array[Node] = _field.get_tree().get_nodes_in_group("enemies")

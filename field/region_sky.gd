@@ -1,10 +1,20 @@
 extends WorldEnvironment
 class_name RegionSky
 
-# The depth fog's values have just been (re)applied - at _ready() and on a
-# live fog_depth_begin/end or fog_light_energy edit (the zone intro's
-# tween, a floor's own fog). RegionField re-pushes the enemies' fog
-# overlays on it (FieldEnemy.refresh_fog()).
+# The field's fog has one source: this node. Its fog exports are the
+# steady state - the scene's values, a floor's own (FloorData, applied by
+# RegionField at load), or a live Remote-tab edit - and each writes
+# through to the Environment at once and stays. The zone intro borrows
+# the depth fog through set_fog_override() / clear_fog_override(), which
+# never touch the exports: it tweens toward the exports as they stand
+# that frame, so an edit made under it is where it lands. Everything else
+# that draws fog itself - the Sea's own copy, the enemies' overlays -
+# reads the fog as it stands now (current_fog_depth_begin()/end()) on
+# fog_changed.
+
+# The fog on screen has just changed - at _ready(), on any fog export
+# edit, and on every override step. RegionField re-pushes the Sea's fog
+# and the enemies' overlays on it.
 signal fog_changed()
 
 @export var sky_top_color: Color = Color(0.82, 0.85, 0.86)
@@ -23,23 +33,36 @@ signal fog_changed()
 # density never reaches opacity inside the field). Colour matched to
 # the sky at the horizon, no aerial-perspective blend (a flat colour, so
 # nothing in the sky - sun halo, gradient - shows through the fog).
-@export var fog_mode: Environment.FogMode = Environment.FOG_MODE_DEPTH
-@export var fog_color: Color = Color(0.87, 0.88, 0.85)
-@export var fog_density: float = 1.0
-# Live setters (the other fog exports still apply once in _ready()): the
-# zone intro (ZoneIntro) opens on a far fog and tweens these two back to
-# the values authored here, reading them off this node first - so these
-# stay the region's real fog, and the intro only borrows them.
+@export var fog_mode: Environment.FogMode = Environment.FOG_MODE_DEPTH:
+	set(value):
+		fog_mode = value
+		_apply_fog()
+@export var fog_color: Color = Color(0.87, 0.88, 0.85):
+	set(value):
+		fog_color = value
+		_apply_fog()
+@export var fog_density: float = 1.0:
+	set(value):
+		fog_density = value
+		_apply_fog()
+# The steady-state depth fog, camera metres. A floor's own pair replaces
+# these at load; the zone intro only overrides them (see the class doc).
 @export var fog_depth_begin: float = 14.0:
 	set(value):
 		fog_depth_begin = value
-		_apply_fog_depth()
+		_apply_fog()
 @export var fog_depth_end: float = 28.0:
 	set(value):
 		fog_depth_end = value
-		_apply_fog_depth()
-@export var fog_sky_affect: float = 1.0
-@export var fog_aerial_perspective: float = 0.0
+		_apply_fog()
+@export var fog_sky_affect: float = 1.0:
+	set(value):
+		fog_sky_affect = value
+		_apply_fog()
+@export var fog_aerial_perspective: float = 0.0:
+	set(value):
+		fog_aerial_perspective = value
+		_apply_fog()
 # Tonemapping shifts how the fog itself reads (AgX/Filmic both compress
 # highlights differently than linear) - exposed here so that can be
 # corrected independently of fog_color/fog_density above, which stay
@@ -48,7 +71,7 @@ signal fog_changed()
 @export var fog_light_energy: float = 1.0:
 	set(value):
 		fog_light_energy = value
-		_apply_fog_light_energy()
+		_apply_fog()
 # Flat color fill instead of the sky's own color - AMBIENT_SOURCE_SKY was
 # tinting every surface (sand most of all) noticeably blue, since the
 # procedural sky's horizon/top colors lean cool. Neutral grey (no warm
@@ -145,6 +168,10 @@ signal fog_changed()
 		_apply_adjustments()
 
 var _environment: Environment
+# The zone intro's borrowed depth fog while it runs (set_fog_override()).
+var _override_active: bool = false
+var _override_begin: float = 0.0
+var _override_end: float = 0.0
 
 func _ready() -> void:
 	var sky_material := ProceduralSkyMaterial.new()
@@ -161,15 +188,8 @@ func _ready() -> void:
 	_environment.background_mode = Environment.BG_SKY
 	_environment.sky = sky
 	_environment.fog_enabled = true
-	_environment.fog_mode = fog_mode
-	_environment.fog_light_color = fog_color
-	_environment.fog_density = fog_density
-	_environment.fog_depth_begin = fog_depth_begin
-	_environment.fog_depth_end = fog_depth_end
-	_environment.fog_sky_affect = fog_sky_affect
-	_environment.fog_aerial_perspective = fog_aerial_perspective
 	_apply_ambient()
-	_apply_fog_light_energy()
+	_apply_fog()
 	_apply_tonemap()
 	_apply_ssao()
 	_apply_ssil()
@@ -181,6 +201,30 @@ func _ready() -> void:
 	_push_pool_color()
 	fog_changed.emit()
 
+# The depth fog on screen now: the override while one is up, else the
+# exports.
+func current_fog_depth_begin() -> float:
+	return _override_begin if _override_active else fog_depth_begin
+
+func current_fog_depth_end() -> float:
+	return _override_end if _override_active else fog_depth_end
+
+# The zone intro's borrowed depth fog: on screen at once, the exports
+# untouched.
+func set_fog_override(begin: float, end: float) -> void:
+	_override_active = true
+	_override_begin = begin
+	_override_end = end
+	_apply_fog()
+
+# Back to the exports as they stand now.
+func clear_fog_override() -> void:
+	_override_active = false
+	_apply_fog()
+
+func has_fog_override() -> bool:
+	return _override_active
+
 # Guarded the same way _push_pool_color() already is: ambient_color/
 # ambient_energy's setters can fire during scene deserialization, before
 # _ready() has built _environment.
@@ -191,17 +235,19 @@ func _apply_ambient() -> void:
 	_environment.ambient_light_color = ambient_color
 	_environment.ambient_light_energy = ambient_energy
 
-func _apply_fog_light_energy() -> void:
+# Every fog value onto the Environment, then fog_changed. Guarded like
+# _apply_ambient(): the setters fire during deserialization too.
+func _apply_fog() -> void:
 	if _environment == null:
 		return
+	_environment.fog_mode = fog_mode
+	_environment.fog_light_color = fog_color
 	_environment.fog_light_energy = fog_light_energy
-	fog_changed.emit()
-
-func _apply_fog_depth() -> void:
-	if _environment == null:
-		return
-	_environment.fog_depth_begin = fog_depth_begin
-	_environment.fog_depth_end = fog_depth_end
+	_environment.fog_density = fog_density
+	_environment.fog_depth_begin = current_fog_depth_begin()
+	_environment.fog_depth_end = current_fog_depth_end()
+	_environment.fog_sky_affect = fog_sky_affect
+	_environment.fog_aerial_perspective = fog_aerial_perspective
 	fog_changed.emit()
 
 func _apply_tonemap() -> void:
