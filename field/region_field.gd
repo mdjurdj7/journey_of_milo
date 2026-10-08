@@ -250,6 +250,35 @@ static func reset_hold_line_spoken() -> void:
 # shape as shoreline_wall_margin already does on the seaward side. See
 # _rebuild_boundary_walls()'s own doc for how "worst-case" is computed
 # from Ground's own landmass exports.
+@export_group("Pathing")
+# The walk grid (NavGrid): its cell, the margin every obstacle is grown by
+# (his radius plus a clearance), how deep water has to be before it is
+# never planned through, and what a shallow cell costs against a dry one.
+# Each rebuilds the grid live.
+@export var nav_cell_size: float = 0.35:
+	set(value):
+		nav_cell_size = maxf(value, 0.1)
+		_queue_nav_build()
+@export var nav_agent_radius: float = 0.4:
+	set(value):
+		nav_agent_radius = value
+		_queue_nav_build()
+@export var nav_clearance: float = 0.1:
+	set(value):
+		nav_clearance = value
+		_queue_nav_build()
+@export var nav_deep_water_depth_m: float = 0.6:
+	set(value):
+		nav_deep_water_depth_m = value
+		_queue_nav_build()
+@export var nav_shallows_cost: float = 6.0:
+	set(value):
+		nav_shallows_cost = value
+		_queue_nav_build()
+# The margin an enemy's contact zone is grown by when a path goes round it.
+@export var nav_contact_margin: float = 0.5
+@export_group("")
+
 @export var side_wade_margin: float = 4.0:
 	set(value):
 		side_wade_margin = value
@@ -316,6 +345,10 @@ var _boundary_span_length: float = 0.0
 
 var _wall_inland: StaticBody3D = null
 var _wall_shoreward: StaticBody3D = null
+# Where the Wanderer can walk (NavGrid), built from this floor's data once
+# the relief and everything on it stand - see _build_nav_grid().
+var _nav: NavGrid = null
+var _nav_build_queued: bool = false
 var _wall_left: StaticBody3D = null
 var _wall_right: StaticBody3D = null
 # The walls' centre-line rectangle, kept for get_wall_rect().
@@ -555,6 +588,11 @@ func _ready() -> void:
 	var ground := get_node_or_null(ground_path) as Ground
 	if ground != null:
 		ground.relief_rebuilt.connect(_rebuild_boundary_walls)
+		# The walk grid follows the relief: built once everything on it has
+		# placed itself (deferred), and again on any live rebuild.
+		ground.relief_rebuilt.connect(_queue_nav_build)
+		if ground.is_built():
+			_queue_nav_build()
 
 	# Last, with the gate placed (the camera's inland limit is set) and the
 	# HUD seeded: the new run's zone intro, once, on the region's first
@@ -2211,6 +2249,68 @@ func _build_boundary() -> void:
 # strip of X between the field's own edge and the pushed-out side wall, at
 # each end-cap's Z line, would have no collision at all, letting the
 # Wanderer walk around it. Inland stays unconditionally dry.
+# --- Pathing ---
+
+func get_nav_grid() -> NavGrid:
+	return _nav
+
+func _queue_nav_build() -> void:
+	if _nav_build_queued or not is_inside_tree():
+		return
+	_nav_build_queued = true
+	call_deferred("_build_nav_grid")
+
+# The grid over the boundary walls' rectangle: Ground's heights, the sea's
+# level, and every static body's shapes but the ground's own, walk
+# surfaces (rock shelves, the spawn slab), the boundary walls and the
+# ExitGate's Blocker (stamped per query while it stands - see
+# _nav_dynamic_shapes()).
+func _build_nav_grid() -> void:
+	_nav_build_queued = false
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground == null or not ground.is_built():
+		return
+	var rect: Rect2
+	if ground.has_landmass_mask():
+		rect = ground.get_landmass_bounds().grow(side_wade_margin)
+	else:
+		rect = Rect2(Vector2(-ground.relief_extent.x * 0.5, -ground.relief_extent.y * 0.5), ground.relief_extent)
+	var sea := get_node_or_null(^"Sea")
+	var sea_level: float = float(sea.get("sea_level")) if sea != null else 0.0
+	var grid := NavGrid.new()
+	grid.cell_size = nav_cell_size
+	grid.inflation = nav_agent_radius + nav_clearance
+	grid.deep_water_depth = nav_deep_water_depth_m
+	grid.shallows_cost = nav_shallows_cost
+	if wanderer != null:
+		grid.step_height = wanderer.step_height
+		grid.max_slope_degrees = rad_to_deg(wanderer.floor_max_angle)
+	grid.build(ground, sea_level, rect, _nav_static_shapes(ground))
+	_nav = grid
+	print("RegionField: walk grid %d x %d at %.2f m (%.0f x %.0f m) in %d ms" % [grid.cols, grid.rows, grid.cell_size, rect.size.x, rect.size.y, grid.build_msec])
+
+func _nav_static_shapes(ground: Ground) -> Array[CollisionShape3D]:
+	var shapes: Array[CollisionShape3D] = []
+	var skip: Array[Node] = [ground, _wall_inland, _wall_shoreward, _wall_left, _wall_right]
+	var gate := get_node_or_null(exit_gate_path)
+	if gate != null:
+		skip.append(gate.get_node_or_null(^"Blocker"))
+	for node in find_children("*", "StaticBody3D", true, false):
+		if skip.has(node) or node is RockShelf or node.name == &"SpawnSlabBody":
+			continue
+		for child in node.find_children("*", "CollisionShape3D", true, false):
+			shapes.append(child as CollisionShape3D)
+	return shapes
+
+# The closed channel's Blocker while it stands.
+func _nav_dynamic_shapes() -> Array[CollisionShape3D]:
+	var shapes: Array[CollisionShape3D] = []
+	var gate := get_node_or_null(exit_gate_path)
+	var blocker := gate.get_node_or_null(^"Blocker/CollisionShape3D") as CollisionShape3D if gate != null else null
+	if blocker != null and not blocker.disabled:
+		shapes.append(blocker)
+	return shapes
+
 func _rebuild_boundary_walls() -> void:
 	if _wall_inland != null:
 		_wall_inland.queue_free()
