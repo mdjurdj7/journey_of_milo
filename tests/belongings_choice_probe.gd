@@ -128,6 +128,11 @@ func _check_take(taken: int, glassbone_slot: int, held: bool) -> void:
 		_expect(not deck.is_empty() and deck.back().get("card_name") == load(CARD_PATH).get("card_name"), "%s: the pack's card is the one added" % label)
 	var noted: bool = (_run_state.get("keepsakes_offered") as Array).has(load(OFFERED_PATH).get("id"))
 	_expect(noted == (taken == BEDROLL), "%s: the bedroll's keepsake %s offered" % [label, "noted" if noted else "not noted"])
+	var tiles: Array = screen.call("get_keepsake_tiles")
+	if taken == BEDROLL:
+		_expect(tiles.size() == 1 and tiles[0].call("get_keepsake") == load(OFFERED_PATH), "%s: the reveal shows the bedroll's keepsake as a tile" % label)
+	else:
+		_expect(tiles.is_empty(), "%s: no keepsake tile for another column" % label)
 
 	if taken == WALK_ON:
 		_expect(report == [-1], "%s: walking on closes at once, reporting -1 (got %s)" % [label, report])
@@ -161,6 +166,14 @@ func _check_full_slot(answer: int, glassbone_slot: int) -> void:
 		_expect(asked[key] == expected[key], "%s: at the reveal, %s %s, expected %s" % [label, key, asked[key], expected[key]])
 	_expect((_run_state.get("keepsakes_offered") as Array).has(load(OFFERED_PATH).get("id")), "%s: the bedroll's keepsake noted offered at the reveal" % label)
 	_expect(bool(screen.get("_asking")), "%s: the question is open" % label)
+	var tiles: Array = screen.call("get_keepsake_tiles")
+	_expect(tiles.size() == 2, "%s: HELD and OFFERED tiles both shown (got %d)" % [label, tiles.size()])
+	if tiles.size() == 2:
+		var held_tile: Control = tiles[0]
+		var offered_tile: Control = tiles[1]
+		_expect(held_tile.call("get_keepsake") == load(HELD_PATH) and offered_tile.call("get_keepsake") == load(OFFERED_PATH), "%s: the held one first, the offered one second" % label)
+		_expect(is_equal_approx(held_tile.position.y, offered_tile.position.y) and held_tile.position.x + held_tile.call("get_tile_size").x < offered_tile.position.x, "%s: side by side, apart" % label)
+		_expect(float(screen.call("_choice_baseline", REPLACE)) > offered_tile.position.y + offered_tile.call("get_tile_size").y, "%s: the choices sit under the tiles" % label)
 
 	# No timeout, and nothing but an answer closes it.
 	for other in [CASE, PACK, BEDROLL, WALK_ON]:
