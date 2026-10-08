@@ -120,7 +120,7 @@
           "encounters": [
             {
               "cluster": "crab",
-              "names": "Sputter + Dragonfly",
+              "names": "Sputter + Underfoot",
               "required": true,
               "elite": false,
               "gate_fight": true,
@@ -158,17 +158,17 @@
                 },
                 {
                   "index": 1,
-                  "name": "Dragonfly",
-                  "enemy_file": "res://battle/rules/enemies/dragonfly_lone.tres",
-                  "hp": 14,
+                  "name": "Underfoot",
+                  "enemy_file": "res://battle/rules/enemies/underfoot.tres",
+                  "hp": 34,
                   "required": true,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
-                    0.0,
-                    -22.0
+                    -0.75,
+                    -21.3
                   ],
-                  "yaw_degrees": -167.0,
+                  "yaw_degrees": -121.3,
                   "face_prop": null
                 }
               ],
@@ -613,6 +613,7 @@
           "class": "StorkTells"
         },
         "contact_radius_m": 2.0,
+        "cluster_gap_m": null,
         "rest_height_m": 0.0,
         "sink_m": 0.0,
         "battle_hover_m": 0.0,
@@ -728,6 +729,7 @@
           "class": "DragonflyWings"
         },
         "contact_radius_m": 2.0,
+        "cluster_gap_m": null,
         "rest_height_m": 0.12,
         "sink_m": 0.0,
         "battle_hover_m": 0.45,
@@ -820,6 +822,7 @@
           "class": "DragonflyWings"
         },
         "contact_radius_m": 2.0,
+        "cluster_gap_m": null,
         "rest_height_m": 0.12,
         "sink_m": 0.0,
         "battle_hover_m": 0.45,
@@ -859,15 +862,7 @@
         "status_gained": null,
         "attachment": {}
       },
-      "appears_on": [
-        {
-          "region": 1,
-          "floor": 2,
-          "cluster": "crab",
-          "required": true,
-          "gate_fight": true
-        }
-      ]
+      "appears_on": []
     },
     {
       "name": "Dunecur",
@@ -885,6 +880,7 @@
           "class": "DunecurPose"
         },
         "contact_radius_m": 3.0,
+        "cluster_gap_m": null,
         "rest_height_m": 0.0,
         "sink_m": 0.0,
         "battle_hover_m": 0.0,
@@ -981,6 +977,7 @@
           "class": "GreyshelfPose"
         },
         "contact_radius_m": 3.2,
+        "cluster_gap_m": null,
         "rest_height_m": 0.0,
         "sink_m": 0.3,
         "battle_hover_m": 0.0,
@@ -1116,6 +1113,7 @@
           "class": "SputterClaws"
         },
         "contact_radius_m": 2.0,
+        "cluster_gap_m": null,
         "rest_height_m": 0.0,
         "sink_m": 0.0,
         "battle_hover_m": 0.0,
@@ -1194,6 +1192,7 @@
           "class": "RearPose"
         },
         "contact_radius_m": 1.0,
+        "cluster_gap_m": null,
         "rest_height_m": -0.66,
         "sink_m": 0.0,
         "battle_hover_m": -0.08,
@@ -1273,6 +1272,7 @@
           "class": "SputterClaws"
         },
         "contact_radius_m": 2.0,
+        "cluster_gap_m": null,
         "rest_height_m": 0.0,
         "sink_m": 0.0,
         "battle_hover_m": 0.0,
@@ -1373,6 +1373,7 @@
         "model_yaw_offset_degrees": 180.0,
         "attachment": null,
         "contact_radius_m": 1.5,
+        "cluster_gap_m": 1.85,
         "rest_height_m": 0.0,
         "sink_m": 0.0,
         "battle_hover_m": 0.0,
@@ -1449,7 +1450,15 @@
         "status_gained": null,
         "attachment": {}
       },
-      "appears_on": []
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 2,
+          "cluster": "crab",
+          "required": true,
+          "gate_fight": true
+        }
+      ]
     },
     {
       "name": "Wardling",
@@ -1467,6 +1476,7 @@
           "class": "HeadTurn"
         },
         "contact_radius_m": 2.0,
+        "cluster_gap_m": null,
         "rest_height_m": 0.0,
         "sink_m": 0.0,
         "battle_hover_m": 0.0,

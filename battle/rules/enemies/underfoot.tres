@@ -27,3 +27,5 @@ intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_sting"), SubR
 ; Placeholder hit, the Greyshelf's (DESIGN.md).
 contact_sounds = Array[AudioStream]([ExtResource("5_hit")])
 contact_radius_m = 1.5
+; The Sputter's rear 0.535 m + its own nose 0.90 m + 0.4 m clear.
+cluster_gap_m = 1.85

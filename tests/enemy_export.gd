@@ -287,6 +287,7 @@ static func _field_entry(data: EnemyData) -> Dictionary:
 		"model_yaw_offset_degrees": _num(data.model_yaw_offset_degrees),
 		"attachment": attachment,
 		"contact_radius_m": _num(data.contact_radius_m),
+		"cluster_gap_m": _num(data.cluster_gap_m) if data.cluster_gap_m >= 0.0 else null,
 		"rest_height_m": _num(data.rest_height_m),
 		"sink_m": _num(data.sink_m),
 		"battle_hover_m": _num(data.battle_hover_m),

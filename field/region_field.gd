@@ -1653,7 +1653,8 @@ func _battle_members_for(enemy: FieldEnemy) -> Array[FieldEnemy]:
 # the Wanderer's approach: it starts at the anchor (the first member -
 # its FieldEnemy.anchor, else the nearest - which keeps its spot) and
 # runs toward the member farthest from it, the
-# others stepping onto it cluster_member_gap apart in order of how far
+# others stepping onto it cluster_member_gap apart (or a member's own
+# EnemyData.cluster_gap_m from the one before it) in order of how far
 # along it they already stand. Returns the direction from the anchor
 # back toward where the Wanderer stands (the line extended past its near
 # end), for Wanderer.enter_battle_stance(); ZERO for a lone enemy, which
@@ -1697,11 +1698,20 @@ func _place_cluster_line(members: Array[FieldEnemy], duration: float) -> Vector3
 		print("RegionField: the line steps %.1f m in from '%s' to keep the stance on dry sand (%.1f m out)." % [shift, anchor.name, spacing])
 		anchor.step_to(start + along * shift, duration)
 	_line_stance_spacing = spacing - shift
+	var offset: float = shift
 	for index in rest.size():
-		var spot: Vector3 = start + along * (shift + cluster_member_gap * float(index + 1))
+		offset += _cluster_gap_for(rest[index])
+		var spot: Vector3 = start + along * offset
 		rest[index].step_to(spot, duration)
 		members[index + 1] = rest[index]
 	return -along
+
+# How far a member stands from the one before it in its cluster's line:
+# its own EnemyData.cluster_gap_m, else the shared cluster_member_gap.
+func _cluster_gap_for(member: FieldEnemy) -> float:
+	if member.enemy_data != null and member.enemy_data.cluster_gap_m >= 0.0:
+		return member.enemy_data.cluster_gap_m
+	return cluster_member_gap
 
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# Two contact areas can fire in one physics frame; the second must

@@ -6,7 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://don06thfbbany" path="res://assets/field/masks/Map3_mask_x1.25_alcove.png" id="4_map3"]
 [ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="5_sputter"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/dragonfly.tres" id="11_dragonfly"]
-[ext_resource type="Resource" path="res://battle/rules/enemies/dragonfly_lone.tres" id="18_dragonfly_lone"]
+[ext_resource type="Resource" path="res://battle/rules/enemies/underfoot.tres" id="18_underfoot"]
 [ext_resource type="Script" path="res://floors/floor_patrol.gd" id="12_floor_patrol"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="7_wanderer_pool"]
 [ext_resource type="Texture2D" uid="uid://i82lal47k3wr" path="res://assets/field/masks/Map3_elev_x1.25_dune.png" id="8_map3_elev"]
@@ -26,11 +26,11 @@ yaw_degrees = 133.0
 group = &"crab"
 anchor = true
 
-[sub_resource type="Resource" id="FloorEnemy_crab_dragonfly"]
+[sub_resource type="Resource" id="FloorEnemy_crab_underfoot"]
 script = ExtResource("2_floor_enemy")
-enemy_data = ExtResource("18_dragonfly_lone")
-position = Vector2(0, -22)
-yaw_degrees = -167.0
+enemy_data = ExtResource("18_underfoot")
+position = Vector2(-0.75, -21.3)
+yaw_degrees = -121.3
 group = &"crab"
 
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly1"]
@@ -107,7 +107,7 @@ relief_amplitude = 0.18
 caustic_strength = 0.12
 relief_extent = Vector2(125, 88)
 relief_subdivisions = Vector2i(356, 251)
-enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_crab_dragonfly"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3"), SubResource("FloorEnemy_siltjaw")])
+enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_crab_underfoot"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3"), SubResource("FloorEnemy_siltjaw")])
 props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_trough"), SubResource("FloorProp_alcove_cache"), SubResource("FloorProp_rock_shelf")])
 patrols = Array[ExtResource("12_floor_patrol")]([SubResource("FloorPatrol_island")])
 exit_kind = 1

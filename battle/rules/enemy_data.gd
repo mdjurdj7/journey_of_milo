@@ -161,3 +161,8 @@ class_name EnemyData
 # enemy's; a roaming one wants its own body's size, so drifting past him
 # never reaches out and takes him.
 @export var contact_radius_m: float = 2.0
+# Metres from the member before it to this one when its cluster forms
+# its fighting line (RegionField._place_cluster_line()), in place of
+# RegionField.cluster_member_gap - a long body wants more room than the
+# shared gap gives. -1 = the shared gap.
+@export var cluster_gap_m: float = -1.0

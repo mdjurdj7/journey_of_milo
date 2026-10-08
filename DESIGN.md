@@ -502,3 +502,7 @@ folder (run_log_probe). (2026-10-04.)
   files it reads. The card export needs a real CardView for its face text
   and rules font size, so its generator builds one. (2026-10-05, enemy
   export.)
+- **The Underfoot's contact sound is a placeholder.** Its
+  `contact_sounds` borrow `combat_old/hit.wav`, as the Greyshelf, the
+  Dunecur and the Wardling do, until a hit on a sand-covered ray is
+  recorded. (2026-10-08, Underfoot.)
