@@ -1679,7 +1679,7 @@
       "face_type_label": "STRIKE",
       "energy_cost": 1,
       "rarity": "COMMON",
-      "card_text": "Deal 5 damage.",
+      "card_text": "Deal 6 damage.",
       "face_hp_line": null,
       "card_text_template": "Deal {damage} damage.",
       "targeting": "enemy",
@@ -1687,12 +1687,12 @@
       "effects": [
         {
           "type": "DAMAGE",
-          "plain_english": "Deal 5 damage to the target."
+          "plain_english": "Deal 6 damage to the target."
         }
       ],
       "keywords": [],
       "self_hp_cost": 0,
-      "base_damage": 5,
+      "base_damage": 6,
       "base_block": null,
       "draw": null,
       "energy_gain": null,
