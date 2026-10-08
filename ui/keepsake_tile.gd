@@ -68,7 +68,7 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 @export_group("")
 
 @export_group("Art")
-@export var art_size_px: float = 104.0:
+@export var art_size_px: float = 96.0:
 	set(value):
 		art_size_px = value
 		_relayout()
@@ -136,6 +136,9 @@ var _paper: Control = null
 var _face: Control = null
 var _paper_seed: float = 0.0
 var _lore_font: Font = null
+# Held: a TextParagraph keeps only its fonts' RIDs, and a font nothing
+# else holds is freed before the paragraph shapes.
+var _rules_font: Font = null
 # Laid out, in scaled pixels.
 var _art_rect: Rect2 = Rect2()
 var _name_baseline: float = 0.0
@@ -221,6 +224,8 @@ func _relayout() -> void:
 	style.shadow_size = roundi(_px(shadow_size_px))
 	style.shadow_offset = Vector2(0.0, _px(shadow_offset_px))
 	_shadow.add_theme_stylebox_override("panel", style)
+	if _rules_font == null:
+		_rules_font = InkType.text_font()
 	if _lore_font == null:
 		var slanted := FontVariation.new()
 		slanted.base_font = load(LORE_FONT_PATH) as Font
@@ -244,7 +249,7 @@ func _relayout() -> void:
 		_rules_size = sizes[i]
 		_rules = TextParagraph.new()
 		_rules.width = text_width
-		_rules.add_string(_keepsake.describe() if _keepsake != null else "", InkType.text_font(), _font_px(_rules_size))
+		_rules.add_string(_keepsake.describe() if _keepsake != null else "", _rules_font, _font_px(_rules_size))
 		_place_lore()
 		if fits():
 			break
