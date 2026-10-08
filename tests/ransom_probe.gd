@@ -122,12 +122,12 @@ func _check_heal_and_block() -> void:
 	var player: Combatant = _player(false)
 	var enemy := Combatant.new(ENEMY_HP)
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq([ENEMY_HP - enemy.hp, _healed], [5, 0], "Without Ransom, Slash deals 5 and heals nothing")
+	_expect_eq([ENEMY_HP - enemy.hp, _healed], [6, 0], "Without Ransom, Slash deals 6 and heals nothing")
 	player = _player()
 	enemy = Combatant.new(ENEMY_HP)
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq(_healed, 2, "Draining, Slash heals half the 5 it dealt: 2")
-	_expect_eq(player.hp, PLAYER_HP + 2, "...onto the player's HP")
+	_expect_eq(_healed, 3, "Draining, Slash heals half the 6 it dealt: 3")
+	_expect_eq(player.hp, PLAYER_HP + 3, "...onto the player's HP")
 	enemy.block = 3
 	_resolve(SLASH_PATH, player, [enemy], enemy)
 	_expect_eq(_healed, 1, "3 Block: Slash heals half the 2 that got through: 1")
@@ -170,7 +170,7 @@ func _check_bonuses() -> void:
 	var come_due: StatusData = load(COME_DUE_STATUS_PATH)
 	Status.apply_to(enemy.statuses, come_due)
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	var marked: int = 5 + come_due.attack_bonus_against_holder
+	var marked: int = 6 + come_due.attack_bonus_against_holder
 	_expect_eq([ENEMY_HP - enemy.hp, _healed], [marked, marked / 2], "Come Due's +%d: Slash deals %d and heals %d" % [come_due.attack_bonus_against_holder, marked, marked / 2])
 	player = _player()
 	enemy = Combatant.new(ENEMY_HP)
@@ -179,8 +179,8 @@ func _check_bonuses() -> void:
 	var bonus: int = AttackBonus.for_player(player, player.hp - price)
 	_expect(bonus > 0 and price > 0, "Self-Eater charges HP and adds damage")
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq([ENEMY_HP - enemy.hp, _healed], [5 + bonus, (5 + bonus) / 2], "Self-Eater's +%d: Slash deals %d and heals %d" % [bonus, 5 + bonus, (5 + bonus) / 2])
-	_expect_eq(player.hp, PLAYER_HP - price + (5 + bonus) / 2, "...after its %d HP price" % price)
+	_expect_eq([ENEMY_HP - enemy.hp, _healed], [6 + bonus, (6 + bonus) / 2], "Self-Eater's +%d: Slash deals %d and heals %d" % [bonus, 6 + bonus, (6 + bonus) / 2])
+	_expect_eq(player.hp, PLAYER_HP - price + (6 + bonus) / 2, "...after its %d HP price" % price)
 	_completed += 1
 
 # With Grace open, a hit's damage reclaims Grace first; Drain heals half
@@ -192,14 +192,14 @@ func _check_grace() -> void:
 	var enemy := Combatant.new(ENEMY_HP)
 	Status.apply_to(enemy.statuses, load(COME_DUE_STATUS_PATH))
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq(ENEMY_HP - enemy.hp, 9, "Slash with Come Due deals 9")
-	_expect_eq([_reclaimed, _healed], [6, 1], "...Grace +6, Drain half the 3 left: +1")
-	_expect_eq([player.hp, player.grace], [PLAYER_HP + 7, 0], "...7 HP back in all, Grace spent")
+	_expect_eq(ENEMY_HP - enemy.hp, 10, "Slash with Come Due deals 10")
+	_expect_eq([_reclaimed, _healed], [6, 2], "...Grace +6, Drain half the 4 left: +2")
+	_expect_eq([player.hp, player.grace], [PLAYER_HP + 8, 0], "...8 HP back in all, Grace spent")
 	player = _player()
 	player.grace = 20
 	enemy = Combatant.new(ENEMY_HP)
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq([_reclaimed, _healed, player.grace], [5, 0, 15], "Grace bigger than the hit: Grace +5, Drain nothing")
+	_expect_eq([_reclaimed, _healed, player.grace], [6, 0, 14], "Grace bigger than the hit: Grace +6, Drain nothing")
 	_completed += 1
 
 # Reckoning, an Attack through its own resolver, Drains too - half, no

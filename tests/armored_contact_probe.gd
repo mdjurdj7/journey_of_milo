@@ -35,7 +35,7 @@ const SHELL_PATHS: Array[String] = [
 # The crack's ID from when it was hit_shell_1.mp3 - the dragonflies were
 # authored against it and must still find the same sound.
 const HIT_ARMOR_UID := "uid://co5jagvmbnmkr"
-const SLASH_DAMAGE := 5
+const SLASH_DAMAGE := 6
 const ENEMY_HP := 999
 # Seconds sampled after the impact: past the recoil's out leg and flash.
 const WATCH_SECONDS := 0.45

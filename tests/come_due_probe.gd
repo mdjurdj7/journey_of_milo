@@ -244,8 +244,8 @@ func _check_toll_never_negative() -> void:
 func _check_face_reads_mark() -> void:
 	var player: Combatant = _player()
 	var marked: Combatant = _marked(player)
-	_expect_eq(await _face_damage("slash", player, [marked]), 9, "Slash's face reads 9 against a Come Due enemy")
-	_expect_eq(await _face_damage("slash", player, [Combatant.new(100)]), 5, "...and 5 against an unmarked one")
+	_expect_eq(await _face_damage("slash", player, [marked]), 10, "Slash's face reads 10 against a Come Due enemy")
+	_expect_eq(await _face_damage("slash", player, [Combatant.new(100)]), 6, "...and 6 against an unmarked one")
 	_expect_eq(_charges(marked), 3, "...and reading it spends no charge")
 	_completed += 1
 
@@ -267,10 +267,10 @@ func _check_face_reverts() -> void:
 	var player: Combatant = _player()
 	var marked: Combatant = _marked(player)
 	for i in 3:
-		_expect_eq(await _face_damage("slash", player, [marked]), 9, "Slash reads 9 with %d charge(s) left" % (3 - i))
+		_expect_eq(await _face_damage("slash", player, [marked]), 10, "Slash reads 10 with %d charge(s) left" % (3 - i))
 		_play(_card("slash"), player, [marked])
 	_expect_eq(_charges(marked), 0, "...three Slashes spend all three charges")
-	_expect_eq(await _face_damage("slash", player, [marked]), 5, "...and Slash reads 5 again")
+	_expect_eq(await _face_damage("slash", player, [marked]), 6, "...and Slash reads 6 again")
 	_completed += 1
 
 # An all-enemies Attack's face leaves the mark out, even aimed at the

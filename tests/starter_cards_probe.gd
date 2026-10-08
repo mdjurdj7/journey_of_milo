@@ -128,7 +128,7 @@ func _check_starting_deck() -> void:
 
 func _check_slash_and_bite_down() -> void:
 	var player: Combatant = _player(50)
-	_expect_eq(_deal(_card("slash"), player), 5, "Slash deals 5")
+	_expect_eq(_deal(_card("slash"), player), 6, "Slash deals 6")
 	_expect_eq(_deal(_card("bite_down"), player), 8, "Bite Down deals 8")
 	_expect_eq(player.hp, 48, "Bite Down loses 2 HP")
 	_expect_eq(player.toll, 2, "Bite Down makes 2 Toll")

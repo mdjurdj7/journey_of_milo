@@ -29,8 +29,8 @@ const CARVE_PATH := "res://cards/data/carve.tres"
 const FLOOR_3 := 2
 const PLAYER_HP := 999
 const ENEMY_HP := 999
-const SLASH := 5
-const MARKED := 9
+const SLASH := 6
+const MARKED := 10
 const CARVE := 6
 const OFF_SCREEN := Vector2(-100000.0, -100000.0)
 const SAFETY_SECONDS := 300.0
@@ -75,31 +75,31 @@ func _initialize() -> void:
 # Two enemies and nothing armed: every face reads with the player's own
 # modifiers only - the mark on one of them left out.
 func _check_rest(controller: Node, slash: CardData, carve: CardData) -> void:
-	_expect_eq(_face_damage(controller, slash), SLASH, "At rest with two enemies, Slash reads 5")
+	_expect_eq(_face_damage(controller, slash), SLASH, "At rest with two enemies, Slash reads 6")
 	_expect_eq(_face_damage(controller, carve), CARVE, "...and Carve 6")
 	_completed += 1
 
-# Slash armed: 9 over the marked Blackback, 5 over the Nipper and over
-# no one (the default target lit then is not a hover), 9 again, and 5
-# once cancelled. The other Slash in hand stays 5 throughout.
+# Slash armed: 10 over the marked Blackback, 6 over the Nipper and over
+# no one (the default target lit then is not a hover), 10 again, and 6
+# once cancelled. The other Slash in hand stays 6 throughout.
 func _check_hover(controller: Node, slash: CardData, other: CardData, blackback: Node, nipper: Node) -> void:
 	controller.call("request_play", _view(controller, slash))
 	_expect(controller.call("is_awaiting_target"), "Slash arms")
 	_hover(controller, blackback)
-	_expect_eq(_face_damage(controller, slash), MARKED, "Armed over the marked Blackback, Slash reads 9")
-	_expect_eq(_face_damage(controller, other), SLASH, "...while the Slash still in hand reads 5")
+	_expect_eq(_face_damage(controller, slash), MARKED, "Armed over the marked Blackback, Slash reads 10")
+	_expect_eq(_face_damage(controller, other), SLASH, "...while the Slash still in hand reads 6")
 	_hover(controller, nipper)
-	_expect_eq(_face_damage(controller, slash), SLASH, "Over the Nipper it reads 5")
+	_expect_eq(_face_damage(controller, slash), SLASH, "Over the Nipper it reads 6")
 	_hover(controller, blackback)
-	_expect_eq(_face_damage(controller, slash), MARKED, "Back over the Blackback, 9")
+	_expect_eq(_face_damage(controller, slash), MARKED, "Back over the Blackback, 10")
 	controller.call("_update_hover", OFF_SCREEN)
-	_expect_eq(_face_damage(controller, slash), SLASH, "Over no enemy it reverts to 5")
+	_expect_eq(_face_damage(controller, slash), SLASH, "Over no enemy it reverts to 6")
 	_hover(controller, blackback)
 	controller.call("cancel_target")
-	_expect_eq(_face_damage(controller, slash), SLASH, "Cancelled over the Blackback, it reverts to 5")
+	_expect_eq(_face_damage(controller, slash), SLASH, "Cancelled over the Blackback, it reverts to 6")
 	_completed += 1
 
-# The Nipper dead, the Blackback is the only enemy: Slash reads 9 with no
+# The Nipper dead, the Blackback is the only enemy: Slash reads 10 with no
 # hover at all, and that is what it then takes off. Carve, beside it,
 # still reads 6 - it hits everyone, so no one enemy's mark is its number.
 func _check_lone_survivor(controller: Node, slash: CardData, carve: CardData, blackback: Node, nipper: Node) -> void:
@@ -111,7 +111,7 @@ func _check_lone_survivor(controller: Node, slash: CardData, carve: CardData, bl
 		await process_frame
 	controller.emit_signal("status_changed")
 	var face: int = _face_damage(controller, slash)
-	_expect_eq(face, MARKED, "With the Blackback alone, Slash reads 9 at rest")
+	_expect_eq(face, MARKED, "With the Blackback alone, Slash reads 10 at rest")
 	_expect_eq(_face_damage(controller, carve), CARVE, "...and Carve still 6")
 	var before: int = survivor.hp + survivor.block
 	(controller.get("player") as Combatant).energy = 3
