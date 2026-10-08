@@ -17,6 +17,8 @@
 [ext_resource type="Resource" path="res://battle/rules/enemies/siltjaw.tres" id="16_siltjaw"]
 [ext_resource type="PackedScene" path="res://field/rock_shelf.tscn" id="19_rock_shelf"]
 [ext_resource type="Texture2D" uid="uid://nkw6gcc8t1ld" path="res://assets/field/masks/Map3_rock_x1.25_shelf.png" id="17_map3_rock"]
+[ext_resource type="Script" path="res://floors/scatter/scatter_set.gd" id="21_scatter_set"]
+[ext_resource type="Resource" path="res://floors/scatter/floor2_shore.tres" id="22_shore_scatter"]
 
 [sub_resource type="Resource" id="FloorEnemy_sputter"]
 script = ExtResource("2_floor_enemy")
@@ -114,6 +116,8 @@ exit_kind = 1
 gate_distance_beyond_enemy = 7.5
 wear_path_mid_offset = 1.875
 wear_path_override = null
+scatter_sets = Array[ExtResource("21_scatter_set")]([ExtResource("22_shore_scatter")])
+scatter_budget = 300
 ambience_sea_db = -3.0
 ambience_wind_db = 1.0
 ambience_sea_lowpass_hz = 7000.0
