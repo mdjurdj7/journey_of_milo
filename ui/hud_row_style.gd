@@ -9,8 +9,9 @@ class_name HudRowStyle
 # An item reads, left to right: a glyph (InkGlyph, on the baseline at
 # about the numeral's cap height), the numeral in Spectral at full ink, an
 # optional secondary run ("/ 70", smaller and grey, as the HP readout's
-# max), and a small tracked caps label. A 2 px bone halo sits under all of
-# it, as the Block and HP readouts' values have. Every item is the same
+# max), and a small tracked caps label - ink straight on the world, no
+# halo (hud_halo_px 0; a positive value puts a bone halo under every part
+# again). Every item is the same
 # height (row_height()) with its baseline at row_baseline(), so items
 # beside each other share a baseline whatever their content.
 #
@@ -83,8 +84,9 @@ class_name HudRowStyle
 		emit_changed()
 
 @export_group("Halo")
-# Px each side of every stroke and glyph, under the ink. 0 = none.
-@export var hud_halo_px: float = 2.0:
+# Px each side of every stroke and glyph, under the ink. 0 (the row's
+# default) = none.
+@export var hud_halo_px: float = 0.0:
 	set(value):
 		hud_halo_px = value
 		emit_changed()

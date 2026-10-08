@@ -3,7 +3,7 @@ class_name InkLine
 
 # One item of the field HUD row, after the DeckPanel's DECK: a glyph, a
 # numeral in Spectral at full ink, an optional secondary run and a small
-# caps label, over a bone halo - the shape and every size, gap and alpha
+# caps label, ink on the world - the shape and every size, gap and alpha
 # come from the row's shared HudRowStyle (see its own doc). Drawn, not
 # boxed; sized to its own content. The base of HPLine, TollLine,
 # GoldLine, GlassboneLine and KeepsakeLine - the row's order after DECK,

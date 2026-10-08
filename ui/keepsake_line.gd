@@ -2,7 +2,8 @@ extends InkLine
 class_name KeepsakeLine
 
 # The field HUD row's keepsake: its name alone, in Spectral at
-# hud_keepsake_size_px, full ink over the bone halo, with a faint ink
+# hud_keepsake_size_px, full ink (the row's halo under it, when it has
+# one), with a faint ink
 # hairline under it that says it can be hovered - set apart at the end of
 # the row by hud_keepsake_gap_px, after GOLD and GLASSBONE (see InkLine
 # for the following, HudRowStyle for every size). No label, no icon, no
@@ -10,7 +11,8 @@ class_name KeepsakeLine
 #
 # Hovering the name shows what the keepsake does - TrinketData.describe()
 # alone, no name repeated - just above it, in the keepsake offer screen's
-# face (Alegreya Sans Regular, ink) over the halo, no backing; it fades
+# face (Alegreya Sans Regular, ink), no backing - over the row's halo when
+# it has one; it fades
 # out on mouse-out. The hover is polled, never a mouse event, so the click
 # under it still moves the Wanderer; a Control under the cursor wins, as
 # on HPBar.

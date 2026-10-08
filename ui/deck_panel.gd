@@ -28,7 +28,8 @@ class_name DeckPanel
 # The field instance alone also takes the field HUD row's look:
 # use_row_style() (RegionField) draws it as the row's first item - two
 # card outlines, the count as a Spectral numeral, "DECK" after it, over
-# the bone halo (see HudRowStyle) - and has it draw the row's optional
+# the row's halo when it has one (see HudRowStyle) - and has it draw the
+# row's optional
 # backing fade - and its count then counts to each new deck size over
 # the style's hud_count_sec, one ease-out (the first size it is shown, the
 # floor load, at once). The battle lines never get a row style and keep
