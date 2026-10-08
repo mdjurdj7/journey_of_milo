@@ -197,6 +197,10 @@ path_probes() {
 		assets/field/masks/region1_floor4_*|assets/field/masks/source/floor4/*) out=$(area_probes floor4) ;;
 		assets/field/masks/region1_floor5_*|assets/field/masks/source/floor5/*) out=$(area_probes floor5) ;;
 		ui/hp_bar.*) out=$(area_probes hp_bar) ;;
+		# The world-voice line: the hold line (hold_line), the collector's
+		# and the wagon's approach lines (collector, temper), and the
+		# Wardling's defeat line over a won fight (elite_reward, glassbone).
+		ui/world_voice_line.gd) out="hold_line collector temper elite_reward glassbone" ;;
 		# The keepsake's tile and examine view: every probe that shows one.
 		ui/keepsake_tile.*|ui/keepsake_examine.*) out="keepsake_tile trinket keeper_keepsake belongings_choice" ;;
 		ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd|ui/hp_line.gd|ui/ink_glyph.gd|ui/hud_row_style.gd) out=$(area_probes hud) ;;
