@@ -99,7 +99,7 @@ func _check_data() -> void:
 		_expect(tempered.tempered == null, "...and can't be tempered again")
 		_expect_eq(tempered.art, card.art, "...its art")
 	var slash: CardData = _tempered("slash")
-	_expect_eq(_values(slash, CardEffect.EffectType.DAMAGE), [8], "Slash+ deals 8")
+	_expect_eq(_values(slash, CardEffect.EffectType.DAMAGE), [9], "Slash+ deals 9")
 	var bite: CardData = _tempered("bite_down")
 	_expect_eq(_values(bite, CardEffect.EffectType.DAMAGE), [11], "Bite Down+ deals 11")
 	_expect_eq(_values(bite, CardEffect.EffectType.SELF_DAMAGE), [2], "...and loses 2 HP")
@@ -347,7 +347,7 @@ func _check_screen_temper() -> void:
 		var cost_mark: Variant = screen.get("_cost_mark")
 		match id:
 			"slash":
-				_expect_eq(text, "Deal [u]8[/u] damage.", "...Slash+ underlines its 8")
+				_expect_eq(text, "Deal [u]9[/u] damage.", "...Slash+ underlines its 9")
 			"bite_down":
 				_expect_eq(text, "Deal [u]11[/u] damage.\nThen lose 2 HP.", "...Bite Down+ underlines its 11 alone")
 			"brace":

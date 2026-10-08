@@ -6,7 +6,7 @@
 
 [sub_resource type="Resource" id="CardEffect_damage"]
 script = ExtResource("2_card_effect")
-value = 8
+value = 9
 
 [resource]
 script = ExtResource("1_card_data")

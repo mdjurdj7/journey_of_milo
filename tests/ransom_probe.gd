@@ -130,7 +130,7 @@ func _check_heal_and_block() -> void:
 	_expect_eq(player.hp, PLAYER_HP + 3, "...onto the player's HP")
 	enemy.block = 3
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq(_healed, 1, "3 Block: Slash heals half the 2 that got through: 1")
+	_expect_eq(_healed, 1, "3 Block: Slash heals half the 3 that got through: 1")
 	enemy.block = 10
 	_resolve(SLASH_PATH, player, [enemy], enemy)
 	_expect_eq(_healed, 0, "Block covering it all: no heal")
@@ -143,12 +143,12 @@ func _check_cap_and_overkill() -> void:
 	player.hp = PLAYER_MAX_HP - 1
 	var enemy := Combatant.new(ENEMY_HP)
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq(player.hp, PLAYER_MAX_HP, "1 below max, a 5's heal of 2 stops at max HP")
+	_expect_eq(player.hp, PLAYER_MAX_HP, "1 below max, a 6's heal of 3 stops at max HP")
 	player = _player()
 	enemy = Combatant.new(ENEMY_HP)
 	enemy.hp = 3
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq([enemy.hp, _healed], [0, 1], "A 5 that kills a 3-HP enemy heals half the 3: 1")
+	_expect_eq([enemy.hp, _healed], [0, 1], "A 6 that kills a 3-HP enemy heals half the 3: 1")
 	_completed += 1
 
 # Carve against two enemies, one with 2 Block: one heal, the total.
