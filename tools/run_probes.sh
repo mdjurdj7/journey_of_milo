@@ -67,6 +67,7 @@ leverage_probe 29
 glassbone_probe 27
 run_log_probe 30
 ransom_probe 26
+heavy_hit_probe 30
 gold_line_probe 19
 armored_contact_probe 10
 drain_probe 10 fixed
@@ -121,7 +122,7 @@ area_probes() {
 		# The fight's own UI: every probe that plays a real fight (which
 		# builds the battle overlay and its hand), plus the rules probes
 		# whose readouts and faces it shows.
-		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf underfoot play_order second_swing" ;;
+		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf underfoot play_order second_swing heavy_hit" ;;
 		*) return 1 ;;
 	esac
 }
