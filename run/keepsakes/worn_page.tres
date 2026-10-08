@@ -7,6 +7,7 @@
 script = ExtResource("1_trinket_data")
 id = &"worn_page"
 display_name = "Worn Page"
+flavor_text = "Folded along the same line many times."
 description = "Draw {draw} extra card{s} on your first turn of each combat."
 opening_draw_bonus = 1
 short_description = "+{draw} card on the first turn of each combat."

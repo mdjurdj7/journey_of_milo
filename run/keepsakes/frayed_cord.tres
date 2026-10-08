@@ -7,6 +7,7 @@
 script = ExtResource("1_trinket_data")
 id = &"frayed_cord"
 display_name = "Frayed Cord"
+flavor_text = "Tied off neatly, as if the bundle would be back."
 description = "At the end of your turn, you may keep {keep} card{s} in your hand."
 short_description = "Keep {keep} card{s} at the end of each turn."
 art = ExtResource("9_art")
