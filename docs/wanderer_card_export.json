@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the three in the belongings pool, and Endure, which no pool offers. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance and Second Swing",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing and Garnish",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 29,
+    "total_unique_wanderer_cards": 30,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 24,
+      "count": 25,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -76,11 +76,12 @@
         "Bide",
         "Deny",
         "Blood Advance",
-        "Second Swing"
+        "Second Swing",
+        "Garnish"
       ],
       "by_rarity": {
         "COMMON": 7,
-        "UNCOMMON": 10,
+        "UNCOMMON": 11,
         "RARE": 7
       },
       "weights": "all 1.0 (weights array empty)"
@@ -97,14 +98,14 @@
       "where": "floor 2's belongings (a RewardSpread prop on region1_floor2.tres)"
     },
     "wanderer_card_types": {
-      "SKILL": 14,
+      "SKILL": 15,
       "ATTACK": 9,
       "POWER": 4,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
       "COMMON": 11,
-      "UNCOMMON": 11,
+      "UNCOMMON": 12,
       "RARE": 7
     },
     "implemented_but_not_obtainable": [
@@ -192,6 +193,10 @@
       {
         "name": "Braced (enemy)",
         "rule": "Brace's debuff: the enemy's next Attack deals 50% less, every hit; gone once that Attack resolves."
+      },
+      {
+        "name": "Garnished (enemy)",
+        "rule": "Garnish's debuff: the enemy's next Attack deals 5 less in all, not per hit - its hits soak the 5 in order, none below 0 (Tail Lash 4×3 lands 0, 3, 4). After Braced's 50%, before Block. Copies add up (two: 10 less). Gone once that Attack resolves; a non-attack move, a Denied or interrupted Attack leave it standing."
       }
     ]
   },
@@ -984,6 +989,75 @@
         }
       ],
       "art_path": "res://cards/art/Wanderer/Dying Light.png",
+      "rules_font_px": 15,
+      "battle_animation": null,
+      "play_effect_scene_path": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Garnish",
+      "file_path": "res://cards/data/garnish.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "TOLL",
+      "energy_cost": 1,
+      "rarity": "UNCOMMON",
+      "card_text": "Target enemy's next Attack deals 5 less.\nGain 5 Toll.",
+      "face_hp_line": "−1 HP",
+      "card_text_template": "Target enemy's next Attack deals 5 less.\nGain 5 Toll.",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "SELF_DAMAGE_TOLL",
+          "plain_english": "Lose up to 1 HP (never below 1), then top Toll up so this card makes 5 Toll in total."
+        },
+        {
+          "type": "APPLY_STATUS_TO_TARGET",
+          "plain_english": "Apply Garnished 5 to the target enemy: Its next Attack deals 5 less."
+        }
+      ],
+      "keywords": [
+        "Toll"
+      ],
+      "self_hp_cost": 1,
+      "base_damage": null,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": 5,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "status_effect": {
+        "id": "garnished",
+        "name": "Garnished",
+        "description": "Its next Attack deals {value} less.",
+        "file_path": "res://battle/rules/statuses/garnished.tres",
+        "duration": "until triggered",
+        "stack_rule": "ADD_MAGNITUDE",
+        "applied_to": "target enemy",
+        "magnitude": 5,
+        "reduces_attack_total": true,
+        "consumed_by_holders_attack": true
+      },
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "cost",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "default_displayed": 1
+        }
+      ],
+      "art_path": "res://cards/art/Wanderer/Garnish.png",
       "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
