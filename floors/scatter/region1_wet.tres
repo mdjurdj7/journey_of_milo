@@ -1,0 +1,82 @@
+[gd_resource type="Resource" script_class="ScatterSet" format=3]
+
+[ext_resource type="Script" path="res://floors/scatter/scatter_set.gd" id="1_set"]
+[ext_resource type="Script" path="res://floors/scatter/scatter_entry.gd" id="2_entry"]
+
+[sub_resource type="Resource" id="ScatterEntry_cast"]
+script = ExtResource("2_entry")
+name = "lugworm_cast"
+placeholder = 0
+size_m = 0.07
+sink_fraction = 0.3
+resting = 0
+tint = Color(0.6, 0.57, 0.49, 1)
+zones = 5
+inland_range_m = Vector2(0.3, 3)
+clusters_per_100m2 = 5.0
+items_per_cluster = Vector2i(3, 7)
+cluster_spread_m = 0.45
+
+[sub_resource type="Resource" id="ScatterEntry_shell"]
+script = ExtResource("2_entry")
+name = "shell"
+placeholder = 1
+size_m = 0.04
+sink_fraction = 0.4
+resting = 1
+tint = Color(0.68, 0.66, 0.6, 1)
+zones = 5
+inland_range_m = Vector2(0, 2)
+clusters_per_100m2 = 3.0
+items_per_cluster = Vector2i(3, 5)
+cluster_spread_m = 0.4
+
+[sub_resource type="Resource" id="ScatterEntry_stone_small"]
+script = ExtResource("2_entry")
+name = "stone_small"
+placeholder = 2
+size_m = 0.07
+sink_fraction = 0.25
+resting = 2
+tint = Color(0.56, 0.59, 0.5, 1)
+zones = 9
+inland_range_m = Vector2(0, 20)
+clusters_per_100m2 = 1.0
+items_per_cluster = Vector2i(3, 4)
+cluster_spread_m = 0.5
+
+[sub_resource type="Resource" id="ScatterEntry_stone_large"]
+script = ExtResource("2_entry")
+name = "stone_large"
+placeholder = 3
+size_m = 0.12
+sink_fraction = 0.25
+resting = 2
+tint = Color(0.56, 0.59, 0.5, 1)
+zones = 9
+inland_range_m = Vector2(0, 20)
+clusters_per_100m2 = 0.5
+items_per_cluster = Vector2i(3, 4)
+cluster_spread_m = 0.6
+
+[sub_resource type="Resource" id="ScatterEntry_samphire"]
+script = ExtResource("2_entry")
+name = "samphire"
+placeholder = 0
+size_m = 0.22
+tilt_jitter_degrees = 5.0
+sink_fraction = 0.1
+resting = 0
+tint = Color(0.45, 0.5, 0.4, 1)
+wind = 0.02
+cast_shadow = true
+zones = 6
+inland_range_m = Vector2(-0.1, 0.8)
+wet_edge_m = 0.04
+clusters_per_100m2 = 20.0
+items_per_cluster = Vector2i(1, 3)
+cluster_spread_m = 0.35
+
+[resource]
+script = ExtResource("1_set")
+entries = Array[ExtResource("2_entry")]([SubResource("ScatterEntry_cast"), SubResource("ScatterEntry_shell"), SubResource("ScatterEntry_stone_small"), SubResource("ScatterEntry_stone_large"), SubResource("ScatterEntry_samphire")])
