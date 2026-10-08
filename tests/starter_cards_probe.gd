@@ -46,7 +46,7 @@ const TEMPERED_DIR := "res://cards/tempered/"
 # Come Due, No Further, Sentence, Last Wager, The Return, Blood Arc,
 # Collateral, Ransom, Leverage, Self-Eater, Unbroken, Small Price, Bide,
 # Deny, Refuse the End, With Regards, Debt Forgiven, Last Resort, Dying
-# Light and Blood Advance.
+# Light, Blood Advance and Second Swing.
 # Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
@@ -77,6 +77,7 @@ const CARD_ART: Dictionary = {
 	"last_resort": "res://cards/art/Wanderer/Last Resort.png",
 	"dying_light": "res://cards/art/Wanderer/Dying Light.png",
 	"blood_advance": "res://cards/art/Wanderer/Blood Advance.png",
+	"second_swing": "res://cards/art/Wanderer/Second Swing.png",
 }
 
 var _failures: int = 0

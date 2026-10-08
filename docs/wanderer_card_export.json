@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the three in the belongings pool, and Endure, which no pool offers. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance and Second Swing",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 28,
+    "total_unique_wanderer_cards": 29,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 23,
+      "count": 24,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -75,10 +75,11 @@
         "Leverage",
         "Bide",
         "Deny",
-        "Blood Advance"
+        "Blood Advance",
+        "Second Swing"
       ],
       "by_rarity": {
-        "COMMON": 6,
+        "COMMON": 7,
         "UNCOMMON": 10,
         "RARE": 7
       },
@@ -97,12 +98,12 @@
     },
     "wanderer_card_types": {
       "SKILL": 14,
-      "ATTACK": 8,
+      "ATTACK": 9,
       "POWER": 4,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
-      "COMMON": 10,
+      "COMMON": 11,
       "UNCOMMON": 11,
       "RARE": 7
     },
@@ -134,7 +135,7 @@
       },
       {
         "name": "Toll",
-        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Debt Forgiven, Come Due and Leverage; spending it brings a Sentence a turn closer."
+        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Debt Forgiven, Come Due, Leverage and Second Swing (optionally, to repeat its hit); spending it brings a Sentence a turn closer."
       },
       {
         "name": "Grace",
@@ -170,7 +171,7 @@
       },
       {
         "name": "Attack bonus",
-        "rule": "Flat extra damage from the stance (x stacks) and a keepsake's status (Keen), paid once per Attack card on its first damage effect - Reckoning included."
+        "rule": "Flat extra damage from the stance (x stacks) and a keepsake's status (Keen), paid once per Attack card on its first damage effect - Reckoning included. Second Swing's repeated hit takes the stance's bonus again, but not Keen's."
       },
       {
         "name": "Marks (Come Due)",
@@ -1532,6 +1533,65 @@
       "art_path": "res://cards/art/Wanderer/Refuse the End.png",
       "rules_font_px": 13,
       "battle_animation": null,
+      "play_effect_scene_path": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Second Swing",
+      "file_path": "res://cards/data/second_swing.tres",
+      "pool_class": "wanderer",
+      "card_type": "ATTACK",
+      "face_type_label": "STRIKE",
+      "energy_cost": 1,
+      "rarity": "COMMON",
+      "card_text": "Deal 6 damage.\nSpend 6 Toll to repeat.",
+      "face_hp_line": null,
+      "card_text_template": "Deal {damage} damage.\nSpend 6 Toll to repeat.",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "DAMAGE",
+          "plain_english": "Deal 6 damage to the target. Then, if the target is still alive and you hold 6 or more Toll, spend 6 Toll and deal 6 damage to it again (CardEffect.repeat_toll_cost 6). With less than 6, or once the first hit has killed, nothing more happens and nothing is spent. Never blocks the play. The second hit is a hit of the same card, not a second play: per-card triggers (Goaded, a Ransom Drain, Sentence's hurry) count the card once."
+        }
+      ],
+      "keywords": [
+        "Toll"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": 6,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": "6 Toll, optional (repeats the hit)",
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "status_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "damage",
+          "rule": "Each hit adds the ongoing attack bonus - the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) - so under Self-Eater both hits deal 9. One-shots go to the first hit only: Keen's +3 (one Attack) and a Come Due mark's +4, spending one charge. Self-Eater's 2 HP per stack is paid once for the card, before the first hit, and the Toll it makes counts toward the 6. The face shows one hit's number.",
+          "default_displayed": "no bonus outside a fight"
+        },
+        {
+          "field": "cost",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "default_displayed": 1
+        }
+      ],
+      "art_path": "res://cards/art/Wanderer/Second Swing.png",
+      "rules_font_px": 15,
+      "battle_animation": "Slash",
       "play_effect_scene_path": null,
       "upgrade_data": null,
       "starting_deck_count": 0,
