@@ -1669,19 +1669,21 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float, direct
 
 	var stance_position := target.global_position + away_from_target * spacing
 
-	# get_height_at() is defined in Ground's own local frame - to_local()
-	# converts explicitly rather than assuming Ground sits at the world
-	# origin (true today, but not guaranteed). stance_position.x/z here are
-	# global (built from target.global_position above, itself always
-	# global regardless of parenting), which is what "sampling must use
-	# global XZ" requires; to_local() is what turns that into whatever
-	# frame get_height_at() actually needs.
+	# The surface as drawn - get_walk_height_at(), what the ground hold
+	# compares his feet against (_hold_above_visible_ground()) - so he
+	# stands on a dune's rise rather than inside it. It takes Ground's own
+	# local frame - to_local() converts explicitly rather than assuming
+	# Ground sits at the world origin (true today, but not guaranteed).
+	# stance_position.x/z here are global (built from target.global_
+	# position above, itself always global regardless of parenting), which
+	# is what "sampling must use global XZ" requires; to_local() is what
+	# turns that into the frame get_walk_height_at() needs.
 	var ground := get_node_or_null(ground_path) as Ground
 	var ground_resolved := ground != null
 	var terrain_height: float = global_position.y
 	if ground_resolved:
 		var local_xz: Vector3 = ground.to_local(Vector3(stance_position.x, 0.0, stance_position.z))
-		terrain_height = ground.get_height_at(Vector2(local_xz.x, local_xz.z))
+		terrain_height = ground.get_walk_height_at(Vector2(local_xz.x, local_xz.z))
 
 	# Same "feet at body floor" convention _apply_continuous_foot_grounding()
 	# already establishes for this body: the model's feet sit at body-local

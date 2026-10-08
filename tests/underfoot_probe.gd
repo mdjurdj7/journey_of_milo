@@ -7,7 +7,9 @@ extends SceneTree
 # Sting; the Sting one unbreakable blow of 12 that Block and Brace
 # soften; the Rebury nothing. Floor 2's required cluster is the Sputter
 # and the Underfoot, no dragonfly, the island's Dragonfly x3 as they
-# were. The body: in the field Covered with its barb down; in the fight
+# were. The Wanderer's stance on the dune's rise east of the crab stands
+# on the drawn surface, and an escape leaves him there with no lift.
+# The body: in the field Covered with its barb down; in the fight
 # the barb raised exactly while the Sting is queued - its height on a
 # 1080p screen printed - lifted and tilted Exposed after the Sting; after
 # an escape reburied, barb down. The rules cases drive EnemyTurn on the
@@ -244,6 +246,8 @@ func _check_fight_body() -> void:
 
 # The line: the Sputter heads it, the Underfoot behind it at its own gap,
 # with at least 0.4 m between the Underfoot's nose and the Sputter's back.
+# The Wanderer's stance - on the dune east of the crab - is on the drawn
+# surface (Ground.get_walk_height_at()), not inside it.
 func _check_fight_line() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -262,10 +266,15 @@ func _check_fight_line() -> void:
 			var gap: float = apart.length() - sputter_back - underfoot_nose
 			print("Line: Sputter back %.3f m, Underfoot nose %.3f m, clear %.3f m" % [sputter_back, underfoot_nose, gap])
 			_expect(gap >= LINE_CLEARANCE_M - 0.02, "...%.2f m clear between them" % gap)
+		var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
+		var drawn: float = _walk_height(wanderer.global_position) - float(wanderer.get("model_ground_offset"))
+		print("Stance: (%.2f, %.2f) at y %.3f, the drawn surface %.3f" % [wanderer.global_position.x, wanderer.global_position.z, wanderer.global_position.y, drawn])
+		_expect(absf(wanderer.global_position.y - drawn) < 0.01, "The Wanderer's stance on the drawn surface: %.3f m off it" % (wanderer.global_position.y - drawn))
 	await _teardown()
 	_completed += 1
 
-# Escape on the Exposed turn: reburied - Covered, sunk, the barb down.
+# Escape on the Exposed turn: reburied - Covered, sunk, the barb down -
+# and the Wanderer pushed clear onto the surface, no lift warning.
 func _check_escape() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -279,6 +288,9 @@ func _check_escape() -> void:
 		_expect(is_zero_approx(float(pose.call("get_exposed"))) and float(pose.call("get_cover")) > 0.5, "After the escape: Covered, the cover on")
 		_expect(is_equal_approx(float(underfoot.get("sink")), sink_covered), "...sunk again")
 		_expect(is_zero_approx(float(pose.call("get_barb_raise"))), "...the barb down")
+		var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
+		_expect(not bool(wanderer.get("_ground_hold_warned")), "...the Wanderer clear of it on the surface - no lift warning")
+		_expect(absf(wanderer.global_position.y - (_walk_height(wanderer.global_position) - float(wanderer.get("model_ground_offset")))) < 0.03, "...standing on it")
 	await _teardown()
 	_completed += 1
 
@@ -393,6 +405,13 @@ func _barb_px(underfoot: Node, pose: Node) -> float:
 	var sand := Vector3(tip.x, (underfoot as Node3D).global_position.y, tip.z)
 	var rows: float = root.get_viewport().get_visible_rect().size.y
 	return absf(camera.unproject_position(sand).y - camera.unproject_position(tip).y) * 1080.0 / maxf(rows, 1.0)
+
+# The drawn surface at a world point's XZ (Ground.get_walk_height_at(),
+# in Ground's own frame).
+func _walk_height(world: Vector3) -> float:
+	var ground: Node3D = _field.get_node("Ground") as Node3D
+	var local: Vector3 = ground.to_local(Vector3(world.x, 0.0, world.z))
+	return float(ground.call("get_walk_height_at", Vector2(local.x, local.z)))
 
 # How far `body`'s model reaches from its origin along `direction`
 # (horizontal), metres - the most of its mesh AABB corners.

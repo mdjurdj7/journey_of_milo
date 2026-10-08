@@ -2488,6 +2488,13 @@ func _push_wanderer_away_from(enemies: Array[FieldEnemy]) -> void:
 			push_distance = maxf(push_distance, needed)
 			target = anchor.global_position + push_dir * push_distance
 
+	# On the surface as drawn there (Ground.get_walk_height_at()), not at
+	# the anchor's height - on a dune's rise that would leave him inside
+	# it for the ground hold to lift out.
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null:
+		var local: Vector3 = ground.to_local(Vector3(target.x, 0.0, target.z))
+		target.y = ground.get_walk_height_at(Vector2(local.x, local.z)) - wanderer.model_ground_offset
 	wanderer.global_position = target
 
 # Computes and caches the field's span (see _boundary_ready's own doc),
