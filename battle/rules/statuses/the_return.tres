@@ -11,5 +11,5 @@ Drain {drain} from all enemies."
 category = 2
 default_duration_turns = -1
 stack_rule = 3
-self_loss_trigger_count = 5
-self_loss_trigger_drain = 10
+self_loss_trigger_count = 3
+self_loss_trigger_drain = 8
