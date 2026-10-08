@@ -1,0 +1,56 @@
+[gd_resource type="Resource" script_class="ScatterSet" format=3]
+
+[ext_resource type="Script" path="res://floors/scatter/scatter_set.gd" id="1_set"]
+[ext_resource type="Script" path="res://floors/scatter/scatter_entry.gd" id="2_entry"]
+
+[sub_resource type="Resource" id="ScatterEntry_samphire"]
+script = ExtResource("2_entry")
+name = "samphire"
+placeholder = 0
+size_m = 0.22
+scale_range = Vector2(1.1, 1.5)
+tilt_jitter_degrees = 5.0
+sink_fraction = 0.1
+resting = 0
+tint = Color(0.45, 0.5, 0.4, 1)
+wind = 0.02
+cast_shadow = true
+zones = 6
+inland_range_m = Vector2(-0.1, 0.8)
+wet_edge_m = 0.04
+area = PackedVector2Array(-17, 5, -5, 5, -5, -1, -8, -3, -8, -15, -17, -15)
+cluster_count = Vector2i(2, 2)
+items_per_cluster = Vector2i(6, 8)
+cluster_spread_m = Vector2(0.6, 0.8)
+
+[sub_resource type="Resource" id="ScatterEntry_stone_small"]
+script = ExtResource("2_entry")
+name = "stone_small"
+placeholder = 2
+size_m = 0.07
+sink_fraction = 0.25
+resting = 2
+tint = Color(0.56, 0.59, 0.5, 1)
+zones = 9
+inland_range_m = Vector2(0, 20)
+cluster_count = Vector2i(1, 1)
+items_per_cluster = Vector2i(2, 3)
+cluster_spread_m = Vector2(0.5, 0.5)
+
+[sub_resource type="Resource" id="ScatterEntry_stone_large"]
+script = ExtResource("2_entry")
+name = "stone_large"
+placeholder = 3
+size_m = 0.12
+sink_fraction = 0.25
+resting = 2
+tint = Color(0.56, 0.59, 0.5, 1)
+zones = 9
+inland_range_m = Vector2(0, 20)
+cluster_count = Vector2i(1, 1)
+items_per_cluster = Vector2i(2, 3)
+cluster_spread_m = Vector2(0.6, 0.6)
+
+[resource]
+script = ExtResource("1_set")
+entries = Array[ExtResource("2_entry")]([SubResource("ScatterEntry_samphire"), SubResource("ScatterEntry_stone_small"), SubResource("ScatterEntry_stone_large")])

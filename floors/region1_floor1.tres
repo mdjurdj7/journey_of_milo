@@ -11,7 +11,7 @@
 [ext_resource type="PackedScene" uid="uid://bti18febtfxyt" path="res://assets/models/cormorant/bird.glb" id="9_cormorant"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="10_wanderer_pool"]
 [ext_resource type="Script" path="res://floors/scatter/scatter_set.gd" id="11_scatter_set"]
-[ext_resource type="Resource" path="res://floors/scatter/region1_wet.tres" id="12_wet_scatter"]
+[ext_resource type="Resource" path="res://floors/scatter/floor1_pristine.tres" id="12_wet_scatter"]
 
 [sub_resource type="Resource" id="FloorEnemy_crab"]
 script = ExtResource("2_floor_enemy")
@@ -69,7 +69,7 @@ props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_hull1"), SubR
 gate_bar_axis_offset = 0.85
 wear_path_override = null
 scatter_sets = Array[ExtResource("11_scatter_set")]([ExtResource("12_wet_scatter")])
-scatter_budget = 70
+scatter_budget = 22
 reward_pool = ExtResource("10_wanderer_pool")
 gold_min = 10
 gold_max = 15
