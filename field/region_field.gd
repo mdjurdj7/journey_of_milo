@@ -380,6 +380,8 @@ var _wall_shoreward: StaticBody3D = null
 # Where the Wanderer can walk (NavGrid), built from this floor's data once
 # the relief and everything on it stand - see _build_nav_grid().
 var _nav: NavGrid = null
+# The HUD row's keepsake - a click on it opens KeepsakeExamine.
+var _keepsake_line: KeepsakeLine = null
 var _nav_build_queued: bool = false
 # Debug builds: the F1 row's Path draw, made on its first toggle.
 var _nav_debug: NavDebugDraw = null
@@ -695,6 +697,11 @@ func _unhandled_input(event: InputEvent) -> void:
 			_holding = false
 		return
 	if event.button_index != MOUSE_BUTTON_LEFT and event.button_index != MOUSE_BUTTON_RIGHT:
+		return
+	# The HUD's keepsake, before anything else a click could be.
+	if event.button_index == MOUSE_BUTTON_LEFT and _keepsake_line != null and _keepsake_line.is_point_over(event.position):
+		get_viewport().set_input_as_handled()
+		open_keepsake_examine(_keepsake_line.get_keepsake(), _keepsake_line.get_global_rect())
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT and _try_open_bundle(event.position):
 		get_viewport().set_input_as_handled()
@@ -1375,6 +1382,7 @@ func _setup_field_hud() -> void:
 	var keepsake_line := KeepsakeLine.new()
 	keepsake_line.name = "KeepsakeLine"
 	_add_hud_row_line(keepsake_line, glassbone_line)
+	_keepsake_line = keepsake_line
 	hp_bar.set_target(wanderer)
 
 # One InkLine into the field HUD row: this region's theme (set before it
@@ -2274,6 +2282,22 @@ func open_collector_screen(collector: Collector) -> bool:
 
 func _on_collector_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
+
+# A keepsake looked at closely (KeepsakeExamine), growing out of
+# `from_rect`; the field locked under it until it closes. False when a
+# fight or another screen has the field already, or there is nothing held.
+func open_keepsake_examine(keepsake: TrinketData, from_rect: Rect2 = Rect2()) -> bool:
+	if keepsake == null or _battle_open or not can_process():
+		return false
+	var examine := KeepsakeExamine.new()
+	examine.name = "KeepsakeExamine"
+	examine.setup(keepsake, from_rect)
+	examine.closed.connect(func() -> void: process_mode = Node.PROCESS_MODE_INHERIT)
+	if wanderer != null:
+		wanderer.clear_move_target()
+	process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(examine)
+	return true
 
 # The wagon's screen (WagonScreen), under the collector's scrim-and-freeze:
 # the field DISABLED under it until it closes. False when a fight or

@@ -132,33 +132,38 @@ class_name HudRowStyle
 	set(value):
 		hud_keepsake_hairline_gap_px = value
 		emit_changed()
-# The hover's description: the keepsake offer screen's face, ink, over
-# the halo, no backing.
-@export var hud_description_font: Font = InkType.text_font():
+# The art thumbnail before the name: this square, cropped square from
+# the art (or the placeholder's tone), a thin ink edge round it, this far
+# before the name.
+@export var hud_keepsake_thumb_px: float = 24.0:
 	set(value):
-		hud_description_font = value
+		hud_keepsake_thumb_px = value
 		emit_changed()
-@export var hud_description_size_px: int = 15:
+@export var hud_keepsake_thumb_gap_px: float = 7.0:
 	set(value):
-		hud_description_size_px = value
+		hud_keepsake_thumb_gap_px = value
 		emit_changed()
-# Line pitch in ems, as the offer screen's line_pitch_em.
-@export var hud_description_line_height: float = 1.28:
+@export var hud_keepsake_thumb_edge_px: float = 1.0:
 	set(value):
-		hud_description_line_height = value
+		hud_keepsake_thumb_edge_px = value
 		emit_changed()
-@export var hud_description_wrap_px: float = 280.0:
+@export var hud_keepsake_thumb_placeholder: Color = Color(0.80, 0.77, 0.71, 1.0):
 	set(value):
-		hud_description_wrap_px = value
+		hud_keepsake_thumb_placeholder = value
 		emit_changed()
-# Between the description's last line and the top of the name.
-@export var hud_description_gap_px: float = 8.0:
+# The hover: the KeepsakeTile at this scale, this far above the row (below
+# it when there is no room above), fading in and out over this long.
+@export var hud_keepsake_tile_scale: float = 1.0:
 	set(value):
-		hud_description_gap_px = value
+		hud_keepsake_tile_scale = value
 		emit_changed()
-@export var hud_description_fade_sec: float = 0.12:
+@export var hud_keepsake_tile_gap_px: float = 12.0:
 	set(value):
-		hud_description_fade_sec = value
+		hud_keepsake_tile_gap_px = value
+		emit_changed()
+@export var hud_keepsake_tile_fade_sec: float = 0.12:
+	set(value):
+		hud_keepsake_tile_fade_sec = value
 		emit_changed()
 
 @export_group("Count")
