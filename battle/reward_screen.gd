@@ -38,6 +38,10 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 # the outline too (see _text()).
 @export var ink: Color = Color(0.165, 0.165, 0.18, 1.0)
 @export var text_outline_px: int = 1
+# The card choice names each card's tier under it (COMMON .. ULTRA RARE),
+# its size, tracking, gap and dim from this shared CardRarityFinish - see
+# _draw_tier_labels().
+@export_file("*.tres") var rarity_finish_path: String = "res://battle/card_rarity_finish.tres"
 
 # The list's caps - LEFT BEHIND, each line's TAKE/CHOOSE and WALK ON -
 # are the card choice's own tracked caps (22 px at 0.16 em), and the
@@ -236,6 +240,12 @@ var _choice_row: Rect2 = Rect2()
 # 1080p sizes: the labels' pixel size and the two gaps.
 var _choice_fit_scale: float = 1.0
 var _choice_label_px: int = 22
+# Each choice card's face rect in Column pixels, in _card_views' order.
+var _choice_faces: Array[Rect2] = []
+# The tier labels: the shared finish, and its font and size at the fit.
+var _rarity_finish: CardRarityFinish = null
+var _tier_font: Font = null
+var _tier_px: int = 11
 var _header_gap_px: float = 48.0
 var _decline_gap_px: float = 100.0
 
@@ -288,6 +298,10 @@ func _ready() -> void:
 	_action_font = InkType.tracked(InkType.text_bold_font(), action_size_px, action_tracking_em)
 	_dismiss_font = InkType.tracked(InkType.text_bold_font(), dismiss_size_px, dismiss_tracking_em)
 	_choice_font = InkType.tracked(InkType.text_bold_font(), choice_label_size_px, choice_label_tracking_em)
+	if not rarity_finish_path.is_empty():
+		_rarity_finish = load(rarity_finish_path) as CardRarityFinish
+		if _rarity_finish != null:
+			_rarity_finish.changed.connect(_relayout_choice)
 
 	_scrim = ColorRect.new()
 	_scrim.name = "Scrim"
@@ -491,6 +505,44 @@ func _draw_choice() -> void:
 	_text(_choice_font, choice_dismiss_text, Vector2(label_left, decline_baseline), _choice_label_px, bone if focused else choice_unfocused_color)
 	if focused:
 		_draw_hairline(label_left, decline_baseline, _choice_label_px)
+	_draw_tier_labels()
+
+# Each offered card's tier, centred under its face (CardRarityFinish):
+# Common and Uncommon in dim bone, Rare and Ultra Rare in full, over the
+# screen's ink outline. Gone with the row once a card is being taken.
+func _draw_tier_labels() -> void:
+	if _tier_font == null or _taking_card:
+		return
+	for index in _choice_faces.size():
+		var text: String = tier_label_at(index)
+		if text.is_empty():
+			continue
+		var colour: Color = bone
+		if _rarity_finish.tier_label_dimmed(_offered[index].rarity):
+			colour.a *= _rarity_finish.tier_label_dim_alpha
+		_text(_tier_font, text, tier_label_origin(index), _tier_px, colour)
+
+# The tier named under choice card `index`, "" where there's none.
+func tier_label_at(index: int) -> String:
+	if _rarity_finish == null or index < 0 or index >= _offered.size() or _offered[index] == null:
+		return ""
+	return _rarity_finish.tier_label_text(_offered[index].rarity)
+
+# Where that label's run starts: its left edge and baseline, centred under
+# the face, tier_label_gap_px (fitted) below it.
+func tier_label_origin(index: int) -> Vector2:
+	if index < 0 or index >= _choice_faces.size() or _tier_font == null:
+		return Vector2.ZERO
+	var face: Rect2 = _choice_faces[index]
+	var width: float = InkType.width(_tier_font, tier_label_at(index), _tier_px)
+	return Vector2(roundf(face.get_center().x - width / 2.0), roundf(face.end.y + _rarity_finish.tier_label_gap_px * _choice_fit_scale + float(_tier_px)))
+
+# The tier line's room under the row at `fit`: its gap and a line and a
+# third of its size. 0 with no finish to name tiers from.
+func _tier_line_height(fit: float) -> float:
+	if _rarity_finish == null:
+		return 0.0
+	return (_rarity_finish.tier_label_gap_px + float(_rarity_finish.tier_label_size_px) * 1.3) * fit
 
 # The decline label is centred on the row; its hairline hangs off to the
 # left of that.
@@ -509,7 +561,7 @@ func _decline_rect() -> Rect2:
 # reward_decline_gap (fitted) under the row, kept clear of the Wanderer -
 # only within the space under the row, never back up onto the cards.
 func _decline_top() -> float:
-	var bottom: float = _choice_row.end.y
+	var bottom: float = _choice_row.end.y + _tier_line_height(_choice_fit_scale)
 	return _below_wanderer(bottom + _decline_gap_px, float(_choice_label_px) * 1.3, bottom + _decline_gap_px * 2.0)
 
 # A line of caps `line_height` tall, wanted at `top`: where it would cross
@@ -776,16 +828,21 @@ func _layout_choice() -> void:
 	# A card scales about its centre (its pivot), so its control sits that
 	# far up and in from the rect the scaled face fills.
 	var pivot_shift: Vector2 = (card_size * 0.5) * (card_scale - 1.0)
+	_choice_faces.clear()
 	for index in count:
+		var face_left: float = roundf(start_x + float(index) * (card.x + gap))
+		_choice_faces.append(Rect2(face_left, top, card.x, card.y))
 		var card_view: CardView = _card_views[index]
 		if not is_instance_valid(card_view):
 			continue
-		var face_left: float = roundf(start_x + float(index) * (card.x + gap))
 		card_view.position = Vector2(face_left, top) + pivot_shift
 		card_view.set_rest_offset(card_view.position.y)
 		card_view.set_base_scale(card_scale)
 	_choice_label_px = maxi(roundi(float(choice_label_size_px) * _choice_fit_scale), 1)
 	_choice_font = InkType.tracked(InkType.text_bold_font(), _choice_label_px, choice_label_tracking_em)
+	if _rarity_finish != null:
+		_tier_px = maxi(roundi(float(_rarity_finish.tier_label_size_px) * _choice_fit_scale), 1)
+		_tier_font = InkType.tracked(InkType.text_bold_font(), _tier_px, _rarity_finish.tier_label_tracking_em)
 	_header_gap_px = reward_header_gap * _choice_fit_scale
 	_decline_gap_px = reward_decline_gap * _choice_fit_scale
 	_decline_top_px = _decline_top()
@@ -803,7 +860,7 @@ func _choice_fit(card_size: Vector2, count: int) -> float:
 	var span: float = float(count) * card.x + float(count - 1) * card.x * card_gap_fraction
 	if span > 0.0:
 		fit = minf(fit, window.x * choice_max_width_fraction / span)
-	var stack: float = float(choice_label_size_px) + reward_header_gap + card.y + reward_decline_gap * 2.0 + float(choice_label_size_px) * 1.3
+	var stack: float = float(choice_label_size_px) + reward_header_gap + card.y + _tier_line_height(1.0) + reward_decline_gap * 2.0 + float(choice_label_size_px) * 1.3
 	if stack > 0.0:
 		fit = minf(fit, window.y * choice_max_height_fraction / stack)
 	return maxf(fit, 0.01)

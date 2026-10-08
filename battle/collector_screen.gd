@@ -9,7 +9,8 @@ class_name CollectorScreen
 #
 # A row of cards at 1x: the collector's rolled stock (Collector.get_
 # stock()), then its fixed card (Samphire) set a little apart at the right
-# end. Each card's price sits under it in Spectral numerals. A card the
+# end. Each card's tier is named under it (COMMON .. ULTRA RARE), its
+# price under that in Spectral numerals. A card the
 # run can't afford is dimmed (CardView.set_playable(false)) and its click
 # does nothing; an affordable one, clicked, spends its price (RunState.
 # spend_gold()), joins the deck (RunState.add_card()), flies to the deck
@@ -59,6 +60,10 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 	set(value):
 		text_outline_px = value
 		_refresh()
+# Each card's tier is named directly under it (COMMON .. ULTRA RARE), the
+# price on the line below - size, tracking, gap and dim from this shared
+# CardRarityFinish. See _draw_screen().
+@export_file("*.tres") var rarity_finish_path: String = "res://battle/card_rarity_finish.tres"
 @export var unfocused_color: Color = Color(0.58, 0.58, 0.60, 1.0):
 	set(value):
 		unfocused_color = value
@@ -178,6 +183,10 @@ var _label_font: Font = null
 var _fit: float = 1.0
 var _label_px: int = 22
 var _price_px: int = 26
+# The tier labels: the shared finish, and its font and size at the fit.
+var _rarity_finish: CardRarityFinish = null
+var _tier_font: Font = null
+var _tier_px: int = 11
 # One per slot: the rolled stock, then the fixed card - null once bought
 # (or a slot that rolled nothing).
 var _views: Array[CardView] = []
@@ -198,6 +207,10 @@ func _ready() -> void:
 	# this layer opts out of the freeze or would stop with it.
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 100
+	if not rarity_finish_path.is_empty():
+		_rarity_finish = load(rarity_finish_path) as CardRarityFinish
+		if _rarity_finish != null:
+			_rarity_finish.changed.connect(_relayout)
 
 	_scrim = ColorRect.new()
 	_scrim.name = "Scrim"
@@ -328,6 +341,9 @@ func _relayout() -> void:
 	_price_px = maxi(roundi(float(price_size_px) * _fit), 1)
 	_numeral_font = InkType.numeral_font()
 	_label_font = InkType.tracked(InkType.text_bold_font(), _label_px, label_tracking_em)
+	if _rarity_finish != null:
+		_tier_px = maxi(roundi(float(_rarity_finish.tier_label_size_px) * _fit), 1)
+		_tier_font = InkType.tracked(InkType.text_bold_font(), _tier_px, _rarity_finish.tier_label_tracking_em)
 	_refresh()
 
 func _row_span(card_width: float, count: int) -> float:
@@ -399,9 +415,15 @@ func _draw_screen() -> void:
 		if _cards[slot] == null:
 			continue
 		var rect: Rect2 = _slot_rect(slot)
+		var tier: String = tier_label_at(slot)
+		if not tier.is_empty() and _tier_font != null:
+			var tier_colour: Color = bone
+			if _rarity_finish.tier_label_dimmed(_cards[slot].rarity):
+				tier_colour.a *= _rarity_finish.tier_label_dim_alpha
+			_text(_tier_font, tier, tier_label_origin(slot), _tier_px, tier_colour)
 		var price: String = str(_price_at(slot))
 		var x: float = roundf(rect.get_center().x - InkType.width(_numeral_font, price, _price_px) / 2.0)
-		var y: float = roundf(rect.end.y + price_gap_px * _fit + float(_price_px))
+		var y: float = roundf(rect.end.y + _tier_line_height() + price_gap_px * _fit + float(_price_px))
 		_text(_numeral_font, price, Vector2(x, y), _price_px, bone if _affordable(slot) else inert_color)
 	for index: int in [_removal_index(), _leave_index()]:
 		_draw_line(index)
@@ -413,6 +435,29 @@ func _draw_screen() -> void:
 	_text(_numeral_font, gold, Vector2(roundf(row_right - gold_width), gold_baseline), _label_px, bone)
 	var caps_width: float = InkType.width(_label_font, gold_text, _label_px)
 	_text(_label_font, gold_text, Vector2(roundf(row_right - gold_width - label_price_gap_px * _fit - caps_width), gold_baseline), _label_px, unfocused_color)
+
+# The tier named under slot `slot` - Samphire's fixed slot too - or ""
+# where the slot is empty (bought) or there's no finish to name it from.
+func tier_label_at(slot: int) -> String:
+	if _rarity_finish == null or slot < 0 or slot >= _cards.size() or _cards[slot] == null:
+		return ""
+	return _rarity_finish.tier_label_text(_cards[slot].rarity)
+
+# Where that label's run starts: its left edge and baseline, centred under
+# the slot's face, tier_label_gap_px (fitted) below it.
+func tier_label_origin(slot: int) -> Vector2:
+	if _tier_font == null:
+		return Vector2.ZERO
+	var rect: Rect2 = _slot_rect(slot)
+	var width: float = InkType.width(_tier_font, tier_label_at(slot), _tier_px)
+	return Vector2(roundf(rect.get_center().x - width / 2.0), roundf(rect.end.y + _rarity_finish.tier_label_gap_px * _fit + float(_tier_px)))
+
+# The tier line's room between a face and its price: its gap and a line
+# and a third of its size, fitted. 0 with no finish.
+func _tier_line_height() -> float:
+	if _rarity_finish == null:
+		return 0.0
+	return (_rarity_finish.tier_label_gap_px + float(_rarity_finish.tier_label_size_px) * 1.3) * _fit
 
 func _draw_line(index: int) -> void:
 	var inert: bool = index == _removal_index() and not _removal_open()
