@@ -346,6 +346,9 @@ class_name HPBar
 @export var toll_rule_px: float = 3.0
 @export var toll_pop_scale: float = 1.15
 @export var toll_pop_time: float = 0.22
+# A Toll blow's count down from the Toll it spent (drain_toll()), in real
+# seconds - it runs through the hit-stop.
+@export var toll_drain_time: float = 0.25
 
 var _wanderer: Wanderer = null
 var _current_hp: int = 0
@@ -373,6 +376,7 @@ var _toll: int = 0
 var _toll_visible: bool = false
 var _toll_pop: float = 1.0
 var _pop_tween: Tween = null
+var _drain_tween: Tween = null
 var _toll_rule_color: Color = Color.WHITE
 var _toll_label_tracked: Font = null
 var _current_fraction: float = 1.0
@@ -1091,14 +1095,44 @@ func show_toll(initial_toll: int) -> void:
 func update_toll(new_toll: int) -> void:
 	if not _toll_visible:
 		return
+	if _drain_tween != null:
+		_drain_tween.kill()
+		_drain_tween = null
 	var changed: bool = new_toll != _toll
 	_toll = maxi(new_toll, 0)
 	if changed:
 		_pop_toll()
 	_apply_layout()
 
+# A Toll blow (Reckoning): the numeral counts down from `from`, the Toll
+# it spent, to `to`, what is left, over toll_drain_time - on real time,
+# so it pours on through the hit-stop its blow makes. Popped as it
+# starts, like any change. A later update_toll() cuts it short.
+func drain_toll(from: int, to: int) -> void:
+	if not _toll_visible:
+		return
+	if _drain_tween != null:
+		_drain_tween.kill()
+	_toll = maxi(from, 0)
+	_pop_toll()
+	_apply_layout()
+	_drain_tween = create_tween()
+	_drain_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_drain_tween.set_ignore_time_scale(true)
+	_drain_tween.tween_method(_set_drained_toll, float(from), float(maxi(to, 0)), toll_drain_time)
+
+func _set_drained_toll(value: float) -> void:
+	var shown: int = roundi(value)
+	if shown == _toll:
+		return
+	_toll = shown
+	_apply_layout()
+
 func hide_toll() -> void:
 	_toll_visible = false
+	if _drain_tween != null:
+		_drain_tween.kill()
+		_drain_tween = null
 	if _pop_tween != null:
 		_pop_tween.kill()
 	_toll_pop = 1.0

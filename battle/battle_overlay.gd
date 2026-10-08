@@ -116,6 +116,8 @@ var _debug_card_picker: OptionButton = null
 # The fight's hit reactions - kept to read a play effect's pacing for the
 # damage numbers (BattleFeedback.reaction_delay()).
 var _battle_feedback: BattleFeedback = null
+# A Toll blow's Toll as it landed, for its toll_changed; -1 = none.
+var _toll_blow_from: int = -1
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
 # One BattleIntent per enemy for this fight - children of this overlay,
 # so they're freed with it and nothing of them exists on the field.
@@ -300,6 +302,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	# heavy tier learns which card's hits these are (a Toll blow's floor).
 	battle_controller.card_impact.connect(func(card: CardData) -> void:
 		_battle_feedback.set_impact_card(card)
+		# Its Toll before it's spent - the play's toll_changed follows.
+		_toll_blow_from = battle_controller.player.toll if BattleFeedback.is_toll_blow(card) else -1
 		_battle_feedback.on_card_impact(card, battle_controller.enemies, _lowest_intent_height()))
 
 	_deck_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DRAW)
@@ -490,7 +494,13 @@ func _refresh_cost_preview() -> void:
 	_resources.set_cost_preview(cost)
 
 func _on_toll_changed(new_toll: int) -> void:
-	_field_hp_bar.update_toll(new_toll)
+	# A Toll blow's spend pours into its hit: counted down, not snapped.
+	var drained_from: int = _toll_blow_from
+	_toll_blow_from = -1
+	if drained_from > new_toll:
+		_field_hp_bar.drain_toll(drained_from, new_toll)
+	else:
+		_field_hp_bar.update_toll(new_toll)
 	# Reckoning and Debt Forgiven print numbers made of Toll.
 	hand_container.set_toll(new_toll)
 

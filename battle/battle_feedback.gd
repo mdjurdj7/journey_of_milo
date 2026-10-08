@@ -196,13 +196,22 @@ func _release_impact_card() -> void:
 
 # --- Heavy tier ---
 
+# Whether `card`'s blow is its Toll, spent whole (CardEffect TOLL_DAMAGE -
+# Reckoning): its hit counts as heavy at least, and BattleOverlay pours
+# the spent Toll into it.
+static func is_toll_blow(card: CardData) -> bool:
+	if card == null:
+		return false
+	for effect in card.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.TOLL_DAMAGE:
+			return true
+	return false
+
 # The damage the heavy tier reads for a hit of `amount` this frame: the
-# hit's own, or at least heavy_min_damage for a Toll blow (Reckoning).
+# hit's own, or at least heavy_min_damage for a Toll blow.
 func heavy_damage(amount: int) -> int:
-	if _impact_card != null:
-		for effect in _impact_card.effects:
-			if effect != null and effect.effect_type == CardEffect.EffectType.TOLL_DAMAGE:
-				return maxi(amount, heavy_min_damage)
+	if is_toll_blow(_impact_card):
+		return maxi(amount, heavy_min_damage)
 	return amount
 
 # Where `damage` sits in the tier: -1 below it (or with the tier off), 0

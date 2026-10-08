@@ -10,7 +10,7 @@ extends SceneTree
 # tier on and again with it off, leaves the fight in the same state -
 # with the tier on it held the world (Engine.time_scale) and sounded the
 # layer, off it did neither, and either way the world is back at full
-# speed after.
+# speed after; and the Toll readout, drained, reads what is left.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/heavy_hit_probe.gd
 #
@@ -121,12 +121,13 @@ func _check_rules_unchanged() -> void:
 	_expect(is_equal_approx(float(off.get("slowest", 0.0)), 1.0), "Off: no hold")
 	_expect(not bool(off.get("layer", true)), "...and no layer")
 	_expect(is_equal_approx(Engine.time_scale, 1.0), "Full speed after")
+	_expect(int(on.get("toll_shown", -1)) == 0 and int(off.get("toll_shown", -1)) == 0, "The Toll readout has drained to 0 (%s / %s)" % [str(on.get("toll_shown")), str(off.get("toll_shown"))])
 	_completed += 1
 
 # One fight: Reckoning on TOLL at the first enemy, the tier `enabled`.
-# Returns {state: [enemy HP, Toll, HP, Energy], slowest: the lowest
-# time_scale seen while it resolved, layer: whether HeavyImpactAudio
-# played a take}.
+# Returns {state: [enemy HP, Toll, HP, Energy], toll_shown: the Toll
+# readout's numeral after, slowest: the lowest time_scale seen while it
+# resolved, layer: whether HeavyImpactAudio played a take}.
 func _reckoning_fight(enabled: bool) -> Dictionary:
 	var out: Dictionary = {}
 	var controller: Node = await _start_fight()
@@ -156,10 +157,14 @@ func _reckoning_fight(enabled: bool) -> Dictionary:
 				slowest = minf(slowest, Engine.time_scale)
 				if not bool(controller.get("_input_locked")) and is_equal_approx(Engine.time_scale, 1.0):
 					break
+			# The Toll readout's drain runs on real time; let it finish.
+			await create_timer(0.5, true, false, true).timeout
 		var layer: Node = enemy.get_node_or_null("HeavyImpactAudio")
 		var combatant: Combatant = (controller.get("_combatants") as Dictionary).values()[0]
+		var bar: Object = controller.get_parent().get("_field_hp_bar")
 		out = {
 			"state": [combatant.hp, player.toll, player.hp, player.energy],
+			"toll_shown": int(bar.get("_toll")) if bar != null else -1,
 			"slowest": slowest,
 			"layer": layer != null and (layer as AudioStreamPlayer3D).stream != null and TAKE_PATHS.has((layer as AudioStreamPlayer3D).stream.resource_path),
 		}
