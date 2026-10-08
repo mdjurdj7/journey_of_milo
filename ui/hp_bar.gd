@@ -14,7 +14,7 @@ class_name HPBar
 # Two styles, blended over the battle transition time rather than
 # snapped, both drawn by _draw() below: field (the Field Style group - a
 # bare ink bar with a Spectral numeral and " / max" centred beneath it,
-# over a bone halo so it reads on sand, wet sand and water) and battle
+# ink straight on the world) and battle
 # (the Battle Style group - ink on the world: a Spectral
 # numeral row with " / max" and the character's name on one baseline, a
 # 3px ink bar beneath over an ink track, a thin ink segment above the
@@ -51,15 +51,16 @@ class_name HPBar
 # The field readout: the bar on top, the numeral row centred under it -
 # current HP in Spectral at field_numeral_size_px in full ink, " / max"
 # in the battle style's smaller secondary ink (battle_max_size_px at
-# battle_secondary_alpha) - with a bone halo under both runs' ink, as the
-# Block readout's value has. The bar is ink over the battle bar's track
+# battle_secondary_alpha) - ink on the world, no halo (field_halo_px 0; a
+# positive value puts a bone halo under both runs' ink, as the Block
+# readout's value has). The bar is ink over the battle bar's track
 # (battle_track_alpha). Pixel sizes at 1080p, never scaled by distance.
 @export_group("Field Style")
 @export var field_numeral_size_px: int = 20:
 	set(value):
 		field_numeral_size_px = value
 		_relayout_if_ready()
-@export var field_halo_px: float = 2.0:
+@export var field_halo_px: float = 0.0:
 	set(value):
 		field_halo_px = value
 		_relayout_if_ready()
@@ -464,8 +465,8 @@ func _field_content_size() -> Vector2:
 func _field_anchor() -> Vector2:
 	return Vector2(roundf(_field_content_size().x * 0.5), 0.0)
 
-# Bar on top, the row centred under it: the halo under both runs first,
-# then the ink. The numeral and the fill take the Critical blend; the
+# Bar on top, the row centred under it: the halo (when it has one) under
+# both runs first, then the ink. The numeral and the fill take the Critical blend; the
 # tick overhangs the bar as the battle style's does. `alpha` is the
 # field style's share of the cross-fade.
 func _draw_field(alpha: float) -> void:
