@@ -420,21 +420,38 @@ func _check_debug_row() -> void:
 			_expect_eq(str(offer.get("_source")), "", "...with no source line - the grant has no named source")
 			offer.call("_activate", 0)
 			await process_frame
-			var line: Node = _field.get_node("FieldHUD/KeepsakeLine")
-			_expect_eq(str(line.get("_value_text")), "White Shell", "After TAKE replaces it, the KEEPSAKE line names the new one")
+			var line: Control = _hud_line("KeepsakeLine")
+			if line != null:
+				_expect_eq(str(line.get("_value_text")), "White Shell", "After TAKE replaces it, the KEEPSAKE line names the new one")
 	await _teardown()
 	_completed += 1
 
+# KEEPSAKE: hidden with an empty slot, shown naming what is held, and set
+# apart at the end of the row (DECK, HP, GOLD, GLASSBONE, keepsake) -
+# hud_keepsake_gap_px past the item before it: GOLD while GLASSBONE is
+# hidden, GLASSBONE once a piece is held. A row item that has gone fails
+# the case by name rather than crashing it.
 func _check_hud_line() -> void:
 	_new_run()
 	await _load_field(0)
-	var line: Control = _field.get_node("FieldHUD/KeepsakeLine")
-	var gold_line: Control = _field.get_node("FieldHUD/GoldLine")
+	var line: Control = _hud_line("KeepsakeLine")
+	var gold_line: Control = _hud_line("GoldLine")
+	var glassbone_line: Control = _hud_line("GlassboneLine")
+	if line == null or gold_line == null or glassbone_line == null:
+		await _teardown()
+		_completed += 1
+		return
+	var keepsake_gap: float = float((line.get("style") as Resource).get("hud_keepsake_gap_px"))
 	_expect(not line.visible, "KEEPSAKE is hidden with an empty slot")
 	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))
 	_expect(line.visible, "...shown once one is held")
 	_expect_eq(str(line.get("_value_text")), "Bent Nail", "...naming it")
-	_expect(line.position.x > gold_line.position.x + gold_line.size.x, "...beside GOLD")
+	_expect(not glassbone_line.visible, "GLASSBONE is hidden on a new run")
+	_expect_eq(line.position.x, gold_line.position.x + gold_line.size.x + keepsake_gap, "...so KEEPSAKE sits hud_keepsake_gap_px past GOLD")
+	_run_state.call("add_glassbone", 1)
+	await process_frame
+	_expect(glassbone_line.visible, "GLASSBONE shows from the first piece")
+	_expect_eq(line.position.x, glassbone_line.position.x + glassbone_line.size.x + keepsake_gap, "...and KEEPSAKE moves to hud_keepsake_gap_px past it")
 	_expect_eq(str(gold_line.get("_value_text")), "0", "GOLD still reads its count")
 	await _teardown()
 	_completed += 1
@@ -455,6 +472,14 @@ func _check_restart_clears() -> void:
 	_completed += 1
 
 # --- Helpers ---
+
+# A field HUD row item by node name, or null - with the case failed by
+# name, so a renamed or removed item reads as that, not as a crash.
+func _hud_line(node_name: String) -> Control:
+	var line := _field.get_node_or_null("FieldHUD/" + node_name) as Control
+	if line == null:
+		_fail("The field HUD has no %s - the row changed under this check" % node_name)
+	return line
 
 func _new_run() -> void:
 	_run_state.call("new_run", load(CHARACTER_PATH))
