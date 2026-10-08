@@ -165,6 +165,13 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # paper_grain_strength, paper_tonal_variation_strength and
 # edge_tone_strength - are the whole game's card stock; all 0 is flat bone.
 @export_file("*.tres") var paper_material_path: String = "res://battle/card_paper_material.tres"
+# The name's finish by the card's rarity (CardRarityFinish): one resource
+# SHARED by every card, like the paper's - its edits re-finish every face
+# live - worn through name_finish_shader_path on the name, Uncommon and up
+# only (a Common name stays plain ink with no material). See
+# _apply_name_finish().
+@export_file("*.tres") var rarity_finish_path: String = "res://battle/card_rarity_finish.tres"
+@export_file("*.gdshader") var name_finish_shader_path: String = "res://battle/card_name_finish.gdshader"
 # The two shadows, lit from above: a contact hairline (1px down, 18%) and
 # a soft shadow thrown down the page (10px, 14%, 3px down). A lifted card
 # (see Hover) throws the soft one further and lighter, and the contact
@@ -467,6 +474,11 @@ var _bonus_corner_blend: float = 0.0
 var _bonus_corner_tween: Tween = null
 var _bonus_corner: Control = null
 var _art_style: StyleBoxFlat = null
+# The shared finish (rarity_finish_path) and this card's own material on
+# the name - made the first time a finished tier is shown, kept for reuse,
+# and off the name for Common.
+var _rarity_finish: CardRarityFinish = null
+var _name_finish: ShaderMaterial = null
 # Draws the art rules - a Control over the whole face made in _ready(),
 # like _bonus_corner, so the rules draw above the image instead of being
 # clipped into it by the field.
@@ -525,6 +537,10 @@ func _ready() -> void:
 	if not paper_material_path.is_empty():
 		paper.material = load(paper_material_path) as Material
 	paper.draw.connect(_draw_paper)
+	if not rarity_finish_path.is_empty():
+		_rarity_finish = load(rarity_finish_path) as CardRarityFinish
+		if _rarity_finish != null:
+			_rarity_finish.changed.connect(_apply_name_finish)
 	# The card's art (CardData.art) as a centred cover crop: fills the
 	# field at its own aspect, the overflow cut, never stretched. Clipped
 	# to the field's own drawn shape so it keeps the rounded corners; the
@@ -578,6 +594,7 @@ func set_card_data(data: CardData) -> void:
 	type_label.text = _type_label_text(_keyline_type)
 	_apply_type_style()
 	_apply_layout()
+	_apply_name_finish()
 
 # The active stance, or null. Pushed by HandContainer/DeckView on the
 # controller's stance_changed - a stance changes what an Attack costs and
@@ -977,6 +994,49 @@ func _rule_style(color: Color, width: int, radius: int) -> StyleBoxFlat:
 	style.border_width_right = width
 	style.border_width_bottom = width
 	return style
+
+# The name's rarity finish (CardRarityFinish, card_name_finish.gdshader):
+# Uncommon and up wear this card's own ShaderMaterial on the name, its
+# base, highlight, rest gradient and sweep shape from the shared resource
+# and the gradient spanning the name's own shaped width (clipped to the
+# label's); Common - and an untagged card - takes the material off and
+# is the resource's flat common_ink. The font, size and one-line
+# layout are untouched; the card's modulate (unaffordable, played) still
+# reaches the name through its alpha.
+func _apply_name_finish() -> void:
+	if card_data == null or _rarity_finish == null or not _rarity_finish.has_finish(card_data.rarity):
+		name_label.material = null
+		if _rarity_finish != null:
+			name_label.add_theme_color_override("font_color", _rarity_finish.common_ink)
+		return
+	if _name_finish == null:
+		var shader := load(name_finish_shader_path) as Shader
+		if shader == null:
+			push_warning("CardView: name finish shader failed to load (%s); the name stays ink." % name_finish_shader_path)
+			return
+		_name_finish = ShaderMaterial.new()
+		_name_finish.shader = shader
+		_name_finish.set_shader_parameter("sheen_t", -1.0)
+	var rarity: CardData.CardRarity = card_data.rarity
+	_name_finish.set_shader_parameter("base_color", _rarity_finish.base_color(rarity))
+	_name_finish.set_shader_parameter("highlight_color", _rarity_finish.highlight_color(rarity))
+	_name_finish.set_shader_parameter("rainbow", _rarity_finish.is_rainbow(rarity))
+	_name_finish.set_shader_parameter("hue_a", _rarity_finish.ultra_hue_rose)
+	_name_finish.set_shader_parameter("hue_b", _rarity_finish.ultra_hue_teal)
+	_name_finish.set_shader_parameter("hue_c", _rarity_finish.ultra_hue_olive)
+	_name_finish.set_shader_parameter("rest_gradient_strength", _rarity_finish.rest_gradient_strength)
+	_name_finish.set_shader_parameter("sheen_width", _rarity_finish.sheen_width)
+	_name_finish.set_shader_parameter("sheen_softness", _rarity_finish.sheen_softness)
+	_name_finish.set_shader_parameter("sheen_strength", _rarity_finish.sheen_strength)
+	var text_width: float = _string_width(name_label, name_font_size_px)
+	if name_label.size.x > 0.0:
+		text_width = minf(text_width, name_label.size.x)
+	_name_finish.set_shader_parameter("text_width_px", text_width)
+	name_label.material = _name_finish
+
+# The name's finish material while it wears one, else null - for probes.
+func get_name_finish() -> ShaderMaterial:
+	return name_label.material as ShaderMaterial
 
 # The art panel's tint. One StyleBoxFlat kept, not rebuilt per call.
 func _apply_panel_color() -> void:
