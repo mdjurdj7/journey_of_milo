@@ -181,6 +181,34 @@ enum ExitKind { CHANNEL, LINE }
 # loop). Empty (the default) = derived.
 @export var wear_path_override: PackedVector2Array = PackedVector2Array()
 
+@export_group("Scatter")
+# The ground clutter this floor lies under - casts, shells, stones,
+# samphire (ScatterSet, ScatterEntry) - placed by FieldScatter at load,
+# seeded from this resource's path, so a floor is the same every time.
+# Empty = bare sand.
+@export var scatter_sets: Array[ScatterSet] = []:
+	set(value):
+		for scatter_set in scatter_sets:
+			if scatter_set != null and scatter_set.changed.is_connected(emit_changed):
+				scatter_set.changed.disconnect(emit_changed)
+		scatter_sets = value
+		for scatter_set in scatter_sets:
+			if scatter_set != null and not scatter_set.changed.is_connected(emit_changed):
+				scatter_set.changed.connect(emit_changed)
+		emit_changed()
+# Every entry's cluster density times this - the floor's one knob for
+# more or less.
+@export_range(0.0, 4.0, 0.05) var scatter_density: float = 1.0:
+	set(value):
+		scatter_density = value
+		emit_changed()
+# The most items the floor holds, all entries together; placing stops
+# there, with a warning. 0 = no cap.
+@export var scatter_budget: int = 0:
+	set(value):
+		scatter_budget = value
+		emit_changed()
+
 @export_group("Rewards")
 # What a won fight offers. Null = no drop at all.
 @export var reward_pool: RewardPool = null
