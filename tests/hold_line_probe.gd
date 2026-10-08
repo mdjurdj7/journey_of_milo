@@ -10,7 +10,9 @@ extends SceneTree
 #   click  - from the worn band's end, GATE_APPROACH_M short of the line,
 #            a click target well past it: he eases to rest ON the line,
 #            hold_line_reached fires once, he turns to face the nearest
-#            required enemy, and the world line is said over him
+#            required enemy, and the world line is said over him - at
+#            a fixed point (where he stopped, at head height) that stays
+#            put as he then walks back WALK_AWAY_SECONDS (and returns)
 #   keys   - move_forward held into the line, then move_forward and
 #            move_right together: he stays on it, and slides along it
 #   dash   - a dash straight at it from DASH_START_M short: reined in
@@ -55,6 +57,10 @@ const OVERSHOOT_LIMIT_M := 0.02
 const SHORT_LIMIT_M := 0.10
 const FACING_LIMIT_DEG := 10.0
 const EXPECTED_LINE := "Not with that still behind him."
+# The click case's walk back from the line, while its world line is up.
+const WALK_AWAY_SECONDS := 0.8
+const WALK_AWAY_M := 4.0
+const ANCHOR_LIMIT_M := 0.01
 
 var _failures: int = 0
 var _field: Node3D = null
@@ -175,6 +181,7 @@ func _case_click() -> void:
 	_check(_reached == reached_before + 1, "click: one arrival (%d)" % (_reached - reached_before))
 	await _check_look_back("click")
 	await _report_screen()
+	await _check_line_anchor_fixed(arrived_at)
 
 func _case_keys() -> void:
 	print("\n=== case: keys")
@@ -252,6 +259,34 @@ func _report_screen() -> void:
 		var font: Font = line.get_theme_font("font")
 		var text_width: float = font.get_string_size(line.text, HORIZONTAL_ALIGNMENT_LEFT, -1, line.get_theme_font_size("font_size")).x if font != null else 0.0
 		print("screen: line box %s, text ~%.0f px wide, a %.2f" % [Rect2(line.position, line.size), text_width, line.modulate.a])
+
+# The world line sits over a fixed point - where he stopped, at head
+# height plus the line's clearance - and stays there while he walks away.
+func _check_line_anchor_fixed(arrived_at: Vector3) -> void:
+	var line := _field.get_node_or_null("FieldHUD/WorldVoiceLine") as Label
+	if line == null:
+		_check(false, "anchor: the world line exists")
+		return
+	var spoken: Variant = line.call("get_anchor_point")
+	_check(spoken is Vector3, "anchor: the line is still over a world point")
+	if not spoken is Vector3:
+		return
+	var height: float = float(_wanderer.call("get_head_height")) + float(_field.get("hold_line_world_line_head_clearance"))
+	var expected: Vector3 = arrived_at + Vector3.UP * height
+	_check((spoken as Vector3).distance_to(expected) <= ANCHOR_LIMIT_M, "anchor: said over where he stopped, at head height (%s vs %s)" % [spoken, expected])
+	var from: Vector3 = _wanderer.global_position
+	_wanderer.call("set_move_target", from - _forward * WALK_AWAY_M)
+	for i in roundi(WALK_AWAY_SECONDS * 60.0):
+		await physics_frame
+	var moved: float = from.distance_to(_wanderer.global_position)
+	var after: Variant = line.call("get_anchor_point")
+	print("anchor: he walked %.2f m; line over %s" % [moved, after])
+	_check(moved > 0.5, "anchor: he walked away from the line (%.2f m)" % moved)
+	_check(after is Vector3 and (after as Vector3).distance_to(spoken as Vector3) <= ANCHOR_LIMIT_M, "anchor: the line stayed where it was said (%s, then %s)" % [spoken, after])
+	# Back to rest on the line, where the keys case starts from (that
+	# arrival is before its own count).
+	_wanderer.call("set_move_target", _gate.global_position + _forward * PAST_LINE_TARGET_M)
+	await _run_until_rest(CASE_SECONDS)
 
 func _check_look_back(label: String) -> void:
 	var enemy: Node3D = _field.call("_nearest_required_enemy", _wanderer.global_position) as Node3D

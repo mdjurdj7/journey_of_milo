@@ -1526,8 +1526,10 @@ func _on_wanderer_hold_line_reached() -> void:
 	if line == null:
 		push_warning("RegionField: no FieldHUD to say the hold line's world line on.")
 		return
+	# Said where he stopped: a fixed point, his position now plus the head
+	# height - it stays there as he walks away (WorldVoiceLine.show_line_at()).
 	var height: float = wanderer.get_head_height() + hold_line_world_line_head_clearance
-	line.show_line_near(hold_line_world_line, hold_line_world_line_seconds, wanderer, Vector3.UP * height)
+	line.show_line_at(hold_line_world_line, hold_line_world_line_seconds, wanderer.global_position + Vector3.UP * height)
 	_hold_line_spoken = true
 
 # The rectangle the four boundary walls' centre lines enclose, in world
