@@ -70,6 +70,13 @@ class_name BattleIntent
 	set(value):
 		glyph_cap_fraction = value
 		_apply_layout()
+# A glyph shown without a number (BURROW, SETTLE, WATCH - and a pain
+# turn's cancelled move) is drawn this many times the glyph height, still
+# centred where the number would sit: it carries the intent alone.
+@export_range(1.0, 3.0) var glyph_alone_scale: float = 1.7:
+	set(value):
+		glyph_alone_scale = value
+		_apply_layout()
 @export var glyph_numeral_gap_px: float = 5.0:
 	set(value):
 		glyph_numeral_gap_px = value
@@ -79,6 +86,11 @@ class_name BattleIntent
 @export var glyph_stroke_px: float = 3.2:
 	set(value):
 		glyph_stroke_px = value
+		queue_redraw()
+# The shield (DEFEND) has its own, lighter pen, so its opening reads.
+@export var shield_stroke_px: float = 2.2:
+	set(value):
+		shield_stroke_px = value
 		queue_redraw()
 @export_range(0.0, 1.0) var glyph_taper: float = 0.15:
 	set(value):
@@ -339,7 +351,10 @@ func _apply_layout() -> void:
 	_glyph_size = cap_height * glyph_cap_fraction
 	_threshold_label.add_theme_font_size_override("font_size", threshold_numeral_size_px)
 	var text_width: float = _text_width(_label, numeral_size_px)
-	# A glyph with no numeral (BURROW) is the glyph alone, no gap.
+	# A glyph with no numeral (BURROW) is the glyph alone, no gap, and
+	# glyph_alone_scale larger.
+	if text_width <= 0.0:
+		_glyph_size *= glyph_alone_scale
 	var pair_width: float = _glyph_width()
 	if text_width > 0.0:
 		pair_width += glyph_numeral_gap_px + text_width
@@ -540,10 +555,12 @@ func _draw_ink(shapes: Array[PackedVector2Array], alpha: float) -> void:
 		_fill(fill, ink, edge)
 
 # A pen stroke as a closed polygon: each spine point pushed out either
-# side by half the width there - glyph_stroke_px at factor 1, glyph_taper
-# of it at 0 - along the bisector of its two segments, mitred so a corner
+# side by half the width there - the pen's full width at factor 1
+# (stroke_px, or glyph_stroke_px if it's negative), glyph_taper of it at
+# 0 - along the bisector of its two segments, mitred so a corner
 # keeps its width; out along the left side and back along the right.
-func _ribbon(spine: PackedVector2Array, factors: PackedFloat32Array) -> PackedVector2Array:
+func _ribbon(spine: PackedVector2Array, factors: PackedFloat32Array, stroke_px: float = -1.0) -> PackedVector2Array:
+	var stroke: float = glyph_stroke_px if stroke_px < 0.0 else stroke_px
 	var left := PackedVector2Array()
 	var right := PackedVector2Array()
 	var count: int = spine.size()
@@ -555,7 +572,7 @@ func _ribbon(spine: PackedVector2Array, factors: PackedFloat32Array) -> PackedVe
 		var miter: float = 1.0
 		if into != Vector2.ZERO and out != Vector2.ZERO:
 			miter = 1.0 / maxf(normal.dot(Vector2(-out.y, out.x)), 0.5)
-		var half: float = glyph_stroke_px * lerpf(glyph_taper, 1.0, factors[i]) * 0.5 * miter
+		var half: float = stroke * lerpf(glyph_taper, 1.0, factors[i]) * 0.5 * miter
 		left.append(spine[i] + normal * half)
 		right.append(spine[i] - normal * half)
 	right.reverse()
@@ -654,8 +671,9 @@ func _keyholed(outer: PackedVector2Array, holes: Array[PackedVector2Array]) -> P
 # ATTACK: a slim spearhead pointing right (_spearhead()) - the action
 # coming at you. DEFEND: a shield in one stroke - up from its point, thick
 # at the shoulders and across the top, down the far side, fining back to
-# the point. BURROW: a mound on a ground line in one stroke - fine at the
-# line's ends, the swell thickest at its crest. HEAL_ALLY: a plus of two
+# the point, in its own lighter pen (shield_stroke_px). BURROW: a mound
+# on a ground line in one stroke - fine at the line's ends, the swell
+# thickest at its crest. HEAL_ALLY: a plus of two
 # strokes, each thick at the crossing and fine at its ends. WATCH: an open
 # eye - an upper lid thickest mid-lid, fine at the corners, a lighter
 # lower lid short of them, and a round pupil. SETTLE: the attack's
@@ -674,7 +692,7 @@ func _glyph_shapes(centre: Vector2, r: float) -> Array[PackedVector2Array]:
 			shapes.append(_ribbon(PackedVector2Array([
 				point, centre + Vector2(-r * 0.78, r * 0.2), centre + Vector2(-r * 0.78, -r * 0.8),
 				centre + Vector2(r * 0.78, -r * 0.8), right_waist, right_waist.lerp(point, 0.9),
-			]), PackedFloat32Array([0.0, 0.6, 1.0, 0.9, 0.55, 0.0])))
+			]), PackedFloat32Array([0.0, 0.6, 1.0, 0.9, 0.55, 0.0]), shield_stroke_px))
 		EnemyIntent.IntentType.BURROW:
 			var ground: float = r * 0.5
 			var spine := PackedVector2Array([centre + Vector2(-r, ground), centre + Vector2(-r * 0.6, ground)])
