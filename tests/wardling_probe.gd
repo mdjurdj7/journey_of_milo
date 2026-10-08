@@ -50,7 +50,7 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var data: EnemyData = _wardling()
 	_expect_eq(data.enemy_name, "Wardling", "The Wardling's name")
-	_expect_eq(data.max_hp, 90, "...90 HP")
+	_expect_eq(data.max_hp, 70, "...70 HP")
 	_expect_eq(data.escalation_multipliers, [1.0, 1.3, 1.6, 2.0] as Array[float], "...escalates 1.0 / 1.3 / 1.6 / 2.0")
 	_expect_eq(data.escalation_stage_length, 2, "...every 2 turns")
 	_expect_eq(data.pain_turn_hp_threshold, 0.5, "...a pain turn below 50%")

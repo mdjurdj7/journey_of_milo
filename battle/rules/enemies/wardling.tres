@@ -25,7 +25,7 @@ value = 11
 script = ExtResource("1_enemy_data")
 enemy_name = "Wardling"
 mechanic_summary = "An elite tied to its post: Shove 9, Stamp 5, Trample 11 in a loop, its attacks growing every two turns (x1.3, x1.6, then x2); the first time it drops below half HP it loses a turn. Teaches racing escalation, and pays a keepsake and Glassbone for it."
-max_hp = 90
+max_hp = 70
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_first"), SubResource("EnemyIntent_second"), SubResource("EnemyIntent_third")])
 ; Placeholder: hit.wav is 8-bit and one take - replace with a proper body hit, 2-3 takes.
 contact_sounds = Array[AudioStream]([ExtResource("4_hit")])

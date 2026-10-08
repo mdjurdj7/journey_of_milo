@@ -389,7 +389,7 @@
                   "index": 1,
                   "name": "Wardling",
                   "enemy_file": "res://battle/rules/enemies/wardling.tres",
-                  "hp": 90,
+                  "hp": 70,
                   "required": false,
                   "anchor": false,
                   "card_reward": "ROLLED",
@@ -1363,7 +1363,7 @@
     {
       "name": "Wardling",
       "file": "res://battle/rules/enemies/wardling.tres",
-      "hp": 90,
+      "hp": 70,
       "elite": true,
       "mechanic_summary": "An elite tied to its post: Shove 9, Stamp 5, Trample 11 in a loop, its attacks growing every two turns (x1.3, x1.6, then x2); the first time it drops below half HP it loses a turn. Teaches racing escalation, and pays a keepsake and Glassbone for it.",
       "field": {
@@ -1452,7 +1452,7 @@
         },
         "pain_turn": {
           "below_hp_fraction": 0.5,
-          "below_hp": 45.0,
+          "below_hp": 35.0,
           "effect": "its queued action is cancelled, once per fight",
           "line": "A ragged breath. It isn't moving."
         },
