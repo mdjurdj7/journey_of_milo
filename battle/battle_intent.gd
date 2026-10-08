@@ -7,12 +7,14 @@ class_name BattleIntent
 # see EnemyTurn.preview_intent()). Ink on the world, like the rest of the
 # battle UI: the numeral in Spectral SemiBold in the theme's ink with a
 # 1px bone outline for legibility over the world, the glyph filled ink
-# over the same bone outline, and a hairline (ink at hairline_alpha)
-# beneath the pair - no backing. The numeral leads: the glyph is
-# glyph_cap_fraction of its cap height - the number is the fairness
-# contract, the glyph is only its category. If the shown damage would
-# reach the Wanderer's current HP through block, the hairline becomes a
-# full-ink rule, lethal_rule_px thick - the one emphasis, nothing else.
+# over the same bone outline - no backing. The numeral leads: the glyph
+# is glyph_cap_fraction of its cap height - the number is the fairness
+# contract, the glyph is only its category. Nothing is drawn under the
+# pair unless there is a reason: a threshold ring hangs from a hairline
+# (ink at hairline_alpha), and if the shown damage would reach the
+# Wanderer's current HP through block, that rule is drawn full ink,
+# lethal_rule_px thick - the one emphasis, nothing else. Its space is
+# kept either way, so the pair never moves when the rule comes or goes.
 #
 # An interruptible attack (EnemyIntent.interrupt_threshold, the Siltjaw's
 # charge) adds a second row under the hairline: the damage still to deal
@@ -320,8 +322,8 @@ func set_revealed(revealed: bool) -> void:
 func _update_visibility() -> void:
 	visible = _revealed and _has_intent
 
-# Glyph on the left, numeral on the right, on one line; the hairline
-# centred beneath. This control's width is the wider of the pair and the
+# Glyph on the left, numeral on the right, on one line; the rule's place
+# centred beneath, whether or not it is drawn. This control's width is the wider of the pair and the
 # hairline, measured from the rendered text width (EnemyStatus's own
 # approach, not the label's lazily-updated minimum size) so the unproject
 # can centre it exactly; its bottom edge is the rule's underside - or,
@@ -407,8 +409,8 @@ func _text_width(label: Label, font_size: int) -> float:
 # attack's spearhead points toward the Wanderer: built pointing
 # screen-right and mirrored about the glyph's centre when the Wanderer is
 # to the left (see _points_left()). The rest are not directional and
-# never flip. Beneath the pair, the hairline - or the lethal rule in its
-# place.
+# never flip. Beneath the pair, the lethal rule, or the hairline a
+# threshold ring hangs from - otherwise nothing.
 func _draw() -> void:
 	if not _has_intent:
 		return
@@ -432,6 +434,8 @@ func _draw() -> void:
 		var strike_y: float = roundf(_pair_rect.position.y + _pair_rect.size.y * denied_rule_y_fraction)
 		draw_rect(Rect2(_pair_rect.position.x - denied_rule_overhang_px, strike_y, _pair_rect.size.x + denied_rule_overhang_px * 2.0, denied_rule_px), ink)
 
+	if not _lethal and not _has_threshold:
+		return
 	var rule_thickness: float = lethal_rule_px if _lethal else hairline_thickness_px
 	var rule_color: Color = ink
 	if not _lethal:
