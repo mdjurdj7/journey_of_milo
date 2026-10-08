@@ -154,9 +154,17 @@ func _ready() -> void:
 	visible = false
 	modulate.a = 0.0
 	if open_fade_sec > 0.0:
-		create_tween().tween_property(self, "modulate:a", 1.0, open_fade_sec)
+		var fade := create_tween()
+		fade.tween_property(self, "modulate:a", 1.0, open_fade_sec)
+		# Faded in, the bundle's card has arrived: its name sheens once.
+		fade.tween_callback(_sheen_card)
 	else:
 		modulate.a = 1.0
+		_sheen_card.call_deferred()
+
+func _sheen_card() -> void:
+	if _card_view != null and is_instance_valid(_card_view):
+		_card_view.play_name_sheen()
 
 func _rebuild_fonts() -> void:
 	_gold_font = InkType.numeral_font()

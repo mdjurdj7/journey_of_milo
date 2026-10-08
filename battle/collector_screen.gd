@@ -283,6 +283,10 @@ func _build_views() -> void:
 		view.mouse_exited.connect(_on_card_mouse_exited.bind(slot))
 		_views.append(view)
 	_apply_affordability()
+	# The stock arriving: each card's name sheens once (a Common's doesn't).
+	for view: CardView in _views:
+		if view != null:
+			view.play_name_sheen()
 
 # Dims every card the run can't pay for now.
 func _apply_affordability() -> void:

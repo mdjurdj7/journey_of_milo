@@ -479,6 +479,10 @@ var _art_style: StyleBoxFlat = null
 # and off the name for Common.
 var _rarity_finish: CardRarityFinish = null
 var _name_finish: ShaderMaterial = null
+# The one sweep running, if any (play_name_sheen()), and how many have
+# started on this card - for probes.
+var _name_sheen_tween: Tween = null
+var _name_sheens_started: int = 0
 # Draws the art rules - a Control over the whole face made in _ready(),
 # like _bonus_corner, so the rules draw above the image instead of being
 # clipped into it by the field.
@@ -1005,6 +1009,7 @@ func _rule_style(color: Color, width: int, radius: int) -> StyleBoxFlat:
 # reaches the name through its alpha.
 func _apply_name_finish() -> void:
 	if card_data == null or _rarity_finish == null or not _rarity_finish.has_finish(card_data.rarity):
+		_stop_name_sheen()
 		name_label.material = null
 		if _rarity_finish != null:
 			name_label.add_theme_color_override("font_color", _rarity_finish.common_ink)
@@ -1037,6 +1042,40 @@ func _apply_name_finish() -> void:
 # The name's finish material while it wears one, else null - for probes.
 func get_name_finish() -> ShaderMaterial:
 	return name_label.material as ShaderMaterial
+
+# One sheen across the name: the highlight band left to right over the
+# finish's sheen_duration_sec, then back to rest. A call while one runs
+# restarts it - one sweep at a time, never a loop. Played on hover start
+# (_on_mouse_entered(), set_hovered()) and by the offer screens as the
+# card arrives; a Common name has no finish and nothing plays. Its own
+# tween, pause-proof the way the card's other tweens are (it follows this
+# card's processing, so a screen over the frozen field still runs it).
+func play_name_sheen() -> void:
+	if _name_finish == null or name_label.material != _name_finish or not is_inside_tree():
+		return
+	_stop_name_sheen()
+	_name_sheens_started += 1
+	_name_sheen_tween = create_tween()
+	_name_sheen_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_name_sheen_tween.tween_method(_set_name_sheen, 0.0, 1.0, maxf(_rarity_finish.sheen_duration_sec, 0.01))
+	_name_sheen_tween.tween_callback(_stop_name_sheen)
+
+func is_name_sheen_playing() -> bool:
+	return _name_sheen_tween != null and _name_sheen_tween.is_valid()
+
+func get_name_sheens_started() -> int:
+	return _name_sheens_started
+
+func _set_name_sheen(t: float) -> void:
+	if _name_finish != null:
+		_name_finish.set_shader_parameter("sheen_t", t)
+
+# Back to rest: the band off the name, no tween left running.
+func _stop_name_sheen() -> void:
+	if _name_sheen_tween != null:
+		_name_sheen_tween.kill()
+		_name_sheen_tween = null
+	_set_name_sheen(-1.0)
 
 # The art panel's tint. One StyleBoxFlat kept, not rebuilt per call.
 func _apply_panel_color() -> void:
@@ -1142,6 +1181,9 @@ func set_hovered(hovered: bool) -> void:
 		_on_mouse_exited()
 
 func _on_mouse_entered() -> void:
+	# The sheen on every CardView's hover start, grown or not.
+	if not _hovering:
+		play_name_sheen()
 	_hovering = true
 	if hover_enabled and not _armed and not _marked and not _hover_suppressed:
 		_raise_for_hover(hover_duration_sec)

@@ -783,6 +783,9 @@ func _sync_card_lift() -> void:
 		if _lifted != null:
 			_lifted.set_keyword_inspect(true)
 		_place_lift()
+		# Revealed, the pack's card has arrived: its name sheens once.
+		if _lifted != null:
+			_lifted.play_name_sheen()
 	elif not wanted and _lifted != null:
 		_lifted.queue_free()
 		_lifted = null

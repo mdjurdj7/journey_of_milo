@@ -737,6 +737,9 @@ func _open_choice() -> void:
 	_layout_choice()
 	_apply_scrim()
 	_play_choice_open()
+	# The offer arriving: each card's name sheens once (a Common's doesn't).
+	for card_view in _card_views:
+		card_view.play_name_sheen()
 
 # The choice-opening cue, once per choice opened. Made on first use.
 func _play_choice_open() -> void:

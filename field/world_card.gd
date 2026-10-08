@@ -491,6 +491,9 @@ func _set_near(near: bool) -> void:
 	_lift_tween = create_tween()
 	_lift_tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	_lift_tween.tween_property(self, "_lift", 1.0 if near else 0.0, lift_duration_sec)
+	# Lifted into reach, the offer has arrived: its name sheens once.
+	if near and _card_view != null:
+		_lift_tween.tween_callback(_card_view.play_name_sheen)
 
 # Only a lifted card takes a click - a far card is scenery, and clicking
 # through it would otherwise swallow a point-to-move click on the sand
