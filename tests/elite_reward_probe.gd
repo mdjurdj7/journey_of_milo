@@ -22,6 +22,7 @@ extends SceneTree
 # 53-68 on floor 5), so landing in one says which rule paid.
 
 const CASES := 4
+const RARITY_FINISH_PATH := "res://battle/card_rarity_finish.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const REGION_PATH := "res://floors/region1.tres"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
@@ -80,6 +81,7 @@ func _check_wardling() -> void:
 			_expect_eq(offered.size(), 3, "...three cards offered")
 			for card: CardData in offered:
 				_expect(card.rarity != CardData.CardRarity.COMMON, "...none Common (%s)" % card.card_name)
+			_check_offer_tiers(reward, offered)
 		reward.call("close")
 	await _teardown()
 	_completed += 1
@@ -129,11 +131,30 @@ func _check_region_end() -> void:
 				if not names.has(card.card_name):
 					names.append(card.card_name)
 			_expect_eq(names.size(), offered.size(), "...all distinct")
+			_check_offer_tiers(reward, offered)
 		reward.call("close")
 	await _teardown()
 	_completed += 1
 
 # --- Helpers ---
+
+# The open choice names each card's tier under it - the right word,
+# centred under its own face, below its bottom edge - and each card's
+# name sheened once as the offer arrived (none for a Common).
+func _check_offer_tiers(reward: Node, offered: Array) -> void:
+	var finish := load(RARITY_FINISH_PATH) as CardRarityFinish
+	var faces: Array = reward.get("_choice_faces")
+	var views: Array = reward.get("_card_views")
+	_expect_eq(faces.size(), offered.size(), "...a face rect per offered card")
+	for index in mini(faces.size(), offered.size()):
+		var card: CardData = offered[index]
+		var face: Rect2 = faces[index]
+		_expect_eq(str(reward.call("tier_label_at", index)), finish.tier_label_text(card.rarity), "...%s's tier named under it" % card.card_name)
+		var origin: Vector2 = reward.call("tier_label_origin", index)
+		_expect(origin.y > face.end.y and origin.x >= face.position.x and origin.x < face.get_center().x, "...below its own face (%s at %s, face %s)" % [card.card_name, origin, face])
+		var view: CardView = views[index]
+		var expected: int = 1 if finish.has_finish(card.rarity) else 0
+		_expect_eq(view.get_name_sheens_started(), expected, "...and its name sheened %d time(s) on arrival" % expected)
 
 # A new run on the floor, the fight with the first enemy whose data is
 # `enemy_path` won, and the reward screen it opens - or null (a FAIL is

@@ -43,6 +43,7 @@ const WANDERER_POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const POOLS_DIR := "res://cards/pools/"
 const SAMPHIRE_PATH := "res://cards/neutral/samphire.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
+const RARITY_FINISH_PATH := "res://battle/card_rarity_finish.tres"
 const NEUTRAL_IN_STOCK: Array[String] = ["Left Hand", "Second Thoughts", "Untouched"]
 const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Reckoning", "Down Payment"]
 const FLOOR_4 := 3
@@ -164,6 +165,7 @@ func _check_screen() -> void:
 		_expect(fixed != null and fixed.resource_path == SAMPHIRE_PATH, "The sixth is Samphire")
 		_expect(not rolled.has("Samphire"), "...and Samphire is not in the roll")
 		_expect_eq(int(screen.call("_price_at", STOCK)), SAMPHIRE_PRICE, "...at 30")
+		_check_tiers(screen, cards)
 		screen.call("_activate", int(screen.call("_leave_index")))
 		await process_frame
 		_expect(not is_instance_valid(screen) or screen.is_queued_for_deletion(), "LEAVE closes it")
@@ -337,6 +339,25 @@ func _check_consumed() -> void:
 	_completed += 1
 
 # --- Helpers ---
+
+# Each slot - Samphire's too - names its card's tier directly under the
+# face, above where the price line sits; and each finished name sheened
+# once as the stock arrived.
+func _check_tiers(screen: Node, cards: Array) -> void:
+	var finish := load(RARITY_FINISH_PATH) as CardRarityFinish
+	var views: Array = screen.get("_views")
+	for slot in cards.size():
+		var card: CardData = cards[slot]
+		if card == null:
+			continue
+		_expect_eq(str(screen.call("tier_label_at", slot)), finish.tier_label_text(card.rarity), "Slot %d (%s) names its tier under it" % [slot, card.card_name])
+		var face: Rect2 = screen.call("_slot_rect", slot)
+		var origin: Vector2 = screen.call("tier_label_origin", slot)
+		var tier_room: float = float(screen.call("_tier_line_height"))
+		_expect(origin.y > face.end.y and origin.y <= face.end.y + tier_room, "...between its face and its price (%s, face bottom %.0f, room %.0f)" % [origin, face.end.y, tier_room])
+		var view: CardView = views[slot]
+		var expected: int = 1 if finish.has_finish(card.rarity) else 0
+		_expect_eq(view.get_name_sheens_started(), expected, "...and its name sheened %d time(s) on arrival" % expected)
 
 # A new run on floor 4 with `gold`, and a collector of our own at its
 # spot, stocked from collector_pool and wired to the field as RegionField
