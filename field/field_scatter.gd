@@ -40,6 +40,13 @@ class_name FieldScatter
 # Nothing here has collision: the walk grid, the click and the Wanderer's
 # steps never see it.
 #
+# A CONTOUR entry (a tideline) instead follows the line contour_inland_m
+# inland of the water - traced over the same grid (marching squares
+# through the cell centres) and chained end to end - broken into
+# segments and gaps drawn from the line's own generator, wandering either
+# side of it, each item turned along it; tested where it lands as any
+# item is.
+#
 # Drawn as one MultiMeshInstance3D per entry (ScatterMeshes' model - its
 # glb or a placeholder - sized to the entry, its thinnest side turned down
 # for a stone), on the shared flat material tinted by the entry with each
@@ -171,6 +178,10 @@ var _sea_level: float = 0.0
 var _spawn: Vector2 = Vector2.ZERO
 var _wear_points: PackedVector2Array = PackedVector2Array()
 var _keepouts: Array[KeepOut] = []
+# Every enemy where it stands, for an entry's enemy_clearance_m.
+var _enemy_points: PackedVector2Array = PackedVector2Array()
+# Traced contours by inland level, cleared with the grid.
+var _contours: Dictionary = {}
 var _rebuild_queued: bool = false
 var _grid_dirty: bool = true
 
@@ -237,6 +248,7 @@ func rebuild() -> void:
 	if _grid_dirty:
 		_build_keepouts()
 		_build_grid()
+		_contours.clear()
 		_grid_dirty = false
 	_place_all()
 	_draw_all()
@@ -401,10 +413,12 @@ func _add_footprint(shape_node: CollisionShape3D, margin: float) -> void:
 # patrolled pack: wherever it can be when he reaches it, its waypoints.
 func _add_battle_keepouts() -> void:
 	var groups: Dictionary = {}
+	_enemy_points = PackedVector2Array()
 	for node in _field.get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as FieldEnemy
 		if enemy == null or enemy.is_queued_for_deletion() or not _field.is_ancestor_of(enemy):
 			continue
+		_enemy_points.append(_xz(enemy))
 		var key: StringName = enemy.group
 		if key == &"":
 			_add_lone_keepouts(enemy)
@@ -521,7 +535,7 @@ func _place_all() -> void:
 				continue
 			_entries.append(entry)
 			var left: int = budget - _item_count if budget > 0 else -1
-			var spots: Array[Spot] = _place_entry(entry, left)
+			var spots: Array[Spot] = _place_contour(entry, left) if entry.mode == ScatterEntry.Mode.CONTOUR else _place_entry(entry, left)
 			_spots[entry] = spots
 			_item_count += spots.size()
 			if budget > 0 and _item_count >= budget:
@@ -618,7 +632,192 @@ func _item_allowed(entry: ScatterEntry, p: Vector2, keep_roll: float) -> bool:
 		return false
 	if is_excluded(p):
 		return false
+	if entry.enemy_clearance_m > 0.0:
+		for at in _enemy_points:
+			if p.distance_to(at) < entry.enemy_clearance_m:
+				return false
 	return keep_roll < wear_weight(p)
+
+# --- Contours ---
+
+# One CONTOUR entry's spots: along each traced line at its inland
+# distance, segments and gaps from the line's own generator (shared by
+# every entry naming the same contour_line, so they break together), the
+# line wandering either side by contour_wander_m; within a segment an item
+# every contour_spacing_m (give or take a third), off the line by up to
+# contour_across_jitter_m, turned along it give or take contour_yaw_
+# jitter_degrees. Each tested where it lands, and in the entry's zones.
+func _place_contour(entry: ScatterEntry, left: int) -> Array[Spot]:
+	var spots: Array[Spot] = []
+	if left == 0 or entry.contour_spacing_m <= 0.0:
+		return spots
+	var line_name: String = entry.contour_line if not entry.contour_line.is_empty() else entry.name
+	var line_rng := RandomNumberGenerator.new()
+	line_rng.seed = hash("%s:line:%s" % [_floor.resource_path, line_name])
+	var rng := RandomNumberGenerator.new()
+	rng.seed = hash("%s:%s" % [_floor.resource_path, entry.name])
+	var segment_range := Vector2(minf(entry.segment_length_m.x, entry.segment_length_m.y), maxf(entry.segment_length_m.x, entry.segment_length_m.y))
+	var gap_range := Vector2(minf(entry.gap_length_m.x, entry.gap_length_m.y), maxf(entry.gap_length_m.x, entry.gap_length_m.y))
+	for line in contour_lines(entry.contour_inland_m):
+		var lengths := PackedFloat32Array([0.0])
+		for i in range(1, line.size()):
+			lengths.append(lengths[i - 1] + line[i - 1].distance_to(line[i]))
+		var total: float = lengths[lengths.size() - 1]
+		var phase_a: float = line_rng.randf() * TAU
+		var phase_b: float = line_rng.randf() * TAU
+		# Start part-way through a segment or a gap, so no line begins on
+		# a break at its very end.
+		var inside: bool = line_rng.randf() < 0.5
+		var at: float = -line_rng.randf() * (segment_range.y if inside else gap_range.y)
+		while at < total:
+			var length: float = line_rng.randf_range(segment_range.x, segment_range.y) if inside else line_rng.randf_range(gap_range.x, gap_range.y)
+			if inside:
+				var along: float = maxf(at, 0.0) + rng.randf() * entry.contour_spacing_m * 0.5
+				while along < minf(at + length, total):
+					if left >= 0 and spots.size() >= left:
+						return spots
+					var next: float = along + entry.contour_spacing_m * rng.randf_range(0.67, 1.33)
+					var spot: Spot = _contour_spot(entry, rng, line, lengths, along, phase_a, phase_b)
+					if spot != null:
+						spots.append(spot)
+					along = next
+			at += length
+			inside = not inside
+	return spots
+
+# One item at `along` metres down `line`: every draw made whether it's
+# kept or not, so one item's fate never shifts the next's.
+func _contour_spot(entry: ScatterEntry, rng: RandomNumberGenerator, line: PackedVector2Array, lengths: PackedFloat32Array, along: float, phase_a: float, phase_b: float) -> Spot:
+	var across_jitter: float = rng.randf_range(-entry.contour_across_jitter_m, entry.contour_across_jitter_m)
+	var yaw_jitter: float = deg_to_rad(rng.randf_range(-entry.contour_yaw_jitter_degrees, entry.contour_yaw_jitter_degrees))
+	var flip: float = PI if rng.randf() < 0.5 else 0.0
+	var keep_roll: float = rng.randf()
+	var tilt_axis: float = rng.randf() * TAU
+	var tilt: float = rng.randf_range(-entry.tilt_jitter_degrees, entry.tilt_jitter_degrees)
+	var factor: float = rng.randf_range(entry.scale_range.x, entry.scale_range.y)
+	var shade: float = 1.0 + rng.randf_range(-entry.tint_jitter, entry.tint_jitter)
+	var i: int = 1
+	while i < lengths.size() - 1 and lengths[i] < along:
+		i += 1
+	var a: Vector2 = line[i - 1]
+	var b: Vector2 = line[i]
+	var span: float = maxf(lengths[i] - lengths[i - 1], 1.0e-6)
+	var tangent: Vector2 = (b - a) / span
+	var normal := Vector2(-tangent.y, tangent.x)
+	var wander: float = contour_wander(entry, along, phase_a, phase_b)
+	var p: Vector2 = a.lerp(b, clampf((along - lengths[i - 1]) / span, 0.0, 1.0)) + normal * (wander + across_jitter)
+	var cell: int = _cell_at(p)
+	if cell < 0 or (_cell_zone[cell] & entry.zones) == 0:
+		return null
+	if not _item_allowed(entry, p, keep_roll):
+		return null
+	var spot := Spot.new()
+	spot.position = Vector3(p.x, _ground.get_visible_height_at(p), p.y)
+	var jitter := Basis(Vector3(cos(tilt_axis), 0.0, sin(tilt_axis)), deg_to_rad(tilt))
+	# Its length - the model's X - along the line.
+	var yaw: float = atan2(-tangent.y, tangent.x) + yaw_jitter + flip
+	spot.basis = Basis(Quaternion(Vector3.UP, slope_normal(p))) * jitter * Basis(Vector3.UP, yaw)
+	spot.size = entry.size_m * factor
+	spot.shade = shade
+	return spot
+
+# How far off its traced line a contour wanders at `along` metres down it:
+# two slow sines, at most contour_wander_m.
+static func contour_wander(entry: ScatterEntry, along: float, phase_a: float, phase_b: float) -> float:
+	return entry.contour_wander_m * (0.6 * sin(along / 3.1 + phase_a) + 0.4 * sin(along / 1.3 + phase_b))
+
+# The grid cell under a point, or -1 off the grid.
+func _cell_at(p: Vector2) -> int:
+	var step: float = maxf(sample_step_m, 0.1)
+	var col: int = floori((p.x - _grid_origin.x) / step)
+	var row: int = floori((p.y - _grid_origin.y) / step)
+	if col < 0 or row < 0 or col >= _grid_cols or row >= _grid_rows:
+		return -1
+	return row * _grid_cols + col
+
+# The lines `level` metres inland of the water, as polylines in world XZ:
+# marching squares over the grid's cell centres, each crossing on an edge
+# between two cells, chained edge to edge (a saddle split by its centre).
+# Lines under a metre are dropped. Cached per level until the grid is read
+# again.
+func contour_lines(level: float) -> Array[PackedVector2Array]:
+	var lines: Array[PackedVector2Array] = []
+	if _contours.has(level):
+		lines.assign(_contours[level])
+		return lines
+	var points: Dictionary = {}
+	var links: Dictionary = {}
+	var ends: Array[Vector2i] = [Vector2i(0, 1), Vector2i(1, 2), Vector2i(3, 2), Vector2i(0, 3)]
+	for row in _grid_rows - 1:
+		for col in _grid_cols - 1:
+			var corners: Array[int] = [row * _grid_cols + col, row * _grid_cols + col + 1, (row + 1) * _grid_cols + col + 1, (row + 1) * _grid_cols + col]
+			var values: Array[float] = []
+			for corner in corners:
+				values.append(_cell_inland[corner] - level)
+			# Edges: 0 top (corner 0-1), 1 right (1-2), 2 bottom (3-2), 3 left (0-3).
+			var keys: Array[int] = [_edge_key(col, row, true), _edge_key(col + 1, row, false), _edge_key(col, row + 1, true), _edge_key(col, row, false)]
+			var crossed: Array[int] = []
+			for edge in 4:
+				var v0: float = values[ends[edge].x]
+				var v1: float = values[ends[edge].y]
+				if (v0 >= 0.0) != (v1 >= 0.0):
+					crossed.append(edge)
+					if not points.has(keys[edge]):
+						var t: float = v0 / (v0 - v1)
+						points[keys[edge]] = _grid_point(corners[ends[edge].x]).lerp(_grid_point(corners[ends[edge].y]), t)
+			if crossed.size() == 2:
+				_link(links, keys[crossed[0]], keys[crossed[1]])
+			elif crossed.size() == 4:
+				var centre: float = (values[0] + values[1] + values[2] + values[3]) * 0.25
+				if (centre >= 0.0) == (values[0] >= 0.0):
+					_link(links, keys[0], keys[1])
+					_link(links, keys[2], keys[3])
+				else:
+					_link(links, keys[0], keys[3])
+					_link(links, keys[1], keys[2])
+	var visited: Dictionary = {}
+	# Open lines from their ends first, then the closed loops left over;
+	# the keys in a fixed order so the lines come out the same every time.
+	var starts: Array = links.keys()
+	starts.sort()
+	for pass_index in 2:
+		for start: int in starts:
+			if visited.has(start) or (pass_index == 0 and (links[start] as Array).size() != 1):
+				continue
+			var line := PackedVector2Array()
+			var previous: int = -1
+			var current: int = start
+			while current != -1 and not visited.has(current):
+				visited[current] = true
+				line.append(points[current])
+				var next: int = -1
+				for neighbour: int in links[current]:
+					if neighbour != previous and not visited.has(neighbour):
+						next = neighbour
+						break
+				previous = current
+				current = next
+			var length: float = 0.0
+			for i in range(1, line.size()):
+				length += line[i - 1].distance_to(line[i])
+			if length >= 1.0:
+				lines.append(line)
+	_contours[level] = lines
+	return lines
+
+func _edge_key(col: int, row: int, horizontal: bool) -> int:
+	return (row * (_grid_cols + 1) + col) * 2 + (0 if horizontal else 1)
+
+func _grid_point(cell: int) -> Vector2:
+	return cell_centre(cell % _grid_cols, floori(float(cell) / float(_grid_cols)))
+
+static func _link(links: Dictionary, a: int, b: int) -> void:
+	if not links.has(a):
+		links[a] = []
+	if not links.has(b):
+		links[b] = []
+	(links[a] as Array).append(b)
+	(links[b] as Array).append(a)
 
 # The drawn surface's normal at a point, from its heights either side.
 func slope_normal(p: Vector2) -> Vector3:

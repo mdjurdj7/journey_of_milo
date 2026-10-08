@@ -9,6 +9,11 @@ class_name ScatterMeshes
 #   SHELL        a shallow ribbed cup, ~4 cm, convex up
 #   STONE_ROUND  a smooth flattened ellipsoid
 #   STONE_FLAT   a flatter, longer one
+#   STRAND       a strand of dried seaweed: a thin flattened ribbon, ~35 cm
+#                long, ~4.5 cm wide, 1 cm high, slightly curved, its ends
+#                tapering - lying along its length on X (a tideline turns
+#                it along the line)
+#   TWIG         a tiny twig: a thin rod, ~10 cm, slightly bent, along X
 # Every mesh has smooth normals - a glb that arrives without any (Meshy's
 # samphire carries positions only) gets them generated here. One mesh per
 # path or kind, shared by every floor.
@@ -87,6 +92,10 @@ static func placeholder(kind: ScatterEntry.PlaceholderKind) -> Mesh:
 			return _stone(Vector3(1.0, 0.45, 0.78), 11)
 		ScatterEntry.PlaceholderKind.STONE_FLAT:
 			return _stone(Vector3(1.0, 0.32, 0.62), 23)
+		ScatterEntry.PlaceholderKind.STRAND:
+			return _strand()
+		ScatterEntry.PlaceholderKind.TWIG:
+			return _twig()
 	return _cast()
 
 # A thin tube wound in a loose, low coil - a lugworm's cast: 1.7 turns,
@@ -192,6 +201,74 @@ static func _stone(axes: Vector3, variant: int) -> Mesh:
 		for x in lon:
 			var n: int = (x + 1) % lon
 			_quad(tool, grid[y][x], grid[y][n], grid[y + 1][n], grid[y + 1][x], Vector3(0.0, axes.y * 0.05, 0.0))
+	tool.generate_normals()
+	return tool.commit()
+
+# A dried strand: a flattened ribbon along X, bowed a little sideways,
+# widest and thickest in the middle and tapering to its ends, closed at
+# both. Its cross-section is a flat box: top, bottom and two thin
+# edges.
+static func _strand() -> Mesh:
+	var length: float = 0.35
+	var width: float = 0.045
+	var thickness: float = 0.01
+	var bow: float = 0.03
+	var stations: int = 14
+	var rings: Array[PackedVector3Array] = []
+	var centres := PackedVector3Array()
+	for i in stations + 1:
+		var t: float = float(i) / float(stations)
+		var x: float = (t - 0.5) * length
+		var swell: float = sin(t * PI)
+		var half_width: float = width * 0.5 * (0.3 + 0.7 * swell)
+		var half_height: float = thickness * 0.5 * (0.4 + 0.6 * swell)
+		var z: float = bow * (1.0 - pow(2.0 * t - 1.0, 2.0))
+		var centre := Vector3(x, half_height, z)
+		centres.append(centre)
+		var ring := PackedVector3Array()
+		ring.append(centre + Vector3(0.0, half_height, -half_width))
+		ring.append(centre + Vector3(0.0, half_height, half_width))
+		ring.append(centre + Vector3(0.0, -half_height, half_width))
+		ring.append(centre + Vector3(0.0, -half_height, -half_width))
+		rings.append(ring)
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in stations:
+		for side in 4:
+			var n: int = (side + 1) % 4
+			_quad(tool, rings[i][side], rings[i + 1][side], rings[i + 1][n], rings[i][n], (centres[i] + centres[i + 1]) * 0.5)
+	# The ends, closed - faced away from the strand's middle.
+	_quad(tool, rings[0][0], rings[0][1], rings[0][2], rings[0][3], centres[1])
+	_quad(tool, rings[stations][0], rings[stations][1], rings[stations][2], rings[stations][3], centres[stations - 1])
+	tool.generate_normals()
+	return tool.commit()
+
+# A tiny twig: a thin rod along X, bent a little, its ends closed.
+static func _twig() -> Mesh:
+	var length: float = 0.1
+	var radius: float = 0.003
+	var sides: int = 5
+	var stations: int = 6
+	var rings: Array[PackedVector3Array] = []
+	var centres := PackedVector3Array()
+	for i in stations + 1:
+		var t: float = float(i) / float(stations)
+		var centre := Vector3((t - 0.5) * length, radius, 0.008 * sin(t * PI))
+		centres.append(centre)
+		var ring := PackedVector3Array()
+		for s in sides:
+			var a: float = float(s) / float(sides) * TAU
+			ring.append(centre + Vector3(0.0, sin(a), cos(a)) * radius * (1.0 - 0.3 * t))
+		rings.append(ring)
+	var tool := SurfaceTool.new()
+	tool.begin(Mesh.PRIMITIVE_TRIANGLES)
+	for i in stations:
+		for s in sides:
+			var n: int = (s + 1) % sides
+			_quad(tool, rings[i][s], rings[i + 1][s], rings[i + 1][n], rings[i][n], (centres[i] + centres[i + 1]) * 0.5)
+	for s in range(1, sides - 1):
+		_tri(tool, rings[0][0], rings[0][s], rings[0][s + 1], centres[1])
+		_tri(tool, rings[stations][0], rings[stations][s], rings[stations][s + 1], centres[stations - 1])
 	tool.generate_normals()
 	return tool.commit()
 

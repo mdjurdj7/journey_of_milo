@@ -13,8 +13,18 @@ class_name ScatterEntry
 # each, Gaussian over cluster_spread_m, so a cluster thins at its edges.
 # Never on the worn band, in water past wet_edge_m, or inside an
 # exclusion (FieldScatter).
+#
+# Or, in CONTOUR mode (a tideline), along a line a set distance inland of
+# the water - contour_inland_m, wandering contour_wander_m either side -
+# broken into segments with gaps between, items every contour_spacing_m
+# along a segment, each turned roughly along the line. Entries that name
+# the same contour_line share its segments (the strands and the twigs of
+# one tideline).
 
-enum PlaceholderKind { CAST, SHELL, STONE_ROUND, STONE_FLAT }
+enum Mode { CLUSTERS, CONTOUR }
+# Appended: an inserted value would rewrite every .tres that stores one
+# of these as an integer.
+enum PlaceholderKind { CAST, SHELL, STONE_ROUND, STONE_FLAT, STRAND, TWIG }
 # How it settles: FLAT lies on the sand as it is (a cast); CONVEX_UP turns
 # its dome up (a shell, the way they come to rest); FLATTEST_SIDE turns
 # its thinnest axis up (a stone).
@@ -42,6 +52,10 @@ const ZONE_ROCK_EDGE := 32
 @export var placeholder: PlaceholderKind = PlaceholderKind.CAST:
 	set(value):
 		placeholder = value
+		emit_changed()
+@export var mode: Mode = Mode.CLUSTERS:
+	set(value):
+		mode = value
 		emit_changed()
 
 @export_group("Look")
@@ -108,6 +122,55 @@ const ZONE_ROCK_EDGE := 32
 @export var wet_edge_m: float = 0.0:
 	set(value):
 		wet_edge_m = value
+		emit_changed()
+# Nothing within this of any enemy - a tideline kept off the water's edge
+# beside a fight. 0 = only the floor's battle-frame exclusions.
+@export var enemy_clearance_m: float = 0.0:
+	set(value):
+		enemy_clearance_m = value
+		emit_changed()
+@export_group("")
+
+@export_group("Contour")
+# CONTOUR mode only. The line: this far inland of the water, metres,
+# wandering up to contour_wander_m either side along its length.
+@export var contour_inland_m: float = 1.8:
+	set(value):
+		contour_inland_m = value
+		emit_changed()
+@export var contour_wander_m: float = 0.4:
+	set(value):
+		contour_wander_m = value
+		emit_changed()
+# The line's name for its segments' draw - entries naming the same one lie
+# along the same broken line. Empty = this entry's own name.
+@export var contour_line: String = "":
+	set(value):
+		contour_line = value
+		emit_changed()
+# Each segment's length and each gap's, metres, at random from x to y.
+@export var segment_length_m: Vector2 = Vector2(1.5, 4.0):
+	set(value):
+		segment_length_m = value
+		emit_changed()
+@export var gap_length_m: Vector2 = Vector2(1.0, 3.0):
+	set(value):
+		gap_length_m = value
+		emit_changed()
+# Items along a segment this far apart, give or take a third.
+@export var contour_spacing_m: float = 0.25:
+	set(value):
+		contour_spacing_m = value
+		emit_changed()
+# Each item off the line across it, up to this, metres; and turned along
+# the line give or take this many degrees.
+@export var contour_across_jitter_m: float = 0.06:
+	set(value):
+		contour_across_jitter_m = value
+		emit_changed()
+@export_range(0.0, 90.0, 0.5) var contour_yaw_jitter_degrees: float = 25.0:
+	set(value):
+		contour_yaw_jitter_degrees = value
 		emit_changed()
 @export_group("")
 
