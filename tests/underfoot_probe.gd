@@ -4,7 +4,7 @@ extends SceneTree
 # Sputter: its Sting -> Rebury loop, Covered (takes 50% less) while the
 # Sting is queued and Exposed (takes 50% more) while the Rebury is -
 # starting Covered, and still alternating after a Denied or Stunned
-# Sting; the Sting one unbreakable blow of 12 that Block and Brace
+# Sting; the Sting one unbreakable blow of 10 that Block and Brace
 # soften; the Rebury nothing. Floor 2's required cluster is the Sputter
 # and the Underfoot, no dragonfly, the island's Dragonfly x3 as they
 # were. The Wanderer's stance on the dune's rise east of the crab stands
@@ -43,7 +43,7 @@ const SLASH_PATH := "res://cards/data/slash.tres"
 const LOG_DIR := "user://underfoot_probe"
 const FLOOR_2 := 1
 const MAX_HP := 34
-const STING := 12
+const STING := 10
 const PLAYER_HP := 999
 # The barb raised should stand at least this tall on a 1080p screen.
 const BARB_MIN_PX := 40.0
@@ -92,7 +92,7 @@ func _check_data() -> void:
 	if data.intents.size() == 2:
 		var sting: EnemyIntent = data.intents[0]
 		var rebury: EnemyIntent = data.intents[1]
-		_expect(sting.intent_name == "Sting" and sting.type == EnemyIntent.IntentType.ATTACK and sting.value == STING and sting.hits == 1, "Sting first, one blow of 12")
+		_expect(sting.intent_name == "Sting" and sting.type == EnemyIntent.IntentType.ATTACK and sting.value == STING and sting.hits == 1, "Sting first, one blow of 10")
 		_expect(sting.interrupt_threshold == 0 and sting.on_interrupt == null, "...unbreakable: no threshold")
 		_expect(sting.rear_while_queued, "...its barb raised while queued")
 		_expect(sting.status_while_queued != null and sting.status_while_queued.resource_path == COVERED_PATH, "...Covered while queued")
@@ -124,7 +124,7 @@ func _check_multipliers() -> void:
 	_completed += 1
 
 # Nothing played, twice round: Covered with the Sting queued - it lands
-# 12 - then Exposed with the Rebury queued - nothing - and Covered again.
+# 10 - then Exposed with the Rebury queued - nothing - and Covered again.
 func _check_loop() -> void:
 	var data: EnemyData = _underfoot()
 	var enemy: Combatant = _enemy(data)
@@ -136,7 +136,7 @@ func _check_loop() -> void:
 		var before: int = player.hp
 		var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
 		seen.append("%s %s %d%s" % [state, intent.intent_name.to_lower(), before - player.hp, "" if bool(result["attacked"]) else " (no attack)"])
-	_expect_eq(seen, ["covered sting 12", "exposed rebury 0 (no attack)", "covered sting 12", "exposed rebury 0 (no attack)"] as Array[String], "Covered Sting 12 -> Exposed Rebury, looping")
+	_expect_eq(seen, ["covered sting 10", "exposed rebury 0 (no attack)", "covered sting 10", "exposed rebury 0 (no attack)"] as Array[String], "Covered Sting 10 -> Exposed Rebury, looping")
 	var preview: Dictionary = EnemyTurn.preview_intent(enemy, data, player)
 	EnemyTurn.take_turn(enemy, data, player)
 	preview = EnemyTurn.preview_intent(enemy, data, player)
@@ -160,7 +160,7 @@ func _check_lost_sting() -> void:
 	_completed += 1
 
 # 99 dealt on the Sting's turn: it lands all the same. Block 5 takes 5 of
-# it; Braced halves it; both: 1.
+# it; Braced halves it; both: 0.
 func _check_sting_defence() -> void:
 	var data: EnemyData = _underfoot()
 	var lost: Array[int] = []
@@ -179,7 +179,7 @@ func _check_sting_defence() -> void:
 		EnemyTurn.take_turn(enemy, data, player)
 		lost.append(before - player.hp)
 		_expect_eq(before - player.hp, int(preview["damage_to_hp"]), "%s: the Sting lands its preview" % case)
-	_expect_eq(lost, [STING, 7, 6, 1] as Array[int], "The Sting: 12 through anything dealt, 7 through Block 5, 6 Braced, 1 both")
+	_expect_eq(lost, [STING, 5, 5, 0] as Array[int], "The Sting: 10 through anything dealt, 5 through Block 5, 5 Braced, 0 both")
 	_completed += 1
 
 # --- Floor 2 ---
@@ -234,7 +234,7 @@ func _check_fight_body() -> void:
 		var combatant: Combatant = _combatant(controller, underfoot)
 		_expect(combatant != null and _state(combatant) == "covered", "The fight opens Covered")
 		_expect(is_equal_approx(float(pose.call("get_barb_raise")), 1.0), "...the barb raised as the frame settles")
-		_expect(_intent_text(controller, underfoot) == "12", "...the Sting telegraphed: 12")
+		_expect(_intent_text(controller, underfoot) == "10", "...the Sting telegraphed: 10")
 		var px: float = _barb_px(underfoot, pose)
 		print("Fight: the raised barb stands %.1f px tall at 1080p" % px)
 		_expect(px >= BARB_MIN_PX, "...clearly above the sand line: %.1f px (at least %d)" % [px, int(BARB_MIN_PX)])

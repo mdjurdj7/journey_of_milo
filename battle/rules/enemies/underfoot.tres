@@ -9,7 +9,7 @@
 [sub_resource type="Resource" id="EnemyIntent_sting"]
 script = ExtResource("2_intent")
 intent_name = "Sting"
-value = 12
+value = 10
 status_while_queued = ExtResource("3_covered")
 rear_while_queued = true
 
@@ -22,7 +22,7 @@ status_while_queued = ExtResource("4_exposed")
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Underfoot"
-mechanic_summary = "A stingray under the sand at the waterline, on a two-turn rhythm: Covered (takes 50% less damage) while its Sting (12) is telegraphed, then Exposed (takes 50% more) while it reburies, dealing nothing. The Sting can't be broken — Block or Brace it, work the enemy beside it, and hit the Underfoot when it's Exposed."
+mechanic_summary = "A stingray under the sand at the waterline, on a two-turn rhythm: Covered (takes 50% less damage) while its Sting (10) is telegraphed, then Exposed (takes 50% more) while it reburies, dealing nothing. The Sting can't be broken — Block or Brace it, work the enemy beside it, and hit the Underfoot when it's Exposed."
 max_hp = 34
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_sting"), SubResource("EnemyIntent_rebury")])
 ; Placeholder hit, the Greyshelf's (DESIGN.md).
