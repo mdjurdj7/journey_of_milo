@@ -148,7 +148,6 @@ var _lore_top: float = 0.0
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_paper_seed = randf()
 	_shadow = Panel.new()
 	_shadow.name = "Shadow"
 	_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -172,6 +171,9 @@ func _ready() -> void:
 
 func set_keepsake(keepsake: TrinketData) -> void:
 	_keepsake = keepsake
+	# The paper's grain from the keepsake's id: the same tile wherever it
+	# is shown, and no draw on the global generator a run's shuffles use.
+	_paper_seed = float(absi(hash(keepsake.id)) % 1000) / 1000.0 if keepsake != null else 0.0
 	_relayout()
 
 func get_keepsake() -> TrinketData:
