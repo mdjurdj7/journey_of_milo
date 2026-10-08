@@ -231,21 +231,70 @@ class_name HPBar
 		critical_fade_time = maxf(value, 0.0)
 
 @export_group("Block Readout")
-# While block is up, the card's open-shield glyph with the block value
-# centred inside it sits to the LEFT of the HP numeral, both ink at
-# block_readout_alpha, block_hp_gap_px before the numeral. The readout
-# grows leftward for it - the HP block stays put on the anchor.
-@export var block_glyph_size_px: float = 24.0
-@export var block_glyph_line_width_px: float = 1.5
+# While block is up, the card's open-shield glyph sits to the LEFT of the
+# HP numeral with the block value centred on it: the value in Spectral at
+# the HP numeral's own size, full ink, over a pale halo that breaks the
+# shield's line wherever a digit crosses it - and free to spill past the
+# shield's edges. The group's right edge stays block_hp_gap_px from the
+# HP numeral; a wider value spills leftward. The readout grows leftward
+# for it - the HP block stays put on the anchor.
+#
+# The shield's size: its height is ~1.85 x half of this, ~26 px at 28 -
+# the digits' own height at 22 px (Spectral's reported line height, 35 at
+# 22, is mostly descent).
+@export var block_glyph_size_px: float = 28.0:
+	set(value):
+		block_glyph_size_px = value
+		_relayout_block()
+# The intent glyphs' stroke (BattleIntent.glyph_line_width_px).
+@export var block_glyph_line_width_px: float = 3.5:
+	set(value):
+		block_glyph_line_width_px = value
+		_relayout_block()
 # The shield's centre sits this fraction of the HP numeral's size above
 # the HP baseline - level with the numeral's cap centre.
-@export var block_glyph_baseline_lift: float = 0.33
-@export var block_value_size_px: int = 13
+@export var block_glyph_baseline_lift: float = 0.33:
+	set(value):
+		block_glyph_baseline_lift = value
+		_relayout_block()
+# The value's size; 0 = the HP numeral's (battle_numeral_size_px).
+@export var block_value_size_px: int = 0:
+	set(value):
+		block_value_size_px = value
+		_relayout_block()
+# Two digits or more: the value at this fraction of its size - the rest
+# spills past the shield.
+@export_range(0.5, 1.0) var block_multi_digit_scale: float = 0.92:
+	set(value):
+		block_multi_digit_scale = value
+		_relayout_block()
 # The value's baseline sits this fraction of its size below the shield's
 # centre, which centres its cap height on the shield.
-@export var block_value_baseline_drop: float = 0.33
-@export_range(0.0, 1.0) var block_readout_alpha: float = 0.7
-@export var block_hp_gap_px: float = 16.0
+@export var block_value_baseline_drop: float = 0.33:
+	set(value):
+		block_value_baseline_drop = value
+		_relayout_block()
+# The halo under the value's ink: this many px each side, in this colour
+# (the bone of the screens' text) - drawn over the shield, under the ink.
+@export var block_halo_px: float = 2.0:
+	set(value):
+		block_halo_px = value
+		_relayout_block()
+@export var block_halo_color: Color = Color(0.94, 0.91, 0.86, 1.0):
+	set(value):
+		block_halo_color = value
+		_relayout_block()
+# The shield's ink alpha; the value is always full ink.
+@export_range(0.0, 1.0) var block_readout_alpha: float = 0.7:
+	set(value):
+		block_readout_alpha = value
+		_relayout_block()
+@export var block_hp_gap_px: float = 16.0:
+	set(value):
+		block_hp_gap_px = value
+		_relayout_block()
+# A changed value crossfades from the old over this long.
+@export var block_crossfade_time: float = 0.12
 
 @export_group("Toll")
 @export var toll_label_text: String = "TOLL"
@@ -276,6 +325,11 @@ var _wanderer: Wanderer = null
 var _current_hp: int = 0
 var _max_hp: int = 1
 var _block: int = 0
+# The value fading out under a crossfade (0: none), and how far the new
+# one has faded in (1: done) - see set_block().
+var _block_prev: int = 0
+var _block_fade: float = 1.0
+var _block_tween: Tween = null
 var _grace: int = 0
 # The row's contents, as flat display data rather than rules objects -
 # this node never reaches into a Stance or a Status, it is handed what to
@@ -413,26 +467,68 @@ func _battle_bar_top() -> float:
 func _block_readout_width() -> float:
 	if _block <= 0:
 		return 0.0
-	return block_glyph_size_px + block_hp_gap_px
+	return _block_group_width() + block_hp_gap_px
 
-# Shield glyph (the card's guard glyph, CardView._draw_glyph()) with the
-# value centred inside it, level with the HP numeral's cap centre.
+# The group's own width: the shield's box, or the value with its halo when
+# that is wider - the fading-out value's too while a crossfade runs, so
+# neither ever reaches toward the HP numeral.
+func _block_group_width() -> float:
+	var width: float = maxf(block_glyph_size_px, _block_value_width(_block))
+	if _block_prev > 0 and _block_fade < 1.0:
+		width = maxf(width, _block_value_width(_block_prev))
+	return width
+
+# The value's size: the HP numeral's (or block_value_size_px), held to
+# block_multi_digit_scale of it from two digits up.
+func _block_value_size(value: int) -> int:
+	var base: int = block_value_size_px if block_value_size_px > 0 else battle_numeral_size_px
+	if str(value).length() >= 2:
+		return maxi(roundi(float(base) * block_multi_digit_scale), 1)
+	return base
+
+func _block_value_width(value: int) -> float:
+	return InkType.width(numeral_font, str(value), _block_value_size(value)) + maxf(block_halo_px, 0.0) * 2.0
+
+# Shield glyph (the card's guard glyph, CardView._draw_glyph()) centred in
+# the group, level with the HP numeral's cap centre, at block_readout_
+# alpha; the value centred on it - the one fading out under the new one
+# while a crossfade runs.
 func _draw_block_readout(baseline: float, ink: Color) -> void:
 	if _block <= 0:
 		return
 	var color: Color = ink
 	color.a *= block_readout_alpha
 	var r: float = block_glyph_size_px * 0.5
-	var centre := Vector2(r, baseline - float(battle_numeral_size_px) * block_glyph_baseline_lift)
+	var centre := Vector2(_block_group_width() * 0.5, baseline - float(battle_numeral_size_px) * block_glyph_baseline_lift)
 	var shield := PackedVector2Array([
 		centre + Vector2(-r * 0.8, -r * 0.9), centre + Vector2(r * 0.8, -r * 0.9), centre + Vector2(r * 0.8, r * 0.1),
 		centre + Vector2(0.0, r * 0.95), centre + Vector2(-r * 0.8, r * 0.1), centre + Vector2(-r * 0.8, -r * 0.9),
 	])
 	draw_polyline(shield, color, block_glyph_line_width_px, true)
-	var value_text: String = str(_block)
-	var value_width: float = InkType.width(numeral_font, value_text, block_value_size_px)
-	var value_origin := Vector2(centre.x - value_width * 0.5, centre.y + float(block_value_size_px) * block_value_baseline_drop)
-	InkType.draw_run(self, numeral_font, value_text, value_origin, block_value_size_px, color)
+	if _block_prev > 0 and _block_fade < 1.0:
+		_draw_block_value(_block_prev, centre, ink, 1.0 - _block_fade)
+	_draw_block_value(_block, centre, ink, _block_fade)
+
+# One value on the shield: its halo first (over the shield's line, under
+# the ink), then the ink, both at `alpha`.
+func _draw_block_value(value: int, centre: Vector2, ink: Color, alpha: float) -> void:
+	if alpha <= 0.0:
+		return
+	var text: String = str(value)
+	var size_px: int = _block_value_size(value)
+	var width: float = InkType.width(numeral_font, text, size_px)
+	var origin := Vector2(centre.x - width * 0.5, centre.y + float(size_px) * block_value_baseline_drop)
+	if block_halo_px > 0.0 and numeral_font != null:
+		var halo: Color = block_halo_color
+		halo.a *= alpha
+		draw_string_outline(numeral_font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, roundi(block_halo_px * 2.0), halo)
+	var fill: Color = ink
+	fill.a *= alpha
+	InkType.draw_run(self, numeral_font, text, origin, size_px, fill)
+
+func _relayout_block() -> void:
+	if is_node_ready():
+		_apply_layout()
 
 func _battle_content_size() -> Vector2:
 	var width: float = _block_readout_width() + battle_width
@@ -886,8 +982,31 @@ func _set_displayed_fraction(value: float) -> void:
 # Called by BattleOverlay on the controller's status_changed with the
 # player's current block (0 clears the segment) - battle-only; the field
 # style never shows it.
+#
+# A changed value crossfades from the old over block_crossfade_time - no
+# pulse, no colour. Appearing and going (to or from 0) are immediate, and
+# the HP numeral never moves for any of it (_anchor_offset()).
 func set_block(block: int) -> void:
-	_block = maxi(block, 0)
+	var value: int = maxi(block, 0)
+	if value == _block:
+		return
+	if _block_tween != null and _block_tween.is_valid():
+		_block_tween.kill()
+	var crossfade: bool = _block > 0 and value > 0 and block_crossfade_time > 0.0
+	_block_prev = _block if crossfade else 0
+	_block = value
+	if crossfade:
+		_block_fade = 0.0
+		_block_tween = create_tween()
+		_block_tween.tween_method(_set_block_fade, 0.0, 1.0, block_crossfade_time)
+	else:
+		_block_fade = 1.0
+	_apply_layout()
+
+func _set_block_fade(value: float) -> void:
+	_block_fade = value
+	if _block_fade >= 1.0:
+		_block_prev = 0
 	_apply_layout()
 
 # Grace changed (opened by an enemy turn, spent by a hit, or lost when
@@ -941,6 +1060,8 @@ func enter_battle(duration: float) -> void:
 func exit_battle(duration: float) -> void:
 	_in_battle = false
 	_block = 0
+	_block_prev = 0
+	_block_fade = 1.0
 	if _reveal != null:
 		_reveal.clear()
 	_tween_battle_blend(0.0, duration)
