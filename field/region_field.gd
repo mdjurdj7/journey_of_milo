@@ -283,6 +283,11 @@ static func reset_hold_line_spoken() -> void:
 # Chasing an enemy that moves (a patrol): the path to it is planned again
 # this often.
 @export var nav_chase_replan_sec: float = 0.5
+# Hold to move (left button held after a press on the ground): the walk
+# follows the cursor's ground point, planned again at most this often and
+# only once the point has moved this far.
+@export var hold_replan_sec: float = 0.15
+@export var hold_replan_dist: float = 0.5
 @export_group("")
 
 @export var side_wade_margin: float = 4.0:
@@ -360,6 +365,10 @@ var _nav_goal: Vector3 = Vector3.INF
 var _nav_goal_enemy: FieldEnemy = null
 var _nav_replans: int = 0
 var _nav_chase_timer: float = 0.0
+# Hold to move: the left button went down on the ground and is still held.
+var _holding: bool = false
+var _hold_point: Vector3 = Vector3.INF
+var _hold_timer: float = 0.0
 var _wall_left: StaticBody3D = null
 var _wall_right: StaticBody3D = null
 # The walls' centre-line rectangle, kept for get_wall_rect().
@@ -648,17 +657,29 @@ func _unhandled_input(event: InputEvent) -> void:
 			_fill_debug_card_picker()
 		get_viewport().set_input_as_handled()
 		return
-	if not (event is InputEventMouseButton) or not event.pressed:
+	if not (event is InputEventMouseButton):
+		return
+	# The hold ends with the left button; the walk goes on to its last point.
+	if not event.pressed:
+		if event.button_index == MOUSE_BUTTON_LEFT:
+			_holding = false
 		return
 	if event.button_index != MOUSE_BUTTON_LEFT and event.button_index != MOUSE_BUTTON_RIGHT:
 		return
 	if event.button_index == MOUSE_BUTTON_LEFT and _try_open_bundle(event.position):
 		get_viewport().set_input_as_handled()
 		return
-	if _handle_move_click(event.position):
+	if _handle_move_click(event.position, event.button_index == MOUSE_BUTTON_LEFT):
 		get_viewport().set_input_as_handled()
 
-func _handle_move_click(screen_pos: Vector2) -> bool:
+# Frozen (a screen, a fight): a hold in progress ends with it.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_DISABLED:
+		_holding = false
+
+# `can_hold`: a left press - one that lands on the ground starts a hold
+# (_tick_hold()); one on an enemy is that fight, never a hold.
+func _handle_move_click(screen_pos: Vector2, can_hold: bool = false) -> bool:
 	if wanderer == null:
 		return false
 	var camera := get_viewport().get_camera_3d()
@@ -671,6 +692,21 @@ func _handle_move_click(screen_pos: Vector2) -> bool:
 		_show_click_marker(enemy.global_position)
 		return true
 
+	var point: Vector3 = _ground_point_under(camera, screen_pos)
+	if point == Vector3.INF:
+		return false
+	walk_to(point)
+	_show_click_marker(point)
+	if can_hold:
+		_holding = true
+		_hold_point = point
+		_hold_timer = 0.0
+	return true
+
+# Where a click at `screen_pos` sends him: the ground under it, or - on a
+# prop with nothing to open (a hull, the hitching post) - beside the prop
+# on his side. Vector3.INF when the ray meets nothing.
+func _ground_point_under(camera: Camera3D, screen_pos: Vector2) -> Vector3:
 	var from: Vector3 = camera.project_ray_origin(screen_pos)
 	var to: Vector3 = from + camera.project_ray_normal(screen_pos) * click_ray_length
 	var query := PhysicsRayQueryParameters3D.create(from, to)
@@ -682,17 +718,13 @@ func _handle_move_click(screen_pos: Vector2) -> bool:
 	query.exclude = excluded
 	var hit: Dictionary = get_world_3d().direct_space_state.intersect_ray(query)
 	if hit.is_empty():
-		return false
+		return Vector3.INF
 	var point: Vector3 = hit["position"]
-	# A prop with nothing to open (a hull, the hitching post): beside it,
-	# on his side of it.
 	if _nav != null and _is_nav_obstacle(hit.get("collider")):
 		var beside: Vector2 = _nav.nearest_open_toward(Vector2(point.x, point.z), Vector2(wanderer.global_position.x, wanderer.global_position.z))
 		var cell: Vector2i = _nav.world_to_cell(beside)
 		point = Vector3(beside.x, _nav.height_at_cell(cell), beside.y)
-	walk_to(point)
-	_show_click_marker(point)
-	return true
+	return point
 
 # A static body the walk grid stamps - not the ground, a walk surface or
 # the spawn slab.
@@ -772,7 +804,33 @@ func _on_wanderer_path_stuck() -> void:
 	_walk_planned()
 
 func _process(delta: float) -> void:
-	# A chased enemy that moves: its path follows it.
+	_tick_hold(delta)
+	_tick_chase(delta)
+
+# Held: the walk's goal follows the cursor's ground point - planned again
+# every hold_replan_sec at most, once it has moved hold_replan_dist. The
+# button let go (even unheard, under a screen), the hold is over.
+func _tick_hold(delta: float) -> void:
+	if not _holding:
+		return
+	if wanderer == null or not Input.is_mouse_button_pressed(MOUSE_BUTTON_LEFT):
+		_holding = false
+		return
+	_hold_timer += delta
+	if _hold_timer < hold_replan_sec:
+		return
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return
+	var point: Vector3 = _ground_point_under(camera, get_viewport().get_mouse_position())
+	if point == Vector3.INF or point.distance_to(_hold_point) <= hold_replan_dist:
+		return
+	_hold_timer = 0.0
+	_hold_point = point
+	walk_to(point)
+
+# A chased enemy that moves: its path follows it.
+func _tick_chase(delta: float) -> void:
 	if wanderer == null or _nav_goal_enemy == null:
 		return
 	if not is_instance_valid(_nav_goal_enemy) or wanderer.get_move_target_enemy() != _nav_goal_enemy:
