@@ -123,8 +123,9 @@ func _check_ledge() -> void:
 	await _teardown()
 	_completed += 1
 
-# Floor 3: from spawn to the plaza past the Blackback's pack - every sample
-# outside every contact zone. To the Blackback itself: into its zone, its
+# Floor 3: from spawn to the plaza past the Blackback's pack, and from one
+# side of the pack straight across to the other - every sample outside
+# every contact zone. To the Blackback itself: into its zone, its
 # packmate's left alone (one fight).
 func _check_enemy_zones() -> void:
 	await _load(2)
@@ -144,6 +145,24 @@ func _check_enemy_zones() -> void:
 			if sample.distance_to(_flat(enemy.global_position)) < float(enemy.get("contact_radius")):
 				inside += 1
 	_expect_eq(inside, 0, "...never inside a contact zone")
+	# Straight through the pack: from south of the Blackback to north of
+	# it - the straight line enters a zone, the planned path none.
+	if blackback != null:
+		var south: Vector3 = blackback.global_position + Vector3(0.0, 0.0, 6.0)
+		var north: Vector3 = blackback.global_position + Vector3(0.0, 0.0, -7.0)
+		var straight_inside: bool = false
+		for sample in _samples(PackedVector3Array([south, north])):
+			if sample.distance_to(_flat(blackback.global_position)) < float(blackback.get("contact_radius")):
+				straight_inside = true
+		_expect(straight_inside, "The straight line through the pack enters the Blackback's zone")
+		var through: PackedVector3Array = _field.call("plan_path", south, north, null, true)
+		_expect(through.size() >= 3, "...the planned one bends round it (%d points)" % through.size())
+		var entered: int = 0
+		for sample in _samples(through):
+			for enemy: Node3D in enemies:
+				if sample.distance_to(_flat(enemy.global_position)) < float(enemy.get("contact_radius")):
+					entered += 1
+		_expect_eq(entered, 0, "...and never inside a contact zone")
 	if blackback != null:
 		var to_it: PackedVector3Array = _field.call("plan_path", spawn, blackback.global_position, blackback, true)
 		_expect(to_it.size() >= 2 and _flat(to_it[to_it.size() - 1]).distance_to(_flat(blackback.global_position)) < float(blackback.get("contact_radius")), "To the Blackback: into its own zone")
