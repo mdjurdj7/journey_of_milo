@@ -267,14 +267,15 @@ func _draw() -> void:
 			var mid: float = baseline - float(choice_size_px) * 0.35
 			draw_rect(Rect2(0.0, mid - hairline_thickness_px * 0.5, hairline_length_px, hairline_thickness_px), ink)
 
-# The drawn ring for the coin, then the amount in the numeral face, both
+# The coin - the stamped coin the field HUD's GOLD draws (InkGlyph), so
+# gold is one mark everywhere - then the amount in the numeral face, both
 # on the item row's centre line.
 func _draw_gold(ink: Color) -> void:
 	var centre_y: float = float(gold_size_px) * 0.5
 	var ring_centre := Vector2(ring_radius_px, centre_y)
 	if text_outline_px > 0:
-		draw_arc(ring_centre, ring_radius_px, 0.0, TAU, 48, get_theme_color("bone", "Battle"), ring_width_px + float(text_outline_px) * 2.0, true)
-	draw_arc(ring_centre, ring_radius_px, 0.0, TAU, 48, ink, ring_width_px, true)
+		InkGlyph.draw_coin(self, ring_centre, ring_radius_px, ring_width_px + float(text_outline_px) * 2.0, get_theme_color("bone", "Battle"))
+	InkGlyph.draw_coin(self, ring_centre, ring_radius_px, ring_width_px, ink)
 	var baseline: float = float(gold_size_px) * 0.8
 	_text(_gold_font, str(_bundle.contents_gold), Vector2(ring_radius_px * 2.0 + ring_gap_px, baseline), gold_size_px, ink)
 
