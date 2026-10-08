@@ -124,10 +124,10 @@ func _check_pain_turn_on_players_turn() -> void:
 	var player: Combatant = _player()
 	EnemyTurn.take_turn(enemy, data, player)
 	EnemyTurn.take_turn(enemy, data, player)
-	enemy.hp = 45
-	_expect(not EnemyTurn.check_pain_turn(enemy, data), "At 45 of 90 - exactly half - no pain turn")
-	enemy.hp = 44
-	_expect(EnemyTurn.check_pain_turn(enemy, data), "At 44, below half, the pain turn is set")
+	enemy.hp = 35
+	_expect(not EnemyTurn.check_pain_turn(enemy, data), "At 35 of 70 - exactly half - no pain turn")
+	enemy.hp = 34
+	_expect(EnemyTurn.check_pain_turn(enemy, data), "At 34, below half, the pain turn is set")
 	var preview: Dictionary = EnemyTurn.preview_intent(enemy, data, player)
 	_expect(bool(preview.get("pain_turn", false)), "...the preview shows the cancelled action")
 	_expect_eq(preview.get("per_hit"), 0, "...with no number")
@@ -167,7 +167,7 @@ func _check_no_second_pain_turn() -> void:
 	var data: EnemyData = _wardling()
 	var enemy: Combatant = _enemy(data)
 	var player: Combatant = _player()
-	enemy.hp = 40
+	enemy.hp = 30
 	_expect(EnemyTurn.check_pain_turn(enemy, data), "First crossing: a pain turn")
 	EnemyTurn.take_turn(enemy, data, player)
 	enemy.hp = 70
