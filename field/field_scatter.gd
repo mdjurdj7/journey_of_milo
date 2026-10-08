@@ -39,6 +39,14 @@ class_name FieldScatter
 #     waypoints.
 # Nothing here has collision: the walk grid, the click and the Wanderer's
 # steps never see it.
+#
+# Drawn as one MultiMeshInstance3D per entry (ScatterMeshes' model - its
+# glb or a placeholder - sized to the entry, its thinnest side turned down
+# for a stone), on the shared flat material tinted by the entry with each
+# item's value jitter as its instance colour - or scatter_sway.gdshader,
+# the same rules, for a kind with wind. Set into the sand by its sink
+# fraction of its height, tilted to the slope. Scene fog as any prop.
+# Shadows only where the entry casts them.
 
 signal rebuilt
 
@@ -182,6 +190,7 @@ var _entries: Array[ScatterEntry] = []
 var _spots: Dictionary = {}
 var _item_count: int = 0
 var _build_msec: int = 0
+var _instances: Array[MultiMeshInstance3D] = []
 
 # From RegionField once its exit channel is cut: what to read, and the
 # first build, deferred so every prop and enemy has placed itself.
@@ -230,6 +239,7 @@ func rebuild() -> void:
 		_build_grid()
 		_grid_dirty = false
 	_place_all()
+	_draw_all()
 	_build_msec = Time.get_ticks_msec() - started
 	print("FieldScatter: %d items, %d kinds, over a %d x %d grid, in %d ms" % [_item_count, _entries.size(), _grid_cols, _grid_rows, _build_msec])
 	rebuilt.emit()
@@ -616,6 +626,83 @@ func slope_normal(p: Vector2) -> Vector3:
 	var dx: float = _ground.get_visible_height_at(p + Vector2(e, 0.0)) - _ground.get_visible_height_at(p - Vector2(e, 0.0))
 	var dz: float = _ground.get_visible_height_at(p + Vector2(0.0, e)) - _ground.get_visible_height_at(p - Vector2(0.0, e))
 	return Vector3(-dx, 2.0 * e, -dz).normalized()
+
+# --- Drawing ---
+
+const SWAY_SHADER_PATH := "res://field/scatter_sway.gdshader"
+
+func _draw_all() -> void:
+	for instance in _instances:
+		if is_instance_valid(instance):
+			remove_child(instance)
+			instance.free()
+	_instances.clear()
+	for entry in _entries:
+		var spots: Array[Spot] = get_spots(entry)
+		if spots.is_empty():
+			continue
+		var mesh: Mesh = ScatterMeshes.mesh_for(entry)
+		var instance := MultiMeshInstance3D.new()
+		instance.name = "Scatter_%s" % entry.name.validate_node_name()
+		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if entry.cast_shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		instance.multimesh = _multimesh(entry, mesh, spots)
+		instance.material_override = _material(entry, mesh)
+		add_child(instance)
+		_instances.append(instance)
+
+# Every spot of an entry as an instance: the model turned to rest, its
+# base centred on the origin and lowered by sink_fraction of its height,
+# scaled to the spot's size across, then the spot's own turn and place;
+# its colour the spot's value off the tint.
+func _multimesh(entry: ScatterEntry, mesh: Mesh, spots: Array[Spot]) -> MultiMesh:
+	var rest: Basis = rest_basis(entry, mesh.get_aabb())
+	var box: AABB = Transform3D(rest, Vector3.ZERO) * mesh.get_aabb()
+	var across: float = maxf(maxf(box.size.x, box.size.z), 1.0e-6)
+	var base := Vector3(box.get_center().x, box.position.y + box.size.y * entry.sink_fraction, box.get_center().z)
+	var multimesh := MultiMesh.new()
+	multimesh.transform_format = MultiMesh.TRANSFORM_3D
+	multimesh.use_colors = true
+	multimesh.mesh = mesh
+	multimesh.instance_count = spots.size()
+	for i in spots.size():
+		var spot: Spot = spots[i]
+		var sized := Transform3D(Basis.from_scale(Vector3.ONE * (spot.size / across)), Vector3.ZERO)
+		multimesh.set_instance_transform(i, Transform3D(spot.basis, spot.position) * sized * Transform3D(rest, -base))
+		# The jitter is a display value; the instance colour multiplies in
+		# linear.
+		multimesh.set_instance_color(i, Color(spot.shade, spot.shade, spot.shade).srgb_to_linear())
+	return multimesh
+
+# How a model is turned to rest before anything else: its thinnest axis
+# up for FLATTEST_SIDE (a stone on its flattest side); as made otherwise -
+# a cast lies flat as modelled, a shell is modelled dome up.
+static func rest_basis(entry: ScatterEntry, box: AABB) -> Basis:
+	if entry.resting != ScatterEntry.Resting.FLATTEST_SIDE:
+		return Basis.IDENTITY
+	if box.size.x < box.size.y and box.size.x <= box.size.z:
+		return Basis(Vector3.BACK, PI * 0.5)
+	if box.size.z < box.size.y and box.size.z < box.size.x:
+		return Basis(Vector3.RIGHT, PI * 0.5)
+	return Basis.IDENTITY
+
+# The shared flat material (Hull._get_shared_flat_material()), tinted,
+# reading the instance colour as albedo - or the sway shader's same rules
+# for a kind with wind.
+func _material(entry: ScatterEntry, mesh: Mesh) -> Material:
+	if entry.wind > 0.0:
+		var sway := ShaderMaterial.new()
+		sway.shader = load(SWAY_SHADER_PATH) as Shader
+		sway.set_shader_parameter("tint", entry.tint)
+		sway.set_shader_parameter("sway_amount", entry.wind)
+		sway.set_shader_parameter("sway_height", mesh.get_aabb().size.y)
+		return sway
+	var flat := Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
+	flat.vertex_color_use_as_albedo = true
+	flat.albedo_color = entry.tint
+	return flat
+
+func get_instances() -> Array[MultiMeshInstance3D]:
+	return _instances
 
 # --- Reading the result ---
 
