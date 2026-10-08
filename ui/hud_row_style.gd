@@ -159,6 +159,16 @@ class_name HudRowStyle
 		hud_description_fade_sec = value
 		emit_changed()
 
+@export_group("Count")
+# Seconds for a numeral to count from its old value to a new one, one
+# ease-out, either way - never on a floor load (that shows the value at
+# once). An edit mid-count re-times the running count from where it
+# stands.
+@export var hud_count_sec: float = 0.35:
+	set(value):
+		hud_count_sec = value
+		emit_changed()
+
 @export_group("Backing")
 # A soft ink fade behind the row, strongest at the screen's bottom-left
 # corner and gone by backing_size_px's right and top - a contrast

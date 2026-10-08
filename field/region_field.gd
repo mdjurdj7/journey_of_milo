@@ -1323,7 +1323,8 @@ func _setup_field_hud() -> void:
 	# The row's look: DECK first (the field DeckPanel, switched to the
 	# row's style - its anchor in region_field.tscn stays put, so the card
 	# flights still land on it), then each InkLine beside the one before,
-	# all sharing hud_row_style - see _apply_hud_row_style().
+	# all sharing hud_row_style - see _apply_hud_row_style(). Each shows
+	# its value at once here and counts to every change after.
 	if hud_row_style == null:
 		hud_row_style = HudRowStyle.new()
 	deck_panel.use_row_style(hud_row_style)
@@ -1339,7 +1340,7 @@ func _setup_field_hud() -> void:
 	# - see TollLine.
 	var toll_line := TollLine.new()
 	toll_line.name = "TollLine"
-	toll_line.set_toll(RunState.toll)
+	toll_line.snap_toll(RunState.toll)
 	_add_hud_row_line(toll_line, hp_line)
 	# GOLD beside TOLL, the same way; always shown - see GoldLine. Ahead of
 	# GLASSBONE and KEEPSAKE, which hide themselves when empty, so it never

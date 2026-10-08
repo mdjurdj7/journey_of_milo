@@ -29,8 +29,10 @@ class_name DeckPanel
 # use_row_style() (RegionField) draws it as the row's first item - two
 # card outlines, the count as a Spectral numeral, "DECK" after it, over
 # the bone halo (see HudRowStyle) - and has it draw the row's optional
-# backing fade. The battle lines never get a row style and keep the
-# label-then-count line above.
+# backing fade - and its count then counts to each new deck size over
+# the style's hud_count_sec, one ease-out (the first size it is shown, the
+# floor load, at once). The battle lines never get a row style and keep
+# the label-then-count line above.
 #
 # Reads the theme's Battle/ink token, so it inverts with the on-pale/
 # on-dark value set (see BattleTheme) - re-read via refresh_style().
@@ -126,6 +128,11 @@ var _deck_view_instance: DeckView = null
 # to it; null on the battle lines.
 var _row_style: HudRowStyle = null
 var _backing_texture: GradientTexture2D = null
+# The row style's counting numeral: what it shows on the way to the deck
+# size, the tween, and whether a first size has been shown yet.
+var _row_count_shown: float = 0.0
+var _row_count_tween: Tween = null
+var _row_count_seeded: bool = false
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -141,9 +148,9 @@ func _exit_tree() -> void:
 # field instance only (see the class doc).
 func use_row_style(row_style: HudRowStyle) -> void:
 	if _row_style != null:
-		_row_style.changed.disconnect(_relayout)
+		_row_style.changed.disconnect(_on_row_style_changed)
 	_row_style = row_style
-	_row_style.changed.connect(_relayout)
+	_row_style.changed.connect(_on_row_style_changed)
 	if not get_viewport().size_changed.is_connected(queue_redraw):
 		get_viewport().size_changed.connect(queue_redraw)
 	_relayout()
@@ -151,6 +158,45 @@ func use_row_style(row_style: HudRowStyle) -> void:
 func show_whole_deck(cards: Array[CardData]) -> void:
 	_unbind()
 	_whole_deck_cards = cards
+	if _row_style != null:
+		if _row_count_seeded:
+			_start_row_count()
+		else:
+			_row_count_seeded = true
+			_set_row_count_shown(float(cards.size()))
+	_relayout()
+
+# A fresh count from the numeral shown now to the deck's size.
+func _start_row_count() -> void:
+	_kill_row_count()
+	var target: float = float(_pile_cards().size())
+	if _row_style.hud_count_sec <= 0.0 or not is_inside_tree():
+		_set_row_count_shown(target)
+		return
+	_row_count_tween = create_tween()
+	_row_count_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_row_count_tween.tween_method(_set_row_count_shown, _row_count_shown, target, _row_style.hud_count_sec).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# Lands on the exact size, whatever the last step's rounding.
+	_row_count_tween.tween_callback(_set_row_count_shown.bind(target))
+
+func _kill_row_count() -> void:
+	if _row_count_tween != null:
+		_row_count_tween.kill()
+		_row_count_tween = null
+
+func _set_row_count_shown(value: float) -> void:
+	_row_count_shown = value
+	_relayout()
+
+# The row style's numeral: the count on its way.
+func _row_numeral() -> String:
+	return str(roundi(_row_count_shown))
+
+# A style edit re-lays the line - and re-times a running count from where
+# it stands (hud_count_sec live).
+func _on_row_style_changed() -> void:
+	if _row_count_tween != null and _row_count_tween.is_valid():
+		_start_row_count()
 	_relayout()
 
 func bind_to_deck(deck: Deck, pile: Pile) -> void:
@@ -212,7 +258,7 @@ func _runs() -> Array[PackedStringArray]:
 
 func _line_width() -> float:
 	if _row_style != null:
-		return _row_style.item_width(InkGlyph.Kind.DECK, str(_pile_cards().size()), "", draw_label_text)
+		return _row_style.item_width(InkGlyph.Kind.DECK, _row_numeral(), "", draw_label_text)
 	var width: float = 0.0
 	var runs := _runs()
 	for i in runs.size():
@@ -245,7 +291,7 @@ func _relayout() -> void:
 func _draw() -> void:
 	if _row_style != null:
 		_draw_backing()
-		_row_style.draw_item(self, _ink, InkGlyph.Kind.DECK, str(_pile_cards().size()), "", draw_label_text)
+		_row_style.draw_item(self, _ink, InkGlyph.Kind.DECK, _row_numeral(), "", draw_label_text)
 		return
 	if _label_font_tracked == null or count_font == null:
 		return

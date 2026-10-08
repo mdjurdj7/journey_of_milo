@@ -225,13 +225,16 @@ func _check_hud_line() -> void:
 	_expect(not line.visible, "GLASSBONE is hidden on 0")
 	_run_state.call("add_glassbone", 1)
 	_expect(line.visible, "...shown from the first piece")
-	_expect_eq(str(line.get("_value_text")), "1", "...reading 1")
+	var count_sec: float = float((line.get("style") as Resource).get("hud_count_sec"))
+	await create_timer(count_sec + 0.3).timeout
+	_expect_eq(str(line.get("_value_text")), "1", "...reading 1 once its count lands")
 	_expect_eq(str(line.get("label_text")), "GLASSBONE", "...under the label GLASSBONE")
 	var gold_right: float = gold_line.position.x + gold_line.size.x
 	_expect(line.position.x > gold_right and line.position.x < gold_right + 40.0, "...right beside GOLD")
 	var glassbone_x: float = line.position.x
 	_run_state.call("add_glassbone", 1)
-	_expect_eq(str(line.get("_value_text")), "2", "...and follows the count (2)")
+	await create_timer(count_sec + 0.3).timeout
+	_expect_eq(str(line.get("_value_text")), "2", "...and counts on to 2")
 	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))
 	await process_frame
 	_expect(keepsake_line.visible, "KEEPSAKE shows once one is held")

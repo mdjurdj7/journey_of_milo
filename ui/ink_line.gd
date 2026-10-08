@@ -8,7 +8,14 @@ class_name InkLine
 # boxed; sized to its own content. The base of HPLine, TollLine,
 # GoldLine, GlassboneLine and KeepsakeLine - the row's order after DECK,
 # the keepsake set apart at the end; a subclass sets its glyph and label
-# and feeds its value through set_value_text().
+# and feeds its value through set_value_text() - or, for a count,
+# count_to() / snap_count().
+#
+# A count's numeral counts from the value it shows to a new one over the
+# style's hud_count_sec, one ease-out, either way, landing on the exact
+# value - no flash, no colour, no pop. snap_count() shows a value at once
+# (a floor load). The line's own tween, pause-proof, so it runs while a
+# reward screen holds the field frozen (InkLine runs ALWAYS).
 #
 # RegionField creates each in _setup_field_hud(), hands it the row's
 # style (set_style()) and the item to sit beside (sit_beside()). It
@@ -41,23 +48,68 @@ var _value_text: String = ""
 var _secondary_text: String = ""
 var _ink: Color = Color.BLACK
 var _beside: Control = null
+# A count's value (what it lands on), what the numeral shows on the way,
+# and the tween between them.
+var _count_target: int = 0
+var _count_shown: float = 0.0
+var _count_tween: Tween = null
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	if not style.changed.is_connected(_relayout):
-		style.changed.connect(_relayout)
+	if not style.changed.is_connected(_on_style_changed):
+		style.changed.connect(_on_style_changed)
 	refresh_style()
 
 func set_style(row_style: HudRowStyle) -> void:
-	if style.changed.is_connected(_relayout):
-		style.changed.disconnect(_relayout)
+	if style.changed.is_connected(_on_style_changed):
+		style.changed.disconnect(_on_style_changed)
 	style = row_style
-	style.changed.connect(_relayout)
+	style.changed.connect(_on_style_changed)
 	_relayout()
 
 func set_value_text(text: String) -> void:
 	_value_text = text
+	_relayout()
+
+# Counts the numeral from what it shows now to `value`.
+func count_to(value: int) -> void:
+	_count_target = value
+	_start_count()
+
+# Shows `value` at once, no count.
+func snap_count(value: int) -> void:
+	_kill_count()
+	_count_target = value
+	_set_count_shown(float(value))
+
+# A fresh count from the numeral shown now to _count_target over the
+# style's hud_count_sec.
+func _start_count() -> void:
+	_kill_count()
+	if style.hud_count_sec <= 0.0 or not is_inside_tree():
+		_set_count_shown(float(_count_target))
+		return
+	_count_tween = create_tween()
+	_count_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_count_tween.tween_method(_set_count_shown, _count_shown, float(_count_target), style.hud_count_sec).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	# Lands on the exact value, whatever the last step's rounding.
+	_count_tween.tween_callback(_set_count_shown.bind(float(_count_target)))
+
+func _kill_count() -> void:
+	if _count_tween != null:
+		_count_tween.kill()
+		_count_tween = null
+
+func _set_count_shown(value: float) -> void:
+	_count_shown = value
+	set_value_text(str(roundi(value)))
+
+# A style edit re-lays the line - and re-times a running count from where
+# it stands (hud_count_sec live).
+func _on_style_changed() -> void:
+	if _count_tween != null and _count_tween.is_valid():
+		_start_count()
 	_relayout()
 
 # Sits this line to the right of `line`, bottoms (and so baselines) level,

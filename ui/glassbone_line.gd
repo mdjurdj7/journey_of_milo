@@ -9,10 +9,9 @@ class_name GlassboneLine
 # while hidden the keepsake sits beside GOLD instead.
 #
 # RegionField creates it in _setup_field_hud() and hands it the GOLD
-# line (sit_beside()); RunState.glassbone_changed keeps it current. It
-# goes with the field row when BattleOverlay hides that for a fight.
-
-var _count: int = 0
+# line (sit_beside()); RunState.glassbone_changed counts it to each new
+# total (InkLine.count_to()). It goes with the field row when
+# BattleOverlay hides that for a fight.
 
 func _init() -> void:
 	label_text = "GLASSBONE"
@@ -22,11 +21,15 @@ func _init() -> void:
 func _ready() -> void:
 	super()
 	RunState.glassbone_changed.connect(set_count)
-	set_count(RunState.glassbone)
+	snap_count(maxi(RunState.glassbone, 0))
 
+# Counts to `count`; shown from the first piece, whatever the numeral is
+# still counting through.
 func set_count(count: int) -> void:
-	_count = maxi(count, 0)
-	set_value_text(str(_count))
+	var was_shown: bool = _is_shown()
+	count_to(maxi(count, 0))
+	if _is_shown() != was_shown:
+		_relayout()
 
 func _is_shown() -> bool:
-	return _count > 0
+	return _count_target > 0
