@@ -46,6 +46,10 @@ const BACK_INDEX := 100001
 const TEMPER_INDEX := 100000
 const SAFETY_SECONDS := 300.0
 
+# This process's log folder: run_probes.sh's per-process --runlog-dir
+# (RunLogger.dir_override()) when it hands one over, so a second copy of
+# this probe running at once never sees this one's files - else LOG_DIR.
+var _log_dir: String = RunLogger.dir_override() if not RunLogger.dir_override().is_empty() else LOG_DIR
 var _run_state: Node = null
 var _field: Node = null
 var _failures: int = 0
@@ -161,7 +165,7 @@ func _check_out_of_pools_and_scans() -> void:
 # its own deck position, for a fresh copy of its tempered version; all or
 # nothing when it can't; never a second time; logged as "temper".
 func _check_temper_card() -> void:
-	RunLogger.set_output_dir(LOG_DIR)
+	RunLogger.set_output_dir(_log_dir)
 	RunLogger.enabled = true
 	_clear_log_dir()
 	_new_run()
@@ -531,7 +535,7 @@ func _collect_resources(dir: String, out: Array[String]) -> void:
 			out.append(dir.path_join(file))
 
 func _clear_log_dir() -> void:
-	var dir := DirAccess.open(LOG_DIR)
+	var dir := DirAccess.open(_log_dir)
 	if dir == null:
 		return
 	for file in dir.get_files():
@@ -539,8 +543,8 @@ func _clear_log_dir() -> void:
 
 func _log_lines() -> Array[Dictionary]:
 	var lines: Array[Dictionary] = []
-	for file in DirAccess.get_files_at(LOG_DIR):
-		for raw in FileAccess.get_file_as_string(LOG_DIR.path_join(file)).split("\n", false):
+	for file in DirAccess.get_files_at(_log_dir):
+		for raw in FileAccess.get_file_as_string(_log_dir.path_join(file)).split("\n", false):
 			var parsed: Variant = JSON.parse_string(raw)
 			if parsed is Dictionary:
 				lines.append(parsed)

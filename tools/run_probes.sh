@@ -469,12 +469,20 @@ if [ "$DO_IMPORT" = 1 ]; then
 fi
 
 # --- Run ---
+# Each probe process gets a run-log folder of its own (RunLogger's
+# --runlog-dir user argument), deleted when it ends: user:// is shared by
+# every checkout and session, so a probe that writes and reads run logs
+# would otherwise see another copy's files.
 run_one() {
-	local p="$1" ff="" start code dur verdict
+	local p="$1" ff="" start code dur verdict runlog runlog_arg
 	[ "$(table_flag "$p" fixed)" = yes ] && ff="--fixed-fps 60"
+	runlog=$(mktemp -d "$LOGS/runlog.$p.XXXXXX")
+	runlog_arg="$runlog"
+	command -v cygpath > /dev/null && runlog_arg=$(cygpath -m "$runlog")
 	start=$(date +%s)
-	( cd "$PROJECT" && timeout "$PROBE_TIMEOUT_SEC" "$GODOT" --headless $ff --path . -s "res://tests/$p.gd" > "$LOGS/$p.log" 2>&1 )
+	( cd "$PROJECT" && timeout "$PROBE_TIMEOUT_SEC" "$GODOT" --headless $ff --path . -s "res://tests/$p.gd" -- "--runlog-dir=$runlog_arg" > "$LOGS/$p.log" 2>&1 )
 	code=$?
+	rm -rf "$runlog"
 	dur=$(( $(date +%s) - start ))
 	if [ "$code" = 0 ] && grep -q "^$p: PASSED" "$LOGS/$p.log"; then verdict=PASS; else verdict=FAIL; fi
 	printf '%-26s %s %4ss%s\n' "$p" "$verdict" "$dur" "$([ "$verdict" = FAIL ] && echo "  (exit $code, $LOGS/$p.log)")" | tee -a "$LOGS/_results.txt"

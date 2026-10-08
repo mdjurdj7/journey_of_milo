@@ -20,6 +20,13 @@ class_name RunLogger
 # of its own (set_output_dir()). RegionField.run_logging_enabled is the
 # switch in the game.
 #
+# The folder can be moved for a whole process with a user argument,
+# `-- --runlog-dir=<path>` (read once, when this class loads): the game's
+# runs go there instead of user://runs/, and a probe that writes a log
+# takes its folder from dir_override() - tools/run_probes.sh hands each
+# probe process a temp folder of its own, so two probes (or two
+# sessions) running at once never see each other's files.
+#
 # Events: run_start, floor_entered, fight_start, fight_end, run_end, and
 # the reward-side ones written through reward_cards()/event(). A fight is
 # summed here as it runs (damage, block, Toll, Grace, every card played)
@@ -37,6 +44,7 @@ class_name RunLogger
 # encounter fields on fight_start.
 
 const RUNS_DIR := "user://runs"
+const DIR_ARG_PREFIX := "--runlog-dir="
 const FORMAT_VERSION := 2
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
@@ -47,6 +55,8 @@ static var enabled: bool = true
 
 # A probe's own folder; also what lets a headless instance write.
 static var _output_dir: String = ""
+# --runlog-dir's folder, or "" - read once, at class load.
+static var _dir_override: String = _read_dir_override()
 
 static var _file: FileAccess = null
 static var _path: String = ""
@@ -122,8 +132,26 @@ static var _card_healed: int = 0
 static var _card_toll_gained: int = 0
 static var _card_toll_spent: int = 0
 
-# A probe's folder (user://...), which also lets a headless instance log.
-# Empty puts it back to user://runs/ and the headless guard.
+# The --runlog-dir=<path> user argument, or "" when there is none.
+static func _read_dir_override() -> String:
+	for arg in OS.get_cmdline_user_args():
+		if arg.begins_with(DIR_ARG_PREFIX):
+			return arg.substr(DIR_ARG_PREFIX.length()).strip_edges()
+	return ""
+
+# This process's --runlog-dir folder, or "" - a probe that reads logs
+# writes them there when it is set (see the class doc).
+static func dir_override() -> String:
+	return _dir_override
+
+# Where a run goes with no probe folder set: --runlog-dir's, else
+# user://runs/.
+static func runs_dir() -> String:
+	return RUNS_DIR if _dir_override.is_empty() else _dir_override
+
+# A probe's folder (user://... or absolute), which also lets a headless
+# instance log.
+# Empty puts it back to runs_dir() and the headless guard.
 static func set_output_dir(dir: String) -> void:
 	_output_dir = dir
 
@@ -142,7 +170,7 @@ static func start_run(seed: int, character_name: String, snapshot: Dictionary) -
 	_close()
 	if not _active():
 		return
-	var dir: String = RUNS_DIR if _output_dir.is_empty() else _output_dir
+	var dir: String = runs_dir() if _output_dir.is_empty() else _output_dir
 	DirAccess.make_dir_recursive_absolute(dir)
 	if not _swept_dirs.has(dir):
 		_swept_dirs[dir] = true

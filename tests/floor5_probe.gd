@@ -67,6 +67,10 @@ const FIGHT_SECONDS := 8.0
 const OVERSHOOT_LIMIT_M := 0.02
 const SAFETY_SECONDS := 400.0
 
+# This process's log folder: run_probes.sh's per-process --runlog-dir
+# (RunLogger.dir_override()) when it hands one over, so a second copy of
+# this probe running at once never sees this one's files - else LOG_DIR.
+var _log_dir: String = RunLogger.dir_override() if not RunLogger.dir_override().is_empty() else LOG_DIR
 var _run_state: Node = null
 var _field: Node3D = null
 var _wanderer: CharacterBody3D = null
@@ -167,7 +171,7 @@ func _check_descent() -> void:
 # the fade, and its NEW RUN a fresh run on floor 1.
 func _check_exit() -> void:
 	_clear_log_dir()
-	RunLogger.set_output_dir(LOG_DIR)
+	RunLogger.set_output_dir(_log_dir)
 	await _load()
 	var gate: Node3D = _field.get_node("ExitGate")
 	var gate_at := Vector2(gate.global_position.x - _spawn.x, gate.global_position.z - _spawn.z)
@@ -330,15 +334,15 @@ func _root_fade() -> Node:
 	return null
 
 func _clear_log_dir() -> void:
-	DirAccess.make_dir_recursive_absolute(LOG_DIR)
-	for name in DirAccess.get_files_at(LOG_DIR):
-		DirAccess.remove_absolute(LOG_DIR.path_join(name))
+	DirAccess.make_dir_recursive_absolute(_log_dir)
+	for name in DirAccess.get_files_at(_log_dir):
+		DirAccess.remove_absolute(_log_dir.path_join(name))
 
 # The last run_end in the probe's log folder.
 func _last_run_end() -> Dictionary:
 	var found: Dictionary = {}
-	for name in DirAccess.get_files_at(LOG_DIR):
-		for raw in FileAccess.get_file_as_string(LOG_DIR.path_join(name)).split("\n", false):
+	for name in DirAccess.get_files_at(_log_dir):
+		for raw in FileAccess.get_file_as_string(_log_dir.path_join(name)).split("\n", false):
 			var parsed: Variant = JSON.parse_string(raw)
 			if parsed is Dictionary and str((parsed as Dictionary).get("ev")) == "run_end":
 				found = parsed

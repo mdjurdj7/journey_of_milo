@@ -23,8 +23,10 @@ extends SceneTree
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/run_log_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
-# The log stays in user://run_log_probe/ for a look afterwards (each run
-# of the probe clears it first). Untyped against anything that names the
+# Run by hand, the log stays in user://run_log_probe/ for a look
+# afterwards (each run of the probe clears it first); under
+# tools/run_probes.sh it goes to the per-process --runlog-dir folder the
+# script deletes after. Untyped against anything that names the
 # RunState autoload.
 
 const LOG_DIR := "user://run_log_probe"
@@ -41,6 +43,10 @@ const RUN_SEED := 4242
 const MAX_TURNS := 12
 const SAFETY_SECONDS := 240.0
 
+# This process's log folder: run_probes.sh's per-process --runlog-dir
+# (RunLogger.dir_override()) when it hands one over, so a second copy of
+# this probe running at once never sees this one's files - else LOG_DIR.
+var _log_dir: String = RunLogger.dir_override() if not RunLogger.dir_override().is_empty() else LOG_DIR
 var _run_state: Node = null
 var _field: Node = null
 var _failures: int = 0
@@ -60,13 +66,13 @@ func _initialize() -> void:
 	_check_headless_guard()
 
 	var on: Dictionary = await _scripted_run(true)
-	var files: PackedStringArray = DirAccess.get_files_at(LOG_DIR)
+	var files: PackedStringArray = DirAccess.get_files_at(_log_dir)
 	_expect_eq(files.size(), 1, "The logged run wrote one file")
 	if files.size() == 1:
-		_check_log(LOG_DIR.path_join(files[0]), on)
+		_check_log(_log_dir.path_join(files[0]), on)
 
 	var off: Dictionary = await _scripted_run(false)
-	_expect_eq(DirAccess.get_files_at(LOG_DIR).size(), 1, "With the log off, no file is written")
+	_expect_eq(DirAccess.get_files_at(_log_dir).size(), 1, "With the log off, no file is written")
 	_expect_eq(off.get("rng_state"), on.get("rng_state"), "The run's generator ends in the same state, log on or off")
 	_expect_eq(off.get("offered"), on.get("offered"), "...the reward offers the same cards")
 	_expect_eq(off.get("hp_end"), on.get("hp_end"), "...and the fight leaves the same HP")
@@ -93,7 +99,7 @@ func _check_headless_guard() -> void:
 # What it saw, for the on/off comparison.
 func _scripted_run(logging: bool) -> Dictionary:
 	print("\n=== run with logging %s" % ("on" if logging else "off"))
-	RunLogger.set_output_dir(LOG_DIR)
+	RunLogger.set_output_dir(_log_dir)
 	RunLogger.enabled = logging
 	_played = []
 	_turns = 0
@@ -399,9 +405,9 @@ func _field_enemy(controller: Node) -> Node:
 # --- Helpers ---
 
 func _clear_dir() -> void:
-	DirAccess.make_dir_recursive_absolute(LOG_DIR)
-	for file in DirAccess.get_files_at(LOG_DIR):
-		DirAccess.remove_absolute(LOG_DIR.path_join(file))
+	DirAccess.make_dir_recursive_absolute(_log_dir)
+	for file in DirAccess.get_files_at(_log_dir):
+		DirAccess.remove_absolute(_log_dir.path_join(file))
 
 func _child_with_script(parent: Node, suffix: String) -> Node:
 	for child in parent.get_children():
