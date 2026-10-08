@@ -79,6 +79,7 @@ run_lost_probe 12
 dunecur_probe 30
 greyshelf_probe 45
 underfoot_probe 40
+scatter_probe 10
 card_rarity_probe 5
 come_due_probe 4
 starter_cards_probe 4
@@ -105,13 +106,13 @@ area_probes() {
 		keywords) echo "keyword starter_cards the_return" ;;
 		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace" ;;
 		enemies) echo "blackback siltjaw wardling dunecur greyshelf underfoot sentence no_further critical_cards kill_order armored_contact deny enemy_export" ;;
-		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost pathing" ;;
-		floor1) echo "kill_order drain" ;;
+		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost pathing scatter" ;;
+		floor1) echo "kill_order drain scatter" ;;
 		floor2) echo "kill_order hold_line bundle_roll underfoot" ;;
 		floor3) echo "kill_order blackback wardling temper" ;;
 		floor4) echo "kill_order floor4 wear_path dunecur collector" ;;
 		floor5) echo "kill_order floor5 wear_path greyshelf elite_reward" ;;
-		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur floor5 greyshelf underfoot pathing" ;;
+		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur floor5 greyshelf underfoot pathing scatter" ;;
 		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake keepsake_tile toll_carry run_log frayed_cord elite_reward run_lost temper" ;;
 		hud) echo "gold_line glassbone trinket keepsake_tile" ;;
 		hp_bar) echo "kill_order" ;;
@@ -186,6 +187,8 @@ path_probes() {
 		# The Keeper's plaque: her probe and the tile's.
 		field/world_keepsake.*) out="$(area_probes field) keeper_keepsake keepsake_tile" ;;
 		field/*) out=$(area_probes field) ;;
+		# The ground scatter's sets: the floors that lay them.
+		floors/scatter/*) out="$(area_probes floor1) scatter" ;;
 		floors/region1_floor1.tres) out="$(area_probes floor1) enemy_export" ;;
 		floors/region1_floor2.tres) out="$(area_probes floor2) enemy_export" ;;
 		floors/region1_floor3.tres) out="$(area_probes floor3) enemy_export" ;;
