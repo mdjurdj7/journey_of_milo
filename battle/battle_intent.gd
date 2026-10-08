@@ -108,15 +108,15 @@ class_name BattleIntent
 # shaft runs back from the blade to the far end, at most
 # spear_shaft_weight of the full stroke - the blade is where the pen
 # presses.
-@export_range(1.0, 3.0) var spear_length: float = 1.5:
+@export_range(1.0, 3.0) var spear_length: float = 1.4:
 	set(value):
 		spear_length = value
 		_apply_layout()
-@export_range(0.1, 2.0) var spear_blade_length: float = 1.2:
+@export_range(0.1, 2.0) var spear_blade_length: float = 1.4:
 	set(value):
 		spear_blade_length = value
 		queue_redraw()
-@export_range(0.05, 1.0) var spear_blade_half_width: float = 0.45:
+@export_range(0.05, 1.0) var spear_blade_half_width: float = 0.52:
 	set(value):
 		spear_blade_half_width = value
 		queue_redraw()
