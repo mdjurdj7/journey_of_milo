@@ -82,6 +82,7 @@ underfoot_probe 40
 scatter_probe 25
 card_rarity_probe 5
 come_due_probe 4
+second_swing_probe 15
 starter_cards_probe 4
 temper_probe 13
 play_order_probe 28
@@ -102,9 +103,9 @@ card_rarity_finish_probe 8
 area_probes() {
 	case "$1" in
 		cards) echo "starter_cards card_rarity frayed_cord" ;;
-		face) echo "starter_cards keyword come_due come_due_face critical_cards card_rarity_finish" ;;
+		face) echo "starter_cards keyword come_due come_due_face critical_cards card_rarity_finish second_swing" ;;
 		keywords) echo "keyword starter_cards the_return" ;;
-		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace" ;;
+		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace second_swing" ;;
 		enemies) echo "blackback siltjaw wardling dunecur greyshelf underfoot sentence no_further critical_cards kill_order armored_contact deny enemy_export" ;;
 		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost pathing scatter" ;;
 		floor1) echo "kill_order drain scatter" ;;
@@ -120,7 +121,7 @@ area_probes() {
 		# The fight's own UI: every probe that plays a real fight (which
 		# builds the battle overlay and its hand), plus the rules probes
 		# whose readouts and faces it shows.
-		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf underfoot play_order" ;;
+		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf underfoot play_order second_swing" ;;
 		*) return 1 ;;
 	esac
 }
