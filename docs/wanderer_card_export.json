@@ -1482,7 +1482,7 @@
       "face_type_label": "POWER",
       "energy_cost": 1,
       "rarity": "RARE",
-      "card_text": "The next time an enemy would kill you while Critical, survive at 10 HP.\nSpent.",
+      "card_text": "The next time an enemy would kill you while Critical, survive at 12 HP.\nSpent.",
       "face_hp_line": null,
       "card_text_template": "The next time an enemy would kill you while Critical, survive at {survive_hp} HP.\nSpent.",
       "targeting": "self",
@@ -1490,7 +1490,7 @@
       "effects": [
         {
           "type": "APPLY_STATUS",
-          "plain_english": "Apply Refuse the End to yourself: The next time an enemy would kill you while Critical, survive at 10 HP."
+          "plain_english": "Apply Refuse the End to yourself: The next time an enemy would kill you while Critical, survive at 12 HP."
         }
       ],
       "keywords": [
@@ -1509,14 +1509,14 @@
       "power_effect": {
         "id": "refuse_the_end",
         "name": "Refuse the End",
-        "description": "The next time an enemy would kill you while Critical, survive at 10 HP.",
+        "description": "The next time an enemy would kill you while Critical, survive at 12 HP.",
         "file_path": "res://battle/rules/statuses/refuse_the_end.tres",
         "duration": "until triggered",
         "stack_rule": "ADD_CHARGES",
         "applied_to": "self",
         "charges": 1,
         "prevents_lethal_while_critical": true,
-        "survive_hp_at_70_max": 10
+        "survive_hp_at_80_max": 12
       },
       "status_effect": null,
       "critical_condition": {

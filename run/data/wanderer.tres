@@ -10,7 +10,7 @@
 [resource]
 script = ExtResource("1_character_data")
 character_name = "Wanderer"
-max_hp = 70
+max_hp = 80
 starting_deck_counts = {
 ExtResource("2_slash"): 4,
 ExtResource("3_bite_down"): 2,
