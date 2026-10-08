@@ -74,6 +74,14 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 # (EffectResolver.card_blocked()). TOLL_HEAL reads it as a cap. Unused by
 # every other type.
 
+@export var repeat_toll_cost: int = 0
+# Read by DAMAGE (damage_effect.gd) only. Above 0: once the hit has
+# landed, a player holding at least this much Toll spends it and the hit
+# lands again on the same target(s) - a second hit of the same card, not
+# a second play (Second Swing). Under it, or with nothing the first hit
+# left alive, nothing more happens and nothing is spent. Never blocks the
+# play (contrast SPEND_TOLL's toll_cost). 0: no repeat.
+
 @export var stance_data: StanceData = null
 # Read by APPLY_STANCE only. The stance a STANCE card takes - or deepens,
 # when it is the one already held.

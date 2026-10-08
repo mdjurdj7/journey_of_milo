@@ -234,13 +234,18 @@ static func consume_triggered(statuses: Array[Status]) -> void:
 # attack_damage_bonus per stack, skipping the ones that want Critical when
 # `critical` says the player isn't. See AttackBonus. `skip`, when given,
 # pays nothing this time (an enemy's attack-card status on an intent that
-# doesn't take it - EnemyTurn.hit_amount()).
-static func attack_bonus(statuses: Array[Status], critical: bool, skip: StatusData = null) -> int:
+# doesn't take it - EnemyTurn.hit_amount()). `ongoing_only` leaves out
+# every status that counts charges (Keen's "+3 on your next Attack"): a
+# one-shot that the card's first hit has already had - what a repeated
+# hit gets (EffectContext.take_repeat_attack_bonus()).
+static func attack_bonus(statuses: Array[Status], critical: bool, skip: StatusData = null, ongoing_only: bool = false) -> int:
 	var total: int = 0
 	for active in statuses:
 		if active.data == null or active.data.attack_damage_bonus == 0:
 			continue
 		if skip != null and active.data == skip:
+			continue
+		if ongoing_only and active.has_charges():
 			continue
 		if active.data.bonus_requires_critical and not critical:
 			continue

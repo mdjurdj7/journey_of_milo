@@ -15,19 +15,39 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	# blocked twice.
 	var base: int = CardBonus.resolved_value(effect, ctx)
 
-	# The attack bonus (stance, Keen) is part of the attack's own
-	# number, so it goes in BEFORE the status modifiers - a status that
-	# scales outgoing damage scales the whole blow, bonus included, rather
-	# than only the part the card authored. Taken once per card: a second
-	# damage effect on the same Attack gets 0 (take_attack_bonus()).
-	var blow: int = base + ctx.take_attack_bonus()
-
 	var targets: Array[Combatant] = []
 	if effect.target_scope == CardEffect.TargetScope.ALL_ENEMIES:
 		targets = ctx.enemies
 	elif ctx.target != null:
 		targets = [ctx.target]
 
+	# The attack bonus (stance, Keen) is part of the attack's own
+	# number, so it goes in BEFORE the status modifiers - a status that
+	# scales outgoing damage scales the whole blow, bonus included, rather
+	# than only the part the card authored. Taken once per card: a second
+	# damage effect on the same Attack gets 0 (take_attack_bonus()).
+	_land(base + ctx.take_attack_bonus(), targets, ctx)
+
+	# A repeat (Second Swing): judged as the first hit resolves, on what
+	# it left standing - a first hit that killed everything it struck
+	# skips the repeat and spends nothing. Otherwise a player holding the
+	# Toll spends it and the same hit lands again: the same number, with
+	# the ongoing bonus again (take_repeat_attack_bonus()) but not a
+	# one-shot charge or a mark, which the first hit had. One card all the
+	# same - counted once by whatever counts cards.
+	if effect.repeat_toll_cost <= 0:
+		return
+	var standing: Array[Combatant] = []
+	for enemy in targets:
+		if enemy.hp > 0:
+			standing.append(enemy)
+	if standing.is_empty() or ctx.player.toll < effect.repeat_toll_cost:
+		return
+	ctx.spend_toll(effect.repeat_toll_cost)
+	_land(base + ctx.take_repeat_attack_bonus(), standing, ctx)
+
+# One hit of `blow` on each of `targets`.
+func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> void:
 	for enemy in targets:
 		# A mark on this enemy (Come Due) adds to the blow against it
 		# alone, once per card - so it's per target, and like the attack

@@ -106,6 +106,17 @@ func take_attack_bonus() -> int:
 	Status.spend_attack_bonus_charges(player.statuses, player.is_critical())
 	return bonus
 
+# The attack bonus for a REPEATED hit of the card being resolved (Card
+# Effect.repeat_toll_cost - Second Swing): the ongoing part alone (Attack
+# Bonus.ongoing_for_player()), every time it's asked - a one-shot charge
+# went with the first hit, and spends nothing here. 0 on anything but an
+# ATTACK. The mark bonus stays once per card: take_mark_bonus() pays it
+# to the first hit only.
+func take_repeat_attack_bonus() -> int:
+	if not card_is_attack:
+		return 0
+	return AttackBonus.ongoing_for_player(player, player.hp)
+
 # Every Toll a card spends goes through here: at most what is held, so
 # Toll never goes below 0, and anything spent at all marks the card as
 # having spent Toll (toll_spent_this_card - Sentence's hurry, once per
