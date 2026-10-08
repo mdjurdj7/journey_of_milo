@@ -34,8 +34,8 @@ class_name BelongingsScreen
 #   the case     "+45 gold"
 #   the pack     its card, lifted at the deck view's inspect size (card_
 #                inspect_scale) over the screen
-#   the bedroll  its keepsake's name and rules line (TrinketData.
-#                describe())
+#   the bedroll  its keepsake's KeepsakeTile, at keepsake_tile_scale over
+#                the bedroll's column
 # and "+ Glassbone ×1" under whichever carried it. Everything is granted
 # through RunState as it's revealed, and the take's sound plays; the
 # reveal holds for result_hold_time, then a card flies to the Belongings
@@ -44,7 +44,9 @@ class_name BelongingsScreen
 # note_keepsake_offered()) only here, once it has been seen.
 #
 # The bedroll taken with the keepsake slot already full: the reveal shows
-# the new keepsake and asks, under it, REPLACE <held> or KEEP <held>, in
+# the held keepsake's tile and the new one's side by side at the same
+# scale, labelled HELD and OFFERED, centred on the screen, and asks under
+# them REPLACE <held> or KEEP <held>, in
 # the WALK ON form of the focus language - and holds, with no timeout,
 # until one is chosen. REPLACE puts the new one in the slot; KEEP leaves
 # it behind. Either closes the screen, and the take is spent either way
@@ -180,20 +182,6 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		glassbone_format = value
 		_refresh()
-# The keepsake's rules line, wrapped to this width and centred line by
-# line under its name.
-@export var rules_size_px: int = 17:
-	set(value):
-		rules_size_px = value
-		_rebuild_fonts()
-@export var rules_width_px: float = 320.0:
-	set(value):
-		rules_width_px = value
-		_rebuild_fonts()
-@export var rules_pitch_px: float = 22.0:
-	set(value):
-		rules_pitch_px = value
-		_refresh()
 @export_group("")
 
 @export_group("Full Slot")
@@ -222,6 +210,37 @@ const DISMISS := SLOT_COUNT
 @export var choice_pitch_px: float = 34.0:
 	set(value):
 		choice_pitch_px = value
+		_refresh()
+@export_group("")
+
+@export_group("Keepsake Tile")
+# The bedroll's keepsake, revealed: its KeepsakeTile at this scale, its
+# centre at keepsake_tile_centre_fraction of the viewport height - over
+# the bedroll's column alone, centred on the screen beside the held one.
+@export var keepsake_tile_scale: float = 1.3:
+	set(value):
+		keepsake_tile_scale = value
+		_refresh()
+@export_range(0.0, 1.0) var keepsake_tile_centre_fraction: float = 0.47:
+	set(value):
+		keepsake_tile_centre_fraction = value
+		_refresh()
+@export var keepsake_tile_gap_px: float = 40.0:
+	set(value):
+		keepsake_tile_gap_px = value
+		_refresh()
+# Over each tile when one is held, this far above it.
+@export var held_label_text: String = "HELD":
+	set(value):
+		held_label_text = value
+		_refresh()
+@export var offered_label_text: String = "OFFERED":
+	set(value):
+		offered_label_text = value
+		_refresh()
+@export var keepsake_label_gap_px: float = 12.0:
+	set(value):
+		keepsake_label_gap_px = value
 		_refresh()
 @export_group("")
 
@@ -374,11 +393,12 @@ var _line_font: Font = null
 var _label_font: Font = null
 var _contents_font: Font = null
 var _choice_font: Font = null
-var _rules_font: Font = null
-# The bedroll keepsake's rules line, wrapped to rules_width_px.
-var _rules: TextParagraph = null
 # The pack's card while it's lifted (_sync_card_lift()), else null.
 var _lifted: CardView = null
+# The bedroll's keepsake and the held one while they're shown
+# (_sync_keepsake_tiles()), else null.
+var _offered_tile: KeepsakeTile = null
+var _held_tile: KeepsakeTile = null
 
 var _viewport: SubViewport = null
 var _cell_px: int = 1
@@ -462,18 +482,13 @@ func _rebuild_fonts() -> void:
 	_label_font = InkType.tracked(InkType.text_bold_font(), label_size_px, label_tracking_em)
 	_contents_font = InkType.text_font()
 	_choice_font = InkType.tracked(InkType.text_bold_font(), choice_word_size_px, label_tracking_em)
-	_rules_font = InkType.text_font()
-	_rules = null
-	if _keepsake != null:
-		_rules = TextParagraph.new()
-		_rules.width = rules_width_px
-		_rules.add_string(_keepsake.describe(), _rules_font, rules_size_px)
 	_refresh()
 
 func _refresh() -> void:
 	if _draw_layer != null:
 		_draw_layer.queue_redraw()
 	_place_lift()
+	_place_keepsake_tiles()
 
 func _has_slot(slot: int) -> bool:
 	match slot:
@@ -672,6 +687,7 @@ func _draw_columns() -> void:
 	if _taken >= 0:
 		_reveal(_taken, true)
 		if _asking:
+			_draw_keepsake_labels()
 			for choice in [Choice.REPLACE, Choice.KEEP]:
 				_draw_choice(choice)
 		return
@@ -709,18 +725,11 @@ func _reveal(slot: int, draw: bool) -> float:
 			if lift.has_area():
 				y = lift.end.y + contents_gap_px
 		Slot.KEEPSAKE:
-			if draw:
-				_text_centred(_contents_font, _keepsake.display_name, x, y, contents_size_px, bone)
-			y += contents_pitch_px
-			# Each rules line centred by its own width - a paragraph line
-			# draws unaligned.
-			if _rules != null:
-				var text: String = _keepsake.describe()
-				for line_index in _rules.get_line_count():
-					if draw:
-						var span: Vector2i = _rules.get_line_range(line_index)
-						_text_centred(_rules_font, text.substr(span.x, span.y - span.x).strip_edges(), x, y, rules_size_px, bone)
-					y += rules_pitch_px
+			# The tile speaks for it; lines hang under the tiles.
+			var tiles: Rect2 = _keepsake_tiles_rect()
+			if tiles.has_area():
+				x = tiles.get_center().x
+				y = tiles.end.y + contents_gap_px
 	var glassbone: int = _glassbone_in(slot)
 	if glassbone > 0:
 		if draw:
@@ -743,7 +752,9 @@ func _choice_width(choice: int) -> float:
 	return InkType.width(_choice_font, _choice_word(choice), choice_word_size_px) + gap + InkType.width(_contents_font, _held.display_name, contents_size_px)
 
 func _choice_left(choice: int) -> float:
-	return roundf(_column_rect(Slot.KEEPSAKE).get_center().x - _choice_width(choice) / 2.0)
+	var tiles: Rect2 = _keepsake_tiles_rect()
+	var centre: float = tiles.get_center().x if tiles.has_area() else _column_rect(Slot.KEEPSAKE).get_center().x
+	return roundf(centre - _choice_width(choice) / 2.0)
 
 # The choice and the hairline's room to its left.
 func _choice_rect(choice: int) -> Rect2:
@@ -762,6 +773,78 @@ func _draw_choice(choice: int) -> void:
 	_text(_contents_font, _held.display_name, Vector2(left + word_width + InkType.width(_contents_font, " ", contents_size_px), baseline), contents_size_px, color)
 	if focused:
 		_hairline_left_of(left, baseline, choice_word_size_px)
+
+# --- The bedroll's keepsake ---
+
+# The tiles' row on screen: the offered tile alone over the bedroll's
+# column (held inside the screen), or the held and the offered side by
+# side, centred on the screen. Empty while none is shown.
+func _keepsake_tiles_rect() -> Rect2:
+	if _offered_tile == null or _draw_layer == null:
+		return Rect2()
+	var tile: Vector2 = _offered_tile.get_tile_size()
+	var both: bool = _held_tile != null
+	var width: float = tile.x * (2.0 if both else 1.0) + (keepsake_tile_gap_px if both else 0.0)
+	var view: Vector2 = _draw_layer.size
+	var centre_x: float = view.x / 2.0
+	if not both:
+		centre_x = clampf(_column_rect(Slot.KEEPSAKE).get_center().x, width / 2.0 + 24.0, view.x - width / 2.0 - 24.0)
+	var top: float = view.y * keepsake_tile_centre_fraction - tile.y / 2.0
+	return Rect2(Vector2(centre_x - width / 2.0, top).round(), Vector2(width, tile.y))
+
+# Up through the bedroll's reveal: its tile, and the held one beside it
+# while the full slot is asked about.
+func _sync_keepsake_tiles() -> void:
+	var wanted: bool = _keepsake != null and not _flying and _taken == Slot.KEEPSAKE
+	var wanted_held: bool = wanted and _asking and _held != null
+	if wanted and _offered_tile == null:
+		_offered_tile = _new_tile(_keepsake)
+	elif not wanted and _offered_tile != null:
+		_offered_tile.queue_free()
+		_offered_tile = null
+	if wanted_held and _held_tile == null:
+		_held_tile = _new_tile(_held)
+	elif not wanted_held and _held_tile != null:
+		_held_tile.queue_free()
+		_held_tile = null
+	_place_keepsake_tiles()
+
+func _new_tile(keepsake: TrinketData) -> KeepsakeTile:
+	var tile := KeepsakeTile.new()
+	tile.tile_scale = keepsake_tile_scale
+	_draw_layer.add_child(tile)
+	tile.set_keepsake(keepsake)
+	return tile
+
+func _place_keepsake_tiles() -> void:
+	var row: Rect2 = _keepsake_tiles_rect()
+	if not row.has_area():
+		return
+	for tile: KeepsakeTile in [_held_tile, _offered_tile]:
+		if tile != null and not is_equal_approx(tile.tile_scale, keepsake_tile_scale):
+			tile.tile_scale = keepsake_tile_scale
+	if _held_tile != null:
+		_held_tile.position = row.position
+		_offered_tile.position = row.position + Vector2(_offered_tile.get_tile_size().x + keepsake_tile_gap_px, 0.0)
+	else:
+		_offered_tile.position = row.position
+
+# HELD and OFFERED, each centred over its tile, in the labels' caps.
+func _draw_keepsake_labels() -> void:
+	if _held_tile == null or _offered_tile == null:
+		return
+	for pair: Array in [[_held_tile, held_label_text], [_offered_tile, offered_label_text]]:
+		var tile: KeepsakeTile = pair[0]
+		var centre: float = tile.position.x + tile.get_tile_size().x / 2.0
+		_text_centred(_label_font, pair[1], centre, roundf(tile.position.y - keepsake_label_gap_px), label_size_px, bone)
+
+# For probes: the tiles up now (held first when both), empty with none.
+func get_keepsake_tiles() -> Array[KeepsakeTile]:
+	var tiles: Array[KeepsakeTile] = []
+	for tile: KeepsakeTile in [_held_tile, _offered_tile]:
+		if tile != null:
+			tiles.append(tile)
+	return tiles
 
 # --- The pack's card ---
 
@@ -978,6 +1061,7 @@ func _activate(index: int) -> void:
 				TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, keepsake_volume_db, "KeepsakeTakeAudio", "BelongingsScreen")
 				print("BelongingsScreen: took '%s'." % _keepsake.display_name)
 	_sync_card_lift()
+	_sync_keepsake_tiles()
 	_draw_layer.queue_redraw()
 	if _asking:
 		return
