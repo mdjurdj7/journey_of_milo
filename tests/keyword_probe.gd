@@ -30,7 +30,7 @@ const BRACE_PATH := "res://cards/data/brace.tres"
 const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Consumed"]
 const DEFINITIONS: Dictionary = {
 	"Toll": "Gained when you lose HP to your own effects. Up to 5 carries over after a fight.",
-	"Grace": "After enemy hits get through your Block, damage you deal on your next turn wins HP back, up to the largest hit.",
+	"Grace": "After enemy hits get through your Block, damage you deal on your next turn wins HP back, up to half the largest hit.",
 	"Critical": "At or below 30% of your max HP.",
 	"Drain": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one.",
 	"Spent": "Removed for the rest of this fight once played.",
