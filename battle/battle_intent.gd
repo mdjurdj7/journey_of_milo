@@ -1,19 +1,18 @@
 extends Control
 class_name BattleIntent
 
-# The enemy's next action, above its head in the battle frame: a line
-# glyph for the type (attack / defend - the only types EnemyIntent has;
-# buff/debuff get theirs when they exist) beside a numeral for
-# the magnitude - "N x M" for a multi-hit attack (hits x per-hit damage,
-# the MODIFIED per-hit number, see EnemyTurn.preview_intent()). Ink on the
-# world, like the rest of the battle UI: the numeral in Spectral SemiBold
-# in the theme's ink with a 1px bone outline for legibility over the
-# world, the glyph stroked the same way, and a hairline (ink at
-# hairline_alpha) beneath the pair - no backing. The numeral is never
-# smaller than the glyph - it's the fairness contract, the glyph is only
-# its category. If the shown damage would reach the Wanderer's current HP
-# through block, the hairline becomes a full-ink rule, lethal_rule_px
-# thick - the one emphasis, nothing else.
+# The enemy's next action, above its head in the battle frame: an inked
+# glyph for the type beside a numeral for the magnitude - "N x M" for a
+# multi-hit attack (hits x per-hit damage, the MODIFIED per-hit number,
+# see EnemyTurn.preview_intent()). Ink on the world, like the rest of the
+# battle UI: the numeral in Spectral SemiBold in the theme's ink with a
+# 1px bone outline for legibility over the world, the glyph filled ink
+# over the same bone outline, and a hairline (ink at hairline_alpha)
+# beneath the pair - no backing. The numeral leads: the glyph is
+# glyph_cap_fraction of its cap height - the number is the fairness
+# contract, the glyph is only its category. If the shown damage would
+# reach the Wanderer's current HP through block, the hairline becomes a
+# full-ink rule, lethal_rule_px thick - the one emphasis, nothing else.
 #
 # An interruptible attack (EnemyIntent.interrupt_threshold, the Siltjaw's
 # charge) adds a second row under the hairline: the damage still to deal
@@ -52,15 +51,29 @@ class_name BattleIntent
 @export var head_margin: float = 0.1
 @export var fallback_head_height: float = 1.8
 @export var numeral_font: Font = load("res://assets/fonts/Spectral-SemiBold.ttf")
-@export var numeral_size_px: int = 34
-@export var outline_size_px: int = 1
-# The glyph is sized to the numeral's cap height and stroked heavier to
-# match its weight; it's clamped to never exceed the numeral.
-@export var glyph_cap_scale: float = 0.7
-@export var glyph_numeral_gap_px: float = 6.0
+@export var numeral_size_px: int = 36:
+	set(value):
+		numeral_size_px = value
+		_apply_layout()
+@export var outline_size_px: int = 1:
+	set(value):
+		outline_size_px = value
+		refresh_style()
+		_apply_layout()
+# The glyph is subordinate to the numeral: glyph_cap_fraction of the
+# digits' cap height (measured from the font, _cap_height()), centred on
+# their cap centre, glyph_numeral_gap_px before them.
+@export_range(0.1, 1.0) var glyph_cap_fraction: float = 0.6:
+	set(value):
+		glyph_cap_fraction = value
+		_apply_layout()
+@export var glyph_numeral_gap_px: float = 5.0:
+	set(value):
+		glyph_numeral_gap_px = value
+		_apply_layout()
 # The glyphs' pen: a stroke's body is glyph_stroke_px wide, narrowing to
 # glyph_taper of that at its fine end (see _ribbon()).
-@export var glyph_stroke_px: float = 3.5:
+@export var glyph_stroke_px: float = 3.2:
 	set(value):
 		glyph_stroke_px = value
 		queue_redraw()
@@ -74,12 +87,46 @@ class_name BattleIntent
 	set(value):
 		glyph_edge_px = value
 		queue_redraw()
+# The spearhead (ATTACK) is spear_length x the glyph's height long - a
+# spear is slim, so it is the one glyph wider than tall. Its blade's
+# length and half-width are fractions of the glyph's half-height; the
+# shaft runs back from the blade to the far end, at most
+# spear_shaft_weight of the full stroke - the blade is where the pen
+# presses.
+@export_range(1.0, 3.0) var spear_length: float = 1.5:
+	set(value):
+		spear_length = value
+		_apply_layout()
+@export_range(0.1, 2.0) var spear_blade_length: float = 1.2:
+	set(value):
+		spear_blade_length = value
+		queue_redraw()
+@export_range(0.05, 1.0) var spear_blade_half_width: float = 0.45:
+	set(value):
+		spear_blade_half_width = value
+		queue_redraw()
+@export_range(0.0, 1.0) var spear_shaft_weight: float = 0.7:
+	set(value):
+		spear_shaft_weight = value
+		queue_redraw()
 # The hairline under glyph + numeral: this wide, centred, this far under
 # the numeral's line box, ink at hairline_alpha.
-@export var hairline_width_px: float = 52.0
-@export var hairline_thickness_px: float = 1.0
-@export_range(0.0, 1.0) var hairline_alpha: float = 0.45
-@export var hairline_drop_px: float = 4.0
+@export var hairline_width_px: float = 52.0:
+	set(value):
+		hairline_width_px = value
+		_apply_layout()
+@export var hairline_thickness_px: float = 1.0:
+	set(value):
+		hairline_thickness_px = value
+		_apply_layout()
+@export_range(0.0, 1.0) var hairline_alpha: float = 0.45:
+	set(value):
+		hairline_alpha = value
+		_apply_layout()
+@export var hairline_drop_px: float = 4.0:
+	set(value):
+		hairline_drop_px = value
+		_apply_layout()
 # A Denied move's strike-through: this thick, this far past the pair at
 # each end, at this fraction of the numeral's line box from its top.
 @export var denied_rule_px: float = 1.0:
@@ -95,7 +142,10 @@ class_name BattleIntent
 		denied_rule_y_fraction = value
 		queue_redraw()
 # The lethal emphasis: the hairline becomes a full-ink rule this thick.
-@export var lethal_rule_px: float = 2.0
+@export var lethal_rule_px: float = 2.0:
+	set(value):
+		lethal_rule_px = value
+		_apply_layout()
 
 # The threshold ring, under the hairline (see the header). Its numeral is
 # never smaller than the HP readout's (EnemyStatus.battle_numeral_size_px,
@@ -151,6 +201,9 @@ class_name BattleIntent
 		pip_top_gap_px = value
 		_apply_layout()
 @export_group("")
+
+# Where along the spearhead's blade, from its point, it is widest.
+const SPEAR_WIDEST_AT: float = 0.7
 
 var target: FieldEnemy = null
 var _label: Label = null
@@ -279,11 +332,12 @@ func _apply_layout() -> void:
 	_label.add_theme_font_size_override("font_size", numeral_size_px)
 	var font: Font = _label.get_theme_font("font")
 	var line_height: float = font.get_height(numeral_size_px) if font != null else float(numeral_size_px)
-	_glyph_size = minf(float(numeral_size_px) * glyph_cap_scale, float(numeral_size_px))
+	var cap_height: float = _cap_height(font)
+	_glyph_size = cap_height * glyph_cap_fraction
 	_threshold_label.add_theme_font_size_override("font_size", threshold_numeral_size_px)
 	var text_width: float = _text_width(_label, numeral_size_px)
 	# A glyph with no numeral (BURROW) is the glyph alone, no gap.
-	var pair_width: float = _glyph_size
+	var pair_width: float = _glyph_width()
 	if text_width > 0.0:
 		pair_width += glyph_numeral_gap_px + text_width
 	var rule_thickness: float = lethal_rule_px if _lethal else hairline_thickness_px
@@ -303,8 +357,10 @@ func _apply_layout() -> void:
 
 	var pair_left: float = (content_width - pair_width) * 0.5
 	_pair_rect = Rect2(pair_left, 0.0, pair_width, line_height)
-	_glyph_centre = Vector2(pair_left + _glyph_size * 0.5, line_height * 0.5)
-	_text_rect = Rect2(pair_left + _glyph_size + glyph_numeral_gap_px, 0.0, text_width, line_height)
+	# The label's one line fills its box, so its baseline is the ascent.
+	var ascent: float = font.get_ascent(numeral_size_px) if font != null else line_height
+	_glyph_centre = Vector2(pair_left + _glyph_width() * 0.5, ascent - cap_height * 0.5)
+	_text_rect = Rect2(pair_left + _glyph_width() + glyph_numeral_gap_px, 0.0, text_width, line_height)
 	_label.position = _text_rect.position
 	_label.size = _text_rect.size
 	_label.visible = text_width > 0.0
@@ -319,29 +375,57 @@ func _apply_layout() -> void:
 	_threshold_label.visible = _has_threshold and not _threshold_label.text.is_empty()
 	queue_redraw()
 
+# The digits' cap height at numeral_size_px, from the "0" glyph's bitmap
+# cell: it is padded alike above and below, and the digit sits on the
+# baseline, so what hangs below the baseline is the padding. Two thirds
+# of the ascent if the font can't say.
+func _cap_height(font: Font) -> float:
+	if font == null:
+		return float(numeral_size_px) * 0.66
+	var rids: Array[RID] = font.get_rids()
+	if rids.is_empty():
+		return font.get_ascent(numeral_size_px) * 0.66
+	var ts: TextServer = TextServerManager.get_primary_interface()
+	var glyph: int = ts.font_get_glyph_index(rids[0], numeral_size_px, "0".unicode_at(0), 0)
+	var size_key := Vector2i(numeral_size_px, 0)
+	var top: float = ts.font_get_glyph_offset(rids[0], size_key, glyph).y
+	var height: float = ts.font_get_glyph_size(rids[0], size_key, glyph).y
+	var padding: float = maxf(top + height, 0.0)
+	return height - padding * 2.0
+
+# The glyph's width: its height, or the spear's length for an ATTACK.
+func _glyph_width() -> float:
+	return _glyph_size * spear_length if _type == EnemyIntent.IntentType.ATTACK else _glyph_size
+
 func _text_width(label: Label, font_size: int) -> float:
 	var font: Font = label.get_theme_font("font")
 	if font == null or label.text.is_empty():
 		return 0.0
 	return font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 
-# The glyph in the same ink/outline as the numeral: each stroke is drawn
-# twice, outline colour wide underneath, ink colour on top - the line
-# equivalent of the label's outline. A directional glyph (the attack
-# chevron) points toward the Wanderer: _glyph_points() is built pointing
+# The glyph in the same ink/outline as the numeral (_draw_ink()). The
+# attack's spearhead points toward the Wanderer: built pointing
 # screen-right and mirrored about the glyph's centre when the Wanderer is
-# to the left (see _points_left()). The shield is symmetric and never
-# flips. Beneath both, the hairline - or the lethal rule in its place.
+# to the left (see _points_left()). The rest are not directional and
+# never flip; until they're inked they are polylines (_stroke()). Beneath both, the hairline - or the lethal rule in its place.
 func _draw() -> void:
 	if not _has_intent:
 		return
 	var ink: Color = get_theme_color("ink", "Battle")
 	var glyph_centre: Vector2 = _glyph_centre
-	var points: PackedVector2Array = _glyph_points(glyph_centre, _glyph_size * 0.5)
-	if _type == EnemyIntent.IntentType.ATTACK and _points_left():
-		for i in points.size():
-			points[i] = Vector2(2.0 * glyph_centre.x - points[i].x, points[i].y)
-	_stroke(points, hairline_alpha if _interrupted else 1.0)
+	if _type == EnemyIntent.IntentType.ATTACK:
+		var r: float = _glyph_size * 0.5
+		var reach: float = _glyph_width() * 0.5
+		var shapes: Array[PackedVector2Array] = _spearhead(glyph_centre + Vector2(reach, 0.0), Vector2.RIGHT, r * spear_blade_length, r * spear_blade_half_width, glyph_centre + Vector2(-reach, 0.0))
+		if _points_left():
+			for k in shapes.size():
+				var shape: PackedVector2Array = shapes[k]
+				for i in shape.size():
+					shape[i] = Vector2(2.0 * glyph_centre.x - shape[i].x, shape[i].y)
+				shapes[k] = shape
+		_draw_ink(shapes, hairline_alpha if _interrupted else 1.0)
+	else:
+		_stroke(_glyph_points(glyph_centre, _glyph_size * 0.5), hairline_alpha if _interrupted else 1.0)
 	if _type == EnemyIntent.IntentType.WATCH:
 		_draw_pupil(glyph_centre, _glyph_size * 0.5, hairline_alpha if _interrupted else 1.0)
 	if _type == EnemyIntent.IntentType.SETTLE:
@@ -429,6 +513,37 @@ func _settle_arrow_points(centre: Vector2, r: float) -> PackedVector2Array:
 	points.append(tip)
 	points.append(centre + Vector2(r * 0.4, -r * 0.1))
 	return points
+
+# A spearhead pointing along `direction` (unit) with its point at `tip`:
+# a blade `blade_length` long, its edges near-straight from the point out
+# to its widest, SPEAR_WIDEST_AT of the way back, where it is 2 x
+# blade_half_width across, then closing in to nothing at the neck; and a
+# shaft from `butt`, a hair there, thickening to spear_shaft_weight of
+# the full stroke where it runs into the blade's widest point (_merged() joins the two). The
+# ATTACK glyph, and SETTLE's arrow.
+func _spearhead(tip: Vector2, direction: Vector2, blade_length: float, blade_half_width: float, butt: Vector2) -> Array[PackedVector2Array]:
+	var across := Vector2(-direction.y, direction.x)
+	var steps: int = 16
+	var side_a := PackedVector2Array()
+	var side_b := PackedVector2Array()
+	for step in steps + 1:
+		var t: float = float(step) / float(steps)
+		var along: Vector2 = tip - direction * blade_length * t
+		var half: float
+		if t <= SPEAR_WIDEST_AT:
+			half = blade_half_width * pow(t / SPEAR_WIDEST_AT, 0.85)
+		else:
+			half = blade_half_width * (1.0 - pow((t - SPEAR_WIDEST_AT) / (1.0 - SPEAR_WIDEST_AT), 1.6))
+		side_a.append(along + across * half)
+		if step > 0 and step < steps:
+			side_b.append(along - across * half)
+	side_b.reverse()
+	side_a.append_array(side_b)
+	var neck: Vector2 = tip - direction * blade_length
+	var widest: Vector2 = tip - direction * blade_length * SPEAR_WIDEST_AT
+	var shaft: PackedVector2Array = _ribbon(PackedVector2Array([butt, butt.lerp(neck, 0.5), neck, widest]), PackedFloat32Array([0.0, 0.5 * spear_shaft_weight, 0.85 * spear_shaft_weight, spear_shaft_weight]))
+	var shapes: Array[PackedVector2Array] = [side_a, shaft]
+	return shapes
 
 # One glyph stroke in the numeral's ink over its bone outline, at alpha.
 func _stroke(points: PackedVector2Array, alpha: float) -> void:
@@ -572,8 +687,7 @@ func _keyholed(outer: PackedVector2Array, holes: Array[PackedVector2Array]) -> P
 		polygon = joined
 	return polygon
 
-# ATTACK: a chevron pointing right with a short shaft - an arrow, the
-# action coming at you. DEFEND: an open shield - flat top, sides, a point
+# The glyphs not yet inked (ATTACK is _spearhead()). DEFEND: an open shield - flat top, sides, a point
 # at the bottom, closed. BURROW: a mound on a ground line - the swell it
 # pushes up under the sand. HEAL_ALLY: a plus - one stroke, out along
 # the bar and back to cross it. WATCH: an open eye - an almond, upper lid
@@ -583,12 +697,6 @@ func _keyholed(outer: PackedVector2Array, holes: Array[PackedVector2Array]) -> P
 func _glyph_points(centre: Vector2, r: float) -> PackedVector2Array:
 	var points := PackedVector2Array()
 	match _type:
-		EnemyIntent.IntentType.ATTACK:
-			points.append(centre + Vector2(-r, 0.0))
-			points.append(centre + Vector2(r * 0.7, 0.0))
-			points.append(centre + Vector2(0.0, -r * 0.7))
-			points.append(centre + Vector2(r * 0.7, 0.0))
-			points.append(centre + Vector2(0.0, r * 0.7))
 		EnemyIntent.IntentType.DEFEND:
 			points.append(centre + Vector2(-r * 0.8, -r * 0.9))
 			points.append(centre + Vector2(r * 0.8, -r * 0.9))
@@ -623,7 +731,7 @@ func _glyph_points(centre: Vector2, r: float) -> PackedVector2Array:
 	return points
 
 # Whether the Wanderer is to the screen-left of the enemy right now -
-# compared in screen X at draw time, so the chevron follows the battle
+# compared in screen X at draw time, so the spearhead follows the battle
 # framing whichever side the camera put each of them on.
 func _points_left() -> bool:
 	if target == null or not is_instance_valid(target):
@@ -655,7 +763,7 @@ func _anchor_offset() -> Vector3:
 	return Vector3(0.0, head + head_margin + bob, 0.0)
 
 # Same loop as EnemyStatus._physics_process(): unproject, whole pixels.
-# Also re-evaluates the chevron's direction, since the framing can swap
+# Also re-evaluates the spearhead's direction, since the framing can swap
 # sides during the battle transition.
 var _pointing_left: bool = false
 
