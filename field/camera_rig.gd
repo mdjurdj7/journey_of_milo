@@ -112,10 +112,11 @@ var _inland_forward: Vector3 = Vector3.ZERO
 # currently apply - see _advance_follow_bounds().
 var _bound_offset: Vector3 = Vector3.ZERO
 
-# Set by micro_shake(), consumed and counted down by _apply_shake() -
-# see that method's own doc.
-var _shake_offset: Vector3 = Vector3.ZERO
-var _shake_frames_remaining: int = 0
+# The jolt running now (see jolt()): its full offset, its length and how
+# far into it it is, in game seconds. _jolt_duration 0 = none.
+var _jolt_offset: Vector3 = Vector3.ZERO
+var _jolt_duration: float = 0.0
+var _jolt_elapsed: float = 0.0
 
 # The threshold look (see look_up()): 0 = none, 1 = fully on the tower.
 # Only ever rises - the floor change that follows is a scene reload, and
@@ -346,29 +347,35 @@ func _physics_process(delta: float) -> void:
 	_place_camera()
 	_apply_free_pose()
 	_update_dof()
-	_apply_shake()
+	_apply_jolt(delta)
 
-# Called by BattleFeedback on any damage_dealt (see its own doc) - magnitude
-# is BattleFeedback's own max_offset already scaled by that hit's damage,
-# not a tunable of this rig's. Held for exactly 2 physics frames: since
-# _place_camera() fully recomputes camera.global_position from scratch
-# every frame (never incrementally), re-adding this same offset on top of
-# that fresh base for 2 frames reads as a brief snap rather than a
-# compounding drift, and the 3rd frame's own _place_camera() call (with
-# _shake_frames_remaining already at 0) renders with no offset at all.
-func micro_shake(magnitude: float) -> void:
-	if magnitude <= 0.0:
+# One small knock to the frame: the camera kicked `amplitude` metres in a
+# random direction across the view, settling back over `duration` game
+# seconds - fast at first, easing out (the square of what's left).
+# Called by BattleFeedback for a card hit of its shake_min_damage or more;
+# the tunables are BattleFeedback's.
+# On game time in _physics_process, like the rest of the rig, so a hit-
+# stop holds it and physics interpolation smooths it. Since
+# _place_camera() recomputes the camera's position from scratch every
+# tick, the offset is added on that fresh base and never drifts; a new
+# jolt replaces one still settling.
+func jolt(amplitude: float, duration: float) -> void:
+	if amplitude <= 0.0 or duration <= 0.0:
 		return
-	var shake_direction := Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0))
-	shake_direction = shake_direction.normalized() if shake_direction.length() > 0.0001 else Vector2.RIGHT
-	_shake_offset = Vector3(shake_direction.x, shake_direction.y, 0.0) * magnitude
-	_shake_frames_remaining = 2
+	var direction := Vector2(randf_range(-1.0, 1.0), randf_range(-1.0, 1.0))
+	direction = direction.normalized() if direction.length() > 0.0001 else Vector2.RIGHT
+	_jolt_offset = Vector3(direction.x, direction.y, 0.0) * amplitude
+	_jolt_duration = duration
+	_jolt_elapsed = 0.0
 
-func _apply_shake() -> void:
-	if _shake_frames_remaining <= 0:
+func _apply_jolt(delta: float) -> void:
+	if _jolt_duration <= 0.0:
 		return
-	camera.position += _shake_offset
-	_shake_frames_remaining -= 1
+	var left: float = 1.0 - _jolt_elapsed / _jolt_duration
+	camera.position += _jolt_offset * left * left
+	_jolt_elapsed += delta
+	if _jolt_elapsed >= _jolt_duration:
+		_jolt_duration = 0.0
 
 # The rig never rotates, so this is a fixed world direction — the follow
 # framing's viewing axis.

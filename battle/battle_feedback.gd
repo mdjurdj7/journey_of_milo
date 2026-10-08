@@ -31,9 +31,12 @@ class_name BattleFeedback
 # heavy_impact_max_volume_db), and the recoil and the damage number grown
 # up to their max multipliers. A card that spends Toll as its blow
 # (CardEffect TOLL_DAMAGE - Reckoning) always counts as at least
-# heavy_min_damage. Presentation only: nothing here touches the rules,
-# and heavy_hit_enabled off gives the plain reaction. Every tunable is
-# read as the hit lands, so a Remote-tab edit takes effect on the next.
+# heavy_min_damage. A card hit of shake_min_damage or more also jolts the
+# camera once (CameraRig.jolt()) - the only camera movement a hit makes,
+# off with camera_shake_enabled. Presentation only: nothing here touches
+# the rules, and heavy_hit_enabled off gives the plain reaction, no jolt
+# either. Every tunable is read as the hit lands, so a Remote-tab edit
+# takes effect on the next.
 
 const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 
@@ -88,9 +91,13 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 @export var heavy_recoil_max_multiplier: float = 1.6
 @export var heavy_number_max_multiplier: float = 1.4
 
-@export_group("Camera Shake")
-@export var camera_shake_max_offset: float = 0.05
-@export var camera_shake_reference_damage: float = 15.0
+@export_group("Camera Jolt")
+@export var camera_shake_enabled: bool = true
+# The least damage one card hit needs to jolt the camera.
+@export var shake_min_damage: int = 30
+# The jolt's offset, in metres, and how long it takes to settle.
+@export var camera_jolt_amplitude: float = 0.05
+@export var camera_jolt_duration: float = 0.15
 
 # A hit-stop never runs longer than this, whatever the tunables say.
 const HITSTOP_CAP_MS: float = 160.0
@@ -128,10 +135,9 @@ func setup(wanderer: Wanderer, on_dark_world: bool) -> void:
 
 # source/target mirror BattleController.damage_dealt's own doc exactly:
 # each is either the String "player" or a FieldEnemy - which one is the
-# FieldEnemy says which side got hit. Slash mark and hit-stop are card-hit
-# only (2, 3, 5, 7 mirror onto the Wanderer for an enemy attack; 4 and 6
-# don't) - camera shake alone applies to both, so it's the one call left
-# outside the branch below.
+# FieldEnemy says which side got hit. The heavy tier, the slash mark, the
+# hit-stop and the camera jolt are card-hit only; an enemy's hit on the
+# Wanderer gets its sound, flash, recoil and puff.
 func on_damage_dealt(source: Variant, target: Variant, amount: int, _kind: String) -> void:
 	if amount <= 0:
 		return
@@ -149,10 +155,10 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, _kind: Strin
 				return
 		_react_to_card_hit(target as FieldEnemy, slash, armored, heavy)
 		_apply_hit_stop(hitstop_ms(heavy))
+		if jolts_camera(amount):
+			_jolt_camera()
 	elif source is FieldEnemy:
 		_react_to_enemy_attack(source as FieldEnemy)
-
-	_shake_camera(amount)
 
 # A card has landed (BattleController.card_impact, before its effects
 # resolve): its play effect, if it names one, is laid over `targets` from
@@ -234,6 +240,10 @@ func number_scale(target: Variant, amount: int) -> float:
 	if not (target is FieldEnemy):
 		return 1.0
 	return number_multiplier(heavy_level(heavy_damage(amount)))
+
+# Whether a card hit of `amount` jolts the camera.
+func jolts_camera(amount: int) -> bool:
+	return heavy_hit_enabled and camera_shake_enabled and amount >= shake_min_damage
 
 # The next impact-layer take - in turn, so two heavy hits in a row never
 # share one.
@@ -337,12 +347,11 @@ func _end_hit_stop(until: int) -> void:
 # live camera through the viewport" idiom BattleController._screen_pos_
 # for()/_raycast_enemy() and BattleOverlay._screen_pos_for_damage_target()
 # already use.
-func _shake_camera(amount: int) -> void:
+func _jolt_camera() -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
 		return
 	var camera_rig := camera.get_parent() as CameraRig
 	if camera_rig == null:
 		return
-	var magnitude: float = camera_shake_max_offset * clampf(float(amount) / camera_shake_reference_damage, 0.0, 1.0)
-	camera_rig.micro_shake(magnitude)
+	camera_rig.jolt(camera_jolt_amplitude, camera_jolt_duration)

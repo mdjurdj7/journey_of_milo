@@ -58,7 +58,8 @@ func _initialize() -> void:
 		quit(1)
 
 # 30 in the tier, 5 not; the stop and the layer at either end and the
-# cap; the recoil and number multipliers; the tier off.
+# cap; the recoil and number multipliers; the camera jolt from 30 and its
+# toggle; the tier off.
 func _check_tier() -> void:
 	var feedback: Node = _feedback()
 	var level_30: float = feedback.call("heavy_level", 30)
@@ -72,6 +73,9 @@ func _check_tier() -> void:
 	_expect(is_equal_approx(float(feedback.call("heavy_impact_volume_db", feedback.call("heavy_level", 35))), -14.0), "...and -14 dB at 35")
 	_expect(is_equal_approx(float(feedback.call("recoil_multiplier", level_5)), 1.0) and is_equal_approx(float(feedback.call("recoil_multiplier", 1.0)), 1.6), "Recoil x1 below the tier, x1.6 at its top")
 	_expect(is_equal_approx(float(feedback.call("number_multiplier", level_5)), 1.0) and is_equal_approx(float(feedback.call("number_multiplier", 1.0)), 1.4), "The number x1 below the tier, x1.4 at its top")
+	_expect(bool(feedback.call("jolts_camera", 30)) and not bool(feedback.call("jolts_camera", 29)), "30 jolts the camera, 29 doesn't")
+	feedback.set("camera_shake_enabled", false)
+	_expect(not bool(feedback.call("jolts_camera", 30)), "...and with the toggle off, nothing does")
 	feedback.set("hitstop_max_ms", 500.0)
 	_expect_eq(roundi(float(feedback.call("hitstop_ms", 1.0))), 160, "Never a stop past 160 ms")
 	feedback.set("heavy_hit_enabled", false)
