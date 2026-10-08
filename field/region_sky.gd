@@ -1,6 +1,12 @@
 extends WorldEnvironment
 class_name RegionSky
 
+# The depth fog's values have just been (re)applied - at _ready() and on a
+# live fog_depth_begin/end or fog_light_energy edit (the zone intro's
+# tween, a floor's own fog). RegionField re-pushes the enemies' fog
+# overlays on it (FieldEnemy.refresh_fog()).
+signal fog_changed()
+
 @export var sky_top_color: Color = Color(0.82, 0.85, 0.86)
 @export var horizon_color: Color = Color(0.87, 0.88, 0.85):
 	set(value):
@@ -173,6 +179,7 @@ func _ready() -> void:
 	environment = _environment
 
 	_push_pool_color()
+	fog_changed.emit()
 
 # Guarded the same way _push_pool_color() already is: ambient_color/
 # ambient_energy's setters can fire during scene deserialization, before
@@ -188,12 +195,14 @@ func _apply_fog_light_energy() -> void:
 	if _environment == null:
 		return
 	_environment.fog_light_energy = fog_light_energy
+	fog_changed.emit()
 
 func _apply_fog_depth() -> void:
 	if _environment == null:
 		return
 	_environment.fog_depth_begin = fog_depth_begin
 	_environment.fog_depth_end = fog_depth_end
+	fog_changed.emit()
 
 func _apply_tonemap() -> void:
 	if _environment == null:

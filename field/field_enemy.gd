@@ -7,6 +7,7 @@ signal contacted(enemy: FieldEnemy)
 # empty) - see model_scene_path below.
 const DEFAULT_MODEL_SCENE_PATH := "res://assets/models/enemies/Sputter/Sputter.glb"
 const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
+const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
 
 @export var enemy_id: StringName = &"enemy"
 @export var enemy_data: EnemyData
@@ -191,6 +192,10 @@ var _tint_base_colors: Array[Color] = []
 # The attachment_scene_path instance, if any (see _attach_scene()) - the
 # lunge tells it to flap and the settle tells it to fold, when it can.
 var _attachment: Node3D = null
+# The fog overlays (see _add_fog_overlay()) and, parallel, the material
+# each one is the next_pass of.
+var _fog_overlays: Array[ShaderMaterial] = []
+var _fog_bases: Array[BaseMaterial3D] = []
 # The instantiated glb root from _spawn_model() - what settle_and_free()
 # sinks. The BODY keeps its place (the recoil tweens that), the model
 # moves under it.
@@ -443,6 +448,57 @@ func _face_shore() -> void:
 	# Wanderer._angle_from_direction().
 	rotation.y = atan2(-to_shore.x, -to_shore.z)
 
+# Takes `base` out of the environment's depth fog and lays this body's
+# own share back over it - an enemy_fog.gdshader overlay as its next_pass
+# (see that shader's doc), at the end of its pass chain. The body's
+# material and every material an attachment hands over (the dragonfly's
+# wings) get one; refresh_fog() fills them.
+func _add_fog_overlay(base: BaseMaterial3D) -> void:
+	var shader := load(FOG_SHADER_PATH) as Shader
+	if shader == null:
+		push_warning("FieldEnemy '%s': fog overlay shader failed to load (%s); fogged as scenery." % [enemy_id, FOG_SHADER_PATH])
+		return
+	var overlay := ShaderMaterial.new()
+	overlay.shader = shader
+	base.disable_fog = true
+	var tail: Material = base
+	while tail.next_pass != null:
+		tail = tail.next_pass
+	tail.next_pass = overlay
+	_fog_overlays.append(overlay)
+	_fog_bases.append(base)
+
+# Pushes the field's depth fog (RegionField's RegionSky) and this body's
+# share of it - enemy_data.fog_factor_override when set, else RegionField.
+# enemy_fog_factor - into every fog overlay. Called once the overlays are
+# built, and by RegionField whenever the fog or the factor changes.
+func refresh_fog() -> void:
+	if _fog_overlays.is_empty():
+		return
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	if region_field == null:
+		return
+	var sky: RegionSky = region_field.get_region_sky()
+	if sky == null:
+		return
+	var factor: float = region_field.enemy_fog_factor
+	if enemy_data != null and enemy_data.fog_factor_override >= 0.0:
+		factor = enemy_data.fog_factor_override
+	for index in _fog_overlays.size():
+		var overlay: ShaderMaterial = _fog_overlays[index]
+		var base: BaseMaterial3D = _fog_bases[index]
+		overlay.set_shader_parameter("fog_color", sky.fog_color)
+		overlay.set_shader_parameter("fog_energy", sky.fog_light_energy)
+		overlay.set_shader_parameter("fog_begin", sky.fog_depth_begin)
+		overlay.set_shader_parameter("fog_end", sky.fog_depth_end)
+		overlay.set_shader_parameter("fog_density", sky.fog_density)
+		overlay.set_shader_parameter("fog_factor", clampf(factor, 0.0, 1.0))
+		# An alpha-scissor surface keeps its cut-away part clear of the fog.
+		var scissor: bool = base.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR and base.albedo_texture != null
+		overlay.set_shader_parameter("use_alpha_texture", scissor)
+		overlay.set_shader_parameter("alpha_texture", base.albedo_texture if scissor else null)
+		overlay.set_shader_parameter("alpha_scissor_threshold", base.alpha_scissor_threshold)
+
 func _spawn_model() -> void:
 	var scene_path: String = model_scene_path if not model_scene_path.is_empty() else DEFAULT_MODEL_SCENE_PATH
 	var scene := load(scene_path) as PackedScene
@@ -493,7 +549,15 @@ func _spawn_model() -> void:
 	_model_ground_y = model.position.y
 
 	_attach_scene(model)
+	# After the attachment: a pose's own pass on the body (the Greyshelf's
+	# throat, the Stork's sac) is already on the chain, and the fog goes
+	# over it, last.
+	if _model_material != null:
+		_add_fog_overlay(_model_material)
 	_apply_model_lift()
+	refresh_fog()
+	if enemy_data != null and not enemy_data.changed.is_connected(refresh_fog):
+		enemy_data.changed.connect(refresh_fog)
 
 # The attachment (attachment_scene_path), under the model root once the
 # body is grounded and its material pass is over, so the attachment's
@@ -520,6 +584,7 @@ func _attach_scene(model: Node3D) -> void:
 		for material in materials:
 			_tint_materials.append(material)
 			_tint_base_colors.append(material.albedo_color)
+			_add_fog_overlay(material)
 	for mesh_instance in attachment.find_children("*", "MeshInstance3D", true, false):
 		var mi := mesh_instance as MeshInstance3D
 		if mi.mesh == null:

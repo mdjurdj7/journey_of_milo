@@ -176,6 +176,17 @@ enum RewardMode { SCREEN, WORLD }
 @export var enemy_world_line_head_clearance: float = 0.35
 @export_group("")
 
+# Enemies read through the field's depth fog as dark figures while the
+# scenery fades: each enemy body takes only this fraction of the fog
+# (FieldEnemy.refresh_fog(), enemy_fog.gdshader) - 1 = fogged as the
+# scenery is, 0 = never. An EnemyData.fog_factor_override >= 0 wins for
+# that enemy. Props, the keeper, the Wanderer, terrain and water keep the
+# full fog.
+@export_range(0.0, 1.0, 0.01) var enemy_fog_factor: float = 0.4:
+	set(value):
+		enemy_fog_factor = value
+		_refresh_enemy_fog()
+
 # See hold_line_world_line - per run, not per floor or per scene load (a
 # floor change is a reload).
 static var _hold_line_spoken: bool = false
@@ -582,6 +593,13 @@ func _ready() -> void:
 	# below, which must see them.
 	_spawn_floor_enemies()
 	_spawn_floor_props()
+	# Each enemy filled its own fog overlay at spawn (reading this node's
+	# sky and factor through get_region_sky()); every later fog change -
+	# the zone intro's tween, a live edit - re-pushes them all.
+	var fog_sky := get_region_sky()
+	if fog_sky != null:
+		fog_sky.fog_changed.connect(_refresh_enemy_fog)
+	_refresh_enemy_fog()
 	_spawn_floor_patrols()
 	_spawn_floor_ledges()
 
@@ -1381,6 +1399,18 @@ func _apply_hud_row_style() -> void:
 	deck_panel.use_row_style(hud_row_style)
 	for line: InkLine in _hud_row_lines:
 		line.set_style(hud_row_style)
+
+# The field's RegionSky (sky_path), by node lookup - a lazy getter, since
+# FieldEnemy reads it from its own _ready(), before this node's.
+func get_region_sky() -> RegionSky:
+	return get_node_or_null(sky_path) as RegionSky
+
+# Re-pushes the fog and enemy_fog_factor into every enemy's fog overlay.
+func _refresh_enemy_fog() -> void:
+	if not is_inside_tree():
+		return
+	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
+		enemy.refresh_fog()
 
 # Parents a FieldEnemy's own persistent HP display under this field's HUD
 # CanvasLayer (a Control needs one as an ancestor to render at all - see

@@ -132,6 +132,13 @@ class_name EnemyData
 # the Wardling's harness, which floor 3's HitchingPost ties its rope to
 # (FieldEnemy.get_harness_point()). Unused by a body nothing is tied to.
 @export var harness_point: Vector3 = Vector3.ZERO
+# This body's share of the field's depth fog, in place of RegionField.
+# enemy_fog_factor (see FieldEnemy.refresh_fog()): 0 = never fogged, 1 =
+# fogged as the scenery is. -1 = use the field's.
+@export_range(-1.0, 1.0, 0.01) var fog_factor_override: float = -1.0:
+	set(value):
+		fog_factor_override = value
+		emit_changed()
 # Metres the body stands clear of the sand in the field, applied after
 # its AABB grounding - legs the mesh doesn't carry (the dragonfly's
 # 0.12). Its contact shadow stays on the sand. 0 = the mesh's own feet.
