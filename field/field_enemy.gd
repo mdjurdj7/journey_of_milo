@@ -161,6 +161,7 @@ var floor_index: int = -1
 
 var _contacted: bool = false
 var _contact_player: AudioStreamPlayer3D = null
+var _heavy_player: AudioStreamPlayer3D = null
 # The facing turn running now, if any (_turn_to()) - stopped when a new
 # one starts, so two turns never pull on rotation.y at once.
 var _face_tween: Tween = null
@@ -750,6 +751,22 @@ func play_pain_turn_sound() -> void:
 	_pain_player.stream = enemy_data.pain_turn_sound
 	_pain_player.volume_db = pain_volume_db
 	_pain_player.play()
+
+# A heavy card hit's impact layer (BattleFeedback's heavy tier): `stream`
+# at `volume_db`, from this body with its contact sound - on the SFX bus
+# and through the battle freeze, like it.
+func play_heavy_impact(stream: AudioStream, volume_db: float) -> void:
+	if stream == null:
+		return
+	if _heavy_player == null:
+		_heavy_player = AudioStreamPlayer3D.new()
+		_heavy_player.name = "HeavyImpactAudio"
+		_heavy_player.bus = &"SFX"
+		_heavy_player.process_mode = Node.PROCESS_MODE_ALWAYS
+		add_child(_heavy_player)
+	_heavy_player.stream = stream
+	_heavy_player.volume_db = volume_db
+	_heavy_player.play()
 
 # `armored`: the hit met this creature's block - its armored takes, if
 # it has any, else the usual ones.

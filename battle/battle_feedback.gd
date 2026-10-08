@@ -22,6 +22,18 @@ class_name BattleFeedback
 # reacts here - the armored contact sound and a reduced recoil, nothing
 # else (no flash, number, hit-stop or shake). One that breaks through
 # reacts as any hit does, with the armored sound.
+#
+# The heavy tier: a card hit of heavy_min_damage or more, by that one
+# hit's damage, is weightier - a hit-stop (hitstop_min_ms at
+# heavy_min_damage rising to hitstop_max_ms at heavy_max_damage, never
+# above HITSTOP_CAP_MS), a deep impact layered under the contact sound
+# (heavy_impact_clips dealt in turn, silent at heavy_min_damage rising to
+# heavy_impact_max_volume_db), and the recoil and the damage number grown
+# up to their max multipliers. A card that spends Toll as its blow
+# (CardEffect TOLL_DAMAGE - Reckoning) always counts as at least
+# heavy_min_damage. Presentation only: nothing here touches the rules,
+# and heavy_hit_enabled off gives the plain reaction. Every tunable is
+# read as the hit lands, so a Remote-tab edit takes effect on the next.
 
 const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 
@@ -52,14 +64,38 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 @export var sand_puff_velocity: float = 1.0
 @export var sand_puff_spread_degrees: float = 45.0
 
-@export_group("Hit-stop")
-@export var hit_stop_threshold: int = 10
-@export var hit_stop_time_scale: float = 0.05
-@export var hit_stop_duration_sec: float = 0.06
+@export_group("Heavy Hit")
+@export var heavy_hit_enabled: bool = true
+# The tier's range, in one hit's damage: its light end and its full one.
+@export var heavy_min_damage: int = 10
+@export var heavy_max_damage: int = 35
+# The hit-stop at either end, in real milliseconds.
+@export var hitstop_min_ms: float = 40.0
+@export var hitstop_max_ms: float = 140.0
+# How slow the world runs through a hit-stop.
+@export_range(0.01, 1.0, 0.01) var hit_stop_time_scale: float = 0.05
+# The impact layer's takes, dealt in turn (never the same one twice
+# running), and its volume at heavy_max_damage.
+@export var heavy_impact_clips: Array[AudioStream] = [
+	load("res://assets/audio/sfx/heavy_impact_01.mp3") as AudioStream,
+	load("res://assets/audio/sfx/heavy_impact_02.mp3") as AudioStream,
+]:
+	set(value):
+		heavy_impact_clips = value
+		_heavy_pool.set_clips(heavy_impact_clips)
+@export var heavy_impact_max_volume_db: float = -14.0
+# The recoil's distance and the damage number's size at heavy_max_damage.
+@export var heavy_recoil_max_multiplier: float = 1.6
+@export var heavy_number_max_multiplier: float = 1.4
 
 @export_group("Camera Shake")
 @export var camera_shake_max_offset: float = 0.05
 @export var camera_shake_reference_damage: float = 15.0
+
+# A hit-stop never runs longer than this, whatever the tunables say.
+const HITSTOP_CAP_MS: float = 160.0
+# The impact layer's volume for "not at all".
+const SILENT_DB: float = -80.0
 
 var _wanderer: Wanderer = null
 var _on_dark_world: bool = false
@@ -70,6 +106,21 @@ var _effect: Node3D = null
 # Enemies whose next reported hit met their block (enemy_hit_blocked,
 # not absorbed) - set and read in the same call, so never stale.
 var _met_block: Dictionary[FieldEnemy, bool] = {}
+# The card resolving right now - set at its impact and cleared at the end
+# of that frame, like _effect: whether its blow counts as heavy at least.
+var _impact_card: CardData = null
+var _heavy_pool := SoundPool.new()
+# When the hit-stop running now ends, in real microseconds (0 = none).
+var _stop_until_usec: int = 0
+
+func _init() -> void:
+	_heavy_pool.set_clips(heavy_impact_clips)
+
+# A fight that ends mid-stop leaves the world at full speed.
+func _exit_tree() -> void:
+	if _stop_until_usec != 0:
+		_stop_until_usec = 0
+		Engine.time_scale = 1.0
 
 func setup(wanderer: Wanderer, on_dark_world: bool) -> void:
 	_wanderer = wanderer
@@ -90,14 +141,14 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, _kind: Strin
 		var slash: bool = not _effect_active()
 		var armored: bool = _met_block.has(target)
 		_met_block.erase(target)
+		var heavy: float = heavy_level(heavy_damage(amount))
 		var delay: float = reaction_delay(target)
 		if delay > 0.0:
 			await get_tree().create_timer(delay).timeout
 			if not is_instance_valid(target):
 				return
-		_react_to_card_hit(target as FieldEnemy, slash, armored)
-		if amount >= hit_stop_threshold:
-			_apply_hit_stop()
+		_react_to_card_hit(target as FieldEnemy, slash, armored, heavy)
+		_apply_hit_stop(hitstop_ms(heavy))
 	elif source is FieldEnemy:
 		_react_to_enemy_attack(source as FieldEnemy)
 
@@ -127,6 +178,67 @@ func on_card_impact(card: CardData, targets: Array[FieldEnemy], ceiling_y: float
 	effect.call("setup", _wanderer, struck, ceiling_y)
 	_effect = effect
 	_release_effect.call_deferred()
+
+# Every card's impact (BattleController.card_impact, before its effects
+# resolve): which card this frame's hits belong to, for heavy_damage().
+func set_impact_card(card: CardData) -> void:
+	_impact_card = card
+	_release_impact_card.call_deferred()
+
+func _release_impact_card() -> void:
+	_impact_card = null
+
+# --- Heavy tier ---
+
+# The damage the heavy tier reads for a hit of `amount` this frame: the
+# hit's own, or at least heavy_min_damage for a Toll blow (Reckoning).
+func heavy_damage(amount: int) -> int:
+	if _impact_card != null:
+		for effect in _impact_card.effects:
+			if effect != null and effect.effect_type == CardEffect.EffectType.TOLL_DAMAGE:
+				return maxi(amount, heavy_min_damage)
+	return amount
+
+# Where `damage` sits in the tier: -1 below it (or with the tier off), 0
+# at heavy_min_damage rising to 1 at heavy_max_damage, and held there.
+func heavy_level(damage: int) -> float:
+	if not heavy_hit_enabled or damage < heavy_min_damage:
+		return -1.0
+	if heavy_max_damage <= heavy_min_damage:
+		return 1.0
+	return clampf(float(damage - heavy_min_damage) / float(heavy_max_damage - heavy_min_damage), 0.0, 1.0)
+
+# A hit's stop at heavy_level() `level`, in real milliseconds; 0 below
+# the tier.
+func hitstop_ms(level: float) -> float:
+	if level < 0.0:
+		return 0.0
+	return minf(lerpf(hitstop_min_ms, hitstop_max_ms, level), HITSTOP_CAP_MS)
+
+# The impact layer's volume: silent at the tier's light end, rising in
+# amplitude to heavy_impact_max_volume_db at its full one.
+func heavy_impact_volume_db(level: float) -> float:
+	if level <= 0.0:
+		return SILENT_DB
+	return heavy_impact_max_volume_db + linear_to_db(level)
+
+func recoil_multiplier(level: float) -> float:
+	return 1.0 if level < 0.0 else lerpf(1.0, heavy_recoil_max_multiplier, level)
+
+func number_multiplier(level: float) -> float:
+	return 1.0 if level < 0.0 else lerpf(1.0, heavy_number_max_multiplier, level)
+
+# The damage number's size for a hit of `amount` on `target` this frame:
+# grown for a heavy card hit, 1 for anything else.
+func number_scale(target: Variant, amount: int) -> float:
+	if not (target is FieldEnemy):
+		return 1.0
+	return number_multiplier(heavy_level(heavy_damage(amount)))
+
+# The next impact-layer take - in turn, so two heavy hits in a row never
+# share one.
+func next_heavy_take() -> AudioStream:
+	return _heavy_pool.next()
 
 # Seconds after the impact `target`'s reaction to this frame's hit waits:
 # the play effect's arrival at it, 0 with none.
@@ -162,13 +274,16 @@ func _react_to_absorbed_hit(enemy: FieldEnemy) -> void:
 	enemy.play_contact_sound(true)
 	enemy.play_hit_recoil(attack_direction, recoil_distance * absorbed_recoil_fraction, recoil_tilt_degrees * absorbed_recoil_fraction, recoil_out_time, recoil_return_time)
 
-func _react_to_card_hit(enemy: FieldEnemy, slash: bool = true, armored: bool = false) -> void:
+# `heavy`: the hit's heavy_level() - -1 for an ordinary hit.
+func _react_to_card_hit(enemy: FieldEnemy, slash: bool = true, armored: bool = false, heavy: float = -1.0) -> void:
 	if _wanderer == null:
 		return
 	var attack_direction: Vector3 = enemy.global_position - _wanderer.global_position
 	enemy.play_contact_sound(armored)
+	if heavy > 0.0:
+		enemy.play_heavy_impact(next_heavy_take(), heavy_impact_volume_db(heavy))
 	enemy.play_hit_flash(flash_color, flash_rise_time, flash_fall_time)
-	enemy.play_hit_recoil(attack_direction, recoil_distance, recoil_tilt_degrees, recoil_out_time, recoil_return_time)
+	enemy.play_hit_recoil(attack_direction, recoil_distance * recoil_multiplier(heavy), recoil_tilt_degrees, recoil_out_time, recoil_return_time)
 	enemy.spawn_sand_puff(sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity, sand_puff_spread_degrees)
 	if slash:
 		enemy.spawn_slash_mark(attack_direction, _slash_mark_color(), slash_mark_length, slash_mark_width, slash_mark_chest_height, slash_mark_grow_time, slash_mark_fade_time)
@@ -194,16 +309,28 @@ func _slash_mark_color() -> Color:
 		return flash_color
 	return theme.on_dark_panel_light_color if _on_dark_world else theme.on_pale_panel_light_color
 
-# ignore_time_scale=true on this one timer only: it's what restores
-# Engine.time_scale, so it has to keep running at real speed regardless
-# of the very time_scale it just set - every other tween/timer this pass
-# adds deliberately keeps respecting time_scale so it visibly freezes
-# during the stutter, which is the whole point of a hit-stop.
-func _apply_hit_stop() -> void:
+# The world at hit_stop_time_scale for `ms` real milliseconds. Hits
+# landing together (one card, several enemies) make one stop, as long as
+# the longest of them: a stop only ever extends the one running. The
+# timer that ends it ignores time scale - it has to run at real speed
+# under the very time_scale it set; every other tween and timer keeps
+# respecting it, so the world visibly holds.
+func _apply_hit_stop(ms: float) -> void:
+	if ms <= 0.0:
+		return
+	var until: int = Time.get_ticks_usec() + int(ms * 1000.0)
+	if until <= _stop_until_usec:
+		return
+	_stop_until_usec = until
 	Engine.time_scale = hit_stop_time_scale
-	get_tree().create_timer(hit_stop_duration_sec, true, false, true).timeout.connect(func() -> void:
-		Engine.time_scale = 1.0
-	)
+	get_tree().create_timer(ms / 1000.0, true, false, true).timeout.connect(_end_hit_stop.bind(until))
+
+# Ends the stop that ran to `until` - unless a longer one has taken over.
+func _end_hit_stop(until: int) -> void:
+	if until != _stop_until_usec:
+		return
+	_stop_until_usec = 0
+	Engine.time_scale = 1.0
 
 # CameraRig isn't threaded through as a reference anywhere in this chain -
 # found via the active camera's own parent instead, the same "reach the

@@ -296,8 +296,10 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.enemy_hit_blocked.connect(_battle_feedback.on_enemy_hit_blocked)
 	# A card's play effect (Blood Arc's stroke) goes down before its hits
 	# report, over the enemies it can hit - and under their intent
-	# readouts, the lowest of whose bottom edges it is handed.
+	# readouts, the lowest of whose bottom edges it is handed. And the
+	# heavy tier learns which card's hits these are (a Toll blow's floor).
 	battle_controller.card_impact.connect(func(card: CardData) -> void:
+		_battle_feedback.set_impact_card(card)
 		_battle_feedback.on_card_impact(card, battle_controller.enemies, _lowest_intent_height()))
 
 	_deck_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DRAW)
@@ -700,11 +702,13 @@ func _lowest_intent_height() -> float:
 # reaction - and is placed when it shows.
 func _on_damage_dealt(_source: Variant, target: Variant, amount: int, _kind: String) -> void:
 	var delay: float = _battle_feedback.reaction_delay(target) if _battle_feedback != null else 0.0
+	# Read in the hit's own frame, while its card is still the impact's.
+	var size: float = _battle_feedback.number_scale(target, amount) if _battle_feedback != null else 1.0
 	if delay > 0.0:
 		await get_tree().create_timer(delay).timeout
 		if target is Object and not is_instance_valid(target):
 			return
-	_spawn_floating_number(amount, _screen_pos_for_damage_target(target))
+	_spawn_floating_number(amount, _screen_pos_for_damage_target(target), size)
 
 func _screen_pos_for_damage_target(target: Variant) -> Vector2:
 	if target is FieldEnemy:
@@ -809,10 +813,10 @@ func _debug_print_enemy_bar_gaps() -> void:
 		print("BattleOverlay: Wanderer HP readout bottom-to-hand gap = %.1f px" % (hand_container.get_rest_top_y() - hp_bottom))
 		print("BattleOverlay: Wanderer status row bottom-to-hand gap = %.1f px" % (hand_container.get_rest_top_y() - _field_hp_bar.get_status_row_bottom_y()))
 
-func _spawn_floating_number(value: int, screen_pos: Vector2) -> void:
+func _spawn_floating_number(value: int, screen_pos: Vector2, size_multiplier: float = 1.0) -> void:
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
 	add_child(number)
-	number.show_value(value, screen_pos)
+	number.show_value(value, screen_pos, size_multiplier)
 
 # Debug: flips the theme between its on-pale and on-dark value sets and
 # re-reads every battle readout's colours - the cards don't take part

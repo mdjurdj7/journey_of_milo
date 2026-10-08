@@ -35,8 +35,11 @@ func _ready() -> void:
 	add_theme_color_override("font_outline_color", get_theme_color("text_color", "CardFace"))
 	add_theme_constant_override("outline_size", outline_size_px)
 
-func show_value(value: int, screen_pos: Vector2) -> void:
+# `size_multiplier` grows the numeral from font_size_px - a heavy hit's
+# (BattleFeedback.number_scale()).
+func show_value(value: int, screen_pos: Vector2, size_multiplier: float = 1.0) -> void:
 	text = str(value)
+	add_theme_font_size_override("font_size", roundi(float(font_size_px) * size_multiplier))
 	position = screen_pos
 
 	var tween := create_tween()
