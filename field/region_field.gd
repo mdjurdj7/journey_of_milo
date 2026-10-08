@@ -2201,6 +2201,14 @@ func _setup_debug_row() -> void:
 	path_button.toggle_mode = true
 	path_button.toggled.connect(_on_debug_path_toggled)
 	_debug_row.add_child(path_button)
+	var scatter_button := Button.new()
+	scatter_button.name = "ScatterButton"
+	scatter_button.theme_type_variation = &"DebugButton"
+	scatter_button.text = "Scatter"
+	scatter_button.toggle_mode = true
+	scatter_button.button_pressed = true
+	scatter_button.toggled.connect(_on_debug_scatter_toggled)
+	_debug_row.add_child(scatter_button)
 	hud.add_child(_debug_row)
 	deck_panel.visibility_changed.connect(func() -> void:
 		if not deck_panel.visible:
@@ -2215,6 +2223,12 @@ func _on_debug_path_toggled(on: bool) -> void:
 		_nav_debug.setup(self)
 		add_child(_nav_debug)
 	_nav_debug.visible = on
+
+# The F1 row's Scatter: the floor's ground scatter shown (pressed, as the
+# floor opens) or hidden - for a look at the floor bare.
+func _on_debug_scatter_toggled(on: bool) -> void:
+	if _scatter != null:
+		_scatter.visible = on
 
 # One piece of Glassbone, through the run's own grant (RunState.add_
 # glassbone()) - a debug button, not a game source.
