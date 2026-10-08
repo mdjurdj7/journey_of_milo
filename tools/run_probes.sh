@@ -110,7 +110,7 @@ area_probes() {
 		floor5) echo "kill_order floor5 wear_path greyshelf elite_reward" ;;
 		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur floor5 greyshelf pathing" ;;
 		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake toll_carry run_log frayed_cord elite_reward run_lost temper" ;;
-		hud) echo "gold_line glassbone" ;;
+		hud) echo "gold_line glassbone trinket" ;;
 		hp_bar) echo "kill_order" ;;
 		ui_inspect) echo "keyword" ;;
 		# The fight's own UI: every probe that plays a real fight (which
