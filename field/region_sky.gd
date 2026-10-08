@@ -75,8 +75,8 @@ signal fog_changed()
 # Flat color fill instead of the sky's own color - AMBIENT_SOURCE_SKY was
 # tinting every surface (sand most of all) noticeably blue, since the
 # procedural sky's horizon/top colors lean cool. Neutral grey (no warm
-# light in Region 1); together with the sun it puts dry sand at ~0.87
-# before AgX.
+# light in Region 1); together with the sun it lights flat dry sand at
+# about its own albedo (irradiance ~1.0-1.08).
 @export var ambient_color: Color = Color(0.85, 0.85, 0.85):
 	set(value):
 		ambient_color = value
@@ -88,10 +88,14 @@ signal fog_changed()
 @export var ground_path: NodePath = ^"../Ground"
 
 @export_group("Tonemap")
-# AgX by default - switch to FILMIC live (Remote tab) if AgX doesn't read
-# right once seen live; there's no way to detect that from code, this
-# export IS the fallback.
-@export var tonemap_mode: Environment.ToneMapper = Environment.TONE_MAPPER_AGX:
+# Linear at exposure 1.0, so an authored colour is the colour on screen:
+# the fog and sky land on fog_color exactly (the floor fade's 2D overlay
+# in the same colour then meets them without a step), and lit dry sand
+# within a couple of hundredths of its albedo under the current sun and
+# ambient. AgX darkened the fog to ~0.76 and greyed the sand. The
+# battle frame renders through this same environment. tonemap_exposure
+# is the live tuning knob; tonemap_white only matters off Linear.
+@export var tonemap_mode: Environment.ToneMapper = Environment.TONE_MAPPER_LINEAR:
 	set(value):
 		tonemap_mode = value
 		_apply_tonemap()
@@ -148,8 +152,9 @@ signal fog_changed()
 		_apply_glow()
 
 @export_group("Adjustments")
-# A nudge toward the bible's muted palette, not a color grade - contrast/
-# saturation both stay close to 1.0 on purpose.
+# Neutral (1.0 each), so the authored palette is what lands on screen -
+# the muting lives in the colours themselves. Left enabled so a live
+# nudge needs no extra toggle.
 @export var adjustments_enabled: bool = true:
 	set(value):
 		adjustments_enabled = value
@@ -158,11 +163,11 @@ signal fog_changed()
 	set(value):
 		adjustment_brightness = value
 		_apply_adjustments()
-@export var adjustment_contrast: float = 1.06:
+@export var adjustment_contrast: float = 1.0:
 	set(value):
 		adjustment_contrast = value
 		_apply_adjustments()
-@export var adjustment_saturation: float = 0.92:
+@export var adjustment_saturation: float = 1.0:
 	set(value):
 		adjustment_saturation = value
 		_apply_adjustments()
