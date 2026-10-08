@@ -244,6 +244,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	energy_changed.emit(player.energy)
 	var opening_bonus: int = maxi(keepsake.opening_draw_bonus, 0) if keepsake != null else 0
 	_hand_container.draw_cards(turn_draw_amount + opening_bonus)
+	_apply_intent_exclusions(enemies)
 	_emit_intent_previews()
 	# Each body takes the pose of what it opens on - under way through the
 	# camera's swing, so a rear is held by the time the frame settles.
@@ -845,6 +846,8 @@ func _run_enemy_turn() -> void:
 func _run_sequential_turn() -> void:
 	# A copy: a countdown that goes off (Sentence) can kill an enemy mid-
 	# loop, and _drop_enemy() takes it out of `enemies`.
+	# Those whose queued intent is already the coming turn's.
+	var acted: Array[FieldEnemy] = []
 	for enemy in enemies.duplicate():
 		var combatant: Combatant = _combatants.get(enemy)
 		if combatant == null or combatant.hp <= 0:
@@ -854,6 +857,7 @@ func _run_sequential_turn() -> void:
 			continue
 		enemy_acting.emit(enemy)
 		var result := _take_turn_logged(enemy, combatant, data)
+		acted.append(enemy)
 		# Killed by its own countdown before it could act: reported, dropped,
 		# and nothing more of this enemy's turn plays out.
 		if _report_countdown(enemy, combatant, result):
@@ -895,6 +899,8 @@ func _run_sequential_turn() -> void:
 		# take_turn() has already advanced this enemy to its next intent -
 		# show it the moment this action has landed.
 		enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
+		# What it queued may rule out a move another has queued already.
+		_apply_intent_exclusions(acted)
 		if player.hp <= 0:
 			break
 
@@ -932,6 +938,7 @@ func _run_simultaneous_turn() -> void:
 	for enemy in acting:
 		_show_roused(enemy)
 		enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
+	_apply_intent_exclusions(acting)
 
 # A countdown that went off at the start of this enemy's turn (Sentence -
 # EnemyTurn.take_turn()'s "countdown_damage"), reported as the player's
@@ -1028,6 +1035,33 @@ func _all_living_simultaneous() -> bool:
 			return false
 		living += 1
 	return living > 1
+
+# The encounter's exclusions (FloorEnemy.excluded_intent): every living
+# enemy with one redraws if its excluded move is queued while another
+# living enemy in the fight has the triggering one queued
+# (EnemyTurn.exclude_queued()), and shows what it drew. Run whenever an
+# intent is newly queued - the fight's opening picks and after each
+# enemy's action - so the turn the player faces never has both. Only
+# `settled` enemies take part, as the trigger and as the one redrawing:
+# those whose queued intent is already the coming turn's (all of them at
+# the opening; in an enemy turn, those that have acted). One still to act
+# shows the turn now ending - the Underfoot's Sting as the Sputter, ahead
+# of it, picks - or a move about to resolve.
+func _apply_intent_exclusions(settled: Array[FieldEnemy]) -> void:
+	for enemy in settled:
+		if enemy.excluded_intent.is_empty() or enemy.enemy_data == null:
+			continue
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant == null or combatant.hp <= 0:
+			continue
+		var others: Array[EnemyIntent] = []
+		for other in settled:
+			var other_combatant: Combatant = _combatants.get(other)
+			if other == enemy or other_combatant == null or other_combatant.hp <= 0 or other.enemy_data == null:
+				continue
+			others.append(EnemyTurn.current_intent(other_combatant, other.enemy_data))
+		if EnemyTurn.exclude_queued(combatant, enemy.enemy_data, enemy.excluded_intent, enemy.excluded_while_packmate_intent, others):
+			enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
 
 func _start_player_turn() -> void:
 	player.block = 0

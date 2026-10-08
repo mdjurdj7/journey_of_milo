@@ -49,3 +49,12 @@ enum CardReward { ROLLED, TOP_TIER_FIRST }
 # member nearest the Wanderer at contact anchors. Floor 2's crab anchors
 # its dragonfly, so the stance never lands up the shelf's rise behind it.
 @export var anchor: bool = false
+# An encounter's rule for an enemy that picks its moves at random
+# (EnemyData.erratic_intent_selection): while another enemy in its fight
+# has the intent named excluded_while_packmate_intent queued, this one
+# never has the intent named excluded_intent queued - it draws again
+# from the rest, its usual rules intact (EnemyTurn.exclude_queued()). On
+# other turns its draw is unchanged. Either empty (the default) = no rule.
+# Floor 2's Sputter beside the Underfoot: no Scissor on a Sting turn.
+@export var excluded_intent: String = ""
+@export var excluded_while_packmate_intent: String = ""

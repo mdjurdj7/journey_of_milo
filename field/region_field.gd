@@ -1081,6 +1081,8 @@ func _spawn_floor_enemies() -> void:
 		enemy.required = entry.required
 		enemy.group = entry.group
 		enemy.anchor = entry.anchor
+		enemy.excluded_intent = entry.excluded_intent
+		enemy.excluded_while_packmate_intent = entry.excluded_while_packmate_intent
 		enemy.card_reward = entry.card_reward
 		enemy.floor_index = index
 		# The body, from the data's Field Body group - its defaults are

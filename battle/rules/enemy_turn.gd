@@ -463,6 +463,7 @@ static func _advance_intent(combatant: Combatant, data: EnemyData) -> void:
 	if data.intents.is_empty():
 		return
 	if data.erratic_intent_selection:
+		combatant.previous_intent_index = combatant.current_intent_index
 		combatant.current_intent_index = _pick_erratic_intent_index(data, combatant.current_intent_index, combatant.pack_alone)
 		return
 	# Alone, the cycle steps over its pack moves - at most once round, so
@@ -472,7 +473,39 @@ static func _advance_intent(combatant: Combatant, data: EnemyData) -> void:
 		if not combatant.pack_alone or not is_pack_move(data.intents[combatant.current_intent_index]):
 			return
 
-static func _pick_erratic_intent_index(data: EnemyData, previous_index: int, pack_alone: bool) -> int:
+# An encounter's exclusion (FloorEnemy.excluded_intent): when the intent
+# named `excluded` is this erratic enemy's queued one and any of
+# `packmate_intents` (the other living enemies' queued intents) is named
+# `trigger`, it draws again without it - the same weighted pick, with
+# no_immediate_repeat against the move before (Combatant.previous_
+# intent_index) and turn_one_locked on its first, as the draw it
+# replaces had. An interjection, a loop enemy, nothing else to draw, or
+# no trigger: left as it is. Returns whether the queued intent changed.
+static func exclude_queued(combatant: Combatant, data: EnemyData, excluded: String, trigger: String, packmate_intents: Array[EnemyIntent]) -> bool:
+	if excluded.is_empty() or trigger.is_empty() or not data.erratic_intent_selection or combatant.interjected_intent != null:
+		return false
+	var queued: EnemyIntent = current_intent(combatant, data)
+	if queued == null or queued.intent_name != excluded:
+		return false
+	var triggered: bool = false
+	for intent in packmate_intents:
+		if intent != null and intent.intent_name == trigger:
+			triggered = true
+	if not triggered:
+		return false
+	var index: int
+	if combatant.turns_taken == 0:
+		index = _pick_erratic_initial_index(data, excluded)
+	else:
+		index = _pick_erratic_intent_index(data, combatant.previous_intent_index, combatant.pack_alone, excluded)
+	if index < 0 or data.intents[index].intent_name == excluded:
+		return false
+	combatant.current_intent_index = index
+	_sync_queued(combatant, data)
+	return true
+
+# `excluded`: an intent name left out of the draw (exclude_queued()).
+static func _pick_erratic_intent_index(data: EnemyData, previous_index: int, pack_alone: bool, excluded: String = "") -> int:
 	var weights: Dictionary = {}
 	for i in data.intents.size():
 		var intent := data.intents[i]
@@ -480,16 +513,20 @@ static func _pick_erratic_intent_index(data: EnemyData, previous_index: int, pac
 			continue
 		if pack_alone and is_pack_move(intent):
 			continue
+		if not excluded.is_empty() and intent.intent_name == excluded:
+			continue
 		weights[i] = intent.erratic_weight
 	return _weighted_pick(weights, previous_index)
 
 # The very first intent an erratic enemy ever shows - also excludes
 # turn_one_locked intents (the Sputter's own Scissor/Block), so a fresh
 # fight can never open on one of those.
-static func _pick_erratic_initial_index(data: EnemyData) -> int:
+static func _pick_erratic_initial_index(data: EnemyData, excluded: String = "") -> int:
 	var weights: Dictionary = {}
 	for i in data.intents.size():
 		if data.intents[i].turn_one_locked:
+			continue
+		if not excluded.is_empty() and data.intents[i].intent_name == excluded:
 			continue
 		weights[i] = data.intents[i].erratic_weight
 	return _weighted_pick(weights, 0)

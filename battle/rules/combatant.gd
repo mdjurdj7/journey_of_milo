@@ -102,6 +102,10 @@ var current_intent_index: int = -1
 # one turn (see EnemyIntent.on_interrupt) - EnemyTurn.current_intent()
 # returns it while it's set. Null = the loop's own intent.
 var interjected_intent: EnemyIntent = null
+# The loop index queued before the last erratic pick - what that pick's
+# no_immediate_repeat was judged against, kept for a redraw
+# (EnemyTurn.exclude_queued()). -1 = none yet.
+var previous_intent_index: int = -1
 # Under the sand: the queued intent is a BURROW. Can't be targeted, takes
 # no damage (DamagePipeline.resolve()). Kept in step with the queued
 # intent by EnemyTurn - nothing else writes it.

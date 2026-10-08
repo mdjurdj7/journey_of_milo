@@ -27,6 +27,8 @@ position = Vector2(1.5, -21.25)
 yaw_degrees = 133.0
 group = &"crab"
 anchor = true
+excluded_intent = "Scissor"
+excluded_while_packmate_intent = "Sting"
 
 [sub_resource type="Resource" id="FloorEnemy_crab_underfoot"]
 script = ExtResource("2_floor_enemy")

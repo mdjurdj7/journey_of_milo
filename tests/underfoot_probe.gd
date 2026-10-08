@@ -13,9 +13,13 @@ extends SceneTree
 # the barb raised exactly while the Sting is queued - its height on a
 # 1080p screen printed - lifted and tilted Exposed after the Sting; after
 # an escape reburied, barb down. The run log's state lines (queued_
-# state): Covered then Exposed, each with what a Slash took off it. The
-# rules cases drive EnemyTurn on the real .tres; the field and fight
-# cases load floor 2.
+# state): Covered then Exposed, each with what a Slash took off it. And
+# the encounter's rule (FloorEnemy.excluded_intent): across many seeded
+# turns the Sputter never has its Scissor queued while the Underfoot's
+# Sting is, and still draws it on the other turns; in the fight the
+# controller redraws a Scissor queued against a Sting and keeps one
+# against a Rebury. The rules cases drive EnemyTurn on the real .tres;
+# the field and fight cases load floor 2.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/underfoot_probe.gd
 #
@@ -23,7 +27,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 10
+const CASES := 12
 const UNDERFOOT_PATH := "res://battle/rules/enemies/underfoot.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const DRAGONFLY_PATH := "res://battle/rules/enemies/dragonfly.tres"
@@ -49,7 +53,10 @@ const PLAYER_HP := 999
 const BARB_MIN_PX := 40.0
 # Nothing in the fight's line nearer anything else than this, metres.
 const LINE_CLEARANCE_M := 0.4
-const SAFETY_SECONDS := 240.0
+const SAFETY_SECONDS := 300.0
+# The rule's seeded runs: this many fights of this many turns.
+const SEEDS := 40
+const TURNS := 30
 
 var _run_state: Node = null
 var _field: Node = null
@@ -68,10 +75,12 @@ func _initialize() -> void:
 	_check_lost_sting()
 	_check_sting_defence()
 	_check_floor_data()
+	_check_scissor_rule()
 	await _check_field_body()
 	await _check_fight_body()
 	await _check_fight_line()
 	await _check_escape()
+	await _check_fight_scissor_rule()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -201,6 +210,54 @@ func _check_floor_data() -> void:
 	_expect_eq(island, 3, "...the island's Dragonfly x3 unchanged")
 	_completed += 1
 
+# Floor 2's rule, over SEEDS x TURNS seeded turns in the controller's
+# order - the Sputter (the anchor, first in line) acts and redraws
+# against nothing yet settled, then the Underfoot acts and the Sputter
+# redraws against its newly queued move, as BattleController.
+# _apply_intent_exclusions() runs them. Every turn the player faces: no
+# Scissor beside a Sting; Scissors beside the Rebury still. Without the
+# rule the two do meet - it is what keeps them apart.
+func _check_scissor_rule() -> void:
+	var floor_data: Resource = load(FLOOR_2_PATH)
+	var rule: Array[String] = []
+	for entry: Resource in floor_data.get("enemies"):
+		var data: EnemyData = entry.get("enemy_data")
+		if entry.get("group") == &"crab" and data.resource_path == SPUTTER_PATH:
+			rule = [String(entry.get("excluded_intent")), String(entry.get("excluded_while_packmate_intent"))]
+	_expect_eq(rule, ["Scissor", "Sting"] as Array[String], "Floor 2's Sputter: no Scissor while a Sting is queued")
+	var with_rule: Array[int] = _scissor_turns(rule)
+	_expect_eq(with_rule[0], 0, "Over %d seeded turns, Scissor never faces the player beside a Sting" % (SEEDS * TURNS))
+	_expect(with_rule[1] > 0, "...and still does beside the Rebury (%d turns)" % with_rule[1])
+	var without: Array[int] = _scissor_turns(["", ""] as Array[String])
+	_expect(without[0] > 0, "Without the rule they meet (%d turns)" % without[0])
+	_completed += 1
+
+# [turns with Scissor beside a Sting, turns with Scissor beside a Rebury]
+# over SEEDS x TURNS turns of the Sputter and the Underfoot, `rule` the
+# Sputter's [excluded, trigger].
+func _scissor_turns(rule: Array[String]) -> Array[int]:
+	var sputter_data := load(SPUTTER_PATH) as EnemyData
+	var underfoot_data: EnemyData = _underfoot()
+	var counts: Array[int] = [0, 0]
+	for run in SEEDS:
+		seed(run)
+		var sputter := Combatant.new(PLAYER_HP)
+		var underfoot := Combatant.new(PLAYER_HP)
+		EnemyTurn.pick_initial_intent(sputter, sputter_data)
+		EnemyTurn.pick_initial_intent(underfoot, underfoot_data)
+		var player: Combatant = _player()
+		EnemyTurn.exclude_queued(sputter, sputter_data, rule[0], rule[1], [EnemyTurn.current_intent(underfoot, underfoot_data)] as Array[EnemyIntent])
+		for turn in TURNS:
+			if EnemyTurn.current_intent(sputter, sputter_data).intent_name == "Scissor":
+				counts[0 if EnemyTurn.current_intent(underfoot, underfoot_data).intent_name == "Sting" else 1] += 1
+			player.hp = PLAYER_HP
+			player.block = 0
+			EnemyTurn.take_turn(sputter, sputter_data, player)
+			EnemyTurn.exclude_queued(sputter, sputter_data, rule[0], rule[1], [] as Array[EnemyIntent])
+			EnemyTurn.take_turn(underfoot, underfoot_data, player)
+			EnemyTurn.exclude_queued(sputter, sputter_data, rule[0], rule[1], [EnemyTurn.current_intent(underfoot, underfoot_data)] as Array[EnemyIntent])
+	return counts
+
 # In the field: Covered - sunk, the cover on - and the barb down.
 func _check_field_body() -> void:
 	_new_run()
@@ -313,6 +370,44 @@ func _check_escape() -> void:
 	_completed += 1
 
 # --- Helpers ---
+
+# The rule in the fight: the Sputter carries it from the floor
+# (FieldEnemy), and BattleController redraws its Scissor - set queued by
+# hand, past its first turn - against the Underfoot's queued Sting, and
+# leaves one queued against the Rebury.
+func _check_fight_scissor_rule() -> void:
+	var controller: Node = await _start_fight()
+	if controller != null:
+		var sputter: Node = _find(SPUTTER_PATH)
+		var underfoot: Node = _find(UNDERFOOT_PATH)
+		_expect(sputter.get("excluded_intent") == "Scissor" and sputter.get("excluded_while_packmate_intent") == "Sting", "The Sputter's body carries the floor's rule")
+		var sputter_data: EnemyData = sputter.get("enemy_data")
+		var scissor: int = -1
+		var strike: int = -1
+		for i in sputter_data.intents.size():
+			if sputter_data.intents[i].intent_name == "Scissor":
+				scissor = i
+			elif sputter_data.intents[i].intent_name == "Strike":
+				strike = i
+		var sputter_combatant: Combatant = _combatant(controller, sputter)
+		var underfoot_combatant: Combatant = _combatant(controller, underfoot)
+		var underfoot_data: EnemyData = underfoot.get("enemy_data")
+		for queued in ["Sting", "Rebury"]:
+			for i in underfoot_data.intents.size():
+				if underfoot_data.intents[i].intent_name == queued:
+					underfoot_combatant.current_intent_index = i
+			sputter_combatant.turns_taken = 1
+			sputter_combatant.previous_intent_index = strike
+			sputter_combatant.current_intent_index = scissor
+			controller.call("_apply_intent_exclusions", controller.get("enemies"))
+			var now: String = EnemyTurn.current_intent(sputter_combatant, sputter_data).intent_name
+			if queued == "Sting":
+				_expect(now != "Scissor", "A Scissor queued against the Sting is drawn again (%s)" % now)
+				_expect(_intent_text(controller, sputter) != str(sputter_data.intents[scissor].value), "...and the readout shows the new move (%s)" % _intent_text(controller, sputter))
+			else:
+				_expect_eq(now, "Scissor", "A Scissor queued against the Rebury stays")
+	await _teardown()
+	_completed += 1
 
 func _underfoot() -> EnemyData:
 	return load(UNDERFOOT_PATH) as EnemyData

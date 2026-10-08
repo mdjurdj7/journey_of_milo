@@ -51,6 +51,10 @@ const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
 @export var group: StringName = &""
 # FloorEnemy.anchor, mirrored the same way - read at contact.
 @export var anchor: bool = false
+# FloorEnemy.excluded_intent / excluded_while_packmate_intent, mirrored
+# the same way - read through the fight (BattleController).
+@export var excluded_intent: String = ""
+@export var excluded_while_packmate_intent: String = ""
 # FloorEnemy.card_reward, mirrored the same way - read as the fight
 # starts (RegionField).
 @export var card_reward: FloorEnemy.CardReward = FloorEnemy.CardReward.ROLLED
