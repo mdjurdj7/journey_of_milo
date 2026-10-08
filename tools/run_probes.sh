@@ -91,6 +91,7 @@ bundle_roll_probe 2
 critical_cards_probe 2
 wardling_probe 2
 siltjaw_probe 1
+enemy_fog_probe 25
 "
 
 # --- Areas: which probes guard which part of the game ---
@@ -172,6 +173,8 @@ path_probes() {
 		field/prop_approach.*) out="$(area_probes field) collector temper" ;;
 		# The Greyshelf's head, rear and throat.
 		field/greyshelf_*) out="$(area_probes field) greyshelf" ;;
+		# The enemies' share of the depth fog.
+		field/enemy_fog.*) out="$(area_probes field) enemy_fog" ;;
 		field/*) out=$(area_probes field) ;;
 		floors/region1_floor1.tres) out="$(area_probes floor1) enemy_export" ;;
 		floors/region1_floor2.tres) out="$(area_probes floor2) enemy_export" ;;
@@ -187,7 +190,7 @@ path_probes() {
 		assets/field/masks/region1_floor4_*|assets/field/masks/source/floor4/*) out=$(area_probes floor4) ;;
 		assets/field/masks/region1_floor5_*|assets/field/masks/source/floor5/*) out=$(area_probes floor5) ;;
 		ui/hp_bar.*) out=$(area_probes hp_bar) ;;
-		ui/toll_line.gd|ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd|ui/hp_line.gd) out=$(area_probes hud) ;;
+		ui/toll_line.gd|ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd|ui/hp_line.gd|ui/ink_glyph.gd|ui/hud_row_style.gd|ui/deck_panel.gd) out=$(area_probes hud) ;;
 		ui/deck_view.*) out="$(area_probes ui_inspect) collector" ;;
 		ui/card_compendium.*) out=$(area_probes ui_inspect) ;;
 		# A play effect: the fight's UI probes, and starter_cards, which
