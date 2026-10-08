@@ -18,8 +18,10 @@ extends SceneTree
 # turns the Sputter never has its Scissor queued while the Underfoot's
 # Sting is, and still draws it on the other turns; in the fight the
 # controller redraws a Scissor queued against a Sting and keeps one
-# against a Rebury. The rules cases drive EnemyTurn on the real .tres;
-# the field and fight cases load floor 2.
+# against a Rebury; and a move the player is shown never switches - the
+# Sputter's redraw lands before its display shows again. The rules cases
+# drive EnemyTurn on the real .tres; the field and fight cases load
+# floor 2.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/underfoot_probe.gd
 #
@@ -27,7 +29,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 12
+const CASES := 13
 const UNDERFOOT_PATH := "res://battle/rules/enemies/underfoot.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const DRAGONFLY_PATH := "res://battle/rules/enemies/dragonfly.tres"
@@ -57,6 +59,8 @@ const SAFETY_SECONDS := 300.0
 # The rule's seeded runs: this many fights of this many turns.
 const SEEDS := 40
 const TURNS := 30
+# The fight the display check plays out: this many enemy turns.
+const VISIBLE_TURNS := 6
 
 var _run_state: Node = null
 var _field: Node = null
@@ -81,6 +85,7 @@ func _initialize() -> void:
 	await _check_fight_line()
 	await _check_escape()
 	await _check_fight_scissor_rule()
+	await _check_no_visible_switch()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -406,6 +411,67 @@ func _check_fight_scissor_rule() -> void:
 				_expect(_intent_text(controller, sputter) != str(sputter_data.intents[scissor].value), "...and the readout shows the new move (%s)" % _intent_text(controller, sputter))
 			else:
 				_expect_eq(now, "Scissor", "A Scissor queued against the Rebury stays")
+	await _teardown()
+	_completed += 1
+
+# A fight of VISIBLE_TURNS enemy turns with the Sputter all but certain
+# to draw Scissor (its Strike and Block weighted to almost nothing, on a
+# copy of its data), so the redraw against the Sting comes round: every
+# frame, no shown display's move (its type and number) changes from the
+# frame before while it stays shown. The redraws did happen (the
+# Sputter's intent changed twice in one enemy turn), and the Scissor
+# still showed beside the Rebury.
+func _check_no_visible_switch() -> void:
+	var controller: Node = await _start_fight()
+	if controller != null:
+		var sputter: Node = _find(SPUTTER_PATH)
+		var underfoot: Node = _find(UNDERFOOT_PATH)
+		var biased: EnemyData = (sputter.get("enemy_data") as EnemyData).duplicate(true)
+		for intent in biased.intents:
+			if intent.intent_name != "Scissor":
+				intent.erratic_weight = 0.001
+		sputter.set("enemy_data", biased)
+		var displays: Dictionary = controller.get_parent().get("_enemy_intents")
+		var last: Dictionary = {}
+		var switches: Array[String] = []
+		var watch := func() -> void:
+			for member: Node in displays.keys():
+				var display: Control = displays[member]
+				if not is_instance_valid(display):
+					continue
+				var label: Label = display.get("_label")
+				var key: String = "%d %s" % [int(display.get("_type")), label.text if label != null else ""]
+				if display.visible and last.get(member, "") != "" and last[member] != key:
+					switches.append("%s: %s -> %s" % [(member.get("enemy_data") as EnemyData).enemy_name, last[member], key])
+				last[member] = key if display.visible else ""
+		process_frame.connect(watch)
+		var redraws: int = 0
+		var scissor_by_rebury: int = 0
+		var changes: Array[int] = [0]
+		var count := func(member: Node, _preview: Dictionary) -> void:
+			if member == sputter:
+				changes[0] += 1
+		controller.connect("enemy_intent_changed", count)
+		for turn in VISIBLE_TURNS:
+			changes[0] = 0
+			await controller.call("end_turn")
+			for i in 600:
+				if not bool(controller.get("_input_locked")):
+					break
+				await process_frame
+			await create_timer(0.5).timeout
+			if changes[0] >= 2:
+				redraws += 1
+			var sputter_now: EnemyIntent = EnemyTurn.current_intent(_combatant(controller, sputter), biased)
+			var underfoot_now: EnemyIntent = EnemyTurn.current_intent(_combatant(controller, underfoot), underfoot.get("enemy_data"))
+			_expect(not (sputter_now.intent_name == "Scissor" and underfoot_now.intent_name == "Sting"), "Turn %d: no Scissor beside the Sting" % (turn + 2))
+			if sputter_now.intent_name == "Scissor" and underfoot_now.intent_name == "Rebury":
+				scissor_by_rebury += 1
+		process_frame.disconnect(watch)
+		controller.disconnect("enemy_intent_changed", count)
+		_expect(switches.is_empty(), "No shown move ever switched (%s)" % ", ".join(switches))
+		_expect(redraws > 0, "...across %d redraw(s) in %d enemy turns" % [redraws, VISIBLE_TURNS])
+		_expect(scissor_by_rebury > 0, "...and the Scissor still shown beside the Rebury (%d turns)" % scissor_by_rebury)
 	await _teardown()
 	_completed += 1
 

@@ -123,6 +123,12 @@ var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
 # so they're freed with it and nothing of them exists on the field.
 var _enemy_intents: Dictionary = {} # FieldEnemy -> BattleIntent
 var _intents_revealed: bool = false
+# The enemy turn is under way (turn_phase_changed(false) until (true)): a
+# display hidden for its enemy's action takes the next intent but stays
+# hidden until every enemy has acted and any redraw has run
+# (BattleController._apply_intent_exclusions()) - then all show at once,
+# as the player's turn begins. So a move the player sees never switches.
+var _enemy_phase: bool = false
 var _field_hp_bar: HPBar = null
 var _field_deck_panel: DeckPanel = null
 var _battle_transition_time: float = 0.0
@@ -442,14 +448,14 @@ func _reveal_enemy_intents() -> void:
 
 # After setup, after each card resolves, at each turn start, and right
 # after an enemy has acted (its NEXT action) - see BattleController's own
-# signal doc. A display hidden for the enemy's action is revealed again
-# here, with the new intent.
+# signal doc. A display hidden for the enemy's action takes its new
+# intent here, and shows again once the enemy turn is over (_enemy_phase).
 func _on_enemy_intent_changed(enemy: FieldEnemy, preview: Dictionary) -> void:
 	var intent: BattleIntent = _enemy_intents.get(enemy)
 	if intent == null or not is_instance_valid(intent):
 		return
 	intent.show_intent(preview)
-	if _intents_revealed:
+	if _intents_revealed and not _enemy_phase:
 		intent.set_revealed(true)
 
 func _on_enemy_acting(enemy: FieldEnemy) -> void:
@@ -583,6 +589,12 @@ func _on_status_changed() -> void:
 func _on_turn_phase_changed(player_turn: bool) -> void:
 	_player_turn = player_turn
 	_update_end_turn()
+	_enemy_phase = not player_turn
+	# Every enemy has acted and redrawn: their next moves show together.
+	if player_turn and _intents_revealed:
+		for intent: BattleIntent in _enemy_intents.values():
+			if is_instance_valid(intent):
+				intent.set_revealed(true)
 
 # The hand's reading of the battle - see HandContainer.set_bonus_
 # context() and the connections in enter_battle().
