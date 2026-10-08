@@ -429,14 +429,13 @@ func _check_hud_line() -> void:
 	_new_run()
 	await _load_field(0)
 	var line: Control = _field.get_node("FieldHUD/KeepsakeLine")
-	var toll_line: Control = _field.get_node("FieldHUD/TollLine")
 	var gold_line: Control = _field.get_node("FieldHUD/GoldLine")
 	_expect(not line.visible, "KEEPSAKE is hidden with an empty slot")
 	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))
 	_expect(line.visible, "...shown once one is held")
 	_expect_eq(str(line.get("_value_text")), "Bent Nail", "...naming it")
 	_expect(line.position.x > gold_line.position.x + gold_line.size.x, "...beside GOLD")
-	_expect_eq(str(toll_line.get("_value_text")), "0", "TOLL still reads its count")
+	_expect_eq(str(gold_line.get("_value_text")), "0", "GOLD still reads its count")
 	await _teardown()
 	_completed += 1
 

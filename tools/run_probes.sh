@@ -190,7 +190,7 @@ path_probes() {
 		assets/field/masks/region1_floor4_*|assets/field/masks/source/floor4/*) out=$(area_probes floor4) ;;
 		assets/field/masks/region1_floor5_*|assets/field/masks/source/floor5/*) out=$(area_probes floor5) ;;
 		ui/hp_bar.*) out=$(area_probes hp_bar) ;;
-		ui/toll_line.gd|ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd|ui/hp_line.gd|ui/ink_glyph.gd|ui/hud_row_style.gd) out=$(area_probes hud) ;;
+		ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd|ui/hp_line.gd|ui/ink_glyph.gd|ui/hud_row_style.gd) out=$(area_probes hud) ;;
 		# The field's DECK and the battle's DECK/DISCARD lines are all
 		# DeckPanels.
 		ui/deck_panel.gd) out="$(area_probes hud) $(area_probes battle_ui)" ;;
