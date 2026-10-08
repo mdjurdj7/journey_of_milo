@@ -79,7 +79,7 @@ run_lost_probe 12
 dunecur_probe 30
 greyshelf_probe 45
 underfoot_probe 40
-scatter_probe 10
+scatter_probe 25
 card_rarity_probe 5
 come_due_probe 4
 starter_cards_probe 4
@@ -108,7 +108,7 @@ area_probes() {
 		enemies) echo "blackback siltjaw wardling dunecur greyshelf underfoot sentence no_further critical_cards kill_order armored_contact deny enemy_export" ;;
 		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost pathing scatter" ;;
 		floor1) echo "kill_order drain scatter" ;;
-		floor2) echo "kill_order hold_line bundle_roll underfoot" ;;
+		floor2) echo "kill_order hold_line bundle_roll underfoot scatter" ;;
 		floor3) echo "kill_order blackback wardling temper" ;;
 		floor4) echo "kill_order floor4 wear_path dunecur collector" ;;
 		floor5) echo "kill_order floor5 wear_path greyshelf elite_reward" ;;
@@ -188,7 +188,7 @@ path_probes() {
 		field/world_keepsake.*) out="$(area_probes field) keeper_keepsake keepsake_tile" ;;
 		field/*) out=$(area_probes field) ;;
 		# The ground scatter's sets: the floors that lay them.
-		floors/scatter/*) out="$(area_probes floor1) scatter" ;;
+		floors/scatter/*) out="$(area_probes floor1) $(area_probes floor2) scatter" ;;
 		floors/region1_floor1.tres) out="$(area_probes floor1) enemy_export" ;;
 		floors/region1_floor2.tres) out="$(area_probes floor2) enemy_export" ;;
 		floors/region1_floor3.tres) out="$(area_probes floor3) enemy_export" ;;
