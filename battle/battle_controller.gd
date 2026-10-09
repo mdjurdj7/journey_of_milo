@@ -140,6 +140,13 @@ var _devour_uses_this_turn: int = 0
 
 var _hand_container: HandContainer
 var _pending_card_view: CardView = null
+# The armed card can't be played (unaffordable, blocked, nothing to land
+# on) and is armed for Devour alone: no enemy is a target - see
+# _arm_for_devour().
+var _pending_devour_only: bool = false
+# Devour was clicked with nothing armed: the next hand card clicked is
+# eaten - see _begin_devour_pick().
+var _devour_picking: bool = false
 # The SET_ASIDE card armed while its choice is open, the other hand cards
 # marked for it, and how many may be - see _begin_choice().
 var _choosing_card_view: CardView = null
@@ -348,8 +355,17 @@ func get_choosing_card_view() -> CardView:
 func request_play(card_view: CardView) -> void:
 	if _input_locked or _pending_card_view != null or _choice_open() or card_view.card_data == null:
 		return
+	# Devour first: the card clicked is the one it eats, playable or not.
+	if _devour_picking:
+		_devour_picking = false
+		_devour_card(card_view, "pick")
+		return
 	var card: CardData = card_view.card_data
 	if not _is_playable(card):
+		# A card that can't be played arms for Devour alone while Devour
+		# is available; with Devour spent, nothing - as before.
+		if is_devour_available():
+			_arm_for_devour(card_view)
 		return
 	# A SET_ASIDE card (Bide) asks which cards first, unless there is
 	# nothing else in the hand to choose - then it just plays.
@@ -402,6 +418,18 @@ func _arm_or_play(card_view: CardView) -> void:
 		_emit_devour_changed()
 	else:
 		_resolve_play(card_view, null)
+
+# An unplayable card armed with Devour its only target: held like any
+# armed card and cancelled the same way, but its dimmed look kept (lift_
+# and_hold() leaves the fade alone), and no enemy lit or clickable
+# (_refresh_enemy_rects() gives none). No Bide choice, no Deny pick: it
+# isn't going to be played.
+func _arm_for_devour(card_view: CardView) -> void:
+	_pending_card_view = card_view
+	_pending_devour_only = true
+	card_view.lift_and_hold()
+	target_requested.emit(card_view.card_data)
+	_emit_devour_changed()
 
 func _has_effect(card: CardData, type: CardEffect.EffectType) -> bool:
 	for effect in card.effects:
@@ -541,7 +569,7 @@ func _close_choice(keep: CardView = null) -> void:
 	_emit_devour_changed()
 
 func confirm_target(enemy: FieldEnemy) -> void:
-	if _pending_card_view == null:
+	if _pending_card_view == null or _pending_devour_only:
 		return
 	if not _can_target(_pending_card_view.card_data, _combatants.get(enemy)):
 		return
@@ -559,6 +587,7 @@ func cancel_target() -> void:
 		return
 	_pending_card_view.release()
 	_pending_card_view = null
+	_pending_devour_only = false
 	if _pending_consume_view != null and is_instance_valid(_pending_consume_view):
 		_pending_consume_view.set_marked(false)
 	_pending_consume_view = null
@@ -577,6 +606,7 @@ func end_turn() -> void:
 		confirm_choice()
 		return
 	cancel_choice()
+	cancel_devour_pick()
 	if _begin_keep_choice():
 		return
 	await _finish_turn([])
@@ -839,20 +869,55 @@ func is_devour_available() -> bool:
 func is_devour_used() -> bool:
 	return _devour_uses_this_turn >= devour_uses_per_turn
 
-# Whether Devour is a target right now: available, with a card armed.
+# Whether Devour is a target right now: available, with a card armed or
+# a card to pick.
 func is_devour_lit() -> bool:
-	return is_devour_available() and _pending_card_view != null
+	return is_devour_available() and (_pending_card_view != null or _devour_picking)
+
+# Devour first: waiting for the hand card it will eat.
+func is_devour_picking() -> bool:
+	return _devour_picking
+
+# The armed card is armed for Devour alone (it can't be played).
+func is_armed_for_devour_only() -> bool:
+	return _pending_card_view != null and _pending_devour_only
+
+# What Devour would eat right now: the armed card, or null (none armed,
+# or picking).
+func get_devour_card() -> CardData:
+	return _pending_card_view.card_data if _pending_card_view != null else null
+
+# Devour first: every hand card - the dimmed ones too, looking as they
+# do - is the next click's to eat (request_play()); no enemy targeting,
+# End Turn greyed. Right-click, Esc or Devour again cancel.
+func _begin_devour_pick() -> void:
+	_devour_picking = true
+	_emit_devour_changed()
+
+func cancel_devour_pick() -> void:
+	if not _devour_picking:
+		return
+	_devour_picking = false
+	_emit_devour_changed()
 
 func _emit_devour_changed() -> void:
 	devour_changed.emit(is_devour_available(), is_devour_used())
 
 # Devour, clicked (DevourButton): the armed card is eaten - see
-# _devour_card(). Nothing armed, or no use left: nothing.
+# _devour_card(). Nothing armed: the pick opens (_begin_devour_pick()),
+# and a second click closes it. No use left: nothing.
 func devour() -> void:
-	if not is_devour_available() or _pending_card_view == null:
+	if _devour_picking:
+		cancel_devour_pick()
+		return
+	if not is_devour_available():
+		return
+	if _pending_card_view == null:
+		_begin_devour_pick()
 		return
 	var card_view: CardView = _pending_card_view
 	_pending_card_view = null
+	_pending_devour_only = false
 	if _pending_consume_view != null and is_instance_valid(_pending_consume_view):
 		_pending_consume_view.set_marked(false)
 	_pending_consume_view = null
@@ -1544,6 +1609,11 @@ func _on_card_view_clicked(card_view: CardView) -> void:
 # Esc) - everything else (movement, camera, ...) is untouched - and
 # already frozen by RegionField anyway.
 func _unhandled_input(event: InputEvent) -> void:
+	if _devour_picking:
+		if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT) or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE):
+			cancel_devour_pick()
+			get_viewport().set_input_as_handled()
+		return
 	if _choice_open():
 		if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT:
 			cancel_choice()
@@ -1648,6 +1718,9 @@ func _refresh_enemy_rects() -> void:
 		# default target lands on one - nor, for the armed card, one it
 		# may not land on (Deny on the already Denied).
 		if combatant == null or combatant.hp <= 0 or combatant.buried:
+			continue
+		# Armed for Devour alone: no enemy is a target.
+		if _pending_devour_only:
 			continue
 		if _pending_card_view != null and not _can_target(_pending_card_view.card_data, combatant):
 			continue

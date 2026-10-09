@@ -296,6 +296,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.battle_won.connect(func() -> void: _finish_battle(Outcome.WIN))
 	battle_controller.battle_lost.connect(func() -> void: _finish_battle(Outcome.LOSE))
 	hand_container.armed_changed.connect(_on_card_armed_changed)
+	# Devour's pick greys End Turn the way an armed card does.
+	battle_controller.devour_changed.connect(func(_available: bool, _used: bool) -> void: _update_end_turn())
 	battle_controller.hand_choice_started.connect(_on_hand_choice_started)
 	battle_controller.hand_choice_changed.connect(_on_hand_choice_changed)
 	battle_controller.hand_choice_ended.connect(_on_hand_choice_ended)
@@ -516,7 +518,8 @@ func _refresh_cost_preview() -> void:
 	if _cost_preview_held:
 		return
 	var cost: int = 0
-	if _cost_focus != null:
+	# A card armed for Devour alone isn't going to be paid for.
+	if _cost_focus != null and not battle_controller.is_armed_for_devour_only():
 		cost = battle_controller.player.energy_cost(_cost_focus)
 		if cost > battle_controller.player.energy:
 			cost = 0
@@ -641,7 +644,8 @@ func _on_card_armed_changed(armed: bool) -> void:
 	_update_end_turn()
 
 func _update_end_turn() -> void:
-	end_turn_button.set_enabled(_player_turn and not _card_armed)
+	var picking: bool = battle_controller != null and battle_controller.is_devour_picking()
+	end_turn_button.set_enabled(_player_turn and not _card_armed and not picking)
 
 func _on_hand_choice_started(confirm_label: String, _cap: int, verb: String) -> void:
 	_choice_card_name = confirm_label
