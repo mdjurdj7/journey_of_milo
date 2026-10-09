@@ -7,7 +7,9 @@
 #   tools/run_probes.sh --area keywords,face      an area's probes (--list-areas)
 #   tools/run_probes.sh --changed [BASE]          the probes for the files changed
 #                                                 since BASE (default HEAD)
-#   tools/run_probes.sh --probe kill_order        named probes ("_probe" optional)
+#   tools/run_probes.sh --probe kill_order,floor4 named probes ("_probe" optional);
+#                                                 repeat --probe or comma-separate,
+#                                                 or both - every name runs
 #
 # Options:
 #   -j N             parallel probes (default 4). Probes marked serial in
@@ -258,7 +260,7 @@ while [ $# -gt 0 ]; do
 		--area) MODE=area; AREAS="${2:?--area needs a list}"; shift ;;
 		--changed) MODE=changed
 			if [ $# -gt 1 ] && [ "${2#-}" = "$2" ]; then BASE="$2"; shift; fi ;;
-		--probe) MODE=probe; NAMES="${2:?--probe needs a list}"; shift ;;
+		--probe) MODE=probe; NAMES="$NAMES,${2:?--probe needs a list}"; shift ;;
 		-j) JOBS="${2:?-j needs a number}"; shift ;;
 		--worktree)
 			WORKTREE="$REPO/../journey-of-milo-probe"
@@ -272,7 +274,7 @@ while [ $# -gt 0 ]; do
 		--list) LIST=1 ;;
 		--moved) MOVED="${2:?--moved needs a commit or range}"; shift ;;
 		--list-areas) for a in $AREAS_ALL; do printf '%-11s %s\n' "$a" "$(area_probes "$a")"; done; exit 0 ;;
-		-h|--help) sed -n '2,36p' "$0"; exit 0 ;;
+		-h|--help) sed -n '2,38p' "$0"; exit 0 ;;
 		*) die "unknown option $1 (--help)" ;;
 	esac
 	shift
@@ -516,6 +518,7 @@ run_one() {
 
 COUNT=$(echo $SELECTED | wc -w)
 echo "run_probes: $COUNT probe(s) in $PROJECT, -j $JOBS, logs in $LOGS"
+echo "run_probes: running:$PARALLEL$SERIAL"
 T0=$(date +%s)
 for p in $PARALLEL; do
 	while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do wait -n; done

@@ -50,7 +50,8 @@
   <first-commit>^..HEAD` over the task's whole commit range. It maps
   the changed files to areas (--list-areas; the map lives in the
   script) and falls back to the full suite for a path no area covers.
-  `--area` / `--probe` pick by hand; `--list` shows the plan without
+  `--area` / `--probe` pick by hand (`--probe a,b` or `--probe a
+  --probe b`, both run); `--list` shows the plan without
   running.
 - If that run fails: fix it, rerun only the failing probes, then the
   --changed set once more.
