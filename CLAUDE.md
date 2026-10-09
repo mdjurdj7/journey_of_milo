@@ -47,11 +47,13 @@
   probe at a time when under 6 GB is free at the start, else two; it
   waits for memory rather than start a probe that would leave under
   2000 MB free, and ends everything it started if it's stopped.
-- During a task: run only the probes the task names, once, at the end,
-  in the foreground.
-- Before a push: run `--prepush` once, in the foreground. It runs the
-  probes mapped to the files changed in origin/main..HEAD, plus the fast
-  tier, and prints the list first.
+- During a task: run only the new probes and the probe files the task
+  edited (`--probe`), once, at the end, in the foreground - not whole
+  areas, and not `--changed`.
+- Areas and `--changed` sweeps are for `--prepush`: before a push, run
+  `--prepush` once, in the foreground. It runs the probes mapped to the
+  files changed in origin/main..HEAD, plus the fast tier, and prints the
+  list first.
 - Runs record their timings in tools/probe_times.local.txt (git-ignored),
   never in the tracked tools/probe_times.txt; `--refresh-times` copies
   the local averages over it when I choose to commit them. `--batch`
