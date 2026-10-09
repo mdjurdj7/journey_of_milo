@@ -46,7 +46,8 @@ const TEMPERED_DIR := "res://cards/tempered/"
 # Come Due, No Further, Sentence, Last Wager, The Return, Blood Arc,
 # Collateral, Ransom, Leverage, Self-Eater, Unbroken, Small Price, Bide,
 # Deny, Refuse the End, With Regards, Debt Forgiven, Last Resort, Dying
-# Light, Blood Advance, Second Swing, Garnish, Claw Back and Gnaw.
+# Light, Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and
+# Settled Account.
 # Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
@@ -81,6 +82,7 @@ const CARD_ART: Dictionary = {
 	"garnish": "res://cards/art/Wanderer/Garnish.png",
 	"claw_back": "res://cards/art/Wanderer/Claw Back.png",
 	"gnaw": "res://cards/art/Wanderer/Gnaw.png",
+	"settled_account": "res://cards/art/Wanderer/Settled Account.png",
 }
 
 var _failures: int = 0
@@ -403,7 +405,8 @@ func _check_lasting_cards_leave_rotation() -> void:
 #     as "Then lose X HP." with the effect's own number;
 #   - any HP the card costs shows in the badge;
 #   - one line per resolution step, in order - TOLL_DAMAGE and TOLL_HEAL
-#     spend and then act (2), a hit with a Toll repeat (repeat_toll_cost)
+#     spend and then act (2), TOLL_SPENT_BLOCK gains and then says its
+#     rate (2), a hit with a Toll repeat (repeat_toll_cost)
 #     lands and then repeats (2), SELF_DAMAGE_TOLL's line is its Toll (the
 #     HP is the badge's), a conditional upgrade shares its effect's line,
 #     and TWO_LINE_STATUS_CARDS' status takes 2 - and the scope last:
@@ -504,7 +507,7 @@ func _check_toll_cards() -> void:
 # The rules lines one effect takes - see _check_rules_text_pattern().
 func _lines_for(effect: CardEffect, card: CardData) -> int:
 	match effect.effect_type:
-		CardEffect.EffectType.TOLL_DAMAGE, CardEffect.EffectType.TOLL_HEAL:
+		CardEffect.EffectType.TOLL_DAMAGE, CardEffect.EffectType.TOLL_HEAL, CardEffect.EffectType.TOLL_SPENT_BLOCK:
 			return 2
 		CardEffect.EffectType.APPLY_STATUS, CardEffect.EffectType.APPLY_STATUS_TO_TARGET:
 			return 2 if TWO_LINE_STATUS_CARDS.has(card.card_name) else 1

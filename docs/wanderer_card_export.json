@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the three in the belongings pool, and Endure, which no pool offers. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back and Gnaw",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 32,
+    "total_unique_wanderer_cards": 33,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 27,
+      "count": 28,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -79,10 +79,11 @@
         "Second Swing",
         "Garnish",
         "Claw Back",
-        "Gnaw"
+        "Gnaw",
+        "Settled Account"
       ],
       "by_rarity": {
-        "COMMON": 8,
+        "COMMON": 9,
         "UNCOMMON": 11,
         "RARE": 8
       },
@@ -100,13 +101,13 @@
       "where": "floor 2's belongings (a RewardSpread prop on region1_floor2.tres)"
     },
     "wanderer_card_types": {
-      "SKILL": 15,
+      "SKILL": 16,
       "ATTACK": 11,
       "POWER": 4,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
-      "COMMON": 12,
+      "COMMON": 13,
       "UNCOMMON": 12,
       "RARE": 8
     },
@@ -138,7 +139,7 @@
       },
       {
         "name": "Toll",
-        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Debt Forgiven, Come Due, Leverage and Second Swing (optionally, to repeat its hit); spending it brings a Sentence a turn closer."
+        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Debt Forgiven, Come Due, Leverage and Second Swing (optionally, to repeat its hit); spending it brings a Sentence a turn closer. The amount spent this turn is tracked too (Settled Account's block)."
       },
       {
         "name": "Grace",
@@ -1947,6 +1948,70 @@
         }
       ],
       "art_path": "res://cards/art/Wanderer/Sentence.png",
+      "rules_font_px": 15,
+      "battle_animation": null,
+      "play_effect_scene_path": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Settled Account",
+      "file_path": "res://cards/data/settled_account.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "GUARD",
+      "energy_cost": 1,
+      "rarity": "COMMON",
+      "card_text": "Gain 3 block.\n+1 per 2 Toll spent this turn.",
+      "face_hp_line": null,
+      "card_text_template": "Gain {block} block.\n+1 per 2 Toll spent this turn.",
+      "targeting": "self",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "TOLL_SPENT_BLOCK",
+          "plain_english": "Gain 3 block, plus 1 for every 2 Toll spent earlier this turn by any card or effect, rounded down (CardEffect value 3, toll_per_block 2; Combatant.toll_spent_amount_this_turn, cleared at the start of each turn). Nothing spent: 3; 6: 6; 7: 6; 20: 13. Toll spent after it resolves doesn't count."
+        }
+      ],
+      "keywords": [
+        "Toll"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": 3,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "status_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "block",
+          "rule": "3 + floor(Toll spent this turn / 2); the face reads the live total in battle, updating as Toll is spent.",
+          "default_displayed": 3
+        },
+        {
+          "field": "block",
+          "rule": "Shows and gives 0 while Last Resort is held.",
+          "default_displayed": 3
+        },
+        {
+          "field": "cost",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "default_displayed": 1
+        }
+      ],
+      "art_path": "res://cards/art/Wanderer/Settled Account.png",
       "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
