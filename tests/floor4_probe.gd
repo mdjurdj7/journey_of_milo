@@ -20,9 +20,10 @@ extends SceneTree
 #            band: walked into from the route, he reaches the collector
 #            and no fight starts
 #
-# The optional fight stands in the east bay, off the walking line: every leg
-# of both routes passes its 2 m contact area at least 4 m clear, and it
-# never fires - the only fight a route starts is the required one.
+# The optional fight - the Adder, an elite - stands in the east bay, off
+# the walking line: every leg of both routes passes its 2 m contact area
+# at least 4 m clear, and it never fires - the only fight a route starts
+# is the required one.
 #
 #   Godot_v4.7.1.exe --headless --fixed-fps 60 --path . -s res://tests/floor4_probe.gd
 #
@@ -35,7 +36,7 @@ const REGION_PATH := "res://floors/region1.tres"
 const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
 const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
 const FLOOR_5_PATH := "res://floors/region1_floor5.tres"
-const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
+const ADDER_PATH := "res://battle/rules/enemies/adder.tres"
 const DUNECUR_PATH := "res://battle/rules/enemies/dunecur.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
@@ -126,7 +127,9 @@ func _check_data() -> void:
 		_expect_eq(int(enemies[0].get("face_prop_index")), 0, "...facing the bones")
 		_expect(not bool(enemies[1].get("required")) and enemies[1].get("position") == OPTIONAL_AT, "...the optional one in the east bay")
 		_expect(is_equal_approx(float(enemies[1].get("yaw_degrees")), OPTIONAL_YAW), "...facing east, out of the bay's mouth")
-		_expect((enemies[1].get("enemy_data") as Resource).resource_path == SPUTTER_PATH, "...the Sputter placeholder")
+		_expect((enemies[1].get("enemy_data") as Resource).resource_path == ADDER_PATH, "...the Adder")
+		_expect(bool((enemies[1].get("enemy_data") as Resource).get("is_elite")), "...an elite")
+		_expect(is_equal_approx(float((enemies[1].get("enemy_data") as Resource).get("contact_radius_m")), CONTACT_RADIUS_M), "...its contact area the 2 m the routes are measured against")
 	var props: Array = data.get("props")
 	_expect(props.size() == 2 and (props[0].get("scene") as Resource).resource_path == "res://field/bone_scatter.tscn", "...two props: the bones first (the Dunecur faces index 0)")
 	_expect(props.size() == 2 and (props[1].get("scene") as Resource).resource_path == "res://field/collector.tscn", "...then the collector")
