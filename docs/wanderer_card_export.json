@@ -1162,9 +1162,9 @@
       "face_type_label": "STRIKE",
       "energy_cost": 0,
       "rarity": "COMMON",
-      "card_text": "Deal 3 damage. Toll spent this turn: drain instead.",
+      "card_text": "Deal 3 damage. If you spent Toll this turn, drain 3 instead.",
       "face_hp_line": null,
-      "card_text_template": "Deal {damage} damage. {if}Toll spent this turn: drain instead.{/if}",
+      "card_text_template": "Deal {damage} damage. {if}If you spent Toll this turn, drain {damage} instead.{/if}",
       "targeting": "enemy",
       "removal_after_play": "discard pile",
       "effects": [
@@ -1968,9 +1968,9 @@
       "face_type_label": "GUARD",
       "energy_cost": 1,
       "rarity": "COMMON",
-      "card_text": "Gain 5 block. Toll spent this turn: 5 more.",
+      "card_text": "Gain 5 block. If you spent Toll this turn, gain 5 more.",
       "face_hp_line": null,
-      "card_text_template": "Gain {block} block. {if}Toll spent this turn: {bonus_block} more.{/if}",
+      "card_text_template": "Gain {block} block. {if}If you spent Toll this turn, gain {bonus_block} more.{/if}",
       "targeting": "self",
       "removal_after_play": "discard pile",
       "effects": [
@@ -1997,7 +1997,7 @@
       "dynamic_values": [
         {
           "field": "block",
-          "rule": "5 normally, 10 once any Toll was spent this turn; the face's 'Toll spent this turn' clause is grey until then and full ink after, live in battle.",
+          "rule": "5 normally, 10 once any Toll was spent this turn; the face's 'If you spent Toll this turn' clause is grey until then and full ink after, live in battle.",
           "default_displayed": "5 / 10"
         },
         {

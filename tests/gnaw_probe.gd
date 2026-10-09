@@ -80,7 +80,7 @@ func _check_data() -> void:
 	_expect_eq(card.card_type, CardData.CardType.ATTACK, "...is an Attack")
 	_expect_eq(card.rarity, CardData.CardRarity.COMMON, "...Common")
 	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
-	_expect_eq(card.description, "Deal {damage} damage. {if}Toll spent this turn: drain instead.{/if}", "...its text, in Cornered's voice")
+	_expect_eq(card.description, "Deal {damage} damage. {if}If you spent Toll this turn, drain {damage} instead.{/if}", "...its text")
 	_expect_eq(card.effects.size(), 1, "...one effect")
 	var effect: CardEffect = card.effects[0]
 	_expect_eq(effect.effect_type, CardEffect.EffectType.DAMAGE, "...an ordinary hit, the card's own blow")
@@ -170,7 +170,7 @@ func _check_face() -> void:
 	var dormant: String = "[color=#%s]" % Color(view.bonus_dormant_ink, view.rules_alpha).to_html(true)
 	var text: String = view.rules_text.text
 	_expect_eq(view._bonus_state, CardBonus.State.DORMANT, "No Toll spent: the face reads DORMANT")
-	_expect(text.find(dormant) >= 0 and text.find(dormant) < text.find("spent this turn") and text.find(dormant) > text.find("Deal"), "...the drain clause grey, the hit in ink (%s)" % text)
+	_expect(text.find(dormant) >= 0 and text.find(dormant) < text.find("If you spent") and text.find(dormant) > text.find("Deal"), "...the drain clause grey, the hit in ink (%s)" % text)
 	_spend_toll(player)
 	view.set_bonus_context(_ctx(player))
 	text = view.rules_text.text
@@ -178,7 +178,7 @@ func _check_face() -> void:
 	_expect(not text.contains(dormant), "...the drain clause in ink (%s)" % text)
 	var regex := RegEx.new()
 	regex.compile("\\[/?[a-z]+(=[^\\]]*)?\\]")
-	_expect_eq(regex.sub(text, "", true), "Deal 3 damage. Toll spent this turn: drain instead.", "...reading Deal 3 damage. Toll spent this turn: drain instead.")
+	_expect_eq(regex.sub(text, "", true), "Deal 3 damage. If you spent Toll this turn, drain 3 instead.", "...reading Deal 3 damage. If you spent Toll this turn, drain 3 instead.")
 	view.free()
 	_completed += 1
 

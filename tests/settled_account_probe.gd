@@ -78,7 +78,7 @@ func _check_data() -> void:
 	_expect_eq(card.rarity, CardData.CardRarity.COMMON, "...Common")
 	_expect_eq(card.target_type, CardData.TargetType.SELF, "...takes no enemy target")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.GUARD, "...reading GUARD")
-	_expect_eq(card.description, "Gain {block} block. {if}Toll spent this turn: {bonus_block} more.{/if}", "...its text, in Untouched's voice")
+	_expect_eq(card.description, "Gain {block} block. {if}If you spent Toll this turn, gain {bonus_block} more.{/if}", "...its text")
 	_expect_eq(card.effects.size(), 1, "...one effect")
 	var effect: CardEffect = card.effects[0]
 	_expect_eq([effect.effect_type, effect.value, effect.condition, effect.bonus_value], [CardEffect.EffectType.BLOCK, 5, CardEffect.Condition.TOLL_SPENT_THIS_TURN, 5], "...BLOCK 5, 5 more with Toll spent this turn")
@@ -139,7 +139,7 @@ func _check_face() -> void:
 	root.add_child(view)
 	await process_frame
 	view.set_card_data(load(CARD_PATH))
-	_expect_eq(view.rules_text.get_parsed_text(), "Gain 5 block. Toll spent this turn: 5 more.", "The face: Gain 5 block. Toll spent this turn: 5 more.")
+	_expect_eq(view.rules_text.get_parsed_text(), "Gain 5 block. If you spent Toll this turn, gain 5 more.", "The face: Gain 5 block. If you spent Toll this turn, gain 5 more.")
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), view.rules_font_sizes[0], "...at the first rules size")
 	var player: Combatant = _player()
 	view.set_bonus_context(_ctx(player))
