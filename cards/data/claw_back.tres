@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://by41c54qnwpc" path="res://cards/art/Wanderer/Claw Back.png" id="9_art"]
+
+[sub_resource type="Resource" id="CardEffect_damage"]
+script = ExtResource("2_card_effect")
+value = 5
+condition = 7
+alt_value = 12
+drains = true
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Claw Back"
+rarity = 3
+cost = 2
+card_type = 0
+target_type = 0
+description = "{else}Drain {damage}.{/else} {if}Critical: drain {alt_damage}.{/if}
+Spent."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
+removal_scope = 1
+battle_animation = &"Slash"
+impact_time = 0.55
+art = ExtResource("9_art")
+play_sound_path = "res://assets/audio/cards/Claw Back/Claw Back.mp3"
+critical_sound_pitch = 0.85
+critical_sound_volume_db = 2.0

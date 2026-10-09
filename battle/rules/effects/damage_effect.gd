@@ -26,7 +26,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	# scales outgoing damage scales the whole blow, bonus included, rather
 	# than only the part the card authored. Taken once per card: a second
 	# damage effect on the same Attack gets 0 (take_attack_bonus()).
-	_land(base + ctx.take_attack_bonus(), targets, ctx)
+	_drain(effect, _land(base + ctx.take_attack_bonus(), targets, ctx), ctx)
 
 	# A repeat (Second Swing): judged as the first hit resolves, on what
 	# it left standing - a first hit that killed everything it struck
@@ -46,10 +46,17 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	if ctx.on_repeat.is_valid():
 		ctx.on_repeat.call()
 	ctx.spend_toll(effect.repeat_toll_cost)
-	_land(base + ctx.take_repeat_attack_bonus(), standing, ctx)
+	_drain(effect, _land(base + ctx.take_repeat_attack_bonus(), standing, ctx), ctx)
 
-# One hit of `blow` on each of `targets`.
-func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> void:
+# A Draining hit (CardEffect.drains - Claw Back) heals what it took.
+func _drain(effect: CardEffect, taken: int, ctx: EffectContext) -> void:
+	if effect.drains:
+		ctx.heal(taken)
+
+# One hit of `blow` on each of `targets`. Returns the HP the hits took,
+# less what Grace reclaimed from them - what a Drain on them heals.
+func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> int:
+	var taken: int = 0
 	for enemy in targets:
 		# A mark on this enemy (Come Due) adds to the blow against it
 		# alone, once per card - so it's per target, and like the attack
@@ -61,7 +68,10 @@ func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> void:
 		ctx.report_block(enemy, result)
 		if result["damage_to_hp"] > 0:
 			ctx.report_damage(enemy, result["damage_to_hp"], "card")
-			ctx.record_hit(hp_before - enemy.hp, ctx.grace_reclaim(result["damage_to_hp"]))
+			var reclaimed: int = ctx.grace_reclaim(result["damage_to_hp"])
+			ctx.record_hit(hp_before - enemy.hp, reclaimed)
+			taken += maxi(hp_before - enemy.hp - reclaimed, 0)
+	return taken
 
 # The number one blow lands for once the statuses have had their say -
 # the attacker's outgoing modifiers, then `enemy`'s incoming ones - ahead

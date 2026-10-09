@@ -711,7 +711,12 @@ func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
 				_card_override_player.bus = &"SFX"
 				add_child(_card_override_player)
 			_card_override_player.stream = stream
-			_card_override_player.volume_db = card_override_volume_db
+			# Critical as it plays: the card's own Critical pitch and lift
+			# (CardData.critical_sound_pitch / _volume_db), 1.0 and 0 by
+			# default.
+			var critical: bool = battle_controller != null and battle_controller.player != null and battle_controller.player.is_critical()
+			_card_override_player.pitch_scale = card.critical_sound_pitch if critical else 1.0
+			_card_override_player.volume_db = card_override_volume_db + (card.critical_sound_volume_db if critical else 0.0)
 			_card_override_player.play()
 			return
 		push_warning("BattleOverlay: '%s' names a play sound that failed to load (%s); using the shared cue." % [card.card_name, card.play_sound_path])

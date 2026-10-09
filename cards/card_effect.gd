@@ -82,6 +82,15 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 # left alive, nothing more happens and nothing is spent. Never blocks the
 # play (contrast SPEND_TOLL's toll_cost). 0: no repeat.
 
+@export var drains: bool = false
+# Read by DAMAGE (damage_effect.gd) only. The hit Drains: once it has
+# landed, the player heals the HP it actually took - after block, never a
+# killing blow's overkill, less what Grace already reclaimed from it, and
+# no further than max HP (Claw Back). The hit is the card's own blow, so
+# the attack bonus and a mark are in it, and an Attack's Drain under
+# Ransom (StatusData.attacks_drain) still adds its share on top. Not the
+# DRAIN effect, which is no Attack's blow.
+
 @export var stance_data: StanceData = null
 # Read by APPLY_STANCE only. The stance a STANCE card takes - or deepens,
 # when it is the one already held.

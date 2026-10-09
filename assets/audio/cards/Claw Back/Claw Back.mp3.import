@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://dpgjsm6bg2lpi"
+path="res://.godot/imported/Claw Back.mp3-05ac0721613c81bd23df0922ae8f6b2f.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/cards/Claw Back/Claw Back.mp3"
+dest_files=["res://.godot/imported/Claw Back.mp3-05ac0721613c81bd23df0922ae8f6b2f.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
