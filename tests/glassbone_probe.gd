@@ -4,8 +4,9 @@ extends SceneTree
 # and its helpers, that it lives exactly as long as the run (across a
 # fight, across a floor, gone on a new run), that the Wardling leaves one
 # piece as its own TAKE line on the reward screen - taken, or left behind
-# on WALK ON, never granted on its own - that no other enemy but the
-# Greyshelf (floor 5's region-end fight, also one) leaves any,
+# on WALK ON, never granted on its own - that an enemy leaves any only if
+# it is an elite or a region-end enemy (a required fight on its region's
+# last floor - the Greyshelf), every enemy's data checked against that,
 # that the gold, card and keepsake rewards around it are unchanged, and
 # the field HUD's GLASSBONE line.
 #
@@ -23,8 +24,9 @@ const CASES := 8
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
-const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
 const ENEMIES_DIR := "res://battle/rules/enemies"
+# Where the regions are: every RegionData here names its floors in order.
+const FLOORS_DIR := "res://floors"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
 # Floor 3 (index 2) is the Wardling's; floor 1 (index 0) the lone Sputter's.
 const WARDLING_FLOOR := 2
@@ -82,9 +84,12 @@ func _check_counting() -> void:
 	_expect_eq(_glassbone(), 0, "A new run resets it to 0")
 	_completed += 1
 
-# Only the Wardling and the Greyshelf leave any: 1 each. Every other
-# enemy's data leaves 0.
+# An enemy may leave Glassbone only if it is an elite (EnemyData.is_
+# elite) or a region-end enemy: every enemy's data under ENEMIES_DIR
+# that leaves any is one or the other.
 func _check_enemy_data() -> void:
+	var region_end: Array[String] = _region_end_enemies()
+	_expect(not region_end.is_empty(), "Some region has a region-end enemy (%s)" % str(region_end))
 	var dir := DirAccess.open(ENEMIES_DIR)
 	var checked: int = 0
 	for file in dir.get_files():
@@ -95,10 +100,35 @@ func _check_enemy_data() -> void:
 		if data == null or data.get("glassbone_reward") == null:
 			continue
 		checked += 1
-		var expected: int = 1 if path == WARDLING_PATH or path == GREYSHELF_PATH else 0
-		_expect_eq(int(data.get("glassbone_reward")), expected, "%s leaves %d Glassbone" % [file, expected])
+		var reward: int = int(data.get("glassbone_reward"))
+		if reward > 0:
+			var elite: bool = bool(data.get("is_elite"))
+			_expect(elite or region_end.has(path), "%s leaves %d Glassbone, so it's an elite or a region-end enemy" % [file, reward])
 	_expect(checked >= 2, "More than one enemy's data was checked (%d)" % checked)
 	_completed += 1
+
+# The region-end enemies: each required enemy (FloorEnemy.required) on
+# the last floor of a region - every RegionData under FLOORS_DIR - by
+# its EnemyData's path.
+func _region_end_enemies() -> Array[String]:
+	var found: Array[String] = []
+	var dir := DirAccess.open(FLOORS_DIR)
+	for file in dir.get_files():
+		if not file.ends_with(".tres"):
+			continue
+		var region: Resource = load(FLOORS_DIR.path_join(file))
+		if region == null or region.get_script() == null or (region.get_script() as Script).get_global_name() != &"RegionData":
+			continue
+		var floors: Array = region.get("floors")
+		if floors.is_empty() or floors.back() == null:
+			continue
+		for entry: Resource in floors.back().get("enemies"):
+			if entry == null or not bool(entry.get("required")) or entry.get("enemy_data") == null:
+				continue
+			var path: String = (entry.get("enemy_data") as Resource).resource_path
+			if not found.has(path):
+				found.append(path)
+	return found
 
 # What a floor advance does (RegionField._on_floor_exited() reloads the
 # scene); the count is RunState's, so it rides through.
