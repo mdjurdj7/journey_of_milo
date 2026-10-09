@@ -5,6 +5,9 @@
 #
 #   tools/run_probes.sh --full                    every probe
 #   tools/run_probes.sh --fast                    the fast tier (tools/probe_times.txt)
+#   tools/run_probes.sh --prepush                 before a push: the probes for the files
+#                                                 changed in origin/main..HEAD, plus the
+#                                                 fast tier - listed first
 #   tools/run_probes.sh --area keywords,face      an area's probes (--list-areas)
 #   tools/run_probes.sh --changed [BASE]          the probes for the files changed
 #                                                 since BASE (default HEAD)
@@ -346,6 +349,7 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 		--full) MODE=full ;;
 		--fast) MODE=fast ;;
+		--prepush) MODE=prepush ;;
 		--area) MODE=area; AREAS="${2:?--area needs a list}"; shift ;;
 		--changed) MODE=changed
 			if [ $# -gt 1 ] && [ "${2#-}" = "$2" ]; then BASE="$2"; shift; fi ;;
@@ -369,7 +373,7 @@ while [ $# -gt 0 ]; do
 	esac
 	shift
 done
-[ -n "$MODE" ] || die "say what to run: --full, --fast, --area, --changed or --probe (--help)"
+[ -n "$MODE" ] || die "say what to run: --full, --fast, --prepush, --area, --changed or --probe (--help)"
 [ -n "$WORKTREE" ] && [ -n "$PROJECT" ] && die "--worktree and --path are exclusive"
 [ -n "$MOVED" ] && [ "$LIST" = 0 ] && die "--moved is a dry run of the HEAD-moved check: use it with --list"
 if [ -n "$BATCH" ]; then
@@ -390,6 +394,10 @@ START_HEAD=$(git -C "$REPO" rev-parse HEAD)
 CHANGED=""
 if [ "$MODE" = changed ]; then
 	CHANGED=$( { gitq -C "$REPO" diff --name-only "${BASE:-HEAD}"; gitq -C "$REPO" ls-files --others --exclude-standard; } | sort -u)
+elif [ "$MODE" = prepush ]; then
+	# What a push would carry: the commits on HEAD not yet on origin/main.
+	git -C "$REPO" rev-parse -q --verify origin/main > /dev/null || die "--prepush: no origin/main to compare with (git fetch?)"
+	CHANGED=$(gitq -C "$REPO" diff --name-only origin/main...HEAD | sort -u)
 fi
 if [ -n "$FILES" ]; then
 	CHANGED=$(printf '%s\n%s\n' "$CHANGED" "$(echo "$FILES" | tr ',' '\n')" | sed '/^$/d' | sort -u)
@@ -435,6 +443,18 @@ case "$MODE" in
 		for p in $ALL_PROBES; do
 			[ "$(probe_tier "$p")" = fast ] && SELECTED="$SELECTED $p"
 		done ;;
+	prepush)
+		map_paths "$CHANGED"
+		FAST=""
+		for p in $ALL_PROBES; do
+			[ "$(probe_tier "$p")" = fast ] && FAST="$FAST $p"
+		done
+		echo "run_probes: prepush - changed in origin/main..HEAD:"
+		if [ -n "$CHANGED" ]; then echo "$CHANGED" | sed 's/^/    /'; else echo "    (nothing)"; fi
+		[ -n "$MAPPED_FULL" ] && echo "run_probes: $MAPPED_FULL is in no area - the full suite"
+		echo "run_probes: mapped to them:" $MAPPED
+		echo "run_probes: and the fast tier:" $FAST
+		SELECTED="$MAPPED $FAST" ;;
 	changed)
 		[ -n "$CHANGED" ] || { echo "run_probes: nothing changed since ${BASE:-HEAD} - no probes to run"; exit 0; }
 		map_paths "$CHANGED"
