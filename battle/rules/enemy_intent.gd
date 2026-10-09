@@ -29,7 +29,12 @@ class_name EnemyIntent
 # carries next (status_while_queued, below). The display shows its glyph
 # alone, a short down-arrow settling onto a ground line. The Underfoot's
 # Rebury.
-enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE }
+#
+# COIL: as SETTLE - nothing happens, it stays targetable, and what it holds
+# next comes with the intent queued after it (the Bite's status_while_
+# queued: Coiled). The display shows its glyph alone, a coil. The Adder's
+# Coil.
+enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL }
 
 # The move's name (the Dunecur's Rush) - for the enemy export (tests/
 # enemy_export.gd) and the design docs; nothing in a fight shows it yet.

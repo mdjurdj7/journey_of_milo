@@ -1,0 +1,15 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "venom"
+display_name = "Venom"
+description = "At the start of your turn, lose {value} HP, then it falls by {decay}. Block doesn't stop it."
+category = 0
+default_magnitude = 1
+default_duration_turns = -1
+stack_rule = 3
+tick_decay = 1
+tick_is_self_loss = false

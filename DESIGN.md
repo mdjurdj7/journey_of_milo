@@ -521,3 +521,12 @@ folder (run_log_probe). (2026-10-04.)
   intent pass. Ink them when either gets its pass - the helpers are in
   BattleIntent, to be shared once a second consumer needs them.
   (2026-10-08, intent glyphs.)
+- **The intent's lethal warning ignores a strike back and next turn's
+  Venom.** `EnemyTurn.preview_intent()`'s `lethal` replays the queued
+  intent's hits only. It doesn't know that an Attack played into a Coiled
+  enemy draws a hit back (`EnemyTurn.counter_strike()`), nor that Venom
+  takes its stacks at the start of the next turn before anything else
+  (`BattleController._start_player_turn()`), so a fight with the Adder
+  can kill a player the display said was safe. Left as it is for the
+  Adder's first pass; fold both in if play shows it misleads.
+  (2026-10-09, the Adder.)

@@ -492,35 +492,38 @@
             },
             {
               "cluster": null,
-              "names": "Sputter",
+              "names": "Adder",
               "required": false,
-              "elite": false,
+              "elite": true,
               "gate_fight": false,
               "elite_rewards": {
-                "gold_multiplier": null,
-                "card_rates": "normal",
-                "why": null
+                "gold_multiplier": 1.5,
+                "card_rates": "elite",
+                "why": "an elite member"
               },
               "patrol": null,
               "members": [
                 {
                   "index": 1,
-                  "name": "Sputter",
-                  "enemy_file": "res://battle/rules/enemies/sputter.tres",
-                  "hp": 45,
+                  "name": "Adder",
+                  "enemy_file": "res://battle/rules/enemies/adder.tres",
+                  "hp": 60,
                   "required": false,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
-                    -24.4,
-                    -21.6
+                    11.0,
+                    -22.5
                   ],
-                  "yaw_degrees": 180.0,
+                  "yaw_degrees": -90.0,
                   "face_prop": null
                 }
               ],
-              "keepsake_drop": null,
-              "glassbone": 0
+              "keepsake_drop": {
+                "from": "Adder",
+                "table": "res://run/keepsakes/adder_keepsakes.tres"
+              },
+              "glassbone": 1
             }
           ]
         },
@@ -597,6 +600,129 @@
     }
   ],
   "enemies": [
+    {
+      "name": "Adder",
+      "file": "res://battle/rules/enemies/adder.tres",
+      "hp": 60,
+      "elite": true,
+      "mechanic_summary": "An elite dune adder, coiled on the faint side of floor 4's dune loop: Coil, Bite 6 and 3 Venom, Strike 11, in a loop. Coiled from its Coil until the Bite lands, it strikes back for 5 at every Attack played against it; Venom takes its stacks in HP at the start of each turn, past Block, then falls by 1. Teaches holding Attacks for the right turn, and pays a keepsake and Glassbone for it.",
+      "field": {
+        "model": "res://assets/models/enemies/Underfoot/Underfoot.glb",
+        "model_is_default": false,
+        "model_scale": 0.744,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": null,
+        "contact_radius_m": 2.0,
+        "cluster_gap_m": null,
+        "rest_height_m": 0.0,
+        "sink_m": 0.0,
+        "battle_hover_m": 0.0,
+        "buried_on_field": false,
+        "flies_in_battle": false,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Coil",
+            "type": "COIL"
+          },
+          {
+            "name": "Bite",
+            "type": "ATTACK",
+            "damage_per_hit": 6,
+            "hits": 1,
+            "status_while_queued": "coiled",
+            "applies_to_player": {
+              "status": "venom",
+              "amount": 3
+            }
+          },
+          {
+            "name": "Strike",
+            "type": "ATTACK",
+            "damage_per_hit": 11,
+            "hits": 1
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null,
+        "phase": null
+      },
+      "statuses": [
+        {
+          "id": "coiled",
+          "name": "Coiled",
+          "file": "res://battle/rules/statuses/coiled.tres",
+          "gained": "while its Bite is queued",
+          "description": "Each Attack you play against it, it strikes back for {value}.",
+          "text": "Each Attack you play against it, it strikes back for 5.",
+          "fields": {
+            "default_magnitude": 5,
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "strikes_back_on_attack_card": true
+          }
+        },
+        {
+          "id": "venom",
+          "name": "Venom",
+          "file": "res://battle/rules/statuses/venom.tres",
+          "gained": "put on the player by its Bite, 3 at a time",
+          "description": "At the start of your turn, lose {value} HP, then it falls by {decay}. Block doesn't stop it.",
+          "text": "At the start of your turn, lose 1 HP, then it falls by 1. Block doesn't stop it.",
+          "fields": {
+            "category": "TICK",
+            "default_magnitude": 1,
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "tick_decay": 1,
+            "tick_is_self_loss": false
+          }
+        }
+      ],
+      "rewards": {
+        "keepsake_table": {
+          "file": "res://run/keepsakes/adder_keepsakes.tres",
+          "guaranteed": true,
+          "drop_chance": 1.0,
+          "entries": [
+            {
+              "keepsake": "Blue Fastener",
+              "id": "blue_fastener",
+              "file": "res://run/keepsakes/keeper/blue_fastener.tres",
+              "weight": 1.0,
+              "unique_per_run": false
+            }
+          ]
+        },
+        "glassbone": 1,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "The adder is still.",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/enemies/Stork/hit_1.mp3",
+          "res://assets/audio/enemies/Stork/hit_2.mp3"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 4,
+          "cluster": null,
+          "required": false,
+          "gate_fight": false
+        }
+      ]
+    },
     {
       "name": "Blackback",
       "file": "res://battle/rules/enemies/blackback.tres",
@@ -1335,13 +1461,6 @@
           "cluster": "crab",
           "required": true,
           "gate_fight": true
-        },
-        {
-          "region": 1,
-          "floor": 4,
-          "cluster": null,
-          "required": false,
-          "gate_fight": false
         }
       ]
     },

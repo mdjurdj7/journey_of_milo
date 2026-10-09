@@ -6,7 +6,7 @@
 [ext_resource type="Texture2D" uid="uid://i12jck4vq70m" path="res://assets/field/masks/region1_floor4_elev.png" id="4_elev"]
 [ext_resource type="Texture2D" uid="uid://cjugv1bpuyn0f" path="res://assets/field/masks/region1_floor4_rock.png" id="5_rock"]
 [ext_resource type="Texture2D" uid="uid://bxonpojwlb3st" path="res://assets/field/masks/region1_floor4_outer.png" id="6_outer"]
-[ext_resource type="Resource" uid="uid://ihhjm1h7lafu" path="res://battle/rules/enemies/sputter.tres" id="7_sputter"]
+[ext_resource type="Resource" path="res://battle/rules/enemies/adder.tres" id="7_adder"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="8_wanderer_pool"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/dunecur.tres" id="9_dunecur"]
 [ext_resource type="Script" uid="uid://bi5wh88prg3u6" path="res://floors/floor_prop.gd" id="10_floor_prop"]
@@ -22,7 +22,7 @@ face_prop_index = 0
 
 [sub_resource type="Resource" id="FloorEnemy_optional"]
 script = ExtResource("2_floor_enemy")
-enemy_data = ExtResource("7_sputter")
+enemy_data = ExtResource("7_adder")
 position = Vector2(11, -22.5)
 yaw_degrees = -90.0
 required = false

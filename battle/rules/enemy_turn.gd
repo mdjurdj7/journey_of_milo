@@ -121,6 +121,10 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# Nothing happens here: it settles, and what it holds next
 				# changes with the queued intent (_sync_queued(), below).
 				pass
+			EnemyIntent.IntentType.COIL:
+				# The same: it coils, and the intent queued next holds what
+				# that brings (the Bite's Coiled).
+				pass
 
 	# Counted whatever the turn did - an interrupted or cancelled one too -
 	# so escalation keeps its own clock.

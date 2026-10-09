@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
+[ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/coiled.tres" id="3_coiled"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/venom.tres" id="4_venom"]
+[ext_resource type="AudioStream" uid="uid://fcgrewh73065" path="res://assets/audio/enemies/Stork/hit_1.mp3" id="5_hit_1"]
+[ext_resource type="AudioStream" uid="uid://dwb6evhuycum6" path="res://assets/audio/enemies/Stork/hit_2.mp3" id="6_hit_2"]
+[ext_resource type="Resource" path="res://run/keepsakes/adder_keepsakes.tres" id="7_keepsakes"]
+
+[sub_resource type="Resource" id="EnemyIntent_coil"]
+script = ExtResource("2_intent")
+intent_name = "Coil"
+type = 6
+
+[sub_resource type="Resource" id="EnemyIntent_bite"]
+script = ExtResource("2_intent")
+intent_name = "Bite"
+value = 6
+status_while_queued = ExtResource("3_coiled")
+applies_to_player = ExtResource("4_venom")
+applied_amount = 3
+
+[sub_resource type="Resource" id="EnemyIntent_strike"]
+script = ExtResource("2_intent")
+intent_name = "Strike"
+value = 11
+
+[resource]
+script = ExtResource("1_enemy_data")
+enemy_name = "Adder"
+mechanic_summary = "An elite dune adder, coiled on the faint side of floor 4's dune loop: Coil, Bite 6 and 3 Venom, Strike 11, in a loop. Coiled from its Coil until the Bite lands, it strikes back for 5 at every Attack played against it; Venom takes its stacks in HP at the start of each turn, past Block, then falls by 1. Teaches holding Attacks for the right turn, and pays a keepsake and Glassbone for it."
+max_hp = 60
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_coil"), SubResource("EnemyIntent_bite"), SubResource("EnemyIntent_strike")])
+; Placeholder: the Stork's body hits, until an adder sound exists.
+contact_sounds = Array[AudioStream]([ExtResource("5_hit_1"), ExtResource("6_hit_2")])
+is_elite = true
+defeat_line = "The adder is still."
+keepsake_table = ExtResource("7_keepsakes")
+glassbone_reward = 1
+; Placeholder body: the Underfoot's, without its pose, until an adder model
+; exists. Its 180 puts the nose along the body's facing (east at yaw -90).
+model_scene_path = "res://assets/models/enemies/Underfoot/Underfoot.glb"
+model_scale = 0.744
+model_yaw_offset_degrees = 180.0
