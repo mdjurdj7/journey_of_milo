@@ -8,18 +8,19 @@ extends SceneTree
 #   west   - spawn, out of the entry neck, round the dune's west side, to
 #            the required fight - the Dunecur at the mouth of the exit neck,
 #            over its bones: contact starts it
-#   east   - the same by the east side: the narrows, past the collector's
-#            bay, the north arc
+#   east   - the same by the east side: the narrows, past the optional
+#            fight's bay, the north arc
 #   dune   - straight at the far side across the dune, from the west and
 #            from the south: he never gets over it
 #   exit   - past the Dunecur (put there - his 3 m contact area all but
 #            fills the neck) toward the exit while he stands: he comes to
 #            rest on the gate line and the floor holds; won, the line lifts
 #            and he walks out, on to floor 5
-#   alcove - the optional fight's alcove off the west side: walked into
-#            from the route, it starts that fight and only it
+#   alcove - the collector's alcove off the west side, beside the worn
+#            band: walked into from the route, he reaches the collector
+#            and no fight starts
 #
-# The optional fight stands in its alcove, off the walking line: every leg
+# The optional fight stands in the east bay, off the walking line: every leg
 # of both routes passes its 2 m contact area at least 4 m clear, and it
 # never fires - the only fight a route starts is the required one.
 #
@@ -47,7 +48,13 @@ const GATE_DISTANCE_M := 7.0
 const PAST_REQUIRED := Vector2(-22.2, -36.3)
 # Every bone this far short of the gate line, at least.
 const BONES_GATE_CLEARANCE_M := 3.0
-const OPTIONAL_AT := Vector2(-24.4, -21.6)
+const OPTIONAL_AT := Vector2(11, -22.5)
+# Facing east, out of the bay's mouth, away from the worn band.
+const OPTIONAL_YAW := -90.0
+# The collector, in the west alcove beside the worn band, facing north
+# along it - its back to the approach.
+const COLLECTOR_AT := Vector3(-24.4, 0, -21.6)
+const COLLECTOR_YAW := -6.3
 const WEST: Array[Vector2] = [Vector2(0, -4.5), Vector2(-6, -9), Vector2(-11.5, -13), Vector2(-16.5, -18), Vector2(-16.8, -24), Vector2(-16.5, -28)]
 const EAST: Array[Vector2] = [Vector2(0, -4.5), Vector2(7, -9), Vector2(14, -12.5), Vector2(17.5, -19), Vector2(17.5, -26), Vector2(14.5, -31.5), Vector2(7, -34), Vector2(0, -35), Vector2(-7, -34.5), Vector2(-10, -33.5)]
 # Metres short of a waypoint that count as there.
@@ -64,9 +71,11 @@ const DUNE_SOUTH_LIMIT_Z := -11.93
 # a route stays.
 const CONTACT_RADIUS_M := 2.0
 const OPTIONAL_CLEARANCE_M := 4.0
-# From the west side into the alcove: its mouth, 3.4 m short of the fight.
+# From the west side into the alcove: its mouth, 3.4 m short of the
+# collector.
 const ALCOVE_FROM := Vector2(-16.8, -21)
 const ALCOVE_MOUTH := Vector2(-21.0, -21.4)
+const COLLECTOR_SECONDS := 8.0
 const OVERSHOOT_LIMIT_M := 0.02
 const SAFETY_SECONDS := 400.0
 
@@ -115,11 +124,14 @@ func _check_data() -> void:
 		_expect(bool(enemies[0].get("required")) and enemies[0].get("position") == REQUIRED_AT, "...the required one first, at the mouth of the exit neck")
 		_expect((enemies[0].get("enemy_data") as Resource).resource_path == DUNECUR_PATH, "...the Dunecur")
 		_expect_eq(int(enemies[0].get("face_prop_index")), 0, "...facing the bones")
-		_expect(not bool(enemies[1].get("required")) and enemies[1].get("position") == OPTIONAL_AT, "...the optional one in its alcove off the west side")
+		_expect(not bool(enemies[1].get("required")) and enemies[1].get("position") == OPTIONAL_AT, "...the optional one in the east bay")
+		_expect(is_equal_approx(float(enemies[1].get("yaw_degrees")), OPTIONAL_YAW), "...facing east, out of the bay's mouth")
 		_expect((enemies[1].get("enemy_data") as Resource).resource_path == SPUTTER_PATH, "...the Sputter placeholder")
 	var props: Array = data.get("props")
 	_expect(props.size() == 2 and (props[0].get("scene") as Resource).resource_path == "res://field/bone_scatter.tscn", "...two props: the bones first (the Dunecur faces index 0)")
 	_expect(props.size() == 2 and (props[1].get("scene") as Resource).resource_path == "res://field/collector.tscn", "...then the collector")
+	_expect(props.size() == 2 and props[1].get("position") == COLLECTOR_AT, "...in the west alcove beside the worn band")
+	_expect(props.size() == 2 and is_equal_approx(float(props[1].get("yaw_degrees")), COLLECTOR_YAW), "...facing north along it")
 	_expect(data.get("exit_direction") == EXIT_DIRECTION and is_equal_approx(float(data.get("gate_distance_beyond_enemy")), GATE_DISTANCE_M), "...the gate 7 m on along the exit neck")
 	_expect_eq((data.get("ledges") as Array).size(), 2, "...two ledge rings: the boundary and the dune")
 	_expect_eq((data.get("wear_path_override") as PackedVector2Array).size(), 8, "...an 8-point worn band")
@@ -161,26 +173,28 @@ func _check_route(label: String, waypoints: Array[Vector2]) -> void:
 	await _unload()
 	_completed += 1
 
-# The alcove is reachable: from the west side to its mouth, then on into
-# the optional fight, which starts with it alone.
+# The alcove is reachable: from the west side to its mouth, then on to
+# the collector, in reach to open it, and no fight starts on the way.
 func _check_alcove() -> void:
 	await _load()
 	await _place(ALCOVE_FROM)
 	var reached: bool = await _walk_to(ALCOVE_MOUTH)
 	_expect(reached, "The alcove's mouth is reachable from the west side (stopped at %s)" % _at())
-	var optional: Node = _optional_enemy()
-	if optional != null:
-		_wanderer.call("set_move_target_enemy", optional)
-		var started: bool = false
-		for i in int(FIGHT_SECONDS * 60.0):
+	var collectors: Array[Node] = get_nodes_in_group("collectors")
+	_expect_eq(collectors.size(), 1, "...one collector on floor 4")
+	if collectors.size() == 1:
+		var collector: Node3D = collectors[0] as Node3D
+		_wanderer.call("set_move_target", _world(Vector2(COLLECTOR_AT.x, COLLECTOR_AT.z)))
+		var in_reach: bool = false
+		for i in int(COLLECTOR_SECONDS * 60.0):
 			await physics_frame
-			if _field.get_node("BattleLayer").get_child_count() > 0:
-				started = true
+			if bool(collector.call("can_open_from", _wanderer.global_position)):
+				in_reach = true
 				break
-		_expect(started, "...and walking on into the alcove meets the optional fight")
-		if started:
-			var members: Array = _field.get_node("BattleLayer").get_child(0).get("battle_controller").get("enemies")
-			_expect(members.size() == 1 and members[0] == optional, "...and only it")
+		_expect(in_reach, "...and walking on into the alcove reaches the collector (stopped at %s)" % _at())
+		for i in 30:
+			await physics_frame
+	_expect(_field.get_node("BattleLayer").get_child_count() == 0, "...and no fight starts")
 	await _unload()
 	_completed += 1
 

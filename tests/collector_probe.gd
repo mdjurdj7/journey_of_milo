@@ -7,8 +7,9 @@ extends SceneTree
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 #
-#   placed   - floor 4's FloorData puts a Collector at (11, -22.5) in the
-#              east bay, facing west (yaw 90), grounded, with its line and
+#   placed   - floor 4's FloorData puts a Collector at (-24.4, -21.6) in the
+#              west alcove beside the worn band, facing north along it
+#              (yaw -6.3), grounded, with its line and
 #              collector_pool, wired to open its screen
 #   data     - collector_pool: the 28 Wanderer pool cards and the three
 #              neutral pool cards, 31, no starter, no Endure, no Samphire;
@@ -47,7 +48,8 @@ const RARITY_FINISH_PATH := "res://battle/card_rarity_finish.tres"
 const NEUTRAL_IN_STOCK: Array[String] = ["Left Hand", "Second Thoughts", "Untouched"]
 const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Reckoning", "Down Payment"]
 const FLOOR_4 := 3
-const SPOT := Vector3(11.0, 0.0, -22.5)
+const SPOT := Vector3(-24.4, 0.0, -21.6)
+const SPOT_YAW := -6.3
 const PRICES: Dictionary = {1: 40, 2: 55, 3: 80, 4: 120}
 const SAMPHIRE_PRICE := 8
 const REMOVAL_PRICE := 50
@@ -132,8 +134,8 @@ func _check_placed() -> void:
 		var collector := placed[0] as Node3D
 		var spawn: Vector3 = _field.call("get_spawn_position")
 		var offset := Vector2(collector.global_position.x - spawn.x, collector.global_position.z - spawn.z)
-		_expect(offset.distance_to(Vector2(SPOT.x, SPOT.z)) < 0.01, "...at (11, -22.5) from spawn (got %s)" % offset)
-		_expect(is_equal_approx(rad_to_deg(collector.rotation.y), 90.0), "...facing west, yaw 90")
+		_expect(offset.distance_to(Vector2(SPOT.x, SPOT.z)) < 0.01, "...at (-24.4, -21.6) from spawn (got %s)" % offset)
+		_expect(absf(rad_to_deg(collector.rotation.y) - SPOT_YAW) < 0.01, "...facing north along the road, yaw -6.3")
 		var ground: Node = _field.get_node("Ground")
 		var local: Vector3 = (ground as Node3D).to_local(collector.global_position)
 		_expect(absf(collector.global_position.y - float(ground.call("get_height_at", Vector2(local.x, local.z)))) < 0.01, "...grounded on the relief")
@@ -376,7 +378,7 @@ func _load_floor_4(gold: int) -> void:
 	_collector.set("ground_path", NodePath("../Ground"))
 	_collector.set("region_field_path", NodePath(".."))
 	_collector.set("stock_pool", load(COLLECTOR_POOL_PATH))
-	_collector.call("set_floor_placement", SPOT, 90.0, 0.0)
+	_collector.call("set_floor_placement", SPOT, SPOT_YAW, 0.0)
 	_field.add_child(_collector)
 	await physics_frame
 
