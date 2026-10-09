@@ -405,8 +405,7 @@ func _check_lasting_cards_leave_rotation() -> void:
 #     as "Then lose X HP." with the effect's own number;
 #   - any HP the card costs shows in the badge;
 #   - one line per resolution step, in order - TOLL_DAMAGE and TOLL_HEAL
-#     spend and then act (2), TOLL_SPENT_BLOCK gains and then says its
-#     rate (2), a hit with a Toll repeat (repeat_toll_cost)
+#     spend and then act (2), a hit with a Toll repeat (repeat_toll_cost)
 #     lands and then repeats (2), SELF_DAMAGE_TOLL's line is its Toll (the
 #     HP is the badge's), a conditional upgrade shares its effect's line,
 #     and TWO_LINE_STATUS_CARDS' status takes 2 - and the scope last:
@@ -507,7 +506,7 @@ func _check_toll_cards() -> void:
 # The rules lines one effect takes - see _check_rules_text_pattern().
 func _lines_for(effect: CardEffect, card: CardData) -> int:
 	match effect.effect_type:
-		CardEffect.EffectType.TOLL_DAMAGE, CardEffect.EffectType.TOLL_HEAL, CardEffect.EffectType.TOLL_SPENT_BLOCK:
+		CardEffect.EffectType.TOLL_DAMAGE, CardEffect.EffectType.TOLL_HEAL:
 			return 2
 		CardEffect.EffectType.APPLY_STATUS, CardEffect.EffectType.APPLY_STATUS_TO_TARGET:
 			return 2 if TWO_LINE_STATUS_CARDS.has(card.card_name) else 1

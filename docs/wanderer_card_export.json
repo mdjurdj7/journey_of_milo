@@ -139,7 +139,7 @@
       },
       {
         "name": "Toll",
-        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Debt Forgiven, Come Due, Leverage and Second Swing (optionally, to repeat its hit); spending it brings a Sentence a turn closer. The amount spent this turn is tracked too (Settled Account's block)."
+        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Debt Forgiven, Come Due, Leverage and Second Swing (optionally, to repeat its hit); spending it brings a Sentence a turn closer."
       },
       {
         "name": "Grace",
@@ -1968,15 +1968,15 @@
       "face_type_label": "GUARD",
       "energy_cost": 1,
       "rarity": "COMMON",
-      "card_text": "Gain 3 block.\n+1 per 2 Toll spent this turn.",
+      "card_text": "Gain 5 block. Toll spent this turn: 5 more.",
       "face_hp_line": null,
-      "card_text_template": "Gain {block} block.\n+1 per 2 Toll spent this turn.",
+      "card_text_template": "Gain {block} block. {if}Toll spent this turn: {bonus_block} more.{/if}",
       "targeting": "self",
       "removal_after_play": "discard pile",
       "effects": [
         {
-          "type": "TOLL_SPENT_BLOCK",
-          "plain_english": "Gain 3 block, plus 1 for every 2 Toll spent earlier this turn by any card or effect, rounded down (CardEffect value 3, toll_per_block 2; Combatant.toll_spent_amount_this_turn, cleared at the start of each turn). Nothing spent: 3; 6: 6; 7: 6; 20: 13. Toll spent after it resolves doesn't count."
+          "type": "BLOCK",
+          "plain_english": "Gain 5 block; if any Toll was spent earlier this turn, by any card or effect (Combatant.toll_spent_this_turn - Gnaw's condition, TOLL_SPENT_THIS_TURN), 5 more - 10 in all, however much was spent. Toll spent after it resolves doesn't count."
         }
       ],
       "keywords": [
@@ -1984,7 +1984,7 @@
       ],
       "self_hp_cost": 0,
       "base_damage": null,
-      "base_block": 3,
+      "base_block": 5,
       "draw": null,
       "energy_gain": null,
       "toll_gain": null,
@@ -1997,13 +1997,13 @@
       "dynamic_values": [
         {
           "field": "block",
-          "rule": "3 + floor(Toll spent this turn / 2); the face reads the live total in battle, updating as Toll is spent.",
-          "default_displayed": 3
+          "rule": "5 normally, 10 once any Toll was spent this turn; the face's 'Toll spent this turn' clause is grey until then and full ink after, live in battle.",
+          "default_displayed": "5 / 10"
         },
         {
           "field": "block",
           "rule": "Shows and gives 0 while Last Resort is held.",
-          "default_displayed": 3
+          "default_displayed": 5
         },
         {
           "field": "cost",
@@ -2022,7 +2022,13 @@
       "obtainable_from": [
         "wanderer_reward_pool"
       ],
-      "not_obtainable_in_play": false
+      "not_obtainable_in_play": false,
+      "play_sound": {
+        "path": "res://assets/audio/cards/Settled Account/Settled Account.mp3",
+        "critical_sound_pitch": 0.95,
+        "critical_sound_volume_db": 1.0,
+        "rule": "Played once Toll was spent this turn (judged at play), the sound plays at pitch 0.95 and 1 dB louder."
+      }
     },
     {
       "name": "Slash",

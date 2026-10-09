@@ -6,9 +6,10 @@
 
 [sub_resource type="Resource" id="CardEffect_block"]
 script = ExtResource("2_card_effect")
-effect_type = 25
-value = 3
-toll_per_block = 2
+effect_type = 1
+value = 5
+condition = 8
+bonus_value = 5
 
 [resource]
 script = ExtResource("1_card_data")
@@ -17,8 +18,9 @@ rarity = 1
 cost = 1
 card_type = 1
 target_type = 1
-description = "Gain {block} block.
-+1 per 2 Toll spent this turn."
+description = "Gain {block} block. {if}Toll spent this turn: {bonus_block} more.{/if}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_block")])
 art = ExtResource("9_art")
 play_sound_path = "res://assets/audio/cards/Settled Account/Settled Account.mp3"
+critical_sound_pitch = 0.95
+critical_sound_volume_db = 1.0

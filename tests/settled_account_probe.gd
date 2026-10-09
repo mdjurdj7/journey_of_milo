@@ -1,10 +1,9 @@
 extends SceneTree
 
 # Headless probe for Settled Account - 1 Energy, Common Skill, GUARD, no
-# target: gain 3 block, plus 1 for every 2 Toll spent earlier this turn,
-# rounded down (TOLL_SPENT_BLOCK, TollSpentBlockEffect.amount()), read off
-# Combatant.toll_spent_amount_this_turn - which EffectContext.spend_toll()
-# adds to beside Gnaw's flag, and the next turn clears.
+# target: gain 5 block, and 5 more if any Toll was spent earlier this turn
+# (an Untouched-shaped BLOCK: condition TOLL_SPENT_THIS_TURN - Gnaw's
+# flag, Combatant.toll_spent_this_turn - with bonus_value 5).
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/settled_account_probe.gd
 #
@@ -13,12 +12,12 @@ extends SceneTree
 # Rules cases play the real cards through EffectResolver on bare
 # Combatants, working each number out of the card's own data. The fight
 # case loads the real region scene and plays through BattleController:
-# the face at hand size, its number live mid-turn after Second Swing
-# spends, its own sound - one take at its own pitch whatever was spent -
-# and the count gone at the next turn. Untyped against anything that names
-# the RunState autoload.
+# the face at hand size, its clause going live mid-turn after Second Swing
+# spends, its own sound - at the card's pitch and lift once Toll is spent,
+# 1.0 and the usual level before - and the condition gone at the next
+# turn. Untyped against anything that names the RunState autoload.
 
-const CASES := 9
+const CASES := 7
 const MAX_HP := 70
 const CARD_PATH := "res://cards/data/settled_account.tres"
 const SECOND_SWING_PATH := "res://cards/data/second_swing.tres"
@@ -40,7 +39,7 @@ var _failures: int = 0
 var _completed: int = 0
 var _resolver := EffectResolver.new()
 var _base: int = 0
-var _rate: int = 0
+var _bonus: int = 0
 
 func _initialize() -> void:
 	create_timer(SAFETY_SECONDS).timeout.connect(func() -> void:
@@ -50,14 +49,12 @@ func _initialize() -> void:
 	_run_state = root.get_node("RunState")
 	var effect: CardEffect = (load(CARD_PATH) as CardData).effects[0]
 	_base = effect.value
-	_rate = effect.toll_per_block
+	_bonus = effect.bonus_value
 
 	_check_data()
 	_check_nothing_spent()
 	_check_after_second_swing()
 	_check_after_reckoning()
-	_check_odd_rounds_down()
-	_check_tracker()
 	_check_last_resort()
 	await _check_face()
 	await _check_fight()
@@ -81,15 +78,16 @@ func _check_data() -> void:
 	_expect_eq(card.rarity, CardData.CardRarity.COMMON, "...Common")
 	_expect_eq(card.target_type, CardData.TargetType.SELF, "...takes no enemy target")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.GUARD, "...reading GUARD")
-	_expect_eq(card.description, "Gain {block} block.\n+1 per 2 Toll spent this turn.", "...its text")
+	_expect_eq(card.description, "Gain {block} block. {if}Toll spent this turn: {bonus_block} more.{/if}", "...its text, in Untouched's voice")
 	_expect_eq(card.effects.size(), 1, "...one effect")
 	var effect: CardEffect = card.effects[0]
-	_expect_eq([effect.effect_type, effect.value, effect.toll_per_block], [CardEffect.EffectType.TOLL_SPENT_BLOCK, 3, 2], "...TOLL_SPENT_BLOCK, 3 plus 1 per 2 Toll")
+	_expect_eq([effect.effect_type, effect.value, effect.condition, effect.bonus_value], [CardEffect.EffectType.BLOCK, 5, CardEffect.Condition.TOLL_SPENT_THIS_TURN, 5], "...BLOCK 5, 5 more with Toll spent this turn")
+	_expect_eq(CardBonus.mode(effect), CardBonus.Mode.ADD, "...an ADD: the 5 always lands")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "The card has its art")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...mipmapped")
 	_expect_eq(card.play_sound_path, SOUND_PATH, "...and its play sound")
 	_expect(load(card.play_sound_path) is AudioStream, "...which loads")
-	_expect_eq([card.critical_sound_pitch, card.critical_sound_volume_db], [1.0, 0.0], "...one take at its own pitch and level")
+	_expect_eq([card.critical_sound_pitch, card.critical_sound_volume_db], [0.95, 1.0], "...fuller with Toll spent (0.95, +1 dB)")
 	_expect((load(WANDERER_POOL_PATH) as RewardPool).entries.has(card), "...in the Wanderer pool")
 	_expect((load(COLLECTOR_POOL_PATH) as RewardPool).entries.has(card), "...and the collector pool")
 	_completed += 1
@@ -106,38 +104,19 @@ func _check_after_second_swing() -> void:
 	var player: Combatant = _player()
 	player.toll = 6
 	_play_card(load(SECOND_SWING_PATH), player, Combatant.new(100))
-	_expect_eq(player.toll_spent_amount_this_turn, 6, "Second Swing's repeat spends 6")
+	_expect(player.toll == 0 and player.toll_spent_this_turn, "Second Swing's repeat spends 6: Toll spent this turn")
 	_play(player)
-	_expect_eq(player.block, _base + floori(6.0 / _rate), "...then %d block" % (_base + floori(6.0 / _rate)))
+	_expect_eq(player.block, _base + _bonus, "...then %d block" % (_base + _bonus))
 	_completed += 1
 
+# However much was spent, the bonus is the same 5.
 func _check_after_reckoning() -> void:
 	var player: Combatant = _player()
 	player.toll = 20
 	_play_card(load(RECKONING_PATH), player, Combatant.new(100))
-	_expect_eq(player.toll_spent_amount_this_turn, 20, "Reckoning spends all 20")
+	_expect(player.toll == 0 and player.toll_spent_this_turn, "Reckoning spends all 20")
 	_play(player)
-	_expect_eq(player.block, _base + floori(20.0 / _rate), "...then %d block" % (_base + floori(20.0 / _rate)))
-	_completed += 1
-
-func _check_odd_rounds_down() -> void:
-	var player: Combatant = _player()
-	_spend(player, 7)
-	_play(player)
-	_expect_eq(player.block, _base + 3, "7 spent rounds down: %d block, not %d" % [_base + 3, _base + 4])
-	_completed += 1
-
-# The amount sums every spend, beside Gnaw's flag; a spend of nothing
-# moves neither.
-func _check_tracker() -> void:
-	var player: Combatant = _player()
-	_expect(not player.toll_spent_this_turn and player.toll_spent_amount_this_turn == 0, "A fresh player: nothing spent, no flag")
-	_ctx(player).spend_toll(5)
-	_expect(not player.toll_spent_this_turn and player.toll_spent_amount_this_turn == 0, "Spending with no Toll held spends nothing")
-	_spend(player, 3)
-	_spend(player, 4)
-	_expect_eq(player.toll_spent_amount_this_turn, 7, "Two spends, 3 and 4: 7 in all")
-	_expect(player.toll_spent_this_turn, "...and Gnaw's flag is set as before")
+	_expect_eq(player.block, _base + _bonus, "...then %d block, not more" % (_base + _bonus))
 	_completed += 1
 
 # Last Resort refuses Block from any card - this one's too.
@@ -148,31 +127,33 @@ func _check_last_resort() -> void:
 	_spend(player, 6)
 	var before: int = player.block
 	_play(player)
-	_expect_eq(player.block - before, 0, "Under Last Resort: no block, whatever was spent")
+	_expect_eq(player.block - before, 0, "Under Last Resort: no block, Toll spent or not")
 	_completed += 1
 
 # --- Face and fight ---
 
-# Outside a fight it reads its base; read against a player who has spent,
-# the live number - the rules' own.
+# Outside a fight: both halves, the first rules size. Read against a
+# player: the clause grey (DORMANT) until Toll is spent, then LIVE.
 func _check_face() -> void:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(view)
 	await process_frame
 	view.set_card_data(load(CARD_PATH))
-	_expect_eq(view.rules_text.get_parsed_text(), "Gain 3 block.\n+1 per 2 Toll spent this turn.", "The face outside a fight: Gain 3 block.")
+	_expect_eq(view.rules_text.get_parsed_text(), "Gain 5 block. Toll spent this turn: 5 more.", "The face: Gain 5 block. Toll spent this turn: 5 more.")
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), view.rules_font_sizes[0], "...at the first rules size")
 	var player: Combatant = _player()
-	_spend(player, 20)
 	view.set_bonus_context(_ctx(player))
-	_expect(view.rules_text.get_parsed_text().begins_with("Gain 13 block."), "Against 20 spent: Gain 13 block. (%s)" % view.rules_text.get_parsed_text())
+	_expect_eq(view._bonus_state, CardBonus.State.DORMANT, "Nothing spent: the clause DORMANT")
+	_spend(player, 1)
+	view.set_bonus_context(_ctx(player))
+	_expect_eq(view._bonus_state, CardBonus.State.LIVE, "Toll spent: LIVE")
 	view.free()
 	_completed += 1
 
-# The real fight: the face at hand size; played with nothing spent, 3
-# block; a copy in hand reads 6 once Second Swing has spent 6, and plays
-# for 6 - its sound at its own pitch both times; at the next turn the
-# count is 0 and the face reads 3 again.
+# The real fight: the face at hand size; played with nothing spent, 5
+# block and its sound at 1.0; a copy in hand goes LIVE once Second Swing
+# has spent, and plays for 10, its sound at 0.95 and 1 dB up; at the next
+# turn the condition is gone and a fresh copy reads DORMANT.
 func _check_fight() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -189,38 +170,41 @@ func _check_fight() -> void:
 			_expect_eq(view.type_label.text, "GUARD", "...labelled GUARD")
 			_expect(view.rules_font_sizes.has(view.rules_text.get_theme_font_size("normal_font_size")), "...its text at a rules size")
 			_expect_eq(view.size, view.card_size, "...fitting the face at hand size")
+			_expect_eq(view._bonus_state, CardBonus.State.DORMANT, "...its clause DORMANT")
 		var before: int = player.block
 		await _play_real(controller, first, null)
 		_expect_eq(player.block - before, _base, "Nothing spent: %d block" % _base)
-		_expect_sound(1.0, "Nothing spent")
+		_expect_sound(false, "Nothing spent")
 		var second: CardData = await _deal(controller, CARD_PATH)
-		_expect(_face_text(controller, second).begins_with("Gain 3 block."), "A copy in hand reads 3 (%s)" % _face_text(controller, second))
 		player.toll = 6
 		await _play_real(controller, await _deal(controller, SECOND_SWING_PATH), target)
-		_expect_eq(player.toll_spent_amount_this_turn, 6, "Second Swing spends 6")
-		_expect(_face_text(controller, second).begins_with("Gain 6 block."), "...and the copy in hand now reads 6, mid-turn (%s)" % _face_text(controller, second))
+		_expect(player.toll_spent_this_turn, "Second Swing spends 6")
+		view = _view(controller, second)
+		_expect(view != null and view._bonus_state == CardBonus.State.LIVE, "...and a copy in hand goes LIVE, mid-turn")
 		before = player.block
 		await _play_real(controller, second, null)
-		_expect_eq(player.block - before, _base + floori(6.0 / _rate), "...and plays for %d" % (_base + floori(6.0 / _rate)))
-		_expect_sound(1.0, "After a spend, one take still")
+		_expect_eq(player.block - before, _base + _bonus, "...and plays for %d" % (_base + _bonus))
+		_expect_sound(true, "Toll spent")
 		await controller.call("end_turn")
 		var deadline: int = Time.get_ticks_msec() + 15000
 		while bool(controller.get("_input_locked")) and Time.get_ticks_msec() < deadline:
 			await process_frame
-		_expect_eq(player.toll_spent_amount_this_turn, 0, "At the next turn the count resets")
-		_expect(not player.toll_spent_this_turn, "...and Gnaw's flag with it")
+		_expect(not player.toll_spent_this_turn, "At the next turn the condition resets")
 		controller.get("deck").call("discard_hand")
-		var third: CardData = await _deal(controller, CARD_PATH)
-		_expect(_face_text(controller, third).begins_with("Gain 3 block."), "...a fresh copy reads 3 (%s)" % _face_text(controller, third))
+		view = _view(controller, await _deal(controller, CARD_PATH))
+		_expect(view != null and view._bonus_state == CardBonus.State.DORMANT, "...and a fresh copy reads DORMANT")
 	await _teardown()
 	_completed += 1
 
-func _expect_sound(pitch: float, label: String) -> void:
+func _expect_sound(fuller: bool, label: String) -> void:
+	var card: CardData = load(CARD_PATH)
 	var sound: AudioStreamPlayer = _overlay.get("_card_override_player")
 	_expect(sound != null and sound.stream != null and sound.stream.resource_path == SOUND_PATH, "%s: its own sound plays" % label)
 	if sound != null:
+		var pitch: float = card.critical_sound_pitch if fuller else 1.0
+		var level: float = float(_overlay.get("card_override_volume_db")) + (card.critical_sound_volume_db if fuller else 0.0)
 		_expect(is_equal_approx(sound.pitch_scale, pitch), "...at pitch %s (%s)" % [pitch, sound.pitch_scale])
-		_expect(is_equal_approx(sound.volume_db, float(_overlay.get("card_override_volume_db"))), "...at the override level")
+		_expect(is_equal_approx(sound.volume_db, level), "...at %s dB (%s)" % [level, sound.volume_db])
 
 # --- Helpers ---
 
@@ -249,10 +233,6 @@ func _play_card(card: CardData, player: Combatant, enemy: Combatant) -> void:
 	var enemies: Array[Combatant] = [enemy if enemy != null else Combatant.new(100)]
 	ctx.enemies = enemies
 	_resolver.resolve_card(card, ctx)
-
-func _face_text(controller: Node, card: CardData) -> String:
-	var view: CardView = _view(controller, card)
-	return view.rules_text.get_parsed_text() if view != null else "(not in hand)"
 
 func _start_fight() -> Node:
 	_run_state.call("new_run", load(CHARACTER_PATH))

@@ -103,7 +103,7 @@ const TOKEN_HP_COST := "{hp_cost}"
 const DAMAGE_EFFECT_TYPES: Array = [CardEffect.EffectType.DAMAGE, CardEffect.EffectType.FIRST_CARD_DAMAGE,
 	CardEffect.EffectType.DAMAGE_ALL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE]
 const BLOCK_EFFECT_TYPES: Array = [CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK,
-	CardEffect.EffectType.TOLL_BLOCK, CardEffect.EffectType.TOLL_SPENT_BLOCK]
+	CardEffect.EffectType.TOLL_BLOCK]
 # The player's Toll right now - 0 outside a battle, which is also what a
 # card in the deck view shows. Reckoning spends all of it, so its printed
 # damage IS this number.
@@ -797,10 +797,6 @@ func _effect_value(data: CardData, types: Array) -> int:
 	for effect in data.effects:
 		if effect == null or not types.has(effect.effect_type):
 			continue
-		# Settled Account's number moves with the Toll spent this turn -
-		# the rules' own reading, live in a battle hand, its base outside.
-		if effect.effect_type == CardEffect.EffectType.TOLL_SPENT_BLOCK:
-			return TollSpentBlockEffect.amount(effect, _bonus_context.player if _bonus_context != null else null)
 		return effect.value
 	return -1
 
@@ -1492,7 +1488,7 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 			if effect == null:
 				continue
 			match effect.effect_type:
-				CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK, CardEffect.EffectType.ABSORB, CardEffect.EffectType.TOLL_SPENT_BLOCK:
+				CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK, CardEffect.EffectType.ABSORB:
 					return KeylineType.GUARD
 				CardEffect.EffectType.APPLY_STATUS:
 					if _is_defensive_status(effect.status_data):

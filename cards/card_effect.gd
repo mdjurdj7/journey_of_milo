@@ -16,7 +16,6 @@ enum EffectType {
 	APPLY_STATUS, FIRST_CARD_DAMAGE, TOLL_FRACTION_DAMAGE_ALL,
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
 	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL, DRAIN, SET_ASIDE, CONSUME,
-	TOLL_SPENT_BLOCK,
 }
 
 # When the effect resolves, with what number, or - for a DAMAGE effect
@@ -114,11 +113,6 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 # The flat total Toll SELF_DAMAGE_TOLL guarantees, topping up whatever the
 # floor-clamped HP loss already accrued on its own. Unused by every other
 # type.
-
-@export var toll_per_block: int = 2
-# Read by TOLL_SPENT_BLOCK only: `value` Block, plus 1 for every this much
-# Toll spent earlier this turn, rounded down (Settled Account's 2 - see
-# TollSpentBlockEffect.amount()). 0 or less: `value` alone.
 
 @export_range(0.0, 1.0, 0.01) var toll_fraction: float = 1.0
 # Portion of current Toll TOLL_FRACTION_DAMAGE_ALL spends. Unused by every
