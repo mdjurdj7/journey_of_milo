@@ -25,7 +25,8 @@ class_name DevourButton
 #   while the pick is open the line reads pick_text. The line sits
 #   hover_gap_px above set_hover_floor_y() - the top of the bottom-left
 #   stack, where the keepsake reveal appears - left-aligned with this.
-# - Back to grey (disarmed, played, devoured): eased back, the jaw closing.
+# - Back to grey (disarmed, played, devoured): eased back, the jaw closing
+#   - on a devour, shut over jaw_bite_sec, the bite.
 #
 # Left-click calls devour(); every other button passes through
 # (MOUSE_FILTER_PASS, not accepted), so a right-click still cancels the
@@ -82,6 +83,9 @@ class_name DevourButton
 		jaw_open_px = value
 		_relayout()
 @export var jaw_open_sec: float = 0.18
+# A card devoured (BattleController.card_devoured, the bite sound's
+# start): the jaw snaps shut over this instead.
+@export var jaw_bite_sec: float = 0.08
 
 @export_group("Text")
 @export var label_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf"):
@@ -216,6 +220,8 @@ var _rule: float = 0.0
 var _open: float = 0.0
 var _rule_weight: float = 0.0
 var _hover_shown: float = 0.0
+# A bite is closing the jaw (_on_card_devoured()) - until it is shut.
+var _biting: bool = false
 # The line last shown, kept while it fades out.
 var _hover_text: String = ""
 # The hover line's floor, this control's local y (set_hover_floor_y()).
@@ -239,6 +245,7 @@ func _ready() -> void:
 func setup(controller: BattleController) -> void:
 	_controller = controller
 	_controller.devour_changed.connect(func(_available_now: bool, _used_now: bool) -> void: _refresh())
+	_controller.card_devoured.connect(_on_card_devoured)
 	_refresh()
 
 # Re-reads the theme's ink - at _ready() and on BattleOverlay's F2 flip.
@@ -287,6 +294,10 @@ func _refresh() -> void:
 	set_process(true)
 	queue_redraw()
 
+func _on_card_devoured(_card: CardData) -> void:
+	_biting = true
+	set_process(true)
+
 func _heal_text() -> String:
 	var amount: int = _controller.devour_heal_amount if _controller != null else 0
 	return heal_format % amount
@@ -308,7 +319,9 @@ func _process(delta: float) -> void:
 		_hover_text = wanted
 	_lit = _step(_lit, lit, lit_fade_sec, delta)
 	_rule = _step(_rule, lit, rule_draw_sec, delta)
-	_open = _step(_open, lit, jaw_open_sec, delta)
+	_open = _step(_open, lit, jaw_bite_sec if _biting else jaw_open_sec, delta)
+	if _open == 0.0:
+		_biting = false
 	_rule_weight = _step(_rule_weight, 1.0 if _hovered and _lit_target else 0.0, lit_fade_sec, delta)
 	_hover_shown = _step(_hover_shown, 0.0 if wanted.is_empty() else 1.0, hover_fade_sec, delta)
 	queue_redraw()

@@ -15,6 +15,12 @@ const CARD_DRAW_SFX_PATH := "res://assets/audio/ui/card_draw.wav"
 # 0.07 s and the take rings 0.4 s, so about six overlap. Each voice its
 # own player, so one card's pitch jitter never bends another's.
 const CARD_DRAW_VOICES := 6
+# Devour's bite (BattleController.card_devoured), one take a time, never
+# the same one twice running - see _on_card_devoured().
+const DEVOUR_SFX_PATHS: Array[String] = [
+	"res://assets/audio/sfx/devour/devour_01.mp3",
+	"res://assets/audio/sfx/devour/devour_02.mp3",
+]
 
 enum Outcome { WIN, LOSE, ESCAPE }
 
@@ -49,6 +55,9 @@ signal battle_finished(outcome: Outcome)
 # the next card.
 @export var card_draw_volume_db: float = -22.0
 @export_range(0.0, 0.5) var card_draw_pitch_jitter: float = 0.05
+# Devour's bite, a 2D UI sound: its takes peak at -6.6 and -6.0 dBFS, so
+# -10 here lands them about -16 at the listener. Read at each bite.
+@export var devour_volume_db: float = -10.0
 
 @export_group("Choice Prompt")
 # An open hand choice says what it wants in one tracked-caps ink line,
@@ -169,6 +178,11 @@ var _card_draw_players: Array[AudioStreamPlayer] = []
 var _card_draw_next: int = 0
 # The per-card override's player, made on first use - see _on_card_played().
 var _card_override_player: AudioStreamPlayer = null
+# Devour's player and its takes (DEVOUR_SFX_PATHS, those that load), made
+# on the first bite; the take it played last (-1: none yet).
+var _devour_player: AudioStreamPlayer = null
+var _devour_takes: Array[AudioStream] = []
+var _devour_last_take: int = -1
 var _resources: BattleResources = null
 var _deck_readout: DeckPanel = null
 var _discard_readout: DeckPanel = null
@@ -280,6 +294,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	_create_corner_readouts()
 	# Drawn cards fly in from the DECK line.
 	hand_container.set_draw_origin(_deck_readout)
+	# A devoured card slides into the jaw.
+	hand_container.set_devour_target(_devour_button)
 
 	battle_controller = BattleController.new()
 	add_child(battle_controller)
@@ -312,6 +328,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	# that read the hand re-read.
 	battle_controller.card_devoured.connect(func(_card: CardData) -> void:
 		Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+		_play_devour_take()
 		_push_bonus_context())
 	battle_controller.hand_choice_started.connect(_on_hand_choice_started)
 	battle_controller.hand_choice_changed.connect(_on_hand_choice_changed)
@@ -787,6 +804,30 @@ func _on_card_draw_started(_card: CardData) -> void:
 	player.volume_db = card_draw_volume_db
 	player.pitch_scale = 1.0 + randf_range(-card_draw_pitch_jitter, card_draw_pitch_jitter)
 	player.play()
+
+# Devour's bite sound, as the card is bitten (HandContainer.devour_card()
+# cuts the notch the same frame - the clack is at each take's start): a
+# take other than the last one, on the SFX bus.
+func _play_devour_take() -> void:
+	if _devour_player == null:
+		_devour_player = AudioStreamPlayer.new()
+		_devour_player.bus = &"SFX"
+		add_child(_devour_player)
+		for path in DEVOUR_SFX_PATHS:
+			var stream := load(path) as AudioStream
+			if stream != null:
+				_devour_takes.append(stream)
+			else:
+				push_warning("BattleOverlay: a Devour take failed to load (%s)." % path)
+	if _devour_takes.is_empty():
+		return
+	var take: int = randi_range(0, _devour_takes.size() - 1)
+	if _devour_takes.size() > 1 and take == _devour_last_take:
+		take = (take + randi_range(1, _devour_takes.size() - 1)) % _devour_takes.size()
+	_devour_last_take = take
+	_devour_player.stream = _devour_takes[take]
+	_devour_player.volume_db = devour_volume_db
+	_devour_player.play()
 
 # Placeholder-only: shows whatever amount actually landed, no distinction
 # between damage/self-damage/attack kinds yet - see this pass's own

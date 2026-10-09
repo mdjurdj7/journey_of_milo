@@ -132,14 +132,58 @@ signal draw_started(card_data: CardData)
 @export var discard_fade_stagger: float = 0.03
 @export var discard_fade_sink_px: float = 6.0
 
+@export_group("Devour Exit")
+# A devoured card's way out (devour_card()), from the bite sound's start,
+# every value read as it starts: a notch bitten out of its left edge (the
+# side facing Devour's jaw) over devour_bite_sec, held devour_hold_sec,
+# then the card shrinks to devour_end_scale of its size and slides into
+# the jaw (set_devour_target()), fading as it arrives - from
+# devour_fade_from of the way - over devour_slide_sec, eased in. The hand
+# keeps the card's gap until then and closes it after. No glow, no flash.
+@export var devour_bite_sec: float = 0.05
+@export var devour_hold_sec: float = 0.2
+@export var devour_slide_sec: float = 0.35
+@export_range(0.01, 1.0) var devour_end_scale: float = 0.15
+@export_range(0.0, 1.0) var devour_fade_from: float = 0.4
+# The notch (battle/card_bite.gdshader), against the card's own size: this
+# deep into its width, cut by a disc devour_bite_radius_ratio of the width
+# across, centred devour_bite_centre_y down the card (0.5 the middle). Its
+# edge carries devour_tooth_count tooth marks of devour_tooth_radius_px,
+# devour_tooth_step_rad apart round the disc's rim; a line of the battle
+# ink devour_ink_width_px wide runs along the cut.
+@export_range(0.0, 1.0) var devour_bite_depth_ratio: float = 0.2
+@export_range(0.05, 1.0) var devour_bite_radius_ratio: float = 0.28
+@export_range(0.0, 1.0) var devour_bite_centre_y: float = 0.44
+@export var devour_tooth_count: int = 7
+@export var devour_tooth_radius_px: float = 7.0
+@export var devour_tooth_step_rad: float = 0.3
+@export var devour_ink_width_px: float = 1.5
+@export_file("*.gdshader") var devour_bite_shader_path: String = "res://battle/card_bite.gdshader"
+# Bone-coloured flecks dropping from the bite as it is cut: this many, each
+# devour_fleck_size_px across, falling devour_fleck_fall_px over
+# devour_fleck_sec as they fade. Off by default.
+@export var devour_flecks_enabled: bool = false
+@export var devour_fleck_count: int = 4
+@export var devour_fleck_size_px: float = 2.5
+@export var devour_fleck_fall_px: float = 34.0
+@export var devour_fleck_sec: float = 0.4
+
+# The bitten card's render reaches this far past the card on every side,
+# so nothing the face draws just outside its rect is cut off.
+const DEVOUR_VIEW_MARGIN_PX := 24.0
+
 var _deck: Deck = null
+# Devour's jaw, where a devoured card slides to - null (no overlay): it
+# shrinks and fades where it is instead.
+var _devour_target: DevourButton = null
 # The hand's slots in hand order, each a Control whose only child is a
 # CardView, and the card each shows. An ARRAY, not a map keyed by
 # CardData: the deck can hold one CardData twice (a reward taken twice
 # used to be the same resource appended twice), and a map lost the
 # first slot the moment the second was drawn - an orphan stuck at its
 # last arc position, never reflowed or removed. Both structures are
-# only ever written by _sync_with_deck(), play_card() and _forget_slot().
+# only ever written by _sync_with_deck(), play_card(), devour_card() and
+# _forget_slot().
 var _slots: Array[Control] = []
 var _slot_cards: Dictionary = {} # Control (slot) -> CardData
 # Each slot's running reflow glide, so the next reflow retargets it
@@ -698,6 +742,201 @@ func play_card(card_data: CardData, _target_screen_pos: Vector2) -> void:
 	fade.tween_property(slot, "modulate:a", 0.0, play_fade_duration)
 	fade.tween_property(card_view, "scale", end_scale, play_fade_duration).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	fade.chain().tween_callback(slot.queue_free)
+
+# Devour's jaw - BattleOverlay hands it over once it exists.
+func set_devour_target(target: DevourButton) -> void:
+	_devour_target = target
+
+# A devoured card leaves the hand (BattleController._devour_card(), the
+# frame the bite sound starts): bitten, held, then into the jaw - see the
+# Devour Exit group. The Deck has already taken it out of deck.hand, so
+# no sync brings it back; its slot leaves _slots now, but the hand closes
+# the gap only once the slide has ended. Returns how long that is - the
+# controller puts the card in its pile and unlocks input then.
+func devour_card(card_data: CardData) -> float:
+	var bite: float = maxf(devour_bite_sec, 0.0)
+	var hold: float = maxf(devour_hold_sec, 0.0)
+	var slide: float = maxf(devour_slide_sec, 0.0)
+	var slot: Control = null
+	for candidate in _slots:
+		if _slot_cards.get(candidate) == card_data:
+			slot = candidate
+			break
+	if slot == null:
+		return 0.0
+	_land_now(slot)
+	_slots.erase(slot)
+	_slot_cards.erase(slot)
+	_forget_slot(slot)
+
+	var card_view: CardView = slot.get_child(0) as CardView
+	card_view.mark_played()
+	card_view.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	if _armed_slot == slot:
+		_armed_slot = null
+		armed_changed.emit(false)
+		_refresh_cost_focus()
+		for other in _slots:
+			var other_view: CardView = other.get_child(0) as CardView
+			if other_view != null:
+				other_view.set_hover_suppressed(false)
+
+	# Off the row, as a played card goes (play_card()): its own travel
+	# then never meets a reflow.
+	var slot_global_pos: Vector2 = slot.global_position
+	remove_child(slot)
+	get_parent().add_child(slot)
+	slot.global_position = slot_global_pos
+
+	if devour_flecks_enabled:
+		var bone: Color = card_view.get_theme_color("bone", "Battle") if card_view.has_theme_color("bone", "Battle") else Color.WHITE
+		var bite_point := Vector2(card_view.size.x * devour_bite_depth_ratio, card_view.size.y * devour_bite_centre_y)
+		_drop_devour_flecks(slot.get_transform() * (card_view.get_transform() * bite_point), bone, slot.z_index)
+	var ink: Color = card_view.get_theme_color("ink", "Battle") if card_view.has_theme_color("ink", "Battle") else card_view.ink_color
+	var face: Control = card_view
+	var material: ShaderMaterial = null
+	var bitten: Control = _devour_bite(slot, card_view, ink)
+	if bitten != null:
+		face = bitten
+		material = bitten.material as ShaderMaterial
+
+	var sequence := create_tween()
+	if material != null and bite > 0.0:
+		sequence.tween_method(func(progress: float) -> void: material.set_shader_parameter("progress", progress), 0.0, 1.0, bite)
+	sequence.tween_interval(hold)
+	sequence.tween_callback(_slide_into_jaw.bind(slot, face, slide))
+	sequence.tween_interval(slide)
+	sequence.tween_callback(slot.queue_free)
+	sequence.tween_callback(_reflow_hand)
+	return bite + hold + slide
+
+# Cuts the bite into `card_view`. The card face is many nodes, several
+# with their own materials and a clip of their own (the art), and a
+# parent's clip_children over that nested clip renders broken - so the
+# card moves into a SubViewport of its own at the scale it shows at, with
+# DEVOUR_VIEW_MARGIN_PX of room round it, and a control where it stood
+# draws that render through card_bite.gdshader: the face but the bite,
+# an ink line along the cut. The card is still from here (its tweens
+# paused). Returns that control - null if the shader is missing, the card
+# left as it is.
+func _devour_bite(slot: Control, card_view: CardView, ink: Color) -> Control:
+	var shader := load(devour_bite_shader_path) as Shader
+	if shader == null:
+		push_warning("HandContainer: bite shader failed to load (%s); the card is devoured unbitten." % devour_bite_shader_path)
+		return null
+	var margin := Vector2.ONE * DEVOUR_VIEW_MARGIN_PX
+	var card_scale: Vector2 = card_view.scale
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("card_size", card_view.size)
+	material.set_shader_parameter("margin", DEVOUR_VIEW_MARGIN_PX)
+	material.set_shader_parameter("depth", card_view.size.x * devour_bite_depth_ratio)
+	material.set_shader_parameter("radius", card_view.size.x * devour_bite_radius_ratio)
+	material.set_shader_parameter("centre_y", devour_bite_centre_y)
+	material.set_shader_parameter("tooth_radius", devour_tooth_radius_px)
+	material.set_shader_parameter("tooth_step", devour_tooth_step_rad)
+	material.set_shader_parameter("tooth_count", maxi(devour_tooth_count, 1))
+	material.set_shader_parameter("ink_color", ink)
+	material.set_shader_parameter("ink_width", devour_ink_width_px)
+	material.set_shader_parameter("progress", 0.0 if devour_bite_sec > 0.0 else 1.0)
+
+	# Where the card stood: its corner `margin` out, turned and scaled as
+	# it was. Its fade (a dimmed card's) goes here, not into the render.
+	var bitten := Control.new()
+	bitten.name = "BittenCard"
+	bitten.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bitten.size = card_view.size + margin * 2.0
+	bitten.position = card_view.get_transform() * -margin
+	bitten.rotation = card_view.rotation
+	bitten.scale = card_scale
+	bitten.modulate = card_view.modulate
+	bitten.material = material
+
+	var viewport := SubViewport.new()
+	viewport.transparent_bg = true
+	viewport.disable_3d = true
+	viewport.gui_disable_input = true
+	viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	viewport.size = Vector2i((bitten.size * card_scale).ceil())
+	bitten.add_child(viewport)
+	# The battle theme the hand's cards read, which a viewport doesn't pass
+	# down.
+	var stage := Control.new()
+	stage.theme = _inherited_theme()
+	viewport.add_child(stage)
+
+	card_view.process_mode = Node.PROCESS_MODE_DISABLED
+	slot.remove_child(card_view)
+	stage.add_child(card_view)
+	card_view.modulate = Color.WHITE
+	card_view.rotation = 0.0
+	# Scaled about its pivot, its corner lands `margin` (scaled) in.
+	card_view.position = card_scale * (margin + card_view.pivot_offset) - card_view.pivot_offset
+	slot.add_child(bitten)
+	bitten.draw.connect(func() -> void: bitten.draw_texture_rect(viewport.get_texture(), Rect2(Vector2.ZERO, bitten.size), false))
+	bitten.queue_redraw()
+	return bitten
+
+# The nearest theme set above this hand - the battle's.
+func _inherited_theme() -> Theme:
+	var node: Node = self
+	while node != null:
+		if node is Control and (node as Control).theme != null:
+			return (node as Control).theme
+		node = node.get_parent()
+	return null
+
+# The bitten card (`face`, in `slot`) shrinks into the jaw (or, with none,
+# where it is), fading as it arrives - eased in, over `slide`. The slot
+# turns about the card's centre from here, so its scale shrinks the card
+# about that.
+func _slide_into_jaw(slot: Control, face: Control, slide: float) -> void:
+	var centre_in_slot: Vector2 = face.get_transform() * (face.size * 0.5)
+	var centre: Vector2 = slot.get_transform() * centre_in_slot
+	slot.pivot_offset = centre_in_slot
+	slot.position = centre - centre_in_slot
+	var target: Vector2 = centre
+	if _devour_target != null and is_instance_valid(_devour_target):
+		var parent: CanvasItem = slot.get_parent() as CanvasItem
+		target = parent.get_global_transform().affine_inverse() * _devour_target.get_target_point()
+	if slide <= 0.0:
+		slot.modulate.a = 0.0
+		return
+	var tween := create_tween()
+	tween.set_parallel(true)
+	tween.tween_property(slot, "position", target - centre_in_slot, slide).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	tween.tween_property(slot, "scale", slot.scale * devour_end_scale, slide).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_CUBIC)
+	var fade_from: float = slide * clampf(devour_fade_from, 0.0, 1.0)
+	tween.tween_property(slot, "modulate:a", 0.0, slide - fade_from).set_delay(fade_from).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
+
+# devour_fleck_count bone flecks from `at` (the bite's deepest point, in
+# the slot's parent's space), dropping and fading - on the parent, so the
+# bitten card's mask never clips them.
+func _drop_devour_flecks(at: Vector2, colour: Color, z: int) -> void:
+	var flecks := Control.new()
+	flecks.name = "BiteFlecks"
+	flecks.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	flecks.position = at
+	flecks.z_index = z
+	get_parent().add_child(flecks)
+	# Each fleck's start (x, y px from the bite) and how far of the fall it
+	# takes.
+	var starts: Array[Vector3] = []
+	for i in maxi(devour_fleck_count, 0):
+		starts.append(Vector3(randf_range(-8.0, 2.0), randf_range(-12.0, 12.0), randf_range(0.6, 1.0)))
+	var elapsed: Array[float] = [0.0]
+	flecks.draw.connect(func() -> void:
+		var t: float = elapsed[0]
+		var faded: Color = colour
+		faded.a = colour.a * (1.0 - t)
+		for start in starts:
+			var drop := Vector2(start.x - 6.0 * t, start.y + devour_fleck_fall_px * start.z * t * t)
+			flecks.draw_circle(drop, devour_fleck_size_px * 0.5, faded))
+	var tween := flecks.create_tween()
+	tween.tween_method(func(t: float) -> void:
+		elapsed[0] = t
+		flecks.queue_redraw(), 0.0, 1.0, maxf(devour_fleck_sec, 0.01))
+	tween.tween_callback(flecks.queue_free)
 
 # Lays every current card out on an arc centred between hand_left_limit_x
 # and hand_right_limit_x: each card's normalized position t (-1 at the

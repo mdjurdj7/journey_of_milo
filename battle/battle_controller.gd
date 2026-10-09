@@ -998,11 +998,11 @@ func devour() -> void:
 # any way (the free card, a reduction or a replacement all wait), no
 # effect, no Toll, not counted as played, no card_played - to the Spent
 # pile for this fight (Deck.spent_unplayed: back next fight even if it is
-# CONSUMED). The way a play does it: out of deck.hand at once, the hand
-# fading it out, in the pile at the fade's end. devour_heal_amount HP
-# back, capped at max, and one of this turn's uses spent. `route` is how
-# it was chosen, for the run log: "armed" (the card first) or "pick"
-# (Devour first).
+# CONSUMED). Like a play: out of deck.hand at once, the hand taking it
+# out (bitten, then into the jaw), in the pile once that has ended.
+# devour_heal_amount HP back, at the bite, capped at max, and one of this
+# turn's uses spent. `route` is how it was chosen, for the run log:
+# "armed" (the card first) or "pick" (Devour first).
 func _devour_card(card_view: CardView, route: String) -> void:
 	var card: CardData = card_view.card_data
 	var playable: bool = _is_playable(card)
@@ -1011,7 +1011,9 @@ func _devour_card(card_view: CardView, route: String) -> void:
 	deck.begin_play(card)
 	deck.spent_unplayed.append(card)
 	card_devoured.emit(card)
-	_hand_container.play_card(card, Vector2.ZERO)
+	# Bitten and slid into the jaw (HandContainer.devour_card()) - input
+	# stays locked until it has gone.
+	var exit_sec: float = _hand_container.devour_card(card)
 
 	var hp_before: int = player.hp
 	player.hp = mini(player.hp + maxi(devour_heal_amount, 0), player.max_hp)
@@ -1025,9 +1027,8 @@ func _devour_card(card_view: CardView, route: String) -> void:
 	_emit_intent_previews()
 	_emit_devour_changed()
 
-	var fade: float = maxf(_hand_container.play_fade_duration, 0.0)
-	if fade > 0.0:
-		await get_tree().create_timer(fade).timeout
+	if exit_sec > 0.0:
+		await get_tree().create_timer(exit_sec).timeout
 	deck.settle_play(true)
 	deck.end_play()
 	_input_locked = false
