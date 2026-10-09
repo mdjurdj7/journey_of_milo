@@ -33,6 +33,8 @@
 #   --import         run Godot's --import first (--path or this tree)
 #   --logs DIR       where the logs go (default: a fresh temp folder)
 #   --list           print the plan and stop
+#   --refresh-times  copy the local measured times (tools/probe_times.local.txt,
+#                    what runs write) over tools/probe_times.txt, to commit
 #   --mapping-gaps   each probe, and the paths it loads (res:// in its
 #                    source) that its areas don't map to it
 #   --batch K/N      run group K of the selection split into N groups of
@@ -167,10 +169,24 @@ hold_line_probe fixed
 floor4_probe fixed
 floor5_probe fixed
 "
-# Measured seconds per probe (tools/probe_times.txt): what orders a run,
-# longest first, and balances --batch. Each run writes back what it
-# measured (record_times()).
+# Measured seconds per probe: what orders a run, longest first, and tiers
+# it. TIMES_FILE (tools/probe_times.txt) is the committed copy - --batch
+# splits by it as it stands at HEAD, so the N batches of a run split
+# alike. Runs write what they measure to LOCAL_TIMES_FILE (tools/
+# probe_times.local.txt, git-ignored; record_times()), never to the
+# tracked one, and read it when it's there. --refresh-times copies the
+# local averages over TIMES_FILE, to commit when chosen.
 TIMES_FILE="$REPO/tools/probe_times.txt"
+LOCAL_TIMES_FILE="$REPO/tools/probe_times.local.txt"
+if [ -f "$LOCAL_TIMES_FILE" ]; then TIMES_READ="$LOCAL_TIMES_FILE"; else TIMES_READ="$TIMES_FILE"; fi
+refresh_times() {
+	if [ ! -f "$LOCAL_TIMES_FILE" ]; then
+		echo "run_probes: no local times yet ($LOCAL_TIMES_FILE) - nothing to refresh"
+		return 0
+	fi
+	cp "$LOCAL_TIMES_FILE" "$TIMES_FILE"
+	echo "run_probes: tools/probe_times.txt now holds the local averages - commit it when you choose"
+}
 # A probe's tier (TIMES_FILE's third column): slow when it measured over
 # SLOW_SEC or loads the field or the battle scene (SLOW_SCENES - most of
 # a probe's start-up), fast otherwise. Stored once it's timed, so a time
@@ -187,11 +203,11 @@ derive_tier() {
 }
 probe_tier() {
 	local stored
-	stored=$(awk -v n="$1" '$1 == n && NF >= 3 { print $3; f = 1 } END { if (!f) print "" }' "$TIMES_FILE" 2>/dev/null)
+	stored=$(awk -v n="$1" '$1 == n && NF >= 3 { print $3; f = 1 } END { if (!f) print "" }' "$TIMES_READ" 2>/dev/null)
 	if [ -n "$stored" ]; then
 		echo "$stored"
-	elif awk -v n="$1" '$1 == n { f = 1 } END { exit !f }' "$TIMES_FILE" 2>/dev/null; then
-		derive_tier "$1" "$(awk -v n="$1" '$1 == n { print $2 }' "$TIMES_FILE")"
+	elif awk -v n="$1" '$1 == n { f = 1 } END { exit !f }' "$TIMES_READ" 2>/dev/null; then
+		derive_tier "$1" "$(awk -v n="$1" '$1 == n { print $2 }' "$TIMES_READ")"
 	else
 		echo slow
 	fi
@@ -447,6 +463,7 @@ while [ $# -gt 0 ]; do
 		--batch) BATCH="${2:?--batch needs K/N}"; shift ;;
 		--list-areas) for a in $AREAS_ALL; do printf '%-11s %s\n' "$a" "$(area_probes "$a")"; done; exit 0 ;;
 		--mapping-gaps) scan_index; mapping_gaps; exit 0 ;;
+		--refresh-times) refresh_times; exit 0 ;;
 		-h|--help) awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; exit 0 ;;
 		*) die "unknown option $1 (--help)" ;;
 	esac
@@ -569,7 +586,7 @@ report_head_moved() {
 	fi
 }
 
-table_seconds() { awk -v n="$1" '$1 == n { print $2; f = 1 } END { if (!f) print 60 }' "$TIMES_FILE" 2>/dev/null || echo 60; }
+table_seconds() { awk -v n="$1" '$1 == n { print $2; f = 1 } END { if (!f) print 60 }' "$TIMES_READ" 2>/dev/null || echo 60; }
 table_flag() { echo "$PROBE_FLAGS" | awk -v n="$1" -v f="$2" '$1 == n { for (i = 2; i <= NF; i++) if ($i == f) print "yes" }'; }
 
 # --batch K/N: the selection split into N groups of near-equal measured
@@ -753,23 +770,24 @@ T1=$(date +%s)
 
 FAILED=$(grep -c ' FAIL ' "$LOGS/_results.txt" 2>/dev/null)
 
-# What this run measured, into TIMES_FILE: each probe that passed, its
+# What this run measured, into LOCAL_TIMES_FILE (started from TIMES_FILE
+# the first time), never the tracked TIMES_FILE: each probe that passed, its
 # new time averaged with the one there (or as measured, if it's new). A
 # failed probe's time stays - a failure can end early.
 record_times() {
-	local tmp="$TIMES_FILE.$$"
-	[ -f "$TIMES_FILE" ] || return 0
+	local tmp="$LOCAL_TIMES_FILE.$$"
+	[ -f "$LOCAL_TIMES_FILE" ] || cp "$TIMES_FILE" "$LOCAL_TIMES_FILE" 2>/dev/null || return 0
 	awk 'FNR == NR { if ($2 == "PASS") { t = $3; sub(/s$/, "", t); m[$1] = t }; next }
 		/^#/ || NF < 2 { print; next }
 		($1 in m) { $2 = int(($2 + m[$1]) / 2 + 0.5); seen[$1] = 1 }
 		{ print }
-		END { for (p in m) if (!(p in seen)) print p, m[p] }' "$LOGS/_results.txt" "$TIMES_FILE" > "$tmp" \
+		END { for (p in m) if (!(p in seen)) print p, m[p] }' "$LOGS/_results.txt" "$LOCAL_TIMES_FILE" > "$tmp" \
 		&& { grep '^#' "$tmp"; grep -v '^#' "$tmp" | sort; } > "$tmp.sorted" \
-		&& awk 'NF == 2 && $1 !~ /^#/ { print $1, $2 }' "$tmp.sorted" > "$tmp.new" && mv "$tmp.sorted" "$TIMES_FILE"
+		&& awk 'NF == 2 && $1 !~ /^#/ { print $1, $2 }' "$tmp.sorted" > "$tmp.new" && mv "$tmp.sorted" "$LOCAL_TIMES_FILE"
 	# A probe timed for the first time gets its tier.
 	local p s
 	while read -r p s; do
-		[ -n "$p" ] && sed -i "s/^$p $s$/$p $s $(derive_tier "$p" "$s")/" "$TIMES_FILE"
+		[ -n "$p" ] && sed -i "s/^$p $s$/$p $s $(derive_tier "$p" "$s")/" "$LOCAL_TIMES_FILE"
 	done < "$tmp.new" 2>/dev/null
 	rm -f "$tmp" "$tmp.sorted" "$tmp.new"
 }

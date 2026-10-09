@@ -51,6 +51,10 @@
 - Before a push: run `--prepush` once, in the foreground. It runs the
   probes mapped to the files changed in origin/main..HEAD, plus the fast
   tier, and prints the list first.
+- Runs record their timings in tools/probe_times.local.txt (git-ignored),
+  never in the tracked tools/probe_times.txt; `--refresh-times` copies
+  the local averages over it when I choose to commit them. `--batch`
+  splits by the committed copy.
 - `--full` only when I ask for it, always as `--full --batch 1/4` ...
   `--batch 4/4`, each in the foreground.
 - Never run probes in the background. Never start probes while another

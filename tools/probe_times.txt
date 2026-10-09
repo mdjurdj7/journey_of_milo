@@ -1,12 +1,15 @@
 # Measured seconds per probe, and its tier - tools/run_probes.sh reads them
 # to order a run (longest first), to balance --batch, and for --fast.
-# Each run that passes a probe writes its new time back here, averaged
-# with the old one (run_probes.sh's record_times()). The tier: slow when
-# it measured over 30 s or loads the field or battle scene, fast otherwise
-# (derive_tier()) - set when a probe is first timed and kept, so a time
-# drifting across the line doesn't move it; delete it to have it set
-# again. Seeded from the full suite at -j 2 on 2026-10-09 (fe50752, four
-# batches). A probe not listed counts as 60 s, and slow, until it has run.
+# Runs never write here: they write what they measure to
+# tools/probe_times.local.txt (git-ignored), averaged with the old
+# (record_times()), and read that when it's there. --refresh-times copies
+# those averages here, to commit when chosen; --batch splits by this file
+# as committed at HEAD. The tier: slow when it measured over 30 s or loads
+# the field or battle scene, fast otherwise (derive_tier()) - set when a
+# probe is first timed and kept, so a time drifting across the line
+# doesn't move it; delete it to have it set again. Seeded from the full
+# suite at -j 2 on 2026-10-09 (fe50752, four batches). A probe not listed
+# counts as 60 s, and slow, until it has run.
 adder_probe 70 slow
 armored_contact_probe 13 slow
 belongings_choice_probe 50 slow
