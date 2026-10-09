@@ -1948,26 +1948,26 @@
       "face_type_label": "UTILITY",
       "energy_cost": 0,
       "rarity": "COMMON",
-      "card_text": "Draw 1.",
-      "face_hp_line": "−2 HP",
+      "card_text": "Draw 2.",
+      "face_hp_line": "−1 HP",
       "card_text_template": "Draw {draw}.",
       "targeting": "self",
       "removal_after_play": "discard pile",
       "effects": [
         {
           "type": "SELF_DAMAGE",
-          "plain_english": "Lose 2 HP: bypasses block and absorb, makes 1 Toll per HP lost, opens no Grace, and can kill."
+          "plain_english": "Lose 1 HP: bypasses block and absorb, makes 1 Toll per HP lost, opens no Grace, and can kill."
         },
         {
           "type": "DRAW",
-          "plain_english": "Draw 1 card."
+          "plain_english": "Draw 2 cards."
         }
       ],
       "keywords": [],
-      "self_hp_cost": 2,
+      "self_hp_cost": 1,
       "base_damage": null,
       "base_block": null,
-      "draw": 1,
+      "draw": 2,
       "energy_gain": null,
       "toll_gain": null,
       "toll_spend": null,
