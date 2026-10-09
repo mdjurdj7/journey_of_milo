@@ -59,6 +59,7 @@ keepsake_tile_probe 20
 collateral_probe 29
 blood_advance_probe 30
 garnish_probe 30
+claw_back_probe 30
 bide_probe 30
 frayed_cord_probe 30
 wear_path_probe 12
@@ -107,7 +108,7 @@ area_probes() {
 		cards) echo "starter_cards card_rarity frayed_cord" ;;
 		face) echo "starter_cards keyword come_due come_due_face critical_cards card_rarity_finish second_swing" ;;
 		keywords) echo "keyword starter_cards the_return" ;;
-		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace second_swing garnish" ;;
+		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace second_swing garnish claw_back" ;;
 		enemies) echo "blackback siltjaw wardling dunecur greyshelf underfoot sentence no_further critical_cards kill_order armored_contact deny enemy_export" ;;
 		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost pathing scatter" ;;
 		floor1) echo "kill_order drain scatter" ;;
@@ -123,7 +124,7 @@ area_probes() {
 		# The fight's own UI: every probe that plays a real fight (which
 		# builds the battle overlay and its hand), plus the rules probes
 		# whose readouts and faces it shows.
-		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf underfoot play_order second_swing heavy_hit garnish" ;;
+		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf underfoot play_order second_swing heavy_hit garnish claw_back" ;;
 		*) return 1 ;;
 	esac
 }
