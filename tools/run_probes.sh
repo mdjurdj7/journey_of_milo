@@ -66,6 +66,7 @@ bide_probe 30
 frayed_cord_probe 30
 wear_path_probe 12
 deny_probe 40
+devour_probe 80
 dying_light_probe 40
 leverage_probe 29
 glassbone_probe 27
@@ -110,7 +111,7 @@ area_probes() {
 		cards) echo "starter_cards card_rarity frayed_cord" ;;
 		face) echo "starter_cards keyword come_due come_due_face critical_cards card_rarity_finish second_swing" ;;
 		keywords) echo "keyword starter_cards the_return" ;;
-		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace second_swing garnish claw_back gnaw settled_account" ;;
+		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace second_swing garnish claw_back gnaw settled_account devour" ;;
 		enemies) echo "blackback siltjaw wardling dunecur greyshelf underfoot sentence no_further critical_cards kill_order armored_contact deny enemy_export" ;;
 		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost pathing scatter" ;;
 		floor1) echo "kill_order drain scatter" ;;
@@ -126,7 +127,7 @@ area_probes() {
 		# The fight's own UI: every probe that plays a real fight (which
 		# builds the battle overlay and its hand), plus the rules probes
 		# whose readouts and faces it shows.
-		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf underfoot play_order second_swing heavy_hit garnish claw_back gnaw settled_account" ;;
+		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf underfoot play_order second_swing heavy_hit garnish claw_back gnaw settled_account devour" ;;
 		*) return 1 ;;
 	esac
 }
@@ -224,7 +225,7 @@ path_probes() {
 		# A play effect: the fight's UI probes, and starter_cards, which
 		# checks Blood Arc's stroke.
 		battle/effects/*) out="$(area_probes battle_ui) starter_cards" ;;
-		battle/battle_overlay.*|battle/battle_feedback.*|battle/battle_intent.*|battle/battle_resources.*|battle/end_turn_button.*|battle/enemy_status.*|battle/floating_number.*|battle/hand_container.*|battle/take_feedback.*|battle/target_line.*) out=$(area_probes battle_ui) ;;
+		battle/battle_overlay.*|battle/battle_feedback.*|battle/battle_intent.*|battle/battle_resources.*|battle/end_turn_button.*|battle/enemy_status.*|battle/floating_number.*|battle/hand_container.*|battle/take_feedback.*|battle/target_line.*|battle/devour_button.*|ui/ink_pen.gd) out=$(area_probes battle_ui) ;;
 		*) echo FULL; return 0 ;;
 	esac
 	# The kill-order gate: any script under battle/ or field/.
