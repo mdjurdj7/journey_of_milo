@@ -1162,9 +1162,9 @@
       "face_type_label": "STRIKE",
       "energy_cost": 0,
       "rarity": "COMMON",
-      "card_text": "Deal 3 damage. Toll spent this turn: drain 3.",
+      "card_text": "Deal 3 damage. Toll spent this turn: drain instead.",
       "face_hp_line": null,
-      "card_text_template": "Deal {damage} damage. {if}Toll spent this turn: drain {damage}.{/if}",
+      "card_text_template": "Deal {damage} damage. {if}Toll spent this turn: drain instead.{/if}",
       "targeting": "enemy",
       "removal_after_play": "discard pile",
       "effects": [

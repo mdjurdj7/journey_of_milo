@@ -80,7 +80,7 @@ func _check_data() -> void:
 	_expect_eq(card.card_type, CardData.CardType.ATTACK, "...is an Attack")
 	_expect_eq(card.rarity, CardData.CardRarity.COMMON, "...Common")
 	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
-	_expect_eq(card.description, "Deal {damage} damage. {if}Toll spent this turn: drain {damage}.{/if}", "...its text, in Cornered's voice")
+	_expect_eq(card.description, "Deal {damage} damage. {if}Toll spent this turn: drain instead.{/if}", "...its text, in Cornered's voice")
 	_expect_eq(card.effects.size(), 1, "...one effect")
 	var effect: CardEffect = card.effects[0]
 	_expect_eq(effect.effect_type, CardEffect.EffectType.DAMAGE, "...an ordinary hit, the card's own blow")
@@ -178,7 +178,7 @@ func _check_face() -> void:
 	_expect(not text.contains(dormant), "...the drain clause in ink (%s)" % text)
 	var regex := RegEx.new()
 	regex.compile("\\[/?[a-z]+(=[^\\]]*)?\\]")
-	_expect_eq(regex.sub(text, "", true), "Deal 3 damage. Toll spent this turn: drain 3.", "...reading Deal 3 damage. Toll spent this turn: drain 3.")
+	_expect_eq(regex.sub(text, "", true), "Deal 3 damage. Toll spent this turn: drain instead.", "...reading Deal 3 damage. Toll spent this turn: drain instead.")
 	view.free()
 	_completed += 1
 
