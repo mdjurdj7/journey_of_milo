@@ -8,8 +8,12 @@ extends SceneTree
 # (its HP paid once); Keen's one-shot +3 and Come Due's mark go to the
 # first hit only. Played into the Greyshelf's Gape, one Goaded stack, not
 # two. Its art loads mipmapped, its face reads its live number and its
-# text fits at the first rules size. Rules cases on the real .tres; the
-# Gape case loads floor 5 and plays the card through BattleController.
+# text fits at the first rules size. Played for real, the repeat is a
+# blow of its own: two damage events second_swing_delay apart, the HP bar
+# dropping twice, two numbers - the second at repeat_number_offset - the
+# Toll readout dropping between them, and input locked until the second
+# lands. Rules cases on the real .tres; the Gape and two-blow cases load
+# floor 5 and play the card through BattleController.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/second_swing_probe.gd
 #
@@ -17,7 +21,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 10
+const CASES := 11
 const CARD_PATH := "res://cards/data/second_swing.tres"
 const ART_PATH := "res://cards/art/Wanderer/Second Swing.png"
 const SELF_EATER_PATH := "res://cards/data/self_eater.tres"
@@ -40,6 +44,7 @@ const SELF_EATER_PRICE := 2
 const KEEN_BONUS := 3
 const MARK_BONUS := 4
 const FIRST_RULES_SIZE := 15
+const NUMBER_SLACK_PX := 1.5
 
 var _run_state: Node = null
 var _field: Node = null
@@ -59,6 +64,7 @@ func _initialize() -> void:
 	await _check_face()
 	await _check_art()
 	await _check_gape_goaded_once()
+	await _check_two_blows()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -251,6 +257,71 @@ func _check_gape_goaded_once() -> void:
 	await _teardown()
 	_completed += 1
 
+# Within NUMBER_SLACK_PX of `expected` - a number's rise may have stepped
+# once by the time it's read.
+func _near(actual: Vector2, expected: Vector2) -> bool:
+	return absf(actual.x - expected.x) <= NUMBER_SLACK_PX and absf(actual.y - expected.y) <= NUMBER_SLACK_PX
+
+# Second Swing on 12 Toll at the Greyshelf, played for real: the repeat
+# lands second_swing_delay after the first hit as its own blow - its own
+# damage event, HP drop and number (offset), the Toll readout dropping
+# by 6 at its swing, before it lands, and input still locked until it has.
+func _check_two_blows() -> void:
+	var controller: Node = await _start_fight()
+	if controller != null:
+		var greyshelf: Node = (controller.get("enemies") as Array)[0]
+		var combatant: Combatant = (controller.get("_combatants") as Dictionary).get(greyshelf)
+		var overlay: Node = _field.get_node("BattleLayer").get_child(0)
+		var player: Combatant = controller.get("player")
+		player.toll = 12
+		var hp_before: int = combatant.hp
+		var hits: Array = []
+		var hp_steps: Array[int] = []
+		var tolls: Array = []
+		var numbers: Array[Vector2] = []
+		var spawn_bases: Dictionary = {}
+		controller.connect("damage_dealt", func(_source: Variant, target: Variant, amount: int, _kind: String) -> void:
+			if target == greyshelf:
+				hits.append([Time.get_ticks_msec(), amount, bool(controller.get("_input_locked"))]))
+		controller.connect("enemy_hp_changed", func(enemy: Node, current: int, _max_hp: int) -> void:
+			if enemy == greyshelf:
+				hp_steps.append(current))
+		controller.connect("toll_changed", func(new_toll: int) -> void:
+			tolls.append([Time.get_ticks_msec(), new_toll]))
+		# Where this enemy's number would go as a number is spawned, against
+		# where it was put - read at that frame's end, placed, its rise not
+		# yet begun.
+		overlay.connect("child_entered_tree", func(node: Node) -> void:
+			if node is FloatingNumber:
+				spawn_bases[node] = overlay.call("_screen_pos_for_damage_target", greyshelf) as Vector2)
+		overlay.connect("child_entered_tree", func(node: Node) -> void:
+			if node is FloatingNumber and spawn_bases.has(node):
+				numbers.append((node as FloatingNumber).position - (spawn_bases[node] as Vector2)), CONNECT_DEFERRED)
+		await _play_first(controller, greyshelf)
+		_expect_eq(hits.size(), 2, "Two damage events, one per hit")
+		if hits.size() == 2:
+			_expect_eq([hits[0][1], hits[1][1]], [HIT, HIT], "...of 6 each")
+			var gap_ms: int = int(hits[1][0]) - int(hits[0][0])
+			var delay_ms: int = roundi(float(controller.get("second_swing_delay")) * 1000.0)
+			_expect(gap_ms >= delay_ms - 20, "...the second %d ms after the first (second_swing_delay %d ms)" % [gap_ms, delay_ms])
+			_expect(bool(hits[1][2]), "...input still locked as the second lands")
+			var drop_at: int = -1
+			for entry: Array in tolls:
+				if int(entry[1]) == 6:
+					drop_at = int(entry[0])
+					break
+			_expect(drop_at >= int(hits[0][0]) and drop_at <= int(hits[1][0]), "The Toll readout drops to 6 between the hits (%d, hits at %d and %d)" % [drop_at, hits[0][0], hits[1][0]])
+		_expect_eq(hp_steps, [hp_before - HIT, hp_before - 2 * HIT] as Array[int], "The HP bar drops twice")
+		_expect_eq(numbers.size(), 2, "Two damage numbers")
+		if numbers.size() == 2:
+			var offset: Vector2 = overlay.get("repeat_number_offset")
+			_expect(_near(numbers[0], Vector2.ZERO), "...the first where a hit's goes (%s)" % str(numbers[0]))
+			_expect(_near(numbers[1], offset), "...the second offset by %s (%s)" % [str(offset), str(numbers[1])])
+		_expect_eq(player.toll, 6, "...6 Toll spent, as before")
+		_expect(not bool(controller.get("_input_locked")), "Input unlocks once it has landed")
+	await _teardown()
+	_completed += 1
+
 # --- Helpers ---
 
 func _card() -> CardData:
@@ -335,10 +406,11 @@ func _play_first(controller: Node, greyshelf: Node) -> void:
 	controller.call("request_play", views[0])
 	if bool(controller.call("is_awaiting_target")):
 		controller.call("confirm_target", greyshelf)
-	for i in 120:
+	# Until the play has resolved - a repeat's second hit included - by the
+	# clock, not frames, which run unthrottled headless.
+	var deadline: int = Time.get_ticks_msec() + 5000
+	while bool(controller.get("_input_locked")) and Time.get_ticks_msec() < deadline:
 		await process_frame
-		if not bool(controller.get("_input_locked")):
-			break
 	await create_timer(0.6).timeout
 
 func _teardown() -> void:

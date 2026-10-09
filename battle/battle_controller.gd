@@ -16,6 +16,14 @@ signal card_impact(card: CardData)
 # the swing's onset. Clamped to the impact delay itself: a card whose
 # delay is shorter than the lead swings at its play instant.
 signal card_swing(card: CardData)
+# A card's hit lands again (CardEffect.repeat_toll_cost - Second Swing),
+# as a blow of its own: card_repeat_swing fires second_swing_lead before
+# its impact - the Wanderer's follow-through and whoosh; the Toll it
+# spends leaves the readout (toll_changed) in the same frame - and
+# card_repeat_impact at it, the repeat's damage_dealt and HP changes
+# following at once in that frame. Both after the card's own card_impact.
+signal card_repeat_swing(card: CardData, target: FieldEnemy)
+signal card_repeat_impact(card: CardData)
 signal hand_changed()
 signal target_requested(card: CardData)
 signal target_cancelled()
@@ -97,6 +105,12 @@ signal battle_lost()
 @export var denied_beat_sec: float = 0.5
 # See card_swing.
 @export var swing_lead_seconds: float = 0.04
+# A repeated hit (Second Swing's) lands this long after the card's first
+# impact, the card's resolution and the input lock waiting on it...
+@export var second_swing_delay: float = 0.22
+# ...its follow-up swing starting this long before it (card_repeat_
+# swing), held to the delay.
+@export var second_swing_lead: float = 0.12
 @export var enemy_head_height: float = 1.8
 # Where a SELF/NONE card's play tween aims, relative to the viewport's own
 # center - there's no "target" to unproject for those, just somewhere up
@@ -146,6 +160,10 @@ var _wanderer: Wanderer = null
 # end_turn() both refuse to start anything new while this is true, so a
 # second card/turn can never be armed mid-swing.
 var _input_locked: bool = false
+# Set by the resolving card's EffectContext.on_repeat: its reports from
+# then on are the repeat's, held here until its own impact (_land_repeat()).
+var _repeat_pending: bool = false
+var _repeat_reports: Array[Callable] = []
 
 func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wanderer: Wanderer) -> void:
 	_hand_container = hand_container
@@ -659,11 +677,18 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	ctx.replaced_cost_hp = replaced_hp
 	if replacement != null and replacement.data != null:
 		ctx.replaced_cost_source = "status:" + replacement.data.id
-	ctx.on_grace_reclaimed = _on_grace_reclaimed
-	ctx.on_heal = _on_card_heal
+	# A repeat's reports wait for its own impact (_land_repeat()); the
+	# rules have already decided them.
+	ctx.on_grace_reclaimed = func(amount: int) -> void:
+		_report_or_hold(_on_grace_reclaimed.bind(amount))
+	ctx.on_heal = func(amount: int) -> void:
+		_report_or_hold(_on_card_heal.bind(amount))
 	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
-		_report_damage("player", target_combatant, amount, kind)
-	ctx.on_block = _report_block
+		_report_or_hold(_report_damage.bind("player", target_combatant, amount, kind))
+	ctx.on_block = func(target_combatant: Combatant, blocked: int, damage_to_hp: int) -> void:
+		_report_or_hold(_report_block.bind(target_combatant, blocked, damage_to_hp))
+	ctx.on_repeat = func() -> void:
+		_repeat_pending = true
 	# Bide's chosen cards: their own views leave the hand just before the
 	# Deck sets their cards aside, so the marked copy is the one that goes.
 	for view in set_aside_views:
@@ -678,6 +703,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 
 	var hp_before_effects: int = player.hp
 	_effect_resolver.resolve_card(card, ctx)
+	if _repeat_pending:
+		await _land_repeat(card, target_enemy)
 	deck.end_play()
 	# A CONSUMED card leaves the run's deck when this fight ends: its play
 	# is a choice the run log keeps on its own line, whatever the card.
@@ -705,6 +732,34 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 
 	_input_locked = false
 	_check_battle_end()
+
+# A report from the resolving card: now, or - once its hit is repeating
+# (EffectContext.on_repeat) - held for the repeat's impact.
+func _report_or_hold(report: Callable) -> void:
+	if _repeat_pending:
+		_repeat_reports.append(report)
+	else:
+		report.call()
+
+# The repeat as a blow of its own: its swing second_swing_lead before its
+# impact, which lands second_swing_delay after the card's first - the
+# Toll it spent read out at the swing, its held reports at the impact.
+# Rules-wise it's long done; only what is shown waits.
+func _land_repeat(card: CardData, target_enemy: FieldEnemy) -> void:
+	var delay: float = maxf(second_swing_delay, 0.0)
+	var lead: float = clampf(second_swing_lead, 0.0, delay)
+	if delay - lead > 0.0:
+		await get_tree().create_timer(delay - lead).timeout
+	card_repeat_swing.emit(card, target_enemy)
+	toll_changed.emit(player.toll)
+	if lead > 0.0:
+		await get_tree().create_timer(lead).timeout
+	card_repeat_impact.emit(card)
+	var reports: Array[Callable] = _repeat_reports
+	_repeat_pending = false
+	_repeat_reports = []
+	for report in reports:
+		report.call()
 
 # An Attack card has been played: each enemy it was played against - its
 # target, and every enemy it could hit when one of its effects hits all

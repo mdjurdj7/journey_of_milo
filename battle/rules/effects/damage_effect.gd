@@ -43,6 +43,8 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 			standing.append(enemy)
 	if standing.is_empty() or ctx.player.toll < effect.repeat_toll_cost:
 		return
+	if ctx.on_repeat.is_valid():
+		ctx.on_repeat.call()
 	ctx.spend_toll(effect.repeat_toll_cost)
 	_land(base + ctx.take_repeat_attack_bonus(), standing, ctx)
 

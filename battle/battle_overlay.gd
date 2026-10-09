@@ -3,6 +3,13 @@ class_name BattleOverlay
 
 const FLOATING_NUMBER_SCENE_PATH := "res://battle/floating_number.tscn"
 const CARD_PLAY_SFX_PATH := "res://assets/audio/ui/card_played.mp3"
+# An optional tick as a repeated hit's Toll is spent (BattleController.
+# card_repeat_swing - Second Swing): the first of these that exists plays;
+# none, and nothing does.
+const TOLL_TICK_PATHS: Array[String] = [
+	"res://assets/audio/cards/SecondSwing/toll_tick.wav",
+	"res://assets/audio/cards/SecondSwing/toll_tick.mp3",
+]
 const CARD_DRAW_SFX_PATH := "res://assets/audio/ui/card_draw.wav"
 # Draw-sound voices, oldest stolen: a turn's draw launches a card every
 # 0.07 s and the take rings 0.4 s, so about six overlap. Each voice its
@@ -27,6 +34,13 @@ signal battle_finished(outcome: Outcome)
 # card play < contact holds, but its own export since the two files'
 # loudness differ.
 @export var card_override_volume_db: float = -16.0
+# The toll tick's level (TOLL_TICK_PATHS), well under the card's own play
+# sound - a quiet accent on the follow-up swing.
+@export var toll_tick_volume_db: float = -24.0
+# A repeated hit's damage number (BattleController.card_repeat_impact)
+# sits this far from where its first hit's did, in screen pixels - up and
+# to the side, so the two read as two blows.
+@export var repeat_number_offset: Vector2 = Vector2(28.0, -34.0)
 # The draw sound, once per card as it leaves the deck (HandContainer.
 # draw_started): a -6 dBFS take at -22, 6 dB under card play, so a
 # five-card draw is felt rather than loud. One take only (see DESIGN.md),
@@ -133,6 +147,11 @@ var _field_hp_bar: HPBar = null
 var _field_deck_panel: DeckPanel = null
 var _battle_transition_time: float = 0.0
 var _card_play_player: AudioStreamPlayer = null
+# The toll tick's player, made on first use (_on_card_repeat_swing()).
+var _toll_tick_player: AudioStreamPlayer = null
+# True through a repeat's impact frame: its damage numbers take
+# repeat_number_offset. Released at that frame's end.
+var _repeat_impact: bool = false
 # The card whose cost the energy pips preview (HandContainer.cost_focus_
 # changed), and whether a play is holding the preview until its spend
 # lands - see _on_cost_focus_changed().
@@ -311,6 +330,10 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 		# Its Toll before it's spent - the play's toll_changed follows.
 		_toll_blow_from = battle_controller.player.toll if BattleFeedback.is_toll_blow(card) else -1
 		_battle_feedback.on_card_impact(card, battle_controller.enemies, _lowest_intent_height()))
+	battle_controller.card_repeat_swing.connect(_on_card_repeat_swing)
+	battle_controller.card_repeat_impact.connect(func(_card: CardData) -> void:
+		_repeat_impact = true
+		set_deferred("_repeat_impact", false))
 
 	_deck_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DRAW)
 	_discard_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DISCARD)
@@ -726,11 +749,30 @@ func _on_damage_dealt(_source: Variant, target: Variant, amount: int, _kind: Str
 	var delay: float = _battle_feedback.reaction_delay(target) if _battle_feedback != null else 0.0
 	# Read in the hit's own frame, while its card is still the impact's.
 	var size: float = _battle_feedback.number_scale(target, amount) if _battle_feedback != null else 1.0
+	var offset: Vector2 = repeat_number_offset if _repeat_impact and target is FieldEnemy else Vector2.ZERO
 	if delay > 0.0:
 		await get_tree().create_timer(delay).timeout
 		if target is Object and not is_instance_valid(target):
 			return
-	_spawn_floating_number(amount, _screen_pos_for_damage_target(target), size)
+	_spawn_floating_number(amount, _screen_pos_for_damage_target(target) + offset, size)
+
+# A repeated hit's follow-up swing (Second Swing): the toll tick, if one
+# is on disk.
+func _on_card_repeat_swing(_card: CardData, _target: FieldEnemy) -> void:
+	var stream: AudioStream = null
+	for path in TOLL_TICK_PATHS:
+		if ResourceLoader.exists(path):
+			stream = load(path) as AudioStream
+			break
+	if stream == null:
+		return
+	if _toll_tick_player == null:
+		_toll_tick_player = AudioStreamPlayer.new()
+		_toll_tick_player.bus = &"SFX"
+		add_child(_toll_tick_player)
+	_toll_tick_player.stream = stream
+	_toll_tick_player.volume_db = toll_tick_volume_db
+	_toll_tick_player.play()
 
 func _screen_pos_for_damage_target(target: Variant) -> Vector2:
 	if target is FieldEnemy:

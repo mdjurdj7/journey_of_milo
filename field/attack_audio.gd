@@ -43,11 +43,13 @@ func setup() -> void:
 	_player.bus = BUS_NAME
 	add_child(_player)
 
-func play_swing() -> void:
+# `pitch_multiplier` scales the jittered pitch - a follow-up swing's
+# whoosh sits a little higher (Wanderer.follow_through_pitch).
+func play_swing(pitch_multiplier: float = 1.0) -> void:
 	var clip: AudioStream = _pool.next()
 	if clip == null or _player == null:
 		return
 	_player.stream = clip
-	_player.pitch_scale = base_pitch + randf_range(-pitch_variance, pitch_variance)
+	_player.pitch_scale = (base_pitch + randf_range(-pitch_variance, pitch_variance)) * pitch_multiplier
 	_player.volume_db = base_volume_db + randf_range(-volume_variance_db, volume_variance_db)
 	_player.play()

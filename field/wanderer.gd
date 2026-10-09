@@ -194,6 +194,18 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 
 enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 
+@export_group("Follow-Through")
+# A repeated hit's own small swing (BattleController.card_repeat_swing -
+# Second Swing): no clip, a short lunge at the target through the recoil
+# tween turned round (play_hit_recoil()), and the whoosh again at this
+# pitch. All read at each swing, so a Remote-tab edit applies from the
+# next one.
+@export var follow_through_distance: float = 0.18
+@export var follow_through_tilt_degrees: float = 0.0
+@export var follow_through_out_time: float = 0.08
+@export var follow_through_return_time: float = 0.2
+@export var follow_through_pitch: float = 1.08
+
 @export_group("Shading")
 # TEXTURED: a plain StandardMaterial3D reading the albedo texture as-
 # painted (Meshy's own colors, roughness 1, specular 0) - no posterizing.
@@ -1630,9 +1642,9 @@ func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spre
 	particles.emitting = true
 	get_tree().create_timer(lifetime + 0.1).timeout.connect(particles.queue_free)
 
-func play_swing_audio() -> void:
+func play_swing_audio(pitch_multiplier: float = 1.0) -> void:
 	if _attack_audio != null:
-		_attack_audio.play_swing()
+		_attack_audio.play_swing(pitch_multiplier)
 
 # An enemy's hit landing on him - called by BattleFeedback._react_to_
 # enemy_attack() with the flash and recoil (see HitAudio for what that
@@ -1743,6 +1755,7 @@ func bind_to_battle(controller: BattleController) -> void:
 	_battle_controller = controller
 	controller.card_played.connect(_on_card_played)
 	controller.card_swing.connect(_on_card_swing)
+	controller.card_repeat_swing.connect(_on_card_repeat_swing)
 	controller.status_changed.connect(_on_status_changed)
 
 func unbind_battle() -> void:
@@ -1752,6 +1765,8 @@ func unbind_battle() -> void:
 		_battle_controller.card_played.disconnect(_on_card_played)
 	if _battle_controller.card_swing.is_connected(_on_card_swing):
 		_battle_controller.card_swing.disconnect(_on_card_swing)
+	if _battle_controller.card_repeat_swing.is_connected(_on_card_repeat_swing):
+		_battle_controller.card_repeat_swing.disconnect(_on_card_repeat_swing)
 	if _battle_controller.status_changed.is_connected(_on_status_changed):
 		_battle_controller.status_changed.disconnect(_on_status_changed)
 	_battle_controller = null
@@ -1767,6 +1782,16 @@ func _on_card_swing(card: CardData) -> void:
 	if card.card_type != CardData.CardType.ATTACK:
 		return
 	play_swing_audio()
+
+# BattleController.card_repeat_swing: the repeated hit's follow-through -
+# a short lunge at `target` (the recoil tween, pointed at it) and the
+# whoosh again, pitched up. An Attack's only, like the first whoosh.
+func _on_card_repeat_swing(card: CardData, target: FieldEnemy) -> void:
+	if card.card_type != CardData.CardType.ATTACK:
+		return
+	play_swing_audio(follow_through_pitch)
+	if target != null and is_instance_valid(target):
+		play_hit_recoil(target.global_position - global_position, follow_through_distance, follow_through_tilt_degrees, follow_through_out_time, follow_through_return_time)
 
 # See CardData.battle_animation's own doc - empty means this card has no
 # swing. Queues _resting_battle_animation() rather than a bare "BattleIdle"

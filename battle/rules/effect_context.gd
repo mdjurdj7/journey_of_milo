@@ -87,6 +87,11 @@ var on_damage: Callable = Callable()
 # effect actually lands damage.
 
 var on_block: Callable = Callable()
+# Called as on_repeat.call() when a hit is about to land again (Card
+# Effect.repeat_toll_cost - Second Swing), before its Toll is spent: what
+# the card reports from then on is the repeat's, which the view presents
+# as its own follow-up blow. Nothing the rules decide reads it.
+var on_repeat: Callable = Callable()
 # Called as on_block.call(target_combatant, blocked, damage_to_hp) when a
 # hit on an enemy meets its block - before that hit's on_damage, which
 # only follows if some of it got through (damage_to_hp > 0).
