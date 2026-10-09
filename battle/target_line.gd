@@ -3,7 +3,8 @@ class_name TargetLine
 
 # Faint curved line from the armed card's top-center to the mouse (or, if
 # an enemy is hovered, the centre of that enemy's projected model rect -
-# BattleController.get_hovered_enemy_rect()) - reads as a thrown line
+# BattleController.get_hovered_enemy_rect() - or, with Devour hovered as
+# the card's target, the jaw's centre - DevourButton) - reads as a thrown line
 # rather than a ruler thanks to the upward sag (see _bezier_points()). One
 # Control (mouse_filter IGNORE, covers the whole overlay so its own local
 # coordinates line up with screen coordinates) holding two Line2D
@@ -27,12 +28,17 @@ var _battle_controller: BattleController
 var _line: Line2D
 var _end_circle: Line2D
 var _armed: bool = false
+var _devour_button: DevourButton = null
 
 func setup(battle_controller: BattleController) -> void:
 	_battle_controller = battle_controller
 	_battle_controller.target_requested.connect(_on_target_requested)
 	_battle_controller.target_cancelled.connect(_on_target_ended)
 	_battle_controller.card_played.connect(_on_card_played)
+	_battle_controller.card_devoured.connect(func(_card: CardData) -> void: _on_target_ended())
+
+func set_devour_button(button: DevourButton) -> void:
+	_devour_button = button
 
 func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -90,6 +96,9 @@ func _process(_delta: float) -> void:
 		if rect.size != Vector2.ZERO:
 			end = rect.get_center()
 			show_circle = true
+	elif _devour_button != null and _devour_button.is_target_hovered():
+		end = _devour_button.get_target_point()
+		show_circle = true
 
 	var color: Color = get_theme_color("text_color", "CardFace")
 	color.a = line_alpha

@@ -88,6 +88,12 @@ signal battle_finished(outcome: Outcome)
 	set(value):
 		energy_anchor = value
 		_apply_energy_anchor()
+# Between the energy readout's pips and Devour (DevourButton) under it,
+# its left edge on the readout's.
+@export var devour_gap_px: float = 10.0:
+	set(value):
+		devour_gap_px = value
+		_apply_energy_anchor()
 # Between the DECK line and the keepsake row under it - the row sits in
 # the corner margin, so nothing above it moves.
 @export var keepsake_row_gap_px: float = 4.0:
@@ -165,6 +171,7 @@ var _resources: BattleResources = null
 var _deck_readout: DeckPanel = null
 var _discard_readout: DeckPanel = null
 var _keepsake_row: KeepsakeRow = null
+var _devour_button: DevourButton = null
 # The theme's current value set (see enter_battle()/_flip_dark_world()).
 var _on_dark_world: bool = false
 # End Turn is enabled only while both hold - see _update_end_turn().
@@ -298,6 +305,12 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	hand_container.armed_changed.connect(_on_card_armed_changed)
 	# Devour's pick greys End Turn the way an armed card does.
 	battle_controller.devour_changed.connect(func(_available: bool, _used: bool) -> void: _update_end_turn())
+	_devour_button.setup(battle_controller)
+	# A devoured card is out of the hand: the cursor back, and the faces
+	# that read the hand re-read.
+	battle_controller.card_devoured.connect(func(_card: CardData) -> void:
+		Input.set_default_cursor_shape(Input.CURSOR_ARROW)
+		_push_bonus_context())
 	battle_controller.hand_choice_started.connect(_on_hand_choice_started)
 	battle_controller.hand_choice_changed.connect(_on_hand_choice_changed)
 	battle_controller.hand_choice_ended.connect(_on_hand_choice_ended)
@@ -346,6 +359,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	var target_line := TargetLine.new()
 	add_child(target_line)
 	target_line.setup(battle_controller)
+	target_line.set_devour_button(_devour_button)
 
 	_card_play_player = AudioStreamPlayer.new()
 	_card_play_player.bus = &"SFX"
@@ -392,6 +406,10 @@ func _create_corner_readouts() -> void:
 	add_child(_discard_readout)
 	_keepsake_row = KeepsakeRow.new()
 	add_child(_keepsake_row)
+	_devour_button = DevourButton.new()
+	_devour_button.name = "DevourButton"
+	add_child(_devour_button)
+	_devour_button.resized.connect(_apply_energy_anchor)
 
 # The keepsakes with no in-combat counter go in the row under DECK; one
 # whose status counts is a counter line under the HP bar instead (see
@@ -437,6 +455,11 @@ func _apply_energy_anchor() -> void:
 	_resources.position = Vector2(maxf(energy_anchor.x - _resources.size.x, corner_margin_px), energy_anchor.y - _resources.numeral_ink_top())
 	if _keepsake_row != null:
 		_keepsake_row.set_reveal_floor_y(_resources.global_position.y)
+	# Devour under it, one column: the same left edge, its hover line over
+	# the stack's top where the keepsake reveal goes.
+	if _devour_button != null:
+		_devour_button.position = Vector2(_resources.position.x, _resources.position.y + _resources.size.y + devour_gap_px)
+		_devour_button.set_hover_floor_y(_resources.global_position.y)
 
 # Reuses each enemy's own persistent EnemyStatus (see FieldEnemy.
 # enemy_status's own doc) rather than creating a fresh one - these live
@@ -928,6 +951,8 @@ func _flip_dark_world() -> void:
 		_discard_readout.refresh_style()
 	if _keepsake_row != null:
 		_keepsake_row.refresh_style()
+	if _devour_button != null:
+		_devour_button.refresh_style()
 	end_turn_button.refresh_style()
 	print("BattleOverlay: ui_on_dark_world (debug flip) = %s" % str(_on_dark_world))
 
