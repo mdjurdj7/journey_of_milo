@@ -49,7 +49,7 @@ const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Reckoning",
 const FLOOR_4 := 3
 const SPOT := Vector3(11.0, 0.0, -22.5)
 const PRICES: Dictionary = {1: 40, 2: 55, 3: 80, 4: 120}
-const SAMPHIRE_PRICE := 30
+const SAMPHIRE_PRICE := 8
 const REMOVAL_PRICE := 50
 const STOCK := 5
 const SAFETY_SECONDS := 300.0
@@ -164,7 +164,7 @@ func _check_screen() -> void:
 		var fixed: CardData = cards[STOCK]
 		_expect(fixed != null and fixed.resource_path == SAMPHIRE_PATH, "The sixth is Samphire")
 		_expect(not rolled.has("Samphire"), "...and Samphire is not in the roll")
-		_expect_eq(int(screen.call("_price_at", STOCK)), SAMPHIRE_PRICE, "...at 30")
+		_expect_eq(int(screen.call("_price_at", STOCK)), SAMPHIRE_PRICE, "...at 8")
 		_check_tiers(screen, cards)
 		screen.call("_activate", int(screen.call("_leave_index")))
 		await process_frame
@@ -193,7 +193,7 @@ func _check_buy() -> void:
 		_expect(_deck_has(first.card_name), "...with %s in it" % first.card_name)
 		_expect((screen.call("get_slot_cards") as Array)[0] == null, "...and the slot empty")
 		screen.call("_activate", STOCK)
-		_expect_eq(int(_run_state.get("gold")), 0, "Samphire bought for 30")
+		_expect_eq(int(_run_state.get("gold")), 0, "Samphire bought for 8")
 		_expect(_deck_has("Samphire"), "...Samphire in the deck")
 		_expect((screen.call("get_slot_cards") as Array)[STOCK] == null, "...its slot empty")
 		screen.call("close")

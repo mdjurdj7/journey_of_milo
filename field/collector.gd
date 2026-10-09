@@ -92,7 +92,7 @@ const GROUP := &"collectors"
 	set(value):
 		price_ultra_rare = value
 		prices_changed.emit()
-@export var fixed_price: int = 30:
+@export var fixed_price: int = 8:
 	set(value):
 		fixed_price = value
 		prices_changed.emit()
