@@ -12,7 +12,7 @@
 #                                                 or both - every name runs
 #
 # Options:
-#   -j N             parallel probes (default 4). Probes marked serial in
+#   -j N             parallel probes (default 2). Probes marked serial in
 #                    the table below always run alone, after the rest.
 #   --worktree [DIR] run in the persistent probe worktree (default
 #                    ../journey-of-milo-probe), not this tree: take its lock,
@@ -35,13 +35,54 @@
 #
 # GODOT overrides the engine (default ../Godot_v4.7.1.exe beside the repo:
 # the main executable, not the _console wrapper). Exit code 0 = every
-# probe passed, 1 = a failure, 2 = usage, 3 = the worktree stayed busy.
+# probe passed, 1 = a failure, 2 = usage, 3 = the worktree stayed busy,
+# 4 = memory stayed short (see the memory guard below).
 
 set -u
 
 REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 GODOT=${GODOT:-$REPO/../Godot_v4.7.1.exe}
 PROBE_TIMEOUT_SEC=600
+
+# --- Memory guard ---
+# A probe - a headless Godot - takes up to about PROBE_MEM_MB, and none is
+# started (nor the import) while that would leave under MIN_FREE_MB free:
+# the run waits for memory instead (await_memory()). With none of its own
+# probes running to give any back, it waits MEM_WAIT_MAX_SEC at most, then
+# stops (exit 4). A probe started under PROBE_RAMP_SEC ago is still
+# loading, its memory not yet taken: it counts as if it had. Free is
+# MemAvailable where the system gives it, else MemFree - Git Bash's,
+# which is Windows' available memory.
+MIN_FREE_MB=3072
+PROBE_MEM_MB=1024
+MEM_WAIT_MAX_SEC=600
+PROBE_RAMP_SEC=10
+LAST_START=0
+free_mb() {
+	awk '/^MemAvailable:/ { a = $2 } /^MemFree:/ { f = $2 } END { v = a ? a : f; if (v) print int(v / 1024) }' /proc/meminfo 2>/dev/null
+}
+await_memory() {
+	local free need idle=0 told=0
+	while :; do
+		free=$(free_mb)
+		[ -n "$free" ] || return 0
+		need=$((MIN_FREE_MB + PROBE_MEM_MB))
+		[ $(( $(date +%s) - LAST_START )) -lt "$PROBE_RAMP_SEC" ] && need=$((need + PROBE_MEM_MB))
+		[ "$free" -ge "$need" ] && return 0
+		if [ "$told" = 0 ]; then
+			echo "run_probes: $free MB free - waiting for $need MB before the next probe"
+			told=1
+		fi
+		if [ -z "$(jobs -rp)" ]; then
+			idle=$((idle + 1))
+			if [ "$idle" -ge "$MEM_WAIT_MAX_SEC" ]; then
+				echo "run_probes: still $free MB free after ${MEM_WAIT_MAX_SEC}s with none of its probes running - stopping" >&2
+				exit 4
+			fi
+		fi
+		tick
+	done
+}
 
 # --- Cleanup: nothing this run starts outlives it ---
 # However it ends - done, Ctrl+C, a TERM, or the shell that started it
@@ -309,7 +350,7 @@ MODE=""
 AREAS=""
 NAMES=""
 BASE=""
-JOBS=4
+JOBS=2
 WORKTREE=""
 REF=""
 FILES=""
@@ -558,6 +599,7 @@ mkdir -p "$LOGS"
 : > "$LOGS/_results.txt"
 
 if [ "$DO_IMPORT" = 1 ]; then
+	await_memory
 	echo "run_probes: importing..."
 	# In the background and waited on, so a stop reaches the trap at once.
 	( cd "$PROJECT" && timeout 900 "$GODOT" --headless --path . --import > "$LOGS/_import.log" 2>&1 ) &
@@ -590,11 +632,13 @@ echo "run_probes: running:$PARALLEL$SERIAL"
 T0=$(date +%s)
 for p in $PARALLEL; do
 	while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do tick; done
+	await_memory
 	run_one "$p" &
+	LAST_START=$(date +%s)
 done
 while [ -n "$(jobs -rp)" ]; do tick; done
 wait
-for p in $SERIAL; do run_one "$p" & await_pid $!; done
+for p in $SERIAL; do await_memory; run_one "$p" & await_pid $!; done
 T1=$(date +%s)
 
 FAILED=$(grep -c ' FAIL ' "$LOGS/_results.txt" 2>/dev/null)
