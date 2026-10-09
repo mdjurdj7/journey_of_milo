@@ -2,6 +2,10 @@ extends CharacterBody3D
 class_name FieldEnemy
 
 signal contacted(enemy: FieldEnemy)
+# Its death has played out (settle_and_free()) - sent the moment before
+# the node is freed. The fight it died in waits on the last one's before
+# the win (BattleController._maybe_win()).
+signal death_finished()
 
 # The body worn when enemy_data names none (EnemyData.model_scene_path
 # empty) - see model_scene_path below.
@@ -1301,8 +1305,9 @@ func _process(delta: float) -> void:
 	global_position = Vector3(_flight_xz.x, _body_y_on_ground(_flight_xz.x, _flight_xz.y) + _hover, _flight_xz.y)
 	rotation.y = lerp_angle(rotation.y, _flight_heading, clampf(delta * flight_turn_rate, 0.0, 1.0))
 
-# Called by RegionField when this enemy dies in a fight that goes on
-# without it (see its _on_enemy_defeated()). The HP readout goes at once
+# Called by RegionField when this enemy's death begins, once the blow
+# that killed it has shown (its _on_enemy_defeated()). The HP readout
+# goes at once
 # - a "0/45" hanging under a body that's leaving is a corpse in the line
 # - an attachment that can fold drops its wings over settle_time, the
 # model then sinks its own height into the sand over settle_time
@@ -1339,7 +1344,7 @@ func settle_and_free() -> void:
 		_hover_tween.kill()
 	_kill_bob()
 	if _model == null or _model_height <= 0.0:
-		queue_free()
+		_finish_death()
 		return
 	var tween := create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
@@ -1352,7 +1357,12 @@ func settle_and_free() -> void:
 		tween.tween_interval(settle_time)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.tween_property(_model, "position:y", _model_ground_y - _model_height, settle_time)
-	tween.tween_callback(queue_free)
+	tween.tween_callback(_finish_death)
+
+# The death's end: said, then the node goes.
+func _finish_death() -> void:
+	death_finished.emit()
+	queue_free()
 
 func _on_body_entered(body: Node3D) -> void:
 	# A dead body's area comes back into the space with the field's

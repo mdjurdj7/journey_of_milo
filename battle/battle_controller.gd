@@ -79,13 +79,18 @@ signal damage_dealt(source: Variant, target: Variant, amount: int, kind: String)
 signal enemy_hit_blocked(enemy: FieldEnemy, absorbed: bool)
 # source/target are each either the String "player" or a FieldEnemy node -
 # whichever combatant actually dealt/received the hit.
-# An enemy's HP reached 0. Fires right after that hit's own damage_dealt/
-# enemy_hp_changed, and BEFORE battle_won when it was the last one - by
-# then the enemy is already out of `enemies`/_combatants, so nothing here
-# reads it again (its node may be freed by whoever listens). The overlay
-# drops the member's displays on this; RegionField takes it off the
-# field.
+# An enemy's death begins. Its HP reached 0 on a hit some time before:
+# the rules dropped it then (out of `enemies`/_combatants at once), but
+# the killing blow's presentation - every hit of the card, numbers, hit-
+# stop, recoil, the play effect - is let finish first (_hold_death_for(),
+# _release_deaths_when_due()). The overlay drops the member's displays on
+# this; RegionField starts its death (FieldEnemy.settle_and_free()), and
+# the fight hears it end through FieldEnemy.death_finished - the last
+# one's is what lets battle_won go (_check_battle_end()).
 signal enemy_defeated(enemy: FieldEnemy)
+# The deaths held for a killing blow have just begun (enemy_defeated sent
+# for each) - the card that dealt it lets input go on this.
+signal deaths_released()
 # An enemy's pain turn has just been set (EnemyTurn.check_pain_turn()):
 # its next action is cancelled. For the line and the sound; the intent's
 # own change comes through enemy_intent_changed.
@@ -122,6 +127,10 @@ signal battle_lost()
 # after the card it answers has resolved, so the card's own blows -
 # Blood Arc's staggered reactions among them - have shown first.
 @export var counter_strike_delay: float = 0.35
+# A killed enemy's death waits for the blow that killed it to show in
+# full - kill_presentation_time's answer for it, then this much more
+# (real seconds) - before it begins (_hold_death_for()).
+@export var kill_presentation_margin: float = 0.1
 @export var enemy_head_height: float = 1.8
 # Where a SELF/NONE card's play tween aims, relative to the viewport's own
 # center - there's no "target" to unproject for those, just somewhere up
@@ -184,6 +193,21 @@ var _wanderer: Wanderer = null
 # end_turn() both refuse to start anything new while this is true, so a
 # second card/turn can never be armed mid-swing.
 var _input_locked: bool = false
+# How long a killing hit on an enemy takes to show in full, in real
+# seconds from the hit: (enemy: FieldEnemy, amount: int) -> float. Set by
+# BattleOverlay, which owns the reactions and numbers; unset, a death
+# waits only kill_presentation_margin.
+var kill_presentation_time: Callable = Callable()
+# Killed, their deaths waiting on the blow (enemy_defeated not yet sent)...
+var _pending_deaths: Array[FieldEnemy] = []
+# ...dying (sent, FieldEnemy.death_finished not yet heard)...
+var _dying: Array[FieldEnemy] = []
+# ...and when the held deaths may begin, in real microseconds.
+var _death_release_usec: int = 0
+var _death_release_running: bool = false
+# The last enemy is down and its death is running: battle_won waits for
+# it (_maybe_win()).
+var _win_waiting: bool = false
 # Set by the resolving card's EffectContext.on_repeat: its reports from
 # then on are the repeat's, held here until its own impact (_land_repeat()).
 var _repeat_pending: bool = false
@@ -797,6 +821,11 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	for enemy in enemies:
 		_pose_for_intent(enemy)
 
+	# A kill: input waits for the blow to show in full and the deaths to
+	# begin - not for them to end; a non-final death plays on while the
+	# player acts.
+	if has_held_deaths():
+		await deaths_released
 	_input_locked = false
 	_emit_devour_changed()
 	_check_battle_end()
@@ -1418,7 +1447,15 @@ func _check_battle_end() -> bool:
 		battle_lost.emit()
 		return true
 	if _living_enemy_combatants().is_empty():
+		if _win_waiting:
+			return true
 		RunLogger.turn_ended(player.energy)
+		# Won - but the last deaths play first: the win goes when they've
+		# ended (_maybe_win()), and nothing new starts meanwhile.
+		if not _pending_deaths.is_empty() or not _dying.is_empty():
+			_win_waiting = true
+			_input_locked = true
+			return true
 		battle_won.emit()
 		return true
 	return false
@@ -1551,10 +1588,16 @@ func _report_damage(source: Variant, target_combatant: Combatant, amount: int, k
 	else:
 		RunLogger.damage_dealt(target_combatant.get_instance_id(), amount, target_combatant.hp)
 		var enemy := _field_enemy_for(target_combatant)
+		# A killing hit: its death is held from here (is_dying()), so its
+		# own presentation - which asks - can show it in full.
+		var killed: bool = enemy != null and target_combatant.hp <= 0
+		if killed and not _pending_deaths.has(enemy):
+			_pending_deaths.append(enemy)
 		damage_dealt.emit(source, enemy, amount, kind)
 		if enemy != null:
 			enemy_hp_changed.emit(enemy, target_combatant.hp, target_combatant.max_hp)
-			if target_combatant.hp <= 0:
+			if killed:
+				_hold_death_for(enemy, amount)
 				_drop_enemy(enemy)
 			else:
 				if EnemyTurn.check_pain_turn(target_combatant, enemy.enemy_data):
@@ -1583,9 +1626,10 @@ func _heal_run_hp(amount: int, source: String = "") -> void:
 	RunState.heal(amount)
 	RunLogger.player_healed(RunState.player_hp - before, source)
 
-# The enemy is dead: out of the lists first (so no later preview/turn/
-# rect pass touches a node that may be freed), then told. The hover
-# clears too, or an armed card could keep a sinking body lit.
+# The enemy is dead to the rules: out of the lists at once, so no later
+# preview/turn/rect pass reads it. The hover clears too, or an armed card
+# could keep it lit. Its death - enemy_defeated - waits for the blow
+# (_release_deaths_when_due()).
 func _drop_enemy(enemy: FieldEnemy) -> void:
 	RunLogger.enemy_died(_log_id(enemy))
 	enemies.erase(enemy)
@@ -1596,7 +1640,60 @@ func _drop_enemy(enemy: FieldEnemy) -> void:
 	if _cursor_enemy == enemy:
 		_set_cursor_enemy(null)
 	_mark_lone_pack_members()
-	enemy_defeated.emit(enemy)
+
+# Whether `enemy` was killed and its death hasn't finished - held for its
+# blow, or running. BattleFeedback reads it in the killing hit's own
+# frame, for the kill's hit-stop.
+func is_dying(enemy: Variant) -> bool:
+	return enemy is FieldEnemy and (_pending_deaths.has(enemy) or _dying.has(enemy))
+
+# Whether any death is still waiting on its blow.
+func has_held_deaths() -> bool:
+	return not _pending_deaths.is_empty()
+
+# A killing hit on `enemy` for `amount`: the deaths held until its whole
+# presentation has played (kill_presentation_time, plus kill_presentation_
+# margin) - a later kill in the same blow only ever extends the hold.
+func _hold_death_for(enemy: FieldEnemy, amount: int) -> void:
+	var seconds: float = kill_presentation_margin
+	if kill_presentation_time.is_valid():
+		seconds += float(kill_presentation_time.call(enemy, amount))
+	_death_release_usec = maxi(_death_release_usec, Time.get_ticks_usec() + int(maxf(seconds, 0.0) * 1000000.0))
+	if not _death_release_running:
+		_release_deaths_when_due()
+
+# Waits out the hold on real time - a hit-stop slows scaled time, and the
+# hold already counts it - then begins every held death: enemy_defeated
+# for each, the overlay and RegionField taking it from there. One nobody
+# took off the field (not settling) has finished at once. Then the win,
+# if it was waiting on these (_maybe_win()).
+func _release_deaths_when_due() -> void:
+	_death_release_running = true
+	while Time.get_ticks_usec() < _death_release_usec:
+		await get_tree().create_timer(float(_death_release_usec - Time.get_ticks_usec()) / 1000000.0, true, false, true).timeout
+	_death_release_running = false
+	var released: Array[FieldEnemy] = _pending_deaths.duplicate()
+	_pending_deaths.clear()
+	for enemy in released:
+		if not is_instance_valid(enemy):
+			continue
+		_dying.append(enemy)
+		enemy.death_finished.connect(_on_death_finished.bind(enemy), CONNECT_ONE_SHOT)
+		enemy_defeated.emit(enemy)
+		if not enemy.is_settling():
+			_on_death_finished(enemy)
+	deaths_released.emit()
+	_maybe_win()
+
+func _on_death_finished(enemy: FieldEnemy) -> void:
+	_dying.erase(enemy)
+	_maybe_win()
+
+# The last enemy fell and every death has played out: the fight is won.
+func _maybe_win() -> void:
+	if _win_waiting and _pending_deaths.is_empty() and _dying.is_empty():
+		_win_waiting = false
+		battle_won.emit()
 
 # Every living enemy with no living packmate left in the fight (none
 # sharing its FieldEnemy.group - an ungrouped enemy has none) stops using

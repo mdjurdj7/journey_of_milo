@@ -136,6 +136,8 @@ var _debug_card_picker: OptionButton = null
 # The fight's hit reactions - kept to read a play effect's pacing for the
 # damage numbers (BattleFeedback.reaction_delay()).
 var _battle_feedback: BattleFeedback = null
+# A damage number's life, read once (_number_seconds()); -1 until then.
+var _number_life: float = -1.0
 # A Toll blow's Toll as it landed, for its toll_changed; -1 = none.
 var _toll_blow_from: int = -1
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
@@ -334,6 +336,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	_battle_feedback = BattleFeedback.new()
 	add_child(_battle_feedback)
 	_battle_feedback.setup(wanderer, on_dark_world)
+	_battle_feedback.battle_controller = battle_controller
+	battle_controller.kill_presentation_time = _kill_presentation_time
 	battle_controller.damage_dealt.connect(_battle_feedback.on_damage_dealt)
 	battle_controller.enemy_hit_blocked.connect(_battle_feedback.on_enemy_hit_blocked)
 	# A card's play effect (Blood Arc's stroke) goes down before its hits
@@ -930,6 +934,26 @@ func _debug_print_enemy_bar_gaps() -> void:
 		var hp_bottom: float = (_field_hp_bar.get_global_transform() * Vector2(0.0, _field_hp_bar.size.y)).y
 		print("BattleOverlay: Wanderer HP readout bottom-to-hand gap = %.1f px" % (hand_container.get_rest_top_y() - hp_bottom))
 		print("BattleOverlay: Wanderer status row bottom-to-hand gap = %.1f px" % (hand_container.get_rest_top_y() - _field_hp_bar.get_status_row_bottom_y()))
+
+# How long a killing hit of `amount` on `enemy` takes to show in full, in
+# real seconds from its frame (BattleController.kill_presentation_time):
+# its reaction and play effect (BattleFeedback.kill_presentation_time()),
+# or its damage number rising and fading, if that ends later.
+func _kill_presentation_time(enemy: FieldEnemy, amount: int) -> float:
+	if _battle_feedback == null:
+		return _number_seconds()
+	var number_end: float = _battle_feedback.reaction_delay(enemy) + _number_seconds()
+	return maxf(_battle_feedback.kill_presentation_time(enemy, amount), number_end)
+
+# A damage number's life (FloatingNumber.duration_sec), read once off the
+# scene.
+func _number_seconds() -> float:
+	if _number_life < 0.0:
+		var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
+		_number_life = number.duration_sec if number != null else 0.0
+		if number != null:
+			number.free()
+	return _number_life
 
 func _spawn_floating_number(value: int, screen_pos: Vector2, size_multiplier: float = 1.0) -> void:
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber

@@ -116,6 +116,8 @@ var _mesh_instance: MeshInstance3D = null
 var _origin: Node3D = null
 var _targets: Array[Node3D] = []
 var _ceiling_y: float = INF
+# The stroke's own play - sweep, hold, fade (setup()).
+var _tween: Tween = null
 # The battle line the stroke runs along: start point, unit direction, and
 # the targets' span on it (stroke start/end distances from the origin).
 var _line_origin: Vector3 = Vector3.ZERO
@@ -148,7 +150,8 @@ func setup(origin: Node3D, targets: Array[Node3D], ceiling_y: float = INF) -> vo
 	_rebuild()
 	if _material == null:
 		return
-	var tween := create_tween()
+	_tween = create_tween()
+	var tween: Tween = _tween
 	tween.tween_method(_set_progress, 0.0, 1.0 + head_feather, maxf(sweep_time, 0.001))
 	tween.tween_interval(maxf(hold_time, 0.0))
 	tween.tween_method(_set_fade, 1.0, 0.0, maxf(fade_time, 0.001))
@@ -162,6 +165,15 @@ func arrival_delay(target: Node3D) -> float:
 		return 0.0
 	var along: float = (target.global_position - _line_origin).dot(_line_dir)
 	return sweep_time * clampf((along - _span_start) / (_span_end - _span_start), 0.0, 1.0)
+
+# Seconds of its play still to run - sweep, hold and fade - 0 once it's
+# done or never played. A killing blow's death waits for it
+# (BattleFeedback.effect_remaining_time()).
+func remaining_time() -> float:
+	if _tween == null or not _tween.is_valid():
+		return 0.0
+	var total: float = maxf(sweep_time, 0.001) + maxf(hold_time, 0.0) + maxf(fade_time, 0.001)
+	return maxf(total - _tween.get_total_elapsed_time(), 0.0)
 
 # --- Building ---
 

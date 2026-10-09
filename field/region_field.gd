@@ -1862,13 +1862,12 @@ func _start_battle_hover(members: Array[FieldEnemy]) -> void:
 		member.enter_battle_hover(TAU * float(index) / float(members.size()))
 
 # A member of the fight died. Where it stood and what it was are kept for
-# the reward (see _on_battle_finished()'s WIN). If the fight goes on
-# without it, it leaves now (FieldEnemy.settle_and_free()); the last kill
-# is the win, and a body on the ground is freed with the win exactly as
-# it always was - the controller has already dropped the dead from its
-# own `enemies`, so an empty list there means this was the last. A last
-# kill in the air folds and falls like any other (the win leaves it to).
-func _on_enemy_defeated(enemy: FieldEnemy, overlay: BattleOverlay) -> void:
+# the reward (see _on_battle_finished()'s WIN). Its death begins now - the
+# controller sends this once the killing blow has shown in full - and
+# plays out (FieldEnemy.settle_and_free()) whether or not the fight goes
+# on: the last kill's too, the win waiting for it (BattleController.
+# _maybe_win()) and leaving a settling body to finish.
+func _on_enemy_defeated(enemy: FieldEnemy, _overlay: BattleOverlay) -> void:
 	_last_fallen_at = enemy.global_position
 	_last_fallen_data = enemy.enemy_data
 	_fight_fallen.append(enemy.enemy_data)
@@ -1879,8 +1878,6 @@ func _on_enemy_defeated(enemy: FieldEnemy, overlay: BattleOverlay) -> void:
 	# line leaves in place if it goes first.
 	if enemy.enemy_data != null:
 		_say_near_enemy(enemy, enemy.enemy_data.defeat_line)
-	if overlay.battle_controller.enemies.is_empty() and not enemy.is_battle_hovering():
-		return
 	enemy.settle_and_free()
 
 # The pain turn has just been set: its sound, and its line near it.
@@ -1966,7 +1963,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 			_pending_elite = _fight_elite
 			_pending_top_tier = _fight_top_tier
 			for member in standing:
-				# The last kill folding from the air frees itself.
+				# The last kill, its death played out, frees itself.
 				if member.is_settling():
 					continue
 				# enemy_status lives under FieldHUD, not as the enemy's

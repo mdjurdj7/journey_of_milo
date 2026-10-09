@@ -99,12 +99,21 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 @export var camera_jolt_amplitude: float = 0.05
 @export var camera_jolt_duration: float = 0.15
 
+@export_group("Killing Blow")
+# A hit that kills holds at least this long (real seconds): the heavy
+# tier's own stop when that is longer, this when it's shorter or there is
+# none (Blood Arc's 9). Capped like any stop (HITSTOP_CAP_MS).
+@export var kill_hitstop_min: float = 0.05
+
 # A hit-stop never runs longer than this, whatever the tunables say.
 const HITSTOP_CAP_MS: float = 160.0
 # The impact layer's volume for "not at all".
 const SILENT_DB: float = -80.0
 
 var _wanderer: Wanderer = null
+# The fight's controller, set by BattleOverlay: whether a hit kills
+# (BattleController.is_dying()), read in its own frame.
+var battle_controller: BattleController = null
 var _on_dark_world: bool = false
 # The play effect of the card resolving right now - set at its impact and
 # cleared at the end of that frame, so only that card's own hits (which
@@ -148,13 +157,14 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, _kind: Strin
 		var armored: bool = _met_block.has(target)
 		_met_block.erase(target)
 		var heavy: float = heavy_level(heavy_damage(amount))
+		var killing: bool = battle_controller != null and battle_controller.is_dying(target)
 		var delay: float = reaction_delay(target)
 		if delay > 0.0:
 			await get_tree().create_timer(delay).timeout
 			if not is_instance_valid(target):
 				return
 		_react_to_card_hit(target as FieldEnemy, slash, armored, heavy)
-		_apply_hit_stop(hitstop_ms(heavy))
+		_apply_hit_stop(stop_ms(heavy, killing))
 		if jolts_camera(amount):
 			_jolt_camera()
 	elif source is FieldEnemy:
@@ -229,6 +239,32 @@ func hitstop_ms(level: float) -> float:
 	if level < 0.0:
 		return 0.0
 	return minf(lerpf(hitstop_min_ms, hitstop_max_ms, level), HITSTOP_CAP_MS)
+
+# A card hit's stop, in real milliseconds: the heavy tier's (hitstop_ms()),
+# and a killing hit's held to kill_hitstop_min at the least.
+func stop_ms(level: float, killing: bool) -> float:
+	var ms: float = hitstop_ms(level)
+	if killing:
+		ms = minf(maxf(ms, kill_hitstop_min * 1000.0), HITSTOP_CAP_MS)
+	return ms
+
+# How long a killing hit of `amount` on `target` takes to show in full, in
+# real seconds from its own frame: the play effect reaching it, then the
+# longest of its flash, recoil and slash mark, with its hit-stop on top -
+# or the play effect running to its end, if that's later. Read in the
+# hit's frame (BattleOverlay, for BattleController.kill_presentation_time).
+func kill_presentation_time(target: FieldEnemy, amount: int) -> float:
+	var reaction: float = maxf(flash_rise_time + flash_fall_time, recoil_out_time + recoil_return_time)
+	reaction = maxf(reaction, slash_mark_grow_time + slash_mark_fade_time)
+	var stop: float = stop_ms(heavy_level(heavy_damage(amount)), true) / 1000.0
+	return maxf(reaction_delay(target) + reaction + stop, effect_remaining_time())
+
+# How much longer this frame's play effect runs (its stroke's sweep, hold
+# and fade), 0 with none.
+func effect_remaining_time() -> float:
+	if not _effect_active() or not _effect.has_method("remaining_time"):
+		return 0.0
+	return float(_effect.call("remaining_time"))
 
 # The impact layer's volume: silent at the tier's light end, rising in
 # amplitude to heavy_impact_max_volume_db at its full one.
