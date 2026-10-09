@@ -69,6 +69,10 @@ var took_damage_this_turn: bool = false
 # EffectContext.spend_toll(), cleared by BattleController._start_player_
 # turn(). Read by CardEffect.Condition.TOLL_SPENT_THIS_TURN (Gnaw).
 var toll_spent_this_turn: bool = false
+# How much Toll that was, in all - EffectContext.spend_toll() adds what it
+# actually spent, _start_player_turn() clears it with the flag above.
+# Read by TOLL_SPENT_BLOCK (Settled Account).
+var toll_spent_amount_this_turn: int = 0
 var took_damage_last_turn: bool = false
 # Critical: HP at or below this fraction of max HP. A default only, like
 # the Grace fields above - BattleController.setup() copies CharacterData.

@@ -34,6 +34,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.DRAIN: "res://battle/rules/effects/drain_effect.gd",
 	CardEffect.EffectType.SET_ASIDE: "res://battle/rules/effects/set_aside_effect.gd",
 	CardEffect.EffectType.CONSUME: "res://battle/rules/effects/consume_effect.gd",
+	CardEffect.EffectType.TOLL_SPENT_BLOCK: "res://battle/rules/effects/toll_spent_block_effect.gd",
 }
 
 var _cache: Dictionary = {}

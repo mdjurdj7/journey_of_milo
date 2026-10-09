@@ -1131,6 +1131,7 @@ func _start_player_turn() -> void:
 	# (Condition.TOLL_SPENT_THIS_TURN).
 	player.damage_taken_this_turn = 0
 	player.toll_spent_this_turn = false
+	player.toll_spent_amount_this_turn = 0
 	for enemy in enemies:
 		var combatant: Combatant = _combatants.get(enemy)
 		if combatant != null:

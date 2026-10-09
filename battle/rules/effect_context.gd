@@ -135,6 +135,7 @@ func spend_toll(amount: int) -> int:
 	player.toll -= spent
 	toll_spent_this_card = true
 	player.toll_spent_this_turn = true
+	player.toll_spent_amount_this_turn += spent
 	return spent
 
 # The extra damage this Attack card deals to `enemy` for the marks it
