@@ -96,6 +96,13 @@ signal enemy_pain_turn(enemy: FieldEnemy)
 # change through status_changed. A fight's opening statuses aren't sent:
 # they're read at its start (RegionField).
 signal enemy_status_gained(enemy: FieldEnemy, status: StatusData)
+# Devour (devour()): whether it can be used now, and whether this turn's
+# uses are spent - emitted whenever either may have changed, and when
+# what it would eat changes (a card armed or disarmed). DevourButton
+# re-reads is_devour_lit() on it.
+signal devour_changed(available: bool, used: bool)
+# A hand card was devoured: out of the hand to the Spent pile, unplayed.
+signal card_devoured(card: CardData)
 signal battle_won()
 signal battle_lost()
 
@@ -119,11 +126,17 @@ signal battle_lost()
 # Padding around each enemy's projected model rect for the armed-card
 # target test - see _refresh_enemy_rects().
 @export var target_padding_px: float = 16.0
+# Devour - the Wanderer's own action, not a card (devour()): the HP one
+# eaten card gives back, and how many it may eat per turn.
+@export var devour_heal_amount: int = 2
+@export var devour_uses_per_turn: int = 1
 
 var deck: Deck
 var player: Combatant
 var enemies: Array[FieldEnemy] = []
 var cards_played_this_turn: int = 0
+# Devours this player turn - reset at its start (_start_player_turn()).
+var _devour_uses_this_turn: int = 0
 
 var _hand_container: HandContainer
 var _pending_card_view: CardView = null
@@ -260,6 +273,8 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	status_changed.emit()
 	_push_enemy_target_available()
 	energy_changed.emit(player.energy)
+	_devour_uses_this_turn = 0
+	_emit_devour_changed()
 	var opening_bonus: int = maxi(keepsake.opening_draw_bonus, 0) if keepsake != null else 0
 	_hand_container.draw_cards(turn_draw_amount + opening_bonus)
 	_apply_intent_exclusions(enemies)
@@ -334,15 +349,7 @@ func request_play(card_view: CardView) -> void:
 	if _input_locked or _pending_card_view != null or _choice_open() or card_view.card_data == null:
 		return
 	var card: CardData = card_view.card_data
-	if player.energy_cost(card) > player.energy:
-		return
-	# A fixed Toll the player doesn't hold (Come Due) - the hand shows it
-	# faded, and this is the rule behind the fade.
-	if EffectResolver.card_blocked(card, player):
-		return
-	# Every enemy buried - or, for Deny, every one already Denied: an
-	# enemy-target card has nothing to land on.
-	if card.target_type == CardData.TargetType.ENEMY and not _has_valid_target(card):
+	if not _is_playable(card):
 		return
 	# A SET_ASIDE card (Bide) asks which cards first, unless there is
 	# nothing else in the hand to choose - then it just plays.
@@ -369,6 +376,21 @@ func request_play(card_view: CardView) -> void:
 			_pending_consume_view.set_marked(true)
 	_arm_or_play(card_view)
 
+# Whether `card` can be played now: affordable, not blocked by the rules,
+# and with something to land on.
+func _is_playable(card: CardData) -> bool:
+	if player.energy_cost(card) > player.energy:
+		return false
+	# A fixed Toll the player doesn't hold (Come Due) - the hand shows it
+	# faded, and this is the rule behind the fade.
+	if EffectResolver.card_blocked(card, player):
+		return false
+	# Every enemy buried - or, for Deny, every one already Denied: an
+	# enemy-target card has nothing to land on.
+	if card.target_type == CardData.TargetType.ENEMY and not _has_valid_target(card):
+		return false
+	return true
+
 # The card goes on: an enemy-target card arms for its target (from
 # wherever it is held), any other resolves now.
 func _arm_or_play(card_view: CardView) -> void:
@@ -377,6 +399,7 @@ func _arm_or_play(card_view: CardView) -> void:
 		_pending_card_view = card_view
 		card_view.lift_and_hold(card_view == _choosing_card_view or _pending_consume_view != null)
 		target_requested.emit(card)
+		_emit_devour_changed()
 	else:
 		_resolve_play(card_view, null)
 
@@ -431,6 +454,7 @@ func _begin_choice(card_view: CardView, cap: int, kind: CardEffect.EffectType, e
 	_hand_container.begin_choice(card_view, eligible)
 	hand_choice_started.emit(card_view.card_data.card_name, cap, "CONSUME" if kind == CardEffect.EffectType.CONSUME else "SET ASIDE")
 	hand_choice_changed.emit(0, cap)
+	_emit_devour_changed()
 
 # Whether a hand choice is open - an armed card's, or the end-of-turn keep.
 func _choice_open() -> bool:
@@ -453,6 +477,7 @@ func _begin_keep_choice() -> bool:
 	_hand_container.begin_choice(null)
 	hand_choice_started.emit("END TURN", cap, "KEEP")
 	hand_choice_changed.emit(0, cap)
+	_emit_devour_changed()
 	return true
 
 func toggle_choice(card_view: CardView) -> void:
@@ -513,6 +538,7 @@ func _close_choice(keep: CardView = null) -> void:
 	_choice_eligible = []
 	_hand_container.end_choice(keep)
 	hand_choice_ended.emit()
+	_emit_devour_changed()
 
 func confirm_target(enemy: FieldEnemy) -> void:
 	if _pending_card_view == null:
@@ -540,6 +566,7 @@ func cancel_target() -> void:
 	_set_cursor_enemy(null)
 	_enemy_rects.clear()
 	target_cancelled.emit()
+	_emit_devour_changed()
 
 # End Turn: with a keepsake that keeps cards and a card in hand, the keep
 # choice first (_begin_keep_choice()) - and End Turn again confirms it.
@@ -561,6 +588,7 @@ func _finish_turn(keep: Array[CardData]) -> void:
 	RunLogger.turn_ended(player.energy)
 	_input_locked = true
 	turn_phase_changed.emit(false)
+	_emit_devour_changed()
 	# The hand fades out in place, card after card; the enemy turn waits
 	# for the last of it (below).
 	var discard_fade: float = _hand_container.discard_hand(keep)
@@ -581,6 +609,7 @@ func _finish_turn(keep: Array[CardData]) -> void:
 	if not _check_battle_end():
 		_start_player_turn()
 		turn_phase_changed.emit(true)
+		_emit_devour_changed()
 
 # The play, in order (DESIGN.md, the played card out of the hand):
 # - Commit: the cost paid; the card leaves deck.hand (Deck.begin_play()) -
@@ -623,6 +652,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		Status.spend_cost_reduction(player.statuses, card)
 	Status.spend_cost_replacement(player.statuses, replacement)
 	_input_locked = true
+	_emit_devour_changed()
 	# Counted at commit, before anyone hears of the play - so a face that
 	# re-reads itself on card_played sees this card as played. The card's
 	# own context carries the count from before it (below).
@@ -731,6 +761,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		_pose_for_intent(enemy)
 
 	_input_locked = false
+	_emit_devour_changed()
 	_check_battle_end()
 
 # A report from the resolving card: now, or - once its hit is repeating
@@ -796,6 +827,78 @@ func _impact_delay_for(card: CardData) -> float:
 		if clip_length > 0.0:
 			delay = minf(delay, clip_length)
 	return delay
+
+# --- Devour ---
+
+# Whether Devour can be used now: a use left this turn, on the player's
+# turn with nothing resolving, and no hand choice open.
+func is_devour_available() -> bool:
+	return player != null and _devour_uses_this_turn < devour_uses_per_turn and not _input_locked and not _choice_open()
+
+# Whether this turn's Devours are spent.
+func is_devour_used() -> bool:
+	return _devour_uses_this_turn >= devour_uses_per_turn
+
+# Whether Devour is a target right now: available, with a card armed.
+func is_devour_lit() -> bool:
+	return is_devour_available() and _pending_card_view != null
+
+func _emit_devour_changed() -> void:
+	devour_changed.emit(is_devour_available(), is_devour_used())
+
+# Devour, clicked (DevourButton): the armed card is eaten - see
+# _devour_card(). Nothing armed, or no use left: nothing.
+func devour() -> void:
+	if not is_devour_available() or _pending_card_view == null:
+		return
+	var card_view: CardView = _pending_card_view
+	_pending_card_view = null
+	if _pending_consume_view != null and is_instance_valid(_pending_consume_view):
+		_pending_consume_view.set_marked(false)
+	_pending_consume_view = null
+	_clear_hover()
+	_set_cursor_enemy(null)
+	_enemy_rects.clear()
+	_devour_card(card_view, "armed")
+
+# The card leaves the hand without being played - no energy, no cost paid
+# any way (the free card, a reduction or a replacement all wait), no
+# effect, no Toll, not counted as played, no card_played - to the Spent
+# pile for this fight (Deck.spent_unplayed: back next fight even if it is
+# CONSUMED). The way a play does it: out of deck.hand at once, the hand
+# fading it out, in the pile at the fade's end. devour_heal_amount HP
+# back, capped at max, and one of this turn's uses spent. `route` is how
+# it was chosen, for the run log: "armed" (the card first) or "pick"
+# (Devour first).
+func _devour_card(card_view: CardView, route: String) -> void:
+	var card: CardData = card_view.card_data
+	var playable: bool = _is_playable(card)
+	_devour_uses_this_turn += 1
+	_input_locked = true
+	deck.begin_play(card)
+	deck.spent_unplayed.append(card)
+	card_devoured.emit(card)
+	_hand_container.play_card(card, Vector2.ZERO)
+
+	var hp_before: int = player.hp
+	player.hp = mini(player.hp + maxi(devour_heal_amount, 0), player.max_hp)
+	if player.hp > hp_before:
+		_heal_run_hp(player.hp - hp_before, "devour")
+		hp_changed.emit(player.hp, player.max_hp)
+	RunLogger.event("devour", {"card": card.card_name, "playable": playable, "route": route, "hp_before": hp_before, "hp_after": player.hp})
+	# HP moved: the lethal flags follow, and a Critical line it may have
+	# left.
+	status_changed.emit()
+	_emit_intent_previews()
+	_emit_devour_changed()
+
+	var fade: float = maxf(_hand_container.play_fade_duration, 0.0)
+	if fade > 0.0:
+		await get_tree().create_timer(fade).timeout
+	deck.settle_play(true)
+	deck.end_play()
+	_input_locked = false
+	_emit_devour_changed()
 
 # Where a played card goes: the exhaust pile (true) for a SPENT or
 # CONSUMED card, and for a power or a stance - it has done its work once
@@ -1127,6 +1230,7 @@ func _start_player_turn() -> void:
 	# The run log's turn opens on the refill, before any tick it counts.
 	RunLogger.turn_started(player.energy)
 	cards_played_this_turn = 0
+	_devour_uses_this_turn = 0
 	# A fresh turn for every interrupt threshold, and for Toll spent
 	# (Condition.TOLL_SPENT_THIS_TURN).
 	player.damage_taken_this_turn = 0
