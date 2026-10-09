@@ -29,6 +29,10 @@
 #   --import         run Godot's --import first (--path or this tree)
 #   --logs DIR       where the logs go (default: a fresh temp folder)
 #   --list           print the plan and stop
+#   --batch K/N      run group K of the selection split into N groups of
+#                    near-equal measured time (tools/probe_times.txt):
+#                    --full --batch 1/4 ... 4/4 is the whole suite, a
+#                    group at a time
 #   --moved A[..B]   with --list: also print what the HEAD-moved check
 #                    would say had commits A..B (B default HEAD) landed
 #                    during this run - a dry run of that check
@@ -147,70 +151,20 @@ await_pid() {
 	wait "$1" 2>/dev/null
 }
 
-# --- The probes: name, seconds on a serial run (2026-10-03), flags ---
+# --- The probes' flags, and their times ---
 # "serial": runs alone after the parallel batch - set for a probe that
 # proved flaky in parallel. "fixed": run at --fixed-fps 60 (the probe's
-# own header asks for it). The seconds only order the batch, longest first.
-PROBE_TABLE="
-keeper_keepsake_probe 75
-collector_probe 30
-elite_reward_probe 30
-enemy_export_probe 8
-belongings_choice_probe 51
-kill_order_probe 42
-blackback_probe 36
-toll_carry_probe 35
-trinket_probe 35
-keepsake_tile_probe 20
-collateral_probe 29
-blood_advance_probe 30
-garnish_probe 30
-claw_back_probe 30
-gnaw_probe 30
-settled_account_probe 30
-bide_probe 30
-frayed_cord_probe 30
-wear_path_probe 12
-deny_probe 40
-devour_probe 80
-dying_light_probe 40
-leverage_probe 29
-glassbone_probe 27
-run_log_probe 30
-ransom_probe 26
-heavy_hit_probe 30
-gold_line_probe 19
-armored_contact_probe 10
-drain_probe 10 fixed
-keyword_probe 9
-come_due_face_probe 7
-hold_line_probe 7 fixed
-floor4_probe 40 fixed
-floor5_probe 20 fixed
-run_lost_probe 12
-dunecur_probe 30
-adder_probe 45
-greyshelf_probe 45
-underfoot_probe 40
-scatter_probe 25
-card_rarity_probe 5
-come_due_probe 4
-second_swing_probe 15
-starter_cards_probe 4
-temper_probe 13
-play_order_probe 28
-grace_probe 3
-pathing_probe 60
-no_further_probe 3
-sentence_probe 3
-the_return_probe 3
-bundle_roll_probe 2
-critical_cards_probe 2
-wardling_probe 2
-siltjaw_probe 1
-enemy_fog_probe 25
-card_rarity_finish_probe 8
+# own header asks for it). A probe not listed has neither.
+PROBE_FLAGS="
+drain_probe fixed
+hold_line_probe fixed
+floor4_probe fixed
+floor5_probe fixed
 "
+# Measured seconds per probe (tools/probe_times.txt): what orders a run,
+# longest first, and balances --batch. Each run writes back what it
+# measured (record_times()).
+TIMES_FILE="$REPO/tools/probe_times.txt"
 
 # --- Areas: which probes guard which part of the game ---
 area_probes() {
@@ -360,6 +314,7 @@ DO_IMPORT=0
 LOGS=""
 LIST=0
 MOVED=""
+BATCH=""
 
 while [ $# -gt 0 ]; do
 	case "$1" in
@@ -380,6 +335,7 @@ while [ $# -gt 0 ]; do
 		--logs) LOGS="${2:?--logs needs a folder}"; shift ;;
 		--list) LIST=1 ;;
 		--moved) MOVED="${2:?--moved needs a commit or range}"; shift ;;
+		--batch) BATCH="${2:?--batch needs K/N}"; shift ;;
 		--list-areas) for a in $AREAS_ALL; do printf '%-11s %s\n' "$a" "$(area_probes "$a")"; done; exit 0 ;;
 		-h|--help) awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; exit 0 ;;
 		*) die "unknown option $1 (--help)" ;;
@@ -389,6 +345,13 @@ done
 [ -n "$MODE" ] || die "say what to run: --full, --area, --changed or --probe (--help)"
 [ -n "$WORKTREE" ] && [ -n "$PROJECT" ] && die "--worktree and --path are exclusive"
 [ -n "$MOVED" ] && [ "$LIST" = 0 ] && die "--moved is a dry run of the HEAD-moved check: use it with --list"
+if [ -n "$BATCH" ]; then
+	case "$BATCH" in
+		[1-9]*/[1-9]*) ;;
+		*) die "--batch takes K/N, 1 <= K <= N" ;;
+	esac
+	[ "${BATCH%/*}" -le "${BATCH#*/}" ] 2>/dev/null || die "--batch takes K/N, 1 <= K <= N"
+fi
 
 # --- What changed (for --changed, and for the HEAD-moved check) ---
 # Every path list below is one path per line - never split on spaces, so
@@ -475,8 +438,24 @@ report_head_moved() {
 	fi
 }
 
-table_seconds() { echo "$PROBE_TABLE" | awk -v n="$1" '$1 == n { print $2; f = 1 } END { if (!f) print 60 }'; }
-table_flag() { echo "$PROBE_TABLE" | awk -v n="$1" -v f="$2" '$1 == n { for (i = 3; i <= NF; i++) if ($i == f) print "yes" }'; }
+table_seconds() { awk -v n="$1" '$1 == n { print $2; f = 1 } END { if (!f) print 60 }' "$TIMES_FILE" 2>/dev/null || echo 60; }
+table_flag() { echo "$PROBE_FLAGS" | awk -v n="$1" -v f="$2" '$1 == n { for (i = 2; i <= NF; i++) if ($i == f) print "yes" }'; }
+
+# --batch K/N: the selection split into N groups of near-equal measured
+# time - each probe, longest first, to the group with the least so far -
+# and only group K run. The split reads the times as committed at HEAD,
+# not the working copy each run writes back to, so batch 2 splits the
+# same way batch 1 did and every probe runs in exactly one of the N.
+if [ -n "$BATCH" ]; then
+	BATCH_K=${BATCH%/*}
+	BATCH_N=${BATCH#*/}
+	BATCH_TIMES=$(git -C "$REPO" show HEAD:tools/probe_times.txt 2>/dev/null || cat "$TIMES_FILE" 2>/dev/null)
+	SELECTED=$(for p in $SELECTED; do echo "$(echo "$BATCH_TIMES" | awk -v n="$p" '$1 == n { print $2; f = 1 } END { if (!f) print 60 }') $p"; done \
+		| sort -k1,1rn -k2,2 \
+		| awk -v k="$BATCH_K" -v n="$BATCH_N" '{ b = 1; for (i = 2; i <= n; i++) if (t[i] < t[b]) b = i; t[b] += $1; if (b == k) print $2 }')
+	echo "run_probes: batch $BATCH_K/$BATCH_N:" $SELECTED
+	[ -n "$SELECTED" ] || { echo "run_probes: batch $BATCH is empty - nothing to run"; exit 0; }
+fi
 
 # Longest first; serial ones apart.
 PARALLEL=""
@@ -642,6 +621,23 @@ for p in $SERIAL; do await_memory; run_one "$p" & await_pid $!; done
 T1=$(date +%s)
 
 FAILED=$(grep -c ' FAIL ' "$LOGS/_results.txt" 2>/dev/null)
+
+# What this run measured, into TIMES_FILE: each probe that passed, its
+# new time averaged with the one there (or as measured, if it's new). A
+# failed probe's time stays - a failure can end early.
+record_times() {
+	local tmp="$TIMES_FILE.$$"
+	[ -f "$TIMES_FILE" ] || return 0
+	awk 'FNR == NR { if ($2 == "PASS") { t = $3; sub(/s$/, "", t); m[$1] = t }; next }
+		/^#/ || NF < 2 { print; next }
+		($1 in m) { $2 = int(($2 + m[$1]) / 2 + 0.5); seen[$1] = 1 }
+		{ print }
+		END { for (p in m) if (!(p in seen)) print p, m[p] }' "$LOGS/_results.txt" "$TIMES_FILE" > "$tmp" \
+		&& { grep '^#' "$tmp"; grep -v '^#' "$tmp" | sort; } > "$tmp.sorted" \
+		&& mv "$tmp.sorted" "$TIMES_FILE"
+	rm -f "$tmp" "$tmp.sorted"
+}
+record_times
 echo "run_probes: $((COUNT - FAILED)) of $COUNT passed in $((T1 - T0))s"
 
 # --- Did HEAD move under the run? ---
