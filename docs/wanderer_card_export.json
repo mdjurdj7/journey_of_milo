@@ -177,7 +177,7 @@
       },
       {
         "name": "Marks (Come Due)",
-        "rule": "A status on an enemy that adds damage to your next N Attacks against it, once per card per enemy, spending a charge each."
+        "rule": "A status on an enemy that adds damage to your next N Attacks against it, once per card per enemy, spending a charge each - and again on a repeated hit (Second Swing), spending another charge while one is left."
       },
       {
         "name": "Cost changes",
@@ -1732,7 +1732,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Each hit adds the ongoing attack bonus - the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) - so under Self-Eater both hits deal 9. One-shots go to the first hit only: Keen's +3 (one Attack) and a Come Due mark's +4, spending one charge. Self-Eater's 2 HP per stack is paid once for the card, before the first hit, and the Toll it makes counts toward the 6. The face shows one hit's number.",
+          "rule": "Each hit adds the ongoing attack bonus - the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) - so under Self-Eater both hits deal 9. Keen's +3 (one Attack) goes to the first hit only. A Come Due mark's +4 goes to each hit, spending a charge per hit; with one charge left the first hit takes it and the repeat lands bare. Self-Eater's 2 HP per stack is paid once for the card, before the first hit, and the Toll it makes counts toward the 6. The face shows one hit's number.",
           "default_displayed": "no bonus outside a fight"
         },
         {

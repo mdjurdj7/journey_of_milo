@@ -42,7 +42,8 @@ var attack_bonus_taken: bool = false
 # a countdown, once per card. Cleared per card by resolve_card().
 var toll_spent_this_card: bool = false
 # The enemies whose mark this card has already been paid (take_mark_
-# bonus()). Cleared per card by resolve_card().
+# bonus()). Cleared per card by resolve_card(), and per enemy for a
+# repeated hit (repeat_mark_bonus()).
 var mark_bonus_paid: Array[Combatant] = []
 
 # HP a card still in hand will have paid before its conditions are read -
@@ -115,8 +116,8 @@ func take_attack_bonus() -> int:
 # Effect.repeat_toll_cost - Second Swing): the ongoing part alone (Attack
 # Bonus.ongoing_for_player()), every time it's asked - a one-shot charge
 # went with the first hit, and spends nothing here. 0 on anything but an
-# ATTACK. The mark bonus stays once per card: take_mark_bonus() pays it
-# to the first hit only.
+# ATTACK. The mark is paid to the repeat as well, a charge for each hit
+# (repeat_mark_bonus()).
 func take_repeat_attack_bonus() -> int:
 	if not card_is_attack:
 		return 0
@@ -139,13 +140,23 @@ func spend_toll(amount: int) -> int:
 # carries (StatusData.attack_bonus_against_holder - Come Due), ONCE per
 # card per enemy, like the attack bonus: the first damage effect to land
 # on it gets the bonus and spends a charge of each mark, every later one
-# 0. Per enemy, so an all-enemies Attack pays it to the marked enemy
-# alone. 0 on anything but an ATTACK, which spends nothing.
+# 0 - save a repeated hit (repeat_mark_bonus()), which is paid again.
+# Per enemy, so an all-enemies Attack pays it to the marked enemy alone.
+# 0 on anything but an ATTACK, which spends nothing.
 func take_mark_bonus(enemy: Combatant) -> int:
 	if not card_is_attack or enemy == null or mark_bonus_paid.has(enemy):
 		return 0
 	mark_bonus_paid.append(enemy)
 	return Status.spend_mark_bonus(enemy.statuses)
+
+# A hit of this card is landing again (CardEffect.repeat_toll_cost -
+# Second Swing): its mark is paid again on each enemy the repeat strikes,
+# so the next take_mark_bonus() there takes the bonus and spends another
+# charge - while a charge is left; a mark the first hit spent the last of
+# is gone, and the repeat lands bare.
+func repeat_mark_bonus(enemies: Array[Combatant]) -> void:
+	for enemy in enemies:
+		mark_bonus_paid.erase(enemy)
 
 # What take_mark_bonus() would pay this card against `enemy`, spending
 # nothing - the card face's reading of the same gate.

@@ -5,8 +5,9 @@ extends SceneTree
 # Under 6 Toll one hit and nothing spent, and the card is never blocked;
 # 6 or more, two hits and exactly 6 spent; a first hit that kills skips
 # the repeat and spends nothing. Under Self-Eater both hits take its +3
-# (its HP paid once); Keen's one-shot +3 and Come Due's mark go to the
-# first hit only. Played into the Greyshelf's Gape, one Goaded stack, not
+# (its HP paid once); Keen's one-shot +3 goes to the first hit only, and
+# Come Due's mark to each hit, a charge apiece - a mark with one charge
+# left pays the first hit and the repeat lands bare. Played into the Greyshelf's Gape, one Goaded stack, not
 # two. Its art loads mipmapped, its face reads its live number and its
 # text fits at the first rules size. Played for real, the repeat is a
 # blow of its own: two damage events second_swing_delay apart, the HP bar
@@ -166,8 +167,9 @@ func _check_self_eater() -> void:
 	_expect_eq(short.toll, 0, "...and spends all 6")
 	_completed += 1
 
-# Keen's charge (+3 on the next Attack) and Come Due's mark (+4) go to the
-# first hit; the second lands the bare 6.
+# Keen's charge (+3 on the next Attack) goes to the first hit; Come Due's
+# mark (+4) to both, a charge each - 13, then 10, one charge left. A mark
+# down to its last charge: 10, then the bare 6, and the mark gone.
 func _check_one_shots_first_hit_only() -> void:
 	var player: Combatant = _player()
 	Status.apply_to(player.statuses, load(KEEN_PATH) as StatusData)
@@ -182,9 +184,20 @@ func _check_one_shots_first_hit_only() -> void:
 		if target == enemy and kind == "card":
 			hits.append(amount)
 	_resolver.resolve_card(_card(), ctx)
-	_expect_eq(hits, [HIT + KEEN_BONUS + MARK_BONUS, HIT] as Array[int], "Keen and the mark: 13 on the first hit, 6 on the second")
+	_expect_eq(hits, [HIT + KEEN_BONUS + MARK_BONUS, HIT + MARK_BONUS] as Array[int], "Keen and the mark: 13 on the first hit, 10 on the second")
 	_expect(Status.find_in(player.statuses, load(KEEN_PATH) as StatusData) == null, "...Keen's one charge spent")
-	_expect_eq(_mark_charges(enemy), 2, "...one charge of the mark spent, not two")
+	_expect_eq(_mark_charges(enemy), 1, "...two charges of the mark spent, one a hit")
+
+	# The mark's last charge: the first hit takes it, the repeat lands bare.
+	hits.clear()
+	player.toll = REPEAT_TOLL
+	ctx = _ctx(player, [enemy])
+	ctx.on_damage = func(target: Combatant, amount: int, kind: String) -> void:
+		if target == enemy and kind == "card":
+			hits.append(amount)
+	_resolver.resolve_card(_card(), ctx)
+	_expect_eq(hits, [HIT + MARK_BONUS, HIT] as Array[int], "One charge left: 10 on the first hit, the bare 6 on the second")
+	_expect_eq(_mark_charges(enemy), 0, "...and the mark gone")
 	_completed += 1
 
 func _check_pools() -> void:

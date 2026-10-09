@@ -32,9 +32,10 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	# it left standing - a first hit that killed everything it struck
 	# skips the repeat and spends nothing. Otherwise a player holding the
 	# Toll spends it and the same hit lands again: the same number, with
-	# the ongoing bonus again (take_repeat_attack_bonus()) but not a
-	# one-shot charge or a mark, which the first hit had. One card all the
-	# same - counted once by whatever counts cards.
+	# the ongoing bonus again (take_repeat_attack_bonus()) and a mark's
+	# bonus again, spending another charge (repeat_mark_bonus()), but not
+	# a one-shot charge, which the first hit had. One card all the same -
+	# counted once by whatever counts cards.
 	if effect.repeat_toll_cost <= 0:
 		return
 	var standing: Array[Combatant] = []
@@ -46,6 +47,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	if ctx.on_repeat.is_valid():
 		ctx.on_repeat.call()
 	ctx.spend_toll(effect.repeat_toll_cost)
+	ctx.repeat_mark_bonus(standing)
 	_drain(effect, _land(base + ctx.take_repeat_attack_bonus(), standing, ctx), ctx)
 
 # A Draining hit (CardEffect.drains - Claw Back) heals what it took.
@@ -59,8 +61,9 @@ func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> int:
 	var taken: int = 0
 	for enemy in targets:
 		# A mark on this enemy (Come Due) adds to the blow against it
-		# alone, once per card - so it's per target, and like the attack
-		# bonus it goes in before the modifiers.
+		# alone, once per card and again for a repeated hit - so it's per
+		# target, and like the attack bonus it goes in before the
+		# modifiers.
 		var hp_before: int = enemy.hp
 		var result := DamagePipeline.resolve(landed(blow + ctx.take_mark_bonus(enemy), ctx.player, enemy), enemy)
 		if enemy.hp <= 0:
