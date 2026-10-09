@@ -203,7 +203,8 @@ func _check_persists_then_ends() -> void:
 	_completed += 1
 
 # Two Leverages, then a card: the second adds to the first rather than
-# spending it, and one card takes all 4 off - Ransom's 3 to 0 - then it's
+# spending it, and one card takes all 4 off - a 3-cost Ransom's 3 to 0 -
+# then it's
 # gone.
 func _check_two_stack() -> void:
 	var controller: Node = await _start_fight()
@@ -215,7 +216,8 @@ func _check_two_stack() -> void:
 		_expect_eq(player.toll, 0, "Two Leverages spend 10 Toll")
 		_expect_eq(_status_label(player), "Leverage ×2", "...and read Leverage ×2")
 		_expect_eq(Status.cost_reduction(player.statuses), 4, "...4 off the next card")
-		var ransom: CardData = await _deal(controller, RANSOM_PATH)
+		# A Ransom made to cost 3 (it costs 2): more than one Leverage takes.
+		var ransom: CardData = await _deal(controller, RANSOM_PATH, 3)
 		var blood_arc: CardData = await _deal(controller, BLOOD_ARC_PATH)
 		_expect_eq(player.energy_cost(ransom), 0, "...Ransom's 3 reads 0")
 		_expect_eq(player.energy_cost(blood_arc), 0, "...Blood Arc's 2 reads 0")
@@ -283,7 +285,8 @@ func _check_faces_and_sentence() -> void:
 		var hand: Object = controller.get("_hand_container")
 		var reckoning: CardData = await _deal(controller, RECKONING_PATH)
 		var slash: CardData = await _deal(controller, SLASH_PATH)
-		var ransom: CardData = await _deal(controller, RANSOM_PATH)
+		# A Ransom made to cost 3 (it costs 2): Leverage takes it to 1, not 0.
+		var ransom: CardData = await _deal(controller, RANSOM_PATH, 3)
 		_expect_eq([_face(controller, reckoning), _face(controller, slash), _face(controller, ransom)], ["2", "1", "3"], "Before Leverage: 2, 1, 3")
 		_expect(not hand.call("_can_play", reckoning, player.energy), "...and on 1 Energy Reckoning is out of reach")
 		await _play(controller, await _deal(controller, LEVERAGE_PATH))
@@ -347,8 +350,12 @@ func _teardown() -> void:
 		await process_frame
 
 # A fresh copy of the card at `path`, drawn into the hand.
-func _deal(controller: Node, path: String) -> CardData:
+# `cost`, when given, is the dealt copy's own - a card at a cost no real
+# one has.
+func _deal(controller: Node, path: String, cost: int = -1) -> CardData:
 	var card: CardData = (load(path) as CardData).duplicate()
+	if cost >= 0:
+		card.cost = cost
 	var deck: Object = controller.get("deck")
 	(deck.get("draw_pile") as Array).append(card)
 	deck.call("draw", 1)

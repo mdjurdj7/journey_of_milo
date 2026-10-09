@@ -89,7 +89,7 @@ func _check_data() -> void:
 	var card: CardData = load(RANSOM_PATH)
 	var waiting: StatusData = load(RANSOM_STATUS_PATH)
 	var active: StatusData = load(RANSOM_ACTIVE_PATH)
-	_expect_eq(card.cost, 3, "Ransom costs 3")
+	_expect_eq(card.cost, 2, "Ransom costs 2")
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.RARE, "...Rare")
 	_expect_eq(card.removal_scope, CardData.RemovalScope.SPENT, "...and Spent")
@@ -224,14 +224,14 @@ func _check_reckoning_and_skills() -> void:
 
 # --- Fights ---
 
-# The turn it's played: 3 Energy, the waiting line, and an Attack after it
+# The turn it's played: 2 Energy, the waiting line, and an Attack after it
 # heals nothing.
 func _check_turn_played() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var player: Combatant = controller.get("player")
 		await _play(controller, await _deal(controller, RANSOM_PATH))
-		_expect_eq(player.energy, 0, "Ransom costs 3 Energy")
+		_expect_eq(player.energy, 1, "Ransom costs 2 Energy (3 -> 1)")
 		_expect_eq(_ransom_lines(controller), [WAITING_TEXT], "The readout: Ransom / " + WAITING_TEXT)
 		player.energy = 3
 		var hp_before: int = player.hp
@@ -313,7 +313,7 @@ func _check_spent() -> void:
 	await _teardown()
 	_completed += 1
 
-# Collateral pays for it: 3 ≥ 2, so 0 Energy and 5 HP.
+# Collateral pays for it: 2 ≥ 2, so 0 Energy and 5 HP.
 func _check_collateral() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:

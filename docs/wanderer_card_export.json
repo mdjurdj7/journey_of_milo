@@ -1500,7 +1500,7 @@
       "pool_class": "wanderer",
       "card_type": "SKILL",
       "face_type_label": "UTILITY",
-      "energy_cost": 3,
+      "energy_cost": 2,
       "rarity": "RARE",
       "card_text": "Next turn, your Attacks heal half the damage dealt.\nSpent.",
       "face_hp_line": null,
@@ -1547,7 +1547,7 @@
         {
           "field": "cost",
           "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
-          "default_displayed": 3
+          "default_displayed": 2
         }
       ],
       "art_path": "res://cards/art/Wanderer/Ransom.png",

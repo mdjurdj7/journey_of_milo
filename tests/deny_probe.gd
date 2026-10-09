@@ -27,7 +27,6 @@ const DENIED_PATH := "res://battle/rules/statuses/denied.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const RECKONING_PATH := "res://cards/data/reckoning.tres"
 const BLOOD_ARC_PATH := "res://cards/data/blood_arc.tres"
-const RANSOM_PATH := "res://cards/data/ransom.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const ART_PATH := "res://cards/art/Wanderer/Deny.png"
 const SOUND_PATH := "res://assets/audio/cards/Deny/Deny.mp3"
@@ -371,8 +370,9 @@ func _check_second_deny_refused() -> void:
 func _check_faded_without_target() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
-		# Ransom, at 3, is what the first Deny takes - not the second Deny.
-		await _deal(controller, RANSOM_PATH)
+		# A Slash made to cost 3 is what the first Deny takes - not the
+		# second Deny. No real card costs more than Deny's 2 now.
+		await _deal(controller, SLASH_PATH, 3)
 		var first: CardData = await _deal(controller, DENY_PATH)
 		var second: CardData = await _deal(controller, DENY_PATH)
 		(controller.get("player") as Combatant).energy = 4
@@ -505,13 +505,17 @@ func _teardown() -> void:
 
 # A fresh copy of the card at `path`, drawn into the hand - the first
 # call of a case discards the opening hand.
-func _deal(controller: Node, path: String) -> CardData:
+# `cost`, when given, is the dealt copy's own - a card at a cost no real
+# one has.
+func _deal(controller: Node, path: String, cost: int = -1) -> CardData:
 	var deck: Object = controller.get("deck")
 	if not bool(controller.get_meta("probe_dealt", false)):
 		controller.set_meta("probe_dealt", true)
 		deck.call("discard_hand")
 		await process_frame
 	var card: CardData = (load(path) as CardData).duplicate()
+	if cost >= 0:
+		card.cost = cost
 	(deck.get("draw_pile") as Array).append(card)
 	deck.call("draw", 1)
 	await process_frame
