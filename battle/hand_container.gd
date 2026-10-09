@@ -134,8 +134,8 @@ signal draw_started(card_data: CardData)
 
 @export_group("Devour Exit")
 # A devoured card's way out (devour_card()), from the bite sound's start,
-# every value read as it starts: a notch bitten out of its left edge (the
-# side facing Devour's jaw) over devour_bite_sec, held devour_hold_sec,
+# every value read as it starts: its top-left corner bitten off (the side
+# facing Devour's jaw) over devour_bite_sec, held devour_hold_sec,
 # then the card shrinks to devour_end_scale of its size and slides into
 # the jaw (set_devour_target()), fading as it arrives - from
 # devour_fade_from of the way - over devour_slide_sec, eased in. The hand
@@ -145,19 +145,31 @@ signal draw_started(card_data: CardData)
 @export var devour_slide_sec: float = 0.35
 @export_range(0.01, 1.0) var devour_end_scale: float = 0.15
 @export_range(0.0, 1.0) var devour_fade_from: float = 0.4
-# The notch (battle/card_bite.gdshader), against the card's own size: this
-# deep into its width, cut by a disc devour_bite_radius_ratio of the width
-# across, centred devour_bite_centre_y down the card (0.5 the middle). Its
-# edge carries devour_tooth_count tooth marks of devour_tooth_radius_px,
-# devour_tooth_step_rad apart round the disc's rim; a line of the battle
-# ink devour_ink_width_px wide runs along the cut.
-@export_range(0.0, 1.0) var devour_bite_depth_ratio: float = 0.2
-@export_range(0.05, 1.0) var devour_bite_radius_ratio: float = 0.28
-@export_range(0.0, 1.0) var devour_bite_centre_y: float = 0.44
-@export var devour_tooth_count: int = 7
-@export var devour_tooth_radius_px: float = 7.0
-@export var devour_tooth_step_rad: float = 0.3
-@export var devour_ink_width_px: float = 1.5
+# The bite (battle/card_bite.gdshader), in the card's own px from its
+# top-left corner (the side facing Devour's jaw), y down: a disc centred
+# devour_bite_centre_px (just outside the corner), cut in along
+# devour_bite_angle_deg (54.5: the card's diagonal) devour_bite_depth_ratio
+# of the card's width at its deepest. Its edge inside the card is
+# devour_tooth_count pointed teeth, devour_tooth_height_px tall, each
+# one's height and width varied by up to devour_tooth_size_jitter /
+# devour_tooth_spacing_jitter of the mean, and the whole rim wobbles by up
+# to devour_edge_wobble_px - all drawn from a seed of the card view's own,
+# so every bite differs. Along the cut a line of the battle ink,
+# devour_ink_width_px at a tooth's root and devour_ink_tip_ratio of that at
+# its point; inside it a devour_torn_band_px band of the paper darkened by
+# devour_torn_band_strength, so the edge reads as torn.
+@export var devour_bite_centre_px: Vector2 = Vector2(-10.0, -12.0)
+@export_range(0.0, 90.0) var devour_bite_angle_deg: float = 54.5
+@export_range(0.0, 1.0) var devour_bite_depth_ratio: float = 0.38
+@export_range(1, 16) var devour_tooth_count: int = 8
+@export var devour_tooth_height_px: float = 9.0
+@export_range(0.0, 1.0) var devour_tooth_size_jitter: float = 0.3
+@export_range(0.0, 1.0) var devour_tooth_spacing_jitter: float = 0.2
+@export var devour_edge_wobble_px: float = 2.5
+@export var devour_ink_width_px: float = 2.5
+@export_range(0.0, 1.0) var devour_ink_tip_ratio: float = 0.5
+@export var devour_torn_band_px: float = 1.5
+@export_range(0.0, 1.0) var devour_torn_band_strength: float = 0.18
 @export_file("*.gdshader") var devour_bite_shader_path: String = "res://battle/card_bite.gdshader"
 # Bone-coloured flecks dropping from the bite as it is cut: this many, each
 # devour_fleck_size_px across, falling devour_fleck_fall_px over
@@ -790,7 +802,7 @@ func devour_card(card_data: CardData) -> float:
 
 	if devour_flecks_enabled:
 		var bone: Color = card_view.get_theme_color("bone", "Battle") if card_view.has_theme_color("bone", "Battle") else Color.WHITE
-		var bite_point := Vector2(card_view.size.x * devour_bite_depth_ratio, card_view.size.y * devour_bite_centre_y)
+		var bite_point: Vector2 = devour_bite_centre_px + Vector2.from_angle(deg_to_rad(devour_bite_angle_deg)) * _devour_bite_radius(card_view.size)
 		_drop_devour_flecks(slot.get_transform() * (card_view.get_transform() * bite_point), bone, slot.z_index)
 	var ink: Color = card_view.get_theme_color("ink", "Battle") if card_view.has_theme_color("ink", "Battle") else card_view.ink_color
 	var face: Control = card_view
@@ -830,14 +842,25 @@ func _devour_bite(slot: Control, card_view: CardView, ink: Color) -> Control:
 	material.shader = shader
 	material.set_shader_parameter("card_size", card_view.size)
 	material.set_shader_parameter("margin", DEVOUR_VIEW_MARGIN_PX)
-	material.set_shader_parameter("depth", card_view.size.x * devour_bite_depth_ratio)
-	material.set_shader_parameter("radius", card_view.size.x * devour_bite_radius_ratio)
-	material.set_shader_parameter("centre_y", devour_bite_centre_y)
-	material.set_shader_parameter("tooth_radius", devour_tooth_radius_px)
-	material.set_shader_parameter("tooth_step", devour_tooth_step_rad)
-	material.set_shader_parameter("tooth_count", maxi(devour_tooth_count, 1))
+	var radius: float = _devour_bite_radius(card_view.size)
+	var arc: Vector2 = _devour_bite_arc(radius)
+	material.set_shader_parameter("centre", devour_bite_centre_px)
+	material.set_shader_parameter("radius", radius)
+	material.set_shader_parameter("arc_from", arc.x)
+	material.set_shader_parameter("arc_to", arc.y)
+	material.set_shader_parameter("tooth_count", clampi(devour_tooth_count, 1, 16))
+	material.set_shader_parameter("tooth_height", devour_tooth_height_px)
+	material.set_shader_parameter("size_jitter", devour_tooth_size_jitter)
+	material.set_shader_parameter("spacing_jitter", devour_tooth_spacing_jitter)
+	material.set_shader_parameter("wobble", devour_edge_wobble_px)
+	# This card view's own: the same card bitten twice looks the same,
+	# two cards differently.
+	material.set_shader_parameter("seed", float(hash(card_view.get_instance_id()) % 10007) / 10007.0)
 	material.set_shader_parameter("ink_color", ink)
 	material.set_shader_parameter("ink_width", devour_ink_width_px)
+	material.set_shader_parameter("ink_tip_ratio", devour_ink_tip_ratio)
+	material.set_shader_parameter("torn_px", devour_torn_band_px)
+	material.set_shader_parameter("torn_strength", devour_torn_band_strength)
 	material.set_shader_parameter("progress", 0.0 if devour_bite_sec > 0.0 else 1.0)
 
 	# Where the card stood: its corner `margin` out, turned and scaled as
@@ -876,6 +899,25 @@ func _devour_bite(slot: Control, card_view: CardView, ink: Color) -> Control:
 	bitten.draw.connect(func() -> void: bitten.draw_texture_rect(viewport.get_texture(), Rect2(Vector2.ZERO, bitten.size), false))
 	bitten.queue_redraw()
 	return bitten
+
+# The bite's radius: its deepest point devour_bite_depth_ratio of the
+# card's width in from the corner, along devour_bite_angle_deg.
+func _devour_bite_radius(card_size_px: Vector2) -> float:
+	var axis: Vector2 = Vector2.from_angle(deg_to_rad(devour_bite_angle_deg))
+	return maxf(card_size_px.x * devour_bite_depth_ratio - devour_bite_centre_px.dot(axis), 1.0)
+
+# The angles (from the bite's centre) where its rim crosses into the card:
+# over the top edge (x) and the left (y) - the stretch that carries teeth.
+func _devour_bite_arc(radius: float) -> Vector2:
+	var c: Vector2 = devour_bite_centre_px
+	var axis: float = deg_to_rad(devour_bite_angle_deg)
+	var from: float = axis - 0.7
+	var to: float = axis + 0.7
+	if radius > absf(c.y):
+		from = atan2(-c.y, sqrt(radius * radius - c.y * c.y))
+	if radius > absf(c.x):
+		to = atan2(sqrt(radius * radius - c.x * c.x), -c.x)
+	return Vector2(from, to)
 
 # The nearest theme set above this hand - the battle's.
 func _inherited_theme() -> Theme:
