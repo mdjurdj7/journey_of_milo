@@ -10,6 +10,8 @@ class_name CardBonus
 #             value, something always resolves (Untouched).
 #   GATE    - neither: the condition decides whether the effect resolves
 #             at all (With Regards' heal on a kill).
+#   DRAIN   - drain_on_condition set: something always resolves, for
+#             value; the condition decides whether its hit drains (Gnaw).
 # resolved_value() is the number an effect lands for, given a context -
 # damage_effect.gd and undamaged_block_effect.gd deal exactly this, and
 # CardView prints exactly this - so the face can never promise a number
@@ -17,12 +19,14 @@ class_name CardBonus
 # whole card: over every effect whose condition can be judged before the
 # card is played (TARGET_KILLED can't - it reads the card's own damage).
 
-enum Mode { NONE, GATE, REPLACE, ADD }
+enum Mode { NONE, GATE, REPLACE, ADD, DRAIN }
 enum State { NONE, DORMANT, LIVE }
 
 static func mode(effect: CardEffect) -> Mode:
 	if effect == null or effect.condition == CardEffect.Condition.NONE:
 		return Mode.NONE
+	if effect.drain_on_condition:
+		return Mode.DRAIN
 	if effect.alt_value != 0:
 		return Mode.REPLACE
 	if effect.bonus_value != 0:
@@ -58,7 +62,8 @@ static func resolved_value(effect: CardEffect, ctx: EffectContext) -> int:
 			return effect.value
 
 # The number the condition is FOR - what the clause prints: alt_value on
-# a REPLACE, bonus_value on an ADD, the effect's own value on a GATE.
+# a REPLACE, bonus_value on an ADD, the effect's own value on a GATE or a
+# DRAIN.
 static func bonus_value(effect: CardEffect) -> int:
 	match mode(effect):
 		Mode.REPLACE:
@@ -71,6 +76,13 @@ static func bonus_value(effect: CardEffect) -> int:
 # The card's reading: LIVE if any previewable condition on it holds now,
 # DORMANT if it has one and none holds, NONE if it has none - in which
 # case the face shows nothing either way.
+# Whether the hit of a DAMAGE effect drains in this context: always with
+# `drains`, and with drain_on_condition while its condition holds.
+static func drains(effect: CardEffect, ctx: EffectContext) -> bool:
+	if effect.drains:
+		return true
+	return mode(effect) == Mode.DRAIN and EffectResolver.condition_met(effect, ctx)
+
 static func state(card: CardData, ctx: EffectContext) -> State:
 	if card == null or ctx == null:
 		return State.NONE

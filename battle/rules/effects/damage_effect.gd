@@ -26,7 +26,11 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	# scales outgoing damage scales the whole blow, bonus included, rather
 	# than only the part the card authored. Taken once per card: a second
 	# damage effect on the same Attack gets 0 (take_attack_bonus()).
-	_drain(effect, _land(base + ctx.take_attack_bonus(), targets, ctx), ctx)
+	# Whether its hits drain is judged now, before they land
+	# (CardBonus.drains() - always for `drains`, on a met condition for
+	# drain_on_condition).
+	var drains: bool = CardBonus.drains(effect, ctx)
+	_drain(drains, _land(base + ctx.take_attack_bonus(), targets, ctx), ctx)
 
 	# A repeat (Second Swing): judged as the first hit resolves, on what
 	# it left standing - a first hit that killed everything it struck
@@ -48,11 +52,12 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 		ctx.on_repeat.call()
 	ctx.spend_toll(effect.repeat_toll_cost)
 	ctx.repeat_mark_bonus(standing)
-	_drain(effect, _land(base + ctx.take_repeat_attack_bonus(), standing, ctx), ctx)
+	_drain(drains, _land(base + ctx.take_repeat_attack_bonus(), standing, ctx), ctx)
 
-# A Draining hit (CardEffect.drains - Claw Back) heals what it took.
-func _drain(effect: CardEffect, taken: int, ctx: EffectContext) -> void:
-	if effect.drains:
+# A Draining hit (CardEffect.drains - Claw Back; drain_on_condition -
+# Gnaw) heals what it took.
+func _drain(drains: bool, taken: int, ctx: EffectContext) -> void:
+	if drains:
 		ctx.heal(taken)
 
 # One hit of `blow` on each of `targets`. Returns the HP the hits took,

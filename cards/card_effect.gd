@@ -18,7 +18,8 @@ enum EffectType {
 	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL, DRAIN, SET_ASIDE, CONSUME,
 }
 
-# When the effect resolves, or with what number. Three modes, told apart
+# When the effect resolves, with what number, or - for a DAMAGE effect
+# with drain_on_condition - whether its hit drains. Four modes, told apart
 # from the fields below by CardBonus.mode() and NOWHERE else:
 #   GATE    - alt_value and bonus_value both 0: condition false and the
 #             effect doesn't resolve at all (With Regards' heal).
@@ -35,7 +36,10 @@ enum EffectType {
 # CRITICAL reads the character's own threshold (Combatant.is_critical_at())
 # rather than condition_value, so every Critical card moves together when
 # it's tuned.
-enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE, UNDAMAGED_LAST_TURN, CRITICAL }
+# TOLL_SPENT_THIS_TURN: any Toll spent this turn before the card resolves,
+# by any card or effect (Combatant.toll_spent_this_turn) - Gnaw's drain.
+# Appended: an inserted value would rewrite every .tres that stores one.
+enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE, UNDAMAGED_LAST_TURN, CRITICAL, TOLL_SPENT_THIS_TURN }
 
 # Which combatant(s) an effect resolves against - lets DAMAGE_ALL collapse
 # into plain DAMAGE (target_scope = ALL_ENEMIES) instead of needing its
@@ -90,6 +94,12 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 # the attack bonus and a mark are in it, and an Attack's Drain under
 # Ransom (StatusData.attacks_drain) still adds its share on top. Not the
 # DRAIN effect, which is no Attack's blow.
+
+@export var drain_on_condition: bool = false
+# Read by DAMAGE only, with a condition: the hit always lands for `value`
+# and drains as `drains` does, but only while the condition holds (Gnaw:
+# Toll spent this turn) - CardBonus.Mode.DRAIN. Judged as the effect
+# resolves, before its hit. False: `drains` alone says whether it drains.
 
 @export var stance_data: StanceData = null
 # Read by APPLY_STANCE only. The stance a STANCE card takes - or deepens,

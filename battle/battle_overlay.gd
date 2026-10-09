@@ -711,18 +711,30 @@ func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
 				_card_override_player.bus = &"SFX"
 				add_child(_card_override_player)
 			_card_override_player.stream = stream
-			# Critical as it plays: the card's own Critical pitch and lift
-			# (CardData.critical_sound_pitch / _volume_db), 1.0 and 0 by
-			# default.
-			var critical: bool = battle_controller != null and battle_controller.player != null and battle_controller.player.is_critical()
-			_card_override_player.pitch_scale = card.critical_sound_pitch if critical else 1.0
-			_card_override_player.volume_db = card_override_volume_db + (card.critical_sound_volume_db if critical else 0.0)
+			# The card's condition live as it plays: its own pitch and
+			# lift (CardData.critical_sound_pitch / _volume_db), 1.0 and 0
+			# by default.
+			var live: bool = _condition_live_at_commit(card)
+			_card_override_player.pitch_scale = card.critical_sound_pitch if live else 1.0
+			_card_override_player.volume_db = card_override_volume_db + (card.critical_sound_volume_db if live else 0.0)
 			_card_override_player.play()
 			return
 		push_warning("BattleOverlay: '%s' names a play sound that failed to load (%s); using the shared cue." % [card.card_name, card.play_sound_path])
 	if _card_play_player != null and _card_play_player.stream != null:
 		_card_play_player.volume_db = card_play_volume_db
 		_card_play_player.play()
+
+# Whether `card`'s condition is live as it is committed - the face's
+# reading (CardBonus.state()) of the battle as it stands then: the card's
+# Energy paid, nothing of it resolved, no HP price counted, and itself not
+# among the cards played before it (the commit has already counted it).
+# Critical on Claw Back is exactly the player's Critical then.
+func _condition_live_at_commit(card: CardData) -> bool:
+	if battle_controller == null or battle_controller.player == null:
+		return false
+	var ctx: EffectContext = battle_controller.preview_context()
+	ctx.cards_played_before_this = maxi(ctx.cards_played_before_this - 1, 0)
+	return CardBonus.state(card, ctx) == CardBonus.State.LIVE
 
 # A drawn card leaves the deck: the draw sound, on the next voice, its
 # pitch jittered.

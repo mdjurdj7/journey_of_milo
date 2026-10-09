@@ -177,4 +177,6 @@ static func condition_met(effect: CardEffect, ctx: EffectContext) -> bool:
 			return not ctx.player.took_damage_last_turn
 		CardEffect.Condition.CRITICAL:
 			return ctx.player.is_critical_at(ctx.player.hp - ctx.preview_hp_cost)
+		CardEffect.Condition.TOLL_SPENT_THIS_TURN:
+			return ctx.player.toll_spent_this_turn
 	return true

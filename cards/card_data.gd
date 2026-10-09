@@ -75,12 +75,13 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 # anything the card goes on to do (Self-Eater's per-Attack HP loss, a
 # stance ending), and never outside a battle hand.
 @export_file("*.wav", "*.mp3", "*.ogg") var play_sound_path: String = ""
-# Read with play_sound_path only: played while the player is Critical,
-# the card's own sound takes this pitch and this many dB on top of its
-# usual level (Claw Back's deeper, louder take). Judged as it plays, at
-# commit - before the card resolves, so an HP price paid then (Self-
-# Eater's, Collateral's) that tips the player into Critical doesn't
-# count. 1.0 and 0: unchanged.
+# Read with play_sound_path only: played while the card's condition is
+# live (CardBonus.state() LIVE - Critical for Claw Back's deeper, louder
+# take; Toll spent this turn for Gnaw's), the card's own sound takes this
+# pitch and this many dB on top of its usual level. Named for the first
+# card that used them. Judged as it plays, at commit - before the card
+# resolves, so an HP price paid then (Self-Eater's, Collateral's) that
+# tips the player into Critical doesn't count. 1.0 and 0: unchanged.
 @export var critical_sound_pitch: float = 1.0
 @export var critical_sound_volume_db: float = 0.0
 

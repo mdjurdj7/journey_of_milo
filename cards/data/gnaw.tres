@@ -1,0 +1,26 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://dtitlmtsqa16p" path="res://cards/art/Wanderer/Gnaw.png" id="9_art"]
+
+[sub_resource type="Resource" id="CardEffect_damage"]
+script = ExtResource("2_card_effect")
+value = 3
+condition = 8
+drain_on_condition = true
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Gnaw"
+rarity = 1
+cost = 0
+card_type = 0
+target_type = 0
+description = "Deal {damage} damage. {if}Toll spent this turn: drain {damage}.{/if}"
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
+battle_animation = &"Slash"
+impact_time = 0.55
+art = ExtResource("9_art")
+play_sound_path = "res://assets/audio/cards/Gnaw/Gnaw.mp3"
+critical_sound_pitch = 0.9

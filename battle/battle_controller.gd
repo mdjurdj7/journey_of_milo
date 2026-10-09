@@ -1127,8 +1127,10 @@ func _start_player_turn() -> void:
 	# The run log's turn opens on the refill, before any tick it counts.
 	RunLogger.turn_started(player.energy)
 	cards_played_this_turn = 0
-	# A fresh turn for every interrupt threshold.
+	# A fresh turn for every interrupt threshold, and for Toll spent
+	# (Condition.TOLL_SPENT_THIS_TURN).
 	player.damage_taken_this_turn = 0
+	player.toll_spent_this_turn = false
 	for enemy in enemies:
 		var combatant: Combatant = _combatants.get(enemy)
 		if combatant != null:

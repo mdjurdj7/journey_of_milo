@@ -65,6 +65,10 @@ var grace_cap_mode: int = CharacterData.GraceCapMode.LARGEST_HIT
 var grace_window_turns: int = 1
 var grace_open_fraction: float = 0.5
 var took_damage_this_turn: bool = false
+# Any Toll spent since this turn began, by any card or effect - set by
+# EffectContext.spend_toll(), cleared by BattleController._start_player_
+# turn(). Read by CardEffect.Condition.TOLL_SPENT_THIS_TURN (Gnaw).
+var toll_spent_this_turn: bool = false
 var took_damage_last_turn: bool = false
 # Critical: HP at or below this fraction of max HP. A default only, like
 # the Grace fields above - BattleController.setup() copies CharacterData.
