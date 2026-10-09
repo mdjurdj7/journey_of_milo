@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the three in the belongings pool, and Endure, which no pool offers. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing and Garnish",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish and Claw Back",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 30,
+    "total_unique_wanderer_cards": 31,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 25,
+      "count": 26,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -77,12 +77,13 @@
         "Deny",
         "Blood Advance",
         "Second Swing",
-        "Garnish"
+        "Garnish",
+        "Claw Back"
       ],
       "by_rarity": {
         "COMMON": 7,
         "UNCOMMON": 11,
-        "RARE": 7
+        "RARE": 8
       },
       "weights": "all 1.0 (weights array empty)"
     },
@@ -99,14 +100,14 @@
     },
     "wanderer_card_types": {
       "SKILL": 15,
-      "ATTACK": 9,
+      "ATTACK": 10,
       "POWER": 4,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
       "COMMON": 11,
       "UNCOMMON": 12,
-      "RARE": 7
+      "RARE": 8
     },
     "implemented_but_not_obtainable": [
       "Endure"
@@ -148,7 +149,7 @@
       },
       {
         "name": "Drain",
-        "rule": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one. Ransom's turn and The Return's trigger Drain."
+        "rule": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one. Ransom's turn and The Return's trigger Drain. Claw Back's hit Drains too: an Attack's own blow, so its bonuses are in the heal, Ransom's half comes on top, and it heals only what Grace doesn't reclaim."
       },
       {
         "name": "Spent",
@@ -541,6 +542,83 @@
         }
       ],
       "art_path": "res://cards/art/Wanderer/Carve.png",
+      "rules_font_px": 15,
+      "battle_animation": "Slash",
+      "play_effect_scene_path": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Claw Back",
+      "file_path": "res://cards/data/claw_back.tres",
+      "pool_class": "wanderer",
+      "card_type": "ATTACK",
+      "face_type_label": "STRIKE",
+      "energy_cost": 2,
+      "rarity": "RARE",
+      "card_text": "Drain 5. Critical: drain 12.\nSpent.",
+      "face_hp_line": null,
+      "card_text_template": "{else}Drain {damage}.{/else} {if}Critical: drain {alt_damage}.{/if}\nSpent.",
+      "targeting": "enemy",
+      "removal_after_play": "Spent: leaves this fight's rotation once played",
+      "effects": [
+        {
+          "type": "DAMAGE",
+          "plain_english": "Deal 5 damage to the target; if you are Critical, 12 instead. The hit Drains (CardEffect.drains): heal the HP it actually took - after block, no overkill, less what Grace reclaims from it - up to max HP. The card's own blow, so the attack bonus and a Come Due mark are in the hit and its heal, and under Ransom its half of the damage dealt heals on top."
+        }
+      ],
+      "keywords": [
+        "Drain",
+        "Critical",
+        "Spent"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": 5,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "status_effect": null,
+      "critical_condition": {
+        "rule": "Critical = HP at or below 30% of max HP, checked when the effect resolves (after any HP this card paid before it - Self-Eater's price can tip it in).",
+        "effect": "DAMAGE",
+        "normal_value": 5,
+        "critical_value": 12
+      },
+      "dynamic_values": [
+        {
+          "field": "damage",
+          "rule": "5 normally, 12 while Critical; the face previews the live state in battle. The heal follows the hit.",
+          "default_displayed": "5 / 12"
+        },
+        {
+          "field": "damage",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "default_displayed": "no bonus outside a fight"
+        },
+        {
+          "field": "cost",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "default_displayed": 2
+        }
+      ],
+      "play_sound": {
+        "path": "res://assets/audio/cards/Claw Back/Claw Back.mp3",
+        "critical_sound_pitch": 0.85,
+        "critical_sound_volume_db": 2.0,
+        "rule": "Played while Critical (judged at play, before Self-Eater's price is paid), the sound plays at pitch 0.85 and 2 dB louder."
+      },
+      "art_path": "res://cards/art/Wanderer/Claw Back.png",
       "rules_font_px": 15,
       "battle_animation": "Slash",
       "play_effect_scene_path": null,
