@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "unbroken"
+display_name = "Unbroken"
+description = "The next Attack against you deals {value} less."
+default_magnitude = 4
+default_duration_turns = -2
+stack_rule = 1
+consumed_by_attack_against = true
+reduces_attack_total = true

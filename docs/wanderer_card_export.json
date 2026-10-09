@@ -199,6 +199,10 @@
       {
         "name": "Garnished (enemy)",
         "rule": "Garnish's debuff: the enemy's next Attack deals 5 less in all, not per hit - its hits soak the 5 in order, none below 0 (Tail Lash 4×3 lands 0, 3, 4). After Braced's 50%, before Block. Copies add up (two: 10 less). Gone once that Attack resolves; a non-attack move, a Denied or interrupted Attack leave it standing."
+      },
+      {
+        "name": "Unbroken (you)",
+        "rule": "Unbroken's status at Critical: the next enemy Attack against you deals 4 less in all, its hits soaking it in order. After other modifiers, before Block; adds to Garnished on the attacker. Copies add up (two: 8). Gone once an enemy Attack against you resolves; a Defend or other move leaves it."
       }
     ]
   },
@@ -2140,15 +2144,19 @@
       "face_type_label": "GUARD",
       "energy_cost": 1,
       "rarity": "COMMON",
-      "card_text": "Gain 6 block. Critical: gain 11.",
+      "card_text": "Gain 6 block.\nCritical: the next Attack against you deals 4 less.",
       "face_hp_line": null,
-      "card_text_template": "{else}Gain {block} block.{/else} {if}Critical: gain {alt_block}.{/if}",
+      "card_text_template": "Gain {block} block.\n{if}Critical: the next Attack against you deals 4 less.{/if}",
       "targeting": "self",
       "removal_after_play": "discard pile",
       "effects": [
         {
           "type": "BLOCK",
-          "plain_english": "Gain 6 block; if you are Critical, 11 block instead."
+          "plain_english": "Gain 6 block."
+        },
+        {
+          "type": "APPLY_STATUS",
+          "plain_english": "If you are Critical: apply Unbroken 4 to yourself - the next enemy Attack against you deals 4 less in all, its hits soaking it in order (4×3 lands 0, 4, 4), after other modifiers and before block. Above Critical, nothing."
         }
       ],
       "keywords": [
@@ -2164,22 +2172,33 @@
       "persistent_effect": null,
       "stance_effect": null,
       "power_effect": null,
-      "status_effect": null,
+      "status_effect": {
+        "id": "unbroken",
+        "name": "Unbroken",
+        "description": "The next Attack against you deals {value} less.",
+        "file_path": "res://battle/rules/statuses/unbroken.tres",
+        "duration": "until triggered",
+        "stack_rule": "ADD_MAGNITUDE",
+        "applied_to": "self",
+        "magnitude": 4,
+        "reduces_attack_total": true,
+        "consumed_by_attack_against": true
+      },
       "critical_condition": {
-        "rule": "Critical = HP at or below 30% of max HP, checked when the effect resolves (after any HP this card paid before it).",
-        "effect": "BLOCK",
-        "normal_value": 6,
-        "critical_value": 11
+        "rule": "Critical = HP at or below 30% of max HP, checked when the effect resolves.",
+        "effect": "APPLY_STATUS",
+        "normal_value": "no status",
+        "critical_value": "Unbroken 4"
       },
       "dynamic_values": [
         {
-          "field": "block",
-          "rule": "6 normally, 11 while Critical; the face previews the live state in battle.",
-          "default_displayed": "6 / 11"
+          "field": "status",
+          "rule": "The Critical line is greyed above Critical and in full ink at it; the face previews the live state in battle.",
+          "default_displayed": "greyed"
         },
         {
           "field": "block",
-          "rule": "Shows and gives 0 while Last Resort is held.",
+          "rule": "Shows and gives 0 while Last Resort is held; the Critical guard still applies.",
           "default_displayed": 6
         },
         {

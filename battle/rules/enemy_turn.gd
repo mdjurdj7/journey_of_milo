@@ -114,8 +114,9 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# and DamagePipeline is the only thing that knows the split
 				# between what block ate and what reached HP.
 				var largest_hit: int = 0
-				# What the attack loses in all (Garnished), soaked hit by hit.
-				var reduction_left: int = Status.attack_total_reduction(combatant.statuses)
+				# What the attack loses in all (Garnished on this enemy,
+				# Unbroken on the player), soaked hit by hit.
+				var reduction_left: int = Status.attack_total_reduction(combatant.statuses) + Status.attack_total_reduction(player.statuses)
 				for hit in hit_count(combatant, intent):
 					var amount: int = hit_amount(combatant, data, intent, hit, player.statuses)
 					var cut: int = reduce_hit(amount, reduction_left)
@@ -249,7 +250,7 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	var saves_used: int = 0
 	var hits: int = hit_count(combatant, intent)
 	var hit_amounts: Array[int] = []
-	var reduction_left: int = Status.attack_total_reduction(combatant.statuses)
+	var reduction_left: int = Status.attack_total_reduction(combatant.statuses) + Status.attack_total_reduction(player_statuses)
 	for hit in hits:
 		var amount: int = hit_amount(combatant, data, intent, hit, player_statuses)
 		var cut: int = reduce_hit(amount, reduction_left)

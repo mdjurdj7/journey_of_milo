@@ -133,6 +133,10 @@ const DURATION_UNTIL_TRIGGERED := -2
 # INFORMATIONAL, or apply_modifiers() would take it off every hit too.
 # Copies add up through StackRule.ADD_MAGNITUDE. Pair it with
 # consumed_by_own_attack and DURATION_UNTIL_TRIGGERED.
+# On the player instead, it's the next enemy ATTACK against them that
+# deals `magnitude` less in all (Unbroken's, at Critical) - the same pool,
+# so Garnished on the attacker and this add up. Pair it there with
+# consumed_by_attack_against, not consumed_by_own_attack.
 @export var reduces_attack_total: bool = false
 
 # Its holder's next turn is skipped (Deny's Denied): whatever move is
