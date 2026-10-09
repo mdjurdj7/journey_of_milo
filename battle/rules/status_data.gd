@@ -61,6 +61,7 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {alone_bonus} grants_when_alone's attack_damage_bonus (what it turns into)
 #   {reduction} next_card_cost_reduction × stacks
 #   {survive_hp} survive_hp() for the holder (only with one - describe(holder))
+#   {decay}    tick_decay
 #   {s}        "s" unless the count token before it is 1 ("Attack{s}")
 # An unknown token is left standing. "It" is the enemy holding it, "you"
 # the player.
@@ -91,6 +92,25 @@ const DURATION_UNTIL_TRIGGERED := -2
 # else about the count (Status.apply_stack()). Roused stops at 4. 0 = no
 # cap.
 @export var max_stacks: int = 0
+
+# A TICK's decay (Venom): after each tick its magnitude - the stacks it
+# holds, added by each application (Status.apply_amount()) - falls by
+# this, and at 0 the status is gone (Status.tick_all()). 0 = the
+# magnitude holds and the duration runs it out, as a TICK always has.
+@export var tick_decay: int = 0
+# Whether a TICK's loss is its holder's own doing - Toll and The Return's
+# count (Combatant.gain_self_loss_toll()), as every tick's has been.
+# False (Venom): an enemy's - no Toll, no count, and a lethal guard
+# (Refuse the End) catches it as it catches an enemy hit (BattleController.
+# _start_player_turn()). Neither way opens Grace: only an enemy attack
+# does (EnemyTurn.open_grace()).
+@export var tick_is_self_loss: bool = true
+# The strike back (Coiled): while its holder - an enemy - has it, each
+# Attack card the player plays against it is answered, once the card has
+# resolved, with an attack of magnitude damage - an enemy hit in every way
+# (EnemyTurn.counter_strike(), BattleController._counter_strikes()). An
+# all-enemies Attack that hits it counts once.
+@export var strikes_back_on_attack_card: bool = false
 
 # Which Wanderer battle clip to hold (LOOP_LINEAR) for as long as this
 # status is active on the player - empty (default) means no held pose.

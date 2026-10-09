@@ -72,10 +72,14 @@ func trigger_drain() -> int:
 # countdown - the turns left ("Sentence 4": a count, not a quantity, so no
 # ×), or its charges when it counts them - down to "×1", since the last
 # one still matters - or its stacks once there is more than one. A
-# counter reads its progress after that ("The Return ×2 3/5").
+# counter reads its progress after that ("The Return ×2 3/5"). A TICK,
+# and a strike back, read their magnitude - the stacks, the hit
+# ("Venom 3", "Coiled 5").
 func label() -> String:
 	if data == null:
 		return ""
+	if data.category == StatusData.Category.TICK or data.strikes_back_on_attack_card:
+		return "%s %d" % [data.display_name, magnitude]
 	if has_self_loss_counter():
 		var title: String = data.display_name
 		if stack_count > 1:
@@ -118,6 +122,7 @@ func describe(holder: Combatant = null) -> String:
 		"alone_bonus": data.grants_when_alone.attack_damage_bonus if data.grants_when_alone != null else 0,
 		"reduction": data.next_card_cost_reduction * stack_count,
 		"energy": data.turn_start_energy_while_critical,
+		"decay": data.tick_decay,
 	}
 	if holder != null:
 		values["survive_hp"] = data.survive_hp(holder.max_hp, holder.critical_hp_fraction)
@@ -166,6 +171,21 @@ static func apply_to(statuses: Array[Status], status_data: StatusData) -> void:
 		existing.apply_stack()
 		return
 	statuses.append(Status.new(status_data))
+
+# Applies `status_data` carrying `amount` (the Adder's Bite: Venom 3): a
+# fresh copy starts at it, and one already up adds it to its magnitude -
+# whatever its stack rule does with default_magnitude. The rest of a
+# restack (stack_count, duration) is apply_stack()'s, as ever.
+static func apply_amount(statuses: Array[Status], status_data: StatusData, amount: int) -> void:
+	var existing := find_in(statuses, status_data)
+	if existing != null:
+		var before: int = existing.magnitude
+		existing.apply_stack()
+		existing.magnitude = before + amount
+		return
+	var fresh := Status.new(status_data)
+	fresh.magnitude = amount
+	statuses.append(fresh)
 
 static func find_in(statuses: Array[Status], status_data: StatusData) -> Status:
 	for active in statuses:
@@ -221,10 +241,18 @@ static func remove_from(statuses: Array[Status], active: Status) -> void:
 # MODIFIER status can still be read by apply_modifiers() later in the same
 # turn before it's erased.
 # `deal_damage` is called (amount, the Status ticking) for each tick.
+# A TICK that decays (StatusData.tick_decay - Venom) loses that much
+# magnitude once it has dealt it, and is gone at 0 - here, since it has
+# no duration to run out.
 static func tick_all(statuses: Array[Status], deal_damage: Callable) -> void:
 	for active in statuses.duplicate():
 		if active.data.category == StatusData.Category.TICK and active.magnitude > 0:
 			deal_damage.call(active.magnitude, active)
+			if active.data.tick_decay > 0:
+				active.magnitude -= active.data.tick_decay
+				if active.magnitude <= 0:
+					statuses.erase(active)
+					continue
 		active.tick_duration()
 
 static func remove_expired(statuses: Array[Status]) -> void:

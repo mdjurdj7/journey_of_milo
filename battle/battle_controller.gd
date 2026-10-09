@@ -118,6 +118,10 @@ signal battle_lost()
 # ...its follow-up swing starting this long before it (card_repeat_
 # swing), held to the delay.
 @export var second_swing_lead: float = 0.12
+# A strike back (Coiled - _counter_strikes()) starts its lunge this long
+# after the card it answers has resolved, so the card's own blows -
+# Blood Arc's staggered reactions among them - have shown first.
+@export var counter_strike_delay: float = 0.35
 @export var enemy_head_height: float = 1.8
 # Where a SELF/NONE card's play tween aims, relative to the viewport's own
 # center - there's no "target" to unproject for those, just somewhere up
@@ -770,8 +774,11 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	# is a choice the run log keeps on its own line, whatever the card.
 	if card.removal_scope == CardData.RemovalScope.CONSUMED:
 		RunLogger.event("consumed_play", {"card": card.card_name, "hp_before": hp_before_effects, "hp_after": player.hp})
-	_count_attack_card(card, ctx)
+	var attacked: Array[FieldEnemy] = _count_attack_card(card, ctx)
 	RunLogger.card_finished()
+	# Then whoever it was played against strikes back (Coiled), before the
+	# previews and the battle-end check read where the play left things.
+	await _counter_strikes(attacked)
 	# Taken, deepened or replaced by the card just played - and the card
 	# faces need to know either way, since a stance changes what the hand
 	# says it will do.
@@ -825,10 +832,13 @@ func _land_repeat(card: CardData, target_enemy: FieldEnemy) -> void:
 # An Attack card has been played: each enemy it was played against - its
 # target, and every enemy it could hit when one of its effects hits all
 # of them - counts it once (EnemyTurn.take_attack_card(), the Dunecur's
-# Roused). Skills, Powers and Stances never count.
-func _count_attack_card(card: CardData, ctx: EffectContext) -> void:
+# Roused). Skills, Powers and Stances never count. Returns the living
+# enemies it counted against, in the fight's order - those a strike back
+# answers from (_counter_strikes()).
+func _count_attack_card(card: CardData, ctx: EffectContext) -> Array[FieldEnemy]:
+	var counted: Array[FieldEnemy] = []
 	if card.card_type != CardData.CardType.ATTACK:
-		return
+		return counted
 	var against: Array[Combatant] = []
 	if ctx.target != null:
 		against.append(ctx.target)
@@ -842,6 +852,35 @@ func _count_attack_card(card: CardData, ctx: EffectContext) -> void:
 		var combatant: Combatant = _combatants.get(enemy)
 		if against.has(combatant):
 			EnemyTurn.take_attack_card(combatant, enemy.enemy_data)
+			if combatant.hp > 0:
+				counted.append(enemy)
+	return counted
+
+# The card just played was played against each of `against`: one holding
+# a strike back (Coiled - EnemyTurn.counter_strike()) answers it, one at a
+# time, in the fight's order - counter_strike_delay after the card, its
+# lunge, then the hit reported as any enemy attack's is (_report_enemy_
+# attack(): the number, Block, Grace, the lethal guard's heal, the run
+# log). Stops once the player is down: the play's _check_battle_end()
+# takes it from there.
+func _counter_strikes(against: Array[FieldEnemy]) -> void:
+	for enemy in against:
+		if player.hp <= 0:
+			return
+		if not enemies.has(enemy) or not is_instance_valid(enemy):
+			continue
+		var combatant: Combatant = _combatants.get(enemy)
+		var result: Dictionary = EnemyTurn.counter_strike(combatant, enemy.enemy_data, player)
+		if result.is_empty():
+			continue
+		if counter_strike_delay > 0.0:
+			await get_tree().create_timer(counter_strike_delay).timeout
+		var snap_delay: float = enemy.play_attack_snap(_wanderer)
+		if snap_delay > 0.0:
+			await get_tree().create_timer(snap_delay).timeout
+		_report_enemy_attack(enemy, result)
+		# What the strike spent (Garnished, Unbroken) leaves the readouts.
+		status_changed.emit()
 
 # CardData.impact_time's own clamp: a clip shorter than the authored
 # impact_time fires at the clip's own end instead of after it's already
@@ -1190,6 +1229,9 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 	if result["grace_opened"] > 0:
 		RunLogger.grace_opened(result["grace_opened"])
 		grace_changed.emit(player.grace)
+	# What it left on them (the Adder's Venom) shows with the hit.
+	if int(result.get("applied_to_player", 0)) > 0:
+		status_changed.emit()
 
 # The body's pose for its queued intent (FieldEnemy.set_rearing()):
 # reared while an intent that asks for it (EnemyIntent.rear_while_
@@ -1308,12 +1350,30 @@ func _start_player_turn() -> void:
 	Status.tick_all(player.statuses, func(amount: int, ticking: Status) -> void:
 		# For the run log: the loss, and its Toll, are this status's.
 		RunLogger.push_source("status:" + (ticking.data.id if ticking.data != null else ""))
+		var hp_before: int = player.hp
+		var was_critical: bool = player.is_critical()
 		var lost := DamagePipeline.apply_bypass(amount, player)
-		if lost > 0:
-			player.gain_self_loss_toll(lost)
-			_lose_run_hp(lost, "status")
-			hp_changed.emit(player.hp, player.max_hp)
-			toll_changed.emit(player.toll)
+		if ticking.data == null or ticking.data.tick_is_self_loss:
+			if lost > 0:
+				player.gain_self_loss_toll(lost)
+				_lose_run_hp(lost, "status")
+				hp_changed.emit(player.hp, player.max_hp)
+				toll_changed.emit(player.toll)
+		else:
+			# Not their own doing (Venom): no Toll, the loss the status's own
+			# in the run log - and a tick that would kill them Critical is
+			# caught by a lethal guard, as an enemy hit is (EnemyTurn.land_
+			# attack()), the HP over what they had a heal.
+			var saved_heal: int = 0
+			if Status.refuse_lethal(player, was_critical):
+				lost = maxi(hp_before - player.hp, 0)
+				saved_heal = maxi(player.hp - hp_before, 0)
+			if lost > 0:
+				_lose_run_hp(lost, ticking.data.id)
+			if saved_heal > 0:
+				_heal_run_hp(saved_heal, "lethal_guard")
+			if lost > 0 or saved_heal > 0:
+				hp_changed.emit(player.hp, player.max_hp)
 		RunLogger.pop_source()
 	)
 	# A tick is a loss to their own effect like any other: one that sets a

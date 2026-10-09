@@ -104,3 +104,10 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE }
 # intent has resolved or been interrupted (BattleController._pose_for_
 # intent(), FieldEnemy.set_rearing()). Only a body whose attachment can
 # rear (RearPose) shows it. The Siltjaw's charge; false for every other.
+
+# A status this ATTACK puts on the player, applied_amount of it (the
+# Adder's Bite: Venom 3), once the attack has resolved - every time, even
+# when Block took all of its damage (EnemyTurn.take_turn(), Status.apply_
+# amount()). Null = none.
+@export var applies_to_player: StatusData = null
+@export var applied_amount: int = 0
