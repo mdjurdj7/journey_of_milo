@@ -586,12 +586,15 @@ func _refresh_standing_row() -> void:
 		var stance_text: String = stance.data.display_name
 		if stance.stacks > 1:
 			stance_text += " ×%d" % stance.stacks
-		lines.append({"text": stance_text, "glyph": true, "name": stance.data.display_name, "rules": stance.describe()})
+		lines.append({"text": stance_text, "glyph": &"stance", "name": stance.data.display_name, "rules": stance.describe()})
 	var counters: Array[Dictionary] = []
 	for active: Status in player.statuses:
 		if active.data == null:
 			continue
 		var line: Dictionary = {"text": active.label(), "name": active.data.display_name, "rules": active.describe(player)}
+		# Its mark before the label (Venom's drop).
+		if active.data.mark == StatusData.Mark.DROP:
+			line["glyph"] = &"drop"
 		if active.has_self_loss_counter():
 			line["count"] = active.data.self_loss_trigger_count
 			line["progress"] = active.progress
@@ -626,6 +629,13 @@ func _on_status_changed() -> void:
 		if status != null and is_instance_valid(status):
 			status.set_block(battle_controller.get_enemy_block(enemy))
 			status.set_status_row(battle_controller.get_enemy_status_labels(enemy))
+			# Beside its HP: the one status shown there (Coiled), mark and
+			# magnitude - or nothing.
+			var beside: Status = battle_controller.get_enemy_hp_mark_status(enemy)
+			if beside != null and beside.data.mark == StatusData.Mark.COIL:
+				status.set_hp_mark(&"coil", beside.magnitude)
+			else:
+				status.set_hp_mark(&"", 0)
 			var reveal_names := PackedStringArray()
 			var reveal_lines := PackedStringArray()
 			for active: Status in battle_controller.get_enemy_statuses(enemy):

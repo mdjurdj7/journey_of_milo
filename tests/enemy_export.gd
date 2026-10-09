@@ -492,6 +492,8 @@ static func _status_fields(status: StatusData) -> Dictionary:
 				value = StatusData.StackRule.keys()[int(value)]
 			"modifier_target":
 				value = StatusData.ModifierTarget.keys()[int(value)]
+			"mark":
+				value = StatusData.Mark.keys()[int(value)]
 			"modifier_operation":
 				value = StatusData.ModifierOperation.keys()[int(value)]
 			"default_duration_turns":

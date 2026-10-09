@@ -147,6 +147,44 @@ class_name EnemyStatus
 @export var status_row_gap_px: float = 6.0
 @export var status_row_item_gap_px: float = 14.0
 
+@export_group("HP Mark")
+# The one status shown beside the HP numeral instead of in the row
+# (StatusData.shows_beside_hp - Coiled), set by BattleOverlay through set_
+# hp_mark(): its mark, then its magnitude, hp_mark_gap_px after the " /
+# max" run, on the numeral's baseline. The coil is BattleIntent's (coil_
+# shapes()), hp_mark_glyph_size_px tall, centred on the numeral's cap
+# centre the way the block shield is (block_glyph_baseline_lift), in the
+# tapered pen: hp_mark_stroke_px, fining to hp_mark_taper, ink over a
+# hp_mark_outline_px bone outline, hp_mark_edge_px of antialiased edge.
+@export var hp_mark_gap_px: float = 10.0:
+	set(value):
+		hp_mark_gap_px = value
+		queue_redraw()
+@export var hp_mark_glyph_size_px: float = 16.0:
+	set(value):
+		hp_mark_glyph_size_px = value
+		queue_redraw()
+@export var hp_mark_value_gap_px: float = 3.0:
+	set(value):
+		hp_mark_value_gap_px = value
+		queue_redraw()
+@export var hp_mark_stroke_px: float = 2.4:
+	set(value):
+		hp_mark_stroke_px = value
+		queue_redraw()
+@export_range(0.0, 1.0) var hp_mark_taper: float = 0.15:
+	set(value):
+		hp_mark_taper = value
+		queue_redraw()
+@export var hp_mark_outline_px: float = 1.0:
+	set(value):
+		hp_mark_outline_px = value
+		queue_redraw()
+@export var hp_mark_edge_px: float = 1.0:
+	set(value):
+		hp_mark_edge_px = value
+		queue_redraw()
+
 @export_group("Status Reveal")
 # Hovering the readout - name, numerals, bar and status row - in battle
 # shows what each status does, one entry each, this far under the status
@@ -214,6 +252,9 @@ var _name_font_tracked: Font = null
 var _status_font_tracked: Font = null
 # The status row's labels - see set_status_row().
 var _status_texts: PackedStringArray = PackedStringArray()
+# The mark beside the HP and its number - see set_hp_mark(); &"" = none.
+var _hp_mark_glyph: StringName = &""
+var _hp_mark_value: int = 0
 # What the statuses do, shown on hover - see set_reveal_lines().
 var _reveal: StatusReveal = null
 
@@ -419,7 +460,8 @@ func _draw() -> void:
 	_draw_block_readout(baseline, ink)
 	var left: float = _block_readout_width()
 	var x: float = left + InkType.draw_run(self, numeral_font, str(maxi(_current_hp, 0)), Vector2(left, baseline), battle_numeral_size_px, ink)
-	InkType.draw_run(self, numeral_font, battle_max_prefix + str(_max_hp), Vector2(x, baseline), battle_max_size_px, secondary)
+	x += InkType.draw_run(self, numeral_font, battle_max_prefix + str(_max_hp), Vector2(x, baseline), battle_max_size_px, secondary)
+	_draw_hp_mark(x, baseline, ink)
 
 	var name_text: String = _enemy_name()
 	if _name_font_tracked != null and not name_text.is_empty():
@@ -436,6 +478,17 @@ func _draw() -> void:
 		draw_rect(Rect2(left, block_top, length, block_thickness_px), ink)
 
 	_draw_status_row(bar_top + battle_bar_height + status_row_gap_px, left)
+
+# The mark beside the HP (see the HP Mark group), from `x` - the end of
+# the " / max" run - on the numeral's baseline: the coil, then the value
+# in the numeral's type at the max's size.
+func _draw_hp_mark(x: float, baseline: float, ink: Color) -> void:
+	if _hp_mark_glyph != &"coil":
+		return
+	var r: float = hp_mark_glyph_size_px * 0.5
+	var centre := Vector2(x + hp_mark_gap_px + r, baseline - float(battle_numeral_size_px) * block_glyph_baseline_lift)
+	InkPen.draw_ink(self, BattleIntent.coil_shapes(centre, r, hp_mark_stroke_px, hp_mark_taper), _ink, get_theme_color("bone", "Battle"), hp_mark_outline_px, hp_mark_edge_px, ink.a)
+	InkType.draw_run(self, numeral_font, str(_hp_mark_value), Vector2(centre.x + r + hp_mark_value_gap_px, baseline), battle_max_size_px, ink)
 
 func _draw_status_row(top: float, left: float) -> void:
 	if _status_texts.is_empty() or _status_font_tracked == null:
@@ -588,6 +641,20 @@ func set_status_row(texts: PackedStringArray) -> void:
 	# The row's height places the reveal under it.
 	if _is_ready:
 		_apply_layout()
+
+# Called by BattleOverlay alongside set_status_row(): the status shown
+# beside the HP - its mark (&"coil") and magnitude - or &"" for none.
+func set_hp_mark(glyph: StringName, value: int) -> void:
+	if glyph == _hp_mark_glyph and value == _hp_mark_value:
+		return
+	_hp_mark_glyph = glyph
+	_hp_mark_value = value
+	queue_redraw()
+
+# What set_hp_mark() last put beside the HP - {"glyph", "value"}, the
+# glyph &"" when nothing is there. For probes.
+func get_hp_mark() -> Dictionary:
+	return {"glyph": _hp_mark_glyph, "value": _hp_mark_value}
 
 # Called by BattleOverlay alongside set_status_row(): each status's name
 # and what it does now (Status.describe()), same order - the hover reveal.

@@ -1433,17 +1433,33 @@ func get_enemy_block(enemy: FieldEnemy) -> int:
 
 # This enemy's statuses as its EnemyStatus row reads them (Status.label())
 # - read by BattleOverlay on status_changed. Empty for a dead/unknown
-# enemy: whatever it held went with it.
+# enemy: whatever it held went with it. One shown beside the HP instead
+# (StatusData.shows_beside_hp - Coiled) isn't among them: see get_enemy_
+# hp_mark_status().
 func get_enemy_status_labels(enemy: FieldEnemy) -> PackedStringArray:
 	var labels := PackedStringArray()
 	var combatant: Combatant = _combatants.get(enemy)
 	if combatant == null or combatant.hp <= 0:
 		return labels
 	for active: Status in combatant.statuses:
+		if active.data != null and active.data.shows_beside_hp:
+			continue
 		var text: String = active.label()
 		if not text.is_empty():
 			labels.append(text)
 	return labels
+
+# The status this enemy's readout shows beside its HP (StatusData.shows_
+# beside_hp - Coiled: its mark and magnitude), or null - none, or the
+# enemy dead/unknown. Read by BattleOverlay with the labels above.
+func get_enemy_hp_mark_status(enemy: FieldEnemy) -> Status:
+	var combatant: Combatant = _combatants.get(enemy)
+	if combatant == null or combatant.hp <= 0:
+		return null
+	for active: Status in combatant.statuses:
+		if active.data != null and active.data.shows_beside_hp:
+			return active
+	return null
 
 # This enemy's statuses themselves, for what its readout's hover reveal
 # says they do (Status.describe()) - read by BattleOverlay on status_

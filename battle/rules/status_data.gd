@@ -112,6 +112,18 @@ const DURATION_UNTIL_TRIGGERED := -2
 # all-enemies Attack that hits it counts once.
 @export var strikes_back_on_attack_card: bool = false
 
+# The inked mark its readout draws for it - a coil (Coiled), a drop
+# (Venom) - or none: the label alone, as every status before them.
+# Appended values only - the .tres stores the integer.
+enum Mark { NONE, COIL, DROP }
+@export var mark: Mark = Mark.NONE
+# Shown beside its holder's HP numeral - its mark and magnitude, "Coiled
+# 5" read at a glance while the player decides - instead of in the
+# status row under the bar (BattleController.get_enemy_status_labels()
+# leaves it out, get_enemy_hp_mark_status() hands it over). Its hover
+# reveal is the row's, as ever. Enemy readouts only.
+@export var shows_beside_hp: bool = false
+
 # Which Wanderer battle clip to hold (LOOP_LINEAR) for as long as this
 # status is active on the player - empty (default) means no held pose.
 # Generic, not Braced-specific: Wanderer._on_status_changed() just looks

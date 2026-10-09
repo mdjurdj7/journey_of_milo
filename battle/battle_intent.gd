@@ -27,7 +27,7 @@ class_name BattleIntent
 # stack still ends at the anchor, so the attack line sits a ring higher.
 # A BURROW (buried - it does nothing this turn) is its glyph alone: there
 # is no number coming - and so is a SETTLE (the Underfoot's Rebury), a
-# down-arrow onto a ground line. A HEAL_ALLY (the Nipper's Forage) is a plus beside
+# down-arrow onto a ground line, and a COIL (the Adder's), a coil. A HEAL_ALLY (the Nipper's Forage) is a plus beside
 # the HP its packmates will heal. A multi-hit attack whose hits differ (a
 # status on the player the first hit consumes - No Further's 0) reads hit
 # by hit, "0 + 4", not "M×N".
@@ -70,7 +70,7 @@ class_name BattleIntent
 	set(value):
 		glyph_cap_fraction = value
 		_apply_layout()
-# A glyph shown without a number (BURROW, SETTLE, WATCH - and a pain
+# A glyph shown without a number (BURROW, SETTLE, WATCH, COIL - and a pain
 # turn's cancelled move) is drawn this many times the glyph height, still
 # centred where the number would sit: it carries the intent alone.
 @export_range(1.0, 3.0) var glyph_alone_scale: float = 1.7:
@@ -230,6 +230,12 @@ const BURROW_MOUND_HEIGHT: float = 0.5
 # How far SETTLE's spear point sinks under its ground line, as a fraction
 # of the blade's length.
 const SETTLE_DIP: float = 0.35
+# The coil (COIL, and the Coiled mark - coil_shapes()): this many turns,
+# from the glyph's edge in to COIL_INNER of it, where the head sits -
+# COIL_HEAD of the pen across.
+const COIL_TURNS: float = 1.6
+const COIL_INNER: float = 0.2
+const COIL_HEAD: float = 0.75
 
 var target: FieldEnemy = null
 var _label: Label = null
@@ -318,7 +324,7 @@ func show_intent(preview: Dictionary) -> void:
 			for amount: Variant in hit_amounts:
 				parts.append(str(int(amount)))
 			_label.text = " + ".join(parts)
-		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE:
+		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE or _type == EnemyIntent.IntentType.COIL:
 			_label.text = ""
 		_has_threshold = preview.has("threshold")
 		# A pain turn's cancelled action reads as interrupted, with no
@@ -581,7 +587,7 @@ func _ribbon(spine: PackedVector2Array, factors: PackedFloat32Array, stroke_px: 
 # mid-lid, fine at the corners, a lighter lower lid short of them, and a
 # round pupil. SETTLE: the attack's spearhead pointing down, its point
 # sunk SETTLE_DIP through the same ground line and cut off there - going
-# into the sand.
+# into the sand. COIL: a coil (coil_shapes()).
 func _glyph_shapes(centre: Vector2, r: float) -> Array[PackedVector2Array]:
 	var shapes: Array[PackedVector2Array] = []
 	match _type:
@@ -656,6 +662,34 @@ func _glyph_shapes(centre: Vector2, r: float) -> Array[PackedVector2Array]:
 			line.remove_at(line.size() - 1)
 			line.append_array(PackedVector2Array([Vector2(2.0 * centre.x - line[1].x, ground + centre.y), Vector2(2.0 * centre.x - line[0].x, ground + centre.y)]))
 			shapes.append(_ribbon(line, PackedFloat32Array([0.0, GROUND_WEIGHT, GROUND_WEIGHT, 0.0])))
+		EnemyIntent.IntentType.COIL:
+			shapes = coil_shapes(centre, r, glyph_stroke_px, glyph_taper)
+	return shapes
+
+# A coil in the tapered pen, r either side of `centre`: one stroke wound
+# COIL_TURNS times from the edge in to COIL_INNER of r - fine at the
+# outer tail, a full pen through the outer turn, easing to two thirds by
+# the centre - and a round head at the inner end, COIL_HEAD of the pen
+# across. The COIL intent's glyph and the Coiled mark beside an enemy's
+# HP (EnemyStatus) - one coil, so static, its pen handed in.
+static func coil_shapes(centre: Vector2, r: float, stroke_px: float, taper: float) -> Array[PackedVector2Array]:
+	var steps: int = 40
+	var spine := PackedVector2Array()
+	var factors := PackedFloat32Array()
+	for step in steps + 1:
+		var t: float = float(step) / float(steps)
+		# Wound clockwise on screen, starting at the bottom - the tail
+		# lying on the ground.
+		var angle: float = PI * 0.5 + TAU * COIL_TURNS * t
+		var radius: float = r * lerpf(1.0, COIL_INNER, t)
+		spine.append(centre + Vector2(cos(angle), sin(angle)) * radius)
+		factors.append(minf(t / 0.2, 1.0) * lerpf(1.0, 0.66, t))
+	var head := PackedVector2Array()
+	var head_r: float = stroke_px * COIL_HEAD
+	for step in 16:
+		var a: float = TAU * float(step) / 16.0
+		head.append(spine[spine.size() - 1] + Vector2(cos(a), sin(a)) * head_r)
+	var shapes: Array[PackedVector2Array] = [InkPen.ribbon(spine, factors, stroke_px, taper), head]
 	return shapes
 
 # Whether the Wanderer is to the screen-left of the enemy right now -

@@ -11,3 +11,5 @@ default_magnitude = 5
 default_duration_turns = -1
 stack_rule = 3
 strikes_back_on_attack_card = true
+mark = 1
+shows_beside_hp = true

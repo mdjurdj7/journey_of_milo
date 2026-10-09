@@ -13,3 +13,4 @@ default_duration_turns = -1
 stack_rule = 3
 tick_decay = 1
 tick_is_self_loss = false
+mark = 2

@@ -184,6 +184,22 @@ class_name HPBar
 	set(value):
 		row_glyph_line_width_px = value
 		queue_redraw()
+# The drop (Venom's mark) is solid ink in the battle UI's pen (InkPen):
+# drop_width of row_glyph_size_px across its round end, a bone outline
+# this wide round it - 0, as the row's lines have none - and the pen's
+# antialiased edge.
+@export_range(0.2, 1.0) var row_drop_width: float = 0.72:
+	set(value):
+		row_drop_width = value
+		queue_redraw()
+@export var row_drop_outline_px: float = 0.0:
+	set(value):
+		row_drop_outline_px = value
+		queue_redraw()
+@export var row_drop_edge_px: float = 1.0:
+	set(value):
+		row_drop_edge_px = value
+		queue_redraw()
 
 @export_group("Status Reveal")
 # Hovering one line of the standing row in battle shows what that one
@@ -769,8 +785,12 @@ func _draw_standing_row(top: float, left: float) -> void:
 		color.a = (row_spent_alpha if item.get("spent", false) else row_alpha) * _battle_blend
 		var baseline: float = y + ascent
 		var x: float = left
-		if item.get("glyph", false):
+		var glyph: StringName = item.get("glyph", &"")
+		if glyph == &"stance":
 			_draw_stance_glyph(Vector2(x, baseline - ascent * 0.5), color)
+			x += row_glyph_size_px + row_glyph_gap_px
+		elif glyph == &"drop":
+			_draw_drop_glyph(Vector2(x + row_glyph_size_px * 0.5, baseline - ascent * 0.5), color.a)
 			x += row_glyph_size_px + row_glyph_gap_px
 		InkType.draw_run(self, _row_font_tracked, String(item.get("text", "")), Vector2(x, baseline), row_font_size_px, color)
 		var count: int = int(item.get("count", 0))
@@ -802,6 +822,22 @@ func _draw_stance_glyph(centre: Vector2, color: Color) -> void:
 		var t: float = 30.0 + 270.0 * float(i) / float(steps)
 		points.append(centre + Vector2(cos(deg_to_rad(t)), sin(deg_to_rad(t))) * r)
 	draw_polyline(points, color, row_glyph_line_width_px, true)
+
+# Venom's mark: a drop, point up and its round end down, row_glyph_size_px
+# tall about `centre` - one solid shape in the tapered pen's ink (InkPen.
+# draw_ink()), at the line's alpha.
+func _draw_drop_glyph(centre: Vector2, alpha: float) -> void:
+	var r: float = row_glyph_size_px * 0.5
+	var half_width: float = r * row_drop_width
+	var drop := PackedVector2Array()
+	var steps: int = 24
+	for i in steps:
+		# The teardrop x = sin t sin(t/2), y = -cos t: pointed at t = 0 (the
+		# top), round through t = PI (the bottom).
+		var t: float = TAU * float(i) / float(steps)
+		drop.append(centre + Vector2(half_width * sin(t) * sin(t * 0.5), -r * cos(t)))
+	var shapes: Array[PackedVector2Array] = [drop]
+	InkPen.draw_ink(self, shapes, _ink, get_theme_color("bone", "Battle"), row_drop_outline_px, row_drop_edge_px, alpha)
 
 func _draw_toll(bar_top: float, ink: Color) -> void:
 	var left: float = _block_readout_width() + battle_width + toll_gap_px
@@ -1040,7 +1076,8 @@ func hide_grace() -> void:
 # reading of its own - it is handed what to draw, which is why it needs
 # no knowledge of stacking rules or status categories. Each entry:
 #   "text"           the line as drawn ("The Return 2/5")
-#   "glyph"          the stance mark before it
+#   "glyph"          the mark before it: &"stance" (the bitten ring) or
+#                    &"drop" (Venom's); none without one
 #   "count"          > 0 for a counter, with "progress" of it - the hairline
 #   "spent"          a guard spent this fight, at row_spent_alpha
 #   "name", "rules"  its hover reveal: the name and what it does now
