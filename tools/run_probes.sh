@@ -85,6 +85,7 @@ floor4_probe 40 fixed
 floor5_probe 20 fixed
 run_lost_probe 12
 dunecur_probe 30
+adder_probe 45
 greyshelf_probe 45
 underfoot_probe 40
 scatter_probe 25
@@ -113,23 +114,23 @@ area_probes() {
 		cards) echo "starter_cards card_rarity frayed_cord" ;;
 		face) echo "starter_cards keyword come_due come_due_face critical_cards card_rarity_finish second_swing" ;;
 		keywords) echo "keyword starter_cards the_return" ;;
-		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace second_swing garnish claw_back gnaw settled_account devour" ;;
-		enemies) echo "blackback siltjaw wardling dunecur greyshelf underfoot sentence no_further critical_cards kill_order armored_contact deny enemy_export" ;;
+		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace second_swing garnish claw_back gnaw settled_account devour adder" ;;
+		enemies) echo "blackback siltjaw wardling dunecur greyshelf underfoot sentence no_further critical_cards kill_order armored_contact deny enemy_export adder" ;;
 		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost pathing scatter" ;;
 		floor1) echo "kill_order drain scatter" ;;
 		floor2) echo "kill_order hold_line bundle_roll underfoot scatter" ;;
 		floor3) echo "kill_order blackback wardling temper" ;;
-		floor4) echo "kill_order floor4 wear_path dunecur collector" ;;
+		floor4) echo "kill_order floor4 wear_path dunecur collector adder" ;;
 		floor5) echo "kill_order floor5 wear_path greyshelf elite_reward" ;;
-		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur floor5 greyshelf underfoot pathing scatter" ;;
+		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur adder floor5 greyshelf underfoot pathing scatter" ;;
 		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake keepsake_tile toll_carry run_log frayed_cord elite_reward run_lost temper" ;;
 		hud) echo "gold_line glassbone trinket keepsake_tile" ;;
-		hp_bar) echo "kill_order" ;;
+		hp_bar) echo "kill_order adder" ;;
 		ui_inspect) echo "keyword" ;;
 		# The fight's own UI: every probe that plays a real fight (which
 		# builds the battle overlay and its hand), plus the rules probes
 		# whose readouts and faces it shows.
-		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf underfoot play_order second_swing heavy_hit garnish claw_back gnaw settled_account devour" ;;
+		battle_ui) echo "keyword no_further critical_cards come_due_face kill_order blackback dunecur collateral glassbone keeper_keepsake leverage ransom toll_carry trinket armored_contact bide deny dying_light run_log frayed_cord blood_advance greyshelf underfoot play_order second_swing heavy_hit garnish claw_back gnaw settled_account devour adder" ;;
 		*) return 1 ;;
 	esac
 }
@@ -170,6 +171,8 @@ path_probes() {
 		ui/keyword_table.gd|ui/keywords.tres|ui/status_reveal.gd) out=$(area_probes keywords) ;;
 		battle/rules/enemies/*|battle/rules/enemy_turn.gd|battle/rules/enemy_intent.gd) out=$(area_probes enemies) ;;
 		battle/rules/statuses/*|battle/rules/enemy_data.gd|battle/rules/status.gd|battle/rules/status_data.gd) out="$(area_probes rules) enemy_export" ;;
+		# The Adder's own table: the probe that wins its fight.
+		run/keepsakes/adder_keepsakes.tres) out="$(area_probes run) enemy_export adder" ;;
 		run/keepsakes/*) out="$(area_probes run) enemy_export" ;;
 		battle/rules/*|battle/battle_controller.gd) out=$(area_probes rules) ;;
 		# The run's end screens (run_end.gd, its won and lost scenes): the run
