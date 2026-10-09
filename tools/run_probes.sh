@@ -43,6 +43,69 @@ REPO=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 GODOT=${GODOT:-$REPO/../Godot_v4.7.1.exe}
 PROBE_TIMEOUT_SEC=600
 
+# --- Cleanup: nothing this run starts outlives it ---
+# However it ends - done, Ctrl+C, a TERM, or the shell that started it
+# gone (a session stopped under it sends no signal: tick() notices) -
+# every child's whole process tree is ended, the Godot processes under
+# timeout included, and a held worktree lock released. The tree is the
+# process table's own (ps -ef's parent links, which under MSYS reach the
+# native Godot under timeout where Windows' own parentage, taskkill /T,
+# doesn't); each process in it is ended by its Windows PID, which also
+# reaches a native process MSYS signals don't.
+#
+# The run never blocks in bash's wait, which under MSYS a signal doesn't
+# interrupt: it waits in one-second sleeps (tick(), await_pid()), so a
+# stop lands within a second.
+LOCK_HELD=""
+PARENT=$PPID
+# `pid` and everything under it, by the process table's parent links -
+# gathered first, so nothing is lost to reparenting while they're ended.
+tree_of() {
+	local kid
+	echo "$1"
+	for kid in $(ps -ef | awk -v p="$1" 'NR > 1 && $3 == p { print $2 }'); do
+		tree_of "$kid"
+	done
+}
+kill_tree() {
+	local pid
+	for pid in $(tree_of "$1"); do
+		if [ -r "/proc/$pid/winpid" ] && command -v taskkill > /dev/null; then
+			taskkill //F //PID "$(cat "/proc/$pid/winpid")" > /dev/null 2>&1
+		fi
+		kill -9 "$pid" 2>/dev/null
+	done
+}
+cleanup() {
+	local code=$? pid
+	trap - EXIT INT TERM HUP
+	for pid in $(jobs -p); do kill_tree "$pid"; done
+	[ -n "$LOCK_HELD" ] && rm -rf "$LOCK_HELD"
+	exit "$code"
+}
+stopped() {
+	echo "run_probes: stopped ($1) - ending its probes" >&2
+	exit "$2"
+}
+trap cleanup EXIT
+trap 'stopped INT 130' INT
+trap 'stopped TERM 143' TERM
+trap 'stopped HUP 129' HUP
+# One second of waiting - and the parent shell checked: gone, the run
+# stops. Only with a real parent (one started straight from a native
+# process sees PPID 1).
+tick() {
+	if [ "$PARENT" -gt 1 ] && ! kill -0 "$PARENT" 2>/dev/null; then
+		stopped "its shell is gone" 143
+	fi
+	sleep 1
+}
+# Until `pid` (a child) ends, then its status.
+await_pid() {
+	while kill -0 "$1" 2>/dev/null; do tick; done
+	wait "$1" 2>/dev/null
+}
+
 # --- The probes: name, seconds on a serial run (2026-10-03), flags ---
 # "serial": runs alone after the parallel batch - set for a probe that
 # proved flaky in parallel. "fixed": run at --fixed-fps 60 (the probe's
@@ -277,7 +340,7 @@ while [ $# -gt 0 ]; do
 		--list) LIST=1 ;;
 		--moved) MOVED="${2:?--moved needs a commit or range}"; shift ;;
 		--list-areas) for a in $AREAS_ALL; do printf '%-11s %s\n' "$a" "$(area_probes "$a")"; done; exit 0 ;;
-		-h|--help) sed -n '2,38p' "$0"; exit 0 ;;
+		-h|--help) awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; exit 0 ;;
 		*) die "unknown option $1 (--help)" ;;
 	esac
 	shift
@@ -431,7 +494,7 @@ if [ -n "$WORKTREE" ]; then
 		waited=$((waited + 10))
 	done
 	echo "$$ $(date '+%Y-%m-%d %H:%M:%S') $(basename "$REPO") ref $(git -C "$REPO" rev-parse --short "$REF")" > "$LOCK/owner"
-	trap 'rm -rf "$LOCK"' EXIT
+	LOCK_HELD="$LOCK"
 
 	NEED_IMPORT=0
 	STALE_IMPORTS=""
@@ -496,7 +559,9 @@ mkdir -p "$LOGS"
 
 if [ "$DO_IMPORT" = 1 ]; then
 	echo "run_probes: importing..."
-	( cd "$PROJECT" && timeout 900 "$GODOT" --headless --path . --import > "$LOGS/_import.log" 2>&1 )
+	# In the background and waited on, so a stop reaches the trap at once.
+	( cd "$PROJECT" && timeout 900 "$GODOT" --headless --path . --import > "$LOGS/_import.log" 2>&1 ) &
+	await_pid $!
 fi
 
 # --- Run ---
@@ -524,11 +589,12 @@ echo "run_probes: $COUNT probe(s) in $PROJECT, -j $JOBS, logs in $LOGS"
 echo "run_probes: running:$PARALLEL$SERIAL"
 T0=$(date +%s)
 for p in $PARALLEL; do
-	while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do wait -n; done
+	while [ "$(jobs -rp | wc -l)" -ge "$JOBS" ]; do tick; done
 	run_one "$p" &
 done
+while [ -n "$(jobs -rp)" ]; do tick; done
 wait
-for p in $SERIAL; do run_one "$p"; done
+for p in $SERIAL; do run_one "$p" & await_pid $!; done
 T1=$(date +%s)
 
 FAILED=$(grep -c ' FAIL ' "$LOGS/_results.txt" 2>/dev/null)
