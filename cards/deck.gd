@@ -20,9 +20,10 @@ var hand: Array[CardData] = []
 var discard_pile: Array[CardData] = []
 var exhaust_pile: Array[CardData] = []
 # The exhaust pile's cards that got there from the hand without being
-# played (Devour): Spent for this fight whatever their removal scope, so a
-# CONSUMED card among them stays in the run (RegionField._apply_consumed_
-# removals() skips them, one occurrence each).
+# played (Devour, Deny's take): Spent for this fight whatever their
+# removal scope, so a CONSUMED card among them stays in the run
+# (RegionField._apply_consumed_removals() skips them, one occurrence
+# each).
 var spent_unplayed: Array[CardData] = []
 # Set aside from the hand (Bide) until the start of the next turn: out of
 # the hand and of every pile a draw or a reshuffle reads, back in the hand

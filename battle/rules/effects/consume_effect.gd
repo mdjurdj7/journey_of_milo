@@ -5,12 +5,14 @@ class_name ConsumeEffect
 # Context.consume_choice - BattleController takes the most expensive
 # other card by printed cost, or the player's pick among a tie) goes to
 # the Spent pile for the rest of this fight, back in the deck next fight
-# like any Spent card. Nothing picked - no other card in hand - consumes
-# nothing; the card's other effects still resolve.
+# like any Spent card - a CONSUMED one too: it wasn't played, so it is
+# on Deck.spent_unplayed and the run keeps it. Nothing picked - no other
+# card in hand - consumes nothing; the card's other effects still resolve.
 func resolve(_effect: CardEffect, ctx: EffectContext) -> void:
-	if ctx.deck == null or ctx.consume_choice == null:
+	if ctx.deck == null or ctx.consume_choice == null or not ctx.deck.hand.has(ctx.consume_choice):
 		return
 	ctx.deck.exhaust(ctx.consume_choice)
+	ctx.deck.spent_unplayed.append(ctx.consume_choice)
 
 # The cards a CONSUME can take from `cards` (the hand without the card
 # being played): every one at the highest printed cost (CardData.cost) -

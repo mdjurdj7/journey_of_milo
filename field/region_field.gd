@@ -2480,7 +2480,7 @@ func _set_ambience_bus_db(level_db: float) -> void:
 # straight from whatever's still in RunState.deck. Must run before overlay.
 # queue_free() above frees battle_controller (and this exhaust_pile) -
 # called first in _on_battle_finished() for exactly that reason. A card
-# Spent without being played (Deck.spent_unplayed - Devour) was never
+# Spent without being played (Deck.spent_unplayed - Devour, Deny) was never
 # Consumed, whatever its scope: it stays.
 func _apply_consumed_removals(fight_deck: Deck) -> void:
 	var unplayed: Array[CardData] = fight_deck.spent_unplayed.duplicate()
