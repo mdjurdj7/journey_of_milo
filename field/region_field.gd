@@ -186,6 +186,11 @@ enum RewardMode { SCREEN, WORLD }
 	set(value):
 		enemy_fog_factor = value
 		_refresh_enemy_fog()
+# The wind on a floor whose sand isn't rippled (FloorData.wind_ripple_
+# strength 0), in degrees from +X toward +Z - what drifts downwind goes
+# this way there (get_wind_direction()). Read when something drifts, so
+# a live edit takes the next.
+@export var default_wind_angle_degrees: float = 30.0
 
 # See hold_line_world_line - per run, not per floor or per scene load (a
 # floor change is a reload).
@@ -1420,6 +1425,20 @@ func _apply_hud_row_style() -> void:
 # FieldEnemy reads it from its own _ready(), before this node's.
 func get_region_sky() -> RegionSky:
 	return get_node_or_null(sky_path) as RegionSky
+
+# The field's wind, for anything that drifts (a death's sand -
+# FieldEnemy.spawn_death_wisps()): downwind, flat, in world XZ - the
+# floor's ripple angle (FloorData.wind_ripple_angle, the + direction of
+# the ground's ripples) where its sand is rippled, else
+# default_wind_angle_degrees. Measured from +X toward +Z, as the ripples
+# are.
+func get_wind_direction() -> Vector3:
+	var floor_data := get_floor_data()
+	var degrees: float = default_wind_angle_degrees
+	if floor_data != null and floor_data.wind_ripple_strength > 0.0:
+		degrees = floor_data.wind_ripple_angle
+	var angle: float = deg_to_rad(degrees)
+	return Vector3(cos(angle), 0.0, sin(angle))
 
 # The Sea's own fog copy (its shader is fog_disabled) onto RegionSky's
 # fog as it stands - the one source, override included.

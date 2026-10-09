@@ -111,12 +111,38 @@ var floor_index: int = -1
 @export var status_gained_volume_db: float = -4.0
 @export_group("")
 
-# How a member of a cluster leaves a fight it didn't end (see settle_and_
-# free()): the model sinks its own height into the sand over settle_time,
-# then the node goes. Unused by a fight's last kill, which RegionField
-# frees outright with the win as it always has.
+# How a body leaves a fight it died in (see settle_and_free()) - the last
+# kill's as much as any, the win waiting for it.
 @export_group("Settle")
+# A winged body's fold, before the death proper (DragonflyWings.fold()).
 @export var settle_time: float = 0.4
+# The death (settle_and_free()): the body slumps - sinks death_slump_depth
+# of its height and tilts death_slump_tilt_degrees, overshooting a little
+# and settling, over death_slump_time - while it goes into the fog: the
+# fog colour laid over it (its fog pass's veil) over death_fade_time,
+# losing its contrast rather than its opacity; then it dissolves out
+# (dithered) over death_vanish_time and is freed. No glow, no flash.
+@export var death_slump_time: float = 0.35
+@export_range(0.0, 0.5) var death_slump_depth: float = 0.08
+@export var death_slump_tilt_degrees: float = 5.0
+@export var death_fade_time: float = 0.8
+@export var death_vanish_time: float = 0.25
+# A few wisps of sand lift from where it lies and drift off downwind
+# (RegionField.get_wind_direction()), fading: death_wisp_count of them,
+# each living death_wisp_lifetime, moving death_wisp_speed m/s along the
+# wind with death_wisp_lift of rise, death_wisp_size across, at most
+# death_wisp_alpha opaque - sand, death_wisp_fog_blend of the way to the
+# fog colour so they sit in the air. They leave over death_wisp_spread of
+# a second, starting death_wisp_delay into the death.
+@export var death_wisp_count: int = 5
+@export var death_wisp_lifetime: float = 1.6
+@export var death_wisp_speed: float = 0.45
+@export var death_wisp_lift: float = 0.12
+@export var death_wisp_size: float = 0.22
+@export_range(0.0, 1.0) var death_wisp_alpha: float = 0.45
+@export_range(0.0, 1.0) var death_wisp_fog_blend: float = 0.3
+@export_range(0.0, 1.0) var death_wisp_spread: float = 0.5
+@export var death_wisp_delay: float = 0.15
 
 # Flight, for a patrolling pack member (PackPatrol -> fly_to()): how
 # fast the body turns to face its travel, and how long a flyer takes to
@@ -205,6 +231,11 @@ var _attachment: Node3D = null
 # each one is the next_pass of.
 var _fog_overlays: Array[ShaderMaterial] = []
 var _fog_bases: Array[BaseMaterial3D] = []
+# The hit flash running now (play_hit_flash()) - a death stops it, or its
+# fall would write full opacity back over the dissolve.
+var _flash_tween: Tween = null
+# The death running now (settle_and_free()), for skip_death().
+var _death_tween: Tween = null
 # The instantiated glb root from _spawn_model() - what settle_and_free()
 # sinks. The BODY keeps its place (the recoil tweens that), the model
 # moves under it.
@@ -692,7 +723,12 @@ func play_hit_flash(flash_color: Color, rise_time: float, fall_time: float) -> v
 	# Every tinted material rises together, then falls together: the
 	# rises in parallel, chain() puts the first fall after them, and the
 	# remaining falls run alongside it.
+	if _settling:
+		return
+	if _flash_tween != null and _flash_tween.is_valid():
+		_flash_tween.kill()
 	var tween := create_tween()
+	_flash_tween = tween
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.set_parallel(true)
 	for index in _tint_materials.size():
@@ -1305,18 +1341,22 @@ func _process(delta: float) -> void:
 	global_position = Vector3(_flight_xz.x, _body_y_on_ground(_flight_xz.x, _flight_xz.y) + _hover, _flight_xz.y)
 	rotation.y = lerp_angle(rotation.y, _flight_heading, clampf(delta * flight_turn_rate, 0.0, 1.0))
 
-# Called by RegionField when this enemy's death begins, once the blow
-# that killed it has shown (its _on_enemy_defeated()). The HP readout
-# goes at once
-# - a "0/45" hanging under a body that's leaving is a corpse in the line
-# - an attachment that can fold drops its wings over settle_time, the
-# model then sinks its own height into the sand over settle_time
-# (through the battle freeze, like every tween here), and then this node
-# is freed. Sinks the MODEL rather than the body so the killing blow's
-# own recoil (play_hit_recoil(), a tween on this body's global_position
-# still returning to rest) never fights it. The contact area goes with
-# the node, so a fight the Wanderer re-contacts later can't include a
-# member that isn't there.
+# The death (settle_and_free()), called by RegionField when it begins -
+# once the blow that killed this enemy has shown in full (its
+# _on_enemy_defeated()). The HP readout goes at once - a "0/45" hanging
+# under a body that's leaving is a corpse in the line - an attachment
+# that can fold drops its wings over settle_time, and then the body
+# slumps a little and goes into the fog: the fog colour laid over it
+# whatever the distance, so it loses its contrast rather than its
+# opacity, while a few wisps of sand lift and drift off downwind; gone
+# into the fog it dissolves out (dithered), says so (death_finished) and
+# is freed - all through the battle freeze, like every tween here, and
+# each part an export in the Settle group. Moves the MODEL rather than
+# the body so the killing blow's own recoil (play_hit_recoil(), a tween on
+# this body's global_position) never fights it - though the death only
+# starts once that has played. The contact area goes with the node, so a
+# fight the Wanderer re-contacts later can't include a member that isn't
+# there.
 func mark_defeated() -> void:
 	_defeated = true
 
@@ -1346,18 +1386,152 @@ func settle_and_free() -> void:
 	if _model == null or _model_height <= 0.0:
 		_finish_death()
 		return
+	_stop_hit_flash()
 	var tween := create_tween()
+	_death_tween = tween
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	# Wings first, body after: an attachment that can fold takes the
-	# settle time to drop its wings, and only then does the body sink -
-	# from wherever it is (standing, or hovering in a fight) to its own
-	# height below its grounded place.
+	# Wings first: an attachment that can fold takes settle_time to drop
+	# its wings before the body goes.
 	if _attachment != null and _attachment.has_method("fold"):
 		_attachment.call("fold", settle_time)
 		tween.tween_interval(settle_time)
-	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
-	tween.tween_property(_model, "position:y", _model_ground_y - _model_height, settle_time)
+	# The slump, from wherever it is (standing, or hovering in a fight) to a
+	# little under its grounded place - overshooting and settling back
+	# (TRANS_BACK) - and a small tilt; the fog over it and its shadow going
+	# alongside; the sand lifting a beat in.
+	tween.tween_callback(_begin_death_wisps)
+	tween.set_parallel(true)
+	tween.tween_property(_model, "position:y", _model_ground_y - _model_height * death_slump_depth, maxf(death_slump_time, 0.001)).set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
+	tween.tween_property(_model, "rotation:z", _model.rotation.z + deg_to_rad(death_slump_tilt_degrees), maxf(death_slump_time, 0.001)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+	tween.tween_method(_set_death_veil, 0.0, 1.0, maxf(death_fade_time, 0.001)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if _contact_shadow != null:
+		tween.tween_property(_contact_shadow, "shadow_opacity", 0.0, maxf(death_fade_time, 0.001))
+	# Then, gone into the fog, it dissolves out and is freed.
+	tween.set_parallel(false)
+	tween.tween_callback(_begin_death_vanish)
+	tween.tween_method(_set_death_presence, 1.0, 0.0, maxf(death_vanish_time, 0.001))
 	tween.tween_callback(_finish_death)
+
+# A click during a death (BattleController.skip_deaths()): straight to
+# its end - the slump settled, the body gone, the node freed. The sand
+# already lifting drifts on.
+func skip_death() -> void:
+	if _death_tween != null and _death_tween.is_valid():
+		_death_tween.custom_step(1.0e6)
+
+# Whether its death is running now (settle_and_free(), not yet finished).
+func is_dying() -> bool:
+	return _death_tween != null and _death_tween.is_valid()
+
+# The hit flash, stopped where it is and its colours put back - its fall
+# would otherwise write full opacity over the dissolve.
+func _stop_hit_flash() -> void:
+	if _flash_tween != null and _flash_tween.is_valid():
+		_flash_tween.kill()
+	for index in _tint_materials.size():
+		_tint_materials[index].albedo_color = _tint_base_colors[index]
+
+# The fog colour over the whole body, distance aside (its fog pass's veil).
+func _set_death_veil(value: float) -> void:
+	for overlay in _fog_overlays:
+		overlay.set_shader_parameter("veil", value)
+
+# The last dissolve: every tinted surface dithered (alpha hash keeps them
+# opaque-sorted, so nothing behind sorts wrong) and casting no shadow.
+func _begin_death_vanish() -> void:
+	for material in _tint_materials:
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_HASH
+	for mesh_instance in _model.find_children("*", "MeshInstance3D", true, false):
+		(mesh_instance as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+# How much of the body is left: its surfaces' alpha and its fog pass's.
+func _set_death_presence(value: float) -> void:
+	for index in _tint_materials.size():
+		var color: Color = _tint_base_colors[index]
+		color.a *= value
+		_tint_materials[index].albedo_color = color
+	for overlay in _fog_overlays:
+		overlay.set_shader_parameter("presence", value)
+
+func _begin_death_wisps() -> void:
+	if death_wisp_delay > 0.0:
+		get_tree().create_timer(death_wisp_delay).timeout.connect(spawn_death_wisps)
+	else:
+		spawn_death_wisps()
+
+# A few wisps of sand lifting from where the body lies and drifting off
+# downwind, fading (the Settle group's death_wisp_*): sand-coloured,
+# death_wisp_fog_blend toward the fog, never brighter than the sand - no
+# glow, no burst. On the field, not this node, so they outlive it; set to
+# run through the battle freeze, and freed once the last has faded.
+func spawn_death_wisps() -> void:
+	if _ground == null or death_wisp_count <= 0 or not is_inside_tree():
+		return
+	var field := get_node_or_null(region_field_path) as RegionField
+	var wind: Vector3 = field.get_wind_direction() if field != null else Vector3.RIGHT
+	var sand: Color = _ground.ground_color
+	if not _fog_overlays.is_empty():
+		var fog: Color = _fog_overlays[0].get_shader_parameter("fog_color")
+		sand = sand.lerp(fog, death_wisp_fog_blend)
+
+	var particles := GPUParticles3D.new()
+	particles.process_mode = Node.PROCESS_MODE_ALWAYS
+	particles.emitting = false
+	particles.one_shot = true
+	particles.amount = death_wisp_count
+	particles.lifetime = death_wisp_lifetime
+	particles.explosiveness = 1.0 - death_wisp_spread
+
+	var quad_mesh := QuadMesh.new()
+	quad_mesh.size = Vector2(death_wisp_size, death_wisp_size * 0.6)
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	material.vertex_color_use_as_albedo = true
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	material.billboard_keep_scale = true
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	quad_mesh.material = material
+	particles.draw_pass_1 = quad_mesh
+	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+
+	var process_material := ParticleProcessMaterial.new()
+	process_material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	process_material.emission_box_extents = Vector3(_model_aabb.size.x, _model_aabb.size.y * 0.3, _model_aabb.size.z) * 0.35
+	process_material.direction = (wind + Vector3.UP * 0.35).normalized()
+	process_material.spread = 12.0
+	process_material.initial_velocity_min = death_wisp_speed * 0.7
+	process_material.initial_velocity_max = death_wisp_speed
+	process_material.gravity = Vector3(0.0, death_wisp_lift, 0.0)
+	process_material.damping_min = 0.1
+	process_material.damping_max = 0.2
+	process_material.scale_min = 0.7
+	process_material.scale_max = 1.2
+	var grow := Curve.new()
+	grow.add_point(Vector2(0.0, 0.6))
+	grow.add_point(Vector2(1.0, 1.4))
+	var scale_texture := CurveTexture.new()
+	scale_texture.curve = grow
+	process_material.scale_curve = scale_texture
+	var fade := Gradient.new()
+	fade.set_color(0, Color(sand, 0.0))
+	fade.set_color(1, Color(sand, 0.0))
+	fade.add_point(0.15, Color(sand, death_wisp_alpha))
+	var ramp := GradientTexture1D.new()
+	ramp.gradient = fade
+	process_material.color_ramp = ramp
+	particles.process_material = process_material
+
+	_wisp_parent().add_child(particles)
+	particles.global_position = global_position + Vector3.UP * (_model_aabb.position.y + _model_aabb.size.y * 0.2)
+	particles.emitting = true
+	get_tree().create_timer(death_wisp_lifetime + 0.2).timeout.connect(particles.queue_free)
+
+# Where a death's wisps live: the field, so they outlive this node - or
+# its own parent, with no field to name.
+func _wisp_parent() -> Node:
+	var field := get_node_or_null(region_field_path)
+	return field if field != null else get_parent()
 
 # The death's end: said, then the node goes.
 func _finish_death() -> void:

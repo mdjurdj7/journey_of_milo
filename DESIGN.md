@@ -43,6 +43,24 @@ the hit reactions it passes; the hits themselves, HP and kills, still land
 at the card's impact. Blood Arc's arc (#461613, 0.9) is the first.
 (2026-10-03.)
 
+One exception to "no particles": a death's sand. When an enemy dies, a
+few wisps of sand lift from where it lies and drift off downwind, fading
+(`FieldEnemy.spawn_death_wisps()`) - world sand, sand-coloured and toward
+the fog, not a combat effect, and never brighter than the ground; no
+glow, no burst. The death itself is a slump and a fade into the fog
+colour (the enemy fog pass's `veil`), never a flash. A killing blow plays
+in full - every hit, number, hit-stop (at least `kill_hitstop_min` on a
+kill), recoil and play effect - before the death begins; the rules drop
+the enemy at once. (2026-10-09.)
+
+## Wind
+
+The field's wind is `RegionField.get_wind_direction()`: the + direction
+of the floor's ground ripples (`FloorData.wind_ripple_angle`, measured
+from +X toward +Z) where its sand is rippled, else
+`RegionField.default_wind_angle_degrees`. Anything that drifts downwind
+reads it - a death's sand today. (2026-10-09.)
+
 ## The played card
 
 A played card is out of the hand from the moment the play commits, before

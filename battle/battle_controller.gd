@@ -1689,6 +1689,25 @@ func _on_death_finished(enemy: FieldEnemy) -> void:
 	_dying.erase(enemy)
 	_maybe_win()
 
+# Every death running now, straight to its end (FieldEnemy.skip_death()):
+# a click does it (_input()). Only a death that has begun - a blow still
+# showing (its death held) is never cut.
+func skip_deaths() -> void:
+	for enemy in _dying.duplicate():
+		if is_instance_valid(enemy):
+			enemy.skip_death()
+
+# Whether any death is running now.
+func has_running_deaths() -> bool:
+	return not _dying.is_empty()
+
+# A click anywhere while a death runs skips it - and goes on to whatever
+# else it does (a card, the end of the turn): never consumed here.
+func _input(event: InputEvent) -> void:
+	var press := event as InputEventMouseButton
+	if press != null and press.pressed and not _dying.is_empty():
+		skip_deaths()
+
 # The last enemy fell and every death has played out: the fight is won.
 func _maybe_win() -> void:
 	if _win_waiting and _pending_deaths.is_empty() and _dying.is_empty():

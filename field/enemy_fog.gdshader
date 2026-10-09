@@ -27,6 +27,13 @@ uniform float fog_factor : hint_range(0.0, 1.0) = 0.4;
 uniform bool use_alpha_texture = false;
 uniform sampler2D alpha_texture : source_color, filter_linear_mipmap;
 uniform float alpha_scissor_threshold = 0.5;
+// A death (FieldEnemy.settle_and_free()): veil lays the fog colour over the
+// body at that much whatever the distance - 1 is the body gone into the
+// atmosphere, a flat fog-coloured shape - and presence fades the whole
+// pass out with the body's own last dissolve. RegionField never pushes
+// either; 0 and 1 are a living body.
+uniform float veil : hint_range(0.0, 1.0) = 0.0;
+uniform float presence : hint_range(0.0, 1.0) = 1.0;
 
 void fragment() {
 	if (use_alpha_texture && texture(alpha_texture, UV).a <= alpha_scissor_threshold) {
@@ -34,5 +41,5 @@ void fragment() {
 	}
 	float amount = smoothstep(fog_begin, fog_end, length(VERTEX)) * fog_density;
 	ALBEDO = fog_color * fog_energy;
-	ALPHA = clamp(amount * fog_factor, 0.0, 1.0);
+	ALPHA = clamp(max(amount * fog_factor, veil), 0.0, 1.0) * presence;
 }
