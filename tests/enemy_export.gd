@@ -398,6 +398,8 @@ static func _intent_entry(data: EnemyData, intent: EnemyIntent) -> Dictionary:
 		entry["rears_while_queued"] = true
 	if intent.status_while_queued != null:
 		entry["status_while_queued"] = intent.status_while_queued.id
+	if intent.status_on_resolve != null:
+		entry["status_on_resolve"] = intent.status_on_resolve.id
 	if intent.counts_attack_cards and data.attack_card_status != null:
 		var status: StatusData = data.attack_card_status
 		entry["counts_attack_cards"] = {
@@ -432,7 +434,8 @@ static func _status_entries(data: EnemyData) -> Array:
 
 # [StatusData, how it comes] for each status the enemy can hold, once, in
 # the order it meets them: its starting statuses, the ones its intents
-# hold while queued, its attack-card status, and whatever those turn into (grants_when_alone / grants_on_critical /
+# hold while queued or bring when they resolve, its attack-card status, and
+# whatever those turn into (grants_when_alone / grants_on_critical /
 # grants_on_turn_start) - and what its attacks put on the player (EnemyIntent.
 # applies_to_player).
 static func _reachable_statuses(data: EnemyData) -> Array:
@@ -443,6 +446,9 @@ static func _reachable_statuses(data: EnemyData) -> Array:
 	for intent in data.intents:
 		if intent != null and intent.status_while_queued != null:
 			queue.append([intent.status_while_queued, "while its %s is queued" % intent.intent_name])
+	for intent in data.intents:
+		if intent != null and intent.status_on_resolve != null:
+			queue.append([intent.status_on_resolve, "from its %s resolving until its next move" % intent.intent_name])
 	for intent in data.intents:
 		if intent != null and intent.applies_to_player != null and intent.applied_amount > 0:
 			queue.append([intent.applies_to_player, "put on the player by its %s, %d at a time" % [intent.intent_name, intent.applied_amount]])

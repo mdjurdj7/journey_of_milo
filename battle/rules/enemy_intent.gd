@@ -30,10 +30,10 @@ class_name EnemyIntent
 # alone, a short down-arrow settling onto a ground line. The Underfoot's
 # Rebury.
 #
-# COIL: as SETTLE - nothing happens, it stays targetable, and what it holds
-# next comes with the intent queued after it (the Bite's status_while_
-# queued: Coiled). The display shows its glyph alone, a coil. The Adder's
-# Coil.
+# COIL: as SETTLE - no damage, no block, it stays targetable - and what it
+# brings is its status_on_resolve (Coiled), held from the Coil until the
+# enemy's next move. The display shows its glyph alone, a coil. The
+# Adder's Coil.
 enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL }
 
 # The move's name (the Dunecur's Rush) - for the enemy export (tests/
@@ -116,3 +116,10 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL }
 # amount()). Null = none.
 @export var applies_to_player: StatusData = null
 @export var applied_amount: int = 0
+
+# The status its enemy gains when this intent resolves - not when it is
+# queued, so a move lost to Denied or a pain turn, or broken, brings
+# nothing - held until the enemy's next move, which takes it off however
+# that goes (EnemyTurn.take_turn()). The Adder's Coil: Coiled through the
+# player's turn after it. Null = none.
+@export var status_on_resolve: StatusData = null

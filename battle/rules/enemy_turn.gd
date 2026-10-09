@@ -78,6 +78,12 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 	if denied != null:
 		combatant.statuses.erase(denied)
 		result["denied"] = true
+	# What its last move brought (EnemyIntent.status_on_resolve - Coiled)
+	# lasts until this one, however this one goes.
+	for brought: StatusData in _resolved_statuses(data):
+		var held: Status = Status.find_in(combatant.statuses, brought)
+		if held != null:
+			Status.remove_from(combatant.statuses, held)
 	if combatant.pain_turn_pending:
 		# The pain turn: nothing resolves and nothing is queued in its
 		# place - the loop moves on and the turn is counted, as if it had.
@@ -122,9 +128,13 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# changes with the queued intent (_sync_queued(), below).
 				pass
 			EnemyIntent.IntentType.COIL:
-				# The same: it coils, and the intent queued next holds what
-				# that brings (the Bite's Coiled).
+				# Nothing happens here either: it coils, and what that brings
+				# is its status_on_resolve (Coiled), just below.
 				pass
+		# The move resolved: what it brings, until the next (the Coil's
+		# Coiled). A move lost or broken, above, brings nothing.
+		if intent.status_on_resolve != null:
+			Status.apply_to(combatant.statuses, intent.status_on_resolve)
 
 	# Counted whatever the turn did - an interrupted or cancelled one too -
 	# so escalation keeps its own clock.
@@ -476,6 +486,16 @@ static func _queued_statuses(data: EnemyData) -> Array[StatusData]:
 		for each: EnemyIntent in [intent, intent.on_interrupt if intent != null else null]:
 			if each != null and each.status_while_queued != null and not found.has(each.status_while_queued):
 				found.append(each.status_while_queued)
+	return found
+
+# Every status_on_resolve this enemy's intents bring - its loop's and
+# their on_interrupt interjections'.
+static func _resolved_statuses(data: EnemyData) -> Array[StatusData]:
+	var found: Array[StatusData] = []
+	for intent: EnemyIntent in data.intents:
+		for each: EnemyIntent in [intent, intent.on_interrupt if intent != null else null]:
+			if each != null and each.status_on_resolve != null and not found.has(each.status_on_resolve):
+				found.append(each.status_on_resolve)
 	return found
 
 # The last of its pack (Combatant.pack_alone, from now on): a status

@@ -12,12 +12,12 @@
 script = ExtResource("2_intent")
 intent_name = "Coil"
 type = 6
+status_on_resolve = ExtResource("3_coiled")
 
 [sub_resource type="Resource" id="EnemyIntent_bite"]
 script = ExtResource("2_intent")
 intent_name = "Bite"
 value = 6
-status_while_queued = ExtResource("3_coiled")
 applies_to_player = ExtResource("4_venom")
 applied_amount = 3
 
@@ -29,7 +29,7 @@ value = 11
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Adder"
-mechanic_summary = "An elite dune adder, coiled on the faint side of floor 4's dune loop: Coil, Bite 6 and 3 Venom, Strike 11, in a loop. Coiled from its Coil until the Bite lands, it strikes back for 5 at every Attack played against it; Venom takes its stacks in HP at the start of each turn, past Block, then falls by 1. Teaches holding Attacks for the right turn, and pays a keepsake and Glassbone for it."
+mechanic_summary = "An elite dune adder, coiled on the faint side of floor 4's dune loop: Coil, Bite 6 and 3 Venom, Strike 11, in a loop. Coiled from its Coil until its next move (a Denied Coil brings none), it strikes back for 5 at every Attack played against it; Venom takes its stacks in HP at the start of each turn, past Block, then falls by 1. Teaches holding Attacks for the right turn, and pays a keepsake and Glassbone for it."
 max_hp = 60
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_coil"), SubResource("EnemyIntent_bite"), SubResource("EnemyIntent_strike")])
 ; Placeholder: the Stork's body hits, until an adder sound exists.

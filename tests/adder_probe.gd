@@ -1,9 +1,9 @@
 extends SceneTree
 
 # Headless probe for the Adder, floor 4's faint-side elite: its Coil ->
-# Bite -> Strike loop; Coiled, held from the Coil until the Bite lands,
-# striking back for 5 at each Attack card played against it - an enemy
-# hit in every way (Block, Garnished and Unbroken taken off and spent,
+# Bite -> Strike loop; Coiled, brought by the Coil resolving - a Denied
+# Coil brings none - and held until its next move, striking back for 5
+# at each Attack card played against it - an enemy hit in every way (Block, Garnished and Unbroken taken off and spent,
 # its attack bonuses, Grace) - Skills never, an all-enemies Attack once;
 # the Bite's Venom, landing whatever Block took and adding up; Venom's
 # tick at the turn's start - its stacks in HP, falling by 1, gone at 0,
@@ -19,7 +19,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 12
+const CASES := 13
 const ADDER_PATH := "res://battle/rules/enemies/adder.tres"
 const COILED_PATH := "res://battle/rules/statuses/coiled.tres"
 const VENOM_PATH := "res://battle/rules/statuses/venom.tres"
@@ -33,6 +33,7 @@ const SOUND_PATHS: Array[String] = ["res://assets/audio/enemies/Stork/hit_1.mp3"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
+const DENIED_PATH := "res://battle/rules/statuses/denied.tres"
 const CARVE_PATH := "res://cards/data/carve.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const RUN_LOGGER_PATH := "res://run/run_logger.gd"
@@ -63,6 +64,7 @@ func _initialize() -> void:
 	_check_bite_venom()
 	_check_venom_tick_rules()
 	await _check_fight_counter()
+	await _check_fight_denied()
 	await _check_fight_skill()
 	await _check_fight_aoe()
 	await _check_fight_venom()
@@ -94,7 +96,8 @@ func _check_data() -> void:
 		_expect(coil.intent_name == "Coil" and coil.type == EnemyIntent.IntentType.COIL, "...Coil, a COIL")
 		_expect(bite.intent_name == "Bite" and bite.type == EnemyIntent.IntentType.ATTACK and bite.value == BITE, "...Bite, an Attack of 6")
 		_expect(bite.applies_to_player != null and bite.applies_to_player.resource_path == VENOM_PATH and bite.applied_amount == VENOM, "...that puts 3 Venom on the player")
-		_expect(bite.status_while_queued != null and bite.status_while_queued.resource_path == COILED_PATH, "...and holds Coiled while it's queued")
+		_expect(coil.status_on_resolve != null and coil.status_on_resolve.resource_path == COILED_PATH, "...the Coil bringing Coiled when it resolves")
+		_expect(coil.status_while_queued == null and bite.status_while_queued == null, "...and nothing held while queued")
 		_expect(strike.intent_name == "Strike" and strike.type == EnemyIntent.IntentType.ATTACK and strike.value == STRIKE and strike.applies_to_player == null, "...Strike, an Attack of 11")
 	var coiled: StatusData = load(COILED_PATH)
 	_expect(coiled.strikes_back_on_attack_card and coiled.default_magnitude == COUNTER, "Coiled strikes back for 5")
@@ -243,6 +246,36 @@ func _check_fight_counter() -> void:
 		before = player.hp
 		await _play_first(controller, adder)
 		_expect_eq(before - player.hp, 0, "...and a Slash now draws nothing back")
+	await _teardown()
+	_completed += 1
+
+# Denied on its Coil turn, it never coils: the Bite comes up with no
+# Coiled, and an Attack into it draws nothing back - until it next coils.
+func _check_fight_denied() -> void:
+	var controller: Node = await _start_fight(SLASH_PATH)
+	if controller != null:
+		var adder: Node = (controller.get("enemies") as Array)[0]
+		var combatant: Combatant = _combatant(controller, adder)
+		var player: Combatant = controller.get("player")
+		Status.apply_to(combatant.statuses, load(DENIED_PATH))
+		await _end_turn(controller)
+		_expect_eq(EnemyTurn.current_intent(combatant, adder.get("enemy_data")).intent_name, "Bite", "Denied on the Coil: the Bite comes up")
+		_expect(not _has(combatant, COILED_PATH), "...with no Coiled")
+		_expect_eq(_hp_mark(controller, adder), {"glyph": &"", "value": 0}, "...nothing beside its HP")
+		var before: int = player.hp
+		await _play_first(controller, adder)
+		_expect_eq(before - player.hp, 0, "...and a Slash into it draws nothing back")
+		# Bite, Strike, then the next Coil resolves: Coiled again.
+		player.block = 99
+		await _end_turn(controller)
+		player.block = 99
+		await _end_turn(controller)
+		player.block = 99
+		await _end_turn(controller)
+		_expect(_has(combatant, COILED_PATH), "Its next Coil resolves: Coiled")
+		before = player.hp
+		await _play_first(controller, adder)
+		_expect_eq(before - player.hp, COUNTER, "...and a Slash draws the strike back")
 	await _teardown()
 	_completed += 1
 

@@ -605,7 +605,7 @@
       "file": "res://battle/rules/enemies/adder.tres",
       "hp": 60,
       "elite": true,
-      "mechanic_summary": "An elite dune adder, coiled on the faint side of floor 4's dune loop: Coil, Bite 6 and 3 Venom, Strike 11, in a loop. Coiled from its Coil until the Bite lands, it strikes back for 5 at every Attack played against it; Venom takes its stacks in HP at the start of each turn, past Block, then falls by 1. Teaches holding Attacks for the right turn, and pays a keepsake and Glassbone for it.",
+      "mechanic_summary": "An elite dune adder, coiled on the faint side of floor 4's dune loop: Coil, Bite 6 and 3 Venom, Strike 11, in a loop. Coiled from its Coil until its next move (a Denied Coil brings none), it strikes back for 5 at every Attack played against it; Venom takes its stacks in HP at the start of each turn, past Block, then falls by 1. Teaches holding Attacks for the right turn, and pays a keepsake and Glassbone for it.",
       "field": {
         "model": "res://assets/models/enemies/Underfoot/Underfoot.glb",
         "model_is_default": false,
@@ -626,14 +626,14 @@
         "intents": [
           {
             "name": "Coil",
-            "type": "COIL"
+            "type": "COIL",
+            "status_on_resolve": "coiled"
           },
           {
             "name": "Bite",
             "type": "ATTACK",
             "damage_per_hit": 6,
             "hits": 1,
-            "status_while_queued": "coiled",
             "applies_to_player": {
               "status": "venom",
               "amount": 3
@@ -656,7 +656,7 @@
           "id": "coiled",
           "name": "Coiled",
           "file": "res://battle/rules/statuses/coiled.tres",
-          "gained": "while its Bite is queued",
+          "gained": "from its Coil resolving until its next move",
           "description": "Each Attack you play against it, it strikes back for {value}.",
           "text": "Each Attack you play against it, it strikes back for 5.",
           "fields": {
