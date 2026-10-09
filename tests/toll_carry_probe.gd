@@ -17,8 +17,11 @@ const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const CASES := 6
 const SAFETY_SECONDS := 180.0
-# Physics frames for a fight's end to land (settle, frees, reward delay).
+# Physics frames for a fight's end to land (settle, frees, reward delay) -
+# a win first waits on its killing blow and last death, up to
+# WIN_WAIT_SECONDS (BattleController._maybe_win()).
 const SETTLE_FRAMES := 90
+const WIN_WAIT_SECONDS := 6.0
 
 var _failures: int = 0
 var _completed: int = 0
@@ -83,6 +86,9 @@ func _check_win() -> void:
 			combatant.set("hp", 0)
 			controller.call("_report_damage", "player", combatant, 99, "card")
 		controller.call("_check_battle_end")
+		var start: int = Time.get_ticks_msec()
+		while bool(field.get("_battle_open")) and Time.get_ticks_msec() - start < int(WIN_WAIT_SECONDS * 1000.0):
+			await physics_frame
 		for i in SETTLE_FRAMES:
 			await physics_frame
 		_expect(not bool(field.get("_battle_open")), "Win on %d: the fight is over" % pair[0])

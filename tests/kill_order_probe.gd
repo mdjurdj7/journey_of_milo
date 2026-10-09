@@ -46,8 +46,11 @@ const ENEMY_STATUS_SCRIPT_SUFFIX := "enemy_status.gd"
 # Well past any case's own timings; a hang here quits with a failure
 # rather than leaving a headless process behind.
 const SAFETY_SECONDS := 240.0
-# Physics frames after the last kill for the settle (0.4 s), the win's
-# frees and the reward delay (0.6 s) to land.
+# After the last kill, the fight waits on its blow and the last death
+# before it is won (BattleController._maybe_win()): up to WIN_WAIT_SECONDS
+# for that, then physics frames for the win's frees and the reward delay
+# (0.6 s) to land.
+const WIN_WAIT_SECONDS := 6.0
 const SETTLE_FRAMES := 90
 
 var _field: Node3D = null
@@ -164,6 +167,9 @@ func _run_case(order: String, group: StringName, expect_cleared: bool) -> void:
 				_kill(controller, combatants, member)
 			controller.call("_check_battle_end")
 
+	var start: int = Time.get_ticks_msec()
+	while bool(_field.get("_battle_open")) and Time.get_ticks_msec() - start < int(WIN_WAIT_SECONDS * 1000.0):
+		await physics_frame
 	for i in SETTLE_FRAMES:
 		await physics_frame
 

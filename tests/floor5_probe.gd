@@ -66,6 +66,9 @@ const WAYPOINT_SECONDS := 12.0
 const FIGHT_SECONDS := 8.0
 const OVERSHOOT_LIMIT_M := 0.02
 const SAFETY_SECONDS := 400.0
+# How long a won fight may take to open its reward screen: the killing
+# blow, the last death, the camera's return.
+const REWARD_WAIT_SECONDS := 5.0
 
 # This process's log folder: run_probes.sh's per-process --runlog-dir
 # (RunLogger.dir_override()) when it hands one over, so a second copy of
@@ -291,7 +294,7 @@ func _win_fight(fight: Node) -> bool:
 		combatant.set("hp", 0)
 		controller.call("_report_damage", "player", combatant, 99, "card")
 	controller.call("_check_battle_end")
-	await create_timer(1.6).timeout
+	await _await_reward_screen()
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")
 	if reward != null:
 		reward.call("close")
@@ -416,6 +419,13 @@ func _required_enemy() -> Node:
 			return node
 	_fail("no required enemy on floor 5")
 	return null
+
+# A fight just won: until its reward screen is up - the killing blow and
+# the last death play out first - or REWARD_WAIT_SECONDS have gone.
+func _await_reward_screen() -> void:
+	var start: int = Time.get_ticks_msec()
+	while _child_with_script(_field, "reward_screen.gd") == null and Time.get_ticks_msec() - start < int(REWARD_WAIT_SECONDS * 1000.0):
+		await process_frame
 
 func _child_with_script(parent: Node, suffix: String) -> Node:
 	for child in parent.get_children():

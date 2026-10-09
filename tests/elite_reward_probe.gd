@@ -34,6 +34,9 @@ const FLOOR_1 := 0
 const FLOOR_3 := 2
 const FLOOR_5 := 4
 const SAFETY_SECONDS := 300.0
+# How long a won fight may take to open its reward screen: the killing
+# blow, the last death, the camera's return.
+const REWARD_WAIT_SECONDS := 5.0
 
 var _run_state: Node = null
 var _field: Node = null
@@ -190,7 +193,7 @@ func _win(floor_index: int, enemy_path: String) -> Node:
 		_fail("no fight started on floor %d" % (floor_index + 1))
 		return null
 	_kill_all(overlay.get("battle_controller"))
-	await create_timer(1.6).timeout
+	await _await_reward_screen()
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")
 	if reward == null:
 		_fail("winning on floor %d opened no reward screen" % (floor_index + 1))
@@ -218,6 +221,13 @@ func _line_ids(reward: Node) -> Array[String]:
 	for line in reward.get("_lines") as Array:
 		ids.append(str((line as RefCounted).get("id")))
 	return ids
+
+# A fight just won: until its reward screen is up - the killing blow and
+# the last death play out first - or REWARD_WAIT_SECONDS have gone.
+func _await_reward_screen() -> void:
+	var start: int = Time.get_ticks_msec()
+	while _child_with_script(_field, "reward_screen.gd") == null and Time.get_ticks_msec() - start < int(REWARD_WAIT_SECONDS * 1000.0):
+		await process_frame
 
 func _child_with_script(parent: Node, suffix: String) -> Node:
 	for child in parent.get_children():

@@ -42,6 +42,9 @@ const GLOBAL_SEED := 20261004
 const RUN_SEED := 4242
 const MAX_TURNS := 12
 const SAFETY_SECONDS := 240.0
+# How long a won fight may take to open its reward screen: the killing
+# blow, the last death, the camera's return.
+const REWARD_WAIT_SECONDS := 5.0
 
 # This process's log folder: run_probes.sh's per-process --runlog-dir
 # (RunLogger.dir_override()) when it hands one over, so a second copy of
@@ -147,7 +150,7 @@ func _scripted_run(logging: bool) -> Dictionary:
 	seen["played"] = _played.duplicate()
 
 	# The reward screen, after the frame's return.
-	await create_timer(1.6).timeout
+	await _await_reward_screen()
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")
 	_expect(reward != null, "The win opens the reward screen")
 	if reward != null:
@@ -408,6 +411,13 @@ func _clear_dir() -> void:
 	DirAccess.make_dir_recursive_absolute(_log_dir)
 	for file in DirAccess.get_files_at(_log_dir):
 		DirAccess.remove_absolute(_log_dir.path_join(file))
+
+# A fight just won: until its reward screen is up - the killing blow and
+# the last death play out first - or REWARD_WAIT_SECONDS have gone.
+func _await_reward_screen() -> void:
+	var start: int = Time.get_ticks_msec()
+	while _child_with_script(_field, "reward_screen.gd") == null and Time.get_ticks_msec() - start < int(REWARD_WAIT_SECONDS * 1000.0):
+		await process_frame
 
 func _child_with_script(parent: Node, suffix: String) -> Node:
 	for child in parent.get_children():

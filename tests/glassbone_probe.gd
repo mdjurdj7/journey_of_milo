@@ -32,6 +32,9 @@ const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
 const WARDLING_FLOOR := 2
 const SPUTTER_FLOOR := 0
 const SAFETY_SECONDS := 300.0
+# How long a won fight may take to open its reward screen: the killing
+# blow, the last death, the camera's return.
+const REWARD_WAIT_SECONDS := 5.0
 
 var _run_state: Node = null
 var _field: Node = null
@@ -166,7 +169,7 @@ func _check_wardling_take() -> void:
 	_expect_eq(_glassbone(), 2, "A fight starting leaves the count alone")
 	_kill_all(controller)
 	_expect_eq(_glassbone(), 2, "The win itself grants nothing")
-	await create_timer(1.6).timeout
+	await _await_reward_screen()
 	_expect_eq(_glassbone(), 2, "...nor the fight's end - it waits on the reward screen")
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")
 	_expect(reward != null, "Killing the Wardling opens the reward screen")
@@ -210,7 +213,7 @@ func _check_wardling_walk_on() -> void:
 		_completed += 1
 		return
 	_kill_all(controller)
-	await create_timer(1.6).timeout
+	await _await_reward_screen()
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")
 	_expect(reward != null, "The Wardling's reward screen opens again")
 	if reward != null:
@@ -231,7 +234,7 @@ func _check_sputter_leaves_none() -> void:
 		_completed += 1
 		return
 	_kill_all(controller)
-	await create_timer(1.6).timeout
+	await _await_reward_screen()
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")
 	_expect(reward != null, "Killing the Sputter opens the reward screen")
 	if reward != null:
@@ -289,7 +292,7 @@ func _check_hud_hides_for_fight() -> void:
 	_expect(not hp_line.visible, "The row's HP hides for the fight")
 	_expect(not line.visible, "...and GLASSBONE with it")
 	_kill_all(controller)
-	await create_timer(1.6).timeout
+	await _await_reward_screen()
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")
 	if reward != null:
 		reward.call("close")
@@ -366,6 +369,13 @@ func _kill_all(controller: Node) -> void:
 		combatant.set("hp", 0)
 		controller.call("_report_damage", "player", combatant, 99, "card")
 	controller.call("_check_battle_end")
+
+# A fight just won: until its reward screen is up - the killing blow and
+# the last death play out first - or REWARD_WAIT_SECONDS have gone.
+func _await_reward_screen() -> void:
+	var start: int = Time.get_ticks_msec()
+	while _child_with_script(_field, "reward_screen.gd") == null and Time.get_ticks_msec() - start < int(REWARD_WAIT_SECONDS * 1000.0):
+		await process_frame
 
 func _child_with_script(parent: Node, suffix: String) -> Node:
 	for child in parent.get_children():

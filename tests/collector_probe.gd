@@ -55,6 +55,9 @@ const SAMPHIRE_PRICE := 8
 const REMOVAL_PRICE := 50
 const STOCK := 5
 const SAFETY_SECONDS := 300.0
+# How long a won fight may take to open its reward screen: the killing
+# blow, the last death, the camera's return.
+const REWARD_WAIT_SECONDS := 5.0
 
 var _run_state: Node = null
 var _field: Node = null
@@ -334,7 +337,7 @@ func _check_consumed() -> void:
 						combatant.set("hp", 0)
 						controller.call("_report_damage", "player", combatant, 99, "card")
 				controller.call("_check_battle_end")
-				await create_timer(1.6).timeout
+				await _await_reward_screen()
 				_expect(not _deck_has("Samphire"), "The fight over: Samphire has left RunState.deck")
 				_expect_eq((_run_state.get("deck") as Array).size(), 4, "...the deck down to the four Braces")
 	await _teardown()
@@ -404,6 +407,13 @@ func _has_name(cards: Array, card_name: String) -> bool:
 		if card.card_name == card_name:
 			return true
 	return false
+
+# A fight just won: until its reward screen is up - the killing blow and
+# the last death play out first - or REWARD_WAIT_SECONDS have gone.
+func _await_reward_screen() -> void:
+	var start: int = Time.get_ticks_msec()
+	while _child_with_script(_field, "reward_screen.gd") == null and Time.get_ticks_msec() - start < int(REWARD_WAIT_SECONDS * 1000.0):
+		await process_frame
 
 func _child_with_script(parent: Node, suffix: String) -> Node:
 	for child in parent.get_children():
