@@ -21,7 +21,7 @@ enum EffectType {
 # When the effect resolves, or with what number. Three modes, told apart
 # from the fields below by CardBonus.mode() and NOWHERE else:
 #   GATE    - alt_value and bonus_value both 0: condition false and the
-#             effect doesn't resolve at all (With Regards' energy).
+#             effect doesn't resolve at all (With Regards' heal).
 #   REPLACE - alt_value set: false uses `value`, true `alt_value`;
 #             something always resolves (Left Hand). The old
 #             project's TOLL_THRESHOLD_DAMAGE/FIRST_CARD_DAMAGE shape,
@@ -46,7 +46,7 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 
 # EFFECT ORDER IS LOAD-BEARING. Effects resolve top to bottom (see
 # EffectResolver.resolve_card()), and TARGET_KILLED reads what an EARLIER
-# effect on this same card did - so With Regards' GAIN_ENERGY has to sit
+# effect on this same card did - so With Regards' HEAL has to sit
 # after its DAMAGE or it will never fire. Every other condition reads
 # state that exists before the card is played and doesn't care.
 @export var effect_type: EffectType = EffectType.DAMAGE

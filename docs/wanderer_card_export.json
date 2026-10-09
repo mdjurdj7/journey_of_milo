@@ -2059,9 +2059,9 @@
       "face_type_label": "STRIKE",
       "energy_cost": 1,
       "rarity": "UNCOMMON",
-      "card_text": "Deal 8 damage.\nIf this kills, gain 1 energy.",
+      "card_text": "Deal 8 damage.\nIf this kills, heal 5.",
       "face_hp_line": null,
-      "card_text_template": "Deal {damage} damage.\nIf this kills, gain 1 energy.",
+      "card_text_template": "Deal {damage} damage.\nIf this kills, heal 5.",
       "targeting": "enemy",
       "removal_after_play": "discard pile",
       "effects": [
@@ -2070,8 +2070,8 @@
           "plain_english": "Deal 8 damage to the target."
         },
         {
-          "type": "GAIN_ENERGY",
-          "plain_english": "If this card's damage killed its target: gain 1 energy."
+          "type": "HEAL",
+          "plain_english": "If this card's damage killed its target: heal 5 HP, up to max HP."
         }
       ],
       "keywords": [],
@@ -2079,7 +2079,7 @@
       "base_damage": 8,
       "base_block": null,
       "draw": null,
-      "energy_gain": 1,
+      "energy_gain": null,
       "toll_gain": null,
       "toll_spend": null,
       "persistent_effect": null,

@@ -14,6 +14,8 @@ extends SceneTree
 
 const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
+# With Regards: what its kill heals.
+const WITH_REGARDS_HEAL := 5
 const CASES := 17
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
@@ -443,34 +445,45 @@ func _check_with_regards() -> void:
 	_expect_eq(card.cost, 1, "With Regards costs 1")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "With Regards is Uncommon")
 
+	var heal: CardEffect = card.effects[1] if card.effects.size() > 1 else null
+	_expect(heal != null and heal.effect_type == CardEffect.EffectType.HEAL and heal.value == WITH_REGARDS_HEAL and heal.condition == CardEffect.Condition.TARGET_KILLED, "Its kill heals 5, after the blow")
+	_expect(card.description.contains("If this kills, heal 5."), "...and its text says so")
+
 	var player: Combatant = _player(50)
+	player.hp = 30
 	player.energy = 1
 	var enemy := Combatant.new(8)
 	_play_into(card, player, [enemy])
 	_expect_eq(enemy.hp, 0, "With Regards kills an 8 HP enemy")
-	_expect_eq(player.energy, 2, "...and refunds 1 Energy")
+	_expect_eq(player.hp, 35, "...and heals 5")
+	_expect_eq(player.energy, 1, "...no Energy back (the card is resolved, not paid for)")
 
-	player.energy = 1
+	player.hp = 30
 	enemy = Combatant.new(20)
 	_play_into(card, player, [enemy])
 	_expect_eq(enemy.hp, 12, "With Regards deals 8")
-	_expect_eq(player.energy, 1, "No kill, no Energy")
+	_expect_eq(player.hp, 30, "No kill, no heal")
+
+	# Capped at max HP: 3 down heals 3.
+	player.hp = player.max_hp - 3
+	_play_into(card, player, [Combatant.new(8)])
+	_expect_eq(player.hp, player.max_hp, "A kill 3 below max HP heals to max, not past it")
 
 	# A kill by an earlier card doesn't carry over into this one.
-	player.energy = 1
+	player.hp = 30
 	_play_into(_card("carve"), player, [Combatant.new(6), Combatant.new(100)])
 	enemy = Combatant.new(20)
 	_play_into(card, player, [enemy])
-	_expect_eq(player.energy, 1, "An earlier card's kill pays nothing")
+	_expect_eq(player.hp, 30, "An earlier card's kill heals nothing")
 
 	# The attack bonus is part of its blow: Self-Eater's +3 kills 11 HP.
 	player = _player(50)
 	_play_into(_card("self_eater"), player, [Combatant.new(100)])
-	player.energy = 0
 	enemy = Combatant.new(11)
+	var hp_before: int = player.hp
 	_play_into(card, player, [enemy])
 	_expect_eq(enemy.hp, 0, "With Regards + Self-Eater kills 11")
-	_expect_eq(player.energy, 1, "...and refunds 1")
+	_expect_eq(player.hp, mini(hp_before - 2 + WITH_REGARDS_HEAL, player.max_hp), "...and heals 5 after Self-Eater's 2 HP")
 	_completed += 1
 
 func _check_starting_deck() -> void:

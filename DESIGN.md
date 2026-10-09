@@ -297,6 +297,10 @@ folder (run_log_probe). (2026-10-04.)
   empty as the entry above describes. Floor 1's single crab still makes
   it a weak pick there; the card itself is unchanged. (2026-09-26,
   card rarity.)
+  Update: the kill now heals 5 instead of refunding 1 Energy ("If this
+  kills, heal 5", capped at max HP). A heal still counts when the kill
+  ends the fight, so the single-enemy case above no longer makes the
+  card dead. (2026-10-08.)
 - **Rarity rolls only a fight's card reward.** `RewardPool.roll_by_
   rarity()` (tier first, 60/30/9/1, empty tiers renormalised) is what
   the reward screen and the fight's sand spread call; belongings bags,

@@ -9,7 +9,7 @@ class_name CardBonus
 #   ADD     - bonus_value set: the condition adds bonus_value on top of
 #             value, something always resolves (Untouched).
 #   GATE    - neither: the condition decides whether the effect resolves
-#             at all (With Regards' energy on a kill).
+#             at all (With Regards' heal on a kill).
 # resolved_value() is the number an effect lands for, given a context -
 # damage_effect.gd and undamaged_block_effect.gd deal exactly this, and
 # CardView prints exactly this - so the face can never promise a number

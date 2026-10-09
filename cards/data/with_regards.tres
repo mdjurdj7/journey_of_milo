@@ -8,10 +8,10 @@
 script = ExtResource("2_card_effect")
 value = 8
 
-[sub_resource type="Resource" id="E_energy"]
+[sub_resource type="Resource" id="E_heal"]
 script = ExtResource("2_card_effect")
-effect_type = 16
-value = 1
+effect_type = 4
+value = 5
 condition = 4
 
 [resource]
@@ -22,8 +22,8 @@ cost = 1
 card_type = 0
 target_type = 0
 description = "Deal {damage} damage.
-If this kills, gain 1 energy."
+If this kills, heal 5."
 battle_animation = &"Slash"
 impact_time = 0.55
-effects = Array[ExtResource("2_card_effect")]([SubResource("E_damage"), SubResource("E_energy")])
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_damage"), SubResource("E_heal")])
 art = ExtResource("3_art")
