@@ -33,6 +33,8 @@
 #   --import         run Godot's --import first (--path or this tree)
 #   --logs DIR       where the logs go (default: a fresh temp folder)
 #   --list           print the plan and stop
+#   --mapping-gaps   each probe, and the paths it loads (res:// in its
+#                    source) that its areas don't map to it
 #   --batch K/N      run group K of the selection split into N groups of
 #                    near-equal measured time (tools/probe_times.txt):
 #                    --full --batch 1/4 ... 4/4 is the whole suite, a
@@ -225,7 +227,7 @@ AREAS_ALL="cards face keywords rules enemies field floor1 floor2 floor3 floor4 f
 
 # The probes for one changed path; FULL for a path no area covers, nothing
 # for a path no probe can see (docs, tools, the bus layout).
-path_probes() {
+path_probes_hand() {
 	local path="${1%.uid}"
 	path="${path%.import}"
 	local out=""
@@ -327,6 +329,82 @@ path_probes() {
 	echo "$out"
 }
 
+# --- What each probe loads ---
+# Each probe's source scanned for the res:// files and folders it names
+# (a format string - one with a % - is skipped): SCAN_INDEX, a line per
+# path and probe, a folder's path ending in /. A changed path maps to
+# every probe that loads it, or a folder holding it, as well as to its
+# hand-written areas (path_probes_hand()) - so a probe reading enemy data
+# runs on a change to it whether or not an area says so. Built once, in
+# the main shell (scan_index()), before anything maps a path.
+SCAN_INDEX=""
+scan_index() {
+	[ -n "$SCAN_INDEX" ] && return 0
+	local f p r
+	SCAN_INDEX=$(for f in "$REPO"/tests/*_probe.gd; do
+		p=$(basename "$f" .gd)
+		grep -o '"res://[^"%]*"' "$f" | tr -d '"' | sed 's|^res://||; s|/$||' | sort -u | while IFS= read -r r; do
+			case "$r" in tests/*|"") continue ;; esac
+			if [ -d "$REPO/$r" ]; then
+				printf '%s/\t%s\n' "$r" "$p"
+			elif [ -e "$REPO/$r" ]; then
+				printf '%s\t%s\n' "$r" "$p"
+			fi
+		done
+	done)
+}
+# The probes that load `path` (scan_index()), one per line.
+scanned_probes() {
+	local path="${1%.uid}"
+	path="${path%.import}"
+	echo "$SCAN_INDEX" | awk -F'\t' -v p="$path" '$1 == p || ($1 ~ /\/$/ && index(p, $1) == 1) { print $2 }'
+}
+# The probes for one changed path: its areas', and every probe that loads
+# it. FULL stays FULL - no area covers it, so everything runs.
+path_probes() {
+	local hand
+	hand=$(path_probes_hand "$1")
+	if [ "$hand" = FULL ]; then
+		echo FULL
+		return 0
+	fi
+	echo "$hand" $(scanned_probes "$1")
+}
+# --mapping-gaps: each probe and the paths it loads that its areas don't
+# map to it - a file it names, or each tracked file under a folder it
+# names. A path no area covers (FULL) runs every probe, so isn't a gap.
+mapping_gaps() {
+	local path probe file files hand missed example found=0 last=""
+	while IFS=$'\t' read -r path probe; do
+		[ -n "$path" ] || continue
+		if [ "${path%/}" != "$path" ]; then
+			files=$(git -C "$REPO" ls-files -- "$path" | grep -v '\.uid$\|\.import$')
+		else
+			files="$path"
+		fi
+		missed=0
+		example=""
+		while IFS= read -r file; do
+			[ -n "$file" ] || continue
+			hand=" $(echo $(path_probes_hand "$file")) "
+			[ "$hand" = " FULL " ] && continue
+			case "$hand" in *" ${probe%_probe} "*|*" $probe "*) continue ;; esac
+			missed=$((missed + 1))
+			[ -n "$example" ] || example="$file"
+		done <<< "$files"
+		[ "$missed" -gt 0 ] || continue
+		[ "$probe" = "$last" ] || echo "$probe:"
+		last="$probe"
+		if [ "${path%/}" != "$path" ]; then
+			echo "    $path ($missed file(s) not mapped to it, e.g. $example)"
+		else
+			echo "    $path"
+		fi
+		found=1
+	done <<< "$(echo "$SCAN_INDEX" | sort -t$'\t' -k2,2 -k1,1)"
+	[ "$found" = 1 ] || echo "(none)"
+}
+
 die() { echo "run_probes: $*" >&2; exit 2; }
 
 MODE=""
@@ -368,6 +446,7 @@ while [ $# -gt 0 ]; do
 		--moved) MOVED="${2:?--moved needs a commit or range}"; shift ;;
 		--batch) BATCH="${2:?--batch needs K/N}"; shift ;;
 		--list-areas) for a in $AREAS_ALL; do printf '%-11s %s\n' "$a" "$(area_probes "$a")"; done; exit 0 ;;
+		--mapping-gaps) scan_index; mapping_gaps; exit 0 ;;
 		-h|--help) awk 'NR == 1 { next } /^#/ { sub(/^# ?/, ""); print; next } { exit }' "$0"; exit 0 ;;
 		*) die "unknown option $1 (--help)" ;;
 	esac
@@ -414,6 +493,7 @@ normalise_probes() { for p in "$@"; do p="${p%.gd}"; p="${p%_probe}_probe"; echo
 # MAPPED (normalised) and MAPPED_FULL: the first path no area covers,
 # which maps to the full suite, or empty.
 map_paths() {
+	scan_index
 	MAPPED=""
 	MAPPED_FULL=""
 	local f p all=""
