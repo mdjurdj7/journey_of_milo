@@ -23,8 +23,8 @@ face_prop_index = 0
 [sub_resource type="Resource" id="FloorEnemy_optional"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("7_sputter")
-position = Vector2(-24.4, -21.6)
-yaw_degrees = 180.0
+position = Vector2(11, -22.5)
+yaw_degrees = -90.0
 required = false
 
 [sub_resource type="Resource" id="FloorProp_bones"]
@@ -40,8 +40,8 @@ overrides = {
 [sub_resource type="Resource" id="FloorProp_collector"]
 script = ExtResource("10_floor_prop")
 scene = ExtResource("12_collector")
-position = Vector3(11, 0, -22.5)
-yaw_degrees = 90.0
+position = Vector3(-24.4, 0, -21.6)
+yaw_degrees = -6.3
 world_line = "It is sorting what it has."
 pool = ExtResource("13_collector_pool")
 
