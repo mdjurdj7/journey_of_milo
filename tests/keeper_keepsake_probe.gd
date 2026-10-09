@@ -371,8 +371,13 @@ func _check_house_key() -> void:
 	_expect_eq(second.cost_label.text, "2", "After it: the hand's faces read 2 again")
 	_expect_eq(player.energy_cost(second.card_data), 2, "...and it costs 2")
 	_expect(not bool(hand.call("_can_play", second.card_data, 0)), "...and on 0 Energy the hand dims it")
+	# Unaffordable, it arms for Devour alone (BattleController._arm_for_
+	# devour()) - never to be played: an enemy click does nothing.
 	controller.call("request_play", second)
-	_expect(not bool(controller.call("is_awaiting_target")), "The second card on 0 Energy is refused")
+	_expect(bool(controller.call("is_armed_for_devour_only")), "The second card on 0 Energy can't be played - armed for Devour alone")
+	controller.call("confirm_target", enemy)
+	_expect(bool(controller.call("is_awaiting_target")) and player.energy == 0, "...an enemy click plays nothing")
+	controller.call("cancel_target")
 	player.energy = 3
 	controller.call("request_play", second)
 	controller.call("confirm_target", enemy)
