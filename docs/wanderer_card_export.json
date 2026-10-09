@@ -1206,12 +1206,6 @@
           "default_displayed": 0
         }
       ],
-      "play_sound": {
-        "path": "res://assets/audio/cards/Gnaw/Gnaw.mp3",
-        "critical_sound_pitch": 0.9,
-        "critical_sound_volume_db": 0.0,
-        "rule": "Played while its condition is live (Toll spent this turn, judged at play), the sound plays at pitch 0.9."
-      },
       "art_path": "res://cards/art/Wanderer/Gnaw.png",
       "rules_font_px": 15,
       "battle_animation": "Slash",

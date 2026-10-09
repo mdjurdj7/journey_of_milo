@@ -16,16 +16,15 @@ extends SceneTree
 # (EffectContext.spend_toll(), or Second Swing's repeat). The face case
 # reads the drain clause grey (DORMANT) and in ink (LIVE). The fight case
 # loads the real region scene, as claw_back_probe does, and plays Gnaw
-# through BattleController: the face at hand size, its own sound at 1.0
-# before any Toll is spent, at the card's 0.9 once Second Swing has spent
-# some, and the condition gone at the next turn.
+# through BattleController: the face at hand size, the shared card-play
+# sound (Gnaw has none of its own) before any Toll is spent and once
+# Second Swing has spent some, and the condition gone at the next turn.
 # Untyped against anything that names the RunState autoload.
 
 const CASES := 8
 const MAX_HP := 70
 const ENEMY_HP := 100
 const HIT := 3
-const DRAIN_PITCH := 0.9
 const CARD_PATH := "res://cards/data/gnaw.tres"
 const SECOND_SWING_PATH := "res://cards/data/second_swing.tres"
 const SELF_EATER_PATH := "res://cards/data/self_eater.tres"
@@ -33,7 +32,6 @@ const RANSOM_ACTIVE_PATH := "res://battle/rules/statuses/ransom_active.tres"
 const WANDERER_POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const COLLECTOR_POOL_PATH := "res://cards/pools/collector_pool.tres"
 const ART_PATH := "res://cards/art/Wanderer/Gnaw.png"
-const SOUND_PATH := "res://assets/audio/cards/Gnaw/Gnaw.mp3"
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
@@ -89,9 +87,8 @@ func _check_data() -> void:
 	_expect_eq(CardBonus.mode(effect), CardBonus.Mode.DRAIN, "...CardBonus's DRAIN mode")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "The card has its art")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...mipmapped")
-	_expect_eq(card.play_sound_path, SOUND_PATH, "...and its play sound")
-	_expect(load(card.play_sound_path) is AudioStream, "...which loads")
-	_expect_eq([card.critical_sound_pitch, card.critical_sound_volume_db], [DRAIN_PITCH, 0.0], "...at 0.9 while it drains")
+	_expect(card.play_sound_path.is_empty(), "...no play sound of its own: the shared card-play sound")
+	_expect_eq([card.critical_sound_pitch, card.critical_sound_volume_db], [1.0, 0.0], "...no conditional pitch or lift")
 	_expect((load(WANDERER_POOL_PATH) as RewardPool).entries.has(card), "...in the Wanderer pool")
 	_expect((load(COLLECTOR_POOL_PATH) as RewardPool).entries.has(card), "...and the collector pool")
 	_completed += 1
@@ -183,9 +180,9 @@ func _check_face() -> void:
 	_completed += 1
 
 # The real fight: Gnaw's face at hand size; played with no Toll spent,
-# its sound at 1.0 and no heal; Second Swing spends 6, then Gnaw drains
-# 3 and sounds at 0.9; at the next turn the condition is gone - no heal,
-# 1.0 again.
+# the shared card-play sound and no heal; Second Swing spends 6, then
+# Gnaw drains 3, the same sound; at the next turn the condition is gone -
+# no heal.
 func _check_fight() -> void:
 	var controller: Node = await _start_fight(50)
 	if controller != null:
@@ -216,8 +213,9 @@ func _check_fight() -> void:
 	await _teardown()
 	_completed += 1
 
-# One real play of Gnaw at `target`: 3 dealt, `drains` heals 3 and plays
-# its sound at 0.9, otherwise no heal and 1.0.
+# One real play of Gnaw at `target`: 3 dealt, `drains` heals 3, otherwise
+# no heal - and either way the shared card-play sound, no override, read
+# as the play commits (card_played, after the overlay has answered it).
 func _gnaw(controller: Node, card: CardData, target: Node, drains: bool, label: String) -> void:
 	var player: Combatant = controller.get("player")
 	var combatant: Combatant = (controller.get("_combatants") as Dictionary)[target]
@@ -227,13 +225,24 @@ func _gnaw(controller: Node, card: CardData, target: Node, drains: bool, label: 
 	player.grace = 0
 	combatant.block = 0
 	var enemy_before: int = combatant.hp
+	var cue: AudioStreamPlayer = _overlay.get("_card_play_player")
+	var own: AudioStreamPlayer = _overlay.get("_card_override_player")
+	for player_node: AudioStreamPlayer in [cue, own]:
+		if player_node != null:
+			player_node.stop()
+	var heard: Array[bool] = []
+	var listen := func(played: CardData, _target: Node) -> void:
+		if played != card:
+			return
+		var override: AudioStreamPlayer = _overlay.get("_card_override_player")
+		heard.append(cue != null and cue.playing)
+		heard.append(override != null and override.playing)
+	controller.connect("card_played", listen)
 	await _play_real(controller, card, target)
+	controller.disconnect("card_played", listen)
 	_expect_eq(enemy_before - combatant.hp, HIT, "%s: Gnaw deals 3" % label)
 	_expect_eq(player.hp - 40, HIT if drains else 0, "...and heals %d" % (HIT if drains else 0))
-	var sound: AudioStreamPlayer = _overlay.get("_card_override_player")
-	_expect(sound != null and sound.stream != null and sound.stream.resource_path == SOUND_PATH, "...its own sound plays")
-	if sound != null:
-		_expect(is_equal_approx(sound.pitch_scale, DRAIN_PITCH if drains else 1.0), "...at pitch %s (%s)" % [DRAIN_PITCH if drains else 1.0, sound.pitch_scale])
+	_expect_eq(heard, [true, false] as Array[bool], "...the shared card-play sound plays, no override")
 
 # --- Helpers ---
 
