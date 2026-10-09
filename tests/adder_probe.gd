@@ -28,7 +28,7 @@ const UNBROKEN_PATH := "res://battle/rules/statuses/unbroken.tres"
 const HUNGRY_PATH := "res://battle/rules/statuses/hungry.tres"
 const REFUSE_PATH := "res://battle/rules/statuses/refuse_the_end.tres"
 const KEEPSAKE_PATH := "res://run/keepsakes/keeper/blue_fastener.tres"
-const MODEL_PATH := "res://assets/models/enemies/Underfoot/Underfoot.glb"
+const MODEL_PATH := "res://assets/models/enemies/Adder/Adder.glb"
 const SOUND_PATHS: Array[String] = ["res://assets/audio/enemies/Stork/hit_1.mp3", "res://assets/audio/enemies/Stork/hit_2.mp3"]
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
@@ -111,7 +111,7 @@ func _check_data() -> void:
 	_expect(venom.mark == StatusData.Mark.DROP, "...marked with a drop")
 	_expect(data.keepsake_table != null and data.keepsake_table.guaranteed and data.keepsake_table.entries.size() == 1 and data.keepsake_table.entries[0].trinket.resource_path == KEEPSAKE_PATH, "Its keepsake table: Blue Fastener, guaranteed")
 	_expect_eq(data.glassbone_reward, 1, "...and Glassbone 1")
-	_expect_eq(data.model_scene_path, MODEL_PATH, "The Underfoot's body stands in")
+	_expect_eq(data.model_scene_path, MODEL_PATH, "Its own body, the adder model")
 	_expect_eq(data.attachment_scene_path, "", "...without its pose")
 	var sounds: Array[String] = []
 	for stream in data.contact_sounds:

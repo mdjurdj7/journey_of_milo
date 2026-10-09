@@ -38,8 +38,6 @@ is_elite = true
 defeat_line = "The adder is still."
 keepsake_table = ExtResource("7_keepsakes")
 glassbone_reward = 1
-; Placeholder body: the Underfoot's, without its pose, until an adder model
-; exists. Its 180 puts the nose along the body's facing (east at yaw -90).
-model_scene_path = "res://assets/models/enemies/Underfoot/Underfoot.glb"
-model_scale = 0.744
+model_scene_path = "res://assets/models/enemies/Adder/Adder.glb"
+model_scale = 0.75
 model_yaw_offset_degrees = 180.0

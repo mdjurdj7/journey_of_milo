@@ -607,9 +607,9 @@
       "elite": true,
       "mechanic_summary": "An elite dune adder, coiled on the faint side of floor 4's dune loop: Coil, Bite 6 and 3 Venom, Strike 11, in a loop. Coiled from its Coil until its next move (a Denied Coil brings none), it strikes back for 5 at every Attack played against it; Venom takes its stacks in HP at the start of each turn, past Block, then falls by 1. Teaches holding Attacks for the right turn, and pays a keepsake and Glassbone for it.",
       "field": {
-        "model": "res://assets/models/enemies/Underfoot/Underfoot.glb",
+        "model": "res://assets/models/enemies/Adder/Adder.glb",
         "model_is_default": false,
-        "model_scale": 0.744,
+        "model_scale": 0.75,
         "model_yaw_offset_degrees": 180.0,
         "attachment": null,
         "contact_radius_m": 2.0,
