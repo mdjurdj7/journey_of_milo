@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the three in the belongings pool, and Endure, which no pool offers. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish and Claw Back",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back and Gnaw",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 31,
+    "total_unique_wanderer_cards": 32,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 26,
+      "count": 27,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -78,10 +78,11 @@
         "Blood Advance",
         "Second Swing",
         "Garnish",
-        "Claw Back"
+        "Claw Back",
+        "Gnaw"
       ],
       "by_rarity": {
-        "COMMON": 7,
+        "COMMON": 8,
         "UNCOMMON": 11,
         "RARE": 8
       },
@@ -100,12 +101,12 @@
     },
     "wanderer_card_types": {
       "SKILL": 15,
-      "ATTACK": 10,
+      "ATTACK": 11,
       "POWER": 4,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
-      "COMMON": 11,
+      "COMMON": 12,
       "UNCOMMON": 12,
       "RARE": 8
     },
@@ -149,7 +150,7 @@
       },
       {
         "name": "Drain",
-        "rule": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one. Ransom's turn and The Return's trigger Drain. Claw Back's hit Drains too: an Attack's own blow, so its bonuses are in the heal, Ransom's half comes on top, and it heals only what Grace doesn't reclaim."
+        "rule": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one. Ransom's turn and The Return's trigger Drain. Claw Back's hit Drains too, and Gnaw's once Toll has been spent this turn: an Attack's own blow, so its bonuses are in the heal, Ransom's half comes on top, and it heals only what Grace doesn't reclaim."
       },
       {
         "name": "Spent",
@@ -1138,6 +1139,77 @@
       "art_path": "res://cards/art/Wanderer/Garnish.png",
       "rules_font_px": 15,
       "battle_animation": null,
+      "play_effect_scene_path": null,
+      "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Gnaw",
+      "file_path": "res://cards/data/gnaw.tres",
+      "pool_class": "wanderer",
+      "card_type": "ATTACK",
+      "face_type_label": "STRIKE",
+      "energy_cost": 0,
+      "rarity": "COMMON",
+      "card_text": "Deal 3 damage. Toll spent this turn: drain 3.",
+      "face_hp_line": null,
+      "card_text_template": "Deal {damage} damage. {if}Toll spent this turn: drain {damage}.{/if}",
+      "targeting": "enemy",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "DAMAGE",
+          "plain_english": "Deal 3 damage to the target. If any Toll was spent earlier this turn (by any card or effect - CardEffect.Condition.TOLL_SPENT_THIS_TURN), the hit Drains (CardEffect.drain_on_condition): heal the HP it actually took - after block, no overkill, less what Grace reclaims from it - up to max HP. The card's own blow, so the attack bonus and a Come Due mark are in the hit and its heal, and under Ransom its half of the damage dealt heals on top."
+        }
+      ],
+      "keywords": [
+        "Toll",
+        "Drain"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": 3,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "status_effect": null,
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "drain",
+          "rule": "Drains only once Toll has been spent this turn (Combatant.toll_spent_this_turn: set whenever Toll is spent, cleared at the start of your turn); the face shows the drain clause grey until then, in ink after. The heal follows the hit.",
+          "default_displayed": "clause grey"
+        },
+        {
+          "field": "damage",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy, once per card, spending a charge. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "default_displayed": "no bonus outside a fight"
+        },
+        {
+          "field": "cost",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "default_displayed": 0
+        }
+      ],
+      "play_sound": {
+        "path": "res://assets/audio/cards/Gnaw/Gnaw.mp3",
+        "critical_sound_pitch": 0.9,
+        "critical_sound_volume_db": 0.0,
+        "rule": "Played while its condition is live (Toll spent this turn, judged at play), the sound plays at pitch 0.9."
+      },
+      "art_path": "res://cards/art/Wanderer/Gnaw.png",
+      "rules_font_px": 15,
+      "battle_animation": "Slash",
       "play_effect_scene_path": null,
       "upgrade_data": null,
       "starting_deck_count": 0,

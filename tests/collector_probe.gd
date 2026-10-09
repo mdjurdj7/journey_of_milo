@@ -10,8 +10,8 @@ extends SceneTree
 #   placed   - floor 4's FloorData puts a Collector at (11, -22.5) in the
 #              east bay, facing west (yaw 90), grounded, with its line and
 #              collector_pool, wired to open its screen
-#   data     - collector_pool: the 26 Wanderer pool cards and the three
-#              neutral pool cards, 29, no starter, no Endure, no Samphire;
+#   data     - collector_pool: the 27 Wanderer pool cards and the three
+#              neutral pool cards, 30, no starter, no Endure, no Samphire;
 #              Samphire in no pool at all; Samphire's own data
 #   screen   - a collector on floor 4 opens its screen with the field
 #              locked: five rolled cards, distinct, from the pool, then
@@ -91,7 +91,7 @@ func _check_data() -> void:
 	var names: Array[String] = []
 	for card in pool.entries:
 		names.append(card.card_name)
-	_expect_eq(names.size(), 29, "collector_pool holds 29 cards")
+	_expect_eq(names.size(), 30, "collector_pool holds 30 cards")
 	for card in wanderer.entries:
 		_expect(names.has(card.card_name), "...including the Wanderer pool's %s" % card.card_name)
 	for card_name in NEUTRAL_IN_STOCK:
