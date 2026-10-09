@@ -43,9 +43,10 @@
 
 ## Probes
 - Run them with tools/run_probes.sh (--help), from your own worktree:
-  `--path <worktree>`, after `--import` there. It runs -j 2 by default,
-  waits for memory rather than start a probe that would leave under 3 GB
-  free, and ends everything it started if it's stopped.
+  `--path <worktree>`, after `--import` there. With no -j it runs one
+  probe at a time when under 6 GB is free at the start, else two; it
+  waits for memory rather than start a probe that would leave under
+  2000 MB free, and ends everything it started if it's stopped.
 - During a task: run only the probes the task names, once, at the end,
   in the foreground.
 - Before a push: run `--prepush` once, in the foreground. It runs the

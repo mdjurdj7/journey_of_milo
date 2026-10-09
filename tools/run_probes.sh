@@ -16,7 +16,8 @@
 #                                                 or both - every name runs
 #
 # Options:
-#   -j N             parallel probes (default 2). Probes marked serial in
+#   -j N             parallel probes (default: 1 while under JOBS_TWO_MIN_FREE_MB,
+#                    6 GB, is free at the start, else 2). Probes marked serial in
 #                    the table below always run alone, after the rest.
 #   --worktree [DIR] run in the persistent probe worktree (default
 #                    ../journey-of-milo-probe), not this tree: take its lock,
@@ -65,10 +66,13 @@ PROBE_TIMEOUT_SEC=600
 # loading, its memory not yet taken: it counts as if it had. Free is
 # MemAvailable where the system gives it, else MemFree - Git Bash's,
 # which is Windows' available memory.
-MIN_FREE_MB=3072
+MIN_FREE_MB=2000
 PROBE_MEM_MB=1024
 MEM_WAIT_MAX_SEC=600
 PROBE_RAMP_SEC=10
+# The default -j (none given): 2 when at least this much is free at the
+# start, else 1.
+JOBS_TWO_MIN_FREE_MB=6144
 LAST_START=0
 free_mb() {
 	awk '/^MemAvailable:/ { a = $2 } /^MemFree:/ { f = $2 } END { v = a ? a : f; if (v) print int(v / 1024) }' /proc/meminfo 2>/dev/null
@@ -130,9 +134,21 @@ kill_tree() {
 	done
 }
 cleanup() {
-	local code=$? pid
+	local code=$? pid mark
 	trap - EXIT INT TERM HUP
 	for pid in $(jobs -p); do kill_tree "$pid"; done
+	# A probe launched at the instant of the stop can slip the first
+	# sweep - its subshell ended under it, it reparented. A moment, then
+	# a second: the jobs again, and anything still carrying one of this
+	# run's run-log folders (<logs>/runlog.<probe>.*) in its command line.
+	if [ -n "${LOGS:-}" ]; then
+		sleep 1
+		for pid in $(jobs -p); do kill_tree "$pid"; done
+		mark="$(basename "$LOGS")/runlog."
+		for pid in $(ps -ef | grep -F -- "$mark" | grep -v grep | awk '{ print $2 }'); do
+			[ "$pid" != "$$" ] && kill_tree "$pid"
+		done
+	fi
 	[ -n "$LOCK_HELD" ] && rm -rf "$LOCK_HELD"
 	exit "$code"
 }
@@ -427,7 +443,7 @@ MODE=""
 AREAS=""
 NAMES=""
 BASE=""
-JOBS=2
+JOBS=""
 WORKTREE=""
 REF=""
 FILES=""
@@ -470,6 +486,11 @@ while [ $# -gt 0 ]; do
 	shift
 done
 [ -n "$MODE" ] || die "say what to run: --full, --fast, --prepush, --area, --changed or --probe (--help)"
+# No -j: 1 on a machine short of memory, 2 with room for two.
+if [ -z "$JOBS" ]; then
+	FREE_AT_START=$(free_mb)
+	if [ -n "$FREE_AT_START" ] && [ "$FREE_AT_START" -lt "$JOBS_TWO_MIN_FREE_MB" ]; then JOBS=1; else JOBS=2; fi
+fi
 [ -n "$WORKTREE" ] && [ -n "$PROJECT" ] && die "--worktree and --path are exclusive"
 [ -n "$MOVED" ] && [ "$LIST" = 0 ] && die "--moved is a dry run of the HEAD-moved check: use it with --list"
 if [ -n "$BATCH" ]; then
