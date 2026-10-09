@@ -42,29 +42,26 @@
   intended; revert stray edits from the editor's Audio panel.
 
 ## Probes
-- Run them with tools/run_probes.sh (--help). It runs headless probes
-  in parallel (-j 4), longest first; probes marked serial in its table
-  run alone afterwards.
-- Once per task, at the end - not after each commit: commit in
-  single-concern steps, then run `tools/run_probes.sh --changed
-  <first-commit>^..HEAD` over the task's whole commit range. It maps
-  the changed files to areas (--list-areas; the map lives in the
-  script) and falls back to the full suite for a path no area covers.
-  `--area` / `--probe` pick by hand (`--probe a,b` or `--probe a
-  --probe b`, both run); `--list` shows the plan without
-  running.
-- If that run fails: fix it, rerun only the failing probes, then the
-  --changed set once more.
-- Full suite (`--full`): once before a push, on the exact tree being
-  pushed - and only when asked to prepare a push.
-- If HEAD moves during a run, follow the script's verdict: "rerun
-  needed" means rerun the named probes on the new HEAD before
-  committing.
-- Never wait on another session's probe run. Each session runs its own
-  probes in its own worktree (`--path <worktree>`, after `--import`
-  there). The shared ../journey-of-milo-probe (`--worktree`, with its
-  ../journey-of-milo-probe.lock) is only for when no task worktree
-  exists.
+- Run them with tools/run_probes.sh (--help), from your own worktree:
+  `--path <worktree>`, after `--import` there. It runs -j 2 by default,
+  waits for memory rather than start a probe that would leave under 3 GB
+  free, and ends everything it started if it's stopped.
+- During a task: run only the probes the task names, once, at the end,
+  in the foreground.
+- Before a push: run `--prepush` once, in the foreground. It runs the
+  probes mapped to the files changed in origin/main..HEAD, plus the fast
+  tier, and prints the list first.
+- `--full` only when I ask for it, always as `--full --batch 1/4` ...
+  `--batch 4/4`, each in the foreground.
+- Never run probes in the background. Never start probes while another
+  session's probes are running: check for running Godot probe
+  processes first (PowerShell: `Get-CimInstance Win32_Process -Filter
+  "Name='Godot_v4.7.1.exe'"`, any whose CommandLine has
+  `-s res://tests/`, or `--headless --path . --import` - a run's import);
+  if there are any, stop and tell me.
+- If a run is stopped for memory, don't retry: end any leftover
+  processes from it, report, and wait.
+- Docs, assets and visual-only changes need no probe run.
 
 ## Probe worktrees
 - When testing a change to any .import file in a worktree that copied
