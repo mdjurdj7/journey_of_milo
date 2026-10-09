@@ -24,7 +24,7 @@ rarity = 2
 card_type = 1
 target_type = 0
 description = "Target enemy's next Attack deals 5 less.
-Gain 5 Toll."
+Gain that much Toll."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_self_damage_toll"), SubResource("E_garnish")])
 art = ExtResource("4_art")
 play_sound_path = "res://assets/audio/cards/Garnish/Garnish.mp3"

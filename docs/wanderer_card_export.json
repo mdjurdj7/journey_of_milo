@@ -1087,9 +1087,9 @@
       "face_type_label": "TOLL",
       "energy_cost": 1,
       "rarity": "UNCOMMON",
-      "card_text": "Target enemy's next Attack deals 5 less.\nGain 5 Toll.",
+      "card_text": "Target enemy's next Attack deals 5 less.\nGain that much Toll.",
       "face_hp_line": "−1 HP",
-      "card_text_template": "Target enemy's next Attack deals 5 less.\nGain 5 Toll.",
+      "card_text_template": "Target enemy's next Attack deals 5 less.\nGain that much Toll.",
       "targeting": "enemy",
       "removal_after_play": "discard pile",
       "effects": [

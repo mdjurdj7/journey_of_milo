@@ -85,7 +85,7 @@ func _check_data() -> void:
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "...Uncommon")
 	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
-	_expect_eq(card.description, "Target enemy's next Attack deals 5 less.\nGain 5 Toll.", "...its text")
+	_expect_eq(card.description, "Target enemy's next Attack deals 5 less.\nGain that much Toll.", "...its text")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...and reads TOLL")
 	_expect_eq(card.effects.size(), 2, "...two effects")
 	if card.effects.size() == 2:
