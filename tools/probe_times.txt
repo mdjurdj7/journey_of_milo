@@ -1,64 +1,67 @@
-# Measured seconds per probe - tools/run_probes.sh reads them to order a
-# run (longest first), to balance --batch, and to tier the probes. Each
-# run that passes a probe writes its new time back here, averaged with
-# the old one (run_probes.sh's record_times()). Seeded from the full
-# suite at -j 2 on 2026-10-09 (fe50752, four batches). A probe not
-# listed counts as 60 s until it has run.
-adder_probe 70
-armored_contact_probe 13
-belongings_choice_probe 50
-bide_probe 50
-blackback_probe 58
-blood_advance_probe 14
-bundle_roll_probe 3
-card_rarity_finish_probe 13
-card_rarity_probe 12
-claw_back_probe 14
-collateral_probe 43
-collector_probe 37
-come_due_face_probe 11
-come_due_probe 5
-critical_cards_probe 4
-deny_probe 52
-devour_probe 82
-drain_probe 16
-dunecur_probe 57
-dying_light_probe 28
-elite_reward_probe 26
-enemy_export_probe 6
-enemy_fog_probe 41
-floor4_probe 28
-floor5_probe 31
-frayed_cord_probe 24
-garnish_probe 8
-glassbone_probe 38
-gnaw_probe 11
-gold_line_probe 37
-grace_probe 2
-greyshelf_probe 71
-heavy_hit_probe 11
-hold_line_probe 11
-keeper_keepsake_probe 100
-keepsake_tile_probe 6
-keyword_probe 15
-kill_order_probe 53
-leverage_probe 46
-no_further_probe 4
-pathing_probe 85
-play_order_probe 29
-ransom_probe 39
-run_log_probe 26
-run_lost_probe 14
-scatter_probe 20
-second_swing_probe 24
-sentence_probe 5
-settled_account_probe 10
-siltjaw_probe 2
-starter_cards_probe 9
-temper_probe 14
-the_return_probe 4
-toll_carry_probe 45
-trinket_probe 49
-underfoot_probe 71
-wardling_probe 3
-wear_path_probe 20
+# Measured seconds per probe, and its tier - tools/run_probes.sh reads them
+# to order a run (longest first), to balance --batch, and for --fast.
+# Each run that passes a probe writes its new time back here, averaged
+# with the old one (run_probes.sh's record_times()). The tier: slow when
+# it measured over 30 s or loads the field or battle scene, fast otherwise
+# (derive_tier()) - set when a probe is first timed and kept, so a time
+# drifting across the line doesn't move it; delete it to have it set
+# again. Seeded from the full suite at -j 2 on 2026-10-09 (fe50752, four
+# batches). A probe not listed counts as 60 s, and slow, until it has run.
+adder_probe 70 slow
+armored_contact_probe 13 slow
+belongings_choice_probe 50 slow
+bide_probe 50 slow
+blackback_probe 58 slow
+blood_advance_probe 14 slow
+bundle_roll_probe 3 fast
+card_rarity_finish_probe 13 fast
+card_rarity_probe 12 fast
+claw_back_probe 14 slow
+collateral_probe 43 slow
+collector_probe 37 slow
+come_due_face_probe 11 slow
+come_due_probe 5 fast
+critical_cards_probe 4 fast
+deny_probe 52 slow
+devour_probe 82 slow
+drain_probe 16 slow
+dunecur_probe 57 slow
+dying_light_probe 28 slow
+elite_reward_probe 26 slow
+enemy_export_probe 6 fast
+enemy_fog_probe 41 slow
+floor4_probe 28 slow
+floor5_probe 31 slow
+frayed_cord_probe 24 slow
+garnish_probe 8 slow
+glassbone_probe 38 slow
+gnaw_probe 11 slow
+gold_line_probe 37 slow
+grace_probe 2 fast
+greyshelf_probe 71 slow
+heavy_hit_probe 11 slow
+hold_line_probe 11 slow
+keeper_keepsake_probe 100 slow
+keepsake_tile_probe 6 slow
+keyword_probe 15 slow
+kill_order_probe 53 slow
+leverage_probe 46 slow
+no_further_probe 4 fast
+pathing_probe 85 slow
+play_order_probe 29 slow
+ransom_probe 39 slow
+run_log_probe 26 slow
+run_lost_probe 14 slow
+scatter_probe 20 slow
+second_swing_probe 24 slow
+sentence_probe 5 fast
+settled_account_probe 10 slow
+siltjaw_probe 2 fast
+starter_cards_probe 9 fast
+temper_probe 14 slow
+the_return_probe 4 fast
+toll_carry_probe 45 slow
+trinket_probe 49 slow
+underfoot_probe 71 slow
+wardling_probe 3 fast
+wear_path_probe 20 slow

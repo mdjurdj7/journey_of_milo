@@ -4,6 +4,7 @@
 # says which passed. See CLAUDE.md's Probes section for when to run what.
 #
 #   tools/run_probes.sh --full                    every probe
+#   tools/run_probes.sh --fast                    the fast tier (tools/probe_times.txt)
 #   tools/run_probes.sh --area keywords,face      an area's probes (--list-areas)
 #   tools/run_probes.sh --changed [BASE]          the probes for the files changed
 #                                                 since BASE (default HEAD)
@@ -165,6 +166,31 @@ floor5_probe fixed
 # longest first, and balances --batch. Each run writes back what it
 # measured (record_times()).
 TIMES_FILE="$REPO/tools/probe_times.txt"
+# A probe's tier (TIMES_FILE's third column): slow when it measured over
+# SLOW_SEC or loads the field or the battle scene (SLOW_SCENES - most of
+# a probe's start-up), fast otherwise. Stored once it's timed, so a time
+# drifting across the line doesn't move it; a probe with none yet is
+# derived now - from its time, or slow while it has none.
+SLOW_SEC=30
+SLOW_SCENES='res://field/region_field\.tscn|res://battle/battle_overlay\.tscn'
+derive_tier() {
+	if [ "$2" -gt "$SLOW_SEC" ] || grep -qE "\"($SLOW_SCENES)\"" "$REPO/tests/$1.gd" 2>/dev/null; then
+		echo slow
+	else
+		echo fast
+	fi
+}
+probe_tier() {
+	local stored
+	stored=$(awk -v n="$1" '$1 == n && NF >= 3 { print $3; f = 1 } END { if (!f) print "" }' "$TIMES_FILE" 2>/dev/null)
+	if [ -n "$stored" ]; then
+		echo "$stored"
+	elif awk -v n="$1" '$1 == n { f = 1 } END { exit !f }' "$TIMES_FILE" 2>/dev/null; then
+		derive_tier "$1" "$(awk -v n="$1" '$1 == n { print $2 }' "$TIMES_FILE")"
+	else
+		echo slow
+	fi
+}
 
 # --- Areas: which probes guard which part of the game ---
 area_probes() {
@@ -319,6 +345,7 @@ BATCH=""
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--full) MODE=full ;;
+		--fast) MODE=fast ;;
 		--area) MODE=area; AREAS="${2:?--area needs a list}"; shift ;;
 		--changed) MODE=changed
 			if [ $# -gt 1 ] && [ "${2#-}" = "$2" ]; then BASE="$2"; shift; fi ;;
@@ -342,7 +369,7 @@ while [ $# -gt 0 ]; do
 	esac
 	shift
 done
-[ -n "$MODE" ] || die "say what to run: --full, --area, --changed or --probe (--help)"
+[ -n "$MODE" ] || die "say what to run: --full, --fast, --area, --changed or --probe (--help)"
 [ -n "$WORKTREE" ] && [ -n "$PROJECT" ] && die "--worktree and --path are exclusive"
 [ -n "$MOVED" ] && [ "$LIST" = 0 ] && die "--moved is a dry run of the HEAD-moved check: use it with --list"
 if [ -n "$BATCH" ]; then
@@ -404,6 +431,10 @@ case "$MODE" in
 			SELECTED="$SELECTED $p"
 		done ;;
 	probe) SELECTED=$(echo "$NAMES" | tr ',' ' ') ;;
+	fast)
+		for p in $ALL_PROBES; do
+			[ "$(probe_tier "$p")" = fast ] && SELECTED="$SELECTED $p"
+		done ;;
 	changed)
 		[ -n "$CHANGED" ] || { echo "run_probes: nothing changed since ${BASE:-HEAD} - no probes to run"; exit 0; }
 		map_paths "$CHANGED"
@@ -634,8 +665,13 @@ record_times() {
 		{ print }
 		END { for (p in m) if (!(p in seen)) print p, m[p] }' "$LOGS/_results.txt" "$TIMES_FILE" > "$tmp" \
 		&& { grep '^#' "$tmp"; grep -v '^#' "$tmp" | sort; } > "$tmp.sorted" \
-		&& mv "$tmp.sorted" "$TIMES_FILE"
-	rm -f "$tmp" "$tmp.sorted"
+		&& awk 'NF == 2 && $1 !~ /^#/ { print $1, $2 }' "$tmp.sorted" > "$tmp.new" && mv "$tmp.sorted" "$TIMES_FILE"
+	# A probe timed for the first time gets its tier.
+	local p s
+	while read -r p s; do
+		[ -n "$p" ] && sed -i "s/^$p $s$/$p $s $(derive_tier "$p" "$s")/" "$TIMES_FILE"
+	done < "$tmp.new" 2>/dev/null
+	rm -f "$tmp" "$tmp.sorted" "$tmp.new"
 }
 record_times
 echo "run_probes: $((COUNT - FAILED)) of $COUNT passed in $((T1 - T0))s"
