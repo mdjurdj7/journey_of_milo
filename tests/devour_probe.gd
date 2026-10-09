@@ -8,7 +8,8 @@ extends SceneTree
 # first (the pick, then the card). Once a turn, again the next; the heal
 # capped at max HP; a Consumed card eaten - or taken by Deny - stays in
 # the run. The button under the energy readout: grey, or ink while it is
-# a target, in one column with the readout and clear of the resting hand.
+# a target, in one column with the readout and clear of the hand, resting
+# or hovered.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/devour_probe.gd
 #
@@ -38,6 +39,11 @@ const START_HP := 50
 const HEAL := 2
 const ESCAPE := 2
 const SAFETY_SECONDS := 400.0
+# The layout case hovers each card whose resting left edge is within this
+# of the bottom-left stack's right edge (a hovered card grows sideways
+# too), and waits this long for the hover to settle.
+const HOVER_REACH_PX := 60.0
+const HOVER_SETTLE_SECONDS := 0.3
 
 var _run_state: Node = null
 var _field: Node = null
@@ -457,7 +463,7 @@ func _check_button_states() -> void:
 	_completed += 1
 
 # One column with the energy readout - the same left edge, under its pips
-# - and clear of every resting hand card from 5 to 10 in hand.
+# - and clear of every hand card from 5 to 10 in hand, resting or hovered.
 func _check_layout() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -484,6 +490,22 @@ func _check_layout() -> void:
 				worst = minf(worst, card_rect.position.y - rect.end.y if card_rect.position.x < rect.end.x else INF)
 				_expect(not card_rect.intersects(rect), "%d in hand: a resting card %s clear of Devour %s" % [count, card_rect, rect])
 			print("%d in hand: nearest card top under Devour's column is %s px below it" % [count, str(worst)])
+			# Hovered too - lifted and grown about its bottom centre - each
+			# card that comes near the column: clear of Devour and the
+			# energy readout over it.
+			var stack: Rect2 = rect.merge(resources.get_global_rect())
+			var worst_hovered: float = INF
+			for view: CardView in controller.get("_hand_container").call("_card_views"):
+				if _rendered_rect(view).position.x > stack.end.x + HOVER_REACH_PX:
+					continue
+				view.set_hovered(true)
+				await create_timer(HOVER_SETTLE_SECONDS).timeout
+				var hovered_rect: Rect2 = _rendered_rect(view)
+				worst_hovered = minf(worst_hovered, hovered_rect.position.y - rect.end.y)
+				_expect(not hovered_rect.intersects(stack), "%d in hand: a hovered card %s clear of Devour and the energy readout %s" % [count, hovered_rect, stack])
+				view.set_hovered(false)
+				await create_timer(HOVER_SETTLE_SECONDS).timeout
+			print("%d in hand: nearest hovered card top under Devour's column is %s px below it" % [count, str(worst_hovered)])
 	await _teardown()
 	_completed += 1
 

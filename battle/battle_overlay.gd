@@ -97,6 +97,15 @@ signal battle_finished(outcome: Outcome)
 	set(value):
 		energy_anchor = value
 		_apply_energy_anchor()
+# The whole bottom-left stack - the energy readout, Devour under it and
+# the line over it (the pick's prompt, the keepsake reveal) - raised this
+# far above energy_anchor, so a hovered card clears Devour too: 12 px
+# over the highest hovered card's top under Devour's column, which is at
+# seven cards (56 px into it unraised at 1080p). devour_probe checks it.
+@export var energy_stack_lift_px: float = 68.0:
+	set(value):
+		energy_stack_lift_px = value
+		_apply_energy_anchor()
 # Between the energy readout's pips and Devour (DevourButton) under it,
 # its left edge on the readout's.
 @export var devour_gap_px: float = 10.0:
@@ -467,13 +476,13 @@ func _layout_corners() -> void:
 
 # Right edge held at energy_anchor's x, left edge clamped to the corner
 # margin - a very wide readout gives up its edge, not screen; the
-# numeral's top on the anchor's y, whatever the readout's size. The
-# keepsake row's hover text keeps to the readout's top row, so it never
-# lands on the readout.
+# numeral's top energy_stack_lift_px over the anchor's y, whatever the
+# readout's size. The keepsake row's hover text keeps to the readout's top
+# row, so it never lands on the readout.
 func _apply_energy_anchor() -> void:
 	if _resources == null:
 		return
-	_resources.position = Vector2(maxf(energy_anchor.x - _resources.size.x, corner_margin_px), energy_anchor.y - _resources.numeral_ink_top())
+	_resources.position = Vector2(maxf(energy_anchor.x - _resources.size.x, corner_margin_px), energy_anchor.y - energy_stack_lift_px - _resources.numeral_ink_top())
 	if _keepsake_row != null:
 		_keepsake_row.set_reveal_floor_y(_resources.global_position.y)
 	# Devour under it, one column: the same left edge, its hover line over
