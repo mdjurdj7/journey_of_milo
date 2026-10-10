@@ -128,7 +128,7 @@ func _check_force_and_props() -> void:
 		var field: Node = await _load_field(_fixture_slot(SILTJAW_PATH), against, force)
 		_expect_eq(_stood(field), [forced], "force_options {%s: %s} stands it against a roll for the other" % [SLOT_ID, forced])
 		var props: Array[String] = _prop_scripts(field)
-		var expected: Array[String] = ["bone_scatter.gd"] if forced == OPTION_A else ["hull.gd"]
+		var expected: Array[String] = ["bone_scatter.gd" if forced == OPTION_A else "hull.gd"]
 		_expect_eq(props, expected, "...and only its own prop stands (%s)" % ", ".join(props))
 		await _teardown(field)
 	_completed += 1
