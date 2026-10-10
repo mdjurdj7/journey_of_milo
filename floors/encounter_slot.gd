@@ -4,9 +4,11 @@ class_name EncounterSlot
 # One place on a floor where an encounter stands - see FloorData.slots.
 # The slot is the where (an anchor, a yaw, whether it gates the exit);
 # its options are the what (EncounterOption: who stands there, and the
-# props that come with them). One option is chosen per floor load and
-# spawned by RegionField (_spawn_floor_enemies(), _spawn_floor_props(),
-# _spawn_floor_patrols()); a slot with one option always stands that one.
+# props that come with them). One option is chosen per floor load - by
+# weight, from the slot's own stream (stream_seed(), pick()), never twice
+# in a run (RegionField._resolve_encounters()) - and spawned by
+# RegionField (_spawn_floor_enemies(), _spawn_floor_props(), _spawn_
+# floor_patrols()); a slot with one option always stands that one.
 #
 # Everything an option places is in the slot's frame: an XZ offset from
 # the anchor, turned by yaw_degrees about the anchor (the same rotation.y
@@ -88,6 +90,44 @@ func validate(role_rule: Callable) -> String:
 		elif role != first_role:
 			return "slot '%s': option '%s' is fought as %s, but '%s' as %s - every option in a slot must share its role" % [slot_id, option.option_id, role, options[0].option_id, first_role]
 	return ""
+
+# The seed of this slot's own stream for a run: the run's seed, the
+# region, the floor and this slot's id, hashed. Never RunState.rng - a
+# slot's roll can't shift the run's other draws, and the same run seed
+# rolls the same floor the same way.
+func stream_seed(run_seed: int, region_index: int, floor_index: int) -> int:
+	return hash("%d:%d:%d:%s" % [run_seed, region_index, floor_index, slot_id])
+
+# The option this slot stands for a roll seeded `stream_seed`: by weight
+# among the options whose id isn't in `taken` (stood elsewhere this run),
+# or among them all when every one is. One option stands without a draw.
+# Null only with no options.
+func pick(stream_seed_value: int, taken: Array[StringName]) -> EncounterOption:
+	if options.size() <= 1:
+		return options[0] if not options.is_empty() else null
+	var candidates: Array[EncounterOption] = []
+	for option in options:
+		if option != null and not taken.has(option.option_id):
+			candidates.append(option)
+	if candidates.is_empty():
+		for option in options:
+			if option != null:
+				candidates.append(option)
+	if candidates.is_empty():
+		return null
+	var rng := RandomNumberGenerator.new()
+	rng.seed = stream_seed_value
+	var total: float = 0.0
+	for option in candidates:
+		total += maxf(option.weight, 0.0)
+	if total <= 0.0:
+		return candidates[rng.randi_range(0, candidates.size() - 1)]
+	var roll: float = rng.randf() * total
+	for option in candidates:
+		roll -= maxf(option.weight, 0.0)
+		if roll < 0.0:
+			return option
+	return candidates.back()
 
 # The option with this id, or null.
 func find_option(option_id: StringName) -> EncounterOption:

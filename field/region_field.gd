@@ -24,6 +24,12 @@ signal floor_cleared
 # wear, rewards) reads get_floor_data() where it needs it. A floor change
 # is a scene reload with the index advanced - see _on_floor_exited().
 @export var region: RegionData = null
+# Dev only: slot id -> option id, standing that option in that slot of
+# whichever floor loads, instead of its roll (_resolve_encounters()). An
+# id this floor doesn't have is ignored with a warning. Read at floor
+# load only - no setter re-applies it: an edit takes effect the next time
+# a floor loads. Empty in play.
+@export var force_options: Dictionary[StringName, StringName] = {}
 
 @export var escape_push_distance: float = 4.0
 # How far past every enemy's contact_radius the escape push must land the
@@ -1092,8 +1098,13 @@ func get_spawn_position() -> Vector3:
 # (FloorData.slots), into _encounters. Each slot is validated first
 # (EncounterSlot.validate(): an id, options, every option fought as the
 # same role); one that fails is reported loudly and stands nothing, and
-# so does a slot whose id another slot on the floor already has. No side
-# effects past _encounters - nothing spawns and nothing is logged here.
+# so does a slot whose id another slot on the floor already has. Then,
+# per slot: force_options' pick if it names one; else what this run
+# already stood there (RunState.encounter_rolls); else a roll from the
+# slot's own stream (EncounterSlot.pick()), passing over every option
+# stood elsewhere this run. The choice is recorded in encounter_rolls -
+# the only state touched: nothing spawns, nothing is logged, and
+# RunState.rng is never drawn from here.
 func _resolve_encounters() -> void:
 	_encounters.clear()
 	var floor_data := get_floor_data()
@@ -1114,8 +1125,30 @@ func _resolve_encounters() -> void:
 		seen[slot.slot_id] = true
 		var encounter := Encounter.new()
 		encounter.slot = slot
-		encounter.option = slot.options[0]
+		encounter.option = _choose_option(slot)
 		_encounters.append(encounter)
+
+# One slot's option this load - see _resolve_encounters() - recorded in
+# RunState.encounter_rolls.
+func _choose_option(slot: EncounterSlot) -> EncounterOption:
+	var region_index: int = RunState.current_region_index
+	var floor_index: int = RunState.current_floor_index
+	var key: String = "%d:%d:%s" % [region_index, floor_index, slot.slot_id]
+	var option: EncounterOption = null
+	if force_options.has(slot.slot_id):
+		option = slot.find_option(force_options[slot.slot_id])
+		if option == null:
+			push_warning("RegionField: force_options names '%s' for slot '%s', which has no such option; rolled." % [force_options[slot.slot_id], slot.slot_id])
+	if option == null and RunState.encounter_rolls.has(key):
+		option = slot.find_option(StringName(RunState.encounter_rolls[key]))
+	if option == null:
+		var taken: Array[StringName] = []
+		for other: String in RunState.encounter_rolls:
+			if other != key:
+				taken.append(StringName(RunState.encounter_rolls[other]))
+		option = slot.pick(slot.stream_seed(RunState.run_seed, region_index, floor_index), taken)
+	RunState.encounter_rolls[key] = option.option_id
+	return option
 
 # The floor's enemies - every member of every slot's chosen option, in
 # slot order then member order - one field_enemy.tscn each, direct

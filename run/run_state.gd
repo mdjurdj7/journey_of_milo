@@ -123,6 +123,13 @@ var title_pending: bool = false
 # wave's phase must not shift the card you are about to be offered.
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var run_seed: int = 0
+# What each encounter slot stood this run (RegionField._resolve_
+# encounters()): "<region>:<floor>:<slot id>" -> option id. A floor stood
+# again stands what it stood; an option id in here is passed over by
+# every other slot's roll, so no option stands twice in a run. Rolled from
+# each slot's own stream (EncounterSlot.stream_seed()), never from rng.
+# new_run() clears it.
+var encounter_rolls: Dictionary = {}
 
 # Starts a brand new run: seeds HP and the starting Belongings from
 # `starting_character`'s own values, resets run-graph position. The only
@@ -154,6 +161,7 @@ func new_run(starting_character: CharacterData) -> void:
 	floors_crossed = 0
 	fights_won = 0
 	end_cause = ""
+	encounter_rolls.clear()
 	# Field findings (a Hull's one-time world line, a Bird's one-time
 	# flight, the Keeper's one-time offer, a belongings cache's one
 	# choice, a trough's one drink) are remembered per run in their own
