@@ -8,8 +8,8 @@ extends SceneTree
 #
 #   stale - the committed export is exactly what tests/enemy_export.gd
 #           builds from the live data now (regenerate it when this fails)
-#   gate  - on every floor FloorData.enemies[0] exists and is required:
-#           RegionField._setup_exit_gate() places the gate off it
+#   gate  - every floor has a required slot: RegionField._setup_exit_
+#           gate() places the gate off the first one's anchor
 #   prose - every enemy has a mechanic_summary, every intent (and every
 #           on_interrupt) an intent_name, and every status text in the
 #           export resolved all its tokens
@@ -55,9 +55,10 @@ func _check_gate() -> void:
 			if floor_data == null:
 				_fail("%s is missing" % label)
 				continue
-			_expect(not floor_data.enemies.is_empty() and floor_data.enemies[0] != null, "%s places an enemy for its gate to measure from" % label)
-			if not floor_data.enemies.is_empty() and floor_data.enemies[0] != null:
-				_expect(floor_data.enemies[0].required, "%s: enemies[0], which the gate is placed off, is required" % label)
+			var required: bool = false
+			for slot in floor_data.slots:
+				required = required or (slot != null and slot.required)
+			_expect(required, "%s has a required slot for its gate to measure from" % label)
 	_completed += 1
 
 func _check_prose() -> void:

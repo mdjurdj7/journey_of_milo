@@ -200,22 +200,29 @@ func _check_others_untouched() -> void:
 
 func _check_floor_3() -> void:
 	var floor_data := load(FLOOR_3_PATH) as Resource
-	var enemies: Array = floor_data.get("enemies")
-	_expect_eq(enemies.size(), 3, "Floor 3 has three enemies")
-	_expect_eq((enemies[0].get("enemy_data") as EnemyData).enemy_name, "Blackback", "...the required Blackback first - the gate measures from it")
-	var entry: Resource = enemies[1]
-	_expect_eq((entry.get("enemy_data") as EnemyData).enemy_name, "Wardling", "...then the Wardling")
-	_expect_eq(entry.get("position"), Vector2(17.6, -13.6), "...in the east lobe at (17.6, -13.6)")
-	_expect_eq(entry.get("face_prop_index"), 0, "...facing the floor's first prop")
-	_expect_eq(entry.get("yaw_degrees"), 0.0, "...straight at it")
-	_expect(not bool(entry.get("required")), "...not required")
-	var props: Array = floor_data.get("props")
-	_expect_eq(props.size(), 2, "Floor 3 has two props")
-	_expect_eq((props[0].get("scene") as PackedScene).resource_path, POST_SCENE_PATH, "...the hitching post first")
-	_expect_eq(props[0].get("position"), Vector3(15.879, 0.0, -16.057), "...north-west of the Wardling, 3.0 m off")
-	_expect_eq((props[0].get("overrides") as Dictionary).get("tether_enemy_index"), 1, "...its rope tied to the Wardling")
-	if props.size() > 1:
-		_expect_eq((props[1].get("scene") as PackedScene).resource_path, WAGON_SCENE_PATH, "...then the wagon")
+	var slots: Array = floor_data.get("slots")
+	_expect_eq(slots.size(), 2, "Floor 3 has two encounter slots")
+	var first: Resource = ((slots[0].get("options") as Array)[0].get("members") as Array)[0]
+	_expect_eq((first.get("enemy_data") as EnemyData).enemy_name, "Blackback", "...the required Blackback's first - the gate measures from it")
+	var slot: Resource = slots[1]
+	var option: Resource = (slot.get("options") as Array)[0]
+	var entry: Resource = (option.get("members") as Array)[0]
+	_expect_eq((entry.get("enemy_data") as EnemyData).enemy_name, "Wardling", "...then the Wardling's")
+	_expect_eq(slot.call("to_floor", entry.get("position")), Vector2(17.6, -13.6), "...in the east lobe at (17.6, -13.6)")
+	_expect_eq(entry.get("face_prop_index"), 0, "...facing its encounter's first prop")
+	_expect_eq(float(slot.get("yaw_degrees")) + float(entry.get("yaw_degrees")), 0.0, "...straight at it")
+	_expect(not bool(slot.get("required")), "...not required")
+	var props: Array = option.get("props")
+	_expect_eq(props.size(), 1, "The Wardling's encounter has one prop")
+	if props.size() == 1:
+		_expect_eq((props[0].get("scene") as PackedScene).resource_path, POST_SCENE_PATH, "...the hitching post")
+		var post: Vector3 = props[0].get("position")
+		_expect_eq(slot.call("to_floor", Vector2(post.x, post.z)), Vector2(15.879, -16.057), "...north-west of the Wardling, 3.0 m off")
+		_expect_eq((props[0].get("overrides") as Dictionary).get("tether_member_index"), 0, "...its rope tied to the Wardling, its encounter's first member")
+	var floor_props: Array = floor_data.get("props")
+	_expect_eq(floor_props.size(), 1, "Floor 3 has one prop of its own")
+	if floor_props.size() == 1:
+		_expect_eq((floor_props[0].get("scene") as PackedScene).resource_path, WAGON_SCENE_PATH, "...the wagon")
 	_completed += 1
 
 # --- Helpers ---

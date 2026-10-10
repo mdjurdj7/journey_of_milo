@@ -110,9 +110,9 @@ func _check_enemy_data() -> void:
 	_expect(checked >= 2, "More than one enemy's data was checked (%d)" % checked)
 	_completed += 1
 
-# The region-end enemies: each required enemy (FloorEnemy.required) on
-# the last floor of a region - every RegionData under FLOORS_DIR - by
-# its EnemyData's path.
+# The region-end enemies: every member of every option of each required
+# slot (EncounterSlot.required) on the last floor of a region - every
+# RegionData under FLOORS_DIR - by its EnemyData's path.
 func _region_end_enemies() -> Array[String]:
 	var found: Array[String] = []
 	var dir := DirAccess.open(FLOORS_DIR)
@@ -125,12 +125,16 @@ func _region_end_enemies() -> Array[String]:
 		var floors: Array = region.get("floors")
 		if floors.is_empty() or floors.back() == null:
 			continue
-		for entry: Resource in floors.back().get("enemies"):
-			if entry == null or not bool(entry.get("required")) or entry.get("enemy_data") == null:
+		for slot: Resource in floors.back().get("slots"):
+			if slot == null or not bool(slot.get("required")):
 				continue
-			var path: String = (entry.get("enemy_data") as Resource).resource_path
-			if not found.has(path):
-				found.append(path)
+			for option: Resource in slot.get("options"):
+				for entry: Resource in option.get("members"):
+					if entry == null or entry.get("enemy_data") == null:
+						continue
+					var path: String = (entry.get("enemy_data") as Resource).resource_path
+					if not found.has(path):
+						found.append(path)
 	return found
 
 # What a floor advance does (RegionField._on_floor_exited() reloads the

@@ -204,13 +204,15 @@ func _check_floor_data() -> void:
 	var floor_data: Resource = load(FLOOR_2_PATH)
 	var crab: Array[String] = []
 	var island: int = 0
-	for entry: Resource in floor_data.get("enemies"):
-		var data: EnemyData = entry.get("enemy_data")
-		if entry.get("group") == &"crab":
-			crab.append("%s%s%s" % [data.resource_path.get_file().get_basename(), " anchor" if bool(entry.get("anchor")) else "", " required" if bool(entry.get("required")) else ""])
-		elif entry.get("group") == &"island":
-			if data.resource_path == DRAGONFLY_PATH and not bool(entry.get("required")):
-				island += 1
+	for slot: Resource in floor_data.get("slots"):
+		var required: bool = bool(slot.get("required"))
+		for entry: Resource in (slot.get("options") as Array)[0].get("members"):
+			var data: EnemyData = entry.get("enemy_data")
+			if slot.get("slot_id") == &"crab":
+				crab.append("%s%s%s" % [data.resource_path.get_file().get_basename(), " anchor" if bool(entry.get("anchor")) else "", " required" if required else ""])
+			elif slot.get("slot_id") == &"island":
+				if data.resource_path == DRAGONFLY_PATH and not required:
+					island += 1
 	_expect_eq(crab, ["sputter anchor required", "underfoot required"] as Array[String], "Floor 2's required fight: the Sputter and the Underfoot")
 	_expect_eq(island, 3, "...the island's Dragonfly x3 unchanged")
 	_completed += 1
@@ -225,10 +227,13 @@ func _check_floor_data() -> void:
 func _check_scissor_rule() -> void:
 	var floor_data: Resource = load(FLOOR_2_PATH)
 	var rule: Array[String] = []
-	for entry: Resource in floor_data.get("enemies"):
-		var data: EnemyData = entry.get("enemy_data")
-		if entry.get("group") == &"crab" and data.resource_path == SPUTTER_PATH:
-			rule = [String(entry.get("excluded_intent")), String(entry.get("excluded_while_packmate_intent"))]
+	for slot: Resource in floor_data.get("slots"):
+		if slot.get("slot_id") != &"crab":
+			continue
+		for entry: Resource in (slot.get("options") as Array)[0].get("members"):
+			var data: EnemyData = entry.get("enemy_data")
+			if data.resource_path == SPUTTER_PATH:
+				rule = [String(entry.get("excluded_intent")), String(entry.get("excluded_while_packmate_intent"))]
 	_expect_eq(rule, ["Scissor", "Sting"] as Array[String], "Floor 2's Sputter: no Scissor while a Sting is queued")
 	var with_rule: Array[int] = _scissor_turns(rule)
 	_expect_eq(with_rule[0], 0, "Over %d seeded turns, Scissor never faces the player beside a Sting" % (SEEDS * TURNS))

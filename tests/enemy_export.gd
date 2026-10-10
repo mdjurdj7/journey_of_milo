@@ -66,16 +66,17 @@ static func build() -> Dictionary:
 			"regenerate": REGENERATE,
 			"generated_from": [
 				REGION_SCENE_PATH + " (its region and encounter_rewards_path)",
-				"res://floors/*.tres (RegionData, FloorData, FloorEnemy, FloorPatrol, FloorProp)",
+				"res://floors/*.tres (RegionData, FloorData, EncounterSlot, EncounterOption, FloorEnemy, FloorPatrol, FloorProp)",
 				ENEMY_DIR + "*.tres (EnemyData, EnemyIntent)",
 				"res://battle/rules/statuses/*.tres (StatusData, resolved through Status.describe())",
 				"res://run/keepsakes/*.tres (KeepsakeTable, TrinketData)",
 				"res://cards/pools/*.tres (RewardPool rarity rates)",
 				REWARD_SCREEN_SCENE_PATH + " (choice_count)",
 			],
-			"positions": "World XZ offsets from the floor's spawn, metres ([x, z]).",
-			"required": "FloorEnemy.required: the floor is cleared, and its gate opens, once no required enemy stands. A cluster is the entries sharing a FloorEnemy.group; it is required when any member is.",
-			"gate_fight": "The encounter holding FloorData.enemies[0]: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past that enemy, along exit_direction.",
+			"positions": "World XZ offsets from the floor's spawn, metres ([x, z]) - an option's members and props mapped through their slot (EncounterSlot.to_floor()).",
+			"encounters": "One entry per option of each EncounterSlot, in slot order: the slot is where (anchor, required), the option is who (members, their props, their route). One option per slot is stood each floor load. A cluster is an option of more than one member; its name is its slot's id.",
+			"required": "EncounterSlot.required: the floor is cleared, and its gate opens, once no member of a required slot stands.",
+			"gate_fight": "The floor's first required slot: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past its anchor, along exit_direction, whichever option stands there.",
 			"elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times its role's gold_multiplier in EncounterRewards (the elite's, rounded) and rolls its card at the pool's elite rarity rates. A placement marked FloorEnemy.card_reward TOP_TIER_FIRST (floor 5's region-end Greyshelf) offers its cards from the highest tier down instead (RewardPool.roll_top_tier()), at the floor's gold. See each encounter's elite_rewards. Keepsakes and Glassbone are their own fields.",
 			"rewards": "Gold is the floor's roll (FloorData) times the fight's role's gold_multiplier; whether it offers cards, and an optional basic fight's extra (a removal or a Samphire), are its role's too (EncounterRewards, by BattleController.encounter_role()). Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Glassbone: every member's, summed.",
 			"intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping.",
@@ -119,22 +120,30 @@ static func _floor_entry(floor_data: FloorData, region_index: int, floor_index: 
 		"bundle_rare_pool": _path(floor_data.rare_pool),
 	}
 	var encounters: Array = []
-	for members in _clusters(floor_data):
-		var encounter: Dictionary = _encounter_entry(floor_data, members)
-		encounters.append(encounter)
-		for index: int in members:
-			var data: EnemyData = floor_data.enemies[index].enemy_data
-			if data == null:
+	var gate_slot: EncounterSlot = _gate_slot(floor_data)
+	for slot in floor_data.slots:
+		if slot == null:
+			continue
+		for option in slot.options:
+			if option == null:
 				continue
-			var list: Array = appearances.get(data.resource_path, [])
-			list.append({
-				"region": region_index + 1,
-				"floor": floor_index + 1,
-				"cluster": encounter["cluster"],
-				"required": floor_data.enemies[index].required,
-				"gate_fight": encounter["gate_fight"],
-			})
-			appearances[data.resource_path] = list
+			var encounter: Dictionary = _encounter_entry(floor_data, slot, option, slot == gate_slot)
+			encounters.append(encounter)
+			for entry in option.members:
+				if entry == null or entry.enemy_data == null:
+					continue
+				var path: String = entry.enemy_data.resource_path
+				var list: Array = appearances.get(path, [])
+				list.append({
+					"region": region_index + 1,
+					"floor": floor_index + 1,
+					"slot": String(slot.slot_id),
+					"option": String(option.option_id),
+					"cluster": encounter["cluster"],
+					"required": slot.required,
+					"gate_fight": encounter["gate_fight"],
+				})
+				appearances[path] = list
 	return {
 		"floor": floor_index + 1,
 		"file": floor_data.resource_path,
@@ -142,56 +151,49 @@ static func _floor_entry(floor_data: FloorData, region_index: int, floor_index: 
 		"encounters": encounters,
 	}
 
-# FloorData.enemies grouped into fights, in the order each fight's first
-# entry is listed: one cluster per non-empty group, every other entry on
-# its own. Indices into FloorData.enemies.
-static func _clusters(floor_data: FloorData) -> Array:
-	var clusters: Array = []
-	var by_group: Dictionary = {}
-	for index in floor_data.enemies.size():
-		var entry: FloorEnemy = floor_data.enemies[index]
-		if entry == null:
+# RegionField._gate_slot()'s rule: the first required slot, else the first.
+static func _gate_slot(floor_data: FloorData) -> EncounterSlot:
+	var first: EncounterSlot = null
+	for slot in floor_data.slots:
+		if slot == null:
 			continue
-		if entry.group == &"":
-			clusters.append([index])
-		elif by_group.has(entry.group):
-			var members: Array = by_group[entry.group]
-			members.append(index)
-		else:
-			var members: Array = [index]
-			by_group[entry.group] = members
-			clusters.append(members)
-	return clusters
+		if slot.required:
+			return slot
+		if first == null:
+			first = slot
+	return first
 
-static func _encounter_entry(floor_data: FloorData, members: Array) -> Dictionary:
-	var first: FloorEnemy = floor_data.enemies[members[0]]
-	var cluster: Variant = String(first.group) if first.group != &"" else null
-	var required: bool = false
+static func _encounter_entry(floor_data: FloorData, slot: EncounterSlot, option: EncounterOption, gate_fight: bool) -> Dictionary:
+	var cluster: Variant = String(slot.slot_id) if option.members.size() > 1 else null
 	var elite: bool = false
 	var top_tier: bool = false
-	var gate_fight: bool = false
 	var keepsake: Variant = null
 	var glassbone: int = 0
 	var member_list: Array = []
-	for index: int in members:
-		var entry: FloorEnemy = floor_data.enemies[index]
+	for member_index in option.members.size():
+		var entry: FloorEnemy = option.members[member_index]
+		if entry == null:
+			continue
 		var data: EnemyData = entry.enemy_data
-		required = required or entry.required
 		top_tier = top_tier or entry.card_reward == FloorEnemy.CardReward.TOP_TIER_FIRST
-		gate_fight = gate_fight or index == 0
 		if data != null:
 			elite = elite or data.is_elite
 			glassbone += maxi(data.glassbone_reward, 0)
 			if keepsake == null and data.keepsake_table != null:
 				keepsake = {"from": data.enemy_name, "table": data.keepsake_table.resource_path}
-		member_list.append(_member_entry(floor_data, index))
+		member_list.append(_member_entry(slot, option, member_index))
 	var names: Array[String] = []
 	for member: Dictionary in member_list:
 		names.append(member["name"])
 	var encounter: Dictionary = {
+		"slot": String(slot.slot_id),
+		"option": String(option.option_id),
+		"weight": _num(option.weight),
+		"anchor": _vec2(slot.position),
+		"slot_yaw_degrees": _num(slot.yaw_degrees),
 		"cluster": cluster,
 		"names": " + ".join(names),
-		"required": required,
+		"required": slot.required,
 		"elite": elite,
 		"gate_fight": gate_fight,
 	}
@@ -208,49 +210,55 @@ static func _encounter_entry(floor_data: FloorData, members: Array) -> Dictionar
 		"card_rates": "top tier first" if top_tier else ("elite" if elite else "normal"),
 		"why": "FloorEnemy.card_reward TOP_TIER_FIRST" if top_tier else ("an elite member" if elite else null),
 	}
-	encounter["patrol"] = _patrol_entry(floor_data, first.group)
+	encounter["patrol"] = _patrol_entry(slot, option)
 	encounter["members"] = member_list
+	var props: Array = []
+	for prop in option.props:
+		if prop != null:
+			props.append({"scene": _path(prop.scene), "position": _vec2(_prop_at(slot, prop))})
+	encounter["props"] = props
 	encounter["keepsake_drop"] = keepsake
 	encounter["glassbone"] = glassbone
 	return encounter
 
-static func _member_entry(floor_data: FloorData, index: int) -> Dictionary:
-	var entry: FloorEnemy = floor_data.enemies[index]
+# Where a top-level option prop stands, floor frame.
+static func _prop_at(slot: EncounterSlot, prop: FloorProp) -> Vector2:
+	return slot.to_floor(Vector2(prop.position.x, prop.position.z))
+
+static func _member_entry(slot: EncounterSlot, option: EncounterOption, member_index: int) -> Dictionary:
+	var entry: FloorEnemy = option.members[member_index]
 	var data: EnemyData = entry.enemy_data
 	var face_prop: Variant = null
-	if entry.face_prop_index >= 0 and entry.face_prop_index < floor_data.props.size():
-		var prop: FloorProp = floor_data.props[entry.face_prop_index]
+	if entry.face_prop_index >= 0 and entry.face_prop_index < option.props.size():
+		var prop: FloorProp = option.props[entry.face_prop_index]
 		face_prop = {
 			"index": entry.face_prop_index,
 			"scene": _path(prop.scene) if prop != null else null,
-			"position": _vec3_xz(prop.position) if prop != null else null,
+			"position": _vec2(_prop_at(slot, prop)) if prop != null else null,
 		}
 	return {
-		"index": index,
+		"member": member_index,
 		"name": data.enemy_name if data != null else "",
 		"enemy_file": _path(data),
 		"hp": data.max_hp if data != null else 0,
-		"required": entry.required,
 		"anchor": entry.anchor,
 		"card_reward": FloorEnemy.CardReward.keys()[entry.card_reward],
-		"position": _vec2(entry.position),
-		"yaw_degrees": _num(entry.yaw_degrees),
+		"position": _vec2(slot.to_floor(entry.position)),
+		"yaw_degrees": _num(slot.yaw_degrees + entry.yaw_degrees),
 		"face_prop": face_prop,
 	}
 
-static func _patrol_entry(floor_data: FloorData, group: StringName) -> Variant:
-	if group == &"":
+static func _patrol_entry(slot: EncounterSlot, option: EncounterOption) -> Variant:
+	var patrol: FloorPatrol = option.patrol
+	if patrol == null:
 		return null
-	for patrol in floor_data.patrols:
-		if patrol != null and patrol.group == group:
-			var waypoints: Array = []
-			for point in patrol.waypoints:
-				waypoints.append(_vec2(point))
-			return {
-				"waypoints": waypoints,
-				"dwell_seconds": [_num(patrol.dwell_min_seconds), _num(patrol.dwell_max_seconds)],
-			}
-	return null
+	var waypoints: Array = []
+	for point in patrol.waypoints:
+		waypoints.append(_vec2(slot.to_floor(point)))
+	return {
+		"waypoints": waypoints,
+		"dwell_seconds": [_num(patrol.dwell_min_seconds), _num(patrol.dwell_max_seconds)],
+	}
 
 static func _enemy_entry(data: EnemyData, appears_on: Array) -> Dictionary:
 	return {
@@ -624,9 +632,6 @@ static func _path(resource: Resource) -> Variant:
 
 static func _vec2(value: Vector2) -> Array:
 	return [_num(value.x), _num(value.y)]
-
-static func _vec3_xz(value: Vector3) -> Array:
-	return [_num(value.x), _num(value.z)]
 
 # Floats to 4 places, so a float32 position (17.6 stored as 17.6000003)
 # writes as authored.

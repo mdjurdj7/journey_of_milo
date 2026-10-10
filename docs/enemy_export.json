@@ -4,16 +4,17 @@
     "regenerate": "Godot_v4.7.1.exe --headless --path . -s res://tests/enemy_export.gd",
     "generated_from": [
       "res://field/region_field.tscn (its region and encounter_rewards_path)",
-      "res://floors/*.tres (RegionData, FloorData, FloorEnemy, FloorPatrol, FloorProp)",
+      "res://floors/*.tres (RegionData, FloorData, EncounterSlot, EncounterOption, FloorEnemy, FloorPatrol, FloorProp)",
       "res://battle/rules/enemies/*.tres (EnemyData, EnemyIntent)",
       "res://battle/rules/statuses/*.tres (StatusData, resolved through Status.describe())",
       "res://run/keepsakes/*.tres (KeepsakeTable, TrinketData)",
       "res://cards/pools/*.tres (RewardPool rarity rates)",
       "res://battle/reward_screen.tscn (choice_count)"
     ],
-    "positions": "World XZ offsets from the floor's spawn, metres ([x, z]).",
-    "required": "FloorEnemy.required: the floor is cleared, and its gate opens, once no required enemy stands. A cluster is the entries sharing a FloorEnemy.group; it is required when any member is.",
-    "gate_fight": "The encounter holding FloorData.enemies[0]: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past that enemy, along exit_direction.",
+    "positions": "World XZ offsets from the floor's spawn, metres ([x, z]) - an option's members and props mapped through their slot (EncounterSlot.to_floor()).",
+    "encounters": "One entry per option of each EncounterSlot, in slot order: the slot is where (anchor, required), the option is who (members, their props, their route). One option per slot is stood each floor load. A cluster is an option of more than one member; its name is its slot's id.",
+    "required": "EncounterSlot.required: the floor is cleared, and its gate opens, once no member of a required slot stands.",
+    "gate_fight": "The floor's first required slot: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past its anchor, along exit_direction, whichever option stands there.",
     "elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times its role's gold_multiplier in EncounterRewards (the elite's, rounded) and rolls its card at the pool's elite rarity rates. A placement marked FloorEnemy.card_reward TOP_TIER_FIRST (floor 5's region-end Greyshelf) offers its cards from the highest tier down instead (RewardPool.roll_top_tier()), at the floor's gold. See each encounter's elite_rewards. Keepsakes and Glassbone are their own fields.",
     "rewards": "Gold is the floor's roll (FloorData) times the fight's role's gold_multiplier; whether it offers cards, and an optional basic fight's extra (a removal or a Samphire), are its role's too (EncounterRewards, by BattleController.encounter_role()). Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Glassbone: every member's, summed.",
     "intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping."
@@ -50,6 +51,14 @@
           },
           "encounters": [
             {
+              "slot": "crab",
+              "option": "sputter",
+              "weight": 1.0,
+              "anchor": [
+                -2.25,
+                -10.73
+              ],
+              "slot_yaw_degrees": 0.0,
               "cluster": null,
               "names": "Sputter",
               "required": true,
@@ -73,11 +82,10 @@
               "patrol": null,
               "members": [
                 {
-                  "index": 0,
+                  "member": 0,
                   "name": "Sputter",
                   "enemy_file": "res://battle/rules/enemies/sputter.tres",
                   "hp": 45,
-                  "required": true,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -88,6 +96,7 @@
                   "face_prop": null
                 }
               ],
+              "props": [],
               "keepsake_drop": null,
               "glassbone": 0
             }
@@ -119,6 +128,14 @@
           },
           "encounters": [
             {
+              "slot": "crab",
+              "option": "sputter_underfoot",
+              "weight": 1.0,
+              "anchor": [
+                1.5,
+                -21.25
+              ],
+              "slot_yaw_degrees": 0.0,
               "cluster": "crab",
               "names": "Sputter + Underfoot",
               "required": true,
@@ -142,11 +159,10 @@
               "patrol": null,
               "members": [
                 {
-                  "index": 0,
+                  "member": 0,
                   "name": "Sputter",
                   "enemy_file": "res://battle/rules/enemies/sputter.tres",
                   "hp": 45,
-                  "required": true,
                   "anchor": true,
                   "card_reward": "ROLLED",
                   "position": [
@@ -157,11 +173,10 @@
                   "face_prop": null
                 },
                 {
-                  "index": 1,
+                  "member": 1,
                   "name": "Underfoot",
                   "enemy_file": "res://battle/rules/enemies/underfoot.tres",
                   "hp": 34,
-                  "required": true,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -172,10 +187,19 @@
                   "face_prop": null
                 }
               ],
+              "props": [],
               "keepsake_drop": null,
               "glassbone": 0
             },
             {
+              "slot": "island",
+              "option": "dragonfly_trio",
+              "weight": 1.0,
+              "anchor": [
+                -15.25,
+                -20.5
+              ],
+              "slot_yaw_degrees": 0.0,
               "cluster": "island",
               "names": "Dragonfly + Dragonfly + Dragonfly",
               "required": false,
@@ -208,11 +232,10 @@
               },
               "members": [
                 {
-                  "index": 2,
+                  "member": 0,
                   "name": "Dragonfly",
                   "enemy_file": "res://battle/rules/enemies/dragonfly.tres",
                   "hp": 14,
-                  "required": false,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -223,11 +246,10 @@
                   "face_prop": null
                 },
                 {
-                  "index": 3,
+                  "member": 1,
                   "name": "Dragonfly",
                   "enemy_file": "res://battle/rules/enemies/dragonfly.tres",
                   "hp": 14,
-                  "required": false,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -238,11 +260,10 @@
                   "face_prop": null
                 },
                 {
-                  "index": 4,
+                  "member": 2,
                   "name": "Dragonfly",
                   "enemy_file": "res://battle/rules/enemies/dragonfly.tres",
                   "hp": 14,
-                  "required": false,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -253,10 +274,19 @@
                   "face_prop": null
                 }
               ],
+              "props": [],
               "keepsake_drop": null,
               "glassbone": 0
             },
             {
+              "slot": "siltjaw",
+              "option": "siltjaw",
+              "weight": 1.0,
+              "anchor": [
+                5.2,
+                -7.0
+              ],
+              "slot_yaw_degrees": 0.0,
               "cluster": null,
               "names": "Siltjaw",
               "required": false,
@@ -270,11 +300,10 @@
               "patrol": null,
               "members": [
                 {
-                  "index": 5,
+                  "member": 0,
                   "name": "Siltjaw",
                   "enemy_file": "res://battle/rules/enemies/siltjaw.tres",
                   "hp": 38,
-                  "required": false,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -285,6 +314,7 @@
                   "face_prop": null
                 }
               ],
+              "props": [],
               "keepsake_drop": null,
               "glassbone": 0
             }
@@ -316,6 +346,14 @@
           },
           "encounters": [
             {
+              "slot": "blackback",
+              "option": "blackback_nipper",
+              "weight": 1.0,
+              "anchor": [
+                -3.0,
+                -9.0
+              ],
+              "slot_yaw_degrees": 0.0,
               "cluster": "blackback",
               "names": "Blackback + Nipper",
               "required": true,
@@ -339,11 +377,10 @@
               "patrol": null,
               "members": [
                 {
-                  "index": 0,
+                  "member": 0,
                   "name": "Blackback",
                   "enemy_file": "res://battle/rules/enemies/blackback.tres",
                   "hp": 40,
-                  "required": true,
                   "anchor": true,
                   "card_reward": "ROLLED",
                   "position": [
@@ -354,11 +391,10 @@
                   "face_prop": null
                 },
                 {
-                  "index": 2,
+                  "member": 1,
                   "name": "Nipper",
                   "enemy_file": "res://battle/rules/enemies/nipper.tres",
                   "hp": 16,
-                  "required": true,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -369,10 +405,19 @@
                   "face_prop": null
                 }
               ],
+              "props": [],
               "keepsake_drop": null,
               "glassbone": 0
             },
             {
+              "slot": "wardling",
+              "option": "wardling",
+              "weight": 1.0,
+              "anchor": [
+                17.6,
+                -13.6
+              ],
+              "slot_yaw_degrees": 0.0,
               "cluster": null,
               "names": "Wardling",
               "required": false,
@@ -386,11 +431,10 @@
               "patrol": null,
               "members": [
                 {
-                  "index": 1,
+                  "member": 0,
                   "name": "Wardling",
                   "enemy_file": "res://battle/rules/enemies/wardling.tres",
                   "hp": 70,
-                  "required": false,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -406,6 +450,15 @@
                       -16.057
                     ]
                   }
+                }
+              ],
+              "props": [
+                {
+                  "scene": "res://field/hitching_post.tscn",
+                  "position": [
+                    15.879,
+                    -16.057
+                  ]
                 }
               ],
               "keepsake_drop": {
@@ -442,6 +495,14 @@
           },
           "encounters": [
             {
+              "slot": "dunecur",
+              "option": "dunecur",
+              "weight": 1.0,
+              "anchor": [
+                -18.5,
+                -35.0
+              ],
+              "slot_yaw_degrees": 0.0,
               "cluster": null,
               "names": "Dunecur",
               "required": true,
@@ -465,11 +526,10 @@
               "patrol": null,
               "members": [
                 {
-                  "index": 0,
+                  "member": 0,
                   "name": "Dunecur",
                   "enemy_file": "res://battle/rules/enemies/dunecur.tres",
                   "hp": 55,
-                  "required": true,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -487,10 +547,27 @@
                   }
                 }
               ],
+              "props": [
+                {
+                  "scene": "res://field/bone_scatter.tscn",
+                  "position": [
+                    -19.73,
+                    -35.422
+                  ]
+                }
+              ],
               "keepsake_drop": null,
               "glassbone": 0
             },
             {
+              "slot": "adder",
+              "option": "adder",
+              "weight": 1.0,
+              "anchor": [
+                11.0,
+                -22.5
+              ],
+              "slot_yaw_degrees": 0.0,
               "cluster": null,
               "names": "Adder",
               "required": false,
@@ -504,11 +581,10 @@
               "patrol": null,
               "members": [
                 {
-                  "index": 1,
+                  "member": 0,
                   "name": "Adder",
                   "enemy_file": "res://battle/rules/enemies/adder.tres",
                   "hp": 60,
-                  "required": false,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -519,6 +595,7 @@
                   "face_prop": null
                 }
               ],
+              "props": [],
               "keepsake_drop": {
                 "from": "Adder",
                 "table": "res://run/keepsakes/adder_keepsakes.tres"
@@ -553,6 +630,14 @@
           },
           "encounters": [
             {
+              "slot": "greyshelf",
+              "option": "greyshelf",
+              "weight": 1.0,
+              "anchor": [
+                -0.567,
+                -42.0
+              ],
+              "slot_yaw_degrees": 0.0,
               "cluster": null,
               "names": "Greyshelf",
               "required": true,
@@ -576,11 +661,10 @@
               "patrol": null,
               "members": [
                 {
-                  "index": 0,
+                  "member": 0,
                   "name": "Greyshelf",
                   "enemy_file": "res://battle/rules/enemies/greyshelf.tres",
                   "hp": 120,
-                  "required": true,
                   "anchor": false,
                   "card_reward": "TOP_TIER_FIRST",
                   "position": [
@@ -591,6 +675,7 @@
                   "face_prop": null
                 }
               ],
+              "props": [],
               "keepsake_drop": null,
               "glassbone": 1
             }
@@ -720,6 +805,8 @@
         {
           "region": 1,
           "floor": 4,
+          "slot": "adder",
+          "option": "adder",
           "cluster": null,
           "required": false,
           "gate_fight": false
@@ -836,6 +923,8 @@
         {
           "region": 1,
           "floor": 3,
+          "slot": "blackback",
+          "option": "blackback_nipper",
           "cluster": "blackback",
           "required": true,
           "gate_fight": true
@@ -915,6 +1004,8 @@
         {
           "region": 1,
           "floor": 2,
+          "slot": "island",
+          "option": "dragonfly_trio",
           "cluster": "island",
           "required": false,
           "gate_fight": false
@@ -922,6 +1013,8 @@
         {
           "region": 1,
           "floor": 2,
+          "slot": "island",
+          "option": "dragonfly_trio",
           "cluster": "island",
           "required": false,
           "gate_fight": false
@@ -929,6 +1022,8 @@
         {
           "region": 1,
           "floor": 2,
+          "slot": "island",
+          "option": "dragonfly_trio",
           "cluster": "island",
           "required": false,
           "gate_fight": false
@@ -1084,6 +1179,8 @@
         {
           "region": 1,
           "floor": 4,
+          "slot": "dunecur",
+          "option": "dunecur",
           "cluster": null,
           "required": true,
           "gate_fight": true
@@ -1206,6 +1303,8 @@
         {
           "region": 1,
           "floor": 5,
+          "slot": "greyshelf",
+          "option": "greyshelf",
           "cluster": null,
           "required": true,
           "gate_fight": true
@@ -1285,6 +1384,8 @@
         {
           "region": 1,
           "floor": 3,
+          "slot": "blackback",
+          "option": "blackback_nipper",
           "cluster": "blackback",
           "required": true,
           "gate_fight": true
@@ -1364,6 +1465,8 @@
         {
           "region": 1,
           "floor": 2,
+          "slot": "siltjaw",
+          "option": "siltjaw",
           "cluster": null,
           "required": false,
           "gate_fight": false
@@ -1454,6 +1557,8 @@
         {
           "region": 1,
           "floor": 1,
+          "slot": "crab",
+          "option": "sputter",
           "cluster": null,
           "required": true,
           "gate_fight": true
@@ -1461,6 +1566,8 @@
         {
           "region": 1,
           "floor": 2,
+          "slot": "crab",
+          "option": "sputter_underfoot",
           "cluster": "crab",
           "required": true,
           "gate_fight": true
@@ -1565,6 +1672,8 @@
         {
           "region": 1,
           "floor": 2,
+          "slot": "crab",
+          "option": "sputter_underfoot",
           "cluster": "crab",
           "required": true,
           "gate_fight": true
@@ -1704,6 +1813,8 @@
         {
           "region": 1,
           "floor": 3,
+          "slot": "wardling",
+          "option": "wardling",
           "cluster": null,
           "required": false,
           "gate_fight": false

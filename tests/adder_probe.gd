@@ -373,9 +373,10 @@ func _check_fight_refuse() -> void:
 # Floor 4's faint-side slot: the adder, an optional elite, facing east.
 func _check_floor_entry() -> void:
 	var data: Resource = load("res://floors/region1_floor4.tres")
-	var entry: Resource = (data.get("enemies") as Array)[1]
-	_expect((entry.get("enemy_data") as Resource).resource_path == ADDER_PATH, "Floor 4's second entry is the adder")
-	_expect(not bool(entry.get("required")) and entry.get("position") == Vector2(11, -22.5) and is_equal_approx(float(entry.get("yaw_degrees")), -90.0), "...optional, at (11, -22.5), yaw -90")
+	var slot: Resource = (data.get("slots") as Array)[1]
+	var entry: Resource = ((slot.get("options") as Array)[0].get("members") as Array)[0]
+	_expect((entry.get("enemy_data") as Resource).resource_path == ADDER_PATH, "Floor 4's second slot stands the adder")
+	_expect(not bool(slot.get("required")) and slot.call("to_floor", entry.get("position")) == Vector2(11, -22.5) and is_equal_approx(float(slot.get("yaw_degrees")) + float(entry.get("yaw_degrees")), -90.0), "...optional, at (11, -22.5), yaw -90")
 	_completed += 1
 
 # Won: elite rates, Glassbone 1, and Blue Fastener offered, from the Adder.

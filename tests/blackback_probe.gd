@@ -127,23 +127,30 @@ func _check_hungry_per_attack() -> void:
 	_expect_eq(_lunge_against(data, HUNGRY_PATH), [15, 15], "Hungry: Lunge 12 + 3 = 15, previewed and resolved")
 	_completed += 1
 
-# Floor 3: the Blackback first at (-3, -9), where the Sputter stood (the
-# gate measures from the first enemy); the Wardling as it was; the Nipper
-# 1.5-2 m from the Blackback in its cluster; both required.
+# Floor 3: the Blackback's slot first, anchored at (-3, -9) where the
+# Sputter stood (the gate measures from the first required slot); the
+# Wardling's slot as it was; the Nipper 1.5-2 m from the Blackback in the
+# same option - one cluster; the slot required.
 func _check_floor_3() -> void:
 	var floor_data := load(FLOOR_3_PATH) as Resource
-	var enemies: Array = floor_data.get("enemies")
-	_expect_eq(enemies.size(), 3, "Floor 3 has three enemies")
-	var blackback: Resource = enemies[0]
-	var nipper: Resource = enemies[2]
+	var slots: Array = floor_data.get("slots")
+	_expect_eq(slots.size(), 2, "Floor 3 has two encounter slots")
+	var cluster: Resource = slots[0]
+	var members: Array = (cluster.get("options") as Array)[0].get("members")
+	_expect_eq(members.size(), 2, "...the first stands two - one cluster")
+	var blackback: Resource = members[0]
+	var nipper: Resource = members[members.size() - 1]
+	var blackback_at: Vector2 = cluster.call("to_floor", blackback.get("position"))
+	var nipper_at: Vector2 = cluster.call("to_floor", nipper.get("position"))
 	_expect_eq((blackback.get("enemy_data") as EnemyData).enemy_name, "Blackback", "...the Blackback first")
-	_expect_eq(blackback.get("position"), Vector2(-3, -9), "...at (-3, -9)")
-	_expect_eq((enemies[1].get("enemy_data") as EnemyData).enemy_name, "Wardling", "...the Wardling second")
-	_expect_eq((nipper.get("enemy_data") as EnemyData).enemy_name, "Nipper", "...the Nipper third")
-	var gap: float = (nipper.get("position") as Vector2).distance_to(blackback.get("position") as Vector2)
+	_expect_eq(blackback_at, Vector2(-3, -9), "...at (-3, -9)")
+	_expect_eq(cluster.get("position"), Vector2(-3, -9), "...the slot anchored on it")
+	var wardling: Resource = ((slots[1].get("options") as Array)[0].get("members") as Array)[0]
+	_expect_eq((wardling.get("enemy_data") as EnemyData).enemy_name, "Wardling", "...the Wardling's slot second")
+	_expect_eq((nipper.get("enemy_data") as EnemyData).enemy_name, "Nipper", "...the Nipper beside the Blackback")
+	var gap: float = nipper_at.distance_to(blackback_at)
 	_expect(gap >= 1.5 and gap <= 2.0, "...%.2f m from the Blackback" % gap)
-	_expect(blackback.get("group") != &"" and blackback.get("group") == nipper.get("group"), "...one cluster")
-	_expect(bool(blackback.get("required")) and bool(nipper.get("required")), "...both required")
+	_expect(bool(cluster.get("required")), "...both required")
 	_completed += 1
 
 # One contact starts the fight with both; the Blackback opens Fed, its

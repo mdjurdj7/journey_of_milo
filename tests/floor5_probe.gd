@@ -117,12 +117,14 @@ func _check_data() -> void:
 	_expect_eq(float(data.get("slope_tint_fade_width")), 0.0, "...no slope-tint height fade")
 	_expect_eq(float(data.get("ambience_sea_db")), -80.0, "...the sea muted")
 	_expect_eq(int(data.get("exit_kind")), 1, "...a LINE gate")
-	var enemies: Array = data.get("enemies")
-	_expect_eq(enemies.size(), 1, "...one fight")
-	if enemies.size() == 1:
-		_expect(bool(enemies[0].get("required")) and enemies[0].get("position") == FIGHT_AT, "...the region-end fight, required, on the crest")
-		_expect((enemies[0].get("enemy_data") as Resource).resource_path == GREYSHELF_PATH, "...the Greyshelf")
-		_expect(is_equal_approx(float(enemies[0].get("yaw_degrees")), -90.0), "...lying across the crest, head east")
+	var slots: Array = data.get("slots")
+	_expect_eq(slots.size(), 1, "...one fight")
+	if slots.size() == 1:
+		var slot: Resource = slots[0]
+		var entry: Resource = ((slot.get("options") as Array)[0].get("members") as Array)[0]
+		_expect(bool(slot.get("required")) and slot.call("to_floor", entry.get("position")) == FIGHT_AT, "...the region-end fight, required, on the crest")
+		_expect((entry.get("enemy_data") as Resource).resource_path == GREYSHELF_PATH, "...the Greyshelf")
+		_expect(is_equal_approx(float(slot.get("yaw_degrees")) + float(entry.get("yaw_degrees")), -90.0), "...lying across the crest, head east")
 	_expect(data.get("exit_direction") == EXIT_DIRECTION and is_equal_approx(float(data.get("gate_distance_beyond_enemy")), GATE_DISTANCE_M), "...the gate 12 m on along the exit neck")
 	_expect_eq((data.get("ledges") as Array).size(), 1, "...one ledge ring: the boundary")
 	_expect_eq((data.get("wear_path_override") as PackedVector2Array).size(), 7, "...a 7-point worn band")

@@ -110,7 +110,8 @@ func _check_ordinary(floor_index: int, enemy_path: String, label: String) -> voi
 func _check_region_end() -> void:
 	var region: Resource = load(REGION_PATH)
 	var floors: Array = region.get("floors")
-	var placement: Resource = (floors[FLOOR_5].get("enemies") as Array)[0]
+	var slot: Resource = (floors[FLOOR_5].get("slots") as Array)[0]
+	var placement: Resource = ((slot.get("options") as Array)[0].get("members") as Array)[0]
 	_expect_eq(int(placement.get("card_reward")), FloorEnemy.CardReward.TOP_TIER_FIRST, "Floor 5's region-end fight is placed TOP_TIER_FIRST")
 	_expect_eq((placement.get("enemy_data") as Resource).resource_path, GREYSHELF_PATH, "...the Greyshelf")
 	_expect(not bool((placement.get("enemy_data") as Resource).get("is_elite")), "...not elite")
