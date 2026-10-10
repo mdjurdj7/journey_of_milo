@@ -8,10 +8,15 @@ signal hold_line_reached
 # stuck_time with waypoints still ahead - RegionField plans again.
 signal path_stuck
 
+# The body: the Wanderer re-rigged on Mixamo with the neck base moved up
+# to the shoulders (Blender), exported as glTF - its skeleton under an
+# Armature node scaled 0.01 and turned 90 deg. Its one clip, battle_idle,
+# is the held battle pose and merges as BattleIdle (_merge_clips()); every
+# other clip is cut on the old FBX rig and carried over (_transfer_clip()).
+const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v2.glb"
 const IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_idle.fbx"
 const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_walking.fbx"
 const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_running.fbx"
-const BATTLE_IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_idle.fbx"
 const DRAW_SWORD_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_start_draw_sword.fbx"
 const SLASH_SCENE_PATH := "res://assets/models/wanderer/wanderer_slash.fbx"
 const BRACE_SCENE_PATH := "res://assets/models/wanderer/wanderer_brace.fbx"
@@ -309,28 +314,28 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 		return back_mount_position
 	set(value):
 		back_mount_position = value
-		if _sword_root != null and _sword_root.get_parent() == _back_attachment:
+		if _sword_root != null and _sword_root.get_parent() == _back_frame:
 			_sword_root.position = _world_offset_to_local(value)
 @export var back_mount_rotation_degrees: Vector3 = Vector3(15.0, -100.0, 80.0):
 	get:
 		return back_mount_rotation_degrees
 	set(value):
 		back_mount_rotation_degrees = value
-		if _sword_root != null and _sword_root.get_parent() == _back_attachment:
+		if _sword_root != null and _sword_root.get_parent() == _back_frame:
 			_sword_root.rotation_degrees = value
 @export var hand_mount_position: Vector3 = Vector3(0.0, 0.0, 0.0):
 	get:
 		return hand_mount_position
 	set(value):
 		hand_mount_position = value
-		if _sword_root != null and _sword_root.get_parent() == _hand_attachment:
+		if _sword_root != null and _sword_root.get_parent() == _hand_frame:
 			_sword_root.position = _world_offset_to_local(value)
 @export var hand_mount_rotation_degrees: Vector3 = Vector3(0.0, 0.0, 0.0):
 	get:
 		return hand_mount_rotation_degrees
 	set(value):
 		hand_mount_rotation_degrees = value
-		if _sword_root != null and _sword_root.get_parent() == _hand_attachment:
+		if _sword_root != null and _sword_root.get_parent() == _hand_frame:
 			_sword_root.rotation_degrees = value
 
 var _model: Node3D = null
@@ -439,6 +444,14 @@ var _sword_mesh_holder: Node3D = null
 var _sword_raw_aabb: AABB = AABB()
 var _back_attachment: BoneAttachment3D = null
 var _hand_attachment: BoneAttachment3D = null
+# What the sword actually hangs from: one child of each attachment whose
+# basis cancels any scale and shear in its bone's pose (_fit_mount_
+# frames()), so the sword keeps sword_length and a clean turn in every
+# pose. wanderer_v2.glb's battle_idle keys bone scale - shoulders and
+# upper arms stretched 1.2-1.3x, fingers 0.7-0.8x - which the right hand
+# inherits; a bone with no scale in its pose leaves its frame at identity.
+var _back_frame: Node3D = null
+var _hand_frame: Node3D = null
 
 # The body's own currently-applied material (set by _apply_model_material()
 # for is_body calls only, never for the sword's) - play_hit_flash() tweens
@@ -458,7 +471,7 @@ var _battle_controller: BattleController = null
 func _ready() -> void:
 	_camera = get_node_or_null(camera_path) as Camera3D
 
-	var model := (load(IDLE_SCENE_PATH) as PackedScene).instantiate() as Node3D
+	var model := (load(MODEL_SCENE_PATH) as PackedScene).instantiate() as Node3D
 	_model = model
 	add_child(model)
 	# RegionField freezes itself (and, by inheritance, the Wanderer and
@@ -542,8 +555,9 @@ func _ready() -> void:
 # material_override is left null (clearing any override from a previous
 # POSTERIZED/FLAT mode) rather than replaced with a StandardMaterial3D
 # built from SWORD_ALBEDO_TEXTURE_PATH, which likely doesn't exist as a
-# standalone file. The body has no such imported material (its FBX ships
-# untextured geometry) so it always keeps the override path.
+# standalone file. The body always keeps the override path: wanderer_v2.
+# glb's imported material reads a texture byte-identical to ALBEDO_
+# TEXTURE_PATH, but with the glb's own roughness, not this one's.
 func _apply_model_material(model: Node3D, texture_path: String = ALBEDO_TEXTURE_PATH, keep_imported_material_when_textured: bool = false, is_body: bool = true) -> void:
 	if shading_mode == ShadingMode.TEXTURED and keep_imported_material_when_textured:
 		for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
@@ -872,6 +886,15 @@ func _setup_sword(model: Node3D) -> void:
 	_sword_skeleton.add_child(_hand_attachment)
 	_hand_attachment.bone_name = _sword_skeleton.get_bone_name(hand_bone_idx)
 
+	_back_frame = Node3D.new()
+	_back_frame.name = "SwordBackFrame"
+	_back_attachment.add_child(_back_frame)
+	_hand_frame = Node3D.new()
+	_hand_frame.name = "SwordHandFrame"
+	_hand_attachment.add_child(_hand_frame)
+	_sword_skeleton.skeleton_updated.connect(_fit_mount_frames)
+	_fit_mount_frames()
+
 	var sword_scene := load(SWORD_SCENE_PATH) as PackedScene
 	if sword_scene == null:
 		push_warning("Wanderer: sword scene failed to load (%s); sword mount disabled." % SWORD_SCENE_PATH)
@@ -888,7 +911,7 @@ func _setup_sword(model: Node3D) -> void:
 	# lands at _sword_root's origin regardless of _sword_root's own scale.
 	_sword_root = Node3D.new()
 	_sword_root.name = "SwordRoot"
-	_back_attachment.add_child(_sword_root)
+	_back_frame.add_child(_sword_root)
 
 	_sword_mesh_holder = sword_mesh_holder
 	_sword_mesh_holder.name = "SwordMesh"
@@ -926,7 +949,7 @@ func _setup_sword(model: Node3D) -> void:
 	else:
 		local_scale_factor = sword_length / longest_axis
 
-	# _sword_root sits under _back_attachment, a child of the model's own
+	# _sword_root sits under _back_frame, on a bone attachment of the model's own
 	# Skeleton3D - it inherits the skeleton's whole scale (_skeleton_scale_
 	# factor: the model's up-scale, easily 50-100x since the source model
 	# ships at ~0.019m tall, times any Armature scale between) on top of
@@ -993,6 +1016,25 @@ func _apply_grip_offset() -> void:
 
 	_sword_mesh_holder.position = -grip_local
 
+# On every skeleton update (Skeleton3D.skeleton_updated - after the clip
+# and the modifiers have posed it): each mount frame's basis becomes its
+# bone pose's inverse times that pose orthonormalized, so attachment x
+# frame is the bone's turn alone, at the skeleton's own uniform scale.
+# Read from the skeleton's pose rather than the attachment, so it doesn't
+# matter which of the two updates first.
+func _fit_mount_frames() -> void:
+	_fit_mount_frame(_back_frame, _back_attachment)
+	_fit_mount_frame(_hand_frame, _hand_attachment)
+
+func _fit_mount_frame(frame: Node3D, attachment: BoneAttachment3D) -> void:
+	if frame == null or attachment == null or _sword_skeleton == null:
+		return
+	var bone_idx := _sword_skeleton.find_bone(attachment.bone_name)
+	if bone_idx == -1:
+		return
+	var pose: Basis = _sword_skeleton.get_bone_global_pose(bone_idx).basis
+	frame.basis = pose.inverse() * pose.orthonormalized()
+
 # Re-resolves one mount's bone (is_back true for back_mount_bone_suffix,
 # false for hand_mount_bone_suffix) against the already-found skeleton and
 # repoints that BoneAttachment3D's own bone_name - lets the suffix export
@@ -1011,22 +1053,22 @@ func _update_mount_bone(is_back: bool) -> void:
 		return
 	attachment.bone_name = _sword_skeleton.get_bone_name(bone_idx)
 
-# Reparents _sword_root onto target_attachment (a no-op if it's already
-# there) and tweens its local position/rotation to the target mount's
+# Reparents _sword_root onto target_frame (a no-op if it's already
+# there; _back_frame or _hand_frame) and tweens its local position/rotation to the target mount's
 # offsets over duration, so the switch reads as the sword sliding into
 # place rather than popping - matches enter_battle_stance's own movement
 # tween shape (parallel, sine in-out) so both read as one motion.
 # target_position_world is in world metres (see back_mount_position's own
 # doc) - converted to _sword_root's local space before the tween.
-func _switch_sword_mount(target_attachment: BoneAttachment3D, target_position_world: Vector3, target_rotation_degrees: Vector3, duration: float) -> void:
-	if _sword_root == null or target_attachment == null:
+func _switch_sword_mount(target_frame: Node3D, target_position_world: Vector3, target_rotation_degrees: Vector3, duration: float) -> void:
+	if _sword_root == null or target_frame == null:
 		return
 
 	var current_parent := _sword_root.get_parent()
-	if current_parent != target_attachment:
+	if current_parent != target_frame:
 		if current_parent != null:
 			current_parent.remove_child(_sword_root)
-		target_attachment.add_child(_sword_root)
+		target_frame.add_child(_sword_root)
 
 	var tween := create_tween()
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
@@ -1074,26 +1116,22 @@ func _build_flat_material() -> StandardMaterial3D:
 # because of how the clips ship as separate files, not because anything
 # here is temporary.
 #
-# The model's own clip is renamed to Idle. Every clip after it is carried
-# onto the model's skeleton by _transfer_clip() - a no-op while it was cut
-# on the same rig.
+# The model's own clip (wanderer_v2.glb's battle_idle - a held pose, two
+# identical keys) is renamed to BattleIdle: where it plays, see enter_
+# battle_stance()/exit_battle_stance(). It loops by its import setting
+# (Loop Mode Linear in wanderer_v2.glb.import), which the rename keeps - the
+# same Animation, renamed - so it holds for the whole battle frame. Every
+# clip after it is carried onto the model's skeleton by _transfer_clip().
 func _merge_clips(anim_player: AnimationPlayer) -> void:
 	if anim_player == null:
-		push_error("Wanderer: idle model has no AnimationPlayer; cannot merge clips.")
+		push_error("Wanderer: model has no AnimationPlayer; cannot merge clips.")
 		return
 
-	var idle_entry := _find_single_animation(anim_player, "idle AnimationPlayer")
-	if idle_entry.is_empty():
+	var battle_idle_entry := _find_single_animation(anim_player, "model AnimationPlayer")
+	if battle_idle_entry.is_empty():
 		return
-	var library := anim_player.get_animation_library(idle_entry["library"])
-	library.rename_animation(idle_entry["name"], "Idle")
-	# Mixamo/FBX imports default to LOOP_NONE - play() would run this once
-	# and hold on the last frame instead of looping, which reads as "idle
-	# froze" the moment the clip's own (short) duration elapses. Applies
-	# whether Idle is playing standalone or re-triggered by enter_battle_
-	# stance()'s own play("Idle") call.
-	var idle_animation: Animation = idle_entry["animation"]
-	idle_animation.loop_mode = Animation.LOOP_LINEAR
+	var library := anim_player.get_animation_library(battle_idle_entry["library"])
+	library.rename_animation(battle_idle_entry["name"], "BattleIdle")
 
 	var anim_root := anim_player.get_node_or_null(anim_player.root_node)
 	var skeletons: Array[Node] = _model.find_children("*", "Skeleton3D", true, false) if _model != null else []
@@ -1106,9 +1144,12 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 # source file, loop mode, whether the Hips' forward drift is taken out
 # (remove_walk_root_motion / _remove_walk_root_motion()), and a label for
 # errors.
+# - Idle: Mixamo/FBX imports default to LOOP_NONE - play() would run it
+#   once and hold on the last frame, which reads as "idle froze" the moment
+#   the clip's own (short) duration elapses - so it loops, whether playing
+#   standalone or re-triggered by exit_battle_stance()'s play("Idle").
 # - Walk, Run: loops; Run plays during a dash in place of Walk/Idle (see
 #   _physics_process()). Both carry the same Mixamo locomotion-root quirk.
-# - BattleIdle: a loop - see enter_battle_stance()/exit_battle_stance().
 # - DrawSword: a one-shot combat-start transition, LOOP_NONE explicitly
 #   (rather than trusting whatever the import defaulted to) - enter_battle_
 #   stance() relies on it finishing so the queued BattleIdle can start.
@@ -1120,9 +1161,9 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 #   so there's nothing on him to hold it for.
 func _merged_clips() -> Array[Dictionary]:
 	return [
+		{"name": "Idle", "path": IDLE_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "root_motion": false, "label": "idle"},
 		{"name": "Walk", "path": WALK_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "root_motion": true, "label": "walking"},
 		{"name": "Run", "path": RUN_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "root_motion": true, "label": "running"},
-		{"name": "BattleIdle", "path": BATTLE_IDLE_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "root_motion": false, "label": "battle-idle"},
 		{"name": "DrawSword", "path": DRAW_SWORD_SCENE_PATH, "loop": Animation.LOOP_NONE, "root_motion": false, "label": "draw-sword"},
 		{"name": "Slash", "path": SLASH_SCENE_PATH, "loop": Animation.LOOP_NONE, "root_motion": false, "label": "slash"},
 		{"name": "Brace", "path": BRACE_SCENE_PATH, "loop": Animation.LOOP_NONE, "root_motion": false, "label": "brace"},
@@ -1170,7 +1211,7 @@ func _merge_clip(library: AnimationLibrary, anim_root: Node, target_skeleton: Sk
 	var track_node_path := NodePath(animation.track_get_path(0).get_concatenated_names())
 	var resolved := anim_root.get_node_or_null(track_node_path) if anim_root else null
 	if not (resolved is Skeleton3D):
-		push_error("Wanderer: %s animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % [clip_name, str(track_node_path)])
+		push_error("Wanderer: %s animation's first track path '%s' does not resolve to a Skeleton3D on the model; clip merge is broken." % [clip_name, str(track_node_path)])
 		return false
 	return true
 
@@ -1739,7 +1780,7 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float, direct
 		_animation_player.play("DrawSword", animation_blend_time)
 		_animation_player.queue("BattleIdle")
 
-	_switch_sword_mount(_hand_attachment, hand_mount_position, hand_mount_rotation_degrees, duration)
+	_switch_sword_mount(_hand_frame, hand_mount_position, hand_mount_rotation_degrees, duration)
 
 	if _battle_stance_modifier:
 		var stance_tween := create_tween()
@@ -1756,7 +1797,7 @@ func exit_battle_stance() -> void:
 	if _animation_player:
 		_animation_player.play("Idle", animation_blend_time)
 
-	_switch_sword_mount(_back_attachment, back_mount_position, back_mount_rotation_degrees, animation_blend_time)
+	_switch_sword_mount(_back_frame, back_mount_position, back_mount_rotation_degrees, animation_blend_time)
 
 	if _battle_stance_modifier:
 		var stance_tween := create_tween()
