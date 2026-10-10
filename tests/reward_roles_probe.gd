@@ -351,8 +351,12 @@ func _teardown() -> void:
 		await process_frame
 
 # The run log into this process's folder - run_probes.sh's, else
-# LOG_DIR - cleared first, so the next run's file is the only one.
+# LOG_DIR - cleared first, so the next run's file is the only one. The
+# last case's run is ended before the clear: left open, the next
+# new_run() would end it then, writing its events back into the folder.
 func _open_log() -> String:
+	if RunLogger.is_run_open():
+		_run_state.call("log_run_end", "abandoned")
 	var dir: String = RunLogger.dir_override() if not RunLogger.dir_override().is_empty() else LOG_DIR
 	DirAccess.make_dir_recursive_absolute(dir)
 	for file_name in DirAccess.get_files_at(dir):
