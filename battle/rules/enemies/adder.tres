@@ -42,3 +42,4 @@ model_scene_path = "res://assets/models/enemies/Adder/Adder.glb"
 model_scale = 0.75
 model_yaw_offset_degrees = 180.0
 attack_lean_degrees = 18.0
+attack_lean_pivot_forward = 0.6
