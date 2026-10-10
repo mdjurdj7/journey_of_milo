@@ -9,7 +9,7 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 const FIELD_ENEMY_SCENE_PATH := "res://field/field_enemy.tscn"
 const PROPS_NODE_NAME := "Props"
 
-# Emitted once, when the last REQUIRED enemy (FloorEnemy.required) is
+# Emitted once, when the last REQUIRED enemy (EncounterSlot.required) is
 # defeated - see _on_battle_finished()'s own WIN branch and _required_
 # enemy_remains(). Opens the ExitGate. An optional fight won afterwards
 # doesn't emit it again.
@@ -486,8 +486,22 @@ var _debug_keepsake_index: int = 0
 # The row's card picker, filled from debug_card_dirs the first time the
 # row shows.
 var _debug_card_picker: OptionButton = null
-# One PackPatrol per FloorData.patrols entry - see _spawn_floor_patrols().
+# One PackPatrol per chosen option with a route - see _spawn_floor_patrols().
 var _patrols: Array[PackPatrol] = []
+# Those routes' waypoints by slot id, floor frame - get_patrol_routes().
+var _patrol_routes: Dictionary = {}
+
+# One slot as this load stands it: the slot, the option it stands
+# (_resolve_encounters()) and the members spawned from that option, in its
+# member order (_spawn_floor_enemies()) - null where a member was skipped.
+class Encounter:
+	var slot: EncounterSlot = null
+	var option: EncounterOption = null
+	var members: Array[FieldEnemy] = []
+
+# This load's encounters, in slot order. Empty until _ready() resolves
+# them.
+var _encounters: Array[Encounter] = []
 
 # Parent-first, before any child has entered the tree or run its
 # _ready(): the one moment the floor's landmass and spawn can be put onto
@@ -605,6 +619,9 @@ func _ready() -> void:
 	RunLogger.enabled = run_logging_enabled
 	if RunState.character == null:
 		RunState.new_run(load(STARTING_CHARACTER_PATH) as CharacterData)
+	# The order at floor load: what each slot stands (no side effects),
+	# then the log line that names it, then everything spawns.
+	_resolve_encounters()
 	RunLogger.floor_entered(RunState.run_snapshot())
 
 	# Ensures forward is computed (and printed) even if no child asked for
@@ -1071,13 +1088,45 @@ func get_spawn_position() -> Vector3:
 	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
 	return spawn_node.global_position if spawn_node != null else global_position
 
-# The floor's enemies, one field_enemy.tscn each, direct children of this
-# node (its own ^".."/^"../Ground" defaults assume exactly that), placed
-# at spawn + the authored XZ offset with the authored yaw taken literally
-# (no face-shore). Y is left alone - FieldEnemy grounds its own Y against
-# Ground.get_height_at() itself (see its _ground_to_relief(), called once
-# deferred from _ready() and again on every Ground.relief_rebuilt), which
-# also means it stays correct across live relief edits.
+# Which option each of the floor's slots stands this load, in slot order
+# (FloorData.slots), into _encounters. Each slot is validated first
+# (EncounterSlot.validate(): an id, options, every option fought as the
+# same role); one that fails is reported loudly and stands nothing, and
+# so does a slot whose id another slot on the floor already has. No side
+# effects past _encounters - nothing spawns and nothing is logged here.
+func _resolve_encounters() -> void:
+	_encounters.clear()
+	var floor_data := get_floor_data()
+	if floor_data == null:
+		return
+	var seen: Dictionary = {}
+	for index in floor_data.slots.size():
+		var slot: EncounterSlot = floor_data.slots[index]
+		if slot == null:
+			push_error("RegionField: %s slot %d is null; it stands nothing." % [floor_data.resource_path, index])
+			continue
+		var problem: String = slot.validate(BattleController.encounter_role)
+		if problem.is_empty() and seen.has(slot.slot_id):
+			problem = "slot id '%s' is used twice on the floor" % slot.slot_id
+		if not problem.is_empty():
+			push_error("RegionField: %s - %s; it stands nothing." % [floor_data.resource_path, problem])
+			continue
+		seen[slot.slot_id] = true
+		var encounter := Encounter.new()
+		encounter.slot = slot
+		encounter.option = slot.options[0]
+		_encounters.append(encounter)
+
+# The floor's enemies - every member of every slot's chosen option, in
+# slot order then member order - one field_enemy.tscn each, direct
+# children of this node (its own ^".."/^"../Ground" defaults assume
+# exactly that), named FieldEnemy<n> by that running count (floor_index),
+# placed at spawn + the slot's mapping of the member's offset (Encounter
+# Slot.to_floor()) with the authored yaw taken literally (no face-shore).
+# Y is left alone - FieldEnemy grounds its own Y against Ground.get_
+# height_at() itself (see its _ground_to_relief(), called once deferred
+# from _ready() and again on every Ground.relief_rebuilt), which also
+# means it stays correct across live relief edits.
 func _spawn_floor_enemies() -> void:
 	var floor_data := get_floor_data()
 	if floor_data == null:
@@ -1087,98 +1136,121 @@ func _spawn_floor_enemies() -> void:
 		push_warning("RegionField: could not load %s; no enemies." % FIELD_ENEMY_SCENE_PATH)
 		return
 	var spawn: Vector3 = get_spawn_position()
-	for index in floor_data.enemies.size():
-		var entry: FloorEnemy = floor_data.enemies[index]
-		if entry == null or entry.enemy_data == null:
-			push_warning("RegionField: floor enemy %d has no EnemyData; skipped." % index)
-			continue
-		var enemy := scene.instantiate() as FieldEnemy
-		enemy.name = "FieldEnemy%d" % index
-		enemy.enemy_data = entry.enemy_data
-		enemy.required = entry.required
-		enemy.group = entry.group
-		enemy.anchor = entry.anchor
-		enemy.excluded_intent = entry.excluded_intent
-		enemy.excluded_while_packmate_intent = entry.excluded_while_packmate_intent
-		enemy.card_reward = entry.card_reward
-		enemy.floor_index = index
-		# The body, from the data's Field Body group - its defaults are
-		# this scene's own values, so a resource that sets none (the
-		# Sputter) wears exactly what it did.
-		enemy.model_scene_path = entry.enemy_data.model_scene_path
-		enemy.model_scale = entry.enemy_data.model_scale
-		enemy.model_yaw_offset = entry.enemy_data.model_yaw_offset_degrees
-		enemy.attachment_scene_path = entry.enemy_data.attachment_scene_path
-		enemy.rest_height = entry.enemy_data.rest_height_m
-		enemy.sink = entry.enemy_data.sink_m
-		enemy.battle_hover = entry.enemy_data.battle_hover_m
-		enemy.contact_radius = entry.enemy_data.contact_radius_m
-		enemy.attack_lean_degrees = entry.enemy_data.attack_lean_degrees
-		enemy.attack_lean_pivot_forward = entry.enemy_data.attack_lean_pivot_forward
-		enemy.harness_point = entry.enemy_data.harness_point
-		enemy.face_shore_at_spawn = false
-		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)
-		enemy.rotation.y = deg_to_rad(entry.yaw_degrees)
-		if entry.face_prop_index >= 0:
-			if entry.face_prop_index < floor_data.props.size() and floor_data.props[entry.face_prop_index] != null:
-				# Toward the prop's spawn-relative spot, the yaw on top - the
-				# same direction<->angle convention as FieldEnemy.face_toward().
-				var prop_position: Vector3 = floor_data.props[entry.face_prop_index].position
-				var toward := Vector2(prop_position.x - entry.position.x, prop_position.z - entry.position.y)
-				if toward.length() > 0.0001:
-					enemy.set_prop_facing(atan2(-toward.x, -toward.y) + deg_to_rad(entry.yaw_degrees))
-			else:
-				push_warning("RegionField: floor enemy %d faces prop %d, which isn't on the floor; yaw as authored." % [index, entry.face_prop_index])
-		add_child(enemy)
+	var index: int = -1
+	for encounter in _encounters:
+		var slot: EncounterSlot = encounter.slot
+		var option: EncounterOption = encounter.option
+		# An option's members are one cluster, named as their slot; a lone
+		# member fights alone.
+		var group: StringName = slot.slot_id if option.members.size() > 1 else &""
+		for member_index in option.members.size():
+			var entry: FloorEnemy = option.members[member_index]
+			# Counted whether or not it spawns, as the old array index was.
+			index += 1
+			if entry == null or entry.enemy_data == null:
+				push_warning("RegionField: slot '%s' option '%s' member %d has no EnemyData; skipped." % [slot.slot_id, option.option_id, member_index])
+				# Held as a gap, so members[i] is still the option's member i.
+				encounter.members.append(null)
+				continue
+			var enemy := scene.instantiate() as FieldEnemy
+			enemy.name = "FieldEnemy%d" % index
+			enemy.enemy_data = entry.enemy_data
+			enemy.required = slot.required
+			enemy.group = group
+			enemy.anchor = entry.anchor
+			enemy.excluded_intent = entry.excluded_intent
+			enemy.excluded_while_packmate_intent = entry.excluded_while_packmate_intent
+			enemy.card_reward = entry.card_reward
+			enemy.floor_index = index
+			enemy.slot_id = slot.slot_id
+			enemy.option_id = option.option_id
+			# The body, from the data's Field Body group - its defaults are
+			# this scene's own values, so a resource that sets none (the
+			# Sputter) wears exactly what it did.
+			enemy.model_scene_path = entry.enemy_data.model_scene_path
+			enemy.model_scale = entry.enemy_data.model_scale
+			enemy.model_yaw_offset = entry.enemy_data.model_yaw_offset_degrees
+			enemy.attachment_scene_path = entry.enemy_data.attachment_scene_path
+			enemy.rest_height = entry.enemy_data.rest_height_m
+			enemy.sink = entry.enemy_data.sink_m
+			enemy.battle_hover = entry.enemy_data.battle_hover_m
+			enemy.contact_radius = entry.enemy_data.contact_radius_m
+			enemy.attack_lean_degrees = entry.enemy_data.attack_lean_degrees
+			enemy.attack_lean_pivot_forward = entry.enemy_data.attack_lean_pivot_forward
+			enemy.harness_point = entry.enemy_data.harness_point
+			enemy.face_shore_at_spawn = false
+			var at: Vector2 = slot.to_floor(entry.position)
+			enemy.position = Vector3(spawn.x + at.x, 0.0, spawn.z + at.y)
+			enemy.rotation.y = deg_to_rad(slot.yaw_degrees + entry.yaw_degrees)
+			if entry.face_prop_index >= 0:
+				if entry.face_prop_index < option.props.size() and option.props[entry.face_prop_index] != null:
+					# Toward the prop's spot, both in the floor's frame, the yaw
+					# on top - the same direction<->angle convention as
+					# FieldEnemy.face_toward(). An absolute facing, so the
+					# slot's yaw is already in it.
+					var prop_position: Vector3 = option.props[entry.face_prop_index].position
+					var prop_at: Vector2 = slot.to_floor(Vector2(prop_position.x, prop_position.z))
+					var toward := Vector2(prop_at.x - at.x, prop_at.y - at.y)
+					if toward.length() > 0.0001:
+						enemy.set_prop_facing(atan2(-toward.x, -toward.y) + deg_to_rad(entry.yaw_degrees))
+				else:
+					push_warning("RegionField: slot '%s' member %d faces prop %d, which isn't in its option; yaw as authored." % [slot.slot_id, member_index, entry.face_prop_index])
+			add_child(enemy)
+			encounter.members.append(enemy)
 
-# The floor's routes (FloorPatrol), one PackPatrol each, direct children
-# of this node so the field's freeze stops them: handed the group's
-# members as spawned (their authored spots are the flock's shape) and
-# the waypoints as world positions, spawn-relative like the enemies'.
+# Each chosen option's route (EncounterOption.patrol), one PackPatrol
+# each, named Patrol_<slot id>, direct children of this node so the
+# field's freeze stops them: handed the option's members as spawned
+# (their authored spots are the flock's shape) and the waypoints mapped
+# through the slot (EncounterSlot.to_floor()) to world positions. Each
+# route's floor-frame points are kept for FieldScatter (get_patrol_
+# routes()).
 func _spawn_floor_patrols() -> void:
-	var floor_data := get_floor_data()
-	if floor_data == null:
+	if get_floor_data() == null:
 		return
 	var spawn: Vector3 = get_spawn_position()
-	for index in floor_data.patrols.size():
-		var entry: FloorPatrol = floor_data.patrols[index]
-		if entry == null or entry.group == &"" or entry.waypoints.size() < 2:
-			push_warning("RegionField: floor patrol %d needs a group and at least two waypoints; skipped." % index)
+	for encounter in _encounters:
+		var route: FloorPatrol = encounter.option.patrol
+		if route == null:
+			continue
+		var slot_id: StringName = encounter.slot.slot_id
+		if route.waypoints.size() < 2:
+			push_warning("RegionField: slot '%s' option '%s' patrol needs at least two waypoints; skipped." % [slot_id, encounter.option.option_id])
 			continue
 		var members: Array[FieldEnemy] = []
-		for node in get_tree().get_nodes_in_group("enemies"):
-			var enemy := node as FieldEnemy
-			if enemy != null and enemy.group == entry.group:
-				members.append(enemy)
+		for member in encounter.members:
+			if is_instance_valid(member):
+				members.append(member)
 		if members.is_empty():
-			push_warning("RegionField: floor patrol %d names group '%s' but no enemy has it; skipped." % [index, entry.group])
+			push_warning("RegionField: slot '%s' has a patrol but no members; skipped." % slot_id)
 			continue
+		var floor_points := PackedVector2Array()
 		var waypoints: Array[Vector3] = []
-		for point in entry.waypoints:
-			waypoints.append(Vector3(spawn.x + point.x, 0.0, spawn.z + point.y))
+		for point in route.waypoints:
+			var at: Vector2 = encounter.slot.to_floor(point)
+			floor_points.append(at)
+			waypoints.append(Vector3(spawn.x + at.x, 0.0, spawn.z + at.y))
+		_patrol_routes[slot_id] = floor_points
 		var patrol := PackPatrol.new()
-		patrol.name = "Patrol_%s" % entry.group
+		patrol.name = "Patrol_%s" % slot_id
 		add_child(patrol)
-		patrol.setup(members, waypoints, entry.dwell_min_seconds, entry.dwell_max_seconds)
+		patrol.setup(members, waypoints, route.dwell_min_seconds, route.dwell_max_seconds)
 		_patrols.append(patrol)
 
-# The route a group flies, if any.
-func _patrol_for(group: StringName) -> PackPatrol:
+# The route a slot's encounter flies, if any.
+func _patrol_for(slot_id: StringName) -> PackPatrol:
 	for patrol in _patrols:
-		if is_instance_valid(patrol) and patrol.name == "Patrol_%s" % group:
+		if is_instance_valid(patrol) and patrol.name == "Patrol_%s" % slot_id:
 			return patrol
 	return null
 
-# The floor's props (FloorProp) under one Props node made here, or under
-# an earlier prop when parent_index says so (the Bird on its hull). Each
-# prop's relative ground_path/region_field_path are re-aimed for its
-# actual depth before it enters the tree (_aim_prop_paths()), its
-# overrides applied, then its placement handed to its own
-# set_floor_placement() where it has one - a WorldCard has no facing and
-# is simply grounded (see _setup_belongings_card()). Once-per-run ids
-# (Hull.finding_id / Bird.flight_id / Keeper.offer_id) are the floor
-# resource's path plus the prop's index: stable across the reload a
-# floor change is, distinct across floors.
+# Every patrolling encounter's waypoints by slot id, as offsets from the
+# spawn in the floor's frame (the slot's mapping already applied) -
+# FieldScatter keeps their perches clear. Empty before
+# _spawn_floor_patrols().
+func get_patrol_routes() -> Dictionary:
+	return _patrol_routes
+
 # The floor's ledge walls (FloorData.ledges), one LedgeBarrier each,
 # standing on Ground's relief and rebuilt with it.
 func _spawn_floor_ledges() -> void:
@@ -1196,42 +1268,86 @@ func _spawn_floor_ledges() -> void:
 		add_child(barrier)
 		barrier.setup(ground, line)
 
+# The floor's props under one Props node made here: the floor's own
+# (FloorData.props) first, in their own order, then each chosen option's
+# (EncounterOption.props), slot by slot - see _spawn_prop_list(). Once-
+# per-run ids (Hull.finding_id / Bird.flight_id / Keeper.offer_id, the
+# trough's, the cache's, the Collector's) are stable across the reload a
+# floor change is and distinct across floors: a floor prop's is the floor
+# resource's path plus its index, "<path>#<n>"; an option prop's names
+# its slot and option too, "<path>#<slot id>/<option id>#<n>".
 func _spawn_floor_props() -> void:
 	var floor_data := get_floor_data()
-	if floor_data == null or floor_data.props.is_empty():
+	if floor_data == null:
+		return
+	var any: bool = not floor_data.props.is_empty()
+	for encounter in _encounters:
+		any = any or not encounter.option.props.is_empty()
+	if not any:
 		return
 	var props_root := Node3D.new()
 	props_root.name = PROPS_NODE_NAME
 	add_child(props_root)
+	var no_members: Array[FieldEnemy] = []
+	# First and in order: a floor prop that rolls as it loads (the
+	# belongings cache, a bundle) draws from RunState.rng here, and the
+	# option props below must not come between those draws.
+	_spawn_prop_list(floor_data.props, props_root, floor_data.resource_path, null, no_members)
+	for encounter in _encounters:
+		var prefix: String = "%s#%s/%s" % [floor_data.resource_path, encounter.slot.slot_id, encounter.option.option_id]
+		_spawn_prop_list(encounter.option.props, props_root, prefix, encounter.slot, encounter.members)
+
+# One list of props, each under `props_root` or under an earlier prop of
+# the same list when parent_index says so (the Bird on its hull). Each
+# prop's relative ground_path/region_field_path are re-aimed for its
+# actual depth before it enters the tree (_aim_prop_paths()), its
+# overrides applied, then its placement handed to its own
+# set_floor_placement() where it has one - a WorldCard has no facing and
+# is simply grounded (see _setup_belongings_card()). `slot` null: the
+# floor's own, X/Z offsets from the spawn. Set: an option's, X/Z in the
+# slot's frame (EncounterSlot.to_floor()) and the slot's yaw on top;
+# `members` is that option's encounter as spawned, for a prop tied to one
+# of them (HitchingPost.option_members). Ids are `id_prefix` + "#<index>".
+func _spawn_prop_list(entries: Array[FloorProp], props_root: Node3D, id_prefix: String, slot: EncounterSlot, members: Array[FieldEnemy]) -> void:
+	var floor_data := get_floor_data()
 	var spawn: Vector3 = get_spawn_position()
 	# Per index: the spawned node (null if skipped) and its depth below
 	# this node, for the parent lookups that follow.
 	var spawned: Array[Node3D] = []
 	var depths: Array[int] = []
-	for index in floor_data.props.size():
+	for index in entries.size():
 		spawned.append(null)
 		depths.append(0)
-		var entry: FloorProp = floor_data.props[index]
+		var entry: FloorProp = entries[index]
 		if entry == null or entry.scene == null:
-			push_warning("RegionField: floor prop %d has no scene; skipped." % index)
+			push_warning("RegionField: prop %s#%d has no scene; skipped." % [id_prefix, index])
 			continue
 		var parent: Node3D = props_root
 		var depth: int = 2
 		if entry.parent_index >= 0:
 			if entry.parent_index >= index or spawned[entry.parent_index] == null:
-				push_warning("RegionField: floor prop %d names parent %d, which isn't an earlier, spawned prop; skipped." % [index, entry.parent_index])
+				push_warning("RegionField: prop %s#%d names parent %d, which isn't an earlier, spawned prop; skipped." % [id_prefix, index, entry.parent_index])
 				continue
 			parent = spawned[entry.parent_index]
 			depth = depths[entry.parent_index] + 1
 		var prop := entry.scene.instantiate() as Node3D
 		if prop == null:
-			push_warning("RegionField: floor prop %d's scene is not a Node3D; skipped." % index)
+			push_warning("RegionField: prop %s#%d's scene is not a Node3D; skipped." % [id_prefix, index])
+			continue
+		# The standing rule for an encounter's props (EncounterOption): never
+		# a draw from RunState.rng as the floor loads, so the roll an option
+		# brings can't shift the floor props' draws or anything after them.
+		# Enforced here - a prop that rolls at load is refused - so a prop
+		# that one day needs a roll must take it from its slot's own stream.
+		if slot != null and _rolls_at_load(prop):
+			push_error("RegionField: prop %s#%d (%s) rolls from RunState.rng as it loads - an encounter's props may not; skipped." % [id_prefix, index, prop.name])
+			prop.free()
 			continue
 		prop.name = "%s%d" % [prop.name, index]
 		_aim_prop_paths(prop, depth)
 		for key: String in entry.overrides:
 			prop.set(key, entry.overrides[key])
-		var id: String = "%s#%d" % [floor_data.resource_path, index]
+		var id: String = "%s#%d" % [id_prefix, index]
 		if prop is Hull:
 			var hull := prop as Hull
 			hull.finding_id = id
@@ -1250,7 +1366,7 @@ func _spawn_floor_props() -> void:
 			# entering the tree, and lifts/takes/dismisses exactly as it does
 			# after a fight. No enemy, so the roll is flat.
 			if entry.pool == null:
-				push_warning("RegionField: floor prop %d is a RewardSpread with no pool; skipped." % index)
+				push_warning("RegionField: prop %s#%d is a RewardSpread with no pool; skipped." % [id_prefix, index])
 				prop.free()
 				continue
 			(prop as RewardSpread).pool = entry.pool
@@ -1260,6 +1376,8 @@ func _spawn_floor_props() -> void:
 			_setup_belongings_cache(prop as BelongingsCache, entry, floor_data, id)
 		elif prop is TroughProp:
 			(prop as TroughProp).trough_id = id
+		elif prop is HitchingPost:
+			(prop as HitchingPost).option_members = members
 		elif prop is Collector:
 			var collector := prop as Collector
 			collector.collector_id = id
@@ -1273,10 +1391,18 @@ func _spawn_floor_props() -> void:
 				wagon.world_line = entry.world_line
 			wagon.open_requested.connect(open_wagon_screen)
 		# A child prop's position is local to its parent (a perch); a top-
-		# level one's is an XZ offset from spawn, grounded by the prop.
-		var placement: Vector3 = entry.position if entry.parent_index >= 0 else Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.z)
+		# level one's is an XZ offset from spawn - through its slot, for an
+		# option's - grounded by the prop.
+		var placement: Vector3 = entry.position
+		var yaw: float = entry.yaw_degrees
+		if entry.parent_index < 0:
+			var at := Vector2(entry.position.x, entry.position.z)
+			if slot != null:
+				at = slot.to_floor(at)
+				yaw += slot.yaw_degrees
+			placement = Vector3(spawn.x + at.x, 0.0, spawn.z + at.y)
 		if prop.has_method("set_floor_placement"):
-			prop.call("set_floor_placement", placement, entry.yaw_degrees, entry.roll_degrees)
+			prop.call("set_floor_placement", placement, yaw, entry.roll_degrees)
 		else:
 			prop.position = placement
 		parent.add_child(prop)
@@ -1284,6 +1410,13 @@ func _spawn_floor_props() -> void:
 			prop.global_position = _ground_point(prop.global_position, world_card_ground_clearance)
 		spawned[index] = prop
 		depths[index] = depth
+
+# Whether a prop draws from RunState.rng as the floor loads: the
+# belongings card, a bundle and a belongings cache roll in their setup
+# above, a RewardSpread on entering the tree. The Keeper and the
+# Collector roll on first use, not at load.
+static func _rolls_at_load(prop: Node) -> bool:
+	return prop is WorldCard or prop is RewardSpread or prop is BundleProp or prop is BelongingsCache
 
 # A prop authored in region_field.tscn sat at a known depth and its
 # NodePath exports (^"../Ground", ^"../../Ground", ^"../../..") were
@@ -1488,18 +1621,35 @@ func add_enemy_status(status: EnemyStatus) -> void:
 	hud.add_child(status)
 
 # Positions and orients the ExitGate along the floor's exit direction,
-# the floor's gate_distance_beyond_enemy past the first enemy's own
-# position, pushes its trigger out to transition_distance and its bar
+# the floor's gate_distance_beyond_enemy past the first required slot's
+# anchor (_gate_slot()), pushes its trigger out to transition_distance and its bar
 # offset from the floor, then wires it to this field's floor_cleared/
 # floor_exited handshake. Done here rather than in ExitGate's own
 # _ready(): children's _ready() runs before their parent's (see
 # get_forward()'s own doc on the same bottom-up ordering), and the
-# enemies only exist once THIS _ready() has spawned them - so an ExitGate
+# floor is only resolved once THIS _ready() has run - so an ExitGate
 # trying to position itself would always be too early. Same rotation.y =
 # atan2(-dir.x, -dir.z) convention FieldEnemy._face_shore()/face_toward()
 # already use to align a node's local -Z with a world direction - which
 # is what orients the channel and the surfaced bar (ExitGate.setup_
 # channel() reads this node's basis).
+# The slot the gate and the worn band measure from: the floor's first
+# required slot, else its first - by its anchor, never by who stands
+# there, so a rolled option never moves the gate. Null with no slots.
+func _gate_slot() -> EncounterSlot:
+	var floor_data := get_floor_data()
+	if floor_data == null:
+		return null
+	var first: EncounterSlot = null
+	for slot in floor_data.slots:
+		if slot == null:
+			continue
+		if slot.required:
+			return slot
+		if first == null:
+			first = slot
+	return first
+
 func _setup_exit_gate() -> void:
 	var exit_gate := get_node_or_null(exit_gate_path) as ExitGate
 	if exit_gate == null:
@@ -1509,24 +1659,27 @@ func _setup_exit_gate() -> void:
 	if floor_data == null:
 		return
 
-	var enemies := get_tree().get_nodes_in_group("enemies")
-	if enemies.is_empty():
-		push_warning("RegionField: no enemies to measure the exit gate's distance from.")
+	var slot: EncounterSlot = _gate_slot()
+	if slot == null:
+		push_warning("RegionField: no encounter slot to measure the exit gate's distance from.")
 		return
-	var enemy := enemies[0] as FieldEnemy
+	# Where a member standing at the anchor would be placed - Y 0, before
+	# any grounding - whichever option the slot rolled.
+	var spawn: Vector3 = get_spawn_position()
+	var anchor: Vector3 = to_global(Vector3(spawn.x + slot.position.x, 0.0, spawn.z + slot.position.y))
 
 	var exit: Vector3 = get_exit_direction()
 	exit_gate.exit_kind = floor_data.exit_kind
 	exit_gate.channel_bar_axis_offset = floor_data.gate_bar_axis_offset
 	exit_gate.channel_max_width = floor_data.gate_channel_max_width
 	exit_gate.trigger_forward_offset = transition_distance
-	exit_gate.global_position = enemy.global_position + exit * floor_data.gate_distance_beyond_enemy
+	exit_gate.global_position = anchor + exit * floor_data.gate_distance_beyond_enemy
 	exit_gate.rotation.y = atan2(-exit.x, -exit.z)
 	# Against the painted land, so before _setup_exit_gate_channel() cuts
 	# the channel across it - see ExitGate.fit_trigger_to_land().
 	exit_gate.fit_trigger_to_land(get_node_or_null(ground_path) as Ground)
 	_apply_camera_inland_limit()
-	_aim_wear_path(enemy)
+	_aim_wear_path(anchor)
 
 	floor_cleared.connect(exit_gate.open)
 	exit_gate.floor_exited.connect(_on_floor_exited)
@@ -1805,7 +1958,7 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# A patrolling pack stops where it is: pending take-offs dropped, and
 	# any member in the air comes down where it is - the anchor here,
 	# the rest through their own step_to() (see FieldEnemy.land_now()).
-	var patrol: PackPatrol = _patrol_for(enemy.group)
+	var patrol: PackPatrol = _patrol_for(enemy.slot_id)
 	if patrol != null:
 		patrol.interrupt()
 	anchor.land_now()
@@ -2044,8 +2197,8 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 			_end_run_lost("died")
 	_fight_fallen.clear()
 
-# Is a fight the floor demands still standing? FloorEnemy.required,
-# mirrored onto each FieldEnemy; a body queued for deletion is already
+# Is a fight the floor demands still standing? EncounterSlot.required,
+# mirrored onto each of its FieldEnemies; a body queued for deletion is already
 # counted as gone.
 func _required_enemy_remains() -> bool:
 	return _nearest_required_enemy(Vector3.ZERO) != null
@@ -2472,14 +2625,15 @@ func _on_loot_screen_closed(screen: LootScreen) -> void:
 		_loot_screen = null
 
 # Points the ground's walked band along the route the floor actually
-# takes: out of spawn, past the enemy, to the gate - or along the floor's
+# takes: out of spawn, past the first required slot's anchor (the gate's
+# own, _gate_slot()), to the gate - or along the floor's
 # own 3 to 8 points when it overrides that (FloorData.wear_path_override).
 # Ground knows none of those - it takes world points and draws a band
 # through them (see Ground.set_wear_path()), so a floor with a
 # different shape re-aims it by calling this with different points rather
 # than by editing a shader. Called from _setup_exit_gate(), the first
 # moment the gate's own position is final.
-func _aim_wear_path(enemy: FieldEnemy) -> void:
+func _aim_wear_path(anchor: Vector3) -> void:
 	var ground := get_node_or_null(ground_path) as Ground
 	if ground == null:
 		return
@@ -2497,12 +2651,12 @@ func _aim_wear_path(enemy: FieldEnemy) -> void:
 		_wear_path = points
 		ground.set_wear_path(points)
 		return
-	# The middle point is pushed off the enemy along the exit's right, so
+	# The middle point is pushed off the anchor along the exit's right, so
 	# the band bends past the standing pool painted beside the crab rather
 	# than running through it. Right is the exit direction turned a
 	# quarter turn, not world +X, so this holds for any exit.
 	var right: Vector3 = get_exit_direction().cross(Vector3.UP).normalized()
-	var mid: Vector3 = enemy.global_position + right * floor_data.wear_path_mid_offset
+	var mid: Vector3 = anchor + right * floor_data.wear_path_mid_offset
 	_wear_path = PackedVector2Array([
 		Vector2(spawn.x, spawn.z), Vector2(mid.x, mid.z), Vector2(gate.global_position.x, gate.global_position.z)])
 	ground.set_wear_path(_wear_path)

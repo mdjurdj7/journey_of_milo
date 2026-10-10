@@ -19,13 +19,13 @@
 [ext_resource type="Texture2D" uid="uid://nkw6gcc8t1ld" path="res://assets/field/masks/Map3_rock_x1.25_shelf.png" id="17_map3_rock"]
 [ext_resource type="Script" path="res://floors/scatter/scatter_set.gd" id="21_scatter_set"]
 [ext_resource type="Resource" path="res://floors/scatter/floor2_shore.tres" id="22_shore_scatter"]
+[ext_resource type="Script" uid="uid://c1xsh7mpatcy3" path="res://floors/encounter_slot.gd" id="90_encounter_slot"]
+[ext_resource type="Script" uid="uid://n5us4ml13k7m" path="res://floors/encounter_option.gd" id="91_encounter_option"]
 
 [sub_resource type="Resource" id="FloorEnemy_sputter"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("5_sputter")
-position = Vector2(1.5, -21.25)
 yaw_degrees = 133.0
-group = &"crab"
 anchor = true
 excluded_intent = "Scissor"
 excluded_while_packmate_intent = "Sting"
@@ -33,45 +33,34 @@ excluded_while_packmate_intent = "Sting"
 [sub_resource type="Resource" id="FloorEnemy_crab_underfoot"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("18_underfoot")
-position = Vector2(-0.75, -21.3)
+position = Vector2(-2.25, -0.05)
 yaw_degrees = -121.3
-group = &"crab"
 
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly1"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("11_dragonfly")
-position = Vector2(-15.25, -20.5)
 yaw_degrees = -113.2
-required = false
-group = &"island"
 
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly2"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("11_dragonfly")
-position = Vector2(-17.875, -21.75)
+position = Vector2(-2.625, -1.25)
 yaw_degrees = -116.6
-required = false
-group = &"island"
 
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly3"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("11_dragonfly")
-position = Vector2(-17.125, -20.0)
+position = Vector2(-1.875, 0.5)
 yaw_degrees = -122.0
-required = false
-group = &"island"
 
 [sub_resource type="Resource" id="FloorEnemy_siltjaw"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("16_siltjaw")
-position = Vector2(5.2, -7)
 yaw_degrees = -11.0
-required = false
 
 [sub_resource type="Resource" id="FloorPatrol_island"]
 script = ExtResource("12_floor_patrol")
-group = &"island"
-waypoints = PackedVector2Array(-16.75, -20.75, -13, -20.375, -14.75, -18.5)
+waypoints = PackedVector2Array(-1.5, -0.25, 2.25, 0.125, 0.5, 2)
 dwell_min_seconds = 2.0
 dwell_max_seconds = 5.0
 
@@ -80,6 +69,7 @@ script = ExtResource("3_floor_prop")
 scene = ExtResource("20_trough")
 position = Vector3(-15.052, 0, -19.878)
 overrides = {
+"guard_slot": &"island",
 "trough_yaw_degrees": 45.0
 }
 
@@ -98,6 +88,42 @@ scene = ExtResource("9_belongings_cache")
 position = Vector3(10.1, 0, -24.3)
 pool = ExtResource("10_belongings_pool")
 
+[sub_resource type="Resource" id="EncounterOption_sputter_underfoot"]
+script = ExtResource("91_encounter_option")
+option_id = &"sputter_underfoot"
+members = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_crab_underfoot")])
+
+[sub_resource type="Resource" id="EncounterSlot_crab"]
+script = ExtResource("90_encounter_slot")
+slot_id = &"crab"
+position = Vector2(1.5, -21.25)
+options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_sputter_underfoot")])
+
+[sub_resource type="Resource" id="EncounterOption_dragonfly_trio"]
+script = ExtResource("91_encounter_option")
+option_id = &"dragonfly_trio"
+members = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3")])
+patrol = SubResource("FloorPatrol_island")
+
+[sub_resource type="Resource" id="EncounterSlot_island"]
+script = ExtResource("90_encounter_slot")
+slot_id = &"island"
+position = Vector2(-15.25, -20.5)
+required = false
+options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_dragonfly_trio")])
+
+[sub_resource type="Resource" id="EncounterOption_siltjaw"]
+script = ExtResource("91_encounter_option")
+option_id = &"siltjaw"
+members = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_siltjaw")])
+
+[sub_resource type="Resource" id="EncounterSlot_siltjaw"]
+script = ExtResource("90_encounter_slot")
+slot_id = &"siltjaw"
+position = Vector2(5.2, -7)
+required = false
+options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_siltjaw")])
+
 [resource]
 script = ExtResource("1_floor_data")
 mask = ExtResource("4_map3")
@@ -111,9 +137,8 @@ relief_amplitude = 0.18
 caustic_strength = 0.12
 relief_extent = Vector2(125, 88)
 relief_subdivisions = Vector2i(356, 251)
-enemies = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_crab_underfoot"), SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3"), SubResource("FloorEnemy_siltjaw")])
+slots = Array[ExtResource("90_encounter_slot")]([SubResource("EncounterSlot_crab"), SubResource("EncounterSlot_island"), SubResource("EncounterSlot_siltjaw")])
 props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_trough"), SubResource("FloorProp_alcove_cache"), SubResource("FloorProp_rock_shelf")])
-patrols = Array[ExtResource("12_floor_patrol")]([SubResource("FloorPatrol_island")])
 exit_kind = 1
 gate_distance_beyond_enemy = 7.5
 wear_path_mid_offset = 1.875

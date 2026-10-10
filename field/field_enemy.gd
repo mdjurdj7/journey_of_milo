@@ -45,13 +45,14 @@ const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
 # enemies()), whose yaw is authored outright - the crab beside the pool
 # faces where it faces.
 @export var face_shore_at_spawn: bool = true
-# FloorEnemy.required, mirrored here at spawn so RegionField can read it
-# off the "enemies" group when it decides whether the floor is cleared
+# EncounterSlot.required, mirrored here at spawn so RegionField can read
+# it off the "enemies" group when it decides whether the floor is cleared
 # (see RegionField._required_enemy_remains()). True for an enemy this
 # scene is placed by hand, same as the data default.
 @export var required: bool = true
-# FloorEnemy.group, mirrored the same way - RegionField reads it off the
-# "enemies" group to find this enemy's cluster on contact.
+# The cluster it fights in: its slot's id when its option has more than
+# one member, else empty (fights alone) - set at spawn. RegionField reads
+# it off the "enemies" group to find this enemy's cluster on contact.
 @export var group: StringName = &""
 # FloorEnemy.anchor, mirrored the same way - read at contact.
 @export var anchor: bool = false
@@ -62,9 +63,15 @@ const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
 # FloorEnemy.card_reward, mirrored the same way - read as the fight
 # starts (RegionField).
 @export var card_reward: FloorEnemy.CardReward = FloorEnemy.CardReward.ROLLED
-# Where this enemy is in its floor's FloorData.enemies - set at spawn, for
-# the run log's encounter fields. -1 for an enemy placed by hand.
+# Where this enemy is in its floor's spawn order (slot by slot, member by
+# member - FieldEnemy<n>) - set at spawn, for the run log's encounter
+# fields. -1 for an enemy placed by hand.
 var floor_index: int = -1
+# The EncounterSlot.slot_id and EncounterOption.option_id it was spawned
+# from - set at spawn, for the run log and for a prop that watches its
+# slot (TroughProp.guard_slot). Empty for an enemy placed by hand.
+var slot_id: StringName = &""
+var option_id: StringName = &""
 @export var region_field_path: NodePath = ^".."
 @export var ground_path: NodePath = ^"../Ground"
 # The hover highlight and the hit flash both BRIGHTEN: albedo times this,

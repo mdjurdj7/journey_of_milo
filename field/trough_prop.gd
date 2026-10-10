@@ -3,12 +3,15 @@ class_name TroughProp
 
 # A stone trough of still water, cut and left - one drink in it. Floor 2
 # puts it at the centre of the dragonflies' island, and it stays inert
-# while they hold it: until every FieldEnemy in guard_group is defeated,
-# walking up says nothing and a click on it is an ordinary move click.
-# The group is read live every tick (FieldEnemy.is_defeated() is set on
-# each kill, RegionField._on_enemy_defeated()), so the trough wakes the
-# moment the last of them falls - no reload, and a Wanderer who won the
-# fight standing beside it hears its line without stepping out and back.
+# while they hold it: until no member of guard_slot's encounter is left
+# standing - whichever option that slot rolled - walking up says nothing
+# and a click on it is an ordinary move click. It is the floor's own prop,
+# not the encounter's: another encounter in the island's slot still
+# guards the same trough. The slot is read live every tick
+# (FieldEnemy.is_defeated() is set on each kill, RegionField._on_enemy_
+# defeated()), so the trough wakes the moment the last of them falls - no
+# reload, and a Wanderer who won the fight standing beside it hears its
+# line without stepping out and back.
 #
 # Awake, the belongings bundle's distance language (BundleProp): inside
 # approach_radius the world line shows - approach_line while the water
@@ -64,9 +67,10 @@ const GROUP := &"troughs"
 
 @export_group("Drink")
 @export var heal_amount: int = 15
-# What the island's pack is called (FloorEnemy.group); the trough wakes
-# once none of it stands. Empty = awake from the start.
-@export var guard_group: StringName = &"island"
+# The EncounterSlot.slot_id whose encounter holds the trough (floor 2's
+# FloorProp overrides set "island"); it wakes once none of that slot's
+# members stands (FieldEnemy.slot_id). Empty = awake from the start.
+@export var guard_slot: StringName = &""
 @export_group("")
 
 @export_group("Approach")
@@ -233,14 +237,14 @@ func _ground_to_relief() -> void:
 	var local_xz: Vector3 = _ground.to_local(Vector3(global_position.x, 0.0, global_position.z))
 	global_position.y = _ground.get_height_at(Vector2(local_xz.x, local_xz.z))
 
-# No member of guard_group still standing: not defeated, not on its way
-# out - RegionField._required_enemy_remains()'s own test.
+# No member of guard_slot's encounter still standing: not defeated, not
+# on its way out - RegionField._required_enemy_remains()'s own test.
 func is_awake() -> bool:
-	if guard_group == &"":
+	if guard_slot == &"":
 		return true
 	for node in get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as FieldEnemy
-		if enemy == null or enemy.group != guard_group:
+		if enemy == null or enemy.slot_id != guard_slot:
 			continue
 		if not enemy.is_queued_for_deletion() and not enemy.is_defeated():
 			return false

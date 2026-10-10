@@ -267,7 +267,7 @@ static func encounter_key(names: Array[String]) -> String:
 	return " + ".join(parts)
 
 # `members`: one entry per enemy - its id, floor_index (its place in the
-# floor's FloorData.enemies), required, elite, region_end (the region-end
+# floor's spawn order, FieldEnemy<n>), required, elite, region_end (the region-end
 # fight, FloorEnemy.CardReward.TOP_TIER_FIRST). `role` is the encounter's,
 # the strongest of them - region_end, elite, required, else basic -
 # decided by the caller (BattleController.encounter_role()) and only

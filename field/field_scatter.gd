@@ -428,15 +428,13 @@ func _add_battle_keepouts() -> void:
 		if not groups.has(key):
 			groups[key] = []
 		(groups[key] as Array).append(enemy)
-	var patrolled: Dictionary = {}
-	if _floor != null:
-		for patrol in _floor.patrols:
-			if patrol != null:
-				patrolled[patrol.group] = patrol
+	# Slot id -> waypoints, the floor's frame (RegionField.get_patrol_
+	# routes()); a pack's group is its slot's id.
+	var patrolled: Dictionary = _field.get_patrol_routes()
 	for key: StringName in groups:
 		var members: Array = groups[key]
 		if patrolled.has(key):
-			_add_patrol_keepouts(members, patrolled[key] as FloorPatrol)
+			_add_patrol_keepouts(members, patrolled[key] as PackedVector2Array)
 		elif members.size() == 1:
 			_add_lone_keepouts(members[0] as FieldEnemy)
 		else:
@@ -484,7 +482,7 @@ func _add_cluster_keepouts(members: Array) -> void:
 		line.outer = radius
 		_keepouts.append(line)
 
-func _add_patrol_keepouts(members: Array, patrol: FloorPatrol) -> void:
+func _add_patrol_keepouts(members: Array, waypoints: PackedVector2Array) -> void:
 	var centroid := Vector2.ZERO
 	var body: float = 0.0
 	for member: FieldEnemy in members:
@@ -499,7 +497,7 @@ func _add_patrol_keepouts(members: Array, patrol: FloorPatrol) -> void:
 		stance = maxf(stance, _field.stance_distance(member))
 	var reach: float = stance + feet_margin_m + spread + body
 	_keepouts.append(_disc(centroid, reach))
-	for waypoint in patrol.waypoints:
+	for waypoint in waypoints:
 		_keepouts.append(_disc(_spawn + waypoint, reach))
 
 func _half_diagonal(enemy: FieldEnemy) -> float:

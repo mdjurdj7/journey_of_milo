@@ -140,11 +140,15 @@ class_name FloorData
 # direction (which is where the sea isn't) - on region 1's floors so far
 # the two agree.
 @export var exit_direction: Vector2 = Vector2(0.0, -1.0)
-@export var enemies: Array[FloorEnemy] = []
+# The floor's encounters, one EncounterSlot each - where it stands and
+# what can stand there (its options, each with its own members, props and
+# route). Spawn order is slot order, then each option's member order:
+# FieldEnemy<n> and the run log's floor_index count across them.
+@export var slots: Array[EncounterSlot] = []
+# The floor's own props - whatever stands whichever encounter is rolled
+# (a hull, the Keeper, the trough). Props that belong to an encounter
+# are its option's (EncounterOption.props) and spawn after these.
 @export var props: Array[FloorProp] = []
-# Routes for clusters that move between perches - one per group that
-# does (see FloorPatrol). Empty: every enemy stands where it was put.
-@export var patrols: Array[FloorPatrol] = []
 # Invisible walls along the lips of raised faces painted too gentle to
 # stop him on their own (LedgeBarrier) - one line per ledge, world XZ
 # offsets from spawn in order along the lip. Empty: every face stops him
@@ -159,8 +163,8 @@ class_name FloorData
 # opens out rather than funnelling.
 enum ExitKind { CHANNEL, LINE }
 @export var exit_kind: ExitKind = ExitKind.CHANNEL
-# Beyond the first enemy's own position, along exit_direction - where the
-# gate line lands.
+# Beyond the first required slot's anchor (EncounterSlot.position), along
+# exit_direction - where the gate line lands.
 @export var gate_distance_beyond_enemy: float = 6.0
 # ExitGate.channel_bar_axis_offset: metres across from the gate line to
 # the surfaced bar's centre, for a neck that isn't centred on the gate.
@@ -171,8 +175,8 @@ enum ExitKind { CHANNEL, LINE }
 @export var gate_channel_max_width: float = 0.0
 
 @export_group("Wear")
-# How far the worn band's middle point sits off the enemy along the
-# exit's right (RegionField._aim_wear_path()).
+# How far the worn band's middle point sits off the first required
+# slot's anchor along the exit's right (RegionField._aim_wear_path()).
 @export var wear_path_mid_offset: float = 1.5
 # Optional: world-XZ points relative to spawn that replace the derived
 # spawn -> enemy -> gate band outright. Three (start, through, end): one

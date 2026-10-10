@@ -2,8 +2,9 @@ extends Node3D
 class_name HitchingPost
 
 # A post someone sank to tie a beast to, and the beast still tied to it -
-# floor 3's Wardling, a creature that stayed. A FloorProp: placed from
-# FloorData.props, grounded on the relief, aged by placement alone (sunk
+# floor 3's Wardling, a creature that stayed. A FloorProp of the
+# Wardling's own encounter (EncounterOption.props), so it stands only
+# when he does: grounded on the relief, aged by placement alone (sunk
 # sink_depth, leaning lean_degrees), never damaged.
 #
 # The model is hitching_post.glb (0.23 x 1.30 high x 0.28 glb units,
@@ -12,10 +13,10 @@ class_name HitchingPost
 # (Hull._get_shared_flat_material()) tinted post_tint - the hulls' tint:
 # silvered wood a step darker than the sand. Its own textures are not used.
 #
-# Facing: the ring turns toward the tethered enemy (tether_enemy_index -
-# the FloorData.enemies index, so RegionField's "FieldEnemy<n>"), with
-# the FloorProp's yaw and ring_yaw_offset_degrees on top. No enemy: the
-# FloorProp's yaw alone.
+# Facing: the ring turns toward the tethered enemy (tether_member_index -
+# a member of the post's own encounter, EncounterOption.members, handed
+# over as option_members at spawn), with the FloorProp's yaw and
+# ring_yaw_offset_degrees on top. No enemy: the FloorProp's yaw alone.
 #
 # The rope: a slack catenary from the ring (ring_point, glb units, the
 # inside bottom of the ring) to the enemy's harness (FieldEnemy.get_
@@ -68,10 +69,11 @@ const MODEL_SCENE_PATH := "res://assets/models/props/hitching_post/hitching_post
 @export_group("")
 
 @export_group("Rope")
-# FloorData.enemies index of the body the rope runs to; -1 = no rope.
-@export var tether_enemy_index: int = -1:
+# Index into the post's own encounter's members (EncounterOption.members,
+# option_members here) of the body the rope runs to; -1 = no rope.
+@export var tether_member_index: int = -1:
 	set(value):
-		tether_enemy_index = value
+		tether_member_index = value
 		if is_node_ready():
 			_find_enemy()
 			_apply_yaw()
@@ -115,6 +117,10 @@ const MODEL_SCENE_PATH := "res://assets/models/props/hitching_post/hitching_post
 @export var ground_path: NodePath = ^"../../Ground"
 @export var region_field_path: NodePath = ^"../.."
 
+# The post's encounter as spawned, in its option's member order - set by
+# RegionField before the post enters the tree (_spawn_option_props()).
+# Empty for a post placed as a floor prop: no encounter, no rope.
+var option_members: Array[FieldEnemy] = []
 var _placement_yaw: float = 0.0
 # Pose carries the sink and the lean; the model sits grounded under it.
 var _pose: Node3D = null
@@ -236,15 +242,13 @@ func _apply_yaw() -> void:
 
 func _find_enemy() -> void:
 	_enemy = null
-	if tether_enemy_index < 0:
+	if tether_member_index < 0:
 		return
-	var region_field := get_node_or_null(region_field_path)
-	if region_field == null:
-		push_warning("HitchingPost '%s': region_field_path did not resolve; no rope." % name)
-		return
-	_enemy = region_field.get_node_or_null(NodePath("FieldEnemy%d" % tether_enemy_index)) as FieldEnemy
+	# A body already freed (won, then a live edit of the index) is no one.
+	if tether_member_index < option_members.size() and is_instance_valid(option_members[tether_member_index]):
+		_enemy = option_members[tether_member_index]
 	if _enemy == null:
-		push_warning("HitchingPost '%s': no FieldEnemy%d to tie the rope to." % [name, tether_enemy_index])
+		push_warning("HitchingPost '%s': its encounter has no member %d to tie the rope to." % [name, tether_member_index])
 
 func _ground_to_relief() -> void:
 	if _ground == null:
@@ -292,7 +296,7 @@ func _body_gone() -> bool:
 	return _enemy == null or not is_instance_valid(_enemy) or _enemy.is_queued_for_deletion() or _enemy.is_settling()
 
 func _process(delta: float) -> void:
-	if _model == null or (tether_enemy_index < 0 and not _has_harness):
+	if _model == null or (tether_member_index < 0 and not _has_harness):
 		_rope.visible = false
 		return
 	if not _dropping:
