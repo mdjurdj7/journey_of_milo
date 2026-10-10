@@ -7,18 +7,19 @@ class_name HPBar
 # tick via unproject, the same shape EnemyStatus already uses for enemies
 # (see that script's own doc). In the field the bar's top centre sits
 # field_offset_px straight down the screen from the Wanderer's feet, at a
-# constant screen size; in battle the readout centres on his feet plus
-# ground_offset (a world-space drop) at battle_scale, so the Battle
-# Style's pixel sizes are what actually lands on screen.
+# constant screen size; in battle the HP numeral's baseline, centred on
+# the HP block, sits on his feet plus ground_offset (a world-space drop)
+# at battle_scale, so the Battle Style's pixel sizes are what actually
+# lands on screen - kept min_energy_clearance_px off the energy readout.
 #
 # Two styles, blended over the battle transition time rather than
 # snapped, both drawn by _draw() below: field (the Field Style group - a
 # bare ink bar with a Spectral numeral and " / max" centred beneath it,
 # ink straight on the world) and battle
 # (the Battle Style group - ink on the world: a Spectral
-# numeral row with " / max" and the character's name on one baseline, a
-# 3px ink bar beneath over an ink track, a thin ink segment above the
-# bar's left end for block, and - while show_toll() has it on - a Toll
+# numeral row - block's shield and value while any is up, the HP numeral,
+# " / max" - on one baseline, a 3px ink bar beneath over an ink track,
+# the standing row under it, and - while show_toll() has it on - a Toll
 # block off the bar's right end: a Spectral numeral with "TOLL" beside it
 # on one baseline and a rule in the toll keyline colour beneath, sitting
 # on the HP bar's own rows; nothing boxed). The two cross-fade: the field
@@ -92,34 +93,71 @@ class_name HPBar
 
 @export_group("Battle Style")
 # The readout's width - numeral row and bar alike.
-@export var battle_width: float = 190.0
-@export var numeral_font: Font = load("res://assets/fonts/Spectral-SemiBold.ttf")
-@export var name_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf")
-@export var battle_numeral_size_px: int = 22
-@export var battle_max_size_px: int = 14
-@export var battle_name_size_px: int = 10
-@export var battle_name_tracking_em: float = 0.16
-# " / max" and the name, ink at this alpha; the numeral is full ink.
-@export_range(0.0, 1.0) var battle_secondary_alpha: float = 0.6
-@export var battle_max_prefix: String = " / "
-# Row gap between the numeral row's descent and the bar's top - the block
-# segment lives inside it (see block_thickness_px/block_gap_px).
-@export var battle_row_gap: float = 6.0
-@export var battle_bar_height: float = 3.0
-@export_range(0.0, 1.0) var battle_track_alpha: float = 0.22
-# Block: a segment this thick, this far above the bar's top, from the
-# bar's left end, block/max_hp of the bar's width (never shorter than
-# block_min_length_px while any block is up).
-@export var block_thickness_px: float = 2.0
-@export var block_gap_px: float = 2.0
-@export var block_min_length_px: float = 6.0
+@export var battle_width: float = 190.0:
+	set(value):
+		battle_width = value
+		_relayout_if_ready()
+@export var numeral_font: Font = load("res://assets/fonts/Spectral-SemiBold.ttf"):
+	set(value):
+		numeral_font = value
+		_relayout_if_ready()
+# The TOLL label's face (toll_label_size_px, toll_label_tracking_em).
+@export var name_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf"):
+	set(value):
+		name_font = value
+		_restyle_if_ready()
+# The HP numeral - the readout's largest figure, over Toll's
+# (toll_numeral_size_px) - and the " / max" after it, small.
+@export var battle_numeral_size_px: int = 34:
+	set(value):
+		battle_numeral_size_px = value
+		_relayout_if_ready()
+@export var battle_max_size_px: int = 14:
+	set(value):
+		battle_max_size_px = value
+		_relayout_if_ready()
+# " / max", ink at this alpha; the numeral is full ink.
+@export_range(0.0, 1.0) var battle_secondary_alpha: float = 0.6:
+	set(value):
+		battle_secondary_alpha = value
+		queue_redraw()
+@export var battle_max_prefix: String = " / ":
+	set(value):
+		battle_max_prefix = value
+		_relayout_if_ready()
+# Row gap between the numeral row's descent and the bar's top.
+@export var battle_row_gap: float = 6.0:
+	set(value):
+		battle_row_gap = value
+		_relayout_if_ready()
+@export var battle_bar_height: float = 3.0:
+	set(value):
+		battle_bar_height = value
+		_relayout_if_ready()
+@export_range(0.0, 1.0) var battle_track_alpha: float = 0.22:
+	set(value):
+		battle_track_alpha = value
+		queue_redraw()
 # Grace (the Wanderer's passive - see CharacterData): HP an enemy took
 # that is still reclaimable this turn, drawn INSIDE the bar immediately
-# right of the filled HP, in ink at grace_alpha. Unlike block - which is
-# its own rule floating above the bar - this is part of the bar, because
-# it is literally the stretch of HP you could still get back. No numeral:
-# the HP numeral keeps reading current HP, which is what you have.
-@export_range(0.0, 1.0) var grace_alpha: float = 0.3
+# right of the filled HP, in ink at grace_alpha - part of the bar,
+# because it is literally the stretch of HP you could still get back. No
+# numeral: the HP numeral keeps reading current HP, which is what you
+# have.
+@export_range(0.0, 1.0) var grace_alpha: float = 0.3:
+	set(value):
+		grace_alpha = value
+		queue_redraw()
+# The battle energy readout's right edge on screen (set_energy_clearance_
+# x(), from BattleOverlay): the HP numeral's left edge - the HP block's,
+# where a block readout spills leftward from - never comes closer to it
+# than this. The readout rides with the Wanderer otherwise; this only
+# pushes it right when the two would crowd. Today's gap in the Sputter
+# fight, so it never fires there.
+@export var min_energy_clearance_px: float = 170.0:
+	set(value):
+		min_energy_clearance_px = value
+		_relayout_if_ready()
 
 # --- The standing row: stance first, then statuses ---
 #
@@ -283,17 +321,13 @@ class_name HPBar
 		critical_fade_time = maxf(value, 0.0)
 
 @export_group("Block Readout")
-# While block is up, the card's open-shield glyph sits to the LEFT of the
-# HP numeral with the block value centred on it: the value in Spectral at
-# the HP numeral's own size, full ink, over a pale halo that breaks the
-# shield's line wherever a digit crosses it - and free to spill past the
-# shield's edges. The group's right edge stays block_hp_gap_px from the
-# HP numeral; a wider value spills leftward. The readout grows leftward
-# for it - the HP block stays put on the anchor.
+# While block is up it reads in the HP row, LEFT of the HP numeral: the
+# card's open-shield glyph, then the block value beside it in Spectral at
+# the HP numeral's own size, full ink, on the same baseline. Hidden at 0.
+# The readout grows leftward for it - the HP block stays put on the
+# anchor.
 #
-# The shield's size: its height is ~1.85 x half of this, ~26 px at 28 -
-# the digits' own height at 22 px (Spectral's reported line height, 35 at
-# 22, is mostly descent).
+# The shield's size: its height is ~1.85 x half of this.
 @export var block_glyph_size_px: float = 28.0:
 	set(value):
 		block_glyph_size_px = value
@@ -314,33 +348,17 @@ class_name HPBar
 	set(value):
 		block_value_size_px = value
 		_relayout_block()
-# Two digits or more: the value at this fraction of its size - the rest
-# spills past the shield.
-@export_range(0.5, 1.0) var block_multi_digit_scale: float = 0.92:
+# Between the shield and the value after it.
+@export var block_glyph_value_gap_px: float = 6.0:
 	set(value):
-		block_multi_digit_scale = value
-		_relayout_block()
-# The value's baseline sits this fraction of its size below the shield's
-# centre, which centres its cap height on the shield.
-@export var block_value_baseline_drop: float = 0.33:
-	set(value):
-		block_value_baseline_drop = value
-		_relayout_block()
-# The halo under the value's ink: this many px each side, in this colour
-# (the bone of the screens' text) - drawn over the shield, under the ink.
-@export var block_halo_px: float = 2.0:
-	set(value):
-		block_halo_px = value
-		_relayout_block()
-@export var block_halo_color: Color = Color(0.94, 0.91, 0.86, 1.0):
-	set(value):
-		block_halo_color = value
+		block_glyph_value_gap_px = value
 		_relayout_block()
 # The shield's ink alpha; the value is always full ink.
 @export_range(0.0, 1.0) var block_readout_alpha: float = 0.7:
 	set(value):
 		block_readout_alpha = value
 		_relayout_block()
+# Between the block value and the HP numeral.
 @export var block_hp_gap_px: float = 16.0:
 	set(value):
 		block_hp_gap_px = value
@@ -349,17 +367,43 @@ class_name HPBar
 @export var block_crossfade_time: float = 0.12
 
 @export_group("Toll")
-@export var toll_label_text: String = "TOLL"
-@export var toll_numeral_size_px: int = 30
-@export var toll_label_size_px: int = 10
-@export var toll_label_tracking_em: float = 0.16
-# Space between the HP bar's right end and the block, between numeral and
-# label, and between the numeral's baseline and the rule's top. The rule
-# is toll_rule_px thick and sits on the HP bar's own rows (same top).
-@export var toll_gap_px: float = 22.0
-@export var toll_label_gap_px: float = 6.0
-@export var toll_rule_gap_px: float = 4.0
-@export var toll_rule_px: float = 3.0
+@export var toll_label_text: String = "TOLL":
+	set(value):
+		toll_label_text = value
+		_relayout_if_ready()
+# Under the HP numeral (battle_numeral_size_px), so the two read apart.
+@export var toll_numeral_size_px: int = 22:
+	set(value):
+		toll_numeral_size_px = value
+		_relayout_if_ready()
+@export var toll_label_size_px: int = 10:
+	set(value):
+		toll_label_size_px = value
+		_restyle_if_ready()
+@export var toll_label_tracking_em: float = 0.16:
+	set(value):
+		toll_label_tracking_em = value
+		_restyle_if_ready()
+# Space between the HP bar's right end and the block - what keeps the HP
+# row and Toll two clusters - between numeral and label, and between the
+# numeral's baseline and the rule's top. The rule is toll_rule_px thick
+# and sits on the HP bar's own rows (same top).
+@export var toll_gap_px: float = 22.0:
+	set(value):
+		toll_gap_px = value
+		_relayout_if_ready()
+@export var toll_label_gap_px: float = 6.0:
+	set(value):
+		toll_label_gap_px = value
+		_relayout_if_ready()
+@export var toll_rule_gap_px: float = 4.0:
+	set(value):
+		toll_rule_gap_px = value
+		_relayout_if_ready()
+@export var toll_rule_px: float = 3.0:
+	set(value):
+		toll_rule_px = value
+		queue_redraw()
 @export var toll_pop_scale: float = 1.15
 @export var toll_pop_time: float = 0.22
 # A Toll blow's count down from the Toll it spent (drain_toll()), in real
@@ -367,6 +411,9 @@ class_name HPBar
 @export var toll_drain_time: float = 0.25
 
 var _wanderer: Wanderer = null
+# The battle energy readout's right edge on screen (set_energy_clearance_
+# x()), NAN out of battle.
+var _energy_right_x: float = NAN
 var _current_hp: int = 0
 var _max_hp: int = 1
 var _block: int = 0
@@ -407,7 +454,6 @@ var _ink: Color = Color.BLACK
 var _critical: bool = false
 var _critical_blend: float = 0.0
 var _critical_tween: Tween = null
-var _name_font_tracked: Font = null
 
 # 0 = field style, 1 = battle style. Tweened by enter_battle()/exit_battle()
 # over the battle transition time (passed in by BattleOverlay, which reads
@@ -554,62 +600,50 @@ func _block_readout_width() -> float:
 		return 0.0
 	return _block_group_width() + block_hp_gap_px
 
-# The group's own width: the shield's box, or the value with its halo when
-# that is wider - the fading-out value's too while a crossfade runs, so
-# neither ever reaches toward the HP numeral.
+# The group's own width: the shield, its gap, and the value - the wider
+# of the value and the one fading out while a crossfade runs, so neither
+# ever reaches toward the HP numeral.
 func _block_group_width() -> float:
-	var width: float = maxf(block_glyph_size_px, _block_value_width(_block))
+	var value_width: float = _block_value_width(_block)
 	if _block_prev > 0 and _block_fade < 1.0:
-		width = maxf(width, _block_value_width(_block_prev))
-	return width
+		value_width = maxf(value_width, _block_value_width(_block_prev))
+	return block_glyph_size_px + block_glyph_value_gap_px + value_width
 
-# The value's size: the HP numeral's (or block_value_size_px), held to
-# block_multi_digit_scale of it from two digits up.
-func _block_value_size(value: int) -> int:
-	var base: int = block_value_size_px if block_value_size_px > 0 else battle_numeral_size_px
-	if str(value).length() >= 2:
-		return maxi(roundi(float(base) * block_multi_digit_scale), 1)
-	return base
+# The value's size: block_value_size_px, or the HP numeral's.
+func _block_value_size() -> int:
+	return block_value_size_px if block_value_size_px > 0 else battle_numeral_size_px
 
 func _block_value_width(value: int) -> float:
-	return InkType.width(numeral_font, str(value), _block_value_size(value)) + maxf(block_halo_px, 0.0) * 2.0
+	return InkType.width(numeral_font, str(value), _block_value_size())
 
-# Shield glyph (the card's guard glyph, CardView._draw_glyph()) centred in
-# the group, level with the HP numeral's cap centre, at block_readout_
-# alpha; the value centred on it - the one fading out under the new one
-# while a crossfade runs.
+# Shield glyph (the card's guard glyph, CardView._draw_glyph()) at the
+# group's left, level with the HP numeral's cap centre, at block_readout_
+# alpha; the value after it on the HP baseline - the one fading out under
+# the new one while a crossfade runs.
 func _draw_block_readout(baseline: float, ink: Color) -> void:
 	if _block <= 0:
 		return
 	var color: Color = ink
 	color.a *= block_readout_alpha
 	var r: float = block_glyph_size_px * 0.5
-	var centre := Vector2(_block_group_width() * 0.5, baseline - float(battle_numeral_size_px) * block_glyph_baseline_lift)
+	var centre := Vector2(r, baseline - float(battle_numeral_size_px) * block_glyph_baseline_lift)
 	var shield := PackedVector2Array([
 		centre + Vector2(-r * 0.8, -r * 0.9), centre + Vector2(r * 0.8, -r * 0.9), centre + Vector2(r * 0.8, r * 0.1),
 		centre + Vector2(0.0, r * 0.95), centre + Vector2(-r * 0.8, r * 0.1), centre + Vector2(-r * 0.8, -r * 0.9),
 	])
 	draw_polyline(shield, color, block_glyph_line_width_px, true)
+	var value_left: float = block_glyph_size_px + block_glyph_value_gap_px
 	if _block_prev > 0 and _block_fade < 1.0:
-		_draw_block_value(_block_prev, centre, ink, 1.0 - _block_fade)
-	_draw_block_value(_block, centre, ink, _block_fade)
+		_draw_block_value(_block_prev, Vector2(value_left, baseline), ink, 1.0 - _block_fade)
+	_draw_block_value(_block, Vector2(value_left, baseline), ink, _block_fade)
 
-# One value on the shield: its halo first (over the shield's line, under
-# the ink), then the ink, both at `alpha`.
-func _draw_block_value(value: int, centre: Vector2, ink: Color, alpha: float) -> void:
+# One value, its baseline-left at `origin`, at `alpha`.
+func _draw_block_value(value: int, origin: Vector2, ink: Color, alpha: float) -> void:
 	if alpha <= 0.0:
 		return
-	var text: String = str(value)
-	var size_px: int = _block_value_size(value)
-	var width: float = InkType.width(numeral_font, text, size_px)
-	var origin := Vector2(centre.x - width * 0.5, centre.y + float(size_px) * block_value_baseline_drop)
-	if block_halo_px > 0.0 and numeral_font != null:
-		var halo: Color = block_halo_color
-		halo.a *= alpha
-		draw_string_outline(numeral_font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, roundi(block_halo_px * 2.0), halo)
 	var fill: Color = ink
 	fill.a *= alpha
-	InkType.draw_run(self, numeral_font, text, origin, size_px, fill)
+	InkType.draw_run(self, numeral_font, str(value), origin, _block_value_size(), fill)
 
 func _relayout_block() -> void:
 	if is_node_ready():
@@ -657,11 +691,13 @@ func _line_rects() -> Array[Rect2]:
 	return rects
 
 # The point of this control that sits on the screen anchor (and that
-# battle_scale scales about): the field bar's top centre, or the HP
-# block's centre in battle - Toll hangs off to the right of it, never
-# shifting the bar off the Wanderer.
+# battle_scale scales about): the field bar's top centre, or in battle
+# the HP block's centre on the HP numeral's baseline - Toll hangs off to
+# the right of it, never shifting the bar off the Wanderer, and the
+# standing row grows downward from under the bar, so a line coming or
+# going never moves the numeral or the bar.
 func _anchor_offset() -> Vector2:
-	var battle_offset := Vector2(_block_readout_width() + battle_width / 2.0, _battle_content_size().y / 2.0)
+	var battle_offset := Vector2(_block_readout_width() + battle_width / 2.0, _battle_top_pad() + _numeral_ascent())
 	return _field_anchor().lerp(battle_offset, _battle_blend)
 
 # This control's size eases between the two layouts' sizes with the
@@ -711,10 +747,9 @@ func _draw() -> void:
 		_draw_battle()
 
 # The battle readout, at _battle_blend alpha.
-# One baseline for the row: numeral, then " / max" run on at its smaller
-# size, the name right-aligned at the readout's width. The bar sits
-# battle_row_gap under the numeral's descent; block is the thin segment
-# in that gap, off the bar's left end.
+# One baseline for the row: block (shield and value, while any is up),
+# the numeral, then " / max" run on at its smaller size. The bar sits
+# battle_row_gap under the numeral's descent.
 func _draw_battle() -> void:
 	var ink: Color = _ink
 	ink.a = _battle_blend
@@ -731,11 +766,6 @@ func _draw_battle() -> void:
 	var left: float = _block_readout_width()
 	var x: float = left + InkType.draw_run(self, numeral_font, str(_current_hp), Vector2(left, baseline), battle_numeral_size_px, hp_ink)
 	InkType.draw_run(self, numeral_font, battle_max_prefix + str(_max_hp), Vector2(x, baseline), battle_max_size_px, secondary)
-
-	var name_text: String = _character_name()
-	if _name_font_tracked != null and not name_text.is_empty():
-		var name_width: float = InkType.width(_name_font_tracked, name_text, battle_name_size_px)
-		InkType.draw_run(self, _name_font_tracked, name_text, Vector2(left + battle_width - name_width, baseline), battle_name_size_px, secondary)
 
 	var bar_top: float = _battle_bar_top()
 	draw_rect(Rect2(left, bar_top, battle_width, battle_bar_height), track)
@@ -758,11 +788,6 @@ func _draw_battle() -> void:
 			var grace_color: Color = _ink
 			grace_color.a = grace_alpha * _battle_blend
 			draw_rect(Rect2(grace_left, bar_top, grace_length, battle_bar_height), grace_color)
-
-	if _block > 0 and _max_hp > 0:
-		var length: float = maxf(battle_width * clampf(float(_block) / float(_max_hp), 0.0, 1.0), block_min_length_px)
-		var block_top: float = bar_top - block_gap_px - block_thickness_px
-		draw_rect(Rect2(left, block_top, length, block_thickness_px), ink)
 
 	if _toll_visible:
 		_draw_toll(bar_top, ink)
@@ -855,11 +880,6 @@ func _draw_toll(bar_top: float, ink: Color) -> void:
 	rule_color.a = _battle_blend
 	draw_rect(Rect2(left, bar_top, _toll_block_width(), toll_rule_px), rule_color)
 
-func _character_name() -> String:
-	if RunState.character == null:
-		return ""
-	return RunState.character.character_name.to_upper()
-
 # Called once by region_field.gd - the Wanderer this bar tracks. Safe to
 # call before or after _ready(); _physics_process() below just no-ops
 # until it's set.
@@ -875,7 +895,6 @@ func set_target(wanderer: Wanderer) -> void:
 func refresh_style() -> void:
 	_ink = get_theme_color("ink", "Battle")
 	_toll_rule_color = get_theme_color("toll_rule", "Battle")
-	_name_font_tracked = InkType.tracked(name_font, battle_name_size_px, battle_name_tracking_em)
 	# Alegreya Bold, tracked - the same treatment the card's own type label
 	# uses, so the row reads as the same voice as "STRIKE"/"GUARD".
 	_row_font_tracked = InkType.tracked(InkType.text_bold_font(), row_font_size_px, row_tracking_em)
@@ -897,6 +916,17 @@ func _relayout_if_ready() -> void:
 	if is_node_ready():
 		_apply_layout()
 
+# A live edit of a tracked face's size or tracking: rebuilt, then laid out.
+func _restyle_if_ready() -> void:
+	if is_node_ready():
+		refresh_style()
+
+# The battle energy readout's right edge on screen, from BattleOverlay -
+# what min_energy_clearance_px keeps the HP numeral off. NAN = none (out
+# of battle).
+func set_energy_clearance_x(right_x: float) -> void:
+	_energy_right_x = right_x
+
 func _physics_process(delta: float) -> void:
 	if _wanderer == null or not is_instance_valid(_wanderer):
 		return
@@ -914,10 +944,18 @@ func _physics_process(delta: float) -> void:
 	# Whole pixels only - a fractional Control position on a bare bar (no
 	# panel background to visually absorb it) reads as shimmer/jitter on
 	# thin edges, most visibly on the halo's edge.
-	position = (screen_pos - _anchor_offset()).round()
-
 	# A constant screen size in the field; battle_scale in battle.
 	scale = Vector2.ONE * lerpf(1.0, battle_scale, _battle_blend)
+	var placed: Vector2 = screen_pos - _anchor_offset()
+	# Kept off the energy readout: the HP numeral's left edge (on screen,
+	# scaled about the pivot) never within min_energy_clearance_px of its
+	# right edge - eased in with the battle style.
+	if not is_nan(_energy_right_x):
+		var hp_left: float = placed.x + pivot_offset.x + (_block_readout_width() - pivot_offset.x) * scale.x
+		var crowding: float = _energy_right_x + min_energy_clearance_px - hp_left
+		if crowding > 0.0:
+			placed.x += crowding * _battle_blend
+	position = placed.round()
 
 	var hovered: bool = not _in_battle and HoverRaycast.is_hovering(get_viewport(), _wanderer)
 	var low_hp: bool = _current_fraction <= low_hp_fraction
@@ -1113,6 +1151,7 @@ func enter_battle(duration: float) -> void:
 
 func exit_battle(duration: float) -> void:
 	_in_battle = false
+	_energy_right_x = NAN
 	_block = 0
 	_block_prev = 0
 	_block_fade = 1.0

@@ -112,6 +112,15 @@ signal battle_finished(outcome: Outcome)
 	set(value):
 		devour_gap_px = value
 		_apply_energy_anchor()
+# The energy group - readout and Devour - moved as one from where
+# energy_anchor and energy_stack_lift_px put it, in overlay (1080p) px
+# like every corner readout, so it scales with the HUD. Left and down
+# from there by default, clear of the Wanderer's HP row: 12 px down keeps
+# a hovered card 12 px under Devour at seven in hand.
+@export var energy_group_offset: Vector2 = Vector2(-40.0, 12.0):
+	set(value):
+		energy_group_offset = value
+		_apply_energy_anchor()
 # Between the DECK line and the keepsake row under it - the row sits in
 # the corner margin, so nothing above it moves.
 @export var keepsake_row_gap_px: float = 4.0:
@@ -493,7 +502,7 @@ func _apply_energy_anchor() -> void:
 		return
 	# The group goes where the readout's top-left goes; inside it the
 	# readout sits at its origin and Devour under it.
-	_energy_group.position = Vector2(maxf(energy_anchor.x - _resources.size.x, corner_margin_px), energy_anchor.y - energy_stack_lift_px - _resources.numeral_ink_top())
+	_energy_group.position = Vector2(maxf(energy_anchor.x - _resources.size.x, corner_margin_px), energy_anchor.y - energy_stack_lift_px - _resources.numeral_ink_top()) + energy_group_offset
 	_resources.position = Vector2.ZERO
 	if _keepsake_row != null:
 		_keepsake_row.set_reveal_floor_y(_resources.global_position.y)
@@ -503,6 +512,10 @@ func _apply_energy_anchor() -> void:
 		_devour_button.position = Vector2(0.0, _resources.size.y + devour_gap_px)
 		_devour_button.set_hover_floor_y(_resources.global_position.y)
 	_energy_group.size = _energy_group_extent()
+	# The Wanderer's HP row keeps its distance from the group's right edge
+	# (HPBar.min_energy_clearance_px).
+	if _field_hp_bar != null:
+		_field_hp_bar.set_energy_clearance_x(_energy_group.get_global_rect().end.x)
 
 # The group's own size: the readout and Devour under it, together.
 func _energy_group_extent() -> Vector2:
