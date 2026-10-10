@@ -302,7 +302,7 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 # (not the attachment's own local space, which is the model's unscaled
 # bone space - the source model is ~0.019m tall, so a raw 0.14 offset
 # there would place the sword ~13m away): _world_offset_to_local() divides
-# by _model_scale_factor before writing _sword_root.position. Rotations
+# by _skeleton_scale_factor before writing _sword_root.position. Rotations
 # are unaffected by that scale, so they're applied as given.
 @export var back_mount_position: Vector3 = Vector3(0.0, 0.15, -0.18):
 	get:
@@ -412,6 +412,13 @@ var _battle_stance_modifier: BattleStanceModifier = null
 # the (hugely up-scaled) model and inherits its scale on top of whatever
 # the sword's own node.scale is set to.
 var _model_scale_factor: float = 1.0
+# The skeleton's own uniform scale in this body's space, set once by
+# _setup_sword() - what the sword, under a BoneAttachment3D on that
+# skeleton, actually inherits. The model's scale times any node between
+# model and skeleton: equal to _model_scale_factor for the FBX rigs, whose
+# skeleton sits directly under the model; a glTF rig's skeleton sits under
+# an Armature node with a scale of its own.
+var _skeleton_scale_factor: float = 1.0
 
 # The model's scaled bbox height and half its larger horizontal extent,
 # from _scale_and_ground_model() - same pair FieldEnemy keeps, read by
@@ -610,6 +617,13 @@ func _build_posterized_material(texture_path: String) -> ShaderMaterial:
 # Rotation about Y (model_yaw_offset above) never changes a point's Y
 # component, so the pre-scale AABB's Y extents survive that rotation
 # unchanged - only the scale factor below affects them.
+#
+# A skinned mesh is measured as it stands at rest (_skinned_rest_aabb()),
+# not through its MeshInstance3D's node transform: a skinned mesh draws
+# where its skeleton puts it, and a glTF rig's mesh node can sit under an
+# Armature node (scaled 0.01 and turned 90 deg) that the node-transform
+# reading would wrongly fold in. For the FBX rigs the two readings are the
+# same box (to float rounding), and there the node-transform one stands.
 func _scale_and_ground_model(model: Node3D) -> void:
 	var combined_aabb: AABB
 	var has_aabb := false
@@ -617,6 +631,9 @@ func _scale_and_ground_model(model: Node3D) -> void:
 		var mi := mesh_instance as MeshInstance3D
 		var mi_transform_in_model: Transform3D = model.global_transform.affine_inverse() * mi.global_transform
 		var mi_aabb_in_model: AABB = mi_transform_in_model * mi.get_aabb()
+		var skinned_aabb: AABB = _skinned_rest_aabb(model, mi)
+		if skinned_aabb.size != Vector3.ZERO and not skinned_aabb.is_equal_approx(mi_aabb_in_model):
+			mi_aabb_in_model = skinned_aabb
 		combined_aabb = mi_aabb_in_model if not has_aabb else combined_aabb.merge(mi_aabb_in_model)
 		has_aabb = true
 	if not has_aabb:
@@ -637,6 +654,47 @@ func _scale_and_ground_model(model: Node3D) -> void:
 	_model_scale_factor = scale_factor
 	_model_height = combined_aabb.size.y * scale_factor
 	_model_half_width = maxf(combined_aabb.size.x, combined_aabb.size.z) * 0.5 * scale_factor
+
+# The box a skinned mesh fills at its skeleton's rest pose, in model's
+# space: every vertex through its weighted binds (skeleton x bone global
+# rest x bind pose) - where the skeleton actually draws it. An empty AABB
+# when mi isn't skinned (no skin, no skeleton, no binds), for the caller's
+# node-transform reading to take over.
+func _skinned_rest_aabb(model: Node3D, mi: MeshInstance3D) -> AABB:
+	var skeleton := mi.get_node_or_null(mi.skeleton) as Skeleton3D
+	var skin: Skin = mi.skin
+	if skeleton == null or skin == null or skin.get_bind_count() == 0 or mi.mesh == null:
+		return AABB()
+	var skeleton_in_model: Transform3D = model.global_transform.affine_inverse() * skeleton.global_transform
+	var binds: Array[Transform3D] = []
+	for bind_idx in skin.get_bind_count():
+		var bone_idx: int = skin.get_bind_bone(bind_idx)
+		if bone_idx < 0:
+			bone_idx = skeleton.find_bone(skin.get_bind_name(bind_idx))
+		if bone_idx < 0:
+			return AABB()
+		binds.append(skeleton_in_model * skeleton.get_bone_global_rest(bone_idx) * skin.get_bind_pose(bind_idx))
+	var low := Vector3.INF
+	var high := -Vector3.INF
+	for surface_idx in mi.mesh.get_surface_count():
+		var arrays: Array = mi.mesh.surface_get_arrays(surface_idx)
+		var vertices: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
+		var bones: PackedInt32Array = arrays[Mesh.ARRAY_BONES]
+		var weights: PackedFloat32Array = arrays[Mesh.ARRAY_WEIGHTS]
+		if vertices.is_empty() or bones.size() != weights.size() or bones.size() % vertices.size() != 0:
+			return AABB()
+		var per_vertex: int = bones.size() / vertices.size()
+		for vertex_idx in vertices.size():
+			var point := Vector3.ZERO
+			for k in per_vertex:
+				var weight: float = weights[vertex_idx * per_vertex + k]
+				if weight > 0.0:
+					point += (binds[bones[vertex_idx * per_vertex + k]] * vertices[vertex_idx]) * weight
+			low = low.min(point)
+			high = high.max(point)
+	if low == Vector3.INF:
+		return AABB()
+	return AABB(low, high - low)
 
 # Finds the skeleton and the lowest-contact bone indices once, at
 # startup - cached into _grounding_skeleton/_grounding_bone_indices so the
@@ -774,13 +832,13 @@ func _find_bone_by_suffix(skeleton: Skeleton3D, suffix: StringName) -> int:
 
 # back_mount_position/hand_mount_position are exported in world metres;
 # _sword_root's own position is read in its parent BoneAttachment3D's
-# local space, which is the model's unscaled bone space (inheriting the
-# model's own up-scale via _model_scale_factor) - dividing converts a
+# local space, which is the skeleton's unscaled bone space (inheriting the
+# skeleton's whole scale, _skeleton_scale_factor) - dividing converts a
 # world-metre offset into that local space.
 func _world_offset_to_local(world_offset: Vector3) -> Vector3:
-	if _model_scale_factor <= 0.0001:
+	if _skeleton_scale_factor <= 0.0001:
 		return world_offset
-	return world_offset / _model_scale_factor
+	return world_offset / _skeleton_scale_factor
 
 # Builds two BoneAttachment3D children of the skeleton (one per mount),
 # loads and scales the sword once, and parks it on the back mount to
@@ -793,6 +851,7 @@ func _setup_sword(model: Node3D) -> void:
 	if _sword_skeleton == null:
 		push_warning("Wanderer: no Skeleton3D found under model; sword mount disabled.")
 		return
+	_skeleton_scale_factor = _model_scale_factor * _transform_under(_sword_skeleton, model).basis.get_scale().x
 
 	var back_bone_idx := _find_bone_by_suffix(_sword_skeleton, back_mount_bone_suffix)
 	var hand_bone_idx := _find_bone_by_suffix(_sword_skeleton, hand_mount_bone_suffix)
@@ -868,16 +927,16 @@ func _setup_sword(model: Node3D) -> void:
 		local_scale_factor = sword_length / longest_axis
 
 	# _sword_root sits under _back_attachment, a child of the model's own
-	# Skeleton3D - it inherits the model's whole up-scale (model_scale_
-	# factor, easily 50-100x since the source model ships at ~0.019m tall)
-	# on top of whatever _sword_root.scale is set to here. Dividing it back
-	# out is what makes the sword's actual WORLD length come out to
-	# sword_length instead of sword_length * model_scale_factor.
+	# Skeleton3D - it inherits the skeleton's whole scale (_skeleton_scale_
+	# factor: the model's up-scale, easily 50-100x since the source model
+	# ships at ~0.019m tall, times any Armature scale between) on top of
+	# whatever _sword_root.scale is set to here. Dividing it back out is
+	# what makes the sword's actual WORLD length come out to sword_length.
 	var world_scale_factor := local_scale_factor
-	if _model_scale_factor > 0.0001:
-		world_scale_factor = local_scale_factor / _model_scale_factor
+	if _skeleton_scale_factor > 0.0001:
+		world_scale_factor = local_scale_factor / _skeleton_scale_factor
 	else:
-		push_warning("Wanderer: _model_scale_factor is ~0 (%f); sword scale not compensated." % _model_scale_factor)
+		push_warning("Wanderer: _skeleton_scale_factor is ~0 (%f); sword scale not compensated." % _skeleton_scale_factor)
 	_sword_root.scale = Vector3.ONE * world_scale_factor
 
 	_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH, true, false)
@@ -1006,14 +1065,18 @@ func _build_flat_material() -> StandardMaterial3D:
 	material.metallic_specular = 0.0
 	return material
 
-# Idle/Walk/BattleIdle/DrawSword ship as four separate Mixamo FBX files,
-# each importing with a single clip whose name Godot's FBX importer
-# assigns (not "mixamo.com" — don't assume a specific name). This finds
-# each player's one clip by count, not by name, and merges them into one
-# AnimationPlayer library as "Idle"/"Walk"/"BattleIdle"/"DrawSword" - this
-# is the real model, not a stand-in; the merge exists because of how the
-# four clips currently ship as separate files, not because anything here
-# is temporary.
+# The clips ship as separate Mixamo FBX files, each importing with a
+# single clip whose name Godot's FBX importer assigns (not "mixamo.com" -
+# don't assume a specific name). This finds each player's one clip by key
+# count, not by name (_find_single_animation()), and merges them into the
+# model's own AnimationPlayer library under the names _merged_clips()
+# gives them - this is the real model, not a stand-in; the merge exists
+# because of how the clips ship as separate files, not because anything
+# here is temporary.
+#
+# The model's own clip is renamed to Idle. Every clip after it is carried
+# onto the model's skeleton by _transfer_clip() - a no-op while it was cut
+# on the same rig.
 func _merge_clips(anim_player: AnimationPlayer) -> void:
 	if anim_player == null:
 		push_error("Wanderer: idle model has no AnimationPlayer; cannot merge clips.")
@@ -1022,8 +1085,8 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 	var idle_entry := _find_single_animation(anim_player, "idle AnimationPlayer")
 	if idle_entry.is_empty():
 		return
-	var idle_library := anim_player.get_animation_library(idle_entry["library"])
-	idle_library.rename_animation(idle_entry["name"], "Idle")
+	var library := anim_player.get_animation_library(idle_entry["library"])
+	library.rename_animation(idle_entry["name"], "Idle")
 	# Mixamo/FBX imports default to LOOP_NONE - play() would run this once
 	# and hold on the last frame instead of looping, which reads as "idle
 	# froze" the moment the clip's own (short) duration elapses. Applies
@@ -1032,208 +1095,162 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 	var idle_animation: Animation = idle_entry["animation"]
 	idle_animation.loop_mode = Animation.LOOP_LINEAR
 
-	var walk_scene := load(WALK_SCENE_PATH) as PackedScene
-	var walk_instance := walk_scene.instantiate()
-	var walk_players := walk_instance.find_children("*", "AnimationPlayer", true, false)
-	if walk_players.is_empty():
-		push_error("Wanderer: walking model has no AnimationPlayer; Walk clip not merged.")
-		walk_instance.free()
-		return
-
-	var walk_player := walk_players[0] as AnimationPlayer
-	var walk_entry := _find_single_animation(walk_player, "walking AnimationPlayer")
-	if walk_entry.is_empty():
-		walk_instance.free()
-		return
-
-	var walk_animation: Animation = walk_entry["animation"]
-	walk_animation.loop_mode = Animation.LOOP_LINEAR
-	idle_library.add_animation("Walk", walk_animation)
-	walk_instance.free()
-
-	if walk_animation.get_track_count() == 0:
-		push_error("Wanderer: merged Walk animation has no tracks; clip merge is broken.")
-		return
-
 	var anim_root := anim_player.get_node_or_null(anim_player.root_node)
-	var track_node_path := NodePath(walk_animation.track_get_path(0).get_concatenated_names())
+	var skeletons: Array[Node] = _model.find_children("*", "Skeleton3D", true, false) if _model != null else []
+	var target_skeleton := skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
+	for clip: Dictionary in _merged_clips():
+		if not _merge_clip(library, anim_root, target_skeleton, clip):
+			return
+
+# The clips merged after the model's own, in order: name in the library,
+# source file, loop mode, whether the Hips' forward drift is taken out
+# (remove_walk_root_motion / _remove_walk_root_motion()), and a label for
+# errors.
+# - Walk, Run: loops; Run plays during a dash in place of Walk/Idle (see
+#   _physics_process()). Both carry the same Mixamo locomotion-root quirk.
+# - BattleIdle: a loop - see enter_battle_stance()/exit_battle_stance().
+# - DrawSword: a one-shot combat-start transition, LOOP_NONE explicitly
+#   (rather than trusting whatever the import defaulted to) - enter_battle_
+#   stance() relies on it finishing so the queued BattleIdle can start.
+# - Slash: a one-shot attack swing, triggered by CardData.battle_animation
+#   (see _on_card_played()), not anything here.
+# - Brace: a one-shot like Slash: the Brace card plays it once (CardData.
+#   battle_animation) and the Wanderer returns to rest. It used to loop as
+#   a held pose while Braced sat on the player; Braced is on the enemy now,
+#   so there's nothing on him to hold it for.
+func _merged_clips() -> Array[Dictionary]:
+	return [
+		{"name": "Walk", "path": WALK_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "root_motion": true, "label": "walking"},
+		{"name": "Run", "path": RUN_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "root_motion": true, "label": "running"},
+		{"name": "BattleIdle", "path": BATTLE_IDLE_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "root_motion": false, "label": "battle-idle"},
+		{"name": "DrawSword", "path": DRAW_SWORD_SCENE_PATH, "loop": Animation.LOOP_NONE, "root_motion": false, "label": "draw-sword"},
+		{"name": "Slash", "path": SLASH_SCENE_PATH, "loop": Animation.LOOP_NONE, "root_motion": false, "label": "slash"},
+		{"name": "Brace", "path": BRACE_SCENE_PATH, "loop": Animation.LOOP_NONE, "root_motion": false, "label": "brace"},
+	]
+
+# Loads one clip file, finds its one real clip, carries it onto the
+# model's skeleton (_transfer_clip()), sets its loop mode and adds it to
+# library under clip["name"] - then checks the merged clip's first track
+# resolves to a Skeleton3D under anim_root. False (with a push_error) when
+# any step fails; _merge_clips() stops there.
+func _merge_clip(library: AnimationLibrary, anim_root: Node, target_skeleton: Skeleton3D, clip: Dictionary) -> bool:
+	var clip_name: String = clip["name"]
+	var label: String = clip["label"]
+	var scene := load(String(clip["path"])) as PackedScene
+	var instance := scene.instantiate()
+	var players := instance.find_children("*", "AnimationPlayer", true, false)
+	if players.is_empty():
+		push_error("Wanderer: %s model has no AnimationPlayer; %s clip not merged." % [label, clip_name])
+		instance.free()
+		return false
+
+	var entry := _find_single_animation(players[0] as AnimationPlayer, "%s AnimationPlayer" % label)
+	if entry.is_empty():
+		instance.free()
+		return false
+
+	var source_animation: Animation = entry["animation"]
+	# In the source rig's own frame, before the transfer - the Hips'
+	# vertical there is Y, which _remove_walk_root_motion() keeps.
+	var strip_root_motion: bool = clip["root_motion"]
+	if strip_root_motion and remove_walk_root_motion:
+		_remove_walk_root_motion(source_animation)
+	var source_skeletons := instance.find_children("*", "Skeleton3D", true, false)
+	var source_skeleton := source_skeletons[0] as Skeleton3D if not source_skeletons.is_empty() else null
+	var animation: Animation = _transfer_clip(source_animation, instance, source_skeleton, anim_root, target_skeleton)
+	var loop_mode: Animation.LoopMode = clip["loop"]
+	animation.loop_mode = loop_mode
+	library.add_animation(clip_name, animation)
+	instance.free()
+
+	if animation.get_track_count() == 0:
+		push_error("Wanderer: merged %s animation has no tracks; clip merge is broken." % clip_name)
+		return false
+
+	var track_node_path := NodePath(animation.track_get_path(0).get_concatenated_names())
 	var resolved := anim_root.get_node_or_null(track_node_path) if anim_root else null
 	if not (resolved is Skeleton3D):
-		push_error("Wanderer: Walk animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(track_node_path))
-		return
+		push_error("Wanderer: %s animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % [clip_name, str(track_node_path)])
+		return false
+	return true
 
-	if remove_walk_root_motion:
-		_remove_walk_root_motion(walk_animation)
+# Carries a clip cut on one rig (source_skeleton, under source_root) onto
+# the model's skeleton (target_skeleton, under target_root - the
+# AnimationPlayer's root), by bone name:
+# - every bone track is re-pointed at target_skeleton's path;
+# - the root bone's rotation and position keys are carried from the
+#   source skeleton's frame into the target's through the nodes above
+#   each (an Armature's scale and turn included), so the hips stand and
+#   face in model space as they did;
+# - every other bone's rotation keys stay as they are. A Mixamo clip holds
+#   each bone's pose as its absolute local rotation, not as a bend from
+#   rest: the running, slash and brace files carry arm rests up to 26 deg
+#   off the idle rig's and have always played as-is on it. Turning keys by
+#   the rest difference would add that difference to the motion;
+# - any other bone's position keys become the target's rest position, so
+#   limbs keep the target rig's own lengths.
+# Scale keys are left as they are. A clip whose skeleton path and frame
+# are the same on both rigs comes back as the same Animation, unchanged.
+# Otherwise the clip is a copy: the source is the import's own cached
+# resource, which a second Wanderer would carry over again.
+func _transfer_clip(animation: Animation, source_root: Node, source_skeleton: Skeleton3D, target_root: Node, target_skeleton: Skeleton3D) -> Animation:
+	if source_skeleton == null or target_skeleton == null or target_root == null:
+		return animation
+	var source_frame: Transform3D = _transform_under(source_skeleton, source_root)
+	var target_frame: Transform3D = _transform_under(target_skeleton, target_root)
+	var source_path := String(source_root.get_path_to(source_skeleton))
+	var target_path := String(target_root.get_path_to(target_skeleton))
+	if source_frame.is_equal_approx(target_frame) and source_path == target_path:
+		return animation
 
-	# Run - same shape as the Walk merge above (load, find its one real
-	# clip by keyframe count, loop it, merge into the same idle_library),
-	# reusing remove_walk_root_motion/_remove_walk_root_motion() since it's
-	# the same Mixamo locomotion-root quirk, just a different clip. Played
-	# during a dash in place of Walk/Idle - see _physics_process().
-	var run_scene := load(RUN_SCENE_PATH) as PackedScene
-	var run_instance := run_scene.instantiate()
-	var run_players := run_instance.find_children("*", "AnimationPlayer", true, false)
-	if run_players.is_empty():
-		push_error("Wanderer: running model has no AnimationPlayer; Run clip not merged.")
-		run_instance.free()
-		return
+	var copy := animation.duplicate(true) as Animation
+	var frame_shift: Transform3D = target_frame.affine_inverse() * source_frame
+	var frame_turn: Quaternion = target_frame.basis.orthonormalized().get_rotation_quaternion().inverse() * source_frame.basis.orthonormalized().get_rotation_quaternion()
+	for track_idx in copy.get_track_count():
+		var bone := _track_bone(copy, track_idx, source_root, source_skeleton)
+		if bone == "":
+			continue
+		var target_bone := target_skeleton.find_bone(bone)
+		if target_bone == -1:
+			continue
+		copy.track_set_path(track_idx, NodePath("%s:%s" % [target_path, bone]))
+		var is_root: bool = target_skeleton.get_bone_parent(target_bone) == -1
+		match copy.track_get_type(track_idx):
+			Animation.TYPE_ROTATION_3D:
+				if not is_root:
+					continue
+				for key_idx in copy.track_get_key_count(track_idx):
+					var key: Quaternion = copy.track_get_key_value(track_idx, key_idx)
+					copy.track_set_key_value(track_idx, key_idx, (frame_turn * key).normalized())
+			Animation.TYPE_POSITION_3D:
+				var rest_origin: Vector3 = target_skeleton.get_bone_rest(target_bone).origin
+				for key_idx in copy.track_get_key_count(track_idx):
+					var key: Vector3 = copy.track_get_key_value(track_idx, key_idx)
+					copy.track_set_key_value(track_idx, key_idx, frame_shift * key if is_root else rest_origin)
+	return copy
 
-	var run_player := run_players[0] as AnimationPlayer
-	var run_entry := _find_single_animation(run_player, "running AnimationPlayer")
-	if run_entry.is_empty():
-		run_instance.free()
-		return
+# The bone a skeleton track of animation names, when its node path is
+# source_skeleton under source_root; "" for any other track.
+func _track_bone(animation: Animation, track_idx: int, source_root: Node, source_skeleton: Skeleton3D) -> String:
+	var path := animation.track_get_path(track_idx)
+	if path.get_subname_count() == 0:
+		return ""
+	if source_root.get_node_or_null(NodePath(path.get_concatenated_names())) != source_skeleton:
+		return ""
+	return String(path.get_subname(path.get_subname_count() - 1))
 
-	var run_animation: Animation = run_entry["animation"]
-	run_animation.loop_mode = Animation.LOOP_LINEAR
-	idle_library.add_animation("Run", run_animation)
-	run_instance.free()
-
-	if run_animation.get_track_count() == 0:
-		push_error("Wanderer: merged Run animation has no tracks; clip merge is broken.")
-		return
-
-	var run_track_node_path := NodePath(run_animation.track_get_path(0).get_concatenated_names())
-	var run_resolved := anim_root.get_node_or_null(run_track_node_path) if anim_root else null
-	if not (run_resolved is Skeleton3D):
-		push_error("Wanderer: Run animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(run_track_node_path))
-		return
-
-	if remove_walk_root_motion:
-		_remove_walk_root_motion(run_animation)
-
-	# BattleIdle - same shape as the Walk merge above (load, find its one
-	# real clip by keyframe count, loop it, merge into the same idle_
-	# library, then the same post-merge checks) - see enter_battle_stance()/
-	# exit_battle_stance() for where this actually gets played.
-	var battle_idle_scene := load(BATTLE_IDLE_SCENE_PATH) as PackedScene
-	var battle_idle_instance := battle_idle_scene.instantiate()
-	var battle_idle_players := battle_idle_instance.find_children("*", "AnimationPlayer", true, false)
-	if battle_idle_players.is_empty():
-		push_error("Wanderer: battle-idle model has no AnimationPlayer; BattleIdle clip not merged.")
-		battle_idle_instance.free()
-		return
-
-	var battle_idle_player := battle_idle_players[0] as AnimationPlayer
-	var battle_idle_entry := _find_single_animation(battle_idle_player, "battle-idle AnimationPlayer")
-	if battle_idle_entry.is_empty():
-		battle_idle_instance.free()
-		return
-
-	var battle_idle_animation: Animation = battle_idle_entry["animation"]
-	battle_idle_animation.loop_mode = Animation.LOOP_LINEAR
-	idle_library.add_animation("BattleIdle", battle_idle_animation)
-	battle_idle_instance.free()
-
-	if battle_idle_animation.get_track_count() == 0:
-		push_error("Wanderer: merged BattleIdle animation has no tracks; clip merge is broken.")
-		return
-
-	var battle_idle_track_node_path := NodePath(battle_idle_animation.track_get_path(0).get_concatenated_names())
-	var battle_idle_resolved := anim_root.get_node_or_null(battle_idle_track_node_path) if anim_root else null
-	if not (battle_idle_resolved is Skeleton3D):
-		push_error("Wanderer: BattleIdle animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(battle_idle_track_node_path))
-		return
-
-	# DrawSword - same load/find/merge/check shape as BattleIdle above,
-	# with one difference: this is a one-shot combat-start transition, not
-	# a loop, so its own loop_mode is set to LOOP_NONE explicitly (rather
-	# than trusting whatever the FBX import happened to default to) -
-	# enter_battle_stance() relies on it actually finishing so the queued
-	# BattleIdle that follows can start.
-	var draw_sword_scene := load(DRAW_SWORD_SCENE_PATH) as PackedScene
-	var draw_sword_instance := draw_sword_scene.instantiate()
-	var draw_sword_players := draw_sword_instance.find_children("*", "AnimationPlayer", true, false)
-	if draw_sword_players.is_empty():
-		push_error("Wanderer: draw-sword model has no AnimationPlayer; DrawSword clip not merged.")
-		draw_sword_instance.free()
-		return
-
-	var draw_sword_player := draw_sword_players[0] as AnimationPlayer
-	var draw_sword_entry := _find_single_animation(draw_sword_player, "draw-sword AnimationPlayer")
-	if draw_sword_entry.is_empty():
-		draw_sword_instance.free()
-		return
-
-	var draw_sword_animation: Animation = draw_sword_entry["animation"]
-	draw_sword_animation.loop_mode = Animation.LOOP_NONE
-	idle_library.add_animation("DrawSword", draw_sword_animation)
-	draw_sword_instance.free()
-
-	if draw_sword_animation.get_track_count() == 0:
-		push_error("Wanderer: merged DrawSword animation has no tracks; clip merge is broken.")
-		return
-
-	var draw_sword_track_node_path := NodePath(draw_sword_animation.track_get_path(0).get_concatenated_names())
-	var draw_sword_resolved := anim_root.get_node_or_null(draw_sword_track_node_path) if anim_root else null
-	if not (draw_sword_resolved is Skeleton3D):
-		push_error("Wanderer: DrawSword animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(draw_sword_track_node_path))
-		return
-
-	# Slash - same load/find/merge/check shape as DrawSword above: a one-
-	# shot attack swing (LOOP_NONE), not a loop. Triggered by CardData.
-	# battle_animation (see _on_card_played()), not anything here.
-	var slash_scene := load(SLASH_SCENE_PATH) as PackedScene
-	var slash_instance := slash_scene.instantiate()
-	var slash_players := slash_instance.find_children("*", "AnimationPlayer", true, false)
-	if slash_players.is_empty():
-		push_error("Wanderer: slash model has no AnimationPlayer; Slash clip not merged.")
-		slash_instance.free()
-		return
-
-	var slash_player := slash_players[0] as AnimationPlayer
-	var slash_entry := _find_single_animation(slash_player, "slash AnimationPlayer")
-	if slash_entry.is_empty():
-		slash_instance.free()
-		return
-
-	var slash_animation: Animation = slash_entry["animation"]
-	slash_animation.loop_mode = Animation.LOOP_NONE
-	idle_library.add_animation("Slash", slash_animation)
-	slash_instance.free()
-
-	if slash_animation.get_track_count() == 0:
-		push_error("Wanderer: merged Slash animation has no tracks; clip merge is broken.")
-		return
-
-	var slash_track_node_path := NodePath(slash_animation.track_get_path(0).get_concatenated_names())
-	var slash_resolved := anim_root.get_node_or_null(slash_track_node_path) if anim_root else null
-	if not (slash_resolved is Skeleton3D):
-		push_error("Wanderer: Slash animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(slash_track_node_path))
-		return
-
-	# Brace - same shape again, and a one-shot like Slash: the Brace card
-	# plays it once (CardData.battle_animation) and the Wanderer returns to
-	# rest. It used to loop as a held pose while Braced sat on the player;
-	# Braced is on the enemy now, so there's nothing on him to hold it for.
-	var brace_scene := load(BRACE_SCENE_PATH) as PackedScene
-	var brace_instance := brace_scene.instantiate()
-	var brace_players := brace_instance.find_children("*", "AnimationPlayer", true, false)
-	if brace_players.is_empty():
-		push_error("Wanderer: brace model has no AnimationPlayer; Brace clip not merged.")
-		brace_instance.free()
-		return
-
-	var brace_player := brace_players[0] as AnimationPlayer
-	var brace_entry := _find_single_animation(brace_player, "brace AnimationPlayer")
-	if brace_entry.is_empty():
-		brace_instance.free()
-		return
-
-	var brace_animation: Animation = brace_entry["animation"]
-	brace_animation.loop_mode = Animation.LOOP_NONE
-	idle_library.add_animation("Brace", brace_animation)
-	brace_instance.free()
-
-	if brace_animation.get_track_count() == 0:
-		push_error("Wanderer: merged Brace animation has no tracks; clip merge is broken.")
-		return
-
-	var brace_track_node_path := NodePath(brace_animation.track_get_path(0).get_concatenated_names())
-	var brace_resolved := anim_root.get_node_or_null(brace_track_node_path) if anim_root else null
-	if not (brace_resolved is Skeleton3D):
-		push_error("Wanderer: Brace animation's first track path '%s' does not resolve to a Skeleton3D on the idle model; clip merge is broken." % str(brace_track_node_path))
-		return
+# node's transform in ancestor's space: the product of the local
+# transforms from node up to (not including) ancestor. Works on a tree
+# that isn't in the scene tree yet (a clip file's instance).
+func _transform_under(node: Node, ancestor: Node) -> Transform3D:
+	var chain := Transform3D.IDENTITY
+	var current: Node = node
+	while current != null and current != ancestor:
+		var current_3d := current as Node3D
+		if current_3d != null:
+			chain = current_3d.transform * chain
+		current = current.get_parent()
+	return chain
 
 # Freezes a Walk clip's Hips position track to its first key's X/Z, leaving
 # Y (vertical bob) untouched, so it plays in place even if the Mixamo
