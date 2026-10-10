@@ -156,34 +156,6 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 # eases in over a few frames instead of popping.
 @export var foot_grounding_smoothing_speed: float = 12.0
 
-# Widens BattleIdle's own square-on stance into a fencer's ready stance -
-# see BattleStanceModifier's own doc for the mechanics (which bone rotates
-# which way, the influence-based blend enter_battle_stance()/exit_battle_
-# stance() drive). Forwarded live into _battle_stance_modifier.
-@export_group("Battle Stance")
-@export var battle_back_leg_degrees: float = 12.0:
-	set(value):
-		battle_back_leg_degrees = value
-		if _battle_stance_modifier:
-			_battle_stance_modifier.battle_back_leg_degrees = value
-@export var battle_front_leg_degrees: float = 4.0:
-	set(value):
-		battle_front_leg_degrees = value
-		if _battle_stance_modifier:
-			_battle_stance_modifier.battle_front_leg_degrees = value
-@export var battle_pelvis_yaw_degrees: float = 6.0:
-	set(value):
-		battle_pelvis_yaw_degrees = value
-		if _battle_stance_modifier:
-			_battle_stance_modifier.battle_pelvis_yaw_degrees = value
-# Default true: he squares up with the sword in his right hand (see hand_
-# mount_bone_suffix below), so the left leg trails as the back leg.
-@export var battle_back_leg_is_left: bool = true:
-	set(value):
-		battle_back_leg_is_left = value
-		if _battle_stance_modifier:
-			_battle_stance_modifier.back_leg_is_left = value
-
 enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 
 @export_group("Follow-Through")
@@ -396,7 +368,6 @@ var _capsule_radius: float = 0.0
 # pose reads by index, every physics frame.
 var _grounding_skeleton: Skeleton3D = null
 var _grounding_bone_indices: Array[int] = []
-var _battle_stance_modifier: BattleStanceModifier = null
 
 # The uniform scale _scale_and_ground_model() applied to the model, set
 # once there - _setup_sword() has to divide its own scale factor by this,
@@ -492,7 +463,6 @@ func _ready() -> void:
 		_animation_player.play("Idle")
 
 	_find_grounding_bones(model)
-	_setup_battle_stance_modifier(model)
 	_setup_sword(model)
 	_setup_step_debug_lines()
 	_capsule_radius = _find_capsule_radius()
@@ -729,29 +699,6 @@ func _find_grounding_bones(model: Node3D) -> void:
 	if _grounding_bone_indices.is_empty():
 		push_warning("Wanderer: none of the expected foot/toe bones were found on the skeleton; continuous foot grounding disabled.")
 		_grounding_skeleton = null
-
-# Does its own Skeleton3D lookup rather than reusing _grounding_skeleton:
-# _find_grounding_bones() above nulls that out when foot/toe bones aren't
-# found, an unrelated failure that shouldn't disable this. animation_player is handed
-# over directly since BattleStanceModifier has no other way to reach it -
-# see its own doc. influence starts at 0: this should be completely inert
-# on the field, only ever raised by enter_battle_stance()'s own tween.
-func _setup_battle_stance_modifier(model: Node3D) -> void:
-	var skeletons := model.find_children("*", "Skeleton3D", true, false)
-	var skeleton := skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
-	if skeleton == null:
-		push_warning("Wanderer: no Skeleton3D found under model; battle stance widening disabled.")
-		return
-
-	_battle_stance_modifier = BattleStanceModifier.new()
-	_battle_stance_modifier.name = "BattleStanceModifier"
-	_battle_stance_modifier.animation_player = _animation_player
-	_battle_stance_modifier.battle_back_leg_degrees = battle_back_leg_degrees
-	_battle_stance_modifier.battle_front_leg_degrees = battle_front_leg_degrees
-	_battle_stance_modifier.battle_pelvis_yaw_degrees = battle_pelvis_yaw_degrees
-	_battle_stance_modifier.back_leg_is_left = battle_back_leg_is_left
-	_battle_stance_modifier.influence = 0.0
-	skeleton.add_child(_battle_stance_modifier)
 
 # Builds the two ImmediateMesh line visualizations _apply_step_up_and_down()
 # draws into via _set_debug_line() - green for the forward probe, red for
@@ -1750,11 +1697,6 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float, direct
 
 	_switch_sword_mount(_hand_frame, hand_mount_position, hand_mount_rotation_degrees, duration)
 
-	if _battle_stance_modifier:
-		var stance_tween := create_tween()
-		stance_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-		stance_tween.tween_property(_battle_stance_modifier, "influence", 1.0, duration)
-
 # Called by region_field.gd once the battle overlay resolves (win, lose,
 # or escape) - blends back from BattleIdle to the normal field Idle.
 # _physics_process's own Idle/Walk switching only fires on movement input,
@@ -1766,11 +1708,6 @@ func exit_battle_stance() -> void:
 		_animation_player.play("Idle", animation_blend_time)
 
 	_switch_sword_mount(_back_frame, back_mount_position, back_mount_rotation_degrees, animation_blend_time)
-
-	if _battle_stance_modifier:
-		var stance_tween := create_tween()
-		stance_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-		stance_tween.tween_property(_battle_stance_modifier, "influence", 0.0, animation_blend_time)
 
 # Called by region_field.gd right after BattleOverlay.enter_battle() (the
 # only point battle_controller exists to hand over - it's created inside

@@ -18,8 +18,6 @@ extends SceneTree
 #            frame strips battle_idle's bone scale); in BattleIdle its
 #            point is ahead of him, below the grip, and the whole blade
 #            stays above the sand under his feet
-#   stance - region_field's BattleStanceModifier values are all 0, so
-#            BattleIdle shows as authored
 #
 # The Wanderer's own _physics_process is held off (process_mode disabled,
 # as the battle freeze does) so it doesn't put Idle back; the model under
@@ -192,10 +190,6 @@ func _initialize() -> void:
 	_check((tip - grip).dot(forward) > 0.5, "its point is ahead of him (%.2f m)" % (tip - grip).dot(forward))
 	_check(tip.y < grip.y - 0.3, "its point angles down (%.2f m below the grip)" % (grip.y - tip.y))
 	_check(lowest > ground_y + 0.02, "the blade stays above the sand (%.3f m)" % (lowest - ground_y))
-
-	print("\n=== stance")
-	for value in ["battle_back_leg_degrees", "battle_front_leg_degrees", "battle_pelvis_yaw_degrees"]:
-		_check(is_zero_approx(float(_wanderer.get(value))), "%s is 0 (%s)" % [value, _wanderer.get(value)])
 
 	_field.queue_free()
 	for i in 5:

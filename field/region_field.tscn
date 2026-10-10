@@ -203,9 +203,6 @@ back_mount_position = Vector3(0.17, 0.5, 0.05)
 back_mount_rotation_degrees = Vector3(24, 0, -19.935)
 hand_mount_position = Vector3(0.026, 0.127, 0.0433)
 hand_mount_rotation_degrees = Vector3(-48.41, 60.26, 161.82)
-battle_back_leg_degrees = 0.0
-battle_front_leg_degrees = 0.0
-battle_pelvis_yaw_degrees = 0.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Wanderer" unique_id=1638228685]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)
