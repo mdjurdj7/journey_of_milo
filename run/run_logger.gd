@@ -41,7 +41,10 @@ class_name RunLogger
 #
 # Format 2 (2026-10-07): debug_run and "stopped"; per-hit, self-loss and
 # heal lines; per-turn energy and draws; Toll by source; mechanic events;
-# encounter fields on fight_start.
+# encounter fields on fight_start. Added within format 2 (2026-10-10),
+# nothing existing changed: floor_entered's slots (slot id -> the option
+# it stood), fight_start's slot and option, and each member's slot_id and
+# option_id.
 
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
@@ -198,7 +201,10 @@ static func start_run(seed: int, character_name: String, snapshot: Dictionary) -
 		"keepsake": snapshot.get("keepsake"),
 	})
 
-static func floor_entered(snapshot: Dictionary) -> void:
+# `slots`: each of the floor's encounter slots, in order, with the option
+# it stood this load (RegionField._resolve_encounters()) - slot id ->
+# option id.
+static func floor_entered(snapshot: Dictionary, slots: Dictionary = {}) -> void:
 	_region = snapshot.get("region", 0)
 	_floor = snapshot.get("floor", 0)
 	_lap = snapshot.get("lap", 0)
@@ -213,6 +219,7 @@ static func floor_entered(snapshot: Dictionary) -> void:
 		"toll": snapshot.get("toll", 0),
 		"deck_size": snapshot.get("deck_size", 0),
 		"keepsake": snapshot.get("keepsake"),
+		"slots": slots,
 	})
 
 # The run is over: `cause` is won (Region 1's last floor left by its
@@ -267,13 +274,15 @@ static func encounter_key(names: Array[String]) -> String:
 	return " + ".join(parts)
 
 # `members`: one entry per enemy - its id, floor_index (its place in the
-# floor's spawn order, FieldEnemy<n>), required, elite, region_end (the region-end
-# fight, FloorEnemy.CardReward.TOP_TIER_FIRST). `role` is the encounter's,
-# the strongest of them - region_end, elite, required, else basic -
-# decided by the caller (BattleController.encounter_role()) and only
+# floor's spawn order, FieldEnemy<n>), required, elite, region_end (the
+# region-end fight, FloorEnemy.CardReward.TOP_TIER_FIRST), slot_id and
+# option_id. `slot` and `option`: the encounter slot the fight stands in
+# and the option it stood ("" for enemies placed by hand). `role` is the
+# encounter's, the strongest of them - region_end, elite, required, else
+# basic - decided by the caller (BattleController.encounter_role()) and only
 # recorded here: naming BattleController would tie this logger to the
 # RunState autoload, which a -s script compiles without.
-static func fight_start(encounter: String, enemy_ids: Array[String], snapshot: Dictionary, members: Array[Dictionary] = [], role: String = "basic") -> void:
+static func fight_start(encounter: String, enemy_ids: Array[String], snapshot: Dictionary, members: Array[Dictionary] = [], role: String = "basic", slot: String = "", option: String = "") -> void:
 	_fight_open = true
 	_encounter = encounter
 	_turn = 0
@@ -311,6 +320,8 @@ static func fight_start(encounter: String, enemy_ids: Array[String], snapshot: D
 		"enemies": enemy_ids,
 		"members": members,
 		"role": role,
+		"slot": slot,
+		"option": option,
 		"region": _region,
 		"floor": _floor,
 		"lap": _lap,

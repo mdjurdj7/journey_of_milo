@@ -628,7 +628,7 @@ func _ready() -> void:
 	# The order at floor load: what each slot stands (no side effects),
 	# then the log line that names it, then everything spawns.
 	_resolve_encounters()
-	RunLogger.floor_entered(RunState.run_snapshot())
+	RunLogger.floor_entered(RunState.run_snapshot(), _stood_slots())
 
 	# Ensures forward is computed (and printed) even if no child asked for
 	# it first; a no-op if one already did.
@@ -1127,6 +1127,14 @@ func _resolve_encounters() -> void:
 		encounter.slot = slot
 		encounter.option = _choose_option(slot)
 		_encounters.append(encounter)
+
+# This load's slots and what each stands, slot id -> option id, in slot
+# order - the run log's floor_entered.
+func _stood_slots() -> Dictionary:
+	var stood: Dictionary = {}
+	for encounter in _encounters:
+		stood[String(encounter.slot.slot_id)] = String(encounter.option.option_id)
+	return stood
 
 # One slot's option this load - see _resolve_encounters() - recorded in
 # RunState.encounter_rolls.

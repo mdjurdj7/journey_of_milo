@@ -277,7 +277,11 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	# it was escaped from) opens without its pack move.
 	_mark_lone_pack_members()
 
-	RunLogger.fight_start(RunLogger.encounter_key(enemy_names), enemy_ids, RunState.run_snapshot(), members, encounter_role(members))
+	# One fight is one slot's option (a cluster never spans slots): the
+	# first member's.
+	var slot_id: String = String(enemies[0].slot_id) if not enemies.is_empty() else ""
+	var option_id: String = String(enemies[0].option_id) if not enemies.is_empty() else ""
+	RunLogger.fight_start(RunLogger.encounter_key(enemy_names), enemy_ids, RunState.run_snapshot(), members, encounter_role(members), slot_id, option_id)
 	for enemy in enemies:
 		var logged: Combatant = _combatants[enemy]
 		RunLogger.enemy_hp_seen(logged.get_instance_id(), logged.hp)
@@ -930,8 +934,9 @@ func _impact_delay_for(card: CardData) -> float:
 
 # One member of an encounter as the run log and the reward read it
 # (RunLogger.fight_start()'s members, encounter_role()): its
-# data's file name, its place on the floor, and the three flags its role
-# is made of. `enemy` must have its enemy_data.
+# data's file name, its place on the floor, the three flags its role is
+# made of, and the encounter slot and option it was spawned from. `enemy`
+# must have its enemy_data.
 static func encounter_member(enemy: FieldEnemy) -> Dictionary:
 	var data: EnemyData = enemy.enemy_data
 	return {
@@ -940,6 +945,8 @@ static func encounter_member(enemy: FieldEnemy) -> Dictionary:
 		"required": enemy.required,
 		"elite": data.is_elite,
 		"region_end": enemy.card_reward == FloorEnemy.CardReward.TOP_TIER_FIRST,
+		"slot_id": String(enemy.slot_id),
+		"option_id": String(enemy.option_id),
 	}
 
 # The encounter's role - the strongest any member is (encounter_member()):

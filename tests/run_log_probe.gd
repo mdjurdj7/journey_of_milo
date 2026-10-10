@@ -8,6 +8,8 @@ extends SceneTree
 #
 #   - the events in order: run_start, floor_entered, fight_start,
 #     fight_end, the reward lines, run_end
+#   - which encounter: floor_entered's slots (slot id -> the option it
+#     stood), fight_start's slot and option and each member's
 #   - the fight's sums: turns, every card with its turn, Energy, hp_cost
 #     (Collateral's swap) and hp_effect (Hold Fast's and Blood Arc's own
 #     self-damage), damage dealt equal to the Sputter's HP, HP that
@@ -218,8 +220,12 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	_expect_eq(str(start.get("class")), "Wanderer", "run_start: the class")
 	_expect(start.get("deck") is Dictionary and not (start.get("deck") as Dictionary).is_empty(), "run_start: the starting deck as counts")
 
+	var entered: Dictionary = _first(lines, "floor_entered")
+	_expect_eq(entered.get("slots"), {"crab": "sputter"}, "floor_entered: floor 1's one slot and the option it stood")
+
 	var fight_start: Dictionary = _first(lines, "fight_start")
 	_expect_eq(str(fight_start.get("encounter")), "Sputter", "fight_start: the encounter")
+	_expect_eq([str(fight_start.get("slot")), str(fight_start.get("option"))], ["crab", "sputter"], "...its slot and option")
 	_expect_eq(fight_start.get("enemies"), ["sputter"], "...its enemies by file")
 	_expect_eq(int(fight_start.get("floor", -1)), 0, "...on floor index 0")
 	# Format 2: the encounter's members and role.
@@ -228,6 +234,7 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	if not members.is_empty():
 		var member: Dictionary = members[0]
 		_expect_eq([str(member.get("id")), int(member.get("floor_index", -1)), member.get("required"), member.get("elite"), member.get("region_end")], ["sputter", 0, true, false, false], "...the Sputter: floor index 0, required, not elite, not region-end")
+		_expect_eq([str(member.get("slot_id")), str(member.get("option_id"))], ["crab", "sputter"], "...from slot crab, option sputter")
 	_expect_eq(str(fight_start.get("role")), "required", "...a required fight")
 
 	var fight: Dictionary = _first(lines, "fight_end")
