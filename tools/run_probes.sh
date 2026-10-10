@@ -244,7 +244,7 @@ area_probes() {
 		floor4) echo "kill_order floor4 wear_path dunecur collector adder" ;;
 		floor5) echo "kill_order floor5 wear_path greyshelf elite_reward" ;;
 		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur adder floor5 greyshelf underfoot pathing scatter" ;;
-		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake keepsake_tile toll_carry run_log frayed_cord elite_reward run_lost temper" ;;
+		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake keepsake_tile toll_carry run_log frayed_cord elite_reward run_lost temper reward_roles" ;;
 		hud) echo "gold_line glassbone trinket keepsake_tile" ;;
 		hp_bar) echo "kill_order adder" ;;
 		ui_inspect) echo "keyword" ;;
