@@ -65,7 +65,7 @@ static func build() -> Dictionary:
 			"description": "Generated export of every enemy encounter as placed in each FloorData, by region and floor in RegionData order, and every enemy data file once (enemies). Never edit by hand - regenerate it; tests/enemy_export_probe.gd fails when this file is stale.",
 			"regenerate": REGENERATE,
 			"generated_from": [
-				REGION_SCENE_PATH + " (its region and elite_gold_multiplier)",
+				REGION_SCENE_PATH + " (its region and encounter_rewards_path)",
 				"res://floors/*.tres (RegionData, FloorData, FloorEnemy, FloorPatrol, FloorProp)",
 				ENEMY_DIR + "*.tres (EnemyData, EnemyIntent)",
 				"res://battle/rules/statuses/*.tres (StatusData, resolved through Status.describe())",
@@ -76,8 +76,8 @@ static func build() -> Dictionary:
 			"positions": "World XZ offsets from the floor's spawn, metres ([x, z]).",
 			"required": "FloorEnemy.required: the floor is cleared, and its gate opens, once no required enemy stands. A cluster is the entries sharing a FloorEnemy.group; it is required when any member is.",
 			"gate_fight": "The encounter holding FloorData.enemies[0]: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past that enemy, along exit_direction.",
-			"elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times RegionField.elite_gold_multiplier (rounded) and rolls its card at the pool's elite rarity rates. A placement marked FloorEnemy.card_reward TOP_TIER_FIRST (floor 5's region-end Greyshelf) offers its cards from the highest tier down instead (RewardPool.roll_top_tier()), at the floor's gold. See each encounter's elite_rewards. Keepsakes and Glassbone are their own fields.",
-			"rewards": "Gold and the card reward are the floor's (FloorData), the same for every fight on it. Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Glassbone: every member's, summed.",
+			"elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times its role's gold_multiplier in EncounterRewards (the elite's, rounded) and rolls its card at the pool's elite rarity rates. A placement marked FloorEnemy.card_reward TOP_TIER_FIRST (floor 5's region-end Greyshelf) offers its cards from the highest tier down instead (RewardPool.roll_top_tier()), at the floor's gold. See each encounter's elite_rewards. Keepsakes and Glassbone are their own fields.",
+			"rewards": "Gold is the floor's roll (FloorData) times the fight's role's gold_multiplier; whether it offers cards, and an optional basic fight's extra (a removal or a Samphire), are its role's too (EncounterRewards, by RunLogger.encounter_role()). Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Glassbone: every member's, summed.",
 			"intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping.",
 		},
 		"regions": region_list,
@@ -580,10 +580,14 @@ static func _default_model_path() -> String:
 		return ""
 	return String(script.get_script_constant_map().get("DEFAULT_MODEL_SCENE_PATH", ""))
 
-# RegionField's elite_gold_multiplier, as its scene sets it.
+# The elite role's gold multiplier: EncounterRewards.elite, from the
+# rewards RegionField's scene points at.
 static func _elite_gold_multiplier() -> float:
-	var value: Variant = _scene_root_property(REGION_SCENE_PATH, "elite_gold_multiplier")
-	return float(value) if value != null else 1.0
+	var path: Variant = _scene_root_property(REGION_SCENE_PATH, "encounter_rewards_path")
+	var rewards := load(String(path)) as EncounterRewards if path != null else null
+	if rewards == null or rewards.elite == null:
+		return 1.0
+	return rewards.elite.gold_multiplier
 
 static func _cards_offered() -> int:
 	var value: Variant = _scene_root_property(REWARD_SCREEN_SCENE_PATH, "choice_count")

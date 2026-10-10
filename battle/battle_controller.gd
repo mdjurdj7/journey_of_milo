@@ -271,13 +271,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 			# Two enemies can share a name (the Dragonflies) - the file
 			# tells them apart in the log.
 			enemy_ids.append(data.resource_path.get_file().get_basename())
-			members.append({
-				"id": data.resource_path.get_file().get_basename(),
-				"floor_index": enemy.floor_index,
-				"required": enemy.required,
-				"elite": data.is_elite,
-				"region_end": enemy.card_reward == FloorEnemy.CardReward.TOP_TIER_FIRST,
-			})
+			members.append(encounter_member(enemy))
 		_combatants[enemy] = combatant
 	# A pack met with one member left (the rest killed in an earlier fight
 	# it was escaped from) opens without its pack move.
@@ -933,6 +927,20 @@ func _impact_delay_for(card: CardData) -> float:
 		if clip_length > 0.0:
 			delay = minf(delay, clip_length)
 	return delay
+
+# One member of an encounter as the run log and the reward read it
+# (RunLogger.fight_start()'s members, RunLogger.encounter_role()): its
+# data's file name, its place on the floor, and the three flags its role
+# is made of. `enemy` must have its enemy_data.
+static func encounter_member(enemy: FieldEnemy) -> Dictionary:
+	var data: EnemyData = enemy.enemy_data
+	return {
+		"id": data.resource_path.get_file().get_basename(),
+		"floor_index": enemy.floor_index,
+		"required": enemy.required,
+		"elite": data.is_elite,
+		"region_end": enemy.card_reward == FloorEnemy.CardReward.TOP_TIER_FIRST,
+	}
 
 # --- Devour ---
 

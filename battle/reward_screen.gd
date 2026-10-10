@@ -226,6 +226,12 @@ var _glassbone: int = 0
 var _pool: RewardPool = null
 var _elite_rates: bool = false
 var _top_tier: bool = false
+# The fight's role offers the card choice (RoleReward.offers_cards); its
+# extra beside the gold (EncounterRewards.Extra), and the card a Samphire
+# extra is.
+var _offers_cards: bool = true
+var _extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE
+var _extra_card: CardData = null
 var _deck_panel: Control = null
 var _mode: int = Mode.LIST
 var _hovered: int = -1
@@ -275,15 +281,21 @@ var _decline_top_px: float = 0.0
 # chosen; deck_panel is where a taken card flies to; glassbone is what
 # the fight's enemies left (0 = no line); elite_rates rolls the card at
 # the pool's elite rarity rates; top_tier offers it from the highest tier
-# down instead (the region-end fight - RewardPool.roll_top_tier()). Called
-# by RegionField before the screen is added to the tree.
-func setup(gold: int, pool: RewardPool, deck_panel: Control, glassbone: int = 0, elite_rates: bool = false, top_tier: bool = false) -> void:
+# down instead (the region-end fight - RewardPool.roll_top_tier()).
+# offers_cards false leaves the card line out (an optional basic fight -
+# EncounterRewards); extra is what its role rolled beside the gold, and
+# extra_card the Samphire a SAMPHIRE extra offers. Called by RegionField
+# before the screen is added to the tree.
+func setup(gold: int, pool: RewardPool, deck_panel: Control, glassbone: int = 0, elite_rates: bool = false, top_tier: bool = false, offers_cards: bool = true, extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE, extra_card: CardData = null) -> void:
 	_gold = gold
 	_glassbone = glassbone
 	_pool = pool
 	_deck_panel = deck_panel
 	_elite_rates = elite_rates
 	_top_tier = top_tier
+	_offers_cards = offers_cards
+	_extra = extra
+	_extra_card = extra_card
 
 func _ready() -> void:
 	# The field is frozen under this (RegionField goes back to
@@ -344,7 +356,7 @@ func _build_lines() -> void:
 			glassbone_line.icon = load(glassbone_icon_path) as Texture2D
 		glassbone_line.shard_glyph = glassbone_line.icon == null
 		_lines.append(glassbone_line)
-	if _pool != null and not _pool.entries.is_empty():
+	if _offers_cards and _pool != null and not _pool.entries.is_empty():
 		var card_line := RewardLine.new()
 		card_line.id = "card"
 		card_line.item = "A card"

@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="EncounterRewards" format=3]
+
+[ext_resource type="Script" path="res://run/encounter_rewards.gd" id="1_rewards"]
+[ext_resource type="Script" path="res://run/role_reward.gd" id="2_role"]
+[ext_resource type="Resource" path="res://cards/neutral/samphire.tres" id="3_samphire"]
+
+[sub_resource type="Resource" id="RoleReward_region_end"]
+script = ExtResource("2_role")
+
+[sub_resource type="Resource" id="RoleReward_elite"]
+script = ExtResource("2_role")
+gold_multiplier = 1.5
+
+[sub_resource type="Resource" id="RoleReward_required"]
+script = ExtResource("2_role")
+
+[sub_resource type="Resource" id="RoleReward_basic"]
+script = ExtResource("2_role")
+offers_cards = false
+gold_multiplier = 1.5
+extra_chance = 0.3
+removal_weight = 2
+samphire_weight = 1
+
+[resource]
+script = ExtResource("1_rewards")
+region_end = SubResource("RoleReward_region_end")
+elite = SubResource("RoleReward_elite")
+required = SubResource("RoleReward_required")
+basic = SubResource("RoleReward_basic")
+samphire_card = ExtResource("3_samphire")

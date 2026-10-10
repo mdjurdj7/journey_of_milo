@@ -92,9 +92,10 @@ enum RewardMode { SCREEN, WORLD }
 # Raised to the camera rig's own battle_transition_time when that's
 # longer, so retuning the blend doesn't leave this stale.
 @export var reward_spread_delay_sec: float = 0.6
-# A fight with an elite in it (EnemyData.is_elite) pays the floor's gold
-# roll times this, rounded. Read when the reward screen opens.
-@export var elite_gold_multiplier: float = 1.5
+# What a won fight leaves by its encounter role - cards, the gold
+# multiplier (the elite's 1.5 included), an optional fight's extra
+# (EncounterRewards). Loaded when the reward screen opens.
+@export_file("*.tres") var encounter_rewards_path: String = "res://run/encounter_rewards.tres"
 
 # Playable boundary, centered on origin. X = width (left/right side
 # edges), Y-component of field_extents = depth along the field's
@@ -465,6 +466,12 @@ var _fight_elite: bool = false
 var _fight_top_tier: bool = false
 var _pending_elite: bool = false
 var _pending_top_tier: bool = false
+# The fight's encounter role (RunLogger.encounter_role(), from the same
+# members the run log is given - BattleController.encounter_member()),
+# set as it starts and carried to the last win's reward the same way:
+# what EncounterRewards pays it.
+var _fight_role: String = "basic"
+var _pending_role: String = "basic"
 var _floor_cleared_emitted: bool = false
 # Debug builds only (_setup_debug_row()): the field's F1 row, and which
 # of debug_keepsake_paths its button grants next.
@@ -1779,11 +1786,15 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	_battle_members = _battle_members_for(enemy)
 	_fight_elite = false
 	_fight_top_tier = false
+	var members: Array[Dictionary] = []
 	for member in _battle_members:
 		if member.enemy_data != null and member.enemy_data.is_elite:
 			_fight_elite = true
 		if member.card_reward == FloorEnemy.CardReward.TOP_TIER_FIRST:
 			_fight_top_tier = true
+		if member.enemy_data != null:
+			members.append(BattleController.encounter_member(member))
+	_fight_role = RunLogger.encounter_role(members)
 	var anchor: FieldEnemy = _battle_members[0]
 	# A patrolling pack stops where it is: pending take-offs dropped, and
 	# any member in the air comes down where it is - the anchor here,
@@ -1983,6 +1994,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 			_pending_glassbone = _glassbone_left_by(won_against)
 			_pending_elite = _fight_elite
 			_pending_top_tier = _fight_top_tier
+			_pending_role = _fight_role
 			for member in standing:
 				# The last kill, its death played out, frees itself.
 				if member.is_settling():
@@ -2102,16 +2114,28 @@ func _open_reward_screen() -> void:
 	# Only reached through _spawn_reward_spread(), which has already checked
 	# the floor, and that there is a pool or Glassbone to offer.
 	var floor_data := get_floor_data()
-	# A floor with no pool opens this only for Glassbone: no gold, no card.
+	# What the fight's role pays (EncounterRewards): with none to read, the
+	# floor's gold and the card offer, as every fight once had.
+	var rewards := load(encounter_rewards_path) as EncounterRewards
+	if rewards == null:
+		push_warning("RegionField: could not load %s; the reward is the floor's gold and a card." % encounter_rewards_path)
+	var role_reward: RoleReward = rewards.for_role(_pending_role) if rewards != null else null
+	# A floor with no pool opens this only for Glassbone: no gold, no card,
+	# no extra.
 	var gold: int = 0
+	var extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE
 	if floor_data.reward_pool != null:
 		gold = RunState.rng.randi_range(mini(floor_data.gold_min, floor_data.gold_max), maxi(floor_data.gold_min, floor_data.gold_max))
-		if _pending_elite:
-			gold = roundi(gold * elite_gold_multiplier)
-	screen.setup(gold, floor_data.reward_pool, deck_panel, _pending_glassbone, _pending_elite, _pending_top_tier)
+		if role_reward != null:
+			gold = roundi(gold * role_reward.gold_multiplier)
+			extra = rewards.roll_extra(role_reward, RunState.rng)
+	var offers_cards: bool = role_reward == null or role_reward.offers_cards
+	var samphire: CardData = rewards.samphire_card if rewards != null else null
+	screen.setup(gold, floor_data.reward_pool, deck_panel, _pending_glassbone, _pending_elite, _pending_top_tier, offers_cards, extra, samphire)
 	_pending_glassbone = 0
 	_pending_elite = false
 	_pending_top_tier = false
+	_pending_role = "basic"
 	screen.closed.connect(_on_reward_screen_closed)
 	add_child(screen)
 	process_mode = Node.PROCESS_MODE_DISABLED
