@@ -197,6 +197,11 @@ var _deck_readout: DeckPanel = null
 var _discard_readout: DeckPanel = null
 var _keepsake_row: KeepsakeRow = null
 var _devour_button: DevourButton = null
+# The energy readout and Devour under it, as one group (_create_corner_
+# readouts()): placed as a whole by _apply_energy_anchor(), their own
+# layout inside it. Ignores the mouse, so it never stands in front of a
+# card - the two in it take their own clicks.
+var _energy_group: Control = null
 # The theme's current value set (see enter_battle()/_flip_dark_world()).
 var _on_dark_world: bool = false
 # End Turn is enabled only while both hold - see _update_end_turn().
@@ -424,8 +429,12 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 # own children, freed with it. Bound/placed once the controller's Deck
 # exists (see enter_battle()).
 func _create_corner_readouts() -> void:
+	_energy_group = Control.new()
+	_energy_group.name = "EnergyGroup"
+	_energy_group.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_energy_group)
 	_resources = BattleResources.new()
-	add_child(_resources)
+	_energy_group.add_child(_resources)
 	# Its size changes with the numeral and the tally; the right edge and
 	# the numeral's top hold.
 	_resources.resized.connect(_apply_energy_anchor)
@@ -438,7 +447,7 @@ func _create_corner_readouts() -> void:
 	add_child(_keepsake_row)
 	_devour_button = DevourButton.new()
 	_devour_button.name = "DevourButton"
-	add_child(_devour_button)
+	_energy_group.add_child(_devour_button)
 	_devour_button.resized.connect(_apply_energy_anchor)
 
 # The keepsakes with no in-combat counter go in the row under DECK; one
@@ -480,16 +489,27 @@ func _layout_corners() -> void:
 # readout's size. The keepsake row's hover text keeps to the readout's top
 # row, so it never lands on the readout.
 func _apply_energy_anchor() -> void:
-	if _resources == null:
+	if _resources == null or _energy_group == null:
 		return
-	_resources.position = Vector2(maxf(energy_anchor.x - _resources.size.x, corner_margin_px), energy_anchor.y - energy_stack_lift_px - _resources.numeral_ink_top())
+	# The group goes where the readout's top-left goes; inside it the
+	# readout sits at its origin and Devour under it.
+	_energy_group.position = Vector2(maxf(energy_anchor.x - _resources.size.x, corner_margin_px), energy_anchor.y - energy_stack_lift_px - _resources.numeral_ink_top())
+	_resources.position = Vector2.ZERO
 	if _keepsake_row != null:
 		_keepsake_row.set_reveal_floor_y(_resources.global_position.y)
 	# Devour under it, one column: the same left edge, its hover line over
 	# the stack's top where the keepsake reveal goes.
 	if _devour_button != null:
-		_devour_button.position = Vector2(_resources.position.x, _resources.position.y + _resources.size.y + devour_gap_px)
+		_devour_button.position = Vector2(0.0, _resources.size.y + devour_gap_px)
 		_devour_button.set_hover_floor_y(_resources.global_position.y)
+	_energy_group.size = _energy_group_extent()
+
+# The group's own size: the readout and Devour under it, together.
+func _energy_group_extent() -> Vector2:
+	var extent: Rect2 = Rect2(Vector2.ZERO, _resources.size)
+	if _devour_button != null:
+		extent = extent.merge(Rect2(_devour_button.position, _devour_button.size))
+	return extent.size
 
 # Reuses each enemy's own persistent EnemyStatus (see FieldEnemy.
 # enemy_status's own doc) rather than creating a fresh one - these live
