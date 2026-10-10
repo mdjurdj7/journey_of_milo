@@ -205,6 +205,23 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 @export var glassbone_volume_db: float = -24.0
 @export_group("")
 
+@export_group("Extra")
+# An optional basic fight's extra (EncounterRewards), its own line under
+# the gold - left behind on WALK ON:
+# - a removal: "Remove a card" / CHOOSE opens the deck as cards over this
+#   screen (DeckPanel.open_picker(), headed removal_header_text,
+#   picker_layer_offset above it). A card clicked is gone for the rest of
+#   the run and the line is struck; closing it without one comes back to
+#   the list with the line still open. WALK ON is the skip.
+# - a Samphire: its card's name / TAKE; taken, its face flies to the deck
+#   from the line, at samphire_flight_start_scale of a card.
+@export var removal_item_text: String = "Remove a card"
+@export var removal_action_text: String = "CHOOSE"
+@export var removal_header_text: String = "Remove one"
+@export var picker_layer_offset: int = 1
+@export_range(0.05, 1.0) var samphire_flight_start_scale: float = 0.4
+@export_group("")
+
 enum Mode { LIST, CHOICE }
 
 # One offer. `taken` covers skipped too: an offer that has been answered,
@@ -232,6 +249,11 @@ var _top_tier: bool = false
 var _offers_cards: bool = true
 var _extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE
 var _extra_card: CardData = null
+# The removal's deck picker while it is open, and whether it picked - an
+# open picker or a Samphire in flight holds the list's own input.
+var _picker: DeckView = null
+var _picker_picked: bool = false
+var _samphire_flying: bool = false
 var _deck_panel: Control = null
 var _mode: int = Mode.LIST
 var _hovered: int = -1
@@ -356,6 +378,18 @@ func _build_lines() -> void:
 			glassbone_line.icon = load(glassbone_icon_path) as Texture2D
 		glassbone_line.shard_glyph = glassbone_line.icon == null
 		_lines.append(glassbone_line)
+	if _extra == EncounterRewards.Extra.REMOVAL and not RunState.deck.is_empty():
+		var removal_line := RewardLine.new()
+		removal_line.id = "removal"
+		removal_line.item = removal_item_text
+		removal_line.action = removal_action_text
+		_lines.append(removal_line)
+	elif _extra == EncounterRewards.Extra.SAMPHIRE and _extra_card != null:
+		var samphire_line := RewardLine.new()
+		samphire_line.id = "samphire"
+		samphire_line.item = _extra_card.card_name
+		samphire_line.action = "TAKE"
+		_lines.append(samphire_line)
 	if _offers_cards and _pool != null and not _pool.entries.is_empty():
 		var card_line := RewardLine.new()
 		card_line.id = "card"
@@ -601,6 +635,8 @@ func _below_wanderer(top: float, line_height: float, max_top: float) -> float:
 # --- Input ---
 
 func _on_gui_input(event: InputEvent) -> void:
+	if _extra_busy():
+		return
 	var motion := event as InputEventMouseMotion
 	if motion != null:
 		if _mode == Mode.CHOICE:
@@ -692,6 +728,8 @@ func _list_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 
 func _unhandled_input(event: InputEvent) -> void:
+	if _extra_busy():
+		return
 	if _mode == Mode.LIST:
 		_list_input(event)
 		return
@@ -732,11 +770,15 @@ func _on_dismiss() -> void:
 			RunLogger.reward_cards("fight", _offered, null)
 		_finish_card_line()
 		return
+	# Walking on is the removal's skip - logged, the deck as it was.
+	for line in _lines:
+		if line.id == "removal" and not line.taken:
+			RunLogger.event("reward_removal", {"source": "fight", "card": null, "deck_size": RunState.deck.size()})
 	close()
 
 func _take_line(index: int) -> void:
 	var line: RewardLine = _lines[index]
-	if line.taken:
+	if line.taken or _extra_busy():
 		return
 	match line.id:
 		"gold":
@@ -759,6 +801,72 @@ func _take_line(index: int) -> void:
 			_close_if_spent()
 		"card":
 			_open_choice()
+		"removal":
+			_open_removal_picker()
+		"samphire":
+			_take_samphire(line)
+
+# --- Extra ---
+
+# The removal's picker is open, or the Samphire is on its way to the deck.
+func _extra_busy() -> bool:
+	return _picker != null or _samphire_flying
+
+func _open_removal_picker() -> void:
+	_picker_picked = false
+	_picker = DeckPanel.open_picker(get_tree(), RunState.deck, removal_header_text, layer + picker_layer_offset)
+	_picker.card_picked.connect(_on_removal_picked)
+	_picker.closed.connect(_on_removal_picker_closed)
+	_set_list_focus(-1)
+
+# The card clicked is gone for the rest of the run; the line is struck.
+func _on_removal_picked(card: CardData) -> void:
+	_picker_picked = true
+	RunState.remove_card(card)
+	RunLogger.event("reward_removal", {"source": "fight", "card": card.card_name, "deck_size": RunState.deck.size()})
+	TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "RemovalAudio", "RewardScreen")
+	print("RewardScreen: removed '%s' (deck now %d)." % [card.card_name, RunState.deck.size()])
+	for line in _lines:
+		if line.id == "removal":
+			line.taken = true
+
+# Picked or not, the picker has gone: back to the list - with the line
+# still open when nothing was picked.
+func _on_removal_picker_closed() -> void:
+	_picker = null
+	_list_mouse_on = -1
+	_draw_layer.queue_redraw()
+	if _picker_picked:
+		_close_if_spent()
+
+# The Samphire into the deck: its face, from the line, flies to the deck
+# readout; the screen closes, if this was the last line, once it lands.
+func _take_samphire(line: RewardLine) -> void:
+	var card: CardData = RunState.add_card(_extra_card)
+	RunLogger.event("reward_samphire", {"source": "fight", "card": card.card_name, "deck_size": RunState.deck.size()})
+	TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "SamphireTakeAudio", "RewardScreen")
+	print("RewardScreen: took '%s' (deck now %d)." % [card.card_name, RunState.deck.size()])
+	line.taken = true
+	_hovered = -1
+	_draw_layer.queue_redraw()
+	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
+	if scene == null:
+		_close_if_spent()
+		return
+	var card_view := scene.instantiate() as CardView
+	card_view.hover_enabled = false
+	_draw_layer.add_child(card_view)
+	card_view.set_card_data(card)
+	card_view.pivot_offset = Vector2.ZERO
+	card_view.scale = Vector2.ONE * samphire_flight_start_scale
+	card_view.position = line.rect.get_center() - card_view.card_size * samphire_flight_start_scale / 2.0
+	_samphire_flying = true
+	var tween: Tween = TakeFeedback.fly_to(self, card_view, _deck_panel_centre(), card_flight_duration_sec, card_flight_end_scale)
+	tween.chain().tween_callback(func() -> void:
+		if is_instance_valid(card_view):
+			card_view.queue_free()
+		_samphire_flying = false
+		_close_if_spent())
 
 # --- Card choice ---
 
