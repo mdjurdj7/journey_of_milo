@@ -291,6 +291,8 @@ func _check_fight() -> void:
 		if intent_view != null:
 			var label: Label = intent_view.get("_label") as Label
 			_expect_eq(label.text, _intent_text(expected), "...and so does the number over it")
+			var hits_label: Label = intent_view.get("_hits_label") as Label
+			_expect_eq(hits_label.text, _hits_text(expected), "...with its hit count beside it when the hits differ")
 		else:
 			_fail("no intent display over the target")
 	await _teardown()
@@ -325,16 +327,23 @@ func _expect_attack(enemy: Combatant, data: EnemyData, player: Combatant, expect
 	_expect_eq(landed, expected, "%s lands %s" % [label, str(expected)])
 	_expect_eq(int(result["damage_to_hp"]), int(preview["damage_to_hp"]), "%s lands what it previewed" % label)
 
-# The intent display's text for these hits (BattleIntent.show_intent()).
+# The intent display's numeral for these hits (BattleIntent.show_intent()):
+# one hit as it is, equal hits "M×N", unequal hits their total.
 func _intent_text(hits: Array[int]) -> String:
 	if hits.size() <= 1:
 		return str(hits[0]) if hits.size() == 1 else ""
 	if hits.count(hits[0]) == hits.size():
 		return "%d×%d" % [hits[0], hits.size()]
-	var parts := PackedStringArray()
+	var total: int = 0
 	for hit in hits:
-		parts.append(str(hit))
-	return " + ".join(parts)
+		total += hit
+	return str(total)
+
+# ...and the count beside it - "N HITS" for unequal hits, else nothing.
+func _hits_text(hits: Array[int]) -> String:
+	if hits.size() <= 1 or hits.count(hits[0]) == hits.size():
+		return ""
+	return "%d HITS" % hits.size()
 
 func _ints(values: Array) -> Array[int]:
 	var out: Array[int] = []

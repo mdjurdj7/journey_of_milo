@@ -27,10 +27,12 @@ class_name BattleIntent
 # stack still ends at the anchor, so the attack line sits a ring higher.
 # A BURROW (buried - it does nothing this turn) is its glyph alone: there
 # is no number coming - and so is a SETTLE (the Underfoot's Rebury), a
-# down-arrow onto a ground line, and a COIL (the Adder's), a coil. A HEAL_ALLY (the Nipper's Forage) is a plus beside
-# the HP its packmates will heal. A multi-hit attack whose hits differ (a
-# status on the player the first hit consumes - No Further's 0) reads hit
-# by hit, "0 + 4", not "M×N".
+# down-arrow onto a ground line, and a COIL (the Adder's), a coil. A
+# HEAL_ALLY (the Nipper's Forage) is a plus beside the HP its packmates
+# will heal. A multi-hit attack whose hits differ once its modifiers have
+# run - Unbroken soaking the first, so a 4×4 lands 0, 4, 4, 4 - reads
+# their total with "4 HITS" beside it (the Hits group), not "M×N"; one
+# whose hits are equal stays "M×N" (No Further's every-hit 0 reads 0×3).
 #
 # One per enemy, created by BattleOverlay for the fight (its child, so it
 # dies with the overlay - nothing of this exists on the field). Anchored
@@ -165,6 +167,38 @@ class_name BattleIntent
 # The threshold ring, under the hairline (see the header). Its numeral is
 # never smaller than the HP readout's (EnemyStatus.battle_numeral_size_px,
 # 22) - it has to read at the battle frame's scale.
+@export_group("Hits")
+# A multi-hit attack whose hits differ once its modifiers have run (the
+# first soaked by Unbroken): the numeral reads their total, and this
+# beside it on its baseline names how many - "4 HITS" - in the card type
+# label's voice (CardView: Alegreya Sans Bold caps, 0.16 em, at its
+# alpha), hits_gap_px after the numeral. Equal hits keep "M×N".
+@export var hits_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf"):
+	set(value):
+		hits_font = value
+		_restyle_hits()
+@export var hits_size_px: int = 12:
+	set(value):
+		hits_size_px = value
+		_restyle_hits()
+@export_range(0.0, 1.0) var hits_tracking_em: float = 0.16:
+	set(value):
+		hits_tracking_em = value
+		_restyle_hits()
+@export_range(0.0, 1.0) var hits_alpha: float = 0.55:
+	set(value):
+		hits_alpha = value
+		_apply_layout()
+@export var hits_gap_px: float = 5.0:
+	set(value):
+		hits_gap_px = value
+		_apply_layout()
+@export var hits_format: String = "%d HITS":
+	set(value):
+		hits_format = value
+		_apply_layout()
+@export_group("")
+
 @export_group("Threshold Ring")
 @export var threshold_numeral_size_px: int = 22:
 	set(value):
@@ -249,6 +283,8 @@ var _lethal: bool = false
 # The threshold ring (see the header): shown, met, where it sits, and
 # the hairline's top now that it no longer ends the control.
 var _threshold_label: Label = null
+# "N HITS" beside the numeral for unequal hits (the Hits group).
+var _hits_label: Label = null
 var _has_threshold: bool = false
 var _interrupted: bool = false
 # Denied (Deny): the move keeps its number, dimmed like an interrupted
@@ -282,6 +318,11 @@ func _ready() -> void:
 		_label.add_theme_font_override("font", numeral_font)
 	add_child(_label)
 
+	_hits_label = Label.new()
+	_hits_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(_hits_label)
+	_restyle_hits()
+
 	_threshold_label = Label.new()
 	_threshold_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_threshold_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -303,7 +344,7 @@ func set_target(enemy: FieldEnemy) -> void:
 func refresh_style() -> void:
 	if _label == null:
 		return
-	for label: Label in [_label, _threshold_label]:
+	for label: Label in [_label, _threshold_label, _hits_label]:
 		label.add_theme_color_override("font_color", get_theme_color("ink", "Battle"))
 		label.add_theme_color_override("font_outline_color", get_theme_color("bone", "Battle"))
 		label.add_theme_constant_override("outline_size", outline_size_px)
@@ -318,20 +359,25 @@ func show_intent(preview: Dictionary) -> void:
 		var hits: int = int(preview.get("hits", 1))
 		var per_hit: int = int(preview.get("per_hit", 0))
 		_label.text = ("%d×%d" % [per_hit, hits]) if hits > 1 else str(per_hit)
+		_hits_label.text = ""
 		var hit_amounts: Array = preview.get("hit_amounts", [])
 		if hits > 1 and hit_amounts.size() == hits and hit_amounts.count(hit_amounts[0]) != hits:
-			var parts := PackedStringArray()
+			# Unequal hits: their total, and how many beside it.
+			var total: int = 0
 			for amount: Variant in hit_amounts:
-				parts.append(str(int(amount)))
-			_label.text = " + ".join(parts)
+				total += int(amount)
+			_label.text = str(total)
+			_hits_label.text = hits_format % hits
 		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE or _type == EnemyIntent.IntentType.COIL:
 			_label.text = ""
+			_hits_label.text = ""
 		_has_threshold = preview.has("threshold")
 		# A pain turn's cancelled action reads as interrupted, with no
 		# number: it won't land at all.
 		var pain_turn: bool = bool(preview.get("pain_turn", false))
 		if pain_turn:
 			_label.text = ""
+			_hits_label.text = ""
 		_denied = bool(preview.get("denied", false))
 		_interrupted = pain_turn or _denied or bool(preview.get("interrupted", false))
 		# The numeral counts down to 0 and stays; the gauge fills with
@@ -375,6 +421,9 @@ func _apply_layout() -> void:
 	var pair_width: float = _glyph_width()
 	if text_width > 0.0:
 		pair_width += glyph_numeral_gap_px + text_width
+	var hits_width: float = _hits_width()
+	if hits_width > 0.0:
+		pair_width += hits_gap_px + hits_width
 	var rule_thickness: float = lethal_rule_px if _lethal else hairline_thickness_px
 	var ring_box: float = ring_diameter_px + ring_stroke_px + float(outline_size_px) * 2.0
 	var content_width: float = maxf(pair_width, hairline_width_px)
@@ -400,6 +449,15 @@ func _apply_layout() -> void:
 	_label.size = _text_rect.size
 	_label.visible = text_width > 0.0
 	_label.modulate.a = hairline_alpha if _interrupted else 1.0
+	# "N HITS" after the numeral, on its baseline.
+	_hits_label.visible = hits_width > 0.0
+	if hits_width > 0.0:
+		var hits_font_now: Font = _hits_label.get_theme_font("font")
+		var hits_ascent: float = hits_font_now.get_ascent(hits_size_px) if hits_font_now != null else float(hits_size_px)
+		var hits_height: float = hits_font_now.get_height(hits_size_px) if hits_font_now != null else float(hits_size_px)
+		_hits_label.position = Vector2(_text_rect.end.x + hits_gap_px, ascent - hits_ascent)
+		_hits_label.size = Vector2(hits_width, hits_height)
+		_hits_label.modulate.a = hits_alpha * (hairline_alpha if _interrupted else 1.0)
 	_rule_top = line_height + hairline_drop_px
 
 	# The ring's numeral fills the ring's box, centred both ways.
@@ -409,6 +467,28 @@ func _apply_layout() -> void:
 	_threshold_label.size = Vector2(ring_box, ring_box)
 	_threshold_label.visible = _has_threshold and not _threshold_label.text.is_empty()
 	queue_redraw()
+
+# "N HITS"'s width, 0 with none to show.
+func _hits_width() -> float:
+	if _hits_label == null or _hits_label.text.is_empty():
+		return 0.0
+	var font: Font = _hits_label.get_theme_font("font")
+	if font == null:
+		return 0.0
+	return font.get_string_size(_hits_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, hits_size_px).x
+
+# The hits label's face: hits_font tracked hits_tracking_em, at
+# hits_size_px - the card type label's treatment (CardView._spaced_bold()).
+func _restyle_hits() -> void:
+	if _hits_label == null:
+		return
+	var variation := FontVariation.new()
+	variation.base_font = hits_font
+	variation.spacing_glyph = roundi(float(hits_size_px) * hits_tracking_em)
+	_hits_label.add_theme_font_override("font", variation)
+	_hits_label.add_theme_font_size_override("font_size", hits_size_px)
+	if _threshold_label != null:
+		_apply_layout()
 
 # The digits' cap height at numeral_size_px, from the "0" glyph's bitmap
 # cell: it is padded alike above and below, and the digit sits on the
