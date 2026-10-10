@@ -84,6 +84,12 @@ var floor_index: int = -1
 @export var attack_snap_distance: float = 0.6
 @export var attack_snap_out_time: float = 0.12
 @export var attack_snap_return_time: float = 0.2
+# EnemyData.attack_lean_degrees / _pivot_forward, copied at spawn: the
+# model tips toward the target over the lunge and back over the return,
+# about a pivot on its base this far from its centre (0) to its front
+# edge (1). Read at each attack; 0 at spawn = no lean pivot at all.
+@export_range(0.0, 60.0) var attack_lean_degrees: float = 0.0
+@export_range(0.0, 1.0) var attack_lean_pivot_forward: float = 1.0
 
 # The sound of a card's hit landing on this creature - enemy_data.
 # contact_sounds picked at random, never the last take twice running
@@ -240,6 +246,10 @@ var _death_tween: Tween = null
 # sinks. The BODY keeps its place (the recoil tweens that), the model
 # moves under it.
 var _model: Node3D = null
+# Between this body and _model when it leans to attack (attack_lean_
+# degrees above 0 at spawn), else null: identity at rest, so the model's
+# grounding, lift and settle are unchanged; play_attack_snap() turns it.
+var _lean_pivot: Node3D = null
 var _settling: bool = false
 # Set the moment this enemy's HP reaches 0 in a fight (RegionField._on_
 # enemy_defeated() -> mark_defeated()), whether it settles now or is
@@ -556,7 +566,13 @@ func _spawn_model() -> void:
 		push_warning("FieldEnemy '%s': model scene failed to load (%s); no body." % [enemy_id, scene_path])
 		return
 	var model := scene.instantiate() as Node3D
-	add_child(model)
+	if attack_lean_degrees > 0.0:
+		_lean_pivot = Node3D.new()
+		_lean_pivot.name = "LeanPivot"
+		add_child(_lean_pivot)
+		_lean_pivot.add_child(model)
+	else:
+		add_child(model)
 	_model = model
 	model.scale = Vector3.ONE * model_scale
 	model.rotation.y = deg_to_rad(model_yaw_offset)
@@ -1021,10 +1037,38 @@ func play_attack_snap(target: Node3D) -> float:
 		tween.tween_interval(windup)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "global_position", lunge_position, attack_snap_out_time)
+	var lean: Callable = _attack_lean(direction)
+	if lean.is_valid():
+		tween.parallel().tween_method(lean, 0.0, 1.0, attack_snap_out_time)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN)
 	tween.tween_property(self, "global_position", base_position, attack_snap_return_time)
+	if lean.is_valid():
+		tween.parallel().tween_method(lean, 1.0, 0.0, attack_snap_return_time)
 
 	return windup + attack_snap_out_time
+
+# The lean toward world `direction` (horizontal) as a tween method of 0
+# (at rest) to 1 (attack_lean_degrees): the lean pivot turned about the
+# base's edge facing `direction` - attack_lean_pivot_forward of the way
+# out from the base's centre - so the top tips toward the target. An
+# invalid Callable when this body doesn't lean.
+func _attack_lean(direction: Vector3) -> Callable:
+	if _lean_pivot == null or attack_lean_degrees <= 0.0 or _model_aabb.size == Vector3.ZERO:
+		return Callable()
+	var forward: Vector3 = global_transform.basis.orthonormalized().inverse() * direction
+	forward.y = 0.0
+	if forward.length() < 0.0001:
+		return Callable()
+	forward = forward.normalized()
+	var aabb: AABB = get_model_aabb()
+	var centre: Vector3 = aabb.get_center()
+	var reach: float = absf(forward.x) * aabb.size.x * 0.5 + absf(forward.z) * aabb.size.z * 0.5
+	var pivot := Vector3(centre.x, aabb.position.y, centre.z) + forward * reach * attack_lean_pivot_forward
+	var axis: Vector3 = Vector3.UP.cross(forward).normalized()
+	var full: float = deg_to_rad(attack_lean_degrees)
+	return func(amount: float) -> void:
+		var turn := Basis(axis, full * amount)
+		_lean_pivot.transform = Transform3D(turn, pivot - turn * pivot)
 
 # Called by region_field.gd on contact. Yaws to face target over duration,
 # taking the short way around. RegionField's contact freeze stops nothing

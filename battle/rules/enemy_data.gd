@@ -151,6 +151,15 @@ class_name EnemyData
 # height, surfaces onto the sand (the Siltjaw). Only a body with this
 # above 0 flies: bobs, beats its wings.
 @export var battle_hover_m: float = 0.0
+# The attack lunge's forward lean, onto FieldEnemy.attack_lean_degrees/
+# _pivot_forward: the model tips this many degrees toward its target as
+# it lunges and eases back with the return, about a pivot on its base
+# attack_lean_pivot_forward of the way from its centre (0) to its front
+# edge toward the target (1) - the head drops and reaches, the back lifts.
+# A lunge that slides a low body (the adder's coil) reads as a strike.
+# The body, and the readouts on it, only move. 0 = no lean.
+@export_range(0.0, 60.0) var attack_lean_degrees: float = 0.0
+@export_range(0.0, 1.0) var attack_lean_pivot_forward: float = 1.0
 # Radius of the sphere the Wanderer has to walk into to start this
 # fight, metres, onto FieldEnemy.contact_radius. 2.0 is every standing
 # enemy's; a roaming one wants its own body's size, so drifting past him

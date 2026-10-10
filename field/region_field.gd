@@ -1101,6 +1101,8 @@ func _spawn_floor_enemies() -> void:
 		enemy.sink = entry.enemy_data.sink_m
 		enemy.battle_hover = entry.enemy_data.battle_hover_m
 		enemy.contact_radius = entry.enemy_data.contact_radius_m
+		enemy.attack_lean_degrees = entry.enemy_data.attack_lean_degrees
+		enemy.attack_lean_pivot_forward = entry.enemy_data.attack_lean_pivot_forward
 		enemy.harness_point = entry.enemy_data.harness_point
 		enemy.face_shore_at_spawn = false
 		enemy.position = Vector3(spawn.x + entry.position.x, 0.0, spawn.z + entry.position.y)
