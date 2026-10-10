@@ -140,9 +140,16 @@ signal battle_lost()
 # target test - see _refresh_enemy_rects().
 @export var target_padding_px: float = 16.0
 # Devour - the Wanderer's own action, not a card (devour()): the HP one
-# eaten card gives back, and how many it may eat per turn.
+# eaten card gives back, how many it may eat per turn, and the Energy each
+# eating costs - paid when the card is eaten, and needed in hand for
+# Devour to be available at all (is_devour_available()).
 @export var devour_heal_amount: int = 2
 @export var devour_uses_per_turn: int = 1
+@export var devour_energy_cost: int = 1:
+	set(value):
+		devour_energy_cost = value
+		if is_inside_tree():
+			_emit_devour_changed()
 
 var deck: Deck
 var player: Combatant
@@ -391,7 +398,8 @@ func request_play(card_view: CardView) -> void:
 	var card: CardData = card_view.card_data
 	if not _is_playable(card):
 		# A card that can't be played arms for Devour alone while Devour
-		# is available; with Devour spent, nothing - as before.
+		# is available; with Devour spent or its Energy short, nothing - as
+		# before Devour existed.
 		if is_devour_available():
 			_arm_for_devour(card_view)
 		return
@@ -928,10 +936,17 @@ func _impact_delay_for(card: CardData) -> float:
 
 # --- Devour ---
 
-# Whether Devour can be used now: a use left this turn, on the player's
-# turn with nothing resolving, and no hand choice open.
+# Whether Devour can be used now: a use left this turn, its Energy
+# (devour_energy_cost) in hand, on the player's turn with nothing
+# resolving, and no hand choice open. Everything that offers it keys on
+# this - the button, arming an unplayable card for it, the pick, lighting
+# up as a target.
 func is_devour_available() -> bool:
-	return player != null and _devour_uses_this_turn < devour_uses_per_turn and not _input_locked and not _choice_open()
+	return player != null and _devour_uses_this_turn < devour_uses_per_turn and is_devour_affordable() and not _input_locked and not _choice_open()
+
+# Whether the player has the Energy Devour costs.
+func is_devour_affordable() -> bool:
+	return player != null and player.energy >= maxi(devour_energy_cost, 0)
 
 # Whether this turn's Devours are spent.
 func is_devour_used() -> bool:
@@ -994,9 +1009,10 @@ func devour() -> void:
 	_enemy_rects.clear()
 	_devour_card(card_view, "armed")
 
-# The card leaves the hand without being played - no energy, no cost paid
-# any way (the free card, a reduction or a replacement all wait), no
-# effect, no Toll, not counted as played, no card_played - to the Spent
+# The card leaves the hand without being played - none of ITS cost paid
+# any way (the free card, a reduction or a replacement all wait; Devour's
+# own devour_energy_cost is paid instead), no effect, no Toll, not
+# counted as played, no card_played - to the Spent
 # pile for this fight (Deck.spent_unplayed: back next fight even if it is
 # CONSUMED). Like a play: out of deck.hand at once, the hand taking it
 # out (bitten, then into the jaw), in the pile once that has ended.
@@ -1007,6 +1023,10 @@ func _devour_card(card_view: CardView, route: String) -> void:
 	var card: CardData = card_view.card_data
 	var playable: bool = _is_playable(card)
 	_devour_uses_this_turn += 1
+	# Devour's own price, out of the pips as a card's is.
+	var energy_spent: int = mini(maxi(devour_energy_cost, 0), player.energy)
+	player.energy -= energy_spent
+	energy_changed.emit(player.energy)
 	_input_locked = true
 	deck.begin_play(card)
 	deck.spent_unplayed.append(card)
@@ -1020,7 +1040,7 @@ func _devour_card(card_view: CardView, route: String) -> void:
 	if player.hp > hp_before:
 		_heal_run_hp(player.hp - hp_before, "devour")
 		hp_changed.emit(player.hp, player.max_hp)
-	RunLogger.event("devour", {"card": card.card_name, "playable": playable, "route": route, "hp_before": hp_before, "hp_after": player.hp})
+	RunLogger.event("devour", {"card": card.card_name, "playable": playable, "route": route, "energy": energy_spent, "hp_before": hp_before, "hp_after": player.hp})
 	# HP moved: the lethal flags follow, and a Critical line it may have
 	# left.
 	status_changed.emit()
@@ -1431,6 +1451,8 @@ func _start_player_turn() -> void:
 	# The enemy turn may have buried or surfaced someone.
 	_push_enemy_target_available()
 	energy_changed.emit(player.energy)
+	# A fresh use, and the refill it's paid from.
+	_emit_devour_changed()
 	# Block just reset to 0 and statuses ticked: lethal flags change here.
 	_emit_intent_previews()
 

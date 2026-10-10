@@ -1,9 +1,13 @@
 extends SceneTree
 
 # Headless probe for Devour - the Wanderer's once-per-turn battle action
-# (BattleController.devour()): one hand card eaten for 2 HP, Spent for the
-# fight and back the next, never played - no energy, no effect, no Toll,
-# no HP cost. Both routes: a card armed first (a playable enemy-target
+# (BattleController.devour()): one hand card eaten for 2 HP and 1 Energy
+# (devour_energy_cost), Spent for the fight and back the next, never
+# played - none of the card's own cost, no effect, no Toll, no HP cost.
+# Available only with a use left and its Energy in hand: at 0 Energy it is
+# grey without USED, a dimmed card can't arm for it and the pick won't
+# open; with 1, an unaffordable 2-cost card still arms and is eaten.
+# Both routes: a card armed first (a playable enemy-target
 # card, or one that can't be played, armed for Devour alone), or Devour
 # first (the pick, then the card). Once a turn, again the next; the heal
 # capped at max HP; a Consumed card eaten - or taken by Deny - stays in
@@ -105,7 +109,7 @@ func _check_armed_playable() -> void:
 		_expect(not (deck.get("hand") as Array).has(bite), "...out of the hand")
 		_expect((deck.get("exhaust_pile") as Array).has(bite), "...into the Spent pile")
 		_expect((deck.get("spent_unplayed") as Array).has(bite), "...as Spent unplayed")
-		_expect_eq(player.energy, 3, "...no energy spent")
+		_expect_eq(player.energy, 2, "...1 energy spent - Devour's own, none of the card's")
 		_expect_eq(enemy.hp, ENEMY_HP, "...no damage dealt")
 		_expect_eq(player.toll, toll_before, "...no Toll")
 		_expect_eq(int(controller.get("cards_played_this_turn")), 0, "...not counted as played")
@@ -116,6 +120,7 @@ func _check_armed_playable() -> void:
 		_expect_eq(str(devour_line.get("card")), "Bite Down", "The run log's devour line names the card")
 		_expect_eq(devour_line.get("playable"), true, "...playable")
 		_expect_eq(str(devour_line.get("route")), "armed", "...the armed route")
+		_expect_eq(int(devour_line.get("energy", -1)), 1, "...1 energy")
 		_expect_eq(int(devour_line.get("hp_before", -1)), START_HP, "...HP before")
 		_expect_eq(int(devour_line.get("hp_after", -1)), START_HP + HEAL, "...HP after")
 		var heal_line: Dictionary = _log_line(log_dir, "heal", "devour")
@@ -124,20 +129,38 @@ func _check_armed_playable() -> void:
 	await _teardown()
 	_completed += 1
 
-# At 0 energy an unaffordable card arms, dimmed, Devour its only target:
-# no enemy is a target, clicking one does nothing, and Devour eats it.
+# At 0 energy Devour is out of reach: grey, no USED, a click on it opens
+# nothing, and a dimmed card doesn't arm. At 1, an unaffordable 2-cost
+# card (Reckoning) arms, dimmed, Devour its only target: no enemy is a
+# target, clicking one does nothing, and Devour eats it for that 1.
 func _check_unaffordable_arms() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var deck: Object = controller.get("deck")
 		var player: Combatant = controller.get("player")
+		var button: Control = _overlay().get("_devour_button")
 		var reckoning: CardData = await _deal(controller, RECKONING_PATH)
+		var view: CardView = _view(controller, reckoning)
 		player.energy = 0
 		controller.emit_signal("energy_changed", 0)
-		await process_frame
-		var view: CardView = _view(controller, reckoning)
+		controller.call("_emit_devour_changed")
+		await create_timer(0.4).timeout
+		_expect(not bool(controller.call("is_devour_available")), "At 0 energy, Devour isn't available")
+		_expect(not bool(controller.call("is_devour_used")), "...though unused")
+		_expect(is_equal_approx(float(button.call("get_glyph_alpha")), float(button.get("grey_alpha"))), "...the button grey")
+		_expect(not bool(button.get("_used")), "...without USED")
+		_expect_eq(button.mouse_default_cursor_shape, Control.CURSOR_ARROW, "...not offered as clickable")
+		controller.call("devour")
+		_expect(not bool(controller.call("is_devour_picking")), "...a click on it opens no pick")
 		controller.call("request_play", view)
-		_expect(bool(controller.call("is_awaiting_target")), "At 0 energy, an unaffordable card arms")
+		_expect(not bool(controller.call("is_awaiting_target")), "...and a dimmed card doesn't arm")
+		_expect(not bool(controller.call("is_devour_lit")), "...Devour stays dark")
+		player.energy = 1
+		controller.emit_signal("energy_changed", 1)
+		controller.call("_emit_devour_changed")
+		await process_frame
+		controller.call("request_play", view)
+		_expect(bool(controller.call("is_awaiting_target")), "At 1 energy, an unaffordable 2-cost card arms")
 		_expect(bool(controller.call("is_armed_for_devour_only")), "...for Devour alone")
 		_expect(bool(controller.call("is_devour_lit")), "...Devour lit")
 		_expect(is_equal_approx(view.modulate.a, view.unplayable_alpha), "...kept dimmed")
@@ -153,11 +176,12 @@ func _check_unaffordable_arms() -> void:
 		await _settle(controller)
 		_expect((deck.get("exhaust_pile") as Array).has(reckoning), "Devoured: Reckoning Spent")
 		_expect_eq(player.hp, START_HP + HEAL, "...2 HP back")
-		_expect_eq(player.energy, 0, "...at 0 energy still")
+		_expect_eq(player.energy, 0, "...its 1 energy spent, leaving 0")
 	await _teardown()
 	_completed += 1
 
-# With Devour used this turn, an unaffordable card can't be armed.
+# With Devour used this turn, it stays out of reach whatever the energy:
+# not available with plenty, an unaffordable card can't be armed.
 func _check_used_blocks_arming() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -167,6 +191,13 @@ func _check_used_blocks_arming() -> void:
 		controller.call("request_play", _view(controller, bite))
 		controller.call("devour")
 		await _settle(controller)
+		player.energy = 3
+		controller.emit_signal("energy_changed", 3)
+		controller.call("_emit_devour_changed")
+		await process_frame
+		_expect(not bool(controller.call("is_devour_available")), "Devour used: not available, even with 3 energy")
+		controller.call("devour")
+		_expect(not bool(controller.call("is_devour_picking")), "...a click on it opens no pick")
 		player.energy = 0
 		controller.emit_signal("energy_changed", 0)
 		await process_frame
@@ -266,27 +297,29 @@ func _check_pick_route() -> void:
 		_expect(not (overlay.get("end_turn_button") as Button).disabled, "...and enabled after")
 		_expect((deck.get("exhaust_pile") as Array).has(arc), "Picked: Blood Arc devoured")
 		_expect_eq(player.hp, START_HP + HEAL, "...2 HP back, its HP cost unpaid")
-		_expect_eq(player.energy, 3, "...no energy")
+		_expect_eq(player.energy, 2, "...1 energy, Devour's own")
 		_expect_eq(_plays, 0, "...never played")
 		_expect(not bool(controller.call("is_devour_picking")), "...the pick closed")
 		var line: Dictionary = _log_line(log_dir, "devour", "")
 		_expect_eq(str(line.get("route")), "pick", "The run log: the pick route")
 	RunLogger.set_output_dir("")
 	await _teardown()
-	# A dimmed card through the pick.
+	# A dimmed card through the pick - at 1 energy, Devour's price.
 	controller = await _start_fight()
 	if controller != null:
 		var deck: Object = controller.get("deck")
 		var player: Combatant = controller.get("player")
 		var reckoning: CardData = await _deal(controller, RECKONING_PATH)
-		player.energy = 0
-		controller.emit_signal("energy_changed", 0)
+		player.energy = 1
+		controller.emit_signal("energy_changed", 1)
+		controller.call("_emit_devour_changed")
 		await process_frame
 		controller.call("devour")
 		controller.call("request_play", _view(controller, reckoning))
 		await _settle(controller)
-		_expect((deck.get("exhaust_pile") as Array).has(reckoning), "Picked at 0 energy: a dimmed card devoured")
+		_expect((deck.get("exhaust_pile") as Array).has(reckoning), "Picked at 1 energy: a dimmed 2-cost card devoured")
 		_expect_eq(player.hp, START_HP + HEAL, "...2 HP back")
+		_expect_eq(player.energy, 0, "...leaving 0 energy")
 	await _teardown()
 	_completed += 1
 
@@ -336,7 +369,8 @@ func _check_untargeted_still_plays() -> void:
 		controller.call("confirm_target", _field_enemy(controller))
 		await _settle(controller)
 		_expect(_enemy_combatant(controller).hp < ENEMY_HP, "Slash armed and aimed still lands")
-		_expect(bool(controller.call("is_devour_available")), "...Devour untouched")
+		_expect(not bool(controller.call("is_devour_used")), "...Devour untouched - unused")
+		_expect(not bool(controller.call("is_devour_available")), "...and, the 3 energy spent on the cards, out of reach")
 	await _teardown()
 	_completed += 1
 

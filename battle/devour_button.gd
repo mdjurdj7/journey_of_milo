@@ -7,14 +7,17 @@ class_name DevourButton
 # line-drawn open jaw on the left - upper and lower jaw, a few teeth,
 # in the intent glyphs' tapered pen (InkPen) at about the energy
 # numeral's cap height - and stacked to its right "DEVOUR" in tracked
-# caps, "+2 HP" in the HP readout's smaller grey numeral, and "USED" in
-# small grey caps once this turn's Devour is spent. No disc, ring, glow
-# or divider.
+# caps with its Energy cost after it (a pip per Energy, the energy
+# readout's own mark), "+2 HP" in the HP readout's smaller grey numeral,
+# and "USED" in small grey caps once this turn's Devour is spent. No
+# disc, ring, glow or divider.
 #
 # States, all read from the controller on devour_changed:
-# - Grey (nothing armed, or used this turn): glyph and label at
-#   grey_alpha. Still clickable while available - with nothing armed a
-#   click opens the controller's pick (a hand card to eat).
+# - Grey (nothing armed, used this turn, or its Energy short): glyph,
+#   label and cost at grey_alpha - "USED" only for used; short of Energy
+#   it is just grey, as an unaffordable card is. Clickable only while
+#   available - with nothing armed a click opens the controller's pick (a
+#   hand card to eat).
 # - Lit (a card armed, or the pick open, with Devour available): glyph and
 #   label ease to full ink over lit_fade_sec, a hairline draws in under
 #   the label left to right over rule_draw_sec, and the jaws part by
@@ -131,6 +134,22 @@ class_name DevourButton
 	set(value):
 		used_size_px = value
 		_restyle()
+# Its cost (BattleController.devour_energy_cost) after "DEVOUR": a pip per
+# Energy, in the energy readout's language - short heavy bars, this size,
+# cost_pip_gap_px apart, cost_gap_px after the label, centred on its caps
+# - in the label's own ink, grey or lit with it.
+@export var cost_pip_size: Vector2 = Vector2(12.0, 4.0):
+	set(value):
+		cost_pip_size = value
+		_relayout()
+@export var cost_pip_gap_px: float = 4.0:
+	set(value):
+		cost_pip_gap_px = value
+		_relayout()
+@export var cost_gap_px: float = 8.0:
+	set(value):
+		cost_gap_px = value
+		_relayout()
 # Between the glyph and the text, and between text rows.
 @export var glyph_text_gap_px: float = 10.0:
 	set(value):
@@ -209,6 +228,11 @@ var _used_tracked: Font = null
 # What the controller last said (_refresh()).
 var _available: bool = false
 var _used: bool = false
+# Its cost in Energy, as the controller has it (_refresh()).
+var _cost: int = 1
+# Where the cost's pips start, and their centre line (_relayout()).
+var _cost_x: float = 0.0
+var _cost_y: float = 0.0
 var _picking: bool = false
 var _lit_target: bool = false
 var _card_name: String = ""
@@ -286,6 +310,10 @@ func _refresh() -> void:
 		return
 	_available = _controller.is_devour_available()
 	_used = _controller.is_devour_used()
+	var cost: int = maxi(_controller.devour_energy_cost, 0)
+	if cost != _cost:
+		_cost = cost
+		_relayout()
 	_picking = _controller.is_devour_picking()
 	_lit_target = _controller.is_devour_lit()
 	var card: CardData = _controller.get_devour_card()
@@ -377,7 +405,12 @@ func _relayout() -> void:
 	_rule_y = text_top + label_ascent + rule_gap_px
 	_heal_baseline = text_top + heal_baseline
 	_used_baseline = text_top + used_baseline
-	var text_width: float = maxf(InkType.width(_label_tracked, label_text, label_size_px), InkType.width(heal_font, _heal_text(), heal_size_px))
+	var label_row: float = InkType.width(_label_tracked, label_text, label_size_px)
+	_cost_x = _text_x + label_row + cost_gap_px
+	_cost_y = _label_baseline - label_ascent * 0.5
+	if _cost > 0:
+		label_row += cost_gap_px + float(_cost) * cost_pip_size.x + float(_cost - 1) * cost_pip_gap_px
+	var text_width: float = maxf(label_row, InkType.width(heal_font, _heal_text(), heal_size_px))
 	text_width = maxf(text_width, InkType.width(_used_tracked, used_text, used_size_px))
 	size = Vector2(_text_x + text_width, height)
 	queue_redraw()
@@ -392,6 +425,10 @@ func _draw() -> void:
 	var label_color: Color = _ink
 	label_color.a = lerpf(grey_alpha, 1.0, lit)
 	var label_width: float = InkType.draw_run(self, _label_tracked, label_text, Vector2(_text_x, _label_baseline), label_size_px, label_color)
+	# Its cost, a pip per Energy, in the label's ink.
+	for i in _cost:
+		var pip_x: float = _cost_x + float(i) * (cost_pip_size.x + cost_pip_gap_px)
+		draw_rect(Rect2(roundf(pip_x), roundf(_cost_y - cost_pip_size.y * 0.5), cost_pip_size.x, cost_pip_size.y), label_color)
 	# The hairline draws in from the label's left edge.
 	var rule_length: float = label_width * _smooth(_rule)
 	if rule_length > 0.0:
