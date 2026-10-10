@@ -1,8 +1,8 @@
 extends SceneTree
 
 # Headless probe for elite rewards: a fight with an elite in it (EnemyData.
-# is_elite - the Wardling) pays the floor's gold times RegionField.
-# elite_gold_multiplier, rounded, and rolls its card at the pool's elite
+# is_elite - the Wardling) pays the floor's gold times the elite role's
+# gold_multiplier (EncounterRewards), rounded, and rolls its card at the pool's elite
 # rarity rates (no Common while a higher tier has a card); floor 5's
 # region-end Greyshelf (FloorEnemy.card_reward TOP_TIER_FIRST) offers
 # three distinct cards from the top tier down - three Rares while Ultra
@@ -68,8 +68,9 @@ func _initialize() -> void:
 func _check_wardling() -> void:
 	var reward: Node = await _win(FLOOR_3, WARDLING_PATH)
 	if reward != null:
-		var multiplier: float = float(_field.get("elite_gold_multiplier"))
-		_expect(is_equal_approx(multiplier, 1.5), "elite_gold_multiplier is 1.5")
+		var rewards: Resource = load(str(_field.get("encounter_rewards_path")))
+		var multiplier: float = float(rewards.get("elite").get("gold_multiplier"))
+		_expect(is_equal_approx(multiplier, 1.5), "The elite role's gold_multiplier (EncounterRewards) is 1.5")
 		var span: Vector2i = _gold_range(FLOOR_3)
 		var low: int = roundi(span.x * multiplier)
 		var high: int = roundi(span.y * multiplier)
