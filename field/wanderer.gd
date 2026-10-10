@@ -1211,6 +1211,7 @@ func _transform_under(node: Node, ancestor: Node) -> Transform3D:
 # Freezes a Walk clip's Hips position track to its first key's X/Z, leaving
 # Y (vertical bob) untouched, so it plays in place even if the Mixamo
 # export carried forward locomotion into the root bone.
+# Old-clip fix-up: delete this once the last old Mixamo locomotion clip (Walk, Run) is replaced.
 func _remove_walk_root_motion(walk_animation: Animation) -> void:
 	for track_idx in walk_animation.get_track_count():
 		if walk_animation.track_get_type(track_idx) != Animation.TYPE_POSITION_3D:
