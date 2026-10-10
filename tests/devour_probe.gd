@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Headless probe for Devour - the Wanderer's once-per-turn battle action
-# (BattleController.devour()): one hand card eaten for 2 HP and 1 Energy
+# (BattleController.devour()): one hand card eaten for 3 HP and 1 Energy
 # (devour_energy_cost), Spent for the fight and back the next, never
 # played - none of the card's own cost, no effect, no Toll, no HP cost.
 # Available only with a use left and its Energy in hand: at 0 Energy it is
@@ -40,7 +40,7 @@ const LOG_DIR := "user://devour_probe"
 const ENEMY_HP := 999
 const MAX_HP := 70
 const START_HP := 50
-const HEAL := 2
+const HEAL := 3
 const ESCAPE := 2
 const SAFETY_SECONDS := 400.0
 # The layout case hovers each card whose resting left edge is within this
@@ -104,7 +104,7 @@ func _check_armed_playable() -> void:
 		_expect(bool(controller.call("is_devour_lit")), "...and Devour lights as a target")
 		controller.call("devour")
 		await _settle(controller)
-		_expect_eq(player.hp, START_HP + HEAL, "Devoured: 2 HP back")
+		_expect_eq(player.hp, START_HP + HEAL, "Devoured: 3 HP back")
 		_expect_eq(int(_run_state.get("player_hp")), START_HP + HEAL, "...on the run's HP too")
 		_expect(not (deck.get("hand") as Array).has(bite), "...out of the hand")
 		_expect((deck.get("exhaust_pile") as Array).has(bite), "...into the Spent pile")
@@ -124,7 +124,7 @@ func _check_armed_playable() -> void:
 		_expect_eq(int(devour_line.get("hp_before", -1)), START_HP, "...HP before")
 		_expect_eq(int(devour_line.get("hp_after", -1)), START_HP + HEAL, "...HP after")
 		var heal_line: Dictionary = _log_line(log_dir, "heal", "devour")
-		_expect_eq(int(heal_line.get("amount", -1)), HEAL, "...and a heal of 2 from devour")
+		_expect_eq(int(heal_line.get("amount", -1)), HEAL, "...and a heal of 3 from devour")
 	RunLogger.set_output_dir("")
 	await _teardown()
 	_completed += 1
@@ -175,7 +175,7 @@ func _check_unaffordable_arms() -> void:
 		controller.call("devour")
 		await _settle(controller)
 		_expect((deck.get("exhaust_pile") as Array).has(reckoning), "Devoured: Reckoning Spent")
-		_expect_eq(player.hp, START_HP + HEAL, "...2 HP back")
+		_expect_eq(player.hp, START_HP + HEAL, "...3 HP back")
 		_expect_eq(player.energy, 0, "...its 1 energy spent, leaving 0")
 	await _teardown()
 	_completed += 1
@@ -271,7 +271,7 @@ func _check_next_turn() -> void:
 			controller.call("request_play", _view(controller, card))
 			await _settle(controller)
 			_expect((deck.get("exhaust_pile") as Array).has(card), "...and it eats again")
-			_expect_eq(player.hp, mini(hp_before + HEAL, player.max_hp), "...for 2 HP")
+			_expect_eq(player.hp, mini(hp_before + HEAL, player.max_hp), "...for 3 HP")
 	await _teardown()
 	_completed += 1
 
@@ -296,7 +296,7 @@ func _check_pick_route() -> void:
 		await _settle(controller)
 		_expect(not (overlay.get("end_turn_button") as Button).disabled, "...and enabled after")
 		_expect((deck.get("exhaust_pile") as Array).has(arc), "Picked: Blood Arc devoured")
-		_expect_eq(player.hp, START_HP + HEAL, "...2 HP back, its HP cost unpaid")
+		_expect_eq(player.hp, START_HP + HEAL, "...3 HP back, its HP cost unpaid")
 		_expect_eq(player.energy, 2, "...1 energy, Devour's own")
 		_expect_eq(_plays, 0, "...never played")
 		_expect(not bool(controller.call("is_devour_picking")), "...the pick closed")
@@ -318,7 +318,7 @@ func _check_pick_route() -> void:
 		controller.call("request_play", _view(controller, reckoning))
 		await _settle(controller)
 		_expect((deck.get("exhaust_pile") as Array).has(reckoning), "Picked at 1 energy: a dimmed 2-cost card devoured")
-		_expect_eq(player.hp, START_HP + HEAL, "...2 HP back")
+		_expect_eq(player.hp, START_HP + HEAL, "...3 HP back")
 		_expect_eq(player.energy, 0, "...leaving 0 energy")
 	await _teardown()
 	_completed += 1

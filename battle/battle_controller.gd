@@ -143,7 +143,7 @@ signal battle_lost()
 # eaten card gives back, how many it may eat per turn, and the Energy each
 # eating costs - paid when the card is eaten, and needed in hand for
 # Devour to be available at all (is_devour_available()).
-@export var devour_heal_amount: int = 2
+@export var devour_heal_amount: int = 3
 @export var devour_uses_per_turn: int = 1
 @export var devour_energy_cost: int = 1:
 	set(value):

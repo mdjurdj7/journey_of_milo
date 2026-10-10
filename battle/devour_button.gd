@@ -8,7 +8,7 @@ class_name DevourButton
 # in the intent glyphs' tapered pen (InkPen) at about the energy
 # numeral's cap height - and stacked to its right "DEVOUR" in tracked
 # caps with its Energy cost after it (a pip per Energy, the energy
-# readout's own mark), "+2 HP" in the HP readout's smaller grey numeral,
+# readout's own mark), "+3 HP" in the HP readout's smaller grey numeral,
 # and "USED" in small grey caps once this turn's Devour is spent. No
 # disc, ring, glow or divider.
 #
@@ -24,7 +24,7 @@ class_name DevourButton
 #   jaw_open_px each, eased, held while it stays lit. No glow, pulse or
 #   colour.
 # - Hovered while lit with a card armed: the hairline thickens to
-#   rule_hover_px and one line names it ("Consume Slash. Heal 2 HP.");
+#   rule_hover_px and one line names it ("Consume Slash. Heal 3 HP.");
 #   while the pick is open the line reads pick_text. The line sits
 #   hover_gap_px above set_hover_floor_y() - the top of the bottom-left
 #   stack, where the keepsake reveal appears - left-aligned with this.
