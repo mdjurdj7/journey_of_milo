@@ -197,7 +197,6 @@ move_speed = 5.0
 acceleration = 30.0
 dash_distance = 8.0
 dash_duration = 0.9
-leg_spread_correction_degrees = -4.0
 sword_length = 1.5
 grip_axis_flip = true
 back_mount_position = Vector3(0.17, 0.5, 0.05)

@@ -156,23 +156,10 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 # eases in over a few frames instead of popping.
 @export var foot_grounding_smoothing_speed: float = 12.0
 
-# The Mixamo rig's own A-pose rest pose bakes in a wider leg stance than
-# the model should stand at. Corrected continuously via a
-# LegSpreadCorrectionModifier (a SkeletonModifier3D added under the
-# skeleton by _setup_leg_spread_correction()) rather than a one-time pose
-# edit, so it stacks with every clip (Idle, Walk, BattleIdle, DrawSword)
-# instead of needing separate correction per clip.
-@export var leg_spread_correction_degrees: float = 6.0:
-	set(value):
-		leg_spread_correction_degrees = value
-		if _leg_spread_modifier:
-			_leg_spread_modifier.correction_degrees = value
-
 # Widens BattleIdle's own square-on stance into a fencer's ready stance -
 # see BattleStanceModifier's own doc for the mechanics (which bone rotates
 # which way, the influence-based blend enter_battle_stance()/exit_battle_
-# stance() drive). Forwarded live into _battle_stance_modifier, same
-# shape as leg_spread_correction_degrees above.
+# stance() drive). Forwarded live into _battle_stance_modifier.
 @export_group("Battle Stance")
 @export var battle_back_leg_degrees: float = 12.0:
 	set(value):
@@ -277,9 +264,10 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 		grip_axis_flip = value
 		_apply_grip_offset()
 
-# Bone names may be sanitized on import (see LegSpreadCorrectionModifier's
-# own doc) - resolved by suffix match against the skeleton, same as
-# everywhere else in this project that reads Mixamo bone names.
+# Bone names may be sanitized on import (Mixamo's "mixamorig:RightHand"
+# imports as "mixamorig_RightHand") - resolved by suffix match against the
+# skeleton, same as everywhere else in this project that reads Mixamo bone
+# names.
 # StringName (not String): these are identifiers, not display text, and
 # an empty one is a real hazard - String.ends_with("") is true for every
 # bone, so an empty suffix would silently "match" bone 0 instead of
@@ -408,7 +396,6 @@ var _capsule_radius: float = 0.0
 # pose reads by index, every physics frame.
 var _grounding_skeleton: Skeleton3D = null
 var _grounding_bone_indices: Array[int] = []
-var _leg_spread_modifier: LegSpreadCorrectionModifier = null
 var _battle_stance_modifier: BattleStanceModifier = null
 
 # The uniform scale _scale_and_ground_model() applied to the model, set
@@ -505,7 +492,6 @@ func _ready() -> void:
 		_animation_player.play("Idle")
 
 	_find_grounding_bones(model)
-	_setup_leg_spread_correction(model)
 	_setup_battle_stance_modifier(model)
 	_setup_sword(model)
 	_setup_step_debug_lines()
@@ -746,25 +732,7 @@ func _find_grounding_bones(model: Node3D) -> void:
 
 # Does its own Skeleton3D lookup rather than reusing _grounding_skeleton:
 # _find_grounding_bones() above nulls that out when foot/toe bones aren't
-# found, which is a completely unrelated failure mode from the leg-spread
-# bones this needs - leg spread correction shouldn't fail just because
-# the foot-bone names didn't match on some other rig.
-func _setup_leg_spread_correction(model: Node3D) -> void:
-	var skeletons := model.find_children("*", "Skeleton3D", true, false)
-	var skeleton := skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
-	if skeleton == null:
-		push_warning("Wanderer: no Skeleton3D found under model; leg spread correction disabled.")
-		return
-
-	_leg_spread_modifier = LegSpreadCorrectionModifier.new()
-	_leg_spread_modifier.name = "LegSpreadCorrection"
-	_leg_spread_modifier.correction_degrees = leg_spread_correction_degrees
-	skeleton.add_child(_leg_spread_modifier)
-
-# Same skeleton lookup as _setup_leg_spread_correction() above, duplicated
-# rather than shared since each already has its own reason to fail
-# independently of the other (see that function's own doc on why it
-# doesn't reuse _grounding_skeleton either). animation_player is handed
+# found, an unrelated failure that shouldn't disable this. animation_player is handed
 # over directly since BattleStanceModifier has no other way to reach it -
 # see its own doc. influence starts at 0: this should be completely inert
 # on the field, only ever raised by enter_battle_stance()'s own tween.
