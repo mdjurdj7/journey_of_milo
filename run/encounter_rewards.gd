@@ -2,7 +2,7 @@ extends Resource
 class_name EncounterRewards
 
 # A won fight's reward by its encounter role - the strongest any member
-# is (RunLogger.encounter_role()): region_end, elite, required, else
+# is (BattleController.encounter_role()): region_end, elite, required, else
 # basic. Cards only from the fights that matter; an optional basic fight
 # pays more gold and sometimes an extra instead (RoleReward). Loaded by
 # RegionField when the reward screen opens; nothing is set per enemy.
@@ -17,7 +17,7 @@ enum Extra { NONE, REMOVAL, SAMPHIRE }
 # The card a SAMPHIRE extra offers.
 @export var samphire_card: CardData = null
 
-# The entry for `role` (RunLogger.encounter_role()'s names), null for an
+# The entry for `role` (BattleController.encounter_role()'s names), null for an
 # unknown one.
 func for_role(role: String) -> RoleReward:
 	match role:

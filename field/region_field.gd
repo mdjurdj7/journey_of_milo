@@ -466,9 +466,9 @@ var _fight_elite: bool = false
 var _fight_top_tier: bool = false
 var _pending_elite: bool = false
 var _pending_top_tier: bool = false
-# The fight's encounter role (RunLogger.encounter_role(), from the same
-# members the run log is given - BattleController.encounter_member()),
-# set as it starts and carried to the last win's reward the same way:
+# The fight's encounter role (BattleController.encounter_role(), from
+# the same members the run log is given - BattleController.encounter_
+# member()), set as it starts and carried to the last win's reward the same way:
 # what EncounterRewards pays it.
 var _fight_role: String = "basic"
 var _pending_role: String = "basic"
@@ -1794,7 +1794,7 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 			_fight_top_tier = true
 		if member.enemy_data != null:
 			members.append(BattleController.encounter_member(member))
-	_fight_role = RunLogger.encounter_role(members)
+	_fight_role = BattleController.encounter_role(members)
 	var anchor: FieldEnemy = _battle_members[0]
 	# A patrolling pack stops where it is: pending take-offs dropped, and
 	# any member in the air comes down where it is - the anchor here,

@@ -277,7 +277,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	# it was escaped from) opens without its pack move.
 	_mark_lone_pack_members()
 
-	RunLogger.fight_start(RunLogger.encounter_key(enemy_names), enemy_ids, RunState.run_snapshot(), members)
+	RunLogger.fight_start(RunLogger.encounter_key(enemy_names), enemy_ids, RunState.run_snapshot(), members, encounter_role(members))
 	for enemy in enemies:
 		var logged: Combatant = _combatants[enemy]
 		RunLogger.enemy_hp_seen(logged.get_instance_id(), logged.hp)
@@ -929,7 +929,7 @@ func _impact_delay_for(card: CardData) -> float:
 	return delay
 
 # One member of an encounter as the run log and the reward read it
-# (RunLogger.fight_start()'s members, RunLogger.encounter_role()): its
+# (RunLogger.fight_start()'s members, encounter_role()): its
 # data's file name, its place on the floor, and the three flags its role
 # is made of. `enemy` must have its enemy_data.
 static func encounter_member(enemy: FieldEnemy) -> Dictionary:
@@ -941,6 +941,21 @@ static func encounter_member(enemy: FieldEnemy) -> Dictionary:
 		"elite": data.is_elite,
 		"region_end": enemy.card_reward == FloorEnemy.CardReward.TOP_TIER_FIRST,
 	}
+
+# The encounter's role - the strongest any member is (encounter_member()):
+# region_end, elite, required, else basic. The rule the rewards are paid
+# by (EncounterRewards) and the run log records (setup() hands it to
+# RunLogger.fight_start()).
+static func encounter_role(members: Array[Dictionary]) -> String:
+	var role: String = "basic"
+	for member in members:
+		if bool(member.get("region_end", false)):
+			return "region_end"
+		if bool(member.get("elite", false)):
+			role = "elite"
+		elif bool(member.get("required", false)) and role == "basic":
+			role = "required"
+	return role
 
 # --- Devour ---
 

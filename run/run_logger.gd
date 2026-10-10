@@ -253,18 +253,6 @@ static func end_run(cause: String, snapshot: Dictionary) -> void:
 
 # --- Fight ---
 
-# region_end, elite, required or basic - the strongest any member is.
-static func encounter_role(members: Array[Dictionary]) -> String:
-	var role: String = "basic"
-	for member in members:
-		if bool(member.get("region_end", false)):
-			return "region_end"
-		if bool(member.get("elite", false)):
-			role = "elite"
-		elif bool(member.get("required", false)) and role == "basic":
-			role = "required"
-	return role
-
 # "Dragonfly x3", "Dragonfly + Siltjaw": the enemies met, sorted, counted.
 static func encounter_key(names: Array[String]) -> String:
 	var counts: Dictionary = {}
@@ -280,9 +268,12 @@ static func encounter_key(names: Array[String]) -> String:
 
 # `members`: one entry per enemy - its id, floor_index (its place in the
 # floor's FloorData.enemies), required, elite, region_end (the region-end
-# fight, FloorEnemy.CardReward.TOP_TIER_FIRST). The encounter's role is the
-# strongest of them: region_end, elite, required, else basic.
-static func fight_start(encounter: String, enemy_ids: Array[String], snapshot: Dictionary, members: Array[Dictionary] = []) -> void:
+# fight, FloorEnemy.CardReward.TOP_TIER_FIRST). `role` is the encounter's,
+# the strongest of them - region_end, elite, required, else basic -
+# decided by the caller (BattleController.encounter_role()) and only
+# recorded here: naming BattleController would tie this logger to the
+# RunState autoload, which a -s script compiles without.
+static func fight_start(encounter: String, enemy_ids: Array[String], snapshot: Dictionary, members: Array[Dictionary] = [], role: String = "basic") -> void:
 	_fight_open = true
 	_encounter = encounter
 	_turn = 0
@@ -319,7 +310,7 @@ static func fight_start(encounter: String, enemy_ids: Array[String], snapshot: D
 		"encounter": encounter,
 		"enemies": enemy_ids,
 		"members": members,
-		"role": encounter_role(members),
+		"role": role,
 		"region": _region,
 		"floor": _floor,
 		"lap": _lap,

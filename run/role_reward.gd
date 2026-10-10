@@ -2,7 +2,7 @@ extends Resource
 class_name RoleReward
 
 # What a won fight of one encounter role leaves on the reward screen
-# (EncounterRewards, one of these per role - RunLogger.encounter_role()).
+# (EncounterRewards, one of these per role - BattleController.encounter_role()).
 # Read when the screen opens, so an edit applies from the next win.
 
 # The one-of-three card offer (RewardScreen's "A card" line). Off for a
