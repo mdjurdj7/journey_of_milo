@@ -33,8 +33,10 @@ class_name FieldScatter
 #     gate_margin_m; a rock shelf's outline by shelf_margin_m; the spawn
 #     by spawn_clear_m;
 #   - the battle frame's feet: a lone enemy's body and the ring his stance
-#     can land on (RegionField.battle_spacing_min..battle_spacing, widened
-#     by feet_margin_m either way); a cluster's line, stance to far member
+#     can land on - every spot RegionField's stance rule can give, its
+#     stance_distance_min()..stance_distance() for that enemy (its near
+#     edge plus battle_gap_min_m..battle_gap_m), centred on it, widened
+#     by feet_margin_m either way; a cluster's line, stance to far member
 #     with the line's possible shift, as a capsule; a patrolled pack's
 #     waypoints.
 # Nothing here has collision: the walk grid, the click and the Wanderer's
@@ -446,8 +448,8 @@ func _add_lone_keepouts(enemy: FieldEnemy) -> void:
 	var ring := KeepOut.new()
 	ring.kind = KeepOut.Kind.RING
 	ring.a = at
-	ring.inner = maxf(_field.battle_spacing_min - feet_margin_m, 0.0)
-	ring.outer = _field.battle_spacing + feet_margin_m
+	ring.inner = maxf(_field.stance_distance_min(enemy) - feet_margin_m, 0.0)
+	ring.outer = _field.stance_distance(enemy) + feet_margin_m
 	_keepouts.append(ring)
 
 func _add_cluster_keepouts(members: Array) -> void:
@@ -477,7 +479,7 @@ func _add_cluster_keepouts(members: Array) -> void:
 			gaps += gap if gap >= 0.0 else _field.cluster_member_gap
 		var line := KeepOut.new()
 		line.kind = KeepOut.Kind.CAPSULE
-		line.a = _xz(anchor) - along * _field.battle_spacing
+		line.a = _xz(anchor) - along * _field.stance_distance(anchor)
 		line.b = _xz(anchor) + along * (_field.battle_line_shift_max + gaps)
 		line.outer = radius
 		_keepouts.append(line)
@@ -492,7 +494,10 @@ func _add_patrol_keepouts(members: Array, patrol: FloorPatrol) -> void:
 	var spread: float = 0.0
 	for member: FieldEnemy in members:
 		spread = maxf(spread, _xz(member).distance_to(centroid))
-	var reach: float = _field.battle_spacing + feet_margin_m + spread + body
+	var stance: float = 0.0
+	for member: FieldEnemy in members:
+		stance = maxf(stance, _field.stance_distance(member))
+	var reach: float = stance + feet_margin_m + spread + body
 	_keepouts.append(_disc(centroid, reach))
 	for waypoint in patrol.waypoints:
 		_keepouts.append(_disc(_spawn + waypoint, reach))

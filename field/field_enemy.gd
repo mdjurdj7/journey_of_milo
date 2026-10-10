@@ -347,6 +347,14 @@ func set_prop_facing(yaw: float) -> void:
 func get_model_aabb() -> AABB:
 	return AABB(_model_aabb.position + Vector3.UP * get_body_lift(), _model_aabb.size + Vector3.UP * _rear_lift())
 
+# How far its body reaches toward the Wanderer in a fight, metres from its
+# origin along the battle axis: every member turns to face his stance
+# (face_toward_point()), its local -Z toward him, so the near edge is its
+# model's box (scale, model yaw and attachment in) at -Z - the same
+# whichever way he came. What RegionField measures his battle_gap_m from.
+func battle_front_reach() -> float:
+	return maxf(-_model_aabb.position.z, 0.0)
+
 # The pose a queued intent asks of the body (EnemyIntent.rear_while_
 # queued, the Siltjaw's charge): the attachment rears the front up or
 # lets it back down (RearPose.set_rearing()). Returns how long that

@@ -26,10 +26,9 @@ const FLOOR_2 := 1
 const FLOOR_1_KINDS: Array[String] = ["samphire", "stone_small", "stone_large"]
 # The worn band's keep-out: its half-width plus its edge noise.
 const WEAR_KEEP_OUT_M := 2.8
-# The stance ring around a lone enemy: battle_spacing_min - 0.6 to
-# battle_spacing + 0.6.
-const RING_INNER_M := 1.9
-const RING_OUTER_M := 4.6
+# The stance ring around a lone enemy is read from the rules it keeps clear
+# for (RegionField.stance_distance_min()..stance_distance() for that enemy,
+# widened by the scatter's own feet_margin_m) - see _stance_ring().
 # A cluster's line: his feet at the stance (his radius + 0.6) and the
 # members along it.
 const LINE_RADIUS_M := 1.0
@@ -150,11 +149,12 @@ func _check_placements(scatter: Node) -> void:
 func _check_crab_clear(scatter: Node) -> void:
 	var crab: Node3D = get_nodes_in_group("enemies")[0] as Node3D
 	var at := Vector2(crab.global_position.x, crab.global_position.z)
+	var ring: Vector2 = _stance_ring(scatter, crab)
 	var problems: Dictionary = {}
 	for entry: Resource in scatter.call("get_entries"):
 		for spot: RefCounted in scatter.call("get_spots", entry):
 			var distance: float = _xz(spot).distance_to(at)
-			if distance >= RING_INNER_M and distance <= RING_OUTER_M:
+			if distance >= ring.x and distance <= ring.y:
 				_count(problems, "in the crab's stance ring")
 			if distance < 0.9:
 				_count(problems, "on the crab")
@@ -191,7 +191,7 @@ func _check_contours(scatter: Node) -> void:
 	_expect(contour_items > 0, "Floor 2 has a tideline")
 	_expect(problems.is_empty(), "Every tideline item in its band and off the enemies - got %s" % str(problems))
 
-# A cluster's battle line, from the rules: his stance battle_spacing
+# A cluster's battle line, from the rules: his stance stance_distance()
 # behind the anchor, the members on the line toward the far one, out to
 # the line's furthest shift - nothing within LINE_RADIUS_M of it.
 func _check_cluster_line_clear(scatter: Node, group: StringName) -> void:
@@ -212,7 +212,7 @@ func _check_cluster_line_clear(scatter: Node, group: StringName) -> void:
 		return
 	var a := Vector2(anchor.global_position.x, anchor.global_position.z)
 	var along: Vector2 = (Vector2(far.global_position.x, far.global_position.z) - a).normalized()
-	var stance: Vector2 = a - along * float(_field.get("battle_spacing"))
+	var stance: Vector2 = a - along * float(_field.call("stance_distance", anchor))
 	var end: Vector2 = a + along * (float(_field.get("battle_line_shift_max")) + gaps)
 	var inside: int = 0
 	for entry: Resource in scatter.call("get_entries"):
@@ -327,3 +327,11 @@ func _expect_eq(actual: Variant, expected: Variant, message: String) -> void:
 func _fail(message: String) -> void:
 	_failures += 1
 	print("FAIL: ", message)
+
+# The ring a lone enemy's stance can land on, from the rules: inner and
+# outer radius (x, y) - its stance distance at the least and the most gap
+# (RegionField.stance_distance_min()/stance_distance()), each widened by
+# the scatter's feet_margin_m.
+func _stance_ring(scatter: Node, enemy: Node) -> Vector2:
+	var margin: float = float(scatter.get("feet_margin_m"))
+	return Vector2(maxf(float(_field.call("stance_distance_min", enemy)) - margin, 0.0), float(_field.call("stance_distance", enemy)) + margin)
