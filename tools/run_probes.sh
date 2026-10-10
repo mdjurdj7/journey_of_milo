@@ -305,6 +305,8 @@ path_probes_hand() {
 		assets/textures/keepsakes/*) out="keeper_keepsake trinket belongings_choice" ;;
 		# Enemy bodies: the probes that fight them.
 		assets/models/enemies/*) out=$(area_probes enemies) ;;
+		# The Wanderer's body, clips and sword: the field probes, and his rig's.
+		field/wanderer.*|assets/models/wanderer/*) out="$(area_probes field) wanderer_rig" ;;
 		# The Dunecur's crest and feeding head.
 		field/dunecur_pose.*) out="$(area_probes field) dunecur" ;;
 		field/collector.*) out="$(area_probes field) collector" ;;
