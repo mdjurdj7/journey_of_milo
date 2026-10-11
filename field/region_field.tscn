@@ -216,6 +216,9 @@ distance = 12.0
 pitch_degrees = 50.0
 framing_bias = 0.4
 fov = 38.0
+battle_distance_min = 7.7
+battle_enemy_room_ratio = 0.8
+head_clearance = 0.14
 
 [node name="Camera3D" type="Camera3D" parent="CameraPivot" unique_id=1648467848]
 

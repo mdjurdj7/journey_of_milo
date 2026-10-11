@@ -115,8 +115,8 @@ signal battle_finished(outcome: Outcome)
 # The energy group - readout and Devour - moved as one from where
 # energy_anchor and energy_stack_lift_px put it, in overlay (1080p) px
 # like every corner readout, so it scales with the HUD. Left and down
-# from there by default, clear of the Wanderer's HP row: 12 px down keeps
-# a hovered card 12 px under Devour at seven in hand.
+# from there by default, clear of the Wanderer's HP row. 12 px down is as
+# low as it goes: a hovered card sits ~0 px under Devour at seven in hand.
 @export var energy_group_offset: Vector2 = Vector2(-40.0, 12.0):
 	set(value):
 		energy_group_offset = value
