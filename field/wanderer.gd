@@ -196,6 +196,18 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 		if _sword_root != null:
 			_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH, true, false)
 
+# Multiplied into the body's albedo texture in TEXTURED mode (the
+# material's albedo_color) - white is the texture as painted, darker
+# darkens him against the sand. Body only, never the sword. POSTERIZED
+# and FLAT ignore it: their own tone colors / wanderer_color set how dark
+# he is there.
+@export var albedo_tint: Color = Color(1, 1, 1, 1):
+	set(value):
+		albedo_tint = value
+		var material := _textured_body_material()
+		if material != null:
+			material.albedo_color = value
+
 # Mirrors wanderer_flat.gdshader's own uniforms one-to-one - see that
 # file's own doc for what each does. Only used when shading_mode is
 # POSTERIZED. Not live-updating on their own (same "set once" shape
@@ -563,8 +575,17 @@ func _build_textured_material(texture_path: String) -> StandardMaterial3D:
 		return null
 	var material := StandardMaterial3D.new()
 	material.albedo_texture = texture
+	material.albedo_color = albedo_tint
 	material.roughness = 1.0
 	material.metallic_specular = 0.0
+	return material
+
+# The body's live material when it is TEXTURED's (a StandardMaterial3D
+# with a texture), else null - the FLAT fallback has no texture to tint.
+func _textured_body_material() -> StandardMaterial3D:
+	var material := _active_material as StandardMaterial3D
+	if material == null or material.albedo_texture == null:
+		return null
 	return material
 
 func _build_posterized_material(texture_path: String) -> ShaderMaterial:
@@ -1553,6 +1574,12 @@ func _tween_standard_flash(material: StandardMaterial3D, flash_color: Color, ris
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.tween_property(material, "albedo_color", flash_color, rise_time)
 	tween.tween_property(material, "albedo_color", base_color, fall_time)
+	# Ends on the live albedo_tint, not the one captured above - an edit
+	# made mid-flash would otherwise be undone by the fall.
+	tween.tween_callback(func() -> void:
+		if material == _textured_body_material():
+			material.albedo_color = albedo_tint
+	)
 
 # wanderer_flat.gdshader has no single "albedo" property to lerp (its own
 # ALBEDO is computed from a posterized ramp, not read back from a
