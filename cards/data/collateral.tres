@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://5f3r5f78sexi"]
 
-[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
-[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/collateral.tres" id="3_collateral"]
 [ext_resource type="Texture2D" uid="uid://856tybwsm6gt" path="res://cards/art/Wanderer/Collateral.png" id="9_art"]
 
@@ -13,9 +13,8 @@ status_data = ExtResource("3_collateral")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Collateral"
-rarity = 2
-cost = 0
 card_type = 1
+rarity = 2
 target_type = 1
 description = "The next card you play costing 2 or more costs 5 HP instead of Energy.
 Spent."

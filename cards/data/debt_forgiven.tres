@@ -13,9 +13,9 @@ toll_cost = 20
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Debt Forgiven"
-rarity = 2
 cost = 1
 card_type = 1
+rarity = 2
 target_type = 1
 description = "Spend up to 20 Toll.
 {battle}Heal {toll_heal} HP.{/battle}{outside}Heal 1 HP per 2 Toll spent.{/outside}"

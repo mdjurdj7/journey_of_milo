@@ -1,8 +1,9 @@
-[gd_resource type="Resource" script_class="EnemyData" format=3]
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://df5dn1fem2yfd"]
 
 [ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
 [ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
 [ext_resource type="AudioStream" uid="uid://co5jagvmbnmkr" path="res://assets/audio/enemies/Sputter/hit_armor.mp3" id="3_hit_armor"]
+[ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="4_l7uxx"]
 
 [sub_resource type="Resource" id="EnemyIntent_bite_1"]
 script = ExtResource("2_intent")
@@ -29,7 +30,6 @@ intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_bite_1"), Sub
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_armor")])
 model_scene_path = "res://assets/models/enemies/Dragonfly/Dragonfly_body.glb"
 model_scale = 0.44
-model_yaw_offset_degrees = 180.0
 attachment_scene_path = "res://field/dragonfly_wings.tscn"
 rest_height_m = 0.12
 battle_hover_m = 0.45

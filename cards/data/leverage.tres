@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=7 format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://bbf28tovk4jsu"]
 
-[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
-[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/leverage.tres" id="3_leverage"]
 [ext_resource type="Texture2D" uid="uid://bsoxupcwy687r" path="res://cards/art/Wanderer/Leverage.png" id="9_art"]
 
@@ -18,9 +18,8 @@ status_data = ExtResource("3_leverage")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Leverage"
-rarity = 2
-cost = 0
 card_type = 1
+rarity = 2
 target_type = 1
 description = "Spend 5 Toll.
 Your next card costs 2 less.

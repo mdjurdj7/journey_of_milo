@@ -13,11 +13,11 @@ stance_data = ExtResource("3_self_eater")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Self-Eater"
-rarity = 2
 cost = 1
 card_type = 2
+rarity = 2
 target_type = 1
 description = "Your Attacks deal 3 more and cost 2 HP."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_stance")])
-play_sound_path = "res://assets/audio/cards/self_eater_play.wav"
 art = ExtResource("4_art")
+play_sound_path = "res://assets/audio/cards/self_eater_play.wav"

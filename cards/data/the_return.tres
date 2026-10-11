@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://b254f5mcxm3x3"]
 
-[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
-[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/the_return.tres" id="3_the_return"]
 [ext_resource type="Texture2D" uid="uid://dfglgd382lqfe" path="res://cards/art/Wanderer/The Return.png" id="9_art"]
 
@@ -13,9 +13,9 @@ status_data = ExtResource("3_the_return")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "The Return"
-rarity = 3
 cost = 2
 card_type = 3
+rarity = 3
 target_type = 1
 description = "Every 3 times you damage yourself:
 Drain 8 from all enemies."

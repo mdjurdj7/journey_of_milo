@@ -6,6 +6,7 @@
 [ext_resource type="AudioStream" uid="uid://ctbnpo2j3ocnc" path="res://assets/audio/enemies/Sputter/hit_shell_2.mp3" id="4_hit_shell_2"]
 [ext_resource type="AudioStream" uid="uid://c2g4kb3njm4pa" path="res://assets/audio/enemies/Sputter/hit_shell_3.mp3" id="5_hit_shell_3"]
 [ext_resource type="AudioStream" uid="uid://co5jagvmbnmkr" path="res://assets/audio/enemies/Sputter/hit_armor.mp3" id="6_hit_armor"]
+[ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="7_fqvsb"]
 
 [sub_resource type="Resource" id="EnemyIntent_block"]
 script = ExtResource("2_intent")

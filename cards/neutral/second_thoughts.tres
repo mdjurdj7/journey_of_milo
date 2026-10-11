@@ -11,9 +11,9 @@ value = 2
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Second Thoughts"
-rarity = 1
 cost = 1
 card_type = 1
+rarity = 1
 target_type = 1
 description = "Draw {draw}."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_draw")])

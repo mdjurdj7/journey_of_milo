@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=7 format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://bmpjx3dr225um"]
 
-[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
-[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/come_due.tres" id="3_come_due"]
 [ext_resource type="Texture2D" uid="uid://cyupr04sdvc3o" path="res://cards/art/Wanderer/Come Due.png" id="9_art"]
 
@@ -18,9 +18,9 @@ status_data = ExtResource("3_come_due")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Come Due"
-rarity = 2
 cost = 1
 card_type = 1
+rarity = 2
 target_type = 0
 description = "Spend 5 Toll.
 Next 3 Attacks against this enemy deal +4 damage."

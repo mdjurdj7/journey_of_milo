@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=4 format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://dbr37uguqysmn"]
 
-[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
-[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Texture2D" uid="uid://ccs08umrji0lw" path="res://cards/art/Wanderer/Cornered.png" id="9_art"]
 
 [sub_resource type="Resource" id="CardEffect_damage"]
@@ -13,11 +13,10 @@ alt_value = 16
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Cornered"
-rarity = 1
 cost = 1
-card_type = 0
+rarity = 1
 target_type = 0
 description = "{else}Deal {damage} damage.{/else} {if}Critical: deal {alt_damage}.{/if}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
-battle_animation = &"Slash"
 art = ExtResource("9_art")
+battle_animation = &"Slash"

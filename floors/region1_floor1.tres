@@ -10,15 +10,10 @@
 [ext_resource type="PackedScene" path="res://field/keeper.tscn" id="8_keeper"]
 [ext_resource type="PackedScene" uid="uid://bti18febtfxyt" path="res://assets/models/cormorant/bird.glb" id="9_cormorant"]
 [ext_resource type="Resource" path="res://cards/pools/wanderer_pool.tres" id="10_wanderer_pool"]
-[ext_resource type="Script" path="res://floors/scatter/scatter_set.gd" id="11_scatter_set"]
-[ext_resource type="Resource" path="res://floors/scatter/floor1_pristine.tres" id="12_wet_scatter"]
+[ext_resource type="Script" uid="uid://bp8hnb8ai830l" path="res://floors/scatter/scatter_set.gd" id="11_scatter_set"]
+[ext_resource type="Resource" uid="uid://d01nm80nur52n" path="res://floors/scatter/floor1_pristine.tres" id="12_wet_scatter"]
 [ext_resource type="Script" uid="uid://c1xsh7mpatcy3" path="res://floors/encounter_slot.gd" id="90_encounter_slot"]
 [ext_resource type="Script" uid="uid://n5us4ml13k7m" path="res://floors/encounter_option.gd" id="91_encounter_option"]
-
-[sub_resource type="Resource" id="FloorEnemy_crab"]
-script = ExtResource("2_floor_enemy")
-enemy_data = ExtResource("5_sputter")
-yaw_degrees = 8.0
 
 [sub_resource type="Resource" id="FloorProp_hull1"]
 script = ExtResource("3_floor_prop")
@@ -61,6 +56,11 @@ overrides = {
 "face_direction": 3
 }
 
+[sub_resource type="Resource" id="FloorEnemy_crab"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("5_sputter")
+yaw_degrees = 8.0
+
 [sub_resource type="Resource" id="EncounterOption_sputter"]
 script = ExtResource("91_encounter_option")
 option_id = &"sputter"
@@ -83,5 +83,4 @@ wear_path_override = null
 scatter_sets = Array[ExtResource("11_scatter_set")]([ExtResource("12_wet_scatter")])
 scatter_budget = 22
 reward_pool = ExtResource("10_wanderer_pool")
-gold_min = 10
 gold_max = 15

@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="CardData" format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://dpef54c1ojk7j"]
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
@@ -19,8 +19,8 @@ status_data = ExtResource("3_denied")
 script = ExtResource("1_card_data")
 card_name = "Deny"
 cost = 2
-rarity = 2
 card_type = 1
+rarity = 2
 target_type = 0
 description = "Consume your costliest card.
 Target enemy skips its next move.

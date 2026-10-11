@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://byoypfv2v0pij"]
 
-[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
-[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/no_further.tres" id="3_no_further"]
 [ext_resource type="Texture2D" uid="uid://cmy4ma03thcl4" path="res://cards/art/Wanderer/No Further.png" id="9_art"]
 
@@ -13,9 +13,9 @@ status_data = ExtResource("3_no_further")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "No Further"
-rarity = 3
 cost = 1
 card_type = 3
+rarity = 3
 target_type = 1
 description = "When you next enter Critical, the next enemy Attack deals 0 damage.
 Spent."

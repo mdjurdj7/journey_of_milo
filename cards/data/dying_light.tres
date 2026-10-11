@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="CardData" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://bvouoilk1xgod"]
 
-[ext_resource type="Script" path="res://cards/card_data.gd" id="1_card_data"]
-[ext_resource type="Script" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/dying_light.tres" id="3_dying_light"]
 [ext_resource type="Texture2D" uid="uid://byy2ku24scpuc" path="res://cards/art/Wanderer/Dying Light.png" id="4_art"]
 
@@ -13,9 +13,9 @@ status_data = ExtResource("3_dying_light")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Dying Light"
-rarity = 3
 cost = 1
 card_type = 3
+rarity = 3
 target_type = 1
 description = "While Critical, gain 1 Energy at the start of your turn."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])

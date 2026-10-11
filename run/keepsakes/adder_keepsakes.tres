@@ -1,7 +1,7 @@
-[gd_resource type="Resource" script_class="KeepsakeTable" load_steps=5 format=3]
+[gd_resource type="Resource" script_class="KeepsakeTable" format=3 uid="uid://brab8mk4ica4g"]
 
-[ext_resource type="Script" path="res://run/keepsake_table.gd" id="1_table"]
-[ext_resource type="Script" path="res://run/keepsake_entry.gd" id="2_entry"]
+[ext_resource type="Script" uid="uid://c1w6aiosotgic" path="res://run/keepsake_table.gd" id="1_table"]
+[ext_resource type="Script" uid="uid://c2mabcrat0q5d" path="res://run/keepsake_entry.gd" id="2_entry"]
 [ext_resource type="Resource" path="res://run/keepsakes/keeper/blue_fastener.tres" id="3_blue_fastener"]
 
 [sub_resource type="Resource" id="KeepsakeEntry_blue_fastener"]
@@ -11,4 +11,3 @@ trinket = ExtResource("3_blue_fastener")
 [resource]
 script = ExtResource("1_table")
 entries = Array[ExtResource("2_entry")]([SubResource("KeepsakeEntry_blue_fastener")])
-guaranteed = true

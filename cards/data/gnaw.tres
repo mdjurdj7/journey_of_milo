@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="CardData" format=3]
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://4gtsbgjwvm8"]
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
@@ -14,11 +14,9 @@ drain_on_condition = true
 script = ExtResource("1_card_data")
 card_name = "Gnaw"
 rarity = 1
-cost = 0
-card_type = 0
 target_type = 0
 description = "Deal {damage} damage. {if}If you spent Toll this turn, drain {damage} instead.{/if}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
+art = ExtResource("9_art")
 battle_animation = &"Slash"
 impact_time = 0.55
-art = ExtResource("9_art")
