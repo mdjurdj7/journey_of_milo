@@ -51,8 +51,9 @@ const BRACE_HIPS_OVER_TOE_M := 0.30
 const LOOPING: Array[String] = ["Idle", "Walk", "Run", "BattleIdle"]
 const ONE_SHOTS: Array[String] = ["DrawSword", "Slash", "Brace"]
 const CARRIED: Array[String] = ["Idle", "Walk", "Run", "DrawSword", "Slash", "Brace"]
-# Bones whose rest length a carried clip must keep (parent -> child).
-const LENGTH_BONES: Array[String] = ["mixamorig_RightForeArm", "mixamorig_RightHand", "mixamorig_LeftLeg", "mixamorig_LeftFoot", "mixamorig_Head"]
+# Bones whose rest length a carried clip must keep (parent -> child), by
+# name after the rig's prefix (_bone()).
+const LENGTH_BONES: Array[String] = ["RightForeArm", "RightHand", "LeftLeg", "LeftFoot", "Head"]
 
 var _failures: int = 0
 var _field: Node3D = null
@@ -90,8 +91,8 @@ func _initialize() -> void:
 	await _pose("Idle", 0.0)
 	var forward: Vector3 = -_wanderer.global_transform.basis.z
 	for side in ["Left", "Right"]:
-		var heel: Vector3 = _bone_world("mixamorig_%sFoot" % side)
-		var toe: Vector3 = _bone_world("mixamorig_%sToeBase" % side)
+		var heel: Vector3 = _bone_world("%sFoot" % side)
+		var toe: Vector3 = _bone_world("%sToeBase" % side)
 		_check((toe - heel).dot(forward) > 0.03, "%s toes ahead of the heel (%.3f m along his forward)" % [side.to_lower(), (toe - heel).dot(forward)])
 
 	print("\n=== clips")
@@ -145,13 +146,13 @@ func _initialize() -> void:
 		var worst_length := 0.0
 		for s in SAMPLES:
 			await _pose(clip, length * float(s) / float(SAMPLES))
-			var head: Vector3 = _bone_world("mixamorig_Head")
-			var hips: Vector3 = _bone_world("mixamorig_Hips")
-			var toe_y: float = minf(_bone_world("mixamorig_LeftToeBase").y, _bone_world("mixamorig_RightToeBase").y)
+			var head: Vector3 = _bone_world("Head")
+			var hips: Vector3 = _bone_world("Hips")
+			var toe_y: float = minf(_bone_world("LeftToeBase").y, _bone_world("RightToeBase").y)
 			if head.y - hips.y < head_floor or hips.y - toe_y < hips_floor:
 				upright = false
 			for bone_name in LENGTH_BONES:
-				var bone: int = _skeleton.find_bone(bone_name)
+				var bone: int = _bone(bone_name)
 				var parent: int = _skeleton.get_bone_parent(bone)
 				var posed: float = (_skeleton.get_bone_global_pose(bone).origin - _skeleton.get_bone_global_pose(parent).origin).length()
 				var rest: float = (_skeleton.get_bone_global_rest(bone).origin - _skeleton.get_bone_global_rest(parent).origin).length()
@@ -178,7 +179,7 @@ func _initialize() -> void:
 	var tip_local: Vector3 = raw.position + raw.size * 0.5
 	tip_local[axis] = raw.position[axis] if bool(_wanderer.get("grip_axis_flip")) else raw.end[axis]
 	var tip: Vector3 = (sword.get_node("SwordMesh") as Node3D).global_transform * tip_local
-	var ground_y: float = minf(_bone_world("mixamorig_LeftToeBase").y, _bone_world("mixamorig_RightToeBase").y)
+	var ground_y: float = minf(_bone_world("LeftToeBase").y, _bone_world("RightToeBase").y)
 	print("sword: grip %s, tip %s" % [sword.global_position, tip])
 	_check(tip.y > ground_y, "its point is above the sand (%.3f m over the toes)" % (tip.y - ground_y))
 
@@ -209,8 +210,16 @@ func _clip_text(animation: Animation) -> String:
 			text += str(animation.track_get_key_value(track, key))
 	return text
 
-func _bone_world(bone_name: String) -> Vector3:
-	return _skeleton.global_transform * _skeleton.get_bone_global_pose(_skeleton.find_bone(bone_name)).origin
+# The model's bone named name after the rig's prefix (mixamorig_,
+# smartrig_ ...), -1 if none.
+func _bone(name: String) -> int:
+	for bone in _skeleton.get_bone_count():
+		if _skeleton.get_bone_name(bone).ends_with("_" + name):
+			return bone
+	return -1
+
+func _bone_world(name: String) -> Vector3:
+	return _skeleton.global_transform * _skeleton.get_bone_global_pose(_bone(name)).origin
 
 func _check_sword_size(sword: Node3D, expected: float, label: String) -> void:
 	var scale: Vector3 = sword.global_transform.basis.get_scale()

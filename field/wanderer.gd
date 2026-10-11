@@ -703,9 +703,10 @@ func _skinned_rest_aabb(model: Node3D, mi: MeshInstance3D) -> AABB:
 # continuous per-physics-frame correction below never does a name lookup
 # or a skeleton scan, just two pose reads by index.
 #
-# Prefers toe bones (mixamorig_LeftToeBase/RightToeBase) since those sit
-# at the actual ground contact point; falls back to
-# mixamorig_LeftFoot/RightFoot if no toe bone is present on this rig.
+# Prefers toe bones (LeftToeBase/RightToeBase) since those sit at the
+# actual ground contact point; falls back to LeftFoot/RightFoot if no toe
+# bone is present on this rig. Found by suffix (_find_bone_by_suffix()),
+# whatever the rig's prefix - mixamorig_, smartrig_.
 func _find_grounding_bones(model: Node3D) -> void:
 	var skeletons := model.find_children("*", "Skeleton3D", true, false)
 	_grounding_skeleton = skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
@@ -713,18 +714,18 @@ func _find_grounding_bones(model: Node3D) -> void:
 		push_warning("Wanderer: no Skeleton3D found under model; continuous foot grounding disabled.")
 		return
 
-	var toe_bone_names := ["mixamorig_LeftToeBase", "mixamorig_RightToeBase"]
-	var foot_bone_names := ["mixamorig_LeftFoot", "mixamorig_RightFoot"]
+	var toe_suffixes: Array[StringName] = [&"LeftToeBase", &"RightToeBase"]
+	var foot_suffixes: Array[StringName] = [&"LeftFoot", &"RightFoot"]
 	var toe_present := false
-	for bone_name in toe_bone_names:
-		if _grounding_skeleton.find_bone(bone_name) != -1:
+	for suffix in toe_suffixes:
+		if _find_bone_by_suffix(_grounding_skeleton, suffix) != -1:
 			toe_present = true
 			break
-	var bone_names: Array = toe_bone_names if toe_present else foot_bone_names
+	var suffixes: Array[StringName] = toe_suffixes if toe_present else foot_suffixes
 
 	_grounding_bone_indices.clear()
-	for bone_name in bone_names:
-		var bone_idx := _grounding_skeleton.find_bone(bone_name)
+	for suffix in suffixes:
+		var bone_idx := _find_bone_by_suffix(_grounding_skeleton, suffix)
 		if bone_idx != -1:
 			_grounding_bone_indices.append(bone_idx)
 
@@ -1164,7 +1165,7 @@ func _merge_clip(library: AnimationLibrary, anim_root: Node, target_skeleton: Sk
 
 # Carries a clip cut on one rig (source_skeleton, under source_root) onto
 # the model's skeleton (target_skeleton, under target_root - the
-# AnimationPlayer's root), by bone name:
+# AnimationPlayer's root), by bone name (_target_bone()):
 # - every bone track is re-pointed at target_skeleton's path;
 # - the root bone's rotation and position keys are carried from the
 #   source skeleton's frame into the target's through the nodes above
@@ -1198,10 +1199,10 @@ func _transfer_clip(animation: Animation, source_root: Node, source_skeleton: Sk
 		var bone := _track_bone(copy, track_idx, source_root, source_skeleton)
 		if bone == "":
 			continue
-		var target_bone := target_skeleton.find_bone(bone)
+		var target_bone := _target_bone(target_skeleton, bone)
 		if target_bone == -1:
 			continue
-		copy.track_set_path(track_idx, NodePath("%s:%s" % [target_path, bone]))
+		copy.track_set_path(track_idx, NodePath("%s:%s" % [target_path, target_skeleton.get_bone_name(target_bone)]))
 		var is_root: bool = target_skeleton.get_bone_parent(target_bone) == -1
 		match copy.track_get_type(track_idx):
 			Animation.TYPE_ROTATION_3D:
@@ -1216,6 +1217,17 @@ func _transfer_clip(animation: Animation, source_root: Node, source_skeleton: Sk
 					var key: Vector3 = copy.track_get_key_value(track_idx, key_idx)
 					copy.track_set_key_value(track_idx, key_idx, frame_shift * key if is_root else rest_origin)
 	return copy
+
+# source_bone's match on target_skeleton: the same name, else the bone
+# with the same name after the rig's prefix - a Mixamo clip's
+# mixamorig_LeftToe_End is smartrig_LeftToe_End on a Meshy rig. -1 when
+# neither is there.
+func _target_bone(target_skeleton: Skeleton3D, source_bone: String) -> int:
+	var bone_idx := target_skeleton.find_bone(source_bone)
+	var prefix_end := source_bone.find("_")
+	if bone_idx == -1 and prefix_end != -1:
+		bone_idx = _find_bone_by_suffix(target_skeleton, StringName(source_bone.substr(prefix_end)))
+	return bone_idx
 
 # The bone a skeleton track of animation names, when its node path is
 # source_skeleton under source_root; "" for any other track.
