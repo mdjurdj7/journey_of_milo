@@ -352,7 +352,7 @@ func _check_fight_line() -> void:
 			print("Line: Sputter back %.3f m, Underfoot nose %.3f m, clear %.3f m" % [sputter_back, underfoot_nose, gap])
 			_expect(gap >= LINE_CLEARANCE_M - 0.02, "...%.2f m clear between them" % gap)
 		var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
-		var drawn: float = _walk_height(wanderer.global_position) - float(wanderer.get("model_ground_offset"))
+		var drawn: float = _walk_height(wanderer.global_position)
 		print("Stance: (%.2f, %.2f) at y %.3f, the drawn surface %.3f" % [wanderer.global_position.x, wanderer.global_position.z, wanderer.global_position.y, drawn])
 		_expect(absf(wanderer.global_position.y - drawn) < 0.01, "The Wanderer's stance on the drawn surface: %.3f m off it" % (wanderer.global_position.y - drawn))
 	await _teardown()
@@ -375,7 +375,7 @@ func _check_escape() -> void:
 		_expect(is_zero_approx(float(pose.call("get_barb_raise"))), "...the barb down")
 		var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
 		_expect(not bool(wanderer.get("_ground_hold_warned")), "...the Wanderer clear of it on the surface - no lift warning")
-		_expect(absf(wanderer.global_position.y - (_walk_height(wanderer.global_position) - float(wanderer.get("model_ground_offset")))) < 0.03, "...standing on it")
+		_expect(absf(wanderer.global_position.y - _walk_height(wanderer.global_position)) < 0.03, "...standing on it")
 	await _teardown()
 	_completed += 1
 

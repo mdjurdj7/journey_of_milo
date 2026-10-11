@@ -147,8 +147,19 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 # their own different hips height too) - _apply_continuous_foot_grounding()
 # corrects for that continuously, every physics frame, using whichever
 # clip is actually playing. This is the target body-local Y its lowest
-# foot/toe bone is driven toward, not a one-time nudge.
-@export var model_ground_offset: float = 0.0
+# foot/toe bone is driven toward, not a one-time nudge: how far, in
+# metres, that toe joint sits above the sand. His body origin is on the
+# sand everywhere (field, battle stance, escape push), so this lifts the
+# model alone. The joint sits inside the boot, above its sole - the
+# default puts BattleIdle's lower sole on the sand, not under it.
+@export var model_ground_offset: float = 0.014:
+	set(value):
+		model_ground_offset = value
+		# Grounding already reads it every physics frame; this lands it at
+		# once, eased over nothing, for an edit made while he isn't
+		# processing.
+		if is_inside_tree():
+			_apply_continuous_foot_grounding(1.0)
 # How fast _apply_continuous_foot_grounding() eases the model toward its
 # target Y (exponential, per second) - high enough that normal per-frame
 # foot movement during Idle/Walk tracks essentially instantly, low enough
@@ -1671,13 +1682,9 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float, direct
 		var local_xz: Vector3 = ground.to_local(Vector3(stance_position.x, 0.0, stance_position.z))
 		terrain_height = ground.get_walk_height_at(Vector2(local_xz.x, local_xz.z))
 
-	# Same "feet at body floor" convention _apply_continuous_foot_grounding()
-	# already establishes for this body: the model's feet sit at body-local
-	# Y = model_ground_offset, not body-local Y = 0 - so the body's own
-	# global Y has to be the terrain height MINUS that offset for the feet
-	# (not the body origin) to actually land on the ground. Same fix
-	# region_field.gd already applies to FieldEnemy's spawn placement.
-	stance_position.y = terrain_height - model_ground_offset
+	# The body origin on the sand, as in the field - model_ground_offset
+	# lifts the model alone (see its own doc), so nothing is taken off here.
+	stance_position.y = terrain_height
 
 	var face_angle := _angle_from_direction(-away_from_target)
 	# Shift face_angle to the equivalent value nearest rotation.y so the

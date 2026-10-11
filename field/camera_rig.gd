@@ -393,15 +393,16 @@ func _battle_ground_forward(a_pos: Vector3, b_pos: Vector3) -> Vector3:
 		return _rig_ground_forward()
 	return Vector3.UP.cross(axis).normalized()
 
-# Every combatant still alive, measured: feet at body-local
-# model_ground_offset (the same "feet at body floor" convention both
-# bodies ground their models by), head = feet + scaled bbox height.
+# Every combatant still alive, measured: feet on the sand, head = feet +
+# scaled bbox height. The Wanderer's body origin is on the sand (his
+# model_ground_offset lifts only the model); an enemy's feet sit at its
+# body-local model_ground_offset.
 func _battle_bodies() -> Array[BattleBody]:
 	var bodies: Array[BattleBody] = []
 	if is_instance_valid(_battle_wanderer):
 		var body := BattleBody.new()
 		body.position = _battle_wanderer.global_position
-		body.feet_y = body.position.y + _battle_wanderer.model_ground_offset
+		body.feet_y = body.position.y
 		body.head_y = body.feet_y + _battle_wanderer.get_head_height()
 		body.half_width = _battle_wanderer.get_half_width()
 		bodies.append(body)
