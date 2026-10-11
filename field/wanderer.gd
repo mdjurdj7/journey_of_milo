@@ -8,19 +8,23 @@ signal hold_line_reached
 # stuck_time with waypoints still ahead - RegionField plans again.
 signal path_stuck
 
-# The body: the Wanderer re-rigged on Mixamo with the neck base moved up
-# to the shoulders (Blender), exported as glTF - its skeleton under an
-# Armature node scaled 0.01 and turned 90 deg. Its one clip, battle_idle,
-# is the held battle pose and merges as BattleIdle (_merge_clips()); every
-# other clip is cut on the old FBX rig and carried over (_transfer_clip()).
-const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v2.glb"
+# The body: the cloaked Wanderer, rigged by Meshy on its Mixamo template
+# (bones smartrig_*, an A-pose rest), exported as glTF in metres - 1.7 m
+# tall at rest, its skeleton unscaled and unturned. Its one clip,
+# battle_idle, is the held battle pose and merges as BattleIdle
+# (_merge_clips()); every other clip is cut on the old FBX rig and carried
+# over (_transfer_clip()).
+const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3.glb"
 const IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_idle.fbx"
 const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_walking.fbx"
 const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_running.fbx"
 const DRAW_SWORD_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_start_draw_sword.fbx"
 const SLASH_SCENE_PATH := "res://assets/models/wanderer/wanderer_slash.fbx"
 const BRACE_SCENE_PATH := "res://assets/models/wanderer/wanderer_brace.fbx"
-const ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/wanderer_albedo.png"
+# The glb's own base colour, extracted on import. The glb also names it as
+# its normal map (a Meshy export slip) - the override below never uses
+# the imported material, so that never reaches the screen.
+const ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/wanderer_v3_bound_output.png"
 const FLAT_SHADER_PATH := "res://field/wanderer_flat.gdshader"
 # sword.glb (glTF, unlike the earlier sword_albedo.fbx) imports with its
 # own embedded textures correctly extracted (sword_0/1/2.jpg) and a real
@@ -150,9 +154,11 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 # foot/toe bone is driven toward, not a one-time nudge: how far, in
 # metres, that toe joint sits above the sand. His body origin is on the
 # sand everywhere (field, battle stance, escape push), so this lifts the
-# model alone. The joint sits inside the boot, above its sole - the
-# default puts BattleIdle's lower sole on the sand, not under it.
-@export var model_ground_offset: float = 0.014:
+# model alone. The joint sits inside the boot, about 4 cm above its sole
+# in BattleIdle - the default puts BattleIdle's soles on the sand, not
+# under it. The old carried clips pitch the foot further and still sink
+# 4-6 cm until they are replaced.
+@export var model_ground_offset: float = 0.041:
 	set(value):
 		model_ground_offset = value
 		# Grounding already reads it every physics frame; this lands it at
@@ -288,10 +294,11 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 # which is exactly why each has a live-reapplying setter rather than only
 # taking effect once at _ready(). The two positions are in WORLD metres
 # (not the attachment's own local space, which is the model's unscaled
-# bone space - the source model is ~0.019m tall, so a raw 0.14 offset
-# there would place the sword ~13m away): _world_offset_to_local() divides
-# by _skeleton_scale_factor before writing _sword_root.position. Rotations
-# are unaffected by that scale, so they're applied as given.
+# bone space, scaled by however the source model ships - on v2, ~0.019 m
+# tall, a raw 0.14 offset would have put the sword ~13 m away):
+# _world_offset_to_local() divides by _skeleton_scale_factor before
+# writing _sword_root.position. Rotations are unaffected by that scale, so
+# they're applied as given.
 @export var back_mount_position: Vector3 = Vector3(0.0, 0.15, -0.18):
 	get:
 		return back_mount_position
@@ -428,9 +435,10 @@ var _hand_attachment: BoneAttachment3D = null
 # What the sword actually hangs from: one child of each attachment whose
 # basis cancels any scale and shear in its bone's pose (_fit_mount_
 # frames()), so the sword keeps sword_length and a clean turn in every
-# pose. wanderer_v2.glb's battle_idle keys bone scale - shoulders and
-# upper arms stretched 1.2-1.3x, fingers 0.7-0.8x - which the right hand
-# inherits; a bone with no scale in its pose leaves its frame at identity.
+# pose. A battle_idle that keys bone scale (wanderer_v2.glb's stretched
+# shoulders and upper arms 1.2-1.3x) passes it to the right hand; a bone
+# with no scale in its pose, as in wanderer_v3.glb, leaves its frame at
+# identity.
 var _back_frame: Node3D = null
 var _hand_frame: Node3D = null
 
@@ -534,9 +542,9 @@ func _ready() -> void:
 # material_override is left null (clearing any override from a previous
 # POSTERIZED/FLAT mode) rather than replaced with a StandardMaterial3D
 # built from SWORD_ALBEDO_TEXTURE_PATH, which likely doesn't exist as a
-# standalone file. The body always keeps the override path: wanderer_v2.
-# glb's imported material reads a texture byte-identical to ALBEDO_
-# TEXTURE_PATH, but with the glb's own roughness, not this one's.
+# standalone file. The body always keeps the override path: wanderer_v3.
+# glb's imported material reads ALBEDO_TEXTURE_PATH too, but with the
+# glb's own roughness and that same image as its normal map.
 func _apply_model_material(model: Node3D, texture_path: String = ALBEDO_TEXTURE_PATH, keep_imported_material_when_textured: bool = false, is_body: bool = true) -> void:
 	if shading_mode == ShadingMode.TEXTURED and keep_imported_material_when_textured:
 		for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
@@ -899,10 +907,11 @@ func _setup_sword(model: Node3D) -> void:
 
 	# _sword_root sits under _back_frame, on a bone attachment of the model's own
 	# Skeleton3D - it inherits the skeleton's whole scale (_skeleton_scale_
-	# factor: the model's up-scale, easily 50-100x since the source model
-	# ships at ~0.019m tall, times any Armature scale between) on top of
-	# whatever _sword_root.scale is set to here. Dividing it back out is
-	# what makes the sword's actual WORLD length come out to sword_length.
+	# factor: the model's scale to target_height - ~1.06 for wanderer_v3.
+	# glb, ~95 for the old ~0.019 m sources - times any Armature scale
+	# between) on top of whatever _sword_root.scale is set to here.
+	# Dividing it back out is what makes the sword's actual WORLD length
+	# come out to sword_length.
 	var world_scale_factor := local_scale_factor
 	if _skeleton_scale_factor > 0.0001:
 		world_scale_factor = local_scale_factor / _skeleton_scale_factor
@@ -1064,10 +1073,10 @@ func _build_flat_material() -> StandardMaterial3D:
 # because of how the clips ship as separate files, not because anything
 # here is temporary.
 #
-# The model's own clip (wanderer_v2.glb's battle_idle - a held pose, two
+# The model's own clip (wanderer_v3.glb's battle_idle - a held pose, two
 # identical keys) is renamed to BattleIdle: where it plays, see enter_
 # battle_stance()/exit_battle_stance(). It loops by its import setting
-# (Loop Mode Linear in wanderer_v2.glb.import), which the rename keeps - the
+# (Loop Mode Linear in wanderer_v3.glb.import), which the rename keeps - the
 # same Animation, renamed - so it holds for the whole battle frame. Every
 # clip after it is carried onto the model's skeleton by _transfer_clip().
 func _merge_clips(anim_player: AnimationPlayer) -> void:

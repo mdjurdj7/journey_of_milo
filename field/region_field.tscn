@@ -199,10 +199,10 @@ dash_distance = 8.0
 dash_duration = 0.9
 sword_length = 1.5
 grip_axis_flip = true
-back_mount_position = Vector3(0.17, 0.5, 0.05)
+back_mount_position = Vector3(0.159, 0.2525, -0.0256)
 back_mount_rotation_degrees = Vector3(24, 0, -19.935)
-hand_mount_position = Vector3(0.03, 0.0684, -0.0026)
-hand_mount_rotation_degrees = Vector3(-9.67, 39.63, 110.34)
+hand_mount_position = Vector3(-0.019, 0.087, 0.0067)
+hand_mount_rotation_degrees = Vector3(-1.36, 71.12, -114.36)
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Wanderer" unique_id=1638228685]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)

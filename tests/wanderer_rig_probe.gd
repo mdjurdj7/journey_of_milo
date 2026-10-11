@@ -5,7 +5,7 @@ extends SceneTree
 # the sword's mounts and their frames). Loads the real region scene on
 # floor 1 and checks, in order:
 #
-#   model  - the body is wanderer_v2.glb, target_height tall (get_head_
+#   model  - the body is wanderer_v3.glb, target_height tall (get_head_
 #            height()), toes ahead of the heels (he faces his forward)
 #   clips  - Idle, Walk, Run, BattleIdle, DrawSword, Slash and Brace are
 #            merged, with their loop modes; every bone track resolves to
@@ -15,7 +15,7 @@ extends SceneTree
 #            (head over hips over toes) on the new rig's own bone lengths
 #   sword  - on his back in Idle and in his right hand's frame in
 #            BattleIdle, sword_length long and uniformly scaled (the hand
-#            frame strips battle_idle's bone scale); in BattleIdle its
+#            frame strips any bone scale in the pose); in BattleIdle its
 #            point is above the sand under his feet - nothing about which
 #            way it points, so any battle pose passes
 #
@@ -31,7 +31,7 @@ extends SceneTree
 
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
-const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v2.glb"
+const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3.glb"
 const SAFETY_SECONDS := 120.0
 const LOAD_FRAMES := 30
 const POSE_FRAMES := 4
@@ -179,9 +179,11 @@ func _initialize() -> void:
 	var tip_local: Vector3 = raw.position + raw.size * 0.5
 	tip_local[axis] = raw.position[axis] if bool(_wanderer.get("grip_axis_flip")) else raw.end[axis]
 	var tip: Vector3 = (sword.get_node("SwordMesh") as Node3D).global_transform * tip_local
-	var ground_y: float = minf(_bone_world("LeftToeBase").y, _bone_world("RightToeBase").y)
+	# The sand under him is his body origin; his toe joints ride
+	# model_ground_offset above it, inside the boots.
+	var ground_y: float = _wanderer.global_position.y
 	print("sword: grip %s, tip %s" % [sword.global_position, tip])
-	_check(tip.y > ground_y, "its point is above the sand (%.3f m over the toes)" % (tip.y - ground_y))
+	_check(tip.y > ground_y, "its point is above the sand (%.3f m over it)" % (tip.y - ground_y))
 
 	_field.queue_free()
 	for i in 5:
