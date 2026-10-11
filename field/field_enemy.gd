@@ -97,6 +97,15 @@ var option_id: StringName = &""
 # edge (1). Read at each attack; 0 at spawn = no lean pivot at all.
 @export_range(0.0, 60.0) var attack_lean_degrees: float = 0.0
 @export_range(0.0, 1.0) var attack_lean_pivot_forward: float = 1.0
+# EnemyData.battle_camera_turn_degrees, copied at spawn: in a fight its
+# model turns this far toward the camera on top of facing the Wanderer
+# (enter_battle_turn()). The model turns, not the body - its facing,
+# lunge, lean and recoil stay on the line. Live while it is in one.
+@export var battle_camera_turn_degrees: float = 20.0:
+	set(value):
+		battle_camera_turn_degrees = value
+		if _battle_turned and _model != null:
+			_model.rotation.y = _model_yaw()
 
 # The sound of a card's hit landing on this creature - enemy_data.
 # contact_sounds picked at random, never the last take twice running
@@ -212,6 +221,10 @@ var _heavy_player: AudioStreamPlayer3D = null
 # The facing turn running now, if any (_turn_to()) - stopped when a new
 # one starts, so two turns never pull on rotation.y at once.
 var _face_tween: Tween = null
+# Whether the model carries battle_camera_turn_degrees (_model_yaw()),
+# and the tween turning it there or back.
+var _battle_turned: bool = false
+var _battle_turn_tween: Tween = null
 # Made on the first pain turn (play_pain_turn_sound()); none before.
 var _pain_player: AudioStreamPlayer3D = null
 # Made on the first status_gained_sound (show_status()); none before.
@@ -358,9 +371,56 @@ func get_model_aabb() -> AABB:
 # origin along the battle axis: every member turns to face his stance
 # (face_toward_point()), its local -Z toward him, so the near edge is its
 # model's box (scale, model yaw and attachment in) at -Z - the same
-# whichever way he came. What RegionField measures his battle_gap_m from.
-func battle_front_reach() -> float:
-	return maxf(-_model_aabb.position.z, 0.0)
+# whichever way he came - turned toward the camera as it will stand
+# (battle_camera_turn_degrees), unless `turned` is false. What RegionField
+# measures his battle_gap_m from.
+func battle_front_reach(turned: bool = true) -> float:
+	return _battle_reach(Vector3.FORWARD, turned)
+
+# The same reach away from him (local +Z) - toward the member behind it
+# in a line (RegionField._cluster_gap_for()).
+func battle_back_reach(turned: bool = true) -> float:
+	return _battle_reach(Vector3.BACK, turned)
+
+# The model box's furthest corner along body-local `direction`, metres,
+# with the box turned about the model's own origin by the battle turn
+# when `turned` - never less than 0.
+func _battle_reach(direction: Vector3, turned: bool) -> float:
+	var turn := Basis(Vector3.UP, deg_to_rad(battle_camera_turn_degrees) if turned else 0.0)
+	var pivot := Vector3(_model.position.x, 0.0, _model.position.z) if _model != null else Vector3.ZERO
+	var reach: float = 0.0
+	for corner in 8:
+		reach = maxf(reach, (turn * (_model_aabb.get_endpoint(corner) - pivot) + pivot).dot(direction))
+	return reach
+
+# Called by RegionField on contact, with face_toward_point(): turns the
+# model battle_camera_turn_degrees toward the camera over duration.
+func enter_battle_turn(duration: float) -> void:
+	_battle_turned = true
+	_tween_model_turn(duration)
+
+# An escape's counterpart: the model back to its plain yaw.
+func exit_battle_turn(duration: float) -> void:
+	_battle_turned = false
+	_tween_model_turn(duration)
+
+func _tween_model_turn(duration: float) -> void:
+	if _model == null:
+		return
+	if _battle_turn_tween != null and _battle_turn_tween.is_valid():
+		_battle_turn_tween.kill()
+	_battle_turn_tween = create_tween()
+	_battle_turn_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_battle_turn_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	_battle_turn_tween.tween_property(_model, "rotation:y", _model_yaw(), maxf(duration, 0.001))
+
+# The model's yaw under the body: model_yaw_offset, and in a fight
+# battle_camera_turn_degrees toward the camera. CameraRig's battle frame
+# puts the enemies screen-right facing left (_battle_ground_forward()),
+# so toward the camera is always a turn to its left - a positive yaw, the
+# mirror of the Wanderer's.
+func _model_yaw() -> float:
+	return deg_to_rad(model_yaw_offset + (battle_camera_turn_degrees if _battle_turned else 0.0))
 
 # The pose a queued intent asks of the body (EnemyIntent.rear_while_
 # queued, the Siltjaw's charge): the attachment rears the front up or

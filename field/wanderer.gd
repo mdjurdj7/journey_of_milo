@@ -126,6 +126,16 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 @export var camera_path: NodePath = ^"../CameraPivot/Camera3D"
 @export var ground_path: NodePath = ^"../Ground"
 @export var model_yaw_offset: float = 180.0
+# In a fight, how far his model turns toward the camera on top of facing
+# the enemy - a 3/4 view instead of exactly side-on. The model turns, not
+# the body: his facing, lunges and recoil tilt stay on the line between
+# the fighters. Tweened in with the battle stance and out on exit; live
+# while he is in one.
+@export var battle_camera_turn_degrees: float = 30.0:
+	set(value):
+		battle_camera_turn_degrees = value
+		if _battle_turned and _model != null:
+			_model.rotation.y = _model_yaw()
 # A touch warmer than the crab's own charcoal (see FieldEnemy.model_color)
 # so the two read as different things even at a glance, not just "the
 # same placeholder grey twice." Used only as the fallback flat material -
@@ -332,6 +342,9 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 var _model: Node3D = null
 var _animation_player: AnimationPlayer
 var _animation_tree: AnimationTree
+# Whether his model carries battle_camera_turn_degrees (_model_yaw()) -
+# set by enter_battle_stance(), cleared by exit_battle_stance().
+var _battle_turned: bool = false
 # The mixer applying the model's poses (the AnimationTree when it's on,
 # else the AnimationPlayer); foot grounding runs on its mixer_applied.
 var _grounding_mixer: AnimationMixer = null
@@ -1783,12 +1796,22 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float, direct
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(self, "global_position", stance_position, duration)
 	tween.tween_property(self, "rotation:y", target_angle, duration)
+	_battle_turned = true
+	if _model != null:
+		tween.tween_property(_model, "rotation:y", _model_yaw(), duration)
 
 	if _animation_player:
 		_animation_player.play("DrawSword", animation_blend_time)
 		_animation_player.queue("BattleIdle")
 
 	_switch_sword_mount(_hand_frame, hand_mount_position, hand_mount_rotation_degrees, duration)
+
+# His model's yaw under the body: model_yaw_offset, and in a fight
+# battle_camera_turn_degrees toward the camera. CameraRig's battle frame
+# always puts him screen-left facing right (_battle_ground_forward()), so
+# toward the camera is always a turn to his right - a negative yaw.
+func _model_yaw() -> float:
+	return deg_to_rad(model_yaw_offset - (battle_camera_turn_degrees if _battle_turned else 0.0))
 
 # Called by region_field.gd once the battle overlay resolves (win, lose,
 # or escape) - blends back from BattleIdle to the normal field Idle.
@@ -1799,6 +1822,13 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float, direct
 func exit_battle_stance() -> void:
 	if _animation_player:
 		_animation_player.play("Idle", animation_blend_time)
+
+	_battle_turned = false
+	if _model != null:
+		var turn_tween := create_tween()
+		turn_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		turn_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		turn_tween.tween_property(_model, "rotation:y", _model_yaw(), animation_blend_time)
 
 	_switch_sword_mount(_back_frame, back_mount_position, back_mount_rotation_degrees, animation_blend_time)
 

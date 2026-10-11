@@ -329,7 +329,9 @@ func _check_fight_body() -> void:
 	await _teardown()
 	_completed += 1
 
-# The line: the Sputter heads it, the Underfoot behind it at its own gap,
+# The line: the Sputter heads it, the Underfoot behind it at its own gap
+# (widened by how much further the two reach once turned to the camera -
+# RegionField._cluster_gap_for()),
 # with at least 0.4 m between the Underfoot's nose and the Sputter's back.
 # The Wanderer's stance - on the dune east of the crab - is on the drawn
 # surface (Ground.get_walk_height_at()), not inside it.
@@ -344,7 +346,8 @@ func _check_fight_line() -> void:
 			_expect((sputter.get("enemy_data") as EnemyData).resource_path == SPUTTER_PATH and (underfoot.get("enemy_data") as EnemyData).resource_path == UNDERFOOT_PATH, "...the Sputter heads the line, the Underfoot behind")
 			var apart: Vector3 = underfoot.global_position - sputter.global_position
 			apart.y = 0.0
-			_expect(absf(apart.length() - _underfoot().cluster_gap_m) < 0.05, "...%.2f m apart (its gap %.2f)" % [apart.length(), _underfoot().cluster_gap_m])
+			var line_gap: float = float(_field.call("_cluster_gap_for", sputter, underfoot))
+			_expect(absf(apart.length() - line_gap) < 0.05, "...%.2f m apart (its gap %.2f, %.2f turned)" % [apart.length(), _underfoot().cluster_gap_m, line_gap])
 			var along: Vector3 = -apart.normalized()
 			var sputter_back: float = _extent(sputter, -along)
 			var underfoot_nose: float = _extent(underfoot, along)

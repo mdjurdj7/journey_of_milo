@@ -1218,6 +1218,7 @@ func _spawn_floor_enemies() -> void:
 			enemy.contact_radius = entry.enemy_data.contact_radius_m
 			enemy.attack_lean_degrees = entry.enemy_data.attack_lean_degrees
 			enemy.attack_lean_pivot_forward = entry.enemy_data.attack_lean_pivot_forward
+			enemy.battle_camera_turn_degrees = entry.enemy_data.battle_camera_turn_degrees
 			enemy.harness_point = entry.enemy_data.harness_point
 			enemy.face_shore_at_spawn = false
 			var at: Vector2 = slot.to_floor(entry.position)
@@ -1952,18 +1953,24 @@ func _place_cluster_line(members: Array[FieldEnemy], duration: float) -> Vector3
 	_line_stance_spacing = spacing - shift
 	var offset: float = shift
 	for index in rest.size():
-		offset += _cluster_gap_for(rest[index])
+		offset += _cluster_gap_for(members[index] if index == 0 else rest[index - 1], rest[index])
 		var spot: Vector3 = start + along * offset
 		rest[index].step_to(spot, duration)
 		members[index + 1] = rest[index]
 	return -along
 
-# How far a member stands from the one before it in its cluster's line:
-# its own EnemyData.cluster_gap_m, else the shared cluster_member_gap.
-func _cluster_gap_for(member: FieldEnemy) -> float:
+# How far a member stands from the one before it (`before`) in its
+# cluster's line: its own EnemyData.cluster_gap_m, else the shared
+# cluster_member_gap - set for the two side-on - widened by however much
+# further the two reach toward each other once turned to the camera
+# (FieldEnemy.battle_camera_turn_degrees), so the room between them holds.
+func _cluster_gap_for(before: FieldEnemy, member: FieldEnemy) -> float:
+	var gap: float = cluster_member_gap
 	if member.enemy_data != null and member.enemy_data.cluster_gap_m >= 0.0:
-		return member.enemy_data.cluster_gap_m
-	return cluster_member_gap
+		gap = member.enemy_data.cluster_gap_m
+	gap += before.battle_back_reach() - before.battle_back_reach(false)
+	gap += member.battle_front_reach() - member.battle_front_reach(false)
+	return gap
 
 func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# Two contact areas can fire in one physics frame; the second must
@@ -2035,6 +2042,7 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 			face_point = anchor.global_position + stance_direction * spacing
 		for member in _battle_members:
 			member.face_toward_point(face_point, camera_rig.battle_transition_time)
+			member.enter_battle_turn(camera_rig.battle_transition_time)
 
 	var directional_light := get_node_or_null(directional_light_path) as OvercastLight
 	if directional_light:
@@ -2234,6 +2242,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 			for member in standing:
 				member.return_to_field_pose(return_time)
 				member.exit_battle_hover()
+				member.exit_battle_turn(return_time)
 		BattleOverlay.Outcome.LOSE:
 			_end_run_lost("died")
 	_fight_fallen.clear()

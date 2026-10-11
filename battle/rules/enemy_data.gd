@@ -160,6 +160,11 @@ class_name EnemyData
 # The body, and the readouts on it, only move. 0 = no lean.
 @export_range(0.0, 60.0) var attack_lean_degrees: float = 0.0
 @export_range(0.0, 1.0) var attack_lean_pivot_forward: float = 1.0
+# In a fight, how far its model turns toward the camera on top of facing
+# the Wanderer, onto FieldEnemy.battle_camera_turn_degrees - the mirror of
+# his own turn, so the two still read as facing each other in a 3/4 view.
+# 0 keeps it exactly side-on.
+@export var battle_camera_turn_degrees: float = 20.0
 # Radius of the sphere the Wanderer has to walk into to start this
 # fight, metres, onto FieldEnemy.contact_radius. 2.0 is every standing
 # enemy's; a roaming one wants its own body's size, so drifting past him
