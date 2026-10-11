@@ -12,7 +12,7 @@ The Wanderer (v3) is made with:
         --blender "C:/Program Files/Blender Foundation/Blender 5.2/blender.exe"
         --lift-target 0.30,0.32,0.36 --accent-color 0.70,0.66,0.56
         --accent-above 0.7 --accent-area 0.0005
-        --pin-dark 0.06,0.06,0.07
+        --pin-dark 0.06,0.06,0.07 --boot-color 0.42,0.30,0.20
 and his sword with:
     python tools/paint_texture.py assets/models/wanderer/sword.glb
         assets/models/wanderer/sword_0.jpg assets/models/wanderer/sword_painted.png
@@ -29,7 +29,9 @@ default pass works on the mesh surface instead:
   5. regions are recoloured: the lighter slate (the cloak) lifted to
      --lift-target, large pale patches (above --accent-above: the
      Wanderer's collar, not his hem pattern) to --accent-color, small
-     ones smoothed away, the dark hood interior pinned to --pin-dark;
+     ones smoothed away, the dark hood interior pinned to --pin-dark,
+     the boots (non-slate, below --boot-below, near each foot's axis)
+     to --boot-color with the sole a little darker;
   6. ambient occlusion baked in Blender (tools/bake_ao_blender.py),
      smoothed and normalised, multiplied in at --ao-strength, and a
      top-down --gradient (lighter at the head, darker at the hem);
@@ -243,6 +245,8 @@ def mesh_space(args):
     height = np.zeros(count)
     height[welded] = positions[:, 1]
     height = (height - height.min()) / max(np.ptp(height), 1e-12)
+    ground = np.zeros((count, 2))
+    ground[welded] = positions[:, [0, 2]]
 
     edges = np.concatenate([wtri[:, [0, 1]], wtri[:, [1, 2]], wtri[:, [2, 0]]])
     edges = np.unique(np.sort(edges, axis=1), axis=0)
@@ -289,8 +293,18 @@ def mesh_space(args):
     painted_luma = painted @ LUMA
     slate = (painted[:, 2] - painted[:, 0] > args.slate_blue) & ~accent & ~dark
     cloak = slate & (painted_luma > args.lift_luma)
+    # Boots: the leather below --boot-below near either foot's vertical
+    # axis (the cloak's hem hangs further out; the trousers are slate).
+    feet = height < 0.05
+    axes = [ground[feet & (np.sign(ground[:, 0]) == side)].mean(0) for side in (-1, 1)
+            if (feet & (np.sign(ground[:, 0]) == side)).any()]
+    to_foot = np.min([np.linalg.norm(ground - axis, axis=1) for axis in axes], axis=0)
+    # Pale is the cloak's hem pattern where it hangs among the boots.
+    boot = (height < args.boot_below) & (to_foot < args.boot_radius) & ~slate & ~pale & ~dark
+    sole = boot & (height < args.sole_below)
     regions = {"cloak (slate above %.2f)" % args.lift_luma: cloak, "inner clothes (slate below)": slate & ~cloak,
-               "large pale patches": accent, "hood interior": dark, "whole model": np.ones(count, bool)}
+               "large pale patches": accent, "hood interior": dark, "boots": boot, "  of which the sole": sole,
+               "whole model": np.ones(count, bool)}
     before = {name: mean_rgb(original, vertex_area * mask) for name, mask in regions.items()}
 
     # 6. Painted-in occlusion and light, before the recolours, so their
@@ -309,6 +323,15 @@ def mesh_space(args):
         ramp = slate * smoothstep(args.lift_luma - 0.04, args.lift_luma + 0.04, painted_luma)
         gain = args.lift_target / np.maximum(mean_rgb(painted, vertex_area * cloak), 1e-4)
         painted = painted * (1 + ramp[:, None] * (gain - 1))
+    if args.boot_color is not None and boot.any():
+        # Per-channel gain to the target average, the sole shaded under
+        # it, feathered at the boot tops like the accents.
+        boot_shade = np.where(sole, args.sole_shade, 1.0)
+        gain = args.boot_color / np.maximum(mean_rgb(painted * boot_shade[:, None], vertex_area * boot), 1e-4)
+        target = painted * gain * boot_shade[:, None]
+        weight = np.clip(np.maximum(smooth(boot.astype(np.float64), args.accent_feather), boot * 1.0) * 2, 0, 1)
+        weight = weight * (height < args.boot_below + 0.05) * ~slate * ~pale
+        painted = painted + weight[:, None] * (target - painted)
     if args.accent_color is not None:
         accent_luma = (detail[accent] @ LUMA) * shade[accent]
         relative = accent_luma / max(np.average(accent_luma, weights=vertex_area[accent]), 1e-4)
@@ -361,6 +384,11 @@ def main():
     parser.add_argument("--pin-dark", type=colour_arg, help="colour for the dark region at the top (hood interior)")
     parser.add_argument("--pin-dark-luma", type=float, default=0.12)
     parser.add_argument("--pin-dark-above", type=float, default=0.85, help="share of the model's height it sits above")
+    parser.add_argument("--boot-color", type=colour_arg, help="recolour the boots to this average (r,g,b)")
+    parser.add_argument("--boot-below", type=float, default=0.27, help="share of the model's height the boots reach to")
+    parser.add_argument("--boot-radius", type=float, default=0.15, help="metres from a foot's vertical axis that count as boot")
+    parser.add_argument("--sole-below", type=float, default=0.03, help="share of the model's height that is sole")
+    parser.add_argument("--sole-shade", type=float, default=0.9, help="the sole's value against the rest of the boot")
     parser.add_argument("--blender", help="Blender executable; bakes ambient occlusion when given")
     parser.add_argument("--ao-strength", type=float, default=0.35)
     parser.add_argument("--ao-distance", type=float, default=0.08, help="occlusion distance in metres")
