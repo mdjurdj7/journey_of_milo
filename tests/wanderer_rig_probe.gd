@@ -13,6 +13,9 @@ extends SceneTree
 #            battle_idle (its tracks, unconverted), looping
 #   poses  - each carried clip, sampled through its length, stands him up
 #            (head over hips over toes) on the new rig's own bone lengths
+#   ground - with his processing off, as the battle freeze leaves it,
+#            BattleIdle after Idle still grounds him: his lower toe joint
+#            settles model_ground_offset over the sand under him
 #   sword  - on his back in Idle and in his right hand's frame in
 #            BattleIdle, sword_length long and uniformly scaled (the hand
 #            frame strips any bone scale in the pose); in BattleIdle its
@@ -38,6 +41,10 @@ const POSE_FRAMES := 4
 const HEIGHT_LIMIT_M := 0.01
 const SWORD_LIMIT_M := 0.01
 const BONE_LENGTH_LIMIT_M := 0.002
+# How long grounding gets to ease onto a new clip, and how close the toe
+# joint must then sit to model_ground_offset over the sand (metres).
+const GROUND_SETTLE_SECONDS := 1.0
+const GROUND_LIMIT_M := 0.005
 const SAMPLES := 6
 # Standing up, per sample: the head at least this far above the hips, the
 # hips at least this far above the lower toe (metres).
@@ -159,6 +166,14 @@ func _initialize() -> void:
 				worst_length = maxf(worst_length, absf(posed - rest) * float(_wanderer.get("_skeleton_scale_factor")))
 		_check(upright, "%s stands him up through its length" % clip)
 		_check(worst_length <= BONE_LENGTH_LIMIT_M, "%s keeps the rig's bone lengths (worst %.4f m)" % [clip, worst_length])
+
+	print("\n=== ground")
+	await _pose("Idle", 0.0)
+	await _pose("BattleIdle", 0.0)
+	await create_timer(GROUND_SETTLE_SECONDS).timeout
+	var offset: float = float(_wanderer.get("model_ground_offset"))
+	var toe_lift: float = minf(_bone_world("LeftToeBase").y, _bone_world("RightToeBase").y) - _wanderer.global_position.y
+	_check(absf(toe_lift - offset) <= GROUND_LIMIT_M, "in BattleIdle with his processing off, his lower toe joint sits %.4f m over the sand (model_ground_offset %.3f)" % [toe_lift, offset])
 
 	print("\n=== sword")
 	var sword: Node3D = _wanderer.get("_sword_root")

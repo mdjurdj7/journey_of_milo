@@ -149,8 +149,9 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 # every clip's own hips height sits somewhere different from the bind pose
 # (Idle floated ~0.5m once it took over; BattleIdle/DrawSword each carry
 # their own different hips height too) - _apply_continuous_foot_grounding()
-# corrects for that continuously, every physics frame, using whichever
-# clip is actually playing. This is the target body-local Y its lowest
+# corrects for that continuously, on every pose the animation mixer
+# applies (battle freeze included), using whichever clip is actually
+# playing. This is the target body-local Y its lowest
 # foot/toe bone is driven toward, not a one-time nudge: how far, in
 # metres, that toe joint sits above the sand. His body origin is on the
 # sand everywhere (field, battle stance, escape push), so this lifts the
@@ -161,9 +162,9 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 @export var model_ground_offset: float = 0.041:
 	set(value):
 		model_ground_offset = value
-		# Grounding already reads it every physics frame; this lands it at
-		# once, eased over nothing, for an edit made while he isn't
-		# processing.
+		# Grounding already reads it on every applied pose; this lands it
+		# at once, eased over nothing, for an edit made while no pose is
+		# being applied.
 		if is_inside_tree():
 			_apply_continuous_foot_grounding(1.0)
 # How fast _apply_continuous_foot_grounding() eases the model toward its
@@ -331,6 +332,9 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 var _model: Node3D = null
 var _animation_player: AnimationPlayer
 var _animation_tree: AnimationTree
+# The mixer applying the model's poses (the AnimationTree when it's on,
+# else the AnimationPlayer); foot grounding runs on its mixer_applied.
+var _grounding_mixer: AnimationMixer = null
 var _camera: Camera3D
 var _dash_timer: float = 0.0
 var _dash_cooldown_timer: float = 0.0
@@ -368,9 +372,8 @@ var _look_back_direction: Vector3 = Vector3.ZERO
 # Set by ZoneIntro for the zone intro, which runs this node ALWAYS
 # through the field freeze: input is read as nothing - no WASD, no dash,
 # any click target dropped - while everything else in _physics_process()
-# (gravity, foot grounding, move_and_slide(), Idle) keeps running, so he
-# stands seated on the sand rather than hovering the way the freeze alone
-# would leave him (see _apply_continuous_foot_grounding()). Cleared when
+# (gravity, move_and_slide(), Idle) keeps running, so he stands seated on
+# the sand rather than hovering where the freeze caught him. Cleared when
 # the intro ends or is skipped; a key still held at that moment moves
 # him then.
 var input_locked: bool = false
@@ -494,6 +497,14 @@ func _ready() -> void:
 		_animation_player.play("Idle")
 
 	_find_grounding_bones(model)
+	# Grounding follows each pose as the mixer lands it, not
+	# _physics_process: RegionField's battle freeze stops the Wanderer's
+	# own processing, but the mixer keeps playing BattleIdle, DrawSword,
+	# Slash and Brace through it, and each stands its hips at its own
+	# height.
+	_grounding_mixer = _animation_tree if _animation_tree != null else _animation_player
+	if _grounding_mixer != null:
+		_grounding_mixer.mixer_applied.connect(_on_mixer_applied)
 	_setup_sword(model)
 	_setup_step_debug_lines()
 	_capsule_radius = _find_capsule_radius()
@@ -1036,12 +1047,17 @@ func _switch_sword_mount(target_frame: Node3D, target_position_world: Vector3, t
 
 # The float this replaces was per-clip: grounding measured once, on
 # Idle, doesn't hold once a battle clip (a different hips height) takes
-# over. Every physics frame instead: read the lowest cached foot/toe bone
+# over. On every pose the mixer applies instead (_on_mixer_applied()):
+# read the lowest cached foot/toe bone
 # Y in body space (to_local() already accounts for the model's current
 # position, so this reflects whatever offset is already applied), derive
 # the model.position.y that would put it exactly at model_ground_offset,
 # and ease toward that rather than snapping, so a clip transition's own
 # hips-height jump doesn't pop the model - it eases in over a few frames.
+func _on_mixer_applied() -> void:
+	var physics := _grounding_mixer.callback_mode_process == AnimationMixer.ANIMATION_CALLBACK_MODE_PROCESS_PHYSICS
+	_apply_continuous_foot_grounding(get_physics_process_delta_time() if physics else get_process_delta_time())
+
 func _apply_continuous_foot_grounding(delta: float) -> void:
 	if _grounding_skeleton == null or _model == null:
 		return
@@ -1179,7 +1195,10 @@ func _merge_clip(library: AnimationLibrary, anim_root: Node, target_skeleton: Sk
 # - the root bone's rotation and position keys are carried from the
 #   source skeleton's frame into the target's through the nodes above
 #   each (an Armature's scale and turn included), so the hips stand and
-#   face in model space as they did;
+#   face in model space as they did; its position keys are also scaled
+#   by the rigs' rest leg lengths (_root_position_scale()), for rigs
+#   whose bones are in different units - the Mixamo FBX clips key the
+#   hips ~0.01 high, wanderer_v3.glb's bones are in metres;
 # - every other bone's rotation keys stay as they are. A Mixamo clip holds
 #   each bone's pose as its absolute local rotation, not as a bend from
 #   rest: the running, slash and brace files carry arm rests up to 26 deg
@@ -1198,11 +1217,12 @@ func _transfer_clip(animation: Animation, source_root: Node, source_skeleton: Sk
 	var target_frame: Transform3D = _transform_under(target_skeleton, target_root)
 	var source_path := String(source_root.get_path_to(source_skeleton))
 	var target_path := String(target_root.get_path_to(target_skeleton))
-	if source_frame.is_equal_approx(target_frame) and source_path == target_path:
+	var frame_shift: Transform3D = target_frame.affine_inverse() * source_frame
+	var root_scale := _root_position_scale(source_skeleton, target_skeleton, frame_shift)
+	if source_frame.is_equal_approx(target_frame) and source_path == target_path and is_equal_approx(root_scale, 1.0):
 		return animation
 
 	var copy := animation.duplicate(true) as Animation
-	var frame_shift: Transform3D = target_frame.affine_inverse() * source_frame
 	var frame_turn: Quaternion = target_frame.basis.orthonormalized().get_rotation_quaternion().inverse() * source_frame.basis.orthonormalized().get_rotation_quaternion()
 	for track_idx in copy.get_track_count():
 		var bone := _track_bone(copy, track_idx, source_root, source_skeleton)
@@ -1224,8 +1244,25 @@ func _transfer_clip(animation: Animation, source_root: Node, source_skeleton: Sk
 				var rest_origin: Vector3 = target_skeleton.get_bone_rest(target_bone).origin
 				for key_idx in copy.track_get_key_count(track_idx):
 					var key: Vector3 = copy.track_get_key_value(track_idx, key_idx)
-					copy.track_set_key_value(track_idx, key_idx, frame_shift * key if is_root else rest_origin)
+					copy.track_set_key_value(track_idx, key_idx, (frame_shift * key) * root_scale if is_root else rest_origin)
 	return copy
+
+# How much a root position key grows from the source rig to the target,
+# beyond what frame_shift (the nodes above each skeleton) already does:
+# the target's rest leg (root bone to LeftFoot) over the source's, carried
+# into the target's frame. 1.0 when either rig has no LeftFoot.
+func _root_position_scale(source_skeleton: Skeleton3D, target_skeleton: Skeleton3D, frame_shift: Transform3D) -> float:
+	var source_foot := _find_bone_by_suffix(source_skeleton, &"LeftFoot")
+	var target_foot := _find_bone_by_suffix(target_skeleton, &"LeftFoot")
+	if source_foot == -1 or target_foot == -1:
+		return 1.0
+	var source_root: int = source_skeleton.get_parentless_bones()[0]
+	var target_root: int = target_skeleton.get_parentless_bones()[0]
+	var source_leg: Vector3 = frame_shift.basis * (source_skeleton.get_bone_global_rest(source_foot).origin - source_skeleton.get_bone_global_rest(source_root).origin)
+	var target_leg: Vector3 = target_skeleton.get_bone_global_rest(target_foot).origin - target_skeleton.get_bone_global_rest(target_root).origin
+	if source_leg.length() < 0.000001:
+		return 1.0
+	return target_leg.length() / source_leg.length()
 
 # source_bone's match on target_skeleton: the same name, else the bone
 # with the same name after the rig's prefix - a Mixamo clip's
@@ -2068,8 +2105,6 @@ func _hide_debug_lines() -> void:
 		_step_down_line.visible = false
 
 func _physics_process(delta: float) -> void:
-	_apply_continuous_foot_grounding(delta)
-
 	_dash_cooldown_timer = maxf(_dash_cooldown_timer - delta, 0.0)
 
 	if not input_locked and _dash_timer <= 0.0 and Input.is_action_just_pressed("dash") and _dash_cooldown_timer <= 0.0:
