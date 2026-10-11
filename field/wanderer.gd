@@ -21,20 +21,20 @@ const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_running.fbx"
 const DRAW_SWORD_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_start_draw_sword.fbx"
 const SLASH_SCENE_PATH := "res://assets/models/wanderer/wanderer_slash.fbx"
 const BRACE_SCENE_PATH := "res://assets/models/wanderer/wanderer_brace.fbx"
-# The glb's own base colour, extracted on import. The glb also names it as
-# its normal map (a Meshy export slip) - the override below never uses
-# the imported material, so that never reaches the screen.
-const ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/wanderer_v3_bound_output.png"
+# The hand-painted pass of the glb's own base colour
+# (wanderer_v3_bound_output.png, extracted on import and kept as the
+# source), made by tools/paint_texture.py. The override below never uses
+# the glb's imported material, which also names the source as its normal
+# map (a Meshy export slip).
+const ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/wanderer_v3_painted.png"
 const FLAT_SHADER_PATH := "res://field/wanderer_flat.gdshader"
-# sword.glb (glTF, unlike the earlier sword_albedo.fbx) imports with its
-# own embedded textures correctly extracted (sword_0/1/2.jpg) and a real
-# material built from them - see _apply_model_material()'s
-# keep_imported_material_when_textured, which leaves that material alone
-# in TEXTURED mode. SWORD_ALBEDO_TEXTURE_PATH below still has no file at
-# it; POSTERIZED mode still falls back to flat charcoal (with a
-# push_warning) until a real texture exists there.
+const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
 const SWORD_SCENE_PATH := "res://assets/models/wanderer/sword.glb"
-const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.png"
+# sword.glb's own albedo (sword_0.jpg) denoised and lifted to a light warm
+# steel by tools/paint_texture.py --image-space. TEXTURED draws the sword
+# with it through wanderer_painted.gdshader instead of the glb's imported
+# material, whose metallic map and normal map made it shine.
+const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_painted.png"
 
 @export var move_speed: float = 4.5
 @export var acceleration: float = 14.0
@@ -140,7 +140,7 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_albedo.pn
 # so the two read as different things even at a glance, not just "the
 # same placeholder grey twice." Used only as the fallback flat material -
 # see _build_flat_material() - when wanderer_flat.gdshader can't be built
-# (ALBEDO_TEXTURE_PATH failed to load).
+# (ALBEDO_TEXTURE_PATH failed to load), and in FLAT mode.
 @export var wanderer_color: Color = Color(0.16, 0.15, 0.14, 1)
 
 # The real model ships at whatever scale its source file happens to use
@@ -199,8 +199,8 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 @export var follow_through_pitch: float = 1.08
 
 @export_group("Shading")
-# TEXTURED: a plain StandardMaterial3D reading the albedo texture as-
-# painted (Meshy's own colors, roughness 1, specular 0) - no posterizing.
+# TEXTURED: wanderer_painted.gdshader - the painted albedo under a soft
+# wrapped light with eased shadows (light_wrap, self_shadow_strength).
 # POSTERIZED: wanderer_flat.gdshader's quantized dark/mid/light ramp.
 # FLAT: the single flat charcoal material, no texture at all. Re-applies
 # live via the setter below, so this can be flipped from the Remote tab
@@ -211,30 +211,67 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 		if _model != null:
 			_apply_model_material(_model)
 		if _sword_root != null:
-			_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH, true, false)
+			_apply_model_material(_sword_root, false)
 
-# Multiplied into the body's albedo texture in TEXTURED mode (the
-# material's albedo_color) - white is the texture as painted, darker
-# darkens him against the sand. Body only, never the sword. POSTERIZED
-# and FLAT ignore it: their own tone colors / wanderer_color set how dark
-# he is there.
+# Multiplied into the body's albedo texture in TEXTURED mode - white is
+# the texture as painted, darker darkens him against the sand. Body only,
+# never the sword. POSTERIZED and FLAT ignore it: their own tone colors /
+# wanderer_color set how dark he is there.
 @export var albedo_tint: Color = Color(1, 1, 1, 1):
 	set(value):
 		albedo_tint = value
-		var material := _textured_body_material()
-		if material != null:
-			material.albedo_color = value
+		_set_textured_parameter(&"albedo_tint", value, false)
+# Mirror wanderer_painted.gdshader's wrap and self_shadow_strength - see
+# that file. TEXTURED only; each re-applies live to the body and sword.
+@export_range(0.0, 1.0) var light_wrap: float = 0.6:
+	set(value):
+		light_wrap = value
+		_set_textured_parameter(&"wrap", value, true)
+@export_range(0.0, 1.0) var self_shadow_strength: float = 0.5:
+	set(value):
+		self_shadow_strength = value
+		_set_textured_parameter(&"self_shadow_strength", value, true)
 
-# Mirrors wanderer_flat.gdshader's own uniforms one-to-one - see that
-# file's own doc for what each does. Only used when shading_mode is
-# POSTERIZED. Not live-updating on their own (same "set once" shape
-# wanderer_color's flat fallback already has) - changing shading_mode
-# itself always re-reads the current values, so toggling it is also how
-# to pick up an edit made here.
-@export_range(2, 8) var tone_count: int = 3
-@export var tone_dark: Color = Color(0.125, 0.12, 0.115, 1)
-@export var tone_mid: Color = Color(0.205, 0.195, 0.185, 1)
-@export var tone_light: Color = Color(0.31, 0.295, 0.28, 1)
+# Mirror wanderer_flat.gdshader's uniforms one-to-one - see that file
+# for what each does. Only used when shading_mode is POSTERIZED; each
+# re-applies live to the body's material (the cut-offs and the light step
+# to the sword's as well).
+@export_range(2, 8) var tone_count: int = 3:
+	set(value):
+		tone_count = value
+		_set_posterized_parameter(&"tone_count", value, false)
+@export var tone_dark: Color = Color(0.125, 0.12, 0.115, 1):
+	set(value):
+		tone_dark = value
+		_set_posterized_parameter(&"tone_dark", value, false)
+@export var tone_mid: Color = Color(0.205, 0.195, 0.185, 1):
+	set(value):
+		tone_mid = value
+		_set_posterized_parameter(&"tone_mid", value, false)
+@export var tone_light: Color = Color(0.31, 0.295, 0.28, 1):
+	set(value):
+		tone_light = value
+		_set_posterized_parameter(&"tone_light", value, false)
+@export_range(0.0, 1.0) var band_low_cutoff: float = 0.333333:
+	set(value):
+		band_low_cutoff = value
+		_set_posterized_parameter(&"band_low_cutoff", value, true)
+@export_range(0.0, 1.0) var band_high_cutoff: float = 0.666667:
+	set(value):
+		band_high_cutoff = value
+		_set_posterized_parameter(&"band_high_cutoff", value, true)
+@export_range(0.0, 1.0) var light_step_softness: float = 0.0:
+	set(value):
+		light_step_softness = value
+		_set_posterized_parameter(&"light_step_softness", value, true)
+# The sword's one flat colour in POSTERIZED (all three of its tones), lit
+# through the same stepped light as the body.
+@export var sword_steel_color: Color = Color(0.42, 0.44, 0.47, 1):
+	set(value):
+		sword_steel_color = value
+		if _sword_material != null and shading_mode == ShadingMode.POSTERIZED:
+			for parameter: StringName in [&"tone_dark", &"tone_mid", &"tone_light"]:
+				_sword_material.set_shader_parameter(parameter, value)
 
 @export_group("Sword")
 # Audited: every sword export below carries an explicit get (returns the
@@ -464,6 +501,9 @@ var _hand_frame: Node3D = null
 # re-walking the model's MeshInstance3D children and, worse, building a
 # second material instance no MeshInstance3D actually has assigned.
 var _active_material: Material = null
+# The sword's TEXTURED or POSTERIZED shader material while it has one,
+# else null - for the live setters above.
+var _sword_material: ShaderMaterial = null
 var _ground: Ground = null
 var _attack_audio: AttackAudio = null
 # The sound of being hit - see HitAudio; made beside _attack_audio below.
@@ -551,38 +591,36 @@ func _ready() -> void:
 
 # One shared material for the whole model, applied via material_override
 # on every MeshInstance3D under it. Which material depends on shading_
-# mode (see that export's own doc); TEXTURED/POSTERIZED both fall back to
-# the flat charcoal material if their own asset (texture and/or shader)
-# fails to load (each guarded and push_warning'd separately below), so a
-# missing/not-yet-imported asset degrades to a solid color instead of an
-# invisible or shaderless model. Re-run whenever shading_mode's setter
-# fires, so this always reflects the current mode - not just at _ready().
-# texture_path defaults to the body's own albedo; _setup_sword() and the
-# shading_mode setter both pass SWORD_ALBEDO_TEXTURE_PATH explicitly to
-# apply the same mode to the sword.
-# keep_imported_material_when_textured is for the sword only: Meshy
-# embedded the sword's texture directly in the FBX and the importer
-# already built a correct material from it, so in TEXTURED mode
-# material_override is left null (clearing any override from a previous
-# POSTERIZED/FLAT mode) rather than replaced with a StandardMaterial3D
-# built from SWORD_ALBEDO_TEXTURE_PATH, which likely doesn't exist as a
-# standalone file. The body always keeps the override path: wanderer_v3.
-# glb's imported material reads ALBEDO_TEXTURE_PATH too, but with the
-# glb's own roughness and that same image as its normal map.
-func _apply_model_material(model: Node3D, texture_path: String = ALBEDO_TEXTURE_PATH, keep_imported_material_when_textured: bool = false, is_body: bool = true) -> void:
-	if shading_mode == ShadingMode.TEXTURED and keep_imported_material_when_textured:
-		for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
-			var mi := mesh_instance as MeshInstance3D
-			mi.material_override = null
-			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-		return
+# mode (see that export's own doc); the body's TEXTURED/POSTERIZED both
+# fall back to the flat charcoal material if their own asset (texture
+# and/or shader) fails to load (each guarded and push_warning'd
+# separately below), so a missing/not-yet-imported asset degrades to a
+# solid color instead of an invisible or shaderless model. Re-run
+# whenever shading_mode's setter fires, so this always reflects the
+# current mode - not just at _ready().
+# The sword (is_body false) gets its own painted texture in TEXTURED and
+# flat sword_steel_color in POSTERIZED, through the same shaders. Neither
+# ever uses a glb's imported material: wanderer_v3.glb's reads the
+# unpainted source with that same image as its normal map, and sword.glb's
+# is metallic with a normal map.
+func _apply_model_material(model: Node3D, is_body: bool = true) -> void:
+	if not is_body:
+		_sword_material = null
 
 	var material: Material = null
 	match shading_mode:
 		ShadingMode.TEXTURED:
-			material = _build_textured_material(texture_path)
+			if is_body:
+				material = _build_textured_material(ALBEDO_TEXTURE_PATH, albedo_tint)
+			else:
+				_sword_material = _build_textured_material(SWORD_ALBEDO_TEXTURE_PATH, Color.WHITE)
+				material = _sword_material
 		ShadingMode.POSTERIZED:
-			material = _build_posterized_material(texture_path)
+			if is_body:
+				material = _build_posterized_material(ALBEDO_TEXTURE_PATH)
+			else:
+				_sword_material = _build_sword_steel_material()
+				material = _sword_material
 		ShadingMode.FLAT:
 			material = null
 	if material == null:
@@ -592,33 +630,40 @@ func _apply_model_material(model: Node3D, texture_path: String = ALBEDO_TEXTURE_
 		mi.material_override = material
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 	# The sword's own material_override is never what play_hit_flash()
-	# should be lerping (only the body should flash) - is_body is false
-	# for both of _setup_sword()'s own calls, so this only ever tracks the
-	# body's material regardless of which shading_mode built it.
+	# should be lerping (only the body should flash), so this only ever
+	# tracks the body's material regardless of which shading_mode built it.
 	if is_body:
 		_active_material = material
 
-# Meshy's own painted colors, no posterizing - same "roughness 1,
-# specular 0" shape every other Wanderer/FieldEnemy material already uses.
-func _build_textured_material(texture_path: String) -> StandardMaterial3D:
+# The painted texture under wanderer_painted.gdshader's soft light. Null
+# (the flat fallback) if the texture or the shader fails to load.
+func _build_textured_material(texture_path: String, tint: Color) -> ShaderMaterial:
 	var texture := load(texture_path) as Texture2D
 	if texture == null:
 		push_warning("Wanderer: albedo texture failed to load (%s); using the flat charcoal fallback material." % texture_path)
 		return null
-	var material := StandardMaterial3D.new()
-	material.albedo_texture = texture
-	material.albedo_color = albedo_tint
-	material.roughness = 1.0
-	material.metallic_specular = 0.0
+	var shader := load(PAINTED_SHADER_PATH) as Shader
+	if shader == null:
+		push_warning("Wanderer: wanderer_painted shader failed to load (%s); using the flat charcoal fallback material." % PAINTED_SHADER_PATH)
+		return null
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("albedo_texture", texture)
+	material.set_shader_parameter("albedo_tint", tint)
+	material.set_shader_parameter("wrap", light_wrap)
+	material.set_shader_parameter("self_shadow_strength", self_shadow_strength)
 	return material
 
-# The body's live material when it is TEXTURED's (a StandardMaterial3D
-# with a texture), else null - the FLAT fallback has no texture to tint.
-func _textured_body_material() -> StandardMaterial3D:
-	var material := _active_material as StandardMaterial3D
-	if material == null or material.albedo_texture == null:
-		return null
-	return material
+# A TEXTURED setting's live edit: onto the body's shader material, and the
+# sword's too when include_sword. No-op in the other modes.
+func _set_textured_parameter(parameter: StringName, value: Variant, include_sword: bool) -> void:
+	if shading_mode != ShadingMode.TEXTURED:
+		return
+	var body := _active_material as ShaderMaterial
+	if body != null:
+		body.set_shader_parameter(parameter, value)
+	if include_sword and _sword_material != null:
+		_sword_material.set_shader_parameter(parameter, value)
 
 func _build_posterized_material(texture_path: String) -> ShaderMaterial:
 	var texture := load(texture_path) as Texture2D
@@ -629,8 +674,7 @@ func _build_posterized_material(texture_path: String) -> ShaderMaterial:
 	if shader == null:
 		push_warning("Wanderer: wanderer_flat shader failed to load (%s); using the flat charcoal fallback material." % FLAT_SHADER_PATH)
 		return null
-	var material := ShaderMaterial.new()
-	material.shader = shader
+	var material := _posterized_shader_material(shader)
 	material.set_shader_parameter("albedo_texture", texture)
 	material.set_shader_parameter("tone_count", tone_count)
 	material.set_shader_parameter("tone_dark", tone_dark)
@@ -638,6 +682,39 @@ func _build_posterized_material(texture_path: String) -> ShaderMaterial:
 	material.set_shader_parameter("tone_light", tone_light)
 	print("Wanderer: applied posterized material - texture=%s tone_count=%d tone_dark=%s tone_mid=%s tone_light=%s" % [texture_path, tone_count, tone_dark, tone_mid, tone_light])
 	return material
+
+# The sword in POSTERIZED: wanderer_flat.gdshader with no texture and all
+# three tones sword_steel_color, so it is one flat colour under the same
+# stepped light as the body. Null (the flat fallback) if the shader fails.
+func _build_sword_steel_material() -> ShaderMaterial:
+	var shader := load(FLAT_SHADER_PATH) as Shader
+	if shader == null:
+		push_warning("Wanderer: wanderer_flat shader failed to load (%s); the sword uses the flat charcoal fallback material." % FLAT_SHADER_PATH)
+		return null
+	var material := _posterized_shader_material(shader)
+	for parameter: StringName in [&"tone_dark", &"tone_mid", &"tone_light"]:
+		material.set_shader_parameter(parameter, sword_steel_color)
+	return material
+
+# The shader settings the body and the sword share.
+func _posterized_shader_material(shader: Shader) -> ShaderMaterial:
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("band_low_cutoff", band_low_cutoff)
+	material.set_shader_parameter("band_high_cutoff", band_high_cutoff)
+	material.set_shader_parameter("light_step_softness", light_step_softness)
+	return material
+
+# A POSTERIZED setting's live edit: onto the body's shader material, and
+# the sword's too when include_sword. No-op in the other modes.
+func _set_posterized_parameter(parameter: StringName, value: Variant, include_sword: bool) -> void:
+	if shading_mode != ShadingMode.POSTERIZED:
+		return
+	var body := _active_material as ShaderMaterial
+	if body != null:
+		body.set_shader_parameter(parameter, value)
+	if include_sword and _sword_material != null:
+		_sword_material.set_shader_parameter(parameter, value)
 
 # The source model ships at whatever raw scale its file happens to use
 # (measured at 0.019m tall before target_height existed) - this measures
@@ -943,7 +1020,7 @@ func _setup_sword(model: Node3D) -> void:
 		push_warning("Wanderer: _skeleton_scale_factor is ~0 (%f); sword scale not compensated." % _skeleton_scale_factor)
 	_sword_root.scale = Vector3.ONE * world_scale_factor
 
-	_apply_model_material(_sword_root, SWORD_ALBEDO_TEXTURE_PATH, true, false)
+	_apply_model_material(_sword_root, false)
 
 	_apply_grip_offset()
 
@@ -1628,10 +1705,12 @@ func get_clip_length(anim_name: StringName) -> float:
 	return _animation_player.get_animation(anim_name).length
 
 # Called by BattleFeedback once BattleController reports a card hit
-# landing on the player. _active_material may be a plain StandardMaterial3D
-# (TEXTURED/FLAT) or wanderer_flat.gdshader's ShaderMaterial (POSTERIZED) -
-# each needs a different property tweened to read as the same "lerp to
-# near-white bone, then back" flash, so this only dispatches; the two
+# landing on the player. _active_material may be the flat fallback's
+# StandardMaterial3D (FLAT, or a failed load) or a ShaderMaterial
+# (TEXTURED's wanderer_painted, POSTERIZED's wanderer_flat, both with
+# flash_amount/flash_color) - each needs a different property tweened to
+# read as the same "lerp to near-white bone, then back" flash, so this
+# only dispatches; the two
 # _tween_*_flash() helpers below do the actual work.
 func play_hit_flash(flash_color: Color, rise_time: float, fall_time: float) -> void:
 	if _active_material is StandardMaterial3D:
@@ -1645,12 +1724,6 @@ func _tween_standard_flash(material: StandardMaterial3D, flash_color: Color, ris
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.tween_property(material, "albedo_color", flash_color, rise_time)
 	tween.tween_property(material, "albedo_color", base_color, fall_time)
-	# Ends on the live albedo_tint, not the one captured above - an edit
-	# made mid-flash would otherwise be undone by the fall.
-	tween.tween_callback(func() -> void:
-		if material == _textured_body_material():
-			material.albedo_color = albedo_tint
-	)
 
 # wanderer_flat.gdshader has no single "albedo" property to lerp (its own
 # ALBEDO is computed from a posterized ramp, not read back from a
