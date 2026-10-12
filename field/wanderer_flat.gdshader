@@ -6,7 +6,11 @@ shader_type spatial;
 // reliably resolve to 1.0 in practice. Never write ALPHA here - depth_
 // draw_opaque plus leaving it alone is what actually renders opaque; an
 // explicit ALPHA = 1.0 line is not needed and should not be reintroduced.
-render_mode cull_back, depth_draw_opaque;
+// cull_disabled, as the glb's own material is double-sided: in the battle
+// pose the skinning turns part of his left palm away from the camera, and
+// back-face culling left a hole there (sand showing through). Back faces
+// get the flipped normal, so they light like the front.
+render_mode cull_disabled, depth_draw_opaque;
 
 // Posterized flat-shading from an albedo texture: sample, convert to
 // luminance, remap it through the two band cut-offs, quantize into

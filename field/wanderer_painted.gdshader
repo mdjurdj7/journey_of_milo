@@ -1,7 +1,11 @@
 shader_type spatial;
 // depth_draw_opaque and never writing ALPHA: see wanderer_flat.gdshader -
-// the same opaque-pass reasoning applies here.
-render_mode cull_back, depth_draw_opaque;
+// the same opaque-pass reasoning applies here. cull_disabled, as the
+// glb's own material is double-sided: in the battle pose the skinning
+// turns part of his left palm away from the camera, and back-face
+// culling left a hole there (sand showing through). Back faces get the
+// flipped normal, so they light like the front.
+render_mode cull_disabled, depth_draw_opaque;
 
 // TEXTURED: a hand-painted albedo (tools/paint_texture.py) under soft
 // light - roughness 1, no specular, no normal map, the light wrapped past
