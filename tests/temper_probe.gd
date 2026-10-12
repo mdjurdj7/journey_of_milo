@@ -7,7 +7,8 @@ extends SceneTree
 # per card, logged; the wagon on floor 3, grounded and clear of the worn
 # band; its screen - no grid while the Glassbone is short, the grid and
 # the preview's hairlines while it isn't, TEMPER, the hold and the field
-# lock; and a tempered Consumed card still removed after its fight.
+# lock; a tempered Consumed card still removed after its fight; and the
+# Cards screen's TEMPERED toggle.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/temper_probe.gd
 #
@@ -16,11 +17,12 @@ extends SceneTree
 # Wagon, WagonScreen): a SceneTree script compiles before the autoloads
 # register.
 
-const CASES := 8
+const CASES := 9
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const WAGON_SCENE_PATH := "res://field/wagon.tscn"
+const COMPENDIUM_SCENE_PATH := "res://ui/card_compendium.tscn"
 const TEMPERED_DIR := "res://cards/tempered/"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 const STARTERS: Array[String] = ["slash", "bite_down", "brace", "reckoning", "down_payment"]
@@ -67,6 +69,7 @@ func _initialize() -> void:
 	_check_out_of_pools_and_scans()
 	_check_temper_card()
 	await _check_faces()
+	await _check_compendium()
 	await _load_floor_3()
 	_check_wagon_placement()
 	await _check_screen_short()
@@ -225,6 +228,113 @@ func _check_faces() -> void:
 		_expect_eq(view.size, view.card_size, "%s keeps the card's size" % tempered.card_name)
 	view.free()
 	_completed += 1
+
+# The Cards screen's TEMPERED: off on open, no "+" face in the grid; Tab
+# turns it on - Slash shows Slash+ and Carve Carve+, their numbers
+# underlined, Reckoning+ its cost, Cornered (none) as it was, no entry
+# added; kept through a rebuild; a click turns it off again, marks and
+# all; the scroll kept across a toggle; a lifted card put away by one.
+func _check_compendium() -> void:
+	var compendium: Node = (load(COMPENDIUM_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(compendium)
+	await process_frame
+	var count: int = _compendium_views(compendium).size()
+	_expect(count > 0, "The compendium shows cards (%d)" % count)
+	_expect(not bool(compendium.call("is_showing_tempered")), "TEMPERED is off on open")
+	_expect_no_tempered_faces(compendium, "Off on open")
+	var label := compendium.get_node("Page/TemperedItem/Label") as Label
+	var hairline := compendium.get_node("Page/TemperedItem/Hairline") as ColorRect
+	_expect_eq(label.text, "TEMPERED", "TEMPERED sits beside BACK")
+	_expect_eq(label.get_theme_color("font_color"), compendium.get("grey"), "...grey while off")
+	_expect(not hairline.visible, "...without its hairline")
+
+	await _press("ui_focus_next")
+	_expect(bool(compendium.call("is_showing_tempered")), "Tab turns TEMPERED on")
+	label = compendium.get_node("Page/TemperedItem/Label") as Label
+	hairline = compendium.get_node("Page/TemperedItem/Hairline") as ColorRect
+	_expect_eq(label.get_theme_color("font_color"), compendium.get("ink"), "...full ink while on")
+	_expect(hairline.visible, "...with its hairline")
+	_expect_tempered_faces(compendium, count, "On")
+	compendium.call("_rebuild")
+	_expect(bool(compendium.call("is_showing_tempered")), "A rebuild keeps TEMPERED on")
+	_expect_tempered_faces(compendium, count, "After a rebuild")
+
+	var click := InputEventMouseButton.new()
+	click.button_index = MOUSE_BUTTON_LEFT
+	click.pressed = true
+	compendium.call("_on_tempered_gui_input", click)
+	_expect(not bool(compendium.call("is_showing_tempered")), "A click turns TEMPERED off")
+	_expect_no_tempered_faces(compendium, "Off again")
+
+	var scroll := compendium.get_node("Page/Scroll") as ScrollContainer
+	# The rebuilt list's range settles over a few sorts.
+	for _frame in 3:
+		await process_frame
+	scroll.scroll_vertical = 400
+	await process_frame
+	var scrolled: int = scroll.scroll_vertical
+	_expect(scrolled > 0, "The list scrolls (%d of %.0f)" % [scrolled, scroll.get_v_scroll_bar().max_value])
+	compendium.call("toggle_tempered")
+	await process_frame
+	await process_frame
+	_expect_eq(scroll.scroll_vertical, scrolled, "Toggling keeps the scroll")
+	compendium.call("toggle_tempered")
+	await process_frame
+	await process_frame
+	_expect_eq(scroll.scroll_vertical, scrolled, "...both ways")
+
+	var cornered: CardView = _compendium_view(compendium, "Cornered")
+	if cornered == null:
+		_fail("Cornered is not in the compendium")
+	else:
+		compendium.call("_begin_inspect", cornered, cornered.get_parent())
+		_expect(compendium.get("_inspected") == cornered, "Cornered lifted")
+		compendium.call("toggle_tempered")
+		_expect(compendium.get("_inspected") == null, "Toggling puts a lifted card away")
+		var inspect_layer := compendium.get_node("Page/InspectLayer") as Control
+		_expect(not inspect_layer.visible, "...its layer hidden")
+		_expect_eq(scroll.modulate.a, 1.0, "...the list back at full")
+		_expect(bool(compendium.call("is_showing_tempered")), "...and TEMPERED is on")
+	compendium.queue_free()
+	await process_frame
+	_completed += 1
+
+func _expect_tempered_faces(compendium: Node, count: int, label: String) -> void:
+	_expect_eq(_compendium_views(compendium).size(), count, "%s: no entry added" % label)
+	for name in ["Slash", "Carve"]:
+		_expect(_compendium_view(compendium, name) == null, "%s: %s's face is gone" % [label, name])
+		var view: CardView = _compendium_view(compendium, name + "+")
+		_expect(view != null, "%s: %s+ shows" % [label, name])
+	var slash: CardView = _compendium_view(compendium, "Slash+")
+	if slash != null:
+		_expect_eq(slash.rules_text.text, "Deal [u]9[/u] damage.", "%s: Slash+ underlines its 9" % label)
+	var carve: CardView = _compendium_view(compendium, "Carve+")
+	if carve != null:
+		_expect(carve.rules_text.text.contains("[u]10[/u]") and carve.rules_text.text.count("[u]") == 1, "%s: Carve+ underlines its 10 alone (%s)" % [label, carve.rules_text.text])
+	var reckoning: CardView = _compendium_view(compendium, "Reckoning+")
+	_expect(reckoning != null and reckoning.get_node_or_null(^"CostMark") != null, "%s: Reckoning+ marks its cost" % label)
+	var cornered: CardView = _compendium_view(compendium, "Cornered")
+	_expect(cornered != null and not cornered.rules_text.text.contains("[u]") and cornered.get_node_or_null(^"CostMark") == null, "%s: Cornered as it was" % label)
+
+func _expect_no_tempered_faces(compendium: Node, label: String) -> void:
+	for view in _compendium_views(compendium):
+		_expect(not view.card_data.card_name.ends_with("+"), "%s: %s isn't a tempered face" % [label, view.card_data.card_name])
+		_expect(not view.rules_text.text.contains("[u]") and view.get_node_or_null(^"CostMark") == null, "%s: %s has no marks" % [label, view.card_data.card_name])
+
+# The grid's faces - not one queued to go with a rebuilt-away section.
+func _compendium_views(compendium: Node) -> Array[CardView]:
+	var views: Array[CardView] = []
+	for node in compendium.find_children("*", "CardView", true, false):
+		var view := node as CardView
+		if view.card_data != null and not view.is_queued_for_deletion():
+			views.append(view)
+	return views
+
+func _compendium_view(compendium: Node, card_name: String) -> CardView:
+	for view in _compendium_views(compendium):
+		if view.card_data.card_name == card_name:
+			return view
+	return null
 
 # The wagon: floor 3's second prop at (-7.3, -28.1) from spawn, yaw 153,
 # grounded by its footprint on the floor, WAGON_EDGE_CLEARANCE from every

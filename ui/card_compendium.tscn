@@ -26,6 +26,18 @@ layout_mode = 0
 mouse_filter = 2
 text = "BACK"
 
+[node name="TemperedItem" type="Control" parent="Page"]
+layout_mode = 0
+
+[node name="Hairline" type="ColorRect" parent="Page/TemperedItem"]
+layout_mode = 0
+mouse_filter = 2
+
+[node name="Label" type="Label" parent="Page/TemperedItem"]
+layout_mode = 0
+mouse_filter = 2
+text = "TEMPERED"
+
 [node name="Scroll" type="ScrollContainer" parent="Page"]
 layout_mode = 0
 

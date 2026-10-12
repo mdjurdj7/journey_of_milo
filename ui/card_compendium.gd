@@ -24,6 +24,14 @@ class_name CardCompendium
 # one lifts that same CardView out to the middle at reading size while
 # the list recedes; clicking anywhere, or ui_cancel, puts it back.
 #
+# TEMPERED, beside BACK (a click or ui_focus_next), shows every card that
+# has a tempered version (CardData.tempered) with that face instead, in
+# its original's slot, the changes underlined as the wagon marks them
+# (CardView.mark_changes()); the rest stay as they are. Tempered cards are
+# never entries of their own - card_folders never lists cards/tempered/.
+# Off on every open; kept through a rebuild; toggling rebuilds the page,
+# which puts a lifted card away, and keeps the scroll where it was.
+#
 # Every size is authored for a 1080-high viewport and scaled by the
 # viewport height, as TitleMenu's are; the whole page is rebuilt on a
 # resize and on any export change.
@@ -50,6 +58,10 @@ class Section:
 @export var back_text: String = "BACK":
 	set(value):
 		back_text = value
+		_rebuild_if_ready()
+@export var tempered_text: String = "TEMPERED":
+	set(value):
+		tempered_text = value
 		_rebuild_if_ready()
 
 @export_group("Type")
@@ -91,7 +103,7 @@ class Section:
 	set(value):
 		ink = value
 		_rebuild_if_ready()
-# The utility grey: the counts and the tier labels.
+# The utility grey: the counts, the tier labels and TEMPERED while off.
 @export var grey: Color = Color(0.58, 0.58, 0.60, 1.0):
 	set(value):
 		grey = value
@@ -121,6 +133,11 @@ class Section:
 @export var back_to_list_gap_px: float = 40.0:
 	set(value):
 		back_to_list_gap_px = value
+		_rebuild_if_ready()
+# BACK's label to TEMPERED's hairline, on BACK's line.
+@export var back_to_tempered_gap_px: float = 56.0:
+	set(value):
+		back_to_tempered_gap_px = value
 		_rebuild_if_ready()
 @export var bottom_px: float = 48.0:
 	set(value):
@@ -185,6 +202,12 @@ class Section:
 		_rebuild_if_ready()
 # How far one ui_up/ui_down press scrolls.
 @export var scroll_step_px: float = 120.0
+# A tempered face's cost hairline: card px under the cost's baseline
+# (WagonScreen's own).
+@export var cost_mark_gap_px: float = 3.0:
+	set(value):
+		cost_mark_gap_px = value
+		_rebuild_if_ready()
 
 @export_group("Inspect")
 # The lifted card's scale, of 1x, before the viewport scale.
@@ -199,6 +222,7 @@ class Section:
 
 @onready var page: Control = $Page
 @onready var back_item: Control = $Page/BackItem
+@onready var tempered_item: Control = $Page/TemperedItem
 @onready var scroll: ScrollContainer = $Page/Scroll
 @onready var margin: MarginContainer = $Page/Scroll/Margin
 @onready var sections_box: VBoxContainer = $Page/Scroll/Margin/Sections
@@ -214,11 +238,15 @@ var _inspect_slot: Control = null
 var _inspect_tween: Tween = null
 var _inspect_busy: bool = false
 var _closing: bool = false
+# TEMPERED on: cards with a tempered version show it. Off on each open.
+var _show_tempered: bool = false
 
 func _ready() -> void:
 	page.mouse_filter = Control.MOUSE_FILTER_STOP
 	back_item.mouse_filter = Control.MOUSE_FILTER_STOP
 	back_item.gui_input.connect(_on_back_gui_input)
+	tempered_item.mouse_filter = Control.MOUSE_FILTER_STOP
+	tempered_item.gui_input.connect(_on_tempered_gui_input)
 	scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
 	scroll.vertical_scroll_mode = ScrollContainer.SCROLL_MODE_SHOW_NEVER
 	scroll.mouse_filter = Control.MOUSE_FILTER_PASS
@@ -329,6 +357,7 @@ func _rebuild() -> void:
 	back_hairline.size = Vector2(hairline_length, hairline_thickness_px)
 	back_hairline.position = Vector2(0.0, (back_label.size.y - hairline_thickness_px) * 0.5)
 	back_hairline.color = ink
+	_lay_out_tempered(back_size, hairline_length, hairline_gap)
 
 	var room: float = shadow_room_px * _ui_scale
 	var list_top: float = back_item.position.y + back_item.size.y + back_to_list_gap_px * _ui_scale
@@ -348,6 +377,25 @@ func _rebuild() -> void:
 		if index > 0:
 			_add_spacer(section_gap_px)
 		_add_section(sections[index])
+
+# TEMPERED on BACK's line, back_to_tempered_gap_px after BACK's label:
+# BACK's face and hairline, full ink with the hairline while on, the
+# utility grey without it while off.
+func _lay_out_tempered(font_size: int, hairline_length: float, hairline_gap: float) -> void:
+	var label := tempered_item.get_node(^"Label") as Label
+	var hairline := tempered_item.get_node(^"Hairline") as ColorRect
+	label.text = tempered_text
+	label.add_theme_font_override("font", InkType.tracked(label_font, font_size, tracking_em))
+	label.add_theme_font_size_override("font_size", font_size)
+	label.add_theme_color_override("font_color", ink if _show_tempered else grey)
+	label.size = label.get_combined_minimum_size()
+	label.position = Vector2(hairline_length + hairline_gap, 0.0)
+	tempered_item.position = Vector2(back_item.position.x + back_item.size.x + back_to_tempered_gap_px * _ui_scale, back_item.position.y)
+	tempered_item.size = Vector2(label.position.x + label.size.x, label.size.y)
+	hairline.size = Vector2(hairline_length, hairline_thickness_px)
+	hairline.position = Vector2(0.0, (label.size.y - hairline_thickness_px) * 0.5)
+	hairline.color = ink
+	hairline.visible = _show_tempered
 
 func _add_section(section: Section) -> void:
 	# Drawn, not two Labels, so the caps heading and the Spectral count
@@ -412,7 +460,9 @@ func _add_section(section: Section) -> void:
 # A CardView at rest in a slot that reserves its scaled footprint. The
 # card scales toward its own top-left (pivot ZERO), the corner the slot
 # reserves from. PASS once it's in the tree (CardView's _ready() sets
-# STOP) so the wheel still reaches the scroll through it.
+# STOP) so the wheel still reaches the scroll through it. With TEMPERED
+# on, a card that has a tempered version shows it instead, marked against
+# the original face read just before the swap.
 func _add_card(flow: HFlowContainer, card: CardData) -> void:
 	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
 	if scene == null:
@@ -430,6 +480,10 @@ func _add_card(flow: HFlowContainer, card: CardData) -> void:
 	flow.add_child(slot)
 	card_view.mouse_filter = Control.MOUSE_FILTER_PASS
 	card_view.set_card_data(card)
+	if _show_tempered and card.tempered != null:
+		var before_text: String = card_view.rules_text.get_parsed_text()
+		card_view.set_card_data(card.tempered)
+		card_view.mark_changes(before_text, card.cost, cost_mark_gap_px)
 	card_view.clicked.connect(_on_card_clicked.bind(card_view, slot))
 
 func _add_spacer(height_px: float) -> void:
@@ -452,10 +506,13 @@ func _fade_in() -> void:
 
 # ui_cancel and ui_accept back out one level at a time: a lifted card is
 # put down before the page closes. ui_up/ui_down scroll the list.
+# ui_focus_next toggles TEMPERED.
 func _unhandled_input(event: InputEvent) -> void:
 	if _closing:
 		return
-	if event.is_action_pressed("ui_cancel") or event.is_action_pressed("ui_accept"):
+	if event.is_action_pressed("ui_focus_next"):
+		toggle_tempered()
+	elif event.is_action_pressed("ui_cancel") or event.is_action_pressed("ui_accept"):
 		if _inspected != null:
 			_end_inspect()
 		elif not _inspect_busy:
@@ -480,6 +537,30 @@ func _on_back_gui_input(event: InputEvent) -> void:
 	get_viewport().set_input_as_handled()
 	if _inspected == null and not _inspect_busy:
 		close()
+
+func _on_tempered_gui_input(event: InputEvent) -> void:
+	var button := event as InputEventMouseButton
+	if button == null or not button.pressed or button.button_index != MOUSE_BUTTON_LEFT:
+		return
+	get_viewport().set_input_as_handled()
+	toggle_tempered()
+
+# TEMPERED flipped and the page rebuilt with it - a lifted card put away
+# with its slot - the scroll put back where it was: once now, and once
+# after the rebuilt list has sorted and the scroll's range caught up.
+func toggle_tempered() -> void:
+	if _closing:
+		return
+	var scrolled: int = scroll.scroll_vertical
+	_show_tempered = not _show_tempered
+	_rebuild()
+	scroll.scroll_vertical = scrolled
+	(func() -> void:
+		if is_instance_valid(scroll):
+			scroll.scroll_vertical = scrolled).call_deferred()
+
+func is_showing_tempered() -> bool:
+	return _show_tempered
 
 # Emits closed and goes; the owner (TitleMenu) shows its column again.
 func close() -> void:
