@@ -32,3 +32,4 @@ contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell"), ExtResource("4_
 ; Placeholder body: the Sputter's at half its scale (1.25 x 0.5).
 model_scale = 0.625
 attachment_scene_path = "res://field/sputter_claws.tscn"
+painted_albedo_path = "res://assets/models/enemies/Sputter/Sputter_Image_0.jpg"
