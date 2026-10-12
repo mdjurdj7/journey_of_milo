@@ -1,0 +1,29 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://cj3fqaldftpk1"]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://vi2ei0xluxbp" path="res://cards/art/Wanderer/Unbroken.png" id="3_art"]
+[ext_resource type="Resource" uid="uid://bkb6nrtx4v55b" path="res://battle/rules/statuses/unbroken_tempered.tres" id="4_unbroken"]
+
+[sub_resource type="Resource" id="CardEffect_block"]
+script = ExtResource("2_card_effect")
+effect_type = 1
+value = 6
+
+[sub_resource type="Resource" id="CardEffect_guard"]
+script = ExtResource("2_card_effect")
+effect_type = 12
+condition = 7
+status_data = ExtResource("4_unbroken")
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Unbroken+"
+cost = 1
+card_type = 1
+rarity = 1
+target_type = 1
+description = "Gain {block} block.
+{if}Critical: the next Attack against you deals 8 less.{/if}"
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_block"), SubResource("CardEffect_guard")])
+art = ExtResource("3_art")

@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Texture2D" uid="uid://vi2ei0xluxbp" path="res://cards/art/Wanderer/Unbroken.png" id="3_art"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/unbroken.tres" id="4_unbroken"]
+[ext_resource type="Resource" uid="uid://cj3fqaldftpk1" path="res://cards/tempered/unbroken_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="CardEffect_block"]
 script = ExtResource("2_card_effect")
@@ -27,3 +28,4 @@ description = "Gain {block} block.
 {if}Critical: the next Attack against you deals 4 less.{/if}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_block"), SubResource("CardEffect_guard")])
 art = ExtResource("3_art")
+tempered = ExtResource("10_tempered")

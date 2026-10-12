@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://c16dtxuqiqm2t"]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://kbl7sdlj2mm0" path="res://cards/art/Wanderer/Second Swing.png" id="9_art"]
+
+[sub_resource type="Resource" id="CardEffect_damage"]
+script = ExtResource("2_card_effect")
+value = 6
+repeat_toll_cost = 3
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Second Swing+"
+cost = 1
+rarity = 1
+target_type = 0
+description = "Deal {damage} damage.
+Spend 3 Toll to repeat."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
+art = ExtResource("9_art")
+battle_animation = &"Slash"
+impact_time = 0.55
