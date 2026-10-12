@@ -12,7 +12,8 @@ The Wanderer (v3) is made with:
         --blender "C:/Program Files/Blender Foundation/Blender 5.2/blender.exe"
         --lift-target 0.30,0.32,0.36 --accent-color 0.70,0.66,0.56
         --accent-above 0.7 --accent-area 0.0005
-        --pin-dark 0.06,0.06,0.07 --boot-color 0.42,0.30,0.20
+        --pin-dark 0.06,0.06,0.07 --boot-color 0.27,0.20,0.14 --sole-shade 0.8
+        --strap-color 0.27,0.20,0.14
 and his sword with:
     python tools/paint_texture.py assets/models/wanderer/sword.glb
         assets/models/wanderer/sword_0.jpg assets/models/wanderer/sword_painted.png
@@ -31,7 +32,9 @@ default pass works on the mesh surface instead:
      Wanderer's collar, not his hem pattern) to --accent-color, small
      ones smoothed away, the dark hood interior pinned to --pin-dark,
      the boots (non-slate, below --boot-below, near each foot's axis)
-     to --boot-color with the sole a little darker;
+     to --boot-color with the sole a little darker, and the leather
+     straps (warm grey across the torso: the chest strap and belt) to
+     --strap-color;
   6. ambient occlusion baked in Blender (tools/bake_ao_blender.py),
      smoothed and normalised, multiplied in at --ao-strength, and a
      top-down --gradient (lighter at the head, darker at the hem);
@@ -302,8 +305,18 @@ def mesh_space(args):
     # Pale is the cloak's hem pattern where it hangs among the boots.
     boot = (height < args.boot_below) & (to_foot < args.boot_radius) & ~slate & ~pale & ~dark
     sole = boot & (height < args.sole_below)
+    # Straps: the source's leather is a warm grey (red at least blue) of
+    # mid value, which on the torso is only the chest strap and the belt -
+    # the clothes are slate, the hood interior darker, the buckles and the
+    # collar pale. Gloves sit beyond --strap-radius.
+    detail_luma = detail @ LUMA
+    centre = np.mean(axes, axis=0)
+    strap = ((detail[:, 0] >= detail[:, 2]) & (detail_luma > args.strap_luma) & ~pale & ~dark
+             & (height > args.strap_above) & (height < args.strap_below)
+             & (np.linalg.norm(ground - centre, axis=1) < args.strap_radius))
     regions = {"cloak (slate above %.2f)" % args.lift_luma: cloak, "inner clothes (slate below)": slate & ~cloak,
                "large pale patches": accent, "hood interior": dark, "boots": boot, "  of which the sole": sole,
+               "straps": strap,
                "whole model": np.ones(count, bool)}
     before = {name: mean_rgb(original, vertex_area * mask) for name, mask in regions.items()}
 
@@ -332,6 +345,13 @@ def mesh_space(args):
         weight = np.clip(np.maximum(smooth(boot.astype(np.float64), args.accent_feather), boot * 1.0) * 2, 0, 1)
         weight = weight * (height < args.boot_below + 0.05) * ~slate * ~pale
         painted = painted + weight[:, None] * (target - painted)
+    if args.strap_color is not None and strap.any():
+        # The same per-channel gain, feathered only into other non-slate,
+        # non-pale vertices, so the cloak and the buckles keep their edge.
+        gain = args.strap_color / np.maximum(mean_rgb(painted, vertex_area * strap), 1e-4)
+        weight = np.clip(np.maximum(smooth(strap.astype(np.float64), args.accent_feather), strap * 1.0) * 2, 0, 1)
+        weight = np.where(strap, 1.0, weight * ~slate * ~pale * ~dark * ~boot)
+        painted = painted + weight[:, None] * (painted * gain - painted)
     if args.accent_color is not None:
         accent_luma = (detail[accent] @ LUMA) * shade[accent]
         relative = accent_luma / max(np.average(accent_luma, weights=vertex_area[accent]), 1e-4)
@@ -389,6 +409,11 @@ def main():
     parser.add_argument("--boot-radius", type=float, default=0.15, help="metres from a foot's vertical axis that count as boot")
     parser.add_argument("--sole-below", type=float, default=0.03, help="share of the model's height that is sole")
     parser.add_argument("--sole-shade", type=float, default=0.9, help="the sole's value against the rest of the boot")
+    parser.add_argument("--strap-color", type=colour_arg, help="recolour the leather straps to this average (r,g,b)")
+    parser.add_argument("--strap-luma", type=float, default=0.16, help="luminance a strap needs (darker is clothes)")
+    parser.add_argument("--strap-above", type=float, default=0.4, help="share of the model's height the straps start at")
+    parser.add_argument("--strap-below", type=float, default=0.88, help="share of the model's height the straps end at")
+    parser.add_argument("--strap-radius", type=float, default=0.3, help="metres from the body's vertical axis that count as strap")
     parser.add_argument("--blender", help="Blender executable; bakes ambient occlusion when given")
     parser.add_argument("--ao-strength", type=float, default=0.35)
     parser.add_argument("--ao-distance", type=float, default=0.08, help="occlusion distance in metres")
