@@ -50,11 +50,10 @@
 - During a task: run only the new probes and the probe files the task
   edited (`--probe`), once, at the end, in the foreground - not whole
   areas, and not `--changed`.
-- Before a push: run only the probes run_probes.sh maps to the files
-  changed since origin/main - `--changed origin/main` - once, in the
-  foreground (it prints the list first). The full `--prepush` suite
-  (those plus the fast tier) and area sweeps run only when I ask for
-  them, not per push.
+- Before a push: run `--smoke` (a fixed six across the field, a fight,
+  the floors and the cards) once, in the foreground. `--changed`,
+  `--prepush` (the mapped probes plus the fast tier) and area sweeps
+  run only when I ask for them.
 - Runs record their timings in tools/probe_times.local.txt (git-ignored),
   never in the tracked tools/probe_times.txt; `--refresh-times` copies
   the local averages over it when I choose to commit them. `--batch`

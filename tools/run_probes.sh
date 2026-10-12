@@ -4,8 +4,11 @@
 # says which passed. See CLAUDE.md's Probes section for when to run what.
 #
 #   tools/run_probes.sh --full                    every probe
+#   tools/run_probes.sh --smoke                   before a push: a fixed six
+#                                                 (SMOKE_PROBES) across the field, a
+#                                                 fight, the floors and the cards
 #   tools/run_probes.sh --fast                    the fast tier (tools/probe_times.txt)
-#   tools/run_probes.sh --prepush                 before a push: the probes for the files
+#   tools/run_probes.sh --prepush                 on request: the probes for the files
 #                                                 changed in origin/main..HEAD, plus the
 #                                                 fast tier - listed first
 #   tools/run_probes.sh --area keywords,face      an area's probes (--list-areas)
@@ -229,6 +232,16 @@ probe_tier() {
 	fi
 }
 
+# --- The smoke tier: the pre-push run, a fixed six (~4 min at -j 1) ---
+# kill_order: the field on floors 1 and 2, a real fight, its win and the
+#   cleanup back to the field - the documented gate for both scenes.
+# devour: a fight played through the battle overlay, its hand and the HUD.
+# pathing: every floor loaded and walked from spawn to exit.
+# hold_line: floor 2's LINE exit and the Wanderer stopping at it.
+# wanderer_rig: his model, clips, sword and materials.
+# starter_cards: the cards' rules layer and their .tres data, no scene.
+SMOKE_PROBES="kill_order devour pathing hold_line wanderer_rig starter_cards"
+
 # --- Areas: which probes guard which part of the game ---
 area_probes() {
 	case "$1" in
@@ -266,6 +279,10 @@ path_probes_hand() {
 	case "$path" in
 		# The enemy export, its generator and what it reads.
 		docs/enemy_export.json|tests/enemy_export.gd) echo enemy_export; return 0 ;;
+		# Models (the Wanderer's, the enemies', the props') and the texture
+		# painter: his rig's probe only - it loads his model and materials,
+		# and no other probe checks how a model looks.
+		assets/models/*|tools/paint_*) echo wanderer_rig; return 0 ;;
 		default_bus_layout.tres|docs/*|*.md|reference/*|tools/*|.githooks/*|.gitignore|.gitattributes) return 0 ;;
 		tests/*_probe.gd) basename "$path" .gd; return 0 ;;
 		tests/*) return 0 ;;
@@ -303,10 +320,8 @@ path_probes_hand() {
 		battle/reward_screen.*|battle/belongings_screen.*|battle/loot_screen.*|battle/keepsake_offer.*|battle/keepsake_row.*|battle/trough_choice.*|run/*) out=$(area_probes run) ;;
 		# Keepsake art: the probes that load keepsakes and their art.
 		assets/textures/keepsakes/*) out="keeper_keepsake trinket belongings_choice" ;;
-		# Enemy bodies: the probes that fight them.
-		assets/models/enemies/*) out=$(area_probes enemies) ;;
-		# The Wanderer's body, clips and sword: the field probes, and his rig's.
-		field/wanderer.*|assets/models/wanderer/*) out="$(area_probes field) wanderer_rig" ;;
+		# The Wanderer's script and scene: the field probes, and his rig's.
+		field/wanderer.*) out="$(area_probes field) wanderer_rig" ;;
 		# The Dunecur's crest and feeding head.
 		field/dunecur_pose.*) out="$(area_probes field) dunecur" ;;
 		field/collector.*) out="$(area_probes field) collector" ;;
@@ -332,7 +347,7 @@ path_probes_hand() {
 		floors/*.tres) out="$(area_probes floors) enemy_export" ;;
 		floors/*) out=$(area_probes floors) ;;
 		# Prop and environment models stand on the floors that place them.
-		assets/models/props/*|assets/Environment/*) out=$(area_probes floors) ;;
+		assets/Environment/*) out=$(area_probes floors) ;;
 		# Floor 3's generated ground and the generator's sources.
 		assets/field/masks/region1_floor3_*|assets/field/masks/source/floor3/*) out=$(area_probes floor3) ;;
 		assets/field/masks/region1_floor4_*|assets/field/masks/source/floor4/*) out=$(area_probes floor4) ;;
@@ -398,6 +413,11 @@ scanned_probes() {
 path_probes() {
 	local hand
 	hand=$(path_probes_hand "$1")
+	# Models and the painter map to their one probe, not to every probe
+	# that names a model.
+	case "${1%.import}" in
+		assets/models/*|tools/paint_*) echo "$hand"; return 0 ;;
+	esac
 	if [ "$hand" = FULL ]; then
 		echo FULL
 		return 0
@@ -461,6 +481,7 @@ while [ $# -gt 0 ]; do
 	case "$1" in
 		--full) MODE=full ;;
 		--fast) MODE=fast ;;
+		--smoke) MODE=smoke ;;
 		--prepush) MODE=prepush ;;
 		--area) MODE=area; AREAS="${2:?--area needs a list}"; shift ;;
 		--changed) MODE=changed
@@ -487,7 +508,7 @@ while [ $# -gt 0 ]; do
 	esac
 	shift
 done
-[ -n "$MODE" ] || die "say what to run: --full, --fast, --prepush, --area, --changed or --probe (--help)"
+[ -n "$MODE" ] || die "say what to run: --full, --smoke, --fast, --prepush, --area, --changed or --probe (--help)"
 # No -j: 1 on a machine short of memory, 2 with room for two.
 if [ -z "$JOBS" ]; then
 	FREE_AT_START=$(free_mb)
@@ -553,6 +574,7 @@ map_paths() {
 SELECTED=""
 case "$MODE" in
 	full) SELECTED="$ALL_PROBES" ;;
+	smoke) SELECTED="$SMOKE_PROBES" ;;
 	area)
 		for a in $(echo "$AREAS" | tr ',' ' '); do
 			p=$(area_probes "$a") || die "no area '$a' (--list-areas)"
