@@ -114,7 +114,9 @@ func _check_data() -> void:
 func _check_candidates_printed_cost() -> void:
 	var slash := load(SLASH_PATH) as CardData
 	var reckoning := load(RECKONING_PATH) as CardData
-	var arc := load(BLOOD_ARC_PATH) as CardData
+	# A Blood Arc made to cost 2 (it costs 1), to tie with Reckoning.
+	var arc := (load(BLOOD_ARC_PATH) as CardData).duplicate() as CardData
+	arc.cost = 2
 	_expect_eq(ConsumeEffect.candidates([slash, reckoning] as Array[CardData]), [1] as Array[int], "Slash 1, Reckoning 2: Reckoning")
 	_expect_eq(ConsumeEffect.candidates([reckoning, slash, arc] as Array[CardData]), [0, 2] as Array[int], "Reckoning 2, Blood Arc 2: a tie")
 	_expect_eq(ConsumeEffect.candidates([] as Array[CardData]), [] as Array[int], "No other card: nothing")
@@ -263,7 +265,8 @@ func _check_tie_choice() -> void:
 		var deck: Object = controller.get("deck")
 		var slash: CardData = await _deal(controller, SLASH_PATH)
 		var reckoning: CardData = await _deal(controller, RECKONING_PATH)
-		var arc: CardData = await _deal(controller, BLOOD_ARC_PATH)
+		# Made to cost 2 (it costs 1), to tie with Reckoning.
+		var arc: CardData = await _deal(controller, BLOOD_ARC_PATH, 2)
 		var deny: CardData = await _deal(controller, DENY_PATH)
 		controller.call("request_play", _view(controller, deny))
 		_expect(bool(controller.call("is_choosing")), "Reckoning and Blood Arc tie at 2: the choice opens")

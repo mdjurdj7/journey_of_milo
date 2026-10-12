@@ -220,11 +220,11 @@ func _check_two_stack() -> void:
 		var ransom: CardData = await _deal(controller, RANSOM_PATH, 3)
 		var blood_arc: CardData = await _deal(controller, BLOOD_ARC_PATH)
 		_expect_eq(player.energy_cost(ransom), 0, "...Ransom's 3 reads 0")
-		_expect_eq(player.energy_cost(blood_arc), 0, "...Blood Arc's 2 reads 0")
+		_expect_eq(player.energy_cost(blood_arc), 0, "...Blood Arc's 1 reads 0")
 		await _play(controller, ransom)
 		_expect_eq(player.energy, 3, "Ransom costs no Energy")
 		_expect_eq(_status_label(player), "", "...and spends both")
-		_expect_eq(player.energy_cost(blood_arc), 2, "Blood Arc reads 2 again")
+		_expect_eq(player.energy_cost(blood_arc), 1, "Blood Arc reads 1 again")
 	await _teardown()
 	_completed += 1
 

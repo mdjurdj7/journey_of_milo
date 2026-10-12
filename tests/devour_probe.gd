@@ -360,7 +360,8 @@ func _check_untargeted_still_plays() -> void:
 	if controller != null:
 		var deck: Object = controller.get("deck")
 		var player: Combatant = controller.get("player")
-		var arc: CardData = await _deal(controller, BLOOD_ARC_PATH)
+		# Made to cost 2 (it costs 1), so it and Slash spend all 3 energy.
+		var arc: CardData = await _deal(controller, BLOOD_ARC_PATH, 2)
 		var slash: CardData = await _deal(controller, SLASH_PATH)
 		controller.call("request_play", _view(controller, arc))
 		_expect(not bool(controller.call("is_awaiting_target")), "Blood Arc with Devour available: no arming")
@@ -615,14 +616,16 @@ func _teardown() -> void:
 		await process_frame
 
 # A fresh copy of the card at `path`, drawn into the hand - the first
-# call of a case discards the opening hand.
-func _deal(controller: Node, path: String) -> CardData:
+# call of a case discards the opening hand. At `cost` when one is given.
+func _deal(controller: Node, path: String, cost: int = -1) -> CardData:
 	var deck: Object = controller.get("deck")
 	if not bool(controller.get_meta("probe_dealt", false)):
 		controller.set_meta("probe_dealt", true)
 		deck.call("discard_hand")
 		await process_frame
 	var card: CardData = (load(path) as CardData).duplicate()
+	if cost >= 0:
+		card.cost = cost
 	(deck.get("draw_pile") as Array).append(card)
 	deck.call("draw", 1)
 	await process_frame

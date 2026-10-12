@@ -212,7 +212,8 @@ func _check_faces() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var reckoning: CardData = await _deal(controller, RECKONING_PATH)
-		var blood_arc: CardData = await _deal(controller, BLOOD_ARC_PATH)
+		# A Blood Arc made to cost 2 (it costs 1), so Collateral covers it.
+		var blood_arc: CardData = await _deal(controller, BLOOD_ARC_PATH, 2)
 		var slash: CardData = await _deal(controller, SLASH_PATH)
 		var own_loss: int = _self_damage(blood_arc)
 		_expect_eq(_face(controller, reckoning), ["2", ""], "Before Collateral, Reckoning reads 2 and no HP line")
@@ -295,9 +296,12 @@ func _teardown() -> void:
 	for i in 5:
 		await process_frame
 
-# A fresh copy of the card at `path`, drawn into the hand.
-func _deal(controller: Node, path: String) -> CardData:
+# A fresh copy of the card at `path`, drawn into the hand - at `cost`
+# when one is given.
+func _deal(controller: Node, path: String, cost: int = -1) -> CardData:
 	var card: CardData = (load(path) as CardData).duplicate()
+	if cost >= 0:
+		card.cost = cost
 	var deck: Object = controller.get("deck")
 	(deck.get("draw_pile") as Array).append(card)
 	deck.call("draw", 1)

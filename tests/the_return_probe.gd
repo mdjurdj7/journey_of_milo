@@ -238,7 +238,7 @@ func _check_stacks_share_one_counter() -> void:
 	_expect_eq(third.hp, 100 - 3 * DRAIN, "Three copies Drain %d" % (3 * DRAIN))
 	_completed += 1
 
-# Blood Arc loses 3 then sweeps for 9: a last loss Drains BEFORE the
+# Blood Arc loses 3 then sweeps for 10: a last loss Drains BEFORE the
 # sweep, and what the Drain kills isn't swept again.
 func _check_blood_arc_order() -> void:
 	var player: Combatant = _armed(50)
@@ -249,7 +249,7 @@ func _check_blood_arc_order() -> void:
 	_play(_card("blood_arc"), player, enemies)
 	_expect_eq(weak.hp, 0, "Blood Arc's loss sets it off: the Drain kills the %d HP enemy" % DRAIN)
 	_expect_eq(_reports_on(weak), 1, "...which is struck once, by the Drain alone")
-	_expect_eq(strong.hp, 100 - DRAIN - 9, "...and the sweep lands after it (100 - %d - 9)" % DRAIN)
+	_expect_eq(strong.hp, 100 - DRAIN - 10, "...and the sweep lands after it (100 - %d - 10)" % DRAIN)
 	_expect_eq(_kinds(), ["self", "drain", "drain", "card"] as Array[String], "...loss, Drain, then the sweep")
 	_completed += 1
 

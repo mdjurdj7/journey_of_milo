@@ -133,8 +133,10 @@ func _scripted_run(logging: bool) -> Dictionary:
 	await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
 	await _play(controller, await _deal(controller, HOLD_FAST_PATH))
 	await _play(controller, await _deal(controller, BLOOD_ARC_PATH))
-	# Turn 2 on: Endure for Block on the second (the Sputter's strike
-	# comes after it), then Slashes until it falls.
+	# Turn 2: Endure for Block (the Sputter's strike comes after it) and
+	# one Slash. Turn 3 on: Slashes until it falls - late enough that a
+	# strike lands unblocked first, early enough (turn 4) that the logging-
+	# on and logging-off runs still fight the same Sputter.
 	while _battle_open() and _turns < MAX_TURNS:
 		await controller.call("end_turn")
 		for i in 3:
@@ -145,6 +147,8 @@ func _scripted_run(logging: bool) -> Dictionary:
 		_fresh_hand(controller)
 		if _turns == 2:
 			await _play(controller, await _deal(controller, ENDURE_PATH))
+			await _play(controller, await _deal(controller, SLASH_PATH), _field_enemy(controller))
+			continue
 		while _battle_open() and int((controller.get("player") as Combatant).energy) >= 1:
 			await _play(controller, await _deal(controller, SLASH_PATH), _field_enemy(controller))
 	_expect(not _battle_open(), "The Sputter falls inside %d turns" % MAX_TURNS)
@@ -250,7 +254,7 @@ func _check_log(path: String, seen: Dictionary) -> void:
 		_expect_card(cards[0], "Collateral", 0, 0, 0)
 		_expect_card(cards[1], "Reckoning", 0, 5, 0)
 		_expect_card(cards[2], "Hold Fast", 1, 0, 2)
-		_expect_card(cards[3], "Blood Arc", 2, 0, 3)
+		_expect_card(cards[3], "Blood Arc", 1, 0, 3)
 		_expect_eq(int((cards[2] as Dictionary).get("block")), 5, "Hold Fast: 5 Block gained")
 		_expect(int((cards[3] as Dictionary).get("dealt")) > 0, "Blood Arc: damage dealt")
 		_expect_eq((cards[3] as Dictionary).get("target"), null, "...with no target")

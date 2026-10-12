@@ -11,13 +11,13 @@ value = 3
 
 [sub_resource type="Resource" id="CardEffect_damage"]
 script = ExtResource("2_card_effect")
-value = 9
+value = 10
 target_scope = 1
 
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Blood Arc"
-cost = 2
+cost = 1
 rarity = 2
 description = "Deal {damage} damage to all enemies."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_self_damage"), SubResource("CardEffect_damage")])

@@ -25,6 +25,7 @@ const TWO_LINE_STATUS_CARDS: Array[String] = ["Sentence", "The Return"]
 # here has changed its wording - or needs to.
 const SHRUNK_RULES: Dictionary = {
 	"Bide": 14,
+	"Blood Arc": 14,
 	"Collateral": 13,
 	"Deny": 13,
 	"Cornered": 14,

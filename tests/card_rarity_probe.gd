@@ -376,7 +376,7 @@ func _check_top_tier_prefers_ultra() -> void:
 
 func _check_blood_arc_basics() -> void:
 	var card: CardData = _card("blood_arc")
-	_expect_eq(card.cost, 2, "Blood Arc costs 2")
+	_expect_eq(card.cost, 1, "Blood Arc costs 1")
 	_expect_eq(card.card_type, CardData.CardType.ATTACK, "Blood Arc is an Attack")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "Blood Arc is Uncommon")
 
@@ -391,7 +391,7 @@ func _check_blood_arc_basics() -> void:
 	_expect_eq(player.toll, 3, "...and makes 3 Toll")
 	_expect_eq(player.grace, 0, "...and opens no Grace")
 	for index in enemies.size():
-		_expect_eq(enemies[index].hp, 91, "Blood Arc deals 9 to enemy %d" % index)
+		_expect_eq(enemies[index].hp, 90, "Blood Arc deals 10 to enemy %d" % index)
 
 	player = _player(2)
 	_play_into(card, player, [Combatant.new(100)])
@@ -409,7 +409,7 @@ func _check_blood_arc_order() -> void:
 	ctx.on_damage = func(target: Combatant, amount: int, kind: String) -> void:
 		reports.append("%s:%d" % [kind, amount])
 	_resolver.resolve_card(card, ctx)
-	_expect_eq(reports, ["self:3", "card:9"] as Array[String], "Self-loss reported before the blow")
+	_expect_eq(reports, ["self:3", "card:10"] as Array[String], "Self-loss reported before the blow")
 	_expect(player.is_critical(), "24 -> 21 is Critical")
 	_completed += 1
 
@@ -421,8 +421,8 @@ func _check_blood_arc_self_eater() -> void:
 	_play_into(card, player, enemies)
 	_expect_eq(player.hp, 45, "Self-Eater's 2 and Blood Arc's 3")
 	_expect_eq(player.toll, 5, "...all Toll")
-	_expect_eq(enemies[0].hp, 88, "Self-Eater +3 on Blood Arc: 12")
-	_expect_eq(enemies[1].hp, 88, "...to every enemy")
+	_expect_eq(enemies[0].hp, 87, "Self-Eater +3 on Blood Arc: 13")
+	_expect_eq(enemies[1].hp, 87, "...to every enemy")
 	_completed += 1
 
 func _check_blood_arc_last_resort() -> void:
@@ -432,14 +432,14 @@ func _check_blood_arc_last_resort() -> void:
 	var enemies: Array[Combatant] = [Combatant.new(100), Combatant.new(100)]
 	_play_into(card, player, enemies)
 	_expect_eq(player.hp, 21, "Last Resort charges no HP")
-	_expect_eq(enemies[0].hp, 85, "Blood Arc pays into Critical, Last Resort +6: 15")
-	_expect_eq(enemies[1].hp, 85, "...to every enemy")
+	_expect_eq(enemies[0].hp, 84, "Blood Arc pays into Critical, Last Resort +6: 16")
+	_expect_eq(enemies[1].hp, 84, "...to every enemy")
 
 	player = _player(30)
 	_play_into(_card("last_resort"), player, [Combatant.new(100)])
 	enemies = [Combatant.new(100)]
 	_play_into(card, player, enemies)
-	_expect_eq(enemies[0].hp, 91, "Above the line: no Last Resort bonus")
+	_expect_eq(enemies[0].hp, 90, "Above the line: no Last Resort bonus")
 	_completed += 1
 
 # --- With Regards ---

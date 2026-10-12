@@ -2,7 +2,7 @@ extends SceneTree
 
 # Headless probe for killing blows and the death after them: a killing
 # hit shows in full - its damage number, its hit-stop (at least
-# kill_hitstop_min, a 9-damage Blood Arc's too) and its recoil - before
+# kill_hitstop_min, a small Blood Arc's too) and its recoil - before
 # the death begins (BattleController.enemy_defeated); Blood Arc killing a
 # whole pack reacts on every one of them, and runs its stroke out, before
 # any dies; the death plays (FieldEnemy.death_finished) and only then is
@@ -83,8 +83,8 @@ func _check_single_kill() -> void:
 	await _teardown()
 	_completed += 1
 
-# Blood Arc (9 to each) kills the whole island pack: every member's
-# number, recoil and the 9-damage kill's minimum hit-stop before any
+# Blood Arc (its damage to each) kills the whole island pack: every member's
+# number, recoil and the small kill's minimum hit-stop before any
 # death; the stroke runs out first; the win after the last death.
 func _check_blood_arc_pack() -> void:
 	var controller: Node = await _start_fight(FLOOR_2, ISLAND, BLOOD_ARC_PATH)
@@ -106,7 +106,7 @@ func _check_blood_arc_pack() -> void:
 				_expect(_recoiled_before(log, member, first_death), "...'%s' recoils before any death" % (log["names"] as Dictionary).get(member, "?"))
 			var stop_ms: int = _stop_ms_before(log, first_death)
 			var minimum: int = int(log["kill_min_ms"])
-			_expect(stop_ms >= minimum - SLACK_MS, "...a 9-damage kill holds at least kill_hitstop_min (%d ms, got %d)" % [minimum, stop_ms])
+			_expect(stop_ms >= minimum - SLACK_MS, "...a small kill holds at least kill_hitstop_min (%d ms, got %d)" % [minimum, stop_ms])
 			var stroke_ms: int = int(log.get("stroke_ms", 0))
 			_expect(first_death - _first(log, "hit") >= stroke_ms - SLACK_MS, "...and the stroke runs out first (%d ms, deaths at %d)" % [stroke_ms, first_death - _first(log, "hit")])
 		_check_win_after_deaths(log, "The pack")
