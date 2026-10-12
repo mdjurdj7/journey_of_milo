@@ -24,9 +24,9 @@ class_name HPBar
 # on one baseline and a rule in the toll keyline colour beneath, sitting
 # on the HP bar's own rows; nothing boxed). The two cross-fade: the field
 # drawing fades out as the battle drawing fades in, and this control's
-# own size eases between the two layouts' sizes; the HP block stays
-# centred on the anchor in both, with Toll hanging off to the right (see
-# _anchor_offset()). See enter_battle()/exit_battle() and _battle_blend's
+# own size eases between the two layouts' sizes; the field bar stays
+# centred on the anchor, and in battle the HP block and Toll beside it
+# are centred on it together (see _anchor_offset()). See enter_battle()/exit_battle() and _battle_blend's
 # own doc.
 #
 # Reads RunState.player_hp/player_max_hp directly and updates on RunState.
@@ -692,12 +692,16 @@ func _line_rects() -> Array[Rect2]:
 
 # The point of this control that sits on the screen anchor (and that
 # battle_scale scales about): the field bar's top centre, or in battle
-# the HP block's centre on the HP numeral's baseline - Toll hangs off to
-# the right of it, never shifting the bar off the Wanderer, and the
-# standing row grows downward from under the bar, so a line coming or
-# going never moves the numeral or the bar.
+# the centre of the HP block and the Toll block beside it, together, on
+# the HP numeral's baseline - the row centred under the Wanderer, shifting
+# half a digit when Toll gains or loses one. A block readout spills
+# leftward from it and the standing row grows downward from under the
+# bar, so neither coming or going moves the numeral or the bar.
 func _anchor_offset() -> Vector2:
-	var battle_offset := Vector2(_block_readout_width() + battle_width / 2.0, _battle_top_pad() + _numeral_ascent())
+	var row_width: float = battle_width
+	if _toll_visible:
+		row_width += toll_gap_px + _toll_block_width()
+	var battle_offset := Vector2(_block_readout_width() + row_width / 2.0, _battle_top_pad() + _numeral_ascent())
 	return _field_anchor().lerp(battle_offset, _battle_blend)
 
 # This control's size eases between the two layouts' sizes with the

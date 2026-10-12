@@ -48,6 +48,9 @@ const SAFETY_SECONDS := 400.0
 # too), and waits this long for the hover to settle.
 const HOVER_REACH_PX := 60.0
 const HOVER_SETTLE_SECONDS := 0.3
+# A hovered card under the bottom-left stack's column keeps at least this
+# much air between its top and Devour's bottom.
+const MIN_HOVER_CLEARANCE_PX := 10.0
 
 var _run_state: Node = null
 var _field: Node = null
@@ -497,7 +500,10 @@ func _check_button_states() -> void:
 	_completed += 1
 
 # One column with the energy readout - the same left edge, under its pips
-# - and clear of every hand card from 5 to 10 in hand, resting or hovered.
+# - and clear of every hand card from 5 to 10 in hand, resting or hovered:
+# a hovered card under the stack's column (its x-range overlapping the
+# stack's) MIN_HOVER_CLEARANCE_PX under Devour. The printed gaps count only
+# cards under that column - a card off to its side has no gap to keep.
 func _check_layout() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -509,6 +515,7 @@ func _check_layout() -> void:
 		_expect(button.global_position.y >= resources.global_position.y + resources.size.y, "...under it")
 		var rect: Rect2 = button.get_global_rect()
 		print("Devour rect: ", rect)
+		var stack: Rect2 = rect.merge(resources.get_global_rect())
 		await _deal(controller, SLASH_PATH)
 		for count in range(1, 11):
 			var hand: Array = (controller.get("deck") as Object).get("hand")
@@ -521,13 +528,13 @@ func _check_layout() -> void:
 			var worst: float = INF
 			for view: CardView in controller.get("_hand_container").call("_card_views"):
 				var card_rect: Rect2 = _rendered_rect(view)
-				worst = minf(worst, card_rect.position.y - rect.end.y if card_rect.position.x < rect.end.x else INF)
+				if _under_column(card_rect, stack):
+					worst = minf(worst, card_rect.position.y - rect.end.y)
 				_expect(not card_rect.intersects(rect), "%d in hand: a resting card %s clear of Devour %s" % [count, card_rect, rect])
 			print("%d in hand: nearest card top under Devour's column is %s px below it" % [count, str(worst)])
 			# Hovered too - lifted and grown about its bottom centre - each
 			# card that comes near the column: clear of Devour and the
 			# energy readout over it.
-			var stack: Rect2 = rect.merge(resources.get_global_rect())
 			var worst_hovered: float = INF
 			for view: CardView in controller.get("_hand_container").call("_card_views"):
 				if _rendered_rect(view).position.x > stack.end.x + HOVER_REACH_PX:
@@ -535,11 +542,13 @@ func _check_layout() -> void:
 				view.set_hovered(true)
 				await create_timer(HOVER_SETTLE_SECONDS).timeout
 				var hovered_rect: Rect2 = _rendered_rect(view)
-				worst_hovered = minf(worst_hovered, hovered_rect.position.y - rect.end.y)
+				if _under_column(hovered_rect, stack):
+					worst_hovered = minf(worst_hovered, hovered_rect.position.y - rect.end.y)
 				_expect(not hovered_rect.intersects(stack), "%d in hand: a hovered card %s clear of Devour and the energy readout %s" % [count, hovered_rect, stack])
 				view.set_hovered(false)
 				await create_timer(HOVER_SETTLE_SECONDS).timeout
 			print("%d in hand: nearest hovered card top under Devour's column is %s px below it" % [count, str(worst_hovered)])
+			_expect(worst_hovered >= MIN_HOVER_CLEARANCE_PX, "%d in hand: a hovered card under the column at least %.0f px under Devour (%s)" % [count, MIN_HOVER_CLEARANCE_PX, str(worst_hovered)])
 	await _teardown()
 	_completed += 1
 
@@ -639,6 +648,10 @@ func _rendered_rect(view: CardView) -> Rect2:
 	for corner in [Vector2(view.size.x, 0.0), Vector2(0.0, view.size.y), view.size]:
 		rect = rect.expand(xform * (corner as Vector2))
 	return rect
+
+# Whether `card` overlaps `column`'s x-range - sits under or over it.
+func _under_column(card: Rect2, column: Rect2) -> bool:
+	return card.position.x < column.end.x and card.end.x > column.position.x
 
 # Until the play or devour has resolved, and a margin after.
 func _settle(controller: Node) -> void:

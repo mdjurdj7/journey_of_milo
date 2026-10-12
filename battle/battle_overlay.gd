@@ -99,9 +99,11 @@ signal battle_finished(outcome: Outcome)
 		_apply_energy_anchor()
 # The whole bottom-left stack - the energy readout, Devour under it and
 # the line over it (the pick's prompt, the keepsake reveal) - raised this
-# far above energy_anchor, so a hovered card clears Devour too: 12 px
-# over the highest hovered card's top under Devour's column, which is at
-# seven cards (56 px into it unraised at 1080p). devour_probe checks it.
+# far above energy_anchor, so a hovered card clears Devour too. With
+# energy_group_offset's 12 px down, Devour's bottom (750.4 at 1080p) sits
+# 12 px over the leftmost card hovered at full size - 762.4 at five to
+# eight in hand, the tightest; the hand fills its limits from eight, so
+# that card is always under the column. devour_probe checks it.
 @export var energy_stack_lift_px: float = 68.0:
 	set(value):
 		energy_stack_lift_px = value
@@ -114,9 +116,11 @@ signal battle_finished(outcome: Outcome)
 		_apply_energy_anchor()
 # The energy group - readout and Devour - moved as one from where
 # energy_anchor and energy_stack_lift_px put it, in overlay (1080p) px
-# like every corner readout, so it scales with the HUD. Left and down
-# from there by default, clear of the Wanderer's HP row. 12 px down is as
-# low as it goes: a hovered card sits ~0 px under Devour at seven in hand.
+# like every corner readout, so it scales with the HUD. 12 px down keeps
+# the leftmost hovered card 12 px under Devour (see energy_stack_lift_px).
+# The overlay scene sets x to -246.75: the group's right edge (214.75)
+# 12 px left of a hovered card at seven in hand, so nothing at seven or
+# fewer reaches its column, and clear of the second card at eight to ten.
 @export var energy_group_offset: Vector2 = Vector2(-40.0, 12.0):
 	set(value):
 		energy_group_offset = value
