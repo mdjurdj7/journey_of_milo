@@ -166,7 +166,9 @@ func _slash(controller: Node, enemy: Node3D) -> Dictionary:
 	if view == null:
 		_fail("Slash is not in the hand")
 		return {"stream": null, "flashed": false, "recoil": 0.0}
-	var materials: Array[BaseMaterial3D] = enemy.get("_tint_materials")
+	# Material, not BaseMaterial3D: a painted body (wanderer_painted.gdshader)
+	# keeps its tint in a uniform - read through FieldEnemy._tint_of().
+	var materials: Array[Material] = enemy.get("_tint_materials")
 	var base_colors: Array[Color] = enemy.get("_tint_base_colors")
 	var base_position: Vector3 = enemy.global_position
 	controller.call("request_play", view)
@@ -181,7 +183,8 @@ func _slash(controller: Node, enemy: Node3D) -> Dictionary:
 	while Time.get_ticks_msec() - start < int(WATCH_SECONDS * 1000.0):
 		recoil = maxf(recoil, enemy.global_position.distance_to(base_position))
 		for index in materials.size():
-			if not materials[index].albedo_color.is_equal_approx(base_colors[index]):
+			var tint: Color = enemy.call("_tint_of", materials[index])
+			if not tint.is_equal_approx(base_colors[index]):
 				flashed = true
 		await process_frame
 	for i in 600:
