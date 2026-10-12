@@ -32,6 +32,7 @@ model_scene_path = "res://assets/models/enemies/Underfoot/Underfoot.glb"
 model_scale = 0.744
 model_yaw_offset_degrees = 180.0
 attachment_scene_path = "res://field/underfoot_pose.tscn"
+painted_albedo_path = "res://assets/models/enemies/Underfoot/Underfoot_texture_0.png"
 ; Covered: the crown 0.1 m proud of the sand, the rim at it, the tail and
 ; the lowered barb under it (UnderfootPose lifts it to 0 Exposed).
 sink_m = 0.09

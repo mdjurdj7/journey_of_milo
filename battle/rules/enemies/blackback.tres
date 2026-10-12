@@ -35,3 +35,4 @@ model_scene_path = "res://assets/models/enemies/Stork/Stork.glb"
 model_scale = 92.9
 model_yaw_offset_degrees = 180.0
 attachment_scene_path = "res://field/stork_tells.tscn"
+painted_albedo_path = "res://assets/models/enemies/Stork/Stork_Image_0.jpg"
