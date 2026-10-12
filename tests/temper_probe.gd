@@ -341,7 +341,7 @@ func _check_screen_temper() -> void:
 		_expect_eq(screen.call("get_mode"), "PREVIEW", "Picking %s previews it" % name)
 		var after: CardView = screen.get("_after_view")
 		var text: String = after.rules_text.text
-		var cost_mark: Variant = screen.get("_cost_mark")
+		var cost_mark: Node = after.get_node_or_null(^"CostMark")
 		match id:
 			"slash":
 				_expect_eq(text, "Deal [u]9[/u] damage.", "...Slash+ underlines its 9")

@@ -169,8 +169,8 @@ const LEAVE_INDEX := 100002
 @export var cost_mark_gap_px: float = 3.0:
 	set(value):
 		cost_mark_gap_px = value
-		if _cost_mark != null:
-			_cost_mark.queue_redraw()
+		if _after_view != null and is_instance_valid(_after_view):
+			_after_view.set_cost_mark_gap(value)
 @export_range(0.0, 1.0) var actions_baseline_fraction: float = 0.8:
 	set(value):
 		actions_baseline_fraction = value
@@ -243,7 +243,6 @@ var _views: Array[CardView] = []
 var _picked: CardData = null
 var _before_view: CardView = null
 var _after_view: CardView = null
-var _cost_mark: Control = null
 var _held_tween: Tween = null
 # Focus: a grid index, or TEMPER/BACK/LEAVE_INDEX; -1 = nothing.
 var _focus: int = -1
@@ -329,7 +328,6 @@ func _clear_preview() -> void:
 			view.queue_free()
 	_before_view = null
 	_after_view = null
-	_cost_mark = null
 	_picked = null
 
 # A card the wagon can work: it has a tempered version. A tempered card's
@@ -380,7 +378,7 @@ func _open_preview(index: int) -> void:
 		return
 	for view: CardView in [_before_view, _after_view]:
 		view.hover_enabled = false
-	mark_changes(_before_view, _after_view)
+	_after_view.mark_changes(_before_view.rules_text.get_parsed_text(), _before_view.card_data.cost, cost_mark_gap_px)
 	_mode = Mode.PREVIEW
 	_mouse_on = -1
 	_relayout()
@@ -419,94 +417,6 @@ func _on_temper_changed() -> void:
 		_enter_rest_mode()
 	else:
 		_refresh()
-
-# --- Changes on the tempered face ---
-
-# On `after`'s face, a hairline under what differs from `before`'s: each
-# number that changed in a line otherwise the same, the whole of a line
-# that changed in its words or that `before` doesn't have ([u] in the
-# rules text - the face's own ink, at its own size), and the cost (a 1 px
-# line under its numeral, cost_mark_gap_px below the baseline).
-func mark_changes(before: CardView, after: CardView) -> void:
-	var old_lines: PackedStringArray = before.rules_text.get_parsed_text().split("
-")
-	var new_lines: PackedStringArray = after.rules_text.get_parsed_text().split("
-")
-	var bbcode: PackedStringArray = after.rules_text.text.split("
-")
-	if bbcode.size() == new_lines.size():
-		for i in new_lines.size():
-			if i < old_lines.size() and old_lines[i] == new_lines[i]:
-				continue
-			var changed: Array[int] = []
-			if i < old_lines.size():
-				changed = _changed_numbers(old_lines[i], new_lines[i])
-			if changed.is_empty():
-				bbcode[i] = "[u]%s[/u]" % bbcode[i]
-			else:
-				bbcode[i] = _underline_numbers(bbcode[i], changed)
-		after.rules_text.text = "
-".join(bbcode)
-	else:
-		push_warning("WagonScreen: '%s' rules text doesn't split into its lines; no hairlines under it." % after.card_data.card_name)
-	if before.card_data.cost != after.card_data.cost:
-		_cost_mark = Control.new()
-		_cost_mark.name = "CostMark"
-		_cost_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		_cost_mark.set_anchors_preset(Control.PRESET_FULL_RECT)
-		_cost_mark.draw.connect(_draw_cost_mark.bind(after))
-		after.add_child(_cost_mark)
-
-# Width -1: one screen pixel at any scale the card is drawn at.
-func _draw_cost_mark(after: CardView) -> void:
-	if _cost_mark == null:
-		return
-	var label: Label = after.cost_label
-	var y: float = after.header_baseline_px + cost_mark_gap_px
-	_cost_mark.draw_line(Vector2(label.position.x, y), Vector2(label.position.x + label.size.x, y), after.ink_color, -1.0)
-
-# Which numbers (by order in the line) differ, when the two lines are the
-# same words round them; empty when the words differ too, or nothing does.
-static func _changed_numbers(old_line: String, new_line: String) -> Array[int]:
-	var changed: Array[int] = []
-	var digits := RegEx.create_from_string("\\d+")
-	if digits.sub(old_line, "#", true) != digits.sub(new_line, "#", true):
-		return changed
-	var old_numbers: Array[RegExMatch] = digits.search_all(old_line)
-	var new_numbers: Array[RegExMatch] = digits.search_all(new_line)
-	for k in new_numbers.size():
-		if old_numbers[k].get_string() != new_numbers[k].get_string():
-			changed.append(k)
-	return changed
-
-# The BBCode line with the given numbers (by order, counting only digits
-# outside [tags]) wrapped in [u].
-static func _underline_numbers(line: String, which: Array[int]) -> String:
-	var out: String = ""
-	var index: int = 0
-	var number: int = 0
-	while index < line.length():
-		var c: String = line[index]
-		if c == "[":
-			var close: int = line.find("]", index)
-			if close < 0:
-				out += line.substr(index)
-				break
-			out += line.substr(index, close - index + 1)
-			index = close + 1
-			continue
-		if c >= "0" and c <= "9":
-			var end: int = index
-			while end < line.length() and line[end] >= "0" and line[end] <= "9":
-				end += 1
-			var run: String = line.substr(index, end - index)
-			out += ("[u]%s[/u]" % run) if which.has(number) else run
-			number += 1
-			index = end
-			continue
-		out += c
-		index += 1
-	return out
 
 # --- Layout ---
 

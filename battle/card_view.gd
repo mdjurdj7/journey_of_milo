@@ -513,6 +513,9 @@ var _keyword_inspect: bool = false
 # narrower of this and the card, so a short one centres on the card
 # (StatusReveal sets its lines flush left in its wrap width).
 var _keyword_line_width: float = 0.0
+# The cost hairline's gap under the cost's baseline, card px, as the
+# host last gave it (mark_changes(), set_cost_mark_gap()).
+var _cost_mark_gap_px: float = 3.0
 # Over the reveal's z: above an armed card (HandContainer's 1001).
 const KEYWORD_REVEAL_Z_INDEX := 1100
 # A keyword's hover rect reaches this far past its ink, in card pixels -
@@ -1448,6 +1451,99 @@ func _screen_rect() -> Rect2:
 	for corner: Vector2 in [Vector2(size.x, 0.0), size, Vector2(0.0, size.y)]:
 		rect = rect.expand(xf * corner)
 	return rect
+
+# --- Changes on a tempered face ---
+
+# On this face, a hairline under what differs from the card it was made
+# from - `before_text` that card's rules text as parsed (no BBCode),
+# `before_cost` its cost: each number that changed in a line otherwise
+# the same, the whole of a line that changed in its words or that the
+# before text doesn't have ([u] in the rules text - the face's own ink,
+# at its own size), and the cost (a 1 px line under its numeral,
+# `cost_mark_gap_px` below the baseline, drawn by a "CostMark" child).
+# Run once, after set_card_data(): the face re-rendering its rules text
+# drops the [u] marks.
+func mark_changes(before_text: String, before_cost: int, cost_mark_gap_px: float) -> void:
+	_cost_mark_gap_px = cost_mark_gap_px
+	var old_lines: PackedStringArray = before_text.split("\n")
+	var new_lines: PackedStringArray = rules_text.get_parsed_text().split("\n")
+	var bbcode: PackedStringArray = rules_text.text.split("\n")
+	if bbcode.size() == new_lines.size():
+		for i in new_lines.size():
+			if i < old_lines.size() and old_lines[i] == new_lines[i]:
+				continue
+			var changed: Array[int] = []
+			if i < old_lines.size():
+				changed = _changed_numbers(old_lines[i], new_lines[i])
+			if changed.is_empty():
+				bbcode[i] = "[u]%s[/u]" % bbcode[i]
+			else:
+				bbcode[i] = _underline_numbers(bbcode[i], changed)
+		rules_text.text = "\n".join(bbcode)
+	else:
+		push_warning("CardView: '%s' rules text doesn't split into its lines; no hairlines under it." % card_data.card_name)
+	if before_cost != card_data.cost:
+		var cost_mark := Control.new()
+		cost_mark.name = "CostMark"
+		cost_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		cost_mark.set_anchors_preset(Control.PRESET_FULL_RECT)
+		cost_mark.draw.connect(_draw_cost_mark.bind(cost_mark))
+		add_child(cost_mark)
+
+# The cost hairline's gap, re-applied live (a host's own export setter).
+func set_cost_mark_gap(cost_mark_gap_px: float) -> void:
+	_cost_mark_gap_px = cost_mark_gap_px
+	var cost_mark := get_node_or_null(^"CostMark") as Control
+	if cost_mark != null:
+		cost_mark.queue_redraw()
+
+# Width -1: one screen pixel at any scale the card is drawn at.
+func _draw_cost_mark(cost_mark: Control) -> void:
+	var y: float = header_baseline_px + _cost_mark_gap_px
+	cost_mark.draw_line(Vector2(cost_label.position.x, y), Vector2(cost_label.position.x + cost_label.size.x, y), ink_color, -1.0)
+
+# Which numbers (by order in the line) differ, when the two lines are the
+# same words round them; empty when the words differ too, or nothing does.
+static func _changed_numbers(old_line: String, new_line: String) -> Array[int]:
+	var changed: Array[int] = []
+	var digits := RegEx.create_from_string("\\d+")
+	if digits.sub(old_line, "#", true) != digits.sub(new_line, "#", true):
+		return changed
+	var old_numbers: Array[RegExMatch] = digits.search_all(old_line)
+	var new_numbers: Array[RegExMatch] = digits.search_all(new_line)
+	for k in new_numbers.size():
+		if old_numbers[k].get_string() != new_numbers[k].get_string():
+			changed.append(k)
+	return changed
+
+# The BBCode line with the given numbers (by order, counting only digits
+# outside [tags]) wrapped in [u].
+static func _underline_numbers(line: String, which: Array[int]) -> String:
+	var out: String = ""
+	var index: int = 0
+	var number: int = 0
+	while index < line.length():
+		var c: String = line[index]
+		if c == "[":
+			var close: int = line.find("]", index)
+			if close < 0:
+				out += line.substr(index)
+				break
+			out += line.substr(index, close - index + 1)
+			index = close + 1
+			continue
+		if c >= "0" and c <= "9":
+			var end: int = index
+			while end < line.length() and line[end] >= "0" and line[end] <= "9":
+				end += 1
+			var run: String = line.substr(index, end - index)
+			out += ("[u]%s[/u]" % run) if which.has(number) else run
+			number += 1
+			index = end
+			continue
+		out += c
+		index += 1
+	return out
 
 # --- Derivations from CardData ---
 
