@@ -1202,9 +1202,11 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 	var anim_root := anim_player.get_node_or_null(anim_player.root_node)
 	var skeletons: Array[Node] = _model.find_children("*", "Skeleton3D", true, false) if _model != null else []
 	var target_skeleton := skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
+	# A clip that fails is reported and the rest still merge - one broken
+	# file costs its own clip, not every clip after it.
 	for clip: Dictionary in _merged_clips():
 		if not _merge_clip(library, anim_root, target_skeleton, clip):
-			return
+			push_error("Wanderer: the %s clip (%s) failed to merge; merging the rest." % [clip["name"], clip["path"]])
 
 # The clips merged after the model's own, in order: name in the library,
 # source file, loop mode and a label for errors.
@@ -1238,7 +1240,7 @@ func _merged_clips() -> Array[Dictionary]:
 # model's skeleton (_transfer_clip()), sets its loop mode and adds it to
 # library under clip["name"] - then checks the merged clip's first track
 # resolves to a Skeleton3D under anim_root. False (with a push_error) when
-# any step fails; _merge_clips() stops there.
+# any step fails; _merge_clips() reports it and goes on to the next clip.
 func _merge_clip(library: AnimationLibrary, anim_root: Node, target_skeleton: Skeleton3D, clip: Dictionary) -> bool:
 	var clip_name: String = clip["name"]
 	var label: String = clip["label"]
@@ -1278,7 +1280,16 @@ func _merge_clip(library: AnimationLibrary, anim_root: Node, target_skeleton: Sk
 # Carries a clip cut on one rig (source_skeleton, under source_root) onto
 # the model's skeleton (target_skeleton, under target_root - the
 # AnimationPlayer's root), by bone name (_target_bone()):
-# - every bone track is re-pointed at target_skeleton's path;
+# - only rotation tracks on bones both rigs share, and the root bone's
+#   position track, are kept. Every other track is dropped: one on a
+#   node that isn't a shared bone (a Meshy FBX's own root node,
+#   target_character, and its *_end leaf bones, which v3 hasn't got),
+#   every scale track, and every other bone's position track - those
+#   bones keep the target rig's rest positions, so limbs keep its own
+#   lengths. The Meshy clips import with remove_immutable_tracks off
+#   (their thumbs hold one fixed pose, which the importer would drop),
+#   so they carry all of these;
+# - every kept track is re-pointed at target_skeleton's path;
 # - the root bone's rotation and position keys are carried from the
 #   source skeleton's frame into the target's through the nodes above
 #   each (an Armature's scale and turn included), so the hips stand and
@@ -1290,11 +1301,9 @@ func _merge_clip(library: AnimationLibrary, anim_root: Node, target_skeleton: Sk
 #   each bone's pose as its absolute local rotation, not as a bend from
 #   rest: the running, slash and brace files carry arm rests up to 26 deg
 #   off the idle rig's and have always played as-is on it. Turning keys by
-#   the rest difference would add that difference to the motion;
-# - any other bone's position keys become the target's rest position, so
-#   limbs keep the target rig's own lengths.
-# Scale keys are left as they are. A clip whose skeleton path and frame
-# are the same on both rigs comes back as the same Animation, unchanged.
+#   the rest difference would add that difference to the motion.
+# A clip whose skeleton path and frame are the same on both rigs comes
+# back as the same Animation, unchanged and unfiltered.
 # Otherwise the clip is a copy: the source is the import's own cached
 # resource, which a second Wanderer would carry over again.
 func _transfer_clip(animation: Animation, source_root: Node, source_skeleton: Skeleton3D, target_root: Node, target_skeleton: Skeleton3D) -> Animation:
@@ -1311,16 +1320,16 @@ func _transfer_clip(animation: Animation, source_root: Node, source_skeleton: Sk
 
 	var copy := animation.duplicate(true) as Animation
 	var frame_turn: Quaternion = target_frame.basis.orthonormalized().get_rotation_quaternion().inverse() * source_frame.basis.orthonormalized().get_rotation_quaternion()
-	for track_idx in copy.get_track_count():
+	for track_idx in range(copy.get_track_count() - 1, -1, -1):
 		var bone := _track_bone(copy, track_idx, source_root, source_skeleton)
-		if bone == "":
-			continue
-		var target_bone := _target_bone(target_skeleton, bone)
-		if target_bone == -1:
+		var target_bone := _target_bone(target_skeleton, bone) if bone != "" else -1
+		var track_type := copy.track_get_type(track_idx)
+		var is_root: bool = target_bone != -1 and target_skeleton.get_bone_parent(target_bone) == -1
+		if target_bone == -1 or track_type == Animation.TYPE_SCALE_3D or (track_type == Animation.TYPE_POSITION_3D and not is_root):
+			copy.remove_track(track_idx)
 			continue
 		copy.track_set_path(track_idx, NodePath("%s:%s" % [target_path, target_skeleton.get_bone_name(target_bone)]))
-		var is_root: bool = target_skeleton.get_bone_parent(target_bone) == -1
-		match copy.track_get_type(track_idx):
+		match track_type:
 			Animation.TYPE_ROTATION_3D:
 				if not is_root:
 					continue
@@ -1328,10 +1337,9 @@ func _transfer_clip(animation: Animation, source_root: Node, source_skeleton: Sk
 					var key: Quaternion = copy.track_get_key_value(track_idx, key_idx)
 					copy.track_set_key_value(track_idx, key_idx, (frame_turn * key).normalized())
 			Animation.TYPE_POSITION_3D:
-				var rest_origin: Vector3 = target_skeleton.get_bone_rest(target_bone).origin
 				for key_idx in copy.track_get_key_count(track_idx):
 					var key: Vector3 = copy.track_get_key_value(track_idx, key_idx)
-					copy.track_set_key_value(track_idx, key_idx, (frame_shift * key) * root_scale if is_root else rest_origin)
+					copy.track_set_key_value(track_idx, key_idx, (frame_shift * key) * root_scale)
 	return copy
 
 # How much a root position key grows from the source rig to the target,
