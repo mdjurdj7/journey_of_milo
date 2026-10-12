@@ -279,10 +279,10 @@ path_probes_hand() {
 	case "$path" in
 		# The enemy export, its generator and what it reads.
 		docs/enemy_export.json|tests/enemy_export.gd) echo enemy_export; return 0 ;;
-		# Models (the Wanderer's, the enemies', the props') and the texture
-		# painter: his rig's probe only - it loads his model and materials,
-		# and no other probe checks how a model looks.
-		assets/models/*|tools/paint_*) echo wanderer_rig; return 0 ;;
+		# The Wanderer's model, clips, sword and textures, and the painter
+		# and AO bake that make his texture: his rig's probe only - it loads
+		# his model and materials, and no other probe checks how he looks.
+		assets/models/wanderer/*|tools/paint_*|tools/bake_ao_blender.py) echo wanderer_rig; return 0 ;;
 		default_bus_layout.tres|docs/*|*.md|reference/*|tools/*|.githooks/*|.gitignore|.gitattributes) return 0 ;;
 		tests/*_probe.gd) basename "$path" .gd; return 0 ;;
 		tests/*) return 0 ;;
@@ -320,6 +320,8 @@ path_probes_hand() {
 		battle/reward_screen.*|battle/belongings_screen.*|battle/loot_screen.*|battle/keepsake_offer.*|battle/keepsake_row.*|battle/trough_choice.*|run/*) out=$(area_probes run) ;;
 		# Keepsake art: the probes that load keepsakes and their art.
 		assets/textures/keepsakes/*) out="keeper_keepsake trinket belongings_choice" ;;
+		# Enemy bodies: the probes that fight them.
+		assets/models/enemies/*) out=$(area_probes enemies) ;;
 		# The Wanderer's script and scene: the field probes, and his rig's.
 		field/wanderer.*) out="$(area_probes field) wanderer_rig" ;;
 		# The Dunecur's crest and feeding head.
@@ -347,7 +349,7 @@ path_probes_hand() {
 		floors/*.tres) out="$(area_probes floors) enemy_export" ;;
 		floors/*) out=$(area_probes floors) ;;
 		# Prop and environment models stand on the floors that place them.
-		assets/Environment/*) out=$(area_probes floors) ;;
+		assets/models/props/*|assets/Environment/*) out=$(area_probes floors) ;;
 		# Floor 3's generated ground and the generator's sources.
 		assets/field/masks/region1_floor3_*|assets/field/masks/source/floor3/*) out=$(area_probes floor3) ;;
 		assets/field/masks/region1_floor4_*|assets/field/masks/source/floor4/*) out=$(area_probes floor4) ;;
@@ -413,10 +415,10 @@ scanned_probes() {
 path_probes() {
 	local hand
 	hand=$(path_probes_hand "$1")
-	# Models and the painter map to their one probe, not to every probe
-	# that names a model.
+	# The Wanderer's model and its painter map to their one probe, not to
+	# every probe that names his model.
 	case "${1%.import}" in
-		assets/models/*|tools/paint_*) echo "$hand"; return 0 ;;
+		assets/models/wanderer/*|tools/paint_*|tools/bake_ao_blender.py) echo "$hand"; return 0 ;;
 	esac
 	if [ "$hand" = FULL ]; then
 		echo FULL
