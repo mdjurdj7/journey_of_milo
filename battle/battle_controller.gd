@@ -710,8 +710,9 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	# as the card resolves, before its effects (EffectContext.replaced_
 	# cost_hp). And a waiting cost reduction, unless this card adds to it.
 	# A 0-cost card spends neither discount: they wait for the next card
-	# that costs something (Combatant.takes_next_card_discount()).
-	if Combatant.takes_next_card_discount(card):
+	# that costs something (Combatant.takes_next_card_discount() - a base
+	# of 0, printed or while Critical).
+	if player.takes_next_card_discount(card):
 		player.first_card_free = false
 		Status.spend_cost_reduction(player.statuses, card)
 	Status.spend_cost_replacement(player.statuses, replacement)

@@ -540,11 +540,15 @@ func set_toll(toll: int) -> void:
 # by the overlay on every signal that can move a conditional - a card
 # played, a turn boundary, Grace, HP, Toll - and to cards drawn
 # afterwards. This is the ONLY place a CardView ever gets one, which is
-# what keeps every other card on screen neutral.
+# what keeps every other card on screen neutral. The fade is re-read with
+# it, at the energy last pushed: a cost can move with no Energy change
+# (CardData.critical_cost, as HP crosses the Critical line).
 func set_bonus_context(ctx: EffectContext) -> void:
 	_bonus_context = ctx
 	for card_view in _card_views():
 		card_view.set_bonus_context(ctx)
+	if _last_energy >= 0:
+		update_playable(_last_energy)
 
 # One face read against its own context - the armed card's, aimed at the
 # enemy under the cursor (BattleOverlay._on_hovered_enemy_changed()). Not

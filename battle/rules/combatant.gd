@@ -171,7 +171,8 @@ static func critical_at(at_hp: int, of_max_hp: int, fraction: float) -> bool:
 # a card's cost the fight uses: affordability, the spend, the hand's fade
 # and the face's number all ask here. CardData.cost itself never changes.
 #
-# House Key's free card first, then a cost reduction (Leverage), then a
+# Its base first (base_cost(): critical_cost while Critical), then
+# House Key's free card, then a cost reduction (Leverage), then a
 # cost replacement (Collateral) on what's left: a card the free card or a
 # reduction already took below the replacement's threshold passes it by,
 # so it keeps its charge. A covered card costs 0 Energy here and
@@ -201,20 +202,29 @@ func cost_replacement_for(card: CardData) -> Status:
 		return null
 	return Status.cost_replacement(statuses, _reduced_cost(card))
 
-# `card`'s Energy before any cost replacement: the free card, then every
-# waiting cost reduction (Status.cost_reduction()), never below 0. A
-# 0-cost card is 0 with neither.
+# `card`'s Energy before any cost replacement: its base, then the free
+# card, then every waiting cost reduction (Status.cost_reduction()),
+# never below 0. A card whose base is 0 is 0 with neither.
 func _reduced_cost(card: CardData) -> int:
 	if not takes_next_card_discount(card):
-		return maxi(card.cost, 0)
-	var base: int = 0 if first_card_free else card.cost
+		return maxi(base_cost(card), 0)
+	var base: int = 0 if first_card_free else base_cost(card)
 	return maxi(base - Status.cost_reduction(statuses), 0)
 
+# `card`'s Energy before any modifier: its critical_cost while this
+# fighter is Critical at the HP held now - Energy is paid before any HP
+# the play costs - when it has one, else its printed cost.
+func base_cost(card: CardData) -> int:
+	if card.critical_cost >= 0 and is_critical():
+		return card.critical_cost
+	return card.cost
+
 # Whether `card` is the one a "your next card" discount (the free card,
-# a cost reduction) lands on and is spent by: any card costing at least
-# 1 Energy. A 0-cost card has nothing to discount and passes them by.
-static func takes_next_card_discount(card: CardData) -> bool:
-	return card != null and card.cost >= 1
+# a cost reduction) lands on and is spent by: any card whose base costs
+# at least 1 Energy. A card at 0 - printed, or by its critical_cost
+# while Critical - has nothing to discount and passes them by.
+func takes_next_card_discount(card: CardData) -> bool:
+	return card != null and base_cost(card) >= 1
 
 # The Critical-entry edge, checked wherever Critical is (Status.resolve_
 # critical_triggers(), after each action that can move HP). Out of

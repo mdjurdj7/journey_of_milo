@@ -409,7 +409,8 @@ func _check_lasting_cards_leave_rotation() -> void:
 #     spend and then act (2), a hit with a Toll repeat (repeat_toll_cost)
 #     lands and then repeats (2), SELF_DAMAGE_TOLL's line is its Toll (the
 #     HP is the badge's), a conditional upgrade shares its effect's line,
-#     and TWO_LINE_STATUS_CARDS' status takes 2 - and the scope last:
+#     and TWO_LINE_STATUS_CARDS' status takes 2 - then a Critical cost
+#     (critical_cost) as "Critical: costs N.", and the scope last:
 #     "Spent." for a SPENT card, "Consumed." for a CONSUMED one.
 func _check_rules_text_pattern() -> void:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
@@ -446,6 +447,14 @@ func _check_rules_text_pattern() -> void:
 				expected += _lines_for(effect, card)
 			if upfront_hp > 0:
 				_expect(lose_regex.search(card.description) == null, "%s's upfront HP is the badge's alone, not its text: %s" % [card.card_name, card.description])
+			# A Critical cost (CardData.critical_cost) says so on its own
+			# line after the steps; no other card says it.
+			if card.critical_cost >= 0:
+				var cost_line: String = lines[expected] if expected < lines.size() else "(none)"
+				_expect_eq(cost_line, "Critical: costs %d." % card.critical_cost, "%s's Critical cost reads on its own line %d" % [card.card_name, expected + 1])
+				expected += 1
+			else:
+				_expect(not card.description.contains("Critical: costs"), "%s has no Critical cost to name" % card.card_name)
 			var spent: bool = card.removal_scope == CardData.RemovalScope.SPENT
 			var consumed: bool = card.removal_scope == CardData.RemovalScope.CONSUMED
 			if spent or consumed:
