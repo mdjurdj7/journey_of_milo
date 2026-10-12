@@ -77,8 +77,10 @@ func _check_sputter() -> void:
 		await _teardown()
 		_completed += 1
 		return
-	var body := enemy.get("_model_material") as BaseMaterial3D
-	_expect(body != null and body.disable_fog, "The Sputter's body material is out of the environment fog")
+	# Either body material: the glb's own (disable_fog) or painted
+	# (wanderer_painted.gdshader, fog_disabled) - _fog_off() reads both.
+	var body := enemy.get("_model_material") as Material
+	_expect(body != null and _fog_off(body), "The Sputter's body material is out of the environment fog")
 	var overlay: ShaderMaterial = _fog_tail(body)
 	_expect(overlay != null, "...and ends its pass chain in the fog overlay")
 	if overlay == null:
