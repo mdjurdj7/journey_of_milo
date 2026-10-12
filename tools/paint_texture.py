@@ -13,7 +13,7 @@ The Wanderer (v3) is made with:
         --lift-target 0.30,0.32,0.36 --accent-color 0.70,0.66,0.56
         --accent-above 0.7 --accent-area 0.0005
         --pin-dark 0.06,0.06,0.07 --boot-color 0.27,0.20,0.14 --sole-shade 0.8
-        --strap-color 0.27,0.20,0.14
+        --strap-color 0.27,0.20,0.14 --glove-color 0.27,0.20,0.14
 and his sword with:
     python tools/paint_texture.py assets/models/wanderer/sword.glb
         assets/models/wanderer/sword_0.jpg assets/models/wanderer/sword_painted.png
@@ -34,7 +34,8 @@ default pass works on the mesh surface instead:
      the boots (non-slate, below --boot-below, near each foot's axis)
      to --boot-color with the sole a little darker, and the leather
      straps (warm grey across the torso: the chest strap and belt) to
-     --strap-color;
+     --strap-color, and the gloves (non-slate at the ends of his arms,
+     hands and cuffs) to --glove-color;
   6. ambient occlusion baked in Blender (tools/bake_ao_blender.py),
      smoothed and normalised, multiplied in at --ao-strength, and a
      top-down --gradient (lighter at the head, darker at the hem);
@@ -314,9 +315,14 @@ def mesh_space(args):
     strap = ((detail[:, 0] >= detail[:, 2]) & (detail_luma > args.strap_luma) & ~pale & ~dark
              & (height > args.strap_above) & (height < args.strap_below)
              & (np.linalg.norm(ground - centre, axis=1) < args.strap_radius))
+    # Gloves: non-slate beyond --glove-radius of his axis (the arms held
+    # out), between his wrists' and fingertips' heights - the sleeves
+    # above are slate and stay so.
+    glove = (~slate & ~pale & ~dark & (height > args.glove_above) & (height < args.glove_below)
+             & (np.linalg.norm(ground - centre, axis=1) > args.glove_radius))
     regions = {"cloak (slate above %.2f)" % args.lift_luma: cloak, "inner clothes (slate below)": slate & ~cloak,
                "large pale patches": accent, "hood interior": dark, "boots": boot, "  of which the sole": sole,
-               "straps": strap,
+               "straps": strap, "gloves": glove,
                "whole model": np.ones(count, bool)}
     before = {name: mean_rgb(original, vertex_area * mask) for name, mask in regions.items()}
 
@@ -351,6 +357,11 @@ def mesh_space(args):
         gain = args.strap_color / np.maximum(mean_rgb(painted, vertex_area * strap), 1e-4)
         weight = np.clip(np.maximum(smooth(strap.astype(np.float64), args.accent_feather), strap * 1.0) * 2, 0, 1)
         weight = np.where(strap, 1.0, weight * ~slate * ~pale * ~dark * ~boot)
+        painted = painted + weight[:, None] * (painted * gain - painted)
+    if args.glove_color is not None and glove.any():
+        gain = args.glove_color / np.maximum(mean_rgb(painted, vertex_area * glove), 1e-4)
+        weight = np.clip(np.maximum(smooth(glove.astype(np.float64), args.accent_feather), glove * 1.0) * 2, 0, 1)
+        weight = np.where(glove, 1.0, weight * ~slate * ~pale * ~dark * ~strap)
         painted = painted + weight[:, None] * (painted * gain - painted)
     if args.accent_color is not None:
         accent_luma = (detail[accent] @ LUMA) * shade[accent]
@@ -414,6 +425,10 @@ def main():
     parser.add_argument("--strap-above", type=float, default=0.4, help="share of the model's height the straps start at")
     parser.add_argument("--strap-below", type=float, default=0.88, help="share of the model's height the straps end at")
     parser.add_argument("--strap-radius", type=float, default=0.3, help="metres from the body's vertical axis that count as strap")
+    parser.add_argument("--glove-color", type=colour_arg, help="recolour the gloves (hands and cuffs) to this average (r,g,b)")
+    parser.add_argument("--glove-above", type=float, default=0.45, help="share of the model's height the gloves start at (fingertips)")
+    parser.add_argument("--glove-below", type=float, default=0.63, help="share of the model's height the gloves end at (cuff tops)")
+    parser.add_argument("--glove-radius", type=float, default=0.33, help="metres from the body's vertical axis beyond which is hand")
     parser.add_argument("--blender", help="Blender executable; bakes ambient occlusion when given")
     parser.add_argument("--ao-strength", type=float, default=0.35)
     parser.add_argument("--ao-distance", type=float, default=0.08, help="occlusion distance in metres")
