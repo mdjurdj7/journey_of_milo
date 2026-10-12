@@ -4,8 +4,11 @@ shader_type spatial;
 // glb's own material is double-sided: in the battle pose the skinning
 // turns part of his left palm away from the camera, and back-face
 // culling left a hole there (sand showing through). Back faces get the
-// flipped normal, so they light like the front.
-render_mode cull_disabled, depth_draw_opaque;
+// flipped normal, so they light like the front. fog_disabled: whoever
+// wears it lays the depth fog back over it with an enemy_fog.gdshader
+// next_pass (the Wanderer at fog_factor 1, as the scene would fog him; a
+// painted enemy at its own share - FieldEnemy.refresh_fog()).
+render_mode cull_disabled, depth_draw_opaque, fog_disabled;
 
 // TEXTURED: a hand-painted albedo (tools/paint_texture.py) under soft
 // light - roughness 1, no specular, no normal map, the light wrapped past
@@ -32,7 +35,19 @@ uniform float self_shadow_strength : hint_range(0.0, 1.0) = 0.5;
 uniform float flash_amount : hint_range(0.0, 1.0) = 0.0;
 uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 
+// How much of the body is left: 1 whole, 0 gone. Below 1 the surface is
+// dithered out (screen-space noise, a discard - never ALPHA, which would
+// take it off the opaque pass). A painted enemy's death dissolve
+// (FieldEnemy._set_death_presence()); the Wanderer leaves it at 1.
+uniform float presence : hint_range(0.0, 1.0) = 1.0;
+
 void fragment() {
+	if (presence < 1.0) {
+		float noise = fract(52.9829189 * fract(dot(FRAGCOORD.xy, vec2(0.06711056, 0.00583715))));
+		if (noise >= presence) {
+			discard;
+		}
+	}
 	vec3 albedo = texture(albedo_texture, UV).rgb * albedo_tint.rgb;
 	ALBEDO = mix(albedo, flash_color.rgb, flash_amount);
 	ROUGHNESS = 1.0;

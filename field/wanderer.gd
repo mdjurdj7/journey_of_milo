@@ -32,6 +32,7 @@ const BRACE_SCENE_PATH := "res://assets/models/wanderer/wanderer_brace.fbx"
 const ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/wanderer_v3_painted.png"
 const FLAT_SHADER_PATH := "res://field/wanderer_flat.gdshader"
 const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
+const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
 const SWORD_SCENE_PATH := "res://assets/models/wanderer/sword.glb"
 # sword.glb's own albedo (sword_0.jpg) denoised and lifted to a light warm
 # steel by tools/paint_texture.py --image-space. TEXTURED draws the sword
@@ -234,6 +235,14 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 	set(value):
 		self_shadow_strength = value
 		_set_textured_parameter(&"self_shadow_strength", value, true)
+# His share of the depth fog in TEXTURED: wanderer_painted.gdshader is
+# fog_disabled, and an enemy_fog.gdshader pass on the body and the sword
+# lays it back at this much - 1 is exactly as the scene would fog him
+# (RegionField pushes the fog through refresh_fog()). Live.
+@export_range(0.0, 1.0, 0.01) var fog_factor: float = 1.0:
+	set(value):
+		fog_factor = value
+		_push_fog()
 
 # Mirror wanderer_flat.gdshader's uniforms one-to-one - see that file
 # for what each does. Only used when shading_mode is POSTERIZED; each
@@ -507,6 +516,11 @@ var _active_material: Material = null
 # The sword's TEXTURED or POSTERIZED shader material while it has one,
 # else null - for the live setters above.
 var _sword_material: ShaderMaterial = null
+# The TEXTURED materials' fog passes (next_pass), body and sword, while
+# they have them, and the sky refresh_fog() last pushed.
+var _body_fog: ShaderMaterial = null
+var _sword_fog: ShaderMaterial = null
+var _fog_sky: RegionSky = null
 var _ground: Ground = null
 var _attack_audio: AttackAudio = null
 # The sound of being hit - see HitAudio; made beside _attack_audio below.
@@ -628,6 +642,16 @@ func _apply_model_material(model: Node3D, is_body: bool = true) -> void:
 			material = null
 	if material == null:
 		material = _build_flat_material()
+	# The painted shader leaves the fog out; its pass lays it back.
+	var fog: ShaderMaterial = null
+	if shading_mode == ShadingMode.TEXTURED and material is ShaderMaterial:
+		fog = _build_fog_pass()
+		material.next_pass = fog
+	if is_body:
+		_body_fog = fog
+	else:
+		_sword_fog = fog
+	_push_fog()
 	for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
 		var mi := mesh_instance as MeshInstance3D
 		mi.material_override = material
@@ -656,6 +680,36 @@ func _build_textured_material(texture_path: String, tint: Color) -> ShaderMateri
 	material.set_shader_parameter("wrap", light_wrap)
 	material.set_shader_parameter("self_shadow_strength", self_shadow_strength)
 	return material
+
+# enemy_fog.gdshader, as FieldEnemy lays it over an enemy: null if it
+# fails to load (he then goes unfogged).
+func _build_fog_pass() -> ShaderMaterial:
+	var shader := load(FOG_SHADER_PATH) as Shader
+	if shader == null:
+		push_warning("Wanderer: fog pass shader failed to load (%s); unfogged." % FOG_SHADER_PATH)
+		return null
+	var pass_material := ShaderMaterial.new()
+	pass_material.shader = shader
+	return pass_material
+
+# The field's depth fog (RegionField._refresh_enemy_fog(), on every fog
+# change) into his fog passes.
+func refresh_fog(sky: RegionSky) -> void:
+	_fog_sky = sky
+	_push_fog()
+
+func _push_fog() -> void:
+	if _fog_sky == null:
+		return
+	for pass_material: ShaderMaterial in [_body_fog, _sword_fog]:
+		if pass_material == null:
+			continue
+		pass_material.set_shader_parameter("fog_color", _fog_sky.fog_color)
+		pass_material.set_shader_parameter("fog_energy", _fog_sky.fog_light_energy)
+		pass_material.set_shader_parameter("fog_begin", _fog_sky.current_fog_depth_begin())
+		pass_material.set_shader_parameter("fog_end", _fog_sky.current_fog_depth_end())
+		pass_material.set_shader_parameter("fog_density", _fog_sky.fog_density)
+		pass_material.set_shader_parameter("fog_factor", fog_factor)
 
 # A TEXTURED setting's live edit: onto the body's shader material, and the
 # sword's too when include_sword. No-op in the other modes.

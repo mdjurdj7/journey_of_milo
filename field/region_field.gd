@@ -1640,10 +1640,13 @@ func _sync_sea_fog() -> void:
 	sea.fog_near_distance = sky.current_fog_depth_begin()
 	sea.fog_far_distance = sky.current_fog_depth_end()
 
-# Re-pushes the fog and enemy_fog_factor into every enemy's fog overlay.
+# Re-pushes the fog and enemy_fog_factor into every enemy's fog overlay,
+# and the fog into the Wanderer's (Wanderer.refresh_fog()).
 func _refresh_enemy_fog() -> void:
 	if not is_inside_tree():
 		return
+	if wanderer != null:
+		wanderer.refresh_fog(get_region_sky())
 	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
 		enemy.refresh_fog()
 
