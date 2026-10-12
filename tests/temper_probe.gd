@@ -231,8 +231,9 @@ func _check_faces() -> void:
 
 # The Cards screen's TEMPERED: off on open, no "+" face in the grid; Tab
 # turns it on - Slash shows Slash+ and Carve Carve+, their numbers
-# underlined, Reckoning+ its cost, Cornered (none) as it was, no entry
-# added; kept through a rebuild; a click turns it off again, marks and
+# underlined, Reckoning+ its cost, a card with none as it was (the
+# first such in the grid, so the check never names one that later gets a
+# tempered version), no entry added; kept through a rebuild; a click turns it off again, marks and
 # all; the scroll kept across a toggle; a lifted card put away by one.
 func _check_compendium() -> void:
 	var compendium: Node = (load(COMPENDIUM_SCENE_PATH) as PackedScene).instantiate()
@@ -242,6 +243,8 @@ func _check_compendium() -> void:
 	_expect(count > 0, "The compendium shows cards (%d)" % count)
 	_expect(not bool(compendium.call("is_showing_tempered")), "TEMPERED is off on open")
 	_expect_no_tempered_faces(compendium, "Off on open")
+	var untouched: String = _untempered_name(compendium)
+	_expect(not untouched.is_empty(), "The grid has a card with no tempered version")
 	var label := compendium.get_node("Page/TemperedItem/Label") as Label
 	var hairline := compendium.get_node("Page/TemperedItem/Hairline") as ColorRect
 	_expect_eq(label.text, "TEMPERED", "TEMPERED sits beside BACK")
@@ -254,10 +257,10 @@ func _check_compendium() -> void:
 	hairline = compendium.get_node("Page/TemperedItem/Hairline") as ColorRect
 	_expect_eq(label.get_theme_color("font_color"), compendium.get("ink"), "...full ink while on")
 	_expect(hairline.visible, "...with its hairline")
-	_expect_tempered_faces(compendium, count, "On")
+	_expect_tempered_faces(compendium, count, untouched, "On")
 	compendium.call("_rebuild")
 	_expect(bool(compendium.call("is_showing_tempered")), "A rebuild keeps TEMPERED on")
-	_expect_tempered_faces(compendium, count, "After a rebuild")
+	_expect_tempered_faces(compendium, count, untouched, "After a rebuild")
 
 	var click := InputEventMouseButton.new()
 	click.button_index = MOUSE_BUTTON_LEFT
@@ -283,12 +286,12 @@ func _check_compendium() -> void:
 	await process_frame
 	_expect_eq(scroll.scroll_vertical, scrolled, "...both ways")
 
-	var cornered: CardView = _compendium_view(compendium, "Cornered")
-	if cornered == null:
-		_fail("Cornered is not in the compendium")
+	var lifted: CardView = _compendium_view(compendium, untouched)
+	if lifted == null:
+		_fail("%s is not in the compendium" % untouched)
 	else:
-		compendium.call("_begin_inspect", cornered, cornered.get_parent())
-		_expect(compendium.get("_inspected") == cornered, "Cornered lifted")
+		compendium.call("_begin_inspect", lifted, lifted.get_parent())
+		_expect(compendium.get("_inspected") == lifted, "%s lifted" % untouched)
 		compendium.call("toggle_tempered")
 		_expect(compendium.get("_inspected") == null, "Toggling puts a lifted card away")
 		var inspect_layer := compendium.get_node("Page/InspectLayer") as Control
@@ -299,7 +302,7 @@ func _check_compendium() -> void:
 	await process_frame
 	_completed += 1
 
-func _expect_tempered_faces(compendium: Node, count: int, label: String) -> void:
+func _expect_tempered_faces(compendium: Node, count: int, untouched: String, label: String) -> void:
 	_expect_eq(_compendium_views(compendium).size(), count, "%s: no entry added" % label)
 	for name in ["Slash", "Carve"]:
 		_expect(_compendium_view(compendium, name) == null, "%s: %s's face is gone" % [label, name])
@@ -313,8 +316,15 @@ func _expect_tempered_faces(compendium: Node, count: int, label: String) -> void
 		_expect(carve.rules_text.text.contains("[u]10[/u]") and carve.rules_text.text.count("[u]") == 1, "%s: Carve+ underlines its 10 alone (%s)" % [label, carve.rules_text.text])
 	var reckoning: CardView = _compendium_view(compendium, "Reckoning+")
 	_expect(reckoning != null and reckoning.get_node_or_null(^"CostMark") != null, "%s: Reckoning+ marks its cost" % label)
-	var cornered: CardView = _compendium_view(compendium, "Cornered")
-	_expect(cornered != null and not cornered.rules_text.text.contains("[u]") and cornered.get_node_or_null(^"CostMark") == null, "%s: Cornered as it was" % label)
+	var plain: CardView = _compendium_view(compendium, untouched)
+	_expect(plain != null and not plain.rules_text.text.contains("[u]") and plain.get_node_or_null(^"CostMark") == null, "%s: %s (no tempered version) as it was" % [label, untouched])
+
+# The name of the first card in the grid with no tempered version, or "".
+func _untempered_name(compendium: Node) -> String:
+	for view in _compendium_views(compendium):
+		if view.card_data.tempered == null:
+			return view.card_data.card_name
+	return ""
 
 func _expect_no_tempered_faces(compendium: Node, label: String) -> void:
 	for view in _compendium_views(compendium):

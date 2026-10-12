@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Texture2D" uid="uid://ccs08umrji0lw" path="res://cards/art/Wanderer/Cornered.png" id="9_art"]
+[ext_resource type="Resource" uid="uid://dmenoqali8em6" path="res://cards/tempered/cornered_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="CardEffect_damage"]
 script = ExtResource("2_card_effect")
@@ -20,3 +21,4 @@ description = "{else}Deal {damage} damage.{/else} {if}Critical: deal {alt_damage
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
 art = ExtResource("9_art")
 battle_animation = &"Slash"
+tempered = ExtResource("10_tempered")
