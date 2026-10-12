@@ -48,15 +48,18 @@
 
 ## 3. Models
 
+Every model — characters, enemies, props — is textured and drawn on the painted shader (`field/wanderer_painted.gdshader`): its own colour map as the albedo, roughness 1, specular 0, no normal map (the glb's normal and metallic/roughness maps go unused), light wrapped 0.6, self-shadow 0.5, double-sided where the glb says so. The shader leaves the depth fog out; each wearer lays it back with an `enemy_fog.gdshader` pass. An albedo tint (`albedo_tint`) pulls a model toward the region's values where it needs it.
+
 ### Props (hulls, the bird, future belongings)
-- Meshy, **Smart Topology, texture off**, Standard resolution, Pose off. Reference image on white with nothing but the object (no rail, no ground).
+- Meshy, **Smart Topology, texture on**, Standard resolution, Pose off. Reference image on white with nothing but the object (no rail, no ground).
 - Download glb, **Resize to real height**, origin **Bottom** (feet/keel at y 0).
-- In engine: the shared flat material, tinted a step darker than sand (hulls (0.50, 0.47, 0.42); the cormorant (0.28, 0.29, 0.31)). Silhouette is all that survives.
+- In engine: the painted shader with the glb's colour map, darker than dry sand.
+- The existing hulls and the cormorant keep their old flat tint (Hull's shared flat material: hulls (0.50, 0.47, 0.42); the cormorant (0.28, 0.29, 0.31)) until they are regenerated textured.
 - Age is placement: sink 0.3 × height, roll 8–12°, low side toward the water. Never damage.
-- **Glassbone** is the one exception to the shared flat material (Bible §20): its own restrained material, with its values set when the first piece is built.
+- **Glassbone** is the one exception to the painted shader (Bible §20): its own restrained material, with its values set when the first piece is built.
 
 ### Characters (the Wanderer, the keeper)
-- Textured. Albedo only (roughness 1, specular 0, no normal map), double-sided where the glb says so. Wind on cloth/hair by vertex shader masks (height bands; luma for hair).
+- On the painted shader, as above. Wind on cloth/hair by vertex shader masks (height bands; luma for hair).
 - Meshy image-to-3D from a single back/three-quarter view is enough for a figure seen from above.
 
 ### Sizes

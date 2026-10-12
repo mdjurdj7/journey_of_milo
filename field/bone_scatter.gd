@@ -14,7 +14,8 @@ class_name BoneScatter
 # length; without one it is a placeholder built from primitives. Either
 # way it takes the project's flat matte material (Hull's shared one,
 # roughness 1, no specular) tinted bone_tint - a step darker than the
-# sand, the way props are (Art Bible, Props flat-shaded).
+# sand, as the hulls are until props move onto the painted shader (Field
+# Asset Spec §3).
 #
 # No collision: he walks over them. Grounded on the relief piece by
 # piece, and again on every relief rebuild, as Hull is.

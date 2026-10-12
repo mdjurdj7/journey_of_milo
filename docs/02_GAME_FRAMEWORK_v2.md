@@ -72,7 +72,7 @@ Multi-enemy encounters are a cluster sharing one contact zone; all members stand
 
 ## 4. Presentation
 
-- Godot 4.7.1, 3D. **Props are flat-shaded** (one shared material + tint; silhouette is all that survives). **Characters are textured** (the Wanderer, the keeper). Atmosphere comes from depth fog (14 → 28 m), overcast light (sun 0.9, neutral ambient, soft shadows) and value.
+- Godot 4.7.1, 3D. **Every model is textured and painted-shaded** — characters, enemies and props alike, on the painted shader (albedo only, roughness 1, specular 0, no normal map, light wrapped 0.6, self-shadow 0.5). Atmosphere comes from depth fog (14 → 28 m), overcast light (sun 0.9, neutral ambient, soft shadows) and value.
 - **Dark figures on pale ground.** Characters, enemies and UI are the dark elements; the world is the pale one.
 - **Ground is a painted mask** (30 px/m; white = sand) plus an optional elevation layer; height is a deterministic function of position (`get_height_at`) and everything placed on the field grounds through it. Borders are water: one sea plane, the shoreline from the mask, collision walls out past a wade margin; the inland edge stays dry.
 - **Two voices.** *World voice* — authored lines in Spectral, appearing near the thing that says them (the keeper, a hull). *System voice* — UI in Alegreya Sans: ink on the world, no boxes, no glow; cards are bone with ink type; energy pips, Toll and HP readouts as numerals and hairlines.
@@ -83,7 +83,7 @@ Multi-enemy encounters are a cluster sharing one contact zone; all members stand
 ## 5. Two-person production
 
 - Card rules ported from the old project as a deliberate re-derivation; the view layer is new. The old card pool is reference only; Wanderer cards are authored fresh to the cost rule.
-- Creature and prop models are generated (Meshy, Smart Topology, texture off for props), imported as glb at real scale, origin at the feet, and take the shared flat material. Characters keep their texture.
+- Creature and prop models are generated (Meshy, Smart Topology, texture on), imported as glb at real scale, origin at the feet, and drawn on the painted shader with their own colour map, as the characters are.
 - The Wanderer is a Mixamo-rigged humanoid; creatures are mostly still with procedural motion.
 - Sound: short WAVs trimmed to the first transient, normalised to −6 dBFS, mixed in-engine; swing < card play < contact; no music in Region 1; the sea/wind bed ducks on contact.
 - Two-phase prompts (read-only report → confirm → implement); explicit out-of-scope lists; the human runs the live verification. Never `git add .`; single-concern commits; no push unless told. Data before tuning (RunLogger).

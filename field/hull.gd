@@ -6,8 +6,10 @@ class_name Hull
 # under this node, applies the project's flat matte material (same shape
 # as Wanderer._build_flat_material() - one StandardMaterial3D via
 # material_override on every mesh, roughness 1, no specular; the glb's own
-# PBR textures are ignored, this field is flat-shaded), faces its bow
-# seaward, and sits on the relief minus sink_depth of its own height.
+# PBR textures are ignored - the hull keeps this flat tint until it is
+# regenerated textured for the painted shader, Field Asset Spec §3),
+# faces its bow seaward, and sits on the relief minus sink_depth of its
+# own height.
 # Solid to the Wanderer at the gunwale (see collision_inset).
 
 const MODEL_SCENE_PATH := "res://assets/models/hull/hull.glb"
