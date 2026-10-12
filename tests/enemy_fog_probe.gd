@@ -144,7 +144,7 @@ func _check_blackback_chain() -> void:
 	await _load_field(BLACKBACK_FLOOR)
 	var found: bool = false
 	for enemy: Node in _field.get_tree().get_nodes_in_group("enemies"):
-		var body := enemy.get("_model_material") as BaseMaterial3D
+		var body := enemy.get("_model_material") as Material
 		if body == null or body.next_pass == null or _is_fog(body.next_pass):
 			continue
 		found = true
