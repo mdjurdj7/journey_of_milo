@@ -1,0 +1,21 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://l3ir4snvwds3d"]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://c0dhw8d57e2i8" path="res://cards/art/Wanderer/Carve.png" id="3_art"]
+
+[sub_resource type="Resource" id="E_damage"]
+script = ExtResource("2_card_effect")
+value = 10
+target_scope = 1
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Carve+"
+cost = 1
+rarity = 1
+description = "Deal {damage} damage to all enemies."
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_damage")])
+art = ExtResource("3_art")
+battle_animation = &"Slash"
+impact_time = 0.55
