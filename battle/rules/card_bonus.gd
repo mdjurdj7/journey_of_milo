@@ -10,8 +10,9 @@ class_name CardBonus
 #             value, something always resolves (Untouched).
 #   GATE    - neither: the condition decides whether the effect resolves
 #             at all (With Regards' heal on a kill).
-#   DRAIN   - drain_on_condition set: something always resolves, for
-#             value; the condition decides whether its hit drains (Gnaw).
+#   DRAIN   - drain_on_condition set (over alt_value): something always
+#             resolves; the condition decides whether its hit drains, and
+#             a met one lands alt_value when that's set, else value (Gnaw).
 # resolved_value() is the number an effect lands for, given a context -
 # damage_effect.gd and undamaged_block_effect.gd deal exactly this, and
 # CardView prints exactly this - so the face can never promise a number
@@ -49,27 +50,31 @@ static func should_resolve(effect: CardEffect, ctx: EffectContext) -> bool:
 	return EffectResolver.condition_met(effect, ctx)
 
 # The number the effect lands for in this context - alt_value on a met
-# REPLACE, value + bonus_value on a met ADD, value otherwise. Before any
-# stance or status modifier: those are the resolver's and the face's to
-# apply alike, on top of this.
+# REPLACE, value + bonus_value on a met ADD, alt_value (when set) on a met
+# DRAIN, value otherwise. Before any stance or status modifier: those are
+# the resolver's and the face's to apply alike, on top of this.
 static func resolved_value(effect: CardEffect, ctx: EffectContext) -> int:
 	match mode(effect):
 		Mode.REPLACE:
 			return effect.alt_value if EffectResolver.condition_met(effect, ctx) else effect.value
 		Mode.ADD:
 			return effect.value + effect.bonus_value if EffectResolver.condition_met(effect, ctx) else effect.value
+		Mode.DRAIN:
+			return effect.alt_value if effect.alt_value != 0 and EffectResolver.condition_met(effect, ctx) else effect.value
 		_:
 			return effect.value
 
 # The number the condition is FOR - what the clause prints: alt_value on
-# a REPLACE, bonus_value on an ADD, the effect's own value on a GATE or a
-# DRAIN.
+# a REPLACE, bonus_value on an ADD, alt_value (when set, else value) on a
+# DRAIN, the effect's own value on a GATE.
 static func bonus_value(effect: CardEffect) -> int:
 	match mode(effect):
 		Mode.REPLACE:
 			return effect.alt_value
 		Mode.ADD:
 			return effect.bonus_value
+		Mode.DRAIN:
+			return effect.alt_value if effect.alt_value != 0 else effect.value
 		_:
 			return effect.value
 

@@ -6,6 +6,8 @@ extends SceneTree
 # toll_spent_this_turn): the player heals the HP it took, after block, no
 # further than max HP. The hit is the card's own blow, so the Attack
 # bonuses are in it and in its heal, and Ransom's half comes on top.
+# A drain with its own number (alt_value with drain_on_condition) lands
+# and drains that number, while Gnaw - no alt_value - drains its own 3.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/gnaw_probe.gd
 #
@@ -21,10 +23,12 @@ extends SceneTree
 # Second Swing has spent some, and the condition gone at the next turn.
 # Untyped against anything that names the RunState autoload.
 
-const CASES := 8
+const CASES := 9
 const MAX_HP := 70
 const ENEMY_HP := 100
 const HIT := 3
+# The alt_value case's drain - a number other than HIT.
+const ALT_DRAIN := 8
 const CARD_PATH := "res://cards/data/gnaw.tres"
 const SECOND_SWING_PATH := "res://cards/data/second_swing.tres"
 const SELF_EATER_PATH := "res://cards/data/self_eater.tres"
@@ -57,6 +61,7 @@ func _initialize() -> void:
 	_check_self_eater()
 	_check_into_block()
 	_check_capped_and_ransom()
+	await _check_alt_value_drain()
 	await _check_face()
 	await _check_fight()
 
@@ -151,6 +156,49 @@ func _check_capped_and_ransom() -> void:
 	_play(player, _enemy())
 	var half: int = floori(float(HIT) * ransom.ransom_heal_fraction)
 	_expect_eq(player.hp, 40 + HIT + half, "Under Ransom: its own 3 and Ransom's %d on top" % half)
+	_completed += 1
+
+# A drain with its own number: an in-memory Gnaw given alt_value 8 and
+# {alt_damage} in its clause. No Toll spent: 3, undrained. Toll spent: 8
+# dealt and 8 healed - one hit, still CardBonus's DRAIN. Its face reads
+# the 8. Plain Gnaw, with no alt_value, still reads and lands its 3.
+func _check_alt_value_drain() -> void:
+	var card: CardData = (load(CARD_PATH) as CardData).duplicate()
+	var effect := (card.effects[0] as CardEffect).duplicate() as CardEffect
+	effect.alt_value = ALT_DRAIN
+	var effects: Array[CardEffect] = [effect]
+	card.effects = effects
+	card.description = "Deal {damage} damage. {if}If you spent Toll this turn, drain {alt_damage} instead.{/if}"
+	_expect_eq(CardBonus.mode(effect), CardBonus.Mode.DRAIN, "alt_value on a drain: still DRAIN")
+	_expect_eq(CardBonus.bonus_value(effect), ALT_DRAIN, "...its clause for %d" % ALT_DRAIN)
+	var player: Combatant = _player(40)
+	var enemy: Combatant = _enemy()
+	_play_card(card, player, enemy)
+	_expect_eq(ENEMY_HP - enemy.hp, HIT, "No Toll spent: deals %d" % HIT)
+	_expect_eq(player.hp, 40, "...undrained")
+	player = _player(40)
+	_spend_toll(player)
+	enemy = _enemy()
+	_play_card(card, player, enemy)
+	_expect_eq(ENEMY_HP - enemy.hp, ALT_DRAIN, "Toll spent: deals %d" % ALT_DRAIN)
+	_expect_eq(player.hp, 40 + ALT_DRAIN, "...and heals %d" % ALT_DRAIN)
+
+	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(view)
+	await process_frame
+	view.set_bonus_context(_ctx(player))
+	view.set_card_data(card)
+	var regex := RegEx.new()
+	regex.compile("\\[/?[a-z]+(=[^\\]]*)?\\]")
+	_expect_eq(regex.sub(view.rules_text.text, "", true), "Deal 3 damage. If you spent Toll this turn, drain 8 instead.", "...its face reads drain 8")
+	view.free()
+
+	var plain: CardEffect = (load(CARD_PATH) as CardData).effects[0]
+	_expect_eq(plain.alt_value, 0, "Plain Gnaw sets no alt_value")
+	_expect_eq(CardBonus.bonus_value(plain), HIT, "...its clause still for %d" % HIT)
+	var spent: Combatant = _player(40)
+	_spend_toll(spent)
+	_expect_eq(CardBonus.resolved_value(plain, _ctx(spent)), HIT, "...and it still lands %d with Toll spent" % HIT)
 	_completed += 1
 
 # --- Face and fight ---

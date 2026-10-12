@@ -5,8 +5,8 @@ class_name DamageEffect
 # FIRST_CARD_DAMAGE, DAMAGE_ALL) - see effect_resolver.gd's registry and
 # CardEffect's own doc on condition/target_scope.
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
-	# The number this lands for - value, or alt_value on a met REPLACE -
-	# is CardBonus's reading, the same one the card face prints. A pure
+	# The number this lands for - value, or alt_value on a met REPLACE or
+	# a met DRAIN that sets one - is CardBonus's reading, the same one the card face prints. A pure
 	# gate has already been applied by EffectResolver.resolve_card(), the
 	# one place that decides whether an effect resolves at all. Exactly
 	# ONE number goes through the modifiers and the damage pipeline below

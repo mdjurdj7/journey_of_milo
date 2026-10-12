@@ -19,7 +19,7 @@ enum EffectType {
 }
 
 # When the effect resolves, with what number, or - for a DAMAGE effect
-# with drain_on_condition - whether its hit drains. Four modes, told apart
+# with drain_on_condition - whether its hit drains. Five modes, told apart
 # from the fields below by CardBonus.mode() and NOWHERE else:
 #   GATE    - alt_value and bonus_value both 0: condition false and the
 #             effect doesn't resolve at all (With Regards' heal).
@@ -29,6 +29,9 @@ enum EffectType {
 #             which its .tres files carried as threshold_value.
 #   ADD     - bonus_value set: true adds bonus_value on top of `value`;
 #             something always resolves (Untouched).
+#   DRAIN   - drain_on_condition set (it wins over alt_value): true
+#             drains the hit, for alt_value when that's set, else
+#             `value`; false lands `value`, undrained (Gnaw).
 # The number an effect lands for is CardBonus.resolved_value(); the card
 # face prints the same call, so what it says is what the rules pay.
 # UNDAMAGED_LAST_TURN and CRITICAL are appended last: an inserted value
@@ -96,10 +99,12 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 # DRAIN effect, which is no Attack's blow.
 
 @export var drain_on_condition: bool = false
-# Read by DAMAGE only, with a condition: the hit always lands for `value`
-# and drains as `drains` does, but only while the condition holds (Gnaw:
-# Toll spent this turn) - CardBonus.Mode.DRAIN. Judged as the effect
-# resolves, before its hit. False: `drains` alone says whether it drains.
+# Read by DAMAGE only, with a condition: while the condition holds the
+# hit drains as `drains` does, and lands for alt_value when that's set,
+# else for `value` (Gnaw: Toll spent this turn); otherwise
+# it lands for `value`, undrained - CardBonus.Mode.DRAIN. Judged as the
+# effect resolves, before its hit. False: `drains` alone says whether it
+# drains.
 
 @export var stance_data: StanceData = null
 # Read by APPLY_STANCE only. The stance a STANCE card takes - or deepens,
