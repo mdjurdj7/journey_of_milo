@@ -125,7 +125,8 @@ func _initialize() -> void:
 				unresolved.append(str(path))
 		_check(unresolved.is_empty(), "%s: all %d tracks resolve to a bone (%s)" % [clip, animation.get_track_count(), ", ".join(unresolved.slice(0, 3))])
 	# A fresh copy of the glb, past the cache the Wanderer's merge renamed
-	# and added to: its one clip, key for key, is what BattleIdle plays.
+	# and added to: its battle_idle_breathe, key for key, is what BattleIdle
+	# plays, looping; battle_idle (held) stays beside it as the fallback.
 	var fresh := ResourceLoader.load(MODEL_SCENE_PATH, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as PackedScene
 	var source: Node = fresh.instantiate()
 	var source_player := source.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
@@ -135,12 +136,13 @@ func _initialize() -> void:
 		var library := source_player.get_animation_library(library_name)
 		for animation_name in library.get_animation_list():
 			own_names.append(String(animation_name))
-			own = library.get_animation(animation_name)
+			if animation_name == &"battle_idle_breathe":
+				own = library.get_animation(animation_name)
 	source.free()
-	_check(own_names == ["battle_idle"], "the glb carries one clip, battle_idle (%s)" % [own_names])
+	own_names.sort()
+	_check(own_names == ["battle_idle", "battle_idle_breathe"], "the glb carries battle_idle and battle_idle_breathe (%s)" % [own_names])
 	if own != null and _player.has_animation("BattleIdle"):
-		_check(_clip_text(_player.get_animation("BattleIdle")) == _clip_text(own), "BattleIdle is battle_idle, track for track and key for key")
-		_check(own.loop_mode == Animation.LOOP_LINEAR, "battle_idle loops by its own import setting")
+		_check(_clip_text(_player.get_animation("BattleIdle")) == _clip_text(own), "BattleIdle is battle_idle_breathe, track for track and key for key")
 
 	print("\n=== poses")
 	for clip in CARRIED:

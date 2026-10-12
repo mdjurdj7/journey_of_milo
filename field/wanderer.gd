@@ -10,14 +10,17 @@ signal path_stuck
 
 # The body: the cloaked Wanderer, rigged by Meshy on its Mixamo template
 # (bones smartrig_*, an A-pose rest), exported as glTF in metres - 1.7 m
-# tall at rest, its skeleton unscaled and unturned. Its one clip,
-# battle_idle, is the held battle pose and merges as BattleIdle
+# tall at rest, its skeleton unscaled and unturned. Its clips are the
+# battle stance: battle_idle_breathe (breathing in it) merges as
+# BattleIdle, battle_idle (held) in its place if it's missing
 # (_merge_clips()); every other clip is a separate FBX carried over
 # (_transfer_clip()). Idle, Walk and Run are Meshy's own clips for this
 # rig (mixamorig_ names, its bone lengths, a different rest), stripped to
 # skeleton and animation (no skin); DrawSword, Slash and Brace are still
 # cut on the old Mixamo rig.
 const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3.glb"
+# The glb's clips that can be BattleIdle, first found wins (_merge_clips()).
+const BATTLE_IDLE_CLIPS: Array[StringName] = [&"battle_idle_breathe", &"battle_idle"]
 const IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_idle.fbx"
 const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_walk.fbx"
 const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_run.fbx"
@@ -1236,21 +1239,25 @@ func _build_flat_material() -> StandardMaterial3D:
 # because of how the clips ship as separate files, not because anything
 # here is temporary.
 #
-# The model's own clip (wanderer_v3.glb's battle_idle - a held pose, two
-# identical keys) is renamed to BattleIdle: where it plays, see enter_
-# battle_stance()/exit_battle_stance(). It loops by its import setting
-# (Loop Mode Linear in wanderer_v3.glb.import), which the rename keeps - the
-# same Animation, renamed - so it holds for the whole battle frame. Every
-# clip after it is carried onto the model's skeleton by _transfer_clip().
+# The model's own clip is renamed to BattleIdle: the first of
+# BATTLE_IDLE_CLIPS the glb carries - battle_idle_breathe, his breathing in
+# the stance, or the held battle_idle if that's missing - else its clip
+# with the most keys. Where it plays, see enter_battle_stance()/exit_
+# battle_stance(). It loops, Loop Mode Linear, set here whatever the
+# import says, so it runs for the whole battle frame. Every clip after it
+# is carried onto the model's skeleton by _transfer_clip().
 func _merge_clips(anim_player: AnimationPlayer) -> void:
 	if anim_player == null:
 		push_error("Wanderer: model has no AnimationPlayer; cannot merge clips.")
 		return
 
-	var battle_idle_entry := _find_single_animation(anim_player, "model AnimationPlayer")
+	var battle_idle_entry := _find_named_animation(anim_player, BATTLE_IDLE_CLIPS)
+	if battle_idle_entry.is_empty():
+		battle_idle_entry = _find_single_animation(anim_player, "model AnimationPlayer")
 	if battle_idle_entry.is_empty():
 		return
 	var library := anim_player.get_animation_library(battle_idle_entry["library"])
+	(battle_idle_entry["animation"] as Animation).loop_mode = Animation.LOOP_LINEAR
 	library.rename_animation(battle_idle_entry["name"], "BattleIdle")
 
 	var anim_root := anim_player.get_node_or_null(anim_player.root_node)
@@ -1457,6 +1464,16 @@ func _transform_under(node: Node, ancestor: Node) -> Transform3D:
 # named "Take 001". If the best candidate has zero keys, push_errors that
 # plus every library/animation name actually found (so the real imported
 # naming is visible) and returns an empty Dictionary.
+# The first of `names` the player carries, in any library: {library, name,
+# animation}, or {} if it has none of them.
+func _find_named_animation(anim_player: AnimationPlayer, names: Array[StringName]) -> Dictionary:
+	for wanted in names:
+		for library_name in anim_player.get_animation_library_list():
+			var library := anim_player.get_animation_library(library_name)
+			if library.has_animation(wanted):
+				return {"library": library_name, "name": wanted, "animation": library.get_animation(wanted)}
+	return {}
+
 func _find_single_animation(anim_player: AnimationPlayer, label: String) -> Dictionary:
 	var found: Array[Dictionary] = []
 	for library_name in anim_player.get_animation_library_list():
