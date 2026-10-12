@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Texture2D" uid="uid://dtitlmtsqa16p" path="res://cards/art/Wanderer/Gnaw.png" id="9_art"]
+[ext_resource type="Resource" uid="uid://8pec7hg7rx2jp" path="res://cards/tempered/gnaw_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="CardEffect_damage"]
 script = ExtResource("2_card_effect")
@@ -20,3 +21,4 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")]
 art = ExtResource("9_art")
 battle_animation = &"Slash"
 impact_time = 0.55
+tempered = ExtResource("10_tempered")
