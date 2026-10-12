@@ -12,12 +12,15 @@ signal path_stuck
 # (bones smartrig_*, an A-pose rest), exported as glTF in metres - 1.7 m
 # tall at rest, its skeleton unscaled and unturned. Its one clip,
 # battle_idle, is the held battle pose and merges as BattleIdle
-# (_merge_clips()); every other clip is cut on the old FBX rig and carried
-# over (_transfer_clip()).
+# (_merge_clips()); every other clip is a separate FBX carried over
+# (_transfer_clip()). Idle, Walk and Run are Meshy's own clips for this
+# rig (mixamorig_ names, its bone lengths, a different rest), stripped to
+# skeleton and animation (no skin); DrawSword, Slash and Brace are still
+# cut on the old Mixamo rig.
 const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3.glb"
-const IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_idle.fbx"
-const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_walking.fbx"
-const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_running.fbx"
+const IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_idle.fbx"
+const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_walk.fbx"
+const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_run.fbx"
 const DRAW_SWORD_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_start_draw_sword.fbx"
 const SLASH_SCENE_PATH := "res://assets/models/wanderer/wanderer_slash.fbx"
 const BRACE_SCENE_PATH := "res://assets/models/wanderer/wanderer_brace.fbx"
@@ -122,7 +125,6 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_painted.p
 @export var use_animation_tree: bool = false
 @export var walk_speed_threshold: float = 0.1
 @export var animation_blend_time: float = 0.2
-@export var remove_walk_root_motion: bool = true
 @export var camera_path: NodePath = ^"../CameraPivot/Camera3D"
 @export var ground_path: NodePath = ^"../Ground"
 @export var model_yaw_offset: float = 180.0
@@ -167,8 +169,9 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_painted.p
 # sand everywhere (field, battle stance, escape push), so this lifts the
 # model alone. The joint sits inside the boot, about 4 cm above its sole
 # in BattleIdle - the default puts BattleIdle's soles on the sand, not
-# under it. The old carried clips pitch the foot further and still sink
-# 4-6 cm until they are replaced.
+# under it. Meshy's Idle and Walk keep the soles within a few mm of it;
+# Run's heel strike still dips up to ~4.5 cm, and the old carried clips
+# (DrawSword, Slash, Brace) pitch the foot further.
 @export var model_ground_offset: float = 0.041:
 	set(value):
 		model_ground_offset = value
@@ -1204,15 +1207,14 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 			return
 
 # The clips merged after the model's own, in order: name in the library,
-# source file, loop mode, whether the Hips' forward drift is taken out
-# (remove_walk_root_motion / _remove_walk_root_motion()), and a label for
-# errors.
-# - Idle: Mixamo/FBX imports default to LOOP_NONE - play() would run it
-#   once and hold on the last frame, which reads as "idle froze" the moment
-#   the clip's own (short) duration elapses - so it loops, whether playing
+# source file, loop mode and a label for errors.
+# - Idle: FBX imports default to LOOP_NONE - play() would run it once and
+#   hold on the last frame, which reads as "idle froze" the moment the
+#   clip's own (short) duration elapses - so it loops, whether playing
 #   standalone or re-triggered by exit_battle_stance()'s play("Idle").
 # - Walk, Run: loops; Run plays during a dash in place of Walk/Idle (see
-#   _physics_process()). Both carry the same Mixamo locomotion-root quirk.
+#   _physics_process()). Both are cut in place - the Hips never move - so
+#   there is no root motion to take out.
 # - DrawSword: a one-shot combat-start transition, LOOP_NONE explicitly
 #   (rather than trusting whatever the import defaulted to) - enter_battle_
 #   stance() relies on it finishing so the queued BattleIdle can start.
@@ -1224,12 +1226,12 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 #   so there's nothing on him to hold it for.
 func _merged_clips() -> Array[Dictionary]:
 	return [
-		{"name": "Idle", "path": IDLE_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "root_motion": false, "label": "idle"},
-		{"name": "Walk", "path": WALK_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "root_motion": true, "label": "walking"},
-		{"name": "Run", "path": RUN_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "root_motion": true, "label": "running"},
-		{"name": "DrawSword", "path": DRAW_SWORD_SCENE_PATH, "loop": Animation.LOOP_NONE, "root_motion": false, "label": "draw-sword"},
-		{"name": "Slash", "path": SLASH_SCENE_PATH, "loop": Animation.LOOP_NONE, "root_motion": false, "label": "slash"},
-		{"name": "Brace", "path": BRACE_SCENE_PATH, "loop": Animation.LOOP_NONE, "root_motion": false, "label": "brace"},
+		{"name": "Idle", "path": IDLE_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "label": "idle"},
+		{"name": "Walk", "path": WALK_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "label": "walking"},
+		{"name": "Run", "path": RUN_SCENE_PATH, "loop": Animation.LOOP_LINEAR, "label": "running"},
+		{"name": "DrawSword", "path": DRAW_SWORD_SCENE_PATH, "loop": Animation.LOOP_NONE, "label": "draw-sword"},
+		{"name": "Slash", "path": SLASH_SCENE_PATH, "loop": Animation.LOOP_NONE, "label": "slash"},
+		{"name": "Brace", "path": BRACE_SCENE_PATH, "loop": Animation.LOOP_NONE, "label": "brace"},
 	]
 
 # Loads one clip file, finds its one real clip, carries it onto the
@@ -1254,11 +1256,6 @@ func _merge_clip(library: AnimationLibrary, anim_root: Node, target_skeleton: Sk
 		return false
 
 	var source_animation: Animation = entry["animation"]
-	# In the source rig's own frame, before the transfer - the Hips'
-	# vertical there is Y, which _remove_walk_root_motion() keeps.
-	var strip_root_motion: bool = clip["root_motion"]
-	if strip_root_motion and remove_walk_root_motion:
-		_remove_walk_root_motion(source_animation)
 	var source_skeletons := instance.find_children("*", "Skeleton3D", true, false)
 	var source_skeleton := source_skeletons[0] as Skeleton3D if not source_skeletons.is_empty() else null
 	var animation: Animation = _transfer_clip(source_animation, instance, source_skeleton, anim_root, target_skeleton)
@@ -1387,30 +1384,6 @@ func _transform_under(node: Node, ancestor: Node) -> Transform3D:
 			chain = current_3d.transform * chain
 		current = current.get_parent()
 	return chain
-
-# Freezes a Walk clip's Hips position track to its first key's X/Z, leaving
-# Y (vertical bob) untouched, so it plays in place even if the Mixamo
-# export carried forward locomotion into the root bone.
-# Old-clip fix-up: delete this once the last old Mixamo locomotion clip (Walk, Run) is replaced.
-func _remove_walk_root_motion(walk_animation: Animation) -> void:
-	for track_idx in walk_animation.get_track_count():
-		if walk_animation.track_get_type(track_idx) != Animation.TYPE_POSITION_3D:
-			continue
-
-		var path := walk_animation.track_get_path(track_idx)
-		if path.get_subname_count() == 0:
-			continue
-		var bone_name := String(path.get_subname(path.get_subname_count() - 1))
-		if not bone_name.to_lower().contains("hips"):
-			continue
-
-		var key_count := walk_animation.track_get_key_count(track_idx)
-		if key_count == 0:
-			continue
-		var base_value: Vector3 = walk_animation.track_get_key_value(track_idx, 0)
-		for key_idx in key_count:
-			var value: Vector3 = walk_animation.track_get_key_value(track_idx, key_idx)
-			walk_animation.track_set_key_value(track_idx, key_idx, Vector3(base_value.x, value.y, base_value.z))
 
 # Returns {"library": StringName, "name": StringName, "animation": Animation}
 # for the animation with the most total keyframes (summed across its
