@@ -206,6 +206,16 @@ folder (run_log_probe). (2026-10-04.)
   10 m to the side would hide it - check in play on floor 5's crest. Fix
   each when a floor needs it: seat on `Ground.get_height_at()`.
   (2026-10-05, floor 5.)
+- **The Dragonfly stays on its glb material, off the painted shader.**
+  Every other enemy wears `field/wanderer_painted.gdshader` with its own
+  colour map (`EnemyData.painted_albedo_path`). The Dragonfly's body is
+  low-poly (4.1k triangles) and its normal map is what smooths it: without
+  it, as the painted shader draws it, the eyes and thorax show hard
+  facets. The fix, when it's taken up, is smoothing the mesh's own normals
+  in Blender (then point `dragonfly.tres` and `dragonfly_lone.tres` at
+  `Dragonfly_body_texture_0.png`), not adding normal maps to the painted
+  shader. Its wings are separate alpha-scissor materials either way.
+  (2026-10-12, roster on the painted shader.)
 
 ## Deferred
 
