@@ -1,0 +1,27 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://mot4hvfav2fqe"]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://c4d4m34y8kovb" path="res://cards/art/Wanderer/Blood Arc.png" id="9_art"]
+
+[sub_resource type="Resource" id="CardEffect_self_damage"]
+script = ExtResource("2_card_effect")
+effect_type = 2
+value = 3
+
+[sub_resource type="Resource" id="CardEffect_damage"]
+script = ExtResource("2_card_effect")
+value = 16
+target_scope = 1
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Blood Arc+"
+cost = 1
+rarity = 2
+description = "Deal {damage} damage to all enemies."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_self_damage"), SubResource("CardEffect_damage")])
+art = ExtResource("9_art")
+battle_animation = &"Slash"
+impact_time = 0.55
+play_effect_scene_path = "res://battle/effects/blood_arc_stroke.tscn"
