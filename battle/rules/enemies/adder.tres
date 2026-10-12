@@ -39,6 +39,7 @@ defeat_line = "The adder is still."
 keepsake_table = ExtResource("7_keepsakes")
 glassbone_reward = 1
 model_scene_path = "res://assets/models/enemies/Adder/Adder.glb"
+painted_albedo_path = "res://assets/models/enemies/Adder/Adder_Image_0.jpg"
 model_scale = 0.75
 model_yaw_offset_degrees = 180.0
 attack_lean_degrees = 18.0

@@ -31,6 +31,7 @@ intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_snap"), SubRe
 model_scene_path = "res://assets/models/enemies/Siltjaw/Siltjaw.glb"
 model_scale = 1.3356
 attachment_scene_path = "res://field/rear_pose.tscn"
+painted_albedo_path = "res://assets/models/enemies/Siltjaw/Siltjaw_Image_0.jpg"
 rest_height_m = -0.66
 battle_hover_m = -0.08
 contact_radius_m = 1.0
