@@ -20,8 +20,8 @@ class_name GreyshelfPose
 # planted and the chest comes up between them - the throat excepted,
 # which comes up whole. The throat swells with it - a bone under the jaw scaled across,
 # down and along by throat_swell at the full rear - and a next pass on
-# the body's material (field/greyshelf_throat.gdshader) deepens and
-# darkens its blue by the rear's own fraction of tell_deepen. Each Goaded
+# the body's material (field/greyshelf_throat.gdshader, a multiply over
+# the body as lit) deepens and darkens its blue by the rear's own fraction of tell_deepen. Each Goaded
 # stack (set_roused()) deepens it by goaded_deepen more, within the same
 # rule: hue and value only, never lighter, nothing that glows. A broken
 # Gape lets it all down on the card that broke it.
@@ -392,19 +392,25 @@ func _apply_throat_colour() -> void:
 		_throat_material.set_shader_parameter("deepen", get_throat_deepen())
 
 # The throat's pass on the body's material - material_override, the one
-# the highlight tints - as StorkTells lays its sac.
+# the highlight tints - as StorkTells lays its sac. The body's albedo
+# either way it's worn: the glb's own (a BaseMaterial3D), or painted
+# (wanderer_painted.gdshader's albedo_texture). The pass multiplies the
+# body as lit, so it needs no light of its own.
 func _add_throat_pass() -> void:
 	var mesh_instance: MeshInstance3D = _skin.mesh_instance
-	var body_material := mesh_instance.material_override as BaseMaterial3D
+	var body_material: Material = mesh_instance.material_override
 	if body_material == null:
-		body_material = mesh_instance.get_active_material(0) as BaseMaterial3D
-	if body_material == null:
-		push_warning("GreyshelfPose: the body has no material to lay the throat on.")
+		body_material = mesh_instance.get_active_material(0)
+	var albedo: Texture2D = null
+	if body_material is BaseMaterial3D:
+		albedo = (body_material as BaseMaterial3D).albedo_texture
+	elif body_material is ShaderMaterial:
+		albedo = (body_material as ShaderMaterial).get_shader_parameter("albedo_texture") as Texture2D
+	if albedo == null:
+		push_warning("GreyshelfPose: the body has no albedo to lay the throat on.")
 		return
 	_throat_material = ShaderMaterial.new()
 	_throat_material.shader = load(THROAT_SHADER_PATH) as Shader
-	_throat_material.set_shader_parameter("albedo_texture", body_material.albedo_texture)
-	_throat_material.set_shader_parameter("normal_texture", body_material.normal_texture)
-	_throat_material.set_shader_parameter("use_normal_texture", body_material.normal_texture != null)
+	_throat_material.set_shader_parameter("albedo_texture", albedo)
 	body_material.next_pass = _throat_material
 	_apply_throat_colour()

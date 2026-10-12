@@ -2,12 +2,18 @@ shader_type spatial;
 // fog_disabled: the body is out of the scene fog and FieldEnemy's
 // enemy_fog.gdshader pass, last on the chain, fogs body and throat
 // alike - scene fog here as well would fade the throat at its own rate.
-render_mode blend_mix, depth_draw_never, cull_back, specular_disabled, fog_disabled;
+// blend_mul, unshaded: it multiplies the body as already drawn and lit,
+// so the throat keeps whatever light the body's own material gives it
+// (wanderer_painted.gdshader's or a StandardMaterial3D's), lit side and
+// shadow side alike.
+render_mode blend_mul, unshaded, depth_draw_never, cull_back, fog_disabled;
 
 // The Greyshelf's throat deepening for the Gape (GreyshelfPose): a next
-// pass over the body's own material that lays the body's albedo, its blue
-// deepened and darkened, over the throat and nothing else, by deepen - 0
-// at rest, up with the rear, further with each Goaded stack. Hue and value
+// pass over the body's own material that turns the body's blue, deepened
+// and darkened, over the throat and nothing else, by deepen - 0 at rest,
+// up with the rear, further with each Goaded stack. As a multiply: per
+// channel the deepened colour over the body's own, mixed from 1 by the
+// mask, so the lit result is the deepened albedo under the same light. Hue and value
 // only, never lighter: the saturation rises to at most max_saturation and
 // the value only falls, so it stays muted - no EMISSION, nothing that
 // reads as a glow.
@@ -17,19 +23,20 @@ render_mode blend_mix, depth_draw_never, cull_back, specular_disabled, fog_disab
 // pose marked as the throat and jaw in CUSTOM0.r, measured on the rest
 // pose so the rear can't slide the mask off it.
 
+// The body's own albedo (GreyshelfPose hands it over).
 uniform sampler2D albedo_texture : source_color, filter_linear_mipmap;
-uniform sampler2D normal_texture : hint_normal, filter_linear_mipmap;
-uniform bool use_normal_texture = false;
 // The blue: hue centre and half-width in degrees, and the least
 // saturation that counts.
 uniform float hue_center_degrees = 207.0;
 uniform float hue_half_width_degrees = 25.0;
 uniform float min_saturation = 0.18;
 // At full deepen: the saturation times (1 + saturation_gain), held under
-// max_saturation, and the value times (1 - darken).
+// max_saturation, and the value times (1 - darken). darken 0.3 as a
+// multiply reads as deep as 0.5 did as a lit blend_mix pass, whose own
+// light sat a little above the body's.
 uniform float saturation_gain = 0.8;
 uniform float max_saturation = 0.6;
-uniform float darken = 0.5;
+uniform float darken = 0.3;
 uniform float deepen : hint_range(0.0, 1.0) = 0.0;
 
 varying float throat;
@@ -60,11 +67,10 @@ void fragment() {
 	blue *= smoothstep(min_saturation * 0.7, min_saturation, hsv.y);
 	float saturation = max(hsv.y, min(hsv.y * (1.0 + saturation_gain), max_saturation));
 	float value = hsv.z * (1.0 - darken);
-	ALBEDO = hsv_to_rgb(vec3(hsv.x, saturation, value));
-	ROUGHNESS = 1.0;
-	METALLIC = 0.0;
-	if (use_normal_texture) {
-		NORMAL_MAP = texture(normal_texture, UV).rgb;
-	}
-	ALPHA = clamp(blue * throat * deepen, 0.0, 1.0);
+	vec3 deepened = hsv_to_rgb(vec3(hsv.x, saturation, value));
+	// Never above 1: a higher saturation at a lower value is darker in
+	// every channel.
+	vec3 ratio = clamp(deepened / max(colour, vec3(1.0e-4)), 0.0, 1.0);
+	float amount = clamp(blue * throat * deepen, 0.0, 1.0);
+	ALBEDO = mix(vec3(1.0), ratio, amount);
 }
