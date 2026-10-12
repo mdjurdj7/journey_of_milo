@@ -582,14 +582,21 @@ func _posed_world(rest_point: Vector3, bone: int) -> Vector3:
 # the highlight tints - as GreyshelfPose lays its throat.
 func _add_cover_pass() -> void:
 	var mesh_instance: MeshInstance3D = _skin.mesh_instance
-	var body_material := mesh_instance.material_override as BaseMaterial3D
+	# The body's albedo either way it's worn: the glb's own (a
+	# BaseMaterial3D) or painted (wanderer_painted.gdshader's albedo_texture).
+	var body_material: Material = mesh_instance.material_override
 	if body_material == null:
-		body_material = mesh_instance.get_active_material(0) as BaseMaterial3D
-	if body_material == null:
-		push_warning("UnderfootPose: the body has no material to lay the cover on.")
+		body_material = mesh_instance.get_active_material(0)
+	var albedo: Texture2D = null
+	if body_material is BaseMaterial3D:
+		albedo = (body_material as BaseMaterial3D).albedo_texture
+	elif body_material is ShaderMaterial:
+		albedo = (body_material as ShaderMaterial).get_shader_parameter("albedo_texture") as Texture2D
+	if albedo == null:
+		push_warning("UnderfootPose: the body has no albedo to lay the cover on.")
 		return
 	_cover_material = ShaderMaterial.new()
 	_cover_material.shader = load(COVER_SHADER_PATH) as Shader
-	_cover_material.set_shader_parameter("albedo_texture", body_material.albedo_texture)
+	_cover_material.set_shader_parameter("albedo_texture", albedo)
 	body_material.next_pass = _cover_material
 	_apply_cover()

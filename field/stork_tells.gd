@@ -104,17 +104,27 @@ func _ready() -> void:
 		push_warning("StorkTells: no body mesh beside it; no sac, no clatter.")
 		return
 	_rest = _body.transform
-	var body_material := _body.material_override as BaseMaterial3D
+	# The body's albedo either way it's worn: the glb's own (a
+	# BaseMaterial3D, with its normal map) or painted (wanderer_painted.
+	# gdshader's albedo_texture, no normal map).
+	var body_material: Material = _body.material_override
 	if body_material == null:
-		body_material = _body.get_active_material(0) as BaseMaterial3D
-	if body_material == null:
-		push_warning("StorkTells: the body has no material to lay the sac on.")
+		body_material = _body.get_active_material(0)
+	var albedo: Texture2D = null
+	var normal: Texture2D = null
+	if body_material is BaseMaterial3D:
+		albedo = (body_material as BaseMaterial3D).albedo_texture
+		normal = (body_material as BaseMaterial3D).normal_texture
+	elif body_material is ShaderMaterial:
+		albedo = (body_material as ShaderMaterial).get_shader_parameter("albedo_texture") as Texture2D
+	if albedo == null:
+		push_warning("StorkTells: the body has no albedo to lay the sac on.")
 		return
 	_sac = ShaderMaterial.new()
 	_sac.shader = load(SAC_SHADER_PATH) as Shader
-	_sac.set_shader_parameter("albedo_texture", body_material.albedo_texture)
-	_sac.set_shader_parameter("normal_texture", body_material.normal_texture)
-	_sac.set_shader_parameter("use_normal_texture", body_material.normal_texture != null)
+	_sac.set_shader_parameter("albedo_texture", albedo)
+	_sac.set_shader_parameter("normal_texture", normal)
+	_sac.set_shader_parameter("use_normal_texture", normal != null)
 	var bounds: AABB = _body.mesh.get_aabb()
 	_sac.set_shader_parameter("bounds_position", bounds.position)
 	_sac.set_shader_parameter("bounds_size", bounds.size)

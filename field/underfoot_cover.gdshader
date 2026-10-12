@@ -4,6 +4,10 @@ shader_type spatial;
 // as greyshelf_throat.gdshader.
 render_mode blend_mix, depth_draw_never, cull_back, specular_disabled, fog_disabled;
 
+// Lit as a painted body is (painted_light.gdshaderinc), so the sand takes
+// the body's own light, lit side and shadow side.
+#include "res://field/painted_light.gdshaderinc"
+
 // The Underfoot's sand cover (UnderfootPose): a next pass over the body's
 // own material that lays sand over its back while it is Covered - by
 // cover, 0 once Exposed. The sand is one colour with a little of the

@@ -4,6 +4,11 @@ shader_type spatial;
 // alike - scene fog here as well would fade the sac at its own rate.
 render_mode blend_mix, depth_draw_never, cull_back, specular_disabled, fog_disabled;
 
+// Lit as a painted body is (painted_light.gdshaderinc), so over one the
+// sac takes the body's own light; over the glb's material it keeps the
+// normal map (use_normal_texture).
+#include "res://field/painted_light.gdshaderinc"
+
 // The marabou's throat sac greyed (StorkTells): a next pass over the body's
 // own material that lays the body's albedo, desaturated, over the sac and
 // nothing else, by grey_amount - 1 while it's Fed, 0 once it's Hungry.
