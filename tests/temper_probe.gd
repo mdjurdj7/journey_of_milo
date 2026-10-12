@@ -1,7 +1,7 @@
 extends SceneTree
 
-# Headless probe for tempering at floor 3's wagon: the five starters'
-# tempered versions as data (CardData.tempered, cards/tempered/), kept out
+# Headless probe for tempering at floor 3's wagon: every card's tempered
+# version as data (CardData.tempered, cards/tempered/), kept out
 # of every pool, list and folder scan; RunState.temper_card() - exactly
 # the cost spent, exactly one card swapped at its own deck position, once
 # per card, logged; the wagon on floor 3, grounded and clear of the worn
@@ -24,6 +24,8 @@ const WAGON_SCENE_PATH := "res://field/wagon.tscn"
 const TEMPERED_DIR := "res://cards/tempered/"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 const STARTERS: Array[String] = ["slash", "bite_down", "brace", "reckoning", "down_payment"]
+# The smallest rules size a tempered face may shrink to and still read.
+const MIN_RULES_SIZE := 14
 # Scripts whose folder lists must leave cards/tempered/ out: the
 # compendium's card_folders, both debug pickers' debug_card_dirs.
 const SCANS: Dictionary = {
@@ -79,22 +81,20 @@ func _initialize() -> void:
 		print("temper_probe: %d FAILED" % _failures)
 		quit(1)
 
-# Each starter names its tempered version: <id>_tempered.tres, its name
-# plus "+", its rarity, type, target and removal scope the original's,
-# its own tempered null; and the provisional numbers. No other card has
-# one.
+# Every card that names a tempered version: <id>_tempered.tres, its name
+# plus "+", its rarity, type, removal scope and art the original's, its
+# own tempered null - its target may differ. Each starter has one; and
+# the provisional numbers.
 func _check_data() -> void:
 	for id in STARTERS:
-		var card := load("res://cards/data/%s.tres" % id) as CardData
+		_expect(_tempered(id) != null, "%s has a tempered version" % id)
+	for card in _tempered_originals():
+		var id: String = card.resource_path.get_file().get_basename()
 		var tempered: CardData = card.tempered
-		_expect(tempered != null, "%s has a tempered version" % card.card_name)
-		if tempered == null:
-			continue
 		_expect_eq(tempered.resource_path, TEMPERED_DIR + "%s_tempered.tres" % id, "...at %s_tempered.tres" % id)
 		_expect_eq(tempered.card_name, card.card_name + "+", "...named %s+" % card.card_name)
 		_expect_eq(tempered.rarity, card.rarity, "...its rarity")
 		_expect_eq(tempered.card_type, card.card_type, "...its type")
-		_expect_eq(tempered.target_type, card.target_type, "...its target")
 		_expect_eq(tempered.removal_scope, card.removal_scope, "...its removal scope")
 		_expect(tempered.tempered == null, "...and can't be tempered again")
 		_expect_eq(tempered.art, card.art, "...its art")
@@ -117,15 +117,12 @@ func _check_data() -> void:
 	var down: CardData = _tempered("down_payment")
 	_expect_eq(_values(down, CardEffect.EffectType.SELF_DAMAGE_TOLL), [1], "Down Payment+ loses 1 HP")
 	_expect_eq(down.effects[0].toll_gain, 8, "...and gains 8 Toll")
-	for dir in CARD_DIRS:
-		for file in DirAccess.get_files_at(dir):
-			if not file.ends_with(".tres") or STARTERS.has(file.get_basename()) and dir == "res://cards/data/":
-				continue
-			var card := load(dir + file) as CardData
-			_expect(card.tempered == null, "%s has no tempered version (only the five starters do)" % card.card_name)
 	for file in DirAccess.get_files_at(TEMPERED_DIR):
 		if file.ends_with(".tres"):
-			_expect(STARTERS.has(file.get_basename().trim_suffix("_tempered")), "cards/tempered/%s is a starter's" % file)
+			var named: bool = false
+			for card in _tempered_originals():
+				named = named or card.tempered.resource_path == TEMPERED_DIR + file
+			_expect(named, "cards/tempered/%s is some card's tempered version" % file)
 	_completed += 1
 
 # No .tres or .tscn names a tempered card but its own original - so no
@@ -212,19 +209,19 @@ func _check_temper_card() -> void:
 	RunLogger.set_output_dir("")
 	_completed += 1
 
-# Each tempered face fits as its original does: the name on one line
-# beside the cost, the rules text at the first size, the card unchanged
-# in size.
+# Each tempered face fits: the name on one line beside the cost, the
+# rules text at MIN_RULES_SIZE or above, the card unchanged in size.
 func _check_faces() -> void:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(view)
 	await process_frame
-	for id in STARTERS:
-		var tempered: CardData = _tempered(id)
+	for card in _tempered_originals():
+		var tempered: CardData = card.tempered
 		view.set_card_data(tempered)
 		var lines: int = view.call("_wrapped_line_count", view.name_label, view.name_font_size_px, view.name_label.size.x)
 		_expect_eq(lines, 1, "%s's name fits on one line beside its cost" % tempered.card_name)
-		_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "%s's rules size" % tempered.card_name)
+		var rules_size: int = view.rules_text.get_theme_font_size("normal_font_size")
+		_expect(rules_size >= MIN_RULES_SIZE, "%s's rules size %d, at least %d (else its text is too long)" % [tempered.card_name, rules_size, MIN_RULES_SIZE])
 		_expect_eq(view.size, view.card_size, "%s keeps the card's size" % tempered.card_name)
 	view.free()
 	_completed += 1
@@ -487,6 +484,18 @@ func _press(action: String) -> void:
 
 func _tempered(id: String) -> CardData:
 	return (load("res://cards/data/%s.tres" % id) as CardData).tempered
+
+# Every card in CARD_DIRS that names a tempered version.
+func _tempered_originals() -> Array[CardData]:
+	var originals: Array[CardData] = []
+	for dir in CARD_DIRS:
+		for file in DirAccess.get_files_at(dir):
+			if not file.ends_with(".tres"):
+				continue
+			var card := load(dir + file) as CardData
+			if card != null and card.tempered != null:
+				originals.append(card)
+	return originals
 
 func _values(card: CardData, type: CardEffect.EffectType) -> Array[int]:
 	var values: Array[int] = []
