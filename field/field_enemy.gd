@@ -12,6 +12,7 @@ signal death_finished()
 const DEFAULT_MODEL_SCENE_PATH := "res://assets/models/enemies/Sputter/Sputter.glb"
 const ENEMY_STATUS_SCENE_PATH := "res://battle/enemy_status.tscn"
 const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
+const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
 
 @export var enemy_id: StringName = &"enemy"
 @export var enemy_data: EnemyData
@@ -37,6 +38,14 @@ const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
 # model's grounding/yaw/scale/settle, and if it offers get_tint_
 # materials() those lighten and flash with the body's. Empty = none.
 @export_file("*.tscn") var attachment_scene_path: String = ""
+# EnemyData.painted_albedo_path, copied the same way: set, the body wears
+# this texture under wanderer_painted.gdshader (see _build_painted_
+# material()). Live: an edit swaps the texture on a painted body.
+@export_file("*.png", "*.jpg") var painted_albedo_path: String = "":
+	set(value):
+		painted_albedo_path = value
+		if _model_material is ShaderMaterial and not value.is_empty():
+			(_model_material as ShaderMaterial).set_shader_parameter("albedo_texture", load(value) as Texture2D)
 @export var model_ground_offset: float = 0.0
 # EnemyData.harness_point, copied the same way: where a rope is tied to
 # this body, glb units (see get_harness_point()).
@@ -237,8 +246,11 @@ var _armored_contact_pool := SoundPool.new()
 # of the other) - albedo_color/roughness/metallic/*_texture are all
 # BaseMaterial3D's own properties, so every read/write below works
 # identically regardless of which concrete class _build_model_material()
-# actually got handed.
-var _model_material: BaseMaterial3D
+# actually got handed. Or a ShaderMaterial on wanderer_painted.gdshader
+# (painted_albedo_path): its tint is the albedo_tint uniform, its
+# dissolve the presence uniform - _tint_property() and
+# _set_death_presence() tell the two apart.
+var _model_material: Material
 # Captured once, right after _model_material is built - what set_highlight()/
 # play_hit_flash() both return to at rest. Not the same thing as model_color:
 # for the real Sputter.glb material this is whatever its own baseColorFactor
@@ -248,7 +260,7 @@ var _model_base_color: Color = Color.WHITE
 # Everything the highlight and the hit flash tint, with what each returns
 # to: the body's material first, then whatever an attachment hands over
 # (see _attach_scene()). Parallel arrays, filled by _spawn_model().
-var _tint_materials: Array[BaseMaterial3D] = []
+var _tint_materials: Array[Material] = []
 var _tint_base_colors: Array[Color] = []
 # The attachment_scene_path instance, if any (see _attach_scene()) - the
 # lunge tells it to flap and the settle tells it to fold, when it can.
@@ -256,7 +268,7 @@ var _attachment: Node3D = null
 # The fog overlays (see _add_fog_overlay()) and, parallel, the material
 # each one is the next_pass of.
 var _fog_overlays: Array[ShaderMaterial] = []
-var _fog_bases: Array[BaseMaterial3D] = []
+var _fog_bases: Array[Material] = []
 # The hit flash running now (play_hit_flash()) - a death stops it, or its
 # fall would write full opacity back over the dissolve.
 var _flash_tween: Tween = null
@@ -588,14 +600,17 @@ func _face_shore() -> void:
 # (see that shader's doc), at the end of its pass chain. The body's
 # material and every material an attachment hands over (the dragonfly's
 # wings) get one; refresh_fog() fills them.
-func _add_fog_overlay(base: BaseMaterial3D) -> void:
+func _add_fog_overlay(base: Material) -> void:
 	var shader := load(FOG_SHADER_PATH) as Shader
 	if shader == null:
 		push_warning("FieldEnemy '%s': fog overlay shader failed to load (%s); fogged as scenery." % [enemy_id, FOG_SHADER_PATH])
 		return
 	var overlay := ShaderMaterial.new()
 	overlay.shader = shader
-	base.disable_fog = true
+	# A painted body is out of the fog already (wanderer_painted.gdshader
+	# is fog_disabled).
+	if base is BaseMaterial3D:
+		(base as BaseMaterial3D).disable_fog = true
 	var tail: Material = base
 	while tail.next_pass != null:
 		tail = tail.next_pass
@@ -621,7 +636,7 @@ func refresh_fog() -> void:
 		factor = enemy_data.fog_factor_override
 	for index in _fog_overlays.size():
 		var overlay: ShaderMaterial = _fog_overlays[index]
-		var base: BaseMaterial3D = _fog_bases[index]
+		var standard := _fog_bases[index] as BaseMaterial3D
 		overlay.set_shader_parameter("fog_color", sky.fog_color)
 		overlay.set_shader_parameter("fog_energy", sky.fog_light_energy)
 		overlay.set_shader_parameter("fog_begin", sky.current_fog_depth_begin())
@@ -629,10 +644,11 @@ func refresh_fog() -> void:
 		overlay.set_shader_parameter("fog_density", sky.fog_density)
 		overlay.set_shader_parameter("fog_factor", clampf(factor, 0.0, 1.0))
 		# An alpha-scissor surface keeps its cut-away part clear of the fog.
-		var scissor: bool = base.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR and base.albedo_texture != null
+		var scissor: bool = standard != null and standard.transparency == BaseMaterial3D.TRANSPARENCY_ALPHA_SCISSOR and standard.albedo_texture != null
 		overlay.set_shader_parameter("use_alpha_texture", scissor)
-		overlay.set_shader_parameter("alpha_texture", base.albedo_texture if scissor else null)
-		overlay.set_shader_parameter("alpha_scissor_threshold", base.alpha_scissor_threshold)
+		overlay.set_shader_parameter("alpha_texture", standard.albedo_texture if scissor else null)
+		if standard != null:
+			overlay.set_shader_parameter("alpha_scissor_threshold", standard.alpha_scissor_threshold)
 
 func _spawn_model() -> void:
 	var scene_path: String = model_scene_path if not model_scene_path.is_empty() else DEFAULT_MODEL_SCENE_PATH
@@ -666,8 +682,11 @@ func _spawn_model() -> void:
 		# than each keeping its own real one, same simplification the old
 		# flat-color placeholder already made.
 		if _model_material == null:
-			_model_material = _build_model_material(mi)
-			_model_base_color = _model_material.albedo_color
+			if not painted_albedo_path.is_empty():
+				_model_material = _build_painted_material()
+			if _model_material == null:
+				_model_material = _build_model_material(mi)
+			_model_base_color = _tint_of(_model_material)
 		mi.material_override = _model_material
 		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 
@@ -768,6 +787,37 @@ func _build_model_material(mesh_instance: MeshInstance3D) -> BaseMaterial3D:
 	material.roughness_texture = null
 	return material
 
+# The body under wanderer_painted.gdshader with painted_albedo_path as
+# its albedo - the Wanderer's soft light at the shader's own settings
+# (wrap, self_shadow_strength; roughness 1, no specular, no normal map,
+# both sides drawn). Each enemy its own material, so its tint is its own.
+# Null when the shader or the texture fails to load: the glb's material
+# is worn instead.
+func _build_painted_material() -> ShaderMaterial:
+	var shader := load(PAINTED_SHADER_PATH) as Shader
+	var texture := load(painted_albedo_path) as Texture2D
+	if shader == null or texture == null:
+		push_warning("FieldEnemy '%s': painted material failed to load (%s, %s); wearing the glb's own." % [enemy_id, PAINTED_SHADER_PATH, painted_albedo_path])
+		return null
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("albedo_texture", texture)
+	material.set_shader_parameter("albedo_tint", Color.WHITE)
+	return material
+
+# Where a tinted material keeps the colour the highlight, the hit flash
+# and the dissolve write: a BaseMaterial3D's albedo_color, a painted
+# body's albedo_tint uniform.
+func _tint_property(material: Material) -> NodePath:
+	return ^"shader_parameter/albedo_tint" if material is ShaderMaterial else ^"albedo_color"
+
+func _tint_of(material: Material) -> Color:
+	var tint: Variant = material.get_indexed(_tint_property(material))
+	return tint if tint is Color else Color.WHITE
+
+func _set_tint(material: Material, color: Color) -> void:
+	material.set_indexed(_tint_property(material), color)
+
 # Creates this enemy's own persistent HP display and hands it to RegionField
 # to parent (see enemy_status's own doc on why - a Control needs a
 # CanvasLayer ancestor, not this Node3D). Seeded at full HP so it reads
@@ -794,7 +844,7 @@ func _spawn_enemy_status() -> void:
 func set_highlight(on: bool) -> void:
 	for index in _tint_materials.size():
 		var base: Color = _tint_base_colors[index]
-		_tint_materials[index].albedo_color = _brightened(base) if on else base
+		_set_tint(_tint_materials[index], _brightened(base) if on else base)
 
 # base x highlight_brightness on the colour channels, alpha untouched.
 func _brightened(base: Color) -> Color:
@@ -825,10 +875,10 @@ func play_hit_flash(flash_color: Color, rise_time: float, fall_time: float) -> v
 	for index in _tint_materials.size():
 		var target: Color = _brightened(_tint_base_colors[index] * flash_color)
 		target.a = _tint_base_colors[index].a
-		tween.tween_property(_tint_materials[index], "albedo_color", target, rise_time)
+		tween.tween_property(_tint_materials[index], _tint_property(_tint_materials[index]), target, rise_time)
 	tween.chain()
 	for index in _tint_materials.size():
-		tween.tween_property(_tint_materials[index], "albedo_color", _tint_base_colors[index], fall_time)
+		tween.tween_property(_tint_materials[index], _tint_property(_tint_materials[index]), _tint_base_colors[index], fall_time)
 
 # from_direction is the direction the hit traveled (attacker -> this
 # enemy, not normalized) - this recoils further along that same line,
@@ -1548,7 +1598,7 @@ func _stop_hit_flash() -> void:
 	if _flash_tween != null and _flash_tween.is_valid():
 		_flash_tween.kill()
 	for index in _tint_materials.size():
-		_tint_materials[index].albedo_color = _tint_base_colors[index]
+		_set_tint(_tint_materials[index], _tint_base_colors[index])
 
 # The fog colour over the whole body, distance aside (its fog pass's veil).
 func _set_death_veil(value: float) -> void:
@@ -1556,19 +1606,25 @@ func _set_death_veil(value: float) -> void:
 		overlay.set_shader_parameter("veil", value)
 
 # The last dissolve: every tinted surface dithered (alpha hash keeps them
-# opaque-sorted, so nothing behind sorts wrong) and casting no shadow.
+# opaque-sorted, so nothing behind sorts wrong; a painted body dithers in
+# its shader, by presence) and casting no shadow.
 func _begin_death_vanish() -> void:
 	for material in _tint_materials:
-		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_HASH
+		if material is BaseMaterial3D:
+			(material as BaseMaterial3D).transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_HASH
 	for mesh_instance in _model.find_children("*", "MeshInstance3D", true, false):
 		(mesh_instance as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 
 # How much of the body is left: its surfaces' alpha and its fog pass's.
 func _set_death_presence(value: float) -> void:
 	for index in _tint_materials.size():
+		var material: Material = _tint_materials[index]
+		if material is ShaderMaterial:
+			(material as ShaderMaterial).set_shader_parameter("presence", value)
+			continue
 		var color: Color = _tint_base_colors[index]
 		color.a *= value
-		_tint_materials[index].albedo_color = color
+		_set_tint(material, color)
 	for overlay in _fog_overlays:
 		overlay.set_shader_parameter("presence", value)
 

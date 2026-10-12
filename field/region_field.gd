@@ -1212,6 +1212,7 @@ func _spawn_floor_enemies() -> void:
 			enemy.model_scale = entry.enemy_data.model_scale
 			enemy.model_yaw_offset = entry.enemy_data.model_yaw_offset_degrees
 			enemy.attachment_scene_path = entry.enemy_data.attachment_scene_path
+			enemy.painted_albedo_path = entry.enemy_data.painted_albedo_path
 			enemy.rest_height = entry.enemy_data.rest_height_m
 			enemy.sink = entry.enemy_data.sink_m
 			enemy.battle_hover = entry.enemy_data.battle_hover_m

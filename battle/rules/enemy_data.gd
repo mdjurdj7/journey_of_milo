@@ -123,6 +123,14 @@ class_name EnemyData
 # own materials but rides the body's grounding, yaw, scale and settle.
 # Empty = nothing attached.
 @export_file("*.tscn") var attachment_scene_path: String = ""
+# A painted albedo (tools/paint_texture.py, or the glb's own colour map)
+# worn under the Wanderer's soft light, field/wanderer_painted.gdshader,
+# in place of the glb's own material - so the body reads in his style.
+# Empty = the glb's material, matte (FieldEnemy._build_model_material()).
+@export_file("*.png", "*.jpg") var painted_albedo_path: String = "":
+	set(value):
+		painted_albedo_path = value
+		emit_changed()
 # Where a rope is tied to this body, glb units in the glb's own space -
 # the Wardling's harness, which floor 3's HitchingPost ties its rope to
 # (FieldEnemy.get_harness_point()). Unused by a body nothing is tied to.
