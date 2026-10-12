@@ -20,15 +20,9 @@ uniform sampler2D albedo_texture : source_color, filter_linear_mipmap, repeat_di
 // Multiplied into the texture - white is the texture as painted.
 uniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 
-// How far the light wraps past the terminator: 0 is plain Lambert, 1
-// lights everything but the exact back. Scaled so a surface facing the
-// light is fully lit at any wrap.
-uniform float wrap : hint_range(0.0, 1.0) = 0.6;
-
-// How much of a shadow lands on him: 1 is as dark as anywhere else, 0
-// none. Every shadow on him at once (his own and anything else's) -
-// light() only sees them combined.
-uniform float self_shadow_strength : hint_range(0.0, 1.0) = 0.5;
+// The light - wrap, self_shadow_strength and light() - shared with the
+// passes laid over a painted body.
+#include "res://field/painted_light.gdshaderinc"
 
 // Battle hit-flash, as in wanderer_flat.gdshader: tweened by wanderer.gd's
 // _tween_shader_flash(), 0 at rest, 1 fully flash_color.
@@ -53,10 +47,4 @@ void fragment() {
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;
 	METALLIC = 0.0;
-}
-
-void light() {
-	float lit = max((dot(NORMAL, LIGHT) + wrap) / (1.0 + wrap), 0.0);
-	float shadow = mix(1.0, ATTENUATION, self_shadow_strength);
-	DIFFUSE_LIGHT += LIGHT_COLOR * shadow * lit / PI;
 }
