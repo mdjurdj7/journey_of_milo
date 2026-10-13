@@ -11,11 +11,16 @@ extends SceneTree
 #            merged, with their loop modes; every bone track resolves to
 #            a bone on the model's skeleton; BattleIdle is the glb's own
 #            battle_idle_breathe and Slash its slash (their tracks,
-#            unconverted); Slash lands on its contact frame (get_clip_
-#            contact_time(), Blender frame 10) and ends on BattleIdle's
-#            first pose, so the blend back is seamless
+#            unconverted); Slash is 32 frames, lands on its contact frame
+#            (get_clip_contact_time(), Blender frame 10) and ends on
+#            BattleIdle's first pose, so the blend back is seamless
 #   lunge  - the glb's Slash steps his model slash_lunge_distance ahead,
-#            arriving on the contact frame, and home again after
+#            arriving on the contact frame, holds there through the
+#            hit-stop, and is home again after
+#   stop   - Slash's contact (card_impact) stops his clip for
+#            slash_hitstop_time, then it plays on; an enemy held for it
+#            (FieldEnemy.hold_for()) keeps a recoil started inside it
+#            still until it ends
 #   poses  - each clip but BattleIdle, sampled through its length, stands
 #            him up (head over hips over toes) on the new rig's own bone
 #            lengths
@@ -67,6 +72,11 @@ const BRACE_HIPS_OVER_TOE_M := 0.30
 # last pose against BattleIdle's first (degrees, worst bone); the lunge's
 # reach at contact and its home after (metres).
 const SLASH_CONTACT_S := 10.0 / 24.0
+const SLASH_LENGTH_S := 32.0 / 24.0
+# How still "still" is through a hit-stop: the clip's playhead (seconds)
+# and an enemy's position (metres).
+const STOP_STILL_S := 0.0001
+const STOP_STILL_M := 0.0001
 const SLASH_SEAM_LIMIT_DEG := 1.0
 const LUNGE_REACH_LIMIT_M := 0.03
 const LUNGE_HOME_LIMIT_M := 0.001
@@ -164,6 +174,9 @@ func _initialize() -> void:
 		_check(_clip_text(_player.get_animation("BattleIdle")) == _clip_text(own), "BattleIdle is battle_idle_breathe, track for track and key for key")
 	if own_slash != null and _player.has_animation("Slash"):
 		_check(_clip_text(_player.get_animation("Slash")) == _clip_text(own_slash), "Slash is the glb's slash, track for track and key for key")
+	if _player.has_animation("Slash"):
+		var slash_length: float = _player.get_animation("Slash").length
+		_check(absf(slash_length - SLASH_LENGTH_S) <= 0.001, "Slash is 32 frames, %.4f s (%.4f s)" % [slash_length, SLASH_LENGTH_S])
 	var contact: float = float(_wanderer.call("get_clip_contact_time", &"Slash"))
 	_check(absf(contact - SLASH_CONTACT_S) <= 0.001, "Slash lands on its contact frame, %.4f s in (frame 10 = %.4f s)" % [contact, SLASH_CONTACT_S])
 	if _player.has_animation("Slash") and _player.has_animation("BattleIdle"):
@@ -186,9 +199,36 @@ func _initialize() -> void:
 	var reach: Vector3 = model.global_position - home
 	var distance: float = float(_wanderer.get("slash_lunge_distance"))
 	_check(absf(reach.dot(forward) - distance) <= LUNGE_REACH_LIMIT_M and Vector2(reach.x, reach.z).length() <= distance + LUNGE_REACH_LIMIT_M, "on the contact frame his model is %.3f m ahead (slash_lunge_distance %.2f)" % [reach.dot(forward), distance])
-	await create_timer(float(_wanderer.get("slash_lunge_return_time")) + 0.2).timeout
+	var stop: float = float(_wanderer.get("slash_hitstop_time"))
+	await create_timer(stop * 0.5).timeout
+	var held: Vector3 = model.global_position - home
+	_check(absf(held.dot(forward) - distance) <= LUNGE_REACH_LIMIT_M, "halfway through the hit-stop it is still %.3f m ahead" % held.dot(forward))
+	await create_timer(stop * 0.5 + float(_wanderer.get("slash_lunge_return_time")) + 0.2).timeout
 	var back: Vector3 = model.global_position - home
 	_check(Vector2(back.x, back.z).length() <= LUNGE_HOME_LIMIT_M, "and home after (%.4f m off)" % Vector2(back.x, back.z).length())
+
+	print("\n=== stop")
+	_check(absf(stop - 0.07) <= 0.0001, "slash_hitstop_time is %.3f s in region_field.tscn (0.07)" % stop)
+	_check(absf(float(_wanderer.call("get_card_hitstop_time", lunge_card)) - stop) <= 0.0001, "the Slash card's blow holds for slash_hitstop_time")
+	_player.play("Slash", 0.0)
+	_player.seek(contact, true)
+	await process_frame
+	var speed: float = _player.speed_scale
+	_wanderer.call("_on_card_impact", lunge_card)
+	var at_contact: float = _player.current_animation_position
+	await create_timer(stop * 0.5).timeout
+	_check(absf(_player.current_animation_position - at_contact) <= STOP_STILL_S, "his clip holds on contact (%.4f s -> %.4f s)" % [at_contact, _player.current_animation_position])
+	await create_timer(stop * 0.5 + 0.1).timeout
+	_check(_player.speed_scale == speed and _player.current_animation_position > at_contact + 0.05, "and plays on after (speed %.2f, at %.4f s)" % [_player.speed_scale, _player.current_animation_position])
+	var enemy: Node3D = get_nodes_in_group("enemies")[0] as Node3D
+	var enemy_home: Vector3 = enemy.global_position
+	enemy.call("hold_for", stop)
+	enemy.call("play_hit_recoil", -forward, 0.3, 0.0, 0.08, 0.25)
+	await create_timer(stop * 0.5).timeout
+	_check(enemy.global_position.distance_to(enemy_home) <= STOP_STILL_M, "an enemy held for it keeps its recoil still through the stop (%.4f m)" % enemy.global_position.distance_to(enemy_home))
+	await create_timer(stop * 0.5 + 0.06).timeout
+	_check(enemy.global_position.distance_to(enemy_home) > 0.05, "and recoils after (%.3f m)" % enemy.global_position.distance_to(enemy_home))
+	await create_timer(0.4).timeout
 
 	print("\n=== poses")
 	for clip in POSED:

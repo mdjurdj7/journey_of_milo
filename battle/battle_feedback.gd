@@ -154,6 +154,7 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, _kind: Strin
 	if target is FieldEnemy:
 		# Read now, in the hit's own frame - the effect lets go at its end.
 		var slash: bool = not _effect_active()
+		var hold: float = card_hitstop_time()
 		var armored: bool = _met_block.has(target)
 		_met_block.erase(target)
 		var heavy: float = heavy_level(heavy_damage(amount))
@@ -163,6 +164,7 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, _kind: Strin
 			await get_tree().create_timer(delay).timeout
 			if not is_instance_valid(target):
 				return
+		(target as FieldEnemy).hold_for(hold)
 		_react_to_card_hit(target as FieldEnemy, slash, armored, heavy)
 		_apply_hit_stop(stop_ms(heavy, killing))
 		if jolts_camera(amount):
@@ -195,8 +197,18 @@ func on_card_impact(card: CardData, targets: Array[FieldEnemy], ceiling_y: float
 	_effect = effect
 	_release_effect.call_deferred()
 
+# The hit-stop this frame's card hits hold their enemies for, in real
+# seconds (FieldEnemy.hold_for(), the flash, number and sound landing as
+# it starts): the Wanderer's for the card (Wanderer.get_card_hitstop_
+# time() - the glb's Slash), 0 for none. Read in the hit's own frame.
+func card_hitstop_time() -> float:
+	if _wanderer == null or _impact_card == null:
+		return 0.0
+	return _wanderer.get_card_hitstop_time(_impact_card)
+
 # Every card's impact (BattleController.card_impact, before its effects
-# resolve): which card this frame's hits belong to, for heavy_damage().
+# resolve): which card this frame's hits belong to, for heavy_damage()
+# and card_hitstop_time().
 func set_impact_card(card: CardData) -> void:
 	_impact_card = card
 	_release_impact_card.call_deferred()
@@ -250,11 +262,12 @@ func stop_ms(level: float, killing: bool) -> float:
 
 # How long a killing hit of `amount` on `target` takes to show in full, in
 # real seconds from its own frame: the play effect reaching it, then the
-# longest of its flash, recoil and slash mark, with its hit-stop on top -
-# or the play effect running to its end, if that's later. Read in the
-# hit's frame (BattleOverlay, for BattleController.kill_presentation_time).
+# longest of its flash, recoil (held back by the card's hit-stop) and
+# slash mark, with its hit-stop on top - or the play effect running to
+# its end, if that's later. Read in the hit's frame (BattleOverlay, for
+# BattleController.kill_presentation_time).
 func kill_presentation_time(target: FieldEnemy, amount: int) -> float:
-	var reaction: float = maxf(flash_rise_time + flash_fall_time, recoil_out_time + recoil_return_time)
+	var reaction: float = maxf(flash_rise_time + flash_fall_time, card_hitstop_time() + recoil_out_time + recoil_return_time)
 	reaction = maxf(reaction, slash_mark_grow_time + slash_mark_fade_time)
 	var stop: float = stop_ms(heavy_level(heavy_damage(amount)), true) / 1000.0
 	return maxf(reaction_delay(target) + reaction + stop, effect_remaining_time())
@@ -315,11 +328,13 @@ func on_enemy_hit_blocked(enemy: FieldEnemy, absorbed: bool) -> void:
 	if not absorbed:
 		_met_block[enemy] = true
 		return
+	var hold: float = card_hitstop_time()
 	var delay: float = reaction_delay(enemy)
 	if delay > 0.0:
 		await get_tree().create_timer(delay).timeout
 		if not is_instance_valid(enemy):
 			return
+	enemy.hold_for(hold)
 	_react_to_absorbed_hit(enemy)
 
 func _react_to_absorbed_hit(enemy: FieldEnemy) -> void:

@@ -207,6 +207,7 @@ hand_mount_rotation_degrees = Vector3(-1.36, 71.12, -114.36)
 shading_mode = 0
 light_wrap = 0.6
 self_shadow_strength = 0.5
+slash_hitstop_time = 0.07
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Wanderer" unique_id=1638228685]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)

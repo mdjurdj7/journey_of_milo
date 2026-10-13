@@ -215,13 +215,18 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 # arriving on slash_contact_time - the clip's contact frame (Blender frame
 # 10 at 24 fps), where the card's hit lands too (get_clip_contact_time())
 # - and back over slash_lunge_return_time. The model moves, not the body:
-# his place in the fight stays where it is. The Mixamo fallback steps in
-# its own clip and gets none of this; its hit lands at the card's
-# impact_time. All read at each swing.
+# his place in the fight stays where it is. On contact the swing holds
+# for slash_hitstop_time (real seconds): his clip stops where it is
+# (hold_animation()) and so does each enemy it strikes (BattleFeedback,
+# FieldEnemy.hold_for()) - the flash, number and sound land as it starts -
+# and the lunge waits the same before it goes back. The Mixamo fallback
+# steps in its own clip and gets none of this; its hit lands at the
+# card's impact_time. All read at each swing.
 @export var slash_contact_time: float = 10.0 / 24.0
 @export var slash_lunge_distance: float = 0.3
 @export var slash_lunge_out_time: float = 0.25
 @export var slash_lunge_return_time: float = 0.45
+@export var slash_hitstop_time: float = 0.07
 
 @export_group("Shading")
 # TEXTURED: wanderer_painted.gdshader - the painted albedo under a soft
@@ -421,6 +426,10 @@ var _own_slash: bool = false
 # returns to.
 var _lunge_tween: Tween = null
 var _lunge_home: Vector2 = Vector2.ZERO
+# When hold_animation()'s stop ends, in real microseconds (0 = none), and
+# the playback speed it puts back.
+var _anim_hold_until_usec: int = 0
+var _anim_held_speed: float = 1.0
 # The mixer applying the model's poses (the AnimationTree when it's on,
 # else the AnimationPlayer); foot grounding runs on its mixer_applied.
 var _grounding_mixer: AnimationMixer = null
@@ -1800,6 +1809,35 @@ func get_clip_contact_time(anim_name: StringName) -> float:
 		return -1.0
 	return clampf(slash_contact_time, 0.0, get_clip_length(anim_name))
 
+# The hit-stop `card`'s blow holds for, in real seconds: slash_hitstop_time
+# for a card that swings the glb's own Slash, 0 for any other. BattleFeedback
+# holds the enemies it strikes for this long.
+func get_card_hitstop_time(card: CardData) -> float:
+	if card == null or card.battle_animation != &"Slash" or not _own_slash:
+		return 0.0
+	return maxf(slash_hitstop_time, 0.0)
+
+# His clip stops where it is for `seconds` (real time), then plays on. A
+# stop only ever extends the one running.
+func hold_animation(seconds: float) -> void:
+	if _animation_player == null or seconds <= 0.0:
+		return
+	var until: int = Time.get_ticks_usec() + int(seconds * 1000000.0)
+	if until <= _anim_hold_until_usec:
+		return
+	if _anim_hold_until_usec == 0:
+		_anim_held_speed = _animation_player.speed_scale
+		_animation_player.speed_scale = 0.0
+	_anim_hold_until_usec = until
+	get_tree().create_timer(seconds, true, false, true).timeout.connect(_end_animation_hold.bind(until))
+
+func _end_animation_hold(until: int) -> void:
+	if until != _anim_hold_until_usec:
+		return
+	_anim_hold_until_usec = 0
+	if _animation_player != null:
+		_animation_player.speed_scale = _anim_held_speed
+
 # Called by BattleFeedback once BattleController reports a card hit
 # landing on the player. _active_material may be the flat fallback's
 # StandardMaterial3D (FLAT, or a failed load) or a ShaderMaterial
@@ -2011,6 +2049,7 @@ func bind_to_battle(controller: BattleController) -> void:
 	_battle_controller = controller
 	controller.card_played.connect(_on_card_played)
 	controller.card_swing.connect(_on_card_swing)
+	controller.card_impact.connect(_on_card_impact)
 	controller.card_repeat_swing.connect(_on_card_repeat_swing)
 	controller.status_changed.connect(_on_status_changed)
 
@@ -2021,6 +2060,8 @@ func unbind_battle() -> void:
 		_battle_controller.card_played.disconnect(_on_card_played)
 	if _battle_controller.card_swing.is_connected(_on_card_swing):
 		_battle_controller.card_swing.disconnect(_on_card_swing)
+	if _battle_controller.card_impact.is_connected(_on_card_impact):
+		_battle_controller.card_impact.disconnect(_on_card_impact)
 	if _battle_controller.card_repeat_swing.is_connected(_on_card_repeat_swing):
 		_battle_controller.card_repeat_swing.disconnect(_on_card_repeat_swing)
 	if _battle_controller.status_changed.is_connected(_on_status_changed):
@@ -2038,6 +2079,11 @@ func _on_card_swing(card: CardData) -> void:
 	if card.card_type != CardData.CardType.ATTACK:
 		return
 	play_swing_audio()
+
+# BattleController.card_impact: the glb's Slash's contact holds his clip
+# (get_card_hitstop_time()).
+func _on_card_impact(card: CardData) -> void:
+	hold_animation(get_card_hitstop_time(card))
 
 # BattleController.card_repeat_swing: the repeated hit's follow-through -
 # a short lunge at `target` (the recoil tween, pointed at it) and the
@@ -2067,8 +2113,9 @@ func _on_card_played(card: CardData, target: FieldEnemy) -> void:
 	_animation_player.queue(resting)
 
 # The glb's Slash's step in (see the Slash group): his model out toward
-# target - straight ahead with none - arriving on the contact frame, then
-# back. A swing over one still in flight starts from the model's home.
+# target - straight ahead with none - arriving on the contact frame,
+# holding there through the hit-stop, then back. A swing over one still
+# in flight starts from the model's home.
 func _play_slash_lunge(target: FieldEnemy) -> void:
 	if _model == null:
 		return
@@ -2092,6 +2139,8 @@ func _play_slash_lunge(target: FieldEnemy) -> void:
 		_lunge_tween.tween_interval(contact - out_time)
 	_lunge_tween.tween_property(_model, "position:x", reach.x, out_time)
 	_lunge_tween.parallel().tween_property(_model, "position:z", reach.y, out_time)
+	if slash_hitstop_time > 0.0:
+		_lunge_tween.chain().tween_interval(slash_hitstop_time)
 	_lunge_tween.chain().tween_property(_model, "position:x", _lunge_home.x, return_time)
 	_lunge_tween.parallel().tween_property(_model, "position:z", _lunge_home.y, return_time)
 
