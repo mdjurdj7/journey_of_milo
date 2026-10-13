@@ -920,14 +920,18 @@ func _counter_strikes(against: Array[FieldEnemy]) -> void:
 
 # CardData.impact_time's own clamp: a clip shorter than the authored
 # impact_time fires at the clip's own end instead of after it's already
-# finished. _wanderer is only used to look up that length - if it's ever
-# unset, the authored impact_time is used unclamped rather than dropped
-# to 0.
+# finished. A clip that knows its own contact frame (Wanderer.get_clip_
+# contact_time() - the glb's Slash) lands there instead, whatever the card
+# says. _wanderer is only used to look these up - if it's ever unset, the
+# authored impact_time is used unclamped rather than dropped to 0.
 func _impact_delay_for(card: CardData) -> float:
 	if card.battle_animation == &"":
 		return 0.0
 	var delay: float = card.impact_time
 	if _wanderer != null:
+		var contact: float = _wanderer.get_clip_contact_time(card.battle_animation)
+		if contact >= 0.0:
+			return contact
 		var clip_length: float = _wanderer.get_clip_length(card.battle_animation)
 		if clip_length > 0.0:
 			delay = minf(delay, clip_length)

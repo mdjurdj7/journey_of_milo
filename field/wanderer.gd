@@ -12,15 +12,18 @@ signal path_stuck
 # (bones smartrig_*, an A-pose rest), exported as glTF in metres - 1.7 m
 # tall at rest, its skeleton unscaled and unturned. Its clips are the
 # battle stance: battle_idle_breathe (breathing in it) merges as
-# BattleIdle, battle_idle (held) in its place if it's missing
-# (_merge_clips()); every other clip is a separate FBX carried over
-# (_transfer_clip()). Idle, Walk and Run are Meshy's own clips for this
-# rig (mixamorig_ names, its bone lengths, a different rest), stripped to
-# skeleton and animation (no skin); DrawSword, Slash and Brace are still
-# cut on the old Mixamo rig.
+# BattleIdle, battle_idle (held) in its place if it's missing, and slash
+# as Slash (_merge_clips()); every other clip is a separate FBX carried
+# over (_transfer_clip()). Idle, Walk and Run are Meshy's own clips for
+# this rig (mixamorig_ names, its bone lengths, a different rest),
+# stripped to skeleton and animation (no skin); DrawSword and Brace are
+# still cut on the old Mixamo rig, and so is the Slash the glb's own
+# stands in for when it's missing.
 const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3.glb"
 # The glb's clips that can be BattleIdle, first found wins (_merge_clips()).
 const BATTLE_IDLE_CLIPS: Array[StringName] = [&"battle_idle_breathe", &"battle_idle"]
+# The glb's own swing, merged as Slash in place of the Mixamo one.
+const SLASH_CLIP := &"slash"
 const IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_idle.fbx"
 const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_walk.fbx"
 const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_run.fbx"
@@ -204,6 +207,21 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 @export var follow_through_out_time: float = 0.08
 @export var follow_through_return_time: float = 0.2
 @export var follow_through_pitch: float = 1.08
+
+@export_group("Slash")
+# The glb's own slash (when it carries one - _merge_clips()) swings feet
+# planted, so the step in comes from here: his model slides
+# slash_lunge_distance toward the target over slash_lunge_out_time,
+# arriving on slash_contact_time - the clip's contact frame (Blender frame
+# 10 at 24 fps), where the card's hit lands too (get_clip_contact_time())
+# - and back over slash_lunge_return_time. The model moves, not the body:
+# his place in the fight stays where it is. The Mixamo fallback steps in
+# its own clip and gets none of this; its hit lands at the card's
+# impact_time. All read at each swing.
+@export var slash_contact_time: float = 10.0 / 24.0
+@export var slash_lunge_distance: float = 0.3
+@export var slash_lunge_out_time: float = 0.25
+@export var slash_lunge_return_time: float = 0.45
 
 @export_group("Shading")
 # TEXTURED: wanderer_painted.gdshader - the painted albedo under a soft
@@ -397,6 +415,12 @@ var _animation_tree: AnimationTree
 # Whether his model carries battle_camera_turn_degrees (_model_yaw()) -
 # set by enter_battle_stance(), cleared by exit_battle_stance().
 var _battle_turned: bool = false
+# Whether Slash is the glb's own (_merge_clips()), not the Mixamo fallback.
+var _own_slash: bool = false
+# The Slash lunge in flight (_play_slash_lunge()), and the model's x/z it
+# returns to.
+var _lunge_tween: Tween = null
+var _lunge_home: Vector2 = Vector2.ZERO
 # The mixer applying the model's poses (the AnimationTree when it's on,
 # else the AnimationPlayer); foot grounding runs on its mixer_applied.
 var _grounding_mixer: AnimationMixer = null
@@ -1244,8 +1268,11 @@ func _build_flat_material() -> StandardMaterial3D:
 # the stance, or the held battle_idle if that's missing - else its clip
 # with the most keys. Where it plays, see enter_battle_stance()/exit_
 # battle_stance(). It loops, Loop Mode Linear, set here whatever the
-# import says, so it runs for the whole battle frame. Every clip after it
-# is carried onto the model's skeleton by _transfer_clip().
+# import says, so it runs for the whole battle frame. The glb's slash, if
+# it has one, is renamed to Slash and plays once (_on_card_played()).
+# Every clip after them is carried onto the model's skeleton by
+# _transfer_clip() - all but one the glb already gave: its Slash leaves
+# the Mixamo one unloaded.
 func _merge_clips(anim_player: AnimationPlayer) -> void:
 	if anim_player == null:
 		push_error("Wanderer: model has no AnimationPlayer; cannot merge clips.")
@@ -1259,6 +1286,11 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 	var library := anim_player.get_animation_library(battle_idle_entry["library"])
 	(battle_idle_entry["animation"] as Animation).loop_mode = Animation.LOOP_LINEAR
 	library.rename_animation(battle_idle_entry["name"], "BattleIdle")
+	var slash_entry := _find_named_animation(anim_player, [SLASH_CLIP])
+	_own_slash = not slash_entry.is_empty()
+	if _own_slash:
+		(slash_entry["animation"] as Animation).loop_mode = Animation.LOOP_NONE
+		anim_player.get_animation_library(slash_entry["library"]).rename_animation(slash_entry["name"], "Slash")
 
 	var anim_root := anim_player.get_node_or_null(anim_player.root_node)
 	var skeletons: Array[Node] = _model.find_children("*", "Skeleton3D", true, false) if _model != null else []
@@ -1266,6 +1298,8 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 	# A clip that fails is reported and the rest still merge - one broken
 	# file costs its own clip, not every clip after it.
 	for clip: Dictionary in _merged_clips():
+		if anim_player.has_animation(String(clip["name"])):
+			continue
 		if not _merge_clip(library, anim_root, target_skeleton, clip):
 			push_error("Wanderer: the %s clip (%s) failed to merge; merging the rest." % [clip["name"], clip["path"]])
 
@@ -1282,7 +1316,9 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 #   (rather than trusting whatever the import defaulted to) - enter_battle_
 #   stance() relies on it finishing so the queued BattleIdle can start.
 # - Slash: a one-shot attack swing, triggered by CardData.battle_animation
-#   (see _on_card_played()), not anything here.
+#   (see _on_card_played()), not anything here. Only merged when the glb
+#   has no slash of its own (_merge_clips()). Its hips step in and back
+#   in the clip itself.
 # - Brace: a one-shot like Slash: the Brace card plays it once (CardData.
 #   battle_animation) and the Wanderer returns to rest. It used to loop as
 #   a held pose while Braced sat on the player; Braced is on the enemy now,
@@ -1756,6 +1792,14 @@ func get_clip_length(anim_name: StringName) -> float:
 		return 0.0
 	return _animation_player.get_animation(anim_name).length
 
+# When a merged clip's blow lands, in seconds into it, for BattleController.
+# _impact_delay_for(): slash_contact_time for the glb's own Slash (held to
+# its length), -1.0 for any other clip - the card's impact_time decides.
+func get_clip_contact_time(anim_name: StringName) -> float:
+	if anim_name != &"Slash" or not _own_slash:
+		return -1.0
+	return clampf(slash_contact_time, 0.0, get_clip_length(anim_name))
+
 # Called by BattleFeedback once BattleController reports a card hit
 # landing on the player. _active_material may be the flat fallback's
 # StandardMaterial3D (FLAT, or a failed load) or a ShaderMaterial
@@ -1947,6 +1991,7 @@ func _model_yaw() -> float:
 func exit_battle_stance() -> void:
 	if _animation_player:
 		_animation_player.play("Idle", animation_blend_time)
+	_end_slash_lunge()
 
 	_battle_turned = false
 	if _model != null:
@@ -2009,11 +2054,56 @@ func _on_card_repeat_swing(card: CardData, target: FieldEnemy) -> void:
 # so a card played while a status holding a pose (StatusData.battle_
 # animation) is active on the player doesn't permanently cancel that pose
 # once the swing finishes. Brace's own clip is a one-shot like Slash.
-func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
+# The glb's own Slash ends on BattleIdle's first pose and blends into the
+# resting clip over animation_blend_time, with its lunge at the target.
+func _on_card_played(card: CardData, target: FieldEnemy) -> void:
 	if card.battle_animation == &"" or _animation_player == null:
 		return
+	var resting := _resting_battle_animation()
 	_animation_player.play(card.battle_animation, animation_blend_time)
-	_animation_player.queue(_resting_battle_animation())
+	if card.battle_animation == &"Slash" and _own_slash:
+		_animation_player.set_blend_time(&"Slash", resting, animation_blend_time)
+		_play_slash_lunge(target)
+	_animation_player.queue(resting)
+
+# The glb's Slash's step in (see the Slash group): his model out toward
+# target - straight ahead with none - arriving on the contact frame, then
+# back. A swing over one still in flight starts from the model's home.
+func _play_slash_lunge(target: FieldEnemy) -> void:
+	if _model == null:
+		return
+	_end_slash_lunge()
+	_lunge_home = Vector2(_model.position.x, _model.position.z)
+	var direction := Vector3.FORWARD
+	if target != null and is_instance_valid(target):
+		var toward: Vector3 = global_transform.basis.orthonormalized().transposed() * (target.global_position - global_position)
+		toward.y = 0.0
+		if toward.length() > 0.0001:
+			direction = toward.normalized()
+	var reach := _lunge_home + Vector2(direction.x, direction.z) * slash_lunge_distance
+	var contact: float = get_clip_contact_time(&"Slash")
+	var out_time: float = clampf(slash_lunge_out_time, 0.0, contact)
+	var return_time: float = maxf(slash_lunge_return_time, 0.0)
+
+	_lunge_tween = create_tween()
+	_lunge_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_lunge_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	if contact - out_time > 0.0:
+		_lunge_tween.tween_interval(contact - out_time)
+	_lunge_tween.tween_property(_model, "position:x", reach.x, out_time)
+	_lunge_tween.parallel().tween_property(_model, "position:z", reach.y, out_time)
+	_lunge_tween.chain().tween_property(_model, "position:x", _lunge_home.x, return_time)
+	_lunge_tween.parallel().tween_property(_model, "position:z", _lunge_home.y, return_time)
+
+# A lunge in flight stops, and his model is back home.
+func _end_slash_lunge() -> void:
+	if _lunge_tween == null:
+		return
+	_lunge_tween.kill()
+	_lunge_tween = null
+	if _model != null:
+		_model.position.x = _lunge_home.x
+		_model.position.z = _lunge_home.y
 
 # See StatusData.battle_animation's own doc. Re-evaluates on every status
 # change (a status being applied, ticked, or cleared) rather than reacting

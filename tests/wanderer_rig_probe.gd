@@ -10,9 +10,15 @@ extends SceneTree
 #   clips  - Idle, Walk, Run, BattleIdle, DrawSword, Slash and Brace are
 #            merged, with their loop modes; every bone track resolves to
 #            a bone on the model's skeleton; BattleIdle is the glb's own
-#            battle_idle (its tracks, unconverted), looping
-#   poses  - each carried clip, sampled through its length, stands him up
-#            (head over hips over toes) on the new rig's own bone lengths
+#            battle_idle_breathe and Slash its slash (their tracks,
+#            unconverted); Slash lands on its contact frame (get_clip_
+#            contact_time(), Blender frame 10) and ends on BattleIdle's
+#            first pose, so the blend back is seamless
+#   lunge  - the glb's Slash steps his model slash_lunge_distance ahead,
+#            arriving on the contact frame, and home again after
+#   poses  - each clip but BattleIdle, sampled through its length, stands
+#            him up (head over hips over toes) on the new rig's own bone
+#            lengths
 #   ground - with his processing off, as the battle freeze leaves it,
 #            BattleIdle after Idle still grounds him: his lower toe joint
 #            settles model_ground_offset over the sand under him
@@ -35,6 +41,8 @@ extends SceneTree
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3.glb"
+# A card that swings Slash (battle_animation), for the lunge.
+const SLASH_CARD_PATH := "res://cards/data/slash.tres"
 const SAFETY_SECONDS := 120.0
 const LOAD_FRAMES := 30
 const POSE_FRAMES := 4
@@ -55,9 +63,16 @@ const UPRIGHT_HIPS_OVER_TOE_M := 0.5
 # hips over toe - so it is held to just under that instead.
 const BRACE_HEAD_OVER_HIPS_M := 0.50
 const BRACE_HIPS_OVER_TOE_M := 0.30
+# The glb's slash: its contact frame, Blender frame 10 at 24 fps; its
+# last pose against BattleIdle's first (degrees, worst bone); the lunge's
+# reach at contact and its home after (metres).
+const SLASH_CONTACT_S := 10.0 / 24.0
+const SLASH_SEAM_LIMIT_DEG := 1.0
+const LUNGE_REACH_LIMIT_M := 0.03
+const LUNGE_HOME_LIMIT_M := 0.001
 const LOOPING: Array[String] = ["Idle", "Walk", "Run", "BattleIdle"]
 const ONE_SHOTS: Array[String] = ["DrawSword", "Slash", "Brace"]
-const CARRIED: Array[String] = ["Idle", "Walk", "Run", "DrawSword", "Slash", "Brace"]
+const POSED: Array[String] = ["Idle", "Walk", "Run", "DrawSword", "Slash", "Brace"]
 # Bones whose rest length a carried clip must keep (parent -> child), by
 # name after the rig's prefix (_bone()).
 const LENGTH_BONES: Array[String] = ["RightForeArm", "RightHand", "LeftLeg", "LeftFoot", "Head"]
@@ -126,26 +141,57 @@ func _initialize() -> void:
 		_check(unresolved.is_empty(), "%s: all %d tracks resolve to a bone (%s)" % [clip, animation.get_track_count(), ", ".join(unresolved.slice(0, 3))])
 	# A fresh copy of the glb, past the cache the Wanderer's merge renamed
 	# and added to: its battle_idle_breathe, key for key, is what BattleIdle
-	# plays, looping; battle_idle (held) stays beside it as the fallback.
+	# plays, looping, and its slash is Slash; battle_idle (held) stays
+	# beside them as the fallback.
 	var fresh := ResourceLoader.load(MODEL_SCENE_PATH, "", ResourceLoader.CACHE_MODE_IGNORE_DEEP) as PackedScene
 	var source: Node = fresh.instantiate()
 	var source_player := source.find_children("*", "AnimationPlayer", true, false)[0] as AnimationPlayer
 	var own_names: Array[String] = []
 	var own: Animation = null
+	var own_slash: Animation = null
 	for library_name in source_player.get_animation_library_list():
 		var library := source_player.get_animation_library(library_name)
 		for animation_name in library.get_animation_list():
 			own_names.append(String(animation_name))
 			if animation_name == &"battle_idle_breathe":
 				own = library.get_animation(animation_name)
+			elif animation_name == &"slash":
+				own_slash = library.get_animation(animation_name)
 	source.free()
 	own_names.sort()
-	_check(own_names == ["battle_idle", "battle_idle_breathe"], "the glb carries battle_idle and battle_idle_breathe (%s)" % [own_names])
+	_check(own_names == ["battle_idle", "battle_idle_breathe", "slash"], "the glb carries battle_idle, battle_idle_breathe and slash (%s)" % [own_names])
 	if own != null and _player.has_animation("BattleIdle"):
 		_check(_clip_text(_player.get_animation("BattleIdle")) == _clip_text(own), "BattleIdle is battle_idle_breathe, track for track and key for key")
+	if own_slash != null and _player.has_animation("Slash"):
+		_check(_clip_text(_player.get_animation("Slash")) == _clip_text(own_slash), "Slash is the glb's slash, track for track and key for key")
+	var contact: float = float(_wanderer.call("get_clip_contact_time", &"Slash"))
+	_check(absf(contact - SLASH_CONTACT_S) <= 0.001, "Slash lands on its contact frame, %.4f s in (frame 10 = %.4f s)" % [contact, SLASH_CONTACT_S])
+	if _player.has_animation("Slash") and _player.has_animation("BattleIdle"):
+		await _pose("BattleIdle", 0.0)
+		var idle_pose: Array[Quaternion] = _bone_rotations()
+		await _pose("Slash", _player.get_animation("Slash").length)
+		var slash_end: Array[Quaternion] = _bone_rotations()
+		var worst_deg := 0.0
+		for bone in idle_pose.size():
+			worst_deg = maxf(worst_deg, rad_to_deg(idle_pose[bone].angle_to(slash_end[bone])))
+		_check(worst_deg <= SLASH_SEAM_LIMIT_DEG, "Slash ends on BattleIdle's first pose (worst bone %.3f deg)" % worst_deg)
+
+	print("\n=== lunge")
+	await _pose("BattleIdle", 0.0)
+	forward = -_wanderer.global_transform.basis.z
+	var home: Vector3 = model.global_position
+	var lunge_card: Resource = load(SLASH_CARD_PATH)
+	_wanderer.call("_on_card_played", lunge_card, null)
+	await create_timer(contact).timeout
+	var reach: Vector3 = model.global_position - home
+	var distance: float = float(_wanderer.get("slash_lunge_distance"))
+	_check(absf(reach.dot(forward) - distance) <= LUNGE_REACH_LIMIT_M and Vector2(reach.x, reach.z).length() <= distance + LUNGE_REACH_LIMIT_M, "on the contact frame his model is %.3f m ahead (slash_lunge_distance %.2f)" % [reach.dot(forward), distance])
+	await create_timer(float(_wanderer.get("slash_lunge_return_time")) + 0.2).timeout
+	var back: Vector3 = model.global_position - home
+	_check(Vector2(back.x, back.z).length() <= LUNGE_HOME_LIMIT_M, "and home after (%.4f m off)" % Vector2(back.x, back.z).length())
 
 	print("\n=== poses")
-	for clip in CARRIED:
+	for clip in POSED:
 		if not _player.has_animation(clip):
 			continue
 		var length: float = _player.get_animation(clip).length
@@ -218,6 +264,13 @@ func _pose(clip: String, time: float) -> void:
 	_player.seek(time, true)
 	for i in POSE_FRAMES:
 		await process_frame
+
+# Every bone's posed rotation, in bone order.
+func _bone_rotations() -> Array[Quaternion]:
+	var rotations: Array[Quaternion] = []
+	for bone in _skeleton.get_bone_count():
+		rotations.append(_skeleton.get_bone_pose_rotation(bone))
+	return rotations
 
 # Every track's path and every key, as text - two clips with the same text
 # play the same.
