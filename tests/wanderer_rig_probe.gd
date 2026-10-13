@@ -32,10 +32,18 @@ extends SceneTree
 #            frame strips any bone scale in the pose); in BattleIdle its
 #            point is above the sand under his feet - nothing about which
 #            way it points, so any battle pose passes
+#   fight  - in a real fight with floor 1's Sputter (HP raised so nothing
+#            dies), through BattleController.request_play()/confirm_
+#            target(): a Slash plays to its last frame through the status
+#            change its own resolution ends with, then BattleIdle takes
+#            over; a second Slash confirmed 0.45 s after the first waits
+#            for the first to reach slash_cancel_time before its play
+#            starts (not before 0.75 s), and lands on its own contact
+#            frame from there
 #
-# The Wanderer's own _physics_process is held off (process_mode disabled,
-# as the battle freeze does) so it doesn't put Idle back; the model under
-# him keeps playing, as it does in a fight.
+# Until the fight, the Wanderer's own _physics_process is held off
+# (process_mode disabled, as the battle freeze does) so it doesn't put
+# Idle back; the model under him keeps playing, as it does in a fight.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/wanderer_rig_probe.gd
 #
@@ -46,6 +54,14 @@ extends SceneTree
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3.glb"
+const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
+const FIGHT_HP := 999
+# The fight's second Slash is confirmed this long after the first (real
+# seconds), and must not start before CANCEL_S.
+const SECOND_PLAY_AT_S := 0.45
+const CANCEL_S := 0.75
+# Frame slack on the fight's timings (seconds).
+const FIGHT_SLACK_S := 0.05
 # A card that swings Slash (battle_animation), for the lunge.
 const SLASH_CARD_PATH := "res://cards/data/slash.tres"
 const SAFETY_SECONDS := 120.0
@@ -92,6 +108,16 @@ var _field: Node3D = null
 var _wanderer: Node3D = null
 var _skeleton: Skeleton3D = null
 var _player: AnimationPlayer = null
+# The fight's spies, written by signal handlers (lambdas capture locals by
+# value, so these are members): status changes seen mid-Slash; each
+# card_played and card_impact's real time (ms) and Slash's playhead at
+# it; the playhead the poll saw last.
+var _status_mid_slash: int = 0
+var _played_ms: Array[int] = []
+var _played_from: Array[float] = []
+var _impact_ms: Array[int] = []
+var _impact_at: Array[float] = []
+var _last_slash_pos: float = -1.0
 
 func _initialize() -> void:
 	create_timer(SAFETY_SECONDS).timeout.connect(func() -> void:
@@ -288,6 +314,15 @@ func _initialize() -> void:
 	print("sword: grip %s, tip %s" % [sword.global_position, tip])
 	_check(tip.y > ground_y, "its point is above the sand (%.3f m over it)" % (tip.y - ground_y))
 
+	print("\n=== fight")
+	_wanderer.process_mode = Node.PROCESS_MODE_INHERIT
+	for node in get_nodes_in_group("enemies"):
+		(node as Node).process_mode = Node.PROCESS_MODE_INHERIT
+	var controller: Node = await _start_fight()
+	if controller != null:
+		await _check_slash_plays_out(controller)
+		await _check_cancel_window(controller)
+
 	_field.queue_free()
 	for i in 5:
 		await process_frame
@@ -304,6 +339,129 @@ func _pose(clip: String, time: float) -> void:
 	_player.seek(time, true)
 	for i in POSE_FRAMES:
 		await process_frame
+
+# A fight with floor 1's Sputter, started through RegionField's contact
+# handler (as armored_contact_probe does), every enemy at FIGHT_HP and the
+# hand empty; null (a failure) if none starts.
+func _start_fight() -> Node:
+	var target: Node3D = _fight_enemy()
+	if target == null:
+		_check(false, "floor 1 has a Sputter to fight")
+		return null
+	_wanderer.global_position = target.global_position + Vector3(1.5, 0.0, 0.0)
+	await physics_frame
+	_field.call_deferred("_on_enemy_contacted", target)
+	for i in 10:
+		await physics_frame
+	var layer: Node = _field.get_node("BattleLayer")
+	var overlay: Node = layer.get_child(0) if layer.get_child_count() > 0 else null
+	_check(overlay != null, "a fight starts")
+	if overlay == null:
+		return null
+	var controller: Node = overlay.get("battle_controller")
+	for combatant: Object in (controller.get("_combatants") as Dictionary).values():
+		combatant.set("max_hp", FIGHT_HP)
+		combatant.set("hp", FIGHT_HP)
+	controller.get("deck").call("discard_hand")
+	controller.connect("status_changed", func() -> void:
+		if _player.current_animation == "Slash":
+			_status_mid_slash += 1)
+	controller.connect("card_played", func(_card: Resource, _target: Node) -> void:
+		_played_ms.append(Time.get_ticks_msec())
+		_played_from.append(_last_slash_pos))
+	controller.connect("card_impact", func(_card: Resource) -> void:
+		_impact_ms.append(Time.get_ticks_msec())
+		_impact_at.append(_player.current_animation_position if _player.current_animation == "Slash" else -1.0))
+	# The fight's opening (DrawSword, the camera) settles first.
+	await create_timer(1.5).timeout
+	return controller
+
+func _fight_enemy() -> Node3D:
+	for node in get_nodes_in_group("enemies"):
+		var data: Resource = node.get("enemy_data")
+		if data != null and data.resource_path == SPUTTER_PATH:
+			return node as Node3D
+	return null
+
+# One Slash, alone: its resolution's status change comes while it is still
+# swinging, and it plays to its last frame before BattleIdle takes over.
+func _check_slash_plays_out(controller: Node) -> void:
+	var view: Object = await _deal(controller)
+	(controller.get("player") as Object).set("energy", 3)
+	_status_mid_slash = 0
+	controller.call("request_play", view)
+	controller.call("confirm_target", _fight_enemy())
+	var length: float = _player.get_animation("Slash").length
+	var furthest: float = -1.0
+	var start: int = Time.get_ticks_msec()
+	while _player.current_animation != "Slash" and Time.get_ticks_msec() - start < 1000:
+		await process_frame
+	while _player.current_animation == "Slash" and Time.get_ticks_msec() - start < 4000:
+		furthest = maxf(furthest, _player.current_animation_position)
+		await process_frame
+	_check(_status_mid_slash > 0, "its resolution's status change comes mid-Slash (%d)" % _status_mid_slash)
+	_check(furthest >= length - FIGHT_SLACK_S, "a lone Slash plays to its last frame through it (%.3f of %.3f s)" % [furthest, length])
+	_check(_player.current_animation == "BattleIdle", "then BattleIdle takes over (%s)" % _player.current_animation)
+	await _settle(controller)
+
+# Two Slashes, the second confirmed SECOND_PLAY_AT_S after the first: it
+# waits for the first's cancel point, then lands on its own contact frame.
+func _check_cancel_window(controller: Node) -> void:
+	var first: Object = await _deal(controller)
+	var second: Object = await _deal(controller)
+	(controller.get("player") as Object).set("energy", 3)
+	_played_ms.clear()
+	_played_from.clear()
+	_impact_ms.clear()
+	_impact_at.clear()
+	_last_slash_pos = -1.0
+	var enemy: Node3D = _fight_enemy()
+	controller.call("request_play", first)
+	controller.call("confirm_target", enemy)
+	var start: int = Time.get_ticks_msec()
+	var asked: bool = false
+	var queued: bool = false
+	while (_played_ms.size() < 2 or _impact_ms.size() < 2) and Time.get_ticks_msec() - start < 4000:
+		_last_slash_pos = _player.current_animation_position if _player.current_animation == "Slash" else -1.0
+		if not asked and Time.get_ticks_msec() - start >= int(SECOND_PLAY_AT_S * 1000.0):
+			asked = true
+			controller.call("request_play", second)
+			controller.call("confirm_target", enemy)
+			queued = bool(controller.get("_play_queued"))
+		await process_frame
+	var cancel: float = float(_wanderer.get("slash_cancel_time"))
+	var contact: float = float(_wanderer.call("get_clip_contact_time", &"Slash"))
+	_check(absf(cancel - CANCEL_S) <= 0.0001, "slash_cancel_time is %.3f s in region_field.tscn (0.75)" % cancel)
+	_check(queued, "a second Slash confirmed %.2f s in is taken and waits" % SECOND_PLAY_AT_S)
+	_check(_played_ms.size() == 2 and _impact_ms.size() == 2, "both Slashes play and land (%d played, %d impacts)" % [_played_ms.size(), _impact_ms.size()])
+	if _played_ms.size() < 2 or _impact_ms.size() < 2:
+		return
+	var second_at: float = (_played_ms[1] - _played_ms[0]) / 1000.0
+	_check(second_at >= CANCEL_S, "the second starts %.3f s after the first, not before %.2f s" % [second_at, CANCEL_S])
+	_check(_played_from[1] >= cancel - FIGHT_SLACK_S, "the first swing had reached its cancel point (%.3f s, slash_cancel_time %.3f)" % [_played_from[1], cancel])
+	var second_impact: float = (_impact_ms[1] - _played_ms[1]) / 1000.0
+	_check(absf(second_impact - contact) <= FIGHT_SLACK_S, "its hit lands %.3f s after its own start (contact %.4f s)" % [second_impact, contact])
+	_check(absf(_impact_at[1] - contact) <= FIGHT_SLACK_S, "on its own frame 10: Slash is %.3f s in at the hit" % _impact_at[1])
+	await _settle(controller)
+
+# A fresh Slash card drawn into the hand; its view.
+func _deal(controller: Node) -> Object:
+	var card: Resource = (load(SLASH_CARD_PATH) as Resource).duplicate()
+	var deck: Object = controller.get("deck")
+	(deck.get("draw_pile") as Array).append(card)
+	deck.call("draw", 1)
+	await process_frame
+	for view: Object in controller.get("_hand_container").call("_card_views"):
+		if view.get("card_data") == card:
+			return view
+	return null
+
+# The play resolved, the swing over and BattleIdle back.
+func _settle(controller: Node) -> void:
+	var start: int = Time.get_ticks_msec()
+	while (bool(controller.get("_input_locked")) or bool(controller.get("_play_queued")) or _player.current_animation != "BattleIdle") and Time.get_ticks_msec() - start < 4000:
+		await process_frame
+	await create_timer(0.3).timeout
 
 # Every bone's posed rotation, in bone order.
 func _bone_rotations() -> Array[Quaternion]:

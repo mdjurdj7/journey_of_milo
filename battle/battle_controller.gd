@@ -200,6 +200,13 @@ var _wanderer: Wanderer = null
 # end_turn() both refuse to start anything new while this is true, so a
 # second card/turn can never be armed mid-swing.
 var _input_locked: bool = false
+# A play is resolving (_resolve_play(), commit to resolved), and a next
+# one is waiting - on it, or on the Wanderer's swing reaching its cancel
+# point (_resolve_play()'s cancel window). While one resolves a next card
+# can still be armed and confirmed; only one waits at a time, and End
+# Turn and Devour wait with it.
+var _play_in_flight: bool = false
+var _play_queued: bool = false
 # How long a killing hit on an enemy takes to show in full, in real
 # seconds from the hit: (enemy: FieldEnemy, amount: int) -> float. Set by
 # BattleOverlay, which owns the reactions and numbers; unset, a death
@@ -386,7 +393,7 @@ func get_choosing_card_view() -> CardView:
 	return _choosing_card_view
 
 func request_play(card_view: CardView) -> void:
-	if _input_locked or _pending_card_view != null or _choice_open() or card_view.card_data == null:
+	if (_input_locked and not _play_in_flight) or _play_queued or _pending_card_view != null or _choice_open() or card_view.card_data == null:
 		return
 	# Devour first: the card clicked is the one it eats, playable or not.
 	if _devour_picking:
@@ -634,7 +641,7 @@ func cancel_target() -> void:
 # End Turn: with a keepsake that keeps cards and a card in hand, the keep
 # choice first (_begin_keep_choice()) - and End Turn again confirms it.
 func end_turn() -> void:
-	if _input_locked:
+	if _input_locked or _play_queued:
 		return
 	if _keep_choice_open:
 		confirm_choice()
@@ -693,9 +700,30 @@ func _finish_turn(keep: Array[CardData]) -> void:
 # floating number, HP bars) already reacts to whichever of them fires
 # once resolve_card() actually runs, so all of that lands in sync with
 # the swing with no rewiring - only the wait moved. _input_locked (set
-# by the caller path this always runs on) keeps a second card from being
-# armed while this is in flight.
+# by the caller path this always runs on) keeps anything but one next card
+# from being armed while this is in flight.
+# - The cancel window: a play confirmed while another is in flight, or
+#   while the Wanderer's swing is short of its cancel point (Wanderer.
+#   holds_next_play() - the glb's Slash, slash_cancel_time), waits for
+#   both before its commit - so its swing, and its impact timer, start
+#   from there and stay in sync. If the wait leaves it unplayable (the
+#   fight over, the card or its target gone, too dear) it goes back to
+#   the hand.
 func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_views: Array[CardView] = [], consume_view: CardView = null) -> void:
+	if _play_in_flight or _swing_holds_next_play():
+		_play_queued = true
+		_emit_devour_changed()
+		while _play_in_flight or _swing_holds_next_play():
+			await get_tree().process_frame
+		_play_queued = false
+		if not _still_playable(card_view, target_enemy, consume_view):
+			if is_instance_valid(card_view):
+				card_view.release()
+			if consume_view != null and is_instance_valid(consume_view):
+				consume_view.set_marked(false)
+			_emit_devour_changed()
+			return
+	_play_in_flight = true
 	var card: CardData = card_view.card_data
 	# Read before anything is spent: whether a cost replacement (Collateral)
 	# covers this card depends on the free card and any cost reduction
@@ -833,6 +861,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	# player acts.
 	if has_held_deaths():
 		await deaths_released
+	_play_in_flight = false
 	_input_locked = false
 	_emit_devour_changed()
 	_check_battle_end()
@@ -918,6 +947,27 @@ func _counter_strikes(against: Array[FieldEnemy]) -> void:
 		# What the strike spent (Garnished, Unbroken) leaves the readouts.
 		status_changed.emit()
 
+# The Wanderer's swing is short of its cancel point (_resolve_play()).
+func _swing_holds_next_play() -> bool:
+	return _wanderer != null and _wanderer.holds_next_play()
+
+# Whether a play that waited in the cancel window can still go: the fight
+# on, the card still in the hand and playable, its target (and Deny's
+# pick) still there.
+func _still_playable(card_view: CardView, target_enemy: FieldEnemy, consume_view: CardView) -> bool:
+	if not is_instance_valid(card_view) or card_view.card_data == null or not deck.hand.has(card_view.card_data):
+		return false
+	if player.hp <= 0 or _win_waiting or _living_enemy_combatants().is_empty():
+		return false
+	var card: CardData = card_view.card_data
+	if not _is_playable(card):
+		return false
+	if target_enemy != null and (not is_instance_valid(target_enemy) or not enemies.has(target_enemy) or not _can_target(card, _combatants.get(target_enemy))):
+		return false
+	if consume_view != null and (not is_instance_valid(consume_view) or consume_view.card_data == null or not deck.hand.has(consume_view.card_data)):
+		return false
+	return true
+
 # CardData.impact_time's own clamp: a clip shorter than the authored
 # impact_time fires at the clip's own end instead of after it's already
 # finished. A clip that knows its own contact frame (Wanderer.get_clip_
@@ -977,7 +1027,7 @@ static func encounter_role(members: Array[Dictionary]) -> String:
 # this - the button, arming an unplayable card for it, the pick, lighting
 # up as a target.
 func is_devour_available() -> bool:
-	return player != null and _devour_uses_this_turn < devour_uses_per_turn and is_devour_affordable() and not _input_locked and not _choice_open()
+	return player != null and _devour_uses_this_turn < devour_uses_per_turn and is_devour_affordable() and not _input_locked and not _play_queued and not _choice_open()
 
 # Whether the player has the Energy Devour costs.
 func is_devour_affordable() -> bool:

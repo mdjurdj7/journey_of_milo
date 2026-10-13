@@ -221,8 +221,14 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 # FieldEnemy.hold_for()) - the flash, number and sound land as it starts -
 # and the lunge waits the same before it goes back. The Mixamo fallback
 # steps in its own clip and gets none of this; its hit lands at the
-# card's impact_time. All read at each swing.
+# card's impact_time. A next card waits for the swing to reach
+# slash_cancel_time (seconds into the clip - the end of the follow-
+# through's hang, Blender frame 18) before its play starts
+# (BattleController, holds_next_play()) - a Slash then swings again from
+# the top, its hit on its own contact frame; with none, the swing plays
+# out and blends into the resting clip. All read at each swing.
 @export var slash_contact_time: float = 10.0 / 24.0
+@export var slash_cancel_time: float = 18.0 / 24.0
 @export var slash_lunge_distance: float = 0.3
 @export var slash_lunge_out_time: float = 0.25
 @export var slash_lunge_return_time: float = 0.45
@@ -422,6 +428,9 @@ var _animation_tree: AnimationTree
 var _battle_turned: bool = false
 # Whether Slash is the glb's own (_merge_clips()), not the Mixamo fallback.
 var _own_slash: bool = false
+# The one-shot clip a card last started (_on_card_played()) - a swing,
+# while it's still the one playing (_swinging()).
+var _swing_clip: StringName = &""
 # The Slash lunge in flight (_play_slash_lunge()), and the model's x/z it
 # returns to.
 var _lunge_tween: Tween = null
@@ -1809,6 +1818,19 @@ func get_clip_contact_time(anim_name: StringName) -> float:
 		return -1.0
 	return clampf(slash_contact_time, 0.0, get_clip_length(anim_name))
 
+# Whether the swing playing now is short of its cancel point: Battle
+# Controller holds a next play until it isn't (see the Slash group). Only
+# the glb's own Slash has one; any other clip holds nothing.
+func holds_next_play() -> bool:
+	if not _own_slash or _swing_clip != &"Slash" or not _swinging():
+		return false
+	return _animation_player.current_animation_position < clampf(slash_cancel_time, 0.0, get_clip_length(&"Slash"))
+
+# Whether a card's one-shot clip (_swing_clip) is still the one playing -
+# held by a hit-stop included.
+func _swinging() -> bool:
+	return _swing_clip != &"" and _animation_player != null and _animation_player.is_playing() and _animation_player.current_animation == String(_swing_clip)
+
 # The hit-stop `card`'s blow holds for, in real seconds: slash_hitstop_time
 # for a card that swings the glb's own Slash, 0 for any other. BattleFeedback
 # holds the enemies it strikes for this long.
@@ -2028,6 +2050,7 @@ func _model_yaw() -> float:
 # normal" immediately instead of staying frozen on BattleIdle's last pose.
 func exit_battle_stance() -> void:
 	if _animation_player:
+		_swing_clip = &""
 		_animation_player.play("Idle", animation_blend_time)
 	_end_slash_lunge()
 
@@ -2102,11 +2125,17 @@ func _on_card_repeat_swing(card: CardData, target: FieldEnemy) -> void:
 # once the swing finishes. Brace's own clip is a one-shot like Slash.
 # The glb's own Slash ends on BattleIdle's first pose and blends into the
 # resting clip over animation_blend_time, with its lunge at the target.
+# The same clip again (a Slash in the last one's cancel window) swings
+# from the top, blending out of where the last one had got to.
 func _on_card_played(card: CardData, target: FieldEnemy) -> void:
 	if card.battle_animation == &"" or _animation_player == null:
 		return
 	var resting := _resting_battle_animation()
+	var again: bool = _animation_player.current_animation == String(card.battle_animation)
 	_animation_player.play(card.battle_animation, animation_blend_time)
+	if again:
+		_animation_player.seek(0.0, true)
+	_swing_clip = card.battle_animation
 	if card.battle_animation == &"Slash" and _own_slash:
 		_animation_player.set_blend_time(&"Slash", resting, animation_blend_time)
 		_play_slash_lunge(target)
@@ -2115,12 +2144,16 @@ func _on_card_played(card: CardData, target: FieldEnemy) -> void:
 # The glb's Slash's step in (see the Slash group): his model out toward
 # target - straight ahead with none - arriving on the contact frame,
 # holding there through the hit-stop, then back. A swing over one still
-# in flight starts from the model's home.
+# in flight goes out from wherever that one has got to, toward the same
+# home.
 func _play_slash_lunge(target: FieldEnemy) -> void:
 	if _model == null:
 		return
-	_end_slash_lunge()
-	_lunge_home = Vector2(_model.position.x, _model.position.z)
+	if _lunge_tween != null and _lunge_tween.is_valid():
+		_lunge_tween.kill()
+	else:
+		_lunge_home = Vector2(_model.position.x, _model.position.z)
+	_lunge_tween = null
 	var direction := Vector3.FORWARD
 	if target != null and is_instance_valid(target):
 		var toward: Vector3 = global_transform.basis.orthonormalized().transposed() * (target.global_position - global_position)
@@ -2156,11 +2189,19 @@ func _end_slash_lunge() -> void:
 
 # See StatusData.battle_animation's own doc. Re-evaluates on every status
 # change (a status being applied, ticked, or cleared) rather than reacting
-# to any one specific status by name.
+# to any one specific status by name. A card's swing still playing plays
+# out: the resting clip waits behind it in the queue, blended in as it
+# ends, instead of cutting it off (every play's resolution ends in a
+# status change).
 func _on_status_changed() -> void:
 	if _animation_player == null or _battle_controller == null:
 		return
 	var target := _resting_battle_animation()
+	if _swinging():
+		_animation_player.clear_queue()
+		_animation_player.set_blend_time(_swing_clip, target, animation_blend_time)
+		_animation_player.queue(target)
+		return
 	if _animation_player.current_animation != target:
 		_animation_player.play(target, animation_blend_time)
 
