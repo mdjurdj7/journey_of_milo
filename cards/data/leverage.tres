@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/leverage.tres" id="3_leverage"]
 [ext_resource type="Texture2D" uid="uid://bsoxupcwy687r" path="res://cards/art/Wanderer/Leverage.png" id="9_art"]
+[ext_resource type="Resource" uid="uid://c2m5tr8hpq3va" path="res://cards/tempered/leverage_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="CardEffect_spend_toll"]
 script = ExtResource("2_card_effect")
@@ -27,3 +28,4 @@ Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_spend_toll"), SubResource("CardEffect_apply_status")])
 removal_scope = 1
 art = ExtResource("9_art")
+tempered = ExtResource("10_tempered")

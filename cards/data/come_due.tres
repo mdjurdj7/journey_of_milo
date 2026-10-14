@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/come_due.tres" id="3_come_due"]
 [ext_resource type="Texture2D" uid="uid://cyupr04sdvc3o" path="res://cards/art/Wanderer/Come Due.png" id="9_art"]
+[ext_resource type="Resource" uid="uid://c6rh4ma8vt1ky" path="res://cards/tempered/come_due_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="CardEffect_spend_toll"]
 script = ExtResource("2_card_effect")
@@ -26,3 +27,4 @@ description = "Spend 5 Toll.
 Next 3 Attacks against this enemy deal +4 damage."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_spend_toll"), SubResource("CardEffect_apply_status_to_target")])
 art = ExtResource("9_art")
+tempered = ExtResource("10_tempered")

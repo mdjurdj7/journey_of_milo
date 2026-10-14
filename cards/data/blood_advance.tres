@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Texture2D" uid="uid://bpsq6oyrlrx32" path="res://cards/art/Wanderer/Blood Advance.png" id="9_art"]
+[ext_resource type="Resource" uid="uid://b7xe3nk6wy2pd" path="res://cards/tempered/blood_advance_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="CardEffect_self_damage_toll"]
 script = ExtResource("2_card_effect")
@@ -23,3 +24,4 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_self_dama
 removal_scope = 1
 art = ExtResource("9_art")
 play_sound_path = "res://assets/audio/cards/Blood Advance/Blood Advance.mp3"
+tempered = ExtResource("10_tempered")

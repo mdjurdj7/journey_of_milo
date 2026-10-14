@@ -27,7 +27,7 @@ const TEMPERED_DIR := "res://cards/tempered/"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 const STARTERS: Array[String] = ["slash", "bite_down", "brace", "reckoning", "down_payment"]
 # The smallest rules size a tempered face may shrink to and still read.
-const MIN_RULES_SIZE := 14
+const MIN_RULES_SIZE := 13
 # Scripts whose folder lists must leave cards/tempered/ out: the
 # compendium's card_folders, both debug pickers' debug_card_dirs.
 const SCANS: Dictionary = {

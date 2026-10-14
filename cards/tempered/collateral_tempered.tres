@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://b4k7wq2nx8ram"]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" uid="uid://c8pw2fy6ke4tn" path="res://battle/rules/statuses/collateral_tempered.tres" id="3_collateral"]
+[ext_resource type="Texture2D" uid="uid://856tybwsm6gt" path="res://cards/art/Wanderer/Collateral.png" id="9_art"]
+
+[sub_resource type="Resource" id="CardEffect_apply_status"]
+script = ExtResource("2_card_effect")
+effect_type = 12
+status_data = ExtResource("3_collateral")
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Collateral+"
+card_type = 1
+rarity = 2
+target_type = 1
+description = "Your next 2 cards costing 2 or more cost 5 HP instead of Energy.
+Spent."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
+removal_scope = 1
+art = ExtResource("9_art")
