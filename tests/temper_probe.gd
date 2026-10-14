@@ -86,8 +86,9 @@ func _initialize() -> void:
 
 # Every card that names a tempered version: <id>_tempered.tres, its name
 # plus "+", its rarity, type, removal scope and art the original's, its
-# own tempered null - its target may differ. Each starter has one; and
-# the provisional numbers.
+# own tempered null - its target may differ, and it may drop Spent (never
+# gain it, or move to another scope). Each starter has one; and the
+# provisional numbers.
 func _check_data() -> void:
 	for id in STARTERS:
 		_expect(_tempered(id) != null, "%s has a tempered version" % id)
@@ -98,7 +99,10 @@ func _check_data() -> void:
 		_expect_eq(tempered.card_name, card.card_name + "+", "...named %s+" % card.card_name)
 		_expect_eq(tempered.rarity, card.rarity, "...its rarity")
 		_expect_eq(tempered.card_type, card.card_type, "...its type")
-		_expect_eq(tempered.removal_scope, card.removal_scope, "...its removal scope")
+		# A temper may drop Spent (Leverage+), never gain it or move to
+		# another scope.
+		var drops_spent: bool = card.removal_scope == CardData.RemovalScope.SPENT and tempered.removal_scope == CardData.RemovalScope.NONE
+		_expect(tempered.removal_scope == card.removal_scope or drops_spent, "...its removal scope, or Spent dropped (%d from %d)" % [tempered.removal_scope, card.removal_scope])
 		_expect(tempered.tempered == null, "...and can't be tempered again")
 		_expect_eq(tempered.art, card.art, "...its art")
 	var slash: CardData = _tempered("slash")

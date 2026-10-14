@@ -102,7 +102,8 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 # The authored, stronger version Glassbone works this card into at the
 # wagon (RunState.temper_card()): a card of its own under cards/tempered/
 # - in no pool and no folder scan - its name carrying a "+", its rarity,
-# type and removal scope the original's. Null: this card can't be
+# type and removal scope the original's, except that it may drop Spent
+# (never gain it, or move to another scope). Null: this card can't be
 # tempered. Every tempered version leaves its own null, so a card is
 # tempered once only.
 @export var tempered: CardData = null
