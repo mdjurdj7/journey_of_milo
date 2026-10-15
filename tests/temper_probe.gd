@@ -5,8 +5,8 @@ extends SceneTree
 # of every pool, list and folder scan; RunState.temper_card() - exactly
 # the cost spent, exactly one card swapped at its own deck position, once
 # per card, logged; the workbench on floor 3 - the grindstone and the
-# handcart beside it, grounded, the worn band past them still open to
-# walk; its screen - no grid while the Glassbone is short, the grid and
+# handcart beside it, grounded in the north-west lobe, off the worn band,
+# reached from spawn; its screen - no grid while the Glassbone is short, the grid and
 # the preview's hairlines while it isn't, TEMPER, the hold and the field
 # lock; a tempered Consumed card still removed after its fight; and the
 # Cards screen's TEMPERED toggle.
@@ -39,13 +39,14 @@ const SCANS: Dictionary = {
 const LOG_DIR := "user://temper_probe"
 # Floor 3 (index 2) holds the wagon.
 const WAGON_FLOOR := 2
-# The grindstone, partway along the east arm against its north wall, in
-# the worn band's fringe behind the handcart's tail, turned 12 degrees.
-const WAGON_OFFSET := Vector2(15.34, -36.49)
-const WAGON_YAW := 12.0
-# The handcart, straddling the band's north edge, its shafts east.
-const CART_OFFSET := Vector2(18.0, -36.4)
-const CART_YAW := 0.0
+# The grindstone, in the north-west lobe - the small dead-end bay off the
+# hub's top-left - behind the handcart's tail, turned 12 degrees off it.
+const WAGON_OFFSET := Vector2(-8.46, -29.0)
+const WAGON_YAW := 6.0
+# The handcart, pulled in and left a metre off the lobe's centre toward
+# its north wall, its shafts only loosely toward the mouth.
+const CART_OFFSET := Vector2(-5.82, -28.63)
+const CART_YAW := -6.0
 # How far into the sand a wheel or a shaft tip may sit: the cart's sink
 # plus its roll's dip at the wheels, and a margin.
 const CART_SUNK_MAX := 0.09
@@ -54,16 +55,15 @@ const CART_SUNK_MAX := 0.09
 const CART_WHEEL_LOW: Array[Vector3] = [Vector3(-0.636, 0.001, -0.69), Vector3(-0.636, 0.001, 0.69)]
 const CART_TIPS: Array[Vector3] = [Vector3(1.495, 0.401, -0.341), Vector3(1.495, 0.401, 0.341)]
 const CART_TAIL := Vector3(-1.5, 0.5, 0.0)
-# The pair stands against the arm's north wall: each footprint inside the
-# floor's ledge lines by at least this, never across one.
-const WALL_GAP_MIN := 0.1
-# The worn band past the pair, as he walks it: across the band at every
-# step along the pair's length, the longest open run of the walk grid
-# (the pair's footprints and the walls already in it) inside the band's
-# visible width is at least this.
-const BAND_CLEAR_MIN := 3.5
-# Metres between samples, along the band and across it.
-const BAND_STEP := 0.25
+# Each footprint inside the floor's ledge lines by at least this, never
+# across one.
+const LEDGE_GAP_MIN := 0.5
+# The lobe's mouth, where it opens onto the hub (spawn-relative XZ): from
+# the notch tip between the lobe and the corridor to the lobe's west wall.
+# Every footprint point lies on the lobe's side of it.
+const MOUTH_A := Vector2(-1.47, -29.02)
+const MOUTH_B := Vector2(-7.07, -23.58)
+const LOBE_CENTRE := Vector2(-5.82, -27.63)
 const LEAVE_INDEX := 100002
 const BACK_INDEX := 100001
 const TEMPER_INDEX := 100000
@@ -369,16 +369,16 @@ func _compendium_view(compendium: Node, card_name: String) -> CardView:
 			return view
 	return null
 
-# The workbench pair on floor 3. The grindstone (the Wagon) at
-# WAGON_OFFSET, yaw WAGON_YAW, with its approach line, MAKE_STATIC, its
-# bbox's four bottom corners on the drawn sand (in it no deeper than its
-# sink and a margin), in the worn band's fringe - off its core. The
-# handcart at CART_OFFSET, yaw CART_YAW, tipped onto its shafts - both
-# wheels and both shaft tips on the drawn sand, in it no deeper than
-# CART_SUNK_MAX - MAKE_STATIC, its tail within 2.5 m of the grindstone.
-# Both footprints inside the floor's ledge lines (WALL_GAP_MIN) on ground
-# flat under them; the band past them still BAND_CLEAR_MIN of open walk
-# grid across; and a plan from spawn gets him into the grindstone's reach.
+# The workbench pair on floor 3, in the north-west lobe. The grindstone
+# (the Wagon) at WAGON_OFFSET, yaw WAGON_YAW, with its approach line,
+# MAKE_STATIC, its bbox's four bottom corners on the drawn sand (in it no
+# deeper than its sink and a margin). The handcart at CART_OFFSET, yaw
+# CART_YAW, tipped onto its shafts - both wheels and both shaft tips on
+# the drawn sand, in it no deeper than CART_SUNK_MAX - MAKE_STATIC, its
+# tail within 2.5 m of the grindstone. Both footprints inside the floor's ledge lines by LEDGE_GAP_MIN,
+# on the lobe's side of its mouth, on ground flat under them, and off the
+# worn band entirely - beyond its visible half-width from its centre
+# line; and a plan from spawn gets him into the grindstone's reach.
 func _check_wagon_placement() -> void:
 	var wagons: Array[Node] = get_nodes_in_group("wagons")
 	_expect_eq(wagons.size(), 1, "Floor 3 has one workbench")
@@ -408,7 +408,7 @@ func _check_wagon_placement() -> void:
 		_expect(point.y >= under - deepest, "...and not buried past its sink (%.3f under)" % [under - point.y])
 	var cart_offset := Vector2(cart.global_position.x - spawn.x, cart.global_position.z - spawn.z)
 	_expect(cart_offset.distance_to(CART_OFFSET) < 0.01, "The handcart at %s from spawn (got %s)" % [CART_OFFSET, cart_offset])
-	_expect(is_equal_approx(float(cart.get("yaw_degrees")), CART_YAW), "...yaw %.0f, its shafts toward the exit" % CART_YAW)
+	_expect(is_equal_approx(float(cart.get("yaw_degrees")), CART_YAW), "...yaw %.0f" % CART_YAW)
 	var cart_body := cart.find_child("Collision", true, false) as StaticBody3D
 	_expect(cart_body != null and cart_body.disable_mode == CollisionObject3D.DISABLE_MODE_MAKE_STATIC, "...its collision MAKE_STATIC")
 	var tip: float = float(cart.call("get_tip_degrees"))
@@ -432,9 +432,7 @@ func _check_wagon_placement() -> void:
 	var ledges: Array = floor_data.get("ledges")
 	_expect(not ledges.is_empty(), "...floor 3 has its ledge lines")
 	var band: PackedVector2Array = _band_line(floor_data.get("wear_path_override"))
-	var core: float = float(ground.get("wear_half_width"))
-	var visible: float = core + float(ground.get("wear_edge_noise_amplitude"))
-	var along := PackedVector2Array()
+	var visible: float = float(ground.get("wear_half_width")) + float(ground.get("wear_edge_noise_amplitude"))
 	for entry: Array in [["The grindstone", wagon, Rect2(box.position.x, box.position.z, box.size.x, box.size.z)], ["The handcart", cart, Rect2(-1.5, -0.86, 3.01, 1.72)]]:
 		var label: String = entry[0]
 		var node: Node3D = entry[1]
@@ -447,11 +445,12 @@ func _check_wagon_placement() -> void:
 				footprint.append(Vector2(point.x - spawn.x, point.z - spawn.z))
 		var to_ledge: float = INF
 		var nearest: float = INF
+		var mouth_margin: float = INF
 		var low: float = INF
 		var high: float = -INF
 		for p in footprint:
 			nearest = minf(nearest, _polyline_distance(band, p))
-			along.append(p)
+			mouth_margin = minf(mouth_margin, _lobe_side(p))
 			var under: float = float(ground.call("get_visible_height_at", p + Vector2(spawn.x, spawn.z)))
 			low = minf(low, under)
 			high = maxf(high, under)
@@ -459,39 +458,10 @@ func _check_wagon_placement() -> void:
 				_expect(Geometry2D.is_point_in_polygon(p, ledge), "%s's footprint inside the floor's ledge lines (%s)" % [label, p])
 				for i in ledge.size() - 1:
 					to_ledge = minf(to_ledge, _segment_distance(p, ledge[i], ledge[i + 1]))
-		_expect(to_ledge >= WALL_GAP_MIN, "...%.1f m or more from the wall (%.2f m)" % [WALL_GAP_MIN, to_ledge])
+		_expect(to_ledge >= LEDGE_GAP_MIN, "...%.1f m or more from any ledge (%.2f m)" % [LEDGE_GAP_MIN, to_ledge])
+		_expect(mouth_margin > 0.0, "...inside the north-west lobe, behind its mouth (%.2f m)" % mouth_margin)
 		_expect(high - low <= 0.3, "...on ground flat under it (%.2f m of rise)" % (high - low))
-		if node == wagon:
-			_expect(nearest > core, "...off the band's core, in its fringe (%.2f m from its centre line, core %.2f)" % [nearest, core])
-	# The band past the pair: across it at every BAND_STEP along the
-	# stretch the pair spans, the longest run of open walk-grid cells
-	# within the band's visible width.
-	var nav: Object = _field.call("get_nav_grid")
-	var first: float = INF
-	var last: float = -INF
-	for p in along:
-		var s: float = _polyline_param(band, p)
-		first = minf(first, s)
-		last = maxf(last, s)
-	var narrowest: float = INF
-	var s_at: float = first
-	while s_at <= last:
-		var centre: Vector2 = _polyline_point(band, s_at)
-		var across: Vector2 = _polyline_normal(band, s_at)
-		var run: float = 0.0
-		var best: float = 0.0
-		var t: float = -visible
-		while t <= visible:
-			var world: Vector2 = centre + across * t + Vector2(spawn.x, spawn.z)
-			if bool(nav.call("is_open", nav.call("world_to_cell", world))):
-				run += BAND_STEP
-				best = maxf(best, run)
-			else:
-				run = 0.0
-			t += BAND_STEP
-		narrowest = minf(narrowest, best)
-		s_at += BAND_STEP
-	_expect(narrowest >= BAND_CLEAR_MIN, "The worn band past the pair keeps %.1f m open to walk (narrowest %.2f m)" % [BAND_CLEAR_MIN, narrowest])
+		_expect(nearest > visible, "...off the worn band entirely (%.2f m from its centre line, %.2f m showing)" % [nearest, visible])
 	var path: PackedVector3Array = _field.call("plan_path", spawn, wagon.global_position, null, false)
 	_expect(path.size() >= 2, "A plan from spawn to the grindstone")
 	if path.size() >= 2:
@@ -761,38 +731,14 @@ func _polyline_distance(line: PackedVector2Array, p: Vector2) -> float:
 		best = minf(best, _segment_distance(p, line[i], line[i + 1]))
 	return best
 
-# Arc length along `line` to the point nearest `p`.
-func _polyline_param(line: PackedVector2Array, p: Vector2) -> float:
-	var best: float = INF
-	var at: float = 0.0
-	var walked: float = 0.0
-	for i in line.size() - 1:
-		var a: Vector2 = line[i]
-		var ab: Vector2 = line[i + 1] - a
-		var length: float = ab.length()
-		var h: float = clampf((p - a).dot(ab) / maxf(length * length, 0.000001), 0.0, 1.0)
-		var d: float = p.distance_to(a + ab * h)
-		if d < best:
-			best = d
-			at = walked + length * h
-		walked += length
-	return at
-
-# The point `s` metres along `line`, and the unit normal there.
-func _polyline_point(line: PackedVector2Array, s: float) -> Vector2:
-	var walked: float = 0.0
-	for i in line.size() - 1:
-		var length: float = line[i].distance_to(line[i + 1])
-		if walked + length >= s:
-			return line[i].lerp(line[i + 1], (s - walked) / maxf(length, 0.000001))
-		walked += length
-	return line[line.size() - 1]
-
-func _polyline_normal(line: PackedVector2Array, s: float) -> Vector2:
-	var a: Vector2 = _polyline_point(line, maxf(s - 0.1, 0.0))
-	var b: Vector2 = _polyline_point(line, s + 0.1)
-	var d: Vector2 = (b - a).normalized()
-	return Vector2(-d.y, d.x)
+# How far `p` lies on the lobe's side of its mouth line (MOUTH_A to
+# MOUTH_B), metres - negative out on the hub's side.
+func _lobe_side(p: Vector2) -> float:
+	var along: Vector2 = (MOUTH_B - MOUTH_A).normalized()
+	var normal := Vector2(-along.y, along.x)
+	if (LOBE_CENTRE - MOUTH_A).dot(normal) < 0.0:
+		normal = -normal
+	return (p - MOUTH_A).dot(normal)
 
 func _collect_resources(dir: String, out: Array[String]) -> void:
 	for sub in DirAccess.get_directories_at(dir):

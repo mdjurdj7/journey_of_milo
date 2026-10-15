@@ -22,14 +22,15 @@
 [sub_resource type="Resource" id="FloorProp_wagon"]
 script = ExtResource("13_floor_prop")
 scene = ExtResource("15_wagon")
-position = Vector3(15.34, 0, -36.49)
-yaw_degrees = 12.0
+position = Vector3(-8.46, 0, -29)
+yaw_degrees = 6.0
 world_line = "A wagon, unhitched. The tools are still on it."
 
 [sub_resource type="Resource" id="FloorProp_handcart"]
 script = ExtResource("13_floor_prop")
 scene = ExtResource("16_handcart")
-position = Vector3(18, 0, -36.4)
+position = Vector3(-5.82, 0, -28.63)
+yaw_degrees = -6.0
 roll_degrees = 2.5
 
 [sub_resource type="Resource" id="FloorEnemy_strawcrown"]
