@@ -11,7 +11,8 @@ class_name BelongingsObject
 # (field/wanderer_painted.gdshader: roughness 1, no specular, no normal
 # map). The shader is fog_disabled, so the depth fog is laid back over it
 # by an enemy_fog.gdshader pass at fog_factor, filled from the field's
-# RegionSky and again whenever its fog changes. If the shader or the
+# RegionSky and again whenever its fog changes (both through PaintedProp,
+# which the workbench and the handcart share). If the shader or the
 # colour map fails to load, the hulls' flat material wears the tint. The
 # bbox is measured in this node's space and its bottom seated on the
 # origin, so a model whose origin isn't at its base still sits on the
@@ -21,8 +22,6 @@ class_name BelongingsObject
 # Taken: it sinks its own height into the sand over settle_seconds and
 # frees - a settled enemy's ease (FieldEnemy.settle_and_free()).
 
-const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
-const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
 # Beside the model: <model>_Image_0.jpg, its colour map.
 const COLOUR_MAP_SUFFIX := "_Image_0.jpg"
 
@@ -85,7 +84,7 @@ func _spawn_model() -> void:
 	_material = painted_material(model_scene_path, tint)
 	_fog = null
 	if _material != null:
-		_fog = _fog_pass()
+		_fog = PaintedProp.fog_pass()
 		_material.next_pass = _fog
 	else:
 		_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
@@ -120,17 +119,7 @@ func _spawn_model() -> void:
 # own material, so its tint is its own. Null when the shader or the map
 # fails to load. BelongingsScreen dresses its renders with it too.
 static func painted_material(model_path: String, albedo_tint: Color) -> ShaderMaterial:
-	var shader := load(PAINTED_SHADER_PATH) as Shader
-	var map_path: String = model_path.get_basename() + COLOUR_MAP_SUFFIX
-	var texture: Texture2D = load(map_path) as Texture2D if ResourceLoader.exists(map_path) else null
-	if shader == null or texture == null:
-		push_warning("BelongingsObject: painted material failed to load (%s, %s); the flat tint instead." % [PAINTED_SHADER_PATH, map_path])
-		return null
-	var material := ShaderMaterial.new()
-	material.shader = shader
-	material.set_shader_parameter("albedo_texture", texture)
-	material.set_shader_parameter("albedo_tint", albedo_tint)
-	return material
+	return PaintedProp.material(model_path.get_basename() + COLOUR_MAP_SUFFIX, albedo_tint)
 
 # A painted material's albedo_tint, a flat one's albedo_color.
 static func set_material_tint(material: Material, albedo_tint: Color) -> void:
@@ -139,26 +128,10 @@ static func set_material_tint(material: Material, albedo_tint: Color) -> void:
 	elif material is BaseMaterial3D:
 		(material as BaseMaterial3D).albedo_color = albedo_tint
 
-func _fog_pass() -> ShaderMaterial:
-	var shader := load(FOG_SHADER_PATH) as Shader
-	if shader == null:
-		push_warning("BelongingsObject '%s': fog pass shader failed to load (%s); unfogged." % [name, FOG_SHADER_PATH])
-		return null
-	var pass_material := ShaderMaterial.new()
-	pass_material.shader = shader
-	return pass_material
-
 # The field's depth fog into the fog pass, as the Wanderer's is
 # (Wanderer.refresh_fog()).
 func _push_fog() -> void:
-	if _fog == null or _sky == null:
-		return
-	_fog.set_shader_parameter("fog_color", _sky.fog_color)
-	_fog.set_shader_parameter("fog_energy", _sky.fog_light_energy)
-	_fog.set_shader_parameter("fog_begin", _sky.current_fog_depth_begin())
-	_fog.set_shader_parameter("fog_end", _sky.current_fog_depth_end())
-	_fog.set_shader_parameter("fog_density", _sky.fog_density)
-	_fog.set_shader_parameter("fog_factor", fog_factor)
+	PaintedProp.push_fog(_fog, _sky, fog_factor)
 
 # A new model_scale: the model, its bbox and its collision again.
 func _rebuild() -> void:

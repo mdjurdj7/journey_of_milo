@@ -14,16 +14,22 @@
 [ext_resource type="Script" uid="uid://bi5wh88prg3u6" path="res://floors/floor_prop.gd" id="13_floor_prop"]
 [ext_resource type="PackedScene" path="res://field/hitching_post.tscn" id="14_hitching_post"]
 [ext_resource type="PackedScene" path="res://field/wagon.tscn" id="15_wagon"]
+[ext_resource type="PackedScene" path="res://field/handcart.tscn" id="16_handcart"]
 [ext_resource type="Script" uid="uid://c1xsh7mpatcy3" path="res://floors/encounter_slot.gd" id="90_encounter_slot"]
 [ext_resource type="Script" uid="uid://n5us4ml13k7m" path="res://floors/encounter_option.gd" id="91_encounter_option"]
 
 [sub_resource type="Resource" id="FloorProp_wagon"]
 script = ExtResource("13_floor_prop")
 scene = ExtResource("15_wagon")
-position = Vector3(-7.3, 0, -28.1)
-yaw_degrees = 153.0
-roll_degrees = 4.0
+position = Vector3(15.34, 0, -36.49)
+yaw_degrees = 12.0
 world_line = "A wagon, unhitched. The tools are still on it."
+
+[sub_resource type="Resource" id="FloorProp_handcart"]
+script = ExtResource("13_floor_prop")
+scene = ExtResource("16_handcart")
+position = Vector3(18, 0, -36.4)
+roll_degrees = 2.5
 
 [sub_resource type="Resource" id="FloorEnemy_blackback"]
 script = ExtResource("2_floor_enemy")
@@ -98,7 +104,7 @@ ambience_wind_db = 2.0
 ambience_sea_lowpass_hz = 3000.0
 exit_direction = Vector2(1, 0)
 slots = Array[ExtResource("90_encounter_slot")]([SubResource("EncounterSlot_blackback"), SubResource("EncounterSlot_wardling")])
-props = Array[ExtResource("13_floor_prop")]([SubResource("FloorProp_wagon")])
+props = Array[ExtResource("13_floor_prop")]([SubResource("FloorProp_wagon"), SubResource("FloorProp_handcart")])
 ledges = Array[PackedVector2Array]([PackedVector2Array(0.3, 5.583, -1.1, 5.45, -2.533, 4.883, -3.533, 4.117, -4.383, 3.133, -5.05, 1.967, -5.45, 0.8, -5.583, 0, -5.617, -2.067, -5.983, -3.633, -6.333, -4.183, -8, -5.217, -8.883, -6.067, -9.417, -6.833, -10.017, -8.267, -10.317, -9.6, -10.383, -11.033, -10.117, -12.433, -9.717, -13.5, -9.083, -14.6, -8.3, -15.483, -7.467, -16.117, -5.683, -17.033, -5.417, -17.533, -4.483, -20.6, -4.517, -21.133, -4.933, -21.75, -7.067, -23.583, -8.967, -24.717, -9.917, -25.767, -10.283, -26.5, -10.483, -27.3, -10.417, -28.533, -9.95, -29.7, -8.9, -30.883, -8.3, -31.283, -7.033, -31.75, -5.833, -31.85, -4.9, -31.683, -3.8, -31.217, -3.033, -30.683, -1.467, -29.017, -0.8, -28.683, -0.033, -28.65, 0.433, -28.817, 1.017, -29.333, 2.95, -31.867, 5.033, -33.75, 7.467, -35.183, 10.867, -36.55, 13.933, -37.25, 18.6, -37.683, 23.9, -37.65, 24.7, -37.483, 25.7, -37.05, 26.15, -36.733, 27.15, -35.6, 27.683, -34.2, 27.75, -33.133, 27.45, -31.867, 26.95, -30.967, 26.3, -30.25, 25.3, -29.517, 23.733, -28.917, 22.433, -28.85, 16.8, -29.817, 14.867, -29.883, 12.867, -29.717, 11.2, -29.317, 10.2, -28.817, 8.917, -27.733, 8.283, -26.867, 7.717, -25.667, 7.417, -24.667, 6.883, -21.167, 5.717, -18.733, 5.717, -18.133, 5.883, -17.8, 6.433, -17.417, 7.433, -17.25, 11, -17.083, 14.7, -17.217, 15.1, -17.35, 16, -18.25, 16.9, -18.75, 17.967, -18.983, 19, -18.85, 20.2, -18.25, 20.85, -17.633, 21.35, -16.933, 21.95, -15.2, 22.017, -14.4, 21.883, -13.267, 21.583, -12.333, 20.85, -11.167, 19.967, -10.383, 18.733, -9.883, 14.567, -9.817, 14.033, -9.95, 7.5, -9.95, 6.633, -9.75, 6.217, -9.1, 5.95, -7.533, 5.983, -1.267, 5.85, 0.433, 5.517, 1.767, 4.75, 3.133, 3.333, 4.517, 1.867, 5.283, 0.3, 5.583)])
 exit_kind = 1
 gate_distance_beyond_enemy = 26.3

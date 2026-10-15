@@ -327,7 +327,9 @@ path_probes_hand() {
 		# The Dunecur's crest and feeding head.
 		field/dunecur_pose.*) out="$(area_probes field) dunecur" ;;
 		field/collector.*) out="$(area_probes field) collector" ;;
-		field/wagon.*) out="$(area_probes field) temper" ;;
+		field/wagon.*|field/handcart.*) out="$(area_probes field) temper" ;;
+		# The painted look the workbench pair and the belongings items share.
+		field/painted_prop.*|field/belongings_object.*) out="$(area_probes field) temper belongings_choice" ;;
 		# The walk-up and click the collector, the trough and the wagon share.
 		field/prop_approach.*) out="$(area_probes field) collector temper" ;;
 		# The Greyshelf's head, rear and throat.

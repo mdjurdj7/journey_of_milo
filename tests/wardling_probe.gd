@@ -18,6 +18,7 @@ const SOUND_PATH := "res://assets/audio/enemies_old/Works_Wardling/Ragged Breath
 const MODEL_PATH := "res://assets/models/enemies/Wardling/Wardling.glb"
 const POST_SCENE_PATH := "res://field/hitching_post.tscn"
 const WAGON_SCENE_PATH := "res://field/wagon.tscn"
+const HANDCART_SCENE_PATH := "res://field/handcart.tscn"
 const HEAD_TURN_PATH := "res://field/head_turn.tscn"
 # Turns 1-9: 9, 5, 11 looping, times 1.0 / 1.3 / 1.6 / 2.0 by twos, held
 # at 2.0 - roundi(11 x 1.3) = 14, roundi(9 x 1.3) = 12, roundi(11 x 1.6)
@@ -220,9 +221,10 @@ func _check_floor_3() -> void:
 		_expect_eq(slot.call("to_floor", Vector2(post.x, post.z)), Vector2(15.879, -16.057), "...north-west of the Wardling, 3.0 m off")
 		_expect_eq((props[0].get("overrides") as Dictionary).get("tether_member_index"), 0, "...its rope tied to the Wardling, its encounter's first member")
 	var floor_props: Array = floor_data.get("props")
-	_expect_eq(floor_props.size(), 1, "Floor 3 has one prop of its own")
-	if floor_props.size() == 1:
-		_expect_eq((floor_props[0].get("scene") as PackedScene).resource_path, WAGON_SCENE_PATH, "...the wagon")
+	_expect_eq(floor_props.size(), 2, "Floor 3 has two props of its own")
+	if floor_props.size() == 2:
+		_expect_eq((floor_props[0].get("scene") as PackedScene).resource_path, WAGON_SCENE_PATH, "...the workbench (the wagon's grindstone)")
+		_expect_eq((floor_props[1].get("scene") as PackedScene).resource_path, HANDCART_SCENE_PATH, "...and the handcart beside it")
 	_completed += 1
 
 # --- Helpers ---

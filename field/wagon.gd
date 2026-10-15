@@ -1,21 +1,23 @@
 extends Node3D
 class_name Wagon
 
-# A wagon set down and left, its tools still on it - floor 3's place to
-# work Glassbone. Not a merchant, not a station: nothing about it is
-# waiting for the Wanderer. Placed from data (a FloorProp: position, yaw,
-# roll, world_line; anything else through overrides) - nothing floor-
-# specific is in wagon.tscn.
+# Floor 3's place to work Glassbone: a grindstone on an A-frame, set
+# down beside a handcart (Handcart, its own prop) and stepped away from -
+# the tools still on it. Not a merchant, not a station: nothing about it
+# is waiting for the Wanderer. Placed from data (a FloorProp: position,
+# yaw, roll, world_line; anything else through overrides) - nothing
+# floor-specific is in wagon.tscn. The class keeps the wagon's name: the
+# screen it opens (WagonScreen) and the run's tempering are the wagon's.
 #
-# A placeholder body until its model exists: one low box, body_length
-# along its own Z by body_width by body_height, in the project's flat
-# matte (Hull's shared material, duplicated) at the hulls' weathered-wood
-# tint. Origin at the base, grounded by its footprint - the base at the
-# mean of the relief under its four bottom corners, pitched along its
-# length to the slope between its two ends, so neither end floats - then
-# rolled roll_degrees round its long axis and sunk sink_depth into the
-# sand: age by placement alone, nothing broken. A box StaticBody3D the Wanderer
-# walks round, MAKE_STATIC so the field's freeze leaves it in the space.
+# The body is model_scene_path on its own colour map (colour_map_path)
+# under the painted shader, with the enemy_fog pass laid over it at
+# fog_factor (PaintedProp, as the belongings items wear it). The model's
+# bbox bottom is seated on Pose's origin. Grounded by its footprint on
+# the relief as drawn (Ground.get_visible_height_at()): the base at the
+# mean of the sand under its four bottom corners, pitched and rolled to
+# the slope between them, roll_degrees on top, sunk sink_depth. A box of
+# the bbox is its collision, MAKE_STATIC so the field's freeze leaves it
+# in the space, and the walk grid steps round it.
 #
 # The walk-up and the click are PropApproach's, as the collector's are:
 # inside approach_radius the world line shows near the body, once per
@@ -33,42 +35,44 @@ signal temper_changed()
 
 const GROUP := &"wagons"
 
-@export_group("Body")
-@export var body_length: float = 2.4:
+@export_group("Model")
+@export_file("*.glb", "*.tscn") var model_scene_path: String = "res://assets/models/props/glassbone grindstone/grindstone.glb":
 	set(value):
-		body_length = value
-		_apply_body()
-@export var body_width: float = 1.2:
+		model_scene_path = value
+		_rebuild()
+# The model's own colour map: its glb's first image, extracted on import,
+# with the stone wheel taken a step below dry sand (tools/darken_part.py -
+# the value rule; it came out brighter than the sand).
+@export_file("*.jpg", "*.png") var colour_map_path: String = "res://assets/models/props/glassbone grindstone/grindstone_valued.png":
 	set(value):
-		body_width = value
-		_apply_body()
-@export var body_height: float = 1.0:
-	set(value):
-		body_height = value
-		_apply_body()
-# Hull.hull_tint's weathered wood.
-@export var tint: Color = Color(0.50, 0.47, 0.42):
+		colour_map_path = value
+		_rebuild()
+# Multiplied into the colour map - white is the map as painted.
+@export var tint: Color = Color(1.0, 1.0, 1.0):
 	set(value):
 		tint = value
 		_apply_tint()
+# Its share of the depth fog - 1 fogged as the scene fogs it.
+@export_range(0.0, 1.0, 0.01) var fog_factor: float = 1.0:
+	set(value):
+		fog_factor = value
+		_push_fog()
 @export_group("")
 
 @export_group("Placement")
-# Its facing, degrees round Y: the long axis runs along +Z at 0. From
-# FloorProp.yaw_degrees.
+# Its facing, degrees round Y. From FloorProp.yaw_degrees.
 @export var yaw_degrees: float = 0.0:
 	set(value):
 		yaw_degrees = value
 		_apply_yaw()
-# The list round its long axis, settled rather than set level. From
+# A list round its own Z on top of the slope's. From
 # FloorProp.roll_degrees.
-@export var roll_degrees: float = 4.0:
+@export var roll_degrees: float = 0.0:
 	set(value):
 		roll_degrees = value
 		_apply_pose()
-# How far the base sits into the sand - past the roll's own dip, so
-# neither bottom edge floats.
-@export var sink_depth: float = 0.08:
+# How far the base sits into the sand.
+@export var sink_depth: float = 0.03:
 	set(value):
 		sink_depth = value
 		_apply_pose()
@@ -115,17 +119,20 @@ const GROUP := &"wagons"
 @export var ground_path: NodePath = ^"../../Ground"
 @export var region_field_path: NodePath = ^"../.."
 
-# Pose carries the pitch, the roll and the sink; the body sits on it.
+# Pose carries the slope's pitch and roll and the sink; the model and its
+# collision sit on it.
 var _pose: Node3D = null
-# Radians round the body's own X: the relief's slope along its length,
-# from _ground_to_relief(); 0 until it is grounded.
+# Radians round the body's own X and Z: the drawn relief's slope under its
+# footprint, from _ground_to_relief(); 0 until it is grounded.
 var _pitch: float = 0.0
-var _mesh_instance: MeshInstance3D = null
-var _mesh: BoxMesh = null
-var _material: StandardMaterial3D = null
+var _ground_roll: float = 0.0
+var _model: Node3D = null
+var _material: Material = null
+var _fog: ShaderMaterial = null
+var _sky: RegionSky = null
+# The model's bbox on Pose, its bottom at Pose's origin.
+var _aabb: AABB = AABB()
 var _collision_body: StaticBody3D = null
-var _collision_shape: BoxShape3D = null
-var _collision_node: CollisionShape3D = null
 var _approach: PropApproach = null
 var _ground: Ground = null
 
@@ -139,8 +146,16 @@ func set_floor_placement(world_position: Vector3, yaw: float, roll: float) -> vo
 func _ready() -> void:
 	add_to_group(GROUP)
 	_apply_yaw()
-	_spawn_body()
+	_pose = Node3D.new()
+	_pose.name = "Pose"
+	add_child(_pose)
+	_spawn_model()
 	_spawn_approach()
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	_sky = region_field.get_region_sky() if region_field != null else null
+	if _sky != null:
+		_sky.fog_changed.connect(_push_fog)
+	_push_fog()
 	_ground = get_node_or_null(ground_path) as Ground
 	if _ground == null:
 		push_warning("Wagon '%s': ground_path did not resolve to a Ground; not grounded." % name)
@@ -148,57 +163,74 @@ func _ready() -> void:
 	_ground.relief_rebuilt.connect(_ground_to_relief)
 	_ground_to_relief()
 
-func _spawn_body() -> void:
-	_pose = Node3D.new()
-	_pose.name = "Pose"
-	add_child(_pose)
-	_mesh = BoxMesh.new()
-	_mesh_instance = MeshInstance3D.new()
-	_mesh_instance.name = "Body"
-	_mesh_instance.mesh = _mesh
-	_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
-	_mesh_instance.material_override = _material
-	_pose.add_child(_mesh_instance)
+# The model on Pose, dressed and seated, and its box collision.
+func _spawn_model() -> void:
+	var scene := load(model_scene_path) as PackedScene
+	if scene == null:
+		push_warning("Wagon '%s': could not load %s; no body." % [name, model_scene_path])
+		return
+	_model = scene.instantiate() as Node3D
+	_model.name = "Model"
+	_pose.add_child(_model)
+	_material = PaintedProp.material(colour_map_path, tint)
+	_fog = null
+	if _material != null:
+		_fog = PaintedProp.fog_pass()
+		_material.next_pass = _fog
+	else:
+		_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
+		_apply_tint()
+	_aabb = PaintedProp.dress_model(_model, _material, _pose)
+	_model.position.y -= _aabb.position.y
+	_aabb.position.y = 0.0
 	_collision_body = StaticBody3D.new()
 	_collision_body.name = "Collision"
 	# RegionField's freeze would otherwise take the body out of the
 	# physics space (the trough's reason).
 	_collision_body.disable_mode = CollisionObject3D.DISABLE_MODE_MAKE_STATIC
-	_collision_shape = BoxShape3D.new()
-	_collision_node = CollisionShape3D.new()
-	_collision_node.shape = _collision_shape
-	_collision_body.add_child(_collision_node)
+	var box := BoxShape3D.new()
+	box.size = _aabb.size
+	var shape_node := CollisionShape3D.new()
+	shape_node.shape = box
+	shape_node.position = _aabb.get_center()
+	_collision_body.add_child(shape_node)
 	_pose.add_child(_collision_body)
-	_apply_body()
 	_apply_pose()
-	_apply_tint()
 
-# The box on Pose, its underside on Pose's origin.
-func _apply_body() -> void:
-	var size := Vector3(maxf(body_width, 0.01), maxf(body_height, 0.01), maxf(body_length, 0.01))
-	if _mesh != null:
-		_mesh.size = size
-		_mesh_instance.position = Vector3(0.0, size.y * 0.5, 0.0)
-	if _collision_shape != null:
-		_collision_shape.size = size
-		_collision_node.position = Vector3(0.0, size.y * 0.5, 0.0)
+# A new model or colour map: the body and its collision again.
+func _rebuild() -> void:
+	if not is_inside_tree() or _pose == null:
+		return
+	if _model != null:
+		_model.free()
+		_model = null
+	if _collision_body != null:
+		_collision_body.free()
+		_collision_body = null
+	_spawn_model()
+	_push_fog()
 	_ground_to_relief()
 
+# A painted material's albedo_tint, the flat fallback's albedo_color.
 func _apply_tint() -> void:
-	if _material != null:
-		_material.albedo_color = tint
+	if _material is ShaderMaterial:
+		(_material as ShaderMaterial).set_shader_parameter("albedo_tint", tint)
+	elif _material is BaseMaterial3D:
+		(_material as BaseMaterial3D).albedo_color = tint
+
+func _push_fog() -> void:
+	PaintedProp.push_fog(_fog, _sky, fog_factor)
 
 func _apply_yaw() -> void:
 	rotation = Vector3(0.0, deg_to_rad(yaw_degrees), 0.0)
 	_ground_to_relief()
 
-# The relief's pitch round X, then the roll round the long axis (Z), at
+# The slope's pitch round X, then its roll and roll_degrees round Z, at
 # the base centre, and the sink.
 func _apply_pose() -> void:
 	if _pose == null:
 		return
-	var basis := Basis(Vector3.RIGHT, _pitch) * Basis(Vector3.BACK, deg_to_rad(roll_degrees))
+	var basis := Basis(Vector3.RIGHT, _pitch) * Basis(Vector3.BACK, _ground_roll + deg_to_rad(roll_degrees))
 	_pose.transform = Transform3D(basis, Vector3(0.0, -sink_depth, 0.0))
 
 # The walk-up and the click (PropApproach): the line near the body once
@@ -218,28 +250,33 @@ func _apply_approach_radius() -> void:
 	if _approach != null:
 		_approach.set_radius(approach_radius)
 
-# The base at the mean height of the relief under the four bottom
-# corners, pitched to the slope from its back end to its front.
+# The base at the mean height of the drawn relief under the footprint's
+# four bottom corners, pitched to the slope from its -Z side to its +Z and
+# rolled to the slope from -X to +X.
 func _ground_to_relief() -> void:
-	if _ground == null or not is_inside_tree():
+	if _ground == null or not is_inside_tree() or _aabb.size == Vector3.ZERO:
 		return
-	var half := Vector2(maxf(body_width, 0.01) * 0.5, maxf(body_length, 0.01) * 0.5)
-	var ends: Array[float] = [0.0, 0.0]
-	for side: float in [-1.0, 1.0]:
-		for end_index in 2:
-			var corner := Vector3(side * half.x, 0.0, (-1.0 if end_index == 0 else 1.0) * half.y)
-			ends[end_index] += _height_under(corner) * 0.5
-	global_position.y = (ends[0] + ends[1]) * 0.5
-	# A positive turn round X lowers +Z: the front end up is a negative one.
-	_pitch = -atan2(ends[1] - ends[0], half.y * 2.0)
+	var x0: float = _aabb.position.x
+	var x1: float = _aabb.end.x
+	var z0: float = _aabb.position.z
+	var z1: float = _aabb.end.z
+	var h00: float = _height_under(Vector3(x0, 0.0, z0))
+	var h10: float = _height_under(Vector3(x1, 0.0, z0))
+	var h01: float = _height_under(Vector3(x0, 0.0, z1))
+	var h11: float = _height_under(Vector3(x1, 0.0, z1))
+	global_position.y = (h00 + h10 + h01 + h11) * 0.25
+	# A positive turn round X lowers +Z: the front side up is a negative one.
+	_pitch = -atan2((h01 + h11) - (h00 + h10), 2.0 * (z1 - z0))
+	# A positive turn round Z raises +X.
+	_ground_roll = atan2((h10 + h11) - (h00 + h01), 2.0 * (x1 - x0))
 	_apply_pose()
 
-# The relief's height under a point in this wagon's own yawed frame.
+# The drawn relief's height under a point in this wagon's own yawed frame.
 func _height_under(local_point: Vector3) -> float:
 	var flat := Transform3D(Basis(Vector3.UP, deg_to_rad(yaw_degrees)), Vector3(global_position.x, 0.0, global_position.z))
 	var world: Vector3 = flat * local_point
 	var local_xz: Vector3 = _ground.to_local(Vector3(world.x, 0.0, world.z))
-	return _ground.get_height_at(Vector2(local_xz.x, local_xz.z))
+	return _ground.get_visible_height_at(Vector2(local_xz.x, local_xz.z))
 
 # Whether the Wanderer at `from` is in reach (approach_radius, on the
 # ground).
@@ -249,20 +286,23 @@ func can_open_from(from: Vector3) -> bool:
 
 func _say(text: String) -> void:
 	if _approach != null:
-		_approach.say_near(text, hold_seconds, fade_seconds, self, Vector3.UP * (body_height + line_clearance_m))
+		_approach.say_near(text, hold_seconds, fade_seconds, self, Vector3.UP * (_aabb.size.y + line_clearance_m))
 
-# The box on screen, rolled and sunk, grown by padding_px - the
+# The body's bbox on screen, as it stands, grown by padding_px - the
 # collector's padded rect.
 func get_screen_rect(camera: Camera3D, padding_px: float) -> Rect2:
-	if camera == null or _pose == null or not is_inside_tree():
+	if camera == null or _pose == null or not is_inside_tree() or _aabb.size == Vector3.ZERO:
 		return Rect2()
-	var box := AABB(Vector3(-body_width * 0.5, 0.0, -body_length * 0.5), Vector3(body_width, body_height, body_length))
 	var to_world: Transform3D = _pose.global_transform
 	var rect := Rect2()
 	for i in 8:
-		var corner: Vector3 = to_world * box.get_endpoint(i)
+		var corner: Vector3 = to_world * _aabb.get_endpoint(i)
 		if camera.is_position_behind(corner):
 			return Rect2()
 		var point: Vector2 = camera.unproject_position(corner)
 		rect = Rect2(point, Vector2.ZERO) if i == 0 else rect.expand(point)
 	return rect.grow(padding_px)
+
+# The body's bbox on Pose, its bottom at Pose's origin.
+func get_body_aabb() -> AABB:
+	return _aabb
