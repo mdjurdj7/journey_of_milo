@@ -7,23 +7,34 @@ signal hold_line_reached
 # A planned walk (set_move_path()) has stood still against something for
 # stuck_time with waypoints still ahead - RegionField plans again.
 signal path_stuck
+# DrawSword's ground strike (draw_sword_strike_time) in a battle entry:
+# the sword tip where it is on that frame, and the drawn sand under it.
+# BattleFeedback raises the sand puff there; the sound is his own
+# (AttackAudio.play_ground_strike()).
+signal draw_strike(tip: Vector3, ground_point: Vector3)
 
 # The body: the cloaked Wanderer, rigged by Meshy on its Mixamo template
 # (bones smartrig_*, an A-pose rest), exported as glTF in metres - 1.7 m
 # tall at rest, its skeleton unscaled and unturned. Its clips are the
 # battle stance: battle_idle_breathe (breathing in it) merges as
-# BattleIdle, battle_idle (held) in its place if it's missing, and slash
-# as Slash (_merge_clips()); every other clip is a separate FBX carried
-# over (_transfer_clip()). Idle, Walk and Run are Meshy's own clips for
-# this rig (mixamorig_ names, its bone lengths, a different rest),
-# stripped to skeleton and animation (no skin); DrawSword and Brace are
-# still cut on the old Mixamo rig, and so is the Slash the glb's own
-# stands in for when it's missing.
+# BattleIdle, battle_idle (held) in its place if it's missing, slash as
+# Slash and draw_sword as DrawSword (_merge_clips()); every other clip is
+# a separate FBX carried over (_transfer_clip()). Idle, Walk and Run are
+# Meshy's own clips for this rig (mixamorig_ names, its bone lengths, a
+# different rest), stripped to skeleton and animation (no skin); Brace is
+# still cut on the old Mixamo rig, and so are the Slash and DrawSword the
+# glb's own stand in for when they're missing.
 const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3.glb"
 # The glb's clips that can be BattleIdle, first found wins (_merge_clips()).
 const BATTLE_IDLE_CLIPS: Array[StringName] = [&"battle_idle_breathe", &"battle_idle"]
 # The glb's own swing, merged as Slash in place of the Mixamo one.
 const SLASH_CLIP := &"slash"
+# The glb's own draw, merged as DrawSword in place of the Mixamo one.
+const DRAW_SWORD_CLIP := &"draw_sword"
+# The method DrawSword's grab key calls (_merge_clips()).
+const GRAB_KEY_METHOD := &"_on_draw_sword_grab_key"
+# The method DrawSword's ground-strike key calls (_merge_clips()).
+const STRIKE_KEY_METHOD := &"_on_draw_sword_strike_key"
 const IDLE_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_idle.fbx"
 const WALK_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_walk.fbx"
 const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_run.fbx"
@@ -132,6 +143,12 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_painted.p
 @export var use_animation_tree: bool = false
 @export var walk_speed_threshold: float = 0.1
 @export var animation_blend_time: float = 0.2
+# Leaving a fight, BattleIdle blends into the field Idle over this
+# (exit_battle_stance()) - longer than animation_blend_time, as the battle
+# clips hold his right upper arm turned ~100 deg about its own axis from
+# where the Mixamo field clips hold it, and a quick blend wrings it round.
+# Read at each exit.
+@export var battle_exit_blend: float = 0.4
 @export var camera_path: NodePath = ^"../CameraPivot/Camera3D"
 @export var ground_path: NodePath = ^"../Ground"
 @export var model_yaw_offset: float = 180.0
@@ -233,6 +250,43 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 @export var slash_lunge_out_time: float = 0.25
 @export var slash_lunge_return_time: float = 0.45
 @export var slash_hitstop_time: float = 0.07
+
+@export_group("Draw Sword")
+# The glb's own draw_sword (when it carries one - _merge_clips()) is the
+# battle entry (enter_battle_stance()): the sword stays on his back until
+# draw_sword_grab_time (seconds into the clip - Blender frame 10 at 24
+# fps, where his right hand is posed on the grip). There it goes into his
+# hand as it stands - the back-carry angle - and over draw_sword_snap_time
+# (frames 10-16) turns onto the hand mount (_set_handoff()). The turn is
+# near half a circle, so its way round is set, not left to the shortest
+# arc (which swings the blade across his back to his left, past the
+# hood): the blade first turns, tip leading, to draw_sword_sweep_direction
+# - up and back over his right shoulder - then on to the hand mount as
+# his hand carries it. The direction is in his model's space: x toward
+# his left, y up, z toward his front. The grab is a method key on the
+# clip (_merge_clips()), so it lands on the clip's frame 10 however the
+# frames fall; a fight that ends before it leaves the sword on his back
+# (_on_draw_sword_grab_key()); one cut off before it by another clip
+# grabs there and then (_on_draw_sword_cut()). The clip blends in from the field
+# clip (Walk or Idle) over draw_sword_blend_in - longer than animation_
+# blend_time, for the same upper-arm turn battle_exit_blend covers - and
+# into the resting clip over animation_blend_time as it ends. The Mixamo
+# fallback keeps the old entry: the sword slides to his hand over the
+# step to battle spacing, and the clip cuts to BattleIdle. All read at
+# each entry.
+@export var draw_sword_blend_in: float = 0.35
+@export var draw_sword_grab_time: float = 10.0 / 24.0
+@export var draw_sword_snap_time: float = 6.0 / 24.0
+@export var draw_sword_sweep_direction: Vector3 = Vector3(-0.6, 0.5, -0.6)
+# The draw's ground strike: a method key on the clip at draw_sword_strike_
+# time (Blender frame 21), like the grab's, acting only while a battle
+# entry is under way - not after a fight ended or a card's clip cut the
+# draw off (_on_draw_sword_strike_key()). On it the sand puff of a slash
+# hit rises, draw_strike_puff_scale its size and speed, on the drawn sand
+# under the sword tip (draw_strike), with the ground-strike sound there.
+# Both read at each entry.
+@export var draw_sword_strike_time: float = 21.0 / 24.0
+@export var draw_strike_puff_scale: float = 1.0
 
 @export_group("Shading")
 # TEXTURED: wanderer_painted.gdshader - the painted albedo under a soft
@@ -428,6 +482,22 @@ var _animation_tree: AnimationTree
 var _battle_turned: bool = false
 # Whether Slash is the glb's own (_merge_clips()), not the Mixamo fallback.
 var _own_slash: bool = false
+# Whether DrawSword is the glb's own (_merge_clips()), not the Mixamo
+# fallback; the path its grab key calls through; whether a battle entry
+# is waiting on that key (enter_battle_stance()); and the handoff's tween
+# once it has fired (_grab_sword()).
+var _own_draw_sword: bool = false
+var _grab_key_path: NodePath = NodePath()
+var _grab_pending: bool = false
+# A battle entry waits on DrawSword's ground-strike key.
+var _strike_pending: bool = false
+var _grab_tween: Tween = null
+# The handoff's turn (_begin_handoff()), in his model's space: where the
+# sword stood at the grab and where it passes on the way; and its grip
+# position in the hand's frame at the grab.
+var _handoff_from: Quaternion = Quaternion.IDENTITY
+var _handoff_via: Quaternion = Quaternion.IDENTITY
+var _handoff_from_position: Vector3 = Vector3.ZERO
 # The one-shot clip a card last started (_on_card_played()) - a swing,
 # while it's still the one playing (_swinging()).
 var _swing_clip: StringName = &""
@@ -620,6 +690,11 @@ func _ready() -> void:
 	_grounding_mixer = _animation_tree if _animation_tree != null else _animation_player
 	if _grounding_mixer != null:
 		_grounding_mixer.mixer_applied.connect(_on_mixer_applied)
+	# DrawSword cut off - another clip, or stopped - while an entry waits on
+	# its grab key: the grab happens there (_on_draw_sword_cut()).
+	if _animation_player != null:
+		_animation_player.current_animation_changed.connect(_on_draw_sword_cut.unbind(1))
+		_animation_player.mixer_applied.connect(_on_draw_sword_cut)
 	_setup_sword(model)
 	_setup_step_debug_lines()
 	_capsule_radius = _find_capsule_radius()
@@ -1287,10 +1362,11 @@ func _build_flat_material() -> StandardMaterial3D:
 # with the most keys. Where it plays, see enter_battle_stance()/exit_
 # battle_stance(). It loops, Loop Mode Linear, set here whatever the
 # import says, so it runs for the whole battle frame. The glb's slash, if
-# it has one, is renamed to Slash and plays once (_on_card_played()).
-# Every clip after them is carried onto the model's skeleton by
-# _transfer_clip() - all but one the glb already gave: its Slash leaves
-# the Mixamo one unloaded.
+# it has one, is renamed to Slash and plays once (_on_card_played()), and
+# its draw_sword to DrawSword, once (enter_battle_stance()). Every clip
+# after them is carried onto the model's skeleton by _transfer_clip() -
+# all but those the glb already gave: its Slash and DrawSword leave the
+# Mixamo ones unloaded.
 func _merge_clips(anim_player: AnimationPlayer) -> void:
 	if anim_player == null:
 		push_error("Wanderer: model has no AnimationPlayer; cannot merge clips.")
@@ -1309,8 +1385,23 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 	if _own_slash:
 		(slash_entry["animation"] as Animation).loop_mode = Animation.LOOP_NONE
 		anim_player.get_animation_library(slash_entry["library"]).rename_animation(slash_entry["name"], "Slash")
-
 	var anim_root := anim_player.get_node_or_null(anim_player.root_node)
+	var draw_entry := _find_named_animation(anim_player, [DRAW_SWORD_CLIP])
+	_own_draw_sword = not draw_entry.is_empty() and anim_root != null
+	if _own_draw_sword:
+		# The grab is a method key on the clip itself, so it lands on the
+		# clip's own frame - the playhead crossing it, not a timer beside
+		# it. A copy carries it: the imported clip may be shared with other
+		# instances of the model.
+		var draw := (draw_entry["animation"] as Animation).duplicate() as Animation
+		draw.loop_mode = Animation.LOOP_NONE
+		_grab_key_path = anim_root.get_path_to(self)
+		var track := draw.add_track(Animation.TYPE_METHOD)
+		draw.track_set_path(track, _grab_key_path)
+		_insert_draw_keys(draw, track)
+		var draw_library := anim_player.get_animation_library(draw_entry["library"])
+		draw_library.remove_animation(draw_entry["name"])
+		draw_library.add_animation("DrawSword", draw)
 	var skeletons: Array[Node] = _model.find_children("*", "Skeleton3D", true, false) if _model != null else []
 	var target_skeleton := skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
 	# A clip that fails is reported and the rest still merge - one broken
@@ -1333,6 +1424,7 @@ func _merge_clips(anim_player: AnimationPlayer) -> void:
 # - DrawSword: a one-shot combat-start transition, LOOP_NONE explicitly
 #   (rather than trusting whatever the import defaulted to) - enter_battle_
 #   stance() relies on it finishing so the queued BattleIdle can start.
+#   Only merged when the glb has no draw_sword of its own (_merge_clips()).
 # - Slash: a one-shot attack swing, triggered by CardData.battle_animation
 #   (see _on_card_played()), not anything here. Only merged when the glb
 #   has no slash of its own (_merge_clips()). Its hips step in and back
@@ -1917,7 +2009,13 @@ func play_hit_recoil(from_direction: Vector3, distance: float, tilt_degrees: flo
 
 # Same mechanism as FieldEnemy.spawn_sand_puff() (see its own doc),
 # duplicated for the same reason play_hit_recoil() above is.
-func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spread_degrees: float) -> void:
+func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spread_degrees: float, tint: float = 1.0) -> void:
+	spawn_sand_puff_at(global_position, particle_count, lifetime, velocity, spread_degrees, 1.0, tint)
+
+# The same puff at `at`, its quads size_scale their size (DrawSword's
+# ground strike - BattleFeedback._on_draw_strike()); `tint` multiplies the
+# ground colour the grains take (BattleFeedback.sand_puff_tint).
+func spawn_sand_puff_at(at: Vector3, particle_count: int, lifetime: float, velocity: float, spread_degrees: float, size_scale: float = 1.0, tint: float = 1.0) -> void:
 	if _ground == null:
 		return
 
@@ -1930,11 +2028,12 @@ func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spre
 	particles.explosiveness = 1.0
 
 	var quad_mesh := QuadMesh.new()
-	quad_mesh.size = Vector2(0.12, 0.12)
+	quad_mesh.size = Vector2(0.12, 0.12) * size_scale
 
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = _ground.ground_color
+	var sand: Color = _ground.ground_color
+	material.albedo_color = Color(sand.r * tint, sand.g * tint, sand.b * tint, sand.a)
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	quad_mesh.material = material
 	particles.draw_pass_1 = quad_mesh
@@ -1950,7 +2049,7 @@ func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spre
 	particles.process_material = process_material
 
 	add_child(particles)
-	particles.global_position = global_position
+	particles.global_position = at
 	particles.emitting = true
 	get_tree().create_timer(lifetime + 0.1).timeout.connect(particles.queue_free)
 
@@ -1974,6 +2073,11 @@ func play_hit_audio() -> void:
 # play("Idle") safe to call even mid-DrawSword) — independent of
 # _physics_process (and its own dash/move-input handling), which
 # RegionField's contact freeze has already stopped by the time this runs.
+# The glb's own DrawSword is a swing (_swing_clip) while it plays, so a
+# status change queues the resting clip behind it rather than cutting it
+# off; it blends into BattleIdle, and the sword leaves his back on its
+# grab frame (see the Draw Sword group). The Mixamo one moves the sword
+# over the whole step.
 #
 # direction, when given, is the way from target to where this Wanderer
 # should stand (a cluster's line extended past its near end - see
@@ -2029,11 +2133,158 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float, direct
 	if _model != null:
 		tween.tween_property(_model, "rotation:y", _model_yaw(), duration)
 
+	_end_grab_wait()
 	if _animation_player:
-		_animation_player.play("DrawSword", animation_blend_time)
+		if _own_draw_sword:
+			_place_draw_keys()
+		_animation_player.play("DrawSword", draw_sword_blend_in)
+		if _own_draw_sword:
+			# After play(): DrawSword is the current clip before the wait
+			# starts, so _on_draw_sword_cut() never reads the old one.
+			_grab_pending = true
+			_strike_pending = true
+			_swing_clip = &"DrawSword"
+			_animation_player.set_blend_time(&"DrawSword", &"BattleIdle", animation_blend_time)
 		_animation_player.queue("BattleIdle")
 
-	_switch_sword_mount(_hand_frame, hand_mount_position, hand_mount_rotation_degrees, duration)
+	if not _own_draw_sword or _animation_player == null:
+		_switch_sword_mount(_hand_frame, hand_mount_position, hand_mount_rotation_degrees, duration)
+
+# DrawSword's grab and strike keys, set to draw_sword_grab_time and
+# draw_sword_strike_time as each entry reads them.
+func _place_draw_keys() -> void:
+	var draw := _animation_player.get_animation(&"DrawSword")
+	var track := draw.find_track(_grab_key_path, Animation.TYPE_METHOD)
+	if track < 0:
+		return
+	while draw.track_get_key_count(track) > 0:
+		draw.track_remove_key(track, 0)
+	_insert_draw_keys(draw, track)
+
+# DrawSword's two method keys - the grab and the ground strike - at their
+# times as they read now.
+func _insert_draw_keys(draw: Animation, track: int) -> void:
+	draw.track_insert_key(track, clampf(draw_sword_grab_time, 0.0, draw.length), {"method": GRAB_KEY_METHOD, "args": []})
+	draw.track_insert_key(track, clampf(draw_sword_strike_time, 0.0, draw.length), {"method": STRIKE_KEY_METHOD, "args": []})
+
+# DrawSword's grab key. It fires wherever the clip plays - blending in
+# under the walk, or blending out after a fight ended - so it only acts
+# for an entry still waiting on it; exit_battle_stance() ends the wait.
+func _on_draw_sword_grab_key() -> void:
+	if not _grab_pending:
+		return
+	_grab_pending = false
+	_grab_sword()
+
+# DrawSword stopped or replaced before its grab key, the entry still
+# waiting (a card's clip inside the first frames of a fight): the grab
+# happens now, so the fight never goes on with the sword on his back.
+# Battle exit ends the wait first (exit_battle_stance()), so it doesn't.
+func _on_draw_sword_cut() -> void:
+	if _animation_player.current_animation == "DrawSword":
+		return
+	# Its strike won't come either: the draw it belongs to is over.
+	_strike_pending = false
+	if _grab_pending:
+		_grab_pending = false
+		_grab_sword()
+
+# DrawSword's ground-strike key: the puff (BattleFeedback, off draw_strike)
+# and the sound on the drawn sand under the sword tip, once per entry.
+func _on_draw_sword_strike_key() -> void:
+	if not _strike_pending:
+		return
+	_strike_pending = false
+	var tip: Vector3 = _sword_tip_world()
+	var ground_point: Vector3 = tip
+	if _ground != null:
+		var local: Vector3 = _ground.to_local(tip)
+		ground_point = _ground.to_global(Vector3(local.x, _ground.get_visible_height_at(Vector2(local.x, local.z)), local.z))
+	draw_strike.emit(tip, ground_point)
+	if _attack_audio != null:
+		_attack_audio.play_ground_strike(ground_point)
+
+# The sword's tip in the world: the end of its long axis _apply_grip_
+# offset() takes for the tip.
+func _sword_tip_world() -> Vector3:
+	if _sword_mesh_holder == null:
+		return global_position
+	var axis := _longest_axis_index(_sword_raw_aabb.size)
+	var tip_local: Vector3 = _sword_raw_aabb.position + _sword_raw_aabb.size * 0.5
+	tip_local[axis] = _sword_raw_aabb.position[axis] if grip_axis_flip else _sword_raw_aabb.end[axis]
+	return _sword_mesh_holder.global_transform * tip_local
+
+# DrawSword's grab frame: the sword goes from his back into his hand as it
+# stands, then turns onto the hand mount (see the Draw Sword group).
+func _grab_sword() -> void:
+	_grab_tween = null
+	if _sword_root == null or _hand_frame == null or _model == null:
+		return
+	if _sword_root.get_parent() != _hand_frame:
+		var held: Transform3D = _sword_root.global_transform
+		if _sword_root.get_parent() != null:
+			_sword_root.get_parent().remove_child(_sword_root)
+		_hand_frame.add_child(_sword_root)
+		_sword_root.global_transform = held
+	_begin_handoff()
+	if draw_sword_snap_time <= 0.0:
+		_set_handoff(1.0)
+		return
+	_grab_tween = create_tween()
+	_grab_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_grab_tween.tween_method(_set_handoff, 0.0, 1.0, draw_sword_snap_time).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+
+# The handoff's ends, read with the sword just put in his hand: where it
+# stands, and the same turned so its tip points draw_sword_sweep_direction
+# (the least turn that does it).
+func _begin_handoff() -> void:
+	_handoff_from_position = _sword_root.position
+	_handoff_from = _model_basis().inverse() * _sword_root.global_basis.orthonormalized().get_rotation_quaternion()
+	var tip: Vector3 = _handoff_from * _sword_tip_axis()
+	var sweep: Vector3 = draw_sword_sweep_direction.normalized()
+	if sweep == Vector3.ZERO:
+		sweep = tip
+	_handoff_via = (Quaternion(tip, sweep) * _handoff_from).normalized()
+
+# The handoff at `t` (0 at the grab, 1 on the hand mount): the grip goes
+# straight to the mount's offset; the blade turns from where it stood to
+# _handoff_via, then on to the hand mount where his hand holds it now -
+# each leg the short way, at one turning speed across both.
+func _set_handoff(t: float) -> void:
+	if _sword_root == null or _hand_frame == null or _model == null:
+		return
+	var hand_basis: Basis = _hand_frame.global_basis.orthonormalized()
+	var mount: Quaternion = _model_basis().inverse() * hand_basis.get_rotation_quaternion() * Quaternion.from_euler(hand_mount_rotation_degrees * (PI / 180.0))
+	var first: float = _handoff_from.angle_to(_handoff_via)
+	var second: float = _handoff_via.angle_to(mount)
+	var split: float = first / maxf(first + second, 0.0001)
+	var turn: Quaternion = mount
+	if t < split:
+		turn = _handoff_from.slerp(_handoff_via, t / split)
+	elif t < 1.0:
+		turn = _handoff_via.slerp(mount, (t - split) / maxf(1.0 - split, 0.0001))
+	_sword_root.position = _handoff_from_position.lerp(_world_offset_to_local(hand_mount_position), t)
+	_sword_root.quaternion = (hand_basis.get_rotation_quaternion().inverse() * _model_basis() * turn).normalized()
+
+# His model's turn in the world, without its scale.
+func _model_basis() -> Quaternion:
+	return _model.global_basis.orthonormalized().get_rotation_quaternion()
+
+# The way the sword's tip points in _sword_root's own space: along the
+# blade's long axis, toward the end _apply_grip_offset() takes for the tip.
+func _sword_tip_axis() -> Vector3:
+	var axis := Vector3.ZERO
+	axis[_longest_axis_index(_sword_raw_aabb.size)] = -1.0 if grip_axis_flip else 1.0
+	return axis
+
+# A wait for DrawSword's grab frame, or the handoff after it, stops; the
+# sword stays where it is.
+func _end_grab_wait() -> void:
+	_grab_pending = false
+	_strike_pending = false
+	if _grab_tween != null:
+		_grab_tween.kill()
+		_grab_tween = null
 
 # His model's yaw under the body: model_yaw_offset, and in a fight
 # battle_camera_turn_degrees toward the camera. CameraRig's battle frame
@@ -2049,9 +2300,12 @@ func _model_yaw() -> float:
 # is what makes standing still right after a battle read as "back to
 # normal" immediately instead of staying frozen on BattleIdle's last pose.
 func exit_battle_stance() -> void:
+	# The grab's wait ends before Idle replaces DrawSword, so the cut
+	# doesn't read as one (_on_draw_sword_cut()).
+	_end_grab_wait()
 	if _animation_player:
 		_swing_clip = &""
-		_animation_player.play("Idle", animation_blend_time)
+		_animation_player.play("Idle", battle_exit_blend)
 	_end_slash_lunge()
 
 	_battle_turned = false

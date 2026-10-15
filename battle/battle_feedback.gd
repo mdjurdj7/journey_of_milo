@@ -66,6 +66,12 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 @export var sand_puff_lifetime: float = 0.6
 @export var sand_puff_velocity: float = 1.0
 @export var sand_puff_spread_degrees: float = 45.0
+# Multiplied onto the ground colour the grains take - a step darker than
+# lit sand, kicked grains in shadow, so a puff reads against the sand it
+# rises from. Every puff here: a hit on an enemy or on him, and the
+# draw's ground strike. Read at each puff; BattleOverlay sets it from its
+# own sand_puff_tint.
+@export var sand_puff_tint: float = 0.75
 
 @export_group("Heavy Hit")
 @export var heavy_hit_enabled: bool = true
@@ -141,6 +147,8 @@ func _exit_tree() -> void:
 func setup(wanderer: Wanderer, on_dark_world: bool) -> void:
 	_wanderer = wanderer
 	_on_dark_world = on_dark_world
+	if _wanderer != null:
+		_wanderer.draw_strike.connect(_on_draw_strike)
 
 # source/target mirror BattleController.damage_dealt's own doc exactly:
 # each is either the String "player" or a FieldEnemy - which one is the
@@ -354,9 +362,18 @@ func _react_to_card_hit(enemy: FieldEnemy, slash: bool = true, armored: bool = f
 		enemy.play_heavy_impact(next_heavy_take(), heavy_impact_volume_db(heavy))
 	enemy.play_hit_flash(flash_color, flash_rise_time, flash_fall_time)
 	enemy.play_hit_recoil(attack_direction, recoil_distance * recoil_multiplier(heavy), recoil_tilt_degrees, recoil_out_time, recoil_return_time)
-	enemy.spawn_sand_puff(sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity, sand_puff_spread_degrees)
+	enemy.spawn_sand_puff(sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity, sand_puff_spread_degrees, sand_puff_tint)
 	if slash:
 		enemy.spawn_slash_mark(attack_direction, _slash_mark_color(), slash_mark_length, slash_mark_width, slash_mark_chest_height, slash_mark_grow_time, slash_mark_fade_time)
+
+# The draw's ground strike (Wanderer.draw_strike): a slash hit's sand puff
+# on the sand under the sword tip, Wanderer.draw_strike_puff_scale its
+# size and speed.
+func _on_draw_strike(_tip: Vector3, ground_point: Vector3) -> void:
+	if _wanderer == null:
+		return
+	var puff_scale: float = maxf(_wanderer.draw_strike_puff_scale, 0.0)
+	_wanderer.spawn_sand_puff_at(ground_point, sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity * puff_scale, sand_puff_spread_degrees, puff_scale, sand_puff_tint)
 
 func _react_to_enemy_attack(enemy: FieldEnemy) -> void:
 	if _wanderer == null:
@@ -365,7 +382,7 @@ func _react_to_enemy_attack(enemy: FieldEnemy) -> void:
 	_wanderer.play_hit_audio()
 	_wanderer.play_hit_flash(flash_color, flash_rise_time, flash_fall_time)
 	_wanderer.play_hit_recoil(attack_direction, recoil_distance, recoil_tilt_degrees, recoil_out_time, recoil_return_time)
-	_wanderer.spawn_sand_puff(sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity, sand_puff_spread_degrees)
+	_wanderer.spawn_sand_puff(sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity, sand_puff_spread_degrees, sand_puff_tint)
 
 # "The theme's light tone" - CardFace's own panel_light_color token
 # (BattleTheme.on_pale_panel_light_color/on_dark_panel_light_color), read

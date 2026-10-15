@@ -1133,7 +1133,9 @@ func _build_slash_gradient_texture() -> GradientTexture2D:
 # RegionField's battle freeze) - a plain MeshInstance3D driven only by a
 # Tween (see spawn_slash_mark()) doesn't need this, but this node's own
 # advancement isn't a Tween.
-func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spread_degrees: float) -> void:
+# `tint` multiplies the ground colour the grains take (BattleFeedback.
+# sand_puff_tint).
+func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spread_degrees: float, tint: float = 1.0) -> void:
 	if _ground == null:
 		return
 
@@ -1150,7 +1152,8 @@ func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spre
 
 	var material := StandardMaterial3D.new()
 	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.albedo_color = _ground.ground_color
+	var sand: Color = _ground.ground_color
+	material.albedo_color = Color(sand.r * tint, sand.g * tint, sand.b * tint, sand.a)
 	material.cull_mode = BaseMaterial3D.CULL_DISABLED
 	quad_mesh.material = material
 	particles.draw_pass_1 = quad_mesh

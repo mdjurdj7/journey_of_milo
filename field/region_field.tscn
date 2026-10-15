@@ -197,11 +197,12 @@ move_speed = 5.0
 acceleration = 30.0
 dash_distance = 8.0
 dash_duration = 0.9
+battle_exit_blend = 0.4
 battle_camera_turn_degrees = 30.0
 sword_length = 1.5
 grip_axis_flip = true
-back_mount_position = Vector3(0.159, 0.2525, -0.0256)
-back_mount_rotation_degrees = Vector3(24, 0, -19.935)
+back_mount_position = Vector3(-0.1324, 0.277, -0.032)
+back_mount_rotation_degrees = Vector3(16, -6.747, 9.46)
 hand_mount_position = Vector3(-0.019, 0.087, 0.0067)
 hand_mount_rotation_degrees = Vector3(-1.36, 71.12, -114.36)
 shading_mode = 0
@@ -209,6 +210,12 @@ light_wrap = 0.6
 self_shadow_strength = 0.5
 slash_hitstop_time = 0.07
 slash_cancel_time = 0.75
+draw_sword_blend_in = 0.35
+draw_sword_grab_time = 0.416667
+draw_sword_snap_time = 0.25
+draw_sword_sweep_direction = Vector3(-0.6, 0.5, -0.6)
+draw_sword_strike_time = 0.875
+draw_strike_puff_scale = 1.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Wanderer" unique_id=1638228685]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.9, 0)

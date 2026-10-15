@@ -10,10 +10,13 @@ extends SceneTree
 #   clips  - Idle, Walk, Run, BattleIdle, DrawSword, Slash and Brace are
 #            merged, with their loop modes; every bone track resolves to
 #            a bone on the model's skeleton; BattleIdle is the glb's own
-#            battle_idle_breathe and Slash its slash (their tracks,
-#            unconverted); Slash is 32 frames, lands on its contact frame
-#            (get_clip_contact_time(), Blender frame 10) and ends on
-#            BattleIdle's first pose, so the blend back is seamless
+#            battle_idle_breathe, Slash its slash and DrawSword its
+#            draw_sword (their tracks, unconverted); Slash is 32 frames,
+#            lands on its contact frame (get_clip_contact_time(), Blender
+#            frame 10) and ends on BattleIdle's first pose, so the blend
+#            back is seamless; DrawSword is 28 frames, and keeps his
+#            right forearm's twist about its own axis under
+#            DRAW_FOREARM_TWIST_DEG on every frame (the hand carries it)
 #   lunge  - the glb's Slash steps his model slash_lunge_distance ahead,
 #            arriving on the contact frame, holds there through the
 #            hit-stop, and is home again after
@@ -32,8 +35,23 @@ extends SceneTree
 #            frame strips any bone scale in the pose); in BattleIdle its
 #            point is above the sand under his feet - nothing about which
 #            way it points, so any battle pose passes
+#   grab   - DrawSword carries one method key at draw_sword_grab_time
+#            calling _on_draw_sword_grab_key() (its clip text, the key
+#            aside, is the glb's draw_sword); entered with a blend in
+#            that outlasts that frame, the sword still goes to his hand on
+#            it; a fight that ends before it leaves the sword on his back
+#            while DrawSword fades out past it; a Slash played 0.2 s into
+#            DrawSword takes the sword into his hand there and then
 #   fight  - in a real fight with floor 1's Sputter (HP raised so nothing
-#            dies), through BattleController.request_play()/confirm_
+#            dies): on entry DrawSword plays to its last frame and blends
+#            into BattleIdle over animation_blend_time, the sword on his
+#            back until draw_sword_grab_time (frame 10) and in his hand
+#            from that frame, turning onto the hand mount by the end of
+#            draw_sword_snap_time (frame 16) - its tip passing up over his
+#            right shoulder, the blade clear of his head; the ground strike
+#            (draw_strike) fires once, on frame 21, with a sand puff on the
+#            drawn sand under the sword tip; then, through
+#            BattleController.request_play()/confirm_
 #            target(): a Slash plays to its last frame through the status
 #            change its own resolution ends with, then BattleIdle takes
 #            over; a second Slash confirmed 0.45 s after the first waits
@@ -89,6 +107,31 @@ const BRACE_HIPS_OVER_TOE_M := 0.30
 # reach at contact and its home after (metres).
 const SLASH_CONTACT_S := 10.0 / 24.0
 const SLASH_LENGTH_S := 32.0 / 24.0
+# The glb's draw_sword: its length and its grab frame (Blender frame 10).
+const DRAW_LENGTH_S := 28.0 / 24.0
+const DRAW_GRAB_S := 10.0 / 24.0
+# The draw's ground strike (Blender frame 21), and how close its puff sits
+# to the drawn sand under the sword tip (metres; across, a centimetre).
+const DRAW_STRIKE_S := 21.0 / 24.0
+const STRIKE_PUFF_GROUND_M := 0.05
+const STRIKE_PUFF_ACROSS_M := 0.01
+# The most his right forearm may twist about its own axis (from its rest,
+# degrees) on any draw_sword frame - past that, with no twist bones, the
+# skin wrings at the elbow and wrist.
+const DRAW_FOREARM_TWIST_DEG := 15.0
+# How far into DrawSword (before its grab frame) the probe cuts it off with
+# a Slash.
+const SLASH_CUT_S := 0.2
+# How close the sword sits to the hand mount once its snap is over
+# (metres, degrees).
+const GRAB_SETTLE_M := 0.002
+const GRAB_SETTLE_DEG := 0.5
+# The handoff's span (frames 10-16), and how clear of his Head bone the
+# blade keeps through it (metres). Measured from the Head bone's origin -
+# the joint at the base of his skull, inside the hood - not the hood's
+# surface; the over-the-shoulder pass measures 0.127 m.
+const DRAW_SNAP_S := 6.0 / 24.0
+const HANDOFF_HEAD_CLEAR_M := 0.10
 # How still "still" is through a hit-stop: the clip's playhead (seconds)
 # and an enemy's position (metres).
 const STOP_STILL_S := 0.0001
@@ -113,6 +156,9 @@ var _player: AnimationPlayer = null
 # card_played and card_impact's real time (ms) and Slash's playhead at
 # it; the playhead the poll saw last.
 var _status_mid_slash: int = 0
+# Each draw_strike heard: [DrawSword's playhead, tip, ground point, the
+# puff's position (or null)].
+var _strikes: Array[Array] = []
 var _played_ms: Array[int] = []
 var _played_from: Array[float] = []
 var _impact_ms: Array[int] = []
@@ -170,11 +216,16 @@ func _initialize() -> void:
 		var unresolved: Array[String] = []
 		for track in animation.get_track_count():
 			var path: NodePath = animation.track_get_path(track)
+			# A method track (DrawSword's grab key) calls the Wanderer.
+			if animation.track_get_type(track) == Animation.TYPE_METHOD:
+				if anim_root.get_node_or_null(path) != _wanderer:
+					unresolved.append(str(path))
+				continue
 			var node: Node = anim_root.get_node_or_null(NodePath(path.get_concatenated_names()))
 			var bone: String = String(path.get_subname(0)) if path.get_subname_count() > 0 else ""
 			if node != _skeleton or _skeleton.find_bone(bone) == -1:
 				unresolved.append(str(path))
-		_check(unresolved.is_empty(), "%s: all %d tracks resolve to a bone (%s)" % [clip, animation.get_track_count(), ", ".join(unresolved.slice(0, 3))])
+		_check(unresolved.is_empty(), "%s: all %d tracks resolve to a bone, or to him for a method key (%s)" % [clip, animation.get_track_count(), ", ".join(unresolved.slice(0, 3))])
 	# A fresh copy of the glb, past the cache the Wanderer's merge renamed
 	# and added to: its battle_idle_breathe, key for key, is what BattleIdle
 	# plays, looping, and its slash is Slash; battle_idle (held) stays
@@ -185,6 +236,7 @@ func _initialize() -> void:
 	var own_names: Array[String] = []
 	var own: Animation = null
 	var own_slash: Animation = null
+	var own_draw: Animation = null
 	for library_name in source_player.get_animation_library_list():
 		var library := source_player.get_animation_library(library_name)
 		for animation_name in library.get_animation_list():
@@ -193,13 +245,32 @@ func _initialize() -> void:
 				own = library.get_animation(animation_name)
 			elif animation_name == &"slash":
 				own_slash = library.get_animation(animation_name)
+			elif animation_name == &"draw_sword":
+				own_draw = library.get_animation(animation_name)
 	source.free()
 	own_names.sort()
-	_check(own_names == ["battle_idle", "battle_idle_breathe", "slash"], "the glb carries battle_idle, battle_idle_breathe and slash (%s)" % [own_names])
+	_check(own_names == ["battle_idle", "battle_idle_breathe", "draw_sword", "slash"], "the glb carries battle_idle, battle_idle_breathe, draw_sword and slash (%s)" % [own_names])
 	if own != null and _player.has_animation("BattleIdle"):
 		_check(_clip_text(_player.get_animation("BattleIdle")) == _clip_text(own), "BattleIdle is battle_idle_breathe, track for track and key for key")
 	if own_slash != null and _player.has_animation("Slash"):
 		_check(_clip_text(_player.get_animation("Slash")) == _clip_text(own_slash), "Slash is the glb's slash, track for track and key for key")
+	if own_draw != null and _player.has_animation("DrawSword"):
+		_check(_clip_text(_player.get_animation("DrawSword")) == _clip_text(own_draw), "DrawSword is the glb's draw_sword, track for track and key for key")
+		var draw_length: float = _player.get_animation("DrawSword").length
+		_check(absf(draw_length - DRAW_LENGTH_S) <= 0.001, "DrawSword is 28 frames, %.4f s (%.4f s)" % [draw_length, DRAW_LENGTH_S])
+		var forearm: int = _bone("RightForeArm")
+		var axis: Vector3 = _skeleton.get_bone_rest(_bone("RightHand")).origin.normalized()
+		var rest: Quaternion = _skeleton.get_bone_rest(forearm).basis.get_rotation_quaternion()
+		var worst_twist := 0.0
+		var worst_frame := 0
+		for frame in roundi(DRAW_LENGTH_S * 24.0) + 1:
+			await _pose("DrawSword", float(frame) / 24.0)
+			var turn: Quaternion = rest.inverse() * _skeleton.get_bone_pose_rotation(forearm)
+			var twist: float = absf(wrapf(rad_to_deg(2.0 * atan2(Vector3(turn.x, turn.y, turn.z).dot(axis), turn.w)), -180.0, 180.0))
+			if twist > worst_twist:
+				worst_twist = twist
+				worst_frame = frame
+		_check(worst_twist <= DRAW_FOREARM_TWIST_DEG, "DrawSword twists his right forearm at most %.1f deg about its own axis (frame %d; %.0f)" % [worst_twist, worst_frame, DRAW_FOREARM_TWIST_DEG])
 	if _player.has_animation("Slash"):
 		var slash_length: float = _player.get_animation("Slash").length
 		_check(absf(slash_length - SLASH_LENGTH_S) <= 0.001, "Slash is 32 frames, %.4f s (%.4f s)" % [slash_length, SLASH_LENGTH_S])
@@ -313,6 +384,15 @@ func _initialize() -> void:
 	var ground_y: float = _wanderer.global_position.y
 	print("sword: grip %s, tip %s" % [sword.global_position, tip])
 	_check(tip.y > ground_y, "its point is above the sand (%.3f m over it)" % (tip.y - ground_y))
+	# Back where the field leaves it, for the fight's draw.
+	_wanderer.call("_switch_sword_mount", _wanderer.get("_back_frame"), _wanderer.get("back_mount_position"), _wanderer.get("back_mount_rotation_degrees"), 0.0)
+	await _pose("Idle", 0.0)
+
+	print("
+=== grab")
+	await _check_grab_key()
+	_wanderer.call("_switch_sword_mount", _wanderer.get("_back_frame"), _wanderer.get("back_mount_position"), _wanderer.get("back_mount_rotation_degrees"), 0.0)
+	await _pose("Idle", 0.0)
 
 	print("\n=== fight")
 	_wanderer.process_mode = Node.PROCESS_MODE_INHERIT
@@ -322,6 +402,7 @@ func _initialize() -> void:
 	if controller != null:
 		await _check_slash_plays_out(controller)
 		await _check_cancel_window(controller)
+		_check(_strikes.size() == 1, "no ground strike after the entry's - the fight's Slashes bring none (%d in all)" % _strikes.size())
 
 	_field.queue_free()
 	for i in 5:
@@ -340,6 +421,86 @@ func _pose(clip: String, time: float) -> void:
 	for i in POSE_FRAMES:
 		await process_frame
 
+# DrawSword's grab key, outside a fight: entered and left directly
+# (enter_battle_stance()/exit_battle_stance()), the field's processing off.
+func _check_grab_key() -> void:
+	var grab: float = float(_wanderer.get("draw_sword_grab_time"))
+	var draw: Animation = _player.get_animation("DrawSword")
+	var key_path: NodePath = _wanderer.get("_grab_key_path")
+	var track: int = draw.find_track(key_path, Animation.TYPE_METHOD)
+	var strike: float = float(_wanderer.get("draw_sword_strike_time"))
+	var key_times: Dictionary = {}
+	if track >= 0:
+		for key in draw.track_get_key_count(track):
+			key_times[String(draw.method_track_get_name(track, key))] = draw.track_get_key_time(track, key)
+	var key_ok: bool = key_times.size() == 2 and key_times.has("_on_draw_sword_grab_key") and key_times.has("_on_draw_sword_strike_key")
+	if key_ok:
+		key_ok = absf(float(key_times["_on_draw_sword_grab_key"]) - grab) <= 0.0001 and absf(float(key_times["_on_draw_sword_strike_key"]) - strike) <= 0.0001
+	_check(key_ok, "DrawSword carries two keys: _on_draw_sword_grab_key() at draw_sword_grab_time (%.4f s), _on_draw_sword_strike_key() at draw_sword_strike_time (%.4f s) (%s)" % [grab, strike, key_times])
+	var sword: Node3D = _wanderer.get("_sword_root")
+	var hand_frame: Node3D = _wanderer.get("_hand_frame")
+	var target: Node3D = _fight_enemy()
+	if target == null:
+		_check(false, "floor 1 has a Sputter to stand against")
+		return
+
+	# From Walk, with a blend in still running at the grab frame.
+	var blend_in: float = float(_wanderer.get("draw_sword_blend_in"))
+	_wanderer.set("draw_sword_blend_in", grab + 0.2)
+	await _pose("Walk", 0.0)
+	_wanderer.call("enter_battle_stance", target, 2.0, 0.6)
+	var grabbed_at := -1.0
+	var start: int = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 2000:
+		await process_frame
+		if sword.get_parent() == hand_frame:
+			grabbed_at = _player.current_animation_position if _player.current_animation == "DrawSword" else 99.0
+			break
+	_check(grabbed_at >= grab - 0.001 and grabbed_at <= grab + 1.0 / 20.0, "blending in from Walk over %.2f s, the sword goes to his hand on the grab frame (DrawSword %.3f s in; %.4f)" % [grab + 0.2, grabbed_at, grab])
+	_wanderer.set("draw_sword_blend_in", blend_in)
+	_wanderer.call("exit_battle_stance")
+	await create_timer(1.0).timeout
+
+	# Over before the grab frame: DrawSword fades out (battle_exit_blend)
+	# past it, and the sword stays on his back.
+	await _pose("Idle", 0.0)
+	_wanderer.call("enter_battle_stance", target, 2.0, 0.6)
+	start = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 1000 and (_player.current_animation != "DrawSword" or _player.current_animation_position < grab * 0.5):
+		await process_frame
+	var left_at: float = _player.current_animation_position
+	_wanderer.call("exit_battle_stance")
+	var in_hand := false
+	start = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 1000:
+		await process_frame
+		in_hand = in_hand or sword.get_parent() == hand_frame
+	_check(not in_hand and not bool(_wanderer.get("_grab_pending")), "a fight over %.3f s into DrawSword leaves the sword on his back as the clip fades out over battle_exit_blend (%.2f s)" % [left_at, float(_wanderer.get("battle_exit_blend"))])
+	_wanderer.call("_switch_sword_mount", _wanderer.get("_back_frame"), _wanderer.get("back_mount_position"), _wanderer.get("back_mount_rotation_degrees"), 0.0)
+
+	# Cut off before the grab frame by a Slash: the sword goes to his hand
+	# as the Slash starts, and ends on the hand mount.
+	await _pose("Idle", 0.0)
+	_wanderer.call("enter_battle_stance", target, 2.0, 0.6)
+	start = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 1000 and (_player.current_animation != "DrawSword" or _player.current_animation_position < SLASH_CUT_S):
+		await process_frame
+	var cut_at: float = _player.current_animation_position
+	var on_back_at_cut: bool = sword.get_parent() != hand_frame
+	_player.play("Slash", float(_wanderer.get("animation_blend_time")))
+	await process_frame
+	var in_hand_at_cut: bool = sword.get_parent() == hand_frame
+	await create_timer(float(_wanderer.get("draw_sword_snap_time")) + 0.2).timeout
+	var scale: float = float(_wanderer.get("_skeleton_scale_factor"))
+	var mount_position: Vector3 = (_wanderer.get("hand_mount_position") as Vector3) / scale
+	var mount_rotation: Quaternion = Quaternion.from_euler((_wanderer.get("hand_mount_rotation_degrees") as Vector3) * (PI / 180.0))
+	var settled_m: float = sword.position.distance_to(mount_position) * scale
+	var settled_deg: float = rad_to_deg(sword.quaternion.angle_to(mount_rotation))
+	_check(on_back_at_cut and in_hand_at_cut, "a Slash played %.3f s into DrawSword (before the grab frame) takes the sword from his back into his hand by its first frame" % cut_at)
+	_check(sword.get_parent() == hand_frame and settled_m <= GRAB_SETTLE_M and settled_deg <= GRAB_SETTLE_DEG, "and it ends on the hand mount (%.4f m, %.2f deg off)" % [settled_m, settled_deg])
+	_wanderer.call("exit_battle_stance")
+	await create_timer(1.0).timeout
+
 # A fight with floor 1's Sputter, started through RegionField's contact
 # handler (as armored_contact_probe does), every enemy at FIGHT_HP and the
 # hand empty; null (a failure) if none starts.
@@ -350,9 +511,12 @@ func _start_fight() -> Node:
 		return null
 	_wanderer.global_position = target.global_position + Vector3(1.5, 0.0, 0.0)
 	await physics_frame
+	# Deferred: after BattleFeedback (connected at contact) has raised the
+	# puff, in the same flush as the strike key, the playhead unmoved.
+	_wanderer.connect("draw_strike", _on_draw_strike, CONNECT_DEFERRED)
 	_field.call_deferred("_on_enemy_contacted", target)
-	for i in 10:
-		await physics_frame
+	await _check_draw()
+	await _check_strike()
 	var layer: Node = _field.get_node("BattleLayer")
 	var overlay: Node = layer.get_child(0) if layer.get_child_count() > 0 else null
 	_check(overlay != null, "a fight starts")
@@ -372,9 +536,119 @@ func _start_fight() -> Node:
 	controller.connect("card_impact", func(_card: Resource) -> void:
 		_impact_ms.append(Time.get_ticks_msec())
 		_impact_at.append(_player.current_animation_position if _player.current_animation == "Slash" else -1.0))
-	# The fight's opening (DrawSword, the camera) settles first.
-	await create_timer(1.5).timeout
+	# The fight's opening (the camera, the intents) settles first.
+	await create_timer(0.5).timeout
 	return controller
+
+# Battle entry, watched frame by frame from the contact: DrawSword plays to
+# its last frame and blends into BattleIdle; the sword is on his back
+# before the grab frame and in his hand from it, on the hand mount once
+# the snap is over.
+func _check_draw() -> void:
+	var sword: Node3D = _wanderer.get("_sword_root")
+	var back_frame: Node3D = _wanderer.get("_back_frame")
+	var hand_frame: Node3D = _wanderer.get("_hand_frame")
+	var grab: float = float(_wanderer.get("draw_sword_grab_time"))
+	var snap: float = float(_wanderer.get("draw_sword_snap_time"))
+	var length: float = _player.get_animation("DrawSword").length
+	var scale: float = float(_wanderer.get("_skeleton_scale_factor"))
+	var mount_position: Vector3 = (_wanderer.get("hand_mount_position") as Vector3) / scale
+	var mount_rotation: Quaternion = Quaternion.from_euler((_wanderer.get("hand_mount_rotation_degrees") as Vector3) * (PI / 180.0))
+	_check(sword.get_parent() == back_frame, "the sword is on his back at contact")
+	var started := false
+	var furthest := -1.0
+	var hand_before := -1.0
+	var back_after := -1.0
+	var switched_at := -1.0
+	var worst_m := 0.0
+	var worst_deg := 0.0
+	var settled_samples := 0
+	# Through the handoff: the blade's least distance to his Head bone, and
+	# how far to his right its tip got while above the grip.
+	var head_clear := INF
+	var tip_right := -INF
+	var model: Node3D = _wanderer.get("_model")
+	var raw: AABB = _wanderer.get("_sword_raw_aabb")
+	var long_axis: int = 0
+	for a in 3:
+		if raw.size[a] > raw.size[long_axis]:
+			long_axis = a
+	var tip_local: Vector3 = raw.position + raw.size * 0.5
+	tip_local[long_axis] = raw.position[long_axis] if bool(_wanderer.get("grip_axis_flip")) else raw.end[long_axis]
+	var start: int = Time.get_ticks_msec()
+	while Time.get_ticks_msec() - start < 4000:
+		await process_frame
+		if _player.current_animation != "DrawSword":
+			if started:
+				break
+			continue
+		started = true
+		var at: float = _player.current_animation_position
+		furthest = maxf(furthest, at)
+		var on_hand: bool = sword.get_parent() == hand_frame
+		if on_hand and at < grab - 0.001:
+			hand_before = at
+		if on_hand and switched_at < 0.0:
+			switched_at = at
+		# A frame of slack past the grab for the tween's own first step.
+		if not on_hand and at > grab + 1.0 / 20.0:
+			back_after = at
+		if on_hand and at >= grab + snap + 1.0 / 20.0:
+			settled_samples += 1
+			worst_m = maxf(worst_m, sword.position.distance_to(mount_position) * scale)
+			worst_deg = maxf(worst_deg, rad_to_deg(sword.quaternion.angle_to(mount_rotation)))
+		if on_hand and at < grab + snap:
+			var grip: Vector3 = sword.global_position
+			var tip: Vector3 = (sword.get_node("SwordMesh") as Node3D).global_transform * tip_local
+			var head: Vector3 = _bone_world("Head")
+			for k in 11:
+				var point: Vector3 = grip.lerp(tip, float(k) / 10.0)
+				head_clear = minf(head_clear, point.distance_to(head))
+			if tip.y > grip.y:
+				# His right is the model's -x (it faces +z).
+				tip_right = maxf(tip_right, -(model.global_transform.affine_inverse() * tip).x * model.scale.x)
+	_check(started, "battle entry plays DrawSword")
+	_check(absf(grab - DRAW_GRAB_S) <= 0.0001, "draw_sword_grab_time is frame 10, %.4f s" % grab)
+	_check(absf(snap - DRAW_SNAP_S) <= 0.0001, "draw_sword_snap_time is frames 10-16, %.4f s" % snap)
+	_check(head_clear >= HANDOFF_HEAD_CLEAR_M, "through the handoff the blade keeps %.3f m from his Head bone (%.2f)" % [head_clear, HANDOFF_HEAD_CLEAR_M])
+	_check(tip_right > 0.0, "its tip passes up on his right (%.3f m to his right, above the grip)" % tip_right)
+	_check(hand_before < 0.0, "the sword stays on his back before the grab frame (in his hand at %.3f s)" % hand_before)
+	_check(back_after < 0.0 and switched_at >= 0.0, "and is in his hand from it (switched at %.3f s, still on his back at %.3f s)" % [switched_at, back_after])
+	_check(settled_samples > 0 and worst_m <= GRAB_SETTLE_M and worst_deg <= GRAB_SETTLE_DEG, "on the hand mount once the snap is over (%d frames, worst %.4f m, %.2f deg)" % [settled_samples, worst_m, worst_deg])
+	_check(furthest >= length - FIGHT_SLACK_S, "DrawSword plays to its last frame (%.3f of %.3f s)" % [furthest, length])
+	_check(_player.current_animation == "BattleIdle", "then BattleIdle takes over (%s)" % _player.current_animation)
+	var blend: float = _player.get_blend_time(&"DrawSword", &"BattleIdle")
+	_check(absf(blend - float(_wanderer.get("animation_blend_time"))) <= 0.0001, "blended over animation_blend_time (%.3f s)" % blend)
+
+func _on_draw_strike(tip: Vector3, ground_point: Vector3) -> void:
+	var at: float = _player.current_animation_position if _player.current_animation == "DrawSword" else -1.0
+	var puff: Variant = null
+	for child in _wanderer.get_children():
+		if child is GPUParticles3D and (child as Node3D).global_position.distance_to(ground_point) <= 0.001:
+			puff = (child as Node3D).global_position
+	_strikes.append([at, tip, ground_point, puff])
+
+# The entry's ground strike: once, on frame 21, its puff on the drawn sand
+# under the sword tip.
+func _check_strike() -> void:
+	var strike: float = float(_wanderer.get("draw_sword_strike_time"))
+	_check(absf(strike - DRAW_STRIKE_S) <= 0.0001, "draw_sword_strike_time is frame 21, %.4f s" % strike)
+	_check(_strikes.size() == 1, "the entry's ground strike fires once (%d)" % _strikes.size())
+	if _strikes.is_empty():
+		return
+	var at: float = _strikes[0][0]
+	var tip: Vector3 = _strikes[0][1]
+	_check(at >= strike - 0.001 and at <= strike + 1.0 / 20.0, "on frame 21: DrawSword %.3f s in (%.4f)" % [at, strike])
+	var ground: Node3D = _field.get_node("Ground") as Node3D
+	var local: Vector3 = ground.to_local(tip)
+	var sand_y: float = ground.to_global(Vector3(local.x, float(ground.call("get_visible_height_at", Vector2(local.x, local.z))), local.z)).y
+	var puff: Variant = _strikes[0][3]
+	if puff == null:
+		_check(false, "a sand puff rises at the strike")
+		return
+	var puff_at: Vector3 = puff
+	var across: float = Vector2(puff_at.x - tip.x, puff_at.z - tip.z).length()
+	_check(across <= STRIKE_PUFF_ACROSS_M and absf(puff_at.y - sand_y) <= STRIKE_PUFF_GROUND_M, "its sand puff sits under the sword tip (%.3f m across), %.3f m from the drawn sand there (tip %.3f m over it)" % [across, absf(puff_at.y - sand_y), tip.y - sand_y])
 
 func _fight_enemy() -> Node3D:
 	for node in get_nodes_in_group("enemies"):
@@ -472,9 +746,12 @@ func _bone_rotations() -> Array[Quaternion]:
 
 # Every track's path and every key, as text - two clips with the same text
 # play the same.
+# Method tracks (DrawSword's grab key - _merge_clips()) aside.
 func _clip_text(animation: Animation) -> String:
-	var text := "%d tracks %.4f s;" % [animation.get_track_count(), animation.length]
+	var text := "%.4f s;" % animation.length
 	for track in animation.get_track_count():
+		if animation.track_get_type(track) == Animation.TYPE_METHOD:
+			continue
 		text += str(animation.track_get_path(track))
 		for key in animation.track_get_key_count(track):
 			text += str(animation.track_get_key_value(track, key))

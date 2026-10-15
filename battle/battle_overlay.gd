@@ -58,6 +58,13 @@ signal battle_finished(outcome: Outcome)
 # Devour's bite, a 2D UI sound: its takes peak at -6.6 and -6.0 dBFS, so
 # -10 here lands them about -16 at the listener. Read at each bite.
 @export var devour_volume_db: float = -10.0
+# The battle sand puffs' tint (BattleFeedback.sand_puff_tint), set here as
+# BattleFeedback is built in code (enter_battle()); passed on live.
+@export var sand_puff_tint: float = 0.75:
+	set(value):
+		sand_puff_tint = value
+		if _battle_feedback != null:
+			_battle_feedback.sand_puff_tint = value
 
 @export_group("Choice Prompt")
 # An open hand choice says what it wants in one tracked-caps ink line,
@@ -378,6 +385,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	get_tree().create_timer(battle_transition_time).timeout.connect(_reveal_enemy_intents)
 
 	_battle_feedback = BattleFeedback.new()
+	_battle_feedback.sand_puff_tint = sand_puff_tint
 	add_child(_battle_feedback)
 	_battle_feedback.setup(wanderer, on_dark_world)
 	_battle_feedback.battle_controller = battle_controller

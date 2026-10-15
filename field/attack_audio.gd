@@ -15,6 +15,12 @@ class_name AttackAudio
 # ~10.6 m the 3D attenuation (unit_size 10, inverse distance) takes ~0.5
 # dB, so base_volume_db -13.5 peaks about -20 dBFS at the listener -
 # felt more than heard under the enemy's contact crack.
+#
+# Also the draw's ground strike (play_ground_strike(), Wanderer._on_draw_
+# sword_strike_key()): its own AudioStreamPlayer3D, set down where the
+# sword tip meets the sand, takes dealt round-robin from strike_clips.
+# strike_volume_db -10.5 peaks about -17 dBFS at the listener - under a
+# contact's -13.
 
 const BUS_NAME := &"SFX"
 
@@ -23,9 +29,18 @@ const BUS_NAME := &"SFX"
 @export var volume_variance_db: float = 1.0
 @export var base_pitch: float = 1.0
 @export var pitch_variance: float = 0.05
+@export var strike_clips: Array[AudioStream] = [
+	load("res://assets/audio/sfx/sword_ground_strike_sand_1.mp3") as AudioStream,
+	load("res://assets/audio/sfx/sword_ground_strike_sand_2.mp3") as AudioStream,
+	load("res://assets/audio/sfx/sword_ground_strike_sand_3.mp3") as AudioStream,
+]
+@export var strike_volume_db: float = -10.5
+@export var strike_volume_variance_db: float = 1.0
 
 var _player: AudioStreamPlayer3D
 var _pool := SoundPool.new()
+var _strike_player: AudioStreamPlayer3D
+var _strike_pool := SoundPool.new()
 
 func setup() -> void:
 	# RegionField freezes the whole Wanderer subtree (PROCESS_MODE_DISABLED)
@@ -43,6 +58,14 @@ func setup() -> void:
 	_player.bus = BUS_NAME
 	add_child(_player)
 
+	_strike_pool.set_clips(strike_clips)
+	if _strike_pool.is_empty():
+		push_warning("AttackAudio: no ground-strike clips; strike audio disabled.")
+	_strike_player = AudioStreamPlayer3D.new()
+	_strike_player.name = "StrikePlayer"
+	_strike_player.bus = BUS_NAME
+	add_child(_strike_player)
+
 # `pitch_multiplier` scales the jittered pitch - a follow-up swing's
 # whoosh sits a little higher (Wanderer.follow_through_pitch).
 func play_swing(pitch_multiplier: float = 1.0) -> void:
@@ -53,3 +76,15 @@ func play_swing(pitch_multiplier: float = 1.0) -> void:
 	_player.pitch_scale = (base_pitch + randf_range(-pitch_variance, pitch_variance)) * pitch_multiplier
 	_player.volume_db = base_volume_db + randf_range(-volume_variance_db, volume_variance_db)
 	_player.play()
+
+# The draw's ground strike, sounded from `at` (where the tip meets the
+# sand).
+func play_ground_strike(at: Vector3) -> void:
+	var clip: AudioStream = _strike_pool.next()
+	if clip == null or _strike_player == null:
+		return
+	_strike_player.global_position = at
+	_strike_player.stream = clip
+	_strike_player.pitch_scale = base_pitch + randf_range(-pitch_variance, pitch_variance)
+	_strike_player.volume_db = strike_volume_db + randf_range(-strike_volume_variance_db, strike_volume_variance_db)
+	_strike_player.play()
