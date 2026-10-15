@@ -1,0 +1,244 @@
+extends SceneTree
+
+# Headless probe for where fights stage, from the code's own placement:
+# every encounter option of every slot on every floor of region 1, stood
+# with RegionField.force_options and contacted from the main approach -
+# the Wanderer put where the planned path from spawn first meets the
+# target's contact zone. Once the battle frame has settled, each fight
+# must have:
+#   - no combatant on a face: the ground under its feet sloping past
+#     FACE_SLOPE_MAX_DEG over half a metre, or rising or falling more
+#     than FACE_JUMP_MAX_M within half a metre
+#   - the Wanderer at least his minimum spacing (RegionField.stance_
+#     distance_min()) from the enemy he faces
+#   - the battle camera inside the walls - the floor's wall rect and,
+#     where it has them, its ledge lines - and over the ground there
+#   - clear sight from the camera to every combatant: no ground above the
+#     ray to its middle
+#   - no prop in the foreground: no corner of a prop's visual bounds in
+#     the camera's frustum and nearer to it than the farthest combatant
+# Every failure is printed (FAIL) with its floor, slot and option, and
+# the probe goes on to the next fight; it fixes nothing.
+#
+#   Godot_v4.7.1.exe --headless --path . -s res://tests/battle_placement_probe.gd
+#
+# Exit code 0 = every fight staged cleanly, 1 = any failure. Untyped
+# against anything that names the RunState autoload.
+
+const REGION_PATH := "res://floors/region1.tres"
+const REGION_SCENE_PATH := "res://field/region_field.tscn"
+const CHARACTER_PATH := "res://run/data/wanderer.tres"
+const FACE_SLOPE_MAX_DEG := 30.0
+const FACE_JUMP_MAX_M := 0.35
+# How far past the contact zone's edge he is put, metres - just outside it.
+const APPROACH_MARGIN := 0.3
+# Above the ground at the camera, metres.
+const CAMERA_GROUND_MIN := 0.3
+# A combatant's middle, metres over its feet, for the sight line.
+const BODY_MIDDLE := 0.75
+const SETTLE_SECONDS := 3.0
+const SAFETY_SECONDS := 900.0
+
+var _run_state: Node = null
+var _field: Node = null
+var _floor_data: FloorData = null
+var _failures: int = 0
+var _fights: int = 0
+var _clean: int = 0
+
+func _initialize() -> void:
+	create_timer(SAFETY_SECONDS).timeout.connect(func() -> void:
+		print("FAIL: safety timeout")
+		quit(1)
+	)
+	_run_state = root.get_node("RunState")
+	var region: Resource = load(REGION_PATH)
+	var floors: Array = region.get("floors")
+	for floor_index in floors.size():
+		_floor_data = floors[floor_index] as FloorData
+		for slot in _floor_data.slots:
+			if slot == null:
+				continue
+			for option in slot.options:
+				if option != null:
+					await _check_fight(floor_index, slot, option)
+	print("battle_placement_probe: %d of %d fights staged cleanly" % [_clean, _fights])
+	if _failures == 0:
+		print("battle_placement_probe: PASSED")
+		quit(0)
+	else:
+		print("battle_placement_probe: %d FAILED" % _failures)
+		quit(1)
+
+func _check_fight(floor_index: int, slot: EncounterSlot, option: EncounterOption) -> void:
+	var label: String = "Floor %d %s/%s" % [floor_index + 1, slot.slot_id, option.option_id]
+	_fights += 1
+	var failures_before: int = _failures
+	_run_state.call("new_run", load(CHARACTER_PATH))
+	_run_state.set("current_floor_index", floor_index)
+	_run_state.set("run_opening_pending", false)
+	_run_state.set("title_pending", false)
+	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	var forced: Dictionary[StringName, StringName] = {}
+	forced[slot.slot_id] = option.option_id
+	_field.set("force_options", forced)
+	root.add_child(_field)
+	for i in 30:
+		await physics_frame
+	var target: Node3D = _target_for(slot.slot_id)
+	if target == null:
+		_fail("%s: no enemy of the slot on the field" % label)
+		await _teardown()
+		return
+	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
+	var ground: Node = _field.get_node("Ground")
+	var spawn: Vector3 = _field.call("get_spawn_position")
+	wanderer.global_position = _approach_point(spawn, target, ground)
+	await physics_frame
+	_field.call_deferred("_on_enemy_contacted", target)
+	for i in 10:
+		await physics_frame
+	await create_timer(SETTLE_SECONDS).timeout
+	var members: Array = _field.get("_battle_members")
+	if members.is_empty():
+		_fail("%s: no fight started" % label)
+		await _teardown()
+		return
+	var anchor: Node3D = members[0]
+	# Faces.
+	for body: Node3D in [wanderer] + members:
+		var face: Vector2 = _face_at(ground, _flat(body.global_position))
+		if face.x > FACE_SLOPE_MAX_DEG or face.y > FACE_JUMP_MAX_M:
+			_fail("%s: %s stands on a face at %s (%.1f degrees, %.2f m within half a metre)" % [label, _name_of(body, wanderer), _flat(body.global_position).snapped(Vector2(0.01, 0.01)), face.x, face.y])
+	# His spacing.
+	var gap: float = _flat(wanderer.global_position).distance_to(_flat(anchor.global_position))
+	var minimum: float = float(_field.call("stance_distance_min", anchor))
+	if gap < minimum - 0.01:
+		_fail("%s: the Wanderer %.2f m from %s, under his minimum %.2f" % [label, gap, _name_of(anchor, wanderer), minimum])
+	# The camera: inside the walls, over the ground.
+	var camera: Camera3D = _field.get_node("CameraPivot").get("camera")
+	var at: Vector2 = _flat(camera.global_position)
+	var walls: Rect2 = _field.call("get_wall_rect")
+	var inside: bool = walls.has_area() and walls.has_point(at)
+	for ledge: PackedVector2Array in _floor_data.ledges:
+		if ledge.size() >= 3 and not Geometry2D.is_point_in_polygon(at - _flat(spawn), ledge):
+			inside = false
+	var under: float = float(ground.call("get_height_at", at))
+	if not inside:
+		_fail("%s: the battle camera stands outside the walls at %s" % [label, at.snapped(Vector2(0.01, 0.01))])
+	if camera.global_position.y - under < CAMERA_GROUND_MIN:
+		_fail("%s: the battle camera is %.2f m over the ground" % [label, camera.global_position.y - under])
+	# Sight to every combatant.
+	var farthest: float = 0.0
+	for body: Node3D in [wanderer] + members:
+		var middle: Vector3 = body.global_position + Vector3.UP * BODY_MIDDLE
+		farthest = maxf(farthest, camera.global_position.distance_to(middle))
+		var blocked: float = _ground_over_ray(ground, camera.global_position, middle)
+		if blocked > 0.0:
+			_fail("%s: the ground rises %.2f m over the camera's sight line to %s" % [label, blocked, _name_of(body, wanderer)])
+	# Props in the foreground.
+	var props: Node = _field.get_node_or_null(^"Props")
+	if props != null:
+		for prop in props.get_children():
+			var bounds: AABB = _visual_bounds(prop as Node3D)
+			if not bounds.has_volume():
+				continue
+			for corner in 8:
+				var point: Vector3 = bounds.get_endpoint(corner)
+				if camera.is_position_in_frustum(point) and camera.global_position.distance_to(point) < farthest:
+					_fail("%s: the prop %s is in the battle frame's foreground (%.1f m from the camera, the farthest combatant %.1f m)" % [label, prop.name, camera.global_position.distance_to(point), farthest])
+					break
+	if _failures == failures_before:
+		_clean += 1
+		print("%s: staged cleanly" % label)
+	await _teardown()
+
+# The slot's member the contact is made on: its anchor, else its first.
+func _target_for(slot_id: StringName) -> Node3D:
+	var first: Node3D = null
+	for node in get_nodes_in_group("enemies"):
+		if node.get("slot_id") != slot_id:
+			continue
+		if bool(node.get("anchor")):
+			return node as Node3D
+		if first == null:
+			first = node as Node3D
+	return first
+
+# Where the planned walk from spawn first comes within the target's
+# contact zone, APPROACH_MARGIN short of it, on the ground - or, with no
+# plan, the same distance out from the target toward spawn.
+func _approach_point(spawn: Vector3, target: Node3D, ground: Node) -> Vector3:
+	var reach: float = float(target.get("contact_radius")) + APPROACH_MARGIN
+	var path: PackedVector3Array = _field.call("plan_path", spawn, target.global_position, target, true)
+	var point := Vector3.INF
+	for index in range(path.size() - 1, 0, -1):
+		var a: Vector3 = path[index - 1]
+		var b: Vector3 = path[index]
+		if _flat(a).distance_to(_flat(target.global_position)) >= reach:
+			var t: float = 1.0
+			for step in 40:
+				var at: Vector3 = a.lerp(b, float(step) / 40.0)
+				if _flat(at).distance_to(_flat(target.global_position)) < reach:
+					t = float(step - 1) / 40.0
+					break
+			point = a.lerp(b, maxf(t, 0.0))
+			break
+	if point == Vector3.INF:
+		var back: Vector2 = (_flat(spawn) - _flat(target.global_position)).normalized()
+		point = target.global_position + Vector3(back.x, 0.0, back.y) * reach
+	point.y = float(ground.call("get_height_at", _flat(point)))
+	return point
+
+# The most the ground rises over the straight ray from `from` to `to`
+# (sampled along its length, ends left out), metres; 0 or less is clear.
+func _ground_over_ray(ground: Node, from: Vector3, to: Vector3) -> float:
+	var worst: float = -INF
+	for step in range(2, 59):
+		var point: Vector3 = from.lerp(to, float(step) / 60.0)
+		worst = maxf(worst, float(ground.call("get_height_at", _flat(point))) - point.y)
+	return worst
+
+# The merged world bounds of every visual under `node`.
+func _visual_bounds(node: Node3D) -> AABB:
+	var bounds := AABB()
+	var started: bool = false
+	if node == null:
+		return bounds
+	for child in node.find_children("*", "VisualInstance3D", true, false):
+		var visual := child as VisualInstance3D
+		var box: AABB = visual.global_transform * visual.get_aabb()
+		bounds = box if not started else bounds.merge(box)
+		started = true
+	return bounds
+
+func _face_at(ground: Node, at: Vector2) -> Vector2:
+	var e: float = 0.25
+	var gx: float = (float(ground.call("get_height_at", at + Vector2(e, 0.0))) - float(ground.call("get_height_at", at - Vector2(e, 0.0)))) / (2.0 * e)
+	var gz: float = (float(ground.call("get_height_at", at + Vector2(0.0, e))) - float(ground.call("get_height_at", at - Vector2(0.0, e)))) / (2.0 * e)
+	var here: float = float(ground.call("get_height_at", at))
+	var jump: float = 0.0
+	for k in 8:
+		var angle: float = TAU * float(k) / 8.0
+		jump = maxf(jump, absf(float(ground.call("get_height_at", at + Vector2(cos(angle), sin(angle)) * 0.5)) - here))
+	return Vector2(rad_to_deg(atan(Vector2(gx, gz).length())), jump)
+
+func _name_of(body: Node3D, wanderer: Node3D) -> String:
+	if body == wanderer:
+		return "the Wanderer"
+	var data: Resource = body.get("enemy_data")
+	return String(data.get("enemy_name")) if data != null else String(body.name)
+
+func _flat(at: Vector3) -> Vector2:
+	return Vector2(at.x, at.z)
+
+func _teardown() -> void:
+	if _field != null:
+		_field.queue_free()
+		_field = null
+	for i in 5:
+		await process_frame
+
+func _fail(message: String) -> void:
+	_failures += 1
+	print("FAIL: ", message)
