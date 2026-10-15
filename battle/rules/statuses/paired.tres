@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" format=3 uid="uid://oqg4wqdatmil"]
+
+[ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="1_status_data"]
+[ext_resource type="Resource" uid="uid://cstprln1dj1ae" path="res://battle/rules/statuses/bereft.tres" id="2_bereft"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "paired"
+display_name = "Paired"
+description = "If its partner falls, it becomes Bereft."
+category = 2
+default_duration_turns = -1
+stack_rule = 3
+grants_when_alone = ExtResource("2_bereft")

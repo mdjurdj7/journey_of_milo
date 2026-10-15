@@ -204,7 +204,7 @@ func _check_floor_3() -> void:
 	var slots: Array = floor_data.get("slots")
 	_expect_eq(slots.size(), 2, "Floor 3 has two encounter slots")
 	var first: Resource = ((slots[0].get("options") as Array)[0].get("members") as Array)[0]
-	_expect_eq((first.get("enemy_data") as EnemyData).enemy_name, "Blackback", "...the required Blackback's first - the gate measures from it")
+	_expect_eq((first.get("enemy_data") as EnemyData).enemy_name, "Strawcrown", "...the required cranes' first - the gate measures from it")
 	var slot: Resource = slots[1]
 	var option: Resource = (slot.get("options") as Array)[0]
 	var entry: Resource = (option.get("members") as Array)[0]

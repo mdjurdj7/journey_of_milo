@@ -1,0 +1,45 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3 uid="uid://cf3bohibpmixo"]
+
+[ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
+[ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
+[ext_resource type="AudioStream" uid="uid://fcgrewh73065" path="res://assets/audio/enemies/Stork/hit_1.mp3" id="3_hit_1"]
+[ext_resource type="AudioStream" uid="uid://dwb6evhuycum6" path="res://assets/audio/enemies/Stork/hit_2.mp3" id="4_hit_2"]
+[ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="5_status_data"]
+[ext_resource type="Resource" uid="uid://oqg4wqdatmil" path="res://battle/rules/statuses/paired.tres" id="6_paired"]
+
+[sub_resource type="Resource" id="EnemyIntent_bow"]
+script = ExtResource("2_intent")
+intent_name = "Bow"
+type = 1
+value = 4
+simultaneous = true
+motion = &"bow"
+
+[sub_resource type="Resource" id="EnemyIntent_step"]
+script = ExtResource("2_intent")
+intent_name = "Step"
+value = 6
+simultaneous = true
+motion = &"step"
+
+[sub_resource type="Resource" id="EnemyIntent_leap"]
+script = ExtResource("2_intent")
+intent_name = "Leap"
+value = 10
+simultaneous = true
+motion = &"leap"
+
+[resource]
+script = ExtResource("1_enemy_data")
+enemy_name = "Strawcrown"
+mechanic_summary = "One of a pair of crowned cranes on a shared loop, Bow (4 Block), Step (6), Leap (10), both on the same step. Paired from the start: if its partner falls first it turns Bereft and carries out each step twice. Felled on the same turn, neither acts again."
+max_hp = 32
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_bow"), SubResource("EnemyIntent_step"), SubResource("EnemyIntent_leap")])
+starting_statuses = Array[ExtResource("5_status_data")]([ExtResource("6_paired")])
+contact_sounds = Array[AudioStream]([ExtResource("3_hit_1"), ExtResource("4_hit_2")])
+; 1.50 m as exported, feet at the origin.
+model_scene_path = "res://assets/models/enemies/Strawcrown/crane.glb"
+model_scale = 1.0
+model_yaw_offset_degrees = 180.0
+attachment_scene_path = "res://field/crane_motion.tscn"
+painted_albedo_path = "res://assets/models/enemies/Strawcrown/crane_0.jpg"

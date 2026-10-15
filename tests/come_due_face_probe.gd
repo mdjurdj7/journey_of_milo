@@ -12,17 +12,17 @@ extends SceneTree
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 #
-# The fight is floor 3's Blackback and Nipper, started through
-# RegionField's contact handler as blackback_probe.gd does. The Blackback
-# carries the mark. Hovers go through the controller's own _update_hover()
-# at the centre of each enemy's target rect, read in the same frame, so
-# the headless cursor can't move them. Untyped against anything that
-# names the RunState autoload.
+# The fight is floor 3's crowned cranes, Strawcrown and Chalkcrown,
+# started through RegionField's contact handler as crane_pair_probe.gd
+# does. Strawcrown carries the mark. Hovers go through the controller's
+# own _update_hover() at the centre of each enemy's target rect, read in
+# the same frame, so the headless cursor can't move them. Untyped
+# against anything that names the RunState autoload.
 
 const CASES := 3
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
-const BLACKBACK_PATH := "res://battle/rules/enemies/blackback.tres"
+const STRAWCROWN_PATH := "res://battle/rules/enemies/strawcrown.tres"
 const COME_DUE_STATUS_PATH := "res://battle/rules/statuses/come_due.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const CARVE_PATH := "res://cards/data/carve.tres"
@@ -49,18 +49,18 @@ func _initialize() -> void:
 
 	var controller: Node = await _start_fight()
 	if controller != null:
-		var blackback: Node = _member(controller, "Blackback")
-		var nipper: Node = _member(controller, "Nipper")
-		_expect(blackback != null and nipper != null, "The fight is the Blackback and the Nipper")
-		if blackback != null and nipper != null:
-			Status.apply_to(_combatant(controller, blackback).statuses, load(COME_DUE_STATUS_PATH) as StatusData)
+		var straw: Node = _member(controller, "Strawcrown")
+		var chalk: Node = _member(controller, "Chalkcrown")
+		_expect(straw != null and chalk != null, "The fight is Strawcrown and Chalkcrown")
+		if straw != null and chalk != null:
+			Status.apply_to(_combatant(controller, straw).statuses, load(COME_DUE_STATUS_PATH) as StatusData)
 			controller.emit_signal("status_changed")
 			var slash: CardData = await _deal(controller, SLASH_PATH)
 			var other: CardData = await _deal(controller, SLASH_PATH)
 			var carve: CardData = await _deal(controller, CARVE_PATH)
 			_check_rest(controller, slash, carve)
-			_check_hover(controller, slash, other, blackback, nipper)
-			await _check_lone_survivor(controller, slash, carve, blackback, nipper)
+			_check_hover(controller, slash, other, straw, chalk)
+			await _check_lone_survivor(controller, slash, carve, straw, chalk)
 	await _teardown()
 
 	if _completed != CASES:
@@ -79,49 +79,49 @@ func _check_rest(controller: Node, slash: CardData, carve: CardData) -> void:
 	_expect_eq(_face_damage(controller, carve), CARVE, "...and Carve 6")
 	_completed += 1
 
-# Slash armed: 10 over the marked Blackback, 6 over the Nipper and over
+# Slash armed: 10 over the marked Strawcrown, 6 over Chalkcrown and over
 # no one (the default target lit then is not a hover), 10 again, and 6
 # once cancelled. The other Slash in hand stays 6 throughout.
-func _check_hover(controller: Node, slash: CardData, other: CardData, blackback: Node, nipper: Node) -> void:
+func _check_hover(controller: Node, slash: CardData, other: CardData, straw: Node, chalk: Node) -> void:
 	controller.call("request_play", _view(controller, slash))
 	_expect(controller.call("is_awaiting_target"), "Slash arms")
-	_hover(controller, blackback)
-	_expect_eq(_face_damage(controller, slash), MARKED, "Armed over the marked Blackback, Slash reads 10")
+	_hover(controller, straw)
+	_expect_eq(_face_damage(controller, slash), MARKED, "Armed over the marked Strawcrown, Slash reads 10")
 	_expect_eq(_face_damage(controller, other), SLASH, "...while the Slash still in hand reads 6")
-	_hover(controller, nipper)
-	_expect_eq(_face_damage(controller, slash), SLASH, "Over the Nipper it reads 6")
-	_hover(controller, blackback)
-	_expect_eq(_face_damage(controller, slash), MARKED, "Back over the Blackback, 10")
+	_hover(controller, chalk)
+	_expect_eq(_face_damage(controller, slash), SLASH, "Over Chalkcrown it reads 6")
+	_hover(controller, straw)
+	_expect_eq(_face_damage(controller, slash), MARKED, "Back over Strawcrown, 10")
 	controller.call("_update_hover", OFF_SCREEN)
 	_expect_eq(_face_damage(controller, slash), SLASH, "Over no enemy it reverts to 6")
-	_hover(controller, blackback)
+	_hover(controller, straw)
 	controller.call("cancel_target")
-	_expect_eq(_face_damage(controller, slash), SLASH, "Cancelled over the Blackback, it reverts to 6")
+	_expect_eq(_face_damage(controller, slash), SLASH, "Cancelled over Strawcrown, it reverts to 6")
 	_completed += 1
 
-# The Nipper dead, the Blackback is the only enemy: Slash reads 10 with no
+# Chalkcrown dead, Strawcrown is the only enemy: Slash reads 10 with no
 # hover at all, and that is what it then takes off. Carve, beside it,
 # still reads 6 - it hits everyone, so no one enemy's mark is its number.
-func _check_lone_survivor(controller: Node, slash: CardData, carve: CardData, blackback: Node, nipper: Node) -> void:
-	var survivor: Combatant = _combatant(controller, blackback)
-	var dead: Combatant = _combatant(controller, nipper)
+func _check_lone_survivor(controller: Node, slash: CardData, carve: CardData, straw: Node, chalk: Node) -> void:
+	var survivor: Combatant = _combatant(controller, straw)
+	var dead: Combatant = _combatant(controller, chalk)
 	dead.hp = 0
 	controller.call("_report_damage", "player", dead, 99, "card")
 	for i in 30:
 		await process_frame
 	controller.emit_signal("status_changed")
 	var face: int = _face_damage(controller, slash)
-	_expect_eq(face, MARKED, "With the Blackback alone, Slash reads 10 at rest")
+	_expect_eq(face, MARKED, "With Strawcrown alone, Slash reads 10 at rest")
 	_expect_eq(_face_damage(controller, carve), CARVE, "...and Carve still 6")
 	var before: int = survivor.hp + survivor.block
 	(controller.get("player") as Combatant).energy = 3
-	await _play(controller, slash, blackback)
+	await _play(controller, slash, straw)
 	_expect_eq(before - (survivor.hp + survivor.block), face, "...and lands the 9 it read")
 	_completed += 1
 
 # --- Helpers ---
 
-# A new run on floor 3 at PLAYER_HP, the fight started on the Blackback,
+# A new run on floor 3 at PLAYER_HP, the fight started on Strawcrown,
 # both enemies unkillable by a stray blow, an empty hand and 3 Energy.
 # The controller, or null (a FAIL is recorded).
 func _start_fight() -> Node:
@@ -138,10 +138,10 @@ func _start_fight() -> Node:
 	var target: Node3D = null
 	for node in get_nodes_in_group("enemies"):
 		var data: Resource = node.get("enemy_data")
-		if data != null and data.resource_path == BLACKBACK_PATH:
+		if data != null and data.resource_path == STRAWCROWN_PATH:
 			target = node as Node3D
 	if target == null:
-		_fail("no Blackback on floor 3")
+		_fail("no Strawcrown on floor 3")
 		return null
 	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
 	wanderer.global_position = target.global_position + Vector3(0.0, 0.0, 1.5)

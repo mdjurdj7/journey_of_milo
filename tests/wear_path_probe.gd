@@ -3,10 +3,10 @@ extends SceneTree
 # Headless probe for the worn band's centreline (Ground.set_wear_path(),
 # RegionField._aim_wear_path()): what each floor hands the ground shader.
 # Floors 1 and 2 derive their three points (spawn, past the first enemy,
-# the gate) and floor 3 overrides with its own three - all still the one
-# three-point curve. A longer override (4 to 8 points) is handed over
-# whole and in order, for the shader's chain through every point; past 8
-# the rest are dropped. Headless has no renderer, so this reads the
+# the gate) - the one three-point curve. Floor 3 overrides with its own
+# chain, from spawn through the crane pair to the exit, handed over whole
+# and in order, as any longer override (4 to 8 points) is, for the
+# shader's chain through every point; past 8 the rest are dropped. Headless has no renderer, so this reads the
 # shader parameters RegionField pushed, not the pixels.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/wear_path_probe.gd
@@ -45,24 +45,28 @@ func _initialize() -> void:
 		print("wear_path_probe: %d FAILED" % _failures)
 		quit(1)
 
-# Floors 1-3: three points each, the one curve as ever - floors 1 and 2
-# from spawn to their gate, floor 3 on its own override.
+# Floors 1 and 2: three points each, from spawn to their gate, the one
+# curve as ever. Floor 3: its own override, every point of it, in order.
 func _check_three_point_floors() -> void:
-	for index in 3:
+	for index in 2:
 		await _load_field(index)
 		var points: PackedVector2Array = _points()
 		_expect_eq(_count(), 3, "Floor %d: a three-point band" % (index + 1))
 		var spawn: Vector3 = _field.call("get_spawn_position")
 		_expect(points.size() == MAX_POINTS and points[0].is_equal_approx(Vector2(spawn.x, spawn.z)), "...starting at spawn")
-		var floor_data: Resource = _field.call("get_floor_data")
-		var override: PackedVector2Array = floor_data.get("wear_path_override")
-		if override.size() >= 3:
-			for i in 3:
-				_expect(points[i].is_equal_approx(Vector2(spawn.x + override[i].x, spawn.z + override[i].y)), "...point %d its override's" % i)
-		else:
-			var gate: Node3D = _field.get_node("ExitGate")
-			_expect(points[2].is_equal_approx(Vector2(gate.global_position.x, gate.global_position.z)), "...ending at the gate")
+		var gate: Node3D = _field.get_node("ExitGate")
+		_expect(points[2].is_equal_approx(Vector2(gate.global_position.x, gate.global_position.z)), "...ending at the gate")
 		await _teardown()
+	await _load_field(2)
+	var floor_data: Resource = _field.call("get_floor_data")
+	var override: PackedVector2Array = floor_data.get("wear_path_override")
+	var spawn_3: Vector3 = _field.call("get_spawn_position")
+	var drawn: PackedVector2Array = _points()
+	_expect(override.size() >= 3 and override.size() <= MAX_POINTS, "Floor 3: its own override, %d points" % override.size())
+	_expect_eq(_count(), override.size(), "...handed over whole")
+	for i in override.size():
+		_expect(drawn[i].is_equal_approx(Vector2(spawn_3.x + override[i].x, spawn_3.z + override[i].y)), "...point %d where it was put" % i)
+	await _teardown()
 	_completed += 1
 
 # A seven-point override reaches the shader whole, in order.

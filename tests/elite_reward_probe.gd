@@ -29,7 +29,7 @@ const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
-const BLACKBACK_PATH := "res://battle/rules/enemies/blackback.tres"
+const STRAWCROWN_PATH := "res://battle/rules/enemies/strawcrown.tres"
 const FLOOR_1 := 0
 const FLOOR_3 := 2
 const FLOOR_5 := 4
@@ -51,7 +51,7 @@ func _initialize() -> void:
 	_run_state = root.get_node("RunState")
 	await _check_wardling()
 	await _check_ordinary(FLOOR_1, SPUTTER_PATH, "The floor 1 Sputter")
-	await _check_ordinary(FLOOR_3, BLACKBACK_PATH, "The Blackback and its Nipper")
+	await _check_ordinary(FLOOR_3, STRAWCROWN_PATH, "The crowned cranes")
 	await _check_region_end()
 	if _completed != CASES:
 		_failures += 1

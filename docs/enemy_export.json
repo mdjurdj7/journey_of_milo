@@ -346,16 +346,16 @@
           },
           "encounters": [
             {
-              "slot": "blackback",
-              "option": "blackback_nipper",
+              "slot": "cranes",
+              "option": "crane_pair",
               "weight": 1.0,
               "anchor": [
-                -3.0,
-                -9.0
+                8.67,
+                -33.4
               ],
               "slot_yaw_degrees": 0.0,
-              "cluster": "blackback",
-              "names": "Blackback + Nipper",
+              "cluster": "cranes",
+              "names": "Strawcrown + Chalkcrown",
               "required": true,
               "elite": false,
               "gate_fight": true,
@@ -365,7 +365,7 @@
                   1.0,
                   0.0
                 ],
-                "gate_distance_beyond_enemy": 26.3,
+                "gate_distance_beyond_enemy": 14.63,
                 "bar_axis_offset": 0.0,
                 "channel_max_width": 0.0
               },
@@ -378,30 +378,30 @@
               "members": [
                 {
                   "member": 0,
-                  "name": "Blackback",
-                  "enemy_file": "res://battle/rules/enemies/blackback.tres",
-                  "hp": 40,
+                  "name": "Strawcrown",
+                  "enemy_file": "res://battle/rules/enemies/strawcrown.tres",
+                  "hp": 32,
                   "anchor": true,
                   "card_reward": "ROLLED",
                   "position": [
-                    -3.0,
-                    -9.0
+                    8.67,
+                    -33.4
                   ],
-                  "yaw_degrees": 18.4,
+                  "yaw_degrees": 10.0,
                   "face_prop": null
                 },
                 {
                   "member": 1,
-                  "name": "Nipper",
-                  "enemy_file": "res://battle/rules/enemies/nipper.tres",
-                  "hp": 16,
+                  "name": "Chalkcrown",
+                  "enemy_file": "res://battle/rules/enemies/chalkcrown.tres",
+                  "hp": 32,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
-                    -4.66,
-                    -8.45
+                    8.63,
+                    -34.7
                   ],
-                  "yaw_degrees": 18.4,
+                  "yaw_degrees": 10.0,
                   "face_prop": null
                 }
               ],
@@ -919,13 +919,114 @@
           "StorkTells.clatter_sound": "res://assets/audio/enemies/Stork/clatter_1.mp3"
         }
       },
+      "appears_on": []
+    },
+    {
+      "name": "Chalkcrown",
+      "file": "res://battle/rules/enemies/chalkcrown.tres",
+      "hp": 32,
+      "elite": false,
+      "mechanic_summary": "One of a pair of crowned cranes on a shared loop, Bow (4 Block), Step (6), Leap (10), both on the same step. Paired from the start: if its partner falls first it turns Bereft and carries out each step twice. Felled on the same turn, neither acts again.",
+      "field": {
+        "model": "res://assets/models/enemies/Chalkcrown/crane.glb",
+        "model_is_default": false,
+        "model_scale": 1.075,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": {
+          "scene": "res://field/crane_motion.tscn",
+          "class": "CraneMotion"
+        },
+        "contact_radius_m": 2.0,
+        "cluster_gap_m": null,
+        "rest_height_m": 0.0,
+        "sink_m": 0.0,
+        "battle_hover_m": 0.0,
+        "buried_on_field": false,
+        "flies_in_battle": false,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Bow",
+            "type": "DEFEND",
+            "block": 4,
+            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+          },
+          {
+            "name": "Step",
+            "type": "ATTACK",
+            "damage_per_hit": 6,
+            "hits": 1,
+            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+          },
+          {
+            "name": "Leap",
+            "type": "ATTACK",
+            "damage_per_hit": 10,
+            "hits": 1,
+            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null,
+        "phase": null
+      },
+      "statuses": [
+        {
+          "id": "paired",
+          "name": "Paired",
+          "file": "res://battle/rules/statuses/paired.tres",
+          "gained": "starts every fight with it",
+          "description": "If its partner falls, it becomes Bereft.",
+          "text": "If its partner falls, it becomes Bereft.",
+          "fields": {
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "grants_when_alone": "bereft"
+          }
+        },
+        {
+          "id": "bereft",
+          "name": "Bereft",
+          "file": "res://battle/rules/statuses/bereft.tres",
+          "gained": "from Paired, when no packmate is left living",
+          "description": "Acts twice each turn.",
+          "text": "Acts twice each turn.",
+          "fields": {
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "repeats_intent": 2,
+            "gained_line": "The other keeps dancing."
+          }
+        }
+      ],
+      "rewards": {
+        "keepsake_table": null,
+        "glassbone": 0,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/enemies/Stork/hit_1.mp3",
+          "res://assets/audio/enemies/Stork/hit_2.mp3"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
       "appears_on": [
         {
           "region": 1,
           "floor": 3,
-          "slot": "blackback",
-          "option": "blackback_nipper",
-          "cluster": "blackback",
+          "slot": "cranes",
+          "option": "crane_pair",
+          "cluster": "cranes",
           "required": true,
           "gate_fight": true
         }
@@ -1380,17 +1481,7 @@
         "status_gained": null,
         "attachment": {}
       },
-      "appears_on": [
-        {
-          "region": 1,
-          "floor": 3,
-          "slot": "blackback",
-          "option": "blackback_nipper",
-          "cluster": "blackback",
-          "required": true,
-          "gate_fight": true
-        }
-      ]
+      "appears_on": []
     },
     {
       "name": "Siltjaw",
@@ -1569,6 +1660,117 @@
           "slot": "crab",
           "option": "sputter_underfoot",
           "cluster": "crab",
+          "required": true,
+          "gate_fight": true
+        }
+      ]
+    },
+    {
+      "name": "Strawcrown",
+      "file": "res://battle/rules/enemies/strawcrown.tres",
+      "hp": 32,
+      "elite": false,
+      "mechanic_summary": "One of a pair of crowned cranes on a shared loop, Bow (4 Block), Step (6), Leap (10), both on the same step. Paired from the start: if its partner falls first it turns Bereft and carries out each step twice. Felled on the same turn, neither acts again.",
+      "field": {
+        "model": "res://assets/models/enemies/Strawcrown/crane.glb",
+        "model_is_default": false,
+        "model_scale": 1.0,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": {
+          "scene": "res://field/crane_motion.tscn",
+          "class": "CraneMotion"
+        },
+        "contact_radius_m": 2.0,
+        "cluster_gap_m": null,
+        "rest_height_m": 0.0,
+        "sink_m": 0.0,
+        "battle_hover_m": 0.0,
+        "buried_on_field": false,
+        "flies_in_battle": false,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Bow",
+            "type": "DEFEND",
+            "block": 4,
+            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+          },
+          {
+            "name": "Step",
+            "type": "ATTACK",
+            "damage_per_hit": 6,
+            "hits": 1,
+            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+          },
+          {
+            "name": "Leap",
+            "type": "ATTACK",
+            "damage_per_hit": 10,
+            "hits": 1,
+            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null,
+        "phase": null
+      },
+      "statuses": [
+        {
+          "id": "paired",
+          "name": "Paired",
+          "file": "res://battle/rules/statuses/paired.tres",
+          "gained": "starts every fight with it",
+          "description": "If its partner falls, it becomes Bereft.",
+          "text": "If its partner falls, it becomes Bereft.",
+          "fields": {
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "grants_when_alone": "bereft"
+          }
+        },
+        {
+          "id": "bereft",
+          "name": "Bereft",
+          "file": "res://battle/rules/statuses/bereft.tres",
+          "gained": "from Paired, when no packmate is left living",
+          "description": "Acts twice each turn.",
+          "text": "Acts twice each turn.",
+          "fields": {
+            "default_duration_turns": "until removed",
+            "stack_rule": "IGNORE",
+            "repeats_intent": 2,
+            "gained_line": "The other keeps dancing."
+          }
+        }
+      ],
+      "rewards": {
+        "keepsake_table": null,
+        "glassbone": 0,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/enemies/Stork/hit_1.mp3",
+          "res://assets/audio/enemies/Stork/hit_2.mp3"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 3,
+          "slot": "cranes",
+          "option": "crane_pair",
+          "cluster": "cranes",
           "required": true,
           "gate_fight": true
         }

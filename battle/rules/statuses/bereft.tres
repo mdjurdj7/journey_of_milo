@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" format=3 uid="uid://cstprln1dj1ae"]
+
+[ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "bereft"
+display_name = "Bereft"
+description = "Acts twice each turn."
+category = 2
+default_duration_turns = -1
+stack_rule = 3
+repeats_intent = 2
+gained_line = "The other keeps dancing."

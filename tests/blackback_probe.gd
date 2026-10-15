@@ -1,28 +1,28 @@
 extends SceneTree
 
-# Headless probe for floor 3's required pair, the Blackback and the
-# Nipper: their loops, the Blackback's Fed from the first frame turning
-# Hungry once when the Nipper dies (a Carve's kill included, and never
-# when one Carve kills both), Hungry's +3
-# on every hit of its Attacks (Peck 2x7, Lunge 15), the Nipper's Forage
-# healing the Blackback 8 up to its max and giving way to Nip once the
-# Blackback is dead, and every turn's intent preview equal to what the
-# turn resolves. Floor 3 keeps the Blackback first, where the Sputter
-# stood, so the LINE exit measures from the same place. Its sounds: two
-# contact takes, the bill clatter with each windup, and the hiss once as
-# it turns Hungry - never at a fight's opening.
+# Headless probe for the Blackback and the Nipper, the pair floor 3 stood
+# before the crowned cranes: their loops, the Blackback's Fed from the
+# first frame turning Hungry once when the Nipper dies (a Carve's kill
+# included, and never when one Carve kills both), Hungry's +3 on every
+# hit of its Attacks (Peck 2x7, Lunge 15), the Nipper's Forage healing
+# the Blackback 8 up to its max and giving way to Nip once the Blackback
+# is dead, and every turn's intent preview equal to what the turn
+# resolves. Its sounds: two contact takes, the bill clatter with each
+# windup, and the hiss once as it turns Hungry - never at a fight's
+# opening.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/blackback_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 #
-# Fights load the real floor 3 scene and drive BattleController's own
+# Fights load the real floor 3 scene, the pair stood in the cranes' place
+# for the probe (_stand_old_pair()), and drive BattleController's own
 # end_turn() and request_play(), as keeper_keepsake_probe does. Untyped
 # against anything that names the RunState autoload (RegionField,
 # BattleController, FieldEnemy): a SceneTree script compiles before the
 # autoloads register.
 
-const CASES := 9
+const CASES := 8
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
@@ -50,7 +50,6 @@ func _initialize() -> void:
 	_run_state = root.get_node("RunState")
 	_check_data()
 	_check_hungry_per_attack()
-	_check_floor_3()
 	await _check_fight_opens()
 	await _check_both_alive_turns()
 	await _check_nipper_dies_first()
@@ -127,32 +126,6 @@ func _check_hungry_per_attack() -> void:
 	_expect_eq(guarded.block, 0, "...the block worn to 0")
 	_expect_eq(_lunge_against(data, FED_PATH), [12, 12], "Fed: Lunge 12, previewed and resolved")
 	_expect_eq(_lunge_against(data, HUNGRY_PATH), [15, 15], "Hungry: Lunge 12 + 3 = 15, previewed and resolved")
-	_completed += 1
-
-# Floor 3: the Blackback's slot first, anchored at (-3, -9) where the
-# Sputter stood (the gate measures from the first required slot); the
-# Wardling's slot as it was; the Nipper 1.5-2 m from the Blackback in the
-# same option - one cluster; the slot required.
-func _check_floor_3() -> void:
-	var floor_data := load(FLOOR_3_PATH) as Resource
-	var slots: Array = floor_data.get("slots")
-	_expect_eq(slots.size(), 2, "Floor 3 has two encounter slots")
-	var cluster: Resource = slots[0]
-	var members: Array = (cluster.get("options") as Array)[0].get("members")
-	_expect_eq(members.size(), 2, "...the first stands two - one cluster")
-	var blackback: Resource = members[0]
-	var nipper: Resource = members[members.size() - 1]
-	var blackback_at: Vector2 = cluster.call("to_floor", blackback.get("position"))
-	var nipper_at: Vector2 = cluster.call("to_floor", nipper.get("position"))
-	_expect_eq((blackback.get("enemy_data") as EnemyData).enemy_name, "Blackback", "...the Blackback first")
-	_expect_eq(blackback_at, Vector2(-3, -9), "...at (-3, -9)")
-	_expect_eq(cluster.get("position"), Vector2(-3, -9), "...the slot anchored on it")
-	var wardling: Resource = ((slots[1].get("options") as Array)[0].get("members") as Array)[0]
-	_expect_eq((wardling.get("enemy_data") as EnemyData).enemy_name, "Wardling", "...the Wardling's slot second")
-	_expect_eq((nipper.get("enemy_data") as EnemyData).enemy_name, "Nipper", "...the Nipper beside the Blackback")
-	var gap: float = nipper_at.distance_to(blackback_at)
-	_expect(gap >= 1.5 and gap <= 2.0, "...%.2f m from the Blackback" % gap)
-	_expect(bool(cluster.get("required")), "...both required")
 	_completed += 1
 
 # One contact starts the fight with both; the Blackback opens Fed, its
@@ -322,6 +295,39 @@ func _check_carve_kills_both() -> void:
 
 # --- Helpers ---
 
+# Floor 3 stands the crane pair now; the Blackback and its Nipper are
+# stood for this probe alone - their option, as floor 3 had it, added to
+# the cranes' slot (the loaded FloorData, in memory) and forced through
+# RegionField.force_options before the field enters the tree.
+const OLD_PAIR := &"blackback_nipper"
+# Held for the probe's length, so the cached FloorData the field loads is
+# the one the option was added to.
+var _floor_3: FloorData = null
+
+func _stand_old_pair(field: Node) -> void:
+	if _floor_3 == null:
+		_floor_3 = load(FLOOR_3_PATH) as FloorData
+	var floor_data: FloorData = _floor_3
+	var slot: EncounterSlot = floor_data.slots[0]
+	if slot.find_option(OLD_PAIR) == null:
+		var option := EncounterOption.new()
+		option.option_id = OLD_PAIR
+		var blackback := FloorEnemy.new()
+		blackback.enemy_data = load(BLACKBACK_PATH) as EnemyData
+		blackback.yaw_degrees = 18.4
+		blackback.anchor = true
+		var nipper := FloorEnemy.new()
+		nipper.enemy_data = load(NIPPER_PATH) as EnemyData
+		nipper.position = Vector2(-1.66, 0.55)
+		nipper.yaw_degrees = 18.4
+		option.members = [blackback, nipper] as Array[FloorEnemy]
+		slot.options.append(option)
+	var forced: Dictionary[StringName, StringName] = {}
+	forced[slot.slot_id] = OLD_PAIR
+	field.set("force_options", forced)
+	if (field.get("force_options") as Dictionary).get(slot.slot_id) != OLD_PAIR:
+		_fail("the old pair could not be forced on floor 3")
+
 # One enemy turn through the controller: the previews read first, then
 # end_turn(). [what reached the player's HP, what the Blackback healed],
 # each checked against its preview.
@@ -359,6 +365,7 @@ func _start_fight(deck_card_path: String = "") -> Node:
 	# No zone intro: it holds the field frozen for its length.
 	_run_state.set("run_opening_pending", false)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	_stand_old_pair(_field)
 	root.add_child(_field)
 	for i in 30:
 		await physics_frame

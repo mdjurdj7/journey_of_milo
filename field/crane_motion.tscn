@@ -1,0 +1,6 @@
+[gd_scene format=3 uid="uid://c4da16qxljpq"]
+
+[ext_resource type="Script" uid="uid://dri7bv678d6k2" path="res://field/crane_motion.gd" id="1_crane_motion"]
+
+[node name="CraneMotion" type="Node3D"]
+script = ExtResource("1_crane_motion")
