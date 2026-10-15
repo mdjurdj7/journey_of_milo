@@ -2,7 +2,8 @@ extends SceneTree
 
 # Headless probe for floor 3's required pair, the Blackback and the
 # Nipper: their loops, the Blackback's Fed from the first frame turning
-# Hungry once when the Nipper dies (a Carve's kill included), Hungry's +3
+# Hungry once when the Nipper dies (a Carve's kill included, and never
+# when one Carve kills both), Hungry's +3
 # on every hit of its Attacks (Peck 2x7, Lunge 15), the Nipper's Forage
 # healing the Blackback 8 up to its max and giving way to Nip once the
 # Blackback is dead, and every turn's intent preview equal to what the
@@ -21,7 +22,7 @@ extends SceneTree
 # BattleController, FieldEnemy): a SceneTree script compiles before the
 # autoloads register.
 
-const CASES := 8
+const CASES := 9
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
@@ -55,6 +56,7 @@ func _initialize() -> void:
 	await _check_nipper_dies_first()
 	await _check_blackback_dies_first()
 	await _check_carve_kills_nipper()
+	await _check_carve_kills_both()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -292,6 +294,29 @@ func _check_carve_kills_nipper() -> void:
 			if active.data.id == "hungry":
 				hungry += active.stack_count
 		_expect_eq(hungry, 1, "...Hungry exactly once")
+	await _teardown()
+	_completed += 1
+
+# A Carve that kills both: the pack is felled by one card, so the
+# Blackback never turns Hungry on its way down - nothing is told gained.
+func _check_carve_kills_both() -> void:
+	var controller: Node = await _start_fight(CARVE_PATH)
+	if controller != null:
+		var blackback: Node = _member(controller, "Blackback")
+		var b: Combatant = _combatant(controller, blackback)
+		b.hp = 5
+		_combatant(controller, _member(controller, "Nipper")).hp = 5
+		var gained: Array = []
+		controller.connect("enemy_status_gained", func(member: Node, status: StatusData) -> void: gained.append([member, status]))
+		var views: Array = controller.get("_hand_container").call("_card_views")
+		controller.call("request_play", views[0])
+		if bool(controller.call("is_awaiting_target")):
+			controller.call("confirm_target", blackback)
+		await create_timer(2.0).timeout
+		_expect_eq((controller.get("enemies") as Array).size(), 0, "One Carve kills both")
+		_expect_eq(gained.size(), 0, "...and neither turns on its way down (%d told gained)" % gained.size())
+		for active: Status in b.statuses:
+			_expect(active.data.id != "hungry", "...the Blackback never Hungry")
 	await _teardown()
 	_completed += 1
 

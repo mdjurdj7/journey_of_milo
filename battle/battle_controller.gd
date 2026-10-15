@@ -233,6 +233,13 @@ var _win_waiting: bool = false
 # then on are the repeat's, held here until its own impact (_land_repeat()).
 var _repeat_pending: bool = false
 var _repeat_reports: Array[Callable] = []
+# While a card's own effects resolve: a kill only notes that the packs
+# need looking at (_pack_check_due), and _mark_lone_pack_members() runs
+# once the card is done - so a card that kills a whole pack never turns
+# a member that it is about to kill too (a damage-to-all lands and
+# reports one target at a time).
+var _deferring_pack_check: bool = false
+var _pack_check_due: bool = false
 
 func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wanderer: Wanderer) -> void:
 	_hand_container = hand_container
@@ -853,7 +860,12 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		_hand_container.release_views([consume_view] as Array[CardView])
 
 	var hp_before_effects: int = player.hp
+	_deferring_pack_check = true
 	_effect_resolver.resolve_card(card, ctx)
+	_deferring_pack_check = false
+	if _pack_check_due:
+		_pack_check_due = false
+		_mark_lone_pack_members()
 	if _repeat_pending:
 		await _land_repeat(card, target_enemy)
 	deck.end_play()
@@ -1775,7 +1787,10 @@ func _drop_enemy(enemy: FieldEnemy) -> void:
 		_clear_hover()
 	if _cursor_enemy == enemy:
 		_set_cursor_enemy(null)
-	_mark_lone_pack_members()
+	if _deferring_pack_check:
+		_pack_check_due = true
+	else:
+		_mark_lone_pack_members()
 
 # Whether `enemy` was killed and its death hasn't finished - held for its
 # blow, or running. BattleFeedback reads it in the killing hit's own
@@ -1856,8 +1871,8 @@ func _maybe_win() -> void:
 # the island's last dragonfly bites instead of Swarming alone, the
 # Nipper stops foraging, the Blackback turns Hungry. A queued move that
 # gives way, or a status that turns, is shown at once. Living by HP, not
-# by the list - a card that kills several drops them one at a time, and
-# the ones still to go are already dead.
+# by the list. A card's own kills are looked at once it is done (see
+# _deferring_pack_check), so one that fells a whole pack turns none of it.
 func _mark_lone_pack_members() -> void:
 	for enemy in enemies:
 		var combatant: Combatant = _combatants.get(enemy)
