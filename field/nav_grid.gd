@@ -40,6 +40,10 @@ var deep_water_depth: float = 0.6
 var shallows_cost: float = 6.0
 var step_height: float = 0.35
 var max_slope_degrees: float = 45.0
+# A footprint narrower than this many cells is stamped by its outline as
+# well as by the cell centres inside it (footprint_cells()) - two cells is
+# where a strip stops being sure to hold a centre in every cell it crosses.
+var thin_width_cells: float = 2.0
 
 var origin: Vector2 = Vector2.ZERO
 var cols: int = 0
@@ -163,18 +167,41 @@ func footprint_cells(shape_node: CollisionShape3D) -> Array[Vector2i]:
 			var cell := Vector2i(x, z)
 			if in_bounds(cell) and Geometry2D.is_point_in_polygon(cell_centre(cell), hull):
 				cells.append(cell)
-	# A sliver thinner than a cell (a ledge wall) still blocks the cells it
-	# crosses: its centre line, walked at a quarter cell.
-	if cells.is_empty():
-		var a: Vector2 = (hull[0] + hull[1]) * 0.5
-		var half: int = hull.size() >> 1
-		var b: Vector2 = (hull[half] + hull[(half + 1) % hull.size()]) * 0.5
-		var steps: int = maxi(int(ceil(a.distance_to(b) / (cell_size * 0.25))), 1)
-		for s in steps + 1:
-			var cell: Vector2i = world_to_cell(a.lerp(b, float(s) / float(steps)))
-			if in_bounds(cell) and not cells.has(cell):
-				cells.append(cell)
+	# A shape narrower than thin_width_cells (a ledge wall's 0.2 m box) covers
+	# cell centres only here and there along its length, or none at all,
+	# and the gaps between them are holes in a wall: its outline, walked at
+	# a quarter cell, blocks every cell it crosses, end to end.
+	if _hull_width(hull) < cell_size * thin_width_cells:
+		var taken: Dictionary = {}
+		for cell in cells:
+			taken[cell] = true
+		# convex_hull() closes the loop: the last point is the first.
+		for i in range(hull.size() - 1):
+			var a: Vector2 = hull[i]
+			var b: Vector2 = hull[i + 1]
+			var steps: int = maxi(int(ceil(a.distance_to(b) / (cell_size * 0.25))), 1)
+			for s in steps + 1:
+				var cell: Vector2i = world_to_cell(a.lerp(b, float(s) / float(steps)))
+				if in_bounds(cell) and not taken.has(cell):
+					taken[cell] = true
+					cells.append(cell)
 	return cells
+
+# The narrowest a closed convex hull is across: over its edges, the
+# least of each edge's farthest point from that edge's line.
+static func _hull_width(hull: PackedVector2Array) -> float:
+	var width: float = INF
+	for i in range(hull.size() - 1):
+		var a: Vector2 = hull[i]
+		var edge: Vector2 = hull[i + 1] - a
+		if edge.length() < 0.000001:
+			continue
+		var normal: Vector2 = Vector2(-edge.y, edge.x).normalized()
+		var farthest: float = 0.0
+		for point in hull:
+			farthest = maxf(farthest, absf((point - a).dot(normal)))
+		width = minf(width, farthest)
+	return width
 
 # --- Cells ---
 
