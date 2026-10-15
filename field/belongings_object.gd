@@ -6,8 +6,13 @@ class_name BelongingsObject
 # field; the choice is the cache's screen (BelongingsScreen). Made by
 # the cache, which places it, yaws it and grounds it.
 #
-# The glb on the props' shared flat material (Hull's: roughness 1, no
-# specular), tinted like the hulls - its own textures are ignored. The
+# The glb's own colour map (<model>_Image_0.jpg beside it, Meshy's
+# baseColor) on the painted shader, times tint - the models' soft light
+# (field/wanderer_painted.gdshader: roughness 1, no specular, no normal
+# map). The shader is fog_disabled, so the depth fog is laid back over it
+# by an enemy_fog.gdshader pass at fog_factor, filled from the field's
+# RegionSky and again whenever its fog changes. If the shader or the
+# colour map fails to load, the hulls' flat material wears the tint. The
 # bbox is measured in this node's space and its bottom seated on the
 # origin, so a model whose origin isn't at its base still sits on the
 # sand. A box of that bbox is its collision, MAKE_STATIC like every prop
@@ -16,12 +21,21 @@ class_name BelongingsObject
 # Taken: it sinks its own height into the sand over settle_seconds and
 # frees - a settled enemy's ease (FieldEnemy.settle_and_free()).
 
+const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
+const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
+# Beside the model: <model>_Image_0.jpg, its colour map.
+const COLOUR_MAP_SUFFIX := "_Image_0.jpg"
+
 @export_file("*.glb", "*.tscn") var model_scene_path: String = ""
-@export var tint: Color = Color(0.50, 0.47, 0.42):
+@export var tint: Color = Color(0.76, 0.62, 0.46):
 	set(value):
 		tint = value
-		if _material != null:
-			_material.albedo_color = tint
+		set_material_tint(_material, tint)
+# The object's share of the depth fog - 1 fogged as the scene fogs it.
+@export_range(0.0, 1.0, 0.01) var fog_factor: float = 1.0:
+	set(value):
+		fog_factor = value
+		_push_fog()
 @export var yaw_degrees: float = 0.0:
 	set(value):
 		yaw_degrees = value
@@ -34,16 +48,24 @@ class_name BelongingsObject
 		_rebuild()
 @export var settle_seconds: float = 0.5
 @export var ground_path: NodePath = ^"../../../Ground"
+@export var region_field_path: NodePath = ^"../../.."
 
 var _model: Node3D = null
 var _body: StaticBody3D = null
-var _material: StandardMaterial3D = null
+var _material: Material = null
+var _fog: ShaderMaterial = null
+var _sky: RegionSky = null
 var _aabb: AABB = AABB()
 var _ground: Ground = null
 var _settling: bool = false
 
 func _ready() -> void:
 	_spawn_model()
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	_sky = region_field.get_region_sky() if region_field != null else null
+	if _sky != null:
+		_sky.fog_changed.connect(_push_fog)
+	_push_fog()
 	_ground = get_node_or_null(ground_path) as Ground
 	if _ground == null:
 		push_warning("BelongingsObject '%s': ground_path did not resolve to a Ground; not grounded." % name)
@@ -60,8 +82,14 @@ func _spawn_model() -> void:
 	_model.name = "Model"
 	_model.scale = Vector3.ONE * model_scale
 	add_child(_model)
-	_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
-	_material.albedo_color = tint
+	_material = painted_material(model_scene_path, tint)
+	_fog = null
+	if _material != null:
+		_fog = _fog_pass()
+		_material.next_pass = _fog
+	else:
+		_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
+		set_material_tint(_material, tint)
 	_aabb = AABB()
 	var has_aabb := false
 	for mesh_instance in _model.find_children("*", "MeshInstance3D", true, false):
@@ -88,6 +116,50 @@ func _spawn_model() -> void:
 	body.add_child(shape_node)
 	add_child(body)
 
+# The model's own colour map under the painted shader, times tint - its
+# own material, so its tint is its own. Null when the shader or the map
+# fails to load. BelongingsScreen dresses its renders with it too.
+static func painted_material(model_path: String, albedo_tint: Color) -> ShaderMaterial:
+	var shader := load(PAINTED_SHADER_PATH) as Shader
+	var map_path: String = model_path.get_basename() + COLOUR_MAP_SUFFIX
+	var texture: Texture2D = load(map_path) as Texture2D if ResourceLoader.exists(map_path) else null
+	if shader == null or texture == null:
+		push_warning("BelongingsObject: painted material failed to load (%s, %s); the flat tint instead." % [PAINTED_SHADER_PATH, map_path])
+		return null
+	var material := ShaderMaterial.new()
+	material.shader = shader
+	material.set_shader_parameter("albedo_texture", texture)
+	material.set_shader_parameter("albedo_tint", albedo_tint)
+	return material
+
+# A painted material's albedo_tint, a flat one's albedo_color.
+static func set_material_tint(material: Material, albedo_tint: Color) -> void:
+	if material is ShaderMaterial:
+		(material as ShaderMaterial).set_shader_parameter("albedo_tint", albedo_tint)
+	elif material is BaseMaterial3D:
+		(material as BaseMaterial3D).albedo_color = albedo_tint
+
+func _fog_pass() -> ShaderMaterial:
+	var shader := load(FOG_SHADER_PATH) as Shader
+	if shader == null:
+		push_warning("BelongingsObject '%s': fog pass shader failed to load (%s); unfogged." % [name, FOG_SHADER_PATH])
+		return null
+	var pass_material := ShaderMaterial.new()
+	pass_material.shader = shader
+	return pass_material
+
+# The field's depth fog into the fog pass, as the Wanderer's is
+# (Wanderer.refresh_fog()).
+func _push_fog() -> void:
+	if _fog == null or _sky == null:
+		return
+	_fog.set_shader_parameter("fog_color", _sky.fog_color)
+	_fog.set_shader_parameter("fog_energy", _sky.fog_light_energy)
+	_fog.set_shader_parameter("fog_begin", _sky.current_fog_depth_begin())
+	_fog.set_shader_parameter("fog_end", _sky.current_fog_depth_end())
+	_fog.set_shader_parameter("fog_density", _sky.fog_density)
+	_fog.set_shader_parameter("fog_factor", fog_factor)
+
 # A new model_scale: the model, its bbox and its collision again.
 func _rebuild() -> void:
 	if not is_inside_tree() or _settling:
@@ -99,6 +171,7 @@ func _rebuild() -> void:
 		_body.free()
 		_body = null
 	_spawn_model()
+	_push_fog()
 
 # Onto the relief at this node's XZ. The cache calls it after moving the
 # object; the relief's own rebuild calls it too.

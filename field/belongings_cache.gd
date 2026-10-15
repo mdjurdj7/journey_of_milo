@@ -24,11 +24,11 @@ class_name BelongingsCache
 # object); a decline leaves all three (sink_on_decline). Back on a spent
 # cache's floor, the objects that sank stay gone and nothing opens.
 #
-# The objects are BelongingsObjects: the model on the hulls' flat
-# material and tint, grounded by its bbox, solid, and inert - nothing
-# opens them from the field and they say nothing. Object i is column i
-# (BelongingsScreen.Slot): the case (the coin), the pack (the card), the
-# bedroll (the keepsake).
+# The objects are BelongingsObjects: the model's own colour map on the
+# painted shader times object_tint, grounded by its bbox, solid, and
+# inert - nothing opens them from the field and they say nothing. Object
+# i is column i (BelongingsScreen.Slot): the case (the coin), the pack
+# (the card), the bedroll (the keepsake).
 
 @export_group("Objects")
 # The three models, in column order: the case, the pack, the bedroll.
@@ -60,8 +60,10 @@ class_name BelongingsCache
 			if _objects[index] != null and is_instance_valid(_objects[index]):
 				_objects[index].model_scale = object_scale(index)
 		_place_objects()
-# The hulls' tint.
-@export var object_tint: Color = Color(0.50, 0.47, 0.42):
+# One shared medium brown multiplied into every object's own colour map -
+# on the sand and on the screen (RegionField hands it to BelongingsScreen),
+# so the pair match. Darker than dry sand (0.74, 0.70, 0.60).
+@export var object_tint: Color = Color(0.76, 0.62, 0.46):
 	set(value):
 		object_tint = value
 		for object in _objects:

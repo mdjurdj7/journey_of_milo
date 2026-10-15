@@ -8,20 +8,28 @@ class_name BelongingsScreen
 # holds where it was, and this layer runs ALWAYS on layer 100.
 #
 # At the top, the cache's one world-voice line in Spectral, bone over
-# the scrim with the reward screen's ink outline - no box, no quotes -
-# and under it the rule, TAKE ONE, in the system voice's tracked caps.
-# Under that three columns side by side, each its object alone - the
-# case, the pack, the bedroll, rendered from their models (see _build_
-# render()). The kind of thing each holds is fixed (Slot) - the case
-# coin, the pack a card, the bedroll a keepsake, any one of them perhaps
-# Glassbone too - but which thing is a mystery until it's taken: nothing
-# of what is inside is drawn or named before. A column whose slot rolled
-# nothing is not drawn and cannot be focused.
+# the scrim with the reward screen's ink outline - no box, no quotes.
+# Lower, one row of three columns side by side, centred across the
+# screen at columns_centre_fraction of its height, each its object alone
+# - the case, the pack, the bedroll, rendered from their models (see
+# _build_render()) - and just above the row the rule, TAKE ONE, in the
+# system voice's tracked caps. A soft band of the ink, feathered top and
+# bottom, darkens the screen's full width behind the row, over the
+# scrim. The kind of thing each holds is fixed (Slot) and named under its
+# column in the choices' tracked caps - COIN, CARD, KEEPSAKE - any one of
+# them perhaps Glassbone too; which thing is a mystery until it's taken:
+# nothing of what is inside is drawn or named before. A column whose slot
+# rolled nothing is not drawn and cannot be focused.
+#
+# The objects wear what they wear on the sand (BelongingsObject.painted_
+# material()): each model's own colour map on the painted shader, times
+# the cache's object_tint, lit by the field's own sun and ambient as the
+# field camera sees them (light_like()).
 #
 # The focus language is on the object itself, the title menu's two
-# states carried over: at rest the object is drawn down in the utility
-# grey (rest_modulate); focused it is full bone, with the short hairline
-# centred under it. The mouse focuses by hovering a column and takes by
+# states carried over: at rest the object is drawn down (rest_modulate)
+# and its kind in the utility grey; focused it is drawn as rendered, its
+# kind in bone, with the short hairline centred under it. The mouse focuses by hovering a column and takes by
 # clicking it; ui_left/ui_right move across the columns (wrapping),
 # ui_down drops to WALK ON, ui_up returns, ui_accept takes. Nothing is
 # focused until the mouse or a key says so. WALK ON keeps the text form
@@ -112,32 +120,33 @@ const DISMISS := SLOT_COUNT
 		line_centre_fraction = value
 		_refresh()
 # The rule, in the choices' tracked caps (label_size_px, label_tracking_
-# em), its baseline this far under the world line's.
+# em), its baseline this far above the row's top.
 @export var take_one_text: String = "TAKE ONE":
 	set(value):
 		take_one_text = value
 		_refresh()
-@export var take_one_gap_px: float = 40.0:
+@export var take_one_gap_px: float = 12.0:
 	set(value):
 		take_one_gap_px = value
 		_refresh()
 @export_group("")
 
 @export_group("Columns")
-# Each column is a square this many pixels across - its object's render.
-@export var column_px: float = 300.0:
+# Each column is a square this many pixels across - its object's render;
+# at 216 no object stands taller than a fifth of a 1080 screen.
+@export var column_px: float = 216.0:
 	set(value):
 		column_px = value
 		_render_objects()
 		_refresh()
-@export var column_gap_px: float = 40.0:
+@export var column_gap_px: float = 96.0:
 	set(value):
 		column_gap_px = value
 		_refresh()
-# The columns' centre, as a fraction of the viewport height - high
-# enough that the lines under them clear the frozen Wanderer, whose head
-# the field camera keeps near y 0.57.
-@export_range(0.0, 1.0) var columns_centre_fraction: float = 0.28:
+# The row's centre, as a fraction of the viewport height - between the
+# world line and WALK ON, its kinds clearing the frozen Wanderer, whose
+# head the field camera keeps near y 0.57.
+@export_range(0.0, 1.0) var columns_centre_fraction: float = 0.40:
 	set(value):
 		columns_centre_fraction = value
 		_refresh()
@@ -150,11 +159,40 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		object_hairline_length_px = value
 		_refresh()
-# An object at rest is drawn at this multiple of its bone render, which
-# brings its lit faces down to about the title menu's utility grey.
-@export var rest_modulate: Color = Color(0.62, 0.64, 0.70, 1.0):
+# An object at rest is drawn at this multiple of its render - neutral, so
+# its colours only dim.
+@export var rest_modulate: Color = Color(0.78, 0.78, 0.78, 1.0):
 	set(value):
 		rest_modulate = value
+		_refresh()
+# Each column's kind under it, column order, in the choices' tracked caps
+# (choice_word_size_px): the baseline this far under the column's square.
+# Grey at rest, bone on focus; gone with the take.
+@export var kind_labels: PackedStringArray = PackedStringArray(["COIN", "CARD", "KEEPSAKE"]):
+	set(value):
+		kind_labels = value
+		_refresh()
+@export var kind_label_gap_px: float = 34.0:
+	set(value):
+		kind_label_gap_px = value
+		_refresh()
+@export_group("")
+
+@export_group("Band")
+# Behind the row only: the ink at band_alpha across the full width, from
+# band_pad_px over TAKE ONE's caps to band_pad_px under the kinds, eased
+# to nothing over band_feather_px above and below - over the scrim.
+@export_range(0.0, 1.0) var band_alpha: float = 0.25:
+	set(value):
+		band_alpha = value
+		_refresh()
+@export var band_pad_px: float = 24.0:
+	set(value):
+		band_pad_px = value
+		_refresh()
+@export var band_feather_px: float = 70.0:
+	set(value):
+		band_feather_px = value
 		_refresh()
 @export_group("")
 
@@ -263,8 +301,8 @@ const DISMISS := SLOT_COUNT
 # first). Read on the take. The full-slot question has no timeout.
 @export var result_hold_time: float = 1.2
 # The two columns not taken, through the reveal: their objects at this
-# multiple of the bone render.
-@export var dimmed_modulate: Color = Color(0.62, 0.64, 0.70, 0.35):
+# multiple of their render - neutral, as rest_modulate is.
+@export var dimmed_modulate: Color = Color(0.6, 0.6, 0.6, 0.35):
 	set(value):
 		dimmed_modulate = value
 		_refresh()
@@ -273,8 +311,10 @@ const DISMISS := SLOT_COUNT
 @export_group("Objects")
 # The render: one SubViewport, three cells side by side, one render. The
 # models keep their relative sizes at the cache's object_scales (the
-# same as on the sand), the largest fitted to its cell. Tinted bone - the on-dark value, as text on the scrim is.
-@export var object_tint: Color = Color(0.94, 0.91, 0.86, 1.0):
+# same as on the sand), the largest fitted to its cell.
+# Each its own colour map times this tint - the cache's object_tint, which
+# RegionField hands over, so the render matches the sand.
+@export var object_tint: Color = Color(0.76, 0.62, 0.46, 1.0):
 	set(value):
 		object_tint = value
 		_render_objects()
@@ -293,7 +333,8 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		object_fill = value
 		_render_objects()
-# The key light, from over the viewer's left shoulder, and the flat fill.
+# Without the field's light (light_like()): the key light, from over the
+# viewer's left shoulder, and the flat fill.
 @export var light_energy: float = 0.9:
 	set(value):
 		light_energy = value
@@ -405,7 +446,18 @@ var _cell_px: int = 1
 var _camera: Camera3D = null
 var _light: DirectionalLight3D = null
 var _environment: Environment = null
-var _material: StandardMaterial3D = null
+# Per column, the model's material (null with no model).
+var _materials: Array[Material] = []
+# The field's light, once light_like() has it.
+var _field_lit: bool = false
+var _field_light_direction: Vector3 = Vector3.DOWN
+var _field_light_color: Color = Color.WHITE
+var _field_light_energy: float = 1.0
+var _field_shadow_opacity: float = 1.0
+var _field_ambient_color: Color = Color.WHITE
+var _field_ambient_energy: float = 1.0
+var _field_tonemap_mode: Environment.ToneMapper = Environment.TONE_MAPPER_LINEAR
+var _field_tonemap_exposure: float = 1.0
 # Per column: the model's root (null if it didn't load) and its bbox in
 # its own space.
 var _models: Array[Node3D] = []
@@ -427,6 +479,24 @@ var _flying: bool = false
 var _asking: bool = false
 var _choice_focus: int = -1
 var _choice_mouse_on: int = -1
+
+# Called by RegionField before the screen enters the tree, after setup():
+# the objects' light is the field's - sun (its direction turned into the
+# field camera's yaw, so a face lit on the sand is lit here), ambient and
+# tonemap. Without it the render keeps the exports' key light and fill.
+func light_like(sun: DirectionalLight3D, sky: RegionSky, camera: Camera3D) -> void:
+	if sun == null or sky == null or camera == null:
+		return
+	_field_lit = true
+	_field_light_direction = (-sun.global_basis.z).rotated(Vector3.UP, -camera.global_basis.get_euler().y)
+	_field_light_color = sun.light_color
+	_field_light_energy = sun.light_energy
+	_field_shadow_opacity = sun.shadow_opacity
+	_field_ambient_color = sky.ambient_color
+	_field_ambient_energy = sky.ambient_energy
+	_field_tonemap_mode = sky.tonemap_mode
+	_field_tonemap_exposure = sky.tonemap_exposure
+	_render_objects()
 
 # Called by RegionField before the screen enters the tree. gold may be 0
 # and card or keepsake null - that column is then left out. glassbone_slot
@@ -518,8 +588,8 @@ func _present_slots() -> Array[int]:
 # once (and again when a render export changes): the three models side
 # by side along X, one cell apart, each centred on its own bbox and
 # turned by its own yaw, under one orthographic camera whose frame is
-# exactly the three cells. One shared material, lit by one key light and
-# a flat ambient. Cheaper than three viewports - one world, one camera,
+# exactly the three cells. Each model on its own painted material, lit
+# by one directional light and a flat ambient. Cheaper than three viewports - one world, one camera,
 # one render pass - and the columns draw sub-rects of its one texture.
 func _build_render() -> void:
 	_viewport = SubViewport.new()
@@ -533,9 +603,9 @@ func _build_render() -> void:
 	add_child(_viewport)
 	get_viewport().size_changed.connect(_render_objects)
 
-	_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
 	for slot in SLOT_COUNT:
 		var model: Node3D = null
+		var material: Material = null
 		var aabb := AABB()
 		var path: String = _object_paths[slot] if slot < _object_paths.size() else ""
 		var scene: PackedScene = null
@@ -546,15 +616,20 @@ func _build_render() -> void:
 		else:
 			model = scene.instantiate() as Node3D
 			_viewport.add_child(model)
+			material = BelongingsObject.painted_material(path, object_tint)
+			if material == null:
+				material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
+				BelongingsObject.set_material_tint(material, object_tint)
 			var has_aabb := false
 			for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
 				var mi := mesh_instance as MeshInstance3D
-				mi.material_override = _material
+				mi.material_override = material
 				var mi_aabb: AABB = (model.global_transform.affine_inverse() * mi.global_transform) * mi.get_aabb()
 				aabb = mi_aabb if not has_aabb else aabb.merge(mi_aabb)
 				has_aabb = true
 		_models.append(model)
 		_model_aabbs.append(aabb)
+		_materials.append(material)
 		if model == null:
 			_drop_slot(slot)
 
@@ -586,7 +661,8 @@ func _drop_slot(slot: int) -> void:
 func _render_objects() -> void:
 	if _viewport == null or _camera == null:
 		return
-	_material.albedo_color = object_tint
+	for material in _materials:
+		BelongingsObject.set_material_tint(material, object_tint)
 	# One cell is one bounding-sphere diameter of the largest object, over
 	# object_fill.
 	var diameter: float = 0.01
@@ -604,9 +680,22 @@ func _render_objects() -> void:
 	_camera.size = cell
 	_camera.position = Vector3(0.0, sin(pitch), cos(pitch)) * (cell * 4.0)
 	_camera.look_at(Vector3.ZERO, Vector3.UP)
-	_light.light_energy = light_energy
-	_light.rotation = Vector3(deg_to_rad(light_pitch_degrees), deg_to_rad(light_yaw_degrees), 0.0)
-	_environment.ambient_light_energy = ambient_energy
+	if _field_lit:
+		_light.light_color = _field_light_color
+		_light.light_energy = _field_light_energy
+		var up: Vector3 = Vector3.UP if absf(_field_light_direction.normalized().y) < 0.99 else Vector3.FORWARD
+		_light.look_at_from_position(Vector3.ZERO, _field_light_direction, up)
+		_light.shadow_enabled = true
+		_light.shadow_opacity = _field_shadow_opacity
+		_light.directional_shadow_max_distance = cell * 8.0
+		_environment.ambient_light_color = _field_ambient_color
+		_environment.ambient_light_energy = _field_ambient_energy
+		_environment.tonemap_mode = _field_tonemap_mode
+		_environment.tonemap_exposure = _field_tonemap_exposure
+	else:
+		_light.light_energy = light_energy
+		_light.rotation = Vector3(deg_to_rad(light_pitch_degrees), deg_to_rad(light_yaw_degrees), 0.0)
+		_environment.ambient_light_energy = ambient_energy
 	_cell_px = _render_cell_size()
 	_viewport.size = Vector2i(_cell_px * SLOT_COUNT, _cell_px)
 	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
@@ -627,6 +716,14 @@ func _column_rect(slot: int) -> Rect2:
 	var left: float = roundf((_draw_layer.size.x - span) / 2.0 + float(slot) * (column_px + column_gap_px))
 	var top: float = roundf(_draw_layer.size.y * columns_centre_fraction - column_px / 2.0)
 	return Rect2(left, top, column_px, column_px)
+
+# TAKE ONE's baseline, just above the row.
+func _take_one_baseline() -> float:
+	return roundf(_column_rect(Slot.GOLD).position.y - take_one_gap_px)
+
+# A column's kind: its baseline under the square.
+func _kind_baseline(slot: int) -> float:
+	return roundf(_column_rect(slot).end.y + kind_label_gap_px)
 
 func _dismiss_baseline() -> float:
 	return roundf(_draw_layer.size.y * dismiss_baseline_fraction)
@@ -662,11 +759,12 @@ func _draw_columns() -> void:
 	# child of this layer) is left over the scrim.
 	if _flying:
 		return
+	_draw_band()
 	var line_width: float = InkType.width(_line_font, _line, line_size_px)
 	var line_baseline: float = roundf(_draw_layer.size.y * line_centre_fraction + float(line_size_px) * 0.35)
 	_text(_line_font, _line, Vector2(roundf((_draw_layer.size.x - line_width) / 2.0), line_baseline), line_size_px, bone)
 	if _taken < 0:
-		_text_centred(_label_font, take_one_text, _draw_layer.size.x / 2.0, roundf(line_baseline + take_one_gap_px), label_size_px, bone)
+		_text_centred(_label_font, take_one_text, _draw_layer.size.x / 2.0, _take_one_baseline(), label_size_px, bone)
 
 	var texture: Texture2D = _viewport.get_texture() if _viewport != null else null
 	for slot in _present_slots():
@@ -683,6 +781,8 @@ func _draw_columns() -> void:
 		if lit:
 			var y: float = rect.end.y + object_hairline_gap_px
 			_draw_layer.draw_rect(Rect2(roundf(rect.get_center().x - object_hairline_length_px / 2.0), y, object_hairline_length_px, hairline_thickness_px), bone)
+		if _taken < 0 and slot < kind_labels.size():
+			_text_centred(_choice_font, kind_labels[slot], rect.get_center().x, _kind_baseline(slot), choice_word_size_px, bone if lit else unfocused_color)
 
 	if _taken >= 0:
 		_reveal(_taken, true)
@@ -696,6 +796,25 @@ func _draw_columns() -> void:
 	_text(_label_font, dismiss_text, Vector2(dismiss_left, _dismiss_baseline()), label_size_px, bone if dismiss_focused else unfocused_color)
 	if dismiss_focused:
 		_hairline_left_of(dismiss_left, _dismiss_baseline(), label_size_px)
+
+# The band behind the row: solid from over TAKE ONE's caps to under the
+# kinds, feathered to nothing above and below, the full width.
+func _draw_band() -> void:
+	if band_alpha <= 0.0:
+		return
+	var on := Color(ink.r, ink.g, ink.b, band_alpha)
+	var off := Color(ink.r, ink.g, ink.b, 0.0)
+	var top: float = _take_one_baseline() - float(label_size_px) * 0.72 - band_pad_px
+	var bottom: float = _kind_baseline(Slot.GOLD) + band_pad_px
+	var ys: Array[float] = [top - band_feather_px, top, bottom, bottom + band_feather_px]
+	var colors: Array[Color] = [off, on, on, off]
+	var width: float = _draw_layer.size.x
+	for i in 3:
+		if ys[i + 1] <= ys[i]:
+			continue
+		_draw_layer.draw_polygon(
+			PackedVector2Array([Vector2(0.0, ys[i]), Vector2(width, ys[i]), Vector2(width, ys[i + 1]), Vector2(0.0, ys[i + 1])]),
+			PackedColorArray([colors[i], colors[i], colors[i + 1], colors[i + 1]]))
 
 # The focus language's text form: the short hairline to the left of a
 # label at `left`, at its mid-height.
