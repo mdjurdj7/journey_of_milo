@@ -53,7 +53,11 @@ func _initialize() -> void:
 		quit(1)
 
 # Every floor: spawn to just short of the exit gate, on the ground alone -
-# reached, and no sample of it in deep water.
+# reached, and no sample of it in deep water. Short of the gate's centre
+# where that is walkable, else of the nearest point along its line that
+# is: a LINE gate spans the floor, and its centre (the anchor plus
+# gate_distance_beyond_enemy along the exit) can land past the ledge
+# walls - floor 3's does, south of the exit arm's wall.
 func _check_exits() -> void:
 	for floor_index in 5:
 		await _load(floor_index)
@@ -63,7 +67,8 @@ func _check_exits() -> void:
 			var spawn: Vector3 = _field.call("get_spawn_position")
 			var gate: Node3D = _field.get_node("ExitGate")
 			var exit_dir: Vector3 = _field.call("get_exit_direction")
-			var target: Vector3 = gate.global_position - exit_dir * 2.0
+			var target: Vector3 = _short_of_gate(spawn, gate.global_position - exit_dir * 2.0, exit_dir)
+			print("Floor %d: exit target %.1f m along the gate line from its centre" % [floor_index + 1, _flat(target).distance_to(_flat(gate.global_position - exit_dir * 2.0))])
 			var path: PackedVector3Array = _field.call("plan_path", spawn, target, null, false)
 			_expect(path.size() >= 2, "Floor %d: a path from spawn to the exit" % (floor_index + 1))
 			if path.size() >= 2:
@@ -280,6 +285,19 @@ func _check_hold_line() -> void:
 	_completed += 1
 
 # --- Helpers ---
+
+# The point on the line through `centre` across `exit_dir` nearest
+# `centre` that a ground-only plan from `spawn` reaches - out to 40 m
+# either side at half a metre; `centre` itself when none is.
+func _short_of_gate(spawn: Vector3, centre: Vector3, exit_dir: Vector3) -> Vector3:
+	var across := Vector3(-exit_dir.z, 0.0, exit_dir.x)
+	for i in 161:
+		var offset: float = ceilf(float(i) / 2.0) * 0.5 * (1.0 if i % 2 == 1 else -1.0)
+		var point: Vector3 = centre + across * offset
+		var path: PackedVector3Array = _field.call("plan_path", spawn, point, null, false)
+		if path.size() >= 2 and _flat(path[path.size() - 1]).distance_to(_flat(point)) < 0.5:
+			return point
+	return centre
 
 func _load(floor_index: int) -> void:
 	_run_state.call("new_run", load(CHARACTER_PATH))
