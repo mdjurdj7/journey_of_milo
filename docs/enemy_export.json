@@ -362,10 +362,10 @@
               "gate": {
                 "exit_kind": "LINE",
                 "exit_direction": [
-                  0.8815,
-                  -0.4722
+                  1.0,
+                  0.0
                 ],
-                "gate_distance_beyond_enemy": 32.0,
+                "gate_distance_beyond_enemy": 26.3,
                 "bar_axis_offset": 0.0,
                 "channel_max_width": 0.0
               },
