@@ -243,11 +243,11 @@ static func reset_hold_line_spoken() -> void:
 # - its model's nearest point along the battle axis (FieldEnemy.battle_
 # front_reach()) - so a long body (the Greyshelf's snout) keeps the same
 # clear ground in front of him as a small one: battle_gap_m, unless that
-# puts him within stance_dry_margin_m of the water; then it is pulled in
-# along the same line toward the pack, never closer than battle_gap_min_m
-# (see _dry_stance_spacing()). Where even that is wet, a cluster's whole
-# line steps inward along itself, up to battle_line_shift_max, until it
-# isn't (see _place_cluster_line()). 3.47 keeps the Sputter where it
+# puts him in water deeper than stance_max_water_m (a ford's shallows are
+# fine); then it is pulled in along the same line toward the pack, never
+# closer than battle_gap_min_m (see _stance_spacing()). Where even that is
+# too deep, a cluster's whole line steps inward along itself, up to
+# battle_line_shift_max, until it isn't (see _place_cluster_line()). 3.47 keeps the Sputter where it
 # always stood (4 m origin to origin, its near edge 0.535 m out); the
 # minimum, 1.97, its old 2.5 m - outside its contact reach (its 2.0 m
 # contact_radius plus his own 0.4 m body): standing inside it through the
@@ -255,7 +255,7 @@ static func reset_hold_line_spoken() -> void:
 # before the escape's push had moved him. Read at contact, so a live edit
 # takes the next fight.
 @export var battle_gap_m: float = 3.47
-@export var stance_dry_margin_m: float = 0.5
+@export var stance_max_water_m: float = 0.3
 @export var battle_gap_min_m: float = 1.97
 @export var battle_line_shift_max: float = 2.0
 # Metres between the members of a cluster along the line they step into
@@ -1951,21 +1951,25 @@ func _place_cluster_line(members: Array[FieldEnemy], duration: float) -> Vector3
 		return (a.global_position - anchor.global_position).dot(along) < (b.global_position - anchor.global_position).dot(along)
 	)
 	# The Wanderer stands on the line's extension past the anchor. When no
-	# spacing down to the minimum puts him on dry sand, the whole line
-	# steps inward along itself - the anchor too - a tenth at a time, up to
-	# battle_line_shift_max, until one does.
+	# spacing down to the minimum keeps him out of deeper water, the whole
+	# line steps inward along itself - the anchor too - a tenth at a time,
+	# up to battle_line_shift_max, until one does. When none does, the line
+	# stays where it stood and he takes the minimum spacing: the search's
+	# shift is undone, or he would stand that much nearer than the minimum
+	# and the line's far end that much further out.
 	# His gap is from the anchor's near edge - the line's nearest member.
 	var start: Vector3 = anchor.global_position
 	var shift: float = 0.0
-	var spacing: float = _dry_stance_spacing(start, -along, anchor)
+	var spacing: float = _stance_spacing(start, -along, anchor)
 	while spacing < 0.0 and shift < battle_line_shift_max - 0.001:
 		shift += 0.1
-		spacing = _dry_stance_spacing(start + along * shift, -along, anchor)
+		spacing = _stance_spacing(start + along * shift, -along, anchor)
 	if spacing < 0.0:
-		push_warning("RegionField: no dry stance for the line at '%s' even %.1f m in; standing at the minimum." % [anchor.name, shift])
+		push_warning("RegionField: no stance out of deeper water for the line at '%s' even %.1f m in; the line stays and he stands at the minimum." % [anchor.name, shift])
+		shift = 0.0
 		spacing = stance_distance_min(anchor)
 	elif shift > 0.0:
-		print("RegionField: the line steps %.1f m in from '%s' to keep the stance on dry sand (%.1f m out)." % [shift, anchor.name, spacing])
+		print("RegionField: the line steps %.1f m in from '%s' to keep the stance out of deeper water (%.1f m out)." % [shift, anchor.name, spacing])
 		anchor.step_to(start + along * shift, duration)
 	_line_stance_spacing = spacing - shift
 	var offset: float = shift
@@ -2044,13 +2048,13 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 		# A cluster's stance was settled with its line. A lone enemy's
 		# lies on the line back to where the Wanderer is (the direction
 		# Wanderer.enter_battle_stance() takes for it), pulled in toward
-		# the enemy if that is wet - it has no line to step.
+		# the enemy if that is too deep - it has no line to step.
 		var spacing: float = _line_stance_spacing
 		if stance_direction == Vector3.ZERO:
 			var toward: Vector3 = Vector3(wanderer.global_position.x - anchor.global_position.x, 0.0, wanderer.global_position.z - anchor.global_position.z).normalized()
-			spacing = _dry_stance_spacing(anchor.global_position, toward, anchor)
+			spacing = _stance_spacing(anchor.global_position, toward, anchor)
 			if spacing < 0.0:
-				push_warning("RegionField: no dry stance for '%s'; standing at the minimum." % anchor.name)
+				push_warning("RegionField: no stance out of deeper water for '%s'; standing at the minimum." % anchor.name)
 				spacing = stance_distance_min(anchor)
 		camera_rig.enter_battle(wanderer, _battle_members.duplicate(), hand_top_fraction)
 		wanderer.enter_battle_stance(anchor, spacing, camera_rig.battle_transition_time, stance_direction)
@@ -2102,27 +2106,31 @@ func _battle_input_unlock_seconds(transition_time: float) -> float:
 # battle_stance() takes - from `from` (the anchor's spot) along
 # `direction`, for `enemy`: its near edge (FieldEnemy.battle_front_
 # reach()) plus battle_gap_m, the gap pulled in a tenth of a metre at a
-# time while the spot lies within stance_dry_margin_m of the water
-# (Ground.get_landmass_distance(), negative on sand), down to battle_gap_
-# min_m. -1 when none of those is dry - the caller decides what then (a
-# cluster steps its line in, see _place_cluster_line()).
-func _dry_stance_spacing(from: Vector3, direction: Vector3, enemy: FieldEnemy) -> float:
+# time while the spot stands in water deeper than stance_max_water_m (the
+# Sea's sea_level over Ground.get_height_at() - a ford's shallows pass),
+# down to battle_gap_min_m. -1 when every one of those is deeper - the
+# caller decides what then (a cluster steps its line in, see _place_
+# cluster_line()).
+func _stance_spacing(from: Vector3, direction: Vector3, enemy: FieldEnemy) -> float:
 	var reach: float = enemy.battle_front_reach() if enemy != null else 0.0
 	var ground := get_node_or_null(ground_path) as Ground
 	if ground == null or direction == Vector3.ZERO:
 		return reach + battle_gap_m
+	var sea := get_node_or_null(sea_path) as Sea
+	var water_level: float = sea.sea_level if sea != null else -INF
 	var gap: float = battle_gap_m
 	while gap >= battle_gap_min_m - 0.001:
 		var point: Vector3 = from + direction * (reach + gap)
-		if -ground.get_landmass_distance(Vector2(point.x, point.z)) >= stance_dry_margin_m:
+		var depth: float = water_level - ground.get_height_at(Vector2(point.x, point.z))
+		if depth <= stance_max_water_m:
 			if gap < battle_gap_m:
-				print("RegionField: stance pulled in to a %.1f m gap to stay on dry sand." % gap)
+				print("RegionField: stance pulled in to a %.1f m gap to keep out of deeper water." % gap)
 			return reach + gap
 		gap -= 0.1
 	return -1.0
 
 # How far from `enemy`'s origin the Wanderer stands to fight it: its near
-# edge plus battle_gap_m, before any pull toward dry sand - and the
+# edge plus battle_gap_m, before any pull out of deeper water - and the
 # least, with battle_gap_min_m. The stance's whole range, for what keeps
 # it clear (FieldScatter's keep-outs).
 func stance_distance(enemy: FieldEnemy) -> float:

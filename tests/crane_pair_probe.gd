@@ -9,7 +9,10 @@ extends SceneTree
 # band through the anchor); and the fight: one contact for both, Paired
 # and on the same Bow; one killed first and the other Bereft at once,
 # its Step 6x2 landing 12 and its Bow 8 Block; both killed by one Carve
-# and neither turning - their line said and Leg Band offered after.
+# and neither turning - their line said and Leg Band offered after. And
+# the fight's staging from the hub side: the Wanderer at least his
+# minimum spacing from the anchor (he may stand in the ford's shallows),
+# and no one standing on a face.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/crane_pair_probe.gd
 #
@@ -18,7 +21,15 @@ extends SceneTree
 # end_turn() and request_play(), as blackback_probe does. Untyped against
 # anything that names the RunState autoload.
 
-const CASES := 7
+const CASES := 8
+# A combatant stands on a face when the ground under its feet slopes past
+# FACE_SLOPE_MAX_DEG (read over half a metre) or rises or falls more than
+# FACE_JUMP_MAX_M within half a metre - a ridge's inner face (43 degrees,
+# 0.48 m) fails both, a ford or a bank's foot (under 25, 0.25) neither.
+const FACE_SLOPE_MAX_DEG := 30.0
+const FACE_JUMP_MAX_M := 0.35
+# Where he comes from for the staging case: from the hub, south-west.
+const HUB_SIDE := Vector3(-0.6, 0.0, 0.8)
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
@@ -53,6 +64,7 @@ func _initialize() -> void:
 	await _check_one_falls_first()
 	await _check_bereft_bow()
 	await _check_felled_together()
+	await _check_staging()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -224,7 +236,52 @@ func _check_felled_together() -> void:
 	await _teardown()
 	_completed += 1
 
+# Contacted from the hub side, the fight stages with the Wanderer at
+# least his minimum spacing from Strawcrown (the anchor) - in the ford's
+# shallows, not on top of it - and no one on a face.
+func _check_staging() -> void:
+	await _load_floor_3()
+	var target: Node3D = _body(STRAWCROWN_PATH)
+	if target == null:
+		_fail("no Strawcrown on floor 3")
+		_completed += 1
+		return
+	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
+	wanderer.global_position = target.global_position + HUB_SIDE.normalized() * 2.3
+	await physics_frame
+	_field.call_deferred("_on_enemy_contacted", target)
+	for i in 10:
+		await physics_frame
+	await create_timer(3.0).timeout
+	var ground: Node = _field.get_node("Ground")
+	var gap: float = _flat(wanderer.global_position).distance_to(_flat(target.global_position))
+	var minimum: float = float(_field.call("stance_distance_min", target))
+	_expect(gap >= minimum - 0.01, "From the hub: the Wanderer %.2f m from Strawcrown, at least his minimum %.2f" % [gap, minimum])
+	var members: Array = _field.get("_battle_members")
+	for body: Node3D in [wanderer] + members:
+		var label: String = "The Wanderer" if body == wanderer else (body.get("enemy_data") as EnemyData).enemy_name
+		var face: Vector2 = _face_at(ground, _flat(body.global_position))
+		_expect(face.x <= FACE_SLOPE_MAX_DEG and face.y <= FACE_JUMP_MAX_M, "...%s off any face (%.1f degrees, %.2f m within half a metre)" % [label, face.x, face.y])
+	await _teardown()
+	_completed += 1
+
 # --- Helpers ---
+
+func _flat(at: Vector3) -> Vector2:
+	return Vector2(at.x, at.z)
+
+# The ground under `at`: [its slope in degrees over half a metre, the most
+# it rises or falls within half a metre].
+func _face_at(ground: Node, at: Vector2) -> Vector2:
+	var e: float = 0.25
+	var gx: float = (float(ground.call("get_height_at", at + Vector2(e, 0.0))) - float(ground.call("get_height_at", at - Vector2(e, 0.0)))) / (2.0 * e)
+	var gz: float = (float(ground.call("get_height_at", at + Vector2(0.0, e))) - float(ground.call("get_height_at", at - Vector2(0.0, e)))) / (2.0 * e)
+	var here: float = float(ground.call("get_height_at", at))
+	var jump: float = 0.0
+	for k in 8:
+		var angle: float = TAU * float(k) / 8.0
+		jump = maxf(jump, absf(float(ground.call("get_height_at", at + Vector2(cos(angle), sin(angle)) * 0.5)) - here))
+	return Vector2(rad_to_deg(atan(Vector2(gx, gz).length())), jump)
 
 func _load_floor_3(deck_card_path: String = "") -> void:
 	_run_state.call("new_run", load(CHARACTER_PATH))
