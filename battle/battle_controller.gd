@@ -240,10 +240,24 @@ var _repeat_reports: Array[Callable] = []
 # reports one target at a time).
 var _deferring_pack_check: bool = false
 var _pack_check_due: bool = false
+# Which of the Wanderer's turns it is, from 1, and whether the enemies
+# are acting - so a death knows when it fell (_fell_on): the player turn
+# it died in, or -1 on an enemy's turn. _roster is everyone the fight
+# opened with, for felled_together().
+var _player_turn: int = 1
+var _enemy_phase: bool = false
+var _fell_on: Dictionary = {} # FieldEnemy -> player turn, -1 on the enemies'
+var _roster: Array[FieldEnemy] = []
+# The keepsake's draw for a card that takes HP from two or more enemies
+# (TrinketData.draw_on_multi_hit): the enemies the resolving card has
+# taken HP from, and whether this turn's draw is spent.
+var _card_damaged: Dictionary = {} # Combatant -> true
+var _multi_hit_draw_used: bool = false
 
 func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wanderer: Wanderer) -> void:
 	_hand_container = hand_container
 	enemies = enemy_list
+	_roster = enemy_list.duplicate()
 	_wanderer = wanderer
 
 	player = Combatant.new(RunState.player_max_hp)
@@ -841,7 +855,10 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		_report_or_hold(_on_grace_reclaimed.bind(amount))
 	ctx.on_heal = func(amount: int) -> void:
 		_report_or_hold(_on_card_heal.bind(amount))
+	_card_damaged.clear()
 	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
+		if target_combatant != player and amount > 0:
+			_card_damaged[target_combatant] = true
 		_report_or_hold(_report_damage.bind("player", target_combatant, amount, kind))
 	ctx.on_block = func(target_combatant: Combatant, blocked: int, damage_to_hp: int) -> void:
 		_report_or_hold(_report_block.bind(target_combatant, blocked, damage_to_hp))
@@ -866,6 +883,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	if _pack_check_due:
 		_pack_check_due = false
 		_mark_lone_pack_members()
+	_draw_for_multi_hit()
 	if _repeat_pending:
 		await _land_repeat(card, target_enemy)
 	deck.end_play()
@@ -1271,6 +1289,7 @@ func _log_status_gained(enemy: FieldEnemy, status: StatusData) -> void:
 # so the rules (block worn down hit by hit, Grace's largest-single-hit
 # cap) see three separate hits, as they always did.
 func _run_enemy_turn() -> void:
+	_enemy_phase = true
 	if _all_living_simultaneous():
 		await _run_simultaneous_turn()
 	else:
@@ -1409,6 +1428,33 @@ func _play_defend_move(enemy: FieldEnemy, intent: EnemyIntent) -> float:
 	if intent == null:
 		return 0.0
 	return maxf(enemy.play_intent_motion(intent.motion, _wanderer), 0.0)
+
+# Whether the fight's whole pack fell together: two or more opened it,
+# and every one of them was killed on the same turn of the Wanderer's -
+# none on an enemy's turn, none left standing.
+func felled_together() -> bool:
+	if _roster.size() < 2:
+		return false
+	var turn: int = -1
+	for enemy in _roster:
+		if not _fell_on.has(enemy) or int(_fell_on[enemy]) < 0:
+			return false
+		if turn < 0:
+			turn = int(_fell_on[enemy])
+		elif int(_fell_on[enemy]) != turn:
+			return false
+	return true
+
+# The held keepsake's draw (TrinketData.draw_on_multi_hit): the card just
+# resolved took HP from two or more enemies - kills included - and this
+# turn's draw is unspent.
+func _draw_for_multi_hit() -> void:
+	var keepsake: TrinketData = RunState.keepsake
+	if keepsake == null or keepsake.draw_on_multi_hit <= 0 or _multi_hit_draw_used or _card_damaged.size() < 2:
+		return
+	_multi_hit_draw_used = true
+	print("BattleController: '%s' - a card took HP from %d enemies; drawing %d." % [keepsake.display_name, _card_damaged.size(), keepsake.draw_on_multi_hit])
+	deck.draw(keepsake.draw_on_multi_hit)
 
 # The attacks a turn's result landed, each as _report_enemy_attack()
 # reads one: its "actions" (EnemyTurn.take_turn()), or the result itself
@@ -1549,6 +1595,9 @@ func _apply_intent_exclusions(settled: Array[FieldEnemy]) -> void:
 
 func _start_player_turn() -> void:
 	player.block = 0
+	_enemy_phase = false
+	_player_turn += 1
+	_multi_hit_draw_used = false
 	# The refill, and Dying Light's 1 if the turn begins Critical - judged
 	# here, before any tick, so entering Critical later gives nothing
 	# until the next turn starts.
@@ -1785,6 +1834,8 @@ func _report_damage(source: Variant, target_combatant: Combatant, amount: int, k
 		var killed: bool = enemy != null and target_combatant.hp <= 0
 		if killed and not _pending_deaths.has(enemy):
 			_pending_deaths.append(enemy)
+		if killed and not _fell_on.has(enemy):
+			_fell_on[enemy] = -1 if _enemy_phase else _player_turn
 		damage_dealt.emit(source, enemy, amount, kind)
 		if enemy != null:
 			enemy_hp_changed.emit(enemy, target_combatant.hp, target_combatant.max_hp)

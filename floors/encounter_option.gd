@@ -27,5 +27,12 @@ class_name EncounterOption
 # frame and takes the slot's yaw on top of its own; parent_index counts
 # within this array. A member's face_prop_index points in here.
 @export var props: Array[FloorProp] = []
+# A pack felled together - every member killed on the same turn of the
+# Wanderer's (BattleController.felled_together()): this keepsake is
+# offered after the win's reward, unless it is held already, and this
+# line is said once over the last of them (Spectral, the enemy lines'
+# own). Null / empty = nothing more for it.
+@export var felled_together_keepsake: TrinketData = null
+@export var felled_together_line: String = ""
 # The members' route, waypoints in the slot's frame. Null = they stand.
 @export var patrol: FloorPatrol = null

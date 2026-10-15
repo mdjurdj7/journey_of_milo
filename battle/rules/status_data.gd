@@ -227,6 +227,10 @@ enum Mark { NONE, COIL, DROP }
 # (Combatant.pack_alone, EnemyTurn.leave_pack()) it is removed and this
 # status applied in its place - once, a pack doesn't regroup. Null = none.
 @export var grants_when_alone: StatusData = null
+# Said over its holder - an enemy - in the world voice the moment it
+# gains this status in a fight (RegionField, on BattleController.enemy_
+# status_gained): Bereft's "The other keeps dancing." Empty = nothing.
+@export var gained_line: String = ""
 
 # A status that waits for its holder's next turn (Ransom): at the start of
 # the player's turn, after the ticks (BattleController._start_player_

@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="TrinketData" format=3 uid="uid://bxavwq71lh5dt"]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+[ext_resource type="Texture2D" uid="uid://cwoa31decvbct" path="res://assets/textures/keepsakes/leg_band.svg" id="2_art"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"leg_band"
+display_name = "Leg Band"
+flavor_text = "Someone was counting them."
+description = "The first time each turn a card damages two or more enemies, draw {multi_draw}."
+art = ExtResource("2_art")
+draw_on_multi_hit = 1

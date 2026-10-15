@@ -35,6 +35,9 @@ class_name TrinketData
 #                        each of his turns: End Turn opens a choice of 0
 #                        to this many first (BattleController.end_turn()),
 #                        and the kept ones skip the discard
+#   draw_on_multi_hit    cards drawn the first time each of his turns a
+#                        card takes HP from two or more enemies (Battle
+#                        Controller._resolve_play()) - its kills included
 
 @export var id: StringName = &""
 @export var display_name: String = ""
@@ -45,7 +48,7 @@ class_name TrinketData
 #   {heal}   heal_on_win             {draw}  opening_draw_bonus
 #   {loss_heal}  heal_on_win_after_loss
 #   {block}  combat_start_block      {critical_block}  critical_entry_block
-#   {keep}   end_turn_keep
+#   {keep}   end_turn_keep           {multi_draw}  draw_on_multi_hit
 #   {s}      "s" unless the count token before it is 1
 @export_multiline var description: String = ""
 # The shortened line for where it's shown small - the "currently held"
@@ -67,6 +70,7 @@ class_name TrinketData
 @export var first_card_free: bool = false
 @export var critical_entry_block: int = 0
 @export var end_turn_keep: int = 0
+@export var draw_on_multi_hit: int = 0
 
 func describe() -> String:
 	return _fill(description)
@@ -84,6 +88,7 @@ func _fill(template: String) -> String:
 		"block": combat_start_block,
 		"critical_block": critical_entry_block,
 		"keep": end_turn_keep,
+		"multi_draw": draw_on_multi_hit,
 	})
 
 # The fight is opening: this trinket's status, if it has one, onto the

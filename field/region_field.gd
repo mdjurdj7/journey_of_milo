@@ -490,6 +490,11 @@ var _pending_top_tier: bool = false
 # member()), set as it starts and carried to the last win's reward the same way:
 # what EncounterRewards pays it.
 var _fight_role: String = "basic"
+# The option the open fight stands (EncounterOption - its pack felled
+# together has a line and a keepsake of its own), and whether that line
+# has been said this fight.
+var _fight_option: EncounterOption = null
+var _felled_line_said: bool = false
 var _pending_role: String = "basic"
 var _floor_cleared_emitted: bool = false
 # Debug builds only (_setup_debug_row()): the field's F1 row, and which
@@ -2015,6 +2020,8 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 			members.append(BattleController.encounter_member(member))
 	_fight_role = BattleController.encounter_role(members)
 	var anchor: FieldEnemy = _battle_members[0]
+	_fight_option = _option_for(anchor)
+	_felled_line_said = false
 	# A patrolling pack stops where it is: pending take-offs dropped, and
 	# any member in the air comes down where it is - the anchor here,
 	# the rest through their own step_to() (see FieldEnemy.land_now()).
@@ -2073,7 +2080,9 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	overlay.battle_controller.enemy_defeated.connect(_on_enemy_defeated.bind(overlay))
 	overlay.battle_controller.enemy_pain_turn.connect(_on_enemy_pain_turn)
 	overlay.battle_controller.enemy_status_gained.connect(func(member: FieldEnemy, status: StatusData) -> void:
-		member.show_status(status, true))
+		member.show_status(status, true)
+		if status != null:
+			_say_near_enemy(member, status.gained_line))
 	# The fight's opening statuses (the Blackback's Fed) - applied before
 	# anyone could hear of them - shown on the bodies at once.
 	for member: FieldEnemy in overlay.battle_controller.enemies:
@@ -2141,7 +2150,7 @@ func _start_battle_hover(members: Array[FieldEnemy]) -> void:
 # plays out (FieldEnemy.settle_and_free()) whether or not the fight goes
 # on: the last kill's too, the win waiting for it (BattleController.
 # _maybe_win()) and leaving a settling body to finish.
-func _on_enemy_defeated(enemy: FieldEnemy, _overlay: BattleOverlay) -> void:
+func _on_enemy_defeated(enemy: FieldEnemy, overlay: BattleOverlay) -> void:
 	_last_fallen_at = enemy.global_position
 	_last_fallen_data = enemy.enemy_data
 	_fight_fallen.append(enemy.enemy_data)
@@ -2152,6 +2161,12 @@ func _on_enemy_defeated(enemy: FieldEnemy, _overlay: BattleOverlay) -> void:
 	# line leaves in place if it goes first.
 	if enemy.enemy_data != null:
 		_say_near_enemy(enemy, enemy.enemy_data.defeat_line)
+	# A pack felled together: its line, once, over the first of them to go
+	# down - the rest are already dead (EncounterOption.felled_together_
+	# line).
+	if not _felled_line_said and _fight_option != null and overlay.battle_controller.felled_together():
+		_felled_line_said = true
+		_say_near_enemy(enemy, _fight_option.felled_together_line)
 	enemy.settle_and_free()
 
 # The pain turn has just been set: its sound, and its line near it.
@@ -2176,6 +2191,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 	# before any keepsake heal. Toll carries on in full to the floor's next
 	# fight; only the floor advance trims it (_on_floor_exited()).
 	RunLogger.fight_end(String(BattleOverlay.Outcome.find_key(outcome)).to_lower(), overlay.finished_by_debug, RunState.player_hp, RunState.toll)
+	var felled_together: bool = overlay.battle_controller.felled_together()
 	wanderer.unbind_battle()
 	_apply_consumed_removals(overlay.battle_controller.deck)
 	overlay.queue_free()
@@ -2233,6 +2249,9 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 				if not member.is_defeated():
 					won_against.append(member.enemy_data)
 			_roll_keepsake_drop(won_against)
+			# Felled together: the option's own keepsake, over any drop.
+			if felled_together:
+				_offer_felled_together_keepsake()
 			_pending_glassbone = _glassbone_left_by(won_against)
 			_pending_elite = _fight_elite
 			_pending_top_tier = _fight_top_tier
@@ -2404,6 +2423,28 @@ func _roll_keepsake_drop(won_against: Array[EnemyData]) -> void:
 		_pending_keepsake_source = data.enemy_name
 		print("RegionField: '%s' left the keepsake '%s'." % [data.enemy_name, drop.display_name])
 		return
+
+# The fight's pack fell together (BattleController.felled_together()):
+# its option's keepsake, offered once the reward has closed - unless the
+# Wanderer holds it already.
+func _offer_felled_together_keepsake() -> void:
+	if _fight_option == null or _fight_option.felled_together_keepsake == null:
+		return
+	var trinket: TrinketData = _fight_option.felled_together_keepsake
+	if RunState.keepsake == trinket:
+		return
+	RunState.note_keepsake_offered(trinket)
+	_pending_keepsake = trinket
+	_pending_keepsake_source = String(_fight_option.option_id)
+	print("RegionField: the pack fell together; '%s' offered." % trinket.display_name)
+
+# The option `enemy` stands in this load (its FieldEnemy.slot_id), or
+# null for an enemy no slot placed.
+func _option_for(enemy: FieldEnemy) -> EncounterOption:
+	for encounter in _encounters:
+		if encounter.slot != null and encounter.slot.slot_id == enemy.slot_id:
+			return encounter.option
+	return null
 
 # The Glassbone a win leaves: every enemy's EnemyData.glassbone_reward,
 # summed, whatever else they left.
