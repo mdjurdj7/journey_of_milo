@@ -12,7 +12,9 @@ extends SceneTree
 # and neither turning - their line said and Leg Band offered after. And
 # the fight's staging from the hub side: the Wanderer at least his
 # minimum spacing from the anchor (he may stand in the ford's shallows),
-# and no one standing on a face.
+# no one standing on a face, and the frame the fight's own camera holds:
+# all three inside it (Camera3D.is_position_in_frustum()), the Wanderer
+# left of both birds, and no prop in its foreground.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/crane_pair_probe.gd
 #
@@ -30,6 +32,8 @@ const FACE_SLOPE_MAX_DEG := 30.0
 const FACE_JUMP_MAX_M := 0.35
 # Where he comes from for the staging case: from the hub, south-west.
 const HUB_SIDE := Vector3(-0.6, 0.0, 0.8)
+# A combatant's middle, metres over its feet - what the frame is read at.
+const BODY_MIDDLE := 0.75
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
@@ -262,6 +266,30 @@ func _check_staging() -> void:
 		var label: String = "The Wanderer" if body == wanderer else (body.get("enemy_data") as EnemyData).enemy_name
 		var face: Vector2 = _face_at(ground, _flat(body.global_position))
 		_expect(face.x <= FACE_SLOPE_MAX_DEG and face.y <= FACE_JUMP_MAX_M, "...%s off any face (%.1f degrees, %.2f m within half a metre)" % [label, face.x, face.y])
+	# The frame, through the camera the fight placed.
+	var camera: Camera3D = _field.get_node("CameraPivot").get("camera")
+	var farthest: float = 0.0
+	var screen_x: Dictionary = {}
+	for body: Node3D in [wanderer] + members:
+		var label: String = "The Wanderer" if body == wanderer else (body.get("enemy_data") as EnemyData).enemy_name
+		var middle: Vector3 = body.global_position + Vector3.UP * BODY_MIDDLE
+		_expect(camera.is_position_in_frustum(middle), "...%s in the battle frame" % label)
+		farthest = maxf(farthest, camera.global_position.distance_to(middle))
+		screen_x[body] = camera.unproject_position(middle).x
+	for bird: Node3D in members:
+		_expect(float(screen_x[wanderer]) < float(screen_x[bird]), "...the Wanderer left of %s on screen (%.0f vs %.0f)" % [(bird.get("enemy_data") as EnemyData).enemy_name, float(screen_x[wanderer]), float(screen_x[bird])])
+	var props: Node = _field.get_node_or_null(^"Props")
+	if props != null:
+		for prop in props.get_children():
+			var foreground: bool = false
+			for child in (prop as Node).find_children("*", "VisualInstance3D", true, false):
+				var visual := child as VisualInstance3D
+				var box: AABB = visual.global_transform * visual.get_aabb()
+				for corner in 8:
+					var point: Vector3 = box.get_endpoint(corner)
+					if camera.is_position_in_frustum(point) and camera.global_position.distance_to(point) < farthest:
+						foreground = true
+			_expect(not foreground, "...the prop %s not in the frame's foreground" % prop.name)
 	await _teardown()
 	_completed += 1
 
