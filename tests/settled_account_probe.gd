@@ -290,12 +290,7 @@ func _play_real(controller: Node, card: CardData, target: Node) -> void:
 			_fail("'%s' didn't ask for a target" % card.card_name)
 			return
 		controller.call("confirm_target", target)
-	# By the clock, not frames, which run unthrottled headless.
-	var deadline: int = Time.get_ticks_msec() + 5000
-	while bool(controller.get("_input_locked")) and Time.get_ticks_msec() < deadline:
-		await process_frame
-	for i in 3:
-		await process_frame
+	await ProbePlay.settle(self, controller)
 
 func _teardown() -> void:
 	if _field != null:

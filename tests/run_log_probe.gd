@@ -406,12 +406,7 @@ func _play(controller: Node, card: CardData, target: Node = null) -> void:
 	controller.call("request_play", view)
 	if target != null:
 		controller.call("confirm_target", target)
-	for i in 600:
-		await process_frame
-		if not _battle_open() or not bool(controller.get("_input_locked")):
-			break
-	for i in 3:
-		await process_frame
+	await ProbePlay.settle(self, controller, func() -> bool: return not _battle_open())
 
 func _field_enemy(controller: Node) -> Node:
 	return (controller.get("_combatants") as Dictionary).keys()[0]
