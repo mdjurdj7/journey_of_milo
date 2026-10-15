@@ -1311,10 +1311,15 @@ func _run_sequential_turn() -> void:
 			if denied_beat_sec > 0.0:
 				await get_tree().create_timer(denied_beat_sec).timeout
 		if result["attacked"]:
-			var snap_delay: float = enemy.play_attack_snap(_wanderer)
-			if snap_delay > 0.0:
-				await get_tree().create_timer(snap_delay).timeout
-			_report_enemy_attack(enemy, result)
+			# Each attack of the turn its own lunge and its own report, one
+			# after another (EnemyTurn.repeats() - Bereft's two).
+			for attack: Dictionary in _attacks_of(result):
+				var snap_delay: float = enemy.play_attack_snap(_wanderer)
+				if snap_delay > 0.0:
+					await get_tree().create_timer(snap_delay).timeout
+				_report_enemy_attack(enemy, attack)
+				if player.hp <= 0:
+					break
 		# A charge spent lets the rear down first, then any burrow carries on
 		# from there. A broken one is already down - it dropped on the card
 		# that broke it (_resolve_play()), so this waits on nothing and the
@@ -1370,12 +1375,24 @@ func _run_simultaneous_turn() -> void:
 	for enemy in acting:
 		var result: Dictionary = results[enemy]
 		if result["attacked"]:
-			_report_enemy_attack(enemy, result)
+			for attack: Dictionary in _attacks_of(result):
+				_report_enemy_attack(enemy, attack)
 	status_changed.emit()
 	for enemy in acting:
 		_show_roused(enemy)
 		enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
 	_apply_intent_exclusions(acting)
+
+# The attacks a turn's result landed, each as _report_enemy_attack()
+# reads one: its "actions" (EnemyTurn.take_turn()), or the result itself
+# when it holds none.
+func _attacks_of(result: Dictionary) -> Array[Dictionary]:
+	var attacks: Array[Dictionary] = []
+	for attack: Dictionary in result.get("actions", []):
+		attacks.append(attack)
+	if attacks.is_empty():
+		attacks.append(result)
+	return attacks
 
 # A countdown that went off at the start of this enemy's turn (Sentence -
 # EnemyTurn.take_turn()'s "countdown_damage"), reported as the player's

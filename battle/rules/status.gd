@@ -221,6 +221,16 @@ static func bonus_hits(statuses: Array[Status]) -> int:
 			total += active.data.bonus_hits
 	return total
 
+# How many times `statuses` have their holder carry out its intent this
+# turn (StatusData.repeats_intent - Bereft): the most any of them asks,
+# at least 1.
+static func intent_repeats(statuses: Array[Status]) -> int:
+	var repeats: int = 1
+	for active in statuses:
+		if active.data != null:
+			repeats = maxi(repeats, active.data.repeats_intent)
+	return repeats
+
 # What `statuses` take off their holder's next ATTACK in all (StatusData.
 # reduces_attack_total - Garnished), summed.
 static func attack_total_reduction(statuses: Array[Status]) -> int:

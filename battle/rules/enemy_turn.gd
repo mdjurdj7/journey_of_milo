@@ -104,16 +104,31 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 	elif intent != null:
 		match intent.type:
 			EnemyIntent.IntentType.ATTACK:
-				land_attack(combatant, data, intent, player, result)
-				# What the attack leaves on the player (the Adder's Venom)
-				# lands whatever its hits did - Block taking all of them too.
-				if intent.applies_to_player != null and intent.applied_amount > 0:
-					Status.apply_amount(player.statuses, intent.applies_to_player, intent.applied_amount)
-					result["applied_to_player"] = intent.applied_amount
+				# Each attack of the turn (repeats() - Bereft's two) in
+				# "actions", one after another, and summed into the turn's
+				# own keys; a turn's one attack is the same, once.
+				var actions: Array[Dictionary] = []
+				for action in repeats(combatant, intent):
+					if player.hp <= 0:
+						break
+					var attack: Dictionary = {"intent": result["intent"], "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "applied_to_player": 0}
+					land_attack(combatant, data, intent, player, attack)
+					# What the attack leaves on the player (the Adder's Venom)
+					# lands whatever its hits did - Block taking all of them too.
+					if intent.applies_to_player != null and intent.applied_amount > 0:
+						Status.apply_amount(player.statuses, intent.applies_to_player, intent.applied_amount)
+						attack["applied_to_player"] = intent.applied_amount
+					actions.append(attack)
+					result["attacked"] = true
+					(result["hits"] as Array).append_array(attack["hits"])
+					for key: String in ["damage_to_hp", "grace_opened", "saved_heal", "blocked", "absorbed", "applied_to_player"]:
+						result[key] += attack[key]
+				result["actions"] = actions
 			EnemyIntent.IntentType.DEFEND:
-				combatant.block += intent.value
+				var gained: int = intent.value * repeats(combatant, intent)
+				combatant.block += gained
 				result["defended"] = true
-				result["block_gained"] = intent.value
+				result["block_gained"] = gained
 			EnemyIntent.IntentType.BURROW:
 				result["surfaced"] = true
 			EnemyIntent.IntentType.HEAL_ALLY:
@@ -284,6 +299,14 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	var denied: bool = is_denied(combatant)
 	if denied:
 		preview["denied"] = true
+	# Carried out more than once (repeats() - Bereft): "repeats" says how
+	# often; a DEFEND's number is all the Block it gains, an ATTACK's hits
+	# are every hit of every attack, in order.
+	var times: int = repeats(combatant, intent)
+	if times > 1:
+		preview["repeats"] = times
+	if intent.type == EnemyIntent.IntentType.DEFEND:
+		preview["per_hit"] = intent.value * times
 	if intent.type != EnemyIntent.IntentType.ATTACK:
 		return preview
 	if intent.interrupt_threshold > 0:
@@ -298,30 +321,38 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	var saves_used: int = 0
 	var hits: int = hit_count(combatant, intent)
 	var hit_amounts: Array[int] = []
-	var reduction_left: int = Status.attack_total_reduction(combatant.statuses) + Status.attack_total_reduction(player_statuses)
-	for hit in hits:
-		var amount: int = hit_amount(combatant, data, intent, hit, player_statuses)
-		var cut: int = reduce_hit(amount, reduction_left)
-		amount -= cut
-		reduction_left -= cut
-		hit_amounts.append(amount)
-		if hit == 0:
-			preview["per_hit"] = amount
-		Status.consume_triggered(player_statuses)
-		var blocked: int = mini(block, amount)
-		var after_block: int = amount - blocked
-		var absorbed: int = mini(absorb, after_block)
-		block -= blocked
-		absorb -= absorbed
-		total_to_hp += after_block - absorbed
-		var was_critical: bool = player.is_critical_at(hp)
-		hp -= after_block - absorbed
-		if hp <= 0:
-			var guard: Status = Status.lethal_guard(player_statuses, was_critical)
-			if guard != null and saves_used < guard.charges:
-				hp = guard.data.survive_hp(player.max_hp, player.critical_hp_fraction)
-				saves_used += 1
-	preview["hits"] = hits
+	# Every attack of the turn, replayed in turn on the same counters; a
+	# later one reads the enemy and the player as the one before left
+	# them - what an attack spends on either side gone.
+	var attacker: Combatant = combatant
+	for action in times:
+		if action > 0:
+			attacker = _after_own_attack(combatant, data, intent)
+			Status.consume_after_attack_against(player_statuses)
+		var reduction_left: int = Status.attack_total_reduction(attacker.statuses) + Status.attack_total_reduction(player_statuses)
+		for hit in hits:
+			var amount: int = hit_amount(attacker, data, intent, hit, player_statuses)
+			var cut: int = reduce_hit(amount, reduction_left)
+			amount -= cut
+			reduction_left -= cut
+			hit_amounts.append(amount)
+			if hit == 0 and action == 0:
+				preview["per_hit"] = amount
+			Status.consume_triggered(player_statuses)
+			var blocked: int = mini(block, amount)
+			var after_block: int = amount - blocked
+			var absorbed: int = mini(absorb, after_block)
+			block -= blocked
+			absorb -= absorbed
+			total_to_hp += after_block - absorbed
+			var was_critical: bool = player.is_critical_at(hp)
+			hp -= after_block - absorbed
+			if hp <= 0:
+				var guard: Status = Status.lethal_guard(player_statuses, was_critical)
+				if guard != null and saves_used < guard.charges:
+					hp = guard.data.survive_hp(player.max_hp, player.critical_hp_fraction)
+					saves_used += 1
+	preview["hits"] = hits * times
 	preview["hit_amounts"] = hit_amounts
 	preview["damage_to_hp"] = 0 if denied else total_to_hp
 	preview["lethal"] = hp <= 0 and not bool(preview.get("interrupted", false)) and not denied
@@ -351,6 +382,28 @@ static func held_back(data: EnemyData, intent: EnemyIntent) -> StatusData:
 	if data == null or intent == null or intent.counts_attack_cards:
 		return null
 	return data.attack_card_status
+
+# How many times this enemy carries out `intent` this turn: what its
+# statuses ask (StatusData.repeats_intent - Bereft) for an ATTACK or a
+# DEFEND, once for anything else. The one count take_turn() resolves and
+# preview_intent() shows.
+static func repeats(combatant: Combatant, intent: EnemyIntent) -> int:
+	if intent == null or (intent.type != EnemyIntent.IntentType.ATTACK and intent.type != EnemyIntent.IntentType.DEFEND):
+		return 1
+	return Status.intent_repeats(combatant.statuses)
+
+# The enemy as a repeated attack after its first finds it: its own
+# statuses spent by an attack (StatusData.consumed_by_own_attack - Braced,
+# Garnished) gone, the rest as they are - a copy, for the preview to read
+# the next attack's hits off without touching the real one.
+static func _after_own_attack(combatant: Combatant, data: EnemyData, intent: EnemyIntent) -> Combatant:
+	var shadow := Combatant.new(combatant.max_hp)
+	shadow.hp = combatant.hp
+	shadow.critical_hp_fraction = combatant.critical_hp_fraction
+	shadow.turns_taken = combatant.turns_taken
+	shadow.statuses = combatant.statuses.duplicate()
+	Status.consume_after_attack(shadow.statuses, held_back(data, intent))
+	return shadow
 
 # How many hits an ATTACK lands: EnemyIntent.hits (at least 1), and a
 # multi-hit one gains what its statuses add (StatusData.bonus_hits - Off

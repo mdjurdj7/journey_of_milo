@@ -187,6 +187,14 @@ enum Mark { NONE, COIL, DROP }
 # 4 times. 0 = none.
 @export var bonus_hits: int = 0
 
+# How many times its holder - an enemy - carries out its current intent
+# each turn while it's up (Bereft: 2): an ATTACK lands as that many
+# separate attacks, one after another, and a DEFEND gains its Block that
+# many times; the loop then advances once, as for any turn (EnemyTurn.
+# take_turn()). Any other intent resolves once. The display shows all of
+# it (EnemyTurn.preview_intent()). 1 = once, as every enemy acts.
+@export var repeats_intent: int = 1
+
 # Energy its holder gains at the start of each of their turns, on top of
 # the refill, if they are Critical at that moment (Dying Light) - judged
 # as the Energy refills (Combatant.turn_start_energy()); entering Critical
