@@ -441,6 +441,16 @@ func _tween_model_turn(duration: float) -> void:
 func _model_yaw() -> float:
 	return deg_to_rad(model_yaw_offset + (battle_camera_turn_degrees if _battle_turned else 0.0))
 
+# The move an intent names (EnemyIntent.motion), toward `target` - the
+# Wanderer - played by the attachment (CraneMotion.play_motion()).
+# Returns how long until it lands - an Attack's contact, the whole of
+# any other move - for the enemy turn to wait on; -1 for a body with no
+# such move, which then does what it always did.
+func play_intent_motion(motion: StringName, target: Node3D) -> float:
+	if motion == &"" or _attachment == null or not _attachment.has_method("play_motion") or _settling:
+		return -1.0
+	return float(_attachment.call("play_motion", motion, target))
+
 # The pose a queued intent asks of the body (EnemyIntent.rear_while_
 # queued, the Siltjaw's charge): the attachment rears the front up or
 # lets it back down (RearPose.set_rearing()). Returns how long that

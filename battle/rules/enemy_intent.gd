@@ -123,3 +123,11 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL }
 # that goes (EnemyTurn.take_turn()). The Adder's Coil: Coiled through the
 # player's turn after it. Null = none.
 @export var status_on_resolve: StatusData = null
+
+# The move the body makes as this intent resolves, by name, for its
+# attachment to play (FieldEnemy.play_intent_motion() - the cranes' bow,
+# step and leap): an Attack's in place of the lunge, a Defend's as its
+# Block goes up, once per time the turn carries it out (EnemyTurn.
+# repeats()). Empty, or a body with no such move: an Attack lunges as
+# always and a Defend doesn't move.
+@export var motion: StringName = &""

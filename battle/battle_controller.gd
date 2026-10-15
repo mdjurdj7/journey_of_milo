@@ -1293,6 +1293,11 @@ func _run_sequential_turn() -> void:
 		if data == null:
 			continue
 		enemy_acting.emit(enemy)
+		# What it is about to carry out, and how often - its body plays
+		# the intent's move each time (_play_attack_move(), _play_defend_
+		# moves()).
+		var intent: EnemyIntent = EnemyTurn.current_intent(combatant, data)
+		var times: int = EnemyTurn.repeats(combatant, intent)
 		var result := _take_turn_logged(enemy, combatant, data)
 		acted.append(enemy)
 		# Killed by its own countdown before it could act: reported, dropped,
@@ -1314,12 +1319,17 @@ func _run_sequential_turn() -> void:
 			# Each attack of the turn its own lunge and its own report, one
 			# after another (EnemyTurn.repeats() - Bereft's two).
 			for attack: Dictionary in _attacks_of(result):
-				var snap_delay: float = enemy.play_attack_snap(_wanderer)
+				var snap_delay: float = _play_attack_move(enemy, intent)
 				if snap_delay > 0.0:
 					await get_tree().create_timer(snap_delay).timeout
 				_report_enemy_attack(enemy, attack)
 				if player.hp <= 0:
 					break
+		if result["defended"]:
+			for move in times:
+				var move_delay: float = _play_defend_move(enemy, intent)
+				if move_delay > 0.0:
+					await get_tree().create_timer(move_delay).timeout
 		# A charge spent lets the rear down first, then any burrow carries on
 		# from there. A broken one is already down - it dropped on the card
 		# that broke it (_resolve_play()), so this waits on nothing and the
@@ -1356,6 +1366,7 @@ func _run_simultaneous_turn() -> void:
 		if combatant == null or combatant.hp <= 0 or enemy.enemy_data == null:
 			continue
 		enemy_acting.emit(enemy)
+		var intent: EnemyIntent = EnemyTurn.current_intent(combatant, enemy.enemy_data)
 		results[enemy] = _take_turn_logged(enemy, combatant, enemy.enemy_data)
 		if _report_countdown(enemy, combatant, results[enemy]):
 			continue
@@ -1364,8 +1375,11 @@ func _run_simultaneous_turn() -> void:
 		if results[enemy]["phase_triggered"]:
 			enemy_status_gained.emit(enemy, enemy.enemy_data.phase_status)
 		acting.append(enemy)
+		# The members' moves start together - one shared move.
 		if results[enemy]["attacked"]:
-			longest_snap = maxf(longest_snap, enemy.play_attack_snap(_wanderer))
+			longest_snap = maxf(longest_snap, _play_attack_move(enemy, intent))
+		if results[enemy]["defended"]:
+			longest_snap = maxf(longest_snap, _play_defend_move(enemy, intent))
 		# A Denied member sits the shared move out, on the same beat.
 		if results[enemy]["denied"]:
 			longest_snap = maxf(longest_snap, denied_beat_sec)
@@ -1382,6 +1396,19 @@ func _run_simultaneous_turn() -> void:
 		_show_roused(enemy)
 		enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
 	_apply_intent_exclusions(acting)
+
+# One attack's move: the intent's own (EnemyIntent.motion), else the
+# lunge. How long until it lands.
+func _play_attack_move(enemy: FieldEnemy, intent: EnemyIntent) -> float:
+	var delay: float = enemy.play_intent_motion(intent.motion, _wanderer) if intent != null else -1.0
+	return delay if delay >= 0.0 else enemy.play_attack_snap(_wanderer)
+
+# A Defend's move (EnemyIntent.motion) as its Block goes up - how long
+# it takes, 0 for one with none.
+func _play_defend_move(enemy: FieldEnemy, intent: EnemyIntent) -> float:
+	if intent == null:
+		return 0.0
+	return maxf(enemy.play_intent_motion(intent.motion, _wanderer), 0.0)
 
 # The attacks a turn's result landed, each as _report_enemy_attack()
 # reads one: its "actions" (EnemyTurn.take_turn()), or the result itself
