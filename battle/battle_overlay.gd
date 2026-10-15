@@ -357,6 +357,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	hand_container.armed_changed.connect(_on_card_armed_changed)
 	# Devour's pick greys End Turn the way an armed card does.
 	battle_controller.devour_changed.connect(func(_available: bool, _used: bool) -> void: _update_end_turn())
+	battle_controller.entry_lock_changed.connect(func(_locked: bool) -> void: _update_end_turn())
 	_devour_button.setup(battle_controller)
 	# A devoured card is out of the hand: the cursor back, and the faces
 	# that read the hand re-read.
@@ -753,7 +754,8 @@ func _on_card_armed_changed(armed: bool) -> void:
 
 func _update_end_turn() -> void:
 	var picking: bool = battle_controller != null and battle_controller.is_devour_picking()
-	end_turn_button.set_enabled(_player_turn and not _card_armed and not picking)
+	var opening: bool = battle_controller != null and battle_controller.is_entry_locked()
+	end_turn_button.set_enabled(_player_turn and not _card_armed and not picking and not opening)
 
 func _on_hand_choice_started(confirm_label: String, _cap: int, verb: String) -> void:
 	_choice_card_name = confirm_label

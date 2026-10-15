@@ -98,6 +98,14 @@ enum RewardMode { SCREEN, WORLD }
 # Raised to the camera rig's own battle_transition_time when that's
 # longer, so retuning the blend doesn't leave this stale.
 @export var reward_spread_delay_sec: float = 0.6
+# Battle entry: cards, End Turn and targeting take no input until this
+# long after contact (BattleController.lock_entry_input()) - the
+# Wanderer's own draw_sword at frame 21 (0.875 s), the sword in his hand
+# and the camera settled. The hand still deals in under it. With the
+# Mixamo DrawSword fallback it's the camera's settle (CameraRig.battle_
+# transition_time) instead (_battle_input_unlock_seconds()). Read at each
+# contact.
+@export var battle_input_unlock_time: float = 21.0 / 24.0
 # What a won fight leaves by its encounter role - cards, the gold
 # multiplier (the elite's 1.5 included), an optional fight's extra
 # (EncounterRewards). Loaded when the reward screen opens.
@@ -2054,6 +2062,7 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 
 	var transition_time: float = camera_rig.battle_transition_time if camera_rig != null else 0.0
 	overlay.enter_battle(ui_on_dark_world, _battle_members.duplicate(), deck_panel, hp_bar, transition_time, wanderer)
+	overlay.battle_controller.lock_entry_input(_battle_input_unlock_seconds(transition_time))
 	# The battle frame settles on the beat the overlay reveals the intents
 	# (BattleOverlay._reveal_enemy_intents()); a flyer takes to the air
 	# then, and stays up until the fight ends.
@@ -2071,6 +2080,14 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 		for active: Status in overlay.battle_controller.get_enemy_statuses(member):
 			member.show_status(active.data, false)
 	wanderer.bind_to_battle(overlay.battle_controller)
+
+# How long a fight's opening holds input (battle_input_unlock_time's doc):
+# the Wanderer's own draw_sword's, or on the Mixamo fallback the camera's
+# settle, `transition_time`.
+func _battle_input_unlock_seconds(transition_time: float) -> float:
+	if wanderer != null and wanderer.has_own_draw_sword():
+		return battle_input_unlock_time
+	return transition_time
 
 # The Wanderer's stance distance - origin to origin, what Wanderer.enter_
 # battle_stance() takes - from `from` (the anchor's spot) along

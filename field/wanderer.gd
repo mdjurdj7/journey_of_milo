@@ -2150,6 +2150,11 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float, direct
 	if not _own_draw_sword or _animation_player == null:
 		_switch_sword_mount(_hand_frame, hand_mount_position, hand_mount_rotation_degrees, duration)
 
+# Whether DrawSword is the glb's own draw_sword (not the Mixamo fallback) -
+# RegionField times the fight's opening input hold by it.
+func has_own_draw_sword() -> bool:
+	return _own_draw_sword
+
 # DrawSword's grab and strike keys, set to draw_sword_grab_time and
 # draw_sword_strike_time as each entry reads them.
 func _place_draw_keys() -> void:

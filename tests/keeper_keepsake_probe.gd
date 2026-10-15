@@ -663,6 +663,10 @@ func _start_fight(floor_index: int, group: StringName) -> Node:
 	_field.call_deferred("_on_enemy_contacted", target)
 	for i in 10:
 		await physics_frame
+	# The fight's opening hold (RegionField.battle_input_unlock_time).
+	var entry_layer: Node = _field.get_node("BattleLayer")
+	while entry_layer.get_child_count() > 0 and bool((entry_layer.get_child(0).get("battle_controller") as Node).call("is_entry_locked")):
+		await process_frame
 	var overlay: Node = _overlay()
 	if overlay == null:
 		_fail("no fight started on floor %d" % (floor_index + 1))

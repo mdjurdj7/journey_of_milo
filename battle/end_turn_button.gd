@@ -10,8 +10,9 @@ class_name EndTurnButton
 # bottom-right; the rule spans the text's width, not the control's.
 #
 # Disabled by BattleOverlay while the enemy turn runs (BattleController.
-# turn_phase_changed) and while a card is armed (HandContainer.
-# armed_changed) - the two moments ending the turn makes no sense.
+# turn_phase_changed), while a card is armed (HandContainer.
+# armed_changed) and through the fight's opening hold (BattleController.
+# entry_lock_changed) - the moments ending the turn makes no sense.
 
 @export var label_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf")
 @export var font_size_px: int = 15

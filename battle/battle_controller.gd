@@ -55,6 +55,9 @@ signal status_changed()
 # End Turn in between. Not emitted by setup(): the fight opens on the
 # player's turn.
 signal turn_phase_changed(player_turn: bool)
+# The fight's opening hold (lock_entry_input()) starts (true) and ends
+# (false) - BattleOverlay disables End Turn through it.
+signal entry_lock_changed(locked: bool)
 # The enemy actually under the cursor while a card is armed - null when
 # it is over none, and when the card is played or cancelled. Never the
 # default target _default_target() lights: what the armed card's face
@@ -200,6 +203,10 @@ var _wanderer: Wanderer = null
 # end_turn() both refuse to start anything new while this is true, so a
 # second card/turn can never be armed mid-swing.
 var _input_locked: bool = false
+# The fight's opening hold (lock_entry_input()): cards, End Turn,
+# targeting and Devour take no input until it ends. The hand still deals
+# in under it.
+var _entry_locked: bool = false
 # A play is resolving (_resolve_play(), commit to resolved), and a next
 # one is waiting - on it, or on the Wanderer's swing reaching its cancel
 # point (_resolve_play()'s cancel window). While one resolves a next card
@@ -392,7 +399,28 @@ func is_choosing() -> bool:
 func get_choosing_card_view() -> CardView:
 	return _choosing_card_view
 
+# The fight's opening hold: no card, End Turn, target or Devour takes
+# input for `seconds` from now (RegionField._on_enemy_contacted() calls it
+# on contact - the Wanderer's draw near done). Zero or less holds nothing.
+func lock_entry_input(seconds: float) -> void:
+	if seconds <= 0.0:
+		return
+	_entry_locked = true
+	entry_lock_changed.emit(true)
+	_emit_devour_changed()
+	get_tree().create_timer(seconds, true).timeout.connect(_unlock_entry_input)
+
+func _unlock_entry_input() -> void:
+	_entry_locked = false
+	entry_lock_changed.emit(false)
+	_emit_devour_changed()
+
+func is_entry_locked() -> bool:
+	return _entry_locked
+
 func request_play(card_view: CardView) -> void:
+	if _entry_locked:
+		return
 	if (_input_locked and not _play_in_flight) or _play_queued or _pending_card_view != null or _choice_open() or card_view.card_data == null:
 		return
 	# Devour first: the card clicked is the one it eats, playable or not.
@@ -610,7 +638,7 @@ func _close_choice(keep: CardView = null) -> void:
 	_emit_devour_changed()
 
 func confirm_target(enemy: FieldEnemy) -> void:
-	if _pending_card_view == null or _pending_devour_only:
+	if _entry_locked or _pending_card_view == null or _pending_devour_only:
 		return
 	if not _can_target(_pending_card_view.card_data, _combatants.get(enemy)):
 		return
@@ -641,7 +669,7 @@ func cancel_target() -> void:
 # End Turn: with a keepsake that keeps cards and a card in hand, the keep
 # choice first (_begin_keep_choice()) - and End Turn again confirms it.
 func end_turn() -> void:
-	if _input_locked or _play_queued:
+	if _entry_locked or _input_locked or _play_queued:
 		return
 	if _keep_choice_open:
 		confirm_choice()
@@ -1027,7 +1055,7 @@ static func encounter_role(members: Array[Dictionary]) -> String:
 # this - the button, arming an unplayable card for it, the pick, lighting
 # up as a target.
 func is_devour_available() -> bool:
-	return player != null and _devour_uses_this_turn < devour_uses_per_turn and is_devour_affordable() and not _input_locked and not _play_queued and not _choice_open()
+	return player != null and _devour_uses_this_turn < devour_uses_per_turn and is_devour_affordable() and not _entry_locked and not _input_locked and not _play_queued and not _choice_open()
 
 # Whether the player has the Energy Devour costs.
 func is_devour_affordable() -> bool:
