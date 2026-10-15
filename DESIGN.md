@@ -558,3 +558,15 @@ folder (run_log_probe). (2026-10-04.)
   can kill a player the display said was safe. Left as it is for the
   Adder's first pass; fold both in if play shows it misleads.
   (2026-10-09, the Adder.)
+- **Slash contact on a timer beside the clip - next fix.** The card's
+  contact (card_swing, card_impact: hit flash, damage, sound) lands on
+  `create_timer()` waits in `BattleController` (the play's settle/swing/
+  impact loop, timed from `_impact_delay_for()` -> `Wanderer.
+  get_clip_contact_time()`), not on the clip's own playhead. Anything that
+  moves the playhead apart from wall time - the hit-stop
+  (`Wanderer.hold_animation()`), a next card waiting on
+  `slash_cancel_time`, a blend - lets the two drift. Fix: a method key on
+  the Slash clip at `slash_contact_time`, as DrawSword's grab now is
+  (`Wanderer._merge_clips()`, `_on_draw_sword_grab_key()`), with the
+  controller waiting on the Wanderer's contact signal instead of its own
+  timer. (2026-10-14, after the DrawSword grab moved onto a method key.)
