@@ -59,16 +59,46 @@ window = (xx > cut_px - 2 * PX) & (np.abs(yy - cz) < (LOBE_RADII[1] + 1.5) * PX)
 walk = np.where(window, binary_closing(walk, structure=disk(int(LOBE_FILLET * PX))), walk)
 elite = px_of(*ELITE_WORLD)
 
+# The stream across the top bend. A shallow channel crossing the corridor from
+# the north-west ridge (upstream, toward the tower) to the south-east ridge. It
+# is painted into the landmass mask as enclosed water, so the engine treats it
+# as a pool: still, no swash, no foam. The walkable floor dips to the water's
+# edge over STREAM_BANK_M; the walkable outline and the ledges do not change
+# (the stream is wadeable). Image px, x right, y down; upstream end first.
+STREAM = True
+STREAM_PTS = [(898, 282), (872, 352), (872, 440), (846, 512), (862, 594)]
+STREAM_WIDTH_M = (1.8, 3.2)    # at the ford (middle), where it wells out and sinks in (ends)
+STREAM_INTO_FACE_M = 0.5       # the water runs this far under the ridge faces
+STREAM_BANK_M = 2.0            # walkable floor ramps from the water's edge to BASE_WALK over this
+stream = np.zeros((H, W), bool)
+if STREAM:
+    from scipy.interpolate import splprep, splev
+    sx, sy = zip(*STREAM_PTS)
+    tck, _ = splprep([sx, sy], s=0, k=3)
+    for u in np.linspace(0, 1, 600):
+        x_, y_ = splev(u, tck)
+        w_ = np.interp(abs(2 * u - 1) ** 2, [0, 1], STREAM_WIDTH_M)
+        r_ = 0.5 * w_ * PX
+        x0, x1 = int(x_ - r_ - 1), int(x_ + r_ + 2)
+        y0, y1 = int(y_ - r_ - 1), int(y_ + r_ + 2)
+        sub = (xx[y0:y1, x0:x1] - x_) ** 2 + (yy[y0:y1, x0:x1] - y_) ** 2 <= r_ * r_
+        stream[y0:y1, x0:x1] |= sub
+    stream &= dilation(walk, disk(int(STREAM_INTO_FACE_M * PX)))
+d_stream = distance_transform_edt(~stream) / PX if STREAM else np.full((H, W), 1e9)
+bank = np.clip(d_stream / STREAM_BANK_M, 0, 1)
+bank = bank * bank * (3 - 2 * bank)                  # 0 at the water, 1 past the bank
+
 # signed distance in metres: >0 outside the walkable area
 d_out = distance_transform_edt(~walk) / PX
 d_in = distance_transform_edt(walk) / PX
 
-h = np.full((H, W), BASE_WALK, np.float32)          # walkable floor
+base = BASE_WALK * bank                              # the floor, dipped to the stream
+h = base.astype(np.float32)                          # walkable floor
 o = d_out
 face = np.clip(o / FACE_W, 0, 1)
-h = np.where(o > 0, BASE_WALK + CREST_RISE * face, h)
+h = np.where(o > 0, base + CREST_RISE * face, h)
 fall_t = np.clip((o - FACE_W - CREST_W) / OUTER_FALL, 0, 1)
-crest_h = BASE_WALK + CREST_RISE
+crest_h = base + CREST_RISE
 h = np.where(o > FACE_W + CREST_W, crest_h - crest_h * fall_t, h)
 h = gaussian_filter(h, sigma=0.3 * PX)               # round the ends of the linear faces
 # ridge shrinks where two faces meet in a narrow wedge: nothing to do, max() of distance handles it
@@ -88,8 +118,11 @@ t = np.clip((o - OUTER_EDGE_AT) / OUTER_EDGE_WIDTH + 0.5, 0, 1)
 outer_ground = t * t * (3 - 2 * t)
 Image.fromarray((outer_ground * 255 + 0.5).astype(np.uint8), "L").save("../../region1_floor3_outer.png")
 
-# landmass: all land (dry floor, no water)
-Image.fromarray(np.full((H, W), 255, np.uint8), "L").save("../../region1_floor3_landmass.png")
+# landmass: all land except the stream, which is enclosed water (a pool to the
+# engine). ~10 px blur on its edge, as the Field Asset Spec asks.
+land = np.where(stream, 0.0, 1.0).astype(np.float32)
+land = gaussian_filter(land, 10.0 / 3.0) if STREAM else land
+Image.fromarray((land * 255 + 0.5).astype(np.uint8), "L").save("../../region1_floor3_landmass.png")
 
 # damp patches in the outer zone (optional: not read by the engine yet)
 rng = np.random.default_rng(11)
@@ -138,6 +171,14 @@ col = col * (1 - 0.28*np.clip(damp,0,1))[...,None]
 col = col * (0.55 + 0.45*shade)[...,None]
 outside = (o > FACE_W + CREST_W)
 col = col * np.where(outside, 0.88, 1.0)[...,None]
+if STREAM:   # wet band (x0.72 at the edge, gone by 0.8 m), then the water itself
+    wet = np.clip(1 - d_stream / 0.8, 0, 1) * (1 - stream)
+    col = col * (1 - 0.28 * wet)[...,None]
+    shallow = np.array([0.54, 0.60, 0.61]); seabed = sand * 0.72 * 0.8
+    d_in_s = distance_transform_edt(stream) / PX
+    k = np.clip(d_in_s / 1.2, 0, 1)[...,None] * 0.75
+    water = seabed[None,None,:] * (1 - k) + shallow[None,None,:] * k
+    col = np.where(stream[...,None], water, col)
 img = (np.clip(col, 0, 1) * 255).astype(np.uint8)
 im = Image.fromarray(img, "RGB")
 from PIL import ImageDraw
