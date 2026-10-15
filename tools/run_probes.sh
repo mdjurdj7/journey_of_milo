@@ -250,13 +250,13 @@ area_probes() {
 		keywords) echo "keyword starter_cards the_return" ;;
 		rules) echo "starter_cards critical_cards come_due come_due_face collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace second_swing garnish claw_back gnaw settled_account devour adder killing_blow critical_cost" ;;
 		enemies) echo "blackback siltjaw wardling dunecur greyshelf underfoot sentence no_further critical_cards kill_order armored_contact deny enemy_export adder glassbone" ;;
-		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost pathing scatter killing_blow" ;;
+		field) echo "kill_order drain hold_line toll_carry gold_line glassbone armored_contact run_log wear_path elite_reward run_lost pathing ledge_nav scatter killing_blow" ;;
 		floor1) echo "kill_order drain scatter" ;;
 		floor2) echo "kill_order hold_line bundle_roll underfoot scatter" ;;
 		floor3) echo "kill_order blackback wardling temper" ;;
 		floor4) echo "kill_order floor4 wear_path dunecur collector adder" ;;
 		floor5) echo "kill_order floor5 wear_path greyshelf elite_reward" ;;
-		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur adder floor5 greyshelf underfoot pathing scatter encounter_slots" ;;
+		floors) echo "kill_order drain hold_line bundle_roll blackback wardling wear_path floor4 dunecur adder floor5 greyshelf underfoot pathing ledge_nav scatter encounter_slots" ;;
 		run) echo "belongings_choice bundle_roll card_rarity glassbone trinket keeper_keepsake keepsake_tile toll_carry run_log frayed_cord elite_reward run_lost temper reward_roles" ;;
 		hud) echo "gold_line glassbone trinket keepsake_tile" ;;
 		hp_bar) echo "kill_order adder" ;;
