@@ -1,0 +1,28 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://buyfdpvlj7rew"]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://cw06we70if8cw" path="res://cards/art/Wanderer/Last Wager.png" id="9_art"]
+
+[sub_resource type="Resource" id="CardEffect_damage"]
+script = ExtResource("2_card_effect")
+value = 16
+condition = 7
+alt_value = 36
+
+[sub_resource type="Resource" id="CardEffect_self_damage"]
+script = ExtResource("2_card_effect")
+effect_type = 2
+value = 4
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Last Wager+"
+cost = 1
+rarity = 2
+target_type = 0
+description = "{else}Deal {damage} damage.{/else} {if}Critical: deal {alt_damage}.{/if}
+Then lose 4 HP."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage"), SubResource("CardEffect_self_damage")])
+art = ExtResource("9_art")
+battle_animation = &"Slash"
