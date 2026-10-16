@@ -17,6 +17,20 @@ class_name FloorEnemy
 # on top of something the relief doesn't draw - floor 4's Adder on its
 # basking slab, the slab's top over the sand. 0 = on the sand.
 @export var height_offset_m: float = 0.0
+# The Wanderer's gap in a fight against this member, metres from its near
+# edge to his stance (FieldEnemy.stance_gap), in place of RegionField.
+# battle_gap_m - pulled in out of deeper water the same way, down to the
+# lesser of this and battle_gap_min_m. Keep his stance outside its
+# contact_radius plus his own 0.4 m body (see battle_gap_m's own doc).
+# Floor 5's Greyshelf: him at the crest rock's foot. -1 = the field's.
+@export var stance_gap_m: float = -1.0
+# A lone member that keeps its authored facing in a fight (FieldEnemy.
+# holds_facing): it doesn't turn to face him on contact, and his stance
+# lies straight out in front of it, along its own facing, however he
+# came - the Greyshelf on its crest rock, which a turn would swing off
+# the edge. It still takes its battle_camera_turn_degrees. Ignored in a
+# cluster, whose line sets the stance. False = turn to him, as ever.
+@export var holds_facing: bool = false
 # The body's yaw in degrees, on top of the slot's yaw - rotation.y.
 # Authored outright rather than derived from "seaward": the crab beside
 # the pool faces where it faces.

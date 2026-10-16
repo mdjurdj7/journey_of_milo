@@ -56,6 +56,10 @@ const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
 	set(value):
 		height_offset = value
 		_ground_to_relief()
+# FloorEnemy.stance_gap_m and holds_facing, copied at spawn - read at
+# contact (RegionField._battle_gap_for(), _on_enemy_contacted()).
+@export var stance_gap: float = -1.0
+@export var holds_facing: bool = false
 # EnemyData.harness_point, copied the same way: where a rope is tied to
 # this body, glb units (see get_harness_point()).
 @export var harness_point: Vector3 = Vector3.ZERO

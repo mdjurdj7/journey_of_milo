@@ -2161,6 +2161,52 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float, direct
 	if not _own_draw_sword or _animation_player == null:
 		_switch_sword_mount(_hand_frame, hand_mount_position, hand_mount_rotation_degrees, duration)
 
+# A stance reached round something standing between him and it (Region
+# Field._stance_path_round() - the Greyshelf's rock): walked along `path`
+# (world points, his own spot first, the stance last) at move_speed, the
+# walk playing and each leg faced, through the battle freeze as a tween -
+# then settled into the stance as enter_battle_stance() does, over
+# settle_duration, from where the walk ends. Returns the walk's seconds,
+# which the caller adds to the fight's opening hold.
+func enter_battle_stance_along(path: PackedVector3Array, target: Node3D, spacing: float, settle_duration: float, direction: Vector3 = Vector3.ZERO) -> float:
+	if target == null:
+		return 0.0
+	clear_move_target()
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	var seconds: float = 0.0
+	var angle: float = rotation.y
+	for i in range(1, path.size()):
+		var leg: Vector3 = path[i] - path[i - 1]
+		var flat := Vector3(leg.x, 0.0, leg.z)
+		if flat.length() < 0.01:
+			continue
+		var leg_seconds: float = flat.length() / maxf(move_speed, 0.1)
+		var face: float = _angle_from_direction(flat.normalized())
+		angle = angle + wrapf(face - angle, -PI, PI)
+		tween.tween_property(self, "global_position", path[i], leg_seconds)
+		tween.parallel().tween_property(self, "rotation:y", angle, minf(leg_seconds, 0.2))
+		seconds += leg_seconds
+	if seconds <= 0.0:
+		tween.kill()
+		enter_battle_stance(target, spacing, settle_duration, direction)
+		return 0.0
+	_play_stance_walk(true)
+	tween.tween_callback(func() -> void:
+		_play_stance_walk(false)
+		enter_battle_stance(target, spacing, settle_duration, direction))
+	return seconds
+
+# The walk on or off while enter_battle_stance_along() moves him -
+# _physics_process, which plays it in the field, is frozen for the fight.
+func _play_stance_walk(on: bool) -> void:
+	if use_animation_tree:
+		if _animation_tree:
+			_animation_tree.set("parameters/blend_position", move_speed if on else 0.0)
+	elif _animation_player and _animation_player.has_animation(&"Walk"):
+		if on:
+			_animation_player.play("Walk", animation_blend_time)
+
 # Whether DrawSword is the glb's own draw_sword (not the Mixamo fallback) -
 # RegionField times the fight's opening input hold by it.
 func has_own_draw_sword() -> bool:

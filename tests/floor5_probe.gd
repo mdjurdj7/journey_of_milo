@@ -20,6 +20,10 @@ extends SceneTree
 #   loop    - loop_region_after_last_floor on: the old wrap to floor 1
 #   pocket  - the side pocket off the climb's west side, where the
 #             finding is reserved: reachable from the climb
+#   stance  - contact with the Greyshelf from in front of it, its side
+#             and its back: he never passes through its rock on the way
+#             to his stance, and ends there, in front of it; each prints
+#             the frame's pitch and whether the camera warned
 #
 #   Godot_v4.7.1.exe --headless --fixed-fps 60 --path . -s res://tests/floor5_probe.gd
 #
@@ -27,7 +31,7 @@ extends SceneTree
 # Untyped against the project's own classes (get()/call() only), for the
 # autoload reason kill_order_probe.gd's own header gives.
 
-const CASES := 7
+const CASES := 8
 const REGION_PATH := "res://floors/region1.tres"
 const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
 const FLOOR_5_PATH := "res://floors/region1_floor5.tres"
@@ -62,7 +66,10 @@ const REACH_M := 1.0
 const WAYPOINT_SECONDS := 12.0
 const FIGHT_SECONDS := 8.0
 const OVERSHOOT_LIMIT_M := 0.02
-const SAFETY_SECONDS := 400.0
+const SAFETY_SECONDS := 460.0
+# How long a contact's move to the stance is watched - the walk round the
+# rock, the settle, the frame's ease.
+const STANCE_SECONDS := 5.0
 # How long a won fight may take to open its reward screen: the killing
 # blow, the last death, the camera's return.
 const REWARD_WAIT_SECONDS := 5.0
@@ -93,6 +100,7 @@ func _initialize() -> void:
 	await _check_title()
 	await _check_loop()
 	await _check_pocket()
+	await _check_stance_sides()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -306,9 +314,11 @@ func _win_fight(fight: Node) -> bool:
 		await physics_frame
 	return true
 
-# On to the exit and through it.
+# On to the exit and through it, as a click walks him (RegionField.
+# walk_to()): round what stands in the way - the Greyshelf's rock, when
+# the fight left him at its foot.
 func _walk_out(exited: Array[bool]) -> void:
-	_wanderer.call("set_move_target", _world(EXIT_AT))
+	_field.call("walk_to", _world(EXIT_AT))
 	for i in int(WAYPOINT_SECONDS * 60.0):
 		await physics_frame
 		if exited[0]:
@@ -366,6 +376,51 @@ func _check_pocket() -> void:
 	_completed += 1
 
 # --- Helpers ---
+
+# Contact from in front of the Greyshelf, its side and its back - put just
+# outside its contact area that way (or clear of its rock, behind it):
+# every frame of the move to his stance his feet stay out of the rock's
+# collision box (his own half width in, so a brush passes), and he ends
+# at the stance in front of it.
+func _check_stance_sides() -> void:
+	for side in ["front", "side", "back"]:
+		await _load()
+		var fight: Node3D = _required_enemy() as Node3D
+		var rock: Node3D = _child_with_script(_field.get_node("Props"), "basking_slab.gd") as Node3D
+		var box: CollisionShape3D = rock.get_node_or_null("Collision").get_child(0) as CollisionShape3D if rock != null and rock.get_node_or_null("Collision") != null else null
+		if fight == null or box == null:
+			_fail("stance %s: no Greyshelf or no rock collision" % side)
+			await _unload()
+			continue
+		var facing: Vector3 = -fight.global_transform.basis.z
+		facing = Vector3(facing.x, 0.0, facing.z).normalized()
+		var across: Vector3 = facing.cross(Vector3.UP).normalized()
+		var size: Vector3 = (box.shape as BoxShape3D).size
+		var reach: float = float(fight.get("contact_radius")) + 0.3
+		var from: Vector3 = fight.global_position + facing * reach
+		if side == "side":
+			from = fight.global_position + across * reach
+		elif side == "back":
+			from = fight.global_position - facing * maxf(reach, size.x * 0.5 + 1.2)
+		await _place(Vector2(from.x - _spawn.x, from.z - _spawn.z))
+		_field.call_deferred("_on_enemy_contacted", fight)
+		var camera: Node = _field.get_node("CameraPivot")
+		var deepest: float = -INF
+		var top_pitch: float = 0.0
+		for i in int(STANCE_SECONDS * 60.0):
+			await physics_frame
+			var local: Vector3 = box.global_transform.affine_inverse() * _wanderer.global_position
+			var inside: float = minf(size.x * 0.5 - absf(local.x), size.z * 0.5 - absf(local.z))
+			deepest = maxf(deepest, inside)
+			top_pitch = maxf(top_pitch, float(camera.get("_battle_pitch_now")))
+		var half: float = float(_wanderer.call("get_half_width"))
+		_expect(deepest < half, "stance %s: never into the rock (deepest %+.2f m past its face, %.2f allowed)" % [side, deepest, half])
+		var to_him: Vector3 = _wanderer.global_position - fight.global_position
+		to_him.y = 0.0
+		_expect(to_him.normalized().dot(facing) > 0.99, "stance %s: he ends in front of it (%s)" % [side, to_him])
+		print("INFO: stance %s: battle pitch %.0f now, %.0f at most; the 20 degree warning %s" % [side, float(camera.get("_battle_pitch_now")), top_pitch, "given" if bool(camera.get("_battle_pitch_warned")) else "not given"])
+		await _unload()
+	_completed += 1
 
 func _load() -> void:
 	_run_state.call("new_run", load(CHARACTER_PATH))

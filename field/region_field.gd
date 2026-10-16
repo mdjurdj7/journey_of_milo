@@ -266,6 +266,9 @@ static func reset_hold_line_spoken() -> void:
 @export var battle_gap_m: float = 3.47
 @export var stance_max_water_m: float = 0.3
 @export var battle_gap_min_m: float = 1.97
+# Metres over his feet, at either end, that _straight_move_blocked() looks
+# along for a prop between him and his stance - under a low rock's top.
+@export var stance_check_height_m: float = 0.5
 @export var battle_line_shift_max: float = 2.0
 # Metres between the members of a cluster along the line they step into
 # for a fight (see _place_cluster_line()) - read at contact, so a Remote-
@@ -488,6 +491,9 @@ var _battle_open: bool = false
 # as _place_cluster_line() settled it (the line may have stepped the
 # anchor inward) - read by the contact handler straight after.
 var _line_stance_spacing: float = 0.0
+# Seconds the Wanderer walks round a prop to his stance this fight
+# (Wanderer.enter_battle_stance_along()) - added to the opening hold.
+var _stance_walk_seconds: float = 0.0
 var _battle_members: Array[FieldEnemy] = []
 var _last_fallen_at: Vector3 = Vector3.ZERO
 var _last_fallen_data: EnemyData = null
@@ -1408,6 +1414,8 @@ func _spawn_floor_enemies() -> void:
 			enemy.harness_point = entry.enemy_data.harness_point
 			enemy.face_shore_at_spawn = false
 			enemy.height_offset = entry.height_offset_m
+			enemy.stance_gap = entry.stance_gap_m
+			enemy.holds_facing = entry.holds_facing
 			var at: Vector2 = slot.to_floor(entry.position)
 			enemy.position = Vector3(spawn.x + at.x, 0.0, spawn.z + at.y)
 			enemy.rotation.y = deg_to_rad(slot.yaw_degrees + entry.yaw_degrees)
@@ -2228,23 +2236,36 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 		# A cluster's stance was settled with its line. A lone enemy's
 		# lies on the line back to where the Wanderer is (the direction
 		# Wanderer.enter_battle_stance() takes for it), pulled in toward
-		# the enemy if that is too deep - it has no line to step.
+		# the enemy if that is too deep - it has no line to step. One that
+		# holds its facing (FieldEnemy.holds_facing) has him straight out
+		# in front of it instead, whichever way he came.
 		var spacing: float = _line_stance_spacing
 		if stance_direction == Vector3.ZERO:
 			var toward: Vector3 = Vector3(wanderer.global_position.x - anchor.global_position.x, 0.0, wanderer.global_position.z - anchor.global_position.z).normalized()
+			if anchor.holds_facing:
+				var facing: Vector3 = -anchor.global_transform.basis.z
+				stance_direction = Vector3(facing.x, 0.0, facing.z).normalized()
+				toward = stance_direction
 			spacing = _stance_spacing(anchor.global_position, toward, anchor)
 			if spacing < 0.0:
 				push_warning("RegionField: no stance out of deeper water for '%s'; standing at the minimum." % anchor.name)
 				spacing = stance_distance_min(anchor)
 		camera_rig.enter_battle(wanderer, _battle_members.duplicate(), hand_top_fraction)
-		wanderer.enter_battle_stance(anchor, spacing, camera_rig.battle_transition_time, stance_direction)
+		# Never through something standing: when the straight move to the
+		# stance would cross a prop, he walks round it first.
+		var round_path: PackedVector3Array = _stance_path_round(anchor, spacing, stance_direction)
+		if round_path.is_empty():
+			wanderer.enter_battle_stance(anchor, spacing, camera_rig.battle_transition_time, stance_direction)
+		else:
+			_stance_walk_seconds = wanderer.enter_battle_stance_along(round_path, anchor, spacing, camera_rig.battle_transition_time, stance_direction)
 		# A lone enemy faces the Wanderer where he is (his stance lies on
 		# that same line); a cluster faces where its line will put him.
 		var face_point: Vector3 = wanderer.global_position
 		if stance_direction != Vector3.ZERO:
 			face_point = anchor.global_position + stance_direction * spacing
 		for member in _battle_members:
-			member.face_toward_point(face_point, camera_rig.battle_transition_time)
+			if not member.holds_facing:
+				member.face_toward_point(face_point, camera_rig.battle_transition_time)
 			member.enter_battle_turn(camera_rig.battle_transition_time)
 
 	var directional_light := get_node_or_null(directional_light_path) as OvercastLight
@@ -2257,7 +2278,8 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# draw strikes the ground (Wanderer.draw_sword_strike_time), the sword
 	# in his hand and the camera settled; the hand still deals in under it.
 	var release: Signal = wanderer.draw_strike_passed if wanderer != null and wanderer.has_own_draw_sword() else Signal()
-	overlay.battle_controller.lock_entry_input(_battle_input_hold_seconds(transition_time), release)
+	overlay.battle_controller.lock_entry_input(_battle_input_hold_seconds(transition_time) + _stance_walk_seconds, release)
+	_stance_walk_seconds = 0.0
 	# The battle frame settles on the beat the overlay reveals the intents
 	# (BattleOverlay._reveal_enemy_intents()); a flyer takes to the air
 	# then, and stays up until the fight ends.
@@ -2278,6 +2300,63 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 			member.show_status(active.data, false)
 	wanderer.bind_to_battle(overlay.battle_controller)
 
+# The planned way to his stance (plan_path(), the walk a click takes)
+# when the straight move there would cross something standing - a prop's
+# collision, as the walk grid stamps it (_is_nav_obstacle()): the
+# Greyshelf's crest rock, when contact came from its side or back. Empty
+# when the straight move is clear, or nothing could be planned (then he
+# moves straight, as ever, with a warning).
+func _stance_path_round(anchor: FieldEnemy, spacing: float, direction: Vector3) -> PackedVector3Array:
+	var none := PackedVector3Array()
+	if wanderer == null or anchor == null:
+		return none
+	var away := Vector3(direction.x, 0.0, direction.z)
+	if away.length() < 0.0001:
+		away = Vector3(wanderer.global_position.x - anchor.global_position.x, 0.0, wanderer.global_position.z - anchor.global_position.z)
+	if away.length() < 0.0001:
+		return none
+	var stance: Vector3 = anchor.global_position + away.normalized() * spacing
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null:
+		var local_xz: Vector3 = ground.to_local(Vector3(stance.x, 0.0, stance.z))
+		stance.y = ground.get_walk_height_at(Vector2(local_xz.x, local_xz.z))
+	if not _straight_move_blocked(wanderer.global_position, stance):
+		return none
+	var path: PackedVector3Array = plan_path(wanderer.global_position, stance, anchor)
+	if path.size() < 2:
+		push_warning("RegionField: the move to '%s's stance crosses a prop and no way round was found; moving straight." % anchor.name)
+		return none
+	path[path.size() - 1] = stance
+	return path
+
+# Whether a body his width moving straight from `from` to `to` meets a
+# walk-grid obstacle: three rays at stance_check_height_m over each end's
+# feet - his middle and either side at his half width.
+func _straight_move_blocked(from: Vector3, to: Vector3) -> bool:
+	var along := Vector3(to.x - from.x, 0.0, to.z - from.z)
+	if along.length() < 0.01:
+		return false
+	var side: Vector3 = along.normalized().cross(Vector3.UP) * (wanderer.get_half_width() if wanderer != null else 0.4)
+	var space := get_world_3d().direct_space_state
+	var offsets: Array[Vector3] = [Vector3.ZERO, side, -side]
+	for offset: Vector3 in offsets:
+		var query := PhysicsRayQueryParameters3D.create(from + offset + Vector3.UP * stance_check_height_m, to + offset + Vector3.UP * stance_check_height_m)
+		var excluded: Array[RID] = []
+		if wanderer != null:
+			excluded.append(wanderer.get_rid())
+		# Past whatever isn't an obstacle (an enemy's body, a walk
+		# surface), a few times over.
+		for attempt in 4:
+			query.exclude = excluded
+			var hit: Dictionary = space.intersect_ray(query)
+			if hit.is_empty():
+				break
+			if _is_nav_obstacle(hit.get("collider")):
+				return true
+			var rid: RID = hit["rid"]
+			excluded.append(rid)
+	return false
+
 # The longest a fight's opening holds input: with the Wanderer's own
 # draw_sword, its whole length (its strike ends the hold before that); on
 # the Mixamo fallback, which has no strike, the camera's settle,
@@ -2290,39 +2369,52 @@ func _battle_input_hold_seconds(transition_time: float) -> float:
 # The Wanderer's stance distance - origin to origin, what Wanderer.enter_
 # battle_stance() takes - from `from` (the anchor's spot) along
 # `direction`, for `enemy`: its near edge (FieldEnemy.battle_front_
-# reach()) plus battle_gap_m, the gap pulled in a tenth of a metre at a
-# time while the spot stands in water deeper than stance_max_water_m (the
-# Sea's sea_level over Ground.get_height_at() - a ford's shallows pass),
-# down to battle_gap_min_m. -1 when every one of those is deeper - the
+# reach()) plus its gap (_battle_gap_for()), pulled in a tenth of a metre
+# at a time while the spot stands in water deeper than stance_max_water_m
+# (the Sea's sea_level over Ground.get_height_at() - a ford's shallows
+# pass), down to _battle_gap_min_for(). -1 when every one of those is deeper - the
 # caller decides what then (a cluster steps its line in, see _place_
 # cluster_line()).
 func _stance_spacing(from: Vector3, direction: Vector3, enemy: FieldEnemy) -> float:
 	var reach: float = enemy.battle_front_reach() if enemy != null else 0.0
 	var ground := get_node_or_null(ground_path) as Ground
+	var full_gap: float = _battle_gap_for(enemy)
 	if ground == null or direction == Vector3.ZERO:
-		return reach + battle_gap_m
+		return reach + full_gap
 	var sea := get_node_or_null(sea_path) as Sea
 	var water_level: float = sea.sea_level if sea != null else -INF
-	var gap: float = battle_gap_m
-	while gap >= battle_gap_min_m - 0.001:
+	var gap: float = full_gap
+	while gap >= _battle_gap_min_for(enemy) - 0.001:
 		var point: Vector3 = from + direction * (reach + gap)
 		var depth: float = water_level - ground.get_height_at(Vector2(point.x, point.z))
 		if depth <= stance_max_water_m:
-			if gap < battle_gap_m:
+			if gap < full_gap:
 				print("RegionField: stance pulled in to a %.1f m gap to keep out of deeper water." % gap)
 			return reach + gap
 		gap -= 0.1
 	return -1.0
 
 # How far from `enemy`'s origin the Wanderer stands to fight it: its near
-# edge plus battle_gap_m, before any pull out of deeper water - and the
-# least, with battle_gap_min_m. The stance's whole range, for what keeps
-# it clear (FieldScatter's keep-outs).
+# edge plus its gap (_battle_gap_for()), before any pull out of deeper
+# water - and the least, with _battle_gap_min_for(). The stance's whole
+# range, for what keeps it clear (FieldScatter's keep-outs).
 func stance_distance(enemy: FieldEnemy) -> float:
-	return (enemy.battle_front_reach() if enemy != null else 0.0) + battle_gap_m
+	return (enemy.battle_front_reach() if enemy != null else 0.0) + _battle_gap_for(enemy)
 
 func stance_distance_min(enemy: FieldEnemy) -> float:
-	return (enemy.battle_front_reach() if enemy != null else 0.0) + battle_gap_min_m
+	return (enemy.battle_front_reach() if enemy != null else 0.0) + _battle_gap_min_for(enemy)
+
+# The gap the Wanderer keeps from `enemy`'s near edge: its own (FieldEnemy.
+# stance_gap, from FloorEnemy.stance_gap_m) when set, else battle_gap_m.
+func _battle_gap_for(enemy: FieldEnemy) -> float:
+	if enemy != null and enemy.stance_gap >= 0.0:
+		return enemy.stance_gap
+	return battle_gap_m
+
+# The least it is pulled in to: battle_gap_min_m, or the enemy's own gap
+# when that is already closer.
+func _battle_gap_min_for(enemy: FieldEnemy) -> float:
+	return minf(battle_gap_min_m, _battle_gap_for(enemy))
 
 # The frame has settled: every member of this fight that flies takes to
 # the air (FieldEnemy.enter_battle_hover()), each a step further round
