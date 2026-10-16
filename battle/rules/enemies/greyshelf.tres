@@ -35,6 +35,6 @@ glassbone_reward = 1
 model_scene_path = "res://assets/models/enemies/Greyshelf/Greyshelf.glb"
 model_scale = 1.36
 attachment_scene_path = "res://field/greyshelf_pose.tscn"
-painted_albedo_path = "res://assets/models/enemies/Greyshelf/Greyshelf_Image_0.jpg"
+painted_albedo_path = "res://assets/models/enemies/Greyshelf/Greyshelf_colour.png"
 sink_m = 0.05
 contact_radius_m = 3.2
