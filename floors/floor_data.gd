@@ -174,6 +174,12 @@ enum ExitKind { CHANNEL, LINE }
 # them, which is what every floor did before floor 2 grew an alcove.
 @export var gate_channel_max_width: float = 0.0
 
+@export_group("Glimpse")
+# Someone walking away ahead of him as the floor fades in, the first time
+# a run stands on it (TravellerGlimpse, Traveller). Null (the default) =
+# no one.
+@export var traveller_glimpse: TravellerGlimpse = null
+
 @export_group("Wear")
 # How far the worn band's middle point sits off the first required
 # slot's anchor along the exit's right (RegionField._aim_wear_path()).

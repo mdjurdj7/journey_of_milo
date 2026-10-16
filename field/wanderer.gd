@@ -559,6 +559,12 @@ var _look_back_direction: Vector3 = Vector3.ZERO
 # the intro ends or is skipped; a key still held at that moment moves
 # him then.
 var input_locked: bool = false
+# The arrival hold (RegionField): the movement keys and dash read as
+# nothing - polled, so a key held from the last floor or pressed now moves
+# nothing - while a walk already given (set_move_target()) carries on;
+# the hold swallows the clicks that would give one. Cleared when the
+# hold ends; a key still held then moves him.
+var keys_locked: bool = false
 
 # Debug-only line visualizations for _apply_step_up_and_down()'s two probe
 # casts - built once in _ready() (top_level, so their own transform IS
@@ -2717,7 +2723,7 @@ func _hide_debug_lines() -> void:
 func _physics_process(delta: float) -> void:
 	_dash_cooldown_timer = maxf(_dash_cooldown_timer - delta, 0.0)
 
-	if not input_locked and _dash_timer <= 0.0 and Input.is_action_just_pressed("dash") and _dash_cooldown_timer <= 0.0:
+	if not input_locked and not keys_locked and _dash_timer <= 0.0 and Input.is_action_just_pressed("dash") and _dash_cooldown_timer <= 0.0:
 		# Dash in the direction the Wanderer is currently facing, via the
 		# same angle<->direction conversion turn-to-face uses below, so it
 		# always matches what's on screen.
@@ -2744,6 +2750,8 @@ func _physics_process(delta: float) -> void:
 		if input_locked:
 			input_dir = Vector2.ZERO
 			clear_move_target()
+		elif keys_locked:
+			input_dir = Vector2.ZERO
 		if input_dir.length() > 1.0:
 			input_dir = input_dir.normalized()
 

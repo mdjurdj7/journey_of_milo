@@ -156,10 +156,18 @@ enum RewardMode { SCREEN, WORLD }
 # The fade to the fog colour, and the fade back on the new floor - each
 # this long (FloorFade).
 @export var fade_seconds: float = 0.8
+# The floor's arrival glimpse (FloorData.traveller_glimpse): this scene,
+# walking it, the first time a run stands on the floor.
+@export_file("*.tscn") var traveller_scene_path: String = "res://field/traveller.tscn"
 # The arrival hold: once a floor has faded in (or the zone intro has
 # finished, or at load when neither runs), the player's input stays
 # locked this long while the world runs on - every floor alike, so it
-# never marks one out. Read live through the hold (is_arrival_held()).
+# never marks one out - except the visit that shows a floor's glimpse,
+# which holds until the traveller is gone (TravellerGlimpse.release_
+# after_removal_seconds, capped by its hold_cap_seconds). Movement too:
+# the Wanderer's keys_locked is set through the hold, so polled keys -
+# held from the last floor or pressed now - move nothing. Read live
+# through the hold (is_arrival_held()).
 @export var arrival_hold_seconds: float = 1.0
 # A WorldCard lying on the sand (a FloorProp whose scene is world_card.
 # tscn) sits this far above the relief - the quad is flat and would
@@ -432,10 +440,17 @@ var _holding: bool = false
 var _hold_point: Vector3 = Vector3.INF
 # The arrival hold (arrival_hold_seconds): WAITING for the fade-in or the
 # zone intro, then RUNNING for the hold itself, then OVER. Presses are
-# swallowed until it is OVER (_input()).
+# swallowed (_input()) and the Wanderer's keys locked (_tick_arrival_
+# hold()) until it is OVER.
 enum ArrivalHold { WAITING, RUNNING, OVER }
 var _arrival_hold: ArrivalHold = ArrivalHold.WAITING
 var _arrival_hold_elapsed: float = 0.0
+# The glimpse shown on this load (_spawn_traveller_glimpse()) and its
+# traveller: the hold lasts until he has been gone release_after_removal_
+# seconds (_glimpse_gone_for), or its hold_cap_seconds. Null = none shown.
+var _shown_glimpse: TravellerGlimpse = null
+var _glimpse_traveller: Traveller = null
+var _glimpse_gone_for: float = 0.0
 var _hold_timer: float = 0.0
 var _wall_left: StaticBody3D = null
 var _wall_right: StaticBody3D = null
@@ -672,6 +687,7 @@ func _ready() -> void:
 	# below, which must see them.
 	_spawn_floor_enemies()
 	_spawn_floor_props()
+	_spawn_traveller_glimpse()
 	# Each enemy filled its own fog overlay at spawn (reading this node's
 	# sky and factor through get_region_sky()); every later fog change -
 	# the zone intro's tween, a live edit - re-pushes them all.
@@ -756,6 +772,10 @@ func _ready() -> void:
 		zone_intro.finished.connect(_start_arrival_hold, CONNECT_ONE_SHOT)
 	elif fade == null:
 		_start_arrival_hold()
+	# The keys locked from the first physics frame - _process() keeps them
+	# so (_tick_arrival_hold()); the intro locks him itself.
+	if wanderer != null and not intro_running:
+		wanderer.keys_locked = true
 
 # Wade-HP drain only - everything else on the field (movement, contact,
 # battle) is either physics-engine-driven or event-driven and doesn't need
@@ -941,6 +961,27 @@ func _process(delta: float) -> void:
 	_tick_hold(delta)
 	_tick_chase(delta)
 
+# Someone already walking away up the floor as it fades in - once a run
+# per floor that has a glimpse (Traveller.has_glimpsed()). He frees
+# himself once out of frame.
+func _spawn_traveller_glimpse() -> void:
+	var floor_data := get_floor_data()
+	if floor_data == null or floor_data.traveller_glimpse == null:
+		return
+	var key: String = "%d:%d" % [RunState.current_region_index, RunState.current_floor_index]
+	if Traveller.has_glimpsed(key):
+		return
+	Traveller.mark_glimpsed(key)
+	var scene := load(traveller_scene_path) as PackedScene
+	if scene == null:
+		push_warning("RegionField: no traveller scene at '%s'; no glimpse." % traveller_scene_path)
+		return
+	var traveller := scene.instantiate() as Traveller
+	add_child(traveller)
+	traveller.walk(floor_data.traveller_glimpse, floor_data.spawn)
+	_shown_glimpse = floor_data.traveller_glimpse
+	_glimpse_traveller = traveller
+
 # The fade back in over this floor, then the arrival hold.
 func _hold_through_fade(fade: FloorFade) -> void:
 	await fade.fade_in(fade_seconds)
@@ -952,14 +993,34 @@ func _start_arrival_hold() -> void:
 		_arrival_hold_elapsed = 0.0
 
 func _tick_arrival_hold(delta: float) -> void:
+	if _arrival_hold == ArrivalHold.OVER:
+		return
+	if wanderer != null:
+		wanderer.keys_locked = true
+	if _shown_glimpse != null and not is_instance_valid(_glimpse_traveller):
+		_glimpse_gone_for += delta
 	if _arrival_hold != ArrivalHold.RUNNING:
 		return
 	_arrival_hold_elapsed += delta
-	if _arrival_hold_elapsed >= arrival_hold_seconds:
+	if _arrival_hold_done():
 		_arrival_hold = ArrivalHold.OVER
+		if wanderer != null:
+			wanderer.keys_locked = false
+
+# arrival_hold_seconds - or, on the visit that shows a glimpse, at least
+# that and until the traveller has been gone release_after_removal_
+# seconds, never past hold_cap_seconds.
+func _arrival_hold_done() -> bool:
+	if _arrival_hold_elapsed < arrival_hold_seconds:
+		return false
+	if _shown_glimpse == null:
+		return true
+	if _arrival_hold_elapsed >= _shown_glimpse.hold_cap_seconds:
+		return true
+	return not is_instance_valid(_glimpse_traveller) and _glimpse_gone_for >= _shown_glimpse.release_after_removal_seconds
 
 # Whether the player's input is still locked on arrival - through the
-# fade-in or the intro, then arrival_hold_seconds.
+# fade-in or the intro, then the hold (_arrival_hold_done()).
 func is_arrival_held() -> bool:
 	return _arrival_hold != ArrivalHold.OVER
 
