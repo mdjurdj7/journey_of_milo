@@ -1218,6 +1218,26 @@ func get_wear_mask_at(world_xz: Vector2) -> float:
 		return 0.0
 	return _canvas_sample(_wear_mask_bytes, world_xz)
 
+# 0..1: where stone may show (rock_mask) at a world XZ, read as
+# get_wear_mask_at() reads its painting. Only the mask - the shader's rule
+# gates it by slope too (rock_slope_min / rock_slope_blend); FieldScatter
+# applies the same. 0 with no painting, or one not the landmass mask's
+# size.
+func get_rock_mask_at(world_xz: Vector2) -> float:
+	if rock_mask == null or not _mask_ready:
+		return 0.0
+	if _rock_mask_decoded_for != rock_mask:
+		_rock_mask_decoded_for = rock_mask
+		_rock_mask_bytes = PackedByteArray()
+		var image: Image = _decode_l8_image(rock_mask)
+		if image != null and image.get_width() == _mask_width and image.get_height() == _mask_height:
+			_rock_mask_bytes = image.get_data()
+		else:
+			push_warning("Ground: rock_mask isn't the landmass mask's size; not read on the CPU.")
+	if _rock_mask_bytes.is_empty():
+		return 0.0
+	return _canvas_sample(_rock_mask_bytes, world_xz)
+
 # 0..1: is the nearest water to this world XZ a pool rather than the sea?
 # Same bilinear read as _mask_distance_sample(), on the same grid.
 func get_enclosure_at(world_xz: Vector2) -> float:
@@ -1784,6 +1804,9 @@ var _mask_height: int = 0
 # wear_mask decoded for get_wear_mask_at(), and the texture it came from.
 var _wear_mask_bytes: PackedByteArray = PackedByteArray()
 var _wear_mask_decoded_for: Texture2D = null
+# rock_mask decoded for get_rock_mask_at(), likewise.
+var _rock_mask_bytes: PackedByteArray = PackedByteArray()
+var _rock_mask_decoded_for: Texture2D = null
 # elevation_mask's own luminance bytes on the landmass mask's canvas (same
 # _mask_width x _mask_height, checked at decode), read by _elevation_lift()
 # through the same _canvas_sample(). Empty, with _elevation_ready false,

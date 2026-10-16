@@ -33,13 +33,15 @@ enum PlaceholderKind { CAST, SHELL, STONE_ROUND, STONE_FLAT, STRAND, TWIG }
 # its thinnest axis up (a stone).
 enum Resting { FLAT, CONVEX_UP, FLATTEST_SIDE }
 # Bit flags for `zones` - which bands of the wet-to-dry gradient a cluster
-# may centre in (FieldScatter classifies every cell into one). DUNE_CREST
-# and ROCK_EDGE are reserved for the dry set: nothing is classified so yet.
+# may centre in (FieldScatter classifies every cell into one of the first
+# four), and the dry ground's two marks a cell may carry on top of its
+# band: DUNE_FLANK, a sloping sand face; ROCK_EDGE, sand at the foot of
+# exposed rock. A cluster may centre where any of its zones' bits is set.
 const ZONE_SHORELINE := 1
 const ZONE_POOL_RIM := 2
 const ZONE_WET_BAND := 4
 const ZONE_OPEN_INTERIOR := 8
-const ZONE_DUNE_CREST := 16
+const ZONE_DUNE_FLANK := 16
 const ZONE_ROCK_EDGE := 32
 
 @export var name: String = "":
@@ -110,7 +112,7 @@ const ZONE_ROCK_EDGE := 32
 @export_group("")
 
 @export_group("Where")
-@export_flags("Shoreline", "Pool rim", "Wet band", "Open interior", "Dune crest", "Rock edge") var zones: int = ZONE_SHORELINE:
+@export_flags("Shoreline", "Pool rim", "Wet band", "Open interior", "Dune flank", "Rock edge") var zones: int = ZONE_SHORELINE:
 	set(value):
 		zones = value
 		emit_changed()
@@ -137,6 +139,107 @@ const ZONE_ROCK_EDGE := 32
 @export var enemy_clearance_m: float = 0.0:
 	set(value):
 		enemy_clearance_m = value
+		emit_changed()
+# Nothing within this beyond each enemy's stance distance (RegionField.
+# stance_distance() for it) - the whole ground a fight's feet can stand
+# on, whichever way he came. Below 0 = off.
+@export var stance_clearance_m: float = -1.0:
+	set(value):
+		stance_clearance_m = value
+		emit_changed()
+# Kept this far off a ledge's wall (LedgeBarrier) instead of the floor's
+# prop margin - grass grows right to the foot of the rock, where he can't
+# walk up to it anyway. Below 0 = the prop margin, as any static body.
+@export var ledge_margin_m: float = -1.0:
+	set(value):
+		ledge_margin_m = value
+		emit_changed()
+# Never on exposed rock (the ground's rock rule - FieldScatter).
+@export var avoid_rock: bool = false:
+	set(value):
+		avoid_rock = value
+		emit_changed()
+# Its own keep-out from the worn band's centreline, and the ramp back to
+# full past it, metres, instead of the floor's (FieldScatter's Worn Band) -
+# a stream bank's grass reaching the water beside the path. Below 0 = the
+# floor's.
+@export var wear_keep_out_m: float = -1.0:
+	set(value):
+		wear_keep_out_m = value
+		emit_changed()
+@export var wear_ramp_m: float = -1.0:
+	set(value):
+		wear_ramp_m = value
+		emit_changed()
+@export_group("")
+
+@export_group("Cards")
+# Painted cards instead of a model: each item one of these, by weight,
+# stood up at its card's height times the item's scale_range factor
+# (size_m unused), drawn by tuft_card.gdshader - turned to the camera's
+# yaw, so never edge-on; the yaw jittered by card_yaw_jitter_degrees,
+# half of them mirrored, leaning card_lean_degrees back from the camera.
+# Its light reads card_normal_up of the way toward straight up, so it
+# lights about as the sand it stands on. Empty = the model above.
+@export var cards: Array[ScatterCard] = []:
+	set(value):
+		for card in cards:
+			if card != null and card.changed.is_connected(emit_changed):
+				card.changed.disconnect(emit_changed)
+		cards = value
+		for card in cards:
+			if card != null and not card.changed.is_connected(emit_changed):
+				card.changed.connect(emit_changed)
+		emit_changed()
+@export_range(0.0, 45.0, 0.5) var card_yaw_jitter_degrees: float = 12.0:
+	set(value):
+		card_yaw_jitter_degrees = value
+		emit_changed()
+@export_range(0.0, 45.0, 0.5) var card_lean_degrees: float = 15.0:
+	set(value):
+		card_lean_degrees = value
+		emit_changed()
+@export_range(0.0, 1.0, 0.01) var card_normal_up: float = 0.6:
+	set(value):
+		card_normal_up = value
+		emit_changed()
+# Two items of a cluster no nearer than this fraction of the wider one's
+# width - tufts overlap, but never stand in one spot.
+@export_range(0.0, 2.0, 0.01) var card_spacing_fraction: float = 0.35:
+	set(value):
+		card_spacing_fraction = value
+		emit_changed()
+# The cutout: texture alpha at or under this is cut away.
+@export_range(0.0, 1.0, 0.01) var card_alpha_scissor: float = 0.5:
+	set(value):
+		card_alpha_scissor = value
+		emit_changed()
+# Wind on a card, along RegionField.get_wind_direction(), each a fraction
+# of the card's height at its top (the base never moves, the bend grows
+# with the square of the height up it): a steady lean downwind, `wind`
+# (Look) as the slow main sway at wind_sway_hz, and a smaller faster
+# flutter, part of it across the wind. The phase from where it stands.
+@export_range(0.0, 0.2, 0.001) var wind_lean: float = 0.03:
+	set(value):
+		wind_lean = value
+		emit_changed()
+@export var wind_sway_hz: float = 0.33:
+	set(value):
+		wind_sway_hz = value
+		emit_changed()
+@export_range(0.0, 0.2, 0.001) var wind_flutter: float = 0.012:
+	set(value):
+		wind_flutter = value
+		emit_changed()
+@export var wind_flutter_hz: float = 1.7:
+	set(value):
+		wind_flutter_hz = value
+		emit_changed()
+# Faded out while a fight's camera would see a fighter's feet through it
+# (FieldScatter.battle_fade_*), back when the fight ends.
+@export var battle_fade: bool = false:
+	set(value):
+		battle_fade = value
 		emit_changed()
 @export_group("")
 

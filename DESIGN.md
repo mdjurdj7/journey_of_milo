@@ -59,7 +59,17 @@ The field's wind is `RegionField.get_wind_direction()`: the + direction
 of the floor's ground ripples (`FloorData.wind_ripple_angle`, measured
 from +X toward +Z) where its sand is rippled, else
 `RegionField.default_wind_angle_degrees`. Anything that drifts downwind
-reads it - a death's sand today. (2026-10-09.)
+reads it - a death's sand today. (2026-10-09.) Floor 3's dune-grass tufts
+sway along it (`tuft_card.gdshader`, set by FieldScatter); blown sand
+should read the same value. (2026-10-16.)
+
+Floor 3's stream banks have their own tuft kind (`dune_grass_bank`): pool
+rim within 3 m of the water, rock allowed, anywhere outside the crane
+pair's stance area (stance distance + 1 m) and never in the water. On
+the west bank the worn path's keep-out shrinks to 0.7 m of its
+centreline (0.5 m ramp) for this kind only, so tufts reach the water's
+edge beside the path; the floor's 2.8 m keep-out still holds for the
+rest. (2026-10-16.)
 
 ## The played card
 

@@ -34,6 +34,40 @@ static func mesh_for(entry: ScatterEntry) -> Mesh:
 	_cache[key] = mesh
 	return mesh
 
+# A ScatterCard's painting, or null (with a warning) when it won't load.
+static func card_texture(card: ScatterCard) -> Texture2D:
+	if card == null or card.texture_path.is_empty() or not ResourceLoader.exists(card.texture_path):
+		push_warning("ScatterMeshes: card painting '%s' doesn't exist." % (card.texture_path if card != null else ""))
+		return null
+	return load(card.texture_path) as Texture2D
+
+# Its width over its height, 0 when it won't load.
+static func card_aspect(card: ScatterCard) -> float:
+	var texture: Texture2D = card_texture(card)
+	if texture == null or texture.get_height() <= 0:
+		return 0.0
+	return float(texture.get_width()) / float(texture.get_height())
+
+# The card as a quad facing +Z, its bottom edge centred on the origin, at
+# the card's height and its painting's aspect - tuft_card.gdshader turns
+# it to the camera and sways it, so its bounds hold any turn plus the
+# lean and the wind. One per painting and height.
+static func card_mesh(card: ScatterCard) -> Mesh:
+	var aspect: float = card_aspect(card)
+	if aspect <= 0.0:
+		return null
+	var key: String = "card:%s:%.4f" % [card.texture_path, card.height_m]
+	if _cache.has(key):
+		return _cache[key]
+	var height: float = maxf(card.height_m, 1.0e-3)
+	var quad := QuadMesh.new()
+	quad.size = Vector2(height * aspect, height)
+	quad.center_offset = Vector3(0.0, height * 0.5, 0.0)
+	var reach: float = height * aspect * 0.5 + height * 0.4
+	quad.custom_aabb = AABB(Vector3(-reach, -0.05, -reach), Vector3(reach * 2.0, height * 1.1 + 0.05, reach * 2.0))
+	_cache[key] = quad
+	return quad
+
 # The glb `entry` is drawn with, or "" for its placeholder.
 static func model_path_for(entry: ScatterEntry) -> String:
 	if not entry.mesh_path.is_empty() and ResourceLoader.exists(entry.mesh_path):

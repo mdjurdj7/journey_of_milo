@@ -29,7 +29,8 @@ class_name FieldScatter
 #     the shader's and can't be matched here), coming back over
 #     wear_ramp_m; and the floor's painted wear;
 #   - every static body's footprint (props, ledges) grown by prop_margin_m
-#     - his walk-up to anything stops at that edge; the gate's shapes by
+#     - his walk-up to anything stops at that edge - or a ledge's by the
+#     entry's own ledge_margin_m, when it has one; the gate's shapes by
 #     gate_margin_m; a rock shelf's outline by shelf_margin_m; the spawn
 #     by spawn_clear_m;
 #   - the battle frame's feet: a lone enemy's body and the ring his stance
@@ -56,6 +57,26 @@ class_name FieldScatter
 # the same rules, for a kind with wind. Set into the sand by its sink
 # fraction of its height, tilted to the slope. Scene fog as any prop.
 # Shadows only where the entry casts them.
+#
+# An entry with cards (dune-grass tufts - ScatterEntry's Cards group)
+# instead stands each item up as one of its painted cards, picked by
+# weight, upright whatever the slope: one MultiMeshInstance3D per card on
+# tuft_card.gdshader, which turns every card to the camera's yaw - pushed
+# here each frame from the live camera - and sways it in the floor's one
+# wind (RegionField.get_wind_direction()). Such an entry may keep off
+# exposed rock (avoid_rock) and off each enemy's whole stance area
+# (stance_clearance_m). With battle_fade, a card fades out while a fight
+# holds the frame and it stands between the battle camera and a fighter's
+# feet, tall enough to hide them - the sight line from the camera's
+# battle eye (CameraRig.get_battle_eye()) down to each foot, read every
+# frame as the fighters move - and back in once it doesn't; over the
+# camera's battle swing. This node processes through the field's battle
+# freeze for that (PROCESS_MODE_ALWAYS).
+#
+# Every cell also carries the dry ground's marks over its band: ROCK_EDGE
+# for sand within rock_edge_width_m of exposed rock (the ground shader's
+# rule - steep past Ground.rock_slope_min where rock_mask allows - read
+# per cell), DUNE_FLANK for sand sloping past dune_flank_slope_degrees.
 
 signal rebuilt
 
@@ -67,6 +88,21 @@ class Spot extends RefCounted:
 	var basis: Basis = Basis.IDENTITY
 	var size: float = 0.0
 	var shade: float = 1.0
+	# A card's (entry.cards): which, its yaw off the camera's, mirrored,
+	# and its width - `size` is then its height.
+	var card: int = -1
+	var card_yaw: float = 0.0
+	var mirrored: bool = false
+	var width: float = 0.0
+
+# One card's MultiMesh of an entry, and each instance's custom data
+# (tuft_card.gdshader's INSTANCE_CUSTOM: yaw, mirror, presence now).
+class CardLayer extends RefCounted:
+	var entry: ScatterEntry = null
+	var instance: MultiMeshInstance3D = null
+	var material: ShaderMaterial = null
+	var spots: Array[Spot] = []
+	var custom: PackedColorArray = PackedColorArray()
 
 # Somewhere nothing lies: a disc, a ring, a capsule (the segment a-b), or
 # a polygon grown by a margin.
@@ -78,23 +114,48 @@ class KeepOut extends RefCounted:
 	var inner: float = 0.0
 	var outer: float = 0.0
 	var polygon: PackedVector2Array = PackedVector2Array()
+	# A ledge's footprint (a LedgeBarrier segment): an entry may grow it by
+	# its own ledge_margin_m instead of `outer`.
+	var ledge: bool = false
+	# Its shape's bounds, worked out on the first ask - a point outside them
+	# grown by the reach skips the exact test (a floor's ledges give
+	# hundreds of footprints).
+	var _bounds: Rect2 = Rect2()
+	var _has_bounds: bool = false
 
-	func contains(p: Vector2) -> bool:
+	# `ledge_margin` at or over 0 replaces a ledge's own margin.
+	func contains(p: Vector2, ledge_margin: float = -1.0) -> bool:
+		var reach: float = ledge_margin if ledge and ledge_margin >= 0.0 else outer
+		if not _has_bounds:
+			_bounds = _shape_bounds()
+			_has_bounds = true
+		if not _bounds.grow(reach + 1.0e-3).has_point(p):
+			return false
 		match kind:
 			Kind.DISC:
-				return p.distance_to(a) <= outer
+				return p.distance_to(a) <= reach
 			Kind.RING:
 				var d: float = p.distance_to(a)
-				return d >= inner and d <= outer
+				return d >= inner and d <= reach
 			Kind.CAPSULE:
-				return FieldScatter.segment_distance(p, a, b) <= outer
+				return FieldScatter.segment_distance(p, a, b) <= reach
 			Kind.POLYGON:
 				if Geometry2D.is_point_in_polygon(p, polygon):
 					return true
 				for i in polygon.size():
-					if FieldScatter.segment_distance(p, polygon[i], polygon[(i + 1) % polygon.size()]) <= outer:
+					if FieldScatter.segment_distance(p, polygon[i], polygon[(i + 1) % polygon.size()]) <= reach:
 						return true
 		return false
+
+	func _shape_bounds() -> Rect2:
+		var box := Rect2(a, Vector2.ZERO)
+		if kind == Kind.CAPSULE:
+			box = box.expand(b)
+		elif kind == Kind.POLYGON and not polygon.is_empty():
+			box = Rect2(polygon[0], Vector2.ZERO)
+			for point in polygon:
+				box = box.expand(point)
+		return box
 
 @export_group("Zones")
 # The grid the ground is read onto, metres a cell.
@@ -113,6 +174,21 @@ class KeepOut extends RefCounted:
 @export var wet_band_height_m: float = -1.0:
 	set(value):
 		wet_band_height_m = value
+		_queue_rebuild(true)
+# Sand this near exposed rock is its edge (ZONE_ROCK_EDGE); a cell is rock
+# where the ground's rule gives it this much stone or more.
+@export var rock_edge_width_m: float = 1.5:
+	set(value):
+		rock_edge_width_m = value
+		_queue_rebuild(true)
+@export_range(0.0, 1.0, 0.01) var rock_threshold: float = 0.5:
+	set(value):
+		rock_threshold = value
+		_queue_rebuild(true)
+# Sand sloping past this many degrees is a dune flank (ZONE_DUNE_FLANK).
+@export var dune_flank_slope_degrees: float = 8.0:
+	set(value):
+		dune_flank_slope_degrees = value
 		_queue_rebuild(true)
 @export_group("")
 
@@ -171,6 +247,16 @@ class KeepOut extends RefCounted:
 		_queue_rebuild(true)
 @export_group("")
 
+@export_group("Battle Fade")
+# A card hides a foot when it stands within its half-width plus this of
+# the sight line, on the camera's side, its top over the line. Read every
+# frame, so a live edit takes at once.
+@export var battle_fade_margin_m: float = 0.35
+# Seconds to fade out or back. Below 0 = the camera's own battle swing
+# (CameraRig.battle_transition_time).
+@export var battle_fade_seconds: float = -1.0
+@export_group("")
+
 var _field: RegionField = null
 var _ground: Ground = null
 var _floor: FloorData = null
@@ -180,8 +266,10 @@ var _sea_level: float = 0.0
 var _spawn: Vector2 = Vector2.ZERO
 var _wear_points: PackedVector2Array = PackedVector2Array()
 var _keepouts: Array[KeepOut] = []
-# Every enemy where it stands, for an entry's enemy_clearance_m.
+# Every enemy where it stands, for an entry's enemy_clearance_m; and as
+# (x, z, stance distance) for its stance_clearance_m.
 var _enemy_points: PackedVector2Array = PackedVector2Array()
+var _enemy_stances: PackedVector3Array = PackedVector3Array()
 # Traced contours by inland level, cleared with the grid.
 var _contours: Dictionary = {}
 var _rebuild_queued: bool = false
@@ -197,6 +285,9 @@ var _cell_height: PackedFloat32Array = PackedFloat32Array()
 var _cell_zone: PackedByteArray = PackedByteArray()
 var _cell_wear: PackedFloat32Array = PackedFloat32Array()
 var _cell_excluded: PackedByteArray = PackedByteArray()
+# Excluded by anything but a ledge, for an entry with its own ledge margin.
+var _cell_excluded_off_ledges: PackedByteArray = PackedByteArray()
+var _cell_rock: PackedByteArray = PackedByteArray()
 
 # Every entry placed, in order, and each one's spots.
 var _entries: Array[ScatterEntry] = []
@@ -204,11 +295,16 @@ var _spots: Dictionary = {}
 var _item_count: int = 0
 var _build_msec: int = 0
 var _instances: Array[MultiMeshInstance3D] = []
+var _card_layers: Array[CardLayer] = []
+# The camera forward last pushed to the cards.
+var _card_forward: Vector2 = Vector2.ZERO
 
 # From RegionField once its exit channel is cut: what to read, and the
 # first build, deferred so every prop and enemy has placed itself.
 func setup(field: RegionField) -> void:
 	_field = field
+	# The battle fade runs while the field is frozen for the fight.
+	process_mode = Node.PROCESS_MODE_ALWAYS
 	_ground = field.get_node_or_null(field.ground_path) as Ground
 	_floor = field.get_floor_data()
 	var spawn: Vector3 = field.get_spawn_position()
@@ -274,6 +370,8 @@ func _build_grid() -> void:
 	_cell_zone.resize(count)
 	_cell_wear.resize(count)
 	_cell_excluded.resize(count)
+	_cell_excluded_off_ledges.resize(count)
+	_cell_rock.resize(count)
 	var wet_band: float = wet_band_height_m if wet_band_height_m >= 0.0 else _ground.shore_slope_start
 	for row in _grid_rows:
 		for col in _grid_cols:
@@ -286,6 +384,77 @@ func _build_grid() -> void:
 			_cell_zone[i] = _zone_at(p, inland, height, wet_band)
 			_cell_wear[i] = wear_weight(p)
 			_cell_excluded[i] = 1 if is_excluded(p) else 0
+			_cell_excluded_off_ledges[i] = 1 if _cell_excluded[i] != 0 and _excluded_off_ledges(p) else 0
+	_mark_dry_ground()
+
+# Over each cell's band, the dry ground's marks: its slope from the drawn
+# heights either side; rock where the ground shader would draw stone
+# there (that slope past Ground.rock_slope_min, ramping over rock_slope_
+# blend, times rock_mask) to rock_threshold; ROCK_EDGE on sand within
+# rock_edge_width_m of rock (a chamfer distance over the grid), DUNE_FLANK
+# on sand sloping past dune_flank_slope_degrees.
+func _mark_dry_ground() -> void:
+	var step: float = maxf(sample_step_m, 0.1)
+	var count: int = _grid_cols * _grid_rows
+	var slopes := PackedFloat32Array()
+	slopes.resize(count)
+	var any_rock: bool = false
+	for row in _grid_rows:
+		for col in _grid_cols:
+			var i: int = row * _grid_cols + col
+			var west: int = maxi(col - 1, 0)
+			var east: int = mini(col + 1, _grid_cols - 1)
+			var north: int = maxi(row - 1, 0)
+			var south: int = mini(row + 1, _grid_rows - 1)
+			var dx: float = (_cell_height[row * _grid_cols + east] - _cell_height[row * _grid_cols + west]) / (step * float(maxi(east - west, 1)))
+			var dz: float = (_cell_height[south * _grid_cols + col] - _cell_height[north * _grid_cols + col]) / (step * float(maxi(south - north, 1)))
+			var slope: float = rad_to_deg(atan(Vector2(dx, dz).length()))
+			slopes[i] = slope
+			var stone: float = smoothstep(_ground.rock_slope_min, _ground.rock_slope_min + maxf(_ground.rock_slope_blend, 0.001), slope) * _ground.get_rock_mask_at(cell_centre(col, row))
+			_cell_rock[i] = 1 if stone >= rock_threshold else 0
+			any_rock = any_rock or _cell_rock[i] != 0
+	var near_rock := PackedFloat32Array()
+	near_rock.resize(count)
+	near_rock.fill(INF)
+	if any_rock:
+		for i in count:
+			if _cell_rock[i] != 0:
+				near_rock[i] = 0.0
+		var diagonal: float = step * sqrt(2.0)
+		for row in _grid_rows:
+			for col in _grid_cols:
+				var i: int = row * _grid_cols + col
+				if col > 0:
+					near_rock[i] = minf(near_rock[i], near_rock[i - 1] + step)
+				if row > 0:
+					near_rock[i] = minf(near_rock[i], near_rock[i - _grid_cols] + step)
+					if col > 0:
+						near_rock[i] = minf(near_rock[i], near_rock[i - _grid_cols - 1] + diagonal)
+					if col < _grid_cols - 1:
+						near_rock[i] = minf(near_rock[i], near_rock[i - _grid_cols + 1] + diagonal)
+		for row in range(_grid_rows - 1, -1, -1):
+			for col in range(_grid_cols - 1, -1, -1):
+				var i: int = row * _grid_cols + col
+				if col < _grid_cols - 1:
+					near_rock[i] = minf(near_rock[i], near_rock[i + 1] + step)
+				if row < _grid_rows - 1:
+					near_rock[i] = minf(near_rock[i], near_rock[i + _grid_cols] + step)
+					if col < _grid_cols - 1:
+						near_rock[i] = minf(near_rock[i], near_rock[i + _grid_cols + 1] + diagonal)
+					if col > 0:
+						near_rock[i] = minf(near_rock[i], near_rock[i + _grid_cols - 1] + diagonal)
+	for i in count:
+		if _cell_rock[i] != 0:
+			continue
+		if near_rock[i] <= rock_edge_width_m:
+			_cell_zone[i] |= ScatterEntry.ZONE_ROCK_EDGE
+		if slopes[i] >= dune_flank_slope_degrees:
+			_cell_zone[i] |= ScatterEntry.ZONE_DUNE_FLANK
+
+# Whether exposed rock covers a point - its cell's (_mark_dry_ground()).
+func is_rock(p: Vector2) -> bool:
+	var cell: int = _cell_at(p)
+	return cell >= 0 and _cell_rock[cell] != 0
 
 # The band of the wet-to-dry gradient a point falls in: a pool's rim when
 # the nearest water is enclosed, else the wet band while drawn low enough,
@@ -305,12 +474,14 @@ func cell_centre(col: int, row: int) -> Vector2:
 
 # 1 clear of the band, 0 on it: nothing within the keep-out of its
 # centreline, back to full over wear_ramp_m; less again where the floor's
-# own painted wear is.
-func wear_weight(p: Vector2) -> float:
+# own painted wear is. An entry's own keep-out and ramp (its wear_keep_
+# out_m / wear_ramp_m, at or over 0) replace the floor's.
+func wear_weight(p: Vector2, keep_out_override: float = -1.0, ramp_override: float = -1.0) -> float:
 	var weight: float = 1.0
 	if _wear_points.size() >= 3:
-		var keep_out: float = get_wear_keep_out()
-		weight = smoothstep(keep_out, keep_out + maxf(wear_ramp_m, 0.001), wear_distance(p))
+		var keep_out: float = keep_out_override if keep_out_override >= 0.0 else get_wear_keep_out()
+		var ramp: float = ramp_override if ramp_override >= 0.0 else wear_ramp_m
+		weight = smoothstep(keep_out, keep_out + maxf(ramp, 0.001), wear_distance(p))
 	var painted: float = _ground.get_wear_mask_at(p)
 	if painted > 0.0:
 		weight *= 1.0 - smoothstep(wear_mask_threshold, wear_mask_threshold + 0.2, painted)
@@ -363,9 +534,17 @@ static func segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
 
 # --- Exclusions ---
 
-func is_excluded(p: Vector2) -> bool:
+# `ledge_margin` at or over 0: ledges' footprints grown by that instead of
+# prop_margin_m (an entry's ledge_margin_m).
+func is_excluded(p: Vector2, ledge_margin: float = -1.0) -> bool:
 	for keepout in _keepouts:
-		if keepout.contains(p):
+		if keepout.contains(p, ledge_margin):
+			return true
+	return false
+
+func _excluded_off_ledges(p: Vector2) -> bool:
+	for keepout in _keepouts:
+		if not keepout.ledge and keepout.contains(p):
 			return true
 	return false
 
@@ -375,7 +554,10 @@ func get_keepouts() -> Array[KeepOut]:
 func _build_keepouts() -> void:
 	_keepouts.clear()
 	for shape in _field.get_obstacle_shapes():
+		var before: int = _keepouts.size()
 		_add_footprint(shape, prop_margin_m)
+		if shape.get_parent() is LedgeBarrier and _keepouts.size() > before:
+			_keepouts[_keepouts.size() - 1].ledge = true
 	var gate := _field.get_node_or_null(_field.exit_gate_path)
 	if gate != null:
 		for shape in gate.find_children("*", "CollisionShape3D", true, false):
@@ -416,11 +598,13 @@ func _add_footprint(shape_node: CollisionShape3D, margin: float) -> void:
 func _add_battle_keepouts() -> void:
 	var groups: Dictionary = {}
 	_enemy_points = PackedVector2Array()
+	_enemy_stances = PackedVector3Array()
 	for node in _field.get_tree().get_nodes_in_group("enemies"):
 		var enemy := node as FieldEnemy
 		if enemy == null or enemy.is_queued_for_deletion() or not _field.is_ancestor_of(enemy):
 			continue
 		_enemy_points.append(_xz(enemy))
+		_enemy_stances.append(Vector3(enemy.global_position.x, enemy.global_position.z, _field.stance_distance(enemy)))
 		var key: StringName = enemy.group
 		if key == &"":
 			_add_lone_keepouts(enemy)
@@ -593,6 +777,7 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 		var count: int = rng.randi_range(mini(entry.items_per_cluster.x, entry.items_per_cluster.y), maxi(entry.items_per_cluster.x, entry.items_per_cluster.y))
 		var spread: float = rng.randf_range(spread_range.x, spread_range.y)
 		var cluster: Array[Vector2] = []
+		var cluster_reach: Array[float] = []
 		for attempt in count * 4:
 			if cluster.size() >= count or (left >= 0 and spots.size() >= left):
 				break
@@ -606,6 +791,23 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 			var factor: float = rng.randf_range(entry.scale_range.x, entry.scale_range.y)
 			var shade: float = 1.0 + rng.randf_range(-entry.tint_jitter, entry.tint_jitter)
 			var size: float = entry.size_m * factor
+			if not entry.cards.is_empty():
+				var card_spot: Spot = _card_spot(entry, rng, factor, shade)
+				if card_spot == null or not _item_allowed(entry, p, keep_roll):
+					continue
+				var reach: float = card_spot.width * entry.card_spacing_fraction
+				var card_crowded: bool = false
+				for k in cluster.size():
+					if cluster[k].distance_to(p) < maxf(reach, cluster_reach[k]):
+						card_crowded = true
+						break
+				if card_crowded:
+					continue
+				cluster.append(p)
+				cluster_reach.append(reach)
+				card_spot.position = Vector3(p.x, _ground.get_visible_height_at(p), p.y)
+				spots.append(card_spot)
+				continue
 			if not _item_allowed(entry, p, keep_roll):
 				continue
 			var crowded: bool = false
@@ -625,11 +827,58 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 			spots.append(spot)
 	return spots
 
+# A card item's own draws - which card by weight, mirrored or not, its yaw
+# off the camera's - made whether it's kept or not; null when the entry's
+# cards can't be read. Upright: a tuft grows up, whatever the slope.
+func _card_spot(entry: ScatterEntry, rng: RandomNumberGenerator, factor: float, shade: float) -> Spot:
+	var pick: float = rng.randf()
+	var mirror_roll: float = rng.randf()
+	var yaw: float = deg_to_rad(rng.randf_range(-entry.card_yaw_jitter_degrees, entry.card_yaw_jitter_degrees))
+	var total: float = 0.0
+	for card in entry.cards:
+		if card != null:
+			total += maxf(card.weight, 0.0)
+	if total <= 0.0:
+		return null
+	var index: int = -1
+	var running: float = 0.0
+	for k in entry.cards.size():
+		var card: ScatterCard = entry.cards[k]
+		if card == null or card.weight <= 0.0:
+			continue
+		index = k
+		running += card.weight
+		if pick * total < running:
+			break
+	var aspect: float = ScatterMeshes.card_aspect(entry.cards[index])
+	if aspect <= 0.0:
+		return null
+	var spot := Spot.new()
+	spot.card = index
+	spot.size = entry.cards[index].height_m * factor
+	spot.width = spot.size * aspect
+	spot.card_yaw = yaw
+	spot.mirrored = mirror_roll < 0.5
+	spot.shade = shade
+	return spot
+
 # A cell a cluster of `entry` may centre in: one of its zones, inside its
 # inland range, dry enough, clear of every exclusion and fully off the
-# worn band.
+# worn band (by its own keep-out when it has one).
 func _centre_allowed(entry: ScatterEntry, cell: int) -> bool:
-	if (_cell_zone[cell] & entry.zones) == 0 or _cell_excluded[cell] != 0 or _cell_wear[cell] < 1.0:
+	if (_cell_zone[cell] & entry.zones) == 0:
+		return false
+	if _has_own_wear(entry):
+		if wear_weight(_grid_point(cell), entry.wear_keep_out_m, entry.wear_ramp_m) < 1.0:
+			return false
+	elif _cell_wear[cell] < 1.0:
+		return false
+	if entry.ledge_margin_m < 0.0:
+		if _cell_excluded[cell] != 0:
+			return false
+	elif _cell_excluded_off_ledges[cell] != 0 or (_cell_excluded[cell] != 0 and is_excluded(_grid_point(cell), entry.ledge_margin_m)):
+		return false
+	if entry.avoid_rock and _cell_rock[cell] != 0:
 		return false
 	var inland: float = _cell_inland[cell]
 	if inland < entry.inland_range_m.x or inland > entry.inland_range_m.y:
@@ -642,13 +891,24 @@ func _centre_allowed(entry: ScatterEntry, cell: int) -> bool:
 func _item_allowed(entry: ScatterEntry, p: Vector2, keep_roll: float) -> bool:
 	if _ground.get_visible_height_at(p) < _sea_level - entry.wet_edge_m:
 		return false
-	if is_excluded(p):
+	if is_excluded(p, entry.ledge_margin_m):
 		return false
 	if entry.enemy_clearance_m > 0.0:
 		for at in _enemy_points:
 			if p.distance_to(at) < entry.enemy_clearance_m:
 				return false
+	if entry.stance_clearance_m >= 0.0:
+		for stance in _enemy_stances:
+			if p.distance_to(Vector2(stance.x, stance.y)) < stance.z + entry.stance_clearance_m:
+				return false
+	if entry.avoid_rock and is_rock(p):
+		return false
+	if _has_own_wear(entry):
+		return keep_roll < wear_weight(p, entry.wear_keep_out_m, entry.wear_ramp_m)
 	return keep_roll < wear_weight(p)
+
+static func _has_own_wear(entry: ScatterEntry) -> bool:
+	return entry.wear_keep_out_m >= 0.0 or entry.wear_ramp_m >= 0.0
 
 # --- Contours ---
 
@@ -848,9 +1108,14 @@ func _draw_all() -> void:
 			remove_child(instance)
 			instance.free()
 	_instances.clear()
+	_card_layers.clear()
+	_card_forward = Vector2.ZERO
 	for entry in _entries:
 		var spots: Array[Spot] = get_spots(entry)
 		if spots.is_empty():
+			continue
+		if not entry.cards.is_empty():
+			_draw_cards(entry, spots)
 			continue
 		var mesh: Mesh = ScatterMeshes.mesh_for(entry)
 		var instance := MultiMeshInstance3D.new()
@@ -911,6 +1176,150 @@ func _material(entry: ScatterEntry, mesh: Mesh) -> Material:
 	flat.vertex_color_use_as_albedo = true
 	flat.albedo_color = entry.tint
 	return flat
+
+const CARD_SHADER_PATH := "res://field/tuft_card.gdshader"
+
+# A card entry's spots, one MultiMeshInstance3D per card they use: each
+# instance at its spot, scaled from the card's height to its own, its
+# base lowered by sink_fraction of that; its colour the value jitter, its
+# custom data (yaw, mirror, presence 1).
+func _draw_cards(entry: ScatterEntry, spots: Array[Spot]) -> void:
+	var shader := load(CARD_SHADER_PATH) as Shader
+	for index in entry.cards.size():
+		var card: ScatterCard = entry.cards[index]
+		var mine: Array[Spot] = []
+		for spot in spots:
+			if spot.card == index:
+				mine.append(spot)
+		if mine.is_empty() or card == null:
+			continue
+		var mesh: Mesh = ScatterMeshes.card_mesh(card)
+		var texture: Texture2D = ScatterMeshes.card_texture(card)
+		if mesh == null or texture == null or shader == null:
+			continue
+		var layer := CardLayer.new()
+		layer.entry = entry
+		layer.spots = mine
+		var multimesh := MultiMesh.new()
+		multimesh.transform_format = MultiMesh.TRANSFORM_3D
+		multimesh.use_colors = true
+		multimesh.use_custom_data = true
+		multimesh.mesh = mesh
+		multimesh.instance_count = mine.size()
+		layer.custom.resize(mine.size())
+		for i in mine.size():
+			var spot: Spot = mine[i]
+			var factor: float = spot.size / maxf(card.height_m, 1.0e-6)
+			var sunk := Vector3(0.0, spot.size * entry.sink_fraction, 0.0)
+			multimesh.set_instance_transform(i, Transform3D(Basis.from_scale(Vector3.ONE * factor), spot.position - sunk))
+			multimesh.set_instance_color(i, Color(spot.shade, spot.shade, spot.shade).srgb_to_linear())
+			layer.custom[i] = Color(spot.card_yaw, -1.0 if spot.mirrored else 1.0, 1.0, 0.0)
+			multimesh.set_instance_custom_data(i, layer.custom[i])
+		var material := ShaderMaterial.new()
+		material.shader = shader
+		material.set_shader_parameter("albedo_texture", texture)
+		material.set_shader_parameter("albedo_tint", entry.tint)
+		material.set_shader_parameter("alpha_scissor", entry.card_alpha_scissor)
+		material.set_shader_parameter("card_height", card.height_m)
+		material.set_shader_parameter("lean_degrees", entry.card_lean_degrees)
+		material.set_shader_parameter("normal_up", entry.card_normal_up)
+		var wind: Vector3 = _field.get_wind_direction()
+		material.set_shader_parameter("wind_direction", Vector2(wind.x, wind.z))
+		material.set_shader_parameter("wind_lean", entry.wind_lean)
+		material.set_shader_parameter("sway_amount", entry.wind)
+		material.set_shader_parameter("sway_hz", entry.wind_sway_hz)
+		material.set_shader_parameter("flutter_amount", entry.wind_flutter)
+		material.set_shader_parameter("flutter_hz", entry.wind_flutter_hz)
+		layer.material = material
+		var instance := MultiMeshInstance3D.new()
+		instance.name = "Scatter_%s_%d" % [entry.name.validate_node_name(), index]
+		instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON if entry.cast_shadow else GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		instance.multimesh = multimesh
+		instance.material_override = material
+		add_child(instance)
+		layer.instance = instance
+		_instances.append(instance)
+		_card_layers.append(layer)
+	_push_card_forward()
+
+func _process(delta: float) -> void:
+	if _card_layers.is_empty():
+		return
+	_push_card_forward()
+	_advance_battle_fade(delta)
+
+# The live camera's forward on the ground into every card's material, when
+# it has moved - a camera looking straight down keeps the last.
+func _push_card_forward() -> void:
+	var camera: Camera3D = get_viewport().get_camera_3d() if is_inside_tree() else null
+	if camera == null:
+		return
+	var forward: Vector3 = -camera.global_transform.basis.z
+	var ground := Vector2(forward.x, forward.z)
+	if ground.length() < 1.0e-4:
+		return
+	ground = ground.normalized()
+	if _card_forward != Vector2.ZERO and ground.distance_to(_card_forward) < 1.0e-4:
+		return
+	_card_forward = ground
+	for layer in _card_layers:
+		layer.material.set_shader_parameter("camera_forward", ground)
+
+# Every battle_fade card toward gone while a fight holds the frame and it
+# hides a fighter's feet from the battle eye (hides_feet()), toward whole
+# otherwise, at one fade a battle_fade_seconds.
+func _advance_battle_fade(delta: float) -> void:
+	var rig: CameraRig = null
+	if _field != null:
+		rig = _field.get_node_or_null(_field.camera_rig_path) as CameraRig
+	var framing: bool = rig != null and rig.is_battle_framing()
+	var eye := Vector3.ZERO
+	var feet := PackedVector3Array()
+	if framing:
+		eye = rig.get_battle_eye()
+		feet = rig.get_battle_feet()
+	var seconds: float = battle_fade_seconds
+	if seconds < 0.0:
+		seconds = rig.battle_transition_time if rig != null else 0.6
+	var step: float = delta / maxf(seconds, 1.0e-3)
+	for layer in _card_layers:
+		if not layer.entry.battle_fade:
+			continue
+		for i in layer.spots.size():
+			var target: float = 0.0 if framing and hides_feet(layer.spots[i], eye, feet) else 1.0
+			var custom: Color = layer.custom[i]
+			if custom.b == target:
+				continue
+			custom.b = move_toward(custom.b, target, step)
+			layer.custom[i] = custom
+			layer.instance.multimesh.set_instance_custom_data(i, custom)
+
+# Whether a card at `spot` hides any of `feet` from `eye`: on the camera's
+# side of the foot, within its half-width plus battle_fade_margin_m of the
+# sight line across, its top over the line where it stands.
+func hides_feet(spot: Spot, eye: Vector3, feet: PackedVector3Array) -> bool:
+	var at := Vector2(spot.position.x, spot.position.z)
+	var top: float = spot.position.y + spot.size
+	var reach: float = spot.width * 0.5 + battle_fade_margin_m
+	for foot in feet:
+		var to_eye := Vector2(eye.x - foot.x, eye.z - foot.z)
+		var run: float = to_eye.length()
+		if run < 1.0e-3:
+			continue
+		var direction: Vector2 = to_eye / run
+		var offset: Vector2 = at - Vector2(foot.x, foot.z)
+		var along: float = offset.dot(direction)
+		if along < -reach or along > run:
+			continue
+		if absf(offset.cross(direction)) > reach:
+			continue
+		var sight: float = foot.y + maxf(along, 0.0) * (eye.y - foot.y) / run
+		if top > sight:
+			return true
+	return false
+
+func get_card_layers() -> Array[CardLayer]:
+	return _card_layers
 
 func get_instances() -> Array[MultiMeshInstance3D]:
 	return _instances

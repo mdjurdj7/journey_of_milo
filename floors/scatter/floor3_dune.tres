@@ -1,0 +1,108 @@
+[gd_resource type="Resource" script_class="ScatterSet" format=3]
+
+[ext_resource type="Script" uid="uid://bp8hnb8ai830l" path="res://floors/scatter/scatter_set.gd" id="1_set"]
+[ext_resource type="Script" uid="uid://cf66kk5mut8b5" path="res://floors/scatter/scatter_entry.gd" id="2_entry"]
+[ext_resource type="Script" uid="uid://clykfotf6omvl" path="res://floors/scatter/scatter_card.gd" id="3_card"]
+
+[sub_resource type="Resource" id="ScatterCard_small"]
+script = ExtResource("3_card")
+texture_path = "res://assets/models/props/scatter/grass_tuft_small.png"
+height_m = 0.3
+weight = 0.45
+
+[sub_resource type="Resource" id="ScatterCard_medium"]
+script = ExtResource("3_card")
+texture_path = "res://assets/models/props/scatter/grass_tuft_medium.png"
+height_m = 0.45
+weight = 0.4
+
+[sub_resource type="Resource" id="ScatterCard_large"]
+script = ExtResource("3_card")
+texture_path = "res://assets/models/props/scatter/grass_tuft_large.png"
+height_m = 0.6
+weight = 0.15
+
+[sub_resource type="Resource" id="ScatterEntry_grass_foot"]
+script = ExtResource("2_entry")
+name = "dune_grass_foot"
+scale_range = Vector2(0.85, 1.15)
+sink_fraction = 0.04
+tint = Color(1, 1, 1, 1)
+tint_jitter = 0.06
+wind = 0.04
+cast_shadow = true
+zones = 32
+inland_range_m = Vector2(0.3, 1000)
+stance_clearance_m = 1.0
+ledge_margin_m = 0.1
+avoid_rock = true
+cards = Array[ExtResource("3_card")]([SubResource("ScatterCard_small"), SubResource("ScatterCard_medium"), SubResource("ScatterCard_large")])
+battle_fade = true
+clusters_per_100m2 = 10.0
+items_per_cluster = Vector2i(2, 6)
+cluster_spread_m = Vector2(0.25, 0.5)
+
+[sub_resource type="Resource" id="ScatterEntry_grass_bank"]
+script = ExtResource("2_entry")
+name = "dune_grass_bank"
+scale_range = Vector2(0.85, 1.15)
+sink_fraction = 0.04
+tint = Color(1, 1, 1, 1)
+tint_jitter = 0.06
+wind = 0.04
+cast_shadow = true
+zones = 7
+inland_range_m = Vector2(0, 3)
+stance_clearance_m = 1.0
+ledge_margin_m = 0.1
+wear_keep_out_m = 0.7
+wear_ramp_m = 0.5
+cards = Array[ExtResource("3_card")]([SubResource("ScatterCard_small"), SubResource("ScatterCard_medium"), SubResource("ScatterCard_large")])
+battle_fade = true
+clusters_per_100m2 = 14.0
+items_per_cluster = Vector2i(2, 6)
+cluster_spread_m = Vector2(0.25, 0.5)
+
+[sub_resource type="Resource" id="ScatterEntry_grass_flank"]
+script = ExtResource("2_entry")
+name = "dune_grass_flank"
+scale_range = Vector2(0.85, 1.15)
+sink_fraction = 0.04
+tint = Color(1, 1, 1, 1)
+tint_jitter = 0.06
+wind = 0.04
+cast_shadow = true
+zones = 16
+inland_range_m = Vector2(0.3, 1000)
+stance_clearance_m = 1.0
+ledge_margin_m = 0.1
+avoid_rock = true
+cards = Array[ExtResource("3_card")]([SubResource("ScatterCard_small"), SubResource("ScatterCard_medium"), SubResource("ScatterCard_large")])
+battle_fade = true
+clusters_per_100m2 = 2.5
+items_per_cluster = Vector2i(2, 6)
+cluster_spread_m = Vector2(0.25, 0.5)
+
+[sub_resource type="Resource" id="ScatterEntry_grass_open"]
+script = ExtResource("2_entry")
+name = "dune_grass_open"
+scale_range = Vector2(0.85, 1.15)
+sink_fraction = 0.04
+tint = Color(1, 1, 1, 1)
+tint_jitter = 0.06
+wind = 0.04
+cast_shadow = true
+zones = 8
+inland_range_m = Vector2(0.3, 1000)
+stance_clearance_m = 1.0
+ledge_margin_m = 0.1
+avoid_rock = true
+cards = Array[ExtResource("3_card")]([SubResource("ScatterCard_small"), SubResource("ScatterCard_medium"), SubResource("ScatterCard_large")])
+battle_fade = true
+clusters_per_100m2 = 0.8
+items_per_cluster = Vector2i(2, 4)
+cluster_spread_m = Vector2(0.25, 0.45)
+
+[resource]
+script = ExtResource("1_set")
+entries = Array[ExtResource("2_entry")]([SubResource("ScatterEntry_grass_foot"), SubResource("ScatterEntry_grass_bank"), SubResource("ScatterEntry_grass_flank"), SubResource("ScatterEntry_grass_open")])

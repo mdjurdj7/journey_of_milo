@@ -230,6 +230,26 @@ func enter_battle(wanderer: Wanderer, enemies: Array[FieldEnemy], hand_top_fract
 func exit_battle() -> void:
 	_start_blend(0.0)
 
+# Whether a fight holds the frame (from enter_battle() until exit_battle())
+# - for things kept out of its sight lines (FieldScatter's battle fade).
+func is_battle_framing() -> bool:
+	return _blend_to > 0.0
+
+# Where the battle frame puts the camera at full blend - its fitted look
+# target, forward and distance at the pitch it is at now (_place_camera()'s
+# own sphere) - whatever the blend has reached. Valid while
+# is_battle_framing().
+func get_battle_eye() -> Vector3:
+	var pitch_rad: float = deg_to_rad(_battle_pitch_now)
+	return _battle_last_target - _battle_last_forward * _battle_last_distance * cos(pitch_rad) + Vector3.UP * _battle_last_distance * sin(pitch_rad)
+
+# Every live combatant's feet, as _battle_bodies() measures them.
+func get_battle_feet() -> PackedVector3Array:
+	var feet := PackedVector3Array()
+	for body in _battle_bodies():
+		feet.append(Vector3(body.position.x, body.feet_y, body.position.z))
+	return feet
+
 # Called by RegionField when the Wanderer reaches a floor's far end, before
 # the fade: over `seconds` the frame lifts toward `target` (the tower's
 # base) - see look_up_pitch_degrees' own doc for the shape. Runs through
