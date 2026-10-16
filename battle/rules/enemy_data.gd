@@ -94,13 +94,19 @@ class_name EnemyData
 @export var defeat_line: String = ""
 # What this enemy can leave as a keepsake - its own table, offered after
 # a won fight's normal reward (RegionField._roll_keepsake_drop()). Null =
-# none, which is every enemy but the Wardling today.
+# none. An elite leaves armor instead (armor_table).
 @export var keepsake_table: KeepsakeTable = null
 # Glassbone this enemy leaves on a won fight, offered as its own TAKE line
 # on the reward screen beside the gold and the card (RegionField._open_
-# reward_screen()); left behind if the player walks on. 0 = none, which is
-# every enemy but the Wardling today.
+# reward_screen()); left behind if the player walks on. 0 = none.
 @export var glassbone_reward: int = 0
+# What this enemy leaves to wear - its own small table of worn pieces
+# (TrinketData.slot WORN), one guaranteed per won fight, lying on the sand
+# where it fell (RegionField, WorldArmor). Null = none.
+@export var armor_table: KeepsakeTable = null
+# The chance (0..1) that piece is the table's RARE one rather than a
+# COMMON (KeepsakeTable.roll_by_rarity()).
+@export_range(0.0, 1.0, 0.01) var armor_rare_chance: float = 0.22
 
 # The field body. RegionField copies these onto the FieldEnemy it
 # spawns for this data (RegionField._spawn_floor_enemies()), the same

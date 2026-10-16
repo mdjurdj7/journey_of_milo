@@ -272,18 +272,27 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	player.energy = player.max_energy
 	# Nothing lost in this fight yet (RunState.hp_lost_this_combat).
 	RunState.begin_combat()
-	# The keepsake's part in the fight opening (see TrinketData): its
-	# status and Block on the Wanderer now, its free card and Critical-
-	# entry Block armed, its extra cards in the opening draw below. The
-	# first turn opens without _start_player_turn()'s Block reset, so the
-	# opening Block stands until the first enemy turn is over.
-	var keepsake: TrinketData = RunState.keepsake
-	if keepsake != null:
-		keepsake.apply_combat_start(player.statuses)
-		player.block += maxi(keepsake.combat_start_block, 0)
-		player.first_card_free = keepsake.first_card_free
-		player.critical_entry_block = maxi(keepsake.critical_entry_block, 0)
-		_end_turn_keep = maxi(keepsake.end_turn_keep, 0)
+	# The keepsake's and the worn piece's part in the fight opening (see
+	# TrinketData), both slots summed: their statuses and Block on the
+	# Wanderer now, the free card, Critical-entry Block, the first hit's
+	# scale and the damage back armed, their extra cards in the opening
+	# draw below. The first turn opens without _start_player_turn()'s
+	# Block reset, so the opening Block stands until the first enemy turn
+	# is over.
+	var held: Array[TrinketData] = RunState.held_pieces()
+	var opening_block: int = 0
+	var opening_bonus: int = 0
+	for piece in held:
+		piece.apply_combat_start(player.statuses)
+		opening_block += maxi(piece.combat_start_block, 0)
+		opening_bonus += maxi(piece.opening_draw_bonus, 0)
+		player.first_card_free = player.first_card_free or piece.first_card_free
+		player.critical_entry_block += maxi(piece.critical_entry_block, 0)
+		_end_turn_keep += maxi(piece.end_turn_keep, 0)
+		player.first_hit_scale = minf(player.first_hit_scale, clampf(piece.first_hit_scale, 0.0, 1.0))
+		player.hit_back_damage += maxi(piece.hit_back_damage, 0)
+	player.block += opening_block
+	if not held.is_empty():
 		# Opening already Critical is not entering it.
 		player.critical_entry_armed = not player.is_critical()
 
@@ -320,8 +329,8 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	for enemy in enemies:
 		var logged: Combatant = _combatants[enemy]
 		RunLogger.enemy_hp_seen(logged.get_instance_id(), logged.hp)
-	if keepsake != null:
-		RunLogger.block_gained(maxi(keepsake.combat_start_block, 0))
+	if not held.is_empty():
+		RunLogger.block_gained(opening_block)
 	RunLogger.turn_started(player.energy)
 	# The run log's mechanic lines, off the signals the view already hears.
 	if not enemy_pain_turn.is_connected(_log_pain_turn):
@@ -350,7 +359,6 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	energy_changed.emit(player.energy)
 	_devour_uses_this_turn = 0
 	_emit_devour_changed()
-	var opening_bonus: int = maxi(keepsake.opening_draw_bonus, 0) if keepsake != null else 0
 	_hand_container.draw_cards(turn_draw_amount + opening_bonus)
 	_apply_intent_exclusions(enemies)
 	_emit_intent_previews()
@@ -1344,6 +1352,12 @@ func _run_sequential_turn() -> void:
 				_report_enemy_attack(enemy, attack)
 				if player.hp <= 0:
 					break
+			# Killed by what came back off its own attack (the worn
+			# piece's hit_back_damage): reported and dropped with that
+			# attack, and nothing more of its turn plays out.
+			if combatant.hp <= 0:
+				status_changed.emit()
+				continue
 		if result["defended"]:
 			for move in times:
 				var move_delay: float = _play_defend_move(enemy, intent)
@@ -1445,16 +1459,18 @@ func felled_together() -> bool:
 			return false
 	return true
 
-# The held keepsake's draw (TrinketData.draw_on_multi_hit): the card just
-# resolved took HP from two or more enemies - kills included - and this
-# turn's draw is unspent.
+# The held pieces' draw (TrinketData.draw_on_multi_hit, both slots
+# summed): the card just resolved took HP from two or more enemies -
+# kills included - and this turn's draw is unspent.
 func _draw_for_multi_hit() -> void:
-	var keepsake: TrinketData = RunState.keepsake
-	if keepsake == null or keepsake.draw_on_multi_hit <= 0 or _multi_hit_draw_used or _card_damaged.size() < 2:
+	var draw: int = 0
+	for piece in RunState.held_pieces():
+		draw += maxi(piece.draw_on_multi_hit, 0)
+	if draw <= 0 or _multi_hit_draw_used or _card_damaged.size() < 2:
 		return
 	_multi_hit_draw_used = true
-	print("BattleController: '%s' - a card took HP from %d enemies; drawing %d." % [keepsake.display_name, _card_damaged.size(), keepsake.draw_on_multi_hit])
-	deck.draw(keepsake.draw_on_multi_hit)
+	print("BattleController: a card took HP from %d enemies; drawing %d (draw_on_multi_hit)." % [_card_damaged.size(), draw])
+	deck.draw(draw)
 
 # The attacks a turn's result landed, each as _report_enemy_attack()
 # reads one: its "actions" (EnemyTurn.take_turn()), or the result itself
@@ -1497,6 +1513,15 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 	# What it left on them (the Adder's Venom) shows with the hit.
 	if int(result.get("applied_to_player", 0)) > 0:
 		status_changed.emit()
+	# The worn piece's damage back (EnemyTurn.land_attack()'s "hit_back"),
+	# already taken off the enemy: reported as the Wanderer's damage, not a
+	# card's - a kill held for its blow and dropped, like a countdown's.
+	var hit_back: int = int(result.get("hit_back", 0))
+	if hit_back > 0:
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant != null:
+			RunLogger.mechanic("hit_back", {"enemy": _log_id(enemy), "damage": hit_back})
+			_report_damage("player", combatant, hit_back, "hit_back")
 
 # The body's pose for its queued intent (FieldEnemy.set_rearing()):
 # reared while an intent that asks for it (EnemyIntent.rear_while_

@@ -26,6 +26,8 @@ signal glassbone_changed(amount: int)
 signal toll_changed(amount: int)
 # The keepsake slot changed - the new one, or null for empty.
 signal keepsake_changed(keepsake: TrinketData)
+# The WORN slot changed - the new piece, or null for empty.
+signal worn_changed(worn: TrinketData)
 
 var player_hp: int = 0
 var player_max_hp: int = 0
@@ -72,6 +74,12 @@ var keepsake: TrinketData = null
 # The ids of every keepsake offered this run, taken or left - what a
 # unique_per_run table entry is kept out by (KeepsakeTable.roll()).
 var keepsakes_offered: Array[StringName] = []
+# The WORN slot - the one piece of armor (TrinketData.slot WORN), or null.
+# Beside the keepsake, never instead of it, and never more than one: a
+# second is a swap that sets the first down on the sand (WorldArmor).
+# Survives every fight and floor; new_run() empties it. Changed only
+# through equip_worn(), which keeps its max_hp_bonus in player_max_hp.
+var worn: TrinketData = null
 # HP actually lost since the fight in progress (or the last one) opened -
 # what lose_hp() really took, never the damage that was attempted, from
 # any source: an enemy's hit, the Wanderer's own self-damage, a status
@@ -150,6 +158,7 @@ func new_run(starting_character: CharacterData) -> void:
 	glassbone = 0
 	toll = 0
 	keepsake = null
+	worn = null
 	keepsakes_offered.clear()
 	hp_lost_this_combat = 0
 	player_max_hp = starting_character.max_hp
@@ -183,10 +192,11 @@ func new_run(starting_character: CharacterData) -> void:
 	glassbone_changed.emit(glassbone)
 	toll_changed.emit(toll)
 	keepsake_changed.emit(keepsake)
+	worn_changed.emit(worn)
 	RunLogger.start_run(run_seed, starting_character.character_name, run_snapshot())
 
 # The run as the log records it (RunLogger): HP, purse, Toll, the deck as
-# card counts, the keepsake's id, and where in the run.
+# card counts, the keepsake's and worn piece's ids, and where in the run.
 func run_snapshot() -> Dictionary:
 	var counts: Dictionary = {}
 	for card in deck:
@@ -200,6 +210,7 @@ func run_snapshot() -> Dictionary:
 		"deck_size": deck.size(),
 		"deck": counts,
 		"keepsake": RunLogger.keepsake_id(keepsake),
+		"worn": RunLogger.keepsake_id(worn),
 		"region": current_region_index,
 		"floor": current_floor_index,
 		"lap": region_lap,
@@ -324,6 +335,32 @@ func equip_keepsake(trinket: TrinketData) -> void:
 	keepsake = trinket
 	keepsake_changed.emit(keepsake)
 
+# The WORN slot's one mutator: `piece` on, whatever was worn taken off
+# (the caller sets it down - WorldArmor). Max HP follows the pieces'
+# max_hp_bonus: the old one's comes off first (set_max_hp() clamps
+# current HP to it), then the new one's goes on as ceiling only - never
+# a heal, so taking a piece off and on again gains nothing. null empties
+# it. Emits only on a real change.
+func equip_worn(piece: TrinketData) -> void:
+	if piece == worn:
+		return
+	var old_bonus: int = maxi(worn.max_hp_bonus, 0) if worn != null else 0
+	var new_bonus: int = maxi(piece.max_hp_bonus, 0) if piece != null else 0
+	worn = piece
+	if old_bonus != new_bonus:
+		set_max_hp(player_max_hp - old_bonus + new_bonus)
+	worn_changed.emit(worn)
+
+# What's held, keepsake then worn piece, the empty slots left out - what
+# every fight hook reads (BattleController.setup()).
+func held_pieces() -> Array[TrinketData]:
+	var held: Array[TrinketData] = []
+	if keepsake != null:
+		held.append(keepsake)
+	if worn != null:
+		held.append(worn)
+	return held
+
 # Acquiring a keepsake: an empty slot takes it at once (true); a full one
 # changes nothing (false) - the caller offers the take-or-keep choice.
 func acquire_keepsake(trinket: TrinketData) -> bool:
@@ -347,14 +384,15 @@ func begin_combat() -> void:
 # max-HP cap applies to the sum. Called by RegionField._on_battle_
 # finished()'s WIN branch.
 func settle_keepsake_win() -> void:
-	if keepsake == null:
-		return
-	var amount: int = keepsake.heal_on_win
-	if hp_lost_this_combat > 0:
-		amount += keepsake.heal_on_win_after_loss
-	var before: int = player_hp
-	heal(amount)
-	RunLogger.player_healed(player_hp - before, "keepsake:" + String(keepsake.id))
+	for piece in held_pieces():
+		var amount: int = piece.heal_on_win
+		if hp_lost_this_combat > 0:
+			amount += piece.heal_on_win_after_loss
+		if amount <= 0:
+			continue
+		var before: int = player_hp
+		heal(amount)
+		RunLogger.player_healed(player_hp - before, "keepsake:" + String(piece.id))
 
 # The run's one card-grant path (rewards, the Keeper's offer, a find on
 # the sand). The deck holds a COPY, never the pool's own resource - the

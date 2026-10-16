@@ -37,3 +37,40 @@ func roll(rng: RandomNumberGenerator, equipped: TrinketData, offered: Array[Stri
 		if pick < 0.0:
 			return entry.trinket
 	return candidates.back().trinket
+
+# One worn piece (an elite's EnemyData.armor_table), or null: RARE entries
+# with `rare_chance` (0..1), else COMMON - by weight within the tier, never
+# the piece already worn (`worn`). A tier with nothing left to give falls
+# back to the other, so a win never leaves nothing while the table holds
+# a piece he isn't wearing. guaranteed / drop_chance as roll()'s; uniqueness
+# isn't read - a worn piece can come up again. Draws from `rng`.
+func roll_by_rarity(rng: RandomNumberGenerator, rare_chance: float, worn: TrinketData) -> TrinketData:
+	if not guaranteed and rng.randf() >= drop_chance:
+		return null
+	var rare: Array[KeepsakeEntry] = []
+	var common: Array[KeepsakeEntry] = []
+	for entry in entries:
+		if entry == null or entry.trinket == null or entry.weight <= 0.0 or entry.trinket == worn:
+			continue
+		if entry.trinket.rarity == CardData.CardRarity.RARE:
+			rare.append(entry)
+		else:
+			common.append(entry)
+	var rare_drawn: bool = rng.randf() < clampf(rare_chance, 0.0, 1.0)
+	var tier: Array[KeepsakeEntry] = rare if rare_drawn else common
+	if tier.is_empty():
+		tier = common if rare_drawn else rare
+	if tier.is_empty():
+		return null
+	return _pick_weighted(rng, tier)
+
+func _pick_weighted(rng: RandomNumberGenerator, candidates: Array[KeepsakeEntry]) -> TrinketData:
+	var total: float = 0.0
+	for entry in candidates:
+		total += entry.weight
+	var pick: float = rng.randf() * total
+	for entry in candidates:
+		pick -= entry.weight
+		if pick < 0.0:
+			return entry.trinket
+	return candidates.back().trinket

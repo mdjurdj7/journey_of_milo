@@ -109,7 +109,9 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# own keys; a turn's one attack is the same, once.
 				var actions: Array[Dictionary] = []
 				for action in repeats(combatant, intent):
-					if player.hp <= 0:
+					# Either side down ends it - the enemy too, killed by
+					# what came back off its last attack (hit_back_damage).
+					if player.hp <= 0 or combatant.hp <= 0:
 						break
 					var attack: Dictionary = {"intent": result["intent"], "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "applied_to_player": 0}
 					land_attack(combatant, data, intent, player, attack)
@@ -195,6 +197,12 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 		var cut: int = reduce_hit(amount, reduction_left)
 		amount -= cut
 		reduction_left -= cut
+		# The worn piece's first hit (first_hit_scale): this one, if it is
+		# the first to get past Block and absorb - scaled before them.
+		if takes_first_hit(player.first_hit_scale, player.first_hit_spent, amount, player.block, player.absorb):
+			amount = scaled_first_hit(amount, player.first_hit_scale)
+			player.first_hit_spent = true
+			result["first_hit_scaled"] = true
 		Status.consume_triggered(player.statuses)
 		# Critical is judged BEFORE the hit: Refuse the End saves a player
 		# who was already there, not one this hit put there.
@@ -230,6 +238,25 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 	if total_to_hp > 0:
 		player.took_damage_this_turn = true
 		result["grace_opened"] = open_grace(player, largest_hit, total_to_hp)
+	# The worn piece's damage back (hit_back_damage): once for the attack,
+	# however many hits and whatever Block took, through the enemy's own
+	# Block - ordinary damage, not an Attack card, so nothing strikes back
+	# at it. "hit_back" is what reached HP, the controller's to report.
+	if player.hit_back_damage > 0 and player.hp > 0 and combatant.hp > 0:
+		var back: Dictionary = DamagePipeline.resolve(player.hit_back_damage, combatant)
+		result["hit_back"] = back["damage_to_hp"]
+
+# Whether a hit of `amount`, against `block` and `absorb`, is the one the
+# worn piece's first hit takes (Combatant.first_hit_scale): one is armed
+# (scale under 1, not yet spent) and this hit would get past both. A
+# fully blocked hit leaves it armed. The one rule land_attack() spends
+# and preview_intent() replays.
+static func takes_first_hit(scale: float, spent: bool, amount: int, block: int, absorb: int) -> bool:
+	return scale < 1.0 and not spent and amount > block + absorb
+
+# That hit, scaled: rounded down, never below 0.
+static func scaled_first_hit(amount: int, scale: float) -> int:
+	return floori(float(amount) * clampf(scale, 0.0, 1.0))
 
 # The strike back (StatusData.strikes_back_on_attack_card - the Adder's
 # Coiled): an Attack card has just been played against this living enemy,
@@ -319,6 +346,7 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	var total_to_hp: int = 0
 	var hp: int = player.hp
 	var saves_used: int = 0
+	var first_hit_spent: bool = player.first_hit_spent
 	var hits: int = hit_count(combatant, intent)
 	var hit_amounts: Array[int] = []
 	# Every attack of the turn, replayed in turn on the same counters; a
@@ -335,6 +363,9 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 			var cut: int = reduce_hit(amount, reduction_left)
 			amount -= cut
 			reduction_left -= cut
+			if takes_first_hit(player.first_hit_scale, first_hit_spent, amount, block, absorb):
+				amount = scaled_first_hit(amount, player.first_hit_scale)
+				first_hit_spent = true
 			hit_amounts.append(amount)
 			if hit == 0 and action == 0:
 				preview["per_hit"] = amount

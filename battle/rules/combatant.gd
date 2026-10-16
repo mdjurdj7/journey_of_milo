@@ -97,6 +97,16 @@ var first_card_free: bool = false
 # fight (critical_entry_block drops to 0).
 var critical_entry_block: int = 0
 var critical_entry_armed: bool = false
+# The worn piece's first hit (TrinketData.first_hit_scale): below 1, the
+# first enemy attack hit this fight that would get past Block and absorb
+# is scaled by it, rounded down, before Block takes its share - see
+# EnemyTurn.scale_first_hit(). Once taken, first_hit_spent for the fight.
+var first_hit_scale: float = 1.0
+var first_hit_spent: bool = false
+# The worn piece's damage back (TrinketData.hit_back_damage): this much
+# to an enemy, through its Block, once for each of its attacks that lands
+# on this fighter (EnemyTurn.land_attack()). 0 = none.
+var hit_back_damage: int = 0
 
 # --- Enemy-only ---
 #
