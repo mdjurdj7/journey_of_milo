@@ -11,12 +11,20 @@ extends SceneTree
 #     than FACE_JUMP_MAX_M within half a metre
 #   - the Wanderer at least his minimum spacing (RegionField.stance_
 #     distance_min()) from the enemy he faces
-#   - the battle camera inside the walls - the floor's wall rect and,
-#     where it has them, its ledge lines - and over the ground there
-#   - clear sight from the camera to every combatant: no ground above the
-#     ray to its middle
+#   - the battle camera over the ground where it stands
+#   - clear sight from the camera to every combatant's feet: no ground
+#     above the straight line to them
+#   - the bottom fifth of the frame no more than FOREGROUND_TERRAIN_MAX
+#     covered by terrain in front of the fight: of a grid of rays through
+#     that strip, the share that meet the ground nearer than the nearest
+#     combatant and RIM_RISE_M or more above the lowest combatant's feet -
+#     a rim or a bank in the way, not the fight's own floor
 #   - no prop in the foreground: no corner of a prop's visual bounds in
-#     the camera's frustum and nearer to it than the farthest combatant
+#     the camera's frustum and PROP_NEARER_M or more nearer to it than the
+#     nearest combatant. The fight's own props (its option's - the
+#     Wardling's hitching post, the Dunecur's bones) belong in its frame
+#     and are left out.
+# The limits are this probe's own constants, below.
 # Every failure is printed (FAIL) with its floor, slot and option, and
 # the probe goes on to the next fight; it fixes nothing.
 #
@@ -34,6 +42,20 @@ const FACE_JUMP_MAX_M := 0.35
 const APPROACH_MARGIN := 0.3
 # Above the ground at the camera, metres.
 const CAMERA_GROUND_MIN := 0.3
+# A prop is in the foreground only this much nearer the camera than the
+# nearest combatant, metres.
+const PROP_NEARER_M := 1.5
+# The most of the frame's bottom fifth that terrain in front of the fight
+# may cover, and how far over the lowest combatant's feet a hit must
+# stand to count as terrain in the way rather than the fight's floor.
+const FOREGROUND_TERRAIN_MAX := 0.15
+const RIM_RISE_M := 0.25
+const STRIP_FRACTION := 0.2
+const STRIP_COLUMNS := 32
+const STRIP_ROWS := 6
+# An encounter prop is the spawned one of its scene within this of where
+# its slot puts it, metres.
+const OWN_PROP_MATCH_M := 0.5
 # A combatant's middle, metres over its feet, for the sight line.
 const BODY_MIDDLE := 0.75
 const SETTLE_SECONDS := 3.0
@@ -115,38 +137,39 @@ func _check_fight(floor_index: int, slot: EncounterSlot, option: EncounterOption
 	var minimum: float = float(_field.call("stance_distance_min", anchor))
 	if gap < minimum - 0.01:
 		_fail("%s: the Wanderer %.2f m from %s, under his minimum %.2f" % [label, gap, _name_of(anchor, wanderer), minimum])
-	# The camera: inside the walls, over the ground.
+	# The camera over the ground where it stands.
 	var camera: Camera3D = _field.get_node("CameraPivot").get("camera")
-	var at: Vector2 = _flat(camera.global_position)
-	var walls: Rect2 = _field.call("get_wall_rect")
-	var inside: bool = walls.has_area() and walls.has_point(at)
-	for ledge: PackedVector2Array in _floor_data.ledges:
-		if ledge.size() >= 3 and not Geometry2D.is_point_in_polygon(at - _flat(spawn), ledge):
-			inside = false
-	var under: float = float(ground.call("get_height_at", at))
-	if not inside:
-		_fail("%s: the battle camera stands outside the walls at %s" % [label, at.snapped(Vector2(0.01, 0.01))])
+	var under: float = float(ground.call("get_height_at", _flat(camera.global_position)))
 	if camera.global_position.y - under < CAMERA_GROUND_MIN:
 		_fail("%s: the battle camera is %.2f m over the ground" % [label, camera.global_position.y - under])
-	# Sight to every combatant.
-	var farthest: float = 0.0
+	# Sight to every combatant's feet.
+	var nearest: float = INF
+	var lowest_feet: float = INF
 	for body: Node3D in [wanderer] + members:
-		var middle: Vector3 = body.global_position + Vector3.UP * BODY_MIDDLE
-		farthest = maxf(farthest, camera.global_position.distance_to(middle))
-		var blocked: float = _ground_over_ray(ground, camera.global_position, middle)
+		var feet: Vector3 = body.global_position
+		nearest = minf(nearest, camera.global_position.distance_to(feet + Vector3.UP * BODY_MIDDLE))
+		lowest_feet = minf(lowest_feet, feet.y)
+		var blocked: float = _ground_over_ray(ground, camera.global_position, feet + Vector3.UP * 0.05)
 		if blocked > 0.0:
-			_fail("%s: the ground rises %.2f m over the camera's sight line to %s" % [label, blocked, _name_of(body, wanderer)])
-	# Props in the foreground.
+			_fail("%s: the ground rises %.2f m over the camera's sight line to %s's feet" % [label, blocked, _name_of(body, wanderer)])
+	# Terrain in front of the fight across the frame's bottom fifth.
+	var covered: float = _foreground_terrain(camera, ground, nearest, lowest_feet + RIM_RISE_M)
+	if covered > FOREGROUND_TERRAIN_MAX:
+		_fail("%s: terrain covers %.0f%% of the frame's bottom fifth (at most %.0f%%)" % [label, covered * 100.0, FOREGROUND_TERRAIN_MAX * 100.0])
+	# Props in the foreground - the fight's own left out.
+	var own: Array[Node] = _own_props(slot, option, spawn)
 	var props: Node = _field.get_node_or_null(^"Props")
 	if props != null:
 		for prop in props.get_children():
+			if own.has(prop):
+				continue
 			var bounds: AABB = _visual_bounds(prop as Node3D)
 			if not bounds.has_volume():
 				continue
 			for corner in 8:
 				var point: Vector3 = bounds.get_endpoint(corner)
-				if camera.is_position_in_frustum(point) and camera.global_position.distance_to(point) < farthest:
-					_fail("%s: the prop %s is in the battle frame's foreground (%.1f m from the camera, the farthest combatant %.1f m)" % [label, prop.name, camera.global_position.distance_to(point), farthest])
+				if camera.is_position_in_frustum(point) and camera.global_position.distance_to(point) <= nearest - PROP_NEARER_M:
+					_fail("%s: the prop %s is in the battle frame's foreground (%.1f m from the camera, the nearest combatant %.1f m)" % [label, prop.name, camera.global_position.distance_to(point), nearest])
 					break
 	if _failures == failures_before:
 		_clean += 1
@@ -189,6 +212,48 @@ func _approach_point(spawn: Vector3, target: Node3D, ground: Node) -> Vector3:
 		point = target.global_position + Vector3(back.x, 0.0, back.y) * reach
 	point.y = float(ground.call("get_height_at", _flat(point)))
 	return point
+
+# The share of a grid of rays through the frame's bottom STRIP_FRACTION
+# that meet the ground nearer than `within` and at or above `rim_height`:
+# terrain standing in front of the fight. A ray meeting the fight's own
+# floor, or nothing that near, is clear.
+func _foreground_terrain(camera: Camera3D, ground: Node, within: float, rim_height: float) -> float:
+	var size: Vector2 = camera.get_viewport().get_visible_rect().size
+	var hits: int = 0
+	var rays: int = 0
+	for column in STRIP_COLUMNS:
+		for row in STRIP_ROWS:
+			var pixel := Vector2((float(column) + 0.5) / float(STRIP_COLUMNS) * size.x, size.y * (1.0 - STRIP_FRACTION * (float(row) + 0.5) / float(STRIP_ROWS)))
+			var origin: Vector3 = camera.project_ray_origin(pixel)
+			var direction: Vector3 = camera.project_ray_normal(pixel)
+			rays += 1
+			var travelled: float = 0.25
+			while travelled < within:
+				var point: Vector3 = origin + direction * travelled
+				var height: float = float(ground.call("get_height_at", _flat(point)))
+				if height >= point.y:
+					if height >= rim_height:
+						hits += 1
+					break
+				travelled += 0.25
+	return float(hits) / float(maxi(rays, 1))
+
+# The props the fight's option placed (EncounterOption.props, top level):
+# the spawned prop of each one's scene within OWN_PROP_MATCH_M of where
+# its slot puts it.
+func _own_props(slot: EncounterSlot, option: EncounterOption, spawn: Vector3) -> Array[Node]:
+	var own: Array[Node] = []
+	var props: Node = _field.get_node_or_null(^"Props")
+	if props == null:
+		return own
+	for entry in option.props:
+		if entry == null or entry.scene == null or entry.parent_index >= 0:
+			continue
+		var at: Vector2 = _flat(spawn) + slot.to_floor(Vector2(entry.position.x, entry.position.z))
+		for prop in props.get_children():
+			if prop.scene_file_path == entry.scene.resource_path and _flat((prop as Node3D).global_position).distance_to(at) <= OWN_PROP_MATCH_M:
+				own.append(prop)
+	return own
 
 # The most the ground rises over the straight ray from `from` to `to`
 # (sampled along its length, ends left out), metres; 0 or less is clear.
