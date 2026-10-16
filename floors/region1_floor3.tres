@@ -10,6 +10,7 @@
 [ext_resource type="Script" uid="uid://bp8hnb8ai830l" path="res://floors/scatter/scatter_set.gd" id="8_fwgpd"]
 [ext_resource type="Resource" uid="uid://ca0wci5cbi77w" path="res://battle/rules/enemies/wardling.tres" id="10_wardling"]
 [ext_resource type="Texture2D" uid="uid://bp5nfs0o8ydnq" path="res://assets/field/masks/region1_floor3_outer.png" id="11_outer"]
+[ext_resource type="Texture2D" uid="uid://bvogh11cgwrr1" path="res://assets/field/masks/region1_floor3_wear.png" id="18_wear"]
 [ext_resource type="Resource" uid="uid://c6r0eenknv707" path="res://battle/rules/enemies/chalkcrown.tres" id="12_chalkcrown"]
 [ext_resource type="Resource" uid="uid://bxavwq71lh5dt" path="res://run/keepsakes/leg_band.tres" id="17_leg_band"]
 [ext_resource type="Script" uid="uid://bi5wh88prg3u6" path="res://floors/floor_prop.gd" id="13_floor_prop"]
@@ -89,6 +90,7 @@ script = ExtResource("1_floor_data")
 mask = ExtResource("3_landmass")
 elevation_mask = ExtResource("4_elev")
 elevation_max_height = 1.8
+wear_mask = ExtResource("18_wear")
 rock_mask = ExtResource("5_rock")
 outer_mask = ExtResource("11_outer")
 mask_origin = Vector2(0.37091, 0.79825)
