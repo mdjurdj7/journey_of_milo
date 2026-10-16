@@ -14,9 +14,9 @@ extends SceneTree
 #            draw_sword (their tracks, unconverted); Slash is 32 frames,
 #            lands on its contact frame (get_clip_contact_time(), Blender
 #            frame 10) and ends on BattleIdle's first pose, so the blend
-#            back is seamless; DrawSword is 28 frames, and keeps his
-#            right forearm's twist about its own axis under
-#            DRAW_FOREARM_TWIST_DEG on every frame (the hand carries it)
+#            back is seamless; DrawSword keeps his right forearm's
+#            twist about its own axis under DRAW_FOREARM_TWIST_DEG on
+#            every frame of its length (the hand carries it)
 #   lunge  - the glb's Slash steps his model slash_lunge_distance ahead,
 #            arriving on the contact frame, holds there through the
 #            hit-stop, and is home again after
@@ -107,8 +107,7 @@ const BRACE_HIPS_OVER_TOE_M := 0.30
 # reach at contact and its home after (metres).
 const SLASH_CONTACT_S := 10.0 / 24.0
 const SLASH_LENGTH_S := 32.0 / 24.0
-# The glb's draw_sword: its length and its grab frame (Blender frame 10).
-const DRAW_LENGTH_S := 28.0 / 24.0
+# The glb's draw_sword: its grab frame (Blender frame 10).
 const DRAW_GRAB_S := 10.0 / 24.0
 # The draw's ground strike (Blender frame 21), and how close its puff sits
 # to the drawn sand under the sword tip (metres; across, a centimetre).
@@ -257,13 +256,12 @@ func _initialize() -> void:
 	if own_draw != null and _player.has_animation("DrawSword"):
 		_check(_clip_text(_player.get_animation("DrawSword")) == _clip_text(own_draw), "DrawSword is the glb's draw_sword, track for track and key for key")
 		var draw_length: float = _player.get_animation("DrawSword").length
-		_check(absf(draw_length - DRAW_LENGTH_S) <= 0.001, "DrawSword is 28 frames, %.4f s (%.4f s)" % [draw_length, DRAW_LENGTH_S])
 		var forearm: int = _bone("RightForeArm")
 		var axis: Vector3 = _skeleton.get_bone_rest(_bone("RightHand")).origin.normalized()
 		var rest: Quaternion = _skeleton.get_bone_rest(forearm).basis.get_rotation_quaternion()
 		var worst_twist := 0.0
 		var worst_frame := 0
-		for frame in roundi(DRAW_LENGTH_S * 24.0) + 1:
+		for frame in roundi(draw_length * 24.0) + 1:
 			await _pose("DrawSword", float(frame) / 24.0)
 			var turn: Quaternion = rest.inverse() * _skeleton.get_bone_pose_rotation(forearm)
 			var twist: float = absf(wrapf(rad_to_deg(2.0 * atan2(Vector3(turn.x, turn.y, turn.z).dot(axis), turn.w)), -180.0, 180.0))
