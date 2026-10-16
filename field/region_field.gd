@@ -53,6 +53,10 @@ enum RewardMode { SCREEN, WORLD }
 @export var wagon_screen_scene_path: String = "res://battle/wagon_screen.tscn"
 # What a keepsake is offered in (see open_keepsake_offer()).
 @export var keepsake_offer_scene_path: String = "res://battle/keepsake_offer.tscn"
+# A worn piece taken off the sand (take_worn_piece()): WorldKeepsake's
+# take, at its level.
+@export var armor_take_sfx_path: String = "res://assets/audio/cards/card_take.wav"
+@export var armor_take_volume_db: float = -18.0
 # The run log (RunLogger - one JSON-lines file per run under user://runs/).
 # Never touches play; off, nothing is written. A headless instance never
 # logs, whatever this says - see RunLogger.
@@ -411,6 +415,8 @@ var _scatter: FieldScatter = null
 var _wear_path: PackedVector2Array = PackedVector2Array()
 # The HUD row's keepsake - a click on it opens KeepsakeExamine.
 var _keepsake_line: KeepsakeLine = null
+# The HUD row's worn piece, beside it - a click opens its ArmorExamine.
+var _worn_line: KeepsakeLine = null
 var _nav_build_queued: bool = false
 # Debug builds: the F1 row's Path draw, made on its first toggle.
 var _nav_debug: NavDebugDraw = null
@@ -466,6 +472,12 @@ var _last_fallen_data: EnemyData = null
 # rolled from on the win (_roll_keepsake_drop()). Cleared as each fight
 # ends, whatever the outcome.
 var _fight_fallen: Array[EnemyData] = []
+# Where each of them fell, in the same order - where a worn piece one of
+# them leaves lies (_drop_armor()).
+var _fight_fallen_at: Array[Vector3] = []
+# ...and how far over the relief each stood (FieldEnemy.height_offset - the
+# Adder on its slab), so the piece lies on what they lay on.
+var _fight_fallen_lift: Array[float] = []
 # A keepsake rolled on the last win, waiting for the normal reward to
 # close before it's offered (_open_pending_keepsake_offer()).
 var _pending_keepsake: TrinketData = null
@@ -765,6 +777,14 @@ func _unhandled_input(event: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 		open_keepsake_examine(_keepsake_line.get_keepsake(), _keepsake_line.get_global_rect())
 		return
+	if event.button_index == MOUSE_BUTTON_LEFT and _worn_line != null and _worn_line.is_point_over(event.position):
+		get_viewport().set_input_as_handled()
+		open_worn_examine(_worn_line.get_keepsake(), _worn_line.get_global_rect())
+		return
+	# A worn piece on the sand, within reach: its plate.
+	if event.button_index == MOUSE_BUTTON_LEFT and _try_examine_armor(event.position):
+		get_viewport().set_input_as_handled()
+		return
 	if event.button_index == MOUSE_BUTTON_LEFT and _try_open_bundle(event.position):
 		get_viewport().set_input_as_handled()
 		return
@@ -966,6 +986,33 @@ func _try_open_bundle(screen_pos: Vector2) -> bool:
 		return false
 	_open_loot_screen(best)
 	return true
+
+# A worn piece on the sand (WorldArmor) under the cursor and within its
+# reach of the Wanderer: its plate opens (open_armor_examine()). Out of
+# reach, the click is a move like any other - he walks up to it. Nearest
+# the camera on overlap, as a bundle.
+func _try_examine_armor(screen_pos: Vector2) -> bool:
+	if wanderer == null:
+		return false
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return false
+	var best: WorldArmor = null
+	var best_distance: float = INF
+	for node in get_tree().get_nodes_in_group(WorldArmor.GROUP):
+		var drop := node as WorldArmor
+		if drop == null or not drop.can_open_from(wanderer.global_position):
+			continue
+		var rect: Rect2 = drop.get_screen_rect(camera, click_target_padding_px)
+		if rect.size == Vector2.ZERO or not rect.has_point(screen_pos):
+			continue
+		var distance: float = camera.global_position.distance_to(drop.global_position)
+		if distance < best_distance:
+			best_distance = distance
+			best = drop
+	if best == null:
+		return false
+	return open_armor_examine(best)
 
 # The enemy whose padded screen rect holds the cursor; nearest to the
 # camera on overlap.
@@ -1603,6 +1650,13 @@ func _setup_field_hud() -> void:
 	keepsake_line.name = "KeepsakeLine"
 	_add_hud_row_line(keepsake_line, glassbone_line)
 	_keepsake_line = keepsake_line
+	# WORN beside it: the same line on the other slot (KeepsakeLine.slot),
+	# hidden while nothing is worn, RunState.worn_changed keeping it current.
+	var worn_line := KeepsakeLine.new()
+	worn_line.slot = TrinketData.Slot.WORN
+	worn_line.name = "WornLine"
+	_add_hud_row_line(worn_line, keepsake_line)
+	_worn_line = worn_line
 	hp_bar.set_target(wanderer)
 
 # One InkLine into the field HUD row: this region's theme (set before it
@@ -2163,6 +2217,8 @@ func _on_enemy_defeated(enemy: FieldEnemy, overlay: BattleOverlay) -> void:
 	_last_fallen_at = enemy.global_position
 	_last_fallen_data = enemy.enemy_data
 	_fight_fallen.append(enemy.enemy_data)
+	_fight_fallen_at.append(enemy.global_position)
+	_fight_fallen_lift.append(enemy.height_offset)
 	# Dead from here whichever path frees it - no contact, no cluster
 	# roster, no gate waiting on it (see FieldEnemy.mark_defeated()).
 	enemy.mark_defeated()
@@ -2253,11 +2309,17 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 			# standing on a debug win - can leave a keepsake, offered once the
 			# normal reward has closed.
 			var won_against: Array[EnemyData] = _fight_fallen.duplicate()
+			var won_at: Array[Vector3] = _fight_fallen_at.duplicate()
+			var won_lift: Array[float] = _fight_fallen_lift.duplicate()
 			for member in standing:
 				# The last kill is left standing for its fold - counted once.
 				if not member.is_defeated():
 					won_against.append(member.enemy_data)
+					won_at.append(member.global_position)
+					won_lift.append(member.height_offset)
 			_roll_keepsake_drop(won_against)
+			# ...and a worn piece, lying where the one that left it fell.
+			_drop_armor(won_against, won_at, won_lift)
 			# Felled together: the option's own keepsake, over any drop.
 			if felled_together:
 				_offer_felled_together_keepsake()
@@ -2295,6 +2357,8 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 		BattleOverlay.Outcome.LOSE:
 			_end_run_lost("died")
 	_fight_fallen.clear()
+	_fight_fallen_at.clear()
+	_fight_fallen_lift.clear()
 
 # Is a fight the floor demands still standing? EncounterSlot.required,
 # mirrored onto each of its FieldEnemies; a body queued for deletion is already
@@ -2693,6 +2757,104 @@ func open_keepsake_examine(keepsake: TrinketData, from_rect: Rect2 = Rect2()) ->
 	examine.name = "KeepsakeExamine"
 	examine.setup(keepsake, from_rect)
 	examine.closed.connect(func() -> void: process_mode = Node.PROCESS_MODE_INHERIT)
+	if wanderer != null:
+		wanderer.clear_move_target()
+	process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(examine)
+	return true
+
+# A won fight's armor: the first enemy it was won against whose own table
+# (EnemyData.armor_table) gives a piece - RARE by its armor_rare_chance,
+# never the piece worn - drawn from the run's generator now, and laid on
+# the sand where that one fell (`won_at`, in won_against's order; `won_lift`
+# its height over the relief) once the battle framing has gone, as the
+# cards wait (reward_spread_delay_sec). One piece a win at most. The reward
+# screen opens over it as usual.
+func _drop_armor(won_against: Array[EnemyData], won_at: Array[Vector3], won_lift: Array[float]) -> void:
+	for index in won_against.size():
+		var data: EnemyData = won_against[index]
+		if data == null or data.armor_table == null:
+			continue
+		var piece: TrinketData = data.armor_table.roll_by_rarity(RunState.rng, data.armor_rare_chance, RunState.worn)
+		if piece == null:
+			continue
+		var at: Vector3 = won_at[index] if index < won_at.size() else _last_fallen_at
+		var lift: float = won_lift[index] if index < won_lift.size() else 0.0
+		print("RegionField: '%s' left the worn piece '%s'." % [data.enemy_name, piece.display_name])
+		RunLogger.event("armor_drop", {"source": data.enemy_name, "piece": RunLogger.keepsake_id(piece)})
+		var delay: float = reward_spread_delay_sec
+		var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
+		if camera_rig != null:
+			delay = maxf(delay, camera_rig.battle_transition_time)
+		await get_tree().create_timer(delay).timeout
+		# The floor can be left, or the run ended, during that beat.
+		if is_inside_tree():
+			spawn_world_armor(piece, at, false, lift)
+		return
+
+# One worn piece lying on the sand at `at` (seated on the relief by
+# WorldArmor itself, `height_offset` over it). `set_down`: put down by a
+# swap rather than left by a fight - its line waits until he has stepped
+# away.
+func spawn_world_armor(piece: TrinketData, at: Vector3, set_down: bool, height_offset: float = 0.0) -> WorldArmor:
+	var drop := WorldArmor.new()
+	drop.name = "WorldArmor"
+	drop.piece = piece
+	drop.set_down = set_down
+	drop.height_offset = height_offset
+	drop.position = to_local(at)
+	add_child(drop, true)
+	return drop
+
+# A worn piece on the sand, looked at with the choice: ArmorExamine with
+# TAKE and LEAVE (and "Replaces ..." when one is worn), the field frozen
+# under it as under every screen. False when a fight or another screen
+# has the field.
+func open_armor_examine(drop: WorldArmor) -> bool:
+	if drop == null or drop.is_taken() or _battle_open or not can_process():
+		return false
+	var examine := ArmorExamine.new()
+	examine.name = "ArmorExamine"
+	examine.setup(drop.piece, RunState.worn, true)
+	examine.closed.connect(_on_armor_examine_closed.bind(drop))
+	if wanderer != null:
+		wanderer.clear_move_target()
+	process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(examine)
+	return true
+
+func _on_armor_examine_closed(taken: bool, drop: WorldArmor) -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT
+	if not is_instance_valid(drop) or drop.is_taken():
+		return
+	if taken:
+		take_worn_piece(drop)
+	else:
+		RunLogger.event("armor_offer", {"offered": RunLogger.keepsake_id(drop.piece), "worn": RunLogger.keepsake_id(RunState.worn), "taken": false})
+
+# TAKE: the piece worn (RunState.equip_worn() - its max HP with it), the
+# one it replaces set down on the sand where the Wanderer stands, to be
+# picked up again while this floor lasts.
+func take_worn_piece(drop: WorldArmor) -> void:
+	var piece: TrinketData = drop.piece
+	var old: TrinketData = RunState.worn
+	RunLogger.event("armor_offer", {"offered": RunLogger.keepsake_id(piece), "worn": RunLogger.keepsake_id(old), "taken": true})
+	RunState.equip_worn(piece)
+	drop.take()
+	TakeFeedback.play_sound(get_tree(), armor_take_sfx_path, armor_take_volume_db, "ArmorTakeAudio", "RegionField")
+	print("RegionField: wore '%s'%s." % [piece.display_name, " (set down '%s')" % old.display_name if old != null else ""])
+	if old != null and wanderer != null:
+		spawn_world_armor(old, wanderer.global_position, true)
+
+# The worn piece looked at from the HUD: its plate, no choice - KeepsakeExamine's
+# terms for the keepsake.
+func open_worn_examine(piece: TrinketData, from_rect: Rect2 = Rect2()) -> bool:
+	if piece == null or _battle_open or not can_process():
+		return false
+	var examine := ArmorExamine.new()
+	examine.name = "WornExamine"
+	examine.setup(piece, null, false, from_rect)
+	examine.closed.connect(func(_taken: bool) -> void: process_mode = Node.PROCESS_MODE_INHERIT)
 	if wanderer != null:
 		wanderer.clear_move_target()
 	process_mode = Node.PROCESS_MODE_DISABLED

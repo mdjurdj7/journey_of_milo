@@ -411,6 +411,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	_discard_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DISCARD)
 	_refresh_keepsake_row()
 	RunState.keepsake_changed.connect(func(_keepsake: TrinketData) -> void: _refresh_keepsake_row())
+	RunState.worn_changed.connect(func(_worn: TrinketData) -> void: _refresh_keepsake_row())
 	_layout_corners()
 
 	var target_line := TargetLine.new()
@@ -474,14 +475,14 @@ func _create_corner_readouts() -> void:
 
 # The keepsakes with no in-combat counter go in the row under DECK; one
 # whose status counts is a counter line under the HP bar instead (see
-# _refresh_standing_row()). One slot today (RunState.keepsake).
+# _refresh_standing_row()). The keepsake slot, then the worn piece beside
+# it (RunState.held_pieces()).
 func _refresh_keepsake_row() -> void:
 	var quiet: Array[TrinketData] = []
-	var keepsake: TrinketData = RunState.keepsake
-	if keepsake != null:
-		var status: StatusData = keepsake.combat_start_status
+	for piece in RunState.held_pieces():
+		var status: StatusData = piece.combat_start_status
 		if status == null or status.self_loss_trigger_count <= 0:
-			quiet.append(keepsake)
+			quiet.append(piece)
 	_keepsake_row.set_keepsakes(quiet)
 
 # Bottom-left: DECK line flush in the corner and the keepsake row

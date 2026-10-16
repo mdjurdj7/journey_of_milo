@@ -15,6 +15,10 @@ class_name KeepsakeRow
 # pips. It fades in and out over reveal_fade_time. Polled, never a mouse
 # event; a card or button under the cursor wins.
 #
+# The worn piece (RunState.worn) is a name in the same row, after the
+# keepsake; hovering it shows its ArmorPlate (at reveal_plate_scale) in the
+# tile's place - armor's one presentation.
+#
 # BattleOverlay creates it with the other corner readouts, places it
 # (_layout_corners()) and hands it the keepsakes (set_keepsakes()). Reads
 # the theme's Battle/ink token - re-read via refresh_style().
@@ -48,6 +52,10 @@ class_name KeepsakeRow
 	set(value):
 		reveal_tile_scale = value
 		_place_reveal()
+@export var reveal_plate_scale: float = 0.6:
+	set(value):
+		reveal_plate_scale = value
+		_place_reveal()
 @export var reveal_fade_time: float = 0.12
 @export_group("")
 
@@ -55,10 +63,15 @@ var _keepsakes: Array[TrinketData] = []
 var _ink: Color = Color.BLACK
 var _font_tracked: Font = null
 var _reveal: KeepsakeTile = null
+# A worn piece's hover, in the tile's place.
+var _reveal_plate: ArmorPlate = null
 # The name under the cursor, or -1.
 var _hovered: int = -1
 # The tile's share of full opacity, 0..1, eased toward the hover.
 var _reveal_alpha: float = 0.0
+# Whether the last name hovered was a worn piece - the reveal it fades out
+# on stays that one.
+var _last_was_plate: bool = false
 # Canvas y the reveal sits over - see set_reveal_floor_y().
 var _reveal_floor_y: float = 0.0
 
@@ -69,6 +82,10 @@ func _ready() -> void:
 	_reveal.name = "Tile"
 	_reveal.visible = false
 	add_child(_reveal)
+	_reveal_plate = ArmorPlate.new()
+	_reveal_plate.name = "Plate"
+	_reveal_plate.visible = false
+	add_child(_reveal_plate)
 	refresh_style()
 
 func set_keepsakes(keepsakes: Array[TrinketData]) -> void:
@@ -140,7 +157,10 @@ func _set_hovered(index: int) -> void:
 		return
 	_hovered = index
 	if index >= 0 and index < _keepsakes.size():
-		_reveal.set_keepsake(_keepsakes[index])
+		if _keepsakes[index].slot == TrinketData.Slot.WORN:
+			_reveal_plate.set_piece(_keepsakes[index])
+		else:
+			_reveal.set_keepsake(_keepsakes[index])
 
 # The tile's opacity eased toward the hover over reveal_fade_time.
 func _advance_reveal(delta: float) -> void:
@@ -150,19 +170,38 @@ func _advance_reveal(delta: float) -> void:
 	_reveal_alpha = target if reveal_fade_time <= 0.0 else move_toward(_reveal_alpha, target, delta / reveal_fade_time)
 	_place_reveal()
 
-# For probes: the hover's tile.
+# For probes: the hover's tile, and a worn piece's plate.
 func get_tile() -> KeepsakeTile:
 	return _reveal
 
+func get_plate() -> ArmorPlate:
+	return _reveal_plate
+
+# The tile, or a worn piece's plate - whichever the last name hovered
+# was; the one it fades out on stays that one.
 func _place_reveal() -> void:
 	if _reveal == null or not is_inside_tree():
 		return
-	_reveal.visible = _reveal_alpha > 0.0
-	_reveal.modulate.a = _reveal_alpha
-	if not is_equal_approx(_reveal.tile_scale, reveal_tile_scale):
-		_reveal.tile_scale = reveal_tile_scale
+	var plate: bool = _last_was_plate
+	if _hovered >= 0 and _hovered < _keepsakes.size():
+		plate = _keepsakes[_hovered].slot == TrinketData.Slot.WORN
+		_last_was_plate = plate
+	var shown: Control = _reveal_plate if plate else _reveal
+	var hidden: Control = _reveal if plate else _reveal_plate
+	hidden.visible = false
+	shown.visible = _reveal_alpha > 0.0
+	shown.modulate.a = _reveal_alpha
+	var height: float
+	if plate:
+		if not is_equal_approx(_reveal_plate.plate_scale, reveal_plate_scale):
+			_reveal_plate.plate_scale = reveal_plate_scale
+		height = _reveal_plate.get_plate_size().y
+	else:
+		if not is_equal_approx(_reveal.tile_scale, reveal_tile_scale):
+			_reveal.tile_scale = reveal_tile_scale
+		height = _reveal.get_tile_size().y
 	var floor_local: float = _reveal_floor_y - global_position.y
-	_reveal.position = Vector2(0.0, roundf(floor_local - reveal_gap_px - _reveal.get_tile_size().y))
+	shown.position = Vector2(0.0, roundf(floor_local - reveal_gap_px - height))
 
 func _draw() -> void:
 	if _font_tracked == null:

@@ -6,7 +6,11 @@ extends SceneTree
 # past Block scaled once a fight (Grace opening on what then reaches HP,
 # the intent preview agreeing), Block as a fight opens, damage back once
 # per attack through the enemy's Block - a kill by it included - and an
-# elite's table rolling by rarity, never the piece already worn.
+# elite's table rolling by rarity, never the piece already worn. On the
+# sand (WorldArmor): its line once he walks up, the plate's TAKE / LEAVE
+# and "Replaces ...", a swap setting the old piece down where he stands to
+# be taken again, a won fight's piece lying where the enemy fell, the
+# name's rarity finish, and the HUD's WORN line.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/armor_probe.gd
 #
@@ -19,10 +23,11 @@ extends SceneTree
 # trinket_probe does. Untyped against anything that names the RunState
 # autoload: a SceneTree script compiles before the autoloads register.
 
-const CASES := 8
+const CASES := 14
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
+const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
 const SAFETY_SECONDS := 240.0
 
 var _run_state: Node = null
@@ -46,6 +51,12 @@ func _initialize() -> void:
 	_check_hit_back_once_per_attack()
 	await _check_fight_opening()
 	await _check_hit_back_kill_in_fight()
+	await _check_drop_line()
+	await _check_examine_leave()
+	await _check_swap_sets_old_down()
+	_check_plate_finish()
+	await _check_worn_line()
+	await _check_elite_drop()
 
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
@@ -259,6 +270,189 @@ func _check_hit_back_kill_in_fight() -> void:
 	await _teardown()
 	_completed += 1
 
+# --- On the sand ---
+
+# A piece lying near him says its line once he walks up; a piece set down
+# under him waits until he has stepped away and back.
+func _check_drop_line() -> void:
+	_new_run()
+	await _load_field(0)
+	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
+	var away: Vector3 = wanderer.global_position
+	var piece: TrinketData = _piece(&"probe_common", CardData.CardRarity.COMMON)
+	piece.drop_line = "Probe line."
+	var drop: Node3D = _field.call("spawn_world_armor", piece, away + Vector3(6.0, 0.0, 0.0), false)
+	await _physics(5)
+	_expect(not bool(drop.call("has_spoken")), "A piece out of reach says nothing")
+	_expect(drop.get_node_or_null("Body") != null, "...and has a body on the sand")
+	wanderer.global_position = drop.global_position + Vector3(0.5, 0.0, 0.0)
+	await _physics(5)
+	_expect(bool(drop.call("has_spoken")), "Walking up to it says its line")
+	var set_down: Node3D = _field.call("spawn_world_armor", piece, wanderer.global_position, true)
+	await _physics(5)
+	_expect(not bool(set_down.call("has_spoken")), "A piece set down under him waits")
+	wanderer.global_position = away
+	await _physics(5)
+	wanderer.global_position = set_down.global_position + Vector3(0.5, 0.0, 0.0)
+	await _physics(5)
+	_expect(bool(set_down.call("has_spoken")), "...until he steps away and back")
+	await _teardown()
+	_completed += 1
+
+# The plate from the sand: TAKE and LEAVE, "Replaces ..." with one worn;
+# LEAVE leaves it lying and the slot as it was; the field frozen under it
+# and live again after.
+func _check_examine_leave() -> void:
+	_new_run()
+	await _load_field(0)
+	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
+	var worn: TrinketData = _piece(&"probe_worn", CardData.CardRarity.COMMON)
+	var offered: TrinketData = _piece(&"probe_offered", CardData.CardRarity.COMMON)
+	_run_state.call("equip_worn", worn)
+	var drop: Node3D = _field.call("spawn_world_armor", offered, wanderer.global_position + Vector3(0.5, 0.0, 0.0), false)
+	await _physics(2)
+	_expect(bool(_field.call("open_armor_examine", drop)), "A piece within reach opens its plate")
+	await process_frame
+	var examine: Node = _field.get_node_or_null("ArmorExamine")
+	_expect(examine != null, "...ArmorExamine is up")
+	_expect(not _field.can_process(), "...over a frozen field")
+	if examine != null:
+		var plate: Node = examine.call("get_plate")
+		_expect(str(plate.call("replaces_text")).begins_with("Replaces " + worn.display_name), "...naming the piece it replaces")
+		plate.call("activate", 1) # LEAVE
+		await _seconds(0.5)
+	_expect(_field.can_process(), "LEAVE: the field is live again")
+	_expect(_run_state.get("worn") == worn, "...the worn piece still worn")
+	_expect(is_instance_valid(drop) and not bool(drop.call("is_taken")), "...and the piece still lying there")
+	await _teardown()
+	_completed += 1
+
+# TAKE: worn, gone from the sand; the old one set down where he stands,
+# to be taken again - and the swap goes back the other way.
+func _check_swap_sets_old_down() -> void:
+	_new_run()
+	await _load_field(0)
+	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
+	var first: TrinketData = _piece(&"probe_first", CardData.CardRarity.COMMON)
+	first.max_hp_bonus = 6
+	var second: TrinketData = _piece(&"probe_second", CardData.CardRarity.RARE)
+	var base_max: int = int(_run_state.get("player_max_hp"))
+	var drop_first: Node3D = _field.call("spawn_world_armor", first, wanderer.global_position + Vector3(0.5, 0.0, 0.0), false)
+	await _physics(2)
+	_field.call("take_worn_piece", drop_first)
+	_expect(_run_state.get("worn") == first, "TAKE wears the piece")
+	_expect(bool(drop_first.call("is_taken")), "...and it leaves the sand")
+	_expect_eq(_lying().size(), 0, "...with nothing set down from an empty slot")
+	var drop_second: Node3D = _field.call("spawn_world_armor", second, wanderer.global_position + Vector3(0.5, 0.0, 0.0), false)
+	await _physics(2)
+	_field.call("take_worn_piece", drop_second)
+	_expect(_run_state.get("worn") == second, "Taking another wears it")
+	_expect_eq(int(_run_state.get("player_max_hp")), base_max, "...the first's max HP gone with it")
+	var lying: Array[Node] = _lying()
+	_expect(lying.size() == 1 and lying[0].get("piece") == first, "...and the first lies on the sand")
+	if lying.size() == 1:
+		var at: Vector3 = (lying[0] as Node3D).global_position
+		_expect(Vector2(at.x - wanderer.global_position.x, at.z - wanderer.global_position.z).length() < 0.01, "...where he stands")
+		_field.call("take_worn_piece", lying[0])
+		_expect(_run_state.get("worn") == first, "It can be taken again")
+		var back: Array[Node] = _lying()
+		_expect(back.size() == 1 and back[0].get("piece") == second, "...setting the second down in turn")
+	await _teardown()
+	_completed += 1
+
+# The name's finish: the cards' own for RARE, none for COMMON.
+func _check_plate_finish() -> void:
+	var plate := ArmorPlate.new()
+	root.add_child(plate)
+	plate.set_piece(_piece(&"probe_rare", CardData.CardRarity.RARE))
+	_expect(plate.get_name_finish() != null, "A RARE piece's name wears the rarity finish")
+	plate.set_piece(_piece(&"probe_common", CardData.CardRarity.COMMON))
+	_expect(plate.get_name_finish() == null, "A COMMON piece's name is plain ink")
+	_expect_eq(plate.replaces_text(), "", "...and with nothing worn there is no Replaces line")
+	plate.queue_free()
+	_completed += 1
+
+# The HUD's WORN line: hidden while nothing is worn, the piece's name
+# while one is; its click opens the plate with no choice.
+func _check_worn_line() -> void:
+	_new_run()
+	await _load_field(0)
+	var line: Control = _field.get_node_or_null("FieldHUD/WornLine") as Control
+	_expect(line != null, "The field HUD has a WORN line")
+	if line != null:
+		_expect(not line.is_visible_in_tree(), "...hidden while nothing is worn")
+		var piece: TrinketData = _piece(&"probe_worn", CardData.CardRarity.COMMON)
+		_run_state.call("equip_worn", piece)
+		await process_frame
+		_expect(line.call("get_keepsake") == piece, "...showing the piece once worn")
+		_expect(bool(_field.call("open_worn_examine", piece, Rect2())), "Its examine opens")
+		await process_frame
+		var examine: Node = _field.get_node_or_null("WornExamine")
+		_expect(examine != null and (examine.call("get_plate") as ArmorPlate).get_piece() == piece, "...the plate, with the piece")
+		if examine != null:
+			examine.call("close", false)
+			await _seconds(0.5)
+		_expect(_field.can_process(), "...and the field is live once it closes")
+	await _teardown()
+	_completed += 1
+
+# A won fight against an enemy with an armor table leaves one piece on the
+# sand, where it fell. The table is set here, not read from the data - the
+# rule under test is the drop.
+func _check_elite_drop() -> void:
+	_new_run()
+	var data: EnemyData = load(WARDLING_PATH)
+	var saved: KeepsakeTable = data.armor_table
+	var table := KeepsakeTable.new()
+	var entry := KeepsakeEntry.new()
+	entry.trinket = _piece(&"probe_drop", CardData.CardRarity.COMMON)
+	table.entries.append(entry)
+	data.armor_table = table
+	var controller: Node = await _start_fight(2, WARDLING_PATH)
+	if controller != null:
+		var fell_at: Vector3 = Vector3.ZERO
+		for member in (controller.get("enemies") as Array):
+			fell_at = (member as Node3D).global_position
+		_kill_all(controller)
+		var start: int = Time.get_ticks_msec()
+		while _lying().is_empty() and Time.get_ticks_msec() - start < 6000:
+			await process_frame
+		var lying: Array[Node] = _lying()
+		_expect_eq(lying.size(), 1, "A win against it leaves one worn piece on the sand")
+		if lying.size() == 1:
+			_expect(lying[0].get("piece") == entry.trinket, "...the piece its table gave")
+			var at: Vector3 = (lying[0] as Node3D).global_position
+			_expect(Vector2(at.x - fell_at.x, at.z - fell_at.z).length() < 0.01, "...where it fell")
+	data.armor_table = saved
+	await _teardown()
+	_completed += 1
+
+func _lying() -> Array[Node]:
+	var lying: Array[Node] = []
+	for node in get_nodes_in_group(&"worn_drops"):
+		if not bool(node.call("is_taken")):
+			lying.append(node)
+	return lying
+
+func _physics(frames: int) -> void:
+	for i in frames:
+		await physics_frame
+
+func _seconds(seconds: float) -> void:
+	await create_timer(seconds).timeout
+
+# Every member to 0 through the controller's own damage path, then the
+# end check - kill_order_probe's _kill().
+func _kill_all(controller: Node) -> void:
+	var combatants: Dictionary = controller.get("_combatants")
+	for member in (controller.get("enemies") as Array).duplicate():
+		var combatant: RefCounted = combatants.get(member)
+		if combatant == null:
+			continue
+		combatant.set("hp", 0)
+		controller.call("_report_damage", "player", combatant, 99, "card")
+	controller.call("_check_battle_end")
+
 # --- Helpers ---
 
 func _piece(id: StringName, rarity: CardData.CardRarity) -> TrinketData:
@@ -305,15 +499,20 @@ func _load_field(floor_index: int) -> void:
 	for i in 30:
 		await physics_frame
 
-# Loads the floor and starts a fight with its first enemy. The fight's
-# BattleController, or null (a FAIL is recorded).
-func _start_fight(floor_index: int) -> Node:
+# Loads the floor and starts a fight with its first enemy (or the first
+# of `enemy_path`'s data, when given). The fight's BattleController, or
+# null (a FAIL is recorded).
+func _start_fight(floor_index: int, enemy_path: String = "") -> Node:
 	await _load_field(floor_index)
-	var targets: Array[Node] = get_nodes_in_group("enemies")
-	if targets.is_empty():
-		_fail("no enemy to fight on floor %d" % (floor_index + 1))
+	var target: Node3D = null
+	for node in get_nodes_in_group("enemies"):
+		var data: Resource = node.get("enemy_data")
+		if enemy_path == "" or (data != null and data.resource_path == enemy_path):
+			target = node as Node3D
+			break
+	if target == null:
+		_fail("no enemy to fight on floor %d (%s)" % [floor_index + 1, enemy_path])
 		return null
-	var target: Node3D = targets[0] as Node3D
 	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
 	wanderer.global_position = target.global_position + Vector3(1.5, 0.0, 0.0)
 	await physics_frame

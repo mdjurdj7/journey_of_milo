@@ -19,9 +19,25 @@ class_name KeepsakeLine
 # RegionField creates it in _setup_field_hud() and hands it the
 # GLASSBONE line (sit_beside() - beside GOLD while GLASSBONE is hidden);
 # RunState.keepsake_changed keeps it current.
+#
+# The WORN line is this same line with slot WORN, set before it enters the
+# tree: RegionField sits it beside the KEEPSAKE line, RunState.worn_changed
+# keeps it current, and its hover is the piece's ArmorPlate (at worn_
+# plate_scale) rather than a KeepsakeTile - armor's one presentation, as
+# the tile is a keepsake's. Its click opens ArmorExamine.
+
+# Which of the run's slots this line shows. Set before _ready().
+var slot: TrinketData.Slot = TrinketData.Slot.KEEPSAKE
+# The WORN hover's plate scale - the plate is wider than a tile.
+@export var worn_plate_scale: float = 0.6:
+	set(value):
+		worn_plate_scale = value
+		_place_tile()
 
 var _keepsake: TrinketData = null
 var _tile: KeepsakeTile = null
+# The WORN line's hover, in place of _tile.
+var _plate: ArmorPlate = null
 # The tile's share of full opacity, 0..1, eased toward the hover.
 var _reveal_alpha: float = 0.0
 
@@ -31,13 +47,23 @@ func _ready() -> void:
 	_tile.name = "Tile"
 	_tile.visible = false
 	add_child(_tile)
-	RunState.keepsake_changed.connect(set_keepsake)
-	set_keepsake(RunState.keepsake)
+	if slot == TrinketData.Slot.WORN:
+		_plate = ArmorPlate.new()
+		_plate.name = "Plate"
+		_plate.visible = false
+		add_child(_plate)
+		RunState.worn_changed.connect(set_keepsake)
+		set_keepsake(RunState.worn)
+	else:
+		RunState.keepsake_changed.connect(set_keepsake)
+		set_keepsake(RunState.keepsake)
 
 func set_keepsake(keepsake: TrinketData) -> void:
 	_keepsake = keepsake
 	if _tile != null:
 		_tile.set_keepsake(keepsake)
+	if _plate != null:
+		_plate.set_piece(keepsake)
 	set_value_text(keepsake.display_name if keepsake != null else "")
 
 func get_keepsake() -> TrinketData:
@@ -46,6 +72,10 @@ func get_keepsake() -> TrinketData:
 # The hover's tile (for probes and the examine view's start).
 func get_tile() -> KeepsakeTile:
 	return _tile
+
+# The WORN line's hover plate; null on the KEEPSAKE line.
+func get_plate() -> ArmorPlate:
+	return _plate
 
 func _is_shown() -> bool:
 	return _keepsake != null
@@ -77,20 +107,28 @@ func _is_hovered() -> bool:
 	return Rect2(Vector2.ZERO, size).has_point(get_local_mouse_position())
 
 # Above the row, left-aligned with it; below when it wouldn't fit above.
+# The WORN line's plate the same way.
 func _place_tile() -> void:
-	if _tile == null:
+	if _tile == null or style == null:
 		return
-	_tile.visible = _reveal_alpha > 0.0
-	_tile.modulate.a = _reveal_alpha
-	if not _tile.visible:
+	var reveal: Control = _plate if _plate != null else _tile
+	reveal.visible = _reveal_alpha > 0.0
+	reveal.modulate.a = _reveal_alpha
+	if not reveal.visible:
 		return
-	if not is_equal_approx(_tile.tile_scale, style.hud_keepsake_tile_scale):
-		_tile.tile_scale = style.hud_keepsake_tile_scale
-	var tile_size: Vector2 = _tile.get_tile_size()
-	var above: float = -tile_size.y - style.hud_keepsake_tile_gap_px
+	var reveal_size: Vector2
+	if _plate != null:
+		if not is_equal_approx(_plate.plate_scale, worn_plate_scale):
+			_plate.plate_scale = worn_plate_scale
+		reveal_size = _plate.get_plate_size()
+	else:
+		if not is_equal_approx(_tile.tile_scale, style.hud_keepsake_tile_scale):
+			_tile.tile_scale = style.hud_keepsake_tile_scale
+		reveal_size = _tile.get_tile_size()
+	var above: float = -reveal_size.y - style.hud_keepsake_tile_gap_px
 	if get_global_rect().position.y + above < 0.0:
 		above = size.y + style.hud_keepsake_tile_gap_px
-	_tile.position = Vector2(0.0, roundf(above))
+	reveal.position = Vector2(0.0, roundf(above))
 
 func _draw() -> void:
 	if _value_text.is_empty():
