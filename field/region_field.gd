@@ -1416,6 +1416,7 @@ func _spawn_floor_enemies() -> void:
 			enemy.height_offset = entry.height_offset_m
 			enemy.stance_gap = entry.stance_gap_m
 			enemy.holds_facing = entry.holds_facing
+			enemy.battle_frame_screen = entry.battle_frame_screen
 			if entry.phase_drop_offset != Vector2.ZERO:
 				var land: Vector2 = slot.to_floor(entry.position + entry.phase_drop_offset)
 				enemy.has_phase_drop = true

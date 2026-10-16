@@ -61,6 +61,9 @@ class_name CameraRig
 # battle_distance_min on a short line, which holds the spacing.
 @export var battle_margin: float = 2.0
 @export var battle_enemy_room_ratio: float = 0.6
+# A fight framed by rule (FieldEnemy.battle_frame_screen): the share of
+# the screen's width kept clear right of the enemy's tail.
+@export var battle_frame_edge_room: float = 0.02
 # The fitted distance never comes closer than min (1.18x the old fixed
 # 9 m frame - one crab at spacing 4 fits at ~9.5 m, so min is what a
 # single-crab fight actually gets) nor further than max, however wide the
@@ -174,6 +177,8 @@ var _battle_last_distance: float = 0.0
 var _battle_fit_pitch: float = 12.0
 var _battle_pitch_now: float = 12.0
 var _battle_pitch_warned: bool = false
+# The framed fight's snout across the screen, last fit (_fit_framed()).
+var _framed_snout_x: float = -1.0
 
 # One measured combatant, in world units: its ground position, feet and
 # head heights, and how far its bbox reaches sideways.
@@ -182,6 +187,14 @@ class BattleBody:
 	var feet_y: float
 	var head_y: float
 	var half_width: float
+	# An enemy's reach toward the Wanderer (its snout) and away (its
+	# tail), and its framing rule (FieldEnemy.battle_frame_screen).
+	var front_reach: float = 0.0
+	var back_reach: float = 0.0
+	# How far its snout and its tail stand toward the camera, off its line.
+	var front_toward: float = 0.0
+	var back_toward: float = 0.0
+	var frame_screen: Vector2 = Vector2.ZERO
 
 # 0 = pure follow framing, 1 = pure battle framing. Animated by
 # _advance_battle_blend() from _blend_from to _blend_to over
@@ -465,6 +478,13 @@ func _battle_bodies() -> Array[BattleBody]:
 		body.feet_y = body.position.y + enemy.model_ground_offset
 		body.head_y = body.feet_y + enemy.get_head_height()
 		body.half_width = enemy.get_half_width()
+		body.frame_screen = enemy.battle_frame_screen
+		if body.frame_screen != Vector2.ZERO:
+			var reaches: Vector4 = enemy.battle_frame_reaches()
+			body.front_reach = reaches.x
+			body.front_toward = reaches.y
+			body.back_reach = reaches.z
+			body.back_toward = reaches.w
 		bodies.append(body)
 	return bodies
 
@@ -567,11 +587,50 @@ func _fit_at(bodies: Array[BattleBody], pitch_deg: float) -> Array:
 	if head_k - feet_k > 0.0001:
 		distance_vertical = (head_max - feet_min) / (head_k - feet_k)
 
+	var framed: BattleBody = null
+	for index in range(1, bodies.size()):
+		if bodies[index].frame_screen != Vector2.ZERO:
+			framed = bodies[index]
+			break
+	if framed != null:
+		return _fit_framed(framed, wanderer_pos, right, forward, distance_vertical, feet_min, feet_k, tan_half_fov * aspect)
+
 	var fitted_distance: float = clampf(maxf(distance_horizontal, distance_vertical), battle_distance_min, battle_distance_max)
 
 	var target := wanderer_pos + right * ((left_edge + right_edge) * 0.5)
 	target.y = feet_min - feet_k * fitted_distance
 	return [target, forward, fitted_distance]
+
+# A fight framed by rule (FieldEnemy.battle_frame_screen on `framed`):
+# the Wanderer held at frame_screen.x of the screen's width, and the
+# frame as close as it can come - the enemy's tail (its back reach, as
+# far toward or away from the camera as it stands) inside the right
+# edge's battle_frame_edge_room, the heights fitted, battle_distance_min
+# held - which brings its snout as far right as it can come; frame_
+# screen.y is where the snout should be no further left than, and a
+# frame that can't keep it there says so once (get_framed_snout_x()).
+# `half_width_per_distance` is tan(fov/2) times the aspect; the Wanderer
+# stands at the look target's depth.
+func _fit_framed(framed: BattleBody, wanderer_pos: Vector3, right: Vector3, forward: Vector3, distance_vertical: float, feet_min: float, feet_k: float, half_width_per_distance: float) -> Array:
+	var h: float = maxf(half_width_per_distance, 0.0001)
+	var at: float = (framed.position - wanderer_pos).dot(right)
+	var snout: float = at - framed.front_reach
+	var tail: float = at + framed.back_reach
+	var wanderer_x: float = framed.frame_screen.x
+	var right_x: float = 1.0 - battle_frame_edge_room
+	# The tail at right_x: s + 2h(X - 0.5)k <= 2Dh(X - x_w), solved for D.
+	var distance_for_tail: float = (tail + 2.0 * h * (right_x - 0.5) * framed.back_toward) / maxf(2.0 * h * (right_x - wanderer_x), 0.0001)
+	var distance: float = clampf(maxf(distance_for_tail, distance_vertical), battle_distance_min, battle_distance_max)
+	var centre: float = (0.5 - wanderer_x) * 2.0 * distance * h
+	_framed_snout_x = 0.5 + (snout - centre) / maxf(2.0 * (distance - framed.front_toward) * h, 0.0001)
+	var target := wanderer_pos + right * centre
+	target.y = feet_min - feet_k * distance
+	return [target, forward, distance]
+
+# Where the framed fight's snout sits across the screen (0..1), from the
+# last fit - for probes and for the frame_screen.y check. -1 before one.
+func get_framed_snout_x() -> float:
+	return _framed_snout_x
 
 # Whether, from the camera a frame at `pitch_deg` would place (look target
 # `target`, ground `forward`, `distance` - _place_camera()'s own sphere),

@@ -108,7 +108,6 @@ func _check_data() -> void:
 	_expect(is_equal_approx(data.model_scale, 1.36) and is_equal_approx(data.model_yaw_offset_degrees, 180.0), "...at 1.36, turned 180")
 	_expect(is_equal_approx(data.rest_height_m, 0.0), "...not buried")
 	_expect_eq(data.attachment_scene_path, POSE_SCENE_PATH, "...GreyshelfPose")
-	_expect(is_equal_approx(data.contact_radius_m, 3.2), "...a 3.2 m contact area")
 	_expect(data.contact_sounds.size() == 1 and data.contact_sounds[0].resource_path == CONTACT_SOUND_PATH, "...the placeholder contact sound")
 	_completed += 1
 
@@ -353,6 +352,8 @@ func _check_fight_phase() -> void:
 			_expect(at.length() < 0.05, "...at its landing spot (%.2f m off)" % at.length())
 			var frame_after: Vector3 = camera.get("_battle_last_forward")
 			_expect(frame_after.angle_to(frame_before) > deg_to_rad(5.0), "...and the battle frame turned to it (%.1f degrees)" % rad_to_deg(frame_after.angle_to(frame_before)))
+			var into: float = _deepest_into_rock(greyshelf)
+			_expect(into < 0.0, "...on open sand, clear of its rock (%+.2f m into it)" % into)
 		_expect_eq(_intent_text(controller, greyshelf), "4×4", "...the Tail Lash reads 4×4")
 		var player: Combatant = controller.get("player")
 		var before: int = player.hp
@@ -408,6 +409,27 @@ func _check_body() -> void:
 	_completed += 1
 
 # --- Helpers ---
+
+# How far the body's outline seen from above (FieldEnemy._model_outline,
+# body-local XZ) reaches into its rock's collision box, metres - below 0
+# when the whole outline is clear of it. INF with no rock.
+func _deepest_into_rock(body: Node3D) -> float:
+	var props: Node = _field.get_node_or_null("Props")
+	var box: CollisionShape3D = null
+	if props != null:
+		for child in props.get_children():
+			var script: Script = child.get_script()
+			if script != null and str(script.resource_path).ends_with("basking_slab.gd") and child.get_node_or_null("Collision") != null:
+				box = child.get_node("Collision").get_child(0) as CollisionShape3D
+	if box == null:
+		return INF
+	var size: Vector3 = (box.shape as BoxShape3D).size
+	var deepest: float = -INF
+	for point in (body.get("_model_outline") as PackedVector2Array):
+		var world: Vector3 = body.global_transform * Vector3(point.x, 0.0, point.y)
+		var local: Vector3 = box.global_transform.affine_inverse() * world
+		deepest = maxf(deepest, minf(size.x * 0.5 - absf(local.x), size.z * 0.5 - absf(local.z)))
+	return deepest
 
 func _greyshelf() -> EnemyData:
 	return load(GREYSHELF_PATH) as EnemyData

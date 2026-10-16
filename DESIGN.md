@@ -550,7 +550,15 @@ folder (run_log_probe). (2026-10-04.)
   (`EnemyData.sink_m`, which lowers the model without burying it the way
   a negative `rest_height_m` does; 0.3 m on open sand put its feet under
   the relief). The rock's top tilts about 0.15 m along its length, so
-  the tail end sits a little into it. Off the rock at half HP, it steps
+  the tail end sits a little into it. The rock is stretched to hold all
+  four feet 0.3 m inside its top's edge in the battle pose
+  (`BaskingSlab.model_scale` 1.2 along, 1.6 across - 7.3 x 5.5 m), and
+  the stance is 2.3 m from the snout: the rock's base flares ~0.9 m past
+  its top, and the fight's framing rule (`FloorEnemy.battle_frame_screen`:
+  the Wanderer at 0.3 of the width, the snout no further left than 0.55)
+  needs the room. Its contact area is 4.4 m, so the rock's front edge
+  (4.2 m ahead of it) never stops the Wanderer short of contact. Off the
+  rock at half HP, it steps
   off the rock's camera side onto the sand (`FloorEnemy.phase_drop_offset`)
   and turns to the Wanderer; an escape climbs it back. Its
   `contact_sounds` borrow `combat_old/hit.wav`, as the Dunecur and the

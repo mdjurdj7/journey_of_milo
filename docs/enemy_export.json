@@ -651,8 +651,8 @@
               "option": "greyshelf",
               "weight": 1.0,
               "anchor": [
-                -1.974,
-                -45.551
+                -2.011,
+                -45.886
               ],
               "slot_yaw_degrees": 0.0,
               "cluster": null,
@@ -666,7 +666,7 @@
                   -0.1022,
                   -0.9948
                 ],
-                "gate_distance_beyond_enemy": 9.3,
+                "gate_distance_beyond_enemy": 9.0,
                 "bar_axis_offset": 0.0,
                 "channel_max_width": 0.0
               },
@@ -685,8 +685,8 @@
                   "anchor": false,
                   "card_reward": "TOP_TIER_FIRST",
                   "position": [
-                    -1.974,
-                    -45.551
+                    -2.011,
+                    -45.886
                   ],
                   "yaw_degrees": -174.13,
                   "face_prop": null
@@ -696,8 +696,8 @@
                 {
                   "scene": "res://field/basking_slab.tscn",
                   "position": [
-                    -2.0,
-                    -45.8
+                    -1.94,
+                    -45.2
                   ]
                 }
               ],
@@ -1341,7 +1341,7 @@
           "scene": "res://field/greyshelf_pose.tscn",
           "class": "GreyshelfPose"
         },
-        "contact_radius_m": 3.2,
+        "contact_radius_m": 4.4,
         "cluster_gap_m": null,
         "rest_height_m": 0.0,
         "sink_m": 0.05,

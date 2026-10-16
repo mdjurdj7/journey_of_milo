@@ -26,6 +26,13 @@ class_name BaskingSlab
 	set(value):
 		model_scene_path = value
 		_rebuild()
+# The model's scale per axis, in its own frame (X its length, Z its
+# width) - a placeholder stretched to hold what lies on it (floor 5's
+# crest rock under the Greyshelf). Its box and collision follow.
+@export var model_scale: Vector3 = Vector3.ONE:
+	set(value):
+		model_scale = value
+		_rebuild()
 # The model's own colour map.
 @export_file("*.jpg", "*.png") var colour_map_path: String = "res://assets/models/props/basking slab/basking_slab_albedo.png":
 	set(value):
@@ -98,6 +105,7 @@ func _spawn_model() -> void:
 		return
 	_model = scene.instantiate() as Node3D
 	_model.name = "Model"
+	_model.scale = model_scale
 	add_child(_model)
 	_material = PaintedProp.material(colour_map_path, tint)
 	_fog = null

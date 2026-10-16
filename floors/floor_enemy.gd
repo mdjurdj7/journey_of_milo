@@ -39,6 +39,13 @@ class_name FloorEnemy
 # and the battle frame refits to where it stands. Rules unchanged. ZERO =
 # it stays where it lies.
 @export var phase_drop_offset: Vector2 = Vector2.ZERO
+# This member's fight framed by rule (FieldEnemy.battle_frame_screen,
+# CameraRig): x the screen-width fraction the Wanderer stands at, y the
+# furthest left its snout comes - the frame widened past that only to fit
+# its tail or the heights, the Wanderer held at x. Floor 5's Greyshelf: the
+# Wanderer in the left third, the snout no further left than 55%, the gap
+# between them across the middle. ZERO = the usual fit round everyone.
+@export var battle_frame_screen: Vector2 = Vector2.ZERO
 # The body's yaw in degrees, on top of the slot's yaw - rotation.y.
 # Authored outright rather than derived from "seaward": the crab beside
 # the pool faces where it faces.

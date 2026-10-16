@@ -60,6 +60,9 @@ const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
 # contact (RegionField._battle_gap_for(), _on_enemy_contacted()).
 @export var stance_gap: float = -1.0
 @export var holds_facing: bool = false
+# FloorEnemy.battle_frame_screen, copied at spawn - read by CameraRig's
+# battle fit every frame.
+@export var battle_frame_screen: Vector2 = Vector2.ZERO
 # EnemyData.harness_point, copied the same way: where a rope is tied to
 # this body, glb units (see get_harness_point()).
 @export var harness_point: Vector3 = Vector3.ZERO
@@ -393,6 +396,10 @@ var _model_half_width: float = 0.0
 # grounding shift applied) - what BattleController projects for the
 # armed-card target test. Empty until the model has spawned.
 var _model_aabb: AABB = AABB()
+# The model's outline seen from above, body-local XZ before any battle
+# turn (a convex hull of its vertices) - what its frame reaches are read
+# from, the body's own taper and all (battle_frame_reaches()).
+var _model_outline: PackedVector2Array = PackedVector2Array()
 
 # The head above the body's feet: the model's own height, standing at
 # rest height, lifted by a fight's hover, and raised by a rear (see
@@ -436,6 +443,53 @@ func battle_front_reach(turned: bool = true) -> float:
 # in a line (RegionField._cluster_gap_for()).
 func battle_back_reach(turned: bool = true) -> float:
 	return _battle_reach(Vector3.BACK, turned)
+
+# How far the body reaches toward the Wanderer (x, its snout) and away
+# (z, its tail) in a fight, from its outline as it will stand turned to
+# the camera - the shape itself, not its box, whose corners a long
+# tapering body overstates - and how far each of those points stands off
+# the body's line toward the camera (y and w: the turn brings the snout
+# nearer, the tail further). What CameraRig frames a fight by rule with
+# (battle_frame_screen). The box's reaches, on the line, until the
+# outline is measured.
+func battle_frame_reaches() -> Vector4:
+	if _model_outline.is_empty():
+		return Vector4(battle_front_reach(), 0.0, battle_back_reach(), 0.0)
+	var turn: float = deg_to_rad(battle_camera_turn_degrees)
+	var pivot: Vector2 = Vector2(_model.position.x, _model.position.z) if _model != null else Vector2.ZERO
+	var front: float = 0.0
+	var front_side: float = 0.0
+	var back: float = 0.0
+	var back_side: float = 0.0
+	for point in _model_outline:
+		# Turned about the model's own origin the way _battle_reach() turns
+		# the box: Basis(UP, turn) on (x, z).
+		var p: Vector2 = point - pivot
+		var turned := Vector2(p.x * cos(turn) + p.y * sin(turn), -p.x * sin(turn) + p.y * cos(turn)) + pivot
+		# Body +X is the camera's own forward in a fight (CameraRig's
+		# ground forward is UP x the line to it), so toward the camera is -x.
+		if -turned.y > front:
+			front = -turned.y
+			front_side = -turned.x
+		if turned.y > back:
+			back = turned.y
+			back_side = -turned.x
+	return Vector4(front, front_side, back, back_side)
+
+# The convex hull of every mesh vertex under `model`, body-local XZ.
+func _measure_outline(model: Node3D) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for node in model.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		var to_body: Transform3D = global_transform.affine_inverse() * mi.global_transform
+		for surface in mi.mesh.get_surface_count():
+			var vertices: PackedVector3Array = mi.mesh.surface_get_arrays(surface)[Mesh.ARRAY_VERTEX]
+			for vertex in vertices:
+				var at: Vector3 = to_body * vertex
+				points.append(Vector2(at.x, at.z))
+	return Geometry2D.convex_hull(points) if points.size() >= 3 else points
 
 # The model box's furthest corner along body-local `direction`, metres,
 # with the box turned about the model's own origin by the battle turn
@@ -759,6 +813,7 @@ func _spawn_model() -> void:
 		_model_height = combined_aabb.size.y
 		_model_half_width = maxf(combined_aabb.size.x, combined_aabb.size.z) * 0.5
 		_model_aabb = AABB(combined_aabb.position + Vector3(0.0, grounding_shift, 0.0), combined_aabb.size)
+		_model_outline = _measure_outline(model)
 	_model_ground_y = model.position.y
 
 	_attach_scene(model)
