@@ -1017,25 +1017,10 @@ func _apply_name_finish() -> void:
 		if _rarity_finish != null:
 			name_label.add_theme_color_override("font_color", _rarity_finish.common_ink)
 		return
-	if _name_finish == null:
-		var shader := load(name_finish_shader_path) as Shader
-		if shader == null:
-			push_warning("CardView: name finish shader failed to load (%s); the name stays ink." % name_finish_shader_path)
-			return
-		_name_finish = ShaderMaterial.new()
-		_name_finish.shader = shader
-		_name_finish.set_shader_parameter("sheen_t", -1.0)
-	var rarity: CardData.CardRarity = card_data.rarity
-	_name_finish.set_shader_parameter("base_color", _rarity_finish.base_color(rarity))
-	_name_finish.set_shader_parameter("highlight_color", _rarity_finish.highlight_color(rarity))
-	_name_finish.set_shader_parameter("rainbow", _rarity_finish.is_rainbow(rarity))
-	_name_finish.set_shader_parameter("hue_a", _rarity_finish.ultra_hue_rose)
-	_name_finish.set_shader_parameter("hue_b", _rarity_finish.ultra_hue_teal)
-	_name_finish.set_shader_parameter("hue_c", _rarity_finish.ultra_hue_olive)
-	_name_finish.set_shader_parameter("rest_gradient_strength", _rarity_finish.rest_gradient_strength)
-	_name_finish.set_shader_parameter("sheen_width", _rarity_finish.sheen_width)
-	_name_finish.set_shader_parameter("sheen_softness", _rarity_finish.sheen_softness)
-	_name_finish.set_shader_parameter("sheen_strength", _rarity_finish.sheen_strength)
+	var material: ShaderMaterial = _rarity_finish.name_material(card_data.rarity, _name_finish, name_finish_shader_path)
+	if material == null:
+		return
+	_name_finish = material
 	var text_width: float = _string_width(name_label, name_font_size_px)
 	if name_label.size.x > 0.0:
 		text_width = minf(text_width, name_label.size.x)

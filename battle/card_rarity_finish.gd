@@ -163,6 +163,36 @@ func highlight_color(rarity: CardData.CardRarity) -> Color:
 func is_rainbow(rarity: CardData.CardRarity) -> bool:
 	return rarity == CardData.CardRarity.ULTRA_RARE
 
+# A name's finish material for `rarity`, set from this resource: `material`
+# itself (made on shader_path, card_name_finish.gdshader, when null) with
+# the tier's base, highlight and hues and the sweep's shape - or null when
+# the tier wears none (has_finish()) or the shader won't load, and the
+# name is flat common_ink. text_width_px and sheen_t stay the caller's:
+# a new material starts at rest. CardView, ArmorPlate and FindLine each
+# keep their own material, so one name's sweep is its own.
+func name_material(rarity: CardData.CardRarity, material: ShaderMaterial, shader_path: String) -> ShaderMaterial:
+	if not has_finish(rarity):
+		return null
+	if material == null:
+		var shader := load(shader_path) as Shader
+		if shader == null:
+			push_warning("CardRarityFinish: name finish shader failed to load (%s); the name stays ink." % shader_path)
+			return null
+		material = ShaderMaterial.new()
+		material.shader = shader
+		material.set_shader_parameter("sheen_t", -1.0)
+	material.set_shader_parameter("base_color", base_color(rarity))
+	material.set_shader_parameter("highlight_color", highlight_color(rarity))
+	material.set_shader_parameter("rainbow", is_rainbow(rarity))
+	material.set_shader_parameter("hue_a", ultra_hue_rose)
+	material.set_shader_parameter("hue_b", ultra_hue_teal)
+	material.set_shader_parameter("hue_c", ultra_hue_olive)
+	material.set_shader_parameter("rest_gradient_strength", rest_gradient_strength)
+	material.set_shader_parameter("sheen_width", sheen_width)
+	material.set_shader_parameter("sheen_softness", sheen_softness)
+	material.set_shader_parameter("sheen_strength", sheen_strength)
+	return material
+
 # The tier's name under an offered card; "" for an untagged card.
 func tier_label_text(rarity: CardData.CardRarity) -> String:
 	match rarity:

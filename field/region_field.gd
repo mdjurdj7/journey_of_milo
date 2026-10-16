@@ -409,6 +409,11 @@ var _wear_path: PackedVector2Array = PackedVector2Array()
 var _keepsake_line: KeepsakeLine = null
 # The HUD row's worn piece, beside it - a click opens its ArmorExamine.
 var _worn_line: KeepsakeLine = null
+# A fight's worn piece waiting to be named by the find line (FindLine,
+# _say_pending_find()) - and who left it - until the reward screen, and
+# any keepsake offer after it, has closed.
+var _pending_find: TrinketData = null
+var _pending_find_creature: String = ""
 var _nav_build_queued: bool = false
 # Debug builds: the F1 row's Path draw, made on its first toggle.
 var _nav_debug: NavDebugDraw = null
@@ -2475,6 +2480,8 @@ func _open_reward_screen() -> void:
 func _on_reward_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
 	_open_pending_keepsake_offer()
+	# A keepsake offer opened over it holds the find line in turn.
+	_say_pending_find()
 
 # A won fight's keepsake: the first enemy it was won against whose own
 # table (EnemyData.keepsake_table) drops something - never the one held,
@@ -2556,6 +2563,7 @@ func open_keepsake_offer(trinket: TrinketData, source: String = "") -> bool:
 
 func _on_keepsake_offer_closed(_taken: bool) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
+	_say_pending_find()
 
 # Debug builds only: a row of debug buttons on the field HUD in the
 # battle row's style (BattleTheme's DebugButton), hidden until F1 -
@@ -2766,7 +2774,8 @@ func open_keepsake_examine(keepsake: TrinketData, from_rect: Rect2 = Rect2()) ->
 # the sand where that one fell (`won_at`, in won_against's order; `won_lift`
 # its height over the relief) once the battle framing has gone, as the
 # cards wait (reward_spread_delay_sec). One piece a win at most. The reward
-# screen opens over it as usual.
+# screen opens over it as usual; the find line names it once that closes
+# (_say_pending_find()) - or at once, with no screen to wait on.
 func _drop_armor(won_against: Array[EnemyData], won_at: Array[Vector3], won_lift: Array[float]) -> void:
 	for index in won_against.size():
 		var data: EnemyData = won_against[index]
@@ -2779,25 +2788,46 @@ func _drop_armor(won_against: Array[EnemyData], won_at: Array[Vector3], won_lift
 		var lift: float = won_lift[index] if index < won_lift.size() else 0.0
 		print("RegionField: '%s' left the worn piece '%s'." % [data.enemy_name, piece.display_name])
 		RunLogger.event("armor_drop", {"source": data.enemy_name, "piece": RunLogger.keepsake_id(piece)})
+		_pending_find = piece
+		_pending_find_creature = data.enemy_name
 		var delay: float = reward_spread_delay_sec
 		var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
 		if camera_rig != null:
 			delay = maxf(delay, camera_rig.battle_transition_time)
 		await get_tree().create_timer(delay).timeout
 		# The floor can be left, or the run ended, during that beat.
+		if not is_inside_tree():
+			return
+		spawn_world_armor(piece, at, lift)
+		# The reward screen opens on this same beat: a frame for it, and the
+		# line waits on whatever screen is up.
+		await get_tree().process_frame
 		if is_inside_tree():
-			spawn_world_armor(piece, at, false, lift)
+			_say_pending_find()
 		return
 
+# The find line for the fight's piece (FindLine): "You find a harness on
+# the Wardling.", above the HUD row - once no screen holds the field, so
+# it's read with the piece in view. Called as the piece lands and as each
+# screen after a win closes; the first with the field free says it.
+func _say_pending_find() -> void:
+	if _pending_find == null or _battle_open or not can_process():
+		return
+	var piece: TrinketData = _pending_find
+	_pending_find = null
+	var line := FindLine.on_hud(get_node_or_null(^"FieldHUD"))
+	if line == null:
+		return
+	line.sit_above(deck_panel)
+	line.say_find(piece, _pending_find_creature)
+
 # One worn piece lying on the sand at `at` (seated on the relief by
-# WorldArmor itself, `height_offset` over it). `set_down`: put down by a
-# swap rather than left by a fight - its line waits until he has stepped
-# away.
-func spawn_world_armor(piece: TrinketData, at: Vector3, set_down: bool, height_offset: float = 0.0) -> WorldArmor:
+# WorldArmor itself, `height_offset` over it) - left by a fight, or set
+# down by a swap.
+func spawn_world_armor(piece: TrinketData, at: Vector3, height_offset: float = 0.0) -> WorldArmor:
 	var drop := WorldArmor.new()
 	drop.name = "WorldArmor"
 	drop.piece = piece
-	drop.set_down = set_down
 	drop.height_offset = height_offset
 	drop.position = to_local(at)
 	add_child(drop, true)
@@ -2841,7 +2871,7 @@ func take_worn_piece(drop: WorldArmor) -> void:
 	TakeFeedback.play_sound(get_tree(), armor_take_sfx_path, armor_take_volume_db, "ArmorTakeAudio", "RegionField")
 	print("RegionField: wore '%s'%s." % [piece.display_name, " (set down '%s')" % old.display_name if old != null else ""])
 	if old != null and wanderer != null:
-		spawn_world_armor(old, wanderer.global_position, true)
+		spawn_world_armor(old, wanderer.global_position)
 
 # The worn piece looked at from the HUD: its plate, no choice - KeepsakeExamine's
 # terms for the keepsake.

@@ -88,9 +88,11 @@ enum Slot { KEEPSAKE, WORN }
 # loaded at runtime - a Meshy model later is a path change. Empty = a
 # plain placeholder block.
 @export_file("*.tscn", "*.glb") var field_model_path: String = ""
-# The world voice's one line when the Wanderer walks up to it lying on the
-# sand (WorldArmor). Empty = no line.
-@export var drop_line: String = ""
+# A worn piece's article in the find line ("You find a harness on the
+# Wardling." - RegionField, FindLine): "a", "an", or empty for a name
+# that takes none ("Wardling's Lamp"). With one, the name is lowercased
+# there (find_name()).
+@export var article: String = ""
 @export var combat_start_status: StatusData = null
 @export var heal_on_win: int = 0
 @export var opening_draw_bonus: int = 0
@@ -103,6 +105,11 @@ enum Slot { KEEPSAKE, WORN }
 @export var max_hp_bonus: int = 0
 @export_range(0.0, 1.0, 0.05) var first_hit_scale: float = 1.0
 @export var hit_back_damage: int = 0
+
+# The name as the find line says it: lowercased after an article ("a
+# harness"), as it is without one ("Wardling's Lamp").
+func find_name() -> String:
+	return display_name.to_lower() if not article.is_empty() else display_name
 
 func describe() -> String:
 	return _fill(description)

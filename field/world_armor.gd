@@ -5,12 +5,9 @@ class_name WorldArmor
 # elite fell (RegionField's win), or where the Wanderer set the last one
 # down when he took another. A plain field object: its body (the piece's
 # field_model_path, else a placeholder block) seated on the relief by its
-# own bounds. No glow, no beam, no floating icon.
-#
-# Walking within reach_radius says the piece's drop_line once, in the world
-# voice near it (WorldVoiceLine.show_line_near() - the Keeper's line, the
-# same Spectral). A set-down piece (set_down) waits until he has stepped
-# out of reach first: he is standing on it as it lands.
+# own bounds. No glow, no beam, no floating icon. It says nothing: a
+# fight's piece is named by the find line once the reward has closed
+# (RegionField, FindLine).
 #
 # Within reach, a click on it opens its plate (RegionField._try_examine_
 # armor(), ArmorExamine): TAKE wears it - whatever was worn is set down
@@ -21,11 +18,7 @@ class_name WorldArmor
 const GROUP := &"worn_drops"
 
 @export var piece: TrinketData = null
-# Set down by a swap rather than dropped by a fight: no line until the
-# Wanderer has left reach once.
-@export var set_down: bool = false
-# How near the Wanderer must be (ground distance) to hear its line and to
-# open it with a click.
+# How near the Wanderer must be (ground distance) to open it with a click.
 @export var reach_radius: float = 2.5
 # Metres it lies over the relief: on something the relief doesn't draw -
 # where floor 4's Adder fell, on its basking slab (FieldEnemy.height_offset,
@@ -34,11 +27,7 @@ const GROUP := &"worn_drops"
 	set(value):
 		height_offset = value
 		seat()
-@export var line_hold_seconds: float = 3.0
-# The line's anchor above the piece's own top.
-@export var line_clearance: float = 0.6
 @export var ground_path: NodePath = ^"../Ground"
-@export var hud_path: NodePath = ^"../FieldHUD"
 @export var yaw_degrees: float = 0.0:
 	set(value):
 		yaw_degrees = value
@@ -58,12 +47,8 @@ const GROUP := &"worn_drops"
 @export_group("")
 
 var _body: Node3D = null
-var _wanderer: Node3D = null
 # The body's bounds in this node's space, measured as it's built.
 var _aabb: AABB = AABB()
-var _was_in_reach: bool = false
-# Whether the line may still be said: once per piece lying here.
-var _line_armed: bool = true
 var _taken: bool = false
 
 func _ready() -> void:
@@ -73,13 +58,6 @@ func _ready() -> void:
 		queue_free()
 		return
 	_rebuild_body()
-	# Standing on it as it lands: in reach already, but not yet heard.
-	_wanderer = _find_wanderer()
-	_was_in_reach = set_down and _wanderer != null and _in_reach(_wanderer.global_position)
-
-func _find_wanderer() -> Node3D:
-	var found: Array[Node] = get_tree().get_nodes_in_group("wanderer")
-	return found[0] as Node3D if not found.is_empty() else null
 
 # The body, built again from the piece (and the placeholder's settings),
 # then seated: its lowest point on the relief.
@@ -162,32 +140,6 @@ func get_screen_rect(camera: Camera3D, padding_px: float) -> Rect2:
 		var point: Vector2 = camera.unproject_position(corner)
 		rect = Rect2(point, Vector2.ZERO) if i == 0 else rect.expand(point)
 	return rect.grow(padding_px)
-
-func _physics_process(_delta: float) -> void:
-	if _taken:
-		return
-	if _wanderer == null or not is_instance_valid(_wanderer):
-		_wanderer = _find_wanderer()
-		if _wanderer == null:
-			return
-	var in_reach: bool = _in_reach(_wanderer.global_position)
-	if in_reach and not _was_in_reach and _line_armed:
-		_line_armed = false
-		_say_line()
-	_was_in_reach = in_reach
-
-func _say_line() -> void:
-	if piece.drop_line.is_empty():
-		return
-	var line := WorldVoiceLine.on_hud(get_node_or_null(hud_path))
-	if line == null:
-		push_warning("WorldArmor: no FieldHUD to say '%s' on." % piece.display_name)
-		return
-	line.show_line_near(piece.drop_line, line_hold_seconds, self, Vector3.UP * (_aabb.end.y + line_clearance))
-
-# Whether its line has been said (for probes).
-func has_spoken() -> bool:
-	return not _line_armed
 
 # Taken: off the sand - it shrinks into the ground where it lay and goes.
 # Nothing flies anywhere: a worn piece has no deck to fly to.

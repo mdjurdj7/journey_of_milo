@@ -345,25 +345,11 @@ func _apply_finish() -> void:
 		_name_layer.material = null
 		_redraw()
 		return
-	if _name_finish == null:
-		var shader := load(name_finish_shader_path) as Shader
-		if shader == null:
-			push_warning("ArmorPlate: name finish shader failed to load (%s); the name stays ink." % name_finish_shader_path)
-			_name_layer.material = null
-			return
-		_name_finish = ShaderMaterial.new()
-		_name_finish.shader = shader
-		_name_finish.set_shader_parameter("sheen_t", -1.0)
-	_name_finish.set_shader_parameter("base_color", _finish.base_color(rarity))
-	_name_finish.set_shader_parameter("highlight_color", _finish.highlight_color(rarity))
-	_name_finish.set_shader_parameter("rainbow", _finish.is_rainbow(rarity))
-	_name_finish.set_shader_parameter("hue_a", _finish.ultra_hue_rose)
-	_name_finish.set_shader_parameter("hue_b", _finish.ultra_hue_teal)
-	_name_finish.set_shader_parameter("hue_c", _finish.ultra_hue_olive)
-	_name_finish.set_shader_parameter("rest_gradient_strength", _finish.rest_gradient_strength)
-	_name_finish.set_shader_parameter("sheen_width", _finish.sheen_width)
-	_name_finish.set_shader_parameter("sheen_softness", _finish.sheen_softness)
-	_name_finish.set_shader_parameter("sheen_strength", _finish.sheen_strength)
+	var material: ShaderMaterial = _finish.name_material(rarity, _name_finish, name_finish_shader_path)
+	if material == null:
+		_name_layer.material = null
+		return
+	_name_finish = material
 	_name_layer.material = _name_finish
 
 # --- Layout ---

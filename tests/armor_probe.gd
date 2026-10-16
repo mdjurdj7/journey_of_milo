@@ -52,7 +52,7 @@ func _initialize() -> void:
 	_check_hit_back_once_per_attack()
 	await _check_fight_opening()
 	await _check_hit_back_kill_in_fight()
-	await _check_drop_line()
+	await _check_find_line()
 	await _check_examine_leave()
 	await _check_swap_sets_old_down()
 	_check_plate_finish()
@@ -274,30 +274,50 @@ func _check_hit_back_kill_in_fight() -> void:
 
 # --- On the sand ---
 
-# A piece lying near him says its line once he walks up; a piece set down
-# under him waits until he has stepped away and back.
-func _check_drop_line() -> void:
+# The find line: a win's piece is named once the reward screen closes -
+# not under it - "You find <article> <name> on the <creature>.", the name
+# lowercased after its article and in its rarity finish; a Common's name
+# plain ink, a name with no article as it is. The table is set here.
+func _check_find_line() -> void:
 	_new_run()
-	await _load_field(0)
-	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
-	var away: Vector3 = wanderer.global_position
-	var piece: TrinketData = _piece(&"probe_common", CardData.CardRarity.COMMON)
-	piece.drop_line = "Probe line."
-	var drop: Node3D = _field.call("spawn_world_armor", piece, away + Vector3(6.0, 0.0, 0.0), false)
-	await _physics(5)
-	_expect(not bool(drop.call("has_spoken")), "A piece out of reach says nothing")
-	_expect(drop.get_node_or_null("Body") != null, "...and has a body on the sand")
-	wanderer.global_position = drop.global_position + Vector3(0.5, 0.0, 0.0)
-	await _physics(5)
-	_expect(bool(drop.call("has_spoken")), "Walking up to it says its line")
-	var set_down: Node3D = _field.call("spawn_world_armor", piece, wanderer.global_position, true)
-	await _physics(5)
-	_expect(not bool(set_down.call("has_spoken")), "A piece set down under him waits")
-	wanderer.global_position = away
-	await _physics(5)
-	wanderer.global_position = set_down.global_position + Vector3(0.5, 0.0, 0.0)
-	await _physics(5)
-	_expect(bool(set_down.call("has_spoken")), "...until he steps away and back")
+	var data: EnemyData = load(WARDLING_PATH)
+	var saved: KeepsakeTable = data.armor_table
+	var table := KeepsakeTable.new()
+	var entry := KeepsakeEntry.new()
+	entry.trinket = _piece(&"Probe Piece", CardData.CardRarity.RARE)
+	entry.trinket.article = "a"
+	table.entries.append(entry)
+	data.armor_table = table
+	var controller: Node = await _start_fight(2, WARDLING_PATH)
+	if controller != null:
+		_kill_all(controller)
+		var reward: Node = null
+		var start: int = Time.get_ticks_msec()
+		while reward == null and Time.get_ticks_msec() - start < 6000:
+			await process_frame
+			# By its script, untyped: naming RewardScreen here would compile it
+			# before the RunState autoload registers.
+			for child in _field.get_children():
+				var script: Script = child.get_script()
+				if script != null and script.resource_path.ends_with("reward_screen.gd"):
+					reward = child
+		_expect(reward != null, "Won: the reward screen")
+		await _seconds(0.2)
+		var line: FindLine = _field.get_node_or_null("FieldHUD/FindLine") as FindLine
+		_expect(line == null or not line.is_showing(), "...with no find line under it")
+		if reward != null:
+			reward.call("close")
+		await _seconds(0.5)
+		line = _field.get_node_or_null("FieldHUD/FindLine") as FindLine
+		_expect(line != null and line.is_showing(), "Closed: the find line")
+		if line != null:
+			_expect_eq(line.get_sentence(), "You find a probe piece on the %s." % data.enemy_name, "...naming the piece, lowercased after its article, and who left it")
+			_expect(line.get_name_finish() != null, "...a RARE name in its finish")
+			var common: TrinketData = _piece(&"Plain Piece", CardData.CardRarity.COMMON)
+			line.say_find(common, data.enemy_name)
+			_expect_eq(line.get_sentence(), "You find Plain Piece on the %s." % data.enemy_name, "A name with no article stays as it is")
+			_expect(line.get_name_finish() == null, "...and a COMMON name is plain ink")
+	data.armor_table = saved
 	await _teardown()
 	_completed += 1
 
@@ -311,7 +331,7 @@ func _check_examine_leave() -> void:
 	var worn: TrinketData = _piece(&"probe_worn", CardData.CardRarity.COMMON)
 	var offered: TrinketData = _piece(&"probe_offered", CardData.CardRarity.COMMON)
 	_run_state.call("equip_worn", worn)
-	var drop: Node3D = _field.call("spawn_world_armor", offered, wanderer.global_position + Vector3(0.5, 0.0, 0.0), false)
+	var drop: Node3D = _field.call("spawn_world_armor", offered, wanderer.global_position + Vector3(0.5, 0.0, 0.0))
 	await _physics(2)
 	_expect(bool(_field.call("open_armor_examine", drop)), "A piece within reach opens its plate")
 	await process_frame
@@ -339,13 +359,13 @@ func _check_swap_sets_old_down() -> void:
 	first.max_hp_bonus = 6
 	var second: TrinketData = _piece(&"probe_second", CardData.CardRarity.RARE)
 	var base_max: int = int(_run_state.get("player_max_hp"))
-	var drop_first: Node3D = _field.call("spawn_world_armor", first, wanderer.global_position + Vector3(0.5, 0.0, 0.0), false)
+	var drop_first: Node3D = _field.call("spawn_world_armor", first, wanderer.global_position + Vector3(0.5, 0.0, 0.0))
 	await _physics(2)
 	_field.call("take_worn_piece", drop_first)
 	_expect(_run_state.get("worn") == first, "TAKE wears the piece")
 	_expect(bool(drop_first.call("is_taken")), "...and it leaves the sand")
 	_expect_eq(_lying().size(), 0, "...with nothing set down from an empty slot")
-	var drop_second: Node3D = _field.call("spawn_world_armor", second, wanderer.global_position + Vector3(0.5, 0.0, 0.0), false)
+	var drop_second: Node3D = _field.call("spawn_world_armor", second, wanderer.global_position + Vector3(0.5, 0.0, 0.0))
 	await _physics(2)
 	_field.call("take_worn_piece", drop_second)
 	_expect(_run_state.get("worn") == second, "Taking another wears it")

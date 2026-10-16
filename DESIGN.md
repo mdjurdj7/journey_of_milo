@@ -472,7 +472,11 @@ folder (run_log_probe). (2026-10-04.)
   primitives and SVGs, by path), more pieces and more elites, and the
   battle row dimming a spent Lamp (the row dims nothing yet). Frayed Cord
   is in no table now - held for a future deed, as are deeds themselves.
-  (2026-10-16, armor.)
+  (2026-10-16, armor.) A piece is named by the find line (FindLine,
+  "You find a harness on the Wardling.") once the reward screen closes,
+  its name in the cards' rarity finish; the RARE finish's dark gold was
+  tuned against bone, so a dark-world variant for that line is deferred
+  until a floor uses ui_on_dark_world. (2026-10-16, find line.)
 - **Signal Glass shows no future intent.** Its intended effect was to
   preview each enemy's intent after the current one. The intent
   architecture doesn't support that cleanly: erratic enemies (Sputter)

@@ -10,7 +10,6 @@ display_name = "Wardling's Lamp"
 slot = 1
 rarity = 3
 description = "The first hit you take each fight is halved."
-drop_line = "The lamp is cold."
 flavor_text = "Nothing has lit it in a long time."
 art = ExtResource("2_art")
 field_model_path = "res://assets/models/armor/wardlings_lamp.tscn"
