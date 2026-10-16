@@ -233,6 +233,10 @@ func _fight_with_cord() -> Node:
 	_field.call_deferred("_on_enemy_contacted", target)
 	for i in 10:
 		await physics_frame
+	# The fight's opening hold (RegionField.battle_input_unlock_time).
+	var entry_layer: Node = _field.get_node("BattleLayer")
+	while entry_layer.get_child_count() > 0 and bool((entry_layer.get_child(0).get("battle_controller") as Node).call("is_entry_locked")):
+		await process_frame
 	var layer: Node = _field.get_node("BattleLayer")
 	if layer.get_child_count() == 0:
 		_fail("no fight started")
