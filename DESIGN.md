@@ -66,10 +66,18 @@ should read the same value. (2026-10-16.)
 Floor 3's stream banks have their own tuft kind (`dune_grass_bank`): pool
 rim within 3 m of the water, rock allowed, anywhere outside the crane
 pair's stance area (stance distance + 1 m) and never in the water. On
-the west bank the worn path's keep-out shrinks to 0.7 m of its
-centreline (0.5 m ramp) for this kind only, so tufts reach the water's
-edge beside the path; the floor's 2.8 m keep-out still holds for the
-rest. (2026-10-16.)
+the west bank the worn path's keep-out shrinks to a quarter of the
+floor's (0.7 m of its centreline at today's 2.8 m; 0.5 m ramp) for this
+kind only, so tufts reach the water's edge beside the path; the floor's
+keep-out - the ground's band half-width plus its edge noise, read live,
+so it narrows with the path - still holds for the rest. (2026-10-16.)
+
+Floor 3's edge tufts follow the walkable edge (the ledges) rather than a
+fixed band (ScatterEntry's Edge group): densest on the edge and up to
+1 m onto the bank, falling off into the floor to a reach that wanders
+0.6-6 m along it, with about 30% of the edge bare. Clumps are bigger and
+tighter (small tufts 20%, medium 45%, large 35%); three in four stones
+have a clump round them. (2026-10-16.)
 
 ## The played card
 

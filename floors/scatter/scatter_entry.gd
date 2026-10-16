@@ -211,9 +211,67 @@ const ZONE_ROCK_EDGE := 32
 	set(value):
 		wear_keep_out_m = value
 		emit_changed()
+# Or its keep-out as this share of the floor's (FieldScatter.get_wear_
+# keep_out(): the band's half-width plus its edge noise, read from the
+# ground), so it follows the band's width - wins over wear_keep_out_m.
+# Below 0 = off.
+@export var wear_keep_out_share: float = -1.0:
+	set(value):
+		wear_keep_out_share = value
+		emit_changed()
 @export var wear_ramp_m: float = -1.0:
 	set(value):
 		wear_ramp_m = value
+		emit_changed()
+@export_group("")
+
+@export_group("Edge")
+# Cluster centres by the walkable edge instead of evenly over its zones:
+# a centre is kept by a weight from how far it lies from the edge - the
+# floor's ledges (FloorData.ledges), signed into the floor (+) and onto
+# the bank past it (-); exposed rock's edge on a floor without ledges -
+# densest on the edge itself and the foot of the bank, edge_onto_m out
+# over it, falling off into the floor to a reach that wanders along the
+# edge between edge_reach_m's x and y (low-frequency noise at edge_noise_
+# wavelength_m), with edge_gap_share of the edge left bare (a second noise
+# at edge_gap_wavelength_m) - so it never reads as an even band. The
+# density then counts each cell by its weight, and a cluster's item count
+# by its centre's (from half at the weakest to full).
+@export var edge_falloff: bool = false:
+	set(value):
+		edge_falloff = value
+		emit_changed()
+# Full weight this far past the edge onto the bank, fading to none over
+# edge_onto_fade_m beyond.
+@export var edge_onto_m: float = 1.0:
+	set(value):
+		edge_onto_m = value
+		emit_changed()
+@export var edge_onto_fade_m: float = 1.0:
+	set(value):
+		edge_onto_fade_m = value
+		emit_changed()
+# Full weight this far into the floor (the foot), then down to none at the
+# local reach.
+@export var edge_core_m: float = 0.6:
+	set(value):
+		edge_core_m = value
+		emit_changed()
+@export var edge_reach_m: Vector2 = Vector2(0.6, 6.0):
+	set(value):
+		edge_reach_m = value
+		emit_changed()
+@export var edge_noise_wavelength_m: float = 12.0:
+	set(value):
+		edge_noise_wavelength_m = value
+		emit_changed()
+@export_range(0.0, 0.9, 0.01) var edge_gap_share: float = 0.3:
+	set(value):
+		edge_gap_share = value
+		emit_changed()
+@export var edge_gap_wavelength_m: float = 8.0:
+	set(value):
+		edge_gap_wavelength_m = value
 		emit_changed()
 @export_group("")
 

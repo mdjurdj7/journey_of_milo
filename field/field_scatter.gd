@@ -63,6 +63,13 @@ class_name FieldScatter
 # changes; a kind may sink by a depth in metres (sink_range_m) and be
 # sized from its model (model_scale).
 #
+# An entry may follow the walkable edge (ScatterEntry's Edge group): each
+# cell also carries its signed distance to the floor's ledges - into the
+# floor +, onto the bank - (a chamfer distance from the cells their lines
+# cross, signed by the spawn's side of each closed ledge) - or, on a floor
+# without ledges, to exposed rock's edge; its cluster centres are kept by
+# a weight from that distance and two noises of its own.
+#
 # A wide kind (a stone) may be tested at its edge as well as its centre
 # (footprint_test), and be solid: every entry placed after it keeps off
 # its items' footprints. An entry may cluster round another's items
@@ -302,6 +309,10 @@ var _cell_excluded: PackedByteArray = PackedByteArray()
 # Excluded by anything but a ledge, for an entry with its own ledge margin.
 var _cell_excluded_off_ledges: PackedByteArray = PackedByteArray()
 var _cell_rock: PackedByteArray = PackedByteArray()
+# Signed metres to the walkable edge: into the floor +, onto the bank -.
+var _cell_edge: PackedFloat32Array = PackedFloat32Array()
+# Metres to the nearest rock cell (_mark_dry_ground()).
+var _rock_distance: PackedFloat32Array = PackedFloat32Array()
 
 # Every entry placed, in order, and each one's spots.
 var _entries: Array[ScatterEntry] = []
@@ -408,6 +419,7 @@ func _build_grid() -> void:
 			_cell_excluded[i] = 1 if is_excluded(p) else 0
 			_cell_excluded_off_ledges[i] = 1 if _cell_excluded[i] != 0 and _excluded_off_ledges(p) else 0
 	_mark_dry_ground()
+	_mark_edge_distance()
 
 # Over each cell's band, the dry ground's marks: its slope from the drawn
 # heights either side; rock where the ground shader would draw stone
@@ -465,6 +477,7 @@ func _mark_dry_ground() -> void:
 						near_rock[i] = minf(near_rock[i], near_rock[i + _grid_cols + 1] + diagonal)
 					if col > 0:
 						near_rock[i] = minf(near_rock[i], near_rock[i + _grid_cols - 1] + diagonal)
+	_rock_distance = near_rock
 	for i in count:
 		if _cell_rock[i] != 0:
 			continue
@@ -472,6 +485,145 @@ func _mark_dry_ground() -> void:
 			_cell_zone[i] |= ScatterEntry.ZONE_ROCK_EDGE
 		if slopes[i] >= dune_flank_slope_degrees:
 			_cell_zone[i] |= ScatterEntry.ZONE_DUNE_FLANK
+
+# Each cell's signed distance to the walkable edge - see the header. The
+# cells every ledge line crosses are its zero; a chamfer pass spreads the
+# distance; a cell on the far side of a closed ledge from the spawn is
+# onto the bank. Without ledges: rock's edge - sand +, rock -.
+func _mark_edge_distance() -> void:
+	var count: int = _grid_cols * _grid_rows
+	_cell_edge.resize(count)
+	var lines: Array[PackedVector2Array] = []
+	if _floor != null:
+		for ledge in _floor.ledges:
+			var line := PackedVector2Array()
+			for point in ledge:
+				line.append(_spawn + point)
+			if line.size() >= 2:
+				lines.append(line)
+	if lines.is_empty():
+		for i in count:
+			var d: float = _rock_distance[i] if not _rock_distance.is_empty() else INF
+			if _cell_rock[i] != 0:
+				d = -_inside_distance(i)
+			_cell_edge[i] = d
+		return
+	var step: float = maxf(sample_step_m, 0.1)
+	var near := PackedFloat32Array()
+	near.resize(count)
+	near.fill(INF)
+	for line in lines:
+		for k in line.size() - 1:
+			var a: Vector2 = line[k]
+			var b: Vector2 = line[k + 1]
+			var samples: int = maxi(int(ceil(a.distance_to(b) / (step * 0.5))), 1)
+			for n in samples + 1:
+				var cell: int = _cell_at(a.lerp(b, float(n) / float(samples)))
+				if cell >= 0:
+					near[cell] = 0.0
+	_chamfer(near, step)
+	var spawn_inside: Array[bool] = []
+	for line in lines:
+		spawn_inside.append(_closed(line) and Geometry2D.is_point_in_polygon(_spawn, line))
+	for i in count:
+		var p: Vector2 = _grid_point(i)
+		var outside: bool = false
+		for k in lines.size():
+			if _closed(lines[k]) and Geometry2D.is_point_in_polygon(p, lines[k]) != spawn_inside[k]:
+				outside = true
+				break
+		_cell_edge[i] = -near[i] if outside else near[i]
+
+# A rock cell's distance to the nearest sand, for the edge without ledges.
+func _inside_distance(cell: int) -> float:
+	var col: int = cell % _grid_cols
+	var row: int = floori(float(cell) / float(_grid_cols))
+	var step: float = maxf(sample_step_m, 0.1)
+	for reach in range(1, 9):
+		for dr in range(-reach, reach + 1):
+			for dc in range(-reach, reach + 1):
+				var c: int = col + dc
+				var r: int = row + dr
+				if c >= 0 and r >= 0 and c < _grid_cols and r < _grid_rows and _cell_rock[r * _grid_cols + c] == 0:
+					return float(reach) * step
+	return 9.0 * step
+
+static func _closed(line: PackedVector2Array) -> bool:
+	return line.size() >= 4 and line[0].distance_to(line[line.size() - 1]) < 0.05
+
+# Two chamfer passes over the grid: each cell the least of its own and
+# its neighbours' plus the step between them.
+func _chamfer(field: PackedFloat32Array, step: float) -> void:
+	var diagonal: float = step * sqrt(2.0)
+	for row in _grid_rows:
+		for col in _grid_cols:
+			var i: int = row * _grid_cols + col
+			if col > 0:
+				field[i] = minf(field[i], field[i - 1] + step)
+			if row > 0:
+				field[i] = minf(field[i], field[i - _grid_cols] + step)
+				if col > 0:
+					field[i] = minf(field[i], field[i - _grid_cols - 1] + diagonal)
+				if col < _grid_cols - 1:
+					field[i] = minf(field[i], field[i - _grid_cols + 1] + diagonal)
+	for row in range(_grid_rows - 1, -1, -1):
+		for col in range(_grid_cols - 1, -1, -1):
+			var i: int = row * _grid_cols + col
+			if col < _grid_cols - 1:
+				field[i] = minf(field[i], field[i + 1] + step)
+			if row < _grid_rows - 1:
+				field[i] = minf(field[i], field[i + _grid_cols] + step)
+				if col < _grid_cols - 1:
+					field[i] = minf(field[i], field[i + _grid_cols + 1] + diagonal)
+				if col > 0:
+					field[i] = minf(field[i], field[i + _grid_cols - 1] + diagonal)
+
+# An edge entry's weight per cell (0..1) - see ScatterEntry's Edge group.
+# Its two noises seeded from the floor and the entry's name; each read
+# over the grid as a rank, so the reach spans its whole range and the gaps
+# are their share of the cells.
+func _edge_weights(entry: ScatterEntry) -> PackedFloat32Array:
+	var count: int = _cell_edge.size()
+	var weights := PackedFloat32Array()
+	weights.resize(count)
+	var reach_noise := FastNoiseLite.new()
+	reach_noise.seed = hash("%s:%s:reach" % [_floor.resource_path, entry.name])
+	reach_noise.frequency = 1.0 / maxf(entry.edge_noise_wavelength_m, 0.5)
+	var gap_noise := FastNoiseLite.new()
+	gap_noise.seed = hash("%s:%s:gap" % [_floor.resource_path, entry.name])
+	gap_noise.frequency = 1.0 / maxf(entry.edge_gap_wavelength_m, 0.5)
+	var reach_raw := PackedFloat32Array()
+	var gap_raw := PackedFloat32Array()
+	reach_raw.resize(count)
+	gap_raw.resize(count)
+	for i in count:
+		var p: Vector2 = _grid_point(i)
+		reach_raw[i] = reach_noise.get_noise_2dv(p)
+		gap_raw[i] = gap_noise.get_noise_2dv(p)
+	var reach_sorted := reach_raw.duplicate()
+	reach_sorted.sort()
+	var gap_sorted := gap_raw.duplicate()
+	gap_sorted.sort()
+	var gap_cut: float = gap_sorted[clampi(int(entry.edge_gap_share * float(count)), 0, count - 1)] if entry.edge_gap_share > 0.0 else -INF
+	var gap_soft: float = (gap_sorted[count - 1] - gap_sorted[0]) * 0.04
+	for i in count:
+		var d: float = _cell_edge[i]
+		if is_inf(d):
+			continue
+		var w: float = 0.0
+		if d < 0.0:
+			w = 1.0 - smoothstep(entry.edge_onto_m, entry.edge_onto_m + maxf(entry.edge_onto_fade_m, 0.01), -d)
+		else:
+			var rank: float = float(reach_sorted.bsearch(reach_raw[i])) / float(maxi(count - 1, 1))
+			var reach: float = lerpf(entry.edge_reach_m.x, entry.edge_reach_m.y, rank)
+			w = 1.0 - smoothstep(entry.edge_core_m, maxf(reach, entry.edge_core_m + 0.01), d)
+		w *= smoothstep(gap_cut - gap_soft, gap_cut + gap_soft, gap_raw[i])
+		weights[i] = w
+	return weights
+
+func get_edge_distance(p: Vector2) -> float:
+	var cell: int = _cell_at(p)
+	return _cell_edge[cell] if cell >= 0 and cell < _cell_edge.size() else INF
 
 # Whether exposed rock covers a point - its cell's (_mark_dry_ground()).
 func is_rock(p: Vector2) -> bool:
@@ -765,6 +917,7 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 	rng.seed = hash("%s:%s" % [_floor.resource_path, entry.name])
 	var spread_range := Vector2(minf(entry.cluster_spread_m.x, entry.cluster_spread_m.y), maxf(entry.cluster_spread_m.x, entry.cluster_spread_m.y))
 	var centres: Array[Vector2] = []
+	var edge_weights: PackedFloat32Array = _edge_weights(entry) if entry.edge_falloff else PackedFloat32Array()
 	# Per centre: the footprint its ring of items lies outside (around_
 	# entries), 0 for a cluster over the zones.
 	var rings := PackedFloat32Array()
@@ -777,13 +930,19 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 					centres.append(Vector2(spot.position.x, spot.position.z))
 					rings.append(spot.size * 0.5)
 	else:
-		_zone_centres(entry, rng, spread_range, centres)
+		_zone_centres(entry, rng, spread_range, centres, edge_weights)
 		rings.resize(centres.size())
 		rings.fill(0.0)
 	var base_size: float = base_size_for(entry)
 	for c in centres.size():
 		var centre: Vector2 = centres[c]
 		var count: int = rng.randi_range(mini(entry.items_per_cluster.x, entry.items_per_cluster.y), maxi(entry.items_per_cluster.x, entry.items_per_cluster.y))
+		if not edge_weights.is_empty():
+			# Fuller where the edge's weight is: half the count at the
+			# weakest, all of it at full.
+			var cell: int = _cell_at(centre)
+			var w: float = edge_weights[cell] if cell >= 0 else 0.0
+			count = maxi(roundi(float(count) * lerpf(0.5, 1.0, w)), mini(entry.items_per_cluster.x, entry.items_per_cluster.y))
 		var spread: float = rng.randf_range(spread_range.x, spread_range.y)
 		var cluster: Array[Vector2] = []
 		var cluster_reach: Array[float] = []
@@ -847,19 +1006,25 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 
 # A zone entry's cluster centres: Poisson-disc over the cells it may
 # centre in (inside its area, when it has one), as many as its count or
-# its density over that ground gives.
-func _zone_centres(entry: ScatterEntry, rng: RandomNumberGenerator, spread_range: Vector2, centres: Array[Vector2]) -> void:
+# its density over that ground gives - an edge entry's each kept by its
+# cell's weight (`weights`, empty for any other), its ground counted by
+# them.
+func _zone_centres(entry: ScatterEntry, rng: RandomNumberGenerator, spread_range: Vector2, centres: Array[Vector2], weights: PackedFloat32Array) -> void:
 	var step: float = maxf(sample_step_m, 0.1)
 	var cells := PackedInt32Array()
 	var polygon := PackedVector2Array()
 	for point in entry.area:
 		polygon.append(_spawn + point)
+	var weighted: float = 0.0
 	for i in _cell_zone.size():
+		if not weights.is_empty() and weights[i] <= 0.0:
+			continue
 		if _centre_allowed(entry, i) and (polygon.size() < 3 or Geometry2D.is_point_in_polygon(_grid_point(i), polygon)):
 			cells.append(i)
+			weighted += weights[i] if not weights.is_empty() else 1.0
 	if cells.is_empty():
 		return
-	var area: float = float(cells.size()) * step * step
+	var area: float = weighted * step * step
 	var target: int = 0
 	if entry.cluster_count.x >= 0:
 		target = rng.randi_range(entry.cluster_count.x, maxi(entry.cluster_count.x, entry.cluster_count.y))
@@ -871,11 +1036,15 @@ func _zone_centres(entry: ScatterEntry, rng: RandomNumberGenerator, spread_range
 	# Poisson-disc by dart throwing: centres no nearer each other than a
 	# share of the spacing the density would give spread evenly.
 	var spacing: float = maxf(0.6 * sqrt(area / float(target)), spread_range.y * 2.0)
-	for attempt in target * 30:
+	# An edge entry keeps a centre by its cell's weight - more throws for it.
+	var throws: int = target * (90 if not weights.is_empty() else 30)
+	for attempt in throws:
 		if centres.size() >= target:
 			break
 		var cell: int = cells[rng.randi_range(0, cells.size() - 1)]
 		var p: Vector2 = cell_centre(cell % _grid_cols, floori(float(cell) / float(_grid_cols))) + Vector2(rng.randf_range(-0.5, 0.5), rng.randf_range(-0.5, 0.5)) * step
+		if not weights.is_empty() and rng.randf() >= weights[cell]:
+			continue
 		var clear: bool = true
 		for other in centres:
 			if other.distance_to(p) < spacing:
@@ -935,7 +1104,7 @@ func _centre_allowed(entry: ScatterEntry, cell: int) -> bool:
 	if (_cell_zone[cell] & entry.zones) == 0:
 		return false
 	if _has_own_wear(entry):
-		if wear_weight(_grid_point(cell), entry.wear_keep_out_m, entry.wear_ramp_m) < 1.0:
+		if wear_weight(_grid_point(cell), _entry_keep_out(entry), entry.wear_ramp_m) < 1.0:
 			return false
 	elif _cell_wear[cell] < 1.0:
 		return false
@@ -970,7 +1139,7 @@ func _item_allowed(entry: ScatterEntry, p: Vector2, keep_roll: float, radius: fl
 		if not _point_allowed(entry, q):
 			return false
 		if _has_own_wear(entry):
-			weight = minf(weight, wear_weight(q, entry.wear_keep_out_m, entry.wear_ramp_m))
+			weight = minf(weight, wear_weight(q, _entry_keep_out(entry), entry.wear_ramp_m))
 		else:
 			weight = minf(weight, wear_weight(q))
 	return keep_roll < weight
@@ -993,7 +1162,15 @@ func _point_allowed(entry: ScatterEntry, p: Vector2) -> bool:
 	return true
 
 static func _has_own_wear(entry: ScatterEntry) -> bool:
-	return entry.wear_keep_out_m >= 0.0 or entry.wear_ramp_m >= 0.0
+	return entry.wear_keep_out_share >= 0.0 or entry.wear_keep_out_m >= 0.0 or entry.wear_ramp_m >= 0.0
+
+# An entry's own keep-out from the band's centreline: its share of the
+# floor's (so it follows the band's width), else its metres, else -1
+# (the floor's).
+func _entry_keep_out(entry: ScatterEntry) -> float:
+	if entry.wear_keep_out_share >= 0.0:
+		return get_wear_keep_out() * entry.wear_keep_out_share
+	return entry.wear_keep_out_m
 
 # --- Contours ---
 

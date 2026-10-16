@@ -8,19 +8,19 @@
 script = ExtResource("3_card")
 texture_path = "res://assets/models/props/scatter/grass_tuft_small.png"
 height_m = 0.3
-weight = 0.45
+weight = 0.2
 
 [sub_resource type="Resource" id="ScatterCard_medium"]
 script = ExtResource("3_card")
 texture_path = "res://assets/models/props/scatter/grass_tuft_medium.png"
 height_m = 0.45
-weight = 0.4
+weight = 0.45
 
 [sub_resource type="Resource" id="ScatterCard_large"]
 script = ExtResource("3_card")
 texture_path = "res://assets/models/props/scatter/grass_tuft_large.png"
 height_m = 0.6
-weight = 0.15
+weight = 0.35
 
 [sub_resource type="Resource" id="ScatterEntry_stone_slab_foot"]
 script = ExtResource("2_entry")
@@ -162,11 +162,12 @@ stance_clearance_m = 1.0
 ledge_margin_m = 0.1
 avoid_rock = true
 around_entries = PackedStringArray("stone_slab_foot", "stone_pair_foot", "stone_cluster_foot", "stone_slab_open", "stone_pair_open", "stone_cluster_open")
-around_share = 0.4
+around_share = 0.75
+card_spacing_fraction = 0.12
 cards = Array[ExtResource("3_card")]([SubResource("ScatterCard_small"), SubResource("ScatterCard_medium"), SubResource("ScatterCard_large")])
 battle_fade = true
-items_per_cluster = Vector2i(2, 4)
-cluster_spread_m = Vector2(0.08, 0.25)
+items_per_cluster = Vector2i(4, 7)
+cluster_spread_m = Vector2(0.08, 0.22)
 
 [sub_resource type="Resource" id="ScatterEntry_grass_foot"]
 script = ExtResource("2_entry")
@@ -177,16 +178,18 @@ tint = Color(1, 1, 1, 1)
 tint_jitter = 0.06
 wind = 0.04
 cast_shadow = true
-zones = 32
+zones = 56
 inland_range_m = Vector2(0.3, 1000)
 stance_clearance_m = 1.0
 ledge_margin_m = 0.1
-avoid_rock = true
+avoid_rock = false
+edge_falloff = true
+card_spacing_fraction = 0.12
 cards = Array[ExtResource("3_card")]([SubResource("ScatterCard_small"), SubResource("ScatterCard_medium"), SubResource("ScatterCard_large")])
 battle_fade = true
-clusters_per_100m2 = 10.0
-items_per_cluster = Vector2i(2, 6)
-cluster_spread_m = Vector2(0.25, 0.5)
+clusters_per_100m2 = 12.0
+items_per_cluster = Vector2i(6, 11)
+cluster_spread_m = Vector2(0.15, 0.35)
 
 [sub_resource type="Resource" id="ScatterEntry_grass_bank"]
 script = ExtResource("2_entry")
@@ -201,13 +204,14 @@ zones = 7
 inland_range_m = Vector2(0, 3)
 stance_clearance_m = 1.0
 ledge_margin_m = 0.1
-wear_keep_out_m = 0.7
 wear_ramp_m = 0.5
+wear_keep_out_share = 0.25
+card_spacing_fraction = 0.15
 cards = Array[ExtResource("3_card")]([SubResource("ScatterCard_small"), SubResource("ScatterCard_medium"), SubResource("ScatterCard_large")])
 battle_fade = true
 clusters_per_100m2 = 14.0
-items_per_cluster = Vector2i(2, 6)
-cluster_spread_m = Vector2(0.25, 0.5)
+items_per_cluster = Vector2i(3, 7)
+cluster_spread_m = Vector2(0.15, 0.35)
 
 [sub_resource type="Resource" id="ScatterEntry_grass_flank"]
 script = ExtResource("2_entry")
@@ -223,11 +227,12 @@ inland_range_m = Vector2(0.3, 1000)
 stance_clearance_m = 1.0
 ledge_margin_m = 0.1
 avoid_rock = true
+card_spacing_fraction = 0.15
 cards = Array[ExtResource("3_card")]([SubResource("ScatterCard_small"), SubResource("ScatterCard_medium"), SubResource("ScatterCard_large")])
 battle_fade = true
-clusters_per_100m2 = 2.5
-items_per_cluster = Vector2i(2, 6)
-cluster_spread_m = Vector2(0.25, 0.5)
+clusters_per_100m2 = 1.5
+items_per_cluster = Vector2i(4, 8)
+cluster_spread_m = Vector2(0.18, 0.38)
 
 [sub_resource type="Resource" id="ScatterEntry_grass_open"]
 script = ExtResource("2_entry")
@@ -243,11 +248,12 @@ inland_range_m = Vector2(0.3, 1000)
 stance_clearance_m = 1.0
 ledge_margin_m = 0.1
 avoid_rock = true
+card_spacing_fraction = 0.15
 cards = Array[ExtResource("3_card")]([SubResource("ScatterCard_small"), SubResource("ScatterCard_medium"), SubResource("ScatterCard_large")])
 battle_fade = true
-clusters_per_100m2 = 0.8
-items_per_cluster = Vector2i(2, 4)
-cluster_spread_m = Vector2(0.25, 0.45)
+clusters_per_100m2 = 0.35
+items_per_cluster = Vector2i(4, 8)
+cluster_spread_m = Vector2(0.2, 0.4)
 
 [resource]
 script = ExtResource("1_set")
