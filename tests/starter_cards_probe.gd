@@ -301,6 +301,7 @@ func _check_face_layout() -> void:
 			_expect_eq(Rect2(view.art_field.position, view.art_field.size), art_rect, "%s's art field" % card.card_name)
 			_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), SHRUNK_RULES.get(card.card_name, 15), "%s's rules size" % card.card_name)
 			_expect_eq(view.size, view.card_size, "%s keeps the card's size" % card.card_name)
+			_expect_eq(view.name_font_size(), view.name_font_sizes[0], "%s's name at the first size" % card.card_name)
 			_expect(view.rules_text.position.y + view.rules_text.size.y <= _type_baseline(view) + _ink_top(view.type_label, view.type_label_font_size_px), "%s's text ends above the type label" % card.card_name)
 			_check_rules_block(view, card.card_name)
 			# ATTACK <=> STRIKE, both ways: the label is how a reader knows
@@ -329,11 +330,27 @@ func _check_face_layout() -> void:
 	_expect_eq(Rect2(view.art_field.position, view.art_field.size), art_rect, "...its art field unmoved")
 	_check_rules_block(view, long_card.card_name)
 
+	# A name just too long for the first size steps down until it fits on
+	# one line, its baseline still the header's, clear of the art.
+	var snug_name := CardData.new()
+	snug_name.card_name = "Second Thoughts+"
+	snug_name.cost = 1
+	snug_name.description = "Draw 1."
+	view.set_card_data(snug_name)
+	var floor_size: int = view.name_font_sizes[view.name_font_sizes.size() - 1]
+	var snug_size: int = view.name_font_size()
+	_expect(snug_size < view.name_font_sizes[0] and snug_size >= floor_size, "A name too long at %d steps down (to %d)" % [view.name_font_sizes[0], snug_size])
+	_expect_eq(view.call("_wrapped_line_count", view.name_label, snug_size, view.name_label.size.x), 1, "...and sits on one line there")
+	_expect_eq(view.name_label.get_theme_font_size("font_size"), snug_size, "...drawn at that size")
+	_expect(is_equal_approx(view.name_label.position.y + view.name_label.get_theme_font("font").get_ascent(snug_size), view.header_baseline_px), "...its baseline on the header's")
+	_expect(view.name_label.position.y + view.name_label.size.y <= art_top, "...clear of the art field")
+
 	var long_name := CardData.new()
 	long_name.card_name = "A Name Far Too Long To Sit Beside Its Cost"
 	long_name.description = "Draw 1."
 	view.set_card_data(long_name)
-	_expect(view.name_label.autowrap_mode == TextServer.AUTOWRAP_OFF and view.name_label.clip_text, "A long name is clipped to one line")
+	_expect_eq(view.name_font_size(), floor_size, "A name too long at every size sits at the floor")
+	_expect(view.name_label.autowrap_mode == TextServer.AUTOWRAP_OFF and view.name_label.clip_text, "...clipped to one line")
 	_expect(view.name_label.position.y + view.name_label.size.y <= art_top, "...clear of the art field")
 	_expect_eq(view.size, view.card_size, "A short card back at card_size after a grown one")
 	view.queue_free()

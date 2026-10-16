@@ -188,7 +188,16 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # The numeral is the Light cut, larger than the name: the name leads by
 # weight, the cost anchors by size, and the two never match.
 @export var cost_font: Font = load("res://assets/fonts/Spectral-Light.ttf")
-@export var name_font_size_px: int = 19
+# The name's sizes at 1x, largest first: each is tried in turn until the
+# name sits on one line beside the cost. The last is the floor - a name
+# still too long there is clipped (_warn_long_name() says so). A name
+# that lands below the first size is a long one.
+@export var name_font_sizes: Array[int] = [19, 18, 17, 16]:
+	set(value):
+		name_font_sizes = value
+		_relayout()
+		if is_node_ready() and card_data != null:
+			_apply_name_finish()
 @export var cost_font_size_px: int = 26
 @export var hp_cost_font_size_px: int = 10
 @export_range(0.0, 1.0) var hp_cost_letter_spacing_em: float = 0.16
@@ -483,6 +492,8 @@ var _name_finish: ShaderMaterial = null
 # started on this card - for probes.
 var _name_sheen_tween: Tween = null
 var _name_sheens_started: int = 0
+# The size the name landed at in the last layout (_fit_name_size()).
+var _name_font_size: int = 0
 # Draws the art rules - a Control over the whole face made in _ready(),
 # like _bonus_corner, so the rules draw above the image instead of being
 # clipped into it by the field.
@@ -1021,7 +1032,7 @@ func _apply_name_finish() -> void:
 	if material == null:
 		return
 	_name_finish = material
-	var text_width: float = _string_width(name_label, name_font_size_px)
+	var text_width: float = _string_width(name_label, _name_font_size)
 	if name_label.size.x > 0.0:
 		text_width = minf(text_width, name_label.size.x)
 	_name_finish.set_shader_parameter("text_width_px", text_width)
@@ -1803,7 +1814,8 @@ func _apply_style() -> void:
 	_apply_shadows(false)
 
 	name_label.add_theme_color_override("font_color", ink_color)
-	name_label.add_theme_font_size_override("font_size", name_font_size_px)
+	if not name_font_sizes.is_empty():
+		name_label.add_theme_font_size_override("font_size", name_font_sizes[0])
 	if name_font != null:
 		name_label.add_theme_font_override("font", _msdf(name_font))
 
@@ -1946,8 +1958,9 @@ func _relayout() -> void:
 		_apply_style()
 		_apply_layout()
 
-# Vertical stack at 1x. The name holds one line beside the cost (a
-# longer one is clipped and warned about); the art field is the fixed
+# Vertical stack at 1x. The name holds one line beside the cost, at the
+# first of name_font_sizes that fits (past the floor it is clipped and
+# warned about); the art field is the fixed
 # art_field_size rect under the header; the rules text is centred in the
 # area between the art field and the footer (rules_area()), at the first
 # of rules_font_sizes that fits inside its margins. Past the last size
@@ -2035,10 +2048,10 @@ func _apply_layout() -> void:
 
 	# One line, always: the art field sits at a fixed height below it.
 	var name_width: float = card_size.x - outer_margin * 2.0 - cost_width - name_cost_gap
-	if _wrapped_line_count(name_label, name_font_size_px, name_width) > 1:
-		_warn_long_name()
-	name_label.position = Vector2(outer_margin, _top_for_baseline(name_label, name_font_size_px, header_baseline_px))
-	name_label.size = Vector2(name_width, _line_height(name_label, name_font_size_px))
+	_name_font_size = _fit_name_size(name_width)
+	name_label.add_theme_font_size_override("font_size", _name_font_size)
+	name_label.position = Vector2(outer_margin, _top_for_baseline(name_label, _name_font_size, header_baseline_px))
+	name_label.size = Vector2(name_width, _line_height(name_label, _name_font_size))
 	name_label.horizontal_alignment = HORIZONTAL_ALIGNMENT_LEFT
 	name_label.vertical_alignment = VERTICAL_ALIGNMENT_TOP
 	name_label.autowrap_mode = TextServer.AUTOWRAP_OFF
@@ -2120,6 +2133,21 @@ func _wrapped_line_count(label: Label, font_size: int, width: float) -> int:
 	var total: float = font.get_multiline_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, width, font_size, -1, TextServer.BREAK_WORD_BOUND | TextServer.BREAK_MANDATORY).y
 	return maxi(roundi(total / maxf(line_height, 1.0)), 1)
 
+# The size the name is drawn at - for the finish and for probes.
+func name_font_size() -> int:
+	return _name_font_size
+
+# The first of name_font_sizes at which the name sits on one line in
+# `width`; past the floor, the floor (clipped, and warned about).
+func _fit_name_size(width: float) -> int:
+	if name_font_sizes.is_empty():
+		return name_label.get_theme_font_size("font_size")
+	for candidate in name_font_sizes:
+		if _wrapped_line_count(name_label, candidate, width) <= 1:
+			return candidate
+	_warn_long_name()
+	return name_font_sizes[name_font_sizes.size() - 1]
+
 # The rules text as the face breaks it: per authored line (paragraph),
 # the lines it wraps to. Shaped with the bold face on keywords, the way
 # the RichTextLabel sets them, and broken as its WORD_SMART does - a
@@ -2186,7 +2214,7 @@ func _warn_long_name() -> void:
 	if _warned.has("name:" + card_name):
 		return
 	_warned["name:" + card_name] = true
-	push_warning("CardView: '%s' doesn't fit on one line beside its cost - clipped. Shorten the name." % card_name)
+	push_warning("CardView: '%s' doesn't fit on one line beside its cost even at the smallest name size - clipped. Shorten the name." % card_name)
 
 # --- Glyph ---
 

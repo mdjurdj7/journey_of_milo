@@ -227,7 +227,7 @@ func _check_faces() -> void:
 	for card in _tempered_originals():
 		var tempered: CardData = card.tempered
 		view.set_card_data(tempered)
-		var lines: int = view.call("_wrapped_line_count", view.name_label, view.name_font_size_px, view.name_label.size.x)
+		var lines: int = view.call("_wrapped_line_count", view.name_label, view.name_font_size(), view.name_label.size.x)
 		_expect_eq(lines, 1, "%s's name fits on one line beside its cost" % tempered.card_name)
 		var rules_size: int = view.rules_text.get_theme_font_size("normal_font_size")
 		_expect(rules_size >= MIN_RULES_SIZE, "%s's rules size %d, at least %d (else its text is too long)" % [tempered.card_name, rules_size, MIN_RULES_SIZE])
