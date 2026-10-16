@@ -47,19 +47,24 @@
   probe at a time when under 6 GB is free at the start, else two; it
   waits for memory rather than start a probe that would leave under
   2000 MB free, and ends everything it started if it's stopped.
-- During a task: run only the new probes and the probe files the task
-  edited (`--probe`), once, at the end, in the foreground - not whole
-  areas, and not `--changed`.
-- Before a push: run `--smoke` (a fixed six across the field, a fight,
-  the floors and the cards) once, in the foreground. `--changed`,
-  `--prepush` (the mapped probes plus the fast tier) and area sweeps
-  run only when I ask for them.
+- After a change: run only the probe(s) for the system you touched
+  (`--probe`), plus `--smoke` (a fixed six across the field, a fight,
+  the floors and the cards), once each, at the end, in the foreground -
+  not whole areas, and not `--changed`.
+- The full probe set runs only before a push: `--full --batch 1/4` ...
+  `--batch 4/4`, each in the foreground. `--changed`, `--prepush` (the
+  mapped probes plus the fast tier) and area sweeps run only when I ask
+  for them.
+- Never push unless my message says "push".
+- Don't write a new probe unless I ask for one, or unless it guards a
+  bug that actually happened.
+- Don't pin content in probes: no exact positions, yaws, point counts
+  or composition checks for props, enemies or bands. Where something
+  stands is checked by me in game.
 - Runs record their timings in tools/probe_times.local.txt (git-ignored),
   never in the tracked tools/probe_times.txt; `--refresh-times` copies
   the local averages over it when I choose to commit them. `--batch`
   splits by the committed copy.
-- `--full` only when I ask for it, always as `--full --batch 1/4` ...
-  `--batch 4/4`, each in the foreground.
 - Never run probes in the background. Never start probes while another
   session's probes are running: check for running Godot probe
   processes first (PowerShell: `Get-CimInstance Win32_Process -Filter
