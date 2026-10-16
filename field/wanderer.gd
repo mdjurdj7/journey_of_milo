@@ -2207,6 +2207,18 @@ func _play_stance_walk(on: bool) -> void:
 		if on:
 			_animation_player.play("Walk", animation_blend_time)
 
+# In a fight, his body turned to face `point` over duration - an enemy
+# that has moved (FieldEnemy.drop_off()). The model keeps its battle turn.
+func turn_toward_in_battle(point: Vector3, duration: float) -> void:
+	var to_point := Vector3(point.x - global_position.x, 0.0, point.z - global_position.z)
+	if to_point.length() < 0.01:
+		return
+	var target_angle: float = rotation.y + wrapf(_angle_from_direction(to_point.normalized()) - rotation.y, -PI, PI)
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(self, "rotation:y", target_angle, maxf(duration, 0.01))
+
 # Whether DrawSword is the glb's own draw_sword (not the Mixamo fallback) -
 # RegionField times the fight's opening input hold by it.
 func has_own_draw_sword() -> bool:

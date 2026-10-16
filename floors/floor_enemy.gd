@@ -31,6 +31,14 @@ class_name FloorEnemy
 # the edge. It still takes its battle_camera_turn_degrees. Ignored in a
 # cluster, whose line sets the stance. False = turn to him, as ever.
 @export var holds_facing: bool = false
+# Where it lands when its phase comes (EnemyData.phase_status - the
+# Greyshelf off its rock): an XZ offset from its own spot, in the slot's
+# frame like position. Set, in the fight it steps sideways off what it
+# lies on and drops to the sand there - height_offset_m to 0, a puff of
+# sand as it lands (FieldEnemy.drop_off()) - then turns to the Wanderer,
+# and the battle frame refits to where it stands. Rules unchanged. ZERO =
+# it stays where it lies.
+@export var phase_drop_offset: Vector2 = Vector2.ZERO
 # The body's yaw in degrees, on top of the slot's yaw - rotation.y.
 # Authored outright rather than derived from "seaward": the crab beside
 # the pool faces where it faces.

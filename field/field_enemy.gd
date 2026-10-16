@@ -202,6 +202,21 @@ var option_id: StringName = &""
 # sand, and with it the contact shadow, the contact area and every
 # lunge/recoil/step tween, so none of them has to know. See
 # enter_battle_hover() for the fight's hover and its bob.
+@export_group("Phase Drop")
+# The drop off its rock at its phase (drop_off(), FloorEnemy.phase_drop_
+# offset): the step sideways and the fall together over phase_drop_
+# seconds, with a hop of phase_drop_hop_m at its middle; the turn to the
+# Wanderer after it; the puff of sand on landing (spawn_sand_puff()'s
+# settings).
+@export var phase_drop_seconds: float = 0.5
+@export var phase_drop_hop_m: float = 0.15
+@export var phase_drop_turn_seconds: float = 0.4
+@export var phase_drop_puff_particles: int = 16
+@export var phase_drop_puff_lifetime: float = 0.8
+@export var phase_drop_puff_velocity: float = 1.4
+@export var phase_drop_puff_spread_degrees: float = 70.0
+@export var phase_drop_puff_tint: float = 0.75
+@export_group("")
 @export_group("Rest And Hover")
 @export var rest_height: float = 0.0:
 	set(value):
@@ -348,6 +363,14 @@ var _slash_mark_mesh: ArrayMesh = null
 # that goes with the model.
 var _mound: SandMound = null
 var _contact_shadow: ContactShadow = null
+# FloorEnemy.phase_drop_offset resolved at spawn: whether it drops at its
+# phase, and the world XZ it lands on (Y unused).
+var has_phase_drop: bool = false
+var phase_drop_spot: Vector3 = Vector3.ZERO
+# Dropped this fight (drop_off()), and the height it lay at before - what
+# an escape climbs back to (return_to_field_pose()).
+var _dropped: bool = false
+var _field_height_offset: float = 0.0
 var _slash_mark_texture: GradientTexture2D = null
 
 # Owned by this enemy, but lives in RegionField.field_hud, not here (a
@@ -1324,10 +1347,53 @@ func step_to(spot: Vector3, duration: float) -> void:
 		_has_field_pose = true
 	_tween_to(spot, duration, delay)
 
+# Its phase come (RegionField._drop_at_phase()): off what it lies on to
+# phase_drop_spot - sideways, height_offset down to the sand, a hop at
+# the middle - a puff of sand as it lands, then a turn to `face_point`
+# (the Wanderer). Once a fight; its spot and height are kept for an
+# escape (return_to_field_pose()).
+func drop_off(face_point: Vector3) -> void:
+	if not has_phase_drop or _dropped:
+		return
+	_dropped = true
+	if not _has_field_pose:
+		_field_position = global_position
+		_field_yaw = rotation.y
+		_has_field_pose = true
+	_field_height_offset = height_offset
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_method(_drop_step.bind(Vector2(global_position.x, global_position.z), Vector2(phase_drop_spot.x, phase_drop_spot.z), height_offset, 0.0), 0.0, 1.0, maxf(phase_drop_seconds, 0.01))
+	tween.tween_callback(func() -> void:
+		spawn_sand_puff(phase_drop_puff_particles, phase_drop_puff_lifetime, phase_drop_puff_velocity, phase_drop_puff_spread_degrees, phase_drop_puff_tint)
+		face_toward_point(face_point, phase_drop_turn_seconds))
+
+# Whether it has dropped off its rock this fight (drop_off()).
+func has_dropped() -> bool:
+	return _dropped
+
+# One step of a drop (or an escape's climb back): XZ eased from `from` to
+# `to`, height_offset from `height_from` to `height_to` with the hop over
+# it - its setter puts the body on the relief at the new XZ.
+func _drop_step(t: float, from: Vector2, to: Vector2, height_from: float, height_to: float) -> void:
+	var xz: Vector2 = from.lerp(to, sin(t * PI * 0.5))
+	global_position.x = xz.x
+	global_position.z = xz.y
+	height_offset = lerpf(height_from, height_to, smoothstep(0.0, 1.0, t)) + phase_drop_hop_m * sin(t * PI)
+
 # The escape's counterpart: back to where it stood and faced before the
 # fight, over duration. A body that never stepped stays where it is - and
-# turns back to its prop if it faces one (the Wardling, his post).
+# turns back to its prop if it faces one (the Wardling, his post). One
+# that dropped off its rock climbs back onto it the way it came down.
 func return_to_field_pose(duration: float) -> void:
+	if _dropped:
+		_dropped = false
+		_has_field_pose = false
+		var tween := create_tween()
+		tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		tween.tween_method(_drop_step.bind(Vector2(global_position.x, global_position.z), Vector2(_field_position.x, _field_position.z), height_offset, _field_height_offset), 0.0, 1.0, maxf(duration, 0.01))
+		_turn_to(_field_yaw, duration)
+		return
 	if not _has_field_pose:
 		if _faces_prop:
 			_turn_to(_prop_yaw, duration)

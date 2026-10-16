@@ -550,7 +550,9 @@ folder (run_log_probe). (2026-10-04.)
   (`EnemyData.sink_m`, which lowers the model without burying it the way
   a negative `rest_height_m` does; 0.3 m on open sand put its feet under
   the relief). The rock's top tilts about 0.15 m along its length, so
-  the tail end sits a little into it. Its
+  the tail end sits a little into it. Off the rock at half HP, it steps
+  off the rock's camera side onto the sand (`FloorEnemy.phase_drop_offset`)
+  and turns to the Wanderer; an escape climbs it back. Its
   `contact_sounds` borrow `combat_old/hit.wav`, as the Dunecur and the
   Wardling do. Its material is the field's for every enemy, normal map
   included, as the Siltjaw's is. (2026-10-05, Greyshelf.)

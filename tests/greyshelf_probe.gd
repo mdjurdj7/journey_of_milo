@@ -326,7 +326,9 @@ func _check_fight_break() -> void:
 
 # The Tail Lash queued and the Greyshelf taken below half by the player's
 # damage: Off the rock in the readout at once, the intent from 4×3
-# (damage × hits, BattleIntent's way) to 4×4.
+# (damage × hits, BattleIntent's way) to 4×4 - and, placed to drop
+# (FloorEnemy.phase_drop_offset), its body off the rock: on the sand at
+# its landing spot, and the battle frame turned to where it now lies.
 func _check_fight_phase() -> void:
 	var controller: Node = await _start_fight(SLASH_PATH)
 	if controller != null:
@@ -334,10 +336,23 @@ func _check_fight_phase() -> void:
 		var combatant: Combatant = _combatant(controller, greyshelf)
 		_expect_eq(_intent_text(controller, greyshelf), "4×3", "Tail Lash queued: 4×3")
 		_expect(not _shows(controller, greyshelf, "Off the rock"), "...on its rock")
+		var drops: bool = bool(greyshelf.get("has_phase_drop"))
+		var lying: float = float(greyshelf.get("height_offset"))
+		var camera: Node = _field.get_node("CameraPivot")
+		var frame_before: Vector3 = camera.get("_battle_last_forward")
 		combatant.hp = MAX_HP / 2 + 3
 		await _play_first(controller, greyshelf)
 		_expect(combatant.hp < MAX_HP / 2, "Slashed below half (%d)" % combatant.hp)
 		_expect(_shows(controller, greyshelf, "Off the rock"), "...Off the rock in the readout at once")
+		_expect(drops and lying > 0.0, "...placed up on its rock, to drop (%.2f m up)" % lying)
+		if drops:
+			await create_timer(float(greyshelf.get("phase_drop_seconds")) + float(greyshelf.get("phase_drop_turn_seconds")) + 0.3).timeout
+			var spot: Vector3 = greyshelf.get("phase_drop_spot")
+			var at := Vector2(greyshelf.global_position.x - spot.x, greyshelf.global_position.z - spot.z)
+			_expect(bool(greyshelf.call("has_dropped")) and is_zero_approx(float(greyshelf.get("height_offset"))), "...dropped onto the sand (%.2f m up)" % float(greyshelf.get("height_offset")))
+			_expect(at.length() < 0.05, "...at its landing spot (%.2f m off)" % at.length())
+			var frame_after: Vector3 = camera.get("_battle_last_forward")
+			_expect(frame_after.angle_to(frame_before) > deg_to_rad(5.0), "...and the battle frame turned to it (%.1f degrees)" % rad_to_deg(frame_after.angle_to(frame_before)))
 		_expect_eq(_intent_text(controller, greyshelf), "4×4", "...the Tail Lash reads 4×4")
 		var player: Combatant = controller.get("player")
 		var before: int = player.hp

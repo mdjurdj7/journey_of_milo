@@ -1416,6 +1416,10 @@ func _spawn_floor_enemies() -> void:
 			enemy.height_offset = entry.height_offset_m
 			enemy.stance_gap = entry.stance_gap_m
 			enemy.holds_facing = entry.holds_facing
+			if entry.phase_drop_offset != Vector2.ZERO:
+				var land: Vector2 = slot.to_floor(entry.position + entry.phase_drop_offset)
+				enemy.has_phase_drop = true
+				enemy.phase_drop_spot = Vector3(spawn.x + land.x, 0.0, spawn.z + land.y)
 			var at: Vector2 = slot.to_floor(entry.position)
 			enemy.position = Vector3(spawn.x + at.x, 0.0, spawn.z + at.y)
 			enemy.rotation.y = deg_to_rad(slot.yaw_degrees + entry.yaw_degrees)
@@ -2292,7 +2296,8 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	overlay.battle_controller.enemy_status_gained.connect(func(member: FieldEnemy, status: StatusData) -> void:
 		member.show_status(status, true)
 		if status != null:
-			_say_near_enemy(member, status.gained_line))
+			_say_near_enemy(member, status.gained_line)
+		_drop_at_phase(member, status))
 	# The fight's opening statuses (the Blackback's Fed) - applied before
 	# anyone could hear of them - shown on the bodies at once.
 	for member: FieldEnemy in overlay.battle_controller.enemies:
@@ -2356,6 +2361,18 @@ func _straight_move_blocked(from: Vector3, to: Vector3) -> bool:
 			var rid: RID = hit["rid"]
 			excluded.append(rid)
 	return false
+
+# A member gaining its phase's status (EnemyData.phase_status) that drops
+# when it does (FloorEnemy.phase_drop_offset): off its rock to the sand
+# beside it, the Wanderer turning to it as it lands. The battle frame
+# follows on its own - CameraRig fits the live bodies every frame.
+func _drop_at_phase(member: FieldEnemy, status: StatusData) -> void:
+	if member == null or not member.has_phase_drop or member.enemy_data == null or status == null or status != member.enemy_data.phase_status:
+		return
+	if wanderer == null:
+		return
+	member.drop_off(wanderer.global_position)
+	wanderer.turn_toward_in_battle(member.phase_drop_spot, member.phase_drop_seconds + member.phase_drop_turn_seconds)
 
 # The longest a fight's opening holds input: with the Wanderer's own
 # draw_sword, its whole length (its strike ends the hold before that); on
