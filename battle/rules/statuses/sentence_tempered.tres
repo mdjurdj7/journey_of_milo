@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" format=3 uid="uid://c5cp5ue4l5hf1"]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "sentence_tempered"
+display_name = "Sentence"
+description = "In {turns} turn{s}, it takes {damage} damage. Spending Toll brings it a turn closer."
+category = 2
+default_duration_turns = 3
+stack_rule = 4
+countdown_damage = 40
+toll_spend_advances = true

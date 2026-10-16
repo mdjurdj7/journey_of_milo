@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" format=3 uid="uid://buxdox8fba3ln"]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+[ext_resource type="Resource" uid="uid://bhgjqihcabjt3" path="res://battle/rules/statuses/no_further_armed_tempered.tres" id="2_no_further_armed"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "no_further_tempered"
+display_name = "No Further"
+description = "Next time you enter Critical, the next 2 enemy Attacks deal 0 damage."
+category = 2
+default_duration_turns = -1
+stack_rule = 3
+grants_on_critical = ExtResource("2_no_further_armed")

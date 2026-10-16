@@ -1,0 +1,22 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://cnmy88najnguv"]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" uid="uid://ckobsxoaiekjb" path="res://battle/rules/stances/last_resort_tempered.tres" id="3_last_resort"]
+[ext_resource type="Texture2D" uid="uid://bw0w5kwlb7v6k" path="res://cards/art/Wanderer/Last Resort.png" id="4_art"]
+
+[sub_resource type="Resource" id="CardEffect_apply_stance"]
+script = ExtResource("2_card_effect")
+effect_type = 19
+stance_data = ExtResource("3_last_resort")
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Last Resort+"
+cost = 1
+card_type = 2
+rarity = 3
+target_type = 1
+description = "While Critical, your Attacks deal 10 more. You can't gain block."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_stance")])
+art = ExtResource("4_art")

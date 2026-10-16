@@ -18,7 +18,7 @@ const CASES := 15
 # Cards whose one status prints as two lines - a rule written as two
 # sentences (Sentence's countdown and its hurry; The Return's count and
 # its Drain). Every other status-applying effect is one line.
-const TWO_LINE_STATUS_CARDS: Array[String] = ["Sentence", "The Return"]
+const TWO_LINE_STATUS_CARDS: Array[String] = ["Sentence", "The Return", "Sentence+", "The Return+"]
 # The rules text size each card lands at outside a fight; any card not
 # listed fits at the first size, 15, cleanly - inside the rules margins
 # (CardView.rules_margin_px) and no lone last word. A card that moves

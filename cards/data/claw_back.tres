@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Texture2D" uid="uid://by41c54qnwpc" path="res://cards/art/Wanderer/Claw Back.png" id="9_art"]
+[ext_resource type="Resource" uid="uid://c8tipvgiqywyn" path="res://cards/tempered/claw_back_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="CardEffect_damage"]
 script = ExtResource("2_card_effect")
@@ -27,3 +28,4 @@ impact_time = 0.55
 play_sound_path = "res://assets/audio/cards/Claw Back/Claw Back.mp3"
 critical_sound_pitch = 0.85
 critical_sound_volume_db = 2.0
+tempered = ExtResource("10_tempered")
