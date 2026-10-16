@@ -12,6 +12,10 @@ class_name TravellerGlimpse
 # the arrival frame through its top edge - he is freed only out of frame -
 # starting with his whole body just under that edge; control returns
 # once he is gone (release_after_removal_seconds).
+# The chance a run shows him, rolled the first time the run stands on
+# the floor - never on two runs in a row. 1 = every run (but still never
+# two in a row).
+@export_range(0.0, 1.0) var chance_per_run: float = 0.25
 @export var path: PackedVector2Array = PackedVector2Array()
 # Walking pace along it, metres a second. Read live.
 @export var speed: float = 1.3

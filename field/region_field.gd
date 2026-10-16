@@ -972,6 +972,8 @@ func _spawn_traveller_glimpse() -> void:
 	if Traveller.has_glimpsed(key):
 		return
 	Traveller.mark_glimpsed(key)
+	if not _glimpse_comes_up(floor_data.traveller_glimpse, key):
+		return
 	var scene := load(traveller_scene_path) as PackedScene
 	if scene == null:
 		push_warning("RegionField: no traveller scene at '%s'; no glimpse." % traveller_scene_path)
@@ -981,6 +983,20 @@ func _spawn_traveller_glimpse() -> void:
 	traveller.walk(floor_data.traveller_glimpse, floor_data.spawn)
 	_shown_glimpse = floor_data.traveller_glimpse
 	_glimpse_traveller = traveller
+	Traveller.mark_shown()
+
+# Whether this run shows `glimpse` on the floor `key`: its chance_per_run,
+# rolled on a generator of its own seeded from the run's seed (so the
+# roll replays with the run and draws nothing from RunState.rng) - never
+# when the last run showed him; always with the F1 row's Traveller on.
+func _glimpse_comes_up(glimpse: TravellerGlimpse, key: String) -> bool:
+	if Traveller.debug_force:
+		return true
+	if Traveller.shown_last_run():
+		return false
+	var roll := RandomNumberGenerator.new()
+	roll.seed = hash("%d:traveller_glimpse:%s" % [RunState.run_seed, key])
+	return roll.randf() < glimpse.chance_per_run
 
 # The fade back in over this floor, then the arrival hold.
 func _hold_through_fade(fade: FloorFade) -> void:
@@ -2727,6 +2743,14 @@ func _setup_debug_row() -> void:
 	scatter_button.button_pressed = true
 	scatter_button.toggled.connect(_on_debug_scatter_toggled)
 	_debug_row.add_child(scatter_button)
+	var traveller_button := Button.new()
+	traveller_button.name = "TravellerButton"
+	traveller_button.theme_type_variation = &"DebugButton"
+	traveller_button.text = "Traveller"
+	traveller_button.toggle_mode = true
+	traveller_button.button_pressed = Traveller.debug_force
+	traveller_button.toggled.connect(_on_debug_traveller_toggled)
+	_debug_row.add_child(traveller_button)
 	hud.add_child(_debug_row)
 	deck_panel.visibility_changed.connect(func() -> void:
 		if not deck_panel.visible:
@@ -2747,6 +2771,14 @@ func _on_debug_path_toggled(on: bool) -> void:
 func _on_debug_scatter_toggled(on: bool) -> void:
 	if _scatter != null:
 		_scatter.visible = on
+
+# The F1 row's Traveller: a floor's glimpse forced on (Traveller.debug_
+# force) for the session - shown on the next first visit of a run to a
+# floor that has one, whatever the roll.
+func _on_debug_traveller_toggled(on: bool) -> void:
+	Traveller.debug_force = on
+	if on:
+		RunLogger.event("debug_traveller_force", {})
 
 # One piece of Glassbone, through the run's own grant (RunState.add_
 # glassbone()) - a debug button, not a game source.

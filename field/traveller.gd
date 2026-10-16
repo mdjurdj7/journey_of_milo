@@ -7,7 +7,9 @@ class_name Traveller
 # follow (the glimpse's own arrival hold outlasts him).
 # RegionField spawns one at load the first time a run stands on a floor
 # that has a glimpse (has_glimpsed()/mark_glimpsed(), cleared by
-# RunState.new_run()) and hands it the glimpse (walk()). He walks its path
+# RunState.new_run()) - when the glimpse's chance comes up, and never two
+# runs in a row (or always, with debug_force) - and hands it the glimpse
+# (walk()). He walks its path
 # at its speed, feet on the relief, facing the way he goes. No collision,
 # nothing to click, and nothing on the floor reacts to him. The moment he
 # is wholly outside the camera's frustum he is freed: he leaves through
@@ -20,9 +22,19 @@ class_name Traveller
 # shader at figure_ink; no fog - the arrival fade is what softens him. His
 # walk is a tweened bob and sway on the model, no rig.
 
-# Floors already glimpsed this run, "<region>:<floor>" - a static set like
-# Hull._findings_shown, so a floor stood on again shows no one.
+# Floors with a glimpse already stood on this run, "<region>:<floor>" -
+# shown or not - a static set like Hull._findings_shown, so a floor stood
+# on again shows no one and never rolls again.
 static var _glimpsed: Dictionary = {}
+# Whether this run, and the run before it, showed anyone - the chance
+# (TravellerGlimpse.chance_per_run) never comes up two runs in a row.
+# Only within the session: nothing persists between sessions.
+static var _shown_this_run: bool = false
+static var _shown_last_run: bool = false
+# The F1 row's Traveller toggle (debug builds): every floor with a glimpse
+# shows him on its first visit of a run, whatever the roll. Static, so it
+# holds across the floor reloads.
+static var debug_force: bool = false
 
 static func has_glimpsed(key: String) -> bool:
 	return _glimpsed.has(key)
@@ -30,8 +42,18 @@ static func has_glimpsed(key: String) -> bool:
 static func mark_glimpsed(key: String) -> void:
 	_glimpsed[key] = true
 
+static func mark_shown() -> void:
+	_shown_this_run = true
+
+static func shown_last_run() -> bool:
+	return _shown_last_run
+
+# A new run (RunState.new_run()): no floor stood on, and this run's
+# showing becomes the last run's.
 static func reset_glimpses() -> void:
 	_glimpsed.clear()
+	_shown_last_run = _shown_this_run
+	_shown_this_run = false
 
 # The body. Loaded at runtime; a change swaps it live.
 @export_file("*.tscn", "*.glb") var model_scene_path: String = "res://field/traveller_placeholder.tscn":
