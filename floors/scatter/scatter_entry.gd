@@ -54,6 +54,13 @@ const ZONE_ROCK_EDGE := 32
 	set(value):
 		mesh_path = value
 		emit_changed()
+# Its own colour map under the painted shader, as the model props wear
+# it (PaintedProp: the soft light, the depth fog laid back over it), times
+# `tint` - set, tint_jitter is unused. Empty = the shared flat material.
+@export_file("*.jpg", "*.png") var colour_map_path: String = "":
+	set(value):
+		colour_map_path = value
+		emit_changed()
 @export var placeholder: PlaceholderKind = PlaceholderKind.CAST:
 	set(value):
 		placeholder = value
@@ -70,6 +77,12 @@ const ZONE_ROCK_EDGE := 32
 	set(value):
 		size_m = value
 		emit_changed()
+# Above 0: sized to the model's own width across times this, instead of
+# size_m - a model made at its real size, scaled as a whole.
+@export var model_scale: float = 0.0:
+	set(value):
+		model_scale = value
+		emit_changed()
 # Each item's size, a random factor from x to y.
 @export var scale_range: Vector2 = Vector2(0.75, 1.25):
 	set(value):
@@ -84,6 +97,12 @@ const ZONE_ROCK_EDGE := 32
 @export_range(0.0, 1.0, 0.01) var sink_fraction: float = 0.3:
 	set(value):
 		sink_fraction = value
+		emit_changed()
+# Set into the sand by a random depth from x to y metres, instead of
+# sink_fraction. x below 0 = the fraction.
+@export var sink_range_m: Vector2 = Vector2(-1.0, -1.0):
+	set(value):
+		sink_range_m = value
 		emit_changed()
 @export var resting: Resting = Resting.FLAT:
 	set(value):
@@ -158,6 +177,31 @@ const ZONE_ROCK_EDGE := 32
 @export var avoid_rock: bool = false:
 	set(value):
 		avoid_rock = value
+		emit_changed()
+# Tested at its edge as well as its centre - eight points round the
+# circle of half its width - so a wide stone never reaches into the worn
+# band, the water or a keep-out its centre clears.
+@export var footprint_test: bool = false:
+	set(value):
+		footprint_test = value
+		emit_changed()
+# Every entry placed after it keeps off its items' footprints (half their
+# width round each) - a tuft never grows through a stone.
+@export var solid: bool = false:
+	set(value):
+		solid = value
+		emit_changed()
+# Clusters round the items of these entries (by name, placed before this
+# one) instead of over its zones: around_share of them each get one, its
+# items in a ring just outside the item's footprint, cluster_spread_m
+# out from its edge - tufts grown round a stone. Empty = its zones.
+@export var around_entries: PackedStringArray = PackedStringArray():
+	set(value):
+		around_entries = value
+		emit_changed()
+@export_range(0.0, 1.0, 0.01) var around_share: float = 0.5:
+	set(value):
+		around_share = value
 		emit_changed()
 # Its own keep-out from the worn band's centreline, and the ramp back to
 # full past it, metres, instead of the floor's (FieldScatter's Worn Band) -

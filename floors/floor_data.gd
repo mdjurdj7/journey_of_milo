@@ -180,6 +180,11 @@ enum ExitKind { CHANNEL, LINE }
 # no one.
 @export var traveller_glimpse: TravellerGlimpse = null
 
+@export_group("Flock")
+# A small flock of shorebirds on open sand that takes off when he comes
+# near (ShoreFlockData, ShoreFlock). Null (the default) = none.
+@export var shore_flock: ShoreFlockData = null
+
 @export_group("Wear")
 # How far the worn band's middle point sits off the first required
 # slot's anchor along the exit's right (RegionField._aim_wear_path()).

@@ -21,6 +21,7 @@
 [ext_resource type="Script" uid="uid://n5us4ml13k7m" path="res://floors/encounter_option.gd" id="91_encounter_option"]
 [ext_resource type="Script" uid="uid://osx6ppea2fow" path="res://floors/traveller_glimpse.gd" id="92_traveller_glimpse"]
 [ext_resource type="Resource" path="res://floors/scatter/floor3_dune.tres" id="93_dune_scatter"]
+[ext_resource type="Script" uid="uid://bnhds0n041gw5" path="res://floors/shore_flock_data.gd" id="94_shore_flock"]
 
 [sub_resource type="Resource" id="FloorProp_wagon"]
 script = ExtResource("13_floor_prop")
@@ -92,6 +93,10 @@ script = ExtResource("92_traveller_glimpse")
 path = PackedVector2Array(0.62, -7.95, 1.5, -19, 4.7, -28.1, 8, -31.6, 14.7, -33.6, 24.1, -33.5)
 speed = 1.6
 
+[sub_resource type="Resource" id="ShoreFlockData_stream"]
+script = ExtResource("94_shore_flock")
+model_scale = 1.5
+
 [resource]
 script = ExtResource("1_floor_data")
 mask = ExtResource("3_landmass")
@@ -122,6 +127,7 @@ ledges = Array[PackedVector2Array]([PackedVector2Array(0.3, 5.583, -1.1, 5.45, -
 exit_kind = 1
 gate_distance_beyond_enemy = 14.63
 traveller_glimpse = SubResource("TravellerGlimpse_arrival")
+shore_flock = SubResource("ShoreFlockData_stream")
 scatter_sets = Array[ExtResource("8_fwgpd")]([ExtResource("93_dune_scatter")])
 scatter_budget = 700
 wear_path_override = PackedVector2Array(0, 0, 1.5, -19, 4.7, -28.1, 8.67, -33.4, 14.7, -33.6, 24.1, -33.5)

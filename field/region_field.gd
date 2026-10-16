@@ -420,6 +420,7 @@ var _nav: NavGrid = null
 # The floor's ground scatter (FieldScatter), and the worn band's points it
 # keeps off (get_wear_path()).
 var _scatter: FieldScatter = null
+var _shore_flock: ShoreFlock = null
 var _wear_path: PackedVector2Array = PackedVector2Array()
 # The HUD row's keepsake - a click on it opens KeepsakeExamine.
 var _keepsake_line: KeepsakeLine = null
@@ -718,6 +719,7 @@ func _ready() -> void:
 	# After the channel: it is water the scatter keeps out of, and every
 	# prop, enemy and the gate it keeps clear of now stands.
 	_spawn_floor_scatter()
+	_spawn_shore_flock()
 
 	# The Ambience bus at its base - a loss mid-duck or a restart must not
 	# inherit the last scene's level.
@@ -2015,6 +2017,25 @@ func _spawn_floor_scatter() -> void:
 
 func get_scatter() -> FieldScatter:
 	return _scatter
+
+# The floor's shorebirds (FloorData.shore_flock) - after the scatter,
+# whose ground they read. None without the scatter or the data.
+func _spawn_shore_flock() -> void:
+	var floor_data := get_floor_data()
+	if floor_data == null or floor_data.shore_flock == null or _scatter == null:
+		return
+	_shore_flock = ShoreFlock.new()
+	_shore_flock.name = "ShoreFlock"
+	add_child(_shore_flock)
+	_shore_flock.setup(self, floor_data.shore_flock)
+
+# Null once it has flown and gone, or on a floor without one.
+func get_shore_flock() -> ShoreFlock:
+	return _shore_flock if is_instance_valid(_shore_flock) else null
+
+# A fight holds the field (from contact to its end).
+func is_battle_open() -> bool:
+	return _battle_open
 
 # The threshold, from the ExitGate's trigger at the far end of the bar:
 # the field freezes (the same process-mode freeze battle uses - this

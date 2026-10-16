@@ -56,7 +56,18 @@ class_name FieldScatter
 # item's value jitter as its instance colour - or scatter_sway.gdshader,
 # the same rules, for a kind with wind. Set into the sand by its sink
 # fraction of its height, tilted to the slope. Scene fog as any prop.
-# Shadows only where the entry casts them.
+# Shadows only where the entry casts them. A kind with its own colour map
+# (colour_map_path) wears it under the painted shader instead, as the
+# model props do (PaintedProp), the depth fog laid back over it by its
+# fog pass at the props' full share, refilled whenever RegionSky's fog
+# changes; a kind may sink by a depth in metres (sink_range_m) and be
+# sized from its model (model_scale).
+#
+# A wide kind (a stone) may be tested at its edge as well as its centre
+# (footprint_test), and be solid: every entry placed after it keeps off
+# its items' footprints. An entry may cluster round another's items
+# instead of over its zones (around_entries) - tufts in a ring round some
+# of the stones - so a set lists its stones first.
 #
 # An entry with cards (dune-grass tufts - ScatterEntry's Cards group)
 # instead stands each item up as one of its painted cards, picked by
@@ -88,6 +99,9 @@ class Spot extends RefCounted:
 	var basis: Basis = Basis.IDENTITY
 	var size: float = 0.0
 	var shade: float = 1.0
+	# Set into the sand this far, metres (the entry's sink_range_m); below
+	# 0 = by its sink_fraction.
+	var sink: float = -1.0
 	# A card's (entry.cards): which, its yaw off the camera's, mirrored,
 	# and its width - `size` is then its height.
 	var card: int = -1
@@ -294,6 +308,11 @@ var _entries: Array[ScatterEntry] = []
 var _spots: Dictionary = {}
 var _item_count: int = 0
 var _build_msec: int = 0
+# The footprints later entries keep off: every item of a solid entry, as
+# (x, z, half its width).
+var _solids: PackedVector3Array = PackedVector3Array()
+# The painted kinds' fog passes, refilled from the sky when its fog changes.
+var _fog_passes: Array[ShaderMaterial] = []
 var _instances: Array[MultiMeshInstance3D] = []
 var _card_layers: Array[CardLayer] = []
 # The camera forward last pushed to the cards.
@@ -316,6 +335,9 @@ func setup(field: RegionField) -> void:
 		_floor.changed.connect(_on_floor_changed)
 	if _ground != null and not _ground.relief_rebuilt.is_connected(_on_relief_rebuilt):
 		_ground.relief_rebuilt.connect(_on_relief_rebuilt)
+	var sky: RegionSky = field.get_region_sky()
+	if sky != null and not sky.fog_changed.is_connected(_push_fog):
+		sky.fog_changed.connect(_push_fog)
 	_queue_rebuild(true)
 
 func _exit_tree() -> void:
@@ -710,6 +732,7 @@ static func _polygon(points: PackedVector2Array, margin: float) -> KeepOut:
 func _place_all() -> void:
 	_entries.clear()
 	_spots.clear()
+	_solids.clear()
 	_item_count = 0
 	if _floor == null:
 		return
@@ -725,6 +748,9 @@ func _place_all() -> void:
 			var spots: Array[Spot] = _place_contour(entry, left) if entry.mode == ScatterEntry.Mode.CONTOUR else _place_entry(entry, left)
 			_spots[entry] = spots
 			_item_count += spots.size()
+			if entry.solid:
+				for spot in spots:
+					_solids.append(Vector3(spot.position.x, spot.position.z, spot.size * 0.5))
 			if budget > 0 and _item_count >= budget:
 				push_warning("FieldScatter: the floor's budget of %d items is reached at '%s'; the rest are left out." % [budget, entry.name])
 
@@ -737,43 +763,26 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 		return spots
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash("%s:%s" % [_floor.resource_path, entry.name])
-	var step: float = maxf(sample_step_m, 0.1)
-	var cells := PackedInt32Array()
-	var polygon := PackedVector2Array()
-	for point in entry.area:
-		polygon.append(_spawn + point)
-	for i in _cell_zone.size():
-		if _centre_allowed(entry, i) and (polygon.size() < 3 or Geometry2D.is_point_in_polygon(_grid_point(i), polygon)):
-			cells.append(i)
-	if cells.is_empty():
-		return spots
-	var area: float = float(cells.size()) * step * step
-	var target: int = 0
-	if entry.cluster_count.x >= 0:
-		target = rng.randi_range(entry.cluster_count.x, maxi(entry.cluster_count.x, entry.cluster_count.y))
-	else:
-		var expected: float = area / 100.0 * maxf(entry.clusters_per_100m2, 0.0) * maxf(_floor.scatter_density, 0.0)
-		target = floori(expected + rng.randf())
-	if target <= 0:
-		return spots
 	var spread_range := Vector2(minf(entry.cluster_spread_m.x, entry.cluster_spread_m.y), maxf(entry.cluster_spread_m.x, entry.cluster_spread_m.y))
-	# Poisson-disc by dart throwing: centres no nearer each other than a
-	# share of the spacing the density would give spread evenly.
-	var spacing: float = maxf(0.6 * sqrt(area / float(target)), spread_range.y * 2.0)
 	var centres: Array[Vector2] = []
-	for attempt in target * 30:
-		if centres.size() >= target:
-			break
-		var cell: int = cells[rng.randi_range(0, cells.size() - 1)]
-		var p: Vector2 = cell_centre(cell % _grid_cols, floori(float(cell) / float(_grid_cols))) + Vector2(rng.randf_range(-0.5, 0.5), rng.randf_range(-0.5, 0.5)) * step
-		var clear: bool = true
-		for other in centres:
-			if other.distance_to(p) < spacing:
-				clear = false
-				break
-		if clear:
-			centres.append(p)
-	for centre in centres:
+	# Per centre: the footprint its ring of items lies outside (around_
+	# entries), 0 for a cluster over the zones.
+	var rings := PackedFloat32Array()
+	if not entry.around_entries.is_empty():
+		for source in _entries:
+			if source == entry or not entry.around_entries.has(source.name):
+				continue
+			for spot in get_spots(source):
+				if rng.randf() < entry.around_share:
+					centres.append(Vector2(spot.position.x, spot.position.z))
+					rings.append(spot.size * 0.5)
+	else:
+		_zone_centres(entry, rng, spread_range, centres)
+		rings.resize(centres.size())
+		rings.fill(0.0)
+	var base_size: float = base_size_for(entry)
+	for c in centres.size():
+		var centre: Vector2 = centres[c]
 		var count: int = rng.randi_range(mini(entry.items_per_cluster.x, entry.items_per_cluster.y), maxi(entry.items_per_cluster.x, entry.items_per_cluster.y))
 		var spread: float = rng.randf_range(spread_range.x, spread_range.y)
 		var cluster: Array[Vector2] = []
@@ -781,7 +790,12 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 		for attempt in count * 4:
 			if cluster.size() >= count or (left >= 0 and spots.size() >= left):
 				break
-			var p: Vector2 = centre + Vector2(rng.randfn(0.0, spread), rng.randfn(0.0, spread))
+			var offset := Vector2(rng.randfn(0.0, spread), rng.randfn(0.0, spread))
+			if rings[c] > 0.0:
+				# Out from the footprint's edge by the offset's length, its
+				# way round by the offset's direction.
+				offset = offset.normalized() * (rings[c] + offset.length()) if offset.length() > 1.0e-6 else Vector2(rings[c], 0.0)
+			var p: Vector2 = centre + offset
 			# Drawn every attempt, kept or not, so one item's fate never
 			# shifts the next's draws.
 			var keep_roll: float = rng.randf()
@@ -790,7 +804,10 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 			var tilt: float = rng.randf_range(-entry.tilt_jitter_degrees, entry.tilt_jitter_degrees)
 			var factor: float = rng.randf_range(entry.scale_range.x, entry.scale_range.y)
 			var shade: float = 1.0 + rng.randf_range(-entry.tint_jitter, entry.tint_jitter)
-			var size: float = entry.size_m * factor
+			# Drawn only for a kind that sinks by depth, so every other
+			# kind's draws stay as they were.
+			var sink: float = rng.randf_range(entry.sink_range_m.x, maxf(entry.sink_range_m.x, entry.sink_range_m.y)) if entry.sink_range_m.x >= 0.0 else -1.0
+			var size: float = base_size * factor
 			if not entry.cards.is_empty():
 				var card_spot: Spot = _card_spot(entry, rng, factor, shade)
 				if card_spot == null or not _item_allowed(entry, p, keep_roll):
@@ -808,7 +825,7 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 				card_spot.position = Vector3(p.x, _ground.get_visible_height_at(p), p.y)
 				spots.append(card_spot)
 				continue
-			if not _item_allowed(entry, p, keep_roll):
+			if not _item_allowed(entry, p, keep_roll, size * 0.5 if entry.footprint_test else 0.0):
 				continue
 			var crowded: bool = false
 			for other in cluster:
@@ -824,8 +841,57 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 			spot.basis = Basis(Quaternion(Vector3.UP, slope_normal(p))) * jitter * Basis(Vector3.UP, yaw)
 			spot.size = size
 			spot.shade = shade
+			spot.sink = sink
 			spots.append(spot)
 	return spots
+
+# A zone entry's cluster centres: Poisson-disc over the cells it may
+# centre in (inside its area, when it has one), as many as its count or
+# its density over that ground gives.
+func _zone_centres(entry: ScatterEntry, rng: RandomNumberGenerator, spread_range: Vector2, centres: Array[Vector2]) -> void:
+	var step: float = maxf(sample_step_m, 0.1)
+	var cells := PackedInt32Array()
+	var polygon := PackedVector2Array()
+	for point in entry.area:
+		polygon.append(_spawn + point)
+	for i in _cell_zone.size():
+		if _centre_allowed(entry, i) and (polygon.size() < 3 or Geometry2D.is_point_in_polygon(_grid_point(i), polygon)):
+			cells.append(i)
+	if cells.is_empty():
+		return
+	var area: float = float(cells.size()) * step * step
+	var target: int = 0
+	if entry.cluster_count.x >= 0:
+		target = rng.randi_range(entry.cluster_count.x, maxi(entry.cluster_count.x, entry.cluster_count.y))
+	else:
+		var expected: float = area / 100.0 * maxf(entry.clusters_per_100m2, 0.0) * maxf(_floor.scatter_density, 0.0)
+		target = floori(expected + rng.randf())
+	if target <= 0:
+		return
+	# Poisson-disc by dart throwing: centres no nearer each other than a
+	# share of the spacing the density would give spread evenly.
+	var spacing: float = maxf(0.6 * sqrt(area / float(target)), spread_range.y * 2.0)
+	for attempt in target * 30:
+		if centres.size() >= target:
+			break
+		var cell: int = cells[rng.randi_range(0, cells.size() - 1)]
+		var p: Vector2 = cell_centre(cell % _grid_cols, floori(float(cell) / float(_grid_cols))) + Vector2(rng.randf_range(-0.5, 0.5), rng.randf_range(-0.5, 0.5)) * step
+		var clear: bool = true
+		for other in centres:
+			if other.distance_to(p) < spacing:
+				clear = false
+				break
+		if clear:
+			centres.append(p)
+
+# An item's width across at a scale factor of 1: its model's own, turned
+# to rest, times model_scale when that is set; else size_m.
+static func base_size_for(entry: ScatterEntry) -> float:
+	if entry.model_scale <= 0.0 or not entry.cards.is_empty():
+		return entry.size_m
+	var mesh: Mesh = ScatterMeshes.mesh_for(entry)
+	var box: AABB = Transform3D(rest_basis(entry, mesh.get_aabb()), Vector3.ZERO) * mesh.get_aabb()
+	return maxf(box.size.x, box.size.z) * entry.model_scale
 
 # A card item's own draws - which card by weight, mirrored or not, its yaw
 # off the camera's - made whether it's kept or not; null when the entry's
@@ -886,9 +952,30 @@ func _centre_allowed(entry: ScatterEntry, cell: int) -> bool:
 	return _cell_height[cell] >= _sea_level - entry.wet_edge_m
 
 # Where one item lands, tested there: dry enough, clear of every
-# exclusion, and off the worn band - on its ramp kept by its weight
-# against `keep_roll`, so the band's edge thins rather than cuts.
-func _item_allowed(entry: ScatterEntry, p: Vector2, keep_roll: float) -> bool:
+# exclusion and every solid footprint placed before it, and off the worn
+# band - on its ramp kept by its weight against `keep_roll`, so the band's
+# edge thins rather than cuts. With a `radius` (a footprint_test kind),
+# eight points round that circle are tested as well, the band's weight
+# the least of them.
+func _item_allowed(entry: ScatterEntry, p: Vector2, keep_roll: float, radius: float = 0.0) -> bool:
+	for solid in _solids:
+		if p.distance_to(Vector2(solid.x, solid.y)) < solid.z + radius:
+			return false
+	var points: PackedVector2Array = [p]
+	if radius > 0.0:
+		for k in 8:
+			points.append(p + Vector2.from_angle(TAU * float(k) / 8.0) * radius)
+	var weight: float = 1.0
+	for q in points:
+		if not _point_allowed(entry, q):
+			return false
+		if _has_own_wear(entry):
+			weight = minf(weight, wear_weight(q, entry.wear_keep_out_m, entry.wear_ramp_m))
+		else:
+			weight = minf(weight, wear_weight(q))
+	return keep_roll < weight
+
+func _point_allowed(entry: ScatterEntry, p: Vector2) -> bool:
 	if _ground.get_visible_height_at(p) < _sea_level - entry.wet_edge_m:
 		return false
 	if is_excluded(p, entry.ledge_margin_m):
@@ -903,9 +990,7 @@ func _item_allowed(entry: ScatterEntry, p: Vector2, keep_roll: float) -> bool:
 				return false
 	if entry.avoid_rock and is_rock(p):
 		return false
-	if _has_own_wear(entry):
-		return keep_roll < wear_weight(p, entry.wear_keep_out_m, entry.wear_ramp_m)
-	return keep_roll < wear_weight(p)
+	return true
 
 static func _has_own_wear(entry: ScatterEntry) -> bool:
 	return entry.wear_keep_out_m >= 0.0 or entry.wear_ramp_m >= 0.0
@@ -1109,6 +1194,7 @@ func _draw_all() -> void:
 			instance.free()
 	_instances.clear()
 	_card_layers.clear()
+	_fog_passes.clear()
 	_card_forward = Vector2.ZERO
 	for entry in _entries:
 		var spots: Array[Spot] = get_spots(entry)
@@ -1127,7 +1213,8 @@ func _draw_all() -> void:
 		_instances.append(instance)
 
 # Every spot of an entry as an instance: the model turned to rest, its
-# base centred on the origin and lowered by sink_fraction of its height,
+# base centred on the origin and lowered by sink_fraction of its height
+# (or by the spot's own sink, metres, after scaling),
 # scaled to the spot's size across, then the spot's own turn and place;
 # its colour the spot's value off the tint.
 func _multimesh(entry: ScatterEntry, mesh: Mesh, spots: Array[Spot]) -> MultiMesh:
@@ -1140,10 +1227,16 @@ func _multimesh(entry: ScatterEntry, mesh: Mesh, spots: Array[Spot]) -> MultiMes
 	multimesh.use_colors = true
 	multimesh.mesh = mesh
 	multimesh.instance_count = spots.size()
+	var bottom := Vector3(base.x, box.position.y, base.z)
 	for i in spots.size():
 		var spot: Spot = spots[i]
 		var sized := Transform3D(Basis.from_scale(Vector3.ONE * (spot.size / across)), Vector3.ZERO)
-		multimesh.set_instance_transform(i, Transform3D(spot.basis, spot.position) * sized * Transform3D(rest, -base))
+		if spot.sink >= 0.0:
+			# Its base on the sand, then down its own up by the depth.
+			var sunk: Vector3 = spot.position - spot.basis.y.normalized() * spot.sink
+			multimesh.set_instance_transform(i, Transform3D(spot.basis, sunk) * sized * Transform3D(rest, -bottom))
+		else:
+			multimesh.set_instance_transform(i, Transform3D(spot.basis, spot.position) * sized * Transform3D(rest, -base))
 		# The jitter is a display value; the instance colour multiplies in
 		# linear.
 		multimesh.set_instance_color(i, Color(spot.shade, spot.shade, spot.shade).srgb_to_linear())
@@ -1163,8 +1256,18 @@ static func rest_basis(entry: ScatterEntry, box: AABB) -> Basis:
 
 # The shared flat material (Hull._get_shared_flat_material()), tinted,
 # reading the instance colour as albedo - or the sway shader's same rules
-# for a kind with wind.
+# for a kind with wind; or, for a kind with a colour map, the painted
+# material with its fog pass (the flat one if the map won't load).
 func _material(entry: ScatterEntry, mesh: Mesh) -> Material:
+	if not entry.colour_map_path.is_empty():
+		var painted: ShaderMaterial = PaintedProp.material(entry.colour_map_path, entry.tint)
+		if painted != null:
+			var fog: ShaderMaterial = PaintedProp.fog_pass()
+			if fog != null:
+				painted.next_pass = fog
+				_fog_passes.append(fog)
+				PaintedProp.push_fog(fog, _field.get_region_sky(), 1.0)
+			return painted
 	if entry.wind > 0.0:
 		var sway := ShaderMaterial.new()
 		sway.shader = load(SWAY_SHADER_PATH) as Shader
@@ -1176,6 +1279,14 @@ func _material(entry: ScatterEntry, mesh: Mesh) -> Material:
 	flat.vertex_color_use_as_albedo = true
 	flat.albedo_color = entry.tint
 	return flat
+
+# Every painted kind's fog pass from the sky's fog as it stands - the
+# props' full share.
+func _push_fog() -> void:
+	if _field == null:
+		return
+	for fog in _fog_passes:
+		PaintedProp.push_fog(fog, _field.get_region_sky(), 1.0)
 
 const CARD_SHADER_PATH := "res://field/tuft_card.gdshader"
 
@@ -1337,6 +1448,40 @@ func get_spots(entry: ScatterEntry) -> Array[Spot]:
 
 func get_item_count() -> int:
 	return _item_count
+
+# Every cell centre of dry open sand (ShoreFlock's ground): in one of
+# `zones` (0 = any) within `inland` of the water, path_distance from the
+# worn band's centreline, clear of every keep-out, exposed rock and solid
+# scatter, and stance_clearance beyond each enemy's stance distance.
+func open_ground(zones: int, inland: Vector2, path_distance: Vector2, stance_clearance: float) -> PackedVector2Array:
+	var points := PackedVector2Array()
+	for i in _cell_zone.size():
+		if zones != 0 and (_cell_zone[i] & zones) == 0:
+			continue
+		if _cell_inland[i] < inland.x or _cell_inland[i] > inland.y:
+			continue
+		if _cell_excluded[i] != 0 or _cell_rock[i] != 0 or _cell_height[i] < _sea_level:
+			continue
+		var p: Vector2 = _grid_point(i)
+		var from_path: float = wear_distance(p)
+		if from_path < path_distance.x or from_path > path_distance.y:
+			continue
+		var clear: bool = true
+		for stance in _enemy_stances:
+			if p.distance_to(Vector2(stance.x, stance.y)) < stance.z + stance_clearance:
+				clear = false
+				break
+		for solid in _solids:
+			if clear and p.distance_to(Vector2(solid.x, solid.y)) < solid.z:
+				clear = false
+		if clear:
+			points.append(p)
+	return points
+
+# Placed at least once, with no rebuild waiting - the grid and every
+# placement there to read.
+func is_built() -> bool:
+	return not _cell_zone.is_empty() and not _rebuild_queued
 
 func get_sea_level() -> float:
 	return _sea_level
