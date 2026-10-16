@@ -147,8 +147,9 @@ func _check_out_of_pools_and_scans() -> void:
 		while at >= 0:
 			var end: int = text.find("\"", at)
 			var named: String = text.substr(at, end - at)
-			var original: String = "res://cards/data/%s.tres" % named.get_file().get_basename().trim_suffix("_tempered")
-			_expect_eq(path, original, "%s is named only by its original" % named)
+			# The original may live in any card folder (cards/data/, cards/neutral/).
+			var original_file: String = named.get_file().get_basename().trim_suffix("_tempered") + ".tres"
+			_expect(CARD_DIRS.has(path.get_base_dir() + "/") and path.get_file() == original_file, "%s is named only by its original (named by %s)" % [named, path])
 			at = text.find(TEMPERED_DIR, at + 1)
 	for script_path: String in SCANS:
 		var node: Object = (load(script_path) as GDScript).new()
@@ -236,10 +237,11 @@ func _check_faces() -> void:
 
 # The Cards screen's TEMPERED: off on open, no "+" face in the grid; Tab
 # turns it on - Slash shows Slash+ and Carve Carve+, their numbers
-# underlined, Reckoning+ its cost, a card with none as it was (the
-# first such in the grid, so the check never names one that later gets a
-# tempered version), no entry added; kept through a rebuild; a click turns it off again, marks and
-# all; the scroll kept across a toggle; a lifted card put away by one.
+# underlined, Reckoning+ its cost, a card with none as it was when one
+# is left (the first such in the grid, so the check never names one that
+# later gets a tempered version), no entry added; kept through a rebuild;
+# a click turns it off again, marks and all; the scroll kept across a
+# toggle; a lifted card put away by one.
 func _check_compendium() -> void:
 	var compendium: Node = (load(COMPENDIUM_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(compendium)
@@ -248,8 +250,8 @@ func _check_compendium() -> void:
 	_expect(count > 0, "The compendium shows cards (%d)" % count)
 	_expect(not bool(compendium.call("is_showing_tempered")), "TEMPERED is off on open")
 	_expect_no_tempered_faces(compendium, "Off on open")
+	# The first card with no tempered version, or "" once every card has one.
 	var untouched: String = _untempered_name(compendium)
-	_expect(not untouched.is_empty(), "The grid has a card with no tempered version")
 	var label := compendium.get_node("Page/TemperedItem/Label") as Label
 	var hairline := compendium.get_node("Page/TemperedItem/Hairline") as ColorRect
 	_expect_eq(label.text, "TEMPERED", "TEMPERED sits beside BACK")
@@ -291,12 +293,13 @@ func _check_compendium() -> void:
 	await process_frame
 	_expect_eq(scroll.scroll_vertical, scrolled, "...both ways")
 
-	var lifted: CardView = _compendium_view(compendium, untouched)
+	var lift_name: String = untouched if not untouched.is_empty() else _compendium_views(compendium)[0].card_data.card_name
+	var lifted: CardView = _compendium_view(compendium, lift_name)
 	if lifted == null:
-		_fail("%s is not in the compendium" % untouched)
+		_fail("%s is not in the compendium" % lift_name)
 	else:
 		compendium.call("_begin_inspect", lifted, lifted.get_parent())
-		_expect(compendium.get("_inspected") == lifted, "%s lifted" % untouched)
+		_expect(compendium.get("_inspected") == lifted, "%s lifted" % lift_name)
 		compendium.call("toggle_tempered")
 		_expect(compendium.get("_inspected") == null, "Toggling puts a lifted card away")
 		var inspect_layer := compendium.get_node("Page/InspectLayer") as Control
@@ -321,8 +324,9 @@ func _expect_tempered_faces(compendium: Node, count: int, untouched: String, lab
 		_expect(carve.rules_text.text.contains("[u]10[/u]") and carve.rules_text.text.count("[u]") == 1, "%s: Carve+ underlines its 10 alone (%s)" % [label, carve.rules_text.text])
 	var reckoning: CardView = _compendium_view(compendium, "Reckoning+")
 	_expect(reckoning != null and reckoning.get_node_or_null(^"CostMark") != null, "%s: Reckoning+ marks its cost" % label)
-	var plain: CardView = _compendium_view(compendium, untouched)
-	_expect(plain != null and not plain.rules_text.text.contains("[u]") and plain.get_node_or_null(^"CostMark") == null, "%s: %s (no tempered version) as it was" % [label, untouched])
+	if not untouched.is_empty():
+		var plain: CardView = _compendium_view(compendium, untouched)
+		_expect(plain != null and not plain.rules_text.text.contains("[u]") and plain.get_node_or_null(^"CostMark") == null, "%s: %s (no tempered version) as it was" % [label, untouched])
 
 # The name of the first card in the grid with no tempered version, or "".
 func _untempered_name(compendium: Node) -> String:
