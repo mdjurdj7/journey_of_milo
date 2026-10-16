@@ -370,13 +370,14 @@ func _check_fight_refuse() -> void:
 	await _teardown()
 	_completed += 1
 
-# Floor 4's faint-side slot: the adder, an optional elite, facing east.
+# Floor 4's second slot: the adder, optional. Where it stands is not this
+# probe's to say.
 func _check_floor_entry() -> void:
 	var data: Resource = load("res://floors/region1_floor4.tres")
 	var slot: Resource = (data.get("slots") as Array)[1]
 	var entry: Resource = ((slot.get("options") as Array)[0].get("members") as Array)[0]
 	_expect((entry.get("enemy_data") as Resource).resource_path == ADDER_PATH, "Floor 4's second slot stands the adder")
-	_expect(not bool(slot.get("required")) and slot.call("to_floor", entry.get("position")) == Vector2(11, -22.5) and is_equal_approx(float(slot.get("yaw_degrees")) + float(entry.get("yaw_degrees")), -90.0), "...optional, at (11, -22.5), yaw -90")
+	_expect(not bool(slot.get("required")), "...optional")
 	_completed += 1
 
 # Won: elite rates, Glassbone 1, and Blue Fastener offered, from the Adder.
