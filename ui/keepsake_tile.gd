@@ -7,6 +7,9 @@ class_name KeepsakeTile
 #   the object   TrinketData.art in a square window - or, with no art, a
 #                flat tone panel with the name's initial: a placeholder,
 #                and plainly one
+#   its slot     only with show_slot_label (the Keeper's, which says
+#                "keepsake" nowhere else): "KEEPSAKE" in the HUD row's
+#                label voice, the tile taller by its row
 #   its name     Spectral SemiBold, centred
 #   what it does TrinketData.describe(), Alegreya Sans, centred, stepped
 #                down through rules_sizes_px until everything fits
@@ -97,6 +100,36 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 	set(value):
 		name_gap_px = value
 		_relayout()
+# Opt-in (WorldKeepsake only): a slot label above the name, in the HUD
+# row's label voice (HudRowStyle.hud_label_*). name_gap_px then runs from
+# the art to the label.
+@export var show_slot_label: bool = false:
+	set(value):
+		show_slot_label = value
+		_relayout()
+@export var slot_label_text: String = "KEEPSAKE":
+	set(value):
+		slot_label_text = value
+		_redraw()
+@export var slot_label_size_px: int = 12:
+	set(value):
+		slot_label_size_px = value
+		_label_font = null
+		_relayout()
+@export var slot_label_tracking_em: float = 0.16:
+	set(value):
+		slot_label_tracking_em = value
+		_label_font = null
+		_relayout()
+@export_range(0.0, 1.0) var slot_label_alpha: float = 0.62:
+	set(value):
+		slot_label_alpha = value
+		_redraw()
+# Between the slot label and the name.
+@export var slot_label_gap_px: float = 3.0:
+	set(value):
+		slot_label_gap_px = value
+		_relayout()
 # Tried largest first; the first that fits the tile wins.
 @export var rules_sizes_px: PackedInt32Array = PackedInt32Array([14, 13, 12, 11]):
 	set(value):
@@ -139,8 +172,12 @@ var _lore_font: Font = null
 # Held: a TextParagraph keeps only its fonts' RIDs, and a font nothing
 # else holds is freed before the paragraph shapes.
 var _rules_font: Font = null
+# The slot label's tracked face, built for _label_font_px (scaled).
+var _label_font: Font = null
+var _label_font_px: int = 0
 # Laid out, in scaled pixels.
 var _art_rect: Rect2 = Rect2()
+var _slot_label_baseline: float = 0.0
 var _name_baseline: float = 0.0
 var _rules: TextParagraph = null
 var _rules_size: int = 14
@@ -182,9 +219,18 @@ func set_keepsake(keepsake: TrinketData) -> void:
 func get_keepsake() -> TrinketData:
 	return _keepsake
 
-# The tile's size on screen: tile_size at tile_scale.
+# The tile's size on screen: tile_size at tile_scale - taller by the slot
+# label's row when it shows one, so the label never steps the rules text
+# down.
 func get_tile_size() -> Vector2:
-	return (tile_size * tile_scale).round()
+	return ((tile_size + Vector2(0.0, _slot_label_row_px())) * tile_scale).round()
+
+# The slot label's row at tile_scale 1: the label and its gap to the name.
+func _slot_label_row_px() -> float:
+	if not show_slot_label:
+		return 0.0
+	var font: Font = InkType.text_bold_font()
+	return font.get_ascent(slot_label_size_px) + font.get_descent(slot_label_size_px) + slot_label_gap_px
 
 # The rules size the text settled on (for probes and the fit check).
 func get_rules_size_px() -> int:
@@ -235,7 +281,15 @@ func _relayout() -> void:
 	var art: float = roundf(_px(art_size_px))
 	_art_rect = Rect2(roundf((tile.x - art) / 2.0), roundf(_px(padding_px)), art, art)
 	var name_px: int = _font_px(name_size_px)
-	_name_baseline = roundf(_art_rect.end.y + _px(name_gap_px) + InkType.numeral_font().get_ascent(name_px))
+	var name_top: float = _art_rect.end.y + _px(name_gap_px)
+	if show_slot_label:
+		var label_px: int = _font_px(slot_label_size_px)
+		if _label_font == null or _label_font_px != label_px:
+			_label_font = InkType.tracked(InkType.text_bold_font(), label_px, slot_label_tracking_em)
+			_label_font_px = label_px
+		_slot_label_baseline = roundf(name_top + _label_font.get_ascent(label_px))
+		name_top = _slot_label_baseline + _label_font.get_descent(label_px) + _px(slot_label_gap_px)
+	_name_baseline = roundf(name_top + InkType.numeral_font().get_ascent(name_px))
 	_rules_top = _name_baseline + InkType.numeral_font().get_descent(name_px) + _px(rules_gap_px)
 	var text_width: float = tile.x - _px(padding_px) * 2.0
 	_lore = null
@@ -303,6 +357,10 @@ func _draw_face() -> void:
 		var width: float = InkType.width(font, initial, initial_px)
 		var baseline: float = _art_rect.get_center().y + (font.get_ascent(initial_px) - font.get_descent(initial_px)) * 0.5
 		InkType.draw_run(_face, font, initial, Vector2(roundf(_art_rect.get_center().x - width / 2.0), roundf(baseline)), initial_px, Color(ink, placeholder_initial_alpha))
+	if show_slot_label and _label_font != null:
+		var label_px: int = _font_px(slot_label_size_px)
+		var label_width: float = InkType.width(_label_font, slot_label_text, label_px)
+		InkType.draw_run(_face, _label_font, slot_label_text, Vector2(roundf((tile.x - label_width) / 2.0), _slot_label_baseline), label_px, Color(ink, ink.a * slot_label_alpha))
 	var name_px: int = _font_px(name_size_px)
 	var name_width: float = InkType.width(InkType.numeral_font(), _keepsake.display_name, name_px)
 	InkType.draw_run(_face, InkType.numeral_font(), _keepsake.display_name, Vector2(roundf((tile.x - name_width) / 2.0), _name_baseline), name_px, ink)

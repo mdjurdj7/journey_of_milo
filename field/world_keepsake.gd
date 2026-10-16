@@ -14,7 +14,8 @@ class_name WorldKeepsake
 #          - never over her, never full-screen, the camera untouched.
 #
 # The plaque is the keepsake's KeepsakeTile - the one way a keepsake is
-# shown: art, name, what it does, its lore - and under it, in a bone strip
+# shown: art, name, what it does, its lore; here with its KEEPSAKE slot
+# label on (show_slot_label) - and under it, in a bone strip
 # of its own, actions_gap_px below -
 #   the action      TAKE with the slot empty; with one held, REPLACE
 #                   <held> and KEEP <held> - so what taking costs is said
@@ -250,6 +251,8 @@ func _ready() -> void:
 	_layer.add_child(_plaque)
 	_tile = KeepsakeTile.new()
 	_tile.name = "Tile"
+	# Nothing else here says what it is: KEEPSAKE above its name.
+	_tile.show_slot_label = true
 	_plaque.add_child(_tile)
 	_tile.set_keepsake(keepsake)
 	_rebuild_fonts()
