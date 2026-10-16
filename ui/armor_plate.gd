@@ -7,16 +7,22 @@ class_name ArmorPlate
 # shaped. Top to bottom:
 #   the object    TrinketData.art in a square window - or, with no art, a
 #                 flat tone panel with the name's initial: a placeholder
+#   its slot      "WORN" in the HUD row's label voice (HudRowStyle's: small
+#                 tracked Alegreya Sans Bold caps, ink at label_alpha), so
+#                 the plate never reads as a keepsake's
 #   its name      Spectral SemiBold, centred, in its rarity's finish - the
 #                 cards' own (CardRarityFinish, card_name_finish.gdshader):
 #                 flat ink for COMMON, the RARE base with its faint
 #                 gradient, a sheen once when the plate opens (play_name_
 #                 sheen()). Nothing else says rarity.
 #   what it does  TrinketData.describe(), Alegreya Sans, centred
+#   what it costs with a piece already worn, "REPLACES" in the slot
+#                 label's voice and the worn piece's name in Spectral, in
+#                 its own rarity finish (its own canvas item, as the
+#                 name's), and that piece's effect in grey under them -
+#                 left out with the slot empty
 #   its lore      TrinketData.flavor_text in a slanted Spectral, grey,
 #                 under a hairline - left out when it has none
-#   what it costs with a piece already worn (set_replaced()), a grey
-#                 "Replaces <name>: <effect>" line
 #   the choice    with show_actions, TAKE and LEAVE side by side - the
 #                 title menu's treatment (TitleMenu, WorldKeepsake): plain
 #                 tracked caps, the focused one in ink with a short
@@ -108,11 +114,37 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 @export_group("")
 
 @export_group("Text")
+# The slot label - and REPLACES - in the HUD row's label voice
+# (HudRowStyle.hud_label_*).
+@export var slot_label_text: String = "WORN":
+	set(value):
+		slot_label_text = value
+		_relayout()
+@export var slot_label_size_px: int = 12:
+	set(value):
+		slot_label_size_px = value
+		_label_font = null
+		_relayout()
+@export var slot_label_tracking_em: float = 0.16:
+	set(value):
+		slot_label_tracking_em = value
+		_label_font = null
+		_relayout()
+@export_range(0.0, 1.0) var slot_label_alpha: float = 0.62:
+	set(value):
+		slot_label_alpha = value
+		_redraw()
+# Between the art and the slot label.
+@export var slot_label_gap_px: float = 10.0:
+	set(value):
+		slot_label_gap_px = value
+		_relayout()
 @export var name_size_px: int = 21:
 	set(value):
 		name_size_px = value
 		_relayout()
-@export var name_gap_px: float = 12.0:
+# Between the slot label and the name.
+@export var name_gap_px: float = 4.0:
 	set(value):
 		name_gap_px = value
 		_relayout()
@@ -142,10 +174,26 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 	set(value):
 		lore_gap_px = value
 		_relayout()
+@export var replaces_label_text: String = "REPLACES":
+	set(value):
+		replaces_label_text = value
+		_relayout()
+# The worn piece's name after REPLACES.
+@export var replaced_name_size_px: int = 15:
+	set(value):
+		replaced_name_size_px = value
+		_relayout()
+# Between REPLACES and the worn piece's name.
+@export var replaces_label_gap_px: float = 6.0:
+	set(value):
+		replaces_label_gap_px = value
+		_relayout()
+# The worn piece's effect, under its name.
 @export var replaces_size_px: int = 13:
 	set(value):
 		replaces_size_px = value
 		_relayout()
+# Between this piece's effect and the REPLACES line.
 @export var replaces_gap_px: float = 12.0:
 	set(value):
 		replaces_gap_px = value
@@ -154,10 +202,6 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 	set(value):
 		replaces_color = value
 		_redraw()
-@export var replaces_format: String = "Replaces %s: %s":
-	set(value):
-		replaces_format = value
-		_relayout()
 @export var line_pitch_em: float = 1.3:
 	set(value):
 		line_pitch_em = value
@@ -221,23 +265,32 @@ var _paper: Control = null
 var _face: Control = null
 # The name on its own canvas item: the finish shader reads its local x.
 var _name_layer: Control = null
+# The worn piece's name after REPLACES, on its own for the same reason.
+var _replaced_name_layer: Control = null
 var _paper_seed: float = 0.0
 var _lore_font: Font = null
 var _rules_font: Font = null
 var _action_font: Font = null
+# The slot label's tracked face, built for _label_font_px (scaled).
+var _label_font: Font = null
+var _label_font_px: int = 0
 var _finish: CardRarityFinish = null
 var _name_finish: ShaderMaterial = null
+var _replaced_name_finish: ShaderMaterial = null
 var _sheen_tween: Tween = null
 
 # Laid out, in scaled pixels.
 var _plate_size: Vector2 = Vector2.ZERO
 var _art_rect: Rect2 = Rect2()
+var _slot_label_baseline: float = 0.0
 var _name_baseline: float = 0.0
 var _rules: TextParagraph = null
 var _rules_top: float = 0.0
 var _hairline_y: float = -1.0
 var _lore: TextParagraph = null
 var _lore_top: float = 0.0
+var _replaces_baseline: float = 0.0
+var _replaces_label_left: float = 0.0
 var _replaces: TextParagraph = null
 var _replaces_top: float = 0.0
 var _action_rects: Array[Rect2] = []
@@ -265,6 +318,11 @@ func _init() -> void:
 	_name_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_name_layer.draw.connect(_draw_name)
 	add_child(_name_layer)
+	_replaced_name_layer = Control.new()
+	_replaced_name_layer.name = "ReplacedName"
+	_replaced_name_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_replaced_name_layer.draw.connect(_draw_replaced_name)
+	add_child(_replaced_name_layer)
 	gui_input.connect(_on_gui_input)
 
 func _ready() -> void:
@@ -291,15 +349,20 @@ func get_replaced() -> TrinketData:
 func get_plate_size() -> Vector2:
 	return _plate_size
 
-# The "Replaces ..." line as shown, "" with nothing worn - for probes.
+# The REPLACES line as shown ("REPLACES <name>"), "" with nothing worn -
+# for probes.
 func replaces_text() -> String:
 	if _replaced == null:
 		return ""
-	return replaces_format % [_replaced.display_name, _replaced.describe()]
+	return "%s %s" % [replaces_label_text, _replaced.display_name]
 
 # The name's finish material while it wears one, else null - for probes.
 func get_name_finish() -> ShaderMaterial:
 	return _name_layer.material as ShaderMaterial if _name_layer != null else null
+
+# The worn piece's name's finish after REPLACES, else null - for probes.
+func get_replaced_name_finish() -> ShaderMaterial:
+	return _replaced_name_layer.material as ShaderMaterial if _replaced_name_layer != null else null
 
 func uses_placeholder() -> bool:
 	return _piece != null and _piece.art == null
@@ -340,17 +403,20 @@ func activate(index: int) -> void:
 func _apply_finish() -> void:
 	if _finish == null and not rarity_finish_path.is_empty():
 		_finish = load(rarity_finish_path) as CardRarityFinish
-	var rarity: CardData.CardRarity = _piece.rarity if _piece != null else CardData.CardRarity.UNSET
+	_name_finish = _finish_on(_name_layer, _piece, _name_finish)
+	_replaced_name_finish = _finish_on(_replaced_name_layer, _replaced, _replaced_name_finish)
+	_redraw()
+
+# Puts `piece`'s rarity finish on `layer` (reusing `material`), or takes
+# it off for a piece with none. Returns the material to keep.
+func _finish_on(layer: Control, piece: TrinketData, material: ShaderMaterial) -> ShaderMaterial:
+	var rarity: CardData.CardRarity = piece.rarity if piece != null else CardData.CardRarity.UNSET
 	if _finish == null or not _finish.has_finish(rarity):
-		_name_layer.material = null
-		_redraw()
-		return
-	var material: ShaderMaterial = _finish.name_material(rarity, _name_finish, name_finish_shader_path)
-	if material == null:
-		_name_layer.material = null
-		return
-	_name_finish = material
-	_name_layer.material = _name_finish
+		layer.material = null
+		return material
+	var finished: ShaderMaterial = _finish.name_material(rarity, material, name_finish_shader_path)
+	layer.material = finished
+	return finished if finished != null else material
 
 # --- Layout ---
 
@@ -387,14 +453,36 @@ func _relayout() -> void:
 	var text_width: float = width - pad * 2.0
 	var art: float = roundf(_px(art_size_px))
 	_art_rect = Rect2(roundf((width - art) / 2.0), roundf(pad), art, art)
+	var label_px: int = _font_px(slot_label_size_px)
+	if _label_font == null or _label_font_px != label_px:
+		_label_font = InkType.tracked(InkType.text_bold_font(), label_px, slot_label_tracking_em)
+		_label_font_px = label_px
+	_slot_label_baseline = roundf(_art_rect.end.y + _px(slot_label_gap_px) + _label_font.get_ascent(label_px))
 	var name_px: int = _font_px(name_size_px)
 	var name_font: Font = InkType.numeral_font()
-	_name_baseline = roundf(_art_rect.end.y + _px(name_gap_px) + name_font.get_ascent(name_px))
+	_name_baseline = roundf(_slot_label_baseline + _label_font.get_descent(label_px) + _px(name_gap_px) + name_font.get_ascent(name_px))
 	var y: float = _name_baseline + name_font.get_descent(name_px) + _px(rules_gap_px)
 	_rules_top = y
 	var rules_px: int = _font_px(rules_size_px)
 	_rules = _paragraph(_piece.describe() if _piece != null else "", _rules_font, rules_px, text_width)
 	y += _paragraph_height(_rules, rules_px)
+	# REPLACES <name> on one baseline, centred together; the worn piece's
+	# effect under it.
+	_replaces = null
+	var replaced_name_left: float = 0.0
+	var replaced_name_width: float = 0.0
+	if _replaced != null:
+		var replaced_px: int = _font_px(replaced_name_size_px)
+		var label_width: float = InkType.width(_label_font, replaces_label_text, label_px)
+		replaced_name_width = InkType.width(name_font, _replaced.display_name, replaced_px)
+		var row_width: float = label_width + _px(replaces_label_gap_px) + replaced_name_width
+		_replaces_label_left = roundf((width - row_width) / 2.0)
+		replaced_name_left = roundf(_replaces_label_left + label_width + _px(replaces_label_gap_px))
+		_replaces_baseline = roundf(y + _px(replaces_gap_px) + maxf(_label_font.get_ascent(label_px), name_font.get_ascent(replaced_px)))
+		_replaces_top = _replaces_baseline + maxf(_label_font.get_descent(label_px), name_font.get_descent(replaced_px))
+		var replaces_px: int = _font_px(replaces_size_px)
+		_replaces = _paragraph(_replaced.describe(), _rules_font, replaces_px, text_width)
+		y = _replaces_top + _paragraph_height(_replaces, replaces_px)
 	_lore = null
 	_hairline_y = -1.0
 	if _piece != null and not _piece.flavor_text.is_empty():
@@ -403,12 +491,6 @@ func _relayout() -> void:
 		var lore_px: int = _font_px(lore_size_px)
 		_lore = _paragraph(_piece.flavor_text, _lore_font, lore_px, text_width)
 		y = _lore_top + _paragraph_height(_lore, lore_px)
-	_replaces = null
-	if _replaced != null:
-		_replaces_top = roundf(y + _px(replaces_gap_px))
-		var replaces_px: int = _font_px(replaces_size_px)
-		_replaces = _paragraph(replaces_text(), _rules_font, replaces_px, text_width)
-		y = _replaces_top + _paragraph_height(_replaces, replaces_px)
 	_action_rects.clear()
 	if _show_actions:
 		if _action_font == null:
@@ -440,6 +522,10 @@ func _relayout() -> void:
 	_name_layer.size = Vector2(maxf(name_width, 1.0), _plate_size.y)
 	if _name_finish != null:
 		_name_finish.set_shader_parameter("text_width_px", name_width)
+	_replaced_name_layer.position = Vector2(replaced_name_left, 0.0)
+	_replaced_name_layer.size = Vector2(maxf(replaced_name_width, 1.0), _plate_size.y)
+	if _replaced_name_finish != null:
+		_replaced_name_finish.set_shader_parameter("text_width_px", replaced_name_width)
 	_redraw()
 
 # The choice's label: centred in its half, at its own label.
@@ -449,7 +535,7 @@ func _choice_label(index: int) -> String:
 # --- Draw ---
 
 func _redraw() -> void:
-	for layer: Control in [_paper, _face, _name_layer]:
+	for layer: Control in [_paper, _face, _name_layer, _replaced_name_layer]:
 		if layer != null:
 			layer.queue_redraw()
 
@@ -479,13 +565,18 @@ func _draw_face() -> void:
 		var initial_width: float = InkType.width(font, initial, initial_px)
 		var baseline: float = _art_rect.get_center().y + (font.get_ascent(initial_px) - font.get_descent(initial_px)) * 0.5
 		InkType.draw_run(_face, font, initial, Vector2(roundf(_art_rect.get_center().x - initial_width / 2.0), roundf(baseline)), initial_px, Color(ink, placeholder_initial_alpha))
+	var label_px: int = _font_px(slot_label_size_px)
+	var label_color := Color(ink, ink.a * slot_label_alpha)
+	var slot_width: float = InkType.width(_label_font, slot_label_text, label_px)
+	InkType.draw_run(_face, _label_font, slot_label_text, Vector2(roundf((_plate_size.x - slot_width) / 2.0), _slot_label_baseline), label_px, label_color)
 	_draw_paragraph(_rules, _rules_top, _pitch(_font_px(rules_size_px)), ink)
+	if _replaces != null:
+		InkType.draw_run(_face, _label_font, replaces_label_text, Vector2(_replaces_label_left, _replaces_baseline), label_px, label_color)
+		_draw_paragraph(_replaces, _replaces_top, _pitch(_font_px(replaces_size_px)), replaces_color)
 	if _lore != null:
 		var hairline_width: float = roundf(_plate_size.x * 0.22)
 		_face.draw_rect(Rect2(roundf((_plate_size.x - hairline_width) / 2.0), _hairline_y, hairline_width, maxf(roundf(plate_scale), 1.0)), Color(ink, hairline_alpha))
 		_draw_paragraph(_lore, _lore_top, _pitch(_font_px(lore_size_px)), Color(ink, lore_alpha))
-	if _replaces != null:
-		_draw_paragraph(_replaces, _replaces_top, _pitch(_font_px(replaces_size_px)), replaces_color)
 	_draw_actions()
 
 # The name at the layer's own origin - its finish (or flat ink) is the
@@ -497,6 +588,15 @@ func _draw_name() -> void:
 	if _name_layer.material == null and _finish != null:
 		color = _finish.common_ink
 	InkType.draw_run(_name_layer, InkType.numeral_font(), _piece.display_name, Vector2(0.0, _name_baseline), _font_px(name_size_px), color)
+
+# The worn piece's name after REPLACES, the same way.
+func _draw_replaced_name() -> void:
+	if _replaced == null:
+		return
+	var color: Color = ink
+	if _replaced_name_layer.material == null and _finish != null:
+		color = _finish.common_ink
+	InkType.draw_run(_replaced_name_layer, InkType.numeral_font(), _replaced.display_name, Vector2(0.0, _replaces_baseline), _font_px(replaced_name_size_px), color)
 
 # The title menu's treatment: each choice centred in its half in tracked
 # caps, the focused one in ink with a short hairline to its left, the

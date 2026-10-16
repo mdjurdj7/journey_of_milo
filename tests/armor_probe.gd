@@ -340,7 +340,7 @@ func _check_examine_leave() -> void:
 	_expect(not _field.can_process(), "...over a frozen field")
 	if examine != null:
 		var plate: Node = examine.call("get_plate")
-		_expect(str(plate.call("replaces_text")).begins_with("Replaces " + worn.display_name), "...naming the piece it replaces")
+		_expect(str(plate.call("replaces_text")).begins_with("REPLACES " + worn.display_name), "...naming the piece it replaces")
 		plate.call("activate", 1) # LEAVE
 		await _seconds(0.5)
 	_expect(_field.can_process(), "LEAVE: the field is live again")
