@@ -47,6 +47,15 @@ const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
 		if _model_material is ShaderMaterial and not value.is_empty():
 			(_model_material as ShaderMaterial).set_shader_parameter("albedo_texture", load(value) as Texture2D)
 @export var model_ground_offset: float = 0.0
+# FloorEnemy.height_offset_m, copied at spawn: metres the BODY stands over
+# the sand, at any XZ - its feet, contact shadow and contact area, and
+# the camera's feet test, all with it - for a body set on something the
+# relief doesn't draw (floor 4's Adder on its basking slab). 0 = on the
+# sand.
+@export var height_offset: float = 0.0:
+	set(value):
+		height_offset = value
+		_ground_to_relief()
 # EnemyData.harness_point, copied the same way: where a rope is tied to
 # this body, glb units (see get_harness_point()).
 @export var harness_point: Vector3 = Vector3.ZERO
@@ -589,13 +598,13 @@ func _ground_to_relief() -> void:
 		_mound.resample()
 
 # The body's global Y with its feet on the relief at this XZ (see
-# _ground_to_relief()'s doc for the model_ground_offset part). The
-# current Y when there is no Ground to ask.
+# _ground_to_relief()'s doc for the model_ground_offset part), raised by
+# height_offset. The current Y when there is no Ground to ask.
 func _body_y_on_ground(x: float, z: float) -> float:
 	if _ground == null:
 		return global_position.y
 	var local_xz: Vector3 = _ground.to_local(Vector3(x, 0.0, z))
-	return _ground.get_height_at(Vector2(local_xz.x, local_xz.z)) - model_ground_offset
+	return _ground.get_height_at(Vector2(local_xz.x, local_xz.z)) - model_ground_offset + height_offset
 
 # get_forward() points inland (spawn -> ForwardMarker, see RegionField's own doc),
 # so facing the shore/sea is the opposite direction. Yaws the body itself,

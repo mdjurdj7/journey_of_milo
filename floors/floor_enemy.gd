@@ -13,6 +13,10 @@ class_name FloorEnemy
 # EncounterSlot.to_floor()). Y is never authored - a FieldEnemy grounds
 # itself on the relief.
 @export var position: Vector2 = Vector2.ZERO
+# Metres the body stands over the relief here (FieldEnemy.height_offset):
+# on top of something the relief doesn't draw - floor 4's Adder on its
+# basking slab, the slab's top over the sand. 0 = on the sand.
+@export var height_offset_m: float = 0.0
 # The body's yaw in degrees, on top of the slot's yaw - rotation.y.
 # Authored outright rather than derived from "seaward": the crab beside
 # the pool faces where it faces.

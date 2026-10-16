@@ -1235,6 +1235,7 @@ func _spawn_floor_enemies() -> void:
 			enemy.battle_camera_turn_degrees = entry.enemy_data.battle_camera_turn_degrees
 			enemy.harness_point = entry.enemy_data.harness_point
 			enemy.face_shore_at_spawn = false
+			enemy.height_offset = entry.height_offset_m
 			var at: Vector2 = slot.to_floor(entry.position)
 			enemy.position = Vector3(spawn.x + at.x, 0.0, spawn.z + at.y)
 			enemy.rotation.y = deg_to_rad(slot.yaw_degrees + entry.yaw_degrees)

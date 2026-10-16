@@ -6,8 +6,8 @@ class_name PaintedProp
 # (roughness 1, no specular, no normal map, cull disabled), times a tint,
 # and - since that shader is fog_disabled - the depth fog laid back over
 # it by an enemy_fog.gdshader pass, filled from the field's RegionSky.
-# Shared by BelongingsObject, the workbench (Wagon) and the Handcart; each
-# keeps its own material, fog pass and fog_factor.
+# Shared by BelongingsObject, the workbench (Wagon), the Handcart and the
+# BaskingSlab; each keeps its own material, fog pass and fog_factor.
 
 const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
 const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
