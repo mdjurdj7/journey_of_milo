@@ -47,15 +47,23 @@
   probe at a time when under 6 GB is free at the start, else two; it
   waits for memory rather than start a probe that would leave under
   2000 MB free, and ends everything it started if it's stopped.
-- After a change: run only the probe(s) for the system you touched
-  (`--probe`), plus `--smoke` (a fixed six across the field, a fight,
-  the floors and the cards), once each, at the end, in the foreground -
-  not whole areas, and not `--changed`.
+- Data-only changes (scene/.tres values, assets, masks, docs): no probes.
+- Code changes: run only the probe(s) for the system you touched
+  (`--probe`), once, at the end, in the foreground - not whole areas,
+  and not `--changed`.
+- Never run --smoke after individual commits. --smoke (a fixed six
+  across the field, a fight, the floors and the cards) and the full set
+  run only before a push.
+- Never re-run a probe that already passed unless the code it covers
+  changed since.
+- If memory is too low to run probes, don't wait; commit and say so.
+  The pre-push full set covers it.
 - The full probe set runs only before a push: `--full --batch 1/4` ...
   `--batch 4/4`, each in the foreground. `--changed`, `--prepush` (the
   mapped probes plus the fast tier) and area sweeps run only when I ask
   for them.
 - Never push unless my message says "push".
+- Before any push, run `git pull --rebase`.
 - Don't write a new probe unless I ask for one, or unless it guards a
   bug that actually happened.
 - Don't pin content in probes: no exact positions, yaws, point counts
@@ -72,8 +80,7 @@
   `-s res://tests/`, or `--headless --path . --import` - a run's import);
   if there are any, stop and tell me.
 - If a run is stopped for memory, don't retry: end any leftover
-  processes from it, report, and wait.
-- Docs, assets and visual-only changes need no probe run.
+  processes from it.
 
 ## Probe worktrees
 - When testing a change to any .import file in a worktree that copied
