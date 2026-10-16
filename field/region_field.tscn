@@ -214,7 +214,7 @@ draw_sword_blend_in = 0.35
 draw_sword_grab_time = 0.416667
 draw_sword_snap_time = 0.25
 draw_sword_sweep_direction = Vector3(-0.6, 0.5, -0.6)
-draw_sword_strike_time = 0.875
+draw_sword_strike_time = 0.958333
 draw_strike_puff_scale = 1.0
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="Wanderer" unique_id=1638228685]

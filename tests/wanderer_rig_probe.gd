@@ -49,8 +49,9 @@ extends SceneTree
 #            from that frame, turning onto the hand mount by the end of
 #            draw_sword_snap_time (frame 16) - its tip passing up over his
 #            right shoulder, the blade clear of his head; the ground strike
-#            (draw_strike) fires once, on frame 21, with a sand puff on the
-#            drawn sand under the sword tip; then, through
+#            (draw_strike) fires once, at draw_sword_strike_time as the
+#            scene sets it (after the grab, inside the clip), with a sand
+#            puff on the drawn sand under the sword tip; then, through
 #            BattleController.request_play()/confirm_
 #            target(): a Slash plays to its last frame through the status
 #            change its own resolution ends with, then BattleIdle takes
@@ -109,9 +110,8 @@ const SLASH_CONTACT_S := 10.0 / 24.0
 const SLASH_LENGTH_S := 32.0 / 24.0
 # The glb's draw_sword: its grab frame (Blender frame 10).
 const DRAW_GRAB_S := 10.0 / 24.0
-# The draw's ground strike (Blender frame 21), and how close its puff sits
-# to the drawn sand under the sword tip (metres; across, a centimetre).
-const DRAW_STRIKE_S := 21.0 / 24.0
+# How close the draw's ground-strike puff sits to the drawn sand under
+# the sword tip (metres; across, a centimetre).
 const STRIKE_PUFF_GROUND_M := 0.05
 const STRIKE_PUFF_ACROSS_M := 0.01
 # The most his right forearm may twist about its own axis (from its rest,
@@ -626,17 +626,19 @@ func _on_draw_strike(tip: Vector3, ground_point: Vector3) -> void:
 			puff = (child as Node3D).global_position
 	_strikes.append([at, tip, ground_point, puff])
 
-# The entry's ground strike: once, on frame 21, its puff on the drawn sand
-# under the sword tip.
+# The entry's ground strike: once, at the scene's draw_sword_strike_time,
+# its puff on the drawn sand under the sword tip.
 func _check_strike() -> void:
 	var strike: float = float(_wanderer.get("draw_sword_strike_time"))
-	_check(absf(strike - DRAW_STRIKE_S) <= 0.0001, "draw_sword_strike_time is frame 21, %.4f s" % strike)
+	var grab: float = float(_wanderer.get("draw_sword_grab_time"))
+	var draw_length: float = _player.get_animation("DrawSword").length
+	_check(strike > grab and strike < draw_length, "draw_sword_strike_time %.4f s lies after the grab (%.4f s) and inside DrawSword (%.4f s)" % [strike, grab, draw_length])
 	_check(_strikes.size() == 1, "the entry's ground strike fires once (%d)" % _strikes.size())
 	if _strikes.is_empty():
 		return
 	var at: float = _strikes[0][0]
 	var tip: Vector3 = _strikes[0][1]
-	_check(at >= strike - 0.001 and at <= strike + 1.0 / 20.0, "on frame 21: DrawSword %.3f s in (%.4f)" % [at, strike])
+	_check(at >= strike - 0.001 and at <= strike + 1.0 / 20.0, "on it: DrawSword %.3f s in (%.4f)" % [at, strike])
 	var ground: Node3D = _field.get_node("Ground") as Node3D
 	var local: Vector3 = ground.to_local(tip)
 	var sand_y: float = ground.to_global(Vector3(local.x, float(ground.call("get_visible_height_at", Vector2(local.x, local.z))), local.z)).y

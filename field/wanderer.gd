@@ -283,13 +283,13 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 @export var draw_sword_snap_time: float = 6.0 / 24.0
 @export var draw_sword_sweep_direction: Vector3 = Vector3(-0.6, 0.5, -0.6)
 # The draw's ground strike: a method key on the clip at draw_sword_strike_
-# time (Blender frame 21), like the grab's, acting only while a battle
-# entry is under way - not after a fight ended or a card's clip cut the
-# draw off (_on_draw_sword_strike_key()). On it the sand puff of a slash
-# hit rises, draw_strike_puff_scale its size and speed, on the drawn sand
-# under the sword tip (draw_strike), with the ground-strike sound there,
-# and the fight's opening hold ends (draw_strike_passed). Both read at
-# each entry.
+# time (the frame the tip meets the sand; region_field.tscn sets it), like
+# the grab's, acting only while a battle entry is under way - not after a
+# fight ended or a card's clip cut the draw off (_on_draw_sword_strike_
+# key()). On it the sand puff of a slash hit rises, draw_strike_puff_scale
+# its size and speed, on the drawn sand under the sword tip (draw_strike),
+# with the ground-strike sound there, and the fight's opening hold ends
+# (draw_strike_passed). Both read at each entry.
 @export var draw_sword_strike_time: float = 21.0 / 24.0
 @export var draw_strike_puff_scale: float = 1.0
 
