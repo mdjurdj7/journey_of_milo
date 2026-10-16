@@ -651,8 +651,8 @@
               "option": "greyshelf",
               "weight": 1.0,
               "anchor": [
-                -0.567,
-                -42.0
+                -1.974,
+                -45.551
               ],
               "slot_yaw_degrees": 0.0,
               "cluster": null,
@@ -666,7 +666,7 @@
                   -0.1022,
                   -0.9948
                 ],
-                "gate_distance_beyond_enemy": 12.0,
+                "gate_distance_beyond_enemy": 9.3,
                 "bar_axis_offset": 0.0,
                 "channel_max_width": 0.0
               },
@@ -685,14 +685,22 @@
                   "anchor": false,
                   "card_reward": "TOP_TIER_FIRST",
                   "position": [
-                    -0.567,
-                    -42.0
+                    -1.974,
+                    -45.551
                   ],
-                  "yaw_degrees": -90.0,
+                  "yaw_degrees": -174.13,
                   "face_prop": null
                 }
               ],
-              "props": [],
+              "props": [
+                {
+                  "scene": "res://field/basking_slab.tscn",
+                  "position": [
+                    -2.0,
+                    -45.8
+                  ]
+                }
+              ],
               "keepsake_drop": null,
               "armor_drop": null,
               "glassbone": 1
@@ -1336,7 +1344,7 @@
         "contact_radius_m": 3.2,
         "cluster_gap_m": null,
         "rest_height_m": 0.0,
-        "sink_m": 0.3,
+        "sink_m": 0.05,
         "battle_hover_m": 0.0,
         "buried_on_field": false,
         "flies_in_battle": false,

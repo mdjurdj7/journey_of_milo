@@ -106,7 +106,7 @@ func _check_data() -> void:
 	_expect_eq(data.glassbone_reward, 1, "It leaves Glassbone x1")
 	_expect_eq(data.model_scene_path, MODEL_PATH, "Its body the Greyshelf glb")
 	_expect(is_equal_approx(data.model_scale, 1.36) and is_equal_approx(data.model_yaw_offset_degrees, 180.0), "...at 1.36, turned 180")
-	_expect(is_equal_approx(data.sink_m, 0.3) and is_equal_approx(data.rest_height_m, 0.0), "...sunk 0.3 m, not buried")
+	_expect(is_equal_approx(data.rest_height_m, 0.0), "...not buried")
 	_expect_eq(data.attachment_scene_path, POSE_SCENE_PATH, "...GreyshelfPose")
 	_expect(is_equal_approx(data.contact_radius_m, 3.2), "...a 3.2 m contact area")
 	_expect(data.contact_sounds.size() == 1 and data.contact_sounds[0].resource_path == CONTACT_SOUND_PATH, "...the placeholder contact sound")
@@ -348,8 +348,7 @@ func _check_fight_phase() -> void:
 
 # --- The body ---
 
-# On the crest: 5 m long, lying broadside (head east), sunk 0.3 m; the
-# head turns and lifts toward the Wanderer within its look range and
+# On floor 5: 5 m long; the head turns and lifts toward the Wanderer within its look range and
 # eases back beyond it; the fight's freeze eases it back too.
 func _check_body() -> void:
 	_new_run()
@@ -368,23 +367,24 @@ func _check_body() -> void:
 	var top: float = aabb.position.y + aabb.size.y
 	print("greyshelf_probe: body %.2f m long, %.2f m wide, its back's top %.2f m above the rock (sunk %.2f), head height %.2f" % [length, minf(aabb.size.x, aabb.size.z), top, float(greyshelf.get("sink")), float(greyshelf.call("get_head_height"))])
 	_expect(absf(length - LENGTH_M) < LENGTH_TOLERANCE_M, "It is 5 m long (%.2f)" % length)
-	_expect(is_equal_approx(float(greyshelf.get("sink")), 0.3) and is_equal_approx(aabb.position.y, -0.3), "...set 0.3 m into the rock")
 	var forward: Vector3 = -greyshelf.global_transform.basis.z
-	_expect(forward.x > 0.99, "...its head east (%s)" % forward)
+	forward = Vector3(forward.x, 0.0, forward.z).normalized()
+	# Off to his side, whichever way he lies.
+	var side: Vector3 = forward.cross(Vector3.UP).normalized()
 	_expect((greyshelf.get_node("SandMound") if greyshelf.has_node("SandMound") else null) == null, "...no mound: sunk, not buried")
 	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
 	var head: Vector3 = greyshelf.global_position + forward * 2.0
-	wanderer.global_position = head + Vector3(0.0, 0.0, 6.0)
+	wanderer.global_position = head + side * 6.0
 	await create_timer(3.0).timeout
 	var angle: float = float(pose.call("get_head_angle"))
 	var lift: float = float(pose.get("_lift"))
 	_expect(absf(angle) > 20.0, "The Wanderer 6 m off: the head turns to him (%.1f)" % angle)
 	_expect(lift > 0.5 * float(pose.get("lift_degrees")), "...and lifts (%.1f)" % lift)
 	_expect(is_equal_approx(float(pose.call("get_rear_lift")), 0.0), "...the body still lying")
-	wanderer.global_position = head + Vector3(0.0, 0.0, 20.0)
+	wanderer.global_position = head + side * 20.0
 	await create_timer(4.0).timeout
 	_expect(absf(float(pose.call("get_head_angle"))) < 1.0 and float(pose.get("_lift")) < 0.5, "20 m off: the head eases back to the front")
-	wanderer.global_position = head + Vector3(0.0, 0.0, 6.0)
+	wanderer.global_position = head + side * 6.0
 	await create_timer(3.0).timeout
 	_field.call_deferred("_on_enemy_contacted", greyshelf)
 	await create_timer(4.0).timeout

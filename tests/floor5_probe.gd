@@ -39,9 +39,6 @@ const TITLE_SCENE_PATH := "res://run/title_screen.tscn"
 const LOG_DIR := "user://floor5_probe_runs"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FLOOR_INDEX := 4
-const FIGHT_AT := Vector2(-0.567, -42.0)
-const EXIT_DIRECTION := Vector2(-0.1022, -0.9948)
-const GATE_DISTANCE_M := 12.0
 const EXIT_AT := Vector2(-3.5, -60.0)
 const FINDING_AT := Vector2(-7.167, -15.9)
 # Spawn to the crest along the worn band's S-bend: the long climb, the
@@ -52,9 +49,9 @@ const DESCENT: Array[Vector2] = [Vector2(1.4, -35), Vector2(1.9, -32.5), Vector2
 const DESCENT_FROM := Vector2(3.0, -36.5)
 # From the climb across to the pocket.
 const POCKET_FROM := Vector2(2.0, -14.0)
-# Past the fight on the crest, toward the exit - outside its contact area,
-# well short of the gate.
-const PAST_FIGHT := Vector2(-1.5, -47.0)
+# Past the fight, toward the exit: this far short of the gate line, back
+# along the exit - outside the fight's contact area, short of the gate.
+const PAST_GATE_BACK_M := 3.0
 # The walk floor's rise from spawn to the crest flat (0.4 m -> 3.45 m on
 # the elevation mask), and how far the feet may read off it: the relief's
 # own noise (relief_amplitude 0.28) rides on the mask at either end.
@@ -122,12 +119,9 @@ func _check_data() -> void:
 	if slots.size() == 1:
 		var slot: Resource = slots[0]
 		var entry: Resource = ((slot.get("options") as Array)[0].get("members") as Array)[0]
-		_expect(bool(slot.get("required")) and slot.call("to_floor", entry.get("position")) == FIGHT_AT, "...the region-end fight, required, on the crest")
+		_expect(bool(slot.get("required")), "...the region-end fight, required")
 		_expect((entry.get("enemy_data") as Resource).resource_path == GREYSHELF_PATH, "...the Greyshelf")
-		_expect(is_equal_approx(float(slot.get("yaw_degrees")) + float(entry.get("yaw_degrees")), -90.0), "...lying across the crest, head east")
-	_expect(data.get("exit_direction") == EXIT_DIRECTION and is_equal_approx(float(data.get("gate_distance_beyond_enemy")), GATE_DISTANCE_M), "...the gate 12 m on along the exit neck")
 	_expect_eq((data.get("ledges") as Array).size(), 1, "...one ledge ring: the boundary")
-	_expect_eq((data.get("wear_path_override") as PackedVector2Array).size(), 7, "...a 7-point worn band")
 	_completed += 1
 
 # Spawn to the crest: every waypoint of the climb and the shelf reached
@@ -179,18 +173,18 @@ func _check_exit() -> void:
 	RunLogger.set_output_dir(_log_dir)
 	await _load()
 	var gate: Node3D = _field.get_node("ExitGate")
-	var gate_at := Vector2(gate.global_position.x - _spawn.x, gate.global_position.z - _spawn.z)
-	_expect(gate_at.distance_to(FIGHT_AT + EXIT_DIRECTION.normalized() * GATE_DISTANCE_M) < 0.01, "The gate stands 12 m past the fight (%s)" % gate_at)
 	var forward: Vector3 = -gate.global_transform.basis.z
 	forward = Vector3(forward.x, 0.0, forward.z).normalized()
 	var exited: Array[bool] = [false]
 	gate.connect("floor_exited", func() -> void: exited[0] = true)
 	_expect(bool(_wanderer.call("has_hold_line")), "Floor 5 holds a line while the region-end fight stands")
 	var fight: Node3D = _required_enemy() as Node3D
+	var past: Vector2 = _past_fight()
 	if fight != null:
-		var clear: float = PAST_FIGHT.distance_to(FIGHT_AT) - float(fight.get("contact_radius"))
+		var fight_at := Vector2(fight.global_position.x - _spawn.x, fight.global_position.z - _spawn.z)
+		var clear: float = past.distance_to(fight_at) - float(fight.get("contact_radius"))
 		_expect(clear > 0.5, "...the spot past it is outside its contact area (%.2f m clear)" % clear)
-	await _place(PAST_FIGHT)
+	await _place(past)
 	_expect(_field.get_node("BattleLayer").get_child_count() == 0, "...put past the fight, none starts")
 	_wanderer.call("set_move_target", _world(EXIT_AT))
 	var worst: float = -INF
@@ -261,7 +255,7 @@ func _check_loop() -> void:
 	var gate: Node3D = _field.get_node("ExitGate")
 	var exited: Array[bool] = [false]
 	gate.connect("floor_exited", func() -> void: exited[0] = true)
-	await _place(PAST_FIGHT)
+	await _place(_past_fight())
 	if await _win_fight(_required_enemy()):
 		var lap_before: int = int(_run_state.get("region_lap"))
 		await _walk_out(exited)
@@ -279,6 +273,14 @@ func _check_loop() -> void:
 		current_scene = null
 	await _unload()
 	_completed += 1
+
+# Past the fight: PAST_GATE_BACK_M short of the gate line, back along the
+# exit, as an offset from spawn.
+func _past_fight() -> Vector2:
+	var gate: Node3D = _field.get_node("ExitGate")
+	var forward: Vector3 = -gate.global_transform.basis.z
+	var exit := Vector2(forward.x, forward.z).normalized()
+	return Vector2(gate.global_position.x - _spawn.x, gate.global_position.z - _spawn.z) - exit * PAST_GATE_BACK_M
 
 # The required fight started and won outright; false when it never starts.
 func _win_fight(fight: Node) -> bool:

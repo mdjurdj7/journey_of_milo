@@ -543,8 +543,14 @@ folder (run_log_probe). (2026-10-04.)
   Gape's tell is `GreyshelfPose`'s rear of the forequarters with the
   throat swelling and its blue deepening (`field/greyshelf_throat.gdshader`,
   hue and value only, no glow). A jaw needs a model with a mouth. It lies
-  sunk 0.3 m on the crest (`EnemyData.sink_m`, which lowers the model
-  without burying it the way a negative `rest_height_m` does), and its
+  on a crest rock at the mouth of floor 5's north bulb - a placeholder
+  glb (`assets/models/props/crest rock/`, `BaskingSlab` with the rock's
+  model and colour map as overrides) until a Meshy rock replaces it - up
+  by its `FloorEnemy.height_offset_m`, settled 0.05 m into the stone
+  (`EnemyData.sink_m`, which lowers the model without burying it the way
+  a negative `rest_height_m` does; 0.3 m on open sand put its feet under
+  the relief). The rock's top tilts about 0.15 m along its length, so
+  the tail end sits a little into it. Its
   `contact_sounds` borrow `combat_old/hit.wav`, as the Dunecur and the
   Wardling do. Its material is the field's for every enemy, normal map
   included, as the Siltjaw's is. (2026-10-05, Greyshelf.)

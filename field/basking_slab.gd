@@ -1,13 +1,15 @@
 extends Node3D
 class_name BaskingSlab
 
-# A low slab of stone the Adder lies on in its den on floor 4 - a stand-
-# in until a modelled one replaces it, so the model and its colour map
-# are paths and nothing else knows its shape. It says nothing and opens
-# nothing. Placed from data (a FloorProp in the Adder's encounter:
-# position and yaw; anything else through overrides) - nothing floor-
-# specific is in basking_slab.tscn. The Adder stands on its top by its
-# own FloorEnemy.height_offset_m, not by asking this.
+# A stone a basking enemy lies on - the Adder's slab in its den on floor
+# 4, and floor 5's crest rock under the Greyshelf (its model and colour
+# map through the FloorProp's overrides). Each a stand-in until a
+# modelled one replaces it, so the model and its colour map are paths and
+# nothing else knows its shape. It says nothing and opens nothing. Placed
+# from data (a FloorProp in the encounter: position and yaw; anything
+# else through overrides) - nothing floor-specific is in
+# basking_slab.tscn. The enemy stands on its top by its own
+# FloorEnemy.height_offset_m, not by asking this.
 #
 # The body is model_scene_path on its own colour map (colour_map_path)
 # under the painted shader, with the enemy_fog pass laid over it at
