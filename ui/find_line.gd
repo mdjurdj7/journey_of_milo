@@ -3,9 +3,12 @@ class_name FindLine
 
 # The field's find line: one sentence in the system voice when a fight
 # leaves a worn piece - "You find a harness on the Wardling." - centred
-# in the lower third, just under WorldVoiceLine's band (its centre at
-# 0.88 of the height, its box 40 px either side) so the two never meet.
-# Alegreya Sans at full Battle/ink, no box; the piece's name inline and
+# in the lower third, above WorldVoiceLine's band (its centre at 0.88 of
+# the height) and clear of the HUD row along the bottom edge, so the
+# three never meet. Alegreya Sans at full Battle/ink, no box - only a
+# faint wash feathered on every edge behind it, opposite to the ink, so
+# it reads over dark ground and all but vanishes on pale sand (_draw_
+# wash()); the piece's name inline and
 # one step stronger, in Alegreya Sans Bold: a Common in a deeper ink
 # (name_ink_strength toward full contrast), a Rare in the cards' RARE
 # finish (CardRarityFinish.name_material()) - the only place the sentence
@@ -39,12 +42,39 @@ const NODE_NAME := "FindLine"
 		name_ink_strength = value
 		if _name_layer != null:
 			_name_layer.queue_redraw()
-# The line's top, as a fraction of the viewport height: WorldVoiceLine's
-# band ends at 0.88 + 40 px (990 at 1080p); this sits a few px under it.
-@export var top_fraction: float = 0.922:
+# The line's centre, as a fraction of the viewport height: 0.82 = y 886
+# at 1080p, the text ~868-904 - above WorldVoiceLine's text (~934-966)
+# and well above the HUD row (~1004-1048).
+@export var centre_fraction: float = 0.82:
 	set(value):
-		top_fraction = value
+		centre_fraction = value
 		_place()
+# The wash behind the sentence: wash_color behind a dark ink (the pale
+# world), wash_color_on_light_ink behind a light one (a dark world), at
+# wash_opacity at most. A soft pill: wash_pad_px beyond the text each
+# side, full strength over the inner wash_solid_share of that reach and
+# easing to nothing at its edge - no box, no border, no corners.
+@export var wash_color: Color = Color(0.93, 0.91, 0.86):
+	set(value):
+		wash_color = value
+		queue_redraw()
+@export var wash_color_on_light_ink: Color = Color(0.16, 0.16, 0.15):
+	set(value):
+		wash_color_on_light_ink = value
+		queue_redraw()
+@export_range(0.0, 1.0) var wash_opacity: float = 0.3:
+	set(value):
+		wash_opacity = value
+		queue_redraw()
+@export var wash_pad_px: Vector2 = Vector2(72.0, 22.0):
+	set(value):
+		wash_pad_px = value
+		queue_redraw()
+@export_range(0.0, 0.95) var wash_solid_share: float = 0.35:
+	set(value):
+		wash_solid_share = value
+		_build_wash()
+		queue_redraw()
 @export_file("*.tres") var rarity_finish_path: String = "res://battle/card_rarity_finish.tres"
 @export_file("*.gdshader") var name_finish_shader_path: String = "res://battle/card_name_finish.gdshader"
 
@@ -59,6 +89,8 @@ var _before: String = ""
 var _name: String = ""
 var _after: String = ""
 var _tween: Tween = null
+# The wash's falloff: a radial gradient, white to clear (_build_wash()).
+var _wash_texture: GradientTexture2D = null
 
 # The field's one FindLine, under `hud` (the FieldHUD CanvasLayer): an
 # existing one by name, else a new one. Null if hud is null.
@@ -85,6 +117,7 @@ func _ready() -> void:
 	add_child(_name_layer)
 	if not rarity_finish_path.is_empty():
 		_finish = load(rarity_finish_path) as CardRarityFinish
+	_build_wash()
 	refresh_style()
 	modulate.a = 0.0
 	visible = false
@@ -162,17 +195,19 @@ func _process(_delta: float) -> void:
 	if visible:
 		_place()
 
-# Centred across the viewport, its top at top_fraction - whole pixels.
+# Centred across the viewport, its centre at centre_fraction - whole
+# pixels.
 func _place() -> void:
 	if not is_inside_tree():
 		return
 	var view: Vector2 = get_viewport_rect().size
-	position = Vector2(roundf((view.x - size.x) / 2.0), roundf(view.y * top_fraction))
+	position = Vector2(roundf((view.x - size.x) / 2.0), roundf(view.y * centre_fraction - size.y / 2.0))
 
 func _baseline() -> float:
 	return _font.get_ascent(text_size_px) if _font != null else float(text_size_px)
 
 func _draw() -> void:
+	_draw_wash()
 	InkType.draw_run(self, _font, _before, Vector2(0.0, _baseline()), text_size_px, _ink)
 	var after_x: float = roundf(InkType.width(_font, _before, text_size_px) + InkType.width(_name_font, _name, text_size_px))
 	InkType.draw_run(self, _font, _after, Vector2(after_x, _baseline()), text_size_px, _ink)
@@ -183,3 +218,38 @@ func _draw_name() -> void:
 	var toward: Color = Color.BLACK if _ink.get_luminance() < 0.5 else Color.WHITE
 	var color: Color = _ink.lerp(Color(toward, _ink.a), name_ink_strength)
 	InkType.draw_run(_name_layer, _name_font, _name, Vector2(0.0, _baseline()), text_size_px, color)
+
+# The wash's falloff texture: a circle, white and solid out to
+# wash_solid_share of its radius, then easing (cubic) to clear at the rim.
+func _build_wash() -> void:
+	var gradient := Gradient.new()
+	gradient.interpolation_mode = Gradient.GRADIENT_INTERPOLATE_CUBIC
+	gradient.offsets = PackedFloat32Array([0.0, wash_solid_share, 1.0])
+	gradient.colors = PackedColorArray([Color.WHITE, Color.WHITE, Color(1.0, 1.0, 1.0, 0.0)])
+	var texture := GradientTexture2D.new()
+	texture.gradient = gradient
+	texture.fill = GradientTexture2D.FILL_RADIAL
+	texture.fill_from = Vector2(0.5, 0.5)
+	texture.fill_to = Vector2(1.0, 0.5)
+	texture.width = 64
+	texture.height = 64
+	_wash_texture = texture
+
+# The wash: the falloff circle cut in half for the two rounded ends,
+# wash_pad_px.x wide, and its middle column stretched under the text
+# between them - a pill wash_pad_px.y above and below the text. Drawn
+# under the sentence and the name (a child, drawn after), and faded with
+# them by the line's modulate.
+func _draw_wash() -> void:
+	if wash_opacity <= 0.0 or size.x <= 0.0 or _wash_texture == null:
+		return
+	var base: Color = wash_color if _ink.get_luminance() < 0.5 else wash_color_on_light_ink
+	var tint := Color(base, wash_opacity)
+	var top: float = -wash_pad_px.y
+	var height: float = size.y + wash_pad_px.y * 2.0
+	var cap: float = maxf(wash_pad_px.x, 0.0)
+	var side: float = _wash_texture.width
+	var half: float = side / 2.0
+	draw_texture_rect_region(_wash_texture, Rect2(-cap, top, cap, height), Rect2(0.0, 0.0, half, side), tint)
+	draw_texture_rect_region(_wash_texture, Rect2(0.0, top, size.x, height), Rect2(half - 0.5, 0.0, 1.0, side), tint)
+	draw_texture_rect_region(_wash_texture, Rect2(size.x, top, cap, height), Rect2(half, 0.0, half, side), tint)
