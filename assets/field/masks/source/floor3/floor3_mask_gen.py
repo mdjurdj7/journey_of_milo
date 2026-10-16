@@ -69,7 +69,7 @@ STREAM = True
 STREAM_PTS = [(898, 282), (872, 352), (872, 440), (846, 512), (862, 594)]
 STREAM_WIDTH_M = (1.8, 3.2)    # at the ford (middle), where it wells out and sinks in (ends)
 STREAM_INTO_FACE_M = 0.5       # the water runs this far under the ridge faces
-STREAM_BANK_M = 2.0            # walkable floor ramps from the water's edge to BASE_WALK over this
+STREAM_BANK_M = 5.0            # walkable floor ramps from the water's edge to BASE_WALK over this
 stream = np.zeros((H, W), bool)
 if STREAM:
     from scipy.interpolate import splprep, splev
