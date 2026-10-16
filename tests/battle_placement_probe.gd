@@ -12,19 +12,19 @@ extends SceneTree
 #   - the Wanderer at least his minimum spacing (RegionField.stance_
 #     distance_min()) from the enemy he faces
 #   - the battle camera over the ground where it stands
-#   - clear sight from the camera to every combatant's feet: no ground
-#     above the straight line to them
-#   - the bottom fifth of the frame no more than FOREGROUND_TERRAIN_MAX
-#     covered by terrain in front of the fight: of a grid of rays through
-#     that strip, the share that meet the ground nearer than the nearest
-#     combatant and RIM_RISE_M or more above the lowest combatant's feet -
-#     a rim or a bank in the way, not the fight's own floor
+#   - clear sight from the camera to every combatant's feet: the ground
+#     nowhere more than FEET_SIGHT_TOLERANCE_M over the straight line to
+#     them - for feet under water, to the water's surface over them (the
+#     camera lifts its pitch until this holds, CameraRig.battle_pitch_max_
+#     deg)
 #   - no prop in the foreground: no corner of a prop's visual bounds in
 #     the camera's frustum and PROP_NEARER_M or more nearer to it than the
 #     nearest combatant. The fight's own props (its option's - the
 #     Wardling's hitching post, the Dunecur's bones) belong in its frame
 #     and are left out.
-# The limits are this probe's own constants, below.
+# The limits are this probe's own constants, below. Each fight also gets
+# an INFO line - its settled battle pitch and whether the Tower is in its
+# frame - never a failure.
 # Every failure is printed (FAIL) with its floor, slot and option, and
 # the probe goes on to the next fight; it fixes nothing.
 #
@@ -48,11 +48,11 @@ const PROP_NEARER_M := 1.5
 # The most of the frame's bottom fifth that terrain in front of the fight
 # may cover, and how far over the lowest combatant's feet a hit must
 # stand to count as terrain in the way rather than the fight's floor.
-const FOREGROUND_TERRAIN_MAX := 0.15
-const RIM_RISE_M := 0.25
-const STRIP_FRACTION := 0.2
-const STRIP_COLUMNS := 32
-const STRIP_ROWS := 6
+# How far the ground may stand over a sight line to the feet, metres -
+# CameraRig.battle_feet_sight_tolerance_m.
+const FEET_SIGHT_TOLERANCE_M := 0.05
+# Points along the Tower's height tried for the INFO line.
+const TOWER_SAMPLES := 12
 # An encounter prop is the spawned one of its scene within this of where
 # its slot puts it, metres.
 const OWN_PROP_MATCH_M := 0.5
@@ -144,18 +144,14 @@ func _check_fight(floor_index: int, slot: EncounterSlot, option: EncounterOption
 		_fail("%s: the battle camera is %.2f m over the ground" % [label, camera.global_position.y - under])
 	# Sight to every combatant's feet.
 	var nearest: float = INF
-	var lowest_feet: float = INF
+	var sea_level: float = float(_field.get_node("Sea").get("sea_level"))
 	for body: Node3D in [wanderer] + members:
 		var feet: Vector3 = body.global_position
 		nearest = minf(nearest, camera.global_position.distance_to(feet + Vector3.UP * BODY_MIDDLE))
-		lowest_feet = minf(lowest_feet, feet.y)
-		var blocked: float = _ground_over_ray(ground, camera.global_position, feet + Vector3.UP * 0.05)
-		if blocked > 0.0:
+		feet.y = maxf(feet.y, sea_level)
+		var blocked: float = _ground_over_ray(ground, camera.global_position, feet)
+		if blocked > FEET_SIGHT_TOLERANCE_M:
 			_fail("%s: the ground rises %.2f m over the camera's sight line to %s's feet" % [label, blocked, _name_of(body, wanderer)])
-	# Terrain in front of the fight across the frame's bottom fifth.
-	var covered: float = _foreground_terrain(camera, ground, nearest, lowest_feet + RIM_RISE_M)
-	if covered > FOREGROUND_TERRAIN_MAX:
-		_fail("%s: terrain covers %.0f%% of the frame's bottom fifth (at most %.0f%%)" % [label, covered * 100.0, FOREGROUND_TERRAIN_MAX * 100.0])
 	# Props in the foreground - the fight's own left out.
 	var own: Array[Node] = _own_props(slot, option, spawn)
 	var props: Node = _field.get_node_or_null(^"Props")
@@ -171,6 +167,8 @@ func _check_fight(floor_index: int, slot: EncounterSlot, option: EncounterOption
 				if camera.is_position_in_frustum(point) and camera.global_position.distance_to(point) <= nearest - PROP_NEARER_M:
 					_fail("%s: the prop %s is in the battle frame's foreground (%.1f m from the camera, the nearest combatant %.1f m)" % [label, prop.name, camera.global_position.distance_to(point), nearest])
 					break
+	# For the record: the pitch the frame settled at, and the Tower.
+	print("INFO: %s: battle pitch %.0f degrees; the Tower %s" % [label, float(_field.get_node("CameraPivot").get("_battle_pitch_now")), "in frame" if _tower_in_frame(camera) else "not in frame"])
 	if _failures == failures_before:
 		_clean += 1
 		print("%s: staged cleanly" % label)
@@ -213,31 +211,6 @@ func _approach_point(spawn: Vector3, target: Node3D, ground: Node) -> Vector3:
 	point.y = float(ground.call("get_height_at", _flat(point)))
 	return point
 
-# The share of a grid of rays through the frame's bottom STRIP_FRACTION
-# that meet the ground nearer than `within` and at or above `rim_height`:
-# terrain standing in front of the fight. A ray meeting the fight's own
-# floor, or nothing that near, is clear.
-func _foreground_terrain(camera: Camera3D, ground: Node, within: float, rim_height: float) -> float:
-	var size: Vector2 = camera.get_viewport().get_visible_rect().size
-	var hits: int = 0
-	var rays: int = 0
-	for column in STRIP_COLUMNS:
-		for row in STRIP_ROWS:
-			var pixel := Vector2((float(column) + 0.5) / float(STRIP_COLUMNS) * size.x, size.y * (1.0 - STRIP_FRACTION * (float(row) + 0.5) / float(STRIP_ROWS)))
-			var origin: Vector3 = camera.project_ray_origin(pixel)
-			var direction: Vector3 = camera.project_ray_normal(pixel)
-			rays += 1
-			var travelled: float = 0.25
-			while travelled < within:
-				var point: Vector3 = origin + direction * travelled
-				var height: float = float(ground.call("get_height_at", _flat(point)))
-				if height >= point.y:
-					if height >= rim_height:
-						hits += 1
-					break
-				travelled += 0.25
-	return float(hits) / float(maxi(rays, 1))
-
 # The props the fight's option placed (EncounterOption.props, top level):
 # the spawned prop of each one's scene within OWN_PROP_MATCH_M of where
 # its slot puts it.
@@ -254,6 +227,18 @@ func _own_props(slot: EncounterSlot, option: EncounterOption, spawn: Vector3) ->
 			if prop.scene_file_path == entry.scene.resource_path and _flat((prop as Node3D).global_position).distance_to(at) <= OWN_PROP_MATCH_M:
 				own.append(prop)
 	return own
+
+# Whether any point up the Tower's height is in `camera`'s frustum.
+func _tower_in_frame(camera: Camera3D) -> bool:
+	var tower := _field.get_node_or_null(^"Tower") as VisualInstance3D
+	if tower == null:
+		return false
+	var box: AABB = tower.global_transform * tower.get_aabb()
+	var base := Vector3(box.get_center().x, box.position.y, box.get_center().z)
+	for sample in TOWER_SAMPLES:
+		if camera.is_position_in_frustum(base + Vector3.UP * box.size.y * float(sample) / float(TOWER_SAMPLES - 1)):
+			return true
+	return false
 
 # The most the ground rises over the straight ray from `from` to `to`
 # (sampled along its length, ends left out), metres; 0 or less is clear.

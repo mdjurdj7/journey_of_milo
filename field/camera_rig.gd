@@ -67,6 +67,24 @@ class_name CameraRig
 # cluster spreads.
 @export var battle_distance_min: float = 10.62
 @export var battle_distance_max: float = 22.0
+# Where the ground hides a combatant's feet from battle_pitch - a fight
+# standing lower than the ground the camera looks over (a ford below its
+# banks, a lobe behind its rim) - the pitch rises battle_pitch_step_deg at
+# a time, the frame refitted at each, until the sight line from the camera
+# to every combatant's feet clears the ground by battle_feet_sight_
+# tolerance_m (feet under water: the water's surface over them is aimed
+# at instead), up to battle_pitch_max_deg - held there, with a warning,
+# when even that doesn't clear. The live pitch eases toward the one
+# chosen at battle_pitch_ease_deg_per_sec. A frame that already sees
+# every foot stays at battle_pitch.
+@export var battle_pitch_max_deg: float = 20.0
+@export var battle_pitch_step_deg: float = 1.0
+@export var battle_pitch_ease_deg_per_sec: float = 20.0
+@export var battle_feet_sight_tolerance_m: float = 0.05
+# The ground the feet test reads (Ground.get_height_at()) and the Sea
+# whose level is the water's surface - RegionField's own children.
+@export var ground_path: NodePath = ^"../Ground"
+@export var sea_path: NodePath = ^"../Sea"
 # Vertical placement, all as fractions of viewport height: the lowest
 # combatant's HP readout - hanging readout_allowance under its feet
 # (HPBar/EnemyStatus's bar_offset, ~0.45 m, is what this stands in for)
@@ -150,6 +168,12 @@ var _hand_top_fraction: float = 1.0
 var _battle_last_target: Vector3
 var _battle_last_forward: Vector3 = Vector3.FORWARD
 var _battle_last_distance: float = 0.0
+# The pitch the feet test chose for this fight's frame, and the pitch the
+# frame is at now, easing toward it (see battle_pitch_max_deg); whether
+# this fight has warned that even the cap left a foot hidden.
+var _battle_fit_pitch: float = 12.0
+var _battle_pitch_now: float = 12.0
+var _battle_pitch_warned: bool = false
 
 # One measured combatant, in world units: its ground position, feet and
 # head heights, and how far its bbox reaches sideways.
@@ -168,6 +192,9 @@ var _blend_to: float = 0.0
 var _blend_elapsed: float = 0.0
 
 @onready var camera: Camera3D = $Camera3D
+
+# How many points along a sight line the feet test reads the ground at.
+const BATTLE_SIGHT_SAMPLES := 48
 
 # Camera3D itself has no dof_blur_* properties in Godot 4 - those live on
 # a CameraAttributes resource assigned to Camera3D.attributes instead (see
@@ -193,6 +220,9 @@ func enter_battle(wanderer: Wanderer, enemies: Array[FieldEnemy], hand_top_fract
 	_battle_wanderer = wanderer
 	_battle_enemies = enemies
 	_hand_top_fraction = hand_top_fraction
+	_battle_fit_pitch = battle_pitch
+	_battle_pitch_now = battle_pitch
+	_battle_pitch_warned = false
 	_start_blend(1.0)
 
 # Called by region_field.gd once the battle stub resolves. Follow mode
@@ -329,6 +359,7 @@ func _physics_process(delta: float) -> void:
 		return
 
 	_advance_battle_blend(delta)
+	_battle_pitch_now = move_toward(_battle_pitch_now, _battle_fit_pitch, maxf(battle_pitch_ease_deg_per_sec, 0.0) * delta)
 	_advance_follow_bounds(delta)
 	_advance_look_up(delta)
 
@@ -435,8 +466,12 @@ func _height_per_distance(y: float, pitch_rad: float, tan_half_fov: float) -> fl
 # top edge (the readout under them is what clears the hand); if the
 # tallest head would then break head_clearance, the distance grows until
 # it doesn't. Whichever of the two (or battle_distance_min) is largest
-# wins, capped at battle_distance_max. Returns false and leaves the last
-# frame in place when nothing is left to frame.
+# wins, capped at battle_distance_max. The pitch is battle_pitch, or the
+# first above it, a step at a time up to battle_pitch_max_deg, from which
+# every combatant's feet can be seen (_feet_in_sight()) - chosen here,
+# eased toward in _physics_process(), and the frame fitted at the pitch
+# it is at now. Returns false and leaves the last frame in place when
+# nothing is left to frame.
 func _fit_battle_frame() -> bool:
 	if not is_instance_valid(_battle_wanderer):
 		return false
@@ -444,6 +479,33 @@ func _fit_battle_frame() -> bool:
 	if bodies.size() < 2:
 		return false
 
+	# Chosen only while a fight's frame is coming in or held - the blend
+	# back out keeps the pitch the fight had.
+	if _blend_to > 0.0:
+		var chosen: float = battle_pitch
+		var cap: float = maxf(battle_pitch_max_deg, battle_pitch)
+		var step: float = maxf(battle_pitch_step_deg, 0.1)
+		while true:
+			var trial: Array = _fit_at(bodies, chosen)
+			if _feet_in_sight(bodies, trial[0], trial[1], trial[2], chosen):
+				break
+			if chosen >= cap - 0.001:
+				if not _battle_pitch_warned:
+					_battle_pitch_warned = true
+					push_warning("CameraRig: the ground still hides a combatant's feet at the %.0f degree cap; framing at the cap." % cap)
+				break
+			chosen = minf(chosen + step, cap)
+		_battle_fit_pitch = chosen
+
+	var fit: Array = _fit_at(bodies, _battle_pitch_now)
+	_battle_last_target = fit[0]
+	_battle_last_forward = fit[1]
+	_battle_last_distance = fit[2]
+	return true
+
+# The frame for `bodies` at `pitch_deg`: [look target, ground forward,
+# distance] - see _fit_battle_frame().
+func _fit_at(bodies: Array[BattleBody], pitch_deg: float) -> Array:
 	var wanderer_pos: Vector3 = bodies[0].position
 	var first_enemy_pos: Vector3 = bodies[1].position
 	var forward := _battle_ground_forward(wanderer_pos, first_enemy_pos)
@@ -470,7 +532,7 @@ func _fit_battle_frame() -> bool:
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var aspect: float = viewport_size.x / maxf(viewport_size.y, 1.0)
 	var tan_half_fov := tan(deg_to_rad(battle_fov) * 0.5)
-	var pitch_rad := deg_to_rad(battle_pitch)
+	var pitch_rad := deg_to_rad(pitch_deg)
 
 	var distance_horizontal: float = (right_edge - left_edge) * 0.5 / (tan_half_fov * aspect)
 
@@ -489,10 +551,29 @@ func _fit_battle_frame() -> bool:
 
 	var target := wanderer_pos + right * ((left_edge + right_edge) * 0.5)
 	target.y = feet_min - feet_k * fitted_distance
+	return [target, forward, fitted_distance]
 
-	_battle_last_target = target
-	_battle_last_forward = forward
-	_battle_last_distance = fitted_distance
+# Whether, from the camera a frame at `pitch_deg` would place (look target
+# `target`, ground `forward`, `distance` - _place_camera()'s own sphere),
+# the ground leaves every combatant's feet in sight: along the straight
+# line to each, nowhere more than battle_feet_sight_tolerance_m over it.
+# Feet under water are aimed at the water's surface above them. True with
+# no ground to read.
+func _feet_in_sight(bodies: Array[BattleBody], target: Vector3, forward: Vector3, distance: float, pitch_deg: float) -> bool:
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground == null:
+		return true
+	var sea := get_node_or_null(sea_path) as Sea
+	var pitch_rad := deg_to_rad(pitch_deg)
+	var eye: Vector3 = target - forward * distance * cos(pitch_rad) + Vector3.UP * distance * sin(pitch_rad)
+	for body in bodies:
+		var feet := Vector3(body.position.x, body.feet_y, body.position.z)
+		if sea != null:
+			feet.y = maxf(feet.y, sea.sea_level)
+		for sample in range(2, BATTLE_SIGHT_SAMPLES - 1):
+			var point: Vector3 = eye.lerp(feet, float(sample) / float(BATTLE_SIGHT_SAMPLES))
+			if ground.get_height_at(Vector2(point.x, point.z)) - point.y > battle_feet_sight_tolerance_m:
+				return false
 	return true
 
 func _place_camera() -> void:
@@ -511,7 +592,7 @@ func _place_camera() -> void:
 	var ground_forward: Vector3 = follow_forward.lerp(battle_forward, _battle_blend)
 	ground_forward = follow_forward if ground_forward.length() < 0.0001 else ground_forward.normalized()
 
-	var eff_pitch: float = lerpf(pitch_degrees, battle_pitch, _battle_blend)
+	var eff_pitch: float = lerpf(pitch_degrees, _battle_pitch_now, _battle_blend)
 	var eff_distance: float = lerpf(distance, _battle_last_distance, _battle_blend)
 	var eff_fov: float = lerpf(fov, battle_fov, _battle_blend)
 	# The battle frame's vertical placement is baked into its look target
