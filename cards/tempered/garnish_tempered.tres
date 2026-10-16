@@ -9,7 +9,7 @@
 script = ExtResource("2_card_effect")
 effect_type = 9
 value = 1
-toll_gain = 5
+toll_gain = 8
 
 [sub_resource type="Resource" id="E_garnish"]
 script = ExtResource("2_card_effect")
@@ -24,7 +24,7 @@ card_type = 1
 rarity = 2
 target_type = 0
 description = "Target enemy's next Attack deals 8 less.
-Gain 5 Toll."
+Gain 8 Toll."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_self_damage_toll"), SubResource("E_garnish")])
 art = ExtResource("4_art")
 play_sound_path = "res://assets/audio/cards/Garnish/Garnish.mp3"
