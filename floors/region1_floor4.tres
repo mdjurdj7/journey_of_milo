@@ -17,6 +17,7 @@
 [ext_resource type="PackedScene" path="res://field/basking_slab.tscn" id="14_basking_slab"]
 [ext_resource type="Script" uid="uid://c1xsh7mpatcy3" path="res://floors/encounter_slot.gd" id="90_encounter_slot"]
 [ext_resource type="Script" uid="uid://n5us4ml13k7m" path="res://floors/encounter_option.gd" id="91_encounter_option"]
+[ext_resource type="Script" uid="uid://mgkhruse1iro" path="res://floors/floor_wind_data.gd" id="95_wind"]
 
 [sub_resource type="Resource" id="FloorProp_collector"]
 script = ExtResource("10_floor_prop")
@@ -77,6 +78,9 @@ position = Vector2(15, -9.4)
 required = false
 options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_adder")])
 
+[sub_resource type="Resource" id="FloorWindData_dunes"]
+script = ExtResource("95_wind")
+
 [resource]
 script = ExtResource("1_floor_data")
 mask = ExtResource("3_landmass")
@@ -112,6 +116,7 @@ ledges = Array[PackedVector2Array]([PackedVector2Array(0.833, 8.883, -0.1, 8.783
 exit_kind = 1
 gate_distance_beyond_enemy = 6.31
 wear_path_override = PackedVector2Array(0, 0, -3.6, -4.4, -10.2, -5.8, -14.6, -9.9, -15, -14, -14.3, -18.2, -17.5, -22.4, -23.8, -22.2)
+wind = SubResource("FloorWindData_dunes")
 reward_pool = ExtResource("8_wanderer_pool")
 gold_min = 18
 gold_max = 25

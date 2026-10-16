@@ -1149,6 +1149,16 @@ func set_swash_source(noise: Texture2D, period: float, phase_noise_scale: float,
 func set_sea_time(sea_time: float) -> void:
 	_apply_uniform("sea_time", sea_time)
 
+# The dust shadows' look and how far they have travelled (see ground.
+# gdshader's dust_shadow_*), from FieldWind every frame - strength 0 is
+# off.
+func set_dust_shadow(strength: float, scale: float, stretch: float, direction: Vector2, offset: float) -> void:
+	_apply_uniform("dust_shadow_strength", strength)
+	_apply_uniform("dust_shadow_scale", scale)
+	_apply_uniform("dust_shadow_stretch", stretch)
+	_apply_uniform("dust_shadow_dir", direction)
+	_apply_uniform("dust_shadow_offset", offset)
+
 # The walked band's centreline, in world XZ, from its start to its end
 # through every point between. Three points: start, a point it passes
 # THROUGH, end - one curve. Four to WEAR_MAX_POINTS: a smooth chain

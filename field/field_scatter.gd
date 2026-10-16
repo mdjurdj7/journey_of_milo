@@ -329,6 +329,8 @@ var _instances: Array[MultiMeshInstance3D] = []
 var _card_layers: Array[CardLayer] = []
 # The camera forward last pushed to the cards.
 var _card_forward: Vector2 = Vector2.ZERO
+# The gust and its sway gain last pushed to the cards.
+var _card_gust: Vector2 = Vector2(-1.0, -1.0)
 
 # From RegionField once its exit channel is cut: what to read, and the
 # first build, deferred so every prop and enemy has placed itself.
@@ -1530,12 +1532,31 @@ func _draw_cards(entry: ScatterEntry, spots: Array[Spot]) -> void:
 		_instances.append(instance)
 		_card_layers.append(layer)
 	_push_card_forward()
+	_card_gust = Vector2(-1.0, -1.0)
+	_push_card_gust()
 
 func _process(delta: float) -> void:
 	if _card_layers.is_empty():
 		return
 	_push_card_forward()
+	_push_card_gust()
 	_advance_battle_fade(delta)
+
+# The floor's gust (RegionField.get_gust()) and its FloorWindData.gust_
+# sway_gain into every card's material, when either has changed - the
+# tufts lean and sway harder as it rises.
+func _push_card_gust() -> void:
+	if _field == null:
+		return
+	var floor_data: FloorData = _field.get_floor_data()
+	var gain: float = floor_data.wind.gust_sway_gain if floor_data != null and floor_data.wind != null else 0.0
+	var now := Vector2(_field.get_gust(), gain)
+	if now.is_equal_approx(_card_gust):
+		return
+	_card_gust = now
+	for layer in _card_layers:
+		layer.material.set_shader_parameter("gust", now.x)
+		layer.material.set_shader_parameter("gust_sway_gain", now.y)
 
 # The live camera's forward on the ground into every card's material, when
 # it has moved - a camera looking straight down keeps the last.

@@ -185,6 +185,11 @@ enum ExitKind { CHANNEL, LINE }
 # near (ShoreFlockData, ShoreFlock). Null (the default) = none.
 @export var shore_flock: ShoreFlockData = null
 
+@export_group("Wind")
+# Blowing sand - streaks, gusts, crest plumes, dust shadows (FloorWind-
+# Data, FieldWind). Null (the default) = still air.
+@export var wind: FloorWindData = null
+
 @export_group("Wear")
 # How far the worn band's middle point sits off the first required
 # slot's anchor along the exit's right (RegionField._aim_wear_path()).

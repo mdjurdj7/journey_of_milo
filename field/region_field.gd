@@ -421,6 +421,7 @@ var _nav: NavGrid = null
 # keeps off (get_wear_path()).
 var _scatter: FieldScatter = null
 var _shore_flock: ShoreFlock = null
+var _wind: FieldWind = null
 var _wear_path: PackedVector2Array = PackedVector2Array()
 # The HUD row's keepsake - a click on it opens KeepsakeExamine.
 var _keepsake_line: KeepsakeLine = null
@@ -720,6 +721,7 @@ func _ready() -> void:
 	# prop, enemy and the gate it keeps clear of now stands.
 	_spawn_floor_scatter()
 	_spawn_shore_flock()
+	_spawn_wind()
 
 	# The Ambience bus at its base - a loss mid-duck or a restart must not
 	# inherit the last scene's level.
@@ -1830,14 +1832,17 @@ func get_region_sky() -> RegionSky:
 
 # The field's wind, for anything that drifts (a death's sand -
 # FieldEnemy.spawn_death_wisps()): downwind, flat, in world XZ - the
-# floor's ripple angle (FloorData.wind_ripple_angle, the + direction of
+# floor's own wind angle where its FloorWindData sets one (use_angle),
+# else its ripple angle (FloorData.wind_ripple_angle, the + direction of
 # the ground's ripples) where its sand is rippled, else
 # default_wind_angle_degrees. Measured from +X toward +Z, as the ripples
 # are.
 func get_wind_direction() -> Vector3:
 	var floor_data := get_floor_data()
 	var degrees: float = default_wind_angle_degrees
-	if floor_data != null and floor_data.wind_ripple_strength > 0.0:
+	if floor_data != null and floor_data.wind != null and floor_data.wind.use_angle:
+		degrees = floor_data.wind.angle_degrees
+	elif floor_data != null and floor_data.wind_ripple_strength > 0.0:
 		degrees = floor_data.wind_ripple_angle
 	var angle: float = deg_to_rad(degrees)
 	return Vector3(cos(angle), 0.0, sin(angle))
@@ -2032,6 +2037,28 @@ func _spawn_shore_flock() -> void:
 # Null once it has flown and gone, or on a floor without one.
 func get_shore_flock() -> ShoreFlock:
 	return _shore_flock if is_instance_valid(_shore_flock) else null
+
+# The floor's blowing sand (FloorData.wind) - its map reads the ground
+# once the relief is built. None without the data.
+func _spawn_wind() -> void:
+	var floor_data := get_floor_data()
+	if floor_data == null or floor_data.wind == null:
+		return
+	_wind = FieldWind.new()
+	_wind.name = "Wind"
+	add_child(_wind)
+	_wind.setup(self, floor_data.wind)
+
+# Null on a floor without wind.
+func get_wind() -> FieldWind:
+	return _wind if is_instance_valid(_wind) else null
+
+# The floor's gust, 0 (calm, or no wind) to 1 (a full gust) - one value
+# every wind-blown thing reads (FieldWind's streaks and plumes, the tufts'
+# sway), next to get_wind_direction().
+func get_gust() -> float:
+	var wind := get_wind()
+	return wind.get_gust() if wind != null else 0.0
 
 # A fight holds the field (from contact to its end).
 func is_battle_open() -> bool:

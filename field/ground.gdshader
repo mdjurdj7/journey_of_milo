@@ -325,6 +325,17 @@ uniform float wind_ripple_strength = 0.0;
 uniform float wind_ripple_angle = 30.0;
 uniform float wind_ripple_scale = 0.45;
 uniform float wind_ripple_warp = 0.5;
+// Dust shadows (FieldWind, FloorWindData's Dust shadow group): large
+// faint patches of haze sliding downwind over the ground, darkening it by
+// at most dust_shadow_strength - never lighter, never on water. Patches
+// about dust_shadow_scale metres across, dust_shadow_stretch longer along
+// dust_shadow_dir (world XZ, downwind); dust_shadow_offset is how far
+// they have travelled, pushed every frame. 0 (the default) is off.
+uniform float dust_shadow_strength = 0.0;
+uniform float dust_shadow_scale = 16.0;
+uniform float dust_shadow_stretch = 2.0;
+uniform vec2 dust_shadow_dir = vec2(0.866, 0.5);
+uniform float dust_shadow_offset = 0.0;
 uniform sampler2D rock_mask : filter_linear, repeat_disable;
 uniform bool rock_mask_ready = false;
 
@@ -1284,6 +1295,20 @@ void fragment() {
 	// applied to the sand beneath them, and so the shore band reads as
 	// wet sand rather than a strip of standing pool.
 	float pool_factor = smoothstep(pool_threshold - pool_edge_width * 0.5, pool_threshold + pool_edge_width * 0.5, base_wetness);
+
+	// Dust shadows: two octaves of soft noise in a frame along the wind,
+	// moving with it, kept to their broad upper lobes so most ground is
+	// clear between patches.
+	if (dust_shadow_strength > 0.0) {
+		vec2 along_dir = normalize(dust_shadow_dir);
+		vec2 across_dir = vec2(-along_dir.y, along_dir.x);
+		vec2 frame = vec2(dot(v_world_xz, along_dir) - dust_shadow_offset, dot(v_world_xz, across_dir));
+		vec2 q = frame / (max(dust_shadow_scale, 0.1) * vec2(max(dust_shadow_stretch, 0.1), 1.0));
+		float haze = value_noise(q + vec2(17.3, 4.1)) * 0.65 + value_noise(q * 2.3 + vec2(3.7, 29.9)) * 0.35;
+		haze = smoothstep(0.45, 0.8, haze);
+		float above_water = 1.0 - smoothstep(0.0, 0.05, depth_below_sea);
+		sand_albedo *= 1.0 - dust_shadow_strength * haze * above_water;
+	}
 
 	// Vertex colour, multiplied in last: white (the default for a mesh with
 	// no colour array - the relief mesh and the dressing strips) changes

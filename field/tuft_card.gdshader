@@ -50,6 +50,11 @@ uniform float flutter_amount = 0.012;
 uniform float flutter_hz = 1.7;
 // How much the place changes the phase, per metre.
 uniform float phase_scale = 0.9;
+// The floor's gust now (RegionField.get_gust(), 0..1) and how much a full
+// one adds to the lean and the sway, a fraction of each (FloorWindData.
+// gust_sway_gain) - pushed by FieldScatter every frame.
+uniform float gust = 0.0;
+uniform float gust_sway_gain = 0.0;
 
 varying float v_presence;
 
@@ -76,7 +81,8 @@ void vertex() {
 	float t = TIME * 6.2831853;
 	vec3 downwind = vec3(wind_direction.x, 0.0, wind_direction.y);
 	vec3 across = vec3(-wind_direction.y, 0.0, wind_direction.x);
-	float along = wind_lean + sway_amount * sin(t * sway_hz + phase) + flutter_amount * sin(t * flutter_hz + phase * 2.3);
+	float gusting = 1.0 + gust * gust_sway_gain;
+	float along = (wind_lean + sway_amount * sin(t * sway_hz + phase)) * gusting + flutter_amount * sin(t * flutter_hz + phase * 2.3);
 	float aside = flutter_amount * 0.5 * sin(t * flutter_hz * 1.31 + phase * 1.7);
 	placed += (downwind * along + across * aside) * card_height * weight;
 
