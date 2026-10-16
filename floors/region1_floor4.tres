@@ -92,7 +92,6 @@ caustic_strength = 0.0
 basin_color = Color(0.6, 0.57, 0.5, 1)
 basin_tint_strength = 1.0
 basin_tint_heights = Vector2(0.05, 1.2)
-wear_darken = 0.36
 slope_tint_strength = 0.85
 slope_tint_min = 12.0
 crest_light_strength = 0.1

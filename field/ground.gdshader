@@ -181,11 +181,14 @@ uniform float underwater_detail_boost = 1.5;
 
 // --- Wear: the walked band ---
 //
-// A faint stretch of sand that reads as trodden, not a path drawn on the
-// ground. Region 1's routes are meant to be findable and losable, so this
-// is deliberately at the edge of visibility: it darkens the sand a few
-// percent and quiets the fine detail, and does nothing else. No height
-// change, no line, no hue shift.
+// A narrow stretch of sand that reads as trodden, not a path drawn on the
+// ground. Region 1's routes are meant to be findable and losable, so the
+// tone barely moves: a core wear_half_width each side of the centreline,
+// a few percent darker, its edge frayed by noise rather than blurred.
+// The texture carries it instead - the wind ripples and fine detail are
+// flattened on it, and sparse scuffs and footprints lie along it
+// (wear_marks()). Everything darkens or flattens; no height change, no
+// lift, no hue shift.
 //
 // Two sources, combined by max(): a procedural band along a curve from
 // spawn through the crab to the gate line (pushed by RegionField via
@@ -199,17 +202,58 @@ uniform bool wear_enabled = false;
 const int WEAR_MAX_POINTS = 8;
 uniform vec2 wear_points[8];
 uniform int wear_point_count = 3;
-uniform float wear_half_width = 2.5;
+// The core: full wear out to wear_half_width from the centreline, then
+// gone over wear_edge_width centred on it. The core holds while the
+// wobble and fray below sum to less than wear_half_width - wear_edge_
+// width / 2; past that the centreline itself lands on the falloff and
+// draws a crease.
+uniform float wear_half_width = 0.75;
+uniform float wear_edge_width = 0.35;
 // Low-frequency wobble on the band's own edge, so it never reads as a
 // ruled boundary. Metres, applied to the distance before the falloff.
 uniform float wear_edge_noise_scale = 6.0;
-uniform float wear_edge_noise_amplitude = 0.8;
+uniform float wear_edge_noise_amplitude = 0.2;
+// Finer noise on the same distance, so the edge breaks up into bays and
+// tongues rather than a smooth line: three octaves from wear_fray_scale
+// metres down, each turned off the grid (wear_fray()). Metres.
+uniform float wear_fray_scale = 0.6;
+uniform float wear_fray_amplitude = 0.25;
 // Wear fades out over the last few metres before the drawn shoreline -
 // nobody wears a track into ground the sea washes twice a day.
 uniform float wear_shore_fade = 3.0;
 uniform float wear_darken : hint_range(0.0, 1.0) = 0.05;
-// How much of the ripple/grain/speckle detail the band flattens away.
+// How much of the grain/speckle detail the band flattens away.
 uniform float wear_flatten : hint_range(0.0, 1.0) = 0.6;
+// How much of the wind ripples it flattens: feet level them first.
+uniform float wear_ripple_flatten : hint_range(0.0, 1.0) = 1.0;
+// Scuffs and footprints along the procedural band (see wear_marks()):
+// one chance per wear_mark_cell-metre cell, wear_mark_density of cells
+// carrying one, wear_mark_footprint_share of those a stride of two
+// prints and the rest a dragged scuff, each wear_mark_darken at most.
+uniform float wear_mark_cell = 0.9;
+uniform float wear_mark_density : hint_range(0.0, 1.0) = 0.3;
+uniform float wear_mark_footprint_share : hint_range(0.0, 1.0) = 0.5;
+uniform float wear_mark_darken : hint_range(0.0, 1.0) = 0.16;
+
+// --- Ruts: a cart's two wheel tracks ---
+//
+// Two thin dark lines rut_gauge apart, centred on their own centreline
+// (rut_points, rut_point_count of them, a chain as the band's is; under
+// 2 = none). They fade in over rut_fade_in from the first point, out over
+// rut_fade_out before the last, and come and go along the way: a slow
+// noise along the run (rut_break_length metres) thresholded at
+// rut_break_threshold. Each line wavers rut_waver metres either side of
+// true. Darken only, gated like the band.
+uniform vec2 rut_points[8];
+uniform int rut_point_count = 0;
+uniform float rut_gauge = 1.4;
+uniform float rut_width = 0.12;
+uniform float rut_darken : hint_range(0.0, 1.0) = 0.08;
+uniform float rut_fade_in = 4.0;
+uniform float rut_fade_out = 1.5;
+uniform float rut_break_length = 4.0;
+uniform float rut_break_threshold : hint_range(0.0, 1.0) = 0.3;
+uniform float rut_waver = 0.04;
 // Optional painted band, same rect and orientation as landmass_mask (see
 // canvas_uv()). White is worn. Null by default.
 uniform sampler2D wear_mask : filter_linear, repeat_disable;
@@ -777,22 +821,28 @@ float wear_segment_distance(vec2 p, vec2 a, vec2 b) {
 }
 
 // Distance from an XZ to the centreline, as the minimum over a polyline
-// approximation. Point-to-SEGMENT rather than point-to-sample, so 16
-// steps are enough to stay smooth at this half-width - sampling points
-// alone would scallop the band's edge wherever the curve bends. A chain
-// takes WEAR_CHAIN_STEPS per span.
+// approximation, and the direction of the nearest piece of it (x: the
+// distance, yz: the unit direction, start to end). Point-to-SEGMENT
+// rather than point-to-sample, so 16 steps are enough to stay smooth at
+// this half-width - sampling points alone would scallop the band's edge
+// wherever the curve bends. A chain takes WEAR_CHAIN_STEPS per span.
 const int WEAR_SEGMENTS = 16;
 const int WEAR_CHAIN_STEPS = 8;
-float wear_distance(vec2 p) {
+vec3 wear_nearest(vec2 p) {
 	float best = 1.0e20;
+	vec2 along = vec2(0.0, 1.0);
 	if (wear_point_count <= 3) {
 		vec2 prev = wear_curve_point(0.0);
 		for (int i = 1; i <= WEAR_SEGMENTS; i++) {
 			vec2 cur = wear_curve_point(float(i) / float(WEAR_SEGMENTS));
-			best = min(best, wear_segment_distance(p, prev, cur));
+			float d = wear_segment_distance(p, prev, cur);
+			if (d < best) {
+				best = d;
+				along = cur - prev;
+			}
 			prev = cur;
 		}
-		return best;
+		return vec3(best, normalize(along + vec2(0.0, 1.0e-6)));
 	}
 	for (int span = 0; span < WEAR_MAX_POINTS - 1; span++) {
 		if (span >= wear_point_count - 1) {
@@ -801,11 +851,125 @@ float wear_distance(vec2 p) {
 		vec2 prev = wear_points[span];
 		for (int i = 1; i <= WEAR_CHAIN_STEPS; i++) {
 			vec2 cur = wear_chain_point(span, float(i) / float(WEAR_CHAIN_STEPS));
-			best = min(best, wear_segment_distance(p, prev, cur));
+			float d = wear_segment_distance(p, prev, cur);
+			if (d < best) {
+				best = d;
+				along = cur - prev;
+			}
 			prev = cur;
 		}
 	}
-	return best;
+	return vec3(best, normalize(along + vec2(0.0, 1.0e-6)));
+}
+
+// The ruts' chain, as wear_chain_point() is the band's.
+vec2 rut_chain_point(int i, float t) {
+	int last = rut_point_count - 1;
+	vec2 p0 = rut_points[max(i - 1, 0)];
+	vec2 p1 = rut_points[i];
+	vec2 p2 = rut_points[min(i + 1, last)];
+	vec2 p3 = rut_points[min(i + 2, last)];
+	float t2 = t * t;
+	return 0.5 * (2.0 * p1 + (p2 - p0) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 + (3.0 * p1 - p0 - 3.0 * p2 + p3) * t2 * t);
+}
+
+// Distance from an XZ to the ruts' centreline (x), how far along the
+// chain its nearest point lies (y) and the chain's whole length (z),
+// all metres, and which side of it the XZ is on (w: 0 or 1).
+vec4 rut_nearest(vec2 p) {
+	float best = 1.0e20;
+	float best_s = 0.0;
+	float best_side = 0.0;
+	float s = 0.0;
+	for (int span = 0; span < WEAR_MAX_POINTS - 1; span++) {
+		if (span >= rut_point_count - 1) {
+			break;
+		}
+		vec2 prev = rut_points[span];
+		for (int i = 1; i <= WEAR_CHAIN_STEPS; i++) {
+			vec2 cur = rut_chain_point(span, float(i) / float(WEAR_CHAIN_STEPS));
+			vec2 ab = cur - prev;
+			float len = length(ab);
+			float h = clamp(dot(p - prev, ab) / max(len * len, 1.0e-6), 0.0, 1.0);
+			float d = length(p - prev - ab * h);
+			if (d < best) {
+				best = d;
+				best_s = s + len * h;
+				best_side = step(0.0, ab.x * (p.y - prev.y) - ab.y * (p.x - prev.x));
+			}
+			s += len;
+			prev = cur;
+		}
+	}
+	return vec4(best, best_s, s, best_side);
+}
+
+// 0..1 of "a wheel ran here": the two lines rut_gauge apart, faded in
+// from the start, out before the end, and broken along the run. The
+// ends fade to 0 exactly at the chain's ends, so the round cap a
+// distance field draws there never shows.
+float rut_factor(vec2 p) {
+	if (rut_point_count < 2) {
+		return 0.0;
+	}
+	vec4 nearest = rut_nearest(p);
+	float s = nearest.y;
+	float waver = (value_noise(vec2(s / 1.7, nearest.w * 5.1 + 2.3)) - 0.5) * 2.0 * rut_waver;
+	float off_track = abs(nearest.x - rut_gauge * 0.5 + waver);
+	float line = 1.0 - smoothstep(rut_width * 0.2, rut_width * 0.5, off_track);
+	if (line <= 0.0) {
+		return 0.0;
+	}
+	float ends = smoothstep(0.0, max(rut_fade_in, 0.001), s) * (1.0 - smoothstep(nearest.z - max(rut_fade_out, 0.001), nearest.z, s));
+	// Each wheel breaks on its own: the side the pixel is on offsets the
+	// noise, so the two lines don't come and go in step.
+	float run = value_noise(vec2(s / max(rut_break_length, 0.01), nearest.w * 7.3));
+	float present = smoothstep(rut_break_threshold, rut_break_threshold + 0.25, run);
+	// A rut is pressed unevenly: fine breakup inside the line itself.
+	float grit = 0.6 + 0.4 * value_noise(p / 0.12);
+	return line * ends * present * grit;
+}
+
+// A soft oval of half-length half_size.x along `along` and half-width
+// half_size.y across it, centred on `centre`: 1 inside, 0 outside.
+float wear_oval(vec2 p, vec2 centre, vec2 along, vec2 half_size) {
+	vec2 local = p - centre;
+	vec2 q = vec2(dot(local, along), dot(local, vec2(-along.y, along.x))) / half_size;
+	return 1.0 - smoothstep(0.55, 1.0, length(q));
+}
+
+// 0..1 of the marks feet leave on the band: one chance per world-aligned
+// cell (so the pattern never shears where the path turns), hashed to
+// carry nothing, a dragged scuff or a stride of two prints, laid along
+// the path's own direction at the pixel and turned a little either way.
+// Each mark is frayed by fine noise so none is a clean shape.
+float wear_marks(vec2 p, vec2 along) {
+	float cell_size = max(wear_mark_cell, 0.1);
+	vec2 cell = floor(p / cell_size);
+	float mark = 0.0;
+	for (int dy = -1; dy <= 1; dy++) {
+		for (int dx = -1; dx <= 1; dx++) {
+			vec2 c = cell + vec2(float(dx), float(dy));
+			if (hash(c + vec2(17.1, 3.7)) > wear_mark_density) {
+				continue;
+			}
+			vec2 centre = (c + vec2(hash(c + vec2(5.3, 9.1)), hash(c + vec2(2.9, 41.7)))) * cell_size;
+			float turn = (hash(c + vec2(31.3, 7.7)) - 0.5) * 0.8;
+			vec2 dir = vec2(along.x * cos(turn) - along.y * sin(turn), along.x * sin(turn) + along.y * cos(turn));
+			vec2 across = vec2(-dir.y, dir.x);
+			float strength = 0.5 + 0.5 * hash(c + vec2(11.9, 23.3));
+			float shape;
+			if (hash(c + vec2(47.1, 13.9)) < wear_mark_footprint_share) {
+				shape = max(
+					wear_oval(p, centre - dir * 0.33 - across * 0.1, dir, vec2(0.13, 0.05)),
+					wear_oval(p, centre + dir * 0.33 + across * 0.1, dir, vec2(0.13, 0.05)));
+			} else {
+				shape = wear_oval(p, centre, dir, vec2(0.28, 0.07));
+			}
+			mark = max(mark, shape * strength);
+		}
+	}
+	return mark * (0.65 + 0.35 * value_noise(p / 0.07));
 }
 
 // Same image->world mapping Ground._mask_world_to_pixel() uses on the
@@ -898,29 +1062,54 @@ float pebble_value(vec2 world_xz) {
 	return clamp(mix(ground, large.x, large.y), -1.0, 1.0);
 }
 
-// 0..1 of "this sand is walked". Procedural band and painted mask by
-// max(), then gated: nothing below sea level, nothing in the wet band,
-// and a fade through the last wear_shore_fade metres before the drawn
-// line. The gates are multiplications rather than branches so the band
-// dies away rather than ending at an edge - which is the whole point.
-float wear_factor(vec2 world_xz, float shore_distance, float sand_wetness, float underwater) {
-	float wear = 0.0;
-	if (wear_enabled) {
-		float wobble = (value_noise(world_xz / max(wear_edge_noise_scale, 0.001)) - 0.5) * 2.0 * wear_edge_noise_amplitude;
-		wear = 1.0 - smoothstep(0.0, max(wear_half_width, 0.001), wear_distance(world_xz) + wobble);
+// What wear_factor() gates: everything walked or driven fades out over
+// the last wear_shore_fade metres before the drawn line, and is gone
+// below sea level and on wet sand. Multiplications rather than branches
+// so the band dies away rather than ending at an edge - which is the
+// whole point.
+float wear_gate(float shore_distance, float sand_wetness, float underwater) {
+	float gate = (1.0 - underwater) * (1.0 - sand_wetness);
+	if (landmass_distance_ready) {
+		gate *= 1.0 - smoothstep(-max(wear_shore_fade, 0.001), 0.0, shore_distance);
 	}
-	if (wear_mask_ready) {
+	return clamp(gate, 0.0, 1.0);
+}
+
+// The band edge's fray, 0..1: three octaves of value noise, each turned
+// and offset off the one before so no octave's grid lines up with
+// another's - one axis-aligned octave scallops the edge in a row.
+float wear_fray(vec2 p) {
+	mat2 turn = mat2(vec2(0.8, 0.6), vec2(-0.6, 0.8));
+	vec2 q = p / max(wear_fray_scale, 0.001);
+	float n = value_noise(q) * 0.5;
+	q = turn * q * 2.03 + vec2(4.1, 1.7);
+	n += value_noise(q) * 0.3;
+	q = turn * q * 2.01 + vec2(9.3, 6.2);
+	n += value_noise(q) * 0.2;
+	return n;
+}
+
+// "This sand is walked", 0..1 (x), and how much of that is the
+// procedural band (y), which alone carries the scuffs and footprints;
+// zw is the band's direction at this XZ. Procedural band and painted
+// mask by max(), then gated (wear_gate()). The band is a core with a
+// frayed edge - see wear_half_width's doc.
+vec4 wear_factor(vec2 world_xz, float gate) {
+	float band = 0.0;
+	vec2 along = vec2(0.0, 1.0);
+	if (wear_enabled && gate > 0.0) {
+		vec3 nearest = wear_nearest(world_xz);
+		along = nearest.yz;
+		float wobble = (value_noise(world_xz / max(wear_edge_noise_scale, 0.001)) - 0.5) * 2.0 * wear_edge_noise_amplitude;
+		float fray = (wear_fray(world_xz) - 0.5) * 2.0 * wear_fray_amplitude;
+		float edge = max(wear_edge_width, 0.001) * 0.5;
+		band = 1.0 - smoothstep(wear_half_width - edge, wear_half_width + edge, nearest.x + wobble + fray);
+	}
+	float wear = band;
+	if (wear_mask_ready && gate > 0.0) {
 		wear = max(wear, canvas_sample(wear_mask, world_xz));
 	}
-	if (wear <= 0.0) {
-		return 0.0;
-	}
-	if (landmass_distance_ready) {
-		wear *= 1.0 - smoothstep(-max(wear_shore_fade, 0.001), 0.0, shore_distance);
-	}
-	wear *= 1.0 - underwater;
-	wear *= 1.0 - sand_wetness;
-	return clamp(wear, 0.0, 1.0);
+	return vec4(clamp(wear * gate, 0.0, 1.0), clamp(band * gate, 0.0, 1.0), along);
 }
 
 void fragment() {
@@ -997,8 +1186,10 @@ void fragment() {
 	float detail_boost = mix(1.0, underwater_detail_boost, underwater);
 
 	// The walked band. Darkens the sand a little and quiets the fine
-	// detail; see wear_factor()'s own doc for what it will not do.
-	float wear = wear_factor(v_world_xz, shore_distance, sand_wetness, underwater);
+	// detail; see the wear block's own doc for what it will not do.
+	float wear_gated = wear_gate(shore_distance, sand_wetness, underwater);
+	vec4 wear_info = wear_factor(v_world_xz, wear_gated);
+	float wear = wear_info.x;
 	float wear_smoothing = 1.0 - wear * wear_flatten;
 
 	// Sand grain + speckle: both multiplicative and applied identically
@@ -1012,9 +1203,9 @@ void fragment() {
 	sand_albedo *= 1.0 + grain;
 
 	// Wind ripples (see wind_ripple_strength's doc): squared so the crests
-	// are narrower than the troughs, faded out on slopes and - through
-	// grain_suppression - on wet sand, the worn band and outer ground, and
-	// wherever a ripple would be under a pixel or two wide.
+	// are narrower than the troughs, faded out on slopes, on wet sand and
+	// outer ground, on the worn band by wear_ripple_flatten, and wherever
+	// a ripple would be under a pixel or two wide.
 	if (wind_ripple_strength > 0.0) {
 		vec2 wind_dir = vec2(cos(radians(wind_ripple_angle)), sin(radians(wind_ripple_angle)));
 		float wind_warp = (value_noise(v_world_xz * 0.12) - 0.5) * 2.0 * wind_ripple_warp;
@@ -1022,7 +1213,8 @@ void fragment() {
 		float wind_aa = 1.0 - smoothstep(0.25, 0.5, fwidth(wind_phase));
 		float wind_wave = sin(wind_phase * 6.2831853);
 		wind_wave *= abs(wind_wave);
-		sand_albedo *= 1.0 + wind_ripple_strength * wind_wave * wind_aa * (1.0 - slope_t) * grain_suppression;
+		float ripple_suppression = (1.0 - sand_wetness) * (1.0 - wear * wear_ripple_flatten) * sand_detail;
+		sand_albedo *= 1.0 + wind_ripple_strength * wind_wave * wind_aa * (1.0 - slope_t) * ripple_suppression;
 	}
 
 	// The outer ground's own pebbles, in place of the sand grain.
@@ -1053,10 +1245,17 @@ void fragment() {
 	sand_albedo *= 1.0 - clamp(ripple, 0.0, 1.0);
 
 	// The band itself: a flat multiplicative darkening, hue preserved like
-	// every other sand modifier here. Applied after the dry detail and
-	// before anything water-side, so the shore, the sheet and the pools
-	// are untouched by it.
+	// every other sand modifier here, then the marks on it and the ruts.
+	// Applied after the dry detail and before anything water-side, so the
+	// shore, the sheet and the pools are untouched by it. Rock takes
+	// neither marks nor ruts.
 	sand_albedo *= 1.0 - wear * wear_darken;
+	if (wear_info.y > 0.0 && wear_mark_density > 0.0) {
+		sand_albedo *= 1.0 - wear_marks(v_world_xz, wear_info.zw) * wear_mark_darken * wear_info.y * (1.0 - rock) * sand_detail;
+	}
+	if (rut_point_count >= 2 && wear_gated > 0.0) {
+		sand_albedo *= 1.0 - rut_factor(v_world_xz) * rut_darken * wear_gated * (1.0 - rock) * sand_detail;
+	}
 
 	// Caustics: the one thing allowed to BRIGHTEN wet sand, and only under
 	// sea_level - full strength just below the waterline (the 3cm ramp

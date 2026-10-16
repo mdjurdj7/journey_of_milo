@@ -72,9 +72,9 @@ class_name FloorData
 @export var basin_color: Color = Color(0.66, 0.63, 0.55)
 @export_range(0.0, 1.0) var basin_tint_strength: float = 0.0
 @export var basin_tint_heights: Vector2 = Vector2(0.0, 1.2)
-# Ground.wear_darken for this floor: how much darker the worn band is than
-# the ground under it. 0.24 is the region's own value.
-@export_range(0.0, 1.0) var wear_darken: float = 0.24
+# Ground.wear_darken for this floor: how much darker the worn band's core
+# is than the ground under it. 0.1 is the region's own value.
+@export_range(0.0, 1.0) var wear_darken: float = 0.1
 # Ground's Slope Tint, for this floor: faces past slope_tint_min degrees
 # toward slope_tint_color (full slope_tint_blend further on) at
 # slope_tint_strength - wind-packed sand, so a slope reads by value even
@@ -195,6 +195,10 @@ enum ExitKind { CHANNEL, LINE }
 # every one of them, for a route that turns more than once (floor 4's
 # loop). Empty (the default) = derived.
 @export var wear_path_override: PackedVector2Array = PackedVector2Array()
+# Optional: a cart's two ruts (Ground.set_rut_path()), world-XZ points
+# relative to spawn, 2 to 8, a smooth curve through every one from where
+# they fade in to just past where they end. Empty (the default) = none.
+@export var rut_path: PackedVector2Array = PackedVector2Array()
 
 @export_group("Scatter")
 # The ground clutter this floor lies under - casts, shells, stones,

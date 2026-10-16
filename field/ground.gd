@@ -582,11 +582,13 @@ signal relief_rebuilt
 		_apply_uniform("underwater_detail_boost", value)
 @export_group("")
 
-# Wear: the walked band. A few percent darker and a little smoother than
-# the sand either side of it, and nothing else - Region 1's routes are
-# meant to be findable and losable, so this is tuned to sit at the edge
-# of visibility rather than to read as a path. See ground.gdshader's own
-# wear block for the rule; everything here just pushes it.
+# Wear: the walked band. A narrow core a few percent darker than the sand
+# either side of it, its edge frayed, the fine detail and wind ripples
+# flattened on it and sparse scuffs and footprints along it - Region 1's
+# routes are meant to be findable and losable, so the texture carries it
+# rather than the tone. See ground.gdshader's own wear block for the
+# rule; everything here just pushes it. The ruts (set_rut_path()) are a
+# cart's, along a floor's own line.
 #
 # The centreline is pushed by RegionField (see set_wear_path()), which is
 # the only thing that knows where spawn, the crab and the gate are - this
@@ -596,26 +598,38 @@ signal relief_rebuilt
 	set(value):
 		wear_enabled = value
 		_apply_uniform("wear_enabled", value)
-@export var wear_half_width: float = 2.0:
+@export var wear_half_width: float = 0.75:
 	set(value):
 		wear_half_width = value
 		_apply_uniform("wear_half_width", value)
+@export var wear_edge_width: float = 0.35:
+	set(value):
+		wear_edge_width = value
+		_apply_uniform("wear_edge_width", value)
 @export var wear_edge_noise_scale: float = 6.0:
 	set(value):
 		wear_edge_noise_scale = value
 		_apply_uniform("wear_edge_noise_scale", value)
-@export var wear_edge_noise_amplitude: float = 0.8:
+@export var wear_edge_noise_amplitude: float = 0.2:
 	set(value):
 		wear_edge_noise_amplitude = value
 		_apply_uniform("wear_edge_noise_amplitude", value)
+@export var wear_fray_scale: float = 0.6:
+	set(value):
+		wear_fray_scale = value
+		_apply_uniform("wear_fray_scale", value)
+@export var wear_fray_amplitude: float = 0.25:
+	set(value):
+		wear_fray_amplitude = value
+		_apply_uniform("wear_fray_amplitude", value)
 @export var wear_shore_fade: float = 3.0:
 	set(value):
 		wear_shore_fade = value
 		_apply_uniform("wear_shore_fade", value)
 # At the sand's own colour: 0.05 is about 3.5 points of value against
-# untrodden ground, 0.24 about 17, 0.4 about 28. The first reads as a
-# band you can lose, the last as a road.
-@export_range(0.0, 1.0) var wear_darken: float = 0.24:
+# untrodden ground, 0.1 about 7, 0.24 about 17. Per floor, from
+# FloorData.wear_darken.
+@export_range(0.0, 1.0) var wear_darken: float = 0.1:
 	set(value):
 		wear_darken = value
 		_apply_uniform("wear_darken", value)
@@ -623,12 +637,78 @@ signal relief_rebuilt
 	set(value):
 		wear_flatten = value
 		_apply_uniform("wear_flatten", value)
+@export_range(0.0, 1.0) var wear_ripple_flatten: float = 1.0:
+	set(value):
+		wear_ripple_flatten = value
+		_apply_uniform("wear_ripple_flatten", value)
+# The scuffs and footprints on the procedural band: one chance per cell
+# this many metres across...
+@export var wear_mark_cell: float = 0.9:
+	set(value):
+		wear_mark_cell = value
+		_apply_uniform("wear_mark_cell", value)
+# ...this share of cells carrying one...
+@export_range(0.0, 1.0) var wear_mark_density: float = 0.3:
+	set(value):
+		wear_mark_density = value
+		_apply_uniform("wear_mark_density", value)
+# ...this share of those a stride of two prints, the rest a scuff...
+@export_range(0.0, 1.0) var wear_mark_footprint_share: float = 0.5:
+	set(value):
+		wear_mark_footprint_share = value
+		_apply_uniform("wear_mark_footprint_share", value)
+# ...each darkening the band by this much at most.
+@export_range(0.0, 1.0) var wear_mark_darken: float = 0.16:
+	set(value):
+		wear_mark_darken = value
+		_apply_uniform("wear_mark_darken", value)
 # Optional painted band on the same rect as landmass_mask - white is
 # worn. Null (the default) leaves only the procedural curve.
 @export var wear_mask: Texture2D = null:
 	set(value):
 		wear_mask = value
 		_push_canvas_paintings()
+@export_group("")
+
+# Ruts: a cart's two wheel tracks along their own line (set_rut_path(),
+# pushed by RegionField from FloorData.rut_path; none without one).
+# rut_gauge apart, rut_width each, rut_darken at most; faded in over
+# rut_fade_in from the start and out over rut_fade_out before the end,
+# and coming and going every rut_break_length or so (more gaps as
+# rut_break_threshold rises), each line wavering rut_waver either side.
+@export_group("Ruts")
+@export var rut_gauge: float = 1.4:
+	set(value):
+		rut_gauge = value
+		_apply_uniform("rut_gauge", value)
+@export var rut_width: float = 0.12:
+	set(value):
+		rut_width = value
+		_apply_uniform("rut_width", value)
+@export_range(0.0, 1.0) var rut_darken: float = 0.08:
+	set(value):
+		rut_darken = value
+		_apply_uniform("rut_darken", value)
+@export var rut_fade_in: float = 4.0:
+	set(value):
+		rut_fade_in = value
+		_apply_uniform("rut_fade_in", value)
+@export var rut_fade_out: float = 1.5:
+	set(value):
+		rut_fade_out = value
+		_apply_uniform("rut_fade_out", value)
+@export var rut_break_length: float = 4.0:
+	set(value):
+		rut_break_length = value
+		_apply_uniform("rut_break_length", value)
+@export_range(0.0, 1.0) var rut_break_threshold: float = 0.3:
+	set(value):
+		rut_break_threshold = value
+		_apply_uniform("rut_break_threshold", value)
+@export var rut_waver: float = 0.04:
+	set(value):
+		rut_waver = value
+		_apply_uniform("rut_waver", value)
 @export_group("")
 
 # Height read as tone: the floor's low ground blends toward basin_color,
@@ -972,11 +1052,27 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("underwater_detail_boost", underwater_detail_boost)
 	_apply_uniform("wear_enabled", wear_enabled)
 	_apply_uniform("wear_half_width", wear_half_width)
+	_apply_uniform("wear_edge_width", wear_edge_width)
 	_apply_uniform("wear_edge_noise_scale", wear_edge_noise_scale)
 	_apply_uniform("wear_edge_noise_amplitude", wear_edge_noise_amplitude)
+	_apply_uniform("wear_fray_scale", wear_fray_scale)
+	_apply_uniform("wear_fray_amplitude", wear_fray_amplitude)
 	_apply_uniform("wear_shore_fade", wear_shore_fade)
 	_apply_uniform("wear_darken", wear_darken)
 	_apply_uniform("wear_flatten", wear_flatten)
+	_apply_uniform("wear_ripple_flatten", wear_ripple_flatten)
+	_apply_uniform("wear_mark_cell", wear_mark_cell)
+	_apply_uniform("wear_mark_density", wear_mark_density)
+	_apply_uniform("wear_mark_footprint_share", wear_mark_footprint_share)
+	_apply_uniform("wear_mark_darken", wear_mark_darken)
+	_apply_uniform("rut_gauge", rut_gauge)
+	_apply_uniform("rut_width", rut_width)
+	_apply_uniform("rut_darken", rut_darken)
+	_apply_uniform("rut_fade_in", rut_fade_in)
+	_apply_uniform("rut_fade_out", rut_fade_out)
+	_apply_uniform("rut_break_length", rut_break_length)
+	_apply_uniform("rut_break_threshold", rut_break_threshold)
+	_apply_uniform("rut_waver", rut_waver)
 	_apply_uniform("rock_color", rock_color)
 	_apply_uniform("rock_slope_min", rock_slope_min)
 	_apply_uniform("rock_slope_blend", rock_slope_blend)
@@ -1074,6 +1170,19 @@ func set_wear_path(points: PackedVector2Array) -> void:
 	padded.resize(WEAR_MAX_POINTS)
 	_apply_uniform("wear_points", padded)
 	_apply_uniform("wear_point_count", used.size())
+
+# The ruts' centreline, in world XZ, start to end: a chain through every
+# point, as a long worn band is. Under 2 points clears them; past
+# WEAR_MAX_POINTS the rest are dropped, with a warning. Called by
+# RegionField with the band (_aim_wear_path()).
+func set_rut_path(points: PackedVector2Array) -> void:
+	var used: PackedVector2Array = points.slice(0, WEAR_MAX_POINTS)
+	if points.size() > WEAR_MAX_POINTS:
+		push_warning("Ground: ruts take at most %d points (got %d); the rest are dropped." % [WEAR_MAX_POINTS, points.size()])
+	var padded: PackedVector2Array = used.duplicate()
+	padded.resize(WEAR_MAX_POINTS)
+	_apply_uniform("rut_points", padded)
+	_apply_uniform("rut_point_count", used.size() if used.size() >= 2 else 0)
 
 # The paintings the shader samples on the landmass canvas (wear_mask,
 # rock_mask, outer_mask) and the canvas's image->world mapping, matching

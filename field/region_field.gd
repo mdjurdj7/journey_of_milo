@@ -3220,6 +3220,7 @@ func _on_loot_screen_closed(screen: LootScreen) -> void:
 # takes: out of spawn, past the first required slot's anchor (the gate's
 # own, _gate_slot()), to the gate - or along the floor's
 # own 3 to 8 points when it overrides that (FloorData.wear_path_override).
+# A floor's ruts (FloorData.rut_path) go over with it, or are cleared.
 # Ground knows none of those - it takes world points and draws a band
 # through them (see Ground.set_wear_path()), so a floor with a
 # different shape re-aims it by calling this with different points rather
@@ -3236,6 +3237,10 @@ func _aim_wear_path(anchor: Vector3) -> void:
 	if floor_data == null:
 		return
 	var spawn: Vector3 = get_spawn_position()
+	var ruts := PackedVector2Array()
+	for offset in floor_data.rut_path:
+		ruts.append(Vector2(spawn.x + offset.x, spawn.z + offset.y))
+	ground.set_rut_path(ruts)
 	if floor_data.wear_path_override.size() >= 3:
 		var points := PackedVector2Array()
 		for offset in floor_data.wear_path_override:

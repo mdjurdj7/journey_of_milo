@@ -24,8 +24,6 @@ const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FLOOR_1 := 0
 const FLOOR_2 := 1
 const FLOOR_1_KINDS: Array[String] = ["samphire", "stone_small", "stone_large"]
-# The worn band's keep-out: its half-width plus its edge noise.
-const WEAR_KEEP_OUT_M := 2.8
 # The stance ring around a lone enemy is read from the rules it keeps clear
 # for (RegionField.stance_distance_min()..stance_distance() for that enemy,
 # widened by the scatter's own feet_margin_m) - see _stance_ring().
@@ -130,13 +128,15 @@ func _check_placements(scatter: Node) -> void:
 	var ground: Node = _field.get_node("Ground")
 	var wear: PackedVector2Array = _field.call("get_wear_path")
 	_expect(wear.size() >= 3, "The worn band's points are kept for it")
+	# The band's keep-out as the scatter derives it from Ground's band.
+	var keep_out: float = float(scatter.call("get_wear_keep_out"))
 	var problems: Dictionary = {}
 	for entry: Resource in scatter.call("get_entries"):
 		for spot: RefCounted in scatter.call("get_spots", entry):
 			var p: Vector2 = _xz(spot)
 			if float(ground.call("get_visible_height_at", p)) < sea - float(entry.get("wet_edge_m")) - 0.001:
 				_count(problems, "in water")
-			if _curve_distance(wear, p) < WEAR_KEEP_OUT_M - 0.01:
+			if _curve_distance(wear, p) < keep_out - 0.01:
 				_count(problems, "on the worn band")
 			if bool(scatter.call("is_excluded", p)):
 				_count(problems, "inside an exclusion")

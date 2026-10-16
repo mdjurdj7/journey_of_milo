@@ -215,8 +215,9 @@ class KeepOut extends RefCounted:
 
 @export_group("Worn Band")
 # Nothing within this of the band's centreline. -1 = the band's own
-# half-width plus its edge noise (Ground.wear_half_width + wear_edge_
-# noise_amplitude) - the furthest it is ever drawn.
+# half-width, half its edge and both its noises (Ground.wear_half_width +
+# wear_edge_width / 2 + wear_edge_noise_amplitude + wear_fray_amplitude)
+# - the furthest it is ever drawn.
 @export var wear_keep_out_m: float = -1.0:
 	set(value):
 		wear_keep_out_m = value
@@ -664,7 +665,7 @@ func wear_weight(p: Vector2, keep_out_override: float = -1.0, ramp_override: flo
 func get_wear_keep_out() -> float:
 	if wear_keep_out_m >= 0.0:
 		return wear_keep_out_m
-	return _ground.wear_half_width + _ground.wear_edge_noise_amplitude
+	return _ground.wear_half_width + _ground.wear_edge_width * 0.5 + _ground.wear_edge_noise_amplitude + _ground.wear_fray_amplitude
 
 # Distance to the band's centreline - the shader's own curve (ground.
 # gdshader wear_distance()): through three points a quadratic Bezier that
