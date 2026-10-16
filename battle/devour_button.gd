@@ -9,27 +9,29 @@ class_name DevourButton
 # numeral's cap height - and stacked to its right "DEVOUR" in tracked
 # caps with its Energy cost after it (a pip per Energy, the energy
 # readout's own mark), "+3 HP" in the HP readout's smaller grey numeral,
-# and "USED" in small grey caps once this turn's Devour is spent. No
-# disc, ring, glow or divider.
+# and, while it can't be used, why - "USED" or "NO ENERGY" - in caps in
+# full ink. No disc, ring, glow or divider.
 #
 # States, all read from the controller on devour_changed:
-# - Grey (nothing armed, used this turn, or its Energy short): glyph,
-#   label and cost at grey_alpha - "USED" only for used; short of Energy
-#   it is just grey, as an unaffordable card is. Clickable only while
+# - Ink (unused this turn and its Energy in hand): glyph, label and cost
+#   in full ink, armed or not - and through the moments a play or the
+#   enemy turn holds it, so it doesn't flicker. Clickable only while
 #   available - with nothing armed a click opens the controller's pick (a
 #   hand card to eat).
-# - Lit (a card armed, or the pick open, with Devour available): glyph and
-#   label ease to full ink over lit_fade_sec, a hairline draws in under
-#   the label left to right over rule_draw_sec, and the jaws part by
-#   jaw_open_px each, eased, held while it stays lit. No glow, pulse or
-#   colour.
+# - Unavailable (used this turn, or its Energy short): glyph, label, cost
+#   and heal ease to grey_alpha over lit_fade_sec, and the reason shows
+#   under the heal in full ink - used_text, else no_energy_text.
+# - Lit (a card armed, or the pick open, with Devour available): a
+#   hairline draws in under the label left to right over rule_draw_sec,
+#   and the jaws part by jaw_open_px each, eased, held while it stays
+#   lit. No glow, pulse or colour.
 # - Hovered while lit with a card armed: the hairline thickens to
 #   rule_hover_px and one line names it ("Consume Slash. Heal 3 HP.");
 #   while the pick is open the line reads pick_text. The line sits
 #   hover_gap_px above set_hover_floor_y() - the top of the bottom-left
 #   stack, where the keepsake reveal appears - left-aligned with this.
-# - Back to grey (disarmed, played, devoured): eased back, the jaw closing
-#   - on a devour, shut over jaw_bite_sec, the bite.
+# - Unlit (disarmed, played, devoured): eased back, the jaw closing - on a
+#   devour, shut over jaw_bite_sec, the bite.
 #
 # Left-click calls devour(); every other button passes through
 # (MOUSE_FILTER_PASS, not accepted), so a right-click still cancels the
@@ -130,9 +132,15 @@ class_name DevourButton
 	set(value):
 		used_text = value
 		_relayout()
-@export var used_size_px: int = 9:
+@export var no_energy_text: String = "NO ENERGY":
 	set(value):
-		used_size_px = value
+		no_energy_text = value
+		_relayout()
+# The reason it can't be used (used_text, no_energy_text): this size, in
+# full ink.
+@export var reason_size_px: int = 10:
+	set(value):
+		reason_size_px = value
 		_restyle()
 # Its cost (BattleController.devour_energy_cost) after "DEVOUR": a pip per
 # Energy, in the energy readout's language - short heavy bars, this size,
@@ -161,7 +169,7 @@ class_name DevourButton
 		_relayout()
 
 @export_group("States")
-# Grey: the ink at this alpha - glyph, label, heal and USED alike.
+# Unavailable: the ink at this alpha - glyph, label, cost and heal alike.
 @export_range(0.0, 1.0) var grey_alpha: float = 0.35:
 	set(value):
 		grey_alpha = value
@@ -224,10 +232,14 @@ var _controller: BattleController = null
 var _ink: Color = Color.BLACK
 var _bone: Color = Color.WHITE
 var _label_tracked: Font = null
-var _used_tracked: Font = null
+var _reason_tracked: Font = null
 # What the controller last said (_refresh()).
 var _available: bool = false
 var _used: bool = false
+# Unused this turn with its Energy in hand - drawn in full ink.
+var _usable: bool = false
+# Why it can't be used, shown under the heal; "" while usable.
+var _reason: String = ""
 # Its cost in Energy, as the controller has it (_refresh()).
 var _cost: int = 1
 # Where the cost's pips start, and their centre line (_relayout()).
@@ -240,6 +252,7 @@ var _hovered: bool = false
 # Each eased 0..1 toward its target in _process() - linear here, eased in
 # _draw().
 var _lit: float = 0.0
+var _ink_level: float = 0.0
 var _rule: float = 0.0
 var _open: float = 0.0
 var _rule_weight: float = 0.0
@@ -256,7 +269,7 @@ var _text_x: float = 0.0
 var _label_baseline: float = 0.0
 var _rule_y: float = 0.0
 var _heal_baseline: float = 0.0
-var _used_baseline: float = 0.0
+var _reason_baseline: float = 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -298,11 +311,15 @@ func is_lit() -> bool:
 	return _lit_target
 
 func get_glyph_alpha() -> float:
-	return lerpf(grey_alpha, 1.0, _smooth(_lit))
+	return lerpf(grey_alpha, 1.0, _smooth(_ink_level))
+
+# The reason shown for its being unavailable, "" while it can be used.
+func get_reason_text() -> String:
+	return _reason
 
 func _restyle() -> void:
 	_label_tracked = InkType.tracked(label_font, label_size_px, label_tracking_em)
-	_used_tracked = InkType.tracked(label_font, used_size_px, label_tracking_em)
+	_reason_tracked = InkType.tracked(label_font, reason_size_px, label_tracking_em)
 	_relayout()
 
 func _refresh() -> void:
@@ -310,6 +327,8 @@ func _refresh() -> void:
 		return
 	_available = _controller.is_devour_available()
 	_used = _controller.is_devour_used()
+	_usable = not _used and _controller.is_devour_affordable()
+	_reason = "" if _usable else (used_text if _used else no_energy_text)
 	var cost: int = maxi(_controller.devour_energy_cost, 0)
 	if cost != _cost:
 		_cost = cost
@@ -345,7 +364,9 @@ func _process(delta: float) -> void:
 	var wanted: String = _wanted_hover_text()
 	if not wanted.is_empty():
 		_hover_text = wanted
+	var ink_level: float = 1.0 if _usable else 0.0
 	_lit = _step(_lit, lit, lit_fade_sec, delta)
+	_ink_level = _step(_ink_level, ink_level, lit_fade_sec, delta)
 	_rule = _step(_rule, lit, rule_draw_sec, delta)
 	_open = _step(_open, lit, jaw_bite_sec if _biting else jaw_open_sec, delta)
 	if _open == 0.0:
@@ -353,7 +374,7 @@ func _process(delta: float) -> void:
 	_rule_weight = _step(_rule_weight, 1.0 if _hovered and _lit_target else 0.0, lit_fade_sec, delta)
 	_hover_shown = _step(_hover_shown, 0.0 if wanted.is_empty() else 1.0, hover_fade_sec, delta)
 	queue_redraw()
-	if _lit == lit and _rule == lit and _open == lit and _rule_weight == (1.0 if _hovered and _lit_target else 0.0) and _hover_shown == (0.0 if wanted.is_empty() else 1.0):
+	if _lit == lit and _ink_level == ink_level and _rule == lit and _open == lit and _rule_weight == (1.0 if _hovered and _lit_target else 0.0) and _hover_shown == (0.0 if wanted.is_empty() else 1.0):
 		set_process(false)
 
 func _step(value: float, target: float, seconds: float, delta: float) -> float:
@@ -385,18 +406,18 @@ func _glyph_width() -> float:
 # column glyph_text_gap_px right of it, centred on it, measured by ink -
 # caps and figures, nothing below the baseline - so the column stays
 # short: the label, its hairline's place (the hovered weight, so nothing
-# moves), the heal, and USED's place - kept whether or not it shows.
+# moves), the heal, and the reason's place - kept whether or not it shows.
 func _relayout() -> void:
 	if not is_inside_tree() or label_font == null or heal_font == null:
 		return
 	var glyph_box := Vector2(_glyph_width(), glyph_height_px + jaw_open_px * 2.0)
 	var label_ascent: float = -BattleResources.figure_ink_top(label_font, label_size_px)
 	var heal_ascent: float = -BattleResources.figure_ink_top(heal_font, heal_size_px)
-	var used_ascent: float = -BattleResources.figure_ink_top(label_font, used_size_px)
+	var reason_ascent: float = -BattleResources.figure_ink_top(label_font, reason_size_px)
 	var rule_bottom: float = label_ascent + rule_gap_px + rule_hover_px
 	var heal_baseline: float = rule_bottom + row_gap_px + heal_ascent
-	var used_baseline: float = heal_baseline + row_gap_px + used_ascent
-	var text_height: float = used_baseline
+	var reason_baseline: float = heal_baseline + row_gap_px + reason_ascent
+	var text_height: float = reason_baseline
 	var height: float = maxf(glyph_box.y, text_height)
 	var text_top: float = (height - text_height) * 0.5
 	_glyph_centre = Vector2(_glyph_width() * 0.5, height * 0.5)
@@ -404,26 +425,27 @@ func _relayout() -> void:
 	_label_baseline = text_top + label_ascent
 	_rule_y = text_top + label_ascent + rule_gap_px
 	_heal_baseline = text_top + heal_baseline
-	_used_baseline = text_top + used_baseline
+	_reason_baseline = text_top + reason_baseline
 	var label_row: float = InkType.width(_label_tracked, label_text, label_size_px)
 	_cost_x = _text_x + label_row + cost_gap_px
 	_cost_y = _label_baseline - label_ascent * 0.5
 	if _cost > 0:
 		label_row += cost_gap_px + float(_cost) * cost_pip_size.x + float(_cost - 1) * cost_pip_gap_px
 	var text_width: float = maxf(label_row, InkType.width(heal_font, _heal_text(), heal_size_px))
-	text_width = maxf(text_width, InkType.width(_used_tracked, used_text, used_size_px))
+	for reason: String in [used_text, no_energy_text]:
+		text_width = maxf(text_width, InkType.width(_reason_tracked, reason, reason_size_px))
 	size = Vector2(_text_x + text_width, height)
 	queue_redraw()
 
 func _draw() -> void:
 	if label_font == null or heal_font == null:
 		return
-	var lit: float = _smooth(_lit)
+	var ink_level: float = _smooth(_ink_level)
 	var shapes: Array[PackedVector2Array] = _jaw_shapes(_glyph_centre, jaw_open_px * _smooth(_open))
-	InkPen.draw_ink(self, shapes, _ink, _bone, glyph_outline_px, glyph_edge_px, lerpf(grey_alpha, 1.0, lit))
+	InkPen.draw_ink(self, shapes, _ink, _bone, glyph_outline_px, glyph_edge_px, lerpf(grey_alpha, 1.0, ink_level))
 
 	var label_color: Color = _ink
-	label_color.a = lerpf(grey_alpha, 1.0, lit)
+	label_color.a = lerpf(grey_alpha, 1.0, ink_level)
 	var label_width: float = InkType.draw_run(self, _label_tracked, label_text, Vector2(_text_x, _label_baseline), label_size_px, label_color)
 	# Its cost, a pip per Energy, in the label's ink.
 	for i in _cost:
@@ -436,13 +458,11 @@ func _draw() -> void:
 		draw_rect(Rect2(_text_x, _rule_y, rule_length, thickness), label_color)
 
 	var heal_color: Color = _ink
-	heal_color.a = lerpf(grey_alpha, heal_alpha, lit)
+	heal_color.a = lerpf(grey_alpha, heal_alpha, ink_level)
 	InkType.draw_run(self, heal_font, _heal_text(), Vector2(_text_x, _heal_baseline), heal_size_px, heal_color)
 
-	if _used:
-		var used_color: Color = _ink
-		used_color.a = grey_alpha
-		InkType.draw_run(self, _used_tracked, used_text, Vector2(_text_x, _used_baseline), used_size_px, used_color)
+	if not _reason.is_empty():
+		InkType.draw_run(self, _reason_tracked, _reason, Vector2(_text_x, _reason_baseline), reason_size_px, _ink)
 
 	if _hover_shown > 0.0 and not _hover_text.is_empty() and hover_font != null:
 		var hover_color: Color = _ink

@@ -132,7 +132,7 @@ func _check_armed_playable() -> void:
 	await _teardown()
 	_completed += 1
 
-# At 0 energy Devour is out of reach: grey, no USED, a click on it opens
+# At 0 energy Devour is out of reach: grey, NO ENERGY, a click on it opens
 # nothing, and a dimmed card doesn't arm. At 1, an unaffordable 2-cost
 # card (Reckoning) arms, dimmed, Devour its only target: no enemy is a
 # target, clicking one does nothing, and Devour eats it for that 1.
@@ -152,6 +152,7 @@ func _check_unaffordable_arms() -> void:
 		_expect(not bool(controller.call("is_devour_used")), "...though unused")
 		_expect(is_equal_approx(float(button.call("get_glyph_alpha")), float(button.get("grey_alpha"))), "...the button grey")
 		_expect(not bool(button.get("_used")), "...without USED")
+		_expect_eq(str(button.call("get_reason_text")), str(button.get("no_energy_text")), "...NO ENERGY shown")
 		_expect_eq(button.mouse_default_cursor_shape, Control.CURSOR_ARROW, "...not offered as clickable")
 		controller.call("devour")
 		_expect(not bool(controller.call("is_devour_picking")), "...a click on it opens no pick")
@@ -467,8 +468,8 @@ func _check_deny_samphire() -> void:
 	await _teardown()
 	_completed += 1
 
-# The button: grey with nothing armed, ink while a card is armed and it is
-# available, grey with USED once used.
+# The button: ink while it can be used, armed or not, lit while a card is
+# armed; grey with USED once used.
 func _check_button_states() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -476,14 +477,15 @@ func _check_button_states() -> void:
 		var slash: CardData = await _deal(controller, SLASH_PATH)
 		await create_timer(0.4).timeout
 		_expect(not bool(button.call("is_lit")), "Nothing armed: the button isn't lit")
-		_expect(is_equal_approx(float(button.call("get_glyph_alpha")), float(button.get("grey_alpha"))), "...grey")
+		_expect(is_equal_approx(float(button.call("get_glyph_alpha")), 1.0), "...but in full ink, usable")
+		_expect_eq(str(button.call("get_reason_text")), "", "...no reason shown")
 		controller.call("request_play", _view(controller, slash))
 		await create_timer(0.4).timeout
 		_expect(bool(button.call("is_lit")), "A card armed: lit")
 		_expect(is_equal_approx(float(button.call("get_glyph_alpha")), 1.0), "...in full ink")
 		controller.call("cancel_target")
 		await create_timer(0.4).timeout
-		_expect(is_equal_approx(float(button.call("get_glyph_alpha")), float(button.get("grey_alpha"))), "Cancelled: grey again")
+		_expect(not bool(button.call("is_lit")) and is_equal_approx(float(button.call("get_glyph_alpha")), 1.0), "Cancelled: unlit, still ink")
 		controller.call("devour")
 		await create_timer(0.4).timeout
 		_expect(is_equal_approx(float(button.call("get_glyph_alpha")), 1.0), "The pick open: ink")
@@ -491,7 +493,8 @@ func _check_button_states() -> void:
 		await _settle(controller)
 		_expect(not bool(button.call("is_lit")), "Used: not lit")
 		_expect(is_equal_approx(float(button.call("get_glyph_alpha")), float(button.get("grey_alpha"))), "...grey")
-		_expect(bool(button.get("_used")), "...USED shown")
+		_expect(bool(button.get("_used")), "...used")
+		_expect_eq(str(button.call("get_reason_text")), str(button.get("used_text")), "...USED shown")
 		var bite: CardData = await _deal(controller, BITE_DOWN_PATH)
 		controller.call("request_play", _view(controller, bite))
 		await create_timer(0.4).timeout

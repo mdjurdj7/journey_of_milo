@@ -42,4 +42,4 @@ model_scene_path = "res://assets/models/enemies/Strawcrown/crane.glb"
 model_scale = 1.0
 model_yaw_offset_degrees = 180.0
 attachment_scene_path = "res://field/crane_motion.tscn"
-painted_albedo_path = "res://assets/models/enemies/Strawcrown/crane_0.jpg"
+painted_albedo_path = "res://assets/models/enemies/Strawcrown/crane_crown_valued.png"

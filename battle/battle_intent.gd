@@ -37,8 +37,9 @@ class_name BattleIntent
 # One per enemy, created by BattleOverlay for the fight (its child, so it
 # dies with the overlay - nothing of this exists on the field). Anchored
 # the way EnemyStatus is: repositioned every physics tick at priority 1
-# (after CameraRig/FieldEnemy have moved this tick), unprojected from the
-# enemy's own head + head_margin, whole pixels. Not distance-scaled: it
+# (after CameraRig/FieldEnemy have moved this tick), placed from the
+# top of the enemy's screen rect (FieldEnemy.get_screen_rect()), gap_px
+# above it, whole pixels. Not distance-scaled: it
 # only shows once the battle frame has settled, and its sizes are the
 # on-screen pixel sizes. EnemyStatus's own bar hangs under the enemy's
 # feet (bar_offset points down), so the two never share the head band and
@@ -48,11 +49,16 @@ class_name BattleIntent
 # battle_transition_time), updated on every enemy_intent_changed, hidden
 # on enemy_acting while the enemy resolves.
 
-# The display's bottom edge (the hairline) sits head_margin metres above
-# the enemy's own head - FieldEnemy.get_head_height(), its model's scaled
-# bbox height (0.75m for the Sputter) - with fallback_head_height
+# The display's lowest ink (the numeral's baseline, or the rule, ring or
+# pips when drawn) sits gap_px screen pixels above the top of the enemy's
+# screen rect - its model's box unprojected as it stands
+# (FieldEnemy.get_screen_rect()), within a few px of the silhouette's own
+# top - the same gap on every enemy at any distance. Until the model has
+# spawned, the bottom edge sits head_margin metres above its head instead
+# - FieldEnemy.get_head_height(), with fallback_head_height
 # (BattleOverlay's humanoid-guess enemy_head_height) only if the enemy
 # reports 0.
+@export var gap_px: float = 14.0
 @export var head_margin: float = 0.1
 @export var fallback_head_height: float = 1.8
 @export var numeral_font: Font = load("res://assets/fonts/Spectral-SemiBold.ttf")
@@ -459,6 +465,9 @@ func _apply_layout() -> void:
 		_hits_label.size = Vector2(hits_width, hits_height)
 		_hits_label.modulate.a = hits_alpha * (hairline_alpha if _interrupted else 1.0)
 	_rule_top = line_height + hairline_drop_px
+	# The lowest ink: the pips, ring or rule when drawn, else the
+	# numeral's baseline - the line's descent below it is empty.
+	_ink_bottom = content_height if _lethal or _has_threshold or _pip_count > 0 else ascent
 
 	# The ring's numeral fills the ring's box, centred both ways.
 	var ring_top: float = _rule_top + rule_thickness + ring_top_gap_px
@@ -787,15 +796,27 @@ func _points_left() -> bool:
 		return false
 	return camera.unproject_position(wanderer.global_position).x < camera.unproject_position(target.global_position).x
 
-# The world height of this readout's bottom edge - its anchor, which it
-# sits on. INF with no target. Read by a play effect that has to stay
-# under the readouts (BrushStrokeEffect, through BattleOverlay).
+# The world height of this readout's lowest ink - its anchor, which it
+# sits on: where the enemy's own upright plane, facing the camera, meets
+# the screen point it was last placed at. INF with no target. Read by a
+# play effect that has to stay under the readouts (BrushStrokeEffect,
+# through BattleOverlay).
 func anchor_height() -> float:
 	if target == null or not is_instance_valid(target):
 		return INF
+	var camera := get_viewport().get_camera_3d()
+	if camera != null and _placed:
+		var facing: Vector3 = camera.global_transform.basis.z
+		facing.y = 0.0
+		if facing.length_squared() > 0.0001:
+			var plane := Plane(facing.normalized(), target.global_position)
+			var hit: Variant = plane.intersects_ray(camera.project_ray_origin(_anchor_screen), camera.project_ray_normal(_anchor_screen))
+			if hit is Vector3:
+				return (hit as Vector3).y
 	return target.global_position.y + _anchor_offset().y
 
-# The anchor: the enemy's own head plus head_margin.
+# The fallback anchor, before the model has spawned: the enemy's own head
+# plus head_margin.
 func _anchor_offset() -> Vector3:
 	var head: float = target.get_head_height() if target != null else 0.0
 	if head <= 0.0:
@@ -808,6 +829,11 @@ func _anchor_offset() -> Vector3:
 # Also re-evaluates the spearhead's direction, since the framing can swap
 # sides during the battle transition.
 var _pointing_left: bool = false
+# The lowest ink's y in this control (_apply_layout()).
+var _ink_bottom: float = 0.0
+# The screen point the lowest ink was last placed on, centred.
+var _anchor_screen: Vector2 = Vector2.ZERO
+var _placed: bool = false
 
 func _physics_process(_delta: float) -> void:
 	if target == null or not is_instance_valid(target):
@@ -815,12 +841,19 @@ func _physics_process(_delta: float) -> void:
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
 		return
-	var anchor: Vector3 = target.global_position + _anchor_offset()
-	var screen_pos: Vector2 = camera.unproject_position(anchor)
-	# Centred on the enemy in X, bottom edge on the anchor in Y - the
-	# display sits just above the silhouette rather than straddling the
-	# anchor.
-	position = (screen_pos - Vector2(size.x / 2.0, size.y)).round()
+	# Centred on the enemy in X, its lowest ink gap_px over the top of the
+	# enemy's screen rect in Y - the display sits just above the silhouette
+	# rather than straddling it. The bottom edge on the fallback anchor
+	# until the model has spawned.
+	var screen_pos: Vector2 = camera.unproject_position(target.global_position + _anchor_offset())
+	var bottom: float = size.y
+	var rect: Rect2 = target.get_screen_rect(camera, 0.0)
+	if rect.has_area():
+		screen_pos.y = rect.position.y - gap_px
+		bottom = _ink_bottom
+	_anchor_screen = screen_pos
+	_placed = true
+	position = (screen_pos - Vector2(size.x / 2.0, bottom)).round()
 	var left: bool = _points_left()
 	if left != _pointing_left:
 		_pointing_left = left

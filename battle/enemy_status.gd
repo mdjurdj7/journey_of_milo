@@ -51,9 +51,21 @@ class_name EnemyStatus
 @export var name_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf")
 @export var battle_numeral_size_px: int = 22
 @export var battle_max_size_px: int = 14
-@export var battle_name_size_px: int = 10
-@export var battle_name_tracking_em: float = 0.16
-# " / max" and the name, ink at this alpha; the numeral is full ink.
+# The name a step up the letterspaced caps (the HUD's own labels are 12),
+# full ink like the HP numeral.
+@export var battle_name_size_px: int = 12:
+	set(value):
+		battle_name_size_px = value
+		refresh_style()
+@export var battle_name_tracking_em: float = 0.16:
+	set(value):
+		battle_name_tracking_em = value
+		refresh_style()
+@export_range(0.0, 1.0) var battle_name_alpha: float = 1.0:
+	set(value):
+		battle_name_alpha = value
+		queue_redraw()
+# " / max", ink at this alpha; the numeral is full ink.
 @export_range(0.0, 1.0) var battle_secondary_alpha: float = 0.6
 @export var battle_max_prefix: String = " / "
 # Row gap between the numeral row's descent and the bar's top - the block
@@ -141,9 +153,18 @@ class_name EnemyStatus
 # same type, handed ready-made labels (Status.label()). Drawn below the
 # readout without growing it, so the bar never moves on the enemy when a
 # status comes or goes. Nothing at all when empty.
-@export var status_row_font_size_px: int = 10
-@export_range(0.0, 1.0) var status_row_tracking_em: float = 0.16
-@export_range(0.0, 1.0) var status_row_alpha: float = 0.7
+@export var status_row_font_size_px: int = 12:
+	set(value):
+		status_row_font_size_px = value
+		refresh_style()
+@export_range(0.0, 1.0) var status_row_tracking_em: float = 0.16:
+	set(value):
+		status_row_tracking_em = value
+		refresh_style()
+@export_range(0.0, 1.0) var status_row_alpha: float = 0.85:
+	set(value):
+		status_row_alpha = value
+		queue_redraw()
 @export var status_row_gap_px: float = 6.0
 @export var status_row_item_gap_px: float = 14.0
 
@@ -453,6 +474,8 @@ func _draw() -> void:
 	ink.a = _battle_blend
 	var secondary: Color = _ink
 	secondary.a = battle_secondary_alpha * _battle_blend
+	var name_ink: Color = _ink
+	name_ink.a = battle_name_alpha * _battle_blend
 	var track: Color = _ink
 	track.a = battle_track_alpha * _battle_blend
 
@@ -466,7 +489,7 @@ func _draw() -> void:
 	var name_text: String = _enemy_name()
 	if _name_font_tracked != null and not name_text.is_empty():
 		var name_width: float = InkType.width(_name_font_tracked, name_text, battle_name_size_px)
-		InkType.draw_run(self, _name_font_tracked, name_text, Vector2(left + battle_width - name_width, baseline), battle_name_size_px, secondary)
+		InkType.draw_run(self, _name_font_tracked, name_text, Vector2(left + battle_width - name_width, baseline), battle_name_size_px, name_ink)
 
 	var bar_top: float = baseline + _numeral_descent() + battle_row_gap
 	draw_rect(Rect2(left, bar_top, battle_width, battle_bar_height), track)
