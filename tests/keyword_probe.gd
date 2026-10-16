@@ -408,7 +408,7 @@ func _start_fight() -> Node:
 	_field.call_deferred("_on_enemy_contacted", target)
 	for i in 10:
 		await physics_frame
-	# The fight's opening hold (RegionField.battle_input_unlock_time).
+	# The fight's opening hold (BattleController.lock_entry_input()).
 	var entry_layer: Node = _field.get_node("BattleLayer")
 	while entry_layer.get_child_count() > 0 and bool((entry_layer.get_child(0).get("battle_controller") as Node).call("is_entry_locked")):
 		await process_frame

@@ -12,6 +12,10 @@ signal path_stuck
 # BattleFeedback raises the sand puff there; the sound is his own
 # (AttackAudio.play_ground_strike()).
 signal draw_strike(tip: Vector3, ground_point: Vector3)
+# A battle entry's draw is past its ground strike: struck (after draw_
+# strike), or cut off before it. The fight's opening hold ends on it
+# (BattleController.lock_entry_input()).
+signal draw_strike_passed
 
 # The body: the cloaked Wanderer, rigged by Meshy on its Mixamo template
 # (bones smartrig_*, an A-pose rest), exported as glTF in metres - 1.7 m
@@ -283,8 +287,9 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 # entry is under way - not after a fight ended or a card's clip cut the
 # draw off (_on_draw_sword_strike_key()). On it the sand puff of a slash
 # hit rises, draw_strike_puff_scale its size and speed, on the drawn sand
-# under the sword tip (draw_strike), with the ground-strike sound there.
-# Both read at each entry.
+# under the sword tip (draw_strike), with the ground-strike sound there,
+# and the fight's opening hold ends (draw_strike_passed). Both read at
+# each entry.
 @export var draw_sword_strike_time: float = 21.0 / 24.0
 @export var draw_strike_puff_scale: float = 1.0
 
@@ -2155,6 +2160,13 @@ func enter_battle_stance(target: Node3D, spacing: float, duration: float, direct
 func has_own_draw_sword() -> bool:
 	return _own_draw_sword
 
+# DrawSword's own length (seconds), 0 when there is none - the fight's
+# opening hold's latest end (RegionField._battle_input_hold_seconds()).
+func get_draw_sword_length() -> float:
+	if _animation_player == null or not _animation_player.has_animation(&"DrawSword"):
+		return 0.0
+	return _animation_player.get_animation(&"DrawSword").length
+
 # DrawSword's grab and strike keys, set to draw_sword_grab_time and
 # draw_sword_strike_time as each entry reads them.
 func _place_draw_keys() -> void:
@@ -2189,7 +2201,10 @@ func _on_draw_sword_cut() -> void:
 	if _animation_player.current_animation == "DrawSword":
 		return
 	# Its strike won't come either: the draw it belongs to is over.
+	var striking: bool = _strike_pending
 	_strike_pending = false
+	if striking:
+		draw_strike_passed.emit()
 	if _grab_pending:
 		_grab_pending = false
 		_grab_sword()
@@ -2208,6 +2223,7 @@ func _on_draw_sword_strike_key() -> void:
 	draw_strike.emit(tip, ground_point)
 	if _attack_audio != null:
 		_attack_audio.play_ground_strike(ground_point)
+	draw_strike_passed.emit()
 
 # The sword's tip in the world: the end of its long axis _apply_grip_
 # offset() takes for the tip.

@@ -207,6 +207,9 @@ var _input_locked: bool = false
 # targeting and Devour take no input until it ends. The hand still deals
 # in under it.
 var _entry_locked: bool = false
+# The signal that ends the hold early (lock_entry_input()'s `release`),
+# connected while it is on; null when there is none.
+var _entry_release: Signal = Signal()
 # A play is resolving (_resolve_play(), commit to resolved), and a next
 # one is waiting - on it, or on the Wanderer's swing reaching its cancel
 # point (_resolve_play()'s cancel window). While one resolves a next card
@@ -429,20 +432,34 @@ func get_choosing_card_view() -> CardView:
 	return _choosing_card_view
 
 # The fight's opening hold: no card, End Turn, target or Devour takes
-# input for `seconds` from now (RegionField._on_enemy_contacted() calls it
-# on contact - the Wanderer's draw near done). Zero or less holds nothing.
-func lock_entry_input(seconds: float) -> void:
+# input until `release` is emitted (RegionField._on_enemy_contacted()
+# passes the Wanderer's draw_strike_passed - his draw's ground strike), or
+# `seconds` from now at the latest. Zero or less holds nothing.
+func lock_entry_input(seconds: float, release: Signal = Signal()) -> void:
 	if seconds <= 0.0:
 		return
+	_drop_entry_release()
 	_entry_locked = true
 	entry_lock_changed.emit(true)
 	_emit_devour_changed()
-	get_tree().create_timer(seconds, true).timeout.connect(_unlock_entry_input)
+	get_tree().create_timer(seconds, true).timeout.connect(unlock_entry_input)
+	if not release.is_null():
+		_entry_release = release
+		release.connect(unlock_entry_input, CONNECT_ONE_SHOT)
 
-func _unlock_entry_input() -> void:
+# The opening hold ends - a no-op once it has.
+func unlock_entry_input() -> void:
+	_drop_entry_release()
+	if not _entry_locked:
+		return
 	_entry_locked = false
 	entry_lock_changed.emit(false)
 	_emit_devour_changed()
+
+func _drop_entry_release() -> void:
+	if not _entry_release.is_null() and _entry_release.is_connected(unlock_entry_input):
+		_entry_release.disconnect(unlock_entry_input)
+	_entry_release = Signal()
 
 func is_entry_locked() -> bool:
 	return _entry_locked
@@ -454,7 +471,7 @@ func _refused_by_entry_hold(action: String) -> bool:
 	if not _entry_locked:
 		return false
 	if OS.is_debug_build():
-		push_warning("BattleController: %s refused - the battle-entry hold is on (RegionField.battle_input_unlock_time)." % action)
+		push_warning("BattleController: %s refused - the battle-entry hold is on (lock_entry_input(), until the Wanderer's draw strikes)." % action)
 	return true
 
 func request_play(card_view: CardView) -> void:
