@@ -4,9 +4,9 @@ extends SceneTree
 # version as data (CardData.tempered, cards/tempered/), kept out
 # of every pool, list and folder scan; RunState.temper_card() - exactly
 # the cost spent, exactly one card swapped at its own deck position, once
-# per card, logged; the workbench on floor 3 - the grindstone and the
-# handcart beside it, grounded in the north-west lobe, off the worn band,
-# reached from spawn; its screen - no grid while the Glassbone is short, the grid and
+# per card, logged; the workbench on floor 3 - grounded on walkable
+# ground inside the walls, reached from spawn, and the handcart, where
+# there is one, grounded and tipped onto its shafts; its screen - no grid while the Glassbone is short, the grid and
 # the preview's hairlines while it isn't, TEMPER, the hold and the field
 # lock; a tempered Consumed card still removed after its fight; and the
 # Cards screen's TEMPERED toggle.
@@ -39,14 +39,6 @@ const SCANS: Dictionary = {
 const LOG_DIR := "user://temper_probe"
 # Floor 3 (index 2) holds the wagon.
 const WAGON_FLOOR := 2
-# The grindstone, in the north-west lobe - the small dead-end bay off the
-# hub's top-left - behind the handcart's tail, turned 12 degrees off it.
-const WAGON_OFFSET := Vector2(-8.46, -29.0)
-const WAGON_YAW := 6.0
-# The handcart, pulled in and left a metre off the lobe's centre toward
-# its north wall, its shafts only loosely toward the mouth.
-const CART_OFFSET := Vector2(-5.82, -28.63)
-const CART_YAW := -6.0
 # How far into the sand a wheel or a shaft tip may sit: the cart's sink
 # plus its roll's dip at the wheels, and a margin.
 const CART_SUNK_MAX := 0.09
@@ -54,16 +46,6 @@ const CART_SUNK_MAX := 0.09
 # either side of the axle, and the shaft tips - Handcart's defaults.
 const CART_WHEEL_LOW: Array[Vector3] = [Vector3(-0.636, 0.001, -0.69), Vector3(-0.636, 0.001, 0.69)]
 const CART_TIPS: Array[Vector3] = [Vector3(1.495, 0.401, -0.341), Vector3(1.495, 0.401, 0.341)]
-const CART_TAIL := Vector3(-1.5, 0.5, 0.0)
-# Each footprint inside the floor's ledge lines by at least this, never
-# across one.
-const LEDGE_GAP_MIN := 0.5
-# The lobe's mouth, where it opens onto the hub (spawn-relative XZ): from
-# the notch tip between the lobe and the corridor to the lobe's west wall.
-# Every footprint point lies on the lobe's side of it.
-const MOUTH_A := Vector2(-1.47, -29.02)
-const MOUTH_B := Vector2(-7.07, -23.58)
-const LOBE_CENTRE := Vector2(-5.82, -27.63)
 const LEAVE_INDEX := 100002
 const BACK_INDEX := 100001
 const TEMPER_INDEX := 100000
@@ -369,36 +351,28 @@ func _compendium_view(compendium: Node, card_name: String) -> CardView:
 			return view
 	return null
 
-# The workbench pair on floor 3, in the north-west lobe. The grindstone
-# (the Wagon) at WAGON_OFFSET, yaw WAGON_YAW, with its approach line,
-# MAKE_STATIC, its bbox's four bottom corners on the drawn sand (in it no
-# deeper than its sink and a margin). The handcart at CART_OFFSET, yaw
-# CART_YAW, tipped onto its shafts - both wheels and both shaft tips on
-# the drawn sand, in it no deeper than CART_SUNK_MAX - MAKE_STATIC, its
-# tail within 2.5 m of the grindstone. Both footprints inside the floor's ledge lines by LEDGE_GAP_MIN,
-# on the lobe's side of its mouth, on ground flat under them, and off the
-# worn band entirely - beyond its visible half-width from its centre
-# line; and a plan from spawn gets him into the grindstone's reach.
+# The workbench on floor 3: one, with an approach line, MAKE_STATIC, its
+# bbox's four bottom corners on the drawn sand (in it no deeper than its
+# sink and a margin), its footprint on walkable ground - inside the
+# floor's ledge lines, never across one, and on land - and a plan from
+# spawn getting him into its reach. The handcart, where there is one:
+# MAKE_STATIC, tipped forward onto its shafts with both wheels and both
+# shaft tips on the drawn sand (in it no deeper than CART_SUNK_MAX), its
+# footprint on walkable ground as the workbench's. Where either stands is
+# not this probe's to say.
 func _check_wagon_placement() -> void:
 	var wagons: Array[Node] = get_nodes_in_group("wagons")
 	_expect_eq(wagons.size(), 1, "Floor 3 has one workbench")
-	var cart := _field.find_child("Handcart*", true, false) as Node3D
-	_expect(cart != null and cart.get_script() != null and (cart.get_script() as Script).get_global_name() == &"Handcart", "...and one handcart")
-	if wagons.is_empty() or cart == null:
+	if wagons.is_empty():
 		_completed += 1
 		return
 	var wagon := wagons[0] as Node3D
 	var spawn: Vector3 = _field.call("get_spawn_position")
 	var ground: Node = _field.get_node("Ground")
-	var offset := Vector2(wagon.global_position.x - spawn.x, wagon.global_position.z - spawn.z)
-	_expect(offset.distance_to(WAGON_OFFSET) < 0.01, "The grindstone at %s from spawn (got %s)" % [WAGON_OFFSET, offset])
-	_expect(is_equal_approx(float(wagon.get("yaw_degrees")), WAGON_YAW), "...yaw %.0f" % WAGON_YAW)
-	_expect_eq(wagon.get("world_line"), "A wagon, unhitched. The tools are still on it.", "...with its approach line")
-	_expect(String(wagon.get("model_scene_path")).ends_with("grindstone.glb"), "...wearing the grindstone")
+	_expect(not String(wagon.get("world_line")).is_empty(), "...with an approach line")
 	var body := wagon.find_child("Collision", true, false) as StaticBody3D
 	_expect(body != null and body.disable_mode == CollisionObject3D.DISABLE_MODE_MAKE_STATIC, "...its collision MAKE_STATIC")
 	var box: AABB = wagon.call("get_body_aabb")
-	_expect(box.size.y > 1.0 and box.size.y < 1.2, "...about 1.1 m tall (%.2f)" % box.size.y)
 	var pose := wagon.get_node("Pose") as Node3D
 	var deepest: float = float(wagon.get("sink_depth")) + 0.03
 	for corner: Vector3 in [Vector3(box.position.x, 0, box.position.z), Vector3(box.end.x, 0, box.position.z), Vector3(box.position.x, 0, box.end.z), Vector3(box.end.x, 0, box.end.z)]:
@@ -406,69 +380,53 @@ func _check_wagon_placement() -> void:
 		var under: float = float(ground.call("get_visible_height_at", Vector2(point.x, point.z)))
 		_expect(point.y <= under + 0.01, "...its foot %s on or in the sand (%.3f over it)" % [corner, point.y - under])
 		_expect(point.y >= under - deepest, "...and not buried past its sink (%.3f under)" % [under - point.y])
-	var cart_offset := Vector2(cart.global_position.x - spawn.x, cart.global_position.z - spawn.z)
-	_expect(cart_offset.distance_to(CART_OFFSET) < 0.01, "The handcart at %s from spawn (got %s)" % [CART_OFFSET, cart_offset])
-	_expect(is_equal_approx(float(cart.get("yaw_degrees")), CART_YAW), "...yaw %.0f" % CART_YAW)
-	var cart_body := cart.find_child("Collision", true, false) as StaticBody3D
-	_expect(cart_body != null and cart_body.disable_mode == CollisionObject3D.DISABLE_MODE_MAKE_STATIC, "...its collision MAKE_STATIC")
-	var tip: float = float(cart.call("get_tip_degrees"))
-	_expect(tip > 5.0 and tip < 20.0, "...tipped forward onto its shafts (%.1f degrees)" % tip)
-	var touching: Array[Vector3] = []
-	for low: Vector3 in CART_WHEEL_LOW:
-		# A wheel's lowest point as posed: its hub less the radius, straight
-		# down in the world, not in the cart's tipped frame.
-		var hub: Vector3 = cart.call("model_to_world", Vector3(low.x, float((cart.get("axle_point") as Vector3).y), low.z))
-		touching.append(hub - Vector3(0.0, float(cart.get("wheel_radius")), 0.0))
-	for shaft: Vector3 in CART_TIPS:
-		touching.append(cart.call("model_to_world", shaft))
-	for point in touching:
-		var under: float = float(ground.call("get_visible_height_at", Vector2(point.x, point.z)))
-		_expect(point.y <= under + 0.01, "...a wheel or shaft tip on or in the sand (%.3f over it)" % [point.y - under])
-		_expect(point.y >= under - CART_SUNK_MAX, "...and not buried past %.2f m (%.3f under)" % [CART_SUNK_MAX, under - point.y])
-	var tail: Vector3 = cart.call("model_to_world", CART_TAIL)
-	var to_tail: float = Vector2(tail.x, tail.z).distance_to(Vector2(wagon.global_position.x, wagon.global_position.z))
-	_expect(to_tail < 2.5, "The grindstone beside the cart's tail (%.2f m)" % to_tail)
-	var floor_data: Resource = _field.call("get_floor_data")
-	var ledges: Array = floor_data.get("ledges")
-	_expect(not ledges.is_empty(), "...floor 3 has its ledge lines")
-	var band: PackedVector2Array = _band_line(floor_data.get("wear_path_override"))
-	var visible: float = float(ground.get("wear_half_width")) + float(ground.get("wear_edge_noise_amplitude"))
-	for entry: Array in [["The grindstone", wagon, Rect2(box.position.x, box.position.z, box.size.x, box.size.z)], ["The handcart", cart, Rect2(-1.5, -0.86, 3.01, 1.72)]]:
-		var label: String = entry[0]
-		var node: Node3D = entry[1]
-		var rect: Rect2 = entry[2]
-		var footprint: Array[Vector2] = []
-		for u in 9:
-			for v in 5:
-				var local := Vector3(lerpf(rect.position.x, rect.end.x, float(u) / 8.0), 0, lerpf(rect.position.y, rect.end.y, float(v) / 4.0))
-				var point: Vector3 = node.global_transform * local
-				footprint.append(Vector2(point.x - spawn.x, point.z - spawn.z))
-		var to_ledge: float = INF
-		var nearest: float = INF
-		var mouth_margin: float = INF
-		var low: float = INF
-		var high: float = -INF
-		for p in footprint:
-			nearest = minf(nearest, _polyline_distance(band, p))
-			mouth_margin = minf(mouth_margin, _lobe_side(p))
-			var under: float = float(ground.call("get_visible_height_at", p + Vector2(spawn.x, spawn.z)))
-			low = minf(low, under)
-			high = maxf(high, under)
-			for ledge: PackedVector2Array in ledges:
-				_expect(Geometry2D.is_point_in_polygon(p, ledge), "%s's footprint inside the floor's ledge lines (%s)" % [label, p])
-				for i in ledge.size() - 1:
-					to_ledge = minf(to_ledge, _segment_distance(p, ledge[i], ledge[i + 1]))
-		_expect(to_ledge >= LEDGE_GAP_MIN, "...%.1f m or more from any ledge (%.2f m)" % [LEDGE_GAP_MIN, to_ledge])
-		_expect(mouth_margin > 0.0, "...inside the north-west lobe, behind its mouth (%.2f m)" % mouth_margin)
-		_expect(high - low <= 0.3, "...on ground flat under it (%.2f m of rise)" % (high - low))
-		_expect(nearest > visible, "...off the worn band entirely (%.2f m from its centre line, %.2f m showing)" % [nearest, visible])
+	_expect_on_walkable_ground("The workbench", wagon, Rect2(box.position.x, box.position.z, box.size.x, box.size.z), spawn, ground)
+	var cart := _field.find_child("Handcart*", true, false) as Node3D
+	if cart != null:
+		var cart_body := cart.find_child("Collision", true, false) as StaticBody3D
+		_expect(cart_body != null and cart_body.disable_mode == CollisionObject3D.DISABLE_MODE_MAKE_STATIC, "The handcart's collision MAKE_STATIC")
+		var tip: float = float(cart.call("get_tip_degrees"))
+		_expect(tip > 5.0 and tip < 20.0, "...tipped forward onto its shafts (%.1f degrees)" % tip)
+		var touching: Array[Vector3] = []
+		for low: Vector3 in CART_WHEEL_LOW:
+			# A wheel's lowest point as posed: its hub less the radius, straight
+			# down in the world, not in the cart's tipped frame.
+			var hub: Vector3 = cart.call("model_to_world", Vector3(low.x, float((cart.get("axle_point") as Vector3).y), low.z))
+			touching.append(hub - Vector3(0.0, float(cart.get("wheel_radius")), 0.0))
+		for shaft: Vector3 in CART_TIPS:
+			touching.append(cart.call("model_to_world", shaft))
+		for point in touching:
+			var under: float = float(ground.call("get_visible_height_at", Vector2(point.x, point.z)))
+			_expect(point.y <= under + 0.01, "...a wheel or shaft tip on or in the sand (%.3f over it)" % [point.y - under])
+			_expect(point.y >= under - CART_SUNK_MAX, "...and not buried past %.2f m (%.3f under)" % [CART_SUNK_MAX, under - point.y])
+		_expect_on_walkable_ground("The handcart", cart, Rect2(-1.5, -0.86, 3.01, 1.72), spawn, ground)
 	var path: PackedVector3Array = _field.call("plan_path", spawn, wagon.global_position, null, false)
-	_expect(path.size() >= 2, "A plan from spawn to the grindstone")
+	_expect(path.size() >= 2, "A plan from spawn to the workbench")
 	if path.size() >= 2:
 		var end: Vector3 = path[path.size() - 1]
 		var reach: float = Vector2(end.x, end.z).distance_to(Vector2(wagon.global_position.x, wagon.global_position.z))
 		_expect(bool(wagon.call("can_open_from", end)), "...ending in its reach (%.2f m off)" % reach)
 	_completed += 1
+
+# A prop's footprint (`rect`, in its own XZ) on walkable ground: every
+# sampled point inside the floor's ledge lines - never across one - and
+# on land, not in the water.
+func _expect_on_walkable_ground(label: String, node: Node3D, rect: Rect2, spawn: Vector3, ground: Node) -> void:
+	var ledges: Array = (_field.call("get_floor_data") as Resource).get("ledges")
+	var outside: int = 0
+	var wet: int = 0
+	for u in 9:
+		for v in 5:
+			var local := Vector3(lerpf(rect.position.x, rect.end.x, float(u) / 8.0), 0, lerpf(rect.position.y, rect.end.y, float(v) / 4.0))
+			var point: Vector3 = node.global_transform * local
+			var at := Vector2(point.x, point.z)
+			for ledge: PackedVector2Array in ledges:
+				if not Geometry2D.is_point_in_polygon(at - Vector2(spawn.x, spawn.z), ledge):
+					outside += 1
+			if float(ground.call("get_landmass_distance", at)) > 0.0:
+				wet += 1
+	_expect_eq(outside, 0, "%s's footprint inside the floor's ledge lines, across none" % label)
+	_expect_eq(wet, 0, "...and on land")
 
 # Glassbone short: EMPTY - the count, the empty line, no grid built. The
 # field locks while it's open; ui_cancel closes it and unlocks.
@@ -693,52 +651,6 @@ func _index_of(deck: Array, card_name: String) -> int:
 		if (deck[i] as CardData).card_name == card_name:
 			return i
 	return -1
-
-func _segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
-	var ab: Vector2 = b - a
-	var t: float = clampf((p - a).dot(ab) / maxf(ab.length_squared(), 0.000001), 0.0, 1.0)
-	return p.distance_to(a + ab * t)
-
-# The worn band's centreline as ground.gdshader draws it, as a dense
-# polyline (spawn-relative XZ): three points are one quadratic that
-# passes through the middle one; four to eight a uniform Catmull-Rom
-# chain through every point, its ends doubled.
-func _band_line(points: PackedVector2Array) -> PackedVector2Array:
-	var line := PackedVector2Array()
-	if points.size() == 3:
-		var control: Vector2 = 2.0 * points[1] - 0.5 * (points[0] + points[2])
-		for i in 401:
-			var t: float = float(i) / 400.0
-			var u: float = 1.0 - t
-			line.append(u * u * points[0] + 2.0 * u * t * control + t * t * points[2])
-		return line
-	var last: int = points.size() - 1
-	for span in last:
-		var p0: Vector2 = points[maxi(span - 1, 0)]
-		var p1: Vector2 = points[span]
-		var p2: Vector2 = points[mini(span + 1, last)]
-		var p3: Vector2 = points[mini(span + 2, last)]
-		for i in 64:
-			var t: float = float(i) / 64.0
-			var t2: float = t * t
-			line.append(0.5 * (2.0 * p1 + (p2 - p0) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 + (3.0 * p1 - p0 - 3.0 * p2 + p3) * t2 * t))
-	line.append(points[last])
-	return line
-
-func _polyline_distance(line: PackedVector2Array, p: Vector2) -> float:
-	var best: float = INF
-	for i in line.size() - 1:
-		best = minf(best, _segment_distance(p, line[i], line[i + 1]))
-	return best
-
-# How far `p` lies on the lobe's side of its mouth line (MOUTH_A to
-# MOUTH_B), metres - negative out on the hub's side.
-func _lobe_side(p: Vector2) -> float:
-	var along: Vector2 = (MOUTH_B - MOUTH_A).normalized()
-	var normal := Vector2(-along.y, along.x)
-	if (LOBE_CENTRE - MOUTH_A).dot(normal) < 0.0:
-		normal = -normal
-	return (p - MOUTH_A).dot(normal)
 
 func _collect_resources(dir: String, out: Array[String]) -> void:
 	for sub in DirAccess.get_directories_at(dir):

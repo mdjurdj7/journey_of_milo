@@ -2,11 +2,12 @@ extends SceneTree
 
 # Headless probe for the worn band's centreline (Ground.set_wear_path(),
 # RegionField._aim_wear_path()): what each floor hands the ground shader.
-# Floors 1 and 2 derive their three points (spawn, past the first enemy,
-# the gate) - the one three-point curve. Floor 3 overrides with its own
-# chain, from spawn through the crane pair to the exit, handed over whole
-# and in order, as any longer override (4 to 8 points) is, for the
-# shader's chain through every point; past 8 the rest are dropped. Headless has no renderer, so this reads the
+# A floor with no override derives three points (spawn, past the first
+# enemy, the gate) - the one three-point curve; one with an override has
+# it handed over whole and in order, for the shader's chain through every
+# point. On a floor with ledge lines the band drawn stays inside them. A
+# longer override (4 to 8 points) is handed over whole; past 8 the rest
+# are dropped. Headless has no renderer, so this reads the
 # shader parameters RegionField pushed, not the pixels.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/wear_path_probe.gd
@@ -45,29 +46,59 @@ func _initialize() -> void:
 		print("wear_path_probe: %d FAILED" % _failures)
 		quit(1)
 
-# Floors 1 and 2: three points each, from spawn to their gate, the one
-# curve as ever. Floor 3: its own override, every point of it, in order.
+# Floors 1-3: no override, the derived three points from spawn to the
+# gate; an override, every point of it, in order. Where ledge lines are,
+# the band's curve stays inside them.
 func _check_three_point_floors() -> void:
-	for index in 2:
+	for index in 3:
 		await _load_field(index)
-		var points: PackedVector2Array = _points()
-		_expect_eq(_count(), 3, "Floor %d: a three-point band" % (index + 1))
+		var floor_data: Resource = _field.call("get_floor_data")
+		var override: PackedVector2Array = floor_data.get("wear_path_override")
 		var spawn: Vector3 = _field.call("get_spawn_position")
-		_expect(points.size() == MAX_POINTS and points[0].is_equal_approx(Vector2(spawn.x, spawn.z)), "...starting at spawn")
-		var gate: Node3D = _field.get_node("ExitGate")
-		_expect(points[2].is_equal_approx(Vector2(gate.global_position.x, gate.global_position.z)), "...ending at the gate")
+		var points: PackedVector2Array = _points()
+		if override.size() >= 3:
+			_expect_eq(_count(), mini(override.size(), MAX_POINTS), "Floor %d: its override handed over whole" % (index + 1))
+			for i in mini(override.size(), MAX_POINTS):
+				_expect(points[i].is_equal_approx(Vector2(spawn.x + override[i].x, spawn.z + override[i].y)), "...point %d where it was put" % i)
+		else:
+			_expect_eq(_count(), 3, "Floor %d: a derived three-point band" % (index + 1))
+			_expect(points[0].is_equal_approx(Vector2(spawn.x, spawn.z)), "...starting at spawn")
+			var gate: Node3D = _field.get_node("ExitGate")
+			_expect(points[2].is_equal_approx(Vector2(gate.global_position.x, gate.global_position.z)), "...ending at the gate")
+		var ledges: Array = floor_data.get("ledges")
+		var outside: int = 0
+		for p in _drawn_curve(points.slice(0, _count())):
+			for ledge: PackedVector2Array in ledges:
+				if not Geometry2D.is_point_in_polygon(p - Vector2(spawn.x, spawn.z), ledge):
+					outside += 1
+		_expect_eq(outside, 0, "Floor %d: the band's curve inside the floor's ledge lines" % (index + 1))
 		await _teardown()
-	await _load_field(2)
-	var floor_data: Resource = _field.call("get_floor_data")
-	var override: PackedVector2Array = floor_data.get("wear_path_override")
-	var spawn_3: Vector3 = _field.call("get_spawn_position")
-	var drawn: PackedVector2Array = _points()
-	_expect(override.size() >= 3 and override.size() <= MAX_POINTS, "Floor 3: its own override, %d points" % override.size())
-	_expect_eq(_count(), override.size(), "...handed over whole")
-	for i in override.size():
-		_expect(drawn[i].is_equal_approx(Vector2(spawn_3.x + override[i].x, spawn_3.z + override[i].y)), "...point %d where it was put" % i)
-	await _teardown()
 	_completed += 1
+
+# The band's centreline as ground.gdshader draws it (world XZ): three
+# points one quadratic through the middle one, four to eight a uniform
+# Catmull-Rom chain through every point, its ends doubled.
+func _drawn_curve(points: PackedVector2Array) -> PackedVector2Array:
+	var line := PackedVector2Array()
+	if points.size() == 3:
+		var control: Vector2 = 2.0 * points[1] - 0.5 * (points[0] + points[2])
+		for i in 201:
+			var t: float = float(i) / 200.0
+			var u: float = 1.0 - t
+			line.append(u * u * points[0] + 2.0 * u * t * control + t * t * points[2])
+		return line
+	var last: int = points.size() - 1
+	for span in last:
+		var p0: Vector2 = points[maxi(span - 1, 0)]
+		var p1: Vector2 = points[span]
+		var p2: Vector2 = points[mini(span + 1, last)]
+		var p3: Vector2 = points[mini(span + 2, last)]
+		for i in 40:
+			var t: float = float(i) / 40.0
+			var t2: float = t * t
+			line.append(0.5 * (2.0 * p1 + (p2 - p0) * t + (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 + (3.0 * p1 - p0 - 3.0 * p2 + p3) * t2 * t))
+	line.append(points[last])
+	return line
 
 # A seven-point override reaches the shader whole, in order.
 func _check_long_override() -> void:

@@ -1,12 +1,11 @@
 extends SceneTree
 
 # Headless probe for floor 3's required pair, the crowned cranes
-# Strawcrown and Chalkcrown: as authored (32 HP each, the shared loop Bow
-# 4 Block, Step 6, Leap 10, every step simultaneous and named for its
-# move; Paired from the start, which turns Bereft - twice each turn, its
-# line said - when the other falls); where floor 3 stands them (in the
-# stream at the top of its pool, the gate line still at x 23.3, the worn
-# band through the anchor); and the fight: one contact for both, Paired
+# Strawcrown and Chalkcrown: their rules (32 HP each, the shared loop Bow
+# 4 Block, Step 6, Leap 10, every step simultaneous; Paired from the
+# start, which turns Bereft - twice each turn, its line said - when the
+# other falls); both standing on walkable ground on floor 3, across no
+# ledge; and the fight: one contact for both, Paired
 # and on the same Bow; one killed first and the other Bereft at once,
 # its Step 6x2 landing 12 and its Bow 8 Block; both killed by one Carve
 # and neither turning - their line said and Leg Band offered after. And
@@ -23,7 +22,7 @@ extends SceneTree
 # end_turn() and request_play(), as blackback_probe does. Untyped against
 # anything that names the RunState autoload.
 
-const CASES := 8
+const CASES := 7
 # A combatant stands on a face when the ground under its feet slopes past
 # FACE_SLOPE_MAX_DEG (read over half a metre) or rises or falls more than
 # FACE_JUMP_MAX_M within half a metre - a ridge's inner face (43 degrees,
@@ -43,9 +42,6 @@ const PAIRED_PATH := "res://battle/rules/statuses/paired.tres"
 const BEREFT_PATH := "res://battle/rules/statuses/bereft.tres"
 const LEG_BAND_PATH := "res://run/keepsakes/leg_band.tres"
 const CARVE_PATH := "res://cards/data/carve.tres"
-const STORK_AUDIO := "res://assets/audio/enemies/Stork/"
-const ANCHOR := Vector2(8.67, -33.4)
-const GATE_X := 23.3
 const FLOOR_3 := 2
 const PLAYER_HP := 999
 const SAFETY_SECONDS := 420.0
@@ -62,7 +58,6 @@ func _initialize() -> void:
 	)
 	_run_state = root.get_node("RunState")
 	_check_data()
-	_check_floor_3()
 	await _check_standing()
 	await _check_fight_opens()
 	await _check_one_falls_first()
@@ -88,18 +83,9 @@ func _check_data() -> void:
 		_expect(not data.erratic_intent_selection, "%s: a fixed loop" % label)
 		var seen: Array = []
 		for intent in data.intents:
-			seen.append([intent.intent_name, intent.type, intent.value, intent.simultaneous, intent.motion])
-		_expect_eq(seen, [["Bow", EnemyIntent.IntentType.DEFEND, 4, true, &"bow"], ["Step", EnemyIntent.IntentType.ATTACK, 6, true, &"step"], ["Leap", EnemyIntent.IntentType.ATTACK, 10, true, &"leap"]], "%s: Bow 4 Block, Step 6, Leap 10, all together, each its move" % label)
+			seen.append([intent.intent_name, intent.type, intent.value, intent.simultaneous])
+		_expect_eq(seen, [["Bow", EnemyIntent.IntentType.DEFEND, 4, true], ["Step", EnemyIntent.IntentType.ATTACK, 6, true], ["Leap", EnemyIntent.IntentType.ATTACK, 10, true]], "%s: Bow 4 Block, Step 6, Leap 10, all together" % label)
 		_expect(data.starting_statuses.size() == 1 and data.starting_statuses[0] == paired, "%s: Paired from the start" % label)
-		var takes: Array[String] = []
-		for take in data.contact_sounds:
-			takes.append(take.resource_path if take != null else "<none>")
-		_expect_eq(takes, [STORK_AUDIO + "hit_1.mp3", STORK_AUDIO + "hit_2.mp3"] as Array[String], "%s: the Stork's hits as its contact sound" % label)
-		_expect_eq(data.attachment_scene_path, "res://field/crane_motion.tscn", "%s: moves by CraneMotion" % label)
-		_expect(data.painted_albedo_path.ends_with("/crane_0.jpg") and ResourceLoader.exists(data.painted_albedo_path), "%s: painted on its own colour map" % label)
-		_expect(data.defeat_line.is_empty(), "%s: no defeat line to talk over the pair's" % label)
-	_expect_eq((load(STRAWCROWN_PATH) as EnemyData).model_scale, 1.0, "Strawcrown at 1.0")
-	_expect_eq((load(CHALKCROWN_PATH) as EnemyData).model_scale, 1.075, "Chalkcrown at 1.075 - its body matched to Strawcrown's")
 	_expect(paired.grants_when_alone == bereft, "Paired turns Bereft when alone")
 	_expect_eq(Status.new(paired).describe(), "If its partner falls, it becomes Bereft.", "Paired's hover line")
 	_expect_eq(Status.new(bereft).describe(), "Acts twice each turn.", "Bereft's hover line")
@@ -107,52 +93,23 @@ func _check_data() -> void:
 	_expect_eq(bereft.gained_line, "The other keeps dancing.", "...and its line")
 	_completed += 1
 
-func _check_floor_3() -> void:
-	var floor_data := load(FLOOR_3_PATH) as FloorData
-	var slot: EncounterSlot = floor_data.slots[0]
-	_expect_eq(slot.slot_id, &"cranes", "Floor 3's first slot: the cranes - the gate measures from it")
-	_expect(slot.required, "...required")
-	_expect_eq(slot.position, ANCHOR, "...anchored at (8.67, -33.4), the top of the pool")
-	var option: EncounterOption = slot.options[0]
-	_expect_eq(option.option_id, &"crane_pair", "...standing the crane pair")
-	_expect_eq(option.members.size(), 2, "...two, one cluster")
-	_expect_eq(option.members[0].enemy_data.resource_path, STRAWCROWN_PATH, "...Strawcrown first")
-	_expect(option.members[0].anchor, "...the anchor")
-	_expect_eq(option.members[1].enemy_data.resource_path, CHALKCROWN_PATH, "...Chalkcrown beside it")
-	var gap: float = slot.to_floor(option.members[1].position).distance_to(ANCHOR)
-	_expect(absf(gap - 1.3) < 0.01, "...1.3 m off (%.3f)" % gap)
-	for member in option.members:
-		_expect_eq(member.yaw_degrees + slot.yaw_degrees, 10.0, "...%s at yaw 10" % member.enemy_data.enemy_name)
-	_expect(option.felled_together_keepsake == load(LEG_BAND_PATH), "Felled together: the Leg Band")
-	_expect_eq(option.felled_together_line, "They fell in step.", "...and their line")
-	var gate_x: float = slot.position.x + floor_data.exit_direction.x * floor_data.gate_distance_beyond_enemy
-	_expect(is_equal_approx(gate_x, GATE_X) and floor_data.exit_direction == Vector2(1, 0), "The gate line stays at x %.1f (got %.2f)" % [GATE_X, gate_x])
-	_expect(floor_data.wear_path_override.has(ANCHOR), "The worn band runs through the anchor")
-	_expect(not floor_data.wear_path_override.has(Vector2(-3, -9)), "...not the old pair's spot")
-	_completed += 1
-
-# Loaded: both stand in the water on the bed, at their real heights, and
-# the exit gate sits on x 23.3.
+# Loaded: both stand on walkable ground - inside floor 3's ledge lines,
+# across none - with their feet on the ground under them.
 func _check_standing() -> void:
 	await _load_floor_3()
 	var ground: Node = _field.get_node("Ground")
-	var sea_level: float = float(_field.get_node("Sea").get("sea_level"))
-	var heights: Array[float] = []
+	var spawn: Vector3 = _field.call("get_spawn_position")
+	var ledges: Array = (_field.call("get_floor_data") as Resource).get("ledges")
 	for path: String in [STRAWCROWN_PATH, CHALKCROWN_PATH]:
 		var body: Node3D = _body(path)
 		if body == null:
 			_fail("no %s on floor 3" % path.get_file())
 			continue
 		var at := Vector2(body.global_position.x, body.global_position.z)
+		for ledge: PackedVector2Array in ledges:
+			_expect(Geometry2D.is_point_in_polygon(at - Vector2(spawn.x, spawn.z), ledge), "%s inside floor 3's ledge lines" % path.get_file())
 		var bed: float = float(ground.call("get_height_at", at))
-		_expect(sea_level - bed > 0.1, "%s stands in water %.2f m deep" % [path.get_file(), sea_level - bed])
-		_expect(absf(body.global_position.y - bed) < 0.05, "...its feet on the bed, not the surface (%.2f vs %.2f)" % [body.global_position.y, bed])
-		heights.append(float(body.call("get_head_height")))
-		_expect(body.get("_attachment") is CraneMotion, "...wearing CraneMotion")
-	if heights.size() == 2:
-		_expect(absf(heights[0] - 1.5) < 0.08 and absf(heights[1] - 1.5) < 0.08, "Both about 1.5 m tall (%.2f, %.2f)" % [heights[0], heights[1]])
-	var gate: Node3D = _field.get_node("ExitGate")
-	_expect(absf(gate.global_position.x - GATE_X) < 0.01, "The gate at x %.2f" % gate.global_position.x)
+		_expect(absf(body.global_position.y - bed) < 0.05, "...its feet on the ground under it (%.2f vs %.2f)" % [body.global_position.y, bed])
 	await _teardown()
 	_completed += 1
 

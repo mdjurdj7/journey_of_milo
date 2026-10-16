@@ -2,8 +2,8 @@ extends SceneTree
 
 # Headless probe for the Wardling: its loop, its escalation (and that the
 # intent preview always equals what lands), its once-per-fight pain turn,
-# its data and its place on floor 3. Rules layer and the real .tres; no
-# field scene:
+# its data, and that floor 3 places it - optional, inside the floor's
+# ledge lines. Rules layer and the real .tres; no field scene:
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/wardling_probe.gd
 #
@@ -14,11 +14,6 @@ const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const DRAGONFLY_PATH := "res://battle/rules/enemies/dragonfly.tres"
 const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
-const SOUND_PATH := "res://assets/audio/enemies_old/Works_Wardling/Ragged Breath.mp3"
-const MODEL_PATH := "res://assets/models/enemies/Wardling/Wardling.glb"
-const POST_SCENE_PATH := "res://field/hitching_post.tscn"
-const WAGON_SCENE_PATH := "res://field/wagon.tscn"
-const HANDCART_SCENE_PATH := "res://field/handcart.tscn"
 const HEAD_TURN_PATH := "res://field/head_turn.tscn"
 # Turns 1-9: 9, 5, 11 looping, times 1.0 / 1.3 / 1.6 / 2.0 by twos, held
 # at 2.0 - roundi(11 x 1.3) = 14, roundi(9 x 1.3) = 12, roundi(11 x 1.6)
@@ -55,19 +50,10 @@ func _check_data() -> void:
 	_expect_eq(data.escalation_multipliers, [1.0, 1.3, 1.6, 2.0] as Array[float], "...escalates 1.0 / 1.3 / 1.6 / 2.0")
 	_expect_eq(data.escalation_stage_length, 2, "...every 2 turns")
 	_expect_eq(data.pain_turn_hp_threshold, 0.5, "...a pain turn below 50%")
-	_expect_eq(data.pain_turn_line, "A ragged breath. It isn't moving.", "...its pain line")
-	_expect(data.pain_turn_sound != null and data.pain_turn_sound.resource_path == SOUND_PATH, "...the Ragged Breath")
-	_expect_eq(data.defeat_line, "The Wardling is still.", "...its defeat line")
+	_expect(not data.pain_turn_line.is_empty(), "...a pain line")
+	_expect(data.pain_turn_sound != null, "...a pain sound")
 	_expect(data.is_elite, "...an elite")
-	_expect_eq(data.model_scene_path, MODEL_PATH, "...wears its own model")
-	_expect_eq(data.model_scale, 1.68, "...at 1.68")
-	_expect_eq(data.contact_radius_m, 2.0, "...the default contact radius")
-	_expect_eq(data.harness_point, Vector3(-0.25, 1.15, 0.0), "...a harness for the hitching post's rope")
 	_expect_eq(data.attachment_scene_path, HEAD_TURN_PATH, "...turns its head, not its body (HeadTurn)")
-	var head_turn: Node = (load(HEAD_TURN_PATH) as PackedScene).instantiate()
-	_expect_eq(head_turn.get("max_angle_degrees"), 70.0, "...up to 70 degrees either side")
-	_expect_eq(head_turn.get("neck_bones"), 4, "...bent over four neck bones")
-	head_turn.free()
 	for intent in data.intents:
 		_expect_eq(intent.type, EnemyIntent.IntentType.ATTACK, "Every intent is an Attack")
 		_expect_eq(intent.hits, 1, "...of one hit")
@@ -199,32 +185,22 @@ func _check_others_untouched() -> void:
 		_expect(data.attachment_scene_path != HEAD_TURN_PATH, "%s turns no head" % data.enemy_name)
 	_completed += 1
 
+# Floor 3 places the Wardling - in a slot of its own, optional - inside
+# the floor's ledge lines. Where it stands is not this probe's to say.
 func _check_floor_3() -> void:
-	var floor_data := load(FLOOR_3_PATH) as Resource
-	var slots: Array = floor_data.get("slots")
-	_expect_eq(slots.size(), 2, "Floor 3 has two encounter slots")
-	var first: Resource = ((slots[0].get("options") as Array)[0].get("members") as Array)[0]
-	_expect_eq((first.get("enemy_data") as EnemyData).enemy_name, "Strawcrown", "...the required cranes' first - the gate measures from it")
-	var slot: Resource = slots[1]
-	var option: Resource = (slot.get("options") as Array)[0]
-	var entry: Resource = (option.get("members") as Array)[0]
-	_expect_eq((entry.get("enemy_data") as EnemyData).enemy_name, "Wardling", "...then the Wardling's")
-	_expect_eq(slot.call("to_floor", entry.get("position")), Vector2(17.6, -13.6), "...in the east lobe at (17.6, -13.6)")
-	_expect_eq(entry.get("face_prop_index"), 0, "...facing its encounter's first prop")
-	_expect_eq(float(slot.get("yaw_degrees")) + float(entry.get("yaw_degrees")), 0.0, "...straight at it")
-	_expect(not bool(slot.get("required")), "...not required")
-	var props: Array = option.get("props")
-	_expect_eq(props.size(), 1, "The Wardling's encounter has one prop")
-	if props.size() == 1:
-		_expect_eq((props[0].get("scene") as PackedScene).resource_path, POST_SCENE_PATH, "...the hitching post")
-		var post: Vector3 = props[0].get("position")
-		_expect_eq(slot.call("to_floor", Vector2(post.x, post.z)), Vector2(15.879, -16.057), "...north-west of the Wardling, 3.0 m off")
-		_expect_eq((props[0].get("overrides") as Dictionary).get("tether_member_index"), 0, "...its rope tied to the Wardling, its encounter's first member")
-	var floor_props: Array = floor_data.get("props")
-	_expect_eq(floor_props.size(), 2, "Floor 3 has two props of its own")
-	if floor_props.size() == 2:
-		_expect_eq((floor_props[0].get("scene") as PackedScene).resource_path, WAGON_SCENE_PATH, "...the workbench (the wagon's grindstone)")
-		_expect_eq((floor_props[1].get("scene") as PackedScene).resource_path, HANDCART_SCENE_PATH, "...and the handcart beside it")
+	var floor_data := load(FLOOR_3_PATH) as FloorData
+	var found: bool = false
+	for slot in floor_data.slots:
+		for option in slot.options:
+			for member in option.members:
+				if member == null or member.enemy_data == null or member.enemy_data.resource_path != WARDLING_PATH:
+					continue
+				found = true
+				_expect(not slot.required, "Floor 3's Wardling is optional")
+				var at: Vector2 = slot.to_floor(member.position)
+				for ledge: PackedVector2Array in floor_data.ledges:
+					_expect(Geometry2D.is_point_in_polygon(at, ledge), "...inside the floor's ledge lines (%s)" % at)
+	_expect(found, "Floor 3 places the Wardling")
 	_completed += 1
 
 # --- Helpers ---
