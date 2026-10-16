@@ -38,6 +38,8 @@ const GOADED_CAP := 3
 const LASH := 4
 const LASH_HITS := 3
 const PLAYER_HP := 999
+# The band over the body's own feet its mesh counts as its feet in, metres.
+const FEET_BAND_M := 0.08
 # The body: 5 m long; the top of its back, belly sunk on the rock, about
 # the Wanderer's waist-to-chest (measured and printed).
 const LENGTH_M := 5.0
@@ -352,8 +354,8 @@ func _check_fight_phase() -> void:
 			_expect(at.length() < 0.05, "...at its landing spot (%.2f m off)" % at.length())
 			var frame_after: Vector3 = camera.get("_battle_last_forward")
 			_expect(frame_after.angle_to(frame_before) > deg_to_rad(5.0), "...and the battle frame turned to it (%.1f degrees)" % rad_to_deg(frame_after.angle_to(frame_before)))
-			var into: float = _deepest_into_rock(greyshelf)
-			_expect(into < 0.0, "...on open sand, clear of its rock (%+.2f m into it)" % into)
+			var into: float = _feet_into_rock(greyshelf)
+			_expect(into < 0.0, "...its feet on open sand, clear of its rock (%+.2f m into it)" % into)
 		_expect_eq(_intent_text(controller, greyshelf), "4×4", "...the Tail Lash reads 4×4")
 		var player: Combatant = controller.get("player")
 		var before: int = player.hp
@@ -410,10 +412,10 @@ func _check_body() -> void:
 
 # --- Helpers ---
 
-# How far the body's outline seen from above (FieldEnemy._model_outline,
-# body-local XZ) reaches into its rock's collision box, metres - below 0
-# when the whole outline is clear of it. INF with no rock.
-func _deepest_into_rock(body: Node3D) -> float:
+# How far the body's feet - its mesh within FEET_BAND_M of its own feet -
+# reach into its rock's collision box, metres; below 0 when every foot is
+# clear of it. INF with no rock or no mesh.
+func _feet_into_rock(body: Node3D) -> float:
 	var props: Node = _field.get_node_or_null("Props")
 	var box: CollisionShape3D = null
 	if props != null:
@@ -425,11 +427,18 @@ func _deepest_into_rock(body: Node3D) -> float:
 		return INF
 	var size: Vector3 = (box.shape as BoxShape3D).size
 	var deepest: float = -INF
-	for point in (body.get("_model_outline") as PackedVector2Array):
-		var world: Vector3 = body.global_transform * Vector3(point.x, 0.0, point.y)
-		var local: Vector3 = box.global_transform.affine_inverse() * world
-		deepest = maxf(deepest, minf(size.x * 0.5 - absf(local.x), size.z * 0.5 - absf(local.z)))
-	return deepest
+	for node in body.find_children("*", "MeshInstance3D", true, false):
+		var mi := node as MeshInstance3D
+		if mi.mesh == null or mi.mesh.get_surface_count() == 0:
+			continue
+		var vertices: PackedVector3Array = mi.mesh.surface_get_arrays(0)[Mesh.ARRAY_VERTEX]
+		for vertex in vertices:
+			var world: Vector3 = mi.global_transform * vertex
+			if world.y - body.global_position.y > FEET_BAND_M:
+				continue
+			var local: Vector3 = box.global_transform.affine_inverse() * world
+			deepest = maxf(deepest, minf(size.x * 0.5 - absf(local.x), size.z * 0.5 - absf(local.z)))
+	return deepest if deepest > -INF else INF
 
 func _greyshelf() -> EnemyData:
 	return load(GREYSHELF_PATH) as EnemyData

@@ -370,6 +370,11 @@ var _contact_shadow: ContactShadow = null
 # phase, and the world XZ it lands on (Y unused).
 var has_phase_drop: bool = false
 var phase_drop_spot: Vector3 = Vector3.ZERO
+# FloorEnemy.phase_drop_frame_offset resolved the same way: whether the
+# frame after the drop is fitted somewhere other than where it lands, and
+# where (world XZ; Y unused).
+var has_phase_drop_frame: bool = false
+var phase_drop_frame_spot: Vector3 = Vector3.ZERO
 # Dropped this fight (drop_off()), and the height it lay at before - what
 # an escape climbs back to (return_to_field_pose()).
 var _dropped: bool = false
@@ -1422,6 +1427,14 @@ func drop_off(face_point: Vector3) -> void:
 	tween.tween_callback(func() -> void:
 		spawn_sand_puff(phase_drop_puff_particles, phase_drop_puff_lifetime, phase_drop_puff_velocity, phase_drop_puff_spread_degrees, phase_drop_puff_tint)
 		face_toward_point(face_point, phase_drop_turn_seconds))
+
+# Where CameraRig's battle frame takes this body to stand: its own
+# position, or - once it has dropped, with a frame spot set - that spot,
+# at its own height (FloorEnemy.phase_drop_frame_offset).
+func get_frame_position() -> Vector3:
+	if _dropped and has_phase_drop_frame:
+		return Vector3(phase_drop_frame_spot.x, global_position.y, phase_drop_frame_spot.z)
+	return global_position
 
 # Whether it has dropped off its rock this fight (drop_off()).
 func has_dropped() -> bool:

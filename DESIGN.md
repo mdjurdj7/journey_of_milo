@@ -559,7 +559,10 @@ folder (run_log_probe). (2026-10-04.)
   needs the room. Its contact area is 4.4 m, so the rock's front edge
   (4.2 m ahead of it) never stops the Wanderer short of contact. Off the
   rock at half HP, it steps
-  off the rock's camera side onto the sand (`FloorEnemy.phase_drop_offset`)
+  off the rock's camera side onto the sand at its foot, toward the
+  Wanderer (`FloorEnemy.phase_drop_offset`), the frame fitted as if it
+  stood further out (`phase_drop_frame_offset`) so it reads as just off
+  the rock
   and turns to the Wanderer; an escape climbs it back. Its
   `contact_sounds` borrow `combat_old/hit.wav`, as the Dunecur and the
   Wardling do. It wears the painted shader on its own colour map

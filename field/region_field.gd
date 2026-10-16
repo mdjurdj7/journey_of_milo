@@ -1421,6 +1421,10 @@ func _spawn_floor_enemies() -> void:
 				var land: Vector2 = slot.to_floor(entry.position + entry.phase_drop_offset)
 				enemy.has_phase_drop = true
 				enemy.phase_drop_spot = Vector3(spawn.x + land.x, 0.0, spawn.z + land.y)
+				if entry.phase_drop_frame_offset != Vector2.ZERO:
+					var framed_at: Vector2 = slot.to_floor(entry.position + entry.phase_drop_frame_offset)
+					enemy.has_phase_drop_frame = true
+					enemy.phase_drop_frame_spot = Vector3(spawn.x + framed_at.x, 0.0, spawn.z + framed_at.y)
 			var at: Vector2 = slot.to_floor(entry.position)
 			enemy.position = Vector3(spawn.x + at.x, 0.0, spawn.z + at.y)
 			enemy.rotation.y = deg_to_rad(slot.yaw_degrees + entry.yaw_degrees)

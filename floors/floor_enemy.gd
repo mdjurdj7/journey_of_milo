@@ -39,6 +39,13 @@ class_name FloorEnemy
 # and the battle frame refits to where it stands. Rules unchanged. ZERO =
 # it stays where it lies.
 @export var phase_drop_offset: Vector2 = Vector2.ZERO
+# Where the battle frame is fitted to once it has dropped, in the same
+# frame as phase_drop_offset: the camera framed as if the body stood there
+# (FieldEnemy.get_frame_position()) while it lands at phase_drop_offset -
+# so a landing tucked in against what it came off keeps the frame it
+# would have had further out. Floor 5's Greyshelf: framed from out on the
+# sand, landed at the rock's foot. ZERO = framed where it lands.
+@export var phase_drop_frame_offset: Vector2 = Vector2.ZERO
 # This member's fight framed by rule (FieldEnemy.battle_frame_screen,
 # CameraRig): x the screen-width fraction the Wanderer stands at, y the
 # furthest left its snout comes - the frame widened past that only to fit

@@ -474,7 +474,7 @@ func _battle_bodies() -> Array[BattleBody]:
 		if not is_instance_valid(enemy):
 			continue
 		var body := BattleBody.new()
-		body.position = enemy.global_position
+		body.position = enemy.get_frame_position()
 		body.feet_y = body.position.y + enemy.model_ground_offset
 		body.head_y = body.feet_y + enemy.get_head_height()
 		body.half_width = enemy.get_half_width()
