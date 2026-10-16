@@ -135,6 +135,10 @@ func _check_hud() -> void:
 	root.add_child(_field)
 	for i in 3:
 		await process_frame
+	# The arrival hold swallows presses at first (RegionField.
+	# arrival_hold_seconds).
+	while bool(_field.call("is_arrival_held")):
+		await process_frame
 	var line := _field.get_node_or_null("FieldHUD/KeepsakeLine") as Control
 	if line == null:
 		_fail("The field HUD has no KeepsakeLine")

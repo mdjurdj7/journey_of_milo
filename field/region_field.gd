@@ -156,6 +156,11 @@ enum RewardMode { SCREEN, WORLD }
 # The fade to the fog colour, and the fade back on the new floor - each
 # this long (FloorFade).
 @export var fade_seconds: float = 0.8
+# The arrival hold: once a floor has faded in (or the zone intro has
+# finished, or at load when neither runs), the player's input stays
+# locked this long while the world runs on - every floor alike, so it
+# never marks one out. Read live through the hold (is_arrival_held()).
+@export var arrival_hold_seconds: float = 1.0
 # A WorldCard lying on the sand (a FloorProp whose scene is world_card.
 # tscn) sits this far above the relief - the quad is flat and would
 # z-fight the sand at exactly ground height. Same value RewardSpread uses.
@@ -425,6 +430,12 @@ var _nav_chase_timer: float = 0.0
 # Hold to move: the left button went down on the ground and is still held.
 var _holding: bool = false
 var _hold_point: Vector3 = Vector3.INF
+# The arrival hold (arrival_hold_seconds): WAITING for the fade-in or the
+# zone intro, then RUNNING for the hold itself, then OVER. Presses are
+# swallowed until it is OVER (_input()).
+enum ArrivalHold { WAITING, RUNNING, OVER }
+var _arrival_hold: ArrivalHold = ArrivalHold.WAITING
+var _arrival_hold_elapsed: float = 0.0
 var _hold_timer: float = 0.0
 var _wall_left: StaticBody3D = null
 var _wall_right: StaticBody3D = null
@@ -702,7 +713,7 @@ func _ready() -> void:
 	# down over this floor. The first floor of a session has none.
 	var fade := FloorFade.find_existing(get_tree())
 	if fade != null:
-		fade.fade_in(fade_seconds)
+		_hold_through_fade(fade)
 
 	# Keeps the walls in sync with live landmass-shape tuning: Ground emits
 	# relief_rebuilt after every mesh/collision rebuild (any landmass/relief
@@ -733,12 +744,18 @@ func _ready() -> void:
 	var title_pending: bool = RunState.title_pending
 	RunState.title_pending = false
 	var zone_intro := get_node_or_null(zone_intro_path) as ZoneIntro
-	if zone_intro == null:
-		return
-	if title_pending:
-		zone_intro.hold_title()
-	elif opening_pending and RunState.current_floor_index == 0:
-		zone_intro.play()
+	var intro_running: bool = false
+	if zone_intro != null:
+		if title_pending:
+			intro_running = zone_intro.hold_title()
+		elif opening_pending and RunState.current_floor_index == 0:
+			intro_running = zone_intro.play()
+	# The arrival hold starts when the frame is the player's to see: after
+	# the intro, after the fade-in, or now.
+	if intro_running:
+		zone_intro.finished.connect(_start_arrival_hold, CONNECT_ONE_SHOT)
+	elif fade == null:
+		_start_arrival_hold()
 
 # Wade-HP drain only - everything else on the field (movement, contact,
 # battle) is either physics-engine-driven or event-driven and doesn't need
@@ -920,8 +937,42 @@ func _on_wanderer_path_stuck() -> void:
 	_walk_planned()
 
 func _process(delta: float) -> void:
+	_tick_arrival_hold(delta)
 	_tick_hold(delta)
 	_tick_chase(delta)
+
+# The fade back in over this floor, then the arrival hold.
+func _hold_through_fade(fade: FloorFade) -> void:
+	await fade.fade_in(fade_seconds)
+	_start_arrival_hold()
+
+func _start_arrival_hold() -> void:
+	if _arrival_hold == ArrivalHold.WAITING:
+		_arrival_hold = ArrivalHold.RUNNING
+		_arrival_hold_elapsed = 0.0
+
+func _tick_arrival_hold(delta: float) -> void:
+	if _arrival_hold != ArrivalHold.RUNNING:
+		return
+	_arrival_hold_elapsed += delta
+	if _arrival_hold_elapsed >= arrival_hold_seconds:
+		_arrival_hold = ArrivalHold.OVER
+
+# Whether the player's input is still locked on arrival - through the
+# fade-in or the intro, then arrival_hold_seconds.
+func is_arrival_held() -> bool:
+	return _arrival_hold != ArrivalHold.OVER
+
+# The arrival hold: every press - mouse button or key - is swallowed
+# before the HUD or the field sees it. Releases and motion pass, so a
+# hold or a hover never sticks.
+func _input(event: InputEvent) -> void:
+	if not is_arrival_held():
+		return
+	var button := event as InputEventMouseButton
+	var key := event as InputEventKey
+	if (button != null and button.pressed) or (key != null and key.pressed):
+		get_viewport().set_input_as_handled()
 
 # Held: the walk's goal follows the cursor's ground point - planned again
 # every hold_replan_sec at most, once it has moved hold_replan_dist. The
