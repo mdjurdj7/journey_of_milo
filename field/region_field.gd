@@ -2869,7 +2869,7 @@ func _say_pending_find() -> void:
 	var line := FindLine.on_hud(get_node_or_null(^"FieldHUD"))
 	if line == null:
 		return
-	line.sit_above(deck_panel)
+	line.use_theme(deck_panel.theme)
 	line.say_find(piece, _pending_find_creature)
 
 # One worn piece lying on the sand at `at` (seated on the relief by

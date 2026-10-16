@@ -2,18 +2,20 @@ extends Control
 class_name FindLine
 
 # The field's find line: one sentence in the system voice when a fight
-# leaves a worn piece - "You find a harness on the Wardling." - bottom-
-# left, just above the HUD row, left-aligned with DECK. Alegreya Sans in
-# the theme's Battle/ink at text_alpha, no box; the piece's name inline
-# in its rarity finish, the cards' own (CardRarityFinish.name_material():
-# flat common_ink for a Common, the RARE finish for a Rare) - the only
-# place the sentence says rarity. It holds hold_seconds, then fades over
-# fade_seconds; a new find restarts it.
+# leaves a worn piece - "You find a harness on the Wardling." - centred
+# in the lower third, just under WorldVoiceLine's band (its centre at
+# 0.88 of the height, its box 40 px either side) so the two never meet.
+# Alegreya Sans at full Battle/ink, no box; the piece's name inline and
+# one step stronger, in Alegreya Sans Bold: a Common in a deeper ink
+# (name_ink_strength toward full contrast), a Rare in the cards' RARE
+# finish (CardRarityFinish.name_material()) - the only place the sentence
+# says rarity. It holds hold_seconds, then fades over fade_seconds; a new
+# find restarts it.
 #
 # RegionField says it (say_find()) once the reward screen - and any
 # keepsake offer after it - has closed, so it lands as the piece is seen
 # on the sand. One per field, created under FieldHUD by on_hud() the
-# first time, handed the row's first item to sit above (sit_above()).
+# first time, handed the HUD's theme for its ink (use_theme()).
 #
 # The name is its own child canvas item, so the finish's shader colours
 # it alone and its gradient runs over the name's own width (the shader
@@ -26,26 +28,28 @@ const NODE_NAME := "FindLine"
 @export var hold_seconds: float = 4.0
 @export var fade_seconds: float = 0.6
 @export var fade_in_seconds: float = 0.2
-@export var text_size_px: int = 17:
+@export var text_size_px: int = 26:
 	set(value):
 		text_size_px = value
 		_relayout()
-# The plain words' share of full ink - the muted register; the name is
-# drawn at full value.
-@export_range(0.0, 1.0) var text_alpha: float = 0.8:
+# A Common name's ink: the line's own ink taken this far toward full
+# contrast (black on the pale world, white on a dark one).
+@export_range(0.0, 1.0) var name_ink_strength: float = 0.5:
 	set(value):
-		text_alpha = value
-		queue_redraw()
-# Between the line's bottom and the top of the item it sits above.
-@export var gap_px: float = 10.0:
+		name_ink_strength = value
+		if _name_layer != null:
+			_name_layer.queue_redraw()
+# The line's top, as a fraction of the viewport height: WorldVoiceLine's
+# band ends at 0.88 + 40 px (990 at 1080p); this sits a few px under it.
+@export var top_fraction: float = 0.922:
 	set(value):
-		gap_px = value
+		top_fraction = value
 		_place()
 @export_file("*.tres") var rarity_finish_path: String = "res://battle/card_rarity_finish.tres"
 @export_file("*.gdshader") var name_finish_shader_path: String = "res://battle/card_name_finish.gdshader"
 
-var _above: Control = null
 var _font: Font = null
+var _name_font: Font = null
 var _ink: Color = Color.BLACK
 var _finish: CardRarityFinish = null
 var _name_layer: Control = null
@@ -73,6 +77,7 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_font = InkType.text_font()
+	_name_font = InkType.text_bold_font()
 	_name_layer = Control.new()
 	_name_layer.name = "Name"
 	_name_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -84,12 +89,9 @@ func _ready() -> void:
 	modulate.a = 0.0
 	visible = false
 
-# The row item this line sits above - RegionField's DeckPanel, the row's
-# first; its theme gives the ink.
-func sit_above(item: Control) -> void:
-	_above = item
-	if item != null:
-		theme = item.theme
+# The theme whose Battle/ink the line reads - the field HUD's.
+func use_theme(hud_theme: Theme) -> void:
+	theme = hud_theme
 	refresh_style()
 
 func refresh_style() -> void:
@@ -144,7 +146,7 @@ func _relayout() -> void:
 	if _name_layer == null:
 		return
 	var before_w: float = InkType.width(_font, _before, text_size_px)
-	var name_w: float = InkType.width(_font, _name, text_size_px)
+	var name_w: float = InkType.width(_name_font, _name, text_size_px)
 	var after_w: float = InkType.width(_font, _after, text_size_px)
 	var height: float = ceilf(_font.get_height(text_size_px)) if _font != null else float(text_size_px)
 	size = Vector2(ceilf(before_w + name_w + after_w), height)
@@ -160,24 +162,24 @@ func _process(_delta: float) -> void:
 	if visible:
 		_place()
 
-# Above the row's first item, left-aligned with it, whole pixels.
+# Centred across the viewport, its top at top_fraction - whole pixels.
 func _place() -> void:
-	if _above == null or not is_instance_valid(_above):
+	if not is_inside_tree():
 		return
-	var rect: Rect2 = _above.get_global_rect()
-	position = Vector2(roundf(rect.position.x), roundf(rect.position.y - gap_px - size.y))
+	var view: Vector2 = get_viewport_rect().size
+	position = Vector2(roundf((view.x - size.x) / 2.0), roundf(view.y * top_fraction))
 
 func _baseline() -> float:
 	return _font.get_ascent(text_size_px) if _font != null else float(text_size_px)
 
 func _draw() -> void:
-	var color := Color(_ink, _ink.a * text_alpha)
-	InkType.draw_run(self, _font, _before, Vector2(0.0, _baseline()), text_size_px, color)
-	var after_x: float = roundf(InkType.width(_font, _before, text_size_px) + InkType.width(_font, _name, text_size_px))
-	InkType.draw_run(self, _font, _after, Vector2(after_x, _baseline()), text_size_px, color)
+	InkType.draw_run(self, _font, _before, Vector2(0.0, _baseline()), text_size_px, _ink)
+	var after_x: float = roundf(InkType.width(_font, _before, text_size_px) + InkType.width(_name_font, _name, text_size_px))
+	InkType.draw_run(self, _font, _after, Vector2(after_x, _baseline()), text_size_px, _ink)
 
+# A Rare's colour is its finish's (the shader replaces it); a Common's is
+# the line's ink pushed toward full contrast.
 func _draw_name() -> void:
-	var color: Color = _ink
-	if _name_layer.material == null and _finish != null:
-		color = _finish.common_ink
-	InkType.draw_run(_name_layer, _font, _name, Vector2(0.0, _baseline()), text_size_px, color)
+	var toward: Color = Color.BLACK if _ink.get_luminance() < 0.5 else Color.WHITE
+	var color: Color = _ink.lerp(Color(toward, _ink.a), name_ink_strength)
+	InkType.draw_run(_name_layer, _name_font, _name, Vector2(0.0, _baseline()), text_size_px, color)
