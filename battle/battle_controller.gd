@@ -447,8 +447,18 @@ func _unlock_entry_input() -> void:
 func is_entry_locked() -> bool:
 	return _entry_locked
 
+# Whether `action` is refused by the opening hold - said once per refusal
+# in a debug build, so a call dropped there (a probe acting too early) is
+# never silent.
+func _refused_by_entry_hold(action: String) -> bool:
+	if not _entry_locked:
+		return false
+	if OS.is_debug_build():
+		push_warning("BattleController: %s refused - the battle-entry hold is on (RegionField.battle_input_unlock_time)." % action)
+	return true
+
 func request_play(card_view: CardView) -> void:
-	if _entry_locked:
+	if _refused_by_entry_hold("card play"):
 		return
 	if (_input_locked and not _play_in_flight) or _play_queued or _pending_card_view != null or _choice_open() or card_view.card_data == null:
 		return
@@ -698,7 +708,9 @@ func cancel_target() -> void:
 # End Turn: with a keepsake that keeps cards and a card in hand, the keep
 # choice first (_begin_keep_choice()) - and End Turn again confirms it.
 func end_turn() -> void:
-	if _entry_locked or _input_locked or _play_queued:
+	if _refused_by_entry_hold("End Turn"):
+		return
+	if _input_locked or _play_queued:
 		return
 	if _keep_choice_open:
 		confirm_choice()
@@ -1143,6 +1155,8 @@ func _emit_devour_changed() -> void:
 func devour() -> void:
 	if _devour_picking:
 		cancel_devour_pick()
+		return
+	if _refused_by_entry_hold("Devour"):
 		return
 	if not is_devour_available():
 		return
