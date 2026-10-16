@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://cos6frhv34se7"]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+
+[sub_resource type="Resource" id="CardEffect_draw"]
+script = ExtResource("2_card_effect")
+effect_type = 3
+value = 3
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Second Thoughts+"
+cost = 1
+card_type = 1
+rarity = 1
+target_type = 1
+description = "Draw {draw}."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_draw")])

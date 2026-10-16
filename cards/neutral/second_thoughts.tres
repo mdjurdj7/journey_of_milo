@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" uid="uid://cos6frhv34se7" path="res://cards/tempered/second_thoughts_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="CardEffect_draw"]
 script = ExtResource("2_card_effect")
@@ -17,3 +18,4 @@ rarity = 1
 target_type = 1
 description = "Draw {draw}."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_draw")])
+tempered = ExtResource("10_tempered")
