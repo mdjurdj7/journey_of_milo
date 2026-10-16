@@ -181,14 +181,8 @@ folder (run_log_probe). (2026-10-04.)
   rules layer (`cards/card_data.gd`). No current card needs them - revisit
   once a real card actually wants a chain-shaped payoff, not before.
   (2026-09-11, rules-layer port.)
-- **Endure out of every Wanderer card pool, for now.** Taken out of
-  `cards/pools/wanderer_pool.tres` (2026-10-03) and then out of
-  `cards/pools/belongings_pool.tres`, the floor-2 belongings and
-  Keeper pool (2026-10-04). The card's data is untouched; its file moved
-  to `cards/neutral/endure.tres` (2026-10-04), so the compendium files it
-  under Neutral. The probes that play it directly still do. Put it
-  back by re-adding the entries (and Endure to `card_rarity_probe.gd`'s
-  EXPECTED_POOL, count back to 20).
+- **Endure stays out of the Wanderer reward pool.** Restored to the
+  belongings and collector pools (2026-10-16).
 - **Debt Forgiven removed; Toll has no HP sink for now.** Turning Toll
   into HP let a player stall a fight to heal, so the card, its art and
   its pool entries are gone (2026-10-16). The TOLL_HEAL effect stays in
@@ -301,9 +295,9 @@ folder (run_log_probe). (2026-10-04.)
   holds class-agnostic cards the Keeper used to hand out (Left Hand,
   Untouched, Second Thoughts) - not reward or shop stock, and a scan
   rooted at `cards/` would sweep them into both. Since 2026-09-30 she
-  offers a keepsake instead; the three are now floor 2's belongings
-  stock, with Hold Fast (`cards/pools/belongings_pool.tres`), and nowhere
-  else. The old project
+  offers a keepsake instead; the three, with Hold Fast and Endure, are
+  floor 2's belongings stock (`cards/pools/belongings_pool.tres`) and the
+  Collector's (`cards/pools/collector_pool.tres`). The old project
   hit exactly this and solved it by hiding the cards in a subfolder its
   flat, non-recursive scan happened to miss (`npc_offers/`, see
   `reference/old_project/deck-builder/docs/DESIGN.md`) - a guard that

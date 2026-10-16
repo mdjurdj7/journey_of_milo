@@ -1,6 +1,6 @@
 {
   "export_info": {
-    "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the three in the belongings pool, and Endure, which no pool offers. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
+    "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
     "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account",
     "generated_from": [
       "res://cards/data/*.tres",
@@ -90,29 +90,28 @@
     },
     "belongings_pool": {
       "file_path": "res://cards/pools/belongings_pool.tres",
-      "count": 4,
+      "count": 5,
       "cards": [
         "Left Hand",
         "Second Thoughts",
         "Untouched",
-        "Hold Fast"
+        "Hold Fast",
+        "Endure"
       ],
       "where": "floor 2's belongings (a RewardSpread prop on region1_floor2.tres)"
     },
     "wanderer_card_types": {
-      "SKILL": 16,
+      "SKILL": 15,
       "ATTACK": 11,
       "POWER": 4,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
       "COMMON": 13,
-      "UNCOMMON": 12,
+      "UNCOMMON": 11,
       "RARE": 8
     },
-    "implemented_but_not_obtainable": [
-      "Endure"
-    ],
+    "implemented_but_not_obtainable": [],
     "missing_art": [],
     "neutral_cards_missing_art": [
       "Endure",
@@ -2337,9 +2336,11 @@
       "upgrade_data": null,
       "starting_deck_count": 0,
       "in_reward_pool": false,
-      "in_belongings_pool": false,
-      "obtainable_from": [],
-      "not_obtainable_in_play": true
+      "in_belongings_pool": true,
+      "obtainable_from": [
+        "belongings_pool"
+      ],
+      "not_obtainable_in_play": false
     },
     {
       "name": "Left Hand",
