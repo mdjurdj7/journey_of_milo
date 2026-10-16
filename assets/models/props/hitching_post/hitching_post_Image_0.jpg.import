@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ivgg14yp8emp"
-path="res://.godot/imported/hitching_post_Image_0.jpg-a734e3592af43fa8353562497e4c8d6b.ctex"
+path.s3tc="res://.godot/imported/hitching_post_Image_0.jpg-a734e3592af43fa8353562497e4c8d6b.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "b6157ab23886ca70a911fb9d2d4998ad"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/props/hitching_post/hitching_post_Image_0.jpg"
-dest_files=["res://.godot/imported/hitching_post_Image_0.jpg-a734e3592af43fa8353562497e4c8d6b.ctex"]
+dest_files=["res://.godot/imported/hitching_post_Image_0.jpg-a734e3592af43fa8353562497e4c8d6b.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
