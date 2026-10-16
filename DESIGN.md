@@ -554,8 +554,9 @@ folder (run_log_probe). (2026-10-04.)
   off the rock's camera side onto the sand (`FloorEnemy.phase_drop_offset`)
   and turns to the Wanderer; an escape climbs it back. Its
   `contact_sounds` borrow `combat_old/hit.wav`, as the Dunecur and the
-  Wardling do. Its material is the field's for every enemy, normal map
-  included, as the Siltjaw's is. (2026-10-05, Greyshelf.)
+  Wardling do. It wears the painted shader on its own colour map
+  (`Greyshelf_colour.png`); its glb's embedded maps are discarded on
+  import. (2026-10-05, Greyshelf.)
 - **The card export should be generated, like the enemy export.**
   `docs/wanderer_card_export.json` is rebuilt by throwaway scripts and
   committed by hand, so nothing notices when it drifts from the cards.
