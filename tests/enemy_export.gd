@@ -70,6 +70,7 @@ static func build() -> Dictionary:
 				ENEMY_DIR + "*.tres (EnemyData, EnemyIntent)",
 				"res://battle/rules/statuses/*.tres (StatusData, resolved through Status.describe())",
 				"res://run/keepsakes/*.tres (KeepsakeTable, TrinketData)",
+				"res://run/armor/*.tres (KeepsakeTable, TrinketData - worn pieces)",
 				"res://cards/pools/*.tres (RewardPool rarity rates)",
 				REWARD_SCREEN_SCENE_PATH + " (choice_count)",
 			],
@@ -77,8 +78,8 @@ static func build() -> Dictionary:
 			"encounters": "One entry per option of each EncounterSlot, in slot order: the slot is where (anchor, required), the option is who (members, their props, their route). One option per slot is stood each floor load. A cluster is an option of more than one member; its name is its slot's id.",
 			"required": "EncounterSlot.required: the floor is cleared, and its gate opens, once no member of a required slot stands.",
 			"gate_fight": "The floor's first required slot: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past its anchor, along exit_direction, whichever option stands there.",
-			"elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times its role's gold_multiplier in EncounterRewards (the elite's, rounded) and rolls its card at the pool's elite rarity rates. A placement marked FloorEnemy.card_reward TOP_TIER_FIRST (floor 5's region-end Greyshelf) offers its cards from the highest tier down instead (RewardPool.roll_top_tier()), at the floor's gold. See each encounter's elite_rewards. Keepsakes and Glassbone are their own fields.",
-			"rewards": "Gold is the floor's roll (FloorData) times the fight's role's gold_multiplier; whether it offers cards, and an optional basic fight's extra (a removal or a Samphire), are its role's too (EncounterRewards, by BattleController.encounter_role()). Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Glassbone: every member's, summed.",
+			"elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times its role's gold_multiplier in EncounterRewards (the elite's, rounded) and rolls its card at the pool's elite rarity rates. A placement marked FloorEnemy.card_reward TOP_TIER_FIRST (floor 5's region-end Greyshelf) offers its cards from the highest tier down instead (RewardPool.roll_top_tier()), at the floor's gold. See each encounter's elite_rewards. Keepsakes, armor and Glassbone are their own fields.",
+			"rewards": "Gold is the floor's roll (FloorData) times the fight's role's gold_multiplier; whether it offers cards, and an optional basic fight's extra (a removal or a Samphire), are its role's too (EncounterRewards, by BattleController.encounter_role()). Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Armor: one worn piece from the first member with an armor_table, RARE at its armor_rare_chance, never the piece worn, lying where it fell (RegionField._drop_armor()). Glassbone: every member's, summed.",
 			"intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping.",
 		},
 		"regions": region_list,
@@ -168,6 +169,7 @@ static func _encounter_entry(floor_data: FloorData, slot: EncounterSlot, option:
 	var elite: bool = false
 	var top_tier: bool = false
 	var keepsake: Variant = null
+	var armor: Variant = null
 	var glassbone: int = 0
 	var member_list: Array = []
 	for member_index in option.members.size():
@@ -181,6 +183,8 @@ static func _encounter_entry(floor_data: FloorData, slot: EncounterSlot, option:
 			glassbone += maxi(data.glassbone_reward, 0)
 			if keepsake == null and data.keepsake_table != null:
 				keepsake = {"from": data.enemy_name, "table": data.keepsake_table.resource_path}
+			if armor == null and data.armor_table != null:
+				armor = {"from": data.enemy_name, "table": data.armor_table.resource_path}
 		member_list.append(_member_entry(slot, option, member_index))
 	var names: Array[String] = []
 	for member: Dictionary in member_list:
@@ -218,6 +222,7 @@ static func _encounter_entry(floor_data: FloorData, slot: EncounterSlot, option:
 			props.append({"scene": _path(prop.scene), "position": _vec2(_prop_at(slot, prop))})
 	encounter["props"] = props
 	encounter["keepsake_drop"] = keepsake
+	encounter["armor_drop"] = armor
 	encounter["glassbone"] = glassbone
 	return encounter
 
@@ -272,6 +277,7 @@ static func _enemy_entry(data: EnemyData, appears_on: Array) -> Dictionary:
 		"statuses": _status_entries(data),
 		"rewards": {
 			"keepsake_table": _keepsake_entry(data.keepsake_table),
+			"armor_table": _armor_entry(data.armor_table, data.armor_rare_chance),
 			"glassbone": data.glassbone_reward,
 			"gold_and_cards": "the floor's - see regions[].floors[].rewards",
 		},
@@ -521,6 +527,28 @@ static func _status_fields(status: StatusData) -> Dictionary:
 			value = _num(value)
 		fields[name] = value
 	return fields
+
+# An armor table (EnemyData.armor_table): its pieces by rarity, drawn RARE
+# at rare_chance (KeepsakeTable.roll_by_rarity()) - one always left.
+static func _armor_entry(table: KeepsakeTable, rare_chance: float) -> Variant:
+	if table == null:
+		return null
+	var entries: Array = []
+	for entry in table.entries:
+		if entry == null or entry.trinket == null:
+			continue
+		entries.append({
+			"piece": entry.trinket.display_name,
+			"id": String(entry.trinket.id),
+			"file": entry.trinket.resource_path,
+			"rarity": CardData.CardRarity.keys()[entry.trinket.rarity],
+			"weight": _num(entry.weight),
+		})
+	return {
+		"file": table.resource_path,
+		"rare_chance": _num(rare_chance),
+		"entries": entries,
+	}
 
 static func _keepsake_entry(table: KeepsakeTable) -> Variant:
 	if table == null:

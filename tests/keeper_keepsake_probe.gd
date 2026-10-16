@@ -20,7 +20,6 @@ const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const KEEPER_SCENE_PATH := "res://field/keeper.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const KEEPER_TABLE_PATH := "res://run/keepsakes/keeper/keeper_keepsakes.tres"
-const WARDLING_TABLE_PATH := "res://run/keepsakes/wardling_keepsakes.tres"
 const HOUSE_KEY_PATH := "res://run/keepsakes/keeper/house_key.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const WRAPPED_SWEET_PATH := "res://run/keepsakes/keeper/wrapped_sweet.tres"
@@ -101,9 +100,8 @@ func _check_table() -> void:
 	for entry in table.entries:
 		ids.append(entry.trinket.id)
 	_expect_eq(ids, KEEPER_IDS, "...holds exactly her six keepsakes")
-	var wardling: KeepsakeTable = load(WARDLING_TABLE_PATH)
-	for entry in wardling.entries:
-		_expect(not ids.has(entry.trinket.id), "...none shared with the Wardling's table (%s)" % entry.trinket.display_name)
+	for entry in table.entries:
+		_expect(entry.trinket.slot == TrinketData.Slot.KEEPSAKE, "...each a keepsake, not a worn piece (%s)" % entry.trinket.display_name)
 	var keeper: Node = (load(KEEPER_SCENE_PATH) as PackedScene).instantiate()
 	_expect(keeper.get("keeper_pool") == table, "keeper.tscn draws from that table")
 	_expect(keeper.get("offered_keepsake") == null, "...with no forced keepsake")

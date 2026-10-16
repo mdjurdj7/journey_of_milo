@@ -1,0 +1,15 @@
+[gd_scene load_steps=3 format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
+albedo_color = Color(0.33, 0.35, 0.37, 1)
+roughness = 0.9
+
+[sub_resource type="CylinderMesh" id="Mesh_body"]
+material = SubResource("StandardMaterial3D_body")
+top_radius = 0.07
+bottom_radius = 0.09
+height = 0.24
+
+[node name="WardlingsLamp" type="MeshInstance3D"]
+
+mesh = SubResource("Mesh_body")

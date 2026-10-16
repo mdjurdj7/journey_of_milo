@@ -2,7 +2,7 @@ extends SceneTree
 
 # Headless probe for Glassbone, the run's one material: RunState's count
 # and its helpers, that it lives exactly as long as the run (across a
-# fight, across a floor, gone on a new run), that the Wardling leaves one
+# fight, across a floor, gone on a new run), that the Greyshelf leaves one
 # piece as its own TAKE line on the reward screen - taken, or left behind
 # on WALK ON, never granted on its own - that an enemy leaves any only if
 # it is an elite or a region-end enemy (a required fight on its region's
@@ -23,13 +23,14 @@ extends SceneTree
 const CASES := 8
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
-const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
+const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
 const ENEMIES_DIR := "res://battle/rules/enemies"
 # Where the regions are: every RegionData here names its floors in order.
 const FLOORS_DIR := "res://floors"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
-# Floor 3 (index 2) is the Wardling's; floor 1 (index 0) the lone Sputter's.
-const WARDLING_FLOOR := 2
+# Floor 5 (index 4) is the Greyshelf's - the region-end fight, since the
+# elites leave armor instead; floor 1 (index 0) the lone Sputter's.
+const GREYSHELF_FLOOR := 4
 const SPUTTER_FLOOR := 0
 const SAFETY_SECONDS := 300.0
 # How long a won fight may take to open its reward screen: the killing
@@ -50,8 +51,8 @@ func _initialize() -> void:
 	_check_counting()
 	_check_enemy_data()
 	await _check_floor_advance()
-	await _check_wardling_take()
-	await _check_wardling_walk_on()
+	await _check_greyshelf_take()
+	await _check_greyshelf_walk_on()
 	await _check_sputter_leaves_none()
 	await _check_hud_line()
 	await _check_hud_hides_for_fight()
@@ -158,14 +159,13 @@ func _check_floor_advance() -> void:
 		await process_frame
 	_completed += 1
 
-# Win against the Wardling: nothing granted by the win itself; the reward
+# Win against the Greyshelf: nothing granted by the win itself; the reward
 # screen offers gold, Glassbone x1 and a card, in that order; TAKE on the
-# Glassbone line adds exactly 1, once, and moves nothing else; the
-# keepsake offer still follows the screen.
-func _check_wardling_take() -> void:
+# Glassbone line adds exactly 1, once, and moves nothing else.
+func _check_greyshelf_take() -> void:
 	_new_run()
 	_run_state.call("add_glassbone", 2)
-	var controller: Node = await _start_fight(WARDLING_FLOOR, WARDLING_PATH)
+	var controller: Node = await _start_fight(GREYSHELF_FLOOR, GREYSHELF_PATH)
 	if controller == null:
 		await _teardown()
 		_completed += 1
@@ -176,7 +176,7 @@ func _check_wardling_take() -> void:
 	await _await_reward_screen()
 	_expect_eq(_glassbone(), 2, "...nor the fight's end - it waits on the reward screen")
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")
-	_expect(reward != null, "Killing the Wardling opens the reward screen")
+	_expect(reward != null, "Killing the Greyshelf opens the reward screen")
 	if reward != null:
 		var ids: Array[String] = _line_ids(reward)
 		_expect_eq(ids, ["gold", "glassbone", "card"] as Array[String], "...gold, Glassbone, a card")
@@ -203,15 +203,13 @@ func _check_wardling_take() -> void:
 			_expect_eq(_glassbone(), 3, "...and no Glassbone")
 		if is_instance_valid(reward):
 			reward.call("close")
-		await process_frame
-		_expect(_child_with_script(_field, "keepsake_offer.gd") != null, "The Wardling's keepsake offer still follows the screen")
 	await _teardown()
 	_completed += 1
 
 # WALK ON with the line untaken: the piece is left behind.
-func _check_wardling_walk_on() -> void:
+func _check_greyshelf_walk_on() -> void:
 	_new_run()
-	var controller: Node = await _start_fight(WARDLING_FLOOR, WARDLING_PATH)
+	var controller: Node = await _start_fight(GREYSHELF_FLOOR, GREYSHELF_PATH)
 	if controller == null:
 		await _teardown()
 		_completed += 1
@@ -219,7 +217,7 @@ func _check_wardling_walk_on() -> void:
 	_kill_all(controller)
 	await _await_reward_screen()
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")
-	_expect(reward != null, "The Wardling's reward screen opens again")
+	_expect(reward != null, "The Greyshelf's reward screen opens again")
 	if reward != null:
 		_expect(_line_ids(reward).has("glassbone"), "...with its Glassbone line")
 		reward.call("_on_dismiss")

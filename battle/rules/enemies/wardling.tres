@@ -4,7 +4,7 @@
 [ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
 [ext_resource type="AudioStream" uid="uid://cv4ojiaajic3y" path="res://assets/audio/enemies_old/Works_Wardling/Ragged Breath.mp3" id="3_ragged_breath"]
 [ext_resource type="AudioStream" uid="uid://bnvfgx6j66j30" path="res://assets/audio/combat_old/hit.wav" id="4_hit"]
-[ext_resource type="Resource" path="res://run/keepsakes/wardling_keepsakes.tres" id="5_keepsakes"]
+[ext_resource type="Resource" path="res://run/armor/wardling_armor.tres" id="5_armor"]
 
 [sub_resource type="Resource" id="EnemyIntent_first"]
 script = ExtResource("2_intent")
@@ -24,7 +24,7 @@ value = 11
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Wardling"
-mechanic_summary = "An elite tied to its post: Shove 9, Stamp 5, Trample 11 in a loop, its attacks growing every two turns (x1.3, x1.6, then x2); the first time it drops below half HP it loses a turn. Teaches racing escalation, and pays a keepsake and Glassbone for it."
+mechanic_summary = "An elite tied to its post: Shove 9, Stamp 5, Trample 11 in a loop, its attacks growing every two turns (x1.3, x1.6, then x2); the first time it drops below half HP it loses a turn. Teaches racing escalation, and leaves a worn piece where it falls: the Harness, or rarely its Lamp."
 max_hp = 70
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_first"), SubResource("EnemyIntent_second"), SubResource("EnemyIntent_third")])
 ; Placeholder: hit.wav is 8-bit and one take - replace with a proper body hit, 2-3 takes.
@@ -36,8 +36,7 @@ pain_turn_line = "A ragged breath. It isn't moving."
 pain_turn_sound = ExtResource("3_ragged_breath")
 is_elite = true
 defeat_line = "The Wardling is still."
-keepsake_table = ExtResource("5_keepsakes")
-glassbone_reward = 1
+armor_table = ExtResource("5_armor")
 model_scene_path = "res://assets/models/enemies/Wardling/Wardling.glb"
 model_scale = 1.68
 model_yaw_offset_degrees = -90.0

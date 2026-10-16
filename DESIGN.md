@@ -105,9 +105,16 @@ pays the floor's gold roll times `RegionField.elite_gold_multiplier`
 (1.5, rounded) and rolls its card reward at the pool's elite rarity
 rates (`RewardPool`'s Elite rarity rates: Common 0 / Uncommon 75 / Rare
 23 / Ultra Rare 2, renormalised over the tiers with a card left, as the
-normal rates are - so Common only when nothing else is). Keepsakes and
-Glassbone stay their own fields (`keepsake_table`, `glassbone_reward`).
-A bundle or cache keeps its own flat roll. (2026-10-05.)
+normal rates are - so Common only when nothing else is). A bundle or
+cache keeps its own flat roll. (2026-10-05.)
+
+An elite leaves armor, not a keepsake or Glassbone: one worn piece
+(`TrinketData.slot` WORN) from its `armor_table`, RARE at its
+`armor_rare_chance` (0.22), never the piece already worn, lying on the
+sand where it fell (`WorldArmor`), beside the usual card offer. The
+Wardling leaves the Harness or, rarely, Wardling's Lamp; the Adder its
+Shed Skin or, rarely, the Coiled Wrap. Keepsakes now come only from the
+keeper and from deeds. (2026-10-16, armor.)
 
 The region-end fight (floor 5's Greyshelf) is not elite: it pays the
 floor's own gold and its Glassbone x1, and its card reward is set on the
@@ -449,7 +456,7 @@ folder (run_log_probe). (2026-10-04.)
 - **Glassbone's upgrade economy is deferred.** Glassbone is the single
   material reward (Glassbone x1; Framework §3), kept apart from gold,
   which stays the currency. The run holds it (RunState.glassbone): the
-  Wardling and the Greyshelf leave one each, and a belongings cache
+  Greyshelf leaves one (the elites leave armor instead), and a belongings cache
   sometimes holds one. Its first use is tempering at floor 3's wagon:
   1 Glassbone (Wagon.temper_cost) swaps a card for its authored tempered
   version (CardData.tempered, cards/tempered/), once per card - only the
@@ -458,6 +465,14 @@ folder (run_log_probe). (2026-10-04.)
   shrines), tempered versions past the starters, undoing a temper, what
   things cost in the long run, and how often it drops. (2026-09-30,
   Glassbone docs; tempering 2026-10-07.)
+- **Armor is deferred past its first four pieces.** The WORN slot, its
+  rules (max HP while worn, the first hit halved, Block at the start,
+  damage back) and the two elites' tables are in. Deferred: armor shown
+  on the Wanderer's model, final models and art (the four are placeholder
+  primitives and SVGs, by path), more pieces and more elites, and the
+  battle row dimming a spent Lamp (the row dims nothing yet). Frayed Cord
+  is in no table now - held for a future deed, as are deeds themselves.
+  (2026-10-16, armor.)
 - **Signal Glass shows no future intent.** Its intended effect was to
   preview each enemy's intent after the current one. The intent
   architecture doesn't support that cleanly: erratic enemies (Sputter)

@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="TrinketData" format=3]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+[ext_resource type="Texture2D" path="res://assets/textures/armor/harness.svg" id="2_art"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"harness"
+display_name = "Harness"
+slot = 1
+rarity = 1
+description = "+{max_hp} max HP while worn."
+drop_line = "It wore this."
+flavor_text = "Worn smooth where the strap crossed."
+art = ExtResource("2_art")
+field_model_path = "res://assets/models/armor/harness.tscn"
+max_hp_bonus = 6

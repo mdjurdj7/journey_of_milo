@@ -63,12 +63,12 @@ func _initialize() -> void:
 	_check_descriptions()
 	_check_art()
 	_check_never_in_card_rewards()
-	_check_wardling_table_guaranteed()
+	_check_guaranteed_table()
 	await _check_combat_start_and_worn_page()
 	await _check_white_shell_win_not_escape()
 	await _check_frayed_cord_tick()
 	await _check_persists_across_floors()
-	await _check_wardling_drop_offered()
+	await _check_table_drop_offered()
 	await _check_debug_row()
 	await _check_hud_line()
 	await _check_restart_clears()
@@ -255,17 +255,19 @@ func _check_never_in_card_rewards() -> void:
 	_expect(pools > 0, "The search found the reward pools (%d)" % pools)
 	_completed += 1
 
-func _check_wardling_table_guaranteed() -> void:
-	var data: EnemyData = load(WARDLING_PATH)
-	var table: KeepsakeTable = data.keepsake_table
-	_expect(table != null, "The Wardling has a keepsake table")
-	if table == null:
-		_completed += 1
-		return
-	_expect(table.guaranteed, "...its drop is guaranteed")
-	_expect_eq(table.entries.size(), 1, "...one entry: its signature")
-	var cord: TrinketData = load(FRAYED_CORD_PATH)
-	_expect(table.entries.size() == 1 and table.entries[0].trinket == cord, "...Frayed Cord")
+# A guaranteed one-entry table, built here - no enemy carries one today
+# (elites leave armor; keepsakes come from the keeper and from deeds).
+func _guaranteed_cord_table() -> KeepsakeTable:
+	var table := KeepsakeTable.new()
+	table.guaranteed = true
+	var entry := KeepsakeEntry.new()
+	entry.trinket = load(FRAYED_CORD_PATH)
+	table.entries.append(entry)
+	return table
+
+func _check_guaranteed_table() -> void:
+	var table: KeepsakeTable = _guaranteed_cord_table()
+	var cord: TrinketData = table.entries[0].trinket
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 7
 	var none: Array[StringName] = []
@@ -369,17 +371,23 @@ func _check_persists_across_floors() -> void:
 	await _teardown()
 	_completed += 1
 
-func _check_wardling_drop_offered() -> void:
+# An enemy's keepsake table, set on the Wardling here for the fight - the
+# rule under test is the drop and its offer, not what any enemy carries.
+func _check_table_drop_offered() -> void:
 	_new_run()
+	var data: EnemyData = load(WARDLING_PATH)
+	var saved: KeepsakeTable = data.keepsake_table
+	data.keepsake_table = _guaranteed_cord_table()
 	var controller: Node = await _start_fight(2, &"", WARDLING_PATH)
 	if controller == null:
+		data.keepsake_table = saved
 		await _teardown()
 		_completed += 1
 		return
 	_kill_all(controller)
 	await _await_reward_screen()
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")
-	_expect(reward != null, "Killing the Wardling opens its normal reward first")
+	_expect(reward != null, "Killing an enemy with a table opens its normal reward first")
 	_expect(_child_with_script(_field, "keepsake_offer.gd") == null, "...with the keepsake offer not yet up")
 	var offered: Array = _run_state.get("keepsakes_offered")
 	_expect_eq(offered.size(), 1, "...and one keepsake already rolled (the guarantee)")
@@ -396,6 +404,7 @@ func _check_wardling_drop_offered() -> void:
 		await process_frame
 		_expect(_keepsake() != null and StringName(_keepsake().id) == StringName(offered[0]), "TAKE equips the offered keepsake")
 		_expect(_field.can_process(), "...and the field is live again once it closes")
+	data.keepsake_table = saved
 	await _teardown()
 	# A Sputter leaves none.
 	controller = await _start_fight(0, &"")

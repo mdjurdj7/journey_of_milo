@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="TrinketData" format=3]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+[ext_resource type="Texture2D" path="res://assets/textures/armor/shed_skin.svg" id="2_art"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"shed_skin"
+display_name = "Shed Skin"
+slot = 1
+rarity = 1
+description = "Start each fight with {block} Block."
+drop_line = "Left behind, whole."
+flavor_text = "It did not need this any more."
+art = ExtResource("2_art")
+field_model_path = "res://assets/models/armor/shed_skin.tscn"
+combat_start_block = 5

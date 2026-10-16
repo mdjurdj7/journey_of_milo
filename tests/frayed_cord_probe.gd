@@ -22,8 +22,6 @@ const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FRAYED_CORD_PATH := "res://run/keepsakes/frayed_cord.tres"
 const ART_PATH := "res://assets/textures/keepsakes/frayed_cord.png"
-const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
-const WARDLING_TABLE_PATH := "res://run/keepsakes/wardling_keepsakes.tres"
 const BELONGINGS_TABLE_PATH := "res://run/keepsakes/belongings_keepsakes.tres"
 const BELONGINGS_IDS: Array[StringName] = [&"bent_nail", &"white_shell", &"worn_page"]
 const SLASH_PATH := "res://cards/data/slash.tres"
@@ -75,14 +73,10 @@ func _check_data() -> void:
 	_expect(cord.art != null and cord.art.resource_path == ART_PATH, "...and its own art, frayed_cord.png")
 	_completed += 1
 
-# The Wardling's signature: its table holds Frayed Cord alone, and no
-# other keepsake table, nor any other enemy's, holds it.
+# Frayed Cord is held for a deed: no table holds it - the Wardling leaves
+# armor now - and no enemy drops it.
 func _check_signature_drop() -> void:
 	var cord: TrinketData = load(FRAYED_CORD_PATH)
-	var wardling: EnemyData = load(WARDLING_PATH)
-	_expect(wardling.keepsake_table != null and wardling.keepsake_table.resource_path == WARDLING_TABLE_PATH, "The Wardling drops from its own table")
-	var table: KeepsakeTable = load(WARDLING_TABLE_PATH)
-	_expect(table.guaranteed and table.entries.size() == 1 and table.entries[0].trinket == cord, "...which is Frayed Cord alone, guaranteed")
 	var belongings: KeepsakeTable = load(BELONGINGS_TABLE_PATH)
 	var ids: Array[StringName] = []
 	for entry in belongings.entries:
@@ -93,12 +87,8 @@ func _check_signature_drop() -> void:
 		var resource: Resource = load(path)
 		if resource is KeepsakeTable:
 			tables += 1
-			if path == WARDLING_TABLE_PATH:
-				continue
 			for entry in (resource as KeepsakeTable).entries:
 				_expect(entry.trinket != cord, "%s holds no Frayed Cord" % path)
-		elif resource is EnemyData and path != WARDLING_PATH:
-			_expect((resource as EnemyData).keepsake_table == null or (resource as EnemyData).keepsake_table.resource_path != WARDLING_TABLE_PATH, "%s doesn't drop from the Wardling's table" % path)
 	_expect(tables >= 3, "The search found the keepsake tables (%d)" % tables)
 	_completed += 1
 

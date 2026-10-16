@@ -23,11 +23,12 @@ extends SceneTree
 # trinket_probe does. Untyped against anything that names the RunState
 # autoload: a SceneTree script compiles before the autoloads register.
 
-const CASES := 14
+const CASES := 15
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
 const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
+const ENEMIES_DIR := "res://battle/rules/enemies"
 const SAFETY_SECONDS := 240.0
 
 var _run_state: Node = null
@@ -57,6 +58,7 @@ func _initialize() -> void:
 	_check_plate_finish()
 	await _check_worn_line()
 	await _check_elite_drop()
+	_check_elites_leave_armor()
 
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
@@ -425,6 +427,25 @@ func _check_elite_drop() -> void:
 			_expect(Vector2(at.x - fell_at.x, at.z - fell_at.z).length() < 0.01, "...where it fell")
 	data.armor_table = saved
 	await _teardown()
+	_completed += 1
+
+# Every elite leaves a worn piece - from a table of worn pieces only - and
+# no keepsake or Glassbone: keepsakes come from the keeper and from deeds.
+func _check_elites_leave_armor() -> void:
+	var elites: int = 0
+	for file in DirAccess.open(ENEMIES_DIR).get_files():
+		if not file.ends_with(".tres"):
+			continue
+		var data := load(ENEMIES_DIR.path_join(file)) as EnemyData
+		if data == null or not data.is_elite:
+			continue
+		elites += 1
+		_expect(data.armor_table != null and not data.armor_table.entries.is_empty(), "%s leaves a worn piece" % file)
+		if data.armor_table != null:
+			for entry in data.armor_table.entries:
+				_expect(entry.trinket != null and entry.trinket.slot == TrinketData.Slot.WORN, "...%s's table holds worn pieces only" % file)
+		_expect(data.keepsake_table == null and data.glassbone_reward == 0, "...and no keepsake or Glassbone (%s)" % file)
+	_expect(elites >= 2, "The search found the elites (%d)" % elites)
 	_completed += 1
 
 func _lying() -> Array[Node]:

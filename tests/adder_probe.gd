@@ -27,7 +27,6 @@ const GARNISHED_PATH := "res://battle/rules/statuses/garnished.tres"
 const UNBROKEN_PATH := "res://battle/rules/statuses/unbroken.tres"
 const HUNGRY_PATH := "res://battle/rules/statuses/hungry.tres"
 const REFUSE_PATH := "res://battle/rules/statuses/refuse_the_end.tres"
-const KEEPSAKE_PATH := "res://run/keepsakes/keeper/blue_fastener.tres"
 const MODEL_PATH := "res://assets/models/enemies/Adder/Adder.glb"
 const SOUND_PATHS: Array[String] = ["res://assets/audio/enemies/Stork/hit_1.mp3", "res://assets/audio/enemies/Stork/hit_2.mp3"]
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
@@ -109,8 +108,8 @@ func _check_data() -> void:
 	var venom: StatusData = load(VENOM_PATH)
 	_expect(venom.category == StatusData.Category.TICK and venom.tick_decay == 1 and not venom.tick_is_self_loss, "Venom: a TICK, falling by 1, not the holder's own loss")
 	_expect(venom.mark == StatusData.Mark.DROP, "...marked with a drop")
-	_expect(data.keepsake_table != null and data.keepsake_table.guaranteed and data.keepsake_table.entries.size() == 1 and data.keepsake_table.entries[0].trinket.resource_path == KEEPSAKE_PATH, "Its keepsake table: Blue Fastener, guaranteed")
-	_expect_eq(data.glassbone_reward, 1, "...and Glassbone 1")
+	_expect(data.armor_table != null and not data.armor_table.entries.is_empty(), "It leaves a worn piece (its armor table)")
+	_expect(data.keepsake_table == null and data.glassbone_reward == 0, "...and no keepsake or Glassbone")
 	_expect_eq(data.model_scene_path, MODEL_PATH, "Its own body, the adder model")
 	_expect_eq(data.attachment_scene_path, "", "...without its pose")
 	var sounds: Array[String] = []
@@ -380,7 +379,8 @@ func _check_floor_entry() -> void:
 	_expect(not bool(slot.get("required")), "...optional")
 	_completed += 1
 
-# Won: elite rates, Glassbone 1, and Blue Fastener offered, from the Adder.
+# Won: elite rates, no Glassbone and no keepsake - a worn piece on the
+# sand instead.
 func _check_elite() -> void:
 	var controller: Node = await _start_fight(SLASH_PATH)
 	if controller != null:
@@ -390,10 +390,12 @@ func _check_elite() -> void:
 		_expect(reward != null, "Won: the reward screen")
 		if reward != null:
 			_expect(bool(reward.get("_elite_rates")), "...its card at the elite rates")
-			_expect_eq(int(reward.get("_glassbone")), 1, "...Glassbone 1")
-		var keepsake: Resource = _field.get("_pending_keepsake")
-		_expect(keepsake != null and keepsake.resource_path == KEEPSAKE_PATH, "...and Blue Fastener waiting to be offered")
-		_expect_eq(str(_field.get("_pending_keepsake_source")), "Adder", "...from the Adder")
+			_expect_eq(int(reward.get("_glassbone")), 0, "...no Glassbone")
+		_expect(_field.get("_pending_keepsake") == null, "...no keepsake waiting to be offered")
+		var start: int = Time.get_ticks_msec()
+		while get_nodes_in_group(&"worn_drops").is_empty() and Time.get_ticks_msec() - start < 6000:
+			await process_frame
+		_expect_eq(get_nodes_in_group(&"worn_drops").size(), 1, "...and a worn piece on the sand")
 		if reward != null:
 			reward.call("close")
 	await _teardown()

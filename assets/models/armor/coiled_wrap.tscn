@@ -1,0 +1,14 @@
+[gd_scene load_steps=3 format=3]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_body"]
+albedo_color = Color(0.42, 0.35, 0.27, 1)
+roughness = 0.9
+
+[sub_resource type="TorusMesh" id="Mesh_body"]
+material = SubResource("StandardMaterial3D_body")
+inner_radius = 0.06
+outer_radius = 0.16
+
+[node name="CoiledWrap" type="MeshInstance3D"]
+scale = Vector3(1, 0.8, 1)
+mesh = SubResource("Mesh_body")

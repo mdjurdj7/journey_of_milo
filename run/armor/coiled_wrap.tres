@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="TrinketData" format=3]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+[ext_resource type="Texture2D" path="res://assets/textures/armor/coiled_wrap.svg" id="2_art"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"coiled_wrap"
+display_name = "Coiled Wrap"
+slot = 1
+rarity = 3
+description = "When an enemy's attack hits you, deal {hit_back} damage back to it."
+drop_line = "It was lying on this."
+flavor_text = "Wound tight, and never undone."
+art = ExtResource("2_art")
+field_model_path = "res://assets/models/armor/coiled_wrap.tscn"
+hit_back_damage = 2
