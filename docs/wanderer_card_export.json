@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 33,
+    "total_unique_wanderer_cards": 32,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,12 +51,11 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 28,
+      "count": 27,
       "cards": [
         "Carve",
         "Hold Fast",
         "Small Price",
-        "Debt Forgiven",
         "Self-Eater",
         "Cornered",
         "Unbroken",
@@ -139,7 +138,7 @@
       },
       {
         "name": "Toll",
-        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Debt Forgiven, Come Due, Leverage and Second Swing (optionally, to repeat its hit); spending it brings a Sentence a turn closer."
+        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Come Due, Leverage and Second Swing (optionally, to repeat its hit); spending it brings a Sentence a turn closer."
       },
       {
         "name": "Grace",
@@ -829,65 +828,6 @@
       "art_path": "res://cards/art/Wanderer/Cornered.png",
       "rules_font_px": 14,
       "battle_animation": "Slash",
-      "play_effect_scene_path": null,
-      "upgrade_data": null,
-      "starting_deck_count": 0,
-      "in_reward_pool": true,
-      "in_belongings_pool": false,
-      "obtainable_from": [
-        "wanderer_reward_pool"
-      ],
-      "not_obtainable_in_play": false
-    },
-    {
-      "name": "Debt Forgiven",
-      "file_path": "res://cards/data/debt_forgiven.tres",
-      "pool_class": "wanderer",
-      "card_type": "SKILL",
-      "face_type_label": "TOLL",
-      "energy_cost": 1,
-      "rarity": "UNCOMMON",
-      "card_text": "Spend up to 20 Toll.\nHeal 1 HP per 2 Toll spent.",
-      "face_hp_line": null,
-      "card_text_template": "Spend up to 20 Toll.\n{battle}Heal {toll_heal} HP.{/battle}{outside}Heal 1 HP per 2 Toll spent.{/outside}",
-      "targeting": "self",
-      "removal_after_play": "discard pile",
-      "effects": [
-        {
-          "type": "TOLL_HEAL",
-          "plain_english": "Spend up to 20 Toll - only the even amount it converts, so an odd point stays held - and heal 1 HP per 2 spent, at most 10 HP."
-        }
-      ],
-      "keywords": [
-        "Toll"
-      ],
-      "self_hp_cost": 0,
-      "base_damage": null,
-      "base_block": null,
-      "draw": null,
-      "energy_gain": null,
-      "toll_gain": null,
-      "toll_spend": "up to 20 Toll",
-      "persistent_effect": null,
-      "stance_effect": null,
-      "power_effect": null,
-      "status_effect": null,
-      "critical_condition": null,
-      "dynamic_values": [
-        {
-          "field": "heal",
-          "rule": "Heal = 1 HP per 2 Toll spent (it spends only an even amount), max 10. Outside a fight the face states the rule instead.",
-          "default_displayed": 0
-        },
-        {
-          "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
-          "default_displayed": 1
-        }
-      ],
-      "art_path": "res://cards/art/Wanderer/Debt Forgiven.png",
-      "rules_font_px": 15,
-      "battle_animation": null,
       "play_effect_scene_path": null,
       "upgrade_data": null,
       "starting_deck_count": 0,

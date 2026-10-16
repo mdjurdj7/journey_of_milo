@@ -86,7 +86,7 @@ const MARK_IF_CLOSE := "{/if}"
 const MARK_ELSE_OPEN := "{else}"
 const MARK_ELSE_CLOSE := "{/else}"
 # A card whose live number means nothing outside a fight (Reckoning's
-# Toll, Debt Forgiven's heal - 0 with no Toll held) says it two ways:
+# Toll - 0 with no Toll held) says it two ways:
 # {battle}...{/battle} only in a battle hand (a bonus context), live;
 # {outside}...{/outside} everywhere else - the compendium, the deck view,
 # rewards, belongings - as the rule. Keep both on one line, so the line
@@ -109,7 +109,7 @@ const BLOCK_EFFECT_TYPES: Array = [CardEffect.EffectType.BLOCK, CardEffect.Effec
 # damage IS this number.
 const TOKEN_TOLL := "{toll}"
 # What a TOLL_HEAL would heal for at that Toll: half of whatever it can
-# actually spend, capped. Debt Forgiven's own preview.
+# actually spend, capped. No card carries a TOLL_HEAL at present.
 const TOKEN_TOLL_HEAL := "{toll_heal}"
 # Where a lethal guard the card applies would leave the player (Refuse the
 # End - StatusData.survive_hp()): for the fight's player in a battle hand,

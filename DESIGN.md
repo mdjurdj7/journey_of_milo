@@ -189,6 +189,12 @@ folder (run_log_probe). (2026-10-04.)
   under Neutral. The probes that play it directly still do. Put it
   back by re-adding the entries (and Endure to `card_rarity_probe.gd`'s
   EXPECTED_POOL, count back to 20).
+- **Debt Forgiven removed; Toll has no HP sink for now.** Turning Toll
+  into HP let a player stall a fight to heal, so the card, its art and
+  its pool entries are gone (2026-10-16). The TOLL_HEAL effect stays in
+  the code with no card using it - `toll_heal_effect.gd`, its resolver
+  entry, the enum entry and CardView's `{toll_heal}` token - pending a
+  separate decision on that code.
 - **Floor 4's dig site is a reserved spot only.** Its position lives in
   `assets/field/masks/source/floor4/floor4_layout.json`
   (`suggested_placements_world_xz.dig`, (-3.0, -21.8), on the ring's

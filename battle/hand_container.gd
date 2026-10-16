@@ -529,8 +529,8 @@ func set_grace(grace: int) -> void:
 		card_view.set_grace(grace)
 
 # The player's Toll, for the same reason as the stance and Grace:
-# Reckoning's printed damage and Debt Forgiven's printed heal are both
-# made of it, and both move every time it does.
+# Reckoning's printed damage is made of it, and moves every time it
+# does.
 func set_toll(toll: int) -> void:
 	_toll = toll
 	for card_view in _card_views():

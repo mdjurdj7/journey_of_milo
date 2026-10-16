@@ -44,7 +44,7 @@ Multi-enemy encounters are a cluster sharing one contact zone; all members stand
 
 **Energy** is the per-turn cost of playing cards, for every class.
 
-**Toll** (Wanderer) accrues only from self-inflicted HP loss — self-damage effects, status ticks, stances — never from enemy hits. It carries in full between fights on a floor, and up to the character's cap (5 for the Wanderer) to the next floor. Reckoning spends it 1:1 for damage; Debt Forgiven spends it for HP; the class pool adds collectors and sinks. *Possible later exception: enemy hits give Toll only while cornered.*
+**Toll** (Wanderer) accrues only from self-inflicted HP loss — self-damage effects, status ticks, stances — never from enemy hits. It carries in full between fights on a floor, and up to the character's cap (5 for the Wanderer) to the next floor. Reckoning spends it 1:1 for damage; the class pool adds collectors and sinks. Nothing turns it into HP for now (see DESIGN.md). *Possible later exception: enemy hits give Toll only while cornered.*
 
 **Grace** (Wanderer passive; replaces the old Rally) is survival, not reward. An unblocked enemy hit opens recoverable HP; damage the player deals on their next turn reclaims it 1:1; it is capped per window by the largest single hit and clears at the end of that turn. Self-damage never opens it. Drawn as a pale segment on the HP bar. Cards may later extend the window or raise the cap.
 

@@ -46,9 +46,8 @@ const TEMPERED_DIR := "res://cards/tempered/"
 # The cards with art, by file - the starters, Carve, Cornered, Hold Fast,
 # Come Due, No Further, Sentence, Last Wager, The Return, Blood Arc,
 # Collateral, Ransom, Leverage, Self-Eater, Unbroken, Small Price, Bide,
-# Deny, Refuse the End, With Regards, Debt Forgiven, Last Resort, Dying
-# Light, Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and
-# Settled Account.
+# Deny, Refuse the End, With Regards, Last Resort, Dying Light, Blood
+# Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account.
 # Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"slash": "res://cards/art/Wanderer/Slash.png",
@@ -75,7 +74,6 @@ const CARD_ART: Dictionary = {
 	"deny": "res://cards/art/Wanderer/Deny.png",
 	"refuse_the_end": "res://cards/art/Wanderer/Refuse the End.png",
 	"with_regards": "res://cards/art/Wanderer/With Regards.png",
-	"debt_forgiven": "res://cards/art/Wanderer/Debt Forgiven.png",
 	"last_resort": "res://cards/art/Wanderer/Last Resort.png",
 	"dying_light": "res://cards/art/Wanderer/Dying Light.png",
 	"blood_advance": "res://cards/art/Wanderer/Blood Advance.png",
@@ -472,29 +470,12 @@ func _check_rules_text_pattern() -> void:
 	view.free()
 	_completed += 1
 
-# Debt Forgiven spends up to 20 Toll and heals 1 HP per 2 spent - only
-# the even amount it converts, so an odd point stays held; it and
-# Reckoning say their rule outside a fight and their live
-# number in a battle hand (CardView's {battle}/{outside} blocks).
+# Reckoning says its rule outside a fight and its live number in a
+# battle hand (CardView's {battle}/{outside} blocks).
 func _check_toll_cards() -> void:
-	var debt: CardData = _card("debt_forgiven")
-	# Toll held, spent, healed - only the even amount it converts is
-	# spent: 13 spends 12, heals 6 and leaves 1.
-	for case: Array in [[30, 20, 10], [20, 20, 10], [13, 12, 6], [7, 6, 3], [1, 0, 0]]:
-		var player: Combatant = _player(40)
-		player.max_hp = 70
-		player.toll = case[0]
-		var ctx := EffectContext.new()
-		ctx.player = player
-		ctx.enemies = [Combatant.new(100)] as Array[Combatant]
-		_resolver.resolve_card(debt, ctx)
-		_expect_eq(case[0] - player.toll, case[1], "Debt Forgiven on %d Toll spends %d" % [case[0], case[1]])
-		_expect_eq(player.hp - 40, case[2], "...and heals %d" % case[2])
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(view)
 	await process_frame
-	view.set_card_data(debt)
-	_expect_eq(view.rules_text.get_parsed_text(), "Spend up to 20 Toll.\nHeal 1 HP per 2 Toll spent.", "Debt Forgiven outside a fight says its rule")
 	view.set_card_data(_card("reckoning"))
 	_expect_eq(view.rules_text.get_parsed_text(), "Spend all Toll.\nDeal that much damage.", "Reckoning outside a fight says its rule")
 	view.free()
@@ -506,10 +487,8 @@ func _check_toll_cards() -> void:
 	battle.player.toll = 13
 	hand_view.set_bonus_context(battle)
 	hand_view.set_toll(13)
-	hand_view.set_card_data(debt)
-	_expect_eq(hand_view.rules_text.get_parsed_text(), "Spend up to 20 Toll.\nHeal 6 HP.", "In a battle hand on 13 Toll it reads its live heal, 6")
 	hand_view.set_card_data(_card("reckoning"))
-	_expect_eq(hand_view.rules_text.get_parsed_text(), "Spend all Toll.\nDeal 13 damage.", "...and Reckoning its live 13")
+	_expect_eq(hand_view.rules_text.get_parsed_text(), "Spend all Toll.\nDeal 13 damage.", "In a battle hand on 13 Toll Reckoning reads its live 13")
 	hand_view.free()
 	_completed += 1
 

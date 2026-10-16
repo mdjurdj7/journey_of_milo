@@ -10,7 +10,7 @@ extends SceneTree
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 
 const MAX_HP := 70
-const CASES := 16
+const CASES := 15
 const DAMAGE := 40
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const BELONGINGS_POOL_PATH := "res://cards/pools/belongings_pool.tres"
@@ -30,7 +30,6 @@ func _initialize() -> void:
 	_check_natural_countdown()
 	_check_toll_spends_once_each()
 	_check_reckoning_once()
-	_check_debt_forgiven()
 	_check_gaining_toll_does_nothing()
 	_check_hurried_to_zero_resolves_now()
 	_check_not_an_attack()
@@ -110,19 +109,6 @@ func _check_reckoning_once() -> void:
 	_expect_eq(_labels(enemy), ["Sentence 3"] as Array[String], "...and takes only one off, not 14")
 	_play("reckoning", player, [enemy])
 	_expect_eq(_labels(enemy), ["Sentence 3"] as Array[String], "A Toll-less Reckoning spends nothing, and takes nothing off")
-	_completed += 1
-
-func _check_debt_forgiven() -> void:
-	var player: Combatant = _player()
-	player.hp = 40
-	var enemy := Combatant.new(200)
-	_play("sentence", player, [enemy])
-	player.toll = 6
-	_play("debt_forgiven", player, [enemy])
-	_expect_eq(player.toll, 0, "Debt Forgiven spends the 6 there is")
-	_expect_eq(_labels(enemy), ["Sentence 3"] as Array[String], "...and takes one off")
-	_play("debt_forgiven", player, [enemy])
-	_expect_eq(_labels(enemy), ["Sentence 3"] as Array[String], "On 0 Toll it spends nothing, and takes nothing off")
 	_completed += 1
 
 func _check_gaining_toll_does_nothing() -> void:

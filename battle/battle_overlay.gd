@@ -633,7 +633,7 @@ func _on_toll_changed(new_toll: int) -> void:
 		_field_hp_bar.drain_toll(drained_from, new_toll)
 	else:
 		_field_hp_bar.update_toll(new_toll)
-	# Reckoning and Debt Forgiven print numbers made of Toll.
+	# Reckoning prints a number made of Toll.
 	hand_container.set_toll(new_toll)
 
 func _on_grace_changed(grace: int) -> void:
