@@ -138,6 +138,9 @@ class KeepOut extends RefCounted:
 	# A ledge's footprint (a LedgeBarrier segment): an entry may grow it by
 	# its own ledge_margin_m instead of `outer`.
 	var ledge: bool = false
+	# Kept for a fight that rolled (_add_battle_keepouts()): an item it
+	# turns away is dropped, not made up elsewhere (see Allowed.BATTLE).
+	var battle: bool = false
 	# Its shape's bounds, worked out on the first ask - a point outside them
 	# grown by the reach skips the exact test (a floor's ledges give
 	# hundreds of footprints).
@@ -292,6 +295,16 @@ var _keepouts: Array[KeepOut] = []
 # (x, z, stance distance) for its stance_clearance_m.
 var _enemy_points: PackedVector2Array = PackedVector2Array()
 var _enemy_stances: PackedVector3Array = PackedVector3Array()
+# Where an item may lie. BATTLE: turned away only by the fights that
+# rolled - the battle keep-outs, an entry's enemy_clearance_m and stance_
+# clearance_m - so it is dropped but counted as laid: in its entry's count,
+# its cluster's spacing and the floor's budget. Every other item then
+# lies where it would with no fight there, and no kind takes up another's
+# dropped share: each kind's count stays near its own whatever rolled.
+enum Allowed { YES, NO, BATTLE }
+# Items dropped as Allowed.BATTLE: the floor's, and the entry being placed's.
+var _charged_count: int = 0
+var _entry_charged: int = 0
 # Traced contours by inland level, cleared with the grid.
 var _contours: Dictionary = {}
 var _rebuild_queued: bool = false
@@ -306,9 +319,12 @@ var _cell_inland: PackedFloat32Array = PackedFloat32Array()
 var _cell_height: PackedFloat32Array = PackedFloat32Array()
 var _cell_zone: PackedByteArray = PackedByteArray()
 var _cell_wear: PackedFloat32Array = PackedFloat32Array()
+# Excluded by a keep-out other than a battle one.
 var _cell_excluded: PackedByteArray = PackedByteArray()
 # Excluded by anything but a ledge, for an entry with its own ledge margin.
 var _cell_excluded_off_ledges: PackedByteArray = PackedByteArray()
+# Inside a battle keep-out (KeepOut.battle): no cluster centres there.
+var _cell_battle: PackedByteArray = PackedByteArray()
 var _cell_rock: PackedByteArray = PackedByteArray()
 # Signed metres to the walkable edge: into the floor +, onto the bank -.
 var _cell_edge: PackedFloat32Array = PackedFloat32Array()
@@ -407,6 +423,7 @@ func _build_grid() -> void:
 	_cell_wear.resize(count)
 	_cell_excluded.resize(count)
 	_cell_excluded_off_ledges.resize(count)
+	_cell_battle.resize(count)
 	_cell_rock.resize(count)
 	var wet_band: float = wet_band_height_m if wet_band_height_m >= 0.0 else _ground.shore_slope_start
 	for row in _grid_rows:
@@ -419,8 +436,9 @@ func _build_grid() -> void:
 			_cell_height[i] = height
 			_cell_zone[i] = _zone_at(p, inland, height, wet_band)
 			_cell_wear[i] = wear_weight(p)
-			_cell_excluded[i] = 1 if is_excluded(p) else 0
+			_cell_excluded[i] = 1 if is_excluded(p, -1.0, false) else 0
 			_cell_excluded_off_ledges[i] = 1 if _cell_excluded[i] != 0 and _excluded_off_ledges(p) else 0
+			_cell_battle[i] = 1 if _in_battle_keepout(p) else 0
 	_mark_dry_ground()
 	_mark_edge_distance()
 
@@ -712,16 +730,23 @@ static func segment_distance(p: Vector2, a: Vector2, b: Vector2) -> float:
 # --- Exclusions ---
 
 # `ledge_margin` at or over 0: ledges' footprints grown by that instead of
-# prop_margin_m (an entry's ledge_margin_m).
-func is_excluded(p: Vector2, ledge_margin: float = -1.0) -> bool:
+# prop_margin_m (an entry's ledge_margin_m). `battle` false leaves the
+# battle keep-outs out (KeepOut.battle).
+func is_excluded(p: Vector2, ledge_margin: float = -1.0, battle: bool = true) -> bool:
 	for keepout in _keepouts:
-		if keepout.contains(p, ledge_margin):
+		if (battle or not keepout.battle) and keepout.contains(p, ledge_margin):
 			return true
 	return false
 
 func _excluded_off_ledges(p: Vector2) -> bool:
 	for keepout in _keepouts:
-		if not keepout.ledge and keepout.contains(p):
+		if not keepout.ledge and not keepout.battle and keepout.contains(p):
+			return true
+	return false
+
+func _in_battle_keepout(p: Vector2) -> bool:
+	for keepout in _keepouts:
+		if keepout.battle and keepout.contains(p):
 			return true
 	return false
 
@@ -773,6 +798,12 @@ func _add_footprint(shape_node: CollisionShape3D, margin: float) -> void:
 # the line's furthest shift - for each member that could anchor it. A
 # patrolled pack: wherever it can be when he reaches it, its waypoints.
 func _add_battle_keepouts() -> void:
+	var first_battle: int = _keepouts.size()
+	_add_battle_keepouts_unmarked()
+	for i in range(first_battle, _keepouts.size()):
+		_keepouts[i].battle = true
+
+func _add_battle_keepouts_unmarked() -> void:
 	var groups: Dictionary = {}
 	_enemy_points = PackedVector2Array()
 	_enemy_stances = PackedVector3Array()
@@ -889,6 +920,7 @@ func _place_all() -> void:
 	_spots.clear()
 	_solids.clear()
 	_item_count = 0
+	_charged_count = 0
 	if _floor == null:
 		return
 	var budget: int = _floor.scatter_budget
@@ -899,14 +931,16 @@ func _place_all() -> void:
 			if entry == null or _entries.has(entry):
 				continue
 			_entries.append(entry)
-			var left: int = budget - _item_count if budget > 0 else -1
+			var left: int = budget - _item_count - _charged_count if budget > 0 else -1
+			_entry_charged = 0
 			var spots: Array[Spot] = _place_contour(entry, left) if entry.mode == ScatterEntry.Mode.CONTOUR else _place_entry(entry, left)
 			_spots[entry] = spots
 			_item_count += spots.size()
+			_charged_count += _entry_charged
 			if entry.solid:
 				for spot in spots:
 					_solids.append(Vector3(spot.position.x, spot.position.z, spot.size * 0.5))
-			if budget > 0 and _item_count >= budget:
+			if budget > 0 and _item_count + _charged_count >= budget:
 				push_warning("FieldScatter: the floor's budget of %d items is reached at '%s'; the rest are left out." % [budget, entry.name])
 
 # One entry's spots: its clusters' centres over the cells it may centre
@@ -950,7 +984,7 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 		var cluster: Array[Vector2] = []
 		var cluster_reach: Array[float] = []
 		for attempt in count * 4:
-			if cluster.size() >= count or (left >= 0 and spots.size() >= left):
+			if cluster.size() >= count or (left >= 0 and spots.size() + _entry_charged >= left):
 				break
 			var offset := Vector2(rng.randfn(0.0, spread), rng.randfn(0.0, spread))
 			if rings[c] > 0.0:
@@ -972,7 +1006,10 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 			var size: float = base_size * factor
 			if not entry.cards.is_empty():
 				var card_spot: Spot = _card_spot(entry, rng, factor, shade)
-				if card_spot == null or not _item_allowed(entry, p, keep_roll):
+				if card_spot == null:
+					continue
+				var card_allowed: Allowed = _item_allowed(entry, p, keep_roll)
+				if card_allowed == Allowed.NO:
 					continue
 				var reach: float = card_spot.width * entry.card_spacing_fraction
 				var card_crowded: bool = false
@@ -984,10 +1021,14 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 					continue
 				cluster.append(p)
 				cluster_reach.append(reach)
+				if card_allowed == Allowed.BATTLE:
+					_entry_charged += 1
+					continue
 				card_spot.position = Vector3(p.x, _ground.get_visible_height_at(p), p.y)
 				spots.append(card_spot)
 				continue
-			if not _item_allowed(entry, p, keep_roll, size * 0.5 if entry.footprint_test else 0.0):
+			var allowed: Allowed = _item_allowed(entry, p, keep_roll, size * 0.5 if entry.footprint_test else 0.0)
+			if allowed == Allowed.NO:
 				continue
 			var crowded: bool = false
 			for other in cluster:
@@ -997,6 +1038,9 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 			if crowded:
 				continue
 			cluster.append(p)
+			if allowed == Allowed.BATTLE:
+				_entry_charged += 1
+				continue
 			var spot := Spot.new()
 			spot.position = Vector3(p.x, _ground.get_visible_height_at(p), p.y)
 			var jitter := Basis(Vector3(cos(tilt_axis), 0.0, sin(tilt_axis)), deg_to_rad(tilt))
@@ -1114,9 +1158,12 @@ func _centre_allowed(entry: ScatterEntry, cell: int) -> bool:
 	if entry.ledge_margin_m < 0.0:
 		if _cell_excluded[cell] != 0:
 			return false
-	elif _cell_excluded_off_ledges[cell] != 0 or (_cell_excluded[cell] != 0 and is_excluded(_grid_point(cell), entry.ledge_margin_m)):
+	elif _cell_excluded_off_ledges[cell] != 0 or (_cell_excluded[cell] != 0 and is_excluded(_grid_point(cell), entry.ledge_margin_m, false)):
 		return false
 	if entry.avoid_rock and _cell_rock[cell] != 0:
+		return false
+	# Off the fights as well: a cluster centres where it can lie whole.
+	if _cell_battle[cell] != 0:
 		return false
 	var inland: float = _cell_inland[cell]
 	if inland < entry.inland_range_m.x or inland > entry.inland_range_m.y:
@@ -1129,40 +1176,51 @@ func _centre_allowed(entry: ScatterEntry, cell: int) -> bool:
 # edge thins rather than cuts. With a `radius` (a footprint_test kind),
 # eight points round that circle are tested as well, the band's weight
 # the least of them.
-func _item_allowed(entry: ScatterEntry, p: Vector2, keep_roll: float, radius: float = 0.0) -> bool:
+# Allowed.BATTLE when the only thing in the way is a fight that rolled
+# (see Allowed).
+func _item_allowed(entry: ScatterEntry, p: Vector2, keep_roll: float, radius: float = 0.0) -> Allowed:
 	for solid in _solids:
 		if p.distance_to(Vector2(solid.x, solid.y)) < solid.z + radius:
-			return false
+			return Allowed.NO
 	var points: PackedVector2Array = [p]
 	if radius > 0.0:
 		for k in 8:
 			points.append(p + Vector2.from_angle(TAU * float(k) / 8.0) * radius)
 	var weight: float = 1.0
+	var battle: bool = false
 	for q in points:
-		if not _point_allowed(entry, q):
-			return false
+		var allowed: Allowed = _point_allowed(entry, q)
+		if allowed == Allowed.NO:
+			return Allowed.NO
+		battle = battle or allowed == Allowed.BATTLE
 		if _has_own_wear(entry):
 			weight = minf(weight, wear_weight(q, _entry_keep_out(entry), entry.wear_ramp_m))
 		else:
 			weight = minf(weight, wear_weight(q))
-	return keep_roll < weight
+	if keep_roll >= weight:
+		return Allowed.NO
+	return Allowed.BATTLE if battle else Allowed.YES
 
-func _point_allowed(entry: ScatterEntry, p: Vector2) -> bool:
+# Everything but the fights first, so Allowed.BATTLE means only they
+# stand in the way.
+func _point_allowed(entry: ScatterEntry, p: Vector2) -> Allowed:
 	if _ground.get_visible_height_at(p) < _sea_level - entry.wet_edge_m:
-		return false
-	if is_excluded(p, entry.ledge_margin_m):
-		return false
+		return Allowed.NO
+	if is_excluded(p, entry.ledge_margin_m, false):
+		return Allowed.NO
+	if entry.avoid_rock and is_rock(p):
+		return Allowed.NO
+	if _in_battle_keepout(p):
+		return Allowed.BATTLE
 	if entry.enemy_clearance_m > 0.0:
 		for at in _enemy_points:
 			if p.distance_to(at) < entry.enemy_clearance_m:
-				return false
+				return Allowed.BATTLE
 	if entry.stance_clearance_m >= 0.0:
 		for stance in _enemy_stances:
 			if p.distance_to(Vector2(stance.x, stance.y)) < stance.z + entry.stance_clearance_m:
-				return false
-	if entry.avoid_rock and is_rock(p):
-		return false
-	return true
+				return Allowed.BATTLE
+	return Allowed.YES
 
 static func _has_own_wear(entry: ScatterEntry) -> bool:
 	return entry.wear_keep_out_share >= 0.0 or entry.wear_keep_out_m >= 0.0 or entry.wear_ramp_m >= 0.0
@@ -1211,7 +1269,7 @@ func _place_contour(entry: ScatterEntry, left: int) -> Array[Spot]:
 			if inside:
 				var along: float = maxf(at, 0.0) + rng.randf() * entry.contour_spacing_m * 0.5
 				while along < minf(at + length, total):
-					if left >= 0 and spots.size() >= left:
+					if left >= 0 and spots.size() + _entry_charged >= left:
 						return spots
 					var next: float = along + entry.contour_spacing_m * rng.randf_range(0.67, 1.33)
 					var spot: Spot = _contour_spot(entry, rng, line, lengths, along, phase_a, phase_b)
@@ -1246,7 +1304,11 @@ func _contour_spot(entry: ScatterEntry, rng: RandomNumberGenerator, line: Packed
 	var cell: int = _cell_at(p)
 	if cell < 0 or (_cell_zone[cell] & entry.zones) == 0:
 		return null
-	if not _item_allowed(entry, p, keep_roll):
+	var allowed: Allowed = _item_allowed(entry, p, keep_roll)
+	if allowed == Allowed.NO:
+		return null
+	if allowed == Allowed.BATTLE:
+		_entry_charged += 1
 		return null
 	var spot := Spot.new()
 	spot.position = Vector3(p.x, _ground.get_visible_height_at(p), p.y)
@@ -1659,7 +1721,7 @@ func open_ground(zones: int, inland: Vector2, path_distance: Vector2, stance_cle
 			continue
 		if _cell_inland[i] < inland.x or _cell_inland[i] > inland.y:
 			continue
-		if _cell_excluded[i] != 0 or _cell_rock[i] != 0 or _cell_height[i] < _sea_level:
+		if _cell_excluded[i] != 0 or _cell_battle[i] != 0 or _cell_rock[i] != 0 or _cell_height[i] < _sea_level:
 			continue
 		var p: Vector2 = _grid_point(i)
 		var from_path: float = wear_distance(p)

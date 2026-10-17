@@ -244,7 +244,9 @@ enum ExitKind { CHANNEL, LINE }
 		scatter_density = value
 		emit_changed()
 # The most items the floor holds, all entries together; placing stops
-# there, with a warning. 0 = no cap.
+# there, with a warning. 0 = no cap. An item a rolled fight's keep-out
+# drops counts as held (FieldScatter.Allowed.BATTLE), so the cap falls
+# alike whatever rolled and no kind takes up another's dropped share.
 @export var scatter_budget: int = 0:
 	set(value):
 		scatter_budget = value

@@ -164,6 +164,6 @@ gate_distance_beyond_enemy = 7.5
 wear_path_mid_offset = 1.875
 wear_path_override = null
 scatter_sets = Array[ExtResource("21_scatter_set")]([ExtResource("22_shore_scatter")])
-scatter_budget = 300
+scatter_budget = 410
 reward_pool = ExtResource("7_wanderer_pool")
 gold_min = 12
