@@ -10,6 +10,9 @@ class_name Ground
 # holds the Wanderer out of the simulation until it lands, see its
 # _on_ground_built(). is_built() answers the same question after the fact.
 signal relief_rebuilt
+# A standing pool stamped, moved or taken away (set_pool_stamp()) - what
+# FieldScatter re-places itself round.
+signal pool_stamps_changed
 
 # The sand: high-key pale with a slight warm bias (R - B ~ +0.14), a pale
 # flat rather than tan. Rendered as authored - near_color/far_color below
@@ -1394,6 +1397,23 @@ func _push_pool_stamps() -> void:
 	_apply_uniform("pool_stamps", shapes)
 	_apply_uniform("pool_stamp_yaws", yaws)
 	_apply_uniform("pool_stamp_count", count)
+	pool_stamps_changed.emit()
+
+# Metres outside the nearest stamped pool's edge (negative inside) at
+# world XZ `p` - the shader's own pool_stamp_distance(), the same rough
+# ellipse distance. INF with none.
+func get_pool_stamp_distance(p: Vector2) -> float:
+	var nearest: float = INF
+	for stamp: Array in _pool_stamps.values():
+		var centre: Vector2 = stamp[0]
+		var radii := Vector2(maxf((stamp[1] as Vector2).x, 0.01), maxf((stamp[1] as Vector2).y, 0.01))
+		var yaw: float = deg_to_rad(float(stamp[2]))
+		var offset: Vector2 = p - centre
+		var c: float = cos(yaw)
+		var s: float = sin(yaw)
+		var local := Vector2(offset.x * c - offset.y * s, offset.x * s + offset.y * c)
+		nearest = minf(nearest, ((local / radii).length() - 1.0) * minf(radii.x, radii.y))
+	return nearest
 
 # The ruts' centreline, in world XZ, start to end: a chain through every
 # point, as a long worn band is. Under 2 points clears them; past

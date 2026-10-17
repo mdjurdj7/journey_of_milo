@@ -24,6 +24,8 @@ class_name FieldScatter
 # where it lands. Kept clear of:
 #   - water deeper than the entry's wet_edge_m (the drawn height against
 #     the sea - the painted line is ragged);
+#   - a stamped standing pool (Ground.set_pool_stamp()) and its damp rim,
+#     plus pool_margin_m;
 #   - the worn band: nothing within wear_keep_out_m of its centreline
 #     (the band's half-width plus its edge noise - the noise itself is
 #     the shader's and can't be matched here), coming back over
@@ -255,6 +257,12 @@ class KeepOut extends RefCounted:
 	set(value):
 		spawn_clear_m = value
 		_queue_rebuild(true)
+# A stamped standing pool (Ground.set_pool_stamp() - the Glower's): nothing
+# on it or its damp rim (Ground.pool_stamp_rim), nor within this more.
+@export var pool_margin_m: float = 0.15:
+	set(value):
+		pool_margin_m = value
+		_queue_rebuild(false)
 # An enemy's body: its model's half-diagonal plus this.
 @export var body_margin_m: float = 0.3:
 	set(value):
@@ -365,6 +373,8 @@ func setup(field: RegionField) -> void:
 		_floor.changed.connect(_on_floor_changed)
 	if _ground != null and not _ground.relief_rebuilt.is_connected(_on_relief_rebuilt):
 		_ground.relief_rebuilt.connect(_on_relief_rebuilt)
+	if _ground != null and not _ground.pool_stamps_changed.is_connected(_on_pool_stamps_changed):
+		_ground.pool_stamps_changed.connect(_on_pool_stamps_changed)
 	var sky: RegionSky = field.get_region_sky()
 	if sky != null and not sky.fog_changed.is_connected(_push_fog):
 		sky.fog_changed.connect(_push_fog)
@@ -379,6 +389,9 @@ func _on_floor_changed() -> void:
 
 func _on_relief_rebuilt() -> void:
 	_queue_rebuild(true)
+
+func _on_pool_stamps_changed() -> void:
+	_queue_rebuild(false)
 
 # One rebuild at the end of the frame however many edits asked; the
 # ground's grid only when something it reads has changed.
@@ -681,6 +694,14 @@ func wear_weight(p: Vector2, keep_out_override: float = -1.0, ramp_override: flo
 	if painted > 0.0:
 		weight *= 1.0 - smoothstep(wear_mask_threshold, wear_mask_threshold + 0.2, painted)
 	return weight
+
+# How far outside a stamped pool's edge nothing goes: its damp rim plus
+# pool_margin_m - the pool's keep-out, as get_wear_keep_out() is the band's.
+func get_pool_keep_out() -> float:
+	return _ground.pool_stamp_rim + pool_margin_m
+
+func in_pool_keep_out(p: Vector2) -> bool:
+	return _ground.get_pool_stamp_distance(p) < get_pool_keep_out()
 
 func get_wear_keep_out() -> float:
 	if wear_keep_out_m >= 0.0:
@@ -1150,6 +1171,8 @@ func _card_spot(entry: ScatterEntry, rng: RandomNumberGenerator, factor: float, 
 func _centre_allowed(entry: ScatterEntry, cell: int) -> bool:
 	if (_cell_zone[cell] & entry.zones) == 0:
 		return false
+	if in_pool_keep_out(_grid_point(cell)):
+		return false
 	if _has_own_wear(entry):
 		if wear_weight(_grid_point(cell), _entry_keep_out(entry), entry.wear_ramp_m) < 1.0:
 			return false
@@ -1208,6 +1231,8 @@ func _item_allowed(entry: ScatterEntry, p: Vector2, keep_roll: float, radius: fl
 # stand in the way.
 func _point_allowed(entry: ScatterEntry, p: Vector2) -> Allowed:
 	if _ground.get_visible_height_at(p) < _sea_level - entry.wet_edge_m:
+		return Allowed.NO
+	if in_pool_keep_out(p):
 		return Allowed.NO
 	if is_excluded(p, entry.ledge_margin_m, false):
 		return Allowed.NO
