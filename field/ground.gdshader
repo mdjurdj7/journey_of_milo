@@ -49,6 +49,16 @@ uniform bool shore_wetness_enabled = true;
 uniform float pool_threshold : hint_range(0.0, 1.0) = 0.75;
 uniform float pool_edge_width : hint_range(0.0, 1.0) = 0.15;
 uniform vec4 pool_color : source_color = vec4(0.696, 0.704, 0.68, 1.0);
+// Standing pools stamped at runtime (Ground.set_pool_stamp() - the
+// Glower's): each an ellipse, xy its centre and zw its semi-axes, its
+// length turned pool_stamp_yaws round Y (a prop's +X to (cos, -sin)).
+// Inside, pool_factor 1, feathered over pool_stamp_edge; round it a damp
+// rim pool_stamp_rim wide. See pool_stamp_distance().
+uniform vec4 pool_stamps[4];
+uniform float pool_stamp_yaws[4];
+uniform int pool_stamp_count = 0;
+uniform float pool_stamp_edge = 0.08;
+uniform float pool_stamp_rim = 0.35;
 
 // Ground relief no longer displaces vertices here - ground.gd bakes it
 // directly into the relief mesh's own vertices (and the matching
@@ -465,6 +475,25 @@ float value_noise(vec2 p) {
 // patch noise toward more or less wet coverage overall. Unconditionally
 // 0 when wet_patches_enabled is off - this is also what turns pools off,
 // since pool_factor is driven directly by this, not a separate flag.
+// Metres outside the nearest stamped pool (negative inside), roughly -
+// the ellipse's normalised distance times its shorter semi-axis, which is
+// exact on that axis and close enough on the other for a feather and a
+// rim. Far off when there are none.
+float pool_stamp_distance(vec2 world_xz) {
+	float nearest = 1000.0;
+	for (int i = 0; i < pool_stamp_count; i++) {
+		vec2 offset = world_xz - pool_stamps[i].xy;
+		float c = cos(pool_stamp_yaws[i]);
+		float s = sin(pool_stamp_yaws[i]);
+		// Into the pool's own frame: its length along (c, -s) in XZ.
+		vec2 local = vec2(offset.x * c - offset.y * s, offset.x * s + offset.y * c);
+		vec2 radii = pool_stamps[i].zw;
+		float d = (length(local / radii) - 1.0) * min(radii.x, radii.y);
+		nearest = min(nearest, d);
+	}
+	return nearest;
+}
+
 float wetness_mask(vec2 world_xz) {
 	if (!wet_patches_enabled) {
 		return 0.0;
@@ -1265,6 +1294,9 @@ void fragment() {
 	if (landmass_distance_ready) {
 		sand_wetness = max(sand_wetness, swash_wet_footprint(shore_distance, reached, swash_ph) * open);
 	}
+	// A stamped pool's damp rim, and the pool itself further down.
+	float pool_stamp_d = pool_stamp_distance(v_world_xz);
+	sand_wetness = max(sand_wetness, 1.0 - smoothstep(0.0, max(pool_stamp_rim, 0.001), pool_stamp_d));
 
 	// VERTEX in fragment() is view-space; its length is distance from the camera.
 	float dist = length(VERTEX);
@@ -1438,6 +1470,7 @@ void fragment() {
 	// applied to the sand beneath them, and so the shore band reads as
 	// wet sand rather than a strip of standing pool.
 	float pool_factor = smoothstep(pool_threshold - pool_edge_width * 0.5, pool_threshold + pool_edge_width * 0.5, base_wetness);
+	pool_factor = max(pool_factor, 1.0 - smoothstep(-max(pool_stamp_edge, 0.001), 0.0, pool_stamp_d));
 
 	// Dust shadows: two octaves of soft noise in a frame along the wind,
 	// moving with it, kept to their broad upper lobes so most ground is

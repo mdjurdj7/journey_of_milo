@@ -63,7 +63,8 @@ Gold 12–18. LINE gate.
 | POI | Type | Req? | Gives | (x, z) | Access |
 |---|---|---|---|---|---|
 | Spawn | spawn | – | – | (0.0, 0.0) | – |
-| Sputter + Underfoot (`crab`) | required fight | yes | cards + 12–18 gold | Sputter (1.5, −21.3), Underfoot (−0.8, −21.3) | dry |
+| Sputter + Underfoot (`crab`, one of two) | required fight | yes | cards + 12–18 gold | Sputter (1.5, −21.3), Underfoot (−0.8, −21.3) | dry |
+| Underfoot + Glower (`crab`, the other) | required fight | yes | cards + 12–18 gold | Glower (1.5, −23.0) in its own standing pool (1.6 × 1.2 m), Underfoot (−0.8, −21.3) | dry |
 | Dragonfly ×3 (`island`) | optional fight | no | 18–27 gold, 30 % extra, no cards | patrol (−16.8, −20.8) → (−13.0, −20.4) → (−14.8, −18.5) | **wading**, ~6 m each way |
 | Trough | trough | no | heal 15, once per run; inert until the island is cleared | (−15.1, −19.9) | **wading**, on the island |
 | Siltjaw (`siltjaw`) | optional fight | no | 18–27 gold, 30 % extra, no cards | (5.2, −7.0) | dry, on a dune 0.55 m up |

@@ -553,6 +553,10 @@ func _new_run() -> void:
 
 func _load_field() -> void:
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	# The crab stands the Sputter's option, whichever way the run's seed
+	# would roll it (its other is the Glower's).
+	var force: Dictionary[StringName, StringName] = {&"crab": &"sputter_underfoot"}
+	_field.set("force_options", force)
 	root.add_child(_field)
 	for i in 30:
 		await physics_frame

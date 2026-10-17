@@ -19,6 +19,8 @@
 [ext_resource type="PackedScene" path="res://field/trough_prop.tscn" id="20_trough"]
 [ext_resource type="Script" uid="uid://bp8hnb8ai830l" path="res://floors/scatter/scatter_set.gd" id="21_scatter_set"]
 [ext_resource type="Resource" uid="uid://cu071h5ncuhs0" path="res://floors/scatter/floor2_shore.tres" id="22_shore_scatter"]
+[ext_resource type="Resource" path="res://battle/rules/enemies/glower.tres" id="23_glower"]
+[ext_resource type="PackedScene" path="res://field/standing_pool.tscn" id="24_standing_pool"]
 [ext_resource type="Script" uid="uid://c1xsh7mpatcy3" path="res://floors/encounter_slot.gd" id="90_encounter_slot"]
 [ext_resource type="Script" uid="uid://n5us4ml13k7m" path="res://floors/encounter_option.gd" id="91_encounter_option"]
 
@@ -65,11 +67,36 @@ script = ExtResource("91_encounter_option")
 option_id = &"sputter_underfoot"
 members = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_sputter"), SubResource("FloorEnemy_crab_underfoot")])
 
+[sub_resource type="Resource" id="FloorEnemy_glower"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("23_glower")
+position = Vector2(0, -1.75)
+yaw_degrees = 135.0
+anchor = true
+
+[sub_resource type="Resource" id="FloorEnemy_glower_underfoot"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("18_underfoot")
+position = Vector2(-2.25, -0.05)
+yaw_degrees = -121.3
+
+[sub_resource type="Resource" id="FloorProp_glower_pool"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("24_standing_pool")
+position = Vector3(0, 0, -1.75)
+yaw_degrees = 45.0
+
+[sub_resource type="Resource" id="EncounterOption_underfoot_glower"]
+script = ExtResource("91_encounter_option")
+option_id = &"underfoot_glower"
+members = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_glower"), SubResource("FloorEnemy_glower_underfoot")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_glower_pool")])
+
 [sub_resource type="Resource" id="EncounterSlot_crab"]
 script = ExtResource("90_encounter_slot")
 slot_id = &"crab"
 position = Vector2(1.5, -21.25)
-options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_sputter_underfoot")])
+options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_sputter_underfoot"), SubResource("EncounterOption_underfoot_glower")])
 
 [sub_resource type="Resource" id="FloorEnemy_island_dragonfly1"]
 script = ExtResource("2_floor_enemy")

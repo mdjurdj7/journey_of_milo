@@ -85,8 +85,9 @@ func _run_case(order: String, group: StringName, expect_cleared: bool) -> void:
 	print("\n=== case: ", order)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate() as Node3D
 	# Floor 2's island stands its trio - the orders above are three kills -
-	# whichever way the run's seed would roll it.
-	var force: Dictionary[StringName, StringName] = {&"island": &"dragonfly_trio"}
+	# and its crab the Sputter's pair, whichever way the run's seed would
+	# roll them.
+	var force: Dictionary[StringName, StringName] = {&"island": &"dragonfly_trio", &"crab": &"sputter_underfoot"}
 	_field.set("force_options", force)
 	root.add_child(_field)
 	for i in 30:

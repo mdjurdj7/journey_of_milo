@@ -272,6 +272,11 @@ func _load_field(floor_index: int, same_run: bool = false) -> void:
 	_run_state.set("run_opening_pending", false)
 	_run_state.set("title_pending", false)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	# Floor 2's crab stands the Sputter's option, whichever way the run's
+	# seed would roll it - the line checked is the Sputter and Underfoot's.
+	if floor_index == FLOOR_2:
+		var force: Dictionary[StringName, StringName] = {&"crab": &"sputter_underfoot"}
+		_field.set("force_options", force)
 	root.add_child(_field)
 	for i in 40:
 		await physics_frame

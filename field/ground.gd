@@ -124,6 +124,19 @@ signal relief_rebuilt
 	set(value):
 		pool_color = value
 		_apply_uniform("pool_color", value)
+# Standing pools stamped at runtime (set_pool_stamp(), from a StandingPool
+# prop - the Glower's): each an ellipse drawn as a pool, pool_color, its
+# edge feathered over pool_stamp_edge metres, and a damp rim pool_stamp_
+# rim metres wide round it, sand wetted as the wet band's. Still water - no
+# swash, no foam, no depth: the relief under it is untouched.
+@export var pool_stamp_edge: float = 0.08:
+	set(value):
+		pool_stamp_edge = value
+		_apply_uniform("pool_stamp_edge", value)
+@export var pool_stamp_rim: float = 0.35:
+	set(value):
+		pool_stamp_rim = value
+		_apply_uniform("pool_stamp_rim", value)
 
 # GDScript-only (see get_height_at()) - relief is baked into the mesh/
 # collision at rebuild time, not pushed to the shader as a uniform.
@@ -1258,6 +1271,9 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("pool_threshold", pool_threshold)
 	_apply_uniform("pool_edge_width", pool_edge_width)
 	_apply_uniform("pool_color", pool_color)
+	_apply_uniform("pool_stamp_edge", pool_stamp_edge)
+	_apply_uniform("pool_stamp_rim", pool_stamp_rim)
+	_push_pool_stamps()
 	_apply_uniform("drift_line_spacing", drift_line_spacing)
 	_apply_uniform("drift_line_width", drift_line_width)
 	_apply_uniform("drift_line_wobble", drift_line_wobble)
@@ -1341,6 +1357,43 @@ func set_wear_path(points: PackedVector2Array) -> void:
 	padded.resize(WEAR_MAX_POINTS)
 	_apply_uniform("wear_points", padded)
 	_apply_uniform("wear_point_count", used.size())
+
+# The pool stamps (see pool_stamp_edge): up to POOL_STAMP_MAX, each held
+# by the node that set it - its instance id -> [centre XZ, semi-axes,
+# yaw degrees]. Setting one again moves it; clearing it takes it away.
+const POOL_STAMP_MAX := 4
+var _pool_stamps: Dictionary = {}
+
+# A standing pool on the ground for `holder`: an ellipse at world XZ
+# `centre` with semi-axes `radii` (x along its own length), its length
+# turned `yaw_degrees` round Y as a prop's +X turns. Past POOL_STAMP_MAX
+# holders, the newest is left out, with a warning.
+func set_pool_stamp(holder: Object, centre: Vector2, radii: Vector2, yaw_degrees: float) -> void:
+	var key: int = holder.get_instance_id()
+	if not _pool_stamps.has(key) and _pool_stamps.size() >= POOL_STAMP_MAX:
+		push_warning("Ground: at most %d pool stamps; '%s' left out." % [POOL_STAMP_MAX, holder])
+		return
+	_pool_stamps[key] = [centre, radii, yaw_degrees]
+	_push_pool_stamps()
+
+func clear_pool_stamp(holder: Object) -> void:
+	if _pool_stamps.erase(holder.get_instance_id()):
+		_push_pool_stamps()
+
+func _push_pool_stamps() -> void:
+	var shapes := PackedVector4Array()
+	var yaws := PackedFloat32Array()
+	for stamp: Array in _pool_stamps.values():
+		var centre: Vector2 = stamp[0]
+		var radii: Vector2 = stamp[1]
+		shapes.append(Vector4(centre.x, centre.y, maxf(radii.x, 0.01), maxf(radii.y, 0.01)))
+		yaws.append(deg_to_rad(float(stamp[2])))
+	var count: int = shapes.size()
+	shapes.resize(POOL_STAMP_MAX)
+	yaws.resize(POOL_STAMP_MAX)
+	_apply_uniform("pool_stamps", shapes)
+	_apply_uniform("pool_stamp_yaws", yaws)
+	_apply_uniform("pool_stamp_count", count)
 
 # The ruts' centreline, in world XZ, start to end: a chain through every
 # point, as a long worn band is. Under 2 points clears them; past

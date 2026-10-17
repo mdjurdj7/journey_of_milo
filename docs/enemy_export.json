@@ -195,6 +195,79 @@
               "glassbone": 0
             },
             {
+              "slot": "crab",
+              "option": "underfoot_glower",
+              "weight": 1.0,
+              "anchor": [
+                1.5,
+                -21.25
+              ],
+              "slot_yaw_degrees": 0.0,
+              "cluster": "crab",
+              "names": "Glower + Underfoot",
+              "required": true,
+              "elite": false,
+              "gate_fight": true,
+              "gate": {
+                "exit_kind": "LINE",
+                "exit_direction": [
+                  0.0,
+                  -1.0
+                ],
+                "gate_distance_beyond_enemy": 7.5,
+                "bar_axis_offset": 0.0,
+                "channel_max_width": 0.0
+              },
+              "elite_rewards": {
+                "gold_multiplier": null,
+                "card_rates": "normal",
+                "why": null
+              },
+              "patrol": null,
+              "members": [
+                {
+                  "member": 0,
+                  "name": "Glower",
+                  "enemy_file": "res://battle/rules/enemies/glower.tres",
+                  "hp": 26,
+                  "anchor": true,
+                  "card_reward": "ROLLED",
+                  "position": [
+                    1.5,
+                    -23.0
+                  ],
+                  "yaw_degrees": 135.0,
+                  "face_prop": null
+                },
+                {
+                  "member": 1,
+                  "name": "Underfoot",
+                  "enemy_file": "res://battle/rules/enemies/underfoot.tres",
+                  "hp": 52,
+                  "anchor": false,
+                  "card_reward": "ROLLED",
+                  "position": [
+                    -0.75,
+                    -21.3
+                  ],
+                  "yaw_degrees": -121.3,
+                  "face_prop": null
+                }
+              ],
+              "props": [
+                {
+                  "scene": "res://field/standing_pool.tscn",
+                  "position": [
+                    1.5,
+                    -23.0
+                  ]
+                }
+              ],
+              "keepsake_drop": null,
+              "armor_drop": null,
+              "glassbone": 0
+            },
+            {
               "slot": "island",
               "option": "dragonfly_trio",
               "weight": 1.0,
@@ -1497,7 +1570,17 @@
         "status_gained": null,
         "attachment": {}
       },
-      "appears_on": []
+      "appears_on": [
+        {
+          "region": 1,
+          "floor": 2,
+          "slot": "crab",
+          "option": "underfoot_glower",
+          "cluster": "crab",
+          "required": true,
+          "gate_fight": true
+        }
+      ]
     },
     {
       "name": "Greyshelf",
@@ -2125,6 +2208,15 @@
           "floor": 2,
           "slot": "crab",
           "option": "sputter_underfoot",
+          "cluster": "crab",
+          "required": true,
+          "gate_fight": true
+        },
+        {
+          "region": 1,
+          "floor": 2,
+          "slot": "crab",
+          "option": "underfoot_glower",
           "cluster": "crab",
           "required": true,
           "gate_fight": true
