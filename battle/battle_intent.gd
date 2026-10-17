@@ -27,7 +27,8 @@ class_name BattleIntent
 # stack still ends at the anchor, so the attack line sits a ring higher.
 # A BURROW (buried - it does nothing this turn) is its glyph alone: there
 # is no number coming - and so is a SETTLE (the Underfoot's Rebury), a
-# down-arrow onto a ground line, and a COIL (the Adder's), a coil. A
+# down-arrow onto a ground line, a COIL (the Adder's), a coil, and a
+# TAUNT (the Glower's Puff), a ring round a dark centre. A
 # HEAL_ALLY (the Nipper's Forage) is a plus beside the HP its packmates
 # will heal. A multi-hit attack whose hits differ once its modifiers have
 # run - Unbroken soaking the first, so a 4×4 lands 0, 4, 4, 4 - reads
@@ -276,6 +277,12 @@ const SETTLE_DIP: float = 0.35
 const COIL_TURNS: float = 1.6
 const COIL_INNER: float = 0.2
 const COIL_HEAD: float = 0.75
+# The false eye (TAUNT): its ring's radius and each of its two strokes'
+# sweep, in turns, as fractions of the glyph's half-height and of a turn;
+# the dark centre's radius.
+const TAUNT_RING: float = 0.85
+const TAUNT_SWEEP: float = 0.62
+const TAUNT_CENTRE: float = 0.34
 
 var target: FieldEnemy = null
 var _label: Label = null
@@ -374,7 +381,7 @@ func show_intent(preview: Dictionary) -> void:
 				total += int(amount)
 			_label.text = str(total)
 			_hits_label.text = hits_format % hits
-		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.DIG or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE or _type == EnemyIntent.IntentType.COIL:
+		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.DIG or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE or _type == EnemyIntent.IntentType.COIL or _type == EnemyIntent.IntentType.TAUNT:
 			_label.text = ""
 			_hits_label.text = ""
 		_has_threshold = preview.has("threshold")
@@ -678,7 +685,9 @@ func _ribbon(spine: PackedVector2Array, factors: PackedFloat32Array, stroke_px: 
 # mid-lid, fine at the corners, a lighter lower lid short of them, and a
 # round pupil. SETTLE: the attack's spearhead pointing down, its point
 # sunk SETTLE_DIP through the same ground line and cut off there - going
-# into the sand. COIL: a coil (coil_shapes()).
+# into the sand. COIL: a coil (coil_shapes()). TAUNT: the Glower's false
+# eye - a ring in two strokes, each fine where it overlaps the other,
+# round a solid dark centre.
 func _glyph_shapes(centre: Vector2, r: float) -> Array[PackedVector2Array]:
 	var shapes: Array[PackedVector2Array] = []
 	match _type:
@@ -755,6 +764,26 @@ func _glyph_shapes(centre: Vector2, r: float) -> Array[PackedVector2Array]:
 			shapes.append(_ribbon(line, PackedFloat32Array([0.0, GROUND_WEIGHT, GROUND_WEIGHT, 0.0])))
 		EnemyIntent.IntentType.COIL:
 			shapes = coil_shapes(centre, r, glyph_stroke_px, glyph_taper)
+		EnemyIntent.IntentType.TAUNT:
+			# Two arcs of TAUNT_SWEEP turns each, the second starting half
+			# a turn on, so their fine ends overlap at the joins; the
+			# centre TAUNT_CENTRE of r across.
+			var arc_steps: int = 24
+			for half in 2:
+				var start: float = -PI * 0.6 + PI * float(half)
+				var arc := PackedVector2Array()
+				var arc_factors := PackedFloat32Array()
+				for step in arc_steps + 1:
+					var t: float = float(step) / float(arc_steps)
+					var angle: float = start + TAU * TAUNT_SWEEP * t
+					arc.append(centre + Vector2(cos(angle), sin(angle)) * r * TAUNT_RING)
+					arc_factors.append(sin(t * PI))
+				shapes.append(_ribbon(arc, arc_factors))
+			var dark := PackedVector2Array()
+			for step in 20:
+				var angle: float = TAU * float(step) / 20.0
+				dark.append(centre + Vector2(cos(angle), sin(angle)) * r * TAUNT_CENTRE)
+			shapes.append(dark)
 	return shapes
 
 # A coil in the tapered pen, r either side of `centre`: one stroke wound

@@ -5,7 +5,8 @@ extends SceneTree
 # Sting is queued and Exposed (takes 50% more) while the Rebury is -
 # starting Covered, and still alternating after a Denied or Stunned
 # Sting; the Sting one unbreakable blow of 16 that Block and Brace
-# soften; the Rebury nothing. Floor 2's required cluster is the Sputter
+# soften; the Rebury nothing; taunt (Inflated) on a packmate barring a
+# Slash from it but not Brace or Sentence. Floor 2's required cluster is the Sputter
 # and the Underfoot, no dragonfly, the island's Dragonfly x3 as they
 # were. The Wanderer's stance on the dune's rise east of the crab stands
 # on the drawn surface, and an escape leaves him there with no lift.
@@ -29,7 +30,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 13
+const CASES := 14
 const UNDERFOOT_PATH := "res://battle/rules/enemies/underfoot.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const DRAGONFLY_PATH := "res://battle/rules/enemies/dragonfly.tres"
@@ -44,6 +45,9 @@ const POSE_SCENE_PATH := "res://field/underfoot_pose.tscn"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
+const BRACE_PATH := "res://cards/data/brace.tres"
+const SENTENCE_PATH := "res://cards/data/sentence.tres"
+const INFLATED_PATH := "res://battle/rules/statuses/inflated.tres"
 # Where the fight case logs its run, when run_probes.sh hands over no
 # folder of this process's own (RunLogger.dir_override()).
 const LOG_DIR := "user://underfoot_probe"
@@ -81,6 +85,7 @@ func _initialize() -> void:
 	_check_loop()
 	_check_lost_sting()
 	_check_sting_defence()
+	_check_taunt()
 	_check_floor_data()
 	_check_scissor_rule()
 	await _check_field_body()
@@ -99,6 +104,28 @@ func _initialize() -> void:
 		quit(1)
 
 # --- Rules ---
+
+# Taunt (Inflated, the Glower's - here on a Sputter): while it's up, a
+# Slash can't target the Underfoot, only the taunter; Brace and Sentence
+# (enemy-target Skills) still can; Inflated takes half; and with the
+# taunter dead the Slash finds the Underfoot again.
+func _check_taunt() -> void:
+	var underfoot: Combatant = _enemy(_underfoot())
+	var taunter: Combatant = _enemy(load(SPUTTER_PATH) as EnemyData)
+	var enemies: Array[Combatant] = [underfoot, taunter]
+	var slash: CardData = load(SLASH_PATH)
+	var brace: CardData = load(BRACE_PATH)
+	var sentence: CardData = load(SENTENCE_PATH)
+	_expect(EffectResolver.can_target(slash, underfoot, enemies), "No taunt: a Slash can target the Underfoot")
+	Status.apply_to(taunter.statuses, load(INFLATED_PATH) as StatusData)
+	_expect(not EffectResolver.can_target(slash, underfoot, enemies), "Taunted: a Slash can't target the Underfoot")
+	_expect(EffectResolver.can_target(slash, taunter, enemies), "...only the taunter")
+	_expect(EffectResolver.has_target(slash, enemies), "...so it is still playable")
+	_expect(EffectResolver.can_target(brace, underfoot, enemies) and EffectResolver.can_target(sentence, underfoot, enemies), "Brace and Sentence still target the Underfoot")
+	_expect_eq(_taken(taunter, 10), 5, "Inflated: 10 lands 5")
+	taunter.hp = 0
+	_expect(EffectResolver.can_target(slash, underfoot, enemies), "The taunter dead: the Slash finds the Underfoot")
+	_completed += 1
 
 func _check_data() -> void:
 	var data: EnemyData = _underfoot()

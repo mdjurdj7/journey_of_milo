@@ -46,7 +46,14 @@ class_name EnemyIntent
 # under_moves - the Siltjaw's Bite, then its Erupt, after which it
 # surfaces on its own. The display shows the move and a pip per turn
 # under, never a mound. The Siltjaw's Dig.
-enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL, DIG }
+#
+# TAUNT: as COIL - no damage, no block, it stays targetable - and what it
+# brings is its status_on_resolve (Inflated: it taunts and takes less),
+# held from the move until the enemy's next. Shown the turn before it
+# lands, so the player sees the taunt coming. The display shows its glyph
+# alone, a ring round a dark centre - the Glower's false eye. The
+# Glower's Puff.
+enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL, DIG, TAUNT }
 
 # The move's name (the Dunecur's Rush) - for the enemy export (tests/
 # enemy_export.gd) and the design docs; nothing in a fight shows it yet.

@@ -176,6 +176,10 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# Nothing happens here either: it coils, and what that brings
 				# is its status_on_resolve (Coiled), just below.
 				pass
+			EnemyIntent.IntentType.TAUNT:
+				# As the Coil: it puffs up, and what that brings is its
+				# status_on_resolve (Inflated), just below.
+				pass
 			EnemyIntent.IntentType.DIG:
 				# Under the sand, its mounds up (start_dig()); the loop moves
 				# on past the Dig below, for when it comes back up.

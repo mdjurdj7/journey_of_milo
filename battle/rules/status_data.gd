@@ -111,6 +111,12 @@ const DURATION_UNTIL_TRIGGERED := -2
 # (EnemyTurn.counter_strike(), BattleController._counter_strikes()). An
 # all-enemies Attack that hits it counts once.
 @export var strikes_back_on_attack_card: bool = false
+# Taunt (Inflated): while its holder - an enemy - has it, the player's
+# Attack cards aimed at one enemy must aim at it - no other living enemy
+# in the fight can be their target (EffectResolver.can_target()). Area
+# Attacks still hit everything, and enemy-target Skills go where they
+# like. The Glower's Inflated.
+@export var taunts: bool = false
 
 # The inked mark its readout draws for it - a coil (Coiled), a drop
 # (Venom) - or none: the label alone, as every status before them.

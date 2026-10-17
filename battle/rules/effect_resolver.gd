@@ -118,21 +118,37 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 # can't be paid for shows it rather than being taken and doing nothing.
 # Whether `card` may land on `combatant`: living and not buried, and - for
 # a card that skips its target's turn (Deny) - not one already holding
-# that status, since it doesn't stack. BattleController's targeting and
-# the hand's fade both ask here.
-static func can_target(card: CardData, combatant: Combatant) -> bool:
+# that status, since it doesn't stack. And taunt (StatusData.taunts - the
+# Glower's Inflated): while any of `enemies` - the fight's, living and
+# unburied - is taunting, an Attack card aimed at one enemy may land only
+# on a taunting one. An area Attack has no target to ask about, and an
+# enemy-target Skill (Brace, Sentence) goes where it likes. Killing the
+# taunter lifts it at once. BattleController's targeting and the hand's
+# fade both ask here.
+static func can_target(card: CardData, combatant: Combatant, enemies: Array[Combatant] = []) -> bool:
 	if combatant == null or combatant.hp <= 0 or combatant.buried:
 		return false
 	for effect in card.effects:
 		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and effect.status_data != null and effect.status_data.skips_next_turn:
 			if Status.skip_turn_status(combatant.statuses) != null:
 				return false
+	if card.card_type == CardData.CardType.ATTACK and card.target_type == CardData.TargetType.ENEMY and not is_taunting(combatant):
+		for other in enemies:
+			if other != null and other != combatant and other.hp > 0 and not other.buried and is_taunting(other):
+				return false
 	return true
 
 # Whether any of `enemies` is one `card` may land on.
 static func has_target(card: CardData, enemies: Array[Combatant]) -> bool:
 	for combatant in enemies:
-		if can_target(card, combatant):
+		if can_target(card, combatant, enemies):
+			return true
+	return false
+
+# Whether `combatant` holds a status that taunts (StatusData.taunts).
+static func is_taunting(combatant: Combatant) -> bool:
+	for active: Status in combatant.statuses:
+		if active.data != null and active.data.taunts:
 			return true
 	return false
 

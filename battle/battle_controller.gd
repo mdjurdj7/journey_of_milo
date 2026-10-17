@@ -578,9 +578,10 @@ func _other_hand_views(card_view: CardView) -> Array[CardView]:
 	return others
 
 # Whether `card` may land on `combatant` (EffectResolver.can_target() -
-# not buried, and Deny not on the already Denied).
+# not buried, Deny not on the already Denied, and a single-target Attack
+# only on a taunting enemy while one stands).
 func _can_target(card: CardData, combatant: Combatant) -> bool:
-	return EffectResolver.can_target(card, combatant)
+	return EffectResolver.can_target(card, combatant, _hittable_enemy_combatants())
 
 func _has_valid_target(card: CardData) -> bool:
 	return EffectResolver.has_target(card, _hittable_enemy_combatants())
