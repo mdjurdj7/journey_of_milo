@@ -65,6 +65,15 @@
   `--batch 4/4`, each in the foreground. `--changed`, `--prepush` (the
   mapped probes plus the fast tier) and area sweeps run only when I ask
   for them.
+- Overnight full set: `tools/nightly_probes.sh` (Git Bash, main tree),
+  or from PowerShell in a window of its own that outlives the terminal:
+  `Start-Process "C:\Program Files\Git\bin\bash.exe" -ArgumentList "tools/nightly_probes.sh"`.
+  It waits out other sessions' probes, makes ../journey-of-milo-nightly
+  afresh at main, imports there and runs `--full -j 2`, then writes
+  ../probe-nightly/latest.txt (main's commit, total time, PASS/FAIL and
+  seconds per probe, each failure's first FAIL lines; logs beside it)
+  and removes the worktree. I start it; Claude doesn't unless I ask, and
+  reads latest.txt when I say the nightly ran.
 - Never push unless my message says "push".
 - Before any push, run `git pull --rebase`.
 - Don't write a new probe unless I ask for one, or unless it guards a
