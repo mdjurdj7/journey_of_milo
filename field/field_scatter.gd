@@ -128,6 +128,15 @@ class CardLayer extends RefCounted:
 	var spots: Array[Spot] = []
 	var custom: PackedColorArray = PackedColorArray()
 
+# A model entry's one MultiMesh, for the battle fade: its spots in
+# instance order, each one's colour as drawn, and its presence now (1
+# solid) - the colour's alpha.
+class ModelLayer extends RefCounted:
+	var instance: MultiMeshInstance3D = null
+	var spots: Array[Spot] = []
+	var colours: PackedColorArray = PackedColorArray()
+	var presence: PackedFloat32Array = PackedFloat32Array()
+
 # Somewhere nothing lies: a disc, a ring, a capsule (the segment a-b), or
 # a polygon grown by a margin.
 class KeepOut extends RefCounted:
@@ -352,6 +361,16 @@ var _solids: PackedVector3Array = PackedVector3Array()
 var _fog_passes: Array[ShaderMaterial] = []
 var _instances: Array[MultiMeshInstance3D] = []
 var _card_layers: Array[CardLayer] = []
+var _model_layers: Array[ModelLayer] = []
+# The battle frame as BattleOcclusion last handed it (set_battle_screen()):
+# the camera (null out of a frame), the fighters' screen boxes and depths
+# along it, the readouts' rects, and how much nearer than a fighter an
+# item must be to count as in front of it.
+var _battle_camera: Camera3D = null
+var _battle_fighter_rects: Array[Rect2] = []
+var _battle_fighter_depths: PackedFloat32Array = PackedFloat32Array()
+var _battle_readouts: Array[Rect2] = []
+var _battle_depth_margin: float = 0.2
 # The camera forward last pushed to the cards.
 var _card_forward: Vector2 = Vector2.ZERO
 # The gust and its sway gain last pushed to the cards.
@@ -1476,6 +1495,7 @@ func _draw_all() -> void:
 			instance.free()
 	_instances.clear()
 	_card_layers.clear()
+	_model_layers.clear()
 	_fog_passes.clear()
 	_card_forward = Vector2.ZERO
 	for entry in _entries:
@@ -1493,6 +1513,15 @@ func _draw_all() -> void:
 		instance.material_override = _material(entry, mesh)
 		add_child(instance)
 		_instances.append(instance)
+		var layer := ModelLayer.new()
+		layer.instance = instance
+		layer.spots = spots
+		layer.colours.resize(spots.size())
+		layer.presence.resize(spots.size())
+		layer.presence.fill(1.0)
+		for i in spots.size():
+			layer.colours[i] = instance.multimesh.get_instance_color(i)
+		_model_layers.append(layer)
 
 # Every spot of an entry as an instance: the model turned to rest, its
 # base centred on the origin and lowered by sink_fraction of its height
@@ -1544,6 +1573,8 @@ func _material(entry: ScatterEntry, mesh: Mesh) -> Material:
 	if not entry.colour_map_path.is_empty():
 		var painted: ShaderMaterial = PaintedProp.material(entry.colour_map_path, entry.tint)
 		if painted != null:
+			# The battle fade, per item, through the instance colour's alpha.
+			painted.set_shader_parameter("instance_presence", true)
 			var fog: ShaderMaterial = PaintedProp.fog_pass()
 			if fog != null:
 				painted.next_pass = fog
@@ -1560,6 +1591,9 @@ func _material(entry: ScatterEntry, mesh: Mesh) -> Material:
 	var flat := Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
 	flat.vertex_color_use_as_albedo = true
 	flat.albedo_color = entry.tint
+	# The battle fade, per item: the instance colour's alpha as a dither
+	# (every item draws whole at alpha 1).
+	flat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA_HASH
 	return flat
 
 # Every painted kind's fog pass from the sky's fog as it stands - the
@@ -1638,10 +1672,9 @@ func _draw_cards(entry: ScatterEntry, spots: Array[Spot]) -> void:
 	_push_card_gust()
 
 func _process(delta: float) -> void:
-	if _card_layers.is_empty():
-		return
-	_push_card_forward()
-	_push_card_gust()
+	if not _card_layers.is_empty():
+		_push_card_forward()
+		_push_card_gust()
 	_advance_battle_fade(delta)
 
 # The floor's gust (RegionField.get_gust()) and its FloorWindData.gust_
@@ -1694,17 +1727,66 @@ func _advance_battle_fade(delta: float) -> void:
 	if seconds < 0.0:
 		seconds = rig.battle_transition_time if rig != null else 0.6
 	var step: float = delta / maxf(seconds, 1.0e-3)
+	var screen: bool = framing and _battle_camera != null and is_instance_valid(_battle_camera)
 	for layer in _card_layers:
-		if not layer.entry.battle_fade:
-			continue
 		for i in layer.spots.size():
-			var target: float = 0.0 if framing and hides_feet(layer.spots[i], eye, feet) else 1.0
+			var spot: Spot = layer.spots[i]
+			var hides: bool = framing and layer.entry.battle_fade and hides_feet(spot, eye, feet)
+			hides = hides or (screen and occludes_battle(spot, spot.width * 0.5))
+			var target: float = 0.0 if hides else 1.0
 			var custom: Color = layer.custom[i]
 			if custom.b == target:
 				continue
 			custom.b = move_toward(custom.b, target, step)
 			layer.custom[i] = custom
 			layer.instance.multimesh.set_instance_custom_data(i, custom)
+	for layer in _model_layers:
+		if not is_instance_valid(layer.instance):
+			continue
+		for i in layer.spots.size():
+			var target: float = 0.0 if screen and occludes_battle(layer.spots[i], layer.spots[i].size * 0.5) else 1.0
+			if layer.presence[i] == target:
+				continue
+			layer.presence[i] = move_toward(layer.presence[i], target, step)
+			var colour: Color = layer.colours[i]
+			colour.a = layer.presence[i]
+			layer.instance.multimesh.set_instance_color(i, colour)
+
+# The battle frame for the per-item fade, from BattleOcclusion every
+# frame: `camera` null out of a frame (everything comes back).
+func set_battle_screen(camera: Camera3D, fighter_rects: Array[Rect2], fighter_depths: PackedFloat32Array, readouts: Array[Rect2], depth_margin: float) -> void:
+	_battle_camera = camera
+	_battle_fighter_rects = fighter_rects
+	_battle_fighter_depths = fighter_depths
+	_battle_readouts = readouts
+	_battle_depth_margin = depth_margin
+
+# Whether an item at `spot`, `half` across either way and spot.size tall,
+# covers a fighter from in front (its screen box over the fighter's, its
+# own spot nearer the camera by more than the margin) or lies under a
+# readout - in the frame set_battle_screen() last handed over.
+func occludes_battle(spot: Spot, half: float) -> bool:
+	var camera: Camera3D = _battle_camera
+	var at: Vector3 = spot.position
+	var rect := Rect2()
+	var first: bool = true
+	for corner in [Vector3(-half, 0.0, -half), Vector3(half, 0.0, -half), Vector3(-half, 0.0, half), Vector3(half, 0.0, half), Vector3(-half, spot.size, -half), Vector3(half, spot.size, -half), Vector3(-half, spot.size, half), Vector3(half, spot.size, half)]:
+		var point: Vector3 = at + corner
+		if camera.is_position_behind(point):
+			continue
+		var screen_point: Vector2 = camera.unproject_position(point)
+		rect = Rect2(screen_point, Vector2.ZERO) if first else rect.expand(screen_point)
+		first = false
+	if first:
+		return false
+	var depth: float = (at - camera.global_position).dot(-camera.global_basis.z)
+	for i in _battle_fighter_rects.size():
+		if rect.intersects(_battle_fighter_rects[i]) and depth < _battle_fighter_depths[i] - _battle_depth_margin:
+			return true
+	for readout in _battle_readouts:
+		if rect.intersects(readout):
+			return true
+	return false
 
 # Whether a card at `spot` hides any of `feet` from `eye`: on the camera's
 # side of the foot, within its half-width plus battle_fade_margin_m of the

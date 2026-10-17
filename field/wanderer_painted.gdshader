@@ -43,11 +43,16 @@ uniform vec4 flash_color : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 // take it off the opaque pass). A painted enemy's death dissolve
 // (FieldEnemy._set_death_presence()); the Wanderer leaves it at 1.
 uniform float presence : hint_range(0.0, 1.0) = 1.0;
+// A MultiMesh's per-item presence (FieldScatter's battle fade): the
+// instance colour's alpha multiplies presence when set. Off for anything
+// that isn't scatter - a model's own vertex alpha never dissolves it.
+uniform bool instance_presence = false;
 
 void fragment() {
-	if (presence < 1.0) {
+	float present = instance_presence ? presence * COLOR.a : presence;
+	if (present < 1.0) {
 		float noise = fract(52.9829189 * fract(dot(FRAGCOORD.xy, vec2(0.06711056, 0.00583715))));
-		if (noise >= presence) {
+		if (noise >= present) {
 			discard;
 		}
 	}

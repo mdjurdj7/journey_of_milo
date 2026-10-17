@@ -572,6 +572,19 @@ func _create_enemy_intents(enemy_list: Array[FieldEnemy]) -> void:
 		intent.set_target(enemy)
 		_enemy_intents[enemy] = intent
 
+# Every enemy readout on screen now - its HP/name plate and its intent -
+# as screen rects (BattleOcclusion fades what lies under them).
+func get_readout_rects() -> Array[Rect2]:
+	var rects: Array[Rect2] = []
+	for display in _enemy_statuses.values() + _enemy_intents.values():
+		var control := display as Control
+		if control == null or not is_instance_valid(control) or not control.is_visible_in_tree():
+			continue
+		var rect: Rect2 = control.get_global_rect()
+		if rect.has_area():
+			rects.append(rect)
+	return rects
+
 # Once the camera swing/stance step has settled - the same delay HPBar/
 # EnemyStatus's style tween takes - every display with an intent shows.
 func _reveal_enemy_intents() -> void:

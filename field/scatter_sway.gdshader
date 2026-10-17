@@ -32,6 +32,14 @@ void vertex() {
 }
 
 void fragment() {
+	// The battle fade (FieldScatter): the instance colour's alpha as a
+	// screen-space dither, as the painted shader's presence.
+	if (COLOR.a < 1.0) {
+		float noise = fract(52.9829189 * fract(dot(FRAGCOORD.xy, vec2(0.06711056, 0.00583715))));
+		if (noise >= COLOR.a) {
+			discard;
+		}
+	}
 	ALBEDO = tint.rgb * COLOR.rgb;
 	ROUGHNESS = 1.0;
 	METALLIC = 0.0;

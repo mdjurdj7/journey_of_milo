@@ -736,6 +736,10 @@ func _ready() -> void:
 	# site later without RunState itself needing to change. Must run before
 	# anything below reads RunState.deck.
 	RunLogger.enabled = run_logging_enabled
+	# The battle frame's fades for props and scatter (BattleOcclusion).
+	var occlusion := BattleOcclusion.new()
+	occlusion.name = "BattleOcclusion"
+	add_child(occlusion)
 	if RunState.character == null:
 		RunState.new_run(load(STARTING_CHARACTER_PATH) as CharacterData)
 	# The order at floor load: what each slot stands (no side effects),
@@ -2260,6 +2264,48 @@ func get_gust() -> float:
 # A fight holds the field (from contact to its end).
 func is_battle_open() -> bool:
 	return _battle_open
+
+# The fight's members as it stands - empty out of a fight.
+func get_battle_members() -> Array[FieldEnemy]:
+	var members: Array[FieldEnemy] = []
+	if _battle_open:
+		members.assign(_battle_members)
+	return members
+
+# The fight's overlay, or null out of a fight.
+func get_battle_overlay() -> BattleOverlay:
+	if not _battle_open or battle_layer == null:
+		return null
+	for child in battle_layer.get_children():
+		if child is BattleOverlay and not child.is_queued_for_deletion():
+			return child as BattleOverlay
+	return null
+
+# Whether a prop (a child of Props) is part of the fight itself, never to
+# be faded or stood clear of: one the fight's own option brought
+# (ENCOUNTER_SLOT_META), or one a member stands on by design - raised by
+# its height_offset over the prop's footprint.
+func is_battle_exempt_prop(prop: Node) -> bool:
+	if not _battle_open or _battle_members.is_empty():
+		return false
+	if prop.has_meta(ENCOUNTER_SLOT_META) and StringName(prop.get_meta(ENCOUNTER_SLOT_META)) == _battle_members[0].slot_id:
+		return true
+	var raised := PackedVector2Array()
+	for member in _battle_members:
+		if is_instance_valid(member) and member.height_offset > 0.0:
+			raised.append(Vector2(member.global_position.x, member.global_position.z))
+	if raised.is_empty():
+		return false
+	var corners := PackedVector2Array()
+	for node in prop.find_children("*", "GeometryInstance3D", true, false):
+		var instance := node as GeometryInstance3D
+		var box: AABB = instance.get_aabb()
+		for k in 8:
+			var corner: Vector3 = instance.global_transform * box.get_endpoint(k)
+			corners.append(Vector2(corner.x, corner.z))
+	if corners.size() < 3:
+		return false
+	return _holds_any(Geometry2D.convex_hull(corners), raised)
 
 # The threshold, from the ExitGate's trigger at the far end of the bar:
 # the field freezes (the same process-mode freeze battle uses - this
