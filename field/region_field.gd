@@ -8,6 +8,9 @@ const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 const FIELD_ENEMY_SCENE_PATH := "res://field/field_enemy.tscn"
 const PROPS_NODE_NAME := "Props"
+# The slot an encounter option's prop came with (_spawn_prop_list()) - a
+# fight's own props are no obstacle to its battle positions.
+const ENCOUNTER_SLOT_META := &"encounter_slot"
 
 # Emitted once, when the last REQUIRED enemy (EncounterSlot.required) is
 # defeated - see _on_battle_finished()'s own WIN branch and _required_
@@ -276,6 +279,17 @@ static func reset_hold_line_spoken() -> void:
 # along for a prop between him and his stance - under a low rock's top.
 @export var stance_check_height_m: float = 0.5
 @export var battle_line_shift_max: float = 2.0
+# Battle positions keep a fighter's body this far off every prop's
+# footprint (and a scatter item at least battle_scatter_obstacle_min_m
+# across): a pack's line slides along itself, either way, up to
+# battle_line_shift_max, and his stance slides in toward the enemy, until
+# none overlaps (see _battle_obstacles()). A body is its model's half-
+# diagonal; his, battle_body_radius_m. Props the fight's own option brings
+# (the Wardling's post) and one a member stands on by design (a slab, the
+# Greyshelf's rock) are no obstacle. Read at contact.
+@export var battle_prop_clearance_m: float = 0.15
+@export var battle_body_radius_m: float = 0.4
+@export var battle_scatter_obstacle_min_m: float = 0.2
 # Metres between the members of a cluster along the line they step into
 # for a fight (see _place_cluster_line()) - read at contact, so a Remote-
 # tab edit takes on the next fight.
@@ -1807,6 +1821,8 @@ func _spawn_prop_list(entries: Array[FloorProp], props_root: Node3D, id_prefix: 
 				at = slot.to_floor(at)
 				yaw += slot.yaw_degrees
 			placement = Vector3(spawn.x + at.x, 0.0, spawn.z + at.y)
+		if slot != null:
+			prop.set_meta(ENCOUNTER_SLOT_META, slot.slot_id)
 		if prop.has_method("set_floor_placement"):
 			prop.call("set_floor_placement", placement, yaw, entry.roll_degrees)
 		else:
@@ -2384,24 +2400,52 @@ func _place_cluster_line(members: Array[FieldEnemy], duration: float) -> Vector3
 	# shift is undone, or he would stand that much nearer than the minimum
 	# and the line's far end that much further out.
 	# His gap is from the anchor's near edge - the line's nearest member.
+	# Each member's distance along the line from the anchor's spot.
+	var offsets: Array[float] = []
+	var offset_sum: float = 0.0
+	for index in rest.size():
+		offset_sum += _cluster_gap_for(members[index] if index == 0 else rest[index - 1], rest[index])
+		offsets.append(offset_sum)
 	var start: Vector3 = anchor.global_position
+	var obstacles: Array[PackedVector2Array] = _battle_obstacles(members)
+	# First a line clear of deeper water and of every prop - the nearest
+	# shift either way along itself first - then, failing that, clear of
+	# the water alone, inward only, as it always was.
 	var shift: float = 0.0
-	var spacing: float = _stance_spacing(start, -along, anchor)
-	while spacing < 0.0 and shift < battle_line_shift_max - 0.001:
-		shift += 0.1
-		spacing = _stance_spacing(start + along * shift, -along, anchor)
+	var spacing: float = -1.0
+	var steps: int = int(floor(battle_line_shift_max / 0.1 + 0.001))
+	for k in steps * 2 + 1:
+		var candidate: float = 0.1 * float((k + 1) / 2) * (1.0 if k % 2 == 1 else -1.0)
+		var line_start: Vector3 = start + along * candidate
+		var stance: float = _stance_spacing(line_start, -along, anchor, obstacles)
+		if stance < 0.0 or not _spot_clear(obstacles, line_start, _body_radius(anchor)):
+			continue
+		var clear: bool = true
+		for index in rest.size():
+			if not _spot_clear(obstacles, line_start + along * offsets[index], _body_radius(rest[index])):
+				clear = false
+				break
+		if clear:
+			shift = candidate
+			spacing = stance
+			break
 	if spacing < 0.0:
-		push_warning("RegionField: no stance out of deeper water for the line at '%s' even %.1f m in; the line stays and he stands at the minimum." % [anchor.name, shift])
+		push_warning("RegionField: no line for '%s' clear of every prop within %.1f m either way; keeping it out of deeper water only." % [anchor.name, battle_line_shift_max])
 		shift = 0.0
-		spacing = stance_distance_min(anchor)
-	elif shift > 0.0:
-		print("RegionField: the line steps %.1f m in from '%s' to keep the stance out of deeper water (%.1f m out)." % [shift, anchor.name, spacing])
+		spacing = _stance_spacing(start, -along, anchor)
+		while spacing < 0.0 and shift < battle_line_shift_max - 0.001:
+			shift += 0.1
+			spacing = _stance_spacing(start + along * shift, -along, anchor)
+		if spacing < 0.0:
+			push_warning("RegionField: no stance out of deeper water for the line at '%s' even %.1f m in; the line stays and he stands at the minimum." % [anchor.name, shift])
+			shift = 0.0
+			spacing = stance_distance_min(anchor)
+	if not is_zero_approx(shift):
+		print("RegionField: the line steps %.1f m along itself from '%s' to keep the pack and the stance clear (%.1f m out)." % [shift, anchor.name, spacing])
 		anchor.step_to(start + along * shift, duration)
 	_line_stance_spacing = spacing - shift
-	var offset: float = shift
 	for index in rest.size():
-		offset += _cluster_gap_for(members[index] if index == 0 else rest[index - 1], rest[index])
-		var spot: Vector3 = start + along * offset
+		var spot: Vector3 = start + along * (shift + offsets[index])
 		rest[index].step_to(spot, duration)
 		members[index + 1] = rest[index]
 	return -along
@@ -2486,7 +2530,12 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 				var facing: Vector3 = -anchor.global_transform.basis.z
 				stance_direction = Vector3(facing.x, 0.0, facing.z).normalized()
 				toward = stance_direction
-			spacing = _stance_spacing(anchor.global_position, toward, anchor)
+			# The enemy keeps its spot; his stance slides in toward it until
+			# it is clear of every prop as well as the water.
+			spacing = _stance_spacing(anchor.global_position, toward, anchor, _battle_obstacles(_battle_members))
+			if spacing < 0.0:
+				push_warning("RegionField: no stance for '%s' clear of every prop; keeping out of deeper water only." % anchor.name)
+				spacing = _stance_spacing(anchor.global_position, toward, anchor)
 			if spacing < 0.0:
 				push_warning("RegionField: no stance out of deeper water for '%s'; standing at the minimum." % anchor.name)
 				spacing = stance_distance_min(anchor)
@@ -2679,7 +2728,7 @@ func _battle_input_hold_seconds(transition_time: float) -> float:
 # pass), down to _battle_gap_min_for(). -1 when every one of those is deeper - the
 # caller decides what then (a cluster steps its line in, see _place_
 # cluster_line()).
-func _stance_spacing(from: Vector3, direction: Vector3, enemy: FieldEnemy) -> float:
+func _stance_spacing(from: Vector3, direction: Vector3, enemy: FieldEnemy, obstacles: Array[PackedVector2Array] = []) -> float:
 	var reach: float = enemy.battle_front_reach() if enemy != null else 0.0
 	var ground := get_node_or_null(ground_path) as Ground
 	var full_gap: float = _battle_gap_for(enemy)
@@ -2691,7 +2740,7 @@ func _stance_spacing(from: Vector3, direction: Vector3, enemy: FieldEnemy) -> fl
 	while gap >= _battle_gap_min_for(enemy) - 0.001:
 		var point: Vector3 = from + direction * (reach + gap)
 		var depth: float = water_level - ground.get_height_at(Vector2(point.x, point.z))
-		if depth <= stance_max_water_m:
+		if depth <= stance_max_water_m and _spot_clear(obstacles, point, battle_body_radius_m):
 			if gap < full_gap:
 				print("RegionField: stance pulled in to a %.1f m gap to keep out of deeper water." % gap)
 			return reach + gap
@@ -2707,6 +2756,93 @@ func stance_distance(enemy: FieldEnemy) -> float:
 
 func stance_distance_min(enemy: FieldEnemy) -> float:
 	return (enemy.battle_front_reach() if enemy != null else 0.0) + _battle_gap_min_for(enemy)
+
+# What a fight's positions keep off, as XZ outlines: every static shape a
+# body could stand against (get_obstacle_shapes() - props, ledges), each
+# SandFence's slats (lying ones have no collision), and every scatter
+# model at least battle_scatter_obstacle_min_m across, as its square. Not
+# a prop `members`' own option brought (ENCOUNTER_SLOT_META), nor one a
+# member stands on by design (raised over it by its height_offset).
+func _battle_obstacles(members: Array[FieldEnemy]) -> Array[PackedVector2Array]:
+	var outlines: Array[PackedVector2Array] = []
+	var own_slot: StringName = members[0].slot_id if not members.is_empty() else &""
+	var raised := PackedVector2Array()
+	for member in members:
+		if member.height_offset > 0.0:
+			raised.append(Vector2(member.global_position.x, member.global_position.z))
+	var props_root := get_node_or_null(PROPS_NODE_NAME)
+	for shape in get_obstacle_shapes():
+		if _is_fight_own_prop(shape, props_root, own_slot):
+			continue
+		var outline: PackedVector2Array = _shape_outline(shape)
+		if outline.size() >= 3 and not _holds_any(outline, raised):
+			outlines.append(outline)
+	for node in find_children("*", "SandFence", true, false):
+		if _is_fight_own_prop(node, props_root, own_slot):
+			continue
+		var footprint: PackedVector2Array = (node as SandFence).get_footprint()
+		if footprint.size() >= 3:
+			outlines.append(footprint)
+	var scatter: FieldScatter = get_scatter()
+	if scatter != null:
+		for entry in scatter.get_entries():
+			if not entry.cards.is_empty():
+				continue
+			for spot in scatter.get_spots(entry):
+				if spot.size < battle_scatter_obstacle_min_m:
+					continue
+				var half: float = spot.size * 0.5
+				var at := Vector2(spot.position.x, spot.position.z)
+				outlines.append(PackedVector2Array([at + Vector2(-half, -half), at + Vector2(half, -half), at + Vector2(half, half), at + Vector2(-half, half), at + Vector2(-half, -half)]))
+	return outlines
+
+# Whether `node` belongs to a prop the fight in slot `own_slot` brought.
+func _is_fight_own_prop(node: Node, props_root: Node, own_slot: StringName) -> bool:
+	if props_root == null or own_slot == &"":
+		return false
+	var walk: Node = node
+	while walk != null and walk != props_root:
+		if walk.has_meta(ENCOUNTER_SLOT_META) and StringName(walk.get_meta(ENCOUNTER_SLOT_META)) == own_slot:
+			return true
+		walk = walk.get_parent()
+	return false
+
+# A collision shape's box through its transform, flattened to XZ: the
+# closed hull of its corners (as FieldScatter reads a footprint).
+static func _shape_outline(shape_node: CollisionShape3D) -> PackedVector2Array:
+	if shape_node == null or shape_node.shape == null or shape_node.disabled:
+		return PackedVector2Array()
+	var box: AABB = shape_node.shape.get_debug_mesh().get_aabb()
+	var points := PackedVector2Array()
+	for i in 8:
+		var corner: Vector3 = shape_node.global_transform * box.get_endpoint(i)
+		points.append(Vector2(corner.x, corner.z))
+	return Geometry2D.convex_hull(points)
+
+static func _holds_any(outline: PackedVector2Array, points: PackedVector2Array) -> bool:
+	for point in points:
+		if Geometry2D.is_point_in_polygon(point, outline):
+			return true
+	return false
+
+# Whether a body of `radius` at `at` keeps battle_prop_clearance_m off
+# every outline (each closed: its last point is its first).
+func _spot_clear(obstacles: Array[PackedVector2Array], at: Vector3, radius: float) -> bool:
+	var p := Vector2(at.x, at.z)
+	var reach: float = radius + battle_prop_clearance_m
+	for outline in obstacles:
+		if Geometry2D.is_point_in_polygon(p, outline):
+			return false
+		for k in outline.size() - 1:
+			if Geometry2D.get_closest_point_to_segment(p, outline[k], outline[k + 1]).distance_to(p) < reach:
+				return false
+	return true
+
+# A body's ground radius in a fight: its model's half-diagonal, at least
+# the Wanderer's.
+func _body_radius(enemy: FieldEnemy) -> float:
+	var box: AABB = enemy.get_model_aabb()
+	return maxf(Vector2(box.size.x, box.size.z).length() * 0.5, battle_body_radius_m)
 
 # The gap the Wanderer keeps from `enemy`'s near edge: its own (FieldEnemy.
 # stance_gap, from FloorEnemy.stance_gap_m) when set, else battle_gap_m.
