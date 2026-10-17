@@ -6,7 +6,7 @@
 script = ExtResource("1_status_data")
 id = "coiled"
 display_name = "Coiled"
-description = "Each Attack you play against it, it strikes back for {value}."
+description = "Each Attack you play against it, it strikes back for {value}. Brace, Garnish, No Further and Unbroken don't reduce it."
 default_magnitude = 5
 default_duration_turns = -1
 stack_rule = 3

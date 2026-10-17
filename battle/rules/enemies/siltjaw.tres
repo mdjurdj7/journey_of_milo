@@ -36,7 +36,7 @@ found_status = ExtResource("4_exposed")
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Siltjaw"
-mechanic_summary = "Buried in the sand on the field, and dug in when the fight opens: three mounds swell up across its side of the field and it is under one of them. Hit the right mound and it is forced up Exposed (takes 50% more) until its next move; hit a wrong one and that mound collapses, the hit wasted, and it bites from below for 5. An attack on every enemy finds it. Under the sand it Bites for 5, then Erupts for 13 and surfaces; up, it Snaps for 6, Charges for 14, then Digs again. Teaches reading the sand - the one mound that breathes, trickles and puffs silt."
+mechanic_summary = "Buried in the sand on the field, and dug in when the fight opens: three mounds swell up across its side of the field and it is under one of them. Hit the right mound and it is forced up Exposed (takes 50% more) until its next move; hit a wrong one and that mound collapses, the hit wasted, and it bites from below for 5, which Brace, Garnish, No Further and Unbroken don't reduce. An attack on every enemy finds it. Under the sand it Bites for 5, then Erupts for 13 and surfaces; up, it Snaps for 6, Charges for 14, then Digs again. Teaches reading the sand - the one mound that breathes, trickles and puffs silt."
 max_hp = 50
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_snap"), SubResource("EnemyIntent_charge"), SubResource("EnemyIntent_dig")])
 opens_dug_in = true

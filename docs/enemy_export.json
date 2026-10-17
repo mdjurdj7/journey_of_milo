@@ -915,8 +915,8 @@
           "name": "Coiled",
           "file": "res://battle/rules/statuses/coiled.tres",
           "gained": "from its Coil resolving until its next move",
-          "description": "Each Attack you play against it, it strikes back for {value}.",
-          "text": "Each Attack you play against it, it strikes back for 5.",
+          "description": "Each Attack you play against it, it strikes back for {value}. Brace, Garnish, No Further and Unbroken don't reduce it.",
+          "text": "Each Attack you play against it, it strikes back for 5. Brace, Garnish, No Further and Unbroken don't reduce it.",
           "fields": {
             "default_magnitude": 5,
             "default_duration_turns": "until removed",
@@ -1785,7 +1785,7 @@
       "file": "res://battle/rules/enemies/siltjaw.tres",
       "hp": 50,
       "elite": false,
-      "mechanic_summary": "Buried in the sand on the field, and dug in when the fight opens: three mounds swell up across its side of the field and it is under one of them. Hit the right mound and it is forced up Exposed (takes 50% more) until its next move; hit a wrong one and that mound collapses, the hit wasted, and it bites from below for 5. An attack on every enemy finds it. Under the sand it Bites for 5, then Erupts for 13 and surfaces; up, it Snaps for 6, Charges for 14, then Digs again. Teaches reading the sand - the one mound that breathes, trickles and puffs silt.",
+      "mechanic_summary": "Buried in the sand on the field, and dug in when the fight opens: three mounds swell up across its side of the field and it is under one of them. Hit the right mound and it is forced up Exposed (takes 50% more) until its next move; hit a wrong one and that mound collapses, the hit wasted, and it bites from below for 5, which Brace, Garnish, No Further and Unbroken don't reduce. An attack on every enemy finds it. Under the sand it Bites for 5, then Erupts for 13 and surfaces; up, it Snaps for 6, Charges for 14, then Digs again. Teaches reading the sand - the one mound that breathes, trickles and puffs silt.",
       "field": {
         "model": "res://assets/models/enemies/Siltjaw/Siltjaw.glb",
         "model_is_default": false,
