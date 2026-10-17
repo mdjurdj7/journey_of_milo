@@ -55,6 +55,10 @@ signal battle_finished(outcome: Outcome)
 # rises - an enemy's intent and HP/name plate, his HP bar - moved beside
 # them when it would cross.
 @export var number_clearance_px: float = 8.0
+# An enemy's number starts no lower than this over the top of its body's
+# screen bounds (FieldEnemy.get_screen_rect()), pixels - a tall body's
+# (the Wardling's lantern) lands over it, not on it at enemy_head_height.
+@export var number_over_body_px: float = 10.0
 # Readouts (plates, intents, his HP bar) are pushed apart until this many
 # pixels lie between any two (_lay_out_readouts()).
 @export var readout_gap_px: float = 4.0
@@ -1026,7 +1030,13 @@ func _on_damage_dealt(_source: Variant, target: Variant, amount: int, _kind: Str
 		var control := display as Control
 		if control != null and is_instance_valid(control) and control.is_visible_in_tree():
 			avoid.append(control.get_global_rect())
-	_spawn_floating_number(amount, _screen_pos_for_damage_target(target) + offset, size, avoid, stack)
+	var ceiling: float = INF
+	if target is FieldEnemy:
+		var camera := get_viewport().get_camera_3d()
+		var body: Rect2 = (target as FieldEnemy).get_screen_rect(camera, 0.0) if camera != null else Rect2()
+		if body.has_area():
+			ceiling = body.position.y - number_over_body_px
+	_spawn_floating_number(amount, _screen_pos_for_damage_target(target) + offset, size, avoid, stack, ceiling)
 
 # A repeated hit's follow-up swing (Second Swing): the toll tick, if one
 # is on disk.
@@ -1169,15 +1179,18 @@ func _number_seconds() -> float:
 			number.free()
 	return _number_life
 
-# `avoid`: rects the number keeps number_clearance_px off the whole way it
-# rises (its own readouts) - moved beside them, the side with room on
-# screen, when its path would cross one; then `stack` on from there (a
-# multi-hit's step), so the numbers of one target never land on one spot.
-func _spawn_floating_number(value: int, screen_pos: Vector2, size_multiplier: float = 1.0, avoid: Array[Rect2] = [], stack: Vector2 = Vector2.ZERO) -> void:
+# `ceiling`: the number's bottom starts no lower than this (over its
+# body's top). `avoid`: rects the number keeps number_clearance_px off the
+# whole way it rises (its own readouts) - moved beside them, the side with
+# room on screen, when its path would cross one; then `stack` on from
+# there (a multi-hit's step), so the numbers of one target never land on
+# one spot.
+func _spawn_floating_number(value: int, screen_pos: Vector2, size_multiplier: float = 1.0, avoid: Array[Rect2] = [], stack: Vector2 = Vector2.ZERO, ceiling: float = INF) -> void:
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
 	add_child(number)
 	var size: Vector2 = number.measure(value, size_multiplier)
 	var at: Vector2 = screen_pos
+	at.y = minf(at.y, ceiling - size.y)
 	var path := Rect2(Vector2(at.x, at.y - number.rise_px), Vector2(size.x, size.y + number.rise_px)).grow(number_clearance_px)
 	var blocked := Rect2()
 	for rect in avoid:
@@ -1187,7 +1200,10 @@ func _spawn_floating_number(value: int, screen_pos: Vector2, size_multiplier: fl
 		var right: float = blocked.end.x + number_clearance_px
 		var left: float = blocked.position.x - number_clearance_px - size.x
 		at.x = right if right + size.x + stack.x <= get_viewport_rect().size.x or left < 0.0 else left
-	number.show_value(value, at + stack, size_multiplier)
+	# Its whole rise on screen.
+	var start: Vector2 = at + stack
+	start.y = maxf(start.y, number.rise_px + number_clearance_px)
+	number.show_value(value, start, size_multiplier)
 
 # Debug: flips the theme between its on-pale and on-dark value sets and
 # re-reads every battle readout's colours - the cards don't take part
