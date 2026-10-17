@@ -226,6 +226,14 @@ enum Mark { NONE, COIL, DROP }
 # Burrow or an interrupted attack leave it in place (EnemyTurn.take_turn()).
 @export var consumed_by_attack_against: bool = false
 
+# Passed by a strike back - damage an enemy deals in answer to a card in
+# the player's own turn (Coiled's, the Siltjaw's bite from below - EnemyTurn.
+# counter_strike(), strike_from_below()): it neither softens that hit nor
+# is spent by it, and waits, armed, for the enemy's own turn. The strike
+# back lands in full past it. Braced (Brace) and Garnished (Garnish) on
+# the enemy; No Further's armed status and Unbroken's on the player.
+@export var ignores_strike_backs: bool = false
+
 # A status that waits for its holder to be Critical (No Further): the
 # first time the holder is Critical after an action - an enemy's attack,
 # a card, a turn's ticks (Status.resolve_critical_triggers()) - it is

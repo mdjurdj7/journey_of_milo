@@ -426,9 +426,12 @@ static func _pays_mark_bonus(active: Status) -> bool:
 # An enemy's attack against the holder of `statuses` has resolved, every
 # hit of it: each status that lasts only until then (StatusData.consumed_
 # by_attack_against - No Further, armed) spends a charge, or goes, without them.
-static func consume_after_attack_against(statuses: Array[Status]) -> void:
+static func consume_after_attack_against(statuses: Array[Status], strike_back: bool = false) -> void:
 	for active in statuses.duplicate():
 		if not active.data.consumed_by_attack_against:
+			continue
+		# A strike back passes it by (StatusData.ignores_strike_backs).
+		if strike_back and active.data.ignores_strike_backs:
 			continue
 		if active.has_charges():
 			active.charges -= 1
@@ -561,10 +564,22 @@ static func refuse_lethal(player: Combatant, was_critical: bool) -> bool:
 # The holder's own attack has resolved: every status that lasts only until
 # then (StatusData.consumed_by_own_attack - Braced on an enemy) is gone -
 # but `keep`, which this attack didn't take (EnemyTurn.take_turn()).
-static func consume_after_attack(statuses: Array[Status], keep: StatusData = null) -> void:
+static func consume_after_attack(statuses: Array[Status], keep: StatusData = null, strike_back: bool = false) -> void:
 	for active in statuses.duplicate():
+		if strike_back and active.data.ignores_strike_backs:
+			continue
 		if active.data.consumed_by_own_attack and not (keep != null and active.data == keep):
 			statuses.erase(active)
+
+# `statuses` less those a strike back passes by (StatusData.ignores_strike_
+# backs - Braced, Garnished, No Further's armed, Unbroken's): what such a
+# hit reads its modifiers and reductions off. A new list; the statuses themselves are the same.
+static func strike_back_view(statuses: Array[Status]) -> Array[Status]:
+	var seen: Array[Status] = []
+	for active in statuses:
+		if not active.data.ignores_strike_backs:
+			seen.append(active)
+	return seen
 
 # Applies every active MODIFIER-category status matching `target` to
 # `amount`, in list order - ADD sums directly; MULTIPLY treats magnitude

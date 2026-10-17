@@ -12,3 +12,4 @@ default_duration_turns = -2
 stack_rule = 1
 consumed_by_own_attack = true
 reduces_attack_total = true
+ignores_strike_backs = true

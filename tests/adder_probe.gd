@@ -3,7 +3,9 @@ extends SceneTree
 # Headless probe for the Adder, floor 4's faint-side elite: its Coil ->
 # Bite -> Strike loop; Coiled, brought by the Coil resolving - a Denied
 # Coil brings none - and held until its next move, striking back for 5
-# at each Attack card played against it - an enemy hit in every way (Block, Garnished and Unbroken taken off and spent,
+# at each Attack card played against it - an enemy hit in every way (Block,
+# its attack bonuses, Grace) except that Brace, Garnish, No Further and
+# Unbroken pass it by - it lands in full and each stays armed for its turn;
 # its attack bonuses, Grace) - Skills never, an all-enemies Attack once;
 # the Bite's Venom, landing whatever Block took and adding up; Venom's
 # tick at the turn's start - its stacks in HP, falling by 1, gone at 0,
@@ -35,6 +37,8 @@ const SLASH_PATH := "res://cards/data/slash.tres"
 const DENIED_PATH := "res://battle/rules/statuses/denied.tres"
 const CARVE_PATH := "res://cards/data/carve.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
+const BRACED_PATH := "res://battle/rules/statuses/braced.tres"
+const NO_FURTHER_ARMED_PATH := "res://battle/rules/statuses/no_further_armed.tres"
 const RUN_LOGGER_PATH := "res://run/run_logger.gd"
 const FLOOR_4 := 3
 const HP := 72
@@ -154,18 +158,37 @@ func _check_counter_rules() -> void:
 	player.block = 3
 	EnemyTurn.counter_strike(enemy, data, player)
 	_expect(PLAYER_HP - player.hp == 2 and player.block == 0, "Block 3: it takes 2, the Block gone")
-	# Garnished on the adder: off it, and spent.
+	# Garnished on the adder: passed by - in full, and still armed.
 	player = _grace_player()
 	Status.apply_to(enemy.statuses, load(GARNISHED_PATH))
 	EnemyTurn.counter_strike(enemy, data, player)
-	_expect_eq(PLAYER_HP - player.hp, 0, "Garnished 5 on it: the strike back lands 0")
-	_expect(not _has(enemy, GARNISHED_PATH), "...and spends Garnished")
-	# Unbroken on the player: off it, and spent.
+	_expect_eq(PLAYER_HP - player.hp, COUNTER, "Garnished 5 on it: the strike back lands in full (5)")
+	_expect(_has(enemy, GARNISHED_PATH), "...and Garnished stays for its turn")
+	_clear(enemy, GARNISHED_PATH)
+	# Unbroken on the player: passed by - in full, and still armed.
 	player = _grace_player()
 	Status.apply_to(player.statuses, load(UNBROKEN_PATH))
 	EnemyTurn.counter_strike(enemy, data, player)
-	_expect_eq(PLAYER_HP - player.hp, 1, "Unbroken 4: it lands 1")
-	_expect(not _has(player, UNBROKEN_PATH), "...and spends Unbroken")
+	_expect_eq(PLAYER_HP - player.hp, COUNTER, "Unbroken 4: the strike back lands in full (5)")
+	_expect(_has(player, UNBROKEN_PATH), "...and Unbroken stays for its turn")
+	# Brace and No Further wait for its own turn: a strike back lands in
+	# full past them and spends neither; its Bite, after, takes both.
+	player = _grace_player()
+	Status.apply_to(enemy.statuses, load(BRACED_PATH))
+	Status.apply_to(player.statuses, load(NO_FURTHER_ARMED_PATH))
+	EnemyTurn.counter_strike(enemy, data, player)
+	_expect_eq(PLAYER_HP - player.hp, COUNTER, "Braced on it, No Further armed: the strike back lands in full (5)")
+	_expect(_has(enemy, BRACED_PATH), "...Braced still on it")
+	_expect(_has(player, NO_FURTHER_ARMED_PATH), "...No Further still armed")
+	var bite: EnemyIntent = null
+	for intent in data.intents:
+		if intent.intent_name == "Bite":
+			bite = intent
+	var hp_before: int = player.hp
+	var turn: Dictionary = {"intent": "Bite", "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0}
+	EnemyTurn.land_attack(enemy, data, bite, player, turn)
+	_expect_eq(hp_before - player.hp, 0, "Its Bite, on its turn: No Further takes it to 0")
+	_expect(not _has(enemy, BRACED_PATH) and not _has(player, NO_FURTHER_ARMED_PATH), "...and spends both")
 	# Its attack bonuses count.
 	player = _grace_player()
 	Status.apply_to(enemy.statuses, load(HUNGRY_PATH))
@@ -415,6 +438,11 @@ func _grace_player() -> Combatant:
 	var player := Combatant.new(PLAYER_HP)
 	player.has_grace = true
 	return player
+
+func _clear(combatant: Combatant, path: String) -> void:
+	for active: Status in combatant.statuses.duplicate():
+		if active.data != null and active.data.resource_path == path:
+			combatant.statuses.erase(active)
 
 func _has(combatant: Combatant, path: String) -> bool:
 	for active: Status in combatant.statuses:

@@ -14,3 +14,4 @@ modifier_target = 0
 modifier_operation = 1
 stack_rule = 4
 consumed_by_attack_against = true
+ignores_strike_backs = true

@@ -228,7 +228,13 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 # trigger's own doc - only softens the first, while one on this enemy that
 # lasts the whole attack (Braced, StatusData.consumed_by_own_attack)
 # softens every hit; block/absorb are worn down hit by hit.
-static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyIntent, player: Combatant, result: Dictionary) -> void:
+#
+# `strike_back`: the hit answers a card in the player's turn (counter_
+# strike(), strike_from_below()) - the statuses that wait for the enemy's
+# own turn (StatusData.ignores_strike_backs: Braced, Garnished, No
+# Further's armed, Unbroken's)
+# neither soften it nor are spent by it.
+static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyIntent, player: Combatant, result: Dictionary, strike_back: bool = false) -> void:
 	result["attacked"] = true
 	var total_to_hp: int = 0
 	# Tracked per hit as well as summed, because Grace's LARGEST_HIT cap is
@@ -237,9 +243,12 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 	var largest_hit: int = 0
 	# What the attack loses in all (Garnished on this enemy, Unbroken on the
 	# player), soaked hit by hit.
-	var reduction_left: int = Status.attack_total_reduction(combatant.statuses) + Status.attack_total_reduction(player.statuses)
+	# A strike back reads neither (Status.strike_back_view()).
+	var own_statuses: Array[Status] = Status.strike_back_view(combatant.statuses) if strike_back else combatant.statuses
+	var player_statuses: Array[Status] = Status.strike_back_view(player.statuses) if strike_back else player.statuses
+	var reduction_left: int = Status.attack_total_reduction(own_statuses) + Status.attack_total_reduction(player_statuses)
 	for hit in hit_count(combatant, intent):
-		var amount: int = hit_amount(combatant, data, intent, hit, player.statuses)
+		var amount: int = hit_amount(combatant, data, intent, hit, player.statuses, strike_back)
 		var cut: int = reduce_hit(amount, reduction_left)
 		amount -= cut
 		reduction_left -= cut
@@ -278,10 +287,11 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 	# The attack has resolved, every hit of it: a status that lasted only
 	# until then (Braced on this enemy) is spent - even if the player's
 	# block ate all of it.
-	Status.consume_after_attack(combatant.statuses, held_back(data, intent))
+	Status.consume_after_attack(combatant.statuses, held_back(data, intent), strike_back)
 	# ...and one on the player that lasted only until an attack against
-	# them resolved (No Further's) goes, or spends a charge.
-	Status.consume_after_attack_against(player.statuses)
+	# them resolved (No Further's) goes, or spends a charge - a strike back
+	# passing both by.
+	Status.consume_after_attack_against(player.statuses, strike_back)
 	# Only now can the attack's HP loss grant anything (No Further): after
 	# the attack, so it never softens itself.
 	Status.resolve_critical_triggers(player)
@@ -312,9 +322,10 @@ static func scaled_first_hit(amount: int, scale: float) -> int:
 # The strike back (StatusData.strikes_back_on_attack_card - the Adder's
 # Coiled): an Attack card has just been played against this living enemy,
 # and it answers with one hit of the status's magnitude - an ATTACK in
-# every way, through land_attack(): its attack bonuses and modifiers,
-# Garnished and Unbroken taken off it and spent, Block, Refuse the End,
-# Grace. "intent" is the status's name, for the run log ("adder:Coiled").
+# every way, through land_attack() as a strike back - its attack bonuses
+# and modifiers, Block, Refuse the End, Grace - except that Braced,
+# Garnished, No Further's armed and Unbroken's wait for its own turn,
+# neither softening it nor spent by it. "intent" is the status's name, for the run log ("adder:Coiled").
 # Empty when it holds nothing that strikes back, or either side is down.
 static func counter_strike(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
 	if combatant == null or player == null or combatant.hp <= 0 or player.hp <= 0:
@@ -330,7 +341,7 @@ static func counter_strike(combatant: Combatant, data: EnemyData, player: Combat
 	strike.intent_name = coiled.data.display_name
 	strike.value = coiled.magnitude
 	var result: Dictionary = {"intent": strike.intent_name, "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0}
-	land_attack(combatant, data, strike, player, result)
+	land_attack(combatant, data, strike, player, result, true)
 	return result
 
 # What the queued intent WILL do if it resolves now, for the intent
@@ -559,11 +570,15 @@ static func intent_value(combatant: Combatant, data: EnemyData, intent: EnemyInt
 # player's incoming ones, so a modifier always reads the bonus in. The
 # one number take_turn() lands and preview_intent() shows, hit by hit;
 # `player_statuses` is the player's list or the preview's copy of it.
-static func hit_amount(combatant: Combatant, data: EnemyData, intent: EnemyIntent, hit: int, player_statuses: Array[Status]) -> int:
+# A strike back (`strike_back`) reads neither side's statuses that wait
+# for the enemy's turn (Status.strike_back_view()).
+static func hit_amount(combatant: Combatant, data: EnemyData, intent: EnemyIntent, hit: int, player_statuses: Array[Status], strike_back: bool = false) -> int:
+	var own: Array[Status] = Status.strike_back_view(combatant.statuses) if strike_back else combatant.statuses
+	var theirs: Array[Status] = Status.strike_back_view(player_statuses) if strike_back else player_statuses
 	var amount: int = intent_value(combatant, data, intent)
-	amount += Status.attack_bonus(combatant.statuses, combatant.is_critical(), held_back(data, intent))
-	amount = Status.apply_modifiers(amount, combatant.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
-	return Status.apply_modifiers(amount, player_statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
+	amount += Status.attack_bonus(own, combatant.is_critical(), held_back(data, intent))
+	amount = Status.apply_modifiers(amount, own, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+	return Status.apply_modifiers(amount, theirs, StatusData.ModifierTarget.INCOMING_DAMAGE)
 
 # What one hit gives up to the attack's total reduction (Garnished -
 # StatusData.reduces_attack_total) with `reduction_left` still to soak:
@@ -695,7 +710,7 @@ static func strike_from_below(combatant: Combatant, data: EnemyData, player: Com
 		return {}
 	var bite: EnemyIntent = combatant.dig_intent.under_moves[0]
 	var result: Dictionary = {"intent": bite.intent_name, "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0}
-	land_attack(combatant, data, bite, player, result)
+	land_attack(combatant, data, bite, player, result, true)
 	return result
 
 # The last of its pack (Combatant.pack_alone, from now on): a status
