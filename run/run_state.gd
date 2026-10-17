@@ -28,6 +28,8 @@ signal toll_changed(amount: int)
 signal keepsake_changed(keepsake: TrinketData)
 # The WORN slot changed - the new piece, or null for empty.
 signal worn_changed(worn: TrinketData)
+# A Bedroll taken or used - whether one is carried now.
+signal bedroll_changed(held: bool)
 
 var player_hp: int = 0
 var player_max_hp: int = 0
@@ -80,6 +82,11 @@ var keepsakes_offered: Array[StringName] = []
 # Survives every fight and floor; new_run() empties it. Changed only
 # through equip_worn(), which keeps its max_hp_bonus in player_max_hp.
 var worn: TrinketData = null
+# The Bedroll (BedrollData): carried or not - never more than one, so an
+# offer of a second can't be taken. Survives every fight and floor until
+# it's used (BedrollRest); new_run() empties it. Changed only through
+# take_bedroll() and use_bedroll().
+var has_bedroll: bool = false
 # HP actually lost since the fight in progress (or the last one) opened -
 # what lose_hp() really took, never the damage that was attempted, from
 # any source: an enemy's hit, the Wanderer's own self-damage, a status
@@ -159,6 +166,7 @@ func new_run(starting_character: CharacterData) -> void:
 	toll = 0
 	keepsake = null
 	worn = null
+	has_bedroll = false
 	keepsakes_offered.clear()
 	hp_lost_this_combat = 0
 	player_max_hp = starting_character.max_hp
@@ -198,6 +206,7 @@ func new_run(starting_character: CharacterData) -> void:
 	toll_changed.emit(toll)
 	keepsake_changed.emit(keepsake)
 	worn_changed.emit(worn)
+	bedroll_changed.emit(has_bedroll)
 	RunLogger.start_run(run_seed, starting_character.character_name, run_snapshot())
 
 # The run as the log records it (RunLogger): HP, purse, Toll, the deck as
@@ -372,6 +381,27 @@ func acquire_keepsake(trinket: TrinketData) -> bool:
 	if trinket == null or keepsake != null:
 		return false
 	equip_keepsake(trinket)
+	return true
+
+# A Bedroll into the pack: true, or false with one already carried - and
+# nothing changes.
+func take_bedroll() -> bool:
+	if has_bedroll:
+		return false
+	has_bedroll = true
+	bedroll_changed.emit(has_bedroll)
+	return true
+
+# The Bedroll used: `amount` HP back (capped at the max, as heal() is) and
+# it's gone. False, and nothing changes, with none carried.
+func use_bedroll(amount: int) -> bool:
+	if not has_bedroll:
+		return false
+	has_bedroll = false
+	var before: int = player_hp
+	heal(amount)
+	RunLogger.player_healed(player_hp - before, "bedroll")
+	bedroll_changed.emit(has_bedroll)
 	return true
 
 # A keepsake has been put in front of the player - remembered for the

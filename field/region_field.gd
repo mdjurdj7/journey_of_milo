@@ -53,6 +53,8 @@ enum RewardMode { SCREEN, WORLD }
 @export var wagon_screen_scene_path: String = "res://battle/wagon_screen.tscn"
 # What a keepsake is offered in (see open_keepsake_offer()).
 @export var keepsake_offer_scene_path: String = "res://battle/keepsake_offer.tscn"
+# The Bedroll's one data file - the HUD item, its hover, what a rest heals.
+@export_file("*.tres") var bedroll_data_path: String = "res://run/data/bedroll.tres"
 # A worn piece taken off the sand (take_worn_piece()): WorldKeepsake's
 # take, at its level.
 @export var armor_take_sfx_path: String = "res://assets/audio/cards/card_take.wav"
@@ -431,6 +433,8 @@ var _wear_path: PackedVector2Array = PackedVector2Array()
 var _keepsake_line: KeepsakeLine = null
 # The HUD row's worn piece, beside it - a click opens its ArmorExamine.
 var _worn_line: KeepsakeLine = null
+# The HUD row's Bedroll, while one is carried - a click asks to rest.
+var _bedroll_line: BedrollLine = null
 # A fight's worn piece waiting to be named by the find line (FindLine,
 # _say_pending_find()) - and who left it - until the reward screen, and
 # any keepsake offer after it, has closed.
@@ -1929,12 +1933,20 @@ func _setup_field_hud() -> void:
 	var glassbone_line := GlassboneLine.new()
 	glassbone_line.name = "GlassboneLine"
 	_add_hud_row_line(glassbone_line, gold_line)
-	# KEEPSAKE last, set apart past GLASSBONE (beside GOLD while GLASSBONE
-	# is hidden - see InkLine._follow()); hidden while the slot is empty,
-	# and RunState.keepsake_changed keeps it current - see KeepsakeLine.
+	# BEDROLL beside GLASSBONE, while one is carried; RunState.bedroll_
+	# changed keeps it current - see BedrollLine.
+	var bedroll_line := BedrollLine.new()
+	bedroll_line.name = "BedrollLine"
+	bedroll_line.bedroll = load(bedroll_data_path) as BedrollData
+	_add_hud_row_line(bedroll_line, glassbone_line)
+	_bedroll_line = bedroll_line
+	# KEEPSAKE last, set apart past the resources (beside GOLD while
+	# GLASSBONE and BEDROLL are hidden - see InkLine._follow()); hidden
+	# while the slot is empty, and RunState.keepsake_changed keeps it
+	# current - see KeepsakeLine.
 	var keepsake_line := KeepsakeLine.new()
 	keepsake_line.name = "KeepsakeLine"
-	_add_hud_row_line(keepsake_line, glassbone_line)
+	_add_hud_row_line(keepsake_line, bedroll_line)
 	_keepsake_line = keepsake_line
 	# WORN beside it: the same line on the other slot (KeepsakeLine.slot),
 	# hidden while nothing is worn, RunState.worn_changed keeping it current.
