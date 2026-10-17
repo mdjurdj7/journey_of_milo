@@ -35,12 +35,12 @@ const STEP := 0.1
 # crosses a ledge, both on the mainland. "outside": a point past the walls.
 const BEHIND := {
 	2: [[Vector2(13.0, -14.0), Vector2(22.0, -30.0)], [Vector2(0.0, -3.0), Vector2(12.0, -13.0)]],
-	3: [[Vector2(-16.4, -29.2), Vector2(16.0, -25.0)], [Vector2(0.0, -3.0), Vector2(12.0, -30.0)]],
+	3: [[Vector2(-4.0, -5.0), Vector2(-4.0, -21.0)], [Vector2(10.0, -14.0), Vector2(18.5, -7.5)]],
 	4: [[Vector2(-8.0, -15.0), Vector2(-8.0, 2.0)]],
 }
 const OUTSIDE := {
 	2: [Vector2(11.0, -6.0), Vector2(30.0, 0.0)],
-	3: [Vector2(0.0, -20.0), Vector2(30.0, 0.0)],
+	3: [Vector2(-3.0, -13.0), Vector2(30.0, 0.0)],
 	4: [Vector2(20.0, -20.0), Vector2(-20.0, -30.0)],
 }
 # The walk walked for real: floor 4, round the central dune.
