@@ -54,18 +54,16 @@
 - Code changes: run only the probe(s) for the system you touched
   (`--probe`), once, at the end, in the foreground - not whole areas,
   and not `--changed`.
-- Never run --smoke after individual commits. --smoke (a fixed six
-  across the field, a fight, the floors and the cards) and the full set
-  run only before a push.
+- No --smoke and no full set before a push: a push needs only the
+  per-change probes above. The full set runs nightly
+  (tools/nightly_probes.sh, below); --smoke, --full, `--changed`,
+  `--prepush` (the mapped probes plus the fast tier) and area sweeps run
+  only when I ask for them.
 - Never re-run a probe that already passed unless the code it covers
   changed since.
 - If memory is too low to run probes, don't wait; commit and say so.
-  The pre-push full set covers it.
-- The full probe set runs only before a push: `--full --batch 1/4` ...
-  `--batch 4/4`, each in the foreground. `--changed`, `--prepush` (the
-  mapped probes plus the fast tier) and area sweeps run only when I ask
-  for them.
-- Overnight full set: `tools/nightly_probes.sh` (Git Bash, main tree),
+  The nightly full set covers it.
+- Nightly full set: `tools/nightly_probes.sh` (Git Bash, main tree),
   or from PowerShell in a window of its own that outlives the terminal:
   `Start-Process "C:\Program Files\Git\bin\bash.exe" -ArgumentList "tools/nightly_probes.sh"`.
   It waits out other sessions' probes, makes ../journey-of-milo-nightly
