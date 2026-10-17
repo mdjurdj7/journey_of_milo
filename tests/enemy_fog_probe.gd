@@ -125,7 +125,8 @@ func _check_dragonfly_wings() -> void:
 	var checked: int = 0
 	for enemy: Node in _field.get_tree().get_nodes_in_group("enemies"):
 		var attachment: Node = enemy.get("_attachment")
-		if attachment == null or not attachment.has_method("get_tint_materials"):
+		# The wings alone - the Glower's body hands over its inflated self too.
+		if attachment == null or not attachment is DragonflyWings:
 			continue
 		var wings: Array[BaseMaterial3D] = attachment.call("get_tint_materials")
 		for wing in wings:

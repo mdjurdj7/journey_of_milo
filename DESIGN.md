@@ -616,6 +616,9 @@ folder (run_log_probe). (2026-10-04.)
   `contact_sounds` borrow `combat_old/hit.wav`, as the Greyshelf, the
   Dunecur and the Wardling do, until a hit on a sand-covered ray is
   recorded. (2026-10-08, Underfoot.)
+- **The Glower's contact sound is a placeholder too.** The same
+  `combat_old/hit.wav`, until a hit on a pufferfish (soft deflated, a
+  taut drum inflated) is recorded. (2026-10-17, Glower.)
 - **The shield and the card glyphs are still line drawings.** The enemy
   intent glyphs are inked - filled, tapered pen strokes over a bone
   outline (`BattleIntent._glyph_shapes()`, `_ribbon()`, `_draw_ink()`).

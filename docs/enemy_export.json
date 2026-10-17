@@ -1419,6 +1419,87 @@
       ]
     },
     {
+      "name": "Glower",
+      "file": "res://battle/rules/enemies/glower.tres",
+      "hp": 26,
+      "elite": false,
+      "mechanic_summary": "A pufferfish resting in a standing pool, on a two-turn rhythm in step with the Underfoot: Puff, telegraphed by its false-eye glyph, then Inflated through the next turn - Attacks at one enemy must target it, and it takes 50% less - while it Bites (4) and lets the air out. Brace the Sting, use area Attacks or pop it on the taunt turn; killing it lifts the taunt at once.",
+      "field": {
+        "model": "res://assets/models/enemies/Glower/Glower_deflated.glb",
+        "model_is_default": false,
+        "model_scale": 1.0,
+        "model_yaw_offset_degrees": 180.0,
+        "attachment": {
+          "scene": "res://field/glower_pose.tscn",
+          "class": "GlowerPose"
+        },
+        "contact_radius_m": 1.5,
+        "cluster_gap_m": null,
+        "rest_height_m": 0.0,
+        "sink_m": 0.06,
+        "battle_hover_m": 0.0,
+        "buried_on_field": false,
+        "flies_in_battle": false,
+        "harness_point": null
+      },
+      "moveset": {
+        "selection": "loop (in order)",
+        "intents": [
+          {
+            "name": "Puff",
+            "type": "TAUNT",
+            "status_on_resolve": "inflated"
+          },
+          {
+            "name": "Bite",
+            "type": "ATTACK",
+            "damage_per_hit": 4,
+            "hits": 1
+          }
+        ],
+        "modified_by": [],
+        "escalation": null,
+        "pain_turn": null,
+        "phase": null
+      },
+      "statuses": [
+        {
+          "id": "inflated",
+          "name": "Inflated",
+          "file": "res://battle/rules/statuses/inflated.tres",
+          "gained": "from its Puff resolving until its next move",
+          "description": "Your Attacks at one enemy must target it. It takes {percent}% less damage.",
+          "text": "Your Attacks at one enemy must target it. It takes 50% less damage.",
+          "fields": {
+            "category": "MODIFIER",
+            "default_magnitude": -50,
+            "default_duration_turns": "until removed",
+            "modifier_operation": "MULTIPLY",
+            "stack_rule": "IGNORE",
+            "taunts": true
+          }
+        }
+      ],
+      "rewards": {
+        "keepsake_table": null,
+        "armor_table": null,
+        "glassbone": 0,
+        "gold_and_cards": "the floor's - see regions[].floors[].rewards"
+      },
+      "defeat_line": "",
+      "sounds": {
+        "contact": [
+          "res://assets/audio/combat_old/hit.wav"
+        ],
+        "armored_contact": [],
+        "pitch_jitter": 0.06,
+        "pain_turn": null,
+        "status_gained": null,
+        "attachment": {}
+      },
+      "appears_on": []
+    },
+    {
       "name": "Greyshelf",
       "file": "res://battle/rules/enemies/greyshelf.tres",
       "hp": 120,

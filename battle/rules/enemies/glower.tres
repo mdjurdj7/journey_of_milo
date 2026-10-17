@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
+[ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/inflated.tres" id="3_inflated"]
+[ext_resource type="AudioStream" uid="uid://bnvfgx6j66j30" path="res://assets/audio/combat_old/hit.wav" id="4_hit"]
+
+[sub_resource type="Resource" id="EnemyIntent_puff"]
+script = ExtResource("2_intent")
+intent_name = "Puff"
+type = 8
+status_on_resolve = ExtResource("3_inflated")
+
+[sub_resource type="Resource" id="EnemyIntent_bite"]
+script = ExtResource("2_intent")
+intent_name = "Bite"
+value = 4
+
+[resource]
+script = ExtResource("1_enemy_data")
+enemy_name = "Glower"
+mechanic_summary = "A pufferfish resting in a standing pool, on a two-turn rhythm in step with the Underfoot: Puff, telegraphed by its false-eye glyph, then Inflated through the next turn - Attacks at one enemy must target it, and it takes 50% less - while it Bites (4) and lets the air out. Brace the Sting, use area Attacks or pop it on the taunt turn; killing it lifts the taunt at once."
+max_hp = 26
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_puff"), SubResource("EnemyIntent_bite")])
+; Placeholder hit, the Greyshelf's (DESIGN.md).
+contact_sounds = Array[AudioStream]([ExtResource("4_hit")])
+; Deflated 0.32 m tall, 0.96 m nose to tail; GlowerPose swells it into
+; Glower_inflated.glb at 0.65 (0.65 m tall, the same length).
+model_scene_path = "res://assets/models/enemies/Glower/Glower_deflated.glb"
+attachment_scene_path = "res://field/glower_pose.tscn"
+painted_albedo_path = "res://assets/models/enemies/Glower/Glower_deflated_0.jpg"
+; Its belly under the pool's surface.
+sink_m = 0.06
+contact_radius_m = 1.5

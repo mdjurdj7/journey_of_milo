@@ -1673,7 +1673,8 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 # for the tell (FieldEnemy.set_poised()), cosmetic and not waited on. The
 # status the intent holds it in (EnemyIntent.status_while_queued - the
 # Underfoot's Covered / Exposed) is the body's to show too (FieldEnemy.
-# set_queued_status()), waited on with the rear.
+# set_queued_status()), waited on with the rear, and so are the statuses
+# it holds (FieldEnemy.show_held_statuses() - the Glower's swell).
 func _pose_for_intent(enemy: FieldEnemy) -> float:
 	var combatant: Combatant = _combatants.get(enemy)
 	var rear: bool = false
@@ -1687,6 +1688,13 @@ func _pose_for_intent(enemy: FieldEnemy) -> float:
 	enemy.set_poised(poised)
 	_show_roused(enemy)
 	var state_delay: float = enemy.set_queued_status(held)
+	# What it holds now, for a body that shows it (the Glower swollen
+	# while Inflated) - the living only, so a kill doesn't let it down.
+	if combatant != null and combatant.hp > 0:
+		var statuses: Array[StatusData] = []
+		for active: Status in combatant.statuses:
+			statuses.append(active.data)
+		state_delay = maxf(state_delay, enemy.show_held_statuses(statuses))
 	return maxf(enemy.set_rearing(rear), state_delay)
 
 # The body shows the stacks of its attack_card_status it holds (the

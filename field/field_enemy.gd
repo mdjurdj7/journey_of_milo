@@ -662,6 +662,14 @@ func set_poised(on: bool) -> void:
 		return
 	_attachment.call("set_poised", on)
 
+# The statuses this enemy holds, after each move and card (BattleController.
+# _pose_for_intent()), for a body that shows one - GlowerPose, swollen
+# while it taunts. Returns how long the change takes; 0 for any other.
+func show_held_statuses(statuses: Array[StatusData]) -> float:
+	if _attachment == null or not _attachment.has_method("show_held_statuses") or _settling:
+		return 0.0
+	return float(_attachment.call("show_held_statuses", statuses))
+
 # The status the queued intent holds its enemy in (EnemyIntent.status_
 # while_queued - the Underfoot's Covered or Exposed), for the body to
 # take its pose (UnderfootPose.set_queued_status()). Returns how long
@@ -945,10 +953,15 @@ func _attach_scene(model: Node3D) -> void:
 	model.add_child(attachment)
 	_attachment = attachment
 	if attachment.has_method("get_tint_materials"):
-		var materials: Array[BaseMaterial3D] = attachment.call("get_tint_materials")
-		for material in materials:
+		# Untyped: the wings hand over BaseMaterial3Ds, the Glower's
+		# inflated body a painted ShaderMaterial.
+		var materials: Array = attachment.call("get_tint_materials")
+		for item: Variant in materials:
+			var material := item as Material
+			if material == null:
+				continue
 			_tint_materials.append(material)
-			_tint_base_colors.append(material.albedo_color)
+			_tint_base_colors.append(_tint_of(material))
 			_add_fog_overlay(material)
 	for mesh_instance in attachment.find_children("*", "MeshInstance3D", true, false):
 		var mi := mesh_instance as MeshInstance3D
