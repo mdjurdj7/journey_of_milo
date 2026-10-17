@@ -213,6 +213,20 @@ folder (run_log_probe). (2026-10-04.)
   the climb's west side), placed by the walkable sample. Nothing reads
   it: what is found there isn't decided, so FloorData carries no field
   for it. Add one when the finding is built. (2026-10-05, floor 5.)
+- **Floor 2's Underfoot + Dragonfly and Siltjaw pair wait for a single
+  island option.** Floor 2 keeps both roll rules (`FloorData.roll_unique_
+  enemies`, `roll_single_and_multi`): while the island stands only
+  dragonflies, a crab option with a Dragonfly can never stand, and the
+  crab and island are always multi-enemy fights, so the siltjaw slot must
+  stand its lone Siltjaw. Both options are held back rather than shipped
+  unrollable, and so is the pair's dig rule (a Siltjaw can't dig while a
+  packmate is under the sand or digging that turn; it Snaps and digs on
+  its next turn). Add them once the island has a single non-dragonfly
+  option: the crab's `underfoot_dragonfly` (the Underfoot with a lone
+  Dragonfly, `dragonfly_lone.tres`), and `siltjaw_pair` (each about 70% of
+  the lone Siltjaw's HP, starting on the same loop so turn 2 has both
+  Charges queued; the dug-in one plays the three-mound rules). (2026-10-16,
+  floor 2 encounter variety.)
 - **Height-based ground tints use a fixed land height.** Basin tint,
   crest light and the slope-tint fade (`basin_tint_heights`,
   `crest_min_height`, `slope_tint_fade_height`) are all measured from

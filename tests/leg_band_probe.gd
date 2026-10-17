@@ -32,6 +32,7 @@ const LEG_BAND_PATH := "res://run/keepsakes/leg_band.tres"
 const CARVE_PATH := "res://cards/data/carve.tres"
 const DRAGONFLY_PATH := "res://battle/rules/enemies/dragonfly.tres"
 const ISLAND_SLOT := &"island"
+const TRIO_OPTION := &"dragonfly_trio"
 const LINE := "Probe: they fell in step."
 const GAINED_LINE := "Probe: the other keeps dancing."
 const FLOOR_2 := 1
@@ -180,7 +181,7 @@ func _island_option() -> EncounterOption:
 	var floor_data := load(FLOOR_2_PATH) as FloorData
 	for slot in floor_data.slots:
 		if slot != null and slot.slot_id == ISLAND_SLOT:
-			return slot.options[0]
+			return slot.find_option(TRIO_OPTION)
 	return null
 
 # HP enough that the Carves kill no one.
@@ -224,6 +225,9 @@ func _start_fight(keepsake: TrinketData) -> Node:
 	_run_state.set("current_floor_index", FLOOR_2)
 	_run_state.set("run_opening_pending", false)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	# The island stands its trio, whichever way the run's seed would roll.
+	var force: Dictionary[StringName, StringName] = {ISLAND_SLOT: TRIO_OPTION}
+	_field.set("force_options", force)
 	root.add_child(_field)
 	for i in 30:
 		await physics_frame

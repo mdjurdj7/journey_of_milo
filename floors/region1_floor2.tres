@@ -98,12 +98,29 @@ option_id = &"dragonfly_trio"
 members = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_island_dragonfly1"), SubResource("FloorEnemy_island_dragonfly2"), SubResource("FloorEnemy_island_dragonfly3")])
 patrol = SubResource("FloorPatrol_island")
 
+[sub_resource type="Resource" id="FloorEnemy_island_pair1"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("11_dragonfly")
+yaw_degrees = -113.2
+
+[sub_resource type="Resource" id="FloorEnemy_island_pair2"]
+script = ExtResource("2_floor_enemy")
+enemy_data = ExtResource("11_dragonfly")
+position = Vector2(-1.875, 0.5)
+yaw_degrees = -122.0
+
+[sub_resource type="Resource" id="EncounterOption_dragonfly_pair"]
+script = ExtResource("91_encounter_option")
+option_id = &"dragonfly_pair"
+members = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_island_pair1"), SubResource("FloorEnemy_island_pair2")])
+patrol = SubResource("FloorPatrol_island")
+
 [sub_resource type="Resource" id="EncounterSlot_island"]
 script = ExtResource("90_encounter_slot")
 slot_id = &"island"
 position = Vector2(-15.25, -20.5)
 required = false
-options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_dragonfly_trio")])
+options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_dragonfly_trio"), SubResource("EncounterOption_dragonfly_pair")])
 
 [sub_resource type="Resource" id="FloorEnemy_siltjaw"]
 script = ExtResource("2_floor_enemy")
