@@ -7,9 +7,10 @@ extends SceneTree
 # Sting; the Sting one unbreakable blow of 16 that Block and Brace
 # soften; the Rebury nothing; taunt (Inflated) on a packmate barring a
 # Slash from it but not Brace or Sentence. Floor 2's required cluster is the Sputter
-# (or, forced, the Glower's option: its pool stamped on the ground, the
-# Puff swelling it on the Exposed turn, no scatter in or round the pool, a Slash only at it then, and its
-# death freeing the Underfoot)
+# (or, forced, the Glower's option: the Glower in the inlet's water within
+# contact reach of dry sand, the Underfoot and the Wanderer on the sand, no
+# scatter up against either body, the Puff swelling it on the Exposed turn,
+# a Slash only at it then, and its death freeing the Underfoot)
 # and the Underfoot, no dragonfly, the island's Dragonfly x3 as they
 # were. The Wanderer's stance on the dune's rise east of the crab stands
 # on the drawn surface, and an escape leaves him there with no lift.
@@ -54,8 +55,8 @@ const INFLATED_PATH := "res://battle/rules/statuses/inflated.tres"
 const GLOWER_PATH := "res://battle/rules/enemies/glower.tres"
 const SPUTTER_OPTION := &"sputter_underfoot"
 const GLOWER_OPTION := &"underfoot_glower"
-# Scatter stays this far past a stamped pool's damp rim.
-const POOL_SCATTER_MARGIN_M := 0.15
+# Scatter stays this far off the Glower's and the Underfoot's bodies.
+const BODY_SCATTER_MARGIN_M := 0.15
 # Where the fight case logs its run, when run_probes.sh hands over no
 # folder of this process's own (RunLogger.dir_override()).
 const LOG_DIR := "user://underfoot_probe"
@@ -421,8 +422,11 @@ func _check_escape() -> void:
 	await _teardown()
 	_completed += 1
 
-# The Glower's option, forced: floor 2 stamps its pool on the ground,
-# round the Glower. In the fight, the Sting's turn shows its Puff (TAUNT)
+# The Glower's option, forced, in its fight's line: the Glower in the
+# inlet's water, dry sand within its contact radius - he never wades to
+# start it; the Underfoot and the Wanderer on dry sand; no scatter within
+# BODY_SCATTER_MARGIN_M of either body (its edge off their meshes' XZ
+# bounds). In the fight, the Sting's turn shows its Puff (TAUNT)
 # and a Slash may still go at the Underfoot; the Sting lands and the Puff
 # with it - the Underfoot Exposed, the Glower Inflated and swollen - and
 # a Slash may go only at the Glower; killing it lifts the taunt, and the
@@ -435,22 +439,30 @@ func _check_glower_option() -> void:
 		_expect(glower != null and underfoot != null, "The Glower's option stands the Glower and the Underfoot")
 		if glower != null and underfoot != null:
 			var ground: Node = _field.get_node("Ground")
+			var sea_level: float = (_field.get_node("Sea") as Node3D).global_position.y
 			var at: Vector3 = (glower as Node3D).global_position
-			_expect_eq((ground.get("_pool_stamps") as Dictionary).size(), 1, "...one pool stamped on the ground")
-			_expect(float(ground.call("get_pool_stamp_distance", Vector2(at.x, at.z))) < 0.0, "...with the Glower in it")
-			var keep_out: float = float(ground.get("pool_stamp_rim")) + POOL_SCATTER_MARGIN_M
+			_expect(_drawn_height(ground, at) < sea_level, "...the Glower in the water (%.3f m under)" % (sea_level - _drawn_height(ground, at)))
+			var reach: float = (glower.get("enemy_data") as EnemyData).contact_radius_m
+			var dry: float = _nearest_dry(ground, at, sea_level, reach)
+			_expect(dry <= reach, "...dry sand within its %.2f m contact radius (%.2f m off)" % [reach, dry])
+			var under_at: Vector3 = (underfoot as Node3D).global_position
+			_expect(_drawn_height(ground, under_at) >= sea_level, "...the Underfoot on dry sand (%.3f m over)" % (_drawn_height(ground, under_at) - sea_level))
+			var stance: Vector3 = (_field.get_node("Wanderer") as Node3D).global_position
+			_expect(_drawn_height(ground, stance) >= sea_level, "...and the Wanderer (%.3f m over)" % (_drawn_height(ground, stance) - sea_level))
+			var bodies: Array[Rect2] = [_body_bounds(glower), _body_bounds(underfoot)]
 			var spots: int = 0
-			var inside: int = 0
+			var crowding: int = 0
 			var scatter: Node = _field.call("get_scatter")
 			if scatter != null:
 				for entry: Resource in scatter.call("get_entries"):
 					for spot: RefCounted in scatter.call("get_spots", entry):
 						spots += 1
 						var spot_at: Vector3 = spot.get("position")
-						if float(ground.call("get_pool_stamp_distance", Vector2(spot_at.x, spot_at.z))) < keep_out:
-							inside += 1
+						for body in bodies:
+							if _rect_distance(body, Vector2(spot_at.x, spot_at.z)) - float(spot.get("size")) * 0.5 < BODY_SCATTER_MARGIN_M:
+								crowding += 1
 			_expect(spots > 0, "...floor 2's scatter laid (%d items)" % spots)
-			_expect_eq(inside, 0, "...none of it in the pool, its rim or %.2f m past" % POOL_SCATTER_MARGIN_M)
+			_expect_eq(crowding, 0, "...none of it within %.2f m of either body" % BODY_SCATTER_MARGIN_M)
 			var poses: Array[Node] = glower.find_children("*", "GlowerPose", true, false)
 			var pose: Node = poses[0] if poses.size() == 1 else null
 			_expect(pose != null, "The Glower wears GlowerPose")
@@ -649,6 +661,40 @@ func _start_fight(option: StringName = SPUTTER_OPTION) -> Node:
 	if pose != null:
 		await ProbePlay.wait_until(self, func() -> bool: return is_equal_approx(float(pose.call("get_barb_raise")), 1.0), BARB_RISE_MAX_SEC)
 	return _overlay().get("battle_controller")
+
+func _drawn_height(ground: Node, at: Vector3) -> float:
+	return float(ground.call("get_visible_height_at", Vector2(at.x, at.z)))
+
+# Metres from `at` to the nearest drawn ground at or over the sea, rings
+# a tenth of a metre apart out to `limit`; INF when none is in it.
+func _nearest_dry(ground: Node, at: Vector3, sea_level: float, limit: float) -> float:
+	var radius: float = 0.0
+	while radius <= limit + 0.001:
+		var steps: int = maxi(1, ceili(TAU * radius / 0.05))
+		for k in steps:
+			var p: Vector3 = at + Vector3(cos(TAU * k / steps), 0.0, sin(TAU * k / steps)) * radius
+			if _drawn_height(ground, p) >= sea_level:
+				return radius
+		radius += 0.1
+	return INF
+
+# A body's ground footprint: the XZ bounds of its visible meshes.
+func _body_bounds(body: Node) -> Rect2:
+	var bounds := Rect2()
+	var first: bool = true
+	for node in body.find_children("*", "MeshInstance3D", true, false):
+		var mesh_instance := node as MeshInstance3D
+		if mesh_instance.mesh == null or not mesh_instance.is_visible_in_tree():
+			continue
+		var box: AABB = mesh_instance.global_transform * mesh_instance.get_aabb()
+		var flat := Rect2(Vector2(box.position.x, box.position.z), Vector2(box.size.x, box.size.z))
+		bounds = flat if first else bounds.merge(flat)
+		first = false
+	return bounds
+
+static func _rect_distance(rect: Rect2, p: Vector2) -> float:
+	var nearest := Vector2(clampf(p.x, rect.position.x, rect.end.x), clampf(p.y, rect.position.y, rect.end.y))
+	return nearest.distance_to(p)
 
 func _find(path: String) -> Node:
 	for node in get_nodes_in_group("enemies"):

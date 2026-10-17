@@ -19,7 +19,7 @@ value = 4
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Glower"
-mechanic_summary = "A pufferfish resting in a standing pool, on a two-turn rhythm in step with the Underfoot: Puff, telegraphed by its false-eye glyph, then Inflated through the next turn - Attacks at one enemy must target it, and it takes 50% less - while it Bites (4) and lets the air out. Brace the Sting, use area Attacks or pop it on the taunt turn; killing it lifts the taunt at once."
+mechanic_summary = "A pufferfish resting in the shallows, on a two-turn rhythm in step with the Underfoot: Puff, telegraphed by its false-eye glyph, then Inflated through the next turn - Attacks at one enemy must target it, and it takes 50% less - while it Bites (4) and lets the air out. Brace the Sting, use area Attacks or pop it on the taunt turn; killing it lifts the taunt at once."
 max_hp = 26
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_puff"), SubResource("EnemyIntent_bite")])
 ; Placeholder hit, the Greyshelf's (DESIGN.md).
@@ -29,6 +29,6 @@ contact_sounds = Array[AudioStream]([ExtResource("4_hit")])
 model_scene_path = "res://assets/models/enemies/Glower/Glower_deflated.glb"
 attachment_scene_path = "res://field/glower_pose.tscn"
 painted_albedo_path = "res://assets/models/enemies/Glower/Glower_deflated_0.jpg"
-; Its belly under the pool's surface.
+; Its belly under the water's surface.
 sink_m = 0.06
 contact_radius_m = 1.5

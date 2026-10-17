@@ -233,10 +233,10 @@
                   "anchor": true,
                   "card_reward": "ROLLED",
                   "position": [
-                    1.5,
-                    -23.0
+                    0.15,
+                    -19.9
                   ],
-                  "yaw_degrees": 135.0,
+                  "yaw_degrees": -90.0,
                   "face_prop": null
                 },
                 {
@@ -247,22 +247,14 @@
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
-                    -0.75,
-                    -21.3
+                    -0.95,
+                    -21.65
                   ],
                   "yaw_degrees": -121.3,
                   "face_prop": null
                 }
               ],
-              "props": [
-                {
-                  "scene": "res://field/standing_pool.tscn",
-                  "position": [
-                    1.5,
-                    -23.0
-                  ]
-                }
-              ],
+              "props": [],
               "keepsake_drop": null,
               "armor_drop": null,
               "glassbone": 0
@@ -1496,7 +1488,7 @@
       "file": "res://battle/rules/enemies/glower.tres",
       "hp": 26,
       "elite": false,
-      "mechanic_summary": "A pufferfish resting in a standing pool, on a two-turn rhythm in step with the Underfoot: Puff, telegraphed by its false-eye glyph, then Inflated through the next turn - Attacks at one enemy must target it, and it takes 50% less - while it Bites (4) and lets the air out. Brace the Sting, use area Attacks or pop it on the taunt turn; killing it lifts the taunt at once.",
+      "mechanic_summary": "A pufferfish resting in the shallows, on a two-turn rhythm in step with the Underfoot: Puff, telegraphed by its false-eye glyph, then Inflated through the next turn - Attacks at one enemy must target it, and it takes 50% less - while it Bites (4) and lets the air out. Brace the Sting, use area Attacks or pop it on the taunt turn; killing it lifts the taunt at once.",
       "field": {
         "model": "res://assets/models/enemies/Glower/Glower_deflated.glb",
         "model_is_default": false,
