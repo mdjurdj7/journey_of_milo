@@ -60,6 +60,10 @@ class_name BattleIntent
 # (BattleOverlay's humanoid-guess enemy_head_height) only if the enemy
 # reports 0.
 @export var gap_px: float = 14.0
+# Screen pixels added to where it would stand, set every frame by the
+# battle overlay's layout pass so no two readouts overlap (BattleOverlay.
+# _lay_out_readouts()).
+var layout_offset: Vector2 = Vector2.ZERO
 @export var head_margin: float = 0.1
 @export var fallback_head_height: float = 1.8
 @export var numeral_font: Font = load("res://assets/fonts/Spectral-SemiBold.ttf")
@@ -884,7 +888,7 @@ func _physics_process(_delta: float) -> void:
 		bottom = _ink_bottom
 	_anchor_screen = screen_pos
 	_placed = true
-	position = (screen_pos - Vector2(size.x / 2.0, bottom)).round()
+	position = (screen_pos - Vector2(size.x / 2.0, bottom) + layout_offset).round()
 	var left: bool = _points_left()
 	if left != _pointing_left:
 		_pointing_left = left

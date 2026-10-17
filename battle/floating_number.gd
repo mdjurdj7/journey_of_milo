@@ -39,6 +39,13 @@ func _ready() -> void:
 	add_theme_color_override("font_outline_color", get_theme_color("text_color", "CardFace"))
 	add_theme_constant_override("outline_size", outline_size_px)
 
+# The size it will show `value` at - for placing it before it shows.
+func measure(value: int, size_multiplier: float = 1.0) -> Vector2:
+	text = str(value)
+	add_theme_font_size_override("font_size", roundi(float(font_size_px) * size_multiplier))
+	reset_size()
+	return size
+
 # `size_multiplier` grows the numeral from font_size_px - a heavy hit's
 # (BattleFeedback.number_scale()). Shown in the frame its hit's stop
 # starts, it punches in about its own centre (punch_scale, punch_time_sec)

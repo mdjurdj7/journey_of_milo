@@ -32,6 +32,10 @@ class_name EnemyStatus
 # ground_offset - retune per enemy live (Remote tab) once a taller/
 # shorter creature needs a different offset.
 @export var bar_offset: Vector3 = Vector3(0.0, -0.45, 0.0)
+# Screen pixels added to where it would stand, set every frame by the
+# battle overlay's layout pass so no two readouts overlap (BattleOverlay.
+# _lay_out_readouts()); zero out of a fight.
+var layout_offset: Vector2 = Vector2.ZERO
 @export var fade_time: float = 0.15
 @export var hp_change_hold_time: float = 1.5
 @export_range(0.0, 1.0) var low_hp_fraction: float = 0.3
@@ -733,7 +737,7 @@ func _physics_process(delta: float) -> void:
 	# Whole pixels only - a fractional Control position on a bare bar (no
 	# panel background to visually absorb it) reads as shimmer/jitter on
 	# thin edges, most visibly on the 1px label outline.
-	position = (screen_pos - _anchor_offset()).round()
+	position = (screen_pos - _anchor_offset() + layout_offset).round()
 
 	var distance: float = camera.global_position.distance_to(target_position)
 	var field_scale: float = DistanceScale.compute_scale(distance, near_scale_distance, far_scale_distance, min_scale, max_scale)

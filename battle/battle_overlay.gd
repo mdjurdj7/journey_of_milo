@@ -47,6 +47,17 @@ signal battle_finished(outcome: Outcome)
 # sits this far from where its first hit's did, in screen pixels - up and
 # to the side, so the two read as two blows.
 @export var repeat_number_offset: Vector2 = Vector2(28.0, -34.0)
+# A further hit's number on a target whose last still shows - a multi-hit
+# ("5, 5, 5") - steps this far on from the one before, in screen pixels,
+# so each reads as its own blow. The player's and the enemies' alike.
+@export var number_stack_step: Vector2 = Vector2(22.0, -26.0)
+# A number keeps this far, in pixels, off its own readouts the whole way it
+# rises - an enemy's intent and HP/name plate, his HP bar - moved beside
+# them when it would cross.
+@export var number_clearance_px: float = 8.0
+# Readouts (plates, intents, his HP bar) are pushed apart until this many
+# pixels lie between any two (_lay_out_readouts()).
+@export var readout_gap_px: float = 4.0
 # The draw sound, once per card as it leaves the deck (HandContainer.
 # draw_started): a -6 dBFS take at -22, 6 dB under card play, so a
 # five-card draw is felt rather than loud. One take only (see DESIGN.md),
@@ -176,6 +187,9 @@ var _debug_card_picker: OptionButton = null
 var _battle_feedback: BattleFeedback = null
 # A damage number's life, read once (_number_seconds()); -1 until then.
 var _number_life: float = -1.0
+# Target (a FieldEnemy, or "player") -> how many of its numbers show now,
+# for the stack's step (number_stack_step).
+var _number_counts: Dictionary = {}
 # A Toll blow's Toll as it landed, for its toll_changed; -1 = none.
 var _toll_blow_from: int = -1
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
@@ -827,6 +841,72 @@ func _place_choice_prompt() -> void:
 
 func _process(_delta: float) -> void:
 	_place_choice_prompt()
+	_lay_out_readouts()
+
+# No two readouts overlap: every enemy's HP/name plate and intent, and his
+# HP bar (which never moves), as they would stand (their own placement,
+# less the offset this gave them), pushed apart - sideways first, by
+# whichever way they overlap least - until readout_gap_px lies between
+# each pair. Each keeps the offset as its layout_offset, which its own
+# placement adds every frame.
+func _lay_out_readouts() -> void:
+	var nodes: Array[Control] = []
+	var rects: Array[Rect2] = []
+	var movable: Array[bool] = []
+	for display in _enemy_statuses.values() + _enemy_intents.values():
+		var control := display as Control
+		if control == null or not is_instance_valid(control) or not control.is_visible_in_tree():
+			continue
+		var offset: Vector2 = control.get("layout_offset")
+		var rect: Rect2 = control.get_global_rect()
+		if not rect.has_area():
+			continue
+		nodes.append(control)
+		rects.append(Rect2(rect.position - offset, rect.size))
+		movable.append(true)
+	if _field_hp_bar != null and _field_hp_bar.is_visible_in_tree():
+		nodes.append(_field_hp_bar)
+		rects.append(_field_hp_bar.get_global_rect())
+		movable.append(false)
+	var shifts: Array[Vector2] = []
+	shifts.resize(nodes.size())
+	shifts.fill(Vector2.ZERO)
+	for _pass in 8:
+		var moved: bool = false
+		for i in nodes.size():
+			for j in range(i + 1, nodes.size()):
+				if not movable[i] and not movable[j]:
+					continue
+				var a: Rect2 = Rect2(rects[i].position + shifts[i], rects[i].size).grow(readout_gap_px * 0.5)
+				var b: Rect2 = Rect2(rects[j].position + shifts[j], rects[j].size).grow(readout_gap_px * 0.5)
+				if not a.intersects(b):
+					continue
+				var overlap: Rect2 = a.intersection(b)
+				var push := Vector2.ZERO
+				if overlap.size.x <= overlap.size.y * 2.0:
+					push.x = overlap.size.x * (1.0 if a.get_center().x <= b.get_center().x else -1.0)
+				else:
+					push.y = overlap.size.y * (1.0 if a.get_center().y <= b.get_center().y else -1.0)
+				if movable[i] and movable[j]:
+					shifts[i] -= push * 0.5
+					shifts[j] += push * 0.5
+				elif movable[j]:
+					shifts[j] += push
+				else:
+					shifts[i] -= push
+				moved = true
+		if not moved:
+			break
+	for i in nodes.size():
+		if movable[i]:
+			nodes[i].set("layout_offset", shifts[i].round())
+
+# The plates outlive the fight (each FieldEnemy's own): what the layout
+# moved them by goes with it.
+func _exit_tree() -> void:
+	for display in _enemy_statuses.values():
+		if display != null and is_instance_valid(display):
+			(display as Control).set("layout_offset", Vector2.ZERO)
 
 func _on_target_requested(_card: CardData) -> void:
 	Input.set_default_cursor_shape(Input.CURSOR_POINTING_HAND)
@@ -932,7 +1012,21 @@ func _on_damage_dealt(_source: Variant, target: Variant, amount: int, _kind: Str
 		await get_tree().create_timer(delay).timeout
 		if target is Object and not is_instance_valid(target):
 			return
-	_spawn_floating_number(amount, _screen_pos_for_damage_target(target) + offset, size)
+	# A multi-hit's numbers step on from each other while the last shows.
+	var key: Variant = target if target is FieldEnemy else "player"
+	var shown: int = int(_number_counts.get(key, 0))
+	var stack: Vector2 = number_stack_step * float(shown)
+	_number_counts[key] = shown + 1
+	get_tree().create_timer(_number_seconds()).timeout.connect(func() -> void:
+		_number_counts[key] = maxi(int(_number_counts.get(key, 1)) - 1, 0))
+	# Clear of its own readouts: an enemy's intent and plate, his HP bar.
+	var avoid: Array[Rect2] = []
+	var readouts: Array = [_enemy_intents.get(target), _enemy_statuses.get(target)] if target is FieldEnemy else [_field_hp_bar]
+	for display in readouts:
+		var control := display as Control
+		if control != null and is_instance_valid(control) and control.is_visible_in_tree():
+			avoid.append(control.get_global_rect())
+	_spawn_floating_number(amount, _screen_pos_for_damage_target(target) + offset, size, avoid, stack)
 
 # A repeated hit's follow-up swing (Second Swing): the toll tick, if one
 # is on disk.
@@ -1075,10 +1169,25 @@ func _number_seconds() -> float:
 			number.free()
 	return _number_life
 
-func _spawn_floating_number(value: int, screen_pos: Vector2, size_multiplier: float = 1.0) -> void:
+# `avoid`: rects the number keeps number_clearance_px off the whole way it
+# rises (its own readouts) - moved beside them, the side with room on
+# screen, when its path would cross one; then `stack` on from there (a
+# multi-hit's step), so the numbers of one target never land on one spot.
+func _spawn_floating_number(value: int, screen_pos: Vector2, size_multiplier: float = 1.0, avoid: Array[Rect2] = [], stack: Vector2 = Vector2.ZERO) -> void:
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
 	add_child(number)
-	number.show_value(value, screen_pos, size_multiplier)
+	var size: Vector2 = number.measure(value, size_multiplier)
+	var at: Vector2 = screen_pos
+	var path := Rect2(Vector2(at.x, at.y - number.rise_px), Vector2(size.x, size.y + number.rise_px)).grow(number_clearance_px)
+	var blocked := Rect2()
+	for rect in avoid:
+		if path.intersects(rect):
+			blocked = rect if not blocked.has_area() else blocked.merge(rect)
+	if blocked.has_area():
+		var right: float = blocked.end.x + number_clearance_px
+		var left: float = blocked.position.x - number_clearance_px - size.x
+		at.x = right if right + size.x + stack.x <= get_viewport_rect().size.x or left < 0.0 else left
+	number.show_value(value, at + stack, size_multiplier)
 
 # Debug: flips the theme between its on-pale and on-dark value sets and
 # re-reads every battle readout's colours - the cards don't take part
