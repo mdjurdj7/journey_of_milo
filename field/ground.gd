@@ -1298,6 +1298,42 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("relief_edge_fade", relief_edge_fade)
 	_push_channel_uniforms()
 
+# The battle frame's press (BattleGroundPress): how far it has eased in
+# (0 off), the battle eye and the horizontal direction it looks, the
+# depths along it where the press is full and where it ends, and the level
+# sand is pressed toward. Drawn only - get_height_at(), the walk surface
+# and every other query read the sand as it is; get_battle_press_drop()
+# says how far the drawn sand sits under that.
+var _battle_press_amount: float = 0.0
+var _battle_press_eye: Vector2 = Vector2.ZERO
+var _battle_press_forward: Vector2 = Vector2(0.0, -1.0)
+var _battle_press_full_depth: float = 0.0
+var _battle_press_zero_depth: float = 0.0
+var _battle_press_level: float = 0.0
+
+func set_battle_press(amount: float, eye: Vector2, forward: Vector2, full_depth: float, zero_depth: float, level: float) -> void:
+	_battle_press_amount = amount
+	_battle_press_eye = eye
+	_battle_press_forward = forward
+	_battle_press_full_depth = full_depth
+	_battle_press_zero_depth = zero_depth
+	_battle_press_level = level
+	_apply_uniform("battle_press_amount", amount)
+	_apply_uniform("battle_press_eye", eye)
+	_apply_uniform("battle_press_forward", forward)
+	_apply_uniform("battle_press_full_depth", full_depth)
+	_apply_uniform("battle_press_zero_depth", zero_depth)
+	_apply_uniform("battle_press_level", level)
+
+# How far the press draws the sand under `world` (a point on it, its Y the
+# sand's height there), metres - 0 out of a fight.
+func get_battle_press_drop(world: Vector3) -> float:
+	if _battle_press_amount <= 0.0:
+		return 0.0
+	var depth: float = (Vector2(world.x, world.z) - _battle_press_eye).dot(_battle_press_forward)
+	var weight: float = _battle_press_amount * (1.0 - smoothstep(_battle_press_full_depth, _battle_press_zero_depth, depth))
+	return weight * maxf(world.y - _battle_press_level, 0.0)
+
 func _apply_uniform(uniform_name: String, value: Variant) -> void:
 	if _material:
 		_material.set_shader_parameter(uniform_name, value)

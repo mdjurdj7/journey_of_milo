@@ -793,6 +793,18 @@ float caustic_web(vec2 world_xz, float time) {
 // it already did before, when both ran the float hash at different
 // precisions (see ground.gd's _hash()).
 // Pushed by Ground._push_channel_uniforms().
+// The battle frame's press (Ground.set_battle_press(), BattleGroundPress):
+// sand nearer the camera than battle_press_zero_depth - horizontal depth
+// from battle_press_eye along battle_press_forward - is drawn pressed down
+// toward battle_press_level, fully by battle_press_full_depth; only what
+// is over the level moves, and only by battle_press_amount of the way.
+uniform float battle_press_amount = 0.0;
+uniform vec2 battle_press_eye = vec2(0.0);
+uniform vec2 battle_press_forward = vec2(0.0, -1.0);
+uniform float battle_press_full_depth = 0.0;
+uniform float battle_press_zero_depth = 0.0;
+uniform float battle_press_level = 0.0;
+
 uniform bool channel_enabled = false;
 uniform vec2 channel_centre = vec2(0.0);
 // The field's forward axis (RegionField.get_forward() XZ), never assumed.
@@ -887,6 +899,17 @@ void vertex() {
 		float ny = max(n.y, 0.001);
 		vec2 slope = vec2(-n.x / ny, -n.z / ny) - vec2(ddx, ddz);
 		NORMAL = normalize(vec3(-slope.x, 1.0, -slope.y));
+	}
+	if (battle_press_amount > 0.0) {
+		float depth = dot(world_pos.xz - battle_press_eye, battle_press_forward);
+		float weight = battle_press_amount * (1.0 - smoothstep(battle_press_full_depth, battle_press_zero_depth, depth));
+		float over = world_pos.y - battle_press_level;
+		if (weight > 0.0 && over > 0.0) {
+			VERTEX.y -= weight * over;
+			world_pos.y -= weight * over;
+			// The slope flattens with it.
+			NORMAL = normalize(vec3(NORMAL.x * (1.0 - weight), NORMAL.y, NORMAL.z * (1.0 - weight)));
+		}
 	}
 	v_world_xz = world_pos.xz;
 	v_world_height = world_pos.y;

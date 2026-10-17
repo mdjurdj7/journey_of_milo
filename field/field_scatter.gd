@@ -371,6 +371,7 @@ var _battle_fighter_rects: Array[Rect2] = []
 var _battle_fighter_depths: PackedFloat32Array = PackedFloat32Array()
 var _battle_readouts: Array[Rect2] = []
 var _battle_depth_margin: float = 0.2
+var _battle_press_float: float = 0.03
 # The camera forward last pushed to the cards.
 var _card_forward: Vector2 = Vector2.ZERO
 # The gust and its sway gain last pushed to the cards.
@@ -1754,20 +1755,25 @@ func _advance_battle_fade(delta: float) -> void:
 
 # The battle frame for the per-item fade, from BattleOcclusion every
 # frame: `camera` null out of a frame (everything comes back).
-func set_battle_screen(camera: Camera3D, fighter_rects: Array[Rect2], fighter_depths: PackedFloat32Array, readouts: Array[Rect2], depth_margin: float) -> void:
+func set_battle_screen(camera: Camera3D, fighter_rects: Array[Rect2], fighter_depths: PackedFloat32Array, readouts: Array[Rect2], depth_margin: float, press_float: float = 0.03) -> void:
 	_battle_camera = camera
 	_battle_fighter_rects = fighter_rects
 	_battle_fighter_depths = fighter_depths
 	_battle_readouts = readouts
 	_battle_depth_margin = depth_margin
+	_battle_press_float = press_float
 
 # Whether an item at `spot`, `half` across either way and spot.size tall,
-# covers a fighter from in front (its screen box over the fighter's, its
+# stands on sand the battle press draws away, or covers a fighter from in front (its screen box over the fighter's, its
 # own spot nearer the camera by more than the margin) or lies under a
 # readout - in the frame set_battle_screen() last handed over.
 func occludes_battle(spot: Spot, half: float) -> bool:
 	var camera: Camera3D = _battle_camera
 	var at: Vector3 = spot.position
+	# Standing where the battle press draws the sand away: gone, not
+	# floating.
+	if _ground != null and _ground.get_battle_press_drop(at) > _battle_press_float:
+		return true
 	var rect := Rect2()
 	var first: bool = true
 	for corner in [Vector3(-half, 0.0, -half), Vector3(half, 0.0, -half), Vector3(-half, 0.0, half), Vector3(half, 0.0, half), Vector3(-half, spot.size, -half), Vector3(half, spot.size, -half), Vector3(-half, spot.size, half), Vector3(half, spot.size, half)]:

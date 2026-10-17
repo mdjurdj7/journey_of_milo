@@ -740,6 +740,10 @@ func _ready() -> void:
 	var occlusion := BattleOcclusion.new()
 	occlusion.name = "BattleOcclusion"
 	add_child(occlusion)
+	# The near foreground pressed under the feet line (BattleGroundPress).
+	var press := BattleGroundPress.new()
+	press.name = "BattleGroundPress"
+	add_child(press)
 	if RunState.character == null:
 		RunState.new_run(load(STARTING_CHARACTER_PATH) as CharacterData)
 	# The order at floor load: what each slot stands (no side effects),

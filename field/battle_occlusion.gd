@@ -30,6 +30,10 @@ class_name BattleOcclusion
 @export var depth_margin_m: float = 0.2
 # Readouts and fighters' boxes grown by this, pixels, before the test.
 @export var screen_margin_px: float = 6.0
+# A prop or scatter item standing where the battle press draws the sand
+# more than this lower (Ground.get_battle_press_drop()) fades rather than
+# float over it, metres.
+@export var press_float_m: float = 0.03
 
 var _field: RegionField = null
 # GeometryInstance3D -> its presence now (1 solid, 0 gone). Only ones
@@ -58,7 +62,7 @@ func _process(delta: float) -> void:
 		_gather(camera, fighter_rects, fighter_depths, readouts)
 	var scatter: FieldScatter = _field.get_scatter()
 	if scatter != null:
-		scatter.set_battle_screen(camera if framing else null, fighter_rects, fighter_depths, readouts, depth_margin_m)
+		scatter.set_battle_screen(camera if framing else null, fighter_rects, fighter_depths, readouts, depth_margin_m, press_float_m)
 	var targets: Dictionary = {}
 	if framing and camera != null:
 		var props_root: Node = _field.get_node_or_null(RegionField.PROPS_NODE_NAME)
@@ -67,7 +71,7 @@ func _process(delta: float) -> void:
 				if _field.is_battle_exempt_prop(prop):
 					continue
 				var geometry: Array[GeometryInstance3D] = _geometry_of(prop)
-				if _occludes(geometry, camera, fighter_rects, fighter_depths, readouts):
+				if _floats(prop) or _occludes(geometry, camera, fighter_rects, fighter_depths, readouts):
 					for instance in geometry:
 						targets[instance] = true
 	for instance: GeometryInstance3D in targets:
@@ -136,6 +140,15 @@ func _occludes(geometry: Array[GeometryInstance3D], camera: Camera3D, fighter_re
 			if rect.intersects(readout):
 				return true
 	return false
+
+# Whether a prop stands where the press draws the sand away under it.
+func _floats(prop: Node) -> bool:
+	var ground := _field.get_node_or_null(_field.ground_path) as Ground
+	if ground == null or not prop is Node3D:
+		return false
+	var at: Vector3 = (prop as Node3D).global_position
+	at.y = ground.get_visible_height_at(Vector2(at.x, at.z))
+	return ground.get_battle_press_drop(at) > press_float_m
 
 static func _geometry_of(node: Node) -> Array[GeometryInstance3D]:
 	var found: Array[GeometryInstance3D] = []
