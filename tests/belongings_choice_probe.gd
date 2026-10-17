@@ -29,7 +29,8 @@ extends SceneTree
 # names it "(carrying one)" and won't take it, the other columns still
 # offered. Then the rest itself on the field (RegionField.open_bedroll_
 # rest(), BedrollRest): at 50 / 80 HP YES brings 74 / 80 and the Bedroll
-# is gone; it can't open at full HP, nor in a fight.
+# is gone, the HUD in bone through the night and back after; it can't
+# open at full HP, nor in a fight.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/belongings_choice_probe.gd
 #
@@ -299,8 +300,15 @@ func _check_bedroll_rest() -> void:
 	_expect(rest != null and not field.can_process(), "Rest: the confirm is up over a frozen field")
 	if rest != null:
 		await process_frame
+		var hp_line: Control = field.get_node("FieldHUD/HPLine")
+		var day_ink: Color = hp_line.get_theme_color("ink", "Battle")
 		rest.call("answer_confirm", true)
+		# The hold: the Bedroll spent, the HUD in its on-dark (bone) set.
+		await ProbePlay.wait_until(self, func() -> bool: return not bool(_run_state.get("has_bedroll")), REST_MAX_SEC)
+		var night_ink: Color = hp_line.get_theme_color("ink", "Battle")
+		_expect(night_ink != day_ink and night_ink.get_luminance() > day_ink.get_luminance(), "Rest: the HUD goes to bone through the night (%s from %s)" % [night_ink, day_ink])
 		await ProbePlay.wait_until(self, func() -> bool: return field.call("get_bedroll_rest") == null, REST_MAX_SEC)
+		_expect(hp_line.get_theme_color("ink", "Battle") == day_ink, "Rest: and back to the day's ink after")
 	_expect(field.call("get_bedroll_rest") == null, "Rest: the night ends")
 	_expect(int(_run_state.get("player_hp")) == 74 and int(_run_state.get("player_max_hp")) == 80, "Rest: 50 / 80 rests to 74 / 80 (got %d / %d)" % [int(_run_state.get("player_hp")), int(_run_state.get("player_max_hp"))])
 	_expect(not bool(_run_state.get("has_bedroll")), "Rest: the Bedroll is used up")

@@ -23,13 +23,15 @@ class_name BedrollRest
 # multiplies the 3D view, water and all, by night_tint, under the HUD
 # (layer 0, FieldHUD is 1) - over night_in_sec. Not a lighting change:
 # the sun and ambient stay as they are. It holds night_hold_sec; the
-# Bedroll is spent as the hold begins (RunState.use_bedroll()) and the
-# HP it restores (BedrollData.heal_amount()) rises through heal_rise_sec
-# of the hold, a point at a time. Then the day comes back over night_out_
+# Bedroll is spent as the hold begins (RunState.use_bedroll()), the HUD
+# goes to its on-dark value set (bone - hud_value_set) so it stays
+# readable on the night, and the HP it restores (BedrollData.heal_
+# amount()) rises through heal_rise_sec of the hold, a point at a time. Then the day comes back over night_out_
 # sec, and as it does one world-voice line (WorldVoiceLine, Spectral, one
 # line) says one of rest_lines, picked at random, held line_hold_sec
-# between its fades. The fog colour returns to what it was; the field
-# stays day. No rest screen.
+# between its fades - the HUD back to the day's value set (day_on_dark)
+# first, so the line is said in it. The fog colour returns to what it
+# was; the field stays day. No rest screen.
 
 # The confirm closed or the night is over - whether it was a rest.
 signal finished(rested: bool)
@@ -77,6 +79,12 @@ enum Answer { YES, NO }
 # Between the line's fades - 0.5 in, this, 0.5 out: about two seconds.
 @export var line_hold_sec: float = 1.0
 @export_group("")
+
+# Switches the field HUD's value set (RegionField.set_hud_value_set());
+# day_on_dark is the set the day uses. Set by RegionField before the node
+# enters the tree.
+var hud_value_set: Callable = Callable()
+var day_on_dark: bool = false
 
 var phase: Phase = Phase.CONFIRM
 # The line said on the way back, once said.
@@ -266,6 +274,7 @@ func _set_night(amount: float) -> void:
 
 # The hold: the Bedroll spent, the HP rising a point at a time.
 func _begin_hold() -> void:
+	_set_hud_on_dark(true)
 	RunState.use_bedroll()
 	var room: int = maxi(RunState.player_max_hp - RunState.player_hp, 0)
 	_heal_target = mini(_heal_target, room)
@@ -283,6 +292,7 @@ func _heal_to(amount: float) -> void:
 func _say_line() -> void:
 	# Whatever the rise hasn't reached by now lands at once.
 	_heal_to(float(_heal_target))
+	_set_hud_on_dark(day_on_dark)
 	RunLogger.player_healed(_healed, "bedroll")
 	if rest_lines.is_empty():
 		return
@@ -292,6 +302,10 @@ func _say_line() -> void:
 	var voice := WorldVoiceLine.on_hud(_hud)
 	if voice != null:
 		voice.show_line(said_line, line_hold_sec)
+
+func _set_hud_on_dark(on_dark: bool) -> void:
+	if hud_value_set.is_valid():
+		hud_value_set.call(on_dark)
 
 # What the rest restored so far.
 func get_healed() -> int:

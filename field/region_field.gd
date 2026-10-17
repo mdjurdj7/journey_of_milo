@@ -1965,6 +1965,23 @@ func _setup_field_hud() -> void:
 	_worn_line = worn_line
 	hp_bar.set_target(wanderer)
 
+# The field HUD in one of BattleTheme's two value sets - on_dark the
+# pale (bone) one - and every item re-read: DECK, the HP readout, the row
+# and the field's enemy readouts. A rest's night switches it to on-dark
+# and back to ui_on_dark_world as the day returns (BedrollRest).
+func set_hud_value_set(on_dark: bool) -> void:
+	var battle_theme := deck_panel.theme as BattleTheme
+	if battle_theme == null:
+		return
+	battle_theme.apply_value_set(on_dark)
+	deck_panel.refresh_style()
+	hp_bar.refresh_style()
+	for line: InkLine in _hud_row_lines:
+		line.refresh_style()
+	for enemy: FieldEnemy in get_tree().get_nodes_in_group("enemies"):
+		if enemy.enemy_status != null:
+			enemy.enemy_status.refresh_style()
+
 # One InkLine into the field HUD row: this region's theme (set before it
 # enters the tree, so its _ready() reads this region's ink), the row's
 # style, and the item it sits beside.
@@ -3305,6 +3322,8 @@ func open_bedroll_rest() -> bool:
 	var rest := BedrollRest.new()
 	rest.name = "BedrollRest"
 	rest.setup(load(bedroll_data_path) as BedrollData, get_region_sky(), get_node_or_null(^"FieldHUD"), _bedroll_line)
+	rest.hud_value_set = set_hud_value_set
+	rest.day_on_dark = ui_on_dark_world
 	rest.finished.connect(_on_bedroll_rest_finished.unbind(1))
 	if wanderer != null:
 		wanderer.stand_still()
