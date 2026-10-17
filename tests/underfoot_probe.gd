@@ -8,7 +8,7 @@ extends SceneTree
 # soften; the Rebury nothing; taunt (Inflated) on a packmate barring a
 # Slash from it but not Brace or Sentence. Floor 2's required cluster is the Sputter
 # (or, forced, the Glower's option: its pool stamped on the ground, the
-# Puff swelling it on the Exposed turn, a Slash only at it then, and its
+# Puff swelling it on the Exposed turn, no scatter in or round the pool, a Slash only at it then, and its
 # death freeing the Underfoot)
 # and the Underfoot, no dragonfly, the island's Dragonfly x3 as they
 # were. The Wanderer's stance on the dune's rise east of the crab stands
@@ -54,6 +54,8 @@ const INFLATED_PATH := "res://battle/rules/statuses/inflated.tres"
 const GLOWER_PATH := "res://battle/rules/enemies/glower.tres"
 const SPUTTER_OPTION := &"sputter_underfoot"
 const GLOWER_OPTION := &"underfoot_glower"
+# Scatter stays this far past a stamped pool's damp rim.
+const POOL_SCATTER_MARGIN_M := 0.15
 # Where the fight case logs its run, when run_probes.sh hands over no
 # folder of this process's own (RunLogger.dir_override()).
 const LOG_DIR := "user://underfoot_probe"
@@ -436,6 +438,19 @@ func _check_glower_option() -> void:
 			var at: Vector3 = (glower as Node3D).global_position
 			_expect_eq((ground.get("_pool_stamps") as Dictionary).size(), 1, "...one pool stamped on the ground")
 			_expect(float(ground.call("get_pool_stamp_distance", Vector2(at.x, at.z))) < 0.0, "...with the Glower in it")
+			var keep_out: float = float(ground.get("pool_stamp_rim")) + POOL_SCATTER_MARGIN_M
+			var spots: int = 0
+			var inside: int = 0
+			var scatter: Node = _field.call("get_scatter")
+			if scatter != null:
+				for entry: Resource in scatter.call("get_entries"):
+					for spot: RefCounted in scatter.call("get_spots", entry):
+						spots += 1
+						var spot_at: Vector3 = spot.get("position")
+						if float(ground.call("get_pool_stamp_distance", Vector2(spot_at.x, spot_at.z))) < keep_out:
+							inside += 1
+			_expect(spots > 0, "...floor 2's scatter laid (%d items)" % spots)
+			_expect_eq(inside, 0, "...none of it in the pool, its rim or %.2f m past" % POOL_SCATTER_MARGIN_M)
 			var poses: Array[Node] = glower.find_children("*", "GlowerPose", true, false)
 			var pose: Node = poses[0] if poses.size() == 1 else null
 			_expect(pose != null, "The Glower wears GlowerPose")
