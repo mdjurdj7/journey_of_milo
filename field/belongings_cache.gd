@@ -9,7 +9,8 @@ class_name BelongingsCache
 #
 # Each object holds one kind of thing, always the same one: the case
 # coin (coin_amount), the pack a card from the prop's pool, the bedroll a
-# keepsake from keepsake_table. The card, and whether one of the three
+# keepsake from keepsake_table - or, with offers_bedroll (floor 2's), the
+# Bedroll itself, one carried at most. The card, and whether one of the three
 # also holds Glassbone (glassbone_chance, which one picked at random),
 # are rolled once, when the floor loads (RegionField._spawn_floor_props()
 # calls roll() from the run's own generator). The keepsake is drawn the
@@ -94,6 +95,11 @@ class_name BelongingsCache
 # What the bedroll draws from - never the keepsake held (KeepsakeTable.
 # roll()). Read when the screen first opens.
 @export var keepsake_table: KeepsakeTable = null
+# The bedroll holds the Bedroll itself (RegionField's bedroll_data_path,
+# BelongingsScreen.offer_bedroll()) rather than a keepsake - no keepsake
+# is drawn then. Floor 2's cache sets it (FloorProp overrides). Read when
+# the screen opens.
+@export var offers_bedroll: bool = false
 # The chance, per cache, that one of the three (any, equally) also holds
 # glassbone_amount Glassbone, taken with it. The chance is read by roll(),
 # the amount when the screen opens.

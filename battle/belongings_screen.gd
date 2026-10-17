@@ -69,6 +69,15 @@ class_name BelongingsScreen
 # doesn't count. Declining is final, as the reward screen's skip is: the
 # cache is spent either way (see BelongingsCache).
 #
+# The bedroll may hold the Bedroll itself instead of a keepsake (offer_
+# bedroll() - floor 2's cache, BelongingsCache.offers_bedroll): its kind
+# is the Bedroll's own label (BEDROLL), and taken it goes into the pack
+# (RunState.take_bedroll()) with "+ Bedroll" under the column. With one
+# already carried it can't be taken: the column is drawn at rest, its
+# kind followed by BedrollData.carrying_text ("(carrying one)") in the
+# utility grey, and it can't be focused, hovered or chosen - the other
+# two are offered as ever.
+#
 # The scrim, the outlined text and the hairline are copies of
 # RewardScreen's own - the shared focus-drawing extraction is deferred
 # (see DESIGN.md).
@@ -219,6 +228,11 @@ const DISMISS := SLOT_COUNT
 @export var glassbone_format: String = "+ Glassbone ×%d":
 	set(value):
 		glassbone_format = value
+		_refresh()
+# The Bedroll taken (offer_bedroll()).
+@export var bedroll_taken_text: String = "+ Bedroll":
+	set(value):
+		bedroll_taken_text = value
 		_refresh()
 @export_group("")
 
@@ -427,6 +441,11 @@ var _deck_panel: Control = null
 # The keepsake held as the screen opened - what the bedroll's keepsake
 # would replace (the full-slot question).
 var _held: TrinketData = null
+# The Bedroll the bedroll holds instead of a keepsake (offer_bedroll()),
+# and whether one was already carried as the screen opened - it can't be
+# taken then.
+var _bedroll: BedrollData = null
+var _bedroll_carried: bool = false
 
 var _scrim: ColorRect = null
 var _draw_layer: Control = null
@@ -514,6 +533,14 @@ func setup(line: String, gold: int, card: CardData, keepsake: TrinketData, glass
 	_object_scales = object_scales
 	_deck_panel = deck_panel
 
+# The bedroll holds the Bedroll rather than a keepsake - whatever keepsake
+# setup() handed over is left out. Called by RegionField after setup(),
+# before the screen enters the tree.
+func offer_bedroll(bedroll: BedrollData) -> void:
+	_bedroll = bedroll
+	if _bedroll != null:
+		_keepsake = null
+
 func _ready() -> void:
 	# The field is frozen under this (see RegionField.open_belongings_
 	# screen()); this layer has to opt out of the freeze or stop with it.
@@ -521,6 +548,7 @@ func _ready() -> void:
 	layer = 100
 	_opened_msec = Time.get_ticks_msec()
 	_held = RunState.keepsake
+	_bedroll_carried = RunState.has_bedroll
 	_rebuild_fonts()
 
 	_scrim = ColorRect.new()
@@ -567,18 +595,40 @@ func _has_slot(slot: int) -> bool:
 		Slot.CARD:
 			return _card != null
 		Slot.KEEPSAKE:
-			return _keepsake != null
+			return _keepsake != null or _bedroll != null
 	return false
+
+# Whether a column can be taken: it holds something, and it isn't the
+# Bedroll with one already carried.
+func can_take(slot: int) -> bool:
+	return _has_slot(slot) and not (slot == Slot.KEEPSAKE and _bedroll != null and _bedroll_carried)
+
+# What's named under a column before the take: its kind - the Bedroll's
+# own label where the bedroll holds it - and, where it can't be taken for
+# one carried, the carrying text after it.
+func kind_text(slot: int) -> String:
+	if slot == Slot.KEEPSAKE and _bedroll != null:
+		return _bedroll.hud_label + (" " + _bedroll.carrying_text if _bedroll_carried else "")
+	return kind_labels[slot] if slot < kind_labels.size() else ""
 
 # The Glassbone a column holds alongside its own thing, 0 for none.
 func _glassbone_in(slot: int) -> int:
 	return maxi(_glassbone_amount, 0) if slot == _glassbone_slot and _has_slot(slot) else 0
 
-# The columns that hold something, left to right.
+# The columns that hold something, left to right - drawn, whether or not
+# they can be taken.
 func _present_slots() -> Array[int]:
 	var slots: Array[int] = []
 	for slot in SLOT_COUNT:
 		if _has_slot(slot):
+			slots.append(slot)
+	return slots
+
+# The columns that can be taken, left to right - what focus moves through.
+func _takeable_slots() -> Array[int]:
+	var slots: Array[int] = []
+	for slot in SLOT_COUNT:
+		if can_take(slot):
 			slots.append(slot)
 	return slots
 
@@ -657,6 +707,7 @@ func _drop_slot(slot: int) -> void:
 			_card = null
 		Slot.KEEPSAKE:
 			_keepsake = null
+			_bedroll = null
 
 func _render_objects() -> void:
 	if _viewport == null or _camera == null:
@@ -781,8 +832,8 @@ func _draw_columns() -> void:
 		if lit:
 			var y: float = rect.end.y + object_hairline_gap_px
 			_draw_layer.draw_rect(Rect2(roundf(rect.get_center().x - object_hairline_length_px / 2.0), y, object_hairline_length_px, hairline_thickness_px), bone)
-		if _taken < 0 and slot < kind_labels.size():
-			_text_centred(_choice_font, kind_labels[slot], rect.get_center().x, _kind_baseline(slot), choice_word_size_px, bone if lit else unfocused_color)
+		if _taken < 0:
+			_text_centred(_choice_font, kind_text(slot), rect.get_center().x, _kind_baseline(slot), choice_word_size_px, bone if lit else unfocused_color)
 
 	if _taken >= 0:
 		_reveal(_taken, true)
@@ -844,11 +895,20 @@ func _reveal(slot: int, draw: bool) -> float:
 			if lift.has_area():
 				y = lift.end.y + contents_gap_px
 		Slot.KEEPSAKE:
+			if _bedroll != null:
+				if draw:
+					_text_centred(_contents_font, bedroll_taken_text, x, y, contents_size_px, bone)
+				y += contents_pitch_px
+				return _reveal_glassbone(slot, x, y, draw)
 			# The tile speaks for it; lines hang under the tiles.
 			var tiles: Rect2 = _keepsake_tiles_rect()
 			if tiles.has_area():
 				x = tiles.get_center().x
 				y = tiles.end.y + contents_gap_px
+	return _reveal_glassbone(slot, x, y, draw)
+
+# The "+ Glassbone" line under a reveal, where its column held some.
+func _reveal_glassbone(slot: int, x: float, y: float, draw: bool) -> float:
 	var glassbone: int = _glassbone_in(slot)
 	if glassbone > 0:
 		if draw:
@@ -914,7 +974,7 @@ func _keepsake_tiles_rect() -> Rect2:
 # Up through the bedroll's reveal: its tile, and the held one beside it
 # while the full slot is asked about.
 func _sync_keepsake_tiles() -> void:
-	var wanted: bool = _keepsake != null and not _flying and _taken == Slot.KEEPSAKE
+	var wanted: bool = _keepsake != null and _bedroll == null and not _flying and _taken == Slot.KEEPSAKE
 	var wanted_held: bool = wanted and _asking and _held != null
 	if wanted and _offered_tile == null:
 		_offered_tile = _new_tile(_keepsake)
@@ -1001,7 +1061,7 @@ func _place_lift() -> void:
 # --- Input ---
 
 func _hit(position: Vector2) -> int:
-	for slot in _present_slots():
+	for slot in _takeable_slots():
 		if _column_rect(slot).has_point(position):
 			return slot
 	if _dismiss_rect().has_point(position):
@@ -1089,16 +1149,18 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if _done:
 		return
-	var slots: Array[int] = _present_slots()
+	var slots: Array[int] = _takeable_slots()
 	var at: int = slots.find(_focus)
 	if event.is_action_pressed("ui_right"):
-		_set_focus(slots[posmod(at + 1, slots.size())] if at >= 0 else slots[0])
+		if not slots.is_empty():
+			_set_focus(slots[posmod(at + 1, slots.size())] if at >= 0 else slots[0])
 	elif event.is_action_pressed("ui_left"):
-		_set_focus(slots[posmod(at - 1, slots.size())] if at >= 0 else slots[slots.size() - 1])
+		if not slots.is_empty():
+			_set_focus(slots[posmod(at - 1, slots.size())] if at >= 0 else slots[slots.size() - 1])
 	elif event.is_action_pressed("ui_down"):
 		_set_focus(DISMISS)
 	elif event.is_action_pressed("ui_up"):
-		if at < 0:
+		if at < 0 and not slots.is_empty():
 			_set_focus(slots[int(float(slots.size()) / 2.0)])
 	elif event.is_action_pressed("ui_accept"):
 		if _focus >= 0:
@@ -1147,7 +1209,7 @@ func _activate(index: int) -> void:
 		_log_choice(-1, 0, null)
 		_finish(-1)
 		return
-	if not _has_slot(index):
+	if not can_take(index):
 		return
 	_done = true
 	_taken = index
@@ -1167,6 +1229,11 @@ func _activate(index: int) -> void:
 			_log_choice(index, glassbone, null)
 			TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "BelongingsScreen")
 			print("BelongingsScreen: took '%s' (deck now %d)." % [_card.card_name, RunState.deck.size()])
+		Slot.KEEPSAKE when _bedroll != null:
+			RunState.take_bedroll()
+			_log_choice(index, glassbone, null)
+			TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "BedrollTakeAudio", "BelongingsScreen")
+			print("BelongingsScreen: took the Bedroll.")
 		Slot.KEEPSAKE:
 			# Offered once it is seen - here, at the reveal.
 			RunState.note_keepsake_offered(_keepsake)
@@ -1213,12 +1280,16 @@ func _log_choice(taken: int, glassbone_taken: int, replaced: Variant) -> void:
 	var offered: Dictionary = {
 		"gold": _gold if _has_slot(Slot.GOLD) else 0,
 		"card": RunLogger.or_null(_card.card_name if _has_slot(Slot.CARD) else ""),
-		"keepsake": RunLogger.keepsake_id(_keepsake if _has_slot(Slot.KEEPSAKE) else null),
+		"keepsake": RunLogger.keepsake_id(_keepsake),
+		"bedroll": _bedroll != null,
 		"glassbone": {"slot": RunLogger.or_null(glassbone_slot), "amount": maxi(_glassbone_amount, 0)},
 	}
+	var taken_name: String = String(Slot.find_key(taken)).to_lower() if taken >= 0 else ""
+	if taken == Slot.KEEPSAKE and _bedroll != null:
+		taken_name = "bedroll"
 	RunLogger.event("belongings", {
 		"offered": offered,
-		"taken": RunLogger.or_null(String(Slot.find_key(taken)).to_lower() if taken >= 0 else ""),
+		"taken": RunLogger.or_null(taken_name),
 		"glassbone_taken": glassbone_taken,
 		"held_before": RunLogger.keepsake_id(_held),
 		"replaced": replaced,

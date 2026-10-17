@@ -3235,8 +3235,13 @@ func open_belongings_screen(cache: BelongingsCache) -> bool:
 		push_warning("RegionField: could not load %s; no belongings screen." % belongings_screen_scene_path)
 		return false
 	var screen := scene.instantiate() as BelongingsScreen
-	cache.ensure_keepsake()
+	# The bedroll's keepsake, or the Bedroll in its place (no keepsake
+	# drawn then).
+	if not cache.offers_bedroll:
+		cache.ensure_keepsake()
 	screen.setup(cache.world_line, cache.coin_amount, cache.card, cache.keepsake, cache.glassbone_slot, cache.glassbone_amount, cache.object_scene_paths, cache.object_scales, deck_panel)
+	if cache.offers_bedroll:
+		screen.offer_bedroll(load(bedroll_data_path) as BedrollData)
 	# The objects as they are on the sand: the cache's tint, the field's light.
 	screen.object_tint = cache.object_tint
 	screen.light_like(get_node_or_null(directional_light_path) as DirectionalLight3D, get_region_sky(), get_viewport().get_camera_3d())

@@ -68,7 +68,7 @@ Gold 12–18. LINE gate.
 | Dragonfly ×3 (`island`) | optional fight | no | 18–27 gold, 30 % extra, no cards | patrol (−16.8, −20.8) → (−13.0, −20.4) → (−14.8, −18.5) | **wading**, ~6 m each way |
 | Trough | trough | no | heal 15, once per run; inert until the island is cleared | (−15.1, −19.9) | **wading**, on the island |
 | Siltjaw (`siltjaw`) | optional fight | no | 18–27 gold, 30 % extra, no cards | (5.2, −7.0) | dry, on a dune 0.55 m up |
-| Belongings cache | finding | no | one of: 45 gold / a card (belongings pool) / a keepsake; 25 % that one also holds Glassbone. Line: "Three packs, set down out of the wind. Nobody came back." | (10.1, −24.3) | dry, the east alcove |
+| Belongings cache | finding | no | one of: 45 gold / a card (belongings pool) / the Bedroll (a rest: 30 % of max HP, one use; not with one carried); 25 % that one also holds Glassbone. Line: "Three packs, set down out of the wind. Nobody came back." | (10.1, −24.3) | dry, the east alcove |
 | Rock shelf | terrain | no | nothing (a walkable slab) | (−4.6, −24.4) | dry, not counted |
 | Gate | gate (hold line) | yes | – | crossing at (0.9, −28.8) | – |
 | Exit | exit | yes | – | (0.9, −30.5) | – |

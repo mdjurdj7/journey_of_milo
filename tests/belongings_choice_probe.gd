@@ -23,6 +23,14 @@ extends SceneTree
 # the new keepsake in the slot; KEEP grants nothing more. Either closes
 # at once, reporting the bedroll - the take spent.
 #
+# The bedroll holding the Bedroll (offer_bedroll(), floor 2's cache): its
+# kind is BEDROLL, the take puts one in the pack (RunState.has_bedroll)
+# and no keepsake is offered or shown; a second screen with one carried
+# names it "(carrying one)" and won't take it, the other columns still
+# offered. Then the rest itself on the field (RegionField.open_bedroll_
+# rest(), BedrollRest): at 50 / 80 HP YES brings 74 / 80 and the Bedroll
+# is gone; it can't open at full HP, nor in a fight.
+#
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/belongings_choice_probe.gd
 #
 # Exit code 0 = passed, 1 = a failure (each printed as FAIL).
@@ -34,6 +42,12 @@ const SCREEN_SCENE_PATH := "res://battle/belongings_screen.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const CARD_PATH := "res://cards/neutral/endure.tres"
 const OFFERED_PATH := "res://run/keepsakes/frayed_cord.tres"
+const BEDROLL_PATH := "res://run/data/bedroll.tres"
+const REGION_SCENE_PATH := "res://field/region_field.tscn"
+const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
+# The rest's whole night - in, hold, out - with slack: a cap on the wait,
+# not a wait.
+const REST_MAX_SEC := 8.0
 const HELD_PATH := "res://run/keepsakes/bent_nail.tres"
 const OBJECT_PATHS := [
 	"res://assets/models/props/belongings/case.glb",
@@ -81,6 +95,8 @@ func _run() -> void:
 		for answer in [REPLACE, KEEP]:
 			await _check_full_slot(answer, glassbone_slot)
 	await _check_second_activation()
+	await _check_bedroll_take()
+	await _check_bedroll_rest()
 	_finish()
 
 func _new_run(held: bool) -> void:
@@ -215,6 +231,122 @@ func _check_second_activation() -> void:
 	_expect(report == [CASE], "the hold still closes on the first take (got %s)" % [report])
 	if is_instance_valid(screen):
 		screen.free()
+
+# The Bedroll in the bedroll's place: BEDROLL under it, the take into the
+# pack - no keepsake noted or shown - and the screen closing on the
+# bedroll after its hold. Then, with one carried, "(carrying one)": the
+# column can't be taken or focused, a press grants nothing, and the case
+# is taken as ever.
+func _check_bedroll_take() -> void:
+	_new_run(false)
+	var screen: Node = _open_bedroll(-1)
+	var report: Array = []
+	screen.connect("closed", func(column: int) -> void: report.append(column))
+	await process_frame
+	_expect(str(screen.call("kind_text", BEDROLL)) == "BEDROLL", "Bedroll offer: the column reads BEDROLL (got '%s')" % screen.call("kind_text", BEDROLL))
+	_expect(bool(screen.call("can_take", BEDROLL)), "Bedroll offer: it can be taken with none carried")
+	screen.call("_activate", BEDROLL)
+	_expect(bool(_run_state.get("has_bedroll")), "Bedroll offer: taken, one is carried")
+	_expect(_run_state.get("keepsake") == null, "Bedroll offer: no keepsake comes with it")
+	_expect(not (_run_state.get("keepsakes_offered") as Array).has(load(OFFERED_PATH).get("id")), "Bedroll offer: no keepsake noted offered")
+	_expect((screen.call("get_keepsake_tiles") as Array).is_empty(), "Bedroll offer: no keepsake tile in the reveal")
+	await ProbePlay.wait_until(self, func() -> bool: return not report.is_empty(), CLOSE_MAX_SEC)
+	_expect(report == [BEDROLL], "Bedroll offer: closed after the hold, reporting the bedroll (got %s)" % [report])
+	if is_instance_valid(screen):
+		screen.free()
+
+	var second: Node = _open_bedroll(-1)
+	var second_report: Array = []
+	second.connect("closed", func(column: int) -> void: second_report.append(column))
+	await process_frame
+	_expect(str(second.call("kind_text", BEDROLL)).ends_with("(carrying one)"), "Carrying one: the offer says so (got '%s')" % second.call("kind_text", BEDROLL))
+	_expect(not bool(second.call("can_take", BEDROLL)), "Carrying one: the second can't be taken")
+	var before: Dictionary = _snapshot()
+	second.call("_set_focus", -1)
+	second.call("_activate", BEDROLL)
+	_expect(_snapshot() == before and bool(_run_state.get("has_bedroll")), "Carrying one: pressing it grants nothing")
+	_expect(not bool(second.get("_done")) and second_report.is_empty(), "Carrying one: the screen stays open for the other two")
+	_expect(not (second.call("_takeable_slots") as Array).has(BEDROLL), "Carrying one: it can't be focused")
+	second.call("_activate", CASE)
+	_expect(int(_run_state.get("gold")) == int(before["gold"]) + GOLD, "Carrying one: the case is still taken")
+	await ProbePlay.wait_until(self, func() -> bool: return not second_report.is_empty(), CLOSE_MAX_SEC)
+	if is_instance_valid(second):
+		second.free()
+
+func _open_bedroll(glassbone_slot: int) -> Node:
+	var screen: Node = (load(SCREEN_SCENE_PATH) as PackedScene).instantiate()
+	screen.call("setup", "Three packs.", GOLD, load(CARD_PATH), load(OFFERED_PATH), glassbone_slot, GLASSBONE, PackedStringArray(OBJECT_PATHS), PackedFloat32Array([0.6, 1.0, 1.0]), _deck_panel)
+	screen.call("offer_bedroll", load(BEDROLL_PATH))
+	screen.set("result_hold_time", HOLD_SEC)
+	root.add_child(screen)
+	return screen
+
+# The rest on the field: at 50 / 80, YES, and once the night is over 74 /
+# 80, the Bedroll gone and the field running again; none at full HP; none
+# in a fight.
+func _check_bedroll_rest() -> void:
+	_new_run(false)
+	var field: Node = await _load_field()
+	_run_state.call("take_bedroll")
+	_run_state.call("set_max_hp", 80)
+	_run_state.call("heal", 80)
+	_expect(not bool(field.call("open_bedroll_rest")), "Rest: not at full HP")
+	_expect(field.call("get_bedroll_rest") == null, "Rest: nothing opened at full HP")
+	_run_state.call("lose_hp", 30)
+	_expect(int(_run_state.get("player_hp")) == 50, "Rest: set up at 50 / 80 (got %d)" % int(_run_state.get("player_hp")))
+	_expect(bool(field.call("open_bedroll_rest")), "Rest: opens at 50 / 80")
+	var rest: Node = field.call("get_bedroll_rest")
+	_expect(rest != null and not field.can_process(), "Rest: the confirm is up over a frozen field")
+	if rest != null:
+		await process_frame
+		rest.call("answer_confirm", true)
+		await ProbePlay.wait_until(self, func() -> bool: return field.call("get_bedroll_rest") == null, REST_MAX_SEC)
+	_expect(field.call("get_bedroll_rest") == null, "Rest: the night ends")
+	_expect(int(_run_state.get("player_hp")) == 74 and int(_run_state.get("player_max_hp")) == 80, "Rest: 50 / 80 rests to 74 / 80 (got %d / %d)" % [int(_run_state.get("player_hp")), int(_run_state.get("player_max_hp"))])
+	_expect(not bool(_run_state.get("has_bedroll")), "Rest: the Bedroll is used up")
+	_expect(field.can_process(), "Rest: the field runs again")
+	_expect(not bool(field.call("open_bedroll_rest")), "Rest: none left to rest on")
+
+	# In a fight: carried and hurt, still no rest.
+	_run_state.call("take_bedroll")
+	_run_state.call("lose_hp", 10)
+	var started: bool = await _start_fight(field)
+	_expect(started, "Rest: a fight starts for the in-fight check")
+	if started:
+		_expect(not bool(field.call("can_rest")) and not bool(field.call("open_bedroll_rest")), "Rest: not in a fight")
+		_expect(bool(_run_state.get("has_bedroll")), "Rest: the Bedroll is kept through the refusal")
+	field.queue_free()
+	for i in 2:
+		await process_frame
+
+# Floor 1, no zone intro, settled.
+func _load_field() -> Node:
+	_run_state.set("current_floor_index", 0)
+	_run_state.set("run_opening_pending", false)
+	_run_state.set("title_pending", false)
+	var field: Node = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(field)
+	for i in 30:
+		await physics_frame
+	return field
+
+# The floor's Sputter contacted through RegionField's own handler: true
+# once a fight is open.
+func _start_fight(field: Node) -> bool:
+	var target: Node3D = null
+	for node in get_nodes_in_group("enemies"):
+		var data: Resource = node.get("enemy_data")
+		if data != null and data.resource_path == SPUTTER_PATH:
+			target = node as Node3D
+			break
+	if target == null:
+		return false
+	var wanderer: Node3D = field.get_node("Wanderer") as Node3D
+	wanderer.global_position = target.global_position + Vector3(1.5, 0.0, 0.0)
+	await physics_frame
+	field.call_deferred("_on_enemy_contacted", target)
+	await ProbePlay.wait_until(self, func() -> bool: return bool(field.get("_battle_open")), 3.0)
+	return bool(field.get("_battle_open"))
 
 func _expect(condition: bool, message: String) -> void:
 	if condition:
