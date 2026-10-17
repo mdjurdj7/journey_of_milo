@@ -16,8 +16,6 @@ script = ExtResource("2_role")
 
 [sub_resource type="Resource" id="RoleReward_basic"]
 script = ExtResource("2_role")
-offers_cards = false
-gold_multiplier = 1.5
 extra_chance = 0.3
 
 [resource]

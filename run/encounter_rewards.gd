@@ -3,8 +3,8 @@ class_name EncounterRewards
 
 # A won fight's reward by its encounter role - the strongest any member
 # is (BattleController.encounter_role()): region_end, elite, required, else
-# basic. Cards only from the fights that matter; an optional basic fight
-# pays more gold and sometimes a Samphire instead (RoleReward). Loaded by
+# basic. Every role offers the card choice; an optional basic fight
+# sometimes leaves a Samphire beside it (RoleReward). Loaded by
 # RegionField when the reward screen opens; nothing is set per enemy.
 # Glassbone, keepsakes and belongings are their own. A card removal is
 # never a fight's: it is the collector's alone.

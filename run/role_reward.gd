@@ -5,8 +5,8 @@ class_name RoleReward
 # (EncounterRewards, one of these per role - BattleController.encounter_role()).
 # Read when the screen opens, so an edit applies from the next win.
 
-# The one-of-three card offer (RewardScreen's "A card" line). Off for a
-# fight that doesn't matter: an optional basic fight pays in gold.
+# The one-of-three card offer (RewardScreen's "A card" line). On for
+# every role today, an optional basic fight's included.
 @export var offers_cards: bool = true
 # The floor's gold roll (FloorData.gold_min/max) times this, rounded.
 @export var gold_multiplier: float = 1.0

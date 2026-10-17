@@ -14,7 +14,7 @@ A read-only audit of every point of interest (POI) on the five floors of `floors
 - **Empty stretch** = the longest run of the main route with no content POI within 6 m. Spawn, gate, exit, silent hulls and the rock shelf don't count as content. Members of a pack count individually.
 - **Real floor times** come from the 182 run logs in `user://runs/`: debug runs excluded, lap 0 only, timed from one floor's `floor_entered` to the next. They are your own playtests across several versions, so treat them as a floor rather than a target.
 
-Rewards by role (`run/encounter_rewards.tres`): **required** = a card offer + the floor's gold; **elite** = a card offer at elite rates + gold ×1.5 (+ the enemy's keepsake roll and Glassbone); **optional basic** = gold ×1.5, a 30 % chance of a Samphire, **no cards** (removal is the collector's alone); **region-end** = cards top tier first + gold.
+Rewards by role (`run/encounter_rewards.tres`): **required** = a card offer + the floor's gold; **elite** = a card offer at elite rates + gold ×1.5 (+ the enemy's keepsake roll and Glassbone); **optional basic** = a card offer + the floor's gold, and a 30 % chance of a Samphire beside them (removal is the collector's alone); **region-end** = cards top tier first + gold.
 
 No slot on any floor has more than one option, so **nothing is randomized yet**. No floor has an **event**.
 
@@ -65,9 +65,9 @@ Gold 12–18. LINE gate.
 | Spawn | spawn | – | – | (0.0, 0.0) | – |
 | Sputter + Underfoot (`crab`, one of two) | required fight | yes | cards + 12–18 gold | Sputter (1.5, −21.3), Underfoot (−0.8, −21.3) | dry |
 | Underfoot + Glower (`crab`, the other) | required fight | yes | cards + 12–18 gold | Glower (1.5, −23.0) in its own standing pool (1.6 × 1.2 m), Underfoot (−0.8, −21.3) | dry |
-| Dragonfly ×3 (`island`) | optional fight | no | 18–27 gold, 30 % extra, no cards | patrol (−16.8, −20.8) → (−13.0, −20.4) → (−14.8, −18.5) | **wading**, ~6 m each way |
+| Dragonfly ×3 (`island`) | optional fight | no | cards + 12–18 gold, 30 % extra | patrol (−16.8, −20.8) → (−13.0, −20.4) → (−14.8, −18.5) | **wading**, ~6 m each way |
 | Trough **or** Glassbone seam (`island_reward`, 1:1) | trough / seam | no | trough: heal 15; seam: 1 Glassbone (one temper at floor 3's wagon); either once per run, inert until the island is cleared | (−15.1, −19.9) | **wading**, on the island |
-| Siltjaw (`siltjaw`) | optional fight | no | 18–27 gold, 30 % extra, no cards | (5.2, −7.0) | dry, on a dune 0.55 m up |
+| Siltjaw (`siltjaw`) | optional fight | no | cards + 12–18 gold, 30 % extra | (5.2, −7.0) | dry, on a dune 0.55 m up |
 | Belongings cache | finding | no | one of: 45 gold / a card (belongings pool) / the Bedroll (a rest: 30 % of max HP, one use; not with one carried); 25 % that one also holds Glassbone. Line: "Three packs, set down out of the wind. Nobody came back." | (10.1, −24.3) | dry, the east alcove |
 | Rock shelf | terrain | no | nothing (a walkable slab) | (−4.6, −24.4) | dry, not counted |
 | Gate | gate (hold line) | yes | – | crossing at (0.9, −28.8) | – |

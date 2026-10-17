@@ -3,12 +3,12 @@ extends SceneTree
 # Headless probe for rewards by encounter role (EncounterRewards): a
 # required fight (floor 1's Sputter), an elite (floor 3's Wardling) and the
 # region-end boss (floor 5's Greyshelf) each offer the one-of-three card
-# choice; an optional basic fight (floor 2's Siltjaw) offers no cards and
-# pays the floor's gold times the basic multiplier - and, with its extra
-# roll forced, a Samphire to take. A card removal is never a fight's
+# choice; so does an optional basic fight (floor 2's Siltjaw), beside the
+# floor's gold times the basic multiplier - and, with its extra roll
+# forced, a Samphire to take as well. A card removal is never a fight's
 # reward (the collector's alone): every extra the basic roll can draw is
-# a Samphire. The run log matches: reward_cards only where cards were
-# offered, reward_samphire.
+# a Samphire. The run log matches: reward_cards for every offer,
+# reward_samphire.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/reward_roles_probe.gd
 #
@@ -93,13 +93,13 @@ func _check_offers(floor_index: int, enemy_path: String, label: String) -> void:
 	await _teardown()
 	_completed += 1
 
-# The data as set: a basic fight offers no cards and pays 1.5x, its extra
-# 30% and always a Samphire, never a removal; every other role offers
-# cards, with no extra, the elite at 1.5x.
+# The data as set: a basic fight offers cards and pays 1x, its extra 30%
+# and always a Samphire, never a removal; every other role offers cards,
+# with no extra, the elite at 1.5x.
 func _check_data() -> void:
 	var basic: Resource = _rewards.get("basic")
-	_expect(not bool(basic.get("offers_cards")), "A basic fight offers no cards")
-	_expect(is_equal_approx(float(basic.get("gold_multiplier")), 1.5), "...pays 1.5x gold")
+	_expect(bool(basic.get("offers_cards")), "A basic fight offers cards")
+	_expect(is_equal_approx(float(basic.get("gold_multiplier")), 1.0), "...pays 1x gold")
 	_expect(is_equal_approx(float(basic.get("extra_chance")), 0.3), "...with a 30% extra")
 	var rng := RandomNumberGenerator.new()
 	rng.seed = 1
@@ -115,36 +115,42 @@ func _check_data() -> void:
 	_expect(is_equal_approx(float(_rewards.get("elite").get("gold_multiplier")), 1.5), "The elite pays 1.5x")
 	_completed += 1
 
-# The basic fight with no extra rolled: the gold line alone, at the floor's
-# range times 1.5, and no card offer anywhere in the log.
+# The basic fight with no extra rolled: the gold, at the floor's range
+# times the basic multiplier, and the card line - three cards on CHOOSE,
+# the skip logged as reward_cards, as any fight that offers them.
 func _check_basic_gold() -> void:
 	var log_dir: String = _open_log()
 	_force_extra(0.0)
 	var reward: Node = await _win(FLOOR_2, SILTJAW_PATH)
 	if reward != null:
-		_expect_eq(_line_ids(reward), ["gold"] as Array[String], "The optional Siltjaw leaves gold alone")
+		_expect_eq(_line_ids(reward), ["gold", "card"] as Array[String], "The optional Siltjaw leaves gold and a card line")
 		var span: Vector2i = _gold_range(FLOOR_2)
 		var multiplier: float = float(_rewards.get("basic").get("gold_multiplier"))
 		var low: int = roundi(span.x * multiplier)
 		var high: int = roundi(span.y * multiplier)
 		var gold: int = int(reward.get("_gold"))
-		_expect(gold >= low and gold <= high, "...at the basic multiplier, %d-%d (got %d)" % [low, high, gold])
+		_expect(gold >= low and gold <= high, "...the gold at the basic multiplier, %d-%d (got %d)" % [low, high, gold])
+		reward.call("_take_line", _line_ids(reward).find("card"))
+		_expect_eq((reward.get("_offered") as Array).size(), 3, "...three cards on CHOOSE")
 		reward.call("_on_dismiss")
-		_expect(_log_lines(log_dir, "reward_cards").is_empty(), "...and no reward_cards in the log")
+		var line: Dictionary = _log_line(log_dir, "reward_cards", "fight")
+		_expect_eq((line.get("offered", []) as Array).size(), 3, "...the three logged as reward_cards")
+		reward.call("close")
 	_restore_extra()
 	await _teardown()
 	_completed += 1
 
-# A Samphire: its own TAKE line; taken, one more Samphire in the deck,
-# logged as reward_samphire; the screen closes once its flight and the
-# gold are done.
+# A Samphire: its own TAKE line, between the gold and the card line;
+# taken, one more Samphire in the deck, logged as reward_samphire; the
+# screen stays up while the gold and the card are left, and WALK ON
+# closes it.
 func _check_samphire() -> void:
 	var log_dir: String = _open_log()
 	_force_extra(1.0)
 	var reward: Node = await _win(FLOOR_2, SILTJAW_PATH)
 	if reward != null:
 		var ids: Array[String] = _line_ids(reward)
-		_expect_eq(ids, ["gold", "samphire"] as Array[String], "A forced Samphire is its own line under the gold")
+		_expect_eq(ids, ["gold", "samphire", "card"] as Array[String], "A forced Samphire is its own line under the gold, the card line after it")
 		var deck: Array = _run_state.get("deck")
 		var before: int = _count(deck, "Samphire")
 		reward.call("_take_line", ids.find("samphire"))
@@ -157,8 +163,11 @@ func _check_samphire() -> void:
 		if is_instance_valid(reward):
 			reward.call("_take_line", ids.find("gold"))
 			await process_frame
-			_expect(not is_instance_valid(reward) or reward.is_queued_for_deletion(), "...and closed once the gold is taken")
-		_expect(_log_lines(log_dir, "reward_cards").is_empty(), "...no reward_cards in the log")
+			_expect(is_instance_valid(reward) and not reward.is_queued_for_deletion(), "...still up once the gold is taken, the card line left")
+		if is_instance_valid(reward):
+			reward.call("_on_dismiss")
+			await process_frame
+			_expect(not is_instance_valid(reward) or reward.is_queued_for_deletion(), "...and WALK ON closes it")
 	_restore_extra()
 	await _teardown()
 	_completed += 1

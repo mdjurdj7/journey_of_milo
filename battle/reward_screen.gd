@@ -288,8 +288,9 @@ var _decline_top_px: float = 0.0
 # the fight's enemies left (0 = no line); elite_rates rolls the card at
 # the pool's elite rarity rates; top_tier offers it from the highest tier
 # down instead (the region-end fight - RewardPool.roll_top_tier()).
-# offers_cards false leaves the card line out (an optional basic fight -
-# EncounterRewards); extra is what its role rolled beside the gold, and
+# offers_cards false leaves the card line out (RoleReward.offers_cards -
+# every role offers it today); extra is what its role rolled beside the
+# gold (an optional basic fight's Samphire - EncounterRewards), and
 # extra_card the Samphire a SAMPHIRE extra offers. Called by RegionField
 # before the screen is added to the tree.
 func setup(gold: int, pool: RewardPool, deck_panel: Control, glassbone: int = 0, elite_rates: bool = false, top_tier: bool = false, offers_cards: bool = true, extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE, extra_card: CardData = null) -> void:
