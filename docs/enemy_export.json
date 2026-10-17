@@ -348,80 +348,6 @@
               "glassbone": 0
             },
             {
-              "slot": "island",
-              "option": "dragonfly_pair",
-              "weight": 1.0,
-              "anchor": [
-                -15.25,
-                -20.5
-              ],
-              "slot_yaw_degrees": 0.0,
-              "cluster": "island",
-              "names": "Dragonfly + Dragonfly",
-              "required": false,
-              "elite": false,
-              "gate_fight": false,
-              "elite_rewards": {
-                "gold_multiplier": null,
-                "card_rates": "normal",
-                "why": null
-              },
-              "patrol": {
-                "waypoints": [
-                  [
-                    -16.75,
-                    -20.75
-                  ],
-                  [
-                    -13.0,
-                    -20.375
-                  ],
-                  [
-                    -14.75,
-                    -18.5
-                  ]
-                ],
-                "dwell_seconds": [
-                  2.0,
-                  5.0
-                ]
-              },
-              "members": [
-                {
-                  "member": 0,
-                  "name": "Dragonfly",
-                  "enemy_file": "res://battle/rules/enemies/dragonfly.tres",
-                  "hp": 14,
-                  "anchor": false,
-                  "card_reward": "ROLLED",
-                  "position": [
-                    -15.25,
-                    -20.5
-                  ],
-                  "yaw_degrees": -113.2,
-                  "face_prop": null
-                },
-                {
-                  "member": 1,
-                  "name": "Dragonfly",
-                  "enemy_file": "res://battle/rules/enemies/dragonfly.tres",
-                  "hp": 14,
-                  "anchor": false,
-                  "card_reward": "ROLLED",
-                  "position": [
-                    -17.125,
-                    -20.0
-                  ],
-                  "yaw_degrees": -122.0,
-                  "face_prop": null
-                }
-              ],
-              "props": [],
-              "keepsake_drop": null,
-              "armor_drop": null,
-              "glassbone": 0
-            },
-            {
               "slot": "siltjaw",
               "option": "siltjaw",
               "weight": 0.6,
@@ -1334,24 +1260,6 @@
           "floor": 2,
           "slot": "island",
           "option": "dragonfly_trio",
-          "cluster": "island",
-          "required": false,
-          "gate_fight": false
-        },
-        {
-          "region": 1,
-          "floor": 2,
-          "slot": "island",
-          "option": "dragonfly_pair",
-          "cluster": "island",
-          "required": false,
-          "gate_fight": false
-        },
-        {
-          "region": 1,
-          "floor": 2,
-          "slot": "island",
-          "option": "dragonfly_pair",
           "cluster": "island",
           "required": false,
           "gate_fight": false
