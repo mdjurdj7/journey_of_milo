@@ -108,6 +108,7 @@ class_name FloorData
 @export_range(0.01, 1.0) var lee_shade_edge: float = 0.35
 @export var lee_shade_min_slope: float = 2.0
 @export var lee_shade_slope_blend: float = 5.0
+@export_range(0.0, 1.0) var lee_shade_cool: float = 0.0
 @export_range(0.0, 0.4) var erosion_strength: float = 0.0
 @export var erosion_spacing_m: float = 0.6
 @export var erosion_width_m: float = 0.05
@@ -115,6 +116,7 @@ class_name FloorData
 @export var erosion_min_slope: float = 14.0
 @export_range(0.0, 1.0) var erosion_break: float = 0.45
 @export var erosion_break_scale: float = 0.15
+@export_range(0.01, 1.0) var erosion_break_soft: float = 0.15
 @export_range(0.0, 0.4) var damp_strength: float = 0.0
 @export var damp_foot_depth: Vector2 = Vector2(0.04, 0.2)
 @export var damp_bank_width_m: float = 1.2

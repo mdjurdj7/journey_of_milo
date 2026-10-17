@@ -741,7 +741,7 @@ signal relief_rebuilt
 # green has to survive the region's cool sun (0.92, 0.94, 0.97), which
 # lifts blue ~5% over red: (0.56, 0.58, 0.55) lit to a neutral that read
 # blue beside the sand; this lights to about G-B +0.08.
-@export var rock_color: Color = Color(0.56, 0.59, 0.50):
+@export var rock_color: Color = Color(0.55, 0.58, 0.515):
 	set(value):
 		rock_color = value
 		_apply_uniform("rock_color", value)
@@ -882,6 +882,16 @@ signal relief_rebuilt
 	set(value):
 		lee_shade_slope_blend = value
 		_apply_uniform("lee_shade_slope_blend", value)
+# How far the lee turns toward a cool grey of its own value as it darkens
+# (lee_shade_cool_tint times its luminance), 0 none.
+@export_range(0.0, 1.0) var lee_shade_cool: float = 0.0:
+	set(value):
+		lee_shade_cool = value
+		_apply_uniform("lee_shade_cool", value)
+@export var lee_shade_cool_tint: Color = Color(0.96, 0.985, 1.03):
+	set(value):
+		lee_shade_cool_tint = value
+		_apply_uniform("lee_shade_cool_tint", Vector3(value.r, value.g, value.b))
 # Erosion lines: thin darker bands on the smoothed height's contours,
 # every erosion_spacing_m from erosion_heights.x to .y over the land
 # level (so two or three on a dune), erosion_width_m across, on slopes
@@ -915,6 +925,11 @@ signal relief_rebuilt
 	set(value):
 		erosion_break_scale = value
 		_apply_uniform("erosion_break_scale", value)
+# How soft a broken line's ends run out, in the break noise's 0..1.
+@export_range(0.01, 1.0) var erosion_break_soft: float = 0.15:
+	set(value):
+		erosion_break_soft = value
+		_apply_uniform("erosion_break_soft", value)
 # Damp strip: darker by up to damp_strength where the ground sits
 # damp_foot_depth.x to .y metres under its wider surroundings (a slope's
 # foot), and within damp_bank_width_m of enclosed water (a pool's or a
@@ -1193,6 +1208,9 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("lee_shade_edge", lee_shade_edge)
 	_apply_uniform("lee_shade_min_slope", lee_shade_min_slope)
 	_apply_uniform("lee_shade_slope_blend", lee_shade_slope_blend)
+	_apply_uniform("lee_shade_cool", lee_shade_cool)
+	_apply_uniform("lee_shade_cool_tint", Vector3(lee_shade_cool_tint.r, lee_shade_cool_tint.g, lee_shade_cool_tint.b))
+	_apply_uniform("erosion_break_soft", erosion_break_soft)
 	_apply_uniform("erosion_strength", erosion_strength)
 	_apply_uniform("erosion_spacing_m", erosion_spacing_m)
 	_apply_uniform("erosion_width_m", erosion_width_m)

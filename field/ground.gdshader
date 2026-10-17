@@ -290,7 +290,7 @@ uniform float basin_tint_strength = 0.0;
 uniform float basin_height_low = 0.0;
 uniform float basin_height_high = 1.0;
 
-uniform vec4 rock_color : source_color = vec4(0.56, 0.59, 0.50, 1.0);
+uniform vec4 rock_color : source_color = vec4(0.55, 0.58, 0.515, 1.0);
 uniform float rock_slope_min = 22.0;
 uniform float rock_slope_blend = 12.0;
 // Slopes read by value: past slope_tint_min degrees of slope the sand
@@ -336,6 +336,11 @@ uniform float lee_shade_strength = 0.0;
 uniform float lee_shade_edge = 0.35;
 uniform float lee_shade_min_slope = 2.0;
 uniform float lee_shade_slope_blend = 5.0;
+// As the lee darkens it also turns lee_shade_cool of the way toward a
+// cool grey of its own value (lee_shade_cool_tint times its luminance) -
+// a shadow, not a muddy brown. 0 leaves the hue.
+uniform float lee_shade_cool = 0.0;
+uniform vec3 lee_shade_cool_tint = vec3(0.96, 0.985, 1.03);
 // Erosion lines: thin darker bands on the smoothed height's contours, one
 // every erosion_spacing_m between erosion_height_low and _high (world
 // metres - Ground converts its own, over the land level), erosion_width_m
@@ -350,6 +355,8 @@ uniform float erosion_height_high = 2.0;
 uniform float erosion_min_slope = 14.0;
 uniform float erosion_break = 0.45;
 uniform float erosion_break_scale = 0.15;
+// How soft a line's broken ends run out, in the break noise's 0..1.
+uniform float erosion_break_soft = 0.15;
 // Damp strip: darker by damp_strength at a slope's foot (the form's
 // depth under its surroundings from damp_foot_depth.x to .y metres) and
 // on the sand within damp_bank_width_m of enclosed water (a pool's or a
@@ -1121,26 +1128,28 @@ float pebble_value(vec2 world_xz) {
 // below sea level and on wet sand. Multiplications rather than branches
 // so the band dies away rather than ending at an edge - which is the
 // whole point.
-// The dune tonal breaks' multiplier at a point, 1 = untouched (see the
-// dune_form uniforms' doc): the lee shade, the erosion lines and the damp
-// strip, the darkest of them winning so two never stack into a hole.
-float dune_tone(vec2 world_xz) {
+// The dune tonal breaks at a point (see the dune_form uniforms' doc): x
+// the lee's own mask (0..1, for its cool shift), y its darkening, z the
+// erosion lines', w the damp strip's. The caller takes the darkest, so two
+// never stack into a hole.
+vec4 dune_tone(vec2 world_xz) {
 	if (!dune_form_ready) {
-		return 1.0;
+		return vec4(0.0);
 	}
 	vec2 uv = ((world_xz - dune_form_origin) / max(dune_form_cell, 0.001) + 0.5) / max(dune_form_dims, vec2(1.0));
 	vec4 form = texture(dune_form_tex, uv);
 	vec2 rise = form.rg;
 	float steep = length(rise);
 	float slope_degrees = degrees(atan(steep));
-	float shade = 0.0;
+	vec4 tone = vec4(0.0);
 	if (lee_shade_strength > 0.0 && steep > 0.0001) {
 		// The ground falls away along the wind on the lee: its rise points
 		// against it.
 		float facing = dot(rise / steep, normalize(dune_wind));
 		float lee = 1.0 - smoothstep(-lee_shade_edge, lee_shade_edge, facing);
 		lee *= smoothstep(lee_shade_min_slope, lee_shade_min_slope + max(lee_shade_slope_blend, 0.001), slope_degrees);
-		shade = max(shade, lee_shade_strength * lee);
+		tone.x = lee;
+		tone.y = lee_shade_strength * lee;
 	}
 	if (erosion_strength > 0.0 && erosion_spacing_m > 0.0) {
 		float height = form.b + (value_noise(world_xz * 0.4) - 0.5) * erosion_width_m * 1.5;
@@ -1148,8 +1157,13 @@ float dune_tone(vec2 world_xz) {
 		float band = 1.0 - smoothstep(erosion_width_m * 0.35, erosion_width_m, from_band);
 		band *= step(erosion_height_low - erosion_width_m, height) * step(height, erosion_height_high + erosion_width_m);
 		band *= smoothstep(erosion_min_slope, erosion_min_slope + 6.0, slope_degrees);
-		band *= smoothstep(erosion_break, erosion_break + 0.15, value_noise(world_xz * erosion_break_scale + vec2(17.3, 41.9)));
-		shade = max(shade, erosion_strength * band);
+		// Broken into short strokes that run out soft: the break noise at
+		// its own scale, and a second, finer one tapering each stroke's
+		// width toward its ends.
+		float stroke = smoothstep(erosion_break, erosion_break + max(erosion_break_soft, 0.001), value_noise(world_xz * erosion_break_scale + vec2(17.3, 41.9)));
+		float taper = smoothstep(0.2, 0.75, value_noise(world_xz * erosion_break_scale * 2.3 + vec2(-8.1, 3.7)));
+		band *= stroke * mix(0.35, 1.0, taper);
+		tone.z = erosion_strength * band;
 	}
 	if (damp_strength > 0.0) {
 		// A foot, not a face: off once the ground steepens.
@@ -1160,9 +1174,9 @@ float dune_tone(vec2 world_xz) {
 			float bank = landmass_enclosure_at(world_xz) * step(shore, 0.0) * (1.0 - smoothstep(0.0, damp_bank_width_m, -shore));
 			damp = max(damp, bank);
 		}
-		shade = max(shade, damp_strength * damp);
+		tone.w = damp_strength * damp;
 	}
-	return 1.0 - clamp(shade, 0.0, 0.9);
+	return tone;
 }
 
 float wear_gate(float shore_distance, float sand_wetness, float underwater) {
@@ -1270,9 +1284,17 @@ void fragment() {
 	sand_base = mix(sand_base, slope_tint_color.rgb, slope_tint_t * slope_tint_strength * sand_detail);
 	float crest_t = (1.0 - slope_tint_t) * smoothstep(crest_min_height, crest_min_height + 0.25, v_world_height) * sand_detail;
 	sand_base *= 1.0 + crest_light_strength * crest_t;
-	// The dune tonal breaks, darken-only, on the sand alone (see dune_tone()).
-	sand_base *= mix(1.0, dune_tone(v_world_xz), sand_detail);
-	vec3 dry = mix(sand_base, rock_color.rgb, rock) * distance_tint;
+	vec3 dry = mix(sand_base, rock_color.rgb, rock);
+	// The dune tonal breaks, darken-only (see dune_tone()): the lee and the
+	// erosion lines over everything dry - sand, rock, outer ground - the
+	// damp strip on bare sand alone; then the lee's cool shift toward a
+	// grey of its own value.
+	vec4 tone = dune_tone(v_world_xz);
+	float tone_shade = clamp(max(max(tone.y, tone.z), tone.w * sand_detail * (1.0 - rock)), 0.0, 0.9);
+	dry *= 1.0 - tone_shade;
+	float tone_value = dot(dry, vec3(0.299, 0.587, 0.114));
+	dry = mix(dry, vec3(tone_value) * lee_shade_cool_tint, clamp(lee_shade_cool * tone.x, 0.0, 1.0));
+	dry *= distance_tint;
 	vec3 wet = dry * wet_darken;
 
 	vec3 sand_albedo = mix(dry, wet, sand_wetness);

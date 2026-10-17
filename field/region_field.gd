@@ -640,6 +640,7 @@ func _enter_tree() -> void:
 		ground.lee_shade_edge = floor_data.lee_shade_edge
 		ground.lee_shade_min_slope = floor_data.lee_shade_min_slope
 		ground.lee_shade_slope_blend = floor_data.lee_shade_slope_blend
+		ground.lee_shade_cool = floor_data.lee_shade_cool
 		ground.erosion_strength = floor_data.erosion_strength
 		ground.erosion_spacing_m = floor_data.erosion_spacing_m
 		ground.erosion_width_m = floor_data.erosion_width_m
@@ -647,6 +648,7 @@ func _enter_tree() -> void:
 		ground.erosion_min_slope = floor_data.erosion_min_slope
 		ground.erosion_break = floor_data.erosion_break
 		ground.erosion_break_scale = floor_data.erosion_break_scale
+		ground.erosion_break_soft = floor_data.erosion_break_soft
 		ground.damp_strength = floor_data.damp_strength
 		ground.damp_foot_depth = floor_data.damp_foot_depth
 		ground.damp_bank_width_m = floor_data.damp_bank_width_m
