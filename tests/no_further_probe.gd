@@ -58,13 +58,13 @@ func _check_card_data() -> void:
 	_expect_eq(card.rarity, CardData.CardRarity.RARE, "...is Rare")
 	_expect_eq(card.target_type, CardData.TargetType.SELF, "...targets the player")
 	_expect_eq(card.removal_scope, CardData.RemovalScope.SPENT, "...is Spent")
-	_expect_eq(card.description, "When you next enter Critical, the next enemy Attack deals 0 damage.\nSpent.", "...and says so")
+	_expect_eq(card.description, "When you are Critical, the next enemy Attack deals 0 damage.\nSpent.", "...and says so")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...and carries its art")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.POWER, "...and its face reads POWER")
 	var waiting := load(WAITING_PATH) as StatusData
 	var armed := load(ARMED_PATH) as StatusData
 	_expect_eq(waiting.display_name, WAITING, "The waiting status reads No Further")
-	_expect_eq(waiting.description, "Next time you enter Critical, the next enemy Attack deals 0 damage.", "...and says what it waits for")
+	_expect_eq(waiting.description, "When you are Critical, the next enemy Attack deals 0 damage.", "...and says what it waits for")
 	_expect_eq(waiting.grants_on_critical, armed, "...and arms the Ready status")
 	_expect_eq(armed.display_name, ARMED, "The armed status reads No Further — Ready")
 	_expect_eq(armed.description, "The next enemy Attack deals 0 damage.", "...and says what it does")

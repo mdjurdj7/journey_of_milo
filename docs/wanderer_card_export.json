@@ -1441,15 +1441,15 @@
       "face_type_label": "POWER",
       "energy_cost": 1,
       "rarity": "RARE",
-      "card_text": "When you next enter Critical, the next enemy Attack deals 0 damage.\nSpent.",
+      "card_text": "When you are Critical, the next enemy Attack deals 0 damage.\nSpent.",
       "face_hp_line": null,
-      "card_text_template": "When you next enter Critical, the next enemy Attack deals 0 damage.\nSpent.",
+      "card_text_template": "When you are Critical, the next enemy Attack deals 0 damage.\nSpent.",
       "targeting": "self",
       "removal_after_play": "leaves rotation for the rest of the fight (stances and powers always do)",
       "effects": [
         {
           "type": "APPLY_STATUS",
-          "plain_english": "Apply No Further to yourself: Next time you enter Critical, the next enemy Attack deals 0 damage."
+          "plain_english": "Apply No Further to yourself: When you are Critical, the next enemy Attack deals 0 damage."
         }
       ],
       "keywords": [
@@ -1468,7 +1468,7 @@
       "power_effect": {
         "id": "no_further",
         "name": "No Further",
-        "description": "Next time you enter Critical, the next enemy Attack deals 0 damage.",
+        "description": "When you are Critical, the next enemy Attack deals 0 damage.",
         "file_path": "res://battle/rules/statuses/no_further.tres",
         "duration": "until removed (rest of combat unless spent)",
         "stack_rule": "IGNORE",
@@ -1482,7 +1482,7 @@
       },
       "status_effect": null,
       "critical_condition": {
-        "rule": "Waits until you next enter Critical (HP crossing to 30% of max or below, from any source), then arms."
+        "rule": "Arms the moment you are Critical: at once if you already are when it is played, else when HP crosses to 30% of max or below, from any source."
       },
       "dynamic_values": [
         {

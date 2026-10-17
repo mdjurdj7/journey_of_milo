@@ -7,7 +7,7 @@
 script = ExtResource("1_status_data")
 id = "no_further_tempered"
 display_name = "No Further"
-description = "Next time you enter Critical, the next 2 enemy Attacks deal 0 damage."
+description = "When you are Critical, the next 2 enemy Attacks deal 0 damage."
 category = 2
 default_duration_turns = -1
 stack_rule = 3

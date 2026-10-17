@@ -31,7 +31,7 @@ const SHRUNK_RULES: Dictionary = {
 	"Cornered": 14,
 	"Last Resort": 14,
 	"Last Wager": 13,
-	"No Further": 12,
+	"No Further": 14,
 	"Refuse the End": 13,
 	"The Return": 13,
 }

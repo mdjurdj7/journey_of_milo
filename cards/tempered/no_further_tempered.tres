@@ -17,7 +17,7 @@ cost = 1
 card_type = 3
 rarity = 3
 target_type = 1
-description = "When you next enter Critical, the next 2 enemy Attacks deal 0.
+description = "When you are Critical, the next 2 enemy Attacks deal 0.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
 removal_scope = 1
