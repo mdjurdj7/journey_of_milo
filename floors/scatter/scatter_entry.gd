@@ -248,6 +248,13 @@ const ZONE_ROCK_EDGE := 32
 	set(value):
 		edge_falloff = value
 		emit_changed()
+# The edge is the water's instead: metres inland of it (+) and out over it
+# (-), whatever ledges or rock the floor has - a shore plant's patches
+# reaching in from the waterline by a wandering distance, with gaps.
+@export var edge_from_water: bool = false:
+	set(value):
+		edge_from_water = value
+		emit_changed()
 # Full weight this far past the edge onto the bank, fading to none over
 # edge_onto_fade_m beyond.
 @export var edge_onto_m: float = 1.0:
@@ -419,5 +426,13 @@ const ZONE_ROCK_EDGE := 32
 @export var cluster_spread_m: Vector2 = Vector2(0.5, 0.5):
 	set(value):
 		cluster_spread_m = value
+		emit_changed()
+# Two items of a cluster no nearer than this times the newer one's width
+# (a model's; cards keep card_spacing_fraction). Under 1 they may touch,
+# so a cluster falls into clumps and gaps; at 1.2 every item keeps clear
+# of the next, which spaces them evenly.
+@export_range(0.0, 2.0, 0.01) var item_spacing_fraction: float = 1.2:
+	set(value):
+		item_spacing_fraction = value
 		emit_changed()
 @export_group("")

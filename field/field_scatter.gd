@@ -641,7 +641,7 @@ func _edge_weights(entry: ScatterEntry) -> PackedFloat32Array:
 	var gap_cut: float = gap_sorted[clampi(int(entry.edge_gap_share * float(count)), 0, count - 1)] if entry.edge_gap_share > 0.0 else -INF
 	var gap_soft: float = (gap_sorted[count - 1] - gap_sorted[0]) * 0.04
 	for i in count:
-		var d: float = _cell_edge[i]
+		var d: float = _cell_inland[i] if entry.edge_from_water else _cell_edge[i]
 		if is_inf(d):
 			continue
 		var w: float = 0.0
@@ -1053,7 +1053,7 @@ func _place_entry(entry: ScatterEntry, left: int) -> Array[Spot]:
 				continue
 			var crowded: bool = false
 			for other in cluster:
-				if other.distance_to(p) < size * 1.2:
+				if other.distance_to(p) < size * entry.item_spacing_fraction:
 					crowded = true
 					break
 			if crowded:
