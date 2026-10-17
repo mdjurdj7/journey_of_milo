@@ -563,6 +563,20 @@ func set_roused(stacks: int) -> void:
 		return
 	_attachment.call("set_roused", stacks)
 
+# The crest held at `stacks` stacks' rise out of a fight as well (Dunecur
+# Pose.set_alert() - floor 4's pup meeting it, DunecurPup); -1 lets it go.
+# A body with no such attachment ignores it.
+func set_alert(stacks: int) -> void:
+	if _attachment == null or not _attachment.has_method("set_alert"):
+		return
+	_attachment.call("set_alert", stacks)
+
+# The body stood at world XZ (x, z), its feet on the relief there, `lift`
+# above them - a walk driven from outside, with no fight on (floor 4's
+# Dunecur walking off with its pup, DunecurPup).
+func walk_to_xz(x: float, z: float, lift: float) -> void:
+	global_position = Vector3(x, _body_y_on_ground(x, z) + lift, z)
+
 # The tell a queued Snap may hold (RearPose.set_poised() - shown only
 # with its hold_tell on); a body with no such attachment ignores it.
 func set_poised(on: bool) -> void:

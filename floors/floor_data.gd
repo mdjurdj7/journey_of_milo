@@ -145,6 +145,13 @@ class_name FloorData
 # route). Spawn order is slot order, then each option's member order:
 # FieldEnemy<n> and the run log's floor_index count across them.
 @export var slots: Array[EncounterSlot] = []
+# The floor's events - something found rather than fought (floor 4's
+# Dunecur pup) - as EncounterSlots of their own: an anchor, and options
+# rolled exactly as an encounter's are, each standing only props (no
+# members, never required). Kept apart from `slots` so nothing that
+# counts fights - the gate's slot, the enemy export - ever sees them.
+# Ids are unique across both lists. See RegionField._resolve_encounters().
+@export var event_slots: Array[EncounterSlot] = []
 # The floor's own props - whatever stands whichever encounter is rolled
 # (a hull, the Keeper, the trough). Props that belong to an encounter
 # are its option's (EncounterOption.props) and spawn after these.

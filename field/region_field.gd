@@ -495,6 +495,9 @@ var _loot_screen: LootScreen = null
 # of them fell, snapshotted at the kill so the reward can land there
 # after the body is gone.
 var _battle_open: bool = false
+# Floor 4's pup meeting its adult (_try_reunion()): no fight, the field
+# live, every press swallowed until the pup releases it.
+var _reunion_open: bool = false
 # The Wanderer's distance from the anchor's CURRENT spot to his stance,
 # as _place_cluster_line() settled it (the line may have stepped the
 # anchor inward) - read by the contact handler straight after.
@@ -1060,7 +1063,7 @@ func is_arrival_held() -> bool:
 # before the HUD or the field sees it. Releases and motion pass, so a
 # hold or a hover never sticks.
 func _input(event: InputEvent) -> void:
-	if not is_arrival_held():
+	if not is_arrival_held() and not _reunion_open:
 		return
 	var button := event as InputEventMouseButton
 	var key := event as InputEventKey
@@ -1296,7 +1299,8 @@ func get_spawn_position() -> Vector3:
 	return spawn_node.global_position if spawn_node != null else global_position
 
 # Which option each of the floor's slots stands this load, in slot order
-# (FloorData.slots), into _encounters. Each slot is validated first
+# (FloorData.slots, then FloorData.event_slots - an event is an Encounter
+# with no members), into _encounters. Each slot is validated first
 # (EncounterSlot.validate(): an id, options, every option fought as the
 # same role); one that fails is reported loudly and stands nothing, and
 # so does a slot whose id another slot on the floor already has. Then,
@@ -1328,6 +1332,32 @@ func _resolve_encounters() -> void:
 		encounter.slot = slot
 		encounter.option = _choose_option(slot)
 		_encounters.append(encounter)
+	# Then the events (FloorData.event_slots), after every fight's slot and
+	# by the same roll, ids unique across both lists. An event stands props
+	# only: one that is required or names a member is refused whole.
+	for index in floor_data.event_slots.size():
+		var slot: EncounterSlot = floor_data.event_slots[index]
+		if slot == null:
+			push_error("RegionField: %s event slot %d is null; it stands nothing." % [floor_data.resource_path, index])
+			continue
+		var problem: String = slot.validate(BattleController.encounter_role)
+		if problem.is_empty() and seen.has(slot.slot_id):
+			problem = "slot id '%s' is used twice on the floor" % slot.slot_id
+		if problem.is_empty() and slot.required:
+			problem = "event slot '%s' is required - an event never holds the gate" % slot.slot_id
+		if problem.is_empty():
+			for option in slot.options:
+				if not option.members.is_empty():
+					problem = "event slot '%s': option '%s' has members - an event stands props only" % [slot.slot_id, option.option_id]
+					break
+		if not problem.is_empty():
+			push_error("RegionField: %s - %s; it stands nothing." % [floor_data.resource_path, problem])
+			continue
+		seen[slot.slot_id] = true
+		var event := Encounter.new()
+		event.slot = slot
+		event.option = _choose_option(slot)
+		_encounters.append(event)
 
 # This load's slots and what each stands, slot id -> option id, in slot
 # order - the run log's floor_entered.
@@ -1632,6 +1662,8 @@ func _spawn_prop_list(entries: Array[FloorProp], props_root: Node3D, id_prefix: 
 			_setup_belongings_cache(prop as BelongingsCache, entry, floor_data, id)
 		elif prop is TroughProp:
 			(prop as TroughProp).trough_id = id
+		elif prop is DunecurPup:
+			(prop as DunecurPup).pup_id = id
 		elif prop is HitchingPost:
 			(prop as HitchingPost).option_members = members
 		elif prop is Collector:
@@ -2248,8 +2280,10 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# Two contact areas can fire in one physics frame; the second must
 	# not open a second fight over the first. Loud, so it's known when a
 	# layout makes that happen.
-	if _battle_open:
+	if _battle_open or _reunion_open:
 		push_warning("RegionField: enemy '%s' contacted while a battle is already open; ignored." % enemy.name)
+		return
+	if _try_reunion(enemy):
 		return
 	_battle_open = true
 	process_mode = Node.PROCESS_MODE_DISABLED
@@ -2363,6 +2397,57 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 		for active: Status in overlay.battle_controller.get_enemy_statuses(member):
 			member.show_status(active.data, false)
 	wanderer.bind_to_battle(overlay.battle_controller)
+
+# Floor 4's pup, saved and following, as he reaches the adult it belongs
+# to (DunecurPup.can_reunite_with()): no fight. He stops and his input is
+# held - every press swallowed (_input()), the walk dropped - while the
+# pup goes to the adult and the two walk off (DunecurPup.reunite()); the
+# adult is out of the fight from now (mark_defeated(): no contact, no
+# click, no gate waiting on it). When the pup releases the hold, the gate
+# opens as for a win - no reward, no gold, no fight counted - and once
+# both have walked out of view the adult is freed. False when no pup can
+# meet this enemy: the fight goes on.
+func _try_reunion(enemy: FieldEnemy) -> bool:
+	var pup: DunecurPup = null
+	for node in get_tree().get_nodes_in_group(DunecurPup.GROUP):
+		var candidate := node as DunecurPup
+		if candidate != null and not candidate.is_queued_for_deletion() and candidate.can_reunite_with(enemy):
+			pup = candidate
+			break
+	if pup == null:
+		return false
+	_reunion_open = true
+	_holding = false
+	_nav_goal_enemy = null
+	if wanderer != null:
+		wanderer.clear_move_target()
+		wanderer.input_locked = true
+	enemy.mark_defeated()
+	enemy.set_highlight(false)
+	if enemy.enemy_status != null and is_instance_valid(enemy.enemy_status):
+		enemy.enemy_status.queue_free()
+		enemy.enemy_status = null
+	pup.reunion_released.connect(_end_reunion, CONNECT_ONE_SHOT)
+	pup.walked_off.connect(_on_reunion_walked_off, CONNECT_ONE_SHOT)
+	pup.reunite(enemy)
+	RunLogger.event("reunion", {"slot": String(enemy.slot_id), "enemy": enemy.enemy_data.enemy_name if enemy.enemy_data != null else ""})
+	return true
+
+# The pup's hold is over: his input back, and the floor cleared as a won
+# fight would leave it - only the gate; nothing is rolled or paid.
+func _end_reunion(_adult: FieldEnemy) -> void:
+	_reunion_open = false
+	if wanderer != null:
+		wanderer.input_locked = false
+	if not _floor_cleared_emitted and not _required_enemy_remains():
+		_floor_cleared_emitted = true
+		floor_cleared.emit()
+
+# The adult has walked out of view with its pup: gone (its HP display,
+# under FieldHUD, went as the meeting began).
+func _on_reunion_walked_off(adult: FieldEnemy) -> void:
+	if adult != null and is_instance_valid(adult):
+		adult.queue_free()
 
 # The planned way to his stance (plan_path(), the walk a click takes)
 # when the straight move there would cross something standing - a prop's

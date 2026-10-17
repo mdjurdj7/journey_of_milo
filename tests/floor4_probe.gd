@@ -14,6 +14,13 @@ extends SceneTree
 #              gate_distance_beyond_enemy past him along exit_direction;
 #              every bone on the near side of the gate line, each sunk
 #              only part way into the sand
+#   reunion  - the pup (the "pup" event slot): with no remedy in the deck
+#              only Leave it is offered; with one, giving takes a plain
+#              one before a tempered one out of the deck and it gets up
+#              and follows; walked with him to the Dunecur, no fight
+#              opens, the gate's line lifts, fights_won and gold stay as
+#              they were, and the Dunecur and the pup both leave the
+#              field. Floor 4 again in the same run: no pup
 #
 # Where anything stands is not this probe's to say - only that it stands
 # on the floor: inside the outer ledge line and outside every other.
@@ -24,7 +31,7 @@ extends SceneTree
 # Untyped against the project's own classes (get()/call() only), for the
 # autoload reason kill_order_probe.gd's own header gives.
 
-const CASES := 4
+const CASES := 5
 const REGION_PATH := "res://floors/region1.tres"
 const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
 const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
@@ -44,6 +51,15 @@ const SAFETY_SECONDS := 400.0
 # How long a won fight may take to open its reward screen: the killing
 # blow, the last death, the camera's return.
 const REWARD_WAIT_SECONDS := 5.0
+const REMEDY_PATH := "res://cards/neutral/samphire.tres"
+const REMEDY_TAG := &"field_remedy"
+# Where he stands to reach the pup, from it (spawn frame): toward the ring.
+const PUP_REACH_OFFSET := Vector2(-2.0, 0.0)
+# From the pup's getting up to his contact with the Dunecur.
+const REUNION_WALK_SECONDS := 30.0
+# From contact to the line lifting (the pup's hold), and to both gone.
+const REUNION_HOLD_SECONDS := 6.0
+const WALK_OFF_SECONDS := 25.0
 
 var _run_state: Node = null
 var _field: Node3D = null
@@ -64,6 +80,7 @@ func _initialize() -> void:
 	await _check_exit()
 	await _check_collector()
 	await _check_feeding_spot()
+	await _check_reunion()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -231,6 +248,75 @@ func _check_feeding_spot() -> void:
 			var local: Vector3 = ground.to_local(piece)
 			worst_sink = minf(worst_sink, piece.y - float(ground.call("get_height_at", Vector2(local.x, local.z))))
 		_expect(worst_sink > -0.05, "...each sunk only part way into the sand (lowest centre %+.3f m)" % worst_sink)
+	await _unload()
+	_completed += 1
+
+# The pup saved and walked to the Dunecur: the meeting in place of the
+# fight, the gate opened by it, nothing paid for it.
+func _check_reunion() -> void:
+	await _load()
+	var pups: Array[Node] = get_nodes_in_group("pups")
+	_expect_eq(pups.size(), 1, "One pup on floor 4")
+	var required: Node3D = _required_enemy() as Node3D
+	if pups.size() == 1 and required != null:
+		var pup: Node3D = pups[0] as Node3D
+		var labels: Array = pup.call("get_choice_labels")
+		_expect_eq(labels.size(), 1, "No remedy in the deck: only Leave it")
+		var remedy: Resource = load(REMEDY_PATH)
+		_run_state.call("add_card", remedy.get("tempered"))
+		_run_state.call("add_card", remedy)
+		labels = pup.call("get_choice_labels")
+		_expect_eq(labels.size(), 2, "...with one, the giving too")
+		var pup_at := Vector2(pup.global_position.x - _spawn.x, pup.global_position.z - _spawn.z)
+		await _place(pup_at + PUP_REACH_OFFSET)
+		_expect(bool(pup.call("can_open_from", _wanderer.global_position)), "...in reach of it")
+		pup.call("choose", 0)
+		var left: Array[Resource] = []
+		for card: Resource in _run_state.get("deck"):
+			if (card.get("tags") as Array).has(REMEDY_TAG):
+				left.append(card)
+		_expect(left.size() == 1 and left[0].get("tempered") == null, "Given: the plain one leaves the deck, the tempered one stays")
+		_expect(bool(pup.call("is_saved")), "...and it is saved")
+		for i in 120:
+			await physics_frame
+		_expect(bool(pup.call("is_following")), "...up, and following")
+		var fights_before: int = int(_run_state.get("fights_won"))
+		var gold_before: int = int(_run_state.get("gold"))
+		var path: PackedVector3Array = _field.call("plan_path", _wanderer.global_position, required.global_position, required, true)
+		_expect(not path.is_empty(), "...a path to the Dunecur")
+		_wanderer.call("set_move_path", path)
+		var met: bool = false
+		for i in int(REUNION_WALK_SECONDS * 60.0):
+			await physics_frame
+			if bool(_field.get("_reunion_open")) or _field.get_node("BattleLayer").get_child_count() > 0:
+				met = bool(_field.get("_reunion_open"))
+				break
+		_expect(met, "Walked to the Dunecur with it, the meeting starts (stopped at %s)" % _at())
+		var lifted: bool = false
+		for i in int(REUNION_HOLD_SECONDS * 60.0):
+			await physics_frame
+			if not bool(_wanderer.call("has_hold_line")):
+				lifted = true
+				break
+		_expect(lifted, "...the line lifts")
+		_expect(not bool(_field.get("_reunion_open")), "...his input is his again")
+		_expect_eq(_field.get_node("BattleLayer").get_child_count(), 0, "...no fight opened")
+		_expect_eq(int(_run_state.get("fights_won")), fights_before, "...no fight counted")
+		_expect_eq(int(_run_state.get("gold")), gold_before, "...no gold")
+		var gone: bool = false
+		for i in int(WALK_OFF_SECONDS * 60.0):
+			await physics_frame
+			if not is_instance_valid(required) and not is_instance_valid(pup):
+				gone = true
+				break
+		_expect(gone, "...and the Dunecur and the pup walk off the field")
+	await _unload()
+	# The same run on floor 4 again: no pup.
+	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate() as Node3D
+	root.add_child(_field)
+	for i in 30:
+		await physics_frame
+	_expect_eq(get_nodes_in_group("pups").size(), 0, "Floor 4 again in the same run: no pup")
 	await _unload()
 	_completed += 1
 

@@ -18,9 +18,10 @@ class_name TroughProp
 # is there, return_line once it has been drunk - once per visit into the
 # radius, as the Keeper's does; and a left click on the trough in reach
 # opens its choice (TroughChoice, beside the trough on FieldHUD, the
-# field live under it). Drink heals heal_amount through RunState.heal()
-# (capped at max HP, allowed at full), says drunk_line and spends it;
-# Leave it closes and changes nothing, and the next click opens it again.
+# field live under it; this is its host - get_choice_labels(), choose()).
+# Drink heals heal_amount through RunState.heal() (capped at max HP,
+# allowed at full), says drunk_line and spends it; Leave it closes and
+# changes nothing, and the next click opens it again. Either is logged.
 #
 # Once per run: drunk ids live in a static set keyed by trough_id (the
 # floor's path#index, set by RegionField._spawn_floor_props()) - a floor
@@ -71,6 +72,12 @@ const GROUP := &"troughs"
 # FloorProp overrides set "island"); it wakes once none of that slot's
 # members stands (FieldEnemy.slot_id). Empty = awake from the start.
 @export var guard_slot: StringName = &""
+@export_group("")
+
+@export_group("Choice")
+# %d is heal_amount.
+@export var drink_text_format: String = "Drink (+%d HP)"
+@export var leave_text: String = "Leave it"
 @export_group("")
 
 @export_group("Approach")
@@ -283,7 +290,20 @@ func _open_choice(region_field: RegionField) -> void:
 	_choice.setup(self, region_field.wanderer, region_field)
 	hud.add_child(_choice)
 
-# Drink, from TroughChoice: the heal, the line, spent for the run. Only
+# TroughChoice's items: Drink, then Leave it.
+func get_choice_labels() -> Array[String]:
+	var drink_text: String = drink_text_format % heal_amount if drink_text_format.contains("%d") else drink_text_format
+	return [drink_text, leave_text]
+
+# TroughChoice's pick: 0 drinks, the last leaves it. Logged either way.
+func choose(index: int) -> void:
+	var hp_before: int = RunState.player_hp
+	var drank: bool = index == 0
+	if drank:
+		drink()
+	RunLogger.event("trough", {"drank": drank, "hp_before": hp_before, "hp_after": RunState.player_hp})
+
+# Drink, from choose(): the heal, the line, spent for the run. Only
 # HP moves - Toll and Grace are not the trough's.
 func drink() -> void:
 	if is_drunk():

@@ -33,7 +33,9 @@ class_name DunecurPose
 # back or shoulders stands up when calm. Roused only stands it up during
 # a fight (FieldEnemy.set_roused(), from BattleController after each card
 # and each enemy turn); out of one - the field running - it is flat. Each
-# change eases over crest_ease_seconds.
+# change eases over crest_ease_seconds. An alert (set_alert(), floor 4's
+# pup meeting it - DunecurPup) overrides both while it is set: the crest
+# at that many stacks' rise, fight or no fight.
 #
 # The head: feed_dip_degrees nose-down while the field runs and the body
 # is alive, eased over head_ease_seconds; level while the field is frozen
@@ -150,6 +152,12 @@ class_name DunecurPose
 @export var head_ease_seconds: float = 0.8
 @export_group("")
 
+# Whose axes are the body's (forward -Z, up +Y) when the skin is built.
+# Null = the FieldEnemy above the model. Floor 4's pup (DunecurPup) has
+# none and lies rolled, so it hands over a frame of its own (SkinFrame:
+# its facing, never its roll, scaled so these metres fit its size).
+var frame: Node3D = null
+
 var _skin: CodeSkin = null
 var _ready_done: bool = false
 # In the mesh's own space: the body's forward, up and across (forward x
@@ -162,6 +170,9 @@ var _neck_first: int = 1
 var _crest_first: int = 1
 # Roused stacks shown, and the fold now / easing from / to, degrees.
 var _stacks: int = 0
+# set_alert()'s stacks, or -1 for none: the crest follows Roused and the
+# field's freeze again.
+var _alert: int = -1
 var _fold: float = 70.0
 var _fold_from: float = 70.0
 var _fold_to: float = 70.0
@@ -189,9 +200,18 @@ func _ready() -> void:
 func _body() -> FieldEnemy:
 	return get_parent().get_parent() as FieldEnemy
 
+func _frame() -> Node3D:
+	return frame if frame != null else _body()
+
 # Roused's stacks (FieldEnemy.set_roused()): the crest eases to its step.
 func set_roused(stacks: int) -> void:
 	_stacks = maxi(stacks, 0)
+	_retarget_crest()
+
+# The crest held at `stacks` stacks' rise whether or not a fight is on -
+# 0 is flat; -1 lets it go back to Roused and the freeze.
+func set_alert(stacks: int) -> void:
+	_alert = stacks
 	_retarget_crest()
 
 # The crest's fold now, and where it is heading - degrees back from the
@@ -208,6 +228,8 @@ func get_head_dip_degrees() -> float:
 
 # Flat out of a fight; in one, the fold Roused's stacks leave.
 func _crest_target() -> float:
+	if _alert >= 0:
+		return clampf(flat_fold_degrees - rise_per_stack_degrees * float(_alert), 0.0, flat_fold_degrees)
 	var body := _body()
 	if body != null and body.can_process():
 		return flat_fold_degrees
@@ -259,10 +281,10 @@ func _process(delta: float) -> void:
 func _rebuild() -> void:
 	if not _ready_done:
 		return
-	var body := _body()
-	if body == null:
+	var body_frame: Node3D = _frame()
+	if body_frame == null:
 		return
-	var to_body: Transform3D = body.global_transform.affine_inverse() * _skin.mesh_instance.global_transform
+	var to_body: Transform3D = body_frame.global_transform.affine_inverse() * _skin.mesh_instance.global_transform
 	var from_body: Basis = to_body.basis.inverse()
 	_forward = (from_body * Vector3.FORWARD).normalized()
 	_up = (from_body * Vector3.UP).normalized()

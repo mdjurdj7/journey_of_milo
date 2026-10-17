@@ -108,6 +108,16 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 # tempered once only.
 @export var tempered: CardData = null
 
+# What the field asks of a card by kind rather than by name, so a rename
+# changes nothing that looks for it: &"field_remedy" is the collector's
+# healing consumable, plain and tempered alike - what floor 4's pup needs
+# (DunecurPup). A tempered version carries its original's tags itself.
+@export var tags: Array[StringName] = []
+
+# Whether this card carries `tag`.
+func has_tag(tag: StringName) -> bool:
+	return tags.has(tag)
+
 # The four real tiers, lowest first - UNSET left out. What a rarity roll
 # walks and what a probe checks a card's tag against.
 static func rarity_tiers() -> Array[CardRarity]:

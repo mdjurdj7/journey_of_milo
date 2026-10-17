@@ -1,43 +1,43 @@
 extends Control
 class_name TroughChoice
 
-# A trough's two choices, shown beside it on the world - LootScreen's
+# A field prop's choices, shown beside it on the world - LootScreen's
 # column without its item row: no scrim, no header, and the field never
-# stops. TroughProp opens it from a click on the trough in reach and
-# parents it under FieldHUD (see TroughProp._open_choice()).
+# stops. The trough (TroughProp) and floor 4's pup (DunecurPup) open it
+# from a click on themselves in reach and parent it under FieldHUD.
+#
+# The host is any Node3D that answers three calls: get_choice_labels()
+# -> Array[String], its items top to bottom, the last always the one
+# that leaves it be ("Leave it"); choose(index) for the one activated;
+# and can_open_from(Vector3), its reach. The host does what a choice
+# means, logs it, and says any line - this only shows and picks.
 #
 # Placed every physics tick the way LootScreen is: the anchor - the
-# trough plus anchor_offset, x metres along the camera's right and y
+# host plus anchor_offset, x metres along the camera's right and y
 # metres up - is unprojected, and this control's scale follows camera
 # distance (DistanceScale). The anchor is the column's left edge, level
 # with its middle.
 #
-# DRINK and LEAVE in the title menu's focus language, LootScreen's: the
+# The items in the title menu's focus language, LootScreen's: the
 # focused item in full ink (the Battle ink token) with a short hairline
-# to its left, the other in the utility grey with none. DRINK has focus
-# on open. ui_up/ui_down move it (wrapping), ui_accept activates;
+# to its left, the others in the utility grey with none. The first has
+# focus on open. ui_up/ui_down move it (wrapping), ui_accept activates;
 # hovering an item focuses it and a click activates. ui_cancel and a
-# right click anywhere are LEAVE, and that right click is spent on
-# closing. The two items are the only things here that stop the mouse.
+# right click anywhere are the last item, and that right click is spent
+# on closing. The items are the only things here that stop the mouse.
 #
-# DRINK calls TroughProp.drink() - the heal, the line, spent for the run
-# - and closes. LEAVE closes and changes nothing, and so does walking
-# out of the trough's reach or the field freezing: the next click on the
-# trough opens this again.
+# Any item closes it once chosen. Walking out of the host's reach or the
+# field freezing closes it with nothing chosen: the next click on the
+# host opens it again.
 
 signal closed()
 
-enum Item { DRINK, LEAVE }
-
-# x: metres along the camera's right from the trough; y: metres up.
+# x: metres along the camera's right from the host; y: metres up.
 @export var anchor_offset: Vector2 = Vector2(0.8, 0.6)
 @export var text_outline_px: int = 0
 @export var open_fade_sec: float = 0.18
 
 @export_group("Choices")
-# %d is the trough's heal_amount.
-@export var drink_text_format: String = "Drink (+%d HP)"
-@export var leave_text: String = "Leave it"
 @export var choice_size_px: int = 22:
 	set(value):
 		choice_size_px = value
@@ -64,18 +64,18 @@ enum Item { DRINK, LEAVE }
 
 const THEME_PATH := "res://ui/battle_theme.tres"
 
-var _trough: TroughProp = null
+var _host: Node3D = null
 var _wanderer: Node3D = null
 var _region_field: Node = null
-var _focused: int = Item.DRINK
+var _focused: int = 0
 var _done: bool = false
 var _closing: bool = false
 var _choices: Array[Control] = []
 var _choice_font: Font = null
 
-# Called by TroughProp before this enters the tree.
-func setup(trough: TroughProp, wanderer: Node3D, region_field: Node) -> void:
-	_trough = trough
+# Called by the host before this enters the tree.
+func setup(host: Node3D, wanderer: Node3D, region_field: Node) -> void:
+	_host = host
 	_wanderer = wanderer
 	_region_field = region_field
 
@@ -86,16 +86,17 @@ func _ready() -> void:
 	theme = load(THEME_PATH) as Theme
 	_rebuild_fonts()
 
-	for index in 2:
+	var labels: Array[String] = _labels()
+	for index in labels.size():
 		var choice := Control.new()
-		choice.name = "Drink" if index == Item.DRINK else "Leave"
+		choice.name = "Choice%d" % index
 		choice.mouse_filter = Control.MOUSE_FILTER_STOP
 		choice.mouse_entered.connect(_set_focus.bind(index))
 		choice.gui_input.connect(_on_choice_gui_input.bind(index))
 		add_child(choice)
 		_choices.append(choice)
 
-	if _trough == null:
+	if _host == null or labels.is_empty():
 		close()
 		return
 
@@ -111,16 +112,24 @@ func _rebuild_fonts() -> void:
 	queue_redraw()
 
 func _labels() -> Array[String]:
-	var heal: int = _trough.heal_amount if _trough != null and is_instance_valid(_trough) else 0
-	var drink_text: String = drink_text_format % heal if drink_text_format.contains("%d") else drink_text_format
-	return [drink_text, leave_text]
+	if _host == null or not is_instance_valid(_host):
+		return []
+	var labels: Array[String] = _host.call("get_choice_labels")
+	return labels
+
+func _leave_index() -> int:
+	return maxi(_choices.size() - 1, 0)
+
+func _host_reaches(from: Vector3) -> bool:
+	var in_reach: bool = _host.call("can_open_from", from)
+	return in_reach
 
 # --- Tick ---
 
 func _physics_process(_delta: float) -> void:
 	if _done or _closing:
 		return
-	if _trough == null or not is_instance_valid(_trough):
+	if _host == null or not is_instance_valid(_host):
 		close()
 		return
 	# The field froze under us (a fight, the floor transition) - FieldHUD
@@ -128,7 +137,7 @@ func _physics_process(_delta: float) -> void:
 	if _region_field != null and is_instance_valid(_region_field) and not _region_field.can_process():
 		close()
 		return
-	if _wanderer != null and is_instance_valid(_wanderer) and not _trough.can_open_from(_wanderer.global_position):
+	if _wanderer != null and is_instance_valid(_wanderer) and not _host_reaches(_wanderer.global_position):
 		close()
 		return
 	var camera := get_viewport().get_camera_3d()
@@ -137,7 +146,7 @@ func _physics_process(_delta: float) -> void:
 	var right: Vector3 = camera.global_transform.basis.x
 	right.y = 0.0
 	right = right.normalized()
-	var anchor: Vector3 = _trough.global_position + right * anchor_offset.x + Vector3.UP * anchor_offset.y
+	var anchor: Vector3 = _host.global_position + right * anchor_offset.x + Vector3.UP * anchor_offset.y
 	if camera.is_position_behind(anchor):
 		visible = false
 		return
@@ -159,10 +168,10 @@ func _choices_width() -> float:
 func _choice_top(index: int) -> float:
 	return float(index) * (float(choice_size_px) + choice_gap_px)
 
-# The two choices, left-aligned, the column's middle on the anchor.
+# The choices, left-aligned, the column's middle on the anchor.
 func _layout() -> void:
 	var row_height: float = float(choice_size_px) * 1.3
-	size = Vector2(_choices_width(), _choice_top(1) + row_height)
+	size = Vector2(_choices_width(), _choice_top(_leave_index()) + row_height)
 	pivot_offset = Vector2(0.0, size.y * 0.5)
 	for index in _choices.size():
 		_choices[index].position = Vector2(0.0, _choice_top(index))
@@ -183,12 +192,12 @@ func _text(font: Font, text: String, origin: Vector2, size_px: int, color: Color
 	InkType.draw_run(self, font, text, origin, size_px, color)
 
 func _draw() -> void:
-	if _trough == null or _choices.size() < 2:
+	if _host == null or not is_instance_valid(_host) or _choices.is_empty():
 		return
 	var ink: Color = _ink()
 	var labels: Array[String] = _labels()
 	var label_left: float = hairline_length_px + hairline_gap_px
-	for index in labels.size():
+	for index in mini(labels.size(), _choices.size()):
 		var focused: bool = index == _focused
 		var baseline: float = _choice_top(index) + float(choice_size_px)
 		_text(_choice_font, labels[index], Vector2(label_left, baseline), choice_size_px, ink if focused else unfocused_color)
@@ -208,13 +217,13 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _done or _closing or not visible:
 		return
 	if event.is_action_pressed("ui_down"):
-		_set_focus(posmod(_focused + 1, 2))
+		_set_focus(posmod(_focused + 1, _choices.size()))
 	elif event.is_action_pressed("ui_up"):
-		_set_focus(posmod(_focused - 1, 2))
+		_set_focus(posmod(_focused - 1, _choices.size()))
 	elif event.is_action_pressed("ui_accept"):
 		_activate(_focused)
 	elif event.is_action_pressed("ui_cancel") or _is_right_press(event):
-		_activate(Item.LEAVE)
+		_activate(_leave_index())
 	else:
 		return
 	get_viewport().set_input_as_handled()
@@ -227,7 +236,7 @@ func _on_choice_gui_input(event: InputEvent, index: int) -> void:
 	if _done:
 		return
 	if _is_right_press(event):
-		_activate(Item.LEAVE)
+		_activate(_leave_index())
 		accept_event()
 		return
 	var button := event as InputEventMouseButton
@@ -242,11 +251,8 @@ func _activate(index: int) -> void:
 	if _done:
 		return
 	_done = true
-	var hp_before: int = RunState.player_hp
-	var drank: bool = index == Item.DRINK and _trough != null and is_instance_valid(_trough)
-	if drank:
-		_trough.drink()
-	RunLogger.event("trough", {"drank": drank, "hp_before": hp_before, "hp_after": RunState.player_hp})
+	if _host != null and is_instance_valid(_host):
+		_host.call("choose", index)
 	close()
 
 func close() -> void:

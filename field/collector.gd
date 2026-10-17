@@ -19,7 +19,13 @@ class_name Collector
 # the radius; a left click on the body's padded screen rect with the
 # Wanderer in reach emits open_requested, for RegionField to open the
 # collector's screen with the field locked. Anything else falls through
-# to the field's move click.
+# to the field's move click. On the run's first visit to any collector,
+# hint_line follows the world line, hint_gap_seconds after it has faded -
+# a word about the healing it always stocks, which floor 4's pup needs
+# (DunecurPup). It never names the card, so a rename changes nothing.
+# Once per run: a static flag, cleared by RunState.new_run() through
+# reset_hint(); a hint cut off by a screen opening waits for the next
+# visit.
 #
 # What it hands over (CollectorScreen): stock_count cards rolled from
 # stock_pool, tier first at the pool's own rates (RewardPool.roll_by_
@@ -63,6 +69,8 @@ const GROUP := &"collectors"
 @export var fade_seconds: float = 0.5
 # Metres above the body's top the line is anchored at.
 @export var line_clearance_m: float = 0.6
+@export_multiline var hint_line: String = "Keeps a thing alive out here."
+@export var hint_gap_seconds: float = 0.4
 @export_group("")
 
 # What its stock rolls from (FloorProp.pool, set by RegionField).
@@ -116,6 +124,12 @@ var _collision_shape: CapsuleShape3D = null
 var _collision_node: CollisionShape3D = null
 var _approach: PropApproach = null
 var _ground: Ground = null
+# hint_line has been said this run.
+static var _hint_said: bool = false
+
+static func reset_hint() -> void:
+	_hint_said = false
+
 # The rolled stock, a null where a card was bought; rolled once.
 var _stock: Array[CardData] = []
 var _rolled: bool = false
@@ -188,7 +202,7 @@ func _spawn_approach() -> void:
 	_approach = PropApproach.new()
 	_approach.name = "Approach"
 	_approach.warning_label = "Collector"
-	_approach.on_visit = func() -> void: _say(world_line)
+	_approach.on_visit = _on_visit
 	_approach.can_open_from = can_open_from
 	_approach.screen_rect = get_screen_rect
 	_approach.open_requested.connect(func() -> void: open_requested.emit(self))
@@ -198,6 +212,27 @@ func _spawn_approach() -> void:
 func _apply_approach_radius() -> void:
 	if _approach != null:
 		_approach.set_radius(approach_radius)
+
+# The visit's line, and on the run's first visit the hint after it.
+func _on_visit() -> void:
+	_say(world_line)
+	if not _hint_said and not hint_line.is_empty():
+		_hint_said = true
+		_say_hint_after()
+
+# hint_line once the world line has faded and hint_gap_seconds more - if
+# the field is still live then (no screen open); else it waits for the
+# next visit.
+func _say_hint_after() -> void:
+	var region_field: Node = get_node_or_null(region_field_path)
+	var voice := WorldVoiceLine.on_hud(region_field.get_node_or_null(^"FieldHUD") if region_field != null else null)
+	if voice != null and voice.is_speaking():
+		await voice.line_finished
+	await get_tree().create_timer(hint_gap_seconds).timeout
+	if not is_inside_tree() or not can_process():
+		_hint_said = false
+		return
+	_say(hint_line)
 
 func _ground_to_relief() -> void:
 	if _ground == null:

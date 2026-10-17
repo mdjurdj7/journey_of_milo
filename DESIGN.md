@@ -193,10 +193,20 @@ folder (run_log_probe). (2026-10-04.)
   `assets/field/masks/source/floor4/floor4_layout.json`
   (`suggested_placements_world_xz.dig`, (-3.0, -21.8), on the ring's
   north side past the dune). Nothing reads it: there is no dig site
-  yet, so FloorData carries no field for it. Add one when it is built,
-  from this position. The collector is a FloorProp in its hollow off the
-  west arm, (-19.8, -11.8). (2026-10-04, floor 4; moved 2026-10-15 with
-  the new ground - the ring, the collector's hollow and the Adder's den.)
+  yet. When it is built it becomes a second option in floor 4's "pup"
+  event slot (`FloorData.event_slots`, anchored at the pup's (15.5,
+  -17.0)), its prop offset from that anchor to this position - so a run
+  stands one or the other. The collector is a FloorProp in its hollow off
+  the west arm, (-19.8, -11.8). (2026-10-04, floor 4; moved 2026-10-15
+  with the new ground - the ring, the collector's hollow and the Adder's
+  den; the event slot 2026-10-16.)
+- **Floor 4's pup wears the adult Dunecur at 0.6 scale.** A stand-in
+  until a pup asset exists: `DunecurPup.model_scene_path` and
+  `painted_albedo_path` swap it, `attachment_tuned_scale` keeps
+  DunecurPose's metres fitting. Its hollow's brush is the floor's own
+  scatter set (`floor4_pup_hollow.tres`, an `area` round the pup), so it
+  stays if the dig is rolled in the pup's place - move it onto the
+  option if that reads wrong. (2026-10-16.)
 - **Floor 5's finding is a reserved spot only.** Its position lives in
   `assets/field/masks/source/floor5/floor5_layout.json`
   (`markers_world_xz.finding`, (-7.167, -15.9), in the side pocket off
