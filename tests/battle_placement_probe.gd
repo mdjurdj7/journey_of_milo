@@ -58,7 +58,9 @@ const TOWER_SAMPLES := 12
 const OWN_PROP_MATCH_M := 0.5
 # A combatant's middle, metres over its feet, for the sight line.
 const BODY_MIDDLE := 0.75
-const SETTLE_SECONDS := 3.0
+# The most game time the battle frame may take to settle (ProbePlay.
+# settle_fight()), seconds - a cap, not a wait.
+const SETTLE_MAX_SECONDS := 8.0
 const SAFETY_SECONDS := 900.0
 
 var _run_state: Node = null
@@ -120,7 +122,9 @@ func _check_fight(floor_index: int, slot: EncounterSlot, option: EncounterOption
 	_field.call_deferred("_on_enemy_contacted", target)
 	for i in 10:
 		await physics_frame
-	await create_timer(SETTLE_SECONDS).timeout
+	var layer: Node = _field.get_node("BattleLayer")
+	if layer.get_child_count() > 0:
+		await ProbePlay.settle_fight(self, _field, layer.get_child(0).get("battle_controller"), SETTLE_MAX_SECONDS)
 	var members: Array = _field.get("_battle_members")
 	if members.is_empty():
 		_fail("%s: no fight started" % label)

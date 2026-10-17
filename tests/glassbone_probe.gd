@@ -375,8 +375,8 @@ func _kill_all(controller: Node) -> void:
 # A fight just won: until its reward screen is up - the killing blow and
 # the last death play out first - or REWARD_WAIT_SECONDS have gone.
 func _await_reward_screen() -> void:
-	var start: int = Time.get_ticks_msec()
-	while _child_with_script(_field, "reward_screen.gd") == null and Time.get_ticks_msec() - start < int(REWARD_WAIT_SECONDS * 1000.0):
+	var start: int = ProbePlay.cap_msec()
+	while _child_with_script(_field, "reward_screen.gd") == null and ProbePlay.cap_msec() - start < int(REWARD_WAIT_SECONDS * 1000.0):
 		await process_frame
 
 func _child_with_script(parent: Node, suffix: String) -> Node:

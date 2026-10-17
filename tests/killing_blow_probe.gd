@@ -125,8 +125,8 @@ func _check_non_final_unlock() -> void:
 		var finished: Array[bool] = [false]
 		target.connect("death_finished", func() -> void: finished[0] = true)
 		_play_first(controller, target)
-		var start: int = Time.get_ticks_msec()
-		while not finished[0] and Time.get_ticks_msec() - start < int(WATCH_SECONDS * 1000.0):
+		var start: int = ProbePlay.cap_msec()
+		while not finished[0] and ProbePlay.cap_msec() - start < int(WATCH_SECONDS * 1000.0):
 			await process_frame
 			if not finished[0] and bool(target.call("is_dying")) and not bool(controller.get("_input_locked")):
 				dying_unlocked[0] = true
@@ -147,13 +147,13 @@ func _check_skip() -> void:
 		var log: Dictionary = _watch_setup(controller, [crab])
 		_play_first(controller, crab)
 		# Clicked while the blow is still showing.
-		var start: int = Time.get_ticks_msec()
-		while _first(log, "hit") == 0 and Time.get_ticks_msec() - start < 3000:
+		var start: int = ProbePlay.cap_msec()
+		while _first(log, "hit") == 0 and ProbePlay.cap_msec() - start < 3000:
 			await process_frame
 		for i in 3:
 			await process_frame
 		_click()
-		while _first(log, "defeated") == 0 and Time.get_ticks_msec() - start < 5000:
+		while _first(log, "defeated") == 0 and ProbePlay.cap_msec() - start < 5000:
 			await process_frame
 			_record_frame(log)
 		var hit: int = _first(log, "hit")
@@ -163,7 +163,7 @@ func _check_skip() -> void:
 		# Clicked once the death runs.
 		for i in 3:
 			await process_frame
-		var clicked: int = Time.get_ticks_msec()
+		var clicked: int = ProbePlay.game_msec()
 		_click()
 		await _watch(controller, log)
 		var won: int = int(log.get("won", 0))
@@ -189,29 +189,29 @@ func _watch_setup(controller: Node, members: Array) -> Dictionary:
 		log["kill_min_ms"] = int(float(feedback_now.get("kill_hitstop_min")) * 1000.0)
 	controller.connect("damage_dealt", func(source: Variant, target: Variant, _amount: int, _kind: String) -> void:
 		if source is String and target is Node and log["hit"] == 0:
-			log["hit"] = Time.get_ticks_msec()
+			log["hit"] = ProbePlay.game_msec()
 			var feedback: Node = _feedback(controller)
 			if feedback != null:
 				log["stroke_ms"] = int(float(feedback.call("effect_remaining_time")) * 1000.0)
 	)
 	controller.connect("enemy_defeated", func(enemy: Node) -> void:
-		var now: int = Time.get_ticks_msec()
+		var now: int = ProbePlay.game_msec()
 		if log["defeated"] == 0:
 			log["defeated"] = now
 		(log["defeated_by"] as Dictionary)[enemy] = now
-		enemy.connect("death_finished", func() -> void: (log["finished_by"] as Dictionary)[enemy] = Time.get_ticks_msec())
+		enemy.connect("death_finished", func() -> void: (log["finished_by"] as Dictionary)[enemy] = ProbePlay.game_msec())
 	)
-	controller.connect("battle_won", func() -> void: log["won"] = Time.get_ticks_msec())
+	controller.connect("battle_won", func() -> void: log["won"] = ProbePlay.game_msec())
 	return log
 
 # Frame by frame until the fight is won, or WATCH_SECONDS.
 func _watch(_controller: Node, log: Dictionary) -> void:
-	var start: int = Time.get_ticks_msec()
-	while int(log["won"]) == 0 and Time.get_ticks_msec() - start < int(WATCH_SECONDS * 1000.0):
+	var start: int = ProbePlay.cap_msec()
+	while int(log["won"]) == 0 and ProbePlay.cap_msec() - start < int(WATCH_SECONDS * 1000.0):
 		await process_frame
 		_record_frame(log)
 	if int(log["stop_from"]) != 0:
-		(log["stops"] as Array).append([int(log["stop_from"]), Time.get_ticks_msec()])
+		(log["stops"] as Array).append([int(log["stop_from"]), ProbePlay.game_msec()])
 		log["stop_from"] = 0
 
 # One frame's look: new damage numbers (whose target is the nearest
@@ -219,7 +219,7 @@ func _watch(_controller: Node, log: Dictionary) -> void:
 # targets' order), the time scale, and how far each member stands from
 # its rest.
 func _record_frame(log: Dictionary) -> void:
-	var now: int = Time.get_ticks_msec()
+	var now: int = ProbePlay.game_msec()
 	var numbers: int = _numbers_now()
 	if numbers > int(log["numbers_seen"]):
 		if int(log["number"]) == 0:
@@ -333,7 +333,7 @@ func _start_fight(floor_index: int, group: StringName, card_path: String) -> Nod
 	if overlay == null:
 		_fail("no fight started on floor %d" % (floor_index + 1))
 		return null
-	await create_timer(2.5).timeout
+	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
 	return overlay.get("battle_controller")
 
 # The first card in hand, at `target` (or none, for a card that takes

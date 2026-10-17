@@ -86,8 +86,8 @@ func _check_win() -> void:
 			combatant.set("hp", 0)
 			controller.call("_report_damage", "player", combatant, 99, "card")
 		controller.call("_check_battle_end")
-		var start: int = Time.get_ticks_msec()
-		while bool(field.get("_battle_open")) and Time.get_ticks_msec() - start < int(WIN_WAIT_SECONDS * 1000.0):
+		var start: int = ProbePlay.cap_msec()
+		while bool(field.get("_battle_open")) and ProbePlay.cap_msec() - start < int(WIN_WAIT_SECONDS * 1000.0):
 			await physics_frame
 		for i in SETTLE_FRAMES:
 			await physics_frame

@@ -76,11 +76,11 @@ func _check_hold() -> void:
 	await physics_frame
 	_field.call_deferred("_on_enemy_contacted", target)
 	var layer: Node = _field.get_node("BattleLayer")
-	var start: int = Time.get_ticks_msec()
-	while layer.get_child_count() == 0 and Time.get_ticks_msec() - start < 2000:
+	var start: int = ProbePlay.cap_msec()
+	while layer.get_child_count() == 0 and ProbePlay.cap_msec() - start < 2000:
 		await process_frame
 	# The contact ran in the deferred flush just before this frame.
-	var contact_usec: int = Time.get_ticks_usec()
+	var contact_usec: int = ProbePlay.game_usec()
 	if layer.get_child_count() == 0:
 		_check(false, "a fight starts")
 		return
@@ -141,7 +141,7 @@ func _check_hold() -> void:
 	_check(not bool(controller.call("is_entry_locked")), "a draw cut off before its strike ends the hold")
 	_check(not release.is_connected(unlock), "and lets the release go")
 	controller.call("lock_entry_input", SAFETY_HOLD_S, release)
-	var armed_usec: int = Time.get_ticks_usec()
+	var armed_usec: int = ProbePlay.game_usec()
 	await _until(armed_usec, SAFETY_HOLD_S - 0.05)
 	_check(bool(controller.call("is_entry_locked")), "a release that never comes holds on (%.3f s)" % _since(armed_usec))
 	await _until(armed_usec, SAFETY_HOLD_S + 0.1)
@@ -181,7 +181,7 @@ func _until(start_usec: int, seconds: float) -> void:
 		await process_frame
 
 func _since(start_usec: int) -> float:
-	return float(Time.get_ticks_usec() - start_usec) / 1000000.0
+	return float(ProbePlay.game_usec() - start_usec) / 1000000.0
 
 func _check(ok: bool, label: String) -> void:
 	print(("ok   " if ok else "FAIL ") + label)

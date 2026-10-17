@@ -134,7 +134,7 @@ func _check_felled_together(leg_band: TrinketData) -> void:
 	await _play_carve(controller)
 	_expect(bool(controller.call("felled_together")), "One Carve kills the three: felled together")
 	_expect_eq(_line_text(), LINE, "...the option's line is said")
-	await create_timer(4.0).timeout
+	await ProbePlay.wait_until(self, func() -> bool: return not bool(_field.call("is_battle_open")), 8.0)
 	_expect(_field.get("_pending_keepsake") == leg_band, "...and the win offers its keepsake")
 	await _teardown()
 
@@ -157,7 +157,7 @@ func _check_felled_apart(leg_band: TrinketData) -> void:
 	_expect_eq((controller.get("enemies") as Array).size(), 0, "Across two turns: all three dead")
 	_expect(not bool(controller.call("felled_together")), "...not felled together")
 	_expect(_line_text() != LINE, "...no line")
-	await create_timer(4.0).timeout
+	await ProbePlay.wait_until(self, func() -> bool: return not bool(_field.call("is_battle_open")), 8.0)
 	_expect(_field.get("_pending_keepsake") != leg_band, "...and no keepsake")
 	await _teardown()
 
@@ -201,7 +201,7 @@ func _play_carve(controller: Node) -> void:
 	var members: Array = controller.get("enemies")
 	if bool(controller.call("is_awaiting_target")) and not members.is_empty():
 		controller.call("confirm_target", members[0])
-	await create_timer(2.0).timeout
+	await ProbePlay.settle_kills(self, controller)
 
 func _line_text() -> String:
 	var hud: Node = _field.get_node_or_null(^"FieldHUD")
@@ -250,7 +250,7 @@ func _start_fight(keepsake: TrinketData) -> Node:
 	if overlay == null:
 		_fail("no fight started on floor 2")
 		return null
-	await create_timer(2.5).timeout
+	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
 	var controller: Node = overlay.get("battle_controller")
 	_expect_eq((controller.get("enemies") as Array).size(), 3, "The island fight has the three")
 	return controller

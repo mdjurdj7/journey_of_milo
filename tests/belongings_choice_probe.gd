@@ -55,6 +55,9 @@ const KEEP := 1
 const HOLD_SEC := 0.4
 # Past the hold: the card's flight (card_flight_duration_sec 0.45) and slack.
 const FLIGHT_ROOM_SEC := 0.8
+# The most game time a take may take to close the screen, seconds - a cap
+# on the wait for its report, not a wait.
+const CLOSE_MAX_SEC := 3.0
 
 var _run_state: Node = null
 # Where a taken card flies - a stand-in for the field HUD's DeckPanel.
@@ -139,7 +142,7 @@ func _check_take(taken: int, glassbone_slot: int, held: bool) -> void:
 		return
 	await create_timer(HOLD_SEC * 0.5).timeout
 	_expect(report.is_empty() and is_instance_valid(screen), "%s: still open halfway through the hold" % label)
-	await create_timer(HOLD_SEC * 0.5 + FLIGHT_ROOM_SEC).timeout
+	await ProbePlay.wait_until(self, func() -> bool: return not report.is_empty(), CLOSE_MAX_SEC)
 	_expect(report == [taken], "%s: closed after the hold, reporting %d (got %s)" % [label, taken, report])
 	if is_instance_valid(screen):
 		screen.free()
@@ -208,7 +211,7 @@ func _check_second_activation() -> void:
 		screen.call("_activate", other)
 	var after_presses: Dictionary = _snapshot()
 	_expect(after_presses == after_take, "presses during the hold grant nothing more (%s, then %s)" % [after_take, after_presses])
-	await create_timer(HOLD_SEC + FLIGHT_ROOM_SEC).timeout
+	await ProbePlay.wait_until(self, func() -> bool: return not report.is_empty(), CLOSE_MAX_SEC)
 	_expect(report == [CASE], "the hold still closes on the first take (got %s)" % [report])
 	if is_instance_valid(screen):
 		screen.free()

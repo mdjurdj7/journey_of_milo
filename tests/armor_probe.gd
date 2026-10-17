@@ -265,8 +265,8 @@ func _check_hit_back_kill_in_fight() -> void:
 		_expect((controller.get("enemies") as Array).is_empty(), "Damage back's kill drops the enemy from the fight")
 		_expect(bool(controller.call("has_held_deaths")) or bool(controller.call("is_dying", enemies[0])), "...its death held for the blow")
 		controller.call("_check_battle_end")
-		var start: int = Time.get_ticks_msec()
-		while not won[0] and Time.get_ticks_msec() - start < 5000:
+		var start: int = ProbePlay.cap_msec()
+		while not won[0] and ProbePlay.cap_msec() - start < 5000:
 			await process_frame
 		_expect(won[0], "...and the fight is won once it has played")
 	await _teardown()
@@ -293,8 +293,8 @@ func _check_find_line() -> void:
 	if controller != null:
 		_kill_all(controller)
 		var reward: Node = null
-		var start: int = Time.get_ticks_msec()
-		while reward == null and Time.get_ticks_msec() - start < 6000:
+		var start: int = ProbePlay.cap_msec()
+		while reward == null and ProbePlay.cap_msec() - start < 6000:
 			await process_frame
 			# By its script, untyped: naming RewardScreen here would compile it
 			# before the RunState autoload registers.
@@ -312,8 +312,8 @@ func _check_find_line() -> void:
 		# find line shows, the world-voice line silent by then.
 		var voice: WorldVoiceLine = _field.get_node_or_null("FieldHUD/WorldVoiceLine") as WorldVoiceLine
 		var overlapped: bool = false
-		start = Time.get_ticks_msec()
-		while Time.get_ticks_msec() - start < 8000:
+		start = ProbePlay.cap_msec()
+		while ProbePlay.cap_msec() - start < 8000:
 			line = _field.get_node_or_null("FieldHUD/FindLine") as FindLine
 			if line != null and line.is_showing():
 				overlapped = voice != null and voice.is_speaking()
@@ -447,8 +447,8 @@ func _check_elite_drop() -> void:
 		for member in (controller.get("enemies") as Array):
 			fell_at = (member as Node3D).global_position
 		_kill_all(controller)
-		var start: int = Time.get_ticks_msec()
-		while _lying().is_empty() and Time.get_ticks_msec() - start < 6000:
+		var start: int = ProbePlay.cap_msec()
+		while _lying().is_empty() and ProbePlay.cap_msec() - start < 6000:
 			await process_frame
 		var lying: Array[Node] = _lying()
 		_expect_eq(lying.size(), 1, "A win against it leaves one worn piece on the sand")

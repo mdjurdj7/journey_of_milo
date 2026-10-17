@@ -295,21 +295,25 @@ func _check_two_blows() -> void:
 		var spawn_bases: Dictionary = {}
 		controller.connect("damage_dealt", func(_source: Variant, target: Variant, amount: int, _kind: String) -> void:
 			if target == greyshelf:
-				hits.append([Time.get_ticks_msec(), amount, bool(controller.get("_input_locked"))]))
+				hits.append([ProbePlay.game_msec(), amount, bool(controller.get("_input_locked"))]))
 		controller.connect("enemy_hp_changed", func(enemy: Node, current: int, _max_hp: int) -> void:
 			if enemy == greyshelf:
 				hp_steps.append(current))
 		controller.connect("toll_changed", func(new_toll: int) -> void:
-			tolls.append([Time.get_ticks_msec(), new_toll]))
+			tolls.append([ProbePlay.game_msec(), new_toll]))
 		# Where this enemy's number would go as a number is spawned, against
-		# where it was put - read at that frame's end, placed, its rise not
-		# yet begun.
+		# where it was put - read at that frame's end, placed, less the one
+		# frame of rise its tween has stepped by then (FloatingNumber.
+		# show_value(): rise_px over duration_sec, linear) - a whole 1/60 s
+		# at --fixed-fps.
 		overlay.connect("child_entered_tree", func(node: Node) -> void:
 			if node is FloatingNumber:
 				spawn_bases[node] = overlay.call("_screen_pos_for_damage_target", greyshelf) as Vector2)
 		overlay.connect("child_entered_tree", func(node: Node) -> void:
 			if node is FloatingNumber and spawn_bases.has(node):
-				numbers.append((node as FloatingNumber).position - (spawn_bases[node] as Vector2)), CONNECT_DEFERRED)
+				var number := node as FloatingNumber
+				var risen: float = number.rise_px * float(root.get_process_delta_time()) / maxf(number.duration_sec, 0.001)
+				numbers.append(number.position + Vector2(0.0, risen) - (spawn_bases[node] as Vector2)), CONNECT_DEFERRED)
 		await _play_first(controller, greyshelf)
 		_expect_eq(hits.size(), 2, "Two damage events, one per hit")
 		if hits.size() == 2:
@@ -406,7 +410,7 @@ func _start_fight() -> Node:
 	if overlay == null:
 		_fail("no fight started on floor 5")
 		return null
-	await create_timer(2.5).timeout
+	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
 	return overlay.get("battle_controller")
 
 func _play_first(controller: Node, greyshelf: Node) -> void:
@@ -421,8 +425,8 @@ func _play_first(controller: Node, greyshelf: Node) -> void:
 		controller.call("confirm_target", greyshelf)
 	# Until the play has resolved - a repeat's second hit included - by the
 	# clock, not frames, which run unthrottled headless.
-	var deadline: int = Time.get_ticks_msec() + 5000
-	while bool(controller.get("_input_locked")) and Time.get_ticks_msec() < deadline:
+	var deadline: int = ProbePlay.cap_msec() + 5000
+	while bool(controller.get("_input_locked")) and ProbePlay.cap_msec() < deadline:
 		await process_frame
 	await create_timer(0.6).timeout
 

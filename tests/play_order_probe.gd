@@ -132,12 +132,12 @@ func _check_timing() -> void:
 		deck.draw_pile.append((load(ENDURE_PATH) as CardData).duplicate())
 	_set_energy(controller, 3)
 	var events: Array = []
-	var start: Array = [Time.get_ticks_usec()]
+	var start: Array = [ProbePlay.game_usec()]
 	deck.discarded.connect(func(card: CardData) -> void:
 		events.append(["discarded", card, _since(start[0])]))
 	controller.connect("card_impact", func(card: CardData) -> void:
 		events.append(["impact", card, _since(start[0]), deck.discard_pile.has(card)]))
-	start[0] = Time.get_ticks_usec()
+	start[0] = ProbePlay.game_usec()
 	controller.call("request_play", _view(controller, thoughts))
 	await _settle(controller)
 	var discarded: Array = _event(events, "discarded", thoughts)
@@ -150,7 +150,7 @@ func _check_timing() -> void:
 	var expected: float = float(controller.call("_impact_delay_for", slash))
 	_expect(expected > fade, "Slash's impact delay (%.3f s) is past the fade" % expected)
 	controller.call("request_play", _view(controller, slash))
-	start[0] = Time.get_ticks_usec()
+	start[0] = ProbePlay.game_usec()
 	controller.call("confirm_target", target)
 	await _settle(controller)
 	discarded = _event(events, "discarded", slash)
@@ -190,10 +190,9 @@ func _check_consumed_fight_end() -> void:
 	_set_energy(controller, 3)
 	controller.call("request_play", _view(controller, owned))
 	controller.call("confirm_target", _field_enemy(controller))
-	for i in 600:
-		await process_frame
-		if not bool(_field.get("_battle_open")):
-			break
+	# A frame count is no cap here: the kill's death hold runs on the wall
+	# clock, and at --fixed-fps the frames outrun it.
+	await ProbePlay.wait_until(self, func() -> bool: return not bool(_field.get("_battle_open")), 10.0)
 	_expect(not bool(_field.get("_battle_open")), "Its hit ends the fight")
 	var run_deck: Array = _run_state.get("deck")
 	_expect(not run_deck.has(owned), "...and it leaves the run deck")
@@ -283,7 +282,7 @@ func _field_enemy(controller: Node) -> Node:
 	return (controller.get("_combatants") as Dictionary).keys()[0]
 
 func _since(start_usec: int) -> float:
-	return float(Time.get_ticks_usec() - start_usec) / 1000000.0
+	return float(ProbePlay.game_usec() - start_usec) / 1000000.0
 
 func _event(events: Array, kind: String, card: CardData) -> Array:
 	for event: Array in events:

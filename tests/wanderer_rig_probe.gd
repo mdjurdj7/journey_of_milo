@@ -448,8 +448,8 @@ func _check_grab_key() -> void:
 	await _pose("Walk", 0.0)
 	_wanderer.call("enter_battle_stance", target, 2.0, 0.6)
 	var grabbed_at := -1.0
-	var start: int = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - start < 2000:
+	var start: int = ProbePlay.game_msec()
+	while ProbePlay.game_msec() - start < 2000:
 		await process_frame
 		if sword.get_parent() == hand_frame:
 			grabbed_at = _player.current_animation_position if _player.current_animation == "DrawSword" else 99.0
@@ -463,14 +463,14 @@ func _check_grab_key() -> void:
 	# past it, and the sword stays on his back.
 	await _pose("Idle", 0.0)
 	_wanderer.call("enter_battle_stance", target, 2.0, 0.6)
-	start = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - start < 1000 and (_player.current_animation != "DrawSword" or _player.current_animation_position < grab * 0.5):
+	start = ProbePlay.cap_msec()
+	while ProbePlay.cap_msec() - start < 1000 and (_player.current_animation != "DrawSword" or _player.current_animation_position < grab * 0.5):
 		await process_frame
 	var left_at: float = _player.current_animation_position
 	_wanderer.call("exit_battle_stance")
 	var in_hand := false
-	start = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - start < 1000:
+	start = ProbePlay.game_msec()
+	while ProbePlay.game_msec() - start < 1000:
 		await process_frame
 		in_hand = in_hand or sword.get_parent() == hand_frame
 	_check(not in_hand and not bool(_wanderer.get("_grab_pending")), "a fight over %.3f s into DrawSword leaves the sword on his back as the clip fades out over battle_exit_blend (%.2f s)" % [left_at, float(_wanderer.get("battle_exit_blend"))])
@@ -480,8 +480,8 @@ func _check_grab_key() -> void:
 	# as the Slash starts, and ends on the hand mount.
 	await _pose("Idle", 0.0)
 	_wanderer.call("enter_battle_stance", target, 2.0, 0.6)
-	start = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - start < 1000 and (_player.current_animation != "DrawSword" or _player.current_animation_position < SLASH_CUT_S):
+	start = ProbePlay.cap_msec()
+	while ProbePlay.cap_msec() - start < 1000 and (_player.current_animation != "DrawSword" or _player.current_animation_position < SLASH_CUT_S):
 		await process_frame
 	var cut_at: float = _player.current_animation_position
 	var on_back_at_cut: bool = sword.get_parent() != hand_frame
@@ -529,10 +529,10 @@ func _start_fight() -> Node:
 		if _player.current_animation == "Slash":
 			_status_mid_slash += 1)
 	controller.connect("card_played", func(_card: Resource, _target: Node) -> void:
-		_played_ms.append(Time.get_ticks_msec())
+		_played_ms.append(ProbePlay.game_msec())
 		_played_from.append(_last_slash_pos))
 	controller.connect("card_impact", func(_card: Resource) -> void:
-		_impact_ms.append(Time.get_ticks_msec())
+		_impact_ms.append(ProbePlay.game_msec())
 		_impact_at.append(_player.current_animation_position if _player.current_animation == "Slash" else -1.0))
 	# The fight's opening (the camera, the intents) settles first.
 	await create_timer(0.5).timeout
@@ -573,8 +573,8 @@ func _check_draw() -> void:
 			long_axis = a
 	var tip_local: Vector3 = raw.position + raw.size * 0.5
 	tip_local[long_axis] = raw.position[long_axis] if bool(_wanderer.get("grip_axis_flip")) else raw.end[long_axis]
-	var start: int = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - start < 4000:
+	var start: int = ProbePlay.game_msec()
+	while ProbePlay.game_msec() - start < 4000:
 		await process_frame
 		if _player.current_animation != "DrawSword":
 			if started:
@@ -667,10 +667,10 @@ func _check_slash_plays_out(controller: Node) -> void:
 	controller.call("confirm_target", _fight_enemy())
 	var length: float = _player.get_animation("Slash").length
 	var furthest: float = -1.0
-	var start: int = Time.get_ticks_msec()
-	while _player.current_animation != "Slash" and Time.get_ticks_msec() - start < 1000:
+	var start: int = ProbePlay.cap_msec()
+	while _player.current_animation != "Slash" and ProbePlay.cap_msec() - start < 1000:
 		await process_frame
-	while _player.current_animation == "Slash" and Time.get_ticks_msec() - start < 4000:
+	while _player.current_animation == "Slash" and ProbePlay.cap_msec() - start < 4000:
 		furthest = maxf(furthest, _player.current_animation_position)
 		await process_frame
 	_check(_status_mid_slash > 0, "its resolution's status change comes mid-Slash (%d)" % _status_mid_slash)
@@ -692,12 +692,12 @@ func _check_cancel_window(controller: Node) -> void:
 	var enemy: Node3D = _fight_enemy()
 	controller.call("request_play", first)
 	controller.call("confirm_target", enemy)
-	var start: int = Time.get_ticks_msec()
+	var start: int = ProbePlay.game_msec()
 	var asked: bool = false
 	var queued: bool = false
-	while (_played_ms.size() < 2 or _impact_ms.size() < 2) and Time.get_ticks_msec() - start < 4000:
+	while (_played_ms.size() < 2 or _impact_ms.size() < 2) and ProbePlay.game_msec() - start < 4000:
 		_last_slash_pos = _player.current_animation_position if _player.current_animation == "Slash" else -1.0
-		if not asked and Time.get_ticks_msec() - start >= int(SECOND_PLAY_AT_S * 1000.0):
+		if not asked and ProbePlay.game_msec() - start >= int(SECOND_PLAY_AT_S * 1000.0):
 			asked = true
 			controller.call("request_play", second)
 			controller.call("confirm_target", enemy)
@@ -732,8 +732,8 @@ func _deal(controller: Node) -> Object:
 
 # The play resolved, the swing over and BattleIdle back.
 func _settle(controller: Node) -> void:
-	var start: int = Time.get_ticks_msec()
-	while (bool(controller.get("_input_locked")) or bool(controller.get("_play_queued")) or _player.current_animation != "BattleIdle") and Time.get_ticks_msec() - start < 4000:
+	var start: int = ProbePlay.cap_msec()
+	while (bool(controller.get("_input_locked")) or bool(controller.get("_play_queued")) or _player.current_animation != "BattleIdle") and ProbePlay.cap_msec() - start < 4000:
 		await process_frame
 	await create_timer(0.3).timeout
 

@@ -179,8 +179,8 @@ func _slash(controller: Node, enemy: Node3D) -> Dictionary:
 			break
 	var flashed: bool = false
 	var recoil: float = 0.0
-	var start: int = Time.get_ticks_msec()
-	while Time.get_ticks_msec() - start < int(WATCH_SECONDS * 1000.0):
+	var start: int = ProbePlay.game_msec()
+	while ProbePlay.game_msec() - start < int(WATCH_SECONDS * 1000.0):
 		recoil = maxf(recoil, enemy.global_position.distance_to(base_position))
 		for index in materials.size():
 			var tint: Color = enemy.call("_tint_of", materials[index])

@@ -258,7 +258,7 @@ func _check_carve_kills_nipper() -> void:
 		# Carve asks for a target like any card; its damage goes to all.
 		if bool(controller.call("is_awaiting_target")):
 			controller.call("confirm_target", blackback)
-		await create_timer(2.0).timeout
+		await ProbePlay.settle_kills(self, controller)
 		_expect_eq((controller.get("enemies") as Array).size(), 1, "Carve kills the Nipper")
 		_expect_eq(b.hp, 34, "...and cuts the Blackback to 34")
 		var hungry: int = 0
@@ -285,7 +285,7 @@ func _check_carve_kills_both() -> void:
 		controller.call("request_play", views[0])
 		if bool(controller.call("is_awaiting_target")):
 			controller.call("confirm_target", blackback)
-		await create_timer(2.0).timeout
+		await ProbePlay.settle_kills(self, controller)
 		_expect_eq((controller.get("enemies") as Array).size(), 0, "One Carve kills both")
 		_expect_eq(gained.size(), 0, "...and neither turns on its way down (%d told gained)" % gained.size())
 		for active: Status in b.statuses:
@@ -389,7 +389,7 @@ func _start_fight(deck_card_path: String = "") -> Node:
 		_fail("no fight started on floor 3")
 		return null
 	# Let the battle frame settle and the opening hand land.
-	await create_timer(2.5).timeout
+	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
 	var controller: Node = overlay.get("battle_controller")
 	var player: Combatant = controller.get("player")
 	_expect_eq(player.hp, PLAYER_HP, "The fight opens at %d HP (no turn can end it)" % PLAYER_HP)

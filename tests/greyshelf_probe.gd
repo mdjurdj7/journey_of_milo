@@ -442,20 +442,22 @@ func _check_body() -> void:
 	_expect((greyshelf.get_node("SandMound") if greyshelf.has_node("SandMound") else null) == null, "...no mound: sunk, not buried")
 	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
 	var head: Vector3 = greyshelf.global_position + forward * 2.0
+	var turned: Callable = func() -> bool: return absf(float(pose.call("get_head_angle"))) > 20.0 and float(pose.get("_lift")) > 0.5 * float(pose.get("lift_degrees"))
+	var eased: Callable = func() -> bool: return absf(float(pose.call("get_head_angle"))) < 1.0 and float(pose.get("_lift")) < 0.5
 	wanderer.global_position = head + side * 6.0
-	await create_timer(3.0).timeout
+	await ProbePlay.wait_until(self, turned, 6.0)
 	var angle: float = float(pose.call("get_head_angle"))
 	var lift: float = float(pose.get("_lift"))
 	_expect(absf(angle) > 20.0, "The Wanderer 6 m off: the head turns to him (%.1f)" % angle)
 	_expect(lift > 0.5 * float(pose.get("lift_degrees")), "...and lifts (%.1f)" % lift)
 	_expect(is_equal_approx(float(pose.call("get_rear_lift")), 0.0), "...the body still lying")
 	wanderer.global_position = head + side * 20.0
-	await create_timer(4.0).timeout
+	await ProbePlay.wait_until(self, eased, 8.0)
 	_expect(absf(float(pose.call("get_head_angle"))) < 1.0 and float(pose.get("_lift")) < 0.5, "20 m off: the head eases back to the front")
 	wanderer.global_position = head + side * 6.0
-	await create_timer(3.0).timeout
+	await ProbePlay.wait_until(self, turned, 6.0)
 	_field.call_deferred("_on_enemy_contacted", greyshelf)
-	await create_timer(4.0).timeout
+	await ProbePlay.wait_until(self, eased, 8.0)
 	_expect(absf(float(pose.call("get_head_angle"))) < 1.0 and float(pose.get("_lift")) < 0.5, "The fight's freeze eases the head back (%.1f, %.1f)" % [float(pose.call("get_head_angle")), float(pose.get("_lift"))])
 	await _teardown()
 	_completed += 1
@@ -566,7 +568,7 @@ func _start_fight(card_path: String) -> Node:
 	if overlay == null:
 		_fail("no fight started on floor 5")
 		return null
-	await create_timer(2.5).timeout
+	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
 	var controller: Node = overlay.get("battle_controller")
 	var members: Array = controller.get("enemies")
 	_expect(members.size() == 1 and members[0] == target, "The fight is the Greyshelf alone")

@@ -350,7 +350,7 @@ func _start_fight(card_path: String) -> Node:
 	if overlay == null:
 		_fail("no fight started on floor 2")
 		return null
-	await create_timer(2.5).timeout
+	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
 	var controller: Node = overlay.get("battle_controller")
 	var members: Array = controller.get("enemies")
 	_expect(members.size() == 1 and members[0] == target, "The fight is the Siltjaw alone")

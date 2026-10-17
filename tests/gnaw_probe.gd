@@ -252,8 +252,8 @@ func _check_fight() -> void:
 		_expect(player.toll_spent_this_turn, "Second Swing spends its 6: Toll spent this turn")
 		await _gnaw(controller, await _deal(controller, CARD_PATH), target, true, "Then")
 		await controller.call("end_turn")
-		var deadline: int = Time.get_ticks_msec() + 15000
-		while bool(controller.get("_input_locked")) and Time.get_ticks_msec() < deadline:
+		var deadline: int = ProbePlay.cap_msec() + 15000
+		while bool(controller.get("_input_locked")) and ProbePlay.cap_msec() < deadline:
 			await process_frame
 		_expect(not player.toll_spent_this_turn, "At the next turn the condition resets")
 		controller.get("deck").call("discard_hand")

@@ -171,8 +171,8 @@ func _run_case(order: String, group: StringName, expect_cleared: bool) -> void:
 				_kill(controller, combatants, member)
 			controller.call("_check_battle_end")
 
-	var start: int = Time.get_ticks_msec()
-	while bool(_field.get("_battle_open")) and Time.get_ticks_msec() - start < int(WIN_WAIT_SECONDS * 1000.0):
+	var start: int = ProbePlay.cap_msec()
+	while bool(_field.get("_battle_open")) and ProbePlay.cap_msec() - start < int(WIN_WAIT_SECONDS * 1000.0):
 		await physics_frame
 	for i in SETTLE_FRAMES:
 		await physics_frame

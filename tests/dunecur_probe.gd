@@ -339,12 +339,13 @@ func _check_crest() -> void:
 	_expect(is_equal_approx(float(pose.call("get_crest_fold_degrees")), flat), "Roused out of a fight: the crest stays flat")
 	dunecur.call("set_roused", 0)
 	_field.call_deferred("_on_enemy_contacted", dunecur)
-	await create_timer(2.5).timeout
 	var layer: Node = _field.get_node("BattleLayer")
+	await ProbePlay.wait_until(self, func() -> bool: return layer.get_child_count() > 0, 2.0)
 	if layer.get_child_count() == 0:
 		_fail("no fight started on floor 4")
 	else:
 		var controller: Node = layer.get_child(0).get("battle_controller")
+		await ProbePlay.settle_fight(self, _field, controller)
 		_expect(is_equal_approx(float(pose.call("get_head_dip_degrees")), 0.0), "The fight lifts his head (%.1f)" % float(pose.call("get_head_dip_degrees")))
 		var folds: Array[float] = []
 		for stacks in 5:
@@ -418,7 +419,7 @@ func _start_fight(card_path: String) -> Node:
 	if overlay == null:
 		_fail("no fight started on floor 4")
 		return null
-	await create_timer(2.5).timeout
+	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
 	var controller: Node = overlay.get("battle_controller")
 	var members: Array = controller.get("enemies")
 	_expect(members.size() == 1 and members[0] == target, "The fight is the Dunecur alone")

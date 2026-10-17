@@ -150,7 +150,7 @@ func _start_fight() -> Node:
 	if overlay == null:
 		_fail("no fight started on floor 1")
 		return null
-	await create_timer(2.5).timeout
+	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
 	return overlay.get("battle_controller")
 
 func _teardown() -> void:

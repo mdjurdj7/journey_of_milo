@@ -187,12 +187,12 @@ func _check_felled_together() -> void:
 		controller.call("request_play", views[0])
 		if bool(controller.call("is_awaiting_target")):
 			controller.call("confirm_target", (controller.get("enemies") as Array)[0])
-		await create_timer(2.0).timeout
+		await ProbePlay.settle_kills(self, controller)
 		_expect_eq((controller.get("enemies") as Array).size(), 0, "One Carve kills both")
 		_expect_eq(gained.size(), 0, "...neither turns Bereft on the way down")
 		_expect(bool(controller.call("felled_together")), "...felled together")
 		_expect_eq(_line_text(), "They fell in step.", "...their line said")
-		await create_timer(4.0).timeout
+		await ProbePlay.wait_until(self, func() -> bool: return not bool(_field.call("is_battle_open")), 8.0)
 		_expect(_field.get("_pending_keepsake") == load(LEG_BAND_PATH), "...and the win offers the Leg Band")
 	await _teardown()
 	_completed += 1
@@ -213,7 +213,9 @@ func _check_staging() -> void:
 	_field.call_deferred("_on_enemy_contacted", target)
 	for i in 10:
 		await physics_frame
-	await create_timer(3.0).timeout
+	var layer: Node = _field.get_node("BattleLayer")
+	if layer.get_child_count() > 0:
+		await ProbePlay.settle_fight(self, _field, layer.get_child(0).get("battle_controller"))
 	var ground: Node = _field.get_node("Ground")
 	var gap: float = _flat(wanderer.global_position).distance_to(_flat(target.global_position))
 	var minimum: float = float(_field.call("stance_distance_min", target))
@@ -301,7 +303,7 @@ func _start_fight(deck_card_path: String) -> Node:
 	if overlay == null:
 		_fail("no fight started on floor 3")
 		return null
-	await create_timer(2.5).timeout
+	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
 	return overlay.get("battle_controller")
 
 func _body(path: String) -> Node3D:

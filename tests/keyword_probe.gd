@@ -441,8 +441,8 @@ func _deal(controller: Node, path: String) -> CardData:
 	# Drawn cards fly in from the DECK readout one at a time, the opening
 	# hand's ahead of this one: measure it only once every card has landed.
 	var hand: Object = controller.get("_hand_container")
-	var deadline: int = Time.get_ticks_msec() + 3000
-	while Time.get_ticks_msec() < deadline:
+	var deadline: int = ProbePlay.game_msec() + 3000
+	while ProbePlay.game_msec() < deadline:
 		if (hand.get("_waiting_slots") as Dictionary).is_empty() and (hand.get("_arrival_tweens") as Dictionary).is_empty():
 			break
 		await process_frame

@@ -224,7 +224,7 @@ func _check_fight_counter() -> void:
 		_expect(not _row_has(controller, adder, "Coiled"), "...and not in the status row")
 		var events: Array = []
 		controller.connect("damage_dealt", func(source: Variant, _target: Variant, amount: int, _kind: String) -> void:
-			events.append([Time.get_ticks_msec(), source is String, amount])
+			events.append([ProbePlay.game_msec(), source is String, amount])
 		)
 		var adder_hp: int = combatant.hp
 		before = player.hp
@@ -392,8 +392,8 @@ func _check_elite() -> void:
 			_expect(bool(reward.get("_elite_rates")), "...its card at the elite rates")
 			_expect_eq(int(reward.get("_glassbone")), 0, "...no Glassbone")
 		_expect(_field.get("_pending_keepsake") == null, "...no keepsake waiting to be offered")
-		var start: int = Time.get_ticks_msec()
-		while get_nodes_in_group(&"worn_drops").is_empty() and Time.get_ticks_msec() - start < 6000:
+		var start: int = ProbePlay.cap_msec()
+		while get_nodes_in_group(&"worn_drops").is_empty() and ProbePlay.cap_msec() - start < 6000:
 			await process_frame
 		_expect_eq(get_nodes_in_group(&"worn_drops").size(), 1, "...and a worn piece on the sand")
 		if reward != null:
@@ -468,7 +468,7 @@ func _start_fight(card_path: String) -> Node:
 	if overlay == null:
 		_fail("no fight started on floor 4")
 		return null
-	await create_timer(2.5).timeout
+	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
 	var controller: Node = overlay.get("battle_controller")
 	var members: Array = controller.get("enemies")
 	_expect(members.size() == 1 and members[0] == target, "The fight is the adder alone")
@@ -486,8 +486,8 @@ func _play_first(controller: Node, adder: Node) -> void:
 	controller.call("request_play", views[0])
 	if bool(controller.call("is_awaiting_target")):
 		controller.call("confirm_target", adder)
-	var start: int = Time.get_ticks_msec()
-	while bool(controller.get("_input_locked")) and Time.get_ticks_msec() - start < 5000:
+	var start: int = ProbePlay.cap_msec()
+	while bool(controller.get("_input_locked")) and ProbePlay.cap_msec() - start < 5000:
 		await process_frame
 	await create_timer(0.4).timeout
 
@@ -538,8 +538,8 @@ func _kill_all(controller: Node) -> void:
 # A fight just won: until its reward screen is up - the killing blow and
 # the last death play out first - or REWARD_WAIT_SECONDS have gone.
 func _await_reward_screen() -> void:
-	var start: int = Time.get_ticks_msec()
-	while _child_with_script(_field, "reward_screen.gd") == null and Time.get_ticks_msec() - start < int(REWARD_WAIT_SECONDS * 1000.0):
+	var start: int = ProbePlay.cap_msec()
+	while _child_with_script(_field, "reward_screen.gd") == null and ProbePlay.cap_msec() - start < int(REWARD_WAIT_SECONDS * 1000.0):
 		await process_frame
 
 func _child_with_script(parent: Node, suffix: String) -> Node:

@@ -421,13 +421,13 @@ func _check_turn_skipped_in_fight() -> void:
 		await _settle(controller)
 		var hp_before: int = player.hp
 		var block_before: int = combatant.block
-		var started: int = Time.get_ticks_msec()
+		var started: int = ProbePlay.game_msec()
 		await _end_turn(controller)
 		_expect_eq(player.hp, hp_before, "The skipped turn deals nothing")
 		_expect_eq(combatant.block, block_before, "...gains nothing")
 		_expect(not EnemyTurn.is_denied(combatant), "...Denied is gone")
 		_expect_eq(combatant.turns_taken, 1, "...and the turn counted")
-		_expect(Time.get_ticks_msec() - started >= int(float(controller.get("denied_beat_sec")) * 1000.0), "...holding its beat")
+		_expect(ProbePlay.game_msec() - started >= int(float(controller.get("denied_beat_sec")) * 1000.0), "...holding its beat")
 	await _teardown()
 	_completed += 1
 

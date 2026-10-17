@@ -56,6 +56,9 @@ const BARB_MIN_PX := 40.0
 # Nothing in the fight's line nearer anything else than this, metres.
 const LINE_CLEARANCE_M := 0.4
 const SAFETY_SECONDS := 300.0
+# The most the barb may take to rise once a fight has settled, seconds -
+# a cap on the wait for it, not a wait.
+const BARB_RISE_MAX_SEC := 4.0
 # The rule's seeded runs: this many fights of this many turns.
 const SEEDS := 40
 const TURNS := 30
@@ -546,7 +549,12 @@ func _start_fight() -> Node:
 	if _overlay() == null:
 		_fail("no fight started on floor 2")
 		return null
-	await create_timer(3.0).timeout
+	await ProbePlay.settle_fight(self, _field, _overlay().get("battle_controller"))
+	# The barb rises once the frame has it (UnderfootPose.set_rearing()):
+	# its tween seen through, the raise checked by the caller.
+	var pose: Node = _pose(target)
+	if pose != null:
+		await ProbePlay.wait_until(self, func() -> bool: return is_equal_approx(float(pose.call("get_barb_raise")), 1.0), BARB_RISE_MAX_SEC)
 	return _overlay().get("battle_controller")
 
 func _find(path: String) -> Node:

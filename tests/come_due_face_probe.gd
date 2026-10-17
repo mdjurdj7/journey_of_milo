@@ -155,7 +155,7 @@ func _start_fight() -> Node:
 		_fail("no fight started on floor 3")
 		return null
 	# Let the battle frame settle and the opening hand land.
-	await create_timer(2.5).timeout
+	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
 	var controller: Node = overlay.get("battle_controller")
 	for enemy: Combatant in (controller.get("_combatants") as Dictionary).values():
 		enemy.max_hp = ENEMY_HP
