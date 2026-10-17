@@ -392,15 +392,13 @@ func take_bedroll() -> bool:
 	bedroll_changed.emit(has_bedroll)
 	return true
 
-# The Bedroll used: `amount` HP back (capped at the max, as heal() is) and
-# it's gone. False, and nothing changes, with none carried.
-func use_bedroll(amount: int) -> bool:
+# The Bedroll used up - the rest itself heals, through heal(), as its
+# night holds (BedrollRest). False, and nothing changes, with none
+# carried.
+func use_bedroll() -> bool:
 	if not has_bedroll:
 		return false
 	has_bedroll = false
-	var before: int = player_hp
-	heal(amount)
-	RunLogger.player_healed(player_hp - before, "bedroll")
 	bedroll_changed.emit(has_bedroll)
 	return true
 

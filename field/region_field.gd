@@ -435,6 +435,8 @@ var _keepsake_line: KeepsakeLine = null
 var _worn_line: KeepsakeLine = null
 # The HUD row's Bedroll, while one is carried - a click asks to rest.
 var _bedroll_line: BedrollLine = null
+# The rest while its confirm or night is up (open_bedroll_rest()).
+var _bedroll_rest: BedrollRest = null
 # A fight's worn piece waiting to be named by the find line (FindLine,
 # _say_pending_find()) - and who left it - until the reward screen, and
 # any keepsake offer after it, has closed.
@@ -863,6 +865,12 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.button_index == MOUSE_BUTTON_LEFT and _worn_line != null and _worn_line.is_point_over(event.position):
 		get_viewport().set_input_as_handled()
 		open_worn_examine(_worn_line.get_keepsake(), _worn_line.get_global_rect())
+		return
+	# The HUD's Bedroll: asks to rest - or, where it can't, the click is
+	# still the HUD's, never a move.
+	if event.button_index == MOUSE_BUTTON_LEFT and _bedroll_line != null and _bedroll_line.is_point_over(event.position):
+		get_viewport().set_input_as_handled()
+		open_bedroll_rest()
 		return
 	# A worn piece on the sand, within reach: its plate.
 	if event.button_index == MOUSE_BUTTON_LEFT and _try_examine_armor(event.position):
@@ -3281,6 +3289,36 @@ func open_keepsake_examine(keepsake: TrinketData, from_rect: Rect2 = Rect2()) ->
 	process_mode = Node.PROCESS_MODE_DISABLED
 	add_child(examine)
 	return true
+
+# A rest on the carried Bedroll (BedrollRest): its confirm, and on YES its
+# night - the field frozen under both, the Wanderer standing still. False,
+# and nothing opens, with none carried, at full HP, in a fight, or with
+# the field already held by a screen.
+func open_bedroll_rest() -> bool:
+	if not can_rest():
+		return false
+	var rest := BedrollRest.new()
+	rest.name = "BedrollRest"
+	rest.setup(load(bedroll_data_path) as BedrollData, get_region_sky(), get_node_or_null(^"FieldHUD"), _bedroll_line)
+	rest.finished.connect(_on_bedroll_rest_finished.unbind(1))
+	if wanderer != null:
+		wanderer.stand_still()
+	process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(rest)
+	_bedroll_rest = rest
+	return true
+
+# Whether a rest could open now (open_bedroll_rest()).
+func can_rest() -> bool:
+	return RunState.has_bedroll and RunState.player_hp < RunState.player_max_hp and not _battle_open and can_process() and _bedroll_rest == null
+
+# The rest open now - its confirm or its night - else null.
+func get_bedroll_rest() -> BedrollRest:
+	return _bedroll_rest
+
+func _on_bedroll_rest_finished() -> void:
+	_bedroll_rest = null
+	process_mode = Node.PROCESS_MODE_INHERIT
 
 # A won fight's armor: the first enemy it was won against whose own table
 # (EnemyData.armor_table) gives a piece - RARE by its armor_rare_chance,

@@ -1791,6 +1791,18 @@ func clear_move_target() -> void:
 func has_move_target() -> bool:
 	return _has_move_target
 
+# Stopped where he stands, in his idle - before a freeze that should show
+# him standing (a rest: BedrollRest). His model plays through the freeze,
+# so a walk left playing would walk on the spot.
+func stand_still() -> void:
+	clear_move_target()
+	velocity = Vector3.ZERO
+	if use_animation_tree:
+		if _animation_tree:
+			_animation_tree.set("parameters/blend_position", 0.0)
+	elif _animation_player != null and _animation_player.has_animation(&"Idle") and _animation_player.current_animation != "Idle":
+		_animation_player.play("Idle", animation_blend_time)
+
 # See the Hold Line export group. `point` is any point on the line,
 # `normal` the direction (XZ, normalized here) he may not move past it
 # along - the floor's exit direction.
