@@ -126,7 +126,7 @@ func _scripted_run(logging: bool) -> Dictionary:
 		return seen
 
 	# Turn 1: Collateral, then Reckoning on its swap (0 Energy, 5 HP);
-	# Hold Fast (Block 5, 2 HP its own); Blood Arc (3 HP its own).
+	# Hold Fast (Block 8, 2 HP its own); Blood Arc (3 HP its own).
 	_turns = 1
 	_fresh_hand(controller)
 	await _play(controller, await _deal(controller, COLLATERAL_PATH))
@@ -255,7 +255,7 @@ func _check_log(path: String, seen: Dictionary) -> void:
 		_expect_card(cards[1], "Reckoning", 0, 5, 0)
 		_expect_card(cards[2], "Hold Fast", 1, 0, 2)
 		_expect_card(cards[3], "Blood Arc", 1, 0, 3)
-		_expect_eq(int((cards[2] as Dictionary).get("block")), 5, "Hold Fast: 5 Block gained")
+		_expect_eq(int((cards[2] as Dictionary).get("block")), 8, "Hold Fast: 8 Block gained")
 		_expect(int((cards[3] as Dictionary).get("dealt")) > 0, "Blood Arc: damage dealt")
 		_expect_eq((cards[3] as Dictionary).get("target"), null, "...with no target")
 		_expect_eq(str((cards[1] as Dictionary).get("target")), "Sputter", "Reckoning: aimed at the Sputter")

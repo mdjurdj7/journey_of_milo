@@ -1166,7 +1166,7 @@
       "face_type_label": "GUARD",
       "energy_cost": 1,
       "rarity": "COMMON",
-      "card_text": "Gain 5 block.\nDraw 1.",
+      "card_text": "Gain 8 block.\nDraw 1.",
       "face_hp_line": "−2 HP",
       "card_text_template": "Gain {block} block.\nDraw {draw}.",
       "targeting": "self",
@@ -1178,7 +1178,7 @@
         },
         {
           "type": "BLOCK",
-          "plain_english": "Gain 5 block."
+          "plain_english": "Gain 8 block."
         },
         {
           "type": "DRAW",
@@ -1188,7 +1188,7 @@
       "keywords": [],
       "self_hp_cost": 2,
       "base_damage": null,
-      "base_block": 5,
+      "base_block": 8,
       "draw": 1,
       "energy_gain": null,
       "toll_gain": null,
@@ -1202,7 +1202,7 @@
         {
           "field": "block",
           "rule": "Shows and gives 0 while Last Resort is held.",
-          "default_displayed": 5
+          "default_displayed": 8
         },
         {
           "field": "cost",
