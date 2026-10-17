@@ -89,6 +89,14 @@ func _process(delta: float) -> void:
 		if now >= 1.0 and target >= 1.0:
 			_presence.erase(instance)
 
+# Whether every prop has reached its fade (none part-way).
+func is_settled() -> bool:
+	for instance in _presence.keys():
+		var now: float = float(_presence[instance])
+		if now > 0.0 and now < 1.0:
+			return false
+	return true
+
 # The fighters' screen boxes and depths, and every readout's rect.
 func _gather(camera: Camera3D, fighter_rects: Array[Rect2], fighter_depths: PackedFloat32Array, readouts: Array[Rect2]) -> void:
 	var forward: Vector3 = -camera.global_basis.z

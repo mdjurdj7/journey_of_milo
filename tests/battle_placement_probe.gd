@@ -22,6 +22,17 @@ extends SceneTree
 #     nearest combatant. The fight's own props (its option's - the
 #     Wardling's hitching post, the Dunecur's bones) belong in its frame
 #     and are left out.
+# And the battle frame's readability, once its fades and the ground's
+# press have settled (BattleOcclusion, FieldScatter, BattleGroundPress):
+#   - nothing over a fighter or a readout: no prop (but the fight's own,
+#     and one a member stands on - RegionField.is_battle_exempt_prop())
+#     and no scatter item still showing whose screen box covers a
+#     fighter's from in front (COVER_DEPTH_M nearer the camera) or meets a
+#     readout - an enemy's HP/name plate or intent, his HP bar
+#   - no two readouts overlapping
+#   - the frame's bottom edge open: along its bottom row, the ground as
+#     drawn (less the press) no more than BOTTOM_EDGE_TOLERANCE_M over the
+#     feet line - the lowest feet, or the water's surface over them
 # The limits are this probe's own constants, below. Each fight also gets
 # an INFO line - its settled battle pitch and whether the Tower is in its
 # frame - never a failure.
@@ -62,6 +73,19 @@ const BODY_MIDDLE := 0.75
 # settle_fight()), seconds - a cap, not a wait.
 const SETTLE_MAX_SECONDS := 8.0
 const SAFETY_SECONDS := 900.0
+# A prop or scatter item covers a fighter only this much nearer the camera
+# than the fighter's origin, metres - BattleOcclusion.depth_margin_m.
+const COVER_DEPTH_M := 0.2
+# How far the ground at the frame's bottom edge may stand over the feet
+# line, metres.
+const BOTTOM_EDGE_TOLERANCE_M := 0.15
+# Pixels between the bottom row's samples, and metres between a sample
+# ray's steps.
+const BOTTOM_EDGE_STEP_PX := 40
+const BOTTOM_EDGE_RAY_STEP_M := 0.05
+# A fade or a press settles within this much game time once the frame
+# has, seconds - a cap, not a wait.
+const FADE_SETTLE_MAX_SECONDS := 3.0
 
 var _run_state: Node = null
 var _field: Node = null
@@ -173,12 +197,164 @@ func _check_fight(floor_index: int, slot: EncounterSlot, option: EncounterOption
 				if camera.is_position_in_frustum(point) and camera.global_position.distance_to(point) <= nearest - PROP_NEARER_M:
 					_fail("%s: the prop %s is in the battle frame's foreground (%.1f m from the camera, the nearest combatant %.1f m)" % [label, prop.name, camera.global_position.distance_to(point), nearest])
 					break
+	# The frame's readability, once its fades and the press have settled.
+	await ProbePlay.wait_until(self, _fades_settled, FADE_SETTLE_MAX_SECONDS)
+	_check_readability(label, camera, wanderer, members, ground, sea_level)
 	# For the record: the pitch the frame settled at, and the Tower.
 	print("INFO: %s: battle pitch %.0f degrees; the Tower %s" % [label, float(_field.get_node("CameraPivot").get("_battle_pitch_now")), "in frame" if _tower_in_frame(camera) else "not in frame"])
 	if _failures == failures_before:
 		_clean += 1
 		print("%s: staged cleanly" % label)
 	await _teardown()
+
+func _fades_settled() -> bool:
+	var occlusion: Node = _field.get_node_or_null(^"BattleOcclusion")
+	var press: Node = _field.get_node_or_null(^"BattleGroundPress")
+	var scatter: Node = _field.call("get_scatter")
+	return (occlusion == null or bool(occlusion.call("is_settled"))) \
+		and (press == null or bool(press.call("is_settled"))) \
+		and (scatter == null or bool(scatter.call("is_battle_fade_settled")))
+
+# The three readability checks (the header's): covered fighters and
+# readouts, overlapping readouts, the bottom edge.
+func _check_readability(label: String, camera: Camera3D, wanderer: Node3D, members: Array, ground: Node, sea_level: float) -> void:
+	var fighters: Array[Node3D] = [wanderer]
+	for member: Node3D in members:
+		if is_instance_valid(member):
+			fighters.append(member)
+	var rects: Array[Rect2] = []
+	var depths: Array[float] = []
+	var feet_line: float = INF
+	for body in fighters:
+		rects.append(_screen_box(body, camera))
+		depths.append(_depth(camera, body.global_position))
+		feet_line = minf(feet_line, body.global_position.y)
+	feet_line = maxf(feet_line, sea_level)
+	var readouts: Array[Rect2] = []
+	var readout_names: Array[String] = []
+	var overlay: Node = _field.call("get_battle_overlay")
+	if overlay != null:
+		for rect: Rect2 in overlay.call("get_readout_rects"):
+			readouts.append(rect)
+			readout_names.append("a readout at %s" % rect.position.round())
+	var hp_bar: Control = _field.get("hp_bar")
+	if hp_bar != null and hp_bar.is_visible_in_tree():
+		readouts.append(hp_bar.get_global_rect())
+		readout_names.append("his HP bar")
+	# Readouts apart.
+	for i in readouts.size():
+		for j in range(i + 1, readouts.size()):
+			if readouts[i].intersects(readouts[j]):
+				_fail("%s: %s overlaps %s" % [label, readout_names[i], readout_names[j]])
+	# Props still showing.
+	var props: Node = _field.get_node_or_null(^"Props")
+	if props != null:
+		for prop in props.get_children():
+			if bool(_field.call("is_battle_exempt_prop", prop)):
+				continue
+			for node in prop.find_children("*", "GeometryInstance3D", true, false):
+				var instance := node as GeometryInstance3D
+				if not instance.is_visible_in_tree() or _faded(instance):
+					continue
+				var box: AABB = instance.get_aabb()
+				if box.size == Vector3.ZERO:
+					continue
+				var nearest: float = INF
+				for k in 8:
+					nearest = minf(nearest, _depth(camera, instance.global_transform * box.get_endpoint(k)))
+				var what: String = _covers(_project(instance.global_transform, box, camera), nearest, rects, depths, readouts, fighters, wanderer, readout_names)
+				if not what.is_empty():
+					_fail("%s: the prop %s %s" % [label, prop.name, what])
+					break
+	# Scatter still showing.
+	var scatter: Node = _field.call("get_scatter")
+	if scatter != null:
+		for instance: MultiMeshInstance3D in scatter.call("get_instances"):
+			var multimesh: MultiMesh = instance.multimesh
+			if multimesh == null or multimesh.mesh == null or not instance.is_visible_in_tree():
+				continue
+			var mesh_box: AABB = multimesh.mesh.get_aabb()
+			for k in multimesh.instance_count:
+				if multimesh.use_custom_data and multimesh.get_instance_custom_data(k).b < 0.5:
+					continue
+				if multimesh.use_colors and multimesh.get_instance_color(k).a < 0.5:
+					continue
+				var transform: Transform3D = instance.global_transform * multimesh.get_instance_transform(k)
+				var what: String = _covers(_project(transform, mesh_box, camera), _depth(camera, transform.origin), rects, depths, readouts, fighters, wanderer, readout_names)
+				if not what.is_empty():
+					_fail("%s: scatter %s at %s %s" % [label, instance.name, _flat(transform.origin).snapped(Vector2(0.01, 0.01)), what])
+	# The bottom edge.
+	var screen: Vector2 = camera.get_viewport().get_visible_rect().size
+	var worst: float = -INF
+	for x in range(0, int(screen.x), BOTTOM_EDGE_STEP_PX):
+		var origin: Vector3 = camera.project_ray_origin(Vector2(x, screen.y - 2.0))
+		var direction: Vector3 = camera.project_ray_normal(Vector2(x, screen.y - 2.0))
+		var t: float = BOTTOM_EDGE_RAY_STEP_M
+		while t < 40.0:
+			var point: Vector3 = origin + direction * t
+			var drawn: float = float(ground.call("get_visible_height_at", _flat(point)))
+			drawn -= float(ground.call("get_battle_press_drop", Vector3(point.x, drawn, point.z)))
+			if point.y <= drawn:
+				worst = maxf(worst, drawn - feet_line)
+				break
+			t += BOTTOM_EDGE_RAY_STEP_M
+	if worst > BOTTOM_EDGE_TOLERANCE_M:
+		_fail("%s: the ground at the frame's bottom edge stands %.2f m over the feet line" % [label, worst])
+
+# What a screen box at `depth` does wrong - covers a fighter from in
+# front, or meets a readout - or "" for nothing.
+func _covers(box: Rect2, depth: float, rects: Array[Rect2], depths: Array[float], readouts: Array[Rect2], fighters: Array[Node3D], wanderer: Node3D, readout_names: Array[String]) -> String:
+	if not box.has_area():
+		return ""
+	for i in rects.size():
+		if rects[i].has_area() and box.intersects(rects[i]) and depth < depths[i] - COVER_DEPTH_M:
+			return "covers %s" % _name_of(fighters[i], wanderer)
+	for i in readouts.size():
+		if box.intersects(readouts[i]):
+			return "lies under %s" % readout_names[i]
+	return ""
+
+# Whether a prop's instance is faded out (BattleOcclusion): its painted
+# material's presence, or its transparency, past half.
+func _faded(instance: GeometryInstance3D) -> bool:
+	if instance.transparency > 0.5:
+		return true
+	var material: Material = instance.material_override
+	if material == null and instance is MeshInstance3D and (instance as MeshInstance3D).mesh != null and (instance as MeshInstance3D).mesh.get_surface_count() > 0:
+		material = (instance as MeshInstance3D).get_active_material(0)
+	if material is ShaderMaterial:
+		var presence: Variant = (material as ShaderMaterial).get_shader_parameter("presence")
+		return presence != null and float(presence) < 0.5
+	return false
+
+# A body's screen box: its visible geometry's corners.
+func _screen_box(body: Node3D, camera: Camera3D) -> Rect2:
+	var box := Rect2()
+	var started: bool = false
+	for node in body.find_children("*", "GeometryInstance3D", true, false):
+		var instance := node as GeometryInstance3D
+		if not instance.is_visible_in_tree() or instance.get_aabb().size == Vector3.ZERO:
+			continue
+		var rect: Rect2 = _project(instance.global_transform, instance.get_aabb(), camera)
+		if rect.has_area():
+			box = rect if not started else box.merge(rect)
+			started = true
+	return box
+
+func _project(transform: Transform3D, box: AABB, camera: Camera3D) -> Rect2:
+	var rect := Rect2()
+	var started: bool = false
+	for k in 8:
+		var corner: Vector3 = transform * box.get_endpoint(k)
+		if camera.is_position_behind(corner):
+			continue
+		var point: Vector2 = camera.unproject_position(corner)
+		rect = Rect2(point, Vector2.ZERO) if not started else rect.expand(point)
+		started = true
+	return rect
+
+func _depth(camera: Camera3D, at: Vector3) -> float:
+	return (at - camera.global_position).dot(-camera.global_basis.z)
 
 # The slot's member the contact is made on: its anchor, else its first.
 func _target_for(slot_id: StringName) -> Node3D:

@@ -1753,6 +1753,18 @@ func _advance_battle_fade(delta: float) -> void:
 			colour.a = layer.presence[i]
 			layer.instance.multimesh.set_instance_color(i, colour)
 
+# Whether every item has reached its battle fade (none part-way).
+func is_battle_fade_settled() -> bool:
+	for layer in _card_layers:
+		for custom in layer.custom:
+			if custom.b > 0.0 and custom.b < 1.0:
+				return false
+	for layer in _model_layers:
+		for presence in layer.presence:
+			if presence > 0.0 and presence < 1.0:
+				return false
+	return true
+
 # The battle frame for the per-item fade, from BattleOcclusion every
 # frame: `camera` null out of a frame (everything comes back).
 func set_battle_screen(camera: Camera3D, fighter_rects: Array[Rect2], fighter_depths: PackedFloat32Array, readouts: Array[Rect2], depth_margin: float, press_float: float = 0.03) -> void:

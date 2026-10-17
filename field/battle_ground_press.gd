@@ -62,6 +62,10 @@ func _process(delta: float) -> void:
 	ground.set_battle_press(amount, _eye_xz, _forward_xz, _full_depth, _zero_depth, _level)
 	_pushed = amount > 0.0
 
+# Whether the press has finished easing - fully in or fully out.
+func is_settled() -> bool:
+	return _progress <= 0.0 or _progress >= 1.0
+
 # The press's frame from the battle camera and the feet it frames.
 func _read_frame(rig: CameraRig, ground: Ground) -> void:
 	var feet: PackedVector3Array = rig.get_battle_feet()
