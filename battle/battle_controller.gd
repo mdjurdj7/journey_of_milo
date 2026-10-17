@@ -1270,7 +1270,7 @@ func _take_turn_logged(enemy: FieldEnemy, combatant: Combatant, data: EnemyData)
 		var stage: int = EnemyTurn.escalation_stage(combatant, data)
 		RunLogger.escalation_stage(combatant.get_instance_id(), id, stage, data.escalation_multipliers[stage])
 	var intent: EnemyIntent = EnemyTurn.current_intent(combatant, data)
-	var threshold: int = intent.interrupt_threshold if intent != null and intent.type == EnemyIntent.IntentType.ATTACK else 0
+	var threshold: int = EnemyTurn.interrupt_threshold(combatant, intent)
 	var dealt: int = combatant.damage_taken_this_turn
 	if intent != null and intent.status_while_queued != null:
 		RunLogger.mechanic("queued_state", {"enemy": id, "intent": intent.intent_name, "state": intent.status_while_queued.id, "taken": dealt})
@@ -1297,8 +1297,9 @@ func _log_threshold_queued(enemy: FieldEnemy) -> void:
 	if combatant == null or enemy.enemy_data == null:
 		return
 	var intent: EnemyIntent = EnemyTurn.current_intent(combatant, enemy.enemy_data)
-	if intent != null and intent.type == EnemyIntent.IntentType.ATTACK and intent.interrupt_threshold > 0:
-		RunLogger.mechanic("threshold_queued", {"enemy": _log_id(enemy), "intent": intent.intent_name, "threshold": intent.interrupt_threshold})
+	var threshold: int = EnemyTurn.interrupt_threshold(combatant, intent)
+	if threshold > 0:
+		RunLogger.mechanic("threshold_queued", {"enemy": _log_id(enemy), "intent": intent.intent_name, "threshold": threshold})
 
 func _log_pain_turn(enemy: FieldEnemy) -> void:
 	RunLogger.mechanic("pain_turn", {"enemy": _log_id(enemy)})

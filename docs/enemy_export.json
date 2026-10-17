@@ -1331,7 +1331,7 @@
       "file": "res://battle/rules/enemies/greyshelf.tres",
       "hp": 120,
       "elite": false,
-      "mechanic_summary": "Lashes its tail 4 × 3, then Gapes for 20, in turn — break the Gape by dealing 16 that turn, but every Attack card you play into it adds 2; broken, it lands nothing. Off its rock below half HP, the lash strikes four times. Teaches landing one big blow at the right moment.",
+      "mechanic_summary": "Lashes its tail 5 × 3, then Gapes for 24, in turn — break the Gape by dealing 26 that turn, but every Attack card you play into it adds 2, up to 30; broken, it lands nothing. Off its rock below half HP, the lash strikes four times and the Gape breaks at 20. Teaches committing a whole turn to one break, and knocking it off its rock.",
       "field": {
         "model": "res://assets/models/enemies/Greyshelf/Greyshelf.glb",
         "model_is_default": false,
@@ -1356,17 +1356,17 @@
           {
             "name": "Tail Lash",
             "type": "ATTACK",
-            "damage_per_hit": 4,
+            "damage_per_hit": 5,
             "hits": 3,
             "hits_after_phase": 4
           },
           {
             "name": "Gape",
             "type": "ATTACK",
-            "damage_per_hit": 20,
+            "damage_per_hit": 24,
             "hits": 1,
             "interrupt": {
-              "break_threshold": 16,
+              "break_threshold": 26,
               "on_interrupt": null,
               "clears_attack_card_status": true
             },
@@ -1376,8 +1376,8 @@
               "bonus_per_card": 2,
               "max_stacks": 3,
               "damage_range": [
-                20,
-                26
+                24,
+                30
               ]
             }
           }
@@ -1413,12 +1413,13 @@
           "name": "Off the rock",
           "file": "res://battle/rules/statuses/off_the_rock.tres",
           "gained": "once, the first time its HP is below 0.5 of 120",
-          "description": "Tail Lash strikes 4 times.",
-          "text": "Tail Lash strikes 4 times.",
+          "description": "Tail Lash strikes 4 times. Gape breaks at 20.",
+          "text": "Tail Lash strikes 4 times. Gape breaks at 20.",
           "fields": {
             "default_duration_turns": "until removed",
             "stack_rule": "IGNORE",
-            "bonus_hits": 1
+            "bonus_hits": 1,
+            "interrupt_threshold_change": -6
           }
         }
       ],

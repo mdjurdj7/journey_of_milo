@@ -10,21 +10,21 @@
 [sub_resource type="Resource" id="EnemyIntent_tail_lash"]
 script = ExtResource("2_intent")
 intent_name = "Tail Lash"
-value = 4
+value = 5
 hits = 3
 
 [sub_resource type="Resource" id="EnemyIntent_gape"]
 script = ExtResource("2_intent")
 intent_name = "Gape"
-value = 20
-interrupt_threshold = 16
+value = 24
+interrupt_threshold = 26
 rear_while_queued = true
 counts_attack_cards = true
 
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Greyshelf"
-mechanic_summary = "Lashes its tail 4 × 3, then Gapes for 20, in turn — break the Gape by dealing 16 that turn, but every Attack card you play into it adds 2; broken, it lands nothing. Off its rock below half HP, the lash strikes four times. Teaches landing one big blow at the right moment."
+mechanic_summary = "Lashes its tail 5 × 3, then Gapes for 24, in turn — break the Gape by dealing 26 that turn, but every Attack card you play into it adds 2, up to 30; broken, it lands nothing. Off its rock below half HP, the lash strikes four times and the Gape breaks at 20. Teaches committing a whole turn to one break, and knocking it off its rock."
 max_hp = 120
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_tail_lash"), SubResource("EnemyIntent_gape")])
 attack_card_status = ExtResource("3_goaded")

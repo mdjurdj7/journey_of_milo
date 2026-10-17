@@ -221,6 +221,15 @@ static func bonus_hits(statuses: Array[Status]) -> int:
 			total += active.data.bonus_hits
 	return total
 
+# What `statuses` add to their holder's interrupt thresholds (StatusData.
+# interrupt_threshold_change - Off the rock), summed.
+static func interrupt_threshold_change(statuses: Array[Status]) -> int:
+	var total: int = 0
+	for active in statuses:
+		if active.data != null:
+			total += active.data.interrupt_threshold_change
+	return total
+
 # How many times `statuses` have their holder carry out its intent this
 # turn (StatusData.repeats_intent - Bereft): the most any of them asks,
 # at least 1.

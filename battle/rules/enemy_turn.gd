@@ -26,12 +26,22 @@ static func current_intent(combatant: Combatant, data: EnemyData) -> EnemyIntent
 		return null
 	return data.intents[combatant.current_intent_index]
 
+# What breaks `intent` now: its interrupt_threshold with what this
+# enemy's statuses add to it (StatusData.interrupt_threshold_change - Off
+# the rock), at least 1; 0 for an intent that can't be broken. The one
+# number the break, the ring and the run log read.
+static func interrupt_threshold(combatant: Combatant, intent: EnemyIntent) -> int:
+	if intent == null or intent.type != EnemyIntent.IntentType.ATTACK or intent.interrupt_threshold <= 0:
+		return 0
+	return maxi(intent.interrupt_threshold + Status.interrupt_threshold_change(combatant.statuses), 1)
+
 # Whether the queued intent's interrupt threshold has been met by what
 # the player has dealt this turn - the attack won't land.
 static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
-	if intent == null or intent.type != EnemyIntent.IntentType.ATTACK or intent.interrupt_threshold <= 0:
+	var threshold: int = interrupt_threshold(combatant, intent)
+	if threshold <= 0:
 		return false
-	return combatant.damage_taken_this_turn >= intent.interrupt_threshold
+	return combatant.damage_taken_this_turn >= threshold
 
 # One enemy's whole turn: tick its own statuses, resolve its queued
 # intent, remove expired statuses, advance to the next one - mirrors the
@@ -300,10 +310,10 @@ static func counter_strike(combatant: Combatant, data: EnemyData, player: Combat
 # would save puts them at its survive HP, as many saves as it has
 # charges - Status.refuse_lethal()). Empty when the enemy has no intent.
 #
-# An ATTACK with an interrupt_threshold also carries "threshold" (the
-# authored number), "threshold_left" (what the player still has to deal
-# this turn, down to 0) and "interrupted" (it's been met - the attack
-# won't land, so never lethal).
+# An ATTACK with an interrupt_threshold also carries "threshold" (what
+# breaks it now - interrupt_threshold()), "threshold_left" (what the
+# player still has to deal this turn, down to 0) and "interrupted" (it's
+# been met - the attack won't land, so never lethal).
 static func preview_intent(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
 	var intent := current_intent(combatant, data)
 	if intent == null:
@@ -336,9 +346,10 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 		preview["per_hit"] = intent.value * times
 	if intent.type != EnemyIntent.IntentType.ATTACK:
 		return preview
-	if intent.interrupt_threshold > 0:
-		preview["threshold"] = intent.interrupt_threshold
-		preview["threshold_left"] = maxi(intent.interrupt_threshold - combatant.damage_taken_this_turn, 0)
+	var threshold: int = interrupt_threshold(combatant, intent)
+	if threshold > 0:
+		preview["threshold"] = threshold
+		preview["threshold_left"] = maxi(threshold - combatant.damage_taken_this_turn, 0)
 		preview["interrupted"] = is_interrupted(combatant, intent)
 	var player_statuses: Array[Status] = player.statuses.duplicate()
 	var block: int = player.block

@@ -187,6 +187,12 @@ enum Mark { NONE, COIL, DROP }
 # 4 times. 0 = none.
 @export var bonus_hits: int = 0
 
+# Added to the interrupt threshold of every breakable ATTACK its holder -
+# an enemy - queues while it's up (EnemyIntent.interrupt_threshold;
+# EnemyTurn.interrupt_threshold()): below 0 it breaks sooner, never below
+# 1. Off the rock: the Greyshelf's Gape breaks at 20, not 26. 0 = none.
+@export var interrupt_threshold_change: int = 0
+
 # How many times its holder - an enemy - carries out its current intent
 # each turn while it's up (Bereft: 2): an ATTACK lands as that many
 # separate attacks, one after another, and a DEFEND gains its Block that
