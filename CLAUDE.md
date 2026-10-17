@@ -44,9 +44,12 @@
 ## Probes
 - Run them with tools/run_probes.sh (--help), from your own worktree:
   `--path <worktree>`, after `--import` there. With no -j it runs one
-  probe at a time when under 6 GB is free at the start, else two; it
+  probe at a time when under 4 GB is free at the start, else two; it
   waits for memory rather than start a probe that would leave under
-  2000 MB free, and ends everything it started if it's stopped.
+  2000 MB free, and ends everything it started if it's stopped. Every
+  probe runs at --fixed-fps 60, so probes time things in game time
+  (ProbePlay.game_msec()), never Time.get_ticks_*, and wait on the
+  event (ProbePlay.wait_until()) rather than a fixed timer.
 - Data-only changes (scene/.tres values, assets, masks, docs): no probes.
 - Code changes: run only the probe(s) for the system you touched
   (`--probe`), once, at the end, in the foreground - not whole areas,

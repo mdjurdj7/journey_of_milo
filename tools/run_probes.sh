@@ -20,7 +20,7 @@
 #
 # Options:
 #   -j N             parallel probes (default: 1 while under JOBS_TWO_MIN_FREE_MB,
-#                    6 GB, is free at the start, else 2). Probes marked serial in
+#                    4 GB, is free at the start, else 2). Probes marked serial in
 #                    the table below always run alone, after the rest.
 #   --worktree [DIR] run in the persistent probe worktree (default
 #                    ../journey-of-milo-probe), not this tree: take its lock,
@@ -61,7 +61,8 @@ GODOT=${GODOT:-$REPO/../Godot_v4.7.1.exe}
 PROBE_TIMEOUT_SEC=600
 
 # --- Memory guard ---
-# A probe - a headless Godot - takes up to about PROBE_MEM_MB, and none is
+# A probe - a headless Godot - takes up to about PROBE_MEM_MB (measured
+# 655-745 MB peak working set over a full batch), and none is
 # started (nor the import) while that would leave under MIN_FREE_MB free:
 # the run waits for memory instead (await_memory()). With none of its own
 # probes running to give any back, it waits MEM_WAIT_MAX_SEC at most, then
@@ -70,12 +71,12 @@ PROBE_TIMEOUT_SEC=600
 # MemAvailable where the system gives it, else MemFree - Git Bash's,
 # which is Windows' available memory.
 MIN_FREE_MB=2000
-PROBE_MEM_MB=1024
+PROBE_MEM_MB=800
 MEM_WAIT_MAX_SEC=600
 PROBE_RAMP_SEC=10
 # The default -j (none given): 2 when at least this much is free at the
 # start, else 1.
-JOBS_TWO_MIN_FREE_MB=6144
+JOBS_TWO_MIN_FREE_MB=4096
 LAST_START=0
 free_mb() {
 	awk '/^MemAvailable:/ { a = $2 } /^MemFree:/ { f = $2 } END { v = a ? a : f; if (v) print int(v / 1024) }' /proc/meminfo 2>/dev/null
@@ -180,13 +181,12 @@ await_pid() {
 
 # --- The probes' flags, and their times ---
 # "serial": runs alone after the parallel batch - set for a probe that
-# proved flaky in parallel. "fixed": run at --fixed-fps 60 (the probe's
-# own header asks for it). A probe not listed has neither.
+# proved flaky in parallel. "realtime": run on the wall clock, not at
+# --fixed-fps 60. Every probe else runs at --fixed-fps 60: each frame
+# steps 1/60 s of game time and the frames run as fast as they go, so a
+# probe's waits cost no idle wall time and land alike under -j 2. A probe
+# not listed has neither flag.
 PROBE_FLAGS="
-drain_probe fixed
-hold_line_probe fixed
-floor4_probe fixed
-floor5_probe fixed
 "
 # Measured seconds per probe: what orders a run, longest first, and tiers
 # it. TIMES_FILE (tools/probe_times.txt) is the committed copy - --batch
@@ -789,7 +789,7 @@ fi
 # would otherwise see another copy's files.
 run_one() {
 	local p="$1" ff="" start code dur verdict runlog runlog_arg
-	[ "$(table_flag "$p" fixed)" = yes ] && ff="--fixed-fps 60"
+	[ "$(table_flag "$p" realtime)" = yes ] || ff="--fixed-fps 60"
 	runlog=$(mktemp -d "$LOGS/runlog.$p.XXXXXX")
 	runlog_arg="$runlog"
 	command -v cygpath > /dev/null && runlog_arg=$(cygpath -m "$runlog")
