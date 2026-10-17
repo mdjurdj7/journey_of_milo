@@ -37,11 +37,11 @@ const CARVE_PATH := "res://cards/data/carve.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const RUN_LOGGER_PATH := "res://run/run_logger.gd"
 const FLOOR_4 := 3
-const HP := 60
+const HP := 72
 const COUNTER := 5
-const BITE := 6
+const BITE := 7
 const VENOM := 3
-const STRIKE := 11
+const STRIKE := 13
 const SLASH := 6
 const PLAYER_HP := 999
 const SAFETY_SECONDS := 400.0
@@ -87,7 +87,7 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var data: EnemyData = _adder()
 	_expect_eq(data.enemy_name, "Adder", "The Adder")
-	_expect_eq(data.max_hp, HP, "...60 HP")
+	_expect_eq(data.max_hp, HP, "...%d HP" % HP)
 	_expect(data.is_elite, "...an elite")
 	_expect(not data.erratic_intent_selection, "...a fixed loop")
 	_expect_eq(data.intents.size(), 3, "...of three moves")
@@ -96,11 +96,11 @@ func _check_data() -> void:
 		var bite: EnemyIntent = data.intents[1]
 		var strike: EnemyIntent = data.intents[2]
 		_expect(coil.intent_name == "Coil" and coil.type == EnemyIntent.IntentType.COIL, "...Coil, a COIL")
-		_expect(bite.intent_name == "Bite" and bite.type == EnemyIntent.IntentType.ATTACK and bite.value == BITE, "...Bite, an Attack of 6")
+		_expect(bite.intent_name == "Bite" and bite.type == EnemyIntent.IntentType.ATTACK and bite.value == BITE, "...Bite, an Attack of %d" % BITE)
 		_expect(bite.applies_to_player != null and bite.applies_to_player.resource_path == VENOM_PATH and bite.applied_amount == VENOM, "...that puts 3 Venom on the player")
 		_expect(coil.status_on_resolve != null and coil.status_on_resolve.resource_path == COILED_PATH, "...the Coil bringing Coiled when it resolves")
 		_expect(coil.status_while_queued == null and bite.status_while_queued == null, "...and nothing held while queued")
-		_expect(strike.intent_name == "Strike" and strike.type == EnemyIntent.IntentType.ATTACK and strike.value == STRIKE and strike.applies_to_player == null, "...Strike, an Attack of 11")
+		_expect(strike.intent_name == "Strike" and strike.type == EnemyIntent.IntentType.ATTACK and strike.value == STRIKE and strike.applies_to_player == null, "...Strike, an Attack of %d" % STRIKE)
 	var coiled: StatusData = load(COILED_PATH)
 	_expect(coiled.strikes_back_on_attack_card and coiled.default_magnitude == COUNTER, "Coiled strikes back for 5")
 	_expect(coiled.shows_beside_hp and coiled.mark == StatusData.Mark.COIL, "...shown beside the HP as a coil")
@@ -118,7 +118,7 @@ func _check_data() -> void:
 	_expect_eq(sounds, SOUND_PATHS, "...and the Stork's hits for its contact")
 	_completed += 1
 
-# Coil (nothing) -> Bite 6 -> Strike 11 -> Coil; Coiled from the Coil's
+# Coil (nothing) -> Bite 7 -> Strike 13 -> Coil; Coiled from the Coil's
 # end until the Bite lands.
 func _check_cycle() -> void:
 	var data: EnemyData = _adder()
@@ -133,7 +133,7 @@ func _check_cycle() -> void:
 		EnemyTurn.take_turn(enemy, data, player)
 		seen.append("%s %d" % [name.to_lower(), before - player.hp])
 		coiled_after.append(_has(enemy, COILED_PATH))
-	_expect_eq(seen, ["coil 0", "bite 6", "strike 11", "coil 0"] as Array[String], "Coil -> Bite 6 -> Strike 11 -> Coil")
+	_expect_eq(seen, ["coil 0", "bite %d" % BITE, "strike %d" % STRIKE, "coil 0"] as Array[String], "Coil -> Bite %d -> Strike %d -> Coil" % [BITE, STRIKE])
 	_expect_eq(coiled_after, [true, false, false, true] as Array[bool], "...Coiled after the Coil, gone once the Bite lands, back after the next Coil")
 	_completed += 1
 
@@ -219,7 +219,7 @@ func _check_fight_counter() -> void:
 		await _play_first(controller, adder)
 		_expect(combatant.hp == HP - SLASH and player.hp == before, "Slash on the Coil: it takes 6, nothing back")
 		await _end_turn(controller)
-		_expect_eq(_intent_text(controller, adder), str(BITE), "Coiled, the Bite queued: the intent reads 6")
+		_expect_eq(_intent_text(controller, adder), str(BITE), "Coiled, the Bite queued: the intent reads %d" % BITE)
 		_expect_eq(_hp_mark(controller, adder), {"glyph": &"coil", "value": COUNTER}, "...the coil and 5 beside its HP")
 		_expect(not _row_has(controller, adder, "Coiled"), "...and not in the status row")
 		var events: Array = []

@@ -9,19 +9,19 @@
 [sub_resource type="Resource" id="EnemyIntent_snarl"]
 script = ExtResource("2_intent")
 intent_name = "Snarl"
-value = 6
+value = 8
 
 [sub_resource type="Resource" id="EnemyIntent_rush"]
 script = ExtResource("2_intent")
 intent_name = "Rush"
-value = 10
+value = 12
 counts_attack_cards = true
 
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Dunecur"
-mechanic_summary = "Snarls for 6, then Rushes for 10; every Attack card played against it while Rush is coming adds 2 to that Rush, up to +8. Teaches holding Attacks on the Rush turn and hitting while it Snarls."
-max_hp = 55
+mechanic_summary = "Snarls for 8, then Rushes for 12; every Attack card played against it while Rush is coming adds 2 to that Rush, up to +8. Teaches holding Attacks on the Rush turn and hitting while it Snarls."
+max_hp = 62
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_snarl"), SubResource("EnemyIntent_rush")])
 attack_card_status = ExtResource("3_roused")
 contact_sounds = Array[AudioStream]([ExtResource("4_hit")])

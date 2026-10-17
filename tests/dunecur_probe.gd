@@ -1,9 +1,9 @@
 extends SceneTree
 
 # Headless probe for the Dunecur, floor 4's required fight: its Snarl ->
-# Rush loop (6, then 10), and Roused - each Attack card played against it
+# Rush loop (8, then 12), and Roused - each Attack card played against it
 # while the Rush is queued adds 2 to that Rush, once per card, up to +8
-# (Rush 10 to 18); played while Snarl is queued, nothing; the Rush that
+# (Rush 12 to 20); played while Snarl is queued, nothing; the Rush that
 # lands spends it, even fully blocked; a Denied Rush keeps it, the Snarl
 # after neither takes nor spends it, and the next Rush carries it. The
 # intent preview climbs with it and always equals what lands. The rules cases drive EnemyTurn on the
@@ -29,8 +29,9 @@ const SLASH_PATH := "res://cards/data/slash.tres"
 const CARVE_PATH := "res://cards/data/carve.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const FLOOR_4 := 3
-const SNARL := 6
-const RUSH := 10
+const MAX_HP := 62
+const SNARL := 8
+const RUSH := 12
 const ROUSED_BONUS := 2
 const ROUSED_CAP := 4
 const PLAYER_HP := 999
@@ -72,7 +73,7 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var data: EnemyData = _dunecur()
 	_expect_eq(data.enemy_name, "Dunecur", "The Dunecur")
-	_expect_eq(data.max_hp, 55, "...55 HP")
+	_expect_eq(data.max_hp, MAX_HP, "...%d HP" % MAX_HP)
 	_expect(not data.erratic_intent_selection, "...a fixed loop")
 	_expect_eq(data.intents.size(), 2, "...of two moves")
 	if data.intents.size() == 2:
@@ -80,11 +81,11 @@ func _check_data() -> void:
 		var rush: EnemyIntent = data.intents[1]
 		_expect_eq(snarl.intent_name, "Snarl", "Snarl first")
 		_expect_eq(snarl.type, EnemyIntent.IntentType.ATTACK, "...an Attack")
-		_expect(snarl.value == SNARL and snarl.hits == 1, "...for 6")
+		_expect(snarl.value == SNARL and snarl.hits == 1, "...for %d" % SNARL)
 		_expect(not snarl.counts_attack_cards, "...that counts no Attack cards")
 		_expect_eq(rush.intent_name, "Rush", "Rush second")
 		_expect_eq(rush.type, EnemyIntent.IntentType.ATTACK, "...an Attack")
-		_expect(rush.value == RUSH and rush.hits == 1, "...for 10")
+		_expect(rush.value == RUSH and rush.hits == 1, "...for %d" % RUSH)
 		_expect(rush.counts_attack_cards, "...that counts Attack cards")
 	var roused: StatusData = data.attack_card_status
 	_expect(roused != null and roused.resource_path == ROUSED_PATH, "It gains Roused")
@@ -107,7 +108,7 @@ func _check_data() -> void:
 	_expect(data.contact_sounds.size() == 1 and data.contact_sounds[0].resource_path == CONTACT_SOUND_PATH, "...the placeholder contact sound")
 	_completed += 1
 
-# Nothing played: Snarl lands 6, Rush lands 10 - twice round, in that
+# Nothing played: Snarl lands 8, Rush lands 12 - twice round, in that
 # order, and no Block either way.
 func _check_loop() -> void:
 	var data: EnemyData = _dunecur()
@@ -119,7 +120,7 @@ func _check_loop() -> void:
 		var before: int = player.hp
 		var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
 		seen.append("%s %d%s" % [name.to_lower(), before - player.hp, "" if bool(result["attacked"]) else " (no attack)"])
-	_expect_eq(seen, ["snarl 6", "rush 10", "snarl 6", "rush 10"] as Array[String], "Snarl 6 -> Rush 10, looping")
+	_expect_eq(seen, ["snarl %d" % SNARL, "rush %d" % RUSH, "snarl %d" % SNARL, "rush %d" % RUSH] as Array[String], "Snarl %d -> Rush %d, looping" % [SNARL, RUSH])
 	_expect_eq(enemy.block, 0, "...and it never Blocks")
 	_completed += 1
 
@@ -137,14 +138,14 @@ func _check_window() -> void:
 	_expect_eq(_roused(enemy), 0, "The Rush landed: Roused spent")
 	_expect(not EnemyTurn.take_attack_card(enemy, data), "Snarl queued again: an Attack card adds nothing")
 	_expect_eq(_roused(enemy), 0, "...no Roused")
-	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), SNARL, "...and the Snarl shows 6")
+	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), SNARL, "...and the Snarl shows %d" % SNARL)
 	EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), RUSH, "The next Rush starts at 10")
+	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), RUSH, "The next Rush starts at %d" % RUSH)
 	_completed += 1
 
-# On the Rush: 10, 12, 14, 16, 18, and a fifth Attack card still 18 - the
+# On the Rush: 12, 14, 16, 18, 20, and a fifth Attack card still 20 - the
 # preview each time; the Rush lands what the preview said and spends
-# Roused; the next Rush is back to 10.
+# Roused; the next Rush is back to 12.
 func _check_climb_and_cap() -> void:
 	var data: EnemyData = _dunecur()
 	var enemy: Combatant = _enemy(data)
@@ -154,21 +155,22 @@ func _check_climb_and_cap() -> void:
 	for card in 5:
 		EnemyTurn.take_attack_card(enemy, data)
 		shown.append(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]))
-	_expect_eq(shown, [10, 12, 14, 16, 18, 18] as Array[int], "The intent climbs 10, 12, 14, 16, 18 and holds at 18")
+	var top: int = RUSH + ROUSED_BONUS * ROUSED_CAP
+	_expect_eq(shown, [RUSH, RUSH + 2, RUSH + 4, RUSH + 6, top, top] as Array[int], "The intent climbs by 2 from %d and holds at %d" % [RUSH, top])
 	_expect_eq(_roused(enemy), ROUSED_CAP, "...Roused capped at 4")
 	var expected: int = int(EnemyTurn.preview_intent(enemy, data, player)["damage_to_hp"])
 	var before: int = player.hp
 	EnemyTurn.take_turn(enemy, data, player)
 	_expect_eq(before - player.hp, expected, "The Rush lands what the preview said (%d)" % expected)
-	_expect_eq(before - player.hp, 18, "...18")
+	_expect_eq(before - player.hp, top, "...%d" % top)
 	_expect_eq(_roused(enemy), 0, "...and Roused is spent")
 	EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), RUSH, "The next Rush is 10 again")
+	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), RUSH, "The next Rush is %d again" % RUSH)
 	_completed += 1
 
 # A Denied Rush lands nothing and keeps Roused. The Snarl that follows
 # neither takes it nor spends it - Attack cards on it add nothing, and it
-# lands 6 - so the next Rush carries the kept 2 stacks: 14, then spent.
+# lands 8 - so the next Rush carries the kept 2 stacks: 16, then spent.
 func _check_denied_keeps() -> void:
 	var data: EnemyData = _dunecur()
 	var enemy: Combatant = _enemy(data)
@@ -188,19 +190,19 @@ func _check_denied_keeps() -> void:
 	_expect(not EnemyTurn.take_attack_card(enemy, data), "Snarl queued: an Attack card adds nothing")
 	_expect_eq(_roused(enemy), 2, "...Roused still 2")
 	var shown: int = int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"])
-	_expect_eq(shown, SNARL, "The Snarl shows 6, Roused 2 or not")
+	_expect_eq(shown, SNARL, "The Snarl shows %d, Roused 2 or not" % SNARL)
 	before = player.hp
 	EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(before - player.hp, SNARL, "...and lands 6")
+	_expect_eq(before - player.hp, SNARL, "...and lands %d" % SNARL)
 	_expect_eq(_roused(enemy), 2, "...leaving Roused 2 for the Rush")
 	var rush: int = RUSH + 2 * ROUSED_BONUS
-	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), rush, "The next Rush shows 14")
+	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), rush, "The next Rush shows %d" % rush)
 	before = player.hp
 	EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(before - player.hp, rush, "...and lands 14")
+	_expect_eq(before - player.hp, rush, "...and lands %d" % rush)
 	_expect_eq(_roused(enemy), 0, "...spending Roused")
 	EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), RUSH, "The Rush after is back to 10")
+	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), RUSH, "The Rush after is back to %d" % RUSH)
 	_completed += 1
 
 # A Rush the player's Block takes all of still lands, and still spends
@@ -217,30 +219,30 @@ func _check_blocked_spends() -> void:
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
 	_expect(bool(result["attacked"]), "A fully blocked Rush still lands")
 	_expect_eq(player.hp, before, "...nothing through")
-	_expect_eq(player.block, 50 - 16, "...16 off the Block")
+	_expect_eq(player.block, 50 - (RUSH + ROUSED_BONUS * 3), "...%d off the Block" % (RUSH + ROUSED_BONUS * 3))
 	_expect_eq(_roused(enemy), 0, "...and Roused is spent")
 	_completed += 1
 
 # --- Fights ---
 
 # Slash on Snarl counts nothing; once the Rush is queued, each Slash puts
-# the readout up 2 - 10, 12, 14, 16 - and the Rush lands its preview.
+# the readout up 2 - 12, 14, 16, 18 - and the Rush lands its preview.
 func _check_fight_slash() -> void:
 	var controller: Node = await _start_fight(SLASH_PATH)
 	if controller != null:
 		var dunecur: Node = (controller.get("enemies") as Array)[0]
 		var combatant: Combatant = _combatant(controller, dunecur)
 		_expect_eq(EnemyTurn.current_intent(combatant, dunecur.get("enemy_data")).intent_name, "Snarl", "The fight opens on Snarl")
-		_expect_eq(_intent_text(controller, dunecur), "6", "...its intent 6")
+		_expect_eq(_intent_text(controller, dunecur), str(SNARL), "...its intent %d" % SNARL)
 		await _play_first(controller, dunecur)
 		_expect_eq(_roused(combatant), 0, "Slash on Snarl: no Roused")
 		await _end_turn(controller)
-		_expect_eq(_intent_text(controller, dunecur), "10", "Rush queued: the intent reads 10")
+		_expect_eq(_intent_text(controller, dunecur), str(RUSH), "Rush queued: the intent reads %d" % RUSH)
 		var read: Array[String] = []
 		for card in 3:
 			await _play_first(controller, dunecur)
 			read.append(_intent_text(controller, dunecur))
-		_expect_eq(read, ["12", "14", "16"] as Array[String], "...each Slash puts it up 2: 12, 14, 16")
+		_expect_eq(read, [str(RUSH + 2), str(RUSH + 4), str(RUSH + 6)] as Array[String], "...each Slash puts it up 2")
 		_expect_eq(_roused(combatant), 3, "...Roused 3")
 		var player: Combatant = controller.get("player")
 		var preview: Dictionary = controller.call("get_intent_preview", dunecur)
@@ -261,7 +263,7 @@ func _check_fight_carve() -> void:
 		await _end_turn(controller)
 		await _play_first(controller, dunecur)
 		_expect_eq(_roused(combatant), 1, "Carve on the Rush: Roused 1, once for the card")
-		_expect_eq(_intent_text(controller, dunecur), "12", "...the intent 12")
+		_expect_eq(_intent_text(controller, dunecur), str(RUSH + 2), "...the intent %d" % (RUSH + 2))
 		_expect(_shows_roused(controller, dunecur), "...and the readout shows Roused")
 		await _play_first(controller, dunecur)
 		_expect_eq(_roused(combatant), 2, "A second Carve: Roused 2")
