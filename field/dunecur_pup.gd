@@ -3,19 +3,19 @@ class_name DunecurPup
 
 # Floor 4's event (its "pup" event slot, FloorData.event_slots): a
 # Dunecur pup half buried in the sand beside a damp patch, in a ring of
-# brush on the faint side of the loop. The Adder bit it - the line says
-# so, nothing else does.
+# brush on the faint side of the loop. The Adder bit it - the line's
+# punctures imply it, nothing names it (nor the pup's kind).
 #
 # Lying, it breathes (a slow swell of breath_scale at breath_hz) on its
 # side (lying_roll_degrees), sunk sink_m into the sand. The walk-up and
 # the click are the trough's (PropApproach, TroughChoice - this is the
 # choice's host): inside approach_radius the line shows once per visit -
-# find_line, and need_line after it when the deck holds no card tagged
+# find_line, two short lines and nothing more. A click in reach opens the
+# choices: give_text and leave_text, always both - give_text shown but
+# not on offer (is_choice_enabled()) while the deck holds no card tagged
 # remedy_tag (CardData.tags - never a card's name, so a rename changes
-# nothing here). A click in reach opens the choices: give_text only with
-# such a card in the deck, Leave it always. Giving removes one - a plain
-# one before a tempered one - says saved_line, and the pup gets up and
-# follows; leaving changes nothing, and it lies there until the floor
+# nothing here). Giving removes one - a plain one before a tempered one -
+# says saved_line, one line, and the pup gets up and follows; leaving changes nothing, and it lies there until the floor
 # ends. Each is logged (RunLogger "pup": found / remedy_given / left).
 #
 # Following: it walks the Wanderer's own trail (his positions, every
@@ -162,18 +162,18 @@ enum Meet { TROT, GREET, WALK }
 	set(value):
 		approach_radius = value
 		_apply_approach_radius()
-@export_multiline var find_line: String = "A pup, half under the sand. Two small punctures on its foreleg, the skin around them tight and dark."
-# After find_line, when the deck holds nothing tagged remedy_tag.
-@export_multiline var need_line: String = "It needs something wet, something green."
+# Two lines, each read in about two seconds - what's there, and the bite
+# it implies.
+@export_multiline var find_line: String = "A pup lies curled in the brush.\nTwo small punctures on its foreleg. It's swelling."
 @export_multiline var saved_line: String = "It takes it slowly. After a while, it stands."
-@export var hold_seconds: float = 5.0
+@export var hold_seconds: float = 4.0
 @export var fade_seconds: float = 0.5
 @export_group("")
 
 @export_group("Choice")
 # The card kind it needs (CardData.tags).
 @export var remedy_tag: StringName = &"field_remedy"
-@export var give_text: String = "Give it something green"
+@export var give_text: String = "Give it Samphire"
 @export var leave_text: String = "Leave it"
 @export_group("")
 
@@ -495,8 +495,7 @@ func _apply_approach_radius() -> void:
 
 func _on_visit() -> void:
 	var remedy: bool = find_remedy() != null
-	var text: String = find_line if remedy or need_line.is_empty() else "%s %s" % [find_line, need_line]
-	_approach.say(text, hold_seconds, fade_seconds)
+	_approach.say(find_line, hold_seconds, fade_seconds)
 	if not _found_logged:
 		_found_logged = true
 		RunLogger.event("pup", {"outcome": "found", "has_remedy": remedy})
@@ -537,19 +536,22 @@ func _on_open_requested() -> void:
 	_choice.call("setup", self, region_field.wanderer, region_field)
 	hud.add_child(_choice)
 
-# TroughChoice's items: the giving only with a remedy in the deck.
+# TroughChoice's items: the giving and the leaving, always both.
 func get_choice_labels() -> Array[String]:
-	if find_remedy() != null:
-		return [give_text, leave_text]
-	return [leave_text]
+	return [give_text, leave_text]
+
+# TroughChoice's gate: the giving is on offer only with a remedy in the
+# deck; leaving always is.
+func is_choice_enabled(index: int) -> bool:
+	return index != 0 or find_remedy() != null
 
 # TroughChoice's pick: the last item leaves it.
 func choose(index: int) -> void:
-	var labels: Array[String] = get_choice_labels()
-	if labels.size() > 1 and index == 0:
+	var remedy: bool = find_remedy() != null
+	if index == 0 and remedy:
 		give_remedy()
-	else:
-		RunLogger.event("pup", {"outcome": "left", "has_remedy": labels.size() > 1})
+	elif index != 0:
+		RunLogger.event("pup", {"outcome": "left", "has_remedy": remedy})
 
 # One remedy out of the deck, the line, and up it gets.
 func give_remedy() -> void:

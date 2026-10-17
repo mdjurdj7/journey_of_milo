@@ -10,7 +10,10 @@ class_name TroughChoice
 # -> Array[String], its items top to bottom, the last always the one
 # that leaves it be ("Leave it"); choose(index) for the one activated;
 # and can_open_from(Vector3), its reach. The host does what a choice
-# means, logs it, and says any line - this only shows and picks.
+# means, logs it, and says any line - this only shows and picks. A host
+# may also answer is_choice_enabled(index) -> bool: an item it says no to
+# shows, fainter (disabled_ink_alpha), but focus passes over it and a
+# click on it does nothing.
 #
 # Placed every physics tick the way LootScreen is: the anchor - the
 # host plus anchor_offset, x metres along the camera's right (or left)
@@ -70,6 +73,12 @@ signal closed()
 @export_range(0.0, 1.0) var unfocused_ink_alpha: float = 0.72:
 	set(value):
 		unfocused_ink_alpha = value
+		queue_redraw()
+# An item the host has disabled: the same ink at this alpha - shown, and
+# plainly not on offer.
+@export_range(0.0, 1.0) var disabled_ink_alpha: float = 0.32:
+	set(value):
+		disabled_ink_alpha = value
 		queue_redraw()
 @export var hairline_length_px: float = 36.0:
 	set(value):
@@ -179,6 +188,8 @@ func _ready() -> void:
 	if _host == null or labels.is_empty():
 		close()
 		return
+	# The first item on offer has focus on open.
+	_focused = _step_focus(-1, 1)
 
 	visible = false
 	modulate.a = 0.0
@@ -199,6 +210,24 @@ func _labels() -> Array[String]:
 
 func _leave_index() -> int:
 	return maxi(_choices.size() - 1, 0)
+
+# Whether the host offers item `index` (is_choice_enabled(), when it has
+# one - else every item).
+func is_enabled(index: int) -> bool:
+	if _host == null or not is_instance_valid(_host) or not _host.has_method("is_choice_enabled"):
+		return true
+	var enabled: bool = _host.call("is_choice_enabled", index)
+	return enabled
+
+# The next item on offer from `from`, `step` at a time, wrapping - `from`
+# itself when none other is.
+func _step_focus(from: int, step: int) -> int:
+	var count: int = _choices.size()
+	for i in range(1, count + 1):
+		var index: int = posmod(from + step * i, count)
+		if is_enabled(index):
+			return index
+	return from
 
 func _host_reaches(from: Vector3) -> bool:
 	var in_reach: bool = _host.call("can_open_from", from)
@@ -441,10 +470,12 @@ func _draw() -> void:
 	var dimmed := Color(ink, ink.a * unfocused_ink_alpha)
 	var labels: Array[String] = _labels()
 	var label_left: float = hairline_length_px + hairline_gap_px
+	var disabled := Color(ink, ink.a * disabled_ink_alpha)
 	for index in mini(labels.size(), _choices.size()):
 		var focused: bool = index == _focused
 		var baseline: float = _choice_top(index) + float(choice_size_px)
-		_text(_choice_font, labels[index], Vector2(label_left, baseline), choice_size_px, ink if focused else dimmed)
+		var colour: Color = disabled if not is_enabled(index) else (ink if focused else dimmed)
+		_text(_choice_font, labels[index], Vector2(label_left, baseline), choice_size_px, colour)
 		if focused:
 			var mid: float = baseline - float(choice_size_px) * 0.35
 			draw_rect(Rect2(0.0, mid - hairline_thickness_px * 0.5, hairline_length_px, hairline_thickness_px), ink)
@@ -490,7 +521,7 @@ func _draw_wash(ink: Color) -> void:
 # --- Input ---
 
 func _set_focus(index: int) -> void:
-	if _done or index == _focused:
+	if _done or index == _focused or not is_enabled(index):
 		return
 	_focused = index
 	queue_redraw()
@@ -499,9 +530,9 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _done or _closing or not visible:
 		return
 	if event.is_action_pressed("ui_down"):
-		_set_focus(posmod(_focused + 1, _choices.size()))
+		_set_focus(_step_focus(_focused, 1))
 	elif event.is_action_pressed("ui_up"):
-		_set_focus(posmod(_focused - 1, _choices.size()))
+		_set_focus(_step_focus(_focused, -1))
 	elif event.is_action_pressed("ui_accept"):
 		_activate(_focused)
 	elif event.is_action_pressed("ui_cancel") or _is_right_press(event):
@@ -528,9 +559,9 @@ func _on_choice_gui_input(event: InputEvent, index: int) -> void:
 	_activate(index)
 	accept_event()
 
-# The one gate: the first activation wins.
+# The one gate: the first activation of an item on offer wins.
 func _activate(index: int) -> void:
-	if _done:
+	if _done or not is_enabled(index):
 		return
 	_done = true
 	if _host != null and is_instance_valid(_host):

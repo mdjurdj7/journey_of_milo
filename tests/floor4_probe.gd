@@ -15,7 +15,7 @@ extends SceneTree
 #              every bone on the near side of the gate line, each sunk
 #              only part way into the sand
 #   reunion  - the pup (the "pup" event slot): with no remedy in the deck
-#              only Leave it is offered; with one, giving takes a plain
+#              the giving shows but can't be picked; with one, giving takes a plain
 #              one before a tempered one out of the deck and it gets up
 #              and follows; walked with him to the Dunecur, no fight
 #              opens, the gate's line lifts, fights_won and gold stay as
@@ -261,12 +261,12 @@ func _check_reunion() -> void:
 	if pups.size() == 1 and required != null:
 		var pup: Node3D = pups[0] as Node3D
 		var labels: Array = pup.call("get_choice_labels")
-		_expect_eq(labels.size(), 1, "No remedy in the deck: only Leave it")
+		_expect_eq(labels.size(), 2, "The giving and Leave it, always both")
+		_expect(not bool(pup.call("is_choice_enabled", 0)) and bool(pup.call("is_choice_enabled", 1)), "No remedy in the deck: the giving shows but can't be picked")
 		var remedy: Resource = load(REMEDY_PATH)
 		_run_state.call("add_card", remedy.get("tempered"))
 		_run_state.call("add_card", remedy)
-		labels = pup.call("get_choice_labels")
-		_expect_eq(labels.size(), 2, "...with one, the giving too")
+		_expect(bool(pup.call("is_choice_enabled", 0)), "...with one, the giving can be picked")
 		var pup_at := Vector2(pup.global_position.x - _spawn.x, pup.global_position.z - _spawn.z)
 		await _place(pup_at + PUP_REACH_OFFSET)
 		_expect(bool(pup.call("can_open_from", _wanderer.global_position)), "...in reach of it")
