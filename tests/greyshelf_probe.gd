@@ -7,7 +7,9 @@ extends SceneTree
 # to +6, the preview always what lands, a Skill
 # nothing, and a broken Gape's stacks cleared so the next starts at 24;
 # off its rock below half HP (Off the rock), once - the Tail Lash strikes
-# 4 times, the Gape still one blow, breaking at 20. The rules cases drive EnemyTurn on the
+# 4 times, the Gape still one blow, breaking at 20; and a Refuse the End
+# save partway through a Tail Lash - the hits after it land on the HP it
+# left, the run's HP and the run log with them. The rules cases drive EnemyTurn on the
 # real .tres; the fight cases load floor 5 and play real cards through
 # BattleController.request_play(); the body case reads GreyshelfPose and
 # the measured size on the crest.
@@ -18,7 +20,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 11
+const CASES := 12
 const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
 const GOADED_PATH := "res://battle/rules/statuses/goaded.tres"
 const OFF_THE_ROCK_PATH := "res://battle/rules/statuses/off_the_rock.tres"
@@ -29,6 +31,8 @@ const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
+const REFUSE_PATH := "res://battle/rules/statuses/refuse_the_end.tres"
+const RUN_LOGGER_PATH := "res://run/run_logger.gd"
 const FLOOR_5 := 4
 const MAX_HP := 120
 const GAPE := 24
@@ -39,6 +43,8 @@ const GOADED_CAP := 3
 const LASH := 5
 const LASH_HITS := 3
 const PLAYER_HP := 999
+# The fight with a save in it: a run's real max HP, so 1 is Critical.
+const RUN_MAX_HP := 80
 # The band over the body's own feet its mesh counts as its feet in, metres.
 const FEET_BAND_M := 0.08
 # The body: 5 m long; the top of its back, belly sunk on the rock, about
@@ -68,6 +74,7 @@ func _initialize() -> void:
 	await _check_fight_skill()
 	await _check_fight_break()
 	await _check_fight_phase()
+	await _check_fight_refuse()
 	await _check_body()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
@@ -375,6 +382,35 @@ func _check_fight_phase() -> void:
 		var before: int = player.hp
 		await _end_turn(controller)
 		_expect_eq(before - player.hp, LASH * (LASH_HITS + 1), "...and lands %d" % (LASH * (LASH_HITS + 1)))
+	await _teardown()
+	_completed += 1
+
+# A run's 80 max HP at 1, Critical, Refuse the End armed, the Tail Lash
+# queued: its first hit is lethal and saved - left at the survive HP - and
+# the two after land on that HP. The run's HP ends where the fight's does,
+# the save logged as a heal from 1 and the later hits as the Greyshelf's,
+# none of them lost to the run's HP stopping at 0 first.
+func _check_fight_refuse() -> void:
+	var controller: Node = await _start_fight(SLASH_PATH)
+	if controller != null:
+		var player: Combatant = controller.get("player")
+		player.max_hp = RUN_MAX_HP
+		player.hp = 1
+		player.block = 0
+		_run_state.set("player_max_hp", RUN_MAX_HP)
+		_run_state.set("player_hp", 1)
+		var refuse: StatusData = load(REFUSE_PATH)
+		Status.apply_to(player.statuses, refuse)
+		var survive: int = refuse.survive_hp(RUN_MAX_HP, player.critical_hp_fraction)
+		var after: int = survive - LASH * (LASH_HITS - 1)
+		await _end_turn(controller)
+		_expect_eq(player.hp, after, "Saved on the Tail Lash's first hit: %d, then two hits of %d - %d" % [survive, LASH, after])
+		_expect_eq(int(_run_state.get("player_hp")), player.hp, "...the run's HP the same")
+		var logger: Script = load(RUN_LOGGER_PATH) as Script
+		var healed_by: Dictionary = logger.get("_healed_by")
+		var taken_by: Dictionary = logger.get("_taken_by")
+		_expect_eq(int(healed_by.get("lethal_guard", 0)), survive - 1, "...the save logged as a heal of %d" % (survive - 1))
+		_expect_eq(int(taken_by.get("Greyshelf", 0)), LASH * (LASH_HITS - 1), "...the later hits as the Greyshelf's %d" % (LASH * (LASH_HITS - 1)))
 	await _teardown()
 	_completed += 1
 

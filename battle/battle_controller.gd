@@ -1531,14 +1531,27 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 	RunLogger.block_used(result["blocked"], result["absorbed"])
 	if enemy.enemy_data != null:
 		RunLogger.enemy_attack(enemy.enemy_data.resource_path.get_file().get_basename(), result["intent"], result["hits"])
-	if result["damage_to_hp"] > 0:
-		_report_damage(enemy, player, result["damage_to_hp"], "attack")
 	# A lethal guard that left the player above where the hit found them
 	# (Refuse the End's survive HP): the run's HP follows, the way a card's
-	# heal does - HP only, no Toll.
+	# heal does - HP only, no Toll - at the hit it caught. What landed
+	# before it, its lift, then what landed after it on the HP it left: all
+	# the loss first would stop the run's HP at 0 and lose the later hits.
 	if result["saved_heal"] > 0:
-		_heal_run_hp(result["saved_heal"], "lethal_guard")
-		hp_changed.emit(player.hp, player.max_hp)
+		var lost: int = 0
+		for hit: Dictionary in result["hits"]:
+			lost += int(hit["to_hp"])
+			var lift: int = int(hit.get("saved_heal", 0))
+			if lift <= 0:
+				continue
+			if lost > 0:
+				_report_damage(enemy, player, lost, "attack")
+			lost = 0
+			_heal_run_hp(lift, "lethal_guard")
+			hp_changed.emit(player.hp, player.max_hp)
+		if lost > 0:
+			_report_damage(enemy, player, lost, "attack")
+	elif result["damage_to_hp"] > 0:
+		_report_damage(enemy, player, result["damage_to_hp"], "attack")
 	if result["grace_opened"] > 0:
 		RunLogger.grace_opened(result["grace_opened"])
 		grace_changed.emit(player.grace)

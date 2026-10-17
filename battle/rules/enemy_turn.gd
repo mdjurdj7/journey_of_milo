@@ -228,12 +228,17 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 		# save that left them higher than before the hit (survive HP over
 		# what they had) lost nothing and is a heal: "saved_heal", for the
 		# run's HP.
+		# The heal is kept on its hit too, so the run's HP can take the
+		# attack in the order the fight did (BattleController._report_
+		# enemy_attack()).
+		var saved: int = 0
 		if Status.refuse_lethal(player, was_critical):
 			to_hp = maxi(hp_before - player.hp, 0)
-			result["saved_heal"] += maxi(player.hp - hp_before, 0)
+			saved = maxi(player.hp - hp_before, 0)
+			result["saved_heal"] += saved
 		total_to_hp += to_hp
 		largest_hit = maxi(largest_hit, to_hp)
-		(result["hits"] as Array).append({"damage": amount, "blocked": damage_result["blocked"], "absorbed": damage_result["absorbed"], "to_hp": to_hp})
+		(result["hits"] as Array).append({"damage": amount, "blocked": damage_result["blocked"], "absorbed": damage_result["absorbed"], "to_hp": to_hp, "saved_heal": saved})
 	# The attack has resolved, every hit of it: a status that lasted only
 	# until then (Braced on this enemy) is spent - even if the player's
 	# block ate all of it.
