@@ -799,6 +799,12 @@ func _build_keepouts() -> void:
 	for node in _field.find_children("*", "SiltjawSigns", true, false):
 		for footprint in (node as SiltjawSigns).get_footprints():
 			_keepouts.append(_polygon(footprint, prop_margin_m))
+	# A sand fence's slats, standing or lying: no collision once it leans,
+	# so its own footprint.
+	for node in _field.find_children("*", "SandFence", true, false):
+		var footprint: PackedVector2Array = (node as SandFence).get_footprint()
+		if footprint.size() >= 3:
+			_keepouts.append(_polygon(footprint, prop_margin_m))
 	_keepouts.append(_disc(_spawn, spawn_clear_m))
 	_add_battle_keepouts()
 

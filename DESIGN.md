@@ -174,6 +174,26 @@ folder (run_log_probe). (2026-10-04.)
   `debug: true`; the summary leaves them out unless `--include-debug`.
   Escape exists only there today.
 
+## Floor 2's shelf
+
+Floor 2 no longer has its low stone shelf (the RockShelf at (-4.6, -24.4),
+north-west of the crab's inlet). 05_REGION_01 §2 permits a low exposed
+shelf as the first rock of the dry end arriving early; on floor 2 that
+beat is dropped, and floors 3-5 keep theirs. In its place is the beach's
+own transition: a strandline along the shore, a broken sand fence (five
+SandFence sections) a few metres inland, and marram on low hummocks
+behind it. RockShelf and its masks' flattening are untouched, for reuse.
+(2026-10-17.)
+
+Two fights fix where that dressing can go. The Sputter + Underfoot frame
+looks south from about (2.8, -31.4), across the ground east of x -1 between
+z -27 and the crab, so the fence stops 4 m west of the worn path (no
+section east of it) and the marram stays west of x -0.6. The island's
+dragonfly patrol keeps 6.8 m round each waypoint clear, which covers the
+inlet's north shore west of x -6 and the west shore south of z -27: the
+strandline lies only between those keep-outs and 3 m short of the Underfoot,
+and up the west shore north of z -27. (2026-10-17.)
+
 ## Parked
 
 - **Chain roles (Opener/Closer, chain payoffs).** The old project's

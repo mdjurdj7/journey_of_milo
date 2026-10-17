@@ -20,6 +20,15 @@ uniform sampler2D albedo_texture : source_color, filter_linear_mipmap, repeat_di
 // Multiplied into the texture - white is the texture as painted.
 uniform vec4 albedo_tint : source_color = vec4(1.0, 1.0, 1.0, 1.0);
 
+// The map's saturated colours (rust on a fence's wire) turned toward
+// rust_tint: a pixel's share is its saturation through rust_saturation
+// (x to y, a smoothstep) times rust_amount, and it keeps its value - the
+// tint takes the hue, the pixel's brightness scales it. 0 = as painted
+// (every wearer but SandFence).
+uniform float rust_amount : hint_range(0.0, 1.0) = 0.0;
+uniform vec4 rust_tint : source_color = vec4(0.30, 0.28, 0.26, 1.0);
+uniform vec2 rust_saturation = vec2(0.25, 0.45);
+
 // The light - wrap, self_shadow_strength and light() - shared with the
 // passes laid over a painted body.
 #include "res://field/painted_light.gdshaderinc"
@@ -42,7 +51,17 @@ void fragment() {
 			discard;
 		}
 	}
-	vec3 albedo = texture(albedo_texture, UV).rgb * albedo_tint.rgb;
+	vec3 painted = texture(albedo_texture, UV).rgb;
+	if (rust_amount > 0.0) {
+		float high = max(painted.r, max(painted.g, painted.b));
+		float low = min(painted.r, min(painted.g, painted.b));
+		float saturation = (high - low) / max(high, 0.001);
+		float share = smoothstep(rust_saturation.x, rust_saturation.y, saturation) * rust_amount;
+		float value = dot(painted, vec3(0.299, 0.587, 0.114));
+		float tint_value = max(dot(rust_tint.rgb, vec3(0.299, 0.587, 0.114)), 0.001);
+		painted = mix(painted, rust_tint.rgb * (value / tint_value), share);
+	}
+	vec3 albedo = painted * albedo_tint.rgb;
 	ALBEDO = mix(albedo, flash_color.rgb, flash_amount);
 	ROUGHNESS = 1.0;
 	SPECULAR = 0.0;

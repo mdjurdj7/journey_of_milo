@@ -15,7 +15,7 @@
 [ext_resource type="Resource" uid="uid://cc3m67pjxuuer" path="res://battle/rules/enemies/siltjaw.tres" id="16_siltjaw"]
 [ext_resource type="Texture2D" uid="uid://nkw6gcc8t1ld" path="res://assets/field/masks/Map3_rock_x1.25_shelf.png" id="17_map3_rock"]
 [ext_resource type="Resource" uid="uid://cpf5jdp32wsj1" path="res://battle/rules/enemies/underfoot.tres" id="18_underfoot"]
-[ext_resource type="PackedScene" path="res://field/rock_shelf.tscn" id="19_rock_shelf"]
+[ext_resource type="PackedScene" path="res://field/sand_fence.tscn" id="19_sand_fence"]
 [ext_resource type="PackedScene" path="res://field/trough_prop.tscn" id="20_trough"]
 [ext_resource type="Script" uid="uid://bp8hnb8ai830l" path="res://floors/scatter/scatter_set.gd" id="21_scatter_set"]
 [ext_resource type="Resource" uid="uid://cu071h5ncuhs0" path="res://floors/scatter/floor2_shore.tres" id="22_shore_scatter"]
@@ -42,13 +42,54 @@ overrides = {
 "offers_bedroll": true
 }
 
-[sub_resource type="Resource" id="FloorProp_rock_shelf"]
+[sub_resource type="Resource" id="FloorProp_sand_fence1"]
 script = ExtResource("3_floor_prop")
-scene = ExtResource("19_rock_shelf")
-position = Vector3(-4.586, 0, -24.354)
+scene = ExtResource("19_sand_fence")
+position = Vector3(-4.417, 0, -34.179)
+yaw_degrees = -113.7
+roll_degrees = -18.0
 overrides = {
-"low_side": Vector2(1, 0),
-"outline": PackedVector2Array(3.05, 0, 3, 1.44, 1.75, 2.2, 0.55, 2.41, -0.61, 2.67, -1.45, 1.82, -2.06, 0.99, -2.96, 0, -3.27, -1.58, -2.44, -3.06, -0.78, -3.41, 0.62, -2.72, 1.64, -2.05, 2.61, -1.26)
+"sink_depth": 0.25
+}
+
+[sub_resource type="Resource" id="FloorProp_sand_fence2"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("19_sand_fence")
+position = Vector3(-5.355, 0, -31.642)
+yaw_degrees = -126.2
+roll_degrees = -90.0
+overrides = {
+"sink_depth": 0.02
+}
+
+[sub_resource type="Resource" id="FloorProp_sand_fence3"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("19_sand_fence")
+position = Vector3(-6.478, 0, -29.641)
+yaw_degrees = -94.4
+roll_degrees = 0.0
+overrides = {
+"sink_depth": 0.32
+}
+
+[sub_resource type="Resource" id="FloorProp_sand_fence4"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("19_sand_fence")
+position = Vector3(-5.092, 0, -26.916)
+yaw_degrees = -46.1
+roll_degrees = -27.0
+overrides = {
+"sink_depth": 0.38
+}
+
+[sub_resource type="Resource" id="FloorProp_sand_fence5"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("19_sand_fence")
+position = Vector3(-2.848, 0, -25.879)
+yaw_degrees = 13.3
+roll_degrees = 90.0
+overrides = {
+"sink_depth": 0.02
 }
 
 [sub_resource type="Resource" id="FloorEnemy_sputter"]
@@ -191,12 +232,12 @@ ambience_wind_db = 1.0
 ambience_sea_lowpass_hz = 7000.0
 slots = Array[ExtResource("90_encounter_slot")]([SubResource("EncounterSlot_crab"), SubResource("EncounterSlot_island"), SubResource("EncounterSlot_siltjaw")])
 roll_unique_enemies = true
-props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_trough"), SubResource("FloorProp_alcove_cache"), SubResource("FloorProp_rock_shelf")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_trough"), SubResource("FloorProp_alcove_cache"), SubResource("FloorProp_sand_fence1"), SubResource("FloorProp_sand_fence2"), SubResource("FloorProp_sand_fence3"), SubResource("FloorProp_sand_fence4"), SubResource("FloorProp_sand_fence5")])
 exit_kind = 1
 gate_distance_beyond_enemy = 7.5
 wear_path_mid_offset = 1.875
 wear_path_override = null
 scatter_sets = Array[ExtResource("21_scatter_set")]([ExtResource("22_shore_scatter")])
-scatter_budget = 410
+scatter_budget = 520
 reward_pool = ExtResource("7_wanderer_pool")
 gold_min = 12
