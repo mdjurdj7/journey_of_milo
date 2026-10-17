@@ -248,8 +248,8 @@ func _check_sputter_leaves_none() -> void:
 	_completed += 1
 
 # GLASSBONE: hidden on 0, shown from the first piece with its count,
-# beside GOLD, the last resource - a keepsake taken after sits past it
-# and doesn't move it.
+# beside GOLD, the last resource - a keepsake taken after stands above
+# the row and doesn't move it.
 func _check_hud_line() -> void:
 	_new_run()
 	await _load_field(0)
@@ -273,7 +273,7 @@ func _check_hud_line() -> void:
 	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))
 	await process_frame
 	_expect(keepsake_line.visible, "KEEPSAKE shows once one is held")
-	_expect(keepsake_line.position.x > line.position.x + line.size.x, "...past GLASSBONE")
+	_expect(keepsake_line.position.y + keepsake_line.size.y < line.position.y, "...above the row")
 	_expect_eq(line.position.x, glassbone_x, "...and GLASSBONE never moved")
 	_expect_eq(line.position.y + line.size.y, hp_line.position.y + hp_line.size.y, "...on the same bottom edge as HP")
 	await _teardown()

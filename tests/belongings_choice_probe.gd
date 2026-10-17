@@ -300,6 +300,9 @@ func _check_bedroll_rest() -> void:
 	_expect(rest != null and not field.can_process(), "Rest: the confirm is up over a frozen field")
 	if rest != null:
 		await process_frame
+		# The Bedroll stands bottom-right: its confirm ends on screen.
+		var confirm_right: float = (rest.call("_confirm_origin") as Vector2).x + float(rest.call("_confirm_width"))
+		_expect(confirm_right <= field.get_viewport().get_visible_rect().size.x, "Rest: the confirm ends on screen (right edge %.0f)" % confirm_right)
 		var hp_line: Control = field.get_node("FieldHUD/HPLine")
 		var day_ink: Color = hp_line.get_theme_color("ink", "Battle")
 		rest.call("answer_confirm", true)

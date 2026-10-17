@@ -444,36 +444,44 @@ func _check_debug_row() -> void:
 	await _teardown()
 	_completed += 1
 
-# KEEPSAKE: hidden with an empty slot, shown naming what is held, and set
-# apart at the end of the row (DECK, HP, GOLD, GLASSBONE, keepsake) -
-# hud_keepsake_gap_px past the item before it: GOLD while GLASSBONE is
-# hidden, GLASSBONE once a piece is held. A row item that has gone fails
-# the case by name rather than crashing it.
+# KEEPSAKE: a slot that always shows - empty, nothing to click - naming
+# what is held once one is; in the equipment column above the row, its
+# left edge level with DECK's, WORN above it, neither moved by GLASSBONE
+# coming into the row. A HUD item that has gone fails the case by name
+# rather than crashing it.
 func _check_hud_line() -> void:
 	_new_run()
 	await _load_field(0)
 	var line: Control = _hud_line("KeepsakeLine")
+	var worn_line: Control = _hud_line("WornLine")
+	var deck_panel: Control = _hud_line("DeckPanel")
 	var gold_line: Control = _hud_line("GoldLine")
 	var glassbone_line: Control = _hud_line("GlassboneLine")
-	if line == null or gold_line == null or glassbone_line == null:
+	if line == null or worn_line == null or deck_panel == null or gold_line == null or glassbone_line == null:
 		await _teardown()
 		_completed += 1
 		return
-	var keepsake_gap: float = float((line.get("style") as Resource).get("hud_keepsake_gap_px"))
-	_expect(not line.visible, "KEEPSAKE is hidden with an empty slot")
+	_expect(line.visible and worn_line.visible, "KEEPSAKE and WORN show with empty slots")
+	_expect_eq(str(line.get("_value_text")), "", "...KEEPSAKE naming nothing")
+	_expect(not bool(line.call("is_point_over", line.get_global_rect().get_center())), "...and with nothing to click")
 	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))
 	_expect(line.visible, "...shown once one is held")
 	_expect_eq(str(line.get("_value_text")), "Bent Nail", "...naming it")
+	_expect(bool(line.call("is_point_over", line.get_global_rect().get_center())), "...and clickable")
 	var style: Resource = line.get("style")
-	_expect(line.size.x > float(style.get("hud_keepsake_thumb_px")), "...after its art thumbnail")
+	_expect(line.size.x > float(style.get("hud_slot_frame_px")), "...its name after its framed art")
 	var tile: Control = line.call("get_tile")
 	_expect(tile != null and tile.call("get_keepsake") == load(BENT_NAIL_PATH), "...its hover tile holds Bent Nail")
+	await process_frame
+	_expect(line.position.y + line.size.y < deck_panel.position.y, "KEEPSAKE stands above the row")
+	_expect_eq(line.position.x, deck_panel.position.x, "...its left edge level with DECK's")
+	_expect(worn_line.position.y + worn_line.size.y < line.position.y and is_equal_approx(worn_line.position.x, line.position.x), "...WORN above it, left edges level")
+	var at: Vector2 = line.position
 	_expect(not glassbone_line.visible, "GLASSBONE is hidden on a new run")
-	_expect_eq(line.position.x, gold_line.position.x + gold_line.size.x + keepsake_gap, "...so KEEPSAKE sits hud_keepsake_gap_px past GOLD")
 	_run_state.call("add_glassbone", 1)
 	await process_frame
 	_expect(glassbone_line.visible, "GLASSBONE shows from the first piece")
-	_expect_eq(line.position.x, glassbone_line.position.x + glassbone_line.size.x + keepsake_gap, "...and KEEPSAKE moves to hud_keepsake_gap_px past it")
+	_expect_eq(line.position, at, "...and KEEPSAKE stays where it was")
 	_expect_eq(str(gold_line.get("_value_text")), "0", "GOLD still reads its count")
 	await _teardown()
 	_completed += 1

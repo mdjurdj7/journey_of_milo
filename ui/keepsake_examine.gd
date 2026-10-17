@@ -3,7 +3,7 @@ class_name KeepsakeExamine
 
 # A keepsake looked at closely: its KeepsakeTile at examine_scale, centred
 # over the dimmed field - DeckView's inspect, for a keepsake. It grows out
-# of where it was clicked (from_rect, the HUD row's keepsake) to the
+# of where it was clicked (from_rect, the HUD's KEEPSAKE slot) to the
 # middle of the screen while an ink scrim fades in, over inspect_duration_
 # sec; a click anywhere, Escape or a right click puts it back the same way
 # and closes. Opened by RegionField.open_keepsake_examine(), which locks

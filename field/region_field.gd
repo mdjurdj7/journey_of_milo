@@ -284,8 +284,9 @@ static func reset_hold_line_spoken() -> void:
 # battle - see ui/battle_theme.gd's own rule: UI is the dark element on a
 # pale world (false, default) and the pale element on a dark one (true).
 @export var ui_on_dark_world: bool = false
-# The field HUD row's one style - every size, gap, alpha and timing of
-# DECK, HP, GOLD, GLASSBONE and the keepsake (see HudRowStyle). Its
+# The field HUD's one style - every size, gap, alpha and timing of the
+# row (DECK, HP, GOLD, GLASSBONE), the equipment column above it and the
+# Bedroll bottom-right (see HudRowStyle). Its
 # own fields re-lay the row live; a new resource here is handed to every
 # item at once. Empty = HudRowStyle's defaults.
 @export var hud_row_style: HudRowStyle = null:
@@ -429,11 +430,12 @@ var _scatter: FieldScatter = null
 var _shore_flock: ShoreFlock = null
 var _wind: FieldWind = null
 var _wear_path: PackedVector2Array = PackedVector2Array()
-# The HUD row's keepsake - a click on it opens KeepsakeExamine.
+# The HUD's KEEPSAKE slot - a click on it opens KeepsakeExamine.
 var _keepsake_line: KeepsakeLine = null
-# The HUD row's worn piece, beside it - a click opens its ArmorExamine.
+# The HUD's WORN slot, above it - a click opens its ArmorExamine.
 var _worn_line: KeepsakeLine = null
-# The HUD row's Bedroll, while one is carried - a click asks to rest.
+# The HUD's Bedroll, bottom-right while one is carried - a click asks
+# to rest.
 var _bedroll_line: BedrollLine = null
 # The rest while its confirm or night is up (open_bedroll_rest()).
 var _bedroll_rest: BedrollRest = null
@@ -1943,28 +1945,28 @@ func _setup_field_hud() -> void:
 	var glassbone_line := GlassboneLine.new()
 	glassbone_line.name = "GlassboneLine"
 	_add_hud_row_line(glassbone_line, gold_line)
-	# BEDROLL beside GLASSBONE, while one is carried; RunState.bedroll_
-	# changed keeps it current - see BedrollLine.
-	var bedroll_line := BedrollLine.new()
-	bedroll_line.name = "BedrollLine"
-	bedroll_line.bedroll = load(bedroll_data_path) as BedrollData
-	_add_hud_row_line(bedroll_line, glassbone_line)
-	_bedroll_line = bedroll_line
-	# KEEPSAKE last, set apart past the resources (beside GOLD while
-	# GLASSBONE and BEDROLL are hidden - see InkLine._follow()); hidden
-	# while the slot is empty, and RunState.keepsake_changed keeps it
-	# current - see KeepsakeLine.
+	# The equipment column above the row, on DECK: KEEPSAKE over the
+	# hairline it draws, WORN over KEEPSAKE - the same line on the other
+	# slot (KeepsakeLine.slot). Each always shows, empty as faint ticks;
+	# RunState.keepsake_changed / worn_changed keep them current - see
+	# KeepsakeLine.
 	var keepsake_line := KeepsakeLine.new()
 	keepsake_line.name = "KeepsakeLine"
-	_add_hud_row_line(keepsake_line, bedroll_line)
+	_add_hud_row_line(keepsake_line, deck_panel)
 	_keepsake_line = keepsake_line
-	# WORN beside it: the same line on the other slot (KeepsakeLine.slot),
-	# hidden while nothing is worn, RunState.worn_changed keeping it current.
 	var worn_line := KeepsakeLine.new()
 	worn_line.slot = TrinketData.Slot.WORN
 	worn_line.name = "WornLine"
 	_add_hud_row_line(worn_line, keepsake_line)
 	_worn_line = worn_line
+	# BEDROLL bottom-right, an action, following DECK's margin, while one
+	# is carried; RunState.bedroll_changed keeps it current - see
+	# BedrollLine.
+	var bedroll_line := BedrollLine.new()
+	bedroll_line.name = "BedrollLine"
+	bedroll_line.bedroll = load(bedroll_data_path) as BedrollData
+	_add_hud_row_line(bedroll_line, deck_panel)
+	_bedroll_line = bedroll_line
 	hp_bar.set_target(wanderer)
 
 # The field HUD in one of BattleTheme's two value sets - on_dark the

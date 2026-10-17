@@ -136,11 +136,21 @@ func _ready() -> void:
 
 # --- The confirm ---
 
+# The question's baseline start: confirm_gap_px over the anchor, the
+# whole line ending at its right edge - the Bedroll stands at the
+# screen's right - or starting at its left, if that's further left.
 func _confirm_origin() -> Vector2:
 	if _anchor == null:
 		return Vector2(48.0, 960.0)
 	var rect: Rect2 = _anchor.get_global_rect()
-	return Vector2(roundf(rect.position.x), roundf(rect.position.y - confirm_gap_px))
+	return Vector2(roundf(minf(rect.position.x, rect.end.x - _confirm_width())), roundf(rect.position.y - confirm_gap_px))
+
+# The whole confirm line: the question, YES, the separator, NO.
+func _confirm_width() -> float:
+	var width: float = InkType.width(_font, confirm_text, confirm_size_px) + confirm_question_gap_px
+	width += InkType.width(_font, yes_text, confirm_size_px) + confirm_word_gap_px
+	width += InkType.width(_font, separator_text, confirm_size_px) + confirm_word_gap_px
+	return width + InkType.width(_font, no_text, confirm_size_px)
 
 func _word(answer: int) -> String:
 	return yes_text if answer == Answer.YES else no_text

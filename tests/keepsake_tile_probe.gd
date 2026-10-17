@@ -12,8 +12,8 @@ extends SceneTree
 #   no draw      a tile takes nothing from the global generator (the
 #                battle shuffles a seeded run replays), and the same
 #                keepsake gets the same paper
-#   HUD          the field HUD's keepsake line hovers its tile above the
-#                row; a left click on it opens KeepsakeExamine at
+#   HUD          the field HUD's KEEPSAKE slot hovers its tile above the
+#                slot; a left click on it opens KeepsakeExamine at
 #                examine_scale, centred, with the field locked under it;
 #                Escape closes it and unlocks the field
 #   battle row   the battle keepsake row's hover shows the hovered
@@ -147,7 +147,7 @@ func _check_hud() -> void:
 		return
 	_expect(line.visible, "The HUD's keepsake line shows Bent Nail")
 
-	# The hover: the tile, above the row.
+	# The hover: the tile, above the slot.
 	var tile: Control = line.call("get_tile")
 	_expect(tile != null and not tile.visible, "...its hover tile hidden at rest")
 	line.set("_reveal_alpha", 1.0)
@@ -155,7 +155,7 @@ func _check_hud() -> void:
 	_expect(tile.visible and tile.call("get_keepsake") == load(BENT_NAIL_PATH), "Hovered: the tile shows Bent Nail")
 	var style: Resource = line.get("style")
 	_expect(is_equal_approx(float(tile.get("tile_scale")), float(style.get("hud_keepsake_tile_scale"))), "...at hud_keepsake_tile_scale")
-	_expect(tile.global_position.y + (tile.call("get_tile_size") as Vector2).y <= line.global_position.y, "...above the row")
+	_expect(tile.global_position.y + (tile.call("get_tile_size") as Vector2).y <= line.global_position.y, "...above the slot")
 	line.set("_reveal_alpha", 0.0)
 	line.call("_place_tile")
 

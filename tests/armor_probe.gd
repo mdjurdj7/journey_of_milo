@@ -405,15 +405,17 @@ func _check_plate_finish() -> void:
 	plate.queue_free()
 	_completed += 1
 
-# The HUD's WORN line: hidden while nothing is worn, the piece's name
-# while one is; its click opens the plate with no choice.
+# The HUD's WORN slot: shown while nothing is worn, naming nothing and
+# with nothing to click; the piece's name while one is; its click opens
+# the plate with no choice.
 func _check_worn_line() -> void:
 	_new_run()
 	await _load_field(0)
 	var line: Control = _field.get_node_or_null("FieldHUD/WornLine") as Control
 	_expect(line != null, "The field HUD has a WORN line")
 	if line != null:
-		_expect(not line.is_visible_in_tree(), "...hidden while nothing is worn")
+		_expect(line.is_visible_in_tree() and str(line.get("_value_text")) == "", "...shown empty while nothing is worn")
+		_expect(not bool(line.call("is_point_over", line.get_global_rect().get_center())), "...with nothing to click")
 		var piece: TrinketData = _piece(&"probe_worn", CardData.CardRarity.COMMON)
 		_run_state.call("equip_worn", piece)
 		await process_frame

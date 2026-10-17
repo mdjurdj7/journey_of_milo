@@ -15,6 +15,11 @@ class_name HudRowStyle
 # height (row_height()) with its baseline at row_baseline(), so items
 # beside each other share a baseline whatever their content.
 #
+# Above the row, the equipment column (the Equipment group): WORN over
+# KEEPSAKE, each slot a caps label over its icon in four corner ticks with
+# its name beside, a hairline between the column and the row. Bottom-
+# right, the Bedroll as an action (the Bedroll group).
+#
 # Pixel sizes at 1080p.
 
 @export_group("Numeral")
@@ -101,11 +106,6 @@ class_name HudRowStyle
 	set(value):
 		hud_item_gap_px = value
 		emit_changed()
-# Before the keepsake, which stands apart from the resources.
-@export var hud_keepsake_gap_px: float = 40.0:
-	set(value):
-		hud_keepsake_gap_px = value
-		emit_changed()
 
 @export_group("Keepsake")
 # Spectral Regular isn't vendored (Light and SemiBold are) - SemiBold
@@ -132,21 +132,7 @@ class_name HudRowStyle
 	set(value):
 		hud_keepsake_hairline_gap_px = value
 		emit_changed()
-# The art thumbnail before the name: this square, cropped square from
-# the art (or the placeholder's tone), a thin ink edge round it, this far
-# before the name.
-@export var hud_keepsake_thumb_px: float = 24.0:
-	set(value):
-		hud_keepsake_thumb_px = value
-		emit_changed()
-@export var hud_keepsake_thumb_gap_px: float = 7.0:
-	set(value):
-		hud_keepsake_thumb_gap_px = value
-		emit_changed()
-@export var hud_keepsake_thumb_edge_px: float = 1.0:
-	set(value):
-		hud_keepsake_thumb_edge_px = value
-		emit_changed()
+# The tone in an art-less piece's ticks.
 @export var hud_keepsake_thumb_placeholder: Color = Color(0.80, 0.77, 0.71, 1.0):
 	set(value):
 		hud_keepsake_thumb_placeholder = value
@@ -164,6 +150,94 @@ class_name HudRowStyle
 @export var hud_keepsake_tile_fade_sec: float = 0.12:
 	set(value):
 		hud_keepsake_tile_fade_sec = value
+		emit_changed()
+
+@export_group("Equipment")
+# A slot's icon frame: this square, four corner ticks this long at this
+# stroke (no box), the art cropped square inside it this far in.
+@export var hud_slot_frame_px: float = 32.0:
+	set(value):
+		hud_slot_frame_px = value
+		emit_changed()
+@export var hud_slot_tick_px: float = 6.0:
+	set(value):
+		hud_slot_tick_px = value
+		emit_changed()
+@export var hud_slot_tick_stroke_px: float = 1.0:
+	set(value):
+		hud_slot_tick_stroke_px = value
+		emit_changed()
+@export var hud_slot_icon_inset_px: float = 5.0:
+	set(value):
+		hud_slot_icon_inset_px = value
+		emit_changed()
+# The name's start past the frame.
+@export var hud_slot_name_gap_px: float = 9.0:
+	set(value):
+		hud_slot_name_gap_px = value
+		emit_changed()
+# The caps label's baseline above the frame's top.
+@export var hud_slot_label_gap_px: float = 6.0:
+	set(value):
+		hud_slot_label_gap_px = value
+		emit_changed()
+# Between WORN's frame bottom and KEEPSAKE's label top.
+@export var hud_slot_gap_px: float = 12.0:
+	set(value):
+		hud_slot_gap_px = value
+		emit_changed()
+# An empty slot's ticks and its "—", as a share of the ink's alpha.
+@export_range(0.0, 1.0) var hud_slot_empty_alpha: float = 0.35:
+	set(value):
+		hud_slot_empty_alpha = value
+		emit_changed()
+@export var hud_slot_empty_text: String = "—":
+	set(value):
+		hud_slot_empty_text = value
+		emit_changed()
+# The hairline between the column and the row: this far from each, this
+# long from the row's left, this thick, the ink at this alpha.
+@export var hud_equipment_rule_gap_px: float = 12.0:
+	set(value):
+		hud_equipment_rule_gap_px = value
+		emit_changed()
+@export var hud_equipment_rule_length_px: float = 280.0:
+	set(value):
+		hud_equipment_rule_length_px = value
+		emit_changed()
+@export var hud_equipment_rule_px: float = 1.0:
+	set(value):
+		hud_equipment_rule_px = value
+		emit_changed()
+@export_range(0.0, 1.0) var hud_equipment_rule_alpha: float = 0.3:
+	set(value):
+		hud_equipment_rule_alpha = value
+		emit_changed()
+
+@export_group("Bedroll")
+# The action bottom-right, its right edge as far in as DECK's left edge
+# is: "BEDROLL" in the faint caps, its glyph in corner ticks (this
+# frame, the glyph this big inside it), "REST" in full-ink caps over the
+# hover hairline - each centred on the frame, this far apart.
+@export var hud_bedroll_frame_px: float = 46.0:
+	set(value):
+		hud_bedroll_frame_px = value
+		emit_changed()
+@export var hud_bedroll_glyph_px: float = 34.0:
+	set(value):
+		hud_bedroll_glyph_px = value
+		emit_changed()
+@export var hud_bedroll_tick_px: float = 8.0:
+	set(value):
+		hud_bedroll_tick_px = value
+		emit_changed()
+@export var hud_bedroll_label_gap_px: float = 7.0:
+	set(value):
+		hud_bedroll_label_gap_px = value
+		emit_changed()
+@export var hud_bedroll_action_text: String = "REST":
+	set(value):
+		hud_bedroll_action_text = value
 		emit_changed()
 
 @export_group("Count")
@@ -219,6 +293,15 @@ func item_width(glyph: InkGlyph.Kind, numeral: String, secondary: String, label:
 	if hud_show_labels and not label.is_empty():
 		width += hud_label_gap_px + InkType.width(label_font_tracked(), label, hud_label_size_px)
 	return width
+
+# Four corner ticks round `rect`, each `tick` long - the slot and Bedroll
+# frames, no box.
+static func draw_corner_ticks(canvas: CanvasItem, rect: Rect2, tick: float, width: float, color: Color) -> void:
+	var t: float = minf(tick, minf(rect.size.x, rect.size.y) * 0.5)
+	for corner: Vector2 in [rect.position, Vector2(rect.end.x, rect.position.y), rect.end, Vector2(rect.position.x, rect.end.y)]:
+		var dx: float = t if corner.x <= rect.position.x else -t
+		var dy: float = t if corner.y <= rect.position.y else -t
+		canvas.draw_polyline(PackedVector2Array([corner + Vector2(dx, 0.0), corner, corner + Vector2(0.0, dy)]), color, width, true)
 
 # Draws one resource item at the canvas's origin: the halo under every
 # part first, then the ink - so no part's halo covers a neighbour's ink.

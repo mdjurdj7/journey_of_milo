@@ -5,11 +5,12 @@ class_name InkLine
 # numeral in Spectral at full ink, an optional secondary run and a small
 # caps label, ink on the world - the shape and every size, gap and alpha
 # come from the row's shared HudRowStyle (see its own doc). Drawn, not
-# boxed; sized to its own content. The base of HPLine,
-# GoldLine, GlassboneLine and KeepsakeLine - the row's order after DECK,
-# the keepsake set apart at the end; a subclass sets its glyph and label
-# and feeds its value through set_value_text() - or, for a count,
-# count_to() / snap_count().
+# boxed; sized to its own content. The base of HPLine, GoldLine and
+# GlassboneLine - the row's order after DECK - and of the equipment slots
+# above it and the Bedroll bottom-right (KeepsakeLine, BedrollLine), which
+# follow DECK but stand apart from the row (_position_by()); a subclass
+# sets its glyph and label and feeds its value through set_value_text() -
+# or, for a count, count_to() / snap_count().
 #
 # A count's numeral counts from the value it shows to a new one over the
 # style's hud_count_sec, one ease-out, either way, landing on the exact
@@ -146,10 +147,14 @@ func _gap_before() -> float:
 func _content_width() -> float:
 	return style.item_width(glyph, _value_text, _secondary_text, label_text)
 
+# A row item's height; the slots and the Bedroll are taller.
+func _content_height() -> float:
+	return style.row_height()
+
 func _relayout() -> void:
 	if not is_inside_tree():
 		return
-	size = Vector2(_content_width(), style.row_height())
+	size = Vector2(_content_width(), _content_height())
 	_follow()
 	queue_redraw()
 
@@ -168,10 +173,15 @@ func _follow() -> void:
 			break
 		anchor = next
 	visible = anchor.visible and _is_shown()
-	# Every row item is style.row_height() tall with its baseline at the
-	# same depth, so level bottoms are level baselines.
-	position = Vector2(anchor.position.x + anchor.size.x + _gap_before(), anchor.position.y + anchor.size.y - size.y)
+	position = _position_by(anchor)
 	followed.emit()
+
+# Where this line stands, given the item it follows: in the row, to its
+# right, bottoms level - every row item is style.row_height() tall with
+# its baseline at the same depth, so level bottoms are level baselines.
+# The equipment slots and the Bedroll place themselves otherwise.
+func _position_by(anchor: Control) -> Vector2:
+	return Vector2(anchor.position.x + anchor.size.x + _gap_before(), anchor.position.y + anchor.size.y - size.y)
 
 func _draw() -> void:
 	style.draw_item(self, _ink, glyph, _value_text, _secondary_text, label_text)

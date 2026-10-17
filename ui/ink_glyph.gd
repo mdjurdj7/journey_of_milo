@@ -12,8 +12,10 @@ class_name InkGlyph
 # GOLD   a stamped coin: a ring with a smaller ring inside - also the
 #        loot screen's coin, so gold is one mark everywhere
 # GLASSBONE  a narrow angled shard, outline only
+# BEDROLL  a roll lying on its side: a capsule, its rolled end showing as
+#        an arc at the left, two straps round it standing a little proud
 
-enum Kind { NONE, DECK, TOLL, GOLD, GLASSBONE }
+enum Kind { NONE, DECK, TOLL, GOLD, GLASSBONE, BEDROLL }
 
 # The coin's inner ring, as a fraction of its outer radius.
 const COIN_INNER_RATIO: float = 0.45
@@ -28,6 +30,8 @@ static func draw(canvas: CanvasItem, kind: Kind, rect: Rect2, width: float, colo
 			draw_coin(canvas, rect.get_center(), minf(rect.size.x, rect.size.y) * 0.5, width, color)
 		Kind.GLASSBONE:
 			_draw_shard(canvas, rect, width, color)
+		Kind.BEDROLL:
+			_draw_bedroll(canvas, rect, width, color)
 
 # The coin by its centre and outer radius - the form the loot screen
 # calls directly.
@@ -61,6 +65,33 @@ static func _draw_toll(canvas: CanvasItem, rect: Rect2, width: float, color: Col
 	canvas.draw_polyline(PackedVector2Array([
 		centre + Vector2(-r * 0.55, -r * 0.35), centre + Vector2(0.0, -r * 0.9), centre + Vector2(r * 0.55, -r * 0.35),
 	]), color, width, true)
+
+# The roll: a capsule as wide as `rect` and about half as tall, centred;
+# inside its left end, the end of the roll - a second, smaller arc; two
+# straps across its middle, clear of that end, standing a little proud
+# above and below.
+static func _draw_bedroll(canvas: CanvasItem, rect: Rect2, width: float, color: Color) -> void:
+	var centre: Vector2 = rect.get_center()
+	var half_h: float = minf(rect.size.y * 0.5, rect.size.x * 0.28)
+	var half_w: float = rect.size.x * 0.5
+	var r: float = half_h
+	var left := Vector2(centre.x - half_w + r, centre.y)
+	var right := Vector2(centre.x + half_w - r, centre.y)
+	var outline := PackedVector2Array()
+	var steps: int = 12
+	for i in steps + 1:
+		var a: float = PI * 0.5 + PI * float(i) / float(steps)
+		outline.append(left + Vector2(cos(a), sin(a)) * r)
+	for i in steps + 1:
+		var a: float = -PI * 0.5 + PI * float(i) / float(steps)
+		outline.append(right + Vector2(cos(a), sin(a)) * r)
+	outline.append(outline[0])
+	canvas.draw_polyline(outline, color, width, true)
+	canvas.draw_arc(left, r * 0.45, 0.0, TAU, 24, color, width, true)
+	var proud: float = r * 0.18
+	for share: float in [0.5, 0.72]:
+		var x: float = lerpf(centre.x - half_w, centre.x + half_w, share)
+		canvas.draw_line(Vector2(x, centre.y - r - proud), Vector2(x, centre.y + r + proud), color, width, true)
 
 # A narrow kite leaning right, widest a third of the way down from its
 # point - a sliver, no facets.
