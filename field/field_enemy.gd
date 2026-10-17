@@ -255,6 +255,38 @@ var option_id: StringName = &""
 @export var burrow_seconds: float = 0.5
 @export_group("")
 
+@export_group("Dig")
+# A DIG's mounds (begin_dig()): in a row across the line to the Wanderer,
+# this far apart centre to centre, each its own SandMound this long (along
+# the body's facing), wide and high. Edits reshape mounds already up.
+@export var dig_mound_spacing_m: float = 2.6:
+	set(value):
+		dig_mound_spacing_m = value
+		_place_dig_mounds()
+@export var dig_mound_length_m: float = 2.8:
+	set(value):
+		dig_mound_length_m = value
+		_shape_dig_mounds()
+@export var dig_mound_width_m: float = 1.7:
+	set(value):
+		dig_mound_width_m = value
+		_shape_dig_mounds()
+@export var dig_mound_height_m: float = 0.2:
+	set(value):
+		dig_mound_height_m = value
+		_shape_dig_mounds()
+# The mounds swelling up, and a wrong one falling flat.
+@export var dig_mound_rise_seconds: float = 0.6
+@export var dig_mound_collapse_seconds: float = 0.35
+# Added over a mound while the cursor is on it - the same for every
+# mound, so the hover says nothing about which is which.
+@export var dig_mound_highlight: Color = Color(0.09, 0.08, 0.06):
+	set(value):
+		dig_mound_highlight = value
+		if _dig_highlight_material != null:
+			_dig_highlight_material.albedo_color = value
+@export_group("")
+
 var _contacted: bool = false
 var _contact_player: AudioStreamPlayer3D = null
 var _heavy_player: AudioStreamPlayer3D = null
@@ -366,6 +398,17 @@ var _slash_mark_mesh: ArrayMesh = null
 # that goes with the model.
 var _mound: SandMound = null
 var _contact_shadow: ContactShadow = null
+# A DIG under way (begin_dig()): the row's centre and its across
+# direction, each mound's anchor (top-level, world-fixed: a lunge never
+# drags the sand) by mound number - null once collapsed or gone - and
+# the hover's overlay. _dig_centre is kept from the fight's first dig, so
+# every dig of the fight lays its row in the same place.
+var _dig_active: bool = false
+var _dig_centre: Vector3 = Vector3.ZERO
+var _dig_centre_set: bool = false
+var _dig_across: Vector3 = Vector3.RIGHT
+var _dig_anchors: Array[Node3D] = []
+var _dig_highlight_material: StandardMaterial3D = null
 # FloorEnemy.phase_drop_offset resolved at spawn: whether it drops at its
 # phase, and the world XZ it lands on (Y unused).
 var has_phase_drop: bool = false
@@ -1609,6 +1652,9 @@ func is_battle_hovering() -> bool:
 # to the field's (UnderfootPose.exit_battle_frame() - reburied, barb
 # down).
 func exit_battle_hover() -> void:
+	# A dig's row goes with the fight; the body's own mound is its show.
+	_end_dig_mounds()
+	_dig_centre_set = false
 	if not _settling and _attachment != null and _attachment.has_method("exit_battle_frame"):
 		_attachment.call("exit_battle_frame")
 	if not _hovering or _settling:
@@ -1649,6 +1695,202 @@ func play_burrow(buried: bool) -> float:
 	var bob_weight: float = 0.0 if buried else _flight_bob_weight()
 	_tween_hover(lift, bob_weight, burrow_seconds, Tween.EASE_IN_OUT)
 	return maxf(burrow_seconds, 0.0)
+
+# --- The dig (EnemyIntent.IntentType.DIG) ---
+#
+# Nothing here knows which mound the body is under: the body goes under
+# where it stands, then waits at the row's middle - the spot the fight's
+# intent, HP bar, status row and camera all read off this node - until a
+# mound is named for it to come up through (surface_at_mound()). Every
+# mound is built, lit and shaped the same.
+
+# Under the sand, and `count` mounds swell up in a row along `across`
+# (the battle camera's own right, so the row reads left to right on
+# screen, no mound behind another), dig_mound_spacing_m apart, on where
+# the fight's first dig stood - stepped back from `toward` (the Wanderer)
+# far enough that no mound stands nearer him than the body did. Returns
+# how long that takes, for the enemy turn to wait on.
+func begin_dig(count: int, toward: Vector3, across: Vector3) -> float:
+	_end_dig_mounds()
+	var under: float = play_burrow(true)
+	var flat := Vector3(across.x, 0.0, across.z)
+	_dig_across = flat.normalized() if flat.length() > 0.0001 else global_transform.basis.x
+	if not _dig_centre_set:
+		_dig_centre = global_position
+		var away := Vector3(_dig_centre.x - toward.x, 0.0, _dig_centre.z - toward.z)
+		var gap: float = away.length()
+		away = away / gap if gap > 0.0001 else global_transform.basis.z
+		# The nearest end's pull toward him, along the line between: the
+		# row stepped back by that much.
+		var reach: float = float(maxi(count - 1, 0)) * 0.5 * dig_mound_spacing_m * absf(_dig_across.dot(away))
+		_dig_centre += away * reach
+		_dig_centre_set = true
+	_dig_active = true
+	for mound in count:
+		var anchor := Node3D.new()
+		anchor.name = "DigMound%d" % mound
+		anchor.top_level = true
+		add_child(anchor)
+		var sand := SandMound.new()
+		sand.name = "SandMound"
+		anchor.add_child(sand)
+		_dig_anchors.append(anchor)
+	_place_dig_mounds()
+	_shape_dig_mounds()
+	# The row swells as the body sinks; once it is down it waits at the
+	# middle.
+	var rise: float = maxf(dig_mound_rise_seconds, 0.01)
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_method(_set_dig_rise, 0.0, 1.0, rise)
+	tween.parallel().tween_callback(_move_body_to(_dig_centre)).set_delay(under)
+	_set_dig_rise(0.0)
+	return maxf(under, rise)
+
+func is_dug_in() -> bool:
+	return _dig_active
+
+# Where mound `mound` stands, world (its anchor's), or the body's own
+# place when there is no such mound.
+func get_mound_position(mound: int) -> Vector3:
+	var anchor: Node3D = _dig_anchor(mound)
+	return anchor.global_position if anchor != null else global_position
+
+# Mound `mound`'s screen rect, padded like get_screen_rect(): its own
+# footprint and height, projected. Empty for a mound that isn't standing
+# or reaches behind the camera.
+func get_mound_screen_rect(camera: Camera3D, mound: int, padding_px: float) -> Rect2:
+	var anchor: Node3D = _dig_anchor(mound)
+	if camera == null or anchor == null:
+		return Rect2()
+	var half := Vector3(dig_mound_width_m * 0.5, 0.0, dig_mound_length_m * 0.5)
+	var rect := Rect2()
+	var first: bool = true
+	for corner in [Vector3(-1, 0, -1), Vector3(1, 0, -1), Vector3(-1, 0, 1), Vector3(1, 0, 1)]:
+		for lift in [0.0, dig_mound_height_m]:
+			var world: Vector3 = anchor.global_transform * Vector3(half.x * corner.x, lift, half.z * corner.z)
+			if camera.is_position_behind(world):
+				return Rect2()
+			var point: Vector2 = camera.unproject_position(world)
+			rect = Rect2(point, Vector2.ZERO) if first else rect.expand(point)
+			first = false
+	return rect.grow(padding_px)
+
+# The hover over one mound (-1: none) - the same light over whichever.
+func set_mound_highlight(mound: int) -> void:
+	if _dig_highlight_material == null:
+		_dig_highlight_material = StandardMaterial3D.new()
+		_dig_highlight_material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		_dig_highlight_material.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+		_dig_highlight_material.albedo_color = dig_mound_highlight
+	for index in _dig_anchors.size():
+		var sand: SandMound = _dig_sand(index)
+		if sand != null:
+			sand.material_overlay = _dig_highlight_material if index == mound else null
+
+# A wrong mound, falling flat and gone. Returns how long it takes.
+func collapse_mound(mound: int) -> float:
+	var anchor: Node3D = _dig_anchor(mound)
+	if anchor == null:
+		return 0.0
+	_dig_anchors[mound] = null
+	var sand: SandMound = anchor.get_node_or_null(^"SandMound") as SandMound
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	if sand != null:
+		sand.material_overlay = null
+		tween.tween_method(sand.set_rise, sand.get_rise(), 0.0, maxf(dig_mound_collapse_seconds, 0.01))
+	tween.tween_callback(anchor.queue_free)
+	return maxf(dig_mound_collapse_seconds, 0.0)
+
+# Up through mound `mound` - found, or erupting on its own: the body moves
+# under it, the row flattens and goes, and the body rises. Returns how
+# long that takes.
+func surface_at_mound(mound: int) -> float:
+	if not _dig_active:
+		return 0.0
+	var spot: Vector3 = get_mound_position(mound)
+	_move_body_to(spot).call()
+	var flatten: float = maxf(burrow_seconds, 0.01)
+	var anchors: Array[Node3D] = _dig_anchors.duplicate()
+	_dig_anchors.clear()
+	_dig_active = false
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_parallel(true)
+	for anchor in anchors:
+		if anchor == null:
+			continue
+		var sand: SandMound = anchor.get_node_or_null(^"SandMound") as SandMound
+		if sand != null:
+			sand.material_overlay = null
+			tween.tween_method(sand.set_rise, sand.get_rise(), 0.0, flatten)
+	tween.set_parallel(false)
+	for anchor in anchors:
+		if anchor != null:
+			tween.tween_callback(anchor.queue_free)
+	return play_burrow(false)
+
+# The row gone at once - a new dig over an old one, a fight's end.
+func _end_dig_mounds() -> void:
+	for anchor in _dig_anchors:
+		if anchor != null and is_instance_valid(anchor):
+			anchor.queue_free()
+	_dig_anchors.clear()
+	_dig_active = false
+
+func _dig_anchor(mound: int) -> Node3D:
+	if mound < 0 or mound >= _dig_anchors.size():
+		return null
+	var anchor: Node3D = _dig_anchors[mound]
+	return anchor if anchor != null and is_instance_valid(anchor) else null
+
+func _dig_sand(mound: int) -> SandMound:
+	var anchor: Node3D = _dig_anchor(mound)
+	return anchor.get_node_or_null(^"SandMound") as SandMound if anchor != null else null
+
+# Each mound at its place in the row - the middle one on the centre, the
+# rest dig_mound_spacing_m apart either side - facing as the body does,
+# and the sand under it sampled again.
+func _place_dig_mounds() -> void:
+	var count: int = _dig_anchors.size()
+	for index in count:
+		var anchor: Node3D = _dig_anchor(index)
+		if anchor == null:
+			continue
+		var offset: float = (float(index) - float(count - 1) * 0.5) * dig_mound_spacing_m
+		var spot: Vector3 = _dig_centre + _dig_across * offset
+		if _ground != null:
+			var local: Vector3 = _ground.to_local(spot)
+			spot.y = _ground.to_global(Vector3(local.x, _ground.get_visible_height_at(Vector2(local.x, local.z)), local.z)).y
+		anchor.global_transform = Transform3D(Basis(Vector3.UP, global_rotation.y), spot)
+		var sand: SandMound = _dig_sand(index)
+		if sand != null:
+			sand.set_ground(_ground)
+			sand.resample()
+
+func _shape_dig_mounds() -> void:
+	for index in _dig_anchors.size():
+		var sand: SandMound = _dig_sand(index)
+		if sand == null:
+			continue
+		sand.length_m = dig_mound_length_m
+		sand.width_m = dig_mound_width_m
+		sand.height_m = dig_mound_height_m
+		sand.resample()
+
+func _set_dig_rise(rise: float) -> void:
+	for index in _dig_anchors.size():
+		var sand: SandMound = _dig_sand(index)
+		if sand != null:
+			sand.set_rise(rise)
+
+# The body to `spot` (XZ), on the sand there, its own mound sampled again
+# where it now is - as a callable, for a tween to call when it's under.
+func _move_body_to(spot: Vector3) -> Callable:
+	return func() -> void:
+		global_position = Vector3(spot.x, global_position.y, spot.z)
+		_ground_to_relief()
 
 func _tween_hover(lift: float, bob_weight: float, seconds: float, easing: Tween.EaseType) -> Tween:
 	if _hover_tween != null and _hover_tween.is_valid():
@@ -1705,7 +1947,9 @@ func _apply_model_lift() -> void:
 	if _contact_shadow != null:
 		_contact_shadow.visible = surfaced > 0.0
 	if _mound != null:
-		_mound.set_rise(1.0 - surfaced)
+		# Under a DIG's mounds the body's own mound stays flat: the row is
+		# all that shows.
+		_mound.set_rise(0.0 if _dig_active else 1.0 - surfaced)
 
 # How far a buried body is on its way up to its fight's surface: 0 down
 # at rest height, 1 all the way up. 1 for a body that isn't buried.
@@ -1760,6 +2004,7 @@ func is_settling() -> bool:
 func settle_and_free() -> void:
 	if _settling:
 		return
+	_end_dig_mounds()
 	_settling = true
 	mark_defeated()
 	set_highlight(false)

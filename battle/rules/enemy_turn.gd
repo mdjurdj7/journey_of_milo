@@ -17,9 +17,12 @@ static func pick_initial_intent(combatant: Combatant, data: EnemyData) -> void:
 		combatant.current_intent_index = 0
 	_sync_queued(combatant, data)
 
-# The queued intent: an interjection (an interrupted intent's on_
-# interrupt) when one is waiting, else the loop's own.
+# The queued intent: under the sand after a DIG, its next move there
+# (EnemyIntent.under_moves); else an interjection (an interrupted
+# intent's on_interrupt) when one is waiting; else the loop's own.
 static func current_intent(combatant: Combatant, data: EnemyData) -> EnemyIntent:
+	if combatant.dug_in and combatant.dig_intent != null and combatant.dug_step < combatant.dig_intent.under_moves.size():
+		return combatant.dig_intent.under_moves[combatant.dug_step]
 	if combatant.interjected_intent != null:
 		return combatant.interjected_intent
 	if data.intents.is_empty() or combatant.current_intent_index < 0:
@@ -77,8 +80,13 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 	# before this turn's move reads it.
 	result["phase_triggered"] = check_phase(combatant, data)
 
+	result["dug"] = false
+	result["erupted"] = false
 	var intent := current_intent(combatant, data)
-	var interjected: bool = combatant.interjected_intent != null
+	# Under the sand (a DIG's): this turn is one of its moves there, the
+	# loop held where the Dig left it.
+	var under: bool = combatant.dug_in
+	var interjected: bool = not under and combatant.interjected_intent != null
 	# For the run log: which move this was, and each hit of it.
 	result["intent"] = intent.intent_name if intent != null else ""
 	# Denied (Deny - StatusData.skips_next_turn): spent by this turn
@@ -158,6 +166,11 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# Nothing happens here either: it coils, and what that brings
 				# is its status_on_resolve (Coiled), just below.
 				pass
+			EnemyIntent.IntentType.DIG:
+				# Under the sand, its mounds up (start_dig()); the loop moves
+				# on past the Dig below, for when it comes back up.
+				start_dig(combatant, intent)
+				result["dug"] = combatant.dug_in
 		# The move resolved: what it brings, until the next (the Coil's
 		# Coiled). A move lost or broken, above, brings nothing.
 		if intent.status_on_resolve != null:
@@ -168,9 +181,18 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 	combatant.turns_taken += 1
 	Status.remove_expired(combatant.statuses)
 	if combatant.hp > 0:
+		# A turn under the sand steps through its moves there - lost to a
+		# pain turn or Denied, the count goes on - and the last surfaces it
+		# on its own: "erupted", at true_mound. The loop is where the Dig
+		# left it.
+		if under:
+			combatant.dug_step += 1
+			if combatant.dig_intent == null or combatant.dug_step >= combatant.dig_intent.under_moves.size():
+				_end_dig(combatant)
+				result["erupted"] = true
 		# An interjection resolved leaves the loop where it was - the loop
 		# already moved past the intent it replaced.
-		if interjected:
+		elif interjected:
 			combatant.interjected_intent = null
 		else:
 			_advance_intent(combatant, data)
@@ -329,6 +351,11 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	if not data.escalation_multipliers.is_empty():
 		preview["escalation_stage"] = escalation_stage(combatant, data)
 		preview["escalation_stages"] = data.escalation_multipliers.size()
+	# Under the sand: which of its turns there this is, of how many before
+	# it erupts (the intent's pips) - never which mound.
+	if combatant.dug_in and combatant.dig_intent != null:
+		preview["dig_stage"] = combatant.dug_step
+		preview["dig_stages"] = combatant.dig_intent.under_moves.size()
 	# The action a pain turn has cancelled: shown, but it won't resolve -
 	# no number, never lethal.
 	if combatant.pain_turn_pending:
@@ -589,14 +616,73 @@ static func _queued_statuses(data: EnemyData) -> Array[StatusData]:
 	return found
 
 # Every status_on_resolve this enemy's intents bring - its loop's and
-# their on_interrupt interjections'.
+# their on_interrupt interjections' - and every DIG's found_status: each
+# lasts until the enemy's next move.
 static func _resolved_statuses(data: EnemyData) -> Array[StatusData]:
 	var found: Array[StatusData] = []
 	for intent: EnemyIntent in data.intents:
 		for each: EnemyIntent in [intent, intent.on_interrupt if intent != null else null]:
 			if each != null and each.status_on_resolve != null and not found.has(each.status_on_resolve):
 				found.append(each.status_on_resolve)
+		if intent != null and intent.type == EnemyIntent.IntentType.DIG and intent.found_status != null and not found.has(intent.found_status):
+			found.append(intent.found_status)
 	return found
+
+# --- The dig (EnemyIntent.IntentType.DIG) ---
+
+# A DIG resolving: under the sand, its mound_count mounds standing, under
+# one of them drawn at random - nothing about it is told by where it is.
+# A DIG with no moves under or no mounds digs nothing.
+static func start_dig(combatant: Combatant, intent: EnemyIntent) -> void:
+	if intent == null or intent.under_moves.is_empty() or intent.mound_count <= 0:
+		return
+	combatant.dug_in = true
+	combatant.dig_intent = intent
+	combatant.dug_step = 0
+	combatant.mounds.clear()
+	for mound in intent.mound_count:
+		combatant.mounds.append(mound)
+	combatant.true_mound = randi_range(0, intent.mound_count - 1)
+
+# Up out of the sand, its mounds gone; true_mound kept - where it came up.
+static func _end_dig(combatant: Combatant) -> void:
+	combatant.dug_in = false
+	combatant.dug_step = 0
+	combatant.mounds.clear()
+
+# Found - a card at its mound, or at every enemy: forced up there, the
+# eruption off, its DIG's found_status (Exposed) on it until its next
+# move, which is the loop's own. False when it isn't under.
+static func unearth(combatant: Combatant, data: EnemyData) -> bool:
+	if combatant == null or not combatant.dug_in:
+		return false
+	var dig: EnemyIntent = combatant.dig_intent
+	_end_dig(combatant)
+	if dig != null and dig.found_status != null and Status.find_in(combatant.statuses, dig.found_status) == null:
+		Status.apply_to(combatant.statuses, dig.found_status)
+	_sync_queued(combatant, data)
+	return true
+
+# A card at `mound`: true when that was a wrong one, now collapsed - its
+# hit wasted, and it bites from below (strike_from_below()). False for
+# its own mound (unearth() is the caller's then), one already gone, or an
+# enemy not under.
+static func collapse_mound(combatant: Combatant, mound: int) -> bool:
+	if combatant == null or not combatant.dug_in or mound == combatant.true_mound or not combatant.mounds.has(mound):
+		return false
+	combatant.mounds.erase(mound)
+	return true
+
+# The bite from below a wrong mound brings at once: its DIG's first move
+# under (the Bite) as an ATTACK, through land_attack() as a strike back
+# is - empty when it isn't under or either side is down.
+static func strike_from_below(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
+	if combatant == null or player == null or combatant.hp <= 0 or player.hp <= 0 or not combatant.dug_in or combatant.dig_intent == null or combatant.dig_intent.under_moves.is_empty():
+		return {}
+	var bite: EnemyIntent = combatant.dig_intent.under_moves[0]
+	var result: Dictionary = {"intent": bite.intent_name, "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0}
+	land_attack(combatant, data, bite, player, result)
+	return result
 
 # The last of its pack (Combatant.pack_alone, from now on): a status
 # waiting for that (Fed) gives way to its grant (Status.resolve_alone_

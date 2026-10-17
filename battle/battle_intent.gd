@@ -374,7 +374,7 @@ func show_intent(preview: Dictionary) -> void:
 				total += int(amount)
 			_label.text = str(total)
 			_hits_label.text = hits_format % hits
-		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE or _type == EnemyIntent.IntentType.COIL:
+		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.DIG or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE or _type == EnemyIntent.IntentType.COIL:
 			_label.text = ""
 			_hits_label.text = ""
 		_has_threshold = preview.has("threshold")
@@ -391,8 +391,10 @@ func show_intent(preview: Dictionary) -> void:
 		var threshold: int = int(preview.get("threshold", 0))
 		var left: int = int(preview.get("threshold_left", 0))
 		_threshold_label.text = str(left) if _has_threshold else ""
-		_pip_count = int(preview.get("escalation_stages", 0))
-		_pip_filled = mini(int(preview.get("escalation_stage", 0)) + 1, _pip_count)
+		# An escalating enemy's stage - or a dug-in one's turns under the
+		# sand, toward its eruption - as pips.
+		_pip_count = int(preview.get("escalation_stages", preview.get("dig_stages", 0)))
+		_pip_filled = mini(int(preview.get("escalation_stage", preview.get("dig_stage", 0))) + 1, _pip_count)
 		_ring_fill = 1.0 if _interrupted else (clampf(float(threshold - left) / float(threshold), 0.0, 1.0) if threshold > 0 else 0.0)
 	_apply_layout()
 	_update_visibility()
@@ -530,7 +532,7 @@ func _glyph_width() -> float:
 	match _type:
 		EnemyIntent.IntentType.ATTACK:
 			return _glyph_size * spear_length
-		EnemyIntent.IntentType.BURROW, EnemyIntent.IntentType.SETTLE:
+		EnemyIntent.IntentType.BURROW, EnemyIntent.IntentType.DIG, EnemyIntent.IntentType.SETTLE:
 			return _glyph_size * GROUND_REACH
 	return _glyph_size
 
@@ -690,7 +692,7 @@ func _glyph_shapes(centre: Vector2, r: float) -> Array[PackedVector2Array]:
 				point, centre + Vector2(-r * 0.78, r * 0.2), centre + Vector2(-r * 0.78, -r * 0.8),
 				centre + Vector2(r * 0.78, -r * 0.8), right_waist, right_waist.lerp(point, 0.9),
 			]), PackedFloat32Array([0.0, 0.6, 1.0, 0.9, 0.55, 0.0]), shield_stroke_px))
-		EnemyIntent.IntentType.BURROW:
+		EnemyIntent.IntentType.BURROW, EnemyIntent.IntentType.DIG:
 			# The mound is BURROW_MOUND_HEIGHT high at its stroke's centre
 			# and 2.2 x that wide - about 1.6 x its height once the crest's
 			# weight is counted - on the ground line; the pair centred.

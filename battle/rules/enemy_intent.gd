@@ -34,7 +34,19 @@ class_name EnemyIntent
 # brings is its status_on_resolve (Coiled), held from the Coil until the
 # enemy's next move. The display shows its glyph alone, a coil. The
 # Adder's Coil.
-enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL }
+#
+# DIG: the turn it resolves, the enemy goes under the sand and
+# mound_count mounds swell up across its side of the field; it is under
+# one of them (Combatant.true_mound). It stays targetable - through the
+# mounds (BattleController): a card at the right one forces it up
+# (EnemyTurn.unearth() - found_status on it until its next move), at a
+# wrong one collapses that mound, the card's hit wasted, and it bites from
+# below at once (EnemyTurn.strike_from_below(): under_moves[0]); a card at
+# every enemy finds it. While under, each of its turns is the next of
+# under_moves - the Siltjaw's Bite, then its Erupt, after which it
+# surfaces on its own. The display shows the move and a pip per turn
+# under, never a mound. The Siltjaw's Dig.
+enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL, DIG }
 
 # The move's name (the Dunecur's Rush) - for the enemy export (tests/
 # enemy_export.gd) and the design docs; nothing in a fight shows it yet.
@@ -82,6 +94,13 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL }
 # counting down. 0 = can't be interrupted (every enemy but the Siltjaw).
 
 @export var on_interrupt: EnemyIntent = null
+
+# A DIG's (above): its moves under the sand, one a turn, the last
+# surfacing it; how many mounds it digs; what it holds once found until
+# its next move (Exposed). Unused by any other type.
+@export var under_moves: Array[EnemyIntent] = []
+@export var mound_count: int = 3
+@export var found_status: StatusData = null
 # What the enemy does on its NEXT turn when this one is interrupted - an
 # interjection outside the intents loop (Combatant.interjected_intent),
 # which carries on where it was once this has resolved. The Siltjaw's is

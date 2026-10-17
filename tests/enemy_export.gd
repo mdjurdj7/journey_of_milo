@@ -396,6 +396,19 @@ static func _intent_entry(data: EnemyData, intent: EnemyIntent) -> Dictionary:
 			entry["block"] = intent.value
 		EnemyIntent.IntentType.HEAL_ALLY:
 			entry["heal_each_packmate"] = intent.value
+		EnemyIntent.IntentType.DIG:
+			# Its moves under the sand, one a turn, the last surfacing it;
+			# the first is also the bite a wrong mound brings at once.
+			var under: Array = []
+			for move: EnemyIntent in intent.under_moves:
+				if move != null:
+					under.append(_intent_entry(data, move))
+			entry["dig"] = {
+				"mounds": intent.mound_count,
+				"under_moves": under,
+				"wrong_mound_bite": intent.under_moves[0].value if not intent.under_moves.is_empty() and intent.under_moves[0] != null else null,
+				"found_status": intent.found_status.id if intent.found_status != null else null,
+			}
 	if data.erratic_intent_selection:
 		entry["erratic_weight"] = _num(intent.erratic_weight)
 		entry["turn_one_locked"] = intent.turn_one_locked
@@ -463,6 +476,9 @@ static func _reachable_statuses(data: EnemyData) -> Array:
 	for intent in data.intents:
 		if intent != null and intent.status_on_resolve != null:
 			queue.append([intent.status_on_resolve, "from its %s resolving until its next move" % intent.intent_name])
+	for intent in data.intents:
+		if intent != null and intent.type == EnemyIntent.IntentType.DIG and intent.found_status != null:
+			queue.append([intent.found_status, "found under its %s's mounds, until its next move" % intent.intent_name])
 	for intent in data.intents:
 		if intent != null and intent.applies_to_player != null and intent.applied_amount > 0:
 			queue.append([intent.applies_to_player, "put on the player by its %s, %d at a time" % [intent.intent_name, intent.applied_amount]])

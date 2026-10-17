@@ -381,7 +381,7 @@
                   "member": 0,
                   "name": "Siltjaw",
                   "enemy_file": "res://battle/rules/enemies/siltjaw.tres",
-                  "hp": 38,
+                  "hp": 42,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -1619,9 +1619,9 @@
     {
       "name": "Siltjaw",
       "file": "res://battle/rules/enemies/siltjaw.tres",
-      "hp": 38,
+      "hp": 42,
       "elite": false,
-      "mechanic_summary": "Buried in the sand on the field. Snaps for 6, then rears for a 14 Charge that breaks if you deal it 14 that turn - broken, it Burrows next turn and can't be hit. Teaches hitting hard into a telegraph, and that breaking it buys a quiet turn.",
+      "mechanic_summary": "Buried in the sand on the field. Snaps for 6, Charges for 14, then Digs: three mounds swell up across its side of the field and it is under one of them. Hit the right mound and it is forced up Exposed (takes 50% more) until its next move; hit a wrong one and that mound collapses, the hit wasted, and it bites from below for 5. An attack on every enemy finds it. Under the sand it Bites for 5, then Erupts for 13 and surfaces. Teaches reading the sand - the one mound that breathes, trickles and puffs silt.",
       "field": {
         "model": "res://assets/models/enemies/Siltjaw/Siltjaw.glb",
         "model_is_default": false,
@@ -1654,15 +1654,30 @@
             "type": "ATTACK",
             "damage_per_hit": 14,
             "hits": 1,
-            "interrupt": {
-              "break_threshold": 14,
-              "on_interrupt": {
-                "name": "Burrow",
-                "type": "BURROW"
-              },
-              "clears_attack_card_status": false
-            },
             "rears_while_queued": true
+          },
+          {
+            "name": "Dig",
+            "type": "DIG",
+            "dig": {
+              "mounds": 3,
+              "under_moves": [
+                {
+                  "name": "Bite",
+                  "type": "ATTACK",
+                  "damage_per_hit": 5,
+                  "hits": 1
+                },
+                {
+                  "name": "Erupt",
+                  "type": "ATTACK",
+                  "damage_per_hit": 13,
+                  "hits": 1
+                }
+              ],
+              "wrong_mound_bite": 5,
+              "found_status": "exposed"
+            }
           }
         ],
         "modified_by": [],
@@ -1670,7 +1685,23 @@
         "pain_turn": null,
         "phase": null
       },
-      "statuses": [],
+      "statuses": [
+        {
+          "id": "exposed",
+          "name": "Exposed",
+          "file": "res://battle/rules/statuses/exposed.tres",
+          "gained": "found under its Dig's mounds, until its next move",
+          "description": "It takes {percent}% more damage.",
+          "text": "It takes 50% more damage.",
+          "fields": {
+            "category": "MODIFIER",
+            "default_magnitude": 50,
+            "default_duration_turns": "until removed",
+            "modifier_operation": "MULTIPLY",
+            "stack_rule": "IGNORE"
+          }
+        }
+      ],
       "rewards": {
         "keepsake_table": null,
         "armor_table": null,

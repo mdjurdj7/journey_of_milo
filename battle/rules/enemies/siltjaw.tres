@@ -3,31 +3,42 @@
 [ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
 [ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
 [ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="3_k7nci"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/exposed.tres" id="4_exposed"]
 
 [sub_resource type="Resource" id="EnemyIntent_snap"]
 script = ExtResource("2_intent")
 intent_name = "Snap"
 value = 6
 
-[sub_resource type="Resource" id="EnemyIntent_burrow"]
-script = ExtResource("2_intent")
-intent_name = "Burrow"
-type = 2
-
 [sub_resource type="Resource" id="EnemyIntent_charge"]
 script = ExtResource("2_intent")
 intent_name = "Charge"
 value = 14
-interrupt_threshold = 14
-on_interrupt = SubResource("EnemyIntent_burrow")
 rear_while_queued = true
+
+[sub_resource type="Resource" id="EnemyIntent_bite"]
+script = ExtResource("2_intent")
+intent_name = "Bite"
+value = 5
+
+[sub_resource type="Resource" id="EnemyIntent_erupt"]
+script = ExtResource("2_intent")
+intent_name = "Erupt"
+value = 13
+
+[sub_resource type="Resource" id="EnemyIntent_dig"]
+script = ExtResource("2_intent")
+intent_name = "Dig"
+type = 7
+under_moves = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_bite"), SubResource("EnemyIntent_erupt")])
+found_status = ExtResource("4_exposed")
 
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Siltjaw"
-mechanic_summary = "Buried in the sand on the field. Snaps for 6, then rears for a 14 Charge that breaks if you deal it 14 that turn - broken, it Burrows next turn and can't be hit. Teaches hitting hard into a telegraph, and that breaking it buys a quiet turn."
-max_hp = 38
-intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_snap"), SubResource("EnemyIntent_charge")])
+mechanic_summary = "Buried in the sand on the field. Snaps for 6, Charges for 14, then Digs: three mounds swell up across its side of the field and it is under one of them. Hit the right mound and it is forced up Exposed (takes 50% more) until its next move; hit a wrong one and that mound collapses, the hit wasted, and it bites from below for 5. An attack on every enemy finds it. Under the sand it Bites for 5, then Erupts for 13 and surfaces. Teaches reading the sand - the one mound that breathes, trickles and puffs silt."
+max_hp = 42
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_snap"), SubResource("EnemyIntent_charge"), SubResource("EnemyIntent_dig")])
 model_scene_path = "res://assets/models/enemies/Siltjaw/Siltjaw.glb"
 model_scale = 1.3356
 attachment_scene_path = "res://field/rear_pose.tscn"

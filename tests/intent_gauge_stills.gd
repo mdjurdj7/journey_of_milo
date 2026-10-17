@@ -1,8 +1,8 @@
 extends SceneTree
 
-# Renders the Siltjaw's intent display - the charge and its threshold
+# Renders the Greyshelf's intent display - the Gape and its threshold
 # gauge - as three PNG stills, from the live data (battle/rules/enemies/
-# siltjaw.tres through EnemyTurn.preview_intent(), the same dictionary
+# greyshelf.tres through EnemyTurn.preview_intent(), the same dictionary
 # the overlay hands BattleIntent): nothing dealt yet, half the threshold
 # dealt, and the threshold met (gauge full, attack pair dimmed). On the
 # pale-world value set of the real BattleTheme, over a flat sand ground,
@@ -31,7 +31,7 @@ extends SceneTree
 # which names RunState, and a script typed against it here compiles before
 # the autoloads register (see kill_order_probe.gd's own note).
 
-const SILTJAW_PATH := "res://battle/rules/enemies/siltjaw.tres"
+const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
 const THEME_PATH := "res://ui/battle_theme.tres"
 const BATTLE_INTENT_PATH := "res://battle/battle_intent.gd"
 const FRAME_SIZE := Vector2i(420, 420)
@@ -86,15 +86,15 @@ func _initialize() -> void:
 	intent.scale = Vector2(MAGNIFY, MAGNIFY)
 	intent.call("set_revealed", true)
 
-	var data := load(SILTJAW_PATH) as EnemyData
-	var siltjaw := Combatant.new(data.max_hp)
-	EnemyTurn.pick_initial_intent(siltjaw, data)
-	# It opens on Snap, which can't be broken - the gauge is the Charge's,
-	# so step the loop on to it.
-	while EnemyTurn.current_intent(siltjaw, data).interrupt_threshold <= 0:
-		siltjaw.current_intent_index += 1
+	var data := load(GREYSHELF_PATH) as EnemyData
+	var greyshelf := Combatant.new(data.max_hp)
+	EnemyTurn.pick_initial_intent(greyshelf, data)
+	# It opens on the Tail Lash, which can't be broken - the gauge is the
+	# Gape's, so step the loop on to it.
+	while EnemyTurn.current_intent(greyshelf, data).interrupt_threshold <= 0:
+		greyshelf.current_intent_index += 1
 	var player := Combatant.new(PLAYER_HP)
-	var threshold: int = EnemyTurn.current_intent(siltjaw, data).interrupt_threshold
+	var threshold: int = EnemyTurn.current_intent(greyshelf, data).interrupt_threshold
 	var frames: Array[Dictionary] = [
 		{"name": "intent_gauge_1_empty.png", "dealt": 0},
 		{"name": "intent_gauge_2_mid.png", "dealt": threshold / 2},
@@ -102,8 +102,8 @@ func _initialize() -> void:
 	]
 	var written: int = 0
 	for frame in frames:
-		siltjaw.damage_taken_this_turn = int(frame["dealt"])
-		var preview: Dictionary = EnemyTurn.preview_intent(siltjaw, data, player)
+		greyshelf.damage_taken_this_turn = int(frame["dealt"])
+		var preview: Dictionary = EnemyTurn.preview_intent(greyshelf, data, player)
 		intent.call("show_intent", preview)
 		# Centred in the frame. BattleIntent scales about its own centre
 		# (pivot_offset = size / 2), so the magnification doesn't move it.

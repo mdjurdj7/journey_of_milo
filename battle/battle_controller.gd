@@ -192,6 +192,13 @@ var _hovered_enemy: FieldEnemy = null
 # hovered_enemy_changed.
 var _cursor_enemy: FieldEnemy = null
 var _enemy_rects: Dictionary = {} # FieldEnemy -> Rect2, see _refresh_enemy_rects()
+# A dug-in enemy's mounds take its place as targets (EnemyIntent.
+# IntentType.DIG): {"enemy": FieldEnemy, "mound": int, "rect": Rect2} each,
+# refreshed with _enemy_rects. The mound the cursor was last over in
+# _enemy_at() (-1: none, or the enemy itself), and the one lit.
+var _mound_rects: Array[Dictionary] = []
+var _cursor_mound: int = -1
+var _hovered_mound: int = -1
 var _combatants: Dictionary = {} # FieldEnemy -> Combatant
 var _effect_resolver := EffectResolver.new()
 # Read-only from here on: the Wanderer whose clip lengths _impact_delay_
@@ -693,10 +700,16 @@ func _close_choice(keep: CardView = null) -> void:
 	hand_choice_ended.emit()
 	_emit_devour_changed()
 
-func confirm_target(enemy: FieldEnemy) -> void:
+# `mound`: for an enemy dug in under its mounds (DIG), which mound the card
+# is played at - one still standing, or the play is refused. Ignored for
+# any other.
+func confirm_target(enemy: FieldEnemy, mound: int = -1) -> void:
 	if _entry_locked or _pending_card_view == null or _pending_devour_only:
 		return
-	if not _can_target(_pending_card_view.card_data, _combatants.get(enemy)):
+	var combatant: Combatant = _combatants.get(enemy)
+	if not _can_target(_pending_card_view.card_data, combatant):
+		return
+	if combatant != null and combatant.dug_in and not combatant.mounds.has(mound):
 		return
 	var card_view := _pending_card_view
 	var consume_view: CardView = _pending_consume_view
@@ -705,7 +718,8 @@ func confirm_target(enemy: FieldEnemy) -> void:
 	_clear_hover()
 	_set_cursor_enemy(null)
 	_enemy_rects.clear()
-	_resolve_play(card_view, enemy, [], consume_view)
+	_mound_rects.clear()
+	_resolve_play(card_view, enemy, [], consume_view, mound)
 
 func cancel_target() -> void:
 	if _pending_card_view == null:
@@ -795,7 +809,7 @@ func _finish_turn(keep: Array[CardData]) -> void:
 #   from there and stay in sync. If the wait leaves it unplayable (the
 #   fight over, the card or its target gone, too dear) it goes back to
 #   the hand.
-func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_views: Array[CardView] = [], consume_view: CardView = null) -> void:
+func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_views: Array[CardView] = [], consume_view: CardView = null, target_mound: int = -1) -> void:
 	if _play_in_flight or _swing_holds_next_play():
 		_play_queued = true
 		_emit_devour_changed()
@@ -877,9 +891,14 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 
 	card_impact.emit(card)
 
+	# A dug-in enemy (DIG) at the impact: found by a card at its mound or at
+	# every enemy - forced up, Exposed, before the card's effects read it -
+	# or a wrong mound collapsing, the card's hit on it wasted.
+	var missed: FieldEnemy = _settle_dig_guess(card, target_enemy, target_mound)
+
 	var ctx := EffectContext.new()
 	ctx.player = player
-	ctx.target = _combatants.get(target_enemy)
+	ctx.target = _combatants.get(target_enemy) if missed == null else null
 	ctx.enemies = _hittable_enemy_combatants()
 	ctx.deck = deck
 	ctx.cards_played_before_this = cards_played_this_turn - 1
@@ -931,8 +950,11 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	var attacked: Array[FieldEnemy] = _count_attack_card(card, ctx)
 	RunLogger.card_finished()
 	# Then whoever it was played against strikes back (Coiled), before the
-	# previews and the battle-end check read where the play left things.
+	# previews and the battle-end check read where the play left things -
+	# and a wrong mound's enemy bites from below.
 	await _counter_strikes(attacked)
+	if missed != null:
+		await _strike_from_below(missed)
 	# Taken, deepened or replaced by the card just played - and the card
 	# faces need to know either way, since a stance changes what the hand
 	# says it will do.
@@ -1041,6 +1063,63 @@ func _counter_strikes(against: Array[FieldEnemy]) -> void:
 		_report_enemy_attack(enemy, result)
 		# What the strike spent (Garnished, Unbroken) leaves the readouts.
 		status_changed.emit()
+
+# --- The dig (EnemyIntent.IntentType.DIG) ---
+
+# The card at its impact, against any enemy dug in under its mounds: a
+# card at every enemy (TargetScope.ALL_ENEMIES) finds each; one at a dug-in
+# target finds it at its own mound, or collapses the wrong one (EnemyTurn.
+# collapse_mound()). Found: up at its mound, its found_status on it
+# (EnemyTurn.unearth()). Returns the enemy whose wrong mound took the card
+# - its hit wasted, the bite from below to follow - or null. A mound gone
+# since the card was armed (a play queued behind another) is a wrong one
+# too.
+func _settle_dig_guess(card: CardData, target_enemy: FieldEnemy, mound: int) -> FieldEnemy:
+	var every: bool = false
+	for effect in card.effects:
+		if effect != null and effect.target_scope == CardEffect.TargetScope.ALL_ENEMIES:
+			every = true
+	if every:
+		for enemy in enemies:
+			var combatant: Combatant = _combatants.get(enemy)
+			if combatant != null and combatant.hp > 0 and combatant.dug_in:
+				_unearth(enemy, combatant, "every")
+		return null
+	if target_enemy == null:
+		return null
+	var target: Combatant = _combatants.get(target_enemy)
+	if target == null or not target.dug_in:
+		return null
+	if mound == target.true_mound:
+		_unearth(target_enemy, target, "mound")
+		return null
+	if EnemyTurn.collapse_mound(target, mound):
+		target_enemy.collapse_mound(mound)
+		RunLogger.mechanic("dig_wrong_mound", {"enemy": _log_id(target_enemy), "left": target.mounds.size()})
+		return target_enemy
+	return target_enemy
+
+func _unearth(enemy: FieldEnemy, combatant: Combatant, how: String) -> void:
+	var left: int = combatant.mounds.size()
+	if not EnemyTurn.unearth(combatant, enemy.enemy_data):
+		return
+	enemy.surface_at_mound(combatant.true_mound)
+	RunLogger.mechanic("dig_found", {"enemy": _log_id(enemy), "by": how, "left": left})
+	status_changed.emit()
+
+# The bite from below a wrong mound (EnemyTurn.strike_from_below()), a
+# beat after the card, reported as any enemy attack - no lunge: the body
+# is under the sand.
+func _strike_from_below(enemy: FieldEnemy) -> void:
+	if player.hp <= 0 or not enemies.has(enemy) or not is_instance_valid(enemy):
+		return
+	var result: Dictionary = EnemyTurn.strike_from_below(_combatants.get(enemy), enemy.enemy_data, player)
+	if result.is_empty():
+		return
+	if counter_strike_delay > 0.0:
+		await get_tree().create_timer(counter_strike_delay).timeout
+	_report_enemy_attack(enemy, result)
+	status_changed.emit()
 
 # The Wanderer's swing is short of its cancel point (_resolve_play()).
 func _swing_holds_next_play() -> bool:
@@ -1374,11 +1453,18 @@ func _run_sequential_turn() -> void:
 			status_changed.emit()
 			if denied_beat_sec > 0.0:
 				await get_tree().create_timer(denied_beat_sec).timeout
+		# Never found: it erupts - up through its own mound first, then the
+		# hit.
+		if result["erupted"]:
+			var up_delay: float = enemy.surface_at_mound(combatant.true_mound)
+			if up_delay > 0.0:
+				await get_tree().create_timer(up_delay).timeout
 		if result["attacked"]:
 			# Each attack of the turn its own lunge and its own report, one
-			# after another (EnemyTurn.repeats() - Bereft's two).
+			# after another (EnemyTurn.repeats() - Bereft's two). A bite from
+			# under the sand has no lunge: the body isn't there to see.
 			for attack: Dictionary in _attacks_of(result):
-				var snap_delay: float = _play_attack_move(enemy, intent)
+				var snap_delay: float = counter_strike_delay if enemy.is_dug_in() else _play_attack_move(enemy, intent)
 				if snap_delay > 0.0:
 					await get_tree().create_timer(snap_delay).timeout
 				_report_enemy_attack(enemy, attack)
@@ -1390,6 +1476,14 @@ func _run_sequential_turn() -> void:
 			if combatant.hp <= 0:
 				status_changed.emit()
 				continue
+		if result["dug"] and _wanderer != null and combatant.dig_intent != null:
+			# The row across the battle camera's view, so it reads left to
+			# right on screen.
+			var camera := get_viewport().get_camera_3d()
+			var across: Vector3 = camera.global_transform.basis.x if camera != null else Vector3.ZERO
+			var dig_delay: float = enemy.begin_dig(combatant.dig_intent.mound_count, _wanderer.global_position, across)
+			if dig_delay > 0.0:
+				await get_tree().create_timer(dig_delay).timeout
 		if result["defended"]:
 			for move in times:
 				var move_delay: float = _play_defend_move(enemy, intent)
@@ -2144,7 +2238,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		elif event.button_index == MOUSE_BUTTON_LEFT:
 			var enemy := _enemy_at(event.position)
 			if enemy != null:
-				confirm_target(enemy)
+				confirm_target(enemy, _cursor_mound)
 				get_viewport().set_input_as_handled()
 		return
 
@@ -2165,15 +2259,20 @@ func _physics_process(_delta: float) -> void:
 
 func _update_hover(screen_pos: Vector2) -> void:
 	var enemy := _enemy_at(screen_pos)
+	var mound: int = _cursor_mound if enemy != null else -1
 	_set_cursor_enemy(enemy)
 	if enemy == null:
 		enemy = _default_target()
-	if enemy == _hovered_enemy:
+	if enemy == _hovered_enemy and mound == _hovered_mound:
 		return
 	_clear_hover()
 	_hovered_enemy = enemy
+	_hovered_mound = mound
 	if _hovered_enemy != null:
-		_hovered_enemy.set_highlight(true)
+		if _hovered_enemy.is_dug_in():
+			_hovered_enemy.set_mound_highlight(mound)
+		else:
+			_hovered_enemy.set_highlight(true)
 
 func _set_cursor_enemy(enemy: FieldEnemy) -> void:
 	if enemy == _cursor_enemy:
@@ -2182,9 +2281,11 @@ func _set_cursor_enemy(enemy: FieldEnemy) -> void:
 	hovered_enemy_changed.emit(enemy)
 
 func _clear_hover() -> void:
-	if _hovered_enemy != null:
+	if _hovered_enemy != null and is_instance_valid(_hovered_enemy):
 		_hovered_enemy.set_highlight(false)
-		_hovered_enemy = null
+		_hovered_enemy.set_mound_highlight(-1)
+	_hovered_enemy = null
+	_hovered_mound = -1
 
 # What an armed card means when the cursor is over none of them: the
 # leftmost living enemy on screen - the one nearest the Wanderer along
@@ -2215,6 +2316,7 @@ func _default_target() -> FieldEnemy:
 # camera gets no rect.
 func _refresh_enemy_rects() -> void:
 	_enemy_rects.clear()
+	_mound_rects.clear()
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
 		return
@@ -2232,6 +2334,14 @@ func _refresh_enemy_rects() -> void:
 			continue
 		if _pending_card_view != null and not _can_target(_pending_card_view.card_data, combatant):
 			continue
+		# Dug in (DIG): its standing mounds are its targets, each its own
+		# rect, every one alike; the body under them has none.
+		if combatant.dug_in:
+			for mound in combatant.mounds:
+				var mound_rect: Rect2 = enemy.get_mound_screen_rect(camera, mound, target_padding_px)
+				if mound_rect.size != Vector2.ZERO:
+					_mound_rects.append({"enemy": enemy, "mound": mound, "rect": mound_rect})
+			continue
 		var rect: Rect2 = enemy.get_screen_rect(camera, target_padding_px)
 		if rect.size == Vector2.ZERO:
 			continue
@@ -2241,11 +2351,12 @@ func _refresh_enemy_rects() -> void:
 # nearest the camera. Rebuilds the cache if a click lands before the
 # first armed physics frame.
 func _enemy_at(screen_pos: Vector2) -> FieldEnemy:
-	if _enemy_rects.is_empty():
+	if _enemy_rects.is_empty() and _mound_rects.is_empty():
 		_refresh_enemy_rects()
 	var camera := get_viewport().get_camera_3d()
 	var best: FieldEnemy = null
 	var best_distance: float = INF
+	_cursor_mound = -1
 	for enemy: FieldEnemy in _enemy_rects:
 		var rect: Rect2 = _enemy_rects[enemy]
 		if not rect.has_point(screen_pos):
@@ -2254,11 +2365,29 @@ func _enemy_at(screen_pos: Vector2) -> FieldEnemy:
 		if distance < best_distance:
 			best_distance = distance
 			best = enemy
+	# A dug-in enemy's mounds, by where each mound stands: the cursor over
+	# one names the enemy and the mound (_cursor_mound).
+	for entry: Dictionary in _mound_rects:
+		var rect: Rect2 = entry["rect"]
+		if not rect.has_point(screen_pos):
+			continue
+		var mound_enemy: FieldEnemy = entry["enemy"]
+		var mound: int = int(entry["mound"])
+		var distance: float = camera.global_position.distance_to(mound_enemy.get_mound_position(mound)) if camera != null else 0.0
+		if distance < best_distance:
+			best_distance = distance
+			best = mound_enemy
+			_cursor_mound = mound
 	return best
 
 # The hovered enemy's padded screen rect (see _refresh_enemy_rects()) -
 # TargetLine ends at its centre. Empty when nothing is hovered.
 func get_hovered_enemy_rect() -> Rect2:
 	if _hovered_enemy == null:
+		return Rect2()
+	if _hovered_mound >= 0:
+		for entry: Dictionary in _mound_rects:
+			if entry["enemy"] == _hovered_enemy and int(entry["mound"]) == _hovered_mound:
+				return entry["rect"]
 		return Rect2()
 	return _enemy_rects.get(_hovered_enemy, Rect2())

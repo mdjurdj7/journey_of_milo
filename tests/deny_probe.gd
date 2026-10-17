@@ -33,7 +33,7 @@ const SOUND_PATH := "res://assets/audio/cards/Deny/Deny.mp3"
 const NIPPER_PATH := "res://battle/rules/enemies/nipper.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
-const SILTJAW_PATH := "res://battle/rules/enemies/siltjaw.tres"
+const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
 const SENTENCE_STATUS_PATH := "res://battle/rules/statuses/sentence.tres"
 const LEVERAGE_STATUS_PATH := "res://battle/rules/statuses/leverage.tres"
 const COLLATERAL_STATUS_PATH := "res://battle/rules/statuses/collateral.tres"
@@ -195,16 +195,17 @@ func _check_pain_turn_spends_it() -> void:
 	_expect(not bool(next["denied"]) and not bool(next["pain_turn"]), "...and the turn after acts")
 	_completed += 1
 
-# A Denied charge is lost, not interrupted: no burrow is queued.
+# A Denied breakable attack (the Greyshelf's Gape) is lost, not
+# interrupted, its threshold met or not: nothing is queued in its place.
 func _check_charge_not_interrupted() -> void:
-	var data := load(SILTJAW_PATH) as EnemyData
+	var data := load(GREYSHELF_PATH) as EnemyData
 	var enemy := _enemy(data)
 	enemy.current_intent_index = 1
 	enemy.damage_taken_this_turn = 99
 	_deny(enemy)
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, Combatant.new(70))
-	_expect(not bool(result["interrupted"]), "A Denied charge isn't interrupted")
-	_expect(enemy.interjected_intent == null, "...so no burrow is queued")
+	_expect(not bool(result["interrupted"]), "A Denied Gape isn't interrupted")
+	_expect(enemy.interjected_intent == null, "...so nothing is queued in its place")
 	_completed += 1
 
 func _check_preview() -> void:
