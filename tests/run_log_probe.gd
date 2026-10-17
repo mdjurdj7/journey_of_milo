@@ -38,7 +38,6 @@ const COLLATERAL_PATH := "res://cards/data/collateral.tres"
 const RECKONING_PATH := "res://cards/data/reckoning.tres"
 const HOLD_FAST_PATH := "res://cards/data/hold_fast.tres"
 const BLOOD_ARC_PATH := "res://cards/data/blood_arc.tres"
-const ENDURE_PATH := "res://cards/neutral/endure.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const GLOBAL_SEED := 20261004
 const RUN_SEED := 4242
@@ -126,17 +125,18 @@ func _scripted_run(logging: bool) -> Dictionary:
 		return seen
 
 	# Turn 1: Collateral, then Reckoning on its swap (0 Energy, 5 HP);
-	# Hold Fast (Block 8, 2 HP its own); Blood Arc (3 HP its own).
+	# Hold Fast (its Block, 2 HP its own); Blood Arc (3 HP its own).
 	_turns = 1
 	_fresh_hand(controller)
 	await _play(controller, await _deal(controller, COLLATERAL_PATH))
 	await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
 	await _play(controller, await _deal(controller, HOLD_FAST_PATH))
 	await _play(controller, await _deal(controller, BLOOD_ARC_PATH))
-	# Turn 2: Endure for Block (the Sputter's strike comes after it) and
-	# one Slash. Turn 3 on: Slashes until it falls - late enough that a
-	# strike lands unblocked first, early enough (turn 4) that the logging-
-	# on and logging-off runs still fight the same Sputter.
+	# Turn 2: one Slash and no Block, so the Sputter's strike after it
+	# lands whatever Hold Fast's turn-1 Block was - the damage sums need a
+	# hit from it. Turn 3 on: Slashes until it falls - early enough
+	# (turn 4) that the logging-on and logging-off runs still fight the
+	# same Sputter.
 	while _battle_open() and _turns < MAX_TURNS:
 		await controller.call("end_turn")
 		for i in 3:
@@ -146,7 +146,6 @@ func _scripted_run(logging: bool) -> Dictionary:
 		_turns += 1
 		_fresh_hand(controller)
 		if _turns == 2:
-			await _play(controller, await _deal(controller, ENDURE_PATH))
 			await _play(controller, await _deal(controller, SLASH_PATH), _field_enemy(controller))
 			continue
 		while _battle_open() and int((controller.get("player") as Combatant).energy) >= 1:
@@ -255,7 +254,7 @@ func _check_log(path: String, seen: Dictionary) -> void:
 		_expect_card(cards[1], "Reckoning", 0, 5, 0)
 		_expect_card(cards[2], "Hold Fast", 1, 0, 2)
 		_expect_card(cards[3], "Blood Arc", 1, 0, 3)
-		_expect_eq(int((cards[2] as Dictionary).get("block")), 8, "Hold Fast: 8 Block gained")
+		_expect_eq(int((cards[2] as Dictionary).get("block")), _hold_fast_block(), "Hold Fast: its Block gained (%d)" % _hold_fast_block())
 		_expect(int((cards[3] as Dictionary).get("dealt")) > 0, "Blood Arc: damage dealt")
 		_expect_eq((cards[3] as Dictionary).get("target"), null, "...with no target")
 		_expect_eq(str((cards[1] as Dictionary).get("target")), "Sputter", "Reckoning: aimed at the Sputter")
@@ -281,7 +280,7 @@ func _check_log(path: String, seen: Dictionary) -> void:
 		card_dealt += int(card.get("dealt"))
 	_expect_eq(card_dealt, int(dealt.get("total", -1)), "...all of it by the cards")
 	var block: Dictionary = fight.get("block", {})
-	_expect(int(block.get("gained", 0)) >= 5 + 8, "Block gained: Hold Fast's 5 and Endure's 8 at least")
+	_expect(int(block.get("gained", 0)) >= _hold_fast_block(), "Block gained: Hold Fast's at least")
 	_expect(int(block.get("used", 0)) > 0 and int(block.get("used", 0)) <= int(block.get("gained", 0)), "Block used: some, never more than gained")
 	var toll: Dictionary = fight.get("toll", {})
 	_expect(int(toll.get("gained", 0)) >= 10, "Toll gained: the 10 HP self-inflicted at least")
@@ -346,6 +345,15 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	_expect_eq(int(end.get("fights", 0)), 1, "...after one fight")
 	_expect_eq([int(end.get("fights_won", -1)), int(end.get("floors_crossed", -1))], [1, 0], "...the tally: one fight won, no floor crossed")
 	_expect_eq([int(end.get("hp", -1)), int(end.get("max_hp", -1)), int(end.get("deck_size", -1))], seen.get("end_tally"), "...HP, max HP and deck size as the run stood")
+
+# Hold Fast's Block as its data has it - the probe reads it rather than
+# pinning it, so a retune doesn't break the run's sums.
+func _hold_fast_block() -> int:
+	var block: int = 0
+	for effect: CardEffect in (load(HOLD_FAST_PATH) as CardData).effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.BLOCK:
+			block += effect.value
+	return block
 
 func _expect_card(card: Dictionary, card_name: String, energy: int, hp_cost: int, hp_effect: int) -> void:
 	_expect_eq([str(card.get("card")), int(card.get("energy")), int(card.get("hp_cost")), int(card.get("hp_effect"))], [card_name, energy, hp_cost, hp_effect], "%s: Energy, hp_cost, hp_effect" % card_name)
