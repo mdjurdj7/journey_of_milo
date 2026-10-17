@@ -425,8 +425,8 @@ func _check_escape() -> void:
 # The Glower's option, forced, in its fight's line: the Glower in the
 # inlet's water, dry sand within its contact radius - he never wades to
 # start it; the Underfoot and the Wanderer on dry sand; no scatter within
-# BODY_SCATTER_MARGIN_M of either body (its edge off their meshes' XZ
-# bounds). In the fight, the Sting's turn shows its Puff (TAUNT)
+# BODY_SCATTER_MARGIN_M of either body (its edge off the ground outline of
+# each visible mesh's box, turned as the body is). In the fight, the Sting's turn shows its Puff (TAUNT)
 # and a Slash may still go at the Underfoot; the Sting lands and the Puff
 # with it - the Underfoot Exposed, the Glower Inflated and swollen - and
 # a Slash may go only at the Glower; killing it lifts the taunt, and the
@@ -449,20 +449,23 @@ func _check_glower_option() -> void:
 			_expect(_drawn_height(ground, under_at) >= sea_level, "...the Underfoot on dry sand (%.3f m over)" % (_drawn_height(ground, under_at) - sea_level))
 			var stance: Vector3 = (_field.get_node("Wanderer") as Node3D).global_position
 			_expect(_drawn_height(ground, stance) >= sea_level, "...and the Wanderer (%.3f m over)" % (_drawn_height(ground, stance) - sea_level))
-			var bodies: Array[Rect2] = [_body_bounds(glower), _body_bounds(underfoot)]
+			var outlines: Array[PackedVector2Array] = _body_outlines(glower) + _body_outlines(underfoot)
 			var spots: int = 0
-			var crowding: int = 0
+			var crowding: Array[String] = []
 			var scatter: Node = _field.call("get_scatter")
 			if scatter != null:
 				for entry: Resource in scatter.call("get_entries"):
 					for spot: RefCounted in scatter.call("get_spots", entry):
 						spots += 1
 						var spot_at: Vector3 = spot.get("position")
-						for body in bodies:
-							if _rect_distance(body, Vector2(spot_at.x, spot_at.z)) - float(spot.get("size")) * 0.5 < BODY_SCATTER_MARGIN_M:
-								crowding += 1
+						var clear: float = INF
+						for outline in outlines:
+							clear = minf(clear, _outline_distance(outline, Vector2(spot_at.x, spot_at.z)))
+						clear -= float(spot.get("size")) * 0.5
+						if clear < BODY_SCATTER_MARGIN_M:
+							crowding.append("%s at (%.2f, %.2f), %.2f m off" % [str(entry.get("name")), spot_at.x, spot_at.z, clear])
 			_expect(spots > 0, "...floor 2's scatter laid (%d items)" % spots)
-			_expect_eq(crowding, 0, "...none of it within %.2f m of either body" % BODY_SCATTER_MARGIN_M)
+			_expect(crowding.is_empty(), "...none of it within %.2f m of either body (%s)" % [BODY_SCATTER_MARGIN_M, ", ".join(crowding)])
 			var poses: Array[Node] = glower.find_children("*", "GlowerPose", true, false)
 			var pose: Node = poses[0] if poses.size() == 1 else null
 			_expect(pose != null, "The Glower wears GlowerPose")
@@ -678,23 +681,33 @@ func _nearest_dry(ground: Node, at: Vector3, sea_level: float, limit: float) -> 
 		radius += 0.1
 	return INF
 
-# A body's ground footprint: the XZ bounds of its visible meshes.
-func _body_bounds(body: Node) -> Rect2:
-	var bounds := Rect2()
-	var first: bool = true
+# A body's ground footprint: per visible mesh, the XZ hull of its box's
+# eight corners as the mesh stands - a turned body's outline, not the
+# axis-aligned bounds round it.
+func _body_outlines(body: Node) -> Array[PackedVector2Array]:
+	var outlines: Array[PackedVector2Array] = []
 	for node in body.find_children("*", "MeshInstance3D", true, false):
 		var mesh_instance := node as MeshInstance3D
 		if mesh_instance.mesh == null or not mesh_instance.is_visible_in_tree():
 			continue
-		var box: AABB = mesh_instance.global_transform * mesh_instance.get_aabb()
-		var flat := Rect2(Vector2(box.position.x, box.position.z), Vector2(box.size.x, box.size.z))
-		bounds = flat if first else bounds.merge(flat)
-		first = false
-	return bounds
+		var box: AABB = mesh_instance.get_aabb()
+		var corners := PackedVector2Array()
+		for k in 8:
+			var corner: Vector3 = mesh_instance.global_transform * box.get_endpoint(k)
+			corners.append(Vector2(corner.x, corner.z))
+		outlines.append(Geometry2D.convex_hull(corners))
+	return outlines
 
-static func _rect_distance(rect: Rect2, p: Vector2) -> float:
-	var nearest := Vector2(clampf(p.x, rect.position.x, rect.end.x), clampf(p.y, rect.position.y, rect.end.y))
-	return nearest.distance_to(p)
+# Metres from `p` to a closed outline's edge, 0 inside it.
+static func _outline_distance(outline: PackedVector2Array, p: Vector2) -> float:
+	if outline.size() < 3:
+		return INF
+	if Geometry2D.is_point_in_polygon(p, outline):
+		return 0.0
+	var best: float = INF
+	for k in outline.size() - 1:
+		best = minf(best, Geometry2D.get_closest_point_to_segment(p, outline[k], outline[k + 1]).distance_to(p))
+	return best
 
 func _find(path: String) -> Node:
 	for node in get_nodes_in_group("enemies"):
