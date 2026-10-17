@@ -19,8 +19,6 @@ script = ExtResource("2_role")
 offers_cards = false
 gold_multiplier = 1.5
 extra_chance = 0.3
-removal_weight = 2
-samphire_weight = 1
 
 [resource]
 script = ExtResource("1_rewards")

@@ -50,8 +50,9 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 # left when focused. The mouse focuses by hovering and activates by
 # clicking; ui_up/ui_down move through the untaken lines and WALK ON
 # (wrapping), ui_accept activates. Nothing is focused until the mouse or
-# a key says so. WALK ON keeps clear of the Wanderer the way NONE OF
-# THESE does (see _below_wanderer()).
+# a key says so. WALK ON is the list's last row, its caps where the
+# actions sit; the whole list lifts clear of the Wanderer rather than
+# cross him (see _above_wanderer()).
 @export_group("Column")
 @export var column_width: float = 300.0
 @export var header_text: String = "LEFT BEHIND"
@@ -72,11 +73,6 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 @export var dismiss_text: String = "WALK ON"
 @export var dismiss_size_px: int = 22
 @export_range(0.0, 1.0) var dismiss_tracking_em: float = 0.16
-# From the last line's bottom edge to WALK ON's baseline, before any push
-# clear of the Wanderer.
-@export var dismiss_gap_px: float = 72.0
-# The furthest WALK ON drops below the last line to clear the Wanderer.
-@export var dismiss_max_drop_px: float = 120.0
 @export_group("")
 
 @export_group("Card Choice")
@@ -157,10 +153,10 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 @export var choice_hairline_length_px: float = 28.0
 @export var choice_hairline_gap_px: float = 14.0
 @export var choice_hairline_thickness_px: float = 1.0
-# Where NONE OF THESE or WALK ON would cross the Wanderer's projected
-# silhouette, it drops to this far below his feet - never up, and never
-# further than twice reward_decline_gap below the row, or dismiss_max_
-# drop_px below the last line (see _below_wanderer()).
+# Where NONE OF THESE would cross the Wanderer's projected silhouette, it
+# drops to this far below his feet - never up, and never further than
+# twice reward_decline_gap below the row (see _below_wanderer()). Where
+# the list would, it lifts to this far above his head (_above_wanderer()).
 @export var decline_wanderer_clearance_px: float = 16.0
 # His height, for the projected silhouette the decline line must clear.
 @export var wanderer_height_m: float = 1.8
@@ -206,19 +202,10 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 @export_group("")
 
 @export_group("Extra")
-# An optional basic fight's extra (EncounterRewards), its own line under
-# the gold - left behind on WALK ON:
-# - a removal: "Remove a card" / CHOOSE opens the deck as cards over this
-#   screen (DeckPanel.open_picker(), headed removal_header_text,
-#   picker_layer_offset above it). A card clicked is gone for the rest of
-#   the run and the line is struck; closing it without one comes back to
-#   the list with the line still open. WALK ON is the skip.
-# - a Samphire: its card's name / TAKE; taken, its face flies to the deck
-#   from the line, at samphire_flight_start_scale of a card.
-@export var removal_item_text: String = "Remove a card"
-@export var removal_action_text: String = "CHOOSE"
-@export var removal_header_text: String = "Remove one"
-@export var picker_layer_offset: int = 1
+# An optional basic fight's extra (EncounterRewards), a Samphire: its own
+# line under the gold, its card's name / TAKE - left behind on WALK ON.
+# Taken, its face flies to the deck from the line, at samphire_flight_
+# start_scale of a card.
 @export_range(0.05, 1.0) var samphire_flight_start_scale: float = 0.4
 @export_group("")
 
@@ -249,10 +236,7 @@ var _top_tier: bool = false
 var _offers_cards: bool = true
 var _extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE
 var _extra_card: CardData = null
-# The removal's deck picker while it is open, and whether it picked - an
-# open picker or a Samphire in flight holds the list's own input.
-var _picker: DeckView = null
-var _picker_picked: bool = false
+# A Samphire in flight holds the list's own input.
 var _samphire_flying: bool = false
 var _deck_panel: Control = null
 var _mode: int = Mode.LIST
@@ -378,13 +362,7 @@ func _build_lines() -> void:
 			glassbone_line.icon = load(glassbone_icon_path) as Texture2D
 		glassbone_line.shard_glyph = glassbone_line.icon == null
 		_lines.append(glassbone_line)
-	if _extra == EncounterRewards.Extra.REMOVAL and not RunState.deck.is_empty():
-		var removal_line := RewardLine.new()
-		removal_line.id = "removal"
-		removal_line.item = removal_item_text
-		removal_line.action = removal_action_text
-		_lines.append(removal_line)
-	elif _extra == EncounterRewards.Extra.SAMPHIRE and _extra_card != null:
+	if _extra == EncounterRewards.Extra.SAMPHIRE and _extra_card != null:
 		var samphire_line := RewardLine.new()
 		samphire_line.id = "samphire"
 		samphire_line.item = _extra_card.card_name
@@ -404,10 +382,12 @@ func _build_lines() -> void:
 func _column_left() -> float:
 	return (_draw_layer.size.x - column_width) / 2.0
 
+# Centred on the window, header to WALK ON's row - lifted clear of the
+# Wanderer where it would cross him.
 func _column_top() -> float:
-	var lines_height: float = float(_lines.size()) * line_height_px
-	var total: float = float(header_size_px) + header_gap_px + lines_height + dismiss_gap_px + float(dismiss_size_px)
-	return (_draw_layer.size.y - total) / 2.0
+	var rows_height: float = float(_lines.size() + 1) * line_height_px
+	var total: float = float(header_size_px) + header_gap_px + rows_height
+	return _above_wanderer((_draw_layer.size.y - total) / 2.0, total)
 
 # The dismiss line's hit rect - WALK ON under the list, or NONE OF THESE
 # under the card row while a choice is open.
@@ -419,23 +399,21 @@ func _dismiss_rect() -> Rect2:
 func _last_line_bottom() -> float:
 	return _column_top() + float(header_size_px) + header_gap_px + float(_lines.size()) * line_height_px
 
-# WALK ON's label, centred on the column.
+# WALK ON's label, right-aligned on the column as the lines' actions are.
 func _walk_on_label_left() -> float:
-	return roundf(_column_left() + (column_width - InkType.width(_dismiss_font, dismiss_text, dismiss_size_px)) / 2.0)
+	return roundf(_column_left() + column_width - InkType.width(_dismiss_font, dismiss_text, dismiss_size_px))
 
-# dismiss_gap_px under the last line (to the baseline), pushed below the
-# Wanderer where it would cross him, never more than dismiss_max_drop_px
-# below the last line.
+# WALK ON's row: the one under the last line, a line tall.
 func _walk_on_top() -> float:
-	var bottom: float = _last_line_bottom()
-	return _below_wanderer(bottom + dismiss_gap_px - float(dismiss_size_px), float(dismiss_size_px) * 1.3, bottom + dismiss_max_drop_px)
+	return _last_line_bottom()
 
-# WALK ON's hit rect: the label and the hairline's room to its left.
+# WALK ON's hit rect: the label and the hairline's room to its left, the
+# row's height.
 func _walk_on_rect() -> Rect2:
 	var label_left: float = _walk_on_label_left()
 	var left: float = label_left - choice_hairline_gap_px - choice_hairline_length_px
 	var right: float = label_left + InkType.width(_dismiss_font, dismiss_text, dismiss_size_px)
-	return Rect2(left, _walk_on_top(), right - left, float(dismiss_size_px) * 1.3)
+	return Rect2(left, _walk_on_top(), right - left, line_height_px)
 
 func _walk_on_index() -> int:
 	return _lines.size()
@@ -499,7 +477,7 @@ func _draw_column() -> void:
 
 	var walk_on_focused: bool = _hovered == _walk_on_index()
 	var walk_on_left: float = _walk_on_label_left()
-	var walk_on_baseline: float = _walk_on_top() + float(dismiss_size_px)
+	var walk_on_baseline: float = _walk_on_top() + line_height_px * 0.62
 	_text(_dismiss_font, dismiss_text, Vector2(walk_on_left, walk_on_baseline), dismiss_size_px, bone if walk_on_focused else choice_unfocused_color)
 	if walk_on_focused:
 		_draw_hairline(walk_on_left, walk_on_baseline, dismiss_size_px)
@@ -616,21 +594,38 @@ func _decline_top() -> float:
 # only ever down, never above him - but no lower than max_top, so it
 # stays with what it belongs to even if that leaves it on his feet.
 func _below_wanderer(top: float, line_height: float, max_top: float) -> float:
+	var span: Vector2 = _wanderer_span()
+	var crosses: bool = span != Vector2.ZERO and top < span.y and top + line_height > span.x
+	if crosses:
+		top = maxf(top, minf(span.y, max_top))
+	return roundf(top)
+
+# A block `height` tall, wanted at `top`: where it would cross the
+# Wanderer's projected silhouette (grown by decline_wanderer_clearance_
+# px), it lifts to end that far above his head - only ever up, and never
+# off the top of the window.
+func _above_wanderer(top: float, height: float) -> float:
+	var span: Vector2 = _wanderer_span()
+	if span != Vector2.ZERO and top < span.y and top + height > span.x:
+		top = maxf(minf(top, span.x - height), 0.0)
+	return roundf(top)
+
+# The Wanderer's projected silhouette as (top, bottom) in screen y, his
+# head to his feet, grown by decline_wanderer_clearance_px; ZERO when
+# there is no camera or no Wanderer in front of it.
+func _wanderer_span() -> Vector2:
 	var camera := get_viewport().get_camera_3d()
 	var found: Array[Node] = get_tree().get_nodes_in_group("wanderer")
 	var wanderer: Node3D = found[0] as Node3D if not found.is_empty() else null
 	if camera == null or wanderer == null:
-		return roundf(top)
+		return Vector2.ZERO
 	var feet: Vector3 = wanderer.global_position
 	var head: Vector3 = feet + Vector3.UP * wanderer_height_m
 	if camera.is_position_behind(feet) or camera.is_position_behind(head):
-		return roundf(top)
+		return Vector2.ZERO
 	var feet_y: float = camera.unproject_position(feet).y
 	var head_y: float = camera.unproject_position(head).y
-	var crosses: bool = top < feet_y + decline_wanderer_clearance_px and top + line_height > head_y - decline_wanderer_clearance_px
-	if crosses:
-		top = maxf(top, minf(feet_y + decline_wanderer_clearance_px, max_top))
-	return roundf(top)
+	return Vector2(head_y - decline_wanderer_clearance_px, feet_y + decline_wanderer_clearance_px)
 
 # --- Input ---
 
@@ -770,10 +765,6 @@ func _on_dismiss() -> void:
 			RunLogger.reward_cards("fight", _offered, null)
 		_finish_card_line()
 		return
-	# Walking on is the removal's skip - logged, the deck as it was.
-	for line in _lines:
-		if line.id == "removal" and not line.taken:
-			RunLogger.event("reward_removal", {"source": "fight", "card": null, "deck_size": RunState.deck.size()})
 	close()
 
 func _take_line(index: int) -> void:
@@ -801,43 +792,14 @@ func _take_line(index: int) -> void:
 			_close_if_spent()
 		"card":
 			_open_choice()
-		"removal":
-			_open_removal_picker()
 		"samphire":
 			_take_samphire(line)
 
 # --- Extra ---
 
-# The removal's picker is open, or the Samphire is on its way to the deck.
+# The Samphire is on its way to the deck.
 func _extra_busy() -> bool:
-	return _picker != null or _samphire_flying
-
-func _open_removal_picker() -> void:
-	_picker_picked = false
-	_picker = DeckPanel.open_picker(get_tree(), RunState.deck, removal_header_text, layer + picker_layer_offset)
-	_picker.card_picked.connect(_on_removal_picked)
-	_picker.closed.connect(_on_removal_picker_closed)
-	_set_list_focus(-1)
-
-# The card clicked is gone for the rest of the run; the line is struck.
-func _on_removal_picked(card: CardData) -> void:
-	_picker_picked = true
-	RunState.remove_card(card)
-	RunLogger.event("reward_removal", {"source": "fight", "card": card.card_name, "deck_size": RunState.deck.size()})
-	TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "RemovalAudio", "RewardScreen")
-	print("RewardScreen: removed '%s' (deck now %d)." % [card.card_name, RunState.deck.size()])
-	for line in _lines:
-		if line.id == "removal":
-			line.taken = true
-
-# Picked or not, the picker has gone: back to the list - with the line
-# still open when nothing was picked.
-func _on_removal_picker_closed() -> void:
-	_picker = null
-	_list_mouse_on = -1
-	_draw_layer.queue_redraw()
-	if _picker_picked:
-		_close_if_spent()
+	return _samphire_flying
 
 # The Samphire into the deck: its face, from the line, flies to the deck
 # readout; the screen closes, if this was the last line, once it lands.

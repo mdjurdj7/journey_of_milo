@@ -14,7 +14,7 @@ A read-only audit of every point of interest (POI) on the five floors of `floors
 - **Empty stretch** = the longest run of the main route with no content POI within 6 m. Spawn, gate, exit, silent hulls and the rock shelf don't count as content. Members of a pack count individually.
 - **Real floor times** come from the 182 run logs in `user://runs/`: debug runs excluded, lap 0 only, timed from one floor's `floor_entered` to the next. They are your own playtests across several versions, so treat them as a floor rather than a target.
 
-Rewards by role (`run/encounter_rewards.tres`): **required** = a card offer + the floor's gold; **elite** = a card offer at elite rates + gold ×1.5 (+ the enemy's keepsake roll and Glassbone); **optional basic** = gold ×1.5, a 30 % chance of an extra (a removal or Samphire), **no cards**; **region-end** = cards top tier first + gold.
+Rewards by role (`run/encounter_rewards.tres`): **required** = a card offer + the floor's gold; **elite** = a card offer at elite rates + gold ×1.5 (+ the enemy's keepsake roll and Glassbone); **optional basic** = gold ×1.5, a 30 % chance of a Samphire, **no cards** (removal is the collector's alone); **region-end** = cards top tier first + gold.
 
 No slot on any floor has more than one option, so **nothing is randomized yet**. No floor has an **event**.
 

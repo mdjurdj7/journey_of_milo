@@ -10,10 +10,8 @@ class_name RoleReward
 @export var offers_cards: bool = true
 # The floor's gold roll (FloorData.gold_min/max) times this, rounded.
 @export var gold_multiplier: float = 1.0
-# The chance (0..1) of one extra beside the gold, drawn by weight from
-# the two below: a card removal (pick one from the deck, or walk on) or a
-# Samphire (EncounterRewards.samphire_card) to take. 0 = never - and then
-# nothing is drawn from the run's RNG for it.
+# The chance (0..1) of one extra beside the gold: a Samphire
+# (EncounterRewards.samphire_card) to take. 0 = never - and then nothing
+# is drawn from the run's RNG for it. Never a card removal: that is the
+# collector's alone.
 @export_range(0.0, 1.0) var extra_chance: float = 0.0
-@export var removal_weight: int = 0
-@export var samphire_weight: int = 0

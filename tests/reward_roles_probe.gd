@@ -5,11 +5,10 @@ extends SceneTree
 # region-end boss (floor 5's Greyshelf) each offer the one-of-three card
 # choice; an optional basic fight (floor 2's Siltjaw) offers no cards and
 # pays the floor's gold times the basic multiplier - and, with its extra
-# roll forced, a card removal (picked: the card gone for the run, there
-# in no later fight's deck; the picker closed without one: the line still
-# open, and WALK ON the logged skip) or a Samphire to take. The run log
-# matches: reward_cards only where cards were offered, reward_removal
-# (null on a skip) and reward_samphire.
+# roll forced, a Samphire to take. A card removal is never a fight's
+# reward (the collector's alone): every extra the basic roll can draw is
+# a Samphire. The run log matches: reward_cards only where cards were
+# offered, reward_samphire.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/reward_roles_probe.gd
 #
@@ -21,7 +20,7 @@ extends SceneTree
 # RegionField loads. Untyped against anything that names the RunState
 # autoload: a SceneTree script compiles before the autoloads register.
 
-const CASES := 8
+const CASES := 6
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const REGION_PATH := "res://floors/region1.tres"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
@@ -64,8 +63,6 @@ func _initialize() -> void:
 	await _check_offers(FLOOR_5, GREYSHELF_PATH, "The region-end Greyshelf")
 	_check_data()
 	await _check_basic_gold()
-	await _check_removal_picked()
-	await _check_removal_skipped()
 	await _check_samphire()
 	RunLogger.set_output_dir("")
 	if _completed != CASES:
@@ -97,14 +94,20 @@ func _check_offers(floor_index: int, enemy_path: String, label: String) -> void:
 	_completed += 1
 
 # The data as set: a basic fight offers no cards and pays 1.5x, its extra
-# 30% - a removal at weight 2 to a Samphire's 1; every other role offers
+# 30% and always a Samphire, never a removal; every other role offers
 # cards, with no extra, the elite at 1.5x.
 func _check_data() -> void:
 	var basic: Resource = _rewards.get("basic")
 	_expect(not bool(basic.get("offers_cards")), "A basic fight offers no cards")
 	_expect(is_equal_approx(float(basic.get("gold_multiplier")), 1.5), "...pays 1.5x gold")
 	_expect(is_equal_approx(float(basic.get("extra_chance")), 0.3), "...with a 30% extra")
-	_expect(int(basic.get("removal_weight")) == 2 and int(basic.get("samphire_weight")) == 1, "...a removal at weight 2, a Samphire at 1")
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 1
+	var drawn: Dictionary = {}
+	for i in 200:
+		drawn[int(_rewards.call("roll_extra", basic, rng))] = true
+	_expect_eq(drawn.keys().size(), 2, "...its extra drawn or not over 200 rolls (%s)" % str(drawn.keys()))
+	_expect(drawn.has(int(EncounterRewards.Extra.NONE)) and drawn.has(int(EncounterRewards.Extra.SAMPHIRE)), "...and when drawn, always a Samphire (%s)" % str(drawn.keys()))
 	_expect_eq(str((_rewards.get("samphire_card") as CardData).card_name), "Samphire", "...the Samphire the Samphire")
 	for role in ["required", "elite", "region_end"]:
 		var entry: Resource = _rewards.get(role)
@@ -116,7 +119,7 @@ func _check_data() -> void:
 # range times 1.5, and no card offer anywhere in the log.
 func _check_basic_gold() -> void:
 	var log_dir: String = _open_log()
-	_force_extra(0.0, 0, 0)
+	_force_extra(0.0)
 	var reward: Node = await _win(FLOOR_2, SILTJAW_PATH)
 	if reward != null:
 		_expect_eq(_line_ids(reward), ["gold"] as Array[String], "The optional Siltjaw leaves gold alone")
@@ -128,80 +131,6 @@ func _check_basic_gold() -> void:
 		_expect(gold >= low and gold <= high, "...at the basic multiplier, %d-%d (got %d)" % [low, high, gold])
 		reward.call("_on_dismiss")
 		_expect(_log_lines(log_dir, "reward_cards").is_empty(), "...and no reward_cards in the log")
-		_expect(_log_lines(log_dir, "reward_removal").is_empty(), "...nor a reward_removal")
-	_restore_extra()
-	await _teardown()
-	_completed += 1
-
-# A removal, picked: the card is gone from the deck, the line struck, the
-# pick logged - and the next fight's deck holds it no more.
-func _check_removal_picked() -> void:
-	var log_dir: String = _open_log()
-	_force_extra(1.0, 1, 0)
-	var reward: Node = await _win(FLOOR_2, SILTJAW_PATH)
-	if reward != null:
-		var ids: Array[String] = _line_ids(reward)
-		_expect_eq(ids, ["gold", "removal"] as Array[String], "A forced removal is its own line under the gold")
-		var deck: Array = _run_state.get("deck")
-		var size_before: int = deck.size()
-		var victim: CardData = deck[0]
-		var victim_name: String = victim.card_name
-		var count_before: int = _count(deck, victim_name)
-		reward.call("_take_line", ids.find("removal"))
-		var picker: Node = reward.get("_picker")
-		_expect(picker != null, "...CHOOSE opens the deck picker")
-		if picker != null:
-			picker.emit_signal("card_picked", victim)
-			picker.call("close")
-			await process_frame
-			deck = _run_state.get("deck")
-			_expect_eq(deck.size(), size_before - 1, "...a card picked leaves the deck")
-			_expect_eq(_count(deck, victim_name), count_before - 1, "...that card (%s)" % victim_name)
-			_expect(not deck.has(victim), "...the very card picked")
-			_expect(_line_taken(reward, "removal"), "...the line struck")
-			_expect(reward.get("_picker") == null, "...the picker gone")
-			var line: Dictionary = _log_line(log_dir, "reward_removal", "fight")
-			_expect_eq(str(line.get("card")), victim_name, "...logged as reward_removal with its name")
-			_expect_eq(int(line.get("deck_size", -1)), size_before - 1, "...and the deck's size after")
-		reward.call("_on_dismiss")
-		_restore_extra()
-		await _teardown()
-		# Permanent: a later fight in the same run deals from the deck
-		# without it.
-		var controller: Node = await _start_fight(FLOOR_1, SPUTTER_PATH, false)
-		if controller != null:
-			var battle_deck: Object = controller.get("deck")
-			var dealt: Array = []
-			for pile in ["draw_pile", "hand", "discard_pile"]:
-				dealt.append_array(battle_deck.get(pile) as Array)
-			_expect_eq(_count(dealt, victim_name), count_before - 1, "...and the next fight's deck holds one %s fewer" % victim_name)
-	else:
-		_restore_extra()
-	await _teardown()
-	_completed += 1
-
-# A removal, the picker closed without a pick: back to the list with the
-# line open, the deck as it was; WALK ON then skips it, logged with a
-# null card.
-func _check_removal_skipped() -> void:
-	var log_dir: String = _open_log()
-	_force_extra(1.0, 1, 0)
-	var reward: Node = await _win(FLOOR_2, SILTJAW_PATH)
-	if reward != null:
-		var size_before: int = (_run_state.get("deck") as Array).size()
-		reward.call("_take_line", _line_ids(reward).find("removal"))
-		var picker: Node = reward.get("_picker")
-		if picker != null:
-			picker.call("close")
-			await process_frame
-		_expect(reward.get("_picker") == null, "Closing the picker without a pick returns to the list")
-		_expect(not _line_taken(reward, "removal"), "...with the removal line still open")
-		_expect_eq((_run_state.get("deck") as Array).size(), size_before, "...and the deck as it was")
-		_expect(_log_lines(log_dir, "reward_removal").is_empty(), "...nothing logged yet")
-		reward.call("_on_dismiss")
-		_expect_eq((_run_state.get("deck") as Array).size(), size_before, "WALK ON skips the removal")
-		var line: Dictionary = _log_line(log_dir, "reward_removal", "fight")
-		_expect(line.has("card") and line.get("card") == null, "...logged as reward_removal with a null card (%s)" % str(line))
 	_restore_extra()
 	await _teardown()
 	_completed += 1
@@ -211,7 +140,7 @@ func _check_removal_skipped() -> void:
 # gold are done.
 func _check_samphire() -> void:
 	var log_dir: String = _open_log()
-	_force_extra(1.0, 0, 1)
+	_force_extra(1.0)
 	var reward: Node = await _win(FLOOR_2, SILTJAW_PATH)
 	if reward != null:
 		var ids: Array[String] = _line_ids(reward)
@@ -236,14 +165,11 @@ func _check_samphire() -> void:
 
 # --- Helpers ---
 
-func _force_extra(chance: float, removal: int, samphire: int) -> void:
-	var basic: Resource = _rewards.get("basic")
-	basic.set("extra_chance", chance)
-	basic.set("removal_weight", removal)
-	basic.set("samphire_weight", samphire)
+func _force_extra(chance: float) -> void:
+	_rewards.get("basic").set("extra_chance", chance)
 
 func _restore_extra() -> void:
-	_force_extra(0.3, 2, 1)
+	_force_extra(0.3)
 
 # A new run on the floor (or this run, `new_run` false), its first enemy
 # whose data is `enemy_path` contacted: the fight's controller, or null.
