@@ -20,6 +20,7 @@
 [ext_resource type="Script" uid="uid://bp8hnb8ai830l" path="res://floors/scatter/scatter_set.gd" id="21_scatter_set"]
 [ext_resource type="Resource" uid="uid://cu071h5ncuhs0" path="res://floors/scatter/floor2_shore.tres" id="22_shore_scatter"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/glower.tres" id="23_glower"]
+[ext_resource type="PackedScene" path="res://field/siltjaw_signs.tscn" id="24_siltjaw_signs"]
 [ext_resource type="Script" uid="uid://c1xsh7mpatcy3" path="res://floors/encounter_slot.gd" id="90_encounter_slot"]
 [ext_resource type="Script" uid="uid://n5us4ml13k7m" path="res://floors/encounter_option.gd" id="91_encounter_option"]
 
@@ -152,14 +153,25 @@ yaw_degrees = -11.0
 [sub_resource type="Resource" id="EncounterOption_siltjaw"]
 script = ExtResource("91_encounter_option")
 option_id = &"siltjaw"
+weight = 0.6
 members = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_siltjaw")])
+
+[sub_resource type="Resource" id="FloorProp_siltjaw_signs"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("24_siltjaw_signs")
+
+[sub_resource type="Resource" id="EncounterOption_siltjaw_gone"]
+script = ExtResource("91_encounter_option")
+option_id = &"siltjaw_gone"
+weight = 0.4
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_siltjaw_signs")])
 
 [sub_resource type="Resource" id="EncounterSlot_siltjaw"]
 script = ExtResource("90_encounter_slot")
 slot_id = &"siltjaw"
 position = Vector2(5.2, -7)
 required = false
-options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_siltjaw")])
+options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_siltjaw"), SubResource("EncounterOption_siltjaw_gone")])
 
 [resource]
 script = ExtResource("1_floor_data")
@@ -179,7 +191,6 @@ ambience_wind_db = 1.0
 ambience_sea_lowpass_hz = 7000.0
 slots = Array[ExtResource("90_encounter_slot")]([SubResource("EncounterSlot_crab"), SubResource("EncounterSlot_island"), SubResource("EncounterSlot_siltjaw")])
 roll_unique_enemies = true
-roll_single_and_multi = true
 props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_trough"), SubResource("FloorProp_alcove_cache"), SubResource("FloorProp_rock_shelf")])
 exit_kind = 1
 gate_distance_beyond_enemy = 7.5

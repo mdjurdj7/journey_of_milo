@@ -21,6 +21,10 @@ extends SceneTree
 #              roll_single_and_multi): a second slot whose roll breaks one
 #              is re-rolled to an option that keeps it; with no legal
 #              roll, the floor stands as rolled
+#   floors   - every real floor of the region, every combination of its
+#              slots' options against its own roll rules: at least one
+#              keeps them (no roll fails), and every option stands in one
+#              that does (none is dead - a re-roll could never reach it)
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/encounter_slots_probe.gd
 #
@@ -28,10 +32,11 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload (RegionField,
 # BattleController, the props' own scripts).
 
-const CASES := 8
+const CASES := 9
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BASE_FLOOR_PATH := "res://floors/region1_floor1.tres"
+const REGION_PATH := "res://floors/region1.tres"
 const BATTLE_CONTROLLER_PATH := "res://battle/battle_controller.gd"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const SILTJAW_PATH := "res://battle/rules/enemies/siltjaw.tres"
@@ -74,6 +79,7 @@ func _initialize() -> void:
 	await _check_rng()
 	await _check_role()
 	await _check_rules()
+	_check_real_floors()
 	if _completed != CASES:
 		_failures += 1
 		print("FAIL: only %d of %d cases ran to the end" % [_completed, CASES])
@@ -357,6 +363,42 @@ func _prop_scripts(field: Node) -> Array[String]:
 	return found
 
 # --- Helpers ---
+
+# Every combination of each real floor's slot options (one per slot),
+# through the floor's own FloorData.roll_problem().
+func _check_real_floors() -> void:
+	var region: Resource = load(REGION_PATH)
+	var floors: Array = region.get("floors")
+	for floor_index in floors.size():
+		var floor_data := floors[floor_index] as FloorData
+		if floor_data == null or floor_data.slots.is_empty():
+			continue
+		var label: String = "Floor %d" % (floor_index + 1)
+		var combos: Array = [[]]
+		for slot in floor_data.slots:
+			var grown: Array = []
+			for combo: Array in combos:
+				for option in slot.options:
+					var next: Array = combo.duplicate()
+					next.append(option)
+					grown.append(next)
+			combos = grown
+		var legal: int = 0
+		var reached: Dictionary = {}
+		for combo: Array in combos:
+			var stood: Array[EncounterOption] = []
+			for option in combo:
+				stood.append(option as EncounterOption)
+			if not floor_data.roll_problem(stood).is_empty():
+				continue
+			legal += 1
+			for option in stood:
+				reached[option.option_id] = true
+		_expect(legal > 0, "%s: some combination of its %d keeps its roll rules" % [label, combos.size()])
+		for slot in floor_data.slots:
+			for option in slot.options:
+				_expect(reached.has(option.option_id), "%s: '%s/%s' stands in a combination that keeps the rules - it isn't dead" % [label, slot.slot_id, option.option_id])
+	_completed += 1
 
 func _expect(condition: bool, label: String) -> void:
 	if condition:

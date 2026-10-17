@@ -181,6 +181,10 @@ func _start_fight(floor_index: int, enemy_path: String, new_run: bool = true) ->
 	_run_state.set("run_opening_pending", false)
 	_run_state.set("title_pending", false)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	# Floor 2's Siltjaw slot can roll empty: stood here.
+	if floor_index == FLOOR_2:
+		var forced: Dictionary[StringName, StringName] = {&"siltjaw": &"siltjaw"}
+		_field.set("force_options", forced)
 	root.add_child(_field)
 	for i in 30:
 		await physics_frame

@@ -84,7 +84,9 @@ func _initialize() -> void:
 			if slot == null:
 				continue
 			for option in slot.options:
-				if option != null:
+				# An option that stands no one (a slot rolled empty) has no
+				# fight to stage.
+				if option != null and not option.members.is_empty():
 					await _check_fight(floor_index, slot, option)
 	print("battle_placement_probe: %d of %d fights staged cleanly" % [_clean, _fights])
 	if _failures == 0:

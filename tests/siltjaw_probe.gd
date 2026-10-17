@@ -357,6 +357,9 @@ func _start_fight(card_path: String) -> Node:
 	_run_state.set("run_opening_pending", false)
 	_run_state.set("title_pending", false)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	# Its slot can roll empty: stood here.
+	var forced: Dictionary[StringName, StringName] = {&"siltjaw": &"siltjaw"}
+	_field.set("force_options", forced)
 	root.add_child(_field)
 	for i in 30:
 		await physics_frame

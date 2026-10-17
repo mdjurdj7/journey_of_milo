@@ -33,8 +33,9 @@ class_name FieldScatter
 #   - every static body's footprint (props, ledges) grown by prop_margin_m
 #     - his walk-up to anything stops at that edge - or a ledge's by the
 #     entry's own ledge_margin_m, when it has one; the gate's shapes by
-#     gate_margin_m; a rock shelf's outline by shelf_margin_m; the spawn
-#     by spawn_clear_m;
+#     gate_margin_m; a rock shelf's outline by shelf_margin_m; an empty
+#     Siltjaw spot's old mounds and trails (SiltjawSigns) by prop_margin_m;
+#     the spawn by spawn_clear_m;
 #   - the battle frame's feet: a lone enemy's body and the ring his stance
 #     can land on - every spot RegionField's stance rule can give, its
 #     stance_distance_min()..stance_distance() for that enemy (its near
@@ -793,6 +794,11 @@ func _build_keepouts() -> void:
 			outline.append(Vector2(world.x, world.z))
 		if outline.size() >= 3:
 			_keepouts.append(_polygon(outline, shelf_margin_m))
+	# A Siltjaw's spot rolled empty: its old mounds and trails, each
+	# footprint grown by prop_margin_m, as a body's would be.
+	for node in _field.find_children("*", "SiltjawSigns", true, false):
+		for footprint in (node as SiltjawSigns).get_footprints():
+			_keepouts.append(_polygon(footprint, prop_margin_m))
 	_keepouts.append(_disc(_spawn, spawn_clear_m))
 	_add_battle_keepouts()
 
