@@ -393,6 +393,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.kill_presentation_time = _kill_presentation_time
 	battle_controller.damage_dealt.connect(_battle_feedback.on_damage_dealt)
 	battle_controller.enemy_hit_blocked.connect(_battle_feedback.on_enemy_hit_blocked)
+	battle_controller.player_hit_blocked.connect(_battle_feedback.on_player_hit_blocked)
 	# A card's play effect (Blood Arc's stroke) goes down before its hits
 	# report, over the enemies it can hit - and under their intent
 	# readouts, the lowest of whose bottom edges it is handed. And the
@@ -551,7 +552,15 @@ func _create_enemy_statuses(enemy_list: Array[FieldEnemy], duration: float) -> v
 		status.enter_battle(duration)
 		_enemy_statuses[enemy] = status
 
+# The bar moves with the hit's number: when a play effect paces the hit
+# (BattleFeedback.reaction_delay() - Blood Arc's stroke reaching it), it
+# waits as long, read in the hit's own frame.
 func _on_enemy_hp_changed(enemy: FieldEnemy, current: int, max_hp: int) -> void:
+	var delay: float = _battle_feedback.reaction_delay(enemy) if _battle_feedback != null else 0.0
+	if delay > 0.0:
+		await get_tree().create_timer(delay).timeout
+		if not is_instance_valid(enemy):
+			return
 	var status: EnemyStatus = _enemy_statuses.get(enemy)
 	if status != null:
 		status.update_hp(current, max_hp)

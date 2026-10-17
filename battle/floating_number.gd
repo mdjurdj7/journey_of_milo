@@ -18,6 +18,10 @@ const FONT_PATH := "res://assets/fonts/Spectral-SemiBold.ttf"
 
 @export var rise_px: float = 60.0
 @export var duration_sec: float = 0.6
+# The punch-in as it lands, through the hit's stop: from punch_scale down
+# to 1 over punch_time_sec.
+@export var punch_scale: float = 1.25
+@export var punch_time_sec: float = 0.12
 @export var font_size_px: int = 40
 @export var outline_size_px: int = 2
 
@@ -36,14 +40,20 @@ func _ready() -> void:
 	add_theme_constant_override("outline_size", outline_size_px)
 
 # `size_multiplier` grows the numeral from font_size_px - a heavy hit's
-# (BattleFeedback.number_scale()).
+# (BattleFeedback.number_scale()). Shown in the frame its hit's stop
+# starts, it punches in about its own centre (punch_scale, punch_time_sec)
+# as it rises.
 func show_value(value: int, screen_pos: Vector2, size_multiplier: float = 1.0) -> void:
 	text = str(value)
 	add_theme_font_size_override("font_size", roundi(float(font_size_px) * size_multiplier))
 	position = screen_pos
+	reset_size()
+	pivot_offset = size / 2.0
+	scale = Vector2.ONE * punch_scale
 
 	var tween := create_tween()
 	tween.set_parallel(true)
 	tween.tween_property(self, "position:y", screen_pos.y - rise_px, duration_sec)
 	tween.tween_property(self, "modulate:a", 0.0, duration_sec)
+	tween.tween_property(self, "scale", Vector2.ONE, maxf(punch_time_sec, 0.0)).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
 	tween.chain().tween_callback(queue_free)

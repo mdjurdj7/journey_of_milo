@@ -415,13 +415,15 @@ var _bob_angle: float = 0.0
 var _bob_phase: float = 0.0
 var _hover_tween: Tween = null
 var _bob_tween: Tween = null
-# A hit-stop on this body (hold_for()): when it ends, in real microseconds
-# (0 = none); the tweens it paused, to play on; its attachment's process
-# mode, to put back. And the latest recoil, which a stop also holds.
-var _hold_until_usec: int = 0
+# A hit-stop on this body (hold_for()): the timer that ends it (null =
+# none); the tweens it paused, to play on; its attachment's process mode,
+# to put back. And the latest recoil and attack lunge, which a stop also
+# holds.
+var _hold_timer: SceneTreeTimer = null
 var _held_tweens: Array[Tween] = []
 var _held_attachment_mode: Node.ProcessMode = Node.PROCESS_MODE_INHERIT
 var _recoil_tween: Tween = null
+var _attack_tween: Tween = null
 var _slash_mark_mesh: ArrayMesh = null
 # A buried body's show while it's down (rest height under the sand; see
 # _apply_model_lift()): the sand swelling over it, and the contact shadow
@@ -1202,37 +1204,43 @@ func play_hit_recoil(from_direction: Vector3, distance: float, tilt_degrees: flo
 	tween.tween_property(self, "global_position", base_position, return_time)
 	tween.parallel().tween_property(self, "rotation:x", base_tilt, return_time)
 	# Struck inside a hit-stop: the recoil waits for it to end.
-	if _hold_until_usec != 0:
+	if _hold_timer != null:
 		tween.pause()
 		_held_tweens.append(tween)
 
-# A hit-stop on this body (the Wanderer's Slash on contact - BattleFeedback)
-# for `seconds` of real time: what moves it holds where it is - its turn,
-# hover, bob, flight and recoil tweens pause, a recoil started during the
-# stop waits for its end, and its attachment (claws, crest, wings) stops
-# processing - then all of it plays on. Its flash, sound and slash mark
-# run through it. A stop only ever extends the one running.
+# A hit-stop on this body (a contact it gives or takes - BattleFeedback)
+# for `seconds` of game time: what moves it holds where it is - its turn,
+# hover, bob, flight, recoil and attack-lunge tweens pause, a recoil
+# started during the stop waits for its end, and its attachment (claws,
+# crest, wings) stops processing - then all of it plays on. Its flash,
+# sound and slash mark run through it. A stop only ever extends the one
+# running. Timed by a SceneTreeTimer, so under the probes' fixed frame
+# rate it lasts the same frames every run.
 func hold_for(seconds: float) -> void:
 	if seconds <= 0.0 or _settling:
 		return
-	var until: int = Time.get_ticks_usec() + int(seconds * 1000000.0)
-	if until <= _hold_until_usec:
+	if _hold_timer != null and _hold_timer.time_left >= seconds:
 		return
-	if _hold_until_usec == 0:
-		for tween: Tween in [_recoil_tween, _face_tween, _battle_turn_tween, _flight_tween, _hover_tween, _bob_tween]:
+	if _hold_timer == null:
+		for tween: Tween in [_recoil_tween, _attack_tween, _face_tween, _battle_turn_tween, _flight_tween, _hover_tween, _bob_tween]:
 			if tween != null and tween.is_valid() and tween.is_running():
 				tween.pause()
 				_held_tweens.append(tween)
 		if _attachment != null:
 			_held_attachment_mode = _attachment.process_mode
 			_attachment.process_mode = Node.PROCESS_MODE_DISABLED
-	_hold_until_usec = until
-	get_tree().create_timer(seconds, true, false, true).timeout.connect(_end_hold.bind(until))
+	var timer: SceneTreeTimer = get_tree().create_timer(seconds, true, false, true)
+	_hold_timer = timer
+	timer.timeout.connect(_end_hold.bind(timer))
 
-func _end_hold(until: int) -> void:
-	if until != _hold_until_usec:
+# Whether a hit-stop holds this body now (hold_for()).
+func is_held() -> bool:
+	return _hold_timer != null
+
+func _end_hold(timer: SceneTreeTimer) -> void:
+	if timer != _hold_timer:
 		return
-	_hold_until_usec = 0
+	_hold_timer = null
 	for tween in _held_tweens:
 		if tween.is_valid():
 			tween.play()
@@ -1417,6 +1425,7 @@ func play_attack_snap(target: Node3D) -> float:
 		windup = float(_attachment.call("play_windup", attack_snap_out_time))
 
 	var tween := create_tween()
+	_attack_tween = tween
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	if windup > 0.0:
 		tween.tween_interval(windup)

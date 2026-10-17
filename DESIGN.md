@@ -49,9 +49,10 @@ few wisps of sand lift from where it lies and drift off downwind, fading
 the fog, not a combat effect, and never brighter than the ground; no
 glow, no burst. The death itself is a slump and a fade into the fog
 colour (the enemy fog pass's `veil`), never a flash. A killing blow plays
-in full - every hit, number, hit-stop (at least `kill_hitstop_min` on a
-kill), recoil and play effect - before the death begins; the rules drop
-the enemy at once. (2026-10-09.)
+in full - every hit, number, hit-stop (`BattleFeedback.big_hitstop_ms`
+on a kill), recoil and play effect - before the death begins; the rules
+drop the enemy at once. (2026-10-09; the stop per fighter since
+2026-10-17.)
 
 ## Wind
 

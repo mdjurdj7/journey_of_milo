@@ -80,6 +80,9 @@ signal damage_dealt(source: Variant, target: Variant, amount: int, kind: String)
 # damage_dealt follows. Otherwise this hit's damage_dealt comes right
 # after, in the same call.
 signal enemy_hit_blocked(enemy: FieldEnemy, absorbed: bool)
+# One hit of `enemy`'s attack the player's Block or absorb took whole: no
+# damage_dealt for it - BattleFeedback's blocked stop and armored sound.
+signal player_hit_blocked(enemy: FieldEnemy)
 # source/target are each either the String "player" or a FieldEnemy node -
 # whichever combatant actually dealt/received the hit.
 # An enemy's death begins. Its HP reached 0 on a hit some time before:
@@ -130,6 +133,10 @@ signal battle_lost()
 # after the card it answers has resolved, so the card's own blows -
 # Blood Arc's staggered reactions among them - have shown first.
 @export var counter_strike_delay: float = 0.35
+# An enemy attack of several hits (Peck, Tail Lash) reports them this far
+# apart (seconds), the first at its move's contact - each its own number,
+# contact sound and hit-stop (_report_enemy_attack()).
+@export var enemy_hit_interval: float = 0.12
 # A killed enemy's death waits for the blow that killed it to show in
 # full - kill_presentation_time's answer for it, then this much more
 # (real seconds) - before it begins (_hold_death_for()).
@@ -263,6 +270,15 @@ var _roster: Array[FieldEnemy] = []
 # taken HP from, and whether this turn's draw is spent.
 var _card_damaged: Dictionary = {} # Combatant -> true
 var _multi_hit_draw_used: bool = false
+# The HP enemy hits have taken by the rules but not yet reported, hit by
+# hit (_owe_attacks()) - what the HP bar is still to lose: shown_player_
+# hp(). And whether the hit reporting now is one of an attack's several
+# (is_multi_hit_report()).
+var _hp_owed: int = 0
+var _multi_hit_report: bool = false
+# Members of a shared move (_run_simultaneous_turn()) still reporting
+# their hits.
+var _reports_running: int = 0
 
 func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wanderer: Wanderer) -> void:
 	_hand_container = hand_container
@@ -1056,12 +1072,14 @@ func _counter_strikes(against: Array[FieldEnemy]) -> void:
 		var result: Dictionary = EnemyTurn.counter_strike(combatant, enemy.enemy_data, player)
 		if result.is_empty():
 			continue
+		_owe_attacks([result] as Array[Dictionary])
 		if counter_strike_delay > 0.0:
 			await get_tree().create_timer(counter_strike_delay).timeout
 		var snap_delay: float = enemy.play_attack_snap(_wanderer)
 		if snap_delay > 0.0:
 			await get_tree().create_timer(snap_delay).timeout
-		_report_enemy_attack(enemy, result)
+		await _report_enemy_attack(enemy, result)
+		_hp_owed = 0
 		# What the strike spent (Garnished, Unbroken) leaves the readouts.
 		status_changed.emit()
 
@@ -1117,9 +1135,11 @@ func _strike_from_below(enemy: FieldEnemy) -> void:
 	var result: Dictionary = EnemyTurn.strike_from_below(_combatants.get(enemy), enemy.enemy_data, player)
 	if result.is_empty():
 		return
+	_owe_attacks([result] as Array[Dictionary])
 	if counter_strike_delay > 0.0:
 		await get_tree().create_timer(counter_strike_delay).timeout
-	_report_enemy_attack(enemy, result)
+	await _report_enemy_attack(enemy, result)
+	_hp_owed = 0
 	status_changed.emit()
 
 # The Wanderer's swing is short of its cancel point (_resolve_play()).
@@ -1464,13 +1484,16 @@ func _run_sequential_turn() -> void:
 			# Each attack of the turn its own lunge and its own report, one
 			# after another (EnemyTurn.repeats() - Bereft's two). A bite from
 			# under the sand has no lunge: the body isn't there to see.
-			for attack: Dictionary in _attacks_of(result):
+			var attacks: Array[Dictionary] = _attacks_of(result)
+			_owe_attacks(attacks)
+			for attack: Dictionary in attacks:
 				var snap_delay: float = counter_strike_delay if enemy.is_dug_in() else _play_attack_move(enemy, intent)
 				if snap_delay > 0.0:
 					await get_tree().create_timer(snap_delay).timeout
-				_report_enemy_attack(enemy, attack)
+				await _report_enemy_attack(enemy, attack)
 				if player.hp <= 0:
 					break
+			_hp_owed = 0
 			# Killed by what came back off its own attack (the worn
 			# piece's hit_back_damage): reported and dropped with that
 			# attack, and nothing more of its turn plays out.
@@ -1518,9 +1541,13 @@ func _run_sequential_turn() -> void:
 		if player.hp <= 0:
 			break
 
+# Each member's hits land at its own move's contact (_report_attacks_
+# after(), all running at once), not after the longest: one wait covers
+# the longest move and every member's last hit.
 func _run_simultaneous_turn() -> void:
 	var acting: Array[FieldEnemy] = []
 	var results: Dictionary = {} # FieldEnemy -> take_turn() result
+	var snaps: Dictionary = {} # FieldEnemy -> its attack move's contact
 	var longest_snap: float = 0.0
 	# A copy, as in _run_sequential_turn(): a countdown can drop an enemy.
 	for enemy in enemies.duplicate():
@@ -1539,20 +1566,30 @@ func _run_simultaneous_turn() -> void:
 		acting.append(enemy)
 		# The members' moves start together - one shared move.
 		if results[enemy]["attacked"]:
-			longest_snap = maxf(longest_snap, _play_attack_move(enemy, intent))
+			var snap: float = _play_attack_move(enemy, intent)
+			snaps[enemy] = snap
+			longest_snap = maxf(longest_snap, snap)
 		if results[enemy]["defended"]:
 			longest_snap = maxf(longest_snap, _play_defend_move(enemy, intent))
 		# A Denied member sits the shared move out, on the same beat.
 		if results[enemy]["denied"]:
 			longest_snap = maxf(longest_snap, denied_beat_sec)
 		longest_snap = maxf(longest_snap, _play_burrow_for(enemy, results[enemy]))
+	# The rules have taken every member's hits already: all of them owed
+	# before the first is shown.
+	for enemy in acting:
+		if results[enemy]["attacked"]:
+			_owe_attacks(_attacks_of(results[enemy]))
+	_reports_running = 0
+	for enemy in acting:
+		if results[enemy]["attacked"]:
+			_reports_running += 1
+			_report_attacks_after(enemy, _attacks_of(results[enemy]), float(snaps.get(enemy, 0.0)))
 	if longest_snap > 0.0:
 		await get_tree().create_timer(longest_snap).timeout
-	for enemy in acting:
-		var result: Dictionary = results[enemy]
-		if result["attacked"]:
-			for attack: Dictionary in _attacks_of(result):
-				_report_enemy_attack(enemy, attack)
+	while _reports_running > 0:
+		await get_tree().process_frame
+	_hp_owed = 0
 	status_changed.emit()
 	for enemy in acting:
 		_show_roused(enemy)
@@ -1622,33 +1659,50 @@ func _report_countdown(enemy: FieldEnemy, combatant: Combatant, result: Dictiona
 		_report_damage("player", combatant, taken, "status")
 	return combatant.hp <= 0
 
-# The hit as the view hears it, once the lunge has landed: the damage
-# that reached HP, and any Grace it opened.
+# One member's attacks in a shared move: its hits from `delay` (its own
+# move's contact), each attack after the last enemy_hit_interval on.
+func _report_attacks_after(enemy: FieldEnemy, attacks: Array[Dictionary], delay: float) -> void:
+	if delay > 0.0:
+		await get_tree().create_timer(delay).timeout
+	for i in attacks.size():
+		if i > 0 and enemy_hit_interval > 0.0:
+			await get_tree().create_timer(enemy_hit_interval).timeout
+		await _report_enemy_attack(enemy, attacks[i])
+	_reports_running -= 1
+
+# The HP `attacks` took by the rules, owed to the HP bar until each hit is
+# reported (_report_enemy_hit()). Called before the first of them shows.
+func _owe_attacks(attacks: Array[Dictionary]) -> void:
+	for attack in attacks:
+		for hit: Dictionary in attack.get("hits", []):
+			_hp_owed += int(hit["to_hp"]) - int(hit.get("saved_heal", 0))
+
+# The player's HP as the readouts should show it now: the rules' HP, plus
+# what enemy hits have taken but not yet reported (_owe_attacks()). Read
+# by BattleFeedback in a hit's own frame - 0 or less: that hit kills.
+func shown_player_hp() -> int:
+	return player.hp + _hp_owed
+
+# Whether the enemy hit reporting now is one of its attack's several - its
+# stop is the multi-hit one (BattleFeedback). Read in the hit's own frame.
+func is_multi_hit_report() -> bool:
+	return _multi_hit_report
+
+# The attack as the view hears it, once its move has landed: hit by hit,
+# enemy_hit_interval apart, each its own report (_report_enemy_hit()) -
+# then the Grace it opened, what it left on them and the worn piece's hit
+# back. Its HP is owed already (_owe_attacks()).
 func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 	RunLogger.block_used(result["blocked"], result["absorbed"])
 	if enemy.enemy_data != null:
 		RunLogger.enemy_attack(enemy.enemy_data.resource_path.get_file().get_basename(), result["intent"], result["hits"])
-	# A lethal guard that left the player above where the hit found them
-	# (Refuse the End's survive HP): the run's HP follows, the way a card's
-	# heal does - HP only, no Toll - at the hit it caught. What landed
-	# before it, its lift, then what landed after it on the HP it left: all
-	# the loss first would stop the run's HP at 0 and lose the later hits.
-	if result["saved_heal"] > 0:
-		var lost: int = 0
-		for hit: Dictionary in result["hits"]:
-			lost += int(hit["to_hp"])
-			var lift: int = int(hit.get("saved_heal", 0))
-			if lift <= 0:
-				continue
-			if lost > 0:
-				_report_damage(enemy, player, lost, "attack")
-			lost = 0
-			_heal_run_hp(lift, "lethal_guard")
-			hp_changed.emit(player.hp, player.max_hp)
-		if lost > 0:
-			_report_damage(enemy, player, lost, "attack")
-	elif result["damage_to_hp"] > 0:
-		_report_damage(enemy, player, result["damage_to_hp"], "attack")
+	var hits: Array = result.get("hits", [])
+	for i in hits.size():
+		if i > 0 and enemy_hit_interval > 0.0:
+			await get_tree().create_timer(enemy_hit_interval).timeout
+			if not is_instance_valid(enemy):
+				return
+		_report_enemy_hit(enemy, hits[i] as Dictionary, hits.size() > 1)
 	if result["grace_opened"] > 0:
 		RunLogger.grace_opened(result["grace_opened"])
 		grace_changed.emit(player.grace)
@@ -1664,6 +1718,28 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 		if combatant != null:
 			RunLogger.mechanic("hit_back", {"enemy": _log_id(enemy), "damage": hit_back})
 			_report_damage("player", combatant, hit_back, "hit_back")
+
+# One hit of an enemy's attack (`multi`: one of several): what reached HP
+# as its own report, or - Block or absorb having taken it whole -
+# player_hit_blocked. A lethal guard that left the player above where the
+# hit found them (Refuse the End's survive HP) lifts the run's HP after
+# it, the way a card's heal does - HP only, no Toll - in the fight's
+# order: all the loss first would stop the run's HP at 0 and lose the
+# later hits.
+func _report_enemy_hit(enemy: FieldEnemy, hit: Dictionary, multi: bool) -> void:
+	var to_hp: int = int(hit["to_hp"])
+	_multi_hit_report = multi
+	if to_hp > 0:
+		_hp_owed -= to_hp
+		_report_damage(enemy, player, to_hp, "attack")
+	elif int(hit["damage"]) > 0 and int(hit["blocked"]) + int(hit["absorbed"]) > 0:
+		player_hit_blocked.emit(enemy)
+	_multi_hit_report = false
+	var lift: int = int(hit.get("saved_heal", 0))
+	if lift > 0:
+		_hp_owed += lift
+		_heal_run_hp(lift, "lethal_guard")
+		hp_changed.emit(shown_player_hp(), player.max_hp)
 
 # The body's pose for its queued intent (FieldEnemy.set_rearing()):
 # reared while an intent that asks for it (EnemyIntent.rear_while_
@@ -2017,7 +2093,7 @@ func _report_damage(source: Variant, target_combatant: Combatant, amount: int, k
 		if source is FieldEnemy and (source as FieldEnemy).enemy_data != null:
 			source_name = (source as FieldEnemy).enemy_data.enemy_name
 		_lose_run_hp(amount, source_name)
-		hp_changed.emit(player.hp, player.max_hp)
+		hp_changed.emit(shown_player_hp(), player.max_hp)
 	else:
 		RunLogger.damage_dealt(target_combatant.get_instance_id(), amount, target_combatant.hp)
 		var enemy := _field_enemy_for(target_combatant)

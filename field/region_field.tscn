@@ -208,7 +208,6 @@ hand_mount_rotation_degrees = Vector3(-1.36, 71.12, -114.36)
 shading_mode = 0
 light_wrap = 0.6
 self_shadow_strength = 0.5
-slash_hitstop_time = 0.07
 slash_cancel_time = 0.75
 draw_sword_blend_in = 0.35
 draw_sword_grab_time = 0.416667

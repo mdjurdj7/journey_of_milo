@@ -1,8 +1,9 @@
 extends SceneTree
 
 # Headless probe for killing blows and the death after them: a killing
-# hit shows in full - its damage number, its hit-stop (at least
-# kill_hitstop_min, a small Blood Arc's too) and its recoil - before
+# hit shows in full - its damage number, its hit-stop on the enemy (the
+# kill's, BattleFeedback.stop_ms(), a small Blood Arc's too - read off
+# FieldEnemy.is_held()) and its recoil - before
 # the death begins (BattleController.enemy_defeated); Blood Arc killing a
 # whole pack reacts on every one of them, and runs its stroke out, before
 # any dies; the death plays (FieldEnemy.death_finished) and only then is
@@ -58,9 +59,9 @@ func _initialize() -> void:
 		print("killing_blow_probe: %d FAILED" % _failures)
 		quit(1)
 
-# A Slash (6 - under the heavy tier) kills floor 1's crab: its number, a
-# hit-stop of at least kill_hitstop_min and its recoil all show before the
-# death begins; the death plays out; then, and only then, the win.
+# A Slash (6 - under the heavy tier) kills floor 1's crab: its number, the
+# kill's hit-stop and its recoil all show before the death begins; the
+# death plays out; then, and only then, the win.
 func _check_single_kill() -> void:
 	var controller: Node = await _start_fight(FLOOR_1, &"", SLASH_PATH)
 	if controller != null:
@@ -77,15 +78,15 @@ func _check_single_kill() -> void:
 			_expect(_recoiled_before(log, crab, defeated), "...and its recoil")
 			var stop_ms: int = _stop_ms_before(log, defeated)
 			var minimum: int = int(log["kill_min_ms"])
-			_expect(stop_ms >= minimum - SLACK_MS, "...and a hit-stop of at least kill_hitstop_min (%d ms, got %d)" % [minimum, stop_ms])
+			_expect(stop_ms >= minimum - SLACK_MS, "...and the kill's hit-stop (%d ms, got %d)" % [minimum, stop_ms])
 			_expect(defeated - hit >= 300, "...the death waits for the blow (%d ms after the hit)" % (defeated - hit))
 		_check_win_after_deaths(log, "The crab")
 	await _teardown()
 	_completed += 1
 
 # Blood Arc (its damage to each) kills the whole island pack: every member's
-# number, recoil and the small kill's minimum hit-stop before any
-# death; the stroke runs out first; the win after the last death.
+# number, recoil and the kill's hit-stop before any death; the stroke
+# runs out first; the win after the last death.
 func _check_blood_arc_pack() -> void:
 	var controller: Node = await _start_fight(FLOOR_2, ISLAND, BLOOD_ARC_PATH)
 	if controller != null:
@@ -106,7 +107,7 @@ func _check_blood_arc_pack() -> void:
 				_expect(_recoiled_before(log, member, first_death), "...'%s' recoils before any death" % (log["names"] as Dictionary).get(member, "?"))
 			var stop_ms: int = _stop_ms_before(log, first_death)
 			var minimum: int = int(log["kill_min_ms"])
-			_expect(stop_ms >= minimum - SLACK_MS, "...a small kill holds at least kill_hitstop_min (%d ms, got %d)" % [minimum, stop_ms])
+			_expect(stop_ms >= minimum - SLACK_MS, "...a small kill holds for the kill's hit-stop (%d ms, got %d)" % [minimum, stop_ms])
 			var stroke_ms: int = int(log.get("stroke_ms", 0))
 			_expect(first_death - _first(log, "hit") >= stroke_ms - SLACK_MS, "...and the stroke runs out first (%d ms, deaths at %d)" % [stroke_ms, first_death - _first(log, "hit")])
 		_check_win_after_deaths(log, "The pack")
@@ -176,8 +177,8 @@ func _check_skip() -> void:
 
 # --- Watching ---
 
-# What a case records, keyed by event: the first time each happened (real
-# ms), per enemy where it matters, the time scale's stops, recoil.
+# What a case records, keyed by event: the first time each happened (game
+# ms), per enemy where it matters, the spans any member was held, recoil.
 func _watch_setup(controller: Node, members: Array) -> Dictionary:
 	var log: Dictionary = {"hit": 0, "number": 0, "defeated": 0, "won": 0, "number_by": {}, "defeated_by": {}, "finished_by": {}, "stops": [], "stop_from": 0, "rest": {}, "moved": {}, "numbers_seen": 0, "stroke_ms": 0, "names": {}, "kill_min_ms": 0}
 	for member in members:
@@ -186,7 +187,7 @@ func _watch_setup(controller: Node, members: Array) -> Dictionary:
 	# Read now: the fight, and the feedback with it, is gone by the checks.
 	var feedback_now: Node = _feedback(controller)
 	if feedback_now != null:
-		log["kill_min_ms"] = int(float(feedback_now.get("kill_hitstop_min")) * 1000.0)
+		log["kill_min_ms"] = roundi(float(feedback_now.call("stop_ms", 1, true)))
 	controller.connect("damage_dealt", func(source: Variant, target: Variant, _amount: int, _kind: String) -> void:
 		if source is String and target is Node and log["hit"] == 0:
 			log["hit"] = ProbePlay.game_msec()
@@ -216,8 +217,8 @@ func _watch(_controller: Node, log: Dictionary) -> void:
 
 # One frame's look: new damage numbers (whose target is the nearest
 # member on screen - by order here: one card's numbers land in its
-# targets' order), the time scale, and how far each member stands from
-# its rest.
+# targets' order), whether any member is held, and how far each member
+# stands from its rest.
 func _record_frame(log: Dictionary) -> void:
 	var now: int = ProbePlay.game_msec()
 	var numbers: int = _numbers_now()
@@ -231,9 +232,13 @@ func _record_frame(log: Dictionary) -> void:
 				if numbers <= int(log["numbers_seen"]):
 					break
 	log["numbers_seen"] = maxi(int(log["numbers_seen"]), _numbers_now())
-	if Engine.time_scale < 1.0 and int(log["stop_from"]) == 0:
+	var held: bool = false
+	for member in (log["rest"] as Dictionary).keys():
+		if is_instance_valid(member) and bool(member.call("is_held")):
+			held = true
+	if held and int(log["stop_from"]) == 0:
 		log["stop_from"] = now
-	elif Engine.time_scale >= 1.0 and int(log["stop_from"]) != 0:
+	elif not held and int(log["stop_from"]) != 0:
 		(log["stops"] as Array).append([int(log["stop_from"]), now])
 		log["stop_from"] = 0
 	# The recoil: a push along the ground, away from the Wanderer - read
@@ -257,7 +262,7 @@ func _recoiled_before(log: Dictionary, member: Variant, at: int) -> bool:
 	var moved: int = int((log["moved"] as Dictionary).get(member, 0))
 	return moved > 0 and moved <= at
 
-# How long the world held, in all, before `at`.
+# How long any member was held, in all, before `at`.
 func _stop_ms_before(log: Dictionary, at: int) -> int:
 	var total: int = 0
 	for span: Array in log["stops"]:
@@ -359,7 +364,6 @@ func _teardown() -> void:
 	if _field != null and is_instance_valid(_field):
 		_field.queue_free()
 	_field = null
-	Engine.time_scale = 1.0
 	for i in 5:
 		await process_frame
 

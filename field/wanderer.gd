@@ -236,12 +236,11 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 # arriving on slash_contact_time - the clip's contact frame (Blender frame
 # 10 at 24 fps), where the card's hit lands too (get_clip_contact_time())
 # - and back over slash_lunge_return_time. The model moves, not the body:
-# his place in the fight stays where it is. On contact the swing holds
-# for slash_hitstop_time (real seconds): his clip stops where it is
-# (hold_animation()) and so does each enemy it strikes (BattleFeedback,
-# FieldEnemy.hold_for()) - the flash, number and sound land as it starts -
-# and the lunge waits the same before it goes back. The Mixamo fallback
-# steps in its own clip and gets none of this; its hit lands at the
+# his place in the fight stays where it is. On contact the hit's stop
+# (BattleFeedback's Hit-Stop group) holds his clip where it is
+# (hold_animation()), and his lunge with it, and each enemy it strikes
+# (FieldEnemy.hold_for()) - the flash, number and sound land as it starts.
+# The Mixamo fallback steps in its own clip; its hit lands at the
 # card's impact_time. A next card waits for the swing to reach
 # slash_cancel_time (seconds into the clip - the end of the follow-
 # through's hang, Blender frame 18) before its play starts
@@ -253,7 +252,6 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 @export var slash_lunge_distance: float = 0.3
 @export var slash_lunge_out_time: float = 0.25
 @export var slash_lunge_return_time: float = 0.45
-@export var slash_hitstop_time: float = 0.07
 
 @export_group("Draw Sword")
 # The glb's own draw_sword (when it carries one - _merge_clips()) is the
@@ -510,10 +508,13 @@ var _swing_clip: StringName = &""
 # returns to.
 var _lunge_tween: Tween = null
 var _lunge_home: Vector2 = Vector2.ZERO
-# When hold_animation()'s stop ends, in real microseconds (0 = none), and
-# the playback speed it puts back.
-var _anim_hold_until_usec: int = 0
+# The timer that ends hold_animation()'s stop (null = none), the playback
+# speed it puts back and the tweens it paused (the lunge, a recoil). And
+# the latest recoil, which a stop also holds.
+var _anim_hold_timer: SceneTreeTimer = null
 var _anim_held_speed: float = 1.0
+var _anim_held_tweens: Array[Tween] = []
+var _recoil_tween: Tween = null
 # The mixer applying the model's poses (the AnimationTree when it's on,
 # else the AnimationPlayer); foot grounding runs on its mixer_applied.
 var _grounding_mixer: AnimationMixer = null
@@ -1946,34 +1947,42 @@ func holds_next_play() -> bool:
 func _swinging() -> bool:
 	return _swing_clip != &"" and _animation_player != null and _animation_player.is_playing() and _animation_player.current_animation == String(_swing_clip)
 
-# The hit-stop `card`'s blow holds for, in real seconds: slash_hitstop_time
-# for a card that swings the glb's own Slash, 0 for any other. BattleFeedback
-# holds the enemies it strikes for this long.
-func get_card_hitstop_time(card: CardData) -> float:
-	if card == null or card.battle_animation != &"Slash" or not _own_slash:
-		return 0.0
-	return maxf(slash_hitstop_time, 0.0)
-
-# His clip stops where it is for `seconds` (real time), then plays on. A
-# stop only ever extends the one running.
+# A hit-stop on him (a contact he gives or takes - BattleFeedback): his
+# clip stops where it is for `seconds` of game time, and his Slash lunge
+# and recoil with it (a recoil started during the stop waits for its
+# end), then all of it plays on. A stop only ever extends the one
+# running. Timed by a SceneTreeTimer, so under the probes' fixed frame
+# rate it lasts the same frames every run.
 func hold_animation(seconds: float) -> void:
 	if _animation_player == null or seconds <= 0.0:
 		return
-	var until: int = Time.get_ticks_usec() + int(seconds * 1000000.0)
-	if until <= _anim_hold_until_usec:
+	if _anim_hold_timer != null and _anim_hold_timer.time_left >= seconds:
 		return
-	if _anim_hold_until_usec == 0:
+	if _anim_hold_timer == null:
 		_anim_held_speed = _animation_player.speed_scale
 		_animation_player.speed_scale = 0.0
-	_anim_hold_until_usec = until
-	get_tree().create_timer(seconds, true, false, true).timeout.connect(_end_animation_hold.bind(until))
+		for tween: Tween in [_lunge_tween, _recoil_tween]:
+			if tween != null and tween.is_valid() and tween.is_running():
+				tween.pause()
+				_anim_held_tweens.append(tween)
+	var timer: SceneTreeTimer = get_tree().create_timer(seconds, true, false, true)
+	_anim_hold_timer = timer
+	timer.timeout.connect(_end_animation_hold.bind(timer))
 
-func _end_animation_hold(until: int) -> void:
-	if until != _anim_hold_until_usec:
+# Whether a hit-stop holds him now (hold_animation()).
+func is_animation_held() -> bool:
+	return _anim_hold_timer != null
+
+func _end_animation_hold(timer: SceneTreeTimer) -> void:
+	if timer != _anim_hold_timer:
 		return
-	_anim_hold_until_usec = 0
+	_anim_hold_timer = null
 	if _animation_player != null:
 		_animation_player.speed_scale = _anim_held_speed
+	for tween in _anim_held_tweens:
+		if tween.is_valid():
+			tween.play()
+	_anim_held_tweens.clear()
 
 # Called by BattleFeedback once BattleController reports a card hit
 # landing on the player. _active_material may be the flat fallback's
@@ -2022,6 +2031,7 @@ func play_hit_recoil(from_direction: Vector3, distance: float, tilt_degrees: flo
 	var recoil_tilt := base_tilt + deg_to_rad(tilt_degrees)
 
 	var tween := create_tween()
+	_recoil_tween = tween
 	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "global_position", recoil_position, out_time)
@@ -2029,6 +2039,10 @@ func play_hit_recoil(from_direction: Vector3, distance: float, tilt_degrees: flo
 	tween.chain().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
 	tween.tween_property(self, "global_position", base_position, return_time)
 	tween.parallel().tween_property(self, "rotation:x", base_tilt, return_time)
+	# Struck inside a hit-stop: the recoil waits for it to end.
+	if _anim_hold_timer != null:
+		tween.pause()
+		_anim_held_tweens.append(tween)
 
 # Same mechanism as FieldEnemy.spawn_sand_puff() (see its own doc),
 # duplicated for the same reason play_hit_recoil() above is.
@@ -2423,7 +2437,6 @@ func bind_to_battle(controller: BattleController) -> void:
 	_battle_controller = controller
 	controller.card_played.connect(_on_card_played)
 	controller.card_swing.connect(_on_card_swing)
-	controller.card_impact.connect(_on_card_impact)
 	controller.card_repeat_swing.connect(_on_card_repeat_swing)
 	controller.status_changed.connect(_on_status_changed)
 
@@ -2434,8 +2447,6 @@ func unbind_battle() -> void:
 		_battle_controller.card_played.disconnect(_on_card_played)
 	if _battle_controller.card_swing.is_connected(_on_card_swing):
 		_battle_controller.card_swing.disconnect(_on_card_swing)
-	if _battle_controller.card_impact.is_connected(_on_card_impact):
-		_battle_controller.card_impact.disconnect(_on_card_impact)
 	if _battle_controller.card_repeat_swing.is_connected(_on_card_repeat_swing):
 		_battle_controller.card_repeat_swing.disconnect(_on_card_repeat_swing)
 	if _battle_controller.status_changed.is_connected(_on_status_changed):
@@ -2453,11 +2464,6 @@ func _on_card_swing(card: CardData) -> void:
 	if card.card_type != CardData.CardType.ATTACK:
 		return
 	play_swing_audio()
-
-# BattleController.card_impact: the glb's Slash's contact holds his clip
-# (get_card_hitstop_time()).
-func _on_card_impact(card: CardData) -> void:
-	hold_animation(get_card_hitstop_time(card))
 
 # BattleController.card_repeat_swing: the repeated hit's follow-through -
 # a short lunge at `target` (the recoil tween, pointed at it) and the
@@ -2494,7 +2500,7 @@ func _on_card_played(card: CardData, target: FieldEnemy) -> void:
 
 # The glb's Slash's step in (see the Slash group): his model out toward
 # target - straight ahead with none - arriving on the contact frame,
-# holding there through the hit-stop, then back. A swing over one still
+# held there by the hit-stop (hold_animation()), then back. A swing over one still
 # in flight goes out from wherever that one has got to, toward the same
 # home.
 func _play_slash_lunge(target: FieldEnemy) -> void:
@@ -2523,8 +2529,6 @@ func _play_slash_lunge(target: FieldEnemy) -> void:
 		_lunge_tween.tween_interval(contact - out_time)
 	_lunge_tween.tween_property(_model, "position:x", reach.x, out_time)
 	_lunge_tween.parallel().tween_property(_model, "position:z", reach.y, out_time)
-	if slash_hitstop_time > 0.0:
-		_lunge_tween.chain().tween_interval(slash_hitstop_time)
 	_lunge_tween.chain().tween_property(_model, "position:x", _lunge_home.x, return_time)
 	_lunge_tween.parallel().tween_property(_model, "position:z", _lunge_home.y, return_time)
 
