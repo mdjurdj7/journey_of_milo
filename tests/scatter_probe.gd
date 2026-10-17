@@ -1,7 +1,10 @@
 extends SceneTree
 
 # Headless probe for the ground scatter (FieldScatter) on floors 1 and 2.
-# Each floor gives identical placements every load; nothing lies in water
+# Each floor gives identical placements every load of the same run - a
+# reload keeps the run's encounter rolls (RunState.encounter_rolls), and
+# the scatter keeps clear of whichever enemies stood, so a new run's other
+# roll lays it differently by design; nothing lies in water
 # past its entry's wet edge, within the worn band's keep-out of its
 # centreline, inside an exclusion, or at the spawn; the item count is
 # under the floor's budget (printed). Floor 1 is near-pristine - two
@@ -82,7 +85,7 @@ func _check_floor_1() -> void:
 	_check_no_collision(scatter)
 	await _check_walk_grid()
 	await _teardown()
-	await _load_field(FLOOR_1)
+	await _load_field(FLOOR_1, true)
 	scatter = _scatter()
 	_expect(scatter != null and _snapshot(scatter) == first, "A second load of floor 1 lays its scatter exactly as the first")
 	await _teardown()
@@ -101,7 +104,7 @@ func _check_floor_2() -> void:
 	_check_cluster_line_clear(scatter, &"crab")
 	_check_no_collision(scatter)
 	await _teardown()
-	await _load_field(FLOOR_2)
+	await _load_field(FLOOR_2, true)
 	scatter = _scatter()
 	_expect(scatter != null and _snapshot(scatter) == first, "A second load of floor 2 lays its scatter exactly as the first")
 	await _teardown()
@@ -260,8 +263,11 @@ func _check_walk_grid() -> void:
 
 # --- Helpers ---
 
-func _load_field(floor_index: int) -> void:
-	_run_state.call("new_run", load(CHARACTER_PATH))
+# A fresh run on `floor_index` - or, `same_run`, the floor loaded again in
+# the run already going: its encounter rolls kept, as a reload keeps them.
+func _load_field(floor_index: int, same_run: bool = false) -> void:
+	if not same_run:
+		_run_state.call("new_run", load(CHARACTER_PATH))
 	_run_state.set("current_floor_index", floor_index)
 	_run_state.set("run_opening_pending", false)
 	_run_state.set("title_pending", false)
@@ -273,9 +279,14 @@ func _load_field(floor_index: int) -> void:
 func _scatter() -> Node:
 	return _field.call("get_scatter") if _field != null else null
 
-# Every instance of every kind: its kind, transform and colour.
+# Every spot of every kind - its place, turn, size, shade and card - then
+# every instance: its kind, transform and colour. The spots are what was
+# laid: headless, the dummy renderer hands back no instance transforms.
 func _snapshot(scatter: Node) -> Array:
 	var items: Array = []
+	for entry: Resource in scatter.call("get_entries"):
+		for spot: RefCounted in scatter.call("get_spots", entry):
+			items.append([entry.get("name"), spot.get("position"), spot.get("basis"), spot.get("size"), spot.get("shade"), spot.get("card"), spot.get("card_yaw"), spot.get("mirrored")])
 	for instance: Node in scatter.call("get_instances"):
 		var multimesh: MultiMesh = (instance as MultiMeshInstance3D).multimesh
 		for i in multimesh.instance_count:
