@@ -6,8 +6,12 @@ extends SceneTree
 # floor 3's crane pair without entering a contact zone - into one only
 # when that enemy is the target; a click in deep water ending at the
 # nearest reachable point; floor 2's island wade walkable and costed, not
-# blocked; smoothing that never wades where the planned path didn't; and
-# floor 2's exit-line hold still stopping a planned walk.
+# blocked; smoothing that never wades where the planned path didn't;
+# floor 2's exit-line hold still stopping a planned walk; and floor 2's
+# island seam (GlassboneSeam, the island_reward roll it shares with the
+# trough), reached on the island: shut while the island's pack stands,
+# open once it is down, worked once for its Glassbone, refusing a second
+# working - and still worked when the floor loads again in the run.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/pathing_probe.gd
 #
@@ -15,7 +19,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload (RegionField,
 # NavGrid through Ground, the Wanderer).
 
-const CASES := 8
+const CASES := 9
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const NAV_GRID_PATH := "res://field/nav_grid.gd"
@@ -43,6 +47,7 @@ func _initialize() -> void:
 	await _check_wade()
 	_check_smoothing_stays_dry()
 	await _check_hold_line()
+	await _check_seam()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -195,7 +200,8 @@ func _check_unreachable() -> void:
 # Floor 2: the trough's island is reached by wading - the path is planned
 # through shallow cells, each costing nav_shallows_cost, none blocked.
 func _check_wade() -> void:
-	await _load(1)
+	# The island's reward rolls the trough or the seam: the trough here.
+	await _load(1, {&"island_reward": &"island_shrine"})
 	var nav: Object = _field.call("get_nav_grid")
 	var spawn: Vector3 = _field.call("get_spawn_position")
 	var trough := _field.find_child("Trough0", true, false) as Node3D
@@ -299,16 +305,76 @@ func _short_of_gate(spawn: Vector3, centre: Vector3, exit_dir: Vector3) -> Vecto
 			return point
 	return centre
 
-func _load(floor_index: int) -> void:
-	_run_state.call("new_run", load(CHARACTER_PATH))
+# `forced`: RegionField.force_options; `new_run` false loads the floor
+# again in the run as it stands.
+func _load(floor_index: int, forced: Dictionary = {}, new_run: bool = true) -> void:
+	if new_run:
+		_run_state.call("new_run", load(CHARACTER_PATH))
 	_run_state.set("current_floor_index", floor_index)
 	_run_state.set("run_opening_pending", false)
 	_run_state.set("title_pending", false)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
 	_field.set("run_logging_enabled", false)
+	if not forced.is_empty():
+		var typed: Dictionary[StringName, StringName] = {}
+		for key in forced:
+			typed[StringName(key)] = StringName(forced[key])
+		_field.set("force_options", typed)
 	root.add_child(_field)
 	for i in 40:
 		await physics_frame
+
+# Floor 2's seam: the Wanderer beside it on the island; shut under the
+# island's pack, open once every member is down, one working for its
+# Glassbone and no second - and, the floor loaded again in the run,
+# still worked and shut.
+func _check_seam() -> void:
+	var forced: Dictionary = {&"island_reward": &"island_seam"}
+	await _load(1, forced)
+	var seam: Node3D = _first_in_group("seams")
+	if seam == null:
+		_fail("no seam on floor 2 with island_seam forced")
+		await _teardown()
+		_completed += 1
+		return
+	var nav: Object = _field.call("get_nav_grid")
+	var spawn: Vector3 = _field.call("get_spawn_position")
+	var beside: Vector2 = nav.call("nearest_open_toward", _flat(seam.global_position), _flat(spawn))
+	var stand := Vector3(beside.x, seam.global_position.y, beside.y)
+	_expect(not bool(seam.call("is_awake")), "Seam: shut while the island's pack stands")
+	_expect(not bool(seam.call("can_open_from", stand)), "...its choice won't open beside it")
+	for node in get_nodes_in_group("enemies"):
+		if node.get("slot_id") == &"island":
+			node.call("mark_defeated")
+	_expect(bool(seam.call("is_awake")), "Seam: open once the pack is down")
+	_expect(bool(seam.call("can_open_from", stand)), "...its choice opens beside it")
+	var before: int = int(_run_state.get("glassbone"))
+	seam.call("choose", 0)
+	_expect(int(_run_state.get("glassbone")) == before + int(seam.get("glassbone_amount")), "Seam: worked, its Glassbone granted (%d -> %d)" % [before, int(_run_state.get("glassbone"))])
+	_expect(bool(seam.call("is_worked")), "...and it is worked")
+	seam.call("choose", 0)
+	_expect(int(_run_state.get("glassbone")) == before + int(seam.get("glassbone_amount")), "Seam: a second working grants nothing")
+	_expect(not bool(seam.call("can_open_from", stand)), "...and its choice won't open again")
+	var granted: int = int(_run_state.get("glassbone"))
+	await _teardown()
+	await _load(1, forced, false)
+	var again: Node3D = _first_in_group("seams")
+	_expect(again != null and bool(again.call("is_worked")), "Seam: back on the floor in the run, still worked")
+	if again != null:
+		for node in get_nodes_in_group("enemies"):
+			if node.get("slot_id") == &"island":
+				node.call("mark_defeated")
+		_expect(not bool(again.call("can_open_from", stand)), "...and shut, its pack down or not")
+		again.call("choose", 0)
+	_expect(int(_run_state.get("glassbone")) == granted, "...granting nothing more")
+	await _teardown()
+	_completed += 1
+
+func _first_in_group(group: StringName) -> Node3D:
+	for node in get_nodes_in_group(group):
+		if _field != null and _field.is_ancestor_of(node) and not node.is_queued_for_deletion():
+			return node as Node3D
+	return null
 
 func _teardown() -> void:
 	if _field != null:

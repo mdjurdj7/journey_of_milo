@@ -21,17 +21,42 @@
 [ext_resource type="Resource" uid="uid://cu071h5ncuhs0" path="res://floors/scatter/floor2_shore.tres" id="22_shore_scatter"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/glower.tres" id="23_glower"]
 [ext_resource type="PackedScene" path="res://field/siltjaw_signs.tscn" id="24_siltjaw_signs"]
+[ext_resource type="PackedScene" path="res://field/glassbone_seam.tscn" id="25_glassbone_seam"]
 [ext_resource type="Script" uid="uid://c1xsh7mpatcy3" path="res://floors/encounter_slot.gd" id="90_encounter_slot"]
 [ext_resource type="Script" uid="uid://n5us4ml13k7m" path="res://floors/encounter_option.gd" id="91_encounter_option"]
 
 [sub_resource type="Resource" id="FloorProp_island_trough"]
 script = ExtResource("3_floor_prop")
 scene = ExtResource("20_trough")
-position = Vector3(-15.052, 0, -19.878)
 overrides = {
 "guard_slot": &"island",
 "trough_yaw_degrees": 45.0
 }
+
+[sub_resource type="Resource" id="EncounterOption_island_shrine"]
+script = ExtResource("91_encounter_option")
+option_id = &"island_shrine"
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_trough")])
+
+[sub_resource type="Resource" id="FloorProp_island_seam"]
+script = ExtResource("3_floor_prop")
+scene = ExtResource("25_glassbone_seam")
+overrides = {
+"guard_slot": &"island",
+"seam_yaw_degrees": 45.0
+}
+
+[sub_resource type="Resource" id="EncounterOption_island_seam"]
+script = ExtResource("91_encounter_option")
+option_id = &"island_seam"
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_seam")])
+
+[sub_resource type="Resource" id="EncounterSlot_island_reward"]
+script = ExtResource("90_encounter_slot")
+slot_id = &"island_reward"
+position = Vector2(-15.052, -19.878)
+required = false
+options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_island_shrine"), SubResource("EncounterOption_island_seam")])
 
 [sub_resource type="Resource" id="FloorProp_alcove_cache"]
 script = ExtResource("3_floor_prop")
@@ -232,7 +257,8 @@ ambience_wind_db = 1.0
 ambience_sea_lowpass_hz = 7000.0
 slots = Array[ExtResource("90_encounter_slot")]([SubResource("EncounterSlot_crab"), SubResource("EncounterSlot_island"), SubResource("EncounterSlot_siltjaw")])
 roll_unique_enemies = true
-props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_island_trough"), SubResource("FloorProp_alcove_cache"), SubResource("FloorProp_sand_fence1"), SubResource("FloorProp_sand_fence2"), SubResource("FloorProp_sand_fence3"), SubResource("FloorProp_sand_fence4"), SubResource("FloorProp_sand_fence5")])
+event_slots = Array[ExtResource("90_encounter_slot")]([SubResource("EncounterSlot_island_reward")])
+props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_alcove_cache"), SubResource("FloorProp_sand_fence1"), SubResource("FloorProp_sand_fence2"), SubResource("FloorProp_sand_fence3"), SubResource("FloorProp_sand_fence4"), SubResource("FloorProp_sand_fence5")])
 exit_kind = 1
 gate_distance_beyond_enemy = 7.5
 wear_path_mid_offset = 1.875

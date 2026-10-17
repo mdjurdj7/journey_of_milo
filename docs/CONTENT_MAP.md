@@ -66,7 +66,7 @@ Gold 12–18. LINE gate.
 | Sputter + Underfoot (`crab`, one of two) | required fight | yes | cards + 12–18 gold | Sputter (1.5, −21.3), Underfoot (−0.8, −21.3) | dry |
 | Underfoot + Glower (`crab`, the other) | required fight | yes | cards + 12–18 gold | Glower (1.5, −23.0) in its own standing pool (1.6 × 1.2 m), Underfoot (−0.8, −21.3) | dry |
 | Dragonfly ×3 (`island`) | optional fight | no | 18–27 gold, 30 % extra, no cards | patrol (−16.8, −20.8) → (−13.0, −20.4) → (−14.8, −18.5) | **wading**, ~6 m each way |
-| Trough | trough | no | heal 15, once per run; inert until the island is cleared | (−15.1, −19.9) | **wading**, on the island |
+| Trough **or** Glassbone seam (`island_reward`, 1:1) | trough / seam | no | trough: heal 15; seam: 1 Glassbone (one temper at floor 3's wagon); either once per run, inert until the island is cleared | (−15.1, −19.9) | **wading**, on the island |
 | Siltjaw (`siltjaw`) | optional fight | no | 18–27 gold, 30 % extra, no cards | (5.2, −7.0) | dry, on a dune 0.55 m up |
 | Belongings cache | finding | no | one of: 45 gold / a card (belongings pool) / the Bedroll (a rest: 30 % of max HP, one use; not with one carried); 25 % that one also holds Glassbone. Line: "Three packs, set down out of the wind. Nobody came back." | (10.1, −24.3) | dry, the east alcove |
 | Rock shelf | terrain | no | nothing (a walkable slab) | (−4.6, −24.4) | dry, not counted |
@@ -211,7 +211,7 @@ The framework budget per floor is 2–3 encounters with one required, one findin
 - **Floor 2** is the only floor fully on budget: 3 encounters, one required, two findings (cache and trough). Its optional content is where the framework says it should be, behind 6 m of wading.
 - **Floor 3** has 2 encounters, which is in range, but **no finding**. The Wagon is a workbench, not a finding.
 - **Floor 4** has 2 encounters, in range, and the Collector, but **no finding**.
-- **Floor 5** has **1 encounter and nothing else**. It is under budget on encounters and findings, and there is **no rest before the region-end fight**: the only heal in the region is floor 2's trough.
+- **Floor 5** has **1 encounter and nothing else**. It is under budget on encounters and findings, and there is **no rest before the region-end fight**: the only heals in the region are floor 2's trough (half of runs - the other half roll its Glassbone seam) and a Bedroll from floor 2's belongings.
 - **Region-level:**
   - Elites fall on floors 3 *and* 4, back to back. The framework says roughly every third floor.
   - The Collector appears once, on floor 4, as the framework asks.
