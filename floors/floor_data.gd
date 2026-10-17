@@ -152,6 +152,16 @@ class_name FloorData
 # counts fights - the gate's slot, the enemy export - ever sees them.
 # Ids are unique across both lists. See RegionField._resolve_encounters().
 @export var event_slots: Array[EncounterSlot] = []
+# Rules the floor's roll keeps across its fight slots (`slots`, never
+# its events) once each has rolled (roll_problem(); RegionField._keep_
+# roll_rules() re-rolls a slot that breaks one, from its own stream).
+# Read at each floor load - an edit shows on the next. Off (the default)
+# = every slot rolls on its own.
+# No enemy (EnemyData.enemy_name - a lone Dragonfly and a swarm's are one
+# enemy) stands in two slots.
+@export var roll_unique_enemies: bool = false
+# At least one slot stands one enemy alone, and at least one two or more.
+@export var roll_single_and_multi: bool = false
 # The floor's own props - whatever stands whichever encounter is rolled
 # (a hull, the Keeper, the trough). Props that belong to an encounter
 # are its option's (EncounterOption.props) and spawn after these.
@@ -250,3 +260,38 @@ enum ExitKind { CHANNEL, LINE }
 # Coin per won fight, inclusive both ends, rolled from RunState.rng.
 @export var gold_min: int = 10
 @export var gold_max: int = 18
+
+# What `stood` - the option each slot stands, one per slot - breaks of the
+# floor's roll rules (roll_unique_enemies, roll_single_and_multi), or ""
+# when it keeps them all. Null entries stand nothing and count for
+# nothing.
+func roll_problem(stood: Array[EncounterOption]) -> String:
+	if roll_unique_enemies:
+		var slot_of: Dictionary = {}
+		for index in stood.size():
+			if stood[index] == null:
+				continue
+			for member in stood[index].members:
+				if member == null or member.enemy_data == null:
+					continue
+				var enemy: String = member.enemy_data.enemy_name
+				if slot_of.has(enemy) and int(slot_of[enemy]) != index:
+					return "%s stands in two slots" % enemy
+				slot_of[enemy] = index
+	if roll_single_and_multi:
+		var single: bool = false
+		var multi: bool = false
+		for option in stood:
+			if option == null:
+				continue
+			var count: int = 0
+			for member in option.members:
+				if member != null and member.enemy_data != null:
+					count += 1
+			single = single or count == 1
+			multi = multi or count >= 2
+		if not single:
+			return "no slot stands a single enemy"
+		if not multi:
+			return "no slot stands more than one enemy"
+	return ""

@@ -17,6 +17,10 @@ extends SceneTree
 #   rng      - the roll leaves RunState.rng exactly where it was
 #   role     - a slot whose options are fought as different roles fails
 #              validation, and the field stands nothing in it
+#   rules    - a floor's roll rules (FloorData.roll_unique_enemies,
+#              roll_single_and_multi): a second slot whose roll breaks one
+#              is re-rolled to an option that keeps it; with no legal
+#              roll, the floor stands as rolled
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/encounter_slots_probe.gd
 #
@@ -24,7 +28,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload (RegionField,
 # BattleController, the props' own scripts).
 
-const CASES := 7
+const CASES := 8
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BASE_FLOOR_PATH := "res://floors/region1_floor1.tres"
@@ -43,6 +47,8 @@ const ANCHOR := Vector2(-2.25, -10.73)
 # Where each option's one prop stands, in the slot's frame.
 const PROP_AT := Vector3(2.0, 0.0, -1.5)
 const SEEDS := 64
+# The rules fixture's second slot, toward the spawn from the first.
+const SECOND_ANCHOR := Vector2(-2.25, -6.0)
 const SETTLE_FRAMES := 10
 const SAFETY_SECONDS := 240.0
 
@@ -67,6 +73,7 @@ func _initialize() -> void:
 	await _check_repeat()
 	await _check_rng()
 	await _check_role()
+	await _check_rules()
 	if _completed != CASES:
 		_failures += 1
 		print("FAIL: only %d of %d cases ran to the end" % [_completed, CASES])
@@ -186,7 +193,86 @@ func _check_role() -> void:
 	await _teardown(field)
 	_completed += 1
 
+# Unique enemies: the first slot stands a Sputter; a seed that rolls the
+# second a Sputter too stands its Siltjaw instead. Single and multi: the
+# first stands a pair; a seed that rolls the second a pair too stands its
+# lone Sputter. Both rules over two lone Sputters: nothing is legal, and
+# both stand as rolled.
+func _check_rules() -> void:
+	var none: Array[StringName] = []
+	var lone: EncounterSlot = _named_slot(&"rules_first", ANCHOR, true, [_option(&"rules_first_sputter", SPUTTER_PATH, BONES_SCENE_PATH)])
+	var second: EncounterSlot = _named_slot(&"rules_second", SECOND_ANCHOR, false, [_option(&"rules_second_sputter", SPUTTER_PATH, HULL_SCENE_PATH), _option(&"rules_second_siltjaw", SILTJAW_PATH, HULL_SCENE_PATH)])
+	var unique_floor: FloorData = _rules_floor([lone, second] as Array[EncounterSlot], true, false)
+	_expect(unique_floor.roll_problem([lone.options[0], second.options[0]] as Array[EncounterOption]).contains("Sputter"), "Two Sputters break unique enemies")
+	_expect(unique_floor.roll_problem([lone.options[0], second.options[1]] as Array[EncounterOption]).is_empty(), "...a Sputter and a Siltjaw keep it")
+	var rolled_seed: int = _seed_rolling(second, &"rules_second_sputter")
+	_clear_rolls()
+	var field: Node = await _load_floor(unique_floor, rolled_seed, {})
+	_expect_eq(_stood(field), [&"rules_first_sputter", &"rules_second_siltjaw"] as Array[StringName], "Seed %d rolls the second a Sputter: it stands its Siltjaw" % rolled_seed)
+	await _teardown(field)
+
+	var pair: EncounterSlot = _named_slot(&"rules_first", ANCHOR, true, [_pair_option(&"rules_first_pair")])
+	var mixed: EncounterSlot = _named_slot(&"rules_second", SECOND_ANCHOR, false, [_pair_option(&"rules_second_pair"), _option(&"rules_second_sputter", SPUTTER_PATH, HULL_SCENE_PATH)])
+	var mix_floor: FloorData = _rules_floor([pair, mixed] as Array[EncounterSlot], false, true)
+	_expect(mix_floor.roll_problem([pair.options[0], mixed.options[0]] as Array[EncounterOption]).contains("single"), "Two pairs break single and multi")
+	rolled_seed = _seed_rolling(mixed, &"rules_second_pair")
+	_clear_rolls()
+	field = await _load_floor(mix_floor, rolled_seed, {})
+	_expect_eq(_stood(field), [&"rules_first_pair", &"rules_first_pair", &"rules_second_sputter"] as Array[StringName], "Seed %d rolls the second a pair: it stands its lone Sputter" % rolled_seed)
+	await _teardown(field)
+
+	var only: EncounterSlot = _named_slot(&"rules_second", SECOND_ANCHOR, false, [_option(&"rules_second_sputter", SPUTTER_PATH, HULL_SCENE_PATH)])
+	var stuck: FloorData = _rules_floor([lone, only] as Array[EncounterSlot], true, true)
+	_clear_rolls()
+	field = await _load_floor(stuck, 1, {})
+	_expect_eq(_stood(field), [&"rules_first_sputter", &"rules_second_sputter"] as Array[StringName], "No legal roll: both stand as rolled")
+	await _teardown(field)
+	_expect(second.pick(rolled_seed, none) == second.ranked(rolled_seed, none)[0], "pick() is ranked()'s first")
+	_completed += 1
+
 # --- Fixture ---
+
+func _named_slot(slot_id: StringName, at: Vector2, required: bool, options: Array) -> EncounterSlot:
+	var slot := EncounterSlot.new()
+	slot.slot_id = slot_id
+	slot.position = at
+	slot.required = required
+	var typed: Array[EncounterOption] = []
+	for option: EncounterOption in options:
+		typed.append(option)
+	slot.options = typed
+	return slot
+
+# A Sputter and a Siltjaw together, no props.
+func _pair_option(option_id: StringName) -> EncounterOption:
+	var option := EncounterOption.new()
+	option.option_id = option_id
+	var members: Array[FloorEnemy] = []
+	for path in [SPUTTER_PATH, SILTJAW_PATH]:
+		var member := FloorEnemy.new()
+		member.enemy_data = load(path) as EnemyData
+		member.position = Vector2(members.size() * 2.5, 0.0)
+		members.append(member)
+	option.members = members
+	return option
+
+func _rules_floor(slots: Array[EncounterSlot], unique: bool, single_and_multi: bool) -> FloorData:
+	var floor_data := (load(BASE_FLOOR_PATH) as FloorData).duplicate() as FloorData
+	floor_data.slots = slots
+	floor_data.props = [] as Array[FloorProp]
+	floor_data.roll_unique_enemies = unique
+	floor_data.roll_single_and_multi = single_and_multi
+	return floor_data
+
+# A run seed whose stream rolls `slot` to `option_id` on region 0, floor
+# 0, or -1 (a FAIL) when none of SEEDS does.
+func _seed_rolling(slot: EncounterSlot, option_id: StringName) -> int:
+	var none: Array[StringName] = []
+	for run_seed in SEEDS:
+		if slot.pick(slot.stream_seed(run_seed, 0, 0), none).option_id == option_id:
+			return run_seed
+	_fail("no seed in %d rolls %s" % [SEEDS, option_id])
+	return -1
 
 # One required slot at floor 1's crab anchor: A, a Sputter with the bones
 # beside it; the other, `second_path`'s enemy with a hull beside it.
@@ -219,9 +305,12 @@ func _fixture_floor(slot: EncounterSlot) -> FloorData:
 	return floor_data
 
 func _load_field(slot: EncounterSlot, run_seed: int, force: Dictionary) -> Node:
+	return await _load_floor(_fixture_floor(slot), run_seed, force)
+
+func _load_floor(floor_data: FloorData, run_seed: int, force: Dictionary) -> Node:
 	var region := RegionData.new()
 	region.display_name = "Fixture"
-	region.floors = [_fixture_floor(slot)] as Array[FloorData]
+	region.floors = [floor_data] as Array[FloorData]
 	_run_state.set("current_region_index", 0)
 	_run_state.set("current_floor_index", 0)
 	_run_state.set("run_seed", run_seed)

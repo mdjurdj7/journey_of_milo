@@ -101,33 +101,54 @@ func stream_seed(run_seed: int, region_index: int, floor_index: int) -> int:
 # The option this slot stands for a roll seeded `stream_seed`: by weight
 # among the options whose id isn't in `taken` (stood elsewhere this run),
 # or among them all when every one is. One option stands without a draw.
-# Null only with no options.
+# Null only with no options. The first of ranked().
 func pick(stream_seed_value: int, taken: Array[StringName]) -> EncounterOption:
-	if options.size() <= 1:
-		return options[0] if not options.is_empty() else null
-	var candidates: Array[EncounterOption] = []
+	var order: Array[EncounterOption] = ranked(stream_seed_value, taken)
+	return order[0] if not order.is_empty() else null
+
+# Every option in the order this slot's stream would stand them: draw by
+# weight among the options not in `taken`, then again among the rest,
+# and so on - those in `taken` after all of them, drawn the same way. The
+# first draw is pick()'s, so a floor's roll rules (FloorData.roll_
+# problem()) re-roll a slot by walking on down this list.
+func ranked(stream_seed_value: int, taken: Array[StringName]) -> Array[EncounterOption]:
+	var fresh: Array[EncounterOption] = []
+	var stood: Array[EncounterOption] = []
 	for option in options:
-		if option != null and not taken.has(option.option_id):
-			candidates.append(option)
-	if candidates.is_empty():
-		for option in options:
-			if option != null:
-				candidates.append(option)
-	if candidates.is_empty():
-		return null
+		if option == null:
+			continue
+		if taken.has(option.option_id):
+			stood.append(option)
+		else:
+			fresh.append(option)
+	if fresh.size() + stood.size() <= 1:
+		return fresh + stood
 	var rng := RandomNumberGenerator.new()
 	rng.seed = stream_seed_value
-	var total: float = 0.0
-	for option in candidates:
-		total += maxf(option.weight, 0.0)
-	if total <= 0.0:
-		return candidates[rng.randi_range(0, candidates.size() - 1)]
-	var roll: float = rng.randf() * total
-	for option in candidates:
-		roll -= maxf(option.weight, 0.0)
-		if roll < 0.0:
-			return option
-	return candidates.back()
+	return _draw_all(fresh, rng) + _draw_all(stood, rng)
+
+# `candidates` drawn one at a time by weight on `rng` (all at weight 0:
+# evenly), each draw taken out - their order.
+static func _draw_all(candidates: Array[EncounterOption], rng: RandomNumberGenerator) -> Array[EncounterOption]:
+	var left: Array[EncounterOption] = candidates.duplicate()
+	var order: Array[EncounterOption] = []
+	while not left.is_empty():
+		var total: float = 0.0
+		for option in left:
+			total += maxf(option.weight, 0.0)
+		var index: int = left.size() - 1
+		if total <= 0.0:
+			index = rng.randi_range(0, left.size() - 1)
+		else:
+			var roll: float = rng.randf() * total
+			for at in left.size():
+				roll -= maxf(left[at].weight, 0.0)
+				if roll < 0.0:
+					index = at
+					break
+		order.append(left[index])
+		left.remove_at(index)
+	return order
 
 # The option with this id, or null.
 func find_option(option_id: StringName) -> EncounterOption:

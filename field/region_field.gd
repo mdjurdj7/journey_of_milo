@@ -573,6 +573,10 @@ class Encounter:
 # This load's encounters, in slot order. Empty until _ready() resolves
 # them.
 var _encounters: Array[Encounter] = []
+# The slots that rolled this load (not forced, not replayed), slot id ->
+# the option ids their roll passed over - for the roll rules' re-roll
+# (_keep_roll_rules()).
+var _rolled_slots: Dictionary = {}
 
 # Parent-first, before any child has entered the tree or run its
 # _ready(): the one moment the floor's landmass and spawn can be put onto
@@ -1307,14 +1311,16 @@ func get_spawn_position() -> Vector3:
 # per slot: force_options' pick if it names one; else what this run
 # already stood there (RunState.encounter_rolls); else a roll from the
 # slot's own stream (EncounterSlot.pick()), passing over every option
-# stood elsewhere this run. The choice is recorded in encounter_rolls -
-# the only state touched: nothing spawns, nothing is logged, and
-# RunState.rng is never drawn from here.
+# stood elsewhere this run. Then the floor's roll rules (FloorData.roll_
+# problem()) - see _keep_roll_rules(). The choices are recorded in
+# encounter_rolls - the only state touched: nothing spawns, nothing is
+# logged, and RunState.rng is never drawn from here.
 func _resolve_encounters() -> void:
 	_encounters.clear()
 	var floor_data := get_floor_data()
 	if floor_data == null:
 		return
+	_rolled_slots.clear()
 	var seen: Dictionary = {}
 	for index in floor_data.slots.size():
 		var slot: EncounterSlot = floor_data.slots[index]
@@ -1332,6 +1338,8 @@ func _resolve_encounters() -> void:
 		encounter.slot = slot
 		encounter.option = _choose_option(slot)
 		_encounters.append(encounter)
+	# The fights' roll rules, before any event joins the list.
+	_keep_roll_rules(floor_data)
 	# Then the events (FloorData.event_slots), after every fight's slot and
 	# by the same roll, ids unique across both lists. An event stands props
 	# only: one that is required or names a member is refused whole.
@@ -1358,6 +1366,77 @@ func _resolve_encounters() -> void:
 		event.slot = slot
 		event.option = _choose_option(slot)
 		_encounters.append(event)
+
+# The options this load's encounters stand, in their order.
+func _stood_options() -> Array[EncounterOption]:
+	var stood: Array[EncounterOption] = []
+	for encounter in _encounters:
+		stood.append(encounter.option)
+	return stood
+
+# The floor's roll rules (FloorData.roll_unique_enemies, roll_single_and_
+# multi) over what its slots rolled. Kept already: nothing changes. Else
+# only the slots that rolled this load are re-rolled - a forced option
+# (force_options) or one this run already stood there stays - optional
+# slots before required, later before earlier: each walks on down its
+# own stream's order (EncounterSlot.ranked()), the rest held, and the
+# first option that keeps every rule stands. If no one slot can, every
+# combination of them is tried in those orders, the first legal one
+# standing. If none is legal, the roll stands as it was, with a warning.
+func _keep_roll_rules(floor_data: FloorData) -> void:
+	if floor_data.roll_problem(_stood_options()).is_empty():
+		return
+	var region_index: int = RunState.current_region_index
+	var floor_index: int = RunState.current_floor_index
+	var movable: Array[int] = []
+	for index in _encounters.size():
+		if _rolled_slots.has(_encounters[index].slot.slot_id):
+			movable.append(index)
+	movable.sort_custom(func(a: int, b: int) -> bool:
+		var a_required: bool = _encounters[a].slot.required
+		var b_required: bool = _encounters[b].slot.required
+		if a_required != b_required:
+			return not a_required
+		return a > b
+	)
+	var orders: Dictionary = {}
+	for index in movable:
+		var slot: EncounterSlot = _encounters[index].slot
+		orders[index] = slot.ranked(slot.stream_seed(RunState.run_seed, region_index, floor_index), _rolled_slots[slot.slot_id])
+	var found: bool = false
+	for index in movable:
+		var before: EncounterOption = _encounters[index].option
+		for option: EncounterOption in orders[index]:
+			_encounters[index].option = option
+			if floor_data.roll_problem(_stood_options()).is_empty():
+				found = true
+				break
+		if found:
+			break
+		_encounters[index].option = before
+	if not found:
+		var held: Array[EncounterOption] = _stood_options()
+		found = _first_legal(floor_data, movable, orders, 0)
+		if not found:
+			for index in _encounters.size():
+				_encounters[index].option = held[index]
+			push_warning("RegionField: %s - no roll keeps its roll rules (%s); it stands as rolled." % [floor_data.resource_path, floor_data.roll_problem(held)])
+	for index in movable:
+		var slot: EncounterSlot = _encounters[index].slot
+		RunState.encounter_rolls["%d:%d:%s" % [region_index, floor_index, slot.slot_id]] = _encounters[index].option.option_id
+
+# Depth-first over `movable` from `depth`, each slot in its order: true
+# with the first combination that keeps the rules standing in
+# _encounters.
+func _first_legal(floor_data: FloorData, movable: Array[int], orders: Dictionary, depth: int) -> bool:
+	if depth >= movable.size():
+		return floor_data.roll_problem(_stood_options()).is_empty()
+	var index: int = movable[depth]
+	for option: EncounterOption in orders[index]:
+		_encounters[index].option = option
+		if _first_legal(floor_data, movable, orders, depth + 1):
+			return true
+	return false
 
 # This load's slots and what each stands, slot id -> option id, in slot
 # order - the run log's floor_entered.
@@ -1386,6 +1465,7 @@ func _choose_option(slot: EncounterSlot) -> EncounterOption:
 			if other != key:
 				taken.append(StringName(RunState.encounter_rolls[other]))
 		option = slot.pick(slot.stream_seed(RunState.run_seed, region_index, floor_index), taken)
+		_rolled_slots[slot.slot_id] = taken
 	RunState.encounter_rolls[key] = option.option_id
 	return option
 
