@@ -7,6 +7,9 @@ extends SceneTree
 # Sting; the Sting one unbreakable blow of 16 that Block and Brace
 # soften; the Rebury nothing; taunt (Inflated) on a packmate barring a
 # Slash from it but not Brace or Sentence. Floor 2's required cluster is the Sputter
+# (or, forced, the Glower's option: its pool stamped on the ground, the
+# Puff swelling it on the Exposed turn, a Slash only at it then, and its
+# death freeing the Underfoot)
 # and the Underfoot, no dragonfly, the island's Dragonfly x3 as they
 # were. The Wanderer's stance on the dune's rise east of the crab stands
 # on the drawn surface, and an escape leaves him there with no lift.
@@ -30,7 +33,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 14
+const CASES := 15
 const UNDERFOOT_PATH := "res://battle/rules/enemies/underfoot.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const DRAGONFLY_PATH := "res://battle/rules/enemies/dragonfly.tres"
@@ -48,6 +51,9 @@ const SLASH_PATH := "res://cards/data/slash.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const SENTENCE_PATH := "res://cards/data/sentence.tres"
 const INFLATED_PATH := "res://battle/rules/statuses/inflated.tres"
+const GLOWER_PATH := "res://battle/rules/enemies/glower.tres"
+const SPUTTER_OPTION := &"sputter_underfoot"
+const GLOWER_OPTION := &"underfoot_glower"
 # Where the fight case logs its run, when run_probes.sh hands over no
 # folder of this process's own (RunLogger.dir_override()).
 const LOG_DIR := "user://underfoot_probe"
@@ -94,6 +100,7 @@ func _initialize() -> void:
 	await _check_escape()
 	await _check_fight_scissor_rule()
 	await _check_no_visible_switch()
+	await _check_glower_option()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -331,7 +338,7 @@ func _check_fight_body() -> void:
 		var combatant: Combatant = _combatant(controller, underfoot)
 		_expect(combatant != null and _state(combatant) == "covered", "The fight opens Covered")
 		_expect(is_equal_approx(float(pose.call("get_barb_raise")), 1.0), "...the barb raised as the frame settles")
-		_expect(_intent_text(controller, underfoot) == "10", "...the Sting telegraphed: 10")
+		_expect(_intent_text(controller, underfoot) == str(STING), "...the Sting telegraphed: %d" % STING)
 		var px: float = _barb_px(underfoot, pose)
 		print("Fight: the raised barb stands %.1f px tall at 1080p" % px)
 		_expect(px >= BARB_MIN_PX, "...clearly above the sand line: %.1f px (at least %d)" % [px, int(BARB_MIN_PX)])
@@ -409,6 +416,46 @@ func _check_escape() -> void:
 		var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
 		_expect(not bool(wanderer.get("_ground_hold_warned")), "...the Wanderer clear of it on the surface - no lift warning")
 		_expect(absf(wanderer.global_position.y - _walk_height(wanderer.global_position)) < 0.03, "...standing on it")
+	await _teardown()
+	_completed += 1
+
+# The Glower's option, forced: floor 2 stamps its pool on the ground,
+# round the Glower. In the fight, the Sting's turn shows its Puff (TAUNT)
+# and a Slash may still go at the Underfoot; the Sting lands and the Puff
+# with it - the Underfoot Exposed, the Glower Inflated and swollen - and
+# a Slash may go only at the Glower; killing it lifts the taunt, and the
+# Slash finds the Underfoot again.
+func _check_glower_option() -> void:
+	var controller: Node = await _start_fight(GLOWER_OPTION)
+	if controller != null:
+		var glower: Node = _find(GLOWER_PATH)
+		var underfoot: Node = _find(UNDERFOOT_PATH)
+		_expect(glower != null and underfoot != null, "The Glower's option stands the Glower and the Underfoot")
+		if glower != null and underfoot != null:
+			var ground: Node = _field.get_node("Ground")
+			var at: Vector3 = (glower as Node3D).global_position
+			_expect_eq((ground.get("_pool_stamps") as Dictionary).size(), 1, "...one pool stamped on the ground")
+			_expect(float(ground.call("get_pool_stamp_distance", Vector2(at.x, at.z))) < 0.0, "...with the Glower in it")
+			var poses: Array[Node] = glower.find_children("*", "GlowerPose", true, false)
+			var pose: Node = poses[0] if poses.size() == 1 else null
+			_expect(pose != null, "The Glower wears GlowerPose")
+			var glower_combatant: Combatant = _combatant(controller, glower)
+			var underfoot_combatant: Combatant = _combatant(controller, underfoot)
+			var slash: CardData = load(SLASH_PATH)
+			_expect_eq(_state(underfoot_combatant), "covered", "The Sting's turn: the Underfoot Covered")
+			_expect_eq(int(controller.call("get_intent_preview", glower)["type"]), EnemyIntent.IntentType.TAUNT, "...the Glower shows its Puff")
+			_expect(not EffectResolver.is_taunting(glower_combatant), "...not yet Inflated")
+			_expect(bool(controller.call("_can_target", slash, underfoot_combatant)), "...a Slash may go at the Underfoot")
+			await _end_turn(controller)
+			_expect_eq(_state(underfoot_combatant), "exposed", "The Sting lands: the Underfoot Exposed")
+			_expect(EffectResolver.is_taunting(glower_combatant), "...and the Glower Puffed: Inflated")
+			_expect(pose != null and bool(pose.call("is_inflated")), "...swollen")
+			_expect(not bool(controller.call("_can_target", slash, underfoot_combatant)), "Inflated: a Slash can't go at the Underfoot")
+			_expect(bool(controller.call("_can_target", slash, glower_combatant)), "...only at the Glower")
+			glower_combatant.hp = 1
+			await _slash(controller, glower, glower_combatant)
+			_expect(glower_combatant.hp <= 0, "A Slash kills the Glower")
+			_expect(bool(controller.call("_can_target", slash, underfoot_combatant)), "The Glower dead: a Slash may go at the Underfoot again")
 	await _teardown()
 	_completed += 1
 
@@ -551,11 +598,11 @@ func _new_run() -> void:
 	_run_state.set("run_opening_pending", false)
 	_run_state.set("title_pending", false)
 
-func _load_field() -> void:
+func _load_field(option: StringName = SPUTTER_OPTION) -> void:
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
-	# The crab stands the Sputter's option, whichever way the run's seed
-	# would roll it (its other is the Glower's).
-	var force: Dictionary[StringName, StringName] = {&"crab": &"sputter_underfoot"}
+	# The crab stands `option` - the Sputter's unless a case asks for the
+	# Glower's - whichever way the run's seed would roll it.
+	var force: Dictionary[StringName, StringName] = {&"crab": option}
 	_field.set("force_options", force)
 	root.add_child(_field)
 	for i in 30:
@@ -564,9 +611,9 @@ func _load_field() -> void:
 # A new run on floor 2 and the crab's fight started at the Underfoot,
 # waited through the camera's swing until the frame settles. The
 # controller, or null (a FAIL is recorded).
-func _start_fight() -> Node:
+func _start_fight(option: StringName = SPUTTER_OPTION) -> Node:
 	_new_run()
-	await _load_field()
+	await _load_field(option)
 	var target: Node3D = _find(UNDERFOOT_PATH) as Node3D
 	if target == null:
 		_fail("no Underfoot on floor 2")
