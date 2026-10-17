@@ -1699,6 +1699,23 @@ func _show_roused(enemy: FieldEnemy) -> void:
 	var held: Status = Status.find_in(combatant.statuses, data.attack_card_status)
 	enemy.set_roused(held.stack_count if held != null and combatant.hp > 0 else 0)
 
+# The battle frame has settled (RegionField._start_battle_hover()): each
+# enemy that opens the fight dug in (EnemyData.opens_dug_in - its rules
+# already under, EnemyTurn.pick_initial_intent()) stays down, and its
+# row swells up across the battle camera's view as a turn's Dig lays it,
+# the tell on its own mound. Called before the frame's hover, so the body
+# never rises first.
+func open_dug_in() -> void:
+	var camera := get_viewport().get_camera_3d()
+	var across: Vector3 = camera.global_transform.basis.x if camera != null else Vector3.ZERO
+	for enemy in enemies:
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant == null or combatant.hp <= 0 or not combatant.dug_in or combatant.dig_intent == null or enemy.is_dug_in() or _wanderer == null:
+			continue
+		enemy.enter_battle_dug_in()
+		enemy.begin_dig(combatant.dig_intent.mound_count, _wanderer.global_position, across)
+		enemy.set_dig_tell(combatant.true_mound)
+
 # An interrupted enemy going under, or a buried one coming up, on the
 # field body (FieldEnemy.play_burrow()) - how long that takes, for the
 # turn to wait on the way it waits on a lunge. 0 when neither happened.

@@ -2460,7 +2460,7 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# The battle frame settles on the beat the overlay reveals the intents
 	# (BattleOverlay._reveal_enemy_intents()); a flyer takes to the air
 	# then, and stays up until the fight ends.
-	get_tree().create_timer(transition_time).timeout.connect(_start_battle_hover.bind(_battle_members.duplicate()))
+	get_tree().create_timer(transition_time).timeout.connect(_start_battle_hover.bind(_battle_members.duplicate(), overlay.battle_controller))
 	overlay.battle_finished.connect(_on_battle_finished.bind(overlay))
 	# Only reachable now - enter_battle() is what creates battle_controller
 	# (see Wanderer.bind_to_battle()'s own doc).
@@ -2659,11 +2659,14 @@ func _battle_gap_min_for(enemy: FieldEnemy) -> float:
 
 # The frame has settled: every member of this fight that flies takes to
 # the air (FieldEnemy.enter_battle_hover()), each a step further round
-# the bob's cycle so a pack never bobs as one. Skipped if the fight is
-# already over.
-func _start_battle_hover(members: Array[FieldEnemy]) -> void:
+# the bob's cycle so a pack never bobs as one - after any that opens the
+# fight dug in has gone under its row instead (BattleController.open_dug_
+# in()). Skipped if the fight is already over.
+func _start_battle_hover(members: Array[FieldEnemy], controller: BattleController) -> void:
 	if not _battle_open:
 		return
+	if is_instance_valid(controller):
+		controller.open_dug_in()
 	for index in members.size():
 		var member: FieldEnemy = members[index]
 		if not is_instance_valid(member) or not _battle_members.has(member):

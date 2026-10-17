@@ -13,6 +13,11 @@ class_name EnemyData
 @export_multiline var mechanic_summary: String = ""
 @export var max_hp: int = 1
 @export var intents: Array[EnemyIntent] = []
+# Opens every fight already under the sand, its loop's first DIG done
+# before the first turn (EnemyTurn.pick_initial_intent()): its mounds up,
+# its first turn the DIG's first move under, and the loop waiting on the
+# move after the DIG. The Siltjaw. False = it opens on its loop's first.
+@export var opens_dug_in: bool = false
 # Statuses it holds from the first frame of every fight, applied as the
 # fight starts (BattleController) - a passive, shown and revealed like
 # any status (the Blackback's Fed). Empty (every enemy by default) = none.

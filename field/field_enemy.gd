@@ -441,6 +441,8 @@ var _dig_anchors: Array[Node3D] = []
 var _dig_highlight_material: StandardMaterial3D = null
 # The tell's mound and its breathing, while it shows (set_dig_tell()).
 var _tell_mound: int = -1
+# The body's own mound giving way to a dig's row (begin_dig()).
+var _own_mound_tween: Tween = null
 var _tell_tweens: Array[Tween] = []
 # FloorEnemy.phase_drop_offset resolved at spawn: whether it drops at its
 # phase, and the world XZ it lands on (Y unused).
@@ -1559,6 +1561,13 @@ func return_to_field_pose(duration: float) -> void:
 	_has_field_pose = false
 	_tween_to(_field_position, duration)
 	_turn_to(_field_yaw, duration)
+	# A buried body's mound is sampled where it stands: again once it is
+	# back (after a dig moved it).
+	if _mound != null:
+		var settle := create_tween()
+		settle.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		settle.tween_interval(maxf(duration, 0.0))
+		settle.tween_callback(_ground_to_relief)
 
 # The XZ where this enemy stands when not stepped into a line - its
 # authored spot - for anything that must clear its contact area after it
@@ -1679,6 +1688,17 @@ func enter_battle_hover(phase: float) -> void:
 func is_battle_hovering() -> bool:
 	return _hovering
 
+# A fight that opens with this body dug in (EnemyData.opens_dug_in): in
+# the fight's hover as enter_battle_hover() puts it, but left down under
+# the sand - its first sight of the fight is its dig's row (begin_dig()),
+# and it rises only when found or erupting (play_burrow()). Called before
+# the frame settles, so enter_battle_hover() then raises nothing. A no-op
+# for a body already hovering, leaving or dead.
+func enter_battle_dug_in() -> void:
+	if _hovering or _settling or _defeated or _model == null:
+		return
+	_hovering = true
+
 # A win or an escape: back down to rest height over battle_settle_
 # seconds, the bob fading out with the lift; the wings land at the end.
 # Hovering or not, an attachment with a fight's pose of its own goes back
@@ -1747,6 +1767,12 @@ func play_burrow(buried: bool) -> float:
 # how long that takes, for the enemy turn to wait on.
 func begin_dig(count: int, toward: Vector3, across: Vector3) -> float:
 	_end_dig_mounds()
+	# Where it stood, for an escape to bring it back to (return_to_field_
+	# pose()) - the dig moves it to the row's middle.
+	if not _has_field_pose:
+		_field_position = global_position
+		_field_yaw = rotation.y
+		_has_field_pose = true
 	var under: float = play_burrow(true)
 	var flat := Vector3(across.x, 0.0, across.z)
 	_dig_across = flat.normalized() if flat.length() > 0.0001 else global_transform.basis.x
@@ -1780,6 +1806,12 @@ func begin_dig(count: int, toward: Vector3, across: Vector3) -> float:
 	tween.tween_method(_set_dig_rise, 0.0, 1.0, rise)
 	tween.parallel().tween_callback(_move_body_to(_dig_centre)).set_delay(under)
 	_set_dig_rise(0.0)
+	# Its own mound - still up for a fight that opens dug in, flat for a
+	# body digging from its surface - flattens as the row swells.
+	if _mound != null and _mound.get_rise() > 0.0:
+		_own_mound_tween = create_tween()
+		_own_mound_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		_own_mound_tween.tween_method(_mound.set_rise, _mound.get_rise(), 0.0, rise)
 	return maxf(under, rise)
 
 # How near `toward` the nearest of a row of `count` centred on `centre`
@@ -2009,6 +2041,9 @@ func surface_at_mound(mound: int) -> float:
 # The row gone at once - a new dig over an old one, a fight's end.
 func _end_dig_mounds() -> void:
 	_stop_dig_tell()
+	if _own_mound_tween != null and _own_mound_tween.is_valid():
+		_own_mound_tween.kill()
+	_own_mound_tween = null
 	for anchor in _dig_anchors:
 		if anchor != null and is_instance_valid(anchor):
 			anchor.queue_free()
@@ -2123,10 +2158,10 @@ func _apply_model_lift() -> void:
 	_model.visible = surfaced > 0.0
 	if _contact_shadow != null:
 		_contact_shadow.visible = surfaced > 0.0
-	if _mound != null:
-		# Under a DIG's mounds the body's own mound stays flat: the row is
-		# all that shows.
-		_mound.set_rise(0.0 if _dig_active else 1.0 - surfaced)
+	if _mound != null and not _dig_active:
+		# Under a DIG's mounds the body's own mound is left to the dig
+		# (begin_dig() flattens it): the row is all that shows.
+		_mound.set_rise(1.0 - surfaced)
 
 # How far a buried body is on its way up to its fight's surface: 0 down
 # at rest height, 1 all the way up. 1 for a body that isn't buried.

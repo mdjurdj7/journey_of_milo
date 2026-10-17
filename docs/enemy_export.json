@@ -381,7 +381,7 @@
                   "member": 0,
                   "name": "Siltjaw",
                   "enemy_file": "res://battle/rules/enemies/siltjaw.tres",
-                  "hp": 42,
+                  "hp": 50,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -1619,9 +1619,9 @@
     {
       "name": "Siltjaw",
       "file": "res://battle/rules/enemies/siltjaw.tres",
-      "hp": 42,
+      "hp": 50,
       "elite": false,
-      "mechanic_summary": "Buried in the sand on the field. Snaps for 6, Charges for 14, then Digs: three mounds swell up across its side of the field and it is under one of them. Hit the right mound and it is forced up Exposed (takes 50% more) until its next move; hit a wrong one and that mound collapses, the hit wasted, and it bites from below for 5. An attack on every enemy finds it. Under the sand it Bites for 5, then Erupts for 13 and surfaces. Teaches reading the sand - the one mound that breathes, trickles and puffs silt.",
+      "mechanic_summary": "Buried in the sand on the field, and dug in when the fight opens: three mounds swell up across its side of the field and it is under one of them. Hit the right mound and it is forced up Exposed (takes 50% more) until its next move; hit a wrong one and that mound collapses, the hit wasted, and it bites from below for 5. An attack on every enemy finds it. Under the sand it Bites for 5, then Erupts for 13 and surfaces; up, it Snaps for 6, Charges for 14, then Digs again. Teaches reading the sand - the one mound that breathes, trickles and puffs silt.",
       "field": {
         "model": "res://assets/models/enemies/Siltjaw/Siltjaw.glb",
         "model_is_default": false,

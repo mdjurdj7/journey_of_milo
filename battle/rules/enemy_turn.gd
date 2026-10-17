@@ -15,6 +15,16 @@ static func pick_initial_intent(combatant: Combatant, data: EnemyData) -> void:
 		combatant.current_intent_index = _pick_erratic_initial_index(data)
 	else:
 		combatant.current_intent_index = 0
+	# Dug in from the start (EnemyData.opens_dug_in): the loop's first DIG
+	# already done, the loop waiting on the move after it.
+	if data.opens_dug_in and not data.erratic_intent_selection:
+		for index in data.intents.size():
+			var intent: EnemyIntent = data.intents[index]
+			if intent != null and intent.type == EnemyIntent.IntentType.DIG:
+				start_dig(combatant, intent)
+				if combatant.dug_in:
+					combatant.current_intent_index = (index + 1) % data.intents.size()
+				break
 	_sync_queued(combatant, data)
 
 # The queued intent: under the sand after a DIG, its next move there

@@ -1,13 +1,15 @@
 extends SceneTree
 
-# Headless probe for the Siltjaw: its Snap -> Charge -> Dig loop (the
-# Charge a plain hit, nothing to break); the Dig's three mounds, under one
-# drawn at random; under the sand its Bite, then its Erupt, surfacing on
-# its own; the intent preview's pips toward the eruption, never a mound;
+# Headless probe for the Siltjaw: dug in from the fight's opening (Enemy
+# Data.opens_dug_in), then its Snap -> Charge -> Dig loop (the Charge a
+# plain hit, nothing to break); the Dig's three mounds, under one drawn at
+# random; under the sand its Bite, then its Erupt, surfacing on its own;
+# the intent preview's pips toward the eruption from turn 1, never a mound;
 # found at its own mound - up, Exposed (50% more) until its next move,
 # the eruption off; a wrong mound collapsing with a bite from below; a
 # Denied Dig lost. The rules cases drive EnemyTurn on the real .tres; the
 # fight cases load floor 2 and play real cards through BattleController -
+# the fight opening on its row, the body never up and its own mound flat,
 # the mounds standing in a row with the body's node at the middle one
 # whichever it is under, a rect for each and none for the body, a wrong
 # mound's card wasted and bitten back, the right one's card at +50%, a
@@ -28,7 +30,7 @@ const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const CARVE_PATH := "res://cards/data/carve.tres"
 const FLOOR_2 := 1
-const HP := 42
+const HP := 50
 const SNAP := 6
 const CHARGE := 14
 const BITE := 5
@@ -79,6 +81,7 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var data: EnemyData = _siltjaw()
 	_expect_eq(data.max_hp, HP, "The Siltjaw has %d HP" % HP)
+	_expect(data.opens_dug_in, "...opens dug in")
 	_expect(not data.erratic_intent_selection, "...a fixed loop")
 	_expect_eq(data.intents.size(), 3, "...of three moves")
 	if data.intents.size() == 3:
@@ -92,12 +95,14 @@ func _check_data() -> void:
 		_expect(dig.found_status != null and dig.found_status.resource_path == EXPOSED_PATH, "...found, Exposed")
 	_completed += 1
 
-# Nothing played: Snap 6, Charge 14, Dig (nothing), Bite 5, Erupt 13 and
-# up, then Snap again - under one of its three mounds while down.
+# Nothing played: dug in from the start - Bite 5, Erupt 13 and up - then
+# Snap 6, Charge 14, Dig (nothing), and the Bite again - under one of its
+# three mounds while down, the opening's and the Dig's alike.
 func _check_never_found() -> void:
 	var data: EnemyData = _siltjaw()
 	var enemy: Combatant = _enemy(data)
 	var player: Combatant = _player()
+	_expect(enemy.dug_in and enemy.mounds.size() == MOUNDS and enemy.true_mound >= 0 and enemy.true_mound < MOUNDS, "Opens dug in: %d mounds, under number %d" % [enemy.mounds.size(), enemy.true_mound])
 	var lost: Array[int] = []
 	var dug: Array[bool] = []
 	for turn in 6:
@@ -105,37 +110,40 @@ func _check_never_found() -> void:
 		EnemyTurn.take_turn(enemy, data, player)
 		lost.append(before - player.hp)
 		dug.append(enemy.dug_in)
-		if turn == 2:
+		if turn == 4:
 			_expect(enemy.mounds.size() == MOUNDS and enemy.true_mound >= 0 and enemy.true_mound < MOUNDS, "Dug: %d mounds, under number %d" % [enemy.mounds.size(), enemy.true_mound])
-	_expect_eq(lost, [SNAP, CHARGE, 0, BITE, ERUPT, SNAP] as Array[int], "Snap, Charge, Dig, Bite, Erupt, Snap")
-	_expect_eq(dug, [false, false, true, true, false, false] as Array[bool], "...under the sand from the Dig until the Erupt")
+	_expect_eq(lost, [BITE, ERUPT, SNAP, CHARGE, 0, BITE] as Array[int], "Bite, Erupt, Snap, Charge, Dig, Bite")
+	_expect_eq(dug, [true, false, false, false, true, true] as Array[bool], "...under the sand until the Erupt, and from the Dig")
 	var seen: Dictionary = {}
+	var dug_seen: Dictionary = {}
 	for trial in 60:
-		var other: Combatant = _enemy(data)
-		other.current_intent_index = DIG_INDEX
+		seen[_enemy(data).true_mound] = true
+		var other: Combatant = _surfaced(data)
 		EnemyTurn.take_turn(other, data, player)
-		seen[other.true_mound] = true
-	_expect_eq(seen.size(), MOUNDS, "Across 60 digs it is under each mound in turn (%d seen)" % seen.size())
+		dug_seen[other.true_mound] = true
+	_expect_eq(seen.size(), MOUNDS, "Across 60 openings it is under each mound in turn (%d seen)" % seen.size())
+	_expect_eq(dug_seen.size(), MOUNDS, "...and across 60 digs (%d seen)" % dug_seen.size())
 	_completed += 1
 
-# Under the sand, the preview shows the move and its pips toward the
-# eruption - 1 of 2, then 2 of 2 - and nothing that names a mound.
+# Under the sand from turn 1, the preview shows the move and its pips
+# toward the eruption - 1 of 2, then 2 of 2 - and nothing that names a
+# mound; up, the Snap and the Charge have no threshold.
 func _check_preview() -> void:
 	var data: EnemyData = _siltjaw()
 	var enemy: Combatant = _enemy(data)
 	var player: Combatant = _player()
-	_expect(not EnemyTurn.preview_intent(enemy, data, player).has("threshold"), "The Snap has no threshold")
-	enemy.current_intent_index = 1
-	_expect(not EnemyTurn.preview_intent(enemy, data, player).has("threshold"), "...nor the Charge")
-	enemy.current_intent_index = DIG_INDEX
-	EnemyTurn.take_turn(enemy, data, player)
 	var preview: Dictionary = EnemyTurn.preview_intent(enemy, data, player)
-	_expect_eq([int(preview["per_hit"]), int(preview["dig_stage"]), int(preview["dig_stages"])], [BITE, 0, 2], "Dug: Bite %d, the first of two turns under" % BITE)
+	_expect_eq([int(preview["per_hit"]), int(preview.get("dig_stage", -1)), int(preview.get("dig_stages", -1))], [BITE, 0, 2], "Turn 1: Bite %d, the first of two turns under" % BITE)
 	for key: String in preview:
 		_expect(not key.contains("mound"), "...nothing in it names a mound (%s)" % key)
 	EnemyTurn.take_turn(enemy, data, player)
 	preview = EnemyTurn.preview_intent(enemy, data, player)
-	_expect_eq([int(preview["per_hit"]), int(preview["dig_stage"]), int(preview["dig_stages"])], [ERUPT, 1, 2], "Then Erupt %d, the second" % ERUPT)
+	_expect_eq([int(preview["per_hit"]), int(preview.get("dig_stage", -1)), int(preview.get("dig_stages", -1))], [ERUPT, 1, 2], "Then Erupt %d, the second" % ERUPT)
+	EnemyTurn.take_turn(enemy, data, player)
+	preview = EnemyTurn.preview_intent(enemy, data, player)
+	_expect(int(preview["per_hit"]) == SNAP and not preview.has("threshold") and not preview.has("dig_stage"), "Up: the Snap, no threshold, no pips")
+	EnemyTurn.take_turn(enemy, data, player)
+	_expect(not EnemyTurn.preview_intent(enemy, data, player).has("threshold"), "...nor the Charge")
 	_completed += 1
 
 # Found: up, Exposed - 10 lands 15 - the eruption off; its next move is
@@ -144,8 +152,6 @@ func _check_found() -> void:
 	var data: EnemyData = _siltjaw()
 	var enemy: Combatant = _enemy(data)
 	var player: Combatant = _player()
-	enemy.current_intent_index = DIG_INDEX
-	EnemyTurn.take_turn(enemy, data, player)
 	_expect(EnemyTurn.unearth(enemy, data), "Its mound found: up")
 	_expect(not enemy.dug_in and enemy.mounds.is_empty(), "...out of the sand")
 	_expect(_has(enemy, EXPOSED_PATH), "...Exposed")
@@ -161,9 +167,8 @@ func _check_found() -> void:
 # mound never collapses; three mounds go to two.
 func _check_wrong_mound() -> void:
 	var data: EnemyData = _siltjaw()
-	var enemy: Combatant = _enemy(data)
+	var enemy: Combatant = _surfaced(data)
 	var player: Combatant = _player()
-	enemy.current_intent_index = DIG_INDEX
 	EnemyTurn.take_turn(enemy, data, player)
 	var wrong: int = (enemy.true_mound + 1) % MOUNDS
 	_expect(EnemyTurn.collapse_mound(enemy, wrong), "A wrong mound collapses")
@@ -179,8 +184,7 @@ func _check_wrong_mound() -> void:
 # A Denied Dig is lost: nothing digs, the Snap is next.
 func _check_denied_dig() -> void:
 	var data: EnemyData = _siltjaw()
-	var enemy: Combatant = _enemy(data)
-	enemy.current_intent_index = DIG_INDEX
+	var enemy: Combatant = _surfaced(data)
 	Status.apply_to(enemy.statuses, load(DENIED_PATH) as StatusData)
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, _player())
 	_expect(bool(result["denied"]) and not enemy.dug_in, "A Denied Dig digs nothing")
@@ -189,16 +193,20 @@ func _check_denied_dig() -> void:
 
 # --- Fights ---
 
-# The Dig in a fight: three mounds in a row, left to right on screen and
-# each its own click; the body's node at the middle one whichever it is
-# under; a rect for each mound and none for the body; the intent's pips.
+# The fight opens dug in: three mounds in a row, left to right on screen
+# and each its own click; the body never up, its own mound flat; its node
+# at the middle one whichever it is under; a rect for each mound and none
+# for the body; the intent's Bite and its pips.
 func _check_fight_dig() -> void:
 	var controller: Node = await _start_fight(SLASH_PATH)
 	if controller != null:
 		var siltjaw: Node = (controller.get("enemies") as Array)[0]
 		var combatant: Combatant = _combatant(controller, siltjaw)
-		await _dig(controller, combatant)
-		_expect(bool(siltjaw.call("is_dug_in")) and combatant.dug_in, "Dug in")
+		await _opened(controller, siltjaw)
+		_expect(bool(siltjaw.call("is_dug_in")) and combatant.dug_in, "The fight opens dug in")
+		_expect(not (siltjaw.get("_model") as Node3D).visible, "...the body never up")
+		var own: Node = siltjaw.get("_mound")
+		_expect(own != null and float(own.call("get_rise")) == 0.0, "...its own mound flat under the row")
 		var at: Vector3 = siltjaw.global_position
 		var middle: Vector3 = siltjaw.call("get_mound_position", 1)
 		_expect(Vector2(at.x - middle.x, at.z - middle.z).length() < 0.05, "...its node at the middle mound, under number %d" % combatant.true_mound)
@@ -220,7 +228,7 @@ func _check_fight_dig() -> void:
 		xs.sort()
 		_expect(xs.size() == MOUNDS and xs[1] - xs[0] > MIN_SCREEN_GAP_PX and xs[2] - xs[1] > MIN_SCREEN_GAP_PX, "...left to right on screen (%s)" % str(xs))
 		var preview: Dictionary = controller.call("get_intent_preview", siltjaw)
-		_expect_eq([int(preview.get("dig_stage", -1)), int(preview.get("dig_stages", -1))], [0, 2], "...its intent's pips 1 of 2")
+		_expect_eq([int(preview.get("per_hit", -1)), int(preview.get("dig_stage", -1)), int(preview.get("dig_stages", -1))], [BITE, 0, 2], "...its intent the Bite %d, pips 1 of 2" % BITE)
 		controller.call("cancel_target")
 	await _teardown()
 	_completed += 1
@@ -233,7 +241,7 @@ func _check_fight_wrong() -> void:
 		var siltjaw: Node = (controller.get("enemies") as Array)[0]
 		var combatant: Combatant = _combatant(controller, siltjaw)
 		var player: Combatant = controller.get("player")
-		await _dig(controller, combatant)
+		await _opened(controller, siltjaw)
 		var hp: int = combatant.hp
 		var before: int = player.hp
 		var wrong: int = (combatant.true_mound + 1) % MOUNDS
@@ -251,7 +259,7 @@ func _check_fight_right() -> void:
 	if controller != null:
 		var siltjaw: Node = (controller.get("enemies") as Array)[0]
 		var combatant: Combatant = _combatant(controller, siltjaw)
-		await _dig(controller, combatant)
+		await _opened(controller, siltjaw)
 		var spot: Vector3 = siltjaw.call("get_mound_position", combatant.true_mound)
 		var hp: int = combatant.hp
 		await _play_at(controller, siltjaw, combatant.true_mound)
@@ -269,7 +277,7 @@ func _check_fight_carve() -> void:
 	if controller != null:
 		var siltjaw: Node = (controller.get("enemies") as Array)[0]
 		var combatant: Combatant = _combatant(controller, siltjaw)
-		await _dig(controller, combatant)
+		await _opened(controller, siltjaw)
 		var hp: int = combatant.hp
 		await _play_first(controller)
 		_expect(not combatant.dug_in, "A Carve finds it")
@@ -284,7 +292,7 @@ func _check_fight_erupt() -> void:
 		var siltjaw: Node = (controller.get("enemies") as Array)[0]
 		var combatant: Combatant = _combatant(controller, siltjaw)
 		var player: Combatant = controller.get("player")
-		await _dig(controller, combatant)
+		await _opened(controller, siltjaw)
 		var spot: Vector3 = siltjaw.call("get_mound_position", combatant.true_mound)
 		var before: int = player.hp
 		await _end_turn(controller)
@@ -306,6 +314,12 @@ func _siltjaw() -> EnemyData:
 func _enemy(data: EnemyData) -> Combatant:
 	var enemy := Combatant.new(data.max_hp)
 	EnemyTurn.pick_initial_intent(enemy, data)
+	return enemy
+
+# Up out of the sand, its Dig queued - the loop's own, past the opening.
+func _surfaced(data: EnemyData) -> Combatant:
+	var enemy := Combatant.new(data.max_hp)
+	enemy.current_intent_index = DIG_INDEX
 	return enemy
 
 func _player() -> Combatant:
@@ -356,11 +370,22 @@ func _start_fight(card_path: String) -> Node:
 	_expect(members.size() == 1 and members[0] == target, "The fight is the Siltjaw alone")
 	return controller
 
-# Its Dig queued and the turn ended: under the sand, its mounds up.
-func _dig(controller: Node, combatant: Combatant) -> void:
-	combatant.current_intent_index = DIG_INDEX
-	await _end_turn(controller)
-	await create_timer(1.0).timeout
+# The opening's row up: every mound at full height, the body's node at
+# the middle one, and the fight ready to play.
+func _opened(controller: Node, siltjaw: Node) -> void:
+	var row_up: Callable = func() -> bool:
+		if not bool(siltjaw.call("is_dug_in")):
+			return false
+		for mound in MOUNDS:
+			var sand: Node = siltjaw.call("_dig_sand", mound)
+			if sand == null or float(sand.call("get_rise")) < 1.0:
+				return false
+		var at: Vector3 = (siltjaw as Node3D).global_position
+		var middle: Vector3 = siltjaw.call("get_mound_position", 1)
+		return Vector2(at.x - middle.x, at.z - middle.z).length() < 0.05
+	var up: bool = await ProbePlay.wait_until(self, row_up, 5.0)
+	_expect(up, "The opening's row comes up")
+	await ProbePlay.wait_until(self, func() -> bool: return ProbePlay.fight_ready(controller), 8.0)
 
 func _end_turn(controller: Node) -> void:
 	await controller.call("end_turn")
