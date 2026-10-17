@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "dug_in"
+display_name = "Dug in"
+description = "Strike the right mound. A wrong one bites back for {value}, which Brace, Garnish, No Further and Unbroken don't reduce."
+category = 2
+default_duration_turns = -1
+stack_rule = 3

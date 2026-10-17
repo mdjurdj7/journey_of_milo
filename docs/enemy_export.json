@@ -863,7 +863,7 @@
       "file": "res://battle/rules/enemies/adder.tres",
       "hp": 72,
       "elite": true,
-      "mechanic_summary": "An elite dune adder, coiled on the faint side of floor 4's dune loop: Coil, Bite 7 and 3 Venom, Strike 13, in a loop. Coiled from its Coil until its next move (a Denied Coil brings none), it strikes back for 5 at every Attack played against it; Venom takes its stacks in HP at the start of each turn, past Block, then falls by 1. Teaches holding Attacks for the right turn, and leaves a worn piece where it falls: its Shed Skin, or rarely the Coiled Wrap.",
+      "mechanic_summary": "An elite dune adder, coiled on the faint side of floor 4's dune loop: Coil, Bite 7 and 3 Venom, Strike 13, in a loop. Coiled from its Coil until its next move (a Denied Coil brings none), it strikes back for 5 at every Attack played against it - which Brace, Garnish, No Further and Unbroken don't reduce; Venom takes its stacks in HP at the start of each turn, past Block, then falls by 1. Teaches holding Attacks for the right turn, and leaves a worn piece where it falls: its Shed Skin, or rarely the Coiled Wrap.",
       "field": {
         "model": "res://assets/models/enemies/Adder/Adder.glb",
         "model_is_default": false,

@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
 [ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="3_k7nci"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/exposed.tres" id="4_exposed"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/dug_in.tres" id="5_dug_in"]
 
 [sub_resource type="Resource" id="EnemyIntent_snap"]
 script = ExtResource("2_intent")
@@ -32,6 +33,7 @@ intent_name = "Dig"
 type = 7
 under_moves = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_bite"), SubResource("EnemyIntent_erupt")])
 found_status = ExtResource("4_exposed")
+dug_in_status = ExtResource("5_dug_in")
 
 [resource]
 script = ExtResource("1_enemy_data")

@@ -108,6 +108,12 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL, DIG, T
 @export var under_moves: Array[EnemyIntent] = []
 @export var mound_count: int = 3
 @export var found_status: StatusData = null
+# A DIG's too: what it holds for as long as it is under the sand - from
+# the dig (or the fight's opening, EnemyData.opens_dug_in) until it comes
+# up, found or erupting (EnemyTurn.start_dig(), _end_dig()) - for its
+# readout and hover. Its magnitude is the bite from below's (under_moves[0]),
+# for a {value} in its text. The Siltjaw's Dug in. Null = none.
+@export var dug_in_status: StatusData = null
 # What the enemy does on its NEXT turn when this one is interrupted - an
 # interjection outside the intents loop (Combatant.interjected_intent),
 # which carries on where it was once this has resolved. The Siltjaw's is

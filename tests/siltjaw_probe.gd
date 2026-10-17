@@ -7,7 +7,8 @@ extends SceneTree
 # the intent preview's pips toward the eruption from turn 1, never a mound;
 # found at its own mound - up, Exposed (50% more) until its next move,
 # the eruption off; a wrong mound collapsing with a bite from below; a
-# Denied Dig lost. The rules cases drive EnemyTurn on the real .tres; the
+# Denied Dig lost; its Dug in readout (the bite's 5 in its hover) from
+# each dig until it surfaces. The rules cases drive EnemyTurn on the real .tres; the
 # fight cases load floor 2 and play real cards through BattleController -
 # the fight opening on its row, the body never up and its own mound flat,
 # the mounds standing in a row with the body's node at the middle one
@@ -24,6 +25,8 @@ extends SceneTree
 const CASES := 11
 const SILTJAW_PATH := "res://battle/rules/enemies/siltjaw.tres"
 const EXPOSED_PATH := "res://battle/rules/statuses/exposed.tres"
+const DUG_IN_PATH := "res://battle/rules/statuses/dug_in.tres"
+const DUG_IN_LABEL := "Dug in"
 const DENIED_PATH := "res://battle/rules/statuses/denied.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
@@ -103,17 +106,23 @@ func _check_never_found() -> void:
 	var enemy: Combatant = _enemy(data)
 	var player: Combatant = _player()
 	_expect(enemy.dug_in and enemy.mounds.size() == MOUNDS and enemy.true_mound >= 0 and enemy.true_mound < MOUNDS, "Opens dug in: %d mounds, under number %d" % [enemy.mounds.size(), enemy.true_mound])
+	_expect(_has(enemy, DUG_IN_PATH), "...its readout Dug in")
+	var dug_in: Status = Status.find_in(enemy.statuses, load(DUG_IN_PATH) as StatusData)
+	_expect(dug_in != null and dug_in.label() == DUG_IN_LABEL and dug_in.describe().contains("bites back for %d" % BITE), "...reading \"%s\", its hover the bite's %d" % [DUG_IN_LABEL, BITE])
 	var lost: Array[int] = []
 	var dug: Array[bool] = []
+	var readout: Array[bool] = []
 	for turn in 6:
 		var before: int = player.hp
 		EnemyTurn.take_turn(enemy, data, player)
 		lost.append(before - player.hp)
 		dug.append(enemy.dug_in)
+		readout.append(_has(enemy, DUG_IN_PATH))
 		if turn == 4:
 			_expect(enemy.mounds.size() == MOUNDS and enemy.true_mound >= 0 and enemy.true_mound < MOUNDS, "Dug: %d mounds, under number %d" % [enemy.mounds.size(), enemy.true_mound])
 	_expect_eq(lost, [BITE, ERUPT, SNAP, CHARGE, 0, BITE] as Array[int], "Bite, Erupt, Snap, Charge, Dig, Bite")
 	_expect_eq(dug, [true, false, false, false, true, true] as Array[bool], "...under the sand until the Erupt, and from the Dig")
+	_expect_eq(readout, dug, "...Dug in on its readout exactly while under: gone at the Erupt, back on the Dig's turn")
 	var seen: Dictionary = {}
 	var dug_seen: Dictionary = {}
 	for trial in 60:
@@ -264,6 +273,7 @@ func _check_fight_right() -> void:
 		var hp: int = combatant.hp
 		await _play_at(controller, siltjaw, combatant.true_mound)
 		_expect(not combatant.dug_in and not bool(siltjaw.call("is_dug_in")), "A Slash at its own mound: found, up")
+		_expect(not _readout_has(controller, siltjaw, DUG_IN_LABEL), "...its readout no longer Dug in")
 		_expect(_has(combatant, EXPOSED_PATH), "...Exposed")
 		_expect_eq(hp - combatant.hp, int(SLASH * EXPOSED_SCALE), "...the Slash landing %d" % int(SLASH * EXPOSED_SCALE))
 		var at: Vector3 = siltjaw.global_position
@@ -293,6 +303,7 @@ func _check_fight_erupt() -> void:
 		var combatant: Combatant = _combatant(controller, siltjaw)
 		var player: Combatant = controller.get("player")
 		await _opened(controller, siltjaw)
+		_expect(_readout_has(controller, siltjaw, DUG_IN_LABEL), "Opened dug in: its readout Dug in")
 		var spot: Vector3 = siltjaw.call("get_mound_position", combatant.true_mound)
 		var before: int = player.hp
 		await _end_turn(controller)
@@ -301,6 +312,7 @@ func _check_fight_erupt() -> void:
 		await _end_turn(controller)
 		_expect_eq(before - player.hp, ERUPT, "...then the Erupt, %d" % ERUPT)
 		_expect(not combatant.dug_in and not bool(siltjaw.call("is_dug_in")), "...and it is up")
+		_expect(not _readout_has(controller, siltjaw, DUG_IN_LABEL), "...its readout no longer Dug in")
 		var at: Vector3 = siltjaw.global_position
 		_expect(Vector2(at.x - spot.x, at.z - spot.z).length() < 0.05, "...at its own mound")
 	await _teardown()
@@ -420,6 +432,11 @@ func _settle(controller: Node) -> void:
 		if not bool(controller.get("_input_locked")):
 			break
 	await create_timer(1.0).timeout
+
+# Whether `member`'s readout shows `label` (BattleController.get_enemy_
+# status_labels()).
+func _readout_has(controller: Node, member: Node, label: String) -> bool:
+	return Array(controller.call("get_enemy_status_labels", member)).has(label)
 
 func _combatant(controller: Node, member: Node) -> Combatant:
 	return (controller.get("_combatants") as Dictionary).get(member)

@@ -672,9 +672,19 @@ static func start_dig(combatant: Combatant, intent: EnemyIntent) -> void:
 	for mound in intent.mound_count:
 		combatant.mounds.append(mound)
 	combatant.true_mound = randi_range(0, intent.mound_count - 1)
+	# Dug in, on its readout, for as long as it is under (_end_dig()).
+	if intent.dug_in_status != null and Status.find_in(combatant.statuses, intent.dug_in_status) == null:
+		Status.apply_to(combatant.statuses, intent.dug_in_status)
+		var held: Status = Status.find_in(combatant.statuses, intent.dug_in_status)
+		if held != null and intent.under_moves[0] != null:
+			held.magnitude = intent.under_moves[0].value
 
 # Up out of the sand, its mounds gone; true_mound kept - where it came up.
 static func _end_dig(combatant: Combatant) -> void:
+	if combatant.dig_intent != null and combatant.dig_intent.dug_in_status != null:
+		var held: Status = Status.find_in(combatant.statuses, combatant.dig_intent.dug_in_status)
+		if held != null:
+			Status.remove_from(combatant.statuses, held)
 	combatant.dug_in = false
 	combatant.dug_step = 0
 	combatant.mounds.clear()
