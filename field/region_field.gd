@@ -1776,6 +1776,8 @@ func _spawn_prop_list(entries: Array[FloorProp], props_root: Node3D, id_prefix: 
 			_setup_belongings_cache(prop as BelongingsCache, entry, floor_data, id)
 		elif prop is TroughProp:
 			(prop as TroughProp).trough_id = id
+		elif prop is GlassboneSeam:
+			(prop as GlassboneSeam).seam_id = id
 		elif prop is DunecurPup:
 			(prop as DunecurPup).pup_id = id
 		elif prop is HitchingPost:

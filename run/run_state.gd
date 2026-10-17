@@ -181,17 +181,19 @@ func new_run(starting_character: CharacterData) -> void:
 	encounter_rolls.clear()
 	# Field findings (a Hull's one-time world line, a Bird's one-time
 	# flight, the Keeper's one-time offer, a belongings cache's one
-	# choice, a trough's one drink, a floor's arrival glimpse, floor 4's
-	# pup, the collector's hint) are remembered per run in their own
-	# statics - see Hull._findings_shown / Bird._flown / Keeper._offers_
-	# made / BelongingsCache._spent / TroughProp._drunk / Traveller._
-	# glimpsed / DunecurPup._stood / Collector._hint_said - so a new run
+	# choice, a trough's one drink, a seam's one working, a floor's
+	# arrival glimpse, floor 4's pup, the collector's hint) are remembered
+	# per run in their own statics - see Hull._findings_shown / Bird._
+	# flown / Keeper._offers_made / BelongingsCache._spent / TroughProp._
+	# drunk / GlassboneSeam._worked / Traveller._glimpsed / DunecurPup._
+	# stood / Collector._hint_said - so a new run
 	# starts with none of them spent.
 	Hull.reset_findings()
 	Bird.reset_flights()
 	Keeper.reset_offers()
 	BelongingsCache.reset_spent()
 	TroughProp.reset_drunk()
+	GlassboneSeam.reset_worked()
 	Traveller.reset_glimpses()
 	DunecurPup.reset_run()
 	Collector.reset_hint()

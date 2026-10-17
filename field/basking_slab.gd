@@ -131,6 +131,11 @@ func _spawn_model() -> void:
 	_collision_body.add_child(shape_node)
 	add_child(_collision_body)
 
+# The model's box in this node's frame - its collision's; empty with no
+# model.
+func get_body_aabb() -> AABB:
+	return _aabb
+
 # A new model or colour map: the body and its collision again.
 func _rebuild() -> void:
 	if not is_inside_tree():
