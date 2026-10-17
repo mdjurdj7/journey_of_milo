@@ -40,6 +40,9 @@ class_name FloorData
 # lower.
 @export var rock_slope_min: float = 22.0
 @export var rock_slope_blend: float = 12.0
+# Ground.rock_value_cap for this floor: above 0, the rock no lighter than
+# that times the sand beside it. 0 leaves it.
+@export_range(0.0, 1.5) var rock_value_cap: float = 0.0
 # Optional out-of-bounds ground on the same canvas: white = the outer
 # surface (Ground.outer_mask) - its own colour and pebbles, so the floor's
 # edge reads by surface where height doesn't. Null = sand everywhere, as
@@ -99,6 +102,12 @@ class_name FloorData
 @export var wind_ripple_scale: float = 0.45
 @export_range(0.0, 0.5) var wind_ripple_strength: float = 0.0
 @export var wind_ripple_warp: float = 0.5
+# The ripples on the dunes' form - Ground's own of the same names: bend
+# (metres of phase per metre of smoothed height), spacing variation, and
+# the fade on crests and in the lee. All 0 keeps them straight.
+@export var wind_ripple_bend: float = 0.0
+@export_range(0.0, 0.6) var wind_ripple_vary: float = 0.0
+@export_range(0.0, 1.0) var wind_ripple_form_fade: float = 0.0
 # Ground's Dune Tones, for this floor - broad darken-only value breaks read
 # off the dunes' form (see Ground's Dune Tones exports for each): the lee
 # slope downwind of the crest (RegionField.get_wind_direction()), thin

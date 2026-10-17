@@ -610,6 +610,7 @@ func _enter_tree() -> void:
 		ground.rock_mask = floor_data.rock_mask
 		ground.rock_slope_min = floor_data.rock_slope_min
 		ground.rock_slope_blend = floor_data.rock_slope_blend
+		ground.rock_value_cap = floor_data.rock_value_cap
 		ground.outer_mask = floor_data.outer_mask
 		ground.elevation_mask = floor_data.elevation_mask
 		ground.landmass_mask_origin = floor_data.mask_origin
@@ -634,6 +635,9 @@ func _enter_tree() -> void:
 		ground.wind_ripple_scale = floor_data.wind_ripple_scale
 		ground.wind_ripple_strength = floor_data.wind_ripple_strength
 		ground.wind_ripple_warp = floor_data.wind_ripple_warp
+		ground.wind_ripple_bend = floor_data.wind_ripple_bend
+		ground.wind_ripple_vary = floor_data.wind_ripple_vary
+		ground.wind_ripple_form_fade = floor_data.wind_ripple_form_fade
 		var wind: Vector3 = get_wind_direction()
 		ground.dune_wind = Vector2(wind.x, wind.z)
 		ground.lee_shade_strength = floor_data.lee_shade_strength

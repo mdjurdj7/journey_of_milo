@@ -4,3 +4,4 @@
 
 [node name="BaskingSlab" type="Node3D"]
 script = ExtResource("1_basking_slab")
+tint = Color(0.725, 0.723, 0.803, 1)

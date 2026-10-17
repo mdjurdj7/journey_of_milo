@@ -291,6 +291,11 @@ uniform float basin_height_low = 0.0;
 uniform float basin_height_high = 1.0;
 
 uniform vec4 rock_color : source_color = vec4(0.55, 0.58, 0.515, 1.0);
+// A cap on the rock's value against the ground it blends from: above 0,
+// rock_color is scaled down wherever its luminance passes rock_value_cap
+// times the sand's beside it - a rock edge that reads darker, never a
+// bright line. 0 (the default) leaves it.
+uniform float rock_value_cap = 0.0;
 uniform float rock_slope_min = 22.0;
 uniform float rock_slope_blend = 12.0;
 // Slopes read by value: past slope_tint_min degrees of slope the sand
@@ -375,6 +380,16 @@ uniform float wind_ripple_strength = 0.0;
 uniform float wind_ripple_angle = 30.0;
 uniform float wind_ripple_scale = 0.45;
 uniform float wind_ripple_warp = 0.5;
+// The ripples follow the dunes' form (Ground's dune-form bake, when it is
+// ready): wind_ripple_bend metres of phase per metre of smoothed height,
+// so the crests bend round the dunes as they climb them; their spacing
+// varies by up to wind_ripple_vary (a share, either way) with slow noise;
+// and wind_ripple_form_fade of them fades out on the crests and in the lee
+// (the dune breaks' lee mask). All 0 (the default) keeps the straight
+// ripple.
+uniform float wind_ripple_bend = 0.0;
+uniform float wind_ripple_vary = 0.0;
+uniform float wind_ripple_form_fade = 0.0;
 // Dust shadows (FieldWind, FloorWindData's Dust shadow group): large
 // faint patches of haze sliding downwind over the ground, darkening it by
 // at most dust_shadow_strength - never lighter, never on water. Patches
@@ -1284,7 +1299,13 @@ void fragment() {
 	sand_base = mix(sand_base, slope_tint_color.rgb, slope_tint_t * slope_tint_strength * sand_detail);
 	float crest_t = (1.0 - slope_tint_t) * smoothstep(crest_min_height, crest_min_height + 0.25, v_world_height) * sand_detail;
 	sand_base *= 1.0 + crest_light_strength * crest_t;
-	vec3 dry = mix(sand_base, rock_color.rgb, rock);
+	vec3 rock_tone = rock_color.rgb;
+	if (rock_value_cap > 0.0) {
+		float rock_value = dot(rock_tone, vec3(0.299, 0.587, 0.114));
+		float sand_value = dot(sand_base, vec3(0.299, 0.587, 0.114));
+		rock_tone *= min(1.0, sand_value * rock_value_cap / max(rock_value, 0.001));
+	}
+	vec3 dry = mix(sand_base, rock_tone, rock);
 	// The dune tonal breaks, darken-only (see dune_tone()): the lee and the
 	// erosion lines over everything dry - sand, rock, outer ground - the
 	// damp strip on bare sand alone; then the lee's cool shift toward a
@@ -1331,12 +1352,23 @@ void fragment() {
 	if (wind_ripple_strength > 0.0) {
 		vec2 wind_dir = vec2(cos(radians(wind_ripple_angle)), sin(radians(wind_ripple_angle)));
 		float wind_warp = (value_noise(v_world_xz * 0.12) - 0.5) * 2.0 * wind_ripple_warp;
-		float wind_phase = dot(v_world_xz, wind_dir) / max(wind_ripple_scale, 0.01) + wind_warp * 3.0;
+		// Along the wind, bent by the dune's smoothed height and stretched
+		// or packed by slow noise (see wind_ripple_bend's doc).
+		float wind_along = dot(v_world_xz, wind_dir);
+		float form_fade = 1.0;
+		if (dune_form_ready) {
+			vec4 ripple_form = texture(dune_form_tex, ((v_world_xz - dune_form_origin) / max(dune_form_cell, 0.001) + 0.5) / max(dune_form_dims, vec2(1.0)));
+			wind_along += ripple_form.b * wind_ripple_bend;
+			float crest = smoothstep(0.03, 0.12, -ripple_form.a);
+			form_fade = 1.0 - wind_ripple_form_fade * max(crest, tone.x);
+		}
+		float wind_spacing = max(wind_ripple_scale, 0.01) * (1.0 + (value_noise(v_world_xz * 0.035 + vec2(5.3, -2.1)) - 0.5) * 2.0 * wind_ripple_vary);
+		float wind_phase = wind_along / wind_spacing + wind_warp * 3.0;
 		float wind_aa = 1.0 - smoothstep(0.25, 0.5, fwidth(wind_phase));
 		float wind_wave = sin(wind_phase * 6.2831853);
 		wind_wave *= abs(wind_wave);
 		float ripple_suppression = (1.0 - sand_wetness) * (1.0 - wear * wear_ripple_flatten) * sand_detail;
-		sand_albedo *= 1.0 + wind_ripple_strength * wind_wave * wind_aa * (1.0 - slope_t) * ripple_suppression;
+		sand_albedo *= 1.0 + wind_ripple_strength * wind_wave * wind_aa * (1.0 - slope_t) * ripple_suppression * form_fade;
 	}
 
 	// The outer ground's own pebbles, in place of the sand grain.

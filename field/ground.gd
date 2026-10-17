@@ -745,6 +745,12 @@ signal relief_rebuilt
 	set(value):
 		rock_color = value
 		_apply_uniform("rock_color", value)
+# Above 0, the rock's value held to at most this times the sand's beside
+# it - a soft darker edge, never a bright line. 0 leaves it. Per floor.
+@export_range(0.0, 1.5) var rock_value_cap: float = 0.0:
+	set(value):
+		rock_value_cap = value
+		_apply_uniform("rock_value_cap", value)
 # Degrees of shading-normal slope. Stone starts showing past
 # rock_slope_min and is full stone rock_slope_blend further on - set for
 # faces painted ~1.2 m wide (25-35 degrees), the width the relief draws
@@ -831,6 +837,22 @@ signal relief_rebuilt
 	set(value):
 		wind_ripple_warp = value
 		_apply_uniform("wind_ripple_warp", value)
+# The ripples on the dunes' form (see ground.gdshader's doc): metres of
+# phase per metre of smoothed height, the spacing's slow variation (a
+# share either way), and how much of them fades on crests and in the lee.
+# All 0 keeps the straight ripple.
+@export var wind_ripple_bend: float = 0.0:
+	set(value):
+		wind_ripple_bend = value
+		_apply_uniform("wind_ripple_bend", value)
+@export_range(0.0, 0.6) var wind_ripple_vary: float = 0.0:
+	set(value):
+		wind_ripple_vary = value
+		_apply_uniform("wind_ripple_vary", value)
+@export_range(0.0, 1.0) var wind_ripple_form_fade: float = 0.0:
+	set(value):
+		wind_ripple_form_fade = value
+		_apply_uniform("wind_ripple_form_fade", value)
 @export_group("")
 
 # Dune tonal breaks - broad darken-only value masses read off the dunes'
@@ -1203,6 +1225,10 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("wind_ripple_scale", wind_ripple_scale)
 	_apply_uniform("wind_ripple_strength", wind_ripple_strength)
 	_apply_uniform("wind_ripple_warp", wind_ripple_warp)
+	_apply_uniform("wind_ripple_bend", wind_ripple_bend)
+	_apply_uniform("wind_ripple_vary", wind_ripple_vary)
+	_apply_uniform("wind_ripple_form_fade", wind_ripple_form_fade)
+	_apply_uniform("rock_value_cap", rock_value_cap)
 	_apply_uniform("dune_wind", dune_wind.normalized() if dune_wind.length() > 0.0001 else Vector2(1.0, 0.0))
 	_apply_uniform("lee_shade_strength", lee_shade_strength)
 	_apply_uniform("lee_shade_edge", lee_shade_edge)
