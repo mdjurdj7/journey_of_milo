@@ -35,7 +35,6 @@ intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_coil"), SubRe
 ; Placeholder: the Stork's body hits, until an adder sound exists.
 contact_sounds = Array[AudioStream]([ExtResource("5_hit_1"), ExtResource("6_hit_2")])
 is_elite = true
-defeat_line = "The adder is still."
 armor_table = ExtResource("7_armor")
 model_scene_path = "res://assets/models/enemies/Adder/Adder.glb"
 painted_albedo_path = "res://assets/models/enemies/Adder/Adder_Image_0.jpg"

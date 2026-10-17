@@ -274,7 +274,8 @@ func _check_hit_back_kill_in_fight() -> void:
 
 # --- On the sand ---
 
-# The find line: a win's piece is named once the reward screen closes -
+# The find line: a win's piece is named once the reward screen closes,
+# and after the defeat line has faded -
 # not under it - "You find <article> <name> on the <creature>.", the name
 # lowercased after its article and in its rarity finish; a Common's name
 # plain ink, a name with no article as it is. The table is set here.
@@ -307,9 +308,19 @@ func _check_find_line() -> void:
 		_expect(line == null or not line.is_showing(), "...with no find line under it")
 		if reward != null:
 			reward.call("close")
-		await _seconds(0.5)
-		line = _field.get_node_or_null("FieldHUD/FindLine") as FindLine
+		# After the Wardling's defeat line, never over it: polled until the
+		# find line shows, the world-voice line silent by then.
+		var voice: WorldVoiceLine = _field.get_node_or_null("FieldHUD/WorldVoiceLine") as WorldVoiceLine
+		var overlapped: bool = false
+		start = Time.get_ticks_msec()
+		while Time.get_ticks_msec() - start < 8000:
+			line = _field.get_node_or_null("FieldHUD/FindLine") as FindLine
+			if line != null and line.is_showing():
+				overlapped = voice != null and voice.is_speaking()
+				break
+			await process_frame
 		_expect(line != null and line.is_showing(), "Closed: the find line")
+		_expect(not overlapped, "...once the defeat line has faded, not over it")
 		if line != null:
 			_expect_eq(line.get_sentence(), "You find a probe piece on the %s." % data.enemy_name, "...naming the piece, lowercased after its article, and who left it")
 			_expect(line.get_name_finish() != null, "...a RARE name in its finish")

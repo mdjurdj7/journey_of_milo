@@ -822,7 +822,7 @@
         "glassbone": 0,
         "gold_and_cards": "the floor's - see regions[].floors[].rewards"
       },
-      "defeat_line": "The adder is still.",
+      "defeat_line": "",
       "sounds": {
         "contact": [
           "res://assets/audio/enemies/Stork/hit_1.mp3",

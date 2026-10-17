@@ -9,7 +9,8 @@ class_name WorldVoiceLine
 # props) calls show_line(), show_line_near() to say it over whoever says
 # it rather than in the band, or show_line_at() to say it over a fixed
 # point in the world. A new line while one is showing restarts the fade
-# with the new text.
+# with the new text. is_speaking() while one shows; line_finished once the
+# last has faded out (RegionField holds the find line behind it).
 #
 # An anchored line is placed in _physics_process() at process_physics_
 # priority 1 - after the CameraRig and the Wanderer (both 0) have moved
@@ -28,6 +29,9 @@ class_name WorldVoiceLine
 const FONT_PATH := "res://assets/fonts/Spectral-SemiBold.ttf"
 const THEME_PATH := "res://ui/battle_theme.tres"
 const NODE_NAME := "WorldVoiceLine"
+
+# The line showing has faded out - not one cut short by a new line.
+signal line_finished
 
 @export var font_size_px: int = 26
 # 0 = no outline (world voice sits bare on the world); raise if a line
@@ -199,3 +203,8 @@ func _play(line: String, hold_seconds: float) -> void:
 	_tween.tween_property(self, "modulate:a", 1.0, fade_in_seconds)
 	_tween.tween_interval(maxf(hold_seconds, 0.0))
 	_tween.tween_property(self, "modulate:a", 0.0, fade_out_seconds)
+	_tween.tween_callback(func() -> void: line_finished.emit())
+
+# Whether a line is showing now - fading in, held, or fading out.
+func is_speaking() -> bool:
+	return _tween != null and _tween.is_valid() and _tween.is_running()

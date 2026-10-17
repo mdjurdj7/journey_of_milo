@@ -102,6 +102,10 @@ enum RewardMode { SCREEN, WORLD }
 # Raised to the camera rig's own battle_transition_time when that's
 # longer, so retuning the blend doesn't leave this stale.
 @export var reward_spread_delay_sec: float = 0.6
+# The find line never shares the screen with a world-voice line (an
+# enemy's defeat line, a hold line): it waits for that one to fade out,
+# then this long (_say_pending_find()).
+@export var find_after_voice_gap_sec: float = 0.3
 # What a won fight leaves by its encounter role - cards, the gold
 # multiplier (the elite's 1.5 included), an optional fight's extra
 # (EncounterRewards). Loaded when the reward screen opens.
@@ -432,6 +436,8 @@ var _worn_line: KeepsakeLine = null
 # any keepsake offer after it, has closed.
 var _pending_find: TrinketData = null
 var _pending_find_creature: String = ""
+# The find line is waiting on a world-voice line to finish.
+var _find_waiting_on_voice: bool = false
 var _nav_build_queued: bool = false
 # Debug builds: the F1 row's Path draw, made on its first toggle.
 var _nav_debug: NavDebugDraw = null
@@ -3115,9 +3121,15 @@ func _drop_armor(won_against: Array[EnemyData], won_at: Array[Vector3], won_lift
 # The find line for the fight's piece (FindLine): "You find a harness on
 # the Wardling.", above the HUD row - once no screen holds the field, so
 # it's read with the piece in view. Called as the piece lands and as each
-# screen after a win closes; the first with the field free says it.
+# screen after a win closes; the first with the field free says it -
+# after any world-voice line showing then (the defeat line) has faded out.
 func _say_pending_find() -> void:
-	if _pending_find == null or _battle_open or not can_process():
+	if _pending_find == null or _battle_open or not can_process() or _find_waiting_on_voice:
+		return
+	var hud: Node = get_node_or_null(^"FieldHUD")
+	var voice: WorldVoiceLine = hud.get_node_or_null(WorldVoiceLine.NODE_NAME) as WorldVoiceLine if hud != null else null
+	if voice != null and voice.is_speaking():
+		_say_find_after(voice)
 		return
 	var piece: TrinketData = _pending_find
 	_pending_find = null
@@ -3126,6 +3138,16 @@ func _say_pending_find() -> void:
 		return
 	line.use_theme(deck_panel.theme)
 	line.say_find(piece, _pending_find_creature)
+
+# The find line once `voice` has faded out and find_after_voice_gap_sec
+# more - checked again then, as any screen may have opened meanwhile.
+func _say_find_after(voice: WorldVoiceLine) -> void:
+	_find_waiting_on_voice = true
+	await voice.line_finished
+	await get_tree().create_timer(find_after_voice_gap_sec).timeout
+	_find_waiting_on_voice = false
+	if is_inside_tree():
+		_say_pending_find()
 
 # One worn piece lying on the sand at `at` (seated on the relief by
 # WorldArmor itself, `height_offset` over it) - left by a fight, or set
