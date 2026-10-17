@@ -1168,6 +1168,9 @@ func _centre_allowed(entry: ScatterEntry, cell: int) -> bool:
 	var inland: float = _cell_inland[cell]
 	if inland < entry.inland_range_m.x or inland > entry.inland_range_m.y:
 		return false
+	var over_land: float = _cell_height[cell] - _sea_level - (_ground.landmass_interior_height if _ground != null else 0.0)
+	if over_land < entry.height_range_m.x or over_land > entry.height_range_m.y:
+		return false
 	return _cell_height[cell] >= _sea_level - entry.wet_edge_m
 
 # Where one item lands, tested there: dry enough, clear of every

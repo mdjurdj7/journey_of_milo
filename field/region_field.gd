@@ -634,6 +634,22 @@ func _enter_tree() -> void:
 		ground.wind_ripple_scale = floor_data.wind_ripple_scale
 		ground.wind_ripple_strength = floor_data.wind_ripple_strength
 		ground.wind_ripple_warp = floor_data.wind_ripple_warp
+		var wind: Vector3 = get_wind_direction()
+		ground.dune_wind = Vector2(wind.x, wind.z)
+		ground.lee_shade_strength = floor_data.lee_shade_strength
+		ground.lee_shade_edge = floor_data.lee_shade_edge
+		ground.lee_shade_min_slope = floor_data.lee_shade_min_slope
+		ground.lee_shade_slope_blend = floor_data.lee_shade_slope_blend
+		ground.erosion_strength = floor_data.erosion_strength
+		ground.erosion_spacing_m = floor_data.erosion_spacing_m
+		ground.erosion_width_m = floor_data.erosion_width_m
+		ground.erosion_heights = floor_data.erosion_heights
+		ground.erosion_min_slope = floor_data.erosion_min_slope
+		ground.erosion_break = floor_data.erosion_break
+		ground.erosion_break_scale = floor_data.erosion_break_scale
+		ground.damp_strength = floor_data.damp_strength
+		ground.damp_foot_depth = floor_data.damp_foot_depth
+		ground.damp_bank_width_m = floor_data.damp_bank_width_m
 	# The floor's own depth fog over the region's, when it names one.
 	var sky := get_node_or_null(sky_path) as RegionSky
 	if sky != null and floor_data != null and floor_data.fog_depth_begin > 0.0 and floor_data.fog_depth_end > floor_data.fog_depth_begin:

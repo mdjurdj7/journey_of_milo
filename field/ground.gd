@@ -833,6 +833,106 @@ signal relief_rebuilt
 		_apply_uniform("wind_ripple_warp", value)
 @export_group("")
 
+# Dune tonal breaks - broad darken-only value masses read off the dunes'
+# own form (ground.gdshader's doc): the lee slope, wind-cut erosion lines
+# on the steep faces, and a damp strip at slope feet and along enclosed
+# water. Each is a multiply under 1, so nothing lifts and nothing warms.
+# Strength 0 (the default) is off. Per floor, from FloorData.
+#
+# The form they read is baked from the relief (_bake_dune_form()): the
+# heights smoothed over dune_form_blur_m on a dune_form_cell_m grid, their
+# gradient, and how far the ground sits under its wider surroundings
+# (dune_form_wide_blur_m) - high at a slope's foot.
+@export_group("Dune Tones")
+@export var dune_form_cell_m: float = 1.0:
+	set(value):
+		dune_form_cell_m = value
+		_bake_dune_form()
+@export var dune_form_blur_m: float = 2.0:
+	set(value):
+		dune_form_blur_m = value
+		_bake_dune_form()
+@export var dune_form_wide_blur_m: float = 3.5:
+	set(value):
+		dune_form_wide_blur_m = value
+		_bake_dune_form()
+# The way the wind blows (XZ, toward), from RegionField.get_wind_
+# direction(): the lee is the slope falling away along it.
+@export var dune_wind: Vector2 = Vector2(0.866, 0.5):
+	set(value):
+		dune_wind = value
+		_apply_uniform("dune_wind", value.normalized() if value.length() > 0.0001 else Vector2(1.0, 0.0))
+# Lee side: the slope facing downwind darker by up to lee_shade_strength;
+# lee_shade_edge the width of the turn across the crest (in the facing's
+# dot, 0..1); the slope it needs, in degrees, from lee_shade_min_slope
+# over lee_shade_slope_blend.
+@export_range(0.0, 0.6) var lee_shade_strength: float = 0.0:
+	set(value):
+		lee_shade_strength = value
+		_apply_uniform("lee_shade_strength", value)
+@export_range(0.01, 1.0) var lee_shade_edge: float = 0.35:
+	set(value):
+		lee_shade_edge = value
+		_apply_uniform("lee_shade_edge", value)
+@export var lee_shade_min_slope: float = 2.0:
+	set(value):
+		lee_shade_min_slope = value
+		_apply_uniform("lee_shade_min_slope", value)
+@export var lee_shade_slope_blend: float = 5.0:
+	set(value):
+		lee_shade_slope_blend = value
+		_apply_uniform("lee_shade_slope_blend", value)
+# Erosion lines: thin darker bands on the smoothed height's contours,
+# every erosion_spacing_m from erosion_heights.x to .y over the land
+# level (so two or three on a dune), erosion_width_m across, on slopes
+# past erosion_min_slope degrees only, broken where noise at erosion_
+# break_scale (cycles a metre) falls under erosion_break (0 whole, 1 gone).
+@export_range(0.0, 0.4) var erosion_strength: float = 0.0:
+	set(value):
+		erosion_strength = value
+		_apply_uniform("erosion_strength", value)
+@export var erosion_spacing_m: float = 0.6:
+	set(value):
+		erosion_spacing_m = value
+		_apply_uniform("erosion_spacing_m", value)
+@export var erosion_width_m: float = 0.05:
+	set(value):
+		erosion_width_m = value
+		_apply_uniform("erosion_width_m", value)
+@export var erosion_heights: Vector2 = Vector2(0.4, 2.0):
+	set(value):
+		erosion_heights = value
+		_push_basin_heights()
+@export var erosion_min_slope: float = 14.0:
+	set(value):
+		erosion_min_slope = value
+		_apply_uniform("erosion_min_slope", value)
+@export_range(0.0, 1.0) var erosion_break: float = 0.45:
+	set(value):
+		erosion_break = value
+		_apply_uniform("erosion_break", value)
+@export var erosion_break_scale: float = 0.15:
+	set(value):
+		erosion_break_scale = value
+		_apply_uniform("erosion_break_scale", value)
+# Damp strip: darker by up to damp_strength where the ground sits
+# damp_foot_depth.x to .y metres under its wider surroundings (a slope's
+# foot), and within damp_bank_width_m of enclosed water (a pool's or a
+# stream's bank).
+@export_range(0.0, 0.4) var damp_strength: float = 0.0:
+	set(value):
+		damp_strength = value
+		_apply_uniform("damp_strength", value)
+@export var damp_foot_depth: Vector2 = Vector2(0.04, 0.2):
+	set(value):
+		damp_foot_depth = value
+		_apply_uniform("damp_foot_depth", value)
+@export var damp_bank_width_m: float = 1.2:
+	set(value):
+		damp_bank_width_m = value
+		_apply_uniform("damp_bank_width_m", value)
+@export_group("")
+
 # Outer ground: past the walkable floor's ridge, a different surface -
 # flat outer_color with a coarse pebble grain and none of the sand's
 # grain, speckle, drift lines or ripples - so the edge of the floor reads
@@ -1005,6 +1105,8 @@ func _push_basin_heights() -> void:
 	_apply_uniform("basin_height_high", land_level + basin_tint_heights.y)
 	_apply_uniform("crest_min_height", land_level + crest_min_height)
 	_apply_uniform("slope_tint_fade_height", land_level + slope_tint_fade_height)
+	_apply_uniform("erosion_height_low", land_level + erosion_heights.x)
+	_apply_uniform("erosion_height_high", land_level + erosion_heights.y)
 
 # Boot-time sanity check: if the dry interior's own height doesn't clear
 # sea_level by more than relief's own fine-detail noise plus the sea's
@@ -1086,6 +1188,21 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("wind_ripple_scale", wind_ripple_scale)
 	_apply_uniform("wind_ripple_strength", wind_ripple_strength)
 	_apply_uniform("wind_ripple_warp", wind_ripple_warp)
+	_apply_uniform("dune_wind", dune_wind.normalized() if dune_wind.length() > 0.0001 else Vector2(1.0, 0.0))
+	_apply_uniform("lee_shade_strength", lee_shade_strength)
+	_apply_uniform("lee_shade_edge", lee_shade_edge)
+	_apply_uniform("lee_shade_min_slope", lee_shade_min_slope)
+	_apply_uniform("lee_shade_slope_blend", lee_shade_slope_blend)
+	_apply_uniform("erosion_strength", erosion_strength)
+	_apply_uniform("erosion_spacing_m", erosion_spacing_m)
+	_apply_uniform("erosion_width_m", erosion_width_m)
+	_apply_uniform("erosion_min_slope", erosion_min_slope)
+	_apply_uniform("erosion_break", erosion_break)
+	_apply_uniform("erosion_break_scale", erosion_break_scale)
+	_apply_uniform("damp_strength", damp_strength)
+	_apply_uniform("damp_foot_depth", damp_foot_depth)
+	_apply_uniform("damp_bank_width_m", damp_bank_width_m)
+	_push_dune_form()
 	_apply_uniform("basin_color", basin_color)
 	_apply_uniform("basin_tint_strength", basin_tint_strength)
 	_apply_uniform("outer_color", outer_color)
@@ -2440,6 +2557,7 @@ func _rebuild_ground_mesh_and_collision() -> void:
 
 	_apply_relief_mesh(cols, rows, heights)
 	_apply_relief_collision(cols, rows, heights)
+	_bake_dune_form()
 	_clear_outer_frame()
 	_build_outer_flat_frame()
 	_rebuild_dressing_frame()
@@ -2450,6 +2568,108 @@ func _rebuild_ground_mesh_and_collision() -> void:
 	_push_channel_uniforms()
 
 	relief_rebuilt.emit()
+
+# --- Dune form: what the tonal breaks read (see the Dune Tones exports) ---
+
+var _dune_form_texture: ImageTexture = null
+var _dune_form_origin: Vector2 = Vector2.ZERO
+var _dune_form_dims: Vector2i = Vector2i.ZERO
+
+# From the relief just sampled (_relief_heights), never per frame: the
+# heights on a dune_form_cell_m grid, smoothed over dune_form_blur_m (b)
+# and their gradient (r, g, rise a metre along X and Z), and how far that
+# sits under the heights smoothed over dune_form_wide_blur_m (a: high at a
+# slope's foot, low on a crest). One RGBA float texture over relief_extent.
+func _bake_dune_form() -> void:
+	if not _ready_done or _relief_heights.is_empty() or _relief_cols < 2 or _relief_rows < 2:
+		return
+	var started: int = Time.get_ticks_msec()
+	var cell: float = maxf(dune_form_cell_m, 0.25)
+	var cols: int = maxi(int(ceil(relief_extent.x / cell)) + 1, 2)
+	var rows: int = maxi(int(ceil(relief_extent.y / cell)) + 1, 2)
+	var half_extent: Vector2 = relief_extent * 0.5
+	var spacing: Vector2 = _relief_grid_spacing(_relief_cols, _relief_rows)
+	var heights := PackedFloat32Array()
+	heights.resize(cols * rows)
+	for row in rows:
+		for col in cols:
+			var local := Vector2(-half_extent.x + float(col) * cell, -half_extent.y + float(row) * cell)
+			heights[row * cols + col] = _relief_grid_height(local, spacing)
+	var smooth: PackedFloat32Array = _box_blur(heights, cols, rows, maxi(roundi(dune_form_blur_m / cell * 0.5), 1))
+	var wide: PackedFloat32Array = _box_blur(heights, cols, rows, maxi(roundi(dune_form_wide_blur_m / cell * 0.5), 1))
+	var packed := PackedFloat32Array()
+	packed.resize(cols * rows * 4)
+	for row in rows:
+		for col in cols:
+			var i: int = row * cols + col
+			var left: float = smooth[row * cols + maxi(col - 1, 0)]
+			var right: float = smooth[row * cols + mini(col + 1, cols - 1)]
+			var up: float = smooth[maxi(row - 1, 0) * cols + col]
+			var down: float = smooth[mini(row + 1, rows - 1) * cols + col]
+			var span_x: float = cell * float(mini(col + 1, cols - 1) - maxi(col - 1, 0))
+			var span_z: float = cell * float(mini(row + 1, rows - 1) - maxi(row - 1, 0))
+			packed[i * 4] = (right - left) / maxf(span_x, 0.001)
+			packed[i * 4 + 1] = (down - up) / maxf(span_z, 0.001)
+			packed[i * 4 + 2] = smooth[i]
+			packed[i * 4 + 3] = wide[i] - smooth[i]
+	var image: Image = Image.create_from_data(cols, rows, false, Image.FORMAT_RGBAF, packed.to_byte_array())
+	_dune_form_texture = ImageTexture.create_from_image(image)
+	var origin: Vector3 = global_transform.origin if is_inside_tree() else position
+	_dune_form_origin = Vector2(origin.x - half_extent.x, origin.z - half_extent.y)
+	_dune_form_dims = Vector2i(cols, rows)
+	_push_dune_form()
+	print("Ground: dune form %d x %d at %.2f m in %d ms" % [cols, rows, cell, Time.get_ticks_msec() - started])
+
+func _push_dune_form() -> void:
+	if _dune_form_texture == null:
+		_apply_uniform("dune_form_ready", false)
+		return
+	_apply_uniform("dune_form_tex", _dune_form_texture)
+	_apply_uniform("dune_form_origin", _dune_form_origin)
+	_apply_uniform("dune_form_cell", maxf(dune_form_cell_m, 0.25))
+	_apply_uniform("dune_form_dims", Vector2(float(_dune_form_dims.x), float(_dune_form_dims.y)))
+	_apply_uniform("dune_form_ready", true)
+
+# The relief grid's height at a Ground-local XZ, bilinear, clamped to the
+# grid.
+func _relief_grid_height(local: Vector2, spacing: Vector2) -> float:
+	var half_extent: Vector2 = relief_extent * 0.5
+	var col_f: float = clampf((local.x + half_extent.x) / spacing.x, 0.0, float(_relief_cols - 1))
+	var row_f: float = clampf((local.y + half_extent.y) / spacing.y, 0.0, float(_relief_rows - 1))
+	var col: int = mini(int(floor(col_f)), _relief_cols - 2)
+	var row: int = mini(int(floor(row_f)), _relief_rows - 2)
+	var fx: float = col_f - float(col)
+	var fz: float = row_f - float(row)
+	var top: float = lerpf(_relief_heights[row * _relief_cols + col], _relief_heights[row * _relief_cols + col + 1], fx)
+	var bottom: float = lerpf(_relief_heights[(row + 1) * _relief_cols + col], _relief_heights[(row + 1) * _relief_cols + col + 1], fx)
+	return lerpf(top, bottom, fz)
+
+# Two passes of a separable box blur of `radius` cells (near a gaussian),
+# edges clamped.
+static func _box_blur(values: PackedFloat32Array, cols: int, rows: int, radius: int) -> PackedFloat32Array:
+	var out: PackedFloat32Array = values
+	for pass_index in 2:
+		out = _box_blur_axis(out, cols, rows, radius, true)
+		out = _box_blur_axis(out, cols, rows, radius, false)
+	return out
+
+static func _box_blur_axis(values: PackedFloat32Array, cols: int, rows: int, radius: int, along_x: bool) -> PackedFloat32Array:
+	var out := PackedFloat32Array()
+	out.resize(values.size())
+	var lines: int = rows if along_x else cols
+	var length: int = cols if along_x else rows
+	var width: float = float(radius * 2 + 1)
+	for line in lines:
+		var sum: float = 0.0
+		for k in range(-radius, radius + 1):
+			var at: int = clampi(k, 0, length - 1)
+			sum += values[line * cols + at] if along_x else values[at * cols + line]
+		for k in length:
+			out[line * cols + k if along_x else k * cols + line] = sum / width
+			var leaving: int = clampi(k - radius, 0, length - 1)
+			var entering: int = clampi(k + radius + 1, 0, length - 1)
+			sum += (values[line * cols + entering] if along_x else values[entering * cols + line]) - (values[line * cols + leaving] if along_x else values[leaving * cols + line])
+	return out
 
 # The one shared mapping from a relief grid index to its world XZ - every
 # consumer (sampling, mesh vertices, the collision transform's spacing, the

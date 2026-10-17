@@ -314,6 +314,49 @@ uniform float crest_min_height = 1.0;
 // (the default) is off: the tint holds at any height.
 uniform float slope_tint_fade_height = 0.0;
 uniform float slope_tint_fade_width = 0.0;
+// Dune tonal breaks (Ground's Dune Tones exports): broad value masses read
+// off the dunes' own form, each only ever darkening - a multiply under 1
+// on the sand's base, hue kept, so nothing lifts and nothing warms. The
+// form is Ground's bake (_bake_dune_form()): an RGBA float texture over
+// the relief, one texel a dune_form_cell metres - r, g the smoothed
+// height's rise a metre along X and Z, b that height, a how far it sits
+// under its wider surroundings (high at a slope's foot). dune_form_ready
+// false (no relief yet) leaves every break off.
+uniform sampler2D dune_form_tex : filter_linear, repeat_disable;
+uniform vec2 dune_form_origin = vec2(0.0);
+uniform float dune_form_cell = 1.0;
+uniform vec2 dune_form_dims = vec2(1.0);
+uniform bool dune_form_ready = false;
+// Lee side: the slope falling away along dune_wind (XZ, the way the wind
+// blows) darker by lee_shade_strength, the turn across the crest
+// lee_shade_edge wide in the facing's dot, on slopes from lee_shade_min_
+// slope degrees over lee_shade_slope_blend. The windward face is as it was.
+uniform vec2 dune_wind = vec2(0.866, 0.5);
+uniform float lee_shade_strength = 0.0;
+uniform float lee_shade_edge = 0.35;
+uniform float lee_shade_min_slope = 2.0;
+uniform float lee_shade_slope_blend = 5.0;
+// Erosion lines: thin darker bands on the smoothed height's contours, one
+// every erosion_spacing_m between erosion_height_low and _high (world
+// metres - Ground converts its own, over the land level), erosion_width_m
+// across in height, on slopes past erosion_min_slope degrees only, and
+// broken where value noise at erosion_break_scale cycles a metre falls
+// under erosion_break - wind-cut ledges, never a regular stripe.
+uniform float erosion_strength = 0.0;
+uniform float erosion_spacing_m = 0.6;
+uniform float erosion_width_m = 0.05;
+uniform float erosion_height_low = 0.4;
+uniform float erosion_height_high = 2.0;
+uniform float erosion_min_slope = 14.0;
+uniform float erosion_break = 0.45;
+uniform float erosion_break_scale = 0.15;
+// Damp strip: darker by damp_strength at a slope's foot (the form's
+// depth under its surroundings from damp_foot_depth.x to .y metres) and
+// on the sand within damp_bank_width_m of enclosed water (a pool's or a
+// stream's bank, by the landmass distance grid's enclosure).
+uniform float damp_strength = 0.0;
+uniform vec2 damp_foot_depth = vec2(0.04, 0.2);
+uniform float damp_bank_width_m = 1.2;
 // Wind ripples on dry open sand: a fine wave along one world direction,
 // wind_ripple_angle degrees from +X toward +Z (its crests run across it),
 // wind_ripple_scale metres crest to crest, warped by slow noise
@@ -1078,6 +1121,50 @@ float pebble_value(vec2 world_xz) {
 // below sea level and on wet sand. Multiplications rather than branches
 // so the band dies away rather than ending at an edge - which is the
 // whole point.
+// The dune tonal breaks' multiplier at a point, 1 = untouched (see the
+// dune_form uniforms' doc): the lee shade, the erosion lines and the damp
+// strip, the darkest of them winning so two never stack into a hole.
+float dune_tone(vec2 world_xz) {
+	if (!dune_form_ready) {
+		return 1.0;
+	}
+	vec2 uv = ((world_xz - dune_form_origin) / max(dune_form_cell, 0.001) + 0.5) / max(dune_form_dims, vec2(1.0));
+	vec4 form = texture(dune_form_tex, uv);
+	vec2 rise = form.rg;
+	float steep = length(rise);
+	float slope_degrees = degrees(atan(steep));
+	float shade = 0.0;
+	if (lee_shade_strength > 0.0 && steep > 0.0001) {
+		// The ground falls away along the wind on the lee: its rise points
+		// against it.
+		float facing = dot(rise / steep, normalize(dune_wind));
+		float lee = 1.0 - smoothstep(-lee_shade_edge, lee_shade_edge, facing);
+		lee *= smoothstep(lee_shade_min_slope, lee_shade_min_slope + max(lee_shade_slope_blend, 0.001), slope_degrees);
+		shade = max(shade, lee_shade_strength * lee);
+	}
+	if (erosion_strength > 0.0 && erosion_spacing_m > 0.0) {
+		float height = form.b + (value_noise(world_xz * 0.4) - 0.5) * erosion_width_m * 1.5;
+		float from_band = abs(fract((height - erosion_height_low) / erosion_spacing_m + 0.5) - 0.5) * erosion_spacing_m;
+		float band = 1.0 - smoothstep(erosion_width_m * 0.35, erosion_width_m, from_band);
+		band *= step(erosion_height_low - erosion_width_m, height) * step(height, erosion_height_high + erosion_width_m);
+		band *= smoothstep(erosion_min_slope, erosion_min_slope + 6.0, slope_degrees);
+		band *= smoothstep(erosion_break, erosion_break + 0.15, value_noise(world_xz * erosion_break_scale + vec2(17.3, 41.9)));
+		shade = max(shade, erosion_strength * band);
+	}
+	if (damp_strength > 0.0) {
+		// A foot, not a face: off once the ground steepens.
+		float damp = smoothstep(damp_foot_depth.x, max(damp_foot_depth.y, damp_foot_depth.x + 0.001), form.a) * (1.0 - smoothstep(10.0, 16.0, slope_degrees));
+		if (landmass_distance_ready && damp_bank_width_m > 0.0) {
+			// Negative on sand: the bank is the sand within the width.
+			float shore = landmass_distance_at(world_xz);
+			float bank = landmass_enclosure_at(world_xz) * step(shore, 0.0) * (1.0 - smoothstep(0.0, damp_bank_width_m, -shore));
+			damp = max(damp, bank);
+		}
+		shade = max(shade, damp_strength * damp);
+	}
+	return 1.0 - clamp(shade, 0.0, 0.9);
+}
+
 float wear_gate(float shore_distance, float sand_wetness, float underwater) {
 	float gate = (1.0 - underwater) * (1.0 - sand_wetness);
 	if (landmass_distance_ready) {
@@ -1183,6 +1270,8 @@ void fragment() {
 	sand_base = mix(sand_base, slope_tint_color.rgb, slope_tint_t * slope_tint_strength * sand_detail);
 	float crest_t = (1.0 - slope_tint_t) * smoothstep(crest_min_height, crest_min_height + 0.25, v_world_height) * sand_detail;
 	sand_base *= 1.0 + crest_light_strength * crest_t;
+	// The dune tonal breaks, darken-only, on the sand alone (see dune_tone()).
+	sand_base *= mix(1.0, dune_tone(v_world_xz), sand_detail);
 	vec3 dry = mix(sand_base, rock_color.rgb, rock) * distance_tint;
 	vec3 wet = dry * wet_darken;
 

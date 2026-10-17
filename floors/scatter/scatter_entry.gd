@@ -141,6 +141,13 @@ const ZONE_ROCK_EDGE := 32
 	set(value):
 		inland_range_m = value
 		emit_changed()
+# Metres over the floor's land level (the Sea's level plus Ground's
+# landmass_interior_height) a cluster may centre, from x to y - an upper
+# dune face's own kind. The default holds anywhere.
+@export var height_range_m: Vector2 = Vector2(-1000.0, 1000.0):
+	set(value):
+		height_range_m = value
+		emit_changed()
 # How far below the water's level an item may still sit, metres - 0 keeps
 # it on dry sand; a little lets samphire stand at the very edge.
 @export var wet_edge_m: float = 0.0:
