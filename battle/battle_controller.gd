@@ -1482,6 +1482,8 @@ func _run_sequential_turn() -> void:
 			var camera := get_viewport().get_camera_3d()
 			var across: Vector3 = camera.global_transform.basis.x if camera != null else Vector3.ZERO
 			var dig_delay: float = enemy.begin_dig(combatant.dig_intent.mound_count, _wanderer.global_position, across)
+			# The one clue, on its own mound alone.
+			enemy.set_dig_tell(combatant.true_mound)
 			if dig_delay > 0.0:
 				await get_tree().create_timer(dig_delay).timeout
 		if result["defended"]:

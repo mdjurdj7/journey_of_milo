@@ -259,22 +259,28 @@ var option_id: StringName = &""
 # A DIG's mounds (begin_dig()): in a row across the line to the Wanderer,
 # this far apart centre to centre, each its own SandMound this long (along
 # the body's facing), wide and high. Edits reshape mounds already up.
-@export var dig_mound_spacing_m: float = 2.6:
+@export var dig_mound_spacing_m: float = 2.4:
 	set(value):
 		dig_mound_spacing_m = value
 		_place_dig_mounds()
-@export var dig_mound_length_m: float = 2.8:
+@export var dig_mound_length_m: float = 2.4:
 	set(value):
 		dig_mound_length_m = value
 		_shape_dig_mounds()
-@export var dig_mound_width_m: float = 1.7:
+@export var dig_mound_width_m: float = 1.5:
 	set(value):
 		dig_mound_width_m = value
 		_shape_dig_mounds()
-@export var dig_mound_height_m: float = 0.2:
+@export var dig_mound_height_m: float = 0.28:
 	set(value):
 		dig_mound_height_m = value
 		_shape_dig_mounds()
+# The row's middle stepped this far from where the body stood toward the
+# Wanderer's side of the screen - a row centred on a body framed at the
+# screen's edge runs off it - but never so far that a mound stands within
+# dig_wanderer_clear_m of him. Read at a fight's first dig.
+@export var dig_row_toward_m: float = 1.3
+@export var dig_wanderer_clear_m: float = 3.0
 # The mounds swelling up, and a wrong one falling flat.
 @export var dig_mound_rise_seconds: float = 0.6
 @export var dig_mound_collapse_seconds: float = 0.35
@@ -285,6 +291,30 @@ var option_id: StringName = &""
 		dig_mound_highlight = value
 		if _dig_highlight_material != null:
 			_dig_highlight_material.albedo_color = value
+@export_group("")
+
+@export_group("Dig tell")
+# The one clue to which mound the body is under (set_dig_tell()), on that
+# mound alone: it breathes - sinks by tell_breathe_amount of its height and
+# swells back, every tell_breathe_seconds; sand trickles off its crest
+# down a flank; and silt puffs from the crest every tell_puff_seconds.
+# The others lie still. Edits take hold on the next dig.
+@export_range(0.0, 0.5, 0.01) var tell_breathe_amount: float = 0.2
+@export var tell_breathe_seconds: float = 2.4
+@export var tell_trickle_count: int = 40
+@export var tell_trickle_lifetime: float = 0.8
+@export var tell_trickle_grain_m: float = 0.06
+# The grains' and the silt's colour: the sand's own (Ground.ground_color)
+# times this - lit like the sand, so they read as it in its own light -
+# at this alpha, each a soft round speck.
+@export var tell_trickle_tint: float = 0.88
+@export_range(0.0, 1.0, 0.01) var tell_trickle_alpha: float = 0.9
+@export var tell_puff_seconds: float = 3.2
+@export var tell_puff_count: int = 14
+@export var tell_puff_lifetime: float = 1.4
+@export var tell_puff_size_m: float = 0.45
+@export var tell_puff_tint: float = 1.0
+@export_range(0.0, 1.0, 0.01) var tell_puff_alpha: float = 0.55
 @export_group("")
 
 var _contacted: bool = false
@@ -409,6 +439,9 @@ var _dig_centre_set: bool = false
 var _dig_across: Vector3 = Vector3.RIGHT
 var _dig_anchors: Array[Node3D] = []
 var _dig_highlight_material: StandardMaterial3D = null
+# The tell's mound and its breathing, while it shows (set_dig_tell()).
+var _tell_mound: int = -1
+var _tell_tweens: Array[Tween] = []
 # FloorEnemy.phase_drop_offset resolved at spawn: whether it drops at its
 # phase, and the world XZ it lands on (Y unused).
 var has_phase_drop: bool = false
@@ -1698,17 +1731,19 @@ func play_burrow(buried: bool) -> float:
 
 # --- The dig (EnemyIntent.IntentType.DIG) ---
 #
-# Nothing here knows which mound the body is under: the body goes under
-# where it stands, then waits at the row's middle - the spot the fight's
-# intent, HP bar, status row and camera all read off this node - until a
-# mound is named for it to come up through (surface_at_mound()). Every
-# mound is built, lit and shaped the same.
+# Where the body is under shows in one thing only - the tell on its mound
+# (set_dig_tell()): the body goes under where it stands, then waits at the
+# row's middle - the spot the fight's intent, HP bar, status row and camera
+# all read off this node - until a mound is named for it to come up
+# through (surface_at_mound()). Every mound is built, lit, shaped and
+# hovered the same.
 
 # Under the sand, and `count` mounds swell up in a row along `across`
 # (the battle camera's own right, so the row reads left to right on
-# screen, no mound behind another), dig_mound_spacing_m apart, on where
-# the fight's first dig stood - stepped back from `toward` (the Wanderer)
-# far enough that no mound stands nearer him than the body did. Returns
+# screen, no mound behind another), dig_mound_spacing_m apart, each
+# turned broadside to the row, its middle where the fight's first dig
+# stood moved dig_row_toward_m toward `toward` (the Wanderer) - less, or
+# away, until every mound keeps dig_wanderer_clear_m from him. Returns
 # how long that takes, for the enemy turn to wait on.
 func begin_dig(count: int, toward: Vector3, across: Vector3) -> float:
 	_end_dig_mounds()
@@ -1716,14 +1751,14 @@ func begin_dig(count: int, toward: Vector3, across: Vector3) -> float:
 	var flat := Vector3(across.x, 0.0, across.z)
 	_dig_across = flat.normalized() if flat.length() > 0.0001 else global_transform.basis.x
 	if not _dig_centre_set:
-		_dig_centre = global_position
-		var away := Vector3(_dig_centre.x - toward.x, 0.0, _dig_centre.z - toward.z)
-		var gap: float = away.length()
-		away = away / gap if gap > 0.0001 else global_transform.basis.z
-		# The nearest end's pull toward him, along the line between: the
-		# row stepped back by that much.
-		var reach: float = float(maxi(count - 1, 0)) * 0.5 * dig_mound_spacing_m * absf(_dig_across.dot(away))
-		_dig_centre += away * reach
+		var spot: Vector3 = global_position
+		var to_him := Vector3(toward.x - spot.x, 0.0, toward.z - spot.z)
+		var side: float = 1.0 if _dig_across.dot(to_him) >= 0.0 else -1.0
+		var shift: float = dig_row_toward_m
+		var floor_shift: float = -float(maxi(count, 1)) * dig_mound_spacing_m
+		while shift > floor_shift and _row_nearest(spot + _dig_across * side * shift, count, toward) < dig_wanderer_clear_m:
+			shift -= 0.1
+		_dig_centre = spot + _dig_across * side * shift
 		_dig_centre_set = true
 	_dig_active = true
 	for mound in count:
@@ -1746,6 +1781,16 @@ func begin_dig(count: int, toward: Vector3, across: Vector3) -> float:
 	tween.parallel().tween_callback(_move_body_to(_dig_centre)).set_delay(under)
 	_set_dig_rise(0.0)
 	return maxf(under, rise)
+
+# How near `toward` the nearest of a row of `count` centred on `centre`
+# would stand, XZ.
+func _row_nearest(centre: Vector3, count: int, toward: Vector3) -> float:
+	var nearest: float = INF
+	for index in count:
+		var offset: float = (float(index) - float(count - 1) * 0.5) * dig_mound_spacing_m
+		var at: Vector3 = centre + _dig_across * offset
+		nearest = minf(nearest, Vector2(at.x - toward.x, at.z - toward.z).length())
+	return nearest
 
 func is_dug_in() -> bool:
 	return _dig_active
@@ -1803,12 +1848,142 @@ func collapse_mound(mound: int) -> float:
 	tween.tween_callback(anchor.queue_free)
 	return maxf(dig_mound_collapse_seconds, 0.0)
 
+# The tell on mound `mound` (see the Dig tell exports): its breathing, the
+# trickle off its crest and the silt puffs - once its row is up. Stops
+# when the row goes.
+func set_dig_tell(mound: int) -> void:
+	_stop_dig_tell()
+	var anchor: Node3D = _dig_anchor(mound)
+	var sand: SandMound = _dig_sand(mound)
+	if anchor == null or sand == null or _ground == null:
+		return
+	_tell_mound = mound
+	var crest := Vector3(0.0, dig_mound_height_m, -dig_mound_length_m * 0.5 + sand.crest_fraction * dig_mound_length_m)
+	# The breathing once the row has risen - the rise owns the mound till
+	# then.
+	var start := create_tween()
+	start.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	start.tween_interval(maxf(dig_mound_rise_seconds, 0.0))
+	start.tween_callback(_breathe.bind(sand))
+	_tell_tweens.append(start)
+	var trickle := _tell_particles(anchor, crest, tell_trickle_count, tell_trickle_lifetime, Vector2(tell_trickle_grain_m, tell_trickle_grain_m), tell_trickle_tint, tell_trickle_alpha)
+	trickle.name = "TellTrickle"
+	var falling := trickle.process_material as ParticleProcessMaterial
+	falling.emission_box_extents = Vector3(dig_mound_width_m * 0.3, 0.01, dig_mound_length_m * 0.08)
+	falling.direction = Vector3(1.0, -0.4, 0.0)
+	falling.spread = 180.0
+	falling.flatness = 0.85
+	falling.initial_velocity_min = 0.15
+	falling.initial_velocity_max = 0.4
+	falling.gravity = Vector3(0.0, -1.4, 0.0)
+	trickle.emitting = true
+	var puff := _tell_particles(anchor, crest, tell_puff_count, tell_puff_lifetime, Vector2(tell_puff_size_m, tell_puff_size_m), tell_puff_tint, tell_puff_alpha)
+	puff.name = "TellPuff"
+	puff.one_shot = true
+	puff.explosiveness = 0.85
+	var rising := puff.process_material as ParticleProcessMaterial
+	rising.emission_box_extents = Vector3(dig_mound_width_m * 0.15, 0.01, dig_mound_length_m * 0.05)
+	rising.direction = Vector3.UP
+	rising.spread = 35.0
+	rising.initial_velocity_min = 0.25
+	rising.initial_velocity_max = 0.55
+	rising.gravity = Vector3(0.0, 0.05, 0.0)
+	rising.damping_min = 0.4
+	rising.damping_max = 0.8
+	rising.scale_min = 0.7
+	rising.scale_max = 1.4
+	var growth := Curve.new()
+	growth.add_point(Vector2(0.0, 0.5))
+	growth.add_point(Vector2(1.0, 1.6))
+	var growth_texture := CurveTexture.new()
+	growth_texture.curve = growth
+	rising.scale_curve = growth_texture
+	var fade := Gradient.new()
+	fade.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
+	fade.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+	var fade_texture := GradientTexture1D.new()
+	fade_texture.gradient = fade
+	rising.color_ramp = fade_texture
+	var puffs := create_tween()
+	puffs.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	puffs.set_loops()
+	puffs.tween_interval(maxf(tell_puff_seconds, 0.3))
+	puffs.tween_callback(puff.restart)
+	_tell_tweens.append(puffs)
+
+func _breathe(sand: SandMound) -> void:
+	if not is_instance_valid(sand):
+		return
+	var half: float = maxf(tell_breathe_seconds, 0.2) * 0.5
+	var breathe := create_tween()
+	breathe.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	breathe.set_loops()
+	breathe.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	breathe.tween_method(sand.set_rise, 1.0, 1.0 - tell_breathe_amount, half)
+	breathe.tween_method(sand.set_rise, 1.0 - tell_breathe_amount, 1.0, half)
+	_tell_tweens.append(breathe)
+
+func _stop_dig_tell() -> void:
+	for tween in _tell_tweens:
+		if tween != null and tween.is_valid():
+			tween.kill()
+	_tell_tweens.clear()
+	var anchor: Node3D = _dig_anchor(_tell_mound)
+	if anchor != null:
+		for path: NodePath in [^"TellTrickle", ^"TellPuff"]:
+			var particles: Node = anchor.get_node_or_null(path)
+			if particles != null:
+				particles.queue_free()
+	_tell_mound = -1
+
+# A tell's particles at `crest` on `anchor`'s mound: lit quads in the
+# sand's colour times `tint`, at `alpha`, facing the camera - the process
+# material's motion is the caller's. ALWAYS-processed through the fight's
+# freeze, as spawn_sand_puff()'s.
+func _tell_particles(anchor: Node3D, crest: Vector3, count: int, lifetime: float, size: Vector2, tint: float, alpha: float) -> GPUParticles3D:
+	var particles := GPUParticles3D.new()
+	particles.process_mode = Node.PROCESS_MODE_ALWAYS
+	particles.emitting = false
+	particles.amount = maxi(count, 1)
+	particles.lifetime = maxf(lifetime, 0.05)
+	particles.local_coords = false
+	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	var quad := QuadMesh.new()
+	quad.size = size
+	var material := StandardMaterial3D.new()
+	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
+	material.vertex_color_use_as_albedo = true
+	var sand: Color = _ground.ground_color
+	material.albedo_color = Color(sand.r * tint, sand.g * tint, sand.b * tint, alpha)
+	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	# A soft round speck, never a hard square.
+	var speck := GradientTexture2D.new()
+	speck.width = 32
+	speck.height = 32
+	speck.fill = GradientTexture2D.FILL_RADIAL
+	speck.fill_from = Vector2(0.5, 0.5)
+	speck.fill_to = Vector2(1.0, 0.5)
+	var falloff := Gradient.new()
+	falloff.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
+	falloff.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
+	speck.gradient = falloff
+	material.albedo_texture = speck
+	quad.material = material
+	particles.draw_pass_1 = quad
+	var process_material := ParticleProcessMaterial.new()
+	process_material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
+	particles.process_material = process_material
+	anchor.add_child(particles)
+	particles.position = crest
+	return particles
+
 # Up through mound `mound` - found, or erupting on its own: the body moves
 # under it, the row flattens and goes, and the body rises. Returns how
 # long that takes.
 func surface_at_mound(mound: int) -> float:
 	if not _dig_active:
 		return 0.0
+	_stop_dig_tell()
 	var spot: Vector3 = get_mound_position(mound)
 	_move_body_to(spot).call()
 	var flatten: float = maxf(burrow_seconds, 0.01)
@@ -1833,6 +2008,7 @@ func surface_at_mound(mound: int) -> float:
 
 # The row gone at once - a new dig over an old one, a fight's end.
 func _end_dig_mounds() -> void:
+	_stop_dig_tell()
 	for anchor in _dig_anchors:
 		if anchor != null and is_instance_valid(anchor):
 			anchor.queue_free()
@@ -1863,7 +2039,8 @@ func _place_dig_mounds() -> void:
 		if _ground != null:
 			var local: Vector3 = _ground.to_local(spot)
 			spot.y = _ground.to_global(Vector3(local.x, _ground.get_visible_height_at(Vector2(local.x, local.z)), local.z)).y
-		anchor.global_transform = Transform3D(Basis(Vector3.UP, global_rotation.y), spot)
+		# Broadside to the row: its width along it, its length across.
+		anchor.global_transform = Transform3D(Basis(Vector3.UP, atan2(-_dig_across.z, _dig_across.x)), spot)
 		var sand: SandMound = _dig_sand(index)
 		if sand != null:
 			sand.set_ground(_ground)
