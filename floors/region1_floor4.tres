@@ -93,7 +93,7 @@ props = Array[ExtResource("10_floor_prop")]([SubResource("FloorProp_pup")])
 [sub_resource type="Resource" id="EncounterSlot_pup"]
 script = ExtResource("90_encounter_slot")
 slot_id = &"pup"
-position = Vector2(15.5, -17)
+position = Vector2(19.5, -14)
 required = false
 options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_pup")])
 
