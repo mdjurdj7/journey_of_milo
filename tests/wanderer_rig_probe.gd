@@ -36,11 +36,13 @@ extends SceneTree
 #            scaled (the hand frame strips any bone scale in the pose); in
 #            BattleIdle its point is above the sand under his feet -
 #            nothing about which way it points, so any battle pose passes
-#   weapon - another weapon equipped (RunState.weapon_changed) rebuilds
+#   weapon - another weapon equipped (RunState.equip_weapon()) rebuilds
 #            the sword on his back mount at its length, its unset fit
 #            the scene's; a change while the sword is in his hand waits
 #            until it is back on his back, then rebuilds - the Rusted
-#            Blade again, its fit his again
+#            Blade again, its fit his again; then Greyshelf's Tail and
+#            the Rusted Blade once more, each built on his back from its
+#            own model, at its length, its fit his
 #   grab   - DrawSword carries one method key at draw_sword_grab_time
 #            calling _on_draw_sword_grab_key() (its clip text, the key
 #            aside, is the glb's draw_sword); entered with a blend in
@@ -85,6 +87,8 @@ const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const WEAPON_DATA_SCRIPT_PATH := "res://run/weapon_data.gd"
 const SWAP_LENGTH := 0.9
 const SWAP_GRIP_FRACTION := 0.7
+# A weapon with a field model of its own, swapped in after it.
+const TAIL_WEAPON_PATH := "res://run/weapons/greyshelfs_tail.tres"
 const FIGHT_HP := 999
 # The fight's second Slash is confirmed this long after the first (real
 # seconds), and must not start before CANCEL_S.
@@ -810,10 +814,9 @@ func _wears_fit(fit: Dictionary) -> bool:
 			return false
 	return true
 
-# Equips `weapon` as a run would: RunState.weapon, then weapon_changed.
+# Equips `weapon` as a run would (RunState.equip_weapon()).
 func _equip(run_state: Node, weapon: Resource) -> void:
-	run_state.set("weapon", weapon)
-	run_state.emit_signal("weapon_changed", weapon)
+	run_state.call("equip_weapon", weapon)
 
 # Another weapon - sword.glb at its own length and grip, the rest of its
 # fit unset - equipped with the sword on his back, then the Rusted Blade
@@ -857,6 +860,22 @@ func _check_weapon_swap(run_state: Node) -> void:
 	var blade_fit: Dictionary = blade.call("field_fit")
 	_check_sword_size(rebuilt, float(blade_fit.get(&"sword_length", scene_fit[&"sword_length"])), "the Rusted Blade again")
 	_check(_wears_fit(blade_fit), "he wears its fit again")
+
+	# Greyshelf's Tail, a model of its own, then the Rusted Blade again.
+	for weapon: Resource in [load(TAIL_WEAPON_PATH), blade]:
+		var label: String = String(weapon.get("display_name"))
+		_equip(run_state, weapon)
+		await _pose("Idle", 0.0)
+		var built: Node3D = _wanderer.get("_sword_root")
+		_check(built != null and built.get_parent() == back_frame, "%s equipped: built on his back mount" % label)
+		if built == null:
+			return
+		var model_path: String = String(weapon.get("field_model_path"))
+		var shown: String = (built.get_node("SwordMesh") as Node).scene_file_path
+		_check(shown == model_path, "%s: its own model (%s)" % [label, shown.get_file()])
+		var weapon_fit: Dictionary = weapon.call("field_fit")
+		_check_sword_size(built, float(weapon_fit.get(&"sword_length", scene_fit[&"sword_length"])), label)
+		_check(_wears_fit(weapon_fit), "%s: he wears its fit" % label)
 
 func _check(ok: bool, label: String) -> void:
 	print(("ok   " if ok else "FAIL ") + label)

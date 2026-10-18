@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://run/weapon_data.gd" id="1_weapon_data"]
 [ext_resource type="Texture2D" uid="uid://dspj065uteprj" path="res://assets/textures/weapons/rusted_blade.png" id="2_art"]
 [ext_resource type="Resource" path="res://cards/weapon/lash.tres" id="3_lash"]
+[ext_resource type="Texture2D" uid="uid://qwlsslq4l0oh" path="res://assets/models/weapons/greyshelf_tail/greyshelf_tail_0.jpg" id="4_field_albedo"]
 
 [resource]
 script = ExtResource("1_weapon_data")
@@ -12,3 +13,12 @@ description = "Your Slashes become Lash."
 lore = "Old Grey, on the coast. It struck three times before it learned to stop."
 art = ExtResource("2_art")
 basic_attack_as = ExtResource("3_lash")
+field_model_path = "res://assets/models/weapons/greyshelf_tail/greyshelf_tail.glb"
+field_albedo = ExtResource("4_field_albedo")
+field_length = 1.5
+field_grip_fraction = 0.676
+field_grip_axis_flip = 1
+field_hand_mount_position = Vector3(-0.019, 0.087, 0.0067)
+field_hand_mount_rotation_degrees = Vector3(-37.98, 91.2, 58.46)
+field_back_mount_position = Vector3(-0.0993, 0.071, -0.129)
+field_back_mount_rotation_degrees = Vector3(16, -6.747, -170.54)
