@@ -535,6 +535,10 @@ var _line_stance_spacing: float = 0.0
 # (Wanderer.enter_battle_stance_along()) - added to the opening hold.
 var _stance_walk_seconds: float = 0.0
 var _battle_members: Array[FieldEnemy] = []
+# Each standing required enemy: whether the Wanderer stood past its
+# engage line (FloorData.engage_line_enabled) at the last physics frame -
+# a fight starts when that turns true (_check_engage_lines()).
+var _engage_past: Dictionary[FieldEnemy, bool] = {}
 # The EncounterSlot the fight's members came from (FieldEnemy.slot_id),
 # kept as it opens: a member killed mid-fight is freed while it is still
 # in _battle_members, so nothing reads the slot off one.
@@ -1262,6 +1266,7 @@ func _show_click_marker(point: Vector3) -> void:
 	_click_marker.show_at(point, ink)
 
 func _physics_process(delta: float) -> void:
+	_check_engage_lines()
 	if not wade_drain_enabled or not _boundary_ready or _run_lost_to_wading:
 		return
 
@@ -3139,6 +3144,31 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 # counted as gone.
 func _required_enemy_remains() -> bool:
 	return _nearest_required_enemy(Vector3.ZERO) != null
+
+# A LINE floor with engage lines on (FloorData.engage_line_enabled): the
+# Wanderer crossing a standing required enemy's line toward the exit -
+# from short of it one physics frame to past it the next - starts that
+# fight, through _on_enemy_contacted() as contact would. A line he stands
+# past when first seen, or crosses back over, does nothing.
+func _check_engage_lines() -> void:
+	var floor_data := get_floor_data()
+	if floor_data == null or not floor_data.engage_line_enabled or floor_data.exit_kind != FloorData.ExitKind.LINE:
+		return
+	if _battle_open or _reunion_open or wanderer == null:
+		return
+	var exit: Vector3 = get_exit_direction()
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as FieldEnemy
+		if enemy == null or not enemy.required or enemy.is_defeated() or enemy.is_queued_for_deletion():
+			continue
+		var offset := Vector3(wanderer.global_position.x - enemy.global_position.x, 0.0, wanderer.global_position.z - enemy.global_position.z)
+		var past: bool = offset.dot(exit) >= floor_data.engage_line_offset_m
+		var was_short: bool = _engage_past.has(enemy) and not _engage_past[enemy]
+		_engage_past[enemy] = past
+		if past and was_short:
+			_engage_past.clear()
+			_on_enemy_contacted(enemy)
+			return
 
 # The standing required enemy nearest `from` (XZ), by the same rule as
 # _required_enemy_remains() - null when none is left. A cluster is its

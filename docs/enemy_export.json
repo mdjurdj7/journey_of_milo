@@ -73,7 +73,8 @@
                 ],
                 "gate_distance_beyond_enemy": 6.0,
                 "bar_axis_offset": 0.85,
-                "channel_max_width": 0.0
+                "channel_max_width": 0.0,
+                "engage_line_offset_m": null
               },
               "elite_rewards": {
                 "gold_multiplier": null,
@@ -151,7 +152,8 @@
                 ],
                 "gate_distance_beyond_enemy": 7.5,
                 "bar_axis_offset": 0.0,
-                "channel_max_width": 0.0
+                "channel_max_width": 0.0,
+                "engage_line_offset_m": null
               },
               "elite_rewards": {
                 "gold_multiplier": null,
@@ -216,7 +218,8 @@
                 ],
                 "gate_distance_beyond_enemy": 7.5,
                 "bar_axis_offset": 0.0,
-                "channel_max_width": 0.0
+                "channel_max_width": 0.0,
+                "engage_line_offset_m": null
               },
               "elite_rewards": {
                 "gold_multiplier": null,
@@ -471,7 +474,8 @@
                 ],
                 "gate_distance_beyond_enemy": 14.63,
                 "bar_axis_offset": 0.0,
-                "channel_max_width": 0.0
+                "channel_max_width": 0.0,
+                "engage_line_offset_m": null
               },
               "elite_rewards": {
                 "gold_multiplier": null,
@@ -536,7 +540,8 @@
                 ],
                 "gate_distance_beyond_enemy": 14.63,
                 "bar_axis_offset": 0.0,
-                "channel_max_width": 0.0
+                "channel_max_width": 0.0,
+                "engage_line_offset_m": null
               },
               "elite_rewards": {
                 "gold_multiplier": null,
@@ -687,7 +692,8 @@
                 ],
                 "gate_distance_beyond_enemy": 6.31,
                 "bar_axis_offset": 0.0,
-                "channel_max_width": 0.0
+                "channel_max_width": 0.0,
+                "engage_line_offset_m": null
               },
               "elite_rewards": {
                 "gold_multiplier": null,
@@ -942,7 +948,8 @@
                 ],
                 "gate_distance_beyond_enemy": 9.0,
                 "bar_axis_offset": 0.0,
-                "channel_max_width": 0.0
+                "channel_max_width": 0.0,
+                "engage_line_offset_m": 0.0
               },
               "elite_rewards": {
                 "gold_multiplier": null,

@@ -210,6 +210,15 @@ class_name FloorData
 # opens out rather than funnelling.
 enum ExitKind { CHANNEL, LINE }
 @export var exit_kind: ExitKind = ExitKind.CHANNEL
+# LINE only: each required enemy also has an engage line - across the
+# whole floor through where it stands, square to exit_direction, moved
+# engage_line_offset_m along it (negative: short of it). Crossing one
+# toward the exit while its enemy stands starts that fight as contact
+# does (RegionField._on_enemy_contacted()), so he can't walk round it to
+# the gate line. Off: only contact starts a fight, and the gate line holds
+# him (the turn-back) - every floor but one with nothing to walk round.
+@export var engage_line_enabled: bool = false
+@export var engage_line_offset_m: float = 0.0
 # Beyond the first required slot's anchor (EncounterSlot.position), along
 # exit_direction - where the gate line lands.
 @export var gate_distance_beyond_enemy: float = 6.0

@@ -11,11 +11,13 @@ extends SceneTree
 #             the top, and walking on meets the region-end fight
 #   descent - from the crest flat back down over the shelf: walkable
 #             both ways
-#   exit    - past the region-end fight toward the exit while it stands:
-#             he comes to rest on the gate line and the floor holds; won,
-#             the line lifts and he walks out - the last floor, so the run
-#             ends: run_end "won" logged, the end screen (RunEnd) shown,
-#             and its NEW RUN a fresh run on floor 1
+#   exit    - walked past the region-end fight on either side, clear of
+#             its contact area, toward the exit while it stands: the fight
+#             starts as he passes it (FloorData.engage_line_enabled) and
+#             he never reaches the gate line; won, the line lifts and he
+#             walks out - the last floor, so the run ends: run_end "won"
+#             logged, the end screen (RunEnd) shown, and its NEW RUN a
+#             fresh run on floor 1
 #   title   - the end screen's TITLE: a fresh run and the boot scene
 #   loop    - loop_region_after_last_floor on: the old wrap to floor 1
 #   pocket  - the side pocket off the climb's west side, where the
@@ -56,6 +58,14 @@ const POCKET_FROM := Vector2(2.0, -14.0)
 # Past the fight, toward the exit: this far short of the gate line, back
 # along the exit - outside the fight's contact area, short of the gate.
 const PAST_GATE_BACK_M := 3.0
+# The exit case's walk past the fight: from this far short of it along
+# the exit, and this far clear of its contact area to either side.
+const PASS_BACK_M := 2.0
+const PASS_CLEAR_M := 1.0
+# Starting as he passes it: when the fight opens he is within this of the
+# fight's own line, along the exit (the stance move may already have
+# begun taking him back).
+const PASS_LATE_M := 1.0
 # The walk floor's rise from spawn to the crest flat (0.4 m -> 3.45 m on
 # the elevation mask), and how far the feet may read off it: the relief's
 # own noise (relief_amplitude 0.28) rides on the mask at either end.
@@ -172,8 +182,9 @@ func _check_descent() -> void:
 	await _unload()
 	_completed += 1
 
-# The exit held while the region-end fight stands, then open once it is
-# won - and floor 5 is the last, so leaving it ends the run, won: run_end
+# No way past the region-end fight while it stands - walking past it on
+# either side starts it (_check_walk_past()) - then the exit open once it
+# is won - and floor 5 is the last, so leaving it ends the run, won: run_end
 # "won" logged with the run's tally, the end screen (RunEnd) shown over
 # the fade, and its NEW RUN a fresh run on floor 1.
 func _check_exit() -> void:
@@ -187,22 +198,16 @@ func _check_exit() -> void:
 	gate.connect("floor_exited", func() -> void: exited[0] = true)
 	_expect(bool(_wanderer.call("has_hold_line")), "Floor 5 holds a line while the region-end fight stands")
 	var fight: Node3D = _required_enemy() as Node3D
-	var past: Vector2 = _past_fight()
-	if fight != null:
-		var fight_at := Vector2(fight.global_position.x - _spawn.x, fight.global_position.z - _spawn.z)
-		var clear: float = past.distance_to(fight_at) - float(fight.get("contact_radius"))
-		_expect(clear > 0.5, "...the spot past it is outside its contact area (%.2f m clear)" % clear)
-	await _place(past)
-	_expect(_field.get_node("BattleLayer").get_child_count() == 0, "...put past the fight, none starts")
-	_wanderer.call("set_move_target", _world(EXIT_AT))
-	var worst: float = -INF
-	for i in int(WAYPOINT_SECONDS * 60.0):
-		await physics_frame
-		worst = maxf(worst, (_wanderer.global_position - gate.global_position).dot(forward))
-	_expect(worst <= OVERSHOOT_LIMIT_M, "...he never crosses the gate line (worst %+.3f m)" % worst)
-	_expect(worst > -0.5, "...he comes to rest on it (%+.3f m)" % worst)
-	_expect(not exited[0], "...and the floor doesn't exit")
-	_expect(_field.get_node("BattleLayer").get_child_count() == 0, "...nor does walking on from past it start the fight")
+	# Each side in turn, the first on a fresh floor of its own: the walk
+	# past, its fight starting; the second side's fight is the one won.
+	for side in [-1.0, 1.0]:
+		if side > 0.0:
+			await _unload()
+			await _load()
+			gate = _field.get_node("ExitGate")
+			gate.connect("floor_exited", func() -> void: exited[0] = true)
+			fight = _required_enemy() as Node3D
+		await _check_walk_past(fight, gate, forward, side, exited)
 	if await _win_fight(fight):
 		_expect(not bool(_wanderer.call("has_hold_line")), "Won: the line lifts")
 		_expect_eq(int(_run_state.get("fights_won")), 1, "...one fight won")
@@ -236,6 +241,39 @@ func _check_exit() -> void:
 	RunLogger.set_output_dir("")
 	await _unload()
 	_completed += 1
+
+# Floor 5's walk past the region-end fight on one side (`side` along the
+# gate's right): from PASS_BACK_M short of it, PASS_CLEAR_M clear of its
+# contact area, clicked on toward the exit. The fight starts as he passes
+# it - within PASS_LATE_M of its own line - and he never comes
+# near the gate line or out.
+func _check_walk_past(fight: Node3D, gate: Node3D, forward: Vector3, side: float, exited: Array[bool]) -> void:
+	if fight == null:
+		return
+	var label: String = "west" if side < 0.0 else "east"
+	var right := Vector3(-forward.z, 0.0, forward.x)
+	var reach: float = float(fight.get("contact_radius")) + PASS_CLEAR_M
+	var start: Vector3 = fight.global_position - forward * PASS_BACK_M + right * side * reach
+	await _place(Vector2(start.x - _spawn.x, start.z - _spawn.z))
+	var layer: Node = _field.get_node("BattleLayer")
+	_expect(layer.get_child_count() == 0, "%s: beside the fight, clear of it, none starts" % label)
+	var aim: Vector3 = start + forward * 8.0
+	_wanderer.call("set_move_target", _world(Vector2(aim.x - _spawn.x, aim.z - _spawn.z)))
+	var started_at: float = INF
+	var nearest_gate: float = -INF
+	for i in int(WAYPOINT_SECONDS * 60.0):
+		await physics_frame
+		nearest_gate = maxf(nearest_gate, (_wanderer.global_position - gate.global_position).dot(forward))
+		if layer.get_child_count() > 0:
+			var offset := _wanderer.global_position - fight.global_position
+			started_at = Vector3(offset.x, 0.0, offset.z).dot(forward)
+			break
+	_expect(started_at < INF, "%s: walked past it, the fight starts" % label)
+	if started_at < INF:
+		_expect(absf(started_at) <= PASS_LATE_M, "%s: ...as he passes it (%+.2f m along the exit from it)" % [label, started_at])
+	_expect(nearest_gate < -1.0, "%s: ...he never nears the gate line (%+.2f m)" % [label, nearest_gate])
+	_expect(not exited[0], "%s: ...and the floor doesn't exit" % label)
+	_wanderer.call("clear_move_target")
 
 # The end screen's TITLE: a fresh run, then the boot scene - the title
 # held over the field, as at launch.
@@ -292,10 +330,11 @@ func _past_fight() -> Vector2:
 
 # The required fight started and won outright; false when it never starts.
 func _win_fight(fight: Node) -> bool:
-	_field.call_deferred("_on_enemy_contacted", fight)
+	var layer: Node = _field.get_node("BattleLayer")
+	if layer.get_child_count() == 0:
+		_field.call_deferred("_on_enemy_contacted", fight)
 	for i in 10:
 		await physics_frame
-	var layer: Node = _field.get_node("BattleLayer")
 	if layer.get_child_count() == 0:
 		_fail("the region-end fight didn't start")
 		return false

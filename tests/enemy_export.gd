@@ -208,6 +208,8 @@ static func _encounter_entry(floor_data: FloorData, slot: EncounterSlot, option:
 			"gate_distance_beyond_enemy": _num(floor_data.gate_distance_beyond_enemy),
 			"bar_axis_offset": _num(floor_data.gate_bar_axis_offset),
 			"channel_max_width": _num(floor_data.gate_channel_max_width),
+			# FloorData.engage_line_enabled: its offset along the exit, or null when off.
+			"engage_line_offset_m": _num(floor_data.engage_line_offset_m) if floor_data.engage_line_enabled else null,
 		}
 	encounter["elite_rewards"] = {
 		"gold_multiplier": _num(_elite_gold_multiplier()) if elite else null,
