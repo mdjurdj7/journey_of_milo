@@ -450,7 +450,7 @@
           },
           "encounters": [
             {
-              "slot": "cranes",
+              "slot": "required",
               "option": "crane_pair",
               "weight": 1.0,
               "anchor": [
@@ -458,7 +458,7 @@
                 -33.4
               ],
               "slot_yaw_degrees": 0.0,
-              "cluster": "cranes",
+              "cluster": "required",
               "names": "Strawcrown + Chalkcrown",
               "required": true,
               "elite": false,
@@ -1158,9 +1158,9 @@
         {
           "region": 1,
           "floor": 3,
-          "slot": "cranes",
+          "slot": "required",
           "option": "crane_pair",
-          "cluster": "cranes",
+          "cluster": "required",
           "required": true,
           "gate_fight": true
         }
@@ -2034,9 +2034,9 @@
         {
           "region": 1,
           "floor": 3,
-          "slot": "cranes",
+          "slot": "required",
           "option": "crane_pair",
-          "cluster": "cranes",
+          "cluster": "required",
           "required": true,
           "gate_fight": true
         }
