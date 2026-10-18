@@ -6,6 +6,7 @@
 [ext_resource type="Resource" path="res://battle/rules/statuses/off_the_rock.tres" id="5_off_the_rock"]
 [ext_resource type="AudioStream" uid="uid://bnvfgx6j66j30" path="res://assets/audio/combat_old/hit.wav" id="6_hit"]
 [ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="6_uf721"]
+[ext_resource type="Resource" path="res://run/weapons/greyshelfs_tail.tres" id="7_tail"]
 
 [sub_resource type="Resource" id="EnemyIntent_tail_lash"]
 script = ExtResource("2_intent")
@@ -32,6 +33,7 @@ contact_sounds = Array[AudioStream]([ExtResource("6_hit")])
 phase_hp_threshold = 0.5
 phase_status = ExtResource("5_off_the_rock")
 glassbone_reward = 1
+weapon_reward = ExtResource("7_tail")
 model_scene_path = "res://assets/models/enemies/Greyshelf/Greyshelf.glb"
 model_scale = 1.36
 attachment_scene_path = "res://field/greyshelf_pose.tscn"

@@ -67,6 +67,9 @@ enum RewardMode { SCREEN, WORLD }
 # take, at its level.
 @export var armor_take_sfx_path: String = "res://assets/audio/cards/card_take.wav"
 @export var armor_take_volume_db: float = -18.0
+# A weapon taken from its offer (open_weapon_offer()): the same take.
+@export var weapon_take_sfx_path: String = "res://assets/audio/cards/card_take.wav"
+@export var weapon_take_volume_db: float = -18.0
 # The run log (RunLogger - one JSON-lines file per run under user://runs/).
 # Never touches play; off, nothing is written. A headless instance never
 # logs, whatever this says - see RunLogger.
@@ -562,10 +565,14 @@ var _fight_fallen_at: Array[Vector3] = []
 # Adder on its slab), so the piece lies on what they lay on.
 var _fight_fallen_lift: Array[float] = []
 # A keepsake rolled on the last win, waiting for the normal reward to
-# close before it's offered (_open_pending_keepsake_offer()).
+# close before it's offered (_open_pending_offers()).
 var _pending_keepsake: TrinketData = null
 # Who left it - the enemy's name, for the offer's quiet source line.
 var _pending_keepsake_source: String = ""
+# A weapon the last win left (EnemyData.weapon_reward - the Greyshelf's
+# Tail), waiting for the normal reward and any keepsake to close before
+# it's offered (_open_pending_offers()).
+var _pending_weapon: WeaponData = null
 # Glassbone the last win left (EnemyData.glassbone_reward, summed over
 # everyone it was won against), waiting for the reward screen to offer it
 # as its own TAKE line. Handed over and zeroed as the screen opens.
@@ -3141,6 +3148,8 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 					won_at.append(member.global_position)
 					won_lift.append(member.height_offset)
 			_roll_keepsake_drop(won_against)
+			# ...a weapon, offered after it...
+			_pending_weapon = _weapon_left_by(won_against)
 			# ...and a worn piece, lying where the one that left it fell.
 			_drop_armor(won_against, won_at, won_lift)
 			# Felled together: the option's own keepsake, over any drop.
@@ -3240,9 +3249,9 @@ func _nearest_required_enemy(from: Vector3) -> FieldEnemy:
 func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	var floor_data := get_floor_data()
 	var has_pool: bool = floor_data != null and run_reward_pool(floor_data) != null
-	# No card reward to wait for: a keepsake rolled on this win is still
+	# No card reward to wait for: a keepsake or weapon this win left is still
 	# offered, after the same beat.
-	if not has_pool and _pending_keepsake == null and _pending_glassbone <= 0:
+	if not has_pool and _pending_keepsake == null and _pending_weapon == null and _pending_glassbone <= 0:
 		return
 	var delay: float = reward_spread_delay_sec
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
@@ -3253,10 +3262,10 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	if not is_inside_tree():
 		return
 	if not has_pool and _pending_glassbone <= 0:
-		_open_pending_keepsake_offer()
+		_open_pending_offers()
 		return
 	if reward_mode == RewardMode.SCREEN or not has_pool:
-		# The keepsake follows when the screen closes (_on_reward_screen_
+		# The keepsake and weapon follow when the screen closes (_on_reward_screen_
 		# closed()).
 		_open_reward_screen()
 		return
@@ -3279,8 +3288,8 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	_pending_top_tier = false
 	add_child(spread)
 	spread.global_position = fell_at
-	# The cards are on the sand, nothing to close: the keepsake at once.
-	_open_pending_keepsake_offer()
+	# The cards are on the sand, nothing to close: the keepsake and weapon at once.
+	_open_pending_offers()
 
 # The interim reward list, over the field. The field goes back under the
 # same process-mode freeze the battle used - which is also what stops
@@ -3325,8 +3334,8 @@ func _open_reward_screen() -> void:
 
 func _on_reward_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
-	_open_pending_keepsake_offer()
-	# A keepsake offer opened over it holds the find line in turn.
+	_open_pending_offers()
+	# A keepsake or weapon offer opened over it holds the find line in turn.
 	_say_pending_find()
 
 # A won fight's keepsake: the first enemy it was won against whose own
@@ -3378,12 +3387,64 @@ func _glassbone_left_by(won_against: Array[EnemyData]) -> int:
 			total += maxi(data.glassbone_reward, 0)
 	return total
 
+# The weapon a win leaves: the first enemy it was won against with a
+# weapon_reward that isn't the one carried, or null.
+func _weapon_left_by(won_against: Array[EnemyData]) -> WeaponData:
+	for data in won_against:
+		if data != null and data.weapon_reward != null and data.weapon_reward != RunState.weapon:
+			print("RegionField: '%s' left the weapon '%s'." % [data.enemy_name, data.weapon_reward.display_name])
+			return data.weapon_reward
+	return null
+
+# What a win left to offer once its normal reward is done, one at a
+# time: the keepsake, then - when that offer closes - the weapon.
+func _open_pending_offers() -> void:
+	if _pending_keepsake != null:
+		_open_pending_keepsake_offer()
+		return
+	if _pending_weapon != null:
+		var weapon: WeaponData = _pending_weapon
+		_pending_weapon = null
+		open_weapon_offer(weapon)
+
 func _open_pending_keepsake_offer() -> void:
 	if _pending_keepsake == null:
 		return
 	var trinket: TrinketData = _pending_keepsake
 	_pending_keepsake = null
 	open_keepsake_offer(trinket, _pending_keepsake_source)
+
+# A weapon offered over the field (the Greyshelf's Tail): its plate with
+# TAKE and LEAVE and "REPLACES" the weapon carried (ArmorExamine.setup_
+# weapon()), the field frozen under it as under every screen. TAKE
+# carries it (RunState.equip_weapon()) - the one it replaces is gone, as
+# a keepsake left is; LEAVE and every other close leave it, and the
+# weapon carried stays. False while a fight is open, another screen has
+# the field, or it is the one carried.
+func open_weapon_offer(weapon: WeaponData) -> bool:
+	if weapon == null or weapon == RunState.weapon or _battle_open or not can_process():
+		return false
+	var examine := ArmorExamine.new()
+	examine.name = "WeaponOffer"
+	examine.setup_weapon(weapon, Rect2(), RunState.weapon, true)
+	examine.closed.connect(_on_weapon_offer_closed.bind(weapon))
+	if wanderer != null:
+		wanderer.clear_move_target()
+	process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(examine)
+	return true
+
+func _on_weapon_offer_closed(taken: bool, weapon: WeaponData) -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT
+	var carried: WeaponData = RunState.weapon
+	RunLogger.event("weapon_offer", {"offered": String(weapon.id), "carried": String(carried.id) if carried != null else "", "taken": taken})
+	if taken:
+		RunState.equip_weapon(weapon)
+		TakeFeedback.play_sound(get_tree(), weapon_take_sfx_path, weapon_take_volume_db, "WeaponTakeAudio", "RegionField")
+		print("RegionField: took the weapon '%s'%s." % [weapon.display_name, " (left '%s')" % carried.display_name if carried != null else ""])
+	else:
+		print("RegionField: left the weapon '%s'." % weapon.display_name)
+	_say_pending_find()
 
 # A keepsake offered over the field, under the belongings screen's own
 # scrim and freeze: TAKE / LEAVE on an empty slot, TAKE / KEEP CURRENT on
@@ -3409,6 +3470,8 @@ func open_keepsake_offer(trinket: TrinketData, source: String = "") -> bool:
 
 func _on_keepsake_offer_closed(_taken: bool) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
+	# The win's weapon, if it left one, next.
+	_open_pending_offers()
 	_say_pending_find()
 
 # Debug builds only: a row of debug buttons on the field HUD in the

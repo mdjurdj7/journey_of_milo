@@ -18,6 +18,9 @@ class_name ArmorExamine
 #     right click closes.
 #   the run's weapon (the WEAPON line, setup_weapon()) - the same, on its
 #     weapon plate (ItemPlate.set_weapon()).
+#   a weapon offered (the Greyshelf's - setup_weapon() with_choice): TAKE
+#     and LEAVE, and "REPLACES" the weapon carried, on the same terms as
+#     the piece on the sand - LEAVE and every other close is false.
 # Layer 100, running ALWAYS.
 
 signal closed(taken: bool)
@@ -29,6 +32,8 @@ signal closed(taken: bool)
 var _piece: TrinketData = null
 var _weapon: WeaponData = null
 var _worn: TrinketData = null
+# The weapon carried, which taking an offered one would replace.
+var _carried: WeaponData = null
 var _with_choice: bool = false
 var _from_rect: Rect2 = Rect2()
 var _scrim: ColorRect = null
@@ -44,11 +49,13 @@ func setup(piece: TrinketData, worn: TrinketData, with_choice: bool, from_rect: 
 	_with_choice = with_choice
 	_from_rect = from_rect
 
-# The weapon instead of a piece - no choice. Called before the layer
-# enters the tree.
-func setup_weapon(weapon: WeaponData, from_rect: Rect2 = Rect2()) -> void:
-	setup(null, null, false, from_rect)
+# The weapon instead of a piece - no choice, or for an offer with_choice
+# and `carried`, the weapon taking it would replace. Called before the
+# layer enters the tree.
+func setup_weapon(weapon: WeaponData, from_rect: Rect2 = Rect2(), carried: WeaponData = null, with_choice: bool = false) -> void:
+	setup(null, null, with_choice, from_rect)
 	_weapon = weapon
+	_carried = carried
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -69,7 +76,7 @@ func _ready() -> void:
 		close(false)
 		return
 	if _weapon != null:
-		_plate.set_weapon(_weapon)
+		_plate.set_weapon(_weapon, _carried if _with_choice else null, _with_choice)
 	else:
 		_plate.set_piece(_piece, _worn if _with_choice else null, _with_choice)
 	_plate.chosen.connect(close)

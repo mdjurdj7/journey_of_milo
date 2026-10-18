@@ -122,6 +122,11 @@ class_name EnemyData
 # on the reward screen beside the gold and the card (RegionField._open_
 # reward_screen()); left behind if the player walks on. 0 = none.
 @export var glassbone_reward: int = 0
+# A weapon this enemy leaves on every won fight (the Greyshelf: its Tail),
+# offered after the normal reward and any keepsake, TAKE or LEAVE in
+# place of the weapon carried (RegionField.open_weapon_offer()) - never
+# while it is the one carried. Null = none.
+@export var weapon_reward: WeaponData = null
 # What this enemy leaves to wear - its own small table of worn pieces
 # (TrinketData.slot WORN), one guaranteed per won fight, lying on the sand
 # where it fell (RegionField, WorldArmor). Null = none.

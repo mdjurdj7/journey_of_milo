@@ -30,8 +30,8 @@ class_name ItemPlate
 # Every plate is the same height whatever it says; fits() says whether its
 # text stays inside those blocks (the probes check every piece).
 #
-# An offer - with show_actions, or a piece already worn that taking this
-# would replace - adds a strip of the same paper and frame strip_gap_px
+# An offer - with show_actions, or a piece already worn (or, for a weapon,
+# the weapon carried) that taking this would replace - adds a strip of the same paper and frame strip_gap_px
 # below the plate, the plate itself unchanged: "REPLACES" in the type
 # label's voice and the worn piece's name in Spectral, in its own rarity
 # finish (its own canvas item, as the name's), that piece's effect in grey
@@ -310,6 +310,9 @@ var _piece: TrinketData = null
 # The weapon shown instead of a piece (set_weapon()); null while a piece is.
 var _weapon: WeaponData = null
 var _replaced: TrinketData = null
+# The weapon carried that taking the one shown would replace (set_
+# weapon()'s offer) - in _replaced's place in the strip; null otherwise.
+var _replaced_weapon: WeaponData = null
 var _show_actions: bool = false
 var _focus: int = Choice.TAKE
 var _stat_text: String = ""
@@ -401,6 +404,7 @@ func _ready() -> void:
 func set_piece(piece: TrinketData, replaced: TrinketData = null, show_actions: bool = false) -> void:
 	_piece = piece
 	_weapon = null
+	_replaced_weapon = null
 	_replaced = replaced if replaced != piece else null
 	_show_actions = show_actions
 	_focus = Choice.TAKE
@@ -421,10 +425,14 @@ func get_piece() -> TrinketData:
 func get_keepsake() -> TrinketData:
 	return _piece
 
-# The run's weapon, in place of a piece: no choice, no REPLACES line.
-func set_weapon(weapon: WeaponData) -> void:
-	set_piece(null)
+# A weapon, in place of a piece: the run's own, with no choice and no
+# REPLACES line - or, for an offer (the Greyshelf's), the weapon carried
+# now it would replace (null: no line) and whether TAKE and LEAVE are
+# offered.
+func set_weapon(weapon: WeaponData, replaced: WeaponData = null, show_actions: bool = false) -> void:
+	set_piece(null, null, show_actions)
 	_weapon = weapon
+	_replaced_weapon = replaced if replaced != weapon else null
 	_paper_seed = float(absi(hash(weapon.id)) % 1000) / 1000.0 if weapon != null else 0.0
 	_relayout()
 
@@ -488,6 +496,24 @@ func _shows_something() -> bool:
 func get_replaced() -> TrinketData:
 	return _replaced
 
+func get_replaced_weapon() -> WeaponData:
+	return _replaced_weapon
+
+# What an offer would replace, piece or weapon: whether there is one, its
+# name and its effect - the strip's three readings.
+func _has_replaced() -> bool:
+	return _replaced != null or _replaced_weapon != null
+
+func _replaced_name() -> String:
+	if _replaced_weapon != null:
+		return _replaced_weapon.display_name
+	return _replaced.display_name if _replaced != null else ""
+
+func _replaced_rules() -> String:
+	if _replaced_weapon != null:
+		return _replaced_weapon.describe()
+	return _replaced.describe() if _replaced != null else ""
+
 # The whole on screen: the plate, and an offer's strip under it.
 func get_plate_size() -> Vector2:
 	return _plate_size
@@ -513,9 +539,9 @@ func get_lore_line_count() -> int:
 # The REPLACES line as shown ("REPLACES <name>"), "" with nothing worn -
 # for probes.
 func replaces_text() -> String:
-	if _replaced == null:
+	if not _has_replaced():
 		return ""
-	return "%s %s" % [replaces_label_text, _replaced.display_name]
+	return "%s %s" % [replaces_label_text, _replaced_name()]
 
 # The name's finish material while it wears one, else null - for probes.
 func get_name_finish() -> ShaderMaterial:
@@ -683,25 +709,25 @@ func _layout_strip(width: float, pad: float, text_width: float, label_px: int, n
 	_action_rects.clear()
 	var replaced_name_left: float = 0.0
 	var replaced_name_width: float = 0.0
-	if _replaced != null or _show_actions:
+	if _has_replaced() or _show_actions:
 		var top: float = roundf(_card_rect.end.y + _px(strip_gap_px))
 		var y: float = top + pad * 0.75
-		if _replaced != null:
+		if _has_replaced():
 			var replaced_px: int = _font_px(replaced_name_size_px)
 			var label_width: float = InkType.width(_label_font, replaces_label_text, label_px)
-			replaced_name_width = InkType.width(name_font, _replaced.display_name, replaced_px)
+			replaced_name_width = InkType.width(name_font, _replaced_name(), replaced_px)
 			var row_width: float = label_width + _px(replaces_label_gap_px) + replaced_name_width
 			_replaces_label_left = roundf((width - row_width) / 2.0)
 			replaced_name_left = roundf(_replaces_label_left + label_width + _px(replaces_label_gap_px))
 			_replaces_baseline = roundf(y + maxf(_label_font.get_ascent(label_px), name_font.get_ascent(replaced_px)))
 			_replaces_top = _replaces_baseline + maxf(_label_font.get_descent(label_px), name_font.get_descent(replaced_px))
 			var replaces_px: int = _font_px(replaces_size_px)
-			_replaces = _paragraph(_replaced.describe(), _rules_font, replaces_px, text_width)
+			_replaces = _paragraph(_replaced_rules(), _rules_font, replaces_px, text_width)
 			y = _replaces_top + _paragraph_height(_replaces, replaces_px)
 		if _show_actions:
 			if _action_font == null:
 				_action_font = InkType.tracked(InkType.text_bold_font(), action_size_px, caps_tracking_em)
-			var row_top: float = roundf(y + (_px(actions_gap_px) if _replaced != null else 0.0))
+			var row_top: float = roundf(y + (_px(actions_gap_px) if _has_replaced() else 0.0))
 			var row_height: float = _px(action_row_height_px)
 			var half: float = text_width / 2.0
 			_action_rects.append(Rect2(pad, row_top, half, row_height))
@@ -793,14 +819,15 @@ func _draw_name() -> void:
 		color = _finish.common_ink
 	InkType.draw_run(_name_layer, InkType.numeral_font(), _shown_name(), Vector2(0.0, _name_baseline), _font_px(name_size_px), color)
 
-# The worn piece's name after REPLACES, the same way.
+# The worn piece's (or carried weapon's) name after REPLACES, the same
+# way - a weapon's in flat ink, having no rarity.
 func _draw_replaced_name() -> void:
-	if _replaced == null:
+	if not _has_replaced():
 		return
 	var color: Color = ink
 	if _replaced_name_layer.material == null and _finish != null:
 		color = _finish.common_ink
-	InkType.draw_run(_replaced_name_layer, InkType.numeral_font(), _replaced.display_name, Vector2(0.0, _replaces_baseline), _font_px(replaced_name_size_px), color)
+	InkType.draw_run(_replaced_name_layer, InkType.numeral_font(), _replaced_name(), Vector2(0.0, _replaces_baseline), _font_px(replaced_name_size_px), color)
 
 # The title menu's treatment: each choice centred in its half in tracked
 # caps, the focused one in ink with a short hairline to its left, the
