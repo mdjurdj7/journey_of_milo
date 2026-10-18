@@ -139,6 +139,14 @@ enum Meet { TROT, GREET, WALK }
 	set(value):
 		damp_offset_m = value
 		_apply_damp()
+# Its footprint radius for the pool under it (ContactShadow.footprint),
+# metres - its own, since the stand-in model lies on its side and its box
+# says nothing about what it covers.
+@export var contact_footprint_m: float = 0.45:
+	set(value):
+		contact_footprint_m = value
+		if _shadow != null:
+			_shadow.footprint = Vector2(value, value)
 # The patch's colour at its middle (alpha its strength), fading out to
 # its edge.
 @export var damp_color: Color = Color(0.36, 0.33, 0.27, 0.55):
@@ -299,7 +307,7 @@ func _ready() -> void:
 	_spawn_approach()
 	_shadow = ContactShadow.new()
 	_shadow.name = "ContactShadow"
-	_shadow.footprint = Vector2(0.45, 0.45)
+	_shadow.footprint = Vector2(contact_footprint_m, contact_footprint_m)
 	add_child(_shadow)
 	_ground = get_node_or_null(ground_path) as Ground
 	_shadow.set_ground(_ground)

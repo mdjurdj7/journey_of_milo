@@ -770,10 +770,13 @@ func _ready() -> void:
 
 	var contact_shadow := ContactShadow.new()
 	contact_shadow.name = "ContactShadow"
+	contact_shadow.footprint = Vector2(_capsule_radius, _capsule_radius)
+	contact_shadow.feet_source = _contact_feet
 	add_child(contact_shadow)
 
 	var ground := get_node_or_null(ground_path) as Ground
 	_ground = ground
+	contact_shadow.set_ground(ground)
 
 	var footprint_spawner := FootprintSpawner.new()
 	footprint_spawner.name = "FootprintSpawner"
@@ -1141,6 +1144,13 @@ func _setup_step_debug_lines() -> void:
 # everywhere else in this file. Returns 0.0 (with a warning) if the shape
 # isn't a CapsuleShape3D, matching this project's "degrade loudly, don't
 # crash" convention (see e.g. _build_textured_material()'s own fallback).
+# Where the pool under him is laid (ContactShadow.feet_source): under the
+# model, which a Slash lunge moves without the body, at the body's feet.
+func _contact_feet() -> Vector3:
+	if _model == null:
+		return global_position
+	return Vector3(_model.global_position.x, global_position.y, _model.global_position.z)
+
 func _find_capsule_radius() -> float:
 	for child in get_children():
 		var collision_shape := child as CollisionShape3D

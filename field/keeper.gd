@@ -92,6 +92,8 @@ enum FaceDirection { SEAWARD, INLAND, LEFT, RIGHT }
 	set(value):
 		collision_radius = value
 		_apply_collision()
+		if _contact_shadow != null:
+			_contact_shadow.footprint = Vector2(value, value)
 @export var collision_height: float = 1.65:
 	set(value):
 		collision_height = value
@@ -287,6 +289,7 @@ var _model: Node3D = null
 # material case.
 var _material: Material = null
 var _ground: Ground = null
+var _contact_shadow: ContactShadow = null
 var _collision_body: StaticBody3D = null
 var _collision_shape: CapsuleShape3D = null
 var _collision_shape_node: CollisionShape3D = null
@@ -310,6 +313,7 @@ func _ready() -> void:
 	# has already fired - the manual call covers the initial grounding,
 	# the connection every live relief edit after it (same as Hull).
 	_ground = get_node_or_null(ground_path) as Ground
+	_contact_shadow.set_ground(_ground)
 	if _ground == null:
 		push_warning("Keeper: ground_path did not resolve to a Ground; not grounded.")
 		return
@@ -429,7 +433,7 @@ func _apply_model_transform() -> void:
 	_model.rotation = Vector3(0.0, deg_to_rad(model_yaw_offset_degrees), 0.0)
 	_model.position = Vector3.ZERO
 
-# The soft disc under her feet - the SAME ContactShadow the Wanderer and
+# The soft pool under her feet - the SAME ContactShadow the Wanderer and
 # every FieldEnemy already carry (see field/contact_shadow.gd), and the
 # thing she was actually missing: the real directional shadow alone is
 # faint under this overcast light (OvercastLight.shadow_darkness is 0.35
@@ -439,15 +443,13 @@ func _apply_model_transform() -> void:
 # she was the only one without it, which is why she read as floating
 # while the hulls - big, and on dry sand - did not.
 #
-# Defaults as-is (radius 0.5, opacity 0.25), same as the Wanderer's and
-# the enemies': it's tuned by selecting the child node in the Remote tab,
-# not by exports here. ContactShadow's own ground_path (^"../Ground")
-# resolves correctly from here for the same reason it does for the
-# Wanderer - both are direct children of RegionField.
+# Its look is the shared field/contact_shadow.tres, the Wanderer's too;
+# its size is her collision_radius, and _ready() hands it the Ground.
 func _spawn_contact_shadow() -> void:
-	var contact_shadow := ContactShadow.new()
-	contact_shadow.name = "ContactShadow"
-	add_child(contact_shadow)
+	_contact_shadow = ContactShadow.new()
+	_contact_shadow.name = "ContactShadow"
+	_contact_shadow.footprint = Vector2(collision_radius, collision_radius)
+	add_child(_contact_shadow)
 
 # A capsule standing on the node origin (her feet), default physics
 # layer/mask like the walls and hulls.

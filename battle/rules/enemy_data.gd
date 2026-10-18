@@ -186,6 +186,12 @@ class_name EnemyData
 # a negative rest height): the Greyshelf's belly on its rock. 0 = the
 # mesh's own feet.
 @export var sink_m: float = 0.0
+# Its own look for the pool under it (ContactShadow) - empty for the
+# shared field/contact_shadow.tres every figure wears.
+@export var contact_shadow: ContactShadowData = null:
+	set(value):
+		contact_shadow = value
+		emit_changed()
 # Metres above the sand the body hovers at through a fight, from the
 # moment the battle frame settles (FieldEnemy.enter_battle_hover()). 0 =
 # it stays where it stands (the Sputter) - or, under a negative rest

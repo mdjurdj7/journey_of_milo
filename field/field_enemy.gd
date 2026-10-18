@@ -793,6 +793,11 @@ func _ready() -> void:
 
 	var contact_shadow := ContactShadow.new()
 	contact_shadow.name = "ContactShadow"
+	if enemy_data != null and enemy_data.contact_shadow != null:
+		contact_shadow.data = enemy_data.contact_shadow
+	if _model_aabb.size != Vector3.ZERO:
+		contact_shadow.footprint = Vector2(_model_aabb.size.x, _model_aabb.size.z) * 0.5
+	contact_shadow.feet_source = _contact_feet
 	add_child(contact_shadow)
 	_contact_shadow = contact_shadow
 	_set_seated(_seated)
@@ -810,6 +815,7 @@ func _ready() -> void:
 	# immediately) so it runs after RegionField's own _ready() has finished
 	# placing this enemy from FloorData, not before.
 	_ground = get_node_or_null(ground_path) as Ground
+	_contact_shadow.set_ground(_ground)
 	if _ground:
 		if _mound != null:
 			_mound.set_ground(_ground)
@@ -835,6 +841,16 @@ func _ground_to_relief() -> void:
 	# it was placed - and again only if the relief itself is rebuilt.
 	if _mound != null:
 		_mound.resample()
+
+# Where the pool under it is laid (ContactShadow.feet_source): under the
+# middle of the model's box, at its feet - lifted with the model by a
+# rest height or a fight's hover and bob, so the pool fades with them.
+func _contact_feet() -> Vector3:
+	if _model == null:
+		return global_position
+	var centre: Vector3 = _model_aabb.get_center()
+	var lift: float = _model.position.y - _model_ground_y
+	return global_transform * Vector3(centre.x, _model_aabb.position.y + lift, centre.z)
 
 # The body's global Y with its feet on the relief at this XZ (see
 # _ground_to_relief()'s doc for the model_ground_offset part), raised by
