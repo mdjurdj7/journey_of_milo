@@ -446,8 +446,58 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		_pose_for_intent(enemy)
 
 # The queued action of one enemy as the display should show it - see
-# EnemyTurn.preview_intent(). Empty for a dead/unknown enemy.
+# EnemyTurn.preview_intent() - and the lethal warning across enemies: when
+# no enemy is lethal on its own but everything queued for the coming enemy
+# turn together would be (_lethal_together()), every intent that adds to
+# it is "lethal" too, with "lethal_together". Empty for a dead/unknown
+# enemy.
 func get_intent_preview(enemy: FieldEnemy) -> Dictionary:
+	var preview: Dictionary = _intent_preview_alone(enemy)
+	if preview.is_empty() or bool(preview.get("lethal", false)):
+		return preview
+	if _lethal_together().has(enemy):
+		preview["lethal"] = true
+		preview["lethal_together"] = true
+	return preview
+
+# The enemies whose queued actions together would be lethal for the coming
+# enemy turn, when none is on its own: every damage-dealing action queued
+# - each attack's hits as they will land (Brace and Garnish off, both of a
+# two-action enemy's, the Erupt's), each Signal's answers - in turn order,
+# run through his Block and HP from where they stand (EnemyTurn.
+# simulate_hits()). Empty when the sum isn't lethal, or when one enemy is
+# lethal alone (its own warning says it). Denied, cancelled or broken
+# intents add nothing.
+func _lethal_together() -> Dictionary:
+	var contributors: Dictionary = {}
+	var amounts: Array[int] = []
+	for enemy in enemies:
+		var preview: Dictionary = _intent_preview_alone(enemy)
+		if preview.is_empty():
+			continue
+		if bool(preview.get("lethal", false)):
+			return {}
+		if bool(preview.get("denied", false)) or bool(preview.get("pain_turn", false)) or bool(preview.get("interrupted", false)):
+			continue
+		var adds: Array = []
+		match int(preview.get("type", -1)):
+			EnemyIntent.IntentType.ATTACK:
+				adds = preview.get("hit_amounts", [])
+			EnemyIntent.IntentType.SIGNAL:
+				adds = preview.get("answers", [])
+		var total: int = 0
+		for amount: Variant in adds:
+			amounts.append(int(amount))
+			total += int(amount)
+		if total > 0:
+			contributors[enemy] = true
+	if contributors.size() < 2 or not bool(EnemyTurn.simulate_hits(player, amounts)["lethal"]):
+		return {}
+	return contributors
+
+# One enemy's preview on its own (get_intent_preview() without the lethal
+# warning across enemies).
+func _intent_preview_alone(enemy: FieldEnemy) -> Dictionary:
 	var combatant: Combatant = _combatants.get(enemy)
 	var data: EnemyData = enemy.enemy_data if enemy != null else null
 	if combatant == null or data == null or combatant.hp <= 0:
