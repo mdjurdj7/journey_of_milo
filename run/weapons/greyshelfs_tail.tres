@@ -9,6 +9,6 @@ script = ExtResource("1_weapon_data")
 id = &"greyshelfs_tail"
 display_name = "Greyshelf's Tail"
 description = "Your Slashes become Lash."
-lore = "They called it Old Grey on the coast. It struck three times before it learned to stop."
+lore = "Old Grey, on the coast. It struck three times before it learned to stop."
 art = ExtResource("2_art")
 basic_attack_as = ExtResource("3_lash")
