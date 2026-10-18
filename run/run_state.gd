@@ -135,6 +135,14 @@ var run_opening_pending: bool = false
 # outright. F6 on the field and the end screen's NEW RUN never raise it.
 var title_pending: bool = false
 
+# Raised by the character select alone (ZoneIntro, on a pick - after the
+# new_run() that also raises run_opening_pending), consumed by
+# RegionField's _ready() ahead of that: the reloaded field comes up on
+# the held title frame with no menu and plays out of it as Start did
+# (ZoneIntro.start_held_title()), not the ordinary play(). F6 and the end
+# screen's NEW RUN never raise it.
+var title_start_pending: bool = false
+
 # The run's one generator. Everything that rolls something a player could
 # call luck draws from HERE rather than from the global randi(), so a run
 # is one sequence and can be replayed from its seed: the Keeper's card

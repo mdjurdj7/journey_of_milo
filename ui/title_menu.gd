@@ -188,6 +188,16 @@ func _relayout() -> void:
 func lock() -> void:
 	_menu.lock()
 
+# Where the column's items stand: the left edge the title and items
+# share, and the first visible item's top - what the character select
+# lines its own column up on.
+func item_anchor() -> Vector2:
+	for item in _menu.items:
+		if item.visible:
+			var label := item.get_node(^"Label") as Control
+			return Vector2(item.position.x + label.position.x, item.position.y)
+	return Vector2(get_viewport().get_visible_rect().size.x * left_margin_fraction, title_label.position.y)
+
 # Back from what Start opened (the character select, cancelled): input
 # live again on the same focus, and the column faded in as on arrival.
 func reopen() -> void:

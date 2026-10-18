@@ -876,11 +876,15 @@ func _ready() -> void:
 	RunState.run_opening_pending = false
 	var title_pending: bool = RunState.title_pending
 	RunState.title_pending = false
+	var title_start_pending: bool = RunState.title_start_pending
+	RunState.title_start_pending = false
 	var zone_intro := get_node_or_null(zone_intro_path) as ZoneIntro
 	var intro_running: bool = false
 	if zone_intro != null:
 		if title_pending:
 			intro_running = zone_intro.hold_title()
+		elif title_start_pending:
+			intro_running = zone_intro.start_held_title()
 		elif opening_pending and RunState.current_floor_index == 0:
 			intro_running = zone_intro.play()
 	# The arrival hold starts when the frame is the player's to see: after

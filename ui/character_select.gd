@@ -2,14 +2,22 @@ extends CanvasLayer
 class_name CharacterSelect
 
 # The class a title-started run plays as, picked between the title's
-# START GAME and the zone intro. A black screen, no art: a small prompt
-# line and one item per class, in the title's type language (InkType.
-# tracked() caps, InkMenu's focus) on dark - the focused item full bone
-# with its hairline in the margin, the rest the utility grey.
+# START GAME and the zone intro. No background of its own: it stands over
+# the held title frame (ZoneIntro's TITLE_HOLD - fog closed, the tower
+# faint) in the title column's place, once that column has faded - a
+# small prompt line and one item per class, in the title's type language
+# (InkType.tracked() caps, InkMenu's focus): the focused item in the
+# title's ink with its hairline in the margin, the rest the utility grey.
 #
 # The items are built from `characters` (CharacterData, each shown as its
 # character_name in caps), so a third class is one more entry in the
 # scene's list. Focus starts on default_index.
+#
+# Where the column stands is the title's: the owner hands in anchor_
+# source, a Callable returning the title column's left edge and its first
+# item's top (TitleMenu.item_anchor()), read on every layout - this
+# column's first item sits there, the prompt above it. Without one, the
+# fallback margin and height below place it.
 #
 # Input is InkMenu's - ui_up/ui_down move focus (wrapping), ui_accept
 # picks, the mouse focuses by hovering and picks by clicking - plus
@@ -17,11 +25,10 @@ class_name CharacterSelect
 # The first pick or cancel wins and locks the menu.
 #
 # The owner (ZoneIntro, whose child this is - so it runs through the
-# title's freeze) drives the beats: open() takes the frame to black and
-# shows the items; a pick goes out as picked(character), after which
-# fade_to_reload() takes the black to the colour the field reload will
-# open on; a cancel fades back out to the held title frame and goes out
-# as cancelled, and this node frees itself.
+# title's freeze) drives the beats: open() fades the column in; a pick
+# goes out as picked(character), after which fade_to_reload() takes the
+# frame to reload_color for the field reload; a cancel fades the column
+# out, goes out as cancelled, and this node frees itself.
 #
 # Every size is authored for a 1080-high viewport and scaled by the
 # viewport height; the layout is redone on every resize.
@@ -64,36 +71,41 @@ const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 		_relayout_if_ready()
 
 @export_group("Colour")
-@export var background_color: Color = Color(0.0, 0.0, 0.0, 1.0):
+# The title's UI ink (TitleMenu.ink) - the prompt, the focused item and
+# its hairline.
+@export var ink: Color = Color(0.165, 0.165, 0.18, 1.0):
 	set(value):
-		background_color = value
-		_apply_background()
-# Bone on dark (BattleTheme's on_pale_bone) - the focused item and its
-# hairline.
-@export var bone: Color = Color(0.94, 0.91, 0.86, 1.0):
-	set(value):
-		bone = value
+		ink = value
 		_relayout_if_ready()
-# The utility grey - the unfocused items and the prompt.
+# The utility grey - the unfocused items.
 @export var unfocused_color: Color = Color(0.58, 0.58, 0.60, 1.0):
 	set(value):
 		unfocused_color = value
 		_relayout_if_ready()
+# The flat colour the frame takes on a pick and holds while the field
+# reloads - which comes up on this same held frame. TitleScreen's
+# background_color, matched by eye to the fog as it renders.
+@export var reload_color: Color = Color(0.86, 0.87, 0.86, 1.0):
+	set(value):
+		reload_color = value
+		if _cover != null:
+			_cover.color = Color(value, _cover.color.a)
 
 @export_group("Layout")
-# The left edge the prompt and items share, as a fraction of the
-# viewport width - the title's own margin.
+# Fallbacks, used only with no anchor_source: the left edge as a
+# fraction of the viewport width, and the first item's top as a fraction
+# of its height.
 @export var left_margin_fraction: float = 0.12:
 	set(value):
 		left_margin_fraction = value
 		_relayout_if_ready()
-# The prompt's top, as a fraction of the viewport height.
-@export var prompt_y_fraction: float = 0.4:
+@export var items_y_fraction: float = 0.45:
 	set(value):
-		prompt_y_fraction = value
+		items_y_fraction = value
 		_relayout_if_ready()
-# Pixels at 1080p: prompt bottom to the first item, item to item, and
-# the hairline's length, gap and thickness (the thickness never scaled).
+# Pixels at 1080p: the prompt's bottom to the first item, item to item,
+# and the hairline's length, gap and thickness (the thickness never
+# scaled) - the title's item values.
 @export var prompt_to_items_gap_px: float = 36.0:
 	set(value):
 		prompt_to_items_gap_px = value
@@ -116,43 +128,31 @@ const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 		_relayout_if_ready()
 
 @export_group("Flow")
-# The title frame to black, on open, and back on a cancel.
-@export var to_black_seconds: float = 0.4
-# The items in once the frame is black, and out again on a cancel.
+# The column in on open and out on a cancel.
 @export var items_fade_seconds: float = 0.3
-# On a pick: the items out, then the black to the reload colour.
+# On a pick: the column out, then the frame to reload_color over this.
 @export var reload_fade_seconds: float = 0.4
-# The colour the frame holds while the field reloads - the zone intro's
-# first frame is the region's fog colour (ZoneIntro.play()), so by
-# default the black fades to that, handed in by the owner. Off: to
-# reload_fade_color instead, to match it by eye.
-@export var reload_fade_to_region_fog: bool = true:
-	set(value):
-		reload_fade_to_region_fog = value
-		_apply_reload_color()
-@export var reload_fade_color: Color = Color(0.86, 0.87, 0.86, 1.0):
-	set(value):
-		reload_fade_color = value
-		_apply_reload_color()
 
-var _background: ColorRect = null
+# Returns Vector2(left edge, first item's top) in viewport pixels; set by
+# the owner before open(). Empty: the fallback exports.
+var anchor_source: Callable = Callable()
+
+# The reload colour's cover - clear until a pick.
+var _cover: ColorRect = null
 var _column: Control = null
 var _prompt: Label = null
 var _menu: InkMenu = null
 # Parallel to _menu.items.
 var _item_characters: Array[CharacterData] = []
 var _tween: Tween = null
-# The region's fog colour, from the owner's fade_to_reload(); and whether
-# the background is holding the reload colour (live edits re-apply it).
-var _region_fog: Color = Color.BLACK
-var _holding_reload_color: bool = false
 
 func _ready() -> void:
-	_background = ColorRect.new()
-	_background.name = "Background"
-	_background.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_background.mouse_filter = Control.MOUSE_FILTER_STOP
-	add_child(_background)
+	_cover = ColorRect.new()
+	_cover.name = "Cover"
+	_cover.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_cover.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_cover.color = Color(reload_color, 0.0)
+	add_child(_cover)
 	_column = Control.new()
 	_column.name = "Column"
 	_column.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -161,8 +161,6 @@ func _ready() -> void:
 	_prompt = Label.new()
 	_prompt.name = "Prompt"
 	_column.add_child(_prompt)
-	_apply_background()
-	_background.modulate.a = 0.0
 	_column.modulate.a = 0.0
 	_build_items()
 	_menu.lock()
@@ -170,27 +168,19 @@ func _ready() -> void:
 
 # --- the owner's side ---------------------------------------------------
 
-# The frame to black, then the items in; input is live once they are.
-# Awaitable.
+# The column in; input is live once it is. Awaitable.
 func open() -> void:
-	await _fade(_background, 1.0, to_black_seconds)
+	_relayout()
 	await _fade(_column, 1.0, items_fade_seconds)
 	if _menu != null:
 		_menu.unlock()
 
-# After picked: the items out, then the black to the reload colour -
-# `region_fog` unless reload_fade_to_region_fog is off. Awaitable; the
-# owner reloads the field on its return.
-func fade_to_reload(region_fog: Color) -> void:
-	_region_fog = region_fog
+# After picked: the column out, then the frame to reload_color.
+# Awaitable; the owner reloads the field on its return.
+func fade_to_reload() -> void:
 	await _fade(_column, 0.0, items_fade_seconds)
-	_kill_tween()
-	var from: Color = _background.color
-	var to: Color = _reload_color()
-	_tween = create_tween()
-	_tween.tween_method(func(c: Color) -> void: _background.color = c, from, to, maxf(reload_fade_seconds, 0.0))
-	await _tween.finished
-	_holding_reload_color = true
+	_cover.color = Color(reload_color, _cover.color.a)
+	await _fade(_cover, 1.0, reload_fade_seconds, ^"color:a")
 
 # --- input --------------------------------------------------------------
 
@@ -218,7 +208,6 @@ func _activate(index: int) -> void:
 func _cancel() -> void:
 	_menu.lock()
 	await _fade(_column, 0.0, items_fade_seconds)
-	await _fade(_background, 0.0, to_black_seconds)
 	cancelled.emit()
 	queue_free()
 
@@ -261,47 +250,41 @@ func _relayout_if_ready() -> void:
 	if is_inside_tree() and _prompt != null:
 		_relayout()
 
+# The first item on the anchor (the title's first item), the prompt
+# above it on the same left edge, the rest stacked below.
 func _relayout() -> void:
 	if _menu == null:
 		return
 	var viewport_size: Vector2 = get_viewport().get_visible_rect().size
 	var scale: float = viewport_size.y / REFERENCE_VIEWPORT_HEIGHT
-	var left: float = viewport_size.x * left_margin_fraction
+	var anchor: Vector2 = Vector2(viewport_size.x * left_margin_fraction, viewport_size.y * items_y_fraction)
+	if anchor_source.is_valid():
+		anchor = anchor_source.call() as Vector2
 
 	var prompt_size: int = maxi(roundi(float(prompt_font_size_px) * scale), 1)
 	_prompt.text = prompt_text
 	_prompt.add_theme_font_override("font", InkType.tracked(item_font, prompt_size, tracking_em))
 	_prompt.add_theme_font_size_override("font_size", prompt_size)
-	_prompt.add_theme_color_override("font_color", unfocused_color)
+	_prompt.add_theme_color_override("font_color", ink)
 	_prompt.size = _prompt.get_combined_minimum_size()
-	_prompt.position = Vector2(left, viewport_size.y * prompt_y_fraction)
+	_prompt.position = Vector2(anchor.x, anchor.y - prompt_to_items_gap_px * scale - _prompt.size.y)
 
 	var item_size: int = maxi(roundi(float(item_font_size_px) * scale), 1)
-	_menu.ink = bone
+	_menu.ink = ink
 	_menu.unfocused_color = unfocused_color
-	_menu.lay_out(left, _prompt.position.y + _prompt.size.y + prompt_to_items_gap_px * scale,
+	_menu.lay_out(anchor.x, anchor.y,
 			InkType.tracked(item_font, item_size, tracking_em), item_size,
 			hairline_length_px * scale, hairline_gap_px * scale, hairline_thickness_px, item_gap_px * scale)
 
-func _apply_background() -> void:
-	if _background != null and not _holding_reload_color:
-		_background.color = background_color
-
-func _apply_reload_color() -> void:
-	if _background != null and _holding_reload_color:
-		_background.color = _reload_color()
-
-func _reload_color() -> Color:
-	return _region_fog if reload_fade_to_region_fog else reload_fade_color
-
-# `node`'s alpha to `to` over `seconds`; awaitable. One fade at a time.
-func _fade(node: CanvasItem, to: float, seconds: float) -> void:
+# `node`'s `property` to `to` over `seconds`; awaitable. One fade at a
+# time.
+func _fade(node: CanvasItem, to: float, seconds: float, property: NodePath = ^"modulate:a") -> void:
 	_kill_tween()
 	if seconds <= 0.0:
-		node.modulate.a = to
+		node.set_indexed(property, to)
 		return
 	_tween = create_tween()
-	_tween.tween_property(node, "modulate:a", to, seconds)
+	_tween.tween_property(node, property, to, seconds)
 	await _tween.finished
 
 func _kill_tween() -> void:

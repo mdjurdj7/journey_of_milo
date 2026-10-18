@@ -56,11 +56,11 @@ class_name ZoneIntro
 # takes the frame to black and offers the classes. Esc there comes back
 # to the held title. A pick starts a new run as that class (RunState.
 # new_run()) and reloads the field - its floor, model and HUD all built
-# for the class - where the intro then plays as on any run's first floor
-# (play(), from the fog colour the select faded to). The run the title
-# was held on, untouched, leaves no log (RunLogger.end_run()'s empty-run
-# rule). Empty path: Start plays straight from the held frame
-# (start_from_title()).
+# for the class - which comes up on the held title frame again, without
+# its menu, and plays out of it exactly as Start did (start_held_title(),
+# raised by RunState.title_start_pending). The run the title was held on,
+# untouched, leaves no log (RunLogger.end_run()'s empty-run rule). Empty
+# path: Start plays straight from the held frame (start_from_title()).
 
 signal finished
 
@@ -311,6 +311,17 @@ func hold_title() -> bool:
 	_start(Phase.TITLE_HOLD)
 	return true
 
+# RegionField's entry point after a character select's reload (RunState.
+# title_start_pending): the held title frame with no menu, played out of
+# at once as Start plays out of it - the fog opening from the title
+# values. With the intro off the field simply begins.
+func start_held_title() -> bool:
+	if not _can_start():
+		return false
+	_start(Phase.TITLE_HOLD, false)
+	_play_from_held_title()
+	return true
+
 # Start, from the menu: the menu locks and fades on its own start delay,
 # then the ordinary timeline runs from t = 0 with the fog opening from
 # the title values (see _apply_fog_at()) - or, with the intro off, the
@@ -365,6 +376,7 @@ func open_character_select() -> void:
 		select.free()
 		return
 	_select = select
+	_select.anchor_source = _menu.item_anchor
 	_select.picked.connect(_on_character_picked)
 	_select.cancelled.connect(_on_character_select_cancelled)
 	add_child(_select)
@@ -378,17 +390,17 @@ func _on_character_select_cancelled() -> void:
 	if _menu != null:
 		_menu.reopen()
 
-# A class picked: the new run as it, the frame to the reload colour, and
-# the field reloaded - its _ready() finds the run started and the run's
-# opening owed (run_opening_pending), and plays the intro.
+# A class picked: the frame to the reload colour, the new run as it, and
+# the field reloaded - its _ready() finds the run started and title_
+# start_pending raised, and plays out of the held title frame.
 func _on_character_picked(character: CharacterData) -> void:
 	if _select == null:
 		return
-	var sky := _sky()
-	await _select.fade_to_reload(sky.fog_color if sky != null else Color.BLACK)
+	await _select.fade_to_reload()
 	if not is_inside_tree():
 		return
 	RunState.new_run(character)
+	RunState.title_start_pending = true
 	get_tree().reload_current_scene()
 
 func _on_menu_exit_requested() -> void:
@@ -414,7 +426,7 @@ func _can_start() -> bool:
 # full for a hold) and the fade (a play only - a hold shows the frame
 # outright). A play already running is finished first, so the fog read
 # below is the region's own, not the intro's.
-func _start(phase: Phase) -> void:
+func _start(phase: Phase, with_menu: bool = true) -> void:
 	if _phase != Phase.IDLE:
 		_finish()
 	_phase = phase
@@ -437,7 +449,8 @@ func _start(phase: Phase) -> void:
 	if phase == Phase.TITLE_HOLD:
 		_sea_from_title = true
 		_set_sea_open(0.0)
-		_spawn_menu()
+		if with_menu:
+			_spawn_menu()
 	if phase == Phase.PLAYING:
 		_fade = FloorFade.new()
 		_fade.name = "IntroFade"
