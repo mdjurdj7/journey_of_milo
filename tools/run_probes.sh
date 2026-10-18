@@ -361,8 +361,11 @@ path_probes_hand() {
 		# and the wagon's approach lines (collector, temper), and the
 		# Wardling's defeat line over a won fight (elite_reward, glassbone).
 		ui/world_voice_line.gd) out="hold_line collector temper elite_reward glassbone" ;;
-		# The keepsake's tile and examine view: every probe that shows one.
-		ui/keepsake_tile.*|ui/keepsake_examine.*) out="keepsake_tile trinket keeper_keepsake belongings_choice" ;;
+		# The equipment plate (ItemPlate) - the weapon's, a worn piece's and
+		# a keepsake's: every probe that shows one.
+		ui/item_plate.*) out="trinket keepsake_tile armor keeper_keepsake belongings_choice" ;;
+		# The keepsake's examine view.
+		ui/keepsake_examine.*) out="keepsake_tile trinket keeper_keepsake belongings_choice" ;;
 		ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd|ui/hp_line.gd|ui/ink_glyph.gd|ui/hud_row_style.gd) out=$(area_probes hud) ;;
 		# The field's DECK and the battle's DECK/DISCARD lines are all
 		# DeckPanels.
