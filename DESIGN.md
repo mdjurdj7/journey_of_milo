@@ -626,14 +626,22 @@ and up the west shore north of z -27. (2026-10-17.)
   shrines), tempered versions past the starters, undoing a temper, what
   things cost in the long run, and how often it drops. (2026-09-30,
   Glassbone docs; tempering 2026-10-07.)
+- **The keeper's pool is the run's opening lean; small finds are the
+  bedroll's.** The keeper offers one of House Key, Frayed Cord, Departure
+  Stub, Bent Nail, Worn Page and Blue Fastener (run/keepsakes/keeper/
+  keeper_keepsakes.tres, weight 1 each); the belongings bedroll's table
+  holds Wrapped Sweet, White Shell, Signal Glass and Pressed Flower - a
+  column still unreachable while floor 2's cache offers the Bedroll.
+  The files kept their paths and UIDs, so the folder names no longer
+  match the tables: run/keepsakes/keeper/ holds three of the bedroll's,
+  and three of hers live in run/keepsakes/. (2026-10-18, keeper pool.)
 - **Armor is deferred past its first four pieces.** The WORN slot, its
   rules (max HP while worn, the first hit halved, Block at the start,
   damage back) and the two elites' tables are in. Deferred: armor shown
   on the Wanderer's model, final models and art (the four are placeholder
   primitives and SVGs, by path), more pieces and more elites, and the
-  battle row dimming a spent Lamp (the row dims nothing yet). Frayed Cord
-  is in no table now - held for a future deed, as are deeds themselves.
-  (2026-10-16, armor.) A piece is named by the find line (FindLine,
+  battle row dimming a spent Lamp (the row dims nothing yet). Deeds
+  themselves are deferred. (2026-10-16, armor.) A piece is named by the find line (FindLine,
   "You find a harness on the Wardling.") once the reward screen closes,
   its name in the cards' rarity finish; the RARE finish's dark gold was
   tuned against bone, so a dark-world variant for that line is deferred

@@ -28,9 +28,12 @@ const DEPARTURE_STUB_PATH := "res://run/keepsakes/keeper/departure_stub.tres"
 const SIGNAL_GLASS_PATH := "res://run/keepsakes/keeper/signal_glass.tres"
 const PRESSED_FLOWER_PATH := "res://run/keepsakes/keeper/pressed_flower.tres"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
+const FRAYED_CORD_PATH := "res://run/keepsakes/frayed_cord.tres"
+const WORN_PAGE_PATH := "res://run/keepsakes/worn_page.tres"
 const BITE_DOWN_PATH := "res://cards/data/bite_down.tres"
 const DOWN_PAYMENT_PATH := "res://cards/data/down_payment.tres"
-const KEEPER_IDS: Array[StringName] = [&"house_key", &"wrapped_sweet", &"blue_fastener", &"departure_stub", &"signal_glass", &"pressed_flower"]
+const KEEPER_IDS: Array[StringName] = [&"house_key", &"frayed_cord", &"departure_stub", &"bent_nail", &"worn_page", &"blue_fastener"]
+const KEEPER_PATHS: Array[String] = [HOUSE_KEY_PATH, FRAYED_CORD_PATH, DEPARTURE_STUB_PATH, BENT_NAIL_PATH, WORN_PAGE_PATH, BLUE_FASTENER_PATH]
 const SAFETY_SECONDS := 400.0
 
 var _run_state: Node = null
@@ -76,16 +79,17 @@ func _initialize() -> void:
 
 # --- Her table ---
 
-# Each of her six has its object art: the 1024 square the drops' PNGs
-# are, imported from SVG with mipmaps (the plaque's ItemPlate draws it
-# well under that).
+# Each of her six has its object art: 1024 square with mipmaps (the
+# plaque's ItemPlate draws it well under that) - an SVG or a PNG, named
+# for the keepsake.
 func _check_art() -> void:
-	for path in [HOUSE_KEY_PATH, WRAPPED_SWEET_PATH, BLUE_FASTENER_PATH, DEPARTURE_STUB_PATH, SIGNAL_GLASS_PATH, PRESSED_FLOWER_PATH]:
+	for path in KEEPER_PATHS:
 		var trinket: TrinketData = load(path)
 		_expect(trinket.art != null, "%s has art" % trinket.display_name)
 		if trinket.art == null:
 			continue
-		_expect_eq(trinket.art.resource_path, "res://assets/textures/keepsakes/%s.svg" % trinket.id, "...its own SVG")
+		var own: Array[String] = ["res://assets/textures/keepsakes/%s.svg" % trinket.id, "res://assets/textures/keepsakes/%s.png" % trinket.id]
+		_expect(own.has(trinket.art.resource_path), "...its own art (%s)" % trinket.art.resource_path)
 		_expect_eq([trinket.art.get_width(), trinket.art.get_height()], [1024, 1024], "...1024 square")
 		_expect(trinket.art.get_image().has_mipmaps(), "...with mipmaps")
 	_completed += 1
@@ -155,11 +159,11 @@ func _check_exhausted_pool() -> void:
 func _check_descriptions() -> void:
 	var expected := {
 		HOUSE_KEY_PATH: ["Someone meant to need it again.", "The first card you play each combat costs 0 Energy."],
-		WRAPPED_SWEET_PATH: ["Saved for later.", "After each combat you win, if you lost HP during it, heal 2 HP."],
-		BLUE_FASTENER_PATH: ["Too small for you.", "The first time you enter Critical each combat, gain 6 Block."],
+		FRAYED_CORD_PATH: ["Tied off neatly, for later.", "At the end of your turn, you may keep 1 card in your hand."],
 		DEPARTURE_STUB_PATH: ["The number is still legible.", "Draw 1 extra card on your first turn of each combat."],
-		SIGNAL_GLASS_PATH: ["It still catches something.", "At the start of each combat, gain 3 Block."],
-		PRESSED_FLOWER_PATH: ["It grew here.", "After each combat you win, heal 1 HP."],
+		BENT_NAIL_PATH: ["Drawn from a stacked board.", "At the start of each combat, +3 damage on your next Attack."],
+		WORN_PAGE_PATH: ["Folded the same way, many times.", "Draw 1 extra card on your first turn of each combat."],
+		BLUE_FASTENER_PATH: ["Too small for you.", "The first time you enter Critical each combat, gain 6 Block."],
 	}
 	for path: String in expected:
 		var trinket: TrinketData = load(path)

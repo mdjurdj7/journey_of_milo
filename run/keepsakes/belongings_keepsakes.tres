@@ -2,22 +2,27 @@
 
 [ext_resource type="Script" uid="uid://c1w6aiosotgic" path="res://run/keepsake_table.gd" id="1_table"]
 [ext_resource type="Script" uid="uid://c2mabcrat0q5d" path="res://run/keepsake_entry.gd" id="2_entry"]
-[ext_resource type="Resource" path="res://run/keepsakes/bent_nail.tres" id="3_bent_nail"]
+[ext_resource type="Resource" path="res://run/keepsakes/keeper/wrapped_sweet.tres" id="3_wrapped_sweet"]
 [ext_resource type="Resource" path="res://run/keepsakes/white_shell.tres" id="4_white_shell"]
-[ext_resource type="Resource" path="res://run/keepsakes/worn_page.tres" id="6_worn_page"]
+[ext_resource type="Resource" path="res://run/keepsakes/keeper/signal_glass.tres" id="5_signal_glass"]
+[ext_resource type="Resource" path="res://run/keepsakes/keeper/pressed_flower.tres" id="6_pressed_flower"]
 
-[sub_resource type="Resource" id="KeepsakeEntry_bent_nail"]
+[sub_resource type="Resource" id="KeepsakeEntry_wrapped_sweet"]
 script = ExtResource("2_entry")
-trinket = ExtResource("3_bent_nail")
+trinket = ExtResource("3_wrapped_sweet")
 
 [sub_resource type="Resource" id="KeepsakeEntry_white_shell"]
 script = ExtResource("2_entry")
 trinket = ExtResource("4_white_shell")
 
-[sub_resource type="Resource" id="KeepsakeEntry_worn_page"]
+[sub_resource type="Resource" id="KeepsakeEntry_signal_glass"]
 script = ExtResource("2_entry")
-trinket = ExtResource("6_worn_page")
+trinket = ExtResource("5_signal_glass")
+
+[sub_resource type="Resource" id="KeepsakeEntry_pressed_flower"]
+script = ExtResource("2_entry")
+trinket = ExtResource("6_pressed_flower")
 
 [resource]
 script = ExtResource("1_table")
-entries = Array[ExtResource("2_entry")]([SubResource("KeepsakeEntry_bent_nail"), SubResource("KeepsakeEntry_white_shell"), SubResource("KeepsakeEntry_worn_page")])
+entries = Array[ExtResource("2_entry")]([SubResource("KeepsakeEntry_wrapped_sweet"), SubResource("KeepsakeEntry_white_shell"), SubResource("KeepsakeEntry_signal_glass"), SubResource("KeepsakeEntry_pressed_flower")])
