@@ -244,6 +244,7 @@ static func build() -> Dictionary:
 				"res://run/keepsakes/*.tres (KeepsakeTable, TrinketData)",
 				"res://run/armor/*.tres (KeepsakeTable, TrinketData - worn pieces)",
 				"res://cards/pools/*.tres (RewardPool rarity rates)",
+				"res://run/fight_rarity_by_floor.tres (FightRarityTable - a normal fight's rarity rates by floor, through EncounterRewards)",
 				REWARD_SCREEN_SCENE_PATH + " (choice_count)",
 			],
 			"positions": "World XZ offsets from the floor's spawn, metres ([x, z]) - an option's members and props mapped through their slot (EncounterSlot.to_floor()).",
@@ -253,6 +254,7 @@ static func build() -> Dictionary:
 			"elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times its role's gold_multiplier in EncounterRewards (the elite's, rounded) and rolls its card at the pool's elite rarity rates. A placement marked FloorEnemy.card_reward TOP_TIER_FIRST (floor 5's region-end Greyshelf) offers its cards from the highest tier down instead (RewardPool.roll_top_tier()), at the floor's gold. See each encounter's elite_rewards. Keepsakes, armor and Glassbone are their own fields.",
 			"rewards": "Gold is the floor's roll (FloorData) times the fight's role's gold_multiplier; whether it offers cards, and an optional basic fight's extra (a Samphire; a removal is the collector's alone), are its role's too (EncounterRewards, by BattleController.encounter_role()). Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Armor: one worn piece from the first member with an armor_table, RARE at its armor_rare_chance, never the piece worn, lying where it fell (RegionField._drop_armor()). Glassbone: every member's, summed. Weapon: the first member's weapon_reward, offered after the reward and any keepsake, TAKE or LEAVE in place of the weapon carried - never while it is the one carried (RegionField.open_weapon_offer()).",
 			"intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping.",
+			"rarity_rates": "A floor's rarity_rates are what a normal fight's card offer rolls each slot with there: EncounterRewards.fight_rarity_by_floor's step for that floor (FightRarityTable.rates_for_floor()), else the pool's own normal rates. Relative weights, renormalised over the tiers that still have an eligible card. elite_rarity_rates are the pool's own, for a fight with an elite in it; the collector rolls at the pool's own normal rates.",
 		},
 		"regions": region_list,
 		"enemies": roster,
@@ -278,12 +280,7 @@ static func _floor_entry(floor_data: FloorData, region_index: int, floor_index: 
 		"gold": [floor_data.gold_min, floor_data.gold_max] if pool != null else null,
 		"card_pool": _path(pool),
 		"cards_offered": _cards_offered() if pool != null else 0,
-		"rarity_rates": {
-			"common": pool.common_rate,
-			"uncommon": pool.uncommon_rate,
-			"rare": pool.rare_rate,
-			"ultra_rare": pool.ultra_rare_rate,
-		} if pool != null else null,
+		"rarity_rates": _fight_rates_entry(pool, floor_index + 1) if pool != null else null,
 		"elite_rarity_rates": {
 			"common": pool.elite_common_rate,
 			"uncommon": pool.elite_uncommon_rate,
@@ -823,14 +820,38 @@ static func _default_model_path() -> String:
 		return ""
 	return String(script.get_script_constant_map().get("DEFAULT_MODEL_SCENE_PATH", ""))
 
+# The EncounterRewards RegionField's scene points at, or null.
+static func _encounter_rewards() -> EncounterRewards:
+	var path: Variant = _scene_root_property(REGION_SCENE_PATH, "encounter_rewards_path")
+	return load(String(path)) as EncounterRewards if path != null else null
+
 # The elite role's gold multiplier: EncounterRewards.elite, from the
 # rewards RegionField's scene points at.
 static func _elite_gold_multiplier() -> float:
-	var path: Variant = _scene_root_property(REGION_SCENE_PATH, "encounter_rewards_path")
-	var rewards := load(String(path)) as EncounterRewards if path != null else null
+	var rewards: EncounterRewards = _encounter_rewards()
 	if rewards == null or rewards.elite == null:
 		return 1.0
 	return rewards.elite.gold_multiplier
+
+# A normal fight's rarity rates on the region's `floor_number` (1 = its
+# first): the floor table's step for it (RegionField._fight_rarity_
+# rates()), else `pool`'s own normal rates.
+static func _fight_rates_entry(pool: RewardPool, floor_number: int) -> Dictionary:
+	var rewards: EncounterRewards = _encounter_rewards()
+	var rates: RarityRates = rewards.fight_rarity_by_floor.rates_for_floor(floor_number) if rewards != null and rewards.fight_rarity_by_floor != null else null
+	if rates != null:
+		return {
+			"common": rates.common_rate,
+			"uncommon": rates.uncommon_rate,
+			"rare": rates.rare_rate,
+			"ultra_rare": rates.ultra_rare_rate,
+		}
+	return {
+		"common": pool.common_rate,
+		"uncommon": pool.uncommon_rate,
+		"rare": pool.rare_rate,
+		"ultra_rare": pool.ultra_rare_rate,
+	}
 
 static func _cards_offered() -> int:
 	var value: Variant = _scene_root_property(REWARD_SCREEN_SCENE_PATH, "choice_count")

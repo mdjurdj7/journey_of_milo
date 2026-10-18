@@ -10,6 +10,7 @@
       "res://run/keepsakes/*.tres (KeepsakeTable, TrinketData)",
       "res://run/armor/*.tres (KeepsakeTable, TrinketData - worn pieces)",
       "res://cards/pools/*.tres (RewardPool rarity rates)",
+      "res://run/fight_rarity_by_floor.tres (FightRarityTable - a normal fight's rarity rates by floor, through EncounterRewards)",
       "res://battle/reward_screen.tscn (choice_count)"
     ],
     "positions": "World XZ offsets from the floor's spawn, metres ([x, z]) - an option's members and props mapped through their slot (EncounterSlot.to_floor()).",
@@ -18,7 +19,8 @@
     "gate_fight": "The floor's first required slot: RegionField._setup_exit_gate() places the gate gate_distance_beyond_enemy past its anchor, along exit_direction, whichever option stands there.",
     "elite": "EnemyData.is_elite. A fight with an elite in it pays the floor's gold times its role's gold_multiplier in EncounterRewards (the elite's, rounded) and rolls its card at the pool's elite rarity rates. A placement marked FloorEnemy.card_reward TOP_TIER_FIRST (floor 5's region-end Greyshelf) offers its cards from the highest tier down instead (RewardPool.roll_top_tier()), at the floor's gold. See each encounter's elite_rewards. Keepsakes, armor and Glassbone are their own fields.",
     "rewards": "Gold is the floor's roll (FloorData) times the fight's role's gold_multiplier; whether it offers cards, and an optional basic fight's extra (a Samphire; a removal is the collector's alone), are its role's too (EncounterRewards, by BattleController.encounter_role()). Keepsake: the first member whose table drops one (RegionField._roll_keepsake_drop()). Armor: one worn piece from the first member with an armor_table, RARE at its armor_rare_chance, never the piece worn, lying where it fell (RegionField._drop_armor()). Glassbone: every member's, summed. Weapon: the first member's weapon_reward, offered after the reward and any keepsake, TAKE or LEAVE in place of the weapon carried - never while it is the one carried (RegionField.open_weapon_offer()).",
-    "intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping."
+    "intent_values": "ATTACK damage is per hit, before statuses, escalation shown per stage. Erratic enemies pick each turn by weight instead of looping.",
+    "rarity_rates": "A floor's rarity_rates are what a normal fight's card offer rolls each slot with there: EncounterRewards.fight_rarity_by_floor's step for that floor (FightRarityTable.rates_for_floor()), else the pool's own normal rates. Relative weights, renormalised over the tiers that still have an eligible card. elite_rarity_rates are the pool's own, for a fight with an elite in it; the collector rolls at the pool's own normal rates."
   },
   "regions": [
     {
@@ -37,9 +39,9 @@
             "card_pool": "res://cards/pools/wanderer_pool.tres",
             "cards_offered": 3,
             "rarity_rates": {
-              "common": 60.0,
-              "uncommon": 30.0,
-              "rare": 9.0,
+              "common": 63.0,
+              "uncommon": 32.0,
+              "rare": 4.0,
               "ultra_rare": 1.0
             },
             "elite_rarity_rates": {
@@ -116,9 +118,9 @@
             "card_pool": "res://cards/pools/wanderer_pool.tres",
             "cards_offered": 3,
             "rarity_rates": {
-              "common": 60.0,
-              "uncommon": 30.0,
-              "rare": 9.0,
+              "common": 63.0,
+              "uncommon": 32.0,
+              "rare": 4.0,
               "ultra_rare": 1.0
             },
             "elite_rarity_rates": {
