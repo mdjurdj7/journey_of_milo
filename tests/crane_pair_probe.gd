@@ -302,6 +302,10 @@ func _load_floor_3(deck_card_path: String = "") -> void:
 	_run_state.set("current_floor_index", FLOOR_3)
 	_run_state.set("run_opening_pending", false)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	# Floor 3's required slot rolls the cranes or Blackback + Nipper:
+	# the cranes, forced.
+	var forced: Dictionary[StringName, StringName] = {&"required": &"crane_pair"}
+	_field.set("force_options", forced)
 	root.add_child(_field)
 	for i in 30:
 		await physics_frame

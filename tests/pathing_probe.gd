@@ -139,7 +139,9 @@ func _check_ledge() -> void:
 # round the pair by the ford. To Strawcrown itself: into its zone, its
 # packmate's left alone (one fight).
 func _check_enemy_zones() -> void:
-	await _load(2)
+	# Floor 3's required slot rolls the cranes or Blackback + Nipper: the
+	# cranes, forced.
+	await _load(2, {&"required": &"crane_pair"})
 	var spawn: Vector3 = _field.call("get_spawn_position")
 	var enemies: Array = []
 	var crane: Node3D = null

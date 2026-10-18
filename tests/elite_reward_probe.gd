@@ -171,6 +171,11 @@ func _win(floor_index: int, enemy_path: String) -> Node:
 	_run_state.set("run_opening_pending", false)
 	_run_state.set("title_pending", false)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	if floor_index == FLOOR_3:
+		# Floor 3's required slot rolls the cranes or Blackback + Nipper:
+		# the cranes, forced.
+		var forced: Dictionary[StringName, StringName] = {&"required": &"crane_pair"}
+		_field.set("force_options", forced)
 	root.add_child(_field)
 	for i in 30:
 		await physics_frame
