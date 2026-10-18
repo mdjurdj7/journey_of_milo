@@ -2,7 +2,7 @@ extends CanvasLayer
 class_name ArmorExamine
 
 # A worn piece looked at closely: its ItemPlate at examine_scale (the one
-# examine and offer scale, KeepsakeExamine's too), centred
+# plate scale, every host's: the hovers', the offers'), centred
 # over the dimmed field - KeepsakeExamine, for armor. It grows out of
 # from_rect (the HUD row's WORN line; empty: from the middle) while an ink
 # scrim fades in, over inspect_duration_sec, and goes back the same way.
@@ -22,7 +22,7 @@ class_name ArmorExamine
 
 signal closed(taken: bool)
 
-@export var examine_scale: float = 1.3
+@export var examine_scale: float = 1.0
 @export var inspect_duration_sec: float = 0.15
 @export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.35)
 

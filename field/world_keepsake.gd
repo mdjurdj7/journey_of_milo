@@ -15,7 +15,7 @@ class_name WorldKeepsake
 #
 # The plaque is the keepsake's ItemPlate - the one way equipment is
 # shown: art, name, its KEEPSAKE type line, what it does, its lore - at
-# plate_scale, the examine and offer scale; and under it, in a bone strip
+# plate_scale, the one plate scale; and under it, in a bone strip
 # of its own, actions_gap_px below -
 #   the action      TAKE with the slot empty; with one held, REPLACE
 #                   <held> and KEEP <held> - so what taking costs is said
@@ -116,9 +116,9 @@ const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 	set(value):
 		unfocused_color = value
 		_redraw()
-# The plate's own scale (ItemPlate.plate_scale) - the examine and offer
-# scale, drawn at that size rather than scaled up, so it stays crisp.
-@export var plate_scale: float = 1.3:
+# The plate's own scale (ItemPlate.plate_scale) - the one plate scale,
+# drawn at that size rather than scaled up, so it stays crisp.
+@export var plate_scale: float = 1.0:
 	set(value):
 		plate_scale = value
 		if _tile != null:

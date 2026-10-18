@@ -137,8 +137,9 @@ class_name HudRowStyle
 	set(value):
 		hud_keepsake_thumb_placeholder = value
 		emit_changed()
-# The hover: an equipment slot's ItemPlate at this scale - the one hover
-# scale, the battle row's (KeepsakeRow.reveal_plate_scale) too - this far
+# The hover: an equipment slot's ItemPlate at this scale - the one plate
+# scale, every host's (the battle row's, the examine views', the
+# offers') - this far
 # above the slot (below it when there is no room above), fading in and out
 # over this long.
 @export var hud_plate_scale: float = 1.0:

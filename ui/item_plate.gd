@@ -112,7 +112,7 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
 @export_group("")
 
 @export_group("Art")
-@export var art_size_px: float = 190.0:
+@export var art_size_px: float = 114.0:
 	set(value):
 		art_size_px = value
 		_relayout()
@@ -135,8 +135,8 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
 	set(value):
 		name_size_px = value
 		_relayout()
-# Between the art and the name.
-@export var name_gap_px: float = 10.0:
+# Between the art and the name - tight, so no empty band opens between.
+@export var name_gap_px: float = 4.0:
 	set(value):
 		name_gap_px = value
 		_relayout()

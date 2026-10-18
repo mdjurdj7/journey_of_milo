@@ -266,10 +266,11 @@ const DISMISS := SLOT_COUNT
 @export_group("")
 
 @export_group("Keepsake Tile")
-# The bedroll's keepsake, revealed: its ItemPlate at this scale, its
+# The bedroll's keepsake, revealed: its ItemPlate at this scale (the one
+# plate scale), its
 # centre at keepsake_tile_centre_fraction of the viewport height - over
 # the bedroll's column alone, centred on the screen beside the held one.
-@export var keepsake_tile_scale: float = 1.3:
+@export var keepsake_tile_scale: float = 1.0:
 	set(value):
 		keepsake_tile_scale = value
 		_refresh()

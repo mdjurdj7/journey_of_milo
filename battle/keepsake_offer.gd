@@ -125,9 +125,10 @@ const PAPER_MATERIAL_PATH := "res://battle/card_paper_material.tres"
 @export_group("")
 
 @export_group("Tiles")
-# The tiles' scale (ItemPlate.plate_scale), the room between the held
-# and the offered one, and from the header rule to the tiles' top.
-@export var tile_scale: float = 1.3:
+# The tiles' scale (ItemPlate.plate_scale - the one plate scale), the
+# room between the held and the offered one, and from the header rule to
+# the tiles' top.
+@export var tile_scale: float = 1.0:
 	set(value):
 		tile_scale = value
 		_layout()

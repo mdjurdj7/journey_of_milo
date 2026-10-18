@@ -47,7 +47,7 @@ class_name KeepsakeRow
 	set(value):
 		reveal_gap_px = value
 		_place_reveal()
-# The one hover scale - HudRowStyle.hud_plate_scale's.
+# The one plate scale - HudRowStyle.hud_plate_scale's.
 @export var reveal_plate_scale: float = 1.0:
 	set(value):
 		reveal_plate_scale = value

@@ -2,7 +2,7 @@ extends CanvasLayer
 class_name KeepsakeExamine
 
 # A keepsake looked at closely: its ItemPlate at examine_scale (the one
-# examine and offer scale, ArmorExamine's too), centred
+# plate scale, every host's: the hovers', the offers'), centred
 # over the dimmed field - DeckView's inspect, for a keepsake. It grows out
 # of where it was clicked (from_rect, the HUD's KEEPSAKE slot) to the
 # middle of the screen while an ink scrim fades in, over inspect_duration_
@@ -13,7 +13,7 @@ class_name KeepsakeExamine
 
 signal closed()
 
-@export var examine_scale: float = 1.3
+@export var examine_scale: float = 1.0
 # DeckView's inspect: its time and its scrim (the card's ink at 35%).
 @export var inspect_duration_sec: float = 0.15
 @export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.35)

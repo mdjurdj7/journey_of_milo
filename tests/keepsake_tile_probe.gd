@@ -7,11 +7,12 @@ extends SceneTree
 #   fit          every keepsake under run/keepsakes/, every worn piece
 #                under run/armor/ and every weapon under run/weapons/ fits
 #                its plate - the effect in its two-line block, the lore in
-#                its two, the name on one line - at the hover scale and
-#                the examine/offer scale; every plate at one scale is the
-#                same size; each says its own kind (WEAPON, WORN,
-#                KEEPSAKE); and every host shows them at the one hover
-#                scale or the one examine/offer scale
+#                its two, the name on one line - at the one plate scale
+#                every host shows them at (the hovers, the examine views,
+#                the offers); every plate is the same size, and at
+#                1920x1080 and 2560x1440 no taller than a third of the
+#                screen (MAX_HEIGHT_FRACTION, the offer strip left out);
+#                each says its own kind (WEAPON, WORN, KEEPSAKE)
 #   blank        a piece with no art draws the placeholder; one with no
 #                effect, or no lore, leaves that block blank, the plate
 #                the same size; the stat row takes no room while empty
@@ -23,7 +24,7 @@ extends SceneTree
 #                examine_scale, centred, with the field locked under it;
 #                Escape closes it and unlocks the field
 #   battle row   the battle keepsake row's hover shows the hovered
-#                keepsake's plate at the hover scale, reveal_gap_px over
+#                keepsake's plate at the plate scale, reveal_gap_px over
 #                its floor
 #
 # The offer and the belongings screen's HELD / OFFERED plates are checked
@@ -47,9 +48,13 @@ const KEEPSAKES_DIR := "res://run/keepsakes/"
 const ARMOR_DIR := "res://run/armor/"
 const WEAPONS_DIR := "res://run/weapons/"
 const PLATE_SCRIPT_PATH := "res://ui/item_plate.gd"
-# The hover's scale and the examine/offer scale, each host's own export.
-const HOVER_SCALES := [["res://ui/hud_row_style.gd", "hud_plate_scale"], ["res://battle/keepsake_row.gd", "reveal_plate_scale"]]
-const EXAMINE_SCALES := [["res://ui/armor_examine.gd", "examine_scale"], ["res://ui/keepsake_examine.gd", "examine_scale"], ["res://battle/keepsake_offer.gd", "tile_scale"], ["res://battle/belongings_screen.gd", "keepsake_tile_scale"], ["res://field/world_keepsake.gd", "plate_scale"]]
+# The one plate scale, each host's own export: the hovers, the examine
+# views, the offers.
+const PLATE_SCALES := [["res://ui/hud_row_style.gd", "hud_plate_scale"], ["res://battle/keepsake_row.gd", "reveal_plate_scale"], ["res://ui/armor_examine.gd", "examine_scale"], ["res://ui/keepsake_examine.gd", "examine_scale"], ["res://battle/keepsake_offer.gd", "tile_scale"], ["res://battle/belongings_screen.gd", "keepsake_tile_scale"], ["res://field/world_keepsake.gd", "plate_scale"]]
+# The screens a plate must stay within a third of the height of, through
+# the window's stretch (display/window/stretch/mode).
+const SCREENS := [Vector2(1920.0, 1080.0), Vector2(2560.0, 1440.0)]
+const MAX_HEIGHT_FRACTION := 0.33
 const ROW_SCRIPT_PATH := "res://battle/keepsake_row.gd"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
@@ -92,13 +97,10 @@ func _check_fit() -> void:
 	_expect(keepsakes.size() >= 10, "At least the ten keepsakes are found (got %d)" % keepsakes.size())
 	_expect(worn.size() >= 4, "...the four worn pieces (got %d)" % worn.size())
 	_expect(weapons.size() >= 1, "...and the weapon (got %d)" % weapons.size())
-	var hover: float = _default(HOVER_SCALES[0])
-	for pair: Array in HOVER_SCALES:
-		_expect(is_equal_approx(_default(pair), hover), "%s's %s is the one hover scale (%.2f)" % [pair[0].get_file(), pair[1], hover])
-	var examine: float = _default(EXAMINE_SCALES[0])
-	for pair: Array in EXAMINE_SCALES:
-		_expect(is_equal_approx(_default(pair), examine), "%s's %s is the one examine/offer scale (%.2f)" % [pair[0].get_file(), pair[1], examine])
-	for scale: float in [hover, examine]:
+	var one: float = _default(PLATE_SCALES[0])
+	for pair: Array in PLATE_SCALES:
+		_expect(is_equal_approx(_default(pair), one), "%s's %s is the one plate scale (%.2f)" % [pair[0].get_file(), pair[1], one])
+	for scale: float in [one]:
 		var plate: Control = _new_plate(scale)
 		var card_size: Vector2 = Vector2.ZERO
 		for group: Array in [[keepsakes, "KEEPSAKE"], [worn, "WORN"], [weapons, "WEAPON"]]:
@@ -113,6 +115,9 @@ func _check_fit() -> void:
 					card_size = plate.call("get_card_size")
 				_expect_eq(plate.call("get_card_size"), card_size, "%s's plate at %.1fx is the same size as every other" % [item_name, scale])
 				_expect_eq(plate.call("get_plate_size"), card_size, "...with no offer strip under it")
+		for screen: Vector2 in SCREENS:
+			var on_screen: float = card_size.y * _stretch(screen)
+			_expect(on_screen <= screen.y * MAX_HEIGHT_FRACTION, "At %dx%d the plate is %.0f px tall: no more than %.0f%% of the screen (%.1f%%)" % [int(screen.x), int(screen.y), on_screen, MAX_HEIGHT_FRACTION * 100.0, on_screen / screen.y * 100.0])
 		plate.queue_free()
 	await process_frame
 	_completed += 1
@@ -270,6 +275,15 @@ func _show(plate: Control, item: Resource) -> void:
 		plate.call("set_weapon", item)
 	else:
 		plate.call("set_piece", item)
+
+# How much the window's stretch scales the UI on `screen`: canvas_items
+# or viewport stretch keep the base size's aspect (the lesser ratio);
+# with none, 1.
+func _stretch(screen: Vector2) -> float:
+	if str(ProjectSettings.get_setting("display/window/stretch/mode", "disabled")) == "disabled":
+		return 1.0
+	var base := Vector2(float(ProjectSettings.get_setting("display/window/size/viewport_width")), float(ProjectSettings.get_setting("display/window/size/viewport_height")))
+	return minf(screen.x / base.x, screen.y / base.y)
 
 # A host's scale export, as authored: [script path, property].
 func _default(pair: Array) -> float:
