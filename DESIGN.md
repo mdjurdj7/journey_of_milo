@@ -197,6 +197,15 @@ and up the west shore north of z -27. (2026-10-17.)
 
 ## Parked
 
+- **Weapons modify the class's basic attack.** The run carries one
+  weapon (`RunState.weapon`, from `CharacterData.starting_weapon`), shown
+  in the HUD's WEAPON slot. What a weapon is for: it changes the class's
+  basic attack - Slash for the Wanderer - through
+  `WeaponData.modify_basic_attack()`, which nothing calls yet. The
+  Rusted Blade is the baseline and leaves Slash unchanged. Until a weapon
+  has an effect it stays out of the battle hover reveal and out of
+  `held_pieces()`; its art is a placeholder crop of Slash's card art
+  (`run/weapons/rusted_blade_art.tres`). (2026-10-17.)
 - **Chain roles (Opener/Closer, chain payoffs).** The old project's
   `CardData.chain_role`/`chain_followup_effect` are not ported to the new
   rules layer (`cards/card_data.gd`). No current card needs them - revisit

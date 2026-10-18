@@ -44,7 +44,7 @@ class_name RunLogger
 # encounter fields on fight_start. Added within format 2 (2026-10-10),
 # nothing existing changed: floor_entered's slots (slot id -> the option
 # it stood), fight_start's slot and option, and each member's slot_id and
-# option_id.
+# option_id; and (2026-10-17) run_start's weapon, its id.
 
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
@@ -199,6 +199,7 @@ static func start_run(seed: int, character_name: String, snapshot: Dictionary) -
 		"max_hp": snapshot.get("max_hp", 0),
 		"deck": snapshot.get("deck", {}),
 		"keepsake": snapshot.get("keepsake"),
+		"weapon": snapshot.get("weapon"),
 	})
 
 # `slots`: each of the floor's encounter slots, in order, with the option

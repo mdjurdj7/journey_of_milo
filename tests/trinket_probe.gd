@@ -446,18 +446,19 @@ func _check_debug_row() -> void:
 
 # KEEPSAKE: a slot that always shows - empty, nothing to click - naming
 # what is held once one is; in the equipment column above the row, its
-# left edge level with DECK's, WORN above it, neither moved by GLASSBONE
-# coming into the row. A HUD item that has gone fails the case by name
-# rather than crashing it.
+# left edge level with DECK's, WORN above it and WEAPON above that, none
+# moved by GLASSBONE coming into the row. A HUD item that has gone fails
+# the case by name rather than crashing it.
 func _check_hud_line() -> void:
 	_new_run()
 	await _load_field(0)
 	var line: Control = _hud_line("KeepsakeLine")
 	var worn_line: Control = _hud_line("WornLine")
+	var weapon_line: Control = _hud_line("WeaponLine")
 	var deck_panel: Control = _hud_line("DeckPanel")
 	var gold_line: Control = _hud_line("GoldLine")
 	var glassbone_line: Control = _hud_line("GlassboneLine")
-	if line == null or worn_line == null or deck_panel == null or gold_line == null or glassbone_line == null:
+	if line == null or worn_line == null or weapon_line == null or deck_panel == null or gold_line == null or glassbone_line == null:
 		await _teardown()
 		_completed += 1
 		return
@@ -476,6 +477,7 @@ func _check_hud_line() -> void:
 	_expect(line.position.y + line.size.y < deck_panel.position.y, "KEEPSAKE stands above the row")
 	_expect_eq(line.position.x, deck_panel.position.x, "...its left edge level with DECK's")
 	_expect(worn_line.position.y + worn_line.size.y < line.position.y and is_equal_approx(worn_line.position.x, line.position.x), "...WORN above it, left edges level")
+	_expect(weapon_line.visible and weapon_line.position.y + weapon_line.size.y < worn_line.position.y and is_equal_approx(weapon_line.position.x, line.position.x), "...WEAPON above WORN, left edges level")
 	var at: Vector2 = line.position
 	_expect(not glassbone_line.visible, "GLASSBONE is hidden on a new run")
 	_run_state.call("add_glassbone", 1)

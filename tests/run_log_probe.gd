@@ -8,6 +8,7 @@ extends SceneTree
 #
 #   - the events in order: run_start, floor_entered, fight_start,
 #     fight_end, the reward lines, run_end
+#   - run_start's class, starting deck and weapon
 #   - which encounter: floor_entered's slots (slot id -> the option it
 #     stood), fight_start's slot and option and each member's
 #   - the fight's sums: turns, every card with its turn, Energy, hp_cost
@@ -222,6 +223,8 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	_expect(str(start.get("version", "")) != "", "run_start records a version")
 	_expect_eq(str(start.get("class")), "Wanderer", "run_start: the class")
 	_expect(start.get("deck") is Dictionary and not (start.get("deck") as Dictionary).is_empty(), "run_start: the starting deck as counts")
+	var starting_weapon: WeaponData = (load(CHARACTER_PATH) as CharacterData).starting_weapon
+	_expect_eq(start.get("weapon"), String(starting_weapon.id) if starting_weapon != null else null, "run_start: the weapon, the character's starting one")
 
 	var entered: Dictionary = _first(lines, "floor_entered")
 	_expect_eq(entered.get("slots"), {"crab": "sputter"}, "floor_entered: floor 1's one slot and the option it stood")

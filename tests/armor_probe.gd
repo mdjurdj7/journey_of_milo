@@ -10,7 +10,8 @@ extends SceneTree
 # sand (WorldArmor): its line once he walks up, the plate's TAKE / LEAVE
 # and "Replaces ...", a swap setting the old piece down where he stands to
 # be taken again, a won fight's piece lying where the enemy fell, the
-# name's rarity finish, and the HUD's WORN line.
+# name's rarity finish, and the HUD's WORN line - and the WEAPON line
+# above it, which shows the run's weapon on the same plate.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/armor_probe.gd
 #
@@ -23,7 +24,7 @@ extends SceneTree
 # trinket_probe does. Untyped against anything that names the RunState
 # autoload: a SceneTree script compiles before the autoloads register.
 
-const CASES := 15
+const CASES := 16
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
@@ -57,6 +58,7 @@ func _initialize() -> void:
 	await _check_swap_sets_old_down()
 	_check_plate_finish()
 	await _check_worn_line()
+	await _check_weapon_line()
 	await _check_elite_drop()
 	_check_elites_leave_armor()
 
@@ -424,6 +426,42 @@ func _check_worn_line() -> void:
 		await process_frame
 		var examine: Node = _field.get_node_or_null("WornExamine")
 		_expect(examine != null and (examine.call("get_plate") as ArmorPlate).get_piece() == piece, "...the plate, with the piece")
+		if examine != null:
+			examine.call("close", false)
+			await _seconds(0.5)
+		_expect(_field.can_process(), "...and the field is live once it closes")
+	await _teardown()
+	_completed += 1
+
+# The HUD's WEAPON slot: a new run carries the character's starting
+# weapon, and the line names it and can be clicked; its examine opens the
+# plate with the weapon, under the WEAPON label, with no effect line
+# while the weapon says nothing (and one when it does).
+func _check_weapon_line() -> void:
+	_new_run()
+	await _load_field(0)
+	var weapon: WeaponData = _run_state.get("weapon")
+	var character: CharacterData = load(CHARACTER_PATH)
+	_expect(weapon != null and weapon == character.starting_weapon, "A new run carries the character's starting weapon")
+	var line: Control = _field.get_node_or_null("FieldHUD/WeaponLine") as Control
+	_expect(line != null, "The field HUD has a WEAPON line")
+	if line != null and weapon != null:
+		_expect(line.is_visible_in_tree() and line.call("get_weapon") == weapon, "...showing the run's weapon")
+		_expect_eq(str(line.get("_value_text")), weapon.display_name, "...by name")
+		_expect(bool(line.call("is_point_over", line.get_global_rect().get_center())), "...and clickable")
+		_expect(bool(_field.call("open_weapon_examine", weapon, Rect2())), "Its examine opens")
+		await process_frame
+		var examine: Node = _field.get_node_or_null("WeaponExamine")
+		var plate: ArmorPlate = examine.call("get_plate") as ArmorPlate if examine != null else null
+		_expect(plate != null and plate.get_weapon() == weapon and plate.get_piece() == null, "...the plate, with the weapon")
+		if plate != null:
+			_expect_eq(plate.shows_rules(), not weapon.describe().is_empty(), "...an effect line only when the weapon has one")
+			var described := WeaponData.new()
+			described.display_name = "Probe Edge"
+			described.description = "Probe effect."
+			plate.set_weapon(described)
+			_expect(plate.shows_rules(), "...shown for a weapon that says something")
+			plate.set_weapon(weapon)
 		if examine != null:
 			examine.call("close", false)
 			await _seconds(0.5)

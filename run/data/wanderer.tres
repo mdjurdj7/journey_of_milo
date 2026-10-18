@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="CharacterData" load_steps=7 format=3]
+[gd_resource type="Resource" script_class="CharacterData" load_steps=8 format=3]
 
 [ext_resource type="Script" path="res://run/character_data.gd" id="1_character_data"]
 [ext_resource type="Resource" path="res://cards/data/slash.tres" id="2_slash"]
@@ -6,6 +6,7 @@
 [ext_resource type="Resource" path="res://cards/data/brace.tres" id="4_brace"]
 [ext_resource type="Resource" path="res://cards/data/reckoning.tres" id="5_reckoning"]
 [ext_resource type="Resource" path="res://cards/data/down_payment.tres" id="6_down_payment"]
+[ext_resource type="Resource" path="res://run/weapons/rusted_blade.tres" id="7_rusted_blade"]
 
 [resource]
 script = ExtResource("1_character_data")
@@ -18,4 +19,5 @@ ExtResource("4_brace"): 2,
 ExtResource("5_reckoning"): 1,
 ExtResource("6_down_payment"): 1
 }
+starting_weapon = ExtResource("7_rusted_blade")
 has_grace = true

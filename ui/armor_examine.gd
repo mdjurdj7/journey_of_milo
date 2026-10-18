@@ -14,6 +14,8 @@ class_name ArmorExamine
 #     right click close with false - the piece stays where it lies.
 #   the piece worn (the WORN line) - no choice: any click, Escape or a
 #     right click closes.
+#   the run's weapon (the WEAPON line, setup_weapon()) - the same, on its
+#     weapon plate (ArmorPlate.set_weapon()).
 # Layer 100, running ALWAYS.
 
 signal closed(taken: bool)
@@ -23,6 +25,7 @@ signal closed(taken: bool)
 @export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.35)
 
 var _piece: TrinketData = null
+var _weapon: WeaponData = null
 var _worn: TrinketData = null
 var _with_choice: bool = false
 var _from_rect: Rect2 = Rect2()
@@ -39,6 +42,12 @@ func setup(piece: TrinketData, worn: TrinketData, with_choice: bool, from_rect: 
 	_with_choice = with_choice
 	_from_rect = from_rect
 
+# The weapon instead of a piece - no choice. Called before the layer
+# enters the tree.
+func setup_weapon(weapon: WeaponData, from_rect: Rect2 = Rect2()) -> void:
+	setup(null, null, false, from_rect)
+	_weapon = weapon
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 100
@@ -54,10 +63,13 @@ func _ready() -> void:
 	_plate = ArmorPlate.new()
 	_plate.name = "Plate"
 	add_child(_plate)
-	if _piece == null:
+	if _piece == null and _weapon == null:
 		close(false)
 		return
-	_plate.set_piece(_piece, _worn if _with_choice else null, _with_choice)
+	if _weapon != null:
+		_plate.set_weapon(_weapon)
+	else:
+		_plate.set_piece(_piece, _worn if _with_choice else null, _with_choice)
 	_plate.chosen.connect(close)
 	_open()
 	_plate.play_name_sheen()
@@ -117,7 +129,7 @@ func close(taken: bool) -> void:
 	if _closing:
 		return
 	_closing = true
-	if _plate == null or _piece == null:
+	if _plate == null or (_piece == null and _weapon == null):
 		closed.emit(false)
 		queue_free()
 		return

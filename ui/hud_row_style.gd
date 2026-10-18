@@ -181,7 +181,8 @@ class_name HudRowStyle
 	set(value):
 		hud_slot_label_gap_px = value
 		emit_changed()
-# Between WORN's frame bottom and KEEPSAKE's label top.
+# Between one slot's frame bottom and the label top of the slot below
+# (WEAPON over WORN, WORN over KEEPSAKE).
 @export var hud_slot_gap_px: float = 12.0:
 	set(value):
 		hud_slot_gap_px = value

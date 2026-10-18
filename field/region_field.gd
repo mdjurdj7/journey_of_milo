@@ -448,6 +448,8 @@ var _wear_path: PackedVector2Array = PackedVector2Array()
 var _keepsake_line: KeepsakeLine = null
 # The HUD's WORN slot, above it - a click opens its ArmorExamine.
 var _worn_line: KeepsakeLine = null
+# The HUD's WEAPON slot, the column's top - a click opens its ArmorExamine.
+var _weapon_line: KeepsakeLine = null
 # The HUD's Bedroll, bottom-right while one is carried - a click asks
 # to rest.
 var _bedroll_line: BedrollLine = null
@@ -889,6 +891,10 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event.button_index == MOUSE_BUTTON_LEFT and _worn_line != null and _worn_line.is_point_over(event.position):
 		get_viewport().set_input_as_handled()
 		open_worn_examine(_worn_line.get_keepsake(), _worn_line.get_global_rect())
+		return
+	if event.button_index == MOUSE_BUTTON_LEFT and _weapon_line != null and _weapon_line.is_point_over(event.position):
+		get_viewport().set_input_as_handled()
+		open_weapon_examine(_weapon_line.get_weapon(), _weapon_line.get_global_rect())
 		return
 	# The HUD's Bedroll: asks to rest - or, where it can't, the click is
 	# still the HUD's, never a move.
@@ -1971,9 +1977,10 @@ func _setup_field_hud() -> void:
 	_add_hud_row_line(glassbone_line, gold_line)
 	# The equipment column above the row, on DECK: KEEPSAKE over the
 	# hairline it draws, WORN over KEEPSAKE - the same line on the other
-	# slot (KeepsakeLine.slot). Each always shows, empty as faint ticks;
-	# RunState.keepsake_changed / worn_changed keep them current - see
-	# KeepsakeLine.
+	# slot (KeepsakeLine.slot) - and WEAPON over WORN (KeepsakeLine.shows_
+	# weapon). Each always shows, an empty one as faint ticks; RunState.
+	# keepsake_changed / worn_changed / weapon_changed keep them current -
+	# see KeepsakeLine.
 	var keepsake_line := KeepsakeLine.new()
 	keepsake_line.name = "KeepsakeLine"
 	_add_hud_row_line(keepsake_line, deck_panel)
@@ -1983,6 +1990,11 @@ func _setup_field_hud() -> void:
 	worn_line.name = "WornLine"
 	_add_hud_row_line(worn_line, keepsake_line)
 	_worn_line = worn_line
+	var weapon_line := KeepsakeLine.new()
+	weapon_line.shows_weapon = true
+	weapon_line.name = "WeaponLine"
+	_add_hud_row_line(weapon_line, worn_line)
+	_weapon_line = weapon_line
 	# BEDROLL bottom-right, an action, following DECK's margin, while one
 	# is carried; RunState.bedroll_changed keeps it current - see
 	# BedrollLine.
@@ -3663,6 +3675,21 @@ func open_worn_examine(piece: TrinketData, from_rect: Rect2 = Rect2()) -> bool:
 	var examine := ArmorExamine.new()
 	examine.name = "WornExamine"
 	examine.setup(piece, null, false, from_rect)
+	examine.closed.connect(func(_taken: bool) -> void: process_mode = Node.PROCESS_MODE_INHERIT)
+	if wanderer != null:
+		wanderer.clear_move_target()
+	process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(examine)
+	return true
+
+# The run's weapon looked at from the HUD: its plate, no choice - the worn
+# piece's terms.
+func open_weapon_examine(weapon: WeaponData, from_rect: Rect2 = Rect2()) -> bool:
+	if weapon == null or _battle_open or not can_process():
+		return false
+	var examine := ArmorExamine.new()
+	examine.name = "WeaponExamine"
+	examine.setup_weapon(weapon, from_rect)
 	examine.closed.connect(func(_taken: bool) -> void: process_mode = Node.PROCESS_MODE_INHERIT)
 	if wanderer != null:
 		wanderer.clear_move_target()

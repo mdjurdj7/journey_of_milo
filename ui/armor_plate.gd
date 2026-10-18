@@ -15,7 +15,8 @@ class_name ArmorPlate
 #                 flat ink for COMMON, the RARE base with its faint
 #                 gradient, a sheen once when the plate opens (play_name_
 #                 sheen()). Nothing else says rarity.
-#   what it does  TrinketData.describe(), Alegreya Sans, centred
+#   what it does  TrinketData.describe(), Alegreya Sans, centred - left
+#                 out when it says nothing
 #   what it costs with a piece already worn, "REPLACES" in the slot
 #                 label's voice and the worn piece's name in Spectral, in
 #                 its own rarity finish (its own canvas item, as the
@@ -36,6 +37,12 @@ class_name ArmorPlate
 # (CLAUDE.md on extracting at the third). Hosts - ArmorExamine, the HUD's
 # WORN line, the battle row's hover - place it; with show_actions it takes
 # the mouse and says `chosen`, otherwise it ignores it.
+#
+# The run's weapon (WeaponData) is shown on the same plate (set_weapon()):
+# "WEAPON" for the slot label, its name in flat ink (a weapon has no
+# rarity), its describe() - left out while it has no effect - and its lore.
+# Never a choice and never a REPLACES line. Hosts: the HUD's WEAPON line
+# and its ArmorExamine.
 
 signal chosen(take: bool)
 
@@ -119,6 +126,11 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 @export var slot_label_text: String = "WORN":
 	set(value):
 		slot_label_text = value
+		_relayout()
+# The slot label on a weapon's plate.
+@export var weapon_label_text: String = "WEAPON":
+	set(value):
+		weapon_label_text = value
 		_relayout()
 @export var slot_label_size_px: int = 12:
 	set(value):
@@ -256,6 +268,8 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 @export_group("")
 
 var _piece: TrinketData = null
+# The weapon shown instead of a piece (set_weapon()); null while a piece is.
+var _weapon: WeaponData = null
 var _replaced: TrinketData = null
 var _show_actions: bool = false
 var _focus: int = Choice.TAKE
@@ -332,6 +346,7 @@ func _ready() -> void:
 # and whether TAKE and LEAVE are offered.
 func set_piece(piece: TrinketData, replaced: TrinketData = null, show_actions: bool = false) -> void:
 	_piece = piece
+	_weapon = null
 	_replaced = replaced if replaced != piece else null
 	_show_actions = show_actions
 	_focus = Choice.TAKE
@@ -342,6 +357,48 @@ func set_piece(piece: TrinketData, replaced: TrinketData = null, show_actions: b
 
 func get_piece() -> TrinketData:
 	return _piece
+
+# The run's weapon, in place of a piece: no choice, no REPLACES line.
+func set_weapon(weapon: WeaponData) -> void:
+	set_piece(null)
+	_weapon = weapon
+	_paper_seed = float(absi(hash(weapon.id)) % 1000) / 1000.0 if weapon != null else 0.0
+	_relayout()
+
+func get_weapon() -> WeaponData:
+	return _weapon
+
+# Whether the effect line is shown - false for a weapon (or piece) with
+# nothing to say. For probes.
+func shows_rules() -> bool:
+	return _rules != null
+
+# What the plate shows, from the piece or the weapon, whichever it holds.
+func _shown_name() -> String:
+	if _weapon != null:
+		return _weapon.display_name
+	return _piece.display_name if _piece != null else ""
+
+func _shown_art() -> Texture2D:
+	if _weapon != null:
+		return _weapon.art
+	return _piece.art if _piece != null else null
+
+func _shown_rules() -> String:
+	if _weapon != null:
+		return _weapon.describe()
+	return _piece.describe() if _piece != null else ""
+
+func _shown_lore() -> String:
+	if _weapon != null:
+		return _weapon.lore
+	return _piece.flavor_text if _piece != null else ""
+
+func _shown_label() -> String:
+	return weapon_label_text if _weapon != null else slot_label_text
+
+func _shows_something() -> bool:
+	return _piece != null or _weapon != null
 
 func get_replaced() -> TrinketData:
 	return _replaced
@@ -365,7 +422,7 @@ func get_replaced_name_finish() -> ShaderMaterial:
 	return _replaced_name_layer.material as ShaderMaterial if _replaced_name_layer != null else null
 
 func uses_placeholder() -> bool:
-	return _piece != null and _piece.art == null
+	return _shows_something() and _shown_art() == null
 
 # One sweep of the finish's sheen across the name - CardView's, played
 # once as the plate opens. Nothing for a name with no finish.
@@ -461,11 +518,15 @@ func _relayout() -> void:
 	var name_px: int = _font_px(name_size_px)
 	var name_font: Font = InkType.numeral_font()
 	_name_baseline = roundf(_slot_label_baseline + _label_font.get_descent(label_px) + _px(name_gap_px) + name_font.get_ascent(name_px))
-	var y: float = _name_baseline + name_font.get_descent(name_px) + _px(rules_gap_px)
-	_rules_top = y
+	var y: float = _name_baseline + name_font.get_descent(name_px)
+	_rules = null
 	var rules_px: int = _font_px(rules_size_px)
-	_rules = _paragraph(_piece.describe() if _piece != null else "", _rules_font, rules_px, text_width)
-	y += _paragraph_height(_rules, rules_px)
+	var rules_text: String = _shown_rules()
+	if not rules_text.is_empty():
+		y += _px(rules_gap_px)
+		_rules_top = y
+		_rules = _paragraph(rules_text, _rules_font, rules_px, text_width)
+		y += _paragraph_height(_rules, rules_px)
 	# REPLACES <name> on one baseline, centred together; the worn piece's
 	# effect under it.
 	_replaces = null
@@ -485,11 +546,11 @@ func _relayout() -> void:
 		y = _replaces_top + _paragraph_height(_replaces, replaces_px)
 	_lore = null
 	_hairline_y = -1.0
-	if _piece != null and not _piece.flavor_text.is_empty():
+	if not _shown_lore().is_empty():
 		_hairline_y = roundf(y + _px(lore_gap_px))
 		_lore_top = _hairline_y + _px(lore_gap_px)
 		var lore_px: int = _font_px(lore_size_px)
-		_lore = _paragraph(_piece.flavor_text, _lore_font, lore_px, text_width)
+		_lore = _paragraph(_shown_lore(), _lore_font, lore_px, text_width)
 		y = _lore_top + _paragraph_height(_lore, lore_px)
 	_action_rects.clear()
 	if _show_actions:
@@ -516,7 +577,7 @@ func _relayout() -> void:
 	_shadow.add_theme_stylebox_override("panel", style)
 	# The name's own box: from its left edge, so the finish's u runs over
 	# the word itself.
-	var name_text: String = _piece.display_name if _piece != null else ""
+	var name_text: String = _shown_name()
 	var name_width: float = InkType.width(name_font, name_text, name_px)
 	_name_layer.position = Vector2(roundf((width - name_width) / 2.0), 0.0)
 	_name_layer.size = Vector2(maxf(name_width, 1.0), _plate_size.y)
@@ -553,13 +614,14 @@ func _draw_face() -> void:
 	frame.border_color = Color(ink, frame_alpha)
 	frame.set_corner_radius_all(roundi(_px(corner_radius_px)))
 	_face.draw_style_box(frame, Rect2(Vector2.ZERO, _plate_size))
-	if _piece == null:
+	if not _shows_something():
 		return
-	if _piece.art != null:
-		_face.draw_texture_rect(_piece.art, _art_rect, false)
+	var art: Texture2D = _shown_art()
+	if art != null:
+		_face.draw_texture_rect(art, _art_rect, false)
 	else:
 		_face.draw_rect(_art_rect, placeholder_color)
-		var initial: String = _piece.display_name.left(1).to_upper()
+		var initial: String = _shown_name().left(1).to_upper()
 		var initial_px: int = _font_px(placeholder_initial_size_px)
 		var font: Font = InkType.numeral_font()
 		var initial_width: float = InkType.width(font, initial, initial_px)
@@ -567,8 +629,9 @@ func _draw_face() -> void:
 		InkType.draw_run(_face, font, initial, Vector2(roundf(_art_rect.get_center().x - initial_width / 2.0), roundf(baseline)), initial_px, Color(ink, placeholder_initial_alpha))
 	var label_px: int = _font_px(slot_label_size_px)
 	var label_color := Color(ink, ink.a * slot_label_alpha)
-	var slot_width: float = InkType.width(_label_font, slot_label_text, label_px)
-	InkType.draw_run(_face, _label_font, slot_label_text, Vector2(roundf((_plate_size.x - slot_width) / 2.0), _slot_label_baseline), label_px, label_color)
+	var label: String = _shown_label()
+	var slot_width: float = InkType.width(_label_font, label, label_px)
+	InkType.draw_run(_face, _label_font, label, Vector2(roundf((_plate_size.x - slot_width) / 2.0), _slot_label_baseline), label_px, label_color)
 	_draw_paragraph(_rules, _rules_top, _pitch(_font_px(rules_size_px)), ink)
 	if _replaces != null:
 		InkType.draw_run(_face, _label_font, replaces_label_text, Vector2(_replaces_label_left, _replaces_baseline), label_px, label_color)
@@ -582,12 +645,12 @@ func _draw_face() -> void:
 # The name at the layer's own origin - its finish (or flat ink) is the
 # layer's material's to colour.
 func _draw_name() -> void:
-	if _piece == null:
+	if not _shows_something():
 		return
 	var color: Color = ink
 	if _name_layer.material == null and _finish != null:
 		color = _finish.common_ink
-	InkType.draw_run(_name_layer, InkType.numeral_font(), _piece.display_name, Vector2(0.0, _name_baseline), _font_px(name_size_px), color)
+	InkType.draw_run(_name_layer, InkType.numeral_font(), _shown_name(), Vector2(0.0, _name_baseline), _font_px(name_size_px), color)
 
 # The worn piece's name after REPLACES, the same way.
 func _draw_replaced_name() -> void:

@@ -3,7 +3,7 @@ class_name KeepsakeLine
 
 # One equipment slot of the field HUD, in the column above the row (see
 # HudRowStyle's Equipment group for every size): its caps label in the
-# row's faint label style ("KEEPSAKE", "WORN"), under it the piece's art
+# row's faint label style ("KEEPSAKE", "WORN", "WEAPON"), under it the piece's art
 # (cropped square - the placeholder's tone with no art) framed by four
 # hairline corner ticks, no box, and the piece's name beside the frame in
 # Spectral at hud_keepsake_size_px, full ink, with the faint hairline
@@ -28,9 +28,18 @@ class_name KeepsakeLine
 # piece's ArmorPlate (at worn_plate_scale) rather than a KeepsakeTile -
 # armor's one presentation, as the tile is a keepsake's. Its click opens
 # ArmorExamine.
+#
+# The WEAPON slot is this line again with shows_weapon, set before it
+# enters the tree: RegionField sits it on WORN, the column's top;
+# RunState.weapon_changed keeps it current (a run always has one). Its
+# hover is the weapon's ArmorPlate (set_weapon()), at worn_plate_scale,
+# and its click opens the weapon's ArmorExamine.
 
 # Which of the run's slots this line shows. Set before _ready().
 var slot: TrinketData.Slot = TrinketData.Slot.KEEPSAKE
+# The run's weapon instead of a trinket slot (slot is then unread). Set
+# before _ready().
+var shows_weapon: bool = false
 # The WORN hover's plate scale - the plate is wider than a tile.
 @export var worn_plate_scale: float = 0.6:
 	set(value):
@@ -38,6 +47,8 @@ var slot: TrinketData.Slot = TrinketData.Slot.KEEPSAKE
 		_place_tile()
 
 var _keepsake: TrinketData = null
+# The WEAPON line's weapon, in place of _keepsake.
+var _weapon: WeaponData = null
 var _tile: KeepsakeTile = null
 # The WORN line's hover, in place of _tile.
 var _plate: ArmorPlate = null
@@ -45,13 +56,23 @@ var _plate: ArmorPlate = null
 var _reveal_alpha: float = 0.0
 
 func _ready() -> void:
-	label_text = "WORN" if slot == TrinketData.Slot.WORN else "KEEPSAKE"
+	if shows_weapon:
+		label_text = "WEAPON"
+	else:
+		label_text = "WORN" if slot == TrinketData.Slot.WORN else "KEEPSAKE"
 	super()
 	_tile = KeepsakeTile.new()
 	_tile.name = "Tile"
 	_tile.visible = false
 	add_child(_tile)
-	if slot == TrinketData.Slot.WORN:
+	if shows_weapon:
+		_plate = ArmorPlate.new()
+		_plate.name = "Plate"
+		_plate.visible = false
+		add_child(_plate)
+		RunState.weapon_changed.connect(set_weapon)
+		set_weapon(RunState.weapon)
+	elif slot == TrinketData.Slot.WORN:
 		_plate = ArmorPlate.new()
 		_plate.name = "Plate"
 		_plate.visible = false
@@ -73,11 +94,25 @@ func set_keepsake(keepsake: TrinketData) -> void:
 func get_keepsake() -> TrinketData:
 	return _keepsake
 
+# The WEAPON line's weapon.
+func set_weapon(weapon: WeaponData) -> void:
+	_weapon = weapon
+	if _plate != null:
+		_plate.set_weapon(weapon)
+	set_value_text(weapon.display_name if weapon != null else "")
+
+func get_weapon() -> WeaponData:
+	return _weapon
+
+# Whether the slot holds anything - a trinket, or the weapon.
+func _is_filled() -> bool:
+	return _keepsake != null or _weapon != null
+
 # The hover's tile (for probes and the examine view's start).
 func get_tile() -> KeepsakeTile:
 	return _tile
 
-# The WORN line's hover plate; null on the KEEPSAKE line.
+# The WORN or WEAPON line's hover plate; null on the KEEPSAKE line.
 func get_plate() -> ArmorPlate:
 	return _plate
 
@@ -101,7 +136,7 @@ func _position_by(anchor: Control) -> Vector2:
 	return Vector2(anchor.position.x, anchor.position.y - _gap_before() - size.y)
 
 func _name_text() -> String:
-	return _value_text if _keepsake != null else style.hud_slot_empty_text
+	return _value_text if _is_filled() else style.hud_slot_empty_text
 
 func _label_baseline() -> float:
 	return roundf(style.label_font_tracked().get_ascent(style.hud_label_size_px))
@@ -123,7 +158,7 @@ func _content_height() -> float:
 
 # Whether a screen point is over a filled slot - its label, frame or name.
 func is_point_over(screen_point: Vector2) -> bool:
-	return _keepsake != null and is_visible_in_tree() and get_global_rect().has_point(screen_point)
+	return _is_filled() and is_visible_in_tree() and get_global_rect().has_point(screen_point)
 
 func _process(delta: float) -> void:
 	var target: float = 1.0 if is_visible_in_tree() and _is_hovered() else 0.0
@@ -134,12 +169,12 @@ func _process(delta: float) -> void:
 	_place_tile()
 
 func _is_hovered() -> bool:
-	if _keepsake == null or get_viewport().gui_get_hovered_control() != null:
+	if not _is_filled() or get_viewport().gui_get_hovered_control() != null:
 		return false
 	return Rect2(Vector2.ZERO, size).has_point(get_local_mouse_position())
 
 # Above the slot, left-aligned with it; below when it wouldn't fit above.
-# The WORN slot's plate the same way.
+# The WORN and WEAPON slots' plate the same way.
 func _place_tile() -> void:
 	if _tile == null or style == null:
 		return
@@ -163,7 +198,7 @@ func _place_tile() -> void:
 	reveal.position = Vector2(0.0, roundf(above))
 
 func _draw() -> void:
-	var filled: bool = _keepsake != null
+	var filled: bool = _is_filled()
 	var faint := Color(_ink, _ink.a * style.hud_slot_empty_alpha)
 	# The label, in the row's caps.
 	var label_font: Font = style.label_font_tracked()
@@ -195,7 +230,7 @@ func _draw() -> void:
 
 # The art, cropped to a centred square - or the placeholder's tone.
 func _draw_art(rect: Rect2) -> void:
-	var art: Texture2D = _keepsake.art
+	var art: Texture2D = _weapon.art if _weapon != null else _keepsake.art
 	if art == null:
 		draw_rect(rect, style.hud_keepsake_thumb_placeholder)
 		return

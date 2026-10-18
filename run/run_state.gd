@@ -28,6 +28,8 @@ signal toll_changed(amount: int)
 signal keepsake_changed(keepsake: TrinketData)
 # The WORN slot changed - the new piece, or null for empty.
 signal worn_changed(worn: TrinketData)
+# The weapon changed - new_run() setting the character's starting one.
+signal weapon_changed(weapon: WeaponData)
 # A Bedroll taken or used - whether one is carried now.
 signal bedroll_changed(held: bool)
 
@@ -82,6 +84,11 @@ var keepsakes_offered: Array[StringName] = []
 # Survives every fight and floor; new_run() empties it. Changed only
 # through equip_worn(), which keeps its max_hp_bonus in player_max_hp.
 var worn: TrinketData = null
+# The WEAPON slot - always filled in a run: new_run() sets the character's
+# starting_weapon (the Wanderer's Rusted Blade). Not a trinket, so never
+# in held_pieces(); what a weapon does is its basic-attack hook
+# (WeaponData.modify_basic_attack()), which nothing calls yet.
+var weapon: WeaponData = null
 # The Bedroll (BedrollData): carried or not - never more than one, so an
 # offer of a second can't be taken. Survives every fight and floor until
 # it's used (BedrollRest); new_run() empties it. Changed only through
@@ -166,6 +173,7 @@ func new_run(starting_character: CharacterData) -> void:
 	toll = 0
 	keepsake = null
 	worn = null
+	weapon = starting_character.starting_weapon
 	has_bedroll = false
 	keepsakes_offered.clear()
 	hp_lost_this_combat = 0
@@ -208,11 +216,13 @@ func new_run(starting_character: CharacterData) -> void:
 	toll_changed.emit(toll)
 	keepsake_changed.emit(keepsake)
 	worn_changed.emit(worn)
+	weapon_changed.emit(weapon)
 	bedroll_changed.emit(has_bedroll)
 	RunLogger.start_run(run_seed, starting_character.character_name, run_snapshot())
 
 # The run as the log records it (RunLogger): HP, purse, Toll, the deck as
-# card counts, the keepsake's and worn piece's ids, and where in the run.
+# card counts, the keepsake's, worn piece's and weapon's ids, and where in
+# the run.
 func run_snapshot() -> Dictionary:
 	var counts: Dictionary = {}
 	for card in deck:
@@ -227,6 +237,7 @@ func run_snapshot() -> Dictionary:
 		"deck": counts,
 		"keepsake": RunLogger.keepsake_id(keepsake),
 		"worn": RunLogger.keepsake_id(worn),
+		"weapon": RunLogger.or_null(String(weapon.id) if weapon != null else ""),
 		"region": current_region_index,
 		"floor": current_floor_index,
 		"lap": region_lap,

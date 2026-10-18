@@ -15,6 +15,10 @@ class_name CharacterData
 # at all to resolve them.
 @export var starting_deck_counts: Dictionary = {}
 
+# The weapon a run starts with (RunState.weapon, set by new_run()) - the
+# one that modifies this class's basic attack (WeaponData).
+@export var starting_weapon: WeaponData = null
+
 # How much Grace one enemy turn can open, when several hits land in it -
 # each at grace_open_fraction (below).
 #   LARGEST_HIT - the biggest single unblocked hit of that turn.
