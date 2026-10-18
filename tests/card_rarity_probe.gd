@@ -1,8 +1,9 @@
 extends SceneTree
 
 # Headless probe for card rarity, the fight reward's rarity roll, the
-# region-end fight's top-tier roll, Blood Arc, and With Regards joining
-# the Wanderer pool. Rules layer, the real
+# region-end fight's top-tier roll, Blood Arc, With Regards joining the
+# Wanderer pool, and each card's class and offer marker with the filter
+# every random offer rolls through. Rules layer, the real
 # .tres cards and pool; no field scene:
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/card_rarity_probe.gd
@@ -16,8 +17,18 @@ const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
 # With Regards: what its kill heals.
 const WITH_REGARDS_HEAL := 5
-const CASES := 17
+const CASES := 19
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
+const SAMURAI_PATH := "res://run/data/samurai.tres"
+# Each card folder and the card_class every card directly in it carries
+# (empty: neutral); each tempered copy carries its original's.
+const FOLDER_CLASS: Dictionary = {
+	"res://cards/data/": &"wanderer",
+	"res://cards/samurai/": &"samurai",
+	"res://cards/neutral/": &"",
+}
+# Offered only on a channel of its own (CardData.OfferScope.OWN_CHANNEL).
+const OWN_CHANNEL: Array[String] = ["Samphire"]
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # Folders whose cards are authored in the editor, not entered in
@@ -106,6 +117,8 @@ func _initialize() -> void:
 	_check_blood_arc_last_resort()
 	_check_with_regards()
 	_check_starting_deck()
+	_check_card_class_and_offer()
+	_check_offer_filter()
 	if _completed != CASES:
 		_failures += 1
 		print("FAIL: only %d of %d cases ran to the end" % [_completed, CASES])
@@ -509,7 +522,99 @@ func _check_starting_deck() -> void:
 	_expect_eq(counts, {"Slash": 4, "Bite Down": 2, "Brace": 2, "Reckoning": 1, "Down Payment": 1}, "Starting deck unchanged")
 	_completed += 1
 
+# --- Class and offer ---
+
+# Every card's card_class matches its folder, each tempered copy's class
+# and offer its original's, the starters STARTER_ONLY, Samphire
+# OWN_CHANNEL, the rest REWARDABLE; both classes name their card_class.
+func _check_card_class_and_offer() -> void:
+	for dir: String in FOLDER_CLASS:
+		for file in DirAccess.get_files_at(dir):
+			if not file.ends_with(".tres"):
+				continue
+			var card := load(dir + file) as CardData
+			if card == null:
+				_fail("%s%s isn't a CardData" % [dir, file])
+				continue
+			_expect_eq(card.card_class, FOLDER_CLASS[dir], "%s's card_class (%s)" % [card.card_name, card.resource_path])
+			var scope: CardData.OfferScope = CardData.OfferScope.REWARDABLE
+			if STARTER_ONLY.has(card.card_name):
+				scope = CardData.OfferScope.STARTER_ONLY
+			elif OWN_CHANNEL.has(card.card_name):
+				scope = CardData.OfferScope.OWN_CHANNEL
+			_expect_eq(card.offer, scope, "%s's offer" % card.card_name)
+			if card.tempered != null:
+				_expect_eq(card.tempered.card_class, card.card_class, "%s's card_class, as %s's" % [card.tempered.card_name, card.card_name])
+				_expect_eq(card.tempered.offer, card.offer, "%s's offer, as %s's" % [card.tempered.card_name, card.card_name])
+	_expect_eq((load(CHARACTER_PATH) as CharacterData).card_class, &"wanderer", "The Wanderer's card_class")
+	_expect_eq((load(SAMURAI_PATH) as CharacterData).card_class, &"samurai", "The Samurai's card_class")
+	_expect_eq(CardData.new().card_class, &"", "An unmarked card is neutral")
+	_expect_eq(CardData.new().offer, CardData.OfferScope.REWARDABLE, "...and rewardable")
+	_completed += 1
+
+# One pool listing a card of each kind: every roll and has_cards() offer a
+# class only its own and neutral rewardable cards; no class check without
+# a character; a pool with nothing offerable has no cards; a thin pool
+# offers fewer, never twice.
+func _check_offer_filter() -> void:
+	var wanderer := CharacterData.new()
+	wanderer.card_class = &"wanderer"
+	var samurai := CharacterData.new()
+	samurai.card_class = &"samurai"
+	var his: CardData = _marked(&"wanderer", CardData.OfferScope.REWARDABLE)
+	var hers: CardData = _marked(&"samurai", CardData.OfferScope.REWARDABLE)
+	var neutral: CardData = _marked(&"", CardData.OfferScope.REWARDABLE)
+	var starter: CardData = _marked(&"", CardData.OfferScope.STARTER_ONLY)
+	var keeper: CardData = _marked(&"", CardData.OfferScope.KEEPER_ONLY)
+	var own: CardData = _marked(&"", CardData.OfferScope.OWN_CHANNEL)
+	var pool := RewardPool.new()
+	pool.entries = [his, hers, neutral, starter, keeper, own]
+	var cases: Array = [[wanderer, [his, neutral], "Wanderer"], [samurai, [hers, neutral], "Samurai"], [null, [his, hers, neutral], "No character"]]
+	for row: Array in cases:
+		var character: CharacterData = row[0]
+		var expected: Array = row[1]
+		for seed_value in 20:
+			var rolls: Array = [
+				pool.roll(10, _rng(seed_value), null, character),
+				pool.roll_by_rarity(10, _rng(seed_value), null, false, character),
+				pool.roll_by_rarity(10, _rng(seed_value), null, true, character),
+				pool.roll_top_tier(10, _rng(seed_value), null, character),
+			]
+			for rolled: Array[CardData] in rolls:
+				_expect_eq(rolled.size(), expected.size(), "%s, seed %d: %d cards offered" % [row[2], seed_value, expected.size()])
+				for card in rolled:
+					_expect(expected.has(card), "%s, seed %d: only its own and neutral rewardable cards" % [row[2], seed_value])
+					_expect_eq(rolled.count(card), 1, "%s, seed %d: no card twice" % [row[2], seed_value])
+		_expect(pool.has_cards(character), "%s: the pool has cards" % row[2])
+	var only_his := RewardPool.new()
+	only_his.entries = [his, starter, own]
+	_expect(not only_his.has_cards(samurai), "Only another class's and unrewardable cards: no cards for the Samurai")
+	_expect(only_his.roll(3, _rng(1), null, samurai).is_empty(), "...and nothing rolled")
+	_expect(only_his.has_cards(wanderer), "...one for the Wanderer")
+	var alone: Array[CardData] = only_his.roll_by_rarity(3, _rng(1), null, false, wanderer)
+	_expect(alone.size() == 1 and alone[0] == his, "...offered alone: fewer, not twice")
+	# The real pools, rolled out whole: nothing unrewardable, nothing of
+	# another class.
+	for character: CharacterData in [load(CHARACTER_PATH) as CharacterData, load(SAMURAI_PATH) as CharacterData]:
+		for file in DirAccess.get_files_at("res://cards/pools/"):
+			if not file.ends_with(".tres"):
+				continue
+			var real := load("res://cards/pools/" + file) as RewardPool
+			var offered: Array[CardData] = real.roll(999, _rng(3), null, character)
+			offered.append_array(real.roll_by_rarity(999, _rng(3), null, false, character))
+			for card: CardData in offered:
+				_expect(card.offer == CardData.OfferScope.REWARDABLE, "%s's %s: %s is rewardable" % [character.character_name, file, card.card_name])
+				_expect(card.card_class == &"" or card.card_class == character.card_class, "%s's %s: %s is neutral or theirs" % [character.character_name, file, card.card_name])
+	_completed += 1
+
 # --- Helpers ---
+
+func _marked(card_class: StringName, offer: CardData.OfferScope) -> CardData:
+	var card := CardData.new()
+	card.rarity = CardData.CardRarity.COMMON
+	card.card_class = card_class
+	card.offer = offer
+	return card
 
 func _all_cards() -> Array[CardData]:
 	var cards: Array[CardData] = []

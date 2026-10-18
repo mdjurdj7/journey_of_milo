@@ -37,6 +37,7 @@ extends SceneTree
 const CASES := 7
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
+const SAMURAI_PATH := "res://run/data/samurai.tres"
 const COLLECTOR_SCENE_PATH := "res://field/collector.tscn"
 const COLLECTOR_POOL_PATH := "res://cards/pools/collector_pool.tres"
 const WANDERER_POOL_PATH := "res://cards/pools/wanderer_pool.tres"
@@ -112,6 +113,18 @@ func _check_data() -> void:
 		var any := load(POOLS_DIR + file) as RewardPool
 		for card in any.entries:
 			_expect(card.resource_path != SAMPHIRE_PATH, "Samphire is in no pool (%s holds it)" % file)
+		# Nor offered by one, its folder scans included (the Samurai's
+		# reads cards/neutral/, where it lives): every card the pool can
+		# give, for either class.
+		for character_path: String in [CHARACTER_PATH, SAMURAI_PATH]:
+			var character := load(character_path) as CharacterData
+			var rng := RandomNumberGenerator.new()
+			rng.seed = 1
+			var offered: Array[CardData] = any.roll(999, rng, null, character)
+			offered.append_array(any.roll_by_rarity(999, rng, null, false, character))
+			offered.append_array(any.roll_top_tier(999, rng, null, character))
+			for card: CardData in offered:
+				_expect(card.resource_path != SAMPHIRE_PATH, "%s never offers Samphire (%s)" % [file, character.character_name])
 	var samphire := load(SAMPHIRE_PATH) as CardData
 	_expect_eq(samphire.card_name, "Samphire", "Samphire")
 	_expect(samphire.card_type == CardData.CardType.SKILL and samphire.cost == 1, "...a 1-Energy Skill")

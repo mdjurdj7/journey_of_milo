@@ -123,7 +123,7 @@ func _check_pool() -> void:
 	var rng := RandomNumberGenerator.new()
 	for seed_index in SEED_COUNT:
 		rng.seed = seed_index
-		for rolled: Array[CardData] in [pool.roll_by_rarity(ROLL_COUNT, rng), pool.roll_by_rarity(ROLL_COUNT, rng, null, true), pool.roll_top_tier(ROLL_COUNT, rng), pool.roll(ROLL_COUNT, rng)]:
+		for rolled: Array[CardData] in [pool.roll_by_rarity(ROLL_COUNT, rng, null, false, samurai), pool.roll_by_rarity(ROLL_COUNT, rng, null, true, samurai), pool.roll_top_tier(ROLL_COUNT, rng, null, samurai), pool.roll(ROLL_COUNT, rng, null, samurai)]:
 			_expect_eq(rolled.size(), ROLL_COUNT, "Seed %d: her pool rolls %d cards" % [seed_index, ROLL_COUNT])
 			for card in rolled:
 				_expect(card.resource_path.begins_with(SAMURAI_DIR) or card.resource_path.begins_with(NEUTRAL_DIR), "Seed %d: %s is hers or neutral (%s)" % [seed_index, card.card_name, card.resource_path])
