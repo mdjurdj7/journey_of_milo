@@ -278,6 +278,20 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		keepsake_tile_centre_fraction = value
 		_refresh()
+# The Bedroll offered in the keepsake column: while that column is
+# focused, before anything is taken, its item plate (ItemPlate.set_
+# bedroll()) shows beside it - bedroll_plate_gap_px right of the column
+# (left, if it would leave the screen), centred on it, at bedroll_plate_
+# scale - so it reads as the rest item it is. The other two columns stay
+# a mystery. Each re-applies live.
+@export var bedroll_plate_scale: float = 0.85:
+	set(value):
+		bedroll_plate_scale = value
+		_sync_bedroll_plate()
+@export var bedroll_plate_gap_px: float = 36.0:
+	set(value):
+		bedroll_plate_gap_px = value
+		_sync_bedroll_plate()
 @export var keepsake_tile_gap_px: float = 40.0:
 	set(value):
 		keepsake_tile_gap_px = value
@@ -447,6 +461,8 @@ var _held: TrinketData = null
 # taken then.
 var _bedroll: BedrollData = null
 var _bedroll_carried: bool = false
+# The Bedroll's plate while its column is focused (_sync_bedroll_plate()).
+var _bedroll_plate: ItemPlate = null
 
 var _scrim: ColorRect = null
 var _draw_layer: Control = null
@@ -1074,6 +1090,30 @@ func _set_focus(index: int) -> void:
 		return
 	_focus = index
 	_draw_layer.queue_redraw()
+	_sync_bedroll_plate()
+
+# The Bedroll's plate beside its column while that column is focused and
+# nothing is taken yet; gone otherwise.
+func _sync_bedroll_plate() -> void:
+	if _draw_layer == null:
+		return
+	var wanted: bool = _bedroll != null and _taken < 0 and _focus == Slot.KEEPSAKE and not _flying
+	if not wanted:
+		if _bedroll_plate != null:
+			_bedroll_plate.queue_free()
+			_bedroll_plate = null
+		return
+	if _bedroll_plate == null:
+		_bedroll_plate = ItemPlate.new()
+		_draw_layer.add_child(_bedroll_plate)
+		_bedroll_plate.set_bedroll(_bedroll)
+	_bedroll_plate.plate_scale = bedroll_plate_scale
+	var column: Rect2 = _column_rect(Slot.KEEPSAKE)
+	var plate: Vector2 = _bedroll_plate.get_plate_size()
+	var x: float = column.end.x + bedroll_plate_gap_px
+	if x + plate.x > _draw_layer.size.x:
+		x = column.position.x - bedroll_plate_gap_px - plate.x
+	_bedroll_plate.position = Vector2(x, column.get_center().y - plate.y * 0.5).round()
 
 func _choice_hit(position: Vector2) -> int:
 	for choice in [Choice.REPLACE, Choice.KEEP]:
@@ -1214,6 +1254,7 @@ func _activate(index: int) -> void:
 		return
 	_done = true
 	_taken = index
+	_sync_bedroll_plate()
 	var glassbone: int = _glassbone_in(index)
 	if glassbone > 0:
 		RunState.add_glassbone(glassbone)

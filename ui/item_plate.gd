@@ -152,6 +152,11 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
 	set(value):
 		keepsake_label_text = value
 		_relayout()
+# The Bedroll's kind (set_bedroll()) - a rest, used in the field.
+@export var rest_label_text: String = "REST":
+	set(value):
+		rest_label_text = value
+		_relayout()
 # The type label - and REPLACES - in the HUD row's label voice: small
 # tracked Alegreya Sans Bold caps, ink at type_alpha; its glyph in the
 # same ink.
@@ -309,6 +314,9 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
 var _piece: TrinketData = null
 # The weapon shown instead of a piece (set_weapon()); null while a piece is.
 var _weapon: WeaponData = null
+# The Bedroll shown instead (set_bedroll()); null otherwise. It has no art
+# of its own: its ink glyph stands in for one, on the placeholder's tone.
+var _bedroll: BedrollData = null
 var _replaced: TrinketData = null
 # The weapon carried that taking the one shown would replace (set_
 # weapon()'s offer) - in _replaced's place in the strip; null otherwise.
@@ -405,6 +413,7 @@ func set_piece(piece: TrinketData, replaced: TrinketData = null, show_actions: b
 	_piece = piece
 	_weapon = null
 	_replaced_weapon = null
+	_bedroll = null
 	_replaced = replaced if replaced != piece else null
 	_show_actions = show_actions
 	_focus = Choice.TAKE
@@ -439,6 +448,17 @@ func set_weapon(weapon: WeaponData, replaced: WeaponData = null, show_actions: b
 func get_weapon() -> WeaponData:
 	return _weapon
 
+# The Bedroll, in place of a piece: its plate_name, its REST kind and
+# glyph, its plate_text as the effect; no choice, no lore, plain ink.
+func set_bedroll(bedroll: BedrollData) -> void:
+	set_piece(null)
+	_bedroll = bedroll
+	_paper_seed = float(absi(hash(bedroll.plate_name)) % 1000) / 1000.0 if bedroll != null else 0.0
+	_relayout()
+
+func get_bedroll() -> BedrollData:
+	return _bedroll
+
 # The stat row's line under the type line - "" (the default) shows none
 # and takes no room. For a later piece that changes your attacks' damage
 # or your defence cards' block; nothing sets it yet.
@@ -456,6 +476,8 @@ func shows_rules() -> bool:
 
 # The type label shown (WEAPON, WORN, KEEPSAKE) - for probes.
 func get_type_label() -> String:
+	if _bedroll != null:
+		return rest_label_text
 	if _weapon != null:
 		return weapon_label_text
 	if _piece != null and _piece.slot == TrinketData.Slot.WORN:
@@ -463,6 +485,8 @@ func get_type_label() -> String:
 	return keepsake_label_text
 
 func _type_glyph() -> InkGlyph.Kind:
+	if _bedroll != null:
+		return InkGlyph.Kind.BEDROLL
 	if _weapon != null:
 		return InkGlyph.Kind.SWORD
 	if _piece != null and _piece.slot == TrinketData.Slot.WORN:
@@ -471,27 +495,35 @@ func _type_glyph() -> InkGlyph.Kind:
 
 # What the plate shows, from the piece or the weapon, whichever it holds.
 func _shown_name() -> String:
+	if _bedroll != null:
+		return _bedroll.plate_name
 	if _weapon != null:
 		return _weapon.display_name
 	return _piece.display_name if _piece != null else ""
 
 func _shown_art() -> Texture2D:
+	if _bedroll != null:
+		return null
 	if _weapon != null:
 		return _weapon.art
 	return _piece.art if _piece != null else null
 
 func _shown_rules() -> String:
+	if _bedroll != null:
+		return _bedroll.describe_plate()
 	if _weapon != null:
 		return _weapon.describe()
 	return _piece.describe() if _piece != null else ""
 
 func _shown_lore() -> String:
+	if _bedroll != null:
+		return ""
 	if _weapon != null:
 		return _weapon.lore
 	return _piece.flavor_text if _piece != null else ""
 
 func _shows_something() -> bool:
-	return _piece != null or _weapon != null
+	return _piece != null or _weapon != null or _bedroll != null
 
 func get_replaced() -> TrinketData:
 	return _replaced
@@ -786,7 +818,12 @@ func _draw_face() -> void:
 		_face.draw_texture_rect(art, _art_rect, false)
 	else:
 		_face.draw_rect(_art_rect, placeholder_color)
-		var initial: String = _shown_name().left(1).to_upper()
+		# The Bedroll: its own ink glyph on the tone, for art.
+		if _bedroll != null:
+			var side: float = minf(_art_rect.size.x, _art_rect.size.y) * 0.6
+			var glyph_rect := Rect2(_art_rect.get_center() - Vector2(side, side) * 0.5, Vector2(side, side))
+			InkGlyph.draw(_face, InkGlyph.Kind.BEDROLL, glyph_rect, maxf(_px(type_glyph_stroke_px) * 2.0, 1.0), Color(ink, maxf(placeholder_initial_alpha, 0.7)))
+		var initial: String = "" if _bedroll != null else _shown_name().left(1).to_upper()
 		var initial_px: int = _font_px(placeholder_initial_size_px)
 		var font: Font = InkType.numeral_font()
 		var initial_width: float = InkType.width(font, initial, initial_px)
