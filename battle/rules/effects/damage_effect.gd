@@ -41,6 +41,8 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 		struck = _standing_after(struck, ctx)
 		if struck.is_empty():
 			return
+		if ctx.on_extra_hit.is_valid():
+			ctx.on_extra_hit.call()
 		ctx.repeat_mark_bonus(struck)
 		_drain(drains, _land(base + ctx.take_repeat_attack_bonus(), struck, ctx), ctx)
 

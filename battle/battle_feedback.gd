@@ -32,8 +32,8 @@ class_name BattleFeedback
 # camera, the UI and the damage number keep running; nothing touches
 # Engine.time_scale. How long (stop_ms()): normal_hitstop_ms, or
 # big_hitstop_ms for a hit of big_hit_min_damage or more or a kill,
-# multi_hit_hitstop_ms for each hit of an enemy's multi-hit attack (a
-# kill still the big one), blocked_hitstop_ms for a hit taken whole by a
+# multi_hit_hitstop_ms for each hit of an enemy's multi-hit attack or of
+# a card hit that lands several times (Lash) - a kill still the big one, blocked_hitstop_ms for a hit taken whole by a
 # block. The number, the contact sound and the HP bar land in the frame
 # it starts. Damage with no contact - a countdown going off, a tick, a
 # Drain, a self-inflicted cost - stops nothing. hitstop_enabled off: no
@@ -190,7 +190,9 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, kind: String
 		var sounded: bool = _surfaced.has(target)
 		var heavy: float = heavy_level(heavy_damage(amount))
 		var killing: bool = battle_controller != null and battle_controller.is_dying(target)
-		var hold: float = stop_ms(amount, killing) / 1000.0 if contact else 0.0
+		# One of a card's several hits (Lash): the multi-hit stop.
+		var multi: bool = battle_controller != null and battle_controller.is_multi_hit_report()
+		var hold: float = stop_ms(amount, killing, multi) / 1000.0 if contact else 0.0
 		_hold_wanderer(hold)
 		var delay: float = reaction_delay(target)
 		if delay > 0.0:

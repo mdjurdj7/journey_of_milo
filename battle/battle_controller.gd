@@ -153,6 +153,12 @@ signal battle_lost()
 # ...its follow-up swing starting this long before it (card_repeat_
 # swing), held to the delay.
 @export var second_swing_lead: float = 0.12
+# A card hit that lands several times as it resolves (CardEffect.repeat_
+# per_earlier_play_tag - Lash) shows them this far apart (seconds), the
+# first at the card's impact - each its own number, contact and the
+# multi-hit stop, as an enemy's several hits are (enemy_hit_interval).
+# No swing of their own.
+@export var card_hit_interval: float = 0.12
 # A strike back (Coiled - _counter_strikes()) starts its lunge this long
 # after the card it answers has resolved, so the card's own blows -
 # Blood Arc's staggered reactions among them - have shown first.
@@ -292,6 +298,10 @@ var _repeat_pending: bool = false
 # start_block) - BattleOverlay shows it once the battle frame settles.
 var opening_block_gained: int = 0
 var _repeat_reports: Array[Callable] = []
+# Set by the resolving card's EffectContext.on_extra_hit: each further
+# hit's reports, one list per hit, held for that hit's beat (_land_extra_
+# hits()).
+var _extra_hit_reports: Array[Array] = []
 # While a card's own effects resolve: a kill only notes that the packs
 # need looking at (_pack_check_due), and _mark_lone_pack_members() runs
 # once the card is done - so a card that kills a whole pack never turns
@@ -1169,6 +1179,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		_report_or_hold(combat_text.emit.bind("player", amount, "block"))
 	ctx.on_repeat = func() -> void:
 		_repeat_pending = true
+	ctx.on_extra_hit = func() -> void:
+		_extra_hit_reports.append([])
 	# Bide's chosen cards: their own views leave the hand just before the
 	# Deck sets their cards aside, so the marked copy is the one that goes.
 	for view in set_aside_views:
@@ -1182,14 +1194,21 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		_hand_container.release_views([consume_view] as Array[CardView])
 
 	var hp_before_effects: int = player.hp
+	# A hit that will land several times (Lash) shows its first as one of
+	# several: the multi-hit stop (is_multi_hit_report()).
+	var multi_hit: bool = _card_hit_count(card, ctx) > 1
+	_multi_hit_report = multi_hit
 	_deferring_pack_check = true
 	_effect_resolver.resolve_card(card, ctx)
 	_deferring_pack_check = false
+	_multi_hit_report = false
 	_report_entry_block()
 	if _pack_check_due:
 		_pack_check_due = false
 		_mark_lone_pack_members()
 	_draw_for_multi_hit()
+	if not _extra_hit_reports.is_empty():
+		await _land_extra_hits()
 	if _repeat_pending:
 		await _land_repeat(card, target_enemy)
 	deck.end_play()
@@ -1235,8 +1254,34 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 func _report_or_hold(report: Callable) -> void:
 	if _repeat_pending:
 		_repeat_reports.append(report)
+	elif not _extra_hit_reports.is_empty():
+		var current: Array = _extra_hit_reports[_extra_hit_reports.size() - 1]
+		current.append(report)
 	else:
 		report.call()
+
+# How many times `card`'s first damage effect lands as it resolves in
+# `ctx` (DamageEffect.hit_count()) - 1 for a card with none.
+func _card_hit_count(card: CardData, ctx: EffectContext) -> int:
+	for effect in card.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.DAMAGE:
+			return DamageEffect.hit_count(effect, ctx)
+	return 1
+
+# A repeating hit's further hits (Lash), card_hit_interval apart after
+# the card's impact - each one's held reports at its own beat, as one of
+# several (the multi-hit stop). Rules-wise they're long done; only what
+# is shown waits.
+func _land_extra_hits() -> void:
+	var hits: Array[Array] = _extra_hit_reports
+	_extra_hit_reports = []
+	for reports in hits:
+		if card_hit_interval > 0.0:
+			await get_tree().create_timer(card_hit_interval).timeout
+		_multi_hit_report = true
+		for report: Callable in reports:
+			report.call()
+		_multi_hit_report = false
 
 # The repeat as a blow of its own: its swing second_swing_lead before its
 # impact, which lands second_swing_delay after the card's first - the

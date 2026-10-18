@@ -106,6 +106,11 @@ var on_block_gained: Callable = Callable()
 # the card reports from then on is the repeat's, which the view presents
 # as its own follow-up blow. Nothing the rules decide reads it.
 var on_repeat: Callable = Callable()
+# Called as on_extra_hit.call() before each further hit of a repeating
+# hit (CardEffect.repeat_per_earlier_play_tag - Lash): what the card
+# reports from then on is that hit's, which the view shows a beat after
+# the one before. Nothing the rules decide reads it.
+var on_extra_hit: Callable = Callable()
 # Called as on_block.call(target_combatant, blocked, damage_to_hp) when a
 # hit on an enemy meets its block - before that hit's on_damage, which
 # only follows if some of it got through (damage_to_hp > 0).
