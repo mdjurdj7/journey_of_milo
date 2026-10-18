@@ -161,7 +161,7 @@ func _check_descriptions() -> void:
 		HOUSE_KEY_PATH: ["Someone meant to need it again.", "The first card you play each combat costs 0 Energy."],
 		FRAYED_CORD_PATH: ["Tied off neatly, for later.", "At the end of your turn, you may keep 1 card in your hand."],
 		DEPARTURE_STUB_PATH: ["The number is still legible.", "Draw 1 extra card on your first turn of each combat."],
-		BENT_NAIL_PATH: ["Drawn from a stacked board.", "At the start of each combat, +3 damage on your next Attack."],
+		BENT_NAIL_PATH: ["Drawn from a stacked board.", "Your first Attack each combat deals double damage."],
 		WORN_PAGE_PATH: ["Folded the same way, many times.", "Draw 1 extra card on your first turn of each combat."],
 		BLUE_FASTENER_PATH: ["Too small for you.", "The first time you enter Critical each combat, gain 6 Block."],
 	}

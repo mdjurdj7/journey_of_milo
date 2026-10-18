@@ -86,6 +86,10 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 		# Straight after the loss that set a counter off, before the next
 		# effect - Blood Arc's Drain lands before its own sweep.
 		ctx.resolve_pending_drain()
+	# An Attack's last effect done: what waits for an Attack card to finish
+	# (Bent Nail's doubling) spends now - after every hit it gave.
+	if ctx.card_is_attack:
+		Status.spend_on_attack_card(ctx.player.statuses)
 	# After the whole card, once however much it spent: Toll spent hurries
 	# every countdown that listens for it (Sentence), and one that reaches
 	# 0 goes off now, in the player's turn - reported as damage, never as

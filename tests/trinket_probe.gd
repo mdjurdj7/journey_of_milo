@@ -22,6 +22,9 @@ const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 const KEEPSAKE_OFFER_SCENE_PATH := "res://battle/keepsake_offer.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
+# Keen, the "+3 on your next Attack" status - Bent Nail's until it took
+# the doubling; still the plain charged attack bonus the stance case reads.
+const KEEN_PATH := "res://battle/rules/statuses/keen.tres"
 const WHITE_SHELL_PATH := "res://run/keepsakes/white_shell.tres"
 const FRAYED_CORD_PATH := "res://run/keepsakes/frayed_cord.tres"
 const WORN_PAGE_PATH := "res://run/keepsakes/worn_page.tres"
@@ -159,10 +162,10 @@ func _check_bent_nail() -> void:
 	_expect_eq(player.statuses.size(), 1, "Bent Nail opens the fight with one status")
 	_expect_eq(player.statuses[0].label(), "Bent Nail ×1", "...shown as Bent Nail ×1")
 	_play(BITE_DOWN_PATH, player, enemy)
-	_expect_eq(enemy.hp, 100 - 11, "The first Attack deals 8 + 3")
+	_expect_eq(enemy.hp, 100 - 16, "The first Attack deals double: 8 x 2")
 	_expect(player.statuses.is_empty(), "...and spends the status")
 	_play(BITE_DOWN_PATH, player, enemy)
-	_expect_eq(enemy.hp, 100 - 11 - 8, "The second Attack deals the card's own 8")
+	_expect_eq(enemy.hp, 100 - 16 - 8, "The second Attack deals the card's own 8")
 	_completed += 1
 
 # Current behaviour, documented: an Attack played with every enemy buried
@@ -183,8 +186,8 @@ func _check_bent_nail_spent_while_buried() -> void:
 	_completed += 1
 
 # A bonus with no charges (Last Resort's, while Critical) pays every
-# Attack and is never spent; beside Bent Nail's Keen, both pay the first
-# and Last Resort alone after.
+# Attack and is never spent; beside Keen, both pay the first and Last
+# Resort alone after.
 func _check_stance_bonus_beside_keen() -> void:
 	var player := _player(50)
 	player.hp = 10
@@ -194,8 +197,7 @@ func _check_stance_bonus_beside_keen() -> void:
 	_play(BITE_DOWN_PATH, player, enemy)
 	_expect_eq(enemy.hp, 100 - 14 - 14, "Last Resort pays +6 on every Attack while Critical")
 	_expect(player.stance != null and player.stance.data.id == "last_resort", "...and is never spent - it has no charges")
-	var nail: TrinketData = load(BENT_NAIL_PATH)
-	nail.apply_combat_start(player.statuses)
+	Status.apply_to(player.statuses, load(KEEN_PATH) as StatusData)
 	enemy.hp = 100
 	_play(BITE_DOWN_PATH, player, enemy)
 	_play(BITE_DOWN_PATH, player, enemy)
@@ -215,9 +217,15 @@ func _check_frayed_cord_data() -> void:
 	_completed += 1
 
 func _check_descriptions() -> void:
-	var keen := Status.new((load(BENT_NAIL_PATH) as TrinketData).combat_start_status)
+	var keen := Status.new(load(KEEN_PATH) as StatusData)
 	print("   Keen: ", keen.describe())
 	_expect_eq(keen.describe(), "+3 damage on your next Attack.", "Keen's live description")
+	var nail: TrinketData = load(BENT_NAIL_PATH)
+	_expect_eq(nail.describe(), "Your first Attack each combat deals double damage.", "Bent Nail's description")
+	_expect_eq(nail.describe_short(), "First Attack each combat: double damage.", "...and its short line")
+	var doubling: Array[Status] = []
+	nail.apply_combat_start(doubling)
+	_expect_eq(doubling[0].describe() if not doubling.is_empty() else "", "Your next Attack deals double damage.", "...and its status's hover line")
 	var cord: TrinketData = load(FRAYED_CORD_PATH)
 	_expect_eq(cord.describe(), "At the end of your turn, you may keep 1 card in your hand.", "Frayed Cord's description")
 	_expect_eq(cord.describe_short(), "Keep 1 card at the end of each turn.", "...and its short line")

@@ -78,6 +78,12 @@ const DURATION_UNTIL_TRIGGERED := -2
 # label()).
 @export var default_charges: int = 0
 @export var clears_on_trigger: bool = false
+# Spends a charge once an Attack card has finished resolving, whatever it
+# dealt (Status.spend_on_attack_card(), from EffectResolver.resolve_card())
+# - after every hit of that card, so a modifier with it (Bent Nail's
+# outgoing doubling) holds for all of them: each target, each extra hit,
+# a repeat.
+@export var spent_by_attack_card: bool = false
 # Made REAL this pass (the old project's own version was decorative - see
 # Phase 1 report's flagged items): status.gd's consume_triggered() removes
 # every status with this flag set, unconditionally, whenever a trigger

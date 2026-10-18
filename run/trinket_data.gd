@@ -49,6 +49,14 @@ class_name TrinketData
 #                        attack()) - Grace opens on what then reaches HP
 #   hit_back_damage      damage to an enemy, through its Block, once for
 #                        each of its attacks that lands on him
+#   first_attack_multiplier  above 1: the fight's first Attack card deals
+#                        this times its damage - every hit, every target -
+#                        through a status (FIRST_ATTACK_STATUS_PATH, an
+#                        outgoing MULTIPLY modifier) put on the Wanderer as
+#                        the fight opens, after the card's own number and
+#                        its attack and mark bonuses and before the
+#                        enemy's Covered/Exposed and Block; spent once that
+#                        Attack card has resolved, whatever it dealt
 #
 # Every hook reads both slots (RunState.held_pieces()), so any field works
 # in either; the worn ones are written for armor.
@@ -71,6 +79,7 @@ enum Slot { KEEPSAKE, WORN }
 #   {block}  combat_start_block      {critical_block}  critical_entry_block
 #   {keep}   end_turn_keep           {multi_draw}  draw_on_multi_hit
 #   {max_hp}  max_hp_bonus           {hit_back}  hit_back_damage
+#   {times}  first_attack_multiplier in words ("double")
 #   {s}      "s" unless the count token before it is 1
 @export_multiline var description: String = ""
 # The shortened line for where it's shown small - the "currently held"
@@ -105,6 +114,14 @@ enum Slot { KEEPSAKE, WORN }
 @export var max_hp_bonus: int = 0
 @export_range(0.0, 1.0, 0.05) var first_hit_scale: float = 1.0
 @export var hit_back_damage: int = 0
+@export var first_attack_multiplier: float = 1.0:
+	set(value):
+		first_attack_multiplier = value
+		emit_changed()
+
+# The status first_attack_multiplier puts on as the fight opens - its
+# magnitude set from the multiplier, so the number lives here.
+const FIRST_ATTACK_STATUS_PATH := "res://battle/rules/statuses/bent_nail.tres"
 
 # The name as the find line says it: lowercased after an article ("a
 # harness"), as it is without one ("Wardling's Lamp").
@@ -130,6 +147,7 @@ func _fill(template: String) -> String:
 		"multi_draw": draw_on_multi_hit,
 		"max_hp": max_hp_bonus,
 		"hit_back": hit_back_damage,
+		"times": Status.times_word(first_attack_multiplier),
 	})
 
 # The fight is opening: this trinket's status, if it has one, onto the
@@ -137,3 +155,10 @@ func _fill(template: String) -> String:
 func apply_combat_start(statuses: Array[Status]) -> void:
 	if combat_start_status != null:
 		Status.apply_to(statuses, combat_start_status)
+	if first_attack_multiplier > 1.0:
+		var doubling := load(FIRST_ATTACK_STATUS_PATH) as StatusData
+		if doubling != null:
+			Status.apply_to(statuses, doubling)
+			var applied: Status = Status.find_in(statuses, doubling)
+			if applied != null:
+				applied.magnitude = roundi((first_attack_multiplier - 1.0) * 100.0)

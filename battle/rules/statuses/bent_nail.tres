@@ -1,0 +1,17 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "bent_nail"
+display_name = "Bent Nail"
+description = "Your next Attack deals {times} damage."
+category = 1
+default_magnitude = 100
+default_charges = 1
+default_duration_turns = -1
+modifier_target = 1
+modifier_operation = 1
+stack_rule = 4
+spent_by_attack_card = true

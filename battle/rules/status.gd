@@ -133,6 +133,7 @@ func describe(holder: Combatant = null) -> String:
 		"reduction": data.next_card_cost_reduction * stack_count,
 		"energy": data.turn_start_energy_while_critical,
 		"decay": data.tick_decay,
+		"times": times_word(1.0 + magnitude / 100.0),
 	}
 	if holder != null:
 		values["survive_hp"] = data.survive_hp(holder.max_hp, holder.critical_hp_fraction)
@@ -156,6 +157,10 @@ static func fill_template(text: String, values: Dictionary) -> String:
 		var token: String = match_result.get_string(1)
 		if token == "s":
 			result += "" if last_count == 1 else "s"
+		elif values.has(token) and values[token] is String:
+			# A word (times_word(), an ordinal): written as it is, and no
+			# count for a following {s}.
+			result += values[token] as String
 		elif values.has(token):
 			var value: int = int(values[token])
 			last_count = value
@@ -163,6 +168,26 @@ static func fill_template(text: String, values: Dictionary) -> String:
 		else:
 			result += match_result.get_string()
 	return result + text.substr(cursor)
+
+# A damage multiplier in words, for rules text: "double", "triple", or
+# "N×" ("1.5×") for anything else.
+static func times_word(multiplier: float) -> String:
+	if is_equal_approx(multiplier, 2.0):
+		return "double"
+	if is_equal_approx(multiplier, 3.0):
+		return "triple"
+	return "%s×" % String.num(snappedf(multiplier, 0.01))
+
+# An Attack card has finished resolving (EffectResolver.resolve_card()):
+# every status that StatusData.spent_by_attack_card spends one charge,
+# and goes at 0 - Bent Nail's doubling, once its Attack is done.
+static func spend_on_attack_card(statuses: Array[Status]) -> void:
+	for active in statuses.duplicate():
+		if active.data == null or not active.data.spent_by_attack_card:
+			continue
+		active.charges -= 1
+		if active.charges <= 0:
+			statuses.erase(active)
 
 func is_expired() -> bool:
 	if turns_remaining == StatusData.DURATION_UNTIL_REMOVED or turns_remaining == StatusData.DURATION_UNTIL_TRIGGERED:
