@@ -729,6 +729,9 @@ func _reveal_enemy_intents() -> void:
 # signal doc. A display hidden for the enemy's action takes its new
 # intent here, and shows again once the enemy turn is over (_enemy_phase).
 func _on_enemy_intent_changed(enemy: FieldEnemy, preview: Dictionary) -> void:
+	# Its Dig queued: the sand sprays at it until it goes under.
+	if is_instance_valid(enemy):
+		enemy.set_dig_spray(int(preview.get("type", -1)) == EnemyIntent.IntentType.DIG and not bool(preview.get("denied", false)) and not bool(preview.get("pain_turn", false)))
 	var intent: BattleIntent = _enemy_intents.get(enemy)
 	if intent == null or not is_instance_valid(intent):
 		return
@@ -1500,6 +1503,11 @@ func _on_debug_add_energy_pressed() -> void:
 # battle style (and the field DeckPanel come back) before region_field.gd
 # reacts to battle_finished and frees this overlay.
 func _finish_battle(outcome: Outcome) -> void:
+	# No Dig spray outlives the fight.
+	if battle_controller != null:
+		for enemy in battle_controller.enemies:
+			if is_instance_valid(enemy):
+				enemy.set_dig_spray(false)
 	_field_hp_bar.hide_toll()
 	# Grace is per fight (it lives on the Combatant, which this battle's
 	# end discards) - the segment goes with it whatever the outcome.

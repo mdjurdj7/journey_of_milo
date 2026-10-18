@@ -77,6 +77,10 @@ class_name BattleIntent
 # (BattleOverlay's humanoid-guess enemy_head_height) only if the enemy
 # reports 0.
 @export var gap_px: float = 14.0
+# Dug in (FieldEnemy.is_dug_in()): the intent sits over its mounds'
+# top (FieldEnemy.get_dug_in_screen_top()), this many pixels more than
+# gap_px clear of the centre one.
+@export var dug_in_lift_px: float = 36.0
 # Screen pixels added to where it would stand, set every frame by the
 # battle overlay's layout pass so no two readouts overlap (BattleOverlay.
 # _lay_out_readouts()).
@@ -1238,6 +1242,12 @@ func _physics_process(_delta: float) -> void:
 	if rect.has_area():
 		screen_pos.y = rect.position.y - gap_px
 		bottom = _ink_bottom
+	# Dug in, the body is under the sand: over the mounds, raised clear.
+	if target.is_dug_in():
+		var top: float = target.get_dug_in_screen_top(camera)
+		if top < INF:
+			screen_pos.y = top - gap_px - dug_in_lift_px
+			bottom = _ink_bottom
 	_anchor_screen = screen_pos
 	_placed = true
 	position = (screen_pos - Vector2(size.x / 2.0, bottom) + layout_offset).round()

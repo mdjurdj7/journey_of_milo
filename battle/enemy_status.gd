@@ -838,6 +838,9 @@ func _physics_process(delta: float) -> void:
 	var target_position: Vector3 = target.global_position + bar_offset + Vector3.UP * target.get_body_lift()
 	if mound_index >= 0:
 		target_position = target.get_mound_position(mound_index) + bar_offset
+	# Dug in, only its mounds' plates and its intent show: its own plate -
+	# HP, name, status row - hides until it surfaces.
+	visible = mound_index >= 0 or not target.is_dug_in()
 	var screen_pos: Vector2 = camera.unproject_position(target_position)
 	# Whole pixels only - a fractional Control position on a bare bar (no
 	# panel background to visually absorb it) reads as shimmer/jitter on

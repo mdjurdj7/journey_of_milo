@@ -301,6 +301,31 @@ var option_id: StringName = &""
 @export_range(0.0, 1.0, 0.01) var dig_mound_hit_dip: float = 0.25
 @export var dig_mound_hit_seconds: float = 0.2
 @export var dig_mound_hit_gain_db: float = 6.0
+# Its Dig queued (set_dig_spray(), from BattleOverlay): a low, steady
+# spray of sand at it - dig_spray_amount grains alive at once, each
+# dig_spray_lifetime seconds, thrown up at up to dig_spray_velocity m/s
+# within dig_spray_spread_degrees of straight up, in the ground's dry
+# colour times dig_spray_tint. Unshaded, no glow. Each re-applies live.
+@export var dig_spray_amount: int = 6:
+	set(value):
+		dig_spray_amount = maxi(value, 1)
+		_apply_dig_spray()
+@export var dig_spray_lifetime: float = 1.4:
+	set(value):
+		dig_spray_lifetime = maxf(value, 0.05)
+		_apply_dig_spray()
+@export var dig_spray_velocity: float = 1.2:
+	set(value):
+		dig_spray_velocity = value
+		_apply_dig_spray()
+@export var dig_spray_spread_degrees: float = 35.0:
+	set(value):
+		dig_spray_spread_degrees = value
+		_apply_dig_spray()
+@export var dig_spray_tint: float = 0.75:
+	set(value):
+		dig_spray_tint = value
+		_apply_dig_spray()
 @export var dig_mound_hit_clips: Array[AudioStream] = [
 	load("res://assets/audio/sfx/sword_ground_strike_sand_1.mp3") as AudioStream,
 	load("res://assets/audio/sfx/sword_ground_strike_sand_2.mp3") as AudioStream,
@@ -461,6 +486,8 @@ var _dig_centre_set: bool = false
 var _dig_across: Vector3 = Vector3.RIGHT
 var _dig_anchors: Array[Node3D] = []
 var _dig_highlight_material: StandardMaterial3D = null
+# The Dig's spray (set_dig_spray()), made the first time it is wanted.
+var _dig_spray: GPUParticles3D = null
 # The tell's mound and its breathing, while it shows (set_dig_tell()).
 var _tell_mound: int = -1
 # The body's own mound giving way to a dig's row (begin_dig()).
@@ -1962,6 +1989,56 @@ func _row_nearest(centre: Vector3, count: int, toward: Vector3) -> float:
 
 func is_dug_in() -> bool:
 	return _dig_active
+
+# The top of its standing mounds on screen - all alike, so the centre
+# one's while it stands - for its intent to sit over while it is dug in
+# (BattleIntent). INF with none standing.
+func get_dug_in_screen_top(camera: Camera3D) -> float:
+	var top: float = INF
+	for mound in _dig_anchors.size():
+		var rect: Rect2 = get_mound_screen_rect(camera, mound, 0.0)
+		if rect.has_area():
+			top = minf(top, rect.position.y)
+	return top
+
+# The Dig's spray on (its Dig queued) or off - see the dig_spray exports.
+func set_dig_spray(on: bool) -> void:
+	if not on and _dig_spray == null:
+		return
+	if _dig_spray == null:
+		_dig_spray = GPUParticles3D.new()
+		_dig_spray.name = "DigSpray"
+		_dig_spray.process_mode = Node.PROCESS_MODE_ALWAYS
+		_dig_spray.emitting = false
+		add_child(_dig_spray)
+		_apply_dig_spray()
+	_dig_spray.emitting = on
+
+func _apply_dig_spray() -> void:
+	if _dig_spray == null:
+		return
+	_dig_spray.amount = dig_spray_amount
+	_dig_spray.lifetime = dig_spray_lifetime
+	_dig_spray.explosiveness = 0.0
+	var quad := QuadMesh.new()
+	quad.size = Vector2(0.1, 0.1)
+	var material := StandardMaterial3D.new()
+	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	material.cull_mode = BaseMaterial3D.CULL_DISABLED
+	var sand: Color = _ground.ground_color if _ground != null else Color(0.74, 0.70, 0.60)
+	material.albedo_color = Color(sand.r * dig_spray_tint, sand.g * dig_spray_tint, sand.b * dig_spray_tint, sand.a)
+	quad.material = material
+	_dig_spray.draw_pass_1 = quad
+	var process_material := ParticleProcessMaterial.new()
+	process_material.direction = Vector3.UP
+	process_material.spread = dig_spray_spread_degrees
+	process_material.initial_velocity_min = dig_spray_velocity * 0.4
+	process_material.initial_velocity_max = dig_spray_velocity
+	process_material.gravity = Vector3(0.0, -2.0, 0.0)
+	process_material.scale_min = 0.6
+	process_material.scale_max = 1.2
+	_dig_spray.process_material = process_material
+	_dig_spray.position = Vector3.ZERO
 
 # Where mound `mound` stands, world (its anchor's), or the body's own
 # place when there is no such mound.
