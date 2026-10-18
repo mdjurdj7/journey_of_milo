@@ -6,10 +6,11 @@ class_name BattleOcclusion
 # fighter from in front - its screen box over the fighter's, nearer the
 # camera by more than depth_margin_m - or lies under a fighter's readout
 # (its HP/name plate, its intent, his HP bar) fades out with a dither,
-# and comes back when the frame goes. Once fully out it stays out for the
-# rest of the fight (_held): a kill takes a fighter's box and readouts
-# away, and the camera re-fits, but nothing faded comes back until the
-# frame ends. The scatter does the same per item
+# - down to faded_presence, a dither of that coverage, never out
+# entirely, so what it was still reads - and comes back when the frame
+# goes. Once down at it it stays there for the rest of the fight (_held):
+# a kill takes a fighter's box and readouts away, and the camera re-fits,
+# but nothing faded comes back until the frame ends. The scatter does the same per item
 # (FieldScatter.set_battle_screen()). Fighters are never faded, nor a
 # prop the fight's own option brought or one a member stands on
 # (RegionField.is_battle_exempt_prop()).
@@ -28,6 +29,9 @@ class_name BattleOcclusion
 
 # Seconds to fade fully out or back; below 0, the camera's swing.
 @export var fade_seconds: float = -1.0
+# How much of a faded prop (and scatter item - FieldScatter.set_battle_
+# screen()) is left: its dither's coverage, 0 gone, 1 whole. Read live.
+@export_range(0.0, 1.0) var faded_presence: float = 0.5
 # How much nearer the camera than a fighter's origin a prop must be to
 # count as in front of it, metres.
 @export var depth_margin_m: float = 0.2
@@ -68,7 +72,7 @@ func _process(delta: float) -> void:
 		_gather(camera, fighter_rects, fighter_depths, readouts)
 	var scatter: FieldScatter = _field.get_scatter()
 	if scatter != null:
-		scatter.set_battle_screen(camera if framing else null, fighter_rects, fighter_depths, readouts, depth_margin_m, press_float_m)
+		scatter.set_battle_screen(camera if framing else null, fighter_rects, fighter_depths, readouts, depth_margin_m, press_float_m, faded_presence)
 	var targets: Dictionary = {}
 	if framing and camera != null:
 		var props_root: Node = _field.get_node_or_null(RegionField.PROPS_NODE_NAME)
@@ -96,11 +100,11 @@ func _process(delta: float) -> void:
 			_restore.erase(instance)
 			_held.erase(instance)
 			continue
-		var target: float = 0.0 if targets.has(instance) else 1.0
+		var target: float = clampf(faded_presence, 0.0, 1.0) if targets.has(instance) else 1.0
 		var now: float = move_toward(float(_presence[instance]), target, step)
 		_presence[instance] = now
 		_apply(instance as GeometryInstance3D, now)
-		if now <= 0.0 and framing:
+		if now <= target and target < 1.0 and framing:
 			_held[instance] = true
 		if now >= 1.0 and target >= 1.0:
 			_presence.erase(instance)
@@ -109,7 +113,7 @@ func _process(delta: float) -> void:
 func is_settled() -> bool:
 	for instance in _presence.keys():
 		var now: float = float(_presence[instance])
-		if now > 0.0 and now < 1.0:
+		if now < 1.0 and not is_equal_approx(now, clampf(faded_presence, 0.0, 1.0)):
 			return false
 	return true
 

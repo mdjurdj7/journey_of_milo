@@ -372,6 +372,9 @@ var _battle_fighter_depths: PackedFloat32Array = PackedFloat32Array()
 var _battle_readouts: Array[Rect2] = []
 var _battle_depth_margin: float = 0.2
 var _battle_press_float: float = 0.03
+# What a faded item keeps (BattleOcclusion.faded_presence, handed over
+# with the frame).
+var _battle_faded_presence: float = 0.0
 # Items faded fully out in this fight, held out until the frame ends
 # (_advance_battle_fade()): layer -> {item index: true}.
 var _battle_held: Dictionary = {}
@@ -1742,14 +1745,14 @@ func _advance_battle_fade(delta: float) -> void:
 			var spot: Spot = layer.spots[i]
 			var hides: bool = framing and (held.has(i) or (layer.entry.battle_fade and hides_feet(spot, eye, feet)))
 			hides = hides or (screen and occludes_battle(spot, spot.width * 0.5))
-			var target: float = 0.0 if hides else 1.0
+			var target: float = _battle_faded_presence if hides else 1.0
 			var custom: Color = layer.custom[i]
 			if custom.b == target:
 				continue
 			custom.b = move_toward(custom.b, target, step)
 			layer.custom[i] = custom
 			layer.instance.multimesh.set_instance_custom_data(i, custom)
-			if framing and custom.b <= 0.0:
+			if framing and hides and custom.b <= target:
 				held[i] = true
 				_battle_held[layer] = held
 	for layer in _model_layers:
@@ -1758,11 +1761,11 @@ func _advance_battle_fade(delta: float) -> void:
 		var held: Dictionary = _battle_held.get(layer, {})
 		for i in layer.spots.size():
 			var hides: bool = framing and (held.has(i) or (screen and occludes_battle(layer.spots[i], layer.spots[i].size * 0.5)))
-			var target: float = 0.0 if hides else 1.0
+			var target: float = _battle_faded_presence if hides else 1.0
 			if layer.presence[i] == target:
 				continue
 			layer.presence[i] = move_toward(layer.presence[i], target, step)
-			if framing and layer.presence[i] <= 0.0:
+			if framing and hides and layer.presence[i] <= target:
 				held[i] = true
 				_battle_held[layer] = held
 			var colour: Color = layer.colours[i]
@@ -1773,17 +1776,18 @@ func _advance_battle_fade(delta: float) -> void:
 func is_battle_fade_settled() -> bool:
 	for layer in _card_layers:
 		for custom in layer.custom:
-			if custom.b > 0.0 and custom.b < 1.0:
+			if custom.b < 1.0 and not is_equal_approx(custom.b, _battle_faded_presence):
 				return false
 	for layer in _model_layers:
 		for presence in layer.presence:
-			if presence > 0.0 and presence < 1.0:
+			if presence < 1.0 and not is_equal_approx(presence, _battle_faded_presence):
 				return false
 	return true
 
 # The battle frame for the per-item fade, from BattleOcclusion every
 # frame: `camera` null out of a frame (everything comes back).
-func set_battle_screen(camera: Camera3D, fighter_rects: Array[Rect2], fighter_depths: PackedFloat32Array, readouts: Array[Rect2], depth_margin: float, press_float: float = 0.03) -> void:
+func set_battle_screen(camera: Camera3D, fighter_rects: Array[Rect2], fighter_depths: PackedFloat32Array, readouts: Array[Rect2], depth_margin: float, press_float: float = 0.03, faded_presence: float = 0.0) -> void:
+	_battle_faded_presence = clampf(faded_presence, 0.0, 1.0)
 	_battle_camera = camera
 	_battle_fighter_rects = fighter_rects
 	_battle_fighter_depths = fighter_depths

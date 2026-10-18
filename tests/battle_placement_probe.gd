@@ -314,17 +314,22 @@ func _covers(box: Rect2, depth: float, rects: Array[Rect2], depths: Array[float]
 			return "lies under %s" % readout_names[i]
 	return ""
 
-# Whether a prop's instance is faded out (BattleOcclusion): its painted
-# material's presence, or its transparency, past half.
+# Whether a prop's instance is faded (BattleOcclusion): its painted
+# material's presence, or what its transparency leaves, down to the
+# occluder's floor (BattleOcclusion.faded_presence) - a faded prop keeps a
+# dither of that much, never gone.
 func _faded(instance: GeometryInstance3D) -> bool:
-	if instance.transparency > 0.5:
+	var occlusion: Node = _field.get_node_or_null(^"BattleOcclusion")
+	var floor_presence: float = float(occlusion.get("faded_presence")) if occlusion != null else 0.0
+	var reached: float = floor_presence + 0.01
+	if 1.0 - instance.transparency <= reached:
 		return true
 	var material: Material = instance.material_override
 	if material == null and instance is MeshInstance3D and (instance as MeshInstance3D).mesh != null and (instance as MeshInstance3D).mesh.get_surface_count() > 0:
 		material = (instance as MeshInstance3D).get_active_material(0)
 	if material is ShaderMaterial:
 		var presence: Variant = (material as ShaderMaterial).get_shader_parameter("presence")
-		return presence != null and float(presence) < 0.5
+		return presence != null and float(presence) <= reached
 	return false
 
 # A body's screen box: its visible geometry's corners.
