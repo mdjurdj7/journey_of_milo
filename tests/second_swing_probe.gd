@@ -292,6 +292,9 @@ func _check_two_blows() -> void:
 		var hp_steps: Array[int] = []
 		var tolls: Array = []
 		var numbers: Array[Vector2] = []
+		# Whether each was held down at the screen's top so its whole rise
+		# shows (BattleOverlay._spawn_floating_number()).
+		var held_down: Array[bool] = []
 		var spawn_bases: Dictionary = {}
 		controller.connect("damage_dealt", func(_source: Variant, target: Variant, amount: int, _kind: String) -> void:
 			if target == greyshelf:
@@ -315,7 +318,8 @@ func _check_two_blows() -> void:
 				var number := node as FloatingNumber
 				if number.kind == FloatingNumber.KIND_DAMAGE:
 					var bottom_centre: Vector2 = number.position - number.jitter + Vector2(number.size.x / 2.0, number.size.y)
-					numbers.append(bottom_centre - (spawn_bases[node] as Vector2)), CONNECT_DEFERRED)
+					numbers.append(bottom_centre - (spawn_bases[node] as Vector2))
+					held_down.append(number.position.y <= number.rise_px + float(overlay.get("number_clearance_px")) + 0.5), CONNECT_DEFERRED)
 		await _play_first(controller, greyshelf)
 		_expect_eq(hits.size(), 2, "Two damage events, one per hit")
 		if hits.size() == 2:
@@ -333,9 +337,16 @@ func _check_two_blows() -> void:
 		_expect_eq(hp_steps, [hp_before - HIT, hp_before - 2 * HIT] as Array[int], "The HP bar drops twice")
 		_expect_eq(numbers.size(), 2, "Two damage numbers")
 		if numbers.size() == 2:
-			var offset: Vector2 = overlay.get("repeat_number_offset")
+			# The repeat's offset, and one step of the stack - the first still
+			# shows as it lands. Held down at the screen's top, it can only
+			# have moved down from there.
+			var offset: Vector2 = Vector2(overlay.get("repeat_number_offset")) + Vector2(overlay.get("number_stack_step"))
+			var expected: Vector2 = numbers[0] + offset
 			_expect(_near(numbers[0], Vector2.ZERO), "...the first where a hit's goes (%s)" % str(numbers[0]))
-			_expect(_near(numbers[1], offset), "...the second offset by %s (%s)" % [str(offset), str(numbers[1])])
+			if held_down[1]:
+				_expect(absf(numbers[1].x - expected.x) <= NUMBER_SLACK_PX and numbers[1].y >= expected.y - NUMBER_SLACK_PX, "...the second offset by %s across, held down at the screen's top (%s)" % [str(offset), str(numbers[1] - numbers[0])])
+			else:
+				_expect(_near(numbers[1], expected), "...the second offset by %s (%s)" % [str(offset), str(numbers[1] - numbers[0])])
 		_expect_eq(player.toll, 6, "...6 Toll spent, as before")
 		_expect(not bool(controller.get("_input_locked")), "Input unlocks once it has landed")
 	await _teardown()
