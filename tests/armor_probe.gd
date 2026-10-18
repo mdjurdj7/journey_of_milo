@@ -188,6 +188,26 @@ func _check_first_hit_preview() -> void:
 	_expect(player.first_hit_spent, "...spending it")
 	var after: Dictionary = EnemyTurn.preview_intent(enemy, data, player)
 	_expect_eq(str(after["hit_amounts"]), str([9, 9]), "Spent, the preview shows whole hits")
+	# Two enemies in one turn, previewed in turn order on one state (the
+	# controller's): the first one's first hit spends it, so the second
+	# shows whole hits - as the two then land.
+	var fresh: Combatant = _player(60)
+	fresh.first_hit_scale = 0.5
+	var turn: Dictionary = EnemyTurn.turn_state(fresh)
+	var lead := Combatant.new(40)
+	EnemyTurn.pick_initial_intent(lead, data)
+	var behind := Combatant.new(40)
+	EnemyTurn.pick_initial_intent(behind, data)
+	var lead_preview: Dictionary = EnemyTurn.preview_intent(lead, data, fresh, turn)
+	var behind_preview: Dictionary = EnemyTurn.preview_intent(behind, data, fresh, turn)
+	_expect_eq(str(lead_preview["hit_amounts"]), str([scaled, 9]), "Two enemies: the first shows the scaled first hit")
+	_expect_eq(str(behind_preview["hit_amounts"]), str([9, 9]), "...the second, after it, whole hits")
+	_expect(not fresh.first_hit_spent, "...and previewing spends nothing real")
+	var landed_hits: Array[int] = []
+	for attacker: Combatant in [lead, behind]:
+		for hit: Dictionary in _attack(attacker, data, data.intents[0], fresh)["hits"]:
+			landed_hits.append(int(hit["damage"]))
+	_expect_eq(str(landed_hits), str([scaled, 9, 9, 9]), "...as the two then land")
 	_completed += 1
 
 # --- Damage back ---

@@ -257,6 +257,23 @@ static func find_mark(statuses: Array[Status], mark: StringName) -> Status:
 			return active
 	return null
 
+# A copy of every status in `statuses`, field for field: what a preview
+# spends a charge of or removes (EnemyTurn.turn_state()) leaves the real
+# ones untouched.
+static func clones(statuses: Array[Status]) -> Array[Status]:
+	var copies: Array[Status] = []
+	for active in statuses:
+		var copy := Status.new(active.data)
+		copy.magnitude = active.magnitude
+		copy.turns_remaining = active.turns_remaining
+		copy.stack_count = active.stack_count
+		copy.charges = active.charges
+		copy.progress = active.progress
+		copy.granted_by = active.granted_by
+		copy.bound_intent = active.bound_intent
+		copies.append(copy)
+	return copies
+
 # `statuses` less `left_out`: a new list, the statuses themselves the same.
 static func without(statuses: Array[Status], left_out: Array[Status]) -> Array[Status]:
 	var kept: Array[Status] = []

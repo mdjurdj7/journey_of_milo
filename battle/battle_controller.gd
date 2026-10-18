@@ -481,13 +481,27 @@ func fight_card(card: CardData) -> CardData:
 # it is "lethal" too, with "lethal_together". Empty for a dead/unknown
 # enemy.
 func get_intent_preview(enemy: FieldEnemy) -> Dictionary:
-	var preview: Dictionary = _intent_preview_alone(enemy)
+	var previews: Dictionary = _turn_previews()
+	var preview: Dictionary = previews.get(enemy, {})
 	if preview.is_empty() or bool(preview.get("lethal", false)):
 		return preview
-	if _lethal_together().has(enemy):
+	if _lethal_together(previews).has(enemy):
 		preview["lethal"] = true
 		preview["lethal_together"] = true
 	return preview
+
+# Every enemy's preview for the coming enemy turn, in turn order, each
+# read from where the ones before it leave the player (EnemyTurn.turn_
+# state()): the worn piece's first hit, Unbroken's and No Further's armed
+# are spent by the first attack that spends them, not shown off every
+# enemy's - so each readout, each Signal's answers and the warning across
+# enemies carry the hits that will land.
+func _turn_previews() -> Dictionary:
+	var state: Dictionary = EnemyTurn.turn_state(player)
+	var previews: Dictionary = {}
+	for enemy in enemies:
+		previews[enemy] = _intent_preview_alone(enemy, state)
+	return previews
 
 # The enemies whose queued actions together would be lethal for the coming
 # enemy turn, when none is on its own: every damage-dealing action queued
@@ -497,11 +511,11 @@ func get_intent_preview(enemy: FieldEnemy) -> Dictionary:
 # simulate_hits()). Empty when the sum isn't lethal, or when one enemy is
 # lethal alone (its own warning says it). Denied, cancelled or broken
 # intents add nothing.
-func _lethal_together() -> Dictionary:
+func _lethal_together(previews: Dictionary) -> Dictionary:
 	var contributors: Dictionary = {}
 	var amounts: Array[int] = []
 	for enemy in enemies:
-		var preview: Dictionary = _intent_preview_alone(enemy)
+		var preview: Dictionary = previews.get(enemy, {})
 		if preview.is_empty():
 			continue
 		if bool(preview.get("lethal", false)):
@@ -524,15 +538,16 @@ func _lethal_together() -> Dictionary:
 		return {}
 	return contributors
 
-# One enemy's preview on its own (get_intent_preview() without the lethal
-# warning across enemies).
-func _intent_preview_alone(enemy: FieldEnemy) -> Dictionary:
+# One enemy's preview (get_intent_preview() without the lethal warning
+# across enemies), read from and spending `state` - the player as the
+# enemies before it in the turn leave him (_turn_previews()).
+func _intent_preview_alone(enemy: FieldEnemy, state: Dictionary) -> Dictionary:
 	var combatant: Combatant = _combatants.get(enemy)
 	var data: EnemyData = enemy.enemy_data if enemy != null else null
 	if combatant == null or data == null or combatant.hp <= 0:
 		return {}
 	_drop_lost_marks(enemy, combatant, data)
-	var preview: Dictionary = EnemyTurn.preview_intent(combatant, data, player)
+	var preview: Dictionary = EnemyTurn.preview_intent(combatant, data, player, state)
 	# A heal for packmates shows what it will actually heal - the same
 	# call the turn makes, without applying it.
 	if int(preview.get("type", -1)) == EnemyIntent.IntentType.HEAL_ALLY and not bool(preview.get("pain_turn", false)):
@@ -542,11 +557,15 @@ func _intent_preview_alone(enemy: FieldEnemy) -> Dictionary:
 	# alone would be lethal (EnemyTurn.simulate_hits()) - nothing, Denied
 	# or cancelled.
 	if int(preview.get("type", -1)) == EnemyIntent.IntentType.SIGNAL and not bool(preview.get("pain_turn", false)) and not bool(preview.get("denied", false)):
-		var answers: Array[int] = signal_answer_amounts(enemy)
+		var lists: Array = signal_answer_lists(enemy, state)
+		var answers: Array[int] = []
+		for list: Array[int] in lists:
+			answers.append_array(list)
 		var total: int = 0
 		for amount in answers:
 			total += amount
 		preview["answers"] = answers
+		preview["answer_lists"] = lists
 		preview["per_hit"] = total
 		var landed: Dictionary = EnemyTurn.simulate_hits(player, answers)
 		preview["damage_to_hp"] = int(landed["to_hp"])
@@ -554,12 +573,19 @@ func _intent_preview_alone(enemy: FieldEnemy) -> Dictionary:
 	return preview
 
 # What each living packmate of `enemy` would answer its SIGNAL with, in
-# member order (EnemyTurn.signal_answer_intent() - its first ATTACK, every
-# hit of it, as it would land now). Empty without a pack.
-func signal_answer_amounts(enemy: FieldEnemy) -> Array[int]:
-	var amounts: Array[int] = []
+# member order - one list of hits per answer (EnemyTurn.signal_answer_
+# intent() - its first ATTACK, every hit of it), as each would land:
+# replayed on `state` (EnemyTurn.replay_attack()), so they read and spend
+# the player's Unbroken, No Further's armed and the worn piece's first hit
+# as the answers do, the mate's own marks (Braced, Garnished on its own
+# intent) set by, as EnemyTurn.answer_signal() sets them by. Empty `state`
+# = the player as he stands. Empty without a pack.
+func signal_answer_lists(enemy: FieldEnemy, state: Dictionary = {}) -> Array:
+	var lists: Array = []
 	if enemy == null or enemy.group == &"":
-		return amounts
+		return lists
+	if state.is_empty():
+		state.merge(EnemyTurn.turn_state(player))
 	for member in enemies:
 		if member == enemy or member.group != enemy.group or member.enemy_data == null:
 			continue
@@ -569,9 +595,15 @@ func signal_answer_amounts(enemy: FieldEnemy) -> Array[int]:
 		var answer: EnemyIntent = EnemyTurn.signal_answer_intent(mate, member.enemy_data)
 		if answer == null:
 			continue
-		for hit in EnemyTurn.hit_count(mate, answer):
-			amounts.append(EnemyTurn.hit_amount(mate, member.enemy_data, answer, hit, player.statuses))
-	return amounts
+		var marked: Array[Status] = Status.marks(mate.statuses)
+		var at: Array[int] = []
+		for active in marked:
+			at.append(mate.statuses.find(active))
+			mate.statuses.erase(active)
+		lists.append(EnemyTurn.replay_attack(mate, member.enemy_data, answer, player, state))
+		for i in marked.size():
+			mate.statuses.insert(mini(at[i], mate.statuses.size()), marked[i])
+	return lists
 
 # What no longer holds on `enemy`'s intent (EnemyTurn.mark_loss() - the
 # intent replaced or cancelled since the card landed) leaves it, said
@@ -2526,6 +2558,14 @@ func intent_facts(enemy: FieldEnemy) -> Dictionary:
 	if intent.type == EnemyIntent.IntentType.SIGNAL and enemy.group != &"":
 		var answers: Array = []
 		var waking: int = 0
+		# Each answer's hits as they will land (signal_answer_lists(), in
+		# the same member order).
+		# A Signal that won't go (Denied, a pain turn) carries none: what they
+		# would answer with from where he stands.
+		var lists: Array = (facts["preview"] as Dictionary).get("answer_lists", [])
+		if lists.is_empty():
+			lists = signal_answer_lists(enemy)
+		var listed: int = 0
 		for member in enemies:
 			if member == enemy or member.group != enemy.group or member.enemy_data == null:
 				continue
@@ -2537,7 +2577,12 @@ func intent_facts(enemy: FieldEnemy) -> Dictionary:
 				continue
 			if mate.dormant:
 				waking += 1
-			answers.append([answer.intent_name, EnemyTurn.hit_amount(mate, member.enemy_data, answer, 0, player.statuses) * EnemyTurn.hit_count(mate, answer), member.enemy_data.enemy_name])
+			var landed: int = 0
+			if listed < lists.size():
+				for amount: int in lists[listed]:
+					landed += amount
+			listed += 1
+			answers.append([answer.intent_name, landed, member.enemy_data.enemy_name])
 		facts["answers"] = answers
 		facts["waking"] = waking
 	return facts

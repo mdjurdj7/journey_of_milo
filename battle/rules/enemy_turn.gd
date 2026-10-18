@@ -397,27 +397,32 @@ static func counter_strike(combatant: Combatant, data: EnemyData, player: Combat
 
 # What the queued intent WILL do if it resolves now, for the intent
 # display - the exact arithmetic take_turn() runs, on copies, mutating
-# nothing: the same two apply_modifiers() calls per hit, the one-shot
-# statuses consumed after the first hit (on a duplicate of the player's
-# status list - the Status objects themselves aren't touched), and the
-# block/absorb wear-down of DamagePipeline.resolve() replayed on local
-# counters. Keys: "type" (EnemyIntent.IntentType), "hits", "per_hit"
+# nothing real (replay_attack(), on `state`). Keys: "type"
+# (EnemyIntent.IntentType), "hits", "per_hit"
 # (the first hit's modified damage - the M of what "M×N" shows - or the block
 # gained for DEFEND, or the heal each packmate takes for HEAL_ALLY, as
 # authored: BattleController caps it at what they're missing),
 # "hit_amounts" (every hit's modified damage, in order - unequal when a
 # status on the player is consumed by the first hit, as No Further's 0
 # is), "damage_to_hp" (total that would reach HP through
-# block and absorb), "lethal" (it would take the player to 0 - replayed
-# hit by hit on a local HP, so a lethal guard keeps it off: each hit it
-# would save puts them at its survive HP, as many saves as it has
-# charges - Status.refuse_lethal()). Empty when the enemy has no intent.
+# block and absorb), "lethal" (it would take the player to 0 - these hits
+# alone from where he stands, simulate_hits(), so a lethal guard keeps it
+# off: each hit it would save puts them at its survive HP, as many saves
+# as it has charges - Status.refuse_lethal()). Empty when the enemy has
+# no intent.
 #
 # An ATTACK with an interrupt_threshold also carries "threshold" (what
 # breaks it now - interrupt_threshold()), "threshold_left" (what the
 # player still has to deal this turn, down to 0) and "interrupted" (it's
 # been met - the attack won't land, so never lethal).
-static func preview_intent(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
+#
+# `state` (turn_state()) is the player as the enemies before this one in
+# the coming turn leave him - what their hits spend (the worn piece's
+# first hit, Unbroken's and No Further's armed, Block) gone - and this
+# one's hits are read from it and spend from it in turn, so each enemy's
+# numbers are the ones that will land (BattleController's previews pass
+# one along in turn order). Empty = the player as he stands, alone.
+static func preview_intent(combatant: Combatant, data: EnemyData, player: Combatant, state: Dictionary = {}) -> Dictionary:
 	var intent := current_intent(combatant, data)
 	# Dormant: nothing shown until it wakes.
 	if intent == null or combatant.dormant:
@@ -460,18 +465,19 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 		preview["threshold"] = threshold
 		preview["threshold_left"] = maxi(threshold - combatant.damage_taken_this_turn, 0)
 		preview["interrupted"] = is_interrupted(combatant, intent)
-	var player_statuses: Array[Status] = player.statuses.duplicate()
-	var block: int = player.block
-	var absorb: int = player.absorb
-	var total_to_hp: int = 0
-	var hp: int = player.hp
-	var saves_used: int = 0
-	var first_hit_spent: bool = player.first_hit_spent
+	if state.is_empty():
+		state.merge(turn_state(player))
+	# What it would land, from where the enemies before it leave him; a
+	# move that won't land (Denied, broken) shows its hits but spends
+	# nothing of `state` - those after it read him as it found him.
+	var entry: Dictionary = copy_state(state)
+	var lands: bool = not denied and not bool(preview.get("interrupted", false))
+	var replay: Dictionary = state if lands else copy_state(state)
 	var hits: int = hit_count(combatant, intent)
 	var hit_amounts: Array[int] = []
-	# Every attack of the turn, replayed in turn on the same counters; a
-	# later one reads the enemy and the player as the one before left
-	# them - what an attack spends on either side gone.
+	# Every attack of the turn, replayed in turn on the same state; a later
+	# one reads the enemy as the one before left it - what an attack spends
+	# on either side gone.
 	var attacker: Combatant = combatant
 	# One that lands as a strike back (EnemyIntent.lands_as_strike_back -
 	# the Erupt) reads neither side's statuses that wait for the enemy's
@@ -480,39 +486,17 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	for action in times:
 		if action > 0:
 			attacker = _after_own_attack(combatant, data, intent)
-			Status.consume_after_attack_against(player_statuses, strike_back)
-		var own_seen: Array[Status] = Status.strike_back_view(attacker.statuses) if strike_back else attacker.statuses
-		var theirs_seen: Array[Status] = Status.strike_back_view(player_statuses) if strike_back else player_statuses
-		var reduction_left: int = Status.attack_total_reduction(own_seen) + Status.attack_total_reduction(theirs_seen)
-		for hit in hits:
-			var amount: int = hit_amount(attacker, data, intent, hit, player_statuses, strike_back)
-			var cut: int = reduce_hit(amount, reduction_left)
-			amount -= cut
-			reduction_left -= cut
-			if takes_first_hit(player.first_hit_scale, first_hit_spent, amount, block, absorb):
-				amount = scaled_first_hit(amount, player.first_hit_scale)
-				first_hit_spent = true
-			hit_amounts.append(amount)
-			if hit == 0 and action == 0:
-				preview["per_hit"] = amount
-			Status.consume_triggered(player_statuses)
-			var blocked: int = mini(block, amount)
-			var after_block: int = amount - blocked
-			var absorbed: int = mini(absorb, after_block)
-			block -= blocked
-			absorb -= absorbed
-			total_to_hp += after_block - absorbed
-			var was_critical: bool = player.is_critical_at(hp)
-			hp -= after_block - absorbed
-			if hp <= 0:
-				var guard: Status = Status.lethal_guard(player_statuses, was_critical)
-				if guard != null and saves_used < guard.charges:
-					hp = guard.data.survive_hp(player.max_hp, player.critical_hp_fraction)
-					saves_used += 1
+		hit_amounts.append_array(replay_attack(attacker, data, intent, player, replay, strike_back))
+	if not hit_amounts.is_empty():
+		preview["per_hit"] = hit_amounts[0]
 	preview["hits"] = hits * times
 	preview["hit_amounts"] = hit_amounts
-	preview["damage_to_hp"] = 0 if denied else total_to_hp
-	preview["lethal"] = hp <= 0 and not bool(preview.get("interrupted", false)) and not denied
+	# Alone: these hits from where he stands now - the warning across
+	# enemies (BattleController._lethal_together()) reads the turn as a
+	# whole.
+	var alone: Dictionary = simulate_hits(player, hit_amounts)
+	preview["damage_to_hp"] = 0 if denied else int(alone["to_hp"])
+	preview["lethal"] = bool(alone["lethal"]) and lands
 	# What lives on this intent (StatusData.intent_mark - Braced,
 	# Garnished): "marks", their names in order ("brace" before
 	# "garnish"), and the same intent as it would be without them -
@@ -529,7 +513,7 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 		for active in marked:
 			at.append(combatant.statuses.find(active))
 			combatant.statuses.erase(active)
-		var plain: Dictionary = preview_intent(combatant, data, player)
+		var plain: Dictionary = preview_intent(combatant, data, player, entry)
 		for i in marked.size():
 			combatant.statuses.insert(mini(at[i], combatant.statuses.size()), marked[i])
 		preview["original_hit_amounts"] = plain.get("hit_amounts", [])
@@ -561,6 +545,60 @@ static func simulate_hits(player: Combatant, amounts: Array[int]) -> Dictionary:
 				hp = guard.data.survive_hp(player.max_hp, player.critical_hp_fraction)
 				saves_used += 1
 	return {"to_hp": total_to_hp, "lethal": hp <= 0}
+
+# The player as the coming enemy turn finds him, for the previews to
+# spend from in turn (preview_intent()'s `state`): his statuses as
+# copies (Status.clones() - spending one here touches nothing real),
+# whether the worn piece's first hit is spent, Block, absorb, HP and the
+# lethal guard's saves used so far.
+static func turn_state(player: Combatant) -> Dictionary:
+	return {"statuses": Status.clones(player.statuses), "first_hit_spent": player.first_hit_spent, "block": player.block, "absorb": player.absorb, "hp": player.hp, "saves_used": 0}
+
+static func copy_state(state: Dictionary) -> Dictionary:
+	var copy: Dictionary = state.duplicate()
+	copy["statuses"] = Status.clones(state["statuses"])
+	return copy
+
+# One attack of `attacker`'s landing on `state` - land_attack()'s
+# arithmetic, replayed: each hit's damage (its modifiers, then the total
+# reductions soaked hit by hit - Garnished on it, Unbroken on him - then
+# the worn piece's first hit, if this is the first to get past Block and
+# absorb), worn through Block, absorb and HP, the lethal guard saving as
+# it would; then what lasted until an attack against him resolved (No
+# Further's, Unbroken's) goes. `state` is changed; nothing real is. The
+# hits' damage, in order.
+static func replay_attack(attacker: Combatant, data: EnemyData, intent: EnemyIntent, player: Combatant, state: Dictionary, strike_back: bool = false) -> Array[int]:
+	var theirs: Array[Status] = state["statuses"]
+	var own_seen: Array[Status] = Status.strike_back_view(attacker.statuses) if strike_back else attacker.statuses
+	var theirs_seen: Array[Status] = Status.strike_back_view(theirs) if strike_back else theirs
+	var reduction_left: int = Status.attack_total_reduction(own_seen) + Status.attack_total_reduction(theirs_seen)
+	var amounts: Array[int] = []
+	for hit in hit_count(attacker, intent):
+		var amount: int = hit_amount(attacker, data, intent, hit, theirs, strike_back)
+		var cut: int = reduce_hit(amount, reduction_left)
+		amount -= cut
+		reduction_left -= cut
+		if takes_first_hit(player.first_hit_scale, bool(state["first_hit_spent"]), amount, int(state["block"]), int(state["absorb"])):
+			amount = scaled_first_hit(amount, player.first_hit_scale)
+			state["first_hit_spent"] = true
+		amounts.append(amount)
+		Status.consume_triggered(theirs)
+		var blocked: int = mini(int(state["block"]), amount)
+		var after_block: int = amount - blocked
+		var absorbed: int = mini(int(state["absorb"]), after_block)
+		state["block"] = int(state["block"]) - blocked
+		state["absorb"] = int(state["absorb"]) - absorbed
+		var hp: int = int(state["hp"])
+		var was_critical: bool = player.is_critical_at(hp)
+		hp -= after_block - absorbed
+		if hp <= 0:
+			var guard: Status = Status.lethal_guard(theirs, was_critical)
+			if guard != null and int(state["saves_used"]) < guard.charges:
+				hp = guard.data.survive_hp(player.max_hp, player.critical_hp_fraction)
+				state["saves_used"] = int(state["saves_used"]) + 1
+		state["hp"] = hp
+	Status.consume_after_attack_against(theirs, strike_back)
+	return amounts
 
 # One Attack card has been played against this living enemy: while its
 # queued intent counts them (EnemyIntent.counts_attack_cards - the
