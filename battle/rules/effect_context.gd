@@ -88,6 +88,9 @@ var on_damage: Callable = Callable()
 # effect actually lands damage.
 
 var on_block: Callable = Callable()
+# Called as on_block_gained.call(amount) when the player gains Block
+# (gain_block()) - the view's number for it.
+var on_block_gained: Callable = Callable()
 # Called as on_repeat.call() when a hit is about to land again (Card
 # Effect.repeat_toll_cost - Second Swing), before its Toll is spent: what
 # the card reports from then on is the repeat's, which the view presents
@@ -173,6 +176,8 @@ func gain_block(amount: int) -> int:
 		return 0
 	player.block += amount
 	RunLogger.block_gained(amount)
+	if on_block_gained.is_valid():
+		on_block_gained.call(amount)
 	return amount
 
 # This context for reading one card still in hand whose costs come to

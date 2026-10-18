@@ -27,6 +27,9 @@ enum Outcome { WIN, LOSE, ESCAPE }
 signal battle_finished(outcome: Outcome)
 
 @export var enemy_head_height: float = 1.8
+# The Wanderer's numbers start over his body: his feet plus this many
+# metres, unprojected - clear of his HP bar under his feet.
+@export var wanderer_number_height: float = 2.0
 # Every card's own shared "played" cue (see _on_card_played()) - fires the
 # instant a card commits to play, independent of that card's own
 # impact_time delay (the swing and the enemy's contact crack are the
@@ -208,6 +211,11 @@ var _number_life: float = -1.0
 var _number_counts: Dictionary = {}
 # A Toll blow's Toll as it landed, for its toll_changed; -1 = none.
 var _toll_blow_from: int = -1
+# The Toll last read out, for the number a gain shows (_on_toll_changed());
+# -1 until the fight's first.
+var _shown_toll: int = -1
+# The Wanderer, for his numbers' anchor (_screen_pos_for_damage_target()).
+var _wanderer: Wanderer = null
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
 # One BattleIntent per enemy for this fight - children of this overlay,
 # so they're freed with it and nothing of them exists on the field.
@@ -336,6 +344,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 		(theme as BattleTheme).apply_value_set(on_dark_world)
 
 	_battle_transition_time = battle_transition_time
+	_wanderer = wanderer
 
 	_field_hp_bar = field_hp_bar
 	_field_hp_bar.enter_battle(battle_transition_time)
@@ -374,6 +383,13 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.stance_changed.connect(_on_stance_changed)
 	battle_controller.enemy_hp_changed.connect(_on_enemy_hp_changed)
 	battle_controller.damage_dealt.connect(_on_damage_dealt)
+	battle_controller.combat_text.connect(_show_number)
+	# A hit a block took whole shows BLOCKED on whoever's block it was.
+	battle_controller.enemy_hit_blocked.connect(func(enemy: FieldEnemy, absorbed: bool) -> void:
+		if absorbed:
+			_show_number(enemy, 0, FloatingNumber.KIND_BLOCKED))
+	battle_controller.player_hit_blocked.connect(func(_enemy: FieldEnemy) -> void:
+		_show_number("player", 0, FloatingNumber.KIND_BLOCKED))
 	battle_controller.enemy_intent_changed.connect(_on_enemy_intent_changed)
 	battle_controller.energy_changed.connect(hand_container.update_playable)
 	battle_controller.energy_changed.connect(_on_energy_changed)
@@ -622,6 +638,9 @@ func get_readout_rects() -> Array[Rect2]:
 # EnemyStatus's style tween takes - every display with an intent shows.
 func _reveal_enemy_intents() -> void:
 	_intents_revealed = true
+	# The fight's opening Block (the held pieces') shows as the frame settles.
+	if battle_controller != null and battle_controller.opening_block_gained > 0:
+		_show_number("player", battle_controller.opening_block_gained, FloatingNumber.KIND_BLOCK)
 	for intent: BattleIntent in _enemy_intents.values():
 		if is_instance_valid(intent):
 			intent.set_revealed(true)
@@ -681,6 +700,10 @@ func _refresh_cost_preview() -> void:
 	_resources.set_cost_preview(cost)
 
 func _on_toll_changed(new_toll: int) -> void:
+	# A gain shows its "+N" over the Wanderer, beside the readout's pop.
+	if _shown_toll >= 0 and new_toll > _shown_toll:
+		_show_number("player", new_toll - _shown_toll, FloatingNumber.KIND_TOLL)
+	_shown_toll = new_toll
 	# A Toll blow's spend pours into its hit: counted down, not snapped.
 	var drained_from: int = _toll_blow_from
 	_toll_blow_from = -1
@@ -1046,10 +1069,18 @@ func _lowest_intent_height() -> float:
 # The number waits with its enemy's hit reaction when a play effect paces
 # them (BattleFeedback.reaction_delay()) - on scaled time, like the
 # reaction - and is placed when it shows.
-func _on_damage_dealt(_source: Variant, target: Variant, amount: int, _kind: String) -> void:
+func _on_damage_dealt(_source: Variant, target: Variant, amount: int, kind: String) -> void:
+	var number_kind: String = FloatingNumber.KIND_DAMAGE
+	if not (target is FieldEnemy):
+		number_kind = FloatingNumber.KIND_SELF if kind == "self" else FloatingNumber.KIND_HP_LOST
+	_show_number(target, amount, number_kind)
+
+# A number of `kind` (FloatingNumber's KIND_*) for `amount` on `target` -
+# a FieldEnemy or "player" - shown over its body.
+func _show_number(target: Variant, amount: int, kind: String) -> void:
 	var delay: float = _battle_feedback.reaction_delay(target) if _battle_feedback != null else 0.0
 	# Read in the hit's own frame, while its card is still the impact's.
-	var size: float = _battle_feedback.number_scale(target, amount) if _battle_feedback != null else 1.0
+	var size: float = _battle_feedback.number_scale(target, amount) if _battle_feedback != null and kind == FloatingNumber.KIND_DAMAGE else 1.0
 	var offset: Vector2 = repeat_number_offset if _repeat_impact and target is FieldEnemy else Vector2.ZERO
 	if delay > 0.0:
 		await get_tree().create_timer(delay).timeout
@@ -1075,7 +1106,7 @@ func _on_damage_dealt(_source: Variant, target: Variant, amount: int, _kind: Str
 		var body: Rect2 = (target as FieldEnemy).get_screen_rect(camera, 0.0) if camera != null else Rect2()
 		if body.has_area():
 			ceiling = body.position.y - number_over_body_px
-	_spawn_floating_number(amount, _screen_pos_for_damage_target(target) + offset, size, avoid, stack, ceiling)
+	_spawn_floating_number(kind, amount, _screen_pos_for_damage_target(target) + offset, size, avoid, stack, ceiling)
 
 # A repeated hit's follow-up swing (Second Swing): the toll tick, if one
 # is on disk.
@@ -1100,9 +1131,11 @@ func _screen_pos_for_damage_target(target: Variant) -> Vector2:
 		var camera := get_viewport().get_camera_3d()
 		if camera != null:
 			return camera.unproject_position((target as FieldEnemy).global_position + Vector3.UP * enemy_head_height)
-	# "player" (or anything else without a 3D position this overlay can
-	# reach) - anchor near the field HP bar instead of unprojecting a
-	# Wanderer position this overlay has no reference to.
+	# "player": over the Wanderer's body.
+	if _wanderer != null and is_instance_valid(_wanderer):
+		var camera := get_viewport().get_camera_3d()
+		if camera != null:
+			return camera.unproject_position(_wanderer.global_position + Vector3.UP * wanderer_number_height)
 	return _field_hp_bar.global_position + Vector2(_field_hp_bar.size.x / 2.0, _field_hp_bar.size.y + 20.0)
 
 # The debug row's WIN/LOSE/ESCAPE: the same ending, marked as not the
@@ -1224,10 +1257,10 @@ func _number_seconds() -> float:
 # room on screen, when its path would cross one; then `stack` on from
 # there (a multi-hit's step), so the numbers of one target never land on
 # one spot.
-func _spawn_floating_number(value: int, screen_pos: Vector2, size_multiplier: float = 1.0, avoid: Array[Rect2] = [], stack: Vector2 = Vector2.ZERO, ceiling: float = INF) -> void:
+func _spawn_floating_number(kind: String, value: int, screen_pos: Vector2, size_multiplier: float = 1.0, avoid: Array[Rect2] = [], stack: Vector2 = Vector2.ZERO, ceiling: float = INF) -> void:
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
 	add_child(number)
-	var size: Vector2 = number.measure(value, size_multiplier)
+	var size: Vector2 = number.measure(kind, value, size_multiplier)
 	var at: Vector2 = screen_pos
 	at.y = minf(at.y, ceiling - size.y)
 	var path := Rect2(Vector2(at.x, at.y - number.rise_px), Vector2(size.x, size.y + number.rise_px)).grow(number_clearance_px)
@@ -1242,7 +1275,7 @@ func _spawn_floating_number(value: int, screen_pos: Vector2, size_multiplier: fl
 	# Its whole rise on screen.
 	var start: Vector2 = at + stack
 	start.y = maxf(start.y, number.rise_px + number_clearance_px)
-	number.show_value(value, start, size_multiplier)
+	number.show_value(kind, value, start, size_multiplier)
 
 # Debug: flips the theme between its on-pale and on-dark value sets and
 # re-reads every battle readout's colours - the cards don't take part

@@ -97,6 +97,9 @@ var first_card_free: bool = false
 # fight (critical_entry_block drops to 0).
 var critical_entry_block: int = 0
 var critical_entry_armed: bool = false
+# The Critical-entry Block given and not yet shown - the controller reads
+# and clears it once the action that gave it has reported.
+var entry_block_unreported: int = 0
 # The worn piece's first hit (TrinketData.first_hit_scale): below 1, the
 # first enemy attack hit this fight that would get past Block and absorb
 # is scaled by it, rounded down, before Block takes its share - see
@@ -267,4 +270,5 @@ func resolve_critical_entry() -> int:
 		return 0
 	block += amount
 	RunLogger.block_gained(amount)
+	entry_block_unreported += amount
 	return amount

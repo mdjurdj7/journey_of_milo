@@ -428,8 +428,9 @@ func begin_combat() -> void:
 # A fight was won (not escaped): the keepsake's heal_on_win, and its
 # heal_on_win_after_loss if the fight actually cost HP - one heal, so the
 # max-HP cap applies to the sum. Called by RegionField._on_battle_
-# finished()'s WIN branch.
-func settle_keepsake_win() -> void:
+# finished()'s WIN branch. Returns the HP it gave back, for its number.
+func settle_keepsake_win() -> int:
+	var healed: int = 0
 	for piece in held_pieces():
 		var amount: int = piece.heal_on_win
 		if hp_lost_this_combat > 0:
@@ -438,7 +439,9 @@ func settle_keepsake_win() -> void:
 			continue
 		var before: int = player_hp
 		heal(amount)
+		healed += player_hp - before
 		RunLogger.player_healed(player_hp - before, "keepsake:" + String(piece.id))
+	return healed
 
 # The run's one card-grant path (rewards, the Keeper's offer, a find on
 # the sand). The deck holds a COPY, never the pool's own resource - the

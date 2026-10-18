@@ -85,6 +85,14 @@ signal enemy_hit_blocked(enemy: FieldEnemy, absorbed: bool)
 # One hit of `enemy`'s attack the player's Block or absorb took whole: no
 # damage_dealt for it - BattleFeedback's blocked stop and armored sound.
 signal player_hit_blocked(enemy: FieldEnemy)
+# Something a combatant gained that no damage_dealt carries, for its
+# floating number: `kind` "heal" (HP back - a card's heal or Drain, Grace
+# reclaimed, Devour, a lethal guard's lift, a packmate's Forage) or
+# "block" (Block gained - a card, the Critical-entry keepsake, an enemy's
+# Defend). `target` as damage_dealt's: "player" or a FieldEnemy. Sent in
+# the frame its readout moves. The fight's opening Block is read instead
+# (opening_block_gained), shown as the intents reveal.
+signal combat_text(target: Variant, amount: int, kind: String)
 # source/target are each either the String "player" or a FieldEnemy node -
 # whichever combatant actually dealt/received the hit.
 # An enemy's death begins. Its HP reached 0 on a hit some time before:
@@ -258,6 +266,9 @@ var _win_waiting: bool = false
 # Set by the resolving card's EffectContext.on_repeat: its reports from
 # then on are the repeat's, held here until its own impact (_land_repeat()).
 var _repeat_pending: bool = false
+# The Block the held pieces opened the fight with (TrinketData.combat_
+# start_block) - BattleOverlay shows it once the battle frame settles.
+var opening_block_gained: int = 0
 var _repeat_reports: Array[Callable] = []
 # While a card's own effects resolve: a kill only notes that the packs
 # need looking at (_pack_check_due), and _mark_lone_pack_members() runs
@@ -327,6 +338,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		player.first_hit_scale = minf(player.first_hit_scale, clampf(piece.first_hit_scale, 0.0, 1.0))
 		player.hit_back_damage += maxi(piece.hit_back_damage, 0)
 	player.block += opening_block
+	opening_block_gained = opening_block
 	if not held.is_empty():
 		# Opening already Critical is not entering it.
 		player.critical_entry_armed = not player.is_critical()
@@ -987,6 +999,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		_report_or_hold(_report_damage.bind("player", target_combatant, amount, kind))
 	ctx.on_block = func(target_combatant: Combatant, blocked: int, damage_to_hp: int) -> void:
 		_report_or_hold(_report_block.bind(target_combatant, blocked, damage_to_hp))
+	ctx.on_block_gained = func(amount: int) -> void:
+		_report_or_hold(combat_text.emit.bind("player", amount, "block"))
 	ctx.on_repeat = func() -> void:
 		_repeat_pending = true
 	# Bide's chosen cards: their own views leave the hand just before the
@@ -1005,6 +1019,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	_deferring_pack_check = true
 	_effect_resolver.resolve_card(card, ctx)
 	_deferring_pack_check = false
+	_report_entry_block()
 	if _pack_check_due:
 		_pack_check_due = false
 		_mark_lone_pack_members()
@@ -1375,6 +1390,7 @@ func _devour_card(card_view: CardView, route: String) -> void:
 	if player.hp > hp_before:
 		_heal_run_hp(player.hp - hp_before, "devour")
 		hp_changed.emit(player.hp, player.max_hp)
+		combat_text.emit("player", player.hp - hp_before, "heal")
 	RunLogger.event("devour", {"card": card.card_name, "playable": playable, "route": route, "energy": energy_spent, "hp_before": hp_before, "hp_after": player.hp})
 	# HP moved: the lethal flags follow, and a Critical line it may have
 	# left.
@@ -1572,6 +1588,7 @@ func _run_sequential_turn() -> void:
 				var move_delay: float = _play_defend_move(enemy, intent)
 				if move_delay > 0.0:
 					await get_tree().create_timer(move_delay).timeout
+			_report_enemy_block(enemy, result)
 		# A charge spent lets the rear down first, then any burrow carries on
 		# from there. A broken one is already down - it dropped on the card
 		# that broke it (_resolve_play()), so this waits on nothing and the
@@ -1650,6 +1667,9 @@ func _run_simultaneous_turn() -> void:
 	while _reports_running > 0:
 		await get_tree().process_frame
 	_hp_owed = 0
+	for enemy in acting:
+		if results[enemy]["defended"]:
+			_report_enemy_block(enemy, results[enemy])
 	status_changed.emit()
 	for enemy in acting:
 		_show_roused(enemy)
@@ -1763,6 +1783,7 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 			if not is_instance_valid(enemy):
 				return
 		_report_enemy_hit(enemy, hits[i] as Dictionary, hits.size() > 1)
+	_report_entry_block()
 	if result["grace_opened"] > 0:
 		RunLogger.grace_opened(result["grace_opened"])
 		grace_changed.emit(player.grace)
@@ -1800,6 +1821,7 @@ func _report_enemy_hit(enemy: FieldEnemy, hit: Dictionary, multi: bool) -> void:
 		_hp_owed += lift
 		_heal_run_hp(lift, "lethal_guard")
 		hp_changed.emit(shown_player_hp(), player.max_hp)
+		combat_text.emit("player", lift, "heal")
 
 # The body's pose for its queued intent (FieldEnemy.set_rearing()):
 # reared while an intent that asks for it (EnemyIntent.rear_while_
@@ -1952,6 +1974,9 @@ func _start_player_turn() -> void:
 		if ticking.data == null or ticking.data.tick_is_self_loss:
 			if lost > 0:
 				player.gain_self_loss_toll(lost)
+				# A tick has no contact: its number, nothing else (BattleFeedback
+				# reacts to an enemy's or a card's hit only).
+				damage_dealt.emit("player", "player", lost, "self")
 				_lose_run_hp(lost, "status")
 				hp_changed.emit(player.hp, player.max_hp)
 				toll_changed.emit(player.toll)
@@ -1965,9 +1990,11 @@ func _start_player_turn() -> void:
 				lost = maxi(hp_before - player.hp, 0)
 				saved_heal = maxi(player.hp - hp_before, 0)
 			if lost > 0:
+				damage_dealt.emit("player", "player", lost, "status")
 				_lose_run_hp(lost, ticking.data.id)
 			if saved_heal > 0:
 				_heal_run_hp(saved_heal, "lethal_guard")
+				combat_text.emit("player", saved_heal, "heal")
 			if lost > 0 or saved_heal > 0:
 				hp_changed.emit(player.hp, player.max_hp)
 		RunLogger.pop_source()
@@ -1993,6 +2020,7 @@ func _start_player_turn() -> void:
 	Status.resolve_turn_start_triggers(player.statuses)
 	# A tick that took them into Critical counts like any other HP loss.
 	Status.resolve_critical_triggers(player)
+	_report_entry_block()
 	status_changed.emit()
 	# The enemy turn may have buried or surfaced someone.
 	_push_enemy_target_available()
@@ -2115,6 +2143,7 @@ func _living_enemy_combatants() -> Array[Combatant]:
 func _on_card_heal(amount: int) -> void:
 	_heal_run_hp(amount)
 	hp_changed.emit(player.hp, player.max_hp)
+	combat_text.emit("player", amount, "heal")
 
 func _on_grace_reclaimed(amount: int) -> void:
 	var before: int = RunState.player_hp
@@ -2122,6 +2151,7 @@ func _on_grace_reclaimed(amount: int) -> void:
 	RunLogger.grace_reclaimed(RunState.player_hp - before)
 	hp_changed.emit(player.hp, player.max_hp)
 	grace_changed.emit(player.grace)
+	combat_text.emit("player", amount, "heal")
 
 # End of the player's turn: the window ages, and whatever Grace is left
 # when it runs out is gone. Runs BEFORE the enemy turn (see end_turn()),
@@ -2137,6 +2167,21 @@ func _close_grace_window() -> void:
 	RunLogger.grace_lost(player.grace)
 	player.grace = 0
 	grace_changed.emit(0)
+
+# The Critical-entry Block the keepsake gave since the last report
+# (Combatant.entry_block_unreported) - its number, once the action that
+# crossed the line has shown.
+func _report_entry_block() -> void:
+	var gained: int = player.entry_block_unreported
+	player.entry_block_unreported = 0
+	if gained > 0:
+		combat_text.emit("player", gained, "block")
+
+# An enemy's Defend has gone up (its move landed): its Block's number.
+func _report_enemy_block(enemy: FieldEnemy, result: Dictionary) -> void:
+	var gained: int = int(result.get("block_gained", 0))
+	if gained > 0 and is_instance_valid(enemy):
+		combat_text.emit(enemy, gained, "block")
 
 # EffectContext.on_block: a hit of the player's met an enemy's block.
 func _report_block(target_combatant: Combatant, _blocked: int, damage_to_hp: int) -> void:
@@ -2333,6 +2378,7 @@ func _heal_packmates(enemy: FieldEnemy, amount: int, apply: bool) -> int:
 			combatant.hp += heal
 			RunLogger.enemy_hp_seen(combatant.get_instance_id(), combatant.hp)
 			enemy_hp_changed.emit(other, combatant.hp, combatant.max_hp)
+			combat_text.emit(other, heal, "heal")
 	return healed
 
 func _has_living_packmate(enemy: FieldEnemy) -> bool:

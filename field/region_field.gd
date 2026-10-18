@@ -150,6 +150,9 @@ enum RewardMode { SCREEN, WORLD }
 @export var directional_light_path: NodePath = ^"DirectionalLight3D"
 @export var exit_gate_path: NodePath = ^"ExitGate"
 @export var sky_path: NodePath = ^"WorldEnvironment"
+# The keepsake's win heal shows its number over the Wanderer on FieldHUD
+# (_show_keepsake_heal()): his feet plus this many metres, unprojected.
+@export var keepsake_heal_number_height: float = 2.0
 
 @export_group("Floor Transition")
 # Where the floor ends: the ExitGate's own TriggerArea, this far along
@@ -2978,6 +2981,24 @@ func _say_near_enemy(enemy: FieldEnemy, text: String) -> void:
 		return
 	line.show_line_near(text, enemy_world_line_seconds, enemy, Vector3.UP * (enemy.get_head_height() + enemy_world_line_head_clearance))
 
+# The keepsake's win heal (RunState.settle_keepsake_win()): its "+N" over
+# the Wanderer on FieldHUD, after `delay` (the camera's way back), placed
+# as it shows.
+func _show_keepsake_heal(amount: int, delay: float) -> void:
+	if amount <= 0:
+		return
+	if delay > 0.0:
+		await get_tree().create_timer(delay).timeout
+	var hud := get_node_or_null(^"FieldHUD") as CanvasLayer
+	var camera := get_viewport().get_camera_3d()
+	if hud == null or camera == null or not is_instance_valid(wanderer):
+		return
+	var number := (load(BattleOverlay.FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
+	hud.add_child(number)
+	var size: Vector2 = number.measure(FloatingNumber.KIND_HEAL, amount)
+	var at: Vector2 = camera.unproject_position(wanderer.global_position + Vector3.UP * keepsake_heal_number_height)
+	number.show_value(FloatingNumber.KIND_HEAL, amount, at - Vector2(size.x / 2.0, size.y))
+
 func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay) -> void:
 	# The fight's log line first - HP and Toll as the fight left them,
 	# before any keepsake heal. Toll carries on in full to the floor's next
@@ -3020,8 +3041,9 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 	match outcome:
 		BattleOverlay.Outcome.WIN:
 			RunState.fights_won += 1
-			# A win, not an escape: the keepsake's heal_on_win, if any.
-			RunState.settle_keepsake_win()
+			# A win, not an escape: the keepsake's heal_on_win, if any - its
+			# number once the camera is back on the field.
+			_show_keepsake_heal(RunState.settle_keepsake_win(), camera_rig.battle_transition_time if camera_rig != null else 0.0)
 			# The reward lands where the last of them fell. Read off the
 			# body still standing when there is one (the last kill, or a
 			# debug win with nobody hurt) BEFORE it is freed - the spread

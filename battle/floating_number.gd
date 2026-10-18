@@ -1,9 +1,11 @@
 extends Label
 class_name FloatingNumber
 
-# A placeholder rising number - reacts to BattleController's own
-# damage_dealt signal (see battle_overlay.gd), nothing else. Rises and
-# fades over its own exported time, then frees itself.
+# A rising number over the body it happened to - BattleOverlay spawns one
+# for each damage_dealt, combat_text (heal, Block), a hit a block took
+# whole and a Toll gain. Rises and fades over its own exported time, then
+# frees itself. `kind` (KIND_*) says which, and what it reads as
+# (text_for()).
 #
 # Color is read from the theme's own CardFace tokens, not hardcoded or
 # left at Label's default white: panel_color is exactly "charcoal on a
@@ -15,6 +17,17 @@ class_name FloatingNumber
 # it survives either ground tone.
 
 const FONT_PATH := "res://assets/fonts/Spectral-SemiBold.ttf"
+
+# Damage dealt to an enemy; HP an enemy's hit (or a tick) took from the
+# Wanderer; HP his own effect took; HP back; Block gained; a hit a block
+# took whole; Toll gained.
+const KIND_DAMAGE := "damage"
+const KIND_HP_LOST := "hp_lost"
+const KIND_SELF := "self"
+const KIND_HEAL := "heal"
+const KIND_BLOCK := "block"
+const KIND_BLOCKED := "blocked"
+const KIND_TOLL := "toll"
 
 @export var rise_px: float = 60.0
 @export var duration_sec: float = 0.6
@@ -39,9 +52,20 @@ func _ready() -> void:
 	add_theme_color_override("font_outline_color", get_theme_color("text_color", "CardFace"))
 	add_theme_constant_override("outline_size", outline_size_px)
 
+# What a number of `kind` reads as for `value`.
+static func text_for(kind: String, value: int) -> String:
+	match kind:
+		KIND_HP_LOST, KIND_SELF:
+			return "\u2212%d" % value
+		KIND_HEAL, KIND_TOLL:
+			return "+%d" % value
+		KIND_BLOCKED:
+			return "BLOCKED"
+	return str(value)
+
 # The size it will show `value` at - for placing it before it shows.
-func measure(value: int, size_multiplier: float = 1.0) -> Vector2:
-	text = str(value)
+func measure(kind: String, value: int, size_multiplier: float = 1.0) -> Vector2:
+	text = text_for(kind, value)
 	add_theme_font_size_override("font_size", roundi(float(font_size_px) * size_multiplier))
 	reset_size()
 	return size
@@ -50,8 +74,8 @@ func measure(value: int, size_multiplier: float = 1.0) -> Vector2:
 # (BattleFeedback.number_scale()). Shown in the frame its hit's stop
 # starts, it punches in about its own centre (punch_scale, punch_time_sec)
 # as it rises.
-func show_value(value: int, screen_pos: Vector2, size_multiplier: float = 1.0) -> void:
-	text = str(value)
+func show_value(kind: String, value: int, screen_pos: Vector2, size_multiplier: float = 1.0) -> void:
+	text = text_for(kind, value)
 	add_theme_font_size_override("font_size", roundi(float(font_size_px) * size_multiplier))
 	position = screen_pos
 	reset_size()
