@@ -340,13 +340,14 @@ class_name HPBar
 
 @export_group("Block Readout")
 # While block is up it reads in the HP row, LEFT of the HP numeral: the
-# card's open-shield glyph, then the block value beside it in Spectral at
-# the HP numeral's own size, full ink, on the same baseline. Hidden at 0.
-# The readout grows leftward for it - the HP block stays put on the
-# anchor.
+# card's open-shield glyph with the block value set inside it, centred, in
+# Spectral at block_value_size_px over a bone halo (the theme's) - the
+# enemy plates' way (EnemyStatus). Hidden at 0. The readout grows leftward
+# for it - the HP block stays put on the anchor.
 #
-# The shield's size: its height is ~1.85 x half of this.
-@export var block_glyph_size_px: float = 28.0:
+# The shield's size: its height is ~1.85 x half of this - room for the
+# value inside.
+@export var block_glyph_size_px: float = 46.0:
 	set(value):
 		block_glyph_size_px = value
 		_relayout_block()
@@ -361,15 +362,28 @@ class_name HPBar
 	set(value):
 		block_glyph_baseline_lift = value
 		_relayout_block()
-# The value's size; 0 = the HP numeral's (battle_numeral_size_px).
-@export var block_value_size_px: int = 0:
+# The value's size inside the shield; 0 = the HP numeral's (battle_
+# numeral_size_px).
+@export var block_value_size_px: int = 24:
 	set(value):
 		block_value_size_px = value
 		_relayout_block()
-# Between the shield and the value after it.
-@export var block_glyph_value_gap_px: float = 6.0:
+# Two digits or more: the value at this fraction of its size.
+@export_range(0.5, 1.0) var block_multi_digit_scale: float = 0.85:
 	set(value):
-		block_glyph_value_gap_px = value
+		block_multi_digit_scale = value
+		_relayout_block()
+# The value's baseline sits this fraction of its size below the shield's
+# centre, which centres its cap height on the shield.
+@export var block_value_baseline_drop: float = 0.33:
+	set(value):
+		block_value_baseline_drop = value
+		_relayout_block()
+# The halo under the value's ink, this many px each side, in the theme's
+# bone - over the shield's line, under the ink.
+@export var block_halo_px: float = 2.0:
+	set(value):
+		block_halo_px = value
 		_relayout_block()
 # The shield's ink alpha; the value is always full ink.
 @export_range(0.0, 1.0) var block_readout_alpha: float = 0.7:
@@ -649,21 +663,25 @@ func _block_readout_width() -> float:
 		return 0.0
 	return _block_group_width() + block_hp_gap_px
 
-# The group's own width: the shield, its gap, and the value - the wider
-# of the value and the one fading out while a crossfade runs, so neither
+# The group's own width: the shield, or the value inside it if that is
+# wider - the fading-out value's too while a crossfade runs, so neither
 # ever reaches toward the HP numeral.
 func _block_group_width() -> float:
-	var value_width: float = _block_value_width(_block)
+	var width: float = maxf(block_glyph_size_px, _block_value_width(_block))
 	if _block_prev > 0 and _block_fade < 1.0:
-		value_width = maxf(value_width, _block_value_width(_block_prev))
-	return block_glyph_size_px + block_glyph_value_gap_px + value_width
+		width = maxf(width, _block_value_width(_block_prev))
+	return width
 
-# The value's size: block_value_size_px, or the HP numeral's.
-func _block_value_size() -> int:
-	return block_value_size_px if block_value_size_px > 0 else battle_numeral_size_px
+# The value's size: block_value_size_px (or the HP numeral's), held to
+# block_multi_digit_scale of it from two digits up.
+func _block_value_size(value: int = 0) -> int:
+	var base: int = block_value_size_px if block_value_size_px > 0 else battle_numeral_size_px
+	if str(value).length() >= 2:
+		return maxi(roundi(float(base) * block_multi_digit_scale), 1)
+	return base
 
 func _block_value_width(value: int) -> float:
-	return InkType.width(numeral_font, str(value), _block_value_size())
+	return InkType.width(numeral_font, str(value), _block_value_size(value)) + maxf(block_halo_px, 0.0) * 2.0
 
 # Shield glyph (the card's guard glyph, CardView._draw_glyph()) at the
 # group's left, level with the HP numeral's cap centre, at block_readout_
@@ -675,24 +693,32 @@ func _draw_block_readout(baseline: float, ink: Color) -> void:
 	var color: Color = ink
 	color.a *= block_readout_alpha
 	var r: float = block_glyph_size_px * 0.5
-	var centre := Vector2(r, baseline - float(battle_numeral_size_px) * block_glyph_baseline_lift)
+	var centre := Vector2(_block_group_width() * 0.5, baseline - float(battle_numeral_size_px) * block_glyph_baseline_lift)
 	var shield := PackedVector2Array([
 		centre + Vector2(-r * 0.8, -r * 0.9), centre + Vector2(r * 0.8, -r * 0.9), centre + Vector2(r * 0.8, r * 0.1),
 		centre + Vector2(0.0, r * 0.95), centre + Vector2(-r * 0.8, r * 0.1), centre + Vector2(-r * 0.8, -r * 0.9),
 	])
 	draw_polyline(shield, color, block_glyph_line_width_px, true)
-	var value_left: float = block_glyph_size_px + block_glyph_value_gap_px
 	if _block_prev > 0 and _block_fade < 1.0:
-		_draw_block_value(_block_prev, Vector2(value_left, baseline), ink, 1.0 - _block_fade)
-	_draw_block_value(_block, Vector2(value_left, baseline), ink, _block_fade)
+		_draw_block_value(_block_prev, centre, ink, 1.0 - _block_fade)
+	_draw_block_value(_block, centre, ink, _block_fade)
 
-# One value, its baseline-left at `origin`, at `alpha`.
-func _draw_block_value(value: int, origin: Vector2, ink: Color, alpha: float) -> void:
+# One value inside the shield, centred on `centre`: its halo first (over
+# the shield's line, under the ink), then the ink, both at `alpha`.
+func _draw_block_value(value: int, centre: Vector2, ink: Color, alpha: float) -> void:
 	if alpha <= 0.0:
 		return
+	var text: String = str(value)
+	var size_px: int = _block_value_size(value)
+	var width: float = InkType.width(numeral_font, text, size_px)
+	var origin := Vector2(centre.x - width * 0.5, centre.y + float(size_px) * block_value_baseline_drop)
+	if block_halo_px > 0.0 and numeral_font != null:
+		var halo: Color = get_theme_color("bone", "Battle")
+		halo.a *= alpha * _battle_blend
+		draw_string_outline(numeral_font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, roundi(block_halo_px * 2.0), halo)
 	var fill: Color = ink
 	fill.a *= alpha
-	InkType.draw_run(self, numeral_font, str(value), origin, _block_value_size(), fill)
+	InkType.draw_run(self, numeral_font, text, origin, size_px, fill)
 
 func _relayout_block() -> void:
 	if is_node_ready():
