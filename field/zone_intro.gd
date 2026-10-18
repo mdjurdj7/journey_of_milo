@@ -58,7 +58,9 @@ class_name ZoneIntro
 # new_run()) and reloads the field - its floor, model and HUD all built
 # for the class - which comes up on the held title frame again, without
 # its menu, and plays out of it exactly as Start did (start_held_title(),
-# raised by RunState.title_start_pending). The run the title was held on,
+# raised by RunState.title_start_pending). The reload never shows: the
+# last drawn frame of the old field is held over it (FreezeFrame, on the
+# tree's root) until the new field's own held frame has drawn under it. The run the title was held on,
 # untouched, leaves no log (RunLogger.end_run()'s empty-run rule). Empty
 # path: Start plays straight from the held frame (start_from_title()).
 
@@ -202,6 +204,12 @@ const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 @export var title_fog_open_seconds: float = 0.8
 # The menu shown while the title is held (a TitleMenu CanvasLayer).
 @export var title_menu_scene_path: String = "res://ui/title_menu.tscn"
+# After a character select's reload: how many frames the new field's
+# held title frame draws under the freeze frame before it comes down,
+# and how long it takes to go (0: at once). The fog only starts opening
+# after.
+@export var freeze_settle_frames: int = 2
+@export var freeze_release_seconds: float = 0.0
 # What Start opens before the run begins (a CharacterSelect), loaded at
 # each Start. Empty: Start plays the intro from the held frame, with the
 # run the title was held on. Read at Start, so an edit takes effect on
@@ -312,15 +320,31 @@ func hold_title() -> bool:
 	return true
 
 # RegionField's entry point after a character select's reload (RunState.
-# title_start_pending): the held title frame with no menu, played out of
-# at once as Start plays out of it - the fog opening from the title
-# values. With the intro off the field simply begins.
+# title_start_pending): the held title frame with no menu, drawn under
+# the freeze frame for freeze_settle_frames, the freeze frame taken
+# down, and then played out of as Start plays out of it - the fog
+# opening from the title values. With the intro off the field simply
+# begins. Until the play starts the phase is TITLE_HOLD, which takes no
+# skip (_input()).
 func start_held_title() -> bool:
 	if not _can_start():
 		return false
 	_start(Phase.TITLE_HOLD, false)
-	_play_from_held_title()
+	_title_starting = true
+	_play_after_drawn_frames()
 	return true
+
+func _play_after_drawn_frames() -> void:
+	for i in maxi(freeze_settle_frames, 1):
+		await _drawn_frame()
+	if not is_inside_tree():
+		return
+	FreezeFrame.release(get_tree(), freeze_release_seconds)
+	# A debug toggle or a finish could have landed meanwhile.
+	if _phase != Phase.TITLE_HOLD or not _title_starting:
+		return
+	_title_starting = false
+	_play_from_held_title()
 
 # Start, from the menu: the menu locks and fades on its own start delay,
 # then the ordinary timeline runs from t = 0 with the fog opening from
@@ -390,18 +414,39 @@ func _on_character_select_cancelled() -> void:
 	if _menu != null:
 		_menu.reopen()
 
-# A class picked: the frame to the reload colour, the new run as it, and
-# the field reloaded - its _ready() finds the run started and title_
-# start_pending raised, and plays out of the held title frame.
+# A class picked: the select's column out, the next drawn frame - the
+# held title frame alone - captured and held over everything (FreezeFrame),
+# the new run as that class, and the field reloaded - its _ready() finds
+# the run started and title_start_pending raised, and plays out of the
+# held title frame (start_held_title()), taking the freeze frame down.
+# A reload that fails takes it down here.
 func _on_character_picked(character: CharacterData) -> void:
 	if _select == null:
 		return
 	await _select.fade_to_reload()
 	if not is_inside_tree():
 		return
+	await _drawn_frame()
+	if not is_inside_tree():
+		return
+	var tree := get_tree()
+	if DisplayServer.get_name() != "headless":
+		FreezeFrame.show_image(tree, get_viewport().get_texture().get_image())
 	RunState.new_run(character)
 	RunState.title_start_pending = true
-	get_tree().reload_current_scene()
+	var error: Error = tree.reload_current_scene()
+	if error != OK:
+		push_error("ZoneIntro: the field didn't reload (error %d); no run opening." % error)
+		RunState.title_start_pending = false
+		FreezeFrame.release(tree)
+
+# One frame drawn - frame_post_draw. A headless run draws nothing and
+# never emits it, so there one processed frame stands in.
+func _drawn_frame() -> void:
+	if DisplayServer.get_name() == "headless":
+		await get_tree().process_frame
+	else:
+		await RenderingServer.frame_post_draw
 
 func _on_menu_exit_requested() -> void:
 	RunState.log_run_end("quit")

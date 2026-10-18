@@ -26,9 +26,10 @@ class_name CharacterSelect
 #
 # The owner (ZoneIntro, whose child this is - so it runs through the
 # title's freeze) drives the beats: open() fades the column in; a pick
-# goes out as picked(character), after which fade_to_reload() takes the
-# frame to reload_color for the field reload; a cancel fades the column
-# out, goes out as cancelled, and this node frees itself.
+# goes out as picked(character), after which fade_to_reload() fades the
+# column out for the owner's capture of the held frame (ZoneIntro, its
+# FreezeFrame) and the field reload; a cancel fades the column out, goes
+# out as cancelled, and this node frees itself.
 #
 # Every size is authored for a 1080-high viewport and scaled by the
 # viewport height; the layout is redone on every resize.
@@ -82,14 +83,6 @@ const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 	set(value):
 		unfocused_color = value
 		_relayout_if_ready()
-# The flat colour the frame takes on a pick and holds while the field
-# reloads - which comes up on this same held frame. TitleScreen's
-# background_color, matched by eye to the fog as it renders.
-@export var reload_color: Color = Color(0.86, 0.87, 0.86, 1.0):
-	set(value):
-		reload_color = value
-		if _cover != null:
-			_cover.color = Color(value, _cover.color.a)
 
 @export_group("Layout")
 # Fallbacks, used only with no anchor_source: the left edge as a
@@ -130,15 +123,11 @@ const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 @export_group("Flow")
 # The column in on open and out on a cancel.
 @export var items_fade_seconds: float = 0.3
-# On a pick: the column out, then the frame to reload_color over this.
-@export var reload_fade_seconds: float = 0.4
 
 # Returns Vector2(left edge, first item's top) in viewport pixels; set by
 # the owner before open(). Empty: the fallback exports.
 var anchor_source: Callable = Callable()
 
-# The reload colour's cover - clear until a pick.
-var _cover: ColorRect = null
 var _column: Control = null
 var _prompt: Label = null
 var _menu: InkMenu = null
@@ -147,12 +136,6 @@ var _item_characters: Array[CharacterData] = []
 var _tween: Tween = null
 
 func _ready() -> void:
-	_cover = ColorRect.new()
-	_cover.name = "Cover"
-	_cover.set_anchors_preset(Control.PRESET_FULL_RECT)
-	_cover.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_cover.color = Color(reload_color, 0.0)
-	add_child(_cover)
 	_column = Control.new()
 	_column.name = "Column"
 	_column.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -175,12 +158,10 @@ func open() -> void:
 	if _menu != null:
 		_menu.unlock()
 
-# After picked: the column out, then the frame to reload_color.
-# Awaitable; the owner reloads the field on its return.
+# After picked: the column out, leaving the held title frame alone for
+# the owner to capture. Awaitable; the owner reloads the field after.
 func fade_to_reload() -> void:
 	await _fade(_column, 0.0, items_fade_seconds)
-	_cover.color = Color(reload_color, _cover.color.a)
-	await _fade(_cover, 1.0, reload_fade_seconds, ^"color:a")
 
 # --- input --------------------------------------------------------------
 

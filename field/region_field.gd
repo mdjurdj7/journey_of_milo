@@ -887,6 +887,10 @@ func _ready() -> void:
 			intro_running = zone_intro.start_held_title()
 		elif opening_pending and RunState.current_floor_index == 0:
 			intro_running = zone_intro.play()
+	# The character select's freeze frame comes down with its held title
+	# play (ZoneIntro.start_held_title()) - or here, when that can't run.
+	if title_start_pending and not intro_running:
+		FreezeFrame.release(get_tree())
 	# The arrival hold starts when the frame is the player's to see: after
 	# the intro, after the fade-in, or now.
 	if intro_running:
