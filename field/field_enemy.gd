@@ -847,12 +847,16 @@ func _ground_to_relief() -> void:
 		_mound.resample()
 
 # Where the pool under it is laid (ContactShadow.feet_source): under the
-# middle of the model's box, at its feet - lifted with the model by a
-# rest height or a fight's hover and bob, so the pool fades with them.
+# middle of the box its footprint was sized from - the body's alone where
+# its data says footprint_from_body (the dragonfly, without its wings),
+# else the model's - turned with the body, at its feet; lifted with the
+# model by a rest height or a fight's hover and bob, so the pool fades
+# with them.
 func _contact_feet() -> Vector3:
 	if _model == null:
 		return global_position
-	var centre: Vector3 = _model_aabb.get_center()
+	var from_body: bool = _contact_shadow != null and _contact_shadow.data != null and _contact_shadow.data.footprint_from_body and _body_aabb.size != Vector3.ZERO
+	var centre: Vector3 = (_body_aabb if from_body else _model_aabb).get_center()
 	var lift: float = _model.position.y - _model_ground_y
 	return global_transform * Vector3(centre.x, _model_aabb.position.y + lift, centre.z)
 
