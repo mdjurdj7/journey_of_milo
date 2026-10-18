@@ -106,7 +106,6 @@ func _check_data() -> void:
 	_expect_eq(status.category, StatusData.Category.INFORMATIONAL, "...not a per-hit modifier")
 	_expect_eq(status.stack_rule, StatusData.StackRule.ADD_MAGNITUDE, "...copies adding up")
 	_expect_eq(status.default_duration_turns, StatusData.DURATION_UNTIL_TRIGGERED, "...no turn counter")
-	_expect_eq(Status.new(status).describe(), "Its next Attack deals 5 less.", "...its hover text")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "The card has its art")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...mipmapped")
 	_expect_eq(card.play_sound_path, SOUND_PATH, "...and its play sound")

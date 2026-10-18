@@ -6,7 +6,6 @@
 script = ExtResource("1_status_data")
 id = "garnished_tempered"
 display_name = "Garnished"
-description = "Its next Attack deals {value} less."
 default_magnitude = 8
 default_duration_turns = -2
 stack_rule = 1

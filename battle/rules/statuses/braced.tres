@@ -6,7 +6,6 @@
 script = ExtResource("1_status_data")
 id = "braced"
 display_name = "Braced"
-description = "Its next Attack deals {percent}% less damage."
 category = 1
 default_magnitude = -50
 default_duration_turns = -2

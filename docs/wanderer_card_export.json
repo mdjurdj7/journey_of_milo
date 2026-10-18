@@ -472,7 +472,6 @@
       "status_effect": {
         "id": "braced",
         "name": "Braced",
-        "description": "Its next Attack deals 50% less damage.",
         "file_path": "res://battle/rules/statuses/braced.tres",
         "duration": "until its intent resolves",
         "stack_rule": "REFRESH_DURATION",
@@ -1069,7 +1068,6 @@
       "status_effect": {
         "id": "garnished",
         "name": "Garnished",
-        "description": "Its next Attack deals {value} less.",
         "file_path": "res://battle/rules/statuses/garnished.tres",
         "duration": "until its intent resolves",
         "stack_rule": "ADD_MAGNITUDE",
