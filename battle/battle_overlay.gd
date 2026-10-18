@@ -68,6 +68,14 @@ signal battle_finished(outcome: Outcome)
 # Readouts (plates, intents, his HP bar) are pushed apart until this many
 # pixels lie between any two (_lay_out_readouts()).
 @export var readout_gap_px: float = 4.0
+# What a refused intent says while an armed Brace or Garnish hovers it
+# (_sync_armed_intents(); %s is the intent's name), read live: one landing
+# as a strike back (the Erupt); not an attack; Denied, a pain turn's or an
+# interrupted one; and one already carrying the card's mark, by mark.
+@export var mark_refusal_only_block: String = "%s: only Block reduces it."
+@export var mark_refusal_not_attack: String = "%s: not an attack."
+@export var mark_refusal_wont_land: String = "%s: it won't land."
+@export var mark_refusal_already: Dictionary = {&"brace": "Already braced.", &"garnish": "Already garnished."}
 # The draw sound, once per card as it leaves the deck (HandContainer.
 # draw_started): a -6 dBFS take at -22, 6 dB under card play, so a
 # five-card draw is felt rather than loud. One take only (see DESIGN.md),
@@ -229,6 +237,9 @@ var _mound_plates: Dictionary = {}
 # One BattleIntent per enemy for this fight - children of this overlay,
 # so they're freed with it and nothing of them exists on the field.
 var _enemy_intents: Dictionary = {} # FieldEnemy -> BattleIntent
+# A card that marks intents (Brace, Garnish) armed now, or null - its
+# targets' hairlines and the refused ones' fade (_sync_armed_intents()).
+var _armed_marking: CardData = null
 var _intents_revealed: bool = false
 # The enemy turn is under way (turn_phase_changed(false) until (true)): a
 # display hidden for its enemy's action takes the next intent but stays
@@ -929,6 +940,52 @@ func _process(_delta: float) -> void:
 	_place_choice_prompt()
 	_sync_mound_plates()
 	_lay_out_readouts()
+	_sync_armed_intents()
+
+# While a card that marks intents (Brace, Garnish) is armed: each intent
+# it may target gets its hairline, each it may not fades, and the refused
+# one under the cursor says why (mark_refusal_*). Every frame, so a play
+# or an intent changing under it is caught; nothing armed, nothing shown.
+func _sync_armed_intents() -> void:
+	if battle_controller == null:
+		return
+	var view: CardView = battle_controller.get_pending_card_view()
+	var card: CardData = view.card_data if view != null and is_instance_valid(view) and not battle_controller.is_armed_for_devour_only() else null
+	if card != null and battle_controller.marking_status(card) == null:
+		card = null
+	if card == null and _armed_marking == null:
+		return
+	_armed_marking = card
+	var mouse: Vector2 = get_viewport().get_mouse_position()
+	for enemy: FieldEnemy in _enemy_intents:
+		var intent: BattleIntent = _enemy_intents[enemy]
+		if not is_instance_valid(intent):
+			continue
+		if card == null:
+			intent.set_armed(BattleIntent.ARMED_NONE)
+			continue
+		var refusal: EnemyTurn.MarkRefusal = battle_controller.mark_refusal_for(card, enemy)
+		if refusal == EnemyTurn.MarkRefusal.NONE:
+			intent.set_armed(BattleIntent.ARMED_VALID)
+			continue
+		intent.set_armed(BattleIntent.ARMED_REFUSED)
+		var hovered: bool = intent.get_pair_global_rect().has_point(mouse)
+		intent.set_refusal(_refusal_text(refusal, card, enemy) if hovered else "")
+
+# What a refused intent says while an armed Brace or Garnish hovers it.
+func _refusal_text(refusal: EnemyTurn.MarkRefusal, card: CardData, enemy: FieldEnemy) -> String:
+	var name: String = battle_controller.queued_intent_name(enemy)
+	match refusal:
+		EnemyTurn.MarkRefusal.ONLY_BLOCK:
+			return mark_refusal_only_block % name
+		EnemyTurn.MarkRefusal.NOT_ATTACK:
+			return mark_refusal_not_attack % name
+		EnemyTurn.MarkRefusal.WONT_LAND:
+			return mark_refusal_wont_land % name
+		EnemyTurn.MarkRefusal.ALREADY:
+			var status_data: StatusData = battle_controller.marking_status(card)
+			return str(mark_refusal_already.get(status_data.intent_mark if status_data != null else &"", ""))
+	return ""
 
 # One plate per standing mound of each dug-in enemy whose row is up
 # (FieldEnemy.is_dug_in()), its HP the mound's own; a broken or gone

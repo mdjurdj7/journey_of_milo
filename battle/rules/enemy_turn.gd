@@ -513,6 +513,27 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	preview["hit_amounts"] = hit_amounts
 	preview["damage_to_hp"] = 0 if denied else total_to_hp
 	preview["lethal"] = hp <= 0 and not bool(preview.get("interrupted", false)) and not denied
+	# What lives on this intent (StatusData.intent_mark - Braced,
+	# Garnished): "marks", their names in order ("brace" before
+	# "garnish"), and the same intent as it would be without them -
+	# "original_hit_amounts", "original_per_hit" - for the readout's small
+	# original beside the number that lands.
+	var marked: Array[Status] = Status.marks(combatant.statuses)
+	if not marked.is_empty() and not strike_back:
+		var names: Array[StringName] = []
+		for active in marked:
+			names.append(active.data.intent_mark)
+		names.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
+		preview["marks"] = names
+		var at: Array[int] = []
+		for active in marked:
+			at.append(combatant.statuses.find(active))
+			combatant.statuses.erase(active)
+		var plain: Dictionary = preview_intent(combatant, data, player)
+		for i in marked.size():
+			combatant.statuses.insert(mini(at[i], combatant.statuses.size()), marked[i])
+		preview["original_hit_amounts"] = plain.get("hit_amounts", [])
+		preview["original_per_hit"] = plain.get("per_hit", 0)
 	return preview
 
 # One Attack card has been played against this living enemy: while its

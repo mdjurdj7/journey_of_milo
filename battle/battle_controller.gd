@@ -2247,6 +2247,10 @@ func get_enemy_status_labels(enemy: FieldEnemy) -> PackedStringArray:
 	for active: Status in combatant.statuses:
 		if active.data != null and active.data.shows_beside_hp:
 			continue
+		# What lives on its intent (Braced, Garnished) shows there
+		# (BattleIntent), not in the row.
+		if active.data != null and active.data.intent_mark != &"":
+			continue
 		var text: String = active.label()
 		if not text.is_empty():
 			labels.append(text)
@@ -2272,7 +2276,20 @@ func get_enemy_statuses(enemy: FieldEnemy) -> Array[Status]:
 	var combatant: Combatant = _combatants.get(enemy)
 	if combatant == null or combatant.hp <= 0:
 		return []
-	return combatant.statuses.duplicate()
+	var shown: Array[Status] = []
+	for active in combatant.statuses:
+		if active.data == null or active.data.intent_mark == &"":
+			shown.append(active)
+	return shown
+
+# The name of the intent `enemy` has queued (EnemyIntent.intent_name), ""
+# for none - what an armed Brace or Garnish's refusal names.
+func queued_intent_name(enemy: FieldEnemy) -> String:
+	var combatant: Combatant = _combatants.get(enemy)
+	if combatant == null or enemy == null or enemy.enemy_data == null:
+		return ""
+	var intent: EnemyIntent = EnemyTurn.current_intent(combatant, enemy.enemy_data)
+	return intent.intent_name if intent != null else ""
 
 # The living enemies a card can reach - not the buried (Combatant.
 # buried). What every card's context carries as ctx.enemies.
