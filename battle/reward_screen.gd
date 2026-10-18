@@ -207,6 +207,18 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 # Taken, its face flies to the deck from the line, at samphire_flight_
 # start_scale of a card.
 @export_range(0.05, 1.0) var samphire_flight_start_scale: float = 0.4
+# The Samphire row focused (hovered, or reached by ui_up/ui_down): the card
+# it grants shown beside the column - a CardView at samphire_preview_scale,
+# samphire_preview_gap_px right of the column, centred on the row. It never
+# takes the mouse. Each re-applies live.
+@export_range(0.2, 2.0) var samphire_preview_scale: float = 1.0:
+	set(value):
+		samphire_preview_scale = value
+		_sync_samphire_preview()
+@export var samphire_preview_gap_px: float = 32.0:
+	set(value):
+		samphire_preview_gap_px = value
+		_sync_samphire_preview()
 @export_group("")
 
 enum Mode { LIST, CHOICE }
@@ -238,6 +250,9 @@ var _extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE
 var _extra_card: CardData = null
 # A Samphire in flight holds the list's own input.
 var _samphire_flying: bool = false
+# The Samphire row's card, shown while the row is focused (_sync_samphire_
+# preview()); made the first time.
+var _samphire_preview: CardView = null
 var _deck_panel: Control = null
 var _mode: int = Mode.LIST
 var _hovered: int = -1
@@ -697,6 +712,40 @@ func _set_list_focus(index: int) -> void:
 		return
 	_hovered = index
 	_draw_layer.queue_redraw()
+	_sync_samphire_preview()
+
+# The Samphire row's card beside the column while that row is focused in
+# the list and not yet taken; hidden otherwise.
+func _sync_samphire_preview() -> void:
+	if _draw_layer == null:
+		return
+	var line: RewardLine = _lines[_hovered] if _hovered >= 0 and _hovered < _lines.size() else null
+	var wanted: bool = _mode == Mode.LIST and line != null and line.id == "samphire" and not line.taken and _extra_card != null
+	if not wanted:
+		if _samphire_preview != null and is_instance_valid(_samphire_preview):
+			_samphire_preview.visible = false
+		return
+	if _samphire_preview == null or not is_instance_valid(_samphire_preview):
+		var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
+		if scene == null:
+			return
+		_samphire_preview = scene.instantiate() as CardView
+		_samphire_preview.hover_enabled = false
+		_draw_layer.add_child(_samphire_preview)
+		_samphire_preview.set_card_data(_extra_card)
+		_ignore_mouse(_samphire_preview)
+	_samphire_preview.pivot_offset = Vector2.ZERO
+	_samphire_preview.scale = Vector2.ONE * samphire_preview_scale
+	var shown_size: Vector2 = _samphire_preview.card_size * samphire_preview_scale
+	_samphire_preview.position = Vector2(line.rect.end.x + samphire_preview_gap_px, line.rect.get_center().y - shown_size.y * 0.5).round()
+	_samphire_preview.visible = true
+
+# `node` and everything under it let the mouse through.
+func _ignore_mouse(node: Node) -> void:
+	if node is Control:
+		(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in node.get_children():
+		_ignore_mouse(child)
 
 # The untaken lines, then WALK ON - what ui_up/ui_down move through.
 func _list_focusable() -> Array[int]:
@@ -812,6 +861,7 @@ func _take_samphire(line: RewardLine) -> void:
 	line.taken = true
 	_hovered = -1
 	_draw_layer.queue_redraw()
+	_sync_samphire_preview()
 	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
 	if scene == null:
 		_close_if_spent()
@@ -842,6 +892,7 @@ func _open_choice() -> void:
 		_finish_card_line()
 		return
 	_mode = Mode.CHOICE
+	_sync_samphire_preview()
 	_hovered = -1
 	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
 	if scene == null:
