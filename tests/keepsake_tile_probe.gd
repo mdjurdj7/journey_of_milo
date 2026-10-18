@@ -60,6 +60,7 @@ const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
 const HOUSE_KEY_PATH := "res://run/keepsakes/keeper/house_key.tres"
+const RUSTED_BLADE_PATH := "res://run/weapons/rusted_blade.tres"
 # Past KeepsakeExamine's inspect_duration_sec (0.15) either way.
 const TWEEN_ROOM_SEC := 0.4
 
@@ -134,7 +135,8 @@ func _check_blank() -> void:
 	_expect(bool(plate.call("fits")), "...and it fits")
 	_expect_eq(int(plate.call("get_lore_line_count")), 0, "No lore: the lore block blank")
 	_expect_eq(plate.call("get_card_size"), card_size, "...the plate the same size")
-	var blade: Resource = _all_in(WEAPONS_DIR)[0]
+	# The baseline weapon, which does nothing to the attack.
+	var blade: Resource = load(RUSTED_BLADE_PATH)
 	plate.call("set_weapon", blade)
 	_expect(not bool(plate.call("shows_rules")), "No effect (%s): the effect block blank" % blade.get("display_name"))
 	_expect_eq(plate.call("get_card_size"), card_size, "...the plate the same size")
