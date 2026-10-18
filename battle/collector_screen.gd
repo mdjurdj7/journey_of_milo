@@ -107,6 +107,18 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 	set(value):
 		price_size_px = value
 		_relayout()
+# A card the deck already holds: "HAVE N" (have_format) under its price,
+# have_gap_px (fitted) below it, in the tier label's tracked caps and the
+# unfocused grey - a tempered copy counted as the card (Samphire+ as
+# Samphire). Nothing at 0.
+@export var have_format: String = "HAVE %d":
+	set(value):
+		have_format = value
+		_relayout()
+@export var have_gap_px: float = 8.0:
+	set(value):
+		have_gap_px = value
+		_relayout()
 @export var price_gap_px: float = 18.0:
 	set(value):
 		price_gap_px = value
@@ -425,6 +437,11 @@ func _draw_screen() -> void:
 		var x: float = roundf(rect.get_center().x - InkType.width(_numeral_font, price, _price_px) / 2.0)
 		var y: float = roundf(rect.end.y + _tier_line_height() + price_gap_px * _fit + float(_price_px))
 		_text(_numeral_font, price, Vector2(x, y), _price_px, bone if _affordable(slot) else inert_color)
+		var have: int = deck_copies_of(_cards[slot])
+		if have > 0 and _tier_font != null:
+			var have_text: String = have_format % have
+			var have_x: float = roundf(rect.get_center().x - InkType.width(_tier_font, have_text, _tier_px) / 2.0)
+			_text(_tier_font, have_text, Vector2(have_x, roundf(y + have_gap_px * _fit + float(_tier_px))), _tier_px, unfocused_color)
 	for index: int in [_removal_index(), _leave_index()]:
 		_draw_line(index)
 	# The run's gold, at LEAVE's baseline on the row's right edge.
@@ -435,6 +452,19 @@ func _draw_screen() -> void:
 	_text(_numeral_font, gold, Vector2(roundf(row_right - gold_width), gold_baseline), _label_px, bone)
 	var caps_width: float = InkType.width(_label_font, gold_text, _label_px)
 	_text(_label_font, gold_text, Vector2(roundf(row_right - gold_width - label_price_gap_px * _fit - caps_width), gold_baseline), _label_px, unfocused_color)
+
+# How many copies of `card` the deck holds now, a tempered one counted as
+# the card - by name, its "+" set aside (the deck holds duplicates, never
+# the resource itself; card names are unique).
+func deck_copies_of(card: CardData) -> int:
+	if card == null:
+		return 0
+	var base: String = card.card_name.trim_suffix("+")
+	var count: int = 0
+	for held: CardData in RunState.deck:
+		if held != null and held.card_name.trim_suffix("+") == base:
+			count += 1
+	return count
 
 # The tier named under slot `slot` - Samphire's fixed slot too - or ""
 # where the slot is empty (bought) or there's no finish to name it from.
