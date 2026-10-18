@@ -54,6 +54,11 @@ var heights: PackedFloat32Array = PackedFloat32Array()
 var water: PackedByteArray = PackedByteArray()
 # Per cell: 1 when solid in the base grid (terrain, footprints, deep water).
 var base_solid: PackedByteArray = PackedByteArray()
+# Per cell: 1 when he can walk there from the floor's spawn - the open
+# cells joined to it, side to side (compute_reachable()). Empty until
+# computed. A raised rim of open cells cut off by a climb is open but not
+# reachable.
+var reachable: PackedByteArray = PackedByteArray()
 var astar: AStarGrid2D = null
 var build_msec: int = 0
 
@@ -268,6 +273,44 @@ func nearest_open_toward(point: Vector2, toward: Vector2) -> Vector2:
 		if is_open(cell):
 			return cell_centre(cell)
 	return toward
+
+# The open cells joined to `from` (world XZ - the floor's spawn), side to
+# side, over the base grid: what he can walk to. A flood fill, once per
+# build (RegionField._build_nav_grid()).
+func compute_reachable(from: Vector2) -> void:
+	reachable = PackedByteArray()
+	reachable.resize(cols * rows)
+	var start: Vector2i = nearest_open(world_to_cell(from))
+	if start.x < 0:
+		return
+	var queue: Array[Vector2i] = [start]
+	reachable[start.y * cols + start.x] = 1
+	var head: int = 0
+	var sides: Array[Vector2i] = [Vector2i(1, 0), Vector2i(-1, 0), Vector2i(0, 1), Vector2i(0, -1)]
+	while head < queue.size():
+		var cell: Vector2i = queue[head]
+		head += 1
+		for side in sides:
+			var next: Vector2i = cell + side
+			if not is_open(next) or reachable[next.y * cols + next.x] == 1:
+				continue
+			reachable[next.y * cols + next.x] = 1
+			queue.append(next)
+
+func has_reachable() -> bool:
+	return reachable.size() == cols * rows and cols > 0
+
+# Whether a world XZ lies inside the grid at all (world_to_cell() clamps).
+func contains(world_xz: Vector2) -> bool:
+	var local: Vector2 = (world_xz - origin) / cell_size
+	return local.x >= 0.0 and local.y >= 0.0 and local.x < float(cols) and local.y < float(rows)
+
+func is_reachable(cell: Vector2i) -> bool:
+	return in_bounds(cell) and has_reachable() and reachable[cell.y * cols + cell.x] == 1
+
+# Cells within `radius` metres, as offsets - for a margin round a cell.
+func disc_offsets(radius: float) -> Array[Vector2i]:
+	return _disc(radius)
 
 # --- Queries ---
 

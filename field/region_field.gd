@@ -45,6 +45,22 @@ signal floor_cleared
 # _push_wanderer_away_from()).
 @export var escape_clearance_margin: float = 0.5
 
+# Where a fight leaves him (is_valid_fight_ground()): ground he can walk
+# to from the floor's spawn, with this much of it all round - never at a
+# border, a ledge lip, a wall, a prop or the wade limit.
+@export var fight_ground_margin_m: float = 0.5:
+	set(value):
+		fight_ground_margin_m = value
+# How far round a spot the nearest valid ground is looked for.
+@export var fight_ground_search_m: float = 12.0:
+	set(value):
+		fight_ground_search_m = value
+# A fight that ended with him off that ground eases him onto it over this
+# long - alongside the camera's return - rather than snapping.
+@export var fight_end_settle_seconds: float = 0.35:
+	set(value):
+		fight_end_settle_seconds = value
+
 # Where a won fight's reward is offered. SCREEN is the interim static
 # list; WORLD is the three cards laid on the sand where the enemy fell
 # (RewardSpread, kept and still working - see DESIGN.md). One or the
@@ -487,6 +503,10 @@ var _wall_shoreward: StaticBody3D = null
 # Where the Wanderer can walk (NavGrid), built from this floor's data once
 # the relief and everything on it stand - see _build_nav_grid().
 var _nav: NavGrid = null
+# Where the Wanderer stood as the open fight's contact began (_on_enemy_
+# contacted()).
+var _contact_position: Vector3 = Vector3.ZERO
+var _has_contact_position: bool = false
 # The floor's ground scatter (FieldScatter), and the worn band's points it
 # keeps off (get_wear_path()).
 var _scatter: FieldScatter = null
@@ -2699,6 +2719,10 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 		return
 	_battle_open = true
 	process_mode = Node.PROCESS_MODE_DISABLED
+	# Where he stood as contact began: ground he walked to, so valid - a
+	# won fight's fallback (win_position()).
+	_contact_position = wanderer.global_position
+	_has_contact_position = true
 
 	var swing_rig := get_node_or_null(camera_rig_path) as CameraRig
 	_duck_ambience(ambience_bus_base_db + ambience_duck_db, swing_rig.battle_transition_time if swing_rig != null else 0.0)
@@ -3205,6 +3229,11 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 	match outcome:
 		BattleOverlay.Outcome.WIN:
 			RunState.fights_won += 1
+			# Left where the fight stood him only if he could have walked
+			# there; else onto ground he could.
+			var settle: Vector3 = win_position(wanderer.global_position)
+			if settle != wanderer.global_position:
+				_settle_wanderer_to(settle, "a won fight")
 			# A win, not an escape: the keepsake's heal_on_win, if any - its
 			# number once the camera is back on the field.
 			_show_keepsake_heal(RunState.settle_keepsake_win(), camera_rig.battle_transition_time if camera_rig != null else 0.0)
@@ -4170,17 +4199,47 @@ func _apply_consumed_removals(fight_deck: Deck) -> void:
 # not a silent soft-lock. Empty list (nothing left to escape from): no
 # push.
 func _push_wanderer_away_from(enemies: Array[FieldEnemy]) -> void:
+	var pushed: Vector3 = escape_push_target(wanderer.global_position, enemies)
+	var target: Vector3 = escape_correction(pushed, enemies)
+	if target == pushed:
+		wanderer.global_position = target
+	else:
+		_settle_wanderer_to(target, "an escape's push")
+
+# Where an escape from `from` leaves him: the push (escape_push_target()),
+# then onto valid ground if it isn't (escape_correction()).
+func escape_position(from: Vector3, enemies: Array[FieldEnemy]) -> Vector3:
+	return escape_correction(escape_push_target(from, enemies), enemies)
+
+# `target` when it's valid fight ground; else the nearest valid ground
+# outside every enemy's contact clearance (where it stands and where it
+# goes back to); else `target` as it was.
+func escape_correction(target: Vector3, enemies: Array[FieldEnemy]) -> Vector3:
+	if is_valid_fight_ground(target):
+		return target
+	var avoid: Array = []
+	for enemy in enemies:
+		var clearance: float = enemy.contact_radius + escape_clearance_margin
+		avoid.append([Vector2(enemy.global_position.x, enemy.global_position.z), clearance])
+		var home: Vector3 = enemy.get_field_position()
+		avoid.append([Vector2(home.x, home.z), clearance])
+	var nearest: PackedVector3Array = nearest_valid_fight_ground(target, avoid)
+	return nearest[0] if not nearest.is_empty() else target
+
+# The escape push from `from` - see _push_wanderer_away_from()'s doc -
+# before any check of the ground it lands on.
+func escape_push_target(from: Vector3, enemies: Array[FieldEnemy]) -> Vector3:
 	var anchor: FieldEnemy = null
 	var anchor_distance: float = INF
 	for enemy in enemies:
-		var distance: float = wanderer.global_position.distance_to(enemy.global_position)
+		var distance: float = from.distance_to(enemy.global_position)
 		if distance < anchor_distance:
 			anchor_distance = distance
 			anchor = enemy
 	if anchor == null:
-		return
+		return from
 
-	var push_dir := wanderer.global_position - anchor.global_position
+	var push_dir := from - anchor.global_position
 	push_dir.y = 0.0
 	push_dir = push_dir.normalized() if push_dir.length() > 0.0001 else Vector3.BACK
 
@@ -4215,7 +4274,7 @@ func _push_wanderer_away_from(enemies: Array[FieldEnemy]) -> void:
 	if ground != null:
 		var local: Vector3 = ground.to_local(Vector3(target.x, 0.0, target.z))
 		target.y = ground.get_walk_height_at(Vector2(local.x, local.z))
-	wanderer.global_position = target
+	return target
 
 # Computes and caches the field's span (see _boundary_ready's own doc),
 # then delegates the four collision walls to _rebuild_boundary_walls().
@@ -4310,8 +4369,101 @@ func _build_nav_grid() -> void:
 		grid.step_height = wanderer.step_height
 		grid.max_slope_degrees = rad_to_deg(wanderer.floor_max_angle)
 	grid.build(ground, sea_level, rect, _nav_static_shapes(ground))
+	grid.compute_reachable(_floor_spawn_xz())
 	_nav = grid
 	print("RegionField: walk grid %d x %d at %.2f m (%.0f x %.0f m) in %d ms" % [grid.cols, grid.rows, grid.cell_size, rect.size.x, rect.size.y, grid.build_msec])
+
+# The floor's spawn, world XZ - from its FloorData, never the Wanderer's
+# live position (get_spawn_position() is that).
+func _floor_spawn_xz() -> Vector2:
+	var floor_data := get_floor_data()
+	var local := Vector3(floor_data.spawn.x, 0.0, floor_data.spawn.y) if floor_data != null else Vector3.ZERO
+	var world: Vector3 = to_global(local)
+	return Vector2(world.x, world.z)
+
+# Ground a fight may leave him on: a walk-grid cell he can reach from the
+# floor's spawn (NavGrid.compute_reachable()), with every cell within
+# fight_ground_margin_m reachable too, and - on a floor with a wade limit
+# - that margin inside it. True with no walk grid to ask.
+func is_valid_fight_ground(point: Vector3) -> bool:
+	if _nav == null or not _nav.has_reachable():
+		return true
+	var xz := Vector2(point.x, point.z)
+	if not _nav.contains(xz):
+		return false
+	var cell: Vector2i = _nav.world_to_cell(xz)
+	for offset in _nav.disc_offsets(maxf(fight_ground_margin_m, 0.0)):
+		if not _nav.is_reachable(cell + offset):
+			return false
+	var floor_data := get_floor_data()
+	var ground := get_node_or_null(ground_path) as Ground
+	if floor_data != null and floor_data.wade_limit_m >= 0.0 and ground != null:
+		if ground.get_landmass_distance(xz) > floor_data.wade_limit_m - fight_ground_margin_m:
+			return false
+	return true
+
+# The valid fight ground (is_valid_fight_ground()) nearest `from`, ring by
+# ring out to fight_ground_search_m, outside every circle in `avoid`
+# ([centre (Vector2), radius (float)] pairs - escape clearances). Empty
+# when there is none in reach.
+func nearest_valid_fight_ground(from: Vector3, avoid: Array = []) -> PackedVector3Array:
+	var found := PackedVector3Array()
+	if _nav == null:
+		return found
+	var centre: Vector2i = _nav.world_to_cell(Vector2(from.x, from.z))
+	var rings: int = int(ceil(maxf(fight_ground_search_m, 0.0) / _nav.cell_size))
+	var ground := get_node_or_null(ground_path) as Ground
+	for ring in rings + 1:
+		var best_distance: float = INF
+		var best := Vector2.ZERO
+		for dz in range(-ring, ring + 1):
+			for dx in range(-ring, ring + 1):
+				if maxi(absi(dx), absi(dz)) != ring:
+					continue
+				var xz: Vector2 = _nav.cell_centre(centre + Vector2i(dx, dz))
+				var distance: float = xz.distance_to(Vector2(from.x, from.z))
+				if distance >= best_distance or not _clear_of(avoid, xz):
+					continue
+				if is_valid_fight_ground(Vector3(xz.x, 0.0, xz.y)):
+					best_distance = distance
+					best = xz
+		if best_distance < INF:
+			var height: float = from.y
+			if ground != null:
+				var local: Vector3 = ground.to_local(Vector3(best.x, 0.0, best.y))
+				height = ground.get_walk_height_at(Vector2(local.x, local.z))
+			found.append(Vector3(best.x, height, best.y))
+			return found
+	return found
+
+func _clear_of(avoid: Array, xz: Vector2) -> bool:
+	for zone: Array in avoid:
+		if xz.distance_to(zone[0] as Vector2) < float(zone[1]):
+			return false
+	return true
+
+# Where a won fight leaves him: where he stands when that's valid fight
+# ground; else where he stood as contact began (he walked there) when that
+# is; else the nearest valid ground; else where he stands.
+func win_position(at: Vector3) -> Vector3:
+	if is_valid_fight_ground(at):
+		return at
+	if _has_contact_position and is_valid_fight_ground(_contact_position):
+		return _contact_position
+	var nearest: PackedVector3Array = nearest_valid_fight_ground(at)
+	return nearest[0] if not nearest.is_empty() else at
+
+# A fight ended with him off valid ground: eased onto `target` over
+# fight_end_settle_seconds, alongside the camera's return, and said so.
+func _settle_wanderer_to(target: Vector3, why: String) -> void:
+	push_warning("RegionField: %s left the Wanderer off walkable ground at (%.1f, %.1f); moving him to (%.1f, %.1f)." % [why, wanderer.global_position.x, wanderer.global_position.z, target.x, target.z])
+	wanderer.stand_still()
+	if fight_end_settle_seconds <= 0.0:
+		wanderer.global_position = target
+		return
+	var tween := create_tween()
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	tween.tween_property(wanderer, "global_position", target, fight_end_settle_seconds)
 
 func _nav_static_shapes(ground: Ground) -> Array[CollisionShape3D]:
 	var shapes: Array[CollisionShape3D] = []
