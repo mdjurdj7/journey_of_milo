@@ -149,7 +149,8 @@ func _check_one_falls_first() -> void:
 		_expect_eq(controller.call("get_enemy_status_labels", straw), PackedStringArray(["Bereft"]), "Chalkcrown dead: Strawcrown is Bereft")
 		_expect(gained.size() == 1 and gained[0][1] == load(BEREFT_PATH), "...told once (%d told)" % gained.size())
 		_expect_eq(_line_text(), "The other keeps dancing.", "...its line said over it")
-		_expect_eq(_intent_text(controller, straw), "6×2", "...its Step reads 6×2")
+		_expect_eq(_intent_text(controller, straw), "6", "...its first Step reads 6")
+		_expect_eq(_extra_texts(controller, straw), PackedStringArray(["6"]), "...beside it a second Step of 6, not 6×2")
 		var player: Combatant = controller.get("player")
 		var hp_before: int = player.hp
 		await controller.call("end_turn")
@@ -170,7 +171,7 @@ func _check_bereft_bow() -> void:
 		var c: Combatant = _combatant(controller, chalk)
 		c.current_intent_index = 0
 		controller.call("_emit_intent_previews")
-		_expect_eq(_intent_text(controller, chalk), "8", "Bereft Chalkcrown's Bow reads 8")
+		_expect_eq([_intent_text(controller, chalk), _extra_texts(controller, chalk)], ["4", PackedStringArray(["4"])], "Bereft Chalkcrown's Bow reads two Bows of 4, side by side")
 		var before: int = c.block
 		var data: EnemyData = chalk.get("enemy_data")
 		var queued: Array[EnemyIntent] = [EnemyTurn.current_intent(c, data)]
@@ -357,6 +358,13 @@ func _intent_text(controller: Node, member: Node) -> String:
 	var intent: Node = intents.get(member)
 	var label: Label = intent.get("_label") if intent != null else null
 	return label.text if label != null else ""
+
+# The numerals of each action after the first (BattleIntent's own pairs
+# beside the first - two actions, not one attack's hits).
+func _extra_texts(controller: Node, member: Node) -> PackedStringArray:
+	var intents: Dictionary = controller.get_parent().get("_enemy_intents")
+	var intent: Node = intents.get(member)
+	return intent.get("_extra_texts") if intent != null else PackedStringArray()
 
 func _line_text() -> String:
 	var hud: Node = _field.get_node_or_null(^"FieldHUD")

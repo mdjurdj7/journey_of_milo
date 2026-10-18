@@ -35,6 +35,12 @@ class_name BattleIntent
 # their total with "4 HITS" beside it (the Hits group), not "M×N"; one
 # whose hits are equal stays "M×N" (No Further's every-hit 0 reads 0×3).
 #
+# An enemy acting more than once this turn (preview "repeats" - Bereft)
+# shows each action as a pair of its own, side by side, action_gap_px
+# apart: glyph and number for each, so two actions never read like one
+# attack's "×N" hits. A mark on the intent shows on every pair, each with
+# its own number and original.
+#
 # An intent carrying a Brace or a Garnish (preview "marks" - StatusData.
 # intent_mark) reads the number that lands after them, then the same
 # reading without them small in faded ink (the Marks group: original_
@@ -258,6 +264,13 @@ var layout_offset: Vector2 = Vector2.ZERO
 # one small square per stage in a row under everything else, the stages
 # reached filled in ink, the rest a hairline outline. Only for an enemy
 # that escalates - no pips, no space for them.
+# Between one action's pair and the next, for an enemy acting more than
+# once (preview "repeats").
+@export var action_gap_px: float = 22.0:
+	set(value):
+		action_gap_px = value
+		_apply_layout()
+
 @export_group("Marks")
 # The reading without the marks, beside the number that lands: Spectral
 # SemiBold at original_size_px, ink at original_alpha, original_gap_px
@@ -395,6 +408,13 @@ var _ready_done: bool = false
 # The marks on this intent (preview "marks") and the reading without them.
 var _marks: Array[StringName] = []
 var _original_text: String = ""
+# Each action after the first (preview "repeats"), drawn beside it: its
+# numeral, its "N HITS" ("" for none), its reading without the marks
+# ("" for none), and where its pair starts.
+var _extra_texts: PackedStringArray = PackedStringArray()
+var _extra_hits: PackedStringArray = PackedStringArray()
+var _extra_originals: PackedStringArray = PackedStringArray()
+var _extra_lefts: PackedFloat32Array = PackedFloat32Array()
 var _original_left: float = 0.0
 var _marks_left: float = 0.0
 var _mark_size: float = 0.0
@@ -470,19 +490,45 @@ func show_intent(preview: Dictionary) -> void:
 	_has_intent = not preview.is_empty()
 	_marks.clear()
 	_original_text = ""
+	_extra_texts.clear()
+	_extra_hits.clear()
+	_extra_originals.clear()
 	if _has_intent:
 		_type = int(preview["type"])
 		_lethal = bool(preview.get("lethal", false))
-		var hits: int = int(preview.get("hits", 1))
-		var reading: PackedStringArray = _reading(int(preview.get("per_hit", 0)), hits, preview.get("hit_amounts", []))
-		_label.text = reading[0]
-		_hits_label.text = reading[1]
-		# Braced, Garnished: the number above is after them; beside it, the
-		# same reading without them.
 		for mark: Variant in preview.get("marks", []):
 			_marks.append(StringName(mark))
-		if not _marks.is_empty():
-			_original_text = _reading(int(preview.get("original_per_hit", 0)), hits, preview.get("original_hit_amounts", []))[0]
+		# One pair per action (preview "repeats" - Bereft's two): each its
+		# own share of the hits, and of the reading without the marks.
+		var actions: int = maxi(int(preview.get("repeats", 1)), 1)
+		if _type != EnemyIntent.IntentType.ATTACK and _type != EnemyIntent.IntentType.DEFEND:
+			actions = 1
+		var hits: int = int(preview.get("hits", 1))
+		var each: int = maxi(hits / actions, 1)
+		var amounts: Array = preview.get("hit_amounts", [])
+		var originals: Array = preview.get("original_hit_amounts", [])
+		for action in actions:
+			var reading: PackedStringArray
+			var original: String = ""
+			if _type == EnemyIntent.IntentType.DEFEND:
+				# Its number is all the Block - one action's share each.
+				reading = PackedStringArray([str(int(preview.get("per_hit", 0)) / actions), ""])
+			else:
+				var mine: Array = amounts.slice(action * each, (action + 1) * each)
+				reading = _reading(int(mine[0]) if not mine.is_empty() else int(preview.get("per_hit", 0)), each, mine)
+				# Braced, Garnished: the number above is after them; beside
+				# it, the same reading without them.
+				if not _marks.is_empty():
+					var plain: Array = originals.slice(action * each, (action + 1) * each)
+					original = _reading(int(plain[0]) if not plain.is_empty() else int(preview.get("original_per_hit", 0)), each, plain)[0]
+			if action == 0:
+				_label.text = reading[0]
+				_hits_label.text = reading[1]
+				_original_text = original
+			else:
+				_extra_texts.append(reading[0])
+				_extra_hits.append(reading[1])
+				_extra_originals.append(original)
 		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.DIG or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE or _type == EnemyIntent.IntentType.COIL or _type == EnemyIntent.IntentType.TAUNT or _type == EnemyIntent.IntentType.SIGNAL:
 			_label.text = ""
 			_hits_label.text = ""
@@ -628,6 +674,11 @@ func _apply_layout() -> void:
 	if not _marks.is_empty():
 		_marks_left = pair_width + mark_gap_px
 		pair_width = _marks_left + float(_marks.size()) * _mark_size + float(_marks.size() - 1) * mark_gap_px
+	# Each further action's pair, action_gap_px on.
+	_extra_lefts.clear()
+	for i in _extra_texts.size():
+		_extra_lefts.append(pair_width + action_gap_px)
+		pair_width = _extra_lefts[i] + _extra_pair_width(i)
 	var rule_thickness: float = lethal_rule_px if _lethal else hairline_thickness_px
 	var ring_box: float = ring_diameter_px + ring_stroke_px + float(outline_size_px) * 2.0
 	var content_width: float = maxf(pair_width, hairline_width_px)
@@ -647,6 +698,8 @@ func _apply_layout() -> void:
 	_pair_rect = Rect2(pair_left, 0.0, pair_width, line_height)
 	_original_left += pair_left
 	_marks_left += pair_left
+	for i in _extra_lefts.size():
+		_extra_lefts[i] += pair_left
 	# The label's one line fills its box, so its baseline is the ascent.
 	var ascent: float = font.get_ascent(numeral_size_px) if font != null else line_height
 	_ascent = ascent
@@ -678,6 +731,57 @@ func _apply_layout() -> void:
 	_threshold_label.visible = _has_threshold and not _threshold_label.text.is_empty()
 	_place_refusal()
 	queue_redraw()
+
+# The width of action `i`'s pair after the first (_extra_texts): glyph,
+# numeral, "N HITS", the reading without the marks, the marks - as the
+# first pair lays them out.
+func _extra_pair_width(i: int) -> float:
+	var width: float = _glyph_width()
+	if numeral_font != null and not _extra_texts[i].is_empty():
+		width += glyph_numeral_gap_px + numeral_font.get_string_size(_extra_texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, numeral_size_px).x
+	var hits_font_now: Font = _hits_label.get_theme_font("font") if _hits_label != null else null
+	if hits_font_now != null and not _extra_hits[i].is_empty():
+		width += hits_gap_px + hits_font_now.get_string_size(_extra_hits[i], HORIZONTAL_ALIGNMENT_LEFT, -1, hits_size_px).x
+	if numeral_font != null and not _extra_originals[i].is_empty():
+		width += original_gap_px + numeral_font.get_string_size(_extra_originals[i], HORIZONTAL_ALIGNMENT_LEFT, -1, original_size_px).x
+	if not _marks.is_empty():
+		width += mark_gap_px + float(_marks.size()) * _mark_size + float(_marks.size() - 1) * mark_gap_px
+	return width
+
+# Action `i`'s pair after the first, drawn as the first is laid out: its
+# glyph (pointing as the first does), its numeral in ink over the bone
+# outline, its "N HITS", its faded reading without the marks, its marks.
+func _draw_extra_pair(i: int, ink: Color) -> void:
+	var alpha: float = hairline_alpha if _interrupted else 1.0
+	var x: float = _extra_lefts[i]
+	var centre := Vector2(x + _glyph_width() * 0.5, _glyph_centre.y)
+	var shapes: Array[PackedVector2Array] = _glyph_shapes(centre, _glyph_size * 0.5)
+	if _type == EnemyIntent.IntentType.ATTACK and _points_left():
+		for k in shapes.size():
+			var shape: PackedVector2Array = shapes[k]
+			for p in shape.size():
+				shape[p] = Vector2(2.0 * centre.x - shape[p].x, shape[p].y)
+			shapes[k] = shape
+	_draw_ink(shapes, alpha)
+	x += _glyph_width()
+	var bone: Color = get_theme_color("bone", "Battle")
+	if numeral_font != null and not _extra_texts[i].is_empty():
+		x += glyph_numeral_gap_px
+		draw_string_outline(numeral_font, Vector2(x, _ascent), _extra_texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, numeral_size_px, outline_size_px * 2, Color(bone, bone.a * alpha))
+		draw_string(numeral_font, Vector2(x, _ascent), _extra_texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, numeral_size_px, Color(ink, ink.a * alpha))
+		x += numeral_font.get_string_size(_extra_texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, numeral_size_px).x
+	var hits_font_now: Font = _hits_label.get_theme_font("font")
+	if hits_font_now != null and not _extra_hits[i].is_empty():
+		x += hits_gap_px
+		draw_string(hits_font_now, Vector2(x, _ascent), _extra_hits[i], HORIZONTAL_ALIGNMENT_LEFT, -1, hits_size_px, Color(ink, ink.a * hits_alpha * alpha))
+		x += hits_font_now.get_string_size(_extra_hits[i], HORIZONTAL_ALIGNMENT_LEFT, -1, hits_size_px).x
+	if numeral_font != null and not _extra_originals[i].is_empty():
+		x += original_gap_px
+		draw_string(numeral_font, Vector2(x, _ascent), _extra_originals[i], HORIZONTAL_ALIGNMENT_LEFT, -1, original_size_px, Color(ink, ink.a * original_alpha))
+		x += numeral_font.get_string_size(_extra_originals[i], HORIZONTAL_ALIGNMENT_LEFT, -1, original_size_px).x
+	for m in _marks.size():
+		var mark_centre := Vector2(x + mark_gap_px + _mark_size * 0.5 + float(m) * (_mark_size + mark_gap_px), _glyph_centre.y)
+		_draw_ink(_mark_shapes(_marks[m], mark_centre, _mark_size * 0.5), 1.0)
 
 # "N HITS"'s width, 0 with none to show.
 func _hits_width() -> float:
@@ -775,6 +879,9 @@ func _draw() -> void:
 	for i in _marks.size():
 		var centre := Vector2(_marks_left + _mark_size * 0.5 + float(i) * (_mark_size + mark_gap_px), _glyph_centre.y)
 		_draw_ink(_mark_shapes(_marks[i], centre, _mark_size * 0.5), 1.0)
+	# Every further action's pair.
+	for i in _extra_texts.size():
+		_draw_extra_pair(i, ink)
 	# Armed: a target's hairline under the pair (the lethal rule, drawn
 	# there below, says as much).
 	if _armed == ARMED_VALID and not _lethal:
