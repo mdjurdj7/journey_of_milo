@@ -181,6 +181,47 @@ class_name EnemyData
 # Negative = sunk that far under the sand (the Siltjaw, buried in the
 # field); a fight lifts it to battle_hover_m when the frame settles.
 @export var rest_height_m: float = 0.0
+# A buried body's tell in the field (FieldEnemy._trickle()): every
+# mound_trickle_interval_min_s to _max_s seconds a little silt spills off
+# its mound near the crest - mound_trickle_particles grains, each alive
+# mound_trickle_lifetime_s, thrown up at up to mound_trickle_velocity m/s
+# within mound_trickle_spread_degrees of straight up, in the sand's colour
+# times mound_trickle_tint, from within mound_trickle_reach of the crest
+# (a fraction of the mound's half-width and length). Only the mound over
+# a body does it, so an empty slot's leftover signs lie still. A max of 0
+# = no trickle; nothing without a negative rest height (no mound).
+@export var mound_trickle_interval_min_s: float = 0.0:
+	set(value):
+		mound_trickle_interval_min_s = maxf(value, 0.0)
+		emit_changed()
+@export var mound_trickle_interval_max_s: float = 0.0:
+	set(value):
+		mound_trickle_interval_max_s = maxf(value, 0.0)
+		emit_changed()
+@export var mound_trickle_particles: int = 5:
+	set(value):
+		mound_trickle_particles = maxi(value, 1)
+		emit_changed()
+@export var mound_trickle_lifetime_s: float = 1.0:
+	set(value):
+		mound_trickle_lifetime_s = maxf(value, 0.05)
+		emit_changed()
+@export var mound_trickle_velocity: float = 0.4:
+	set(value):
+		mound_trickle_velocity = value
+		emit_changed()
+@export var mound_trickle_spread_degrees: float = 30.0:
+	set(value):
+		mound_trickle_spread_degrees = value
+		emit_changed()
+@export var mound_trickle_tint: float = 0.75:
+	set(value):
+		mound_trickle_tint = value
+		emit_changed()
+@export_range(0.0, 1.0, 0.01) var mound_trickle_reach: float = 0.35:
+	set(value):
+		mound_trickle_reach = value
+		emit_changed()
 # Metres the model is set into the ground below its AABB feet, in the
 # field and in a fight alike - still seen, never buried (no mound, unlike
 # a negative rest height): the Greyshelf's belly on its rock. 0 = the

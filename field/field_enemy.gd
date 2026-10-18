@@ -464,6 +464,9 @@ var _slash_mark_mesh: ArrayMesh = null
 # that goes with the model.
 var _mound: SandMound = null
 var _contact_shadow: ContactShadow = null
+# The mound's silt trickle (_setup_trickle()) and its own rolls.
+var _trickle_timer: Timer = null
+var _trickle_rng: RandomNumberGenerator = RandomNumberGenerator.new()
 # Riding (ride_on()): the member it rides on, where on it (the carrier's
 # body frame, metres up from its feet), turned how far from its facing,
 # and whether it is seated there now - a fight takes it down to its line
@@ -811,6 +814,7 @@ func _ready() -> void:
 		_mound.name = "SandMound"
 		add_child(_mound)
 	_apply_model_lift()
+	_setup_trickle()
 
 	# relief_rebuilt covers every LIVE relief edit after this point, but its
 	# very first emission happens inside Ground's own _ready() - before this
@@ -1469,6 +1473,41 @@ func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spre
 	particles.global_position = global_position if at == Vector3.INF else at
 	particles.emitting = true
 	get_tree().create_timer(lifetime + 0.1).timeout.connect(particles.queue_free)
+
+# The silt trickle off a buried body's mound (EnemyData.mound_trickle_*,
+# read at each spill, so edits are live): a one-shot timer, rolled afresh
+# after each. It stops with the field freeze on contact, skips its spill
+# while the body is met or up out of the sand, and ends at defeat.
+func _setup_trickle() -> void:
+	if _mound == null or enemy_data == null:
+		return
+	_trickle_rng.randomize()
+	_trickle_timer = Timer.new()
+	_trickle_timer.name = "TrickleTimer"
+	_trickle_timer.one_shot = true
+	add_child(_trickle_timer)
+	_trickle_timer.timeout.connect(_trickle)
+	if not enemy_data.changed.is_connected(_arm_trickle):
+		enemy_data.changed.connect(_arm_trickle)
+	_arm_trickle()
+
+func _arm_trickle() -> void:
+	if _trickle_timer == null or not _trickle_timer.is_inside_tree():
+		return
+	var longest: float = maxf(enemy_data.mound_trickle_interval_min_s, enemy_data.mound_trickle_interval_max_s)
+	if longest <= 0.0 or _defeated:
+		_trickle_timer.stop()
+		return
+	_trickle_timer.start(maxf(_trickle_rng.randf_range(minf(enemy_data.mound_trickle_interval_min_s, longest), longest), 0.1))
+
+func _trickle() -> void:
+	if _mound != null and _mound.get_rise() > 0.5 and not _contacted and not _defeated:
+		var reach: float = enemy_data.mound_trickle_reach
+		var local := Vector2(
+			_trickle_rng.randf_range(-reach, reach) * _mound.width_m * 0.5,
+			_mound.get_crest_z() + _trickle_rng.randf_range(-reach, reach) * _mound.length_m * 0.5)
+		spawn_sand_puff(enemy_data.mound_trickle_particles, enemy_data.mound_trickle_lifetime_s, enemy_data.mound_trickle_velocity, enemy_data.mound_trickle_spread_degrees, enemy_data.mound_trickle_tint, _mound.surface_point(local))
+	_arm_trickle()
 
 # Creatures have no clips to swing (unlike a card's own battle_animation),
 # so this is their equivalent: a short lunge toward target and back,

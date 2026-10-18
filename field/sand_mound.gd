@@ -179,6 +179,8 @@ var _indices: PackedInt32Array = PackedInt32Array()
 var _world_xz: PackedVector2Array = PackedVector2Array()
 var _ground_y: PackedFloat32Array = PackedFloat32Array()
 var _sampled: bool = false
+# The body's frame the sample was taken in, yaw only.
+var _frame: Transform3D = Transform3D.IDENTITY
 
 func _ready() -> void:
 	top_level = true
@@ -206,6 +208,22 @@ func set_rise(rise: float) -> void:
 func get_rise() -> float:
 	return _rise
 
+# The crest's body-local Z (see _radius_at()).
+func get_crest_z() -> float:
+	var length: float = maxf(length_m, 0.01)
+	return clampf(crest_fraction, 0.05, 0.95) * length - length * 0.5 - forward_offset_m
+
+# The mound's surface, world space, over a body-local XZ in the frame it
+# was last sampled in - where FieldEnemy's silt trickle starts.
+func surface_point(local: Vector2) -> Vector3:
+	var world: Vector3 = _frame * Vector3(local.x, 0.0, local.y)
+	if _ground == null:
+		return world
+	var on_ground: Vector3 = _ground.to_local(world)
+	var height: float = _ground.get_visible_height_at(Vector2(on_ground.x, on_ground.z))
+	world.y = _ground.to_global(Vector3(on_ground.x, height, on_ground.z)).y
+	return world + Vector3.UP * height_m * _rise * _bell_at(_radius_at(local))
+
 # Samples the sand under the body where it stands and faces now, and
 # rebuilds - FieldEnemy calls it when the body is grounded at spawn and
 # on a relief rebuild; the shape exports call it through _rebuild_grid().
@@ -222,6 +240,7 @@ func resample() -> void:
 # recoil.
 func _sample(anchor_position: Vector3, anchor_yaw: float) -> void:
 	var frame := Transform3D(Basis(Vector3.UP, anchor_yaw), anchor_position)
+	_frame = frame
 	var count: int = _local_xz.size()
 	_world_xz.resize(count)
 	_ground_y.resize(count)
