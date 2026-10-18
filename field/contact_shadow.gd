@@ -45,6 +45,13 @@ const _PERCH_RAY_TRIES := 4
 	set(value):
 		footprint = value
 		_place()
+# The same for the body alone, without its attachments (FieldEnemy's
+# model before its wings or claws); used in place of footprint when
+# data.footprint_from_body. Zero for no difference.
+@export var body_footprint: Vector2 = Vector2.ZERO:
+	set(value):
+		body_footprint = value
+		_place()
 # Over everything else: 1 the pool as its data says, 0 gone (a death's
 # fade).
 @export_range(0.0, 1.0, 0.01) var fade: float = 1.0:
@@ -117,7 +124,8 @@ func _place() -> void:
 		surface = maxf(surface, _perch_top(feet, surface))
 	var height: float = maxf(feet.y - surface, 0.0)
 	var lift: float = clampf(height / maxf(data.hover_fade_height_m, 0.001), 0.0, 1.0)
-	var extent: Vector2 = footprint * data.footprint_scale + Vector2.ONE * data.footprint_margin_m
+	var base: Vector2 = body_footprint if data.footprint_from_body and body_footprint != Vector2.ZERO else footprint
+	var extent: Vector2 = base * data.footprint_scale + Vector2.ONE * data.footprint_margin_m
 	var radii: Vector2 = extent * lerpf(1.0, data.hover_min_scale, lift)
 	var alpha: float = data.strength * (1.0 - lift) * _wade_factor(surface) * fade
 	global_transform = Transform3D(Basis(Vector3.UP, _yaw()), Vector3(feet.x, surface, feet.z))

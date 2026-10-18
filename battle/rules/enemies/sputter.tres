@@ -7,6 +7,7 @@
 [ext_resource type="AudioStream" uid="uid://c2g4kb3njm4pa" path="res://assets/audio/enemies/Sputter/hit_shell_3.mp3" id="5_hit_shell_3"]
 [ext_resource type="AudioStream" uid="uid://co5jagvmbnmkr" path="res://assets/audio/enemies/Sputter/hit_armor.mp3" id="6_hit_armor"]
 [ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="7_fqvsb"]
+[ext_resource type="Resource" path="res://field/contact_shadow_sputter.tres" id="8_contact_shadow"]
 
 [sub_resource type="Resource" id="EnemyIntent_block"]
 script = ExtResource("2_intent")
@@ -40,3 +41,4 @@ erratic_intent_selection = true
 model_scale = 1.25
 attachment_scene_path = "res://field/sputter_claws.tscn"
 painted_albedo_path = "res://assets/models/enemies/Sputter/Sputter_Image_0.jpg"
+contact_shadow = ExtResource("8_contact_shadow")

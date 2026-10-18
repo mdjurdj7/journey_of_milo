@@ -31,6 +31,13 @@ class_name ContactShadowData
 	set(value):
 		footprint_margin_m = value
 		emit_changed()
+# Size the pool from the figure's body alone, not with what is attached to
+# it (the dragonfly's wings) - where the owner knows the difference
+# (ContactShadow.body_footprint).
+@export var footprint_from_body: bool = false:
+	set(value):
+		footprint_from_body = value
+		emit_changed()
 # How far out, as a fraction of the radius, the pool holds full strength
 # before it eases to nothing at its edge. No hard edge at any value.
 @export_range(0.0, 0.95, 0.01) var falloff_start: float = 0.55:

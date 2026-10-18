@@ -528,6 +528,9 @@ var _model_half_width: float = 0.0
 # grounding shift applied) - what BattleController projects for the
 # armed-card target test. Empty until the model has spawned.
 var _model_aabb: AABB = AABB()
+# _model_aabb before the attachment widens it (_attach_scene()): the body
+# alone - the contact pool's footprint where its data asks for the body.
+var _body_aabb: AABB = AABB()
 # The model's outline seen from above, body-local XZ before any battle
 # turn (a convex hull of its vertices) - what its frame reaches are read
 # from, the body's own taper and all (battle_frame_reaches()).
@@ -797,6 +800,7 @@ func _ready() -> void:
 		contact_shadow.data = enemy_data.contact_shadow
 	if _model_aabb.size != Vector3.ZERO:
 		contact_shadow.footprint = Vector2(_model_aabb.size.x, _model_aabb.size.z) * 0.5
+		contact_shadow.body_footprint = Vector2(_body_aabb.size.x, _body_aabb.size.z) * 0.5
 	contact_shadow.feet_source = _contact_feet
 	add_child(contact_shadow)
 	_contact_shadow = contact_shadow
@@ -987,6 +991,7 @@ func _spawn_model() -> void:
 		_model_height = combined_aabb.size.y
 		_model_half_width = maxf(combined_aabb.size.x, combined_aabb.size.z) * 0.5
 		_model_aabb = AABB(combined_aabb.position + Vector3(0.0, grounding_shift, 0.0), combined_aabb.size)
+		_body_aabb = _model_aabb
 		_model_outline = _measure_outline(model)
 	_model_ground_y = model.position.y
 

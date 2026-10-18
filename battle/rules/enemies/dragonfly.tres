@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
 [ext_resource type="AudioStream" uid="uid://co5jagvmbnmkr" path="res://assets/audio/enemies/Sputter/hit_armor.mp3" id="3_hit_armor"]
 [ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="4_l7uxx"]
+[ext_resource type="Resource" path="res://field/contact_shadow_dragonfly.tres" id="8_contact_shadow"]
 
 [sub_resource type="Resource" id="EnemyIntent_bite_1"]
 script = ExtResource("2_intent")
@@ -34,3 +35,4 @@ model_scale = 0.44
 attachment_scene_path = "res://field/dragonfly_wings.tscn"
 rest_height_m = 0.12
 battle_hover_m = 0.45
+contact_shadow = ExtResource("8_contact_shadow")
