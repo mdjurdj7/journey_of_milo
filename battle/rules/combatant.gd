@@ -140,8 +140,8 @@ var true_mound: int = -1
 # resolve(), reset by BattleController._start_player_turn().
 var damage_taken_this_turn: int = 0
 # No living packmate left in this fight (the last of its FieldEnemy.group,
-# or never one): a simultaneous intent is a pack's move, so EnemyTurn
-# steps past it from here on - see EnemyTurn.leave_pack(). Set by
+# or never one): a pack move (EnemyTurn.is_pack_move()) is stepped past
+# from here on - see EnemyTurn.leave_pack(). Set by
 # BattleController; never cleared, a pack doesn't regroup mid-fight.
 var pack_alone: bool = false
 # Turns this enemy has taken this fight - every EnemyTurn.take_turn() it

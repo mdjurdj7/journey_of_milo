@@ -748,10 +748,11 @@ static func leave_pack(combatant: Combatant, data: EnemyData) -> bool:
 	return true
 
 # A move only a pack makes - dropped from the loop once the enemy is the
-# last of its pack: the dragonflies' simultaneous Swarm, and a heal for
-# packmates (HEAL_ALLY - the Nipper's Forage).
+# last of its pack: one marked pack_only (the dragonflies' Swarm), and a
+# heal for packmates (HEAL_ALLY - the Nipper's Forage). A simultaneous
+# move is only a shared beat, and isn't one by that alone.
 static func is_pack_move(intent: EnemyIntent) -> bool:
-	return intent != null and (intent.simultaneous or intent.type == EnemyIntent.IntentType.HEAL_ALLY)
+	return intent != null and (intent.pack_only or intent.type == EnemyIntent.IntentType.HEAL_ALLY)
 
 static func _advance_intent(combatant: Combatant, data: EnemyData) -> void:
 	if data.intents.is_empty():

@@ -1085,21 +1085,24 @@
             "name": "Bow",
             "type": "DEFEND",
             "block": 4,
-            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+            "simultaneous": "a shared beat: every living member queued on one acts at once",
+            "pack_only": "a pack move: dropped from the loop once the enemy is the last of its pack"
           },
           {
             "name": "Step",
             "type": "ATTACK",
             "damage_per_hit": 6,
             "hits": 1,
-            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+            "simultaneous": "a shared beat: every living member queued on one acts at once",
+            "pack_only": "a pack move: dropped from the loop once the enemy is the last of its pack"
           },
           {
             "name": "Leap",
             "type": "ATTACK",
             "damage_per_hit": 10,
             "hits": 1,
-            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+            "simultaneous": "a shared beat: every living member queued on one acts at once",
+            "pack_only": "a pack move: dropped from the loop once the enemy is the last of its pack"
           }
         ],
         "modified_by": [],
@@ -1210,7 +1213,8 @@
             "type": "ATTACK",
             "damage_per_hit": 4,
             "hits": 1,
-            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+            "simultaneous": "a shared beat: every living member queued on one acts at once",
+            "pack_only": "a pack move: dropped from the loop once the enemy is the last of its pack"
           }
         ],
         "modified_by": [],
@@ -1960,21 +1964,24 @@
             "name": "Bow",
             "type": "DEFEND",
             "block": 4,
-            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+            "simultaneous": "a shared beat: every living member queued on one acts at once",
+            "pack_only": "a pack move: dropped from the loop once the enemy is the last of its pack"
           },
           {
             "name": "Step",
             "type": "ATTACK",
             "damage_per_hit": 6,
             "hits": 1,
-            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+            "simultaneous": "a shared beat: every living member queued on one acts at once",
+            "pack_only": "a pack move: dropped from the loop once the enemy is the last of its pack"
           },
           {
             "name": "Leap",
             "type": "ATTACK",
             "damage_per_hit": 10,
             "hits": 1,
-            "simultaneous": "a pack move: every living member queued on one acts in the same beat"
+            "simultaneous": "a shared beat: every living member queued on one acts at once",
+            "pack_only": "a pack move: dropped from the loop once the enemy is the last of its pack"
           }
         ],
         "modified_by": [],

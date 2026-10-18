@@ -414,7 +414,9 @@ static func _intent_entry(data: EnemyData, intent: EnemyIntent) -> Dictionary:
 		entry["turn_one_locked"] = intent.turn_one_locked
 		entry["no_immediate_repeat"] = intent.no_immediate_repeat
 	if intent.simultaneous:
-		entry["simultaneous"] = "a pack move: every living member queued on one acts in the same beat"
+		entry["simultaneous"] = "a shared beat: every living member queued on one acts at once"
+	if intent.pack_only:
+		entry["pack_only"] = "a pack move: dropped from the loop once the enemy is the last of its pack"
 	if intent.interrupt_threshold > 0:
 		entry["interrupt"] = {
 			"break_threshold": intent.interrupt_threshold,

@@ -20,6 +20,7 @@ script = ExtResource("2_intent")
 intent_name = "Swarm"
 value = 4
 simultaneous = true
+pack_only = true
 
 [resource]
 script = ExtResource("1_enemy_data")

@@ -16,7 +16,7 @@ class_name EnemyIntent
 #
 # HEAL_ALLY: no damage - each living packmate (FieldEnemy.group) heals
 # `value` HP, capped at its max (BattleController._heal_packmates()). A
-# pack move, like a simultaneous one: alone, the enemy steps past it
+# pack move, like a pack_only one: alone, the enemy steps past it
 # (EnemyTurn.leave_pack()). The Nipper's Forage. Appended: an inserted
 # value would rewrite every .tres that stores one of these as an integer.
 #
@@ -84,12 +84,22 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL, DIG, T
 # choice if it was ALSO the intent picked last turn.
 
 @export var simultaneous: bool = false
-# A pack's shared move (the dragonflies' Swarm): when every living member
-# of a fight's cluster is queued on an intent with this set, they act as
-# one - lunges started together, one wait, every hit landed in the same
-# beat (BattleController._run_enemy_turn()). The rules are unchanged:
-# each member's take_turn() runs on its own, so Grace still sees three
-# separate hits. False = the ordinary one-after-another turn.
+# A shared beat (the dragonflies' Swarm, the cranes' steps): when every
+# living member of a fight's cluster is queued on an intent with this
+# set, they act as one - lunges started together, one wait, every hit
+# landed in the same beat (BattleController._run_enemy_turn()). The rules
+# are unchanged: each member's take_turn() runs on its own, so Grace
+# still sees three separate hits. False = the ordinary one-after-another
+# turn. Presentation only - whether the move outlives the pack is
+# pack_only's.
+
+@export var pack_only: bool = false:
+	set(value):
+		pack_only = value
+		emit_changed()
+# A move only a pack makes (the dragonflies' Swarm): once the enemy is the
+# last of its pack it drops out of the loop (EnemyTurn.is_pack_move(),
+# leave_pack()). False = the move stays in the loop alone too.
 
 @export var interrupt_threshold: int = 0
 # ATTACK only: damage the player has to deal this enemy during the turn

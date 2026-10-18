@@ -13,6 +13,7 @@ intent_name = "Bow"
 type = 1
 value = 4
 simultaneous = true
+pack_only = true
 motion = &"bow"
 
 [sub_resource type="Resource" id="EnemyIntent_step"]
@@ -20,6 +21,7 @@ script = ExtResource("2_intent")
 intent_name = "Step"
 value = 6
 simultaneous = true
+pack_only = true
 motion = &"step"
 
 [sub_resource type="Resource" id="EnemyIntent_leap"]
@@ -27,6 +29,7 @@ script = ExtResource("2_intent")
 intent_name = "Leap"
 value = 10
 simultaneous = true
+pack_only = true
 motion = &"leap"
 
 [resource]
