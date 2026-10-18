@@ -102,9 +102,13 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	# (EffectContext.record_hit()) - all of them summed for an all-enemies
 	# Attack. Never a countdown going off or a counter's Drain: neither is
 	# the Attack's blow. Before the Critical triggers below, so a heal that
-	# lifts the player out of Critical is seen there.
+	# lifts the player out of Critical is seen there. The run log puts the
+	# heal down to the card that granted the Drain, with this Attack as its
+	# trigger (RunLogger.player_healed()).
 	if ctx.card_is_attack and Status.attacks_drain(ctx.player.statuses):
+		RunLogger.push_source(Status.attacks_drain_source(ctx.player.statuses))
 		ctx.heal(floori(float(ctx.hp_dealt_this_card) * Status.attacks_drain_fraction(ctx.player.statuses)))
+		RunLogger.pop_source()
 	# After the whole card: its own HP cost (self-damage, the stance's
 	# price) may have made the player Critical, and a status waiting for
 	# that (No Further) gives way now - as does one this card just applied

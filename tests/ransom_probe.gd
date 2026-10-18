@@ -36,6 +36,9 @@ const COLLATERAL_PATH := "res://cards/data/collateral.tres"
 const COME_DUE_STATUS_PATH := "res://battle/rules/statuses/come_due.tres"
 const SELF_EATER_STANCE_PATH := "res://battle/rules/stances/self_eater.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
+# Where the next-turn case writes its run, when run_probes.sh hands over
+# no folder of this process's own (RunLogger.dir_override()).
+const LOG_DIR := "user://ransom_probe"
 const WAITING_TEXT := "Next turn, your Attacks heal half the damage dealt."
 const ACTIVE_TEXT := "This turn, your Attacks heal half the damage dealt."
 const PLAYER_MAX_HP := 70
@@ -240,21 +243,28 @@ func _check_turn_played() -> void:
 	await _teardown()
 	_completed += 1
 
-# Next turn the live line shows and an Attack heals exactly what it took;
-# the turn after, it's gone and heals nothing.
+# Next turn the live line shows and an Attack heals exactly what it took
+# - the run log putting the heal down to Ransom, Slash its trigger; the
+# turn after, it's gone and heals nothing.
 func _check_next_turn_then_ends() -> void:
+	var log_dir: String = _open_log()
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var player: Combatant = controller.get("player")
 		await _play(controller, await _deal(controller, RANSOM_PATH))
 		await _next_turn(controller)
 		_expect_eq(_ransom_lines(controller), [ACTIVE_TEXT], "Next turn the readout: Ransom / " + ACTIVE_TEXT)
-		_expect_eq(_slash_heal(await _slash(controller)), true, "...and Slash heals half what it dealt")
+		var healed: Array = await _slash(controller)
+		_expect_eq(_slash_heal(healed), true, "...and Slash heals half what it dealt")
+		var heal_line: Dictionary = _log_line(log_dir, "heal", "card:Ransom")
+		_expect_eq([int(heal_line.get("amount", -1)), str(heal_line.get("trigger"))], [int(healed[1]), "card:Slash"], "...logged as a heal from card:Ransom, triggered by card:Slash")
+		_expect_eq(int(heal_line.get("v", 0)), RunLogger.FORMAT_VERSION, "...on a format %d line" % RunLogger.FORMAT_VERSION)
 		await _next_turn(controller)
 		_expect_eq(_ransom_lines(controller), [], "The turn after, no Ransom line")
 		var hit: Array = await _slash(controller)
 		_expect(hit[0] > 0 and hit[1] == 0, "...and Slash heals nothing (dealt %d, healed %d)" % hit)
 	await _teardown()
+	RunLogger.set_output_dir("")
 	_completed += 1
 
 # Two Ransoms while one waits: one status, one stack, one Drain.
@@ -489,6 +499,32 @@ func _enemy(controller: Node) -> Combatant:
 
 func _field_enemy(controller: Node) -> Node:
 	return (controller.get("_combatants") as Dictionary).keys()[0]
+
+# A fresh run-log folder for this process (RunLogger.dir_override(), else
+# LOG_DIR), emptied and set as the log's output.
+func _open_log() -> String:
+	var dir: String = RunLogger.dir_override() if not RunLogger.dir_override().is_empty() else LOG_DIR
+	DirAccess.make_dir_recursive_absolute(dir)
+	for file_name in DirAccess.get_files_at(dir):
+		DirAccess.remove_absolute(dir.path_join(file_name))
+	RunLogger.set_output_dir(dir)
+	RunLogger.enabled = true
+	return dir
+
+# The last line of event `ev` from `source` in the folder's run logs.
+func _log_line(dir: String, ev: String, source: String) -> Dictionary:
+	var found: Dictionary = {}
+	for file_name in DirAccess.get_files_at(dir):
+		if not file_name.ends_with(".jsonl"):
+			continue
+		for raw in FileAccess.get_file_as_string(dir.path_join(file_name)).split("
+", false):
+			var parsed: Variant = JSON.parse_string(raw)
+			if parsed is Dictionary and str((parsed as Dictionary).get("ev")) == ev and str((parsed as Dictionary).get("source")) == source:
+				found = parsed
+	if found.is_empty():
+		_fail("no %s line from %s in the run log at %s" % [ev, source, ProjectSettings.globalize_path(dir)])
+	return found
 
 func _expect(condition: bool, message: String) -> void:
 	if not condition:

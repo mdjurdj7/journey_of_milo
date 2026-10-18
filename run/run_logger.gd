@@ -45,10 +45,17 @@ class_name RunLogger
 # nothing existing changed: floor_entered's slots (slot id -> the option
 # it stood), fight_start's slot and option, and each member's slot_id and
 # option_id; and (2026-10-17) run_start's weapon, its id.
+#
+# Format 3 (2026-10-18): a heal made by something a card set going - a
+# source pushed while a card is open, Ransom's Drain on an Attack - is
+# put down to that ("card:Ransom", the card that granted it) with a
+# "trigger" naming the card that set it off ("card:Slash"), where format
+# 2 put it down to the trigger alone. fight_end's healed by_source counts
+# it under its source.
 
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 2
+const FORMAT_VERSION := 3
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic"]
@@ -511,7 +518,9 @@ static func player_hp_lost(amount: int, source: String) -> void:
 
 # HP the run actually got back, other than Grace, and from what: `source`
 # when given, else what is acting now (current_source()), else "other".
-# In a fight it is summed onto fight_end; in or out, a heal line.
+# One pushed while a card is open (Ransom's Drain on an Attack) carries
+# that card as its "trigger". In a fight it is summed onto fight_end; in
+# or out, a heal line.
 static func player_healed(amount: int, source: String = "") -> void:
 	if amount <= 0:
 		return
@@ -523,7 +532,11 @@ static func player_healed(amount: int, source: String = "") -> void:
 		_healed_by[by] = int(_healed_by.get(by, 0)) + amount
 		if _card_open:
 			_card_healed += amount
-	_write_detail("heal", {"fight": _fights if _fight_open else null, "turn": _turn if _fight_open else null, "source": by, "amount": amount})
+	var line: Dictionary = {"fight": _fights if _fight_open else null, "turn": _turn if _fight_open else null, "source": by, "amount": amount}
+	var card_source: String = "card:" + _card_name
+	if _card_open and not _sources.is_empty() and by != card_source:
+		line["trigger"] = card_source
+	_write_detail("heal", line)
 
 # One enemy attack as it landed: who, which intent, and each hit's damage
 # before block, what block and absorb took, and what reached HP.

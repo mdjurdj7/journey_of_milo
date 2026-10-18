@@ -14,12 +14,18 @@ var charges: int = 0
 # next Drain, 0 up to one short of the count. Kept across a stack - a
 # second copy joins the count, it doesn't restart it.
 var progress: int = 0
+# For the run log only: what put it on (RunLogger.current_source() as it
+# was made - "card:Ransom" for the card that played it), carried on to
+# what it grants at turn start (resolve_turn_start_triggers()). A heal it
+# makes is put down to it (attacks_drain_source()).
+var granted_by: String = ""
 
 func _init(status_data: StatusData) -> void:
 	data = status_data
 	magnitude = status_data.default_magnitude
 	turns_remaining = status_data.default_duration_turns
 	charges = status_data.default_charges
+	granted_by = RunLogger.current_source()
 
 func apply_stack() -> void:
 	stack_count += 1
@@ -508,6 +514,9 @@ static func resolve_turn_start_triggers(statuses: Array[Status]) -> void:
 			continue
 		statuses.erase(active)
 		apply_to(statuses, active.data.grants_on_turn_start)
+		var granted := find_in(statuses, active.data.grants_on_turn_start)
+		if granted != null:
+			granted.granted_by = active.granted_by
 
 # Its holder's turn has ended: every status that lasts only that turn
 # (StatusData.ends_at_turn_end) is gone.
@@ -522,6 +531,18 @@ static func attacks_drain(statuses: Array[Status]) -> bool:
 		if active.data != null and active.data.attacks_drain:
 			return true
 	return false
+
+# What the run log puts an Attack's Drain heal down to: the granted_by of
+# the status giving the largest share (attacks_drain_fraction()) - the
+# card that played Ransom - else "status:<its id>". "" when none Drains.
+static func attacks_drain_source(statuses: Array[Status]) -> String:
+	var best: Status = null
+	for active in statuses:
+		if active.data != null and active.data.attacks_drain and (best == null or active.data.ransom_heal_fraction > best.data.ransom_heal_fraction):
+			best = active
+	if best == null:
+		return ""
+	return best.granted_by if not best.granted_by.is_empty() else "status:" + best.data.id
 
 # The share of its HP dealt an Attack played now heals - the largest
 # ransom_heal_fraction among the statuses making it Drain; 0 when none is.
