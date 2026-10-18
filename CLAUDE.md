@@ -20,6 +20,9 @@
   `git worktree add ../journey-of-milo-<task> -b <task-branch>` (or
   detached at main). Commit there, then bring the commits onto main
   (fast-forward or cherry-pick) by explicit path.
+- Never chain worktree removal or other cleanup onto a merge,
+  fast-forward or push command. Run cleanup as its own step, only after
+  confirming the merge succeeded.
 - Never run two sessions in the same working tree. If another session
   may be active, work in your own `git worktree`. Before editing
   anything in main, check `git status` and stop if there are changes
@@ -50,6 +53,8 @@
   probe runs at --fixed-fps 60, so probes time things in game time
   (ProbePlay.game_msec()), never Time.get_ticks_*, and wait on the
   event (ProbePlay.wait_until()) rather than a fixed timer.
+- If a headless import fails or crashes, stop before running any
+  generator or probe on that tree, and re-import.
 - Data-only changes (scene/.tres values, assets, masks, docs): no probes.
 - Code changes: run only the probe(s) for the system you touched
   (`--probe`), once, at the end, in the foreground - not whole areas,
@@ -63,6 +68,10 @@
   changed since.
 - If memory is too low to run probes, don't wait; commit and say so.
   The nightly full set covers it.
+- A task prompt's own stop or merge conditions ("merge only if the
+  probes pass", "stop if memory is under the floor") override this
+  file's general guidance, the low-memory rule above included. Never
+  merge unprobed work unless my message explicitly says to.
 - Nightly full set: `tools/nightly_probes.sh` (Git Bash, main tree),
   or from PowerShell in a window of its own that outlives the terminal:
   `Start-Process "C:\Program Files\Git\bin\bash.exe" -ArgumentList "tools/nightly_probes.sh"`.
@@ -72,7 +81,8 @@
   seconds per probe, each failure's first FAIL lines; logs beside it)
   and removes the worktree. I start it; Claude doesn't unless I ask, and
   reads latest.txt when I say the nightly ran.
-- Never push unless my message says "push".
+- Never push unless my current message says "push". A push word in an
+  earlier message, or approval to commit or merge, doesn't carry over.
 - Before any push, run `git pull --rebase`.
 - Don't write a new probe unless I ask for one, or unless it guards a
   bug that actually happened.
