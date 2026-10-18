@@ -25,3 +25,5 @@ Then lose 2 HP."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage"), SubResource("CardEffect_self_damage")])
 battle_animation = &"Slash"
 art = ExtResource("9_art")
+card_class = &"wanderer"
+offer = 1

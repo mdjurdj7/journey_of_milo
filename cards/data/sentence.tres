@@ -24,3 +24,4 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_sta
 art = ExtResource("9_art")
 play_sound_path = "res://assets/audio/cards/Sentence/Sentence.mp3"
 tempered = ExtResource("10_tempered")
+card_class = &"wanderer"

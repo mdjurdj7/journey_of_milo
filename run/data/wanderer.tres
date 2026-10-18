@@ -12,6 +12,7 @@
 [resource]
 script = ExtResource("1_character_data")
 character_name = "Wanderer"
+card_class = &"wanderer"
 max_hp = 80
 starting_deck_counts = {
 ExtResource("2_slash"): 4,

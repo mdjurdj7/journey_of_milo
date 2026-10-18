@@ -26,3 +26,4 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("E_damage"), SubResou
 art = ExtResource("3_art")
 battle_animation = &"Slash"
 impact_time = 0.55
+card_class = &"wanderer"

@@ -22,3 +22,4 @@ description = "While Critical, gain 1 Energy at the start of your turn."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
 art = ExtResource("4_art")
 tempered = ExtResource("10_tempered")
+card_class = &"wanderer"

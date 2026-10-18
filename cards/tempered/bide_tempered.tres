@@ -24,3 +24,4 @@ description = "Set aside up to {set_aside} cards until next turn.
 Draw {draw}."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_set_aside"), SubResource("E_draw")])
 art = ExtResource("3_art")
+card_class = &"wanderer"

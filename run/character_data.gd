@@ -12,6 +12,9 @@ class_name CharacterData
 # so an edit here takes effect on the next floor or run, never live.
 
 @export var character_name: String = ""
+# This class's cards: a random card offer gives a card whose own card_class
+# is this, or empty (neutral) - RewardPool.
+@export var card_class: StringName = &""
 @export var max_hp: int = 70
 
 # CardData -> copy count: the run's starting Belongings. Keys are real

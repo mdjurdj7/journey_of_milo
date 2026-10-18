@@ -29,3 +29,4 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_spend_tol
 removal_scope = 1
 art = ExtResource("9_art")
 tempered = ExtResource("10_tempered")
+card_class = &"wanderer"

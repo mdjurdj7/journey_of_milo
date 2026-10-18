@@ -23,3 +23,4 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_self_dama
 removal_scope = 1
 art = ExtResource("9_art")
 play_sound_path = "res://assets/audio/cards/Blood Advance/Blood Advance.mp3"
+card_class = &"wanderer"

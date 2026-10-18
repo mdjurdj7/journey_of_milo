@@ -25,3 +25,4 @@ description = "Draw {draw}."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_self"), SubResource("E_draw")])
 art = ExtResource("3_art")
 tempered = ExtResource("4_tempered")
+card_class = &"wanderer"

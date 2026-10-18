@@ -23,6 +23,7 @@ Required:
 | **Cost** | Energy to play. |
 | **Card Type** | Attack, Skill, Stance or Power. Attack matters to the rules: stances react to Attacks. |
 | **Rarity** | Common, Uncommon, Rare or Ultra Rare. **Never leave it Unset.** An Unset card is never offered as a reward, and the card rarity check fails on it. |
+| **Card Class** | `samurai`. Every card in this folder needs it: a reward only offers the run's own class's cards and neutral ones, and the card rarity check fails on a card here without it. If you duplicated a card from `cards/neutral/`, its Card Class is empty: set it. |
 | **Target Type** | Enemy (the player picks one), Self or None. |
 | **Description** | The rules text. Numbers come from the effects through tokens such as `{damage}`, `{block}` and `{draw}`, so the text always matches. Copy the pattern from a similar card in `cards/neutral/`. |
 | **Effects** | One or more CardEffect entries: click the array, **Add Element**, **New CardEffect**. Set **Effect Type** (Damage, Block, Draw, Heal and so on), **Value** and, if needed, **Condition** and **Target Scope**. |

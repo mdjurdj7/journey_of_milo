@@ -29,3 +29,4 @@ description = "Gain {block} block.
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_block"), SubResource("CardEffect_guard")])
 art = ExtResource("3_art")
 tempered = ExtResource("10_tempered")
+card_class = &"wanderer"

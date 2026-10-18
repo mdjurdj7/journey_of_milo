@@ -27,3 +27,5 @@ Draw {draw}."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status_to_target"), SubResource("CardEffect_draw")])
 battle_animation = &"Brace"
 art = ExtResource("9_art")
+card_class = &"wanderer"
+offer = 1

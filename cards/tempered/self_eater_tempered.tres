@@ -21,3 +21,4 @@ description = "Your Attacks deal 5 more and cost 2 HP."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_stance")])
 art = ExtResource("4_art")
 play_sound_path = "res://assets/audio/cards/self_eater_play.wav"
+card_class = &"wanderer"

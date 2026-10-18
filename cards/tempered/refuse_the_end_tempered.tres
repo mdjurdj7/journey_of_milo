@@ -22,3 +22,4 @@ Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
 removal_scope = 1
 art = ExtResource("4_art")
+card_class = &"wanderer"

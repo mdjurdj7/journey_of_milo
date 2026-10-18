@@ -30,3 +30,4 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("E_self_damage_toll")
 art = ExtResource("4_art")
 play_sound_path = "res://assets/audio/cards/Garnish/Garnish.mp3"
 tempered = ExtResource("10_tempered")
+card_class = &"wanderer"

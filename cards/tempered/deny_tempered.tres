@@ -29,3 +29,4 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("E_consume"), SubReso
 removal_scope = 1
 art = ExtResource("4_art")
 play_sound_path = "res://assets/audio/cards/Deny/Deny.mp3"
+card_class = &"wanderer"

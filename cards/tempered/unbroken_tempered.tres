@@ -27,3 +27,4 @@ description = "Gain {block} block.
 {if}Critical: the next Attack against you deals 8 less.{/if}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_block"), SubResource("CardEffect_guard")])
 art = ExtResource("3_art")
+card_class = &"wanderer"

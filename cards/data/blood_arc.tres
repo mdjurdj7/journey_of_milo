@@ -27,3 +27,4 @@ battle_animation = &"Slash"
 impact_time = 0.55
 play_effect_scene_path = "res://battle/effects/blood_arc_stroke.tscn"
 tempered = ExtResource("10_tempered")
+card_class = &"wanderer"

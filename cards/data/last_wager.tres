@@ -28,3 +28,4 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage"),
 art = ExtResource("9_art")
 battle_animation = &"Slash"
 tempered = ExtResource("10_tempered")
+card_class = &"wanderer"

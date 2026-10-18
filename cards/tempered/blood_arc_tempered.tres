@@ -25,3 +25,4 @@ art = ExtResource("9_art")
 battle_animation = &"Slash"
 impact_time = 0.55
 play_effect_scene_path = "res://battle/effects/blood_arc_stroke.tscn"
+card_class = &"wanderer"

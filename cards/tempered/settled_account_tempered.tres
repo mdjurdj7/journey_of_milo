@@ -24,3 +24,4 @@ art = ExtResource("9_art")
 play_sound_path = "res://assets/audio/cards/Settled Account/Settled Account.mp3"
 critical_sound_pitch = 0.95
 critical_sound_volume_db = 1.0
+card_class = &"wanderer"

@@ -21,3 +21,4 @@ description = "Every 3 times you damage yourself:
 Drain 8 from all enemies."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
 art = ExtResource("9_art")
+card_class = &"wanderer"

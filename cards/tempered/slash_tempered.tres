@@ -20,3 +20,5 @@ battle_animation = &"Slash"
 impact_time = 0.55
 art = ExtResource("9_art")
 tags = Array[StringName]([&"basic_attack"])
+card_class = &"wanderer"
+offer = 1

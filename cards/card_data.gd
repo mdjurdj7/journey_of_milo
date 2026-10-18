@@ -27,6 +27,15 @@ enum CardType { ATTACK, SKILL, STANCE, POWER }
 enum CardRarity { UNSET = 0, COMMON = 1, UNCOMMON = 2, RARE = 3, ULTRA_RARE = 4 }
 
 enum RemovalScope { NONE, SPENT, CONSUMED }
+
+# Whether a random card offer may give this card (RewardPool - every
+# reward, bundle, belongings and collector roll), whatever pool lists it.
+# REWARDABLE: it may. STARTER_ONLY: only ever in a starting deck (the
+# Wanderer's five). KEEPER_ONLY: only ever from the Keeper. OWN_CHANNEL:
+# offered only by a channel of its own, never by a roll (Samphire - the
+# fight's Samphire chance, the collector's fixed slot). Integers are baked
+# into every .tres: append, never reorder.
+enum OfferScope { REWARDABLE = 0, STARTER_ONLY = 1, KEEPER_ONLY = 2, OWN_CHANNEL = 3 }
 # NONE: goes to the discard pile, reshuffles back in for the rest of the
 # fight like any other card. SPENT and CONSUMED both leave this fight's
 # draw/hand/discard rotation for good once played (Deck.exhaust_pile -
@@ -113,6 +122,15 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 # healing consumable, plain and tempered alike - what floor 4's pup needs
 # (DunecurPup). A tempered version carries its original's tags itself.
 @export var tags: Array[StringName] = []
+
+# Whose card this is: a class's card_class (CharacterData.card_class -
+# &"wanderer" for every card under cards/data/ and its tempered copy,
+# &"samurai" under cards/samurai/), or empty for a neutral card any class
+# may be offered. A random offer gives only the run's class's cards and
+# neutral ones (RewardPool).
+@export var card_class: StringName = &""
+# See OfferScope.
+@export var offer: OfferScope = OfferScope.REWARDABLE
 
 # Whether this card carries `tag`.
 func has_tag(tag: StringName) -> bool:

@@ -29,3 +29,4 @@ play_sound_path = "res://assets/audio/cards/Claw Back/Claw Back.mp3"
 critical_sound_pitch = 0.85
 critical_sound_volume_db = 2.0
 tempered = ExtResource("10_tempered")
+card_class = &"wanderer"

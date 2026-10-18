@@ -22,3 +22,4 @@ Critical: costs 0."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
 art = ExtResource("9_art")
 battle_animation = &"Slash"
+card_class = &"wanderer"

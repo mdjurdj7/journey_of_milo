@@ -20,3 +20,4 @@ Consumed."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_heal")])
 removal_scope = 2
 tags = Array[StringName]([&"field_remedy"])
+offer = 3

@@ -20,3 +20,4 @@ target_type = 1
 description = "While Critical, your Attacks deal 10 more. You can't gain block."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_stance")])
 art = ExtResource("4_art")
+card_class = &"wanderer"

@@ -28,3 +28,4 @@ Next 3 Attack hits against this enemy deal +4 damage."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_spend_toll"), SubResource("CardEffect_apply_status_to_target")])
 art = ExtResource("9_art")
 tempered = ExtResource("10_tempered")
+card_class = &"wanderer"

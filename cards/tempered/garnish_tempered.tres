@@ -28,3 +28,4 @@ Gain 8 Toll."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_self_damage_toll"), SubResource("E_garnish")])
 art = ExtResource("4_art")
 play_sound_path = "res://assets/audio/cards/Garnish/Garnish.mp3"
+card_class = &"wanderer"

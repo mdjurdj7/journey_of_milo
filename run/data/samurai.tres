@@ -11,6 +11,7 @@
 [resource]
 script = ExtResource("1_character_data")
 character_name = "Samurai"
+card_class = &"samurai"
 max_hp = 80
 starting_deck_counts = {
 ExtResource("2_left_hand"): 5,

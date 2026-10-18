@@ -27,3 +27,4 @@ impact_time = 0.55
 play_sound_path = "res://assets/audio/cards/Claw Back/Claw Back.mp3"
 critical_sound_pitch = 0.85
 critical_sound_volume_db = 2.0
+card_class = &"wanderer"
