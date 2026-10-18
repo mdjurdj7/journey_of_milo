@@ -152,11 +152,12 @@ enum Mark { NONE, COIL, DROP }
 @export var bonus_requires_critical: bool = false
 
 # Extra damage each of the player's Attack cards deals to this status's
-# HOLDER - an enemy - while it's up (Come Due). Once per Attack card, like
-# the attack bonus (EffectContext.take_mark_bonus()), and to the holder
-# alone: an all-enemies Attack pays it to this enemy, not its neighbours.
-# Each Attack card that lands on the holder spends one charge (default_
-# charges to start) and the status is gone at 0. Pair it with DURATION_UNTIL_REMOVED so no turn takes it
+# HOLDER - an enemy - while it's up (Come Due). Once per hit of an Attack
+# card (EffectContext.take_mark_bonus(), paid again for a repeated hit -
+# Second Swing, Lash), and to the holder alone: an all-enemies Attack
+# pays it to this enemy, not its neighbours. Each such hit that lands on
+# the holder spends one charge (default_charges to start) and the status
+# is gone at 0. Pair it with DURATION_UNTIL_REMOVED so no turn takes it
 # first. 0 = none.
 @export var attack_bonus_against_holder: int = 0
 

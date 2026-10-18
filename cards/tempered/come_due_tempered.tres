@@ -23,6 +23,6 @@ card_type = 1
 rarity = 2
 target_type = 0
 description = "Spend 5 Toll.
-Next 3 Attacks against this enemy deal +6 damage."
+Next 3 Attack hits against this enemy deal +6 damage."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_spend_toll"), SubResource("CardEffect_apply_status_to_target")])
 art = ExtResource("9_art")
