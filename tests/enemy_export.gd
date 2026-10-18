@@ -13,8 +13,22 @@ class_name EnemyExport
 # The prose comes from the data too: EnemyData.mechanic_summary,
 # EnemyIntent.intent_name, and each status's description resolved through
 # Status.describe().
+#
+# It refuses to write (exit 1, nothing touched) when the project didn't
+# load cleanly - an import left unfinished, or a resource the export reads
+# missing (load_problems()) - or when the export would have more than
+# --max-shrink=<fraction> (default DEFAULT_MAX_SHRINK) fewer floors,
+# encounters or enemies than the committed file (shrink_problems()). A
+# half-imported tree once wrote a near-empty export. For an intended large
+# removal, pass --allow-shrink:
+#
+#   Godot_v4.7.1.exe --headless --path . -s res://tests/enemy_export.gd -- --allow-shrink
 
 const OUTPUT_PATH := "res://docs/enemy_export.json"
+const OUTPUT_GIT_PATH := "docs/enemy_export.json"
+const DEFAULT_MAX_SHRINK := 0.2
+const ALLOW_SHRINK_FLAG := "--allow-shrink"
+const MAX_SHRINK_ARG := "--max-shrink="
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const REWARD_SCREEN_SCENE_PATH := "res://battle/reward_screen.tscn"
 const ENEMY_DIR := "res://battle/rules/enemies/"
@@ -25,18 +39,176 @@ const REGENERATE := "Godot_v4.7.1.exe --headless --path . -s res://tests/enemy_e
 const STATUS_SKIP: Array[String] = ["id", "display_name", "description", "battle_animation", "script", "resource_local_to_scene", "resource_path", "resource_name", "resource_scene_unique_id"]
 
 func _initialize() -> void:
+	var args: PackedStringArray = OS.get_cmdline_user_args()
+	var max_shrink: float = DEFAULT_MAX_SHRINK
+	for arg in args:
+		if arg.begins_with(MAX_SHRINK_ARG):
+			max_shrink = arg.trim_prefix(MAX_SHRINK_ARG).to_float()
+	var problems: Array[String] = load_problems()
+	if not problems.is_empty():
+		_refuse(problems, "the project didn't load cleanly. Re-import it (Godot_v4.7.1.exe --headless --path . --import) and run this again.")
+		return
+	var export: Dictionary = build()
+	var committed: Variant = _committed_export()
+	if committed == null:
+		print("enemy_export: no committed %s to compare against - writing it fresh" % OUTPUT_PATH)
+	elif not args.has(ALLOW_SHRINK_FLAG):
+		problems = shrink_problems(export, committed as Dictionary, max_shrink)
+		if not problems.is_empty():
+			_refuse(problems, "it would shrink sharply. If the removal is intended, pass %s after --." % ALLOW_SHRINK_FLAG)
+			return
 	var file := FileAccess.open(OUTPUT_PATH, FileAccess.WRITE)
 	if file == null:
 		print("enemy_export: could not write %s" % OUTPUT_PATH)
 		quit(1)
 		return
-	file.store_string(to_json())
+	file.store_string(_stringify(export))
 	file.close()
 	print("enemy_export: wrote %s" % OUTPUT_PATH)
 	quit(0)
 
+func _refuse(problems: Array[String], why: String) -> void:
+	for problem in problems:
+		print("enemy_export: REFUSED - " + problem)
+	print("enemy_export: nothing written to %s - %s" % [OUTPUT_PATH, why])
+	quit(1)
+
 static func to_json() -> String:
-	return JSON.stringify(build(), "  ", false) + "\n"
+	return _stringify(build())
+
+static func _stringify(export: Dictionary) -> String:
+	return JSON.stringify(export, "  ", false) + "\n"
+
+# What would make the export a lie: an import that didn't finish (an
+# imported file missing from .godot/imported, or an asset never imported),
+# or a resource the export reads that doesn't load. build() skips nulls
+# quietly, so without this a broken tree writes a gutted export. Empty =
+# clean.
+static func load_problems() -> Array[String]:
+	var problems: Array[String] = _import_problems()
+	var region := _scene_root_property(REGION_SCENE_PATH, "region") as RegionData
+	if region == null:
+		problems.append("%s didn't load, or names no region" % REGION_SCENE_PATH)
+	else:
+		if region.floors.is_empty():
+			problems.append("%s has no floors" % region.resource_path)
+		for index in region.floors.size():
+			var floor_data: FloorData = region.floors[index]
+			if floor_data == null:
+				problems.append("%s floor %d didn't load" % [region.resource_path, index + 1])
+				continue
+			for slot in floor_data.slots:
+				if slot == null:
+					problems.append("%s has a slot that didn't load" % floor_data.resource_path)
+					continue
+				for option in slot.options:
+					if option == null:
+						problems.append("%s slot %s has an option that didn't load" % [floor_data.resource_path, slot.slot_id])
+						continue
+					for entry in option.members:
+						if entry == null or entry.enemy_data == null:
+							problems.append("%s slot %s option %s has a member whose enemy didn't load" % [floor_data.resource_path, slot.slot_id, option.option_id])
+	var enemy_paths: Array[String] = _enemy_paths()
+	if enemy_paths.is_empty():
+		problems.append("no enemy files in %s" % ENEMY_DIR)
+	for path in enemy_paths:
+		if not (load(path) is EnemyData):
+			problems.append("%s didn't load as EnemyData" % path)
+	if _scene_root_property(REWARD_SCREEN_SCENE_PATH, "choice_count") == null:
+		problems.append("%s didn't load, or has no choice_count" % REWARD_SCREEN_SCENE_PATH)
+	if not (load(FIELD_ENEMY_SCRIPT_PATH) is Script):
+		problems.append("%s didn't load" % FIELD_ENEMY_SCRIPT_PATH)
+	return problems
+
+# Every .import's dest_files exist, and every file of a kind the project
+# imports has its .import - outside .gdignore'd folders.
+static func _import_problems() -> Array[String]:
+	var problems: Array[String] = []
+	var files: Array[String] = []
+	_collect_files("res://", files)
+	var imported_kinds: Dictionary = {}
+	var has_import: Dictionary = {}
+	for path in files:
+		if not path.ends_with(".import"):
+			continue
+		var source: String = path.trim_suffix(".import")
+		has_import[source] = true
+		imported_kinds[source.get_extension().to_lower()] = true
+		var config := ConfigFile.new()
+		if config.load(path) != OK:
+			problems.append("%s can't be read" % path)
+			continue
+		var dest_files: Variant = config.get_value("deps", "dest_files", [])
+		if not dest_files is Array:
+			continue
+		for dest: Variant in dest_files:
+			if not FileAccess.file_exists(String(dest)):
+				problems.append("%s isn't imported (%s is missing)" % [source, dest])
+				break
+	if imported_kinds.is_empty():
+		problems.append("no .import files under res:// - the project was never imported")
+	for path in files:
+		if imported_kinds.has(path.get_extension().to_lower()) and not has_import.has(path):
+			problems.append("%s was never imported (no .import beside it)" % path)
+	return problems
+
+static func _collect_files(dir: String, out: Array[String]) -> void:
+	if FileAccess.file_exists(dir.path_join(".gdignore")):
+		return
+	for file_name in DirAccess.get_files_at(dir):
+		out.append(dir.path_join(file_name))
+	for sub in DirAccess.get_directories_at(dir):
+		if not sub.begins_with("."):
+			_collect_files(dir.path_join(sub), out)
+
+# The export at HEAD (git show), else the file on disk; null when neither
+# exists. An unreadable one is an empty Dictionary, so every count drops.
+static func _committed_export() -> Variant:
+	var text: String = ""
+	var output: Array = []
+	var root: String = ProjectSettings.globalize_path("res://")
+	if OS.execute("git", ["-C", root, "show", "HEAD:" + OUTPUT_GIT_PATH], output) == 0 and not output.is_empty():
+		text = String(output[0])
+	elif FileAccess.file_exists(OUTPUT_PATH):
+		text = FileAccess.get_file_as_string(OUTPUT_PATH)
+	else:
+		return null
+	var parsed: Variant = JSON.parse_string(text)
+	return parsed if parsed is Dictionary else {}
+
+# The export's floors, encounters and enemies against the committed one's:
+# a problem for each that drops by more than max_shrink (a fraction).
+static func shrink_problems(export: Dictionary, committed: Dictionary, max_shrink: float) -> Array[String]:
+	var problems: Array[String] = []
+	var now: Dictionary = entry_counts(export)
+	var before: Dictionary = entry_counts(committed)
+	for key: String in now:
+		var had: int = before[key]
+		var has: int = now[key]
+		if had > 0 and float(has) < float(had) * (1.0 - max_shrink):
+			problems.append("%s: %d now, %d committed (more than %d%% fewer)" % [key, has, had, roundi(max_shrink * 100.0)])
+	return problems
+
+static func entry_counts(export: Dictionary) -> Dictionary:
+	var floors: int = 0
+	var encounters: int = 0
+	var regions: Variant = export.get("regions", [])
+	if regions is Array:
+		for region: Variant in regions:
+			var region_floors: Variant = (region as Dictionary).get("floors", []) if region is Dictionary else []
+			if not region_floors is Array:
+				continue
+			for floor_entry: Variant in region_floors:
+				floors += 1
+				var floor_encounters: Variant = (floor_entry as Dictionary).get("encounters", []) if floor_entry is Dictionary else []
+				if floor_encounters is Array:
+					encounters += (floor_encounters as Array).size()
+	var enemies: Variant = export.get("enemies", [])
+	return {
+		"floors": floors,
+		"encounters": encounters,
+		"enemies": (enemies as Array).size() if enemies is Array else 0,
+	}
 
 # The regions RegionField plays: its scene's own `region` export (one
 # region today).

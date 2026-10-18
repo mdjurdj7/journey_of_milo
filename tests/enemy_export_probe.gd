@@ -13,8 +13,11 @@ extends SceneTree
 #   prose - every enemy has a mechanic_summary, every intent (and every
 #           on_interrupt) an intent_name, and every status text in the
 #           export resolved all its tokens
+#   guard - this tree loads cleanly for the generator (load_problems()),
+#           the export matches itself, and a gutted one refuses
+#           (shrink_problems())
 
-const CASES := 3
+const CASES := 4
 const EXPORT_PATH := "res://docs/enemy_export.json"
 
 var _failures: int = 0
@@ -24,6 +27,7 @@ func _initialize() -> void:
 	_check_stale()
 	_check_gate()
 	_check_prose()
+	_check_guard()
 	if _completed != CASES:
 		_failures += 1
 		print("FAIL: only %d of %d cases ran to the end" % [_completed, CASES])
@@ -73,6 +77,20 @@ func _check_prose() -> void:
 				_expect(not String(intent["interrupt"]["on_interrupt"]["name"]).is_empty(), "%s's on_interrupt has an intent_name" % name)
 		for status: Dictionary in enemy["statuses"]:
 			_expect(not String(status["text"]).contains("{"), "%s's %s text resolves every token - got \"%s\"" % [name, status["name"], status["text"]])
+	_completed += 1
+
+func _check_guard() -> void:
+	for problem in EnemyExport.load_problems():
+		_fail("the generator would refuse this tree: " + problem)
+	var export: Dictionary = EnemyExport.build()
+	var counts: Dictionary = EnemyExport.entry_counts(export)
+	for key: String in counts:
+		_expect(int(counts[key]) > 0, "the export has %s" % key)
+	_expect(EnemyExport.shrink_problems(export, export, EnemyExport.DEFAULT_MAX_SHRINK).is_empty(), "an unchanged export doesn't count as a shrink")
+	var gutted: Dictionary = export.duplicate()
+	gutted["enemies"] = []
+	_expect(not EnemyExport.shrink_problems(gutted, export, EnemyExport.DEFAULT_MAX_SHRINK).is_empty(), "an export with no enemies counts as a shrink")
+	_expect(not EnemyExport.shrink_problems({}, export, EnemyExport.DEFAULT_MAX_SHRINK).is_empty(), "an empty export counts as a shrink")
 	_completed += 1
 
 func _first_difference(a: String, b: String) -> int:
