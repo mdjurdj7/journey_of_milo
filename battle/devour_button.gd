@@ -142,22 +142,6 @@ class_name DevourButton
 	set(value):
 		reason_size_px = value
 		_restyle()
-# Its cost (BattleController.devour_energy_cost) after "DEVOUR": a pip per
-# Energy, in the energy readout's language - short heavy bars, this size,
-# cost_pip_gap_px apart, cost_gap_px after the label, centred on its caps
-# - in the label's own ink, grey or lit with it.
-@export var cost_pip_size: Vector2 = Vector2(12.0, 4.0):
-	set(value):
-		cost_pip_size = value
-		_relayout()
-@export var cost_pip_gap_px: float = 4.0:
-	set(value):
-		cost_pip_gap_px = value
-		_relayout()
-@export var cost_gap_px: float = 8.0:
-	set(value):
-		cost_gap_px = value
-		_relayout()
 # Between the glyph and the text, and between text rows.
 @export var glyph_text_gap_px: float = 10.0:
 	set(value):
@@ -240,11 +224,6 @@ var _used: bool = false
 var _usable: bool = false
 # Why it can't be used, shown under the heal; "" while usable.
 var _reason: String = ""
-# Its cost in Energy, as the controller has it (_refresh()).
-var _cost: int = 1
-# Where the cost's pips start, and their centre line (_relayout()).
-var _cost_x: float = 0.0
-var _cost_y: float = 0.0
 var _picking: bool = false
 var _lit_target: bool = false
 var _card_name: String = ""
@@ -329,10 +308,6 @@ func _refresh() -> void:
 	_used = _controller.is_devour_used()
 	_usable = not _used and _controller.is_devour_affordable()
 	_reason = "" if _usable else (used_text if _used else no_energy_text)
-	var cost: int = maxi(_controller.devour_energy_cost, 0)
-	if cost != _cost:
-		_cost = cost
-		_relayout()
 	_picking = _controller.is_devour_picking()
 	_lit_target = _controller.is_devour_lit()
 	var card: CardData = _controller.get_devour_card()
@@ -427,10 +402,6 @@ func _relayout() -> void:
 	_heal_baseline = text_top + heal_baseline
 	_reason_baseline = text_top + reason_baseline
 	var label_row: float = InkType.width(_label_tracked, label_text, label_size_px)
-	_cost_x = _text_x + label_row + cost_gap_px
-	_cost_y = _label_baseline - label_ascent * 0.5
-	if _cost > 0:
-		label_row += cost_gap_px + float(_cost) * cost_pip_size.x + float(_cost - 1) * cost_pip_gap_px
 	var text_width: float = maxf(label_row, InkType.width(heal_font, _heal_text(), heal_size_px))
 	for reason: String in [used_text, no_energy_text]:
 		text_width = maxf(text_width, InkType.width(_reason_tracked, reason, reason_size_px))
@@ -447,10 +418,6 @@ func _draw() -> void:
 	var label_color: Color = _ink
 	label_color.a = lerpf(grey_alpha, 1.0, ink_level)
 	var label_width: float = InkType.draw_run(self, _label_tracked, label_text, Vector2(_text_x, _label_baseline), label_size_px, label_color)
-	# Its cost, a pip per Energy, in the label's ink.
-	for i in _cost:
-		var pip_x: float = _cost_x + float(i) * (cost_pip_size.x + cost_pip_gap_px)
-		draw_rect(Rect2(roundf(pip_x), roundf(_cost_y - cost_pip_size.y * 0.5), cost_pip_size.x, cost_pip_size.y), label_color)
 	# The hairline draws in from the label's left edge.
 	var rule_length: float = label_width * _smooth(_rule)
 	if rule_length > 0.0:

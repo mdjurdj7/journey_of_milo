@@ -503,8 +503,10 @@ func _check_button_states() -> void:
 	await _teardown()
 	_completed += 1
 
-# One column with the energy readout - the same left edge, under its pips
-# - and clear of every hand card from 5 to 10 in hand, resting or hovered:
+# On its own above the energy readout - its left edge on the corner
+# margin, its bottom devour_gap_px over the energy numeral's ink top, clear
+# of the pips - and clear of every hand card from 5 to 10 in hand, resting
+# or hovered:
 # a hovered card under the stack's column (its x-range overlapping the
 # stack's) MIN_HOVER_CLEARANCE_PX under Devour. The printed gaps count only
 # cards under that column - a card off to its side has no gap to keep.
@@ -515,8 +517,11 @@ func _check_layout() -> void:
 		var button: Control = overlay.get("_devour_button")
 		var resources: Control = overlay.get("_resources")
 		await create_timer(0.4).timeout
-		_expect(is_equal_approx(button.global_position.x, resources.global_position.x), "Devour's left edge on the energy readout's (%.1f, %.1f)" % [button.global_position.x, resources.global_position.x])
-		_expect(button.global_position.y >= resources.global_position.y + resources.size.y, "...under it")
+		var margin: float = float(overlay.get("corner_margin_px"))
+		_expect(is_equal_approx(button.global_position.x, margin), "Devour's left edge on the corner margin (%.1f, %.1f)" % [button.global_position.x, margin])
+		var numeral_top: float = resources.global_position.y + float(resources.call("numeral_ink_top"))
+		var gap: float = float(overlay.get("devour_gap_px"))
+		_expect(absf(button.get_global_rect().end.y - (numeral_top - gap)) <= 1.0, "...its bottom %.0f px over the energy numeral's top (%.1f, %.1f)" % [gap, button.get_global_rect().end.y, numeral_top - gap])
 		var rect: Rect2 = button.get_global_rect()
 		print("Devour rect: ", rect)
 		var stack: Rect2 = rect.merge(resources.get_global_rect())

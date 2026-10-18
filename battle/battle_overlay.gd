@@ -194,9 +194,10 @@ signal battle_finished(outcome: Outcome)
 	set(value):
 		energy_stack_lift_px = value
 		_apply_energy_anchor()
-# Between the energy readout's pips and Devour (DevourButton) under it,
-# its left edge on the readout's.
-@export var devour_gap_px: float = 10.0:
+# Devour (DevourButton) stands on its own above the energy readout: its
+# left edge on the corner margin (corner_margin_px), its bottom this many
+# px over the energy numeral's ink top - clear of the pips and the hand.
+@export var devour_gap_px: float = 30.0:
 	set(value):
 		devour_gap_px = value
 		_apply_energy_anchor()
@@ -591,7 +592,8 @@ func _create_corner_readouts() -> void:
 	add_child(_keepsake_row)
 	_devour_button = DevourButton.new()
 	_devour_button.name = "DevourButton"
-	_energy_group.add_child(_devour_button)
+	# Its own place, above the energy readout - not in the energy group.
+	add_child(_devour_button)
 	_devour_button.resized.connect(_apply_energy_anchor)
 
 # The keepsakes with no in-combat counter go in the row under DECK; one
@@ -639,25 +641,27 @@ func _apply_energy_anchor() -> void:
 	# readout sits at its origin and Devour under it.
 	_energy_group.position = Vector2(maxf(energy_anchor.x - _resources.size.x, corner_margin_px), energy_anchor.y - energy_stack_lift_px - _resources.numeral_ink_top()) + energy_group_offset
 	_resources.position = Vector2.ZERO
-	if _keepsake_row != null:
-		_keepsake_row.set_reveal_floor_y(_resources.global_position.y)
-	# Devour under it, one column: the same left edge, its hover line over
-	# the stack's top where the keepsake reveal goes.
+	# The stack's top, where the hover lines go over: the energy numeral's,
+	# or Devour's above it.
+	var stack_top: float = _resources.global_position.y
+	# Devour on its own above the readout: the corner margin, its bottom
+	# devour_gap_px over the numeral's ink top.
 	if _devour_button != null:
-		_devour_button.position = Vector2(0.0, _resources.size.y + devour_gap_px)
-		_devour_button.set_hover_floor_y(_resources.global_position.y)
+		var numeral_top: float = _energy_group.position.y + _resources.numeral_ink_top()
+		_devour_button.position = Vector2(corner_margin_px, numeral_top - devour_gap_px - _devour_button.size.y)
+		stack_top = _devour_button.position.y
+		_devour_button.set_hover_floor_y(stack_top)
+	if _keepsake_row != null:
+		_keepsake_row.set_reveal_floor_y(stack_top)
 	_energy_group.size = _energy_group_extent()
 	# The Wanderer's HP row keeps its distance from the group's right edge
 	# (HPBar.min_energy_clearance_px).
 	if _field_hp_bar != null:
 		_field_hp_bar.set_energy_clearance_x(_energy_group.get_global_rect().end.x)
 
-# The group's own size: the readout and Devour under it, together.
+# The group's own size: the energy readout (Devour stands apart).
 func _energy_group_extent() -> Vector2:
-	var extent: Rect2 = Rect2(Vector2.ZERO, _resources.size)
-	if _devour_button != null:
-		extent = extent.merge(Rect2(_devour_button.position, _devour_button.size))
-	return extent.size
+	return _resources.size
 
 # Reuses each enemy's own persistent EnemyStatus (see FieldEnemy.
 # enemy_status's own doc) rather than creating a fresh one - these live
