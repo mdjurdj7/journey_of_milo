@@ -86,7 +86,7 @@ options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOptio
 [sub_resource type="Resource" id="FloorEnemy_nettlebasket"]
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("98_nettlebasket")
-yaw_degrees = -25.0
+yaw_degrees = 26.5
 anchor = true
 
 [sub_resource type="Resource" id="FloorEnemy_nettle_rear"]
@@ -121,7 +121,8 @@ members = Array[ExtResource("2_floor_enemy")]([SubResource("FloorEnemy_nettlebas
 [sub_resource type="Resource" id="EncounterSlot_nettlebasket"]
 script = ExtResource("90_encounter_slot")
 slot_id = &"nettlebasket"
-position = Vector2(-0.5, -5.2)
+position = Vector2(-7.2, -2.3)
+yaw_degrees = 108.5
 required = false
 options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_nettlebasket")])
 

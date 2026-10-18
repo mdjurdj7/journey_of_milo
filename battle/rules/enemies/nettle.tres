@@ -22,6 +22,7 @@ starts_dormant = true
 dormant_status = ExtResource("6_dormant")
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell"), ExtResource("4_hit_shell_2"), ExtResource("5_hit_shell_3")])
 model_scene_path = "res://assets/models/enemies/Nettlebasket/Nettlebasket.glb"
+attachment_scene_path = "res://field/nettlebasket_pose.tscn"
 model_scale = 0.12
 painted_albedo_path = "res://assets/models/enemies/Nettlebasket/Nettlebasket_0.jpg"
 contact_radius_m = 0.6

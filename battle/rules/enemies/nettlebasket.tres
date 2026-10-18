@@ -30,5 +30,7 @@ max_hp = 36
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_pinch"), SubResource("EnemyIntent_signal"), SubResource("EnemyIntent_sting")])
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell"), ExtResource("4_hit_shell_2"), ExtResource("5_hit_shell_3")])
 model_scene_path = "res://assets/models/enemies/Nettlebasket/Nettlebasket.glb"
+attachment_scene_path = "res://field/nettlebasket_pose.tscn"
+battle_camera_turn_degrees = 40.0
 painted_albedo_path = "res://assets/models/enemies/Nettlebasket/Nettlebasket_0.jpg"
 contact_radius_m = 1.4
