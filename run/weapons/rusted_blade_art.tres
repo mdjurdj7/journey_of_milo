@@ -1,7 +1,0 @@
-[gd_resource type="AtlasTexture" format=3]
-
-[ext_resource type="Texture2D" uid="uid://cwypn1c3f6exg" path="res://cards/art/Wanderer/Slash.png" id="1_slash"]
-
-[resource]
-atlas = ExtResource("1_slash")
-region = Rect2(600, 0, 654, 654)
