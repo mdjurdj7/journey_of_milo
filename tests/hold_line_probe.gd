@@ -18,6 +18,15 @@ extends SceneTree
 #   dash   - a dash straight at it from DASH_START_M short: reined in
 #   rearm  - set back REARM_START_M, a click past the line again: a
 #            second arrival, a second look back, and no second line
+#   wade   - floor 2's wade limit (FloorData.wade_limit_m, the Wanderer's
+#            Wade Limit group): from just inside the main body's shore,
+#            level with spawn, a click WADE_TARGET_M out across the open
+#            water: he comes to rest at the limit past the shoreline
+#            (Ground.get_landmass_distance()), never beyond it, not short
+#            of it
+#   shoal  - the same limit still lets him cross to the island: from the
+#            main body's shore opposite the island's slot, a click onto
+#            the island, reached
 #   open   - ExitGate.open() (what floor_cleared calls): the line lifts,
 #            and the same click walks him into the TriggerArea
 #
@@ -61,6 +70,18 @@ const EXPECTED_LINE := "Not with that still behind him."
 const WALK_AWAY_SECONDS := 0.8
 const WALK_AWAY_M := 4.0
 const ANCHOR_LIMIT_M := 0.01
+# The wade and shoal cases: how far out past the shore the wade click
+# lands, how far inside a shore they start or aim, the step a shore is
+# looked for in, how long each walk may take, how near counts as reached,
+# and how far short of the limit he may rest.
+const WADE_TARGET_M := 12.0
+const SHORE_INSET_M := 1.0
+const SHORE_STEP_M := 0.25
+const WADE_SECONDS := 8.0
+const SHOAL_SECONDS := 10.0
+const REACH_M := 0.6
+const WADE_SHORT_LIMIT_M := 0.3
+const ISLAND_SLOT_ID := &"island"
 
 var _failures: int = 0
 var _field: Node3D = null
@@ -73,6 +94,9 @@ var _exited: bool = false
 var _opened: bool = false
 var _worst_past_m: float = -INF
 var _line_shows: int = 0
+# Floor 2's spawn, read as it loads (get_spawn_position() is where he
+# stands now).
+var _spawn: Vector3 = Vector3.ZERO
 var _line_texts: Array[String] = []
 var _line_was_visible: bool = false
 # The turn, timed from the arrival itself: frames since it, the facing
@@ -97,6 +121,7 @@ func _initialize() -> void:
 	await _unload()
 
 	await _load_floor(run_state, LINE_FLOOR_INDEX)
+	_spawn = _field.call("get_spawn_position")
 	print("\n=== floor 2")
 	_check(int(_gate.get("exit_kind")) == 1, "floor 2's gate is a LINE")
 	_check(bool(_wanderer.call("has_hold_line")), "floor 2 holds a line")
@@ -121,6 +146,12 @@ func _initialize() -> void:
 	await _case_keys()
 	await _case_dash()
 	await _case_rearm()
+	# Before open: it walks him off the floor. Then back where rearm left
+	# him, on the line, for open's click.
+	var at_line: Vector3 = _wanderer.global_position
+	await _case_wade()
+	await _case_shoal()
+	await _stand_at(at_line)
 	await _case_open()
 
 	print("\n--- line: said %d time(s) %s; worst past the line before open %+.3f m" % [_line_shows, _line_texts, _worst_past_m])
@@ -298,6 +329,85 @@ func _check_look_back(label: String) -> void:
 	var ninety_seconds: float = float(_turn_90_frame - _arrival_frame) / 60.0 if _turn_90_frame >= 0 else -1.0
 	print("%s: look back %.0f deg to go at arrival, 90%% of it turned %.2f s after, %.1f deg off %.1f s later" % [label, _arrival_error_deg, ninety_seconds, end_error, LOOK_SECONDS])
 	_check(end_error <= FACING_LIMIT_DEG, "%s: faces the enemy (%.1f deg off)" % [label, end_error])
+
+# Metres past the nearest shoreline at `at` - negative on land.
+func _shore_distance(at: Vector3) -> float:
+	return float(_field.get_node("Ground").call("get_landmass_distance", Vector2(at.x, at.z)))
+
+# On the ground at `at`'s XZ.
+func _grounded(at: Vector3) -> Vector3:
+	var ground: Node3D = _field.get_node("Ground") as Node3D
+	var local: Vector3 = ground.to_local(Vector3(at.x, 0.0, at.z))
+	return Vector3(at.x, float(ground.call("get_height_at", Vector2(local.x, local.z))), at.z)
+
+# From `from`, stepping along `direction`: the first point where land
+# (true) or water (false) starts, within `reach` metres; INF when none.
+func _march_to(from: Vector3, direction: Vector3, land: bool, reach: float) -> Vector3:
+	var travelled: float = 0.0
+	while travelled <= reach:
+		var at: Vector3 = from + direction * travelled
+		if (_shore_distance(at) <= 0.0) == land:
+			return at
+		travelled += SHORE_STEP_M
+	return Vector3.INF
+
+func _stand_at(at: Vector3) -> void:
+	_wanderer.call("clear_move_target")
+	_wanderer.global_position = _grounded(at) + Vector3.UP * 0.05
+	_wanderer.velocity = Vector3.ZERO
+	for i in SETTLE_FRAMES:
+		await physics_frame
+
+func _case_wade() -> void:
+	print("\n--- wade")
+	var limit: float = float(_field.call("get_floor_data").get("wade_limit_m"))
+	_check(limit >= 0.0, "wade: floor 2 has a wade limit (%.2f m)" % limit)
+	var shore: Vector3 = _march_to(_spawn, -_right, false, 60.0)
+	_check(shore != Vector3.INF, "wade: the main body's shore, level with spawn")
+	if limit < 0.0 or shore == Vector3.INF:
+		return
+	await _stand_at(shore + _right * SHORE_INSET_M)
+	_wanderer.call("set_move_target", _grounded(shore - _right * WADE_TARGET_M))
+	var worst: float = -INF
+	for i in int(WADE_SECONDS * 60.0):
+		await physics_frame
+		worst = maxf(worst, _shore_distance(_wanderer.global_position))
+	var rest: float = _shore_distance(_wanderer.global_position)
+	print("    limit %.2f m: rested %.3f m past the shore, furthest %.3f m" % [limit, rest, worst])
+	_check(worst <= limit + OVERSHOOT_LIMIT_M, "wade: never past the limit (furthest %.3f m, limit %.2f)" % [worst, limit])
+	_check(rest >= limit - WADE_SHORT_LIMIT_M, "wade: held at it, not short (%.3f m)" % rest)
+
+func _case_shoal() -> void:
+	print("\n--- shoal")
+	var anchor := Vector3.INF
+	for slot in _field.call("get_floor_data").get("slots"):
+		if slot.get("slot_id") == ISLAND_SLOT_ID:
+			var offset: Vector2 = slot.get("position")
+			anchor = _spawn + Vector3(offset.x, 0.0, offset.y)
+	_check(anchor != Vector3.INF, "shoal: floor 2's island slot")
+	if anchor == Vector3.INF:
+		return
+	# Off the island toward the main body, across the shoal, onto it.
+	var island_shore: Vector3 = _march_to(anchor, _right, false, 30.0)
+	var main_shore: Vector3 = _march_to(island_shore, _right, true, 30.0) if island_shore != Vector3.INF else Vector3.INF
+	_check(main_shore != Vector3.INF, "shoal: water between the island and the main body")
+	if main_shore == Vector3.INF:
+		return
+	await _stand_at(main_shore + _right * SHORE_INSET_M)
+	var aim: Vector3 = island_shore - _right * SHORE_INSET_M
+	_wanderer.call("set_move_target", _grounded(aim))
+	var reached: bool = false
+	var worst: float = -INF
+	for i in int(SHOAL_SECONDS * 60.0):
+		await physics_frame
+		worst = maxf(worst, _shore_distance(_wanderer.global_position))
+		var gap: Vector3 = _wanderer.global_position - aim
+		if Vector2(gap.x, gap.z).length() <= REACH_M:
+			reached = true
+			break
+	var left: Vector3 = _wanderer.global_position - aim
+	print("    crossed %.2f m of water, furthest %.3f m past the shore" % [Vector2(main_shore.x - island_shore.x, main_shore.z - island_shore.z).length(), worst])
+	_check(reached, "shoal: he crosses to the island (stopped %.2f m short)" % Vector2(left.x, left.z).length())
 
 func _check_at_line(label: String) -> void:
 	var along: float = _along()

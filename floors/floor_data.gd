@@ -141,6 +141,13 @@ class_name FloorData
 # RegionField.wade_drain_enabled for this floor: whether standing past the
 # shoreline costs HP (the rates stay RegionField's own, region-wide).
 @export var wade_drain_enabled: bool = false
+# How far past the nearest shoreline he can wade, metres (Ground.get_
+# landmass_distance()) - held there as he is at a gate line, sliding
+# along it (Wanderer.set_wade_limit()); no HP cost, nothing to do with the
+# drain. Below 0: no limit, the walls alone. Set it no lower than the
+# widest midline of any water he must cross, plus Wanderer.wade_limit_
+# ease_distance, or he slows there.
+@export var wade_limit_m: float = -1.0
 
 @export_group("Ambience")
 # This floor's sea/wind balance, as offsets on the beds' own base levels

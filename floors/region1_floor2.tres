@@ -243,6 +243,7 @@ slots = Array[ExtResource("90_encounter_slot")]([SubResource("EncounterSlot_crab
 roll_unique_enemies = true
 event_slots = Array[ExtResource("90_encounter_slot")]([SubResource("EncounterSlot_island_reward")])
 props = Array[ExtResource("3_floor_prop")]([SubResource("FloorProp_alcove_cache"), SubResource("FloorProp_sand_fence1"), SubResource("FloorProp_sand_fence2"), SubResource("FloorProp_sand_fence3"), SubResource("FloorProp_sand_fence4"), SubResource("FloorProp_sand_fence5")])
+wade_limit_m = 4.5
 exit_kind = 1
 gate_distance_beyond_enemy = 7.5
 wear_path_mid_offset = 1.875

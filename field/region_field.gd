@@ -797,6 +797,7 @@ func _ready() -> void:
 		_setup_debug_row()
 	_build_boundary()
 	_setup_exit_gate_channel()
+	_apply_wade_limit()
 	# After the channel: it is water the scatter keeps out of, and every
 	# prop, enemy and the gate it keeps clear of now stands.
 	_spawn_floor_scatter()
@@ -2225,6 +2226,15 @@ func _setup_exit_gate_channel() -> void:
 			wanderer.hold_line_reached.connect(_on_wanderer_hold_line_reached)
 		return
 	exit_gate.setup_channel(ground, get_wall_rect())
+
+# The floor's wade limit (FloorData.wade_limit_m) handed to the Wanderer,
+# against Ground's shoreline distance; none below 0 or without a floor.
+func _apply_wade_limit() -> void:
+	if wanderer == null:
+		return
+	var floor_data := get_floor_data()
+	var ground := get_node_or_null(ground_path) as Ground
+	wanderer.set_wade_limit(ground, floor_data.wade_limit_m if floor_data != null else -1.0)
 
 # He has come to rest at a LINE floor's gate line with the floor not yet
 # cleared (the line lifts on floor_cleared - ExitGate.open()): he looks

@@ -143,6 +143,17 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_painted.p
 @export var hold_line_arrive_margin: float = 0.05
 @export var hold_line_rearm_distance: float = 0.75
 @export var hold_line_turn_speed: float = 4.0
+@export_group("Wade Limit")
+# A floor's wade limit (FloorData.wade_limit_m - RegionField hands it
+# over, set_wade_limit()): he won't wade further than that past the
+# nearest shoreline (Ground.get_landmass_distance()). Held as the hold
+# line holds him: no wall, he eases to rest over the last wade_limit_ease_
+# distance metres and slides along it, only his motion further out held -
+# "out" the distance field's slope, read wade_limit_probe_m either side of
+# him. Put past it (a fight's stance), he may stay there, never go further.
+# No HP cost. All read live.
+@export var wade_limit_ease_distance: float = 1.0
+@export var wade_limit_probe_m: float = 0.25
 @export_group("")
 @export var use_animation_tree: bool = false
 @export var walk_speed_threshold: float = 0.1
@@ -549,6 +560,13 @@ var _hold_line_active: bool = false
 var _hold_line_point: Vector3 = Vector3.ZERO
 var _hold_line_normal: Vector3 = Vector3.ZERO
 var _hold_line_armed: bool = true
+# The wade limit (set_wade_limit()): the ground its distance is read from,
+# and the metres (below 0: none). And his distance past shore as this
+# frame's move began - the most it may end at, when that is past the
+# limit.
+var _wade_ground: Ground = null
+var _wade_limit_m: float = -1.0
+var _wade_start_distance: float = 0.0
 var _look_back_active: bool = false
 var _look_back_direction: Vector3 = Vector3.ZERO
 
@@ -1820,6 +1838,66 @@ func clear_hold_line() -> void:
 func has_hold_line() -> bool:
 	return _hold_line_active
 
+# See the Wade Limit export group. `metres` below 0, or no ground: none.
+func set_wade_limit(ground: Ground, metres: float) -> void:
+	_wade_ground = ground
+	_wade_limit_m = metres
+
+func has_wade_limit() -> bool:
+	return _wade_ground != null and is_instance_valid(_wade_ground) and _wade_limit_m >= 0.0
+
+func _wade_distance(at: Vector3) -> float:
+	return _wade_ground.get_landmass_distance(Vector2(at.x, at.z))
+
+# The slope of the shoreline distance at `at` (XZ): the way further out,
+# about a metre a metre - ZERO where it is flat (between two shores).
+func _wade_slope(at: Vector3) -> Vector3:
+	var h: float = maxf(wade_limit_probe_m, 0.01)
+	var across := Vector3(h, 0.0, 0.0)
+	var along := Vector3(0.0, 0.0, h)
+	return Vector3(_wade_distance(at + across) - _wade_distance(at - across), 0.0, _wade_distance(at + along) - _wade_distance(at - along)) / (2.0 * h)
+
+# Before move_and_slide(), with the hold line's: his velocity further out
+# capped as the hold line caps it (sqrt(2 a d), d the room left to the
+# limit), so he eases to rest on it - along the shore is untouched.
+func _limit_velocity_at_wade_limit() -> void:
+	if not has_wade_limit() or _battle_controller != null:
+		return
+	_wade_start_distance = _wade_distance(global_position)
+	var room: float = _wade_limit_m - _wade_start_distance
+	if room > wade_limit_ease_distance + 1.0:
+		return
+	var slope: Vector3 = _wade_slope(global_position)
+	if slope.length() < 0.0001:
+		return
+	var out_dir: Vector3 = slope.normalized()
+	var out: float = velocity.x * out_dir.x + velocity.z * out_dir.z
+	if out <= 0.0:
+		return
+	var deceleration: float = move_speed * move_speed / (2.0 * maxf(wade_limit_ease_distance, 0.01))
+	var allowed: float = sqrt(2.0 * deceleration * maxf(room, 0.0))
+	if out > allowed:
+		velocity.x -= out_dir.x * (out - allowed)
+		velocity.z -= out_dir.z * (out - allowed)
+
+# After move_and_slide(), with the hold line's: a step that still took him
+# past the limit - or further out than he began, when he began past it -
+# is put back along the slope.
+func _hold_at_wade_limit() -> void:
+	if not has_wade_limit() or _battle_controller != null:
+		return
+	var cap: float = maxf(_wade_limit_m, _wade_start_distance)
+	var distance: float = _wade_distance(global_position)
+	if distance <= cap:
+		return
+	var slope: Vector3 = _wade_slope(global_position)
+	var steepness: float = slope.length()
+	if steepness < 0.0001:
+		return
+	var back: Vector3 = slope / steepness * ((distance - cap) / steepness)
+	global_position.x -= back.x
+	global_position.z -= back.z
+
 # Turn to face `point` while he stands at the hold line (hold_line_turn_
 # speed) - kept until he walks off the line or it lifts. Walking along
 # the line faces the way he walks, as always; coming to rest there again
@@ -2863,6 +2941,7 @@ func _physics_process(delta: float) -> void:
 
 	# Before the step probes, so they test the motion he will actually make.
 	_limit_velocity_at_hold_line()
+	_limit_velocity_at_wade_limit()
 
 	_apply_step_up_and_down(delta)
 
@@ -2870,6 +2949,7 @@ func _physics_process(delta: float) -> void:
 
 	var planar_speed := Vector2(velocity.x, velocity.z).length()
 	_hold_at_line(planar_speed)
+	_hold_at_wade_limit()
 
 	# Last, after every other write to global_position this frame, so the
 	# position that renders is the held one - a step-down onto lagging
