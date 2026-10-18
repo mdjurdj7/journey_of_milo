@@ -1512,6 +1512,10 @@ func _run_sequential_turn() -> void:
 		var times: int = EnemyTurn.repeats(combatant, intent)
 		var result := _take_turn_logged(enemy, combatant, data)
 		acted.append(enemy)
+		# Its Block went as the turn began: the readout empties now, as it
+		# starts acting, not once its move has played out.
+		if result["block_cleared"] > 0:
+			status_changed.emit()
 		# Killed by its own countdown before it could act: reported, dropped,
 		# and nothing more of this enemy's turn plays out.
 		if _report_countdown(enemy, combatant, result):
@@ -1610,6 +1614,9 @@ func _run_simultaneous_turn() -> void:
 		enemy_acting.emit(enemy)
 		var intent: EnemyIntent = EnemyTurn.current_intent(combatant, enemy.enemy_data)
 		results[enemy] = _take_turn_logged(enemy, combatant, enemy.enemy_data)
+		# Its Block went as the turn began - the readout empties now.
+		if results[enemy]["block_cleared"] > 0:
+			status_changed.emit()
 		if _report_countdown(enemy, combatant, results[enemy]):
 			continue
 		if results[enemy]["pain_turn_triggered"]:

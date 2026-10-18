@@ -68,7 +68,15 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "phase_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "blocked": 0, "absorbed": 0, "applied_to_player": 0}
+	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "block_cleared": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "phase_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "blocked": 0, "absorbed": 0, "applied_to_player": 0}
+
+	# Its Block is gone as its own turn starts, as the player's is at
+	# theirs (BattleController._start_player_turn()): what a Defend gained
+	# guards it through the player's next turn and no longer. Every turn
+	# clears it - a pain turn, a Denied one, one under the sand. Absorb is
+	# untouched. "block_cleared" is what went, for the readout.
+	result["block_cleared"] = combatant.block
+	combatant.block = 0
 
 	Status.tick_all(combatant.statuses, func(amount: int, _ticking: Status) -> void:
 		combatant.hp = max(combatant.hp - amount, 0)
