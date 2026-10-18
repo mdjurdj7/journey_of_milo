@@ -1757,6 +1757,15 @@ func _owe_attacks(attacks: Array[Dictionary]) -> void:
 		for hit: Dictionary in attack.get("hits", []):
 			_hp_owed += int(hit["to_hp"]) - int(hit.get("saved_heal", 0))
 
+# `target`'s max HP - a FieldEnemy in the fight, or "player"; 0 for one
+# it no longer holds. For the size of its numbers (BattleFeedback.
+# number_scale()).
+func max_hp_of(target: Variant) -> int:
+	if target is FieldEnemy:
+		var combatant: Combatant = _combatants.get(target)
+		return combatant.max_hp if combatant != null else 0
+	return player.max_hp if player != null else 0
+
 # The player's HP as the readouts should show it now: the rules' HP, plus
 # what enemy hits have taken but not yet reported (_owe_attacks()). Read
 # by BattleFeedback in a hit's own frame - 0 or less: that hit kills.

@@ -43,8 +43,8 @@ class_name BattleFeedback
 # The heavy tier: a card hit of heavy_min_damage or more, by that one
 # hit's damage, is weightier - a deep impact layered under the contact
 # sound (heavy_impact_clips dealt in turn, silent at heavy_min_damage
-# rising to heavy_impact_max_volume_db), and the recoil and the damage
-# number grown up to their max multipliers. A card that spends Toll as
+# rising to heavy_impact_max_volume_db), and the recoil grown up to its
+# max multiplier. A card that spends Toll as
 # its blow (CardEffect TOLL_DAMAGE - Reckoning) always counts as at least
 # heavy_min_damage. A card hit of shake_min_damage or more also jolts the
 # camera once (CameraRig.jolt()) - the only camera movement a hit makes,
@@ -113,9 +113,16 @@ const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 		heavy_impact_clips = value
 		_heavy_pool.set_clips(heavy_impact_clips)
 @export var heavy_impact_max_volume_db: float = -14.0
-# The recoil's distance and the damage number's size at heavy_max_damage.
+# The recoil's distance at heavy_max_damage.
 @export var heavy_recoil_max_multiplier: float = 1.6
-@export var heavy_number_max_multiplier: float = 1.4
+
+@export_group("Number Size")
+# A hit's number grows with the hit as a share of its target's max HP:
+# number_min_multiplier for nothing, number_max_multiplier from
+# number_full_share on - and for a kill, whatever its share.
+@export var number_min_multiplier: float = 1.0
+@export var number_max_multiplier: float = 1.8
+@export_range(0.01, 1.0, 0.01) var number_full_share: float = 0.5
 
 @export_group("Camera Jolt")
 @export var camera_shake_enabled: bool = true
@@ -321,15 +328,22 @@ func heavy_impact_volume_db(level: float) -> float:
 func recoil_multiplier(level: float) -> float:
 	return 1.0 if level < 0.0 else lerpf(1.0, heavy_recoil_max_multiplier, level)
 
-func number_multiplier(level: float) -> float:
-	return 1.0 if level < 0.0 else lerpf(1.0, heavy_number_max_multiplier, level)
+# The number's size for a hit taking `share` of its target's max HP.
+func number_multiplier(share: float, killing: bool = false) -> float:
+	if killing:
+		return number_max_multiplier
+	return lerpf(number_min_multiplier, number_max_multiplier, clampf(share / maxf(number_full_share, 0.01), 0.0, 1.0))
 
-# The damage number's size for a hit of `amount` on `target` this frame:
-# grown for a heavy card hit, 1 for anything else.
+# The number's size for a hit of `amount` on `target` (a FieldEnemy or
+# "player"), read in the hit's own frame: by its share of the target's
+# max HP, the top size for one that kills.
 func number_scale(target: Variant, amount: int) -> float:
-	if not (target is FieldEnemy):
-		return 1.0
-	return number_multiplier(heavy_level(heavy_damage(amount)))
+	if battle_controller == null:
+		return number_min_multiplier
+	var max_hp: int = battle_controller.max_hp_of(target)
+	var share: float = float(amount) / float(max_hp) if max_hp > 0 else 0.0
+	var killing: bool = battle_controller.is_dying(target) if target is FieldEnemy else battle_controller.shown_player_hp() <= 0
+	return number_multiplier(share, killing)
 
 # Whether a card hit of `amount` jolts the camera.
 func jolts_camera(amount: int) -> bool:

@@ -61,8 +61,8 @@ func _initialize() -> void:
 		print("heavy_hit_probe: %d FAILED" % _failures)
 		quit(1)
 
-# 30 in the tier, 5 not; the layer at either end; the recoil and number
-# multipliers; the camera jolt from 30 and its toggle; the tier off. The
+# 30 in the tier, 5 not; the layer at either end; the recoil multiplier;
+# the number's size by share of max HP; the camera jolt from 30 and its toggle; the tier off. The
 # stop's lengths, and none with it off.
 func _check_tier() -> void:
 	var feedback: Node = _feedback()
@@ -80,7 +80,9 @@ func _check_tier() -> void:
 	_expect(float(feedback.call("heavy_impact_volume_db", feedback.call("heavy_level", 10))) <= -80.0, "The layer is silent at 10")
 	_expect(is_equal_approx(float(feedback.call("heavy_impact_volume_db", feedback.call("heavy_level", 35))), -14.0), "...and -14 dB at 35")
 	_expect(is_equal_approx(float(feedback.call("recoil_multiplier", level_5)), 1.0) and is_equal_approx(float(feedback.call("recoil_multiplier", 1.0)), 1.6), "Recoil x1 below the tier, x1.6 at its top")
-	_expect(is_equal_approx(float(feedback.call("number_multiplier", level_5)), 1.0) and is_equal_approx(float(feedback.call("number_multiplier", 1.0)), 1.4), "The number x1 below the tier, x1.4 at its top")
+	_expect(is_equal_approx(float(feedback.call("number_multiplier", 0.0)), 1.0) and is_equal_approx(float(feedback.call("number_multiplier", 0.5)), 1.8), "The number x1 for nothing, x1.8 at half the target's max HP")
+	_expect(is_equal_approx(float(feedback.call("number_multiplier", 2.0)), 1.8) and is_equal_approx(float(feedback.call("number_multiplier", 0.25)), 1.4), "...clamped there, x1.4 at a quarter")
+	_expect(is_equal_approx(float(feedback.call("number_multiplier", 0.05, true)), 1.8), "...and a kill at the top size, whatever its share")
 	_expect(bool(feedback.call("jolts_camera", 30)) and not bool(feedback.call("jolts_camera", 29)), "30 jolts the camera, 29 doesn't")
 	feedback.set("camera_shake_enabled", false)
 	_expect(not bool(feedback.call("jolts_camera", 30)), "...and with the toggle off, nothing does")

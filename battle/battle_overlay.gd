@@ -27,9 +27,9 @@ enum Outcome { WIN, LOSE, ESCAPE }
 signal battle_finished(outcome: Outcome)
 
 @export var enemy_head_height: float = 1.8
-# The Wanderer's numbers start over his body: his feet plus this many
-# metres, unprojected - clear of his HP bar under his feet.
-@export var wanderer_number_height: float = 2.0
+# The Wanderer's numbers sit this far, in pixels, over the top of his
+# model (Wanderer.get_head_height()) - clear of his HP bar under his feet.
+@export var wanderer_number_over_head_px: float = 10.0
 # Every card's own shared "played" cue (see _on_card_played()) - fires the
 # instant a card commits to play, independent of that card's own
 # impact_time delay (the swing and the enemy's contact crack are the
@@ -53,14 +53,15 @@ signal battle_finished(outcome: Outcome)
 # A further hit's number on a target whose last still shows - a multi-hit
 # ("5, 5, 5") - steps this far on from the one before, in screen pixels,
 # so each reads as its own blow. The player's and the enemies' alike.
-@export var number_stack_step: Vector2 = Vector2(22.0, -26.0)
+@export var number_stack_step: Vector2 = Vector2(30.0, -38.0)
 # A number keeps this far, in pixels, off its own readouts the whole way it
 # rises - an enemy's intent and HP/name plate, his HP bar - moved beside
 # them when it would cross.
 @export var number_clearance_px: float = 8.0
-# An enemy's number starts no lower than this over the top of its body's
-# screen bounds (FieldEnemy.get_screen_rect()), pixels - a tall body's
-# (the Wardling's lantern) lands over it, not on it at enemy_head_height.
+# An enemy's number sits this far, in pixels, over the top of its body's
+# screen bounds (FieldEnemy.get_screen_rect()) - on the body it happened
+# to, tall (the Wardling's lantern) or low (a crab) alike; at
+# enemy_head_height when there are no bounds to read.
 @export var number_over_body_px: float = 10.0
 # Readouts (plates, intents, his HP bar) are pushed apart until this many
 # pixels lie between any two (_lay_out_readouts()).
@@ -204,11 +205,16 @@ var _debug_card_picker: OptionButton = null
 # The fight's hit reactions - kept to read a play effect's pacing for the
 # damage numbers (BattleFeedback.reaction_delay()).
 var _battle_feedback: BattleFeedback = null
-# A damage number's life, read once (_number_seconds()); -1 until then.
+# A number's whole life and its legible part (pop and hold), read once
+# (_read_number_times()); -1 until then.
 var _number_life: float = -1.0
+var _number_legible: float = -1.0
 # Target (a FieldEnemy, or "player") -> how many of its numbers show now,
 # for the stack's step (number_stack_step).
 var _number_counts: Dictionary = {}
+# Target -> the sideways jitter its stack's first number drew - the rest of
+# the stack share it, so the step stays exact.
+var _stack_jitter: Dictionary = {}
 # A Toll blow's Toll as it landed, for its toll_changed; -1 = none.
 var _toll_blow_from: int = -1
 # The Toll last read out, for the number a gain shows (_on_toll_changed());
@@ -1080,7 +1086,8 @@ func _on_damage_dealt(_source: Variant, target: Variant, amount: int, kind: Stri
 func _show_number(target: Variant, amount: int, kind: String) -> void:
 	var delay: float = _battle_feedback.reaction_delay(target) if _battle_feedback != null else 0.0
 	# Read in the hit's own frame, while its card is still the impact's.
-	var size: float = _battle_feedback.number_scale(target, amount) if _battle_feedback != null and kind == FloatingNumber.KIND_DAMAGE else 1.0
+	var sized: bool = kind == FloatingNumber.KIND_DAMAGE or kind == FloatingNumber.KIND_HP_LOST
+	var size: float = _battle_feedback.number_scale(target, amount) if _battle_feedback != null and sized else 1.0
 	var offset: Vector2 = repeat_number_offset if _repeat_impact and target is FieldEnemy else Vector2.ZERO
 	if delay > 0.0:
 		await get_tree().create_timer(delay).timeout
@@ -1100,13 +1107,10 @@ func _show_number(target: Variant, amount: int, kind: String) -> void:
 		var control := display as Control
 		if control != null and is_instance_valid(control) and control.is_visible_in_tree():
 			avoid.append(control.get_global_rect())
-	var ceiling: float = INF
-	if target is FieldEnemy:
-		var camera := get_viewport().get_camera_3d()
-		var body: Rect2 = (target as FieldEnemy).get_screen_rect(camera, 0.0) if camera != null else Rect2()
-		if body.has_area():
-			ceiling = body.position.y - number_over_body_px
-	_spawn_floating_number(kind, amount, _screen_pos_for_damage_target(target) + offset, size, avoid, stack, ceiling)
+	var jitter: float = NAN if shown == 0 else float(_stack_jitter.get(key, NAN))
+	var number: FloatingNumber = _spawn_floating_number(kind, amount, _screen_pos_for_damage_target(target) + offset, size, avoid, stack, jitter)
+	if shown == 0:
+		_stack_jitter[key] = number.jitter.x
 
 # A repeated hit's follow-up swing (Second Swing): the toll tick, if one
 # is on disk.
@@ -1126,16 +1130,23 @@ func _on_card_repeat_swing(_card: CardData, _target: FieldEnemy) -> void:
 	_toll_tick_player.volume_db = toll_tick_volume_db
 	_toll_tick_player.play()
 
+# Where `target`'s number sits - the bottom centre it is placed by: over
+# an enemy's body (number_over_body_px), over the Wanderer's head
+# (wanderer_number_over_head_px).
 func _screen_pos_for_damage_target(target: Variant) -> Vector2:
 	if target is FieldEnemy:
 		var camera := get_viewport().get_camera_3d()
 		if camera != null:
+			var body: Rect2 = (target as FieldEnemy).get_screen_rect(camera, 0.0)
+			if body.has_area():
+				return Vector2(body.get_center().x, body.position.y - number_over_body_px)
 			return camera.unproject_position((target as FieldEnemy).global_position + Vector3.UP * enemy_head_height)
 	# "player": over the Wanderer's body.
 	if _wanderer != null and is_instance_valid(_wanderer):
 		var camera := get_viewport().get_camera_3d()
 		if camera != null:
-			return camera.unproject_position(_wanderer.global_position + Vector3.UP * wanderer_number_height)
+			var head: Vector2 = camera.unproject_position(_wanderer.global_position + Vector3.UP * _wanderer.get_head_height())
+			return head - Vector2(0.0, wanderer_number_over_head_px)
 	return _field_hp_bar.global_position + Vector2(_field_hp_bar.size.x / 2.0, _field_hp_bar.size.y + 20.0)
 
 # The debug row's WIN/LOSE/ESCAPE: the same ending, marked as not the
@@ -1234,35 +1245,42 @@ func _debug_print_enemy_bar_gaps() -> void:
 # How long a killing hit of `amount` on `enemy` takes to show in full, in
 # real seconds from its frame (BattleController.kill_presentation_time):
 # its reaction and play effect (BattleFeedback.kill_presentation_time()),
-# or its damage number rising and fading, if that ends later.
+# or its damage number's pop and hold, if that ends later - its fade plays
+# over the death.
 func _kill_presentation_time(enemy: FieldEnemy, amount: int) -> float:
+	_read_number_times()
 	if _battle_feedback == null:
-		return _number_seconds()
-	var number_end: float = _battle_feedback.reaction_delay(enemy) + _number_seconds()
+		return _number_legible
+	var number_end: float = _battle_feedback.reaction_delay(enemy) + _number_legible
 	return maxf(_battle_feedback.kill_presentation_time(enemy, amount), number_end)
 
-# A damage number's life (FloatingNumber.duration_sec), read once off the
-# scene.
+# A number's whole life (FloatingNumber.life_seconds()) - how long it
+# counts toward its target's stack.
 func _number_seconds() -> float:
-	if _number_life < 0.0:
-		var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
-		_number_life = number.duration_sec if number != null else 0.0
-		if number != null:
-			number.free()
+	_read_number_times()
 	return _number_life
 
-# `ceiling`: the number's bottom starts no lower than this (over its
-# body's top). `avoid`: rects the number keeps number_clearance_px off the
-# whole way it rises (its own readouts) - moved beside them, the side with
-# room on screen, when its path would cross one; then `stack` on from
-# there (a multi-hit's step), so the numbers of one target never land on
-# one spot.
-func _spawn_floating_number(kind: String, value: int, screen_pos: Vector2, size_multiplier: float = 1.0, avoid: Array[Rect2] = [], stack: Vector2 = Vector2.ZERO, ceiling: float = INF) -> void:
+# Read once off the scene.
+func _read_number_times() -> void:
+	if _number_life >= 0.0:
+		return
+	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
+	_number_life = number.life_seconds() if number != null else 0.0
+	_number_legible = number.legible_seconds() if number != null else 0.0
+	if number != null:
+		number.free()
+
+# `screen_pos`: the number's bottom centre. `avoid`: rects the number
+# keeps number_clearance_px off the whole way it rises (its own readouts) -
+# moved beside them, the side with room on screen, when its path would
+# cross one; then `stack` on from there (a multi-hit's step), so the
+# numbers of one target never land on one spot. `jitter`: the sideways
+# offset to land at - NAN draws one (FloatingNumber.jitter_px).
+func _spawn_floating_number(kind: String, value: int, screen_pos: Vector2, size_multiplier: float = 1.0, avoid: Array[Rect2] = [], stack: Vector2 = Vector2.ZERO, jitter: float = NAN) -> FloatingNumber:
 	var number := (load(FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
 	add_child(number)
 	var size: Vector2 = number.measure(kind, value, size_multiplier)
-	var at: Vector2 = screen_pos
-	at.y = minf(at.y, ceiling - size.y)
+	var at: Vector2 = screen_pos - Vector2(size.x / 2.0, size.y)
 	var path := Rect2(Vector2(at.x, at.y - number.rise_px), Vector2(size.x, size.y + number.rise_px)).grow(number_clearance_px)
 	var blocked := Rect2()
 	for rect in avoid:
@@ -1275,7 +1293,8 @@ func _spawn_floating_number(kind: String, value: int, screen_pos: Vector2, size_
 	# Its whole rise on screen.
 	var start: Vector2 = at + stack
 	start.y = maxf(start.y, number.rise_px + number_clearance_px)
-	number.show_value(kind, value, start, size_multiplier)
+	number.show_value(kind, value, start, size_multiplier, jitter)
+	return number
 
 # Debug: flips the theme between its on-pale and on-dark value sets and
 # re-reads every battle readout's colours - the cards don't take part

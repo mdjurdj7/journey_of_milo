@@ -302,18 +302,20 @@ func _check_two_blows() -> void:
 		controller.connect("toll_changed", func(new_toll: int) -> void:
 			tolls.append([ProbePlay.game_msec(), new_toll]))
 		# Where this enemy's number would go as a number is spawned, against
-		# where it was put - read at that frame's end, placed, less the one
-		# frame of rise its tween has stepped by then (FloatingNumber.
-		# show_value(): rise_px over duration_sec, linear) - a whole 1/60 s
-		# at --fixed-fps.
+		# where it was put - read at that frame's end, placed by its bottom
+		# centre, less the sideways jitter it drew (FloatingNumber.jitter).
+		# It holds still
+		# through its pop and hold, so it hasn't risen yet. Damage numbers
+		# only - the Wanderer's own (a heal, Toll) aren't this enemy's.
 		overlay.connect("child_entered_tree", func(node: Node) -> void:
 			if node is FloatingNumber:
 				spawn_bases[node] = overlay.call("_screen_pos_for_damage_target", greyshelf) as Vector2)
 		overlay.connect("child_entered_tree", func(node: Node) -> void:
 			if node is FloatingNumber and spawn_bases.has(node):
 				var number := node as FloatingNumber
-				var risen: float = number.rise_px * float(root.get_process_delta_time()) / maxf(number.duration_sec, 0.001)
-				numbers.append(number.position + Vector2(0.0, risen) - (spawn_bases[node] as Vector2)), CONNECT_DEFERRED)
+				if number.kind == FloatingNumber.KIND_DAMAGE:
+					var bottom_centre: Vector2 = number.position - number.jitter + Vector2(number.size.x / 2.0, number.size.y)
+					numbers.append(bottom_centre - (spawn_bases[node] as Vector2)), CONNECT_DEFERRED)
 		await _play_first(controller, greyshelf)
 		_expect_eq(hits.size(), 2, "Two damage events, one per hit")
 		if hits.size() == 2:
