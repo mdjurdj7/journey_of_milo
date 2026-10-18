@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://run/encounter_rewards.gd" id="1_rewards"]
 [ext_resource type="Script" path="res://run/role_reward.gd" id="2_role"]
 [ext_resource type="Resource" path="res://cards/neutral/samphire.tres" id="3_samphire"]
+[ext_resource type="Resource" path="res://run/fight_rarity_by_floor.tres" id="4_fight_rarity"]
 
 [sub_resource type="Resource" id="RoleReward_region_end"]
 script = ExtResource("2_role")
@@ -25,3 +26,4 @@ elite = SubResource("RoleReward_elite")
 required = SubResource("RoleReward_required")
 basic = SubResource("RoleReward_basic")
 samphire_card = ExtResource("3_samphire")
+fight_rarity_by_floor = ExtResource("4_fight_rarity")

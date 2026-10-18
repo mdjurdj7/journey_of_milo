@@ -42,6 +42,10 @@ class_name RewardSpread
 # region-end fight (FloorEnemy.CardReward.TOP_TIER_FIRST, set the same
 # way). Wins over elite_rates.
 @export var top_tier: bool = false
+# With roll_by_rarity: the floor's rates for a normal fight's drop
+# (FightRarityTable, set by RegionField._spawn_reward_spread()); null
+# rolls the pool's own. The elite rates and the top tier never read it.
+@export var rarity_rates: RarityRates = null
 
 @export_group("Layout")
 # The fan's own axis, world XZ. Zero (the fight-drop default) = the
@@ -120,7 +124,7 @@ func _spawn_cards() -> void:
 	elif top_tier:
 		rolled = pool.roll_top_tier(card_count, RunState.rng, enemy, RunState.character)
 	else:
-		rolled = pool.roll_by_rarity(card_count, RunState.rng, enemy, elite_rates, RunState.character)
+		rolled = pool.roll_by_rarity(card_count, RunState.rng, enemy, elite_rates, RunState.character, rarity_rates)
 	if rolled.is_empty():
 		return
 	var scene := load(world_card_scene_path) as PackedScene

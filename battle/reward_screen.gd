@@ -253,6 +253,10 @@ var _glassbone: int = 0
 var _pool: RewardPool = null
 var _elite_rates: bool = false
 var _top_tier: bool = false
+# The floor's rates for a normal fight's offer (FightRarityTable, through
+# RegionField); null rolls the pool's own. Never read at the elite rates
+# or for the top tier first.
+var _rarity_rates: RarityRates = null
 # The fight's role offers the card choice (RoleReward.offers_cards); its
 # extra beside the gold (EncounterRewards.Extra), and the card a Samphire
 # extra is.
@@ -323,7 +327,7 @@ var _decline_top_px: float = 0.0
 # gold (an optional basic fight's Samphire - EncounterRewards), and
 # extra_card the Samphire a SAMPHIRE extra offers. Called by RegionField
 # before the screen is added to the tree.
-func setup(gold: int, pool: RewardPool, deck_panel: Control, glassbone: int = 0, elite_rates: bool = false, top_tier: bool = false, offers_cards: bool = true, extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE, extra_card: CardData = null) -> void:
+func setup(gold: int, pool: RewardPool, deck_panel: Control, glassbone: int = 0, elite_rates: bool = false, top_tier: bool = false, offers_cards: bool = true, extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE, extra_card: CardData = null, rarity_rates: RarityRates = null) -> void:
 	_gold = gold
 	_glassbone = glassbone
 	_pool = pool
@@ -333,6 +337,7 @@ func setup(gold: int, pool: RewardPool, deck_panel: Control, glassbone: int = 0,
 	_offers_cards = offers_cards
 	_extra = extra
 	_extra_card = extra_card
+	_rarity_rates = rarity_rates
 
 func _ready() -> void:
 	# The field is frozen under this (RegionField goes back to
@@ -960,7 +965,7 @@ func _take_samphire(line: RewardLine) -> void:
 func _open_choice() -> void:
 	# A fight's reward, so tier first - see RewardPool.roll_by_rarity() -
 	# or, for the region-end fight, the highest tier down (roll_top_tier()).
-	var rolled: Array[CardData] = _pool.roll_top_tier(choice_count, RunState.rng, null, RunState.character) if _top_tier else _pool.roll_by_rarity(choice_count, RunState.rng, null, _elite_rates, RunState.character)
+	var rolled: Array[CardData] = _pool.roll_top_tier(choice_count, RunState.rng, null, RunState.character) if _top_tier else _pool.roll_by_rarity(choice_count, RunState.rng, null, _elite_rates, RunState.character, _rarity_rates)
 	_offered = rolled.duplicate()
 	if rolled.is_empty():
 		_finish_card_line()

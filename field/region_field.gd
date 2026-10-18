@@ -3367,12 +3367,23 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	spread.roll_by_rarity = true
 	spread.elite_rates = _pending_elite
 	spread.top_tier = _pending_top_tier
+	spread.rarity_rates = _fight_rarity_rates()
 	_pending_elite = false
 	_pending_top_tier = false
 	add_child(spread)
 	spread.global_position = fell_at
 	# The cards are on the sand, nothing to close: the keepsake and weapon at once.
 	_open_pending_offers()
+
+# The rarity rates a normal fight's card offer rolls with on this floor:
+# EncounterRewards' FightRarityTable at the region's floor (1 = its
+# first), or null - the pool's own rates - with no table or no step for
+# it. Elite and region-end offers never read what this returns.
+func _fight_rarity_rates() -> RarityRates:
+	var rewards := load(encounter_rewards_path) as EncounterRewards
+	if rewards == null or rewards.fight_rarity_by_floor == null:
+		return null
+	return rewards.fight_rarity_by_floor.rates_for_floor(RunState.current_floor_index + 1)
 
 # The interim reward list, over the field. The field goes back under the
 # same process-mode freeze the battle used - which is also what stops
@@ -3406,7 +3417,7 @@ func _open_reward_screen() -> void:
 			extra = rewards.roll_extra(role_reward, RunState.rng)
 	var offers_cards: bool = role_reward == null or role_reward.offers_cards
 	var samphire: CardData = rewards.samphire_card if rewards != null else null
-	screen.setup(gold, run_reward_pool(floor_data), deck_panel, _pending_glassbone, _pending_elite, _pending_top_tier, offers_cards, extra, samphire)
+	screen.setup(gold, run_reward_pool(floor_data), deck_panel, _pending_glassbone, _pending_elite, _pending_top_tier, offers_cards, extra, samphire, _fight_rarity_rates())
 	_pending_glassbone = 0
 	_pending_elite = false
 	_pending_top_tier = false

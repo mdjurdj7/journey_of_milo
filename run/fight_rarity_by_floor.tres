@@ -1,0 +1,33 @@
+[gd_resource type="Resource" script_class="FightRarityTable" format=3]
+
+[ext_resource type="Script" uid="uid://caj5ib1ukv0w0" path="res://run/fight_rarity_table.gd" id="1_table"]
+[ext_resource type="Script" uid="uid://dkygpftw2t3bt" path="res://run/fight_rarity_step.gd" id="2_step"]
+[ext_resource type="Script" uid="uid://05e4w2hxjf8" path="res://run/rarity_rates.gd" id="3_rates"]
+
+[sub_resource type="Resource" id="RarityRates_early"]
+script = ExtResource("3_rates")
+common_rate = 63.0
+uncommon_rate = 32.0
+rare_rate = 4.0
+ultra_rare_rate = 1.0
+
+[sub_resource type="Resource" id="FightRarityStep_early"]
+script = ExtResource("2_step")
+from_floor = 1
+rates = SubResource("RarityRates_early")
+
+[sub_resource type="Resource" id="RarityRates_standard"]
+script = ExtResource("3_rates")
+common_rate = 60.0
+uncommon_rate = 30.0
+rare_rate = 9.0
+ultra_rare_rate = 1.0
+
+[sub_resource type="Resource" id="FightRarityStep_standard"]
+script = ExtResource("2_step")
+from_floor = 3
+rates = SubResource("RarityRates_standard")
+
+[resource]
+script = ExtResource("1_table")
+steps = Array[ExtResource("2_step")]([SubResource("FightRarityStep_early"), SubResource("FightRarityStep_standard")])

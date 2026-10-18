@@ -17,6 +17,13 @@ enum Extra { NONE, SAMPHIRE }
 @export var basic: RoleReward = null
 # The card a SAMPHIRE extra offers.
 @export var samphire_card: CardData = null
+# The rarity rates a normal fight's card offer rolls with, by floor (the
+# reward screen's and the reward spread's alike, through RegionField).
+# Null: every fight rolls with its pool's own rates.
+@export var fight_rarity_by_floor: FightRarityTable = null:
+	set(value):
+		fight_rarity_by_floor = value
+		emit_changed()
 
 # The entry for `role` (BattleController.encounter_role()'s names), null for an
 # unknown one.
