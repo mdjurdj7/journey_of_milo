@@ -39,7 +39,8 @@ class_name BattleIntent
 # intent_mark) reads the number that lands after them, then the same
 # reading without them small in faded ink (the Marks group: original_
 # size_px at original_alpha), then each mark's glyph in the same hand: the
-# Brace a post with its strut on a ground line, the Garnish a sprig. While
+# Brace a post with its strut on a ground line, the Garnish a bar with a
+# notch cut from its top - a cut taken. While
 # a card that marks intents is armed (set_armed()), an intent it may
 # target gets a hairline under it and one it may not fades to armed_
 # invalid_alpha; hovered, a refused one says why beneath it (set_
@@ -784,7 +785,8 @@ func _draw() -> void:
 # A mark's glyph (StatusData.intent_mark), in a box r either side of
 # `centre`, in the glyphs' hand at mark_stroke_px. "brace": an upright
 # post on a ground line, a strut leaning into it from the ground - braced.
-# "garnish": a sprig - a curved stem, a leaf either side.
+# "garnish": a short level bar, a notch cut down into its top edge at
+# the middle - a cut taken - in one stroke, fine at its ends.
 func _mark_shapes(mark: StringName, centre: Vector2, r: float) -> Array[PackedVector2Array]:
 	var shapes: Array[PackedVector2Array] = []
 	var even := PackedFloat32Array([1.0, 1.0])
@@ -794,13 +796,8 @@ func _mark_shapes(mark: StringName, centre: Vector2, r: float) -> Array[PackedVe
 			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(-r * 0.75, r), centre + Vector2(r * 0.35, -r * 0.3)]), PackedFloat32Array([1.0, 0.4]), mark_stroke_px))
 			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(-r, r), centre + Vector2(r, r)]), even, mark_stroke_px * 0.7))
 		&"garnish":
-			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(-r * 0.1, r), centre + Vector2(r * 0.05, 0.0), centre + Vector2(r * 0.3, -r)]), PackedFloat32Array([1.0, 0.8, 0.3]), mark_stroke_px))
-			for side in [-1.0, 1.0]:
-				var base: Vector2 = centre + Vector2(r * 0.05, r * 0.15 * side - r * 0.1)
-				var tip: Vector2 = base + Vector2(r * 0.8 * side, -r * 0.45)
-				var across: Vector2 = (tip - base).orthogonal().normalized() * r * 0.22
-				var mid: Vector2 = (base + tip) * 0.5
-				shapes.append(PackedVector2Array([base, mid + across, tip, mid - across]))
+			var top: float = r * 0.1
+			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(-r, top), centre + Vector2(-r * 0.3, top), centre + Vector2(0.0, top + r * 0.5), centre + Vector2(r * 0.3, top), centre + Vector2(r, top)]), PackedFloat32Array([0.4, 1.0, 1.0, 1.0, 0.4]), mark_stroke_px))
 	return shapes
 
 func _pips_width() -> float:
