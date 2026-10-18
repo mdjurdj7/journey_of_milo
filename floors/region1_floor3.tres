@@ -175,3 +175,4 @@ wind = SubResource("FloorWindData_dunes")
 reward_pool = ExtResource("7_wanderer_pool")
 gold_min = 15
 gold_max = 22
+wear_darken = 0.08

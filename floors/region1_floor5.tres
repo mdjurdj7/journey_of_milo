@@ -104,3 +104,4 @@ wear_path_override = PackedVector2Array(0, 0, 2.47, -10, 3.5, -20, 2.47, -30, 2,
 reward_pool = ExtResource("8_wanderer_pool")
 gold_min = 35
 gold_max = 45
+wear_darken = 0.08

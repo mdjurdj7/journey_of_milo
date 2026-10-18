@@ -206,3 +206,4 @@ scatter_sets = Array[ExtResource("9_w4aba")]([ExtResource("97_pup_hollow")])
 reward_pool = ExtResource("8_wanderer_pool")
 gold_min = 18
 gold_max = 25
+wear_darken = 0.08

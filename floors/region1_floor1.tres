@@ -84,3 +84,4 @@ scatter_sets = Array[ExtResource("11_scatter_set")]([ExtResource("12_wet_scatter
 scatter_budget = 22
 reward_pool = ExtResource("10_wanderer_pool")
 gold_max = 15
+wear_darken = 0.08
