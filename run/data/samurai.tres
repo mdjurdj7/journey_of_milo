@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="CharacterData" load_steps=8 format=3]
+
+[ext_resource type="Script" uid="uid://dm776r835syew" path="res://run/character_data.gd" id="1_character_data"]
+[ext_resource type="Resource" uid="uid://c7jcraas74exv" path="res://cards/neutral/left_hand.tres" id="2_left_hand"]
+[ext_resource type="Resource" uid="uid://c84g0s5gr1yw7" path="res://cards/neutral/endure.tres" id="3_endure"]
+[ext_resource type="Resource" uid="uid://cjvv17es5rb3e" path="res://cards/neutral/untouched.tres" id="4_untouched"]
+[ext_resource type="Resource" uid="uid://dka7rqy5ml1mf" path="res://cards/neutral/second_thoughts.tres" id="5_second_thoughts"]
+[ext_resource type="Resource" path="res://cards/pools/samurai_pool.tres" id="6_pool"]
+[ext_resource type="Texture2D" uid="uid://cxo6fjbq44gk8" path="res://assets/models/samurai/samurai_v1_texture_0.png" id="7_albedo"]
+
+[resource]
+script = ExtResource("1_character_data")
+character_name = "Samurai"
+max_hp = 80
+starting_deck_counts = {
+ExtResource("2_left_hand"): 5,
+ExtResource("3_endure"): 3,
+ExtResource("4_untouched"): 1,
+ExtResource("5_second_thoughts"): 1
+}
+reward_pool = ExtResource("6_pool")
+field_model_path = "res://assets/models/samurai/samurai_v1.glb"
+field_albedo = ExtResource("7_albedo")
+field_model_yaw_degrees = 180.0
+field_model_height = 1.7
