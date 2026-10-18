@@ -255,7 +255,8 @@ and up the west shore north of z -27. (2026-10-17.)
   option: the crab's `underfoot_dragonfly` (the Underfoot with a lone
   Dragonfly, `dragonfly_lone.tres`), and `siltjaw_pair` (each about 70% of
   the lone Siltjaw's HP, starting on the same loop so turn 2 has both
-  Charges queued; the dug-in one plays the three-mound rules). (2026-10-16,
+  Charges queued; the dug-in one plays the mound rules - three 12 HP
+  mounds, each with its plate). (2026-10-16,
   floor 2 encounter variety.)
 - **Height-based ground tints use a fixed land height.** Basin tint,
   crest light and the slope-tint fade (`basin_tint_heights`,
@@ -295,6 +296,24 @@ and up the west shore north of z -27. (2026-10-17.)
 
 ## Deferred
 
+- **The Siltjaw's mound rework leaves four things open.** Its mounds are
+  12 HP targets with plates, unbroken it erupts for 14 (Block-only),
+  breaking its own brings it up Exposed through your next turn with the
+  overkill raw, and its tell is a 6% settle every 3.5 s. Open:
+  - **Card faces read the Siltjaw, not the mound.** An armed card over a
+    mound (`BattleController.preview_context_against()`) prints its
+    number against the enemy under it; a mound has no statuses, so the
+    two only differ when the Siltjaw holds an incoming modifier.
+  - **The intent reads "←14", not "ERUPT 14"**, the same glyph-and-number
+    form every intent uses. A move name on the intent would be a change
+    to BattleIntent for every enemy.
+  - **A mound hit reuses the blade-into-sand clips**
+    (`sword_ground_strike_sand_*`, `FieldEnemy.dig_mound_hit_clips`); a
+    softer sand thud of its own waits for a sound pass.
+  - **The numbers are a first guess:** Siltjaw 44 HP, mounds 12, Erupt 14,
+    `tell_strength` 0.06 - tune from play and the run logs' fight lengths
+    (26 s median before).
+  (2026-10-17, Siltjaw mound rework.)
 - **Sea wave calming under a painted landmass mask.** `sea.gdshader`'s
   `wave_fade_factor()` is its own port of Ground's SDF shoreline
   (`landmass_side_distance()`/`landmass_seaward_distance()`, uniforms
