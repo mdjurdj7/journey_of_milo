@@ -350,6 +350,9 @@ func _build_grid() -> void:
 
 # The reward screen's choice card: grows in place about its centre (pivot
 # set after add_child()), no lift; keywords define themselves on hover.
+# `card` as the weapon carried makes it (RunState.as_carried() - Lash and
+# Lash+ under Greyshelf's Tail); what's picked and tempered is still the
+# deck's own card (_cards).
 func _new_view(card: CardData) -> CardView:
 	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
 	if scene == null:
@@ -359,7 +362,7 @@ func _new_view(card: CardData) -> CardView:
 	view.hover_lift = 0.0
 	_draw_layer.add_child(view)
 	view.pivot_offset = view.card_size / 2.0
-	view.set_card_data(card)
+	view.set_card_data(RunState.as_carried(card))
 	view.set_keyword_inspect(true)
 	return view
 

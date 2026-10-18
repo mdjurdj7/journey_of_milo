@@ -19,8 +19,9 @@ class_name ArmorExamine
 #   the run's weapon (the WEAPON line, setup_weapon()) - the same, on its
 #     weapon plate (ItemPlate.set_weapon()).
 #   a weapon offered (the Greyshelf's - setup_weapon() with_choice): TAKE
-#     and LEAVE, and "REPLACES" the weapon carried, on the same terms as
-#     the piece on the sand - LEAVE and every other close is false.
+#     and LEAVE, and "REPLACES" the weapon carried. Only a choice closes
+#     it - a click off the plate, Escape and a right click do nothing,
+#     since a weapon left is gone for good (_choice_only).
 # Layer 100, running ALWAYS.
 
 signal closed(taken: bool)
@@ -35,6 +36,8 @@ var _worn: TrinketData = null
 # The weapon carried, which taking an offered one would replace.
 var _carried: WeaponData = null
 var _with_choice: bool = false
+# A weapon offer: TAKE or LEAVE is the only way out.
+var _choice_only: bool = false
 var _from_rect: Rect2 = Rect2()
 var _scrim: ColorRect = null
 var _plate: ItemPlate = null
@@ -56,6 +59,7 @@ func setup_weapon(weapon: WeaponData, from_rect: Rect2 = Rect2(), carried: Weapo
 	setup(null, null, with_choice, from_rect)
 	_weapon = weapon
 	_carried = carried
+	_choice_only = with_choice
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -115,13 +119,16 @@ func _tween_to(to_scale: float, to_position: Vector2, scrim_alpha: float) -> Twe
 func _on_scrim_gui_input(event: InputEvent) -> void:
 	var button := event as InputEventMouseButton
 	if button != null and button.pressed and (button.button_index == MOUSE_BUTTON_LEFT or button.button_index == MOUSE_BUTTON_RIGHT):
+		# Taken either way, so it never reaches the field.
 		_scrim.accept_event()
-		close(false)
+		if not _choice_only:
+			close(false)
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event.is_action_pressed("ui_cancel"):
 		get_viewport().set_input_as_handled()
-		close(false)
+		if not _choice_only:
+			close(false)
 		return
 	if not _with_choice or _plate == null:
 		return

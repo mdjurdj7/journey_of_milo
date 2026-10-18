@@ -13,8 +13,12 @@ extends SceneTree
 # under the Tail: the hand holds Lash, the third Lash's three hits land
 # card_hit_interval apart with input locked until the last, the faces
 # count up - and with the Rusted Blade back the next fight's hand is
-# Slash again. Rules cases on the real .tres; the fight cases load floor
-# 5 and play the cards through BattleController.
+# Slash again. The weapon offer closes on TAKE or LEAVE alone - a click
+# off the plate and Escape do nothing - while a piece on the sand still
+# closes on either. A deck view shows the deck as the weapon carried
+# makes it (Lash under the Tail, Slash under the Blade), and a pick hands
+# back the deck's own card. Rules cases on the real .tres; the fight cases
+# load floor 5 and play the cards through BattleController.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/lash_probe.gd
 #
@@ -22,7 +26,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 10
+const CASES := 12
 const LASH_PATH := "res://cards/weapon/lash.tres"
 const LASH_PLUS_PATH := "res://cards/weapon/lash_tempered.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
@@ -37,6 +41,7 @@ const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
+const ARMOR_PATH := "res://run/armor/harness.tres"
 const LASH_TAG := &"lash"
 const FLOOR_5 := 4
 const PLAYER_HP := 999
@@ -65,6 +70,8 @@ func _initialize() -> void:
 	_check_mound_break_carries()
 	await _check_face()
 	_check_weapon_mapping()
+	await _check_offer_needs_a_choice()
+	await _check_deck_view()
 	await _check_fight()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
@@ -263,6 +270,87 @@ func _check_weapon_mapping() -> void:
 	_expect(blade.modify_basic_attack(slash) == slash, "The Rusted Blade plays Slash as Slash")
 	_expect_eq(slash.card_name, "Slash", "...and the Slash itself is untouched")
 	_completed += 1
+
+# The Tail's offer: a click off the plate and Escape leave it open; LEAVE
+# closes it, not taken. A piece on the sand (ArmorExamine with_choice)
+# still closes on a click off it.
+func _check_offer_needs_a_choice() -> void:
+	var offer := ArmorExamine.new()
+	offer.setup_weapon(load(TAIL_PATH) as WeaponData, Rect2(), load(BLADE_PATH) as WeaponData, true)
+	var results: Array = []
+	offer.closed.connect(func(taken: bool) -> void: results.append(taken))
+	root.add_child(offer)
+	await process_frame
+	offer.call("_on_scrim_gui_input", _click(MOUSE_BUTTON_LEFT))
+	offer.call("_on_scrim_gui_input", _click(MOUSE_BUTTON_RIGHT))
+	var escape := InputEventAction.new()
+	escape.action = &"ui_cancel"
+	escape.pressed = true
+	offer.call("_unhandled_input", escape)
+	await create_timer(0.4).timeout
+	_expect(results.is_empty() and is_instance_valid(offer) and offer.is_inside_tree(), "The weapon offer stays open through a click off it, a right click and Escape")
+	if is_instance_valid(offer):
+		offer.get_plate().activate(ItemPlate.Choice.LEAVE)
+		await create_timer(0.4).timeout
+	_expect_eq(results, [false], "...LEAVE closes it, not taken")
+	var armor := ArmorExamine.new()
+	armor.setup(load(ARMOR_PATH) as TrinketData, null, true)
+	var armor_results: Array = []
+	armor.closed.connect(func(taken: bool) -> void: armor_results.append(taken))
+	root.add_child(armor)
+	await process_frame
+	armor.call("_on_scrim_gui_input", _click(MOUSE_BUTTON_LEFT))
+	await create_timer(0.4).timeout
+	_expect_eq(armor_results, [false], "A piece on the sand still closes on a click off it")
+	_completed += 1
+
+# A deck view of one Slash: Lash under the Tail - its pick the Slash
+# itself - and Slash again under the Rusted Blade.
+func _check_deck_view() -> void:
+	if _run_state == null:
+		_fail("no RunState autoload")
+		_completed += 1
+		return
+	_run_state.call("new_run", load(CHARACTER_PATH))
+	var slash: CardData = (load(SLASH_PATH) as CardData).duplicate() as CardData
+	var cards: Array[CardData] = [slash]
+	_run_state.call("equip_weapon", load(TAIL_PATH))
+	var picked: Array = []
+	var view: DeckView = DeckPanel.open_picker(self, cards, "PICK", 100)
+	view.card_picked.connect(func(card: CardData) -> void: picked.append(card))
+	await process_frame
+	var faces: Array[CardView] = _deck_view_faces(view)
+	_expect(faces.size() == 1 and faces[0].card_data.card_name == "Lash", "Under the Tail the deck view shows Lash")
+	if faces.size() == 1:
+		faces[0].clicked.emit(faces[0].card_data)
+	await process_frame
+	_expect(picked.size() == 1 and picked[0] == slash, "...and a pick hands back the deck's own Slash")
+	_expect_eq(slash.card_name, "Slash", "...the Slash untouched")
+	_run_state.call("equip_weapon", load(BLADE_PATH))
+	var again: DeckView = DeckPanel.open_view(self, cards, "DECK")
+	await process_frame
+	faces = _deck_view_faces(again)
+	_expect(faces.size() == 1 and faces[0].card_data.card_name == "Slash", "The Rusted Blade back on: the deck view shows Slash")
+	again.close()
+	await process_frame
+	_completed += 1
+
+func _deck_view_faces(view: DeckView) -> Array[CardView]:
+	var faces: Array[CardView] = []
+	var grid: Node = view.get("_grid")
+	if grid == null:
+		return faces
+	for slot in grid.get_children():
+		for child in slot.get_children():
+			if child is CardView and not child.is_queued_for_deletion():
+				faces.append(child as CardView)
+	return faces
+
+func _click(button_index: MouseButton) -> InputEventMouseButton:
+	var click := InputEventMouseButton.new()
+	click.button_index = button_index
+	click.pressed = true
+	return click
 
 # A run of Slashes under the Tail at the Greyshelf: the hand is Lash; the
 # third Lash lands three hits card_hit_interval apart, input locked until

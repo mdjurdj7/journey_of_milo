@@ -3439,7 +3439,7 @@ func _open_pending_keepsake_offer() -> void:
 # TAKE and LEAVE and "REPLACES" the weapon carried (ArmorExamine.setup_
 # weapon()), the field frozen under it as under every screen. TAKE
 # carries it (RunState.equip_weapon()) - the one it replaces is gone, as
-# a keepsake left is; LEAVE and every other close leave it, and the
+# a keepsake left is; LEAVE leaves it - only a choice closes it - and the
 # weapon carried stays. False while a fight is open, another screen has
 # the field, or it is the one carried.
 func open_weapon_offer(weapon: WeaponData) -> bool:

@@ -244,8 +244,14 @@ func _ready() -> void:
 func open(cards: Array[CardData], header_text: String) -> void:
 	_header_label.text = header_text
 
+	# Each card as the weapon carried makes it (RunState.as_carried() -
+	# Lash under Greyshelf's Tail), sorted by that name; a pick still
+	# hands back the card itself, the one the run's deck holds.
+	var shown: Dictionary = {}
+	for card in cards:
+		shown[card] = RunState.as_carried(card)
 	var sorted_cards := cards.duplicate()
-	sorted_cards.sort_custom(func(a: CardData, b: CardData) -> bool: return a.card_name < b.card_name)
+	sorted_cards.sort_custom(func(a: CardData, b: CardData) -> bool: return (shown[a] as CardData).card_name < (shown[b] as CardData).card_name)
 
 	for child in _grid.get_children():
 		child.queue_free()
@@ -276,11 +282,13 @@ func open(cards: Array[CardData], header_text: String) -> void:
 		slot.custom_minimum_size = scaled_card_size
 		slot.add_child(card_view)
 		_grid.add_child(slot)
-		card_view.set_card_data(card)
+		card_view.set_card_data(shown[card] as CardData)
 		# The card carries its own slot to the handler - the slot is where
 		# it has to land again, and looking it up later through get_parent()
-		# wouldn't work while the card is out of the tree it came from.
-		card_view.clicked.connect(_on_card_clicked.bind(card_view, slot))
+		# wouldn't work while the card is out of the tree it came from. The
+		# handler gets the deck's own card, not the one shown.
+		var own: CardData = card
+		card_view.clicked.connect(func(_shown_card: CardData) -> void: _on_card_clicked(own, card_view, slot))
 
 # Largest column count whose total width (n cards plus (n-1) gaps between
 # them) still fits _available_grid_width, floored at 1 (a single huge

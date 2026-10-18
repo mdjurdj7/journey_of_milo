@@ -464,9 +464,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 # deck is never rewritten; a CONSUMED card is never a basic attack, so
 # _apply_consumed_removals() still finds every one it needs by identity.
 func fight_card(card: CardData) -> CardData:
-	if RunState.weapon == null:
-		return card
-	return RunState.weapon.modify_basic_attack(card)
+	return RunState.as_carried(card)
 
 # The queued action of one enemy as the display should show it - see
 # EnemyTurn.preview_intent() - and the lethal warning across enemies: when

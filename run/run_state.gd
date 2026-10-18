@@ -402,6 +402,16 @@ func equip_weapon(new_weapon: WeaponData) -> void:
 	weapon = new_weapon
 	weapon_changed.emit(weapon)
 
+# `card` as the weapon carried makes it (WeaponData.modify_basic_attack()
+# - the Tail's Slash as a Lash of its own), anything else `card` itself:
+# what a fight plays (BattleController.fight_card()) and what the deck
+# views show (DeckView, the wagon). The deck itself is never rewritten, so
+# whatever acts on a card shown this way acts on `card`.
+func as_carried(card: CardData) -> CardData:
+	if weapon == null:
+		return card
+	return weapon.modify_basic_attack(card)
+
 # What's held, keepsake then worn piece, the empty slots left out - what
 # every fight hook reads (BattleController.setup()).
 func held_pieces() -> Array[TrinketData]:

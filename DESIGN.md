@@ -211,9 +211,9 @@ and up the west shore north of z -27. (2026-10-17.)
   in the HUD's WEAPON slot. What a weapon is for: it changes the class's
   basic attack - Slash for the Wanderer - through
   `WeaponData.modify_basic_attack()`, which each fight's deck is built
-  through (`BattleController.fight_card()`); the run's deck itself is
-  never rewritten, so out of a fight (deck panel, Belongings, wagon,
-  Collector) it still shows Slash. The Rusted Blade is the baseline and
+  through (`BattleController.fight_card()`), and which every deck view shows
+  its cards as (`RunState.as_carried()` - DeckView, the wagon); the run's
+  deck itself is never rewritten. The Rusted Blade is the baseline and
   leaves Slash unchanged. A weapon stays out of the battle hover reveal
   and out of `held_pieces()`. Its art is
   `assets/textures/weapons/rusted_blade.png`. (2026-10-17.)
