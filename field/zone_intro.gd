@@ -327,6 +327,12 @@ func start_from_title() -> void:
 		return
 	_title_starting = false
 	_free_menu()
+	_play_from_held_title()
+
+# From the held title frame, its menu gone: the ordinary timeline from
+# t = 0 with the fog opening from the title values - or, with the intro
+# off, the field simply begins.
+func _play_from_held_title() -> void:
 	if not zone_intro_enabled:
 		_finish()
 		debug_title_hold = false
