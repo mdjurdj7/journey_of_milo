@@ -88,6 +88,11 @@ var on_damage: Callable = Callable()
 # effect actually lands damage.
 
 var on_block: Callable = Callable()
+# Called as on_mound_broken.call(enemy, mound, own) when a hit breaks a
+# mound of a dug-in enemy's row (EnemyTurn.break_mound()): `own` true for
+# the one it was under - it is up, Exposed, and the hit's overkill follows
+# as its own report_damage(). Before any later effect of the card.
+var on_mound_broken: Callable = Callable()
 # Called as on_block_gained.call(amount) when the player gains Block
 # (gain_block()) - the view's number for it.
 var on_block_gained: Callable = Callable()
@@ -195,6 +200,74 @@ func for_card_preview(hp_cost: int) -> EffectContext:
 func report_damage(target_combatant: Combatant, amount: int, kind: String) -> void:
 	if on_damage.is_valid():
 		on_damage.call(target_combatant, amount, kind)
+	if target_combatant != null and target_combatant.mound_owner != null and target_combatant.hp <= 0:
+		_break_mound(target_combatant, kind)
+
+# A mound's Combatant brought to 0 (report_damage()): the mound breaks. Its
+# own: the enemy up and Exposed, the rest of the card landing on it
+# (landing_for()), and the hit's overkill carried into it raw - past its
+# block, but not through its statuses - as damage of its own. A wrong one:
+# gone, the rest of the card's single-target effects landing on nothing.
+func _break_mound(guard: Combatant, kind: String) -> void:
+	var owner: Combatant = guard.mound_owner
+	var outcome: EnemyTurn.MoundBreak = EnemyTurn.break_mound(owner, owner_data(owner), guard.mound_index)
+	if outcome == EnemyTurn.MoundBreak.NOT_BROKEN:
+		return
+	var own: bool = outcome == EnemyTurn.MoundBreak.BROKE_TRUE
+	if on_mound_broken.is_valid():
+		on_mound_broken.call(owner, guard.mound_index, own)
+	if target == guard:
+		target = owner if own else null
+	if not own:
+		return
+	var overkill: int = guard.last_overkill
+	guard.last_overkill = 0
+	if overkill <= 0 or owner.hp <= 0:
+		return
+	var result := DamagePipeline.resolve(overkill, owner)
+	report_block(owner, result)
+	if result["damage_to_hp"] > 0:
+		if owner.hp <= 0:
+			killed_this_card = true
+		report_damage(owner, result["damage_to_hp"], kind)
+
+# The EnemyData behind a dug-in enemy, for EnemyTurn's rules on its
+# mounds - handed in by the controller (mound_data), keyed by Combatant.
+var mound_data: Dictionary = {}
+func owner_data(owner: Combatant) -> EnemyData:
+	return mound_data.get(owner) as EnemyData
+
+# Where a hit meant for `combatant` lands now: itself, or - for a mound's
+# Combatant - itself while the mound stands, the enemy under it once its
+# own mound is broken (it is up), nothing once a wrong one is gone or the
+# row has gone.
+func landing_for(combatant: Combatant) -> Combatant:
+	if combatant == null or combatant.mound_owner == null:
+		return combatant
+	if EnemyTurn.mound_standing(combatant):
+		return combatant
+	var owner: Combatant = combatant.mound_owner
+	if not owner.dug_in and combatant.mound_index == owner.true_mound and combatant.hp <= 0:
+		return owner
+	return null
+
+# What a status aimed at the card's target lands on: the target, or - a
+# mound - the enemy under it (Brace, Deny, Come Due, Sentence at a mound
+# reach the Siltjaw and break nothing).
+func status_target() -> Combatant:
+	if target != null and target.mound_owner != null:
+		return target.mound_owner
+	return target
+
+# The enemies in reach as holders of statuses: each of `enemies`, with a
+# mound's Combatant standing for the enemy under it, once.
+func status_holders() -> Array[Combatant]:
+	var holders: Array[Combatant] = []
+	for enemy in enemies:
+		var holder: Combatant = enemy.mound_owner if enemy.mound_owner != null else enemy
+		if not holders.has(holder):
+			holders.append(holder)
+	return holders
 
 # A hit on an enemy's DamagePipeline result: tells on_block if its block
 # took any of it. Call before that hit's report_damage().

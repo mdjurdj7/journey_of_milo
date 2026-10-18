@@ -383,6 +383,8 @@ static func _intent_entry(data: EnemyData, intent: EnemyIntent) -> Dictionary:
 		EnemyIntent.IntentType.ATTACK:
 			entry["damage_per_hit"] = intent.value
 			entry["hits"] = intent.hits
+			if intent.lands_as_strike_back:
+				entry["lands_as_strike_back"] = "the statuses that wait for its own turn (Braced, Garnished, No Further, Unbroken) don't reduce it; Block does"
 			# A multi-hit attack gains what its phase adds (StatusData.
 			# bonus_hits - EnemyTurn.hit_count()).
 			if intent.hits > 1 and data.phase_status != null and data.phase_status.bonus_hits > 0:
@@ -398,15 +400,15 @@ static func _intent_entry(data: EnemyData, intent: EnemyIntent) -> Dictionary:
 			entry["heal_each_packmate"] = intent.value
 		EnemyIntent.IntentType.DIG:
 			# Its moves under the sand, one a turn, the last surfacing it;
-			# the first is also the bite a wrong mound brings at once.
+			# its mounds, each a target of mound_hp.
 			var under: Array = []
 			for move: EnemyIntent in intent.under_moves:
 				if move != null:
 					under.append(_intent_entry(data, move))
 			entry["dig"] = {
 				"mounds": intent.mound_count,
+				"mound_hp": intent.mound_hp,
 				"under_moves": under,
-				"wrong_mound_bite": intent.under_moves[0].value if not intent.under_moves.is_empty() and intent.under_moves[0] != null else null,
 				"found_status": intent.found_status.id if intent.found_status != null else null,
 			}
 	if data.erratic_intent_selection:
@@ -480,7 +482,7 @@ static func _reachable_statuses(data: EnemyData) -> Array:
 			queue.append([intent.status_on_resolve, "from its %s resolving until its next move" % intent.intent_name])
 	for intent in data.intents:
 		if intent != null and intent.type == EnemyIntent.IntentType.DIG and intent.found_status != null:
-			queue.append([intent.found_status, "found under its %s's mounds, until its next move" % intent.intent_name])
+			queue.append([intent.found_status, "its own mound broken under its %s, for %d of its turns" % [intent.intent_name, intent.found_status.default_duration_turns]])
 	for intent in data.intents:
 		if intent != null and intent.applies_to_player != null and intent.applied_amount > 0:
 			queue.append([intent.applies_to_player, "put on the player by its %s, %d at a time" % [intent.intent_name, intent.applied_amount]])

@@ -15,6 +15,7 @@ static func resolve(amount: int, combatant: Combatant) -> Dictionary:
 	var damage_to_hp: int = after_block - absorbed
 	combatant.block -= blocked
 	combatant.absorb -= absorbed
+	combatant.last_overkill = maxi(damage_to_hp - combatant.hp, 0)
 	combatant.hp = max(combatant.hp - damage_to_hp, 0)
 	combatant.damage_taken_this_turn += damage_to_hp
 	return {

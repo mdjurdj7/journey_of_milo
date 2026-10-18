@@ -227,8 +227,9 @@ enum Mark { NONE, COIL, DROP }
 @export var consumed_by_attack_against: bool = false
 
 # Passed by a strike back - damage an enemy deals in answer to a card in
-# the player's own turn (Coiled's, the Siltjaw's bite from below - EnemyTurn.
-# counter_strike(), strike_from_below()): it neither softens that hit nor
+# the player's own turn (Coiled's - EnemyTurn.counter_strike()), or an
+# attack that lands as one (EnemyIntent.lands_as_strike_back - the
+# Siltjaw's Erupt): it neither softens that hit nor
 # is spent by it, and waits, armed, for the enemy's own turn. The strike
 # back lands in full past it. Braced (Brace) and Garnished (Garnish) on
 # the enemy; No Further's armed status and Unbroken's on the player.

@@ -13,6 +13,8 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 		return
 	var amount: int = Status.apply_modifiers(spent, ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 	for enemy in ctx.enemies:
+		if enemy.mound_owner != null and not EnemyTurn.mound_standing(enemy):
+			continue
 		var incoming: int = Status.apply_modifiers(amount, enemy.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
 		var result := DamagePipeline.resolve(incoming, enemy)
 		ctx.report_block(enemy, result)

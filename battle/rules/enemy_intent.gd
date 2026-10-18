@@ -36,16 +36,15 @@ class_name EnemyIntent
 # Adder's Coil.
 #
 # DIG: the turn it resolves, the enemy goes under the sand and
-# mound_count mounds swell up across its side of the field; it is under
-# one of them (Combatant.true_mound). It stays targetable - through the
-# mounds (BattleController): a card at the right one forces it up
-# (EnemyTurn.unearth() - found_status on it until its next move), at a
-# wrong one collapses that mound, the card's hit wasted, and it bites from
-# below at once (EnemyTurn.strike_from_below(): under_moves[0]); a card at
-# every enemy finds it. While under, each of its turns is the next of
-# under_moves - the Siltjaw's Bite, then its Erupt, after which it
-# surfaces on its own. The display shows the move and a pip per turn
-# under, never a mound. The Siltjaw's Dig.
+# mound_count mounds swell up across its side of the field, each a target
+# of its own with mound_hp HP (Combatant.mound_guards); it is under one of
+# them (Combatant.true_mound). The mounds take its place as targets
+# (BattleController): a card at every enemy hits every mound. Breaking its
+# own mound forces it up there (EnemyTurn.break_mound() - found_status on
+# it), the hit's overkill carried into it raw; breaking a wrong one does
+# nothing more. While under, each of its turns is the next of under_moves
+# - the Siltjaw's Erupt, after which it surfaces on its own. The display
+# shows the move, never a mound. The Siltjaw's Dig.
 #
 # TAUNT: as COIL - no damage, no block, it stays targetable - and what it
 # brings is its status_on_resolve (Inflated: it taunts and takes less),
@@ -113,16 +112,19 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL, DIG, T
 @export var on_interrupt: EnemyIntent = null
 
 # A DIG's (above): its moves under the sand, one a turn, the last
-# surfacing it; how many mounds it digs; what it holds once found until
-# its next move (Exposed). Unused by any other type.
+# surfacing it; how many mounds it digs and each one's HP; what it holds
+# once found, for that status's own duration (Exposed, through the
+# player's next turn). Unused by any other type.
 @export var under_moves: Array[EnemyIntent] = []
 @export var mound_count: int = 3
+@export var mound_hp: int = 12
 @export var found_status: StatusData = null
 # A DIG's too: what it holds for as long as it is under the sand - from
 # the dig (or the fight's opening, EnemyData.opens_dug_in) until it comes
 # up, found or erupting (EnemyTurn.start_dig(), _end_dig()) - for its
-# readout and hover. Its magnitude is the bite from below's (under_moves[0]),
-# for a {value} in its text. The Siltjaw's Dug in. Null = none.
+# readout and hover. Its magnitude is its first move under's
+# (under_moves[0] - the eruption), for a {value} in its text. The
+# Siltjaw's Dug in. Null = none.
 @export var dug_in_status: StatusData = null
 # What the enemy does on its NEXT turn when this one is interrupted - an
 # interjection outside the intents loop (Combatant.interjected_intent),
@@ -130,6 +132,13 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL, DIG, T
 # a BURROW. Null = the interrupted turn is simply lost.
 
 @export var rear_while_queued: bool = false
+
+# An ATTACK that lands as a strike back does (EnemyTurn.land_attack()'s
+# strike_back): the statuses that wait for the enemy's own turn - Braced,
+# Garnished, No Further's armed, Unbroken's - neither soften it nor are
+# spent by it; Block and absorb still take their share. The Siltjaw's
+# Erupt.
+@export var lands_as_strike_back: bool = false
 
 # The status its enemy holds for exactly as long as this intent is the
 # queued one - applied when it is queued, removed when another is (Status.

@@ -130,14 +130,23 @@ var buried: bool = false
 # Under the sand after a DIG (EnemyIntent.IntentType.DIG): dug_in, by
 # which DIG (dig_intent), how many turns under so far (dug_step - its
 # under_moves index), the mounds still standing (mounds, of the DIG's
-# mound_count, 0-based) and the one it is under (true_mound). Targetable
-# all the while, through the mounds. Set and cleared by EnemyTurn only
-# (start_dig(), unearth(), collapse_mound(), take_turn()).
+# mound_count, 0-based), each mound's own Combatant by number (mound_
+# guards - the targets in its place, EnemyIntent.mound_hp each) and the
+# one it is under (true_mound). Set and cleared by EnemyTurn only
+# (start_dig(), break_mound(), unearth(), take_turn()).
 var dug_in: bool = false
 var dig_intent: EnemyIntent = null
 var dug_step: int = 0
 var mounds: Array[int] = []
+var mound_guards: Array[Combatant] = []
 var true_mound: int = -1
+# A mound's own Combatant (mound_guards above): the enemy under the row
+# and which mound this is. Null / -1 for any other fighter.
+var mound_owner: Combatant = null
+var mound_index: int = -1
+# What the last hit through DamagePipeline.resolve() took past this
+# fighter's HP - a broken mound's, carried into the enemy under it.
+var last_overkill: int = 0
 # HP damage taken since the player's turn began - what an intent's
 # interrupt_threshold is measured against. Counted by DamagePipeline.
 # resolve(), reset by BattleController._start_player_turn().

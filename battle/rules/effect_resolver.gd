@@ -91,7 +91,7 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	# 0 goes off now, in the player's turn - reported as damage, never as
 	# the card's own blow.
 	if ctx.toll_spent_this_card:
-		for enemy in ctx.enemies:
+		for enemy in ctx.status_holders():
 			Status.advance_on_toll_spend(enemy)
 			var taken: int = Status.resolve_countdowns(enemy)
 			if taken > 0:

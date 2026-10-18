@@ -6,7 +6,7 @@
 script = ExtResource("1_status_data")
 id = "dug_in"
 display_name = "Dug in"
-description = "Strike the right mound. A wrong one bites back for {value}, which Brace, Garnish, No Further and Unbroken don't reduce."
+description = "Break the mound it is under to bring it up Exposed. Left alone through your turn, it erupts for {value} - only Block reduces it."
 category = 2
 default_duration_turns = -1
 stack_rule = 3

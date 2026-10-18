@@ -85,6 +85,14 @@ signal enemy_hit_blocked(enemy: FieldEnemy, absorbed: bool)
 # One hit of `enemy`'s attack the player's Block or absorb took whole: no
 # damage_dealt for it - BattleFeedback's blocked stop and armored sound.
 signal player_hit_blocked(enemy: FieldEnemy)
+# A hit on mound `mound` of a dug-in enemy's row (EnemyIntent.IntentType.
+# DIG - each mound its own target, Combatant.mound_guards): `amount` HP
+# off it, `hp` of `max_hp` left - in place of damage_dealt, which is the
+# enemy's own. Then mound_broken when it reached 0: `own` for the one the
+# enemy was under, up through it now, the overkill to follow as the
+# enemy's damage_dealt.
+signal mound_damaged(enemy: FieldEnemy, mound: int, amount: int, hp: int, max_hp: int)
+signal mound_broken(enemy: FieldEnemy, mound: int, own: bool)
 # Something a combatant gained that no damage_dealt carries, for its
 # floating number: `kind` "heal" (HP back - a card's heal or Drain, Grace
 # reclaimed, Devour, a lethal guard's lift, a packmate's Forage) or
@@ -972,15 +980,14 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 
 	card_impact.emit(card)
 
-	# A dug-in enemy (DIG) at the impact: found by a card at its mound or at
-	# every enemy - forced up, Exposed, before the card's effects read it -
-	# or a wrong mound collapsing, the card's hit on it wasted.
-	var missed: FieldEnemy = _settle_dig_guess(card, target_enemy, target_mound)
-
 	var ctx := EffectContext.new()
 	ctx.player = player
-	ctx.target = _combatants.get(target_enemy) if missed == null else null
-	ctx.enemies = _hittable_enemy_combatants()
+	# A dug-in enemy is hit through its mounds: the card at a mound lands on
+	# that mound (EffectContext.landing_for() - nothing once it is gone),
+	# a card at every enemy on every mound standing.
+	ctx.target = _card_target(target_enemy, target_mound)
+	ctx.enemies = _card_enemy_combatants()
+	_wire_mounds(ctx)
 	ctx.deck = deck
 	ctx.cards_played_before_this = cards_played_this_turn - 1
 	ctx.replaced_cost_hp = replaced_hp
@@ -994,7 +1001,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		_report_or_hold(_on_card_heal.bind(amount))
 	_card_damaged.clear()
 	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
-		if target_combatant != player and amount > 0:
+		# A mound is no enemy (draw_on_multi_hit counts enemies).
+		if target_combatant != player and target_combatant.mound_owner == null and amount > 0:
 			_card_damaged[target_combatant] = true
 		_report_or_hold(_report_damage.bind("player", target_combatant, amount, kind))
 	ctx.on_block = func(target_combatant: Combatant, blocked: int, damage_to_hp: int) -> void:
@@ -1034,11 +1042,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	var attacked: Array[FieldEnemy] = _count_attack_card(card, ctx)
 	RunLogger.card_finished()
 	# Then whoever it was played against strikes back (Coiled), before the
-	# previews and the battle-end check read where the play left things -
-	# and a wrong mound's enemy bites from below.
+	# previews and the battle-end check read where the play left things.
 	await _counter_strikes(attacked)
-	if missed != null:
-		await _strike_from_below(missed)
 	# Taken, deepened or replaced by the card just played - and the card
 	# faces need to know either way, since a stance changes what the hand
 	# says it will do.
@@ -1152,62 +1157,58 @@ func _counter_strikes(against: Array[FieldEnemy]) -> void:
 
 # --- The dig (EnemyIntent.IntentType.DIG) ---
 
-# The card at its impact, against any enemy dug in under its mounds: a
-# card at every enemy (TargetScope.ALL_ENEMIES) finds each; one at a dug-in
-# target finds it at its own mound, or collapses the wrong one (EnemyTurn.
-# collapse_mound()). Found: up at its mound, its found_status on it
-# (EnemyTurn.unearth()). Returns the enemy whose wrong mound took the card
-# - its hit wasted, the bite from below to follow - or null. A mound gone
-# since the card was armed (a play queued behind another) is a wrong one
-# too.
-func _settle_dig_guess(card: CardData, target_enemy: FieldEnemy, mound: int) -> FieldEnemy:
-	var every: bool = false
-	for effect in card.effects:
-		if effect != null and effect.target_scope == CardEffect.TargetScope.ALL_ENEMIES:
-			every = true
-	if every:
-		for enemy in enemies:
-			var combatant: Combatant = _combatants.get(enemy)
-			if combatant != null and combatant.hp > 0 and combatant.dug_in:
-				_unearth(enemy, combatant, "every")
-		return null
-	if target_enemy == null:
-		return null
-	var target: Combatant = _combatants.get(target_enemy)
-	if target == null or not target.dug_in:
-		return null
-	if mound == target.true_mound:
-		_unearth(target_enemy, target, "mound")
-		return null
-	if EnemyTurn.collapse_mound(target, mound):
-		target_enemy.collapse_mound(mound)
-		RunLogger.mechanic("dig_wrong_mound", {"enemy": _log_id(target_enemy), "left": target.mounds.size()})
-		return target_enemy
-	return target_enemy
+# What a card played at `enemy` (at `mound` of its row, when it is dug in)
+# lands on: that mound's Combatant while the enemy is under, else the
+# enemy's own. A mound gone since the card was armed (a play queued behind
+# another) is still its target - and takes nothing (EffectContext.
+# landing_for()).
+func _card_target(enemy: FieldEnemy, mound: int) -> Combatant:
+	var combatant: Combatant = _combatants.get(enemy)
+	if combatant != null and combatant.dug_in and mound >= 0 and mound < combatant.mound_guards.size():
+		return combatant.mound_guards[mound]
+	return combatant
 
-func _unearth(enemy: FieldEnemy, combatant: Combatant, how: String) -> void:
-	var left: int = combatant.mounds.size()
-	if not EnemyTurn.unearth(combatant, enemy.enemy_data):
-		return
-	enemy.surface_at_mound(combatant.true_mound)
-	RunLogger.mechanic("dig_found", {"enemy": _log_id(enemy), "by": how, "left": left})
-	status_changed.emit()
+# The enemies a card can hit: the hittable ones, each dug-in enemy's
+# standing mounds in its place - a card at every enemy hits every mound,
+# never the body under them.
+func _card_enemy_combatants() -> Array[Combatant]:
+	var hittable: Array[Combatant] = []
+	for combatant in _hittable_enemy_combatants():
+		if combatant.dug_in:
+			for guard in combatant.mound_guards:
+				if EnemyTurn.mound_standing(guard):
+					hittable.append(guard)
+		else:
+			hittable.append(combatant)
+	return hittable
 
-# The bite from below a wrong mound (EnemyTurn.strike_from_below()), a
-# beat after the card, reported as any enemy attack - no lunge: the body
-# is under the sand.
-func _strike_from_below(enemy: FieldEnemy) -> void:
-	if player.hp <= 0 or not enemies.has(enemy) or not is_instance_valid(enemy):
+# A card's context told about the mounds: whose rules each dug-in enemy's
+# row follows, and what to do when one breaks (_on_mound_broken(), held
+# with the card's other reports for a repeat's impact).
+func _wire_mounds(ctx: EffectContext) -> void:
+	for enemy in enemies:
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant != null and combatant.dug_in:
+			ctx.mound_data[combatant] = enemy.enemy_data
+	ctx.on_mound_broken = func(owner: Combatant, mound: int, own: bool) -> void:
+		_report_or_hold(_on_mound_broken.bind(_field_enemy_for(owner), mound, own))
+
+# A mound broken (EnemyTurn.break_mound()): a wrong one falls flat and
+# gone; its own brings the enemy up through it, Exposed - the overkill's
+# damage_dealt follows straight after, onto the body coming up.
+func _on_mound_broken(enemy: FieldEnemy, mound: int, own: bool) -> void:
+	if enemy == null or not is_instance_valid(enemy):
 		return
-	var result: Dictionary = EnemyTurn.strike_from_below(_combatants.get(enemy), enemy.enemy_data, player)
-	if result.is_empty():
-		return
-	_owe_attacks([result] as Array[Dictionary])
-	if counter_strike_delay > 0.0:
-		await get_tree().create_timer(counter_strike_delay).timeout
-	await _report_enemy_attack(enemy, result)
-	_hp_owed = 0
-	status_changed.emit()
+	var combatant: Combatant = _combatants.get(enemy)
+	mound_broken.emit(enemy, mound, own)
+	if own:
+		enemy.surface_at_mound(mound)
+		RunLogger.mechanic("dig_found", {"enemy": _log_id(enemy), "by": "mound", "left": combatant.mound_guards.size() if combatant != null else 0})
+		status_changed.emit()
+		enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
+	else:
+		enemy.collapse_mound(mound)
+		RunLogger.mechanic("dig_wrong_mound", {"enemy": _log_id(enemy), "left": combatant.mounds.size() if combatant != null else 0})
 
 # The Wanderer's swing is short of its cancel point (_resolve_play()).
 func _swing_holds_next_play() -> bool:
@@ -2014,7 +2015,8 @@ func _start_player_turn() -> void:
 	if player.pending_drain > 0:
 		var ctx := EffectContext.new()
 		ctx.player = player
-		ctx.enemies = _hittable_enemy_combatants()
+		ctx.enemies = _card_enemy_combatants()
+		_wire_mounds(ctx)
 		ctx.deck = deck
 		ctx.on_heal = _on_card_heal
 		ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
@@ -2199,6 +2201,12 @@ func _report_block(target_combatant: Combatant, _blocked: int, damage_to_hp: int
 		enemy_hit_blocked.emit(enemy, damage_to_hp <= 0)
 
 func _report_damage(source: Variant, target_combatant: Combatant, amount: int, kind: String) -> void:
+	# A mound's HP: its own report - the enemy under it took nothing.
+	if target_combatant.mound_owner != null:
+		var owner_enemy := _field_enemy_for(target_combatant.mound_owner)
+		if owner_enemy != null:
+			mound_damaged.emit(owner_enemy, target_combatant.mound_index, amount, target_combatant.hp, target_combatant.max_hp)
+		return
 	if target_combatant == player:
 		damage_dealt.emit(source, "player", amount, kind)
 		# The log's source: the enemy by name, else the kind ("self",

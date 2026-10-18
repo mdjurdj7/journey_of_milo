@@ -26,7 +26,7 @@ static func drain(amount: int, targets: Array[Combatant], ctx: EffectContext) ->
 	var killed: bool = false
 	var outgoing: int = Status.apply_modifiers(amount, ctx.player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 	for enemy in targets.duplicate():
-		if enemy.hp <= 0:
+		if enemy.hp <= 0 or (enemy.mound_owner != null and not EnemyTurn.mound_standing(enemy)):
 			continue
 		var incoming: int = Status.apply_modifiers(outgoing, enemy.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)
 		var hp_before: int = enemy.hp
@@ -35,7 +35,7 @@ static func drain(amount: int, targets: Array[Combatant], ctx: EffectContext) ->
 		# The heal counts HP the enemy actually lost - not a killing blow's
 		# overkill, which the number shown still carries like any hit's.
 		dealt += hp_before - enemy.hp
-		if enemy.hp <= 0:
+		if enemy.hp <= 0 and enemy.mound_owner == null:
 			killed = true
 		ctx.report_block(enemy, result)
 		if damage_to_hp > 0:

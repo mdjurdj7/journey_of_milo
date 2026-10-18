@@ -42,9 +42,12 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	# counted once by whatever counts cards.
 	if effect.repeat_toll_cost <= 0:
 		return
+	# What each first hit left: a mound broken under its target is the
+	# enemy it was over, or nothing (EffectContext.landing_for()).
 	var standing: Array[Combatant] = []
-	for enemy in targets:
-		if enemy.hp > 0:
+	for struck in targets:
+		var enemy: Combatant = ctx.landing_for(struck)
+		if enemy != null and enemy.hp > 0 and not standing.has(enemy):
 			standing.append(enemy)
 	if standing.is_empty() or ctx.player.toll < effect.repeat_toll_cost:
 		return
@@ -65,13 +68,18 @@ func _drain(drains: bool, taken: int, ctx: EffectContext) -> void:
 func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> int:
 	var taken: int = 0
 	for enemy in targets:
+		# A mound gone since the card began - broken, or its row gone with
+		# the enemy coming up under another - takes nothing.
+		if enemy.mound_owner != null and not EnemyTurn.mound_standing(enemy):
+			continue
 		# A mark on this enemy (Come Due) adds to the blow against it
 		# alone, once per card and again for a repeated hit - so it's per
 		# target, and like the attack bonus it goes in before the
 		# modifiers.
 		var hp_before: int = enemy.hp
 		var result := DamagePipeline.resolve(landed(blow + ctx.take_mark_bonus(enemy), ctx.player, enemy), enemy)
-		if enemy.hp <= 0:
+		# A broken mound is no kill.
+		if enemy.hp <= 0 and enemy.mound_owner == null:
 			ctx.killed_this_card = true
 		ctx.report_block(enemy, result)
 		if result["damage_to_hp"] > 0:

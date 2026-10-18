@@ -372,7 +372,7 @@
                   "member": 0,
                   "name": "Siltjaw",
                   "enemy_file": "res://battle/rules/enemies/siltjaw.tres",
-                  "hp": 50,
+                  "hp": 44,
                   "anchor": false,
                   "card_reward": "ROLLED",
                   "position": [
@@ -1803,9 +1803,9 @@
     {
       "name": "Siltjaw",
       "file": "res://battle/rules/enemies/siltjaw.tres",
-      "hp": 50,
+      "hp": 44,
       "elite": false,
-      "mechanic_summary": "Buried in the sand on the field, and dug in when the fight opens: three mounds swell up across its side of the field and it is under one of them. Hit the right mound and it is forced up Exposed (takes 50% more) until its next move; hit a wrong one and that mound collapses, the hit wasted, and it bites from below for 5, which Brace, Garnish, No Further and Unbroken don't reduce. An attack on every enemy finds it. Under the sand it Bites for 5, then Erupts for 13 and surfaces; up, it Snaps for 6, Charges for 14, then Digs again. Teaches reading the sand - the one mound that breathes, trickles and puffs silt.",
+      "mechanic_summary": "Buried in the sand on the field, and dug in when the fight opens: three mounds of 12 HP rise close together and it is under one of them. Break its mound and it surfaces Exposed (takes 50% more) until your next turn ends, the overkill carried into it; break a wrong one and nothing happens. An attack on every enemy hits every mound. Left alone through your turn, it Erupts for 14 - only Block reduces it, not Brace, Garnish, No Further or Unbroken - and surfaces. Up, it Snaps for 6, Charges for 14, then Digs again. Teaches reading the sand - the one mound that breathes.",
       "field": {
         "model": "res://assets/models/enemies/Siltjaw/Siltjaw.glb",
         "model_is_default": false,
@@ -1845,22 +1845,17 @@
             "type": "DIG",
             "dig": {
               "mounds": 3,
+              "mound_hp": 12,
               "under_moves": [
-                {
-                  "name": "Bite",
-                  "type": "ATTACK",
-                  "damage_per_hit": 5,
-                  "hits": 1
-                },
                 {
                   "name": "Erupt",
                   "type": "ATTACK",
-                  "damage_per_hit": 13,
-                  "hits": 1
+                  "damage_per_hit": 14,
+                  "hits": 1,
+                  "lands_as_strike_back": "the statuses that wait for its own turn (Braced, Garnished, No Further, Unbroken) don't reduce it; Block does"
                 }
               ],
-              "wrong_mound_bite": 5,
-              "found_status": "exposed"
+              "found_status": "exposed_surfaced"
             }
           }
         ],
@@ -1871,16 +1866,16 @@
       },
       "statuses": [
         {
-          "id": "exposed",
+          "id": "exposed_surfaced",
           "name": "Exposed",
-          "file": "res://battle/rules/statuses/exposed.tres",
-          "gained": "found under its Dig's mounds, until its next move",
-          "description": "It takes {percent}% more damage.",
-          "text": "It takes 50% more damage.",
+          "file": "res://battle/rules/statuses/exposed_surfaced.tres",
+          "gained": "its own mound broken under its Dig, for 2 of its turns",
+          "description": "It takes {percent}% more damage until your next turn ends.",
+          "text": "It takes 50% more damage until your next turn ends.",
           "fields": {
             "category": "MODIFIER",
             "default_magnitude": 50,
-            "default_duration_turns": "until removed",
+            "default_duration_turns": 2,
             "modifier_operation": "MULTIPLY",
             "stack_rule": "IGNORE"
           }

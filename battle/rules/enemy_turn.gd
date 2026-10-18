@@ -150,7 +150,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 					if player.hp <= 0 or combatant.hp <= 0:
 						break
 					var attack: Dictionary = {"intent": result["intent"], "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "applied_to_player": 0}
-					land_attack(combatant, data, intent, player, attack)
+					land_attack(combatant, data, intent, player, attack, intent.lands_as_strike_back)
 					# What the attack leaves on the player (the Adder's Venom)
 					# lands whatever its hits did - Block taking all of them too.
 					if intent.applies_to_player != null and intent.applied_amount > 0:
@@ -238,10 +238,10 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 # softens every hit; block/absorb are worn down hit by hit.
 #
 # `strike_back`: the hit answers a card in the player's turn (counter_
-# strike(), strike_from_below()) - the statuses that wait for the enemy's
-# own turn (StatusData.ignores_strike_backs: Braced, Garnished, No
-# Further's armed, Unbroken's)
-# neither soften it nor are spent by it.
+# strike()), or lands as one does (EnemyIntent.lands_as_strike_back - the
+# Siltjaw's Erupt) - the statuses that wait for the enemy's own turn
+# (StatusData.ignores_strike_backs: Braced, Garnished, No Further's armed,
+# Unbroken's) neither soften it nor are spent by it.
 static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyIntent, player: Combatant, result: Dictionary, strike_back: bool = false) -> void:
 	result["attacked"] = true
 	var total_to_hp: int = 0
@@ -429,13 +429,19 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	# later one reads the enemy and the player as the one before left
 	# them - what an attack spends on either side gone.
 	var attacker: Combatant = combatant
+	# One that lands as a strike back (EnemyIntent.lands_as_strike_back -
+	# the Erupt) reads neither side's statuses that wait for the enemy's
+	# own turn, as land_attack() does.
+	var strike_back: bool = intent.lands_as_strike_back
 	for action in times:
 		if action > 0:
 			attacker = _after_own_attack(combatant, data, intent)
-			Status.consume_after_attack_against(player_statuses)
-		var reduction_left: int = Status.attack_total_reduction(attacker.statuses) + Status.attack_total_reduction(player_statuses)
+			Status.consume_after_attack_against(player_statuses, strike_back)
+		var own_seen: Array[Status] = Status.strike_back_view(attacker.statuses) if strike_back else attacker.statuses
+		var theirs_seen: Array[Status] = Status.strike_back_view(player_statuses) if strike_back else player_statuses
+		var reduction_left: int = Status.attack_total_reduction(own_seen) + Status.attack_total_reduction(theirs_seen)
 		for hit in hits:
-			var amount: int = hit_amount(attacker, data, intent, hit, player_statuses)
+			var amount: int = hit_amount(attacker, data, intent, hit, player_statuses, strike_back)
 			var cut: int = reduce_hit(amount, reduction_left)
 			amount -= cut
 			reduction_left -= cut
@@ -653,23 +659,22 @@ static func _queued_statuses(data: EnemyData) -> Array[StatusData]:
 	return found
 
 # Every status_on_resolve this enemy's intents bring - its loop's and
-# their on_interrupt interjections' - and every DIG's found_status: each
-# lasts until the enemy's next move.
+# their on_interrupt interjections': each lasts until the enemy's next
+# move. (A DIG's found_status runs for its own duration instead.)
 static func _resolved_statuses(data: EnemyData) -> Array[StatusData]:
 	var found: Array[StatusData] = []
 	for intent: EnemyIntent in data.intents:
 		for each: EnemyIntent in [intent, intent.on_interrupt if intent != null else null]:
 			if each != null and each.status_on_resolve != null and not found.has(each.status_on_resolve):
 				found.append(each.status_on_resolve)
-		if intent != null and intent.type == EnemyIntent.IntentType.DIG and intent.found_status != null and not found.has(intent.found_status):
-			found.append(intent.found_status)
 	return found
 
 # --- The dig (EnemyIntent.IntentType.DIG) ---
 
-# A DIG resolving: under the sand, its mound_count mounds standing, under
-# one of them drawn at random - nothing about it is told by where it is.
-# A DIG with no moves under or no mounds digs nothing.
+# A DIG resolving: under the sand, its mound_count mounds standing - each
+# its own Combatant of mound_hp HP (mound_guards) - under one of them drawn
+# at random: nothing about it is told by where it is. A DIG with no moves
+# under or no mounds digs nothing.
 static func start_dig(combatant: Combatant, intent: EnemyIntent) -> void:
 	if intent == null or intent.under_moves.is_empty() or intent.mound_count <= 0:
 		return
@@ -677,8 +682,13 @@ static func start_dig(combatant: Combatant, intent: EnemyIntent) -> void:
 	combatant.dig_intent = intent
 	combatant.dug_step = 0
 	combatant.mounds.clear()
+	combatant.mound_guards.clear()
 	for mound in intent.mound_count:
 		combatant.mounds.append(mound)
+		var guard := Combatant.new(maxi(intent.mound_hp, 1))
+		guard.mound_owner = combatant
+		guard.mound_index = mound
+		combatant.mound_guards.append(guard)
 	combatant.true_mound = randi_range(0, intent.mound_count - 1)
 	# Dug in, on its readout, for as long as it is under (_end_dig()).
 	if intent.dug_in_status != null and Status.find_in(combatant.statuses, intent.dug_in_status) == null:
@@ -697,9 +707,14 @@ static func _end_dig(combatant: Combatant) -> void:
 	combatant.dug_step = 0
 	combatant.mounds.clear()
 
-# Found - a card at its mound, or at every enemy: forced up there, the
-# eruption off, its DIG's found_status (Exposed) on it until its next
-# move, which is the loop's own. False when it isn't under.
+# Whether `guard` - a mound's Combatant (Combatant.mound_owner) - is still
+# standing in its row: its enemy under it, the mound not broken or gone.
+static func mound_standing(guard: Combatant) -> bool:
+	return guard != null and guard.mound_owner != null and guard.mound_owner.dug_in and guard.mound_owner.mounds.has(guard.mound_index) and guard.hp > 0
+
+# Found - its own mound broken: forced up there, the eruption off, its
+# DIG's found_status (Exposed) on it for that status's duration; its next
+# move is the loop's own. False when it isn't under.
 static func unearth(combatant: Combatant, data: EnemyData) -> bool:
 	if combatant == null or not combatant.dug_in:
 		return false
@@ -710,26 +725,19 @@ static func unearth(combatant: Combatant, data: EnemyData) -> bool:
 	_sync_queued(combatant, data)
 	return true
 
-# A card at `mound`: true when that was a wrong one, now collapsed - its
-# hit wasted, and it bites from below (strike_from_below()). False for
-# its own mound (unearth() is the caller's then), one already gone, or an
-# enemy not under.
-static func collapse_mound(combatant: Combatant, mound: int) -> bool:
-	if combatant == null or not combatant.dug_in or mound == combatant.true_mound or not combatant.mounds.has(mound):
-		return false
-	combatant.mounds.erase(mound)
-	return true
-
-# The bite from below a wrong mound brings at once: its DIG's first move
-# under (the Bite) as an ATTACK, through land_attack() as a strike back
-# is - empty when it isn't under or either side is down.
-static func strike_from_below(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	if combatant == null or player == null or combatant.hp <= 0 or player.hp <= 0 or not combatant.dug_in or combatant.dig_intent == null or combatant.dig_intent.under_moves.is_empty():
-		return {}
-	var bite: EnemyIntent = combatant.dig_intent.under_moves[0]
-	var result: Dictionary = {"intent": bite.intent_name, "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0}
-	land_attack(combatant, data, bite, player, result, true)
-	return result
+# Mound `mound` of `combatant`'s row broken (its Combatant at 0 HP): a
+# wrong one is gone and nothing more happens - BROKE_WRONG; its own forces
+# it up there, Exposed (unearth()) - BROKE_TRUE. NOT_BROKEN for a mound
+# already gone or an enemy not under.
+enum MoundBreak { NOT_BROKEN, BROKE_WRONG, BROKE_TRUE }
+static func break_mound(combatant: Combatant, data: EnemyData, mound: int) -> MoundBreak:
+	if combatant == null or not combatant.dug_in or not combatant.mounds.has(mound):
+		return MoundBreak.NOT_BROKEN
+	if mound != combatant.true_mound:
+		combatant.mounds.erase(mound)
+		return MoundBreak.BROKE_WRONG
+	unearth(combatant, data)
+	return MoundBreak.BROKE_TRUE
 
 # The last of its pack (Combatant.pack_alone, from now on): a status
 # waiting for that (Fed) gives way to its grant (Status.resolve_alone_
