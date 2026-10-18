@@ -56,12 +56,12 @@ Every model — characters, enemies, props — is textured and drawn on the pain
 - In engine: the painted shader with the glb's colour map, darker than dry sand.
 - The existing hulls and the cormorant keep their old flat tint (Hull's shared flat material: hulls (0.50, 0.47, 0.42); the cormorant (0.28, 0.29, 0.31)) until they are regenerated textured.
 - Age is placement: sink 0.3 × height, roll 8–12°, low side toward the water. Never damage.
-- **Glassbone** is the one exception to the painted shader (Bible §20): its own restrained material, set with the first piece built (floor 2's seam, `GlassboneSeam`) in `field/glassbone_material.tres` - every Glassbone piece wears it:
+- **Glassbone** is the one exception to the painted shader (Bible §20): its own restrained material, set with the first piece built (floor 2's seam, `GlassboneSeam` - since its shard model, the whole mesh wears it, the model's own maps ignored) in `field/glassbone_material.tres` - every Glassbone piece wears it:
   - albedo (0.86, 0.87, 0.84) - pale, a hair cool, never white; alpha 0.82 (alpha-blended: slightly translucent, the stone under it just reads through)
   - roughness 0.45, specular 0.3, metallic 0 - a low sheen where the sand's matte has none, never a highlight
   - no emission, no rim, no fresnel - it never glows; it takes the scene's light and fog as the sand does
   - double-sided, casts no shadow (a vein lies on the stone; a free piece may cast)
-  - a worked seam's gouge: `field/glassbone_gouge_material.tres`, albedo (0.30, 0.28, 0.25), roughness 1, specular 0 - the scar left in the stone, darker than it
+  - a worked seam's scar: `field/glassbone_gouge_material.tres`, albedo (0.30, 0.28, 0.25), roughness 1, specular 0 - the patch left in the sand round the shard's stump, darker than it
 
 ### Characters (the Wanderer, the keeper)
 - On the painted shader, as above. Wind on cloth/hair by vertex shader masks (height bands; luma for hair).

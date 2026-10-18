@@ -43,6 +43,7 @@ script = ExtResource("3_floor_prop")
 scene = ExtResource("25_glassbone_seam")
 overrides = {
 "guard_slot": &"island",
+"lean_yaw_degrees": 127.0,
 "seam_yaw_degrees": 45.0
 }
 
