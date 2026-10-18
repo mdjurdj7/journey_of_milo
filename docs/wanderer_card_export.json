@@ -1038,9 +1038,9 @@
       "face_type_label": "TOLL",
       "energy_cost": 1,
       "rarity": "UNCOMMON",
-      "card_text": "Garnish an attack. It deals 5 less.\nGain 5 Toll.",
+      "card_text": "An attack deals 5 less.\nGain 5 Toll.",
       "face_hp_line": "−1 HP",
-      "card_text_template": "Garnish an attack. It deals 5 less.\nGain 5 Toll.",
+      "card_text_template": "An attack deals 5 less.\nGain 5 Toll.",
       "targeting": "an enemy's attack intent (its readout, or its body for its queued intent)",
       "removal_after_play": "discard pile",
       "effects": [
@@ -1094,7 +1094,7 @@
       "upgrade_data": {
         "name": "Garnish+",
         "file_path": "res://cards/tempered/garnish_tempered.tres",
-        "card_text": "Garnish an attack. It deals 8 less.\nGain 8 Toll.",
+        "card_text": "An attack deals 8 less.\nGain 8 Toll.",
         "changes": "8 less and 8 Toll in place of 5 (its own status, Garnished 8); cost 1, the same 1 HP."
       },
       "starting_deck_count": 0,
