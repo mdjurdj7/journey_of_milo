@@ -281,6 +281,10 @@ enum ExitKind { CHANNEL, LINE }
 # relative to spawn, 2 to 8, a smooth curve through every one from where
 # they fade in to just past where they end. Empty (the default) = none.
 @export var rut_path: PackedVector2Array = PackedVector2Array()
+# Their look on this floor (RutLook), in place of the region's Ground
+# Ruts exports - floor 4's single, swinging snake trail. Null (the
+# default) = the region's: floor 3's cart.
+@export var rut_look: RutLook = null
 
 @export_group("Scatter")
 # The ground clutter this floor lies under - casts, shells, stones,

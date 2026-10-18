@@ -260,8 +260,9 @@ and up the west shore north of z -27. (2026-10-17.)
   (`suggested_placements_world_xz.dig`, (-3.0, -21.8), on the ring's
   north side past the dune). Nothing reads it: there is no dig site
   yet. When it is built it becomes a second option in floor 4's "pup"
-  event slot (`FloorData.event_slots`, anchored at the pup's (15.5,
-  -17.0)), its prop offset from that anchor to this position - so a run
+  event slot (`FloorData.event_slots`, anchored at the pup's (11.0,
+  -17.3) - moved 2026-10-18 from (19.5, -14.0), well before the Adder),
+  its prop offset from that anchor to this position - so a run
   stands one or the other. The collector is a FloorProp in its hollow off
   the west arm, (-19.8, -11.8). (2026-10-04, floor 4; moved 2026-10-15
   with the new ground - the ring, the collector's hollow and the Adder's

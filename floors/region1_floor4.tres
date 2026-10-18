@@ -22,6 +22,7 @@
 [ext_resource type="Resource" path="res://floors/scatter/floor4_pup_hollow.tres" id="97_pup_hollow"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/nettlebasket.tres" id="98_nettlebasket"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/nettle.tres" id="99_nettle"]
+[ext_resource type="Script" uid="uid://d4mb532t1ord0" path="res://floors/rut_look.gd" id="100_rut_look"]
 
 [sub_resource type="Resource" id="FloorProp_collector"]
 script = ExtResource("10_floor_prop")
@@ -137,9 +138,22 @@ props = Array[ExtResource("10_floor_prop")]([SubResource("FloorProp_pup")])
 [sub_resource type="Resource" id="EncounterSlot_pup"]
 script = ExtResource("90_encounter_slot")
 slot_id = &"pup"
-position = Vector2(19.5, -14)
+position = Vector2(11, -17.3)
 required = false
 options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOption_pup")])
+
+[sub_resource type="Resource" id="RutLook_snake"]
+script = ExtResource("100_rut_look")
+rut_gauge = 0.0
+rut_width = 0.07
+rut_darken = 0.07
+rut_fade_in = 2.0
+rut_fade_out = 1.5
+rut_break_length = 3.0
+rut_break_threshold = 0.35
+rut_waver = 0.015
+rut_wave_amplitude = 0.1
+rut_wave_length = 0.75
 
 [sub_resource type="Resource" id="FloorWindData_dunes"]
 script = ExtResource("95_wind")
@@ -201,6 +215,8 @@ ledges = Array[PackedVector2Array]([PackedVector2Array(0.833, 8.883, -0.1, 8.783
 exit_kind = 1
 gate_distance_beyond_enemy = 6.31
 wear_path_override = PackedVector2Array(0, 0, -3.6, -4.4, -10.2, -5.8, -14.6, -9.9, -15, -14, -14.3, -18.2, -17.5, -22.4, -23.8, -22.2)
+rut_path = PackedVector2Array(11.8, -17.7, 13.5, -18.5, 16.2, -18, 18.3, -16, 19, -11.4, 17, -8.6, 15.6, -9)
+rut_look = SubResource("RutLook_snake")
 use_wind_angle = true
 wind_angle_degrees = 90.0
 wind = SubResource("FloorWindData_dunes")

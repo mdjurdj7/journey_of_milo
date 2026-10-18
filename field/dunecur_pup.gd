@@ -27,6 +27,10 @@ class_name DunecurPup
 # battle_wait_distance_m from him, waits, and takes up the trail again
 # after.
 #
+# Wary (the Wary exports): following, when he comes near the Adder that
+# bit it, it stops, faces the Adder, lowers itself and yips once - and
+# follows again when he moves off, a fight opens, or the Adder is gone.
+#
 # The meeting (RegionField._try_reunion(), on contact with an enemy in
 # reunite_slot while this follows): no fight. The adult's crest rises
 # (FieldEnemy.set_alert(adult_alarm_stacks)) and it looks round; the pup
@@ -60,7 +64,7 @@ const CHOICE_SCENE_PATH := "res://battle/trough_choice.tscn"
 # (cull_mask without it) never darkens it.
 const PUP_LAYER := 1 << 19
 
-enum State { LYING, RISING, FOLLOWING, REUNITING, GONE }
+enum State { LYING, RISING, FOLLOWING, REUNITING, GONE, WARY }
 enum Meet { TROT, GREET, WALK }
 
 @export_group("Model")
@@ -216,6 +220,44 @@ enum Meet { TROT, GREET, WALK }
 @export var sway_degrees: float = 2.5
 @export_group("")
 
+@export_group("Wary")
+# Following, when he comes within wary_distance_m of a standing enemy of
+# wary_slot (the Adder that bit it): it stops, turns to face that enemy,
+# lowers itself and yips once, yip_delay_seconds after it stops. It stays
+# so until he is wary_distance_m + wary_release_m from the enemy, a fight
+# opens, or the enemy is gone, then follows again; it can go wary again
+# once he has been out past that. Read every tick.
+@export var wary_slot: StringName = &"adder"
+@export var wary_distance_m: float = 6.0
+@export var wary_release_m: float = 1.5
+# The crouch, on Pose: its front pitched down this many degrees and the
+# body this much lower, eased in and out over crouch_seconds.
+@export_range(0.0, 45.0, 0.5) var crouch_pitch_degrees: float = 9.0:
+	set(value):
+		crouch_pitch_degrees = value
+		_apply_pose()
+@export var crouch_drop_m: float = 0.05:
+	set(value):
+		crouch_drop_m = value
+		_apply_pose()
+@export var crouch_seconds: float = 0.35
+# Its takes, round-robin - never the same one twice running (SoundPool.
+# next()). Placeholder: the Stork's clatter, until the pup's own yips
+# (assets/audio/enemies/Dunecur/pup_yip_1..3) exist.
+@export var yip_clips: Array[AudioStream] = [
+	load("res://assets/audio/enemies/Stork/clatter_1.mp3") as AudioStream,
+]:
+	set(value):
+		yip_clips = value
+		_yip_pool.set_clips(value)
+@export var yip_volume_db: float = 0.0:
+	set(value):
+		yip_volume_db = value
+		if _yip_player != null:
+			_yip_player.volume_db = value
+@export var yip_delay_seconds: float = 0.3
+@export_group("")
+
 @export_group("Reunion")
 # The EncounterSlot.slot_id of the adult it belongs to.
 @export var reunite_slot: StringName = &"dunecur"
@@ -287,6 +329,16 @@ var _meet_time_mark: float = 0.0
 var _released: bool = false
 var _unseen_for: float = 0.0
 var _adult_stride_phase: float = 0.0
+# Wary: 1 crouched, 0 not; what of; whether he has been out past the
+# release distance since; how long it has been wary, and whether it has
+# yipped.
+var _crouch: float = 0.0
+var _wary_of: FieldEnemy = null
+var _wary_armed: bool = true
+var _wary_time: float = 0.0
+var _yipped: bool = false
+var _yip_player: AudioStreamPlayer3D = null
+var _yip_pool: SoundPool = SoundPool.new()
 
 # FloorProp's placement (RegionField._spawn_prop_list()): XZ here, Y from
 # the relief; the entry's yaw under lying_yaw_degrees.
@@ -318,6 +370,7 @@ func _ready() -> void:
 		_ground_to_relief()
 	_lying_transform = global_transform
 	_spawn_damp()
+	_spawn_yip()
 	var region_field := _region_field()
 	if region_field != null:
 		_sky = region_field.get_region_sky()
@@ -410,8 +463,9 @@ func _apply_pose() -> void:
 	var lying_y: float = _model_aabb.size.x * 0.5 - sink_m
 	var roll: float = deg_to_rad(lying_roll_degrees) * _lie
 	var sway: float = deg_to_rad(sway_degrees) * sin(_stride_phase * PI) * _trot_share()
-	var basis := Basis(Vector3.BACK, roll + sway)
-	var middle_y: float = lerpf(standing_y, lying_y, _lie) + _step_lift(_stride_phase, _trot_share())
+	var crouch: float = smoothstep(0.0, 1.0, _crouch)
+	var basis := Basis(Vector3.RIGHT, -deg_to_rad(crouch_pitch_degrees) * crouch) * Basis(Vector3.BACK, roll + sway)
+	var middle_y: float = lerpf(standing_y, lying_y, _lie) + _step_lift(_stride_phase, _trot_share()) - crouch_drop_m * crouch
 	var breath: float = 1.0 + breath_scale * sin(_breath_phase * TAU) * _lie
 	basis = basis * Basis.from_scale(Vector3(breath, breath, 1.0))
 	_pose.transform = Transform3D(basis, Vector3(0.0, middle_y, 0.0) - basis * centre)
@@ -589,10 +643,14 @@ func give_remedy() -> void:
 		_trail.append(_flat(wanderer.global_position))
 
 func is_saved() -> bool:
-	return _state == State.RISING or _state == State.FOLLOWING or _state == State.REUNITING
+	return _state == State.RISING or _state == State.FOLLOWING or _state == State.WARY or _state == State.REUNITING
 
+# With him: on his trail, or stopped on it, wary of the Adder.
 func is_following() -> bool:
-	return _state == State.FOLLOWING
+	return _state == State.FOLLOWING or _state == State.WARY
+
+func is_wary() -> bool:
+	return _state == State.WARY
 
 # Whether he reaching `enemy` now is the meeting: it follows, the enemy is
 # its adult's, and it isn't too far back.
@@ -635,10 +693,16 @@ func _on_physics_frame() -> void:
 			var region_field := _region_field()
 			if region_field != null and region_field.is_battle_open():
 				_tick_retreat(delta)
+			elif _check_wary():
+				_tick_wary(delta)
 			else:
 				_tick_follow(delta)
+		State.WARY:
+			_record_trail()
+			_tick_wary(delta)
 		State.REUNITING:
 			_tick_meeting(delta)
+	_crouch = move_toward(_crouch, 1.0 if _state == State.WARY else 0.0, delta / maxf(crouch_seconds, 0.01))
 	_apply_pose()
 
 func _flat(point: Vector3) -> Vector3:
@@ -714,6 +778,67 @@ func _tick_retreat(delta: float) -> void:
 		target = _here() + (away.normalized() if away.length() > 0.01 else -global_transform.basis.z) * trail_step_m
 	_speed_now = move_toward(_speed_now, retreat_speed, retreat_speed * 4.0 * delta)
 	_step_toward(target, _speed_now * delta, delta)
+
+# Following: whether he has come within wary_distance_m of a standing
+# enemy of wary_slot - and if he has, it goes wary of it. Armed again
+# once he has been out past wary_distance_m + wary_release_m.
+func _check_wary() -> bool:
+	var wanderer := _wanderer()
+	var enemy := _wary_enemy()
+	if wanderer == null or enemy == null:
+		return false
+	var distance: float = _flat(wanderer.global_position).distance_to(_flat(enemy.global_position))
+	if distance > wary_distance_m + wary_release_m:
+		_wary_armed = true
+	if not _wary_armed or distance > wary_distance_m:
+		return false
+	_wary_armed = false
+	_wary_of = enemy
+	_wary_time = 0.0
+	_yipped = false
+	_state = State.WARY
+	return true
+
+# Wary: stopped on the trail, turned to the enemy, crouched (the tick
+# eases _crouch), one yip yip_delay_seconds in. Back to following once he
+# is out past the release distance, a fight opens, or the enemy is gone.
+func _tick_wary(delta: float) -> void:
+	var wanderer := _wanderer()
+	var region_field := _region_field()
+	var gone: bool = _wary_of == null or not is_instance_valid(_wary_of) or _wary_of.is_defeated()
+	var far: bool = gone or wanderer == null or _flat(wanderer.global_position).distance_to(_flat(_wary_of.global_position)) > wary_distance_m + wary_release_m
+	if far or (region_field != null and region_field.is_battle_open()):
+		_wary_of = null
+		_state = State.FOLLOWING
+		return
+	_speed_now = move_toward(_speed_now, 0.0, follow_speed * 4.0 * delta)
+	_face_toward(_flat(_wary_of.global_position), delta)
+	_wary_time += delta
+	if not _yipped and _wary_time >= yip_delay_seconds:
+		_yipped = true
+		_yip()
+
+func _wary_enemy() -> FieldEnemy:
+	for node in get_tree().get_nodes_in_group("enemies"):
+		var enemy := node as FieldEnemy
+		if enemy != null and enemy.slot_id == wary_slot and not enemy.is_defeated():
+			return enemy
+	return null
+
+func _spawn_yip() -> void:
+	_yip_pool.set_clips(yip_clips)
+	_yip_player = AudioStreamPlayer3D.new()
+	_yip_player.name = "Yip"
+	_yip_player.bus = &"SFX"
+	_yip_player.volume_db = yip_volume_db
+	add_child(_yip_player)
+
+func _yip() -> void:
+	var clip: AudioStream = _yip_pool.next()
+	if _yip_player == null or clip == null:
+		return
+	_yip_player.stream = clip
+	_yip_player.play()
 
 func _trim_walked() -> void:
 	var limit: int = int(ceilf(walked_keep_m / maxf(trail_step_m, 0.05)))

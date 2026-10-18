@@ -263,7 +263,10 @@ uniform float wear_mark_core_fade = 0.6;
 // rut_fade_out before the last, and come and go along the way: a slow
 // noise along the run (rut_break_length metres) thresholded at
 // rut_break_threshold. Each line wavers rut_waver metres either side of
-// true. Darken only, gated like the band.
+// true. Darken only, gated like the band. rut_wave_amplitude above 0
+// swings the line(s) side to side off the centreline, rut_wave_length
+// metres from one swing to the next - at rut_gauge 0 one line, a snake's
+// trail; at 0 (the default) the lines run straight, exactly as before.
 uniform vec2 rut_points[8];
 uniform int rut_point_count = 0;
 uniform float rut_gauge = 1.4;
@@ -274,6 +277,8 @@ uniform float rut_fade_out = 1.5;
 uniform float rut_break_length = 4.0;
 uniform float rut_break_threshold : hint_range(0.0, 1.0) = 0.3;
 uniform float rut_waver = 0.04;
+uniform float rut_wave_amplitude = 0.0;
+uniform float rut_wave_length = 0.8;
 // Optional painted band, same rect and orientation as landmass_mask (see
 // canvas_uv()). White is worn. Null by default.
 uniform sampler2D wear_mask : filter_linear, repeat_disable;
@@ -1066,7 +1071,11 @@ float rut_factor(vec2 p) {
 	vec4 nearest = rut_nearest(p);
 	float s = nearest.y;
 	float waver = (value_noise(vec2(s / 1.7, nearest.w * 5.1 + 2.3)) - 0.5) * 2.0 * rut_waver;
-	float off_track = abs(nearest.x - rut_gauge * 0.5 + waver);
+	// Signed across the centreline, less the swing: with no swing its
+	// absolute value is the plain distance, so straight ruts are unchanged.
+	float swing = rut_wave_amplitude * sin(TAU * s / max(rut_wave_length, 0.01));
+	float across = (nearest.w > 0.5 ? nearest.x : -nearest.x) - swing;
+	float off_track = abs(abs(across) - rut_gauge * 0.5 + waver);
 	float line = 1.0 - smoothstep(rut_width * 0.2, rut_width * 0.5, off_track);
 	if (line <= 0.0) {
 		return 0.0;

@@ -755,6 +755,18 @@ signal wear_keep_out_changed
 	set(value):
 		rut_waver = value
 		_apply_uniform("rut_waver", value)
+# A side-to-side swing of the line(s) off the centreline, this many
+# metres either side, rut_wave_length metres from one swing to the next -
+# with rut_gauge 0, a snake's trail. 0 (the default) = none, straight
+# ruts. A floor sets these through its FloorData.rut_look.
+@export var rut_wave_amplitude: float = 0.0:
+	set(value):
+		rut_wave_amplitude = value
+		_apply_uniform("rut_wave_amplitude", value)
+@export var rut_wave_length: float = 0.8:
+	set(value):
+		rut_wave_length = value
+		_apply_uniform("rut_wave_length", value)
 @export_group("")
 
 # Height read as tone: the floor's low ground blends toward basin_color,
@@ -1288,6 +1300,8 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("rut_break_length", rut_break_length)
 	_apply_uniform("rut_break_threshold", rut_break_threshold)
 	_apply_uniform("rut_waver", rut_waver)
+	_apply_uniform("rut_wave_amplitude", rut_wave_amplitude)
+	_apply_uniform("rut_wave_length", rut_wave_length)
 	_apply_uniform("rock_color", rock_color)
 	_apply_uniform("rock_slope_min", rock_slope_min)
 	_apply_uniform("rock_slope_blend", rock_slope_blend)

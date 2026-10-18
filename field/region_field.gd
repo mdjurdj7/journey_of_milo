@@ -4048,6 +4048,25 @@ func _on_loot_screen_closed(screen: LootScreen) -> void:
 # different shape re-aims it by calling this with different points rather
 # than by editing a shader. Called from _setup_exit_gate(), the first
 # moment the gate's own position is final.
+# The floor's own rut look (FloorData.rut_look) onto Ground's Ruts
+# exports - with its rut path, and again on a live edit of it.
+func _apply_rut_look() -> void:
+	var ground := get_node_or_null(ground_path) as Ground
+	var floor_data := get_floor_data()
+	if ground == null or floor_data == null or floor_data.rut_look == null:
+		return
+	var look: RutLook = floor_data.rut_look
+	ground.rut_gauge = look.rut_gauge
+	ground.rut_width = look.rut_width
+	ground.rut_darken = look.rut_darken
+	ground.rut_fade_in = look.rut_fade_in
+	ground.rut_fade_out = look.rut_fade_out
+	ground.rut_break_length = look.rut_break_length
+	ground.rut_break_threshold = look.rut_break_threshold
+	ground.rut_waver = look.rut_waver
+	ground.rut_wave_amplitude = look.rut_wave_amplitude
+	ground.rut_wave_length = look.rut_wave_length
+
 func _aim_wear_path(anchor: Vector3) -> void:
 	var ground := get_node_or_null(ground_path) as Ground
 	if ground == null:
@@ -4063,6 +4082,10 @@ func _aim_wear_path(anchor: Vector3) -> void:
 	for offset in floor_data.rut_path:
 		ruts.append(Vector2(spawn.x + offset.x, spawn.z + offset.y))
 	ground.set_rut_path(ruts)
+	if floor_data.rut_look != null:
+		_apply_rut_look()
+		if not floor_data.rut_look.changed.is_connected(_apply_rut_look):
+			floor_data.rut_look.changed.connect(_apply_rut_look)
 	if floor_data.wear_path_override.size() >= 3:
 		var points := PackedVector2Array()
 		for offset in floor_data.wear_path_override:
