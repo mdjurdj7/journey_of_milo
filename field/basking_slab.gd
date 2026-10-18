@@ -81,6 +81,8 @@ var _sky: RegionSky = null
 # The model's bbox in this node's frame.
 var _aabb: AABB = AABB()
 var _collision_body: StaticBody3D = null
+# get_surface_colour()'s answer, worked out once per colour map and tint.
+var _surface_colour: Color = Color(0.0, 0.0, 0.0, 0.0)
 var _ground: Ground = null
 
 # FloorProp's placement (RegionField._spawn_floor_props()): XZ here, Y
@@ -140,6 +142,30 @@ func _spawn_model() -> void:
 	_collision_body.add_to_group(ContactShadow.STANDABLE_GROUP)
 	add_child(_collision_body)
 
+# Its painted colour on average (the colour map shrunk by halves to a few
+# pixels, then averaged) times its tint - what a contact pool on it
+# darkens, so the pool keeps the stone's hue. Alpha 0 with no colour map.
+func get_surface_colour() -> Color:
+	if _surface_colour.a > 0.0:
+		return _surface_colour
+	var texture := load(colour_map_path) as Texture2D if ResourceLoader.exists(colour_map_path) else null
+	if texture == null:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	var image: Image = texture.get_image()
+	if image == null:
+		return Color(0.0, 0.0, 0.0, 0.0)
+	if image.is_compressed():
+		image.decompress()
+	while image.get_width() > 8 and image.get_height() > 8:
+		image.shrink_x2()
+	var sum := Color(0.0, 0.0, 0.0, 0.0)
+	for y in image.get_height():
+		for x in image.get_width():
+			sum += image.get_pixel(x, y)
+	var count: float = float(image.get_width() * image.get_height())
+	_surface_colour = Color(sum.r / count * tint.r, sum.g / count * tint.g, sum.b / count * tint.b, 1.0)
+	return _surface_colour
+
 # The model's box in this node's frame - its collision's; empty with no
 # model.
 func get_body_aabb() -> AABB:
@@ -155,11 +181,13 @@ func _rebuild() -> void:
 	if _collision_body != null:
 		_collision_body.free()
 		_collision_body = null
+	_surface_colour = Color(0.0, 0.0, 0.0, 0.0)
 	_spawn_model()
 	_push_fog()
 
 # A painted material's albedo_tint, the flat fallback's albedo_color.
 func _apply_tint() -> void:
+	_surface_colour = Color(0.0, 0.0, 0.0, 0.0)
 	if _material is ShaderMaterial:
 		(_material as ShaderMaterial).set_shader_parameter("albedo_tint", tint)
 	elif _material is BaseMaterial3D:

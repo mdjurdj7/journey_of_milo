@@ -4,14 +4,17 @@ class_name ContactShadowData
 # The look of the soft pale pool under a figure (ContactShadow): one
 # shared copy (field/contact_shadow.tres) for every figure, and an
 # EnemyData may point at its own. Art Bible §7 - no pure black; the
-# figure stays the darkest thing in its area, so the pool is a cool,
-# darkened ground tone laid into the sand's colour, never a black wash.
+# figure stays the darkest thing in its area, so the pool is the ground
+# under it, darker, in its own hue - never a black wash, never a colour
+# of its own.
 
-# The tone the sand takes at the pool's middle (the Decal's albedo), and
-# how much of it: 0 none, 1 the sand replaced outright.
-@export var tint: Color = Color(0.40, 0.42, 0.46):
+# The pool's colour is the surface under it - Ground's dry sand, or a
+# standable prop's own colour - times this (each channel alike, so the
+# hue holds); strength is how much of it: 0 none, 1 the surface
+# replaced outright.
+@export_range(0.0, 1.0, 0.01) var darkening: float = 0.55:
 	set(value):
-		tint = value
+		darkening = value
 		emit_changed()
 @export_range(0.0, 1.0, 0.01) var strength: float = 0.5:
 	set(value):

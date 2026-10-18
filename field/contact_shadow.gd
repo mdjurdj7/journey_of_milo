@@ -19,9 +19,10 @@ class_name ContactShadow
 # tres when none is given) - edits to it re-apply live.
 #
 # Every frame: at the feet's XZ, the surface under them (the sand, or a
-# standable prop's top there), the pool laid on it, faded and shrunk by
-# how far the feet are above it (a hover, a leap), and faded with the
-# sand's depth under the sea.
+# standable prop's top there), the pool laid on it in that surface's own
+# colour darkened (data.darkening - Ground's ground_color, or the prop's
+# get_surface_colour()), faded and shrunk by how far the feet are above
+# it (a hover, a leap), and faded with the sand's depth under the sea.
 
 const DEFAULT_DATA_PATH := "res://field/contact_shadow.tres"
 # The collision bodies a figure can stand on that aren't the Ground - a
@@ -63,6 +64,9 @@ const _PERCH_RAY_TRIES := 4
 var feet_source: Callable = Callable()
 
 var _ground: Ground = null
+# The colour of the standable prop the last perch ray landed on; alpha 0
+# when the pool is on the sand (or the prop has no colour to give).
+var _perch_colour: Color = Color(0.0, 0.0, 0.0, 0.0)
 
 func _ready() -> void:
 	# RegionField's battle freeze would otherwise stop the pool following
@@ -119,9 +123,13 @@ func _place() -> void:
 	if data == null or not is_inside_tree():
 		return
 	var feet: Vector3 = _feet()
-	var surface: float = _sand_height(feet)
+	var sand: float = _sand_height(feet)
+	var surface: float = sand
+	_perch_colour = Color(0.0, 0.0, 0.0, 0.0)
 	if data.perch_surfaces:
-		surface = maxf(surface, _perch_top(feet, surface))
+		surface = maxf(sand, _perch_top(feet, sand))
+	if surface <= sand:
+		_perch_colour = Color(0.0, 0.0, 0.0, 0.0)
 	var height: float = maxf(feet.y - surface, 0.0)
 	var lift: float = clampf(height / maxf(data.hover_fade_height_m, 0.001), 0.0, 1.0)
 	var base: Vector2 = body_footprint if data.footprint_from_body and body_footprint != Vector2.ZERO else footprint
@@ -130,7 +138,8 @@ func _place() -> void:
 	var alpha: float = data.strength * (1.0 - lift) * _wade_factor(surface) * fade
 	global_transform = Transform3D(Basis(Vector3.UP, _yaw()), Vector3(feet.x, surface, feet.z))
 	size = Vector3(radii.x * 2.0, maxf(data.reach_m, 0.01) * 2.0, radii.y * 2.0)
-	modulate = Color(data.tint.r, data.tint.g, data.tint.b, alpha)
+	var ground_tone: Color = _perch_colour if _perch_colour.a > 0.0 else _sand_colour()
+	modulate = Color(ground_tone.r * data.darkening, ground_tone.g * data.darkening, ground_tone.b * data.darkening, alpha)
 
 # The parent's facing round world Y - from its +Z flattened, so a tilt
 # (a recoil, a lean) doesn't turn the pool.
@@ -140,6 +149,10 @@ func _yaw() -> float:
 		return 0.0
 	var along: Vector3 = parent.global_basis.z
 	return atan2(along.x, along.z)
+
+# Ground's dry sand colour; a mid sand with no Ground to ask.
+func _sand_colour() -> Color:
+	return _ground.ground_color if _ground != null else Color(0.74, 0.70, 0.60)
 
 func _feet() -> Vector3:
 	if feet_source.is_valid():
@@ -176,6 +189,9 @@ func _perch_top(feet: Vector3, sand: float) -> float:
 		var collider := hit["collider"] as Node
 		if collider != null and collider.is_in_group(STANDABLE_GROUP):
 			var point: Vector3 = hit["position"]
+			var prop: Node = collider.get_parent()
+			if prop != null and prop.has_method("get_surface_colour"):
+				_perch_colour = prop.call("get_surface_colour") as Color
 			return point.y
 		var rid: RID = hit["rid"]
 		exclude.append(rid)
