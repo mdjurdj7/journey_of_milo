@@ -393,6 +393,10 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.enemy_hp_changed.connect(_on_enemy_hp_changed)
 	battle_controller.damage_dealt.connect(_on_damage_dealt)
 	battle_controller.mound_damaged.connect(_on_mound_damaged)
+	battle_controller.mound_broken.connect(func(enemy: FieldEnemy, mound: int, own: bool) -> void:
+		if _battle_feedback != null:
+			_battle_feedback.on_mound_broken(enemy, mound, own)
+	)
 	battle_controller.combat_text.connect(_show_number)
 	# A hit a block took whole shows BLOCKED on whoever's block it was.
 	battle_controller.enemy_hit_blocked.connect(func(enemy: FieldEnemy, absorbed: bool) -> void:

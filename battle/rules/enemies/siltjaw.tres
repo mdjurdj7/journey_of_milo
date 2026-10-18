@@ -5,6 +5,10 @@
 [ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="3_k7nci"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/exposed_surfaced.tres" id="4_exposed"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/dug_in.tres" id="5_dug_in"]
+[ext_resource type="AudioStream" uid="uid://bqhk7amkael6o" path="res://assets/audio/enemies/Sputter/hit_shell_1.mp3" id="6_hit_shell"]
+[ext_resource type="AudioStream" uid="uid://ctbnpo2j3ocnc" path="res://assets/audio/enemies/Sputter/hit_shell_2.mp3" id="7_hit_shell_2"]
+[ext_resource type="AudioStream" uid="uid://c2g4kb3njm4pa" path="res://assets/audio/enemies/Sputter/hit_shell_3.mp3" id="8_hit_shell_3"]
+[ext_resource type="AudioStream" uid="uid://co5jagvmbnmkr" path="res://assets/audio/enemies/Sputter/hit_armor.mp3" id="9_hit_armor"]
 
 [sub_resource type="Resource" id="EnemyIntent_snap"]
 script = ExtResource("2_intent")
@@ -35,6 +39,8 @@ dug_in_status = ExtResource("5_dug_in")
 [resource]
 script = ExtResource("1_enemy_data")
 enemy_name = "Siltjaw"
+contact_sounds = Array[AudioStream]([ExtResource("6_hit_shell"), ExtResource("7_hit_shell_2"), ExtResource("8_hit_shell_3")])
+armored_contact_sounds = Array[AudioStream]([ExtResource("9_hit_armor")])
 mechanic_summary = "Buried in the sand on the field, and dug in when the fight opens: three mounds of 12 HP rise close together and it is under one of them. Break its mound and it surfaces Exposed (takes 50% more) until your next turn ends, the overkill carried into it; break a wrong one and nothing happens. An attack on every enemy hits every mound. Left alone through your turn, it Erupts for 14 - only Block reduces it, not Brace, Garnish, No Further or Unbroken - and surfaces. Up, it Snaps for 6, Charges for 14, then Digs again. Teaches reading the sand - the one mound that breathes."
 max_hp = 44
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_snap"), SubResource("EnemyIntent_charge"), SubResource("EnemyIntent_dig")])

@@ -317,8 +317,12 @@ and up the west shore north of z -27. (2026-10-17.)
     form every intent uses. A move name on the intent would be a change
     to BattleIntent for every enemy.
   - **A mound hit reuses the blade-into-sand clips**
-    (`sword_ground_strike_sand_*`, `FieldEnemy.dig_mound_hit_clips`); a
-    softer sand thud of its own waits for a sound pass.
+    (`sword_ground_strike_sand_*`, `FieldEnemy.dig_mound_hit_clips`),
+    played `dig_mound_hit_gain_db` (6) over the contact volume so they
+    read at contact level; a softer sand thud of its own waits for a
+    sound pass. Never the shell on a mound - it would lie on an empty one
+    or give the answer away on its own; only breaking its own mound plays
+    the Siltjaw's contact sound, as it surfaces. (2026-10-18.)
   - **The numbers are a first guess:** Siltjaw 44 HP, mounds 12, Erupt 14,
     `tell_strength` 0.06 - tune from play and the run logs' fight lengths
     (26 s median before).
@@ -491,11 +495,11 @@ and up the west shore north of z -27. (2026-10-17.)
   the field camera; it stays still. `FloorData.rare_pool` exists and is
   empty on every floor, so the 5% rare draw falls back to the bundle's
   own pool until trinkets or weapons exist. (2026-09-22, bundle.)
-- **The Siltjaw still wears the Sputter's body and has no contact
-  sound.** Its rules, intent, burial and buried look (a SandMound over it
-  in the field) are built (`battle/rules/enemies/siltjaw.tres`,
-  `field/sand_mound.gd`); the surfaced body is the default glb and its
-  `contact_sounds` is empty. Build both with the model. It no longer
+- **The Siltjaw borrows the Sputter's contact sounds.** Its rules,
+  intent, burial and buried look (a SandMound over it in the field) are
+  built (`battle/rules/enemies/siltjaw.tres`, `field/sand_mound.gd`); its
+  `contact_sounds` are the Sputter's shell takes and the `hit_armor`
+  crack (2026-10-18) until it has its own. It no longer
   roams: it stands at a fixed spot on floor 2's flats, and its mound
   samples the sand once. (2026-09-25, Siltjaw rules pass; 2026-09-26,
   roam removed.)

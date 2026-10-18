@@ -2177,8 +2177,14 @@
       },
       "defeat_line": "",
       "sounds": {
-        "contact": [],
-        "armored_contact": [],
+        "contact": [
+          "res://assets/audio/enemies/Sputter/hit_shell_1.mp3",
+          "res://assets/audio/enemies/Sputter/hit_shell_2.mp3",
+          "res://assets/audio/enemies/Sputter/hit_shell_3.mp3"
+        ],
+        "armored_contact": [
+          "res://assets/audio/enemies/Sputter/hit_armor.mp3"
+        ],
         "pitch_jitter": 0.06,
         "pain_turn": null,
         "status_gained": null,

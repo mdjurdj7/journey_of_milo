@@ -150,6 +150,11 @@ var _effect: Node3D = null
 # Enemies whose next reported hit met their block (enemy_hit_blocked,
 # not absorbed) - set and read in the same call, so never stale.
 var _met_block: Dictionary[FieldEnemy, bool] = {}
+# Enemies that came up through their own mound this frame (on_mound_
+# broken()): their contact sound has played on the break, so the
+# overkill's hit that follows in the same blow doesn't play it again.
+# Cleared at the frame's end.
+var _surfaced: Dictionary[FieldEnemy, bool] = {}
 # The card resolving right now - set at its impact and cleared at the end
 # of that frame, like _effect: whether its blow counts as heavy at least.
 var _impact_card: CardData = null
@@ -182,6 +187,7 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, kind: String
 		var slash: bool = not _effect_active()
 		var armored: bool = _met_block.has(target)
 		_met_block.erase(target)
+		var sounded: bool = _surfaced.has(target)
 		var heavy: float = heavy_level(heavy_damage(amount))
 		var killing: bool = battle_controller != null and battle_controller.is_dying(target)
 		var hold: float = stop_ms(amount, killing) / 1000.0 if contact else 0.0
@@ -192,7 +198,7 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, kind: String
 			if not is_instance_valid(target):
 				return
 		(target as FieldEnemy).hold_for(hold)
-		_react_to_card_hit(target as FieldEnemy, slash, armored, heavy)
+		_react_to_card_hit(target as FieldEnemy, slash, armored, heavy, not sounded)
 		if jolts_camera(amount):
 			_jolt_camera()
 	elif source is FieldEnemy:
@@ -217,6 +223,20 @@ func on_mound_damaged(enemy: FieldEnemy, mound: int, amount: int, hp: int, _max_
 	_hold_wanderer(stop_ms(amount, hp <= 0) / 1000.0)
 	enemy.play_mound_hit(mound)
 	enemy.spawn_sand_puff(sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity, sand_puff_spread_degrees, sand_puff_tint, enemy.get_mound_position(mound))
+
+# BattleController.mound_broken: its own mound broken, the enemy is up -
+# its contact sound on that hit, in place of the sand's (the same player,
+# the same frame). A wrong mound keeps the sand: the shell would give the
+# answer away.
+func on_mound_broken(enemy: FieldEnemy, _mound: int, own: bool) -> void:
+	if not own or not is_instance_valid(enemy):
+		return
+	enemy.play_contact_sound(false)
+	_surfaced[enemy] = true
+	_clear_surfaced.call_deferred(enemy)
+
+func _clear_surfaced(enemy: FieldEnemy) -> void:
+	_surfaced.erase(enemy)
 
 # BattleController.player_hit_blocked: an enemy's hit the player's Block
 # or absorb took whole - the blocked stop on both, and that enemy's
@@ -402,12 +422,14 @@ func _react_to_absorbed_hit(enemy: FieldEnemy) -> void:
 	enemy.play_contact_sound(true)
 	enemy.play_hit_recoil(attack_direction, recoil_distance * absorbed_recoil_fraction, recoil_tilt_degrees * absorbed_recoil_fraction, recoil_out_time, recoil_return_time)
 
-# `heavy`: the hit's heavy_level() - -1 for an ordinary hit.
-func _react_to_card_hit(enemy: FieldEnemy, slash: bool = true, armored: bool = false, heavy: float = -1.0) -> void:
+# `heavy`: the hit's heavy_level() - -1 for an ordinary hit. `sound`
+# false when its contact sound has already played (on_mound_broken()).
+func _react_to_card_hit(enemy: FieldEnemy, slash: bool = true, armored: bool = false, heavy: float = -1.0, sound: bool = true) -> void:
 	if _wanderer == null:
 		return
 	var attack_direction: Vector3 = enemy.global_position - _wanderer.global_position
-	enemy.play_contact_sound(armored)
+	if sound:
+		enemy.play_contact_sound(armored)
 	if heavy > 0.0:
 		enemy.play_heavy_impact(next_heavy_take(), heavy_impact_volume_db(heavy))
 	enemy.play_hit_flash(flash_color, flash_rise_time, flash_fall_time)

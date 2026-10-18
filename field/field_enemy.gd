@@ -291,9 +291,16 @@ var option_id: StringName = &""
 @export var dig_mound_collapse_seconds: float = 0.35
 # A hit on a mound (play_mound_hit()): it dips by dig_mound_hit_dip of its
 # height and springs back over dig_mound_hit_seconds, with a strike into
-# sand (dig_mound_hit_clips, in turn at random) - the same on every mound.
+# sand (dig_mound_hit_clips, in turn at random) - the same on every mound,
+# so it never says which one the enemy is under. The sand clips carry
+# about 6 dB less body than a contact sound at the same peak (their
+# loudest 50 ms, -18 dBFS against the Sputter shell's -12), so they play
+# dig_mound_hit_gain_db over contact_volume_db, to read at contact level
+# (04_FIELD_ASSET_SPEC section 4: contact about -13 at the listener)
+# rather than under the swing.
 @export_range(0.0, 1.0, 0.01) var dig_mound_hit_dip: float = 0.25
 @export var dig_mound_hit_seconds: float = 0.2
+@export var dig_mound_hit_gain_db: float = 6.0
 @export var dig_mound_hit_clips: Array[AudioStream] = [
 	load("res://assets/audio/sfx/sword_ground_strike_sand_1.mp3") as AudioStream,
 	load("res://assets/audio/sfx/sword_ground_strike_sand_2.mp3") as AudioStream,
@@ -2011,7 +2018,7 @@ func play_mound_hit(mound: int) -> void:
 	if clip != null and _contact_player != null:
 		_contact_player.stream = clip
 		_contact_player.pitch_scale = 1.0 + randf_range(-enemy_data.pitch_jitter, enemy_data.pitch_jitter)
-		_contact_player.volume_db = contact_volume_db + randf_range(-contact_volume_variance_db, contact_volume_variance_db)
+		_contact_player.volume_db = contact_volume_db + dig_mound_hit_gain_db + randf_range(-contact_volume_variance_db, contact_volume_variance_db)
 		_contact_player.play()
 
 # A wrong mound, falling flat and gone. Returns how long it takes.
