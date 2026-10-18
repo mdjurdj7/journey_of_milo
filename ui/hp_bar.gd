@@ -427,6 +427,21 @@ class_name HPBar
 # A Toll blow's count down from the Toll it spent (drain_toll()), in real
 # seconds - it runs through the hit-stop.
 @export var toll_drain_time: float = 0.25
+# A gain's count up to the new Toll (update_toll()), in real seconds.
+@export var toll_count_time: float = 0.25
+# A gain's "+N" (update_toll()): ink in Spectral at toll_gain_size_px,
+# toll_gain_gap_px past the readout's right end (the TOLL label) on its
+# baseline, over a soft bone halo like the floating numbers'
+# (FloatingNumber's Halo group) - holding toll_gain_hold_sec, then fading
+# over toll_gain_fade_sec. A gain while it shows adds to its N and holds
+# it again. Drawn past the layout, so nothing moves for it.
+@export var toll_gain_size_px: int = 14
+@export var toll_gain_gap_px: float = 6.0
+@export var toll_gain_hold_sec: float = 0.5
+@export var toll_gain_fade_sec: float = 0.3
+@export var toll_gain_halo_px: float = 6.0
+@export var toll_gain_halo_steps: int = 5
+@export_range(0.0, 1.0) var toll_gain_halo_alpha: float = 0.35
 
 var _wanderer: Wanderer = null
 # The battle energy readout's right edge on screen (set_energy_clearance_
@@ -457,7 +472,15 @@ var _toll: int = 0
 var _toll_visible: bool = false
 var _toll_pop: float = 1.0
 var _pop_tween: Tween = null
+# The numeral counting - down for a Toll blow (drain_toll()), up for a gain
+# (update_toll()).
 var _drain_tween: Tween = null
+# The Toll the numeral is counting to (or shows).
+var _toll_target: int = 0
+# The gain's "+N" and its alpha (0: not showing).
+var _toll_gain: int = 0
+var _toll_gain_alpha: float = 0.0
+var _toll_gain_tween: Tween = null
 var _toll_rule_color: Color = Color.WHITE
 var _toll_label_tracked: Font = null
 var _current_fraction: float = 1.0
@@ -909,6 +932,22 @@ func _draw_toll(bar_top: float, ink: Color) -> void:
 	var rule_color: Color = _toll_rule_color
 	rule_color.a = _battle_blend
 	draw_rect(Rect2(left, bar_top, _toll_block_width(), toll_rule_px), rule_color)
+	if _toll_gain > 0 and _toll_gain_alpha > 0.0:
+		_draw_toll_gain(Vector2(left + _toll_block_width() + toll_gain_gap_px, baseline), ink)
+
+# The gain's "+N" from `origin` (its baseline-left): the halo's passes,
+# widest first and each faint, then the ink.
+func _draw_toll_gain(origin: Vector2, ink: Color) -> void:
+	if numeral_font == null:
+		return
+	var text: String = "+%d" % _toll_gain
+	var bone: Color = get_theme_color("bone", "Battle")
+	var steps: int = maxi(toll_gain_halo_steps, 1)
+	var alpha: float = _toll_gain_alpha * ink.a
+	for i in steps:
+		var reach: float = maxf(toll_gain_halo_px, 0.0) * float(steps - i) / float(steps)
+		draw_string_outline(numeral_font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, toll_gain_size_px, maxi(roundi(reach * 2.0), 1), Color(bone, bone.a * toll_gain_halo_alpha / float(steps) * alpha))
+	draw_string(numeral_font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, toll_gain_size_px, Color(ink, alpha))
 
 # Called once by region_field.gd - the Wanderer this bar tracks. Safe to
 # call before or after _ready(); _physics_process() below just no-ops
@@ -1236,20 +1275,51 @@ func exit_battle(duration: float) -> void:
 # own connect-then-setup order), so there's no stale-number frame.
 func show_toll(initial_toll: int) -> void:
 	_toll = maxi(initial_toll, 0)
+	_toll_target = _toll
 	_toll_visible = true
 	_apply_layout()
 
+# A gain counts the numeral up to `new_toll` over toll_count_time, popped
+# as it starts, and shows its "+N" beside the readout (merged into one
+# still showing); any other change shows at once, popped.
 func update_toll(new_toll: int) -> void:
 	if not _toll_visible:
 		return
 	if _drain_tween != null:
 		_drain_tween.kill()
 		_drain_tween = null
+	new_toll = maxi(new_toll, 0)
+	var gained: int = new_toll - _toll_target
 	var changed: bool = new_toll != _toll
-	_toll = maxi(new_toll, 0)
+	_toll_target = new_toll
+	if gained > 0:
+		_show_toll_gain(gained)
+		_drain_tween = create_tween()
+		_drain_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		_drain_tween.set_ignore_time_scale(true)
+		_drain_tween.tween_method(_set_drained_toll, float(_toll), float(new_toll), maxf(toll_count_time, 0.0))
+	else:
+		_toll = new_toll
 	if changed:
 		_pop_toll()
 	_apply_layout()
+
+# The "+N" beside the readout, `gained` more on one still showing, held
+# toll_gain_hold_sec from now and faded over toll_gain_fade_sec.
+func _show_toll_gain(gained: int) -> void:
+	_toll_gain = gained + (_toll_gain if _toll_gain_alpha > 0.0 else 0)
+	_toll_gain_alpha = 1.0
+	if _toll_gain_tween != null:
+		_toll_gain_tween.kill()
+	_toll_gain_tween = create_tween()
+	_toll_gain_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	_toll_gain_tween.tween_interval(maxf(toll_gain_hold_sec, 0.0))
+	_toll_gain_tween.tween_method(_set_toll_gain_alpha, 1.0, 0.0, maxf(toll_gain_fade_sec, 0.0))
+	queue_redraw()
+
+func _set_toll_gain_alpha(value: float) -> void:
+	_toll_gain_alpha = value
+	queue_redraw()
 
 # A Toll blow (Reckoning): the numeral counts down from `from`, the Toll
 # it spent, to `to`, what is left, over toll_drain_time - on real time,
@@ -1261,6 +1331,7 @@ func drain_toll(from: int, to: int) -> void:
 	if _drain_tween != null:
 		_drain_tween.kill()
 	_toll = maxi(from, 0)
+	_toll_target = maxi(to, 0)
 	_pop_toll()
 	_apply_layout()
 	_drain_tween = create_tween()
@@ -1280,6 +1351,10 @@ func hide_toll() -> void:
 	if _drain_tween != null:
 		_drain_tween.kill()
 		_drain_tween = null
+	_toll = _toll_target
+	if _toll_gain_tween != null:
+		_toll_gain_tween.kill()
+	_toll_gain_alpha = 0.0
 	if _pop_tween != null:
 		_pop_tween.kill()
 	_toll_pop = 1.0

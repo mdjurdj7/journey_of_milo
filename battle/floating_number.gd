@@ -3,7 +3,8 @@ class_name FloatingNumber
 
 # A rising number over the body it happened to - BattleOverlay spawns one
 # for each damage_dealt, combat_text (heal, Block), a hit a block took
-# whole and a Toll gain; RegionField one for the keepsake's win heal.
+# whole; RegionField one for the keepsake's win heal. (A Toll gain shows
+# at its own readout - HPBar.update_toll().)
 # `kind` (KIND_*) says which, and what it reads as (text_for()).
 #
 # Its life (show_value()): it pops in at pop_scale about its own centre and
@@ -20,7 +21,7 @@ class_name FloatingNumber
 # out to halo_px, each faint, so it falls off like a blur - which keeps
 # the ink legible where it crosses a dark body. The kind reads by its
 # mark, not its colour: a minus for HP lost (smaller for his own cost), a
-# plus for a heal or a Toll gain, a shield glyph before Block's value,
+# plus for a heal, a shield glyph before Block's value,
 # "Blocked" in Spectral's small caps. tint_strength (0 by default) eases a
 # heal's and a loss's ink toward heal_tint/loss_tint, to try a faint
 # tint.
@@ -33,14 +34,13 @@ const FONT_PATH := "res://assets/fonts/Spectral-SemiBold.ttf"
 
 # Damage dealt to an enemy; HP an enemy's hit (or a tick) took from the
 # Wanderer; HP his own effect took; HP back; Block gained; a hit a block
-# took whole; Toll gained.
+# took whole.
 const KIND_DAMAGE := "damage"
 const KIND_HP_LOST := "hp_lost"
 const KIND_SELF := "self"
 const KIND_HEAL := "heal"
 const KIND_BLOCK := "block"
 const KIND_BLOCKED := "blocked"
-const KIND_TOLL := "toll"
 
 @export_group("Motion")
 @export var pop_scale: float = 1.5
@@ -56,7 +56,6 @@ const KIND_TOLL := "toll"
 @export var self_size: float = 0.75
 @export var block_size: float = 0.8
 @export var blocked_size: float = 0.7
-@export var toll_size: float = 0.75
 
 @export_group("Halo")
 # How far the halo reaches past the ink, in pixels at size 1, over how
@@ -101,7 +100,7 @@ static func text_for(number_kind: String, value: int) -> String:
 	match number_kind:
 		KIND_HP_LOST, KIND_SELF:
 			return "−%d" % value
-		KIND_HEAL, KIND_TOLL:
+		KIND_HEAL:
 			return "+%d" % value
 		KIND_BLOCKED:
 			return "Blocked"
@@ -169,8 +168,6 @@ func _kind_size(number_kind: String) -> float:
 			return block_size
 		KIND_BLOCKED:
 			return blocked_size
-		KIND_TOLL:
-			return toll_size
 	return 1.0
 
 func _ink() -> Color:

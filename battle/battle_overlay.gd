@@ -217,9 +217,6 @@ var _number_counts: Dictionary = {}
 var _stack_jitter: Dictionary = {}
 # A Toll blow's Toll as it landed, for its toll_changed; -1 = none.
 var _toll_blow_from: int = -1
-# The Toll last read out, for the number a gain shows (_on_toll_changed());
-# -1 until the fight's first.
-var _shown_toll: int = -1
 # The Wanderer, for his numbers' anchor (_screen_pos_for_damage_target()).
 var _wanderer: Wanderer = null
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
@@ -706,10 +703,7 @@ func _refresh_cost_preview() -> void:
 	_resources.set_cost_preview(cost)
 
 func _on_toll_changed(new_toll: int) -> void:
-	# A gain shows its "+N" over the Wanderer, beside the readout's pop.
-	if _shown_toll >= 0 and new_toll > _shown_toll:
-		_show_number("player", new_toll - _shown_toll, FloatingNumber.KIND_TOLL)
-	_shown_toll = new_toll
+	# A gain counts up and shows its "+N" at the readout (HPBar.update_toll()).
 	# A Toll blow's spend pours into its hit: counted down, not snapped.
 	var drained_from: int = _toll_blow_from
 	_toll_blow_from = -1
