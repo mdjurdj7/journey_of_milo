@@ -241,15 +241,28 @@ func _ready() -> void:
 	_grid.add_theme_constant_override("h_separation", int(grid_h_separation))
 	_grid.add_theme_constant_override("v_separation", int(grid_v_separation))
 
+# `card` as the run's weapon makes it (the run state's as_carried()), or
+# `card` itself with no run to ask. The run state is found at runtime by
+# path and by what it answers, never named: naming the autoload here would
+# compile it into every script that loads this view, and a headless
+# script compiles those before the autoloads exist (keyword_table.gd's
+# live_values() does the same).
+func _as_carried(card: CardData) -> CardData:
+	var tree: SceneTree = Engine.get_main_loop() as SceneTree
+	var run_state: Node = tree.root.get_node_or_null(^"RunState") if tree != null else null
+	if run_state == null or not run_state.has_method(&"as_carried"):
+		return card
+	return run_state.call(&"as_carried", card) as CardData
+
 func open(cards: Array[CardData], header_text: String) -> void:
 	_header_label.text = header_text
 
-	# Each card as the weapon carried makes it (RunState.as_carried() -
-	# Lash under Greyshelf's Tail), sorted by that name; a pick still
-	# hands back the card itself, the one the run's deck holds.
+	# Each card as the weapon carried makes it (_as_carried() - Lash under
+	# Greyshelf's Tail), sorted by that name; a pick still hands back the
+	# card itself, the one the run's deck holds.
 	var shown: Dictionary = {}
 	for card in cards:
-		shown[card] = RunState.as_carried(card)
+		shown[card] = _as_carried(card)
 	var sorted_cards := cards.duplicate()
 	sorted_cards.sort_custom(func(a: CardData, b: CardData) -> bool: return (shown[a] as CardData).card_name < (shown[b] as CardData).card_name)
 
