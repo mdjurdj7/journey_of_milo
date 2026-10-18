@@ -1,0 +1,11 @@
+[gd_scene load_steps=5 format=3]
+
+[ext_resource type="Script" path="res://ui/character_select.gd" id="1_character_select"]
+[ext_resource type="Resource" path="res://run/data/wanderer.tres" id="2_wanderer"]
+[ext_resource type="Resource" path="res://run/data/samurai.tres" id="3_samurai"]
+[ext_resource type="Script" uid="uid://dm776r835syew" path="res://run/character_data.gd" id="4_character_data"]
+
+[node name="CharacterSelect" type="CanvasLayer"]
+layer = 5
+script = ExtResource("1_character_select")
+characters = Array[ExtResource("4_character_data")]([ExtResource("2_wanderer"), ExtResource("3_samurai")])

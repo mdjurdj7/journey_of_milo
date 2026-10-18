@@ -188,6 +188,13 @@ func _relayout() -> void:
 func lock() -> void:
 	_menu.lock()
 
+# Back from what Start opened (the character select, cancelled): input
+# live again on the same focus, and the column faded in as on arrival.
+func reopen() -> void:
+	_menu.unlock()
+	_menu.apply_focus()
+	_fade_in()
+
 # The column from nothing to full over title_fade_in_seconds, on
 # arrival. Only the look - nothing waits on it.
 func _fade_in() -> void:

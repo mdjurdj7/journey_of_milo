@@ -71,6 +71,10 @@ func apply_focus() -> void:
 func lock() -> void:
 	locked = true
 
+# Live again after a lock - a menu come back to (TitleMenu.reopen()).
+func unlock() -> void:
+	locked = false
+
 func set_focus(index: int) -> void:
 	if locked or held or index == focused or not items[index].visible:
 		return

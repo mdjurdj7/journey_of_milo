@@ -50,6 +50,17 @@ class_name ZoneIntro
 # and the sea appearing. The three debug exports (debug_hold_opening,
 # debug_replay, debug_title_hold) exist for tuning the held frames live
 # from the Remote tab and replaying without a restart.
+#
+# With a character_select_scene_path, Start goes through the character
+# select first (open_character_select()): the menu fades, the select
+# takes the frame to black and offers the classes. Esc there comes back
+# to the held title. A pick starts a new run as that class (RunState.
+# new_run()) and reloads the field - its floor, model and HUD all built
+# for the class - where the intro then plays as on any run's first floor
+# (play(), from the fog colour the select faded to). The run the title
+# was held on, untouched, leaves no log (RunLogger.end_run()'s empty-run
+# rule). Empty path: Start plays straight from the held frame
+# (start_from_title()).
 
 signal finished
 
@@ -191,6 +202,11 @@ const REFERENCE_VIEWPORT_HEIGHT := 1080.0
 @export var title_fog_open_seconds: float = 0.8
 # The menu shown while the title is held (a TitleMenu CanvasLayer).
 @export var title_menu_scene_path: String = "res://ui/title_menu.tscn"
+# What Start opens before the run begins (a CharacterSelect), loaded at
+# each Start. Empty: Start plays the intro from the held frame, with the
+# run the title was held on. Read at Start, so an edit takes effect on
+# the next one.
+@export var character_select_scene_path: String = "res://ui/character_select.tscn"
 
 @export_group("Debug")
 # On: freeze and hold the opening frame - pose, intro fog, title fully
@@ -265,6 +281,8 @@ var _title: Label = null
 # and its fade is running.
 var _menu: TitleMenu = null
 var _title_starting: bool = false
+# The character select while it's open over the held title.
+var _select: CharacterSelect = null
 # A play begun from the title: the fog opens from the title values over
 # title_fog_open_seconds instead of a FloorFade lifting.
 var _fog_from_title: bool = false
@@ -320,6 +338,52 @@ func start_from_title() -> void:
 	# Cleared only now that the phase has moved on: its setter finishes a
 	# hold that is still TITLE_HOLD.
 	debug_title_hold = false
+
+# Start, through the character select: the menu locks and fades, the
+# select opens over the held frame. Falls back to start_from_title() when
+# there is no select to open.
+func open_character_select() -> void:
+	if _phase != Phase.TITLE_HOLD or _title_starting or _menu == null:
+		return
+	var scene: PackedScene = load(character_select_scene_path) as PackedScene if not character_select_scene_path.is_empty() else null
+	var select: CharacterSelect = scene.instantiate() as CharacterSelect if scene != null else null
+	if select == null:
+		if not character_select_scene_path.is_empty():
+			push_warning("ZoneIntro: could not load a CharacterSelect from %s; Start plays as the held run." % character_select_scene_path)
+		start_from_title()
+		return
+	_title_starting = true
+	_menu.lock()
+	await _menu.fade_out()
+	if _phase != Phase.TITLE_HOLD or not _title_starting or _menu == null:
+		select.free()
+		return
+	_select = select
+	_select.picked.connect(_on_character_picked)
+	_select.cancelled.connect(_on_character_select_cancelled)
+	add_child(_select)
+	_select.open()
+
+# Esc from the select: its own fade has lifted back to the held frame
+# (it frees itself); the menu comes back where it was.
+func _on_character_select_cancelled() -> void:
+	_select = null
+	_title_starting = false
+	if _menu != null:
+		_menu.reopen()
+
+# A class picked: the new run as it, the frame to the reload colour, and
+# the field reloaded - its _ready() finds the run started and the run's
+# opening owed (run_opening_pending), and plays the intro.
+func _on_character_picked(character: CharacterData) -> void:
+	if _select == null:
+		return
+	var sky := _sky()
+	await _select.fade_to_reload(sky.fog_color if sky != null else Color.BLACK)
+	if not is_inside_tree():
+		return
+	RunState.new_run(character)
+	get_tree().reload_current_scene()
 
 func _on_menu_exit_requested() -> void:
 	RunState.log_run_end("quit")
@@ -637,7 +701,7 @@ func _spawn_menu() -> void:
 	if _menu == null:
 		push_warning("ZoneIntro: %s is not a TitleMenu; the title has no menu." % title_menu_scene_path)
 		return
-	_menu.start_requested.connect(start_from_title)
+	_menu.start_requested.connect(open_character_select)
 	_menu.exit_requested.connect(_on_menu_exit_requested)
 	add_child(_menu)
 
@@ -645,6 +709,9 @@ func _free_menu() -> void:
 	if _menu != null:
 		_menu.queue_free()
 		_menu = null
+	if _select != null:
+		_select.queue_free()
+		_select = null
 
 # --- the title ----------------------------------------------------------
 
