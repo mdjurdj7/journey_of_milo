@@ -20,7 +20,7 @@ card_name = "Bide+"
 card_type = 1
 rarity = 1
 target_type = 1
-description = "Set aside {set_aside} cards until next turn.
+description = "Set aside up to {set_aside} cards until next turn.
 Draw {draw}."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_set_aside"), SubResource("E_draw")])
 art = ExtResource("3_art")

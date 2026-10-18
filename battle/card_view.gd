@@ -389,6 +389,13 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # Unplayable (can't afford): the whole card fades to this - ink and bone
 # alike, no grey overlay.
 @export_range(0.0, 1.0) var unplayable_alpha: float = 0.42
+# While a hand choice is open (set_choice_state()), a card it can't take
+# fades to this; one it can shows at full ink, affordable or not - the
+# choice, not the Energy, is what it answers to then.
+@export_range(0.0, 1.0) var choice_unpickable_alpha: float = 0.3:
+	set(value):
+		choice_unpickable_alpha = value
+		_apply_fade()
 
 @export_group("Keyword Reveal")
 # Hovering a bold keyword on this face shows its definition (Keyword-
@@ -461,6 +468,10 @@ var _marked: bool = false
 var _mark_rule: ColorRect = null
 var _armed_at_msec: int = 0
 var _playable: bool = true
+# A hand choice is open, and whether it can take this card - see
+# set_choice_state().
+var _in_choice: bool = false
+var _choice_pickable: bool = false
 var _keyline_type: KeylineType = KeylineType.STRIKE
 # The stance in force, for the numbers on this face - see set_stance().
 var _stance: Stance = null
@@ -1087,7 +1098,22 @@ func _apply_panel_color() -> void:
 # this on every energy change. Unplayable fades the whole card.
 func set_playable(playable: bool) -> void:
 	_playable = playable
-	modulate.a = 1.0 if playable else unplayable_alpha
+	_apply_fade()
+
+# A hand choice opened (in_choice) or closed: while open, `pickable` says
+# whether the choice can take this card, and the fade says so in place of
+# the playable one (choice_unpickable_alpha). Closed, the playable fade is
+# back.
+func set_choice_state(in_choice: bool, pickable: bool = false) -> void:
+	_in_choice = in_choice
+	_choice_pickable = pickable
+	_apply_fade()
+
+func _apply_fade() -> void:
+	if _in_choice:
+		modulate.a = 1.0 if _choice_pickable else choice_unpickable_alpha
+	else:
+		modulate.a = 1.0 if _playable else unplayable_alpha
 	# The keyword definition is the card's child and inherits that fade;
 	# it reads at full ink regardless, so it takes the fade back out.
 	if _keyword_reveal != null:

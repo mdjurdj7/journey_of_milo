@@ -291,11 +291,16 @@ func set_draw_origin(origin: Control) -> void:
 # A hand choice opened with `chooser` armed (BattleController's choose
 # mode): the arming suppressed every other card's hover, but here they
 # are what gets clicked, so hover comes back for them - for `eligible`
-# alone when it names any (Deny's tie), the rest staying still. A null
-# chooser is the end-of-turn keep: no card armed, the whole hand chooses.
+# alone when it names any (Deny's tie), the rest staying still and faded
+# (CardView.set_choice_state()). A null chooser is the end-of-turn keep:
+# no card armed, the whole hand chooses.
 func begin_choice(chooser: CardView, eligible: Array[CardView] = []) -> void:
 	for view in _card_views():
-		if view != chooser and (eligible.is_empty() or eligible.has(view)):
+		if view == chooser:
+			continue
+		var pickable: bool = eligible.is_empty() or eligible.has(view)
+		view.set_choice_state(true, pickable)
+		if pickable:
 			view.set_hover_suppressed(false)
 
 # The choice closed (confirmed or cancelled): every mark comes off but
@@ -303,6 +308,7 @@ func begin_choice(chooser: CardView, eligible: Array[CardView] = []) -> void:
 # still armed the rest of the hand goes back to not hovering.
 func end_choice(keep: CardView = null) -> void:
 	for view in _card_views():
+		view.set_choice_state(false)
 		if view != keep:
 			view.set_marked(false)
 	if _armed_slot == null:

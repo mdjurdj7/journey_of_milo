@@ -30,8 +30,8 @@ const BRACE_PATH := "res://cards/data/brace.tres"
 const SEARCH_ROOTS: Array[String] = ["res://run", "res://battle", "res://field", "res://floors"]
 const TURN_DRAW := 5
 const HAND_LIMIT := 10
-const PROMPT_OPEN := "KEEP 0 / 1  ·  CLICK END TURN TO CONFIRM"
-const PROMPT_MARKED := "KEEP 1 / 1  ·  CLICK END TURN TO CONFIRM"
+const PROMPT_OPEN := "KEEP  ·  1 LEFT  ·  CLICK END TURN TO CONFIRM"
+const PROMPT_MARKED := "KEEP  ·  0 LEFT  ·  CLICK END TURN TO CONFIRM"
 const SAFETY_SECONDS := 300.0
 
 var _run_state: Node = null
@@ -113,6 +113,9 @@ func _check_keep_one() -> void:
 		controller.call("end_turn")
 		_expect(bool(controller.get("_keep_choice_open")), "End Turn with a hand opens the keep")
 		_expect_eq(_prompt_text(), PROMPT_OPEN, "...prompting '%s'" % PROMPT_OPEN)
+		var done: Node = _field.get_node("BattleLayer").get_child(0).find_child("ChoiceDone", true, false)
+		_expect(done == null or not bool(done.get("visible")), "...End Turn confirms it: no DONE")
+		_expect(_views(controller).all(func(v: Object) -> bool: return is_equal_approx(float((v as CanvasItem).modulate.a), 1.0)), "...every hand card at full ink, pickable")
 		var view: Object = _views(controller)[2]
 		var kept: CardData = view.get("card_data")
 		controller.call("toggle_choice", view)

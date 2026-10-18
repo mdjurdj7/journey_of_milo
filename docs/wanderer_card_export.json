@@ -214,9 +214,9 @@
       "face_type_label": "UTILITY",
       "energy_cost": 0,
       "rarity": "COMMON",
-      "card_text": "Set aside 2 cards until next turn.\nDraw 1.",
+      "card_text": "Set aside up to 2 cards until next turn.\nDraw 1.",
       "face_hp_line": null,
-      "card_text_template": "Set aside {set_aside} cards until next turn.\nDraw {draw}.",
+      "card_text_template": "Set aside up to {set_aside} cards until next turn.\nDraw {draw}.",
       "targeting": "self",
       "removal_after_play": "discard pile",
       "effects": [

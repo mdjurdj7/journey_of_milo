@@ -85,9 +85,21 @@ signal battle_finished(outcome: Outcome)
 # An open hand choice says what it wants in one tracked-caps ink line,
 # this far above the armed card, or above the hand for the end-of-turn
 # keep (BattleController.hand_choice_*): its verb (SET ASIDE, CONSUME,
-# KEEP), the count marked, the cap, and what to click to confirm (the
-# armed card, or END TURN).
-@export var choice_prompt_format: String = "%s %d / %d  ·  CLICK %s TO CONFIRM"
+# KEEP) and how many cards are left to pick (choice_prompt_format), then,
+# for a choice confirmed elsewhere, what to click (choice_confirm_format -
+# END TURN, the keep's). A choice that takes a variable count (Bide's)
+# has a DONE beside the line, in the same ink as End Turn; one with a
+# fixed count goes on by itself at its last pick and has neither.
+@export var choice_prompt_format: String = "%s  ·  %d LEFT"
+@export var choice_confirm_format: String = "  ·  CLICK %s TO CONFIRM"
+@export var choice_done_text: String = "DONE":
+	set(value):
+		choice_done_text = value
+		if _choice_done != null:
+			_choice_done.text = value
+			_choice_done.refresh_style()
+# Between the prompt line's end and DONE.
+@export var choice_done_gap_px: float = 18.0
 @export var choice_prompt_font_size_px: int = 13:
 	set(value):
 		choice_prompt_font_size_px = value
@@ -250,6 +262,9 @@ var _card_armed: bool = false
 var _choice_prompt: Label = null
 var _choice_card_name: String = ""
 var _choice_verb: String = ""
+# The open choice's DONE (choice_done_text), made with the first choice
+# that has one; hidden while none is open or the open one has none.
+var _choice_done: EndTurnButton = null
 
 func _ready() -> void:
 	# RegionField freezes itself (and, by inheritance, this whole overlay -
@@ -798,7 +813,10 @@ func _update_end_turn() -> void:
 	var opening: bool = battle_controller != null and battle_controller.is_entry_locked()
 	end_turn_button.set_enabled(_player_turn and not _card_armed and not picking and not opening)
 
-func _on_hand_choice_started(confirm_label: String, _cap: int, verb: String) -> void:
+# `confirm_label`: what confirms the choice when that's something else
+# (END TURN), empty when DONE or the last pick does; `done`: whether it
+# has a DONE.
+func _on_hand_choice_started(confirm_label: String, _cap: int, verb: String, done: bool) -> void:
 	_choice_card_name = confirm_label
 	_choice_verb = verb
 	if _choice_prompt == null:
@@ -808,11 +826,22 @@ func _on_hand_choice_started(confirm_label: String, _cap: int, verb: String) -> 
 		add_child(_choice_prompt)
 	_style_choice_prompt()
 	_choice_prompt.visible = true
+	if done and _choice_done == null:
+		_choice_done = EndTurnButton.new()
+		_choice_done.name = "ChoiceDone"
+		_choice_done.label_text = choice_done_text
+		add_child(_choice_done)
+		_choice_done.pressed.connect(func() -> void: battle_controller.confirm_choice())
+	if _choice_done != null:
+		_choice_done.visible = done
 
 func _on_hand_choice_changed(marked: int, cap: int) -> void:
 	if _choice_prompt == null:
 		return
-	_choice_prompt.text = choice_prompt_format % [_choice_verb, marked, cap, _choice_card_name.to_upper()]
+	var line: String = choice_prompt_format % [_choice_verb, maxi(cap - marked, 0)]
+	if _choice_card_name != "":
+		line += choice_confirm_format % _choice_card_name.to_upper()
+	_choice_prompt.text = line
 	_choice_prompt.size = Vector2.ZERO
 	_place_choice_prompt()
 
@@ -820,6 +849,8 @@ func _on_hand_choice_ended() -> void:
 	_choice_card_name = ""
 	if _choice_prompt != null:
 		_choice_prompt.visible = false
+	if _choice_done != null:
+		_choice_done.visible = false
 
 func _style_choice_prompt() -> void:
 	if _choice_prompt == null:
@@ -841,7 +872,15 @@ func _place_choice_prompt() -> void:
 		var rect: Rect2 = card.get_global_rect()
 		centre_x = rect.get_center().x
 		top_y = rect.position.y
-	_choice_prompt.global_position = Vector2(centre_x - _choice_prompt.size.x / 2.0, top_y - choice_prompt_gap_px - _choice_prompt.size.y)
+	# The line and its DONE centred as one.
+	var done_shown: bool = _choice_done != null and _choice_done.visible
+	var width: float = _choice_prompt.size.x
+	if done_shown:
+		width += choice_done_gap_px + _choice_done.size.x
+	var left: float = centre_x - width / 2.0
+	_choice_prompt.global_position = Vector2(left, top_y - choice_prompt_gap_px - _choice_prompt.size.y)
+	if done_shown:
+		_choice_done.global_position = Vector2(left + _choice_prompt.size.x + choice_done_gap_px, _choice_prompt.global_position.y + (_choice_prompt.size.y - _choice_done.size.y) / 2.0)
 
 func _process(_delta: float) -> void:
 	_place_choice_prompt()
@@ -1233,6 +1272,8 @@ func _flip_dark_world() -> void:
 	if _devour_button != null:
 		_devour_button.refresh_style()
 	end_turn_button.refresh_style()
+	if _choice_done != null:
+		_choice_done.refresh_style()
 	print("BattleOverlay: ui_on_dark_world (debug flip) = %s" % str(_on_dark_world))
 
 func _unhandled_input(event: InputEvent) -> void:

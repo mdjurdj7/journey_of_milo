@@ -30,10 +30,12 @@ signal target_cancelled()
 # A hand choice (see _begin_choice()) - Bide's set-aside, Deny's pick
 # among cards tied for most expensive, or the keep a keepsake allows at
 # the end of the turn (_begin_keep_choice()): opened with up to `cap`
-# cards to mark, the verb that names what happens to them and what to
-# click to confirm (the armed card's name, or END TURN), the count marked
-# as it moves, and closed (confirmed, or cancelled with nothing spent).
-signal hand_choice_started(confirm_label: String, cap: int, verb: String)
+# cards to mark, the verb that names what happens to them, what to click
+# to confirm when that's something other than DONE (END TURN, the keep's;
+# empty otherwise) and whether it has a DONE (Bide's - a variable count,
+# confirm_choice()), the count marked as it moves, and closed (confirmed,
+# or cancelled with nothing spent).
+signal hand_choice_started(confirm_label: String, cap: int, verb: String, done: bool)
 signal hand_choice_changed(marked: int, cap: int)
 signal hand_choice_ended()
 
@@ -615,10 +617,12 @@ func _set_aside_cap(card: CardData) -> int:
 
 # A hand choice, opened: the card arms the way a targeting card does (the
 # hand stops hovering, End Turn greys), then the cards it may take wake up
-# to be clicked - each click marks or unmarks one, up to `cap`; a click
-# past the cap, or on a card it may not take, does nothing. Clicking the
-# armed card again, Enter or Space confirm; right-click or Esc cancel with
-# nothing spent. Bide's (SET_ASIDE) takes 0 to `cap` of any other card.
+# to be clicked, the rest faded (HandContainer.begin_choice()) - each click
+# marks or unmarks one, up to `cap`; a click past the cap, or on a card it
+# may not take, does nothing. Right-click or Esc cancel with nothing
+# spent. Bide's (SET_ASIDE) takes 0 to `cap` of any other card, confirmed
+# by DONE (the overlay's, confirm_choice()) or Enter/Space - clicking the
+# armed card again does nothing.
 # Deny's (CONSUME) takes exactly `cap` of `eligible` - the cards tied for
 # most expensive - and goes on to its target once confirmed.
 func _begin_choice(card_view: CardView, cap: int, kind: CardEffect.EffectType, eligible: Array[CardView] = []) -> void:
@@ -629,7 +633,10 @@ func _begin_choice(card_view: CardView, cap: int, kind: CardEffect.EffectType, e
 	_choice_eligible = eligible
 	card_view.lift_and_hold(true)
 	_hand_container.begin_choice(card_view, eligible)
-	hand_choice_started.emit(card_view.card_data.card_name, cap, "CONSUME" if kind == CardEffect.EffectType.CONSUME else "SET ASIDE")
+	if kind == CardEffect.EffectType.CONSUME:
+		hand_choice_started.emit(card_view.card_data.card_name, cap, "CONSUME", false)
+	else:
+		hand_choice_started.emit("", cap, "SET ASIDE", true)
 	hand_choice_changed.emit(0, cap)
 	_emit_devour_changed()
 
@@ -652,7 +659,7 @@ func _begin_keep_choice() -> bool:
 	_choice_cap = cap
 	_choice_eligible = []
 	_hand_container.begin_choice(null)
-	hand_choice_started.emit("END TURN", cap, "KEEP")
+	hand_choice_started.emit("END TURN", cap, "KEEP", false)
 	hand_choice_changed.emit(0, cap)
 	_emit_devour_changed()
 	return true
@@ -2302,10 +2309,10 @@ func _screen_pos_for(target: FieldEnemy) -> Vector2:
 
 func _on_card_view_clicked(card_view: CardView) -> void:
 	if _choice_open():
-		if card_view == _choosing_card_view:
-			confirm_choice()
-		else:
+		if card_view != _choosing_card_view:
 			toggle_choice(card_view)
+		elif _choice_kind == CardEffect.EffectType.CONSUME:
+			confirm_choice()
 		return
 	request_play(card_view)
 

@@ -2,11 +2,13 @@ extends SceneTree
 
 # Headless probe for Bide - SET_ASIDE and the choice behind it: playing it
 # opens a choice of up to 2 other hand cards (fewer when the hand holds
-# fewer, 0 always allowed); confirmed, the chosen leave the hand for the
-# deck's set-aside pile, Bide draws 1 and goes to the discard; at the
-# start of the next turn they come back after the normal draw, which is
-# unchanged. Cancelled, nothing is spent. Next-card discounts (Leverage,
-# Collateral) wait through it. The readout names the waiting cards.
+# fewer, 0 always allowed), counted down by the prompt and confirmed by
+# its DONE - clicking Bide again does nothing; confirmed, the chosen
+# leave the hand for the deck's set-aside pile, Bide draws 1 and goes to
+# the discard; at the start of the next turn they come back after the
+# normal draw, which is unchanged. Cancelled, nothing is spent. Next-card
+# discounts (Leverage, Collateral) wait through it. The readout names the
+# waiting cards.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/bide_probe.gd
 #
@@ -76,6 +78,9 @@ func _check_data() -> void:
 	_expect_eq(bide.cost, 0, "...costs 0")
 	_expect_eq(bide.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(bide.rarity, CardData.CardRarity.COMMON, "...is Common")
+	_expect(bide.description.begins_with("Set aside up to {set_aside} cards"), "...and its text says up to")
+	var tempered: CardData = bide.tempered
+	_expect(tempered != null and tempered.description == bide.description, "...as Bide+'s does")
 	_expect_eq(bide.target_type, CardData.TargetType.SELF, "...targets the player")
 	_expect_eq(bide.removal_scope, CardData.RemovalScope.NONE, "...is not Spent")
 	_expect_eq(bide.effects.size(), 2, "...two effects")
@@ -141,11 +146,21 @@ func _check_choose_two() -> void:
 		controller.call("request_play", _view(controller, bide))
 		_expect(bool(controller.call("is_choosing")), "Bide with three others opens the choice")
 		_expect_eq(int(controller.get("_choice_cap")), 2, "...capped at 2")
+		_expect_eq(_prompt_text(), "SET ASIDE  ·  2 LEFT", "...the prompt counts 2 left")
+		var done: Button = _done_button()
+		_expect(done != null and done.visible, "...and shows DONE")
+		_expect_eq(_view(controller, reckoning).modulate.a, 1.0, "...every other card at full ink, pickable")
+		controller.call("_on_card_view_clicked", _view(controller, bide))
+		_expect(bool(controller.call("is_choosing")), "Clicking Bide again doesn't confirm")
 		var slash_view: CardView = _view(controller, slash)
 		controller.call("toggle_choice", slash_view)
+		_expect_eq(_prompt_text(), "SET ASIDE  ·  1 LEFT", "One marked: 1 left")
 		controller.call("toggle_choice", _view(controller, brace))
 		_expect(slash_view.is_marked(), "A clicked card is marked")
-		controller.call("confirm_choice")
+		_expect(bool(controller.call("is_choosing")), "...the cap reached, still open: DONE confirms")
+		if done != null:
+			done.pressed.emit()
+		_expect(done == null or not done.visible, "DONE: the choice closes, DONE with it")
 		await _settle(controller)
 		var hand: Array = deck.get("hand")
 		_expect_eq(deck.get("set_aside_pile"), [slash, brace], "Confirmed: Slash and Brace are set aside")
@@ -370,6 +385,16 @@ func _overlay() -> Node:
 		return null
 	var layer: Node = _field.get_node("BattleLayer")
 	return layer.get_child(0) if layer.get_child_count() > 0 else null
+
+# The open choice's prompt line, and its DONE (BattleOverlay's).
+func _prompt_text() -> String:
+	var overlay: Node = _overlay()
+	var prompt := overlay.get_node_or_null("ChoicePrompt") as Label if overlay != null else null
+	return prompt.text if prompt != null and prompt.visible else ""
+
+func _done_button() -> Button:
+	var overlay: Node = _overlay()
+	return overlay.get_node_or_null("ChoiceDone") as Button if overlay != null else null
 
 func _teardown() -> void:
 	if _field != null and is_instance_valid(_field):
