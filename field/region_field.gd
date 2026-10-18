@@ -91,12 +91,20 @@ enum RewardMode { SCREEN, WORLD }
 
 # Debug builds only: the field's F1 row and its Keepsake button, which
 # grants these in turn (see _on_debug_keepsake_pressed()). Paths, loaded
-# at the press.
+# at the press: every keepsake there is - the keeper's six, the bedroll's
+# four, and floor 3's Leg Band.
 @export var debug_keepsake_paths: PackedStringArray = PackedStringArray([
 	"res://run/keepsakes/bent_nail.tres",
 	"res://run/keepsakes/white_shell.tres",
 	"res://run/keepsakes/frayed_cord.tres",
 	"res://run/keepsakes/worn_page.tres",
+	"res://run/keepsakes/keeper/house_key.tres",
+	"res://run/keepsakes/keeper/departure_stub.tres",
+	"res://run/keepsakes/keeper/blue_fastener.tres",
+	"res://run/keepsakes/keeper/wrapped_sweet.tres",
+	"res://run/keepsakes/keeper/signal_glass.tres",
+	"res://run/keepsakes/keeper/pressed_flower.tres",
+	"res://run/keepsakes/leg_band.tres",
 ])
 # Debug builds only: the weapon a new run starts with in place of the
 # character's (RunState.equip_weapon() on a new run's first floor, after
