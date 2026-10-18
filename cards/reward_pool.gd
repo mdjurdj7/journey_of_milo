@@ -77,14 +77,18 @@ var _resolved_ready: bool = false
 # eligible entries. rng is passed in rather than taken from RunState here
 # so this stays a pure data object (and so a test can hand it a fixed
 # seed); enemy may be null, which simply skips the bias.
-func roll(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null) -> Array[CardData]:
+# `character` is whose run it is: every roll here - this, roll_by_rarity(),
+# roll_top_tier() - and has_cards() offer only cards _offerable() for it,
+# whatever the pool lists. Null skips the class half of that, never the
+# offer half.
+func roll(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, character: CharacterData = null) -> Array[CardData]:
 	var picked: Array[CardData] = []
 	# Index-based so an entry's own weight stays findable as the remaining
 	# set shrinks; removing from these two in step is what keeps them
 	# parallel through the draw.
 	var remaining: Array[int] = []
 	for index in _cards().size():
-		if _cards()[index] != null and _weight_of(index, enemy) > 0.0:
+		if _offerable(index, character) and _weight_of(index, enemy) > 0.0:
 			remaining.append(index)
 
 	while picked.size() < count and not remaining.is_empty():
@@ -110,10 +114,11 @@ func roll(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null) -> Ar
 # (or ULTRA_RARE, empty today) never costs a slot: this returns fewer
 # than `count` only when the pool itself runs out. An UNSET card is
 # never offered - see CardData.CardRarity.
-# `elite` rolls the tiers at the elite rates instead.
-func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, elite: bool = false) -> Array[CardData]:
+# `elite` rolls the tiers at the elite rates instead; `character` as in
+# roll().
+func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, elite: bool = false, character: CharacterData = null) -> Array[CardData]:
 	var picked: Array[CardData] = []
-	var remaining: Array[int] = _rarity_eligible(enemy)
+	var remaining: Array[int] = _rarity_eligible(enemy, character)
 	while picked.size() < count and not remaining.is_empty():
 		var available: Array[CardData.CardRarity] = []
 		for index in remaining:
@@ -134,10 +139,10 @@ func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = n
 # by the same weights and bias, and only when that tier runs dry the next
 # one down fills the rest (Rare, then lower). No rates: the tier order is
 # the rule. Fewer than `count` only when the pool itself runs out; an
-# UNSET card is never offered.
-func roll_top_tier(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null) -> Array[CardData]:
+# UNSET card is never offered. `character` as in roll().
+func roll_top_tier(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, character: CharacterData = null) -> Array[CardData]:
 	var picked: Array[CardData] = []
-	var eligible: Array[int] = _rarity_eligible(enemy)
+	var eligible: Array[int] = _rarity_eligible(enemy, character)
 	var tiers: Array[CardData.CardRarity] = CardData.rarity_tiers()
 	tiers.reverse()
 	for tier in tiers:
@@ -200,15 +205,24 @@ func rarity_rate(tier: CardData.CardRarity, elite: bool = false) -> float:
 			return ultra_rare_rate
 	return 0.0
 
-# Indices of the entries a rarity roll can offer: a card, tagged (not
-# UNSET), with a weight above 0.
-func _rarity_eligible(enemy: EnemyData) -> Array[int]:
+# Indices of the entries a rarity roll can offer: _offerable() for
+# `character`, tagged (not UNSET), with a weight above 0.
+func _rarity_eligible(enemy: EnemyData, character: CharacterData) -> Array[int]:
 	var eligible: Array[int] = []
 	for index in _cards().size():
-		var entry: CardData = _cards()[index]
-		if entry != null and entry.rarity != CardData.CardRarity.UNSET and _weight_of(index, enemy) > 0.0:
+		if _offerable(index, character) and _cards()[index].rarity != CardData.CardRarity.UNSET and _weight_of(index, enemy) > 0.0:
 			eligible.append(index)
 	return eligible
+
+# Whether a random offer in `character`'s run may give the card at `index`
+# (in _cards()): a card, REWARDABLE (CardData.offer - never a starter-only,
+# Keeper-only or own-channel one), and neutral (no card_class) or
+# `character`'s own class. A null character skips the class check.
+func _offerable(index: int, character: CharacterData) -> bool:
+	var card: CardData = _cards()[index]
+	if card == null or card.offer != CardData.OfferScope.REWARDABLE:
+		return false
+	return character == null or card.card_class == &"" or card.card_class == character.card_class
 
 # One of `candidates` (entry indices, not empty), by weight and bias - one
 # rng draw. The pick inside a tier for roll_by_rarity() and roll_top_
@@ -224,11 +238,15 @@ func _pick_weighted(candidates: Array[int], rng: RandomNumberGenerator, enemy: E
 			return index
 	return candidates[candidates.size() - 1]
 
-# Whether the pool has any card to roll - its entries and its source
-# folders' cards together (_cards()); a pool of folders alone (a class's,
-# the Samurai's) has none in entries and cards all the same.
-func has_cards() -> bool:
-	return not _cards().is_empty()
+# Whether the pool has any card to offer `character` (_offerable()) - its
+# entries and its source folders' cards together (_cards()); a pool of
+# folders alone (a class's, the Samurai's) has none in entries and cards
+# all the same.
+func has_cards(character: CharacterData = null) -> bool:
+	for index in _cards().size():
+		if _offerable(index, character):
+			return true
+	return false
 
 # Every card the pool can roll, indexed the way weights are: entries
 # first, in order, then each source folder's cards not already in it.

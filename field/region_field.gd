@@ -1973,7 +1973,7 @@ func _setup_belongings_card(card: WorldCard, entry: FloorProp, floor_data: Floor
 	if pool == null:
 		push_warning("RegionField: a belongings WorldCard needs a pool to roll from (the prop's, or the floor's reward_pool); none set.")
 		return false
-	var rolled: Array[CardData] = pool.roll(1, RunState.rng, null)
+	var rolled: Array[CardData] = pool.roll(1, RunState.rng, null, get_run_character())
 	if rolled.is_empty():
 		push_warning("RegionField: the pool rolled nothing for the belongings WorldCard.")
 		return false
@@ -1988,7 +1988,7 @@ func _setup_belongings_card(card: WorldCard, entry: FloorProp, floor_data: Floor
 # BundleProp.roll() for the split and the fallbacks.
 func _setup_bundle(bundle: BundleProp, entry: FloorProp, floor_data: FloorData) -> void:
 	var pool: RewardPool = entry.pool if entry.pool != null else run_reward_pool(floor_data)
-	bundle.roll(RunState.rng, floor_data.gold_min, floor_data.gold_max, pool, floor_data.rare_pool)
+	bundle.roll(RunState.rng, floor_data.gold_min, floor_data.gold_max, pool, floor_data.rare_pool, get_run_character())
 
 # A belongings cache's one roll, at floor load from the run's own
 # generator - the pack's card from the prop's pool, the floor's reward
@@ -1999,7 +1999,7 @@ func _setup_belongings_cache(cache: BelongingsCache, entry: FloorProp, floor_dat
 	cache.cache_id = id
 	if not entry.world_line.is_empty():
 		cache.world_line = entry.world_line
-	cache.roll(RunState.rng, pool)
+	cache.roll(RunState.rng, pool, get_run_character())
 
 # A world point seated on the relief plus `clearance` - same to_local()-
 # first idiom RewardSpread/Keeper use, since get_height_at() works in

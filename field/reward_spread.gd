@@ -98,7 +98,7 @@ func _ready() -> void:
 	_wanderer = _find_wanderer()
 	# Its cards: entries and source folders alike (a class's folder-only
 	# pool has no entries and cards all the same).
-	if pool == null or not pool.has_cards():
+	if pool == null or not pool.has_cards(RunState.character):
 		if not _empty_pool_reported:
 			_empty_pool_reported = true
 			print("RewardSpread: reward pool empty; no cards will drop.")
@@ -116,11 +116,11 @@ func _find_wanderer() -> Node3D:
 func _spawn_cards() -> void:
 	var rolled: Array[CardData] = []
 	if not roll_by_rarity:
-		rolled = pool.roll(card_count, RunState.rng, enemy)
+		rolled = pool.roll(card_count, RunState.rng, enemy, RunState.character)
 	elif top_tier:
-		rolled = pool.roll_top_tier(card_count, RunState.rng, enemy)
+		rolled = pool.roll_top_tier(card_count, RunState.rng, enemy, RunState.character)
 	else:
-		rolled = pool.roll_by_rarity(card_count, RunState.rng, enemy, elite_rates)
+		rolled = pool.roll_by_rarity(card_count, RunState.rng, enemy, elite_rates, RunState.character)
 	if rolled.is_empty():
 		return
 	var scene := load(world_card_scene_path) as PackedScene

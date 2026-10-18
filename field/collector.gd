@@ -257,7 +257,7 @@ func ensure_stock() -> void:
 	if stock_pool == null:
 		push_warning("Collector '%s': no stock pool; nothing rolled." % name)
 		return
-	_stock = stock_pool.roll_by_rarity(stock_count, RunState.rng)
+	_stock = stock_pool.roll_by_rarity(stock_count, RunState.rng, null, false, RunState.character)
 	var names: Array[String] = []
 	for card in _stock:
 		names.append(card.card_name)

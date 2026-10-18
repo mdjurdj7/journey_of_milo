@@ -399,7 +399,7 @@ func _build_lines() -> void:
 		samphire_line.item = _extra_card.card_name
 		samphire_line.action = "TAKE"
 		_lines.append(samphire_line)
-	if _offers_cards and _pool != null and _pool.has_cards():
+	if _offers_cards and _pool != null and _pool.has_cards(RunState.character):
 		var card_line := RewardLine.new()
 		card_line.id = "card"
 		card_line.item = "A card"
@@ -960,7 +960,7 @@ func _take_samphire(line: RewardLine) -> void:
 func _open_choice() -> void:
 	# A fight's reward, so tier first - see RewardPool.roll_by_rarity() -
 	# or, for the region-end fight, the highest tier down (roll_top_tier()).
-	var rolled: Array[CardData] = _pool.roll_top_tier(choice_count, RunState.rng) if _top_tier else _pool.roll_by_rarity(choice_count, RunState.rng, null, _elite_rates)
+	var rolled: Array[CardData] = _pool.roll_top_tier(choice_count, RunState.rng, null, RunState.character) if _top_tier else _pool.roll_by_rarity(choice_count, RunState.rng, null, _elite_rates, RunState.character)
 	_offered = rolled.duplicate()
 	if rolled.is_empty():
 		_finish_card_line()

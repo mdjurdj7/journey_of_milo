@@ -131,10 +131,12 @@ static var _spent: Dictionary = {}
 static func reset_spent() -> void:
 	_spent.clear()
 
-func roll(rng: RandomNumberGenerator, pool: RewardPool) -> void:
+# `character` is whose run it is - the pack's card only of theirs or
+# neutral (RewardPool.roll()).
+func roll(rng: RandomNumberGenerator, pool: RewardPool, character: CharacterData = null) -> void:
 	var cards: Array[CardData] = []
 	if pool != null:
-		cards = pool.roll(1, rng, null)
+		cards = pool.roll(1, rng, null, character)
 	card = cards[0] if not cards.is_empty() else null
 	if card == null:
 		push_warning("BelongingsCache '%s': the pack's card rolled nothing; that column is left out." % name)

@@ -145,15 +145,17 @@ var _line_shown: bool = false
 # belongings pool), `rare_pool` the floor's - null or empty falls back to
 # `pool`, the kind is still RARE_CARD. A card roll that comes back empty
 # falls back to gold with a warning, so the bundle is never empty.
-func roll(rng: RandomNumberGenerator, gold_min: int, gold_max: int, pool: RewardPool, rare_pool: RewardPool) -> void:
+# `character` is whose run it is - a card only of theirs or neutral
+# (RewardPool.roll()).
+func roll(rng: RandomNumberGenerator, gold_min: int, gold_max: int, pool: RewardPool, rare_pool: RewardPool, character: CharacterData = null) -> void:
 	var point: float = rng.randf()
 	if point >= gold_chance:
 		var rare: bool = point >= gold_chance + card_chance
 		var from: RewardPool = pool
-		if rare and rare_pool != null and rare_pool.has_cards():
+		if rare and rare_pool != null and rare_pool.has_cards(character):
 			from = rare_pool
 		if from != null:
-			var rolled: Array[CardData] = from.roll(1, rng, null)
+			var rolled: Array[CardData] = from.roll(1, rng, null, character)
 			if not rolled.is_empty():
 				contents = Contents.RARE_CARD if rare else Contents.CARD
 				contents_card = rolled[0]
