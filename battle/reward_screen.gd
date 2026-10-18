@@ -71,6 +71,17 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 @export var strike_px: float = 1.0
 @export_range(0.0, 1.0) var taken_alpha: float = 0.45
 @export var dismiss_text: String = "WALK ON"
+# DECK, on WALK ON's row at the column's left (and on NONE OF THESE's row
+# at the cards' left while a choice is open): the deck viewer over the
+# screen, deck_view_layer_offset layers up (DeckPanel.open_view()) - the
+# screen deaf to its own input while it is open, and the same list or
+# choice still there when it closes. The dismiss line's face and size.
+@export var deck_text: String = "DECK":
+	set(value):
+		deck_text = value
+		if _draw_layer != null:
+			_draw_layer.queue_redraw()
+@export var deck_view_layer_offset: int = 1
 @export var dismiss_size_px: int = 22
 @export_range(0.0, 1.0) var dismiss_tracking_em: float = 0.16
 @export_group("")
@@ -253,6 +264,10 @@ var _samphire_flying: bool = false
 # The Samphire row's card, shown while the row is focused (_sync_samphire_
 # preview()); made the first time.
 var _samphire_preview: CardView = null
+# The deck viewer opened from DECK (_open_deck_view()), while it is open;
+# and whether DECK is under the cursor.
+var _deck_view: DeckView = null
+var _deck_hovered: bool = false
 var _deck_panel: Control = null
 var _mode: int = Mode.LIST
 var _hovered: int = -1
@@ -497,6 +512,7 @@ func _draw_column() -> void:
 	_text(_dismiss_font, dismiss_text, Vector2(walk_on_left, walk_on_baseline), dismiss_size_px, bone if walk_on_focused else choice_unfocused_color)
 	if walk_on_focused:
 		_draw_hairline(walk_on_left, walk_on_baseline, dismiss_size_px)
+	_draw_deck_action()
 
 # A line's icon, centred on the text's caps, or its placeholder shard,
 # sitting on the text's baseline, at `left`. Returns how far the text
@@ -545,6 +561,8 @@ func _draw_choice() -> void:
 	_text(_choice_font, choice_dismiss_text, Vector2(label_left, decline_baseline), _choice_label_px, bone if focused else choice_unfocused_color)
 	if focused:
 		_draw_hairline(label_left, decline_baseline, _choice_label_px)
+	if not _taking_card:
+		_draw_deck_action()
 	_draw_tier_labels()
 
 # Each offered card's tier, centred under its face (CardRarityFinish):
@@ -650,6 +668,10 @@ func _on_gui_input(event: InputEvent) -> void:
 		return
 	var motion := event as InputEventMouseMotion
 	if motion != null:
+		var over_deck: bool = _deck_rect().has_point(motion.position) and not _taking_card
+		if over_deck != _deck_hovered:
+			_deck_hovered = over_deck
+			_draw_layer.queue_redraw()
 		if _mode == Mode.CHOICE:
 			var over: bool = _decline_rect().has_point(motion.position)
 			if over and not _decline_hovered:
@@ -670,6 +692,10 @@ func _on_gui_input(event: InputEvent) -> void:
 		return
 	var button := event as InputEventMouseButton
 	if button == null or button.button_index != MOUSE_BUTTON_LEFT or not button.pressed:
+		return
+	if _deck_rect().has_point(button.position) and not _taking_card:
+		_open_deck_view()
+		_draw_layer.accept_event()
 		return
 	if _dismiss_rect().has_point(button.position):
 		_on_dismiss()
@@ -700,7 +726,7 @@ func _set_choice_focus(index: int) -> void:
 	_draw_layer.queue_redraw()
 
 func _on_choice_card_mouse_entered(index: int) -> void:
-	if not _taking_card:
+	if not _taking_card and not _deck_view_open():
 		_set_choice_focus(index)
 
 func _on_choice_card_mouse_exited(index: int) -> void:
@@ -849,7 +875,55 @@ func _take_line(index: int) -> void:
 
 # The Samphire is on its way to the deck.
 func _extra_busy() -> bool:
-	return _samphire_flying
+	return _samphire_flying or _deck_view_open()
+
+func _deck_view_open() -> bool:
+	return _deck_view != null and is_instance_valid(_deck_view)
+
+# DECK's label: on WALK ON's row at the column's left, or - a choice
+# open - on NONE OF THESE's row at the cards' left. Its baseline-left.
+func _deck_label_origin() -> Vector2:
+	if _mode == Mode.CHOICE:
+		return Vector2(roundf(_choice_row.position.x), _decline_top_px + float(_choice_label_px))
+	return Vector2(roundf(_column_left()), _walk_on_top() + line_height_px * 0.62)
+
+func _deck_font() -> Font:
+	return _choice_font if _mode == Mode.CHOICE else _dismiss_font
+
+func _deck_size() -> int:
+	return _choice_label_px if _mode == Mode.CHOICE else dismiss_size_px
+
+# DECK's hit rect: its label and the hairline's room to its right, its row's
+# height.
+func _deck_rect() -> Rect2:
+	var origin: Vector2 = _deck_label_origin()
+	var width: float = InkType.width(_deck_font(), deck_text, _deck_size())
+	var height: float = float(_deck_size()) * 1.3 if _mode == Mode.CHOICE else line_height_px
+	var top: float = _decline_top_px if _mode == Mode.CHOICE else _walk_on_top()
+	return Rect2(origin.x, top, width + choice_hairline_gap_px + choice_hairline_length_px, height)
+
+func _draw_deck_action() -> void:
+	var origin: Vector2 = _deck_label_origin()
+	_text(_deck_font(), deck_text, origin, _deck_size(), bone if _deck_hovered else choice_unfocused_color)
+	if _deck_hovered:
+		_draw_hairline(origin.x, origin.y, _deck_size())
+
+# The whole deck, over this screen; the list or choice left as it was.
+func _open_deck_view() -> void:
+	if _deck_view_open():
+		return
+	var title: Variant = _deck_panel.get("deck_title") if _deck_panel != null else null
+	_deck_view = DeckPanel.open_view(get_tree(), RunState.deck, str(title) if title != null else deck_text.capitalize(), layer + deck_view_layer_offset)
+	_deck_view.closed.connect(func() -> void:
+		_deck_view = null
+		_deck_hovered = false
+		_draw_layer.queue_redraw())
+	_deck_hovered = false
+	if _mode == Mode.CHOICE:
+		_set_choice_focus(-1)
+	else:
+		_set_list_focus(-1)
+	_draw_layer.queue_redraw()
 
 # The Samphire into the deck: its face, from the line, flies to the deck
 # readout; the screen closes, if this was the last line, once it lands.
@@ -1014,7 +1088,7 @@ func _apply_scrim() -> void:
 	_scrim.color = colour
 
 func _on_choice_clicked(card_data: CardData, card_view: CardView) -> void:
-	if _taking_card:
+	if _taking_card or _deck_view_open():
 		return
 	_taking_card = true
 	RunState.add_card(card_data)
