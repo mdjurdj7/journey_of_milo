@@ -3,9 +3,10 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://drv0e2at6klix"
-path="res://.godot/imported/samurai_v1_texture_0_metallic_roughness.png-9f009171b1a4731faf2400e019bca6e3.ctex"
+path.s3tc="res://.godot/imported/samurai_v1_texture_0_metallic_roughness.png-9f009171b1a4731faf2400e019bca6e3.s3tc.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "e74057f788be032b7d576230106892dc"
@@ -14,11 +15,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/samurai/samurai_v1_texture_0_metallic_roughness.png"
-dest_files=["res://.godot/imported/samurai_v1_texture_0_metallic_roughness.png-9f009171b1a4731faf2400e019bca6e3.ctex"]
+dest_files=["res://.godot/imported/samurai_v1_texture_0_metallic_roughness.png-9f009171b1a4731faf2400e019bca6e3.s3tc.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -40,4 +41,4 @@ process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
 process/size_limit=0
-detect_3d/compress_to=1
+detect_3d/compress_to=0
