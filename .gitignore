@@ -4,3 +4,6 @@
 
 # run_probes.sh's own measured times (see tools/probe_times.txt)
 tools/probe_times.local.txt
+
+# Python bytecode from the tools/ scripts
+tools/__pycache__/
