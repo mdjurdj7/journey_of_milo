@@ -27,7 +27,6 @@ const TWO_LINE_STATUS_CARDS: Array[String] = ["Sentence", "The Return", "Sentenc
 # (CardView.rules_margin_px) and no lone last word. A card that moves
 # here has changed its wording - or needs to.
 const SHRUNK_RULES: Dictionary = {
-	"Bide": 14,
 	"Blood Arc": 14,
 	"Collateral": 13,
 	"Deny": 13,
