@@ -192,8 +192,8 @@ func _check_full_slot(answer: int, glassbone_slot: int) -> void:
 		var held_tile: Control = tiles[0]
 		var offered_tile: Control = tiles[1]
 		_expect(held_tile.call("get_keepsake") == load(HELD_PATH) and offered_tile.call("get_keepsake") == load(OFFERED_PATH), "%s: the held one first, the offered one second" % label)
-		_expect(is_equal_approx(held_tile.position.y, offered_tile.position.y) and held_tile.position.x + held_tile.call("get_tile_size").x < offered_tile.position.x, "%s: side by side, apart" % label)
-		_expect(float(screen.call("_choice_baseline", REPLACE)) > offered_tile.position.y + offered_tile.call("get_tile_size").y, "%s: the choices sit under the tiles" % label)
+		_expect(is_equal_approx(held_tile.position.y, offered_tile.position.y) and held_tile.position.x + held_tile.call("get_plate_size").x < offered_tile.position.x, "%s: side by side, apart" % label)
+		_expect(float(screen.call("_choice_baseline", REPLACE)) > offered_tile.position.y + offered_tile.call("get_plate_size").y, "%s: the choices sit under the tiles" % label)
 
 	# No timeout, and nothing but an answer closes it.
 	for other in [CASE, PACK, BEDROLL, WALK_ON]:

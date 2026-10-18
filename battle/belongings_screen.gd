@@ -42,7 +42,7 @@ class_name BelongingsScreen
 #   the case     "+45 gold"
 #   the pack     its card, lifted at the deck view's inspect size (card_
 #                inspect_scale) over the screen
-#   the bedroll  its keepsake's KeepsakeTile, at keepsake_tile_scale over
+#   the bedroll  its keepsake's ItemPlate, at keepsake_tile_scale over
 #                the bedroll's column
 # and "+ Glassbone ×1" under whichever carried it. Everything is granted
 # through RunState as it's revealed, and the take's sound plays; the
@@ -266,7 +266,7 @@ const DISMISS := SLOT_COUNT
 @export_group("")
 
 @export_group("Keepsake Tile")
-# The bedroll's keepsake, revealed: its KeepsakeTile at this scale, its
+# The bedroll's keepsake, revealed: its ItemPlate at this scale, its
 # centre at keepsake_tile_centre_fraction of the viewport height - over
 # the bedroll's column alone, centred on the screen beside the held one.
 @export var keepsake_tile_scale: float = 1.3:
@@ -457,8 +457,8 @@ var _choice_font: Font = null
 var _lifted: CardView = null
 # The bedroll's keepsake and the held one while they're shown
 # (_sync_keepsake_tiles()), else null.
-var _offered_tile: KeepsakeTile = null
-var _held_tile: KeepsakeTile = null
+var _offered_tile: ItemPlate = null
+var _held_tile: ItemPlate = null
 
 var _viewport: SubViewport = null
 var _cell_px: int = 1
@@ -961,7 +961,7 @@ func _draw_choice(choice: int) -> void:
 func _keepsake_tiles_rect() -> Rect2:
 	if _offered_tile == null or _draw_layer == null:
 		return Rect2()
-	var tile: Vector2 = _offered_tile.get_tile_size()
+	var tile: Vector2 = _offered_tile.get_plate_size()
 	var both: bool = _held_tile != null
 	var width: float = tile.x * (2.0 if both else 1.0) + (keepsake_tile_gap_px if both else 0.0)
 	var view: Vector2 = _draw_layer.size
@@ -988,9 +988,9 @@ func _sync_keepsake_tiles() -> void:
 		_held_tile = null
 	_place_keepsake_tiles()
 
-func _new_tile(keepsake: TrinketData) -> KeepsakeTile:
-	var tile := KeepsakeTile.new()
-	tile.tile_scale = keepsake_tile_scale
+func _new_tile(keepsake: TrinketData) -> ItemPlate:
+	var tile := ItemPlate.new()
+	tile.plate_scale = keepsake_tile_scale
 	_draw_layer.add_child(tile)
 	tile.set_keepsake(keepsake)
 	return tile
@@ -999,12 +999,12 @@ func _place_keepsake_tiles() -> void:
 	var row: Rect2 = _keepsake_tiles_rect()
 	if not row.has_area():
 		return
-	for tile: KeepsakeTile in [_held_tile, _offered_tile]:
-		if tile != null and not is_equal_approx(tile.tile_scale, keepsake_tile_scale):
-			tile.tile_scale = keepsake_tile_scale
+	for tile: ItemPlate in [_held_tile, _offered_tile]:
+		if tile != null and not is_equal_approx(tile.plate_scale, keepsake_tile_scale):
+			tile.plate_scale = keepsake_tile_scale
 	if _held_tile != null:
 		_held_tile.position = row.position
-		_offered_tile.position = row.position + Vector2(_offered_tile.get_tile_size().x + keepsake_tile_gap_px, 0.0)
+		_offered_tile.position = row.position + Vector2(_offered_tile.get_plate_size().x + keepsake_tile_gap_px, 0.0)
 	else:
 		_offered_tile.position = row.position
 
@@ -1013,14 +1013,14 @@ func _draw_keepsake_labels() -> void:
 	if _held_tile == null or _offered_tile == null:
 		return
 	for pair: Array in [[_held_tile, held_label_text], [_offered_tile, offered_label_text]]:
-		var tile: KeepsakeTile = pair[0]
-		var centre: float = tile.position.x + tile.get_tile_size().x / 2.0
+		var tile: ItemPlate = pair[0]
+		var centre: float = tile.position.x + tile.get_plate_size().x / 2.0
 		_text_centred(_label_font, pair[1], centre, roundf(tile.position.y - keepsake_label_gap_px), label_size_px, bone)
 
 # For probes: the tiles up now (held first when both), empty with none.
-func get_keepsake_tiles() -> Array[KeepsakeTile]:
-	var tiles: Array[KeepsakeTile] = []
-	for tile: KeepsakeTile in [_held_tile, _offered_tile]:
+func get_keepsake_tiles() -> Array[ItemPlate]:
+	var tiles: Array[ItemPlate] = []
+	for tile: ItemPlate in [_held_tile, _offered_tile]:
 		if tile != null:
 			tiles.append(tile)
 	return tiles

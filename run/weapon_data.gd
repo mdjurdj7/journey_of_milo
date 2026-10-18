@@ -3,7 +3,7 @@ class_name WeaponData
 
 # The weapon the run carries - one, always (RunState.weapon), set from the
 # character's starting_weapon by new_run(). Shown in the HUD's WEAPON slot
-# (KeepsakeLine) and on its plate (ArmorPlate.set_weapon()). Never a
+# (KeepsakeLine) and on its plate (ItemPlate.set_weapon()). Never a
 # trinket: held_pieces() and the fight hooks don't read it.
 #
 # What a weapon is for (DESIGN.md, Weapons): it modifies the class's basic

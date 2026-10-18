@@ -471,8 +471,8 @@ func _check_hud_line() -> void:
 	_expect(bool(line.call("is_point_over", line.get_global_rect().get_center())), "...and clickable")
 	var style: Resource = line.get("style")
 	_expect(line.size.x > float(style.get("hud_slot_frame_px")), "...its name after its framed art")
-	var tile: Control = line.call("get_tile")
-	_expect(tile != null and tile.call("get_keepsake") == load(BENT_NAIL_PATH), "...its hover tile holds Bent Nail")
+	var tile: Control = line.call("get_plate")
+	_expect(tile != null and tile.call("get_keepsake") == load(BENT_NAIL_PATH), "...its hover plate holds Bent Nail")
 	await process_frame
 	_expect(line.position.y + line.size.y < deck_panel.position.y, "KEEPSAKE stands above the row")
 	_expect_eq(line.position.x, deck_panel.position.x, "...its left edge level with DECK's")

@@ -13,9 +13,9 @@ class_name WorldKeepsake
 #          position beside the holder's silhouette, level with her
 #          - never over her, never full-screen, the camera untouched.
 #
-# The plaque is the keepsake's KeepsakeTile - the one way a keepsake is
-# shown: art, name, what it does, its lore; here with its KEEPSAKE slot
-# label on (show_slot_label) - and under it, in a bone strip
+# The plaque is the keepsake's ItemPlate - the one way equipment is
+# shown: art, name, its KEEPSAKE type line, what it does, its lore - at
+# plate_scale, the examine and offer scale; and under it, in a bone strip
 # of its own, actions_gap_px below -
 #   the action      TAKE with the slot empty; with one held, REPLACE
 #                   <held> and KEEP <held> - so what taking costs is said
@@ -25,10 +25,8 @@ class_name WorldKeepsake
 #                   others in the utility grey. No plate, no box.
 #
 # Lifted, the plaque is drawn at lifted_scale - absolute, not distance-
-# corrected, so the tile's rules text is always its KeepsakeTile size x
-# lifted_scale on screen: 14 px at 1.0 for all ten keepsakes, a card's
-# rules text in the hand at rest (CardView.rules_font_sizes[0] 15 x
-# HandContainer.hand_card_scale 0.95 = 14.25 px).
+# corrected, so the plate's text is always its ItemPlate size x
+# plate_scale x lifted_scale on screen.
 #
 # Nothing is granted by walking into range: only a click on the action
 # resolves it. Resolving is final either way - the one-slot rule
@@ -103,8 +101,8 @@ const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 		_apply_quad()
 @export_group("")
 
-# The actions' strip under the tile: KeepsakeOffer's bone and ink, the
-# tile's frame and shadow.
+# The actions' strip under the plate: KeepsakeOffer's bone and ink, the
+# plate's frame and shadow.
 @export_group("Plaque")
 @export var bone: Color = Color(0.94, 0.91, 0.86, 1.0):
 	set(value):
@@ -118,7 +116,15 @@ const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 	set(value):
 		unfocused_color = value
 		_redraw()
-# Between the tile and the actions' strip.
+# The plate's own scale (ItemPlate.plate_scale) - the examine and offer
+# scale, drawn at that size rather than scaled up, so it stays crisp.
+@export var plate_scale: float = 1.3:
+	set(value):
+		plate_scale = value
+		if _tile != null:
+			_tile.plate_scale = value
+		_layout()
+# Between the plate and the actions' strip.
 @export var actions_gap_px: float = 8.0:
 	set(value):
 		actions_gap_px = value
@@ -218,7 +224,7 @@ var _holder_box: AABB = AABB()
 
 var _action_font: Font = null
 # The plaque's body: the keepsake's tile, the actions' strip under it.
-var _tile: KeepsakeTile = null
+var _tile: ItemPlate = null
 
 # Plaque-space layout, from _layout().
 var _plaque_size: Vector2 = Vector2.ZERO
@@ -249,10 +255,9 @@ func _ready() -> void:
 	_plaque.gui_input.connect(_on_plaque_gui_input)
 	_plaque.visible = false
 	_layer.add_child(_plaque)
-	_tile = KeepsakeTile.new()
-	_tile.name = "Tile"
-	# Nothing else here says what it is: KEEPSAKE above its name.
-	_tile.show_slot_label = true
+	_tile = ItemPlate.new()
+	_tile.name = "Plate"
+	_tile.plate_scale = plate_scale
 	_plaque.add_child(_tile)
 	_tile.set_keepsake(keepsake)
 	_rebuild_fonts()
@@ -327,7 +332,7 @@ func _layout() -> void:
 		return
 	if _tile.get_keepsake() != keepsake:
 		_tile.set_keepsake(keepsake)
-	var tile: Vector2 = _tile.get_tile_size()
+	var tile: Vector2 = _tile.get_plate_size()
 	var strip_top: float = tile.y + actions_gap_px
 	var y: float = strip_top + padding_px
 	_action_rects.clear()
@@ -361,8 +366,8 @@ func _draw_plaque() -> void:
 	_plaque.draw_style_box(body, _strip_rect)
 	_draw_actions()
 
-# For probes: the plaque's KeepsakeTile.
-func get_tile() -> KeepsakeTile:
+# For probes: the plaque's ItemPlate.
+func get_tile() -> ItemPlate:
 	return _tile
 
 # TitleMenu's treatment: each choice centred on its row in tracked caps,

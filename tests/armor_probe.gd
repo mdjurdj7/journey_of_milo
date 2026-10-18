@@ -354,6 +354,9 @@ func _check_examine_leave() -> void:
 	if examine != null:
 		var plate: Node = examine.call("get_plate")
 		_expect(str(plate.call("replaces_text")).begins_with("REPLACES " + worn.display_name), "...naming the piece it replaces")
+		var card: Vector2 = plate.call("get_card_size")
+		_expect((plate.call("get_plate_size") as Vector2).y > card.y, "...REPLACES and TAKE / LEAVE in a strip below the plate, the plate itself unchanged")
+		_expect_eq(plate.call("get_type_label"), "WORN", "...which says WORN")
 		plate.call("activate", 1) # LEAVE
 		await _seconds(0.5)
 	_expect(_field.can_process(), "LEAVE: the field is live again")
@@ -397,7 +400,7 @@ func _check_swap_sets_old_down() -> void:
 
 # The name's finish: the cards' own for RARE, none for COMMON.
 func _check_plate_finish() -> void:
-	var plate := ArmorPlate.new()
+	var plate := ItemPlate.new()
 	root.add_child(plate)
 	plate.set_piece(_piece(&"probe_rare", CardData.CardRarity.RARE))
 	_expect(plate.get_name_finish() != null, "A RARE piece's name wears the rarity finish")
@@ -425,7 +428,7 @@ func _check_worn_line() -> void:
 		_expect(bool(_field.call("open_worn_examine", piece, Rect2())), "Its examine opens")
 		await process_frame
 		var examine: Node = _field.get_node_or_null("WornExamine")
-		_expect(examine != null and (examine.call("get_plate") as ArmorPlate).get_piece() == piece, "...the plate, with the piece")
+		_expect(examine != null and (examine.call("get_plate") as ItemPlate).get_piece() == piece, "...the plate, with the piece")
 		if examine != null:
 			examine.call("close", false)
 			await _seconds(0.5)
@@ -452,7 +455,7 @@ func _check_weapon_line() -> void:
 		_expect(bool(_field.call("open_weapon_examine", weapon, Rect2())), "Its examine opens")
 		await process_frame
 		var examine: Node = _field.get_node_or_null("WeaponExamine")
-		var plate: ArmorPlate = examine.call("get_plate") as ArmorPlate if examine != null else null
+		var plate: ItemPlate = examine.call("get_plate") as ItemPlate if examine != null else null
 		_expect(plate != null and plate.get_weapon() == weapon and plate.get_piece() == null, "...the plate, with the weapon")
 		if plate != null:
 			_expect_eq(plate.shows_rules(), not weapon.describe().is_empty(), "...an effect line only when the weapon has one")

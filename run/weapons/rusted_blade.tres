@@ -7,5 +7,6 @@
 script = ExtResource("1_weapon_data")
 id = &"rusted_blade"
 display_name = "Rusted Blade"
-lore = "It was sharp once. It was someone else's once."
+lore = "It was sharp once.
+It was someone else's once."
 art = ExtResource("2_art")

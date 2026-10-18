@@ -77,8 +77,8 @@ func _initialize() -> void:
 # --- Her table ---
 
 # Each of her six has its object art: the 1024 square the drops' PNGs
-# are, imported from SVG with mipmaps (the plaque's KeepsakeTile draws it
-# in a 104 px window).
+# are, imported from SVG with mipmaps (the plaque's ItemPlate draws it
+# well under that).
 func _check_art() -> void:
 	for path in [HOUSE_KEY_PATH, WRAPPED_SWEET_PATH, BLUE_FASTENER_PATH, DEPARTURE_STUB_PATH, SIGNAL_GLASS_PATH, PRESSED_FLOWER_PATH]:
 		var trinket: TrinketData = load(path)
@@ -185,7 +185,7 @@ func _check_approach_grants_nothing() -> void:
 			await physics_frame
 		_expect(bool(held_out.get("_near")), "Walking into range lifts the plaque")
 		var tile: Control = held_out.call("get_tile")
-		_expect(tile != null and tile.call("get_keepsake") == held_out.get("keepsake"), "...its KeepsakeTile shows the keepsake held out")
+		_expect(tile != null and tile.call("get_keepsake") == held_out.get("keepsake"), "...its ItemPlate shows the keepsake held out")
 		_expect(tile != null and bool(tile.call("fits")), "...and fits it")
 		_expect(_keepsake() == null, "...and grants nothing: the slot is still empty")
 		_expect(bool(keeper.call("is_offering")), "...the offer still stands")

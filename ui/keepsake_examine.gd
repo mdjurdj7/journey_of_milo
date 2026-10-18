@@ -1,7 +1,8 @@
 extends CanvasLayer
 class_name KeepsakeExamine
 
-# A keepsake looked at closely: its KeepsakeTile at examine_scale, centred
+# A keepsake looked at closely: its ItemPlate at examine_scale (the one
+# examine and offer scale, ArmorExamine's too), centred
 # over the dimmed field - DeckView's inspect, for a keepsake. It grows out
 # of where it was clicked (from_rect, the HUD's KEEPSAKE slot) to the
 # middle of the screen while an ink scrim fades in, over inspect_duration_
@@ -12,7 +13,7 @@ class_name KeepsakeExamine
 
 signal closed()
 
-@export var examine_scale: float = 2.0
+@export var examine_scale: float = 1.3
 # DeckView's inspect: its time and its scrim (the card's ink at 35%).
 @export var inspect_duration_sec: float = 0.15
 @export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.35)
@@ -20,7 +21,7 @@ signal closed()
 var _keepsake: TrinketData = null
 var _from_rect: Rect2 = Rect2()
 var _scrim: ColorRect = null
-var _tile: KeepsakeTile = null
+var _plate: ItemPlate = null
 var _tween: Tween = null
 var _closing: bool = false
 
@@ -42,17 +43,21 @@ func _ready() -> void:
 	_scrim.gui_input.connect(_on_scrim_gui_input)
 	_scrim.modulate.a = 0.0
 	add_child(_scrim)
-	_tile = KeepsakeTile.new()
-	_tile.name = "Tile"
-	add_child(_tile)
-	_tile.set_keepsake(_keepsake)
+	_plate = ItemPlate.new()
+	_plate.name = "Plate"
+	add_child(_plate)
+	_plate.set_keepsake(_keepsake)
 	if _keepsake == null:
 		close()
 		return
 	_open()
 
-func get_tile() -> KeepsakeTile:
-	return _tile
+func get_plate() -> ItemPlate:
+	return _plate
+
+# The plate's size at plate_scale 1.
+func _unit() -> Vector2:
+	return _plate.get_plate_size() / _plate.plate_scale
 
 # Grows from from_rect (at the scale that fits it) to the centre at
 # examine_scale.
@@ -60,14 +65,15 @@ func _open() -> void:
 	var view: Vector2 = _scrim.get_viewport_rect().size
 	var start_scale: float = examine_scale
 	var start_position: Vector2
+	var unit: Vector2 = _unit()
 	if _from_rect.size.x > 0.0:
-		start_scale = clampf(_from_rect.size.y / _tile.tile_size.y, 0.1, examine_scale)
+		start_scale = clampf(_from_rect.size.y / unit.y, 0.1, examine_scale)
 		start_position = _from_rect.position
 	else:
-		start_position = (view - _tile.tile_size * start_scale) / 2.0
-	_tile.tile_scale = start_scale
-	_tile.position = start_position
-	_tween_to(examine_scale, ((view - _tile.tile_size * examine_scale) / 2.0).round(), 1.0)
+		start_position = (view - unit * start_scale) / 2.0
+	_plate.plate_scale = start_scale
+	_plate.position = start_position
+	_tween_to(examine_scale, ((view - unit * examine_scale) / 2.0).round(), 1.0)
 
 func _tween_to(to_scale: float, to_position: Vector2, scrim_alpha: float) -> Tween:
 	if _tween != null and _tween.is_valid():
@@ -75,8 +81,8 @@ func _tween_to(to_scale: float, to_position: Vector2, scrim_alpha: float) -> Twe
 	_tween = create_tween()
 	_tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	_tween.set_parallel(true)
-	_tween.tween_property(_tile, "tile_scale", to_scale, inspect_duration_sec)
-	_tween.tween_property(_tile, "position", to_position, inspect_duration_sec)
+	_tween.tween_property(_plate, "plate_scale", to_scale, inspect_duration_sec)
+	_tween.tween_property(_plate, "position", to_position, inspect_duration_sec)
 	_tween.tween_property(_scrim, "modulate:a", scrim_alpha, inspect_duration_sec)
 	return _tween
 
@@ -96,14 +102,14 @@ func close() -> void:
 	if _closing:
 		return
 	_closing = true
-	if _tile == null or _keepsake == null:
+	if _plate == null or _keepsake == null:
 		closed.emit()
 		queue_free()
 		return
 	var back_scale: float = examine_scale
-	var back_position: Vector2 = _tile.position
+	var back_position: Vector2 = _plate.position
 	if _from_rect.size.x > 0.0:
-		back_scale = clampf(_from_rect.size.y / _tile.tile_size.y, 0.1, examine_scale)
+		back_scale = clampf(_from_rect.size.y / _unit().y, 0.1, examine_scale)
 		back_position = _from_rect.position
 	var tween: Tween = _tween_to(back_scale, back_position, 0.0)
 	tween.chain().tween_callback(func() -> void:

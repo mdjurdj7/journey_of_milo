@@ -11,7 +11,7 @@ class_name KeepsakeOffer
 # a charcoal frame, a soft shadow - sized to what it holds, and reads top
 # to bottom:
 #   KEEPSAKE FOUND   small tracked caps, a printed rule under it
-#   the keepsake     its KeepsakeTile (art, name, what it does, its lore)
+#   the keepsake     its ItemPlate (art, name, what it does, its lore)
 #                    at tile_scale, centred - or, with one already held,
 #                    the held tile and the offered one side by side at the
 #                    same scale, labelled HELD and OFFERED in tracked caps
@@ -125,7 +125,7 @@ const PAPER_MATERIAL_PATH := "res://battle/card_paper_material.tres"
 @export_group("")
 
 @export_group("Tiles")
-# The tiles' scale (KeepsakeTile.tile_scale), the room between the held
+# The tiles' scale (ItemPlate.plate_scale), the room between the held
 # and the offered one, and from the header rule to the tiles' top.
 @export var tile_scale: float = 1.3:
 	set(value):
@@ -237,8 +237,8 @@ var _panel: Control = null
 var _shadow: Panel = null
 var _paper: Control = null
 var _face: Control = null
-var _offered_tile: KeepsakeTile = null
-var _held_tile: KeepsakeTile = null
+var _offered_tile: ItemPlate = null
+var _held_tile: ItemPlate = null
 var _header_font: Font = null
 var _label_font: Font = null
 var _action_font: Font = null
@@ -309,10 +309,10 @@ func _ready() -> void:
 	_panel.add_child(_face)
 
 	# Over the face: the tiles ignore the mouse, so the face still hears it.
-	_held_tile = KeepsakeTile.new()
+	_held_tile = ItemPlate.new()
 	_held_tile.name = "HeldTile"
 	_panel.add_child(_held_tile)
-	_offered_tile = KeepsakeTile.new()
+	_offered_tile = ItemPlate.new()
 	_offered_tile.name = "OfferedTile"
 	_panel.add_child(_offered_tile)
 
@@ -361,10 +361,10 @@ func _choice_label(index: int) -> String:
 func _layout() -> void:
 	if _panel == null or _scrim == null or _offered == null:
 		return
-	for tile: KeepsakeTile in [_held_tile, _offered_tile]:
-		if not is_equal_approx(tile.tile_scale, tile_scale):
-			tile.tile_scale = tile_scale
-	var tile_size: Vector2 = _offered_tile.get_tile_size()
+	for tile: ItemPlate in [_held_tile, _offered_tile]:
+		if not is_equal_approx(tile.plate_scale, tile_scale):
+			tile.plate_scale = tile_scale
+	var tile_size: Vector2 = _offered_tile.get_plate_size()
 	var row_width: float = tile_size.x * (2.0 if _held != null else 1.0) + (tile_gap_px if _held != null else 0.0)
 	_header_rule_y = header_baseline_px + header_rule_gap_px
 	var tiles_top: float = _header_rule_y + tiles_top_gap_px
@@ -441,10 +441,10 @@ func _draw_face() -> void:
 	# HELD and OFFERED, each centred over its tile.
 	if _held != null:
 		for pair: Array in [[_held_tile, held_label_text], [_offered_tile, offered_label_text]]:
-			var tile: KeepsakeTile = pair[0]
+			var tile: ItemPlate = pair[0]
 			var text: String = pair[1]
 			var width: float = InkType.width(_label_font, text, tile_label_size_px)
-			InkType.draw_run(_face, _label_font, text, Vector2(roundf(tile.position.x + (tile.get_tile_size().x - width) / 2.0), _labels_baseline), tile_label_size_px, label)
+			InkType.draw_run(_face, _label_font, text, Vector2(roundf(tile.position.x + (tile.get_plate_size().x - width) / 2.0), _labels_baseline), tile_label_size_px, label)
 	if not _source.is_empty():
 		_text_centred(_face, _text_font, source_format % _source, _source_baseline, source_size_px, Color(ink, source_alpha))
 	_rule(_actions_rule_y)

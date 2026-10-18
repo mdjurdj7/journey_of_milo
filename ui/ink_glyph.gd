@@ -14,8 +14,14 @@ class_name InkGlyph
 # GLASSBONE  a narrow angled shard, outline only
 # BEDROLL  a roll lying on its side: a capsule, its rolled end showing as
 #        an arc at the left, two straps round it standing a little proud
+# SWORD  a blade leaning up to the right, a crossguard across it near the
+#        foot and a short grip under that - the WEAPON plate's type line
+# SHIELD a heater shield: a flat top, sides that run straight then curve
+#        in to a point - the WORN plate's
+# TAG    a luggage tag: a card with its top corners clipped and a small
+#        ring punched near the top - the KEEPSAKE plate's
 
-enum Kind { NONE, DECK, TOLL, GOLD, GLASSBONE, BEDROLL }
+enum Kind { NONE, DECK, TOLL, GOLD, GLASSBONE, BEDROLL, SWORD, SHIELD, TAG }
 
 # The coin's inner ring, as a fraction of its outer radius.
 const COIN_INNER_RATIO: float = 0.45
@@ -32,6 +38,12 @@ static func draw(canvas: CanvasItem, kind: Kind, rect: Rect2, width: float, colo
 			_draw_shard(canvas, rect, width, color)
 		Kind.BEDROLL:
 			_draw_bedroll(canvas, rect, width, color)
+		Kind.SWORD:
+			_draw_sword(canvas, rect, width, color)
+		Kind.SHIELD:
+			_draw_shield(canvas, rect, width, color)
+		Kind.TAG:
+			_draw_tag(canvas, rect, width, color)
 
 # The coin by its centre and outer radius - the form the loot screen
 # calls directly.
@@ -104,3 +116,51 @@ static func _draw_shard(canvas: CanvasItem, rect: Rect2, width: float, color: Co
 	var across := Vector2(-along.y, along.x) * r * 0.2
 	var widest: Vector2 = tip.lerp(foot, 0.35)
 	canvas.draw_polyline(PackedVector2Array([tip, widest + across, foot, widest - across, tip]), color, width, true)
+
+# The blade from the upper right down to the guard, the guard across it,
+# the grip on below - one diagonal, all of it in `rect`'s square.
+static func _draw_sword(canvas: CanvasItem, rect: Rect2, width: float, color: Color) -> void:
+	var centre: Vector2 = rect.get_center()
+	var r: float = minf(rect.size.x, rect.size.y) * 0.5
+	var tip := centre + Vector2(r, -r)
+	var pommel := centre + Vector2(-r, r)
+	var along: Vector2 = (tip - pommel).normalized()
+	var across := Vector2(-along.y, along.x)
+	var guard: Vector2 = pommel.lerp(tip, 0.3)
+	canvas.draw_line(guard, tip, color, width, true)
+	canvas.draw_line(guard - across * r * 0.42, guard + across * r * 0.42, color, width, true)
+	canvas.draw_line(pommel, guard, color, width, true)
+
+# Flat across the top, straight down two fifths of the way, then curving
+# in to the point at the foot.
+static func _draw_shield(canvas: CanvasItem, rect: Rect2, width: float, color: Color) -> void:
+	var centre: Vector2 = rect.get_center()
+	var r: float = minf(rect.size.x, rect.size.y) * 0.5
+	var half_w: float = r * 0.85
+	var top: float = centre.y - r
+	var shoulder: float = top + r * 0.8
+	var outline := PackedVector2Array([Vector2(centre.x - half_w, shoulder), Vector2(centre.x - half_w, top), Vector2(centre.x + half_w, top), Vector2(centre.x + half_w, shoulder)])
+	var steps: int = 10
+	for i in range(1, steps + 1):
+		var t: float = float(i) / float(steps)
+		outline.append(Vector2(centre.x + half_w * (1.0 - t) * (1.0 - t * 0.3), lerpf(shoulder, centre.y + r, sin(t * PI * 0.5))))
+	for i in range(1, steps + 1):
+		var t: float = 1.0 - float(i) / float(steps)
+		outline.append(Vector2(centre.x - half_w * (1.0 - t) * (1.0 - t * 0.3), lerpf(shoulder, centre.y + r, sin(t * PI * 0.5))))
+	canvas.draw_polyline(outline, color, width, true)
+
+# A tall card, its top corners clipped, the ring a fifth of the way down.
+static func _draw_tag(canvas: CanvasItem, rect: Rect2, width: float, color: Color) -> void:
+	var centre: Vector2 = rect.get_center()
+	var r: float = minf(rect.size.x, rect.size.y) * 0.5
+	var half_w: float = r * 0.72
+	var clip: float = half_w * 0.6
+	var top: float = centre.y - r
+	var bottom: float = centre.y + r
+	canvas.draw_polyline(PackedVector2Array([
+		Vector2(centre.x - half_w + clip, top), Vector2(centre.x + half_w - clip, top),
+		Vector2(centre.x + half_w, top + clip), Vector2(centre.x + half_w, bottom),
+		Vector2(centre.x - half_w, bottom), Vector2(centre.x - half_w, top + clip),
+		Vector2(centre.x - half_w + clip, top),
+	]), color, width, true)
+	canvas.draw_arc(Vector2(centre.x, top + r * 0.5), r * 0.16, 0.0, TAU, 16, color, width, true)

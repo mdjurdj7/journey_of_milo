@@ -1,57 +1,61 @@
 extends Control
-class_name ArmorPlate
+class_name ItemPlate
 
-# One worn piece (TrinketData.slot WORN), shown the one way armor is
-# shown: a landscape plate in the card family - the card's paper (card_
-# paper_material), a thin charcoal frame, a soft shadow - never card-
-# shaped. Top to bottom:
-#   the object    TrinketData.art in a square window - or, with no art, a
-#                 flat tone panel with the name's initial: a placeholder
-#   its slot      "WORN" in the HUD row's label voice (HudRowStyle's: small
-#                 tracked Alegreya Sans Bold caps, ink at label_alpha), so
-#                 the plate never reads as a keepsake's
+# One piece of equipment - the run's weapon, a worn piece or a keepsake -
+# shown the one way all three are shown, everywhere: a portrait plate in
+# the card family - the card's paper (card_paper_material), a thin
+# charcoal frame, a soft shadow - the same shape, frame and size for every
+# kind. Top to bottom:
+#   the object    its art, centred, in a square window - or, with no art,
+#                 a flat tone panel with the name's initial: a placeholder
 #   its name      Spectral SemiBold, centred, in its rarity's finish - the
 #                 cards' own (CardRarityFinish, card_name_finish.gdshader):
-#                 flat ink for COMMON, the RARE base with its faint
+#                 flat ink for COMMON and for anything with no rarity (a
+#                 weapon, a keepsake), the RARE base with its faint
 #                 gradient, a sheen once when the plate opens (play_name_
 #                 sheen()). Nothing else says rarity.
-#   what it does  TrinketData.describe(), Alegreya Sans, centred - left
-#                 out when it says nothing
-#   what it costs with a piece already worn, "REPLACES" in the slot
-#                 label's voice and the worn piece's name in Spectral, in
-#                 its own rarity finish (its own canvas item, as the
-#                 name's), and that piece's effect in grey under them -
-#                 left out with the slot empty
-#   its lore      TrinketData.flavor_text in a slanted Spectral, grey,
-#                 under a hairline - left out when it has none
-#   the choice    with show_actions, TAKE and LEAVE side by side - the
-#                 title menu's treatment (TitleMenu, WorldKeepsake): plain
-#                 tracked caps, the focused one in ink with a short
-#                 hairline to its left, the other in the utility grey. No
-#                 buttons, no boxes, no glow.
+#   its type      a small line drawing and a caps label, centred: a sword
+#                 and WEAPON, a shield and WORN, a tag and KEEPSAKE
+#                 (InkGlyph), one ink and one spacing for all three
+#   (a stat row)  the hook for a later piece that changes your attacks'
+#                 damage or your defence cards' block: set_stat_row() puts
+#                 one centred line under the type line. Nothing sets it
+#                 yet, and while it is empty it takes no room
+#   what it does  TrinketData.describe() / WeaponData.describe() in the
+#                 cards' rules voice (Alegreya Sans, full ink, centred), in
+#                 a block always rules_lines tall - left blank when the
+#                 piece does nothing, so nothing below it moves
+#   its lore      under a short centred hairline, in Spectral Italic at
+#                 full ink, in a block always lore_lines tall
+# Every plate is the same height whatever it says; fits() says whether its
+# text stays inside those blocks (the probes check every piece).
 #
-# Drawn at plate_scale, not scaled, like KeepsakeTile: every size and gap
-# multiplied out, so a large plate is as crisp as a small one; size
-# follows the laid-out content. A second copy of KeepsakeTile's paper,
-# frame and paragraph drawing rather than a shared helper - two consumers
-# (CLAUDE.md on extracting at the third). Hosts - ArmorExamine, the HUD's
-# WORN line, the battle row's hover - place it; with show_actions it takes
-# the mouse and says `chosen`, otherwise it ignores it.
+# An offer - with show_actions, or a piece already worn that taking this
+# would replace - adds a strip of the same paper and frame strip_gap_px
+# below the plate, the plate itself unchanged: "REPLACES" in the type
+# label's voice and the worn piece's name in Spectral, in its own rarity
+# finish (its own canvas item, as the name's), that piece's effect in grey
+# under them; then TAKE and LEAVE side by side - the title menu's
+# treatment (TitleMenu, WorldKeepsake): plain tracked caps, the focused
+# one in ink with a short hairline to its left, the other in the utility
+# grey. No buttons, no boxes, no glow.
 #
-# The run's weapon (WeaponData) is shown on the same plate (set_weapon()):
-# "WEAPON" for the slot label, its name in flat ink (a weapon has no
-# rarity), its describe() - left out while it has no effect - and its lore.
-# Never a choice and never a REPLACES line. Hosts: the HUD's WEAPON line
-# and its ArmorExamine.
+# Drawn at plate_scale, not scaled: every size and gap multiplied out, so a
+# large plate is as crisp as a small one. Hosts - the HUD's equipment
+# slots' hovers (KeepsakeLine), the battle row's hover (KeepsakeRow), the
+# examine views (ArmorExamine, KeepsakeExamine), the offers
+# (KeepsakeOffer, BelongingsScreen, the Keeper's WorldKeepsake) - place it
+# and choose its scale; with show_actions it takes the mouse and says
+# `chosen`, otherwise it ignores it.
 
 signal chosen(take: bool)
 
 enum Choice { TAKE, LEAVE }
 
 const PAPER_MATERIAL_PATH := "res://battle/card_paper_material.tres"
-const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
+const LORE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
 
-@export var plate_width: float = 460.0:
+@export var plate_width: float = 300.0:
 	set(value):
 		plate_width = value
 		_relayout()
@@ -91,7 +95,8 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 	set(value):
 		shadow_offset_px = value
 		_relayout()
-@export var padding_px: float = 18.0:
+# Round the plate's edge, inside the frame.
+@export var padding_px: float = 16.0:
 	set(value):
 		padding_px = value
 		_relayout()
@@ -99,10 +104,15 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 	set(value):
 		hairline_alpha = value
 		_redraw()
+# The lore's hairline, as a share of the plate's width.
+@export_range(0.0, 1.0) var hairline_width_fraction: float = 0.3:
+	set(value):
+		hairline_width_fraction = value
+		_redraw()
 @export_group("")
 
 @export_group("Art")
-@export var art_size_px: float = 96.0:
+@export var art_size_px: float = 190.0:
 	set(value):
 		art_size_px = value
 		_relayout()
@@ -110,7 +120,7 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 	set(value):
 		placeholder_color = value
 		_redraw()
-@export var placeholder_initial_size_px: int = 44:
+@export var placeholder_initial_size_px: int = 72:
 	set(value):
 		placeholder_initial_size_px = value
 		_redraw()
@@ -120,71 +130,115 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 		_redraw()
 @export_group("")
 
-@export_group("Text")
-# The slot label - and REPLACES - in the HUD row's label voice
-# (HudRowStyle.hud_label_*).
-@export var slot_label_text: String = "WORN":
+@export_group("Name and Type")
+@export var name_size_px: int = 22:
 	set(value):
-		slot_label_text = value
+		name_size_px = value
 		_relayout()
-# The slot label on a weapon's plate.
+# Between the art and the name.
+@export var name_gap_px: float = 10.0:
+	set(value):
+		name_gap_px = value
+		_relayout()
 @export var weapon_label_text: String = "WEAPON":
 	set(value):
 		weapon_label_text = value
 		_relayout()
-@export var slot_label_size_px: int = 12:
+@export var worn_label_text: String = "WORN":
 	set(value):
-		slot_label_size_px = value
+		worn_label_text = value
+		_relayout()
+@export var keepsake_label_text: String = "KEEPSAKE":
+	set(value):
+		keepsake_label_text = value
+		_relayout()
+# The type label - and REPLACES - in the HUD row's label voice: small
+# tracked Alegreya Sans Bold caps, ink at type_alpha; its glyph in the
+# same ink.
+@export var type_size_px: int = 11:
+	set(value):
+		type_size_px = value
 		_label_font = null
 		_relayout()
-@export var slot_label_tracking_em: float = 0.16:
+@export var type_tracking_em: float = 0.16:
 	set(value):
-		slot_label_tracking_em = value
+		type_tracking_em = value
 		_label_font = null
 		_relayout()
-@export_range(0.0, 1.0) var slot_label_alpha: float = 0.62:
+@export_range(0.0, 1.0) var type_alpha: float = 0.62:
 	set(value):
-		slot_label_alpha = value
+		type_alpha = value
 		_redraw()
-# Between the art and the slot label.
-@export var slot_label_gap_px: float = 10.0:
+# Between the name and the type line.
+@export var type_gap_px: float = 6.0:
 	set(value):
-		slot_label_gap_px = value
+		type_gap_px = value
 		_relayout()
-@export var name_size_px: int = 21:
+# The glyph's square, its stroke, and the room between it and the label.
+@export var type_glyph_px: float = 12.0:
 	set(value):
-		name_size_px = value
+		type_glyph_px = value
 		_relayout()
-# Between the slot label and the name.
-@export var name_gap_px: float = 4.0:
+@export var type_glyph_stroke_px: float = 1.2:
 	set(value):
-		name_gap_px = value
+		type_glyph_stroke_px = value
+		_redraw()
+@export var type_glyph_gap_px: float = 6.0:
+	set(value):
+		type_glyph_gap_px = value
 		_relayout()
+# The stat row's text (set_stat_row()), and its gap under the type line.
+@export var stat_row_size_px: int = 13:
+	set(value):
+		stat_row_size_px = value
+		_relayout()
+@export var stat_row_gap_px: float = 6.0:
+	set(value):
+		stat_row_gap_px = value
+		_relayout()
+@export_group("")
+
+@export_group("Effect and Lore")
 @export var rules_size_px: int = 15:
 	set(value):
 		rules_size_px = value
 		_relayout()
-@export var rules_gap_px: float = 8.0:
+# The effect's block, in lines - the same height with one line, two, or
+# none.
+@export var rules_lines: int = 2:
+	set(value):
+		rules_lines = maxi(value, 1)
+		_relayout()
+# Between the type line (or stat row) and the effect's block.
+@export var rules_gap_px: float = 12.0:
 	set(value):
 		rules_gap_px = value
 		_relayout()
-@export var lore_size_px: int = 14:
+@export var lore_size_px: int = 16:
 	set(value):
 		lore_size_px = value
 		_relayout()
-@export_range(0.0, 1.0) var lore_alpha: float = 0.6:
+@export var lore_lines: int = 2:
 	set(value):
-		lore_alpha = value
-		_redraw()
-@export var lore_slant: float = 0.18:
-	set(value):
-		lore_slant = value
-		_lore_font = null
+		lore_lines = maxi(value, 1)
 		_relayout()
-# Between the rules and the hairline, and the hairline and the lore.
-@export var lore_gap_px: float = 8.0:
+# Between the effect's block and the hairline, and the hairline and the
+# lore.
+@export var lore_gap_px: float = 10.0:
 	set(value):
 		lore_gap_px = value
+		_relayout()
+@export var line_pitch_em: float = 1.3:
+	set(value):
+		line_pitch_em = value
+		_relayout()
+@export_group("")
+
+@export_group("Offer")
+# Between the plate and the offer's strip under it.
+@export var strip_gap_px: float = 10.0:
+	set(value):
+		strip_gap_px = value
 		_relayout()
 @export var replaces_label_text: String = "REPLACES":
 	set(value):
@@ -205,22 +259,10 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 	set(value):
 		replaces_size_px = value
 		_relayout()
-# Between this piece's effect and the REPLACES line.
-@export var replaces_gap_px: float = 12.0:
-	set(value):
-		replaces_gap_px = value
-		_relayout()
 @export var replaces_color: Color = Color(0.45, 0.45, 0.47, 1.0):
 	set(value):
 		replaces_color = value
 		_redraw()
-@export var line_pitch_em: float = 1.3:
-	set(value):
-		line_pitch_em = value
-		_relayout()
-@export_group("")
-
-@export_group("Choice")
 @export var take_text: String = "TAKE":
 	set(value):
 		take_text = value
@@ -239,14 +281,10 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 		caps_tracking_em = value
 		_action_font = null
 		_relayout()
-@export var actions_gap_px: float = 16.0:
+# Between the REPLACES lines and the choices.
+@export var actions_gap_px: float = 8.0:
 	set(value):
 		actions_gap_px = value
-		_relayout()
-# Between the two choices' centres, each side of the plate's middle.
-@export var action_spread_px: float = 70.0:
-	set(value):
-		action_spread_px = value
 		_relayout()
 @export var action_row_height_px: float = 30.0:
 	set(value):
@@ -267,14 +305,17 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Light.ttf"
 		_redraw()
 @export_group("")
 
+# A worn piece or a keepsake (by its slot).
 var _piece: TrinketData = null
 # The weapon shown instead of a piece (set_weapon()); null while a piece is.
 var _weapon: WeaponData = null
 var _replaced: TrinketData = null
 var _show_actions: bool = false
 var _focus: int = Choice.TAKE
+var _stat_text: String = ""
 
 var _shadow: Panel = null
+var _strip_shadow: Panel = null
 var _paper: Control = null
 var _face: Control = null
 # The name on its own canvas item: the finish shader reads its local x.
@@ -282,10 +323,12 @@ var _name_layer: Control = null
 # The worn piece's name after REPLACES, on its own for the same reason.
 var _replaced_name_layer: Control = null
 var _paper_seed: float = 0.0
+# Held: a TextParagraph keeps only its fonts' RIDs, and a font nothing
+# else holds is freed before the paragraph shapes.
 var _lore_font: Font = null
 var _rules_font: Font = null
 var _action_font: Font = null
-# The slot label's tracked face, built for _label_font_px (scaled).
+# The type label's tracked face, built for _label_font_px (scaled).
 var _label_font: Font = null
 var _label_font_px: int = 0
 var _finish: CardRarityFinish = null
@@ -294,13 +337,18 @@ var _replaced_name_finish: ShaderMaterial = null
 var _sheen_tween: Tween = null
 
 # Laid out, in scaled pixels.
+var _card_rect: Rect2 = Rect2()
+var _strip_rect: Rect2 = Rect2()
 var _plate_size: Vector2 = Vector2.ZERO
 var _art_rect: Rect2 = Rect2()
-var _slot_label_baseline: float = 0.0
 var _name_baseline: float = 0.0
+var _type_baseline: float = 0.0
+var _type_glyph_rect: Rect2 = Rect2()
+var _type_label_left: float = 0.0
+var _stat_baseline: float = -1.0
 var _rules: TextParagraph = null
 var _rules_top: float = 0.0
-var _hairline_y: float = -1.0
+var _hairline_y: float = 0.0
 var _lore: TextParagraph = null
 var _lore_top: float = 0.0
 var _replaces_baseline: float = 0.0
@@ -311,10 +359,8 @@ var _action_rects: Array[Rect2] = []
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_shadow = Panel.new()
-	_shadow.name = "Shadow"
-	_shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	add_child(_shadow)
+	_shadow = _new_shadow("Shadow")
+	_strip_shadow = _new_shadow("StripShadow")
 	_paper = Control.new()
 	_paper.name = "Paper"
 	_paper.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -324,6 +370,7 @@ func _init() -> void:
 	_face = Control.new()
 	_face.name = "Face"
 	_face.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	# The art is drawn well under its size, like a card's.
 	_face.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	_face.draw.connect(_draw_face)
 	add_child(_face)
@@ -339,23 +386,39 @@ func _init() -> void:
 	add_child(_replaced_name_layer)
 	gui_input.connect(_on_gui_input)
 
+func _new_shadow(shadow_name: String) -> Panel:
+	var shadow := Panel.new()
+	shadow.name = shadow_name
+	shadow.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	add_child(shadow)
+	return shadow
+
 func _ready() -> void:
 	_relayout()
 
-# The piece shown, the one worn it would replace (null: none - no line),
-# and whether TAKE and LEAVE are offered.
+# A worn piece or a keepsake; for an offer, the piece worn now it would
+# replace (null: none - no line) and whether TAKE and LEAVE are offered.
 func set_piece(piece: TrinketData, replaced: TrinketData = null, show_actions: bool = false) -> void:
 	_piece = piece
 	_weapon = null
 	_replaced = replaced if replaced != piece else null
 	_show_actions = show_actions
 	_focus = Choice.TAKE
+	# The paper's grain from the piece's id: the same plate wherever it is
+	# shown, and no draw on the global generator a run's shuffles use.
 	_paper_seed = float(absi(hash(piece.id)) % 1000) / 1000.0 if piece != null else 0.0
 	mouse_filter = Control.MOUSE_FILTER_STOP if show_actions else Control.MOUSE_FILTER_IGNORE
 	_apply_finish()
 	_relayout()
 
+# A keepsake: set_piece() with no offer of its own (its hosts draw theirs).
+func set_keepsake(keepsake: TrinketData) -> void:
+	set_piece(keepsake)
+
 func get_piece() -> TrinketData:
+	return _piece
+
+func get_keepsake() -> TrinketData:
 	return _piece
 
 # The run's weapon, in place of a piece: no choice, no REPLACES line.
@@ -368,10 +431,35 @@ func set_weapon(weapon: WeaponData) -> void:
 func get_weapon() -> WeaponData:
 	return _weapon
 
-# Whether the effect line is shown - false for a weapon (or piece) with
-# nothing to say. For probes.
+# The stat row's line under the type line - "" (the default) shows none
+# and takes no room. For a later piece that changes your attacks' damage
+# or your defence cards' block; nothing sets it yet.
+func set_stat_row(text: String) -> void:
+	_stat_text = text
+	_relayout()
+
+func get_stat_row() -> String:
+	return _stat_text
+
+# Whether the effect's block holds anything - false for a weapon (or
+# piece) with nothing to say. For probes.
 func shows_rules() -> bool:
 	return _rules != null
+
+# The type label shown (WEAPON, WORN, KEEPSAKE) - for probes.
+func get_type_label() -> String:
+	if _weapon != null:
+		return weapon_label_text
+	if _piece != null and _piece.slot == TrinketData.Slot.WORN:
+		return worn_label_text
+	return keepsake_label_text
+
+func _type_glyph() -> InkGlyph.Kind:
+	if _weapon != null:
+		return InkGlyph.Kind.SWORD
+	if _piece != null and _piece.slot == TrinketData.Slot.WORN:
+		return InkGlyph.Kind.SHIELD
+	return InkGlyph.Kind.TAG
 
 # What the plate shows, from the piece or the weapon, whichever it holds.
 func _shown_name() -> String:
@@ -394,17 +482,33 @@ func _shown_lore() -> String:
 		return _weapon.lore
 	return _piece.flavor_text if _piece != null else ""
 
-func _shown_label() -> String:
-	return weapon_label_text if _weapon != null else slot_label_text
-
 func _shows_something() -> bool:
 	return _piece != null or _weapon != null
 
 func get_replaced() -> TrinketData:
 	return _replaced
 
+# The whole on screen: the plate, and an offer's strip under it.
 func get_plate_size() -> Vector2:
 	return _plate_size
+
+# The plate alone - the same for every piece at one scale.
+func get_card_size() -> Vector2:
+	return _card_rect.size
+
+# Whether every line stays inside its block: the effect in rules_lines,
+# the lore in lore_lines, and the name on one line inside the padding.
+func fits() -> bool:
+	if get_rules_line_count() > rules_lines or get_lore_line_count() > lore_lines:
+		return false
+	var name_width: float = InkType.width(InkType.numeral_font(), _shown_name(), _font_px(name_size_px))
+	return name_width <= _card_rect.size.x - _px(padding_px) * 2.0 + 0.5
+
+func get_rules_line_count() -> int:
+	return _rules.get_line_count() if _rules != null else 0
+
+func get_lore_line_count() -> int:
+	return _lore.get_line_count() if _lore != null else 0
 
 # The REPLACES line as shown ("REPLACES <name>"), "" with nothing worn -
 # for probes.
@@ -501,80 +605,65 @@ func _relayout() -> void:
 	if _rules_font == null:
 		_rules_font = InkType.text_font()
 	if _lore_font == null:
-		var slanted := FontVariation.new()
-		slanted.base_font = load(LORE_FONT_PATH) as Font
-		slanted.variation_transform = Transform2D(Vector2(1.0, lore_slant), Vector2(0.0, 1.0), Vector2.ZERO)
-		_lore_font = slanted
+		_lore_font = load(LORE_FONT_PATH) as Font
 	var width: float = roundf(_px(plate_width))
 	var pad: float = _px(padding_px)
 	var text_width: float = width - pad * 2.0
 	var art: float = roundf(_px(art_size_px))
 	_art_rect = Rect2(roundf((width - art) / 2.0), roundf(pad), art, art)
-	var label_px: int = _font_px(slot_label_size_px)
-	if _label_font == null or _label_font_px != label_px:
-		_label_font = InkType.tracked(InkType.text_bold_font(), label_px, slot_label_tracking_em)
-		_label_font_px = label_px
-	_slot_label_baseline = roundf(_art_rect.end.y + _px(slot_label_gap_px) + _label_font.get_ascent(label_px))
 	var name_px: int = _font_px(name_size_px)
 	var name_font: Font = InkType.numeral_font()
-	_name_baseline = roundf(_slot_label_baseline + _label_font.get_descent(label_px) + _px(name_gap_px) + name_font.get_ascent(name_px))
+	_name_baseline = roundf(_art_rect.end.y + _px(name_gap_px) + name_font.get_ascent(name_px))
 	var y: float = _name_baseline + name_font.get_descent(name_px)
-	_rules = null
+	# The type line: glyph and label centred together, the glyph's middle
+	# on the label's cap middle.
+	var label_px: int = _font_px(type_size_px)
+	if _label_font == null or _label_font_px != label_px:
+		_label_font = InkType.tracked(InkType.text_bold_font(), label_px, type_tracking_em)
+		_label_font_px = label_px
+	_type_baseline = roundf(y + _px(type_gap_px) + _label_font.get_ascent(label_px))
+	var glyph: float = roundf(_px(type_glyph_px))
+	var label_width: float = InkType.width(_label_font, get_type_label(), label_px)
+	var row_width: float = glyph + _px(type_glyph_gap_px) + label_width
+	var row_left: float = roundf((width - row_width) / 2.0)
+	var cap_middle: float = _type_baseline - float(label_px) * 0.36
+	_type_glyph_rect = Rect2(row_left, roundf(cap_middle - glyph / 2.0), glyph, glyph)
+	_type_label_left = roundf(row_left + glyph + _px(type_glyph_gap_px))
+	y = maxf(_type_baseline + _label_font.get_descent(label_px), _type_glyph_rect.end.y)
+	# The stat row: no room at all while it says nothing.
+	_stat_baseline = -1.0
+	if not _stat_text.is_empty():
+		var stat_px: int = _font_px(stat_row_size_px)
+		_stat_baseline = roundf(y + _px(stat_row_gap_px) + _rules_font.get_ascent(stat_px))
+		y = _stat_baseline + _rules_font.get_descent(stat_px)
+	# The effect's block, rules_lines tall whatever it holds.
 	var rules_px: int = _font_px(rules_size_px)
+	_rules_top = roundf(y + _px(rules_gap_px))
+	_rules = null
 	var rules_text: String = _shown_rules()
 	if not rules_text.is_empty():
-		y += _px(rules_gap_px)
-		_rules_top = y
 		_rules = _paragraph(rules_text, _rules_font, rules_px, text_width)
-		y += _paragraph_height(_rules, rules_px)
-	# REPLACES <name> on one baseline, centred together; the worn piece's
-	# effect under it.
-	_replaces = null
-	var replaced_name_left: float = 0.0
-	var replaced_name_width: float = 0.0
-	if _replaced != null:
-		var replaced_px: int = _font_px(replaced_name_size_px)
-		var label_width: float = InkType.width(_label_font, replaces_label_text, label_px)
-		replaced_name_width = InkType.width(name_font, _replaced.display_name, replaced_px)
-		var row_width: float = label_width + _px(replaces_label_gap_px) + replaced_name_width
-		_replaces_label_left = roundf((width - row_width) / 2.0)
-		replaced_name_left = roundf(_replaces_label_left + label_width + _px(replaces_label_gap_px))
-		_replaces_baseline = roundf(y + _px(replaces_gap_px) + maxf(_label_font.get_ascent(label_px), name_font.get_ascent(replaced_px)))
-		_replaces_top = _replaces_baseline + maxf(_label_font.get_descent(label_px), name_font.get_descent(replaced_px))
-		var replaces_px: int = _font_px(replaces_size_px)
-		_replaces = _paragraph(_replaced.describe(), _rules_font, replaces_px, text_width)
-		y = _replaces_top + _paragraph_height(_replaces, replaces_px)
+	y = _rules_top + _pitch(rules_px) * float(rules_lines)
+	# The hairline, then the lore's block, lore_lines tall.
+	_hairline_y = roundf(y + _px(lore_gap_px))
+	_lore_top = _hairline_y + _px(lore_gap_px)
+	var lore_px: int = _font_px(lore_size_px)
 	_lore = null
-	_hairline_y = -1.0
 	if not _shown_lore().is_empty():
-		_hairline_y = roundf(y + _px(lore_gap_px))
-		_lore_top = _hairline_y + _px(lore_gap_px)
-		var lore_px: int = _font_px(lore_size_px)
 		_lore = _paragraph(_shown_lore(), _lore_font, lore_px, text_width)
-		y = _lore_top + _paragraph_height(_lore, lore_px)
-	_action_rects.clear()
-	if _show_actions:
-		if _action_font == null:
-			_action_font = InkType.tracked(InkType.text_bold_font(), action_size_px, caps_tracking_em)
-		var row_top: float = roundf(y + _px(actions_gap_px))
-		var row_height: float = _px(action_row_height_px)
-		var half: float = (width - pad * 2.0) / 2.0
-		_action_rects.append(Rect2(pad, row_top, half, row_height))
-		_action_rects.append(Rect2(pad + half, row_top, half, row_height))
-		y = row_top + row_height
-	_plate_size = Vector2(width, roundf(y + pad))
+	y = _lore_top + _pitch(lore_px) * float(lore_lines)
+	_card_rect = Rect2(Vector2.ZERO, Vector2(width, roundf(y + pad)))
+	_layout_strip(width, pad, text_width, label_px, name_font)
+	_plate_size = Vector2(width, _strip_rect.end.y if _strip_rect.has_area() else _card_rect.end.y)
 	size = _plate_size
 	custom_minimum_size = _plate_size
-	for child: Control in [_shadow, _paper, _face]:
+	for child: Control in [_paper, _face]:
 		child.position = Vector2.ZERO
 		child.size = _plate_size
-	var style := StyleBoxFlat.new()
-	style.bg_color = Color(0.94, 0.91, 0.86, 0.0)
-	style.set_corner_radius_all(roundi(_px(corner_radius_px)))
-	style.shadow_color = Color(0.0, 0.0, 0.0, shadow_alpha)
-	style.shadow_size = roundi(_px(shadow_size_px))
-	style.shadow_offset = Vector2(0.0, _px(shadow_offset_px))
-	_shadow.add_theme_stylebox_override("panel", style)
+	_place_shadow(_shadow, _card_rect)
+	_strip_shadow.visible = _strip_rect.has_area()
+	if _strip_rect.has_area():
+		_place_shadow(_strip_shadow, _strip_rect)
 	# The name's own box: from its left edge, so the finish's u runs over
 	# the word itself.
 	var name_text: String = _shown_name()
@@ -583,13 +672,59 @@ func _relayout() -> void:
 	_name_layer.size = Vector2(maxf(name_width, 1.0), _plate_size.y)
 	if _name_finish != null:
 		_name_finish.set_shader_parameter("text_width_px", name_width)
-	_replaced_name_layer.position = Vector2(replaced_name_left, 0.0)
-	_replaced_name_layer.size = Vector2(maxf(replaced_name_width, 1.0), _plate_size.y)
-	if _replaced_name_finish != null:
-		_replaced_name_finish.set_shader_parameter("text_width_px", replaced_name_width)
 	_redraw()
 
-# The choice's label: centred in its half, at its own label.
+# An offer's strip under the plate: REPLACES <name> on one baseline,
+# centred together, the worn piece's effect under it; then the choices.
+# No strip (an empty rect) when the plate offers nothing.
+func _layout_strip(width: float, pad: float, text_width: float, label_px: int, name_font: Font) -> void:
+	_strip_rect = Rect2()
+	_replaces = null
+	_action_rects.clear()
+	var replaced_name_left: float = 0.0
+	var replaced_name_width: float = 0.0
+	if _replaced != null or _show_actions:
+		var top: float = roundf(_card_rect.end.y + _px(strip_gap_px))
+		var y: float = top + pad * 0.75
+		if _replaced != null:
+			var replaced_px: int = _font_px(replaced_name_size_px)
+			var label_width: float = InkType.width(_label_font, replaces_label_text, label_px)
+			replaced_name_width = InkType.width(name_font, _replaced.display_name, replaced_px)
+			var row_width: float = label_width + _px(replaces_label_gap_px) + replaced_name_width
+			_replaces_label_left = roundf((width - row_width) / 2.0)
+			replaced_name_left = roundf(_replaces_label_left + label_width + _px(replaces_label_gap_px))
+			_replaces_baseline = roundf(y + maxf(_label_font.get_ascent(label_px), name_font.get_ascent(replaced_px)))
+			_replaces_top = _replaces_baseline + maxf(_label_font.get_descent(label_px), name_font.get_descent(replaced_px))
+			var replaces_px: int = _font_px(replaces_size_px)
+			_replaces = _paragraph(_replaced.describe(), _rules_font, replaces_px, text_width)
+			y = _replaces_top + _paragraph_height(_replaces, replaces_px)
+		if _show_actions:
+			if _action_font == null:
+				_action_font = InkType.tracked(InkType.text_bold_font(), action_size_px, caps_tracking_em)
+			var row_top: float = roundf(y + (_px(actions_gap_px) if _replaced != null else 0.0))
+			var row_height: float = _px(action_row_height_px)
+			var half: float = text_width / 2.0
+			_action_rects.append(Rect2(pad, row_top, half, row_height))
+			_action_rects.append(Rect2(pad + half, row_top, half, row_height))
+			y = row_top + row_height
+		_strip_rect = Rect2(0.0, top, width, roundf(y + pad * 0.75 - top))
+	_replaced_name_layer.position = Vector2(replaced_name_left, 0.0)
+	_replaced_name_layer.size = Vector2(maxf(replaced_name_width, 1.0), maxf(_strip_rect.end.y, 1.0))
+	if _replaced_name_finish != null:
+		_replaced_name_finish.set_shader_parameter("text_width_px", replaced_name_width)
+
+func _place_shadow(shadow: Panel, rect: Rect2) -> void:
+	shadow.position = rect.position
+	shadow.size = rect.size
+	var style := StyleBoxFlat.new()
+	style.bg_color = Color(0.94, 0.91, 0.86, 0.0)
+	style.set_corner_radius_all(roundi(_px(corner_radius_px)))
+	style.shadow_color = Color(0.0, 0.0, 0.0, shadow_alpha)
+	style.shadow_size = roundi(_px(shadow_size_px))
+	style.shadow_offset = Vector2(0.0, _px(shadow_offset_px))
+	shadow.add_theme_stylebox_override("panel", style)
+
+# The choice's label.
 func _choice_label(index: int) -> String:
 	return take_text if index == Choice.TAKE else leave_text
 
@@ -605,7 +740,9 @@ func _draw_paper() -> void:
 	var style := StyleBoxFlat.new()
 	style.bg_color = Color(_paper_seed, 0.0, 0.0, 1.0)
 	style.set_corner_radius_all(roundi(_px(corner_radius_px)))
-	_paper.draw_style_box(style, Rect2(Vector2.ZERO, _plate_size))
+	_paper.draw_style_box(style, _card_rect)
+	if _strip_rect.has_area():
+		_paper.draw_style_box(style, _strip_rect)
 
 func _draw_face() -> void:
 	var frame := StyleBoxFlat.new()
@@ -613,7 +750,9 @@ func _draw_face() -> void:
 	frame.set_border_width_all(maxi(roundi(plate_scale), 1))
 	frame.border_color = Color(ink, frame_alpha)
 	frame.set_corner_radius_all(roundi(_px(corner_radius_px)))
-	_face.draw_style_box(frame, Rect2(Vector2.ZERO, _plate_size))
+	_face.draw_style_box(frame, _card_rect)
+	if _strip_rect.has_area():
+		_face.draw_style_box(frame, _strip_rect)
 	if not _shows_something():
 		return
 	var art: Texture2D = _shown_art()
@@ -627,19 +766,21 @@ func _draw_face() -> void:
 		var initial_width: float = InkType.width(font, initial, initial_px)
 		var baseline: float = _art_rect.get_center().y + (font.get_ascent(initial_px) - font.get_descent(initial_px)) * 0.5
 		InkType.draw_run(_face, font, initial, Vector2(roundf(_art_rect.get_center().x - initial_width / 2.0), roundf(baseline)), initial_px, Color(ink, placeholder_initial_alpha))
-	var label_px: int = _font_px(slot_label_size_px)
-	var label_color := Color(ink, ink.a * slot_label_alpha)
-	var label: String = _shown_label()
-	var slot_width: float = InkType.width(_label_font, label, label_px)
-	InkType.draw_run(_face, _label_font, label, Vector2(roundf((_plate_size.x - slot_width) / 2.0), _slot_label_baseline), label_px, label_color)
+	var label_px: int = _font_px(type_size_px)
+	var type_color := Color(ink, ink.a * type_alpha)
+	InkGlyph.draw(_face, _type_glyph(), _type_glyph_rect, maxf(_px(type_glyph_stroke_px), 1.0), type_color)
+	InkType.draw_run(_face, _label_font, get_type_label(), Vector2(_type_label_left, _type_baseline), label_px, type_color)
+	if _stat_baseline >= 0.0:
+		var stat_px: int = _font_px(stat_row_size_px)
+		var stat_width: float = InkType.width(_rules_font, _stat_text, stat_px)
+		InkType.draw_run(_face, _rules_font, _stat_text, Vector2(roundf((_plate_size.x - stat_width) / 2.0), _stat_baseline), stat_px, ink)
 	_draw_paragraph(_rules, _rules_top, _pitch(_font_px(rules_size_px)), ink)
+	var hairline_width: float = roundf(_plate_size.x * hairline_width_fraction)
+	_face.draw_rect(Rect2(roundf((_plate_size.x - hairline_width) / 2.0), _hairline_y, hairline_width, maxf(roundf(plate_scale), 1.0)), Color(ink, hairline_alpha))
+	_draw_paragraph(_lore, _lore_top, _pitch(_font_px(lore_size_px)), ink)
 	if _replaces != null:
-		InkType.draw_run(_face, _label_font, replaces_label_text, Vector2(_replaces_label_left, _replaces_baseline), label_px, label_color)
+		InkType.draw_run(_face, _label_font, replaces_label_text, Vector2(_replaces_label_left, _replaces_baseline), label_px, type_color)
 		_draw_paragraph(_replaces, _replaces_top, _pitch(_font_px(replaces_size_px)), replaces_color)
-	if _lore != null:
-		var hairline_width: float = roundf(_plate_size.x * 0.22)
-		_face.draw_rect(Rect2(roundf((_plate_size.x - hairline_width) / 2.0), _hairline_y, hairline_width, maxf(roundf(plate_scale), 1.0)), Color(ink, hairline_alpha))
-		_draw_paragraph(_lore, _lore_top, _pitch(_font_px(lore_size_px)), Color(ink, lore_alpha))
 	_draw_actions()
 
 # The name at the layer's own origin - its finish (or flat ink) is the

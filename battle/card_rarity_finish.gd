@@ -168,7 +168,7 @@ func is_rainbow(rarity: CardData.CardRarity) -> bool:
 # the tier's base, highlight and hues and the sweep's shape - or null when
 # the tier wears none (has_finish()) or the shader won't load, and the
 # name is flat common_ink. text_width_px and sheen_t stay the caller's:
-# a new material starts at rest. CardView, ArmorPlate and FindLine each
+# a new material starts at rest. CardView, ItemPlate and FindLine each
 # keep their own material, so one name's sweep is its own.
 func name_material(rarity: CardData.CardRarity, material: ShaderMaterial, shader_path: String) -> ShaderMaterial:
 	if not has_finish(rarity):

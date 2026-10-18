@@ -1,26 +1,28 @@
 extends CanvasLayer
 class_name ArmorExamine
 
-# A worn piece looked at closely: its ArmorPlate at examine_scale, centred
+# A worn piece looked at closely: its ItemPlate at examine_scale (the one
+# examine and offer scale, KeepsakeExamine's too), centred
 # over the dimmed field - KeepsakeExamine, for armor. It grows out of
 # from_rect (the HUD row's WORN line; empty: from the middle) while an ink
 # scrim fades in, over inspect_duration_sec, and goes back the same way.
 #
 # Two uses (RegionField opens both, locking the field under it until
 # `closed`):
-#   the piece on the sand (WorldArmor) - with_choice: TAKE and LEAVE on
-#     the plate, and the "Replaces ..." line when something is worn. TAKE
+#   the piece on the sand (WorldArmor) - with_choice: TAKE and LEAVE in
+#     the strip under the plate, and the "Replaces ..." line when
+#     something is worn. TAKE
 #     closes with taken = true; LEAVE, a click off the plate, Escape or a
 #     right click close with false - the piece stays where it lies.
 #   the piece worn (the WORN line) - no choice: any click, Escape or a
 #     right click closes.
 #   the run's weapon (the WEAPON line, setup_weapon()) - the same, on its
-#     weapon plate (ArmorPlate.set_weapon()).
+#     weapon plate (ItemPlate.set_weapon()).
 # Layer 100, running ALWAYS.
 
 signal closed(taken: bool)
 
-@export var examine_scale: float = 1.25
+@export var examine_scale: float = 1.3
 @export var inspect_duration_sec: float = 0.15
 @export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.35)
 
@@ -30,7 +32,7 @@ var _worn: TrinketData = null
 var _with_choice: bool = false
 var _from_rect: Rect2 = Rect2()
 var _scrim: ColorRect = null
-var _plate: ArmorPlate = null
+var _plate: ItemPlate = null
 var _tween: Tween = null
 var _closing: bool = false
 
@@ -60,7 +62,7 @@ func _ready() -> void:
 	_scrim.gui_input.connect(_on_scrim_gui_input)
 	_scrim.modulate.a = 0.0
 	add_child(_scrim)
-	_plate = ArmorPlate.new()
+	_plate = ItemPlate.new()
 	_plate.name = "Plate"
 	add_child(_plate)
 	if _piece == null and _weapon == null:
@@ -74,7 +76,7 @@ func _ready() -> void:
 	_open()
 	_plate.play_name_sheen()
 
-func get_plate() -> ArmorPlate:
+func get_plate() -> ItemPlate:
 	return _plate
 
 # Grows from from_rect (at the scale that fits it) to the centre.
@@ -118,7 +120,7 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	if event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
 		get_viewport().set_input_as_handled()
-		_plate.set_focus(ArmorPlate.Choice.LEAVE if _plate.get_focus() == ArmorPlate.Choice.TAKE else ArmorPlate.Choice.TAKE)
+		_plate.set_focus(ItemPlate.Choice.LEAVE if _plate.get_focus() == ItemPlate.Choice.TAKE else ItemPlate.Choice.TAKE)
 	elif event.is_action_pressed("ui_accept"):
 		get_viewport().set_input_as_handled()
 		_plate.activate(_plate.get_focus())

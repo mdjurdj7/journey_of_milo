@@ -10,12 +10,12 @@ class_name KeepsakeLine
 # under it that says it can be hovered. No rarity colour. An empty slot
 # still shows: its label, faint ticks and a faint "—", nothing to hover.
 #
-# Hovering a filled slot shows the keepsake's KeepsakeTile at hud_
-# keepsake_tile_scale just above the slot (below, with no room above),
-# fading in and out. The hover is polled, never a mouse event; a Control
-# under the cursor wins, as on HPBar. A left click on it opens
-# KeepsakeExamine (RegionField checks is_point_over() before the click
-# can be a move).
+# Hovering a filled slot shows its ItemPlate - every slot's, the one
+# plate equipment is shown on - at hud_plate_scale just above the slot
+# (below, with no room above), fading in and out. The hover is polled,
+# never a mouse event; a Control under the cursor wins, as on HPBar. A
+# left click on it opens KeepsakeExamine (RegionField checks
+# is_point_over() before the click can be a move).
 #
 # RegionField creates it in _setup_field_hud() and sits it on DECK
 # (sit_beside()): left-aligned with the row, above it past the hairline
@@ -24,35 +24,27 @@ class_name KeepsakeLine
 #
 # The WORN slot is this same line with slot WORN, set before it enters the
 # tree: RegionField sits it on the KEEPSAKE slot (above it, hud_slot_gap_
-# px apart), RunState.worn_changed keeps it current, and its hover is the
-# piece's ArmorPlate (at worn_plate_scale) rather than a KeepsakeTile -
-# armor's one presentation, as the tile is a keepsake's. Its click opens
+# px apart), RunState.worn_changed keeps it current. Its click opens
 # ArmorExamine.
 #
 # The WEAPON slot is this line again with shows_weapon, set before it
 # enters the tree: RegionField sits it on WORN, the column's top;
 # RunState.weapon_changed keeps it current (a run always has one). Its
-# hover is the weapon's ArmorPlate (set_weapon()), at worn_plate_scale,
-# and its click opens the weapon's ArmorExamine.
+# hover is the weapon's plate (ItemPlate.set_weapon()), and its click
+# opens the weapon's ArmorExamine.
 
 # Which of the run's slots this line shows. Set before _ready().
 var slot: TrinketData.Slot = TrinketData.Slot.KEEPSAKE
 # The run's weapon instead of a trinket slot (slot is then unread). Set
 # before _ready().
 var shows_weapon: bool = false
-# The WORN hover's plate scale - the plate is wider than a tile.
-@export var worn_plate_scale: float = 0.6:
-	set(value):
-		worn_plate_scale = value
-		_place_tile()
 
 var _keepsake: TrinketData = null
 # The WEAPON line's weapon, in place of _keepsake.
 var _weapon: WeaponData = null
-var _tile: KeepsakeTile = null
-# The WORN line's hover, in place of _tile.
-var _plate: ArmorPlate = null
-# The tile's share of full opacity, 0..1, eased toward the hover.
+# The hover.
+var _plate: ItemPlate = null
+# The plate's share of full opacity, 0..1, eased toward the hover.
 var _reveal_alpha: float = 0.0
 
 func _ready() -> void:
@@ -61,22 +53,16 @@ func _ready() -> void:
 	else:
 		label_text = "WORN" if slot == TrinketData.Slot.WORN else "KEEPSAKE"
 	super()
-	_tile = KeepsakeTile.new()
-	_tile.name = "Tile"
-	_tile.visible = false
-	add_child(_tile)
+	_plate = ItemPlate.new()
+	_plate.name = "Plate"
+	_plate.visible = false
+	# Over the column's other slots, which it rises across.
+	_plate.z_index = 1
+	add_child(_plate)
 	if shows_weapon:
-		_plate = ArmorPlate.new()
-		_plate.name = "Plate"
-		_plate.visible = false
-		add_child(_plate)
 		RunState.weapon_changed.connect(set_weapon)
 		set_weapon(RunState.weapon)
 	elif slot == TrinketData.Slot.WORN:
-		_plate = ArmorPlate.new()
-		_plate.name = "Plate"
-		_plate.visible = false
-		add_child(_plate)
 		RunState.worn_changed.connect(set_keepsake)
 		set_keepsake(RunState.worn)
 	else:
@@ -85,8 +71,6 @@ func _ready() -> void:
 
 func set_keepsake(keepsake: TrinketData) -> void:
 	_keepsake = keepsake
-	if _tile != null:
-		_tile.set_keepsake(keepsake)
 	if _plate != null:
 		_plate.set_piece(keepsake)
 	set_value_text(keepsake.display_name if keepsake != null else "")
@@ -108,12 +92,8 @@ func get_weapon() -> WeaponData:
 func _is_filled() -> bool:
 	return _keepsake != null or _weapon != null
 
-# The hover's tile (for probes and the examine view's start).
-func get_tile() -> KeepsakeTile:
-	return _tile
-
-# The WORN or WEAPON line's hover plate; null on the KEEPSAKE line.
-func get_plate() -> ArmorPlate:
+# The hover's plate (for probes).
+func get_plate() -> ItemPlate:
 	return _plate
 
 # The slot always shows - empty, as faint ticks and a "—".
@@ -164,7 +144,7 @@ func _process(delta: float) -> void:
 	var target: float = 1.0 if is_visible_in_tree() and _is_hovered() else 0.0
 	if is_equal_approx(_reveal_alpha, target):
 		return
-	var fade: float = style.hud_keepsake_tile_fade_sec
+	var fade: float = style.hud_plate_fade_sec
 	_reveal_alpha = target if fade <= 0.0 else move_toward(_reveal_alpha, target, delta / fade)
 	_place_tile()
 
@@ -174,28 +154,20 @@ func _is_hovered() -> bool:
 	return Rect2(Vector2.ZERO, size).has_point(get_local_mouse_position())
 
 # Above the slot, left-aligned with it; below when it wouldn't fit above.
-# The WORN and WEAPON slots' plate the same way.
 func _place_tile() -> void:
-	if _tile == null or style == null:
+	if _plate == null or style == null:
 		return
-	var reveal: Control = _plate if _plate != null else _tile
-	reveal.visible = _reveal_alpha > 0.0
-	reveal.modulate.a = _reveal_alpha
-	if not reveal.visible:
+	_plate.visible = _reveal_alpha > 0.0
+	_plate.modulate.a = _reveal_alpha
+	if not _plate.visible:
 		return
-	var reveal_size: Vector2
-	if _plate != null:
-		if not is_equal_approx(_plate.plate_scale, worn_plate_scale):
-			_plate.plate_scale = worn_plate_scale
-		reveal_size = _plate.get_plate_size()
-	else:
-		if not is_equal_approx(_tile.tile_scale, style.hud_keepsake_tile_scale):
-			_tile.tile_scale = style.hud_keepsake_tile_scale
-		reveal_size = _tile.get_tile_size()
-	var above: float = -reveal_size.y - style.hud_keepsake_tile_gap_px
+	if not is_equal_approx(_plate.plate_scale, style.hud_plate_scale):
+		_plate.plate_scale = style.hud_plate_scale
+	var reveal_size: Vector2 = _plate.get_plate_size()
+	var above: float = -reveal_size.y - style.hud_plate_gap_px
 	if get_global_rect().position.y + above < 0.0:
-		above = size.y + style.hud_keepsake_tile_gap_px
-	reveal.position = Vector2(0.0, roundf(above))
+		above = size.y + style.hud_plate_gap_px
+	_plate.position = Vector2(0.0, roundf(above))
 
 func _draw() -> void:
 	var filled: bool = _is_filled()

@@ -137,19 +137,21 @@ class_name HudRowStyle
 	set(value):
 		hud_keepsake_thumb_placeholder = value
 		emit_changed()
-# The hover: the KeepsakeTile at this scale, this far above the row (below
-# it when there is no room above), fading in and out over this long.
-@export var hud_keepsake_tile_scale: float = 1.0:
+# The hover: an equipment slot's ItemPlate at this scale - the one hover
+# scale, the battle row's (KeepsakeRow.reveal_plate_scale) too - this far
+# above the slot (below it when there is no room above), fading in and out
+# over this long.
+@export var hud_plate_scale: float = 1.0:
 	set(value):
-		hud_keepsake_tile_scale = value
+		hud_plate_scale = value
 		emit_changed()
-@export var hud_keepsake_tile_gap_px: float = 12.0:
+@export var hud_plate_gap_px: float = 12.0:
 	set(value):
-		hud_keepsake_tile_gap_px = value
+		hud_plate_gap_px = value
 		emit_changed()
-@export var hud_keepsake_tile_fade_sec: float = 0.12:
+@export var hud_plate_fade_sec: float = 0.12:
 	set(value):
-		hud_keepsake_tile_fade_sec = value
+		hud_plate_fade_sec = value
 		emit_changed()
 
 @export_group("Equipment")
