@@ -79,6 +79,20 @@ var layout_offset: Vector2 = Vector2.ZERO
 @export_group("Battle Style")
 # The readout's width - numeral row and bar alike.
 @export var battle_width: float = 160.0
+# A plate's width follows its enemy's max HP: battle_width x clamp(max HP /
+# reference_hp, min_fraction, 1) - a 9 HP Nettle's short, every enemy of
+# reference_hp or more the full width - and its name and centring follow
+# the bar (_width()). A mound's plate keeps mound_battle_width.
+@export var reference_hp: float = 14.0:
+	set(value):
+		reference_hp = maxf(value, 1.0)
+		if _is_ready:
+			_apply_layout()
+@export_range(0.05, 1.0) var min_fraction: float = 0.4:
+	set(value):
+		min_fraction = value
+		if _is_ready:
+			_apply_layout()
 @export var numeral_font: Font = load("res://assets/fonts/Spectral-SemiBold.ttf")
 @export var name_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf")
 @export var battle_numeral_size_px: int = 22
@@ -459,7 +473,7 @@ func _relayout_block() -> void:
 		_apply_layout()
 
 func _battle_content_size() -> Vector2:
-	return Vector2(_block_readout_width() + battle_width, _numeral_ascent() + _numeral_descent() + battle_row_gap + battle_bar_height)
+	return Vector2(_block_readout_width() + _width(), _numeral_ascent() + _numeral_descent() + battle_row_gap + battle_bar_height)
 
 # The point of this control that sits on the unprojected anchor (and
 # that DistanceScale scales about): the field layout's centre, or the HP
@@ -467,7 +481,7 @@ func _battle_content_size() -> Vector2:
 # never shifting the bar off the enemy.
 func _anchor_offset() -> Vector2:
 	var field_offset: Vector2 = _field_content_size() / 2.0
-	var battle_offset := Vector2(_block_readout_width() + battle_width / 2.0, _battle_content_size().y / 2.0)
+	var battle_offset := Vector2(_block_readout_width() + _width() / 2.0, _battle_content_size().y / 2.0)
 	return field_offset.lerp(battle_offset, _battle_blend)
 
 # This control's size eases between the two layouts' sizes with the
@@ -503,7 +517,7 @@ func _apply_layout() -> void:
 
 	if _reveal != null:
 		_reveal.position = Vector2(_block_readout_width(), _status_row_bottom() + reveal_gap_px)
-		_reveal.set_wrap_width(battle_width)
+		_reveal.set_wrap_width(_width())
 
 	queue_redraw()
 
@@ -531,15 +545,15 @@ func _draw() -> void:
 	var name_text: String = _enemy_name()
 	if _name_font_tracked != null and not name_text.is_empty():
 		var name_width: float = InkType.width(_name_font_tracked, name_text, battle_name_size_px)
-		InkType.draw_run(self, _name_font_tracked, name_text, Vector2(left + battle_width - name_width, baseline), battle_name_size_px, name_ink)
+		InkType.draw_run(self, _name_font_tracked, name_text, Vector2(left + _width() - name_width, baseline), battle_name_size_px, name_ink)
 
 	var bar_top: float = baseline + _numeral_descent() + battle_row_gap
-	draw_rect(Rect2(left, bar_top, battle_width, battle_bar_height), track)
-	draw_rect(Rect2(left, bar_top, battle_width * _fill_drawn(_current_hp_fraction()), battle_bar_height), ink)
-	_draw_hp_change(left, bar_top, battle_width, battle_bar_height, _current_hp_fraction(), ink)
+	draw_rect(Rect2(left, bar_top, _width(), battle_bar_height), track)
+	draw_rect(Rect2(left, bar_top, _width() * _fill_drawn(_current_hp_fraction()), battle_bar_height), ink)
+	_draw_hp_change(left, bar_top, _width(), battle_bar_height, _current_hp_fraction(), ink)
 
 	if _block > 0 and _max_hp > 0:
-		var length: float = maxf(battle_width * clampf(float(_block) / float(_max_hp), 0.0, 1.0), block_min_length_px)
+		var length: float = maxf(_width() * clampf(float(_block) / float(_max_hp), 0.0, 1.0), block_min_length_px)
 		var block_top: float = bar_top - block_gap_px - block_thickness_px
 		draw_rect(Rect2(left, block_top, length, block_thickness_px), ink)
 
@@ -654,6 +668,14 @@ func set_mound(field_enemy: FieldEnemy, mound: int) -> void:
 # Safe to call before this node has entered the tree (see _pending_
 # current/_pending_max's own doc) - defers to _ready() in that case rather
 # than touching hp_label/bar_background/bar_fill while they're still null.
+# The readout's width now - numeral row and bar alike: battle_width scaled
+# by the enemy's max HP (reference_hp, min_fraction), or a mound plate's
+# own (set_mound()).
+func _width() -> float:
+	if mound_index >= 0:
+		return battle_width
+	return battle_width * clampf(float(_max_hp) / maxf(reference_hp, 1.0), clampf(min_fraction, 0.0, 1.0), 1.0)
+
 func update_hp(current: int, max_hp: int) -> void:
 	if not _is_ready:
 		_pending_current = current
