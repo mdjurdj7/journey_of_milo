@@ -18,6 +18,15 @@ class_name EnemyData
 # its first turn the DIG's first move under, and the loop waiting on the
 # move after the DIG. The Siltjaw. False = it opens on its loop's first.
 @export var opens_dug_in: bool = false
+# Opens every fight dormant (Combatant.dormant): no intent shown, no
+# action taken - targeted and damaged as ever, its statuses ticking -
+# until it is woken. With nothing in its pack able to wake it, it wakes
+# as the next enemy turn begins (BattleController). False (every enemy
+# by default) = it acts from the first turn.
+@export var starts_dormant: bool = false:
+	set(value):
+		starts_dormant = value
+		emit_changed()
 # Statuses it holds from the first frame of every fight, applied as the
 # fight starts (BattleController) - a passive, shown and revealed like
 # any status (the Blackback's Fed). Empty (every enemy by default) = none.

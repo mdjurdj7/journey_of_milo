@@ -165,6 +165,11 @@ var turns_taken: int = 0
 # fight, and its cancelled action is still to come.
 var pain_turn_used: bool = false
 var pain_turn_pending: bool = false
+# An enemy that takes no action and shows no intent until it is woken
+# (EnemyData.starts_dormant - BattleController wakes it). It is
+# targeted and damaged as ever, and its statuses still tick; its loop
+# waits where it is.
+var dormant: bool = false
 # The phase (EnemyData.phase_hp_threshold): its status has been gained
 # this fight, so it never is again.
 var phase_reached: bool = false

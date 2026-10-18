@@ -89,6 +89,14 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 	if combatant.hp <= 0 or data.intents.is_empty():
 		return result
 
+	# Dormant: its statuses have ticked and a countdown has gone off, and
+	# that is all - no action, nothing spent, the loop and the turn count
+	# waiting until it wakes.
+	if combatant.dormant:
+		result["dormant"] = true
+		Status.remove_expired(combatant.statuses)
+		return result
+
 	# A drop below the pain line since the player's turn - that turn's own
 	# drops are caught as they land (BattleController._report_damage()) -
 	# or from the countdown just now: this turn's action is the one
@@ -376,7 +384,8 @@ static func counter_strike(combatant: Combatant, data: EnemyData, player: Combat
 # been met - the attack won't land, so never lethal).
 static func preview_intent(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
 	var intent := current_intent(combatant, data)
-	if intent == null:
+	# Dormant: nothing shown until it wakes.
+	if intent == null or combatant.dormant:
 		return {}
 	var preview: Dictionary = {"type": intent.type, "hits": 1, "per_hit": intent.value, "damage_to_hp": 0, "lethal": false}
 	# An escalating enemy says where it stands: the stage of the turn it is

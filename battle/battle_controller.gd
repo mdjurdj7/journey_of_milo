@@ -361,6 +361,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		var combatant := Combatant.new(data.max_hp if data != null else 1)
 		if data != null:
 			EnemyTurn.pick_initial_intent(combatant, data)
+			combatant.dormant = data.starts_dormant
 			# Its passives (the Blackback's Fed), before the pack check
 			# below can turn one.
 			for status_data: StatusData in data.starting_statuses:
@@ -1512,6 +1513,7 @@ func _log_status_gained(enemy: FieldEnemy, status: StatusData) -> void:
 # cap) see three separate hits, as they always did.
 func _run_enemy_turn() -> void:
 	_enemy_phase = true
+	_wake_unaided_dormant()
 	if _all_living_simultaneous():
 		await _run_simultaneous_turn()
 	else:
@@ -1549,6 +1551,9 @@ func _run_sequential_turn() -> void:
 		# and nothing more of this enemy's turn plays out.
 		if _report_countdown(enemy, combatant, result):
 			status_changed.emit()
+			continue
+		# Dormant: its statuses ticked, and nothing more of its turn.
+		if bool(result.get("dormant", false)):
 			continue
 		if result["pain_turn_triggered"]:
 			enemy_pain_turn.emit(enemy)
@@ -1627,6 +1632,37 @@ func _run_sequential_turn() -> void:
 		_apply_intent_exclusions(acted)
 		if player.hp <= 0:
 			break
+
+# A dormant enemy (Combatant.dormant) that nothing living in its pack
+# could wake (_can_wake()) wakes as the enemy turn begins - and takes
+# that turn.
+func _wake_unaided_dormant() -> void:
+	for enemy in enemies:
+		var combatant: Combatant = _combatants.get(enemy)
+		if combatant == null or combatant.hp <= 0 or not combatant.dormant:
+			continue
+		var waker: bool = false
+		if enemy.group != &"":
+			for other in enemies:
+				if other != enemy and other.group == enemy.group and _can_wake(other):
+					waker = true
+					break
+		if not waker:
+			_wake(enemy, "alone")
+
+# Whether `enemy` could still wake a dormant packmate. Nothing can yet.
+func _can_wake(_enemy: FieldEnemy) -> bool:
+	return false
+
+# Out of its dormancy: it acts from its next turn (this one, woken as the
+# enemy turn begins), and its intent shows.
+func _wake(enemy: FieldEnemy, cause: String) -> void:
+	var combatant: Combatant = _combatants.get(enemy)
+	if combatant == null or not combatant.dormant:
+		return
+	combatant.dormant = false
+	RunLogger.mechanic("woke", {"enemy": _log_id(enemy), "by": cause})
+	enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
 
 # Each member's hits land at its own move's contact (_report_attacks_
 # after(), all running at once), not after the longest: one wait covers
