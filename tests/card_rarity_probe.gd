@@ -29,6 +29,9 @@ const FOLDER_CLASS: Dictionary = {
 }
 # Offered only on a channel of its own (CardData.OfferScope.OWN_CHANNEL).
 const OWN_CHANNEL: Array[String] = ["Samphire"]
+# Weapon cards come only with their weapon: every card here, and its
+# tempered copy, is OWN_CHANNEL.
+const WEAPON_CARD_DIR := "res://cards/weapon/"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
 # Folders whose cards are authored in the editor, not entered in
@@ -525,8 +528,9 @@ func _check_starting_deck() -> void:
 # --- Class and offer ---
 
 # Every card's card_class matches its folder, each tempered copy's class
-# and offer its original's, the starters STARTER_ONLY, Samphire
-# OWN_CHANNEL, the rest REWARDABLE; both classes name their card_class.
+# and offer its original's, the starters STARTER_ONLY, Samphire and every
+# weapon card OWN_CHANNEL, the rest REWARDABLE; both classes name their
+# card_class.
 func _check_card_class_and_offer() -> void:
 	for dir: String in FOLDER_CLASS:
 		for file in DirAccess.get_files_at(dir):
@@ -546,6 +550,16 @@ func _check_card_class_and_offer() -> void:
 			if card.tempered != null:
 				_expect_eq(card.tempered.card_class, card.card_class, "%s's card_class, as %s's" % [card.tempered.card_name, card.card_name])
 				_expect_eq(card.tempered.offer, card.offer, "%s's offer, as %s's" % [card.tempered.card_name, card.card_name])
+	for file in DirAccess.get_files_at(WEAPON_CARD_DIR):
+		if not file.ends_with(".tres"):
+			continue
+		var weapon_card := load(WEAPON_CARD_DIR + file) as CardData
+		if weapon_card == null:
+			_fail("%s%s isn't a CardData" % [WEAPON_CARD_DIR, file])
+			continue
+		_expect_eq(weapon_card.offer, CardData.OfferScope.OWN_CHANNEL, "%s's offer, a weapon's card (%s)" % [weapon_card.card_name, weapon_card.resource_path])
+		if weapon_card.tempered != null:
+			_expect_eq(weapon_card.tempered.offer, CardData.OfferScope.OWN_CHANNEL, "%s's offer, as %s's" % [weapon_card.tempered.card_name, weapon_card.card_name])
 	_expect_eq((load(CHARACTER_PATH) as CharacterData).card_class, &"wanderer", "The Wanderer's card_class")
 	_expect_eq((load(SAMURAI_PATH) as CharacterData).card_class, &"samurai", "The Samurai's card_class")
 	_expect_eq(CardData.new().card_class, &"", "An unmarked card is neutral")
