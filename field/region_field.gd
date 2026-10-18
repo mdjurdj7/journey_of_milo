@@ -2995,6 +2995,8 @@ func _show_keepsake_heal(amount: int, delay: float) -> void:
 	if hud == null or hp_bar == null:
 		return
 	var number := (load(BattleOverlay.FLOATING_NUMBER_SCENE_PATH) as PackedScene).instantiate() as FloatingNumber
+	# The battle theme's ink and bone, as the HUD row's.
+	number.theme = deck_panel.theme
 	hud.add_child(number)
 	var size: Vector2 = number.measure(FloatingNumber.KIND_HEAL, amount)
 	var bar: Rect2 = hp_bar.get_global_rect()

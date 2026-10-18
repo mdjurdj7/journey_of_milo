@@ -41,20 +41,21 @@ var layout_offset: Vector2 = Vector2.ZERO
 @export_range(0.0, 1.0) var low_hp_fraction: float = 0.3
 
 @export_group("HP Change")
-# A loss: the fill drops in the frame it lands, and a pale ghost
-# (ghost_color) holds the lost stretch for ghost_hold_sec, then drains
-# down to the new value over ghost_drain_sec - drawn over the fill's track,
+# A loss: the fill drops in the frame it lands, and a ghost - the fill's
+# own ink at ghost_alpha - holds the lost stretch for ghost_hold_sec, then
+# drains down to the new value over ghost_drain_sec, drawn over the track,
 # which it uncovers as it goes. A heal: the fill rises at once, the
-# stretch gained in heal_color, fading into the fill over heal_fade_sec.
-@export var ghost_color: Color = Color(0.94, 0.91, 0.86, 0.9):
+# stretch gained in that ink at heal_start_alpha, filling in to full over
+# heal_fade_sec. Muted, the bar's own tone - no colour of their own.
+@export_range(0.0, 1.0) var ghost_alpha: float = 0.5:
 	set(value):
-		ghost_color = value
+		ghost_alpha = value
 		queue_redraw()
 @export var ghost_hold_sec: float = 0.4
 @export var ghost_drain_sec: float = 0.3
-@export var heal_color: Color = Color(0.66, 0.74, 0.62, 1.0):
+@export_range(0.0, 1.0) var heal_start_alpha: float = 0.45:
 	set(value):
-		heal_color = value
+		heal_start_alpha = value
 		queue_redraw()
 @export var heal_fade_sec: float = 0.5
 
@@ -522,8 +523,8 @@ func _draw() -> void:
 
 	var bar_top: float = baseline + _numeral_descent() + battle_row_gap
 	draw_rect(Rect2(left, bar_top, battle_width, battle_bar_height), track)
-	draw_rect(Rect2(left, bar_top, battle_width * _current_hp_fraction(), battle_bar_height), ink)
-	_draw_hp_change(left, bar_top, battle_width, battle_bar_height, _current_hp_fraction(), _battle_blend)
+	draw_rect(Rect2(left, bar_top, battle_width * _fill_drawn(_current_hp_fraction()), battle_bar_height), ink)
+	_draw_hp_change(left, bar_top, battle_width, battle_bar_height, _current_hp_fraction(), ink)
 
 	if _block > 0 and _max_hp > 0:
 		var length: float = maxf(battle_width * clampf(float(_block) / float(_max_hp), 0.0, 1.0), block_min_length_px)
@@ -675,17 +676,22 @@ func _set_heal_alpha(value: float) -> void:
 	_heal_alpha = value
 	queue_redraw()
 
+# How far the fill draws in full: short of a heal's segment while it
+# fills in (_draw_hp_change() draws that).
+func _fill_drawn(fill: float) -> float:
+	return minf(fill, _heal_from) if _heal_alpha > 0.0 else fill
+
 # The ghost and the heal segment on a bar `width` long from `left`, its
-# fill at `fill` (a fraction), at `alpha`.
-func _draw_hp_change(left: float, top: float, width: float, height: float, fill: float, alpha: float) -> void:
-	if _ghost_fraction > fill:
-		var ghost: Color = ghost_color
-		ghost.a *= alpha
-		draw_rect(Rect2(left + width * fill, top, width * (_ghost_fraction - fill), height), ghost)
+# fill at `fill` (a fraction) in `ink`.
+func _draw_hp_change(left: float, top: float, width: float, height: float, fill: float, ink: Color) -> void:
 	if _heal_alpha > 0.0 and fill > _heal_from:
-		var heal: Color = heal_color
-		heal.a *= _heal_alpha * alpha
+		var heal: Color = ink
+		heal.a *= lerpf(1.0, heal_start_alpha, _heal_alpha)
 		draw_rect(Rect2(left + width * _heal_from, top, width * (fill - _heal_from), height), heal)
+	if _ghost_fraction > fill:
+		var ghost: Color = ink
+		ghost.a *= ghost_alpha
+		draw_rect(Rect2(left + width * fill, top, width * (_ghost_fraction - fill), height), ghost)
 
 # _current_hp starts at the -1 sentinel ("never set") - the very first
 # real call (FieldEnemy's own field-mode seed at spawn, or battle setup()'s

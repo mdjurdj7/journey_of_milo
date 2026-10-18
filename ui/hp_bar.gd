@@ -320,20 +320,21 @@ class_name HPBar
 		critical_fade_time = maxf(value, 0.0)
 
 @export_group("HP Change")
-# A loss: the fill drops in the frame it lands, and a pale ghost
-# (ghost_color) holds the lost stretch for ghost_hold_sec, then drains
-# down to the new value over ghost_drain_sec - drawn over Grace's segment,
+# A loss: the fill drops in the frame it lands, and a ghost - the fill's
+# own ink at ghost_alpha - holds the lost stretch for ghost_hold_sec, then
+# drains down to the new value over ghost_drain_sec, drawn over Grace's segment,
 # which it uncovers as it goes. A heal: the fill rises at once, the
-# stretch gained in heal_color, fading into the fill over heal_fade_sec.
-@export var ghost_color: Color = Color(0.94, 0.91, 0.86, 0.9):
+# stretch gained in that ink at heal_start_alpha, filling in to full over
+# heal_fade_sec. Muted, the bar's own tone - no colour of their own.
+@export_range(0.0, 1.0) var ghost_alpha: float = 0.5:
 	set(value):
-		ghost_color = value
+		ghost_alpha = value
 		queue_redraw()
 @export var ghost_hold_sec: float = 0.4
 @export var ghost_drain_sec: float = 0.3
-@export var heal_color: Color = Color(0.66, 0.74, 0.62, 1.0):
+@export_range(0.0, 1.0) var heal_start_alpha: float = 0.45:
 	set(value):
-		heal_color = value
+		heal_start_alpha = value
 		queue_redraw()
 @export var heal_fade_sec: float = 0.5
 
@@ -570,8 +571,8 @@ func _draw_field(alpha: float) -> void:
 	var width: float = _field_content_size().x
 	var bar_left: float = roundf((width - field_bar_width) * 0.5)
 	draw_rect(Rect2(bar_left, 0.0, field_bar_width, field_bar_height), track)
-	draw_rect(Rect2(bar_left, 0.0, field_bar_width * _displayed_fraction, field_bar_height), hp_ink)
-	_draw_hp_change(bar_left, 0.0, field_bar_width, field_bar_height, _displayed_fraction, alpha)
+	draw_rect(Rect2(bar_left, 0.0, field_bar_width * _fill_drawn(_displayed_fraction), field_bar_height), hp_ink)
+	_draw_hp_change(bar_left, 0.0, field_bar_width, field_bar_height, _displayed_fraction, hp_ink)
 	var tick_color: Color = _ink
 	tick_color.a = critical_tick_alpha * alpha
 	var tick_x: float = roundf(bar_left + field_bar_width * _critical_fraction())
@@ -797,7 +798,7 @@ func _draw_battle() -> void:
 
 	var bar_top: float = _battle_bar_top()
 	draw_rect(Rect2(left, bar_top, battle_width, battle_bar_height), track)
-	draw_rect(Rect2(left, bar_top, battle_width * _displayed_fraction, battle_bar_height), hp_ink)
+	draw_rect(Rect2(left, bar_top, battle_width * _fill_drawn(_displayed_fraction), battle_bar_height), hp_ink)
 	# The Critical line, after the fill, overhanging the bar.
 	var tick_color: Color = _ink
 	tick_color.a = critical_tick_alpha * _battle_blend
@@ -816,7 +817,7 @@ func _draw_battle() -> void:
 			var grace_color: Color = _ink
 			grace_color.a = grace_alpha * _battle_blend
 			draw_rect(Rect2(grace_left, bar_top, grace_length, battle_bar_height), grace_color)
-	_draw_hp_change(left, bar_top, battle_width, battle_bar_height, _displayed_fraction, _battle_blend)
+	_draw_hp_change(left, bar_top, battle_width, battle_bar_height, _displayed_fraction, hp_ink)
 
 	if _toll_visible:
 		_draw_toll(bar_top, ink)
@@ -1123,17 +1124,22 @@ func _set_heal_alpha(value: float) -> void:
 	_heal_alpha = value
 	queue_redraw()
 
+# How far the fill draws in full: short of a heal's segment while it
+# fills in (_draw_hp_change() draws that).
+func _fill_drawn(fill: float) -> float:
+	return minf(fill, _heal_from) if _heal_alpha > 0.0 else fill
+
 # The ghost and the heal segment on a bar `width` long from `left`, its
-# fill at `fill` (a fraction), at `alpha`.
-func _draw_hp_change(left: float, top: float, width: float, height: float, fill: float, alpha: float) -> void:
-	if _ghost_fraction > fill:
-		var ghost: Color = ghost_color
-		ghost.a *= alpha
-		draw_rect(Rect2(left + width * fill, top, width * (_ghost_fraction - fill), height), ghost)
+# fill at `fill` (a fraction) in `ink`.
+func _draw_hp_change(left: float, top: float, width: float, height: float, fill: float, ink: Color) -> void:
 	if _heal_alpha > 0.0 and fill > _heal_from:
-		var heal: Color = heal_color
-		heal.a *= _heal_alpha * alpha
+		var heal: Color = ink
+		heal.a *= lerpf(1.0, heal_start_alpha, _heal_alpha)
 		draw_rect(Rect2(left + width * _heal_from, top, width * (fill - _heal_from), height), heal)
+	if _ghost_fraction > fill:
+		var ghost: Color = ink
+		ghost.a *= ghost_alpha
+		draw_rect(Rect2(left + width * fill, top, width * (_ghost_fraction - fill), height), ghost)
 
 # Called by BattleOverlay on the controller's status_changed with the
 # player's current block (0 clears the segment) - battle-only; the field
