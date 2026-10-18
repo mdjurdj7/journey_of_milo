@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://run/weapon_data.gd" id="1_weapon_data"]
+[ext_resource type="Texture2D" uid="uid://dspj065uteprj" path="res://assets/textures/weapons/rusted_blade.png" id="2_art"]
+[ext_resource type="Resource" path="res://cards/weapon/lash.tres" id="3_lash"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+id = &"greyshelfs_tail"
+display_name = "Greyshelf's Tail"
+description = "Your Slashes become Lash."
+lore = "They called it Old Grey on the coast. It struck three times before it learned to stop."
+art = ExtResource("2_art")
+basic_attack_as = ExtResource("3_lash")

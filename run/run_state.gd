@@ -28,7 +28,8 @@ signal toll_changed(amount: int)
 signal keepsake_changed(keepsake: TrinketData)
 # The WORN slot changed - the new piece, or null for empty.
 signal worn_changed(worn: TrinketData)
-# The weapon changed - new_run() setting the character's starting one.
+# The weapon changed - new_run() setting the character's starting one, or
+# equip_weapon().
 signal weapon_changed(weapon: WeaponData)
 # A Bedroll taken or used - whether one is carried now.
 signal bedroll_changed(held: bool)
@@ -37,10 +38,12 @@ var player_hp: int = 0
 var player_max_hp: int = 0
 
 # The run's Belongings - every CardData instance this run currently owns.
-# BattleController.setup() wraps a fresh per-fight Deck around this same
-# array (Deck.new(RunState.deck)) rather than copying it, so a card
-# played, discarded, or SPENT-exhausted this fight is still this exact
-# same instance; only a CONSUMED removal (see region_field.gd's own
+# BattleController.setup() builds a fresh per-fight Deck from these same
+# instances rather than copies, so a card played, discarded, or SPENT-
+# exhausted this fight is still this exact same instance - all but a
+# basic attack under a weapon that changes it (BattleController.fight_
+# card() - Greyshelf's Tail's Lash), a copy of the fight's own that
+# leaves this one as it was; only a CONSUMED removal (see region_field.gd's own
 # _apply_consumed_removals(), called at battle end) ever calls remove_
 # card() to take one out for good. SPENT cards never touch RunState at
 # all - they just aren't reachable again until Deck.new() rebuilds next
@@ -87,7 +90,10 @@ var worn: TrinketData = null
 # The WEAPON slot - always filled in a run: new_run() sets the character's
 # starting_weapon (the Wanderer's Rusted Blade). Not a trinket, so never
 # in held_pieces(); what a weapon does is its basic-attack hook
-# (WeaponData.modify_basic_attack()), which nothing calls yet.
+# (WeaponData.modify_basic_attack()), which each fight's deck is built
+# through (BattleController.setup()). Changed after new_run() only
+# through equip_weapon() - a weapon taken (the Greyshelf's, RegionField.
+# open_weapon_offer()) or the F1 row's swap.
 var weapon: WeaponData = null
 # The Bedroll (BedrollData): carried or not - never more than one, so an
 # offer of a second can't be taken. Survives every fight and floor until
@@ -385,6 +391,16 @@ func equip_worn(piece: TrinketData) -> void:
 	if old_bonus != new_bonus:
 		set_max_hp(player_max_hp - old_bonus + new_bonus)
 	worn_changed.emit(worn)
+
+# The WEAPON slot's mutator after new_run(): `new_weapon` in, the one
+# carried gone - never empty, so null changes nothing. Between fights
+# only: a fight's deck was built through the weapon it opened with.
+# Emits only on a real change.
+func equip_weapon(new_weapon: WeaponData) -> void:
+	if new_weapon == null or new_weapon == weapon:
+		return
+	weapon = new_weapon
+	weapon_changed.emit(weapon)
 
 # What's held, keepsake then worn piece, the empty slots left out - what
 # every fight hook reads (BattleController.setup()).

@@ -2,14 +2,17 @@ extends Resource
 class_name WeaponData
 
 # The weapon the run carries - one, always (RunState.weapon), set from the
-# character's starting_weapon by new_run(). Shown in the HUD's WEAPON slot
-# (KeepsakeLine) and on its plate (ItemPlate.set_weapon()). Never a
-# trinket: held_pieces() and the fight hooks don't read it.
+# character's starting_weapon by new_run() and changed only through
+# RunState.equip_weapon(). Shown in the HUD's WEAPON slot (KeepsakeLine)
+# and on its plate (ItemPlate.set_weapon()). Never a trinket:
+# held_pieces() and the fight hooks don't read it.
 #
 # What a weapon is for (DESIGN.md, Weapons): it modifies the class's basic
-# attack - Slash for the Wanderer - through modify_basic_attack(). Nothing
-# calls that yet; the Rusted Blade, the baseline, leaves the attack as it
-# is.
+# attack - Slash for the Wanderer - through modify_basic_attack(), which
+# BattleController.setup() runs every card of the run's deck through as
+# a fight opens. The run's deck itself is never touched, so another
+# weapon equipped has the attack back as it was by the next fight. The
+# Rusted Blade, the baseline, leaves the attack as it is.
 
 @export var id: StringName = &""
 @export var display_name: String = ""
@@ -22,6 +25,13 @@ class_name WeaponData
 # The object, square - cropped to a square in the HUD slot, drawn in the
 # plate's art window. Null = the plate's placeholder; nothing breaks.
 @export var art: Texture2D = null
+# The card every basic attack plays as while this is carried (Greyshelf's
+# Tail: Lash) - a tempered basic attack as its tempered version (Lash+),
+# or as itself when it has none. Null: the attack as it is.
+@export var basic_attack_as: CardData = null
+# What marks a card as the class's basic attack (CardData.tags) - Slash
+# and Slash+ carry it.
+@export var basic_attack_tag: StringName = &"basic_attack"
 
 @export_group("Field Model")
 # What the Wanderer carries in the field and the battle frame (Wanderer.
@@ -73,11 +83,19 @@ func field_fit() -> Dictionary:
 			fit[property] = value
 	return fit
 
-# The effect hook: the class's basic attack as this weapon makes it. The
-# baseline returns `card` unchanged; a weapon with an effect returns a
-# modified copy, never edits the shared resource.
+# The effect hook: the class's basic attack as this weapon makes it - a
+# fresh copy, its own object as every card in a fight is (RunState.add_
+# card()), never the shared resource. Anything else, and every card under
+# a weapon with no basic_attack_as, comes back as `card`. Which version:
+# a tempered card leaves its own `tempered` null (CardData.tempered), so
+# a basic attack with none is the tempered one.
 func modify_basic_attack(card: CardData) -> CardData:
-	return card
+	if card == null or basic_attack_as == null or not card.has_tag(basic_attack_tag):
+		return card
+	var source: CardData = basic_attack_as
+	if card.tempered == null and basic_attack_as.tempered != null:
+		source = basic_attack_as.tempered
+	return source.duplicate() as CardData
 
 func describe() -> String:
 	return description

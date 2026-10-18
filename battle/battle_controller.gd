@@ -427,7 +427,10 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	for enemy in enemies:
 		_log_threshold_queued(enemy)
 
-	deck = Deck.new(RunState.deck)
+	var fight_cards: Array[CardData] = []
+	for card in RunState.deck:
+		fight_cards.append(fight_card(card))
+	deck = Deck.new(fight_cards)
 	deck.drawn.connect(func(_card: CardData) -> void: hand_changed.emit())
 	deck.drawn.connect(func(_card: CardData) -> void: RunLogger.card_drawn())
 	deck.discarded.connect(func(_card: CardData) -> void: hand_changed.emit())
@@ -454,6 +457,16 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	# camera's swing, so a rear is held by the time the frame settles.
 	for enemy in enemies:
 		_pose_for_intent(enemy)
+
+# A card of the run's deck as this fight plays it: through the run's
+# weapon (WeaponData.modify_basic_attack() - Greyshelf's Tail's Slash
+# as a Lash of its own), anything else the run's own instance. The run's
+# deck is never rewritten; a CONSUMED card is never a basic attack, so
+# _apply_consumed_removals() still finds every one it needs by identity.
+func fight_card(card: CardData) -> CardData:
+	if RunState.weapon == null:
+		return card
+	return RunState.weapon.modify_basic_attack(card)
 
 # The queued action of one enemy as the display should show it - see
 # EnemyTurn.preview_intent() - and the lethal warning across enemies: when

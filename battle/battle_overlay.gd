@@ -1527,15 +1527,16 @@ func _fill_debug_card_picker() -> void:
 # the fight) and that same copy into this fight - the hand, or the top of
 # the draw pile when the hand is full (Deck.add(), never a draw). The
 # same instance in both, so a CONSUMED play still takes it out of the run
-# at the fight's end. Logged, so a run that used it can be left out of
-# tuning.
+# at the fight's end - save a basic attack, which goes in as the weapon
+# plays it (BattleController.fight_card()), as every one in the fight
+# did. Logged, so a run that used it can be left out of tuning.
 func _on_debug_add_card_pressed() -> void:
 	if battle_controller == null or battle_controller.deck == null or _debug_card_picker.selected < 0:
 		return
 	var card := _debug_card_picker.get_item_metadata(_debug_card_picker.selected) as CardData
 	if card == null:
 		return
-	battle_controller.deck.add(RunState.add_card(card))
+	battle_controller.deck.add(battle_controller.fight_card(RunState.add_card(card)))
 	RunLogger.event("debug_card_add", {"card": card.card_name, "context": "battle"})
 
 # Debug builds only: one more Energy this turn, past max if need be, told
