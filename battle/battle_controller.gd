@@ -2548,6 +2548,16 @@ func intent_facts(enemy: FieldEnemy) -> Dictionary:
 	var facts: Dictionary = {"name": intent.intent_name, "preview": get_intent_preview(enemy), "intent": intent, "next": null, "brings": [], "brings_status": null, "holds": [], "answers": [], "waking": 0, "under": []}
 	if not data.erratic_intent_selection and not combatant.dug_in and not data.intents.is_empty():
 		facts["next"] = data.intents[(combatant.current_intent_index + 1) % data.intents.size()]
+	# What lives on the intent (Braced, Garnished), and each hit as it would
+	# read without them - for the hover's breakdown.
+	var marked: Array[Status] = Status.marks(combatant.statuses)
+	if not marked.is_empty() and intent.type == EnemyIntent.IntentType.ATTACK:
+		facts["marks"] = marked
+		var unmarked: Array[int] = []
+		var each: int = EnemyTurn.unmarked_hit_amount(combatant, data, intent, player.statuses)
+		for hit in EnemyTurn.hit_count(combatant, intent) * EnemyTurn.repeats(combatant, intent):
+			unmarked.append(each)
+		facts["unmarked_hits"] = unmarked
 	if intent.status_on_resolve != null:
 		facts["brings"] = [intent.status_on_resolve.display_name, Status.new(intent.status_on_resolve).describe()]
 		facts["brings_status"] = intent.status_on_resolve

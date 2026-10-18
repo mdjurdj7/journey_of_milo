@@ -774,6 +774,12 @@ static func hit_amount(combatant: Combatant, data: EnemyData, intent: EnemyInten
 	var theirs: Array[Status] = Status.strike_back_view(player_statuses) if strike_back else player_statuses
 	return _hit_amount_seen(combatant, data, intent, own, theirs)
 
+# One hit of `combatant`'s queued attack as it would read without what
+# lives on the intent (Braced, Garnished - Status.marks()): its modifiers
+# and bonuses only - the hover's "5×3" before what the marks take.
+static func unmarked_hit_amount(combatant: Combatant, data: EnemyData, intent: EnemyIntent, player_statuses: Array[Status]) -> int:
+	return _hit_amount_seen(combatant, data, intent, Status.without(combatant.statuses, Status.marks(combatant.statuses)), player_statuses)
+
 # hit_amount() off the statuses given for each side.
 static func _hit_amount_seen(combatant: Combatant, data: EnemyData, intent: EnemyIntent, own: Array[Status], theirs: Array[Status]) -> int:
 	var amount: int = intent_value(combatant, data, intent)

@@ -90,7 +90,16 @@ signal battle_finished(outcome: Outcome)
 # is; %s and %d as each line's own. Read live.
 @export var intent_hover_lines: Dictionary = {
 	&"attack": "%s: deals %s.",
-	&"hits": "%d ×%d",
+	# A marked attack (Braced, Garnished on it): what it would deal, each
+	# mark with what it takes, then the hits that land - "Tail Lash: 5×3,
+	# Braced (halved), Garnished (5 less in all) — 0, 0, 1: 1 in all."
+	&"marked": "%s: %s, %s — %s.",
+	&"lands_hits": "%s: %d in all",
+	&"mark_halved": "%s (halved)",
+	&"mark_less_percent": "%s (%d%% less)",
+	&"mark_more_percent": "%s (%d%% more)",
+	&"mark_less_in_all": "%s (%d less in all)",
+	&"hits": "%d×%d",
 	&"total": "%d over %d hits",
 	&"twice": "%s twice",
 	&"applies": " Then %s %d.",
@@ -1083,6 +1092,8 @@ func _intent_hover_text(enemy: FieldEnemy) -> String:
 			if intent.lands_as_strike_back:
 				return (str(lines.get(&"strike_back", "%s %d")) % [name, int(preview.get("per_hit", 0))]) + holds
 			var line: String = str(lines.get(&"attack", "%s %s")) % [name, _attack_phrase(preview)]
+			if facts.has("marks"):
+				line = _marked_line(name, preview, facts)
 			if intent.applies_to_player != null and intent.applied_amount > 0:
 				line += str(lines.get(&"applies", "")) % [intent.applies_to_player.display_name, intent.applied_amount]
 			if preview.has("threshold") and int(preview.get("threshold_left", 0)) > 0:
@@ -1189,6 +1200,43 @@ func _attack_phrase(preview: Dictionary) -> String:
 	if times > 1:
 		phrase = str(lines.get(&"twice", "%s")) % phrase
 	return phrase
+
+# A marked attack's breakdown, from data: its numbers without the marks
+# (BattleController.intent_facts() "unmarked_hits", as _attack_phrase()
+# reads them), each mark by its name with what it takes - a modifier's
+# percentage (-50 "halved"), a total reduction its magnitude "in all" -
+# then every hit as it will land and, for more than one, their total.
+func _marked_line(name: String, preview: Dictionary, facts: Dictionary) -> String:
+	var lines: Dictionary = intent_hover_lines
+	var unmarked: Array = facts.get("unmarked_hits", [])
+	var before: Dictionary = {"hits": unmarked.size(), "repeats": preview.get("repeats", 1), "hit_amounts": unmarked, "per_hit": int(unmarked[0]) if not unmarked.is_empty() else 0}
+	var parts: PackedStringArray = PackedStringArray()
+	for active: Status in facts["marks"]:
+		parts.append(_mark_phrase(active))
+	var landing: Array = preview.get("hit_amounts", [])
+	var each: PackedStringArray = PackedStringArray()
+	var total: int = 0
+	for amount: Variant in landing:
+		each.append(str(int(amount)))
+		total += int(amount)
+	var lands: String = ", ".join(each)
+	if landing.size() > 1:
+		lands = str(lines.get(&"lands_hits", "%s %d")) % [lands, total]
+	return str(lines.get(&"marked", "%s %s %s %s")) % [name, _attack_phrase(before), ", ".join(parts), lands]
+
+# One mark on an intent, by what its data does to the attack.
+func _mark_phrase(active: Status) -> String:
+	var lines: Dictionary = intent_hover_lines
+	var status: StatusData = active.data
+	if status.reduces_attack_total:
+		return str(lines.get(&"mark_less_in_all", "%s %d")) % [status.display_name, active.magnitude]
+	if status.category == StatusData.Category.MODIFIER and status.modifier_operation == StatusData.ModifierOperation.MULTIPLY:
+		if active.magnitude == -50:
+			return str(lines.get(&"mark_halved", "%s")) % status.display_name
+		if active.magnitude < 0:
+			return str(lines.get(&"mark_less_percent", "%s %d")) % [status.display_name, -active.magnitude]
+		return str(lines.get(&"mark_more_percent", "%s %d")) % [status.display_name, active.magnitude]
+	return status.display_name
 
 # What a refused intent says while an armed Brace or Garnish hovers it.
 func _refusal_text(refusal: EnemyTurn.MarkRefusal, card: CardData, enemy: FieldEnemy) -> String:
