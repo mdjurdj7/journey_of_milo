@@ -91,6 +91,23 @@ enum RewardMode { SCREEN, WORLD }
 	"res://run/keepsakes/frayed_cord.tres",
 	"res://run/keepsakes/worn_page.tres",
 ])
+# Debug builds only: the weapon a new run starts with in place of the
+# character's (RunState.equip_weapon() on a new run's first floor, after
+# new_run() - F6, the character select and RunEnd's NEW RUN alike).
+# Null (the shipped scene's): the character's own. A Remote-tab edit
+# equips it there and then.
+@export var debug_starting_weapon: WeaponData = null:
+	set(value):
+		debug_starting_weapon = value
+		if value != null and is_inside_tree() and OS.is_debug_build() and not _battle_open:
+			RunState.equip_weapon(value)
+# Debug builds only: the weapons the F1 row's Weapon button swaps between,
+# in turn, skipping the one carried (_on_debug_weapon_pressed()). Paths,
+# loaded at the press.
+@export var debug_weapon_paths: PackedStringArray = PackedStringArray([
+	"res://run/weapons/rusted_blade.tres",
+	"res://run/weapons/greyshelfs_tail.tres",
+])
 # Debug builds only: the folders the F1 row's card picker lists - every
 # CardData .tres in each, sorted by card name. Listed through
 # ResourceLoader.list_directory(), which reports an exported build's
@@ -794,6 +811,10 @@ func _ready() -> void:
 		if starting_character == null:
 			push_error("RegionField: no starting_character set; the run can't start.")
 		RunState.new_run(starting_character)
+	# A new run's first floor, however it was started: the debug weapon.
+	if OS.is_debug_build() and RunState.run_opening_pending and debug_starting_weapon != null:
+		RunState.equip_weapon(debug_starting_weapon)
+		print("RegionField: debug start with the weapon '%s'." % debug_starting_weapon.display_name)
 	# The order at floor load: what each slot stands (no side effects),
 	# then the log line that names it, then everything spawns.
 	_resolve_encounters()
@@ -3476,7 +3497,7 @@ func _on_keepsake_offer_closed(_taken: bool) -> void:
 
 # Debug builds only: a row of debug buttons on the field HUD in the
 # battle row's style (BattleTheme's DebugButton), hidden until F1 -
-# Keepsake, a card picker with its Add card, +1 Glassbone, and Path (the
+# Keepsake, a card picker with its Add card, +1 Glassbone, Weapon, and Path (the
 # planned walk and the walk grid near him - NavDebugDraw). It goes with the DECK
 # line when a fight hides that, so it never sits over a battle.
 func _setup_debug_row() -> void:
@@ -3509,6 +3530,12 @@ func _setup_debug_row() -> void:
 	glassbone_button.text = "+1 Glassbone"
 	glassbone_button.pressed.connect(_on_debug_glassbone_pressed)
 	_debug_row.add_child(glassbone_button)
+	var weapon_button := Button.new()
+	weapon_button.name = "WeaponButton"
+	weapon_button.theme_type_variation = &"DebugButton"
+	weapon_button.text = "Weapon"
+	weapon_button.pressed.connect(_on_debug_weapon_pressed)
+	_debug_row.add_child(weapon_button)
 	var path_button := Button.new()
 	path_button.name = "PathButton"
 	path_button.theme_type_variation = &"DebugButton"
@@ -3567,6 +3594,24 @@ func _on_debug_glassbone_pressed() -> void:
 	RunState.add_glassbone(1)
 	RunLogger.event("debug_glassbone_add", {})
 	print("RegionField: debug +1 Glassbone (run total %d)." % RunState.glassbone)
+
+# The F1 row's Weapon: the next of debug_weapon_paths after the one
+# carried, equipped at once (RunState.equip_weapon()) - the next fight's
+# basic attack follows it. Between fights only, as every weapon change.
+func _on_debug_weapon_pressed() -> void:
+	if debug_weapon_paths.is_empty() or _battle_open or not can_process():
+		return
+	var at: int = -1
+	for i in debug_weapon_paths.size():
+		if RunState.weapon != null and RunState.weapon.resource_path == debug_weapon_paths[i]:
+			at = i
+	for step in debug_weapon_paths.size():
+		var weapon := load(debug_weapon_paths[(at + 1 + step) % debug_weapon_paths.size()]) as WeaponData
+		if weapon != null and weapon != RunState.weapon:
+			RunState.equip_weapon(weapon)
+			RunLogger.event("debug_weapon", {"weapon": String(weapon.id)})
+			print("RegionField: debug weapon '%s'." % weapon.display_name)
+			return
 
 # Grants the next of debug_keepsake_paths, skipping the one held: into an
 # empty slot at once, or - the slot full - through the take-or-keep offer.
