@@ -163,7 +163,7 @@ func _check_descriptions() -> void:
 		DEPARTURE_STUB_PATH: ["The number is still legible.", "Draw 1 extra card on your first turn of each combat."],
 		BENT_NAIL_PATH: ["Drawn from a stacked board.", "Your first Attack each combat deals double damage."],
 		WORN_PAGE_PATH: ["Folded the same way, many times.", "The first time each turn you play your third card, draw 1."],
-		BLUE_FASTENER_PATH: ["Too small for you.", "The first time you enter Critical each combat, gain 6 Block."],
+		BLUE_FASTENER_PATH: ["Too small for you.", "Up to 3 of your Block carries over to your next turn."],
 	}
 	for path: String in expected:
 		var trinket: TrinketData = load(path)
@@ -277,7 +277,9 @@ func _check_keep_current() -> void:
 	await _teardown()
 	_completed += 1
 
-# --- Blue Fastener's edge, rules only ---
+# --- The Critical-entry Block hook, rules only ---
+# No keepsake carries critical_entry_block now (Blue Fastener carries
+# Block instead); the hook stays, checked through a probe-only trinket.
 
 func _check_critical_entry_rules() -> void:
 	# 70 max, Critical at 21 and under.
@@ -455,7 +457,7 @@ func _check_signal_glass() -> void:
 # Critical.
 func _check_blue_fastener_self_damage() -> void:
 	_new_run()
-	_run_state.call("equip_keepsake", load(BLUE_FASTENER_PATH))
+	_run_state.call("equip_keepsake", _critical_entry_trinket())
 	# The Wanderer's 80 max HP puts Critical at 24 and under.
 	_run_state.set("player_hp", 25)
 	var controller: Node = await _start_fight(0, &"")
@@ -572,12 +574,21 @@ func _new_run() -> void:
 func _keepsake() -> TrinketData:
 	return _run_state.get("keepsake") as TrinketData
 
-# A bare player carrying Blue Fastener's charge the way setup() arms it.
+# A probe-only trinket with the Critical-entry hook's 6 Block - what
+# Blue Fastener used to carry.
+func _critical_entry_trinket() -> TrinketData:
+	var trinket := TrinketData.new()
+	trinket.id = &"probe_critical_entry"
+	trinket.display_name = "Probe Critical Entry"
+	trinket.critical_entry_block = 6
+	return trinket
+
+# A bare player carrying the hook's charge the way setup() arms it.
 func _fastened(max_hp: int, hp: int) -> Combatant:
 	var player := Combatant.new(max_hp)
 	player.hp = hp
 	player.critical_hp_fraction = 0.3
-	player.critical_entry_block = (load(BLUE_FASTENER_PATH) as TrinketData).critical_entry_block
+	player.critical_entry_block = _critical_entry_trinket().critical_entry_block
 	player.critical_entry_armed = not player.is_critical()
 	return player
 

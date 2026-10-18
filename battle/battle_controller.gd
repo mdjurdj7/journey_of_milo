@@ -2049,6 +2049,14 @@ func _draw_for_multi_hit() -> void:
 	print("BattleController: a card took HP from %d enemies; drawing %d (draw_on_multi_hit)." % [_card_damaged.size(), draw])
 	deck.draw(draw)
 
+# How much Block outlasts each turn's reset: the held pieces' block_carry,
+# summed.
+func _block_carry() -> int:
+	var carry: int = 0
+	for piece in RunState.held_pieces():
+		carry += maxi(piece.block_carry, 0)
+	return carry
+
 # The held pieces' draw for the turn's Nth card (TrinketData.draw_on_
 # card_count - Worn Page, both slots summed): the card just resolved
 # brought this turn's plays (cards_played_this_turn, counted at commit -
@@ -2302,7 +2310,10 @@ func _apply_intent_exclusions(settled: Array[FieldEnemy]) -> void:
 			enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
 
 func _start_player_turn() -> void:
-	player.block = 0
+	# Block resets, but the held pieces' carry (TrinketData.block_carry -
+	# Blue Fastener, both slots summed) keeps up to that much of what's
+	# left. Absorb isn't Block, and never resets here.
+	player.block = mini(player.block, _block_carry())
 	_enemy_phase = false
 	_player_turn += 1
 	_multi_hit_draw_used = false

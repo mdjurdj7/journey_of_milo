@@ -28,7 +28,6 @@ const BLOOD_ARC_PATH := "res://cards/data/blood_arc.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const HOUSE_KEY_PATH := "res://run/keepsakes/keeper/house_key.tres"
-const BLUE_FASTENER_PATH := "res://run/keepsakes/keeper/blue_fastener.tres"
 const ENEMY_HP := 999
 const SAFETY_SECONDS := 300.0
 
@@ -192,8 +191,18 @@ func _check_house_key_first() -> void:
 
 # Blue Fastener: the payment that crosses into Critical fires the entry
 # Block, as any self-inflicted loss does.
+# The Critical-entry Block hook (TrinketData.critical_entry_block), through
+# a probe-only trinket - no keepsake carries it since Blue Fastener took
+# to carrying Block.
+func _critical_entry_trinket() -> TrinketData:
+	var trinket := TrinketData.new()
+	trinket.id = &"probe_critical_entry"
+	trinket.display_name = "Probe Critical Entry"
+	trinket.critical_entry_block = 6
+	return trinket
+
 func _check_critical_entry() -> void:
-	var controller: Node = await _start_fight(25, BLUE_FASTENER_PATH)
+	var controller: Node = await _start_fight(25, "", _critical_entry_trinket())
 	if controller != null:
 		var player: Combatant = controller.get("player")
 		_expect(not player.is_critical(), "At 25 of 70 HP the Wanderer is out of Critical")
@@ -201,7 +210,7 @@ func _check_critical_entry() -> void:
 		var block_before: int = player.block
 		await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
 		_expect(player.is_critical(), "The 5 HP takes him into Critical")
-		_expect_eq(player.block - block_before, 6, "...and Blue Fastener's 6 Block fires")
+		_expect_eq(player.block - block_before, 6, "...and the Critical-entry hook's 6 Block fires")
 	await _teardown()
 	_completed += 1
 
@@ -250,10 +259,12 @@ func _check_payment_kills() -> void:
 # A fresh run and a fresh fight on floor 1 against its first enemy, made
 # unkillable here, with an empty hand and 3 Energy: at `hp` when given,
 # holding the keepsake at `keepsake_path` when given.
-func _start_fight(hp: int = -1, keepsake_path: String = "") -> Node:
+func _start_fight(hp: int = -1, keepsake_path: String = "", keepsake: TrinketData = null) -> Node:
 	_run_state.call("new_run", load(CHARACTER_PATH))
 	if not keepsake_path.is_empty():
 		_run_state.call("equip_keepsake", load(keepsake_path))
+	if keepsake != null:
+		_run_state.call("equip_keepsake", keepsake)
 	if hp > 0:
 		_run_state.set("player_hp", hp)
 	_run_state.set("current_floor_index", 0)
