@@ -14,12 +14,16 @@ extends SceneTree
 #            pool; it rolls by rarity, top tier first and flat, without
 #            error, every card from her folder or cards/neutral/; a pool
 #            naming only a missing folder rolls nothing, quietly
+#   devour - a fight as her offers no Devour (CharacterData.has_devour
+#            off): no DevourButton, never available, devour() changes
+#            nothing, an unplayable card doesn't arm for it; the Wanderer
+#            keeps has_devour
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/samurai_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 
-const CASES := 4
+const CASES := 5
 const SAMURAI_PATH := "res://run/data/samurai.tres"
 const WANDERER_PATH := "res://run/data/wanderer.tres"
 const HP_BAR_SCENE_PATH := "res://ui/hp_bar.tscn"
@@ -35,18 +39,30 @@ const SAMURAI_DIR := "res://cards/samurai/"
 const MISSING_DIR := "res://cards/no_such_folder/"
 const ROLL_COUNT := 3
 const SEED_COUNT := 50
+const REGION_SCENE_PATH := "res://field/region_field.tscn"
+# A Samurai starter, dealt at UNPLAYABLE_COST so it can't be played on
+# the fight's 3 Energy.
+const UNPLAYABLE_CARD_PATH := "res://cards/neutral/left_hand.tres"
+const UNPLAYABLE_COST := 9
+const SAFETY_SECONDS := 120.0
 
 var _failures: int = 0
 var _completed: int = 0
 var _run_state: Node = null
+var _field: Node = null
 
 func _initialize() -> void:
+	create_timer(SAFETY_SECONDS).timeout.connect(func() -> void:
+		print("FAIL: safety timeout")
+		quit(1)
+	)
 	_run_state = root.get_node("RunState")
 	_run_state.call("new_run", load(SAMURAI_PATH))
 	_check_class()
 	_check_no_toll()
 	_check_no_critical()
 	_check_pool()
+	await _check_no_devour()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -72,6 +88,8 @@ func _check_class() -> void:
 		_expect(card_data.resource_path.begins_with(NEUTRAL_DIR), "Starter %s is class-neutral (%s)" % [card_data.card_name, card_data.resource_path])
 	var wanderer := load(WANDERER_PATH) as CharacterData
 	_expect(wanderer.has_toll and wanderer.has_grace and wanderer.shows_critical, "The Wanderer keeps Toll, Grace and Critical")
+	_expect(not samurai.has_devour, "...no Devour")
+	_expect(wanderer.has_devour, "The Wanderer keeps Devour")
 	_completed += 1
 
 # The same self-inflicted loss, through the run's Toll, for each class.
@@ -116,6 +134,95 @@ func _check_pool() -> void:
 	_expect(empty.roll_by_rarity(ROLL_COUNT, rng).is_empty(), "A pool naming only a missing folder rolls nothing")
 	_expect(empty.roll(ROLL_COUNT, rng).is_empty(), "...flat as well")
 	_completed += 1
+
+# A fight as her, through RegionField's contact handler as devour_probe
+# fights: no Devour anywhere in it.
+func _check_no_devour() -> void:
+	_run_state.call("new_run", load(SAMURAI_PATH))
+	_run_state.set("current_floor_index", 0)
+	_run_state.set("run_opening_pending", false)
+	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(_field)
+	for i in 30:
+		await physics_frame
+	var target: Node3D = null
+	for node in get_nodes_in_group("enemies"):
+		target = node as Node3D
+		break
+	if target == null:
+		_fail("no enemy on floor 1")
+		await _teardown()
+		return
+	var body: Node3D = _field.get_node("Wanderer") as Node3D
+	body.global_position = target.global_position + Vector3(1.5, 0.0, 0.0)
+	await physics_frame
+	_field.call_deferred("_on_enemy_contacted", target)
+	for i in 10:
+		await physics_frame
+	var layer: Node = _field.get_node("BattleLayer")
+	if layer.get_child_count() == 0:
+		_fail("no fight started")
+		await _teardown()
+		return
+	var overlay: Node = layer.get_child(0)
+	var controller: Node = overlay.get("battle_controller")
+	# The fight's opening hold (BattleController.lock_entry_input()).
+	while bool(controller.call("is_entry_locked")):
+		await process_frame
+	await process_frame
+
+	_expect(not bool(controller.get("has_devour")), "Her fight has no Devour")
+	_expect(overlay.get_node_or_null("DevourButton") == null, "...and no Devour button")
+	var player: Combatant = controller.get("player")
+	player.energy = 3
+	controller.emit_signal("energy_changed", 3)
+	player.hp = maxi(player.max_hp - 20, 1)
+	_expect(not bool(controller.call("is_devour_available")), "...never available, with Energy and a card in hand")
+
+	var devoured: Array[CardData] = []
+	controller.connect("card_devoured", func(card: CardData) -> void: devoured.append(card))
+	var deck: Object = controller.get("deck")
+	var hp_before: int = player.hp
+	var energy_before: int = player.energy
+	var hand_before: int = (deck.get("hand") as Array).size()
+	controller.call("devour")
+	for i in 5:
+		await process_frame
+	_expect(not bool(controller.call("is_devour_picking")), "devour() opens no pick")
+	controller.call("devour")
+	for i in 5:
+		await process_frame
+	_expect(devoured.is_empty(), "...and eats nothing")
+	_expect_eq(player.hp, hp_before, "...heals nothing")
+	_expect_eq(player.energy, energy_before, "...spends no Energy")
+	_expect_eq((deck.get("hand") as Array).size(), hand_before, "...and the hand keeps its cards")
+
+	# A card she can't play arms for nothing.
+	var card: CardData = (load(UNPLAYABLE_CARD_PATH) as CardData).duplicate()
+	card.cost = UNPLAYABLE_COST
+	(deck.get("draw_pile") as Array).append(card)
+	deck.call("draw", 1)
+	await process_frame
+	var view: CardView = null
+	for candidate: CardView in controller.get("_hand_container").call("_card_views"):
+		if candidate.card_data == card:
+			view = candidate
+	_expect(view != null, "The unplayable card is in her hand")
+	if view != null:
+		controller.call("request_play", view)
+		await process_frame
+		_expect(not bool(controller.call("is_awaiting_target")), "An unplayable card doesn't arm for Devour")
+		_expect(not bool(controller.call("is_armed_for_devour_only")), "...not even for Devour alone")
+	_expect(devoured.is_empty(), "Nothing was devoured in her fight")
+	await _teardown()
+	_completed += 1
+
+func _teardown() -> void:
+	if _field != null and is_instance_valid(_field):
+		_field.queue_free()
+	_field = null
+	for i in 5:
+		await process_frame
 
 # --- Helpers ---
 

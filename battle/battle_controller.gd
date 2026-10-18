@@ -195,6 +195,10 @@ var deck: Deck
 var player: Combatant
 var enemies: Array[FieldEnemy] = []
 var cards_played_this_turn: int = 0
+# Whether this class has Devour at all (CharacterData.has_devour), from
+# setup(). Off, is_devour_available() is always false and devour() does
+# nothing.
+var has_devour: bool = true
 # Devours this player turn - reset at its start (_start_player_turn()).
 var _devour_uses_this_turn: int = 0
 
@@ -350,6 +354,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	player.run_toll_owner = RunState
 	player.has_toll = RunState.character.has_toll
 	player.has_grace = RunState.character.has_grace
+	has_devour = RunState.character.has_devour
 	player.grace_cap_mode = RunState.character.grace_cap_mode
 	player.grace_window_turns = RunState.character.grace_window_turns
 	player.grace_open_fraction = RunState.character.grace_open_fraction
@@ -1512,11 +1517,11 @@ static func encounter_role(members: Array[Dictionary]) -> String:
 
 # Whether Devour can be used now: a use left this turn, its Energy
 # (devour_energy_cost) in hand, on the player's turn with nothing
-# resolving, and no hand choice open. Everything that offers it keys on
-# this - the button, arming an unplayable card for it, the pick, lighting
-# up as a target.
+# resolving, and no hand choice open - never for a class without it
+# (has_devour). Everything that offers it keys on this - the button,
+# arming an unplayable card for it, the pick, lighting up as a target.
 func is_devour_available() -> bool:
-	return player != null and _devour_uses_this_turn < devour_uses_per_turn and is_devour_affordable() and not _entry_locked and not _input_locked and not _play_queued and not _choice_open()
+	return has_devour and player != null and _devour_uses_this_turn < devour_uses_per_turn and is_devour_affordable() and not _entry_locked and not _input_locked and not _play_queued and not _choice_open()
 
 # Whether the player has the Energy Devour costs.
 func is_devour_affordable() -> bool:
@@ -1564,6 +1569,9 @@ func _emit_devour_changed() -> void:
 # _devour_card(). Nothing armed: the pick opens (_begin_devour_pick()),
 # and a second click closes it. No use left: nothing.
 func devour() -> void:
+	# A class without Devour: nothing, not even the entry hold's refusal.
+	if not has_devour:
+		return
 	if _devour_picking:
 		cancel_devour_pick()
 		return

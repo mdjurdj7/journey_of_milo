@@ -68,6 +68,13 @@ enum GraceCapMode { LARGEST_HIT, SUM }
 # largest hit, or the turn's sum - grace_cap_mode) scales the same way.
 @export_range(0.0, 1.0, 0.05) var grace_open_fraction: float = 0.5
 
+# --- Devour, the Wanderer's battle action ---
+#
+# Whether the battle offers Devour (BattleController.devour()): its button
+# over the energy readout, and an unplayable card arming for it. Without
+# it there is no button and nothing reaches the action.
+@export var has_devour: bool = false
+
 # Critical: HP at or below this fraction of max HP. What the Critical
 # cards (Cornered, Unbroken, Last Wager, Dying Light, Refuse the End, Last
 # Resort) read - see Combatant.is_critical_at(). 0.3 is a playtest

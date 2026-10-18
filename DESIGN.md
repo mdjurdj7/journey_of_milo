@@ -356,6 +356,11 @@ and up the west shore north of z -27. (2026-10-17.)
   - **The compendium warns on her empty folder** ("no cards found in
     res://cards/samurai/") each time it opens, and shows SAMURAI with no
     cards, until her first card lands there.
+  - **No Devour, and no sustain in a fight.** Devour is the Wanderer's
+    (`CharacterData.has_devour`, on in `wanderer.tres` only): her fights
+    show no Devour button and nothing reaches the action. Her own
+    ability, not designed yet, will take Devour's HUD slot over the
+    energy readout; until then she has no in-battle sustain.
   (2026-10-18, Samurai shell.)
 - **The Siltjaw's mound rework leaves four things open.** Its mounds are
   12 HP targets with plates, unbroken it erupts for 14 (Block-only),

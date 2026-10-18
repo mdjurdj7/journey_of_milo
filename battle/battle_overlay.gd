@@ -484,7 +484,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	# Devour's pick greys End Turn the way an armed card does.
 	battle_controller.devour_changed.connect(func(_available: bool, _used: bool) -> void: _update_end_turn())
 	battle_controller.entry_lock_changed.connect(func(_locked: bool) -> void: _update_end_turn())
-	_devour_button.setup(battle_controller)
+	if _devour_button != null:
+		_devour_button.setup(battle_controller)
 	# A devoured card is out of the hand: the cursor back, and the faces
 	# that read the hand re-read.
 	battle_controller.card_devoured.connect(func(_card: CardData) -> void:
@@ -596,6 +597,10 @@ func _create_corner_readouts() -> void:
 	add_child(_discard_readout)
 	_keepsake_row = KeepsakeRow.new()
 	add_child(_keepsake_row)
+	# A class without Devour (CharacterData.has_devour) gets no button; the
+	# stack's top is then the energy numeral's.
+	if RunState.character != null and not RunState.character.has_devour:
+		return
 	_devour_button = DevourButton.new()
 	_devour_button.name = "DevourButton"
 	# Its own place, above the energy readout - not in the energy group.

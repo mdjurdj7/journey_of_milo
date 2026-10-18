@@ -23,6 +23,7 @@ ExtResource("6_down_payment"): 1
 starting_weapon = ExtResource("7_rusted_blade")
 has_toll = true
 has_grace = true
+has_devour = true
 shows_critical = true
 field_model_path = "res://assets/models/wanderer/wanderer_v3.glb"
 field_albedo = ExtResource("8_albedo")
