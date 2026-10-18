@@ -3,7 +3,8 @@ extends SceneTree
 # Headless probe for Deny - CONSUME and the Denied status behind it:
 # playing it takes the most expensive other card in the hand by printed
 # cost (CardData.cost) to the Spent pile - a tie is the player's pick,
-# exactly one, through the hand choice - and the target enemy's next move
+# exactly one, through the hand choice once the target is picked, the
+# play going on at the pick - and the target enemy's next move
 # is skipped: lost, not delayed, the pattern moving on and the turn still
 # counted. Denied doesn't stack, so an enemy holding it can't be targeted
 # by another Deny. The intent keeps its number, struck through.
@@ -258,8 +259,9 @@ func _check_auto_consume() -> void:
 	await _teardown()
 	_completed += 1
 
-# A tie: the choice opens over the tied cards only, exactly one must be
-# chosen, then the target; the chosen one is Spent.
+# A tie: Deny goes to its target first, like any attack; then the choice
+# opens over the tied cards only - the rest faded, the prompt counting 1
+# left, no DONE - and the pick plays it; the chosen one is Spent.
 func _check_tie_choice() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -270,42 +272,53 @@ func _check_tie_choice() -> void:
 		var arc: CardData = await _deal(controller, BLOOD_ARC_PATH, 2)
 		var deny: CardData = await _deal(controller, DENY_PATH)
 		controller.call("request_play", _view(controller, deny))
-		_expect(bool(controller.call("is_choosing")), "Reckoning and Blood Arc tie at 2: the choice opens")
-		_expect_eq(int(controller.get("_choice_cap")), 1, "...for exactly one")
-		controller.call("toggle_choice", _view(controller, slash))
-		_expect(not _view(controller, slash).is_marked(), "...Slash, not tied, can't be chosen")
-		controller.call("confirm_choice")
-		_expect(bool(controller.call("is_choosing")), "...nor can it confirm with none")
-		controller.call("toggle_choice", _view(controller, arc))
-		controller.call("confirm_choice")
-		_expect(not bool(controller.call("is_choosing")) and bool(controller.call("is_awaiting_target")), "Blood Arc chosen: on to the target")
-		_expect(_view(controller, arc).is_marked(), "...Blood Arc stays marked")
+		_expect(not bool(controller.call("is_choosing")) and bool(controller.call("is_awaiting_target")), "Reckoning and Blood Arc tie at 2: the target first")
+		_expect(not _view(controller, arc).is_marked() and not _view(controller, reckoning).is_marked(), "...neither marked yet")
 		controller.call("confirm_target", _field_enemy(controller))
+		_expect(bool(controller.call("is_choosing")) and not bool(controller.call("is_awaiting_target")), "The target picked: the choice opens")
+		_expect_eq(int(controller.get("_choice_cap")), 1, "...for exactly one")
+		_expect_eq(_prompt_text(), "CONSUME  ·  1 LEFT", "...the prompt counting 1 left")
+		var done: Node = _overlay_child("ChoiceDone")
+		_expect(done == null or not bool(done.get("visible")), "...and no DONE: the pick plays it")
+		_expect(_view(controller, slash).modulate.a < 1.0, "...Slash, not tied, faded")
+		_expect_eq(_view(controller, arc).modulate.a, 1.0, "...the tied cards at full ink")
+		_expect_eq((controller.get("player") as Combatant).energy, 3, "...nothing spent yet")
+		controller.call("toggle_choice", _view(controller, slash))
+		_expect(not _view(controller, slash).is_marked() and bool(controller.call("is_choosing")), "...Slash can't be chosen")
+		controller.call("_on_card_view_clicked", _view(controller, deny))
+		_expect(bool(controller.call("is_choosing")), "...clicking Deny again does nothing")
+		controller.call("toggle_choice", _view(controller, arc))
+		_expect(not bool(controller.call("is_choosing")), "Blood Arc picked: the play goes on")
 		await _settle(controller)
 		var spent: Array = deck.get("exhaust_pile")
 		_expect(spent.has(arc) and not spent.has(reckoning), "Blood Arc is Spent, Reckoning stays")
+		_expect(EnemyTurn.is_denied(_enemy_combatant(controller)), "...and the Sputter is Denied")
+		_expect_eq((controller.get("player") as Combatant).energy, 1, "...for 2 Energy")
 	await _teardown()
 	_completed += 1
 
-# Cancelled at the choice or at the target: nothing consumed or spent.
+# Backing out goes one step at a time - the choice back to the target,
+# the target back to the hand - and nothing is consumed or spent.
 func _check_tie_cancel() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var deck: Object = controller.get("deck")
 		var reckoning: CardData = await _deal(controller, RECKONING_PATH)
-		await _deal(controller, BLOOD_ARC_PATH)
+		await _deal(controller, BLOOD_ARC_PATH, 2)
 		var deny: CardData = await _deal(controller, DENY_PATH)
 		controller.call("request_play", _view(controller, deny))
+		controller.call("confirm_target", _field_enemy(controller))
+		_expect(bool(controller.call("is_choosing")), "The tie's choice is open")
 		controller.call("cancel_choice")
-		await create_timer(0.8).timeout
-		_expect(not bool(controller.call("is_choosing")), "Cancelled at the choice: it closes")
-		controller.call("request_play", _view(controller, deny))
-		controller.call("toggle_choice", _view(controller, reckoning))
-		controller.call("confirm_choice")
+		_expect(not bool(controller.call("is_choosing")) and bool(controller.call("is_awaiting_target")), "Backed out of the choice: Deny waits on its target again")
+		_expect(not _view(controller, reckoning).is_marked(), "...the choice's marks gone")
+		controller.call("confirm_target", _field_enemy(controller))
+		_expect(bool(controller.call("is_choosing")), "...a target again: the choice again")
+		controller.call("cancel_choice")
 		controller.call("cancel_target")
 		await create_timer(0.8).timeout
-		_expect(not bool(controller.call("is_awaiting_target")), "Cancelled at the target: it disarms")
-		_expect(not _view(controller, reckoning).is_marked(), "...the pick unmarked")
+		_expect(not bool(controller.call("is_awaiting_target")) and not bool(controller.call("is_choosing")), "Backed out of the target: it disarms")
+		_expect(not _view(controller, reckoning).is_marked(), "...nothing marked")
 		_expect_eq((deck.get("exhaust_pile") as Array).size(), 0, "...nothing Spent")
 		_expect_eq((deck.get("hand") as Array).size(), 3, "...the hand whole")
 		_expect_eq((controller.get("player") as Combatant).energy, 3, "...no Energy spent")
@@ -503,6 +516,16 @@ func _overlay() -> Node:
 		return null
 	var layer: Node = _field.get_node("BattleLayer")
 	return layer.get_child(0) if layer.get_child_count() > 0 else null
+
+# The open choice's prompt line, and one of the overlay's own children by
+# name (its DONE).
+func _prompt_text() -> String:
+	var prompt := _overlay_child("ChoicePrompt") as Label
+	return prompt.text if prompt != null and prompt.visible else ""
+
+func _overlay_child(child_name: String) -> Node:
+	var overlay: Node = _overlay()
+	return overlay.get_node_or_null(child_name) if overlay != null else null
 
 func _teardown() -> void:
 	if _field != null and is_instance_valid(_field):

@@ -193,9 +193,16 @@ var _choice_eligible: Array[CardView] = []
 # lets the hand keep (TrinketData.end_turn_keep), read as the fight opens.
 var _keep_choice_open: bool = false
 var _end_turn_keep: int = 0
-# The hand card a CONSUME card (Deny) will take, picked before its target
-# is: marked in the hand while the target is chosen, taken as it resolves.
+# The hand card a CONSUME card (Deny) will take when one card is its
+# costliest: marked in the hand while the target is chosen, taken as it
+# resolves.
 var _pending_consume_view: CardView = null
+# Deny armed with several cards tied for costliest: the tied ones, which
+# the choice after its target offers (confirm_target()); empty otherwise.
+# And the target that choice goes on to, held while it is open.
+var _pending_consume_tie: Array[CardView] = []
+var _choice_target: FieldEnemy = null
+var _choice_target_mound: int = -1
 var _hovered_enemy: FieldEnemy = null
 # The enemy under the cursor itself, without the default - see
 # hovered_enemy_changed.
@@ -524,7 +531,8 @@ func request_play(card_view: CardView) -> void:
 		_begin_choice(card_view, cap, CardEffect.EffectType.SET_ASIDE)
 		return
 	# A CONSUME card (Deny) takes the most expensive other card: picked
-	# now, or chosen first when several tie; none to take is fine.
+	# now, or - when several tie - chosen once its target is; none to
+	# take is fine.
 	if _has_effect(card, CardEffect.EffectType.CONSUME):
 		var others: Array[CardView] = _other_hand_views(card_view)
 		var others_data: Array[CardData] = []
@@ -532,12 +540,10 @@ func request_play(card_view: CardView) -> void:
 			others_data.append(view.card_data)
 		var picks: Array[int] = ConsumeEffect.candidates(others_data)
 		if picks.size() > 1:
-			var tied: Array[CardView] = []
+			_pending_consume_tie.clear()
 			for i in picks:
-				tied.append(others[i])
-			_begin_choice(card_view, 1, CardEffect.EffectType.CONSUME, tied)
-			return
-		if picks.size() == 1:
+				_pending_consume_tie.append(others[i])
+		elif picks.size() == 1:
 			_pending_consume_view = others[picks[0]]
 			_pending_consume_view.set_marked(true)
 	_arm_or_play(card_view)
@@ -563,7 +569,7 @@ func _arm_or_play(card_view: CardView) -> void:
 	var card: CardData = card_view.card_data
 	if card.target_type == CardData.TargetType.ENEMY:
 		_pending_card_view = card_view
-		card_view.lift_and_hold(card_view == _choosing_card_view or _pending_consume_view != null)
+		card_view.lift_and_hold(card_view == _choosing_card_view or _pending_consume_view != null or not _pending_consume_tie.is_empty())
 		target_requested.emit(card)
 		_emit_devour_changed()
 	else:
@@ -622,7 +628,10 @@ func _set_aside_cap(card: CardData) -> int:
 # may not take, does nothing. Right-click or Esc cancel with nothing
 # spent. Bide's (SET_ASIDE) takes 0 to `cap` of any other card, confirmed
 # by DONE (the overlay's, confirm_choice()) or Enter/Space - clicking the
-# armed card again does nothing.
+# armed card again does nothing. Deny's (CONSUME) opens once its target is
+# picked (confirm_target()) and takes exactly `cap` of `eligible` - the
+# cards tied for most expensive - the play going on by itself at the last
+# pick; cancelled, it steps back to picking the target, Deny still armed.
 # Deny's (CONSUME) takes exactly `cap` of `eligible` - the cards tied for
 # most expensive - and goes on to its target once confirmed.
 func _begin_choice(card_view: CardView, cap: int, kind: CardEffect.EffectType, eligible: Array[CardView] = []) -> void:
@@ -634,7 +643,7 @@ func _begin_choice(card_view: CardView, cap: int, kind: CardEffect.EffectType, e
 	card_view.lift_and_hold(true)
 	_hand_container.begin_choice(card_view, eligible)
 	if kind == CardEffect.EffectType.CONSUME:
-		hand_choice_started.emit(card_view.card_data.card_name, cap, "CONSUME", false)
+		hand_choice_started.emit("", cap, "CONSUME", false)
 	else:
 		hand_choice_started.emit("", cap, "SET ASIDE", true)
 	hand_choice_changed.emit(0, cap)
@@ -678,6 +687,9 @@ func toggle_choice(card_view: CardView) -> void:
 	else:
 		return
 	hand_choice_changed.emit(_choice_marked.size(), _choice_cap)
+	# A fixed count (Deny's) goes on at its last pick.
+	if _choice_kind == CardEffect.EffectType.CONSUME and _choosing_card_view != null and _choice_marked.size() == _choice_cap:
+		confirm_choice()
 
 func confirm_choice() -> void:
 	if _keep_choice_open:
@@ -692,13 +704,22 @@ func confirm_choice() -> void:
 	var card_view: CardView = _choosing_card_view
 	var chosen: Array[CardView] = _choice_marked.duplicate()
 	if _choice_kind == CardEffect.EffectType.CONSUME:
-		# Exactly one of the tied cards, then on to the target, the
-		# chosen card staying marked while it waits.
+		# Exactly one of the tied cards, then the play at the target picked
+		# before the choice - or, should that target have gone meanwhile
+		# (a play still resolving), back to picking one.
 		if chosen.size() != _choice_cap:
 			return
-		_pending_consume_view = chosen[0]
-		_close_choice(_pending_consume_view)
-		_arm_or_play(card_view)
+		var enemy: FieldEnemy = _choice_target
+		var mound: int = _choice_target_mound
+		var combatant: Combatant = _combatants.get(enemy) if enemy != null and is_instance_valid(enemy) else null
+		if combatant == null or not _can_target(card_view.card_data, combatant):
+			_step_back_to_target()
+			return
+		_choice_target = null
+		_choice_target_mound = -1
+		_pending_consume_tie.clear()
+		_close_choice(chosen[0])
+		_resolve_play(card_view, enemy, [], chosen[0], mound)
 		return
 	_close_choice()
 	_resolve_play(card_view, null, chosen)
@@ -709,9 +730,21 @@ func cancel_choice() -> void:
 		return
 	if _choosing_card_view == null:
 		return
+	if _choice_kind == CardEffect.EffectType.CONSUME:
+		_step_back_to_target()
+		return
 	var card_view: CardView = _choosing_card_view
 	_close_choice()
 	card_view.release()
+
+# Deny's tie choice closed without its pick: Deny goes back to waiting for
+# a target, armed where it was, its tie still to settle after.
+func _step_back_to_target() -> void:
+	var card_view: CardView = _choosing_card_view
+	_choice_target = null
+	_choice_target_mound = -1
+	_close_choice()
+	_arm_or_play(card_view)
 
 # `keep` stays marked (Deny's pick, waiting on its target).
 func _close_choice(keep: CardView = null) -> void:
@@ -743,6 +776,14 @@ func confirm_target(enemy: FieldEnemy, mound: int = -1) -> void:
 	_set_cursor_enemy(null)
 	_enemy_rects.clear()
 	_mound_rects.clear()
+	# Deny with a tie: the target is picked, now which card it takes - the
+	# play waits on that choice (_begin_choice()).
+	if not _pending_consume_tie.is_empty():
+		_choice_target = enemy
+		_choice_target_mound = mound
+		target_cancelled.emit()
+		_begin_choice(card_view, 1, CardEffect.EffectType.CONSUME, _pending_consume_tie)
+		return
 	_resolve_play(card_view, enemy, [], consume_view, mound)
 
 func cancel_target() -> void:
@@ -754,6 +795,7 @@ func cancel_target() -> void:
 	if _pending_consume_view != null and is_instance_valid(_pending_consume_view):
 		_pending_consume_view.set_marked(false)
 	_pending_consume_view = null
+	_pending_consume_tie.clear()
 	_clear_hover()
 	_set_cursor_enemy(null)
 	_enemy_rects.clear()
@@ -771,6 +813,9 @@ func end_turn() -> void:
 		confirm_choice()
 		return
 	cancel_choice()
+	# Deny's tie choice steps back to its target rather than closing: End
+	# Turn lets it go altogether.
+	cancel_target()
 	cancel_devour_pick()
 	if _begin_keep_choice():
 		return
@@ -1293,6 +1338,7 @@ func devour() -> void:
 	if _pending_consume_view != null and is_instance_valid(_pending_consume_view):
 		_pending_consume_view.set_marked(false)
 	_pending_consume_view = null
+	_pending_consume_tie.clear()
 	_clear_hover()
 	_set_cursor_enemy(null)
 	_enemy_rects.clear()
@@ -2311,8 +2357,6 @@ func _on_card_view_clicked(card_view: CardView) -> void:
 	if _choice_open():
 		if card_view != _choosing_card_view:
 			toggle_choice(card_view)
-		elif _choice_kind == CardEffect.EffectType.CONSUME:
-			confirm_choice()
 		return
 	request_play(card_view)
 
