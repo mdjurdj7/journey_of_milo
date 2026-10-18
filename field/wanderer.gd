@@ -53,12 +53,17 @@ const BRACE_SCENE_PATH := "res://assets/models/wanderer/wanderer_brace.fbx"
 const FLAT_SHADER_PATH := "res://field/wanderer_flat.gdshader"
 const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
 const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
+# The sword he carries is the run's weapon's field model (WeaponData.
+# field_model_path - _build_sword()); this one where it names none.
 const SWORD_SCENE_PATH := "res://assets/models/wanderer/sword.glb"
 # sword.glb's own albedo (sword_0.jpg) denoised and lifted to a light warm
 # steel by tools/paint_texture.py --image-space. TEXTURED draws the sword
 # with it through wanderer_painted.gdshader instead of the glb's imported
-# material, whose metallic map and normal map made it shine.
+# material, whose metallic map and normal map made it shine. The weapon's
+# field_albedo comes first; this is sword.glb's when it has none.
 const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_painted.png"
+# The sword exports a weapon's fit can set (WeaponData.field_fit()).
+const SWORD_FIT_PROPERTIES: Array[StringName] = [&"sword_length", &"grip_fraction", &"grip_axis_flip", &"hand_mount_position", &"hand_mount_rotation_degrees", &"back_mount_position", &"back_mount_rotation_degrees"]
 
 @export var move_speed: float = 4.5
 @export var acceleration: float = 14.0
@@ -395,16 +400,23 @@ enum ShadingMode { TEXTURED, POSTERIZED, FLAT }
 # holder) guards on that node being non-null, which is only true once
 # _setup_sword() has run in _ready() - so a setter firing during scene
 # deserialization (before _ready()) is always a plain no-op on the
-# backing field, never a reset of anything else. _setup_sword() and
+# backing field, never a reset of anything else. _build_sword() and
 # _switch_sword_mount() never read a constant or a cached copy of any of
 # these - every read below is the live export at call time, so a scene-
 # file override is exactly what ends up applied at _ready() and at every
 # enter_battle_stance()/exit_battle_stance() mount switch after it.
+# The run's weapon sets its own fit onto them (WeaponData.field_fit()) as
+# _build_sword() builds it; what it leaves unset keeps the scene's value.
 
 # Uniform scale is derived from this / the sword model's own raw AABB
-# longest axis (see _setup_sword()) - same "measure raw, then derive a
-# factor" approach _scale_and_ground_model() uses for the body.
-@export var sword_length: float = 1.3
+# longest axis (see _apply_sword_scale()) - same "measure raw, then derive
+# a factor" approach _scale_and_ground_model() uses for the body.
+@export var sword_length: float = 1.3:
+	get:
+		return sword_length
+	set(value):
+		sword_length = value
+		_apply_sword_scale()
 
 # Where _sword_root's own origin sits along the blade's detected long
 # axis, as a fraction from the tip - 0.82 is "just below the guard" for a
@@ -613,8 +625,8 @@ var _grounding_skeleton: Skeleton3D = null
 var _grounding_bone_indices: Array[int] = []
 
 # The uniform scale _scale_and_ground_model() applied to the model, set
-# once there - _setup_sword() has to divide its own scale factor by this,
-# since the sword sits under a BoneAttachment3D that's a descendant of
+# once there - _apply_sword_scale() has to divide its own scale factor by
+# this, since the sword sits under a BoneAttachment3D that's a descendant of
 # the (hugely up-scaled) model and inherits its scale on top of whatever
 # the sword's own node.scale is set to.
 var _model_scale_factor: float = 1.0
@@ -643,6 +655,17 @@ var _sword_skeleton: Skeleton3D = null
 var _sword_root: Node3D = null
 var _sword_mesh_holder: Node3D = null
 var _sword_raw_aabb: AABB = AABB()
+# The sword's albedo as _build_sword() chose it, for shading_mode's
+# rebuilds.
+var _sword_albedo: Texture2D = null
+# The fit exports as the scene set them (SWORD_FIT_PROPERTIES), read once
+# by _setup_sword(): what a weapon's unset fit values fall back to.
+var _scene_sword_fit: Dictionary = {}
+# The last mount switch's tween (_switch_sword_mount()) until it ends.
+var _sword_mount_tween: Tween = null
+# The run's weapon changed while the sword was off his back mount: it is
+# rebuilt once it rests there again (_on_sword_mount_settled()).
+var _sword_rebuild_pending: bool = false
 var _back_attachment: BoneAttachment3D = null
 var _hand_attachment: BoneAttachment3D = null
 # What the sword actually hangs from: one child of each attachment whose
@@ -797,6 +820,11 @@ func _instantiate_model(character: CharacterData) -> Node3D:
 func _find_body_albedo(model: Node3D, character: CharacterData) -> Texture2D:
 	if character != null and character.field_albedo != null:
 		return character.field_albedo
+	return _imported_albedo(model)
+
+# A model's own imported base colour: its first mesh's first surface
+# material's albedo texture, null if it has none.
+func _imported_albedo(model: Node3D) -> Texture2D:
 	for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
 		var mesh: Mesh = (mesh_instance as MeshInstance3D).mesh
 		if mesh == null or mesh.get_surface_count() == 0:
@@ -815,8 +843,9 @@ func _find_body_albedo(model: Node3D, character: CharacterData) -> Texture2D:
 # solid color instead of an invisible or shaderless model. Re-run
 # whenever shading_mode's setter fires, so this always reflects the
 # current mode - not just at _ready().
-# The sword (is_body false) gets its own painted texture in TEXTURED and
-# flat sword_steel_color in POSTERIZED, through the same shaders. Neither
+# The sword (is_body false) gets its own painted texture (_sword_albedo)
+# in TEXTURED and flat sword_steel_color in POSTERIZED, through the same
+# shaders. Neither
 # ever uses a glb's imported material: wanderer_v3.glb's reads the
 # unpainted source with that same image as its normal map, and sword.glb's
 # is metallic with a normal map.
@@ -830,7 +859,7 @@ func _apply_model_material(model: Node3D, is_body: bool = true) -> void:
 			if is_body:
 				material = _build_textured_material(_body_albedo, albedo_tint)
 			else:
-				_sword_material = _build_textured_material(load(SWORD_ALBEDO_TEXTURE_PATH) as Texture2D, Color.WHITE)
+				_sword_material = _build_textured_material(_sword_albedo, Color.WHITE)
 				material = _sword_material
 		ShadingMode.POSTERIZED:
 			if is_body:
@@ -1167,10 +1196,12 @@ func _world_offset_to_local(world_offset: Vector3) -> Vector3:
 	return world_offset / _skeleton_scale_factor
 
 # Builds two BoneAttachment3D children of the skeleton (one per mount),
-# loads and scales the sword once, and parks it on the back mount to
-# start. enter_battle_stance()/exit_battle_stance() move it between the
-# two via _switch_sword_mount() - the attachments themselves never move
-# once created; only which one currently parents _sword_root changes.
+# reads the scene's sword fit, and builds the run's weapon on the back
+# mount to start (_build_sword()). enter_battle_stance()/exit_battle_
+# stance() move it between the two via _switch_sword_mount() - the
+# attachments themselves never move once created; only which one
+# currently parents _sword_root changes. A new weapon (RunState.weapon_
+# changed) is built in its place (_on_weapon_changed()).
 func _setup_sword(model: Node3D) -> void:
 	var skeletons := model.find_children("*", "Skeleton3D", true, false)
 	_sword_skeleton = skeletons[0] as Skeleton3D if not skeletons.is_empty() else null
@@ -1207,14 +1238,51 @@ func _setup_sword(model: Node3D) -> void:
 	_sword_skeleton.skeleton_updated.connect(_fit_mount_frames)
 	_fit_mount_frames()
 
-	var sword_scene := load(SWORD_SCENE_PATH) as PackedScene
+	for property in SWORD_FIT_PROPERTIES:
+		_scene_sword_fit[property] = get(property)
+	_build_sword()
+	RunState.weapon_changed.connect(_on_weapon_changed)
+
+# The run's weapon (RunState.weapon) as the sword on his back mount, in
+# place of any sword already built: its fit (WeaponData.field_fit()) over
+# the scene's own (_scene_sword_fit), its field model (SWORD_SCENE_PATH
+# where it names none) and its albedo (_sword_albedo).
+func _build_sword() -> void:
+	_sword_rebuild_pending = false
+	if _sword_mount_tween != null:
+		_sword_mount_tween.kill()
+		_sword_mount_tween = null
+	if _sword_root != null:
+		if _sword_root.get_parent() != null:
+			_sword_root.get_parent().remove_child(_sword_root)
+		_sword_root.queue_free()
+		_sword_root = null
+		_sword_mesh_holder = null
+
+	var weapon: WeaponData = RunState.weapon
+	var fit: Dictionary = _scene_sword_fit.duplicate()
+	if weapon != null:
+		fit.merge(weapon.field_fit(), true)
+	for property: StringName in fit:
+		set(property, fit[property])
+	var scene_path: String = SWORD_SCENE_PATH
+	if weapon != null and not weapon.field_model_path.is_empty():
+		scene_path = weapon.field_model_path
+
+	var sword_scene := load(scene_path) as PackedScene
 	if sword_scene == null:
-		push_warning("Wanderer: sword scene failed to load (%s); sword mount disabled." % SWORD_SCENE_PATH)
+		push_warning("Wanderer: sword scene failed to load (%s); sword mount disabled." % scene_path)
 		return
 	var sword_mesh_holder := sword_scene.instantiate() as Node3D
 	if sword_mesh_holder == null:
-		push_warning("Wanderer: sword scene root (%s) is not a Node3D; sword mount disabled." % SWORD_SCENE_PATH)
+		push_warning("Wanderer: sword scene root (%s) is not a Node3D; sword mount disabled." % scene_path)
 		return
+	if weapon != null and weapon.field_albedo != null:
+		_sword_albedo = weapon.field_albedo
+	elif scene_path == SWORD_SCENE_PATH:
+		_sword_albedo = load(SWORD_ALBEDO_TEXTURE_PATH) as Texture2D
+	else:
+		_sword_albedo = _imported_albedo(sword_mesh_holder)
 
 	# _sword_root is the node mounts actually position/scale/rotate - its
 	# origin is the grip (see _apply_grip_offset()), not wherever the
@@ -1253,27 +1321,7 @@ func _setup_sword(model: Node3D) -> void:
 	print("Wanderer: sword AABB (pre-scale) = %s" % combined_aabb)
 	_sword_raw_aabb = combined_aabb
 
-	var axis := _longest_axis_index(combined_aabb.size)
-	var longest_axis: float = combined_aabb.size[axis]
-	var local_scale_factor := 1.0
-	if longest_axis <= 0.0001:
-		push_warning("Wanderer: sword AABB longest axis is ~0 (%f); leaving scale at 1.0." % longest_axis)
-	else:
-		local_scale_factor = sword_length / longest_axis
-
-	# _sword_root sits under _back_frame, on a bone attachment of the model's own
-	# Skeleton3D - it inherits the skeleton's whole scale (_skeleton_scale_
-	# factor: the model's scale to target_height - ~1.06 for wanderer_v3.
-	# glb, ~95 for the old ~0.019 m sources - times any Armature scale
-	# between) on top of whatever _sword_root.scale is set to here.
-	# Dividing it back out is what makes the sword's actual WORLD length
-	# come out to sword_length.
-	var world_scale_factor := local_scale_factor
-	if _skeleton_scale_factor > 0.0001:
-		world_scale_factor = local_scale_factor / _skeleton_scale_factor
-	else:
-		push_warning("Wanderer: _skeleton_scale_factor is ~0 (%f); sword scale not compensated." % _skeleton_scale_factor)
-	_sword_root.scale = Vector3.ONE * world_scale_factor
+	_apply_sword_scale()
 
 	_apply_model_material(_sword_root, false)
 
@@ -1296,6 +1344,57 @@ func _setup_sword(model: Node3D) -> void:
 	if has_world_aabb:
 		print("Wanderer: sword final world-space AABB height = %f" % world_aabb.size.y)
 
+# Scales _sword_root so the model's longest side comes out sword_length
+# long in the world. No-op until _build_sword() has measured it.
+func _apply_sword_scale() -> void:
+	if _sword_root == null:
+		return
+	var longest_axis: float = _sword_raw_aabb.size[_longest_axis_index(_sword_raw_aabb.size)]
+	var local_scale_factor := 1.0
+	if longest_axis <= 0.0001:
+		push_warning("Wanderer: sword AABB longest axis is ~0 (%f); leaving scale at 1.0." % longest_axis)
+	else:
+		local_scale_factor = sword_length / longest_axis
+
+	# _sword_root sits under _back_frame, on a bone attachment of the model's own
+	# Skeleton3D - it inherits the skeleton's whole scale (_skeleton_scale_
+	# factor: the model's scale to target_height - ~1.06 for wanderer_v3.
+	# glb, ~95 for the old ~0.019 m sources - times any Armature scale
+	# between) on top of whatever _sword_root.scale is set to here.
+	# Dividing it back out is what makes the sword's actual WORLD length
+	# come out to sword_length.
+	var world_scale_factor := local_scale_factor
+	if _skeleton_scale_factor > 0.0001:
+		world_scale_factor = local_scale_factor / _skeleton_scale_factor
+	else:
+		push_warning("Wanderer: _skeleton_scale_factor is ~0 (%f); sword scale not compensated." % _skeleton_scale_factor)
+	_sword_root.scale = Vector3.ONE * world_scale_factor
+
+# The run's weapon changed: built now while the sword rests on his back
+# mount, else once it is back there (_on_sword_mount_settled()) - never
+# swapped in his hands.
+func _on_weapon_changed(_weapon: WeaponData) -> void:
+	if _sword_on_back():
+		_build_sword()
+	else:
+		_sword_rebuild_pending = true
+
+# Whether the sword rests on his back mount - there, with no mount switch
+# still moving it - or there is none built.
+func _sword_on_back() -> bool:
+	if _sword_root == null:
+		return true
+	return _sword_root.get_parent() == _back_frame and _sword_mount_tween == null
+
+# A mount switch's tween is over (`tween`, unless a later switch has
+# replaced it): a weapon change that waited for the back mount is built.
+func _on_sword_mount_settled(tween: Tween) -> void:
+	if tween != _sword_mount_tween:
+		return
+	_sword_mount_tween = null
+	if _sword_rebuild_pending and _sword_on_back():
+		_build_sword()
+
 func _longest_axis_index(size: Vector3) -> int:
 	var axis := 0
 	if size[1] > size[axis]:
@@ -1311,7 +1410,7 @@ func _longest_axis_index(size: Vector3) -> int:
 # rather than at a corner. Which end of the axis IS the tip is a guess
 # (grip_axis_flip) since this project's "never run the game" rule means
 # it can't be checked here - flip it live if the grip lands at the wrong
-# end. No-op until _setup_sword() has populated _sword_mesh_holder/
+# end. No-op until _build_sword() has populated _sword_mesh_holder/
 # _sword_raw_aabb.
 func _apply_grip_offset() -> void:
 	if _sword_mesh_holder == null:
@@ -1372,7 +1471,9 @@ func _update_mount_bone(is_back: bool) -> void:
 # place rather than popping - matches enter_battle_stance's own movement
 # tween shape (parallel, sine in-out) so both read as one motion.
 # target_position_world is in world metres (see back_mount_position's own
-# doc) - converted to _sword_root's local space before the tween.
+# doc) - converted to _sword_root's local space before the tween. A weapon
+# change waiting for the back mount is built once it ends there (_on_
+# sword_mount_settled()).
 func _switch_sword_mount(target_frame: Node3D, target_position_world: Vector3, target_rotation_degrees: Vector3, duration: float) -> void:
 	if _sword_root == null or target_frame == null:
 		return
@@ -1389,6 +1490,8 @@ func _switch_sword_mount(target_frame: Node3D, target_position_world: Vector3, t
 	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	tween.tween_property(_sword_root, "position", _world_offset_to_local(target_position_world), duration)
 	tween.tween_property(_sword_root, "rotation_degrees", target_rotation_degrees, duration)
+	_sword_mount_tween = tween
+	tween.finished.connect(_on_sword_mount_settled.bind(tween))
 
 # The float this replaces was per-clip: grounding measured once, on
 # Idle, doesn't hold once a battle clip (a different hips height) takes

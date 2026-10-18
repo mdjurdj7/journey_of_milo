@@ -30,11 +30,17 @@ extends SceneTree
 #   ground - with his processing off, as the battle freeze leaves it,
 #            BattleIdle after Idle still grounds him: his lower toe joint
 #            settles model_ground_offset over the sand under him
-#   sword  - on his back in Idle and in his right hand's frame in
-#            BattleIdle, sword_length long and uniformly scaled (the hand
-#            frame strips any bone scale in the pose); in BattleIdle its
-#            point is above the sand under his feet - nothing about which
-#            way it points, so any battle pose passes
+#   sword  - he wears the equipped weapon's fit (WeaponData.field_fit());
+#            the sword is on his back in Idle and in his right hand's
+#            frame in BattleIdle, the weapon's length long and uniformly
+#            scaled (the hand frame strips any bone scale in the pose); in
+#            BattleIdle its point is above the sand under his feet -
+#            nothing about which way it points, so any battle pose passes
+#   weapon - another weapon equipped (RunState.weapon_changed) rebuilds
+#            the sword on his back mount at its length, its unset fit
+#            the scene's; a change while the sword is in his hand waits
+#            until it is back on his back, then rebuilds - the Rusted
+#            Blade again, its fit his again
 #   grab   - DrawSword carries one method key at draw_sword_grab_time
 #            calling _on_draw_sword_grab_key() (its clip text, the key
 #            aside, is the glb's draw_sword); entered with a blend in
@@ -74,6 +80,11 @@ const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3.glb"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
+# The swap check's other weapon: sword.glb (no model of its own) at this
+# length and grip, the rest of its fit unset.
+const WEAPON_DATA_SCRIPT_PATH := "res://run/weapon_data.gd"
+const SWAP_LENGTH := 0.9
+const SWAP_GRIP_FRACTION := 0.7
 const FIGHT_HP := 999
 # The fight's second Slash is confirmed this long after the first (real
 # seconds), and must not start before CANCEL_S.
@@ -362,7 +373,10 @@ func _initialize() -> void:
 
 	print("\n=== sword")
 	var sword: Node3D = _wanderer.get("_sword_root")
-	var sword_length: float = float(_wanderer.get("sword_length"))
+	var weapon: Resource = run_state.get("weapon")
+	var fit: Dictionary = weapon.call("field_fit")
+	_check(_wears_fit(fit), "he wears the equipped weapon's fit (%s: %s)" % [weapon.get("id"), fit])
+	var sword_length: float = float(fit.get(&"sword_length", _wanderer.get("sword_length")))
 	await _pose("Idle", 0.0)
 	_check(sword.get_parent() == _wanderer.get("_back_frame"), "on his back in the field")
 	_check_sword_size(sword, sword_length, "on his back")
@@ -387,6 +401,9 @@ func _initialize() -> void:
 	# Back where the field leaves it, for the fight's draw.
 	_wanderer.call("_switch_sword_mount", _wanderer.get("_back_frame"), _wanderer.get("back_mount_position"), _wanderer.get("back_mount_rotation_degrees"), 0.0)
 	await _pose("Idle", 0.0)
+
+	print("\n=== weapon")
+	await _check_weapon_swap(run_state)
 
 	print("
 === grab")
@@ -777,6 +794,69 @@ func _check_sword_size(sword: Node3D, expected: float, label: String) -> void:
 	var length: float = longest * scale.x
 	_check(absf(length - expected) <= SWORD_LIMIT_M, "%s: %.3f m long (sword_length %.2f)" % [label, length, expected])
 	_check(absf(scale.x - scale.y) <= 0.001 * scale.x and absf(scale.x - scale.z) <= 0.001 * scale.x, "%s: uniformly scaled (%s)" % [label, scale])
+
+# Whether each of `fit`'s values (WeaponData.field_fit()) is his export's.
+func _wears_fit(fit: Dictionary) -> bool:
+	for property: StringName in fit:
+		var value: Variant = fit[property]
+		var his: Variant = _wanderer.get(property)
+		if value is Vector3:
+			if not (value as Vector3).is_equal_approx(his as Vector3):
+				return false
+		elif value is float:
+			if not is_equal_approx(float(value), float(his)):
+				return false
+		elif value != his:
+			return false
+	return true
+
+# Equips `weapon` as a run would: RunState.weapon, then weapon_changed.
+func _equip(run_state: Node, weapon: Resource) -> void:
+	run_state.set("weapon", weapon)
+	run_state.emit_signal("weapon_changed", weapon)
+
+# Another weapon - sword.glb at its own length and grip, the rest of its
+# fit unset - equipped with the sword on his back, then the Rusted Blade
+# again while the sword is in his hand.
+func _check_weapon_swap(run_state: Node) -> void:
+	var blade: Resource = run_state.get("weapon")
+	var back_frame: Node3D = _wanderer.get("_back_frame")
+	var hand_frame: Node3D = _wanderer.get("_hand_frame")
+	var scene_fit: Dictionary = _wanderer.get("_scene_sword_fit")
+	var other: Resource = (load(WEAPON_DATA_SCRIPT_PATH) as Script).new()
+	other.set("id", &"probe_swap")
+	other.set("field_length", SWAP_LENGTH)
+	other.set("field_grip_fraction", SWAP_GRIP_FRACTION)
+	var before_id: int = (_wanderer.get("_sword_root") as Node3D).get_instance_id()
+	_equip(run_state, other)
+	await _pose("Idle", 0.0)
+	var swapped: Node3D = _wanderer.get("_sword_root")
+	_check(swapped != null and swapped.get_instance_id() != before_id and swapped.get_parent() == back_frame, "another weapon equipped with the sword on his back: rebuilt there at once")
+	if swapped == null:
+		return
+	var swapped_id: int = swapped.get_instance_id()
+	_check_sword_size(swapped, SWAP_LENGTH, "the other weapon on his back")
+	_check(_wears_fit(other.call("field_fit")), "he wears its fit (grip_fraction %.2f)" % float(_wanderer.get("grip_fraction")))
+	var unset_kept: bool = true
+	for property: StringName in [&"grip_axis_flip", &"hand_mount_position", &"hand_mount_rotation_degrees", &"back_mount_position", &"back_mount_rotation_degrees"]:
+		unset_kept = unset_kept and _wears_fit({property: scene_fit[property]})
+	_check(unset_kept, "what it leaves unset is the scene's")
+
+	_wanderer.call("_switch_sword_mount", hand_frame, _wanderer.get("hand_mount_position"), _wanderer.get("hand_mount_rotation_degrees"), 0.0)
+	await _pose("BattleIdle", 0.0)
+	_equip(run_state, blade)
+	await _pose("BattleIdle", 0.0)
+	var held: Node3D = _wanderer.get("_sword_root")
+	_check(held == swapped and held.get_parent() == hand_frame and bool(_wanderer.get("_sword_rebuild_pending")), "the Rusted Blade equipped with the sword in his hand: it stays as it is, the rebuild waiting")
+	_wanderer.call("_switch_sword_mount", back_frame, _wanderer.get("back_mount_position"), _wanderer.get("back_mount_rotation_degrees"), 0.0)
+	await _pose("Idle", 0.0)
+	var rebuilt: Node3D = _wanderer.get("_sword_root")
+	_check(rebuilt != null and rebuilt.get_instance_id() != swapped_id and rebuilt.get_parent() == back_frame and not bool(_wanderer.get("_sword_rebuild_pending")), "back on his back mount, it is rebuilt")
+	if rebuilt == null:
+		return
+	var blade_fit: Dictionary = blade.call("field_fit")
+	_check_sword_size(rebuilt, float(blade_fit.get(&"sword_length", scene_fit[&"sword_length"])), "the Rusted Blade again")
+	_check(_wears_fit(blade_fit), "he wears its fit again")
 
 func _check(ok: bool, label: String) -> void:
 	print(("ok   " if ok else "FAIL ") + label)
