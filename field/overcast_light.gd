@@ -61,8 +61,16 @@ class_name OvercastLight
 # even see. shadow_max_distance itself (the export, not the native
 # directional_shadow_max_distance property this pushes to) is left
 # untouched by enter_battle()/exit_battle() below specifically so it
-# stays the value exit_battle() restores.
-@export var battle_shadow_max_distance: float = 15.0
+# stays the value exit_battle() restores. 25 m: the fighters stand 8-10.5 m
+# deep in the battle frame, and the shadow fades from 80% of this - 15 m
+# began that fade at 12 m, too near a wide frame or a pack's far member.
+@export var battle_shadow_max_distance: float = 25.0:
+	set(value):
+		battle_shadow_max_distance = value
+		if _in_battle:
+			directional_shadow_max_distance = value
+
+var _in_battle: bool = false
 
 func _ready() -> void:
 	_apply_rotation()
@@ -94,6 +102,7 @@ func _apply_rotation() -> void:
 
 # Called by region_field.gd on enemy contact.
 func enter_battle() -> void:
+	_in_battle = true
 	directional_shadow_max_distance = battle_shadow_max_distance
 
 # Called by region_field.gd once the battle resolves. Reads shadow_max_
@@ -101,4 +110,5 @@ func enter_battle() -> void:
 # never touches that export, only the native property it feeds, so it's
 # always still holding the field value here.
 func exit_battle() -> void:
+	_in_battle = false
 	directional_shadow_max_distance = shadow_max_distance
