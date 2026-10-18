@@ -49,6 +49,15 @@
 #                    would say had commits A..B (B default HEAD) landed
 #                    during this run - a dry run of that check
 #
+# A probe that prints a SCRIPT ERROR fails, whatever it says itself: a
+# script error abandons only the function it hit (headless, nothing stops),
+# so a probe can pass straight over one the game's debugger would stop on.
+# The verdict names how many and the first, with its file:line, and the
+# log gains it as a FAIL line. A probe that means to cause one says so in
+# its source, a line each:
+#   # probe-expects-script-error: <text in the error's message>
+# and an error whose message holds that text isn't counted.
+#
 # GODOT overrides the engine (default ../Godot_v4.7.1.exe beside the repo:
 # the main executable, not the _console wrapper). Exit code 0 = every
 # probe passed, 1 = a failure, 2 = usage, 3 = the worktree stayed busy,
@@ -786,12 +795,42 @@ if [ "$DO_IMPORT" = 1 ]; then
 fi
 
 # --- Run ---
+# The script errors in probe $1's log (SCRIPT ERROR, then its "at:" line),
+# less those its source expects (probe-expects-script-error): the count,
+# a tab, the first as "message (file:line)". Nothing when there are none.
+script_errors() {
+	awk -v src="$PROJECT/tests/$1.gd" '
+		BEGIN {
+			while ((getline line < src) > 0)
+				if (match(line, /^[ \t]*#[ \t]*probe-expects-script-error:[ \t]*/))
+					expected[++n] = substr(line, RSTART + RLENGTH)
+		}
+		function settle() {
+			if (pending == "") return
+			for (i = 1; i <= n; i++)
+				if (expected[i] != "" && index(pending, expected[i]) > 0) { pending = ""; return }
+			if (++found == 1) first = pending (where == "" ? "" : " (" where ")")
+			pending = ""
+		}
+		/^SCRIPT ERROR: / { settle(); pending = substr($0, 15); where = ""; next }
+		pending != "" && /^[ \t]*at: / {
+			where = $0
+			if (match(where, /\([^()]*:[0-9]+\)[ \t]*$/)) where = substr(where, RSTART + 1, RLENGTH - 2)
+			else sub(/^[ \t]*at: /, "", where)
+			settle()
+			next
+		}
+		{ settle() }
+		END { settle(); if (found > 0) printf "%d\t%s\n", found, first }
+	' "$LOGS/$1.log"
+}
+
 # Each probe process gets a run-log folder of its own (RunLogger's
 # --runlog-dir user argument), deleted when it ends: user:// is shared by
 # every checkout and session, so a probe that writes and reads run logs
 # would otherwise see another copy's files.
 run_one() {
-	local p="$1" ff="" start code dur verdict runlog runlog_arg
+	local p="$1" ff="" start code dur verdict runlog runlog_arg errors note
 	[ "$(table_flag "$p" realtime)" = yes ] || ff="--fixed-fps 60"
 	runlog=$(mktemp -d "$LOGS/runlog.$p.XXXXXX")
 	runlog_arg="$runlog"
@@ -802,7 +841,14 @@ run_one() {
 	rm -rf "$runlog"
 	dur=$(( $(date +%s) - start ))
 	if [ "$code" = 0 ] && grep -q "^$p: PASSED" "$LOGS/$p.log"; then verdict=PASS; else verdict=FAIL; fi
-	printf '%-26s %s %4ss%s\n' "$p" "$verdict" "$dur" "$([ "$verdict" = FAIL ] && echo "  (exit $code, $LOGS/$p.log)")" | tee -a "$LOGS/_results.txt"
+	errors=$(script_errors "$p")
+	note=""
+	if [ -n "$errors" ]; then
+		verdict=FAIL
+		note="; ${errors%%$'\t'*} script error(s), first: ${errors#*$'\t'}"
+		echo "FAIL [run_probes]: ${errors%%$'\t'*} script error(s), the first: ${errors#*$'\t'}" >> "$LOGS/$p.log"
+	fi
+	printf '%-26s %s %4ss%s\n' "$p" "$verdict" "$dur" "$([ "$verdict" = FAIL ] && echo "  (exit $code$note, $LOGS/$p.log)")" | tee -a "$LOGS/_results.txt"
 }
 
 COUNT=$(echo $SELECTED | wc -w)
