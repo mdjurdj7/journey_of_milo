@@ -33,6 +33,14 @@ extends SceneTree
 #   - the frame's bottom edge open: along its bottom row, the ground as
 #     drawn (less the press) no more than BOTTOM_EDGE_TOLERANCE_M over the
 #     feet line - the lowest feet, or the water's surface over them
+# And where the fight leaves him (the 18 Oct Wardling: on its lobe's
+# rim, cut off from the bowl), by RegionField.is_valid_fight_ground() -
+# ground he can walk to from spawn, with its margin - never coordinates:
+#   - the stance he was put at, and where a win and an escape would leave
+#     him from it (RegionField.win_position(), escape_position())
+#   - for a lone enemy, the same from every one of GROUND_ANGLES
+#     approaches that start on valid ground, through the stance RegionField
+#     itself would choose (lone_stance()), before the fight is staged
 # The limits are this probe's own constants, below. Each fight also gets
 # an INFO line - its settled battle pitch and whether the Tower is in its
 # frame - never a failure.
@@ -86,6 +94,9 @@ const BOTTOM_EDGE_RAY_STEP_M := 0.05
 # A fade or a press settles within this much game time once the frame
 # has, seconds - a cap, not a wait.
 const FADE_SETTLE_MAX_SECONDS := 3.0
+# Approaches round a lone enemy for the ground check.
+const GROUND_ANGLES := 16
+const FIELD_ENEMY_SCRIPT_PATH := "res://field/field_enemy.gd"
 
 var _run_state: Node = null
 var _field: Node = null
@@ -143,6 +154,7 @@ func _check_fight(floor_index: int, slot: EncounterSlot, option: EncounterOption
 	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
 	var ground: Node = _field.get_node("Ground")
 	var spawn: Vector3 = _field.call("get_spawn_position")
+	_check_lone_ground(label, target)
 	wanderer.global_position = _approach_point(spawn, target, ground)
 	await physics_frame
 	_field.call_deferred("_on_enemy_contacted", target)
@@ -197,6 +209,9 @@ func _check_fight(floor_index: int, slot: EncounterSlot, option: EncounterOption
 				if camera.is_position_in_frustum(point) and camera.global_position.distance_to(point) <= nearest - PROP_NEARER_M:
 					_fail("%s: the prop %s is in the battle frame's foreground (%.1f m from the camera, the nearest combatant %.1f m)" % [label, prop.name, camera.global_position.distance_to(point), nearest])
 					break
+	# Where this fight stood him, and where a win or an escape would leave
+	# him from there.
+	_check_fight_end_ground(label, wanderer.global_position, members)
 	# The frame's readability, once its fades and the press have settled.
 	await ProbePlay.wait_until(self, _fades_settled, FADE_SETTLE_MAX_SECONDS)
 	_check_readability(label, camera, wanderer, members, ground, sea_level)
@@ -206,6 +221,60 @@ func _check_fight(floor_index: int, slot: EncounterSlot, option: EncounterOption
 		_clean += 1
 		print("%s: staged cleanly" % label)
 	await _teardown()
+
+# A lone enemy, from GROUND_ANGLES approaches that start on valid ground:
+# the stance RegionField would choose (lone_stance(), with that approach
+# as where contact began) and the win and escape positions from it, all
+# on valid fight ground. A cluster's line is checked on the staged fight.
+func _check_lone_ground(label: String, target: Node3D) -> void:
+	var members: Array = _field.call("_battle_members_for", target)
+	if members.size() != 1:
+		return
+	var typed: Array = _field_enemies(members)
+	var obstacles: Array = _field.call("_battle_obstacles", typed)
+	var reach: float = float(target.get("contact_radius")) + APPROACH_MARGIN
+	var tried: int = 0
+	for i in GROUND_ANGLES:
+		var angle: float = TAU * float(i) / float(GROUND_ANGLES)
+		var toward := Vector3(cos(angle), 0.0, sin(angle))
+		var approach: Vector3 = target.global_position + toward * reach
+		if not bool(_field.call("is_valid_fight_ground", approach)):
+			continue
+		tried += 1
+		_field.set("_contact_position", approach)
+		_field.set("_has_contact_position", true)
+		if bool(target.get("holds_facing")):
+			var facing: Vector3 = -target.global_transform.basis.z
+			toward = Vector3(facing.x, 0.0, facing.z).normalized()
+		var placed: Array = _field.call("lone_stance", target, toward, obstacles)
+		var stance: Vector3 = target.global_position + (placed[0] as Vector3) * float(placed[1])
+		_check_fight_end_ground("%s from %.0f degrees" % [label, rad_to_deg(angle)], stance, typed)
+	_field.set("_has_contact_position", false)
+	if tried == 0:
+		_fail("%s: no approach round the enemy starts on valid ground" % label)
+
+# `stance` and where a win and an escape would leave him from it, each on
+# valid fight ground (RegionField.is_valid_fight_ground()).
+func _check_fight_end_ground(label: String, stance: Vector3, members: Array) -> void:
+	if not bool(_field.call("is_valid_fight_ground", stance)):
+		_fail("%s: the stance is off walkable ground" % label)
+	var win: Vector3 = _field.call("win_position", stance)
+	if not bool(_field.call("is_valid_fight_ground", win)):
+		_fail("%s: a win would leave him off walkable ground" % label)
+	var escape: Vector3 = _field.call("escape_position", stance, _field_enemies(members))
+	if not bool(_field.call("is_valid_fight_ground", escape)):
+		_fail("%s: an escape would leave him off walkable ground" % label)
+
+# `members` as an Array[FieldEnemy], built from the script at runtime -
+# naming the class would compile what names the RunState autoload too
+# early (see the header).
+func _field_enemies(members: Array) -> Array:
+	var script: Script = load(FIELD_ENEMY_SCRIPT_PATH)
+	var typed: Array = Array([], TYPE_OBJECT, script.get_instance_base_type(), script)
+	for member: Node in members:
+		if is_instance_valid(member):
+			typed.append(member)
+	return typed
 
 func _fades_settled() -> bool:
 	var occlusion: Node = _field.get_node_or_null(^"BattleOcclusion")
