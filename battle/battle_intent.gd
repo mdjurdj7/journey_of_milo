@@ -32,21 +32,19 @@ class_name BattleIntent
 # HEAL_ALLY (the Nipper's Forage) is a plus beside the HP its packmates
 # will heal. A multi-hit attack whose hits differ once its modifiers have
 # run - Unbroken soaking the first, so a 4×4 lands 0, 4, 4, 4 - reads
-# their total with "4 HITS" beside it (the Hits group), not "M×N"; one
-# whose hits are equal stays "M×N" (No Further's every-hit 0 reads 0×3).
+# their total with "4 HITS" small beneath it (the Hits group), never a
+# per-hit number repeated over hits that differ; one whose hits are equal
+# stays "M×N" (No Further's every-hit 0 reads 0×3).
 #
 # An enemy acting more than once this turn (preview "repeats" - Bereft)
 # shows each action as a pair of its own, side by side, action_gap_px
 # apart: glyph and number for each, so two actions never read like one
-# attack's "×N" hits. A mark on the intent shows on every pair, each with
-# its own number and original.
+# attack's "×N" hits. A mark on the intent shows on every pair.
 #
 # An intent carrying a Brace or a Garnish (preview "marks" - StatusData.
-# intent_mark) reads the number that lands after them, then the same
-# reading without them small in faded ink (the Marks group: original_
-# size_px at original_alpha), then each mark's glyph in the same hand: the
-# Brace a post with its strut on a ground line, the Garnish a bar with a
-# notch cut from its top - a cut taken. While
+# intent_mark) reads only the number that lands after them, with one
+# short ink hairline under its numeral (the Marks group) - what they took
+# is the hover's to say (BattleOverlay._intent_hover_text()). While
 # a card that marks intents is armed (set_armed()), an intent it may
 # target gets a hairline under it and one it may not fades to armed_
 # invalid_alpha; hovered, a refused one says why beneath it (set_
@@ -202,9 +200,10 @@ var layout_offset: Vector2 = Vector2.ZERO
 @export_group("Hits")
 # A multi-hit attack whose hits differ once its modifiers have run (the
 # first soaked by Unbroken): the numeral reads their total, and this
-# beside it on its baseline names how many - "4 HITS" - in the card type
-# label's voice (CardView: Alegreya Sans Bold caps, 0.16 em, at its
-# alpha), hits_gap_px after the numeral. Equal hits keep "M×N".
+# small beneath it names how many - "4 HITS" - in the card type label's
+# voice (CardView: Alegreya Sans Bold caps, 0.16 em, at its alpha),
+# centred under the numeral, its line box hits_gap_px under the numeral's
+# baseline. Equal hits keep "M×N".
 @export var hits_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf"):
 	set(value):
 		hits_font = value
@@ -221,7 +220,7 @@ var layout_offset: Vector2 = Vector2.ZERO
 	set(value):
 		hits_alpha = value
 		_apply_layout()
-@export var hits_gap_px: float = 5.0:
+@export var hits_gap_px: float = 3.0:
 	set(value):
 		hits_gap_px = value
 		_apply_layout()
@@ -276,34 +275,16 @@ var layout_offset: Vector2 = Vector2.ZERO
 		_apply_layout()
 
 @export_group("Marks")
-# The reading without the marks, beside the number that lands: Spectral
-# SemiBold at original_size_px, ink at original_alpha, original_gap_px
-# after the numeral, on its baseline.
-@export var original_size_px: int = 18:
+# A marked intent's hairline: ink, mark_hairline_px thick, as wide as the
+# numeral it underlines, mark_hairline_drop_px under its baseline - on
+# every pair of an enemy acting more than once.
+@export var mark_hairline_px: float = 1.0:
 	set(value):
-		original_size_px = value
-		_apply_layout()
-@export_range(0.0, 1.0) var original_alpha: float = 0.45:
-	set(value):
-		original_alpha = value
+		mark_hairline_px = value
 		queue_redraw()
-@export var original_gap_px: float = 5.0:
+@export var mark_hairline_drop_px: float = 2.0:
 	set(value):
-		original_gap_px = value
-		_apply_layout()
-# Each mark's glyph: mark_glyph_fraction of the numeral's cap height,
-# mark_gap_px apart and after the original, in mark_stroke_px.
-@export_range(0.2, 2.0) var mark_glyph_fraction: float = 0.85:
-	set(value):
-		mark_glyph_fraction = value
-		_apply_layout()
-@export var mark_gap_px: float = 6.0:
-	set(value):
-		mark_gap_px = value
-		_apply_layout()
-@export var mark_stroke_px: float = 2.0:
-	set(value):
-		mark_stroke_px = value
+		mark_hairline_drop_px = value
 		queue_redraw()
 # Armed (set_armed()): a target's hairline, armed_hairline_px of ink
 # under the pair; a refused intent's fade.
@@ -409,20 +390,16 @@ var _pip_top: float = 0.0
 # is only visible when revealed AND it has something to show.
 var _revealed: bool = false
 var _ready_done: bool = false
-# The marks on this intent (preview "marks") and the reading without them.
+# The marks on this intent (preview "marks").
 var _marks: Array[StringName] = []
-var _original_text: String = ""
 # Each action after the first (preview "repeats"), drawn beside it: its
-# numeral, its "N HITS" ("" for none), its reading without the marks
-# ("" for none), and where its pair starts.
+# numeral, its "N HITS" ("" for none), and where its pair starts.
 var _extra_texts: PackedStringArray = PackedStringArray()
 var _extra_hits: PackedStringArray = PackedStringArray()
-var _extra_originals: PackedStringArray = PackedStringArray()
 var _extra_lefts: PackedFloat32Array = PackedFloat32Array()
-var _original_left: float = 0.0
-var _marks_left: float = 0.0
-var _mark_size: float = 0.0
 var _ascent: float = 0.0
+# Where an "N HITS" beneath a numeral has its line box's top.
+var _hits_top: float = 0.0
 # Armed for a card that marks intents: ARMED_NONE, ARMED_VALID (hairline),
 # ARMED_REFUSED (faded); and the reason shown while a refused one is
 # hovered ("" for none).
@@ -493,46 +470,35 @@ func refresh_style() -> void:
 func show_intent(preview: Dictionary) -> void:
 	_has_intent = not preview.is_empty()
 	_marks.clear()
-	_original_text = ""
 	_extra_texts.clear()
 	_extra_hits.clear()
-	_extra_originals.clear()
 	if _has_intent:
 		_type = int(preview["type"])
 		_lethal = bool(preview.get("lethal", false))
 		for mark: Variant in preview.get("marks", []):
 			_marks.append(StringName(mark))
 		# One pair per action (preview "repeats" - Bereft's two): each its
-		# own share of the hits, and of the reading without the marks.
+		# own share of the hits.
 		var actions: int = maxi(int(preview.get("repeats", 1)), 1)
 		if _type != EnemyIntent.IntentType.ATTACK and _type != EnemyIntent.IntentType.DEFEND:
 			actions = 1
 		var hits: int = int(preview.get("hits", 1))
 		var each: int = maxi(hits / actions, 1)
 		var amounts: Array = preview.get("hit_amounts", [])
-		var originals: Array = preview.get("original_hit_amounts", [])
 		for action in actions:
 			var reading: PackedStringArray
-			var original: String = ""
 			if _type == EnemyIntent.IntentType.DEFEND:
 				# Its number is all the Block - one action's share each.
 				reading = PackedStringArray([str(int(preview.get("per_hit", 0)) / actions), ""])
 			else:
 				var mine: Array = amounts.slice(action * each, (action + 1) * each)
 				reading = _reading(int(mine[0]) if not mine.is_empty() else int(preview.get("per_hit", 0)), each, mine)
-				# Braced, Garnished: the number above is after them; beside
-				# it, the same reading without them.
-				if not _marks.is_empty():
-					var plain: Array = originals.slice(action * each, (action + 1) * each)
-					original = _reading(int(plain[0]) if not plain.is_empty() else int(preview.get("original_per_hit", 0)), each, plain)[0]
 			if action == 0:
 				_label.text = reading[0]
 				_hits_label.text = reading[1]
-				_original_text = original
 			else:
 				_extra_texts.append(reading[0])
 				_extra_hits.append(reading[1])
-				_extra_originals.append(original)
 		# A Signal keeps the number its pack's answers will land in all
 		# (BattleController.get_intent_preview()); the rest of these are
 		# their glyph alone.
@@ -666,31 +632,27 @@ func _apply_layout() -> void:
 	if text_width > 0.0:
 		pair_width += glyph_numeral_gap_px + text_width
 	var hits_width: float = _hits_width()
-	if hits_width > 0.0:
-		pair_width += hits_gap_px + hits_width
-	# The reading without the marks, then the marks' glyphs.
-	_original_left = 0.0
-	_marks_left = 0.0
-	_mark_size = cap_height * mark_glyph_fraction
-	var original_width: float = 0.0
-	if not _original_text.is_empty() and numeral_font != null:
-		original_width = numeral_font.get_string_size(_original_text, HORIZONTAL_ALIGNMENT_LEFT, -1, original_size_px).x
-	var after_pair: float = pair_width
-	if original_width > 0.0:
-		_original_left = after_pair + original_gap_px
-		pair_width = _original_left + original_width
-	if not _marks.is_empty():
-		_marks_left = pair_width + mark_gap_px
-		pair_width = _marks_left + float(_marks.size()) * _mark_size + float(_marks.size() - 1) * mark_gap_px
 	# Each further action's pair, action_gap_px on.
 	_extra_lefts.clear()
 	for i in _extra_texts.size():
 		_extra_lefts.append(pair_width + action_gap_px)
 		pair_width = _extra_lefts[i] + _extra_pair_width(i)
-	var rule_thickness: float = lethal_rule_px if _lethal else hairline_thickness_px
+	# The ascent sets every baseline; an "N HITS" under any pair pushes
+	# the rule's place down below it.
+	var ascent: float = font.get_ascent(numeral_size_px) if font != null else line_height
+	var hits_font_now: Font = _hits_label.get_theme_font("font")
+	var hits_height: float = hits_font_now.get_height(hits_size_px) if hits_font_now != null else float(hits_size_px)
+	var any_hits: bool = hits_width > 0.0
+	for extra in _extra_hits:
+		any_hits = any_hits or not extra.is_empty()
+	_hits_top = ascent + hits_gap_px
+	var above_rule: float = maxf(line_height, _hits_top + hits_height) if any_hits else line_height
+	# The rule's place is kept at its thickest whether or not it is drawn,
+	# so nothing moves when the lethal rule comes or goes.
+	var rule_band: float = maxf(lethal_rule_px, hairline_thickness_px)
 	var ring_box: float = ring_diameter_px + ring_stroke_px + float(outline_size_px) * 2.0
 	var content_width: float = maxf(pair_width, hairline_width_px)
-	var content_height: float = line_height + hairline_drop_px + rule_thickness
+	var content_height: float = above_rule + hairline_drop_px + rule_band
 	if _has_threshold:
 		content_width = maxf(content_width, ring_box)
 		content_height += ring_top_gap_px + ring_box
@@ -704,12 +666,9 @@ func _apply_layout() -> void:
 
 	var pair_left: float = (content_width - pair_width) * 0.5
 	_pair_rect = Rect2(pair_left, 0.0, pair_width, line_height)
-	_original_left += pair_left
-	_marks_left += pair_left
 	for i in _extra_lefts.size():
 		_extra_lefts[i] += pair_left
 	# The label's one line fills its box, so its baseline is the ascent.
-	var ascent: float = font.get_ascent(numeral_size_px) if font != null else line_height
 	_ascent = ascent
 	_glyph_centre = Vector2(pair_left + _glyph_width() * 0.5, ascent - cap_height * 0.5)
 	_text_rect = Rect2(pair_left + _glyph_width() + glyph_numeral_gap_px, 0.0, text_width, line_height)
@@ -717,22 +676,19 @@ func _apply_layout() -> void:
 	_label.size = _text_rect.size
 	_label.visible = text_width > 0.0
 	_label.modulate.a = hairline_alpha if _interrupted else 1.0
-	# "N HITS" after the numeral, on its baseline.
+	# "N HITS" beneath the numeral, centred on it.
 	_hits_label.visible = hits_width > 0.0
 	if hits_width > 0.0:
-		var hits_font_now: Font = _hits_label.get_theme_font("font")
-		var hits_ascent: float = hits_font_now.get_ascent(hits_size_px) if hits_font_now != null else float(hits_size_px)
-		var hits_height: float = hits_font_now.get_height(hits_size_px) if hits_font_now != null else float(hits_size_px)
-		_hits_label.position = Vector2(_text_rect.end.x + hits_gap_px, ascent - hits_ascent)
+		_hits_label.position = Vector2(roundf(_text_rect.get_center().x - hits_width * 0.5), _hits_top)
 		_hits_label.size = Vector2(hits_width, hits_height)
 		_hits_label.modulate.a = hits_alpha * (hairline_alpha if _interrupted else 1.0)
-	_rule_top = line_height + hairline_drop_px
-	# The lowest ink: the pips, ring or rule when drawn, else the
-	# numeral's baseline - the line's descent below it is empty.
-	_ink_bottom = content_height if _lethal or _has_threshold or _pip_count > 0 else ascent
+	_rule_top = above_rule + hairline_drop_px
+	# The bottom the display is anchored by: the rule's place, drawn or
+	# not, or the ring or pips under it.
+	_ink_bottom = content_height
 
 	# The ring's numeral fills the ring's box, centred both ways.
-	var ring_top: float = _rule_top + rule_thickness + ring_top_gap_px
+	var ring_top: float = _rule_top + rule_band + ring_top_gap_px
 	_ring_centre = Vector2(content_width * 0.5, ring_top + ring_box * 0.5)
 	_threshold_label.position = _ring_centre - Vector2(ring_box, ring_box) * 0.5
 	_threshold_label.size = Vector2(ring_box, ring_box)
@@ -740,25 +696,17 @@ func _apply_layout() -> void:
 	_place_refusal()
 	queue_redraw()
 
-# The width of action `i`'s pair after the first (_extra_texts): glyph,
-# numeral, "N HITS", the reading without the marks, the marks - as the
-# first pair lays them out.
+# The width of action `i`'s pair after the first (_extra_texts): glyph
+# and numeral, as the first pair lays them out.
 func _extra_pair_width(i: int) -> float:
 	var width: float = _glyph_width()
 	if numeral_font != null and not _extra_texts[i].is_empty():
 		width += glyph_numeral_gap_px + numeral_font.get_string_size(_extra_texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, numeral_size_px).x
-	var hits_font_now: Font = _hits_label.get_theme_font("font") if _hits_label != null else null
-	if hits_font_now != null and not _extra_hits[i].is_empty():
-		width += hits_gap_px + hits_font_now.get_string_size(_extra_hits[i], HORIZONTAL_ALIGNMENT_LEFT, -1, hits_size_px).x
-	if numeral_font != null and not _extra_originals[i].is_empty():
-		width += original_gap_px + numeral_font.get_string_size(_extra_originals[i], HORIZONTAL_ALIGNMENT_LEFT, -1, original_size_px).x
-	if not _marks.is_empty():
-		width += mark_gap_px + float(_marks.size()) * _mark_size + float(_marks.size() - 1) * mark_gap_px
 	return width
 
 # Action `i`'s pair after the first, drawn as the first is laid out: its
 # glyph (pointing as the first does), its numeral in ink over the bone
-# outline, its "N HITS", its faded reading without the marks, its marks.
+# outline, its "N HITS" beneath it, its marks' hairline.
 func _draw_extra_pair(i: int, ink: Color) -> void:
 	var alpha: float = hairline_alpha if _interrupted else 1.0
 	var x: float = _extra_lefts[i]
@@ -773,23 +721,25 @@ func _draw_extra_pair(i: int, ink: Color) -> void:
 	_draw_ink(shapes, alpha)
 	x += _glyph_width()
 	var bone: Color = get_theme_color("bone", "Battle")
-	if numeral_font != null and not _extra_texts[i].is_empty():
-		x += glyph_numeral_gap_px
-		draw_string_outline(numeral_font, Vector2(x, _ascent), _extra_texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, numeral_size_px, outline_size_px * 2, Color(bone, bone.a * alpha))
-		draw_string(numeral_font, Vector2(x, _ascent), _extra_texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, numeral_size_px, Color(ink, ink.a * alpha))
-		x += numeral_font.get_string_size(_extra_texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, numeral_size_px).x
+	if numeral_font == null or _extra_texts[i].is_empty():
+		return
+	x += glyph_numeral_gap_px
+	draw_string_outline(numeral_font, Vector2(x, _ascent), _extra_texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, numeral_size_px, outline_size_px * 2, Color(bone, bone.a * alpha))
+	draw_string(numeral_font, Vector2(x, _ascent), _extra_texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, numeral_size_px, Color(ink, ink.a * alpha))
+	var numeral_width: float = numeral_font.get_string_size(_extra_texts[i], HORIZONTAL_ALIGNMENT_LEFT, -1, numeral_size_px).x
+	_draw_mark_hairline(x, numeral_width, ink, alpha)
 	var hits_font_now: Font = _hits_label.get_theme_font("font")
 	if hits_font_now != null and not _extra_hits[i].is_empty():
-		x += hits_gap_px
-		draw_string(hits_font_now, Vector2(x, _ascent), _extra_hits[i], HORIZONTAL_ALIGNMENT_LEFT, -1, hits_size_px, Color(ink, ink.a * hits_alpha * alpha))
-		x += hits_font_now.get_string_size(_extra_hits[i], HORIZONTAL_ALIGNMENT_LEFT, -1, hits_size_px).x
-	if numeral_font != null and not _extra_originals[i].is_empty():
-		x += original_gap_px
-		draw_string(numeral_font, Vector2(x, _ascent), _extra_originals[i], HORIZONTAL_ALIGNMENT_LEFT, -1, original_size_px, Color(ink, ink.a * original_alpha))
-		x += numeral_font.get_string_size(_extra_originals[i], HORIZONTAL_ALIGNMENT_LEFT, -1, original_size_px).x
-	for m in _marks.size():
-		var mark_centre := Vector2(x + mark_gap_px + _mark_size * 0.5 + float(m) * (_mark_size + mark_gap_px), _glyph_centre.y)
-		_draw_ink(_mark_shapes(_marks[m], mark_centre, _mark_size * 0.5), 1.0)
+		var hits_width: float = hits_font_now.get_string_size(_extra_hits[i], HORIZONTAL_ALIGNMENT_LEFT, -1, hits_size_px).x
+		var hits_baseline: float = _hits_top + hits_font_now.get_ascent(hits_size_px)
+		draw_string(hits_font_now, Vector2(roundf(x + (numeral_width - hits_width) * 0.5), hits_baseline), _extra_hits[i], HORIZONTAL_ALIGNMENT_LEFT, -1, hits_size_px, Color(ink, ink.a * hits_alpha * alpha))
+
+# A marked intent's hairline under a numeral `width` wide starting at `x`
+# (the Marks group) - none on an unmarked one.
+func _draw_mark_hairline(x: float, width: float, ink: Color, alpha: float) -> void:
+	if _marks.is_empty() or width <= 0.0:
+		return
+	draw_rect(Rect2(x, roundf(_ascent + mark_hairline_drop_px), width, mark_hairline_px), Color(ink, ink.a * alpha))
 
 # "N HITS"'s width, 0 with none to show.
 func _hits_width() -> float:
@@ -878,15 +828,9 @@ func _draw() -> void:
 	if _pip_count > 0:
 		_draw_pips(ink)
 
-	# The reading without the marks, faded, on the numeral's baseline;
-	# then each mark's glyph.
-	if not _original_text.is_empty() and numeral_font != null:
-		var faded: Color = ink
-		faded.a *= original_alpha
-		draw_string(numeral_font, Vector2(_original_left, _ascent), _original_text, HORIZONTAL_ALIGNMENT_LEFT, -1, original_size_px, faded)
-	for i in _marks.size():
-		var centre := Vector2(_marks_left + _mark_size * 0.5 + float(i) * (_mark_size + mark_gap_px), _glyph_centre.y)
-		_draw_ink(_mark_shapes(_marks[i], centre, _mark_size * 0.5), 1.0)
+	# Marked: the hairline under the numeral.
+	if _label.visible:
+		_draw_mark_hairline(_text_rect.position.x, _text_rect.size.x, ink, hairline_alpha if _interrupted else 1.0)
 	# Every further action's pair.
 	for i in _extra_texts.size():
 		_draw_extra_pair(i, ink)
@@ -908,24 +852,6 @@ func _draw() -> void:
 		rule_color.a = hairline_alpha
 	var rule_left: float = (size.x - hairline_width_px) * 0.5
 	draw_rect(Rect2(rule_left, _rule_top, hairline_width_px, rule_thickness), rule_color)
-
-# A mark's glyph (StatusData.intent_mark), in a box r either side of
-# `centre`, in the glyphs' hand at mark_stroke_px. "brace": an upright
-# post on a ground line, a strut leaning into it from the ground - braced.
-# "garnish": a short level bar, a notch cut down into its top edge at
-# the middle - a cut taken - in one stroke, fine at its ends.
-func _mark_shapes(mark: StringName, centre: Vector2, r: float) -> Array[PackedVector2Array]:
-	var shapes: Array[PackedVector2Array] = []
-	var even := PackedFloat32Array([1.0, 1.0])
-	match mark:
-		&"brace":
-			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(r * 0.35, -r), centre + Vector2(r * 0.35, r)]), PackedFloat32Array([0.4, 1.0]), mark_stroke_px))
-			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(-r * 0.75, r), centre + Vector2(r * 0.35, -r * 0.3)]), PackedFloat32Array([1.0, 0.4]), mark_stroke_px))
-			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(-r, r), centre + Vector2(r, r)]), even, mark_stroke_px * 0.7))
-		&"garnish":
-			var top: float = r * 0.1
-			shapes.append(_ribbon(PackedVector2Array([centre + Vector2(-r, top), centre + Vector2(-r * 0.3, top), centre + Vector2(0.0, top + r * 0.5), centre + Vector2(r * 0.3, top), centre + Vector2(r, top)]), PackedFloat32Array([0.4, 1.0, 1.0, 1.0, 0.4]), mark_stroke_px))
-	return shapes
 
 func _pips_width() -> float:
 	return float(_pip_count) * pip_size_px + float(maxi(_pip_count - 1, 0)) * pip_gap_px

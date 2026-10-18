@@ -470,7 +470,6 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	# What it would land, from where the enemies before it leave him; a
 	# move that won't land (Denied, broken) shows its hits but spends
 	# nothing of `state` - those after it read him as it found him.
-	var entry: Dictionary = copy_state(state)
 	var lands: bool = not denied and not bool(preview.get("interrupted", false))
 	var replay: Dictionary = state if lands else copy_state(state)
 	var hits: int = hit_count(combatant, intent)
@@ -499,9 +498,7 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	preview["lethal"] = bool(alone["lethal"]) and lands
 	# What lives on this intent (StatusData.intent_mark - Braced,
 	# Garnished): "marks", their names in order ("brace" before
-	# "garnish"), and the same intent as it would be without them -
-	# "original_hit_amounts", "original_per_hit" - for the readout's small
-	# original beside the number that lands.
+	# "garnish") - the readout's hairline under its numeral.
 	var marked: Array[Status] = Status.marks(combatant.statuses)
 	if not marked.is_empty() and not strike_back:
 		var names: Array[StringName] = []
@@ -509,15 +506,6 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 			names.append(active.data.intent_mark)
 		names.sort_custom(func(a: StringName, b: StringName) -> bool: return String(a) < String(b))
 		preview["marks"] = names
-		var at: Array[int] = []
-		for active in marked:
-			at.append(combatant.statuses.find(active))
-			combatant.statuses.erase(active)
-		var plain: Dictionary = preview_intent(combatant, data, player, entry)
-		for i in marked.size():
-			combatant.statuses.insert(mini(at[i], combatant.statuses.size()), marked[i])
-		preview["original_hit_amounts"] = plain.get("hit_amounts", [])
-		preview["original_per_hit"] = plain.get("per_hit", 0)
 	return preview
 
 # Hits landing on `player` in order, from where they stand now: each
