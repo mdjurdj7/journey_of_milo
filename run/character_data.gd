@@ -2,9 +2,14 @@ extends Resource
 class_name CharacterData
 
 # One character's own starting numbers - name, max HP, starting deck
-# composition, and the class passive. No class-select UI exists yet;
-# RunState.new_run() is just handed one of these directly by whatever
-# calls it (region_field.gd, for now - see its own doc).
+# composition, the class passive, its reward pool and its field model. No
+# class-select UI exists yet; RunState.new_run() is just handed one of
+# these directly by whatever calls it (RegionField.starting_character, for
+# now - see its own doc).
+#
+# Read once per run or per load: a run started already has its copy in
+# RunState.character, and the field model is built when the floor loads,
+# so an edit here takes effect on the next floor or run, never live.
 
 @export var character_name: String = ""
 @export var max_hp: int = 70
@@ -19,11 +24,25 @@ class_name CharacterData
 # one that modifies this class's basic attack (WeaponData).
 @export var starting_weapon: WeaponData = null
 
+# What a won fight, and any prop without a pool of its own, rolls from in
+# this character's runs (RegionField.reward_pool()). Null = the floor's own
+# FloorData.reward_pool - the Wanderer's case, whose pool every floor of
+# Region 1 already names.
+@export var reward_pool: RewardPool = null
+
 # How much Grace one enemy turn can open, when several hits land in it -
 # each at grace_open_fraction (below).
 #   LARGEST_HIT - the biggest single unblocked hit of that turn.
 #   SUM         - every unblocked hit added together.
 enum GraceCapMode { LARGEST_HIT, SUM }
+
+# --- Toll, the Wanderer's resource ---
+#
+# Whether self-inflicted HP loss accrues Toll (Combatant.gain_self_loss_
+# toll()) and the battle HP readout shows its Toll block. Without it the
+# loss still happens, just with no Toll, and nothing carries between
+# floors.
+@export var has_toll: bool = false
 
 # --- Grace, the Wanderer's passive ---
 #
@@ -54,8 +73,30 @@ enum GraceCapMode { LARGEST_HIT, SUM }
 # Resort) read - see Combatant.is_critical_at(). 0.3 is a playtest
 # starting point, not a settled number.
 @export_range(0.0, 1.0, 0.01) var critical_hp_fraction: float = 0.3
+# Whether the HP readout draws Critical - the line across the bar at
+# critical_hp_fraction and the numeral's turn to critical_color (HPBar).
+# Display only: the rule still holds for every class, so a keepsake that
+# reads Critical (Blue Fastener) keeps working without it.
+@export var shows_critical: bool = false
 
 # The most Toll this character takes to the next floor: Toll carries in
 # full between a floor's fights, and the floor advance keeps min(Toll,
 # this) (RunState.carry_toll()). In a fight Toll runs free.
 @export var toll_carry_cap: int = 5
+
+# --- Field model ---
+#
+# The body the Wanderer node wears on the field (Wanderer._ready()) - every
+# class walks as that same node, only the model differs. A path, loaded at
+# runtime. A model with no Skeleton3D is a static body: it slides as he
+# walks, with no clips, sword, footprints or footsteps.
+@export_file("*.glb", "*.gltf", "*.tscn", "*.fbx") var field_model_path: String = ""
+# The painted shader's albedo. Null = the model's own imported base colour
+# (its first mesh material's albedo_texture).
+@export var field_albedo: Texture2D = null
+# The yaw that turns the model's own front to the body's -Z: 180 for a
+# model that faces +Z, as Mixamo rigs and glTF exports do.
+@export var field_model_yaw_degrees: float = 180.0
+# The height the model is scaled to, by its own AABB (Wanderer.
+# target_height's per-character value).
+@export var field_model_height: float = 1.8

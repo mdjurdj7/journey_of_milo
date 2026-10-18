@@ -338,6 +338,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	player.hp = RunState.player_hp
 	# Toll carries between fights, up to a cap - see RunState.toll.
 	player.run_toll_owner = RunState
+	player.has_toll = RunState.character.has_toll
 	player.has_grace = RunState.character.has_grace
 	player.grace_cap_mode = RunState.character.grace_cap_mode
 	player.grace_window_turns = RunState.character.grace_window_turns

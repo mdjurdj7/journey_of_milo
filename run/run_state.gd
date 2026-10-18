@@ -338,9 +338,9 @@ func spend_glassbone(amount: int) -> bool:
 # Toll between floors: what's held, down to the character's toll_carry_
 # cap if it's over. Called at the floor advance (RegionField._on_floor_
 # exited()) - a floor's fights hand it on in full. Nothing without a
-# character.
+# character, or for a class without Toll (CharacterData.has_toll).
 func carry_toll() -> void:
-	if character == null:
+	if character == null or not character.has_toll:
 		return
 	set_toll(mini(toll, maxi(character.toll_carry_cap, 0)))
 

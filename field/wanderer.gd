@@ -28,7 +28,12 @@ signal draw_strike_passed
 # different rest), stripped to skeleton and animation (no skin); Brace is
 # still cut on the old Mixamo rig, and so are the Slash and DrawSword the
 # glb's own stand in for when they're missing.
-const MODEL_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3.glb"
+#
+# Which model, and its albedo, yaw and height, are the run's character's
+# (CharacterData's field model - _character()); the clips below are the
+# Wanderer's rig's, merged only onto a model that has a Skeleton3D. A
+# model without one (the Samurai's, for now) stands as a static body: it
+# slides as he walks, with no clips, sword, footprints or footsteps.
 # The glb's clips that can be BattleIdle, first found wins (_merge_clips()).
 const BATTLE_IDLE_CLIPS: Array[StringName] = [&"battle_idle_breathe", &"battle_idle"]
 # The glb's own swing, merged as Slash in place of the Mixamo one.
@@ -45,12 +50,6 @@ const RUN_SCENE_PATH := "res://assets/models/wanderer/wanderer_v3_run.fbx"
 const DRAW_SWORD_SCENE_PATH := "res://assets/models/wanderer/wanderer_battle_start_draw_sword.fbx"
 const SLASH_SCENE_PATH := "res://assets/models/wanderer/wanderer_slash.fbx"
 const BRACE_SCENE_PATH := "res://assets/models/wanderer/wanderer_brace.fbx"
-# The hand-painted pass of the glb's own base colour
-# (wanderer_v3_bound_output.png, extracted on import and kept as the
-# source), made by tools/paint_texture.py. The override below never uses
-# the glb's imported material, which also names the source as its normal
-# map (a Meshy export slip).
-const ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/wanderer_v3_painted.png"
 const FLAT_SHADER_PATH := "res://field/wanderer_flat.gdshader"
 const PAINTED_SHADER_PATH := "res://field/wanderer_painted.gdshader"
 const FOG_SHADER_PATH := "res://field/enemy_fog.gdshader"
@@ -166,6 +165,8 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_painted.p
 @export var battle_exit_blend: float = 0.4
 @export var camera_path: NodePath = ^"../CameraPivot/Camera3D"
 @export var ground_path: NodePath = ^"../Ground"
+# Set from the character's field_model_yaw_degrees when the model is
+# built (_ready()).
 @export var model_yaw_offset: float = 180.0
 # In a fight, how far his model turns toward the camera on top of facing
 # the enemy - a 3/4 view instead of exactly side-on. The model turns, not
@@ -181,13 +182,15 @@ const SWORD_ALBEDO_TEXTURE_PATH := "res://assets/models/wanderer/sword_painted.p
 # so the two read as different things even at a glance, not just "the
 # same placeholder grey twice." Used only as the fallback flat material -
 # see _build_flat_material() - when wanderer_flat.gdshader can't be built
-# (ALBEDO_TEXTURE_PATH failed to load), and in FLAT mode.
+# (the body's albedo failed to load), and in FLAT mode.
 @export var wanderer_color: Color = Color(0.16, 0.15, 0.14, 1)
 
 # The real model ships at whatever scale its source file happens to use
 # (verified at 0.019m tall before this export existed) - this is the
 # actual size the Wanderer renders at, in meters, measured by AABB height
 # right after instancing. model_scale_override below can bypass this.
+# Set from the character's field_model_height when the model is built
+# (_ready()), so an edit here holds until the next floor loads.
 @export var target_height: float = 1.8
 
 # 0 (default) means "auto": derive the scale factor from target_height /
@@ -658,6 +661,8 @@ var _hand_frame: Node3D = null
 # re-walking the model's MeshInstance3D children and, worse, building a
 # second material instance no MeshInstance3D actually has assigned.
 var _active_material: Material = null
+# The body's albedo (_find_body_albedo()), kept for shading_mode's rebuilds.
+var _body_albedo: Texture2D = null
 # The sword's TEXTURED or POSTERIZED shader material while it has one,
 # else null - for the live setters above.
 var _sword_material: ShaderMaterial = null
@@ -678,7 +683,11 @@ var _battle_controller: BattleController = null
 func _ready() -> void:
 	_camera = get_node_or_null(camera_path) as Camera3D
 
-	var model := (load(MODEL_SCENE_PATH) as PackedScene).instantiate() as Node3D
+	var character: CharacterData = _character()
+	var model: Node3D = _instantiate_model(character)
+	if character != null:
+		target_height = character.field_model_height
+		model_yaw_offset = character.field_model_yaw_degrees
 	_model = model
 	add_child(model)
 	# RegionField freezes itself (and, by inheritance, the Wanderer and
@@ -694,8 +703,12 @@ func _ready() -> void:
 	# Mixamo meshes face +Z in their own space while the body's forward is
 	# -Z (see _forward_from_angle()), so the model is rotated to match.
 	model.rotation.y = deg_to_rad(model_yaw_offset)
+	_body_albedo = _find_body_albedo(model, character)
 	_apply_model_material(model)
 	_scale_and_ground_model(model)
+	# No skeleton, no rig: none of the clip, grounding, sword or footprint
+	# setup below has bones to find, so it's skipped rather than warned.
+	var rigged: bool = not model.find_children("*", "Skeleton3D", true, false).is_empty()
 
 	var players := model.find_children("*", "AnimationPlayer", true, false)
 	_animation_player = players[0] as AnimationPlayer if not players.is_empty() else null
@@ -705,13 +718,15 @@ func _ready() -> void:
 	if _animation_player:
 		_animation_player.process_mode = Node.PROCESS_MODE_ALWAYS
 
-	_merge_clips(_animation_player)
+	if rigged:
+		_merge_clips(_animation_player)
 	if use_animation_tree:
 		_build_animation_tree()
 	elif _animation_player:
 		_animation_player.play("Idle")
 
-	_find_grounding_bones(model)
+	if rigged:
+		_find_grounding_bones(model)
 	# Grounding follows each pose as the mixer lands it, not
 	# _physics_process: RegionField's battle freeze stops the Wanderer's
 	# own processing, but the mixer keeps playing BattleIdle, DrawSword,
@@ -725,7 +740,8 @@ func _ready() -> void:
 	if _animation_player != null:
 		_animation_player.current_animation_changed.connect(_on_draw_sword_cut.unbind(1))
 		_animation_player.mixer_applied.connect(_on_draw_sword_cut)
-	_setup_sword(model)
+	if rigged:
+		_setup_sword(model)
 	_setup_step_debug_lines()
 	_capsule_radius = _find_capsule_radius()
 
@@ -739,7 +755,8 @@ func _ready() -> void:
 	var footprint_spawner := FootprintSpawner.new()
 	footprint_spawner.name = "FootprintSpawner"
 	add_child(footprint_spawner)
-	footprint_spawner.setup(model, self, ground)
+	if rigged:
+		footprint_spawner.setup(model, self, ground)
 
 	var footstep_audio := FootstepAudio.new()
 	footstep_audio.name = "FootstepAudio"
@@ -755,6 +772,39 @@ func _ready() -> void:
 	_hit_audio.name = "HitAudio"
 	add_child(_hit_audio)
 	_hit_audio.setup()
+
+# The run's character, for the model: RunState's once a run has started,
+# else the one RegionField is about to start it with - the first floor's
+# Wanderer is ready before RegionField._ready() calls new_run().
+func _character() -> CharacterData:
+	var field := get_parent() as RegionField
+	if field != null:
+		return field.get_run_character()
+	return RunState.character
+
+# The character's field model, instanced. An empty Node3D (and an error)
+# when there is none to load, so nothing below has a null model to trip on.
+func _instantiate_model(character: CharacterData) -> Node3D:
+	var path: String = character.field_model_path if character != null else ""
+	var scene: PackedScene = load(path) as PackedScene if not path.is_empty() else null
+	if scene == null:
+		push_error("Wanderer: no field model to load (%s); standing an empty body." % path)
+		return Node3D.new()
+	return scene.instantiate() as Node3D
+
+# The body's albedo: the character's field_albedo, else the model's own
+# imported base colour (its first mesh's first surface material).
+func _find_body_albedo(model: Node3D, character: CharacterData) -> Texture2D:
+	if character != null and character.field_albedo != null:
+		return character.field_albedo
+	for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
+		var mesh: Mesh = (mesh_instance as MeshInstance3D).mesh
+		if mesh == null or mesh.get_surface_count() == 0:
+			continue
+		var imported := mesh.surface_get_material(0) as BaseMaterial3D
+		if imported != null and imported.albedo_texture != null:
+			return imported.albedo_texture
+	return null
 
 # One shared material for the whole model, applied via material_override
 # on every MeshInstance3D under it. Which material depends on shading_
@@ -778,13 +828,13 @@ func _apply_model_material(model: Node3D, is_body: bool = true) -> void:
 	match shading_mode:
 		ShadingMode.TEXTURED:
 			if is_body:
-				material = _build_textured_material(ALBEDO_TEXTURE_PATH, albedo_tint)
+				material = _build_textured_material(_body_albedo, albedo_tint)
 			else:
-				_sword_material = _build_textured_material(SWORD_ALBEDO_TEXTURE_PATH, Color.WHITE)
+				_sword_material = _build_textured_material(load(SWORD_ALBEDO_TEXTURE_PATH) as Texture2D, Color.WHITE)
 				material = _sword_material
 		ShadingMode.POSTERIZED:
 			if is_body:
-				material = _build_posterized_material(ALBEDO_TEXTURE_PATH)
+				material = _build_posterized_material(_body_albedo)
 			else:
 				_sword_material = _build_sword_steel_material()
 				material = _sword_material
@@ -814,10 +864,9 @@ func _apply_model_material(model: Node3D, is_body: bool = true) -> void:
 
 # The painted texture under wanderer_painted.gdshader's soft light. Null
 # (the flat fallback) if the texture or the shader fails to load.
-func _build_textured_material(texture_path: String, tint: Color) -> ShaderMaterial:
-	var texture := load(texture_path) as Texture2D
+func _build_textured_material(texture: Texture2D, tint: Color) -> ShaderMaterial:
 	if texture == null:
-		push_warning("Wanderer: albedo texture failed to load (%s); using the flat charcoal fallback material." % texture_path)
+		push_warning("Wanderer: no albedo texture; using the flat charcoal fallback material.")
 		return null
 	var shader := load(PAINTED_SHADER_PATH) as Shader
 	if shader == null:
@@ -872,10 +921,9 @@ func _set_textured_parameter(parameter: StringName, value: Variant, include_swor
 	if include_sword and _sword_material != null:
 		_sword_material.set_shader_parameter(parameter, value)
 
-func _build_posterized_material(texture_path: String) -> ShaderMaterial:
-	var texture := load(texture_path) as Texture2D
+func _build_posterized_material(texture: Texture2D) -> ShaderMaterial:
 	if texture == null:
-		push_warning("Wanderer: albedo texture failed to load (%s); using the flat charcoal fallback material." % texture_path)
+		push_warning("Wanderer: no albedo texture; using the flat charcoal fallback material.")
 		return null
 	var shader := load(FLAT_SHADER_PATH) as Shader
 	if shader == null:
@@ -887,7 +935,7 @@ func _build_posterized_material(texture_path: String) -> ShaderMaterial:
 	material.set_shader_parameter("tone_dark", tone_dark)
 	material.set_shader_parameter("tone_mid", tone_mid)
 	material.set_shader_parameter("tone_light", tone_light)
-	print("Wanderer: applied posterized material - texture=%s tone_count=%d tone_dark=%s tone_mid=%s tone_light=%s" % [texture_path, tone_count, tone_dark, tone_mid, tone_light])
+	print("Wanderer: applied posterized material - texture=%s tone_count=%d tone_dark=%s tone_mid=%s tone_light=%s" % [texture.resource_path, tone_count, tone_dark, tone_mid, tone_light])
 	return material
 
 # The sword in POSTERIZED: wanderer_flat.gdshader with no texture and all

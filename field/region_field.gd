@@ -4,7 +4,6 @@ class_name RegionField
 const BATTLE_OVERLAY_SCENE_PATH := "res://battle/battle_overlay.tscn"
 const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 const RUN_END_SCENE_PATH := "res://run/run_end.tscn"
-const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 const FIELD_ENEMY_SCENE_PATH := "res://field/field_enemy.tscn"
 const PROPS_NODE_NAME := "Props"
@@ -33,6 +32,12 @@ signal floor_cleared
 # load only - no setter re-applies it: an edit takes effect the next time
 # a floor loads. Empty in play.
 @export var force_options: Dictionary[StringName, StringName] = {}
+# Dev only: the class a run starts as, when this scene starts one (no run
+# on RunState yet - the game's first floor, or F6). Read then only: a run
+# under way keeps its own RunState.character, and the end screen's NEW RUN
+# and TITLE restart with that one, so an edit here takes effect the next
+# time a run starts from this scene. No class-select screen exists yet.
+@export var starting_character: CharacterData = null
 
 @export var escape_push_distance: float = 4.0
 # How far past every enemy's contact_radius the escape push must land the
@@ -740,6 +745,24 @@ func _on_ground_built() -> void:
 	spawn_node.process_mode = Node.PROCESS_MODE_INHERIT
 	print("RegionField: Wanderer released onto %s ground at y %.3f" % ["mask" if ground.has_landmass_mask() else "SDF", spawn_node.global_position.y])
 
+# The class this run plays: RunState's once a run has started, else
+# starting_character, the one _ready() is about to start it with. What the
+# Wanderer node builds its model from - it's ready before this is.
+func get_run_character() -> CharacterData:
+	return RunState.character if RunState.character != null else starting_character
+
+# What this floor's fights, and its props without a pool of their own,
+# roll from: the class's own pool (CharacterData.reward_pool) where it has
+# one, else the floor's. Null where the floor names none - a floor without
+# a reward pool gives no cards, whoever plays it.
+func run_reward_pool(floor_data: FloorData) -> RewardPool:
+	if floor_data == null or floor_data.reward_pool == null:
+		return null
+	var character: CharacterData = get_run_character()
+	if character != null and character.reward_pool != null:
+		return character.reward_pool
+	return floor_data.reward_pool
+
 func _ready() -> void:
 	# Starts the run once per game session, seeding HP and the starting
 	# Belongings from RunState.new_run()'s own doc - guarded on character
@@ -760,7 +783,9 @@ func _ready() -> void:
 	press.name = "BattleGroundPress"
 	add_child(press)
 	if RunState.character == null:
-		RunState.new_run(load(STARTING_CHARACTER_PATH) as CharacterData)
+		if starting_character == null:
+			push_error("RegionField: no starting_character set; the run can't start.")
+		RunState.new_run(starting_character)
 	# The order at floor load: what each slot stands (no side effects),
 	# then the log line that names it, then everything spawns.
 	_resolve_encounters()
@@ -1900,7 +1925,7 @@ func _aim_prop_paths(prop: Node, depth: int) -> void:
 # against). A real find type is not this - see the task's out-of-scope
 # list. False, with a warning, if there's nothing to hold.
 func _setup_belongings_card(card: WorldCard, entry: FloorProp, floor_data: FloorData) -> bool:
-	var pool: RewardPool = entry.pool if entry.pool != null else floor_data.reward_pool
+	var pool: RewardPool = entry.pool if entry.pool != null else run_reward_pool(floor_data)
 	if pool == null:
 		push_warning("RegionField: a belongings WorldCard needs a pool to roll from (the prop's, or the floor's reward_pool); none set.")
 		return false
@@ -1918,7 +1943,7 @@ func _setup_belongings_card(card: WorldCard, entry: FloorProp, floor_data: Floor
 # from FloorData.rare_pool, gold from the floor's range - see
 # BundleProp.roll() for the split and the fallbacks.
 func _setup_bundle(bundle: BundleProp, entry: FloorProp, floor_data: FloorData) -> void:
-	var pool: RewardPool = entry.pool if entry.pool != null else floor_data.reward_pool
+	var pool: RewardPool = entry.pool if entry.pool != null else run_reward_pool(floor_data)
 	bundle.roll(RunState.rng, floor_data.gold_min, floor_data.gold_max, pool, floor_data.rare_pool)
 
 # A belongings cache's one roll, at floor load from the run's own
@@ -1926,7 +1951,7 @@ func _setup_bundle(bundle: BundleProp, entry: FloorProp, floor_data: FloorData) 
 # pool when it names none (see BelongingsCache.roll()) - plus its once-
 # per-run id and the prop's own line when it names one.
 func _setup_belongings_cache(cache: BelongingsCache, entry: FloorProp, floor_data: FloorData, id: String) -> void:
-	var pool: RewardPool = entry.pool if entry.pool != null else floor_data.reward_pool
+	var pool: RewardPool = entry.pool if entry.pool != null else run_reward_pool(floor_data)
 	cache.cache_id = id
 	if not entry.world_line.is_empty():
 		cache.world_line = entry.world_line
@@ -3205,7 +3230,7 @@ func _nearest_required_enemy(from: Vector3) -> FieldEnemy:
 # the time this resumes that node is freed.
 func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	var floor_data := get_floor_data()
-	var has_pool: bool = floor_data != null and floor_data.reward_pool != null
+	var has_pool: bool = floor_data != null and run_reward_pool(floor_data) != null
 	# No card reward to wait for: a keepsake rolled on this win is still
 	# offered, after the same beat.
 	if not has_pool and _pending_keepsake == null and _pending_glassbone <= 0:
@@ -3236,7 +3261,7 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 		push_warning("RegionField: %d Glassbone left by this win is not offered in RewardMode.SPREAD yet." % _pending_glassbone)
 		_pending_glassbone = 0
 	var spread := scene.instantiate() as RewardSpread
-	spread.pool = floor_data.reward_pool
+	spread.pool = run_reward_pool(floor_data)
 	spread.enemy = fell_to
 	spread.roll_by_rarity = true
 	spread.elite_rates = _pending_elite
@@ -3273,14 +3298,14 @@ func _open_reward_screen() -> void:
 	# no extra.
 	var gold: int = 0
 	var extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE
-	if floor_data.reward_pool != null:
+	if run_reward_pool(floor_data) != null:
 		gold = RunState.rng.randi_range(mini(floor_data.gold_min, floor_data.gold_max), maxi(floor_data.gold_min, floor_data.gold_max))
 		if role_reward != null:
 			gold = roundi(gold * role_reward.gold_multiplier)
 			extra = rewards.roll_extra(role_reward, RunState.rng)
 	var offers_cards: bool = role_reward == null or role_reward.offers_cards
 	var samphire: CardData = rewards.samphire_card if rewards != null else null
-	screen.setup(gold, floor_data.reward_pool, deck_panel, _pending_glassbone, _pending_elite, _pending_top_tier, offers_cards, extra, samphire)
+	screen.setup(gold, run_reward_pool(floor_data), deck_panel, _pending_glassbone, _pending_elite, _pending_top_tier, offers_cards, extra, samphire)
 	_pending_glassbone = 0
 	_pending_elite = false
 	_pending_top_tier = false

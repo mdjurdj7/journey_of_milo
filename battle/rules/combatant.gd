@@ -65,6 +65,10 @@ var grace_cap_mode: int = CharacterData.GraceCapMode.LARGEST_HIT
 var grace_window_turns: int = 1
 var grace_open_fraction: float = 0.5
 var took_damage_this_turn: bool = false
+# Whether self-inflicted loss accrues Toll (gain_self_loss_toll()). True
+# for every enemy, as it always was; the player's is CharacterData.has_
+# toll, copied by BattleController.setup() - false for a class without it.
+var has_toll: bool = true
 # Any Toll spent since this turn began, by any card or effect - set by
 # EffectContext.spend_toll(), cleared by BattleController._start_player_
 # turn(). Read by CardEffect.Condition.TOLL_SPENT_THIS_TURN (Gnaw).
@@ -193,7 +197,8 @@ func _init(starting_hp: int = 1) -> void:
 func gain_self_loss_toll(lost: int) -> void:
 	if lost <= 0:
 		return
-	toll += lost
+	if has_toll:
+		toll += lost
 	pending_drain += Status.count_self_loss(statuses)
 
 func is_critical() -> bool:

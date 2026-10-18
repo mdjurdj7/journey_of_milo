@@ -599,7 +599,8 @@ func _draw_field(alpha: float) -> void:
 	var tick_color: Color = _ink
 	tick_color.a = critical_tick_alpha * alpha
 	var tick_x: float = roundf(bar_left + field_bar_width * _critical_fraction())
-	draw_rect(Rect2(tick_x, -critical_tick_overhang_px, 1.0, field_bar_height + critical_tick_overhang_px * 2.0), tick_color)
+	if _shows_critical():
+		draw_rect(Rect2(tick_x, -critical_tick_overhang_px, 1.0, field_bar_height + critical_tick_overhang_px * 2.0), tick_color)
 
 	var numeral_text: String = str(_current_hp)
 	var max_text: String = battle_max_prefix + str(_max_hp)
@@ -826,7 +827,8 @@ func _draw_battle() -> void:
 	var tick_color: Color = _ink
 	tick_color.a = critical_tick_alpha * _battle_blend
 	var tick_x: float = roundf(left + battle_width * _critical_fraction())
-	draw_rect(Rect2(tick_x, bar_top - critical_tick_overhang_px, 1.0, battle_bar_height + critical_tick_overhang_px * 2.0), tick_color)
+	if _shows_critical():
+		draw_rect(Rect2(tick_x, bar_top - critical_tick_overhang_px, 1.0, battle_bar_height + critical_tick_overhang_px * 2.0), tick_color)
 
 	# Pinned to _displayed_fraction, so it stays welded to the filled end
 	# while the bar eases toward a new HP value rather than briefly
@@ -1089,9 +1091,15 @@ func _on_player_hp_changed(current: int, max_hp: int) -> void:
 # fight's own rule (Combatant.critical_at()) with the character's own
 # fraction, so this can't drift from what the cards read.
 func _is_critical() -> bool:
-	if RunState.character == null:
+	if RunState.character == null or not _shows_critical():
 		return false
 	return Combatant.critical_at(RunState.player_hp, RunState.player_max_hp, RunState.character.critical_hp_fraction)
+
+# Whether this class's readout draws Critical at all (CharacterData.
+# shows_critical): its line and its colour. With no run there's no class
+# to ask, and the line draws as it always has.
+func _shows_critical() -> bool:
+	return RunState.character == null or RunState.character.shows_critical
 
 # Where the Critical line sits along the bar: max HP x the character's
 # fraction, over max HP.
