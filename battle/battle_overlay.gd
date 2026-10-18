@@ -454,6 +454,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	_battle_feedback.setup(wanderer, on_dark_world)
 	_battle_feedback.battle_controller = battle_controller
 	battle_controller.kill_presentation_time = _kill_presentation_time
+	battle_controller.intent_rect_of = _intent_rect_of
 	battle_controller.damage_dealt.connect(_battle_feedback.on_damage_dealt)
 	battle_controller.enemy_hit_blocked.connect(_battle_feedback.on_enemy_hit_blocked)
 	battle_controller.player_hit_blocked.connect(_battle_feedback.on_player_hit_blocked)
@@ -647,6 +648,14 @@ func get_readout_rects() -> Array[Rect2]:
 		if rect.has_area():
 			rects.append(rect)
 	return rects
+
+# `enemy`'s intent readout on screen (BattleIntent.get_pair_global_rect()),
+# for a card aimed at intents: empty while it shows nothing.
+func _intent_rect_of(enemy: FieldEnemy) -> Rect2:
+	var intent: BattleIntent = _enemy_intents.get(enemy)
+	if intent == null or not is_instance_valid(intent) or not intent.is_visible_in_tree():
+		return Rect2()
+	return intent.get_pair_global_rect()
 
 # Once the camera swing/stance step has settled - the same delay HPBar/
 # EnemyStatus's style tween takes - every display with an intent shows.

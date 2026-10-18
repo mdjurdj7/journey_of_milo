@@ -1,10 +1,13 @@
 extends SceneTree
 
-# Headless probe for Garnish - 1 Energy, Uncommon Skill, one enemy: lose
-# 1 HP up front (the face's HP badge, Down Payment's SELF_DAMAGE_TOLL) and
-# gain 5 Toll in total, and the target is Garnished 5 - its next ATTACK
-# deals 5 less in all, the hits soaking it in order, each down to 0 at
-# most, after Braced's 50% and before block (EnemyTurn.reduce_hit()).
+# Headless probe for Garnish - 1 Energy, Uncommon Skill, aimed at one
+# enemy's attack intent: lose 1 HP up front (the face's HP badge, Down
+# Payment's SELF_DAMAGE_TOLL) and gain 5 Toll in total, and that intent is
+# Garnished 5 - it deals 5 less in all, the hits soaking it in order, each
+# down to 0 at most, after Braced's 50% and before block (EnemyTurn.
+# reduce_hit()). Only an attack that will land may be Garnished, once
+# (StatusData.intent_mark); bound to its intent, the Garnish is lost if
+# that intent doesn't land, and covers both of Bereft's actions.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/garnish_probe.gd
 #
@@ -28,6 +31,8 @@ const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const CARD_PATH := "res://cards/data/garnish.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const STATUS_PATH := "res://battle/rules/statuses/garnished.tres"
+const TEMPERED_PATH := "res://cards/tempered/garnish_tempered.tres"
+const BEREFT_PATH := "res://battle/rules/statuses/bereft.tres"
 const BRACED_PATH := "res://battle/rules/statuses/braced.tres"
 const DENIED_PATH := "res://battle/rules/statuses/denied.tres"
 const OFF_THE_ROCK_PATH := "res://battle/rules/statuses/off_the_rock.tres"
@@ -62,8 +67,8 @@ func _initialize() -> void:
 	_check_scissor()
 	_check_sting_braced()
 	_check_tail_lash()
-	_check_waits()
-	_check_stacking()
+	_check_needs_an_attack()
+	_check_once_per_intent()
 	_check_hp_and_toll()
 	await _check_fight()
 
@@ -169,54 +174,49 @@ func _check_tail_lash() -> void:
 
 # Only an Attack that resolves spends it: Rebury, the Sputter's Block, a
 # Denied Sting leave it standing - and the next Attack takes it.
-func _check_waits() -> void:
+# Garnish targets an attack intent that will land: not the Underfoot's
+# Rebury, not the Sputter's Block, not a Denied Sting. One on the Sting,
+# Denied after, is lost - "cancelled" - and lands nothing.
+func _check_needs_an_attack() -> void:
 	var underfoot: EnemyData = load(UNDERFOOT_PATH)
-	var sting: EnemyIntent = _queue(underfoot, "Sting")
+	var card: CardData = load(CARD_PATH)
 	var enemy: Combatant = _enemy(underfoot, "Rebury")
-	var player: Combatant = _player(60)
-	_garnish(player, enemy)
-	var hp_before: int = player.hp
-	EnemyTurn.take_turn(enemy, underfoot, player)
-	_expect_eq(player.hp, hp_before, "Rebury deals nothing")
-	var waiting: Status = _garnished(enemy)
-	_expect(waiting != null and waiting.magnitude == _garnish_total, "...and leaves Garnished %d standing" % _garnish_total)
-	_expect_eq(EnemyTurn.current_intent(enemy, underfoot), sting, "The Sting comes next")
-	_expect_attack(enemy, underfoot, player, _absorb([sting.value], _garnish_total), "...and takes it")
-	_expect(_garnished(enemy) == null, "...spending it")
-
+	_expect(not EffectResolver.can_target(card, enemy), "Garnish can't target the Rebury")
+	_expect_eq(EnemyTurn.mark_refusal(enemy, underfoot, load(STATUS_PATH)), EnemyTurn.MarkRefusal.NOT_ATTACK, "...not an attack")
 	var sputter: EnemyData = load(SPUTTER_PATH)
-	enemy = _enemy(sputter, "Block")
-	_garnish(player, enemy)
-	EnemyTurn.take_turn(enemy, sputter, player)
-	_expect(_garnished(enemy) != null, "The Sputter's Block leaves it standing")
+	_expect(not EffectResolver.can_target(card, _enemy(sputter, "Block")), "...nor the Sputter's Block")
 
+	var player: Combatant = _player(60)
 	enemy = _enemy(underfoot, "Sting")
+	_expect(EffectResolver.can_target(card, enemy), "The Sting it can")
 	_garnish(player, enemy)
 	Status.apply_to(enemy.statuses, load(DENIED_PATH))
-	hp_before = player.hp
-	EnemyTurn.take_turn(enemy, underfoot, player)
+	_expect_eq(EnemyTurn.mark_loss(_garnished(enemy), enemy, underfoot), "cancelled", "...Denied after: the Garnish won't hold")
+	var hp_before: int = player.hp
+	var result: Dictionary = EnemyTurn.take_turn(enemy, underfoot, player)
 	_expect_eq(player.hp, hp_before, "A Denied Sting lands nothing")
-	_expect(_garnished(enemy) != null, "...and leaves it standing")
+	var marks: Array = result.get("marks", [])
+	_expect(marks.size() == 1 and str(marks[0]["outcome"]) == "lost" and str(marks[0]["reason"]) == "cancelled", "...its Garnish lost, cancelled")
+	_expect(_garnished(enemy) == null, "...and gone")
+
+	enemy = _enemy(underfoot, "Sting")
+	Status.apply_to(enemy.statuses, load(DENIED_PATH))
+	_expect(not EffectResolver.can_target(card, enemy), "A Denied Sting can't be Garnished")
 	_completed += 1
 
-# Two Garnishes add up: 10 off the next Attack, one status.
-func _check_stacking() -> void:
+# One Garnish an intent - Garnish+ too - and it covers every hit of every
+# action: the Tail Lash's hits soak it in order; Bereft's two Scissors
+# each lose it.
+func _check_once_per_intent() -> void:
 	var data: EnemyData = load(SPUTTER_PATH)
 	var intent: EnemyIntent = _queue(data, "Scissor")
 	var enemy: Combatant = _enemy(data, "Scissor")
 	var player: Combatant = _player(60)
 	_garnish(player, enemy)
-	_garnish(player, enemy)
-	var count: int = 0
-	for active: Status in enemy.statuses:
-		if active.data.reduces_attack_total:
-			count += 1
-	_expect_eq(count, 1, "Two Garnishes: one status")
-	var garnished: Status = _garnished(enemy)
-	_expect(garnished != null and garnished.magnitude == _garnish_total * 2, "...worth %d" % (_garnish_total * 2))
-	if garnished != null:
-		_expect_eq(garnished.describe(), "Its next Attack deals %d less." % (_garnish_total * 2), "...its hover says so")
-	_expect_attack(enemy, data, player, _absorb([intent.value], _garnish_total * 2), "Scissor %d, Garnished twice" % intent.value)
+	_expect(not EffectResolver.can_target(load(CARD_PATH), enemy), "A Garnished intent can't be Garnished again")
+	_expect(not EffectResolver.can_target(load(TEMPERED_PATH), enemy), "...nor by Garnish+")
+	_expect_eq(EnemyTurn.mark_refusal(enemy, data, load(STATUS_PATH)), EnemyTurn.MarkRefusal.ALREADY, "...already garnished")
+	_expect_attack(enemy, data, player, _absorb([intent.value], _garnish_total), "Scissor %d, Garnished" % intent.value)
 
 	var greyshelf: EnemyData = load(GREYSHELF_PATH)
 	var lash: EnemyIntent = _queue(greyshelf, "Tail Lash")
@@ -225,8 +225,15 @@ func _check_stacking() -> void:
 		hits.append(lash.value)
 	enemy = _enemy(greyshelf, "Tail Lash")
 	_garnish(player, enemy)
+	_expect_attack(enemy, greyshelf, player, _absorb(hits, _garnish_total), "Tail Lash, Garnished")
+
+	enemy = _enemy(data, "Scissor")
+	Status.apply_to(enemy.statuses, load(BEREFT_PATH))
 	_garnish(player, enemy)
-	_expect_attack(enemy, greyshelf, player, _absorb(hits, _garnish_total * 2), "Tail Lash, Garnished twice")
+	var both: Array[int] = []
+	for action in 2:
+		both.append_array(_absorb([intent.value], _garnish_total))
+	_expect_attack(enemy, data, player, both, "Bereft's two Scissors, Garnished: each")
 	_completed += 1
 
 # The price: 1 HP, and 5 Toll in total - the HP's own 1 topped up by 4.
@@ -361,6 +368,7 @@ func _queue(data: EnemyData, intent_name: String) -> EnemyIntent:
 # A fresh enemy with `intent_name` queued.
 func _enemy(data: EnemyData, intent_name: String) -> Combatant:
 	var enemy := Combatant.new(data.max_hp)
+	enemy.enemy_data = data
 	EnemyTurn.pick_initial_intent(enemy, data)
 	enemy.current_intent_index = data.intents.find(_queue(data, intent_name))
 	EnemyTurn._sync_queued(enemy, data)

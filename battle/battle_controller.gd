@@ -93,6 +93,12 @@ signal player_hit_blocked(enemy: FieldEnemy)
 # enemy's damage_dealt.
 signal mound_damaged(enemy: FieldEnemy, mound: int, amount: int, hp: int, max_hp: int)
 signal mound_broken(enemy: FieldEnemy, mound: int, own: bool)
+# A status living on one of `enemy`'s intents (StatusData.intent_mark -
+# Brace's, Garnish's) has left it: `entry` is EnemyTurn.mark_entry()'s,
+# with "outcome" "spent" (its intent landed - "before" and "after" the
+# hits' totals either side of it) or "lost" ("reason": "replaced",
+# "cancelled" or "enemy died").
+signal intent_mark_settled(enemy: FieldEnemy, entry: Dictionary)
 # Something a combatant gained that no damage_dealt carries, for its
 # floating number: `kind` "heal" (HP back - a card's heal or Drain, Grace
 # reclaimed, Devour, a lethal guard's lift, a packmate's Forage) or
@@ -230,6 +236,14 @@ var _enemy_rects: Dictionary = {} # FieldEnemy -> Rect2, see _refresh_enemy_rect
 # _enemy_at() (-1: none, or the enemy itself), and the one lit.
 var _mound_rects: Array[Dictionary] = []
 var _cursor_mound: int = -1
+# An enemy's intent readout on screen, for a card that marks an intent
+# (Brace, Garnish) to be aimed at it as well as at the body: (enemy:
+# FieldEnemy) -> Rect2, empty when it shows none. Set by BattleOverlay,
+# which owns the readouts.
+var intent_rect_of: Callable = Callable()
+# The intents a card that marks one may be aimed at now: FieldEnemy ->
+# Rect2 (_refresh_enemy_rects()), read by _enemy_at() before the bodies.
+var _intent_rects: Dictionary = {}
 var _hovered_mound: int = -1
 var _combatants: Dictionary = {} # FieldEnemy -> Combatant
 var _effect_resolver := EffectResolver.new()
@@ -362,6 +376,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	for enemy in enemies:
 		var data: EnemyData = enemy.enemy_data
 		var combatant := Combatant.new(data.max_hp if data != null else 1)
+		combatant.enemy_data = data
 		if data != null:
 			EnemyTurn.pick_initial_intent(combatant, data)
 			combatant.dormant = data.starts_dormant
@@ -433,12 +448,29 @@ func get_intent_preview(enemy: FieldEnemy) -> Dictionary:
 	var data: EnemyData = enemy.enemy_data if enemy != null else null
 	if combatant == null or data == null or combatant.hp <= 0:
 		return {}
+	_drop_lost_marks(enemy, combatant, data)
 	var preview: Dictionary = EnemyTurn.preview_intent(combatant, data, player)
 	# A heal for packmates shows what it will actually heal - the same
 	# call the turn makes, without applying it.
 	if int(preview.get("type", -1)) == EnemyIntent.IntentType.HEAL_ALLY and not bool(preview.get("pain_turn", false)):
 		preview["per_hit"] = _heal_packmates(enemy, int(preview["per_hit"]), false)
 	return preview
+
+# What no longer holds on `enemy`'s intent (EnemyTurn.mark_loss() - the
+# intent replaced or cancelled since the card landed) leaves it, said
+# (intent_mark_settled). Every change to an intent is shown through
+# get_intent_preview(), which asks this first - so what the readout shows
+# never carries a mark that won't hold.
+func _drop_lost_marks(enemy: FieldEnemy, combatant: Combatant, data: EnemyData) -> void:
+	for active in Status.marks(combatant.statuses):
+		var reason: String = EnemyTurn.mark_loss(active, combatant, data)
+		if reason.is_empty():
+			continue
+		combatant.statuses.erase(active)
+		var entry: Dictionary = EnemyTurn.mark_entry(active)
+		entry["outcome"] = "lost"
+		entry["reason"] = reason
+		intent_mark_settled.emit(enemy, entry)
 
 func _emit_intent_previews() -> void:
 	for enemy in enemies:
@@ -630,6 +662,29 @@ func _other_hand_views(card_view: CardView) -> Array[CardView]:
 # only on a taunting enemy while one stands).
 func _can_target(card: CardData, combatant: Combatant) -> bool:
 	return EffectResolver.can_target(card, combatant, _hittable_enemy_combatants())
+
+# Whether `card` marks an intent (StatusData.intent_mark - Brace, Garnish):
+# aimed at an enemy's queued intent, its readout or its body.
+func _marks_intent(card: CardData) -> bool:
+	return marking_status(card) != null
+
+# The status `card` puts on an intent (StatusData.intent_mark), or null.
+func marking_status(card: CardData) -> StatusData:
+	if card == null:
+		return null
+	for effect in card.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and effect.status_data != null and effect.status_data.intent_mark != &"":
+			return effect.status_data
+	return null
+
+# Why `card` can't mark `enemy`'s queued intent (EnemyTurn.mark_refusal()):
+# NONE when it can, or for a card that marks none.
+func mark_refusal_for(card: CardData, enemy: FieldEnemy) -> EnemyTurn.MarkRefusal:
+	var status_data: StatusData = marking_status(card)
+	var combatant: Combatant = _combatants.get(enemy)
+	if status_data == null:
+		return EnemyTurn.MarkRefusal.NONE
+	return EnemyTurn.mark_refusal(combatant, enemy.enemy_data if enemy != null else null, status_data)
 
 func _has_valid_target(card: CardData) -> bool:
 	return EffectResolver.has_target(card, _hittable_enemy_combatants())
@@ -1465,6 +1520,8 @@ func _take_turn_logged(enemy: FieldEnemy, combatant: Combatant, data: EnemyData)
 		var held: Status = Status.find_in(combatant.statuses, data.attack_card_status)
 		stacks = held.stack_count if held != null else 0
 	var result: Dictionary = EnemyTurn.take_turn(combatant, data, player)
+	for entry: Dictionary in result.get("marks", []):
+		intent_mark_settled.emit(enemy, entry)
 	if result["pain_turn"]:
 		RunLogger.mechanic("pain_turn_spent", {"enemy": id})
 	if threshold > 0:
@@ -2366,6 +2423,15 @@ func _heal_run_hp(amount: int, source: String = "") -> void:
 # (_release_deaths_when_due()).
 func _drop_enemy(enemy: FieldEnemy) -> void:
 	RunLogger.enemy_died(_log_id(enemy))
+	# What lived on its intent goes with it, unspent.
+	var dying: Combatant = _combatants.get(enemy)
+	if dying != null:
+		for active in Status.marks(dying.statuses):
+			dying.statuses.erase(active)
+			var entry: Dictionary = EnemyTurn.mark_entry(active)
+			entry["outcome"] = "lost"
+			entry["reason"] = "enemy died"
+			intent_mark_settled.emit(enemy, entry)
 	enemies.erase(enemy)
 	_combatants.erase(enemy)
 	_enemy_rects.erase(enemy)
@@ -2643,6 +2709,7 @@ func _default_target() -> FieldEnemy:
 func _refresh_enemy_rects() -> void:
 	_enemy_rects.clear()
 	_mound_rects.clear()
+	_intent_rects.clear()
 	var camera := get_viewport().get_camera_3d()
 	if camera == null:
 		return
@@ -2660,6 +2727,12 @@ func _refresh_enemy_rects() -> void:
 			continue
 		if _pending_card_view != null and not _can_target(_pending_card_view.card_data, combatant):
 			continue
+		# A card that marks an intent (Brace, Garnish) is aimed at the
+		# intent too: its readout is a target of its own (_enemy_at()).
+		if _pending_card_view != null and _marks_intent(_pending_card_view.card_data) and intent_rect_of.is_valid():
+			var intent_rect: Rect2 = intent_rect_of.call(enemy)
+			if intent_rect.has_area():
+				_intent_rects[enemy] = intent_rect.grow(target_padding_px)
 		# Dug in (DIG): its standing mounds are its targets, each its own
 		# rect, every one alike; the body under them has none.
 		if combatant.dug_in:
@@ -2683,6 +2756,11 @@ func _enemy_at(screen_pos: Vector2) -> FieldEnemy:
 	var best: FieldEnemy = null
 	var best_distance: float = INF
 	_cursor_mound = -1
+	# An intent under the cursor (a card that marks one - _intent_rects)
+	# is its enemy's, before any body: the readout sits over the world.
+	for enemy: FieldEnemy in _intent_rects:
+		if (_intent_rects[enemy] as Rect2).has_point(screen_pos):
+			return enemy
 	for enemy: FieldEnemy in _enemy_rects:
 		var rect: Rect2 = _enemy_rects[enemy]
 		if not rect.has_point(screen_pos):

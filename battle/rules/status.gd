@@ -19,6 +19,10 @@ var progress: int = 0
 # what it grants at turn start (resolve_turn_start_triggers()). A heal it
 # makes is put down to it (attacks_drain_source()).
 var granted_by: String = ""
+# A status with an intent_mark (Braced, Garnished): the intent it was put
+# on - the one its enemy had queued as the card landed. It holds only
+# while that is still the intent queued (EnemyTurn.mark_loss()).
+var bound_intent: EnemyIntent = null
 
 func _init(status_data: StatusData) -> void:
 	data = status_data
@@ -192,6 +196,29 @@ static func apply_amount(statuses: Array[Status], status_data: StatusData, amoun
 	var fresh := Status.new(status_data)
 	fresh.magnitude = amount
 	statuses.append(fresh)
+
+# The statuses living on an intent (StatusData.intent_mark), in order.
+static func marks(statuses: Array[Status]) -> Array[Status]:
+	var found: Array[Status] = []
+	for active in statuses:
+		if active.data != null and active.data.intent_mark != &"":
+			found.append(active)
+	return found
+
+# The one carrying `mark` ("brace", "garnish"), or null.
+static func find_mark(statuses: Array[Status], mark: StringName) -> Status:
+	for active in statuses:
+		if active.data != null and active.data.intent_mark == mark:
+			return active
+	return null
+
+# `statuses` less `left_out`: a new list, the statuses themselves the same.
+static func without(statuses: Array[Status], left_out: Array[Status]) -> Array[Status]:
+	var kept: Array[Status] = []
+	for active in statuses:
+		if not left_out.has(active):
+			kept.append(active)
+	return kept
 
 static func find_in(statuses: Array[Status], status_data: StatusData) -> Status:
 	for active in statuses:
@@ -583,11 +610,15 @@ static func refuse_lethal(player: Combatant, was_critical: bool) -> bool:
 	return true
 
 # The holder's own attack has resolved: every status that lasts only until
-# then (StatusData.consumed_by_own_attack - Braced on an enemy) is gone -
-# but `keep`, which this attack didn't take (EnemyTurn.take_turn()).
+# then (StatusData.consumed_by_own_attack - Roused, Goaded) is gone - but
+# `keep`, which this attack didn't take (EnemyTurn.take_turn()). One living
+# on the intent (StatusData.intent_mark - Braced, Garnished) stays: its
+# intent settles it once every action of it is done.
 static func consume_after_attack(statuses: Array[Status], keep: StatusData = null, strike_back: bool = false) -> void:
 	for active in statuses.duplicate():
 		if strike_back and active.data.ignores_strike_backs:
+			continue
+		if active.data.intent_mark != &"":
 			continue
 		if active.data.consumed_by_own_attack and not (keep != null and active.data == keep):
 			statuses.erase(active)

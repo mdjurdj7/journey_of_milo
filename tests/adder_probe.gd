@@ -184,11 +184,20 @@ func _check_counter_rules() -> void:
 	for intent in data.intents:
 		if intent.intent_name == "Bite":
 			bite = intent
+	# Its Bite, queued and Braced (bound to it, as a Brace played on it
+	# would be), on its own turn: the turn settles the Brace.
 	var hp_before: int = player.hp
-	var turn: Dictionary = {"intent": "Bite", "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0}
-	EnemyTurn.land_attack(enemy, data, bite, player, turn)
+	enemy.current_intent_index = data.intents.find(bite)
+	var braced: Status = Status.find_mark(enemy.statuses, &"brace")
+	if braced != null:
+		braced.bound_intent = bite
+	EnemyTurn.take_turn(enemy, data, player)
 	_expect_eq(hp_before - player.hp, 0, "Its Bite, on its turn: No Further takes it to 0")
 	_expect(not _has(enemy, BRACED_PATH) and not _has(player, NO_FURTHER_ARMED_PATH), "...and spends both")
+	# Its turn ended the Coiled with it (what the last move brought): back
+	# on, for the strike backs below.
+	if not _has(enemy, COILED_PATH):
+		Status.apply_to(enemy.statuses, load(COILED_PATH))
 	# Its attack bonuses count.
 	player = _grace_player()
 	Status.apply_to(enemy.statuses, load(HUNGRY_PATH))
@@ -304,7 +313,8 @@ func _check_fight_denied() -> void:
 	await _teardown()
 	_completed += 1
 
-# A Skill into Coiled draws nothing back.
+# A Skill into Coiled draws nothing back - a Brace on the Bite; a second
+# can't target the Braced Bite at all.
 func _check_fight_skill() -> void:
 	var controller: Node = await _start_fight(BRACE_PATH)
 	if controller != null:
@@ -314,8 +324,9 @@ func _check_fight_skill() -> void:
 		_expect(_has(_combatant(controller, adder), COILED_PATH), "Coiled")
 		var before: int = player.hp
 		await _play_first(controller, adder)
-		await _play_first(controller, adder)
-		_expect_eq(before - player.hp, 0, "Two Braces - Skills - into Coiled: nothing back")
+		_expect_eq(before - player.hp, 0, "A Brace - a Skill - into Coiled: nothing back")
+		_expect(_has(_combatant(controller, adder), BRACED_PATH), "...the Bite Braced")
+		_expect(not EffectResolver.can_target(load(BRACE_PATH) as CardData, _combatant(controller, adder)), "...and a second Brace can't target it")
 	await _teardown()
 	_completed += 1
 

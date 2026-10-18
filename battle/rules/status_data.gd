@@ -157,12 +157,26 @@ enum Mark { NONE, COIL, DROP }
 @export var attack_bonus_against_holder: int = 0
 
 # Removed from its holder once the holder's own ATTACK has resolved -
-# after every hit of it, so a status that softens that attack (Braced, on
-# an enemy) softens all of it - whether or not any damage got through.
-# An attack interrupted before it resolves, a Defend or a Burrow leave it
-# in place (EnemyTurn.take_turn()). Pair it with DURATION_UNTIL_TRIGGERED
-# so the turn counter never takes it first.
+# after every hit of it, so a status that softens that attack softens all
+# of it - whether or not any damage got through. An attack interrupted
+# before it resolves, a Defend or a Burrow leave it in place (EnemyTurn.
+# take_turn()). Pair it with DURATION_UNTIL_TRIGGERED so the turn counter
+# never takes it first. One with an intent_mark is settled by its intent
+# instead (below).
 @export var consumed_by_own_attack: bool = false
+
+# Lives on one enemy intent, not on the enemy (Braced, Garnished): the
+# card that puts it on (APPLY_STATUS_TO_TARGET) targets an attack intent
+# the enemy has queued - one that will deal damage when it resolves, not a
+# strike back - and binds to it (Status.bound_intent). It holds every hit
+# of every action of that intent (both of Bereft's), is spent once the
+# intent has landed, and is lost - with why - if the intent is replaced,
+# cancelled (Deny, a pain turn, an interrupt) or its enemy dies first
+# (EnemyTurn.mark_loss(), take_turn()). An out-of-turn answer to a Signal
+# neither reads nor spends it. The mark names it: one of each per intent
+# ("brace", "garnish" - Garnish+'s as Garnish's), so a second of the same
+# can't target an intent already carrying one. Empty: an ordinary status.
+@export var intent_mark: StringName = &""
 
 # Its holder's next ATTACK deals `magnitude` less in all, not per hit
 # (Garnish's Garnished): the hits soak it in order, each down to 0 at
@@ -232,7 +246,8 @@ enum Mark { NONE, COIL, DROP }
 # Siltjaw's Erupt): it neither softens that hit nor
 # is spent by it, and waits, armed, for the enemy's own turn. The strike
 # back lands in full past it. Braced (Brace) and Garnished (Garnish) on
-# the enemy; No Further's armed status and Unbroken's on the player.
+# the enemy's intent; No Further's armed status and Unbroken's on the
+# player.
 @export var ignores_strike_backs: bool = false
 
 # A status that waits for its holder to be Critical (No Further): the

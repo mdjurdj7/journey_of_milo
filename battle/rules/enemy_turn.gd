@@ -152,12 +152,16 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# "actions", one after another, and summed into the turn's
 				# own keys; a turn's one attack is the same, once.
 				var actions: Array[Dictionary] = []
+				# What the marks on it changed, summed over every action
+				# (land_attack()'s "mark_numbers").
+				var mark_numbers: Dictionary = {}
+				result["mark_numbers"] = mark_numbers
 				for action in repeats(combatant, intent):
 					# Either side down ends it - the enemy too, killed by
 					# what came back off its last attack (hit_back_damage).
 					if player.hp <= 0 or combatant.hp <= 0:
 						break
-					var attack: Dictionary = {"intent": result["intent"], "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "applied_to_player": 0}
+					var attack: Dictionary = {"intent": result["intent"], "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "applied_to_player": 0, "mark_numbers": mark_numbers}
 					land_attack(combatant, data, intent, player, attack, intent.lands_as_strike_back)
 					# What the attack leaves on the player (the Adder's Venom)
 					# lands whatever its hits did - Block taking all of them too.
@@ -209,6 +213,11 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 		# Coiled). A move lost or broken, above, brings nothing.
 		if intent.status_on_resolve != null:
 			Status.apply_to(combatant.statuses, intent.status_on_resolve)
+	# What lived on its intent (StatusData.intent_mark - Braced, Garnished):
+	# spent once that intent has landed, every action of it; lost, with
+	# why, if this turn's move was another or didn't land. "marks": one
+	# entry each (_settle_marks()).
+	result["marks"] = _settle_marks(combatant, intent, result)
 
 	# Counted whatever the turn did - an interrupted or cancelled one too -
 	# so escalation keeps its own clock.
@@ -267,9 +276,31 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 	var own_statuses: Array[Status] = Status.strike_back_view(combatant.statuses) if strike_back else combatant.statuses
 	var player_statuses: Array[Status] = Status.strike_back_view(player.statuses) if strike_back else player.statuses
 	var reduction_left: int = Status.attack_total_reduction(own_statuses) + Status.attack_total_reduction(player_statuses)
+	# What lives on the intent (StatusData.intent_mark - Braced, Garnished;
+	# never on a strike back), and what each takes off this attack, for
+	# "mark_numbers": a modifier (Braced) its hits before and after it, a
+	# total reduction (Garnished) its hits before and after its share of
+	# the cut - its share soaked first.
+	var marked: Array[Status] = Status.marks(own_statuses)
+	var numbers: Dictionary = result.get("mark_numbers", {})
+	var mark_left: Dictionary = {}
+	for active in marked:
+		if active.data.reduces_attack_total:
+			mark_left[active] = maxi(active.magnitude, 0)
 	for hit in hit_count(combatant, intent):
 		var amount: int = hit_amount(combatant, data, intent, hit, player.statuses, strike_back)
+		if not marked.is_empty():
+			var plain: int = _hit_amount_seen(combatant, data, intent, Status.without(own_statuses, marked), player.statuses)
+			for active in marked:
+				if active.data.category == StatusData.Category.MODIFIER:
+					_tally_mark(numbers, active.data.intent_mark, plain, amount)
 		var cut: int = reduce_hit(amount, reduction_left)
+		var share_left: int = cut
+		for active: Status in mark_left:
+			var share: int = mini(share_left, int(mark_left[active]))
+			mark_left[active] = int(mark_left[active]) - share
+			share_left -= share
+			_tally_mark(numbers, active.data.intent_mark, amount, amount - share)
 		amount -= cut
 		reduction_left -= cut
 		# The worn piece's first hit (first_hit_scale): this one, if it is
@@ -542,6 +573,72 @@ static func hit_count(combatant: Combatant, intent: EnemyIntent) -> int:
 	return hits
 
 # Whether this enemy's next turn is skipped (Denied).
+# Why a card marking an intent (StatusData.intent_mark - Brace, Garnish)
+# may not target this enemy's queued intent: NONE when it may - an attack
+# that will land when it resolves, not one that lands as a strike back
+# (the Erupt), carrying no `status_data` mark yet. NO_INTENT: nothing
+# shown (dormant, dead); NOT_ATTACK; ONLY_BLOCK (lands as a strike back);
+# WONT_LAND (Denied, a pain turn's, an interrupted one); ALREADY.
+enum MarkRefusal { NONE, NO_INTENT, NOT_ATTACK, ONLY_BLOCK, WONT_LAND, ALREADY }
+
+static func mark_refusal(combatant: Combatant, data: EnemyData, status_data: StatusData) -> MarkRefusal:
+	if combatant == null or data == null or combatant.hp <= 0 or combatant.dormant:
+		return MarkRefusal.NO_INTENT
+	var intent: EnemyIntent = current_intent(combatant, data)
+	if intent == null:
+		return MarkRefusal.NO_INTENT
+	if intent.type != EnemyIntent.IntentType.ATTACK:
+		return MarkRefusal.NOT_ATTACK
+	if intent.lands_as_strike_back:
+		return MarkRefusal.ONLY_BLOCK
+	if combatant.pain_turn_pending or is_denied(combatant) or is_interrupted(combatant, intent):
+		return MarkRefusal.WONT_LAND
+	var held: Status = Status.find_mark(combatant.statuses, status_data.intent_mark) if status_data != null else null
+	if held != null and held.bound_intent == intent:
+		return MarkRefusal.ALREADY
+	return MarkRefusal.NONE
+
+# Whether a status living on an intent (StatusData.intent_mark) still
+# holds in the player's turn: "" while its intent is queued and will
+# land; "replaced" once another is queued (a pack move dropped, the
+# Siltjaw up through its mound); "cancelled" once it won't land (Denied,
+# a pain turn, an interrupt met).
+static func mark_loss(active: Status, combatant: Combatant, data: EnemyData) -> String:
+	var intent: EnemyIntent = current_intent(combatant, data) if data != null else null
+	if intent == null or intent != active.bound_intent or combatant.dormant:
+		return "replaced"
+	if combatant.pain_turn_pending or is_denied(combatant) or is_interrupted(combatant, intent):
+		return "cancelled"
+	return ""
+
+# The enemy's turn is done: each status living on an intent (Status.
+# marks()) leaves it - "spent" when its intent was the move that landed
+# (with "before" and "after": the hits' total either side of it, from
+# land_attack()'s "mark_numbers"), "lost" otherwise, with "reason":
+# "replaced" (another move came) or "cancelled" (it didn't land). Each
+# entry names its "mark", "status", "intent" and the card that put it on
+# ("granted_by").
+static func _settle_marks(combatant: Combatant, intent: EnemyIntent, result: Dictionary) -> Array[Dictionary]:
+	var settled: Array[Dictionary] = []
+	var numbers: Dictionary = result.get("mark_numbers", {})
+	for active in Status.marks(combatant.statuses):
+		var entry: Dictionary = mark_entry(active)
+		if active.bound_intent == intent and bool(result["attacked"]):
+			entry["outcome"] = "spent"
+			var tally: Dictionary = numbers.get(active.data.intent_mark, {"before": 0, "after": 0})
+			entry["before"] = int(tally["before"])
+			entry["after"] = int(tally["after"])
+		else:
+			entry["outcome"] = "lost"
+			entry["reason"] = "replaced" if active.bound_intent != intent else "cancelled"
+		combatant.statuses.erase(active)
+		settled.append(entry)
+	return settled
+
+# What the run log and the readout say of a status living on an intent.
+static func mark_entry(active: Status) -> Dictionary:
+	return {"mark": active.data.intent_mark, "status": active.data.id, "intent": active.bound_intent.intent_name if active.bound_intent != null else "", "granted_by": active.granted_by}
+
 static func is_denied(combatant: Combatant) -> bool:
 	return Status.skip_turn_status(combatant.statuses) != null
 
@@ -602,10 +699,21 @@ static func intent_value(combatant: Combatant, data: EnemyData, intent: EnemyInt
 static func hit_amount(combatant: Combatant, data: EnemyData, intent: EnemyIntent, hit: int, player_statuses: Array[Status], strike_back: bool = false) -> int:
 	var own: Array[Status] = Status.strike_back_view(combatant.statuses) if strike_back else combatant.statuses
 	var theirs: Array[Status] = Status.strike_back_view(player_statuses) if strike_back else player_statuses
+	return _hit_amount_seen(combatant, data, intent, own, theirs)
+
+# hit_amount() off the statuses given for each side.
+static func _hit_amount_seen(combatant: Combatant, data: EnemyData, intent: EnemyIntent, own: Array[Status], theirs: Array[Status]) -> int:
 	var amount: int = intent_value(combatant, data, intent)
 	amount += Status.attack_bonus(own, combatant.is_critical(), held_back(data, intent))
 	amount = Status.apply_modifiers(amount, own, StatusData.ModifierTarget.OUTGOING_DAMAGE)
 	return Status.apply_modifiers(amount, theirs, StatusData.ModifierTarget.INCOMING_DAMAGE)
+
+# One hit's `before` and `after` a mark, onto its running "before"/"after".
+static func _tally_mark(numbers: Dictionary, mark: StringName, before: int, after: int) -> void:
+	var tally: Dictionary = numbers.get(mark, {"before": 0, "after": 0})
+	tally["before"] = int(tally["before"]) + before
+	tally["after"] = int(tally["after"]) + after
+	numbers[mark] = tally
 
 # What one hit gives up to the attack's total reduction (Garnished -
 # StatusData.reduces_attack_total) with `reduction_left` still to soak:
@@ -780,7 +888,17 @@ static func answer_signal(combatant: Combatant, data: EnemyData, player: Combata
 	if intent == null or combatant.hp <= 0 or player.hp <= 0:
 		return result
 	result["intent"] = intent.intent_name
+	# What lives on its own intent (Braced, Garnished on its Nip) waits for
+	# that intent's own turn: out of the list while the answer lands, then
+	# back where it was.
+	var marked: Array[Status] = Status.marks(combatant.statuses)
+	var at: Array[int] = []
+	for active in marked:
+		at.append(combatant.statuses.find(active))
+		combatant.statuses.erase(active)
 	land_attack(combatant, data, intent, player, result)
+	for i in marked.size():
+		combatant.statuses.insert(mini(at[i], combatant.statuses.size()), marked[i])
 	if intent.applies_to_player != null and intent.applied_amount > 0:
 		Status.apply_amount(player.statuses, intent.applies_to_player, intent.applied_amount)
 		result["applied_to_player"] = intent.applied_amount

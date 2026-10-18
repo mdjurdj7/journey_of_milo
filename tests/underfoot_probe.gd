@@ -595,6 +595,7 @@ func _underfoot() -> EnemyData:
 
 func _enemy(data: EnemyData) -> Combatant:
 	var enemy := Combatant.new(data.max_hp)
+	enemy.enemy_data = data
 	EnemyTurn.pick_initial_intent(enemy, data)
 	return enemy
 

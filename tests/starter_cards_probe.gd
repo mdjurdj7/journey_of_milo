@@ -14,7 +14,10 @@ extends SceneTree
 
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BATTLE_CONTROLLER_PATH := "res://battle/battle_controller.gd"
-const CASES := 15
+const CASES := 17
+const BRACED_PATH := "res://battle/rules/statuses/braced.tres"
+const BEREFT_PATH := "res://battle/rules/statuses/bereft.tres"
+const GARNISH_PATH := "res://cards/data/garnish.tres"
 # Cards whose one status prints as two lines - a rule written as two
 # sentences (Sentence's countdown and its hurry; The Return's count and
 # its Drain). Every other status-applying effect is one line.
@@ -95,10 +98,12 @@ func _initialize() -> void:
 	_check_slash_and_bite_down()
 	_check_brace_single_hit()
 	_check_brace_multi_hit()
-	_check_brace_waits_through_defend()
+	_check_brace_needs_an_attack()
 	_check_brace_spent_when_blocked()
-	_check_brace_survives_interrupt()
-	_check_brace_reapplied()
+	_check_brace_lost_on_interrupt()
+	_check_brace_once_per_intent()
+	_check_brace_both_actions()
+	_check_brace_waits_out_an_answer()
 	_check_brace_face()
 	_check_lasting_cards_leave_rotation()
 	await _check_starter_art()
@@ -154,6 +159,10 @@ func _check_brace_single_hit() -> void:
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
 	_expect_eq(int(result["damage_to_hp"]), 3, "Braced attack lands for 3")
 	_expect(not _is_braced(enemy), "Braced gone after the attack")
+	var marks: Array = result.get("marks", [])
+	_expect_eq(marks.size(), 1, "...one mark settled")
+	if marks.size() == 1:
+		_expect_eq([str(marks[0]["outcome"]), int(marks[0]["before"]), int(marks[0]["after"])], ["spent", 7, 3], "...spent: 7 before the Brace, 3 after")
 	EnemyTurn.take_turn(other, other_data, player)
 	_expect_eq(player.hp, 50 - 3 - 7, "Other enemy hits in full")
 	_completed += 1
@@ -171,16 +180,24 @@ func _check_brace_multi_hit() -> void:
 	_expect(not _is_braced(enemy), "Braced gone after the whole attack")
 	_completed += 1
 
-func _check_brace_waits_through_defend() -> void:
+# Brace targets an attack intent: not a Defend; bound to an attack, it is
+# lost - "replaced" - once another intent is queued, and never reaches it.
+func _check_brace_needs_an_attack() -> void:
 	var player: Combatant = _player(50)
 	var data: EnemyData = _enemy_data([_defend(5), _attack(8, 1)])
 	var enemy: Combatant = _enemy(data)
-	_brace(player, enemy)
+	_expect(not EffectResolver.can_target(_card("brace"), enemy), "Brace can't target a Defend")
+	_expect_eq(EnemyTurn.mark_refusal(enemy, data, _braced_data()), EnemyTurn.MarkRefusal.NOT_ATTACK, "...not an attack")
 	EnemyTurn.take_turn(enemy, data, player)
-	_expect(_is_braced(enemy), "Braced stays through a Defend")
+	_expect(EffectResolver.can_target(_card("brace"), enemy), "...but the Attack after it")
+	_brace(player, enemy)
+	_expect(_is_braced(enemy), "Braced, on the Attack")
+	enemy.current_intent_index = 0
+	_expect_eq(EnemyTurn.mark_loss(Status.find_mark(enemy.statuses, &"brace"), enemy, data), "replaced", "...the intent replaced: lost")
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(int(result["damage_to_hp"]), 4, "Next attack after the Defend is halved")
-	_expect(not _is_braced(enemy), "Then Braced is gone")
+	var marks: Array = result.get("marks", [])
+	_expect(marks.size() == 1 and str(marks[0]["outcome"]) == "lost" and str(marks[0]["reason"]) == "replaced", "...settled lost, replaced")
+	_expect(not _is_braced(enemy), "...and gone; nothing waits for the next Attack")
 	_completed += 1
 
 func _check_brace_spent_when_blocked() -> void:
@@ -195,7 +212,8 @@ func _check_brace_spent_when_blocked() -> void:
 	_expect(not _is_braced(enemy), "Braced spent even when blocked")
 	_completed += 1
 
-func _check_brace_survives_interrupt() -> void:
+# An interrupted attack doesn't land: its Brace is lost, "cancelled".
+func _check_brace_lost_on_interrupt() -> void:
 	var player: Combatant = _player(50)
 	var charge: EnemyIntent = _attack(10, 1)
 	charge.interrupt_threshold = 5
@@ -203,25 +221,57 @@ func _check_brace_survives_interrupt() -> void:
 	var enemy: Combatant = _enemy(data)
 	_brace(player, enemy)
 	enemy.damage_taken_this_turn = 5
+	_expect_eq(EnemyTurn.mark_loss(Status.find_mark(enemy.statuses, &"brace"), enemy, data), "cancelled", "Interrupt met: the Brace won't hold")
+	_expect_eq(EnemyTurn.mark_refusal(enemy, data, _braced_data()), EnemyTurn.MarkRefusal.WONT_LAND, "...nor can another Brace target it")
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
 	_expect(bool(result["interrupted"]), "Attack interrupted")
-	_expect(_is_braced(enemy), "Braced stays through an interrupted attack")
+	var marks: Array = result.get("marks", [])
+	_expect(marks.size() == 1 and str(marks[0]["outcome"]) == "lost" and str(marks[0]["reason"]) == "cancelled", "...its Brace lost, cancelled")
+	_expect(not _is_braced(enemy), "...and gone")
 	_completed += 1
 
-func _check_brace_reapplied() -> void:
+# One Brace an intent: a second can't target it; a Garnish still can.
+func _check_brace_once_per_intent() -> void:
 	var player: Combatant = _player(50)
 	var data: EnemyData = _enemy_data([_attack(8, 1)])
 	var enemy: Combatant = _enemy(data)
 	_brace(player, enemy)
-	_brace(player, enemy)
-	var braced: int = 0
-	for active in enemy.statuses:
-		if active.data.id == "braced":
-			braced += 1
-			_expect_eq(active.magnitude, -50, "Reapplied Brace stays at 50%")
-	_expect_eq(braced, 1, "One Braced, not two")
+	_expect(not EffectResolver.can_target(_card("brace"), enemy), "A Braced intent can't be Braced again")
+	_expect_eq(EnemyTurn.mark_refusal(enemy, data, _braced_data()), EnemyTurn.MarkRefusal.ALREADY, "...already braced")
+	_expect(EffectResolver.can_target(load(GARNISH_PATH) as CardData, enemy), "...but it can still be Garnished")
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(int(result["damage_to_hp"]), 4, "Twice-Braced 8 -> 4, not 2")
+	_expect_eq(int(result["damage_to_hp"]), 4, "Braced 8 -> 4")
+	_completed += 1
+
+# Bereft's two actions of the Braced intent: both halved, the Brace
+# spent once both are done.
+func _check_brace_both_actions() -> void:
+	var player: Combatant = _player(50)
+	var data: EnemyData = _enemy_data([_attack(8, 1)])
+	var enemy: Combatant = _enemy(data)
+	Status.apply_to(enemy.statuses, load(BEREFT_PATH) as StatusData)
+	_brace(player, enemy)
+	var preview: Dictionary = EnemyTurn.preview_intent(enemy, data, player)
+	_expect_eq(preview.get("hit_amounts", []), [4, 4], "Bereft, Braced: both actions preview 4")
+	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
+	_expect_eq(int(result["damage_to_hp"]), 8, "...and land 4 + 4")
+	var marks: Array = result.get("marks", [])
+	_expect(marks.size() == 1 and str(marks[0]["outcome"]) == "spent" and int(marks[0]["before"]) == 16 and int(marks[0]["after"]) == 8, "...spent once, 16 before, 8 after")
+	_completed += 1
+
+# An out-of-turn answer to a Signal (EnemyTurn.answer_signal()) is no
+# move of the Braced intent's own: it lands in full and leaves the Brace
+# waiting for the Nip's own turn.
+func _check_brace_waits_out_an_answer() -> void:
+	var player: Combatant = _player(50)
+	var data: EnemyData = _enemy_data([_attack(8, 1)])
+	var enemy: Combatant = _enemy(data)
+	_brace(player, enemy)
+	var answer: Dictionary = EnemyTurn.answer_signal(enemy, data, player)
+	_expect_eq(int(answer["damage_to_hp"]), 8, "A Signal's answer lands in full past the Brace")
+	_expect(_is_braced(enemy), "...the Brace still waiting")
+	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
+	_expect_eq(int(result["damage_to_hp"]), 4, "...for its own turn: 8 -> 4")
 	_completed += 1
 
 func _check_brace_face() -> void:
@@ -601,8 +651,12 @@ func _enemy_data(intents: Array[EnemyIntent]) -> EnemyData:
 
 func _enemy(data: EnemyData) -> Combatant:
 	var enemy := Combatant.new(data.max_hp)
+	enemy.enemy_data = data
 	EnemyTurn.pick_initial_intent(enemy, data)
 	return enemy
+
+func _braced_data() -> StatusData:
+	return load(BRACED_PATH) as StatusData
 
 func _brace(player: Combatant, enemy: Combatant) -> void:
 	var ctx := EffectContext.new()

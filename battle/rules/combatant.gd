@@ -170,6 +170,12 @@ var pain_turn_pending: bool = false
 # targeted and damaged as ever, and its statuses still tick; its loop
 # waits where it is.
 var dormant: bool = false
+# An enemy's own rules (BattleController sets it): what its queued intent
+# is read from where only the Combatant is to hand - whether a card that
+# marks an intent (StatusData.intent_mark - Brace, Garnish) may target it
+# (EffectResolver.can_target()), and which intent it binds to. Null on the
+# player and on a bare Combatant.
+var enemy_data: EnemyData = null
 # The phase (EnemyData.phase_hp_threshold): its status has been gained
 # this fight, so it never is again.
 var phase_reached: bool = false

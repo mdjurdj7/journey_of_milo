@@ -136,6 +136,12 @@ static func can_target(card: CardData, combatant: Combatant, enemies: Array[Comb
 		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and effect.status_data != null and effect.status_data.skips_next_turn:
 			if Status.skip_turn_status(combatant.statuses) != null:
 				return false
+		# A card that marks an intent (Brace, Garnish) targets the enemy's
+		# queued intent: only an attack that will land, carrying none of
+		# the same mark yet (EnemyTurn.mark_refusal()).
+		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and effect.status_data != null and effect.status_data.intent_mark != &"":
+			if EnemyTurn.mark_refusal(combatant, combatant.enemy_data, effect.status_data) != EnemyTurn.MarkRefusal.NONE:
+				return false
 	if card.card_type == CardData.CardType.ATTACK and card.target_type == CardData.TargetType.ENEMY and not is_taunting(combatant):
 		for other in enemies:
 			if other != null and other != combatant and other.hp > 0 and not other.buried and is_taunting(other):

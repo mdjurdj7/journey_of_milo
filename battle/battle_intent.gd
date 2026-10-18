@@ -415,6 +415,13 @@ func show_intent(preview: Dictionary) -> void:
 	_apply_layout()
 	_update_visibility()
 
+# The glyph and numeral's box on screen - what a card aimed at an intent
+# (Brace, Garnish) clicks (BattleController.intent_rect_of).
+func get_pair_global_rect() -> Rect2:
+	if not _has_intent:
+		return Rect2()
+	return get_global_transform() * _pair_rect
+
 func set_revealed(revealed: bool) -> void:
 	_revealed = revealed
 	_update_visibility()

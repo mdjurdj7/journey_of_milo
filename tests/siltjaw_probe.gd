@@ -4,8 +4,8 @@ extends SceneTree
 # Data.opens_dug_in), then its Snap -> Charge -> Dig loop (the Charge a
 # plain hit, nothing to break); the Dig's three mounds, each a target of
 # 12 HP, under one drawn at random; under the sand one move - the Erupt,
-# 14, landing as a strike back (Brace neither softens it nor is spent;
-# Block still takes its share) - surfacing on its own; the intent preview
+# 14, landing as a strike back (no Brace or Garnish may target it; Block
+# still takes its share) - surfacing on its own; the intent preview
 # the Erupt from turn 1, never a mound. A mound broken: a wrong one gone
 # and nothing more; its own brings it up Exposed (50% more) through the
 # player's next turn, the overkill carried in raw, and a broken mound is
@@ -42,6 +42,9 @@ const SLASH_PATH := "res://cards/data/slash.tres"
 const CARVE_PATH := "res://cards/data/carve.tres"
 const BITE_DOWN_PATH := "res://cards/data/bite_down.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
+const GARNISH_PATH := "res://cards/data/garnish.tres"
+const SENTENCE_PATH := "res://cards/data/sentence.tres"
+const SENTENCE_STATUS_PATH := "res://battle/rules/statuses/sentence.tres"
 const FLOOR_2 := 1
 const HP := 44
 const SNAP := 6
@@ -72,7 +75,7 @@ func _initialize() -> void:
 	_check_data()
 	_check_never_found()
 	_check_preview()
-	_check_eruption_past_brace()
+	_check_eruption_refuses_brace()
 	_check_break_wrong()
 	_check_break_own()
 	_check_every_mound()
@@ -170,24 +173,21 @@ func _check_preview() -> void:
 	_expect(not EnemyTurn.preview_intent(enemy, data, player).has("threshold"), "...nor the Charge")
 	_completed += 1
 
-# Braced (Brace) on the Siltjaw: the Erupt lands its whole 14, previewed
-# so, and the Braced is still there for its next attack; Block 5 still
-# takes 5 of it.
-func _check_eruption_past_brace() -> void:
+# Dug in, its Erupt lands as a strike back: no Brace or Garnish may
+# target it (EnemyTurn.MarkRefusal.ONLY_BLOCK), it previews and lands its
+# whole 14, and Block 5 still takes 5 of it.
+func _check_eruption_refuses_brace() -> void:
 	var data: EnemyData = _siltjaw()
 	var enemy: Combatant = _enemy(data)
 	var player: Combatant = _player()
-	Status.apply_to(enemy.statuses, load(BRACED_PATH) as StatusData)
-	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), ERUPT, "Braced: the Erupt still previews %d" % ERUPT)
+	_expect(not EffectResolver.can_target(load(BRACE_PATH) as CardData, enemy), "Dug in: a Brace can't target the Erupt")
+	_expect(not EffectResolver.can_target(load(GARNISH_PATH) as CardData, enemy), "...nor a Garnish")
+	_expect_eq(EnemyTurn.mark_refusal(enemy, data, load(BRACED_PATH) as StatusData), EnemyTurn.MarkRefusal.ONLY_BLOCK, "...only Block reduces it")
+	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), ERUPT, "The Erupt previews %d" % ERUPT)
 	player.block = 5
 	var before: int = player.hp
 	EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(before - player.hp, ERUPT - 5, "...and lands %d past Block 5 - Brace takes nothing off" % (ERUPT - 5))
-	_expect(_has(enemy, BRACED_PATH), "...the Braced not spent by it")
-	before = player.hp
-	player.block = 0
-	EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(before - player.hp, SNAP / 2, "...but on the Snap after, halved to %d" % (SNAP / 2))
+	_expect_eq(before - player.hp, ERUPT - 5, "...and lands %d past Block 5" % (ERUPT - 5))
 	_completed += 1
 
 # A wrong mound brought to 0: gone, the Siltjaw untouched and still under,
@@ -252,14 +252,14 @@ func _check_every_mound() -> void:
 	_expect(enemy.hp == HP and enemy.dug_in, "...the Siltjaw untouched, still under")
 	_completed += 1
 
-# A Brace at a mound: Braced on the Siltjaw, the mound untouched.
+# A Sentence at a mound: on the Siltjaw, the mound untouched.
 func _check_status_at_mound() -> void:
 	var data: EnemyData = _siltjaw()
 	var enemy: Combatant = _enemy(data)
 	var guard: Combatant = enemy.mound_guards[0]
 	var ctx: EffectContext = _ctx(enemy, guard)
-	EffectResolver.new().resolve_card(load(BRACE_PATH) as CardData, ctx)
-	_expect(_has(enemy, BRACED_PATH), "A Brace at a mound lands on the Siltjaw")
+	EffectResolver.new().resolve_card(load(SENTENCE_PATH) as CardData, ctx)
+	_expect(_has(enemy, SENTENCE_STATUS_PATH), "A Sentence at a mound lands on the Siltjaw")
 	_expect(guard.statuses.is_empty() and guard.hp == MOUND_HP and enemy.mounds.size() == MOUNDS, "...the mound untouched, nothing broken")
 	_completed += 1
 
@@ -426,6 +426,7 @@ func _siltjaw() -> EnemyData:
 
 func _enemy(data: EnemyData) -> Combatant:
 	var enemy := Combatant.new(data.max_hp)
+	enemy.enemy_data = data
 	EnemyTurn.pick_initial_intent(enemy, data)
 	return enemy
 
