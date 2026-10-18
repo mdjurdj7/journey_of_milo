@@ -6,3 +6,4 @@
 script = ExtResource("1_bedroll")
 plate_name = "Bedroll"
 plate_text = "Use anywhere in the field, outside battle: restore {percent}% of your max HP. One use."
+lore = "Rolled tight, as if someone meant to come back for it."

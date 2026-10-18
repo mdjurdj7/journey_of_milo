@@ -23,6 +23,8 @@ class_name BedrollData
 # a rest item, used in the field.
 @export var plate_name: String = "Bedroll"
 @export var plate_text: String = "Use anywhere in the field, outside battle: restore {percent}% of your max HP. One use."
+# Its plate's lore line (the plate's italic lore block).
+@export var lore: String = "Rolled tight, as if someone meant to come back for it."
 
 # hover_text with its number in.
 func describe() -> String:

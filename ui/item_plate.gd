@@ -26,7 +26,8 @@ class_name ItemPlate
 #                 a block always rules_lines tall - left blank when the
 #                 piece does nothing, so nothing below it moves
 #   its lore      under a short centred hairline, in Spectral Italic at
-#                 full ink, in a block always lore_lines tall
+#                 full ink, in a block always lore_lines tall - no lore,
+#                 no hairline (never a rule alone)
 # Every plate is the same height whatever it says; fits() says whether its
 # text stays inside those blocks (the probes check every piece).
 #
@@ -449,7 +450,7 @@ func get_weapon() -> WeaponData:
 	return _weapon
 
 # The Bedroll, in place of a piece: its plate_name, its REST kind and
-# glyph, its plate_text as the effect; no choice, no lore, plain ink.
+# glyph, its plate_text as the effect, its lore; no choice, plain ink.
 func set_bedroll(bedroll: BedrollData) -> void:
 	set_piece(null)
 	_bedroll = bedroll
@@ -517,7 +518,7 @@ func _shown_rules() -> String:
 
 func _shown_lore() -> String:
 	if _bedroll != null:
-		return ""
+		return _bedroll.lore
 	if _weapon != null:
 		return _weapon.lore
 	return _piece.flavor_text if _piece != null else ""
@@ -838,8 +839,11 @@ func _draw_face() -> void:
 		var stat_width: float = InkType.width(_rules_font, _stat_text, stat_px)
 		InkType.draw_run(_face, _rules_font, _stat_text, Vector2(roundf((_plate_size.x - stat_width) / 2.0), _stat_baseline), stat_px, ink)
 	_draw_paragraph(_rules, _rules_top, _pitch(_font_px(rules_size_px)), ink)
-	var hairline_width: float = roundf(_plate_size.x * hairline_width_fraction)
-	_face.draw_rect(Rect2(roundf((_plate_size.x - hairline_width) / 2.0), _hairline_y, hairline_width, maxf(roundf(plate_scale), 1.0)), Color(ink, hairline_alpha))
+	# The hairline separates the effect from the lore - none with no lore,
+	# never a rule alone.
+	if _lore != null:
+		var hairline_width: float = roundf(_plate_size.x * hairline_width_fraction)
+		_face.draw_rect(Rect2(roundf((_plate_size.x - hairline_width) / 2.0), _hairline_y, hairline_width, maxf(roundf(plate_scale), 1.0)), Color(ink, hairline_alpha))
 	_draw_paragraph(_lore, _lore_top, _pitch(_font_px(lore_size_px)), ink)
 	if _replaces != null:
 		InkType.draw_run(_face, _label_font, replaces_label_text, Vector2(_replaces_label_left, _replaces_baseline), label_px, type_color)
