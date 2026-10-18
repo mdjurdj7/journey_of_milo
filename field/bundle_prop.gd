@@ -150,7 +150,7 @@ func roll(rng: RandomNumberGenerator, gold_min: int, gold_max: int, pool: Reward
 	if point >= gold_chance:
 		var rare: bool = point >= gold_chance + card_chance
 		var from: RewardPool = pool
-		if rare and rare_pool != null and not rare_pool.entries.is_empty():
+		if rare and rare_pool != null and rare_pool.has_cards():
 			from = rare_pool
 		if from != null:
 			var rolled: Array[CardData] = from.roll(1, rng, null)

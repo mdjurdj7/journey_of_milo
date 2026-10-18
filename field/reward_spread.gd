@@ -96,7 +96,9 @@ func _ready() -> void:
 	# run after CameraRig has placed the camera this frame.
 	process_priority = 1
 	_wanderer = _find_wanderer()
-	if pool == null or pool.entries.is_empty():
+	# Its cards: entries and source folders alike (a class's folder-only
+	# pool has no entries and cards all the same).
+	if pool == null or not pool.has_cards():
 		if not _empty_pool_reported:
 			_empty_pool_reported = true
 			print("RewardSpread: reward pool empty; no cards will drop.")
@@ -104,7 +106,7 @@ func _ready() -> void:
 		return
 	_spawn_cards()
 	if _cards.is_empty():
-		push_warning("RewardSpread: pool holds %d entries but rolled nothing; freeing." % pool.entries.size())
+		push_warning("RewardSpread: pool has cards but rolled nothing; freeing.")
 		queue_free()
 
 func _find_wanderer() -> Node3D:
