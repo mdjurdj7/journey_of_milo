@@ -89,6 +89,13 @@ func _check_offers(floor_index: int, enemy_path: String, label: String) -> void:
 			reward.call("_on_dismiss")
 			var line: Dictionary = _log_line(log_dir, "reward_cards", "fight")
 			_expect_eq((line.get("offered", []) as Array).size(), 3, "...the three logged as reward_cards")
+			# Each with its rarity, in step; none taken, no taken_rarity.
+			var rarities: Array = line.get("offered_rarities", [])
+			var named: bool = rarities.size() == 3
+			for rarity: Variant in rarities:
+				named = named and ["common", "uncommon", "rare", "ultra_rare"].has(str(rarity))
+			_expect(named, "...each with its rarity (%s)" % str(rarities))
+			_expect(line.has("taken_rarity") and line.get("taken_rarity") == null, "...and no taken_rarity, none taken")
 		reward.call("close")
 	await _teardown()
 	_completed += 1

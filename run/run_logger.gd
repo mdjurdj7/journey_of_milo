@@ -57,10 +57,15 @@ class_name RunLogger
 # "intent_mark" line says how each mark left it - "spent" with the hits'
 # "original" total before it, "after" it and what it "prevented", or
 # "lost" with its "reason" ("replaced", "cancelled", "enemy died").
+#
+# Format 5 (2026-10-18): reward_cards carries each offered card's rarity
+# ("offered_rarities", in step with "offered") and the taken card's
+# ("taken_rarity", null when none was taken) - lowercase, as collector_buy
+# writes it.
 
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 4
+const FORMAT_VERSION := 5
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]
@@ -649,14 +654,26 @@ static func toll_changed(before: int, after: int) -> void:
 # `source`: fight, bundle, find.
 static func reward_cards(source: String, offered: Array[CardData], taken: CardData) -> void:
 	var names: Array[String] = []
+	var rarities: Array[String] = []
 	for card in offered:
 		if card != null:
 			names.append(card.card_name)
+			rarities.append(rarity_name(card))
 	event("reward_cards", {
 		"source": source,
 		"offered": names,
+		"offered_rarities": rarities,
 		"taken": or_null(taken.card_name if taken != null else ""),
+		"taken_rarity": or_null(rarity_name(taken) if taken != null else ""),
 	})
+
+# A card's rarity as the log writes it: its CardData.CardRarity key,
+# lowercase ("common", "ultra_rare") - collector_buy's form.
+static func rarity_name(card: CardData) -> String:
+	if card == null:
+		return ""
+	var key: Variant = CardData.CardRarity.find_key(card.rarity)
+	return String(key).to_lower() if key != null else ""
 
 # Any other choice - reward_gold, reward_glassbone, belongings,
 # keepsake_offer, trough - with where in the run it happened.
