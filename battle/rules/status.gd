@@ -186,16 +186,28 @@ static func ordinal_word(n: int) -> String:
 		return words[n - 1]
 	return "%dth" % n
 
+# What the statuses an Attack card spends (Bent Nail's doubling) add to
+# one blow of `blow` among the holder's outgoing modifiers - before the
+# enemy's own modifiers and Block. 0 with none up.
+static func attack_card_extra(blow: int, statuses: Array[Status]) -> int:
+	var with_all: int = apply_modifiers(blow, statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+	var without: int = apply_modifiers(blow, statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE, true)
+	return maxi(with_all - without, 0)
+
 # An Attack card has finished resolving (EffectResolver.resolve_card()):
 # every status that StatusData.spent_by_attack_card spends one charge,
-# and goes at 0 - Bent Nail's doubling, once its Attack is done.
-static func spend_on_attack_card(statuses: Array[Status]) -> void:
+# and goes at 0 - Bent Nail's doubling, once its Attack is done. Returns
+# the ids of those that were up, for the run log.
+static func spend_on_attack_card(statuses: Array[Status]) -> Array[String]:
+	var spent: Array[String] = []
 	for active in statuses.duplicate():
 		if active.data == null or not active.data.spent_by_attack_card:
 			continue
+		spent.append(active.data.id)
 		active.charges -= 1
 		if active.charges <= 0:
 			statuses.erase(active)
+	return spent
 
 func is_expired() -> bool:
 	if turns_remaining == StatusData.DURATION_UNTIL_REMOVED or turns_remaining == StatusData.DURATION_UNTIL_TRIGGERED:
@@ -669,12 +681,17 @@ static func strike_back_view(statuses: Array[Status]) -> Array[Status]:
 # Applies every active MODIFIER-category status matching `target` to
 # `amount`, in list order - ADD sums directly; MULTIPLY treats magnitude
 # as a PERCENTAGE. Never returns below 0.
-static func apply_modifiers(amount: int, statuses: Array[Status], target: StatusData.ModifierTarget) -> int:
+static func apply_modifiers(amount: int, statuses: Array[Status], target: StatusData.ModifierTarget, skip_attack_card_spent: bool = false) -> int:
 	var result := amount
 	for active in statuses:
 		if active.data.category != StatusData.Category.MODIFIER:
 			continue
 		if active.data.modifier_target != target:
+			continue
+		# Leaving out what an Attack card spends (Bent Nail's doubling) -
+		# for the run log's measure of what that added (attack_card_
+		# extra()), never for a blow that lands.
+		if skip_attack_card_spent and active.data.spent_by_attack_card:
 			continue
 		match active.data.modifier_operation:
 			StatusData.ModifierOperation.ADD:

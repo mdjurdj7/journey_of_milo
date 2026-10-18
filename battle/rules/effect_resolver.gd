@@ -56,6 +56,7 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	ctx.mark_bonus_paid.clear()
 	ctx.toll_spent_this_card = false
 	ctx.hp_dealt_this_card = 0
+	ctx.attack_card_extra_this_card = 0
 	# A cost replacement's HP (Collateral), first of all - it is this
 	# card's price. A price that kills ends the card: none of its effects
 	# resolve, and the fight ends as a defeat.
@@ -89,7 +90,8 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	# An Attack's last effect done: what waits for an Attack card to finish
 	# (Bent Nail's doubling) spends now - after every hit it gave.
 	if ctx.card_is_attack:
-		Status.spend_on_attack_card(ctx.player.statuses)
+		for spent_id in Status.spend_on_attack_card(ctx.player.statuses):
+			RunLogger.mechanic("keepsake_double", {"card": card.card_name, "status": spent_id, "extra": ctx.attack_card_extra_this_card})
 	# After the whole card, once however much it spent: Toll spent hurries
 	# every countdown that listens for it (Sentence), and one that reaches
 	# 0 goes off now, in the player's turn - reported as damage, never as

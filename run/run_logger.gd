@@ -63,9 +63,16 @@ class_name RunLogger
 # ("taken_rarity", null when none was taken) - lowercase, as collector_buy
 # writes it.
 
+# Format 6 (2026-10-18): three keepsake mechanic lines - "keepsake_double"
+# (Bent Nail: the card, the status spent, and the "extra" its doubling
+# added to the card's blows before the enemy's modifiers and Block, all
+# hits summed), "keepsake_draw" (Worn Page: the "card_count" played this
+# turn and the cards "drawn") and "keepsake_block_carry" (Blue Fastener:
+# Block "kept" over the turn's reset and Block "lost" to it).
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 5
+const FORMAT_VERSION := 6
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]
@@ -404,7 +411,8 @@ static func turn_ended(energy: int) -> void:
 
 # A mechanic line: `kind` and what it says, on the fight and turn it
 # happened in. Kinds: enemy_died, pain_turn, pain_turn_spent, phase,
-# threshold_queued, threshold_resolved, escalation, queued_state.
+# threshold_queued, threshold_resolved, escalation, queued_state,
+# keepsake_double, keepsake_draw, keepsake_block_carry.
 static func mechanic(kind: String, data: Dictionary) -> void:
 	if not _fight_open:
 		return

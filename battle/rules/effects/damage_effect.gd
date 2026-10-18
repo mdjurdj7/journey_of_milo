@@ -106,7 +106,9 @@ func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> int:
 		# target, and like the attack bonus it goes in before the
 		# modifiers.
 		var hp_before: int = enemy.hp
-		var result := DamagePipeline.resolve(landed(blow + ctx.take_mark_bonus(enemy), ctx.player, enemy), enemy)
+		var full_blow: int = blow + ctx.take_mark_bonus(enemy)
+		ctx.attack_card_extra_this_card += Status.attack_card_extra(full_blow, ctx.player.statuses)
+		var result := DamagePipeline.resolve(landed(full_blow, ctx.player, enemy), enemy)
 		# A broken mound is no kill.
 		if enemy.hp <= 0 and enemy.mound_owner == null:
 			ctx.killed_this_card = true

@@ -81,6 +81,11 @@ var killed_this_card: bool = false
 # StatusData.attacks_drain is up (EffectResolver.resolve_card()). Cleared
 # per card by resolve_card().
 var hp_dealt_this_card: int = 0
+# What this card's Attack-spent outgoing modifiers (Bent Nail's doubling)
+# added to its blows, summed over every hit, before the enemy's own
+# modifiers and Block (Status.attack_card_extra()). For the run log
+# alone. Cleared per card by resolve_card().
+var attack_card_extra_this_card: int = 0
 
 # HP put back by a card (HEAL, TOLL_HEAL). The rules mutate the
 # Combatant; this is how battle_controller.gd learns to mirror it onto

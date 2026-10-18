@@ -2073,6 +2073,7 @@ func _draw_for_card_count() -> void:
 		return
 	_card_count_draw_used = true
 	print("BattleController: card %d this turn; drawing %d (draw_on_card_count)." % [cards_played_this_turn, draw])
+	RunLogger.mechanic("keepsake_draw", {"card_count": cards_played_this_turn, "drawn": draw})
 	deck.draw(draw)
 
 # The attacks a turn's result landed, each as _report_enemy_attack()
@@ -2313,7 +2314,9 @@ func _start_player_turn() -> void:
 	# Block resets, but the held pieces' carry (TrinketData.block_carry -
 	# Blue Fastener, both slots summed) keeps up to that much of what's
 	# left. Absorb isn't Block, and never resets here.
-	player.block = mini(player.block, _block_carry())
+	var block_before: int = player.block
+	var carry: int = _block_carry()
+	player.block = mini(player.block, carry)
 	_enemy_phase = false
 	_player_turn += 1
 	_multi_hit_draw_used = false
@@ -2324,6 +2327,9 @@ func _start_player_turn() -> void:
 	player.energy = player.turn_start_energy()
 	# The run log's turn opens on the refill, before any tick it counts.
 	RunLogger.turn_started(player.energy)
+	# In the new turn's lines: what the carry kept of the Block left over.
+	if carry > 0 and block_before > 0:
+		RunLogger.mechanic("keepsake_block_carry", {"kept": player.block, "lost": block_before - player.block})
 	cards_played_this_turn = 0
 	_devour_uses_this_turn = 0
 	# A fresh turn for every interrupt threshold, and for Toll spent

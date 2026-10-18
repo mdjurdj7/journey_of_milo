@@ -20,6 +20,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	if base <= 0:
 		return
 	var hp_before: int = ctx.target.hp
+	ctx.attack_card_extra_this_card += Status.attack_card_extra(base, ctx.player.statuses)
 	var result := DamagePipeline.resolve(DamageEffect.landed(base, ctx.player, ctx.target), ctx.target)
 	ctx.report_block(ctx.target, result)
 	if result["damage_to_hp"] > 0:
