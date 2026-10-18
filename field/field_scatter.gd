@@ -372,6 +372,9 @@ var _battle_fighter_depths: PackedFloat32Array = PackedFloat32Array()
 var _battle_readouts: Array[Rect2] = []
 var _battle_depth_margin: float = 0.2
 var _battle_press_float: float = 0.03
+# Items faded fully out in this fight, held out until the frame ends
+# (_advance_battle_fade()): layer -> {item index: true}.
+var _battle_held: Dictionary = {}
 # The camera forward last pushed to the cards.
 var _card_forward: Vector2 = Vector2.ZERO
 # The gust and its sway gain last pushed to the cards.
@@ -1713,7 +1716,9 @@ func _push_card_forward() -> void:
 
 # Every battle_fade card toward gone while a fight holds the frame and it
 # hides a fighter's feet from the battle eye (hides_feet()), toward whole
-# otherwise, at one fade a battle_fade_seconds.
+# otherwise, at one fade a battle_fade_seconds. Once fully gone in a fight
+# it stays gone until the frame ends (_battle_held), as BattleOcclusion's
+# props do: a kill changes what is covered, and nothing comes back for it.
 func _advance_battle_fade(delta: float) -> void:
 	var rig: CameraRig = null
 	if _field != null:
@@ -1729,10 +1734,13 @@ func _advance_battle_fade(delta: float) -> void:
 		seconds = rig.battle_transition_time if rig != null else 0.6
 	var step: float = delta / maxf(seconds, 1.0e-3)
 	var screen: bool = framing and _battle_camera != null and is_instance_valid(_battle_camera)
+	if not framing:
+		_battle_held.clear()
 	for layer in _card_layers:
+		var held: Dictionary = _battle_held.get(layer, {})
 		for i in layer.spots.size():
 			var spot: Spot = layer.spots[i]
-			var hides: bool = framing and layer.entry.battle_fade and hides_feet(spot, eye, feet)
+			var hides: bool = framing and (held.has(i) or (layer.entry.battle_fade and hides_feet(spot, eye, feet)))
 			hides = hides or (screen and occludes_battle(spot, spot.width * 0.5))
 			var target: float = 0.0 if hides else 1.0
 			var custom: Color = layer.custom[i]
@@ -1741,14 +1749,22 @@ func _advance_battle_fade(delta: float) -> void:
 			custom.b = move_toward(custom.b, target, step)
 			layer.custom[i] = custom
 			layer.instance.multimesh.set_instance_custom_data(i, custom)
+			if framing and custom.b <= 0.0:
+				held[i] = true
+				_battle_held[layer] = held
 	for layer in _model_layers:
 		if not is_instance_valid(layer.instance):
 			continue
+		var held: Dictionary = _battle_held.get(layer, {})
 		for i in layer.spots.size():
-			var target: float = 0.0 if screen and occludes_battle(layer.spots[i], layer.spots[i].size * 0.5) else 1.0
+			var hides: bool = framing and (held.has(i) or (screen and occludes_battle(layer.spots[i], layer.spots[i].size * 0.5)))
+			var target: float = 0.0 if hides else 1.0
 			if layer.presence[i] == target:
 				continue
 			layer.presence[i] = move_toward(layer.presence[i], target, step)
+			if framing and layer.presence[i] <= 0.0:
+				held[i] = true
+				_battle_held[layer] = held
 			var colour: Color = layer.colours[i]
 			colour.a = layer.presence[i]
 			layer.instance.multimesh.set_instance_color(i, colour)

@@ -6,7 +6,10 @@ class_name BattleOcclusion
 # fighter from in front - its screen box over the fighter's, nearer the
 # camera by more than depth_margin_m - or lies under a fighter's readout
 # (its HP/name plate, its intent, his HP bar) fades out with a dither,
-# and comes back when the frame goes. The scatter does the same per item
+# and comes back when the frame goes. Once fully out it stays out for the
+# rest of the fight (_held): a kill takes a fighter's box and readouts
+# away, and the camera re-fits, but nothing faded comes back until the
+# frame ends. The scatter does the same per item
 # (FieldScatter.set_battle_screen()). Fighters are never faded, nor a
 # prop the fight's own option brought or one a member stands on
 # (RegionField.is_battle_exempt_prop()).
@@ -42,6 +45,9 @@ var _presence: Dictionary = {}
 # GeometryInstance3D -> the material_override it had before its hashed
 # copy went on (null for none).
 var _restore: Dictionary = {}
+# GeometryInstance3D -> true: faded fully out in this fight, so held out
+# until the frame ends (cleared then).
+var _held: Dictionary = {}
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -74,6 +80,13 @@ func _process(delta: float) -> void:
 				if _floats(prop) or _occludes(geometry, camera, fighter_rects, fighter_depths, readouts):
 					for instance in geometry:
 						targets[instance] = true
+		for instance: Variant in _held.keys():
+			if is_instance_valid(instance):
+				targets[instance] = true
+			else:
+				_held.erase(instance)
+	else:
+		_held.clear()
 	for instance: GeometryInstance3D in targets:
 		if not _presence.has(instance):
 			_presence[instance] = 1.0
@@ -81,11 +94,14 @@ func _process(delta: float) -> void:
 		if not is_instance_valid(instance):
 			_presence.erase(instance)
 			_restore.erase(instance)
+			_held.erase(instance)
 			continue
 		var target: float = 0.0 if targets.has(instance) else 1.0
 		var now: float = move_toward(float(_presence[instance]), target, step)
 		_presence[instance] = now
 		_apply(instance as GeometryInstance3D, now)
+		if now <= 0.0 and framing:
+			_held[instance] = true
 		if now >= 1.0 and target >= 1.0:
 			_presence.erase(instance)
 
