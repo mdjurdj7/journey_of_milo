@@ -117,6 +117,10 @@ const DURATION_UNTIL_TRIGGERED := -2
 # Attacks still hit everything, and enemy-target Skills go where they
 # like. The Glower's Inflated.
 @export var taunts: bool = false
+# What its enemy does as a move brings it, for the intent hover's line
+# ("inflates", "coils" - BattleOverlay.intent_hover_lines' "brings"). Empty:
+# the line falls back to its name.
+@export var gained_verb: String = ""
 
 # The inked mark its readout draws for it - a coil (Coiled), a drop
 # (Venom) - or none: the label alone, as every status before them.

@@ -10,6 +10,7 @@ description = "Each Attack you play against it, it strikes back for {value}. Bra
 default_magnitude = 5
 default_duration_turns = -1
 stack_rule = 3
+gained_verb = "coils"
 strikes_back_on_attack_card = true
 mark = 1
 shows_beside_hp = true

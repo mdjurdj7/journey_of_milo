@@ -1057,6 +1057,7 @@
             "default_duration_turns": "until removed",
             "stack_rule": "IGNORE",
             "strikes_back_on_attack_card": true,
+            "gained_verb": "coils",
             "mark": "COIL",
             "shows_beside_hp": true
           }
@@ -1683,7 +1684,8 @@
             "default_duration_turns": "until removed",
             "modifier_operation": "MULTIPLY",
             "stack_rule": "IGNORE",
-            "taunts": true
+            "taunts": true,
+            "gained_verb": "inflates"
           }
         }
       ],

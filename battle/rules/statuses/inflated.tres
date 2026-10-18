@@ -13,4 +13,5 @@ default_duration_turns = -1
 modifier_target = 0
 modifier_operation = 1
 stack_rule = 3
+gained_verb = "inflates"
 taunts = true

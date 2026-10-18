@@ -95,24 +95,30 @@ signal battle_finished(outcome: Outcome)
 	&"twice": "%s twice",
 	&"applies": " Then %s %d.",
 	&"threshold": " Deal %d to it this turn to break it.",
-	&"strike_back": "%s: %d from below as your turn ends - only Block reduces it.",
+	&"strike_back": "%s: %d from below as your turn ends; only Block reduces it.",
 	&"defend": "%s: gains %d Block.",
 	&"defend_twice": "%s: gains %d Block, twice.",
 	&"heal": "%s: heals its pack %d.",
-	&"brings": "%s: %s until its %s - %s",
+	&"brings": "%s: %s until its next %s. While %s, %s",
 	&"brings_next": "%s (%d)",
-	&"brings_any": "next move",
-	&"signal": "%s: its pack answers at once - %s, %d in all.",
-	&"signal_wakes": " Wakes the sleeping first.",
+	&"brings_any": "move",
+	&"taunts": "your single-target Attacks must hit it",
+	&"half_damage": "for half damage",
+	&"less_damage": "for %d%% less damage",
+	&"more_damage": "for %d%% more damage",
+	&"signal": "%s: %s %s; each answers with %s %d (%d in all).",
+	&"signal_mixed": "%s: %s %s; they answer with %s (%d in all).",
+	&"signal_wakes": "wakes",
+	&"signal_calls": "calls",
 	&"signal_none": "%s: calls a pack that isn't there.",
 	&"dig": "%s: goes under its mounds; next it %s for %d unless you break the one it's under.",
 	&"holds": " While queued, %s: %s",
-	&"burrow": "%s: goes under - it can't be targeted until it surfaces.",
+	&"burrow": "%s: goes under; it can't be targeted until it surfaces.",
 	&"watch": "%s: watches.",
 	&"plain": "%s.",
-	&"cancelled": "%s: cancelled - it won't act.",
-	&"denied": "%s: denied - it won't act.",
-	&"broken": "%s: broken - it won't land.",
+	&"cancelled": "%s: cancelled; it won't act.",
+	&"denied": "%s: denied; it won't act.",
+	&"broken": "%s: broken; it won't land.",
 }
 # The draw sound, once per card as it leaves the deck (HandContainer.
 # draw_started): a -6 dBFS take at -22, 6 dB under card play, so a
@@ -1088,15 +1094,30 @@ func _intent_hover_text(enemy: FieldEnemy) -> String:
 			var answers: Array = facts["answers"]
 			if answers.is_empty():
 				return str(lines.get(&"signal_none", "%s")) % name
-			var parts: PackedStringArray = PackedStringArray()
+			var verb: String = str(lines.get(&"signal_wakes" if int(facts["waking"]) > 0 else &"signal_calls", ""))
 			var total: int = 0
+			var parts: PackedStringArray = PackedStringArray()
+			var names: Array[String] = []
+			var alike: bool = true
 			for answer: Array in answers:
-				parts.append("%s %d" % [answer[0], int(answer[1])])
 				total += int(answer[1])
-			var line: String = str(lines.get(&"signal", "%s %s %d")) % [name, ", ".join(parts), total]
-			if int(facts["waking"]) > 0:
-				line += str(lines.get(&"signal_wakes", ""))
-			return line
+				parts.append("%s %d" % [answer[0], int(answer[1])])
+				if not names.has(str(answer[2])):
+					names.append(str(answer[2]))
+				if str(answer[0]) != str(answers[0][0]) or int(answer[1]) != int(answers[0][1]):
+					alike = false
+			# Who it calls, by their names: "the Nettles" (living, the total
+			# theirs), "the Nettle" for one left.
+			var who: PackedStringArray = PackedStringArray()
+			for mate_name in names:
+				var count: int = 0
+				for answer: Array in answers:
+					if str(answer[2]) == mate_name:
+						count += 1
+				who.append("the " + (mate_name + "s" if count > 1 else mate_name))
+			if alike:
+				return str(lines.get(&"signal", "%s %s %s %s %d %d")) % [name, verb, " and ".join(who), answers[0][0], int(answers[0][1]), total]
+			return str(lines.get(&"signal_mixed", "%s %s %s %s %d")) % [name, verb, " and ".join(who), ", ".join(parts), total]
 		EnemyIntent.IntentType.DIG:
 			var under: Array = facts["under"]
 			if under.size() == 2:
@@ -1109,12 +1130,39 @@ func _intent_hover_text(enemy: FieldEnemy) -> String:
 	# Adder's Coil - Coiled), or what it holds while queued (the Rebury).
 	var brings: Array = facts["brings"]
 	if brings.size() == 2:
+		var status: StatusData = facts["brings_status"]
 		var next: EnemyIntent = facts["next"]
-		var until: String = str(lines.get(&"brings_any", "next move"))
+		var until: String = str(lines.get(&"brings_any", "move"))
 		if next != null:
 			until = (str(lines.get(&"brings_next", "%s %d")) % [next.intent_name, next.value]) if next.value > 0 else next.intent_name
-		return str(lines.get(&"brings", "%s %s %s %s")) % [name, brings[0], until, brings[1]]
+		var verb: String = status.gained_verb if status != null and not status.gained_verb.is_empty() else str(brings[0]).to_lower()
+		return str(lines.get(&"brings", "%s %s %s %s %s")) % [name, verb, until, str(brings[0]).to_lower(), _status_effect_phrase(status, str(brings[1]))]
 	return (str(lines.get(&"plain", "%s")) % name) + holds
+
+# What a status a move brings does, for the hover's "While ..." clause,
+# from its own data: a taunt and its incoming-damage modifier in plain
+# words ("your single-target Attacks must hit it, for half damage"), else
+# its description with its first letter lowered. Ends with a full stop.
+func _status_effect_phrase(status: StatusData, described: String) -> String:
+	var lines: Dictionary = intent_hover_lines
+	var parts: PackedStringArray = PackedStringArray()
+	if status != null and status.taunts:
+		parts.append(str(lines.get(&"taunts", "")))
+	if status != null and status.category == StatusData.Category.MODIFIER and status.modifier_target == StatusData.ModifierTarget.INCOMING_DAMAGE and status.modifier_operation == StatusData.ModifierOperation.MULTIPLY and status.default_magnitude != 0:
+		var by: int = absi(status.default_magnitude)
+		if status.default_magnitude == -50:
+			parts.append(str(lines.get(&"half_damage", "")))
+		elif status.default_magnitude < 0:
+			parts.append(str(lines.get(&"less_damage", "%d")) % by)
+		else:
+			parts.append(str(lines.get(&"more_damage", "%d")) % by)
+	if not parts.is_empty() and status != null and status.taunts:
+		return ", ".join(parts) + "."
+	var text: String = described.strip_edges()
+	if text.is_empty():
+		return ""
+	text = text.substr(0, 1).to_lower() + text.substr(1)
+	return text if text.ends_with(".") else text + "."
 
 # An attack's numbers, as it will land: "6", "5 ×3", "11 over 3 hits", and
 # "... twice" for an enemy acting twice (each action alike).

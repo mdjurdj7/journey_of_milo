@@ -2397,11 +2397,12 @@ func intent_facts(enemy: FieldEnemy) -> Dictionary:
 	var intent: EnemyIntent = EnemyTurn.current_intent(combatant, data)
 	if intent == null or combatant.dormant:
 		return {}
-	var facts: Dictionary = {"name": intent.intent_name, "preview": get_intent_preview(enemy), "intent": intent, "next": null, "brings": [], "holds": [], "answers": [], "waking": 0, "under": []}
+	var facts: Dictionary = {"name": intent.intent_name, "preview": get_intent_preview(enemy), "intent": intent, "next": null, "brings": [], "brings_status": null, "holds": [], "answers": [], "waking": 0, "under": []}
 	if not data.erratic_intent_selection and not combatant.dug_in and not data.intents.is_empty():
 		facts["next"] = data.intents[(combatant.current_intent_index + 1) % data.intents.size()]
 	if intent.status_on_resolve != null:
 		facts["brings"] = [intent.status_on_resolve.display_name, Status.new(intent.status_on_resolve).describe()]
+		facts["brings_status"] = intent.status_on_resolve
 	if intent.status_while_queued != null:
 		facts["holds"] = [intent.status_while_queued.display_name, Status.new(intent.status_while_queued).describe()]
 	if intent.type == EnemyIntent.IntentType.DIG and not intent.under_moves.is_empty() and intent.under_moves[0] != null:
@@ -2420,7 +2421,7 @@ func intent_facts(enemy: FieldEnemy) -> Dictionary:
 				continue
 			if mate.dormant:
 				waking += 1
-			answers.append([answer.intent_name, EnemyTurn.hit_amount(mate, member.enemy_data, answer, 0, player.statuses) * EnemyTurn.hit_count(mate, answer)])
+			answers.append([answer.intent_name, EnemyTurn.hit_amount(mate, member.enemy_data, answer, 0, player.statuses) * EnemyTurn.hit_count(mate, answer), member.enemy_data.enemy_name])
 		facts["answers"] = answers
 		facts["waking"] = waking
 	return facts
