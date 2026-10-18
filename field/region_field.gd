@@ -95,6 +95,7 @@ enum RewardMode { SCREEN, WORLD }
 @export var debug_card_dirs: PackedStringArray = PackedStringArray([
 	"res://cards/data/",
 	"res://cards/neutral/",
+	"res://cards/samurai/",
 ]):
 	set(value):
 		debug_card_dirs = value

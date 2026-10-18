@@ -20,6 +20,10 @@ const CASES := 17
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
+# Folders whose cards are authored in the editor, not entered in
+# EXPECTED_RARITY: each must carry a real tier, whichever it is (cards/
+# samurai/AUTHORING.md).
+const OPEN_CARD_DIRS: Array[String] = ["res://cards/samurai/"]
 # user:// is shared by every checkout of the project, so the file is named
 # for this process: two runs at once (parallel probes, another session's
 # suite) never save over or delete each other's.
@@ -126,6 +130,14 @@ func _check_every_card_tagged() -> void:
 			_expect_eq(card.rarity, EXPECTED_RARITY[card.card_name], "%s's rarity" % card.card_name)
 	for card_name: String in EXPECTED_RARITY:
 		_expect(seen.has(card_name), "%s exists on disk" % card_name)
+	for dir in OPEN_CARD_DIRS:
+		for file in DirAccess.get_files_at(dir):
+			if not file.ends_with(".tres"):
+				continue
+			var open_card := load(dir + file) as CardData
+			_expect(open_card != null, "%s%s is a CardData" % [dir, file])
+			if open_card != null:
+				_expect(tiers.has(open_card.rarity), "%s has a rarity tier, not UNSET (%s)" % [open_card.card_name, open_card.resource_path])
 	_expect_eq(tiers.size(), 4, "Four real tiers")
 	_expect(not tiers.has(CardData.CardRarity.UNSET), "UNSET is not a tier")
 	_expect_eq(CardData.new().rarity, CardData.CardRarity.UNSET, "An untagged card reads as UNSET, not Common")

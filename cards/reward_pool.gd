@@ -1,10 +1,12 @@
 extends Resource
 class_name RewardPool
 
-# What a fight can drop. An explicit list of CardData, never a folder
-# scan: a scan would sweep in the starters, the Keeper's neutral cards
-# and anything else that happens to live under cards/, and adding a
-# folder would silently change what every fight drops (see DESIGN.md).
+# What a fight can drop. An explicit list of CardData, plus every card in
+# the folders source_folders names - never a scan of everything under
+# cards/: that would sweep in the starters, the Keeper's neutral cards
+# and anything else that happens to live there, and adding a folder
+# would silently change what every fight drops (see DESIGN.md). Naming a
+# folder here is the decision.
 #
 # Deliberately not the reward RULES - who rolls, when, how many, and
 # where the cards land is RewardSpread's and RegionField's business. This
@@ -12,7 +14,26 @@ class_name RewardPool
 
 # The cards this pool can produce. Order is meaningless; weights below
 # are matched by index.
-@export var entries: Array[CardData] = []
+@export var entries: Array[CardData] = []:
+	set(value):
+		entries = value
+		_resolved_ready = false
+
+# Folders whose every CardData .tres joins entries, unweighted (1.0) and
+# never twice - a card already in entries keeps its own weight. Listed
+# through ResourceLoader.list_directory(), which an exported build's
+# .tres.remap entries also answer to, and only once per pool: a card
+# saved into the folder mid-session needs the pool reloaded (a new run
+# does) or this set again. Not recursive - name each folder. An empty or
+# missing folder adds nothing; a pool left with no card rolls nothing.
+@export var source_folders: PackedStringArray = PackedStringArray():
+	set(value):
+		source_folders = value
+		_resolved_ready = false
+
+# entries plus the source_folders' cards, listed once (_cards()).
+var _resolved: Array[CardData] = []
+var _resolved_ready: bool = false
 
 # Parallel to entries. Short or empty is fine - any entry without a
 # weight uses 1.0, so an unweighted pool is a flat roll and a pool that
@@ -62,8 +83,8 @@ func roll(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null) -> Ar
 	# set shrinks; removing from these two in step is what keeps them
 	# parallel through the draw.
 	var remaining: Array[int] = []
-	for index in entries.size():
-		if entries[index] != null and _weight_of(index, enemy) > 0.0:
+	for index in _cards().size():
+		if _cards()[index] != null and _weight_of(index, enemy) > 0.0:
 			remaining.append(index)
 
 	while picked.size() < count and not remaining.is_empty():
@@ -77,7 +98,7 @@ func roll(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null) -> Ar
 			if roll_point <= 0.0:
 				chosen = position
 				break
-		picked.append(entries[remaining[chosen]])
+		picked.append(_cards()[remaining[chosen]])
 		remaining.remove_at(chosen)
 	return picked
 
@@ -96,15 +117,15 @@ func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = n
 	while picked.size() < count and not remaining.is_empty():
 		var available: Array[CardData.CardRarity] = []
 		for index in remaining:
-			if not available.has(entries[index].rarity):
-				available.append(entries[index].rarity)
+			if not available.has(_cards()[index].rarity):
+				available.append(_cards()[index].rarity)
 		var tier: CardData.CardRarity = pick_rarity(rng.randf(), available, elite)
 		var in_tier: Array[int] = []
 		for index in remaining:
-			if entries[index].rarity == tier:
+			if _cards()[index].rarity == tier:
 				in_tier.append(index)
 		var chosen: int = _pick_weighted(in_tier, rng, enemy)
-		picked.append(entries[chosen])
+		picked.append(_cards()[chosen])
 		remaining.erase(chosen)
 	return picked
 
@@ -122,11 +143,11 @@ func roll_top_tier(count: int, rng: RandomNumberGenerator, enemy: EnemyData = nu
 	for tier in tiers:
 		var in_tier: Array[int] = []
 		for index in eligible:
-			if entries[index].rarity == tier:
+			if _cards()[index].rarity == tier:
 				in_tier.append(index)
 		while picked.size() < count and not in_tier.is_empty():
 			var chosen: int = _pick_weighted(in_tier, rng, enemy)
-			picked.append(entries[chosen])
+			picked.append(_cards()[chosen])
 			in_tier.erase(chosen)
 		if picked.size() >= count:
 			break
@@ -183,8 +204,8 @@ func rarity_rate(tier: CardData.CardRarity, elite: bool = false) -> float:
 # UNSET), with a weight above 0.
 func _rarity_eligible(enemy: EnemyData) -> Array[int]:
 	var eligible: Array[int] = []
-	for index in entries.size():
-		var entry: CardData = entries[index]
+	for index in _cards().size():
+		var entry: CardData = _cards()[index]
 		if entry != null and entry.rarity != CardData.CardRarity.UNSET and _weight_of(index, enemy) > 0.0:
 			eligible.append(index)
 	return eligible
@@ -203,10 +224,32 @@ func _pick_weighted(candidates: Array[int], rng: RandomNumberGenerator, enemy: E
 			return index
 	return candidates[candidates.size() - 1]
 
+# Every card the pool can roll, indexed the way weights are: entries
+# first, in order, then each source folder's cards not already in it.
+# Just entries with no folders named, read live as it always was.
+func _cards() -> Array[CardData]:
+	if source_folders.is_empty():
+		return entries
+	if not _resolved_ready:
+		_resolved_ready = true
+		_resolved = entries.duplicate()
+		for folder in source_folders:
+			var files: PackedStringArray = ResourceLoader.list_directory(folder) if DirAccess.dir_exists_absolute(folder) else PackedStringArray()
+			var found: Array[CardData] = []
+			for file in files:
+				if not file.ends_with(".tres"):
+					continue
+				var card := load(folder.path_join(file)) as CardData
+				if card != null and not _resolved.has(card):
+					found.append(card)
+			found.sort_custom(func(a: CardData, b: CardData) -> bool: return a.resource_path < b.resource_path)
+			_resolved.append_array(found)
+	return _resolved
+
 func _weight_of(index: int, enemy: EnemyData) -> float:
-	var weight: float = weights[index] if index < weights.size() else 1.0
+	var weight: float = weights[index] if index < mini(weights.size(), entries.size()) else 1.0
 	if enemy != null and enemy_bias.has(enemy):
 		var favoured: Array = enemy_bias[enemy]
-		if favoured.has(entries[index]):
+		if favoured.has(_cards()[index]):
 			weight *= enemy_bias_multiplier
 	return weight

@@ -50,6 +50,7 @@ class Section:
 # Folder -> section heading, in section order.
 @export var card_folders: Dictionary[String, String] = {
 	"res://cards/data/": "Wanderer",
+	"res://cards/samurai/": "Samurai",
 	"res://cards/neutral/": "Neutral",
 }:
 	set(value):
