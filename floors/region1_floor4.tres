@@ -20,6 +20,7 @@
 [ext_resource type="Script" uid="uid://mgkhruse1iro" path="res://floors/floor_wind_data.gd" id="95_wind"]
 [ext_resource type="PackedScene" path="res://field/dunecur_pup.tscn" id="96_dunecur_pup"]
 [ext_resource type="Resource" path="res://floors/scatter/floor4_pup_hollow.tres" id="97_pup_hollow"]
+[ext_resource type="Resource" path="res://floors/scatter/floor4_ridge_grass.tres" id="101_ridge_grass"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/nettlebasket.tres" id="98_nettlebasket"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/nettle.tres" id="99_nettle"]
 [ext_resource type="Script" uid="uid://d4mb532t1ord0" path="res://floors/rut_look.gd" id="100_rut_look"]
@@ -221,7 +222,7 @@ rut_look = SubResource("RutLook_snake")
 use_wind_angle = true
 wind_angle_degrees = 90.0
 wind = SubResource("FloorWindData_dunes")
-scatter_sets = Array[ExtResource("9_w4aba")]([ExtResource("97_pup_hollow")])
+scatter_sets = Array[ExtResource("9_w4aba")]([ExtResource("97_pup_hollow"), ExtResource("101_ridge_grass")])
 reward_pool = ExtResource("8_wanderer_pool")
 gold_min = 18
 gold_max = 25
