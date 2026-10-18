@@ -51,6 +51,15 @@ signal floor_cleared
 @export var fight_ground_margin_m: float = 0.5:
 	set(value):
 		fight_ground_margin_m = value
+# A lone enemy's stance with no walkable spot on the approach line turns
+# off it this many degrees at a time, either way, up to the max
+# (lone_stance()).
+@export var stance_turn_step_degrees: float = 15.0:
+	set(value):
+		stance_turn_step_degrees = value
+@export var stance_turn_max_degrees: float = 90.0:
+	set(value):
+		stance_turn_max_degrees = value
 # How far round a spot the nearest valid ground is looked for.
 @export var fight_ground_search_m: float = 12.0:
 	set(value):
@@ -2781,14 +2790,12 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 				stance_direction = Vector3(facing.x, 0.0, facing.z).normalized()
 				toward = stance_direction
 			# The enemy keeps its spot; his stance slides in toward it until
-			# it is clear of every prop as well as the water.
-			spacing = _stance_spacing(anchor.global_position, toward, anchor, _battle_obstacles(_battle_members))
-			if spacing < 0.0:
-				push_warning("RegionField: no stance for '%s' clear of every prop; keeping out of deeper water only." % anchor.name)
-				spacing = _stance_spacing(anchor.global_position, toward, anchor)
-			if spacing < 0.0:
-				push_warning("RegionField: no stance out of deeper water for '%s'; standing at the minimum." % anchor.name)
-				spacing = stance_distance_min(anchor)
+			# it is clear of every prop and the water, on ground he could
+			# walk to - turning off the approach line if it has to.
+			var placed: Array = lone_stance(anchor, toward, _battle_obstacles(_battle_members))
+			spacing = float(placed[1])
+			if (placed[0] as Vector3) != toward:
+				stance_direction = placed[0] as Vector3
 		camera_rig.enter_battle(wanderer, _battle_members.duplicate(), hand_top_fraction)
 		# Never through something standing: when the straight move to the
 		# stance would cross a prop, he walks round it first.
@@ -2975,9 +2982,10 @@ func _battle_input_hold_seconds(transition_time: float) -> float:
 # reach()) plus its gap (_battle_gap_for()), pulled in a tenth of a metre
 # at a time while the spot stands in water deeper than stance_max_water_m
 # (the Sea's sea_level over Ground.get_height_at() - a ford's shallows
-# pass), down to _battle_gap_min_for(). -1 when every one of those is deeper - the
-# caller decides what then (a cluster steps its line in, see _place_
-# cluster_line()).
+# pass) or off ground he could walk to (is_valid_fight_ground()), down to
+# _battle_gap_min_for(). -1 when every one of those fails - the caller
+# decides what then (a cluster steps its line in, see _place_cluster_
+# line(); a lone enemy turns, lone_stance()).
 func _stance_spacing(from: Vector3, direction: Vector3, enemy: FieldEnemy, obstacles: Array[PackedVector2Array] = []) -> float:
 	var reach: float = enemy.battle_front_reach() if enemy != null else 0.0
 	var ground := get_node_or_null(ground_path) as Ground
@@ -2990,12 +2998,37 @@ func _stance_spacing(from: Vector3, direction: Vector3, enemy: FieldEnemy, obsta
 	while gap >= _battle_gap_min_for(enemy) - 0.001:
 		var point: Vector3 = from + direction * (reach + gap)
 		var depth: float = water_level - ground.get_height_at(Vector2(point.x, point.z))
-		if depth <= stance_max_water_m and _spot_clear(obstacles, point, battle_body_radius_m):
+		if depth <= stance_max_water_m and _spot_clear(obstacles, point, battle_body_radius_m) and is_valid_fight_ground(point):
 			if gap < full_gap:
 				print("RegionField: stance pulled in to a %.1f m gap to keep out of deeper water." % gap)
 			return reach + gap
 		gap -= 0.1
 	return -1.0
+
+# A lone enemy's stance: [direction from it (Vector3), spacing (float)].
+# Along `toward` (his approach, or its facing) when _stance_spacing()
+# finds a spot there; else that line turned 15 degrees at a time either
+# way, up to stance_turn_max_degrees; else where he stood as contact
+# began (he walked there); else `toward` at the minimum, as it always was.
+func lone_stance(anchor: FieldEnemy, toward: Vector3, obstacles: Array[PackedVector2Array]) -> Array:
+	var spacing: float = _stance_spacing(anchor.global_position, toward, anchor, obstacles)
+	if spacing >= 0.0:
+		return [toward, spacing]
+	var turns: int = int(floor(maxf(stance_turn_max_degrees, 0.0) / maxf(stance_turn_step_degrees, 1.0) + 0.001))
+	for k in range(1, turns + 1):
+		for side: float in [1.0, -1.0]:
+			var turned: Vector3 = toward.rotated(Vector3.UP, deg_to_rad(stance_turn_step_degrees * float(k) * side))
+			spacing = _stance_spacing(anchor.global_position, turned, anchor, obstacles)
+			if spacing >= 0.0:
+				print("RegionField: stance for '%s' turned %.0f degrees off the approach to stand on walkable ground." % [anchor.name, stance_turn_step_degrees * float(k) * side])
+				return [turned, spacing]
+	if _has_contact_position:
+		var back := Vector3(_contact_position.x - anchor.global_position.x, 0.0, _contact_position.z - anchor.global_position.z)
+		if back.length() > 0.0001:
+			push_warning("RegionField: no stance for '%s' on walkable ground within %.0f degrees; standing where contact began." % [anchor.name, stance_turn_max_degrees])
+			return [back.normalized(), back.length()]
+	push_warning("RegionField: no stance for '%s' on walkable ground; standing at the minimum." % anchor.name)
+	return [toward, stance_distance_min(anchor)]
 
 # How far from `enemy`'s origin the Wanderer stands to fight it: its near
 # edge plus its gap (_battle_gap_for()), before any pull out of deeper
