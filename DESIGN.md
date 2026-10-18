@@ -210,11 +210,18 @@ and up the west shore north of z -27. (2026-10-17.)
   weapon (`RunState.weapon`, from `CharacterData.starting_weapon`), shown
   in the HUD's WEAPON slot. What a weapon is for: it changes the class's
   basic attack - Slash for the Wanderer - through
-  `WeaponData.modify_basic_attack()`, which nothing calls yet. The
-  Rusted Blade is the baseline and leaves Slash unchanged. Until a weapon
-  has an effect it stays out of the battle hover reveal and out of
-  `held_pieces()`. Its art is `assets/textures/weapons/rusted_blade.png`.
-  (2026-10-17.)
+  `WeaponData.modify_basic_attack()`, which each fight's deck is built
+  through (`BattleController.fight_card()`); the run's deck itself is
+  never rewritten, so out of a fight (deck panel, Belongings, wagon,
+  Collector) it still shows Slash. The Rusted Blade is the baseline and
+  leaves Slash unchanged. A weapon stays out of the battle hover reveal
+  and out of `held_pieces()`. Its art is
+  `assets/textures/weapons/rusted_blade.png`. (2026-10-17.)
+  Greyshelf's Tail (`run/weapons/greyshelfs_tail.tres`) is offered after
+  every Greyshelf win while not carried (`EnemyData.weapon_reward`):
+  Slash plays as Lash, Slash+ as Lash+ (`cards/weapon/`). **Placeholder
+  art:** the Tail's plate reuses the Rusted Blade's art and Lash/Lash+
+  reuse Slash's, until real art exists. (2026-10-18.)
 - **Chain roles (Opener/Closer, chain payoffs).** The old project's
   `CardData.chain_role`/`chain_followup_effect` are not ported to the new
   rules layer (`cards/card_data.gd`). No current card needs them - revisit
