@@ -536,6 +536,32 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 		preview["original_per_hit"] = plain.get("per_hit", 0)
 	return preview
 
+# Hits landing on `player` in order, from where they stand now: each
+# through Block, then absorb, then HP, a lethal guard saving them as it
+# would (preview_intent()'s own replay). "to_hp": what reaches HP in all;
+# "lethal": whether the last of them leaves them at 0. Nothing is changed.
+static func simulate_hits(player: Combatant, amounts: Array[int]) -> Dictionary:
+	var block: int = player.block
+	var absorb: int = player.absorb
+	var hp: int = player.hp
+	var saves_used: int = 0
+	var total_to_hp: int = 0
+	for amount in amounts:
+		var blocked: int = mini(block, amount)
+		var after_block: int = amount - blocked
+		var absorbed: int = mini(absorb, after_block)
+		block -= blocked
+		absorb -= absorbed
+		total_to_hp += after_block - absorbed
+		var was_critical: bool = player.is_critical_at(hp)
+		hp -= after_block - absorbed
+		if hp <= 0:
+			var guard: Status = Status.lethal_guard(player.statuses, was_critical)
+			if guard != null and saves_used < guard.charges:
+				hp = guard.data.survive_hp(player.max_hp, player.critical_hp_fraction)
+				saves_used += 1
+	return {"to_hp": total_to_hp, "lethal": hp <= 0}
+
 # One Attack card has been played against this living enemy: while its
 # queued intent counts them (EnemyIntent.counts_attack_cards - the
 # Dunecur's Rush), a stack of its attack_card_status (Roused), up to that

@@ -529,7 +529,11 @@ func show_intent(preview: Dictionary) -> void:
 				_extra_texts.append(reading[0])
 				_extra_hits.append(reading[1])
 				_extra_originals.append(original)
-		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.DIG or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE or _type == EnemyIntent.IntentType.COIL or _type == EnemyIntent.IntentType.TAUNT or _type == EnemyIntent.IntentType.SIGNAL:
+		# A Signal keeps the number its pack's answers will land in all
+		# (BattleController.get_intent_preview()); the rest of these are
+		# their glyph alone.
+		var answered: bool = _type == EnemyIntent.IntentType.SIGNAL and int(preview.get("per_hit", 0)) > 0
+		if not answered and (_type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.DIG or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE or _type == EnemyIntent.IntentType.COIL or _type == EnemyIntent.IntentType.TAUNT or _type == EnemyIntent.IntentType.SIGNAL):
 			_label.text = ""
 			_hits_label.text = ""
 		_has_threshold = preview.has("threshold")

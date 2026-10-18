@@ -458,7 +458,41 @@ func get_intent_preview(enemy: FieldEnemy) -> Dictionary:
 	# call the turn makes, without applying it.
 	if int(preview.get("type", -1)) == EnemyIntent.IntentType.HEAL_ALLY and not bool(preview.get("pain_turn", false)):
 		preview["per_hit"] = _heal_packmates(enemy, int(preview["per_hit"]), false)
+	# A Signal shows what its pack's answers will land in all ("per_hit"),
+	# each answer's damage ("answers", member order), and whether they
+	# alone would be lethal (EnemyTurn.simulate_hits()) - nothing, Denied
+	# or cancelled.
+	if int(preview.get("type", -1)) == EnemyIntent.IntentType.SIGNAL and not bool(preview.get("pain_turn", false)) and not bool(preview.get("denied", false)):
+		var answers: Array[int] = signal_answer_amounts(enemy)
+		var total: int = 0
+		for amount in answers:
+			total += amount
+		preview["answers"] = answers
+		preview["per_hit"] = total
+		var landed: Dictionary = EnemyTurn.simulate_hits(player, answers)
+		preview["damage_to_hp"] = int(landed["to_hp"])
+		preview["lethal"] = bool(landed["lethal"])
 	return preview
+
+# What each living packmate of `enemy` would answer its SIGNAL with, in
+# member order (EnemyTurn.signal_answer_intent() - its first ATTACK, every
+# hit of it, as it would land now). Empty without a pack.
+func signal_answer_amounts(enemy: FieldEnemy) -> Array[int]:
+	var amounts: Array[int] = []
+	if enemy == null or enemy.group == &"":
+		return amounts
+	for member in enemies:
+		if member == enemy or member.group != enemy.group or member.enemy_data == null:
+			continue
+		var mate: Combatant = _combatants.get(member)
+		if mate == null or mate.hp <= 0:
+			continue
+		var answer: EnemyIntent = EnemyTurn.signal_answer_intent(mate, member.enemy_data)
+		if answer == null:
+			continue
+		for hit in EnemyTurn.hit_count(mate, answer):
+			amounts.append(EnemyTurn.hit_amount(mate, member.enemy_data, answer, hit, player.statuses))
+	return amounts
 
 # What no longer holds on `enemy`'s intent (EnemyTurn.mark_loss() - the
 # intent replaced or cancelled since the card landed) leaves it, said
