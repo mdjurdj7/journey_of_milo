@@ -2,6 +2,8 @@ extends Control
 class_name BattleOverlay
 
 const FLOATING_NUMBER_SCENE_PATH := "res://battle/floating_number.tscn"
+# A mound's plate is an enemy plate in its mound mode (EnemyStatus.set_mound()).
+const MOUND_PLATE_SCENE_PATH := "res://battle/enemy_status.tscn"
 const CARD_PLAY_SFX_PATH := "res://assets/audio/ui/card_played.mp3"
 # An optional tick as a repeated hit's Toll is spent (BattleController.
 # card_repeat_swing - Second Swing): the first of these that exists plays;
@@ -220,6 +222,10 @@ var _toll_blow_from: int = -1
 # The Wanderer, for his numbers' anchor (_screen_pos_for_damage_target()).
 var _wanderer: Wanderer = null
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
+# A dug-in enemy's mounds' plates (EnemyStatus.set_mound()), made and
+# dropped as its row stands (_sync_mound_plates()) - children of this
+# overlay, gone with the fight. _mound_key() -> EnemyStatus.
+var _mound_plates: Dictionary = {}
 # One BattleIntent per enemy for this fight - children of this overlay,
 # so they're freed with it and nothing of them exists on the field.
 var _enemy_intents: Dictionary = {} # FieldEnemy -> BattleIntent
@@ -386,6 +392,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.stance_changed.connect(_on_stance_changed)
 	battle_controller.enemy_hp_changed.connect(_on_enemy_hp_changed)
 	battle_controller.damage_dealt.connect(_on_damage_dealt)
+	battle_controller.mound_damaged.connect(_on_mound_damaged)
 	battle_controller.combat_text.connect(_show_number)
 	# A hit a block took whole shows BLOCKED on whoever's block it was.
 	battle_controller.enemy_hit_blocked.connect(func(enemy: FieldEnemy, absorbed: bool) -> void:
@@ -628,7 +635,7 @@ func _create_enemy_intents(enemy_list: Array[FieldEnemy]) -> void:
 # as screen rects (BattleOcclusion fades what lies under them).
 func get_readout_rects() -> Array[Rect2]:
 	var rects: Array[Rect2] = []
-	for display in _enemy_statuses.values() + _enemy_intents.values():
+	for display in _enemy_statuses.values() + _enemy_intents.values() + _mound_plates.values():
 		var control := display as Control
 		if control == null or not is_instance_valid(control) or not control.is_visible_in_tree():
 			continue
@@ -907,7 +914,61 @@ func _place_choice_prompt() -> void:
 
 func _process(_delta: float) -> void:
 	_place_choice_prompt()
+	_sync_mound_plates()
 	_lay_out_readouts()
+
+# One plate per standing mound of each dug-in enemy whose row is up
+# (FieldEnemy.is_dug_in()), its HP the mound's own; a broken or gone
+# mound's plate goes, and every one of an enemy that has come up.
+func _sync_mound_plates() -> void:
+	if battle_controller == null:
+		return
+	var wanted: Dictionary = {}
+	for enemy in battle_controller.enemies:
+		if not is_instance_valid(enemy) or not enemy.is_dug_in():
+			continue
+		var guards: Array[Combatant] = battle_controller.mound_guards_of(enemy)
+		for mound in guards.size():
+			if guards[mound] == null:
+				continue
+			var key: String = _mound_key(enemy, mound)
+			wanted[key] = true
+			if not _mound_plates.has(key):
+				var plate := (load(MOUND_PLATE_SCENE_PATH) as PackedScene).instantiate() as EnemyStatus
+				add_child(plate)
+				plate.set_mound(enemy, mound)
+				plate.update_hp(guards[mound].hp, guards[mound].max_hp)
+				_mound_plates[key] = plate
+	for key: String in _mound_plates.keys():
+		if not wanted.has(key):
+			var plate: EnemyStatus = _mound_plates[key]
+			if is_instance_valid(plate):
+				plate.queue_free()
+			_mound_plates.erase(key)
+
+func _mound_key(enemy: FieldEnemy, mound: int) -> String:
+	return "%d:%d" % [enemy.get_instance_id(), mound]
+
+# A hit on a mound (BattleController.mound_damaged): its plate's HP (with
+# the ghost), its number over the mound - sized by its share of the
+# mound's HP, a break the top size - and the hit's reaction.
+func _on_mound_damaged(enemy: FieldEnemy, mound: int, amount: int, hp: int, max_hp: int) -> void:
+	if not is_instance_valid(enemy):
+		return
+	if _battle_feedback != null:
+		_battle_feedback.on_mound_damaged(enemy, mound, amount, hp, max_hp)
+	var key: String = _mound_key(enemy, mound)
+	var plate: EnemyStatus = _mound_plates.get(key)
+	var avoid: Array[Rect2] = []
+	if plate != null and is_instance_valid(plate):
+		plate.update_hp(hp, max_hp)
+		avoid.append(plate.get_global_rect())
+	var camera := get_viewport().get_camera_3d()
+	var body: Rect2 = enemy.get_mound_screen_rect(camera, mound, 0.0) if camera != null else Rect2()
+	if not body.has_area():
+		return
+	var size: float = _battle_feedback.number_multiplier(float(amount) / float(maxi(max_hp, 1)), hp <= 0) if _battle_feedback != null else 1.0
+	_place_number(key, FloatingNumber.KIND_DAMAGE, amount, Vector2(body.get_center().x, body.position.y - number_over_body_px), size, avoid)
 
 # No two readouts overlap: every enemy's HP/name plate and intent, and his
 # HP bar (which never moves), as they would stand (their own placement,
@@ -919,7 +980,7 @@ func _lay_out_readouts() -> void:
 	var nodes: Array[Control] = []
 	var rects: Array[Rect2] = []
 	var movable: Array[bool] = []
-	for display in _enemy_statuses.values() + _enemy_intents.values():
+	for display in _enemy_statuses.values() + _enemy_intents.values() + _mound_plates.values():
 		var control := display as Control
 		if control == null or not is_instance_valid(control) or not control.is_visible_in_tree():
 			continue
@@ -1089,11 +1150,6 @@ func _show_number(target: Variant, amount: int, kind: String) -> void:
 			return
 	# A multi-hit's numbers step on from each other while the last shows.
 	var key: Variant = target if target is FieldEnemy else "player"
-	var shown: int = int(_number_counts.get(key, 0))
-	var stack: Vector2 = number_stack_step * float(shown)
-	_number_counts[key] = shown + 1
-	get_tree().create_timer(_number_seconds()).timeout.connect(func() -> void:
-		_number_counts[key] = maxi(int(_number_counts.get(key, 1)) - 1, 0))
 	# Clear of its own readouts: an enemy's intent and plate, his HP bar.
 	var avoid: Array[Rect2] = []
 	var readouts: Array = [_enemy_intents.get(target), _enemy_statuses.get(target)] if target is FieldEnemy else [_field_hp_bar]
@@ -1101,8 +1157,19 @@ func _show_number(target: Variant, amount: int, kind: String) -> void:
 		var control := display as Control
 		if control != null and is_instance_valid(control) and control.is_visible_in_tree():
 			avoid.append(control.get_global_rect())
+	_place_number(key, kind, amount, _screen_pos_for_damage_target(target) + offset, size, avoid)
+
+# A number of `kind` for `amount` at `screen_pos` (its bottom centre),
+# stepping on from `key`'s numbers still showing (a multi-hit's stack,
+# sharing its first's jitter), clear of `avoid`.
+func _place_number(key: Variant, kind: String, amount: int, screen_pos: Vector2, size: float, avoid: Array[Rect2]) -> void:
+	var shown: int = int(_number_counts.get(key, 0))
+	var stack: Vector2 = number_stack_step * float(shown)
+	_number_counts[key] = shown + 1
+	get_tree().create_timer(_number_seconds()).timeout.connect(func() -> void:
+		_number_counts[key] = maxi(int(_number_counts.get(key, 1)) - 1, 0))
 	var jitter: float = NAN if shown == 0 else float(_stack_jitter.get(key, NAN))
-	var number: FloatingNumber = _spawn_floating_number(kind, amount, _screen_pos_for_damage_target(target) + offset, size, avoid, stack, jitter)
+	var number: FloatingNumber = _spawn_floating_number(kind, amount, screen_pos, size, avoid, stack, jitter)
 	if shown == 0:
 		_stack_jitter[key] = number.jitter.x
 

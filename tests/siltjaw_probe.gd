@@ -17,8 +17,8 @@ extends SceneTree
 # the fight cases load floor 2 and play real cards through
 # BattleController - the fight opening on its row, the body never up and
 # its own mound flat, the mounds in a row with the body's node at the
-# middle one whichever it is under, a rect for each and none for the
-# body; Slashes at a wrong mound wearing it down and breaking it, nothing
+# middle one whichever it is under, a plate of 12 on each, a rect for
+# each and none for the body; Slashes at a wrong mound wearing it down and breaking it, nothing
 # back; Bite Downs breaking its own, the overkill landing raw and the
 # Siltjaw up Exposed at that mound; a Carve on every mound; and the
 # eruption coming up at its mound.
@@ -307,6 +307,7 @@ func _check_fight_dig() -> void:
 		var at: Vector3 = siltjaw.global_position
 		var middle: Vector3 = siltjaw.call("get_mound_position", 1)
 		_expect(Vector2(at.x - middle.x, at.z - middle.z).length() < 0.05, "...its node at the middle mound, under number %d" % combatant.true_mound)
+		_expect_eq(_plate_hps(), [MOUND_HP, MOUND_HP, MOUND_HP] as Array[int], "...a plate on each mound, %d HP" % MOUND_HP)
 		await _arm(controller)
 		controller.call("_refresh_enemy_rects")
 		var rects: Array = controller.get("_mound_rects")
@@ -346,10 +347,12 @@ func _check_fight_wrong() -> void:
 		await _play_at(controller, siltjaw, wrong)
 		_expect_eq(hits, [[wrong, SLASH, MOUND_HP - SLASH]], "A Slash at a wrong mound: %d off it, reported on it" % SLASH)
 		_expect(combatant.hp == HP and combatant.mounds.size() == MOUNDS, "...the Siltjaw untouched, every mound standing")
+		_expect(_plate_hps().has(MOUND_HP - SLASH), "...its plate down to %d" % (MOUND_HP - SLASH))
 		await _play_at(controller, siltjaw, wrong)
 		_expect(combatant.dug_in and combatant.mounds.size() == MOUNDS - 1 and not combatant.mounds.has(wrong), "A second breaks it: %d left, still under" % combatant.mounds.size())
 		_expect_eq(combatant.hp, HP, "...the Siltjaw untouched")
 		_expect_eq(before - player.hp, 0, "...and nothing comes back")
+		_expect_eq(_plate_hps().size(), MOUNDS - 1, "...its plate gone with it")
 	await _teardown()
 	_completed += 1
 
@@ -374,6 +377,7 @@ func _check_fight_own() -> void:
 		_expect(not _readout_has(controller, siltjaw, DUG_IN_LABEL), "...its readout no longer Dug in")
 		_expect(_has(combatant, EXPOSED_PATH), "...Exposed")
 		_expect_eq(HP - combatant.hp, 2 * BITE_DOWN - MOUND_HP, "...the overkill carried in raw, %d" % (2 * BITE_DOWN - MOUND_HP))
+		_expect(_plate_hps().is_empty(), "...every mound's plate gone")
 		var at: Vector3 = siltjaw.global_position
 		_expect(Vector2(at.x - spot.x, at.z - spot.z).length() < 0.05, "...up at that mound")
 	await _teardown()
@@ -552,6 +556,20 @@ func _settle(controller: Node) -> void:
 # status_labels()).
 func _readout_has(controller: Node, member: Node, label: String) -> bool:
 	return Array(controller.call("get_enemy_status_labels", member)).has(label)
+
+# The mound plates showing (BattleOverlay._mound_plates), each one's HP,
+# in mound order.
+func _plate_hps() -> Array[int]:
+	var hps: Array[int] = []
+	var overlay: Node = _field.get_node("BattleLayer").get_child(0)
+	var plates: Dictionary = overlay.get("_mound_plates")
+	var keys: Array = plates.keys()
+	keys.sort()
+	for key in keys:
+		var plate: Node = plates[key]
+		if is_instance_valid(plate) and not plate.is_queued_for_deletion():
+			hps.append(int(plate.get("_current_hp")))
+	return hps
 
 func _combatant(controller: Node, member: Node) -> Combatant:
 	return (controller.get("_combatants") as Dictionary).get(member)

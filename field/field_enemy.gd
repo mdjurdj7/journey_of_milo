@@ -259,7 +259,7 @@ var option_id: StringName = &""
 # A DIG's mounds (begin_dig()): in a row across the line to the Wanderer,
 # this far apart centre to centre, each its own SandMound this long (along
 # the body's facing), wide and high. Edits reshape mounds already up.
-@export var dig_mound_spacing_m: float = 2.4:
+@export var dig_mound_spacing_m: float = 1.7:
 	set(value):
 		dig_mound_spacing_m = value
 		_place_dig_mounds()
@@ -284,6 +284,16 @@ var option_id: StringName = &""
 # The mounds swelling up, and a wrong one falling flat.
 @export var dig_mound_rise_seconds: float = 0.6
 @export var dig_mound_collapse_seconds: float = 0.35
+# A hit on a mound (play_mound_hit()): it dips by dig_mound_hit_dip of its
+# height and springs back over dig_mound_hit_seconds, with a strike into
+# sand (dig_mound_hit_clips, in turn at random) - the same on every mound.
+@export_range(0.0, 1.0, 0.01) var dig_mound_hit_dip: float = 0.25
+@export var dig_mound_hit_seconds: float = 0.2
+@export var dig_mound_hit_clips: Array[AudioStream] = [
+	load("res://assets/audio/sfx/sword_ground_strike_sand_1.mp3") as AudioStream,
+	load("res://assets/audio/sfx/sword_ground_strike_sand_2.mp3") as AudioStream,
+	load("res://assets/audio/sfx/sword_ground_strike_sand_3.mp3") as AudioStream,
+]
 # Added over a mound while the cursor is on it - the same for every
 # mound, so the hover says nothing about which is which.
 @export var dig_mound_highlight: Color = Color(0.09, 0.08, 0.06):
@@ -332,6 +342,7 @@ var _pain_player: AudioStreamPlayer3D = null
 # Made on the first status_gained_sound (show_status()); none before.
 var _status_player: AudioStreamPlayer3D = null
 var _contact_pool := SoundPool.new()
+var _mound_hit_pool := SoundPool.new()
 var _armored_contact_pool := SoundPool.new()
 # BaseMaterial3D, not StandardMaterial3D: Godot's glTF importer can produce
 # either it or an ORMMaterial3D for a material with a combined metallic-
@@ -1354,7 +1365,9 @@ func _build_slash_gradient_texture() -> GradientTexture2D:
 # advancement isn't a Tween.
 # `tint` multiplies the ground colour the grains take (BattleFeedback.
 # sand_puff_tint).
-func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spread_degrees: float, tint: float = 1.0) -> void:
+# `at`: where it bursts - the body's own place when INF (a mound's hit
+# names its mound's).
+func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spread_degrees: float, tint: float = 1.0, at: Vector3 = Vector3.INF) -> void:
 	if _ground == null:
 		return
 
@@ -1388,7 +1401,7 @@ func spawn_sand_puff(particle_count: int, lifetime: float, velocity: float, spre
 	particles.process_material = process_material
 
 	add_child(particles)
-	particles.global_position = global_position
+	particles.global_position = global_position if at == Vector3.INF else at
 	particles.emitting = true
 	get_tree().create_timer(lifetime + 0.1).timeout.connect(particles.queue_free)
 
@@ -1886,6 +1899,26 @@ func set_mound_highlight(mound: int) -> void:
 		var sand: SandMound = _dig_sand(index)
 		if sand != null:
 			sand.material_overlay = _dig_highlight_material if index == mound else null
+
+# A hit on mound `mound`: it dips and springs back, and the sand takes the
+# blade (see dig_mound_hit_dip) - the same on every mound.
+func play_mound_hit(mound: int) -> void:
+	var sand: SandMound = _dig_sand(mound)
+	if sand == null:
+		return
+	var half: float = maxf(dig_mound_hit_seconds, 0.02) * 0.5
+	var low: float = sand.get_rise() * (1.0 - clampf(dig_mound_hit_dip, 0.0, 1.0))
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_method(sand.set_rise, sand.get_rise(), low, half).set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_QUAD)
+	tween.tween_method(sand.set_rise, low, 1.0, half).set_ease(Tween.EASE_IN_OUT).set_trans(Tween.TRANS_SINE)
+	_mound_hit_pool.set_clips(dig_mound_hit_clips)
+	var clip: AudioStream = _mound_hit_pool.next_random()
+	if clip != null and _contact_player != null:
+		_contact_player.stream = clip
+		_contact_player.pitch_scale = 1.0 + randf_range(-enemy_data.pitch_jitter, enemy_data.pitch_jitter)
+		_contact_player.volume_db = contact_volume_db + randf_range(-contact_volume_variance_db, contact_volume_variance_db)
+		_contact_player.play()
 
 # A wrong mound, falling flat and gone. Returns how long it takes.
 func collapse_mound(mound: int) -> float:

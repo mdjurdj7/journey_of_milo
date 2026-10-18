@@ -1157,6 +1157,18 @@ func _counter_strikes(against: Array[FieldEnemy]) -> void:
 
 # --- The dig (EnemyIntent.IntentType.DIG) ---
 
+# `enemy`'s standing mounds' Combatants by mound number - null for one
+# broken or gone; empty when it isn't dug in. For their plates
+# (BattleOverlay).
+func mound_guards_of(enemy: FieldEnemy) -> Array[Combatant]:
+	var standing: Array[Combatant] = []
+	var combatant: Combatant = _combatants.get(enemy)
+	if combatant == null or not combatant.dug_in:
+		return standing
+	for guard in combatant.mound_guards:
+		standing.append(guard if EnemyTurn.mound_standing(guard) else null)
+	return standing
+
 # What a card played at `enemy` (at `mound` of its row, when it is dug in)
 # lands on: that mound's Combatant while the enemy is under, else the
 # enemy's own. A mound gone since the card was armed (a play queued behind

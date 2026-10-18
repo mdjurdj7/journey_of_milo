@@ -207,6 +207,17 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, kind: String
 			_hold_wanderer(hold)
 		_react_to_enemy_attack(attacker)
 
+# BattleController.mound_damaged: a hit on a dug-in enemy's mound - the
+# Wanderer's stop (a broken mound's the big one), the mound dipping and
+# the sand struck (FieldEnemy.play_mound_hit()), a sand puff off it. No
+# flash, slash mark or recoil: there is no body to show them.
+func on_mound_damaged(enemy: FieldEnemy, mound: int, amount: int, hp: int, _max_hp: int) -> void:
+	if amount <= 0 or not is_instance_valid(enemy):
+		return
+	_hold_wanderer(stop_ms(amount, hp <= 0) / 1000.0)
+	enemy.play_mound_hit(mound)
+	enemy.spawn_sand_puff(sand_puff_particle_count, sand_puff_lifetime, sand_puff_velocity, sand_puff_spread_degrees, sand_puff_tint, enemy.get_mound_position(mound))
+
 # BattleController.player_hit_blocked: an enemy's hit the player's Block
 # or absorb took whole - the blocked stop on both, and that enemy's
 # armored contact sound; no number, flash or recoil.

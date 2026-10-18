@@ -40,6 +40,15 @@ var layout_offset: Vector2 = Vector2.ZERO
 @export var hp_change_hold_time: float = 1.5
 @export_range(0.0, 1.0) var low_hp_fraction: float = 0.3
 
+@export_group("Mound Plate")
+# As one mound's plate of a dug-in enemy's row (set_mound() - BattleOverlay
+# makes one per standing mound): this narrow, no name, no status row, at
+# bar_offset under that mound. The enemy's own plate stays under its body
+# at the row's middle - lower than the mounds', the body being under the
+# sand.
+@export var mound_battle_width: float = 84.0
+@export_group("")
+
 @export_group("HP Change")
 # A loss: the fill drops in the frame it lands, and a ghost - the fill's
 # own ink at ghost_alpha - holds the lost stretch for ghost_hold_sec, then
@@ -280,6 +289,9 @@ var layout_offset: Vector2 = Vector2.ZERO
 @onready var hp_label: Label = $NumbersLabel
 
 var target: FieldEnemy
+# A mound's plate (set_mound()): which mound of the target's row; -1 for
+# the enemy's own plate.
+var mound_index: int = -1
 var _current_hp: int = -1
 var _max_hp: int = 1
 # HP Change: the ghost's right end, as a fraction of the bar (none while
@@ -582,7 +594,7 @@ func _is_readout_hovered() -> bool:
 	return Rect2(0.0, 0.0, size.x, _status_row_bottom()).has_point(get_local_mouse_position())
 
 func _enemy_name() -> String:
-	if target == null or not is_instance_valid(target) or target.enemy_data == null:
+	if mound_index >= 0 or target == null or not is_instance_valid(target) or target.enemy_data == null:
 		return ""
 	return target.enemy_data.enemy_name.to_upper()
 
@@ -630,6 +642,14 @@ func _build_bar_style(color: Color) -> StyleBoxFlat:
 
 func set_target(field_enemy: FieldEnemy) -> void:
 	target = field_enemy
+
+# This plate as mound `mound`'s of `field_enemy`'s row: narrow, nameless,
+# under that mound, in the battle style from the start.
+func set_mound(field_enemy: FieldEnemy, mound: int) -> void:
+	target = field_enemy
+	mound_index = mound
+	battle_width = mound_battle_width
+	enter_battle(0.0)
 
 # Safe to call before this node has entered the tree (see _pending_
 # current/_pending_max's own doc) - defers to _ready() in that case rather
@@ -813,8 +833,11 @@ func _physics_process(delta: float) -> void:
 		return
 
 	# Under the model, wherever it stands or hovers (FieldEnemy.get_body_
-	# lift()) - the body itself never leaves the sand.
+	# lift()) - the body itself never leaves the sand. A mound's plate:
+	# under its mound.
 	var target_position: Vector3 = target.global_position + bar_offset + Vector3.UP * target.get_body_lift()
+	if mound_index >= 0:
+		target_position = target.get_mound_position(mound_index) + bar_offset
 	var screen_pos: Vector2 = camera.unproject_position(target_position)
 	# Whole pixels only - a fractional Control position on a bare bar (no
 	# panel background to visually absorb it) reads as shimmer/jitter on
