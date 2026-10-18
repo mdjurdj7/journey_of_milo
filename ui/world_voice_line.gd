@@ -24,7 +24,17 @@ class_name WorldVoiceLine
 # pale world, bone on a dark one" (see ui/battle_theme.gd's figure/ground
 # rule), the same value FloatingNumber uses for text sitting directly over
 # the 3D view - so it follows RegionField's ui_on_dark_world switch for
-# free.
+# free. Under its ink, every line - the band's too - wears the floating
+# numbers' faint halo (FloatingNumber's Halo group) in the theme's
+# opposite tone (CardFace text_color): halo_steps outline passes out to
+# halo_px, each faint, so it falls off like a blur and the line reads over
+# brush and sand alike. Drawn per wrapped line (_draw()); the Label keeps
+# its own glyphs only to measure and wrap, transparent.
+#
+# An anchored line sits clear of what stands round its point: over the
+# tallest prop or scatter item within occluder_radius_m of it (RegionField.
+# tallest_occluder_top()), occluder_clearance_m above that, when that is
+# higher than its own point.
 
 const FONT_PATH := "res://assets/fonts/Spectral-SemiBold.ttf"
 const THEME_PATH := "res://ui/battle_theme.tres"
@@ -50,6 +60,24 @@ signal line_finished
 # Read every physics tick while anchored.
 @export var anchored_width_px: float = 900.0
 @export var anchored_gap_px: float = 8.0
+# The halo (see the header): how far it reaches past the ink, in pixels,
+# over how many passes, and their alpha together. Each redraws live.
+@export var halo_px: float = 9.0:
+	set(value):
+		halo_px = value
+		queue_redraw()
+@export var halo_steps: int = 5:
+	set(value):
+		halo_steps = value
+		queue_redraw()
+@export_range(0.0, 1.0) var halo_alpha: float = 0.35:
+	set(value):
+		halo_alpha = value
+		queue_redraw()
+# An anchored line rises over what stands within this many metres of its
+# point (XZ), this far above the tallest of it. Read every physics tick.
+@export var occluder_radius_m: float = 2.0
+@export var occluder_clearance_m: float = 0.35
 
 var _tween: Tween = null
 # Whether the line is over a point in the world rather than in the band;
@@ -59,6 +87,10 @@ var _anchored: bool = false
 var _anchor: Node3D = null
 var _anchor_offset: Vector3 = Vector3.ZERO
 var _anchor_point: Vector3 = Vector3.ZERO
+# The ink and the halo's tone (CardFace panel_color / text_color), read as
+# it readies; the Label's own font colour is transparent.
+var _ink: Color = Color.BLACK
+var _halo: Color = Color.WHITE
 
 # The field's one WorldVoiceLine, under `hud` (the FieldHUD CanvasLayer -
 # a Control needs a CanvasLayer ancestor to render, same reason
@@ -85,8 +117,11 @@ func _ready() -> void:
 	if font != null:
 		add_theme_font_override("font", font)
 	add_theme_font_size_override("font_size", font_size_px)
-	add_theme_color_override("font_color", get_theme_color("panel_color", "CardFace"))
-	add_theme_color_override("font_outline_color", get_theme_color("text_color", "CardFace"))
+	_ink = get_theme_color("panel_color", "CardFace")
+	_halo = get_theme_color("text_color", "CardFace")
+	# Its own glyphs only measure and wrap; _draw() inks the line.
+	add_theme_color_override("font_color", Color(_ink, 0.0))
+	add_theme_color_override("font_outline_color", Color(_halo, 0.0))
 	add_theme_constant_override("outline_size", outline_size_px)
 
 	_apply_band_layout()
@@ -141,6 +176,13 @@ func _place_anchored() -> void:
 			_anchored = false
 			return
 		point = _anchor.global_position + _anchor_offset
+	# Clear of what stands round it: over the tallest thing within
+	# occluder_radius_m, occluder_clearance_m above it.
+	var field: Node = _region_field()
+	if field != null:
+		var top: float = float(field.call("tallest_occluder_top", point, occluder_radius_m))
+		if top > -INF:
+			point.y = maxf(point.y, top + occluder_clearance_m)
 	var camera: Camera3D = get_viewport().get_camera_3d()
 	if camera == null:
 		return
@@ -149,6 +191,44 @@ func _place_anchored() -> void:
 	var screen_pos: Vector2 = camera.unproject_position(point)
 	size = Vector2(anchored_width_px, size.y)
 	position = (screen_pos - Vector2(anchored_width_px * 0.5, size.y + anchored_gap_px)).round()
+
+# The RegionField over this line's FieldHUD, or null - found by what it
+# answers (tallest_occluder_top()), not named: naming RegionField here
+# would compile it, and the RunState autoload it names, into everything
+# that loads this line.
+func _region_field() -> Node:
+	var node: Node = get_parent()
+	while node != null:
+		if node.has_method("tallest_occluder_top"):
+			return node
+		node = node.get_parent()
+	return null
+
+# The line, wrapped as the Label wraps it, each line drawn halo first -
+# the passes widest to narrowest, each faint - then the ink; centred, and
+# in the band centred on the box, anchored on its bottom edge.
+func _draw() -> void:
+	var font: Font = get_theme_font("font")
+	if font == null or text.is_empty():
+		return
+	var paragraph := TextParagraph.new()
+	paragraph.add_string(text, font, font_size_px)
+	paragraph.width = size.x
+	paragraph.alignment = HORIZONTAL_ALIGNMENT_CENTER
+	paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
+	var height: float = paragraph.get_size().y
+	var y: float = size.y - height if vertical_alignment == VERTICAL_ALIGNMENT_BOTTOM else (size.y - height) * 0.5
+	var steps: int = maxi(halo_steps, 1)
+	var step_alpha: float = halo_alpha / float(steps)
+	var canvas: RID = get_canvas_item()
+	for line in paragraph.get_line_count():
+		# Centred by its own width (draw_line() doesn't align).
+		var at := Vector2(roundf((size.x - paragraph.get_line_width(line)) * 0.5), y)
+		for i in steps:
+			var reach: float = maxf(halo_px, 0.0) * float(steps - i) / float(steps)
+			paragraph.draw_line_outline(canvas, at, line, maxi(roundi(reach * 2.0), 1), Color(_halo, _halo.a * step_alpha))
+		paragraph.draw_line(canvas, at, line, _ink)
+		y += paragraph.get_line_size(line).y
 
 # Fades the line in over fade_in_seconds, holds it hold_seconds, fades it
 # out over fade_out_seconds. Restarts cleanly if called mid-show.
@@ -199,6 +279,7 @@ func _play(line: String, hold_seconds: float) -> void:
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	text = line
+	queue_redraw()
 	_tween = create_tween()
 	_tween.tween_property(self, "modulate:a", 1.0, fade_in_seconds)
 	_tween.tween_interval(maxf(hold_seconds, 0.0))

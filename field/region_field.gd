@@ -2345,6 +2345,33 @@ func _spawn_floor_scatter() -> void:
 func get_scatter() -> FieldScatter:
 	return _scatter
 
+# The highest top of anything standing within `radius` metres (XZ) of
+# `at` that could hide a line said over it - a prop's geometry (the world
+# top of its boxes) or a scatter item (its base plus its height); -INF
+# with nothing there. WorldVoiceLine raises an anchored line over it.
+func tallest_occluder_top(at: Vector3, radius: float) -> float:
+	var top: float = -INF
+	var reach: float = maxf(radius, 0.0)
+	var props_root: Node = get_node_or_null(NodePath(PROPS_NODE_NAME))
+	if props_root != null:
+		for prop in props_root.get_children():
+			for node in prop.find_children("*", "GeometryInstance3D", true, false):
+				var instance := node as GeometryInstance3D
+				if not instance.is_visible_in_tree():
+					continue
+				var origin: Vector3 = instance.global_position
+				if Vector2(origin.x - at.x, origin.z - at.z).length() > reach:
+					continue
+				var box: AABB = instance.get_aabb()
+				for k in 8:
+					top = maxf(top, (instance.global_transform * box.get_endpoint(k)).y)
+	if _scatter != null:
+		for entry in _scatter.get_entries():
+			for spot in _scatter.get_spots(entry):
+				if Vector2(spot.position.x - at.x, spot.position.z - at.z).length() <= reach:
+					top = maxf(top, spot.position.y + spot.size)
+	return top
+
 # The floor's shorebirds (FloorData.shore_flock) - after the scatter,
 # whose ground they read. None without the scatter or the data.
 func _spawn_shore_flock() -> void:

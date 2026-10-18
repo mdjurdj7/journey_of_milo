@@ -166,6 +166,9 @@ enum Meet { TROT, GREET, WALK }
 # it implies.
 @export_multiline var find_line: String = "A pup lies curled in the brush.\nTwo small punctures on its foreleg. It's swelling."
 @export_multiline var saved_line: String = "It takes it slowly. After a while, it stands."
+# Its find and saved lines are said over it, this far above its model's
+# top - WorldVoiceLine lifts them clear of the brush round it.
+@export var line_clearance_m: float = 0.4
 @export var hold_seconds: float = 4.0
 @export var fade_seconds: float = 0.5
 @export_group("")
@@ -489,13 +492,17 @@ func _spawn_approach() -> void:
 	add_child(_approach)
 	_apply_approach_radius()
 
+# Where its own lines sit: over its model's top, line_clearance_m up.
+func _line_offset() -> Vector3:
+	return Vector3.UP * (_model_aabb.size.y + line_clearance_m)
+
 func _apply_approach_radius() -> void:
 	if _approach != null:
 		_approach.set_radius(approach_radius)
 
 func _on_visit() -> void:
 	var remedy: bool = find_remedy() != null
-	_approach.say(find_line, hold_seconds, fade_seconds)
+	_approach.say_near(find_line, hold_seconds, fade_seconds, self, _line_offset())
 	if not _found_logged:
 		_found_logged = true
 		RunLogger.event("pup", {"outcome": "found", "has_remedy": remedy})
@@ -562,7 +569,7 @@ func give_remedy() -> void:
 	RunLogger.event("pup", {"outcome": "remedy_given", "card": card.card_name})
 	if _approach != null:
 		_approach.mark_said()
-		_approach.say(saved_line, hold_seconds, fade_seconds)
+		_approach.say_near(saved_line, hold_seconds, fade_seconds, self, _line_offset())
 	_state = State.RISING
 	if _collision_body != null:
 		_collision_body.queue_free()
