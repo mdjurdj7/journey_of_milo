@@ -305,27 +305,13 @@ var option_id: StringName = &""
 
 @export_group("Dig tell")
 # The one clue to which mound the body is under (set_dig_tell()), on that
-# mound alone: it breathes - sinks by tell_breathe_amount of its height and
-# swells back, every tell_breathe_seconds; sand trickles off its crest
-# down a flank; and silt puffs from the crest every tell_puff_seconds.
-# The others lie still. Edits take hold on the next dig.
-@export_range(0.0, 0.5, 0.01) var tell_breathe_amount: float = 0.2
-@export var tell_breathe_seconds: float = 2.4
-@export var tell_trickle_count: int = 40
-@export var tell_trickle_lifetime: float = 0.8
-@export var tell_trickle_grain_m: float = 0.06
-# The grains' and the silt's colour: the sand's own (Ground.ground_color)
-# times this - lit like the sand, so they read as it in its own light -
-# at this alpha, each a soft round speck.
-@export var tell_trickle_tint: float = 0.88
-@export_range(0.0, 1.0, 0.01) var tell_trickle_alpha: float = 0.9
-@export var tell_puff_seconds: float = 3.2
-@export var tell_puff_count: int = 14
-@export var tell_puff_lifetime: float = 1.4
-@export var tell_puff_size_m: float = 0.45
-@export var tell_puff_tint: float = 1.0
-@export_range(0.0, 1.0, 0.01) var tell_puff_alpha: float = 0.55
-@export_group("")
+# mound alone: every tell_breathe_interval seconds it settles by
+# tell_strength of its height and rises back, over tell_breathe_seconds -
+# then lies still again. No particles; the other mounds never move.
+# tell_strength is how subtle it is. Edits take hold on the next dig.
+@export_range(0.0, 0.5, 0.01) var tell_strength: float = 0.06
+@export var tell_breathe_seconds: float = 1.2
+@export var tell_breathe_interval: float = 3.5
 
 var _contacted: bool = false
 var _contact_player: AudioStreamPlayer3D = null
@@ -1935,79 +1921,34 @@ func collapse_mound(mound: int) -> float:
 	tween.tween_callback(anchor.queue_free)
 	return maxf(dig_mound_collapse_seconds, 0.0)
 
-# The tell on mound `mound` (see the Dig tell exports): its breathing, the
-# trickle off its crest and the silt puffs - once its row is up. Stops
-# when the row goes.
+# The tell on mound `mound` (see the Dig tell exports): its slow settle
+# and rise, every so often - once its row is up. Stops when the row goes.
 func set_dig_tell(mound: int) -> void:
 	_stop_dig_tell()
-	var anchor: Node3D = _dig_anchor(mound)
 	var sand: SandMound = _dig_sand(mound)
-	if anchor == null or sand == null or _ground == null:
+	if sand == null:
 		return
 	_tell_mound = mound
-	var crest := Vector3(0.0, dig_mound_height_m, -dig_mound_length_m * 0.5 + sand.crest_fraction * dig_mound_length_m)
-	# The breathing once the row has risen - the rise owns the mound till
-	# then.
-	var start := create_tween()
-	start.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	start.tween_interval(maxf(dig_mound_rise_seconds, 0.0))
-	start.tween_callback(_breathe.bind(sand))
-	_tell_tweens.append(start)
-	var trickle := _tell_particles(anchor, crest, tell_trickle_count, tell_trickle_lifetime, Vector2(tell_trickle_grain_m, tell_trickle_grain_m), tell_trickle_tint, tell_trickle_alpha)
-	trickle.name = "TellTrickle"
-	var falling := trickle.process_material as ParticleProcessMaterial
-	falling.emission_box_extents = Vector3(dig_mound_width_m * 0.3, 0.01, dig_mound_length_m * 0.08)
-	falling.direction = Vector3(1.0, -0.4, 0.0)
-	falling.spread = 180.0
-	falling.flatness = 0.85
-	falling.initial_velocity_min = 0.15
-	falling.initial_velocity_max = 0.4
-	falling.gravity = Vector3(0.0, -1.4, 0.0)
-	trickle.emitting = true
-	var puff := _tell_particles(anchor, crest, tell_puff_count, tell_puff_lifetime, Vector2(tell_puff_size_m, tell_puff_size_m), tell_puff_tint, tell_puff_alpha)
-	puff.name = "TellPuff"
-	puff.one_shot = true
-	puff.explosiveness = 0.85
-	var rising := puff.process_material as ParticleProcessMaterial
-	rising.emission_box_extents = Vector3(dig_mound_width_m * 0.15, 0.01, dig_mound_length_m * 0.05)
-	rising.direction = Vector3.UP
-	rising.spread = 35.0
-	rising.initial_velocity_min = 0.25
-	rising.initial_velocity_max = 0.55
-	rising.gravity = Vector3(0.0, 0.05, 0.0)
-	rising.damping_min = 0.4
-	rising.damping_max = 0.8
-	rising.scale_min = 0.7
-	rising.scale_max = 1.4
-	var growth := Curve.new()
-	growth.add_point(Vector2(0.0, 0.5))
-	growth.add_point(Vector2(1.0, 1.6))
-	var growth_texture := CurveTexture.new()
-	growth_texture.curve = growth
-	rising.scale_curve = growth_texture
-	var fade := Gradient.new()
-	fade.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
-	fade.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
-	var fade_texture := GradientTexture1D.new()
-	fade_texture.gradient = fade
-	rising.color_ramp = fade_texture
-	var puffs := create_tween()
-	puffs.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	puffs.set_loops()
-	puffs.tween_interval(maxf(tell_puff_seconds, 0.3))
-	puffs.tween_callback(puff.restart)
-	_tell_tweens.append(puffs)
+	# The rise owns the mound until the row is up; a first breath after a
+	# full interval, so the row never opens on it.
+	var breathe := create_tween()
+	breathe.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	breathe.tween_interval(maxf(dig_mound_rise_seconds, 0.0))
+	breathe.tween_callback(_breathe.bind(sand))
+	_tell_tweens.append(breathe)
 
 func _breathe(sand: SandMound) -> void:
 	if not is_instance_valid(sand):
 		return
 	var half: float = maxf(tell_breathe_seconds, 0.2) * 0.5
+	var low: float = 1.0 - clampf(tell_strength, 0.0, 1.0)
 	var breathe := create_tween()
 	breathe.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 	breathe.set_loops()
 	breathe.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-	breathe.tween_method(sand.set_rise, 1.0, 1.0 - tell_breathe_amount, half)
-	breathe.tween_method(sand.set_rise, 1.0 - tell_breathe_amount, 1.0, half)
+	breathe.tween_interval(maxf(tell_breathe_interval, 0.0))
+	breathe.tween_method(sand.set_rise, 1.0, low, half)
+	breathe.tween_method(sand.set_rise, low, 1.0, half)
 	_tell_tweens.append(breathe)
 
 func _stop_dig_tell() -> void:
@@ -2015,54 +1956,7 @@ func _stop_dig_tell() -> void:
 		if tween != null and tween.is_valid():
 			tween.kill()
 	_tell_tweens.clear()
-	var anchor: Node3D = _dig_anchor(_tell_mound)
-	if anchor != null:
-		for path: NodePath in [^"TellTrickle", ^"TellPuff"]:
-			var particles: Node = anchor.get_node_or_null(path)
-			if particles != null:
-				particles.queue_free()
 	_tell_mound = -1
-
-# A tell's particles at `crest` on `anchor`'s mound: lit quads in the
-# sand's colour times `tint`, at `alpha`, facing the camera - the process
-# material's motion is the caller's. ALWAYS-processed through the fight's
-# freeze, as spawn_sand_puff()'s.
-func _tell_particles(anchor: Node3D, crest: Vector3, count: int, lifetime: float, size: Vector2, tint: float, alpha: float) -> GPUParticles3D:
-	var particles := GPUParticles3D.new()
-	particles.process_mode = Node.PROCESS_MODE_ALWAYS
-	particles.emitting = false
-	particles.amount = maxi(count, 1)
-	particles.lifetime = maxf(lifetime, 0.05)
-	particles.local_coords = false
-	particles.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var quad := QuadMesh.new()
-	quad.size = size
-	var material := StandardMaterial3D.new()
-	material.billboard_mode = BaseMaterial3D.BILLBOARD_PARTICLES
-	material.vertex_color_use_as_albedo = true
-	var sand: Color = _ground.ground_color
-	material.albedo_color = Color(sand.r * tint, sand.g * tint, sand.b * tint, alpha)
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	# A soft round speck, never a hard square.
-	var speck := GradientTexture2D.new()
-	speck.width = 32
-	speck.height = 32
-	speck.fill = GradientTexture2D.FILL_RADIAL
-	speck.fill_from = Vector2(0.5, 0.5)
-	speck.fill_to = Vector2(1.0, 0.5)
-	var falloff := Gradient.new()
-	falloff.set_color(0, Color(1.0, 1.0, 1.0, 1.0))
-	falloff.set_color(1, Color(1.0, 1.0, 1.0, 0.0))
-	speck.gradient = falloff
-	material.albedo_texture = speck
-	quad.material = material
-	particles.draw_pass_1 = quad
-	var process_material := ParticleProcessMaterial.new()
-	process_material.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_BOX
-	particles.process_material = process_material
-	anchor.add_child(particles)
-	particles.position = crest
-	return particles
 
 # Up through mound `mound` - found, or erupting on its own: the body moves
 # under it, the row flattens and goes, and the body rises. Returns how
