@@ -27,6 +27,11 @@ var consume_choice: CardData = null
 # commit, so for the card resolving this is its count minus one; for a
 # preview of a card still in hand it is the count itself.
 var cards_played_before_this: int = 0
+# The same count by tag (Combatant.tagged_plays_this_turn): tag -> cards
+# carrying it committed this turn before this one - the resolving card's
+# own tags taken back off, a hand card's preview the count itself. What
+# CardEffect.repeat_per_earlier_play_tag reads (earlier_plays_tagged()).
+var tagged_plays_before_this: Dictionary = {}
 # Called with the amount reclaimed, so battle_controller.gd can mirror it
 # onto RunState and tell the readouts. Grace itself is spent here, in the
 # rules, the same way damage is dealt here and only REPORTED outward.
@@ -194,8 +199,13 @@ func for_card_preview(hp_cost: int) -> EffectContext:
 	copy.enemies = enemies
 	copy.deck = deck
 	copy.cards_played_before_this = cards_played_before_this
+	copy.tagged_plays_before_this = tagged_plays_before_this
 	copy.preview_hp_cost = hp_cost
 	return copy
+
+# Cards carrying `tag` played this turn before this one.
+func earlier_plays_tagged(tag: StringName) -> int:
+	return int(tagged_plays_before_this.get(tag, 0))
 
 func report_damage(target_combatant: Combatant, amount: int, kind: String) -> void:
 	if on_damage.is_valid():

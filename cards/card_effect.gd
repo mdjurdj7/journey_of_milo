@@ -89,6 +89,16 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 # left alive, nothing more happens and nothing is spent. Never blocks the
 # play (contrast SPEND_TOLL's toll_cost). 0: no repeat.
 
+@export var repeat_per_earlier_play_tag: StringName = &""
+# Read by DAMAGE (damage_effect.gd) only. Set: the hit lands once, then
+# once more for each card carrying this tag (CardData.tags) played
+# earlier this turn (EffectContext.tagged_plays_before_this) - Lash's
+# &"lash": 5, then 5 x 2, then 5 x 3. Each further hit is a repeat on
+# Second Swing's terms: on what the hit before left standing, the
+# ongoing attack bonus and a mark's again, a one-shot charge with the
+# first hit only. The card is still one card to whatever counts cards.
+# Empty: one hit.
+
 @export var drains: bool = false
 # Read by DAMAGE (damage_effect.gd) only. The hit Drains: once it has
 # landed, the player heals the HP it actually took - after block, never a

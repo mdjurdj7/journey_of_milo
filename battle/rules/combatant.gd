@@ -73,6 +73,11 @@ var has_toll: bool = true
 # EffectContext.spend_toll(), cleared by BattleController._start_player_
 # turn(). Read by CardEffect.Condition.TOLL_SPENT_THIS_TURN (Gnaw).
 var toll_spent_this_turn: bool = false
+# Cards played since this turn began, by tag (CardData.tags): tag ->
+# count. Counted at a play's commit (count_play() - BattleController.
+# _resolve_play()), cleared by BattleController._start_player_turn().
+# Read through EffectContext.tagged_plays_before_this (Lash's repeats).
+var tagged_plays_this_turn: Dictionary = {}
 var took_damage_last_turn: bool = false
 # Critical: HP at or below this fraction of max HP. A default only, like
 # the Grace fields above - BattleController.setup() copies CharacterData.
@@ -200,6 +205,13 @@ func gain_self_loss_toll(lost: int) -> void:
 	if has_toll:
 		toll += lost
 	pending_drain += Status.count_self_loss(statuses)
+
+# `card` has been played this turn: once for each of its tags.
+func count_play(card: CardData) -> void:
+	if card == null:
+		return
+	for tag in card.tags:
+		tagged_plays_this_turn[tag] = int(tagged_plays_this_turn.get(tag, 0)) + 1
 
 func is_critical() -> bool:
 	return is_critical_at(hp)

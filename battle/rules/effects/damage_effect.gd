@@ -32,6 +32,18 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	var drains: bool = CardBonus.drains(effect, ctx)
 	_drain(drains, _land(base + ctx.take_attack_bonus(), targets, ctx), ctx)
 
+	# Lash's further hits (repeat_per_earlier_play_tag): one for each
+	# card of its tag played earlier this turn, each a repeat as Second
+	# Swing's is below - on what the hit before left standing, so a kill
+	# ends the chain, and a broken mound hands it to the enemy under it.
+	var struck: Array[Combatant] = targets
+	for i in hit_count(effect, ctx) - 1:
+		struck = _standing_after(struck, ctx)
+		if struck.is_empty():
+			return
+		ctx.repeat_mark_bonus(struck)
+		_drain(drains, _land(base + ctx.take_repeat_attack_bonus(), struck, ctx), ctx)
+
 	# A repeat (Second Swing): judged as the first hit resolves, on what
 	# it left standing - a first hit that killed everything it struck
 	# skips the repeat and spends nothing. Otherwise a player holding the
@@ -42,13 +54,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	# counted once by whatever counts cards.
 	if effect.repeat_toll_cost <= 0:
 		return
-	# What each first hit left: a mound broken under its target is the
-	# enemy it was over, or nothing (EffectContext.landing_for()).
-	var standing: Array[Combatant] = []
-	for struck in targets:
-		var enemy: Combatant = ctx.landing_for(struck)
-		if enemy != null and enemy.hp > 0 and not standing.has(enemy):
-			standing.append(enemy)
+	var standing: Array[Combatant] = _standing_after(struck, ctx)
 	if standing.is_empty() or ctx.player.toll < effect.repeat_toll_cost:
 		return
 	if ctx.on_repeat.is_valid():
@@ -56,6 +62,27 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	ctx.spend_toll(effect.repeat_toll_cost)
 	ctx.repeat_mark_bonus(standing)
 	_drain(drains, _land(base + ctx.take_repeat_attack_bonus(), standing, ctx), ctx)
+
+# How many times this effect's hit lands as it resolves: once, and once
+# more for each card of its repeat_per_earlier_play_tag played earlier
+# this turn (EffectContext.earlier_plays_tagged()) - before Second
+# Swing's Toll repeat, which isn't counted here. The card face reads the
+# same call (CardView's {hits}).
+static func hit_count(effect: CardEffect, ctx: EffectContext) -> int:
+	if effect == null or effect.repeat_per_earlier_play_tag == &"" or ctx == null:
+		return 1
+	return 1 + maxi(ctx.earlier_plays_tagged(effect.repeat_per_earlier_play_tag), 0)
+
+# What hits on `struck` left to hit again: a mound broken under its
+# target is the enemy it was over, or nothing (EffectContext.landing_
+# for()); the dead are left out.
+func _standing_after(struck: Array[Combatant], ctx: EffectContext) -> Array[Combatant]:
+	var standing: Array[Combatant] = []
+	for target in struck:
+		var enemy: Combatant = ctx.landing_for(target)
+		if enemy != null and enemy.hp > 0 and not standing.has(enemy):
+			standing.append(enemy)
+	return standing
 
 # A Draining hit (CardEffect.drains - Claw Back; drain_on_condition -
 # Gnaw) heals what it took.

@@ -21,3 +21,4 @@ battle_animation = &"Slash"
 impact_time = 0.55
 art = ExtResource("9_art")
 tempered = ExtResource("10_tempered")
+tags = Array[StringName]([&"basic_attack"])

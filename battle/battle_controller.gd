@@ -579,9 +579,18 @@ func preview_context() -> EffectContext:
 	ctx.enemies = _hittable_enemy_combatants()
 	ctx.deck = deck
 	ctx.cards_played_before_this = cards_played_this_turn
+	ctx.tagged_plays_before_this = player.tagged_plays_this_turn.duplicate()
 	if ctx.enemies.size() == 1:
 		ctx.target = ctx.enemies[0]
 	return ctx
+
+# The turn's plays by tag before `card`, which the commit has already
+# counted: its own tags taken back off.
+func _tagged_plays_before(card: CardData) -> Dictionary:
+	var before: Dictionary = player.tagged_plays_this_turn.duplicate()
+	for tag in card.tags:
+		before[tag] = maxi(int(before.get(tag, 0)) - 1, 0)
+	return before
 
 # preview_context() aimed at `enemy` - what an armed card's face reads
 # while the cursor is over it.
@@ -1086,6 +1095,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	# re-reads itself on card_played sees this card as played. The card's
 	# own context carries the count from before it (below).
 	cards_played_this_turn += 1
+	player.count_play(card)
 
 	var target_name: String = target_enemy.enemy_data.enemy_name if target_enemy != null and target_enemy.enemy_data != null else ""
 	RunLogger.card_started(card.card_name, energy_paid, target_name)
@@ -1137,6 +1147,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	_wire_mounds(ctx)
 	ctx.deck = deck
 	ctx.cards_played_before_this = cards_played_this_turn - 1
+	ctx.tagged_plays_before_this = _tagged_plays_before(card)
 	ctx.replaced_cost_hp = replaced_hp
 	if replacement != null and replacement.data != null:
 		ctx.replaced_cost_source = "status:" + replacement.data.id
@@ -2221,6 +2232,7 @@ func _start_player_turn() -> void:
 	# (Condition.TOLL_SPENT_THIS_TURN).
 	player.damage_taken_this_turn = 0
 	player.toll_spent_this_turn = false
+	player.tagged_plays_this_turn.clear()
 	for enemy in enemies:
 		var combatant: Combatant = _combatants.get(enemy)
 		if combatant != null:

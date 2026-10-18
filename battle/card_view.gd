@@ -99,6 +99,12 @@ const TOKEN_DRAW := "{draw}"
 # How many cards a SET_ASIDE (Bide) sets aside - its value.
 const TOKEN_SET_ASIDE := "{set_aside}"
 const TOKEN_HP_COST := "{hp_cost}"
+# What follows a repeating hit's number (CardEffect.repeat_per_earlier_
+# play_tag - Lash), by how many times it lands now (DamageEffect.hit_
+# count(), the resolver's own call): " damage" for once - "Deal 5
+# damage." - and " ×N" from twice - "Deal 5 ×2." Once outside a battle
+# hand, which has no turn to count.
+const TOKEN_HITS := "{hits}"
 # The effect types {damage}/{alt_damage} and {block}/{alt_block} read.
 const DAMAGE_EFFECT_TYPES: Array = [CardEffect.EffectType.DAMAGE, CardEffect.EffectType.FIRST_CARD_DAMAGE,
 	CardEffect.EffectType.DAMAGE_ALL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE]
@@ -734,6 +740,9 @@ func _resolve_tokens(description: String) -> String:
 			text = text.replace(TOKEN_SET_ASIDE, str(set_aside))
 	if text.contains(TOKEN_HP_COST):
 		text = text.replace(TOKEN_HP_COST, str(_hp_cost))
+	if text.contains(TOKEN_HITS):
+		var hits: int = _hit_count()
+		text = text.replace(TOKEN_HITS, " damage" if hits <= 1 else " ×%d" % hits)
 	if text.contains(TOKEN_TOLL):
 		text = text.replace(TOKEN_TOLL, str(_toll_token_value()))
 	if text.contains(TOKEN_TOLL_HEAL):
@@ -743,6 +752,16 @@ func _resolve_tokens(description: String) -> String:
 		if survive > 0:
 			text = text.replace(TOKEN_SURVIVE_HP, str(survive))
 	return text
+
+# How many times the card's first damage effect lands now: its repeats
+# read against the battle hand's context, once anywhere else.
+func _hit_count() -> int:
+	if _bonus_context == null:
+		return 1
+	for effect in card_data.effects:
+		if effect != null and DAMAGE_EFFECT_TYPES.has(effect.effect_type):
+			return DamageEffect.hit_count(effect, _bonus_context)
+	return 1
 
 # The survive HP of the lethal guard this card applies: for the fight's
 # player in a battle hand (its bonus context), otherwise for the run's

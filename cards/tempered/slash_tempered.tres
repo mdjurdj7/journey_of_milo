@@ -19,3 +19,4 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")]
 battle_animation = &"Slash"
 impact_time = 0.55
 art = ExtResource("9_art")
+tags = Array[StringName]([&"basic_attack"])
