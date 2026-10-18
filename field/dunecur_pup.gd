@@ -242,10 +242,9 @@ enum Meet { TROT, GREET, WALK }
 		_apply_pose()
 @export var crouch_seconds: float = 0.35
 # Its takes, round-robin - never the same one twice running (SoundPool.
-# next()). Placeholder: the Stork's clatter, until the pup's own yips
-# (assets/audio/enemies/Dunecur/pup_yip_1..3) exist.
+# next()); one take just repeats.
 @export var yip_clips: Array[AudioStream] = [
-	load("res://assets/audio/enemies/Stork/clatter_1.mp3") as AudioStream,
+	load("res://assets/audio/enemies/Dunecur/baby yip.mp3") as AudioStream,
 ]:
 	set(value):
 		yip_clips = value

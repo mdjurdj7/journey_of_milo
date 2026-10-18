@@ -1,0 +1,19 @@
+[remap]
+
+importer="mp3"
+type="AudioStreamMP3"
+uid="uid://dd1qa4f1c6dmr"
+path="res://.godot/imported/baby yip.mp3-20d96d552c4ba0fff6d22b439448f494.mp3str"
+
+[deps]
+
+source_file="res://assets/audio/enemies/Dunecur/baby yip.mp3"
+dest_files=["res://.godot/imported/baby yip.mp3-20d96d552c4ba0fff6d22b439448f494.mp3str"]
+
+[params]
+
+loop=false
+loop_offset=0
+bpm=0
+beat_count=0
+bar_beats=4
