@@ -222,6 +222,15 @@ and up the west shore north of z -27. (2026-10-17.)
   Slash plays as Lash, Slash+ as Lash+ (`cards/weapon/`). **Placeholder
   art:** the Tail's plate reuses the Rusted Blade's art and Lash/Lash+
   reuse Slash's, until real art exists. (2026-10-18.)
+  **Reveal sound:** `assets/audio/sfx/weapon_reveal.mp3` plays once as a
+  weapon offer's plate appears (`RegionField.open_weapon_offer()`). It is
+  the old 2D project's ultra-rare drop sound,
+  `reference/old_project/deck-builder/assets/audio/cards/ultra_rare.mp3`
+  (its `rare_drop`; the same bytes as `assets/audio/cards_old/
+  ultra_rare.mp3`), copied unprocessed. Against §4 it peaks −1 dBFS, not
+  −6, and starts ~31 ms in; at 9.5 s (audible to ~6.1 s) it is a sting,
+  stereo, played 2D. Its level is set in `weapon_reveal_volume_db` (−17)
+  instead, just under a full heavy hit. (2026-10-18.)
 - **Chain roles (Opener/Closer, chain payoffs).** The old project's
   `CardData.chain_role`/`chain_followup_effect` are not ported to the new
   rules layer (`cards/card_data.gd`). No current card needs them - revisit

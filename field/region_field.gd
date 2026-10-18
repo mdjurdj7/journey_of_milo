@@ -70,6 +70,13 @@ enum RewardMode { SCREEN, WORLD }
 # A weapon taken from its offer (open_weapon_offer()): the same take.
 @export var weapon_take_sfx_path: String = "res://assets/audio/cards/card_take.wav"
 @export var weapon_take_volume_db: float = -18.0
+# A weapon offer's reveal, once as its plate appears (open_weapon_offer())
+# - never on TAKE/LEAVE. 2D on the SFX bus. The clip peaks -1 dBFS, its
+# loudest 300 ms about -7.4 dBFS RMS; -17 puts that about 1 dB under a
+# full heavy hit's (contact at contact_volume_db plus the impact layer at
+# heavy_impact_max_volume_db, ~-23.4 dBFS at the listener).
+@export var weapon_reveal_sfx_path: String = "res://assets/audio/sfx/weapon_reveal.mp3"
+@export var weapon_reveal_volume_db: float = -17.0
 # The run log (RunLogger - one JSON-lines file per run under user://runs/).
 # Never touches play; off, nothing is written. A headless instance never
 # logs, whatever this says - see RunLogger.
@@ -3453,6 +3460,7 @@ func open_weapon_offer(weapon: WeaponData) -> bool:
 		wanderer.clear_move_target()
 	process_mode = Node.PROCESS_MODE_DISABLED
 	add_child(examine)
+	TakeFeedback.play_sound(get_tree(), weapon_reveal_sfx_path, weapon_reveal_volume_db, "WeaponRevealAudio", "RegionField")
 	return true
 
 func _on_weapon_offer_closed(taken: bool, weapon: WeaponData) -> void:
