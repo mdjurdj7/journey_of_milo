@@ -2,20 +2,20 @@
 
 importer="texture"
 type="CompressedTexture2D"
-uid="uid://ccwnmudoived2"
-path.s3tc="res://.godot/imported/samurai_v1_normal.png-23dbc476a7128410158c16c0c73f0bf2.s3tc.ctex"
+uid="uid://dbxd8qsea2ct7"
+path.s3tc="res://.godot/imported/samurai_v2_texture_0_metallic_roughness.png-94119218b1ba533375f2ffc201e1b2e0.s3tc.ctex"
 metadata={
 "imported_formats": ["s3tc_bptc"],
 "vram_texture": true
 }
 generator_parameters={
-"md5": "b654d3a1683ee77488fed001dd335cd5"
+"md5": "4a2ca60dd1e86ec52888381591ddfb36"
 }
 
 [deps]
 
-source_file="res://assets/models/samurai/samurai_v1_normal.png"
-dest_files=["res://.godot/imported/samurai_v1_normal.png-23dbc476a7128410158c16c0c73f0bf2.s3tc.ctex"]
+source_file="res://assets/models/samurai/samurai_v2_texture_0_metallic_roughness.png"
+dest_files=["res://.godot/imported/samurai_v2_texture_0_metallic_roughness.png-94119218b1ba533375f2ffc201e1b2e0.s3tc.ctex"]
 
 [params]
 
@@ -25,12 +25,12 @@ compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
-compress/normal_map=1
+compress/normal_map=0
 compress/channel_pack=0
 mipmaps/generate=true
 mipmaps/limit=-1
-roughness/mode=1
-roughness/src_normal="res://assets/models/samurai/samurai_v1_normal.png"
+roughness/mode=0
+roughness/src_normal=""
 process/channel_remap/red=0
 process/channel_remap/green=1
 process/channel_remap/blue=2

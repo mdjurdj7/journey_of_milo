@@ -6,7 +6,7 @@
 [ext_resource type="Resource" uid="uid://cjvv17es5rb3e" path="res://cards/neutral/untouched.tres" id="4_untouched"]
 [ext_resource type="Resource" uid="uid://dka7rqy5ml1mf" path="res://cards/neutral/second_thoughts.tres" id="5_second_thoughts"]
 [ext_resource type="Resource" path="res://cards/pools/samurai_pool.tres" id="6_pool"]
-[ext_resource type="Texture2D" uid="uid://cxo6fjbq44gk8" path="res://assets/models/samurai/samurai_v1_texture_0.png" id="7_albedo"]
+[ext_resource type="Texture2D" uid="uid://chol5clvwqkkw" path="res://assets/models/samurai/samurai_v2_texture_0.png" id="7_albedo"]
 
 [resource]
 script = ExtResource("1_character_data")
@@ -19,7 +19,7 @@ ExtResource("4_untouched"): 1,
 ExtResource("5_second_thoughts"): 1
 }
 reward_pool = ExtResource("6_pool")
-field_model_path = "res://assets/models/samurai/samurai_v1.glb"
+field_model_path = "res://assets/models/samurai/samurai_v2.glb"
 field_albedo = ExtResource("7_albedo")
 field_model_yaw_degrees = 180.0
 field_model_height = 1.7
