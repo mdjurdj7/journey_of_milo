@@ -52,13 +52,18 @@ class_name RunLogger
 # "trigger" naming the card that set it off ("card:Slash"), where format
 # 2 put it down to the trigger alone. fight_end's healed by_source counts
 # it under its source.
+#
+# Format 4 (2026-10-18): Brace and Garnish mark one attack intent; an
+# "intent_mark" line says how each mark left it - "spent" with the hits'
+# "original" total before it, "after" it and what it "prevented", or
+# "lost" with its "reason" ("replaced", "cancelled", "enemy died").
 
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 3
+const FORMAT_VERSION := 4
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
-const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic"]
+const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]
 
 # The switch - RegionField.run_logging_enabled pushes it here.
 static var enabled: bool = true
@@ -403,6 +408,26 @@ static func mechanic(kind: String, data: Dictionary) -> void:
 	_write_detail("mechanic", line)
 
 # An enemy died - in order, onto fight_end's deaths too.
+# A Brace or Garnish has left the intent it marked (BattleController.
+# intent_mark_settled): `entry` is EnemyTurn.mark_entry()'s with its
+# outcome. One line: the enemy, the intent, the card that marked it
+# ("card:Brace"), the mark, and either "spent" with "original" (the hits'
+# total before the mark), "after" and "prevented", or "lost" with its
+# "reason".
+static func intent_mark(enemy_id: String, entry: Dictionary) -> void:
+	if not _fight_open:
+		return
+	var line: Dictionary = {"fight": _fights, "turn": _turn, "enemy": enemy_id, "intent": entry.get("intent", ""), "card": entry.get("granted_by", ""), "mark": String(entry.get("mark", &"")), "outcome": entry.get("outcome", "")}
+	if str(entry.get("outcome", "")) == "spent":
+		var before: int = int(entry.get("before", 0))
+		var after: int = int(entry.get("after", 0))
+		line["original"] = before
+		line["after"] = after
+		line["prevented"] = before - after
+	else:
+		line["reason"] = entry.get("reason", "")
+	_write_detail("intent_mark", line)
+
 static func enemy_died(enemy_id: String) -> void:
 	if not _fight_open:
 		return

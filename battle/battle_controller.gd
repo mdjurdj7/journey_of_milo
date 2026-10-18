@@ -330,6 +330,9 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	enemies = enemy_list
 	_roster = enemy_list.duplicate()
 	_wanderer = wanderer
+	# Every Brace or Garnish leaving its intent, into the run log.
+	if not intent_mark_settled.is_connected(_log_intent_mark):
+		intent_mark_settled.connect(_log_intent_mark)
 
 	player = Combatant.new(RunState.player_max_hp)
 	player.hp = RunState.player_hp
@@ -1543,6 +1546,9 @@ func _log_threshold_queued(enemy: FieldEnemy) -> void:
 	var threshold: int = EnemyTurn.interrupt_threshold(combatant, intent)
 	if threshold > 0:
 		RunLogger.mechanic("threshold_queued", {"enemy": _log_id(enemy), "intent": intent.intent_name, "threshold": threshold})
+
+func _log_intent_mark(enemy: FieldEnemy, entry: Dictionary) -> void:
+	RunLogger.intent_mark(_log_id(enemy), entry)
 
 func _log_pain_turn(enemy: FieldEnemy) -> void:
 	RunLogger.mechanic("pain_turn", {"enemy": _log_id(enemy)})
