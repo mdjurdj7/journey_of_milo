@@ -223,6 +223,9 @@ func _check_descriptions() -> void:
 	var nail: TrinketData = load(BENT_NAIL_PATH)
 	_expect_eq(nail.describe(), "Your first Attack each combat deals double damage.", "Bent Nail's description")
 	_expect_eq(nail.describe_short(), "First Attack each combat: double damage.", "...and its short line")
+	var page: TrinketData = load(WORN_PAGE_PATH)
+	_expect_eq(page.describe(), "The first time each turn you play your third card, draw 1.", "Worn Page's description")
+	_expect_eq(page.describe_short(), "Draw 1 on your third card each turn.", "...and its short line")
 	var doubling: Array[Status] = []
 	nail.apply_combat_start(doubling)
 	_expect_eq(doubling[0].describe() if not doubling.is_empty() else "", "Your next Attack deals double damage.", "...and its status's hover line")
@@ -300,7 +303,7 @@ func _check_combat_start_and_worn_page() -> void:
 	_run_state.call("equip_keepsake", load(WORN_PAGE_PATH))
 	controller = await _start_fight(0, &"")
 	if controller != null:
-		_expect_eq(_hand_size(controller), 6, "Worn Page: the opening hand is 6")
+		_expect_eq(_hand_size(controller), 5, "Worn Page: the opening hand is the usual 5 - it draws on the third card, not the first turn")
 		controller.get("_hand_container").call("discard_hand")
 		controller.call("_start_player_turn")
 		_expect_eq(_hand_size(controller), 5, "...and the second turn's draw is the usual 5")

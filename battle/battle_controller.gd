@@ -326,6 +326,9 @@ var _roster: Array[FieldEnemy] = []
 # taken HP from, and whether this turn's draw is spent.
 var _card_damaged: Dictionary = {} # Combatant -> true
 var _multi_hit_draw_used: bool = false
+# Whether this turn's card-count draw (TrinketData.draw_on_card_count -
+# Worn Page) has been taken. Reset at the turn's start.
+var _card_count_draw_used: bool = false
 # The HP enemy hits have taken by the rules but not yet reported, hit by
 # hit (_owe_attacks()) - what the HP bar is still to lose: shown_player_
 # hp(). And whether the hit reporting now is one of an attack's several
@@ -1223,6 +1226,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		_pack_check_due = false
 		_mark_lone_pack_members()
 	_draw_for_multi_hit()
+	_draw_for_card_count()
 	if not _extra_hit_reports.is_empty():
 		await _land_extra_hits()
 	if _repeat_pending:
@@ -2045,6 +2049,24 @@ func _draw_for_multi_hit() -> void:
 	print("BattleController: a card took HP from %d enemies; drawing %d (draw_on_multi_hit)." % [_card_damaged.size(), draw])
 	deck.draw(draw)
 
+# The held pieces' draw for the turn's Nth card (TrinketData.draw_on_
+# card_count - Worn Page, both slots summed): the card just resolved
+# brought this turn's plays (cards_played_this_turn, counted at commit -
+# 0-cost cards included, never a set-aside, Devoured or discarded one) to
+# a piece's count, and this turn's draw is unspent. Once a turn.
+func _draw_for_card_count() -> void:
+	if _card_count_draw_used:
+		return
+	var draw: int = 0
+	for piece in RunState.held_pieces():
+		if piece.draw_on_card_count > 0 and cards_played_this_turn >= piece.draw_on_card_count:
+			draw += maxi(piece.card_count_draw, 0)
+	if draw <= 0:
+		return
+	_card_count_draw_used = true
+	print("BattleController: card %d this turn; drawing %d (draw_on_card_count)." % [cards_played_this_turn, draw])
+	deck.draw(draw)
+
 # The attacks a turn's result landed, each as _report_enemy_attack()
 # reads one: its "actions" (EnemyTurn.take_turn()), or the result itself
 # when it holds none.
@@ -2284,6 +2306,7 @@ func _start_player_turn() -> void:
 	_enemy_phase = false
 	_player_turn += 1
 	_multi_hit_draw_used = false
+	_card_count_draw_used = false
 	# The refill, and Dying Light's 1 if the turn begins Critical - judged
 	# here, before any tick, so entering Critical later gives nothing
 	# until the next turn starts.

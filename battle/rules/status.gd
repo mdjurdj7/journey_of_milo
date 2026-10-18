@@ -178,6 +178,14 @@ static func times_word(multiplier: float) -> String:
 		return "triple"
 	return "%s×" % String.num(snappedf(multiplier, 0.01))
 
+# A count as an ordinal word, for rules text: "first" to "tenth", "Nth"
+# past that.
+static func ordinal_word(n: int) -> String:
+	var words: Array[String] = ["first", "second", "third", "fourth", "fifth", "sixth", "seventh", "eighth", "ninth", "tenth"]
+	if n >= 1 and n <= words.size():
+		return words[n - 1]
+	return "%dth" % n
+
 # An Attack card has finished resolving (EffectResolver.resolve_card()):
 # every status that StatusData.spent_by_attack_card spends one charge,
 # and goes at 0 - Bent Nail's doubling, once its Attack is done.

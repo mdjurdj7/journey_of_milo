@@ -49,6 +49,11 @@ class_name TrinketData
 #                        attack()) - Grace opens on what then reaches HP
 #   hit_back_damage      damage to an enemy, through its Block, once for
 #                        each of its attacks that lands on him
+#   draw_on_card_count   the first time each turn this many cards have
+#                        been played (BattleController.cards_played_this_
+#                        turn - every committed play, 0-cost included;
+#                        never a set-aside, Devoured or discarded card),
+#                        draw card_count_draw, once that card has resolved
 #   first_attack_multiplier  above 1: the fight's first Attack card deals
 #                        this times its damage - every hit, every target -
 #                        through a status (FIRST_ATTACK_STATUS_PATH, an
@@ -80,6 +85,8 @@ enum Slot { KEEPSAKE, WORN }
 #   {keep}   end_turn_keep           {multi_draw}  draw_on_multi_hit
 #   {max_hp}  max_hp_bonus           {hit_back}  hit_back_damage
 #   {times}  first_attack_multiplier in words ("double")
+#   {nth}    draw_on_card_count as an ordinal ("third")
+#   {play_draw}  card_count_draw
 #   {s}      "s" unless the count token before it is 1
 @export_multiline var description: String = ""
 # The shortened line for where it's shown small - the "currently held"
@@ -114,6 +121,14 @@ enum Slot { KEEPSAKE, WORN }
 @export var max_hp_bonus: int = 0
 @export_range(0.0, 1.0, 0.05) var first_hit_scale: float = 1.0
 @export var hit_back_damage: int = 0
+@export var draw_on_card_count: int = 0:
+	set(value):
+		draw_on_card_count = value
+		emit_changed()
+@export var card_count_draw: int = 0:
+	set(value):
+		card_count_draw = value
+		emit_changed()
 @export var first_attack_multiplier: float = 1.0:
 	set(value):
 		first_attack_multiplier = value
@@ -148,6 +163,8 @@ func _fill(template: String) -> String:
 		"max_hp": max_hp_bonus,
 		"hit_back": hit_back_damage,
 		"times": Status.times_word(first_attack_multiplier),
+		"nth": Status.ordinal_word(draw_on_card_count),
+		"play_draw": card_count_draw,
 	})
 
 # The fight is opening: this trinket's status, if it has one, onto the
