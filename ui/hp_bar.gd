@@ -44,7 +44,6 @@ class_name HPBar
 # The battle style's anchor: the Wanderer's feet plus this world-space
 # drop (the field style's is field_offset_px). Read every tick.
 @export var ground_offset: Vector3 = Vector3(0.0, -0.45, 0.0)
-@export var bar_tween_time: float = 0.25
 @export var fade_time: float = 0.15
 @export var hp_change_hold_time: float = 1.5
 @export_range(0.0, 1.0) var low_hp_fraction: float = 0.3
@@ -320,6 +319,24 @@ class_name HPBar
 	set(value):
 		critical_fade_time = maxf(value, 0.0)
 
+@export_group("HP Change")
+# A loss: the fill drops in the frame it lands, and a pale ghost
+# (ghost_color) holds the lost stretch for ghost_hold_sec, then drains
+# down to the new value over ghost_drain_sec - drawn over Grace's segment,
+# which it uncovers as it goes. A heal: the fill rises at once, the
+# stretch gained in heal_color, fading into the fill over heal_fade_sec.
+@export var ghost_color: Color = Color(0.94, 0.91, 0.86, 0.9):
+	set(value):
+		ghost_color = value
+		queue_redraw()
+@export var ghost_hold_sec: float = 0.4
+@export var ghost_drain_sec: float = 0.3
+@export var heal_color: Color = Color(0.66, 0.74, 0.62, 1.0):
+	set(value):
+		heal_color = value
+		queue_redraw()
+@export var heal_fade_sec: float = 0.5
+
 @export_group("Block Readout")
 # While block is up it reads in the HP row, LEFT of the HP numeral: the
 # card's open-shield glyph, then the block value beside it in Spectral at
@@ -444,7 +461,13 @@ var _toll_rule_color: Color = Color.WHITE
 var _toll_label_tracked: Font = null
 var _current_fraction: float = 1.0
 var _displayed_fraction: float = 1.0
-var _fraction_tween: Tween = null
+# HP Change: the ghost's right end, as a fraction of the bar (none while
+# at or under the fill's), and the heal segment's left end and alpha.
+var _ghost_fraction: float = 0.0
+var _ghost_tween: Tween = null
+var _heal_from: float = 0.0
+var _heal_alpha: float = 0.0
+var _heal_tween: Tween = null
 var _in_battle: bool = false
 var _visibility: HoverFadeVisibility = null
 # Cached theme ink/bone (see refresh_style()).
@@ -548,6 +571,7 @@ func _draw_field(alpha: float) -> void:
 	var bar_left: float = roundf((width - field_bar_width) * 0.5)
 	draw_rect(Rect2(bar_left, 0.0, field_bar_width, field_bar_height), track)
 	draw_rect(Rect2(bar_left, 0.0, field_bar_width * _displayed_fraction, field_bar_height), hp_ink)
+	_draw_hp_change(bar_left, 0.0, field_bar_width, field_bar_height, _displayed_fraction, alpha)
 	var tick_color: Color = _ink
 	tick_color.a = critical_tick_alpha * alpha
 	var tick_x: float = roundf(bar_left + field_bar_width * _critical_fraction())
@@ -792,6 +816,7 @@ func _draw_battle() -> void:
 			var grace_color: Color = _ink
 			grace_color.a = grace_alpha * _battle_blend
 			draw_rect(Rect2(grace_left, bar_top, grace_length, battle_bar_height), grace_color)
+	_draw_hp_change(left, bar_top, battle_width, battle_bar_height, _displayed_fraction, _battle_blend)
 
 	if _toll_visible:
 		_draw_toll(bar_top, ink)
@@ -1013,7 +1038,10 @@ func _on_player_hp_changed(current: int, max_hp: int) -> void:
 	# The field row's width follows the digits.
 	_relayout_if_ready()
 	_current_fraction = _hp_fraction(current, max_hp)
-	_tween_bar_to(_current_fraction)
+	var before: float = _displayed_fraction
+	_displayed_fraction = _current_fraction
+	_apply_layout()
+	_start_hp_change(before, _current_fraction)
 	_visibility.notify_hp_changed()
 	_refresh_critical()
 
@@ -1060,19 +1088,52 @@ func _apply_critical_colors() -> void:
 		return
 	queue_redraw()
 
-# Animates _displayed_fraction (not the fill's width directly - see that
-# var's own doc) toward `fraction` over bar_tween_time; _apply_layout(),
-# called every step, is what actually applies it to both bars' fills.
-func _tween_bar_to(fraction: float) -> void:
-	if _fraction_tween != null:
-		_fraction_tween.kill()
-	_fraction_tween = create_tween()
-	_fraction_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_fraction_tween.tween_method(_set_displayed_fraction, _displayed_fraction, fraction, bar_tween_time)
+# The fill moves from `before` to `after` (fractions of the bar): a loss
+# leaves its ghost, a heal its segment - see the HP Change group.
+func _start_hp_change(before: float, after: float) -> void:
+	if after < before:
+		_ghost_fraction = maxf(_ghost_fraction, before)
+		if _heal_tween != null:
+			_heal_tween.kill()
+		_heal_alpha = 0.0
+		if _ghost_tween != null:
+			_ghost_tween.kill()
+		_ghost_tween = create_tween()
+		_ghost_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		_ghost_tween.tween_interval(maxf(ghost_hold_sec, 0.0))
+		_ghost_tween.tween_method(_set_ghost_fraction, _ghost_fraction, after, maxf(ghost_drain_sec, 0.0))
+	elif after > before:
+		if _ghost_fraction <= after:
+			if _ghost_tween != null:
+				_ghost_tween.kill()
+			_ghost_fraction = 0.0
+		_heal_from = minf(_heal_from, before) if _heal_alpha > 0.0 else before
+		if _heal_tween != null:
+			_heal_tween.kill()
+		_heal_tween = create_tween()
+		_heal_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		_heal_tween.tween_method(_set_heal_alpha, 1.0, 0.0, maxf(heal_fade_sec, 0.0))
+	queue_redraw()
 
-func _set_displayed_fraction(value: float) -> void:
-	_displayed_fraction = value
-	_apply_layout()
+func _set_ghost_fraction(value: float) -> void:
+	_ghost_fraction = value
+	queue_redraw()
+
+func _set_heal_alpha(value: float) -> void:
+	_heal_alpha = value
+	queue_redraw()
+
+# The ghost and the heal segment on a bar `width` long from `left`, its
+# fill at `fill` (a fraction), at `alpha`.
+func _draw_hp_change(left: float, top: float, width: float, height: float, fill: float, alpha: float) -> void:
+	if _ghost_fraction > fill:
+		var ghost: Color = ghost_color
+		ghost.a *= alpha
+		draw_rect(Rect2(left + width * fill, top, width * (_ghost_fraction - fill), height), ghost)
+	if _heal_alpha > 0.0 and fill > _heal_from:
+		var heal: Color = heal_color
+		heal.a *= _heal_alpha * alpha
+		draw_rect(Rect2(left + width * _heal_from, top, width * (fill - _heal_from), height), heal)
 
 # Called by BattleOverlay on the controller's status_changed with the
 # player's current block (0 clears the segment) - battle-only; the field

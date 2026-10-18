@@ -40,6 +40,24 @@ var layout_offset: Vector2 = Vector2.ZERO
 @export var hp_change_hold_time: float = 1.5
 @export_range(0.0, 1.0) var low_hp_fraction: float = 0.3
 
+@export_group("HP Change")
+# A loss: the fill drops in the frame it lands, and a pale ghost
+# (ghost_color) holds the lost stretch for ghost_hold_sec, then drains
+# down to the new value over ghost_drain_sec - drawn over the fill's track,
+# which it uncovers as it goes. A heal: the fill rises at once, the
+# stretch gained in heal_color, fading into the fill over heal_fade_sec.
+@export var ghost_color: Color = Color(0.94, 0.91, 0.86, 0.9):
+	set(value):
+		ghost_color = value
+		queue_redraw()
+@export var ghost_hold_sec: float = 0.4
+@export var ghost_drain_sec: float = 0.3
+@export var heal_color: Color = Color(0.66, 0.74, 0.62, 1.0):
+	set(value):
+		heal_color = value
+		queue_redraw()
+@export var heal_fade_sec: float = 0.5
+
 @export_group("Bar")
 @export var bar_size: Vector2 = Vector2(110.0, 5.0)
 @export var bar_corner_radius: int = 2
@@ -263,6 +281,13 @@ var layout_offset: Vector2 = Vector2.ZERO
 var target: FieldEnemy
 var _current_hp: int = -1
 var _max_hp: int = 1
+# HP Change: the ghost's right end, as a fraction of the bar (none while
+# at or under the fill's), and the heal segment's left end and alpha.
+var _ghost_fraction: float = 0.0
+var _ghost_tween: Tween = null
+var _heal_from: float = 0.0
+var _heal_alpha: float = 0.0
+var _heal_tween: Tween = null
 var _block: int = 0
 # The value fading out under a crossfade (0: none), and how far the new
 # one has faded in (1: done) - see set_block().
@@ -498,6 +523,7 @@ func _draw() -> void:
 	var bar_top: float = baseline + _numeral_descent() + battle_row_gap
 	draw_rect(Rect2(left, bar_top, battle_width, battle_bar_height), track)
 	draw_rect(Rect2(left, bar_top, battle_width * _current_hp_fraction(), battle_bar_height), ink)
+	_draw_hp_change(left, bar_top, battle_width, battle_bar_height, _current_hp_fraction(), _battle_blend)
 
 	if _block > 0 and _max_hp > 0:
 		var length: float = maxf(battle_width * clampf(float(_block) / float(_max_hp), 0.0, 1.0), block_min_length_px)
@@ -614,6 +640,53 @@ func update_hp(current: int, max_hp: int) -> void:
 		return
 	_apply_hp(current, max_hp)
 
+# The fill moves from `before` to `after` (fractions of the bar): a loss
+# leaves its ghost, a heal its segment - see the HP Change group.
+func _start_hp_change(before: float, after: float) -> void:
+	if after < before:
+		_ghost_fraction = maxf(_ghost_fraction, before)
+		if _heal_tween != null:
+			_heal_tween.kill()
+		_heal_alpha = 0.0
+		if _ghost_tween != null:
+			_ghost_tween.kill()
+		_ghost_tween = create_tween()
+		_ghost_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		_ghost_tween.tween_interval(maxf(ghost_hold_sec, 0.0))
+		_ghost_tween.tween_method(_set_ghost_fraction, _ghost_fraction, after, maxf(ghost_drain_sec, 0.0))
+	elif after > before:
+		if _ghost_fraction <= after:
+			if _ghost_tween != null:
+				_ghost_tween.kill()
+			_ghost_fraction = 0.0
+		_heal_from = minf(_heal_from, before) if _heal_alpha > 0.0 else before
+		if _heal_tween != null:
+			_heal_tween.kill()
+		_heal_tween = create_tween()
+		_heal_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		_heal_tween.tween_method(_set_heal_alpha, 1.0, 0.0, maxf(heal_fade_sec, 0.0))
+	queue_redraw()
+
+func _set_ghost_fraction(value: float) -> void:
+	_ghost_fraction = value
+	queue_redraw()
+
+func _set_heal_alpha(value: float) -> void:
+	_heal_alpha = value
+	queue_redraw()
+
+# The ghost and the heal segment on a bar `width` long from `left`, its
+# fill at `fill` (a fraction), at `alpha`.
+func _draw_hp_change(left: float, top: float, width: float, height: float, fill: float, alpha: float) -> void:
+	if _ghost_fraction > fill:
+		var ghost: Color = ghost_color
+		ghost.a *= alpha
+		draw_rect(Rect2(left + width * fill, top, width * (_ghost_fraction - fill), height), ghost)
+	if _heal_alpha > 0.0 and fill > _heal_from:
+		var heal: Color = heal_color
+		heal.a *= _heal_alpha * alpha
+		draw_rect(Rect2(left + width * _heal_from, top, width * (fill - _heal_from), height), heal)
+
 # _current_hp starts at the -1 sentinel ("never set") - the very first
 # real call (FieldEnemy's own field-mode seed at spawn, or battle setup()'s
 # own initial full-HP emit right after) never counts as a "change" worth
@@ -621,11 +694,14 @@ func update_hp(current: int, max_hp: int) -> void:
 # already showing does.
 func _apply_hp(current: int, max_hp: int) -> void:
 	var changed: bool = _current_hp != -1 and current != _current_hp
+	var before: float = _current_hp_fraction()
 	_current_hp = current
 	_max_hp = max_hp
 
 	hp_label.text = "%d/%d" % [current, max_hp]
 	_apply_layout()
+	if changed:
+		_start_hp_change(before, _current_hp_fraction())
 
 	if changed:
 		_visibility.notify_hp_changed()
