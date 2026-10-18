@@ -303,6 +303,9 @@ var _multi_hit_draw_used: bool = false
 # hp(). And whether the hit reporting now is one of an attack's several
 # (is_multi_hit_report()).
 var _hp_owed: int = 0
+# Packmates a SIGNAL woke this enemy turn (_answer_signal()) - their
+# answer was their turn. Cleared as each enemy turn begins.
+var _signal_woken: Dictionary = {}
 var _multi_hit_report: bool = false
 # Members of a shared move (_run_simultaneous_turn()) still reporting
 # their hits.
@@ -1513,6 +1516,7 @@ func _log_status_gained(enemy: FieldEnemy, status: StatusData) -> void:
 # cap) see three separate hits, as they always did.
 func _run_enemy_turn() -> void:
 	_enemy_phase = true
+	_signal_woken.clear()
 	_wake_unaided_dormant()
 	if _all_living_simultaneous():
 		await _run_simultaneous_turn()
@@ -1534,6 +1538,9 @@ func _run_sequential_turn() -> void:
 			continue
 		var data: EnemyData = enemy.enemy_data
 		if data == null:
+			continue
+		# Woken by a SIGNAL this enemy turn: its answer was its turn.
+		if _signal_woken.has(enemy):
 			continue
 		enemy_acting.emit(enemy)
 		# What it is about to carry out, and how often - its body plays
@@ -1620,6 +1627,10 @@ func _run_sequential_turn() -> void:
 			await get_tree().create_timer(burrow_delay).timeout
 		if result["heal_allies"] > 0:
 			_heal_packmates(enemy, result["heal_allies"], true)
+		if bool(result.get("signal", false)):
+			await _answer_signal(enemy)
+			if player.hp <= 0:
+				break
 		status_changed.emit()
 		# The pose of what comes next, landing on the beat the intent shows.
 		var pose_delay: float = _pose_for_intent(enemy)
@@ -1650,9 +1661,48 @@ func _wake_unaided_dormant() -> void:
 		if not waker:
 			_wake(enemy, "alone")
 
-# Whether `enemy` could still wake a dormant packmate. Nothing can yet.
-func _can_wake(_enemy: FieldEnemy) -> bool:
+# Whether `enemy` could still wake a dormant packmate: living, with a
+# SIGNAL in its loop.
+func _can_wake(enemy: FieldEnemy) -> bool:
+	var combatant: Combatant = _combatants.get(enemy)
+	if combatant == null or combatant.hp <= 0 or enemy.enemy_data == null:
+		return false
+	for intent: EnemyIntent in enemy.enemy_data.intents:
+		if intent != null and intent.type == EnemyIntent.IntentType.SIGNAL:
+			return true
 	return false
+
+# `caller`'s SIGNAL: every living packmate, in member order, wakes if it
+# was dormant and answers with one attack out of turn (EnemyTurn.answer_
+# signal()) - its own move and its own report, one after another. One
+# woken here takes no turn of its own this enemy turn (_signal_woken).
+func _answer_signal(caller: FieldEnemy) -> void:
+	if caller.group == &"":
+		return
+	for member in enemies.duplicate():
+		if member == caller or member.group != caller.group or member.enemy_data == null:
+			continue
+		var combatant: Combatant = _combatants.get(member)
+		if combatant == null or combatant.hp <= 0:
+			continue
+		if combatant.dormant:
+			_wake(member, "signal")
+			_signal_woken[member] = true
+		var attack: Dictionary = EnemyTurn.answer_signal(combatant, member.enemy_data, player)
+		if not bool(attack["attacked"]):
+			continue
+		RunLogger.mechanic("signal_answer", {"enemy": _log_id(member), "caller": _log_id(caller), "to_hp": attack["damage_to_hp"]})
+		enemy_acting.emit(member)
+		var attacks: Array[Dictionary] = [attack]
+		_owe_attacks(attacks)
+		var snap_delay: float = _play_attack_move(member, EnemyTurn.signal_answer_intent(combatant, member.enemy_data))
+		if snap_delay > 0.0:
+			await get_tree().create_timer(snap_delay).timeout
+		await _report_enemy_attack(member, attack)
+		_hp_owed = 0
+		if player.hp <= 0:
+			return
+		enemy_intent_changed.emit(member, get_intent_preview(member))
 
 # Out of its dormancy: it acts from its next turn (this one, woken as the
 # enemy turn begins), and its intent shows.
@@ -1719,6 +1769,9 @@ func _run_simultaneous_turn() -> void:
 	for enemy in acting:
 		if results[enemy]["defended"]:
 			_report_enemy_block(enemy, results[enemy])
+	for enemy in acting:
+		if bool(results[enemy].get("signal", false)) and player.hp > 0:
+			await _answer_signal(enemy)
 	status_changed.emit()
 	for enemy in acting:
 		_show_roused(enemy)

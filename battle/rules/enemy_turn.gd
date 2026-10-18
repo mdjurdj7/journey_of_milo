@@ -196,6 +196,10 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 				# As the Coil: it puffs up, and what that brings is its
 				# status_on_resolve (Inflated), just below.
 				pass
+			EnemyIntent.IntentType.SIGNAL:
+				# Its pack is the controller's to call - this side knows
+				# only this enemy (BattleController._answer_signal()).
+				result["signal"] = true
 			EnemyIntent.IntentType.DIG:
 				# Under the sand, its mounds up (start_dig()); the loop moves
 				# on past the Dig below, for when it comes back up.
@@ -763,6 +767,37 @@ static func leave_pack(combatant: Combatant, data: EnemyData) -> bool:
 	_advance_intent(combatant, data)
 	_sync_queued(combatant, data)
 	return true
+
+# A packmate answering a SIGNAL (BattleController._answer_signal()): one
+# attack, out of turn - the first ATTACK in its loop, from where the loop
+# stands - landed as its own turn's would be (land_attack(), what it puts
+# on the player included). Its loop, its turn count and anything waiting
+# for its own turn are left alone. take_turn()'s attack keys; "attacked"
+# false when it has no attack to answer with.
+static func answer_signal(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
+	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "applied_to_player": 0}
+	var intent: EnemyIntent = signal_answer_intent(combatant, data)
+	if intent == null or combatant.hp <= 0 or player.hp <= 0:
+		return result
+	result["intent"] = intent.intent_name
+	land_attack(combatant, data, intent, player, result)
+	if intent.applies_to_player != null and intent.applied_amount > 0:
+		Status.apply_amount(player.statuses, intent.applies_to_player, intent.applied_amount)
+		result["applied_to_player"] = intent.applied_amount
+	return result
+
+# The attack a packmate answers a SIGNAL with: the first ATTACK in its
+# loop from the intent queued now. Null with none.
+static func signal_answer_intent(combatant: Combatant, data: EnemyData) -> EnemyIntent:
+	if data == null or data.intents.is_empty():
+		return null
+	var count: int = data.intents.size()
+	var start: int = clampi(combatant.current_intent_index, 0, count - 1)
+	for step in count:
+		var intent: EnemyIntent = data.intents[(start + step) % count]
+		if intent != null and intent.type == EnemyIntent.IntentType.ATTACK:
+			return intent
+	return null
 
 # A move only a pack makes - dropped from the loop once the enemy is the
 # last of its pack: one marked pack_only (the dragonflies' Swarm), and a

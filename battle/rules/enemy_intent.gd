@@ -52,7 +52,16 @@ class_name EnemyIntent
 # lands, so the player sees the taunt coming. The display shows its glyph
 # alone, a ring round a dark centre - the Glower's false eye. The
 # Glower's Puff.
-enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL, DIG, TAUNT }
+#
+# SIGNAL: no damage of its own - it calls its pack (BattleController.
+# _answer_signal()): every living packmate wakes if it was dormant
+# (Combatant.dormant) and answers at once with one attack of its own, out
+# of turn (EnemyTurn.answer_signal()); one woken by the call takes no
+# turn of its own that enemy turn - the answer was it. The display shows
+# its glyph alone, a call going out. Mark it pack_only, so it drops out of
+# the loop once the pack is gone. The Nettlebasket's Signal. Appended,
+# like HEAL_ALLY.
+enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL, DIG, TAUNT, SIGNAL }
 
 # The move's name (the Dunecur's Rush) - for the enemy export (tests/
 # enemy_export.gd) and the design docs; nothing in a fight shows it yet.

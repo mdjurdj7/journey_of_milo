@@ -287,6 +287,11 @@ const COIL_HEAD: float = 0.75
 const TAUNT_RING: float = 0.85
 const TAUNT_SWEEP: float = 0.62
 const TAUNT_CENTRE: float = 0.34
+# The SIGNAL glyph: its source dot's radius, its outer arc's, and how
+# much of a turn each arc sweeps - all as fractions of r.
+const SIGNAL_DOT: float = 0.16
+const SIGNAL_RING: float = 1.25
+const SIGNAL_SWEEP: float = 0.3
 
 var target: FieldEnemy = null
 var _label: Label = null
@@ -385,7 +390,7 @@ func show_intent(preview: Dictionary) -> void:
 				total += int(amount)
 			_label.text = str(total)
 			_hits_label.text = hits_format % hits
-		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.DIG or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE or _type == EnemyIntent.IntentType.COIL or _type == EnemyIntent.IntentType.TAUNT:
+		if _type == EnemyIntent.IntentType.BURROW or _type == EnemyIntent.IntentType.DIG or _type == EnemyIntent.IntentType.WATCH or _type == EnemyIntent.IntentType.SETTLE or _type == EnemyIntent.IntentType.COIL or _type == EnemyIntent.IntentType.TAUNT or _type == EnemyIntent.IntentType.SIGNAL:
 			_label.text = ""
 			_hits_label.text = ""
 		_has_threshold = preview.has("threshold")
@@ -788,6 +793,26 @@ func _glyph_shapes(centre: Vector2, r: float) -> Array[PackedVector2Array]:
 				var angle: float = TAU * float(step) / 20.0
 				dark.append(centre + Vector2(cos(angle), sin(angle)) * r * TAUNT_CENTRE)
 			shapes.append(dark)
+		EnemyIntent.IntentType.SIGNAL:
+			# A call going out: a dot low in the glyph and two arcs
+			# rising over it, each of SIGNAL_SWEEP of a turn, the outer
+			# SIGNAL_RING of r out.
+			var source: Vector2 = centre + Vector2(0.0, r * 0.55)
+			var dot := PackedVector2Array()
+			for step in 16:
+				var angle: float = TAU * float(step) / 16.0
+				dot.append(source + Vector2(cos(angle), sin(angle)) * r * SIGNAL_DOT)
+			shapes.append(dot)
+			var arc_steps: int = 16
+			for ring: float in [SIGNAL_RING * 0.6, SIGNAL_RING]:
+				var arc := PackedVector2Array()
+				var arc_factors := PackedFloat32Array()
+				for step in arc_steps + 1:
+					var t: float = float(step) / float(arc_steps)
+					var angle: float = -PI * 0.5 + TAU * SIGNAL_SWEEP * (t - 0.5)
+					arc.append(source + Vector2(cos(angle), sin(angle)) * r * ring)
+					arc_factors.append(sin(t * PI))
+				shapes.append(_ribbon(arc, arc_factors))
 	return shapes
 
 # A coil in the tapered pen, r either side of `centre`: one stroke wound
