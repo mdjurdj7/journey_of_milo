@@ -7,7 +7,9 @@ extends SceneTree
 # other falls); both standing on walkable ground on floor 3, across no
 # ledge; and the fight: one contact for both, Paired
 # and on the same Bow; one killed first and the other Bereft at once,
-# its Step 6x2 landing 12 and its Bow 8 Block; both killed by one Carve
+# its Step 6x2 landing 12 and its Bow 8 Block - gone again as its next
+# turn starts, and its loop going on, not one move every turn; both
+# killed by one Carve
 # and neither turning - their line said and Leg Band offered after. And
 # the fight's staging from the hub side: the Wanderer at least his
 # minimum spacing from the anchor (he may stand in the ford's shallows),
@@ -156,7 +158,10 @@ func _check_one_falls_first() -> void:
 	await _teardown()
 	_completed += 1
 
-# Bereft on Bow: 8 Block in its one turn.
+# Bereft on Bow: 8 Block in its one turn. Then two more of its turns: the
+# Block is gone as the next one starts (an enemy's Block lasts through the
+# player's turn after it and no longer), and the survivor keeps to its
+# loop - the move it queues isn't the same one every turn.
 func _check_bereft_bow() -> void:
 	var controller: Node = await _start_fight("")
 	if controller != null:
@@ -167,8 +172,23 @@ func _check_bereft_bow() -> void:
 		controller.call("_emit_intent_previews")
 		_expect_eq(_intent_text(controller, chalk), "8", "Bereft Chalkcrown's Bow reads 8")
 		var before: int = c.block
+		var data: EnemyData = chalk.get("enemy_data")
+		var queued: Array[EnemyIntent] = [EnemyTurn.current_intent(c, data)]
 		await controller.call("end_turn")
 		_expect_eq(c.block - before, 8, "...and gains 8 Block")
+		queued.append(EnemyTurn.current_intent(c, data))
+		await ProbePlay.settle(self, controller)
+		await controller.call("end_turn")
+		_expect_eq(c.block, 0, "...gone again once its next turn has started")
+		queued.append(EnemyTurn.current_intent(c, data))
+		await ProbePlay.settle(self, controller)
+		await controller.call("end_turn")
+		queued.append(EnemyTurn.current_intent(c, data))
+		var names: Array[String] = []
+		for intent: EnemyIntent in queued:
+			if intent != null and not names.has(intent.intent_name):
+				names.append(intent.intent_name)
+		_expect(names.size() > 1, "...and over three turns alone it doesn't queue one move every turn (%s)" % ", ".join(names))
 	await _teardown()
 	_completed += 1
 
