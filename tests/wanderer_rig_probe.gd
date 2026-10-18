@@ -67,6 +67,12 @@ extends SceneTree
 #            for the first to reach slash_cancel_time before its play
 #            starts (not before 0.75 s), and lands on its own contact
 #            frame from there
+#   recoil - in that fight, a multi-hit attack's hits (each with its
+#            stop and recoil, landing while the last recoil is out) leave
+#            his body untilted and home once done; a fight won mid-recoil
+#            leaves his body untilted, its push undone, and his model's
+#            local transform at its field rest once the settle time
+#            (RegionField.fight_end_settle_seconds) has run
 #
 # Until the fight, the Wanderer's own _physics_process is held off
 # (process_mode disabled, as the battle freeze does) so it doesn't put
@@ -153,6 +159,21 @@ const STOP_STILL_S := 0.0001
 # BattleFeedback's normal_hitstop_ms.
 const HIT_STOP_S := 0.07
 const STOP_STILL_M := 0.0001
+# A multi-hit attack's hits on him (recoil): BattleFeedback's per-hit
+# stop, recoil and spacing - RECOIL_HITS of them RECOIL_GAP_FRAMES apart
+# at 60 fps (BattleController.enemy_hit_interval 0.12 s); what "at rest"
+# allows of his body's tilt (degrees) and of his body and model's place
+# (metres).
+const RECOIL_HITS := 3
+const RECOIL_GAP_FRAMES := 7
+const RECOIL_HOLD_S := 0.04
+const RECOIL_DISTANCE_M := 0.25
+const RECOIL_TILT_DEG := 8.0
+const RECOIL_OUT_S := 0.08
+const RECOIL_RETURN_S := 0.25
+const RECOIL_WAIT_S := 2.0
+const REST_TILT_LIMIT_DEG := 0.1
+const REST_LIMIT_M := 0.005
 const SLASH_SEAM_LIMIT_DEG := 1.0
 const LUNGE_REACH_LIMIT_M := 0.03
 const LUNGE_HOME_LIMIT_M := 0.001
@@ -424,6 +445,8 @@ func _initialize() -> void:
 		await _check_slash_plays_out(controller)
 		await _check_cancel_window(controller)
 		_check(_strikes.size() == 1, "no ground strike after the entry's - the fight's Slashes bring none (%d in all)" % _strikes.size())
+		print("\n=== recoil")
+		await _check_recoil_rest()
 
 	_field.queue_free()
 	for i in 5:
@@ -703,6 +726,52 @@ func _check_slash_plays_out(controller: Node) -> void:
 
 # Two Slashes, the second confirmed SECOND_PLAY_AT_S after the first: it
 # waits for the first's cancel point, then lands on its own contact frame.
+# A multi-hit attack's hits, each landing while the last recoil is still
+# out, leave his body untilted and where it stood once they're done; then
+# a fight won mid-recoil eases his body's tilt and push, and his model
+# (its turn to the camera, a lunge), back to rest over the fight's settle
+# time - his model's local transform as the field has it.
+func _check_recoil_rest() -> void:
+	var enemy: Node3D = _fight_enemy()
+	var from: Vector3 = _wanderer.global_position - enemy.global_position
+	var home: Vector3 = _wanderer.global_position
+	for hit in RECOIL_HITS:
+		_wanderer.call("hold_animation", RECOIL_HOLD_S)
+		_wanderer.call("play_hit_recoil", from, RECOIL_DISTANCE_M, RECOIL_TILT_DEG, RECOIL_OUT_S, RECOIL_RETURN_S)
+		for i in RECOIL_GAP_FRAMES:
+			await physics_frame
+	await ProbePlay.wait_until(self, func() -> bool: return not bool(_wanderer.call("_recoil_running")), RECOIL_WAIT_S)
+	var tilt: float = rad_to_deg(_wanderer.rotation.x)
+	var off: float = _wanderer.global_position.distance_to(home)
+	_check(absf(tilt) <= REST_TILT_LIMIT_DEG and off <= REST_LIMIT_M, "%d hits %d frames apart leave him untilted and home (%.3f deg, %.4f m off)" % [RECOIL_HITS, RECOIL_GAP_FRAMES, tilt, off])
+
+	var model: Node3D = _wanderer.get("_model") as Node3D
+	var lunge_home: Vector2 = _wanderer.get("_lunge_home")
+	var expected: Vector3 = _field.call("win_position", home)
+	_wanderer.call("hold_animation", RECOIL_HOLD_S)
+	_wanderer.call("play_hit_recoil", from, RECOIL_DISTANCE_M, RECOIL_TILT_DEG, RECOIL_OUT_S, RECOIL_RETURN_S)
+	for i in RECOIL_GAP_FRAMES:
+		await physics_frame
+	var mid_tilt: float = rad_to_deg(_wanderer.rotation.x)
+	_check(mid_tilt > 1.0, "a recoil is out as the fight ends (%.2f deg)" % mid_tilt)
+	var layer: Node = _field.get_node("BattleLayer")
+	var overlay: Node = layer.get_child(0) if layer.get_child_count() > 0 else null
+	if overlay == null:
+		_check(false, "the fight is still open to end")
+		return
+	overlay.call("_finish_battle", 0) # WIN
+	var settle: float = maxf(float(_field.get("fight_end_settle_seconds")), float(_wanderer.get("animation_blend_time")))
+	var ended_at: int = ProbePlay.game_msec()
+	await ProbePlay.wait_until(self, func() -> bool: return ProbePlay.game_msec() - ended_at >= int((settle + FIGHT_SLACK_S) * 1000.0), settle + 1.0)
+	var body_tilt: Vector3 = Vector3(rad_to_deg(_wanderer.rotation.x), 0.0, rad_to_deg(_wanderer.rotation.z))
+	var body_off: float = Vector2(_wanderer.global_position.x - expected.x, _wanderer.global_position.z - expected.z).length()
+	_check(absf(body_tilt.x) <= REST_TILT_LIMIT_DEG and absf(body_tilt.z) <= REST_TILT_LIMIT_DEG, "a fight won mid-recoil leaves his body untilted (%.3f, %.3f deg)" % [body_tilt.x, body_tilt.z])
+	_check(body_off <= REST_LIMIT_M, "...and its push undone (%.4f m off where the fight leaves him)" % body_off)
+	var model_turn: float = rad_to_deg(model.rotation.y) - float(_wanderer.get("model_yaw_offset"))
+	var model_tilt: Vector2 = Vector2(rad_to_deg(model.rotation.x), rad_to_deg(model.rotation.z))
+	var model_off: float = Vector2(model.position.x - lunge_home.x, model.position.z - lunge_home.y).length()
+	_check(absf(wrapf(model_turn, -180.0, 180.0)) <= REST_TILT_LIMIT_DEG and model_tilt.length() <= REST_TILT_LIMIT_DEG and model_off <= REST_LIMIT_M, "...his model's local transform back at its field rest (turn %.3f deg, tilt %s, %.4f m off home)" % [model_turn, model_tilt, model_off])
+
 func _check_cancel_window(controller: Node) -> void:
 	var first: Object = await _deal(controller)
 	var second: Object = await _deal(controller)
