@@ -229,10 +229,9 @@ class KeepOut extends RefCounted:
 @export_group("")
 
 @export_group("Worn Band")
-# Nothing within this of the band's centreline. -1 = the band's own
-# half-width, half its edge and both its noises (Ground.wear_half_width +
-# wear_edge_width / 2 + wear_edge_noise_amplitude + wear_fray_amplitude)
-# - the furthest it is ever drawn.
+# Nothing within this of the band's centreline. -1 = Ground's
+# wear_scatter_keep_out - the trodden core's reach (the feathered tone
+# past it is faint enough to stand tufts in).
 @export var wear_keep_out_m: float = -1.0:
 	set(value):
 		wear_keep_out_m = value
@@ -402,6 +401,8 @@ func setup(field: RegionField) -> void:
 		_ground.relief_rebuilt.connect(_on_relief_rebuilt)
 	if _ground != null and not _ground.pool_stamps_changed.is_connected(_on_pool_stamps_changed):
 		_ground.pool_stamps_changed.connect(_on_pool_stamps_changed)
+	if _ground != null and not _ground.wear_keep_out_changed.is_connected(_on_pool_stamps_changed):
+		_ground.wear_keep_out_changed.connect(_on_pool_stamps_changed)
 	var sky: RegionSky = field.get_region_sky()
 	if sky != null and not sky.fog_changed.is_connected(_push_fog):
 		sky.fog_changed.connect(_push_fog)
@@ -733,7 +734,7 @@ func in_pool_keep_out(p: Vector2) -> bool:
 func get_wear_keep_out() -> float:
 	if wear_keep_out_m >= 0.0:
 		return wear_keep_out_m
-	return _ground.wear_half_width + _ground.wear_edge_width * 0.5 + _ground.wear_edge_noise_amplitude + _ground.wear_fray_amplitude
+	return _ground.wear_scatter_keep_out
 
 # Distance to the band's centreline - the shader's own curve (ground.
 # gdshader wear_distance()): through three points a quadratic Bezier that

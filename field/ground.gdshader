@@ -191,14 +191,15 @@ uniform float underwater_detail_boost = 1.5;
 
 // --- Wear: the walked band ---
 //
-// A narrow stretch of sand that reads as trodden, not a path drawn on the
+// A stretch of sand that reads as trodden, not a path drawn on the
 // ground. Region 1's routes are meant to be findable and losable, so the
-// tone barely moves: a core wear_half_width each side of the centreline,
-// a few percent darker, its edge frayed by noise rather than blurred.
-// The texture carries it instead - the wind ripples and fine detail are
-// flattened on it, and sparse scuffs and footprints lie along it
-// (wear_marks()). Everything darkens or flattens; no height change, no
-// lift, no hue shift.
+// tone barely moves and has no edge: half strength wear_half_width each
+// side of the centreline, eased in and out over wear_edge_width, the
+// centreline itself meandering (wear_wander_*) so it never rules a line.
+// Darkening and both flattenings ride the one factor, so they feather
+// together. The scuffs and footprints keep to the core (wear_marks(),
+// wear_mark_core_fade) - the walked line inside the soft tone. Everything
+// darkens or flattens; no height change, no lift, no hue shift.
 //
 // Two sources, combined by max(): a procedural band along a curve from
 // spawn through the crab to the gate line (pushed by RegionField via
@@ -212,17 +213,23 @@ uniform bool wear_enabled = false;
 const int WEAR_MAX_POINTS = 8;
 uniform vec2 wear_points[8];
 uniform int wear_point_count = 3;
-// The core: full wear out to wear_half_width from the centreline, then
-// gone over wear_edge_width centred on it. The core holds while the
-// wobble and fray below sum to less than wear_half_width - wear_edge_
-// width / 2; past that the centreline itself lands on the falloff and
-// draws a crease.
-uniform float wear_half_width = 0.75;
-uniform float wear_edge_width = 0.35;
-// Low-frequency wobble on the band's own edge, so it never reads as a
-// ruled boundary. Metres, applied to the distance before the falloff.
-uniform float wear_edge_noise_scale = 6.0;
-uniform float wear_edge_noise_amplitude = 0.2;
+// The profile: half strength at wear_half_width from the (wandered)
+// centreline, eased from full at wear_half_width - wear_edge_width / 2 to
+// nothing at wear_half_width + wear_edge_width / 2. The core holds while
+// the width wobble and fray below sum to less than that inner edge; past
+// that the centreline itself lands on the falloff and draws a crease.
+uniform float wear_half_width = 2.0;
+uniform float wear_edge_width = 2.4;
+// The centreline meanders: shifted sideways by slow noise, up to
+// wear_wander_amplitude metres either way over about wear_wander_scale
+// metres - the band snakes rather than pinching, so it never reads as a
+// ruled line, and no crease forms on it.
+uniform float wear_wander_scale = 14.0;
+uniform float wear_wander_amplitude = 0.6;
+// Low-frequency wobble on the band's width, both edges at once. Metres,
+// applied to the distance before the falloff.
+uniform float wear_edge_noise_scale = 8.0;
+uniform float wear_edge_noise_amplitude = 0.4;
 // Finer noise on the same distance, so the edge breaks up into bays and
 // tongues rather than a smooth line: three octaves from wear_fray_scale
 // metres down, each turned off the grid (wear_fray()). Metres.
@@ -235,7 +242,7 @@ uniform float wear_darken : hint_range(0.0, 1.0) = 0.05;
 // How much of the grain/speckle detail the band flattens away.
 uniform float wear_flatten : hint_range(0.0, 1.0) = 0.6;
 // How much of the wind ripples it flattens: feet level them first.
-uniform float wear_ripple_flatten : hint_range(0.0, 1.0) = 1.0;
+uniform float wear_ripple_flatten : hint_range(0.0, 1.0) = 0.7;
 // Scuffs and footprints along the procedural band (see wear_marks()):
 // one chance per wear_mark_cell-metre cell, wear_mark_density of cells
 // carrying one, wear_mark_footprint_share of those a stride of two
@@ -243,7 +250,10 @@ uniform float wear_ripple_flatten : hint_range(0.0, 1.0) = 1.0;
 uniform float wear_mark_cell = 0.9;
 uniform float wear_mark_density : hint_range(0.0, 1.0) = 0.3;
 uniform float wear_mark_footprint_share : hint_range(0.0, 1.0) = 0.5;
-uniform float wear_mark_darken : hint_range(0.0, 1.0) = 0.16;
+uniform float wear_mark_darken : hint_range(0.0, 1.0) = 0.12;
+// The marks keep to the core: full inside the profile's inner edge, gone
+// this many metres past it.
+uniform float wear_mark_core_fade = 0.6;
 
 // --- Ruts: a cart's two wheel tracks ---
 //
@@ -950,15 +960,26 @@ float wear_segment_distance(vec2 p, vec2 a, vec2 b) {
 
 // Distance from an XZ to the centreline, as the minimum over a polyline
 // approximation, and the direction of the nearest piece of it (x: the
-// distance, yz: the unit direction, start to end). Point-to-SEGMENT
+// distance, yz: the unit direction, start to end, w: the signed offset
+// across that piece, perpendicular to it - the whole distance beside a
+// piece, shrinking to 0 along its line past an end, so a sideways shift
+// of the band fades out round the ends instead of flipping there). Point-to-SEGMENT
 // rather than point-to-sample, so 16 steps are enough to stay smooth at
 // this half-width - sampling points alone would scallop the band's edge
 // wherever the curve bends. A chain takes WEAR_CHAIN_STEPS per span.
 const int WEAR_SEGMENTS = 16;
 const int WEAR_CHAIN_STEPS = 8;
-vec3 wear_nearest(vec2 p) {
+float wear_across(vec2 p, vec2 a, vec2 b) {
+	vec2 ab = b - a;
+	float h = clamp(dot(p - a, ab) / max(dot(ab, ab), 1.0e-6), 0.0, 1.0);
+	vec2 normal = vec2(-ab.y, ab.x) / max(length(ab), 1.0e-6);
+	return dot(p - a - ab * h, normal);
+}
+
+vec4 wear_nearest(vec2 p) {
 	float best = 1.0e20;
 	vec2 along = vec2(0.0, 1.0);
+	float across = 0.0;
 	if (wear_point_count <= 3) {
 		vec2 prev = wear_curve_point(0.0);
 		for (int i = 1; i <= WEAR_SEGMENTS; i++) {
@@ -967,10 +988,11 @@ vec3 wear_nearest(vec2 p) {
 			if (d < best) {
 				best = d;
 				along = cur - prev;
+				across = wear_across(p, prev, cur);
 			}
 			prev = cur;
 		}
-		return vec3(best, normalize(along + vec2(0.0, 1.0e-6)));
+		return vec4(best, normalize(along + vec2(0.0, 1.0e-6)), across);
 	}
 	for (int span = 0; span < WEAR_MAX_POINTS - 1; span++) {
 		if (span >= wear_point_count - 1) {
@@ -983,11 +1005,12 @@ vec3 wear_nearest(vec2 p) {
 			if (d < best) {
 				best = d;
 				along = cur - prev;
+				across = wear_across(p, prev, cur);
 			}
 			prev = cur;
 		}
 	}
-	return vec3(best, normalize(along + vec2(0.0, 1.0e-6)));
+	return vec4(best, normalize(along + vec2(0.0, 1.0e-6)), across);
 }
 
 // The ruts' chain, as wear_chain_point() is the band's.
@@ -1268,27 +1291,37 @@ float wear_fray(vec2 p) {
 	return n;
 }
 
-// "This sand is walked", 0..1 (x), and how much of that is the
-// procedural band (y), which alone carries the scuffs and footprints;
-// zw is the band's direction at this XZ. Procedural band and painted
-// mask by max(), then gated (wear_gate()). The band is a core with a
-// frayed edge - see wear_half_width's doc.
+// "This sand is walked", 0..1 (x), and how much of the procedural band's
+// core is here (y), which alone carries the scuffs and footprints; zw is
+// the band's direction at this XZ. Procedural band and painted mask by
+// max(), then gated (wear_gate()). See wear_half_width's doc for the
+// profile.
 vec4 wear_factor(vec2 world_xz, float gate) {
 	float band = 0.0;
+	float core = 0.0;
 	vec2 along = vec2(0.0, 1.0);
 	if (wear_enabled && gate > 0.0) {
-		vec3 nearest = wear_nearest(world_xz);
+		vec4 nearest = wear_nearest(world_xz);
 		along = nearest.yz;
+		// The meander: the centreline shifted sideways - on the offset
+		// across it, so the band snakes as one piece, and past an end the
+		// shift eases out rather than flipping sides along the line.
+		float wander = (value_noise(world_xz / max(wear_wander_scale, 0.001) + vec2(37.2, 11.9)) - 0.5) * 2.0 * wear_wander_amplitude;
+		float beyond = max(nearest.x * nearest.x - nearest.w * nearest.w, 0.0);
+		float off_line = sqrt(beyond + (nearest.w - wander) * (nearest.w - wander));
 		float wobble = (value_noise(world_xz / max(wear_edge_noise_scale, 0.001)) - 0.5) * 2.0 * wear_edge_noise_amplitude;
 		float fray = (wear_fray(world_xz) - 0.5) * 2.0 * wear_fray_amplitude;
+		float d = off_line + wobble + fray;
 		float edge = max(wear_edge_width, 0.001) * 0.5;
-		band = 1.0 - smoothstep(wear_half_width - edge, wear_half_width + edge, nearest.x + wobble + fray);
+		float inner = wear_half_width - edge;
+		band = 1.0 - smoothstep(inner, wear_half_width + edge, d);
+		core = 1.0 - smoothstep(inner, inner + max(wear_mark_core_fade, 0.001), d);
 	}
 	float wear = band;
 	if (wear_mask_ready && gate > 0.0) {
 		wear = max(wear, canvas_sample(wear_mask, world_xz));
 	}
-	return vec4(clamp(wear * gate, 0.0, 1.0), clamp(band * gate, 0.0, 1.0), along);
+	return vec4(clamp(wear * gate, 0.0, 1.0), clamp(core * gate, 0.0, 1.0), along);
 }
 
 void fragment() {

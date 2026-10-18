@@ -13,6 +13,8 @@ signal relief_rebuilt
 # A standing pool stamped, moved or taken away (set_pool_stamp()) - what
 # FieldScatter re-places itself round.
 signal pool_stamps_changed
+# wear_scatter_keep_out changed - FieldScatter re-places itself.
+signal wear_keep_out_changed
 
 # The sand: high-key pale with a slight warm bias (R - B ~ +0.14), a pale
 # flat rather than tan. Rendered as authored - near_color/far_color below
@@ -614,19 +616,33 @@ signal pool_stamps_changed
 	set(value):
 		wear_enabled = value
 		_apply_uniform("wear_enabled", value)
-@export var wear_half_width: float = 0.75:
+# Half strength this far from the (wandered) centreline, eased from full
+# at wear_half_width - wear_edge_width / 2 to nothing at + wear_edge_width
+# / 2 - no edge anywhere. Field Asset Spec §1's half-width.
+@export var wear_half_width: float = 2.0:
 	set(value):
 		wear_half_width = value
 		_apply_uniform("wear_half_width", value)
-@export var wear_edge_width: float = 0.35:
+@export var wear_edge_width: float = 2.4:
 	set(value):
 		wear_edge_width = value
 		_apply_uniform("wear_edge_width", value)
-@export var wear_edge_noise_scale: float = 6.0:
+# The centreline's meander: up to this many metres either way...
+@export var wear_wander_amplitude: float = 0.6:
+	set(value):
+		wear_wander_amplitude = value
+		_apply_uniform("wear_wander_amplitude", value)
+# ...over about this many metres.
+@export var wear_wander_scale: float = 14.0:
+	set(value):
+		wear_wander_scale = value
+		_apply_uniform("wear_wander_scale", value)
+# The width's own slow wobble, both edges at once.
+@export var wear_edge_noise_scale: float = 8.0:
 	set(value):
 		wear_edge_noise_scale = value
 		_apply_uniform("wear_edge_noise_scale", value)
-@export var wear_edge_noise_amplitude: float = 0.2:
+@export var wear_edge_noise_amplitude: float = 0.4:
 	set(value):
 		wear_edge_noise_amplitude = value
 		_apply_uniform("wear_edge_noise_amplitude", value)
@@ -653,7 +669,7 @@ signal pool_stamps_changed
 	set(value):
 		wear_flatten = value
 		_apply_uniform("wear_flatten", value)
-@export_range(0.0, 1.0) var wear_ripple_flatten: float = 1.0:
+@export_range(0.0, 1.0) var wear_ripple_flatten: float = 0.7:
 	set(value):
 		wear_ripple_flatten = value
 		_apply_uniform("wear_ripple_flatten", value)
@@ -673,11 +689,25 @@ signal pool_stamps_changed
 	set(value):
 		wear_mark_footprint_share = value
 		_apply_uniform("wear_mark_footprint_share", value)
-# ...each darkening the band by this much at most.
-@export_range(0.0, 1.0) var wear_mark_darken: float = 0.16:
+# ...each darkening the band by this much at most...
+@export_range(0.0, 1.0) var wear_mark_darken: float = 0.12:
 	set(value):
 		wear_mark_darken = value
 		_apply_uniform("wear_mark_darken", value)
+# ...and only on the core: full inside the profile's inner edge, gone
+# this many metres past it.
+@export var wear_mark_core_fade: float = 0.6:
+	set(value):
+		wear_mark_core_fade = value
+		_apply_uniform("wear_mark_core_fade", value)
+# How far from the centreline FieldScatter keeps clear (its wear_keep_
+# out_m at -1): the trodden core's reach, not the feathered tone's - held
+# at the 0.75 m band's derived 1.375 m, so feathering the band wider moved
+# no prop.
+@export var wear_scatter_keep_out: float = 1.375:
+	set(value):
+		wear_scatter_keep_out = value
+		wear_keep_out_changed.emit()
 # Optional painted band on the same rect as landmass_mask - white is
 # worn. Null (the default) leaves only the procedural curve.
 @export var wear_mask: Texture2D = null:
@@ -1234,6 +1264,8 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("underwater_detail_boost", underwater_detail_boost)
 	_apply_uniform("wear_enabled", wear_enabled)
 	_apply_uniform("wear_half_width", wear_half_width)
+	_apply_uniform("wear_wander_amplitude", wear_wander_amplitude)
+	_apply_uniform("wear_wander_scale", wear_wander_scale)
 	_apply_uniform("wear_edge_width", wear_edge_width)
 	_apply_uniform("wear_edge_noise_scale", wear_edge_noise_scale)
 	_apply_uniform("wear_edge_noise_amplitude", wear_edge_noise_amplitude)
@@ -1247,6 +1279,7 @@ func _apply_all_uniforms() -> void:
 	_apply_uniform("wear_mark_density", wear_mark_density)
 	_apply_uniform("wear_mark_footprint_share", wear_mark_footprint_share)
 	_apply_uniform("wear_mark_darken", wear_mark_darken)
+	_apply_uniform("wear_mark_core_fade", wear_mark_core_fade)
 	_apply_uniform("rut_gauge", rut_gauge)
 	_apply_uniform("rut_width", rut_width)
 	_apply_uniform("rut_darken", rut_darken)
