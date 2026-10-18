@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" uid="uid://de2lvj17h354q" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "dormant_nettle"
+display_name = "Dormant"
+description = "Wakes when the Nettlebasket Signals, or at the next enemy turn after she dies."
+category = 2
+default_duration_turns = -1

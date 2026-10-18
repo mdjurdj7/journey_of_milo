@@ -27,6 +27,14 @@ class_name EnemyData
 	set(value):
 		starts_dormant = value
 		emit_changed()
+# What its readout shows while it is dormant: this status's name in the
+# status row, its description in the row's hover (BattleController.get_
+# enemy_status_labels() / get_enemy_statuses()) - display only, never on
+# the Combatant, gone the moment it wakes. Null: nothing shown.
+@export var dormant_status: StatusData = null:
+	set(value):
+		dormant_status = value
+		emit_changed()
 # Statuses it holds from the first frame of every fight, applied as the
 # fight starts (BattleController) - a passive, shown and revealed like
 # any status (the Blackback's Fed). Empty (every enemy by default) = none.

@@ -1811,6 +1811,8 @@ func _wake(enemy: FieldEnemy, cause: String) -> void:
 	combatant.dormant = false
 	RunLogger.mechanic("woke", {"enemy": _log_id(enemy), "by": cause})
 	enemy_intent_changed.emit(enemy, get_intent_preview(enemy))
+	# Its Dormant goes from the status row.
+	status_changed.emit()
 
 # Each member's hits land at its own move's contact (_report_attacks_
 # after(), all running at once), not after the longest: one wait covers
@@ -2285,6 +2287,9 @@ func get_enemy_status_labels(enemy: FieldEnemy) -> PackedStringArray:
 	var combatant: Combatant = _combatants.get(enemy)
 	if combatant == null or combatant.hp <= 0:
 		return labels
+	# Dormant: its EnemyData.dormant_status first, while it sleeps.
+	if combatant.dormant and enemy.enemy_data != null and enemy.enemy_data.dormant_status != null:
+		labels.append(enemy.enemy_data.dormant_status.display_name)
 	for active: Status in combatant.statuses:
 		if active.data != null and active.data.shows_beside_hp:
 			continue
@@ -2318,6 +2323,8 @@ func get_enemy_statuses(enemy: FieldEnemy) -> Array[Status]:
 	if combatant == null or combatant.hp <= 0:
 		return []
 	var shown: Array[Status] = []
+	if combatant.dormant and enemy.enemy_data != null and enemy.enemy_data.dormant_status != null:
+		shown.append(Status.new(enemy.enemy_data.dormant_status))
 	for active in combatant.statuses:
 		if active.data == null or active.data.intent_mark == &"":
 			shown.append(active)

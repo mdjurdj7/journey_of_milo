@@ -5,6 +5,7 @@
 [ext_resource type="AudioStream" uid="uid://bqhk7amkael6o" path="res://assets/audio/enemies/Sputter/hit_shell_1.mp3" id="3_hit_shell"]
 [ext_resource type="AudioStream" uid="uid://ctbnpo2j3ocnc" path="res://assets/audio/enemies/Sputter/hit_shell_2.mp3" id="4_hit_shell_2"]
 [ext_resource type="AudioStream" uid="uid://c2g4kb3njm4pa" path="res://assets/audio/enemies/Sputter/hit_shell_3.mp3" id="5_hit_shell_3"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/dormant_nettle.tres" id="6_dormant"]
 
 [sub_resource type="Resource" id="EnemyIntent_nip"]
 script = ExtResource("2_intent")
@@ -18,6 +19,7 @@ mechanic_summary = "One of the three small scorpions riding in the Nettlebasket'
 max_hp = 9
 intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_nip")])
 starts_dormant = true
+dormant_status = ExtResource("6_dormant")
 contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell"), ExtResource("4_hit_shell_2"), ExtResource("5_hit_shell_3")])
 model_scene_path = "res://assets/models/enemies/Nettlebasket/Nettlebasket.glb"
 model_scale = 0.12
