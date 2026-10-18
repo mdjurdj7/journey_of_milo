@@ -34,8 +34,6 @@ const SPUTTER_FLOOR := 0
 const DRAGONFLY_FLOOR := 1
 const BLACKBACK_FLOOR := 2
 const BLACKBACK_PATH := "res://battle/rules/enemies/blackback.tres"
-const NIPPER_PATH := "res://battle/rules/enemies/nipper.tres"
-const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
 const GREYSHELF_FLOOR := 4
 # Floor 4 names its own depth fog (20 / 40 in region1_floor4.tres).
 const OWN_FOG_FLOOR := 3
@@ -142,7 +140,7 @@ func _check_dragonfly_wings() -> void:
 	await _teardown()
 	_completed += 1
 
-# The Blackback (stood on floor 3 for the probe - _stand_old_pair()): the
+# The Blackback (floor 3's required slot, forced - _force_pair()): the
 # Stork's sac pass stays on the body's chain,
 # with the fog overlay after it, last.
 func _check_blackback_chain() -> void:
@@ -278,43 +276,20 @@ func _load_field(floor_index: int) -> void:
 	_run_state.set("run_opening_pending", false)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
 	if floor_index == BLACKBACK_FLOOR:
-		_stand_old_pair(_field)
+		_force_pair(_field)
 	root.add_child(_field)
 	for i in 30:
 		await physics_frame
 
-# Floor 3 stands the crane pair now; the Blackback and its Nipper are
-# stood for this probe alone - their option, as floor 3 had it, added to
-# the cranes' slot (the loaded FloorData, in memory) and forced through
-# RegionField.force_options before the field enters the tree.
-const OLD_PAIR := &"blackback_nipper"
-# Held for the probe's length, so the cached FloorData the field loads is
-# the one the option was added to.
-var _floor_3: FloorData = null
+# Floor 3's required slot rolls the cranes or Blackback + Nipper; the
+# pair, as the floor's data stands it, forced through RegionField.force_
+# options before the field enters the tree.
+const PAIR_SLOT := &"required"
+const PAIR_OPTION := &"blackback_nipper"
 
-func _stand_old_pair(field: Node) -> void:
-	if _floor_3 == null:
-		_floor_3 = load(FLOOR_3_PATH) as FloorData
-	var floor_data: FloorData = _floor_3
-	var slot: EncounterSlot = floor_data.slots[0]
-	if slot.find_option(OLD_PAIR) == null:
-		var option := EncounterOption.new()
-		option.option_id = OLD_PAIR
-		var blackback := FloorEnemy.new()
-		blackback.enemy_data = load(BLACKBACK_PATH) as EnemyData
-		blackback.yaw_degrees = 18.4
-		blackback.anchor = true
-		var nipper := FloorEnemy.new()
-		nipper.enemy_data = load(NIPPER_PATH) as EnemyData
-		nipper.position = Vector2(-1.66, 0.55)
-		nipper.yaw_degrees = 18.4
-		option.members = [blackback, nipper] as Array[FloorEnemy]
-		slot.options.append(option)
-	var forced: Dictionary[StringName, StringName] = {}
-	forced[slot.slot_id] = OLD_PAIR
+func _force_pair(field: Node) -> void:
+	var forced: Dictionary[StringName, StringName] = {PAIR_SLOT: PAIR_OPTION}
 	field.set("force_options", forced)
-	if (field.get("force_options") as Dictionary).get(slot.slot_id) != OLD_PAIR:
-		_fail("the old pair could not be forced on floor 3")
 
 func _teardown() -> void:
 	if _field != null:

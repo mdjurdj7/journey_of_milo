@@ -1,22 +1,22 @@
 extends SceneTree
 
-# Headless probe for the Blackback and the Nipper, the pair floor 3 stood
-# before the crowned cranes: their loops, the Blackback's Fed from the
-# first frame turning Hungry once when the Nipper dies (a Carve's kill
-# included, and never when one Carve kills both), Hungry's +3 on every
-# hit of its Attacks (Peck 2x7, Lunge 15), the Nipper's Forage healing
-# the Blackback 8 up to its max and giving way to Nip once the Blackback
-# is dead, and every turn's intent preview equal to what the turn
-# resolves. Its sounds: two contact takes, the bill clatter with each
-# windup, and the hiss once as it turns Hungry - never at a fight's
-# opening.
+# Headless probe for the Blackback and the Nipper, one of the two pairs
+# floor 3's required slot rolls (the crowned cranes the other): their
+# loops, the Blackback's Fed from the first frame turning Hungry once
+# when the Nipper dies (a Carve's kill included, and never when one
+# Carve kills both), Hungry's +3 on every hit of its Attacks (Peck 2x7,
+# Lunge 15), the Nipper's Forage healing the Blackback 8 up to its max
+# and giving way to Nip once the Blackback is dead, and every turn's
+# intent preview equal to what the turn resolves. Its sounds: two
+# contact takes, the bill clatter with each windup, and the hiss once as
+# it turns Hungry - never at a fight's opening.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/blackback_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 #
-# Fights load the real floor 3 scene, the pair stood in the cranes' place
-# for the probe (_stand_old_pair()), and drive BattleController's own
+# Fights load the real floor 3 scene, its required slot forced to the
+# pair (_force_pair()), and drive BattleController's own
 # end_turn() and request_play(), as keeper_keepsake_probe does. Untyped
 # against anything that names the RunState autoload (RegionField,
 # BattleController, FieldEnemy): a SceneTree script compiles before the
@@ -25,7 +25,6 @@ extends SceneTree
 const CASES := 8
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
-const FLOOR_3_PATH := "res://floors/region1_floor3.tres"
 const BLACKBACK_PATH := "res://battle/rules/enemies/blackback.tres"
 const NIPPER_PATH := "res://battle/rules/enemies/nipper.tres"
 const FED_PATH := "res://battle/rules/statuses/fed.tres"
@@ -295,38 +294,15 @@ func _check_carve_kills_both() -> void:
 
 # --- Helpers ---
 
-# Floor 3 stands the crane pair now; the Blackback and its Nipper are
-# stood for this probe alone - their option, as floor 3 had it, added to
-# the cranes' slot (the loaded FloorData, in memory) and forced through
-# RegionField.force_options before the field enters the tree.
-const OLD_PAIR := &"blackback_nipper"
-# Held for the probe's length, so the cached FloorData the field loads is
-# the one the option was added to.
-var _floor_3: FloorData = null
+# Floor 3's required slot rolls the cranes or Blackback + Nipper; the
+# pair, as the floor's data stands it, forced through RegionField.force_
+# options before the field enters the tree.
+const PAIR_SLOT := &"required"
+const PAIR_OPTION := &"blackback_nipper"
 
-func _stand_old_pair(field: Node) -> void:
-	if _floor_3 == null:
-		_floor_3 = load(FLOOR_3_PATH) as FloorData
-	var floor_data: FloorData = _floor_3
-	var slot: EncounterSlot = floor_data.slots[0]
-	if slot.find_option(OLD_PAIR) == null:
-		var option := EncounterOption.new()
-		option.option_id = OLD_PAIR
-		var blackback := FloorEnemy.new()
-		blackback.enemy_data = load(BLACKBACK_PATH) as EnemyData
-		blackback.yaw_degrees = 18.4
-		blackback.anchor = true
-		var nipper := FloorEnemy.new()
-		nipper.enemy_data = load(NIPPER_PATH) as EnemyData
-		nipper.position = Vector2(-1.66, 0.55)
-		nipper.yaw_degrees = 18.4
-		option.members = [blackback, nipper] as Array[FloorEnemy]
-		slot.options.append(option)
-	var forced: Dictionary[StringName, StringName] = {}
-	forced[slot.slot_id] = OLD_PAIR
+func _force_pair(field: Node) -> void:
+	var forced: Dictionary[StringName, StringName] = {PAIR_SLOT: PAIR_OPTION}
 	field.set("force_options", forced)
-	if (field.get("force_options") as Dictionary).get(slot.slot_id) != OLD_PAIR:
-		_fail("the old pair could not be forced on floor 3")
 
 # One enemy turn through the controller: the previews read first, then
 # end_turn(). [what reached the player's HP, what the Blackback healed],
@@ -365,7 +341,7 @@ func _start_fight(deck_card_path: String = "") -> Node:
 	# No zone intro: it holds the field frozen for its length.
 	_run_state.set("run_opening_pending", false)
 	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
-	_stand_old_pair(_field)
+	_force_pair(_field)
 	root.add_child(_field)
 	for i in 30:
 		await physics_frame
