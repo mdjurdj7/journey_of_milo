@@ -224,6 +224,12 @@ func _pick_weighted(candidates: Array[int], rng: RandomNumberGenerator, enemy: E
 			return index
 	return candidates[candidates.size() - 1]
 
+# Whether the pool has any card to roll - its entries and its source
+# folders' cards together (_cards()); a pool of folders alone (a class's,
+# the Samurai's) has none in entries and cards all the same.
+func has_cards() -> bool:
+	return not _cards().is_empty()
+
 # Every card the pool can roll, indexed the way weights are: entries
 # first, in order, then each source folder's cards not already in it.
 # Just entries with no folders named, read live as it always was.

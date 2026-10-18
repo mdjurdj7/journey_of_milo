@@ -369,7 +369,7 @@ func _build_lines() -> void:
 		samphire_line.item = _extra_card.card_name
 		samphire_line.action = "TAKE"
 		_lines.append(samphire_line)
-	if _offers_cards and _pool != null and not _pool.entries.is_empty():
+	if _offers_cards and _pool != null and _pool.has_cards():
 		var card_line := RewardLine.new()
 		card_line.id = "card"
 		card_line.item = "A card"
