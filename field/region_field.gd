@@ -265,11 +265,14 @@ enum RewardMode { SCREEN, WORLD }
 	set(value):
 		enemy_fog_factor = value
 		_refresh_enemy_fog()
-# The wind on a floor whose sand isn't rippled (FloorData.wind_ripple_
-# strength 0), in degrees from +X toward +Z - what drifts downwind goes
-# this way there (get_wind_direction()). Read when something drifts, so
-# a live edit takes the next.
-@export var default_wind_angle_degrees: float = 30.0
+# The wind on a floor that sets no angle of its own (FloorData.use_wind_
+# angle off) and whose sand isn't rippled, in degrees from +X toward +Z -
+# see get_wind_direction(). Live.
+@export var default_wind_angle_degrees: float = 30.0:
+	set(value):
+		default_wind_angle_degrees = value
+		if is_inside_tree():
+			_apply_wind_direction()
 
 # See hold_line_world_line - per run, not per floor or per scene load (a
 # floor change is a reload).
@@ -713,15 +716,15 @@ func _enter_tree() -> void:
 		ground.crest_min_height = floor_data.crest_min_height
 		ground.slope_tint_fade_height = floor_data.slope_tint_fade_height
 		ground.slope_tint_fade_width = floor_data.slope_tint_fade_width
-		ground.wind_ripple_angle = floor_data.wind_ripple_angle
 		ground.wind_ripple_scale = floor_data.wind_ripple_scale
 		ground.wind_ripple_strength = floor_data.wind_ripple_strength
 		ground.wind_ripple_warp = floor_data.wind_ripple_warp
 		ground.wind_ripple_bend = floor_data.wind_ripple_bend
 		ground.wind_ripple_vary = floor_data.wind_ripple_vary
 		ground.wind_ripple_form_fade = floor_data.wind_ripple_form_fade
-		var wind: Vector3 = get_wind_direction()
-		ground.dune_wind = Vector2(wind.x, wind.z)
+		_apply_wind_direction()
+		if not floor_data.changed.is_connected(_apply_wind_direction):
+			floor_data.changed.connect(_apply_wind_direction)
 		ground.lee_shade_strength = floor_data.lee_shade_strength
 		ground.lee_shade_edge = floor_data.lee_shade_edge
 		ground.lee_shade_min_slope = floor_data.lee_shade_min_slope
@@ -2151,22 +2154,39 @@ func _apply_hud_row_style() -> void:
 func get_region_sky() -> RegionSky:
 	return get_node_or_null(sky_path) as RegionSky
 
-# The field's wind, for anything that drifts (a death's sand -
-# FieldEnemy.spawn_death_wisps()): downwind, flat, in world XZ - the
-# floor's own wind angle where its FloorWindData sets one (use_angle),
+# The field's wind, for everything it moves: downwind, flat, in world XZ
+# - the floor's own angle where it sets one (FloorData.use_wind_angle),
 # else its ripple angle (FloorData.wind_ripple_angle, the + direction of
 # the ground's ripples) where its sand is rippled, else
 # default_wind_angle_degrees. Measured from +X toward +Z, as the ripples
-# are.
+# are. Read each frame by FieldWind and the tufts, at the moment by a
+# death's sand and the shore flock; _apply_wind_direction() pushes it to
+# the rest.
 func get_wind_direction() -> Vector3:
-	var floor_data := get_floor_data()
-	var degrees: float = default_wind_angle_degrees
-	if floor_data != null and floor_data.wind != null and floor_data.wind.use_angle:
-		degrees = floor_data.wind.angle_degrees
-	elif floor_data != null and floor_data.wind_ripple_strength > 0.0:
-		degrees = floor_data.wind_ripple_angle
-	var angle: float = deg_to_rad(degrees)
+	var angle: float = deg_to_rad(get_wind_angle_degrees())
 	return Vector3(cos(angle), 0.0, sin(angle))
+
+func get_wind_angle_degrees() -> float:
+	var floor_data := get_floor_data()
+	if floor_data != null and floor_data.use_wind_angle:
+		return floor_data.wind_angle_degrees
+	if floor_data != null and floor_data.wind_ripple_strength > 0.0:
+		return floor_data.wind_ripple_angle
+	return default_wind_angle_degrees
+
+# The wind's direction onto what holds a copy: the ground's ripples (they
+# run with the wind, so the sand's grain is the wind's) and lee shade,
+# and the Keeper's cloth and hair. From _enter_tree() and on any change to
+# the floor's data or default_wind_angle_degrees, so it is live.
+func _apply_wind_direction() -> void:
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null:
+		var wind: Vector3 = get_wind_direction()
+		ground.wind_ripple_angle = get_wind_angle_degrees()
+		ground.dune_wind = Vector2(wind.x, wind.z)
+	for child in get_children():
+		if child is Keeper:
+			(child as Keeper).refresh_wind()
 
 # The Sea's own fog copy (its shader is fog_disabled) onto RegionSky's
 # fog as it stands - the one source, override included.

@@ -64,6 +64,17 @@ reads it - a death's sand today. (2026-10-09.) Floor 3's dune-grass tufts
 sway along it (`tuft_card.gdshader`, set by FieldScatter); blown sand
 should read the same value. (2026-10-16.)
 
+Each floor can set its own: `FloorData.use_wind_angle` /
+`wind_angle_degrees`, ahead of the ripple angle and the default, and the
+ripples turn with it. Everything the wind moves reads it live - ripples,
+lee shade, tufts, blowing sand, dust shadows, death wisps, the shore
+flock, the Keeper's cloth and hair. Floors 1-2 keep the default 30;
+floors 3-5 blow toward +Z (90), crest to lee on floor 5's south-facing
+shelf. Floors 3 and 4 have no slip-face direction of their own (their
+ridges are symmetric, steep side inward), so 90 there is one prevailing
+wind for the region. The Wanderer has no cloth or hair wind yet; that
+waits for his Blender work. (2026-10-18.)
+
 Floor 3's stream banks have their own tuft kind (`dune_grass_bank`): pool
 rim within 3 m of the water, rock allowed, anywhere outside the crane
 pair's stance area (stance distance + 1 m) and never in the water. On

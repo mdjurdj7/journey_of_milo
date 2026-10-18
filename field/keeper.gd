@@ -194,9 +194,10 @@ enum FaceDirection { SEAWARD, INLAND, LEFT, RIGHT }
 	set(value):
 		wind_speed = value
 		_apply_wind()
-# World space. ZERO (the default) means "the way she faces" - resolved in
-# _apply_wind() from her own facing, so it follows face_direction and
-# never hardcodes an axis. Set it non-zero to aim the wind independently.
+# World space. ZERO (the default) means the field's own wind (RegionField.
+# get_wind_direction(), the floor's), resolved in _apply_wind() and again
+# whenever RegionField re-aims it (refresh_wind()) - her facing only away
+# from a field. Set it non-zero to aim her wind independently.
 @export var wind_direction: Vector3 = Vector3.ZERO:
 	set(value):
 		wind_direction = value
@@ -398,18 +399,23 @@ func _apply_tint() -> void:
 	elif _material is StandardMaterial3D:
 		(_material as StandardMaterial3D).albedo_color = keeper_tint
 
+# The field's wind turned - RegionField._apply_wind_direction().
+func refresh_wind() -> void:
+	_apply_wind()
+
 # Pushes every wind uniform, including the resolved direction: wind_
-# direction ZERO means "the way she faces", which is her own -Z in world
-# space once _apply_facing() has set her rotation. Called from there too,
-# so re-aiming her re-aims the wind with nothing else to touch. No-ops on
-# the fallback materials, which have no wind to drive.
+# direction ZERO means the field's wind, or with no field the way she
+# faces (her own -Z in world space once _apply_facing() has set her
+# rotation). No-ops on the fallback materials, which have no wind to
+# drive.
 func _apply_wind() -> void:
 	var material := _material as ShaderMaterial
 	if material == null:
 		return
 	var direction: Vector3 = wind_direction
 	if direction.length() < 0.0001:
-		direction = -global_transform.basis.z
+		var field := get_node_or_null(region_field_path) as RegionField
+		direction = field.get_wind_direction() if field != null else -global_transform.basis.z
 	direction = Vector3(direction.x, 0.0, direction.z)
 	material.set_shader_parameter("boot_top", boot_top)
 	material.set_shader_parameter("hem_height", hem_height)

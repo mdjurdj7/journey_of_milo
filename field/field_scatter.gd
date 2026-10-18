@@ -381,6 +381,8 @@ var _battle_held: Dictionary = {}
 var _card_forward: Vector2 = Vector2.ZERO
 # The gust and its sway gain last pushed to the cards.
 var _card_gust: Vector2 = Vector2(-1.0, -1.0)
+# The wind direction last pushed to the cards.
+var _card_wind: Vector2 = Vector2.ZERO
 
 # From RegionField once its exit channel is cut: what to read, and the
 # first build, deferred so every prop and enemy has placed itself.
@@ -1658,8 +1660,6 @@ func _draw_cards(entry: ScatterEntry, spots: Array[Spot]) -> void:
 		material.set_shader_parameter("card_height", card.height_m)
 		material.set_shader_parameter("lean_degrees", entry.card_lean_degrees)
 		material.set_shader_parameter("normal_up", entry.card_normal_up)
-		var wind: Vector3 = _field.get_wind_direction()
-		material.set_shader_parameter("wind_direction", Vector2(wind.x, wind.z))
 		material.set_shader_parameter("wind_lean", entry.wind_lean)
 		material.set_shader_parameter("sway_amount", entry.wind)
 		material.set_shader_parameter("sway_hz", entry.wind_sway_hz)
@@ -1678,12 +1678,28 @@ func _draw_cards(entry: ScatterEntry, spots: Array[Spot]) -> void:
 	_push_card_forward()
 	_card_gust = Vector2(-1.0, -1.0)
 	_push_card_gust()
+	_card_wind = Vector2.ZERO
+	_push_card_wind()
 
 func _process(delta: float) -> void:
 	if not _card_layers.is_empty():
 		_push_card_forward()
 		_push_card_gust()
+		_push_card_wind()
 	_advance_battle_fade(delta)
+
+# The field's wind (RegionField.get_wind_direction()) into every card's
+# material, when it has turned - the tufts lean downwind, live.
+func _push_card_wind() -> void:
+	if _field == null:
+		return
+	var wind3: Vector3 = _field.get_wind_direction()
+	var wind := Vector2(wind3.x, wind3.z)
+	if wind.is_equal_approx(_card_wind):
+		return
+	_card_wind = wind
+	for layer in _card_layers:
+		layer.material.set_shader_parameter("wind_direction", wind)
 
 # The floor's gust (RegionField.get_gust()) and its FloorWindData.gust_
 # sway_gain into every card's material, when either has changed - the

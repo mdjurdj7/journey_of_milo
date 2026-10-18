@@ -15,20 +15,8 @@ class_name FloorWindData
 # The map values (map_step_m, the crest ones) rebuild the map live; the
 # rest are read every frame.
 
-@export_group("Direction")
-# The wind's own angle, degrees from +X toward +Z (as the ripples are),
-# in place of the floor's ripple angle or RegionField.default_wind_angle_
-# degrees - see RegionField.get_wind_direction(). use_angle off = the
-# floor's.
-@export var use_angle: bool = false:
-	set(value):
-		use_angle = value
-		emit_changed()
-@export var angle_degrees: float = 30.0:
-	set(value):
-		angle_degrees = value
-		emit_changed()
-@export_group("")
+# The direction is the floor's own (FloorData.use_wind_angle/wind_angle_
+# degrees), shared with everything else the wind moves.
 
 @export_group("Gusts")
 # A gust starts every x..y seconds (start to start), drawn from the

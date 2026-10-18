@@ -249,6 +249,20 @@ enum ExitKind { CHANNEL, LINE }
 @export var shore_flock: ShoreFlockData = null
 
 @export_group("Wind")
+# The floor's wind, downwind, in degrees from +X toward +Z (as the ripples
+# are) - with use_wind_angle off, its ripple angle where its sand is
+# rippled, else RegionField.default_wind_angle_degrees. Everything the
+# wind moves reads it (RegionField.get_wind_direction()): the ripples and
+# lee shade, the tufts' lean, the blowing sand and dust shadows, death
+# wisps, the shore flock, the Keeper's cloth and hair. Live.
+@export var use_wind_angle: bool = false:
+	set(value):
+		use_wind_angle = value
+		emit_changed()
+@export var wind_angle_degrees: float = 30.0:
+	set(value):
+		wind_angle_degrees = value
+		emit_changed()
 # Blowing sand - streaks, gusts, crest plumes, dust shadows (FloorWind-
 # Data, FieldWind). Null (the default) = still air.
 @export var wind: FloorWindData = null
