@@ -407,6 +407,9 @@ const ARMED_VALID := 1
 const ARMED_REFUSED := 2
 var _armed: int = ARMED_NONE
 var _refusal_label: Label = null
+# A combat number over its enemy dims it (BattleOverlay._dim_intents_
+# under_numbers()): 1 with none.
+var _number_dim: float = 1.0
 
 func _ready() -> void:
 	_ready_done = true
@@ -541,10 +544,19 @@ func set_refusal(text: String) -> void:
 	_refusal_label.text = text
 	_place_refusal()
 
-# The fade on its own drawing and its labels (self_modulate), never on the
-# refusal beneath it.
+# The intent dimmed under a combat number over its enemy, its marks with
+# it (`alpha`, 1 for none).
+func set_number_dim(alpha: float) -> void:
+	if is_equal_approx(alpha, _number_dim):
+		return
+	_number_dim = alpha
+	_apply_armed_look()
+
+# The fade on its own drawing and its labels (self_modulate) - an armed
+# card's refusal and a number's dim, together - never on the line beneath
+# it.
 func _apply_armed_look() -> void:
-	var alpha: float = armed_invalid_alpha if _armed == ARMED_REFUSED else 1.0
+	var alpha: float = (armed_invalid_alpha if _armed == ARMED_REFUSED else 1.0) * _number_dim
 	self_modulate.a = alpha
 	for label: Label in [_label, _threshold_label, _hits_label]:
 		if label != null:

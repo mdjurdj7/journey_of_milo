@@ -60,11 +60,19 @@ signal battle_finished(outcome: Outcome)
 # rises - an enemy's intent and HP/name plate, his HP bar - moved beside
 # them when it would cross.
 @export var number_clearance_px: float = 8.0
-# An enemy's number sits this far, in pixels, over the top of its body's
-# screen bounds (FieldEnemy.get_screen_rect()) - on the body it happened
-# to, tall (the Wardling's lantern) or low (a crab) alike; at
-# enemy_head_height when there are no bounds to read.
+# A mound's number sits this far, in pixels, over the top of the mound's
+# screen bounds (FieldEnemy.get_mound_screen_rect()).
 @export var number_over_body_px: float = 10.0
+# An enemy's number starts at mid-body: its bottom this fraction of the way
+# down its body's screen bounds (FieldEnemy.get_screen_rect()) from their
+# top - on the body it happened to, tall (the Wardling's lantern) or low
+# (a crab) alike, and below the intent over its head; at enemy_head_height
+# when there are no bounds to read.
+@export_range(0.0, 1.0) var number_body_fraction: float = 0.5
+# While a number over an enemy (or its mounds) shows, that enemy's intent
+# fades to this, its marks with it - back as the number fades
+# (_dim_intents_under_numbers()).
+@export_range(0.0, 1.0) var intent_dim_alpha: float = 0.4
 # Readouts (plates, intents, his HP bar) are pushed apart until this many
 # pixels lie between any two (_lay_out_readouts()).
 @export var readout_gap_px: float = 4.0
@@ -238,6 +246,9 @@ var _mound_plates: Dictionary = {}
 # One BattleIntent per enemy for this fight - children of this overlay,
 # so they're freed with it and nothing of them exists on the field.
 var _enemy_intents: Dictionary = {} # FieldEnemy -> BattleIntent
+# FieldEnemy -> the FloatingNumbers showing over it (and its mounds) now,
+# for its intent's dim (_dim_intents_under_numbers()).
+var _numbers_over: Dictionary = {}
 # A card that marks intents (Brace, Garnish) armed now, or null - its
 # targets' hairlines and the refused ones' fade (_sync_armed_intents()).
 var _armed_marking: CardData = null
@@ -945,6 +956,26 @@ func _process(_delta: float) -> void:
 	_sync_mound_plates()
 	_lay_out_readouts()
 	_sync_armed_intents()
+	_dim_intents_under_numbers()
+
+# Each intent dims under the numbers over its enemy: intent_dim_alpha at
+# a number's full ink, back up with it as it fades (FloatingNumber's own
+# fade), whole once none is left.
+func _dim_intents_under_numbers() -> void:
+	for enemy: Variant in _numbers_over.keys():
+		var strongest: float = 0.0
+		var alive: Array = []
+		for number: Variant in _numbers_over[enemy]:
+			if is_instance_valid(number) and not (number as Node).is_queued_for_deletion():
+				alive.append(number)
+				strongest = maxf(strongest, (number as CanvasItem).modulate.a)
+		var intent: BattleIntent = _enemy_intents.get(enemy)
+		if intent != null and is_instance_valid(intent):
+			intent.set_number_dim(lerpf(1.0, clampf(intent_dim_alpha, 0.0, 1.0), clampf(strongest, 0.0, 1.0)))
+		if alive.is_empty():
+			_numbers_over.erase(enemy)
+		else:
+			_numbers_over[enemy] = alive
 
 # While a card that marks intents (Brace, Garnish) is armed: each intent
 # it may target gets its hairline, each it may not fades, and the refused
@@ -1037,12 +1068,15 @@ func _on_mound_damaged(enemy: FieldEnemy, mound: int, amount: int, hp: int, max_
 	if plate != null and is_instance_valid(plate):
 		plate.update_hp(hp, max_hp)
 		avoid.append(plate.get_global_rect())
+	var shared: BattleIntent = _enemy_intents.get(enemy)
+	if shared != null and is_instance_valid(shared) and shared.is_visible_in_tree():
+		avoid.append(shared.get_global_rect())
 	var camera := get_viewport().get_camera_3d()
 	var body: Rect2 = enemy.get_mound_screen_rect(camera, mound, 0.0) if camera != null else Rect2()
 	if not body.has_area():
 		return
 	var size: float = _battle_feedback.number_multiplier(float(amount) / float(maxi(max_hp, 1)), hp <= 0) if _battle_feedback != null else 1.0
-	_place_number(key, FloatingNumber.KIND_DAMAGE, amount, Vector2(body.get_center().x, body.position.y - number_over_body_px), size, avoid)
+	_place_number(key, FloatingNumber.KIND_DAMAGE, amount, Vector2(body.get_center().x, body.position.y - number_over_body_px), size, avoid, enemy)
 
 # No two readouts overlap: every enemy's HP/name plate and intent, and his
 # HP bar (which never moves), as they would stand (their own placement,
@@ -1231,12 +1265,12 @@ func _show_number(target: Variant, amount: int, kind: String) -> void:
 		var control := display as Control
 		if control != null and is_instance_valid(control) and control.is_visible_in_tree():
 			avoid.append(control.get_global_rect())
-	_place_number(key, kind, amount, _screen_pos_for_damage_target(target) + offset, size, avoid)
+	_place_number(key, kind, amount, _screen_pos_for_damage_target(target) + offset, size, avoid, target as FieldEnemy if target is FieldEnemy else null)
 
 # A number of `kind` for `amount` at `screen_pos` (its bottom centre),
 # stepping on from `key`'s numbers still showing (a multi-hit's stack,
 # sharing its first's jitter), clear of `avoid`.
-func _place_number(key: Variant, kind: String, amount: int, screen_pos: Vector2, size: float, avoid: Array[Rect2]) -> void:
+func _place_number(key: Variant, kind: String, amount: int, screen_pos: Vector2, size: float, avoid: Array[Rect2], owner: FieldEnemy = null) -> void:
 	var shown: int = int(_number_counts.get(key, 0))
 	var stack: Vector2 = number_stack_step * float(shown)
 	_number_counts[key] = shown + 1
@@ -1246,6 +1280,11 @@ func _place_number(key: Variant, kind: String, amount: int, screen_pos: Vector2,
 	var number: FloatingNumber = _spawn_floating_number(kind, amount, screen_pos, size, avoid, stack, jitter)
 	if shown == 0:
 		_stack_jitter[key] = number.jitter.x
+	# Over an enemy: its intent dims while this shows.
+	if owner != null:
+		var over: Array = _numbers_over.get(owner, [])
+		over.append(number)
+		_numbers_over[owner] = over
 
 # A repeated hit's follow-up swing (Second Swing): the toll tick, if one
 # is on disk.
@@ -1265,8 +1304,8 @@ func _on_card_repeat_swing(_card: CardData, _target: FieldEnemy) -> void:
 	_toll_tick_player.volume_db = toll_tick_volume_db
 	_toll_tick_player.play()
 
-# Where `target`'s number sits - the bottom centre it is placed by: over
-# an enemy's body (number_over_body_px), over the Wanderer's head
+# Where `target`'s number sits - the bottom centre it is placed by: at
+# an enemy's mid-body (number_body_fraction), over the Wanderer's head
 # (wanderer_number_over_head_px).
 func _screen_pos_for_damage_target(target: Variant) -> Vector2:
 	if target is FieldEnemy:
@@ -1274,7 +1313,7 @@ func _screen_pos_for_damage_target(target: Variant) -> Vector2:
 		if camera != null:
 			var body: Rect2 = (target as FieldEnemy).get_screen_rect(camera, 0.0)
 			if body.has_area():
-				return Vector2(body.get_center().x, body.position.y - number_over_body_px)
+				return Vector2(body.get_center().x, body.position.y + body.size.y * clampf(number_body_fraction, 0.0, 1.0))
 			return camera.unproject_position((target as FieldEnemy).global_position + Vector3.UP * enemy_head_height)
 	# "player": over the Wanderer's body.
 	if _wanderer != null and is_instance_valid(_wanderer):
@@ -1416,15 +1455,17 @@ func _spawn_floating_number(kind: String, value: int, screen_pos: Vector2, size_
 	add_child(number)
 	var size: Vector2 = number.measure(kind, value, size_multiplier)
 	var at: Vector2 = screen_pos - Vector2(size.x / 2.0, size.y)
-	var path := Rect2(Vector2(at.x, at.y - number.rise_px), Vector2(size.x, size.y + number.rise_px)).grow(number_clearance_px)
+	# Its whole path - from where it starts, a multi-hit's step included, up
+	# through its rise - clear of `avoid`: one it would cross pushes it down
+	# below that readout, never beside it (where an intent's own numeral
+	# would read as its neighbour).
+	var path := Rect2(Vector2(at.x + stack.x, at.y + stack.y - number.rise_px), Vector2(size.x, size.y + number.rise_px)).grow(number_clearance_px)
 	var blocked := Rect2()
 	for rect in avoid:
 		if path.intersects(rect):
 			blocked = rect if not blocked.has_area() else blocked.merge(rect)
 	if blocked.has_area():
-		var right: float = blocked.end.x + number_clearance_px
-		var left: float = blocked.position.x - number_clearance_px - size.x
-		at.x = right if right + size.x + stack.x <= get_viewport_rect().size.x or left < 0.0 else left
+		at.y = blocked.end.y + number_clearance_px * 2.0 + number.rise_px - stack.y
 	# Its whole rise on screen.
 	var start: Vector2 = at + stack
 	start.y = maxf(start.y, number.rise_px + number_clearance_px)
