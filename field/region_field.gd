@@ -3242,6 +3242,10 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 
 	deck_panel.show_whole_deck(RunState.deck)
 
+	# His battle motion stops, and what a recoil or lunge left - tilt,
+	# push, the model out - eases back over the settle time; `rest` is
+	# where his body comes to rest, what the fight leaves him at.
+	var rest: Vector3 = wanderer.end_battle_motion(fight_end_settle_seconds)
 	wanderer.exit_battle_stance()
 
 	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
@@ -3264,9 +3268,11 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 			RunState.fights_won += 1
 			# Left where the fight stood him only if he could have walked
 			# there; else onto ground he could.
-			var settle: Vector3 = win_position(wanderer.global_position)
-			if settle != wanderer.global_position:
+			var settle: Vector3 = win_position(rest)
+			if settle != rest:
 				_settle_wanderer_to(settle, "a won fight")
+			elif rest != wanderer.global_position:
+				_ease_wanderer_to(rest)
 			# A win, not an escape: the keepsake's heal_on_win, if any - its
 			# number once the camera is back on the field.
 			_show_keepsake_heal(RunState.settle_keepsake_win(), camera_rig.battle_transition_time if camera_rig != null else 0.0)
@@ -3323,7 +3329,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 				_floor_cleared_emitted = true
 				floor_cleared.emit()
 		BattleOverlay.Outcome.ESCAPE:
-			_push_wanderer_away_from(standing)
+			_push_wanderer_away_from(standing, rest)
 			# Back to their own spots, over the same beat the frame
 			# blends out on. A lone enemy never stepped; no-op for it.
 			var return_time: float = camera_rig.battle_transition_time if camera_rig != null else 0.0
@@ -4260,8 +4266,8 @@ func _apply_consumed_removals(fight_deck: Deck) -> void:
 # the export didn't clear on its own, so a misconfigured pair is loud,
 # not a silent soft-lock. Empty list (nothing left to escape from): no
 # push.
-func _push_wanderer_away_from(enemies: Array[FieldEnemy]) -> void:
-	var pushed: Vector3 = escape_push_target(wanderer.global_position, enemies)
+func _push_wanderer_away_from(enemies: Array[FieldEnemy], from: Vector3) -> void:
+	var pushed: Vector3 = escape_push_target(from, enemies)
 	var target: Vector3 = escape_correction(pushed, enemies)
 	if target == pushed:
 		wanderer.global_position = target
@@ -4519,6 +4525,11 @@ func win_position(at: Vector3) -> Vector3:
 # fight_end_settle_seconds, alongside the camera's return, and said so.
 func _settle_wanderer_to(target: Vector3, why: String) -> void:
 	push_warning("RegionField: %s left the Wanderer off walkable ground at (%.1f, %.1f); moving him to (%.1f, %.1f)." % [why, wanderer.global_position.x, wanderer.global_position.z, target.x, target.z])
+	_ease_wanderer_to(target)
+
+# Eased onto `target` over fight_end_settle_seconds - a correction, or a
+# recoil's push undone at a fight's end (Wanderer.end_battle_motion()).
+func _ease_wanderer_to(target: Vector3) -> void:
 	wanderer.stand_still()
 	if fight_end_settle_seconds <= 0.0:
 		wanderer.global_position = target

@@ -541,6 +541,8 @@ var _anim_hold_timer: SceneTreeTimer = null
 var _anim_held_speed: float = 1.0
 var _anim_held_tweens: Array[Tween] = []
 var _recoil_tween: Tween = null
+# Where a run of recoils returns him (play_hit_recoil()).
+var _recoil_home: Vector3 = Vector3.ZERO
 # The mixer applying the model's poses (the AnimationTree when it's on,
 # else the AnimationPlayer); foot grounding runs on its mixer_applied.
 var _grounding_mixer: AnimationMixer = null
@@ -2260,14 +2262,21 @@ func _tween_shader_flash(material: ShaderMaterial, flash_color: Color, rise_time
 # Wanderer, not normalized) - same mechanism as FieldEnemy.play_hit_
 # recoil(), duplicated rather than shared (see that method's own doc on
 # why - still only the second occurrence).
+#
+# Its rest is fixed: where he stood as the first of a run of recoils began
+# (_recoil_home), untilted - a hit landing while the last recoil is still
+# out stops that one and recoils from where he is back toward the same
+# rest, so a multi-hit attack never leaves its mid-tilt or mid-push as his
+# new rest. Second Swing's follow-through goes through here too.
 func play_hit_recoil(from_direction: Vector3, distance: float, tilt_degrees: float, out_time: float, return_time: float) -> void:
 	var away := Vector3(from_direction.x, 0.0, from_direction.z)
 	away = away.normalized() if away.length() > 0.0001 else Vector3.BACK
 
-	var base_position := global_position
-	var base_tilt := rotation.x
-	var recoil_position := base_position + away * distance
-	var recoil_tilt := base_tilt + deg_to_rad(tilt_degrees)
+	if not _recoil_running():
+		_recoil_home = global_position
+	_stop_recoil()
+	var recoil_position := _recoil_home + away * distance
+	var recoil_tilt := deg_to_rad(tilt_degrees)
 
 	var tween := create_tween()
 	_recoil_tween = tween
@@ -2276,12 +2285,50 @@ func play_hit_recoil(from_direction: Vector3, distance: float, tilt_degrees: flo
 	tween.tween_property(self, "global_position", recoil_position, out_time)
 	tween.parallel().tween_property(self, "rotation:x", recoil_tilt, out_time)
 	tween.chain().set_trans(Tween.TRANS_BACK).set_ease(Tween.EASE_OUT)
-	tween.tween_property(self, "global_position", base_position, return_time)
-	tween.parallel().tween_property(self, "rotation:x", base_tilt, return_time)
+	tween.tween_property(self, "global_position", _recoil_home, return_time)
+	tween.parallel().tween_property(self, "rotation:x", 0.0, return_time)
 	# Struck inside a hit-stop: the recoil waits for it to end.
 	if _anim_hold_timer != null:
 		tween.pause()
 		_anim_held_tweens.append(tween)
+
+# A recoil still out or on its way back (held by a hit-stop included).
+func _recoil_running() -> bool:
+	return _recoil_tween != null and _recoil_tween.is_valid()
+
+# The recoil in flight stops where it is - out of a hit-stop's hold too.
+func _stop_recoil() -> void:
+	if _recoil_tween == null:
+		return
+	if _recoil_tween.is_valid():
+		_recoil_tween.kill()
+	_anim_held_tweens.erase(_recoil_tween)
+	_recoil_tween = null
+
+# The fight is over (RegionField._on_battle_finished() - won, escaped or
+# lost): every procedural battle motion on him stops - a recoil, the
+# Slash's lunge - and what they left eases back to rest over `seconds`,
+# his tilt to none and his model home. Returns where his body rests: a
+# recoil's home if one was under way (its push to be undone), else where
+# he stands - RegionField settles him from there.
+func end_battle_motion(seconds: float) -> Vector3:
+	var rest: Vector3 = _recoil_home if _recoil_running() else global_position
+	_stop_recoil()
+	var lunge_running: bool = _lunge_tween != null and _lunge_tween.is_valid()
+	if _lunge_tween != null:
+		_lunge_tween.kill()
+		_anim_held_tweens.erase(_lunge_tween)
+		_lunge_tween = null
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+	var span: float = maxf(seconds, 0.001)
+	tween.tween_property(self, "rotation:x", 0.0, span)
+	tween.parallel().tween_property(self, "rotation:z", 0.0, span)
+	if lunge_running and _model != null:
+		tween.parallel().tween_property(_model, "position:x", _lunge_home.x, span)
+		tween.parallel().tween_property(_model, "position:z", _lunge_home.y, span)
+	return rest
 
 # Same mechanism as FieldEnemy.spawn_sand_puff() (see its own doc),
 # duplicated for the same reason play_hit_recoil() above is.
