@@ -2289,6 +2289,51 @@ func get_enemy_statuses(enemy: FieldEnemy) -> Array[Status]:
 			shown.append(active)
 	return shown
 
+# What an intent hover says of `enemy`'s queued intent (BattleOverlay's
+# intent hover line), as facts for the overlay to word: "name", "preview"
+# (get_intent_preview()), "intent" (the EnemyIntent), "next" (the next
+# move's EnemyIntent in a fixed loop, null for an erratic one), "brings"
+# / "holds" ([display name, what it does] of its status_on_resolve /
+# status_while_queued, empty for none), "answers" (each living
+# packmate's answer to a SIGNAL: [move name, damage]), "waking" (how many
+# of them sleep), "under" (a DIG's first move under the sand: [name,
+# value]). Empty for no intent.
+func intent_facts(enemy: FieldEnemy) -> Dictionary:
+	var combatant: Combatant = _combatants.get(enemy)
+	if combatant == null or enemy == null or enemy.enemy_data == null or combatant.hp <= 0:
+		return {}
+	var data: EnemyData = enemy.enemy_data
+	var intent: EnemyIntent = EnemyTurn.current_intent(combatant, data)
+	if intent == null or combatant.dormant:
+		return {}
+	var facts: Dictionary = {"name": intent.intent_name, "preview": get_intent_preview(enemy), "intent": intent, "next": null, "brings": [], "holds": [], "answers": [], "waking": 0, "under": []}
+	if not data.erratic_intent_selection and not combatant.dug_in and not data.intents.is_empty():
+		facts["next"] = data.intents[(combatant.current_intent_index + 1) % data.intents.size()]
+	if intent.status_on_resolve != null:
+		facts["brings"] = [intent.status_on_resolve.display_name, Status.new(intent.status_on_resolve).describe()]
+	if intent.status_while_queued != null:
+		facts["holds"] = [intent.status_while_queued.display_name, Status.new(intent.status_while_queued).describe()]
+	if intent.type == EnemyIntent.IntentType.DIG and not intent.under_moves.is_empty() and intent.under_moves[0] != null:
+		facts["under"] = [intent.under_moves[0].intent_name, intent.under_moves[0].value]
+	if intent.type == EnemyIntent.IntentType.SIGNAL and enemy.group != &"":
+		var answers: Array = []
+		var waking: int = 0
+		for member in enemies:
+			if member == enemy or member.group != enemy.group or member.enemy_data == null:
+				continue
+			var mate: Combatant = _combatants.get(member)
+			if mate == null or mate.hp <= 0:
+				continue
+			var answer: EnemyIntent = EnemyTurn.signal_answer_intent(mate, member.enemy_data)
+			if answer == null:
+				continue
+			if mate.dormant:
+				waking += 1
+			answers.append([answer.intent_name, EnemyTurn.hit_amount(mate, member.enemy_data, answer, 0, player.statuses) * EnemyTurn.hit_count(mate, answer)])
+		facts["answers"] = answers
+		facts["waking"] = waking
+	return facts
+
 # The name of the intent `enemy` has queued (EnemyIntent.intent_name), ""
 # for none - what an armed Brace or Garnish's refusal names.
 func queued_intent_name(enemy: FieldEnemy) -> String:

@@ -84,6 +84,36 @@ signal battle_finished(outcome: Outcome)
 @export var mark_refusal_not_attack: String = "%s: not an attack."
 @export var mark_refusal_wont_land: String = "%s: it won't land."
 @export var mark_refusal_already: Dictionary = {&"brace": "Already braced.", &"garnish": "Already garnished."}
+# What hovering an intent says, at any time (_intent_hover_text()), one
+# line in system voice beneath it - while a Brace or Garnish is armed its
+# validity lines (above) take the refused ones' place. By what the intent
+# is; %s and %d as each line's own. Read live.
+@export var intent_hover_lines: Dictionary = {
+	&"attack": "%s: deals %s.",
+	&"hits": "%d ×%d",
+	&"total": "%d over %d hits",
+	&"twice": "%s twice",
+	&"applies": " Then %s %d.",
+	&"threshold": " Deal %d to it this turn to break it.",
+	&"strike_back": "%s: %d from below as your turn ends - only Block reduces it.",
+	&"defend": "%s: gains %d Block.",
+	&"defend_twice": "%s: gains %d Block, twice.",
+	&"heal": "%s: heals its pack %d.",
+	&"brings": "%s: %s until its %s - %s",
+	&"brings_next": "%s (%d)",
+	&"brings_any": "next move",
+	&"signal": "%s: its pack answers at once - %s, %d in all.",
+	&"signal_wakes": " Wakes the sleeping first.",
+	&"signal_none": "%s: calls a pack that isn't there.",
+	&"dig": "%s: goes under its mounds; next it %s for %d unless you break the one it's under.",
+	&"holds": " While queued, %s: %s",
+	&"burrow": "%s: goes under - it can't be targeted until it surfaces.",
+	&"watch": "%s: watches.",
+	&"plain": "%s.",
+	&"cancelled": "%s: cancelled - it won't act.",
+	&"denied": "%s: denied - it won't act.",
+	&"broken": "%s: broken - it won't land.",
+}
 # The draw sound, once per card as it leaves the deck (HandContainer.
 # draw_started): a -6 dBFS take at -22, 6 dB under card play, so a
 # five-card draw is felt rather than loud. One take only (see DESIGN.md),
@@ -988,24 +1018,117 @@ func _sync_armed_intents() -> void:
 	var card: CardData = view.card_data if view != null and is_instance_valid(view) and not battle_controller.is_armed_for_devour_only() else null
 	if card != null and battle_controller.marking_status(card) == null:
 		card = null
-	if card == null and _armed_marking == null:
-		return
 	_armed_marking = card
 	var mouse: Vector2 = get_viewport().get_mouse_position()
+	# A card or button under the cursor wins over any intent's line.
+	var over_ui: bool = get_viewport().gui_get_hovered_control() != null
 	for enemy: FieldEnemy in _enemy_intents:
 		var intent: BattleIntent = _enemy_intents[enemy]
 		if not is_instance_valid(intent):
 			continue
+		var hovered_intent: bool = not over_ui and intent.is_visible_in_tree() and intent.get_pair_global_rect().has_point(mouse)
 		if card == null:
+			# Nothing armed: the hovered intent says what it does.
 			intent.set_armed(BattleIntent.ARMED_NONE)
+			intent.set_refusal(_intent_hover_text(enemy) if hovered_intent else "")
 			continue
 		var refusal: EnemyTurn.MarkRefusal = battle_controller.mark_refusal_for(card, enemy)
 		if refusal == EnemyTurn.MarkRefusal.NONE:
 			intent.set_armed(BattleIntent.ARMED_VALID)
 			continue
 		intent.set_armed(BattleIntent.ARMED_REFUSED)
-		var hovered: bool = intent.get_pair_global_rect().has_point(mouse)
-		intent.set_refusal(_refusal_text(refusal, card, enemy) if hovered else "")
+		intent.set_refusal(_refusal_text(refusal, card, enemy) if hovered_intent else "")
+
+# One line on what `enemy`'s queued intent does, with its numbers - the
+# ones it will land, Brace and Garnish taken off (intent_hover_lines,
+# BattleController.intent_facts()). "" for none.
+func _intent_hover_text(enemy: FieldEnemy) -> String:
+	var facts: Dictionary = battle_controller.intent_facts(enemy)
+	if facts.is_empty():
+		return ""
+	var lines: Dictionary = intent_hover_lines
+	var name: String = str(facts["name"])
+	var preview: Dictionary = facts["preview"]
+	var intent: EnemyIntent = facts["intent"]
+	if bool(preview.get("pain_turn", false)):
+		return str(lines.get(&"cancelled", "%s")) % name
+	if bool(preview.get("denied", false)):
+		return str(lines.get(&"denied", "%s")) % name
+	if bool(preview.get("interrupted", false)):
+		return str(lines.get(&"broken", "%s")) % name
+	var holds: String = ""
+	var held: Array = facts["holds"]
+	if held.size() == 2:
+		holds = str(lines.get(&"holds", "")) % [held[0], held[1]]
+	match int(preview.get("type", -1)):
+		EnemyIntent.IntentType.ATTACK:
+			if intent.lands_as_strike_back:
+				return (str(lines.get(&"strike_back", "%s %d")) % [name, int(preview.get("per_hit", 0))]) + holds
+			var line: String = str(lines.get(&"attack", "%s %s")) % [name, _attack_phrase(preview)]
+			if intent.applies_to_player != null and intent.applied_amount > 0:
+				line += str(lines.get(&"applies", "")) % [intent.applies_to_player.display_name, intent.applied_amount]
+			if preview.has("threshold") and int(preview.get("threshold_left", 0)) > 0:
+				line += str(lines.get(&"threshold", "")) % int(preview["threshold_left"])
+			return line + holds
+		EnemyIntent.IntentType.DEFEND:
+			var times: int = maxi(int(preview.get("repeats", 1)), 1)
+			if times > 1:
+				return str(lines.get(&"defend_twice", "%s %d")) % [name, int(preview.get("per_hit", 0)) / times]
+			return str(lines.get(&"defend", "%s %d")) % [name, int(preview.get("per_hit", 0))]
+		EnemyIntent.IntentType.HEAL_ALLY:
+			return str(lines.get(&"heal", "%s %d")) % [name, int(preview.get("per_hit", 0))]
+		EnemyIntent.IntentType.SIGNAL:
+			var answers: Array = facts["answers"]
+			if answers.is_empty():
+				return str(lines.get(&"signal_none", "%s")) % name
+			var parts: PackedStringArray = PackedStringArray()
+			var total: int = 0
+			for answer: Array in answers:
+				parts.append("%s %d" % [answer[0], int(answer[1])])
+				total += int(answer[1])
+			var line: String = str(lines.get(&"signal", "%s %s %d")) % [name, ", ".join(parts), total]
+			if int(facts["waking"]) > 0:
+				line += str(lines.get(&"signal_wakes", ""))
+			return line
+		EnemyIntent.IntentType.DIG:
+			var under: Array = facts["under"]
+			if under.size() == 2:
+				return str(lines.get(&"dig", "%s %s %d")) % [name, str(under[0]).to_lower() + "s", int(under[1])]
+		EnemyIntent.IntentType.BURROW:
+			return str(lines.get(&"burrow", "%s")) % name
+		EnemyIntent.IntentType.WATCH:
+			return str(lines.get(&"watch", "%s")) % name
+	# What it brings until its next move (the Glower's Puff - Inflated, the
+	# Adder's Coil - Coiled), or what it holds while queued (the Rebury).
+	var brings: Array = facts["brings"]
+	if brings.size() == 2:
+		var next: EnemyIntent = facts["next"]
+		var until: String = str(lines.get(&"brings_any", "next move"))
+		if next != null:
+			until = (str(lines.get(&"brings_next", "%s %d")) % [next.intent_name, next.value]) if next.value > 0 else next.intent_name
+		return str(lines.get(&"brings", "%s %s %s %s")) % [name, brings[0], until, brings[1]]
+	return (str(lines.get(&"plain", "%s")) % name) + holds
+
+# An attack's numbers, as it will land: "6", "5 ×3", "11 over 3 hits", and
+# "... twice" for an enemy acting twice (each action alike).
+func _attack_phrase(preview: Dictionary) -> String:
+	var lines: Dictionary = intent_hover_lines
+	var times: int = maxi(int(preview.get("repeats", 1)), 1)
+	var hits: int = maxi(int(preview.get("hits", 1)) / times, 1)
+	var amounts: Array = preview.get("hit_amounts", [])
+	var mine: Array = amounts.slice(0, hits)
+	var phrase: String = str(int(preview.get("per_hit", 0)))
+	if hits > 1:
+		if not mine.is_empty() and mine.count(mine[0]) == mine.size():
+			phrase = str(lines.get(&"hits", "%d x%d")) % [int(mine[0]), hits]
+		else:
+			var total: int = 0
+			for amount: Variant in mine:
+				total += int(amount)
+			phrase = str(lines.get(&"total", "%d %d")) % [total, hits]
+	if times > 1:
+		phrase = str(lines.get(&"twice", "%s")) % phrase
+	return phrase
 
 # What a refused intent says while an armed Brace or Garnish hovers it.
 func _refusal_text(refusal: EnemyTurn.MarkRefusal, card: CardData, enemy: FieldEnemy) -> String:
