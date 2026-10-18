@@ -370,6 +370,16 @@ func _bounded_position(raw: Vector3) -> Vector3:
 # frame - exponential, ~95% settled in limit_ease_time. Only the offset
 # is eased, never the follow itself, so inside the bounds (offset -> 0)
 # the frame tracks the Wanderer exactly as before.
+# The follow onto its target at once - a jump (the debug Spawn teleport),
+# not a walk: the rig on him, the follow bounds' ease settled, and the
+# camera placed there this frame.
+func snap_to_target() -> void:
+	if _target == null:
+		return
+	global_position = _target.global_position
+	_bound_offset = _bounded_position(_target.global_position) - _target.global_position
+	_place_camera()
+
 func _advance_follow_bounds(delta: float) -> void:
 	var wanted: Vector3 = _bounded_position(_target.global_position) - _target.global_position
 	if limit_ease_time <= 0.0:

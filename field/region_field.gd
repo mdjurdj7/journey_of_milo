@@ -3633,8 +3633,9 @@ func _on_keepsake_offer_closed(_taken: bool) -> void:
 
 # Debug builds only: a row of debug buttons on the field HUD in the
 # battle row's style (BattleTheme's DebugButton), hidden until F1 -
-# Keepsake, a card picker with its Add card, +1 Glassbone, Weapon, and Path (the
-# planned walk and the walk grid near him - NavDebugDraw). It goes with the DECK
+# Keepsake, a card picker with its Add card, +1 Glassbone, Weapon, Path (the
+# planned walk and the walk grid near him - NavDebugDraw), Scatter,
+# Traveller, and Spawn (back to the floor's spawn). It goes with the DECK
 # line when a fight hides that, so it never sits over a battle.
 func _setup_debug_row() -> void:
 	var hud := get_node_or_null(^"FieldHUD") as CanvasLayer
@@ -3695,6 +3696,12 @@ func _setup_debug_row() -> void:
 	traveller_button.button_pressed = Traveller.debug_force
 	traveller_button.toggled.connect(_on_debug_traveller_toggled)
 	_debug_row.add_child(traveller_button)
+	var spawn_button := Button.new()
+	spawn_button.name = "SpawnButton"
+	spawn_button.theme_type_variation = &"DebugButton"
+	spawn_button.text = "Spawn"
+	spawn_button.pressed.connect(_on_debug_spawn_pressed)
+	_debug_row.add_child(spawn_button)
 	hud.add_child(_debug_row)
 	deck_panel.visibility_changed.connect(func() -> void:
 		if not deck_panel.visible:
@@ -3726,6 +3733,28 @@ func _on_debug_traveller_toggled(on: bool) -> void:
 
 # One piece of Glassbone, through the run's own grant (RunState.add_
 # glassbone()) - a debug button, not a game source.
+# Debug: the Wanderer back to the floor's spawn (FloorData.spawn, on the
+# ground there), facing its exit as a floor opens, stopped - no path, no
+# velocity - and the camera's follow snapped onto him. In the field only:
+# never while a fight or a screen holds it (the field can't process then).
+func _on_debug_spawn_pressed() -> void:
+	if _battle_open or not can_process() or wanderer == null:
+		return
+	var spawn: Vector2 = _floor_spawn_xz()
+	var height: float = wanderer.global_position.y
+	var ground := get_node_or_null(ground_path) as Ground
+	if ground != null:
+		var local: Vector3 = ground.to_local(Vector3(spawn.x, 0.0, spawn.y))
+		height = ground.get_walk_height_at(Vector2(local.x, local.z))
+	wanderer.stand_still()
+	wanderer.global_position = Vector3(spawn.x, height, spawn.y)
+	var exit: Vector3 = get_exit_direction()
+	wanderer.rotation.y = atan2(-exit.x, -exit.z)
+	var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
+	if camera_rig != null:
+		camera_rig.snap_to_target()
+	print("RegionField: debug - the Wanderer back to the floor's spawn.")
+
 func _on_debug_glassbone_pressed() -> void:
 	RunState.add_glassbone(1)
 	RunLogger.event("debug_glassbone_add", {})
