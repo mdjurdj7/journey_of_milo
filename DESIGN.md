@@ -305,6 +305,42 @@ and up the west shore north of z -27. (2026-10-17.)
 
 ## Deferred
 
+- **The Samurai is a shell; these are left as they are.** She is a
+  second CharacterData (`run/data/samurai.tres`), selected by
+  RegionField's `starting_character` export, with no cards, mechanics or
+  rig of her own yet (her cards: `cards/samurai/AUTHORING.md`). Open:
+  - **Samphire is in her rolls.** Her pool (`cards/pools/samurai_pool.
+    tres`) names `cards/samurai/` and `cards/neutral/`, and Samphire, the
+    reward screen's fixed extra and the Collector's fixed card, lives in
+    the second. The Wanderer's pool holds no neutral card at all.
+    Accepted for now.
+  - **Floor props hand her Wanderer cards.** Floor 2's belongings pool
+    holds Hold Fast and the Collector's stock on floor 4 holds 27
+    Wanderer cards; both are props' own pools, which the class's pool
+    doesn't replace (`RegionField.run_reward_pool()` stands in only for
+    the floor's `reward_pool`), nor does it replace a floor's `rare_pool`.
+  - **"him" in the world's lines:** `run/run_over.tscn`'s drowned_line
+    ("The water took him.") and RegionField's hold_line_world_line ("Not
+    with that still behind him.") are the Wanderer's words for any class.
+  - **Her sounds are the Wanderer's placeholders.** Attack and hit sounds
+    come from `assets/audio/Wanderer/` (AttackAudio, HitAudio) whoever
+    plays. Footsteps are the same folder's, but with no foot bones her
+    FootprintSpawner never sets up, so she makes none (and leaves no
+    prints) until she's rigged.
+  - **No rig.** `samurai_v1.glb` is a static mesh: on the field it slides
+    as the body moves; in a fight there's no draw, Slash, Brace or idle,
+    the entry lock clears on its timer, and a card's `battle_animation`
+    (the Wanderer's clip names - Left Hand's Slash) plays nothing, its
+    damage landing at its authored `impact_time`. Hit flash, recoil and
+    the stance turns are tweens and play as for him.
+  - **Placeholders:** her max HP (80, the Wanderer's), her starting deck
+    (neutral cards only), `field_model_height` 1.7 (the glb's own) and
+    `field_model_yaw_degrees` 180 are guesses to settle in play. Her
+    albedo is the glb's own base colour, unpainted.
+  - **The compendium warns on her empty folder** ("no cards found in
+    res://cards/samurai/") each time it opens, and shows SAMURAI with no
+    cards, until her first card lands there.
+  (2026-10-18, Samurai shell.)
 - **The Siltjaw's mound rework leaves four things open.** Its mounds are
   12 HP targets with plates, unbroken it erupts for 14 (Block-only),
   breaking its own brings it up Exposed through your next turn with the
