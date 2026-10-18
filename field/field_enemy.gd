@@ -427,6 +427,14 @@ var _slash_mark_mesh: ArrayMesh = null
 # that goes with the model.
 var _mound: SandMound = null
 var _contact_shadow: ContactShadow = null
+# Riding (ride_on()): the member it rides on, where on it (the carrier's
+# body frame, metres up from its feet), turned how far from its facing,
+# and whether it is seated there now - a fight takes it down to its line
+# spot (step_to()), an escape back up (return_to_field_pose()).
+var _carrier: FieldEnemy = null
+var _ride_offset: Vector3 = Vector3.ZERO
+var _ride_yaw: float = 0.0
+var _seated: bool = false
 # A DIG under way (begin_dig()): the row's centre and its across
 # direction, each mound's anchor (top-level, world-fixed: a lunge never
 # drags the sand) by mound number - null once collapsed or gone - and
@@ -745,6 +753,7 @@ func _ready() -> void:
 	contact_shadow.name = "ContactShadow"
 	add_child(contact_shadow)
 	_contact_shadow = contact_shadow
+	_set_seated(_seated)
 
 	if rest_height < 0.0:
 		_mound = SandMound.new()
@@ -774,6 +783,9 @@ func _ready() -> void:
 # and again on every Ground.relief_rebuilt - see _ready()'s own comment
 # for why both are needed.
 func _ground_to_relief() -> void:
+	if _seated and is_riding():
+		_seat_on_carrier()
+		return
 	if _ground == null:
 		return
 	global_position.y = _body_y_on_ground(global_position.x, global_position.z)
@@ -1518,7 +1530,54 @@ func step_to(spot: Vector3, duration: float) -> void:
 		_field_position = global_position
 		_field_yaw = rotation.y
 		_has_field_pose = true
+	_set_seated(false)
 	_tween_to(spot, duration, delay)
+
+# --- Riding (FloorEnemy.rides_on) ---
+
+# Seated on `carrier` from now on: `offset` in its body frame - metres, x
+# to its right, y up from its feet, z toward its back - turned
+# `yaw_degrees` from its facing. It follows the carrier's grounding (its
+# own _ground_to_relief() seats it instead of standing it on the sand)
+# and casts no contact shadow of its own while it rides.
+func ride_on(carrier: FieldEnemy, offset: Vector3, yaw_degrees: float) -> void:
+	_carrier = carrier
+	_ride_offset = offset
+	_ride_yaw = deg_to_rad(yaw_degrees)
+	_set_seated(carrier != null)
+	if is_inside_tree() and _seated:
+		_seat_on_carrier()
+
+# Whether it rides on another member - seated now or not (a fight takes
+# it down; the carrier is kept for an escape's climb back).
+func is_riding() -> bool:
+	return _carrier != null and is_instance_valid(_carrier)
+
+func is_seated() -> bool:
+	return _seated and is_riding()
+
+func get_carrier() -> FieldEnemy:
+	return _carrier if is_riding() else null
+
+func _set_seated(on: bool) -> void:
+	_seated = on
+	if _contact_shadow != null:
+		_contact_shadow.visible = not (on and is_riding())
+
+# Where its body origin goes seated: the carrier's feet on the relief at
+# its own XZ, the offset turned by its yaw, then this body's own grounding
+# terms - as _body_y_on_ground() puts a standing body.
+func get_seat_position() -> Vector3:
+	if not is_riding():
+		return global_position
+	var carrier_origin := Vector3(_carrier.global_position.x, _carrier._body_y_on_ground(_carrier.global_position.x, _carrier.global_position.z), _carrier.global_position.z)
+	var feet: Vector3 = carrier_origin + Vector3(0.0, _carrier.model_ground_offset, 0.0)
+	var seat: Vector3 = feet + Basis(Vector3.UP, _carrier.rotation.y) * _ride_offset
+	return seat + Vector3(0.0, -model_ground_offset + height_offset, 0.0)
+
+func _seat_on_carrier() -> void:
+	global_position = get_seat_position()
+	rotation.y = _carrier.rotation.y + _ride_yaw
 
 # Its phase come (RegionField._drop_at_phase()): off what it lies on to
 # phase_drop_spot - sideways, height_offset down to the sand, a hop at
@@ -1574,6 +1633,21 @@ func return_to_field_pose(duration: float) -> void:
 		tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
 		tween.tween_method(_drop_step.bind(Vector2(global_position.x, global_position.z), Vector2(_field_position.x, _field_position.z), height_offset, _field_height_offset), 0.0, 1.0, maxf(duration, 0.01))
 		_turn_to(_field_yaw, duration)
+		return
+	# A rider brought down for the fight goes back up onto its carrier -
+	# toward its seat as the carrier walks back too, so it lands where
+	# the carrier ends.
+	if is_riding() and not _seated:
+		_has_field_pose = false
+		var from: Vector3 = global_position
+		var back := create_tween()
+		back.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+		back.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+		back.tween_method(func(t: float) -> void: global_position = from.lerp(get_seat_position(), t), 0.0, 1.0, maxf(duration, 0.01))
+		back.tween_callback(func() -> void:
+			_set_seated(true)
+			_seat_on_carrier())
+		_turn_to(_carrier.rotation.y + _ride_yaw, duration)
 		return
 	if not _has_field_pose:
 		if _faces_prop:

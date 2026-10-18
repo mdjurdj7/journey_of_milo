@@ -1632,6 +1632,18 @@ func _spawn_floor_enemies() -> void:
 					push_warning("RegionField: slot '%s' member %d faces prop %d, which isn't in its option; yaw as authored." % [slot.slot_id, member_index, entry.face_prop_index])
 			add_child(enemy)
 			encounter.members.append(enemy)
+		# Riders onto their carriers, once every member of the option is
+		# in the tree (a carrier may come after its rider).
+		for member_index in option.members.size():
+			var entry: FloorEnemy = option.members[member_index]
+			if entry == null or entry.rides_on < 0:
+				continue
+			var rider: FieldEnemy = encounter.members[member_index]
+			var carrier: FieldEnemy = encounter.members[entry.rides_on] if entry.rides_on < encounter.members.size() else null
+			if rider == null or carrier == null or carrier == rider:
+				push_warning("RegionField: slot '%s' option '%s' member %d rides on member %d, which isn't there; it stands." % [slot.slot_id, option.option_id, member_index, entry.rides_on])
+				continue
+			rider.ride_on(carrier, entry.ride_offset, entry.ride_yaw_degrees)
 
 # Each chosen option's route (EncounterOption.patrol), one PackPatrol
 # each, named Patrol_<slot id>, direct children of this node so the

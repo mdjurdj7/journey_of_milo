@@ -89,3 +89,16 @@ enum CardReward { ROLLED, TOP_TIER_FIRST }
 # Floor 2's Sputter beside the Underfoot: no Scissor on a Sting turn.
 @export var excluded_intent: String = ""
 @export var excluded_while_packmate_intent: String = ""
+# A member that rides on another member of its option rather than
+# standing on the sand (FieldEnemy.ride_on()): rides_on is the carrier's
+# index in the option's members, -1 = it stands. Riding, it sits where
+# ride_offset puts it in the carrier's own frame - metres, x to the
+# carrier's right, y up from the carrier's feet, z toward its back (the
+# body's frame, not the model's) - turned ride_yaw_degrees from the
+# carrier's facing, and follows the carrier's grounding; its own position
+# and yaw_degrees are unused. In a fight it comes down to its place in
+# the line (RegionField._place_cluster_line()). The Nettles in the
+# Nettlebasket's cradle.
+@export var rides_on: int = -1
+@export var ride_offset: Vector3 = Vector3.ZERO
+@export var ride_yaw_degrees: float = 0.0
