@@ -25,6 +25,34 @@ class_name BattleTheme
 # the Toll numeral (BattleResources). Never inverts.
 @export var toll_rule_color: Color = Color(0.54, 0.50, 0.58, 1.0)
 
+# The combat numbers' two tints ("Battle" tokens "self_loss" and "heal",
+# FloatingNumber): HP the Wanderer's own effects took - the Toll keyline's
+# hue, darkened to read on sand - and HP coming back (Grace, Ransom,
+# Devour, a keepsake, anything that heals) in a muted sage at the same
+# value. On a dark world, pale versions of the same hues. The numeral
+# only; its halo stays bone. Each re-applies the value set in use.
+@export_group("Combat Number Tints")
+@export var on_pale_self_loss: Color = Color(0.35, 0.33, 0.38, 1.0):
+	set(value):
+		on_pale_self_loss = value
+		_reapply()
+@export var on_pale_heal: Color = Color(0.32, 0.38, 0.31, 1.0):
+	set(value):
+		on_pale_heal = value
+		_reapply()
+@export var on_dark_self_loss: Color = Color(0.80, 0.76, 0.84, 1.0):
+	set(value):
+		on_dark_self_loss = value
+		_reapply()
+@export var on_dark_heal: Color = Color(0.76, 0.84, 0.74, 1.0):
+	set(value):
+		on_dark_heal = value
+		_reapply()
+@export_group("")
+
+# The value set last applied (apply_value_set()), for a tint's setter.
+var _on_dark_world: bool = false
+
 # DebugRow's F1 buttons (see BattleOverlay) are the only boxed controls
 # left - a flat 1px outline in ink, no fill, under the "DebugButton"
 # variation so the plain Button type stays unstyled.
@@ -45,10 +73,13 @@ func apply_value_set(on_dark_world: bool) -> void:
 	var text_color: Color = on_dark_text_color if on_dark_world else on_pale_text_color
 	var ink: Color = on_dark_ink if on_dark_world else on_pale_ink
 	var bone: Color = on_dark_bone if on_dark_world else on_pale_bone
+	_on_dark_world = on_dark_world
 
 	set_color("ink", "Battle", ink)
 	set_color("bone", "Battle", bone)
 	set_color("toll_rule", "Battle", toll_rule_color)
+	set_color("self_loss", "Battle", on_dark_self_loss if on_dark_world else on_pale_self_loss)
+	set_color("heal", "Battle", on_dark_heal if on_dark_world else on_pale_heal)
 
 	set_color("font_color", "Label", text_color)
 
@@ -74,3 +105,6 @@ func apply_value_set(on_dark_world: bool) -> void:
 	set_color("font_hover_color", "DebugButton", ink)
 	set_color("font_pressed_color", "DebugButton", ink)
 	set_color("font_focus_color", "DebugButton", ink)
+
+func _reapply() -> void:
+	apply_value_set(_on_dark_world)

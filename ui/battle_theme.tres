@@ -4,3 +4,7 @@
 
 [resource]
 script = ExtResource("1_battle_theme")
+on_pale_self_loss = Color(0.35, 0.33, 0.38, 1)
+on_pale_heal = Color(0.32, 0.38, 0.31, 1)
+on_dark_self_loss = Color(0.8, 0.76, 0.84, 1)
+on_dark_heal = Color(0.76, 0.84, 0.74, 1)

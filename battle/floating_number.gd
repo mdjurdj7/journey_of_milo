@@ -22,9 +22,10 @@ class_name FloatingNumber
 # the ink legible where it crosses a dark body. The kind reads by its
 # mark, not its colour: a minus for HP lost (smaller for his own cost), a
 # plus for a heal, a shield glyph before Block's value,
-# "Blocked" in Spectral's small caps. tint_strength (0 by default) eases a
-# heal's and a loss's ink toward heal_tint/loss_tint, to try a faint
-# tint.
+# "Blocked" in Spectral's small caps. Two kinds take a tint on the numeral
+# alone, the halo staying bone: his own HP cost in the theme's "self_loss"
+# token, a heal in its "heal" token (BattleTheme's Combat Number Tints);
+# an enemy's damage to him stays ink.
 #
 # The Label measures and places it; _draw() draws it - halo first, ink
 # over, the halo reaching past the rect - so the Label's own glyphs are
@@ -64,12 +65,6 @@ const KIND_BLOCKED := "blocked"
 @export var halo_steps: int = 5
 @export_range(0.0, 1.0) var halo_alpha: float = 0.35
 
-@export_group("Tint")
-# 0: heals and losses in plain ink. Up to 1: their ink eased this far
-# toward heal_tint / loss_tint.
-@export_range(0.0, 1.0) var tint_strength: float = 0.0
-@export var heal_tint: Color = Color(0.42, 0.50, 0.40, 1.0)
-@export var loss_tint: Color = Color(0.46, 0.18, 0.16, 1.0)
 
 @export_group("Shield")
 # Block's shield, before its value: its height ~1.85 x half of this, at
@@ -174,10 +169,14 @@ func _ink() -> Color:
 	var ink: Color = get_theme_color("ink", "Battle")
 	match kind:
 		KIND_HEAL:
-			return ink.lerp(Color(heal_tint, ink.a), tint_strength)
-		KIND_HP_LOST, KIND_SELF:
-			return ink.lerp(Color(loss_tint, ink.a), tint_strength)
+			return _token("heal", ink)
+		KIND_SELF:
+			return _token("self_loss", ink)
 	return ink
+
+# A "Battle" theme colour, or `fallback` where the theme has none.
+func _token(token: String, fallback: Color) -> Color:
+	return get_theme_color(token, "Battle") if has_theme_color(token, "Battle") else fallback
 
 func _draw() -> void:
 	if _font == null:
