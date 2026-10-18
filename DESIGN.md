@@ -197,6 +197,15 @@ and up the west shore north of z -27. (2026-10-17.)
 
 ## Parked
 
+- **The Nettlebasket's numbers are provisional.** Floor 4's optional
+  road-side fight (`battle/rules/enemies/nettlebasket.tres`, `nettle.tres`):
+  she has 36 HP, Pinch 6, Signal, Sting 12; each Nettle has 9 HP (one
+  Carve's 6 leaves it standing, two finish it) and Nips for 2. Retune
+  from playtest logs (the run log's `woke` and `signal_answer` lines).
+  Open with them: her Signal's intent shows its glyph alone, not what
+  the Nettles' answers will deal, and the lethal preview doesn't count
+  those answers; at 0.12 scale the Nettles read small in the battle
+  frame. (2026-10-18.)
 - **Weapons modify the class's basic attack.** The run carries one
   weapon (`RunState.weapon`, from `CharacterData.starting_weapon`), shown
   in the HUD's WEAPON slot. What a weapon is for: it changes the class's

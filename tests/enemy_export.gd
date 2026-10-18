@@ -241,7 +241,7 @@ static func _member_entry(slot: EncounterSlot, option: EncounterOption, member_i
 			"scene": _path(prop.scene) if prop != null else null,
 			"position": _vec2(_prop_at(slot, prop)) if prop != null else null,
 		}
-	return {
+	var member: Dictionary = {
 		"member": member_index,
 		"name": data.enemy_name if data != null else "",
 		"enemy_file": _path(data),
@@ -252,6 +252,15 @@ static func _member_entry(slot: EncounterSlot, option: EncounterOption, member_i
 		"yaw_degrees": _num(slot.yaw_degrees + entry.yaw_degrees),
 		"face_prop": face_prop,
 	}
+	# A rider (FloorEnemy.rides_on): on which member, and where on it -
+	# its position above is its spot in the fight's line.
+	if entry.rides_on >= 0:
+		member["rides_on"] = {
+			"member": entry.rides_on,
+			"seat_offset_m": [_num(entry.ride_offset.x), _num(entry.ride_offset.y), _num(entry.ride_offset.z)],
+			"yaw_degrees": _num(entry.ride_yaw_degrees),
+		}
+	return member
 
 static func _patrol_entry(slot: EncounterSlot, option: EncounterOption) -> Variant:
 	var patrol: FloorPatrol = option.patrol
@@ -272,6 +281,7 @@ static func _enemy_entry(data: EnemyData, appears_on: Array) -> Dictionary:
 		"hp": data.max_hp,
 		"elite": data.is_elite,
 		"mechanic_summary": data.mechanic_summary,
+		"starts_dormant": data.starts_dormant,
 		"field": _field_entry(data),
 		"moveset": _moveset_entry(data),
 		"statuses": _status_entries(data),
@@ -398,6 +408,8 @@ static func _intent_entry(data: EnemyData, intent: EnemyIntent) -> Dictionary:
 			entry["block"] = intent.value
 		EnemyIntent.IntentType.HEAL_ALLY:
 			entry["heal_each_packmate"] = intent.value
+		EnemyIntent.IntentType.SIGNAL:
+			entry["signal"] = "wakes every dormant packmate; each living packmate answers at once with one attack out of turn"
 		EnemyIntent.IntentType.DIG:
 			# Its moves under the sand, one a turn, the last surfacing it;
 			# its mounds, each a target of mound_hp.

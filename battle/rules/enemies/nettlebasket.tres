@@ -1,0 +1,34 @@
+[gd_resource type="Resource" script_class="EnemyData" format=3]
+
+[ext_resource type="Script" uid="uid://c3ycbu6flob4g" path="res://battle/rules/enemy_data.gd" id="1_enemy_data"]
+[ext_resource type="Script" uid="uid://d1ay3y47ipmsr" path="res://battle/rules/enemy_intent.gd" id="2_intent"]
+[ext_resource type="AudioStream" uid="uid://bqhk7amkael6o" path="res://assets/audio/enemies/Sputter/hit_shell_1.mp3" id="3_hit_shell"]
+[ext_resource type="AudioStream" uid="uid://ctbnpo2j3ocnc" path="res://assets/audio/enemies/Sputter/hit_shell_2.mp3" id="4_hit_shell_2"]
+[ext_resource type="AudioStream" uid="uid://c2g4kb3njm4pa" path="res://assets/audio/enemies/Sputter/hit_shell_3.mp3" id="5_hit_shell_3"]
+
+[sub_resource type="Resource" id="EnemyIntent_pinch"]
+script = ExtResource("2_intent")
+intent_name = "Pinch"
+value = 6
+
+[sub_resource type="Resource" id="EnemyIntent_signal"]
+script = ExtResource("2_intent")
+intent_name = "Signal"
+type = 9
+pack_only = true
+
+[sub_resource type="Resource" id="EnemyIntent_sting"]
+script = ExtResource("2_intent")
+intent_name = "Sting"
+value = 12
+
+[resource]
+script = ExtResource("1_enemy_data")
+enemy_name = "Nettlebasket"
+mechanic_summary = "A scorpion carrying three Nettles in the cradle on her back. Pinches for 6, then Signals - every Nettle wakes and strikes at once, out of turn - then Stings for 12, in a loop; with the Nettles gone the Signal drops out and she alternates Pinch and Sting. Teaches clearing a pack before its caller brings it in: an attack on all of them weakens the Nettles before they wake."
+max_hp = 36
+intents = Array[ExtResource("2_intent")]([SubResource("EnemyIntent_pinch"), SubResource("EnemyIntent_signal"), SubResource("EnemyIntent_sting")])
+contact_sounds = Array[AudioStream]([ExtResource("3_hit_shell"), ExtResource("4_hit_shell_2"), ExtResource("5_hit_shell_3")])
+model_scene_path = "res://assets/models/enemies/Nettlebasket/Nettlebasket.glb"
+painted_albedo_path = "res://assets/models/enemies/Nettlebasket/Nettlebasket_0.jpg"
+contact_radius_m = 1.4

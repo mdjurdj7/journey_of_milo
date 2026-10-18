@@ -18,6 +18,12 @@ extends SceneTree
 #                        Underfoot, the Sputter first
 #   pair_other_first   - the same pair, the Underfoot first
 #   floor1_crab        - the one required crab on floor 1
+#   nettlebasket       - floor 4's Nettlebasket and her three Nettles:
+#                        while she hasn't Signalled, a Nettle shows no
+#                        intent and takes no turn; the Nettles killed,
+#                        she never queues her Signal again and her
+#                        queued move changes from turn to turn - then
+#                        she is killed
 #
 # and asserts, after the win and the reward beat: no member of the pack
 # left on the field, an EnemyStatus left under the HUD for each enemy
@@ -45,7 +51,7 @@ const STARTING_CHARACTER_PATH := "res://run/data/wanderer.tres"
 const ENEMY_STATUS_SCRIPT_SUFFIX := "enemy_status.gd"
 # Well past any case's own timings; a hang here quits with a failure
 # rather than leaving a headless process behind.
-const SAFETY_SECONDS := 240.0
+const SAFETY_SECONDS := 300.0
 # After the last kill, the fight waits on its blow and the last death
 # before it is won (BattleController._maybe_win()): up to WIN_WAIT_SECONDS
 # for that, then physics frames for the win's frees and the reward delay
@@ -72,6 +78,8 @@ func _initialize() -> void:
 		await _run_case(order, &"crab", true)
 	run_state.set("current_floor_index", 0)
 	await _run_case("floor1_crab", &"", true)
+	run_state.set("current_floor_index", 3)
+	await _run_case("nettlebasket", &"nettlebasket", false)
 
 	print("\nkill_order_probe: %s" % ("PASSED" if _failures == 0 else "%d FAILURE(S)" % _failures))
 	quit(0 if _failures == 0 else 1)
@@ -171,6 +179,8 @@ func _run_case(order: String, group: StringName, expect_cleared: bool) -> void:
 			for member in members:
 				_kill(controller, combatants, member)
 			controller.call("_check_battle_end")
+		"nettlebasket":
+			await _check_nettlebasket(order, controller, combatants, members)
 
 	var start: int = ProbePlay.cap_msec()
 	while bool(_field.get("_battle_open")) and ProbePlay.cap_msec() - start < int(WIN_WAIT_SECONDS * 1000.0):
@@ -199,6 +209,56 @@ func _run_case(order: String, group: StringName, expect_cleared: bool) -> void:
 	_check(order, layer.get_child_count() == 0, "the overlay is still up")
 	_check(order, cleared == expect_cleared, "floor_cleared emitted=%s, expected %s" % [cleared, expect_cleared])
 	await _teardown()
+
+# Floor 4's Nettlebasket (members[0], the anchor) and her Nettles. Turn
+# by turn until she has Signalled: before her Signal a Nettle shows no
+# intent and takes no turn (Combatant.dormant); after it, none sleeps.
+# Then the Nettles killed, three enemy turns: never her Signal queued
+# again (pack_only), and not one move every turn. Her own move order and
+# numbers are left alone. Then she is killed.
+func _check_nettlebasket(order: String, controller: Node, combatants: Dictionary, members: Array) -> void:
+	await ProbePlay.settle_fight(self, _field, controller)
+	var basket: Node = members[0]
+	var nettles: Array = members.slice(1)
+	_check(order, nettles.size() == 3, "%d Nettle(s) in her fight, expected 3" % nettles.size())
+	var basket_data: Resource = basket.get("enemy_data")
+	var signalled: bool = false
+	for turn in basket_data.get("intents").size():
+		var queued: Resource = _queued_intent(combatants, basket)
+		var signal_turn: bool = int(queued.get("type")) == EnemyIntent.IntentType.SIGNAL
+		for nettle in nettles:
+			_check(order, (controller.call("get_intent_preview", nettle) as Dictionary).is_empty(), "'%s' shows an intent before the Signal" % nettle.name)
+		await controller.call("end_turn")
+		await ProbePlay.settle(self, controller)
+		for nettle in nettles:
+			var nettle_combatant: RefCounted = combatants.get(nettle)
+			if signal_turn:
+				_check(order, not bool(nettle_combatant.get("dormant")), "'%s' still dormant after her Signal" % nettle.name)
+			else:
+				_check(order, bool(nettle_combatant.get("dormant")) and int(nettle_combatant.get("turns_taken")) == 0, "'%s' took a turn before her Signal" % nettle.name)
+		if signal_turn:
+			signalled = true
+			break
+	_check(order, signalled, "she never Signalled in a loop of her moves")
+	for nettle in nettles:
+		_kill(controller, combatants, nettle)
+	controller.call("_check_battle_end")
+	await create_timer(0.6).timeout
+	var seen: Array[String] = []
+	for turn in 3:
+		var queued: Resource = _queued_intent(combatants, basket)
+		_check(order, int(queued.get("type")) != EnemyIntent.IntentType.SIGNAL, "her Signal queued with no Nettle left")
+		if not seen.has(str(queued.get("intent_name"))):
+			seen.append(str(queued.get("intent_name")))
+		await controller.call("end_turn")
+		await ProbePlay.settle(self, controller)
+	_check(order, seen.size() > 1, "alone, she queued one move every turn (%s)" % ", ".join(seen))
+	_kill(controller, combatants, basket)
+	controller.call("_check_battle_end")
+
+func _queued_intent(combatants: Dictionary, member: Node) -> Resource:
+	var intents: Array = member.get("enemy_data").get("intents")
+	return intents[int(combatants.get(member).get("current_intent_index"))]
 
 # What a card's damage does to a member, without the card: HP to 0, the
 # hit reported through the controller's own path (which drops the member
