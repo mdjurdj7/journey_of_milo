@@ -212,6 +212,11 @@ var option_id: StringName = &""
 # Wanderer after it; the puff of sand on landing (spawn_sand_puff()'s
 # settings).
 @export var phase_drop_seconds: float = 0.5
+# A seated rider's way down to its line spot at a fight's start
+# (climb_down_to()) - and back up after an escape: the hop over its
+# carrier's side, metres, at the middle of the move. The move takes the
+# fight's own transition (the camera's swing), the Wanderer's step.
+@export var climb_hop_m: float = 0.3
 @export var phase_drop_hop_m: float = 0.15
 @export var phase_drop_turn_seconds: float = 0.4
 @export var phase_drop_puff_particles: int = 16
@@ -435,6 +440,9 @@ var _carrier: FieldEnemy = null
 var _ride_offset: Vector3 = Vector3.ZERO
 var _ride_yaw: float = 0.0
 var _seated: bool = false
+# Where it stood as placed, before it was seated - its authored spot,
+# which its cluster's line reads (get_line_point()).
+var _line_spot: Vector3 = Vector3.ZERO
 # A DIG under way (begin_dig()): the row's centre and its across
 # direction, each mound's anchor (top-level, world-fixed: a lunge never
 # drags the sand) by mound number - null once collapsed or gone - and
@@ -1530,8 +1538,29 @@ func step_to(spot: Vector3, duration: float) -> void:
 		_field_position = global_position
 		_field_yaw = rotation.y
 		_has_field_pose = true
+	if is_seated():
+		climb_down_to(spot, duration)
+		return
 	_set_seated(false)
 	_tween_to(spot, duration, delay)
+
+# A seated rider off its carrier to `spot` over `duration`: its XZ eased
+# there, its height from the seat down to the sand there, climb_hop_m
+# over the carrier's side at the middle - a procedural move, no clip.
+func climb_down_to(spot: Vector3, duration: float) -> void:
+	_set_seated(false)
+	var from: Vector3 = global_position
+	var to := Vector3(spot.x, _body_y_on_ground(spot.x, spot.z), spot.z)
+	var tween := create_tween()
+	tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+	tween.tween_method(_climb_step.bind(from, func() -> Vector3: return to), 0.0, 1.0, maxf(duration, 0.01))
+
+# One step of a climb: XZ eased from `from` to where `to_point` says now,
+# the height eased between the two with climb_hop_m over it.
+func _climb_step(t: float, from: Vector3, to_point: Callable) -> void:
+	var to: Vector3 = to_point.call()
+	var eased: float = smoothstep(0.0, 1.0, t)
+	global_position = Vector3(lerpf(from.x, to.x, eased), lerpf(from.y, to.y, eased) + climb_hop_m * sin(t * PI), lerpf(from.z, to.z, eased))
 
 # --- Riding (FloorEnemy.rides_on) ---
 
@@ -1544,6 +1573,7 @@ func ride_on(carrier: FieldEnemy, offset: Vector3, yaw_degrees: float) -> void:
 	_carrier = carrier
 	_ride_offset = offset
 	_ride_yaw = deg_to_rad(yaw_degrees)
+	_line_spot = global_position if is_inside_tree() else position
 	_set_seated(carrier != null)
 	if is_inside_tree() and _seated:
 		_seat_on_carrier()
@@ -1558,6 +1588,12 @@ func is_seated() -> bool:
 
 func get_carrier() -> FieldEnemy:
 	return _carrier if is_riding() else null
+
+# Where its cluster's line takes it to be (RegionField._place_cluster_
+# line()): where it stands - or, seated, its authored spot (a rider's
+# position in its option), not the seat on its carrier.
+func get_line_point() -> Vector3:
+	return _line_spot if is_seated() else global_position
 
 func _set_seated(on: bool) -> void:
 	_seated = on
@@ -1634,16 +1670,14 @@ func return_to_field_pose(duration: float) -> void:
 		tween.tween_method(_drop_step.bind(Vector2(global_position.x, global_position.z), Vector2(_field_position.x, _field_position.z), height_offset, _field_height_offset), 0.0, 1.0, maxf(duration, 0.01))
 		_turn_to(_field_yaw, duration)
 		return
-	# A rider brought down for the fight goes back up onto its carrier -
+	# A rider brought down for the fight climbs back up onto its carrier -
 	# toward its seat as the carrier walks back too, so it lands where
 	# the carrier ends.
 	if is_riding() and not _seated:
 		_has_field_pose = false
-		var from: Vector3 = global_position
 		var back := create_tween()
 		back.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-		back.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
-		back.tween_method(func(t: float) -> void: global_position = from.lerp(get_seat_position(), t), 0.0, 1.0, maxf(duration, 0.01))
+		back.tween_method(_climb_step.bind(global_position, get_seat_position), 0.0, 1.0, maxf(duration, 0.01))
 		back.tween_callback(func() -> void:
 			_set_seated(true)
 			_seat_on_carrier())

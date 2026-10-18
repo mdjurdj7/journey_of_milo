@@ -2455,12 +2455,15 @@ func _place_cluster_line(members: Array[FieldEnemy], duration: float) -> Vector3
 	var anchor: FieldEnemy = members[0]
 	var far: FieldEnemy = members[0]
 	var far_distance: float = 0.0
+	# A seated rider (FieldEnemy.ride_on()) is read at its authored spot,
+	# not its seat on the carrier (FieldEnemy.get_line_point()) - where it
+	# climbs down to (FieldEnemy.climb_down_to(), through step_to()).
 	for member in members:
-		var distance: float = anchor.global_position.distance_squared_to(member.global_position)
+		var distance: float = anchor.global_position.distance_squared_to(member.get_line_point())
 		if distance > far_distance:
 			far_distance = distance
 			far = member
-	var along := far.global_position - anchor.global_position
+	var along := far.get_line_point() - anchor.global_position
 	along.y = 0.0
 	if along.length() < 0.0001:
 		return Vector3.ZERO
@@ -2469,7 +2472,7 @@ func _place_cluster_line(members: Array[FieldEnemy], duration: float) -> Vector3
 	# the pack keeps its own order rather than crossing.
 	var rest: Array[FieldEnemy] = members.slice(1)
 	rest.sort_custom(func(a: FieldEnemy, b: FieldEnemy) -> bool:
-		return (a.global_position - anchor.global_position).dot(along) < (b.global_position - anchor.global_position).dot(along)
+		return (a.get_line_point() - anchor.global_position).dot(along) < (b.get_line_point() - anchor.global_position).dot(along)
 	)
 	# The Wanderer stands on the line's extension past the anchor. When no
 	# spacing down to the minimum keeps him out of deeper water, the whole

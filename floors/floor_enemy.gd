@@ -95,10 +95,11 @@ enum CardReward { ROLLED, TOP_TIER_FIRST }
 # ride_offset puts it in the carrier's own frame - metres, x to the
 # carrier's right, y up from the carrier's feet, z toward its back (the
 # body's frame, not the model's) - turned ride_yaw_degrees from the
-# carrier's facing, and follows the carrier's grounding; its own position
-# and yaw_degrees are unused. In a fight it comes down to its place in
-# the line (RegionField._place_cluster_line()). The Nettles in the
-# Nettlebasket's cradle.
+# carrier's facing, and follows the carrier's grounding; its yaw_degrees
+# is unused. Its position still says where it stands in its cluster's
+# line, as any member's does: in a fight it comes down to its place there
+# (RegionField._place_cluster_line()). The Nettles in the Nettlebasket's
+# cradle.
 @export var rides_on: int = -1
 @export var ride_offset: Vector3 = Vector3.ZERO
 @export var ride_yaw_degrees: float = 0.0
