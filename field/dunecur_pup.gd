@@ -299,10 +299,10 @@ func _ready() -> void:
 	_spawn_approach()
 	_shadow = ContactShadow.new()
 	_shadow.name = "ContactShadow"
-	_shadow.ground_path = NodePath("../" + String(ground_path))
-	_shadow.radius = 0.45
+	_shadow.footprint = Vector2(0.45, 0.45)
 	add_child(_shadow)
 	_ground = get_node_or_null(ground_path) as Ground
+	_shadow.set_ground(_ground)
 	if _ground == null:
 		push_warning("DunecurPup '%s': ground_path did not resolve to a Ground; not grounded." % name)
 	else:

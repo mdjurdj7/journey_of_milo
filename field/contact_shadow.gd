@@ -1,100 +1,181 @@
-extends MeshInstance3D
+extends Decal
 class_name ContactShadow
 
-# A soft, dark, flat disc that sits just above the ground directly under
-# whatever this is parented to (the Wanderer, a FieldEnemy) - so the
-# figure reads as grounded even where the real directional shadow is
-# faint (an overcast sky is a soft, low-contrast light source) or
-# offscreen entirely (the battle camera can crop it out of frame). Built
-# purely in code - instantiated via ContactShadow.new() and added as a
-# child, not part of any .tscn - so tune it by selecting that child node
-# directly in the scene tree.
+# The soft pale pool under a figure (Art Bible §7: a contact shadow, not
+# a hard shape, never black) - a Decal projected down onto the surface
+# under the figure, so it lies on the sand's own relief (a dune face, a
+# channel bank) instead of a flat disc cutting through it. It lands only
+# on the render layers its data names: Ground's contact layer, and a
+# standable prop's (a basking slab, the crest rock) when the figure may
+# perch - never on the figure, other props or the sea.
 #
-# Tracks Ground.get_height_at() every frame rather than being placed
-# once: its owner can move (the Wanderer walking, or enter_battle_
-# stance()'s own tween), and a contact shadow that doesn't follow would
-# visibly detach from its owner.
+# Built in code: the owner (Wanderer, FieldEnemy, Keeper, DunecurPup)
+# makes one with ContactShadow.new(), hands it the Ground (set_ground()),
+# its footprint, and where its feet are (feet_source - the model's, so a
+# lunge that moves the model and not the body takes the pool along). The
+# pool is an ellipse turned with its parent's facing - a long body (the
+# Greyshelf, the Dunecur) lies in a long pool.
+# Its look is a ContactShadowData (data; the shared field/contact_shadow.
+# tres when none is given) - edits to it re-apply live.
+#
+# Every frame: at the feet's XZ, the surface under them (the sand, or a
+# standable prop's top there), the pool laid on it, faded and shrunk by
+# how far the feet are above it (a hover, a leap), and faded with the
+# sand's depth under the sea.
 
-@export var radius: float = 0.5:
+const DEFAULT_DATA_PATH := "res://field/contact_shadow.tres"
+# The collision bodies a figure can stand on that aren't the Ground - a
+# perch. Their tops are found by a ray down from the feet.
+const STANDABLE_GROUP := &"standable"
+const _PERCH_RAY_TRIES := 4
+
+@export var data: ContactShadowData = null:
 	set(value):
-		radius = value
-		_apply_size()
-@export var shadow_opacity: float = 0.25:
+		if data != null and data.changed.is_connected(_apply_look):
+			data.changed.disconnect(_apply_look)
+		data = value
+		if data != null:
+			data.changed.connect(_apply_look)
+		_apply_look()
+# The figure's own footprint, metres: its radius across (x) and along
+# (y) its parent's facing - a capsule's radius both ways, or its model's
+# half-extents. The pool is this times data.footprint_scale, plus
+# data.footprint_margin_m.
+@export var footprint: Vector2 = Vector2(0.4, 0.4):
 	set(value):
-		shadow_opacity = value
-		_apply_opacity()
-@export var height_offset: float = 0.01
-@export var ground_path: NodePath = ^"../Ground"
+		footprint = value
+		_place()
+# Over everything else: 1 the pool as its data says, 0 gone (a death's
+# fade).
+@export_range(0.0, 1.0, 0.01) var fade: float = 1.0:
+	set(value):
+		fade = value
+		_place()
+
+# The feet's world position: () -> Vector3. Unset, the parent's origin.
+var feet_source: Callable = Callable()
 
 var _ground: Ground = null
 
 func _ready() -> void:
-	# RegionField's battle freeze would otherwise stop this from tracking
-	# its owner mid-transition (e.g. Wanderer.enter_battle_stance()'s own
-	# tween keeps moving the Wanderer through the freeze) - same reasoning
-	# as Wanderer's model/AnimationPlayer overrides.
+	# RegionField's battle freeze would otherwise stop the pool following
+	# its figure through the fight's own tweens (a stance, a lunge).
 	process_mode = Node.PROCESS_MODE_ALWAYS
+	# Placed in world space each frame - the body's tilt (a recoil) never
+	# tips the projection.
+	top_level = true
+	if data == null:
+		data = load(DEFAULT_DATA_PATH) as ContactShadowData
+	_apply_look()
 
-	# PlaneMesh's default orientation already faces +Y (lies flat in the
-	# XZ plane) with no rotation needed - the same primitive and default
-	# ground.gd already relies on for its own flat dressing/relief meshes,
-	# so its facing is already proven correct in this project rather than
-	# assumed. QuadMesh was tried first but its own default facing axis
-	# isn't something this project had independently verified, and got
-	# dropped for exactly that reason.
-	mesh = PlaneMesh.new()
+func set_ground(ground: Ground) -> void:
+	_ground = ground
+	_place()
 
-	var material := StandardMaterial3D.new()
-	material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
-	material.albedo_texture = _build_radial_texture()
-	material.albedo_color = Color(0.0, 0.0, 0.0, 1.0)
-	# A decal-like blob standing in for a real shadow, not a real
-	# occluder - it shouldn't cast its own shadow (that would double up
-	# with the real one) or have the real shadow darken it further.
-	material.disable_receive_shadows = true
-	material_override = material
-	cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+func _process(_delta: float) -> void:
+	_place()
 
-	_apply_size()
-	_apply_opacity()
+func _apply_look() -> void:
+	if data == null or not is_inside_tree():
+		return
+	texture_albedo = _build_falloff(data.falloff_start)
+	albedo_mix = 1.0
+	normal_fade = data.normal_fade
+	upper_fade = data.edge_fade
+	lower_fade = data.edge_fade
+	cull_mask = data.ground_layers | (data.perch_layers if data.perch_surfaces else 0)
+	_place()
 
-	_ground = get_node_or_null(ground_path) as Ground
-
-# Opaque white at the center fading to fully transparent at the edge -
-# GradientTexture2D's own FILL_RADIAL does the round falloff, no shader
-# needed. fill_to sits at UV-distance 0.5 from fill_from (the texture's
-# center), i.e. exactly the square texture's inscribed circle, so the
-# corners beyond that circle read as fully transparent too.
-func _build_radial_texture() -> GradientTexture2D:
+# Full strength out to `start` of the radius, then a smoothstep down to
+# nothing at the edge - sampled into the gradient so there's no ring.
+func _build_falloff(start: float) -> GradientTexture2D:
+	var offsets := PackedFloat32Array([0.0])
+	var colors := PackedColorArray([Color(1.0, 1.0, 1.0, 1.0)])
+	var steps: int = 8
+	for i in steps + 1:
+		var u: float = float(i) / float(steps)
+		offsets.append(lerpf(start, 1.0, u))
+		colors.append(Color(1.0, 1.0, 1.0, 1.0 - smoothstep(0.0, 1.0, u)))
 	var gradient := Gradient.new()
-	gradient.colors = PackedColorArray([Color(1.0, 1.0, 1.0, 1.0), Color(1.0, 1.0, 1.0, 0.0)])
-	gradient.offsets = PackedFloat32Array([0.0, 1.0])
-
+	gradient.offsets = offsets
+	gradient.colors = colors
 	var texture := GradientTexture2D.new()
 	texture.gradient = gradient
-	texture.width = 64
-	texture.height = 64
+	texture.width = 128
+	texture.height = 128
 	texture.fill = GradientTexture2D.FILL_RADIAL
 	texture.fill_from = Vector2(0.5, 0.5)
 	texture.fill_to = Vector2(1.0, 0.5)
 	return texture
 
-func _apply_size() -> void:
-	if mesh is PlaneMesh:
-		(mesh as PlaneMesh).size = Vector2.ONE * radius * 2.0
-
-func _apply_opacity() -> void:
-	if material_override is StandardMaterial3D:
-		var material := material_override as StandardMaterial3D
-		var albedo: Color = material.albedo_color
-		albedo.a = shadow_opacity
-		material.albedo_color = albedo
-
-func _process(_delta: float) -> void:
-	if _ground == null:
+func _place() -> void:
+	if data == null or not is_inside_tree():
 		return
-	var world_xz := Vector3(global_position.x, 0.0, global_position.z)
-	var local_xz: Vector3 = _ground.to_local(world_xz)
-	var height: float = _ground.get_height_at(Vector2(local_xz.x, local_xz.z))
-	global_position.y = height + height_offset
+	var feet: Vector3 = _feet()
+	var surface: float = _sand_height(feet)
+	if data.perch_surfaces:
+		surface = maxf(surface, _perch_top(feet, surface))
+	var height: float = maxf(feet.y - surface, 0.0)
+	var lift: float = clampf(height / maxf(data.hover_fade_height_m, 0.001), 0.0, 1.0)
+	var extent: Vector2 = footprint * data.footprint_scale + Vector2.ONE * data.footprint_margin_m
+	var radii: Vector2 = extent * lerpf(1.0, data.hover_min_scale, lift)
+	var alpha: float = data.strength * (1.0 - lift) * _wade_factor(surface) * fade
+	global_transform = Transform3D(Basis(Vector3.UP, _yaw()), Vector3(feet.x, surface, feet.z))
+	size = Vector3(radii.x * 2.0, maxf(data.reach_m, 0.01) * 2.0, radii.y * 2.0)
+	modulate = Color(data.tint.r, data.tint.g, data.tint.b, alpha)
+
+# The parent's facing round world Y - from its +Z flattened, so a tilt
+# (a recoil, a lean) doesn't turn the pool.
+func _yaw() -> float:
+	var parent := get_parent() as Node3D
+	if parent == null:
+		return 0.0
+	var along: Vector3 = parent.global_basis.z
+	return atan2(along.x, along.z)
+
+func _feet() -> Vector3:
+	if feet_source.is_valid():
+		return feet_source.call() as Vector3
+	var parent := get_parent() as Node3D
+	return parent.global_position if parent != null else global_position
+
+# The sand under `feet`; the feet's own height with no Ground to ask.
+func _sand_height(feet: Vector3) -> float:
+	if _ground == null:
+		return feet.y
+	var local_xz: Vector3 = _ground.to_local(Vector3(feet.x, 0.0, feet.z))
+	return _ground.get_height_at(Vector2(local_xz.x, local_xz.z))
+
+# The top of a standable prop under the feet, from a ray down from a
+# reach above them to the sand; `sand` where there is none. Anything else
+# the ray meets on the way (the figure's own body, a neighbour's) is
+# passed through.
+func _perch_top(feet: Vector3, sand: float) -> float:
+	var from := Vector3(feet.x, feet.y + data.reach_m, feet.z)
+	var to := Vector3(feet.x, sand, feet.z)
+	if from.y <= to.y:
+		return sand
+	var space: PhysicsDirectSpaceState3D = get_world_3d().direct_space_state
+	if space == null:
+		return sand
+	var query := PhysicsRayQueryParameters3D.create(from, to)
+	var exclude: Array[RID] = []
+	for i in _PERCH_RAY_TRIES:
+		query.exclude = exclude
+		var hit: Dictionary = space.intersect_ray(query)
+		if hit.is_empty():
+			return sand
+		var collider := hit["collider"] as Node
+		if collider != null and collider.is_in_group(STANDABLE_GROUP):
+			var point: Vector3 = hit["position"]
+			return point.y
+		var rid: RID = hit["rid"]
+		exclude.append(rid)
+	return sand
+
+# 1 on dry sand, easing to 0 by data.wade_fade_depth_m under the sea.
+func _wade_factor(surface: float) -> float:
+	if _ground == null:
+		return 1.0
+	var depth: float = _ground.get_sea_level() - surface
+	return 1.0 - smoothstep(0.0, maxf(data.wade_fade_depth_m, 0.001), depth)

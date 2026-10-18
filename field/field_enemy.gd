@@ -2392,7 +2392,7 @@ func settle_and_free() -> void:
 	tween.tween_property(_model, "rotation:z", _model.rotation.z + deg_to_rad(death_slump_tilt_degrees), maxf(death_slump_time, 0.001)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
 	tween.tween_method(_set_death_veil, 0.0, 1.0, maxf(death_fade_time, 0.001)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
 	if _contact_shadow != null:
-		tween.tween_property(_contact_shadow, "shadow_opacity", 0.0, maxf(death_fade_time, 0.001))
+		tween.tween_property(_contact_shadow, "fade", 0.0, maxf(death_fade_time, 0.001))
 	# Then, gone into the fog, it dissolves out and is freed.
 	tween.set_parallel(false)
 	tween.tween_callback(_begin_death_vanish)

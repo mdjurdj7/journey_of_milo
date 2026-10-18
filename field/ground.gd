@@ -1022,6 +1022,14 @@ signal pool_stamps_changed
 @export_group("")
 @export var region_field_path: NodePath = ^".."
 @export var sea_path: NodePath = ^"../Sea"
+# The render layers the sand's meshes (the relief and the dressing
+# strips) are on besides layer 1 - the ones a figure's contact pool
+# (ContactShadow, ContactShadowData.ground_layers) projects onto, so it
+# lands on the sand and nothing else. Layer 1 stays, for the sun.
+@export_flags_3d_render var contact_layers: int = 1 << 18:
+	set(value):
+		contact_layers = value
+		_apply_contact_layers()
 
 # Draws a small sphere at get_height_at() for every vertex of the current
 # relief grid - the exact same samples the relief mesh and its
@@ -1124,6 +1132,7 @@ func _ready() -> void:
 
 	_ready_done = true
 	_rebuild_ground_mesh_and_collision()
+	_apply_contact_layers()
 	_debug_assert_height_matches_shader_math()
 
 	_push_sea_level_uniform()
@@ -1134,6 +1143,24 @@ func _ready() -> void:
 	# defaults.
 	_push_canvas_paintings()
 	_check_landmass_interior_height_clears_water()
+
+# Layer 1 and contact_layers on the relief and every dressing strip.
+func _apply_contact_layers() -> void:
+	if not _ready_done:
+		return
+	var meshes: Array[MeshInstance3D] = [_relief_mesh_instance, mesh_instance]
+	for child in get_children():
+		if child is MeshInstance3D and String(child.name).begins_with(DRESSING_FRAME_NODE_PREFIX) and not child.is_queued_for_deletion():
+			meshes.append(child as MeshInstance3D)
+	for mesh_node: MeshInstance3D in meshes:
+		if mesh_node != null:
+			mesh_node.layers = 1 | contact_layers
+
+# The sea's level, world height - where the sand goes under the water.
+# -INF with no Sea.
+func get_sea_level() -> float:
+	var sea := get_node_or_null(sea_path) as Sea
+	return sea.sea_level if sea != null else -INF
 
 # sea_level drives both the shader's height-based wet band (shore_t()) and
 # this script's own landmass height formula (_landmass_distance()'s own
@@ -3114,6 +3141,7 @@ func _build_outer_flat_frame() -> void:
 func _rebuild_dressing_frame() -> void:
 	_clear_dressing_frame_extras()
 	_build_dressing_frame()
+	_apply_contact_layers()
 
 func _clear_dressing_frame_extras() -> void:
 	for child in get_children():

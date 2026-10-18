@@ -15,7 +15,7 @@ class_name ExitGate
 # channel's whole width while closed), its BlockContactArea, and the
 # TriggerArea on the inland side that fires floor_exited. Every export
 # that affects a built shape gets a setter so a Remote-tab edit rebuilds
-# it live, same pattern as contact_shadow.gd's radius/shadow_opacity.
+# it live, same pattern as contact_shadow.gd's footprint/fade.
 #
 # That is exit_kind CHANNEL. A LINE floor (FloorData.exit_kind) has none
 # of it - no channel is registered, the Blocker and its contact area stay

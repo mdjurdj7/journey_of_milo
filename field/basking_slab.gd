@@ -62,6 +62,13 @@ class_name BaskingSlab
 	set(value):
 		sink_depth = value
 		_ground_to_relief()
+# The render layers its meshes are on besides layer 1: what lies on it
+# can lay its contact pool here (ContactShadowData.perch_layers), and its
+# collision is in ContactShadow.STANDABLE_GROUP so the pool finds its top.
+@export_flags_3d_render var standable_layers: int = 1 << 17:
+	set(value):
+		standable_layers = value
+		_apply_standable_layers()
 @export_group("")
 
 @export var ground_path: NodePath = ^"../../Ground"
@@ -116,6 +123,7 @@ func _spawn_model() -> void:
 		_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
 		_apply_tint()
 	_aabb = PaintedProp.dress_model(_model, _material, self)
+	_apply_standable_layers()
 	if _aabb.size == Vector3.ZERO:
 		return
 	_collision_body = StaticBody3D.new()
@@ -129,6 +137,7 @@ func _spawn_model() -> void:
 	shape_node.shape = box
 	shape_node.position = _aabb.get_center()
 	_collision_body.add_child(shape_node)
+	_collision_body.add_to_group(ContactShadow.STANDABLE_GROUP)
 	add_child(_collision_body)
 
 # The model's box in this node's frame - its collision's; empty with no
@@ -155,6 +164,12 @@ func _apply_tint() -> void:
 		(_material as ShaderMaterial).set_shader_parameter("albedo_tint", tint)
 	elif _material is BaseMaterial3D:
 		(_material as BaseMaterial3D).albedo_color = tint
+
+func _apply_standable_layers() -> void:
+	if _model == null:
+		return
+	for node in _model.find_children("*", "VisualInstance3D", true, false):
+		(node as VisualInstance3D).layers = 1 | standable_layers
 
 func _push_fog() -> void:
 	PaintedProp.push_fog(_fog, _sky, fog_factor)

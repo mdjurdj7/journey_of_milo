@@ -400,7 +400,7 @@ func _measure_holder_box() -> AABB:
 	var have: bool = false
 	for node in holder.find_children("*", "MeshInstance3D", true, false):
 		var mesh_instance := node as MeshInstance3D
-		if mesh_instance.mesh == null or mesh_instance is ContactShadow or is_ancestor_of(mesh_instance):
+		if mesh_instance.mesh == null or is_ancestor_of(mesh_instance):
 			continue
 		var box: AABB = holder.global_transform.affine_inverse() * (mesh_instance.global_transform * mesh_instance.get_aabb())
 		union = box if not have else union.merge(box)

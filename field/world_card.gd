@@ -229,15 +229,11 @@ func _ready() -> void:
 	_holder_half_width = _measure_holder_half_width()
 
 # Half the holder's rendered width, in its own space - the FIGURE's, not
-# everything parented to her. Two things under her are meshes and neither
-# belongs in a silhouette:
-#   ContactShadow - a ground disc, radius 0.5, wider than she is (0.392).
-#                   Taking it would push the card ~11 cm further out for
-#                   no visible reason, since the disc is flat on the sand.
-#   this WorldCard - the far quad is a child of a child of hers. Measuring
-#                    the card to place the card is circular.
-# Both were actually hit before these two lines existed; the union is
-# still over every remaining mesh rather than one assumed model node.
+# everything parented to her. This WorldCard is under her and doesn't
+# belong in a silhouette: the far quad is a child of a child of hers, and
+# measuring the card to place the card is circular. (Her ContactShadow is
+# a Decal, not a mesh, so the search never meets it.) The union is still
+# over every remaining mesh rather than one assumed model node.
 func _measure_holder_half_width() -> float:
 	if holder_half_width > 0.0:
 		return holder_half_width
@@ -247,7 +243,7 @@ func _measure_holder_half_width() -> float:
 	var widest: float = 0.0
 	for node in holder.find_children("*", "MeshInstance3D", true, false):
 		var mesh_instance := node as MeshInstance3D
-		if mesh_instance.mesh == null or mesh_instance is ContactShadow or is_ancestor_of(mesh_instance):
+		if mesh_instance.mesh == null or is_ancestor_of(mesh_instance):
 			continue
 		var box: AABB = holder.global_transform.affine_inverse() * (mesh_instance.global_transform * mesh_instance.get_aabb())
 		widest = maxf(widest, maxf(absf(box.position.x), absf(box.position.x + box.size.x)))
