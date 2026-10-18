@@ -23,7 +23,7 @@ cost = 1
 card_type = 1
 rarity = 2
 target_type = 0
-description = "Target enemy's next Attack deals 8 less.
+description = "Garnish an attack. It deals 8 less.
 Gain 8 Toll."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_self_damage_toll"), SubResource("E_garnish")])
 art = ExtResource("4_art")

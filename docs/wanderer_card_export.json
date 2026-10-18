@@ -192,12 +192,12 @@
         "rule": "Deny's status: the enemy's next move is skipped - lost, not delayed; its pattern advances and the turn still counts, and its statuses still tick. Removed by that turn; doesn't stack, so a Denied enemy can't be targeted by another Deny. Its intent keeps its number, struck through."
       },
       {
-        "name": "Braced (enemy)",
-        "rule": "Brace's debuff: the enemy's next Attack deals 50% less, every hit; gone once that Attack resolves."
+        "name": "Braced (enemy intent)",
+        "rule": "Brace's mark, on one attack intent the enemy has queued (not the enemy, not its status row - the intent readout shows it): that attack deals 50% less, every hit of every action (both of Bereft's), rounded as before. Valid targets: an attack that will land - not a non-attack, not one landing as a strike back (the Siltjaw's Erupt), not one Denied, cancelled or interrupted - and one Brace per intent. Spent once that intent lands; lost if it is replaced, cancelled (Deny, a pain turn, an interrupt) or its enemy dies first. A Signal's out-of-turn answer neither reads nor spends it."
       },
       {
-        "name": "Garnished (enemy)",
-        "rule": "Garnish's debuff: the enemy's next Attack deals 5 less in all, not per hit - its hits soak the 5 in order, none below 0 (Tail Lash 4×3 lands 0, 3, 4). After Braced's 50%, before Block. Copies add up (two: 10 less). Gone once that Attack resolves; a non-attack move, a Denied or interrupted Attack leave it standing."
+        "name": "Garnished (enemy intent)",
+        "rule": "Garnish's mark, on one attack intent the enemy has queued, under Brace's rule (valid targets, spent and lost the same way): that attack deals 5 less in all, not per hit - its hits soak the 5 in order, none below 0 (Tail Lash 4×3 lands 0, 3, 4) - and each of Bereft's two actions loses its own 5. After Braced's 50%, before Block. One Garnish per intent (Garnish+'s counts); an intent can carry one Brace and one Garnish."
       },
       {
         "name": "Unbroken (you)",
@@ -447,15 +447,15 @@
       "face_type_label": "GUARD",
       "energy_cost": 1,
       "rarity": "COMMON",
-      "card_text": "Target enemy's next Attack deals 50% less damage.",
+      "card_text": "Brace against an attack. Halve its damage.",
       "face_hp_line": null,
-      "card_text_template": "Target enemy's next Attack deals 50% less damage.",
-      "targeting": "enemy",
+      "card_text_template": "Brace against an attack. Halve its damage.",
+      "targeting": "an enemy's attack intent (its readout, or its body for its queued intent)",
       "removal_after_play": "discard pile",
       "effects": [
         {
           "type": "APPLY_STATUS_TO_TARGET",
-          "plain_english": "Apply Braced to the target enemy: Its next Attack deals 50% less damage."
+          "plain_english": "Brace the targeted attack intent: every hit of it deals 50% less. Unplayable while no valid intent shows."
         }
       ],
       "keywords": [],
@@ -474,9 +474,10 @@
         "name": "Braced",
         "description": "Its next Attack deals 50% less damage.",
         "file_path": "res://battle/rules/statuses/braced.tres",
-        "duration": "until triggered",
+        "duration": "until its intent resolves",
         "stack_rule": "REFRESH_DURATION",
-        "applied_to": "target enemy",
+        "applied_to": "target enemy's queued attack intent",
+        "intent_mark": "brace",
         "magnitude": -50,
         "consumed_by_holders_attack": true
       },
@@ -492,7 +493,12 @@
       "rules_font_px": 15,
       "battle_animation": "Brace",
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Brace+",
+        "file_path": "res://cards/tempered/brace_tempered.tres",
+        "card_text": "Brace against an attack. Halve its damage.\nDraw 1.",
+        "changes": "Draw 1 after the Brace; cost 1, the same Brace."
+      },
       "starting_deck_count": 2,
       "in_reward_pool": false,
       "in_belongings_pool": false,
@@ -1032,10 +1038,10 @@
       "face_type_label": "TOLL",
       "energy_cost": 1,
       "rarity": "UNCOMMON",
-      "card_text": "Target enemy's next Attack deals 5 less.\nGain 5 Toll.",
+      "card_text": "Garnish an attack. It deals 5 less.\nGain 5 Toll.",
       "face_hp_line": "−1 HP",
-      "card_text_template": "Target enemy's next Attack deals 5 less.\nGain 5 Toll.",
-      "targeting": "enemy",
+      "card_text_template": "Garnish an attack. It deals 5 less.\nGain 5 Toll.",
+      "targeting": "an enemy's attack intent (its readout, or its body for its queued intent)",
       "removal_after_play": "discard pile",
       "effects": [
         {
@@ -1044,7 +1050,7 @@
         },
         {
           "type": "APPLY_STATUS_TO_TARGET",
-          "plain_english": "Apply Garnished 5 to the target enemy: Its next Attack deals 5 less."
+          "plain_english": "Garnish the targeted attack intent: it deals 5 less in all. Unplayable while no valid intent shows."
         }
       ],
       "keywords": [
@@ -1065,9 +1071,10 @@
         "name": "Garnished",
         "description": "Its next Attack deals {value} less.",
         "file_path": "res://battle/rules/statuses/garnished.tres",
-        "duration": "until triggered",
+        "duration": "until its intent resolves",
         "stack_rule": "ADD_MAGNITUDE",
-        "applied_to": "target enemy",
+        "applied_to": "target enemy's queued attack intent",
+        "intent_mark": "garnish",
         "magnitude": 5,
         "reduces_attack_total": true,
         "consumed_by_holders_attack": true
@@ -1084,7 +1091,12 @@
       "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Garnish+",
+        "file_path": "res://cards/tempered/garnish_tempered.tres",
+        "card_text": "Garnish an attack. It deals 8 less.\nGain 8 Toll.",
+        "changes": "8 less and 8 Toll in place of 5 (its own status, Garnished 8); cost 1, the same 1 HP."
+      },
       "starting_deck_count": 0,
       "in_reward_pool": true,
       "in_belongings_pool": false,
