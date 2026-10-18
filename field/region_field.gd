@@ -535,6 +535,10 @@ var _line_stance_spacing: float = 0.0
 # (Wanderer.enter_battle_stance_along()) - added to the opening hold.
 var _stance_walk_seconds: float = 0.0
 var _battle_members: Array[FieldEnemy] = []
+# The EncounterSlot the fight's members came from (FieldEnemy.slot_id),
+# kept as it opens: a member killed mid-fight is freed while it is still
+# in _battle_members, so nothing reads the slot off one.
+var _battle_slot_id: StringName = &""
 var _last_fallen_at: Vector3 = Vector3.ZERO
 var _last_fallen_data: EnemyData = null
 # Every enemy killed in the fight in progress - what a keepsake drop is
@@ -2321,7 +2325,7 @@ func get_battle_overlay() -> BattleOverlay:
 func is_battle_exempt_prop(prop: Node) -> bool:
 	if not _battle_open or _battle_members.is_empty():
 		return false
-	if prop.has_meta(ENCOUNTER_SLOT_META) and StringName(prop.get_meta(ENCOUNTER_SLOT_META)) == _battle_members[0].slot_id:
+	if prop.has_meta(ENCOUNTER_SLOT_META) and StringName(prop.get_meta(ENCOUNTER_SLOT_META)) == _battle_slot_id:
 		return true
 	var raised := PackedVector2Array()
 	for member in _battle_members:
@@ -2566,6 +2570,7 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	var overlay := (load(BATTLE_OVERLAY_SCENE_PATH) as PackedScene).instantiate() as BattleOverlay
 	battle_layer.add_child(overlay)
 	_battle_members = _battle_members_for(enemy)
+	_battle_slot_id = _battle_members[0].slot_id
 	_fight_elite = false
 	_fight_top_tier = false
 	var members: Array[Dictionary] = []
@@ -3037,6 +3042,7 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 		if is_instance_valid(member) and not member.is_queued_for_deletion():
 			standing.append(member)
 	_battle_members.clear()
+	_battle_slot_id = &""
 
 	deck_panel.show_whole_deck(RunState.deck)
 

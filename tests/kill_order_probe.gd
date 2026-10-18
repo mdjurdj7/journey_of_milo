@@ -14,6 +14,11 @@ extends SceneTree
 #   carve_two          - two in one card, then the last alone
 #   carve_three        - all three in one card
 #   last_normal        - two in one card, the last by a single attack
+#   card_kill_then_turn - the first killed by a real Slash played at it
+#                        (request_play() / confirm_target()), then End
+#                        Turn: the enemy turn must run through without a
+#                        script error, the two left alive and the next
+#                        player turn begun - then the two killed
 #   pair_anchor_first  - floor 2's required pair, the Sputter and the
 #                        Underfoot, the Sputter first
 #   pair_other_first   - the same pair, the Underfoot first
@@ -58,6 +63,29 @@ const SAFETY_SECONDS := 300.0
 # (0.6 s) to land.
 const WIN_WAIT_SECONDS := 6.0
 const SETTLE_FRAMES := 90
+const SLASH_PATH := "res://cards/data/slash.tres"
+# card_kill_then_turn: the enemy turn after the kill, up to this long.
+const ENEMY_TURN_WAIT_SECONDS := 20.0
+# Frames the field runs on once the killed body is freed, for anything
+# still reading it.
+const BODY_GONE_FRAMES := 30
+
+# Every script error while installed (OS.add_logger()) - one doesn't stop
+# a headless probe, it just abandons the function (the game, under the
+# debugger, stops on it), so a case that must run clean counts them itself.
+class ErrorCounter extends Logger:
+	var errors: Array[String] = []
+	var _lock: Mutex = Mutex.new()
+
+	func _log_error(function: String, file: String, line: int, code: String, rationale: String, _editor_notify: bool, error_type: int, _script_backtraces: Array[ScriptBacktrace]) -> void:
+		if error_type != ERROR_TYPE_SCRIPT:
+			return
+		_lock.lock()
+		errors.append("%s:%d %s(): %s" % [file, line, function, rationale if rationale != "" else code])
+		_lock.unlock()
+
+	func _log_message(_message: String, _error: bool) -> void:
+		pass
 
 var _field: Node3D = null
 var _failures: int = 0
@@ -73,6 +101,16 @@ func _initialize() -> void:
 	for order in ["one_at_a_time", "carve_two", "carve_three", "last_normal"]:
 		run_state.set("current_floor_index", 1)
 		await _run_case(order, &"island", false)
+	# A deck of Slashes, so the first hand has the single-target card;
+	# the starting deck back after.
+	var starting_deck: Variant = run_state.get("deck")
+	var slashes: Array[CardData] = []
+	for i in 10:
+		slashes.append((load(SLASH_PATH) as CardData).duplicate() as CardData)
+	run_state.set("deck", slashes)
+	run_state.set("current_floor_index", 1)
+	await _run_case("card_kill_then_turn", &"island", false)
+	run_state.set("deck", starting_deck)
 	for order in ["pair_anchor_first", "pair_other_first"]:
 		run_state.set("current_floor_index", 1)
 		await _run_case(order, &"crab", true)
@@ -181,6 +219,8 @@ func _run_case(order: String, group: StringName, expect_cleared: bool) -> void:
 			controller.call("_check_battle_end")
 		"nettlebasket":
 			await _check_nettlebasket(order, controller, combatants, members)
+		"card_kill_then_turn":
+			await _check_card_kill_then_turn(order, controller, combatants, members)
 
 	var start: int = ProbePlay.cap_msec()
 	while bool(_field.get("_battle_open")) and ProbePlay.cap_msec() - start < int(WIN_WAIT_SECONDS * 1000.0):
@@ -254,6 +294,54 @@ func _check_nettlebasket(order: String, controller: Node, combatants: Dictionary
 		await ProbePlay.settle(self, controller)
 	_check(order, seen.size() > 1, "alone, she queued one move every turn (%s)" % ", ".join(seen))
 	_kill(controller, combatants, basket)
+	controller.call("_check_battle_end")
+
+# Floor 2's island trio: the first dragonfly killed by a Slash played at
+# it through the hand, as a player would, its death seen through; then End
+# Turn, and the enemy turn must finish, the two others alive and the next
+# player turn begun - and no script error from the kill until its body is
+# freed and the field has run on past it (the fight's first member, which
+# RegionField read every frame once it was gone). Then the two are killed.
+func _check_card_kill_then_turn(order: String, controller: Node, combatants: Dictionary, members: Array) -> void:
+	await ProbePlay.settle_fight(self, _field, controller)
+	_check(order, members.size() == 3, "%d dragonfly(s) in the fight, expected 3" % members.size())
+	var errors := ErrorCounter.new()
+	OS.add_logger(errors)
+	var first: Node = members[0]
+	var first_combatant: RefCounted = combatants.get(first)
+	# One Slash's worth left, so the card is the kill.
+	first_combatant.set("hp", 1)
+	controller.get("player").set("energy", 99)
+	var views: Array = controller.get("_hand_container").call("_card_views")
+	_check(order, not views.is_empty(), "no card in hand to play")
+	if not views.is_empty():
+		controller.call("request_play", views[0])
+		if bool(controller.call("is_awaiting_target")):
+			controller.call("confirm_target", first)
+		await ProbePlay.settle(self, controller)
+		_check(order, await ProbePlay.settle_kills(self, controller), "the Slash's kill never settled")
+	_check(order, int(first_combatant.get("hp")) <= 0, "the Slash left the first dragonfly at %d HP" % int(first_combatant.get("hp")))
+	var turn_before: int = int(controller.get("_player_turn"))
+	controller.call("end_turn")
+	var turned: bool = await ProbePlay.wait_until(self, func() -> bool:
+		return int(controller.get("_player_turn")) > turn_before and ProbePlay.is_settled(controller), ENEMY_TURN_WAIT_SECONDS)
+	_check(order, turned, "the enemy turn after the kill never handed back a player turn")
+	var freed: bool = await ProbePlay.wait_until(self, func() -> bool:
+		return not is_instance_valid(first), ENEMY_TURN_WAIT_SECONDS)
+	_check(order, freed, "the first dragonfly's body was never freed")
+	for i in BODY_GONE_FRAMES:
+		await process_frame
+	OS.remove_logger(errors)
+	if not errors.errors.is_empty():
+		_fail(order, "%d script error(s) after the kill, the first: %s" % [errors.errors.size(), errors.errors[0]])
+	var alive: int = 0
+	for member in members.slice(1):
+		var combatant: RefCounted = combatants.get(member)
+		if combatant != null and int(combatant.get("hp")) > 0:
+			alive += 1
+	_check(order, alive == 2, "%d dragonfly(s) alive after the enemy turn, expected 2" % alive)
+	for member in members.slice(1):
+		_kill(controller, combatants, member)
 	controller.call("_check_battle_end")
 
 func _queued_intent(combatants: Dictionary, member: Node) -> Resource:
