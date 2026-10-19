@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 32,
+    "total_unique_wanderer_cards": 33,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 28,
+      "count": 29,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -80,11 +80,12 @@
         "Claw Back",
         "Gnaw",
         "Settled Account",
-        "Reckoning"
+        "Reckoning",
+        "In the Red"
       ],
       "by_rarity": {
         "COMMON": 9,
-        "UNCOMMON": 11,
+        "UNCOMMON": 12,
         "RARE": 8
       },
       "weights": "all 1.0 (weights array empty)"
@@ -102,18 +103,20 @@
       "where": "floor 2's belongings (a RewardSpread prop on region1_floor2.tres)"
     },
     "wanderer_card_types": {
-      "SKILL": 15,
+      "SKILL": 16,
       "ATTACK": 11,
       "POWER": 4,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
       "COMMON": 13,
-      "UNCOMMON": 11,
+      "UNCOMMON": 12,
       "RARE": 8
     },
     "implemented_but_not_obtainable": [],
-    "missing_art": [],
+    "missing_art": [
+      "In the Red"
+    ],
     "neutral_cards_missing_art": [
       "Endure",
       "Left Hand",
@@ -134,7 +137,7 @@
     "keywords_and_mechanics": [
       {
         "name": "Energy",
-        "rule": "Per-turn resource that pays a card's cost; 3 per turn."
+        "rule": "Per-turn resource that pays a card's cost; 3 per turn. Gained Energy can stand above that for the turn (In the Red); each turn starts on the refill."
       },
       {
         "name": "Toll",
@@ -162,7 +165,7 @@
       },
       {
         "name": "Self-damage",
-        "rule": "Bypasses block and absorb, makes Toll, opens no Grace, can kill (Down Payment's and Blood Advance's never take you below 1)."
+        "rule": "Bypasses block and absorb, makes Toll, opens no Grace, can kill (Down Payment's, Blood Advance's and In the Red's never take you below 1)."
       },
       {
         "name": "Stance",
@@ -626,7 +629,7 @@
         "path": "res://assets/audio/cards/Claw Back/Claw Back.mp3",
         "critical_sound_pitch": 0.85,
         "critical_sound_volume_db": 2.0,
-        "rule": "Played while Critical (judged at play, before Self-Eater's price is paid), the sound plays at pitch 0.85 and 2 dB louder."
+        "rule": "Played while Critical (judged at play, at the HP left after Self-Eater's price, as the face reads it), the sound plays at pitch 0.85 and 2 dB louder."
       },
       "art_path": "res://cards/art/Wanderer/Claw Back.png",
       "rules_font_px": 15,
@@ -1232,6 +1235,88 @@
       "obtainable_from": [
         "wanderer_reward_pool",
         "belongings_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "In the Red",
+      "file_path": "res://cards/data/in_the_red.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "TOLL",
+      "energy_cost": 0,
+      "rarity": "UNCOMMON",
+      "card_text": "Gain 1 Energy.\nCritical: 1 more, and draw 2.\nSpent.",
+      "face_hp_line": "−8 HP",
+      "card_text_template": "Gain {energy} Energy.\n{if}Critical: {bonus_energy} more, and draw {draw}.{/if}\nSpent.",
+      "targeting": "self",
+      "removal_after_play": "Spent: leaves this fight's rotation once played",
+      "effects": [
+        {
+          "type": "SELF_DAMAGE_TOLL",
+          "plain_english": "Lose up to 8 HP, never below 1: bypasses block and absorb, makes 1 Toll per HP actually lost, opens no Grace. No top-up (toll_gain 0), so near 1 HP it makes less. The text leaves the loss and its Toll unsaid: the face's −8 HP line shows the HP."
+        },
+        {
+          "type": "GAIN_ENERGY",
+          "plain_english": "Gain 1 Energy. Not capped at the maximum: Energy can stand above 3 for the turn (the readout adds pips past the row); the next turn starts on the usual refill."
+        },
+        {
+          "type": "GAIN_ENERGY",
+          "plain_english": "If you are Critical after the loss, gain 1 more Energy (condition CRITICAL, a gate)."
+        },
+        {
+          "type": "DRAW",
+          "plain_english": "If you are Critical after the loss, draw 2 cards (condition CRITICAL, a gate)."
+        }
+      ],
+      "keywords": [
+        "Critical",
+        "Spent"
+      ],
+      "self_hp_cost": 8,
+      "base_damage": null,
+      "base_block": null,
+      "draw": 2,
+      "energy_gain": "1, and 1 more while Critical (2 in all)",
+      "toll_gain": 8,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "status_effect": null,
+      "critical_condition": {
+        "rule": "Critical = HP at or below 30% of max HP, read from the fighter's own threshold after this card's 8 HP is lost - the loss itself can tip it in.",
+        "effect": "GAIN_ENERGY + DRAW",
+        "normal_value": "1 Energy",
+        "critical_value": "2 Energy and draw 2"
+      },
+      "dynamic_values": [
+        {
+          "field": "Critical clause",
+          "rule": "In a battle hand the Critical clause is in ink when playing the card now would leave you Critical (HP after the 8), grey otherwise; Gain 1 Energy is always in ink.",
+          "default_displayed": "all in ink outside a fight"
+        },
+        {
+          "field": "cost",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "default_displayed": 0
+        }
+      ],
+      "art_path": null,
+      "rules_font_px": 15,
+      "battle_animation": null,
+      "play_effect_scene_path": null,
+      "upgrade_data": {
+        "name": "In the Red+",
+        "file_path": "res://cards/tempered/in_the_red_tempered.tres",
+        "card_text": "Gain 1 Energy.\nCritical: 1 more, and draw 3.\nSpent.",
+        "changes": "Draw 3 in place of 2 when Critical; cost 0, the same 8 HP and Energy."
+      },
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
       ],
       "not_obtainable_in_play": false
     },
