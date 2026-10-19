@@ -99,3 +99,34 @@ static func state(card: CardData, ctx: EffectContext) -> State:
 		if EffectResolver.condition_met(effect, ctx):
 			return State.LIVE
 	return State.DORMANT if has_condition else State.NONE
+
+# The HP `card` will have paid before its first conditional or damage
+# effect reads anything - what state() is judged against, through
+# EffectContext.for_card_preview(): `replaced_hp` (a cost replacement's,
+# Collateral - paid before any effect, see EffectResolver.resolve_card()),
+# the stance's per-Attack price, and the card's own self-loss authored
+# ahead of its conditions (In the Red's 8). Self-loss authored after
+# (Bite Down's, Last Wager's - the Wanderer's attack-then-pay convention)
+# is paid too late to count. The card face and the play sound both ask
+# here, so the sound is lifted exactly when the face shows the clause live.
+#
+# The effects that end the count: every damage type (CardView.DAMAGE_
+# EFFECT_TYPES) and Reckoning's TOLL_DAMAGE.
+const HP_COST_STOPS: Array = [CardEffect.EffectType.DAMAGE, CardEffect.EffectType.FIRST_CARD_DAMAGE,
+	CardEffect.EffectType.DAMAGE_ALL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_DAMAGE]
+
+static func upfront_hp_cost(card: CardData, stance: Stance, replaced_hp: int) -> int:
+	if card == null:
+		return 0
+	var total: int = replaced_hp
+	if card.card_type == CardData.CardType.ATTACK:
+		total += Stance.attack_hp_loss(stance)
+	for effect in card.effects:
+		if effect == null:
+			continue
+		if effect.effect_type == CardEffect.EffectType.SELF_DAMAGE or effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL:
+			total += effect.value
+			continue
+		if effect.condition != CardEffect.Condition.NONE or HP_COST_STOPS.has(effect.effect_type):
+			break
+	return total

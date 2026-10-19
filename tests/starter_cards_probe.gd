@@ -22,6 +22,13 @@ const GARNISH_PATH := "res://cards/data/garnish.tres"
 # sentences (Sentence's countdown and its hurry; The Return's count and
 # its Drain). Every other status-applying effect is one line.
 const TWO_LINE_STATUS_CARDS: Array[String] = ["Sentence", "The Return", "Sentence+", "The Return+"]
+# Cards whose upfront SELF_DAMAGE_TOLL has no line of its own - the badge's
+# HP says it, and its Toll goes unsaid (In the Red: four steps and Spent
+# don't fit the face's three lines).
+const UNSAID_TOLL_CARDS: Array[String] = ["In the Red", "In the Red+"]
+# Cards whose Critical-gated effects in a row share one clause line ("1
+# more, and draw 2"); every other step is a line of its own.
+const ONE_CRITICAL_LINE_CARDS: Array[String] = ["In the Red", "In the Red+"]
 # The rules text size each card lands at outside a fight; any card not
 # listed fits at the first size, 15, cleanly - inside the rules margins
 # (CardView.rules_margin_px) and no lone last word. A card that moves
@@ -472,8 +479,10 @@ func _check_lasting_cards_leave_rotation() -> void:
 #   - one line per resolution step, in order - TOLL_DAMAGE and TOLL_HEAL
 #     spend and then act (2), a hit with a Toll repeat (repeat_toll_cost)
 #     lands and then repeats (2), SELF_DAMAGE_TOLL's line is its Toll (the
-#     HP is the badge's), a conditional upgrade shares its effect's line,
-#     and TWO_LINE_STATUS_CARDS' status takes 2 - then a Critical cost
+#     HP is the badge's; none for UNSAID_TOLL_CARDS), a conditional upgrade
+#     shares its effect's line, ONE_CRITICAL_LINE_CARDS' Critical gates in
+#     a row share one, and TWO_LINE_STATUS_CARDS' status takes 2 - then a
+#     Critical cost
 #     (critical_cost) as "Critical: costs N.", and the scope last:
 #     "Spent." for a SPENT card, "Consumed." for a CONSUMED one.
 func _check_rules_text_pattern() -> void:
@@ -492,6 +501,7 @@ func _check_rules_text_pattern() -> void:
 			var upfront: bool = true
 			var hp_total: int = 0
 			var upfront_hp: int = 0
+			var after_critical_gate: bool = false
 			for effect in card.effects:
 				var self_loss: bool = effect.effect_type == CardEffect.EffectType.SELF_DAMAGE or effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL
 				if self_loss:
@@ -499,7 +509,7 @@ func _check_rules_text_pattern() -> void:
 				if self_loss and upfront:
 					upfront_hp += effect.value
 					# Its Toll is still something the card does.
-					if effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL:
+					if effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL and not UNSAID_TOLL_CARDS.has(card.card_name):
 						expected += 1
 					continue
 				upfront = false
@@ -508,7 +518,10 @@ func _check_rules_text_pattern() -> void:
 					_expect_eq(at, "Then lose %d HP." % effect.value, "%s's HP after another effect reads on its own line %d" % [card.card_name, expected + 1])
 					expected += 1
 					continue
-				expected += _lines_for(effect, card)
+				var critical_gate: bool = effect.condition == CardEffect.Condition.CRITICAL and CardBonus.mode(effect) == CardBonus.Mode.GATE
+				if not (critical_gate and after_critical_gate and ONE_CRITICAL_LINE_CARDS.has(card.card_name)):
+					expected += _lines_for(effect, card)
+				after_critical_gate = critical_gate
 			if upfront_hp > 0:
 				_expect(lose_regex.search(card.description) == null, "%s's upfront HP is the badge's alone, not its text: %s" % [card.card_name, card.description])
 			# A Critical cost (CardData.critical_cost) says so on its own

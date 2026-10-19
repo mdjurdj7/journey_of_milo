@@ -1409,9 +1409,12 @@ func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
 
 # Whether `card`'s condition is live as it is committed - the face's
 # reading (CardBonus.state()) of the battle as it stands then: the card's
-# Energy paid, nothing of it resolved, no HP price counted, and itself not
-# among the cards played before it (the commit has already counted it).
-# Critical on Claw Back is exactly the player's Critical then.
+# Energy paid, nothing of it resolved, and itself not among the cards
+# played before it (the commit has already counted it). Critical is read
+# at the HP the card will have paid before its conditions, as the face
+# reads it (CardBonus.upfront_hp_cost()): In the Red's own 8, the stance's
+# price on an Attack. Not a cost replacement's HP (Collateral): its charge
+# is spent at the commit, so the player can no longer say what it was.
 func _condition_live_at_commit(card: CardData) -> bool:
 	if battle_controller == null or battle_controller.player == null:
 		return false
@@ -1421,7 +1424,8 @@ func _condition_live_at_commit(card: CardData) -> bool:
 	# will actually spend some.
 	if TollBlockEffect.spendable_by_card(card, ctx.player.toll, ctx.player.stance) > 0:
 		return true
-	return CardBonus.state(card, ctx) == CardBonus.State.LIVE
+	var paid: EffectContext = ctx.for_card_preview(CardBonus.upfront_hp_cost(card, ctx.player.stance, 0))
+	return CardBonus.state(card, paid) == CardBonus.State.LIVE
 
 # A drawn card leaves the deck: the draw sound, on the next voice, its
 # pitch jittered.

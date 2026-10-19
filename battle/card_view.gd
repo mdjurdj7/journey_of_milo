@@ -96,6 +96,11 @@ const MARK_BATTLE_CLOSE := "{/battle}"
 const MARK_OUTSIDE_OPEN := "{outside}"
 const MARK_OUTSIDE_CLOSE := "{/outside}"
 const TOKEN_DRAW := "{draw}"
+# The Energy a GAIN_ENERGY gives: {energy} the card's first (In the Red's
+# unconditional 1), {bonus_energy} its first conditional one (the 1 more
+# when Critical).
+const TOKEN_ENERGY := "{energy}"
+const TOKEN_BONUS_ENERGY := "{bonus_energy}"
 # How many cards a SET_ASIDE (Bide) sets aside - its value.
 const TOKEN_SET_ASIDE := "{set_aside}"
 const TOKEN_HP_COST := "{hp_cost}"
@@ -738,6 +743,14 @@ func _resolve_tokens(description: String) -> String:
 		var draw: int = _effect_value(card_data, [CardEffect.EffectType.DRAW])
 		if draw >= 0:
 			text = text.replace(TOKEN_DRAW, str(draw))
+	if text.contains(TOKEN_BONUS_ENERGY):
+		var bonus_energy: int = _bonus_effect_value(card_data, [CardEffect.EffectType.GAIN_ENERGY])
+		if bonus_energy >= 0:
+			text = text.replace(TOKEN_BONUS_ENERGY, str(bonus_energy))
+	if text.contains(TOKEN_ENERGY):
+		var energy: int = _effect_value(card_data, [CardEffect.EffectType.GAIN_ENERGY])
+		if energy >= 0:
+			text = text.replace(TOKEN_ENERGY, str(energy))
 	if text.contains(TOKEN_SET_ASIDE):
 		var set_aside: int = _effect_value(card_data, [CardEffect.EffectType.SET_ASIDE])
 		if set_aside >= 0:
@@ -1706,26 +1719,11 @@ func _replaced_cost_hp() -> int:
 	return _bonus_context.player.replaced_cost_hp(card_data)
 
 # The HP paid before this card's first conditional or damage effect reads
-# anything: a cost replacement's HP and the stance's per-Attack cost
-# (both paid before any effect, see EffectResolver.resolve_card()) and
-# the card's own self-damage authored ahead of it (none is, now). What
-# the face judges Critical against, so it shows the number the card will
-# land for, not the one it would at the HP held now. Self-damage authored after (Bite Down's, Last Wager's - the
-# Wanderer's attack-then-pay convention) is paid too late to count.
+# anything (CardBonus.upfront_hp_cost(), which the play sound reads too).
+# What the face judges Critical against, so it shows the number the card
+# will land for, not the one it would at the HP held now.
 func _upfront_hp_cost() -> int:
-	var total: int = _replaced_cost_hp()
-	if card_data.card_type == CardData.CardType.ATTACK:
-		total += Stance.attack_hp_loss(_stance)
-	for effect in card_data.effects:
-		if effect == null:
-			continue
-		if effect.effect_type == CardEffect.EffectType.SELF_DAMAGE or effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL:
-			total += effect.value
-			continue
-		if effect.condition != CardEffect.Condition.NONE or DAMAGE_EFFECT_TYPES.has(effect.effect_type) \
-				or effect.effect_type == CardEffect.EffectType.TOLL_DAMAGE:
-			break
-	return total
+	return CardBonus.upfront_hp_cost(card_data, _stance, _replaced_cost_hp())
 
 # The attack bonus one half of the face prints. On a card whose damage is
 # conditional on Critical, each half is read in its own state - the {if}

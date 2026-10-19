@@ -13,7 +13,7 @@ class_name AttackBonus
 #
 # `at_hp` is the HP Critical is judged at: the player's own when the
 # attack lands, what it will be once the card's own costs are paid when a
-# face previews it (see CardView._upfront_hp_cost()).
+# face previews it (see CardBonus.upfront_hp_cost()).
 static func for_player(player: Combatant, at_hp: int) -> int:
 	if player == null:
 		return 0
