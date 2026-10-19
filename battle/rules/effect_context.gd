@@ -106,11 +106,16 @@ var on_mound_broken: Callable = Callable()
 # Called as on_block_gained.call(amount) when the player gains Block
 # (gain_block()) - the view's number for it.
 var on_block_gained: Callable = Callable()
-# Called as on_repeat.call() when a hit is about to land again (Card
-# Effect.repeat_toll_cost - Second Swing), before its Toll is spent: what
-# the card reports from then on is the repeat's, which the view presents
-# as its own follow-up blow. Nothing the rules decide reads it.
-var on_repeat: Callable = Callable()
+# Called as on_replay.call() by a REPLAY_LAST_ATTACK (Second Swing): the
+# view replays the last Attack itself once this card has resolved - its
+# swing, impact and reports as a blow of their own (BattleController._
+# replay_attack()). Unset (a bare rules context), the effect replays it
+# on the spot (ReplayLastAttackEffect).
+var on_replay: Callable = Callable()
+# This context is a replay's (Second Swing): the card resolving was
+# played before, and isn't played now - nothing that waits for an Attack
+# card is spent by it, and nothing doubles it (Bent Nail).
+var is_replay: bool = false
 # Called as on_extra_hit.call() before each further hit of a repeating
 # hit (CardEffect.repeat_per_earlier_play_tag - Lash): what the card
 # reports from then on is that hit's, which the view shows a beat after
@@ -136,7 +141,7 @@ func take_attack_bonus() -> int:
 	return bonus
 
 # The attack bonus for a REPEATED hit of the card being resolved (Card
-# Effect.repeat_toll_cost - Second Swing): the ongoing part alone (Attack
+# Effect.repeat_per_earlier_play_tag - Lash): the ongoing part alone (Attack
 # Bonus.ongoing_for_player()), every time it's asked - a one-shot charge
 # went with the first hit, and spends nothing here. 0 on anything but an
 # ATTACK. The mark is paid to the repeat as well, a charge for each hit
@@ -173,8 +178,8 @@ func take_mark_bonus(enemy: Combatant) -> int:
 	mark_bonus_paid.append(enemy)
 	return Status.spend_mark_bonus(enemy.statuses)
 
-# A hit of this card is landing again (CardEffect.repeat_toll_cost -
-# Second Swing): its mark is paid again on each enemy the repeat strikes,
+# A hit of this card is landing again (CardEffect.repeat_per_earlier_
+# play_tag - Lash): its mark is paid again on each enemy the repeat strikes,
 # so the next take_mark_bonus() there takes the bonus and spends another
 # charge - while a charge is left; a mark the first hit spent the last of
 # is gone, and the repeat lands bare.

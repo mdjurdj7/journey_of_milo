@@ -66,8 +66,7 @@ func setup() -> void:
 	_strike_player.bus = BUS_NAME
 	add_child(_strike_player)
 
-# `pitch_multiplier` scales the jittered pitch - a follow-up swing's
-# whoosh sits a little higher (Wanderer.follow_through_pitch).
+# `pitch_multiplier` scales the jittered pitch.
 func play_swing(pitch_multiplier: float = 1.0) -> void:
 	var clip: AudioStream = _pool.next()
 	if clip == null or _player == null:

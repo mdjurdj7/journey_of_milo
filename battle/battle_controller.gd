@@ -16,14 +16,12 @@ signal card_impact(card: CardData)
 # the swing's onset. Clamped to the impact delay itself: a card whose
 # delay is shorter than the lead swings at its play instant.
 signal card_swing(card: CardData)
-# A card's hit lands again (CardEffect.repeat_toll_cost - Second Swing),
-# as a blow of its own: card_repeat_swing fires second_swing_lead before
-# its impact - the Wanderer's follow-through and whoosh; the Toll it
-# spends leaves the readout (toll_changed) in the same frame - and
-# card_repeat_impact at it, the repeat's damage_dealt and HP changes
-# following at once in that frame. Both after the card's own card_impact.
-signal card_repeat_swing(card: CardData, target: FieldEnemy)
-signal card_repeat_impact(card: CardData)
+# The last Attack played again (Second Swing - _replay_attack()), after
+# the card that replays it: the Wanderer swings it as if played - its
+# clip and lunge at `target` (null for an all-enemies Attack) - and its
+# card_swing and card_impact follow as a play's do. Not card_played: it
+# isn't one (no play sound, no hand, no cost).
+signal card_replayed(card: CardData, target: FieldEnemy)
 signal hand_changed()
 signal target_requested(card: CardData)
 signal target_cancelled()
@@ -147,12 +145,6 @@ signal battle_lost()
 @export var denied_beat_sec: float = 0.5
 # See card_swing.
 @export var swing_lead_seconds: float = 0.04
-# A repeated hit (Second Swing's) lands this long after the card's first
-# impact, the card's resolution and the input lock waiting on it...
-@export var second_swing_delay: float = 0.22
-# ...its follow-up swing starting this long before it (card_repeat_
-# swing), held to the delay.
-@export var second_swing_lead: float = 0.12
 # A card hit that lands several times as it resolves (CardEffect.repeat_
 # per_earlier_play_tag - Lash) shows them this far apart (seconds), the
 # first at the card's impact - each its own number, contact and the
@@ -295,13 +287,17 @@ var _death_release_running: bool = false
 # The last enemy is down and its death is running: battle_won waits for
 # it (_maybe_win()).
 var _win_waiting: bool = false
-# Set by the resolving card's EffectContext.on_repeat: its reports from
-# then on are the repeat's, held here until its own impact (_land_repeat()).
-var _repeat_pending: bool = false
+# Set by the resolving card's EffectContext.on_replay (Second Swing): the
+# last Attack is played again once the card has resolved (_replay_attack()).
+var _replay_pending: bool = false
+# The FieldEnemy and mound the last Attack this turn was played at - what
+# Combatant.last_attack_target is to the rules, for the view: where a
+# replay swings. Cleared with it each turn.
+var _last_attack_enemy: FieldEnemy = null
+var _last_attack_mound: int = -1
 # The Block the held pieces opened the fight with (TrinketData.combat_
 # start_block) - BattleOverlay shows it once the battle frame settles.
 var opening_block_gained: int = 0
-var _repeat_reports: Array[Callable] = []
 # Set by the resolving card's EffectContext.on_extra_hit: each further
 # hit's reports, one list per hit, held for that hit's beat (_land_extra_
 # hits()).
@@ -775,13 +771,42 @@ func _is_playable(card: CardData) -> bool:
 	# enemy-target card has nothing to land on.
 	if card.target_type == CardData.TargetType.ENEMY and not _has_valid_target(card):
 		return false
+	# Second Swing whose Attack's enemy is gone: another it can land on.
+	if _replay_needs_target(card) and not _has_valid_target(card):
+		return false
 	return true
+
+# Whether `card` replays the last Attack (Second Swing).
+func _replays(card: CardData) -> bool:
+	return _has_effect(card, CardEffect.EffectType.REPLAY_LAST_ATTACK)
+
+# The card whose targeting rules a play of `card` follows: the Attack it
+# replays for Second Swing - its taunt and its can-it-land, not the
+# Skill's - `card` itself for any other.
+func _targeting_card(card: CardData) -> CardData:
+	if card != null and _replays(card) and player != null and player.last_attack != null:
+		return player.last_attack
+	return card
+
+# Second Swing asks for a target only when its Attack was aimed at one
+# enemy and that enemy can't be hit now; an all-enemies Attack, or one
+# whose enemy still stands, replays where it went.
+func _replay_needs_target(card: CardData) -> bool:
+	if not _replays(card) or player == null or player.last_attack == null or player.last_attack_all:
+		return false
+	return not _last_attack_enemy_standing()
+
+func _last_attack_enemy_standing() -> bool:
+	var enemy: FieldEnemy = _last_attack_enemy
+	if enemy == null or not is_instance_valid(enemy) or not enemies.has(enemy):
+		return false
+	return _can_target(player.last_attack, _combatants.get(enemy))
 
 # The card goes on: an enemy-target card arms for its target (from
 # wherever it is held), any other resolves now.
 func _arm_or_play(card_view: CardView) -> void:
 	var card: CardData = card_view.card_data
-	if card.target_type == CardData.TargetType.ENEMY:
+	if card.target_type == CardData.TargetType.ENEMY or _replay_needs_target(card):
 		_pending_card_view = card_view
 		card_view.lift_and_hold(card_view == _choosing_card_view or _pending_consume_view != null or not _pending_consume_tie.is_empty())
 		target_requested.emit(card)
@@ -819,7 +844,7 @@ func _other_hand_views(card_view: CardView) -> Array[CardView]:
 # not buried, Deny not on the already Denied, and a single-target Attack
 # only on a taunting enemy while one stands).
 func _can_target(card: CardData, combatant: Combatant) -> bool:
-	return EffectResolver.can_target(card, combatant, _hittable_enemy_combatants())
+	return EffectResolver.can_target(_targeting_card(card), combatant, _hittable_enemy_combatants())
 
 # Whether `card` marks an intent (StatusData.intent_mark - Brace, Garnish):
 # aimed at an enemy's queued intent, its readout or its body.
@@ -845,7 +870,7 @@ func mark_refusal_for(card: CardData, enemy: FieldEnemy) -> EnemyTurn.MarkRefusa
 	return EnemyTurn.mark_refusal(combatant, enemy.enemy_data if enemy != null else null, status_data)
 
 func _has_valid_target(card: CardData) -> bool:
-	return EffectResolver.has_target(card, _hittable_enemy_combatants())
+	return EffectResolver.has_target(_targeting_card(card), _hittable_enemy_combatants())
 
 # How many cards a SET_ASIDE card may set aside right now: its number,
 # capped at the other cards in the hand. 0 for every other card.
@@ -1157,6 +1182,12 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	# own context carries the count from before it (below).
 	cards_played_this_turn += 1
 	player.count_play(card)
+	# The last Attack, for Second Swing - a real play only, never a replay.
+	if card.card_type == CardData.CardType.ATTACK:
+		var all_enemies: bool = card.target_type != CardData.TargetType.ENEMY
+		player.record_attack(card, null if all_enemies else _card_target(target_enemy, target_mound), all_enemies)
+		_last_attack_enemy = null if all_enemies else target_enemy
+		_last_attack_mound = -1 if all_enemies else target_mound
 
 	var target_name: String = target_enemy.enemy_data.enemy_name if target_enemy != null and target_enemy.enemy_data != null else ""
 	RunLogger.card_started(card.card_name, energy_paid, target_name)
@@ -1198,40 +1229,14 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 
 	card_impact.emit(card)
 
-	var ctx := EffectContext.new()
-	ctx.player = player
-	# A dug-in enemy is hit through its mounds: the card at a mound lands on
-	# that mound (EffectContext.landing_for() - nothing once it is gone),
-	# a card at every enemy on every mound standing.
-	ctx.target = _card_target(target_enemy, target_mound)
-	ctx.enemies = _card_enemy_combatants()
-	_wire_mounds(ctx)
-	ctx.deck = deck
+	var ctx: EffectContext = _card_context(target_enemy, target_mound)
 	ctx.cards_played_before_this = cards_played_this_turn - 1
 	ctx.tagged_plays_before_this = _tagged_plays_before(card)
 	ctx.replaced_cost_hp = replaced_hp
 	if replacement != null and replacement.data != null:
 		ctx.replaced_cost_source = "status:" + replacement.data.id
-	# A repeat's reports wait for its own impact (_land_repeat()); the
-	# rules have already decided them.
-	ctx.on_grace_reclaimed = func(amount: int) -> void:
-		_report_or_hold(_on_grace_reclaimed.bind(amount))
-	ctx.on_heal = func(amount: int) -> void:
-		_report_or_hold(_on_card_heal.bind(amount))
-	_card_damaged.clear()
-	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
-		# A mound is no enemy (draw_on_multi_hit counts enemies).
-		if target_combatant != player and target_combatant.mound_owner == null and amount > 0:
-			_card_damaged[target_combatant] = true
-		_report_or_hold(_report_damage.bind("player", target_combatant, amount, kind))
-	ctx.on_block = func(target_combatant: Combatant, blocked: int, damage_to_hp: int) -> void:
-		_report_or_hold(_report_block.bind(target_combatant, blocked, damage_to_hp))
-	ctx.on_block_gained = func(amount: int) -> void:
-		_report_or_hold(combat_text.emit.bind("player", amount, "block"))
-	ctx.on_repeat = func() -> void:
-		_repeat_pending = true
-	ctx.on_extra_hit = func() -> void:
-		_extra_hit_reports.append([])
+	ctx.on_replay = func() -> void:
+		_replay_pending = true
 	# Bide's chosen cards: their own views leave the hand just before the
 	# Deck sets their cards aside, so the marked copy is the one that goes.
 	for view in set_aside_views:
@@ -1253,16 +1258,12 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	_effect_resolver.resolve_card(card, ctx)
 	_deferring_pack_check = false
 	_multi_hit_report = false
-	_report_entry_block()
-	if _pack_check_due:
-		_pack_check_due = false
-		_mark_lone_pack_members()
-	_draw_for_multi_hit()
+	_after_card_effects()
 	_draw_for_card_count()
 	if not _extra_hit_reports.is_empty():
 		await _land_extra_hits()
-	if _repeat_pending:
-		await _land_repeat(card, target_enemy)
+	if _replay_pending:
+		await _replay_attack(target_enemy)
 	deck.end_play()
 	# A CONSUMED card leaves the run's deck when this fight ends: its play
 	# is a choice the run log keeps on its own line, whatever the card.
@@ -1273,6 +1274,102 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	# Then whoever it was played against strikes back (Coiled), before the
 	# previews and the battle-end check read where the play left things.
 	await _counter_strikes(attacked)
+	await _after_play()
+
+# A card's effect context for the fight as it stands, aimed at
+# `target_enemy` (at `target_mound` when it's dug in), its reports wired to
+# the view - each now, or held for a further hit's beat. The caller sets
+# what is the play's own (the turn's counts, a cost replacement).
+func _card_context(target_enemy: FieldEnemy, target_mound: int) -> EffectContext:
+	var ctx := EffectContext.new()
+	ctx.player = player
+	# A dug-in enemy is hit through its mounds: the card at a mound lands on
+	# that mound (EffectContext.landing_for() - nothing once it is gone),
+	# a card at every enemy on every mound standing.
+	ctx.target = _card_target(target_enemy, target_mound)
+	ctx.enemies = _card_enemy_combatants()
+	_wire_mounds(ctx)
+	ctx.deck = deck
+	ctx.on_grace_reclaimed = func(amount: int) -> void:
+		_report_or_hold(_on_grace_reclaimed.bind(amount))
+	ctx.on_heal = func(amount: int) -> void:
+		_report_or_hold(_on_card_heal.bind(amount))
+	_card_damaged.clear()
+	ctx.on_damage = func(target_combatant: Combatant, amount: int, kind: String) -> void:
+		# A mound is no enemy (draw_on_multi_hit counts enemies).
+		if target_combatant != player and target_combatant.mound_owner == null and amount > 0:
+			_card_damaged[target_combatant] = true
+		_report_or_hold(_report_damage.bind("player", target_combatant, amount, kind))
+	ctx.on_block = func(target_combatant: Combatant, blocked: int, damage_to_hp: int) -> void:
+		_report_or_hold(_report_block.bind(target_combatant, blocked, damage_to_hp))
+	ctx.on_block_gained = func(amount: int) -> void:
+		_report_or_hold(combat_text.emit.bind("player", amount, "block"))
+	ctx.on_extra_hit = func() -> void:
+		_extra_hit_reports.append([])
+	_card_damaged.clear()
+	return ctx
+
+# What follows any card's effects, a replay's too: the keepsake's Critical-
+# entry Block, the packs a kill left alone, and the once-a-turn draw for a
+# card that took HP from two enemies (Leg Band).
+func _after_card_effects() -> void:
+	_report_entry_block()
+	if _pack_check_due:
+		_pack_check_due = false
+		_mark_lone_pack_members()
+	_draw_for_multi_hit()
+
+# The last Attack played again (Second Swing), once the card replaying it
+# has resolved: at `chosen` when the play asked for a target (its enemy
+# gone), else where it was played - every enemy for an all-enemies one.
+# Its clip and lunge (card_replayed), swing and impact at a play's own
+# timing, then its effects in full as if played (EffectContext.is_replay -
+# no Energy, no pile, no played-card or tag count, no Bent Nail), its hits
+# shown at their beats, what it struck counting it (Goaded, Roused) and
+# striking back (Coiled). Nothing left to hit: nothing happens.
+func _replay_attack(chosen: FieldEnemy) -> void:
+	_replay_pending = false
+	var card: CardData = player.last_attack
+	if card == null:
+		return
+	var target_enemy: FieldEnemy = null
+	var mound: int = -1
+	if not player.last_attack_all:
+		target_enemy = chosen if chosen != null else _last_attack_enemy
+		if target_enemy == _last_attack_enemy:
+			mound = _last_attack_mound
+		if target_enemy == null or not is_instance_valid(target_enemy) or not enemies.has(target_enemy) or not _can_target(card, _combatants.get(target_enemy)):
+			return
+	card_replayed.emit(card, target_enemy)
+	if card.battle_animation != &"":
+		var impact_at: float = _impact_delay_for(card)
+		var swing_at: float = impact_at - clampf(swing_lead_seconds, 0.0, impact_at)
+		if swing_at > 0.0:
+			await get_tree().create_timer(swing_at).timeout
+		card_swing.emit(card)
+		if impact_at - swing_at > 0.0:
+			await get_tree().create_timer(impact_at - swing_at).timeout
+	card_impact.emit(card)
+	var ctx: EffectContext = _card_context(target_enemy, mound)
+	ctx.is_replay = true
+	# Not a play: every card this turn was played before it, and it adds no
+	# count of its own.
+	ctx.cards_played_before_this = cards_played_this_turn
+	ctx.tagged_plays_before_this = player.tagged_plays_this_turn.duplicate()
+	_multi_hit_report = _card_hit_count(card, ctx) > 1
+	_deferring_pack_check = true
+	_effect_resolver.resolve_card(card, ctx)
+	_deferring_pack_check = false
+	_multi_hit_report = false
+	_after_card_effects()
+	if not _extra_hit_reports.is_empty():
+		await _land_extra_hits()
+	var attacked: Array[FieldEnemy] = _count_attack_card(card, ctx)
+	await _counter_strikes(attacked)
+
+# The play's last beats: the readouts catch up, the input reopens and the
+# battle's end is checked.
+func _after_play() -> void:
 	# Taken, deepened or replaced by the card just played - and the card
 	# faces need to know either way, since a stance changes what the hand
 	# says it will do.
@@ -1301,12 +1398,10 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	_emit_devour_changed()
 	_check_battle_end()
 
-# A report from the resolving card: now, or - once its hit is repeating
-# (EffectContext.on_repeat) - held for the repeat's impact.
+# A report from the resolving card: now, or - once a further hit of it is
+# landing (EffectContext.on_extra_hit - Lash) - held for that hit's beat.
 func _report_or_hold(report: Callable) -> void:
-	if _repeat_pending:
-		_repeat_reports.append(report)
-	elif not _extra_hit_reports.is_empty():
+	if not _extra_hit_reports.is_empty():
 		var current: Array = _extra_hit_reports[_extra_hit_reports.size() - 1]
 		current.append(report)
 	else:
@@ -1334,26 +1429,6 @@ func _land_extra_hits() -> void:
 		for report: Callable in reports:
 			report.call()
 		_multi_hit_report = false
-
-# The repeat as a blow of its own: its swing second_swing_lead before its
-# impact, which lands second_swing_delay after the card's first - the
-# Toll it spent read out at the swing, its held reports at the impact.
-# Rules-wise it's long done; only what is shown waits.
-func _land_repeat(card: CardData, target_enemy: FieldEnemy) -> void:
-	var delay: float = maxf(second_swing_delay, 0.0)
-	var lead: float = clampf(second_swing_lead, 0.0, delay)
-	if delay - lead > 0.0:
-		await get_tree().create_timer(delay - lead).timeout
-	card_repeat_swing.emit(card, target_enemy)
-	toll_changed.emit(player.toll)
-	if lead > 0.0:
-		await get_tree().create_timer(lead).timeout
-	card_repeat_impact.emit(card)
-	var reports: Array[Callable] = _repeat_reports
-	_repeat_pending = false
-	_repeat_reports = []
-	for report in reports:
-		report.call()
 
 # An Attack card has been played: each enemy it was played against - its
 # target, and every enemy it could hit when one of its effects hits all
@@ -1451,7 +1526,7 @@ func _card_enemy_combatants() -> Array[Combatant]:
 
 # A card's context told about the mounds: whose rules each dug-in enemy's
 # row follows, and what to do when one breaks (_on_mound_broken(), held
-# with the card's other reports for a repeat's impact).
+# with the card's other reports for a further hit's beat).
 func _wire_mounds(ctx: EffectContext) -> void:
 	for enemy in enemies:
 		var combatant: Combatant = _combatants.get(enemy)
@@ -2369,6 +2444,9 @@ func _start_player_turn() -> void:
 	player.damage_taken_this_turn = 0
 	player.toll_spent_this_turn = false
 	player.tagged_plays_this_turn.clear()
+	player.clear_last_attack()
+	_last_attack_enemy = null
+	_last_attack_mound = -1
 	for enemy in enemies:
 		var combatant: Combatant = _combatants.get(enemy)
 		if combatant != null:

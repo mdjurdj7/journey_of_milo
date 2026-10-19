@@ -1,33 +1,38 @@
 extends SceneTree
 
-# Headless probe for Second Swing: Deal 6; holding 5 Toll, spend it and
-# the hit lands again - a second hit of the same card, not a second play.
-# Under 5 Toll one hit and nothing spent, and the card is never blocked;
-# 5 or more, two hits and exactly 5 spent; a first hit that kills skips
-# the repeat and spends nothing. Under Self-Eater both hits take its +3
-# (its HP paid once); Keen's one-shot +3 goes to the first hit only, and
-# Come Due's mark to each hit, a charge apiece - a mark with one charge
-# left pays the first hit and the repeat lands bare. Played into the Greyshelf's Gape, one Goaded stack, not
-# two. Its art loads mipmapped, its face reads its live number and its
-# text fits at the first rules size. Played for real, the repeat is a
-# blow of its own: two damage events second_swing_delay apart, the HP bar
-# dropping twice, two numbers - the second at repeat_number_offset - the
-# Toll readout dropping between them, and input locked until the second
-# lands. Rules cases on the real .tres; the Gape and two-blow cases load
-# floor 5 and play the card through BattleController.
+# Headless probe for Second Swing - 1 Energy, Uncommon Skill, TOLL:
+# "Spend 5 Toll. Play the last Attack you played this turn again." No
+# damage of its own; blocked under 5 Toll or with no Attack played this
+# turn. The replay resolves that Attack's effects in full as if played -
+# its own HP and Toll (Bite Down), the stance's price and bonus (Self-
+# Eater) - but isn't a play: no Energy, no pile moved, no played-card or
+# tag count, no Bent Nail, and a one-shot Keen the Attack already spent
+# stays spent. At the enemy it was played at while that one stands, at
+# every enemy for an all-enemies Attack (Carve). Second Swing+ costs 0.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/second_swing_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
+# Rules cases play the real cards through EffectResolver on bare
+# Combatants. The fight cases load floor 5 and play through
+# BattleController at the Greyshelf: Slash then Second Swing lands two
+# blows, two Goaded stacks into a queued Gape, Slash's card staying in
+# the discard; a Spent Claw Back replays from the Spent pile; with the
+# Attack's enemy no longer standing, Second Swing asks for a target.
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
 const CASES := 11
 const CARD_PATH := "res://cards/data/second_swing.tres"
+const TEMPERED_PATH := "res://cards/tempered/second_swing_tempered.tres"
 const ART_PATH := "res://cards/art/Wanderer/Second Swing.png"
+const SLASH_PATH := "res://cards/data/slash.tres"
+const BITE_DOWN_PATH := "res://cards/data/bite_down.tres"
+const CARVE_PATH := "res://cards/data/carve.tres"
+const CLAW_BACK_PATH := "res://cards/data/claw_back.tres"
 const SELF_EATER_PATH := "res://cards/data/self_eater.tres"
-const COME_DUE_PATH := "res://cards/data/come_due.tres"
 const KEEN_PATH := "res://battle/rules/statuses/keen.tres"
+const BENT_NAIL_PATH := "res://battle/rules/statuses/bent_nail.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const COLLECTOR_POOL_PATH := "res://cards/pools/collector_pool.tres"
 const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
@@ -39,33 +44,30 @@ const FLOOR_5 := 4
 const PLAYER_HP := 999
 const ENEMY_HP := 100
 const HIT := 6
-const REPEAT_TOLL := 5
 const SELF_EATER_BONUS := 3
 const SELF_EATER_PRICE := 2
-const KEEN_BONUS := 3
-const MARK_BONUS := 4
-const FIRST_RULES_SIZE := 15
-const NUMBER_SLACK_PX := 1.5
 
 var _run_state: Node = null
 var _field: Node = null
 var _failures: int = 0
 var _completed: int = 0
 var _resolver := EffectResolver.new()
+var _toll: int = 0
 
 func _initialize() -> void:
 	_run_state = root.get_node_or_null("RunState")
+	_toll = _card().effects[0].toll_cost
 	_check_card_data()
-	_check_under_toll()
-	_check_at_toll()
-	_check_kill_skips_repeat()
-	_check_self_eater()
-	_check_one_shots_first_hit_only()
-	_check_pools()
+	_check_blocked()
+	_check_replays_slash()
+	_check_own_costs()
+	_check_stance()
+	_check_one_shots()
+	_check_targets()
 	await _check_face()
-	await _check_art()
-	await _check_gape_goaded_once()
-	await _check_two_blows()
+	await _check_fight_gape()
+	await _check_fight_spent()
+	await _check_fight_needs_target()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -78,277 +80,217 @@ func _initialize() -> void:
 func _check_card_data() -> void:
 	var card: CardData = _card()
 	_expect_eq(card.card_name, "Second Swing", "The card is named Second Swing")
-	_expect_eq(card.rarity, CardData.CardRarity.COMMON, "...is Common")
-	_expect_eq(card.cost, 1, "...costs 1")
-	_expect_eq(card.card_type, CardData.CardType.ATTACK, "...is an Attack")
-	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
-	_expect_eq(card.description, "Deal {damage} damage.\nSpend 5 Toll to repeat.", "...its text")
-	_expect_eq(card.effects.size(), 1, "...one effect")
-	if card.effects.size() == 1:
-		var effect: CardEffect = card.effects[0]
-		_expect(effect.effect_type == CardEffect.EffectType.DAMAGE and effect.value == HIT and effect.repeat_toll_cost == REPEAT_TOLL, "...DAMAGE 6, repeated for 5 Toll")
-		_expect_eq(effect.condition, CardEffect.Condition.NONE, "...unconditional: the first hit always lands")
-	_expect_eq(card.battle_animation, &"Slash", "...swings Slash's clip")
-	_expect_eq(card.impact_time, 0.55, "...at Slash's impact time")
+	_expect_eq([card.cost, card.card_type, card.rarity, card.card_class], [1, CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, &"wanderer"], "...1 Energy, a Skill, Uncommon, the Wanderer's")
+	_expect_eq(card.target_type, CardData.TargetType.SELF, "...no target of its own")
+	_expect_eq(card.removal_scope, CardData.RemovalScope.NONE, "...not Spent")
+	_expect_eq(card.description, "Spend {toll_cost} Toll.\nPlay the last Attack you played this turn again.", "...its text")
+	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[0].toll_cost == 5 and card.effects[1].effect_type == CardEffect.EffectType.REPLAY_LAST_ATTACK, "...SPEND_TOLL 5, then REPLAY_LAST_ATTACK")
+	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
+	_expect(card.art != null and card.art.resource_path == ART_PATH, "...its art kept")
+	var tempered: CardData = load(TEMPERED_PATH)
+	_expect(card.tempered == tempered, "...tempering to Second Swing+")
+	_expect_eq([tempered.card_name, tempered.cost, tempered.card_type, tempered.rarity], ["Second Swing+", 0, CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON], "Second Swing+: 0 Energy, the same Skill")
+	_expect_eq(tempered.description, card.description, "...the same text")
+	_expect((load(POOL_PATH) as RewardPool).entries.has(card), "In the Wanderer pool")
+	_expect((load(COLLECTOR_POOL_PATH) as RewardPool).entries.has(card), "...and the collector's")
 	_completed += 1
 
-# 4 Toll: one hit of 6, nothing spent - and 0 Toll never blocks the play.
-func _check_under_toll() -> void:
+# Blocked with no Attack played this turn, whatever the Toll; then by
+# Toll under 5; playable on 5.
+func _check_blocked() -> void:
 	var player: Combatant = _player()
-	_expect(not EffectResolver.card_blocked(_card(), player), "Playable on 0 Toll")
-	player.toll = REPEAT_TOLL - 1
-	_expect(not EffectResolver.card_blocked(_card(), player), "...and on 4")
+	player.toll = 9
+	_expect(EffectResolver.card_blocked(_card(), player), "No Attack played this turn: blocked on 9 Toll")
+	player.record_attack(load(SLASH_PATH), null, false)
+	player.toll = _toll - 1
+	_expect(EffectResolver.card_blocked(_card(), player), "An Attack played, %d Toll: blocked" % (_toll - 1))
+	player.toll = _toll
+	_expect(not EffectResolver.card_blocked(_card(), player), "...%d: playable" % _toll)
+	player.clear_last_attack()
+	_expect(EffectResolver.card_blocked(_card(), player), "The turn's record cleared: blocked again")
+	player.record_attack(load(SELF_EATER_PATH), null, false)
+	_expect(player.last_attack == null, "A Stance played is no Attack to replay")
+	_completed += 1
+
+# Slash at an enemy, then Second Swing on 7 Toll: 6 again, 5 spent, no
+# Energy, no tag or play counted.
+func _check_replays_slash() -> void:
+	var player: Combatant = _player()
 	var enemy := Combatant.new(ENEMY_HP)
-	var ctx: EffectContext = _play(player, [enemy])
-	_expect_eq(ENEMY_HP - enemy.hp, HIT, "4 Toll: one hit of 6")
-	_expect_eq(player.toll, REPEAT_TOLL - 1, "...no Toll spent")
-	_expect(not ctx.toll_spent_this_card, "...the card spent no Toll")
+	player.energy = 3
+	_play_attack(load(SLASH_PATH), player, enemy, [enemy])
+	_expect_eq(ENEMY_HP - enemy.hp, HIT, "Slash: 6")
+	player.toll = 7
+	var tags: Dictionary = player.tagged_plays_this_turn.duplicate()
+	_play(_card(), player, null, [enemy])
+	_expect_eq(ENEMY_HP - enemy.hp, 2 * HIT, "Second Swing replays it: 6 again")
+	_expect_eq(player.toll, 7 - _toll, "...%d Toll spent" % _toll)
+	_expect_eq(player.energy, 3, "...no Energy taken by the replay")
+	_expect_eq(player.tagged_plays_this_turn, tags, "...no tag counted")
+	_expect_eq(player.last_attack, load(SLASH_PATH), "...and Slash still the last Attack")
 	_completed += 1
 
-# 5 Toll: two hits of 6, 5 spent; 9: the same, 4 left. Each hit meets
-# block on its own.
-func _check_at_toll() -> void:
-	for held in [REPEAT_TOLL, 9]:
-		var player: Combatant = _player()
-		player.toll = held
-		var enemy := Combatant.new(ENEMY_HP)
-		var hits: Array[int] = []
-		var ctx: EffectContext = _ctx(player, [enemy])
-		ctx.on_damage = func(target: Combatant, amount: int, kind: String) -> void:
-			if target == enemy and kind == "card":
-				hits.append(amount)
-		_resolver.resolve_card(_card(), ctx)
-		_expect_eq(hits, [HIT, HIT] as Array[int], "%d Toll: two hits of 6" % held)
-		_expect_eq(player.toll, held - REPEAT_TOLL, "...5 Toll spent")
-		_expect(ctx.toll_spent_this_card, "...the card spent Toll")
+# Bite Down: deal 8, then lose 2 HP and make 2 Toll - the replay pays and
+# makes them again.
+func _check_own_costs() -> void:
 	var player: Combatant = _player()
-	player.toll = REPEAT_TOLL
-	var blocker := Combatant.new(ENEMY_HP)
-	blocker.block = 8
-	_play(player, [blocker])
-	_expect_eq(ENEMY_HP - blocker.hp, 4, "8 Block: the first hit spends it (6), the second takes 2 of its 6, 4 to HP")
-	_completed += 1
-
-# A first hit that kills skips the repeat: nothing spent.
-func _check_kill_skips_repeat() -> void:
-	var player: Combatant = _player()
-	player.toll = 10
-	var enemy := Combatant.new(5)
-	var ctx: EffectContext = _play(player, [enemy])
-	_expect(enemy.hp <= 0, "A 5 HP enemy dies to the first hit")
-	_expect_eq(player.toll, 10, "...no repeat, no Toll spent")
-	_expect(not ctx.toll_spent_this_card, "...the card spent no Toll")
-	_completed += 1
-
-# Self-Eater: both hits get +3; its 2 HP is paid once - and the Toll that
-# price accrues counts, being paid before the first hit.
-func _check_self_eater() -> void:
-	var player: Combatant = _player()
-	_resolver.resolve_card(load(SELF_EATER_PATH) as CardData, _ctx(player, []))
-	_expect(player.stance != null, "Self-Eater taken")
-	player.toll = REPEAT_TOLL
 	var enemy := Combatant.new(ENEMY_HP)
-	var hits: Array[int] = []
-	var ctx: EffectContext = _ctx(player, [enemy])
-	ctx.on_damage = func(target: Combatant, amount: int, kind: String) -> void:
-		if target == enemy and kind == "card":
-			hits.append(amount)
-	var hp_before: int = player.hp
-	_resolver.resolve_card(_card(), ctx)
-	_expect_eq(hits, [HIT + SELF_EATER_BONUS, HIT + SELF_EATER_BONUS] as Array[int], "Under Self-Eater: two hits of 9")
-	_expect_eq(hp_before - player.hp, SELF_EATER_PRICE, "...its 2 HP paid once")
-	_expect_eq(player.toll, REPEAT_TOLL + SELF_EATER_PRICE - REPEAT_TOLL, "...5 spent of the 7 held after the price")
-	var short: Combatant = _player()
-	_resolver.resolve_card(load(SELF_EATER_PATH) as CardData, _ctx(short, []))
-	short.toll = REPEAT_TOLL - SELF_EATER_PRICE
+	_play_attack(load(BITE_DOWN_PATH), player, enemy, [enemy])
+	var hp: int = player.hp
+	player.toll = _toll
+	_play(_card(), player, null, [enemy])
+	_expect_eq(ENEMY_HP - enemy.hp, 16, "Bite Down replayed: 8 again")
+	_expect_eq(hp - player.hp, 2, "...its 2 HP paid again")
+	_expect_eq(player.toll, 2, "...and its 2 Toll made again, after the 5 spent")
+	_completed += 1
+
+# Under Self-Eater the replay is an Attack like any: its price and its +3.
+func _check_stance() -> void:
+	var player: Combatant = _player()
+	var enemy := Combatant.new(ENEMY_HP)
+	_play(load(SELF_EATER_PATH), player, null, [enemy])
+	_play_attack(load(SLASH_PATH), player, enemy, [enemy])
+	var hp: int = player.hp
+	player.toll += _toll
+	var dealt: int = ENEMY_HP - enemy.hp
+	_play(_card(), player, null, [enemy])
+	_expect_eq(ENEMY_HP - enemy.hp - dealt, HIT + SELF_EATER_BONUS, "Under Self-Eater the replay deals 6 + 3")
+	_expect_eq(hp - player.hp, SELF_EATER_PRICE, "...and pays its 2 HP")
+	_completed += 1
+
+# Keen's one charge went with Slash; Bent Nail, still up, neither doubles
+# the replay nor is spent by it.
+func _check_one_shots() -> void:
+	var player: Combatant = _player()
+	var enemy := Combatant.new(ENEMY_HP)
+	Status.apply_to(player.statuses, load(KEEN_PATH))
+	_play_attack(load(SLASH_PATH), player, enemy, [enemy])
+	_expect(not _holds(player, KEEN_PATH), "Slash spends Keen")
+	player.toll = _toll
+	var before: int = enemy.hp
+	_play(_card(), player, null, [enemy])
+	_expect_eq(before - enemy.hp, HIT, "...the replay lands 6, no Keen")
+	var nailed: Combatant = _player()
 	var other := Combatant.new(ENEMY_HP)
-	_play(short, [other])
-	_expect_eq(ENEMY_HP - other.hp, 2 * (HIT + SELF_EATER_BONUS), "3 Toll and Self-Eater's 2: 5 at the first hit - it repeats")
-	_expect_eq(short.toll, 0, "...and spends all 5")
+	nailed.record_attack(load(SLASH_PATH), other, false)
+	Status.apply_to(nailed.statuses, load(BENT_NAIL_PATH))
+	nailed.toll = _toll
+	_play(_card(), nailed, null, [other])
+	_expect_eq(ENEMY_HP - other.hp, HIT, "Bent Nail up: the replay isn't doubled")
+	_expect(_holds(nailed, BENT_NAIL_PATH), "...nor does it spend Bent Nail")
 	_completed += 1
 
-# Keen's charge (+3 on the next Attack) goes to the first hit; Come Due's
-# mark (+4) to both, a charge each - 13, then 10, one charge left. A mark
-# down to its last charge: 10, then the bare 6, and the mark gone.
-func _check_one_shots_first_hit_only() -> void:
+# Slash's enemy dead: the replay goes to the card's own target; Carve (all
+# enemies) hits every one.
+func _check_targets() -> void:
 	var player: Combatant = _player()
-	Status.apply_to(player.statuses, load(KEEN_PATH) as StatusData)
-	var enemy := Combatant.new(ENEMY_HP)
-	player.toll = 5
-	_resolver.resolve_card(load(COME_DUE_PATH) as CardData, _ctx(player, [enemy]))
-	_expect_eq(player.toll, 0, "Come Due spent its 5")
-	player.toll = REPEAT_TOLL
-	var hits: Array[int] = []
-	var ctx: EffectContext = _ctx(player, [enemy])
-	ctx.on_damage = func(target: Combatant, amount: int, kind: String) -> void:
-		if target == enemy and kind == "card":
-			hits.append(amount)
-	_resolver.resolve_card(_card(), ctx)
-	_expect_eq(hits, [HIT + KEEN_BONUS + MARK_BONUS, HIT + MARK_BONUS] as Array[int], "Keen and the mark: 13 on the first hit, 10 on the second")
-	_expect(Status.find_in(player.statuses, load(KEEN_PATH) as StatusData) == null, "...Keen's one charge spent")
-	_expect_eq(_mark_charges(enemy), 1, "...two charges of the mark spent, one a hit")
-
-	# The mark's last charge: the first hit takes it, the repeat lands bare.
-	hits.clear()
-	player.toll = REPEAT_TOLL
-	ctx = _ctx(player, [enemy])
-	ctx.on_damage = func(target: Combatant, amount: int, kind: String) -> void:
-		if target == enemy and kind == "card":
-			hits.append(amount)
-	_resolver.resolve_card(_card(), ctx)
-	_expect_eq(hits, [HIT + MARK_BONUS, HIT] as Array[int], "One charge left: 10 on the first hit, the bare 6 on the second")
-	_expect_eq(_mark_charges(enemy), 0, "...and the mark gone")
+	var first := Combatant.new(ENEMY_HP)
+	var second := Combatant.new(ENEMY_HP)
+	_play_attack(load(SLASH_PATH), player, first, [first, second])
+	first.hp = 0
+	player.toll = _toll
+	_play(_card(), player, second, [second])
+	_expect_eq(ENEMY_HP - second.hp, HIT, "Slash's enemy dead: the replay lands on the other")
+	var all: Combatant = _player()
+	var a := Combatant.new(ENEMY_HP)
+	var b := Combatant.new(ENEMY_HP)
+	_play_attack(load(CARVE_PATH), all, null, [a, b], true)
+	all.toll = _toll
+	_play(_card(), all, null, [a, b])
+	_expect_eq([ENEMY_HP - a.hp, ENEMY_HP - b.hp], [2 * HIT, 2 * HIT], "Carve replayed: 6 more to each")
 	_completed += 1
 
-func _check_pools() -> void:
-	for path in [POOL_PATH, COLLECTOR_POOL_PATH]:
-		var pool: RewardPool = load(path) as RewardPool
-		var found: bool = false
-		for entry in pool.entries:
-			if entry != null and entry.resource_path == CARD_PATH:
-				found = true
-		_expect(found, "In %s" % path.get_file())
-	_completed += 1
-
-# Out of a fight the face reads its rule, and its text sits at the first
-# rules size - it fits without stepping down. In a battle hand under
-# Self-Eater the number is the hit's, 9.
 func _check_face() -> void:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(view)
 	await process_frame
 	view.set_card_data(_card())
-	_expect_eq(view.rules_text.get_parsed_text(), "Deal 6 damage.\nSpend 5 Toll to repeat.", "The face reads its rule")
-	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), FIRST_RULES_SIZE, "...at the first rules size, 15")
-	_expect_eq(view.size, view.card_size, "...the card keeps its size")
-	_expect_eq(view.rules_text.get_line_count(), 2, "...on two lines")
+	_expect_eq(view.rules_text.get_parsed_text(), "Spend 5 Toll.\nPlay the last Attack you played this turn again.", "The face reads its rule")
+	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
+	_expect_eq(view.type_label.text, "TOLL", "...labelled TOLL")
+	_expect(not view.hp_cost_label.visible, "...no HP badge")
 	view.free()
-	var player: Combatant = _player()
-	_resolver.resolve_card(load(SELF_EATER_PATH) as CardData, _ctx(player, []))
-	var hand: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
-	root.add_child(hand)
-	await process_frame
-	hand.set_stance(player.stance)
-	hand.set_toll(player.toll)
-	hand.set_bonus_context(_ctx(player, [Combatant.new(ENEMY_HP)]))
-	hand.set_card_data(_card())
-	_expect(hand.rules_text.get_parsed_text().begins_with("Deal 9 damage."), "Under Self-Eater the hand reads Deal 9 (%s)" % hand.rules_text.get_parsed_text())
-	hand.free()
 	_completed += 1
 
-func _check_art() -> void:
-	var card: CardData = _card()
-	_expect(card.art != null and card.art.resource_path == ART_PATH, "Carries %s" % ART_PATH)
-	if card.art != null:
-		_expect(card.art.get_image().has_mipmaps(), "...mipmapped")
-		var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
-		root.add_child(view)
-		await process_frame
-		view.set_card_data(card)
-		_expect(view.art_rect.visible and view.art_rect.texture == card.art, "...shown on the face")
-		_expect(not view.glyph.visible, "...in place of the glyph")
-		view.free()
-	_completed += 1
-
-# The Gape queued, Second Swing on 12 Toll at the Greyshelf: two hits, 5
-# spent, and one Goaded stack - one Attack card.
-func _check_gape_goaded_once() -> void:
+# The Gape queued at the Greyshelf: Slash at it, then Second Swing on 12
+# Toll - two blows (the replay a swing of its own), two Goaded stacks, 5
+# Toll spent, 2 Energy in all, Slash's card in the discard once.
+func _check_fight_gape() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var greyshelf: Node = (controller.get("enemies") as Array)[0]
 		var combatant: Combatant = (controller.get("_combatants") as Dictionary).get(greyshelf)
-		await controller.call("end_turn")
-		await create_timer(0.5).timeout
+		await _end_turn(controller)
 		_expect_eq(EnemyTurn.current_intent(combatant, greyshelf.get("enemy_data")).intent_name, "Gape", "The Gape is queued")
 		var player: Combatant = controller.get("player")
 		player.toll = 12
-		var before: int = combatant.damage_taken_this_turn
-		await _play_first(controller, greyshelf)
-		_expect_eq(combatant.damage_taken_this_turn - before, 2 * HIT, "...Second Swing on 12 Toll lands two hits into it (12)")
-		_expect_eq(player.toll, 12 - REPEAT_TOLL, "...5 Toll spent")
-		_expect_eq(_goaded(combatant), 1, "...and one Goaded stack, not two")
+		player.energy = 3
+		var replayed: Array = []
+		controller.connect("card_replayed", func(card: CardData, target: Variant) -> void:
+			replayed.append([card.card_name, target]))
+		var hits: Array[int] = []
+		controller.connect("damage_dealt", func(_source: Variant, target: Variant, amount: int, _kind: String) -> void:
+			if target == greyshelf:
+				hits.append(amount))
+		var deck: Object = controller.get("deck")
+		var slash: CardData = await _deal(controller, SLASH_PATH)
+		await _play_view(controller, slash, greyshelf)
+		var swing: CardData = await _deal(controller, CARD_PATH)
+		await _play_view(controller, swing, null)
+		_expect_eq(hits, [HIT, HIT] as Array[int], "Slash, then its replay: two blows of 6")
+		_expect_eq(replayed.size(), 1, "...the replay swung as Slash (card_replayed once)")
+		if replayed.size() == 1:
+			_expect(replayed[0][0] == "Slash" and replayed[0][1] == greyshelf, "...at the Greyshelf")
+		_expect_eq(_goaded(combatant), 2, "...two Goaded stacks - an Attack each time")
+		_expect_eq(player.toll, 12 - _toll, "...5 Toll spent")
+		_expect_eq(player.energy, 1, "...2 Energy in all: Slash's and Second Swing's")
+		_expect_eq((deck.get("discard_pile") as Array).count(slash), 1, "...Slash's card in the discard once")
+		_expect(not bool(controller.get("_input_locked")), "Input unlocks after the replay")
 	await _teardown()
 	_completed += 1
 
-# Within NUMBER_SLACK_PX of `expected` - a number's rise may have stepped
-# once by the time it's read.
-func _near(actual: Vector2, expected: Vector2) -> bool:
-	return absf(actual.x - expected.x) <= NUMBER_SLACK_PX and absf(actual.y - expected.y) <= NUMBER_SLACK_PX
-
-# Second Swing on 12 Toll at the Greyshelf, played for real: the repeat
-# lands second_swing_delay after the first hit as its own blow - its own
-# damage event, HP drop and number (offset), the Toll readout dropping
-# by 5 at its swing, before it lands, and input still locked until it has.
-func _check_two_blows() -> void:
+# Claw Back is Spent once played; Second Swing replays it from there.
+func _check_fight_spent() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var greyshelf: Node = (controller.get("enemies") as Array)[0]
 		var combatant: Combatant = (controller.get("_combatants") as Dictionary).get(greyshelf)
-		var overlay: Node = _field.get_node("BattleLayer").get_child(0)
 		var player: Combatant = controller.get("player")
-		player.toll = 12
-		var hp_before: int = combatant.hp
-		var hits: Array = []
-		var hp_steps: Array[int] = []
-		var tolls: Array = []
-		var numbers: Array[Vector2] = []
-		# Whether each was held down at the screen's top so its whole rise
-		# shows (BattleOverlay._spawn_floating_number()).
-		var held_down: Array[bool] = []
-		var spawn_bases: Dictionary = {}
+		player.toll = _toll
+		player.energy = 9
+		var deck: Object = controller.get("deck")
+		var claw: CardData = await _deal(controller, CLAW_BACK_PATH)
+		await _play_view(controller, claw, greyshelf)
+		var hp: int = combatant.hp
+		_expect((deck.get("exhaust_pile") as Array).has(claw), "Claw Back is Spent")
+		await _play_view(controller, await _deal(controller, CARD_PATH), null)
+		_expect(combatant.hp < hp, "Second Swing replays the Spent Claw Back (%d to %d)" % [hp, combatant.hp])
+		_expect_eq((deck.get("exhaust_pile") as Array).count(claw), 1, "...which stays where it was")
+	await _teardown()
+	_completed += 1
+
+# The Attack's enemy no longer stands where it was played (the record's
+# enemy gone): Second Swing asks for a target, and replays at the one
+# chosen.
+func _check_fight_needs_target() -> void:
+	var controller: Node = await _start_fight()
+	if controller != null:
+		var greyshelf: Node = (controller.get("enemies") as Array)[0]
+		var player: Combatant = controller.get("player")
+		player.toll = _toll
+		player.energy = 9
+		await _play_view(controller, await _deal(controller, SLASH_PATH), greyshelf)
+		controller.set("_last_attack_enemy", null)
+		var hits: Array[int] = []
 		controller.connect("damage_dealt", func(_source: Variant, target: Variant, amount: int, _kind: String) -> void:
 			if target == greyshelf:
-				hits.append([ProbePlay.game_msec(), amount, bool(controller.get("_input_locked"))]))
-		controller.connect("enemy_hp_changed", func(enemy: Node, current: int, _max_hp: int) -> void:
-			if enemy == greyshelf:
-				hp_steps.append(current))
-		controller.connect("toll_changed", func(new_toll: int) -> void:
-			tolls.append([ProbePlay.game_msec(), new_toll]))
-		# Where this enemy's number would go as a number is spawned, against
-		# where it was put - read at that frame's end, placed by its bottom
-		# centre, less the sideways jitter it drew (FloatingNumber.jitter).
-		# It holds still
-		# through its pop and hold, so it hasn't risen yet. Damage numbers
-		# only - the Wanderer's own (a heal, Toll) aren't this enemy's.
-		overlay.connect("child_entered_tree", func(node: Node) -> void:
-			if node is FloatingNumber:
-				spawn_bases[node] = overlay.call("_screen_pos_for_damage_target", greyshelf) as Vector2)
-		overlay.connect("child_entered_tree", func(node: Node) -> void:
-			if node is FloatingNumber and spawn_bases.has(node):
-				var number := node as FloatingNumber
-				if number.kind == FloatingNumber.KIND_DAMAGE:
-					var bottom_centre: Vector2 = number.position - number.jitter + Vector2(number.size.x / 2.0, number.size.y)
-					numbers.append(bottom_centre - (spawn_bases[node] as Vector2))
-					held_down.append(number.position.y <= number.rise_px + float(overlay.get("number_clearance_px")) + 0.5), CONNECT_DEFERRED)
-		await _play_first(controller, greyshelf)
-		_expect_eq(hits.size(), 2, "Two damage events, one per hit")
-		if hits.size() == 2:
-			_expect_eq([hits[0][1], hits[1][1]], [HIT, HIT], "...of 6 each")
-			var gap_ms: int = int(hits[1][0]) - int(hits[0][0])
-			var delay_ms: int = roundi(float(controller.get("second_swing_delay")) * 1000.0)
-			_expect(gap_ms >= delay_ms - 20, "...the second %d ms after the first (second_swing_delay %d ms)" % [gap_ms, delay_ms])
-			_expect(bool(hits[1][2]), "...input still locked as the second lands")
-			var drop_at: int = -1
-			for entry: Array in tolls:
-				if int(entry[1]) == 12 - REPEAT_TOLL:
-					drop_at = int(entry[0])
-					break
-			_expect(drop_at >= int(hits[0][0]) and drop_at <= int(hits[1][0]), "The Toll readout drops to 7 between the hits (%d, hits at %d and %d)" % [drop_at, hits[0][0], hits[1][0]])
-		_expect_eq(hp_steps, [hp_before - HIT, hp_before - 2 * HIT] as Array[int], "The HP bar drops twice")
-		_expect_eq(numbers.size(), 2, "Two damage numbers")
-		if numbers.size() == 2:
-			# The repeat's offset, and one step of the stack - the first still
-			# shows as it lands. Held down at the screen's top, it can only
-			# have moved down from there.
-			var offset: Vector2 = Vector2(overlay.get("repeat_number_offset")) + Vector2(overlay.get("number_stack_step"))
-			var expected: Vector2 = numbers[0] + offset
-			_expect(_near(numbers[0], Vector2.ZERO), "...the first where a hit's goes (%s)" % str(numbers[0]))
-			if held_down[1]:
-				_expect(absf(numbers[1].x - expected.x) <= NUMBER_SLACK_PX and numbers[1].y >= expected.y - NUMBER_SLACK_PX, "...the second offset by %s across, held down at the screen's top (%s)" % [str(offset), str(numbers[1] - numbers[0])])
-			else:
-				_expect(_near(numbers[1], expected), "...the second offset by %s (%s)" % [str(offset), str(numbers[1] - numbers[0])])
-		_expect_eq(player.toll, 12 - REPEAT_TOLL, "...5 Toll spent, as before")
-		_expect(not bool(controller.get("_input_locked")), "Input unlocks once it has landed")
+				hits.append(amount))
+		var view: CardView = _view(controller, await _deal(controller, CARD_PATH))
+		controller.call("request_play", view)
+		_expect(bool(controller.call("is_awaiting_target")), "Its enemy gone: Second Swing asks for a target")
+		controller.call("confirm_target", greyshelf)
+		await ProbePlay.settle(self, controller)
+		_expect_eq(hits, [HIT] as Array[int], "...and replays Slash at the one chosen")
 	await _teardown()
 	_completed += 1
 
@@ -360,23 +302,25 @@ func _card() -> CardData:
 func _player() -> Combatant:
 	return Combatant.new(PLAYER_HP)
 
-func _ctx(player: Combatant, enemies: Array[Combatant]) -> EffectContext:
+func _holds(player: Combatant, path: String) -> bool:
+	for active in player.statuses:
+		if active.data != null and active.data.resource_path == path:
+			return true
+	return false
+
+# `card` resolved as BattleController would play it, recorded as the
+# last Attack.
+func _play_attack(card: CardData, player: Combatant, target: Combatant, enemies: Array[Combatant], all_enemies: bool = false) -> void:
+	player.record_attack(card, target, all_enemies)
+	player.count_play(card)
+	_play(card, player, target, enemies)
+
+func _play(card: CardData, player: Combatant, target: Combatant, enemies: Array[Combatant]) -> void:
 	var ctx := EffectContext.new()
 	ctx.player = player
+	ctx.target = target
 	ctx.enemies = enemies
-	ctx.target = enemies[0] if not enemies.is_empty() else null
-	return ctx
-
-func _play(player: Combatant, enemies: Array[Combatant]) -> EffectContext:
-	var ctx: EffectContext = _ctx(player, enemies)
-	_resolver.resolve_card(_card(), ctx)
-	return ctx
-
-func _mark_charges(enemy: Combatant) -> int:
-	for active in enemy.statuses:
-		if active.data != null and active.data.id == "come_due":
-			return active.charges
-	return 0
+	_resolver.resolve_card(card, ctx)
 
 func _goaded(combatant: Combatant) -> int:
 	for active: Status in combatant.statuses:
@@ -391,17 +335,13 @@ func _find_greyshelf() -> Node3D:
 			return node as Node3D
 	return null
 
-# A new run on floor 5 with a deck of Second Swing alone, the fight
-# started on the Greyshelf. The controller, or null (a FAIL is recorded).
+# A new run on floor 5, the fight started on the Greyshelf, the hand
+# emptied. The controller, or null (a FAIL is recorded).
 func _start_fight() -> Node:
 	if _run_state == null:
 		_fail("no RunState autoload")
 		return null
 	_run_state.call("new_run", load(CHARACTER_PATH))
-	var cards: Array[CardData] = []
-	for i in 10:
-		cards.append(_card().duplicate() as CardData)
-	_run_state.set("deck", cards)
 	_run_state.set("player_max_hp", PLAYER_HP)
 	_run_state.set("player_hp", PLAYER_HP)
 	_run_state.set("current_floor_index", FLOOR_5)
@@ -423,25 +363,44 @@ func _start_fight() -> Node:
 	if overlay == null:
 		_fail("no fight started on floor 5")
 		return null
-	await ProbePlay.settle_fight(self, _field, overlay.get("battle_controller"))
-	return overlay.get("battle_controller")
+	var controller: Node = overlay.get("battle_controller")
+	await ProbePlay.settle_fight(self, _field, controller)
+	controller.get("deck").call("discard_hand")
+	return controller
 
-func _play_first(controller: Node, greyshelf: Node) -> void:
-	var player: Combatant = controller.get("player")
-	player.energy = 99
-	var views: Array = controller.get("_hand_container").call("_card_views")
-	if views.is_empty():
-		_fail("no card in hand to play")
+func _deal(controller: Node, path: String) -> CardData:
+	var card: CardData = (load(path) as CardData).duplicate()
+	var deck: Object = controller.get("deck")
+	(deck.get("draw_pile") as Array).append(card)
+	deck.call("draw", 1)
+	await process_frame
+	return card
+
+func _view(controller: Node, card: CardData) -> CardView:
+	for view: CardView in controller.get("_hand_container").call("_card_views"):
+		if view.card_data == card:
+			return view
+	return null
+
+func _play_view(controller: Node, card: CardData, target: Node) -> void:
+	var view: CardView = _view(controller, card)
+	if view == null:
+		_fail("'%s' is not in the hand" % card.card_name)
 		return
-	controller.call("request_play", views[0])
-	if bool(controller.call("is_awaiting_target")):
-		controller.call("confirm_target", greyshelf)
-	# Until the play has resolved - a repeat's second hit included - by the
-	# clock, not frames, which run unthrottled headless.
-	var deadline: int = ProbePlay.cap_msec() + 5000
-	while bool(controller.get("_input_locked")) and ProbePlay.cap_msec() < deadline:
-		await process_frame
-	await create_timer(0.6).timeout
+	controller.call("request_play", view)
+	if target != null:
+		if not bool(controller.call("is_awaiting_target")):
+			_fail("'%s' didn't ask for a target" % card.card_name)
+			return
+		controller.call("confirm_target", target)
+	await ProbePlay.settle(self, controller)
+
+# End Turn, and back once the player's next turn is open.
+func _end_turn(controller: Node) -> void:
+	var turn: int = int(controller.get("_player_turn"))
+	controller.call("end_turn")
+	await ProbePlay.wait_until(self, func() -> bool: return int(controller.get("_player_turn")) > turn and ProbePlay.is_settled(controller), 20.0)
+	controller.get("deck").call("discard_hand")
 
 func _teardown() -> void:
 	if _field != null:

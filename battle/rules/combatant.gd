@@ -78,6 +78,14 @@ var toll_spent_this_turn: bool = false
 # _resolve_play()), cleared by BattleController._start_player_turn().
 # Read through EffectContext.tagged_plays_before_this (Lash's repeats).
 var tagged_plays_this_turn: Dictionary = {}
+# The last Attack card played this turn, what it was played at (null for
+# an all-enemies one) and whether it hit every enemy - what Second Swing
+# plays again (ReplayLastAttackEffect). Set at a play's commit (record_
+# attack() - BattleController._resolve_play()), never by a replay; cleared
+# by BattleController._start_player_turn().
+var last_attack: CardData = null
+var last_attack_target: Combatant = null
+var last_attack_all: bool = false
 var took_damage_last_turn: bool = false
 # Critical: HP at or below this fraction of max HP. A default only, like
 # the Grace fields above - BattleController.setup() copies CharacterData.
@@ -213,6 +221,19 @@ func count_play(card: CardData) -> void:
 		return
 	for tag in card.tags:
 		tagged_plays_this_turn[tag] = int(tagged_plays_this_turn.get(tag, 0)) + 1
+
+# `card` has been played this turn: the last Attack, if it is one.
+func record_attack(card: CardData, target: Combatant, all_enemies: bool) -> void:
+	if card == null or card.card_type != CardData.CardType.ATTACK:
+		return
+	last_attack = card
+	last_attack_target = null if all_enemies else target
+	last_attack_all = all_enemies
+
+func clear_last_attack() -> void:
+	last_attack = null
+	last_attack_target = null
+	last_attack_all = false
 
 func is_critical() -> bool:
 	return is_critical_at(hp)

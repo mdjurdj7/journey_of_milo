@@ -34,6 +34,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.DRAIN: "res://battle/rules/effects/drain_effect.gd",
 	CardEffect.EffectType.SET_ASIDE: "res://battle/rules/effects/set_aside_effect.gd",
 	CardEffect.EffectType.CONSUME: "res://battle/rules/effects/consume_effect.gd",
+	CardEffect.EffectType.REPLAY_LAST_ATTACK: "res://battle/rules/effects/replay_last_attack_effect.gd",
 }
 
 var _cache: Dictionary = {}
@@ -88,8 +89,9 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 		# effect - Blood Arc's Drain lands before its own sweep.
 		ctx.resolve_pending_drain()
 	# An Attack's last effect done: what waits for an Attack card to finish
-	# (Bent Nail's doubling) spends now - after every hit it gave.
-	if ctx.card_is_attack:
+	# (Bent Nail's doubling) spends now - after every hit it gave. Not on a
+	# replay (Second Swing): that card was played before, and isn't now.
+	if ctx.card_is_attack and not ctx.is_replay:
 		for spent_id in Status.spend_on_attack_card(ctx.player.statuses):
 			RunLogger.mechanic("keepsake_double", {"card": card.card_name, "status": spent_id, "extra": ctx.attack_card_extra_this_card})
 	# After the whole card, once however much it spent: Toll spent hurries
@@ -175,6 +177,9 @@ static func card_blocked(card: CardData, player: Combatant) -> bool:
 		return false
 	for effect in card.effects:
 		if effect != null and effect.effect_type == CardEffect.EffectType.SPEND_TOLL and player.toll < effect.toll_cost:
+			return true
+		# Nothing to play again: no Attack played this turn (Second Swing).
+		if effect != null and effect.effect_type == CardEffect.EffectType.REPLAY_LAST_ATTACK and player.last_attack == null:
 			return true
 		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS and effect.status_data != null and effect.status_data.blocks_reapply_while_held and Status.find_in(player.statuses, effect.status_data) != null:
 			return true

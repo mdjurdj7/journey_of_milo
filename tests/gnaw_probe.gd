@@ -15,12 +15,12 @@ extends SceneTree
 #
 # Rules cases play the real cards through EffectResolver on bare
 # Combatants (max HP 70); Toll is spent the way any card spends it
-# (EffectContext.spend_toll(), or Second Swing's repeat). The face case
+# (EffectContext.spend_toll() - Leverage's 5). The face case
 # reads the drain clause grey (DORMANT) and in ink (LIVE). The fight case
 # loads the real region scene, as claw_back_probe does, and plays Gnaw
 # through BattleController: the face at hand size, the shared card-play
 # sound (Gnaw has none of its own) before any Toll is spent and once
-# Second Swing has spent some, and the condition gone at the next turn.
+# Leverage has spent some, and the condition gone at the next turn.
 # Untyped against anything that names the RunState autoload.
 
 const CASES := 9
@@ -30,7 +30,7 @@ const HIT := 3
 # The alt_value case's drain - a number other than HIT.
 const ALT_DRAIN := 8
 const CARD_PATH := "res://cards/data/gnaw.tres"
-const SECOND_SWING_PATH := "res://cards/data/second_swing.tres"
+const LEVERAGE_PATH := "res://cards/data/leverage.tres"
 const SELF_EATER_PATH := "res://cards/data/self_eater.tres"
 const RANSOM_ACTIVE_PATH := "res://battle/rules/statuses/ransom_active.tres"
 const WANDERER_POOL_PATH := "res://cards/pools/wanderer_pool.tres"
@@ -57,7 +57,7 @@ func _initialize() -> void:
 
 	_check_data()
 	_check_no_toll_spent()
-	_check_after_second_swing()
+	_check_after_leverage()
 	_check_self_eater()
 	_check_into_block()
 	_check_capped_and_ransom()
@@ -108,12 +108,12 @@ func _check_no_toll_spent() -> void:
 	_expect_eq(player.hp, 40, "...and heals 0")
 	_completed += 1
 
-# Second Swing spends its 5 Toll on the repeat: Toll spent this turn.
-func _check_after_second_swing() -> void:
+# Leverage spends its 5 Toll: Toll spent this turn.
+func _check_after_leverage() -> void:
 	var player: Combatant = _player(40)
 	player.toll = 5
-	_play_card(load(SECOND_SWING_PATH), player, _enemy())
-	_expect(player.toll == 0 and player.toll_spent_this_turn, "Second Swing's repeat spends 5 Toll: Toll spent this turn")
+	_play_card(load(LEVERAGE_PATH), player, _enemy())
+	_expect(player.toll == 0 and player.toll_spent_this_turn, "Leverage spends 5 Toll: Toll spent this turn")
 	var enemy: Combatant = _enemy()
 	_play(player, enemy)
 	_expect_eq(ENEMY_HP - enemy.hp, HIT, "...then Gnaw deals 3")
@@ -228,7 +228,7 @@ func _check_face() -> void:
 	_completed += 1
 
 # The real fight: Gnaw's face at hand size; played with no Toll spent,
-# the shared card-play sound and no heal; Second Swing spends 6, then
+# the shared card-play sound and no heal; Leverage spends 5, then
 # Gnaw drains 3, the same sound; at the next turn the condition is gone -
 # no heal.
 func _check_fight() -> void:
@@ -248,8 +248,8 @@ func _check_fight() -> void:
 		await _gnaw(controller, card, target, false, "No Toll spent")
 		player.toll = 5
 		player.energy = 3
-		await _play_real(controller, await _deal(controller, SECOND_SWING_PATH), target)
-		_expect(player.toll_spent_this_turn, "Second Swing spends its 5: Toll spent this turn")
+		await _play_real(controller, await _deal(controller, LEVERAGE_PATH), null)
+		_expect(player.toll_spent_this_turn, "Leverage spends its 5: Toll spent this turn")
 		await _gnaw(controller, await _deal(controller, CARD_PATH), target, true, "Then")
 		await controller.call("end_turn")
 		var deadline: int = ProbePlay.cap_msec() + 15000
@@ -377,10 +377,11 @@ func _play_real(controller: Node, card: CardData, target: Node) -> void:
 		_fail("'%s' is not in the hand" % card.card_name)
 		return
 	controller.call("request_play", view)
-	if not bool(controller.call("is_awaiting_target")):
-		_fail("'%s' didn't ask for a target" % card.card_name)
-		return
-	controller.call("confirm_target", target)
+	if target != null:
+		if not bool(controller.call("is_awaiting_target")):
+			_fail("'%s' didn't ask for a target" % card.card_name)
+			return
+		controller.call("confirm_target", target)
 	await ProbePlay.settle(self, controller)
 
 func _teardown() -> void:

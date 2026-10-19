@@ -33,9 +33,9 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	_drain(drains, _land(base + ctx.take_attack_bonus(), targets, ctx), ctx)
 
 	# Lash's further hits (repeat_per_earlier_play_tag): one for each
-	# card of its tag played earlier this turn, each a repeat as Second
-	# Swing's is below - on what the hit before left standing, so a kill
-	# ends the chain, and a broken mound hands it to the enemy under it.
+	# card of its tag played earlier this turn, each the same hit again -
+	# on what the hit before left standing, so a kill ends the chain, and
+	# a broken mound hands it to the enemy under it.
 	var struck: Array[Combatant] = targets
 	for i in hit_count(effect, ctx) - 1:
 		struck = _standing_after(struck, ctx)
@@ -46,30 +46,10 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 		ctx.repeat_mark_bonus(struck)
 		_drain(drains, _land(base + ctx.take_repeat_attack_bonus(), struck, ctx), ctx)
 
-	# A repeat (Second Swing): judged as the first hit resolves, on what
-	# it left standing - a first hit that killed everything it struck
-	# skips the repeat and spends nothing. Otherwise a player holding the
-	# Toll spends it and the same hit lands again: the same number, with
-	# the ongoing bonus again (take_repeat_attack_bonus()) and a mark's
-	# bonus again, spending another charge (repeat_mark_bonus()), but not
-	# a one-shot charge, which the first hit had. One card all the same -
-	# counted once by whatever counts cards.
-	if effect.repeat_toll_cost <= 0:
-		return
-	var standing: Array[Combatant] = _standing_after(struck, ctx)
-	if standing.is_empty() or ctx.player.toll < effect.repeat_toll_cost:
-		return
-	if ctx.on_repeat.is_valid():
-		ctx.on_repeat.call()
-	ctx.spend_toll(effect.repeat_toll_cost)
-	ctx.repeat_mark_bonus(standing)
-	_drain(drains, _land(base + ctx.take_repeat_attack_bonus(), standing, ctx), ctx)
-
 # How many times this effect's hit lands as it resolves: once, and once
 # more for each card of its repeat_per_earlier_play_tag played earlier
-# this turn (EffectContext.earlier_plays_tagged()) - before Second
-# Swing's Toll repeat, which isn't counted here. The card face reads the
-# same call (CardView's {hits}).
+# this turn (EffectContext.earlier_plays_tagged()). The card face reads
+# the same call (CardView's {hits}).
 static func hit_count(effect: CardEffect, ctx: EffectContext) -> int:
 	if effect == null or effect.repeat_per_earlier_play_tag == &"" or ctx == null:
 		return 1
@@ -108,7 +88,7 @@ func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> int:
 		var hp_before: int = enemy.hp
 		var full_blow: int = blow + ctx.take_mark_bonus(enemy)
 		ctx.attack_card_extra_this_card += Status.attack_card_extra(full_blow, ctx.player.statuses)
-		var result := DamagePipeline.resolve(landed(full_blow, ctx.player, enemy), enemy)
+		var result := DamagePipeline.resolve(landed(full_blow, ctx.player, enemy, ctx.is_replay), enemy)
 		# A broken mound is no kill.
 		if enemy.hp <= 0 and enemy.mound_owner == null:
 			ctx.killed_this_card = true
@@ -126,9 +106,11 @@ func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> int:
 # adds up to: its value, the attack bonus and the mark bonus. A null
 # `enemy` (a card face with no one to read against) skips the incoming
 # half. The resolvers and the card face both call this, so the face can't
-# print a number the rules won't land.
-static func landed(blow: int, player: Combatant, enemy: Combatant) -> int:
-	var amount: int = Status.apply_modifiers(blow, player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE)
+# print a number the rules won't land. A replay (`replay` - Second Swing)
+# never takes what waits for an Attack card's first blows (StatusData.
+# spent_by_attack_card - Bent Nail's doubling): it isn't one.
+static func landed(blow: int, player: Combatant, enemy: Combatant, replay: bool = false) -> int:
+	var amount: int = Status.apply_modifiers(blow, player.statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE, replay)
 	if enemy == null:
 		return amount
 	return Status.apply_modifiers(amount, enemy.statuses, StatusData.ModifierTarget.INCOMING_DAMAGE)

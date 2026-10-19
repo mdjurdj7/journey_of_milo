@@ -6,7 +6,7 @@ class_name AttackBonus
 # Critical where its data says so. Once per Attack card, not per hit or
 # per damage effect - EffectContext.take_attack_bonus() hands it to the
 # card's first damage effect and nothing after - save a repeated hit
-# (CardEffect.repeat_toll_cost), which takes the ongoing part again
+# (CardEffect.repeat_per_earlier_play_tag), which takes the ongoing part again
 # (ongoing_for_player()). The resolver and the card
 # face both call this, so the face can't print a bonus the rules won't
 # pay.
@@ -31,7 +31,7 @@ static func when_critical(player: Combatant, critical: bool) -> int:
 # The part of the bonus that holds for every hit rather than being spent
 # by one - the stance's and every status's without charges (Self-Eater,
 # Last Resort, Hungry), Keen's charge left out. What a repeated hit of
-# the same card takes (CardEffect.repeat_toll_cost - Second Swing); an
+# the same card takes (CardEffect.repeat_per_earlier_play_tag - Lash); an
 # ordinary Attack still takes the whole bonus once, above.
 static func ongoing_for_player(player: Combatant, at_hp: int) -> int:
 	if player == null:

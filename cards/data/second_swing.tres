@@ -5,22 +5,25 @@
 [ext_resource type="Texture2D" uid="uid://kbl7sdlj2mm0" path="res://cards/art/Wanderer/Second Swing.png" id="9_art"]
 [ext_resource type="Resource" uid="uid://c16dtxuqiqm2t" path="res://cards/tempered/second_swing_tempered.tres" id="10_tempered"]
 
-[sub_resource type="Resource" id="CardEffect_damage"]
+[sub_resource type="Resource" id="E_spend"]
 script = ExtResource("2_card_effect")
-value = 6
-repeat_toll_cost = 5
+effect_type = 21
+toll_cost = 5
+
+[sub_resource type="Resource" id="E_replay"]
+script = ExtResource("2_card_effect")
+effect_type = 25
 
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Second Swing"
 cost = 1
-rarity = 1
-target_type = 0
-description = "Deal {damage} damage.
-Spend 5 Toll to repeat."
-effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
+card_type = 1
+rarity = 2
+target_type = 1
+description = "Spend {toll_cost} Toll.
+Play the last Attack you played this turn again."
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_replay")])
 art = ExtResource("9_art")
-battle_animation = &"Slash"
-impact_time = 0.55
 tempered = ExtResource("10_tempered")
 card_class = &"wanderer"

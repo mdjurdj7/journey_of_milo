@@ -103,6 +103,8 @@ const TOKEN_ENERGY := "{energy}"
 const TOKEN_BONUS_ENERGY := "{bonus_energy}"
 # How many cards a SET_ASIDE (Bide) sets aside - its value.
 const TOKEN_SET_ASIDE := "{set_aside}"
+# The Toll a SPEND_TOLL spends - its toll_cost (Second Swing's 5).
+const TOKEN_TOLL_COST := "{toll_cost}"
 const TOKEN_HP_COST := "{hp_cost}"
 # What follows a repeating hit's number (CardEffect.repeat_per_earlier_
 # play_tag - Lash), by how many times it lands now (DamageEffect.hit_
@@ -754,6 +756,11 @@ func _resolve_tokens(description: String) -> String:
 		var energy: int = _effect_value(card_data, [CardEffect.EffectType.GAIN_ENERGY])
 		if energy >= 0:
 			text = text.replace(TOKEN_ENERGY, str(energy))
+	if text.contains(TOKEN_TOLL_COST):
+		for effect in card_data.effects:
+			if effect != null and effect.effect_type == CardEffect.EffectType.SPEND_TOLL:
+				text = text.replace(TOKEN_TOLL_COST, str(effect.toll_cost))
+				break
 	if text.contains(TOKEN_SET_ASIDE):
 		var set_aside: int = _effect_value(card_data, [CardEffect.EffectType.SET_ASIDE])
 		if set_aside >= 0:

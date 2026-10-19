@@ -16,7 +16,13 @@ enum EffectType {
 	APPLY_STATUS, FIRST_CARD_DAMAGE, TOLL_FRACTION_DAMAGE_ALL,
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
 	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL, DRAIN, SET_ASIDE, CONSUME,
+	REPLAY_LAST_ATTACK,
 }
+# REPLAY_LAST_ATTACK (Second Swing): the last Attack card played this
+# turn (Combatant.last_attack) resolves again - its effects in full, as
+# if played, but no play: no Energy, no pile, no played-card count
+# (replay_last_attack_effect.gd). Appended, like every value since: an
+# inserted one would rewrite every .tres that stores one.
 
 # When the effect resolves, with what number, or - for a DAMAGE effect
 # with drain_on_condition - whether its hit drains. Five modes, told apart
@@ -82,22 +88,13 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 # cap - TOLL_BLOCK spends up to it, 1 Block per Toll (Settled Account).
 # Unused by every other type.
 
-@export var repeat_toll_cost: int = 0
-# Read by DAMAGE (damage_effect.gd) only. Above 0: once the hit has
-# landed, a player holding at least this much Toll spends it and the hit
-# lands again on the same target(s) - a second hit of the same card, not
-# a second play (Second Swing). Under it, or with nothing the first hit
-# left alive, nothing more happens and nothing is spent. Never blocks the
-# play (contrast SPEND_TOLL's toll_cost). 0: no repeat.
-
 @export var repeat_per_earlier_play_tag: StringName = &""
 # Read by DAMAGE (damage_effect.gd) only. Set: the hit lands once, then
 # once more for each card carrying this tag (CardData.tags) played
 # earlier this turn (EffectContext.tagged_plays_before_this) - Lash's
-# &"lash": 5, then 5 x 2, then 5 x 3. Each further hit is a repeat on
-# Second Swing's terms: on what the hit before left standing, the
-# ongoing attack bonus and a mark's again, a one-shot charge with the
-# first hit only. The card is still one card to whatever counts cards.
+# &"lash": 5, then 5 x 2, then 5 x 3. Each further hit lands on what
+# the hit before left standing, with the ongoing attack bonus and a
+# mark's again, a one-shot charge with the first hit only. The card is still one card to whatever counts cards.
 # Empty: one hit.
 
 @export var drains: bool = false
