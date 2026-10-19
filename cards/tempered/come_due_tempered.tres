@@ -2,28 +2,34 @@
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
-[ext_resource type="Resource" uid="uid://b5ny7ht3qa8wr" path="res://battle/rules/statuses/come_due_tempered.tres" id="3_come_due"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/owed.tres" id="3_owed"]
 [ext_resource type="Texture2D" uid="uid://cyupr04sdvc3o" path="res://cards/art/Wanderer/Come Due.png" id="9_art"]
 
-[sub_resource type="Resource" id="CardEffect_spend_toll"]
+[sub_resource type="Resource" id="E_spend"]
 script = ExtResource("2_card_effect")
 effect_type = 21
 toll_cost = 5
 
-[sub_resource type="Resource" id="CardEffect_apply_status_to_target"]
+[sub_resource type="Resource" id="E_energy"]
 script = ExtResource("2_card_effect")
-effect_type = 18
-status_data = ExtResource("3_come_due")
+effect_type = 16
+value = 2
+
+[sub_resource type="Resource" id="E_owed"]
+script = ExtResource("2_card_effect")
+effect_type = 12
+value = 1
+status_data = ExtResource("3_owed")
 
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Come Due+"
-cost = 1
 card_type = 1
-rarity = 2
-target_type = 0
-description = "Spend 5 Toll.
-Next 3 Attack hits against this enemy deal +6 damage."
-effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_spend_toll"), SubResource("CardEffect_apply_status_to_target")])
+rarity = 1
+target_type = 1
+description = "Spend {toll_cost} Toll.
+Gain {energy} Energy.
+Next turn, gain {debt} less."
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_energy"), SubResource("E_owed")])
 art = ExtResource("9_art")
 card_class = &"wanderer"

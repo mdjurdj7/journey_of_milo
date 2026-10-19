@@ -4,7 +4,7 @@ extends SceneTree
 # once more for each Lash played earlier this turn - 5, then 5 x 2, then
 # 5 x 3, each a hit of its own. Under Self-Eater every hit takes its +3
 # and its 2 HP is paid once for the card; Keen's one-shot +3 goes to the
-# first hit only, and Come Due's mark to every hit, a charge apiece; an
+# first hit only; an
 # enemy's Block meets each hit on its own; a kill ends the chain; a
 # Siltjaw's own mound broken mid-chain hands the rest of the hits to the
 # Siltjaw. The face reads "Deal 5 damage." once and "Deal 5 ×N" from
@@ -34,7 +34,6 @@ const SLASH_PLUS_PATH := "res://cards/tempered/slash_tempered.tres"
 const TAIL_PATH := "res://run/weapons/greyshelfs_tail.tres"
 const BLADE_PATH := "res://run/weapons/rusted_blade.tres"
 const SELF_EATER_PATH := "res://cards/data/self_eater.tres"
-const COME_DUE_PATH := "res://cards/data/come_due.tres"
 const KEEN_PATH := "res://battle/rules/statuses/keen.tres"
 const SILTJAW_PATH := "res://battle/rules/enemies/siltjaw.tres"
 const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
@@ -51,7 +50,6 @@ const HIT_PLUS := 7
 const SELF_EATER_BONUS := 3
 const SELF_EATER_PRICE := 2
 const KEEN_BONUS := 3
-const MARK_BONUS := 4
 
 var _run_state: Node = null
 var _field: Node = null
@@ -128,23 +126,17 @@ func _check_self_eater() -> void:
 	_expect_eq(hp_before - player.hp, SELF_EATER_PRICE, "...its 2 HP paid once for the card")
 	_completed += 1
 
-# Keen (+3 on the next Attack) to the first hit only; Come Due (+4, 3
-# charges) to every hit, a charge each: 12 then 9, one charge left - then
-# 9, and the two hits after it bare, the mark gone.
+# Keen (+3 on the next Attack) to the first hit only: 8 then 5, and the
+# next Lash bare.
 func _check_keen_and_mark() -> void:
 	var player: Combatant = _player()
 	Status.apply_to(player.statuses, load(KEEN_PATH) as StatusData)
 	var enemy := Combatant.new(ENEMY_HP)
-	player.toll = 5
-	_resolver.resolve_card(load(COME_DUE_PATH) as CardData, _ctx(player, [enemy]))
-	_expect_eq(_mark_charges(enemy), 3, "Come Due on the enemy, 3 charges")
 	var hits: Array[int] = _play(player, [enemy], _lash(), 1)
-	_expect_eq(hits, [HIT + KEEN_BONUS + MARK_BONUS, HIT + MARK_BONUS] as Array[int], "Keen and the mark: 12 on the first hit, 9 on the second")
+	_expect_eq(hits, [HIT + KEEN_BONUS, HIT] as Array[int], "Keen: 8 on the first hit, 5 on the second")
 	_expect(Status.find_in(player.statuses, load(KEEN_PATH) as StatusData) == null, "...Keen's one charge spent")
-	_expect_eq(_mark_charges(enemy), 1, "...two charges of the mark spent, one a hit")
 	hits = _play(player, [enemy], _lash(), 2)
-	_expect_eq(hits, [HIT + MARK_BONUS, HIT, HIT] as Array[int], "The mark's last charge: 9, then 5 and 5")
-	_expect_eq(_mark_charges(enemy), 0, "...and the mark gone")
+	_expect_eq(hits, [HIT, HIT, HIT] as Array[int], "...then 5, 5 and 5")
 	_completed += 1
 
 # 8 Block against three hits of 5: the first all blocked, the second 3
@@ -443,12 +435,6 @@ func _play_counted(player: Combatant, enemies: Array[Combatant], card: CardData)
 	var earlier: int = int(player.tagged_plays_this_turn.get(LASH_TAG, 0))
 	player.count_play(card)
 	return _play(player, enemies, card, earlier)
-
-func _mark_charges(enemy: Combatant) -> int:
-	for active in enemy.statuses:
-		if active.data != null and active.data.id == "come_due":
-			return active.charges
-	return 0
 
 func _hand_names(controller: Node) -> Array[String]:
 	var names: Array[String] = []

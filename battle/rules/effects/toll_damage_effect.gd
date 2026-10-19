@@ -14,9 +14,7 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	var consumed: int = ctx.spend_toll(ctx.player.toll)
 	if ctx.target == null:
 		return
-	# A mark on the target (Come Due) adds to the blow, once per card, as
-	# on any damage effect - so even a Toll-less Reckoning lands it.
-	var base: int = consumed + ctx.take_attack_bonus() + ctx.take_mark_bonus(ctx.target)
+	var base: int = consumed + ctx.take_attack_bonus()
 	if base <= 0:
 		return
 	var hp_before: int = ctx.target.hp

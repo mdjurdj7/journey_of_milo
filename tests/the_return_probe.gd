@@ -4,7 +4,7 @@ extends SceneTree
 # leaves, the self-inflicted losses that move it (one per loss, never an
 # enemy's hit), the Drain the count's last sets off - once from every enemy, the
 # heal capped at the printed number - and what Drain is not: an Attack,
-# a mark's payoff, a Grace reclaim. Rules layer and the real .tres cards,
+# a Grace reclaim. Rules layer and the real .tres cards,
 # statuses and pool; no field scene:
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/the_return_probe.gd
@@ -14,13 +14,12 @@ extends SceneTree
 
 const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
-const CASES := 19
+const CASES := 18
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const BELONGINGS_POOL_PATH := "res://cards/pools/belongings_pool.tres"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const ART_PATH := "res://cards/art/Wanderer/The Return.png"
 const STATUS_PATH := "res://battle/rules/statuses/the_return.tres"
-const COME_DUE_PATH := "res://battle/rules/statuses/come_due.tres"
 const KEEN_PATH := "res://battle/rules/statuses/keen.tres"
 const DRAIN := 8
 const COUNT := 3
@@ -44,7 +43,6 @@ func _initialize() -> void:
 	_check_heal_follows_damage_dealt()
 	_check_heal_capped_at_max_hp()
 	_check_not_an_attack()
-	_check_come_due_untouched()
 	_check_toll_and_grace()
 	_check_lethal_loss_not_rescued()
 	_check_stacks_share_one_counter()
@@ -184,16 +182,6 @@ func _check_not_an_attack() -> void:
 	var keen: Status = Status.find_in(player.statuses, load(KEEN_PATH) as StatusData)
 	_expect(keen != null and keen.charges == 1, "...and Keen's charge is left for an Attack")
 	_expect_eq(player.hp, 20 - COUNT + DRAIN, "...and Self-Eater charges nothing for it (20 - %d + %d)" % [COUNT, DRAIN])
-	_completed += 1
-
-func _check_come_due_untouched() -> void:
-	var player: Combatant = _armed(50)
-	var marked: Combatant = _enemy(100)
-	Status.apply_to(marked.statuses, load(COME_DUE_PATH) as StatusData)
-	_losses(player, [marked], COUNT)
-	_expect_eq(marked.hp, 100 - DRAIN, "A Come Due mark adds nothing to a Drain")
-	var mark: Status = Status.find_in(marked.statuses, load(COME_DUE_PATH) as StatusData)
-	_expect(mark != null and mark.charges == 3, "...and keeps all 3 charges")
 	_completed += 1
 
 func _check_toll_and_grace() -> void:

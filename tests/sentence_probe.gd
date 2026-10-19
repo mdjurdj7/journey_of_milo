@@ -10,7 +10,7 @@ extends SceneTree
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 
 const MAX_HP := 70
-const CASES := 15
+const CASES := 14
 const DAMAGE := 40
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const BELONGINGS_POOL_PATH := "res://cards/pools/belongings_pool.tres"
@@ -33,7 +33,6 @@ func _initialize() -> void:
 	_check_gaining_toll_does_nothing()
 	_check_hurried_to_zero_resolves_now()
 	_check_not_an_attack()
-	_check_leaves_come_due()
 	_check_replay_refreshes()
 	_check_separate_enemies()
 	_check_death_cleans_up()
@@ -152,20 +151,6 @@ func _check_not_an_attack() -> void:
 	for turn in 4:
 		EnemyTurn.take_turn(enemy, data, player)
 	_expect_eq(enemy.hp, 100 - DAMAGE, "...but Sentence deals exactly 40")
-	_completed += 1
-
-func _check_leaves_come_due() -> void:
-	var player: Combatant = _player()
-	var enemy := Combatant.new(100)
-	_play("sentence", player, [enemy])
-	player.toll = 5
-	_play("come_due", player, [enemy])
-	var data: EnemyData = _defender()
-	EnemyTurn.pick_initial_intent(enemy, data)
-	for turn in 3:
-		EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(enemy.hp, 100 - DAMAGE, "With Come Due on it, Sentence still deals 40, not 44")
-	_expect_eq(_label_of(enemy, "come_due"), "Come Due ×3", "...and spends no Come Due charge")
 	_completed += 1
 
 func _check_replay_refreshes() -> void:

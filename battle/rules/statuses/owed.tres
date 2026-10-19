@@ -4,11 +4,10 @@
 
 [resource]
 script = ExtResource("1_status_data")
-id = "come_due"
-display_name = "Come Due"
-description = "+{mark} damage on your next {charges} Attack hit{s} against it."
+id = "owed"
+display_name = "Owed"
+description = "Next turn, gain {value} less Energy."
 category = 2
-default_charges = 3
-default_duration_turns = -1
-stack_rule = 4
-attack_bonus_against_holder = 4
+default_duration_turns = 1
+stack_rule = 1
+energy_debt = true

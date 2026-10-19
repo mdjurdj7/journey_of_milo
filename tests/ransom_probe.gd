@@ -33,7 +33,7 @@ const CARVE_PATH := "res://cards/data/carve.tres"
 const RECKONING_PATH := "res://cards/data/reckoning.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const COLLATERAL_PATH := "res://cards/data/collateral.tres"
-const COME_DUE_STATUS_PATH := "res://battle/rules/statuses/come_due.tres"
+const KEEN_STATUS_PATH := "res://battle/rules/statuses/keen.tres"
 const SELF_EATER_STANCE_PATH := "res://battle/rules/stances/self_eater.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 # Where the next-turn case writes its run, when run_probes.sh hands over
@@ -165,16 +165,16 @@ func _check_all_enemies() -> void:
 	_expect_eq(_healed, 5, "...and heals half the 10, once: 5")
 	_completed += 1
 
-# Come Due's mark and the Self-Eater stance's bonus are part of the blow,
+# Keen's charge and the Self-Eater stance's bonus are part of the blow,
 # so they are part of the heal; the stance's own HP price is still paid.
 func _check_bonuses() -> void:
 	var player: Combatant = _player()
 	var enemy := Combatant.new(ENEMY_HP)
-	var come_due: StatusData = load(COME_DUE_STATUS_PATH)
-	Status.apply_to(enemy.statuses, come_due)
+	var keen: StatusData = load(KEEN_STATUS_PATH)
+	Status.apply_to(player.statuses, keen)
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	var marked: int = 6 + come_due.attack_bonus_against_holder
-	_expect_eq([ENEMY_HP - enemy.hp, _healed], [marked, marked / 2], "Come Due's +%d: Slash deals %d and heals %d" % [come_due.attack_bonus_against_holder, marked, marked / 2])
+	var keened: int = 6 + keen.attack_damage_bonus
+	_expect_eq([ENEMY_HP - enemy.hp, _healed], [keened, keened / 2], "Keen's +%d: Slash deals %d and heals %d" % [keen.attack_damage_bonus, keened, keened / 2])
 	player = _player()
 	enemy = Combatant.new(ENEMY_HP)
 	Stance.apply_to(player, load(SELF_EATER_STANCE_PATH))
@@ -193,11 +193,11 @@ func _check_grace() -> void:
 	var player: Combatant = _player()
 	player.grace = 6
 	var enemy := Combatant.new(ENEMY_HP)
-	Status.apply_to(enemy.statuses, load(COME_DUE_STATUS_PATH))
+	Status.apply_to(player.statuses, load(KEEN_STATUS_PATH))
 	_resolve(SLASH_PATH, player, [enemy], enemy)
-	_expect_eq(ENEMY_HP - enemy.hp, 10, "Slash with Come Due deals 10")
-	_expect_eq([_reclaimed, _healed], [6, 2], "...Grace +6, Drain half the 4 left: +2")
-	_expect_eq([player.hp, player.grace], [PLAYER_HP + 8, 0], "...8 HP back in all, Grace spent")
+	_expect_eq(ENEMY_HP - enemy.hp, 9, "Slash with Keen deals 9")
+	_expect_eq([_reclaimed, _healed], [6, 1], "...Grace +6, Drain half the 3 left: +1")
+	_expect_eq([player.hp, player.grace], [PLAYER_HP + 7, 0], "...7 HP back in all, Grace spent")
 	player = _player()
 	player.grace = 20
 	enemy = Combatant.new(ENEMY_HP)

@@ -64,7 +64,7 @@ const EXPECTED_RARITY: Dictionary = {
 	"Last Wager": CardData.CardRarity.UNCOMMON,
 	"Blood Arc": CardData.CardRarity.UNCOMMON,
 	"With Regards": CardData.CardRarity.UNCOMMON,
-	"Come Due": CardData.CardRarity.UNCOMMON,
+	"Come Due": CardData.CardRarity.COMMON,
 	"Collateral": CardData.CardRarity.UNCOMMON,
 	"Leverage": CardData.CardRarity.UNCOMMON,
 	"Deny": CardData.CardRarity.UNCOMMON,

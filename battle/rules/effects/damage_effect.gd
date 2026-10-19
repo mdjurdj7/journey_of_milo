@@ -43,7 +43,6 @@ func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 			return
 		if ctx.on_extra_hit.is_valid():
 			ctx.on_extra_hit.call()
-		ctx.repeat_mark_bonus(struck)
 		_drain(drains, _land(base + ctx.take_repeat_attack_bonus(), struck, ctx), ctx)
 
 # How many times this effect's hit lands as it resolves: once, and once
@@ -81,14 +80,9 @@ func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> int:
 		# the enemy coming up under another - takes nothing.
 		if enemy.mound_owner != null and not EnemyTurn.mound_standing(enemy):
 			continue
-		# A mark on this enemy (Come Due) adds to the blow against it
-		# alone, once per card and again for a repeated hit - so it's per
-		# target, and like the attack bonus it goes in before the
-		# modifiers.
 		var hp_before: int = enemy.hp
-		var full_blow: int = blow + ctx.take_mark_bonus(enemy)
-		ctx.attack_card_extra_this_card += Status.attack_card_extra(full_blow, ctx.player.statuses)
-		var result := DamagePipeline.resolve(landed(full_blow, ctx.player, enemy, ctx.is_replay), enemy)
+		ctx.attack_card_extra_this_card += Status.attack_card_extra(blow, ctx.player.statuses)
+		var result := DamagePipeline.resolve(landed(blow, ctx.player, enemy, ctx.is_replay), enemy)
 		# A broken mound is no kill.
 		if enemy.hp <= 0 and enemy.mound_owner == null:
 			ctx.killed_this_card = true
@@ -103,7 +97,7 @@ func _land(blow: int, targets: Array[Combatant], ctx: EffectContext) -> int:
 # The number one blow lands for once the statuses have had their say -
 # the attacker's outgoing modifiers, then `enemy`'s incoming ones - ahead
 # of block and the damage pipeline. `blow` is everything the card itself
-# adds up to: its value, the attack bonus and the mark bonus. A null
+# adds up to: its value and the attack bonus. A null
 # `enemy` (a card face with no one to read against) skips the incoming
 # half. The resolvers and the card face both call this, so the face can't
 # print a number the rules won't land. A replay (`replay` - Second Swing)

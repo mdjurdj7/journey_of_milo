@@ -763,7 +763,8 @@ func request_play(card_view: CardView) -> void:
 func _is_playable(card: CardData) -> bool:
 	if player.energy_cost(card) > player.energy:
 		return false
-	# A fixed Toll the player doesn't hold (Come Due) - the hand shows it
+	# A fixed Toll the player doesn't hold (Come Due), nothing to replay
+	# (Second Swing) - the hand shows it
 	# faded, and this is the rule behind the fade.
 	if EffectResolver.card_blocked(card, player):
 		return false

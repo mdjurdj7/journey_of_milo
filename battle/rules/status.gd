@@ -88,7 +88,7 @@ func trigger_drain() -> int:
 func label() -> String:
 	if data == null:
 		return ""
-	if data.category == StatusData.Category.TICK or data.strikes_back_on_attack_card:
+	if data.category == StatusData.Category.TICK or data.strikes_back_on_attack_card or data.energy_debt:
 		return "%s %d" % [data.display_name, magnitude]
 	if has_self_loss_counter():
 		var title: String = data.display_name
@@ -118,7 +118,6 @@ func describe(holder: Combatant = null) -> String:
 		"stacks": stack_count,
 		"percent": absi(magnitude),
 		"value": magnitude,
-		"mark": data.attack_bonus_against_holder,
 		"bonus": data.attack_damage_bonus * stack_count,
 		"bonus_each": data.attack_damage_bonus,
 		"max": data.attack_damage_bonus * data.max_stacks,
@@ -501,33 +500,14 @@ static func count_self_loss(statuses: Array[Status]) -> int:
 			due += active.trigger_drain()
 	return due
 
-# The extra damage one Attack card would deal the holder of `statuses`
-# for every mark on it (StatusData.attack_bonus_against_holder - Come
-# Due) with a charge left. Read only: what a card face previews, and what
-# spend_mark_bonus() below pays and then spends.
-static func mark_bonus(statuses: Array[Status]) -> int:
+# The Energy `statuses` take off the next turn's refill (StatusData.
+# energy_debt - Come Due's Owed): each one's magnitude, summed.
+static func energy_debt(statuses: Array[Status]) -> int:
 	var total: int = 0
 	for active in statuses:
-		if _pays_mark_bonus(active):
-			total += active.data.attack_bonus_against_holder
+		if active.data != null and active.data.energy_debt:
+			total += maxi(active.magnitude, 0)
 	return total
-
-# One Attack card is landing on the holder of `statuses`: mark_bonus(),
-# with each mark that paid it spending one charge and leaving once it has
-# none. Called at most once per Attack card per enemy - EffectContext.
-# take_mark_bonus() keeps that.
-static func spend_mark_bonus(statuses: Array[Status]) -> int:
-	var total: int = mark_bonus(statuses)
-	for active in statuses.duplicate():
-		if not _pays_mark_bonus(active):
-			continue
-		active.charges -= 1
-		if active.charges <= 0:
-			statuses.erase(active)
-	return total
-
-static func _pays_mark_bonus(active: Status) -> bool:
-	return active.data.attack_bonus_against_holder > 0 and active.has_charges() and active.charges > 0
 
 # An enemy's attack against the holder of `statuses` has resolved, every
 # hit of it: each status that lasts only until then (StatusData.consumed_

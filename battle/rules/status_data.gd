@@ -26,7 +26,7 @@ enum StackRule { REFRESH_DURATION, ADD_MAGNITUDE, REFRESH_AND_ADD, IGNORE, RESET
 # existing instance just keeps running), though stack_count still climbs
 # for those four. RESET puts the status back as if freshly applied -
 # default magnitude, duration and charges, one stack - a refresh, never a
-# pile-up (Come Due, No Further armed). ADD_CHARGES adds default_charges
+# pile-up (No Further armed). ADD_CHARGES adds default_charges
 # to the charges still waiting and leaves the rest alone - each copy
 # covers one more use (Collateral). Appended: an inserted value would
 # rewrite every .tres that stores one of these as an integer.
@@ -50,7 +50,6 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {charges}  charges left              {turns}  turns left (a countdown's)
 #   {stacks}   stack_count               {percent}  |magnitude| (a MULTIPLY %)
 #   {value}    magnitude (Garnished's total)
-#   {mark}     attack_bonus_against_holder
 #   {bonus}    attack_damage_bonus × stacks
 #   {bonus_each} attack_damage_bonus, one stack's worth
 #   {max}      attack_damage_bonus × max_stacks (the bonus at the cap)
@@ -73,9 +72,9 @@ const DURATION_UNTIL_TRIGGERED := -2
 # How many times this status can be spent before it's gone - counted on
 # Status.charges, apart from magnitude (which a MODIFIER needs for its
 # own number). 0 = not a charge status. What spends one is the status's
-# own rule: an Attack on its holder (attack_bonus_against_holder - Come
-# Due), or an enemy attack against its holder (consumed_by_attack_against,
-# on a status that has charges). Shown as "Name ×N" down to ×1 (Status.
+# own rule: an enemy attack against its holder (consumed_by_attack_
+# against, on a status that has charges), or the play it waits for
+# (Collateral, Bent Nail). Shown as "Name ×N" down to ×1 (Status.
 # label()).
 @export var default_charges: int = 0
 @export var clears_on_trigger: bool = false
@@ -158,15 +157,13 @@ enum Mark { NONE, COIL, DROP }
 # The bonus above only while the player is Critical.
 @export var bonus_requires_critical: bool = false
 
-# Extra damage each of the player's Attack cards deals to this status's
-# HOLDER - an enemy - while it's up (Come Due). Once per hit of an Attack
-# card (EffectContext.take_mark_bonus(), paid again for a repeated hit -
-# Lash), and to the holder alone: an all-enemies Attack
-# pays it to this enemy, not its neighbours. Each such hit that lands on
-# the holder spends one charge (default_charges to start) and the status
-# is gone at 0. Pair it with DURATION_UNTIL_REMOVED so no turn takes it
-# first. 0 = none.
-@export var attack_bonus_against_holder: int = 0
+# Energy owed (Come Due's Owed): its magnitude comes off its holder's
+# next turn's refill, never below 0 (Combatant.turn_start_energy()), and
+# it reads "Name N" in the row. Its amount is the applying effect's value,
+# added on a restack (ApplyStatusEffect - Status.apply_amount()). Pair it
+# with a duration of 1: the refill reads it before the turn's tick ends
+# it, so it takes exactly the one turn.
+@export var energy_debt: bool = false
 
 # Removed from its holder once the holder's own ATTACK has resolved -
 # after every hit of it, so a status that softens that attack softens all

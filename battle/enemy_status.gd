@@ -194,7 +194,7 @@ var layout_offset: Vector2 = Vector2.ZERO
 @export var block_crossfade_time: float = 0.12
 
 @export_group("Status Row")
-# The enemy's statuses (Braced, Come Due ×3), left to right under the bar
+# The enemy's statuses (Braced, Sentence 3), left to right under the bar
 # in battle - the same row the player's HPBar draws under its own, in the
 # same type, handed ready-made labels (Status.label()). Drawn below the
 # readout without growing it, so the bar never moves on the enemy when a

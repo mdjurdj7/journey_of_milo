@@ -1,46 +1,55 @@
 extends SceneTree
 
-# Headless probe for Come Due: the Toll it requires and spends, the mark
-# it leaves on an enemy, and how Attacks spend that mark - and the number
-# a battle-hand face prints for an Attack against a marked target. Rules
-# layer, CardView and the real .tres cards, status and pool; no field
-# scene (come_due_face_probe.gd drives the hover through a real fight):
+# Headless probe for Come Due - 0 Energy, Common Skill, TOLL, no target:
+# "Spend 5 Toll. Gain 2 Energy. Next turn, gain 2 less." Blocked under 5
+# Toll. The debt is Owed on the Wanderer, its amount in its row ("Owed
+# 2"), adding up over plays; the next turn's refill is that much less,
+# never below 0, and then it clears. Come Due+ owes 1. Rules layer, a
+# CardView, the real .tres cards, status and pool; the fight case plays it
+# through BattleController on floor 1 and ends the turn.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/come_due_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
+# Untyped against anything that names the RunState autoload.
 
+const CASES := 9
 const MAX_HP := 70
-const CASES := 17
-const BONUS := 4
+const CARD_PATH := "res://cards/data/come_due.tres"
+const TEMPERED_PATH := "res://cards/tempered/come_due_tempered.tres"
+const OWED_PATH := "res://battle/rules/statuses/owed.tres"
+const DYING_LIGHT_PATH := "res://battle/rules/statuses/dying_light.tres"
+const ART_PATH := "res://cards/art/Wanderer/Come Due.png"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
-const BELONGINGS_POOL_PATH := "res://cards/pools/belongings_pool.tres"
-const CHARACTER_PATH := "res://run/data/wanderer.tres"
-const BATTLE_CONTROLLER_PATH := "res://battle/battle_controller.gd"
+const COLLECTOR_POOL_PATH := "res://cards/pools/collector_pool.tres"
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
+const REGION_SCENE_PATH := "res://field/region_field.tscn"
+const CHARACTER_PATH := "res://run/data/wanderer.tres"
 
+var _run_state: Node = null
+var _field: Node = null
 var _failures: int = 0
 var _completed: int = 0
 var _resolver := EffectResolver.new()
+var _toll: int = 0
+var _gain: int = 0
+var _debt: int = 0
 
 func _initialize() -> void:
+	_run_state = root.get_node_or_null("RunState")
+	var card: CardData = load(CARD_PATH)
+	_toll = card.effects[0].toll_cost
+	_gain = card.effects[1].value
+	_debt = card.effects[2].value
 	_check_card_data()
-	_check_toll_requirement()
-	_check_spend_and_mark()
-	_check_single_target_attack()
-	_check_three_attacks_spend_it()
-	_check_aoe_attack()
-	_check_multi_hit_attack()
-	_check_non_attacks_leave_it()
-	_check_replay_refreshes()
-	_check_reckoning()
-	_check_death_clears_row()
-	_check_pool()
-	_check_toll_never_negative()
-	await _check_face_reads_mark()
-	await _check_face_is_resolution()
-	await _check_face_reverts()
-	await _check_aoe_face()
+	_check_toll_gate()
+	_check_play()
+	_check_stacks()
+	_check_next_turn()
+	_check_floor()
+	_check_tempered()
+	await _check_face()
+	await _check_fight()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
 	if _failures == 0:
@@ -51,307 +60,222 @@ func _initialize() -> void:
 		quit(1)
 
 func _check_card_data() -> void:
-	var card: CardData = _card("come_due")
-	_expect_eq(card.card_name, "Come Due", "The card is named Come Due")
-	_expect_eq(card.cost, 1, "...costs 1")
-	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
-	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "...is Uncommon")
-	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
-	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Come Due.png", "...carries its art")
-	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...and its face reads TOLL")
+	var card: CardData = load(CARD_PATH)
+	var owed: StatusData = load(OWED_PATH)
+	_expect_eq(card.card_name, "Come Due", "The card loads")
+	_expect_eq([card.cost, card.card_type, card.rarity, card.target_type, card.card_class], [0, CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.TargetType.SELF, &"wanderer"], "...0 Energy, a Skill, Common, no target, the Wanderer's")
+	_expect_eq(card.description, "Spend {toll_cost} Toll.\nGain {energy} Energy.\nNext turn, gain {debt} less.", "...its text")
+	_expect(card.effects.size() == 3 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.GAIN_ENERGY and card.effects[2].effect_type == CardEffect.EffectType.APPLY_STATUS and card.effects[2].status_data == owed, "...SPEND_TOLL, GAIN_ENERGY, then Owed")
+	_expect_eq([_toll, _gain, _debt], [5, 2, 2], "...5 Toll, 2 Energy, 2 owed")
+	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
+	_expect(card.art != null and card.art.resource_path == ART_PATH, "...its art kept")
+	_expect(owed.energy_debt and owed.default_duration_turns == 1, "Owed: an Energy debt, for one turn")
+	_expect((load(POOL_PATH) as RewardPool).entries.has(card), "In the Wanderer pool")
+	_expect((load(COLLECTOR_POOL_PATH) as RewardPool).entries.has(card), "...and the collector's")
 	_completed += 1
 
-func _check_toll_requirement() -> void:
-	var card: CardData = _card("come_due")
+func _check_toll_gate() -> void:
 	var player: Combatant = _player()
-	player.toll = 4
-	_expect(EffectResolver.card_blocked(card, player), "Can't be played on 4 Toll")
-	player.toll = 5
-	_expect(not EffectResolver.card_blocked(card, player), "...can on 5")
-	player.toll = 12
-	_expect(not EffectResolver.card_blocked(card, player), "...and on 12")
+	player.toll = _toll - 1
+	_expect(EffectResolver.card_blocked(load(CARD_PATH), player), "%d Toll: blocked" % (_toll - 1))
+	player.toll = _toll
+	_expect(not EffectResolver.card_blocked(load(CARD_PATH), player), "%d: playable" % _toll)
 	_completed += 1
 
-func _check_spend_and_mark() -> void:
+# On 7 Toll and 1 Energy: 2 Toll left, 3 Energy, Owed 2.
+func _check_play() -> void:
 	var player: Combatant = _player()
 	player.toll = 7
-	var enemy := Combatant.new(100)
-	_play(_card("come_due"), player, [enemy])
-	_expect_eq(player.toll, 2, "Played on 7 Toll, it spends exactly 5")
-	var mark: Status = _mark(enemy)
-	_expect(mark != null, "...and marks the target")
-	if mark != null:
-		_expect_eq(mark.charges, 3, "...with 3 charges")
-		_expect_eq(mark.label(), "Come Due ×3", "...shown as Come Due ×3")
-	_expect_eq(player.statuses.size(), 0, "...and nothing on the player")
-	player.toll = 5
-	_play(_card("come_due"), player, [Combatant.new(100)])
-	_expect_eq(player.toll, 0, "Played on exactly 5, it leaves 0")
+	player.energy = 1
+	_play(load(CARD_PATH), player)
+	_expect_eq(player.toll, 7 - _toll, "Come Due spends 5")
+	_expect_eq(player.energy, 1 + _gain, "...gains 2 Energy")
+	_expect_eq(_owed_label(player), "Owed 2", "...and owes 2: 'Owed 2'")
+	_expect(player.toll_spent_this_turn, "...Toll spent this turn")
 	_completed += 1
 
-func _check_single_target_attack() -> void:
+func _check_stacks() -> void:
 	var player: Combatant = _player()
-	var enemy: Combatant = _marked(player)
-	var slash: CardData = _card("slash")
-	_play(slash, player, [enemy])
-	_expect_eq(enemy.hp, 100 - _damage(slash) - BONUS, "Slash on the mark deals 4 more")
-	_expect_eq(_charges(enemy), 2, "...and spends one charge")
-	_expect_eq(_mark(enemy).label(), "Come Due ×2", "...shown as Come Due ×2")
+	player.toll = 2 * _toll
+	_play(load(CARD_PATH), player)
+	_play(load(CARD_PATH), player)
+	_expect_eq(player.energy, 2 * _gain, "Twice: 4 Energy")
+	_expect_eq(_owed_label(player), "Owed 4", "...one Owed, 4")
+	_expect_eq(Status.energy_debt(player.statuses), 4, "...4 owed")
 	_completed += 1
 
-func _check_three_attacks_spend_it() -> void:
+# The refill reads the debt, then the turn's tick ends it - as
+# BattleController._start_player_turn() runs them: 3 - 2, then 3 again.
+func _check_next_turn() -> void:
 	var player: Combatant = _player()
-	var enemy: Combatant = _marked(player)
-	var slash: CardData = _card("slash")
-	var bite: CardData = _card("bite_down")
-	_play(slash, player, [enemy])
-	_play(bite, player, [enemy])
-	_expect_eq(_mark(enemy).label(), "Come Due ×1", "Two Attacks in, Come Due ×1")
-	_play(slash, player, [enemy])
-	_expect(_mark(enemy) == null, "The third Attack spends the last charge and the mark is gone")
-	var expected: int = 100 - 3 * BONUS - 2 * _damage(slash) - _damage(bite)
-	_expect_eq(enemy.hp, expected, "...each of the three dealt 4 more")
-	_play(slash, player, [enemy])
-	_expect_eq(enemy.hp, expected - _damage(slash), "A fourth Attack gets no bonus")
+	player.toll = _toll
+	_play(load(CARD_PATH), player)
+	_expect_eq(player.turn_start_energy(), player.max_energy - _debt, "Next turn's refill: 3 - 2 = 1")
+	_start_turn(player)
+	_expect_eq(player.energy, player.max_energy - _debt, "...the turn starts on 1")
+	_expect_eq(_owed_label(player), "", "...and Owed is gone")
+	_start_turn(player)
+	_expect_eq(player.energy, player.max_energy, "The turn after: 3 again")
 	_completed += 1
 
-func _check_aoe_attack() -> void:
-	for card_name in ["carve", "blood_arc"]:
-		var card: CardData = _card(card_name)
-		var player: Combatant = _player()
-		var marked: Combatant = _marked(player)
-		var other := Combatant.new(100)
-		_play(card, player, [other, marked])
-		_expect_eq(marked.hp, 100 - _damage(card) - BONUS, "%s: the marked enemy takes 4 more" % card.card_name)
-		_expect_eq(other.hp, 100 - _damage(card), "%s: the other takes normal damage" % card.card_name)
-		_expect_eq(_charges(marked), 2, "%s: exactly one charge spent" % card.card_name)
-	_completed += 1
-
-# No card deals damage twice yet, so the probe builds one: two 3-damage
-# effects on one Attack.
-func _check_multi_hit_attack() -> void:
-	var card := CardData.new()
-	card.card_name = "Probe Twice"
-	card.card_type = CardData.CardType.ATTACK
-	card.effects = [_damage_effect(3), _damage_effect(3)] as Array[CardEffect]
+# Owed 4 against a refill of 3: 0, never below; Dying Light's 1 at
+# Critical comes off the same debt.
+func _check_floor() -> void:
 	var player: Combatant = _player()
-	var enemy: Combatant = _marked(player)
-	_play(card, player, [enemy])
-	_expect_eq(enemy.hp, 100 - 3 - 3 - BONUS, "A two-hit Attack gets 4 more once, not per hit")
-	_expect_eq(_charges(enemy), 2, "...and spends one charge")
+	player.toll = 2 * _toll
+	_play(load(CARD_PATH), player)
+	_play(load(CARD_PATH), player)
+	_expect_eq(player.turn_start_energy(), 0, "Owed 4, refill 3: 0, not -1")
+	var lit: Combatant = _player()
+	lit.hp = 10
+	Status.apply_to(lit.statuses, load(DYING_LIGHT_PATH))
+	lit.toll = 2 * _toll
+	_play(load(CARD_PATH), lit)
+	_play(load(CARD_PATH), lit)
+	_expect_eq(lit.turn_start_energy(), 0, "...with Dying Light at Critical: 3 + 1 - 4 = 0")
 	_completed += 1
 
-func _check_non_attacks_leave_it() -> void:
+func _check_tempered() -> void:
+	var card: CardData = load(CARD_PATH)
+	var tempered: CardData = load(TEMPERED_PATH)
+	_expect(card.tempered == tempered, "Come Due tempers to Come Due+")
+	_expect_eq([tempered.card_name, tempered.cost, tempered.rarity, tempered.card_type], ["Come Due+", 0, CardData.CardRarity.COMMON, CardData.CardType.SKILL], "...0 Energy, Common, a Skill")
+	_expect_eq(tempered.description, card.description, "...the same text")
 	var player: Combatant = _player()
-	var enemy: Combatant = _marked(player)
-	for card_name in ["endure", "brace", "down_payment"]:
-		_play(_card(card_name), player, [enemy])
-	_expect_eq(_charges(enemy), 3, "Skills leave every charge in place")
-	# And damage from a non-Attack - none exists yet, so built here.
-	var jab := CardData.new()
-	jab.card_name = "Probe Skill Damage"
-	jab.card_type = CardData.CardType.SKILL
-	jab.effects = [_damage_effect(6)] as Array[CardEffect]
-	var before: int = enemy.hp
-	_play(jab, player, [enemy])
-	_expect_eq(before - enemy.hp, 6, "Non-Attack damage gets no bonus")
-	_expect_eq(_charges(enemy), 3, "...and spends no charge")
+	player.toll = _toll
+	_play(tempered, player)
+	_expect_eq([player.energy, _owed_label(player)], [_gain, "Owed 1"], "Come Due+: 2 Energy, owes 1")
 	_completed += 1
 
-func _check_replay_refreshes() -> void:
-	var player: Combatant = _player()
-	var enemy: Combatant = _marked(player)
-	var slash: CardData = _card("slash")
-	_play(slash, player, [enemy])
-	_expect_eq(_charges(enemy), 2, "One Attack in, 2 charges")
-	player.toll = 5
-	_play(_card("come_due"), player, [enemy])
-	var mark: Status = _mark(enemy)
-	_expect_eq(mark.charges, 3, "Replaying refreshes to 3 charges")
-	_expect_eq(mark.stack_count, 1, "...one mark, not a second stack")
-	_expect_eq(enemy.statuses.size(), 1, "...one status on the enemy")
-	player.toll = 5
-	_play(_card("come_due"), player, [enemy])
-	_expect_eq(_charges(enemy), 3, "Replaying at full is still 3, never 6")
-	var before: int = enemy.hp
-	_play(slash, player, [enemy])
-	_expect_eq(before - enemy.hp, _damage(slash) + BONUS, "...and the bonus stays 4")
+func _check_face() -> void:
+	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(view)
+	await process_frame
+	view.set_card_data(load(CARD_PATH))
+	_expect_eq(view.rules_text.get_parsed_text(), "Spend 5 Toll.\nGain 2 Energy.\nNext turn, gain 2 less.", "The face reads its rule")
+	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
+	_expect_eq(view.type_label.text, "TOLL", "...labelled TOLL")
+	_expect_eq(view.cost_label.text, "0", "...0 Energy")
+	view.set_card_data(load(TEMPERED_PATH))
+	_expect_eq(view.rules_text.get_parsed_text(), "Spend 5 Toll.\nGain 2 Energy.\nNext turn, gain 1 less.", "Come Due+'s face")
+	view.free()
 	_completed += 1
 
-func _check_reckoning() -> void:
-	var reckoning: CardData = _card("reckoning")
-	var player: Combatant = _player()
-	var enemy: Combatant = _marked(player)
-	player.toll = 6
-	_play(reckoning, player, [enemy])
-	_expect_eq(enemy.hp, 100 - 6 - BONUS, "Reckoning on 6 Toll deals 6 + 4")
-	_expect_eq(_charges(enemy), 2, "...and spends one charge")
-	_play(reckoning, player, [enemy])
-	_expect_eq(enemy.hp, 100 - 6 - 2 * BONUS, "A Toll-less Reckoning still lands the 4")
-	_expect_eq(_charges(enemy), 1, "...spending a charge")
-	_completed += 1
-
-# A dead enemy's status goes with it: BattleController reads no row for it
-# (the fight's combatants are rebuilt next fight, so nothing carries over).
-func _check_death_clears_row() -> void:
-	var controller: Object = (load(BATTLE_CONTROLLER_PATH) as GDScript).new()
-	var player: Combatant = _player()
-	var enemy: Combatant = _marked(player)
-	# Loaded, not named: FieldEnemy compiles against the RunState autoload,
-	# which a -s probe can't see at compile time.
-	var field_enemy: Node = (load("res://field/field_enemy.gd") as GDScript).new()
-	controller._combatants[field_enemy] = enemy
-	_expect_eq(controller.get_enemy_status_labels(field_enemy), PackedStringArray(["Come Due ×3"]), "A living marked enemy's row reads Come Due ×3")
-	enemy.hp = 2
-	_play(_card("slash"), player, [enemy])
-	_expect_eq(enemy.hp, 0, "Slash kills it")
-	_expect_eq(controller.get_enemy_status_labels(field_enemy), PackedStringArray(), "...and its row is empty")
-	field_enemy.free()
-	controller.free()
-	_completed += 1
-
-func _check_pool() -> void:
-	var pool := load(POOL_PATH) as RewardPool
-	var entry: CardData = null
-	for card in pool.entries:
-		if card != null and card.card_name == "Come Due":
-			entry = card
-	_expect(entry != null, "Come Due is in the Wanderer reward pool")
-	if entry != null:
-		_expect_eq(entry.rarity, CardData.CardRarity.UNCOMMON, "...as Uncommon")
-	var belongings := load(BELONGINGS_POOL_PATH) as RewardPool
-	for card in belongings.entries:
-		_expect(card == null or card.card_name != "Come Due", "...not in the belongings (Keeper) pool")
-	var character := load(CHARACTER_PATH) as CharacterData
-	for card: CardData in character.starting_deck_counts:
-		_expect(card.card_name != "Come Due", "...nor the starting deck")
-	_completed += 1
-
-func _check_toll_never_negative() -> void:
-	# Past the gate - straight to the effect - it still can't dig below 0.
-	var player: Combatant = _player()
-	player.toll = 3
-	var ctx: EffectContext = _ctx(player, [Combatant.new(100)])
-	var spend: CardEffect = _card("come_due").effects[0]
-	(load("res://battle/rules/effects/spend_toll_effect.gd") as GDScript).new().resolve(spend, ctx)
-	_expect_eq(player.toll, 0, "Spending 5 of 3 Toll leaves 0, never -2")
+# The real fight: Come Due on 5 Toll and 3 Energy - 5 Energy, "Owed 2" in
+# the Wanderer's row; the next turn starts on 1, the row without it.
+func _check_fight() -> void:
+	var controller: Node = await _start_fight()
+	if controller != null:
+		var player: Combatant = controller.get("player")
+		var overlay: Node = _field.get_node("BattleLayer").get_child(0)
+		var bar: Node = overlay.get("_field_hp_bar")
+		player.toll = _toll
+		player.energy = player.max_energy
+		var card: CardData = await _deal(controller, CARD_PATH)
+		var view: CardView = _view(controller, card)
+		if view != null:
+			controller.call("request_play", view)
+			await ProbePlay.settle(self, controller)
+		_expect_eq(player.energy, player.max_energy + _gain, "Played: 5 Energy")
+		_expect(_row_has(bar, "Owed 2"), "...'Owed 2' in the Wanderer's row")
+		var turn: int = int(controller.get("_player_turn"))
+		player.hp = player.max_hp
+		controller.call("end_turn")
+		var back: bool = await ProbePlay.wait_until(self, func() -> bool: return int(controller.get("_player_turn")) > turn and ProbePlay.is_settled(controller), 20.0)
+		_expect(back, "The next turn comes round")
+		if back:
+			_expect_eq(player.energy, player.max_energy - _debt, "...on 1 Energy")
+			_expect(not _row_has(bar, "Owed"), "...Owed gone from the row")
+	await _teardown()
 	_completed += 1
 
 # --- Helpers ---
 
-# Slash's face against its target: 9 with Come Due on it, 5 without -
-# and reading it spends nothing.
-func _check_face_reads_mark() -> void:
-	var player: Combatant = _player()
-	var marked: Combatant = _marked(player)
-	_expect_eq(await _face_damage("slash", player, [marked]), 10, "Slash's face reads 10 against a Come Due enemy")
-	_expect_eq(await _face_damage("slash", player, [Combatant.new(100)]), 6, "...and 6 against an unmarked one")
-	_expect_eq(_charges(marked), 3, "...and reading it spends no charge")
-	_completed += 1
-
-# What the face prints is what the card then takes off the marked enemy:
-# Slash, Cornered's base half and Reckoning's Toll blow.
-func _check_face_is_resolution() -> void:
-	for card_name in ["slash", "cornered", "reckoning"]:
-		var player: Combatant = _player()
-		var marked: Combatant = _marked(player)
-		player.toll = 6
-		var face: int = await _face_damage(card_name, player, [marked])
-		_play(_card(card_name), player, [marked])
-		_expect_eq(100 - marked.hp, face, "%s: the face's number is the damage landed" % card_name)
-	_completed += 1
-
-# Three Slashes spend the mark: the face reads 9 before each, and 5 once
-# the last charge is gone.
-func _check_face_reverts() -> void:
-	var player: Combatant = _player()
-	var marked: Combatant = _marked(player)
-	for i in 3:
-		_expect_eq(await _face_damage("slash", player, [marked]), 10, "Slash reads 10 with %d charge(s) left" % (3 - i))
-		_play(_card("slash"), player, [marked])
-	_expect_eq(_charges(marked), 0, "...three Slashes spend all three charges")
-	_expect_eq(await _face_damage("slash", player, [marked]), 6, "...and Slash reads 6 again")
-	_completed += 1
-
-# An all-enemies Attack's face leaves the mark out, even aimed at the
-# marked enemy - the target it names isn't the one it hits.
-func _check_aoe_face() -> void:
-	for card_name in ["carve", "blood_arc"]:
-		var player: Combatant = _player()
-		var marked: Combatant = _marked(player)
-		_expect_eq(await _face_damage(card_name, player, [marked]), _damage(_card(card_name)), "%s's face leaves Come Due out" % card_name)
-	_completed += 1
-
-# A card by file name - the Wanderer's, else a neutral one (Endure).
-func _card(card_name: String) -> CardData:
-	var path: String = "res://cards/data/%s.tres" % card_name
-	if not ResourceLoader.exists(path):
-		path = "res://cards/neutral/%s.tres" % card_name
-	return load(path) as CardData
-
 func _player() -> Combatant:
 	var player := Combatant.new(MAX_HP)
-	player.critical_hp_fraction = 0.3
+	player.energy = 0
 	return player
 
-# A fresh 100 HP enemy with Come Due freshly on it.
-func _marked(player: Combatant) -> Combatant:
-	var enemy := Combatant.new(100)
-	player.toll = 5
-	_play(_card("come_due"), player, [enemy])
-	return enemy
-
-func _mark(enemy: Combatant) -> Status:
-	for active in enemy.statuses:
-		if active.data != null and active.data.id == "come_due":
-			return active
-	return null
-
-func _charges(enemy: Combatant) -> int:
-	var mark: Status = _mark(enemy)
-	return mark.charges if mark != null else 0
-
-# The first damage effect's authored value.
-func _damage(card: CardData) -> int:
-	for effect in card.effects:
-		if effect != null and effect.effect_type == CardEffect.EffectType.DAMAGE:
-			return effect.value
-	return 0
-
-func _damage_effect(value: int) -> CardEffect:
-	var effect := CardEffect.new()
-	effect.effect_type = CardEffect.EffectType.DAMAGE
-	effect.value = value
-	return effect
-
-# The target is the LAST enemy listed, so an all-enemies card can be
-# checked with the marked enemy after an unmarked one.
-func _ctx(player: Combatant, enemies: Array[Combatant]) -> EffectContext:
+func _play(card: CardData, player: Combatant) -> void:
 	var ctx := EffectContext.new()
 	ctx.player = player
+	var enemies: Array[Combatant] = [Combatant.new(100)]
 	ctx.enemies = enemies
-	ctx.target = enemies[enemies.size() - 1] if not enemies.is_empty() else null
-	return ctx
+	_resolver.resolve_card(card, ctx)
 
-# The number after "Deal" on `card_name`'s battle-hand face read against
-# _ctx(player, enemies) - its damage. -1 with none.
-func _face_damage(card_name: String, player: Combatant, enemies: Array[Combatant]) -> int:
-	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
-	root.add_child(view)
+# The turn-start steps that touch Energy and the debt, in
+# BattleController._start_player_turn()'s order.
+func _start_turn(player: Combatant) -> void:
+	player.energy = player.turn_start_energy()
+	Status.tick_all(player.statuses, func(_amount: int, _ticking: Status) -> void: pass)
+	Status.remove_expired(player.statuses)
+
+func _owed_label(player: Combatant) -> String:
+	for active in player.statuses:
+		if active.data != null and active.data.resource_path == OWED_PATH:
+			return active.label()
+	return ""
+
+func _row_has(bar: Node, prefix: String) -> bool:
+	for item: Dictionary in bar.get("_row_items"):
+		if str(item.get("text", "")).begins_with(prefix):
+			return true
+	return false
+
+func _start_fight() -> Node:
+	if _run_state == null:
+		_fail("no RunState autoload")
+		return null
+	_run_state.call("new_run", load(CHARACTER_PATH))
+	_run_state.set("current_floor_index", 0)
+	_run_state.set("run_opening_pending", false)
+	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(_field)
+	for i in 30:
+		await physics_frame
+	var target: Node3D = null
+	for node in get_nodes_in_group("enemies"):
+		target = node as Node3D
+		break
+	if target == null:
+		_fail("no enemy on floor 1")
+		return null
+	var wanderer: Node3D = _field.get_node("Wanderer") as Node3D
+	wanderer.global_position = target.global_position + Vector3(1.5, 0.0, 0.0)
+	await physics_frame
+	_field.call_deferred("_on_enemy_contacted", target)
+	for i in 10:
+		await physics_frame
+	var layer: Node = _field.get_node("BattleLayer")
+	while layer.get_child_count() > 0 and bool((layer.get_child(0).get("battle_controller") as Node).call("is_entry_locked")):
+		await process_frame
+	if layer.get_child_count() == 0:
+		_fail("no fight started")
+		return null
+	var controller: Node = layer.get_child(0).get("battle_controller")
+	controller.get("deck").call("discard_hand")
+	return controller
+
+func _deal(controller: Node, path: String) -> CardData:
+	var card: CardData = (load(path) as CardData).duplicate()
+	var deck: Object = controller.get("deck")
+	(deck.get("draw_pile") as Array).append(card)
+	deck.call("draw", 1)
 	await process_frame
-	view.set_stance(player.stance)
-	view.set_toll(player.toll)
-	view.set_bonus_context(_ctx(player, enemies))
-	view.set_card_data(_card(card_name))
-	var text: String = view.rules_text.get_parsed_text()
-	view.free()
-	var regex := RegEx.new()
-	regex.compile("Deal (\\d+)")
-	var found: RegExMatch = regex.search(text)
-	return int(found.get_string(1)) if found != null else -1
+	return card
 
-func _play(card: CardData, player: Combatant, enemies: Array[Combatant]) -> void:
-	_resolver.resolve_card(card, _ctx(player, enemies))
+func _view(controller: Node, card: CardData) -> CardView:
+	for view: CardView in controller.get("_hand_container").call("_card_views"):
+		if view.card_data == card:
+			return view
+	return null
+
+func _teardown() -> void:
+	if _field != null:
+		_field.queue_free()
+		_field = null
+	for i in 3:
+		await process_frame
 
 func _fail(label: String) -> void:
 	_failures += 1

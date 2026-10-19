@@ -105,6 +105,9 @@ const TOKEN_BONUS_ENERGY := "{bonus_energy}"
 const TOKEN_SET_ASIDE := "{set_aside}"
 # The Toll a SPEND_TOLL spends - its toll_cost (Second Swing's 5).
 const TOKEN_TOLL_COST := "{toll_cost}"
+# The Energy owed next turn - the value of an effect applying an energy-
+# debt status (StatusData.energy_debt - Come Due's 2).
+const TOKEN_DEBT := "{debt}"
 const TOKEN_HP_COST := "{hp_cost}"
 # What follows a repeating hit's number (CardEffect.repeat_per_earlier_
 # play_tag - Lash), by how many times it lands now (DamageEffect.hit_
@@ -761,6 +764,11 @@ func _resolve_tokens(description: String) -> String:
 			if effect != null and effect.effect_type == CardEffect.EffectType.SPEND_TOLL:
 				text = text.replace(TOKEN_TOLL_COST, str(effect.toll_cost))
 				break
+	if text.contains(TOKEN_DEBT):
+		for effect in card_data.effects:
+			if effect != null and effect.status_data != null and effect.status_data.energy_debt:
+				text = text.replace(TOKEN_DEBT, str(effect.value))
+				break
 	if text.contains(TOKEN_SET_ASIDE):
 		var set_aside: int = _effect_value(card_data, [CardEffect.EffectType.SET_ASIDE])
 		if set_aside >= 0:
@@ -849,8 +857,8 @@ func _toll_block_preview() -> int:
 	return -1
 
 # What a blow the card adds up to `blow` (its value and attack bonus)
-# lands for against the context's target - its mark bonus (Come Due)
-# added, then DamageEffect.landed(), the resolvers' own call. The target
+# lands for against the context's target - DamageEffect.landed(), the
+# resolvers' own call. The target
 # is the one enemy of a single-enemy fight, or the enemy an armed card is
 # over (BattleController.preview_context()/preview_context_against());
 # none for an all-enemies effect (`all_enemies`), which reads with the
@@ -859,9 +867,7 @@ func _landed(blow: int, all_enemies: bool) -> int:
 	if _bonus_context == null or _bonus_context.player == null:
 		return blow
 	var enemy: Combatant = null if all_enemies else _bonus_context.target
-	var preview: EffectContext = _bonus_context.for_card_preview(_upfront_hp_cost())
-	preview.card_is_attack = card_data.card_type == CardData.CardType.ATTACK
-	return DamageEffect.landed(blow + preview.mark_bonus_for(enemy), _bonus_context.player, enemy)
+	return DamageEffect.landed(blow, _bonus_context.player, enemy)
 
 # Whether the damage effect a token reads - the first one, or with
 # `conditional` the first conditional one, as _effect_value() and

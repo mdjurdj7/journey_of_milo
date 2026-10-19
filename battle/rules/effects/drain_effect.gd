@@ -4,7 +4,7 @@ class_name DrainEffect
 # Drain X: deal X to each target, then heal up to X - once, however many
 # targets it hit: the heal is the HP the targets actually lost, summed,
 # and never more than X. Not an Attack and not a card's blow - no attack
-# bonus, no mark (Come Due), no Attack charge, no Grace reclaimed; only
+# bonus, no Attack charge, no Grace reclaimed; only
 # what softens any damage (the modifiers, block, absorb). Its heal goes
 # through EffectContext.heal(), so it accrues no Toll and opens no Grace.
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:

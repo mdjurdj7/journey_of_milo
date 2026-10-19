@@ -3,8 +3,8 @@ class_name StatusReveal
 
 # What each status - and the Wanderer's stance - on one combatant does,
 # one entry each, directly under its battle readout's status row: the
-# name, then its rules sentence with live numbers ("Come Due: +4 damage
-# on your next 2 Attack hits against it."). Shown while the readout is
+# name, then its rules sentence with live numbers ("Sentence: In 3 turns,
+# it takes 40 damage."). Shown while the readout is
 # hovered - the host (EnemyStatus or HPBar) decides when and calls
 # set_revealed() - faded in and out over reveal_fade_time.
 #
