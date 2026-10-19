@@ -10,7 +10,7 @@ extends SceneTree
 # Both routes: a card armed first (a playable enemy-target
 # card, or one that can't be played, armed for Devour alone), or Devour
 # first (the pick, then the card). Once a turn, again the next; the heal
-# capped at max HP; a Consumed card eaten - or taken by Deny - stays in
+# capped at max HP; a Consumed card eaten stays in
 # the run. The button under the energy readout: grey, or ink while it is
 # a target, in one column with the readout and clear of the hand, resting
 # or hovered.
@@ -25,14 +25,13 @@ extends SceneTree
 # cancel_target() / end_turn(), and the overlay's _finish_battle() to
 # leave. Untyped against anything that names the RunState autoload.
 
-const CASES := 14
+const CASES := 12
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BITE_DOWN_PATH := "res://cards/data/bite_down.tres"
 const RECKONING_PATH := "res://cards/data/reckoning.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const BLOOD_ARC_PATH := "res://cards/data/blood_arc.tres"
-const DENY_PATH := "res://cards/data/deny.tres"
 const SAMPHIRE_PATH := "res://cards/neutral/samphire.tres"
 # Where the log case writes its run, when run_probes.sh hands over no
 # folder of this process's own (RunLogger.dir_override()).
@@ -74,9 +73,7 @@ func _initialize() -> void:
 	await _check_pick_route()
 	await _check_pick_cancel()
 	await _check_untargeted_still_plays()
-	await _check_deny_pick_unmarked()
 	await _check_back_next_fight()
-	await _check_deny_samphire()
 	await _check_button_states()
 	await _check_layout()
 
@@ -379,26 +376,6 @@ func _check_untargeted_still_plays() -> void:
 	await _teardown()
 	_completed += 1
 
-# Deny armed with its pick marked, then devoured: the pick unmarked and
-# kept, no one Denied.
-func _check_deny_pick_unmarked() -> void:
-	var controller: Node = await _start_fight()
-	if controller != null:
-		var deck: Object = controller.get("deck")
-		var deny: CardData = await _deal(controller, DENY_PATH)
-		var reckoning: CardData = await _deal(controller, RECKONING_PATH)
-		await _deal(controller, SLASH_PATH)
-		controller.call("request_play", _view(controller, deny))
-		_expect(_view(controller, reckoning).is_marked(), "Deny armed: Reckoning marked as its pick")
-		controller.call("devour")
-		await _settle(controller)
-		_expect((deck.get("exhaust_pile") as Array).has(deny), "Deny devoured")
-		_expect((deck.get("hand") as Array).has(reckoning), "...Reckoning stays in the hand")
-		_expect(not _view(controller, reckoning).is_marked(), "...unmarked")
-		_expect(not EnemyTurn.is_denied(_enemy_combatant(controller)), "...no one Denied")
-	await _teardown()
-	_completed += 1
-
 # A devoured card is back in the deck for the next fight - one from the
 # run's deck, and a Consumed one (Samphire) too; a Samphire played still
 # leaves the run.
@@ -447,26 +424,6 @@ func _check_back_next_fight() -> void:
 	await _teardown()
 	_completed += 1
 
-# Deny taking a Samphire Spends it for the fight; the run keeps it.
-func _check_deny_samphire() -> void:
-	var controller: Node = await _start_fight()
-	var samphire: CardData = null
-	if controller != null:
-		var deck: Object = controller.get("deck")
-		var deny: CardData = await _deal(controller, DENY_PATH)
-		samphire = _run_state.call("add_card", load(SAMPHIRE_PATH))
-		deck.call("add", samphire)
-		await process_frame
-		controller.call("request_play", _view(controller, deny))
-		_expect(_view(controller, samphire).is_marked(), "Deny's pick: the Samphire")
-		controller.call("confirm_target", _field_enemy(controller))
-		await _settle(controller)
-		_expect((deck.get("exhaust_pile") as Array).has(samphire), "...taken to the Spent pile")
-		_overlay().call("_finish_battle", ESCAPE)
-		await process_frame
-	_expect(samphire != null and (_run_state.get("deck") as Array).has(samphire), "After the fight the Samphire Deny took is still in the run's deck")
-	await _teardown()
-	_completed += 1
 
 # The button: ink while it can be used, armed or not, lit while a card is
 # armed; grey with USED once used.

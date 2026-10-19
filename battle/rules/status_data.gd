@@ -180,7 +180,7 @@ enum Mark { NONE, COIL, DROP }
 # strike back - and binds to it (Status.bound_intent). It holds every hit
 # of every action of that intent (both of Bereft's), is spent once the
 # intent has landed, and is lost - with why - if the intent is replaced,
-# cancelled (Deny, a pain turn, an interrupt) or its enemy dies first
+# cancelled (Stunned, a pain turn, an interrupt) or its enemy dies first
 # (EnemyTurn.mark_loss(), take_turn()). An out-of-turn answer to a Signal
 # neither reads nor spends it. The mark names it: one of each per intent
 # ("brace", "garnish" - Garnish+'s as Garnish's), so a second of the same
@@ -200,8 +200,8 @@ enum Mark { NONE, COIL, DROP }
 # consumed_by_attack_against, not consumed_by_own_attack.
 @export var reduces_attack_total: bool = false
 
-# Its holder's next turn is skipped (Deny's Denied): whatever move is
-# queued doesn't happen and the pattern moves on as if it had - lost, not
+# Its holder's next turn is skipped (Stunned): whatever move is queued
+# doesn't happen and the pattern moves on as if it had - lost, not
 # delayed - and the turn still counts (escalation keeps its clock). Its
 # statuses still tick first, so a countdown can still go off. Removed by
 # that turn, whatever else it does (a pain turn on the same turn spends
@@ -209,6 +209,17 @@ enum Mark { NONE, COIL, DROP }
 # DURATION_UNTIL_TRIGGERED and StackRule.IGNORE. A holder can't be
 # targeted by another card applying it (BattleController).
 @export var skips_next_turn: bool = false
+
+# Its holder's next action waits a turn (Deny's Delayed): on its coming
+# turn it does nothing - the queued move held where it is, the marks on
+# it (Braced, Garnished) still bound to it, its turn count not moving, so
+# an escalation is paused with it - and on the turn after it performs the
+# held move, its loop going on from there. Its statuses still tick on the
+# do-nothing turn, and a pain turn due then is spent on it. Removed by
+# that turn. A Delayed packmate doesn't answer a Signal, holding its own
+# move. Pair it with DURATION_UNTIL_TRIGGERED and StackRule.IGNORE; a
+# holder can't be targeted by another card applying it.
+@export var delays_next_action: bool = false
 
 # Extra hits its holder - an enemy - lands with every multi-hit ATTACK
 # (EnemyIntent.hits above 1) while it's up; a single blow stays single

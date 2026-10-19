@@ -309,8 +309,16 @@ static func raised_critical_fraction(statuses: Array[Status]) -> float:
 			highest = maxi(highest, active.data.raises_critical_percent)
 	return clampf(highest / 100.0, 0.0, 1.0)
 
+# The status that holds its holder's next action a turn (StatusData.
+# delays_next_action - Deny's Delayed), or null.
+static func delay_status(statuses: Array[Status]) -> Status:
+	for active in statuses:
+		if active.data != null and active.data.delays_next_action:
+			return active
+	return null
+
 # The status that skips its holder's next turn (StatusData.skips_next_
-# turn - Denied), or null.
+# turn - Stunned), or null.
 static func skip_turn_status(statuses: Array[Status]) -> Status:
 	for active in statuses:
 		if active.data != null and active.data.skips_next_turn:

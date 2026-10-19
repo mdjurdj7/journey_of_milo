@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Headless probe for the Adder, floor 4's faint-side elite: its Coil ->
-# Bite -> Strike loop; Coiled, brought by the Coil resolving - a Denied
+# Bite -> Strike loop; Coiled, brought by the Coil resolving - a Stunned
 # Coil brings none - and held until its next move, striking back for 5
 # at each Attack card played against it - an enemy hit in every way (Block,
 # its attack bonuses, Grace) except that Brace, Garnish, No Further and
@@ -34,7 +34,7 @@ const SOUND_PATHS: Array[String] = ["res://assets/audio/enemies/Stork/hit_1.mp3"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
-const DENIED_PATH := "res://battle/rules/statuses/denied.tres"
+const STUNNED_PATH := "res://battle/rules/statuses/stunned.tres"
 const CARVE_PATH := "res://cards/data/carve.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const BRACED_PATH := "res://battle/rules/statuses/braced.tres"
@@ -70,7 +70,7 @@ func _initialize() -> void:
 	_check_bite_venom()
 	_check_venom_tick_rules()
 	await _check_fight_counter()
-	await _check_fight_denied()
+	await _check_fight_stunned()
 	await _check_fight_skill()
 	await _check_fight_aoe()
 	await _check_fight_venom()
@@ -283,17 +283,17 @@ func _check_fight_counter() -> void:
 	await _teardown()
 	_completed += 1
 
-# Denied on its Coil turn, it never coils: the Bite comes up with no
+# Stunned on its Coil turn, it never coils: the Bite comes up with no
 # Coiled, and an Attack into it draws nothing back - until it next coils.
-func _check_fight_denied() -> void:
+func _check_fight_stunned() -> void:
 	var controller: Node = await _start_fight(SLASH_PATH)
 	if controller != null:
 		var adder: Node = (controller.get("enemies") as Array)[0]
 		var combatant: Combatant = _combatant(controller, adder)
 		var player: Combatant = controller.get("player")
-		Status.apply_to(combatant.statuses, load(DENIED_PATH))
+		Status.apply_to(combatant.statuses, load(STUNNED_PATH))
 		await _end_turn(controller)
-		_expect_eq(EnemyTurn.current_intent(combatant, adder.get("enemy_data")).intent_name, "Bite", "Denied on the Coil: the Bite comes up")
+		_expect_eq(EnemyTurn.current_intent(combatant, adder.get("enemy_data")).intent_name, "Bite", "Stunned on the Coil: the Bite comes up")
 		_expect(not _has(combatant, COILED_PATH), "...with no Coiled")
 		_expect_eq(_hp_mark(controller, adder), {"glyph": &"", "value": 0}, "...nothing beside its HP")
 		var before: int = player.hp

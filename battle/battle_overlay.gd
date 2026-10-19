@@ -112,7 +112,8 @@ signal battle_finished(outcome: Outcome)
 	&"watch": "%s: watches.",
 	&"plain": "%s.",
 	&"cancelled": "%s: cancelled; it won't act.",
-	&"denied": "%s: denied; it won't act.",
+	&"denied": "%s: stunned; it won't act.",
+	&"delayed": "%s: delayed; it acts next turn.",
 	&"broken": "%s: broken; it won't land.",
 }
 # The draw sound, once per card as it leaves the deck (HandContainer.
@@ -137,8 +138,7 @@ signal battle_finished(outcome: Outcome)
 @export_group("Choice Prompt")
 # An open hand choice says what it wants in one tracked-caps ink line,
 # this far above the armed card, or above the hand for the end-of-turn
-# keep (BattleController.hand_choice_*): its verb (SET ASIDE, CONSUME,
-# KEEP) and how many cards are left to pick (choice_prompt_format), then,
+# keep (BattleController.hand_choice_*): its verb (SET ASIDE, KEEP) and how many cards are left to pick (choice_prompt_format), then,
 # for a choice confirmed elsewhere, what to click (choice_confirm_format -
 # END TURN, the keep's). A choice that takes a variable count (Bide's)
 # has a DONE beside the line, in the same ink as End Turn; one with a
@@ -732,7 +732,7 @@ func _reveal_enemy_intents() -> void:
 func _on_enemy_intent_changed(enemy: FieldEnemy, preview: Dictionary) -> void:
 	# Its Dig queued: the sand sprays at it until it goes under.
 	if is_instance_valid(enemy):
-		enemy.set_dig_spray(int(preview.get("type", -1)) == EnemyIntent.IntentType.DIG and not bool(preview.get("denied", false)) and not bool(preview.get("pain_turn", false)))
+		enemy.set_dig_spray(int(preview.get("type", -1)) == EnemyIntent.IntentType.DIG and not bool(preview.get("denied", false)) and not bool(preview.get("delayed", false)) and not bool(preview.get("pain_turn", false)))
 	var intent: BattleIntent = _enemy_intents.get(enemy)
 	if intent == null or not is_instance_valid(intent):
 		return
@@ -1064,6 +1064,8 @@ func _intent_hover_text(enemy: FieldEnemy) -> String:
 		return str(lines.get(&"cancelled", "%s")) % name
 	if bool(preview.get("denied", false)):
 		return str(lines.get(&"denied", "%s")) % name
+	if bool(preview.get("delayed", false)):
+		return str(lines.get(&"delayed", "%s")) % name
 	if bool(preview.get("interrupted", false)):
 		return str(lines.get(&"broken", "%s")) % name
 	var holds: String = ""

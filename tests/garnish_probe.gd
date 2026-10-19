@@ -34,7 +34,7 @@ const STATUS_PATH := "res://battle/rules/statuses/garnished.tres"
 const TEMPERED_PATH := "res://cards/tempered/garnish_tempered.tres"
 const BEREFT_PATH := "res://battle/rules/statuses/bereft.tres"
 const BRACED_PATH := "res://battle/rules/statuses/braced.tres"
-const DENIED_PATH := "res://battle/rules/statuses/denied.tres"
+const STUNNED_PATH := "res://battle/rules/statuses/stunned.tres"
 const OFF_THE_ROCK_PATH := "res://battle/rules/statuses/off_the_rock.tres"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const UNDERFOOT_PATH := "res://battle/rules/enemies/underfoot.tres"
@@ -172,10 +172,10 @@ func _check_tail_lash() -> void:
 	_completed += 1
 
 # Only an Attack that resolves spends it: Rebury, the Sputter's Block, a
-# Denied Sting leave it standing - and the next Attack takes it.
+# Stunned Sting leave it standing - and the next Attack takes it.
 # Garnish targets an attack intent that will land: not the Underfoot's
-# Rebury, not the Sputter's Block, not a Denied Sting. One on the Sting,
-# Denied after, is lost - "cancelled" - and lands nothing.
+# Rebury, not the Sputter's Block, not a Stunned Sting. One on the Sting,
+# Stunned after, is lost - "cancelled" - and lands nothing.
 func _check_needs_an_attack() -> void:
 	var underfoot: EnemyData = load(UNDERFOOT_PATH)
 	var card: CardData = load(CARD_PATH)
@@ -189,18 +189,18 @@ func _check_needs_an_attack() -> void:
 	enemy = _enemy(underfoot, "Sting")
 	_expect(EffectResolver.can_target(card, enemy), "The Sting it can")
 	_garnish(player, enemy)
-	Status.apply_to(enemy.statuses, load(DENIED_PATH))
-	_expect_eq(EnemyTurn.mark_loss(_garnished(enemy), enemy, underfoot), "cancelled", "...Denied after: the Garnish won't hold")
+	Status.apply_to(enemy.statuses, load(STUNNED_PATH))
+	_expect_eq(EnemyTurn.mark_loss(_garnished(enemy), enemy, underfoot), "cancelled", "...Stunned after: the Garnish won't hold")
 	var hp_before: int = player.hp
 	var result: Dictionary = EnemyTurn.take_turn(enemy, underfoot, player)
-	_expect_eq(player.hp, hp_before, "A Denied Sting lands nothing")
+	_expect_eq(player.hp, hp_before, "A Stunned Sting lands nothing")
 	var marks: Array = result.get("marks", [])
 	_expect(marks.size() == 1 and str(marks[0]["outcome"]) == "lost" and str(marks[0]["reason"]) == "cancelled", "...its Garnish lost, cancelled")
 	_expect(_garnished(enemy) == null, "...and gone")
 
 	enemy = _enemy(underfoot, "Sting")
-	Status.apply_to(enemy.statuses, load(DENIED_PATH))
-	_expect(not EffectResolver.can_target(card, enemy), "A Denied Sting can't be Garnished")
+	Status.apply_to(enemy.statuses, load(STUNNED_PATH))
+	_expect(not EffectResolver.can_target(card, enemy), "A Stunned Sting can't be Garnished")
 	_completed += 1
 
 # One Garnish an intent - Garnish+ too - and it covers every hit of every

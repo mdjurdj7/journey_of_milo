@@ -374,9 +374,12 @@ var _threshold_label: Label = null
 var _hits_label: Label = null
 var _has_threshold: bool = false
 var _interrupted: bool = false
-# Denied (Deny): the move keeps its number, dimmed like an interrupted
+# Stunned: the move keeps its number, dimmed like an interrupted
 # one, with denied_rule_px of ink struck through the glyph and numeral.
 var _denied: bool = false
+# Delayed (Deny): the move keeps its number, dimmed - not struck: it lands
+# on the turn after.
+var _delayed: bool = false
 var _pair_rect: Rect2 = Rect2()
 # How much of the ring is filled, 0..1: dealt this turn over the threshold.
 var _ring_fill: float = 0.0
@@ -514,6 +517,7 @@ func show_intent(preview: Dictionary) -> void:
 			_label.text = ""
 			_hits_label.text = ""
 		_denied = bool(preview.get("denied", false))
+		_delayed = bool(preview.get("delayed", false))
 		_interrupted = pain_turn or _denied or bool(preview.get("interrupted", false))
 		# The numeral counts down to 0 and stays; the gauge fills with
 		# what has been dealt, full once the threshold is met.
@@ -675,13 +679,13 @@ func _apply_layout() -> void:
 	_label.position = _text_rect.position
 	_label.size = _text_rect.size
 	_label.visible = text_width > 0.0
-	_label.modulate.a = hairline_alpha if _interrupted else 1.0
+	_label.modulate.a = hairline_alpha if _interrupted or _delayed else 1.0
 	# "N HITS" beneath the numeral, centred on it.
 	_hits_label.visible = hits_width > 0.0
 	if hits_width > 0.0:
 		_hits_label.position = Vector2(roundf(_text_rect.get_center().x - hits_width * 0.5), _hits_top)
 		_hits_label.size = Vector2(hits_width, hits_height)
-		_hits_label.modulate.a = hits_alpha * (hairline_alpha if _interrupted else 1.0)
+		_hits_label.modulate.a = hits_alpha * (hairline_alpha if _interrupted or _delayed else 1.0)
 	_rule_top = above_rule + hairline_drop_px
 	# The bottom the display is anchored by: the rule's place, drawn or
 	# not, or the ring or pips under it.
@@ -708,7 +712,7 @@ func _extra_pair_width(i: int) -> float:
 # glyph (pointing as the first does), its numeral in ink over the bone
 # outline, its "N HITS" beneath it, its marks' hairline.
 func _draw_extra_pair(i: int, ink: Color) -> void:
-	var alpha: float = hairline_alpha if _interrupted else 1.0
+	var alpha: float = hairline_alpha if _interrupted or _delayed else 1.0
 	var x: float = _extra_lefts[i]
 	var centre := Vector2(x + _glyph_width() * 0.5, _glyph_centre.y)
 	var shapes: Array[PackedVector2Array] = _glyph_shapes(centre, _glyph_size * 0.5)
@@ -822,7 +826,7 @@ func _draw() -> void:
 			for i in shape.size():
 				shape[i] = Vector2(2.0 * glyph_centre.x - shape[i].x, shape[i].y)
 			shapes[k] = shape
-	_draw_ink(shapes, hairline_alpha if _interrupted else 1.0)
+	_draw_ink(shapes, hairline_alpha if _interrupted or _delayed else 1.0)
 	if _has_threshold:
 		_draw_ring()
 	if _pip_count > 0:
@@ -830,7 +834,7 @@ func _draw() -> void:
 
 	# Marked: the hairline under the numeral.
 	if _label.visible:
-		_draw_mark_hairline(_text_rect.position.x, _text_rect.size.x, ink, hairline_alpha if _interrupted else 1.0)
+		_draw_mark_hairline(_text_rect.position.x, _text_rect.size.x, ink, hairline_alpha if _interrupted or _delayed else 1.0)
 	# Every further action's pair.
 	for i in _extra_texts.size():
 		_draw_extra_pair(i, ink)

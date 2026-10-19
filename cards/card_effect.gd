@@ -18,6 +18,8 @@ enum EffectType {
 	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL, DRAIN, SET_ASIDE, CONSUME,
 	REPLAY_LAST_ATTACK,
 }
+# CONSUME is retired (Deny no longer takes a hand card) - no resolver,
+# nothing authors it; kept so the values after it keep their numbers.
 # REPLAY_LAST_ATTACK (Second Swing): the last Attack card played this
 # turn (Combatant.last_attack) resolves again - its effects in full, as
 # if played, but no play: no Energy, no pile, no played-card count

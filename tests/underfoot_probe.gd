@@ -3,7 +3,7 @@ extends SceneTree
 # Headless probe for the Underfoot, floor 2's required fight beside the
 # Sputter: its Sting -> Rebury loop, Covered (takes 50% less) while the
 # Sting is queued and Exposed (takes 50% more) while the Rebury is -
-# starting Covered, and still alternating after a Denied or Stunned
+# starting Covered, and still alternating after a Stunned
 # Sting; the Sting one unbreakable blow of 16 that Block and Brace
 # soften; the Rebury nothing; taunt (Inflated) on a packmate barring a
 # Slash from it but not Brace or Sentence. Floor 2's required cluster is the Sputter
@@ -40,7 +40,6 @@ const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 const DRAGONFLY_PATH := "res://battle/rules/enemies/dragonfly.tres"
 const COVERED_PATH := "res://battle/rules/statuses/covered.tres"
 const EXPOSED_PATH := "res://battle/rules/statuses/exposed.tres"
-const DENIED_PATH := "res://battle/rules/statuses/denied.tres"
 const STUNNED_PATH := "res://battle/rules/statuses/stunned.tres"
 const BRACED_PATH := "res://battle/rules/statuses/braced.tres"
 const FLOOR_2_PATH := "res://floors/region1_floor2.tres"
@@ -197,10 +196,10 @@ func _check_loop() -> void:
 	_expect(int(preview["type"]) == EnemyIntent.IntentType.SETTLE and int(preview["damage_to_hp"]) == 0, "The Rebury previews no damage")
 	_completed += 1
 
-# A Denied Sting and a Stunned one: nothing lands, and the loop still
+# A Stunned Sting: nothing lands, and the loop still
 # hands over - Exposed with the Rebury queued, then Covered again.
 func _check_lost_sting() -> void:
-	for path: String in [DENIED_PATH, STUNNED_PATH]:
+	for path: String in [STUNNED_PATH]:
 		var data: EnemyData = _underfoot()
 		var enemy: Combatant = _enemy(data)
 		var player: Combatant = _player()

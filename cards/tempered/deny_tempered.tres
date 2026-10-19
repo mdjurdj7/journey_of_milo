@@ -2,18 +2,18 @@
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
-[ext_resource type="Resource" path="res://battle/rules/statuses/denied.tres" id="3_denied"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/delayed.tres" id="3_delayed"]
 [ext_resource type="Texture2D" uid="uid://1vy6gdh8dkvj" path="res://cards/art/Wanderer/Deny.png" id="4_art"]
 
-[sub_resource type="Resource" id="E_consume"]
+[sub_resource type="Resource" id="E_spend"]
 script = ExtResource("2_card_effect")
-effect_type = 24
-value = 1
+effect_type = 21
+toll_cost = 4
 
-[sub_resource type="Resource" id="E_deny"]
+[sub_resource type="Resource" id="E_delay"]
 script = ExtResource("2_card_effect")
 effect_type = 18
-status_data = ExtResource("3_denied")
+status_data = ExtResource("3_delayed")
 
 [resource]
 script = ExtResource("1_card_data")
@@ -22,11 +22,9 @@ cost = 1
 card_type = 1
 rarity = 2
 target_type = 0
-description = "Consume your costliest card.
-Target enemy skips its next move.
-Spent."
-effects = Array[ExtResource("2_card_effect")]([SubResource("E_consume"), SubResource("E_deny")])
-removal_scope = 1
+description = "Spend {toll_cost} Toll.
+Delay target enemy's next action by a turn."
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_delay")])
 art = ExtResource("4_art")
 play_sound_path = "res://assets/audio/cards/Deny/Deny.mp3"
 card_class = &"wanderer"

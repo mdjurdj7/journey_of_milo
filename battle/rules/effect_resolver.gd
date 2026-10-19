@@ -33,7 +33,6 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.SPEND_TOLL: "res://battle/rules/effects/spend_toll_effect.gd",
 	CardEffect.EffectType.DRAIN: "res://battle/rules/effects/drain_effect.gd",
 	CardEffect.EffectType.SET_ASIDE: "res://battle/rules/effects/set_aside_effect.gd",
-	CardEffect.EffectType.CONSUME: "res://battle/rules/effects/consume_effect.gd",
 	CardEffect.EffectType.REPLAY_LAST_ATTACK: "res://battle/rules/effects/replay_last_attack_effect.gd",
 }
 
@@ -142,6 +141,10 @@ static func can_target(card: CardData, combatant: Combatant, enemies: Array[Comb
 	for effect in card.effects:
 		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and effect.status_data != null and effect.status_data.skips_next_turn:
 			if Status.skip_turn_status(combatant.statuses) != null:
+				return false
+		# Deny: not on one whose next action is held already.
+		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and effect.status_data != null and effect.status_data.delays_next_action:
+			if Status.delay_status(combatant.statuses) != null:
 				return false
 		# A card that marks an intent (Brace, Garnish) targets the enemy's
 		# queued intent: only an attack that will land, carrying none of

@@ -4,10 +4,10 @@
 
 [resource]
 script = ExtResource("1_status_data")
-id = "denied"
-display_name = "Denied"
-description = "It skips its next move."
+id = "delayed"
+display_name = "Delayed"
+description = "Its next action waits a turn."
 category = 2
 default_duration_turns = -2
 stack_rule = 3
-skips_next_turn = true
+delays_next_action = true

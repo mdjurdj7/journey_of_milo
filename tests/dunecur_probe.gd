@@ -4,7 +4,7 @@ extends SceneTree
 # Rush loop (8, then 12), and Roused - each Attack card played against it
 # while the Rush is queued adds 2 to that Rush, once per card, up to +8
 # (Rush 12 to 20); played while Snarl is queued, nothing; the Rush that
-# lands spends it, even fully blocked; a Denied Rush keeps it, the Snarl
+# lands spends it, even fully blocked; a Stunned Rush keeps it, the Snarl
 # after neither takes nor spends it, and the next Rush carries it. The
 # intent preview climbs with it and always equals what lands. The rules cases drive EnemyTurn on the
 # real .tres; the fight cases load floor 4 and play real cards through
@@ -20,7 +20,7 @@ extends SceneTree
 const CASES := 11
 const DUNECUR_PATH := "res://battle/rules/enemies/dunecur.tres"
 const ROUSED_PATH := "res://battle/rules/statuses/roused.tres"
-const DENIED_PATH := "res://battle/rules/statuses/denied.tres"
+const STUNNED_PATH := "res://battle/rules/statuses/stunned.tres"
 const CONTACT_SOUND_PATH := "res://assets/audio/combat_old/hit.wav"
 const MODEL_PATH := "res://assets/models/enemies/Dunecur/Dunecur.glb"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
@@ -52,7 +52,7 @@ func _initialize() -> void:
 	_check_loop()
 	_check_window()
 	_check_climb_and_cap()
-	_check_denied_keeps()
+	_check_stunned_keeps()
 	_check_blocked_spends()
 	await _check_fight_slash()
 	await _check_fight_carve()
@@ -168,23 +168,23 @@ func _check_climb_and_cap() -> void:
 	_expect_eq(int(EnemyTurn.preview_intent(enemy, data, player)["per_hit"]), RUSH, "The next Rush is %d again" % RUSH)
 	_completed += 1
 
-# A Denied Rush lands nothing and keeps Roused. The Snarl that follows
+# A Stunned Rush lands nothing and keeps Roused. The Snarl that follows
 # neither takes it nor spends it - Attack cards on it add nothing, and it
 # lands 8 - so the next Rush carries the kept 2 stacks: 16, then spent.
-func _check_denied_keeps() -> void:
+func _check_stunned_keeps() -> void:
 	var data: EnemyData = _dunecur()
 	var enemy: Combatant = _enemy(data)
 	var player: Combatant = _player()
 	EnemyTurn.take_turn(enemy, data, player)
 	EnemyTurn.take_attack_card(enemy, data)
 	EnemyTurn.take_attack_card(enemy, data)
-	Status.apply_to(enemy.statuses, load(DENIED_PATH) as StatusData)
+	Status.apply_to(enemy.statuses, load(STUNNED_PATH) as StatusData)
 	var preview: Dictionary = EnemyTurn.preview_intent(enemy, data, player)
-	_expect(bool(preview.get("denied", false)), "Denied on the Rush: the preview says so")
+	_expect(bool(preview.get("denied", false)), "Stunned on the Rush: the preview says so")
 	_expect_eq(int(preview["damage_to_hp"]), 0, "...and that nothing reaches")
 	var before: int = player.hp
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
-	_expect(bool(result["denied"]) and not bool(result["attacked"]), "The Denied Rush doesn't land")
+	_expect(bool(result["denied"]) and not bool(result["attacked"]), "The Stunned Rush doesn't land")
 	_expect_eq(player.hp, before, "...nothing lost")
 	_expect_eq(_roused(enemy), 2, "...and Roused 2 stays")
 	_expect(not EnemyTurn.take_attack_card(enemy, data), "Snarl queued: an Attack card adds nothing")

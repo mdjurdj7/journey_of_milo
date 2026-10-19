@@ -10,8 +10,8 @@ extends SceneTree
 # and nothing more; its own brings it up Exposed (50% more) through the
 # player's next turn, the overkill carried in raw, and a broken mound is
 # no kill. A card at every enemy hits every mound; a status aimed at a
-# mound lands on the Siltjaw. Denied under the sand: no eruption, up at
-# its mound, not Exposed. A Denied Dig lost. Its Dug in readout (the
+# mound lands on the Siltjaw. Stunned under the sand: no eruption, up at
+# its mound, not Exposed. A Stunned Dig lost. Its Dug in readout (the
 # eruption's 14 in its hover) from each dig until it surfaces. The rules
 # cases drive EnemyTurn and EffectResolver on the real .tres and cards;
 # the fight cases load floor 2 and play real cards through
@@ -35,7 +35,7 @@ const EXPOSED_PATH := "res://battle/rules/statuses/exposed_surfaced.tres"
 const BRACED_PATH := "res://battle/rules/statuses/braced.tres"
 const DUG_IN_PATH := "res://battle/rules/statuses/dug_in.tres"
 const DUG_IN_LABEL := "Dug in"
-const DENIED_PATH := "res://battle/rules/statuses/denied.tres"
+const STUNNED_PATH := "res://battle/rules/statuses/stunned.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
@@ -80,8 +80,8 @@ func _initialize() -> void:
 	_check_break_own()
 	_check_every_mound()
 	_check_status_at_mound()
-	_check_denied_under()
-	_check_denied_dig()
+	_check_stunned_under()
+	_check_stunned_dig()
 	await _check_fight_dig()
 	await _check_fight_wrong()
 	await _check_fight_own()
@@ -263,28 +263,28 @@ func _check_status_at_mound() -> void:
 	_expect(guard.statuses.is_empty() and guard.hp == MOUND_HP and enemy.mounds.size() == MOUNDS, "...the mound untouched, nothing broken")
 	_completed += 1
 
-# Denied under the sand: no eruption - up at its mound, not Exposed, the
+# Stunned under the sand: no eruption - up at its mound, not Exposed, the
 # Snap next.
-func _check_denied_under() -> void:
+func _check_stunned_under() -> void:
 	var data: EnemyData = _siltjaw()
 	var enemy: Combatant = _enemy(data)
 	var player: Combatant = _player()
-	Status.apply_to(enemy.statuses, load(DENIED_PATH) as StatusData)
+	Status.apply_to(enemy.statuses, load(STUNNED_PATH) as StatusData)
 	var before: int = player.hp
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
-	_expect(bool(result["denied"]) and before == player.hp, "Denied under the sand: no eruption")
+	_expect(bool(result["denied"]) and before == player.hp, "Stunned under the sand: no eruption")
 	_expect(bool(result["erupted"]) and not enemy.dug_in, "...up at its mound all the same")
 	_expect(not _has(enemy, EXPOSED_PATH), "...not Exposed")
 	_expect_eq(EnemyTurn.current_intent(enemy, data).intent_name, "Snap", "...the Snap next")
 	_completed += 1
 
-# A Denied Dig is lost: nothing digs, the Snap is next.
-func _check_denied_dig() -> void:
+# A Stunned Dig is lost: nothing digs, the Snap is next.
+func _check_stunned_dig() -> void:
 	var data: EnemyData = _siltjaw()
 	var enemy: Combatant = _surfaced(data)
-	Status.apply_to(enemy.statuses, load(DENIED_PATH) as StatusData)
+	Status.apply_to(enemy.statuses, load(STUNNED_PATH) as StatusData)
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, _player())
-	_expect(bool(result["denied"]) and not enemy.dug_in, "A Denied Dig digs nothing")
+	_expect(bool(result["denied"]) and not enemy.dug_in, "A Stunned Dig digs nothing")
 	_expect_eq(EnemyTurn.current_intent(enemy, data).intent_name, "Snap", "...the Snap next")
 	_completed += 1
 

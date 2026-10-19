@@ -68,7 +68,7 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "block_cleared": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "phase_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "blocked": 0, "absorbed": 0, "applied_to_player": 0}
+	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "block_cleared": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "phase_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "delayed": false, "blocked": 0, "absorbed": 0, "applied_to_player": 0}
 
 	# Its Block is gone as its own turn starts, as the player's is at
 	# theirs (BattleController._start_player_turn()): what a Defend gained
@@ -115,9 +115,9 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 	var interjected: bool = not under and combatant.interjected_intent != null
 	# For the run log: which move this was, and each hit of it.
 	result["intent"] = intent.intent_name if intent != null else ""
-	# Denied (Deny - StatusData.skips_next_turn): spent by this turn
-	# whatever happens, so it never carries over - a pain turn landing on
-	# the same turn takes it too.
+	# Stunned (StatusData.skips_next_turn): spent by this turn whatever
+	# happens, so it never carries over - a pain turn landing on the same
+	# turn takes it too.
 	var denied: Status = Status.skip_turn_status(combatant.statuses)
 	if denied != null:
 		combatant.statuses.erase(denied)
@@ -128,13 +128,29 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 		var held: Status = Status.find_in(combatant.statuses, brought)
 		if held != null:
 			Status.remove_from(combatant.statuses, held)
+	# Delayed (Deny - StatusData.delays_next_action): this turn does
+	# nothing and its move waits for the next - held where it is (the loop,
+	# an interjection, a dig's step), its marks still bound to it, the turn
+	# count not moving (an escalation paused). A pain turn due now is spent
+	# on it. Delayed goes with this turn.
+	var delayed: Status = Status.delay_status(combatant.statuses)
+	if delayed != null:
+		combatant.statuses.erase(delayed)
+		result["delayed"] = true
+		if combatant.pain_turn_pending:
+			combatant.pain_turn_pending = false
+			result["pain_turn"] = true
+		Status.remove_expired(combatant.statuses)
+		_sync_queued(combatant, data)
+		result["buried"] = combatant.buried
+		return result
 	if combatant.pain_turn_pending:
 		# The pain turn: nothing resolves and nothing is queued in its
 		# place - the loop moves on and the turn is counted, as if it had.
 		combatant.pain_turn_pending = false
 		result["pain_turn"] = true
 	elif denied != null:
-		# Denied: the same as a pain turn - the move is lost, not delayed;
+		# Stunned: the same as a pain turn - the move is lost, not delayed;
 		# an interruptible one isn't "interrupted", so nothing is queued.
 		pass
 	elif is_interrupted(combatant, intent):
@@ -225,7 +241,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 	Status.remove_expired(combatant.statuses)
 	if combatant.hp > 0:
 		# A turn under the sand steps through its moves there - lost to a
-		# pain turn or Denied, the count goes on - and the last surfaces it
+		# pain turn or Stunned, the count goes on - and the last surfaces it
 		# on its own: "erupted", at true_mound. The loop is where the Dig
 		# left it.
 		if under:
@@ -444,12 +460,16 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 		preview["pain_turn"] = true
 		preview["per_hit"] = 0
 		return preview
-	# Denied: the move keeps its number - the display shows what was
+	# Stunned: the move keeps its number - the display shows what was
 	# denied, struck through - but it won't resolve, so it reaches nothing
-	# and is never lethal.
+	# and is never lethal. Delayed (Deny) the same this turn, dimmed rather
+	# than struck: it lands on the turn after.
 	var denied: bool = is_denied(combatant)
 	if denied:
 		preview["denied"] = true
+	var delayed: bool = is_delayed(combatant)
+	if delayed:
+		preview["delayed"] = true
 	# Carried out more than once (repeats() - Bereft): "repeats" says how
 	# often; a DEFEND's number is all the Block it gains, an ATTACK's hits
 	# are every hit of every attack, in order.
@@ -468,9 +488,10 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	if state.is_empty():
 		state.merge(turn_state(player))
 	# What it would land, from where the enemies before it leave him; a
-	# move that won't land (Denied, broken) shows its hits but spends
-	# nothing of `state` - those after it read him as it found him.
-	var lands: bool = not denied and not bool(preview.get("interrupted", false))
+	# move that won't land this turn (Stunned, Delayed, broken) shows its
+	# hits but spends nothing of `state` - those after it read him as it
+	# found him.
+	var lands: bool = not denied and not delayed and not bool(preview.get("interrupted", false))
 	var replay: Dictionary = state if lands else copy_state(state)
 	var hits: int = hit_count(combatant, intent)
 	var hit_amounts: Array[int] = []
@@ -494,7 +515,7 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 	# enemies (BattleController._lethal_together()) reads the turn as a
 	# whole.
 	var alone: Dictionary = simulate_hits(player, hit_amounts)
-	preview["damage_to_hp"] = 0 if denied else int(alone["to_hp"])
+	preview["damage_to_hp"] = 0 if not lands and not bool(preview.get("interrupted", false)) else int(alone["to_hp"])
 	preview["lethal"] = bool(alone["lethal"]) and lands
 	# What lives on this intent (StatusData.intent_mark - Braced,
 	# Garnished): "marks", their names in order ("brace" before
@@ -651,7 +672,8 @@ static func hit_count(combatant: Combatant, intent: EnemyIntent) -> int:
 # that will land when it resolves, not one that lands as a strike back
 # (the Erupt), carrying no `status_data` mark yet. NO_INTENT: nothing
 # shown (dormant, dead); NOT_ATTACK; ONLY_BLOCK (lands as a strike back);
-# WONT_LAND (Denied, a pain turn's, an interrupted one); ALREADY.
+# WONT_LAND (Stunned, a pain turn's, an interrupted one); ALREADY. A
+# Delayed move (Deny) takes one: it lands, a turn later.
 enum MarkRefusal { NONE, NO_INTENT, NOT_ATTACK, ONLY_BLOCK, WONT_LAND, ALREADY }
 
 static func mark_refusal(combatant: Combatant, data: EnemyData, status_data: StatusData) -> MarkRefusal:
@@ -674,8 +696,8 @@ static func mark_refusal(combatant: Combatant, data: EnemyData, status_data: Sta
 # Whether a status living on an intent (StatusData.intent_mark) still
 # holds in the player's turn: "" while its intent is queued and will
 # land; "replaced" once another is queued (a pack move dropped, the
-# Siltjaw up through its mound); "cancelled" once it won't land (Denied,
-# a pain turn, an interrupt met).
+# Siltjaw up through its mound); "cancelled" once it won't land (Stunned,
+# a pain turn, an interrupt met). A Delayed move keeps its marks.
 static func mark_loss(active: Status, combatant: Combatant, data: EnemyData) -> String:
 	var intent: EnemyIntent = current_intent(combatant, data) if data != null else null
 	if intent == null or intent != active.bound_intent or combatant.dormant:
@@ -714,6 +736,10 @@ static func mark_entry(active: Status) -> Dictionary:
 
 static func is_denied(combatant: Combatant) -> bool:
 	return Status.skip_turn_status(combatant.statuses) != null
+
+# Its next action held a turn (Deny's Delayed).
+static func is_delayed(combatant: Combatant) -> bool:
+	return Status.delay_status(combatant.statuses) != null
 
 # The pain turn's trigger (EnemyData.pain_turn_hp_threshold): the first
 # time this living enemy's HP is strictly below that fraction of its max,
@@ -986,7 +1012,8 @@ static func answer_signal(combatant: Combatant, data: EnemyData, player: Combata
 # The attack a packmate answers a SIGNAL with: the first ATTACK in its
 # loop from the intent queued now. Null with none.
 static func signal_answer_intent(combatant: Combatant, data: EnemyData) -> EnemyIntent:
-	if data == null or data.intents.is_empty():
+	# Delayed (Deny): it holds its own move, and answers nothing.
+	if data == null or data.intents.is_empty() or is_delayed(combatant):
 		return null
 	var count: int = data.intents.size()
 	var start: int = clampi(combatant.current_intent_index, 0, count - 1)

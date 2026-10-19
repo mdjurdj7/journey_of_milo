@@ -53,7 +53,7 @@ enum OfferScope { REWARDABLE = 0, STARTER_ONLY = 1, KEEPER_ONLY = 2, OWN_CHANNEL
 # hold now, in place of `cost` - before the free card, a cost reduction
 # or a cost replacement (Combatant.base_cost()). The face's numeral reads
 # it in a fight; the printed `cost` stays the card's own everywhere else
-# (the wagon, the Cards screen, Deny's costliest card). Its rules text
+# (the wagon, the Cards screen). Its rules text
 # says it on a line of its own: "Critical: costs N.". -1 = none.
 @export var critical_cost: int = -1
 @export var card_type: CardType = CardType.ATTACK

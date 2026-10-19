@@ -16,7 +16,7 @@ signal card_clicked(card_view: CardView)
 signal armed_changed(armed: bool)
 # The card whose cost the energy readout previews changed: the armed card
 # if there is one, else the hovered one - never a card that is only
-# marked (a Bide or Deny choice) - or null for none.
+# marked (a Bide choice) - or null for none.
 signal cost_focus_changed(card_data: CardData)
 # A drawn card has left the deck - its arrival flight has just begun
 # (see _launch_arrival()). Once per card, staggered as the flights are.
@@ -290,27 +290,23 @@ func set_draw_origin(origin: Control) -> void:
 
 # A hand choice opened with `chooser` armed (BattleController's choose
 # mode): the arming suppressed every other card's hover, but here they
-# are what gets clicked, so hover comes back for them - for `eligible`
-# alone when it names any (Deny's tie), the rest staying still and faded
-# (CardView.set_choice_state()). A null chooser is the end-of-turn keep:
-# no card armed, the whole hand chooses.
-func begin_choice(chooser: CardView, eligible: Array[CardView] = []) -> void:
+# are what gets clicked, so hover comes back for them (CardView.set_
+# choice_state()). A null chooser is the end-of-turn keep: no card armed,
+# the whole hand chooses.
+func begin_choice(chooser: CardView) -> void:
 	for view in _card_views():
 		if view == chooser:
 			continue
-		var pickable: bool = eligible.is_empty() or eligible.has(view)
-		view.set_choice_state(true, pickable)
-		if pickable:
-			view.set_hover_suppressed(false)
+		view.set_choice_state(true, true)
+		view.set_hover_suppressed(false)
 
-# The choice closed (confirmed or cancelled): every mark comes off but
-# `keep`'s (Deny's pick, waiting on its target), and while a card is
-# still armed the rest of the hand goes back to not hovering.
-func end_choice(keep: CardView = null) -> void:
+# The choice closed (confirmed or cancelled): every mark comes off, and
+# while a card is still armed the rest of the hand goes back to not
+# hovering.
+func end_choice() -> void:
 	for view in _card_views():
 		view.set_choice_state(false)
-		if view != keep:
-			view.set_marked(false)
+		view.set_marked(false)
 	if _armed_slot == null:
 		return
 	var armed_view: CardView = _armed_slot.get_child(0) as CardView
