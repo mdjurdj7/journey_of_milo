@@ -114,9 +114,7 @@
       "RARE": 8
     },
     "implemented_but_not_obtainable": [],
-    "missing_art": [
-      "In the Red"
-    ],
+    "missing_art": [],
     "neutral_cards_missing_art": [
       "Endure",
       "Left Hand",
@@ -1302,7 +1300,7 @@
           "default_displayed": 0
         }
       ],
-      "art_path": null,
+      "art_path": "res://cards/art/Wanderer/In the Red.png",
       "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,

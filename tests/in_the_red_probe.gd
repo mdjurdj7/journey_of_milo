@@ -27,6 +27,7 @@ const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
 const CARD_PATH := "res://cards/data/in_the_red.tres"
 const TEMPERED_PATH := "res://cards/tempered/in_the_red_tempered.tres"
+const ART_PATH := "res://cards/art/Wanderer/In the Red.png"
 const FILLER_PATH := "res://cards/data/slash.tres"
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
@@ -88,7 +89,8 @@ func _check_data() -> void:
 	_expect_eq(card.target_type, CardData.TargetType.SELF, "...takes no enemy target")
 	_expect_eq(card.removal_scope, CardData.RemovalScope.SPENT, "...Spent")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
-	_expect(card.art == null, "...with the glyph for art")
+	_expect(card.art != null and card.art.resource_path == ART_PATH, "...with its art")
+	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...mipmapped")
 	_expect_eq(card.description, "Gain {energy} Energy.\n{if}Critical: {bonus_energy} more, and draw {draw}.{/if}\nSpent.", "...its text - the 8 HP on the badge alone")
 	_expect_eq(_shape(card), [CardEffect.EffectType.SELF_DAMAGE_TOLL, 8, 0, CardEffect.Condition.NONE,
 		CardEffect.EffectType.GAIN_ENERGY, 1, CardEffect.Condition.NONE,
@@ -102,6 +104,7 @@ func _check_data() -> void:
 	_expect_eq(tempered.card_name, "In the Red+", "In the Red+ loads")
 	_expect_eq(tempered.description, card.description, "...reads the same text")
 	_expect_eq([tempered.cost, tempered.rarity, tempered.card_class, tempered.removal_scope], [0, CardData.CardRarity.UNCOMMON, &"wanderer", CardData.RemovalScope.SPENT], "...0 Energy, Uncommon, the Wanderer's, Spent")
+	_expect(tempered.art == card.art, "...the same art")
 	_expect_eq(_shape(tempered), [CardEffect.EffectType.SELF_DAMAGE_TOLL, 8, 0, CardEffect.Condition.NONE,
 		CardEffect.EffectType.GAIN_ENERGY, 1, CardEffect.Condition.NONE,
 		CardEffect.EffectType.GAIN_ENERGY, 1, CardEffect.Condition.CRITICAL,

@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://dnx4tytwu3mbd" path="res://cards/art/Wanderer/In the Red.png" id="9_art"]
 [ext_resource type="Resource" path="res://cards/tempered/in_the_red_tempered.tres" id="3_tempered"]
 
 [sub_resource type="Resource" id="E_self"]
@@ -37,5 +38,6 @@ description = "Gain {energy} Energy.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_self"), SubResource("E_energy"), SubResource("E_energy_critical"), SubResource("E_draw_critical")])
 removal_scope = 1
+art = ExtResource("9_art")
 tempered = ExtResource("3_tempered")
 card_class = &"wanderer"

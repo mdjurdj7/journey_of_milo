@@ -59,6 +59,7 @@ const TEMPERED_DIR := "res://cards/tempered/"
 # Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account.
 # Every other card has none yet.
 const CARD_ART: Dictionary = {
+	"in_the_red": "res://cards/art/Wanderer/In the Red.png",
 	"slash": "res://cards/art/Wanderer/Slash.png",
 	"bite_down": "res://cards/art/Wanderer/Bite Down.png",
 	"brace": "res://cards/art/Wanderer/Brace.png",
