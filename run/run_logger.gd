@@ -70,9 +70,20 @@ class_name RunLogger
 # turn and the cards "drawn") and "keepsake_block_carry" (Blue Fastener:
 # Block "kept" over the turn's reset and Block "lost" to it).
 
+# Format 7 (2026-10-19): the Toll package. A replayed Attack's own Toll,
+# HP and heals (Second Swing - BattleController._replay_attack()) are put
+# down to "replay:<attack>" in the by-source tallies - Second Swing's own
+# spend stays "card:Second Swing" - so an audit sees Reckoning's share,
+# replays and all. Three mechanic lines: "replay" (the "attack" replayed
+# and its "target", "" for an all-enemies one), "energy_debt" (Come Due's
+# Owed paid off at a turn's refill: "owed", and the "energy" the turn
+# starts on) and "delay" (Deny: the "enemy" and the "intent" it holds).
+# A threshold_resolved outcome may now be "delayed"; Come Due's enemy
+# mark, and Deny's hand-card take, are gone.
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 6
+const FORMAT_VERSION := 7
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]
@@ -412,7 +423,8 @@ static func turn_ended(energy: int) -> void:
 # A mechanic line: `kind` and what it says, on the fight and turn it
 # happened in. Kinds: enemy_died, pain_turn, pain_turn_spent, phase,
 # threshold_queued, threshold_resolved, escalation, queued_state,
-# keepsake_double, keepsake_draw, keepsake_block_carry.
+# keepsake_double, keepsake_draw, keepsake_block_carry, replay,
+# energy_debt, delay.
 static func mechanic(kind: String, data: Dictionary) -> void:
 	if not _fight_open:
 		return

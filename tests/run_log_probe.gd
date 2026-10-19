@@ -23,6 +23,11 @@ extends SceneTree
 # offer and the HP left exactly as they were with it on. And the headless
 # guard: with no folder of its own, a headless instance writes nothing.
 #
+# Last, a run of its own for the Toll package: Reckoning, Second Swing
+# replaying it, Come Due and Deny - every Toll spend put down to its
+# source ("replay:Reckoning" for the replay's own), and the replay,
+# energy_debt and delay lines.
+#
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/run_log_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
@@ -40,6 +45,9 @@ const RECKONING_PATH := "res://cards/data/reckoning.tres"
 const HOLD_FAST_PATH := "res://cards/data/hold_fast.tres"
 const BLOOD_ARC_PATH := "res://cards/data/blood_arc.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
+const SECOND_SWING_PATH := "res://cards/data/second_swing.tres"
+const COME_DUE_PATH := "res://cards/data/come_due.tres"
+const DENY_PATH := "res://cards/data/deny.tres"
 const GLOBAL_SEED := 20261004
 const RUN_SEED := 4242
 const MAX_TURNS := 12
@@ -82,6 +90,8 @@ func _initialize() -> void:
 	_expect_eq(off.get("offered"), on.get("offered"), "...the reward offers the same cards")
 	_expect_eq(off.get("hp_end"), on.get("hp_end"), "...and the fight leaves the same HP")
 	_expect_eq(off.get("played"), on.get("played"), "...over the same plays")
+
+	await _toll_package_run()
 
 	RunLogger.set_output_dir("")
 	RunLogger.enabled = true
@@ -189,6 +199,81 @@ func _scripted_run(logging: bool) -> Dictionary:
 	_run_state.call("log_run_end", "quit")
 	await _teardown()
 	return seen
+
+# The Toll package, logged: on 20 Toll Reckoning spends it all; on 15,
+# Second Swing spends 5 and replays Reckoning, which spends the other 10;
+# on 5, Come Due; on 6, Deny at the Sputter. End Turn: the Sputter's
+# turn waits (delay), and the next turn starts owing 2 (energy_debt).
+# The fight's Toll spent by source, and the three lines, read back.
+func _toll_package_run() -> void:
+	print("\n=== the Toll package")
+	_clear_dir()
+	RunLogger.set_output_dir(_log_dir)
+	RunLogger.enabled = true
+	_run_state.call("new_run", load(CHARACTER_PATH))
+	_run_state.set("current_floor_index", 0)
+	_run_state.set("run_opening_pending", false)
+	_field = (load(REGION_SCENE_PATH) as PackedScene).instantiate()
+	_field.set("run_logging_enabled", true)
+	root.add_child(_field)
+	for i in 30:
+		await physics_frame
+	var controller: Node = await _start_fight()
+	if controller == null:
+		await _teardown()
+		return
+	var combatants: Dictionary = controller.get("_combatants")
+	for combatant: Combatant in combatants.values():
+		combatant.max_hp = 999
+		combatant.hp = 999
+	var player: Combatant = controller.get("player")
+	player.energy = 99
+	_fresh_hand(controller)
+	player.toll = 20
+	await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
+	player.toll = 15
+	await _play(controller, await _deal(controller, SECOND_SWING_PATH))
+	player.toll = 5
+	await _play(controller, await _deal(controller, COME_DUE_PATH))
+	player.toll = 6
+	await _play(controller, await _deal(controller, DENY_PATH), _field_enemy(controller))
+	var turn: int = int(controller.get("_player_turn"))
+	controller.call("end_turn")
+	await ProbePlay.wait_until(self, func() -> bool: return int(controller.get("_player_turn")) > turn and ProbePlay.is_settled(controller), 20.0)
+	for member in (controller.get("enemies") as Array).duplicate():
+		var combatant: Combatant = combatants.get(member)
+		combatant.hp = 0
+		controller.call("_report_damage", "player", combatant, 999, "card")
+	controller.call("_check_battle_end")
+	await _await_reward_screen()
+	_run_state.call("log_run_end", "quit")
+	await _teardown()
+	var files: PackedStringArray = DirAccess.get_files_at(_log_dir)
+	_expect_eq(files.size(), 1, "The Toll package run wrote one file")
+	if files.size() != 1:
+		return
+	var lines: Array[Dictionary] = []
+	for raw in FileAccess.get_file_as_string(_log_dir.path_join(files[0])).split("\n", false):
+		var parsed: Variant = JSON.parse_string(raw)
+		if parsed is Dictionary:
+			lines.append(parsed)
+	var fight_end: Dictionary = _first(lines, "fight_end")
+	var spent: Dictionary = (fight_end.get("toll", {}) as Dictionary).get("spent_by_source", {})
+	var expected: Dictionary = {"card:Reckoning": 20, "card:Second Swing": 5, "replay:Reckoning": 10, "card:Come Due": 5, "card:Deny": 6}
+	for source: String in expected:
+		_expect_eq(int(spent.get(source, 0)), int(expected[source]), "Toll spent by %s" % source)
+	var kinds: Dictionary = {}
+	for line in lines:
+		if str(line.get("ev", "")) == "mechanic":
+			kinds[str(line.get("kind", ""))] = line
+	var replay: Dictionary = kinds.get("replay", {})
+	_expect_eq(str(replay.get("attack", "")), "Reckoning", "A replay line: Reckoning")
+	_expect(not str(replay.get("target", "")).is_empty(), "...at its enemy (%s)" % str(replay.get("target", "")))
+	var delay: Dictionary = kinds.get("delay", {})
+	_expect(not delay.is_empty() and not str(delay.get("enemy", "")).is_empty(), "A delay line names the Sputter (%s)" % str(delay))
+	var debt: Dictionary = kinds.get("energy_debt", {})
+	_expect_eq([int(debt.get("owed", 0)), int(debt.get("energy", -1))], [2, 1], "An energy_debt line: 2 owed, the turn on 1")
+	_expect_eq(int(debt.get("v", 0)), 7, "...on a format 7 line")
 
 # --- The log ---
 

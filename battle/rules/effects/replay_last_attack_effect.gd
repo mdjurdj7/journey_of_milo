@@ -33,4 +33,6 @@ func resolve(_effect: CardEffect, ctx: EffectContext) -> void:
 	replay.tagged_plays_before_this = ctx.player.tagged_plays_this_turn.duplicate()
 	replay.on_damage = ctx.on_damage
 	replay.on_heal = ctx.on_heal
+	RunLogger.push_source("replay:" + card.card_name)
 	EffectResolver.new().resolve_card(card, replay)
+	RunLogger.pop_source()

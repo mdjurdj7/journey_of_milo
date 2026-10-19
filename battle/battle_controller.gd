@@ -1246,6 +1246,10 @@ func _replay_attack(chosen: FieldEnemy) -> void:
 		if impact_at - swing_at > 0.0:
 			await get_tree().create_timer(impact_at - swing_at).timeout
 	card_impact.emit(card)
+	RunLogger.mechanic("replay", {"attack": card.card_name, "target": _log_id(target_enemy) if target_enemy != null else ""})
+	# Its own Toll, HP and heals are the replay's in the run log, not the
+	# card that replayed it.
+	RunLogger.push_source("replay:" + card.card_name)
 	var ctx: EffectContext = _card_context(target_enemy, mound)
 	ctx.is_replay = true
 	# Not a play: every card this turn was played before it, and it adds no
@@ -1257,6 +1261,7 @@ func _replay_attack(chosen: FieldEnemy) -> void:
 	_effect_resolver.resolve_card(card, ctx)
 	_deferring_pack_check = false
 	_multi_hit_report = false
+	RunLogger.pop_source()
 	_after_card_effects()
 	if not _extra_hit_reports.is_empty():
 		await _land_extra_hits()
@@ -1684,6 +1689,8 @@ func _take_turn_logged(enemy: FieldEnemy, combatant: Combatant, data: EnemyData)
 		var held: Status = Status.find_in(combatant.statuses, data.attack_card_status)
 		stacks = held.stack_count if held != null else 0
 	var result: Dictionary = EnemyTurn.take_turn(combatant, data, player)
+	if result["delayed"]:
+		RunLogger.mechanic("delay", {"enemy": id, "intent": result["intent"]})
 	for entry: Dictionary in result.get("marks", []):
 		intent_mark_settled.emit(enemy, entry)
 	if result["pain_turn"]:
@@ -2322,9 +2329,13 @@ func _start_player_turn() -> void:
 	# The refill, and Dying Light's 1 if the turn begins Critical - judged
 	# here, before any tick, so entering Critical later gives nothing
 	# until the next turn starts.
+	var owed: int = Status.energy_debt(player.statuses)
 	player.energy = player.turn_start_energy()
 	# The run log's turn opens on the refill, before any tick it counts.
 	RunLogger.turn_started(player.energy)
+	# Energy owed (Come Due) paid off in the refill just now.
+	if owed > 0:
+		RunLogger.mechanic("energy_debt", {"owed": owed, "energy": player.energy})
 	# In the new turn's lines: what the carry kept of the Block left over.
 	if carry > 0 and block_before > 0:
 		RunLogger.mechanic("keepsake_block_carry", {"kept": player.block, "lost": block_before - player.block})
