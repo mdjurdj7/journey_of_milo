@@ -108,8 +108,7 @@ const TOKEN_HITS := "{hits}"
 # The effect types {damage}/{alt_damage} and {block}/{alt_block} read.
 const DAMAGE_EFFECT_TYPES: Array = [CardEffect.EffectType.DAMAGE, CardEffect.EffectType.FIRST_CARD_DAMAGE,
 	CardEffect.EffectType.DAMAGE_ALL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE]
-const BLOCK_EFFECT_TYPES: Array = [CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK,
-	CardEffect.EffectType.TOLL_BLOCK]
+const BLOCK_EFFECT_TYPES: Array = [CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK]
 # The player's Toll right now - 0 outside a battle, which is also what a
 # card in the deck view shows. Reckoning spends all of it, so its printed
 # damage IS this number.
@@ -117,6 +116,11 @@ const TOKEN_TOLL := "{toll}"
 # What a TOLL_HEAL would heal for at that Toll: half of whatever it can
 # actually spend, capped. No card carries a TOLL_HEAL at present.
 const TOKEN_TOLL_HEAL := "{toll_heal}"
+# What a TOLL_BLOCK spends, and so the Block it adds (TollBlockEffect.
+# spendable()): in a battle hand the Toll held up to its cap - 0 under a
+# stance that forbids Block - and its cap anywhere else, the rule's own
+# number (Settled Account's "Spend up to 5 Toll").
+const TOKEN_TOLL_BLOCK := "{toll_block}"
 # Where a lethal guard the card applies would leave the player (Refuse the
 # End - StatusData.survive_hp()): for the fight's player in a battle hand,
 # for the run's max HP anywhere else.
@@ -747,6 +751,10 @@ func _resolve_tokens(description: String) -> String:
 		text = text.replace(TOKEN_TOLL, str(_toll_token_value()))
 	if text.contains(TOKEN_TOLL_HEAL):
 		text = text.replace(TOKEN_TOLL_HEAL, str(_toll_heal_preview()))
+	if text.contains(TOKEN_TOLL_BLOCK):
+		var toll_block: int = _toll_block_preview()
+		if toll_block >= 0:
+			text = text.replace(TOKEN_TOLL_BLOCK, str(toll_block))
 	if text.contains(TOKEN_SURVIVE_HP):
 		var survive: int = _survive_hp_preview()
 		if survive > 0:
@@ -800,6 +808,17 @@ func _toll_heal_preview() -> int:
 		if effect != null and effect.effect_type == CardEffect.EffectType.TOLL_HEAL:
 			return mini(mini(effect.toll_cost, _toll) / 2, effect.value)
 	return 0
+
+# What this card's TOLL_BLOCK prints - see TOKEN_TOLL_BLOCK. -1 with no
+# such effect, which leaves the token standing.
+func _toll_block_preview() -> int:
+	for effect in card_data.effects:
+		if effect == null or effect.effect_type != CardEffect.EffectType.TOLL_BLOCK:
+			continue
+		if _bonus_context == null:
+			return effect.toll_cost
+		return TollBlockEffect.spendable(effect, _toll, _stance)
+	return -1
 
 # What a blow the card adds up to `blow` (its value and attack bonus)
 # lands for against the context's target - its mark bonus (Come Due)
@@ -1610,7 +1629,9 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 		if effect == null:
 			continue
 		match effect.effect_type:
-			CardEffect.EffectType.TOLL_DAMAGE, CardEffect.EffectType.TOLL_BLOCK, CardEffect.EffectType.TOLL_RETALIATE, \
+			# Not TOLL_BLOCK: a card that spends Toll only to add Block
+			# (Settled Account) reads as the Block it is - GUARD, below.
+			CardEffect.EffectType.TOLL_DAMAGE, CardEffect.EffectType.TOLL_RETALIATE, \
 			CardEffect.EffectType.SELF_DAMAGE_TOLL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_FRACTION_DAMAGE_ALL, 			CardEffect.EffectType.TOLL_HEAL, CardEffect.EffectType.SPEND_TOLL:
 				return KeylineType.TOLL
 	# Read off card_type, not off the effect: a stance is a stance because
@@ -1625,7 +1646,7 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 			if effect == null:
 				continue
 			match effect.effect_type:
-				CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK, CardEffect.EffectType.ABSORB:
+				CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK, CardEffect.EffectType.TOLL_BLOCK, CardEffect.EffectType.ABSORB:
 					return KeylineType.GUARD
 				CardEffect.EffectType.APPLY_STATUS:
 					if _is_defensive_status(effect.status_data):

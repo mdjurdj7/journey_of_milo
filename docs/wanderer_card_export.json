@@ -137,7 +137,7 @@
       },
       {
         "name": "Toll",
-        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Come Due, Leverage and Second Swing (optionally, to repeat its hit); spending it brings a Sentence a turn closer."
+        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Come Due, Leverage, Settled Account (up to 5, for block) and Second Swing (optionally, to repeat its hit); spending it brings a Sentence a turn closer."
       },
       {
         "name": "Grace",
@@ -1911,15 +1911,19 @@
       "face_type_label": "GUARD",
       "energy_cost": 1,
       "rarity": "COMMON",
-      "card_text": "Gain 5 block. If you spent Toll this turn, gain 5 more.",
+      "card_text": "Gain 5 block.\nSpend up to 5 Toll: gain that much more block.",
       "face_hp_line": null,
-      "card_text_template": "Gain {block} block. {if}If you spent Toll this turn, gain {bonus_block} more.{/if}",
+      "card_text_template": "Gain {block} block.\n{battle}Spend {toll_block} Toll: gain {toll_block} more block.{/battle}{outside}Spend up to {toll_block} Toll: gain that much more block.{/outside}",
       "targeting": "self",
       "removal_after_play": "discard pile",
       "effects": [
         {
           "type": "BLOCK",
-          "plain_english": "Gain 5 block; if any Toll was spent earlier this turn, by any card or effect (Combatant.toll_spent_this_turn - Gnaw's condition, TOLL_SPENT_THIS_TURN), 5 more - 10 in all, however much was spent. Toll spent after it resolves doesn't count."
+          "plain_english": "Gain 5 block."
+        },
+        {
+          "type": "TOLL_BLOCK",
+          "plain_english": "Spend up to 5 of the Toll held (toll_cost is the cap), automatically, and gain 1 block per Toll spent - 10 block in all on 5 Toll or more. Toll spent earlier in the turn doesn't matter. Anything it spends counts as Toll spent this turn (Gnaw) and brings a Sentence a turn closer. While Block can't be gained (Last Resort) it spends nothing."
         }
       ],
       "keywords": [
@@ -1931,7 +1935,7 @@
       "draw": null,
       "energy_gain": null,
       "toll_gain": null,
-      "toll_spend": null,
+      "toll_spend": "up to 5 (all held, if less)",
       "persistent_effect": null,
       "stance_effect": null,
       "power_effect": null,
@@ -1939,13 +1943,13 @@
       "critical_condition": null,
       "dynamic_values": [
         {
-          "field": "block",
-          "rule": "5 normally, 10 once any Toll was spent this turn; the face's 'If you spent Toll this turn' clause is grey until then and full ink after, live in battle.",
-          "default_displayed": "5 / 10"
+          "field": "toll_block",
+          "rule": "In a battle hand the second line reads the Toll it will spend, the Toll held up to 5 ('Spend 3 Toll: gain 3 more block.'); outside a fight it reads the rule ('Spend up to 5 Toll: gain that much more block.').",
+          "default_displayed": "up to 5"
         },
         {
           "field": "block",
-          "rule": "Shows and gives 0 while Last Resort is held.",
+          "rule": "Both numbers show and give 0 while Last Resort is held, and it spends no Toll.",
           "default_displayed": 5
         },
         {
@@ -1970,7 +1974,7 @@
         "path": "res://assets/audio/cards/Settled Account/Settled Account.mp3",
         "critical_sound_pitch": 0.95,
         "critical_sound_volume_db": 1.0,
-        "rule": "Played once Toll was spent this turn (judged at play), the sound plays at pitch 0.95 and 1 dB louder."
+        "rule": "Played when it will spend Toll (judged at play: Toll held and no Last Resort), the sound plays at pitch 0.95 and 1 dB louder."
       }
     },
     {

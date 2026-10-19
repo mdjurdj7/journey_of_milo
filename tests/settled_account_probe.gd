@@ -1,9 +1,11 @@
 extends SceneTree
 
 # Headless probe for Settled Account - 1 Energy, Common Skill, GUARD, no
-# target: gain 5 block, and 5 more if any Toll was spent earlier this turn
-# (an Untouched-shaped BLOCK: condition TOLL_SPENT_THIS_TURN - Gnaw's
-# flag, Combatant.toll_spent_this_turn - with bonus_value 5).
+# target: gain 5 block, then spend up to 5 of the Toll held for 1 block
+# each (BLOCK 5, then a TOLL_BLOCK capped at toll_cost 5 - TollBlockEffect).
+# The spend is automatic and counts as Toll spent this turn; Toll spent
+# earlier doesn't matter. Under Last Resort it gains no block and spends
+# nothing. Settled Account+ is 6 and up to 8.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/settled_account_probe.gd
 #
@@ -12,15 +14,15 @@ extends SceneTree
 # Rules cases play the real cards through EffectResolver on bare
 # Combatants, working each number out of the card's own data. The fight
 # case loads the real region scene and plays through BattleController:
-# the face at hand size, its clause going live mid-turn after Second Swing
-# spends, its own sound - at the card's pitch and lift once Toll is spent,
-# 1.0 and the usual level before - and the condition gone at the next
-# turn. Untyped against anything that names the RunState autoload.
+# the face at hand size reading the Toll it will spend, its own sound -
+# at the card's pitch and lift when it spends, 1.0 and the usual level
+# when it has nothing to spend. Untyped against anything that names the
+# RunState autoload.
 
-const CASES := 7
+const CASES := 9
 const MAX_HP := 70
 const CARD_PATH := "res://cards/data/settled_account.tres"
-const SECOND_SWING_PATH := "res://cards/data/second_swing.tres"
+const TEMPERED_PATH := "res://cards/tempered/settled_account_tempered.tres"
 const RECKONING_PATH := "res://cards/data/reckoning.tres"
 const LAST_RESORT_PATH := "res://cards/data/last_resort.tres"
 const WANDERER_POOL_PATH := "res://cards/pools/wanderer_pool.tres"
@@ -39,7 +41,7 @@ var _failures: int = 0
 var _completed: int = 0
 var _resolver := EffectResolver.new()
 var _base: int = 0
-var _bonus: int = 0
+var _cap: int = 0
 
 func _initialize() -> void:
 	create_timer(SAFETY_SECONDS).timeout.connect(func() -> void:
@@ -47,15 +49,17 @@ func _initialize() -> void:
 		quit(1)
 	)
 	_run_state = root.get_node("RunState")
-	var effect: CardEffect = (load(CARD_PATH) as CardData).effects[0]
-	_base = effect.value
-	_bonus = effect.bonus_value
+	var card: CardData = load(CARD_PATH)
+	_base = card.effects[0].value
+	_cap = card.effects[1].toll_cost
 
 	_check_data()
-	_check_nothing_spent()
-	_check_after_second_swing()
-	_check_after_reckoning()
+	_check_nothing_held()
+	_check_some_held()
+	_check_capped()
+	_check_earlier_spend()
 	_check_last_resort()
+	_check_tempered()
 	await _check_face()
 	await _check_fight()
 
@@ -76,93 +80,130 @@ func _check_data() -> void:
 	_expect_eq(card.cost, 1, "...costs 1 Energy")
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.COMMON, "...Common")
+	_expect_eq(card.offer, CardData.OfferScope.REWARDABLE, "...rewardable")
 	_expect_eq(card.target_type, CardData.TargetType.SELF, "...takes no enemy target")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.GUARD, "...reading GUARD")
-	_expect_eq(card.description, "Gain {block} block. {if}If you spent Toll this turn, gain {bonus_block} more.{/if}", "...its text")
-	_expect_eq(card.effects.size(), 1, "...one effect")
-	var effect: CardEffect = card.effects[0]
-	_expect_eq([effect.effect_type, effect.value, effect.condition, effect.bonus_value], [CardEffect.EffectType.BLOCK, 5, CardEffect.Condition.TOLL_SPENT_THIS_TURN, 5], "...BLOCK 5, 5 more with Toll spent this turn")
-	_expect_eq(CardBonus.mode(effect), CardBonus.Mode.ADD, "...an ADD: the 5 always lands")
+	_expect_eq(card.description, "Gain {block} block.\n{battle}Spend {toll_block} Toll: gain {toll_block} more block.{/battle}{outside}Spend up to {toll_block} Toll: gain that much more block.{/outside}", "...its text")
+	_expect_eq(_shape(card), [CardEffect.EffectType.BLOCK, 5, CardEffect.EffectType.TOLL_BLOCK, 5], "...BLOCK 5, then TOLL_BLOCK up to 5")
+	_expect_eq(CardBonus.mode(card.effects[0]), CardBonus.Mode.NONE, "...no condition left")
+	var tempered: CardData = load(TEMPERED_PATH)
+	_expect(card.tempered == tempered, "...tempering to Settled Account+")
+	_expect_eq(tempered.description, card.description, "Settled Account+ reads the same text")
+	_expect_eq(_shape(tempered), [CardEffect.EffectType.BLOCK, 6, CardEffect.EffectType.TOLL_BLOCK, 8], "...BLOCK 6, then TOLL_BLOCK up to 8")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "The card has its art")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...mipmapped")
 	_expect_eq(card.play_sound_path, SOUND_PATH, "...and its play sound")
 	_expect(load(card.play_sound_path) is AudioStream, "...which loads")
-	_expect_eq([card.critical_sound_pitch, card.critical_sound_volume_db], [0.95, 1.0], "...fuller with Toll spent (0.95, +1 dB)")
+	_expect_eq([card.critical_sound_pitch, card.critical_sound_volume_db], [0.95, 1.0], "...fuller when it spends (0.95, +1 dB)")
 	_expect((load(WANDERER_POOL_PATH) as RewardPool).entries.has(card), "...in the Wanderer pool")
 	_expect((load(COLLECTOR_POOL_PATH) as RewardPool).entries.has(card), "...and the collector pool")
 	_completed += 1
 
+# [BLOCK type, value, TOLL_BLOCK type, cap] - a card's two effects.
+func _shape(card: CardData) -> Array:
+	if card.effects.size() != 2:
+		return [card.effects.size()]
+	var block: CardEffect = card.effects[0]
+	var toll_block: CardEffect = card.effects[1]
+	return [block.effect_type, block.value, toll_block.effect_type, toll_block.toll_cost]
+
 # --- Rules ---
 
-func _check_nothing_spent() -> void:
+func _check_nothing_held() -> void:
 	var player: Combatant = _player()
 	_play(player)
-	_expect_eq(player.block, _base, "Nothing spent: %d block" % _base)
+	_expect_eq(player.block, _base, "No Toll held: %d block" % _base)
+	_expect(not player.toll_spent_this_turn, "...and no Toll spent this turn")
 	_completed += 1
 
-func _check_after_second_swing() -> void:
+func _check_some_held() -> void:
 	var player: Combatant = _player()
-	player.toll = 6
-	_play_card(load(SECOND_SWING_PATH), player, Combatant.new(100))
-	_expect(player.toll == 0 and player.toll_spent_this_turn, "Second Swing's repeat spends 6: Toll spent this turn")
+	player.toll = _cap - 2
 	_play(player)
-	_expect_eq(player.block, _base + _bonus, "...then %d block" % (_base + _bonus))
+	_expect_eq(player.block, _base + _cap - 2, "%d Toll held: all of it spent, %d block" % [_cap - 2, _base + _cap - 2])
+	_expect_eq(player.toll, 0, "...no Toll left")
+	_expect(player.toll_spent_this_turn, "...and it counts as Toll spent this turn")
 	_completed += 1
 
-# However much was spent, the bonus is the same 5.
-func _check_after_reckoning() -> void:
+func _check_capped() -> void:
+	var player: Combatant = _player()
+	player.toll = _cap + 7
+	_play(player)
+	_expect_eq(player.block, _base + _cap, "%d Toll held: %d spent, %d block" % [_cap + 7, _cap, _base + _cap])
+	_expect_eq(player.toll, 7, "...7 left")
+	_completed += 1
+
+# Toll spent earlier this turn no longer counts: Reckoning took it all, so
+# there is nothing to spend.
+func _check_earlier_spend() -> void:
 	var player: Combatant = _player()
 	player.toll = 20
 	_play_card(load(RECKONING_PATH), player, Combatant.new(100))
 	_expect(player.toll == 0 and player.toll_spent_this_turn, "Reckoning spends all 20")
 	_play(player)
-	_expect_eq(player.block, _base + _bonus, "...then %d block, not more" % (_base + _bonus))
+	_expect_eq(player.block, _base, "...then %d block, no more" % _base)
 	_completed += 1
 
-# Last Resort refuses Block from any card - this one's too.
+# Last Resort refuses Block from any card - and with no Block to buy, the
+# card spends nothing.
 func _check_last_resort() -> void:
 	var player: Combatant = _player()
 	player.hp = 15
 	_play_card(load(LAST_RESORT_PATH), player, Combatant.new(100))
-	_spend(player, 6)
+	player.toll = 6
+	player.toll_spent_this_turn = false
 	var before: int = player.block
 	_play(player)
-	_expect_eq(player.block - before, 0, "Under Last Resort: no block, Toll spent or not")
+	_expect_eq(player.block - before, 0, "Under Last Resort: no block")
+	_expect_eq(player.toll, 6, "...no Toll spent")
+	_expect(not player.toll_spent_this_turn, "...and no Toll spent this turn")
+	_completed += 1
+
+func _check_tempered() -> void:
+	var player: Combatant = _player()
+	player.toll = 10
+	_play_card(load(TEMPERED_PATH), player, null)
+	_expect_eq(player.block, 14, "Settled Account+ on 10 Toll: 6 + 8 block")
+	_expect_eq(player.toll, 2, "...2 Toll left")
 	_completed += 1
 
 # --- Face and fight ---
 
-# Outside a fight: both halves, the first rules size. Read against a
-# player: the clause grey (DORMANT) until Toll is spent, then LIVE.
+# Outside a fight: the rule, its cap. In a battle hand: the Toll it will
+# spend, up to the cap, 0 under Last Resort.
 func _check_face() -> void:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(view)
 	await process_frame
 	view.set_card_data(load(CARD_PATH))
-	_expect_eq(view.rules_text.get_parsed_text(), "Gain 5 block. If you spent Toll this turn, gain 5 more.", "The face: Gain 5 block. If you spent Toll this turn, gain 5 more.")
-	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), view.rules_font_sizes[0], "...at the first rules size")
+	_expect_eq(view.rules_text.get_parsed_text(), "Gain 5 block.\nSpend up to 5 Toll: gain that much more block.", "The face outside a fight says its rule")
+	_expect_eq(view._bonus_state, CardBonus.State.NONE, "...with no clause to light")
+	view.set_card_data(load(TEMPERED_PATH))
+	_expect_eq(view.rules_text.get_parsed_text(), "Gain 6 block.\nSpend up to 8 Toll: gain that much more block.", "Settled Account+ outside a fight")
+	view.set_card_data(load(CARD_PATH))
 	var player: Combatant = _player()
 	view.set_bonus_context(_ctx(player))
-	_expect_eq(view._bonus_state, CardBonus.State.DORMANT, "Nothing spent: the clause DORMANT")
-	_spend(player, 1)
-	view.set_bonus_context(_ctx(player))
-	_expect_eq(view._bonus_state, CardBonus.State.LIVE, "Toll spent: LIVE")
+	view.set_toll(3)
+	_expect_eq(view.rules_text.get_parsed_text(), "Gain 5 block.\nSpend 3 Toll: gain 3 more block.", "In a battle hand on 3 Toll: spend 3")
+	view.set_toll(9)
+	_expect_eq(view.rules_text.get_parsed_text(), "Gain 5 block.\nSpend 5 Toll: gain 5 more block.", "...on 9 Toll: spend 5, the cap")
+	player.hp = 15
+	_play_card(load(LAST_RESORT_PATH), player, Combatant.new(100))
+	view.set_stance(player.stance)
+	_expect_eq(view.rules_text.get_parsed_text(), "Gain 0 block.\nSpend 0 Toll: gain 0 more block.", "...under Last Resort: 0 and 0")
 	view.free()
 	_completed += 1
 
-# The real fight: the face at hand size; played with nothing spent, 5
-# block and its sound at 1.0; a copy in hand goes LIVE once Second Swing
-# has spent, and plays for 10, its sound at 0.95 and 1 dB up; at the next
-# turn the condition is gone and a fresh copy reads DORMANT.
+# The real fight: the face at hand size; played on no Toll, 5 block and
+# its sound at 1.0; a copy on 7 Toll reads its 5, plays for 10 leaving 2,
+# its sound at 0.95 and 1 dB up, and counts as Toll spent this turn.
 func _check_fight() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var player: Combatant = controller.get("player")
-		var target: Node = (controller.get("_combatants") as Dictionary).keys()[0]
-		var combatant: Combatant = (controller.get("_combatants") as Dictionary)[target]
-		combatant.max_hp = 999
-		combatant.hp = 999
 		player.energy = 99
+		player.toll = 0
+		controller.emit_signal("toll_changed", 0)
 		var first: CardData = await _deal(controller, CARD_PATH)
 		var view: CardView = _view(controller, first)
 		if view != null:
@@ -170,29 +211,22 @@ func _check_fight() -> void:
 			_expect_eq(view.type_label.text, "GUARD", "...labelled GUARD")
 			_expect(view.rules_font_sizes.has(view.rules_text.get_theme_font_size("normal_font_size")), "...its text at a rules size")
 			_expect_eq(view.size, view.card_size, "...fitting the face at hand size")
-			_expect_eq(view._bonus_state, CardBonus.State.DORMANT, "...its clause DORMANT")
 		var before: int = player.block
 		await _play_real(controller, first, null)
-		_expect_eq(player.block - before, _base, "Nothing spent: %d block" % _base)
-		_expect_sound(false, "Nothing spent")
+		_expect_eq(player.block - before, _base, "No Toll: %d block" % _base)
+		_expect_sound(false, "No Toll")
+		player.toll = 7
+		controller.emit_signal("toll_changed", 7)
 		var second: CardData = await _deal(controller, CARD_PATH)
-		player.toll = 6
-		await _play_real(controller, await _deal(controller, SECOND_SWING_PATH), target)
-		_expect(player.toll_spent_this_turn, "Second Swing spends 6")
 		view = _view(controller, second)
-		_expect(view != null and view._bonus_state == CardBonus.State.LIVE, "...and a copy in hand goes LIVE, mid-turn")
+		var face: String = view.rules_text.get_parsed_text() if view != null else "no view"
+		_expect(face.ends_with("Spend 5 Toll: gain 5 more block."), "On 7 Toll a copy in hand reads its 5 (%s)" % face)
 		before = player.block
 		await _play_real(controller, second, null)
-		_expect_eq(player.block - before, _base + _bonus, "...and plays for %d" % (_base + _bonus))
+		_expect_eq(player.block - before, _base + _cap, "...plays for %d" % (_base + _cap))
+		_expect_eq(player.toll, 2, "...leaving 2 Toll")
+		_expect(player.toll_spent_this_turn, "...and counts as Toll spent this turn")
 		_expect_sound(true, "Toll spent")
-		await controller.call("end_turn")
-		var deadline: int = ProbePlay.cap_msec() + 15000
-		while bool(controller.get("_input_locked")) and ProbePlay.cap_msec() < deadline:
-			await process_frame
-		_expect(not player.toll_spent_this_turn, "At the next turn the condition resets")
-		controller.get("deck").call("discard_hand")
-		view = _view(controller, await _deal(controller, CARD_PATH))
-		_expect(view != null and view._bonus_state == CardBonus.State.DORMANT, "...and a fresh copy reads DORMANT")
 	await _teardown()
 	_completed += 1
 
@@ -212,11 +246,6 @@ func _player() -> Combatant:
 	var player := Combatant.new(MAX_HP)
 	player.hp = 50
 	return player
-
-# `amount` Toll spent the way every card spends it.
-func _spend(player: Combatant, amount: int) -> void:
-	player.toll += amount
-	_ctx(player).spend_toll(amount)
 
 func _ctx(player: Combatant) -> EffectContext:
 	var ctx := EffectContext.new()

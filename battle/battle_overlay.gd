@@ -1417,6 +1417,10 @@ func _condition_live_at_commit(card: CardData) -> bool:
 		return false
 	var ctx: EffectContext = battle_controller.preview_context()
 	ctx.cards_played_before_this = maxi(ctx.cards_played_before_this - 1, 0)
+	# A card that turns Toll into Block (Settled Account) is live when it
+	# will actually spend some.
+	if TollBlockEffect.spendable_by_card(card, ctx.player.toll, ctx.player.stance) > 0:
+		return true
 	return CardBonus.state(card, ctx) == CardBonus.State.LIVE
 
 # A drawn card leaves the deck: the draw sound, on the next voice, its

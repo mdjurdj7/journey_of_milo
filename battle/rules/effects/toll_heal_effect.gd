@@ -2,9 +2,9 @@ extends RefCounted
 class_name TollHealEffect
 
 # Spends UP TO toll_cost Toll - whatever is actually held, if that's less
-# - and heals half of what it spent, capped at `value`. The only bounded
-# Toll spend in the set: TOLL_DAMAGE takes all of it, TOLL_FRACTION_DAMAGE
-# _ALL takes a share, TOLL_BLOCK takes a fixed amount.
+# - and heals half of what it spent, capped at `value`. A bounded Toll
+# spend, as TOLL_BLOCK's is: TOLL_DAMAGE takes all of it, TOLL_FRACTION_
+# DAMAGE_ALL takes a share.
 #
 # It spends only what it converts: an even amount, 2 Toll per HP, never
 # past what `value` HP takes. An odd point is left held, not spent for
