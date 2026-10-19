@@ -39,8 +39,8 @@
         },
         {
           "count": 1,
-          "file_path": "res://cards/data/reckoning.tres",
-          "name": "Reckoning"
+          "file_path": "res://cards/data/settled_account.tres",
+          "name": "Settled Account"
         },
         {
           "count": 1,
@@ -111,7 +111,9 @@
       "UNCOMMON": 11,
       "RARE": 8
     },
-    "implemented_but_not_obtainable": [],
+    "implemented_but_not_obtainable": [
+      "Reckoning"
+    ],
     "missing_art": [],
     "neutral_cards_missing_art": [
       "Endure",
@@ -1639,13 +1641,11 @@
       "battle_animation": "Slash",
       "play_effect_scene_path": null,
       "upgrade_data": null,
-      "starting_deck_count": 1,
+      "starting_deck_count": 0,
       "in_reward_pool": false,
       "in_belongings_pool": false,
-      "obtainable_from": [
-        "starting_deck"
-      ],
-      "not_obtainable_in_play": false
+      "obtainable_from": [],
+      "not_obtainable_in_play": true
     },
     {
       "name": "Refuse the End",
@@ -1963,10 +1963,11 @@
       "battle_animation": null,
       "play_effect_scene_path": null,
       "upgrade_data": null,
-      "starting_deck_count": 0,
+      "starting_deck_count": 1,
       "in_reward_pool": true,
       "in_belongings_pool": false,
       "obtainable_from": [
+        "starting_deck",
         "wanderer_reward_pool"
       ],
       "not_obtainable_in_play": false,

@@ -4,7 +4,7 @@
 [ext_resource type="Resource" path="res://cards/data/slash.tres" id="2_slash"]
 [ext_resource type="Resource" path="res://cards/data/bite_down.tres" id="3_bite_down"]
 [ext_resource type="Resource" path="res://cards/data/brace.tres" id="4_brace"]
-[ext_resource type="Resource" path="res://cards/data/reckoning.tres" id="5_reckoning"]
+[ext_resource type="Resource" path="res://cards/data/settled_account.tres" id="5_settled_account"]
 [ext_resource type="Resource" path="res://cards/data/down_payment.tres" id="6_down_payment"]
 [ext_resource type="Resource" path="res://run/weapons/rusted_blade.tres" id="7_rusted_blade"]
 [ext_resource type="Texture2D" uid="uid://dpjpf63qyqh0p" path="res://assets/models/wanderer/wanderer_v3_painted.png" id="8_albedo"]
@@ -18,7 +18,7 @@ starting_deck_counts = {
 ExtResource("2_slash"): 4,
 ExtResource("3_bite_down"): 2,
 ExtResource("4_brace"): 2,
-ExtResource("5_reckoning"): 1,
+ExtResource("5_settled_account"): 1,
 ExtResource("6_down_payment"): 1
 }
 starting_weapon = ExtResource("7_rusted_blade")

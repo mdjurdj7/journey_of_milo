@@ -26,7 +26,7 @@ const WAGON_SCENE_PATH := "res://field/wagon.tscn"
 const COMPENDIUM_SCENE_PATH := "res://ui/card_compendium.tscn"
 const TEMPERED_DIR := "res://cards/tempered/"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
-const STARTERS: Array[String] = ["slash", "bite_down", "brace", "reckoning", "down_payment"]
+const STARTERS: Array[String] = ["slash", "bite_down", "brace", "settled_account", "down_payment"]
 # The smallest rules size a tempered face may shrink to and still read.
 const MIN_RULES_SIZE := 13
 # Scripts whose folder lists must leave cards/tempered/ out: the
@@ -489,13 +489,12 @@ func _check_screen_temper() -> void:
 				_expect_eq(text, "Deal [u]11[/u] damage.\nThen lose 2 HP.", "...Bite Down+ underlines its 11 alone")
 			"brace":
 				_expect(text.ends_with("\n[u]Draw 1.[/u]") and text.count("[u]") == 1, "...Brace+ underlines its added line whole (%s)" % text)
-			"reckoning":
-				_expect(not text.contains("[u]"), "...Reckoning+ underlines no rules text")
-				_expect(cost_mark != null, "...but its cost")
+			"settled_account":
+				_expect_eq(text, "Gain [u]6[/u] block.
+Spend up to [u]8[/u] [b]Toll[/b]: gain that much more block.", "...Settled Account+ underlines its 6 and its 8")
 			"down_payment":
 				_expect(text.begins_with("Gain [u]8[/u] ") and text.count("[u]") == 1, "...Down Payment+ underlines its 8 (%s)" % text)
-		if id != "reckoning":
-			_expect(cost_mark == null, "...and no cost (it's the same)")
+		_expect(cost_mark == null, "...and no cost (it's the same)")
 		screen.call("_activate", BACK_INDEX)
 		await process_frame
 		_expect_eq(screen.call("get_mode"), "GRID", "...BACK returns to the grid")

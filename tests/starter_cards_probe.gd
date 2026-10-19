@@ -131,7 +131,7 @@ func _check_starting_deck() -> void:
 		counts[card.card_name] = count
 		total += count
 	_expect_eq(total, 10, "Starting deck is 10 cards")
-	_expect_eq(counts, {"Slash": 4, "Bite Down": 2, "Brace": 2, "Reckoning": 1, "Down Payment": 1}, "Starting deck contents")
+	_expect_eq(counts, {"Slash": 4, "Bite Down": 2, "Brace": 2, "Settled Account": 1, "Down Payment": 1}, "Starting deck contents")
 	_completed += 1
 
 func _check_slash_and_bite_down() -> void:
