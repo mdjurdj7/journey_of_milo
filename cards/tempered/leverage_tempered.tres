@@ -8,7 +8,7 @@
 [sub_resource type="Resource" id="CardEffect_spend_toll"]
 script = ExtResource("2_card_effect")
 effect_type = 21
-toll_cost = 5
+toll_cost = 4
 
 [sub_resource type="Resource" id="CardEffect_apply_status"]
 script = ExtResource("2_card_effect")
@@ -21,8 +21,8 @@ card_name = "Leverage+"
 card_type = 1
 rarity = 2
 target_type = 1
-description = "Spend 5 Toll.
-Your next card costs 2 less."
+description = "Spend {toll_cost} Toll.
+The next card you play this turn costs {reduction} less Energy."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_spend_toll"), SubResource("CardEffect_apply_status")])
 art = ExtResource("9_art")
 card_class = &"wanderer"

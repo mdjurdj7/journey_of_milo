@@ -303,8 +303,8 @@ enum Mark { NONE, COIL, DROP }
 
 # Gone the moment its holder's turn ends (BattleController.end_turn(),
 # Status.remove_at_turn_end()) - "this turn" means the player's turn, not
-# the enemy's that follows. Pair it with DURATION_UNTIL_REMOVED so no
-# tick takes it first.
+# the enemy's that follows (Ransom's turn, Leverage's unused discount).
+# Pair it with DURATION_UNTIL_REMOVED so no tick takes it first.
 @export var ends_at_turn_end: bool = false
 
 # While this is up, every Attack card the player plays Drains: after its

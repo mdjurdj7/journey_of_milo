@@ -7,7 +7,8 @@ extends SceneTree
 # leave the hand for the deck's set-aside pile, Bide draws 1 and goes to
 # the discard; at the start of the next turn they come back after the
 # normal draw, which is unchanged. Cancelled, nothing is spent. Next-card
-# discounts (Leverage, Collateral) wait through it. The readout names the
+# discounts (Leverage, Collateral) wait through it, Leverage only to the
+# turn's end. The readout names the
 # waiting cards.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/bide_probe.gd
@@ -296,8 +297,9 @@ func _check_hand_full_on_return() -> void:
 	await _teardown()
 	_completed += 1
 
-# Leverage and Collateral wait through Bide (it costs 0) and through the
-# set-aside, for the next card that costs something.
+# Leverage and Collateral wait through Bide (it costs 0); Leverage, a
+# this-turn discount, ends with the turn, Collateral waits through the
+# set-aside for the next card that costs something.
 func _check_discounts_wait() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -310,9 +312,9 @@ func _check_discounts_wait() -> void:
 		await _bide(controller, bide, [slash, reckoning])
 		_expect_eq(_labels(player), ["Leverage", "Collateral ×1"] as Array[String], "Bide spends neither Leverage nor Collateral")
 		await _end_turn(controller)
-		_expect_eq(_labels(player), ["Leverage", "Collateral ×1"] as Array[String], "...nor does a card set aside")
-		_expect_eq(player.energy_cost(slash), 0, "...the returned Slash reads Leverage's 0")
-		_expect_eq(player.energy_cost(reckoning), 0, "...and Reckoning, 2 less, falls under Collateral's 2")
+		_expect_eq(_labels(player), ["Collateral ×1"] as Array[String], "...Leverage ends with the turn, Collateral waits")
+		_expect_eq(player.energy_cost(slash), 1, "...the returned Slash reads its own 1")
+		_expect_eq(player.energy_cost(reckoning), 0, "...and Reckoning's 2 falls under Collateral")
 	await _teardown()
 	_completed += 1
 

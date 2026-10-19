@@ -6,8 +6,9 @@
 script = ExtResource("1_status_data")
 id = "leverage"
 display_name = "Leverage"
-description = "Your next card costs {reduction} less."
+description = "The next card you play this turn costs {reduction} less Energy."
 category = 2
 default_duration_turns = -1
 stack_rule = 3
 next_card_cost_reduction = 2
+ends_at_turn_end = true

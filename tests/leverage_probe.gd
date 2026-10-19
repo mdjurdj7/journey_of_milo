@@ -2,9 +2,11 @@ extends SceneTree
 
 # Headless probe for Leverage - the card, its status and the cost
 # reduction behind them (StatusData.next_card_cost_reduction): it spends
-# 5 Toll like Come Due (and can't be played on less), and the next card
-# played that costs at least 1 Energy - on any later turn - costs 2 less,
-# never below 0; a 0-cost card passes it by and leaves it waiting. Two Leverages before another card give that card both. House
+# 5 Toll like Come Due (and can't be played on less), isn't Spent, and
+# the next card played this turn that costs at least 1 Energy costs 2
+# less, never below 0; a 0-cost card passes it by and leaves it waiting;
+# unused, it ends with the turn. Two Leverages before another card give
+# that card both. Leverage+ spends 4. House
 # Key's free card comes first and a cost replacement (Collateral) judges
 # what's left, so a card Leverage takes below 2 leaves its charge.
 #
@@ -77,28 +79,30 @@ func _check_data() -> void:
 	_expect_eq(card.cost, 0, "Leverage costs 0")
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "...Uncommon")
-	_expect_eq(card.removal_scope, CardData.RemovalScope.SPENT, "...and Spent")
+	_expect_eq(card.removal_scope, CardData.RemovalScope.NONE, "...and not Spent")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...with mipmapped art")
 	_expect((load(POOL_PATH) as RewardPool).entries.has(card), "...in the Wanderer pool")
 	_expect_eq(card.effects.size(), 2, "Two effects")
 	_expect_eq([card.effects[0].effect_type, card.effects[0].toll_cost], [CardEffect.EffectType.SPEND_TOLL, 5], "...Spend 5 Toll first")
 	_expect_eq([card.effects[1].effect_type, card.effects[1].status_data], [CardEffect.EffectType.APPLY_STATUS, status], "...then the Leverage status")
-	_expect_eq(card.description, "Spend %d Toll.\nYour next card costs %d less.\nSpent." % [card.effects[0].toll_cost, status.next_card_cost_reduction], "The card's text carries its own numbers")
-	_expect_eq([status.next_card_cost_reduction, status.default_duration_turns, status.stack_rule], [2, StatusData.DURATION_UNTIL_REMOVED, StatusData.StackRule.IGNORE], "The status: 2 less, until spent, stacks by count")
+	_expect_eq(card.description, "Spend {toll_cost} Toll.\nThe next card you play this turn costs {reduction} less Energy.", "The card's text, its numbers from data")
+	_expect_eq([status.next_card_cost_reduction, status.default_duration_turns, status.stack_rule, status.ends_at_turn_end], [2, StatusData.DURATION_UNTIL_REMOVED, StatusData.StackRule.IGNORE, true], "The status: 2 less, until spent or the turn ends, stacks by count")
+	var tempered: CardData = card.tempered
+	_expect_eq([tempered.card_name, tempered.effects[0].toll_cost, tempered.removal_scope, tempered.description], ["Leverage+", 4, CardData.RemovalScope.NONE, card.description], "Leverage+: spends 4, the same text, not Spent")
 	var statuses: Array[Status] = []
 	Status.apply_to(statuses, status)
 	_expect_eq(statuses[0].label(), "Leverage", "One play: the line reads Leverage")
-	_expect_eq(statuses[0].describe(), "Your next card costs 2 less.", "...and the reveal")
+	_expect_eq(statuses[0].describe(), "The next card you play this turn costs 2 less Energy.", "...and the reveal")
 	Status.apply_to(statuses, status)
 	_expect_eq(statuses.size(), 1, "A second play adds to the same status")
 	_expect_eq(statuses[0].label(), "Leverage ×2", "...Leverage ×2")
-	_expect_eq(statuses[0].describe(), "Your next card costs 4 less.", "...and the reveal says 4")
+	_expect_eq(statuses[0].describe(), "The next card you play this turn costs 4 less Energy.", "...and the reveal says 4")
 	_completed += 1
 
 # --- Fights ---
 
 # Played on 7 Toll it spends exactly 5, costs no Energy, leaves the
-# status and is Spent.
+# status and goes to the discard - not Spent.
 func _check_toll() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -109,12 +113,8 @@ func _check_toll() -> void:
 		_expect_eq(player.toll, 2, "On 7 Toll, Leverage spends exactly 5")
 		_expect_eq(player.energy, 3, "...costs no Energy")
 		_expect_eq(_status_label(player), "Leverage", "...and leaves Leverage")
-		var exhaust: Array = controller.get("deck").get("exhaust_pile")
-		for i in 180:
-			if exhaust.has(leverage):
-				break
-			await process_frame
-		_expect(exhaust.has(leverage), "...and is Spent")
+		var deck: Object = controller.get("deck")
+		_expect((deck.get("discard_pile") as Array).has(leverage) and not (deck.get("exhaust_pile") as Array).has(leverage), "...and goes to the discard, not Spent")
 	await _teardown()
 	_completed += 1
 
@@ -179,22 +179,22 @@ func _check_zero_cost_passes_by() -> void:
 	await _teardown()
 	_completed += 1
 
-# The reduction waits through a whole enemy turn for the next card, and
-# the next fight starts without it.
+# Unused, the reduction ends with the turn: the next turn's card costs
+# its full Energy, and the next fight starts without it.
 func _check_persists_then_ends() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var player: Combatant = controller.get("player")
 		player.toll = 5
 		await _play(controller, await _deal(controller, LEVERAGE_PATH))
+		_expect_eq(_status_label(player), "Leverage", "Leverage waits through the turn")
 		await controller.call("end_turn")
-		_expect_eq(_status_label(player), "Leverage", "Leverage is still there next turn")
+		_expect_eq(_status_label(player), "", "...and ends with it, unused")
 		controller.get("deck").call("discard_hand")
 		player.energy = 3
 		await process_frame
 		await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
-		_expect_eq(player.energy, 3, "...and the turn's first card costs 2 less: Reckoning 0")
-		_expect_eq(_status_label(player), "", "...spending it")
+		_expect_eq(player.energy, 1, "The next turn's Reckoning costs its full 2")
 	await _teardown()
 	controller = await _start_fight()
 	if controller != null:
@@ -294,7 +294,7 @@ func _check_faces_and_sentence() -> void:
 		_expect_eq([_face(controller, reckoning), _face(controller, slash), _face(controller, ransom)], ["0", "0", "1"], "While it waits: 0, 0, 1")
 		_expect(hand.call("_can_play", reckoning, player.energy), "...and Reckoning is in reach")
 		var line: Status = Status.find_in(player.statuses, load(LEVERAGE_STATUS_PATH))
-		_expect(line != null and line.describe() == "Your next card costs 2 less.", "The readout: Your next card costs 2 less.")
+		_expect(line != null and line.describe() == "The next card you play this turn costs 2 less Energy.", "The readout says so")
 		await _play(controller, slash, _field_enemy(controller))
 		_expect_eq([_face(controller, reckoning), _face(controller, ransom)], ["2", "3"], "Once spent: 2 and 3 again")
 	await _teardown()
