@@ -10,8 +10,8 @@ extends SceneTree
 #   placed   - floor 4's FloorData puts one Collector on the floor,
 #              grounded, with its line and collector_pool, wired to open
 #              its screen
-#   data     - collector_pool: the 27 Wanderer pool cards and the four
-#              neutral pool cards, 31, no starter, no Samphire;
+#   data     - collector_pool: the 28 Wanderer pool cards and the four
+#              neutral pool cards, 32, no STARTER_ONLY card, no Samphire;
 #              Samphire in no pool at all; Samphire's own data
 #   screen   - a collector on floor 4 opens its screen with the field
 #              locked: five rolled cards, distinct, from the pool, then
@@ -46,7 +46,7 @@ const SAMPHIRE_PATH := "res://cards/neutral/samphire.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const RARITY_FINISH_PATH := "res://battle/card_rarity_finish.tres"
 const NEUTRAL_IN_STOCK: Array[String] = ["Left Hand", "Second Thoughts", "Untouched", "Endure"]
-const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Reckoning", "Down Payment"]
+const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Down Payment"]
 const FLOOR_4 := 3
 const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
 # Where the field cases put their own collector, from spawn - any
@@ -99,7 +99,7 @@ func _check_data() -> void:
 	var names: Array[String] = []
 	for card in pool.entries:
 		names.append(card.card_name)
-	_expect_eq(names.size(), 31, "collector_pool holds 31 cards")
+	_expect_eq(names.size(), 32, "collector_pool holds 32 cards")
 	for card in wanderer.entries:
 		_expect(names.has(card.card_name), "...including the Wanderer pool's %s" % card.card_name)
 	for card_name in NEUTRAL_IN_STOCK:

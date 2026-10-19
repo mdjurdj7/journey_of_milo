@@ -92,9 +92,9 @@ const EXPECTED_POOL: Array[String] = [
 	"Refuse the End", "Last Resort", "Blood Arc", "With Regards", "Come Due",
 	"No Further", "Sentence", "The Return", "Collateral", "Ransom", "Leverage",
 	"Bide", "Deny", "Blood Advance", "Second Swing", "Garnish", "Claw Back",
-	"Gnaw", "Settled Account",
+	"Gnaw", "Settled Account", "Reckoning",
 ]
-const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Reckoning", "Down Payment"]
+const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Down Payment"]
 
 var _failures: int = 0
 # Cases that ran to their end. A script error aborts a case without
@@ -189,7 +189,7 @@ func _check_pool_membership() -> void:
 	var names: Array[String] = []
 	for card in pool.entries:
 		names.append(card.card_name)
-	_expect_eq(names.size(), 27, "Wanderer pool holds 27 cards")
+	_expect_eq(names.size(), 28, "Wanderer pool holds 28 cards")
 	for card_name in EXPECTED_POOL:
 		_expect(names.has(card_name), "%s is in the Wanderer pool" % card_name)
 	for card_name in STARTER_ONLY:
@@ -528,7 +528,7 @@ func _check_starting_deck() -> void:
 # --- Class and offer ---
 
 # Every card's card_class matches its folder, each tempered copy's class
-# and offer its original's, the starters STARTER_ONLY, Samphire and every
+# and offer its original's, the STARTER_ONLY cards so, Samphire and every
 # weapon card OWN_CHANNEL, the rest REWARDABLE; both classes name their
 # card_class.
 func _check_card_class_and_offer() -> void:

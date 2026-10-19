@@ -21,4 +21,3 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_toll_dama
 battle_animation = &"Slash"
 art = ExtResource("9_art")
 card_class = &"wanderer"
-offer = 1

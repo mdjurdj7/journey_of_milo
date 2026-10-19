@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 27,
+      "count": 28,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -79,7 +79,8 @@
         "Garnish",
         "Claw Back",
         "Gnaw",
-        "Settled Account"
+        "Settled Account",
+        "Reckoning"
       ],
       "by_rarity": {
         "COMMON": 9,
@@ -111,9 +112,7 @@
       "UNCOMMON": 11,
       "RARE": 8
     },
-    "implemented_but_not_obtainable": [
-      "Reckoning"
-    ],
+    "implemented_but_not_obtainable": [],
     "missing_art": [],
     "neutral_cards_missing_art": [
       "Endure",
@@ -1642,10 +1641,12 @@
       "play_effect_scene_path": null,
       "upgrade_data": null,
       "starting_deck_count": 0,
-      "in_reward_pool": false,
+      "in_reward_pool": true,
       "in_belongings_pool": false,
-      "obtainable_from": [],
-      "not_obtainable_in_play": true
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
     },
     {
       "name": "Refuse the End",

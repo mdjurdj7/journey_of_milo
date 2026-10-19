@@ -23,4 +23,3 @@ battle_animation = &"Slash"
 art = ExtResource("9_art")
 tempered = ExtResource("10_tempered")
 card_class = &"wanderer"
-offer = 1
