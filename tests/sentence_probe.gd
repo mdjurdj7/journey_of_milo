@@ -1,17 +1,20 @@
 extends SceneTree
 
-# Headless probe for Sentence: the countdown it puts on an enemy, how the
-# enemy's own turns and the player's Toll spends run it down, and the 40
-# it deals at 0 - never as an Attack. Rules layer and the real .tres
-# cards, statuses and pool; no field scene:
+# Headless probe for Sentence - 1 Energy, Rare, Spent: the countdown it
+# puts on an enemy (3), how the enemy's own turns and every card or replay
+# that spends any Toll run it down - once each, whatever the amount, a
+# Second Swing replaying a Toll spender twice - and the 36 it deals at 0,
+# mid-turn if a spend got it there - never as an Attack. Several on one
+# enemy each count on their own. Sentence+ deals 45. Rules layer and the
+# real .tres cards, statuses and pool; no field scene:
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/sentence_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 
 const MAX_HP := 70
-const CASES := 14
-const DAMAGE := 40
+const CASES := 17
+const DAMAGE := 36
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const BELONGINGS_POOL_PATH := "res://cards/pools/belongings_pool.tres"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
@@ -26,14 +29,17 @@ var _reports: Array[String] = []
 
 func _initialize() -> void:
 	_check_card_data()
-	_check_applies_four()
+	_check_applies_three()
 	_check_natural_countdown()
 	_check_toll_spends_once_each()
 	_check_reckoning_once()
 	_check_gaining_toll_does_nothing()
 	_check_hurried_to_zero_resolves_now()
 	_check_not_an_attack()
-	_check_replay_refreshes()
+	_check_several_count_apart()
+	_check_second_swing_twice()
+	_check_settled_account_on_nothing()
+	_check_tempered()
 	_check_separate_enemies()
 	_check_death_cleans_up()
 	_check_countdown_kill_ends_the_turn()
@@ -51,21 +57,23 @@ func _initialize() -> void:
 func _check_card_data() -> void:
 	var card: CardData = _card("sentence")
 	_expect_eq(card.card_name, "Sentence", "The card is named Sentence")
-	_expect_eq(card.cost, 2, "...costs 2")
+	_expect_eq(card.cost, 1, "...costs 1")
+	_expect_eq(card.removal_scope, CardData.RemovalScope.SPENT, "...is Spent")
+	_expect_eq(card.description, "In {countdown_turns} turns, deal {countdown_damage} damage.\nEach Toll spend: 1 turn sooner.\nSpent.", "...its text, numbers from data")
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.RARE, "...is Rare")
 	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...and carries its art")
 	_completed += 1
 
-func _check_applies_four() -> void:
+func _check_applies_three() -> void:
 	var player: Combatant = _player()
 	var enemy := Combatant.new(100)
 	_play("sentence", player, [enemy])
-	_expect_eq(_labels(enemy), ["Sentence 4"] as Array[String], "Playing Sentence marks the target Sentence 4")
+	_expect_eq(_labels(enemy), ["Sentence 3"] as Array[String], "Playing Sentence marks the target Sentence 3")
 	_play("slash", player, [enemy])
 	_play("endure", player, [enemy])
-	_expect_eq(_labels(enemy), ["Sentence 4"] as Array[String], "...and the rest of that turn leaves it at 4")
+	_expect_eq(_labels(enemy), ["Sentence 3"] as Array[String], "...and the rest of that turn leaves it at 3")
 	_expect_eq(player.statuses.size(), 0, "...nothing on the player")
 	_completed += 1
 
@@ -76,14 +84,14 @@ func _check_natural_countdown() -> void:
 	EnemyTurn.pick_initial_intent(enemy, data)
 	_play("sentence", player, [enemy])
 	var seen: Array[String] = []
-	for turn in 3:
+	for turn in 2:
 		EnemyTurn.take_turn(enemy, data, player)
 		seen.append(_labels(enemy)[0] if not _labels(enemy).is_empty() else "")
-	_expect_eq(seen, ["Sentence 3", "Sentence 2", "Sentence 1"] as Array[String], "Each enemy turn takes one off: 3, 2, 1")
+	_expect_eq(seen, ["Sentence 2", "Sentence 1"] as Array[String], "Each enemy turn takes one off, at its start: 2, 1")
 	_expect_eq(enemy.hp, 100, "...and nothing lands before 0")
 	var hp_before: int = enemy.hp
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(hp_before - enemy.hp, DAMAGE, "The fourth enemy turn deals exactly 40")
+	_expect_eq(hp_before - enemy.hp, DAMAGE, "The third enemy turn deals exactly 36")
 	_expect_eq(result.get("countdown_damage"), DAMAGE, "...reported as countdown damage")
 	_expect_eq(_labels(enemy), [] as Array[String], "...and Sentence is gone")
 	_completed += 1
@@ -95,7 +103,7 @@ func _check_toll_spends_once_each() -> void:
 	player.toll = 5
 	_play("come_due", player, [enemy])
 	_expect_eq(player.toll, 0, "Come Due spends 5")
-	_expect_eq(_label_of(enemy, "sentence"), "Sentence 3", "...and takes exactly one off (4 -> 3)")
+	_expect_eq(_label_of(enemy, "sentence"), "Sentence 2", "...and takes exactly one off (3 -> 2)")
 	_completed += 1
 
 func _check_reckoning_once() -> void:
@@ -105,9 +113,9 @@ func _check_reckoning_once() -> void:
 	player.toll = 14
 	_play("reckoning", player, [enemy])
 	_expect_eq(player.toll, 0, "Reckoning spends all 14")
-	_expect_eq(_labels(enemy), ["Sentence 3"] as Array[String], "...and takes only one off, not 14")
+	_expect_eq(_labels(enemy), ["Sentence 2"] as Array[String], "...and takes only one off, not 14")
 	_play("reckoning", player, [enemy])
-	_expect_eq(_labels(enemy), ["Sentence 3"] as Array[String], "A Toll-less Reckoning spends nothing, and takes nothing off")
+	_expect_eq(_labels(enemy), ["Sentence 2"] as Array[String], "A Toll-less Reckoning spends nothing, and takes nothing off")
 	_completed += 1
 
 func _check_gaining_toll_does_nothing() -> void:
@@ -117,27 +125,27 @@ func _check_gaining_toll_does_nothing() -> void:
 	_play("down_payment", player, [enemy])
 	_play("bite_down", player, [enemy])
 	_expect(player.toll > 0, "Down Payment and Bite Down make Toll (%d)" % player.toll)
-	_expect_eq(_labels(enemy), ["Sentence 4"] as Array[String], "...and gaining it takes nothing off")
+	_expect_eq(_labels(enemy), ["Sentence 3"] as Array[String], "...and gaining it takes nothing off")
 	player.toll += 7
-	_expect_eq(_labels(enemy), ["Sentence 4"] as Array[String], "...nor does Toll set directly")
+	_expect_eq(_labels(enemy), ["Sentence 3"] as Array[String], "...nor does Toll set directly")
 	_completed += 1
 
 func _check_hurried_to_zero_resolves_now() -> void:
 	var player: Combatant = _player()
 	var enemy := Combatant.new(100)
 	_play("sentence", player, [enemy])
-	for spend in 3:
+	for spend in 2:
 		player.toll = 5
 		_play("come_due", player, [enemy])
-	_expect_eq(_label_of(enemy, "sentence"), "Sentence 1", "Three spends: Sentence 1")
+	_expect_eq(_label_of(enemy, "sentence"), "Sentence 1", "Two spends: Sentence 1")
 	player.toll = 5
 	_play("come_due", player, [enemy])
-	_expect_eq(enemy.hp, 100 - DAMAGE, "A fourth spend takes it to 0 and it deals 40 at once, in the player's turn")
+	_expect_eq(enemy.hp, 100 - DAMAGE, "A third spend takes it to 0 and it deals 36 at once, in the player's turn")
 	_expect(_reports.has("status:%d" % DAMAGE), "...reported as status damage, not a card's (%s)" % str(_reports))
 	_expect_eq(_label_of(enemy, "sentence"), "", "...and Sentence is gone")
 	_completed += 1
 
-# The 40 is no Attack: no attack bonus from a stance, even Critical,
+# The 36 is no Attack: no attack bonus from a stance, even Critical,
 # where Last Resort would pay.
 func _check_not_an_attack() -> void:
 	var player: Combatant = _player()
@@ -148,25 +156,65 @@ func _check_not_an_attack() -> void:
 	_play("sentence", player, [enemy])
 	var data: EnemyData = _defender()
 	EnemyTurn.pick_initial_intent(enemy, data)
-	for turn in 4:
+	for turn in 3:
 		EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(enemy.hp, 100 - DAMAGE, "...but Sentence deals exactly 40")
+	_expect_eq(enemy.hp, 100 - DAMAGE, "...but Sentence deals exactly 36")
 	_completed += 1
 
-func _check_replay_refreshes() -> void:
+# Two on one enemy each count on their own: one a turn in (2), one fresh
+# (3); a Toll spend takes one off each; the older goes off first, the
+# other a turn later - 36 twice.
+func _check_several_count_apart() -> void:
 	var player: Combatant = _player()
 	var enemy := Combatant.new(200)
 	var data: EnemyData = _defender()
 	EnemyTurn.pick_initial_intent(enemy, data)
 	_play("sentence", player, [enemy])
 	EnemyTurn.take_turn(enemy, data, player)
-	EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(_labels(enemy), ["Sentence 2"] as Array[String], "Two turns in, Sentence 2")
 	_play("sentence", player, [enemy])
-	_expect_eq(_labels(enemy), ["Sentence 4"] as Array[String], "Replayed, it resets to 4 - one Sentence, not two, not 6")
-	for turn in 4:
-		EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(enemy.hp, 200 - DAMAGE, "...and still deals 40, once")
+	_expect_eq(_labels(enemy), ["Sentence 2", "Sentence 3"] as Array[String], "A second Sentence is its own: 2 and 3")
+	player.toll = 5
+	_play("come_due", player, [enemy])
+	_expect_eq(_labels(enemy), ["Sentence 1", "Sentence 2"] as Array[String], "...one Toll spend takes one off each")
+	EnemyTurn.take_turn(enemy, data, player)
+	_expect_eq(enemy.hp, 200 - DAMAGE, "The older goes off on the enemy's turn: 36")
+	_expect_eq(_labels(enemy), ["Sentence 1"] as Array[String], "...the other still counting")
+	EnemyTurn.take_turn(enemy, data, player)
+	_expect_eq(enemy.hp, 200 - 2 * DAMAGE, "...and goes off a turn later: 36 again")
+	_completed += 1
+
+# Second Swing replaying Reckoning: its own 5, then the replay's spend -
+# two Toll spends, two turns off: 3 -> 1.
+func _check_second_swing_twice() -> void:
+	var player: Combatant = _player()
+	var enemy := Combatant.new(200)
+	_play("sentence", player, [enemy])
+	player.record_attack(_card("reckoning"), enemy, false)
+	player.toll = 8
+	_play("second_swing", player, [enemy])
+	_expect_eq(player.toll, 0, "Second Swing spends 5, its Reckoning replay the other 3")
+	_expect_eq(_label_of(enemy, "sentence"), "Sentence 1", "...two spends, two turns off: 3 -> 1")
+	_completed += 1
+
+# Settled Account on 0 Toll spends nothing, and takes nothing off.
+func _check_settled_account_on_nothing() -> void:
+	var player: Combatant = _player()
+	var enemy := Combatant.new(200)
+	_play("sentence", player, [enemy])
+	player.toll = 0
+	_play("settled_account", player, [enemy])
+	_expect_eq(_label_of(enemy, "sentence"), "Sentence 3", "Settled Account on 0 Toll takes nothing off")
+	player.toll = 1
+	_play("settled_account", player, [enemy])
+	_expect_eq(_label_of(enemy, "sentence"), "Sentence 2", "...on 1 Toll it spends it, and takes one off")
+	_completed += 1
+
+func _check_tempered() -> void:
+	var card: CardData = _card("sentence")
+	var tempered: CardData = card.tempered
+	var status: StatusData = tempered.effects[0].status_data
+	_expect_eq([tempered.card_name, tempered.cost, tempered.removal_scope, tempered.description], ["Sentence+", 1, CardData.RemovalScope.SPENT, card.description], "Sentence+: 1 Energy, Spent, the same text")
+	_expect_eq([status.default_duration_turns, status.countdown_damage, status.stack_rule], [3, 45, StatusData.StackRule.SEPARATE], "...3 turns, 45 damage, each its own")
 	_completed += 1
 
 func _check_separate_enemies() -> void:
@@ -179,19 +227,20 @@ func _check_separate_enemies() -> void:
 	EnemyTurn.pick_initial_intent(first, data)
 	EnemyTurn.take_turn(first, data, player)
 	_play("sentence", player, [first, second])
-	_expect_eq(_labels(first), ["Sentence 3"] as Array[String], "Each enemy holds its own Sentence (the first, a turn in: 3)")
-	_expect_eq(_labels(second), ["Sentence 4"] as Array[String], "...(the second, fresh: 4)")
+	_expect_eq(_labels(first), ["Sentence 2"] as Array[String], "Each enemy holds its own Sentence (the first, a turn in: 2)")
+	_expect_eq(_labels(second), ["Sentence 3"] as Array[String], "...(the second, fresh: 3)")
 	EnemyTurn.take_turn(first, data, player)
-	_expect_eq(_labels(first), ["Sentence 2"] as Array[String], "...each counting down on its own turn")
-	_expect_eq(_labels(second), ["Sentence 4"] as Array[String], "...the other untouched")
+	_expect_eq(_labels(first), ["Sentence 1"] as Array[String], "...each counting down on its own turn")
+	_expect_eq(_labels(second), ["Sentence 3"] as Array[String], "...the other untouched")
 	player.toll = 5
 	_play("come_due", player, [first, second])
-	_expect_eq(_label_of(first, "sentence"), "Sentence 1", "One Toll spend hurries every Sentence: 2 -> 1")
-	_expect_eq(_label_of(second, "sentence"), "Sentence 3", "...and 4 -> 3")
+	_expect_eq(first.hp, 200 - DAMAGE, "One Toll spend hurries every Sentence: 1 -> 0, the first goes off")
+	_expect_eq(_label_of(second, "sentence"), "Sentence 2", "...and 3 -> 2")
 	_completed += 1
 
-# A dead enemy's Sentence goes with it: the controller reads no row for it,
-# and a living one isn't handed its damage.
+# A dead enemy's Sentence goes with it: the controller reads no countdown
+# for it, and a living one isn't handed its damage. A living one's shows
+# beside its HP (get_enemy_countdowns()), not in the row.
 func _check_death_cleans_up() -> void:
 	var controller: Object = (load(BATTLE_CONTROLLER_PATH) as GDScript).new()
 	var player: Combatant = _player()
@@ -200,14 +249,15 @@ func _check_death_cleans_up() -> void:
 	_play("sentence", player, [marked])
 	var field_enemy: Node = (load("res://field/field_enemy.gd") as GDScript).new()
 	controller._combatants[field_enemy] = marked
-	_expect_eq(controller.get_enemy_status_labels(field_enemy), PackedStringArray(["Sentence 4"]), "A living marked enemy's row reads Sentence 4")
+	_expect_eq(controller.get_enemy_countdowns(field_enemy), [3] as Array[int], "A living marked enemy's readout shows its countdown, 3")
+	_expect_eq(controller.get_enemy_status_labels(field_enemy), PackedStringArray(), "...beside its HP, not in the row")
 	marked.hp = 0
-	_expect_eq(controller.get_enemy_status_labels(field_enemy), PackedStringArray(), "...dead, its row is empty")
-	# The living are all a card can reach: four spends over the other.
-	for spend in 4:
+	_expect_eq(controller.get_enemy_countdowns(field_enemy), [] as Array[int], "...dead, none")
+	# The living are all a card can reach: three spends over the other.
+	for spend in 3:
 		player.toll = 5
 		_play("come_due", player, [other])
-	_expect_eq(other.hp, 100, "...and its 40 never lands on anyone else")
+	_expect_eq(other.hp, 100, "...and its 36 never lands on anyone else")
 	field_enemy.free()
 	controller.free()
 	_completed += 1
@@ -219,7 +269,7 @@ func _check_countdown_kill_ends_the_turn() -> void:
 	var data: EnemyData = _attacker(10)
 	EnemyTurn.pick_initial_intent(enemy, data)
 	_play("sentence", player, [enemy])
-	for turn in 3:
+	for turn in 2:
 		EnemyTurn.take_turn(enemy, data, player)
 	var before: int = player.hp
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
@@ -235,11 +285,11 @@ func _check_block_softens_it() -> void:
 	enemy.block = 10
 	var data: EnemyData = _defender()
 	EnemyTurn.pick_initial_intent(enemy, data)
-	for turn in 3:
+	for turn in 2:
 		EnemyTurn.take_turn(enemy, data, player)
 	var block_before: int = enemy.block
 	EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(enemy.hp, 100 - (DAMAGE - block_before), "Enemy block takes its share of the 40, like any damage (%d block)" % block_before)
+	_expect_eq(enemy.hp, 100 - (DAMAGE - block_before), "Enemy block takes its share of the 36, like any damage (%d block)" % block_before)
 	_completed += 1
 
 func _check_pool() -> void:

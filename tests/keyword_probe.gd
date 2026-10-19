@@ -29,7 +29,7 @@ const SLASH_PATH := "res://cards/data/slash.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Consumed"]
 const DEFINITIONS: Dictionary = {
-	"Toll": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor.",
+	"Toll": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Each card that spends any Toll hurries every Sentence by a turn.",
 	"Grace": "After enemy hits get through your Block, damage you deal on your next turn wins HP back, up to half the largest hit.",
 	"Critical": "At or below 30% of your max HP.",
 	"Drain": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one.",
@@ -104,7 +104,7 @@ func _check_live_values() -> void:
 	_run_state.set("character", character)
 	var table: KeywordTable = KeywordTable.shared()
 	_expect_eq(table.definition("Critical"), "At or below 25% of your max HP.", "Critical reads the live fraction: 25%")
-	_expect_eq(table.definition("Toll"), "Gained when you lose HP to your own cards. Carries between fights; up to 3 carries to the next floor.", "Toll reads the live carry cap: 3")
+	_expect_eq(table.definition("Toll"), "Gained when you lose HP to your own cards. Carries between fights; up to 3 carries to the next floor. Each card that spends any Toll hurries every Sentence by a turn.", "Toll reads the live carry cap: 3")
 	_run_state.set("character", null)
 	_expect_eq(table.definition("Critical"), DEFINITIONS["Critical"], "With no run, the Wanderer's 30%")
 	_run_state.call("new_run", load(CHARACTER_PATH))

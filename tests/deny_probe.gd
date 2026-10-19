@@ -158,7 +158,7 @@ func _check_ticks_run() -> void:
 	Status.find_in(enemy.statuses, load(SENTENCE_STATUS_PATH)).turns_remaining = 1
 	_delay(enemy)
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, Combatant.new(70))
-	_expect_eq(int(result["countdown_damage"]), 40, "A Sentence still goes off on a Delayed turn")
+	_expect_eq(int(result["countdown_damage"]), (load(SENTENCE_STATUS_PATH) as StatusData).countdown_damage, "A Sentence still goes off on a Delayed turn")
 	_completed += 1
 
 # A pain turn due on the do-nothing turn is spent on it; the turn after

@@ -14,13 +14,15 @@ status_data = ExtResource("3_sentence")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Sentence"
-cost = 2
+cost = 1
 card_type = 1
 rarity = 3
 target_type = 0
-description = "In 4 turns, deal 40 damage.
-Spending Toll reduces the countdown by 1."
+description = "In {countdown_turns} turns, deal {countdown_damage} damage.
+Each Toll spend: 1 turn sooner.
+Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status_to_target")])
+removal_scope = 1
 art = ExtResource("9_art")
 play_sound_path = "res://assets/audio/cards/Sentence/Sentence.mp3"
 tempered = ExtResource("10_tempered")

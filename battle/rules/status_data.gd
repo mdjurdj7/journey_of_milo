@@ -18,7 +18,7 @@ enum ModifierOperation { ADD, MULTIPLY }
 # to the running damage total; MULTIPLY treats magnitude as a PERCENTAGE
 # (-50 means "half", 50 means "+50%") rather than a raw multiplier.
 
-enum StackRule { REFRESH_DURATION, ADD_MAGNITUDE, REFRESH_AND_ADD, IGNORE, RESET, ADD_CHARGES }
+enum StackRule { REFRESH_DURATION, ADD_MAGNITUDE, REFRESH_AND_ADD, IGNORE, RESET, ADD_CHARGES, SEPARATE }
 # What happens when this exact StatusData is applied again while already
 # active on the same combatant - see Status.apply_stack(). REFRESH_
 # DURATION resets the clock only; ADD_MAGNITUDE/REFRESH_AND_ADD also grow
@@ -26,7 +26,9 @@ enum StackRule { REFRESH_DURATION, ADD_MAGNITUDE, REFRESH_AND_ADD, IGNORE, RESET
 # existing instance just keeps running), though stack_count still climbs
 # for those four. RESET puts the status back as if freshly applied -
 # default magnitude, duration and charges, one stack - a refresh, never a
-# pile-up (No Further armed). ADD_CHARGES adds default_charges
+# pile-up (No Further armed). SEPARATE never restacks: each application
+# is an instance of its own, keeping its own clock (Sentence - several on
+# one enemy each count down and go off on their own). ADD_CHARGES adds default_charges
 # to the charges still waiting and leaves the rest alone - each copy
 # covers one more use (Collateral). Appended: an inserted value would
 # rewrite every .tres that stores one of these as an integer.

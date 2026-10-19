@@ -2474,6 +2474,10 @@ func get_enemy_status_labels(enemy: FieldEnemy) -> PackedStringArray:
 	for active: Status in combatant.statuses:
 		if active.data != null and active.data.shows_beside_hp:
 			continue
+		# A countdown (Sentence) shows beside the HP, glyph and numeral
+		# (get_enemy_countdowns()).
+		if active.has_countdown():
+			continue
 		# What lives on its intent (Braced, Garnished) shows there
 		# (BattleIntent), not in the row.
 		if active.data != null and active.data.intent_mark != &"":
@@ -2482,6 +2486,20 @@ func get_enemy_status_labels(enemy: FieldEnemy) -> PackedStringArray:
 		if not text.is_empty():
 			labels.append(text)
 	return labels
+
+# The turns left on each countdown on this enemy (Sentence), soonest
+# first - its readout's hourglass marks beside the HP. Empty for none, or
+# for a dead/unknown enemy.
+func get_enemy_countdowns(enemy: FieldEnemy) -> Array[int]:
+	var turns: Array[int] = []
+	var combatant: Combatant = _combatants.get(enemy)
+	if combatant == null or combatant.hp <= 0:
+		return turns
+	for active: Status in combatant.statuses:
+		if active.has_countdown():
+			turns.append(active.turns_remaining)
+	turns.sort()
+	return turns
 
 # The status this enemy's readout shows beside its HP (StatusData.shows_
 # beside_hp - Coiled: its mark and magnitude), or null - none, or the

@@ -114,6 +114,10 @@ const TOKEN_REDUCTION := "{reduction}"
 # The HP a status the card applies charges for each Energy short (Status
 # Data.hp_per_missing_energy - Collateral's 3).
 const TOKEN_HP_PER_ENERGY := "{hp_per_energy}"
+# A countdown the card puts on its target (StatusData.countdown_damage -
+# Sentence): the turns it starts at and what it deals.
+const TOKEN_COUNTDOWN_TURNS := "{countdown_turns}"
+const TOKEN_COUNTDOWN_DAMAGE := "{countdown_damage}"
 const TOKEN_HP_COST := "{hp_cost}"
 # What follows a repeating hit's number (CardEffect.repeat_per_earlier_
 # play_tag - Lash), by how many times it lands now (DamageEffect.hit_
@@ -769,6 +773,11 @@ func _resolve_tokens(description: String) -> String:
 		for effect in card_data.effects:
 			if effect != null and effect.effect_type == CardEffect.EffectType.SPEND_TOLL:
 				text = text.replace(TOKEN_TOLL_COST, str(effect.toll_cost))
+				break
+	if text.contains(TOKEN_COUNTDOWN_TURNS) or text.contains(TOKEN_COUNTDOWN_DAMAGE):
+		for effect in card_data.effects:
+			if effect != null and effect.status_data != null and effect.status_data.countdown_damage > 0:
+				text = text.replace(TOKEN_COUNTDOWN_TURNS, str(effect.status_data.default_duration_turns)).replace(TOKEN_COUNTDOWN_DAMAGE, str(effect.status_data.countdown_damage))
 				break
 	if text.contains(TOKEN_HP_PER_ENERGY):
 		for effect in card_data.effects:

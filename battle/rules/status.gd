@@ -220,6 +220,10 @@ func is_expired() -> bool:
 # directly rather than wrapping it in its own class.
 
 static func apply_to(statuses: Array[Status], status_data: StatusData) -> void:
+	# Each its own (Sentence): never a restack.
+	if status_data.stack_rule == StatusData.StackRule.SEPARATE:
+		statuses.append(Status.new(status_data))
+		return
 	var existing := find_in(statuses, status_data)
 	if existing != null:
 		existing.apply_stack()
@@ -536,10 +540,11 @@ static func resolve_countdowns(holder: Combatant) -> int:
 		taken += DamagePipeline.resolve(amount, holder)["damage_to_hp"]
 	return taken
 
-# The player just spent Toll - once per card, whatever the amount (see
-# EffectContext.spend_toll()): every countdown on `holder` that Toll
-# hurries (StatusData.toll_spend_advances) takes a turn off. What reaches
-# 0 goes off at the caller's resolve_countdowns().
+# The player just spent Toll - once per card or replay that spent any,
+# whatever the amount (see EffectContext.spend_toll()): every countdown on
+# `holder` that Toll hurries (StatusData.toll_spend_advances) takes a turn
+# off, each Sentence its own. What reaches 0 goes off at the caller's
+# resolve_countdowns(), mid-turn.
 static func advance_on_toll_spend(holder: Combatant) -> void:
 	for active in holder.statuses:
 		if active.data != null and active.data.toll_spend_advances and active.has_countdown() and active.turns_remaining > 0:

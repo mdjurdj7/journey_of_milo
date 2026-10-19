@@ -251,6 +251,17 @@ var layout_offset: Vector2 = Vector2.ZERO
 	set(value):
 		hp_mark_edge_px = value
 		queue_redraw()
+# Countdowns (Sentence) beside the HP after the coil, one hourglass in the
+# coil's pen and its turns each: on a drop every glyph swells this much
+# (a fraction of its size) and eases back over countdown_pulse_sec - the
+# tick a Toll spend makes. Read at each drop.
+@export_range(0.0, 1.0) var countdown_pulse_scale: float = 0.35:
+	set(value):
+		countdown_pulse_scale = value
+		queue_redraw()
+@export var countdown_pulse_sec: float = 0.3:
+	set(value):
+		countdown_pulse_sec = maxf(value, 0.0)
 
 @export_group("Status Reveal")
 # Hovering the readout - name, numerals, bar and status row - in battle
@@ -332,6 +343,11 @@ var _status_texts: PackedStringArray = PackedStringArray()
 # The mark beside the HP and its number - see set_hp_mark(); &"" = none.
 var _hp_mark_glyph: StringName = &""
 var _hp_mark_value: int = 0
+# Each countdown's turns left (Sentence), soonest first - set_countdowns() -
+# and the pulse its last drop set off, 1 easing to 0.
+var _countdowns: Array[int] = []
+var _countdown_pulse: float = 0.0
+var _countdown_tween: Tween = null
 # What the statuses do, shown on hover - see set_reveal_lines().
 var _reveal: StatusReveal = null
 
@@ -540,7 +556,8 @@ func _draw() -> void:
 	var left: float = _block_readout_width()
 	var x: float = left + InkType.draw_run(self, numeral_font, str(maxi(_current_hp, 0)), Vector2(left, baseline), battle_numeral_size_px, ink)
 	x += InkType.draw_run(self, numeral_font, battle_max_prefix + str(_max_hp), Vector2(x, baseline), battle_max_size_px, secondary)
-	_draw_hp_mark(x, baseline, ink)
+	x = _draw_hp_mark(x, baseline, ink)
+	_draw_countdowns(x, baseline, ink)
 
 	var name_text: String = _enemy_name()
 	if _name_font_tracked != null and not name_text.is_empty():
@@ -561,14 +578,44 @@ func _draw() -> void:
 
 # The mark beside the HP (see the HP Mark group), from `x` - the end of
 # the " / max" run - on the numeral's baseline: the coil, then the value
-# in the numeral's type at the max's size.
-func _draw_hp_mark(x: float, baseline: float, ink: Color) -> void:
+# in the numeral's type at the max's size. Returns where it ends (`x`
+# with none).
+func _draw_hp_mark(x: float, baseline: float, ink: Color) -> float:
 	if _hp_mark_glyph != &"coil":
-		return
+		return x
 	var r: float = hp_mark_glyph_size_px * 0.5
 	var centre := Vector2(x + hp_mark_gap_px + r, baseline - float(battle_numeral_size_px) * block_glyph_baseline_lift)
 	InkPen.draw_ink(self, BattleIntent.coil_shapes(centre, r, hp_mark_stroke_px, hp_mark_taper), _ink, get_theme_color("bone", "Battle"), hp_mark_outline_px, hp_mark_edge_px, ink.a)
-	InkType.draw_run(self, numeral_font, str(_hp_mark_value), Vector2(centre.x + r + hp_mark_value_gap_px, baseline), battle_max_size_px, ink)
+	var value_x: float = centre.x + r + hp_mark_value_gap_px
+	return value_x + InkType.draw_run(self, numeral_font, str(_hp_mark_value), Vector2(value_x, baseline), battle_max_size_px, ink)
+
+# Each countdown (Sentence) from `x`, after the coil: an hourglass in the
+# coil's pen, then its turns left, soonest first - every one swelling by
+# countdown_pulse_scale and easing back when a count drops.
+func _draw_countdowns(x: float, baseline: float, ink: Color) -> void:
+	var r: float = hp_mark_glyph_size_px * 0.5 * (1.0 + countdown_pulse_scale * _countdown_pulse)
+	for turns in _countdowns:
+		var centre := Vector2(x + hp_mark_gap_px + hp_mark_glyph_size_px * 0.5, baseline - float(battle_numeral_size_px) * block_glyph_baseline_lift)
+		InkPen.draw_ink(self, hourglass_shapes(centre, r, hp_mark_stroke_px, hp_mark_taper), _ink, get_theme_color("bone", "Battle"), hp_mark_outline_px, hp_mark_edge_px, ink.a)
+		var value_x: float = centre.x + hp_mark_glyph_size_px * 0.5 + hp_mark_value_gap_px
+		x = value_x + InkType.draw_run(self, numeral_font, str(turns), Vector2(value_x, baseline), battle_max_size_px, ink)
+
+# An hourglass `r` across from its centre: the top and bottom rules and the
+# two strokes crossing between them, in the coil's tapered pen.
+static func hourglass_shapes(centre: Vector2, r: float, stroke_px: float, taper: float) -> Array[PackedVector2Array]:
+	var w: float = r * 0.72
+	var corners: Array[Vector2] = [centre + Vector2(-w, -r), centre + Vector2(w, -r), centre + Vector2(-w, r), centre + Vector2(w, r)]
+	var lines: Array = [[corners[0], corners[1]], [corners[2], corners[3]], [corners[0], corners[3]], [corners[1], corners[2]]]
+	var shapes: Array[PackedVector2Array] = []
+	for line: Array in lines:
+		var spine := PackedVector2Array()
+		var factors := PackedFloat32Array()
+		for step in 9:
+			var t: float = float(step) / 8.0
+			spine.append((line[0] as Vector2).lerp(line[1] as Vector2, t))
+			factors.append(1.0)
+		shapes.append(InkPen.ribbon(spine, factors, stroke_px, taper))
+	return shapes
 
 func _draw_status_row(top: float, left: float) -> void:
 	if _status_texts.is_empty() or _status_font_tracked == null:
@@ -801,6 +848,37 @@ func set_hp_mark(glyph: StringName, value: int) -> void:
 	_hp_mark_glyph = glyph
 	_hp_mark_value = value
 	queue_redraw()
+
+# Each countdown on the enemy (Sentence) beside its HP, after the coil:
+# `turns` its turns left, soonest first. A count that dropped since -
+# a Toll spend, the enemy's turn - pulses them all (countdown_pulse_sec).
+func set_countdowns(turns: Array[int]) -> void:
+	var dropped: bool = false
+	for i in mini(turns.size(), _countdowns.size()):
+		if turns[i] < _countdowns[i]:
+			dropped = true
+	if turns == _countdowns:
+		return
+	_countdowns = turns.duplicate()
+	if dropped:
+		_pulse_countdowns()
+	queue_redraw()
+
+# What set_countdowns() last put beside the HP.
+func get_countdowns() -> Array[int]:
+	return _countdowns.duplicate()
+
+func _pulse_countdowns() -> void:
+	if _countdown_tween != null:
+		_countdown_tween.kill()
+	_countdown_pulse = 1.0
+	if countdown_pulse_sec <= 0.0:
+		_countdown_pulse = 0.0
+		return
+	_countdown_tween = create_tween()
+	_countdown_tween.tween_method(func(value: float) -> void:
+		_countdown_pulse = value
+		queue_redraw(), 1.0, 0.0, countdown_pulse_sec)
 
 # What set_hp_mark() last put beside the HP - {"glyph", "value"}, the
 # glyph &"" when nothing is there. For probes.

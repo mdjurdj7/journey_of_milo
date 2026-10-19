@@ -279,7 +279,10 @@ func _check_faces_and_sentence() -> void:
 		var player: Combatant = controller.get("player")
 		var enemy: Combatant = _enemy(controller)
 		Status.apply_to(enemy.statuses, load(SENTENCE_STATUS_PATH))
-		_expect_eq(_sentence_label(enemy), "Sentence 4", "The enemy carries Sentence 4")
+		controller.emit_signal("status_changed")
+		_expect_eq(_sentence_label(enemy), "Sentence 3", "The enemy carries Sentence 3")
+		var plate: Node = (controller.get_parent().get("_enemy_statuses") as Dictionary).get(_field_enemy(controller))
+		_expect(plate != null and str(plate.call("get_countdowns")) == "[3]", "...its plate's hourglass reads 3, beside the HP")
 		player.toll = 5
 		player.energy = 1
 		var hand: Object = controller.get("_hand_container")
@@ -290,7 +293,9 @@ func _check_faces_and_sentence() -> void:
 		_expect_eq([_face(controller, reckoning), _face(controller, slash), _face(controller, ransom)], ["2", "1", "3"], "Before Leverage: 2, 1, 3")
 		_expect(not hand.call("_can_play", reckoning, player.energy), "...and on 1 Energy Reckoning is out of reach")
 		await _play(controller, await _deal(controller, LEVERAGE_PATH))
-		_expect_eq(_sentence_label(enemy), "Sentence 3", "Leverage's Toll spend takes a turn off Sentence")
+		_expect_eq(_sentence_label(enemy), "Sentence 2", "Leverage's Toll spend takes a turn off Sentence")
+		_expect(plate != null and str(plate.call("get_countdowns")) == "[2]", "...the hourglass reads 2")
+		_expect(plate != null and plate.get("_countdown_tween") != null, "...and pulsed as it dropped")
 		_expect_eq([_face(controller, reckoning), _face(controller, slash), _face(controller, ransom)], ["0", "0", "1"], "While it waits: 0, 0, 1")
 		_expect(hand.call("_can_play", reckoning, player.energy), "...and Reckoning is in reach")
 		var line: Status = Status.find_in(player.statuses, load(LEVERAGE_STATUS_PATH))

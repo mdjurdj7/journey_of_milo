@@ -6,9 +6,9 @@
 script = ExtResource("1_status_data")
 id = "sentence_tempered"
 display_name = "Sentence"
-description = "In {turns} turn{s}, it takes {damage} damage. Spending Toll brings it a turn closer."
+description = "In {turns} turn{s}, it takes {damage} damage. Each card that spends any Toll brings it a turn closer."
 category = 2
 default_duration_turns = 3
-stack_rule = 4
-countdown_damage = 40
+stack_rule = 6
+countdown_damage = 45
 toll_spend_advances = true
