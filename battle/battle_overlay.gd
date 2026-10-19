@@ -494,6 +494,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.grace_changed.connect(func(_grace: int) -> void: _push_bonus_context())
 	battle_controller.hp_changed.connect(func(_current: int, _max_hp: int) -> void: _push_bonus_context())
 	battle_controller.toll_changed.connect(func(_toll: int) -> void: _push_bonus_context())
+	# Collateral's "-N HP" depends on the Energy held: the faces re-read it.
+	battle_controller.energy_changed.connect(func(_energy: int) -> void: _push_bonus_context())
 	# A status taken (Keen, a keepsake's) moves every Attack's printed damage.
 	battle_controller.status_changed.connect(func() -> void: _push_bonus_context())
 	# The armed card's damage reads against the enemy under the cursor.
@@ -1398,8 +1400,9 @@ func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
 # played before it (the commit has already counted it). Critical is read
 # at the HP the card will have paid before its conditions, as the face
 # reads it (CardBonus.upfront_hp_cost()): In the Red's own 8, the stance's
-# price on an Attack. Not a cost replacement's HP (Collateral): its charge
-# is spent at the commit, so the player can no longer say what it was.
+# price on an Attack, and the HP this play pays for Energy short
+# (Collateral - BattleController.play_hp_cost, read before the commit
+# spent the Energy).
 func _condition_live_at_commit(card: CardData) -> bool:
 	if battle_controller == null or battle_controller.player == null:
 		return false
@@ -1409,7 +1412,7 @@ func _condition_live_at_commit(card: CardData) -> bool:
 	# will actually spend some.
 	if TollBlockEffect.spendable_by_card(card, ctx.player.toll, ctx.player.stance) > 0:
 		return true
-	var paid: EffectContext = ctx.for_card_preview(CardBonus.upfront_hp_cost(card, ctx.player.stance, 0))
+	var paid: EffectContext = ctx.for_card_preview(CardBonus.upfront_hp_cost(card, ctx.player.stance, battle_controller.play_hp_cost))
 	return CardBonus.state(card, paid) == CardBonus.State.LIVE
 
 # A drawn card leaves the deck: the draw sound, on the next voice, its

@@ -17,7 +17,7 @@ card_name = "Collateral"
 card_type = 1
 rarity = 2
 target_type = 1
-description = "The next card you play costing 2 or more costs 5 HP instead of Energy.
+description = "This turn, pay {hp_per_energy} HP for each Energy you lack.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
 removal_scope = 1

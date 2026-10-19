@@ -111,6 +111,9 @@ const TOKEN_DEBT := "{debt}"
 # What a cost reduction the card applies takes off the next card (Status
 # Data.next_card_cost_reduction - Leverage's 2).
 const TOKEN_REDUCTION := "{reduction}"
+# The HP a status the card applies charges for each Energy short (Status
+# Data.hp_per_missing_energy - Collateral's 3).
+const TOKEN_HP_PER_ENERGY := "{hp_per_energy}"
 const TOKEN_HP_COST := "{hp_cost}"
 # What follows a repeating hit's number (CardEffect.repeat_per_earlier_
 # play_tag - Lash), by how many times it lands now (DamageEffect.hit_
@@ -766,6 +769,11 @@ func _resolve_tokens(description: String) -> String:
 		for effect in card_data.effects:
 			if effect != null and effect.effect_type == CardEffect.EffectType.SPEND_TOLL:
 				text = text.replace(TOKEN_TOLL_COST, str(effect.toll_cost))
+				break
+	if text.contains(TOKEN_HP_PER_ENERGY):
+		for effect in card_data.effects:
+			if effect != null and effect.status_data != null and effect.status_data.hp_per_missing_energy > 0:
+				text = text.replace(TOKEN_HP_PER_ENERGY, str(effect.status_data.hp_per_missing_energy))
 				break
 	if text.contains(TOKEN_REDUCTION):
 		for effect in card_data.effects:

@@ -6,10 +6,9 @@
 script = ExtResource("1_status_data")
 id = "collateral_tempered"
 display_name = "Collateral"
-description = "Pay {hp} HP instead of Energy for your next {charges} card{s} costing {min_cost} or more."
+description = "This turn, pay {hp} HP for each Energy you lack."
 category = 2
-default_charges = 2
 default_duration_turns = -1
-stack_rule = 5
-replaces_cost_at_least = 2
-replacement_hp_cost = 5
+stack_rule = 3
+ends_at_turn_end = true
+hp_per_missing_energy = 2

@@ -140,6 +140,10 @@ signal battle_won()
 signal battle_lost()
 
 @export var turn_draw_amount: int = 5
+# The HP the play being committed pays on top of its Energy (Collateral -
+# Combatant.replaced_cost_hp(), read before the Energy is spent), from its
+# commit until the next: what the play sound's Critical check counts.
+var play_hp_cost: int = 0
 # A Stunned enemy's skipped turn, or a Delayed one's do-nothing turn,
 # holds this long (seconds), the status gone from the readout, so the
 # turn reads - it has no lunge to wait on.
@@ -732,7 +736,7 @@ func request_play(card_view: CardView) -> void:
 # Whether `card` can be played now: affordable, not blocked by the rules,
 # and with something to land on.
 func _is_playable(card: CardData) -> bool:
-	if player.energy_cost(card) > player.energy:
+	if not player.can_pay(card):
 		return false
 	# A fixed Toll the player doesn't hold (Come Due), nothing to replay
 	# (Second Swing) - the hand shows it
@@ -1056,12 +1060,12 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 			return
 	_play_in_flight = true
 	var card: CardData = card_view.card_data
-	# Read before anything is spent: whether a cost replacement (Collateral)
-	# covers this card depends on the free card and any cost reduction
-	# (Leverage) still being there.
-	var replacement: Status = player.cost_replacement_for(card)
+	# Read before anything is spent: what Collateral's HP comes to depends
+	# on the Energy held and any cost reduction (Leverage) still there.
+	var collateral: Status = Status.missing_energy_status(player.statuses)
 	var replaced_hp: int = player.replaced_cost_hp(card)
 	var energy_paid: int = player.energy_cost(card)
+	play_hp_cost = replaced_hp
 	player.energy -= energy_paid
 	# The play is committed: a free card (House Key) is spent here, before
 	# card_played re-reads the hand's faces - never on a hover, a face or
@@ -1074,7 +1078,6 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	if player.takes_next_card_discount(card):
 		player.first_card_free = false
 		Status.spend_cost_reduction(player.statuses, card)
-	Status.spend_cost_replacement(player.statuses, replacement)
 	_input_locked = true
 	_emit_devour_changed()
 	# Counted at commit, before anyone hears of the play - so a face that
@@ -1133,8 +1136,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 	ctx.cards_played_before_this = cards_played_this_turn - 1
 	ctx.tagged_plays_before_this = _tagged_plays_before(card)
 	ctx.replaced_cost_hp = replaced_hp
-	if replacement != null and replacement.data != null:
-		ctx.replaced_cost_source = "status:" + replacement.data.id
+	if replaced_hp > 0 and collateral != null and collateral.data != null:
+		ctx.replaced_cost_source = "status:" + collateral.data.id
 	ctx.on_replay = func() -> void:
 		_replay_pending = true
 	# Bide's chosen cards: their own views leave the hand just before the

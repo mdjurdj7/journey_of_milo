@@ -323,16 +323,17 @@ func _check_spent() -> void:
 	await _teardown()
 	_completed += 1
 
-# Collateral pays for it: 2 ≥ 2, so 0 Energy and 5 HP.
+# Collateral pays for it on 0 Energy: its 2 short, 6 HP.
 func _check_collateral() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var player: Combatant = controller.get("player")
 		await _play(controller, await _deal(controller, COLLATERAL_PATH))
+		player.energy = 0
 		var hp_before: int = player.hp
 		await _play(controller, await _deal(controller, RANSOM_PATH))
-		_expect_eq(player.energy, 3, "Under Collateral, Ransom costs 0 Energy")
-		_expect_eq(hp_before - player.hp, 5, "...and 5 HP")
+		_expect_eq(player.energy, 0, "Under Collateral on 0 Energy, Ransom is played")
+		_expect_eq(hp_before - player.hp, 6, "...for 6 HP, 3 for each Energy short")
 		_expect_eq(_ransom_lines(controller), [WAITING_TEXT], "...and still waits for next turn")
 	await _teardown()
 	_completed += 1

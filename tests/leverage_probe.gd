@@ -7,8 +7,8 @@ extends SceneTree
 # less, never below 0; a 0-cost card passes it by and leaves it waiting;
 # unused, it ends with the turn. Two Leverages before another card give
 # that card both. Leverage+ spends 4. House
-# Key's free card comes first and a cost replacement (Collateral) judges
-# what's left, so a card Leverage takes below 2 leaves its charge.
+# Key's free card comes first, then Leverage, and Collateral judges what
+# is left short of the Energy held.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/leverage_probe.gd
 #
@@ -169,7 +169,7 @@ func _check_zero_cost_passes_by() -> void:
 		await _play(controller, await _deal(controller, LEVERAGE_PATH))
 		await _play(controller, await _deal(controller, COLLATERAL_PATH))
 		_expect_eq(_status_label(player), "Leverage", "A 0-cost Collateral leaves Leverage waiting")
-		_expect_eq(_collateral_label(player), "Collateral ×1", "...and its own charge waits")
+		_expect_eq(_collateral_label(player), "Collateral", "...and Collateral is up for the turn")
 		_expect_eq(player.energy, 3, "...Energy 3, unchanged")
 		var slash: CardData = await _deal(controller, SLASH_PATH)
 		_expect_eq(player.energy_cost(slash), 0, "The Slash after it reads 0")
@@ -228,9 +228,9 @@ func _check_two_stack() -> void:
 	await _teardown()
 	_completed += 1
 
-# House Key -> Leverage -> Collateral: with a Collateral charge and
-# Leverage waiting, Reckoning's 2 comes down to 0 before Collateral asks,
-# so it costs 0 Energy, 0 HP, and the charge stays for the next one.
+# Leverage -> Collateral: on 0 Energy with Leverage waiting, Reckoning's
+# 2 comes down to 0 before Collateral asks what's short - 0 Energy, 0 HP.
+# The next Reckoning, Leverage spent, is 2 short: 6 HP.
 func _check_collateral_order() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -238,21 +238,21 @@ func _check_collateral_order() -> void:
 		player.toll = 5
 		await _play(controller, await _deal(controller, COLLATERAL_PATH))
 		await _play(controller, await _deal(controller, LEVERAGE_PATH))
-		_expect_eq(_collateral_label(player), "Collateral ×1", "Leverage (0) passes Collateral's charge by")
-		_expect_eq(_status_label(player), "Leverage", "...and Leverage waits")
+		_expect_eq(_status_label(player), "Leverage", "Leverage waits beside Collateral")
+		player.energy = 0
 		var hp_before: int = player.hp
 		await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
-		_expect_eq(player.energy, 3, "Reckoning under Leverage and Collateral costs 0 Energy")
-		_expect_eq(player.hp, hp_before, "...and 0 HP")
-		_expect_eq(_collateral_label(player), "Collateral ×1", "...and the Collateral charge remains")
-		_expect_eq(_status_label(player), "", "...while Leverage is spent")
+		_expect_eq(player.hp, hp_before, "Reckoning under Leverage and Collateral on 0 Energy: 0 HP")
+		_expect_eq(_status_label(player), "", "...Leverage spent")
+		var rate: int = (load(COLLATERAL_STATUS_PATH) as StatusData).hp_per_missing_energy
 		await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
-		_expect_eq(hp_before - player.hp, 5, "The next Reckoning takes the charge: 5 HP")
+		_expect_eq(hp_before - player.hp, 2 * rate, "The next Reckoning, 2 short: %d HP" % (2 * rate))
 	await _teardown()
 	_completed += 1
 
 # House Key's free first card is "the next card": it costs 0 before
-# Leverage is asked, and spends a waiting Leverage all the same. (In play
+# Leverage is asked, and spends a waiting Leverage all the same; nothing
+# is short, so Collateral takes no HP. (In play
 # Leverage would itself be the free card - the status is applied directly
 # here to reach the ordering.)
 func _check_house_key_first() -> void:
@@ -266,7 +266,7 @@ func _check_house_key_first() -> void:
 		_expect_eq(player.energy, 3, "House Key's free Reckoning costs 0 Energy")
 		_expect_eq(player.hp, hp_before, "...and no HP")
 		_expect_eq(_status_label(player), "", "...and spends the waiting Leverage")
-		_expect_eq(_collateral_label(player), "Collateral ×1", "...while Collateral keeps its charge")
+		_expect_eq(_collateral_label(player), "Collateral", "...while Collateral stays up")
 	await _teardown()
 	_completed += 1
 

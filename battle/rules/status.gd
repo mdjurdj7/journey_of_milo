@@ -126,8 +126,7 @@ func describe(holder: Combatant = null) -> String:
 		"progress": progress,
 		"count": data.self_loss_trigger_count,
 		"drain": trigger_drain(),
-		"hp": data.replacement_hp_cost,
-		"min_cost": data.replaces_cost_at_least,
+		"hp": data.hp_per_missing_energy,
 		"alone_bonus": data.grants_when_alone.attack_damage_bonus if data.grants_when_alone != null else 0,
 		"reduction": data.next_card_cost_reduction * stack_count,
 		"energy": data.turn_start_energy_while_critical,
@@ -437,28 +436,17 @@ static func spend_attack_bonus_charges(statuses: Array[Status], critical: bool) 
 		if active.charges <= 0:
 			statuses.erase(active)
 
-# The cost replacement (StatusData.replaces_cost_at_least - Collateral)
-# that would take a card costing `energy_cost` - its Energy after every
-# other modifier - or null: one with a charge waiting whose threshold
-# the cost reaches. The first such, in the order they were applied.
-static func cost_replacement(statuses: Array[Status], energy_cost: int) -> Status:
+# The status letting Energy short be paid in HP this turn (StatusData.
+# hp_per_missing_energy - Collateral), or null - the cheapest, when
+# Collateral and Collateral+ are both up.
+static func missing_energy_status(statuses: Array[Status]) -> Status:
+	var best: Status = null
 	for active in statuses:
-		if active.data == null or active.data.replaces_cost_at_least <= 0:
+		if active.data == null or active.data.hp_per_missing_energy <= 0:
 			continue
-		if not active.has_charges() or active.charges <= 0:
-			continue
-		if energy_cost >= active.data.replaces_cost_at_least:
-			return active
-	return null
-
-# A play that cost_replacement() covered has committed: one charge spent,
-# and the status gone at 0.
-static func spend_cost_replacement(statuses: Array[Status], active: Status) -> void:
-	if active == null:
-		return
-	active.charges -= 1
-	if active.charges <= 0:
-		statuses.erase(active)
+		if best == null or active.data.hp_per_missing_energy < best.data.hp_per_missing_energy:
+			best = active
+	return best
 
 # The Energy every waiting cost reduction (StatusData.next_card_cost_
 # reduction - Leverage) takes off the next card: each one's amount per

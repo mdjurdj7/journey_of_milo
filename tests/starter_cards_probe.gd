@@ -35,7 +35,6 @@ const ONE_CRITICAL_LINE_CARDS: Array[String] = ["In the Red", "In the Red+"]
 # here has changed its wording - or needs to.
 const SHRUNK_RULES: Dictionary = {
 	"Blood Arc": 14,
-	"Collateral": 13,
 	"Cornered": 14,
 	"Last Resort": 14,
 	"Last Wager": 13,

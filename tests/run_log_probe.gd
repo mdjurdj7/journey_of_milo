@@ -12,7 +12,8 @@ extends SceneTree
 #   - which encounter: floor_entered's slots (slot id -> the option it
 #     stood), fight_start's slot and option and each member's
 #   - the fight's sums: turns, every card with its turn, Energy, hp_cost
-#     (Collateral's swap) and hp_effect (Hold Fast's and Blood Arc's own
+#     (Collateral's 3 for Reckoning's Energy short) and hp_effect (Hold
+#     Fast's and Blood Arc's own
 #     self-damage), damage dealt equal to the Sputter's HP, HP that
 #     reconciles (start - taken + healed + reclaimed = end), block used,
 #     Toll that reconciles
@@ -135,14 +136,15 @@ func _scripted_run(logging: bool) -> Dictionary:
 		await _teardown()
 		return seen
 
-	# Turn 1: Collateral, then Reckoning on its swap (0 Energy, 5 HP);
-	# Hold Fast (its Block, 2 HP its own); Blood Arc (3 HP its own).
+	# Turn 1: Collateral; Hold Fast (its Block, 2 HP its own); Blood Arc
+	# (3 HP its own); then Reckoning's 2 on the 1 Energy left - 1 short,
+	# 3 HP under Collateral.
 	_turns = 1
 	_fresh_hand(controller)
 	await _play(controller, await _deal(controller, COLLATERAL_PATH))
-	await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
 	await _play(controller, await _deal(controller, HOLD_FAST_PATH))
 	await _play(controller, await _deal(controller, BLOOD_ARC_PATH))
+	await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
 	# Turn 2: one Slash and no Block, so the Sputter's strike after it
 	# lands whatever Hold Fast's turn-1 Block was - the damage sums need a
 	# hit from it. Turn 3 on: Slashes until it falls - early enough
@@ -339,13 +341,13 @@ func _check_log(path: String, seen: Dictionary) -> void:
 		_expect_eq([int(card.get("turn")), str(card.get("card"))], _played[index], "Card %d: its turn and name" % index)
 	if cards.size() >= 4:
 		_expect_card(cards[0], "Collateral", 0, 0, 0)
-		_expect_card(cards[1], "Reckoning", 0, 5, 0)
-		_expect_card(cards[2], "Hold Fast", 1, 0, 2)
-		_expect_card(cards[3], "Blood Arc", 1, 0, 3)
-		_expect_eq(int((cards[2] as Dictionary).get("block")), _hold_fast_block(), "Hold Fast: its Block gained (%d)" % _hold_fast_block())
-		_expect(int((cards[3] as Dictionary).get("dealt")) > 0, "Blood Arc: damage dealt")
-		_expect_eq((cards[3] as Dictionary).get("target"), null, "...with no target")
-		_expect_eq(str((cards[1] as Dictionary).get("target")), "Sputter", "Reckoning: aimed at the Sputter")
+		_expect_card(cards[1], "Hold Fast", 1, 0, 2)
+		_expect_card(cards[2], "Blood Arc", 1, 0, 3)
+		_expect_card(cards[3], "Reckoning", 1, 3, 0)
+		_expect_eq(int((cards[1] as Dictionary).get("block")), _hold_fast_block(), "Hold Fast: its Block gained (%d)" % _hold_fast_block())
+		_expect(int((cards[2] as Dictionary).get("dealt")) > 0, "Blood Arc: damage dealt")
+		_expect_eq((cards[2] as Dictionary).get("target"), null, "...with no target")
+		_expect_eq(str((cards[3] as Dictionary).get("target")), "Sputter", "Reckoning: aimed at the Sputter")
 
 	var taken: Dictionary = fight.get("damage_taken", {})
 	var by_source: Dictionary = taken.get("by_source", {})
@@ -353,7 +355,7 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	for source in by_source:
 		source_sum += int(by_source[source])
 	_expect_eq(source_sum, int(taken.get("total", -1)), "Damage taken: the sources add up to the total")
-	_expect_eq(int(by_source.get("self", 0)), 5 + 2 + 3, "...10 of it self-inflicted (5 + 2 + 3)")
+	_expect_eq(int(by_source.get("self", 0)), 3 + 2 + 3, "...8 of it self-inflicted (3 + 2 + 3)")
 	_expect(int(by_source.get("Sputter", 0)) > 0, "...and some from the Sputter")
 	var grace: Dictionary = fight.get("grace", {})
 	var hp_start: int = int(fight.get("hp_start", -1))
@@ -371,7 +373,7 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	_expect(int(block.get("gained", 0)) >= _hold_fast_block(), "Block gained: Hold Fast's at least")
 	_expect(int(block.get("used", 0)) > 0 and int(block.get("used", 0)) <= int(block.get("gained", 0)), "Block used: some, never more than gained")
 	var toll: Dictionary = fight.get("toll", {})
-	_expect(int(toll.get("gained", 0)) >= 10, "Toll gained: the 10 HP self-inflicted at least")
+	_expect(int(toll.get("gained", 0)) >= 8, "Toll gained: the 8 HP self-inflicted at least")
 	_expect(int(toll.get("spent", 0)) > 0, "Toll spent: Reckoning's")
 	_expect_eq(int(toll.get("start", 0)) + int(toll.get("gained", 0)) - int(toll.get("spent", 0)), int(toll.get("end", -1)), "Toll reconciles: start + gained - spent = end")
 
@@ -380,7 +382,7 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	var self_by_ints: Dictionary = {}
 	for key in self_by:
 		self_by_ints[key] = int(self_by[key])
-	_expect_eq(self_by_ints, {"status:collateral": 5, "card:Hold Fast": 2, "card:Blood Arc": 3}, "Self-loss by source: Collateral's price, Hold Fast's and Blood Arc's HP")
+	_expect_eq(self_by_ints, {"status:collateral": 3, "card:Hold Fast": 2, "card:Blood Arc": 3}, "Self-loss by source: Collateral's price, Hold Fast's and Blood Arc's HP")
 	var self_lines: int = 0
 	var attack_hp: int = 0
 	for line in lines:
@@ -406,8 +408,8 @@ func _check_log(path: String, seen: Dictionary) -> void:
 		toll_gained_sum += int(toll_gained_by[key])
 	_expect_eq(toll_gained_sum, int(toll.get("gained", -1)), "Toll gained by source adds up to the gain")
 	_expect_eq((toll.get("spent_by_source", {}) as Dictionary).get("card:Reckoning"), toll.get("spent"), "...and all of the spend is Reckoning's")
-	if cards.size() >= 2:
-		_expect_eq(int((cards[1] as Dictionary).get("toll_spent", -1)), int(toll.get("spent", -2)), "Reckoning's entry: the Toll it spent")
+	if cards.size() >= 4:
+		_expect_eq(int((cards[3] as Dictionary).get("toll_spent", -1)), int(toll.get("spent", -2)), "Reckoning's entry: the Toll it spent")
 	var turn_log: Array = fight.get("turn_log", [])
 	_expect_eq(turn_log.size(), _turns, "turn_log: a line per turn")
 	var spent_energy: int = 0

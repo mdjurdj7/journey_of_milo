@@ -3,7 +3,7 @@ extends SceneTree
 # Headless probe for a cost that drops while Critical (CardData.critical_
 # cost, Combatant.base_cost()): judged at the HP held now, it replaces the
 # printed cost before House Key's free card, a cost reduction (Leverage)
-# and a cost replacement (Collateral), never below 0. A card whose base
+# and Collateral's shortfall, never below 0. A card whose base
 # is 0 while Critical takes no "next card" discount and leaves it waiting.
 # Unset (-1), a card costs as it always has. In a fight the face's numeral
 # and the hand's fade follow HP across the Critical line with no Energy
@@ -90,8 +90,8 @@ func _check_rules() -> void:
 	_completed += 1
 
 # Leverage: 0 and left waiting while Critical; 1 - 2, floored at 0, above.
-# Collateral (2 or more) judges the base: a cost-2 card with Critical cost
-# 0 is covered above the line (0 Energy, 5 HP) and passes it by while
+# Collateral judges the base: on 0 Energy a cost-2 card with Critical cost
+# 0 is 2 short above the line (0 Energy, 6 HP) and short of nothing while
 # Critical (0 Energy, no HP).
 func _check_modifiers() -> void:
 	var card: CardData = _card(1, 0)
@@ -104,18 +104,18 @@ func _check_modifiers() -> void:
 
 	var heavy: CardData = _card(2, 0)
 	var other: Combatant = _player(SAFE_HP)
-	Status.apply_to(other.statuses, load(COLLATERAL_STATUS_PATH))
-	_expect(other.cost_replacement_for(heavy) != null, "Collateral above the line covers a 2-cost card")
-	_expect_eq([other.energy_cost(heavy), other.replaced_cost_hp(heavy)], [0, 5], "...0 Energy and 5 HP")
+	other.energy = 0
+	var collateral: StatusData = load(COLLATERAL_STATUS_PATH)
+	Status.apply_to(other.statuses, collateral)
+	_expect_eq([other.energy_cost(heavy), other.replaced_cost_hp(heavy)], [0, 2 * collateral.hp_per_missing_energy], "Collateral above the line on 0 Energy: 2 short, 0 Energy and 6 HP")
 	other.hp = CRITICAL_HP
-	_expect(other.cost_replacement_for(heavy) == null, "While Critical its base is 0: Collateral passes it by")
-	_expect_eq([other.energy_cost(heavy), other.replaced_cost_hp(heavy)], [0, 0], "...0 Energy and no HP")
+	_expect_eq([other.energy_cost(heavy), other.replaced_cost_hp(heavy)], [0, 0], "While Critical its base is 0: nothing short, no HP")
 	_completed += 1
 
 # --- Fight ---
 
 # Played while Critical at 0 Energy: it plays, spends nothing, and
-# Leverage and Collateral both wait. Above the line it pays 1 and spends
+# Leverage waits, Collateral still up. Above the line it pays 1 and spends
 # Leverage.
 func _check_commit_leaves_discounts() -> void:
 	var controller: Node = await _start_fight()
@@ -130,7 +130,7 @@ func _check_commit_leaves_discounts() -> void:
 		await _play(controller, card, _field_enemy(controller))
 		_expect_eq(player.energy, 0, "...played for 0 Energy")
 		_expect_eq(_label_of(player, "leverage"), "Leverage", "...Leverage still waiting")
-		_expect(_label_of(player, "collateral") != "", "...Collateral still waiting")
+		_expect(_label_of(player, "collateral") != "", "...Collateral still up")
 		_expect_eq(player.hp, CRITICAL_HP, "...and no HP paid")
 		_set_hp(controller, SAFE_HP)
 		player.energy = 3
