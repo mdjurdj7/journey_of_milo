@@ -878,9 +878,15 @@ func _refresh_standing_row() -> void:
 	_field_hp_bar.set_hand_top_y(hand_container.get_rest_top_y())
 
 # Block moved somewhere (a card, a turn start, an enemy's own guard) -
-# every readout's segment follows.
+# every readout's segment follows. So does the player's Critical line,
+# which a status can raise for the fight (Combatant.critical_fraction() -
+# Gone Under): the HP bar's tick and colour, and the Critical keyword's
+# tooltip.
 func _on_status_changed() -> void:
 	_field_hp_bar.set_block(battle_controller.player.block)
+	var critical_line: float = battle_controller.player.critical_fraction()
+	_field_hp_bar.set_critical_fraction(critical_line)
+	KeywordTable.fight_critical_fraction = critical_line
 	_refresh_standing_row()
 	for enemy: FieldEnemy in _enemy_statuses:
 		var status: EnemyStatus = _enemy_statuses[enemy]
@@ -1629,6 +1635,9 @@ func _finish_battle(outcome: Outcome) -> void:
 	# Stances and statuses are per fight, like Grace - the row goes with
 	# them whatever the outcome.
 	_field_hp_bar.clear_standing_row()
+	# The HP bar's Critical line goes back with exit_battle(); the keyword
+	# tooltip's here.
+	KeywordTable.fight_critical_fraction = -1.0
 	_field_hp_bar.exit_battle(_battle_transition_time)
 	if _field_deck_panel != null:
 		_field_deck_panel.visible = true

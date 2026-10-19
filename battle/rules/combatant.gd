@@ -82,7 +82,8 @@ var took_damage_last_turn: bool = false
 # Critical: HP at or below this fraction of max HP. A default only, like
 # the Grace fields above - BattleController.setup() copies CharacterData.
 # critical_hp_fraction over it. Read through is_critical_at(), never
-# compared against hp directly, so the rule lives in one place.
+# compared against hp directly, so the rule lives in one place - and its
+# line through critical_fraction(), which a status can raise (Gone Under).
 var critical_hp_fraction: float = 0.3
 # Lethal guards that have fired their last charge this fight (Refuse the
 # End - Status.refuse_lethal()), each once: the readout's spent line. A
@@ -220,7 +221,14 @@ func is_critical() -> bool:
 # a card face can ask about the HP it WILL have once its own costs are
 # paid (see EffectContext.preview_hp_cost).
 func is_critical_at(at_hp: int) -> bool:
-	return critical_at(at_hp, max_hp, critical_hp_fraction)
+	return critical_at(at_hp, max_hp, critical_fraction())
+
+# The fraction of max HP this fighter is Critical at or below now: their
+# own line, or the higher one a status raises it to for the fight (Status.
+# raised_critical_fraction() - Gone Under). Every reading of Critical goes
+# through here, so none keeps the old line.
+func critical_fraction() -> float:
+	return maxf(critical_hp_fraction, Status.raised_critical_fraction(statuses))
 
 # The Critical rule itself, for any HP, max HP and fraction - static so a
 # readout with no Combatant to ask (HPBar, on the field) reads the same

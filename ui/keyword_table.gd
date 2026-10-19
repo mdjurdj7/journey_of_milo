@@ -62,6 +62,12 @@ func definition(keyword: String) -> String:
 		return ""
 	return Status.fill_template(entries[keyword], live_values())
 
+# The fight's Critical line while one is under way (BattleOverlay sets it
+# from Combatant.critical_fraction() as the player's statuses change, and
+# clears it to < 0 when the fight ends): {threshold} reads it over the
+# character's own, so Go Under's 50% shows in the tooltip.
+static var fight_critical_fraction: float = -1.0
+
 # The numbers the templates read, from the run's character - or the
 # Wanderer's data when no run has started. The autoload is looked up by
 # path, not named: CardView compiles this class, and a headless script
@@ -77,6 +83,6 @@ static func live_values() -> Dictionary:
 	if character == null:
 		return {}
 	return {
-		"threshold": roundi(character.critical_hp_fraction * 100.0),
+		"threshold": roundi((fight_critical_fraction if fight_critical_fraction >= 0.0 else character.critical_hp_fraction) * 100.0),
 		"carry": character.toll_carry_cap,
 	}

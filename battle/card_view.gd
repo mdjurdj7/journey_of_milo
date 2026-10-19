@@ -130,6 +130,9 @@ const TOKEN_TOLL_BLOCK := "{toll_block}"
 # End - StatusData.survive_hp()): for the fight's player in a battle hand,
 # for the run's max HP anywhere else.
 const TOKEN_SURVIVE_HP := "{survive_hp}"
+# The Critical line a status the card applies raises its player's to
+# (StatusData.raises_critical_percent - Go Under's 50).
+const TOKEN_CRITICAL_PERCENT := "{critical_percent}"
 # The blank border Godot's glyph rasteriser puts round every glyph
 # bitmap - an engine fact, not a tunable. See _cap_top().
 const GLYPH_RECT_MARGIN_PX := 1.0
@@ -768,6 +771,11 @@ func _resolve_tokens(description: String) -> String:
 		var toll_block: int = _toll_block_preview()
 		if toll_block >= 0:
 			text = text.replace(TOKEN_TOLL_BLOCK, str(toll_block))
+	if text.contains(TOKEN_CRITICAL_PERCENT):
+		for effect in card_data.effects:
+			if effect != null and effect.status_data != null and effect.status_data.raises_critical_percent > 0:
+				text = text.replace(TOKEN_CRITICAL_PERCENT, str(effect.status_data.raises_critical_percent))
+				break
 	if text.contains(TOKEN_SURVIVE_HP):
 		var survive: int = _survive_hp_preview()
 		if survive > 0:
@@ -797,7 +805,7 @@ func _survive_hp_preview() -> int:
 	if guard == null:
 		return 0
 	if _bonus_context != null and _bonus_context.player != null:
-		return guard.survive_hp(_bonus_context.player.max_hp, _bonus_context.player.critical_hp_fraction)
+		return guard.survive_hp(_bonus_context.player.max_hp, _bonus_context.player.critical_fraction())
 	var max_hp: int = 0
 	var character: CharacterData = null
 	var tree: SceneTree = Engine.get_main_loop() as SceneTree

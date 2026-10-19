@@ -530,7 +530,7 @@ static func simulate_hits(player: Combatant, amounts: Array[int]) -> Dictionary:
 		if hp <= 0:
 			var guard: Status = Status.lethal_guard(player.statuses, was_critical)
 			if guard != null and saves_used < guard.charges:
-				hp = guard.data.survive_hp(player.max_hp, player.critical_hp_fraction)
+				hp = guard.data.survive_hp(player.max_hp, player.critical_fraction())
 				saves_used += 1
 	return {"to_hp": total_to_hp, "lethal": hp <= 0}
 
@@ -582,7 +582,7 @@ static func replay_attack(attacker: Combatant, data: EnemyData, intent: EnemyInt
 		if hp <= 0:
 			var guard: Status = Status.lethal_guard(theirs, was_critical)
 			if guard != null and int(state["saves_used"]) < guard.charges:
-				hp = guard.data.survive_hp(player.max_hp, player.critical_hp_fraction)
+				hp = guard.data.survive_hp(player.max_hp, player.critical_fraction())
 				state["saves_used"] = int(state["saves_used"]) + 1
 		state["hp"] = hp
 	Status.consume_after_attack_against(theirs, strike_back)

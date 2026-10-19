@@ -134,9 +134,10 @@ func describe(holder: Combatant = null) -> String:
 		"energy": data.turn_start_energy_while_critical,
 		"decay": data.tick_decay,
 		"times": times_word(1.0 + magnitude / 100.0),
+		"critical_percent": data.raises_critical_percent,
 	}
 	if holder != null:
-		values["survive_hp"] = data.survive_hp(holder.max_hp, holder.critical_hp_fraction)
+		values["survive_hp"] = data.survive_hp(holder.max_hp, holder.critical_fraction())
 	return fill_template(data.description, values)
 
 # Replaces each {token} in `text` with its value from `values`, and each
@@ -298,6 +299,16 @@ static func turn_start_energy(statuses: Array[Status], critical: bool) -> int:
 		if active.data != null:
 			total += active.data.turn_start_energy_while_critical
 	return total
+
+# The highest Critical line `statuses` raise their holder's to (StatusData.
+# raises_critical_percent - Gone Under), as a fraction of max HP; 0 with
+# none. Combatant.critical_fraction() takes it over the holder's own.
+static func raised_critical_fraction(statuses: Array[Status]) -> float:
+	var highest: int = 0
+	for active in statuses:
+		if active.data != null:
+			highest = maxi(highest, active.data.raises_critical_percent)
+	return clampf(highest / 100.0, 0.0, 1.0)
 
 # The status that skips its holder's next turn (StatusData.skips_next_
 # turn - Denied), or null.
@@ -663,7 +674,7 @@ static func refuse_lethal(player: Combatant, was_critical: bool) -> bool:
 	var guard: Status = lethal_guard(player.statuses, was_critical)
 	if guard == null:
 		return false
-	player.hp = guard.data.survive_hp(player.max_hp, player.critical_hp_fraction)
+	player.hp = guard.data.survive_hp(player.max_hp, player.critical_fraction())
 	guard.charges -= 1
 	if guard.charges <= 0:
 		player.statuses.erase(guard)

@@ -318,6 +318,12 @@ class_name HPBar
 @export var critical_fade_time: float = 0.2:
 	set(value):
 		critical_fade_time = maxf(value, 0.0)
+# When the fight's Critical line moves (set_critical_fraction() - Go
+# Under's 50%, and back to the character's own after the fight), the
+# tick eases there over this long. Read at each move.
+@export var critical_line_ease_time: float = 0.5:
+	set(value):
+		critical_line_ease_time = maxf(value, 0.0)
 
 @export_group("HP Change")
 # A loss: the fill drops in the frame it lands, and a ghost - the fill's
@@ -515,6 +521,13 @@ var _ink: Color = Color.BLACK
 var _critical: bool = false
 var _critical_blend: float = 0.0
 var _critical_tween: Tween = null
+# The fight's Critical line as a fraction of max HP (set_critical_
+# fraction()), or < 0 for the character's own. What Critical is judged
+# against; the tick draws at _critical_line while easing toward it (NAN
+# once there: the tick follows the line itself).
+var _critical_override: float = -1.0
+var _critical_line: float = NAN
+var _critical_line_tween: Tween = null
 
 # 0 = field style, 1 = battle style. Tweened by enter_battle()/exit_battle()
 # over the battle transition time (passed in by BattleOverlay, which reads
@@ -1114,12 +1127,13 @@ func _on_player_hp_changed(current: int, max_hp: int) -> void:
 	_refresh_critical()
 
 # Whether the Wanderer is Critical at the HP the run holds now - the
-# fight's own rule (Combatant.critical_at()) with the character's own
-# fraction, so this can't drift from what the cards read.
+# fight's own rule (Combatant.critical_at()) at the line the fight holds
+# (the character's own, or what BattleOverlay passed in from Combatant.
+# critical_fraction()), so this can't drift from what the cards read.
 func _is_critical() -> bool:
 	if RunState.character == null or not _shows_critical():
 		return false
-	return Combatant.critical_at(RunState.player_hp, RunState.player_max_hp, RunState.character.critical_hp_fraction)
+	return Combatant.critical_at(RunState.player_hp, RunState.player_max_hp, _target_critical_fraction())
 
 # Whether this class's readout draws Critical at all (CharacterData.
 # shows_critical): its line and its colour. With no run there's no class
@@ -1127,12 +1141,50 @@ func _is_critical() -> bool:
 func _shows_critical() -> bool:
 	return RunState.character == null or RunState.character.shows_critical
 
-# Where the Critical line sits along the bar: max HP x the character's
-# fraction, over max HP.
+# Where the Critical tick draws along the bar now: the line itself, or
+# partway there while easing after a move.
 func _critical_fraction() -> float:
+	return _target_critical_fraction() if is_nan(_critical_line) else _critical_line
+
+# The Critical line as a fraction of the bar: the fight's (set_critical_
+# fraction()), else max HP x the character's fraction, over max HP.
+func _target_critical_fraction() -> float:
+	if _critical_override >= 0.0:
+		return clampf(_critical_override, 0.0, 1.0)
 	if RunState.character == null:
 		return 0.0
 	return clampf(RunState.character.critical_hp_fraction, 0.0, 1.0)
+
+# The fight's Critical line, from BattleOverlay whenever the player's
+# statuses change (Combatant.critical_fraction() - Go Under raises it):
+# the tick eases there over critical_line_ease_time, and Critical is
+# judged against it at once - a numeral and fill now inside it turn
+# Critical as a crossing would. < 0 is the character's own line again
+# (exit_battle()).
+func set_critical_fraction(fraction: float) -> void:
+	var before: float = _target_critical_fraction()
+	_critical_override = fraction
+	var after: float = _target_critical_fraction()
+	if not is_equal_approx(before, after):
+		if _critical_line_tween != null:
+			_critical_line_tween.kill()
+		if critical_line_ease_time <= 0.0:
+			_set_critical_line(NAN)
+		else:
+			var from: float = before if is_nan(_critical_line) else _critical_line
+			# Held at the start until the tween's first step, or the tick
+			# would show the new line for a frame before easing there.
+			_critical_line = from
+			_critical_line_tween = create_tween()
+			_critical_line_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
+			_critical_line_tween.set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_IN_OUT)
+			_critical_line_tween.tween_method(_set_critical_line, from, after, critical_line_ease_time)
+			_critical_line_tween.tween_callback(_set_critical_line.bind(NAN))
+	_refresh_critical()
+
+func _set_critical_line(value: float) -> void:
+	_critical_line = value
+	queue_redraw()
 
 # Re-read on every HP or max-HP change: a crossing either way eases the
 # numeral and fill over critical_fade_time; no crossing, nothing moves.
@@ -1295,6 +1347,8 @@ func enter_battle(duration: float) -> void:
 
 func exit_battle(duration: float) -> void:
 	_in_battle = false
+	# The fight's line ends with it: back to the character's own.
+	set_critical_fraction(-1.0)
 	_energy_right_x = NAN
 	_block = 0
 	_block_prev = 0

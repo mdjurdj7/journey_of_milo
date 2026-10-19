@@ -62,6 +62,7 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {reduction} next_card_cost_reduction × stacks
 #   {survive_hp} survive_hp() for the holder (only with one - describe(holder))
 #   {decay}    tick_decay
+#   {critical_percent} raises_critical_percent
 #   {s}        "s" unless the count token before it is 1 ("Attack{s}")
 # An unknown token is left standing. "It" is the enemy holding it, "you"
 # the player.
@@ -237,6 +238,12 @@ enum Mark { NONE, COIL, DROP }
 # as the Energy refills (Combatant.turn_start_energy()); entering Critical
 # later in the turn gives nothing until the next one starts. 0 = none.
 @export var turn_start_energy_while_critical: int = 0
+
+# While its holder has it, they are Critical at or below this percent of
+# max HP - over their own line when it is higher (Go Under's Gone Under:
+# 50), never under it. Read through Combatant.critical_fraction(), so
+# everything that judges Critical moves with it. 0 = none.
+@export_range(0, 100) var raises_critical_percent: int = 0
 
 # While its holder has it, a card that applies it can't be played - the
 # face fades like an unplayable one (EffectResolver.card_blocked()) - so
