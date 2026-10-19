@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -124,7 +124,6 @@
     ],
     "rules_text_below_15px": {
       "Bide": 14,
-      "Collateral": 13,
       "Cornered": 14,
       "Last Resort": 14,
       "Last Wager": 13,
@@ -139,7 +138,7 @@
       },
       {
         "name": "Toll",
-        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Leverage, Settled Account (up to 5, for block), and the three that turn it into time and actions: Second Swing (5: play the last Attack again), Come Due (5: 2 Energy now, 2 less next turn) and Deny (6: an enemy's next action a turn later); spending it brings a Sentence a turn closer."
+        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Leverage, Settled Account (up to 5, for block), and the three that turn it into time and actions: Second Swing (5: play the last Attack again), Come Due (5: 2 Energy now, 2 less next turn) and Deny (6: an enemy's next action a turn later); each card (or replay) that spends any of it brings every Sentence a turn closer. Collateral's HP makes it too."
       },
       {
         "name": "Grace",
@@ -179,11 +178,11 @@
       },
       {
         "name": "Cost changes",
-        "rule": "Leverage: the next card costing at least 1 Energy costs 2 less; the House Key's free card is the same kind of next-card discount; 0-cost cards pass both by. Collateral: the next card costing 2 or more costs 5 HP (paid like self-damage) instead of Energy. Each is spent by the card it changes."
+        "rule": "Leverage: the next card you play this turn costing at least 1 Energy costs 2 less, several adding up; unused, it ends with the turn. The House Key's free card is the same kind of next-card discount; 0-cost cards pass both by. Collateral: this turn, Energy short of a card's cost is paid at 3 HP each (self-damage), never down to 0 HP."
       },
       {
         "name": "Countdown (Sentence)",
-        "rule": "A status on an enemy that deals its damage when the turns run out; spending Toll takes a turn off."
+        "rule": "A status on an enemy, beside its HP as an hourglass and its turns: it deals its damage when the turns run out - 1 off at the start of the enemy's turn, 1 off for each card that spends any Toll, at once when it reaches 0. Several on one enemy each count on their own."
       },
       {
         "name": "Delayed (enemy)",
@@ -243,7 +242,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 0
         }
       ],
@@ -304,7 +303,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -359,7 +358,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 0
         }
       ],
@@ -420,7 +419,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 2
         }
       ],
@@ -482,7 +481,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -544,7 +543,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -615,7 +614,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 2
         }
       ],
@@ -646,15 +645,15 @@
       "face_type_label": "UTILITY",
       "energy_cost": 0,
       "rarity": "UNCOMMON",
-      "card_text": "The next card you play costing 2 or more costs 5 HP instead of Energy.\nSpent.",
+      "card_text": "This turn, pay 3 HP for each Energy you lack.\nSpent.",
       "face_hp_line": null,
-      "card_text_template": "The next card you play costing 2 or more costs 5 HP instead of Energy.\nSpent.",
+      "card_text_template": "This turn, pay {hp_per_energy} HP for each Energy you lack.\nSpent.",
       "targeting": "self",
       "removal_after_play": "Spent: leaves this fight's rotation once played",
       "effects": [
         {
           "type": "APPLY_STATUS",
-          "plain_english": "Apply Collateral to yourself: Pay 5 HP instead of Energy for your next 1 card costing 2 or more."
+          "plain_english": "Apply Collateral to yourself for the turn: a card costing more Energy than you hold - after Leverage's discount - takes all your Energy and 3 HP for each Energy short, paid before its effects as self-damage (past Block, 1 Toll a point, no Grace). Energy enough, nothing changes. A card whose HP would leave you at 0 can't be played (its face fades). While it's up every face shows its live -N HP and Critical faces read the HP after it."
         }
       ],
       "keywords": [
@@ -673,28 +672,31 @@
       "status_effect": {
         "id": "collateral",
         "name": "Collateral",
-        "description": "Pay 5 HP instead of Energy for your next 1 card costing 2 or more.",
+        "description": "This turn, pay 3 HP for each Energy you lack.",
         "file_path": "res://battle/rules/statuses/collateral.tres",
-        "duration": "until removed (rest of combat unless spent)",
-        "stack_rule": "ADD_CHARGES",
+        "duration": "this turn (ends at its end)",
+        "stack_rule": "IGNORE (the cheaper rate when Collateral+ is up too)",
         "applied_to": "self",
-        "charges": 1,
-        "replacement_hp_cost": 5,
-        "replaces_cost_at_least": 2
+        "hp_per_missing_energy": 3
       },
       "critical_condition": null,
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 0
         }
       ],
       "art_path": "res://cards/art/Wanderer/Collateral.png",
-      "rules_font_px": 13,
+      "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Collateral+",
+        "file_path": "res://cards/tempered/collateral_tempered.tres",
+        "card_text": "This turn, pay 2 HP for each Energy you lack.\nSpent.",
+        "changes": "2 HP for each Energy short in place of 3."
+      },
       "starting_deck_count": 0,
       "in_reward_pool": true,
       "in_belongings_pool": false,
@@ -757,7 +759,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 0
         }
       ],
@@ -831,7 +833,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -898,7 +900,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -957,7 +959,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 0
         }
       ],
@@ -1023,7 +1025,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -1092,7 +1094,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -1162,7 +1164,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 0
         }
       ],
@@ -1233,7 +1235,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -1303,7 +1305,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -1381,7 +1383,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 0
         }
       ],
@@ -1454,7 +1456,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -1527,7 +1529,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -1552,11 +1554,11 @@
       "face_type_label": "TOLL",
       "energy_cost": 0,
       "rarity": "UNCOMMON",
-      "card_text": "Spend 5 Toll.\nYour next card costs 2 less.\nSpent.",
+      "card_text": "Spend 5 Toll.\nThe next card you play this turn costs 2 less Energy.",
       "face_hp_line": null,
-      "card_text_template": "Spend 5 Toll.\nYour next card costs 2 less.\nSpent.",
+      "card_text_template": "Spend {toll_cost} Toll.\nThe next card you play this turn costs {reduction} less Energy.",
       "targeting": "self",
-      "removal_after_play": "Spent: leaves this fight's rotation once played",
+      "removal_after_play": "discard pile",
       "effects": [
         {
           "type": "SPEND_TOLL",
@@ -1564,11 +1566,10 @@
         },
         {
           "type": "APPLY_STATUS",
-          "plain_english": "Apply Leverage to yourself: Your next card costs 2 less."
+          "plain_english": "Apply Leverage to yourself: the next card you play this turn that costs Energy costs 2 less, never below 0; several Leverages add up on that card. Unused, it ends with the turn. Not Spent, so a Toll deck can cycle it."
         }
       ],
       "keywords": [
-        "Spent",
         "Toll"
       ],
       "self_hp_cost": 0,
@@ -1584,10 +1585,10 @@
       "status_effect": {
         "id": "leverage",
         "name": "Leverage",
-        "description": "Your next card costs 2 less.",
+        "description": "The next card you play this turn costs 2 less Energy.",
         "file_path": "res://battle/rules/statuses/leverage.tres",
-        "duration": "until removed (rest of combat unless spent)",
-        "stack_rule": "IGNORE",
+        "duration": "this turn (ends at its end), or until spent",
+        "stack_rule": "IGNORE (stacks count: 2 each)",
         "applied_to": "self",
         "next_card_cost_reduction": 2
       },
@@ -1595,7 +1596,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 0
         }
       ],
@@ -1603,7 +1604,12 @@
       "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Leverage+",
+        "file_path": "res://cards/tempered/leverage_tempered.tres",
+        "card_text": "Spend 4 Toll.\nThe next card you play this turn costs 2 less Energy.",
+        "changes": "Spends 4 Toll in place of 5."
+      },
       "starting_deck_count": 0,
       "in_reward_pool": true,
       "in_belongings_pool": false,
@@ -1666,7 +1672,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -1735,7 +1741,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 2
         }
       ],
@@ -1799,7 +1805,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 2
         }
       ],
@@ -1867,7 +1873,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -1925,7 +1931,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -1995,7 +2001,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -2018,20 +2024,21 @@
       "pool_class": "wanderer",
       "card_type": "SKILL",
       "face_type_label": "UTILITY",
-      "energy_cost": 2,
+      "energy_cost": 1,
       "rarity": "RARE",
-      "card_text": "In 4 turns, deal 40 damage.\nSpending Toll reduces the countdown by 1.",
+      "card_text": "In 3 turns, deal 36 damage.\nEach Toll spend: 1 turn sooner.\nSpent.",
       "face_hp_line": null,
-      "card_text_template": "In 4 turns, deal 40 damage.\nSpending Toll reduces the countdown by 1.",
+      "card_text_template": "In {countdown_turns} turns, deal {countdown_damage} damage.\nEach Toll spend: 1 turn sooner.\nSpent.",
       "targeting": "enemy",
-      "removal_after_play": "discard pile",
+      "removal_after_play": "Spent: leaves this fight's rotation once played",
       "effects": [
         {
           "type": "APPLY_STATUS_TO_TARGET",
-          "plain_english": "Apply Sentence to the target enemy: In 4 turns, it takes 40 damage. Spending Toll brings it a turn closer."
+          "plain_english": "Put a Sentence on the target enemy: in 3 turns it takes 36 damage. It counts down 1 at the start of that enemy's own turn, and 1 for each card or replay you play that spends any Toll - once a card, whatever the amount; a Second Swing replaying a Toll-spending Attack counts twice; Settled Account on 0 Toll none. At 0 it goes off at once, mid-turn if a spend got it there. Not an Attack - no attack bonus, Self-Eater or Bent Nail - and it goes through the enemy's modifiers (Covered/Exposed) and Block. Lost if the enemy dies first. Several on one enemy each count on their own."
         }
       ],
       "keywords": [
+        "Spent",
         "Toll"
       ],
       "self_hp_cost": 0,
@@ -2047,27 +2054,32 @@
       "status_effect": {
         "id": "sentence",
         "name": "Sentence",
-        "description": "In 4 turns, it takes 40 damage. Spending Toll brings it a turn closer.",
+        "description": "In 3 turns, it takes 36 damage. Each card that spends any Toll brings it a turn closer.",
         "file_path": "res://battle/rules/statuses/sentence.tres",
-        "duration": "4 turns",
-        "stack_rule": "RESET",
+        "duration": "3 turns (a countdown)",
+        "stack_rule": "SEPARATE (each its own)",
         "applied_to": "target enemy",
-        "countdown_damage": 40,
+        "countdown_damage": 36,
         "toll_spend_advances_countdown": true
       },
       "critical_condition": null,
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
-          "default_displayed": 2
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
+          "default_displayed": 1
         }
       ],
       "art_path": "res://cards/art/Wanderer/Sentence.png",
       "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Sentence+",
+        "file_path": "res://cards/tempered/sentence_tempered.tres",
+        "card_text": "In 3 turns, deal 45 damage.\nEach Toll spend: 1 turn sooner.\nSpent.",
+        "changes": "45 damage in place of 36; the same 3 turns."
+      },
       "starting_deck_count": 0,
       "in_reward_pool": true,
       "in_belongings_pool": false,
@@ -2127,7 +2139,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -2191,7 +2203,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -2247,7 +2259,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 0
         }
       ],
@@ -2311,7 +2323,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 2
         }
       ],
@@ -2395,7 +2407,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -2456,7 +2468,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -2513,7 +2525,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -2575,7 +2587,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -2627,7 +2639,7 @@
       "dynamic_values": [
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
@@ -2684,7 +2696,7 @@
         },
         {
           "field": "cost",
-          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
           "default_displayed": 1
         }
       ],
