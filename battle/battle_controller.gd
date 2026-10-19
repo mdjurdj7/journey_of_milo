@@ -2102,6 +2102,7 @@ func _attacks_of(result: Dictionary) -> Array[Dictionary]:
 func _report_countdown(enemy: FieldEnemy, combatant: Combatant, result: Dictionary) -> bool:
 	var taken: int = result.get("countdown_damage", 0)
 	if taken > 0:
+		RunLogger.mechanic("sentence_resolved", {"enemy": _log_id(enemy), "damage": taken, "by": "tick"})
 		_report_damage("player", combatant, taken, "status")
 	return combatant.hp <= 0
 

@@ -96,11 +96,15 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	# every countdown that listens for it (Sentence), and one that reaches
 	# 0 goes off now, in the player's turn - reported as damage, never as
 	# the card's own blow.
+	# The run log puts each step down to what spent the Toll - the card, or
+	# a replay ("replay:<attack>").
 	if ctx.toll_spent_this_card:
 		for enemy in ctx.status_holders():
-			Status.advance_on_toll_spend(enemy)
+			for left in Status.advance_on_toll_spend(enemy):
+				RunLogger.mechanic("sentence_advance", {"enemy": RunLogger.combatant_id(enemy), "turns_left": left, "source": RunLogger.current_source()})
 			var taken: int = Status.resolve_countdowns(enemy)
 			if taken > 0:
+				RunLogger.mechanic("sentence_resolved", {"enemy": RunLogger.combatant_id(enemy), "damage": taken, "by": "spend"})
 				ctx.report_damage(enemy, taken, "status")
 	# After the card's last effect, once: an Attack played while its
 	# Attacks Drain (Ransom) heals its share (StatusData.ransom_heal_

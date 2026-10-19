@@ -24,10 +24,11 @@ extends SceneTree
 # offer and the HP left exactly as they were with it on. And the headless
 # guard: with no folder of its own, a headless instance writes nothing.
 #
-# Last, a run of its own for the Toll package: Reckoning, Second Swing
-# replaying it, Come Due and Deny - every Toll spend put down to its
-# source ("replay:Reckoning" for the replay's own), and the replay,
-# energy_debt and delay lines.
+# Last, a run of its own for the Toll package: Sentence on the Sputter,
+# Reckoning, Second Swing replaying it, Come Due and Deny - every Toll
+# spend put down to its source ("replay:Reckoning" for the replay's own),
+# the replay, energy_debt and delay lines, and Sentence advanced by each
+# spend (card, card, replay) until it goes off on the third.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/run_log_probe.gd
 #
@@ -49,6 +50,7 @@ const SLASH_PATH := "res://cards/data/slash.tres"
 const SECOND_SWING_PATH := "res://cards/data/second_swing.tres"
 const COME_DUE_PATH := "res://cards/data/come_due.tres"
 const DENY_PATH := "res://cards/data/deny.tres"
+const SENTENCE_PATH := "res://cards/data/sentence.tres"
 const GLOBAL_SEED := 20261004
 const RUN_SEED := 4242
 const MAX_TURNS := 12
@@ -231,6 +233,7 @@ func _toll_package_run() -> void:
 	var player: Combatant = controller.get("player")
 	player.energy = 99
 	_fresh_hand(controller)
+	await _play(controller, await _deal(controller, SENTENCE_PATH), _field_enemy(controller))
 	player.toll = 20
 	await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
 	player.toll = 15
@@ -275,7 +278,17 @@ func _toll_package_run() -> void:
 	_expect(not delay.is_empty() and not str(delay.get("enemy", "")).is_empty(), "A delay line names the Sputter (%s)" % str(delay))
 	var debt: Dictionary = kinds.get("energy_debt", {})
 	_expect_eq([int(debt.get("owed", 0)), int(debt.get("energy", -1))], [2, 1], "An energy_debt line: 2 owed, the turn on 1")
-	_expect_eq(int(debt.get("v", 0)), 7, "...on a format 7 line")
+	_expect_eq(int(debt.get("v", 0)), RunLogger.FORMAT_VERSION, "...on a format %d line" % RunLogger.FORMAT_VERSION)
+	var advances: Array = []
+	var resolved: Dictionary = {}
+	for line in lines:
+		if str(line.get("ev", "")) == "mechanic" and str(line.get("kind", "")) == "sentence_advance":
+			advances.append([str(line.get("source", "")), int(line.get("turns_left", -1))])
+		if str(line.get("ev", "")) == "mechanic" and str(line.get("kind", "")) == "sentence_resolved":
+			resolved = line
+	_expect_eq(advances, [["card:Reckoning", 2], ["card:Second Swing", 1], ["replay:Reckoning", 0]], "Sentence advanced by each spend: Reckoning, Second Swing, its replay")
+	_expect_eq(str(resolved.get("by", "")), "spend", "...going off on the third, mid-turn")
+	_expect(int(resolved.get("damage", 0)) > 0 and not str(resolved.get("enemy", "")).is_empty(), "...naming the Sputter and its damage (%s)" % str(resolved))
 
 # --- The log ---
 

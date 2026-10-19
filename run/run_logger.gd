@@ -81,9 +81,18 @@ class_name RunLogger
 # A threshold_resolved outcome may now be "delayed"; Come Due's enemy
 # mark, and Deny's hand-card take, are gone.
 
+# Format 8 (2026-10-19): the Toll package, part 2. Two mechanic lines for
+# Sentence: "sentence_advance" (each step a Toll spend takes off it: the
+# "enemy", the "turns_left" after, and the "source" that spent the Toll -
+# "card:<name>", or "replay:<attack>" for a Second Swing replay) and
+# "sentence_resolved" (it went off: the "enemy", the "damage" it took,
+# and "by": "spend" mid-turn, or "tick" at the enemy's own turn).
+# Collateral's HP is put down to "status:collateral" as before, now for
+# each card it covers short this turn.
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 7
+const FORMAT_VERSION := 8
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]
@@ -424,13 +433,20 @@ static func turn_ended(energy: int) -> void:
 # happened in. Kinds: enemy_died, pain_turn, pain_turn_spent, phase,
 # threshold_queued, threshold_resolved, escalation, queued_state,
 # keepsake_double, keepsake_draw, keepsake_block_carry, replay,
-# energy_debt, delay.
+# energy_debt, delay, sentence_advance, sentence_resolved.
 static func mechanic(kind: String, data: Dictionary) -> void:
 	if not _fight_open:
 		return
 	var line: Dictionary = {"kind": kind, "fight": _fights, "turn": _turn}
 	line.merge(data, true)
 	_write_detail("mechanic", line)
+
+# The id an enemy goes by in the log - its data's file name - from its
+# Combatant, for the rules layer (BattleController names it the same way).
+static func combatant_id(combatant: Combatant) -> String:
+	if combatant == null or combatant.enemy_data == null:
+		return ""
+	return combatant.enemy_data.resource_path.get_file().get_basename()
 
 # An enemy died - in order, onto fight_end's deaths too.
 # A Brace or Garnish has left the intent it marked (BattleController.

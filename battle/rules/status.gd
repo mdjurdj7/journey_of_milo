@@ -545,10 +545,14 @@ static func resolve_countdowns(holder: Combatant) -> int:
 # `holder` that Toll hurries (StatusData.toll_spend_advances) takes a turn
 # off, each Sentence its own. What reaches 0 goes off at the caller's
 # resolve_countdowns(), mid-turn.
-static func advance_on_toll_spend(holder: Combatant) -> void:
+# Returns the turns each one left it with, for the run log.
+static func advance_on_toll_spend(holder: Combatant) -> Array[int]:
+	var left: Array[int] = []
 	for active in holder.statuses:
 		if active.data != null and active.data.toll_spend_advances and active.has_countdown() and active.turns_remaining > 0:
 			active.turns_remaining -= 1
+			left.append(active.turns_remaining)
+	return left
 
 # Every status waiting for its holder to be Critical (StatusData.grants_
 # on_critical - No Further) gives way, if `holder` is Critical now: removed,
