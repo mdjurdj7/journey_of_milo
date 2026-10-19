@@ -108,12 +108,12 @@ func _check_no_toll_spent() -> void:
 	_expect_eq(player.hp, 40, "...and heals 0")
 	_completed += 1
 
-# Second Swing spends its 6 Toll on the repeat: Toll spent this turn.
+# Second Swing spends its 5 Toll on the repeat: Toll spent this turn.
 func _check_after_second_swing() -> void:
 	var player: Combatant = _player(40)
-	player.toll = 6
+	player.toll = 5
 	_play_card(load(SECOND_SWING_PATH), player, _enemy())
-	_expect(player.toll == 0 and player.toll_spent_this_turn, "Second Swing's repeat spends 6 Toll: Toll spent this turn")
+	_expect(player.toll == 0 and player.toll_spent_this_turn, "Second Swing's repeat spends 5 Toll: Toll spent this turn")
 	var enemy: Combatant = _enemy()
 	_play(player, enemy)
 	_expect_eq(ENEMY_HP - enemy.hp, HIT, "...then Gnaw deals 3")
@@ -246,10 +246,10 @@ func _check_fight() -> void:
 			_expect(view.rules_font_sizes.has(view.rules_text.get_theme_font_size("normal_font_size")), "...its text at a rules size")
 			_expect_eq(view.size, view.card_size, "...fitting the face at hand size")
 		await _gnaw(controller, card, target, false, "No Toll spent")
-		player.toll = 6
+		player.toll = 5
 		player.energy = 3
 		await _play_real(controller, await _deal(controller, SECOND_SWING_PATH), target)
-		_expect(player.toll_spent_this_turn, "Second Swing spends its 6: Toll spent this turn")
+		_expect(player.toll_spent_this_turn, "Second Swing spends its 5: Toll spent this turn")
 		await _gnaw(controller, await _deal(controller, CARD_PATH), target, true, "Then")
 		await controller.call("end_turn")
 		var deadline: int = ProbePlay.cap_msec() + 15000

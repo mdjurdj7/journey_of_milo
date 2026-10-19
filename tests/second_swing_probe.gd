@@ -1,9 +1,9 @@
 extends SceneTree
 
-# Headless probe for Second Swing: Deal 6; holding 6 Toll, spend it and
+# Headless probe for Second Swing: Deal 6; holding 5 Toll, spend it and
 # the hit lands again - a second hit of the same card, not a second play.
-# Under 6 Toll one hit and nothing spent, and the card is never blocked;
-# 6 or more, two hits and exactly 6 spent; a first hit that kills skips
+# Under 5 Toll one hit and nothing spent, and the card is never blocked;
+# 5 or more, two hits and exactly 5 spent; a first hit that kills skips
 # the repeat and spends nothing. Under Self-Eater both hits take its +3
 # (its HP paid once); Keen's one-shot +3 goes to the first hit only, and
 # Come Due's mark to each hit, a charge apiece - a mark with one charge
@@ -39,7 +39,7 @@ const FLOOR_5 := 4
 const PLAYER_HP := 999
 const ENEMY_HP := 100
 const HIT := 6
-const REPEAT_TOLL := 6
+const REPEAT_TOLL := 5
 const SELF_EATER_BONUS := 3
 const SELF_EATER_PRICE := 2
 const KEEN_BONUS := 3
@@ -82,33 +82,33 @@ func _check_card_data() -> void:
 	_expect_eq(card.cost, 1, "...costs 1")
 	_expect_eq(card.card_type, CardData.CardType.ATTACK, "...is an Attack")
 	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
-	_expect_eq(card.description, "Deal {damage} damage.\nSpend 6 Toll to repeat.", "...its text")
+	_expect_eq(card.description, "Deal {damage} damage.\nSpend 5 Toll to repeat.", "...its text")
 	_expect_eq(card.effects.size(), 1, "...one effect")
 	if card.effects.size() == 1:
 		var effect: CardEffect = card.effects[0]
-		_expect(effect.effect_type == CardEffect.EffectType.DAMAGE and effect.value == HIT and effect.repeat_toll_cost == REPEAT_TOLL, "...DAMAGE 6, repeated for 6 Toll")
+		_expect(effect.effect_type == CardEffect.EffectType.DAMAGE and effect.value == HIT and effect.repeat_toll_cost == REPEAT_TOLL, "...DAMAGE 6, repeated for 5 Toll")
 		_expect_eq(effect.condition, CardEffect.Condition.NONE, "...unconditional: the first hit always lands")
 	_expect_eq(card.battle_animation, &"Slash", "...swings Slash's clip")
 	_expect_eq(card.impact_time, 0.55, "...at Slash's impact time")
 	_completed += 1
 
-# 5 Toll: one hit of 6, nothing spent - and 0 Toll never blocks the play.
+# 4 Toll: one hit of 6, nothing spent - and 0 Toll never blocks the play.
 func _check_under_toll() -> void:
 	var player: Combatant = _player()
 	_expect(not EffectResolver.card_blocked(_card(), player), "Playable on 0 Toll")
-	player.toll = 5
-	_expect(not EffectResolver.card_blocked(_card(), player), "...and on 5")
+	player.toll = REPEAT_TOLL - 1
+	_expect(not EffectResolver.card_blocked(_card(), player), "...and on 4")
 	var enemy := Combatant.new(ENEMY_HP)
 	var ctx: EffectContext = _play(player, [enemy])
-	_expect_eq(ENEMY_HP - enemy.hp, HIT, "5 Toll: one hit of 6")
-	_expect_eq(player.toll, 5, "...no Toll spent")
+	_expect_eq(ENEMY_HP - enemy.hp, HIT, "4 Toll: one hit of 6")
+	_expect_eq(player.toll, REPEAT_TOLL - 1, "...no Toll spent")
 	_expect(not ctx.toll_spent_this_card, "...the card spent no Toll")
 	_completed += 1
 
-# 6 Toll: two hits of 6, 6 spent; 9: the same, 3 left. Each hit meets
+# 5 Toll: two hits of 6, 5 spent; 9: the same, 4 left. Each hit meets
 # block on its own.
 func _check_at_toll() -> void:
-	for held in [6, 9]:
+	for held in [REPEAT_TOLL, 9]:
 		var player: Combatant = _player()
 		player.toll = held
 		var enemy := Combatant.new(ENEMY_HP)
@@ -119,7 +119,7 @@ func _check_at_toll() -> void:
 				hits.append(amount)
 		_resolver.resolve_card(_card(), ctx)
 		_expect_eq(hits, [HIT, HIT] as Array[int], "%d Toll: two hits of 6" % held)
-		_expect_eq(player.toll, held - REPEAT_TOLL, "...6 Toll spent")
+		_expect_eq(player.toll, held - REPEAT_TOLL, "...5 Toll spent")
 		_expect(ctx.toll_spent_this_card, "...the card spent Toll")
 	var player: Combatant = _player()
 	player.toll = REPEAT_TOLL
@@ -157,14 +157,14 @@ func _check_self_eater() -> void:
 	_resolver.resolve_card(_card(), ctx)
 	_expect_eq(hits, [HIT + SELF_EATER_BONUS, HIT + SELF_EATER_BONUS] as Array[int], "Under Self-Eater: two hits of 9")
 	_expect_eq(hp_before - player.hp, SELF_EATER_PRICE, "...its 2 HP paid once")
-	_expect_eq(player.toll, REPEAT_TOLL + SELF_EATER_PRICE - REPEAT_TOLL, "...6 spent of the 8 held after the price")
+	_expect_eq(player.toll, REPEAT_TOLL + SELF_EATER_PRICE - REPEAT_TOLL, "...5 spent of the 7 held after the price")
 	var short: Combatant = _player()
 	_resolver.resolve_card(load(SELF_EATER_PATH) as CardData, _ctx(short, []))
-	short.toll = 4
+	short.toll = REPEAT_TOLL - SELF_EATER_PRICE
 	var other := Combatant.new(ENEMY_HP)
 	_play(short, [other])
-	_expect_eq(ENEMY_HP - other.hp, 2 * (HIT + SELF_EATER_BONUS), "4 Toll and Self-Eater's 2: 6 at the first hit - it repeats")
-	_expect_eq(short.toll, 0, "...and spends all 6")
+	_expect_eq(ENEMY_HP - other.hp, 2 * (HIT + SELF_EATER_BONUS), "3 Toll and Self-Eater's 2: 5 at the first hit - it repeats")
+	_expect_eq(short.toll, 0, "...and spends all 5")
 	_completed += 1
 
 # Keen's charge (+3 on the next Attack) goes to the first hit; Come Due's
@@ -218,7 +218,7 @@ func _check_face() -> void:
 	root.add_child(view)
 	await process_frame
 	view.set_card_data(_card())
-	_expect_eq(view.rules_text.get_parsed_text(), "Deal 6 damage.\nSpend 6 Toll to repeat.", "The face reads its rule")
+	_expect_eq(view.rules_text.get_parsed_text(), "Deal 6 damage.\nSpend 5 Toll to repeat.", "The face reads its rule")
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), FIRST_RULES_SIZE, "...at the first rules size, 15")
 	_expect_eq(view.size, view.card_size, "...the card keeps its size")
 	_expect_eq(view.rules_text.get_line_count(), 2, "...on two lines")
@@ -250,7 +250,7 @@ func _check_art() -> void:
 		view.free()
 	_completed += 1
 
-# The Gape queued, Second Swing on 12 Toll at the Greyshelf: two hits, 6
+# The Gape queued, Second Swing on 12 Toll at the Greyshelf: two hits, 5
 # spent, and one Goaded stack - one Attack card.
 func _check_gape_goaded_once() -> void:
 	var controller: Node = await _start_fight()
@@ -265,7 +265,7 @@ func _check_gape_goaded_once() -> void:
 		var before: int = combatant.damage_taken_this_turn
 		await _play_first(controller, greyshelf)
 		_expect_eq(combatant.damage_taken_this_turn - before, 2 * HIT, "...Second Swing on 12 Toll lands two hits into it (12)")
-		_expect_eq(player.toll, 6, "...6 Toll spent")
+		_expect_eq(player.toll, 12 - REPEAT_TOLL, "...5 Toll spent")
 		_expect_eq(_goaded(combatant), 1, "...and one Goaded stack, not two")
 	await _teardown()
 	_completed += 1
@@ -278,7 +278,7 @@ func _near(actual: Vector2, expected: Vector2) -> bool:
 # Second Swing on 12 Toll at the Greyshelf, played for real: the repeat
 # lands second_swing_delay after the first hit as its own blow - its own
 # damage event, HP drop and number (offset), the Toll readout dropping
-# by 6 at its swing, before it lands, and input still locked until it has.
+# by 5 at its swing, before it lands, and input still locked until it has.
 func _check_two_blows() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -330,10 +330,10 @@ func _check_two_blows() -> void:
 			_expect(bool(hits[1][2]), "...input still locked as the second lands")
 			var drop_at: int = -1
 			for entry: Array in tolls:
-				if int(entry[1]) == 6:
+				if int(entry[1]) == 12 - REPEAT_TOLL:
 					drop_at = int(entry[0])
 					break
-			_expect(drop_at >= int(hits[0][0]) and drop_at <= int(hits[1][0]), "The Toll readout drops to 6 between the hits (%d, hits at %d and %d)" % [drop_at, hits[0][0], hits[1][0]])
+			_expect(drop_at >= int(hits[0][0]) and drop_at <= int(hits[1][0]), "The Toll readout drops to 7 between the hits (%d, hits at %d and %d)" % [drop_at, hits[0][0], hits[1][0]])
 		_expect_eq(hp_steps, [hp_before - HIT, hp_before - 2 * HIT] as Array[int], "The HP bar drops twice")
 		_expect_eq(numbers.size(), 2, "Two damage numbers")
 		if numbers.size() == 2:
@@ -347,7 +347,7 @@ func _check_two_blows() -> void:
 				_expect(absf(numbers[1].x - expected.x) <= NUMBER_SLACK_PX and numbers[1].y >= expected.y - NUMBER_SLACK_PX, "...the second offset by %s across, held down at the screen's top (%s)" % [str(offset), str(numbers[1] - numbers[0])])
 			else:
 				_expect(_near(numbers[1], expected), "...the second offset by %s (%s)" % [str(offset), str(numbers[1] - numbers[0])])
-		_expect_eq(player.toll, 6, "...6 Toll spent, as before")
+		_expect_eq(player.toll, 12 - REPEAT_TOLL, "...5 Toll spent, as before")
 		_expect(not bool(controller.get("_input_locked")), "Input unlocks once it has landed")
 	await _teardown()
 	_completed += 1

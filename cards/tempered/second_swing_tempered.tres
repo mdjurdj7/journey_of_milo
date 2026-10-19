@@ -7,7 +7,7 @@
 [sub_resource type="Resource" id="CardEffect_damage"]
 script = ExtResource("2_card_effect")
 value = 6
-repeat_toll_cost = 3
+repeat_toll_cost = 2
 
 [resource]
 script = ExtResource("1_card_data")
@@ -16,7 +16,7 @@ cost = 1
 rarity = 1
 target_type = 0
 description = "Deal {damage} damage.
-Spend 3 Toll to repeat."
+Spend 2 Toll to repeat."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
 art = ExtResource("9_art")
 battle_animation = &"Slash"

@@ -1724,15 +1724,15 @@
       "face_type_label": "STRIKE",
       "energy_cost": 1,
       "rarity": "COMMON",
-      "card_text": "Deal 6 damage.\nSpend 6 Toll to repeat.",
+      "card_text": "Deal 6 damage.\nSpend 5 Toll to repeat.",
       "face_hp_line": null,
-      "card_text_template": "Deal {damage} damage.\nSpend 6 Toll to repeat.",
+      "card_text_template": "Deal {damage} damage.\nSpend 5 Toll to repeat.",
       "targeting": "enemy",
       "removal_after_play": "discard pile",
       "effects": [
         {
           "type": "DAMAGE",
-          "plain_english": "Deal 6 damage to the target. Then, if the target is still alive and you hold 6 or more Toll, spend 6 Toll and deal 6 damage to it again (CardEffect.repeat_toll_cost 6). With less than 6, or once the first hit has killed, nothing more happens and nothing is spent. Never blocks the play. The second hit is a hit of the same card, not a second play: per-card triggers (Goaded, a Ransom Drain, Sentence's hurry) count the card once."
+          "plain_english": "Deal 6 damage to the target. Then, if the target is still alive and you hold 5 or more Toll, spend 5 Toll and deal 6 damage to it again (CardEffect.repeat_toll_cost 5). With less than 5, or once the first hit has killed, nothing more happens and nothing is spent. Never blocks the play. The second hit is a hit of the same card, not a second play: per-card triggers (Goaded, a Ransom Drain, Sentence's hurry) count the card once."
         }
       ],
       "keywords": [
@@ -1744,7 +1744,7 @@
       "draw": null,
       "energy_gain": null,
       "toll_gain": null,
-      "toll_spend": "6 Toll, optional (repeats the hit)",
+      "toll_spend": "5 Toll, optional (repeats the hit)",
       "persistent_effect": null,
       "stance_effect": null,
       "power_effect": null,
@@ -1753,7 +1753,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Each hit adds the ongoing attack bonus - the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) - so under Self-Eater both hits deal 9. Keen's +3 (one Attack) goes to the first hit only. A Come Due mark's +4 goes to each hit, spending a charge per hit; with one charge left the first hit takes it and the repeat lands bare. Self-Eater's 2 HP per stack is paid once for the card, before the first hit, and the Toll it makes counts toward the 6. The face shows one hit's number.",
+          "rule": "Each hit adds the ongoing attack bonus - the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) - so under Self-Eater both hits deal 9. Keen's +3 (one Attack) goes to the first hit only. A Come Due mark's +4 goes to each hit, spending a charge per hit; with one charge left the first hit takes it and the repeat lands bare. Self-Eater's 2 HP per stack is paid once for the card, before the first hit, and the Toll it makes counts toward the 5. The face shows one hit's number.",
           "default_displayed": "no bonus outside a fight"
         },
         {
