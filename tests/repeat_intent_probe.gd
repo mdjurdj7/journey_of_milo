@@ -7,8 +7,8 @@ extends SceneTree
 # separate attacks - previewed and resolved alike, each attack its own
 # entry in the turn's "actions", the loop advancing once. The preview's
 # lethal flag and the player's Block are read across both attacks, and
-# a status an attack spends (Garnished on the enemy) softens only the
-# first. Without it every turn is as it always was.
+# a status an attack spends (Garnished on the enemy) softens each of
+# them, as garnish_probe has it. Without it every turn is as it always was.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/repeat_intent_probe.gd
 #
@@ -23,7 +23,7 @@ func _initialize() -> void:
 	_check_once()
 	_check_twice()
 	_check_lethal_and_block()
-	_check_spent_by_first()
+	_check_garnish_each_action()
 	if _failures == 0:
 		print("repeat_intent_probe: PASSED")
 		quit(0)
@@ -101,9 +101,9 @@ func _check_lethal_and_block() -> void:
 	_expect(not bool(EnemyTurn.preview_intent(fresh, data, Combatant.new(13))["lethal"]), "...at 13: not")
 	_expect(not bool(EnemyTurn.preview_intent(_stepping(data), data, Combatant.new(12))["lethal"]), "...and unheld, one 6 at 12: not")
 
-# Garnished (4 off its next attack, spent by it) on a held enemy: the
-# first Step lands 2, the second its full 6 - previewed and resolved.
-func _check_spent_by_first() -> void:
+# Garnished (4 off its next attack) on a held enemy: each Step loses
+# the full 4 and lands 2 - previewed and resolved.
+func _check_garnish_each_action() -> void:
 	var data := _crane()
 	var enemy := _enemy(data)
 	Status.apply_to(enemy.statuses, _bereft())
@@ -111,9 +111,9 @@ func _check_spent_by_first() -> void:
 	EnemyTurn._advance_intent(enemy, data)
 	var player := Combatant.new(PLAYER_HP)
 	var preview: Dictionary = EnemyTurn.preview_intent(enemy, data, player)
-	_expect_eq(preview["hit_amounts"], [2, 6], "Garnished 4: the first Step 2, the second 6, previewed")
+	_expect_eq(preview["hit_amounts"], [2, 2], "Garnished 4: each Step 2, previewed")
 	var landed: Dictionary = EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq([int(landed["actions"][0]["damage_to_hp"]), int(landed["actions"][1]["damage_to_hp"])], [2, 6], "...and landed")
+	_expect_eq([int(landed["actions"][0]["damage_to_hp"]), int(landed["actions"][1]["damage_to_hp"])], [2, 2], "...and landed")
 
 # --- Helpers ---
 

@@ -14,7 +14,7 @@ extends SceneTree
 # BattleController.request_play(), as collateral_probe does: 1 Energy
 # paid, 5 HP lost, Toll +20 in all, its own play sound, Spent - and the
 # loss counted as self-damage, by The Return's counter and by entering
-# Critical (Blue Fastener's Block). Untyped against anything that names
+# Critical (a probe-only trinket's Critical-entry Block). Untyped against anything that names
 # the RunState autoload.
 
 const CASES := 4
@@ -25,7 +25,6 @@ const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const ART_PATH := "res://cards/art/Wanderer/Blood Advance.png"
 const SOUND_PATH := "res://assets/audio/cards/Blood Advance/Blood Advance.mp3"
 const THE_RETURN_STATUS_PATH := "res://battle/rules/statuses/the_return.tres"
-const BLUE_FASTENER_PATH := "res://run/keepsakes/keeper/blue_fastener.tres"
 const HP_LOSS := 5
 const TOLL_TOTAL := 20
 const SAFETY_SECONDS := 180.0
@@ -129,10 +128,10 @@ func _check_counts_for_the_return() -> void:
 	await _teardown()
 	_completed += 1
 
-# From 25 HP the 5 crosses into Critical (21 and below at 70): Blue
-# Fastener's Block for first entering it fires.
+# From 25 HP the 5 crosses into Critical (21 and below at 70): the
+# Critical-entry hook's Block fires.
 func _check_enters_critical() -> void:
-	var controller: Node = await _start_fight(25, BLUE_FASTENER_PATH)
+	var controller: Node = await _start_fight(25, _critical_entry_trinket())
 	if controller != null:
 		var player: Combatant = controller.get("player")
 		_expect(not player.is_critical(), "25 HP is not Critical")
@@ -140,17 +139,27 @@ func _check_enters_critical() -> void:
 		await _play(controller, await _deal(controller))
 		_expect_eq(player.hp, 20, "Blood Advance takes them to 20")
 		_expect(player.is_critical(), "...which is Critical")
-		_expect_eq(player.block - block_before, 6, "...and Blue Fastener's 6 Block fires: the loss entered Critical")
+		_expect_eq(player.block - block_before, 6, "...and the Critical-entry hook's 6 Block fires: the loss entered Critical")
 		_expect_eq(player.toll, TOLL_TOTAL, "...Toll still 20")
 	await _teardown()
 	_completed += 1
 
 # --- Helpers ---
 
-func _start_fight(hp: int = -1, keepsake_path: String = "") -> Node:
+# The Critical-entry Block hook (TrinketData.critical_entry_block), through
+# a probe-only trinket - no keepsake carries it since Blue Fastener took
+# to carrying Block.
+func _critical_entry_trinket() -> TrinketData:
+	var trinket := TrinketData.new()
+	trinket.id = &"probe_critical_entry"
+	trinket.display_name = "Probe Critical Entry"
+	trinket.critical_entry_block = 6
+	return trinket
+
+func _start_fight(hp: int = -1, keepsake: TrinketData = null) -> Node:
 	_run_state.call("new_run", load(CHARACTER_PATH))
-	if not keepsake_path.is_empty():
-		_run_state.call("equip_keepsake", load(keepsake_path))
+	if keepsake != null:
+		_run_state.call("equip_keepsake", keepsake)
 	if hp > 0:
 		_run_state.set("player_hp", hp)
 	_run_state.set("current_floor_index", 0)
