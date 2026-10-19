@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -104,8 +104,8 @@
       "where": "floor 2's belongings (a RewardSpread prop on region1_floor2.tres)"
     },
     "wanderer_card_types": {
-      "SKILL": 16,
-      "ATTACK": 11,
+      "SKILL": 17,
+      "ATTACK": 10,
       "POWER": 5,
       "STANCE": 2
     },
@@ -126,7 +126,6 @@
       "Bide": 14,
       "Collateral": 13,
       "Cornered": 14,
-      "Deny": 13,
       "Last Resort": 14,
       "Last Wager": 13,
       "No Further": 12,
@@ -136,11 +135,11 @@
     "keywords_and_mechanics": [
       {
         "name": "Energy",
-        "rule": "Per-turn resource that pays a card's cost; 3 per turn. Gained Energy can stand above that for the turn (In the Red); each turn starts on the refill."
+        "rule": "Per-turn resource that pays a card's cost; 3 per turn. Gained Energy can stand above that for the turn (In the Red, Come Due); each turn starts on the refill, less what is owed (Come Due's Owed), never below 0."
       },
       {
         "name": "Toll",
-        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Come Due, Leverage, Settled Account (up to 5, for block) and Second Swing (optionally, to repeat its hit); spending it brings a Sentence a turn closer."
+        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Leverage, Settled Account (up to 5, for block), and the three that turn it into time and actions: Second Swing (5: play the last Attack again), Come Due (5: 2 Energy now, 2 less next turn) and Deny (6: an enemy's next action a turn later); spending it brings a Sentence a turn closer."
       },
       {
         "name": "Grace",
@@ -176,11 +175,7 @@
       },
       {
         "name": "Attack bonus",
-        "rule": "Flat extra damage from the stance (x stacks) and a keepsake's status (Keen), paid once per Attack card on its first damage effect - Reckoning included. Second Swing's repeated hit takes the stance's bonus again, but not Keen's."
-      },
-      {
-        "name": "Marks (Come Due)",
-        "rule": "A status on an enemy that adds damage to your next N Attack hits against it, spending a charge per hit - an ordinary Attack is one hit; a repeated hit (Second Swing, Lash) pays and spends again while a charge is left."
+        "rule": "Flat extra damage from the stance (x stacks) and a keepsake's status (Keen), paid once per Attack card on its first damage effect - Reckoning included. Lash's further hits take the stance's bonus again, but not Keen's; a Second Swing replay is an Attack again, so it takes the stance's bonus and Keen's if a charge is left."
       },
       {
         "name": "Cost changes",
@@ -191,12 +186,12 @@
         "rule": "A status on an enemy that deals its damage when the turns run out; spending Toll takes a turn off."
       },
       {
-        "name": "Denied (enemy)",
-        "rule": "Deny's status: the enemy's next move is skipped - lost, not delayed; its pattern advances and the turn still counts, and its statuses still tick. Removed by that turn; doesn't stack, so a Denied enemy can't be targeted by another Deny. Its intent keeps its number, struck through."
+        "name": "Delayed (enemy)",
+        "rule": "Deny's status: the enemy's coming turn does nothing and its queued move waits for the turn after - held, not lost; its loop, turn count and escalation wait with it, its statuses still tick, a pain turn due then is spent on it. Removed by that turn; doesn't stack, so a Delayed enemy can't be targeted by another Deny. Its intent keeps its number, dimmed; the hover says it acts next turn. A Delayed packmate answers no Signal. (Stunned, which no card applies, still skips a move outright.)"
       },
       {
         "name": "Braced (enemy intent)",
-        "rule": "Brace's mark, on one attack intent the enemy has queued (not the enemy, not its status row - the intent readout shows it): that attack deals 50% less, every hit of every action (both of Bereft's), rounded as before. Valid targets: an attack that will land - not a non-attack, not one landing as a strike back (the Siltjaw's Erupt), not one Denied, cancelled or interrupted - and one Brace per intent. Spent once that intent lands; lost if it is replaced, cancelled (Deny, a pain turn, an interrupt) or its enemy dies first. A Signal's out-of-turn answer neither reads nor spends it."
+        "rule": "Brace's mark, on one attack intent the enemy has queued (not the enemy, not its status row - the intent readout shows it): that attack deals 50% less, every hit of every action (both of Bereft's), rounded as before. Valid targets: an attack that will land - not a non-attack, not one landing as a strike back (the Siltjaw's Erupt), not one Stunned, cancelled or interrupted - a Delayed one can, it lands a turn later - and one Brace per intent. Spent once that intent lands; lost if it is replaced, cancelled (Stunned, a pain turn, an interrupt) or its enemy dies first. A Signal's out-of-turn answer neither reads nor spends it."
       },
       {
         "name": "Garnished (enemy intent)",
@@ -304,7 +299,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy on each hit, spending a charge per hit. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -420,7 +415,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy on each hit, spending a charge per hit. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -544,7 +539,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy on each hit, spending a charge per hit. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -582,7 +577,7 @@
       "effects": [
         {
           "type": "DAMAGE",
-          "plain_english": "Deal 5 damage to the target; if you are Critical, 12 instead. The hit Drains (CardEffect.drains): heal the HP it actually took - after block, no overkill, less what Grace reclaims from it - up to max HP. The card's own blow, so the attack bonus and a Come Due mark are in the hit and its heal, and under Ransom its half of the damage dealt heals on top."
+          "plain_english": "Deal 5 damage to the target; if you are Critical, 12 instead. The hit Drains (CardEffect.drains): heal the HP it actually took - after block, no overkill, less what Grace reclaims from it - up to max HP. The card's own blow, so the attack bonus is in the hit and its heal, and under Ransom its half of the damage dealt heals on top."
         }
       ],
       "keywords": [
@@ -615,7 +610,7 @@
         },
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy on each hit, spending a charge per hit. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -714,12 +709,12 @@
       "pool_class": "wanderer",
       "card_type": "SKILL",
       "face_type_label": "TOLL",
-      "energy_cost": 1,
-      "rarity": "UNCOMMON",
-      "card_text": "Spend 5 Toll.\nNext 3 Attack hits against this enemy deal +4 damage.",
+      "energy_cost": 0,
+      "rarity": "COMMON",
+      "card_text": "Spend 5 Toll.\nGain 2 Energy.\nNext turn, gain 2 less.",
       "face_hp_line": null,
-      "card_text_template": "Spend 5 Toll.\nNext 3 Attack hits against this enemy deal +4 damage.",
-      "targeting": "enemy",
+      "card_text_template": "Spend {toll_cost} Toll.\nGain {energy} Energy.\nNext turn, gain {debt} less.",
+      "targeting": "self",
       "removal_after_play": "discard pile",
       "effects": [
         {
@@ -727,8 +722,12 @@
           "plain_english": "Spend 5 Toll. The card can't be played with less (its face fades)."
         },
         {
-          "type": "APPLY_STATUS_TO_TARGET",
-          "plain_english": "Apply Come Due to the target enemy: +4 damage on your next 3 Attack hits against it."
+          "type": "GAIN_ENERGY",
+          "plain_english": "Gain 2 Energy now - past the maximum if need be."
+        },
+        {
+          "type": "APPLY_STATUS",
+          "plain_english": "Owe 2 (Owed, on you, its amount in your row): the next turn's refill is 2 less, never below 0, then it clears. Plays add up (Owed 4); a fight's end clears it."
         }
       ],
       "keywords": [
@@ -738,36 +737,40 @@
       "base_damage": null,
       "base_block": null,
       "draw": null,
-      "energy_gain": null,
+      "energy_gain": "2 now, 2 less next turn",
       "toll_gain": null,
       "toll_spend": "5 Toll",
       "persistent_effect": null,
       "stance_effect": null,
       "power_effect": null,
       "status_effect": {
-        "id": "come_due",
-        "name": "Come Due",
-        "description": "+4 damage on your next 3 Attack hits against it.",
-        "file_path": "res://battle/rules/statuses/come_due.tres",
-        "duration": "until removed (rest of combat unless spent)",
-        "stack_rule": "RESET",
-        "applied_to": "target enemy",
-        "charges": 3,
-        "attack_bonus_against_holder": 4
+        "id": "owed",
+        "name": "Owed",
+        "description": "Next turn, gain {value} less Energy.",
+        "file_path": "res://battle/rules/statuses/owed.tres",
+        "duration": "1 turn: read by the next refill, then gone",
+        "stack_rule": "ADD_MAGNITUDE (the card's amount added)",
+        "applied_to": "self",
+        "energy_debt": true
       },
       "critical_condition": null,
       "dynamic_values": [
         {
           "field": "cost",
           "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
-          "default_displayed": 1
+          "default_displayed": 0
         }
       ],
       "art_path": "res://cards/art/Wanderer/Come Due.png",
       "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Come Due+",
+        "file_path": "res://cards/tempered/come_due_tempered.tres",
+        "card_text": "Spend 5 Toll.\nGain 2 Energy.\nNext turn, gain 1 less.",
+        "changes": "Owes 1 in place of 2."
+      },
       "starting_deck_count": 0,
       "in_reward_pool": true,
       "in_belongings_pool": false,
@@ -823,7 +826,7 @@
         },
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy on each hit, spending a charge per hit. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -850,26 +853,26 @@
       "file_path": "res://cards/data/deny.tres",
       "pool_class": "wanderer",
       "card_type": "SKILL",
-      "face_type_label": "UTILITY",
-      "energy_cost": 2,
+      "face_type_label": "TOLL",
+      "energy_cost": 1,
       "rarity": "UNCOMMON",
-      "card_text": "Consume your costliest card.\nTarget enemy skips its next move.\nSpent.",
+      "card_text": "Spend 6 Toll.\nDelay target enemy's next action by a turn.",
       "face_hp_line": null,
-      "card_text_template": "Consume your costliest card.\nTarget enemy skips its next move.\nSpent.",
+      "card_text_template": "Spend {toll_cost} Toll.\nDelay target enemy's next action by a turn.",
       "targeting": "enemy",
-      "removal_after_play": "Spent: leaves this fight's rotation once played",
+      "removal_after_play": "discard pile",
       "effects": [
         {
-          "type": "CONSUME",
-          "plain_english": "Consume the other card in hand with the highest printed cost (CardData.cost - discounts never reorder it): it goes to the Spent pile for the rest of this fight. A tie is the player's pick, exactly one, through the hand choice; no other card consumes nothing."
+          "type": "SPEND_TOLL",
+          "plain_english": "Spend 6 Toll. The card can't be played with less (its face fades)."
         },
         {
           "type": "APPLY_STATUS_TO_TARGET",
-          "plain_english": "Apply Denied to the target enemy: It skips its next move."
+          "plain_english": "Apply Delayed to the target enemy (not one already Delayed): its coming turn does nothing - its queued move held where it is, the Brace and Garnish on it still bound, its turn count and escalation unmoved, its statuses still ticking, a pain turn due then spent on it - and on the turn after it performs the held move, its loop going on from there. That turn's preview leaves the move out: no damage, never lethal. A Delayed packmate answers no Signal."
         }
       ],
       "keywords": [
-        "Spent"
+        "Toll"
       ],
       "self_hp_cost": 0,
       "base_damage": null,
@@ -877,33 +880,38 @@
       "draw": null,
       "energy_gain": null,
       "toll_gain": null,
-      "toll_spend": null,
+      "toll_spend": "6 Toll",
       "persistent_effect": null,
       "stance_effect": null,
       "power_effect": null,
       "status_effect": {
-        "id": "denied",
-        "name": "Denied",
-        "description": "It skips its next move.",
-        "file_path": "res://battle/rules/statuses/denied.tres",
+        "id": "delayed",
+        "name": "Delayed",
+        "description": "Its next action waits a turn.",
+        "file_path": "res://battle/rules/statuses/delayed.tres",
         "duration": "until triggered",
         "stack_rule": "IGNORE",
         "applied_to": "target enemy",
-        "skips_holders_next_turn": true
+        "delays_next_action": true
       },
       "critical_condition": null,
       "dynamic_values": [
         {
           "field": "cost",
           "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
-          "default_displayed": 2
+          "default_displayed": 1
         }
       ],
       "art_path": "res://cards/art/Wanderer/Deny.png",
-      "rules_font_px": 13,
+      "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Deny+",
+        "file_path": "res://cards/tempered/deny_tempered.tres",
+        "card_text": "Spend 4 Toll.\nDelay target enemy's next action by a turn.",
+        "changes": "Spends 4 Toll in place of 6."
+      },
       "starting_deck_count": 0,
       "in_reward_pool": true,
       "in_belongings_pool": false,
@@ -1122,7 +1130,7 @@
       "effects": [
         {
           "type": "DAMAGE",
-          "plain_english": "Deal 3 damage to the target. If any Toll was spent earlier this turn (by any card or effect - CardEffect.Condition.TOLL_SPENT_THIS_TURN), the hit Drains (CardEffect.drain_on_condition): heal the HP it actually took - after block, no overkill, less what Grace reclaims from it - up to max HP. The card's own blow, so the attack bonus and a Come Due mark are in the hit and its heal, and under Ransom its half of the damage dealt heals on top."
+          "plain_english": "Deal 3 damage to the target. If any Toll was spent earlier this turn (by any card or effect - CardEffect.Condition.TOLL_SPENT_THIS_TURN), the hit Drains (CardEffect.drain_on_condition): heal the HP it actually took - after block, no overkill, less what Grace reclaims from it - up to max HP. The card's own blow, so the attack bonus is in the hit and its heal, and under Ransom its half of the damage dealt heals on top."
         }
       ],
       "keywords": [
@@ -1149,7 +1157,7 @@
         },
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy on each hit, spending a charge per hit. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -1514,7 +1522,7 @@
         },
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy on each hit, spending a charge per hit. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -1786,7 +1794,7 @@
         },
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy on each hit, spending a charge per hit. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -1880,42 +1888,41 @@
       "name": "Second Swing",
       "file_path": "res://cards/data/second_swing.tres",
       "pool_class": "wanderer",
-      "card_type": "ATTACK",
-      "face_type_label": "STRIKE",
+      "card_type": "SKILL",
+      "face_type_label": "TOLL",
       "energy_cost": 1,
-      "rarity": "COMMON",
-      "card_text": "Deal 6 damage.\nSpend 5 Toll to repeat.",
+      "rarity": "UNCOMMON",
+      "card_text": "Spend 5 Toll.\nPlay the last Attack you played this turn again.",
       "face_hp_line": null,
-      "card_text_template": "Deal {damage} damage.\nSpend 5 Toll to repeat.",
-      "targeting": "enemy",
+      "card_text_template": "Spend {toll_cost} Toll.\nPlay the last Attack you played this turn again.",
+      "targeting": "none - the replayed Attack's own target (asked for when that enemy is gone)",
       "removal_after_play": "discard pile",
       "effects": [
         {
-          "type": "DAMAGE",
-          "plain_english": "Deal 6 damage to the target. Then, if the target is still alive and you hold 5 or more Toll, spend 5 Toll and deal 6 damage to it again (CardEffect.repeat_toll_cost 5). With less than 5, or once the first hit has killed, nothing more happens and nothing is spent. Never blocks the play. The second hit is a hit of the same card, not a second play: per-card triggers (Goaded, a Ransom Drain, Sentence's hurry) count the card once."
+          "type": "SPEND_TOLL",
+          "plain_english": "Spend 5 Toll. The card can't be played with less (its face fades)."
+        },
+        {
+          "type": "REPLAY_LAST_ATTACK",
+          "plain_english": "The last Attack card you played this turn resolves again, its effects in full as if played: its own HP costs and Toll gains, the stance's price and bonus (Self-Eater, Last Resort), Keen if a charge is left, Ransom's heal, Goaded/Roused on its enemy, Coiled striking back, Leg Band's multi-enemy draw. Not a play: no Energy, the card stays wherever it went (a Spent Attack replays from the Spent pile), no played-card or tag count (Worn Page, Lash's count), never Bent Nail's first Attack, and never itself the last Attack for another Second Swing. At the enemy the Attack was played at while it stands, at every enemy for an all-enemies one, else at a target you pick. Can't be played with no Attack played this turn."
         }
       ],
       "keywords": [
         "Toll"
       ],
       "self_hp_cost": 0,
-      "base_damage": 6,
+      "base_damage": null,
       "base_block": null,
       "draw": null,
       "energy_gain": null,
       "toll_gain": null,
-      "toll_spend": "5 Toll, optional (repeats the hit)",
+      "toll_spend": "5 Toll",
       "persistent_effect": null,
       "stance_effect": null,
       "power_effect": null,
       "status_effect": null,
       "critical_condition": null,
       "dynamic_values": [
-        {
-          "field": "damage",
-          "rule": "Each hit adds the ongoing attack bonus - the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) - so under Self-Eater both hits deal 9. Keen's +3 (one Attack) goes to the first hit only. A Come Due mark's +4 goes to each hit, spending a charge per hit; with one charge left the first hit takes it and the repeat lands bare. Self-Eater's 2 HP per stack is paid once for the card, before the first hit, and the Toll it makes counts toward the 5. The face shows one hit's number.",
-          "default_displayed": "no bonus outside a fight"
-        },
         {
           "field": "cost",
           "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then Collateral on what's left: a card still costing 2 or more costs 5 HP instead of Energy. The face shows the cost it would be paid at.",
@@ -1924,9 +1931,14 @@
       ],
       "art_path": "res://cards/art/Wanderer/Second Swing.png",
       "rules_font_px": 15,
-      "battle_animation": "Slash",
+      "battle_animation": null,
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Second Swing+",
+        "file_path": "res://cards/tempered/second_swing_tempered.tres",
+        "card_text": "Spend 5 Toll.\nPlay the last Attack you played this turn again.",
+        "changes": "Cost 0 in place of 1; the same text."
+      },
       "starting_deck_count": 0,
       "in_reward_pool": true,
       "in_belongings_pool": false,
@@ -2174,7 +2186,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy on each hit, spending a charge per hit. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -2439,7 +2451,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy on each hit, spending a charge per hit. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
@@ -2558,7 +2570,7 @@
         },
         {
           "field": "damage",
-          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). A Come Due mark on the target adds +4 against that enemy on each hit, spending a charge per hit. Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
+          "rule": "Attacks add the attack bonus once per card, on its first damage effect: the held stance's bonus x stacks (Self-Eater +3; Last Resort +6 while Critical) plus a keepsake's status (Keen +3, one Attack). Self-Eater also costs 2 HP per stack on each Attack, shown on the face's HP line.",
           "default_displayed": "no bonus outside a fight"
         },
         {
