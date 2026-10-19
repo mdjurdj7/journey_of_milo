@@ -60,6 +60,7 @@ const TEMPERED_DIR := "res://cards/tempered/"
 # Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"in_the_red": "res://cards/art/Wanderer/In the Red.png",
+	"go_under": "res://cards/art/Wanderer/Go Under.png",
 	"slash": "res://cards/art/Wanderer/Slash.png",
 	"bite_down": "res://cards/art/Wanderer/Bite Down.png",
 	"brace": "res://cards/art/Wanderer/Brace.png",

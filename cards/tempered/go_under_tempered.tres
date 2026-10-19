@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/gone_under.tres" id="3_gone_under"]
+[ext_resource type="Texture2D" uid="uid://yon5efcr36g" path="res://cards/art/Wanderer/Go Under.png" id="4_art"]
 
 [sub_resource type="Resource" id="CardEffect_apply_status"]
 script = ExtResource("2_card_effect")
@@ -18,4 +19,5 @@ rarity = 2
 target_type = 1
 description = "This fight, you're Critical at {critical_percent}% of max HP or below."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
+art = ExtResource("4_art")
 card_class = &"wanderer"
