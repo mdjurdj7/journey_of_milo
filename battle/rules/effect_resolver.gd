@@ -34,6 +34,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.DRAIN: "res://battle/rules/effects/drain_effect.gd",
 	CardEffect.EffectType.REPLAY_LAST_ATTACK: "res://battle/rules/effects/replay_last_attack_effect.gd",
 	CardEffect.EffectType.GRANT_KEEP: "res://battle/rules/effects/grant_keep_effect.gd",
+	CardEffect.EffectType.COPY_HAND_CARD: "res://battle/rules/effects/copy_hand_card_effect.gd",
 }
 
 var _cache: Dictionary = {}
@@ -173,6 +174,25 @@ static func has_target(card: CardData, enemies: Array[Combatant]) -> bool:
 static func is_taunting(combatant: Combatant) -> bool:
 	for active: Status in combatant.statuses:
 		if active.data != null and active.data.taunts:
+			return true
+	return false
+
+# The hand cards `card` may copy (COPY_HAND_CARD - Countersign): every
+# other card in `hand` but one that copies itself - Countersign never
+# copies a Countersign. Empty for a card that copies nothing, too. With
+# none, the controller and the hand's fade both refuse the card.
+static func copy_targets(card: CardData, hand: Array[CardData]) -> Array[CardData]:
+	var targets: Array[CardData] = []
+	if card == null or not copies_hand_card(card):
+		return targets
+	for other in hand:
+		if other != card and other != null and not copies_hand_card(other):
+			targets.append(other)
+	return targets
+
+static func copies_hand_card(card: CardData) -> bool:
+	for effect in card.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.COPY_HAND_CARD:
 			return true
 	return false
 

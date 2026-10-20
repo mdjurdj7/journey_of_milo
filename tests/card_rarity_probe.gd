@@ -71,6 +71,7 @@ const EXPECTED_RARITY: Dictionary = {
 	"Blood Advance": CardData.CardRarity.UNCOMMON,
 	"Garnish": CardData.CardRarity.UNCOMMON,
 	"In the Red": CardData.CardRarity.UNCOMMON,
+	"Countersign": CardData.CardRarity.UNCOMMON,
 	"Go Under": CardData.CardRarity.UNCOMMON,
 	"Dying Light": CardData.CardRarity.RARE,
 	"Refuse the End": CardData.CardRarity.RARE,

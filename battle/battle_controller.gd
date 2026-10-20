@@ -211,6 +211,9 @@ var _devour_picking: bool = false
 # The GRANT_KEEP card (Bide) armed while its choice is open, the other hand cards
 # marked for it, and how many may be - see _begin_choice().
 var _choosing_card_view: CardView = null
+# The cards the open choice may take, when it names them (Countersign's -
+# everything else in the hand is faded and unpickable); empty for any.
+var _choice_eligible: Array[CardView] = []
 var _choice_marked: Array[CardView] = []
 var _choice_cap: int = 0
 # The end-of-turn keep is open (see _begin_keep_choice()): a choice with
@@ -731,6 +734,17 @@ func request_play(card_view: CardView) -> void:
 	if cap > 0:
 		_begin_choice(card_view, cap)
 		return
+	# A COPY_HAND_CARD card (Countersign) asks which one card to copy,
+	# from those it may (EffectResolver.copy_targets()), and plays the
+	# moment it's picked.
+	if EffectResolver.copies_hand_card(card):
+		var eligible: Array[CardView] = []
+		var targets: Array[CardData] = EffectResolver.copy_targets(card, deck.hand)
+		for view: CardView in _hand_container.call("_card_views"):
+			if view != card_view and targets.has(view.card_data):
+				eligible.append(view)
+		_begin_choice(card_view, 1, eligible)
+		return
 	_arm_or_play(card_view)
 
 # Whether `card` can be played now: affordable, not blocked by the rules,
@@ -746,6 +760,9 @@ func _is_playable(card: CardData) -> bool:
 	# Every enemy buried - or, for Deny, every one already Delayed: an
 	# enemy-target card has nothing to land on.
 	if card.target_type == CardData.TargetType.ENEMY and not _has_valid_target(card):
+		return false
+	# Countersign with nothing it may copy.
+	if EffectResolver.copies_hand_card(card) and EffectResolver.copy_targets(card, deck.hand).is_empty():
 		return false
 	# Second Swing whose Attack's enemy is gone: another it can land on.
 	if _replay_needs_target(card) and not _has_valid_target(card):
@@ -859,13 +876,20 @@ func _keep_cap(card: CardData) -> int:
 # spent. Bide's (GRANT_KEEP) takes 0 to `cap` of any other card, confirmed
 # by DONE (the overlay's, confirm_choice()) or Enter/Space - clicking the
 # armed card again does nothing.
-func _begin_choice(card_view: CardView, cap: int) -> void:
+# Countersign's (`eligible` given) takes exactly one of `eligible` - the
+# rest faded and unpickable - and the play goes on the moment it's picked,
+# with no DONE.
+func _begin_choice(card_view: CardView, cap: int, eligible: Array[CardView] = []) -> void:
 	_choosing_card_view = card_view
 	_choice_marked.clear()
 	_choice_cap = cap
+	_choice_eligible = eligible
 	card_view.lift_and_hold(true)
-	_hand_container.begin_choice(card_view)
-	hand_choice_started.emit("", cap, "KEEP", true)
+	_hand_container.begin_choice(card_view, eligible)
+	if eligible.is_empty():
+		hand_choice_started.emit("", cap, "KEEP", true)
+	else:
+		hand_choice_started.emit("", cap, "COPY", false)
 	hand_choice_changed.emit(0, cap)
 	_emit_devour_changed()
 
@@ -895,6 +919,8 @@ func _begin_keep_choice() -> bool:
 func toggle_choice(card_view: CardView) -> void:
 	if not _choice_open() or card_view == _choosing_card_view:
 		return
+	if not _choice_eligible.is_empty() and not _choice_eligible.has(card_view):
+		return
 	if _choice_marked.has(card_view):
 		_choice_marked.erase(card_view)
 		card_view.set_marked(false)
@@ -904,6 +930,9 @@ func toggle_choice(card_view: CardView) -> void:
 	else:
 		return
 	hand_choice_changed.emit(_choice_marked.size(), _choice_cap)
+	# Countersign's goes on at its pick.
+	if not _choice_eligible.is_empty() and _choosing_card_view != null and _choice_marked.size() == _choice_cap:
+		confirm_choice()
 
 func confirm_choice() -> void:
 	if _keep_choice_open:
@@ -917,6 +946,9 @@ func confirm_choice() -> void:
 		return
 	var card_view: CardView = _choosing_card_view
 	var chosen: Array[CardView] = _choice_marked.duplicate()
+	# Countersign: exactly its one.
+	if not _choice_eligible.is_empty() and chosen.size() != _choice_cap:
+		return
 	_close_choice()
 	_resolve_play(card_view, null, chosen)
 
@@ -935,6 +967,7 @@ func _close_choice() -> void:
 	_keep_choice_open = false
 	_choice_marked.clear()
 	_choice_cap = 0
+	_choice_eligible = []
 	_hand_container.end_choice()
 	hand_choice_ended.emit()
 	_emit_devour_changed()
@@ -1046,7 +1079,7 @@ func _finish_turn(keep: Array[CardData]) -> void:
 #   from there and stay in sync. If the wait leaves it unplayable (the
 #   fight over, the card or its target gone, too dear) it goes back to
 #   the hand.
-func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, keep_views: Array[CardView] = [], target_mound: int = -1) -> void:
+func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: Array[CardView] = [], target_mound: int = -1) -> void:
 	if _play_in_flight or _swing_holds_next_play():
 		_play_queued = true
 		_emit_devour_changed()
@@ -1140,10 +1173,13 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, keep_views: Ar
 		ctx.replaced_cost_source = "status:" + collateral.data.id
 	ctx.on_replay = func() -> void:
 		_replay_pending = true
-	# Bide's chosen cards, to gain Keep where they are.
-	for view in keep_views:
+	# The hand choice's cards: Bide's to gain Keep where they are,
+	# Countersign's one to copy.
+	for view in chosen_views:
 		if is_instance_valid(view) and view.card_data != null:
 			ctx.keep_choice.append(view.card_data)
+	if not ctx.keep_choice.is_empty():
+		ctx.copy_choice = ctx.keep_choice[0]
 
 	var hp_before_effects: int = player.hp
 	# A hit that will land several times (Lash) shows its first as one of

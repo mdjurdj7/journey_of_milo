@@ -292,15 +292,18 @@ func set_draw_origin(origin: Control) -> void:
 
 # A hand choice opened with `chooser` armed (BattleController's choose
 # mode): the arming suppressed every other card's hover, but here they
-# are what gets clicked, so hover comes back for them (CardView.set_
-# choice_state()). A null chooser is the end-of-turn keep: no card armed,
-# the whole hand chooses.
-func begin_choice(chooser: CardView) -> void:
+# are what gets clicked, so hover comes back for them - for `eligible`
+# alone when it names any (Countersign's), the rest staying still and
+# faded (CardView.set_choice_state()). A null chooser is the end-of-turn
+# keep: no card armed, the whole hand chooses.
+func begin_choice(chooser: CardView, eligible: Array[CardView] = []) -> void:
 	for view in _card_views():
 		if view == chooser:
 			continue
-		view.set_choice_state(true, true)
-		view.set_hover_suppressed(false)
+		var pickable: bool = eligible.is_empty() or eligible.has(view)
+		view.set_choice_state(true, pickable)
+		if pickable:
+			view.set_hover_suppressed(false)
 
 # The choice closed (confirmed or cancelled): every mark comes off, and
 # while a card is still armed the rest of the hand goes back to not
@@ -579,6 +582,9 @@ func _can_play(card: CardData, energy: int) -> bool:
 	# an unaffordable one (EffectResolver.card_blocked()). No context yet =
 	# nothing to ask.
 	if _bonus_context != null and EffectResolver.card_blocked(card, _bonus_context.player):
+		return false
+	# Countersign with nothing it may copy (EffectResolver.copy_targets()).
+	if _deck != null and EffectResolver.copies_hand_card(card) and EffectResolver.copy_targets(card, _deck.hand).is_empty():
 		return false
 	# The fight's own affordability check (Combatant.can_pay() - Energy,
 	# or Collateral's HP), once there's a context to ask.

@@ -16,13 +16,15 @@ enum EffectType {
 	APPLY_STATUS, FIRST_CARD_DAMAGE, TOLL_FRACTION_DAMAGE_ALL,
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
 	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL, DRAIN, SET_ASIDE, CONSUME,
-	REPLAY_LAST_ATTACK, GRANT_KEEP,
+	REPLAY_LAST_ATTACK, GRANT_KEEP, COPY_HAND_CARD,
 }
 # CONSUME and SET_ASIDE are retired (Deny no longer takes a hand card,
 # Bide no longer sets cards aside) - no resolver, nothing authors them;
 # kept so the values after them keep their numbers.
 # GRANT_KEEP (Bide): up to `value` chosen hand cards gain Keep (grant_
 # keep_effect.gd).
+# COPY_HAND_CARD (Countersign): a fight-only copy of the chosen hand card
+# into the hand (copy_hand_card_effect.gd, Deck.add_copy()).
 # REPLAY_LAST_ATTACK (Second Swing): the last Attack card played this
 # turn (Combatant.last_attack) resolves again - its effects in full, as
 # if played, but no play: no Energy, no pile, no played-card count
