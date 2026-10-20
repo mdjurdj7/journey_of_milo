@@ -49,14 +49,17 @@
 #                    would say had commits A..B (B default HEAD) landed
 #                    during this run - a dry run of that check
 #
-# A probe that prints a SCRIPT ERROR fails, whatever it says itself: a
-# script error abandons only the function it hit (headless, nothing stops),
-# so a probe can pass straight over one the game's debugger would stop on.
-# The verdict names how many and the first, with its file:line, and the
-# log gains it as a FAIL line. A probe that means to cause one says so in
-# its source, a line each:
+# A probe that prints a SCRIPT ERROR, or an engine ERROR, fails, whatever
+# it says itself: a script error abandons only the function it hit
+# (headless, nothing stops), so a probe can pass straight over one the
+# game's debugger would stop on; an engine error is the engine refusing
+# something the game asked of it. The verdict names how many and the
+# first, with its file:line, and the log gains it as a FAIL line. A probe
+# that means to cause one says so in its source, a line each:
 #   # probe-expects-script-error: <text in the error's message>
-# and an error whose message holds that text isn't counted.
+#   # probe-expects-error: <text in an engine ERROR's message>
+# and an error whose message holds that text isn't counted. Engine errors
+# no probe answers for - Godot's own report at exit - are IGNORED_ERRORS.
 #
 # GODOT overrides the engine (default ../Godot_v4.7.1.exe beside the repo:
 # the main executable, not the _console wrapper). Exit code 0 = every
@@ -795,28 +798,56 @@ if [ "$DO_IMPORT" = 1 ]; then
 fi
 
 # --- Run ---
-# The script errors in probe $1's log (SCRIPT ERROR, then its "at:" line),
-# less those its source expects (probe-expects-script-error): the count,
-# a tab, the first as "message (file:line)". Nothing when there are none.
+# Engine ERROR messages never counted, whatever the probe: text in the
+# message, one per line - Godot's leak report as it exits, printed by
+# every probe.
+IGNORED_ERRORS='resources still in use at exit'
+
+# The errors in probe $1's log (a SCRIPT ERROR or an engine ERROR, then
+# its "at:" line), less those its source expects (probe-expects-script-
+# error, probe-expects-error) and IGNORED_ERRORS: the count, a tab, the
+# first as "message (file:line)". Nothing when there are none.
 script_errors() {
-	awk -v src="$PROJECT/tests/$1.gd" '
+	awk -v src="$PROJECT/tests/$1.gd" -v ignored="$IGNORED_ERRORS" '
 		BEGIN {
-			while ((getline line < src) > 0)
+			while ((getline line < src) > 0) {
 				if (match(line, /^[ \t]*#[ \t]*probe-expects-script-error:[ \t]*/))
 					expected[++n] = substr(line, RSTART + RLENGTH)
+				else if (match(line, /^[ \t]*#[ \t]*probe-expects-error:[ \t]*/))
+					expected_engine[++m] = substr(line, RSTART + RLENGTH)
+			}
+			k = split(ignored, ignored_list, "\n")
 		}
 		function settle() {
 			if (pending == "") return
-			for (i = 1; i <= n; i++)
-				if (expected[i] != "" && index(pending, expected[i]) > 0) { pending = ""; return }
+			if (engine) {
+				for (i = 1; i <= m; i++)
+					if (expected_engine[i] != "" && index(pending, expected_engine[i]) > 0) { pending = ""; return }
+				for (i = 1; i <= k; i++)
+					if (ignored_list[i] != "" && index(pending, ignored_list[i]) > 0) { pending = ""; return }
+			} else {
+				for (i = 1; i <= n; i++)
+					if (expected[i] != "" && index(pending, expected[i]) > 0) { pending = ""; return }
+			}
 			if (++found == 1) first = pending (where == "" ? "" : " (" where ")")
 			pending = ""
 		}
-		/^SCRIPT ERROR: / { settle(); pending = substr($0, 15); where = ""; next }
+		/^SCRIPT ERROR: / { settle(); pending = substr($0, 15); where = ""; engine = 0; next }
+		/^ERROR: / { settle(); pending = substr($0, 8); where = ""; engine = 1; next }
 		pending != "" && /^[ \t]*at: / {
 			where = $0
 			if (match(where, /\([^()]*:[0-9]+\)[ \t]*$/)) where = substr(where, RSTART + 1, RLENGTH - 2)
 			else sub(/^[ \t]*at: /, "", where)
+			# The "at:" of an engine error is in the engine source: wait
+			# for the GDScript frame that called it, when there is one.
+			if (!engine) settle()
+			next
+		}
+		# The GDScript backtrace of an engine error: its header, then the
+		# innermost frame - the script line that asked.
+		pending != "" && engine && /^[ \t]*GDScript backtrace/ { next }
+		pending != "" && engine && /^[ \t]*\[0\] / {
+			if (match($0, /\(res:\/\/[^()]*:[0-9]+\)[ \t]*$/)) where = substr($0, RSTART + 7, RLENGTH - 8)
 			settle()
 			next
 		}
@@ -845,8 +876,8 @@ run_one() {
 	note=""
 	if [ -n "$errors" ]; then
 		verdict=FAIL
-		note="; ${errors%%$'\t'*} script error(s), first: ${errors#*$'\t'}"
-		echo "FAIL [run_probes]: ${errors%%$'\t'*} script error(s), the first: ${errors#*$'\t'}" >> "$LOGS/$p.log"
+		note="; ${errors%%$'\t'*} error(s), first: ${errors#*$'\t'}"
+		echo "FAIL [run_probes]: ${errors%%$'\t'*} error(s), the first: ${errors#*$'\t'}" >> "$LOGS/$p.log"
 	fi
 	printf '%-26s %s %4ss%s\n' "$p" "$verdict" "$dur" "$([ "$verdict" = FAIL ] && echo "  (exit $code$note, $LOGS/$p.log)")" | tee -a "$LOGS/_results.txt"
 }
