@@ -326,8 +326,11 @@ func _check_card_kill_then_turn(order: String, controller: Node, combatants: Dic
 	var turned: bool = await ProbePlay.wait_until(self, func() -> bool:
 		return int(controller.get("_player_turn")) > turn_before and ProbePlay.is_settled(controller), ENEMY_TURN_WAIT_SECONDS)
 	_check(order, turned, "the enemy turn after the kill never handed back a player turn")
+	# By id, not the node: a lambda holding the node outlives it once it
+	# is freed - "Lambda capture at index 0 was freed" on every call after.
+	var first_id: int = first.get_instance_id()
 	var freed: bool = await ProbePlay.wait_until(self, func() -> bool:
-		return not is_instance_valid(first), ENEMY_TURN_WAIT_SECONDS)
+		return not is_instance_id_valid(first_id), ENEMY_TURN_WAIT_SECONDS)
 	_check(order, freed, "the first dragonfly's body was never freed")
 	for i in BODY_GONE_FRAMES:
 		await process_frame
