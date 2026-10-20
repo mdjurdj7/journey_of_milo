@@ -17,7 +17,7 @@ card_name = "Collateral"
 card_type = 1
 rarity = 2
 target_type = 1
-description = "This turn, pay {hp_per_energy} HP for each Energy you lack.
+description = "This turn, cover missing Energy with HP: {hp_per_energy} HP each.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
 removal_scope = 1

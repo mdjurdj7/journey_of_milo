@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Headless probe for Collateral - 0 Energy, Uncommon Skill, Spent: "This
-# turn, pay 3 HP for each Energy you lack." (StatusData.hp_per_missing_
+# turn, cover missing Energy with HP: 3 HP each." (StatusData.hp_per_missing_
 # energy, ends_at_turn_end). A card costing more Energy than is held -
 # after Leverage's discount - takes all the Energy there is and 3 HP for
 # each short, paid before its effects through the self-loss path (past
@@ -78,7 +78,7 @@ func _check_data() -> void:
 	_expect_eq([card.cost, card.card_type, card.rarity, card.removal_scope], [0, CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.RemovalScope.SPENT], "Collateral: 0 Energy, a Skill, Uncommon, Spent")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...with mipmapped art")
 	_expect((load(POOL_PATH) as RewardPool).entries.has(card), "...in the Wanderer pool")
-	_expect_eq(card.description, "This turn, pay {hp_per_energy} HP for each Energy you lack.\nSpent.", "The card's text, its number from data")
+	_expect_eq(card.description, "This turn, cover missing Energy with HP: {hp_per_energy} HP each.\nSpent.", "The card's text, its number from data")
 	_expect_eq([status.hp_per_missing_energy, status.default_charges, status.ends_at_turn_end, status.default_duration_turns], [3, 0, true, StatusData.DURATION_UNTIL_REMOVED], "The status: 3 HP an Energy, no charges, for the turn")
 	var statuses: Array[Status] = []
 	Status.apply_to(statuses, status)
