@@ -584,6 +584,8 @@ var _rest_offset_y: float = 0.0
 
 var _card_style: StyleBoxFlat
 var _hovering: bool = false
+# Keyword definitions held off by a host (set_keyword_hover_blocked()).
+var _keyword_hover_blocked: bool = false
 # The scale HandContainer/DeckView assign (the hand's shrink factor) -
 # hover multiplies it, armed replaces it; both return to it.
 var _base_scale: float = 1.0
@@ -1484,11 +1486,26 @@ func update_keyword_hover() -> void:
 func clear_keyword_hover() -> void:
 	_show_keyword("")
 
+# A host keeping keyword definitions off this card for now - Take In's
+# choice, where the hand's yield line takes the place over a candidate.
+func set_keyword_hover_blocked(blocked: bool) -> void:
+	_keyword_hover_blocked = blocked
+	if blocked:
+		clear_keyword_hover()
+
+# Whether the cursor is over this card now (hover, mouse or set_hovered()).
+func is_hovered() -> bool:
+	return _hovering
+
+# This card's face on screen as it stands now - lifted, grown, turned.
+func get_screen_rect_now() -> Rect2:
+	return _screen_rect()
+
 # Whether a definition may show now: on a hover-lifted hand card while
 # nothing is armed, or on a card a host has up for inspection - never on
 # an armed card.
 func keyword_hover_allowed() -> bool:
-	if card_data == null or _armed:
+	if card_data == null or _armed or _keyword_hover_blocked:
 		return false
 	if _keyword_inspect:
 		return true

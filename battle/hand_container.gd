@@ -180,6 +180,20 @@ signal draw_started(card_data: CardData)
 @export var devour_fleck_fall_px: float = 34.0
 @export var devour_fleck_sec: float = 0.4
 
+@export_group("Devour Yield Line")
+# While Take In's choice is open, the hovered candidate's yield in one
+# line of ink (DevourYieldLine, DevourYield.describe()) centred over the
+# card as it stands lifted, yield_line_gap_px above its top edge - the
+# keyword definition's place, which stays off for candidates meanwhile.
+# Each re-applies live.
+@export var yield_line_font_size_px: int = 13:
+	set(value):
+		yield_line_font_size_px = value
+		if _yield_line != null:
+			_yield_line.set_font_size_px(value)
+@export var yield_line_gap_px: float = 8.0
+@export_group("")
+
 # The bitten card's render reaches this far past the card on every side,
 # so nothing the face draws just outside its rect is cut off.
 const DEVOUR_VIEW_MARGIN_PX := 24.0
@@ -188,6 +202,12 @@ var _deck: Deck = null
 # Devour's jaw, where a devoured card slides to - null (no overlay): it
 # shrinks and fades where it is instead.
 var _devour_target: DevourButton = null
+# Take In's choice: what the chooser yields per Energy (EffectResolver.
+# devour_per_energy()) while it's open, -1 otherwise; the cards it may eat;
+# and the line over the hovered one.
+var _devour_per_energy: int = -1
+var _devour_candidates: Array[CardView] = []
+var _yield_line: DevourYieldLine = null
 # The hand's slots in hand order, each a Control whose only child is a
 # CardView, and the card each shows. An ARRAY, not a map keyed by
 # CardData: the deck can hold one CardData twice (a reward taken twice
@@ -243,6 +263,11 @@ func _ready() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	# The arc is centred on this control's own width.
 	resized.connect(func() -> void: _reflow_hand(false))
+	_yield_line = DevourYieldLine.new()
+	_yield_line.name = "DevourYieldLine"
+	_yield_line.set_font_size_px(yield_line_font_size_px)
+	add_child(_yield_line)
+	set_process(false)
 
 # This slot's own current arc target - read back by _on_card_lowered() to
 # know what to return to (_reflow_hand() may have moved the target while
@@ -296,7 +321,12 @@ func set_draw_origin(origin: Control) -> void:
 # alone when it names any (Countersign's), the rest staying still and
 # faded (CardView.set_choice_state()). A null chooser is the end-of-turn
 # keep: no card armed, the whole hand chooses.
+# Take In's (a chooser that devours - EffectResolver.devour_per_energy())
+# also shows the hovered candidate's yield over it (_process()), and keeps
+# keyword definitions off the candidates meanwhile.
 func begin_choice(chooser: CardView, eligible: Array[CardView] = []) -> void:
+	_devour_per_energy = EffectResolver.devour_per_energy(chooser.card_data) if chooser != null else -1
+	_devour_candidates = eligible.duplicate() if _devour_per_energy >= 0 else ([] as Array[CardView])
 	for view in _card_views():
 		if view == chooser:
 			continue
@@ -304,20 +334,50 @@ func begin_choice(chooser: CardView, eligible: Array[CardView] = []) -> void:
 		view.set_choice_state(true, pickable)
 		if pickable:
 			view.set_hover_suppressed(false)
+		if _devour_per_energy >= 0:
+			view.set_keyword_hover_blocked(true)
+	set_process(_devour_per_energy >= 0)
 
 # The choice closed (confirmed or cancelled): every mark comes off, and
 # while a card is still armed the rest of the hand goes back to not
 # hovering.
 func end_choice() -> void:
+	_devour_per_energy = -1
+	_devour_candidates.clear()
+	set_process(false)
+	if _yield_line != null:
+		_yield_line.hide_line()
 	for view in _card_views():
 		view.set_choice_state(false)
 		view.set_marked(false)
+		view.set_keyword_hover_blocked(false)
 	if _armed_slot == null:
 		return
 	var armed_view: CardView = _armed_slot.get_child(0) as CardView
 	for view in _card_views():
 		if view != armed_view:
 			view.set_hover_suppressed(true)
+
+# While Take In's choice is open: the line over the candidate hovered now,
+# following it as it lifts and grows; hidden over none.
+func _process(_delta: float) -> void:
+	if _yield_line == null:
+		return
+	var hovered: CardView = null
+	for view in _devour_candidates:
+		if is_instance_valid(view) and view.is_hovered():
+			hovered = view
+			break
+	if hovered == null or hovered.card_data == null:
+		_yield_line.hide_line()
+		return
+	if has_theme_color("ink", "Battle"):
+		_yield_line.set_ink(get_theme_color("ink", "Battle"))
+	_yield_line.show_over(DevourYield.describe(hovered.card_data, _devour_per_energy), hovered.get_screen_rect_now(), yield_line_gap_px)
+
+# For probes: the yield line, or null.
+func get_yield_line() -> DevourYieldLine:
+	return _yield_line
 
 # Each face says whether its card has Keep (Deck.has_keep()).
 func _sync_keep() -> void:
