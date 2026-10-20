@@ -70,7 +70,7 @@ func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	_expect_eq([card.card_name, card.cost, card.critical_cost, card.card_type, card.rarity, card.card_class], ["Nothing Left", 3, 0, CardData.CardType.ATTACK, CardData.CardRarity.RARE, &"wanderer"], "Nothing Left: 3 Energy, 0 while Critical, a Rare Attack")
 	_expect_eq([card.target_type, card.offer, card.removal_scope], [CardData.TargetType.ENEMY, CardData.OfferScope.REWARDABLE, CardData.RemovalScope.NONE], "...at an enemy, rewardable, to the discard")
-	_expect(card.art == null, "...no art yet")
+	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Nothing Left.png", "...with its art")
 	_expect_eq(card.description, "Deal {damage} damage.\nCritical: costs 0.", "...its text")
 	_expect(card.effects.size() == 1 and card.effects[0].effect_type == CardEffect.EffectType.DAMAGE and card.effects[0].value == 28 and card.effects[0].condition == CardEffect.Condition.NONE, "...one blow of 28")
 	var tempered: CardData = load(TEMPERED_PATH)

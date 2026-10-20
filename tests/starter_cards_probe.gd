@@ -63,6 +63,8 @@ const CARD_ART: Dictionary = {
 	"not_so": "res://cards/art/Wanderer/Not So.png",
 	"take_in": "res://cards/art/Wanderer/Take In.png",
 	"on_the_brink": "res://cards/art/Wanderer/On the Brink.png",
+	"nothing_left": "res://cards/art/Wanderer/Nothing Left.png",
+	"owed_time": "res://cards/art/Wanderer/Owed Time.png",
 	"go_under": "res://cards/art/Wanderer/Go Under.png",
 	"slash": "res://cards/art/Wanderer/Slash.png",
 	"bite_down": "res://cards/art/Wanderer/Bite Down.png",

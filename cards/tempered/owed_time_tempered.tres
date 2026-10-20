@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/owed_time.tres" id="3_owed_time"]
+[ext_resource type="Texture2D" uid="uid://cucf3jff7gj7u" path="res://cards/art/Wanderer/Owed Time.png" id="9_art"]
 
 [sub_resource type="Resource" id="E_spend"]
 script = ExtResource("2_card_effect")
@@ -26,4 +27,5 @@ description = "Spend {toll_cost} Toll.
 Take another turn after this.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_owed_time")])
+art = ExtResource("9_art")
 card_class = &"wanderer"
