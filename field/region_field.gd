@@ -1427,7 +1427,7 @@ func _compute_forward() -> Vector3:
 	var marker := get_node_or_null(forward_marker_path) as Node3D
 	if spawn_node == null or marker == null:
 		return Vector3.FORWARD
-	var to_marker := marker.global_position - spawn_node.global_position
+	var to_marker := _world_position_of(marker) - _world_position_of(spawn_node)
 	to_marker.y = 0.0
 	return to_marker.normalized() if to_marker.length() > 0.0001 else Vector3.FORWARD
 
@@ -1488,7 +1488,25 @@ func get_inland_z() -> float:
 # origin if the Wanderer isn't present.
 func get_spawn_position() -> Vector3:
 	var spawn_node := get_node_or_null(^"Wanderer") as Node3D
-	return spawn_node.global_position if spawn_node != null else global_position
+	return _world_position_of(spawn_node) if spawn_node != null else global_position
+
+# `node`'s world position - its global_position once it is in the tree;
+# before, through its own and its parents' local transforms up to this
+# node. Ground asks for the forward and the spawn from this node's own
+# _enter_tree() (its mask setters repaint), when no child has entered the
+# tree yet and global_position would refuse - returning the origin.
+func _world_position_of(node: Node3D) -> Vector3:
+	if node.is_inside_tree():
+		return node.global_position
+	var local := Transform3D.IDENTITY
+	var at: Node = node
+	while at != null and at != self:
+		var at_3d := at as Node3D
+		if at_3d != null:
+			local = at_3d.transform * local
+		at = at.get_parent()
+	var base: Transform3D = global_transform if is_inside_tree() else transform
+	return (base * local).origin
 
 # Which option each of the floor's slots stands this load, in slot order
 # (FloorData.slots, then FloorData.event_slots - an event is an Encounter

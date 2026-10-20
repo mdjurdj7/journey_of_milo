@@ -598,7 +598,15 @@ func _field_width() -> float:
 func _compute_near_edge_z() -> float:
 	var region_field := get_node_or_null(region_field_path) as RegionField
 	_forward = region_field.get_forward() if region_field else Vector3.FORWARD
-	var spawn: Vector3 = _wanderer.global_position if _wanderer else Vector3.ZERO
+	var spawn: Vector3 = Vector3.ZERO
+	if _wanderer != null:
+		# Before the Wanderer has entered the tree (Ground asks from
+		# RegionField's _enter_tree()), its global_position would refuse:
+		# RegionField reads the same node through its local transform.
+		if _wanderer.is_inside_tree() or region_field == null:
+			spawn = _wanderer.global_position
+		else:
+			spawn = region_field.get_spawn_position()
 	return (spawn - _forward * sea_edge_distance).z
 
 # Lazily resolves _wanderer if needed, so this is safe to call from
