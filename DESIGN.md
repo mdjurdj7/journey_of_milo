@@ -242,11 +242,39 @@ and up the west shore north of z -27. (2026-10-17.)
   −6, and starts ~31 ms in; at 9.5 s (audible to ~6.1 s) it is a sting,
   stereo, played 2D. Its level is set in `weapon_reveal_volume_db` (−17)
   instead, just under a full heavy hit. (2026-10-18.)
-- **Chain roles (Opener/Closer, chain payoffs).** The old project's
-  `CardData.chain_role`/`chain_followup_effect` are not ported to the new
-  rules layer (`cards/card_data.gd`). No current card needs them - revisit
-  once a real card actually wants a chain-shaped payoff, not before.
-  (2026-09-11, rules-layer port.)
+- **The Samurai's skillchains (prototype).** They replace the old
+  project's Opener/Closer chain roles, which were never ported.
+  - **Properties.** A card carries one of Advance, Hold or Withdraw, or
+    none (`CardData.chain_property`). The loop is Advance -> Hold ->
+    Withdraw -> Advance. A card whose property follows the last chained
+    card's raises the chain a level (1, 2, 3...). A card with no property
+    ends the chain; one with the wrong property starts a new chain at
+    level 0. The chain resets at the end and start of each turn
+    (`Skillchain`, kept on the player's Combatant).
+  - **Skillchains.** Each link fires one after the card's own effects:
+    Advance -> Hold **Parry** (Block x level), Hold -> Withdraw
+    **Recover** (draw), Withdraw -> Advance **Lunge** (damage x level to
+    the card's target; nothing if the card's own blow killed it). Lunge
+    is not an Attack's blow: no attack bonus, Bent Nail or Ransom. The
+    numbers are `CharacterData.parry_block_per_level` (3), `recover_draw`
+    (1) and `lunge_damage_per_level` (3). Run log: the `skillchain`
+    mechanic line (format 11).
+  - **Burst** (`CardData.burst`) reads the chain level from before the
+    card was played, through `CardEffect.bonus_per_chain_level`. The
+    face prints the live number in a fight and `{chain_bonus}` outside
+    one.
+  - **Starter deck** (`run/data/samurai.tres`, cards in `cards/samurai/`,
+    all STARTER_ONLY): 4 Cut (Advance, 1, deal 6), 2 Guard (Hold, 1, 5
+    block), 2 Step Back (Withdraw, 0, draw 1), 1 Measured Cut (Hold, 1,
+    deal 5), 1 Severance (Burst, 1, deal 5 plus 4 per chain level). The
+    standing row shows "Chain N · <last skillchain>" while a chain is
+    live.
+  - **Open:** the Edge and Counter archetypes; her reward pool (her
+    starters never roll, so her rolls are neutral cards only); tempering
+    her cards (none has a tempered version); attack animations for her
+    model (her cards leave `battle_animation` empty); balance - every
+    number above is a prototype guess.
+  (2026-10-19, Samurai prototype.)
 - **Endure stays out of the Wanderer reward pool.** Restored to the
   belongings and collector pools (2026-10-16).
 - **Debt Forgiven removed; Toll has no HP sink for now.** Turning Toll
@@ -361,13 +389,14 @@ and up the west shore north of z -27. (2026-10-17.)
     (the Wanderer's clip names - Left Hand's Slash) plays nothing, its
     damage landing at its authored `impact_time`. Hit flash, recoil and
     the stance turns are tweens and play as for him.
-  - **Placeholders:** her max HP (80, the Wanderer's), her starting deck
-    (neutral cards only), `field_model_height` 1.7 (the glb's own) and
+  - **Placeholders:** her max HP (80, the Wanderer's),
+    `field_model_height` 1.7 (the glb's own) and
     `field_model_yaw_degrees` 180 are guesses to settle in play. Her
-    albedo is the glb's own base colour, unpainted.
-  - **The compendium warns on her empty folder** ("no cards found in
-    res://cards/samurai/") each time it opens, and shows SAMURAI with no
-    cards, until her first card lands there.
+    albedo is the glb's own base colour, unpainted. Her starting deck is
+    the skillchain prototype's ten (see Parked, "The Samurai's
+    skillchains"), its numbers guesses too.
+  - **The compendium shows her five starters** under SAMURAI: it lists
+    every card in `cards/samurai/`, STARTER_ONLY or not.
   - **No Devour, and no sustain in a fight.** Devour is the Wanderer's
     (`CharacterData.has_devour`, on in `wanderer.tres` only): her fights
     show no Devour button and nothing reaches the action. Her own
