@@ -24,6 +24,7 @@ const MAX_HP := 70
 const ENEMY_HP := 200
 const CARD_PATH := "res://cards/data/take_in.tres"
 const TEMPERED_PATH := "res://cards/tempered/take_in_tempered.tres"
+const ART_PATH := "res://cards/art/Wanderer/Take In.png"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const CLAW_BACK_PATH := "res://cards/data/claw_back.tres"
@@ -73,6 +74,7 @@ func _check_data() -> void:
 	_expect(card.effects.size() == 1 and card.effects[0].effect_type == CardEffect.EffectType.DEVOUR_FROM_HAND and _per_energy == 2, "...one DEVOUR_FROM_HAND, 2 per Energy")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Take In+")
+	_expect(card.art != null and card.art.resource_path == ART_PATH and tempered.art == card.art, "...both carrying its art")
 	_expect_eq([tempered.card_name, tempered.cost, tempered.description, tempered.effects[0].value], ["Take In+", 0, card.description, _per_energy], "Take In+: 0 Energy, the same text and yield")
 	var definition: String = KeywordTable.shared().definition("Devour")
 	_expect(definition.contains("deal %d more" % _per_energy) and definition.contains("gives %d Block" % _per_energy), "The Devour keyword's numbers are the card's (%s)" % definition)

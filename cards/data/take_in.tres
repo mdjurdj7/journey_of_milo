@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://b38qlbpaqaecf" path="res://cards/art/Wanderer/Take In.png" id="9_art"]
 [ext_resource type="Resource" path="res://cards/tempered/take_in_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="E_devour"]
@@ -18,5 +19,6 @@ rarity = 2
 target_type = 1
 description = "Devour a card in your hand."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_devour")])
+art = ExtResource("9_art")
 tempered = ExtResource("10_tempered")
 card_class = &"wanderer"

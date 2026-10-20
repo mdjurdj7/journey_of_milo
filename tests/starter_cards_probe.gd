@@ -59,6 +59,7 @@ const TEMPERED_DIR := "res://cards/tempered/"
 const CARD_ART: Dictionary = {
 	"in_the_red": "res://cards/art/Wanderer/In the Red.png",
 	"not_so": "res://cards/art/Wanderer/Not So.png",
+	"take_in": "res://cards/art/Wanderer/Take In.png",
 	"go_under": "res://cards/art/Wanderer/Go Under.png",
 	"slash": "res://cards/art/Wanderer/Slash.png",
 	"bite_down": "res://cards/art/Wanderer/Bite Down.png",
