@@ -8,7 +8,7 @@ extends SceneTree
 # turn ends as any does - hand discarded, this-turn statuses gone - the
 # enemies don't act and their intents stand, and the next player turn
 # starts in full - Energy refilled, Dying Light, Marrow, Venom, the draw.
-# A Countersign copy queues a second. Every play is Spent, original and
+# A Twice Over copy queues a second. Every play is Spent, original and
 # copy: no chain past the cards and the Toll there are.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/owed_time_probe.gd
@@ -166,7 +166,7 @@ func _check_extra_turn() -> void:
 	await _teardown()
 	_completed += 1
 
-# Countersign copies Owed Time: two turns owed, the copy Spent too; two
+# Twice Over copies Owed Time: two turns owed, the copy Spent too; two
 # End Turns pass with no enemy acting, the third lets them act.
 func _check_countersign() -> void:
 	var controller: Node = await _start_fight()
@@ -185,13 +185,13 @@ func _check_countersign() -> void:
 		for held: CardData in deck.hand:
 			if held.battle_copy:
 				copy = held
-		_expect(copy != null and copy.card_name == "Owed Time", "Countersign: an Owed Time copy in the hand")
+		_expect(copy != null and copy.card_name == "Owed Time", "Twice Over: an Owed Time copy in the hand")
 		await _play_real(controller, card)
 		if copy != null:
 			await _play_real(controller, copy)
 		var owed: Status = Status.find_in(player.statuses, load(STATUS_PATH))
 		_expect(owed != null and owed.charges == 2, "Both played: two turns owed")
-		_expect_eq(player.toll, 0, "...for 20 + 20 + Countersign's %d Toll" % countersign_toll)
+		_expect_eq(player.toll, 0, "...for 20 + 20 + Twice Over's %d Toll" % countersign_toll)
 		_expect(deck.exhaust_pile.has(card) and copy != null and not deck.hand.has(copy) and not deck.discard_pile.has(copy), "...both Spent")
 		var turn: int = int(controller.get("_player_turn"))
 		await _end_turn(controller)

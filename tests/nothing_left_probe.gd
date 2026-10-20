@@ -5,7 +5,7 @@ extends SceneTree
 # through Combatant.base_cost(), as Cornered+ does). Nothing Left+ deals
 # 36. At 0 a "next card" discount (Leverage) passes it by; above the line
 # Leverage makes it 1. Under Collateral, above the line it costs 3 HP per
-# Energy short; Critical, nothing. A Countersign copy keeps its Critical
+# Energy short; Critical, nothing. A Twice Over copy keeps its Critical
 # cost. On the Brink at 31-50% makes it free for the turn.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/nothing_left_probe.gd
@@ -132,14 +132,14 @@ func _check_collateral() -> void:
 	_expect(player.can_pay(card), "...and free")
 	_completed += 1
 
-# A Countersign copy is the same card, Critical cost and all, and a fight-
+# A Twice Over copy is the same card, Critical cost and all, and a fight-
 # only one: gone once played.
 func _check_copy() -> void:
 	var cards: Array[CardData] = [load(CARD_PATH) as CardData]
 	var deck := Deck.new(cards)
 	deck.draw(1)
 	var copy: CardData = deck.add_copy(deck.hand[0])
-	_expect(copy != null and copy.battle_copy, "Countersign's copy: a fight-only card")
+	_expect(copy != null and copy.battle_copy, "Twice Over's copy: a fight-only card")
 	if copy != null:
 		_expect_eq([copy.cost, copy.critical_cost], [3, 0], "...3 Energy, 0 while Critical")
 		var player: Combatant = _player(20)

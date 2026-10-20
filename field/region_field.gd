@@ -4289,7 +4289,7 @@ func _apply_consumed_removals(fight_deck: Deck) -> void:
 		if index >= 0:
 			unplayed.remove_at(index)
 			continue
-		# A fight-only copy (Countersign's) was never the run's to remove.
+		# A fight-only copy (Twice Over's) was never the run's to remove.
 		if card.removal_scope == CardData.RemovalScope.CONSUMED and not card.battle_copy:
 			RunState.remove_card(card)
 

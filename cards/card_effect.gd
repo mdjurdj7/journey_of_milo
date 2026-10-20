@@ -31,7 +31,7 @@ enum EffectType {
 # effect.gd).
 # GRANT_KEEP (Bide): up to `value` chosen hand cards gain Keep (grant_
 # keep_effect.gd).
-# COPY_HAND_CARD (Countersign): a fight-only copy of the chosen hand card
+# COPY_HAND_CARD (Twice Over): a fight-only copy of the chosen hand card
 # into the hand (copy_hand_card_effect.gd, Deck.add_copy()).
 # UNDO_LAST_ATTACK (Not So): the newest enemy attack on the player's record
 # not yet undone - its HP restored, its Grace share closed, as much dealt

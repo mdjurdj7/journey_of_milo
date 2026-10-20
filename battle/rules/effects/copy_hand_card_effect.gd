@@ -1,7 +1,7 @@
 extends RefCounted
 class_name CopyHandCardEffect
 
-# COPY_HAND_CARD (Countersign): a fight-only copy of the hand card the
+# COPY_HAND_CARD (Twice Over): a fight-only copy of the hand card the
 # player chose (EffectContext.copy_choice, picked before the play
 # committed) into the hand (Deck.add_copy()) - Spent when played, gone at
 # the end of the turn, never in the run's deck. A choice no longer in the

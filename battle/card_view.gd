@@ -640,7 +640,7 @@ const STRIKE_LABEL_WORD := "STRIKE"
 const KEEP_LABEL_WORD := "KEEP"
 const KEEP_KEYWORD := "Keep"
 const TYPE_PREFIX_SEPARATOR := " · "
-# A fight-only copy (CardData.battle_copy - Countersign's) leads with this,
+# A fight-only copy (CardData.battle_copy - Twice Over's) leads with this,
 # before any KEEP, and answers keyword_at() as COPY_KEYWORD.
 const COPY_LABEL_WORD := "COPY"
 const COPY_KEYWORD := "Copy"

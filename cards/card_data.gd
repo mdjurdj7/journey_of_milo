@@ -138,7 +138,7 @@ enum ChainProperty { NONE = 0, ADVANCE = 1, HOLD = 2, WITHDRAW = 3 }
 # may be offered. A random offer gives only the run's class's cards and
 # neutral ones (RewardPool).
 @export var card_class: StringName = &""
-# A fight-only copy (Deck.add_copy() - Countersign): made from a card in
+# A fight-only copy (Deck.add_copy() - Twice Over): made from a card in
 # the hand for this fight, never in the run's deck. It costs its Energy as
 # ever, goes to the Spent pile when played (BattleController.exhausts_on_
 # play()) and is gone at the end of the turn unplayed, Keep or not (Deck.

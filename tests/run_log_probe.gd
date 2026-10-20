@@ -30,7 +30,7 @@ extends SceneTree
 # spend nothing), the replay, energy_debt and delay lines, and Sentence
 # advanced by each spend (Second Swing, Come Due, Deny) until it goes off
 # on the third. Then Bide
-# keeps a Slash and Countersign copies it: keep, copy and - the copy left
+# keeps a Slash and Twice Over copies it: keep, copy and - the copy left
 # unplayed - copy_end "vanished" at the turn's end. Then Take In devours
 # the Slash: the devour_keyword line. Last, Not So undoes an attack put on
 # the player's record: the undo line.
@@ -289,7 +289,7 @@ func _toll_package_run() -> void:
 			lines.append(parsed)
 	var fight_end: Dictionary = _first(lines, "fight_end")
 	var spent: Dictionary = (fight_end.get("toll", {}) as Dictionary).get("spent_by_source", {})
-	var expected: Dictionary = {"card:Second Swing": 5, "card:Come Due": 5, "card:Deny": 6, "card:Bide": 4, "card:Countersign": 7, "card:Not So": 10}
+	var expected: Dictionary = {"card:Second Swing": 5, "card:Come Due": 5, "card:Deny": 6, "card:Bide": 4, "card:Twice Over": 7, "card:Not So": 10}
 	for source: String in expected:
 		_expect_eq(int(spent.get(source, 0)), int(expected[source]), "Toll spent by %s" % source)
 	_expect(not spent.has("card:Reckoning") and not spent.has("replay:Reckoning"), "...none by Reckoning or its replay (%s)" % str(spent))
@@ -316,7 +316,7 @@ func _toll_package_run() -> void:
 	_expect_eq(str(resolved.get("by", "")), "spend", "...going off on the third, mid-turn")
 	var keep: Dictionary = kinds.get("keep", {})
 	_expect_eq(keep.get("cards", []), ["Slash"], "A keep line: Bide kept Slash")
-	_expect_eq(str((kinds.get("copy", {}) as Dictionary).get("card", "")), "Slash", "A copy line: Countersign copied Slash")
+	_expect_eq(str((kinds.get("copy", {}) as Dictionary).get("card", "")), "Slash", "A copy line: Twice Over copied Slash")
 	var copy_end: Dictionary = kinds.get("copy_end", {})
 	_expect_eq([str(copy_end.get("card", "")), str(copy_end.get("outcome", ""))], ["Slash", "vanished"], "...and the copy, unplayed, vanished at the turn's end")
 	var devoured: Dictionary = _first(lines, "devour_keyword")
@@ -559,7 +559,7 @@ func _play(controller: Node, card: CardData, target: Node = null) -> void:
 	await ProbePlay.settle(self, controller, func() -> bool: return not _battle_open())
 
 # Plays `card` through its hand choice, picking `pick` - Bide waits for
-# confirm_choice(), Countersign goes on at the pick.
+# confirm_choice(), Twice Over goes on at the pick.
 func _choose(controller: Node, card: CardData, pick: CardData) -> void:
 	var view: CardView = null
 	var picked: CardView = null

@@ -220,7 +220,7 @@ var _devour_picking: bool = false
 # The GRANT_KEEP card (Bide) armed while its choice is open, the other hand cards
 # marked for it, and how many may be - see _begin_choice().
 var _choosing_card_view: CardView = null
-# The cards the open choice may take, when it names them (Countersign's -
+# The cards the open choice may take, when it names them (Twice Over's -
 # everything else in the hand is faded and unpickable); empty for any.
 var _choice_eligible: Array[CardView] = []
 var _choice_marked: Array[CardView] = []
@@ -445,7 +445,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	deck.drawn.connect(func(_card: CardData) -> void: RunLogger.card_drawn())
 	deck.discarded.connect(func(_card: CardData) -> void: hand_changed.emit())
 	deck.keep_changed.connect(func() -> void: hand_changed.emit())
-	# A fight-only copy (Countersign's) gone unplayed at the turn's end.
+	# A fight-only copy (Twice Over's) gone unplayed at the turn's end.
 	deck.vanished.connect(func(card: CardData) -> void:
 		RunLogger.mechanic("copy_end", {"card": card.card_name, "outcome": "vanished"}))
 	_hand_container.set_deck(deck)
@@ -751,7 +751,7 @@ func request_play(card_view: CardView) -> void:
 	if cap > 0:
 		_begin_choice(card_view, cap)
 		return
-	# A COPY_HAND_CARD card (Countersign) asks which one card to copy,
+	# A COPY_HAND_CARD card (Twice Over) asks which one card to copy,
 	# from those it may (EffectResolver.copy_targets()), and plays the
 	# moment it's picked.
 	if EffectResolver.copies_hand_card(card):
@@ -764,7 +764,7 @@ func request_play(card_view: CardView) -> void:
 		return
 	# A DEVOUR_FROM_HAND card (Take In) asks which one card to eat, from
 	# every other in the hand (EffectResolver.devour_targets()), and plays
-	# the moment it's picked - Countersign's way.
+	# the moment it's picked - Twice Over's way.
 	if EffectResolver.devours_from_hand(card):
 		var to_eat: Array[CardView] = []
 		var edible: Array[CardData] = EffectResolver.devour_targets(card, deck.hand)
@@ -789,7 +789,7 @@ func _is_playable(card: CardData) -> bool:
 	# enemy-target card has nothing to land on.
 	if card.target_type == CardData.TargetType.ENEMY and not _has_valid_target(card):
 		return false
-	# Countersign with nothing it may copy.
+	# Twice Over with nothing it may copy.
 	if EffectResolver.copies_hand_card(card) and EffectResolver.copy_targets(card, deck.hand).is_empty():
 		return false
 	# Take In with nothing else in the hand to eat.
@@ -907,7 +907,7 @@ func _keep_cap(card: CardData) -> int:
 # spent. Bide's (GRANT_KEEP) takes 0 to `cap` of any other card, confirmed
 # by DONE (the overlay's, confirm_choice()) or Enter/Space - clicking the
 # armed card again does nothing.
-# Countersign's (`eligible` given) takes exactly one of `eligible` - the
+# Twice Over's (`eligible` given) takes exactly one of `eligible` - the
 # rest faded and unpickable - and the play goes on the moment it's picked,
 # with no DONE; Take In's the same, its prompt's `verb` DEVOUR.
 func _begin_choice(card_view: CardView, cap: int, eligible: Array[CardView] = [], verb: String = "COPY") -> void:
@@ -961,7 +961,7 @@ func toggle_choice(card_view: CardView) -> void:
 	else:
 		return
 	hand_choice_changed.emit(_choice_marked.size(), _choice_cap)
-	# Countersign's goes on at its pick.
+	# Twice Over's goes on at its pick.
 	if not _choice_eligible.is_empty() and _choosing_card_view != null and _choice_marked.size() == _choice_cap:
 		confirm_choice()
 
@@ -977,7 +977,7 @@ func confirm_choice() -> void:
 		return
 	var card_view: CardView = _choosing_card_view
 	var chosen: Array[CardView] = _choice_marked.duplicate()
-	# Countersign: exactly its one.
+	# Twice Over: exactly its one.
 	if not _choice_eligible.is_empty() and chosen.size() != _choice_cap:
 		return
 	_close_choice()
@@ -1227,7 +1227,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	ctx.on_replay = func() -> void:
 		_replay_pending = true
 	# The hand choice's cards: Bide's to gain Keep where they are,
-	# Countersign's one to copy.
+	# Twice Over's one to copy.
 	for view in chosen_views:
 		if is_instance_valid(view) and view.card_data != null:
 			ctx.keep_choice.append(view.card_data)
@@ -1756,7 +1756,7 @@ func _on_keyword_devoured(card: CardData) -> void:
 # For a stance that is what makes a stack one physical copy: reshuffled,
 # the same card would stack itself again. Every other card, the discard.
 static func exhausts_on_play(card: CardData) -> bool:
-	# A fight-only copy (Countersign's) is Spent whatever it copies.
+	# A fight-only copy (Twice Over's) is Spent whatever it copies.
 	if card.battle_copy or card.card_type == CardData.CardType.POWER or card.card_type == CardData.CardType.STANCE:
 		return true
 	return card.removal_scope != CardData.RemovalScope.NONE

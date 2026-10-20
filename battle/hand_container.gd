@@ -333,7 +333,7 @@ func set_draw_origin(origin: Control) -> void:
 # A hand choice opened with `chooser` armed (BattleController's choose
 # mode): the arming suppressed every other card's hover, but here they
 # are what gets clicked, so hover comes back for them - for `eligible`
-# alone when it names any (Countersign's), the rest staying still and
+# alone when it names any (Twice Over's), the rest staying still and
 # faded (CardView.set_choice_state()). A null chooser is the end-of-turn
 # keep: no card armed, the whole hand chooses.
 # Keyword definitions stay off the candidates meanwhile - a slip over a
@@ -669,7 +669,7 @@ func _can_play(card: CardData, energy: int) -> bool:
 	# nothing to ask.
 	if _bonus_context != null and EffectResolver.card_blocked(card, _bonus_context.player):
 		return false
-	# Countersign with nothing it may copy (EffectResolver.copy_targets()).
+	# Twice Over with nothing it may copy (EffectResolver.copy_targets()).
 	if _deck != null and EffectResolver.copies_hand_card(card) and EffectResolver.copy_targets(card, _deck.hand).is_empty():
 		return false
 	# Take In with nothing else to eat (EffectResolver.devour_targets()).

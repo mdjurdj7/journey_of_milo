@@ -15,7 +15,7 @@ effect_type = 27
 
 [resource]
 script = ExtResource("1_card_data")
-card_name = "Countersign"
+card_name = "Twice Over"
 card_type = 1
 rarity = 2
 target_type = 1

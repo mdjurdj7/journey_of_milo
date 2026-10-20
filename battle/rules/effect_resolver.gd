@@ -187,9 +187,9 @@ static func is_taunting(combatant: Combatant) -> bool:
 			return true
 	return false
 
-# The hand cards `card` may copy (COPY_HAND_CARD - Countersign): every
-# other card in `hand` but one that copies itself - Countersign never
-# copies a Countersign. Empty for a card that copies nothing, too. With
+# The hand cards `card` may copy (COPY_HAND_CARD - Twice Over): every
+# other card in `hand` but one that copies itself - Twice Over never
+# copies a Twice Over. Empty for a card that copies nothing, too. With
 # none, the controller and the hand's fade both refuse the card.
 static func copy_targets(card: CardData, hand: Array[CardData]) -> Array[CardData]:
 	var targets: Array[CardData] = []
@@ -201,7 +201,7 @@ static func copy_targets(card: CardData, hand: Array[CardData]) -> Array[CardDat
 	return targets
 
 # The hand cards `card` may Devour (DEVOUR_FROM_HAND - Take In): every
-# other card in `hand` - unplayable ones, Keep cards and Countersign's
+# other card in `hand` - unplayable ones, Keep cards and Twice Over's
 # copies included. Empty for a card that devours nothing, too. With none,
 # the controller and the hand's fade both refuse the card.
 static func devour_targets(card: CardData, hand: Array[CardData]) -> Array[CardData]:

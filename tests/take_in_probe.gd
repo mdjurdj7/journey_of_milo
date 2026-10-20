@@ -2,7 +2,7 @@ extends SceneTree
 
 # Headless probe for Take In - 1 Energy, Uncommon Skill: "Devour a card
 # in your hand." - and the Devour keyword. The eaten card leaves the
-# hand for the fight (the Spent pile, back next fight; a Countersign copy
+# hand for the fight (the Spent pile, back next fight; a Twice Over copy
 # just gone) and yields, for each Energy of its PRINTED cost, 2: an Attack
 # Teeth (your Attacks deal that much more - every hit, each Lash repeat),
 # a Skill Marrow (that much Block at the start of each turn); a 0-cost
@@ -135,7 +135,7 @@ func _check_out_of_the_hand() -> void:
 	_expect(not deck.hand.has(brace) and deck.exhaust_pile.has(brace) and deck.spent_unplayed.has(brace), "The eaten card: out of the hand, Spent, unplayed (back next fight)")
 	_completed += 1
 
-# A Countersign copy eaten: it yields and counts, then is gone - no pile,
+# A Twice Over copy eaten: it yields and counts, then is gone - no pile,
 # not spent_unplayed, nothing to come back.
 func _check_copy_devoured() -> void:
 	var player: Combatant = _player()
@@ -143,7 +143,7 @@ func _check_copy_devoured() -> void:
 	var slash: CardData = (load(SLASH_PATH) as CardData).duplicate()
 	deck.hand.append(slash)
 	var copy: CardData = deck.add_copy(slash)
-	_expect(copy != null and copy.battle_copy, "A Countersign copy in the hand")
+	_expect(copy != null and copy.battle_copy, "A Twice Over copy in the hand")
 	if copy != null:
 		_devour(player, copy, deck)
 		_expect_eq(_applied_line(player), "+2 damage this combat", "...devoured, it yields as its card")

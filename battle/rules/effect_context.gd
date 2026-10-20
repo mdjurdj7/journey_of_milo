@@ -18,11 +18,11 @@ var deck: Deck
 # before the play committed (BattleController's choose mode). Empty for
 # every other card, and for a Bide played with none chosen.
 var keep_choice: Array[CardData] = []
-# The hand card the player chose for a COPY_HAND_CARD (Countersign) to
+# The hand card the player chose for a COPY_HAND_CARD (Twice Over) to
 # copy, picked before the play committed. Null for every other card.
 var copy_choice: CardData = null
 # The hand card a DEVOUR_FROM_HAND card (Take In) eats - the hand choice's
-# one pick, as copy_choice is Countersign's.
+# one pick, as copy_choice is Twice Over's.
 var devour_choice: CardData = null
 # What a Not So just undid (UndoLastAttackEffect): {"intent", "attacker",
 # "restored", "dealt", "grace_closed"} - for the run log. Empty for any

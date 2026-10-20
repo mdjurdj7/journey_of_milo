@@ -1,15 +1,15 @@
 extends SceneTree
 
-# Headless probe for Countersign - 0 Energy, Uncommon Skill, Spent, TOLL:
+# Headless probe for Twice Over - 0 Energy, Uncommon Skill, Spent, TOLL:
 # "Spend 7 Toll. Copy another card in hand." Blocked under 7 Toll, and
-# with no other card it may copy - never a Countersign. The picker takes
+# with no other card it may copy - never a Twice Over. The picker takes
 # exactly one of the cards it may, the rest faded, and plays at the pick.
 # The copy (Deck.add_copy(), CardData.battle_copy) is the same card,
 # tempered or not; it costs its Energy, is Spent when played, can be
 # Second Swing's last Attack, and is gone at the end of the turn unplayed
 # - Keep or not - in no pile, never in the run's deck (a Consumed copy
 # included). Its face reads "COPY ·" and carries the hatched band. The
-# spend hurries a Sentence. Countersign+ spends 5.
+# spend hurries a Sentence. Twice Over+ spends 5.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/countersign_probe.gd
 #
@@ -71,14 +71,14 @@ func _initialize() -> void:
 
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
-	_expect_eq([card.card_name, card.cost, card.card_type, card.rarity, card.removal_scope, card.offer, card.card_class], ["Countersign", 0, CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.RemovalScope.SPENT, CardData.OfferScope.REWARDABLE, &"wanderer"], "Countersign: 0 Energy, an Uncommon Skill, Spent, rewardable, the Wanderer's")
+	_expect_eq([card.card_name, card.cost, card.card_type, card.rarity, card.removal_scope, card.offer, card.card_class], ["Twice Over", 0, CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.RemovalScope.SPENT, CardData.OfferScope.REWARDABLE, &"wanderer"], "Twice Over: 0 Energy, an Uncommon Skill, Spent, rewardable, the Wanderer's")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[0].toll_cost == 7 and card.effects[1].effect_type == CardEffect.EffectType.COPY_HAND_CARD, "...SPEND_TOLL 7, then COPY_HAND_CARD")
 	_expect_eq(card.description, "Spend {toll_cost} Toll.\nCopy another card in hand.\nSpent.", "...its text, numbers from data")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect(card.art == null, "...its glyph for art, for now")
 	var tempered: CardData = load(TEMPERED_PATH)
-	_expect(card.tempered == tempered, "...tempering to Countersign+")
-	_expect_eq([tempered.card_name, tempered.effects[0].toll_cost, tempered.removal_scope, tempered.description], ["Countersign+", 5, CardData.RemovalScope.SPENT, card.description], "Countersign+: spends 5, the same text, Spent")
+	_expect(card.tempered == tempered, "...tempering to Twice Over+")
+	_expect_eq([tempered.card_name, tempered.effects[0].toll_cost, tempered.removal_scope, tempered.description], ["Twice Over+", 5, CardData.RemovalScope.SPENT, card.description], "Twice Over+: spends 5, the same text, Spent")
 	_completed += 1
 
 # A copy into the hand: a new card, the same in all else, marked; with a
@@ -110,15 +110,15 @@ func _check_targets() -> void:
 	var plus: CardData = (load(TEMPERED_PATH) as CardData).duplicate()
 	var slash: CardData = (load(SLASH_PATH) as CardData).duplicate()
 	var hand: Array[CardData] = [card, other, plus, slash]
-	_expect_eq(EffectResolver.copy_targets(card, hand), [slash] as Array[CardData], "It may copy Slash - not itself, nor any Countersign")
+	_expect_eq(EffectResolver.copy_targets(card, hand), [slash] as Array[CardData], "It may copy Slash - not itself, nor any Twice Over")
 	var only: Array[CardData] = [card, other]
-	_expect(EffectResolver.copy_targets(card, only).is_empty(), "...with only Countersigns, nothing")
+	_expect(EffectResolver.copy_targets(card, only).is_empty(), "...with only other Twice Overs, nothing")
 	_completed += 1
 
 # --- Fights ---
 
-# On 7 Toll with Slash and another Countersign: the picker offers Slash
-# alone; picked, it plays - 7 Toll spent, Countersign Spent, a Slash copy
+# On 7 Toll with Slash and another Twice Over: the picker offers Slash
+# alone; picked, it plays - 7 Toll spent, Twice Over Spent, a Slash copy
 # in the hand. The copy costs its 1 Energy, lands, is Spent, and is the
 # last Attack.
 func _check_copy_and_play() -> void:
@@ -133,11 +133,11 @@ func _check_copy_and_play() -> void:
 		controller.call("request_play", _view(controller, card))
 		_expect(_prompt_text().begins_with("COPY"), "The picker: %s" % _prompt_text())
 		controller.call("toggle_choice", _view(controller, spare))
-		_expect(not _view(controller, spare).is_marked(), "...the other Countersign can't be picked")
+		_expect(not _view(controller, spare).is_marked(), "...the other Twice Over can't be picked")
 		controller.call("toggle_choice", _view(controller, slash))
 		await ProbePlay.settle(self, controller)
 		_expect_eq(player.toll, 0, "Picked: 7 Toll spent, at once")
-		_expect((deck.get("exhaust_pile") as Array).has(card), "...Countersign Spent")
+		_expect((deck.get("exhaust_pile") as Array).has(card), "...Twice Over Spent")
 		var copy: CardData = _copy_in_hand(deck)
 		_expect(copy != null and copy.card_name == "Slash", "...a Slash copy in the hand")
 		if copy != null:
@@ -215,7 +215,7 @@ func _check_consumed_copy() -> void:
 	await _teardown()
 	_completed += 1
 
-# 6 Toll: blocked. 7, but only another Countersign in hand: nothing it may
+# 6 Toll: blocked. 7, but only another Twice Over in hand: nothing it may
 # copy - not playable, faded.
 func _check_blocked() -> void:
 	var controller: Node = await _start_fight()
@@ -224,13 +224,13 @@ func _check_blocked() -> void:
 		player.toll = _toll - 1
 		await _deal(controller, SLASH_PATH)
 		var card: CardData = await _deal(controller, CARD_PATH)
-		_expect(not bool(controller.call("_is_playable", card)), "On 6 Toll Countersign can't be played")
+		_expect(not bool(controller.call("_is_playable", card)), "On 6 Toll Twice Over can't be played")
 		controller.get("deck").call("discard_hand")
 		await process_frame
 		player.toll = _toll
 		await _deal(controller, CARD_PATH)
 		var lone: CardData = await _deal(controller, CARD_PATH)
-		_expect(not bool(controller.call("_is_playable", lone)), "On 7 with only a Countersign beside it: nothing to copy, not playable")
+		_expect(not bool(controller.call("_is_playable", lone)), "On 7 with only a Twice Over beside it: nothing to copy, not playable")
 		_expect(not controller.get("_hand_container").call("_can_play", lone, player.energy), "...the hand fades it")
 	await _teardown()
 	_completed += 1
@@ -245,7 +245,7 @@ func _check_sentence() -> void:
 		var slash: CardData = await _deal(controller, SLASH_PATH)
 		await _countersign(controller, await _deal(controller, CARD_PATH), slash)
 		var sentence: Status = Status.find_in(enemy.statuses, load(SENTENCE_STATUS_PATH))
-		_expect(sentence != null and sentence.turns_remaining == 2, "Countersign's spend hurries a Sentence: 3 -> 2")
+		_expect(sentence != null and sentence.turns_remaining == 2, "Twice Over's spend hurries a Sentence: 3 -> 2")
 	await _teardown()
 	_completed += 1
 

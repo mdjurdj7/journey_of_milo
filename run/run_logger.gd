@@ -90,9 +90,9 @@ class_name RunLogger
 # Collateral's HP is put down to "status:collateral" as before, now for
 # each card it covers short this turn.
 
-# Format 9 (2026-10-19): Bide and Countersign. Mechanic lines "keep" (the
+# Format 9 (2026-10-19): Bide and Twice Over. Mechanic lines "keep" (the
 # "cards" a Bide gave Keep, possibly none), "copy" (the "card" a
-# Countersign copied) and "copy_end" (the copy's "card" and its
+# Twice Over copied) and "copy_end" (the copy's "card" and its
 # "outcome": "played", or "vanished" at the turn's end). Bide's set-aside
 # is gone.
 

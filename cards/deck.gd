@@ -81,7 +81,7 @@ func discard(card: CardData) -> void:
 	if not hand.has(card):
 		return
 	_leave_hand(card)
-	# A fight-only copy (Countersign's) is gone, not discarded: no pile, no
+	# A fight-only copy (Twice Over's) is gone, not discarded: no pile, no
 	# reshuffle ever brings it back.
 	if card.battle_copy:
 		vanished.emit(card)
@@ -89,7 +89,7 @@ func discard(card: CardData) -> void:
 	discard_pile.append(card)
 	discarded.emit(card)
 
-# A fight-only copy of `card` (Countersign) into the hand: the same card -
+# A fight-only copy of `card` (Twice Over) into the hand: the same card -
 # tempered or not - marked CardData.battle_copy. Null when the hand is
 # full; it never goes to the draw pile, so it can't outlive the turn.
 func add_copy(card: CardData) -> CardData:
@@ -168,7 +168,7 @@ func end_play() -> void:
 # Devoured by the keyword (Take In - DevourFromHandEffect): out of the hand
 # for the rest of this fight without being played - to the exhaust pile
 # and spent_unplayed, as the Devour button's eaten cards go, so it is back
-# next fight even if CONSUMED. A fight-only copy (Countersign's) is only
+# next fight even if CONSUMED. A fight-only copy (Twice Over's) is only
 # gone: no pile, nothing to come back. False for a card not in the hand.
 func devour(card: CardData) -> bool:
 	if not hand.has(card):

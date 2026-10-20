@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20); Last Wager reworked (2026-10-20); Nothing Left (2026-10-20); Owed Time (2026-10-20); Nothing Left's and Owed Time's art (2026-10-20); In the Red's HP 8 to 5 (2026-10-20)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20); Last Wager reworked (2026-10-20); Nothing Left (2026-10-20); Owed Time (2026-10-20); Nothing Left's and Owed Time's art (2026-10-20); In the Red's HP 8 to 5 (2026-10-20); Countersign renamed Twice Over (2026-10-20)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -83,7 +83,7 @@
         "Reckoning",
         "In the Red",
         "Go Under",
-        "Countersign",
+        "Twice Over",
         "Not So",
         "Take In",
         "On the Brink",
@@ -122,7 +122,7 @@
     },
     "implemented_but_not_obtainable": [],
     "missing_art": [
-      "Countersign"
+      "Twice Over"
     ],
     "neutral_cards_missing_art": [
       "Endure",
@@ -144,7 +144,7 @@
       },
       {
         "name": "Toll",
-        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Leverage, Settled Account (5, for 5 block), Bide (4: up to 2 hand cards gain Keep), Countersign (7: a copy of a hand card), Not So (10: the last enemy attack undone and returned), and the three that turn it into time and actions: Second Swing (5: play the last Attack again), Come Due (5: 2 Energy now, 2 less next turn) and Deny (6: an enemy's next action a turn later); each card (or replay) that spends any of it brings every Sentence a turn closer. Reckoning deals what you've spent this fight, spending none. Collateral's HP makes it too."
+        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Leverage, Settled Account (5, for 5 block), Bide (4: up to 2 hand cards gain Keep), Twice Over (7: a copy of a hand card), Not So (10: the last enemy attack undone and returned), and the three that turn it into time and actions: Second Swing (5: play the last Attack again), Come Due (5: 2 Energy now, 2 less next turn) and Deny (6: an enemy's next action a turn later); each card (or replay) that spends any of it brings every Sentence a turn closer. Reckoning deals what you've spent this fight, spending none. Collateral's HP makes it too."
       },
       {
         "name": "Grace",
@@ -164,7 +164,7 @@
       },
       {
         "name": "Keep",
-        "rule": "Stays in your hand at the end of each turn until played (or until it leaves the hand any other way). Given by Bide; never carried to the next fight. A fight-only copy (Countersign's) goes at the turn's end even with Keep."
+        "rule": "Stays in your hand at the end of each turn until played (or until it leaves the hand any other way). Given by Bide; never carried to the next fight. A fight-only copy (Twice Over's) goes at the turn's end even with Keep."
       },
       {
         "name": "Devour",
@@ -873,7 +873,7 @@
       "not_obtainable_in_play": false
     },
     {
-      "name": "Countersign",
+      "name": "Twice Over",
       "file_path": "res://cards/data/countersign.tres",
       "pool_class": "wanderer",
       "card_type": "SKILL",
@@ -892,7 +892,7 @@
         },
         {
           "type": "COPY_HAND_CARD",
-          "plain_english": "Pick one other card in your hand - never a Countersign - and a copy of it, tempered state and all, comes into your hand. The copy costs its normal Energy, is Spent when played, and is gone at the end of the turn unplayed, even with Keep; it never enters your deck or the run's deck list. Copies of Powers and Stances follow those cards' own rules. A played copy of an Attack is Second Swing's last Attack. Its face reads COPY ahead of its type, with a fine hatched band along the top."
+          "plain_english": "Pick one other card in your hand - never a Twice Over - and a copy of it, tempered state and all, comes into your hand. The copy costs its normal Energy, is Spent when played, and is gone at the end of the turn unplayed, even with Keep; it never enters your deck or the run's deck list. Copies of Powers and Stances follow those cards' own rules. A played copy of an Attack is Second Swing's last Attack. Its face reads COPY ahead of its type, with a fine hatched band along the top."
         }
       ],
       "keywords": [
@@ -923,7 +923,7 @@
       "battle_animation": null,
       "play_effect_scene_path": null,
       "upgrade_data": {
-        "name": "Countersign+",
+        "name": "Twice Over+",
         "file_path": "res://cards/tempered/countersign_tempered.tres",
         "card_text": "Spend 5 Toll.\nCopy another card in hand.\nSpent.",
         "changes": "Spends 5 Toll in place of 7."
@@ -1884,7 +1884,7 @@
       "power_effect": null,
       "status_effect": null,
       "critical_condition": {
-        "rule": "Costs 0 whenever you are Critical (CardData.critical_cost 0, read through Combatant.base_cost() at the HP held when it is paid for) - under Go Under's or On the Brink's line too; the hand shows the live cost. A Countersign copy keeps it.",
+        "rule": "Costs 0 whenever you are Critical (CardData.critical_cost 0, read through Combatant.base_cost() at the HP held when it is paid for) - under Go Under's or On the Brink's line too; the hand shows the live cost. A Twice Over copy keeps it.",
         "effect": "cost",
         "normal_value": 3,
         "critical_value": 0
@@ -2019,7 +2019,7 @@
         },
         {
           "type": "APPLY_STATUS",
-          "plain_english": "Apply Owed Time to yourself: a charge per play (a Countersign copy adds a second). When your turn ends with a charge up, one goes and the enemy turn is skipped: the turn ends as any does (hand discarded but Keep, Grace closed, this-turn statuses gone), the enemies don't act and their intents stay as shown (their Block stays, their statuses don't age, Sentence doesn't count down), and your next turn starts in full - Block resets (Blue Fastener's carry aside), Energy refills, Dying Light, Marrow, Venom and status ages, and the draw. 'Took damage last turn' then means the turn just ended."
+          "plain_english": "Apply Owed Time to yourself: a charge per play (a Twice Over copy adds a second). When your turn ends with a charge up, one goes and the enemy turn is skipped: the turn ends as any does (hand discarded but Keep, Grace closed, this-turn statuses gone), the enemies don't act and their intents stay as shown (their Block stays, their statuses don't age, Sentence doesn't count down), and your next turn starts in full - Block resets (Blue Fastener's carry aside), Energy refills, Dying Light, Marrow, Venom and status ages, and the draw. 'Took damage last turn' then means the turn just ended."
         }
       ],
       "keywords": [
@@ -2685,7 +2685,7 @@
       "effects": [
         {
           "type": "DEVOUR_FROM_HAND",
-          "plain_english": "Pick one other card in your hand - any card, unplayable ones, Keep cards and Countersign's copies included - and Devour it: it leaves your hand for the rest of this fight without being played (to the Spent pile, back next fight; a Countersign copy is simply gone). For each Energy of its PRINTED cost (no discount, free card or replacement counts): an Attack gives Teeth +2 - your Attacks deal 2 more this fight, on every hit, each Lash repeat included; a Skill gives Marrow +2 - 2 Block at the start of each of your turns, from the next one. A 0-cost card, a Power or a Stance yields nothing. While choosing, hovering a candidate shows its yield as one line of ink above it (\"+4 damage this combat\", \"+2 Block each turn\", \"Nothing\"). The fight's Devoured cards are counted for later cards. Can't be played with no other card in hand. Not the Devour button: no heal, no use of it."
+          "plain_english": "Pick one other card in your hand - any card, unplayable ones, Keep cards and Twice Over's copies included - and Devour it: it leaves your hand for the rest of this fight without being played (to the Spent pile, back next fight; a Twice Over copy is simply gone). For each Energy of its PRINTED cost (no discount, free card or replacement counts): an Attack gives Teeth +2 - your Attacks deal 2 more this fight, on every hit, each Lash repeat included; a Skill gives Marrow +2 - 2 Block at the start of each of your turns, from the next one. A 0-cost card, a Power or a Stance yields nothing. While choosing, hovering a candidate shows its yield as one line of ink above it (\"+4 damage this combat\", \"+2 Block each turn\", \"Nothing\"). The fight's Devoured cards are counted for later cards. Can't be played with no other card in hand. Not the Devour button: no heal, no use of it."
         }
       ],
       "keywords": [
