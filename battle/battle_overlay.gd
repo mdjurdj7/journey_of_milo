@@ -820,6 +820,9 @@ func _refresh_standing_row() -> void:
 		if stance.stacks > 1:
 			stance_text += " ×%d" % stance.stacks
 		lines.append({"text": stance_text, "glyph": &"stance", "name": stance.data.display_name, "rules": stance.describe()})
+	var chain: Dictionary = _chain_line(player)
+	if not chain.is_empty():
+		lines.append(chain)
 	var counters: Array[Dictionary] = []
 	for active: Status in player.statuses:
 		if active.data == null:
@@ -845,6 +848,34 @@ func _refresh_standing_row() -> void:
 	# don't read as gone.
 	_field_hp_bar.set_standing_row(lines)
 	_field_hp_bar.set_hand_top_y(hand_container.get_rest_top_y())
+
+# The row's chain line (Skillchain): "Chain 2 · Parry" - the level, then
+# the last skillchain this chain fired, once one has - or {} with no
+# chain. Its reveal says what extends it and what that fires, by the
+# player's own numbers (Skillchain.payoff()). Read whenever the row is:
+# after a play, and on the status_changed that follows each turn's reset.
+func _chain_line(player: Combatant) -> Dictionary:
+	if player.chain_property == CardData.ChainProperty.NONE:
+		return {}
+	var text: String = "Chain %d" % player.chain_level
+	if player.last_skillchain != &"":
+		text += " · %s" % player.last_skillchain
+	var next: CardData.ChainProperty = Skillchain.next_property(player.chain_property)
+	var level: int = player.chain_level + 1
+	var link: StringName = Skillchain.link_into(next)
+	var payoff: CardEffect = Skillchain.payoff(link, level, player)
+	var amount: int = payoff.value if payoff != null else 0
+	var fires: String = ""
+	match link:
+		Skillchain.PARRY:
+			fires = "Parry for %d Block" % amount
+		Skillchain.RECOVER:
+			fires = "Recover, drawing %d" % amount
+		Skillchain.LUNGE:
+			fires = "Lunge for %d damage to its target" % amount
+	var property: String = str(CardData.ChainProperty.find_key(next)).capitalize()
+	var rules: String = "%s next: chain %d, %s. Any other card ends the chain." % [property, level, fires]
+	return {"text": text, "name": "Chain", "rules": rules}
 
 # Block moved somewhere (a card, a turn start, an enemy's own guard) -
 # every readout's segment follows. So does the player's Critical line,

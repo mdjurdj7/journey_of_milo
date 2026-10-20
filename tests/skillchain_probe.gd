@@ -22,9 +22,10 @@ extends SceneTree
 #             chain level now (5, 9, 13 at levels 0, 1, 2); outside a
 #             fight its rule prints the per-level number ({chain_bonus})
 #   turn    - in a fight: a play's commit steps the chain and fires its
-#             link, and the hand's context carries the new level; the
-#             chain is gone once the turn ends, before the enemies act,
-#             and at the next turn's start
+#             link, the hand's context carries the new level and her
+#             readout's standing row reads "Chain 1 · Parry"; the chain,
+#             and its line, are gone once the turn ends, before the
+#             enemies act, and at the next turn's start
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/skillchain_probe.gd
 #
@@ -244,21 +245,26 @@ func _check_turn() -> void:
 	_expect_eq(player.block - block_before, CARD_BLOCK + _samurai.parry_block_per_level, "...its Block after the card's")
 	var preview: EffectContext = controller.call("preview_context")
 	_expect_eq(preview.chain_level_before_this, 1, "...and the hand reads the chain at level 1")
+	_expect_eq(_chain_texts(controller), ["Chain 1 · Parry"], "...and her readout says so")
 
 	controller.call("end_turn")
 	var enemies_acting: bool = await ProbePlay.wait_until(self, func() -> bool: return bool(controller.get("_enemy_phase")), 10.0)
 	_expect(enemies_acting, "The enemy turn comes")
 	_expect_eq(player.chain_level, 0, "The turn's end clears the chain before the enemies act")
 	_expect_eq(player.last_skillchain, &"", "...and its last skillchain")
+	_expect(_chain_texts(controller).is_empty(), "...and her readout shows no chain")
 	# A chain put back mid enemy turn: the next turn's start clears it too.
 	_chain_at(player, CardData.ChainProperty.HOLD, 2)
 	player.last_skillchain = Skillchain.PARRY
+	controller.emit_signal("status_changed")
+	_expect_eq(_chain_texts(controller), ["Chain 2 · Parry"], "A chain put back shows on her readout")
 	var back: bool = await ProbePlay.wait_until(self, func() -> bool:
 		return not bool(controller.get("_enemy_phase")) and ProbePlay.is_settled(controller), 20.0)
 	_expect(back, "The player's turn comes back")
 	_expect_eq(player.chain_level, 0, "The turn's start clears the chain")
 	_expect_eq(player.chain_property, CardData.ChainProperty.NONE, "...leaving none to follow")
 	_expect_eq(player.last_skillchain, &"", "...and no skillchain")
+	_expect(_chain_texts(controller).is_empty(), "...and her readout shows no chain")
 	await _teardown()
 	_completed += 1
 
@@ -287,6 +293,19 @@ func _start_fight() -> Node:
 	var controller: Node = layer.get_child(0).get("battle_controller")
 	await ProbePlay.settle_fight(self, _field, controller)
 	return controller
+
+# The chain lines of her readout's standing row, as BattleOverlay hands
+# them to the HP bar.
+func _chain_texts(controller: Node) -> Array:
+	var texts: Array = []
+	var bar: Object = controller.get_parent().get("_field_hp_bar")
+	if bar == null:
+		_fail("no HP bar readout")
+		return texts
+	for item: Dictionary in bar.get("_row_items"):
+		if String(item.get("name", "")) == "Chain":
+			texts.append(String(item.get("text", "")))
+	return texts
 
 # Plays the first hand card with `property` and waits for it to resolve.
 func _play_property(controller: Node, property: CardData.ChainProperty) -> void:
