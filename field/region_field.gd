@@ -2829,7 +2829,19 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 	# The battle frame settles on the beat the overlay reveals the intents
 	# (BattleOverlay._reveal_enemy_intents()); a flyer takes to the air
 	# then, and stays up until the fight ends.
-	get_tree().create_timer(transition_time).timeout.connect(_start_battle_hover.bind(_battle_members.duplicate(), overlay.battle_controller))
+	# The controller's own timer, so it goes with the fight: a fight over
+	# before the frame settles never calls back with its freed controller.
+	# Run always, as a tree timer is; the next frame at least, as one of
+	# 0 s fires.
+	var hover_timer := Timer.new()
+	hover_timer.name = "BattleHoverTimer"
+	hover_timer.one_shot = true
+	hover_timer.autostart = true
+	hover_timer.process_mode = Node.PROCESS_MODE_ALWAYS
+	hover_timer.wait_time = maxf(transition_time, 0.001)
+	hover_timer.timeout.connect(_start_battle_hover.bind(_battle_members.duplicate(), overlay.battle_controller))
+	hover_timer.timeout.connect(hover_timer.queue_free)
+	overlay.battle_controller.add_child(hover_timer)
 	overlay.battle_finished.connect(_on_battle_finished.bind(overlay))
 	# Only reachable now - enter_battle() is what creates battle_controller
 	# (see Wanderer.bind_to_battle()'s own doc).
