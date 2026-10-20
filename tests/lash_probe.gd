@@ -333,15 +333,7 @@ func _check_deck_view() -> void:
 	_completed += 1
 
 func _deck_view_faces(view: DeckView) -> Array[CardView]:
-	var faces: Array[CardView] = []
-	var grid: Node = view.get("_grid")
-	if grid == null:
-		return faces
-	for slot in grid.get_children():
-		for child in slot.get_children():
-			if child is CardView and not child.is_queued_for_deletion():
-				faces.append(child as CardView)
-	return faces
+	return view.get_card_views()
 
 # The Tail's offer: one link, base Lash, over the "Lash" its effect names;
 # hovering it shows base Lash beside the plate's card - on screen, over

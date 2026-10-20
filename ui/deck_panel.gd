@@ -52,10 +52,11 @@ const DECK_VIEW_LAYER: int = 3
 
 enum Pile { DRAW, DISCARD }
 
-# DeckView's header in whole-deck mode - the battle piles use "Draw pile"/
-# "Discard pile" instead (see _open_deck_view() below), since the lines
-# themselves already show the pile name.
-@export var deck_title: String = "Belongings"
+# DeckView's header in whole-deck mode (shown in caps: DECK) - the battle
+# piles use "Draw pile"/"Discard pile" instead (see _open_deck_view()
+# below), since the lines themselves already show the pile name. The
+# reward screen's DECK opens it with this too.
+@export var deck_title: String = "Deck"
 
 @export var label_font: Font = InkType.text_bold_font():
 	set(value):

@@ -1,62 +1,199 @@
 extends Control
 class_name DeckView
 
-# Emitted right before queue_free(), regardless of which of the three
-# close paths fired (DeckPanel's own toggle-close, a scrim click, or
-# Escape) - DeckPanel connects to this to clear its own "a view from me
-# is currently open" reference (see its _on_deck_view_closed()), so that
+# Emitted right before queue_free(), regardless of which close path fired
+# (DeckPanel's own toggle-close, a click off the cards, BACK, or Escape) -
+# DeckPanel connects to this to clear its own "a view from me is
+# currently open" reference (see its _on_deck_view_closed()), so that
 # stays accurate no matter how this instance actually closed.
 signal closed()
 # Pick mode only (pick_mode): the card clicked, emitted just before the
 # view closes. A view that closes without it was cancelled.
 signal card_picked(card: CardData)
 
-# Full-screen dark scrim behind a scrollable grid of CardView instances,
-# sorted by name - browsing only (hover_enabled is turned off on every
-# card, so nothing lifts/fights the grid layout). Escape or a click
-# outside the content panel closes it. Dumb about where its cards/header
-# came from - DeckPanel decides that (whole deck vs. a battle pile) and
-# calls open() with a plain card list and a pre-formatted header string.
+# A pile of cards to scan, in the screens' own language: ink on the world
+# - the reward screen's ink scrim, bone labels with an ink outline,
+# tracked caps, no box or panel. The heading (the caller's text, in caps:
+# DECK, DRAW PILE, HAND ONE OVER) at the top; then the cards in rows by
+# type - ATTACKS, SKILLS, POWERS, STANCES (and OTHER, should a card be
+# none of those) - each under its caps heading, its count and a hairline,
+# sorted by cost then name; then BACK at the bottom. POWERS and STANCES
+# share a line when both are short enough to. Identical cards (the same
+# name as carried, tempered or not, a fight-only copy apart) are one card
+# with "×N" under it. The rows scroll; the wheel reaches the scroll
+# through the cards.
 #
-# Layout is containers all the way down, no manually-computed position
-# anywhere: Scrim (full-rect) -> CenterContainer (full-rect) ->
-# ContentPanel, sized only via custom_minimum_size (a fraction of the
-# viewport) and placed by CenterContainer itself -> MarginContainer ->
-# VBoxContainer -> HeaderLabel + a filling ScrollContainer -> a second
-# CenterContainer (GridCenterContainer, EXPAND_FILL - see _ready()'s own
-# doc on why a real CenterContainer is needed here rather than a size
-# flag on GridContainer itself) -> GridContainer, which ends up centered
-# with equal left/right margins whenever it's narrower than the available
-# width (fewer cards than fit, or the column cap itself - see _compute_
-# column_count()).
+# BACK, Escape, or a click anywhere off the cards closes it. A click on a
+# card lifts it to read (Inspect, below) - or, in pick mode, picks it.
+# Dumb about where its cards and heading came from - DeckPanel decides
+# that (whole deck vs. a battle pile) and calls open() with a plain card
+# list and a heading string.
 #
-# Opened via DeckPanel._open_deck_view(), added directly under the
-# SceneTree's own root so it renders full-screen over both the field and
-# any battle overlay regardless of which one is currently active - not a
-# child of either, and not otherwise part of any other scene's tree.
+# Opened via DeckPanel.open_view(), under the SceneTree's own root in a
+# CanvasLayer of its own, so it renders full-screen over both the field
+# and any battle overlay. Every size is in the 1080p canvas's pixels.
 
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 
-@export var scrim_color: Color = Color(0.0, 0.0, 0.0, 0.6)
-@export_range(0.1, 1.0) var content_width_fraction: float = 0.75
-@export_range(0.1, 1.0) var content_height_fraction: float = 0.8
-@export var content_margin_px: int = 24
-@export var header_grid_gap_px: int = 24
-@export var grid_h_separation: float = 20.0
-@export var grid_v_separation: float = 20.0
-@export var header_font_size_px: int = 28
-# Applied to every CardView in the grid (both .scale and the slot
-# reserving only its scaled footprint) so a whole pile reads at a glance
-# instead of needing to scroll through full hand-sized cards.
-@export_range(0.1, 1.0) var deck_view_card_scale: float = 0.75
+@export_group("Page")
+# The reward screen's scrim: its ink, so the world recedes rather than
+# turning to a new surface.
+@export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.62):
+	set(value):
+		scrim_color = value
+		_relayout()
+@export var bone: Color = Color(0.94, 0.91, 0.86, 1.0):
+	set(value):
+		bone = value
+		_relayout()
+# The text outline under bone, and the rules' hairlines.
+@export var ink: Color = Color(0.165, 0.165, 0.18, 1.0):
+	set(value):
+		ink = value
+		_relayout()
+# BACK at rest, and each heading's count: the utility grey.
+@export var unfocused_color: Color = Color(0.58, 0.58, 0.60, 1.0):
+	set(value):
+		unfocused_color = value
+		_relayout()
+@export var text_outline_px: int = 1:
+	set(value):
+		text_outline_px = maxi(value, 0)
+		_relayout()
+# The heading, BACK and the row headings, in tracked caps.
+@export var label_size_px: int = 22:
+	set(value):
+		label_size_px = maxi(value, 1)
+		_relayout()
+@export_range(0.0, 1.0) var tracking_em: float = 0.16:
+	set(value):
+		tracking_em = value
+		_relayout()
+# The heading's line top, from the top of the screen.
+@export var title_top_px: float = 48.0:
+	set(value):
+		title_top_px = value
+		_relayout()
+@export var title_rows_gap_px: float = 32.0:
+	set(value):
+		title_rows_gap_px = value
+		_relayout()
+@export var back_text: String = "BACK":
+	set(value):
+		back_text = value
+		_relayout()
+# BACK's line bottom, from the bottom of the screen.
+@export var back_bottom_px: float = 44.0:
+	set(value):
+		back_bottom_px = value
+		_relayout()
+@export var rows_back_gap_px: float = 28.0:
+	set(value):
+		rows_back_gap_px = value
+		_relayout()
+# The rows' width, centred.
+@export_range(0.1, 1.0) var content_width_fraction: float = 0.85:
+	set(value):
+		content_width_fraction = value
+		_relayout()
+# BACK focused: bone, with this hairline to its left (the reward
+# screen's).
+@export var hairline_length_px: float = 28.0:
+	set(value):
+		hairline_length_px = value
+		_relayout()
+@export var hairline_gap_px: float = 14.0:
+	set(value):
+		hairline_gap_px = value
+		_relayout()
+@export var hairline_thickness_px: float = 1.0:
+	set(value):
+		hairline_thickness_px = value
+		_relayout()
 
-# Inspect: clicking a card in the grid lifts THAT SAME CardView out of
-# its slot, over a dim, at reading size. The same instance rather than a
-# second one so the card can't drift from the grid's - one layout, one
-# set of colours, text simply larger. Lifting it out of the tree is also
-# what makes it possible at all: in the grid it lives inside a
-# ScrollContainer, which clips, so a card scaled up in place would be cut
-# off at the panel's edge.
+@export_group("Rows")
+@export var attacks_text: String = "ATTACKS":
+	set(value):
+		attacks_text = value
+		_relayout()
+@export var skills_text: String = "SKILLS":
+	set(value):
+		skills_text = value
+		_relayout()
+@export var powers_text: String = "POWERS":
+	set(value):
+		powers_text = value
+		_relayout()
+@export var stances_text: String = "STANCES":
+	set(value):
+		stances_text = value
+		_relayout()
+@export var other_text: String = "OTHER":
+	set(value):
+		other_text = value
+		_relayout()
+# The count beside each row's heading - its cards, stacks counted in full.
+@export var count_size_px: int = 22:
+	set(value):
+		count_size_px = maxi(value, 1)
+		_relayout()
+@export var heading_count_gap_px: float = 14.0:
+	set(value):
+		heading_count_gap_px = value
+		_relayout()
+@export var heading_rule_gap_px: float = 10.0:
+	set(value):
+		heading_rule_gap_px = value
+		_relayout()
+# The hairline under each heading: ink-free bone at this alpha.
+@export_range(0.0, 1.0) var rule_alpha: float = 0.35:
+	set(value):
+		rule_alpha = value
+		_relayout()
+@export var rule_cards_gap_px: float = 16.0:
+	set(value):
+		rule_cards_gap_px = value
+		_relayout()
+# Between one row and the next heading.
+@export var group_gap_px: float = 40.0:
+	set(value):
+		group_gap_px = value
+		_relayout()
+# Between POWERS and STANCES when they share a line.
+@export var shared_group_gap_px: float = 56.0:
+	set(value):
+		shared_group_gap_px = value
+		_relayout()
+# Every card at this scale (hand_container.gd's own doc names it).
+@export_range(0.1, 1.0) var deck_view_card_scale: float = 0.75:
+	set(value):
+		deck_view_card_scale = value
+		_relayout()
+@export var card_gap_px: float = 20.0:
+	set(value):
+		card_gap_px = value
+		_relayout()
+# Under a stack of identical cards, right-aligned: how many.
+@export var stack_count_format: String = "×%d":
+	set(value):
+		stack_count_format = value
+		_relayout()
+@export var stack_count_size_px: int = 20:
+	set(value):
+		stack_count_size_px = maxi(value, 1)
+		_relayout()
+@export var stack_count_gap_px: float = 6.0:
+	set(value):
+		stack_count_gap_px = value
+		_relayout()
+
+# Inspect: clicking a card lifts THAT SAME CardView out of its slot, over
+# a dim, at reading size. The same instance rather than a second one so
+# the card can't drift from the row's - one layout, one set of colours,
+# text simply larger. Lifting it out of the tree is also what makes it
+# possible at all: in the rows it lives inside a ScrollContainer, which
+# clips, so a card scaled up in place would be cut off. A stack's card
+# lifts; its count stays under the slot.
 @export_group("Inspect")
 @export var inspect_scale: float = 2.2
 @export var inspect_duration_sec: float = 0.15
@@ -64,56 +201,33 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 # the dim reads as the deck receding rather than as a new surface.
 @export var inspect_scrim_color: Color = Color(0.165, 0.165, 0.18, 0.35)
 @export_group("")
-# Hard cap regardless of how much width is actually available - past a
-# point, more columns just means smaller reading distance between eye and
-# card, not a more useful browse. GridCenterContainer keeps the grid
-# centered whenever fewer than this many columns end up fitting anyway.
-@export var max_columns: int = 7
 
 # Off (every view DeckPanel opens for browsing): a click lifts a card to
 # read, as above. On (DeckPanel.open_picker() - the collector's HAND ONE
-# OVER): a click picks that card instead - card_picked, then close() -
-# and Escape or a click outside the panel closes with no pick, which is
-# the caller's cancel. Read at the click.
+# OVER): a click picks that card instead - one of a stack's, all alike -
+# card_picked, then close(); BACK, Escape or a click off the cards closes
+# with no pick, which is the caller's cancel. Read at the click.
 @export var pick_mode: bool = false
 
-@export_group("Panel/Card Contrast")
-# Two ways to make cards read as objects sitting ON this view rather than
-# blending into it - both computed from the theme's own panel_color ->
-# panel_light_color delta (one "step"), extrapolated by the given step
-# count rather than a separately-tuned color, so they track the theme
-# automatically. Both are real, independent toggles (not mutually
-# exclusive) but this feature's own spec calls for shipping with the
-# lighter panel active and the card edge off.
-@export var use_lighter_content_panel: bool = true
-@export var content_panel_steps: int = 2
-@export var use_card_edge: bool = false
-@export var card_edge_steps: int = 1
-# How far each step moves the edge from the card's bone toward its ink.
-@export_range(0.0, 1.0) var card_edge_step_fraction: float = 0.15
-@export var card_edge_width_px: float = 1.0
-
 @onready var _scrim: ColorRect = $Scrim
-@onready var _center_container: CenterContainer = $Scrim/CenterContainer
-@onready var _content_panel: PanelContainer = $Scrim/CenterContainer/ContentPanel
-@onready var _margin: MarginContainer = $Scrim/CenterContainer/ContentPanel/Margin
-@onready var _vbox: VBoxContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox
-@onready var _header_label: Label = $Scrim/CenterContainer/ContentPanel/Margin/VBox/HeaderLabel
-@onready var _scroll_container: ScrollContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer
-@onready var _grid_center: CenterContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer/GridCenterContainer
-@onready var _grid: GridContainer = $Scrim/CenterContainer/ContentPanel/Margin/VBox/ScrollContainer/GridCenterContainer/GridContainer
+@onready var _page: Control = $Page
+@onready var _scroll: ScrollContainer = $ScrollContainer
+@onready var _rows: VBoxContainer = $ScrollContainer/Rows
 @onready var _inspect_layer: Control = $InspectLayer
 @onready var _inspect_scrim: ColorRect = $InspectLayer/InspectScrim
 
-# The width _grid actually has to lay columns out in, derived arithmetically
-# from content_width_fraction/content_margin_px rather than read back off
-# the live container tree - VBox/ScrollContainer/GridCenterContainer all
-# stretch to fill Margin's content width, so this is exactly that width
-# without needing to wait for a layout pass to settle before open() can
-# use it.
-var _available_grid_width: float = 0.0
+# What open() was given, kept for a live relayout.
+var _cards: Array[CardData] = []
+var _header_text: String = ""
+# Held, as every drawn face here is: a font loaded and dropped in a draw
+# callback is freed with its glyphs as the callback returns.
+var _label_font: Font = null
+var _numeral_font: Font = null
+var _back_hovered: bool = false
+# Every slot in the rows, in order - get_card_views().
+var _slots: Array[Control] = []
 # The card currently lifted out for inspection, and the slot it came
-# from - the slot stays in the grid holding its footprint, so nothing
+# from - the slot stays in its row holding its footprint, so nothing
 # reflows while a card is out and it has somewhere exact to go back to.
 var _inspected: CardView = null
 var _inspect_slot: Control = null
@@ -121,43 +235,23 @@ var _inspect_tween: Tween = null
 # True for the length of a lift or a return - see _on_card_clicked().
 var _inspect_busy: bool = false
 
-# One "step" in the theme's own value set - the delta between panel_color
-# and panel_light_color, extrapolated by content_panel_steps/
-# card_edge_steps below rather than picked as an arbitrary lighten
-# amount, so both stay in the theme's own voice.
-var _card_edge_color: Color = Color.WHITE
-
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	set_anchors_preset(Control.PRESET_FULL_RECT)
 
-	_scrim.color = scrim_color
-	_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_page.draw.connect(_draw_page)
+	# PASS, not STOP: the scroll takes the wheel, and a click on its empty
+	# space goes on up to _gui_input() and closes. Horizontal scroll is
+	# never wanted - every row wraps to the width.
+	_scroll.mouse_filter = Control.MOUSE_FILTER_PASS
+	_scroll.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
+	_rows.mouse_filter = Control.MOUSE_FILTER_PASS
 
-	# mouse_filter IGNORE, not the Control default STOP - CenterContainer
-	# has no visual footprint of its own and spans the full screen, so
-	# leaving it at STOP would swallow every click outside ContentPanel
-	# (anywhere in that full-rect area) before it could ever reach this
-	# node's own _gui_input() below, breaking "click outside closes."
-	_center_container.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_center_container.set_anchors_preset(Control.PRESET_FULL_RECT)
-
-	# No position/anchor math for ContentPanel itself - custom_minimum_size
-	# is the only input CenterContainer needs to size and center it.
-	var viewport_size: Vector2 = get_viewport_rect().size
-	var content_size := Vector2(viewport_size.x * content_width_fraction, viewport_size.y * content_height_fraction)
-	_content_panel.custom_minimum_size = content_size
-	_content_panel.mouse_filter = Control.MOUSE_FILTER_STOP
-
-	_available_grid_width = content_size.x - float(content_margin_px) * 2.0
-
-	# Above Scrim in the scene, so the lifted card and its dim cover the
-	# grid and the panel alike. IGNORE on the layer itself and STOP on the
-	# scrim inside it: while a card is out, the scrim is what catches
-	# "click anywhere", and it has to catch it BEFORE this node's own
-	# _gui_input() closes the whole view.
+	# Above everything else, so the lifted card and its dim cover the rows.
+	# IGNORE on the layer itself and STOP on the scrim inside it: while a
+	# card is out, the scrim is what catches "click anywhere", and it has to
+	# catch it BEFORE this node's own _gui_input() closes the whole view.
 	_inspect_layer.set_anchors_preset(Control.PRESET_FULL_RECT)
 	_inspect_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_inspect_layer.visible = false
@@ -169,69 +263,7 @@ func _ready() -> void:
 	# own 0.35 is the target, modulate is what animates to it.
 	_inspect_scrim.modulate.a = 0.0
 
-	var panel_color: Color = get_theme_color("panel_color", "CardFace")
-	var panel_light_color: Color = get_theme_color("panel_light_color", "CardFace")
-	var text_color: Color = get_theme_color("text_color", "CardFace")
-	var step: Color = Color(
-		panel_light_color.r - panel_color.r,
-		panel_light_color.g - panel_color.g,
-		panel_light_color.b - panel_color.b,
-		0.0
-	)
-
-	var content_bg_color: Color = panel_color
-	if use_lighter_content_panel:
-		content_bg_color = panel_color + step * float(content_panel_steps)
-	var style := StyleBoxFlat.new()
-	style.bg_color = content_bg_color
-	style.corner_radius_top_left = 12
-	style.corner_radius_top_right = 12
-	style.corner_radius_bottom_right = 12
-	style.corner_radius_bottom_left = 12
-	_content_panel.add_theme_stylebox_override("panel", style)
-
-	# Cards are always ink-on-bone (they don't take the theme's value set -
-	# see CardView), so their browsing edge steps the card's own bone
-	# toward its ink rather than following panel_color.
-	var reference_card := (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
-	_card_edge_color = reference_card.field_color.lerp(reference_card.ink_color, card_edge_step_fraction * float(card_edge_steps))
-	reference_card.free()
-
-	_margin.add_theme_constant_override("margin_left", content_margin_px)
-	_margin.add_theme_constant_override("margin_top", content_margin_px)
-	_margin.add_theme_constant_override("margin_right", content_margin_px)
-	_margin.add_theme_constant_override("margin_bottom", content_margin_px)
-
-	_vbox.add_theme_constant_override("separation", header_grid_gap_px)
-
-	_header_label.add_theme_color_override("font_color", text_color)
-	_header_label.add_theme_font_size_override("font_size", header_font_size_px)
-
-	# Horizontal scroll is never actually wanted (columns are already capped
-	# to fit _available_grid_width - see _compute_column_count()) - left at
-	# ScrollContainer's own default (AUTO), it sizes its DIRECT child to
-	# exactly that child's own minimum width on this axis regardless of
-	# whether scrolling is actually needed, leaving GridCenterContainer no
-	# extra room to center into. DISABLED makes ScrollContainer treat this
-	# axis like a normal stretch container instead, handing GridCenter
-	# Container the full available width. Vertical scrolling (a tall pile)
-	# is untouched.
-	_scroll_container.horizontal_scroll_mode = ScrollContainer.SCROLL_MODE_DISABLED
-
-	# ScrollContainer does not honor a direct child's own size_flags for
-	# centering purposes (confirmed: GridContainer's own SHRINK_CENTER,
-	# even with scrolling disabled above, still left it flush left) - the
-	# working fix is structural, not a flag on the grid itself:
-	# GridCenterContainer sits between ScrollContainer and GridContainer
-	# specifically so a real CenterContainer (which always centers its own
-	# child, regardless of that child's flags) does the centering.
-	# EXPAND_FILL is what makes ScrollContainer stretch THIS node to the
-	# full available width in the first place, giving it room to center
-	# GridContainer into whenever the grid is narrower than that.
-	_grid_center.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-
-	_grid.add_theme_constant_override("h_separation", int(grid_h_separation))
-	_grid.add_theme_constant_override("v_separation", int(grid_v_separation))
+	_refresh_page()
 
 # `card` as the run's weapon makes it (the run state's as_carried()), or
 # `card` itself with no run to ask. The run state is found at runtime by
@@ -247,74 +279,267 @@ func _as_carried(card: CardData) -> CardData:
 	return run_state.call(&"as_carried", card) as CardData
 
 func open(cards: Array[CardData], header_text: String) -> void:
-	_header_label.text = header_text
+	_cards = cards.duplicate()
+	_header_text = header_text
+	_build()
+	_page.queue_redraw()
 
-	# Each card as the weapon carried makes it (_as_carried() - Lash under
-	# Greyshelf's Tail), sorted by that name; a pick still hands back the
-	# card itself, the one the run's deck holds.
-	var shown: Dictionary = {}
-	for card in cards:
-		shown[card] = _as_carried(card)
-	var sorted_cards := cards.duplicate()
-	sorted_cards.sort_custom(func(a: CardData, b: CardData) -> bool: return (shown[a] as CardData).card_name < (shown[b] as CardData).card_name)
+# The cards on screen in the rows, slot by slot - a lifted one is out.
+func get_card_views() -> Array[CardView]:
+	var views: Array[CardView] = []
+	for slot in _slots:
+		if not is_instance_valid(slot):
+			continue
+		for child in slot.get_children():
+			if child is CardView and not child.is_queued_for_deletion():
+				views.append(child as CardView)
+	return views
 
-	for child in _grid.get_children():
+# A live edit: the page again, and the rows - not while a card is out,
+# which has a slot to go back to.
+func _relayout() -> void:
+	if not is_node_ready():
+		return
+	_refresh_page()
+	if _inspected == null and not _cards.is_empty():
+		_build()
+
+func _refresh_page() -> void:
+	_scrim.color = scrim_color
+	_label_font = InkType.tracked(InkType.text_bold_font(), label_size_px, tracking_em)
+	_numeral_font = InkType.numeral_font()
+	var view: Vector2 = get_viewport_rect().size
+	var width: float = view.x * content_width_fraction
+	var top: float = title_top_px + _line_height(label_size_px) + title_rows_gap_px
+	var bottom: float = view.y - back_bottom_px - _line_height(label_size_px) - rows_back_gap_px
+	_scroll.position = Vector2(roundf((view.x - width) * 0.5), roundf(top))
+	_scroll.size = Vector2(roundf(width), maxf(roundf(bottom - top), 1.0))
+	_page.queue_redraw()
+
+func _line_height(size_px: int) -> float:
+	if _label_font == null:
+		return float(size_px)
+	return _label_font.get_ascent(size_px) + _label_font.get_descent(size_px)
+
+# --- Rows ---
+
+func _build() -> void:
+	for child in _rows.get_children():
+		_rows.remove_child(child)
 		child.queue_free()
+	_slots.clear()
+	_rows.add_theme_constant_override("separation", roundi(group_gap_px))
 
 	# A throwaway instance purely to read CardView's own card_size (never
-	# added to the tree, so free() - not queue_free() - is safe) - avoids
-	# hardcoding a second copy of that size here just to size the grid.
+	# added to the tree, so free() - not queue_free() - is safe).
 	var reference_card := (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
-	var scaled_card_size: Vector2 = reference_card.card_size * deck_view_card_scale
+	var card_size: Vector2 = reference_card.card_size * deck_view_card_scale
 	reference_card.free()
+	var slot_size := Vector2(card_size.x, card_size.y + stack_count_gap_px + _numeral_line_height())
 
-	_grid.columns = _compute_column_count(scaled_card_size.x, sorted_cards.size())
+	var groups: Dictionary = {}
+	for stack: Dictionary in _stacks():
+		var shown: CardData = stack["shown"]
+		var key: int = int(shown.card_type) if [CardData.CardType.ATTACK, CardData.CardType.SKILL, CardData.CardType.POWER, CardData.CardType.STANCE].has(shown.card_type) else -1
+		if not groups.has(key):
+			groups[key] = [] as Array[Dictionary]
+		(groups[key] as Array[Dictionary]).append(stack)
 
-	for card in sorted_cards:
-		var slot := Control.new()
-		var card_view := (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
-		card_view.hover_enabled = false
-		# Set before add_child(), same as hover_enabled above - scale
-		# shrinks the rendered card toward its own top-left corner
-		# (pivot_offset's default), which is exactly the corner slot's
-		# custom_minimum_size below reserves the footprint from.
-		card_view.pivot_offset = Vector2.ZERO
-		card_view.scale = Vector2(deck_view_card_scale, deck_view_card_scale)
-		if use_card_edge:
-			card_view.edge_color_override_enabled = true
-			card_view.edge_color = _card_edge_color
-			card_view.edge_width_px = card_edge_width_px
-		slot.custom_minimum_size = scaled_card_size
-		slot.add_child(card_view)
-		_grid.add_child(slot)
-		card_view.set_card_data(shown[card] as CardData)
-		# The card carries its own slot to the handler - the slot is where
-		# it has to land again, and looking it up later through get_parent()
-		# wouldn't work while the card is out of the tree it came from. The
-		# handler gets the deck's own card, not the one shown.
-		var own: CardData = card
-		card_view.clicked.connect(func(_shown_card: CardData) -> void: _on_card_clicked(own, card_view, slot))
+	var powers: Array[Dictionary] = groups.get(CardData.CardType.POWER, [] as Array[Dictionary])
+	var stances: Array[Dictionary] = groups.get(CardData.CardType.STANCE, [] as Array[Dictionary])
+	var share: bool = not powers.is_empty() and not stances.is_empty() and _line_width(powers.size(), slot_size.x) + shared_group_gap_px + _line_width(stances.size(), slot_size.x) <= _scroll.size.x
 
-# Largest column count whose total width (n cards plus (n-1) gaps between
-# them) still fits _available_grid_width, floored at 1 (a single huge
-# card never divides out to zero columns), capped at max_columns
-# regardless of how much width is actually available, and also capped at
-# card_count - a pile with fewer cards than would otherwise fit no longer
-# reserves more columns than it has cards for, which used to leave a
-# short last row inside an unnecessarily wide grid (still centered as a
-# block by GridCenterContainer, but reading as lopsided internally).
-func _compute_column_count(scaled_card_width: float, card_count: int) -> int:
-	var columns: int = int((_available_grid_width + grid_h_separation) / (scaled_card_width + grid_h_separation))
-	columns = maxi(columns, 1)
-	columns = mini(columns, max_columns)
-	return mini(columns, maxi(card_count, 1))
+	for key: int in [CardData.CardType.ATTACK, CardData.CardType.SKILL, CardData.CardType.POWER, CardData.CardType.STANCE, -1]:
+		if not groups.has(key):
+			continue
+		if share and key == CardData.CardType.STANCE:
+			continue
+		if share and key == CardData.CardType.POWER:
+			var line := HBoxContainer.new()
+			line.mouse_filter = Control.MOUSE_FILTER_PASS
+			line.add_theme_constant_override("separation", roundi(shared_group_gap_px))
+			_rows.add_child(line)
+			_add_group(line, powers_text, powers, slot_size, _line_width(powers.size(), slot_size.x))
+			_add_group(line, stances_text, stances, slot_size, _line_width(stances.size(), slot_size.x))
+			continue
+		_add_group(_rows, _group_text(key), groups[key], slot_size, 0.0)
 
-# Frees the wrapping CanvasLayer DeckPanel._open_deck_view() parents this
+# Each distinct card as carried (_as_carried() - Lash under Greyshelf's
+# Tail), with every card of the pile it stands for - identical by name
+# as carried (a tempered card's name has its +), a fight-only copy kept
+# apart - sorted by cost, then name. A pick hands back the first of the
+# stack's own cards, the ones the run's deck holds.
+func _stacks() -> Array[Dictionary]:
+	var by_key: Dictionary = {}
+	var stacks: Array[Dictionary] = []
+	for card in _cards:
+		if card == null:
+			continue
+		var shown: CardData = _as_carried(card)
+		var key: String = shown.card_name + ("#copy" if card.battle_copy else "")
+		if not by_key.has(key):
+			var stack: Dictionary = {"shown": shown, "cards": [] as Array[CardData]}
+			by_key[key] = stack
+			stacks.append(stack)
+		((by_key[key] as Dictionary)["cards"] as Array[CardData]).append(card)
+	stacks.sort_custom(func(a: Dictionary, b: Dictionary) -> bool:
+		var first: CardData = a["shown"]
+		var second: CardData = b["shown"]
+		if first.cost != second.cost:
+			return first.cost < second.cost
+		return first.card_name < second.card_name)
+	return stacks
+
+func _group_text(key: int) -> String:
+	match key:
+		CardData.CardType.ATTACK:
+			return attacks_text
+		CardData.CardType.SKILL:
+			return skills_text
+		CardData.CardType.POWER:
+			return powers_text
+		CardData.CardType.STANCE:
+			return stances_text
+	return other_text
+
+# `count` slots side by side, gaps between.
+func _line_width(count: int, slot_width: float) -> float:
+	return float(count) * slot_width + float(maxi(count - 1, 0)) * card_gap_px
+
+# One row: its heading and count, the hairline, then its cards wrapping
+# to the width. `width` 0 fills the parent; else the block is that wide
+# (a shared line's half).
+func _add_group(parent: Container, text: String, stacks: Array[Dictionary], slot_size: Vector2, width: float) -> void:
+	var block := VBoxContainer.new()
+	block.mouse_filter = Control.MOUSE_FILTER_PASS
+	block.add_theme_constant_override("separation", 0)
+	if width > 0.0:
+		block.custom_minimum_size = Vector2(width, 0.0)
+	else:
+		block.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	parent.add_child(block)
+
+	var total: int = 0
+	for stack in stacks:
+		total += (stack["cards"] as Array[CardData]).size()
+	var heading_text: String = text.to_upper()
+	var count_text: String = str(total)
+	var ascent: float = maxf(_label_font.get_ascent(label_size_px), _numeral_font.get_ascent(count_size_px))
+	var descent: float = maxf(_label_font.get_descent(label_size_px), _numeral_font.get_descent(count_size_px))
+	var heading := Control.new()
+	heading.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	heading.custom_minimum_size = Vector2(0.0, ascent + descent)
+	heading.draw.connect(func() -> void:
+		var x: float = _text(heading, _label_font, heading_text, Vector2(0.0, ascent), label_size_px, bone)
+		_text(heading, _numeral_font, count_text, Vector2(x + heading_count_gap_px, ascent), count_size_px, unfocused_color))
+	block.add_child(heading)
+	_add_spacer(block, heading_rule_gap_px)
+	var rule := ColorRect.new()
+	rule.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	rule.custom_minimum_size = Vector2(0.0, hairline_thickness_px)
+	rule.color = Color(bone.r, bone.g, bone.b, bone.a * rule_alpha)
+	block.add_child(rule)
+	_add_spacer(block, rule_cards_gap_px)
+
+	var flow := HFlowContainer.new()
+	flow.mouse_filter = Control.MOUSE_FILTER_PASS
+	flow.add_theme_constant_override("h_separation", roundi(card_gap_px))
+	flow.add_theme_constant_override("v_separation", roundi(card_gap_px))
+	block.add_child(flow)
+	for stack in stacks:
+		_add_slot(flow, stack, slot_size)
+
+# A CardView at rest in a slot that reserves its scaled footprint and the
+# stack's count line under it. The card scales toward its own top-left
+# (pivot ZERO), the corner the slot reserves from. PASS once it's in the
+# tree (CardView's _ready() sets STOP) so the wheel still reaches the
+# scroll through it; its click is taken here (_on_card_clicked()), so it
+# never closes the view.
+func _add_slot(flow: HFlowContainer, stack: Dictionary, slot_size: Vector2) -> void:
+	var cards: Array[CardData] = stack["cards"]
+	var slot := Control.new()
+	slot.mouse_filter = Control.MOUSE_FILTER_PASS
+	slot.custom_minimum_size = slot_size
+	var card_view := (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
+	card_view.hover_enabled = false
+	card_view.pivot_offset = Vector2.ZERO
+	card_view.scale = Vector2(deck_view_card_scale, deck_view_card_scale)
+	slot.add_child(card_view)
+	flow.add_child(slot)
+	card_view.mouse_filter = Control.MOUSE_FILTER_PASS
+	card_view.set_card_data(stack["shown"] as CardData)
+	_slots.append(slot)
+	if cards.size() > 1:
+		var count_text: String = stack_count_format % cards.size()
+		var card_height: float = card_view.card_size.y * deck_view_card_scale
+		slot.draw.connect(func() -> void:
+			var ascent: float = _numeral_font.get_ascent(stack_count_size_px)
+			var width: float = InkType.width(_numeral_font, count_text, stack_count_size_px)
+			_text(slot, _numeral_font, count_text, Vector2(slot.size.x - width, card_height + stack_count_gap_px + ascent), stack_count_size_px, bone))
+	# The card carries its own slot to the handler - the slot is where it
+	# has to land again, and looking it up later through get_parent()
+	# wouldn't work while the card is out of the tree it came from. The
+	# handler gets the deck's own card, not the one shown.
+	var own: CardData = cards[0]
+	card_view.clicked.connect(func(_shown_card: CardData) -> void: _on_card_clicked(own, card_view, slot))
+
+func _numeral_line_height() -> float:
+	if _numeral_font == null:
+		return float(stack_count_size_px)
+	return _numeral_font.get_ascent(stack_count_size_px) + _numeral_font.get_descent(stack_count_size_px)
+
+func _add_spacer(parent: Container, height_px: float) -> void:
+	var spacer := Control.new()
+	spacer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	spacer.custom_minimum_size = Vector2(0.0, height_px)
+	parent.add_child(spacer)
+
+# --- Page: the heading and BACK ---
+
+# One bone run with its ink outline under it, as the reward screen draws
+# its labels. Returns the advance width.
+func _text(canvas: CanvasItem, font: Font, text: String, origin: Vector2, size_px: int, color: Color) -> float:
+	if font == null or text.is_empty():
+		return 0.0
+	if text_outline_px > 0:
+		var outline: Color = ink
+		outline.a = ink.a * color.a
+		canvas.draw_string_outline(font, origin, text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, text_outline_px, outline)
+	return InkType.draw_run(canvas, font, text, origin, size_px, color)
+
+func _draw_page() -> void:
+	if _label_font == null:
+		return
+	var view: Vector2 = get_viewport_rect().size
+	var ascent: float = _label_font.get_ascent(label_size_px)
+	var title: String = _header_text.to_upper()
+	var title_width: float = InkType.width(_label_font, title, label_size_px)
+	_text(_page, _label_font, title, Vector2(roundf((view.x - title_width) * 0.5), roundf(title_top_px + ascent)), label_size_px, bone)
+	var back: Rect2 = _back_label_rect()
+	var baseline: float = back.position.y + ascent
+	_text(_page, _label_font, back_text, Vector2(back.position.x, baseline), label_size_px, bone if _back_hovered else unfocused_color)
+	if _back_hovered:
+		var mid: float = baseline - float(label_size_px) * 0.35
+		_page.draw_rect(Rect2(back.position.x - hairline_gap_px - hairline_length_px, mid - hairline_thickness_px * 0.5, hairline_length_px, hairline_thickness_px), bone)
+
+# BACK's label, centred, back_bottom_px off the bottom.
+func _back_label_rect() -> Rect2:
+	var view: Vector2 = get_viewport_rect().size
+	var width: float = InkType.width(_label_font, back_text, label_size_px)
+	var height: float = _line_height(label_size_px)
+	return Rect2(roundf((view.x - width) * 0.5), roundf(view.y - back_bottom_px - height), width, height)
+
+# BACK's hit rect: the label and the hairline's room to its left.
+func _back_rect() -> Rect2:
+	var label: Rect2 = _back_label_rect()
+	return label.grow_side(SIDE_LEFT, hairline_gap_px + hairline_length_px)
+
+# --- Close ---
+
+# Frees the wrapping CanvasLayer DeckPanel.open_view() parents this
 # under (see DeckPanel.DECK_VIEW_LAYER's own doc), not just this node -
-# that CanvasLayer has no purpose once this is gone, and would otherwise
-# linger as an empty, harmless-but-orphaned node. Falls back to freeing
-# self directly if that's ever not the case (defensive only - every real
-# caller today goes through that wrapper).
+# that CanvasLayer has no purpose once this is gone. Falls back to freeing
+# self directly if that's ever not the case.
 func close() -> void:
 	closed.emit()
 	var wrapper := get_parent()
@@ -323,8 +548,15 @@ func close() -> void:
 	else:
 		queue_free()
 
+# A click that reaches here landed off every card - on BACK, the scrim or
+# the rows' empty space - and closes. The pointer over BACK focuses it.
 func _gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
+	if event is InputEventMouseMotion:
+		var over: bool = _back_rect().has_point((event as InputEventMouseMotion).position)
+		if over != _back_hovered:
+			_back_hovered = over
+			_page.queue_redraw()
+	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
 		close()
 		get_viewport().set_input_as_handled()
 
@@ -341,13 +573,15 @@ func _unhandled_input(event: InputEvent) -> void:
 
 # --- Inspect ---
 
-# A grid card was clicked, or the inspected one was clicked again. Only
-# those two reach here: while a card is out, the scrim covers the grid,
-# so no OTHER card can be clicked and there is no card-to-card swap to
-# handle. _inspect_busy holds off both for the length of a transition,
-# so a click landing mid-flight can't start a second one on a card that
-# is currently between parents.
+# A card in the rows was clicked, or the inspected one was clicked again.
+# Taken here, so the click goes no further up to _gui_input()'s close.
+# While a card is out, the scrim covers the rows, so no OTHER card can be
+# clicked and there is no card-to-card swap to handle. _inspect_busy
+# holds off both for the length of a transition, so a click landing mid-
+# flight can't start a second one on a card that is between parents.
 func _on_card_clicked(card_data: CardData, card_view: CardView, slot: Control) -> void:
+	card_view.accept_event()
+	get_viewport().set_input_as_handled()
 	if pick_mode:
 		card_picked.emit(card_data)
 		close()
@@ -383,7 +617,7 @@ func _begin_inspect(card_view: CardView, slot: Control) -> void:
 	_tween_inspect(card_view, _inspect_centre(card_view), inspect_scale, 1.0)
 
 # Puts it back: the reverse tween onto the slot's own screen position,
-# then home into the slot at a clean zero offset so the grid owns its
+# then home into the slot at a clean zero offset so the row owns its
 # placement again.
 func _end_inspect() -> void:
 	if _inspected == null or _inspect_busy:
@@ -402,7 +636,7 @@ func _end_inspect() -> void:
 		_inspect_layer.visible = false)
 
 # Top-left that centres the card at `inspect_scale`. pivot_offset is
-# ZERO on these (see open()), so a card grows down-right from its own
+# ZERO on these (see _add_slot()), so a card grows down-right from its own
 # position and its rendered size is card_size x scale - the centring has
 # to account for that rather than just using the viewport's middle.
 func _inspect_centre(card_view: CardView) -> Vector2:
