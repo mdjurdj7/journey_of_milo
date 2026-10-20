@@ -14,12 +14,14 @@ extends SceneTree
 #   exit    - walked past the region-end fight on either side, clear of
 #             its contact area, toward the exit while it stands: the fight
 #             starts as he passes it (FloorData.engage_line_enabled) and
-#             he never reaches the gate line; won, the line lifts and he
-#             walks out - the last floor, so the run ends: run_end "won"
+#             he never reaches the gate line; won, the line lifts, the
+#             Greyshelf's Tail is offered over the frozen field and LEFT,
+#             and he walks out - the last floor, so the run ends: run_end "won"
 #             logged, the end screen (RunEnd) shown, and its NEW RUN a
 #             fresh run on floor 1
 #   title   - the end screen's TITLE: a fresh run and the boot scene
-#   loop    - loop_region_after_last_floor on: the old wrap to floor 1
+#   loop    - loop_region_after_last_floor on: the old wrap to floor 1,
+#             the Tail TAKEN on the way
 #   pocket  - the side pocket off the climb's west side, where the
 #             finding is reserved: reachable from the climb
 #   stance  - contact with the Greyshelf from in front of it, its side
@@ -38,6 +40,8 @@ const REGION_PATH := "res://floors/region1.tres"
 const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
 const FLOOR_5_PATH := "res://floors/region1_floor5.tres"
 const GREYSHELF_PATH := "res://battle/rules/enemies/greyshelf.tres"
+const TAIL_ID := &"greyshelfs_tail"
+const BLADE_ID := &"rusted_blade"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const RUN_END_SCENE_PATH := "res://run/run_end.tscn"
 const TITLE_SCENE_PATH := "res://run/title_screen.tscn"
@@ -209,6 +213,7 @@ func _check_exit() -> void:
 			fight = _required_enemy() as Node3D
 		await _check_walk_past(fight, gate, forward, side, exited)
 	if await _win_fight(fight):
+		await _answer_weapon_offer(false)
 		_expect(not bool(_wanderer.call("has_hold_line")), "Won: the line lifts")
 		_expect_eq(int(_run_state.get("fights_won")), 1, "...one fight won")
 		await _walk_out(exited)
@@ -303,6 +308,7 @@ func _check_loop() -> void:
 	gate.connect("floor_exited", func() -> void: exited[0] = true)
 	await _place(_past_fight())
 	if await _win_fight(_required_enemy()):
+		await _answer_weapon_offer(true)
 		var lap_before: int = int(_run_state.get("region_lap"))
 		await _walk_out(exited)
 		for i in 8 * 60:
@@ -352,6 +358,27 @@ func _win_fight(fight: Node) -> bool:
 	for i in 30:
 		await physics_frame
 	return true
+
+# The Greyshelf won: its Tail offered (RegionField.open_weapon_offer()),
+# the field frozen under it - then answered the player's way, TAKE or
+# LEAVE on its plate, and the field live again, the weapon carried as
+# chosen.
+func _answer_weapon_offer(take: bool) -> void:
+	var offer: Node = _field.get_node_or_null("WeaponOffer")
+	_expect(offer != null, "Won: the Greyshelf's Tail is offered")
+	if offer == null:
+		return
+	var plate: Node = offer.call("get_plate")
+	_expect_eq(str((plate.call("get_weapon") as Resource).get("id")), str(TAIL_ID), "...its plate the Tail's")
+	_expect(not _field.can_process(), "...over a frozen field")
+	plate.call("activate", 0 if take else 1)
+	for i in 60:
+		if not is_instance_valid(offer) and _field.can_process():
+			break
+		await physics_frame
+	_expect(not is_instance_valid(offer) and _field.can_process(), "...%s closes it, the field live again" % ("TAKE" if take else "LEAVE"))
+	var carried: Resource = _run_state.get("weapon")
+	_expect_eq(str(carried.get("id")) if carried != null else "", str(TAIL_ID if take else BLADE_ID), "...the weapon carried %s" % ("the Tail" if take else "still the Rusted Blade"))
 
 # On to the exit and through it, as a click walks him (RegionField.
 # walk_to()): round what stands in the way - the Greyshelf's rock, when
