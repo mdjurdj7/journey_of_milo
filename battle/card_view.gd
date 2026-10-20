@@ -119,6 +119,11 @@ const TOKEN_HP_PER_ENERGY := "{hp_per_energy}"
 # Sentence): the turns it starts at and what it deals.
 const TOKEN_COUNTDOWN_TURNS := "{countdown_turns}"
 const TOKEN_COUNTDOWN_DAMAGE := "{countdown_damage}"
+# What an UNDO_LAST_ATTACK (Not So) would undo now: the HP and the move of
+# the newest enemy attack on the player's record not yet undone (Combatant.
+# last_undoable_hit()). With none, the face shows its {outside} rule.
+const TOKEN_UNDO_HP := "{undo_hp}"
+const TOKEN_UNDO_ATTACK := "{undo_attack}"
 const TOKEN_HP_COST := "{hp_cost}"
 # What follows a repeating hit's number (CardEffect.repeat_per_earlier_
 # play_tag - Lash), by how many times it lands now (DamageEffect.hit_
@@ -804,6 +809,10 @@ func _resolve_tokens(description: String) -> String:
 			if effect != null and (effect.effect_type == CardEffect.EffectType.SPEND_TOLL or effect.effect_type == CardEffect.EffectType.TOLL_BLOCK):
 				text = text.replace(TOKEN_TOLL_COST, str(effect.toll_cost))
 				break
+	if text.contains(TOKEN_UNDO_HP) or text.contains(TOKEN_UNDO_ATTACK):
+		var undo: Dictionary = _undo_preview()
+		if not undo.is_empty():
+			text = text.replace(TOKEN_UNDO_HP, str(int(undo["hp"]))).replace(TOKEN_UNDO_ATTACK, str(undo["intent"]))
 	if text.contains(TOKEN_COUNTDOWN_TURNS) or text.contains(TOKEN_COUNTDOWN_DAMAGE):
 		for effect in card_data.effects:
 			if effect != null and effect.status_data != null and effect.status_data.countdown_damage > 0:
@@ -997,7 +1006,8 @@ func _style_bonus_clauses(bbcode: String) -> String:
 # taken out and the kept one's markers dropped - in a battle hand when it
 # has a bonus context.
 func _select_context(description: String) -> String:
-	var in_battle: bool = _bonus_context != null
+	# A Not So with nothing to undo reads its rule, as outside a fight.
+	var in_battle: bool = _bonus_context != null and not (_undoes() and _undo_preview().is_empty())
 	var drop_open: String = MARK_OUTSIDE_OPEN if in_battle else MARK_BATTLE_OPEN
 	var drop_close: String = MARK_OUTSIDE_CLOSE if in_battle else MARK_BATTLE_CLOSE
 	var text: String = description
@@ -1457,6 +1467,22 @@ func keyword_hover_allowed() -> bool:
 		return true
 	return hover_enabled and _hovering and not _hover_suppressed
 
+# Whether this card undoes an enemy attack (UNDO_LAST_ATTACK - Not So).
+func _undoes() -> bool:
+	if card_data == null:
+		return false
+	for effect in card_data.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.UNDO_LAST_ATTACK:
+			return true
+	return false
+
+# The attack an UNDO_LAST_ATTACK would undo now - the player's newest not
+# yet undone - or {} outside a battle hand or with none.
+func _undo_preview() -> Dictionary:
+	if _bonus_context == null or _bonus_context.player == null:
+		return {}
+	return _bonus_context.player.last_undoable_hit()
+
 # The keyword whose definition is up, "" for none.
 func get_hovered_keyword() -> String:
 	return _hovered_keyword
@@ -1477,6 +1503,10 @@ func keyword_at(local_pos: Vector2) -> String:
 			return KEEP_KEYWORD
 	if strike_label_rect().has_point(local_pos):
 		return STRIKE_LABEL_WORD
+	# A card with a hover note (CardData.hover_note - Not So): anywhere on
+	# its rules text, the note, under the card's name.
+	if card_data != null and not card_data.hover_note.is_empty() and rules_text != null and Rect2(rules_text.position, rules_text.size).has_point(local_pos):
+		return card_data.card_name
 	return ""
 
 # The STRIKE type label's drawn word and the hit pad round it, in this
@@ -1595,6 +1625,8 @@ func _show_keyword(word: String) -> void:
 		_keyword_reveal.set_revealed(false)
 		return
 	var definition: String = strike_label_definition if word == STRIKE_LABEL_WORD else (copy_label_definition if word == COPY_KEYWORD else KeywordTable.shared().definition(word))
+	if card_data != null and word == card_data.card_name and not card_data.hover_note.is_empty():
+		definition = card_data.hover_note
 	var line := TextLine.new()
 	line.add_string(word + ": ", _keyword_reveal.text_bold_font, keyword_reveal_font_size_px)
 	line.add_string(definition, _keyword_reveal.text_font, keyword_reveal_font_size_px)

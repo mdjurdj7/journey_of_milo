@@ -1319,6 +1319,8 @@ func _after_play() -> void:
 
 	toll_changed.emit(player.toll)
 	status_changed.emit()
+	# A card may have closed some Grace (Not So).
+	grace_changed.emit(player.grace)
 	# A kill can leave only buried enemies standing.
 	_push_enemy_target_available()
 	energy_changed.emit(player.energy)
@@ -2697,12 +2699,14 @@ func _on_grace_reclaimed(amount: int) -> void:
 func _close_grace_window() -> void:
 	if player.grace <= 0:
 		player.grace_turns_left = 0
+		player.grace_window_hits.clear()
 		return
 	player.grace_turns_left -= 1
 	if player.grace_turns_left > 0:
 		return
 	RunLogger.grace_lost(player.grace)
 	player.grace = 0
+	player.grace_window_hits.clear()
 	grace_changed.emit(0)
 
 # The Critical-entry Block the keepsake gave since the last report

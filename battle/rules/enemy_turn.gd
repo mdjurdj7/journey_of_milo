@@ -366,6 +366,8 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 	if total_to_hp > 0:
 		player.took_damage_this_turn = true
 		result["grace_opened"] = open_grace(player, largest_hit, total_to_hp)
+		# On the record for Not So: the whole attack, every hit of it.
+		player.record_hit_taken(combatant, intent.intent_name if intent != null else "", total_to_hp, grace_share(player, largest_hit, total_to_hp))
 	# The worn piece's damage back (hit_back_damage): once for the attack,
 	# however many hits and whatever Block took, through the enemy's own
 	# Block - ordinary damage, not an Attack card, so nothing strikes back
@@ -843,6 +845,17 @@ static func reduce_hit(amount: int, reduction_left: int) -> int:
 # of the turn's sum. Returns how much Grace this call added. A strike back
 # (counter_strike()) opens it too, in the player's own turn - the window
 # then closes at that turn's end, like any other.
+# What one attack opens Grace to on its own - the same share open_grace()
+# reads: the largest hit's, or its sum's, at grace_open_fraction. 0 for a
+# fighter without Grace.
+static func grace_share(player: Combatant, largest_hit: int, total_to_hp: int) -> int:
+	if not player.has_grace:
+		return 0
+	var fraction: float = clampf(player.grace_open_fraction, 0.0, 1.0)
+	if player.grace_cap_mode == CharacterData.GraceCapMode.SUM:
+		return floori(float(total_to_hp) * fraction)
+	return floori(float(largest_hit) * fraction)
+
 static func open_grace(player: Combatant, largest_hit: int, total_to_hp: int) -> int:
 	if not player.has_grace:
 		return 0

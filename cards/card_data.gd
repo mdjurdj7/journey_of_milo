@@ -137,6 +137,10 @@ enum OfferScope { REWARDABLE = 0, STARTER_ONLY = 1, KEEPER_ONLY = 2, OWN_CHANNEL
 var battle_copy: bool = false
 # See OfferScope.
 @export var offer: OfferScope = OfferScope.REWARDABLE
+# What hovering this card's rules text says, under its name, when its
+# face is too short to spell out a rule (Not So's "return it": deal that
+# much to its attacker). Empty: the rules text answers only its keywords.
+@export_multiline var hover_note: String = ""
 
 # Whether this card carries `tag`.
 func has_tag(tag: StringName) -> bool:

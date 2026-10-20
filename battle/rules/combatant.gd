@@ -85,6 +85,17 @@ var tagged_plays_this_turn: Dictionary = {}
 # attack() - BattleController._resolve_play()), never by a replay; cleared
 # by BattleController._start_player_turn().
 var last_attack: CardData = null
+# Every enemy attack this fight that cost this fighter HP past Block, in
+# order - each {"attacker": Combatant, "intent": its move's name, "hp": the
+# HP all its hits took, "grace_share": what it opened Grace to on its own,
+# "undone": false until Not So undoes it}. Written by EnemyTurn.land_
+# attack() (a turn's attack, a Signal answer, a Coiled strike back); a
+# fully blocked one isn't one. Per fight, like everything here.
+var hits_taken: Array[Dictionary] = []
+# The entries of hits_taken that opened the Grace window still open, for
+# closing one attack's share (UndoLastAttackEffect); cleared as the window
+# closes (BattleController._close_grace_window()).
+var grace_window_hits: Array[Dictionary] = []
 var last_attack_target: Combatant = null
 var last_attack_all: bool = false
 var took_damage_last_turn: bool = false
@@ -230,6 +241,23 @@ func record_attack(card: CardData, target: Combatant, all_enemies: bool) -> void
 	last_attack = card
 	last_attack_target = null if all_enemies else target
 	last_attack_all = all_enemies
+
+# An enemy attack took `hp` past Block: on the record (hits_taken), and
+# in the Grace window's list when it opened Grace (`grace_share` > 0).
+func record_hit_taken(attacker: Combatant, intent_name: String, hp: int, grace_share: int) -> void:
+	if hp <= 0:
+		return
+	var entry: Dictionary = {"attacker": attacker, "intent": intent_name, "hp": hp, "grace_share": grace_share, "undone": false}
+	hits_taken.append(entry)
+	if grace_share > 0:
+		grace_window_hits.append(entry)
+
+# The newest attack on the record not yet undone - Not So's - or {}.
+func last_undoable_hit() -> Dictionary:
+	for i in range(hits_taken.size() - 1, -1, -1):
+		if not bool(hits_taken[i]["undone"]):
+			return hits_taken[i]
+	return {}
 
 func clear_last_attack() -> void:
 	last_attack = null

@@ -21,6 +21,10 @@ var keep_choice: Array[CardData] = []
 # The hand card the player chose for a COPY_HAND_CARD (Countersign) to
 # copy, picked before the play committed. Null for every other card.
 var copy_choice: CardData = null
+# What a Not So just undid (UndoLastAttackEffect): {"intent", "attacker",
+# "restored", "dealt", "grace_closed"} - for the run log. Empty for any
+# other card.
+var last_undo: Dictionary = {}
 # Cards committed this turn BEFORE the one this context is for - what
 # Condition.FIRST_CARD_THIS_TURN reads. The controller counts a card at
 # commit, so for the card resolving this is its count minus one; for a

@@ -35,6 +35,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.REPLAY_LAST_ATTACK: "res://battle/rules/effects/replay_last_attack_effect.gd",
 	CardEffect.EffectType.GRANT_KEEP: "res://battle/rules/effects/grant_keep_effect.gd",
 	CardEffect.EffectType.COPY_HAND_CARD: "res://battle/rules/effects/copy_hand_card_effect.gd",
+	CardEffect.EffectType.UNDO_LAST_ATTACK: "res://battle/rules/effects/undo_last_attack_effect.gd",
 }
 
 var _cache: Dictionary = {}
@@ -203,6 +204,9 @@ static func card_blocked(card: CardData, player: Combatant) -> bool:
 		return false
 	for effect in card.effects:
 		if effect != null and effect.effect_type == CardEffect.EffectType.SPEND_TOLL and player.toll < effect.toll_cost:
+			return true
+		# Nothing to undo: no enemy attack on the record not yet undone (Not So).
+		if effect != null and effect.effect_type == CardEffect.EffectType.UNDO_LAST_ATTACK and player.last_undoable_hit().is_empty():
 			return true
 		# Nothing to play again: no Attack played this turn (Second Swing).
 		if effect != null and effect.effect_type == CardEffect.EffectType.REPLAY_LAST_ATTACK and player.last_attack == null:
