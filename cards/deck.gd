@@ -9,9 +9,11 @@ signal exhausted(card: CardData)
 signal shuffled()
 # A card gained Keep (grant_keep()) or lost it (it left the hand).
 signal keep_changed()
-# A card put into the fight from outside it (add()) - never a draw, so
-# nothing that answers a draw hears of it.
+# A card put into the fight from outside it (add(), add_copy()) - never a
+# draw, so nothing that answers a draw hears of it.
 signal added(card: CardData)
+# A fight-only copy left the hand unplayed (discard()) - gone, in no pile.
+signal vanished(card: CardData)
 
 @export var hand_size: int = 10
 
@@ -79,15 +81,36 @@ func discard(card: CardData) -> void:
 	if not hand.has(card):
 		return
 	_leave_hand(card)
+	# A fight-only copy (Countersign's) is gone, not discarded: no pile, no
+	# reshuffle ever brings it back.
+	if card.battle_copy:
+		vanished.emit(card)
+		return
 	discard_pile.append(card)
 	discarded.emit(card)
 
+# A fight-only copy of `card` (Countersign) into the hand: the same card -
+# tempered or not - marked CardData.battle_copy. Null when the hand is
+# full; it never goes to the draw pile, so it can't outlive the turn.
+func add_copy(card: CardData) -> CardData:
+	if card == null or hand.size() >= hand_size:
+		return null
+	var copy := card.duplicate() as CardData
+	copy.battle_copy = true
+	hand.append(copy)
+	added.emit(copy)
+	return copy
+
 # Every hand card to the discard pile but `keep` (Frayed Cord's end-of-
 # turn keep, one occurrence each, so keeping one of two copies discards
-# the other) and every card with Keep, on top of it.
+# the other) and every card with Keep, on top of it. A fight-only copy
+# goes whatever keeps it (discard()).
 func discard_hand(keep: Array[CardData] = []) -> void:
 	var keeping: Array[CardData] = keep.duplicate()
 	for card in hand.duplicate():
+		if card.battle_copy:
+			discard(card)
+			continue
 		if kept.has(card):
 			continue
 		var index: int = keeping.find(card)

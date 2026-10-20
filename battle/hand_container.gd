@@ -268,12 +268,14 @@ func set_deck(deck: Deck) -> void:
 		_deck.drawn.disconnect(_on_card_drawn)
 		_deck.discarded.disconnect(_on_deck_changed)
 		_deck.added.disconnect(_on_deck_changed)
+		_deck.vanished.disconnect(_on_deck_changed)
 		_deck.keep_changed.disconnect(_sync_keep)
 	_deck = deck
 	_arriving_cards.clear()
 	_deck.drawn.connect(_on_card_drawn)
 	_deck.discarded.connect(_on_deck_changed)
 	_deck.added.connect(_on_deck_changed)
+	_deck.vanished.connect(_on_deck_changed)
 	_deck.keep_changed.connect(_sync_keep)
 	_sync_with_deck()
 

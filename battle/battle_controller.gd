@@ -1653,7 +1653,8 @@ func _devour_card(card_view: CardView, route: String) -> void:
 # For a stance that is what makes a stack one physical copy: reshuffled,
 # the same card would stack itself again. Every other card, the discard.
 static func exhausts_on_play(card: CardData) -> bool:
-	if card.card_type == CardData.CardType.POWER or card.card_type == CardData.CardType.STANCE:
+	# A fight-only copy (Countersign's) is Spent whatever it copies.
+	if card.battle_copy or card.card_type == CardData.CardType.POWER or card.card_type == CardData.CardType.STANCE:
 		return true
 	return card.removal_scope != CardData.RemovalScope.NONE
 

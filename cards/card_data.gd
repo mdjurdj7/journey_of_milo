@@ -129,6 +129,12 @@ enum OfferScope { REWARDABLE = 0, STARTER_ONLY = 1, KEEPER_ONLY = 2, OWN_CHANNEL
 # may be offered. A random offer gives only the run's class's cards and
 # neutral ones (RewardPool).
 @export var card_class: StringName = &""
+# A fight-only copy (Deck.add_copy() - Countersign): made from a card in
+# the hand for this fight, never in the run's deck. It costs its Energy as
+# ever, goes to the Spent pile when played (BattleController.exhausts_on_
+# play()) and is gone at the end of the turn unplayed, Keep or not (Deck.
+# discard()). Not exported: no saved card is ever one.
+var battle_copy: bool = false
 # See OfferScope.
 @export var offer: OfferScope = OfferScope.REWARDABLE
 

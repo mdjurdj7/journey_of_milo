@@ -467,6 +467,25 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # Dunecur's Roused). Its own text, not a KeywordTable entry, so the word
 # is never bolded in rules text. Read when the reveal opens.
 @export_multiline var strike_label_definition: String = "An Attack card."
+# What a fight-only copy's COPY says when hovered (CardData.battle_copy).
+@export_multiline var copy_label_definition: String = "A copy: Spent when played, and gone at the end of the turn."
+# A copy's quiet mark: a band this deep along the face's top edge, hatched
+# with 1px ink strokes this far apart at this alpha - no glow, no colour.
+@export var copy_band_px: float = 6.0:
+	set(value):
+		copy_band_px = maxf(value, 0.0)
+		if is_node_ready():
+			keyline.queue_redraw()
+@export var copy_hatch_spacing_px: float = 4.0:
+	set(value):
+		copy_hatch_spacing_px = maxf(value, 1.0)
+		if is_node_ready():
+			keyline.queue_redraw()
+@export_range(0.0, 1.0) var copy_hatch_alpha: float = 0.35:
+	set(value):
+		copy_hatch_alpha = value
+		if is_node_ready():
+			keyline.queue_redraw()
 
 @export_group("Edge Override")
 # Every card gets the 1px ink frame by default. This is an escape hatch
@@ -586,6 +605,10 @@ const STRIKE_LABEL_WORD := "STRIKE"
 const KEEP_LABEL_WORD := "KEEP"
 const KEEP_KEYWORD := "Keep"
 const TYPE_PREFIX_SEPARATOR := " · "
+# A fight-only copy (CardData.battle_copy - Countersign's) leads with this,
+# before any KEEP, and answers keyword_at() as COPY_KEYWORD.
+const COPY_LABEL_WORD := "COPY"
+const COPY_KEYWORD := "Copy"
 
 func _ready() -> void:
 	size = card_size
@@ -1086,6 +1109,23 @@ func _draw_keyline() -> void:
 	var shade: Color = ink_color
 	shade.a = bottom_shade_alpha
 	_draw_edge_pair(keyline, face.grow(-1.0), float(corner_radius), top_highlight_color, shade)
+	if _is_copy():
+		_draw_copy_band()
+
+# A fight-only copy's hatched band along the top edge, inside the corners:
+# short diagonal ink strokes copy_hatch_spacing_px apart, copy_band_px deep.
+func _draw_copy_band() -> void:
+	if copy_band_px <= 0.0:
+		return
+	var ink: Color = ink_color
+	ink.a = copy_hatch_alpha
+	var top: float = 2.0
+	var left: float = float(corner_radius)
+	var right: float = size.x - float(corner_radius)
+	var x: float = left
+	while x + copy_band_px <= right:
+		keyline.draw_line(Vector2(x, top + copy_band_px), Vector2(x + copy_band_px, top), ink, 1.0)
+		x += copy_hatch_spacing_px
 
 # A 1px line along the inside top of `rect` and one along its inside
 # bottom, each stopping `radius` short of the corners.
@@ -1440,8 +1480,12 @@ func keyword_at(local_pos: Vector2) -> String:
 		var rect: Rect2 = entry["rect"]
 		if rect.has_point(local_pos):
 			return String(entry["keyword"])
-	if _kept and _type_part_rect(0, KEEP_LABEL_WORD.length()).has_point(local_pos):
-		return KEEP_KEYWORD
+	if _is_copy() and _type_part_rect(0, COPY_LABEL_WORD.length()).has_point(local_pos):
+		return COPY_KEYWORD
+	if _kept:
+		var keep_at: int = (COPY_LABEL_WORD + TYPE_PREFIX_SEPARATOR).length() if _is_copy() else 0
+		if _type_part_rect(keep_at, KEEP_LABEL_WORD.length()).has_point(local_pos):
+			return KEEP_KEYWORD
 	if strike_label_rect().has_point(local_pos):
 		return STRIKE_LABEL_WORD
 	return ""
@@ -1486,9 +1530,18 @@ func set_kept(on: bool) -> void:
 func is_kept() -> bool:
 	return _kept
 
-# What the type label leads with: "KEEP · " on a kept card, else "".
+# What the type label leads with: "COPY · " on a fight-only copy, then
+# "KEEP · " on a kept card - "" for neither.
 func _type_prefix() -> String:
-	return KEEP_LABEL_WORD + TYPE_PREFIX_SEPARATOR if _kept else ""
+	var prefix: String = ""
+	if _is_copy():
+		prefix += COPY_LABEL_WORD + TYPE_PREFIX_SEPARATOR
+	if _kept:
+		prefix += KEEP_LABEL_WORD + TYPE_PREFIX_SEPARATOR
+	return prefix
+
+func _is_copy() -> bool:
+	return card_data != null and card_data.battle_copy
 
 # Every bold keyword on the face and the rect it covers, in this card's
 # own unscaled pixels - [{"keyword": String, "rect": Rect2}], in text
@@ -1552,7 +1605,7 @@ func _show_keyword(word: String) -> void:
 	if word.is_empty():
 		_keyword_reveal.set_revealed(false)
 		return
-	var definition: String = strike_label_definition if word == STRIKE_LABEL_WORD else KeywordTable.shared().definition(word)
+	var definition: String = strike_label_definition if word == STRIKE_LABEL_WORD else (copy_label_definition if word == COPY_KEYWORD else KeywordTable.shared().definition(word))
 	var line := TextLine.new()
 	line.add_string(word + ": ", _keyword_reveal.text_bold_font, keyword_reveal_font_size_px)
 	line.add_string(definition, _keyword_reveal.text_font, keyword_reveal_font_size_px)
