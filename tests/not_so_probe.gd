@@ -26,6 +26,7 @@ extends SceneTree
 const CASES := 12
 const MAX_HP := 70
 const CARD_PATH := "res://cards/data/not_so.tres"
+const ART_PATH := "res://cards/art/Wanderer/Not So.png"
 const TEMPERED_PATH := "res://cards/tempered/not_so_tempered.tres"
 const SELF_EATER_PATH := "res://cards/data/self_eater.tres"
 const SENTENCE_PATH := "res://cards/data/sentence.tres"
@@ -80,9 +81,10 @@ func _check_data() -> void:
 	_expect_eq(card.description, "Spend {toll_cost} Toll.\n{battle}Undo {undo_hp} ({undo_attack}); return it.{/battle}{outside}Undo the last attack; return it.{/outside}\nSpent.", "...its text")
 	_expect(card.hover_note.contains("deal that much to its attacker"), "...its hover note spells out 'return it'")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
-	_expect(card.art == null, "...its glyph for art, for now")
+	_expect(card.art != null and card.art.resource_path == ART_PATH, "...carrying its art")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Not So+")
+	_expect(tempered.art == card.art, "...which carries the same art")
 	_expect_eq([tempered.card_name, tempered.effects[0].toll_cost, tempered.description], ["Not So+", 7, card.description], "Not So+: spends 7, the same text")
 	_completed += 1
 

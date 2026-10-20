@@ -2,6 +2,7 @@
 
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Texture2D" uid="uid://db214pbac1b8b" path="res://cards/art/Wanderer/Not So.png" id="9_art"]
 [ext_resource type="Resource" path="res://cards/tempered/not_so_tempered.tres" id="10_tempered"]
 
 [sub_resource type="Resource" id="E_spend"]
@@ -25,6 +26,7 @@ description = "Spend {toll_cost} Toll.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_undo")])
 removal_scope = 1
+art = ExtResource("9_art")
 tempered = ExtResource("10_tempered")
 card_class = &"wanderer"
 hover_note = "Undo: the HP the last enemy attack that hit you took - every hit of it, past your Block; not one undone before - comes back, and that attack's Grace closes. Return it: deal that much to its attacker. Not an Attack: it meets the attacker's Block, and nothing adds to it."
