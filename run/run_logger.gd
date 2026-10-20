@@ -96,9 +96,14 @@ class_name RunLogger
 # "outcome": "played", or "vanished" at the turn's end). Bide's set-aside
 # is gone.
 
+# Format 10 (2026-10-19): Not So. Mechanic line "undo": the "attack" it
+# undid (the enemy move's name), its "enemy", the HP "restored", the
+# damage "dealt" back to that enemy, and whether its Grace share closed
+# ("grace_closed").
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 9
+const FORMAT_VERSION := 10
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]
@@ -440,7 +445,7 @@ static func turn_ended(energy: int) -> void:
 # threshold_queued, threshold_resolved, escalation, queued_state,
 # keepsake_double, keepsake_draw, keepsake_block_carry, replay,
 # energy_debt, delay, sentence_advance, sentence_resolved, keep, copy,
-# copy_end.
+# copy_end, undo.
 static func mechanic(kind: String, data: Dictionary) -> void:
 	if not _fight_open:
 		return

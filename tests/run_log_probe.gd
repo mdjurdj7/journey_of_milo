@@ -30,7 +30,8 @@ extends SceneTree
 # the replay, energy_debt and delay lines, and Sentence advanced by each
 # spend (card, card, replay) until it goes off on the third. Then Bide
 # keeps a Slash and Countersign copies it: keep, copy and - the copy left
-# unplayed - copy_end "vanished" at the turn's end.
+# unplayed - copy_end "vanished" at the turn's end. Last, Not So undoes an
+# attack put on the player's record: the undo line.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/run_log_probe.gd
 #
@@ -55,6 +56,7 @@ const DENY_PATH := "res://cards/data/deny.tres"
 const SENTENCE_PATH := "res://cards/data/sentence.tres"
 const BIDE_PATH := "res://cards/data/bide.tres"
 const COUNTERSIGN_PATH := "res://cards/data/countersign.tres"
+const NOT_SO_PATH := "res://cards/data/not_so.tres"
 const GLOBAL_SEED := 20261004
 const RUN_SEED := 4242
 const MAX_TURNS := 12
@@ -257,6 +259,13 @@ func _toll_package_run() -> void:
 	var turn: int = int(controller.get("_player_turn"))
 	controller.call("end_turn")
 	await ProbePlay.wait_until(self, func() -> bool: return int(controller.get("_player_turn")) > turn and ProbePlay.is_settled(controller), 20.0)
+	# An attack of 6 on the record (Deny delayed the Sputter's own), undone.
+	var attacker: Combatant = combatants.values()[0]
+	attacker.block = 0
+	player.hp -= 6
+	player.record_hit_taken(attacker, "Probe Hit", 6, 0)
+	player.toll = 10
+	await _play(controller, await _deal(controller, NOT_SO_PATH))
 	for member in (controller.get("enemies") as Array).duplicate():
 		var combatant: Combatant = combatants.get(member)
 		combatant.hp = 0
@@ -276,7 +285,7 @@ func _toll_package_run() -> void:
 			lines.append(parsed)
 	var fight_end: Dictionary = _first(lines, "fight_end")
 	var spent: Dictionary = (fight_end.get("toll", {}) as Dictionary).get("spent_by_source", {})
-	var expected: Dictionary = {"card:Reckoning": 20, "card:Second Swing": 5, "replay:Reckoning": 10, "card:Come Due": 5, "card:Deny": 6, "card:Bide": 4, "card:Countersign": 7}
+	var expected: Dictionary = {"card:Reckoning": 20, "card:Second Swing": 5, "replay:Reckoning": 10, "card:Come Due": 5, "card:Deny": 6, "card:Bide": 4, "card:Countersign": 7, "card:Not So": 10}
 	for source: String in expected:
 		_expect_eq(int(spent.get(source, 0)), int(expected[source]), "Toll spent by %s" % source)
 	var kinds: Dictionary = {}
@@ -305,6 +314,9 @@ func _toll_package_run() -> void:
 	_expect_eq(str((kinds.get("copy", {}) as Dictionary).get("card", "")), "Slash", "A copy line: Countersign copied Slash")
 	var copy_end: Dictionary = kinds.get("copy_end", {})
 	_expect_eq([str(copy_end.get("card", "")), str(copy_end.get("outcome", ""))], ["Slash", "vanished"], "...and the copy, unplayed, vanished at the turn's end")
+	var undo: Dictionary = kinds.get("undo", {})
+	_expect_eq([str(undo.get("attack", "")), int(undo.get("restored", 0)), int(undo.get("dealt", 0)), undo.get("grace_closed", true)], ["Probe Hit", 6, 6, false], "An undo line: Probe Hit, 6 restored, 6 dealt back, no Grace closed")
+	_expect(not str(undo.get("enemy", "")).is_empty(), "...naming its enemy (%s)" % str(undo))
 	_expect(int(resolved.get("damage", 0)) > 0 and not str(resolved.get("enemy", "")).is_empty(), "...naming the Sputter and its damage (%s)" % str(resolved))
 
 # --- The log ---

@@ -32,6 +32,7 @@ func resolve(_effect: CardEffect, ctx: EffectContext) -> void:
 		if dealt > 0:
 			ctx.report_damage(attacker, dealt, "status")
 	ctx.last_undo = {"intent": entry["intent"], "attacker": attacker, "restored": restored, "dealt": dealt, "grace_closed": grace_closed}
+	RunLogger.mechanic("undo", {"attack": entry["intent"], "enemy": RunLogger.combatant_id(attacker) if attacker != null else "", "restored": restored, "dealt": dealt, "grace_closed": grace_closed})
 
 # `entry`'s share of the Grace window, if that window is still open and it
 # opened some: off the window's list, and the pool down to what the rest
