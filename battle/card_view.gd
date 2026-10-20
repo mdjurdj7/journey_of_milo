@@ -444,17 +444,19 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 
 @export_group("Keyword Reveal")
 # Hovering a bold keyword on this face shows its definition (Keyword-
-# Table) just above a hand card - below one up for inspection - in the
-# status reveal's type - a
-# StatusReveal of the card's own, drawn at screen size whatever the
-# card's scale. Shown on a lifted hand card (never while it or any other
-# card is armed) and wherever a host turns inspect on (set_keyword_
-# inspect()); fades out when the cursor leaves the word.
+# Table) just above a hand card - below one up for inspection - on a
+# slip of this card's own bone (KeywordSlip, field_color), in ink, its
+# type at screen size whatever the card's scale. No wider than the card
+# as it ends its hover or inspect - keyword_hand_width_factor of it in
+# the hand - and kept on screen. Shown on a lifted hand card (never while
+# it or any other card is armed, nor during a hand choice) and wherever
+# a host turns inspect on (set_keyword_inspect()); fades out when the
+# cursor leaves the word.
 @export var keyword_reveal_ink: Color = Color(0.165, 0.165, 0.18):
 	set(value):
 		keyword_reveal_ink = value
 		_apply_keyword_reveal_style()
-@export var keyword_reveal_font_size_px: int = 13:
+@export var keyword_reveal_font_size_px: int = 17:
 	set(value):
 		keyword_reveal_font_size_px = value
 		_apply_keyword_reveal_style()
@@ -464,11 +466,32 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 	set(value):
 		keyword_reveal_line_height = value
 		_apply_keyword_reveal_style()
-# Screen pixels between the definition and the card's edge, above or
-# below.
-@export var keyword_reveal_gap_px: float = 8.0:
+# Screen pixels between the slip and the card's edge, above or below.
+@export var keyword_reveal_gap_px: float = 4.0:
 	set(value):
 		keyword_reveal_gap_px = value
+		_place_keyword_reveal()
+# Bone between the slip's edge and its text: x each side, y top and
+# bottom, in screen pixels.
+@export var keyword_slip_padding_px: Vector2 = Vector2(8.0, 6.0):
+	set(value):
+		keyword_slip_padding_px = value
+		_apply_keyword_reveal_style()
+# The slip's hairline edge, in screen pixels (0 = none), and its ink.
+@export var keyword_slip_edge_px: float = 0.0:
+	set(value):
+		keyword_slip_edge_px = value
+		_apply_keyword_reveal_style()
+@export var keyword_slip_edge_color: Color = Color(0.165, 0.165, 0.18, 0.88):
+	set(value):
+		keyword_slip_edge_color = value
+		_apply_keyword_reveal_style()
+# In the hand the slip may be this many times the hovered card's width -
+# the field above is open; up for inspection it is never wider than the
+# card.
+@export var keyword_hand_width_factor: float = 1.5:
+	set(value):
+		keyword_hand_width_factor = maxf(value, 0.1)
 		_place_keyword_reveal()
 @export var keyword_reveal_fade_sec: float = 0.12:
 	set(value):
@@ -593,16 +616,14 @@ var _base_scale: float = 1.0
 # hover entirely (no second lift).
 var _hover_suppressed: bool = false
 var _scale_tween: Tween = null
-# The keyword definition above the card - made in _ready(), top_level so
-# it ignores this card's scale. Which keyword it shows ("" = none), and
+# The keyword definition's slip by the card - made in _ready(), top_level
+# so it ignores this card's scale. Which keyword it shows ("" = none), and
 # whether a host has this card up for inspection (set_keyword_inspect()).
-var _keyword_reveal: StatusReveal = null
+var _keyword_reveal: KeywordSlip = null
 var _hovered_keyword: String = ""
 var _keyword_inspect: bool = false
-# The shown definition's width on one line - the reveal wraps at the
-# narrower of this and the card, so a short one centres on the card
-# (StatusReveal sets its lines flush left in its wrap width).
-var _keyword_line_width: float = 0.0
+# The scale this card's own scale tween is heading for (_tween_scale()).
+var _scale_target: float = 1.0
 # The cost hairline's gap under the cost's baseline, card px, as the
 # host last gave it (mark_changes(), set_cost_mark_gap()).
 var _cost_mark_gap_px: float = 3.0
@@ -670,7 +691,7 @@ func _ready() -> void:
 	_bonus_corner.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_bonus_corner.draw.connect(_draw_bonus_corner)
 	add_child(_bonus_corner)
-	_keyword_reveal = StatusReveal.new()
+	_keyword_reveal = KeywordSlip.new()
 	_keyword_reveal.name = "KeywordReveal"
 	_keyword_reveal.top_level = true
 	_keyword_reveal.z_as_relative = false
@@ -1453,6 +1474,7 @@ func _tween_to(target_y: float, duration: float) -> void:
 func _tween_scale(target: float, duration: float) -> void:
 	if _scale_tween != null and _scale_tween.is_valid():
 		_scale_tween.kill()
+	_scale_target = target
 	_scale_tween = create_tween()
 	_scale_tween.set_ease(Tween.EASE_OUT)
 	_scale_tween.set_trans(Tween.TRANS_CUBIC)
@@ -1671,11 +1693,8 @@ func _show_keyword(word: String) -> void:
 	var definition: String = strike_label_definition if word == STRIKE_LABEL_WORD else (copy_label_definition if word == COPY_KEYWORD else KeywordTable.shared().definition(word))
 	if card_data != null and word == card_data.card_name and not card_data.hover_note.is_empty():
 		definition = card_data.hover_note
-	var line := TextLine.new()
-	line.add_string(word + ": ", _keyword_reveal.text_bold_font, keyword_reveal_font_size_px)
-	line.add_string(definition, _keyword_reveal.text_font, keyword_reveal_font_size_px)
-	_keyword_line_width = ceilf(line.get_line_width()) + 1.0
-	_keyword_reveal.set_wrap_width(_reveal_width(_screen_rect()))
+	_keyword_reveal.set_bone(field_color)
+	_keyword_reveal.set_max_width(keyword_reveal_max_width())
 	_keyword_reveal.set_lines(PackedStringArray([word]), PackedStringArray([definition]))
 	_place_keyword_reveal()
 	_keyword_reveal.set_revealed(true)
@@ -1688,22 +1707,25 @@ func _process(_delta: float) -> void:
 func _apply_keyword_reveal_style() -> void:
 	if _keyword_reveal == null:
 		return
+	_keyword_reveal.set_bone(field_color)
 	_keyword_reveal.set_ink(keyword_reveal_ink)
+	_keyword_reveal.set_edge(keyword_slip_edge_px, keyword_slip_edge_color)
+	_keyword_reveal.set_padding(keyword_slip_padding_px)
 	_keyword_reveal.set_font_size_px(keyword_reveal_font_size_px)
 	_keyword_reveal.set_line_height(keyword_reveal_line_height)
 	_keyword_reveal.set_fade_time(keyword_reveal_fade_sec)
 	_place_keyword_reveal()
 
-# Centred on the card as it stands on screen, no wider than it,
-# keyword_reveal_gap_px off its edge: above a hand card, where the field
-# is open; below a card up for inspection (set_keyword_inspect()), which
-# sits centred with the browse grid or the screen's own lines above it.
-# Kept inside the viewport.
+# Centred on the card as it stands on screen, keyword_reveal_gap_px off
+# its edge: above a hand card, where the field is open; below a card up
+# for inspection (set_keyword_inspect()), which sits centred with the
+# browse grid or the screen's own lines above it. Kept inside the
+# viewport.
 func _place_keyword_reveal() -> void:
 	if _keyword_reveal == null or not is_inside_tree():
 		return
 	var rect: Rect2 = _screen_rect()
-	_keyword_reveal.set_wrap_width(_reveal_width(rect))
+	_keyword_reveal.set_max_width(keyword_reveal_max_width())
 	var at := Vector2(rect.get_center().x - _keyword_reveal.size.x / 2.0, rect.end.y + keyword_reveal_gap_px)
 	if not keyword_reveal_below():
 		at.y = rect.position.y - keyword_reveal_gap_px - _keyword_reveal.size.y
@@ -1712,10 +1734,15 @@ func _place_keyword_reveal() -> void:
 	at.y = clampf(at.y, view.position.y, maxf(view.end.y - _keyword_reveal.size.y, view.position.y))
 	_keyword_reveal.global_position = at.round()
 
-# The definition's wrap width: its own line, or the card's width when
-# that's narrower.
-func _reveal_width(card_rect: Rect2) -> float:
-	return minf(card_rect.size.x, _keyword_line_width) if _keyword_line_width > 0.0 else card_rect.size.x
+# The widest the slip may be: the card's width on screen as its own scale
+# tween will leave it (so a slip opened mid-grow doesn't re-wrap as the
+# card finishes) - keyword_hand_width_factor of that in the hand.
+func keyword_reveal_max_width() -> float:
+	var own: float = absf(scale.x)
+	var target: float = _scale_target if _scale_tween != null and _scale_tween.is_running() else own
+	var parent_scale: float = get_global_transform().get_scale().x / own if own > 0.0 else 1.0
+	var width: float = card_size.x * target * absf(parent_scale)
+	return width if _keyword_inspect else width * keyword_hand_width_factor
 
 # Whether the definition goes under the card rather than over it - on a
 # card a host has up for inspection.

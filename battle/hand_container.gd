@@ -321,9 +321,10 @@ func set_draw_origin(origin: Control) -> void:
 # alone when it names any (Countersign's), the rest staying still and
 # faded (CardView.set_choice_state()). A null chooser is the end-of-turn
 # keep: no card armed, the whole hand chooses.
-# Take In's (a chooser that devours - EffectResolver.devour_per_energy())
-# also shows the hovered candidate's yield over it (_process()), and keeps
-# keyword definitions off the candidates meanwhile.
+# Keyword definitions stay off the candidates meanwhile - a slip over a
+# candidate would cover the chooser held above the hand. Take In's (a
+# chooser that devours - EffectResolver.devour_per_energy()) also shows
+# the hovered candidate's yield over it (_process()).
 func begin_choice(chooser: CardView, eligible: Array[CardView] = []) -> void:
 	_devour_per_energy = EffectResolver.devour_per_energy(chooser.card_data) if chooser != null else -1
 	_devour_candidates = eligible.duplicate() if _devour_per_energy >= 0 else ([] as Array[CardView])
@@ -334,8 +335,7 @@ func begin_choice(chooser: CardView, eligible: Array[CardView] = []) -> void:
 		view.set_choice_state(true, pickable)
 		if pickable:
 			view.set_hover_suppressed(false)
-		if _devour_per_energy >= 0:
-			view.set_keyword_hover_blocked(true)
+		view.set_keyword_hover_blocked(true)
 	set_process(_devour_per_energy >= 0)
 
 # The choice closed (confirmed or cancelled): every mark comes off, and

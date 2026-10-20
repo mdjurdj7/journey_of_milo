@@ -63,14 +63,6 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 # CardView's own ink at 35% - the same dark the cards are drawn with, so
 # the dim reads as the deck receding rather than as a new surface.
 @export var inspect_scrim_color: Color = Color(0.165, 0.165, 0.18, 0.35)
-# The inspected card's keyword definitions (CardView's Keyword Reveal)
-# sit on this view's dark panel, not the pale world, so they read in a
-# light ink instead of the card's.
-@export var inspect_keyword_ink: Color = Color(0.86, 0.84, 0.80):
-	set(value):
-		inspect_keyword_ink = value
-		if _inspected != null:
-			_inspected.keyword_reveal_ink = value
 @export_group("")
 # Hard cap regardless of how much width is actually available - past a
 # point, more columns just means smaller reading distance between eye and
@@ -387,7 +379,6 @@ func _begin_inspect(card_view: CardView, slot: Control) -> void:
 	_inspect_slot = slot
 	_inspect_layer.visible = true
 	# Up for inspection: its keywords define themselves on hover.
-	card_view.keyword_reveal_ink = inspect_keyword_ink
 	card_view.set_keyword_inspect(true)
 	_tween_inspect(card_view, _inspect_centre(card_view), inspect_scale, 1.0)
 

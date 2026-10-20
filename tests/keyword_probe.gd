@@ -3,7 +3,9 @@ extends SceneTree
 # Headless probe for the rules keywords - one table (KeywordTable, ui/
 # keywords.tres) that both bolds a word on a card face and defines it on
 # hover - and the definition's hover on CardView: where a keyword is on
-# the face, when a definition may show, and where it sits.
+# the face, when a definition may show, and where its slip sits (Keyword-
+# Slip: the card's bone, ink type at one size on screen, no wider than
+# the card - half as wide again in the hand).
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/keyword_probe.gd
 #
@@ -14,10 +16,10 @@ extends SceneTree
 # found) rather than a real cursor, which headless has none of. The fight
 # case loads the real region scene and arms a card through
 # BattleController.request_play(), as collateral_probe does; the
-# inspect cases open the real DeckView and compendium. Untyped against
+# inspect cases open the real DeckView, compendium and reward screen. Untyped against
 # anything that names the RunState autoload.
 
-const CASES := 10
+const CASES := 13
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
@@ -27,6 +29,10 @@ const NO_FURTHER_PATH := "res://cards/data/no_further.tres"
 const CORNERED_PATH := "res://cards/data/cornered.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
+const BIDE_PATH := "res://cards/data/bide.tres"
+const NOT_SO_PATH := "res://cards/data/not_so.tres"
+const REWARD_SCREEN_PATH := "res://battle/reward_screen.tscn"
+const REWARD_POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Consumed", "Keep", "Advance", "Hold", "Withdraw", "Burst", "Devour"]
 const DEFINITIONS: Dictionary = {
 	"Toll": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Each card that spends any Toll hurries every Sentence by a turn.",
@@ -66,8 +72,11 @@ func _initialize() -> void:
 	await _check_full_ink_when_faded()
 	await _check_hand_gating()
 	await _check_hand_above()
+	await _check_hand_wide()
+	await _check_hand_choice_blocks()
 	await _check_deck_view_below()
 	await _check_compendium_below()
+	await _check_reward_below()
 
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
@@ -281,13 +290,66 @@ func _check_hand_above() -> void:
 		_expect(absf(card_rect.position.y - view.keyword_reveal_gap_px - reveal.end.y) <= 1.0, "...ending the gap above the card's top (reveal %s, card %s)" % [reveal, card_rect])
 		_expect(not reveal.intersects(card_rect), "...clear of the card")
 		_expect(absf(reveal.get_center().x - card_rect.get_center().x) <= 1.0, "...centred on it")
+		_expect_slip(view, "Hand")
+	await _teardown()
+	_completed += 1
+
+# In the hand the slip may be half as wide again as the hovered card - its
+# cap taken from the scale the hover is growing to, so a definition opened
+# mid-grow doesn't re-wrap - centred on it and on screen. Devour's
+# definition is wider than the card on one line, so it uses the room.
+func _check_hand_wide() -> void:
+	var controller: Node = await _start_fight()
+	if controller != null:
+		var card: CardData = await _deal(controller, NO_FURTHER_PATH)
+		var view: CardView = _view(controller, card)
+		view.set_hovered(true)
+		await process_frame
+		var grown: float = view.card_size.x * float(view.get("_base_scale")) * view.hover_scale
+		_expect(absf(view.keyword_reveal_max_width() - grown * view.keyword_hand_width_factor) <= 1.0, "Mid-grow, the slip's cap is the grown card's width x %.2f (%.1f, expected %.1f)" % [view.keyword_hand_width_factor, view.keyword_reveal_max_width(), grown * view.keyword_hand_width_factor])
+		await _frames(30)
+		view.call("_show_keyword", "Devour")
+		await _frames(3)
+		var reveal: Rect2 = _reveal_rect(view)
+		var card_rect: Rect2 = _screen_rect(view)
+		_expect(reveal.size.x > card_rect.size.x + 1.0, "Devour's slip is wider than the hand card (%.1f vs %.1f)" % [reveal.size.x, card_rect.size.x])
+		_expect(reveal.size.x <= card_rect.size.x * view.keyword_hand_width_factor + 1.0, "...but no wider than %.2fx it (%.1f)" % [view.keyword_hand_width_factor, reveal.size.x])
+		_expect(absf(reveal.get_center().x - card_rect.get_center().x) <= 1.0, "...centred on it")
+		_expect(Rect2(Vector2.ZERO, root.get_visible_rect().size).encloses(reveal), "...and on screen (%s)" % reveal)
+		_expect(not reveal.intersects(card_rect), "...clear of the card")
+	await _teardown()
+	_completed += 1
+
+# A hand choice (Bide's) keeps keyword definitions off its candidates, as
+# Take In's does: a slip over one would cover the chooser held above.
+func _check_hand_choice_blocks() -> void:
+	var controller: Node = await _start_fight()
+	if controller != null:
+		var bide_data: CardData = load(BIDE_PATH) as CardData
+		(controller.get("player") as Combatant).toll = bide_data.effects[0].toll_cost
+		var candidate: CardData = await _deal(controller, NO_FURTHER_PATH)
+		var bide: CardData = await _deal(controller, BIDE_PATH)
+		var view: CardView = _view(controller, candidate)
+		controller.call("request_play", _view(controller, bide))
+		await _frames(30)
+		view.set_hovered(true)
+		await _frames(20)
+		_expect(not view.keyword_hover_allowed(), "During Bide's choice, a hovered candidate allows no definition")
+		view.call("update_keyword_hover")
+		_expect_eq(view.get_hovered_keyword(), "", "...and shows none")
+		view.set_hovered(false)
+		controller.call("cancel_choice")
+		await _frames(60)
+		view.set_hovered(true)
+		await _frames(20)
+		_expect(view.keyword_hover_allowed(), "The choice cancelled, it may again")
 	await _teardown()
 	_completed += 1
 
 # --- Inspect ---
 
-# DeckView: the inspected card defines its keywords, below it, in the
-# view's light ink - and once it's back in the grid, no longer.
+# DeckView: the inspected card defines its keywords, below it, on its slip
+# in the card's own ink - and once it's back in the grid, no longer.
 func _check_deck_view_below() -> void:
 	var cards: Array[CardData] = [load(SLASH_PATH) as CardData, load(CORNERED_PATH) as CardData, load(BRACE_PATH) as CardData]
 	var deck_view: Node = load(DECK_PANEL_PATH).open_view(self, cards, "Deck")
@@ -298,8 +360,9 @@ func _check_deck_view_below() -> void:
 	await _frames(30)
 	_expect(cornered.keyword_hover_allowed(), "Inspected, it may")
 	_expect(cornered.keyword_reveal_below(), "...below the card")
-	_expect_eq(cornered.keyword_reveal_ink, deck_view.get("inspect_keyword_ink"), "...in the deck view's light ink")
+	_expect_eq(cornered.keyword_reveal_ink, cornered.ink_color, "...in the card's own ink")
 	await _expect_below(cornered, "Deck view")
+	_expect_slip(cornered, "Deck view")
 	deck_view.call("_end_inspect")
 	await _frames(30)
 	_expect(not cornered.keyword_hover_allowed(), "Back in the grid, none")
@@ -327,6 +390,40 @@ func _check_compendium_below() -> void:
 	await _frames(5)
 	_completed += 1
 
+# The reward choice: a hovered card's longest definition (Not So's hover
+# note) sits below it on its slip, no wider than the card, on screen.
+func _check_reward_below() -> void:
+	_run_state.call("new_run", load(CHARACTER_PATH))
+	var reward: Node = (load(REWARD_SCREEN_PATH) as PackedScene).instantiate()
+	reward.call("setup", 0, load(REWARD_POOL_PATH), null)
+	root.add_child(reward)
+	await _frames(5)
+	reward.call("_open_choice")
+	await _frames(10)
+	var views: Array = reward.get("_card_views")
+	if views.is_empty():
+		_fail("Reward screen: no choice opened")
+	else:
+		var view: CardView = views[0]
+		view.set_card_data(load(NOT_SO_PATH) as CardData)
+		view.set_hovered(true)
+		await _frames(30)
+		_expect(view.keyword_hover_allowed(), "Reward: a hovered choice card may define")
+		view.call("_show_keyword", view.card_data.card_name)
+		await _frames(3)
+		var reveal: Rect2 = _reveal_rect(view)
+		var card_rect: Rect2 = _screen_rect(view)
+		_expect(view.keyword_reveal_below(), "Reward: below the card")
+		_expect(reveal.size.y > 0.0, "Reward: Not So's note has its lines")
+		_expect(absf(reveal.position.y - (card_rect.end.y + view.keyword_reveal_gap_px)) <= 1.0, "Reward: the gap below the card (reveal %s, card %s)" % [reveal, card_rect])
+		_expect(reveal.size.x <= card_rect.size.x + 1.0, "Reward: no wider than the card (%.1f vs %.1f)" % [reveal.size.x, card_rect.size.x])
+		_expect(absf(reveal.get_center().x - card_rect.get_center().x) <= 1.0, "Reward: centred on it")
+		_expect(Rect2(Vector2.ZERO, root.get_visible_rect().size).encloses(reveal), "Reward: on screen (%s)" % reveal)
+		_expect_slip(view, "Reward")
+	reward.queue_free()
+	await _frames(5)
+	_completed += 1
+
 # --- Helpers ---
 
 # Shows Critical on `view` and checks it sits the gap below the card,
@@ -341,6 +438,18 @@ func _expect_below(view: CardView, where: String) -> void:
 	_expect(not reveal.intersects(card_rect), "%s: clear of the card" % where)
 	_expect(absf(reveal.get_center().x - card_rect.get_center().x) <= 1.0, "%s: centred on it" % where)
 	_expect(Rect2(Vector2.ZERO, root.get_visible_rect().size).encloses(reveal), "%s: on screen" % where)
+
+# The slip up on `view`: the card's own bone under its ink, its type at
+# keyword_reveal_font_size_px on screen whatever the card's scale.
+func _expect_slip(view: CardView, where: String) -> void:
+	var slip: KeywordSlip = view.get_node("KeywordReveal") as KeywordSlip
+	if slip == null:
+		_fail("%s: the definition is no KeywordSlip" % where)
+		return
+	_expect_eq(slip.get("_bone"), view.field_color, "%s: the slip is the card's bone" % where)
+	_expect_eq(slip.get("_ink"), view.keyword_reveal_ink, "%s: ...in its ink" % where)
+	_expect_eq(slip.get_font_size_px(), view.keyword_reveal_font_size_px, "%s: ...at %d px" % [where, view.keyword_reveal_font_size_px])
+	_expect(slip.get_global_transform().get_scale().is_equal_approx(Vector2.ONE), "%s: ...unscaled by the card's %.2f (%s)" % [where, view.scale.x, slip.get_global_transform().get_scale()])
 
 func _reveal_rect(view: CardView) -> Rect2:
 	var reveal: Control = view.get_node("KeywordReveal")
