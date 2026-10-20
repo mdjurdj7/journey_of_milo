@@ -433,6 +433,9 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	deck.drawn.connect(func(_card: CardData) -> void: RunLogger.card_drawn())
 	deck.discarded.connect(func(_card: CardData) -> void: hand_changed.emit())
 	deck.keep_changed.connect(func() -> void: hand_changed.emit())
+	# A fight-only copy (Countersign's) gone unplayed at the turn's end.
+	deck.vanished.connect(func(card: CardData) -> void:
+		RunLogger.mechanic("copy_end", {"card": card.card_name, "outcome": "vanished"}))
 	_hand_container.set_deck(deck)
 	_hand_container.card_clicked.connect(_on_card_view_clicked)
 
@@ -1118,6 +1121,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	# own context carries the count from before it (below).
 	cards_played_this_turn += 1
 	player.count_play(card)
+	if card.battle_copy:
+		RunLogger.mechanic("copy_end", {"card": card.card_name, "outcome": "played"})
 	# The last Attack, for Second Swing - a real play only, never a replay.
 	if card.card_type == CardData.CardType.ATTACK:
 		var all_enemies: bool = card.target_type != CardData.TargetType.ENEMY

@@ -9,9 +9,10 @@ class_name GrantKeepEffect
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	if ctx.deck == null:
 		return
-	var granted: int = 0
+	var granted: Array[String] = []
 	for card in ctx.keep_choice:
-		if granted >= effect.value:
+		if granted.size() >= effect.value:
 			break
 		if ctx.deck.grant_keep(card):
-			granted += 1
+			granted.append(card.card_name)
+	RunLogger.mechanic("keep", {"cards": granted})

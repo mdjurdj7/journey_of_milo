@@ -9,4 +9,5 @@ class_name CopyHandCardEffect
 func resolve(_effect: CardEffect, ctx: EffectContext) -> void:
 	if ctx.deck == null or ctx.copy_choice == null or not ctx.deck.hand.has(ctx.copy_choice):
 		return
-	ctx.deck.add_copy(ctx.copy_choice)
+	if ctx.deck.add_copy(ctx.copy_choice) != null:
+		RunLogger.mechanic("copy", {"card": ctx.copy_choice.card_name})

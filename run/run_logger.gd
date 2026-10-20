@@ -90,9 +90,15 @@ class_name RunLogger
 # Collateral's HP is put down to "status:collateral" as before, now for
 # each card it covers short this turn.
 
+# Format 9 (2026-10-19): Bide and Countersign. Mechanic lines "keep" (the
+# "cards" a Bide gave Keep, possibly none), "copy" (the "card" a
+# Countersign copied) and "copy_end" (the copy's "card" and its
+# "outcome": "played", or "vanished" at the turn's end). Bide's set-aside
+# is gone.
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 8
+const FORMAT_VERSION := 9
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]
@@ -433,7 +439,8 @@ static func turn_ended(energy: int) -> void:
 # happened in. Kinds: enemy_died, pain_turn, pain_turn_spent, phase,
 # threshold_queued, threshold_resolved, escalation, queued_state,
 # keepsake_double, keepsake_draw, keepsake_block_carry, replay,
-# energy_debt, delay, sentence_advance, sentence_resolved.
+# energy_debt, delay, sentence_advance, sentence_resolved, keep, copy,
+# copy_end.
 static func mechanic(kind: String, data: Dictionary) -> void:
 	if not _fight_open:
 		return

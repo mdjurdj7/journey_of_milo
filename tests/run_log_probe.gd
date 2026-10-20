@@ -28,7 +28,9 @@ extends SceneTree
 # Reckoning, Second Swing replaying it, Come Due and Deny - every Toll
 # spend put down to its source ("replay:Reckoning" for the replay's own),
 # the replay, energy_debt and delay lines, and Sentence advanced by each
-# spend (card, card, replay) until it goes off on the third.
+# spend (card, card, replay) until it goes off on the third. Then Bide
+# keeps a Slash and Countersign copies it: keep, copy and - the copy left
+# unplayed - copy_end "vanished" at the turn's end.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/run_log_probe.gd
 #
@@ -51,6 +53,8 @@ const SECOND_SWING_PATH := "res://cards/data/second_swing.tres"
 const COME_DUE_PATH := "res://cards/data/come_due.tres"
 const DENY_PATH := "res://cards/data/deny.tres"
 const SENTENCE_PATH := "res://cards/data/sentence.tres"
+const BIDE_PATH := "res://cards/data/bide.tres"
+const COUNTERSIGN_PATH := "res://cards/data/countersign.tres"
 const GLOBAL_SEED := 20261004
 const RUN_SEED := 4242
 const MAX_TURNS := 12
@@ -242,6 +246,14 @@ func _toll_package_run() -> void:
 	await _play(controller, await _deal(controller, COME_DUE_PATH))
 	player.toll = 6
 	await _play(controller, await _deal(controller, DENY_PATH), _field_enemy(controller))
+	var slash: CardData = await _deal(controller, SLASH_PATH)
+	player.toll = 4
+	await _choose(controller, await _deal(controller, BIDE_PATH), slash)
+	controller.call("confirm_choice")
+	await ProbePlay.settle(self, controller)
+	player.toll = 7
+	await _choose(controller, await _deal(controller, COUNTERSIGN_PATH), slash)
+	await ProbePlay.settle(self, controller)
 	var turn: int = int(controller.get("_player_turn"))
 	controller.call("end_turn")
 	await ProbePlay.wait_until(self, func() -> bool: return int(controller.get("_player_turn")) > turn and ProbePlay.is_settled(controller), 20.0)
@@ -264,7 +276,7 @@ func _toll_package_run() -> void:
 			lines.append(parsed)
 	var fight_end: Dictionary = _first(lines, "fight_end")
 	var spent: Dictionary = (fight_end.get("toll", {}) as Dictionary).get("spent_by_source", {})
-	var expected: Dictionary = {"card:Reckoning": 20, "card:Second Swing": 5, "replay:Reckoning": 10, "card:Come Due": 5, "card:Deny": 6}
+	var expected: Dictionary = {"card:Reckoning": 20, "card:Second Swing": 5, "replay:Reckoning": 10, "card:Come Due": 5, "card:Deny": 6, "card:Bide": 4, "card:Countersign": 7}
 	for source: String in expected:
 		_expect_eq(int(spent.get(source, 0)), int(expected[source]), "Toll spent by %s" % source)
 	var kinds: Dictionary = {}
@@ -288,6 +300,11 @@ func _toll_package_run() -> void:
 			resolved = line
 	_expect_eq(advances, [["card:Reckoning", 2], ["card:Second Swing", 1], ["replay:Reckoning", 0]], "Sentence advanced by each spend: Reckoning, Second Swing, its replay")
 	_expect_eq(str(resolved.get("by", "")), "spend", "...going off on the third, mid-turn")
+	var keep: Dictionary = kinds.get("keep", {})
+	_expect_eq(keep.get("cards", []), ["Slash"], "A keep line: Bide kept Slash")
+	_expect_eq(str((kinds.get("copy", {}) as Dictionary).get("card", "")), "Slash", "A copy line: Countersign copied Slash")
+	var copy_end: Dictionary = kinds.get("copy_end", {})
+	_expect_eq([str(copy_end.get("card", "")), str(copy_end.get("outcome", ""))], ["Slash", "vanished"], "...and the copy, unplayed, vanished at the turn's end")
 	_expect(int(resolved.get("damage", 0)) > 0 and not str(resolved.get("enemy", "")).is_empty(), "...naming the Sputter and its damage (%s)" % str(resolved))
 
 # --- The log ---
@@ -522,6 +539,24 @@ func _play(controller: Node, card: CardData, target: Node = null) -> void:
 	if target != null:
 		controller.call("confirm_target", target)
 	await ProbePlay.settle(self, controller, func() -> bool: return not _battle_open())
+
+# Plays `card` through its hand choice, picking `pick` - Bide waits for
+# confirm_choice(), Countersign goes on at the pick.
+func _choose(controller: Node, card: CardData, pick: CardData) -> void:
+	var view: CardView = null
+	var picked: CardView = null
+	for candidate: CardView in controller.get("_hand_container").call("_card_views"):
+		if candidate.card_data == card:
+			view = candidate
+		if candidate.card_data == pick:
+			picked = candidate
+	if view == null or picked == null:
+		_fail("'%s' or '%s' is not in the hand" % [card.card_name, pick.card_name])
+		return
+	_played.append([_turns, card.card_name])
+	controller.call("request_play", view)
+	controller.call("toggle_choice", picked)
+	await process_frame
 
 func _field_enemy(controller: Node) -> Node:
 	return (controller.get("_combatants") as Dictionary).keys()[0]
