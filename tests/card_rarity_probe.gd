@@ -99,7 +99,8 @@ const EXPECTED_POOL: Array[String] = [
 	"Gnaw", "Settled Account", "Reckoning", "In the Red", "Go Under", "Countersign",
 	"Not So",
 ]
-const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Down Payment"]
+const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Down Payment",
+	"Cut", "Guard", "Step Back", "Measured Cut", "Severance"]
 
 var _failures: int = 0
 # Cases that ran to their end. A script error aborts a case without

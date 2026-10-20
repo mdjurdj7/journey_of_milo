@@ -11,5 +11,9 @@ entries = Dictionary[String, String]({
 "Drain": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one.",
 "Spent": "Removed for the rest of this fight once played.",
 "Consumed": "Removed from your deck after the fight in which it is played.",
-"Keep": "Stays in your hand at the end of each turn until played."
+"Keep": "Stays in your hand at the end of each turn until played.",
+"Advance": "Follows Withdraw in a chain: the chain rises a level and Lunge deals damage to this card's target for each level. A card that doesn't follow ends the chain.",
+"Hold": "Follows Advance in a chain: the chain rises a level and Parry gives Block for each level. A card that doesn't follow ends the chain.",
+"Withdraw": "Follows Hold in a chain: the chain rises a level and Recover draws a card. A card that doesn't follow ends the chain.",
+"Burst": "Reads the chain level from before this card was played."
 })

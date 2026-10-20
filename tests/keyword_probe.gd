@@ -27,7 +27,7 @@ const NO_FURTHER_PATH := "res://cards/data/no_further.tres"
 const CORNERED_PATH := "res://cards/data/cornered.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
-const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Consumed", "Keep"]
+const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Consumed", "Keep", "Advance", "Hold", "Withdraw", "Burst"]
 const DEFINITIONS: Dictionary = {
 	"Toll": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Each card that spends any Toll hurries every Sentence by a turn.",
 	"Grace": "After enemy hits get through your Block, damage you deal on your next turn wins HP back, up to half the largest hit.",
@@ -36,6 +36,10 @@ const DEFINITIONS: Dictionary = {
 	"Spent": "Removed for the rest of this fight once played.",
 	"Consumed": "Removed from your deck after the fight in which it is played.",
 	"Keep": "Stays in your hand at the end of each turn until played.",
+	"Advance": "Follows Withdraw in a chain: the chain rises a level and Lunge deals damage to this card's target for each level. A card that doesn't follow ends the chain.",
+	"Hold": "Follows Advance in a chain: the chain rises a level and Parry gives Block for each level. A card that doesn't follow ends the chain.",
+	"Withdraw": "Follows Hold in a chain: the chain rises a level and Recover draws a card. A card that doesn't follow ends the chain.",
+	"Burst": "Reads the chain level from before this card was played.",
 }
 const SCALES: Array[float] = [0.95, 1.15, 2.2]
 const ENEMY_HP := 999

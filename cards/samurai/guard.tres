@@ -1,0 +1,23 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://ciyiha74yc4tt"]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+
+[sub_resource type="Resource" id="CardEffect_block"]
+script = ExtResource("2_card_effect")
+effect_type = 1
+value = 5
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Guard"
+cost = 1
+card_type = 1
+rarity = 1
+target_type = 1
+description = "Hold.
+Gain {block} block."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_block")])
+chain_property = 2
+card_class = &"samurai"
+offer = 1

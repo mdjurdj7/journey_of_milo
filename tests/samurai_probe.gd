@@ -4,8 +4,9 @@ extends SceneTree
 # class seam a run started as her goes through, not her content.
 #
 #   class  - a run started with samurai.tres is hers: no weapon, no Toll,
-#            no Grace, shows_critical off, every starter a class-neutral
-#            card (cards/neutral/); the Wanderer's own flags stay on
+#            no Grace, shows_critical off, every starter one of her own
+#            (cards/samurai/, her card_class, STARTER_ONLY); the
+#            Wanderer's own flags stay on
 #   toll   - her self-inflicted HP loss accrues no Toll (Combatant.has_
 #            toll, copied from the character as BattleController.setup()
 #            does); the same loss as the Wanderer still does
@@ -42,7 +43,7 @@ const SEED_COUNT := 50
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 # A Samurai starter, dealt at UNPLAYABLE_COST so it can't be played on
 # the fight's 3 Energy.
-const UNPLAYABLE_CARD_PATH := "res://cards/neutral/left_hand.tres"
+const UNPLAYABLE_CARD_PATH := "res://cards/samurai/cut.tres"
 const UNPLAYABLE_COST := 9
 const SAFETY_SECONDS := 120.0
 
@@ -85,7 +86,9 @@ func _check_class() -> void:
 	var deck: Array[CardData] = _run_state.get(&"deck")
 	_expect(not deck.is_empty(), "She starts with a deck")
 	for card_data: CardData in samurai.starting_deck_counts:
-		_expect(card_data.resource_path.begins_with(NEUTRAL_DIR), "Starter %s is class-neutral (%s)" % [card_data.card_name, card_data.resource_path])
+		_expect(card_data.resource_path.begins_with(SAMURAI_DIR), "Starter %s is from her folder (%s)" % [card_data.card_name, card_data.resource_path])
+		_expect_eq(card_data.card_class, samurai.card_class, "...her class's card")
+		_expect_eq(card_data.offer, CardData.OfferScope.STARTER_ONLY, "...and a starter only, never rolled")
 	var wanderer := load(WANDERER_PATH) as CharacterData
 	_expect(wanderer.has_toll and wanderer.has_grace and wanderer.shows_critical, "The Wanderer keeps Toll, Grace and Critical")
 	_expect(not samurai.has_devour, "...no Devour")
