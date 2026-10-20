@@ -83,7 +83,7 @@ func _check_data() -> void:
 	var statuses: Array[Status] = []
 	Status.apply_to(statuses, status)
 	_expect_eq(statuses[0].label(), "Collateral", "Its line reads Collateral")
-	_expect_eq(statuses[0].describe(), "This turn, pay 3 HP for each Energy you lack.", "...and the reveal")
+	_expect_eq(statuses[0].describe(), "This turn, cover missing Energy with HP: 3 HP each.", "...and the reveal")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Collateral+")
 	_expect_eq([tempered.cost, tempered.removal_scope, tempered.description, tempered.effects[0].status_data.hp_per_missing_energy], [0, CardData.RemovalScope.SPENT, card.description, 2], "Collateral+: the same card at 2 HP an Energy")

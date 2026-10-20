@@ -6,7 +6,7 @@
 script = ExtResource("1_status_data")
 id = "collateral"
 display_name = "Collateral"
-description = "This turn, pay {hp} HP for each Energy you lack."
+description = "This turn, cover missing Energy with HP: {hp} HP each."
 category = 2
 default_duration_turns = -1
 stack_rule = 3

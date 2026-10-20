@@ -692,7 +692,7 @@
       "status_effect": {
         "id": "collateral",
         "name": "Collateral",
-        "description": "This turn, pay 3 HP for each Energy you lack.",
+        "description": "This turn, cover missing Energy with HP: 3 HP each.",
         "file_path": "res://battle/rules/statuses/collateral.tres",
         "duration": "this turn (ends at its end)",
         "stack_rule": "IGNORE (the cheaper rate when Collateral+ is up too)",
