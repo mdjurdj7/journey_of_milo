@@ -36,6 +36,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.COPY_HAND_CARD: "res://battle/rules/effects/copy_hand_card_effect.gd",
 	CardEffect.EffectType.UNDO_LAST_ATTACK: "res://battle/rules/effects/undo_last_attack_effect.gd",
 	CardEffect.EffectType.TOLL_SPENT_DAMAGE: "res://battle/rules/effects/toll_spent_damage_effect.gd",
+	CardEffect.EffectType.DEVOUR_FROM_HAND: "res://battle/rules/effects/devour_from_hand_effect.gd",
 }
 
 var _cache: Dictionary = {}
@@ -196,6 +197,33 @@ static func copy_targets(card: CardData, hand: Array[CardData]) -> Array[CardDat
 		if other != card and other != null and not copies_hand_card(other):
 			targets.append(other)
 	return targets
+
+# The hand cards `card` may Devour (DEVOUR_FROM_HAND - Take In): every
+# other card in `hand` - unplayable ones, Keep cards and Countersign's
+# copies included. Empty for a card that devours nothing, too. With none,
+# the controller and the hand's fade both refuse the card.
+static func devour_targets(card: CardData, hand: Array[CardData]) -> Array[CardData]:
+	var targets: Array[CardData] = []
+	if card == null or not devours_from_hand(card):
+		return targets
+	for other in hand:
+		if other != card and other != null:
+			targets.append(other)
+	return targets
+
+static func devours_from_hand(card: CardData) -> bool:
+	return devour_per_energy(card) >= 0
+
+# A DEVOUR_FROM_HAND card's yield per Energy of what it eats (its effect's
+# value) - what the hand's line and the Devour both read; -1 for a card
+# that devours nothing.
+static func devour_per_energy(card: CardData) -> int:
+	if card == null:
+		return -1
+	for effect in card.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.DEVOUR_FROM_HAND:
+			return effect.value
+	return -1
 
 static func copies_hand_card(card: CardData) -> bool:
 	for effect in card.effects:

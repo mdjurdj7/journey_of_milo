@@ -114,6 +114,10 @@ var hits_taken: Array[Dictionary] = []
 # closing one attack's share (UndoLastAttackEffect); cleared as the window
 # closes (BattleController._close_grace_window()).
 var grace_window_hits: Array[Dictionary] = []
+# The cards Devoured by the keyword this fight, in order (Take In -
+# DevourFromHandEffect); the count is its size. Never the Devour button's.
+# Per fight, like everything here - later cards read it.
+var devoured_cards: Array[CardData] = []
 var last_attack_target: Combatant = null
 var last_attack_all: bool = false
 var took_damage_last_turn: bool = false

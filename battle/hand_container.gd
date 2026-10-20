@@ -596,6 +596,9 @@ func _can_play(card: CardData, energy: int) -> bool:
 	# Countersign with nothing it may copy (EffectResolver.copy_targets()).
 	if _deck != null and EffectResolver.copies_hand_card(card) and EffectResolver.copy_targets(card, _deck.hand).is_empty():
 		return false
+	# Take In with nothing else to eat (EffectResolver.devour_targets()).
+	if _deck != null and EffectResolver.devours_from_hand(card) and EffectResolver.devour_targets(card, _deck.hand).is_empty():
+		return false
 	# The fight's own affordability check (Combatant.can_pay() - Energy,
 	# or Collateral's HP), once there's a context to ask.
 	if _bonus_context != null:
@@ -783,7 +786,10 @@ func set_devour_target(target: DevourButton) -> void:
 # no sync brings it back; its slot leaves _slots now, but the hand closes
 # the gap only once the slide has ended. Returns how long that is - the
 # controller puts the card in its pile and unlocks input then.
-func devour_card(card_data: CardData) -> float:
+# Not `into_jaw` (the Devour keyword - Take In): the same bite and hold,
+# then it fades where it stands over the slide's time - the Devour
+# button's jaw never read or touched.
+func devour_card(card_data: CardData, into_jaw: bool = true) -> float:
 	var bite: float = maxf(devour_bite_sec, 0.0)
 	var hold: float = maxf(devour_hold_sec, 0.0)
 	var slide: float = maxf(devour_slide_sec, 0.0)
@@ -834,8 +840,11 @@ func devour_card(card_data: CardData) -> float:
 	if material != null and bite > 0.0:
 		sequence.tween_method(func(progress: float) -> void: material.set_shader_parameter("progress", progress), 0.0, 1.0, bite)
 	sequence.tween_interval(hold)
-	sequence.tween_callback(_slide_into_jaw.bind(slot, face, slide))
-	sequence.tween_interval(slide)
+	if into_jaw:
+		sequence.tween_callback(_slide_into_jaw.bind(slot, face, slide))
+		sequence.tween_interval(slide)
+	else:
+		sequence.tween_property(slot, "modulate:a", 0.0, maxf(slide, 0.01)).set_ease(Tween.EASE_IN).set_trans(Tween.TRANS_QUAD)
 	sequence.tween_callback(slot.queue_free)
 	sequence.tween_callback(_reflow_hand)
 	return bite + hold + slide

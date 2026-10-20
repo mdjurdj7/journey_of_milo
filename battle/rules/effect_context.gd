@@ -21,6 +21,9 @@ var keep_choice: Array[CardData] = []
 # The hand card the player chose for a COPY_HAND_CARD (Countersign) to
 # copy, picked before the play committed. Null for every other card.
 var copy_choice: CardData = null
+# The hand card a DEVOUR_FROM_HAND card (Take In) eats - the hand choice's
+# one pick, as copy_choice is Countersign's.
+var devour_choice: CardData = null
 # What a Not So just undid (UndoLastAttackEffect): {"intent", "attacker",
 # "restored", "dealt", "grace_closed"} - for the run log. Empty for any
 # other card.
@@ -120,6 +123,9 @@ var on_block_gained: Callable = Callable()
 # replay_attack()). Unset (a bare rules context), the effect replays it
 # on the spot (ReplayLastAttackEffect).
 var on_replay: Callable = Callable()
+# A card was Devoured by the keyword (DevourFromHandEffect): the hand's
+# bite, nothing of the Devour button's. Called with the card.
+var on_devour: Callable = Callable()
 # This context is a replay's (Second Swing): the card resolving was
 # played before, and isn't played now - nothing that waits for an Attack
 # card is spent by it, and nothing doubles it (Bent Nail).

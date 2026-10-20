@@ -165,6 +165,21 @@ func settle_play(exhaust: bool) -> void:
 func end_play() -> void:
 	playing = null
 
+# Devoured by the keyword (Take In - DevourFromHandEffect): out of the hand
+# for the rest of this fight without being played - to the exhaust pile
+# and spent_unplayed, as the Devour button's eaten cards go, so it is back
+# next fight even if CONSUMED. A fight-only copy (Countersign's) is only
+# gone: no pile, nothing to come back. False for a card not in the hand.
+func devour(card: CardData) -> bool:
+	if not hand.has(card):
+		return false
+	if card.battle_copy:
+		_leave_hand(card)
+		return true
+	exhaust(card)
+	spent_unplayed.append(card)
+	return true
+
 # Removes a card from hand for the rest of this Deck's lifetime (i.e. this
 # fight) - unlike discard(), it never returns via _reshuffle_discard_into_draw().
 func exhaust(card: CardData) -> void:

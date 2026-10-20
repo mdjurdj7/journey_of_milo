@@ -129,6 +129,7 @@ func describe(holder: Combatant = null) -> String:
 		"hp": data.hp_per_missing_energy,
 		"alone_bonus": data.grants_when_alone.attack_damage_bonus if data.grants_when_alone != null else 0,
 		"reduction": data.next_card_cost_reduction * stack_count,
+		"block": data.turn_start_block * stack_count,
 		"energy": data.turn_start_energy_while_critical,
 		"decay": data.tick_decay,
 		"times": times_word(1.0 + magnitude / 100.0),
@@ -290,6 +291,15 @@ static func find_in(statuses: Array[Status], status_data: StatusData) -> Status:
 		if active.data == status_data:
 			return active
 	return null
+
+# The Block `statuses` give at the start of a turn (StatusData.turn_start_
+# block per stack - Marrow), summed.
+static func turn_start_block(statuses: Array[Status]) -> int:
+	var total: int = 0
+	for active in statuses:
+		if active.data != null and active.data.turn_start_block > 0:
+			total += active.data.turn_start_block * active.stack_count
+	return total
 
 # The Energy `statuses` add at the start of a turn begun Critical (or
 # not - `critical`): StatusData.turn_start_energy_while_critical, summed.

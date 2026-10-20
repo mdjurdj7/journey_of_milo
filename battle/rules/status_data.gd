@@ -61,6 +61,7 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {hp}       hp_per_missing_energy
 #   {alone_bonus} grants_when_alone's attack_damage_bonus (what it turns into)
 #   {reduction} next_card_cost_reduction × stacks
+#   {block}    turn_start_block × stacks
 #   {survive_hp} survive_hp() for the holder (only with one - describe(holder))
 #   {decay}    tick_decay
 #   {critical_percent} raises_critical_percent
@@ -248,6 +249,12 @@ enum Mark { NONE, COIL, DROP }
 # as the Energy refills (Combatant.turn_start_energy()); entering Critical
 # later in the turn gives nothing until the next one starts. 0 = none.
 @export var turn_start_energy_while_critical: int = 0
+
+# Block its holder gains at the start of each of their turns, per stack,
+# after the turn's Block reset (Marrow - a Devoured Skill's yield,
+# DevourYield). Read by Status.turn_start_block(); {block} in the
+# description. 0 = none.
+@export var turn_start_block: int = 0
 
 # While its holder has it, they are Critical at or below this percent of
 # max HP - over their own line when it is higher (Go Under's Gone Under:

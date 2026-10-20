@@ -753,6 +753,17 @@ func request_play(card_view: CardView) -> void:
 				eligible.append(view)
 		_begin_choice(card_view, 1, eligible)
 		return
+	# A DEVOUR_FROM_HAND card (Take In) asks which one card to eat, from
+	# every other in the hand (EffectResolver.devour_targets()), and plays
+	# the moment it's picked - Countersign's way.
+	if EffectResolver.devours_from_hand(card):
+		var to_eat: Array[CardView] = []
+		var edible: Array[CardData] = EffectResolver.devour_targets(card, deck.hand)
+		for view: CardView in _hand_container.call("_card_views"):
+			if view != card_view and edible.has(view.card_data):
+				to_eat.append(view)
+		_begin_choice(card_view, 1, to_eat, "DEVOUR")
+		return
 	_arm_or_play(card_view)
 
 # Whether `card` can be played now: affordable, not blocked by the rules,
@@ -771,6 +782,9 @@ func _is_playable(card: CardData) -> bool:
 		return false
 	# Countersign with nothing it may copy.
 	if EffectResolver.copies_hand_card(card) and EffectResolver.copy_targets(card, deck.hand).is_empty():
+		return false
+	# Take In with nothing else in the hand to eat.
+	if EffectResolver.devours_from_hand(card) and EffectResolver.devour_targets(card, deck.hand).is_empty():
 		return false
 	# Second Swing whose Attack's enemy is gone: another it can land on.
 	if _replay_needs_target(card) and not _has_valid_target(card):
@@ -886,8 +900,8 @@ func _keep_cap(card: CardData) -> int:
 # armed card again does nothing.
 # Countersign's (`eligible` given) takes exactly one of `eligible` - the
 # rest faded and unpickable - and the play goes on the moment it's picked,
-# with no DONE.
-func _begin_choice(card_view: CardView, cap: int, eligible: Array[CardView] = []) -> void:
+# with no DONE; Take In's the same, its prompt's `verb` DEVOUR.
+func _begin_choice(card_view: CardView, cap: int, eligible: Array[CardView] = [], verb: String = "COPY") -> void:
 	_choosing_card_view = card_view
 	_choice_marked.clear()
 	_choice_cap = cap
@@ -897,7 +911,7 @@ func _begin_choice(card_view: CardView, cap: int, eligible: Array[CardView] = []
 	if eligible.is_empty():
 		hand_choice_started.emit("", cap, "KEEP", true)
 	else:
-		hand_choice_started.emit("", cap, "COPY", false)
+		hand_choice_started.emit("", cap, verb, false)
 	hand_choice_changed.emit(0, cap)
 	_emit_devour_changed()
 
@@ -1200,6 +1214,9 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 			ctx.keep_choice.append(view.card_data)
 	if not ctx.keep_choice.is_empty():
 		ctx.copy_choice = ctx.keep_choice[0]
+		# Take In's one pick, to eat.
+		ctx.devour_choice = ctx.keep_choice[0]
+	ctx.on_devour = _on_keyword_devoured
 
 	var hp_before_effects: int = player.hp
 	# A hit that will land several times (Lash) shows its first as one of
@@ -1703,6 +1720,12 @@ func _devour_card(card_view: CardView, route: String) -> void:
 	deck.end_play()
 	_input_locked = false
 	_emit_devour_changed()
+
+# EffectContext.on_devour: a card Devoured by the keyword (Take In) - the
+# hand's bite, faded where it stands. Nothing of the Devour button's: no
+# card_devoured, no slide into its jaw, no use of it, no heal.
+func _on_keyword_devoured(card: CardData) -> void:
+	_hand_container.devour_card(card, false)
 
 # Where a played card goes: the exhaust pile (true) for a SPENT or
 # CONSUMED card, and for a power or a stance - it has done its work once
@@ -2393,6 +2416,13 @@ func _start_player_turn() -> void:
 	player.energy = player.turn_start_energy()
 	# The run log's turn opens on the refill, before any tick it counts.
 	RunLogger.turn_started(player.energy)
+	# Marrow (a Devoured Skill's yield): its Block, on top of what the
+	# reset kept, before any tick.
+	var marrow: int = Status.turn_start_block(player.statuses)
+	if marrow > 0:
+		player.block += marrow
+		combat_text.emit("player", marrow, "block")
+		RunLogger.block_gained(marrow)
 	# Energy owed (Come Due) paid off in the refill just now.
 	if owed > 0:
 		RunLogger.mechanic("energy_debt", {"owed": owed, "energy": player.energy})

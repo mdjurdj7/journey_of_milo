@@ -17,12 +17,15 @@ enum EffectType {
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
 	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL, DRAIN, SET_ASIDE, CONSUME,
 	REPLAY_LAST_ATTACK, GRANT_KEEP, COPY_HAND_CARD, UNDO_LAST_ATTACK,
-	TOLL_SPENT_DAMAGE,
+	TOLL_SPENT_DAMAGE, DEVOUR_FROM_HAND,
 }
 # CONSUME and SET_ASIDE are retired (Deny no longer takes a hand card,
 # Bide no longer sets cards aside), and TOLL_DAMAGE (Reckoning no longer
 # spends all Toll) - no resolver, nothing authors them; kept so the
 # values after them keep their numbers.
+# DEVOUR_FROM_HAND (Take In): Devour the chosen hand card - out for the
+# fight, its yield (DevourYield, `value` per Energy of its printed cost) on
+# the player (devour_from_hand_effect.gd).
 # TOLL_SPENT_DAMAGE (Reckoning): deal the Toll spent this fight
 # (Combatant.toll_spent_this_fight), spending none (toll_spent_damage_
 # effect.gd).

@@ -27,7 +27,7 @@ const NO_FURTHER_PATH := "res://cards/data/no_further.tres"
 const CORNERED_PATH := "res://cards/data/cornered.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
-const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Consumed", "Keep", "Advance", "Hold", "Withdraw", "Burst"]
+const KEYWORDS: Array[String] = ["Toll", "Grace", "Critical", "Drain", "Spent", "Consumed", "Keep", "Advance", "Hold", "Withdraw", "Burst", "Devour"]
 const DEFINITIONS: Dictionary = {
 	"Toll": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Each card that spends any Toll hurries every Sentence by a turn.",
 	"Grace": "After enemy hits get through your Block, damage you deal on your next turn wins HP back, up to half the largest hit.",
@@ -40,6 +40,7 @@ const DEFINITIONS: Dictionary = {
 	"Hold": "Follows Advance in a chain: the chain rises a level and Parry gives Block for each level. A card that doesn't follow ends the chain.",
 	"Withdraw": "Follows Hold in a chain: the chain rises a level and Recover draws a card. A card that doesn't follow ends the chain.",
 	"Burst": "Reads the chain level from before this card was played.",
+	"Devour": "Remove a card from your hand for the rest of this fight. For each Energy it cost: an Attack makes your Attacks deal 2 more this fight; a Skill gives 2 Block at the start of each turn.",
 }
 const SCALES: Array[float] = [0.95, 1.15, 2.2]
 const ENEMY_HP := 999

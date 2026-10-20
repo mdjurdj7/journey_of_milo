@@ -106,9 +106,13 @@ class_name RunLogger
 # "level" it fired at, the "card" whose play fired it, and whether it
 # "fizzled" (a Lunge with its target already down).
 
+# Format 12 (2026-10-20): Take In. Event "devour_keyword": the "card" the
+# Devour keyword ate, its "yield" ("attack", "block" or "nothing") and the
+# "amount". The Devour button's own "devour" event is unchanged.
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 11
+const FORMAT_VERSION := 12
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]
