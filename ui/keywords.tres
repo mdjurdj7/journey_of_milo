@@ -10,5 +10,6 @@ entries = Dictionary[String, String]({
 "Critical": "At or below {threshold}% of your max HP.",
 "Drain": "Heal for the HP the damage takes from enemies, up to the Drain's number if it has one.",
 "Spent": "Removed for the rest of this fight once played.",
-"Consumed": "Removed from your deck after the fight in which it is played."
+"Consumed": "Removed from your deck after the fight in which it is played.",
+"Keep": "Stays in your hand at the end of each turn until played."
 })

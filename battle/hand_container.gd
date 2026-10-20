@@ -268,13 +268,13 @@ func set_deck(deck: Deck) -> void:
 		_deck.drawn.disconnect(_on_card_drawn)
 		_deck.discarded.disconnect(_on_deck_changed)
 		_deck.added.disconnect(_on_deck_changed)
-		_deck.set_aside_changed.disconnect(_sync_with_deck)
+		_deck.keep_changed.disconnect(_sync_keep)
 	_deck = deck
 	_arriving_cards.clear()
 	_deck.drawn.connect(_on_card_drawn)
 	_deck.discarded.connect(_on_deck_changed)
 	_deck.added.connect(_on_deck_changed)
-	_deck.set_aside_changed.connect(_sync_with_deck)
+	_deck.keep_changed.connect(_sync_keep)
 	_sync_with_deck()
 
 func _on_deck_changed(_card: CardData) -> void:
@@ -314,20 +314,12 @@ func end_choice() -> void:
 		if view != armed_view:
 			view.set_hover_suppressed(true)
 
-# The chosen cards' own slots leave the hand now - called right before
-# the Deck sets their cards aside, so with two copies of a card in hand
-# the one that goes is the one that was marked, not whichever the sync
-# would match first (play_card() takes its slot out the same way).
-func release_views(views: Array[CardView]) -> void:
-	for slot in _slots.duplicate():
-		var view: CardView = slot.get_child(0) as CardView
-		if view == null or not views.has(view):
-			continue
-		_slots.erase(slot)
-		_slot_cards.erase(slot)
-		_forget_slot(slot)
-		_fade_and_remove(slot, 0.0)
-	_reflow_hand()
+# Each face says whether its card has Keep (Deck.has_keep()).
+func _sync_keep() -> void:
+	if _deck == null:
+		return
+	for view in _card_views():
+		view.set_kept(view.card_data != null and _deck.has_keep(view.card_data))
 
 # The one way the hand's contents change: the Deck's hand is the truth,
 # and the slots are brought to match it - a slot for every card the
@@ -368,6 +360,7 @@ func _sync_with_deck() -> void:
 		_add_card_view(card)
 		if index >= 0:
 			_queue_arrival(_slots.back())
+	_sync_keep()
 	_reflow_hand()
 
 func draw_cards(amount: int) -> void:

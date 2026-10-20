@@ -25,7 +25,7 @@ signal card_replayed(card: CardData, target: FieldEnemy)
 signal hand_changed()
 signal target_requested(card: CardData)
 signal target_cancelled()
-# A hand choice (see _begin_choice()) - Bide's set-aside
+# A hand choice (see _begin_choice()) - Bide's Keep
 # among cards tied for most expensive, or the keep a keepsake allows at
 # the end of the turn (_begin_keep_choice()): opened with up to `cap`
 # cards to mark, the verb that names what happens to them, what to click
@@ -208,7 +208,7 @@ var _pending_devour_only: bool = false
 # Devour was clicked with nothing armed: the next hand card clicked is
 # eaten - see _begin_devour_pick().
 var _devour_picking: bool = false
-# The SET_ASIDE card armed while its choice is open, the other hand cards
+# The GRANT_KEEP card (Bide) armed while its choice is open, the other hand cards
 # marked for it, and how many may be - see _begin_choice().
 var _choosing_card_view: CardView = null
 var _choice_marked: Array[CardView] = []
@@ -429,7 +429,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	deck.drawn.connect(func(_card: CardData) -> void: hand_changed.emit())
 	deck.drawn.connect(func(_card: CardData) -> void: RunLogger.card_drawn())
 	deck.discarded.connect(func(_card: CardData) -> void: hand_changed.emit())
-	deck.set_aside_changed.connect(func() -> void: hand_changed.emit())
+	deck.keep_changed.connect(func() -> void: hand_changed.emit())
 	_hand_container.set_deck(deck)
 	_hand_container.card_clicked.connect(_on_card_view_clicked)
 
@@ -725,9 +725,9 @@ func request_play(card_view: CardView) -> void:
 		if is_devour_available():
 			_arm_for_devour(card_view)
 		return
-	# A SET_ASIDE card (Bide) asks which cards first, unless there is
+	# A GRANT_KEEP card (Bide) asks which cards first, unless there is
 	# nothing else in the hand to choose - then it just plays.
-	var cap: int = _set_aside_cap(card)
+	var cap: int = _keep_cap(card)
 	if cap > 0:
 		_begin_choice(card_view, cap)
 		return
@@ -840,12 +840,12 @@ func mark_refusal_for(card: CardData, enemy: FieldEnemy) -> EnemyTurn.MarkRefusa
 func _has_valid_target(card: CardData) -> bool:
 	return EffectResolver.has_target(_targeting_card(card), _hittable_enemy_combatants())
 
-# How many cards a SET_ASIDE card may set aside right now: its number,
+# How many cards a GRANT_KEEP card may give Keep right now: its number,
 # capped at the other cards in the hand. 0 for every other card.
-func _set_aside_cap(card: CardData) -> int:
+func _keep_cap(card: CardData) -> int:
 	var value: int = 0
 	for effect in card.effects:
-		if effect != null and effect.effect_type == CardEffect.EffectType.SET_ASIDE:
+		if effect != null and effect.effect_type == CardEffect.EffectType.GRANT_KEEP:
 			value += effect.value
 	if value <= 0:
 		return 0
@@ -856,7 +856,7 @@ func _set_aside_cap(card: CardData) -> int:
 # to be clicked, the rest faded (HandContainer.begin_choice()) - each click
 # marks or unmarks one, up to `cap`; a click past the cap, or on a card it
 # may not take, does nothing. Right-click or Esc cancel with nothing
-# spent. Bide's (SET_ASIDE) takes 0 to `cap` of any other card, confirmed
+# spent. Bide's (GRANT_KEEP) takes 0 to `cap` of any other card, confirmed
 # by DONE (the overlay's, confirm_choice()) or Enter/Space - clicking the
 # armed card again does nothing.
 func _begin_choice(card_view: CardView, cap: int) -> void:
@@ -865,7 +865,7 @@ func _begin_choice(card_view: CardView, cap: int) -> void:
 	_choice_cap = cap
 	card_view.lift_and_hold(true)
 	_hand_container.begin_choice(card_view)
-	hand_choice_started.emit("", cap, "SET ASIDE", true)
+	hand_choice_started.emit("", cap, "KEEP", true)
 	hand_choice_changed.emit(0, cap)
 	_emit_devour_changed()
 
@@ -1046,7 +1046,7 @@ func _finish_turn(keep: Array[CardData]) -> void:
 #   from there and stay in sync. If the wait leaves it unplayable (the
 #   fight over, the card or its target gone, too dear) it goes back to
 #   the hand.
-func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_views: Array[CardView] = [], target_mound: int = -1) -> void:
+func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, keep_views: Array[CardView] = [], target_mound: int = -1) -> void:
 	if _play_in_flight or _swing_holds_next_play():
 		_play_queued = true
 		_emit_devour_changed()
@@ -1140,13 +1140,10 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, set_aside_view
 		ctx.replaced_cost_source = "status:" + collateral.data.id
 	ctx.on_replay = func() -> void:
 		_replay_pending = true
-	# Bide's chosen cards: their own views leave the hand just before the
-	# Deck sets their cards aside, so the marked copy is the one that goes.
-	for view in set_aside_views:
+	# Bide's chosen cards, to gain Keep where they are.
+	for view in keep_views:
 		if is_instance_valid(view) and view.card_data != null:
-			ctx.set_aside_choice.append(view.card_data)
-	if not set_aside_views.is_empty():
-		_hand_container.release_views(set_aside_views)
+			ctx.keep_choice.append(view.card_data)
 
 	var hp_before_effects: int = player.hp
 	# A hit that will land several times (Lash) shows its first as one of
@@ -2426,11 +2423,6 @@ func _start_player_turn() -> void:
 
 	if not _check_battle_end():
 		_hand_container.draw_cards(turn_draw_amount)
-		# Bide's set-aside cards come back after the draw, so it draws as
-		# many as ever; the readout's "Set aside" line goes with them.
-		if not deck.set_aside_pile.is_empty():
-			deck.return_set_aside()
-			status_changed.emit()
 
 func _check_battle_end() -> bool:
 	if player.hp <= 0:

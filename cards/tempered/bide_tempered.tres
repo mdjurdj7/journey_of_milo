@@ -4,15 +4,15 @@
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Texture2D" uid="uid://dqtwy32ibs1t5" path="res://cards/art/Wanderer/Bide.png" id="3_art"]
 
-[sub_resource type="Resource" id="E_set_aside"]
+[sub_resource type="Resource" id="E_spend"]
 script = ExtResource("2_card_effect")
-effect_type = 23
-value = 3
+effect_type = 21
+toll_cost = 4
 
-[sub_resource type="Resource" id="E_draw"]
+[sub_resource type="Resource" id="E_keep"]
 script = ExtResource("2_card_effect")
-effect_type = 3
-value = 2
+effect_type = 26
+value = 3
 
 [resource]
 script = ExtResource("1_card_data")
@@ -20,8 +20,8 @@ card_name = "Bide+"
 card_type = 1
 rarity = 1
 target_type = 1
-description = "Set aside up to {set_aside} cards until next turn.
-Draw {draw}."
-effects = Array[ExtResource("2_card_effect")]([SubResource("E_set_aside"), SubResource("E_draw")])
+description = "Spend {toll_cost} Toll.
+Choose up to {keep} cards in your hand. They gain Keep."
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_keep")])
 art = ExtResource("3_art")
 card_class = &"wanderer"

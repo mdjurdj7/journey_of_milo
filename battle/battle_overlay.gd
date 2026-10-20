@@ -138,7 +138,7 @@ signal battle_finished(outcome: Outcome)
 @export_group("Choice Prompt")
 # An open hand choice says what it wants in one tracked-caps ink line,
 # this far above the armed card, or above the hand for the end-of-turn
-# keep (BattleController.hand_choice_*): its verb (SET ASIDE, KEEP) and how many cards are left to pick (choice_prompt_format), then,
+# keep (BattleController.hand_choice_*): its verb (KEEP) and how many cards are left to pick (choice_prompt_format), then,
 # for a choice confirmed elsewhere, what to click (choice_confirm_format -
 # END TURN, the keep's). A choice that takes a variable count (Bide's)
 # has a DONE beside the line, in the same ink as End Turn; one with a
@@ -162,10 +162,6 @@ signal battle_finished(outcome: Outcome)
 		choice_prompt_tracking_em = value
 		_style_choice_prompt()
 @export var choice_prompt_gap_px: float = 12.0
-# The readout's line for Bide's set-aside cards while they wait, and the
-# reveal under it that names them.
-@export var set_aside_line_format: String = "Set aside %d"
-@export var set_aside_reveal_format: String = "Back in your hand at the start of your next turn: %s."
 
 @export_group("Corners")
 # The fixed readouts' inset from the viewport's edges: bottom-left the
@@ -847,12 +843,6 @@ func _refresh_standing_row() -> void:
 	lines.append_array(counters)
 	# Bide's cards, waiting for next turn - named in the reveal, so they
 	# don't read as gone.
-	var waiting: Array[CardData] = battle_controller.deck.set_aside_pile if battle_controller.deck != null else []
-	if not waiting.is_empty():
-		var names: PackedStringArray = []
-		for card in waiting:
-			names.append(card.card_name)
-		lines.append({"text": set_aside_line_format % waiting.size(), "name": "Set aside", "rules": set_aside_reveal_format % ", ".join(names)})
 	_field_hp_bar.set_standing_row(lines)
 	_field_hp_bar.set_hand_top_y(hand_container.get_rest_top_y())
 

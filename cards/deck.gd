@@ -7,8 +7,8 @@ signal discarded(card: CardData)
 # (exhaust()) or from its own play (settle_play()).
 signal exhausted(card: CardData)
 signal shuffled()
-# Cards left the hand for set_aside_pile, or came back from it.
-signal set_aside_changed()
+# A card gained Keep (grant_keep()) or lost it (it left the hand).
+signal keep_changed()
 # A card put into the fight from outside it (add()) - never a draw, so
 # nothing that answers a draw hears of it.
 signal added(card: CardData)
@@ -25,11 +25,12 @@ var exhaust_pile: Array[CardData] = []
 # (RegionField._apply_consumed_removals() skips them, one occurrence
 # each).
 var spent_unplayed: Array[CardData] = []
-# Set aside from the hand (Bide) until the start of the next turn: out of
-# the hand and of every pile a draw or a reshuffle reads, back in the hand
-# by return_set_aside(). A fight that ends first just drops it - each
-# fight's Deck is built fresh from the run's deck.
-var set_aside_pile: Array[CardData] = []
+# The hand cards with Keep (Bide): each stays in the hand at the end of
+# every turn (discard_hand()) until it leaves it by any route - played,
+# Spent, devoured - and loses Keep then. Held here, not on the card: the
+# fight's cards are the run deck's own, and each fight's Deck is built
+# fresh, so Keep never carries from one fight to the next.
+var kept: Array[CardData] = []
 # The card being played, from its commit (begin_play()) until its effects
 # have resolved (end_play()); null between plays. Out of the hand from the
 # commit - no slot, not counted toward hand_size - and in no pile until
@@ -77,51 +78,42 @@ func add(card: CardData) -> void:
 func discard(card: CardData) -> void:
 	if not hand.has(card):
 		return
-	hand.erase(card)
+	_leave_hand(card)
 	discard_pile.append(card)
 	discarded.emit(card)
 
-# Every hand card to the discard pile but `keep` (the end-of-turn keep) -
-# one occurrence each, so keeping one of two copies discards the other.
+# Every hand card to the discard pile but `keep` (Frayed Cord's end-of-
+# turn keep, one occurrence each, so keeping one of two copies discards
+# the other) and every card with Keep, on top of it.
 func discard_hand(keep: Array[CardData] = []) -> void:
 	var keeping: Array[CardData] = keep.duplicate()
 	for card in hand.duplicate():
+		if kept.has(card):
+			continue
 		var index: int = keeping.find(card)
 		if index >= 0:
 			keeping.remove_at(index)
 			continue
 		discard(card)
 
-# `cards` leave the hand for set_aside_pile - one occurrence each; a card
-# not in the hand is skipped.
-func set_aside(cards: Array[CardData]) -> void:
-	var moved: bool = false
-	for card in cards:
-		if not hand.has(card):
-			continue
-		hand.erase(card)
-		set_aside_pile.append(card)
-		moved = true
-	if moved:
-		set_aside_changed.emit()
+# `card`, in the hand, gains Keep (Bide). False for one not in the hand.
+func grant_keep(card: CardData) -> bool:
+	if not hand.has(card):
+		return false
+	if not kept.has(card):
+		kept.append(card)
+		keep_changed.emit()
+	return true
 
-# Every set-aside card back into the hand, in the order set aside - after
-# the turn's draw, so they never count against it. One that would take
-# the hand past hand_size goes to the discard pile instead of vanishing.
-func return_set_aside() -> void:
-	if set_aside_pile.is_empty():
-		return
-	var overflow: Array[CardData] = []
-	for card in set_aside_pile:
-		if hand.size() >= hand_size:
-			overflow.append(card)
-			continue
-		hand.append(card)
-	set_aside_pile.clear()
-	set_aside_changed.emit()
-	for card in overflow:
-		discard_pile.append(card)
-		discarded.emit(card)
+func has_keep(card: CardData) -> bool:
+	return kept.has(card)
+
+# `card` leaves the hand - by any route - and with it its Keep.
+func _leave_hand(card: CardData) -> void:
+	hand.erase(card)
+	if kept.has(card):
+		kept.erase(card)
+		keep_changed.emit()
 
 # A play commits: `card` leaves the hand - in no pile yet, and no longer
 # counted toward hand_size while its effects resolve. False, and nothing
@@ -129,7 +121,7 @@ func return_set_aside() -> void:
 func begin_play(card: CardData) -> bool:
 	if not hand.has(card):
 		return false
-	hand.erase(card)
+	_leave_hand(card)
 	playing = card
 	return true
 
@@ -155,7 +147,7 @@ func end_play() -> void:
 func exhaust(card: CardData) -> void:
 	if not hand.has(card):
 		return
-	hand.erase(card)
+	_leave_hand(card)
 	exhaust_pile.append(card)
 	exhausted.emit(card)
 

@@ -1,37 +1,37 @@
 extends SceneTree
 
-# Headless probe for Bide - SET_ASIDE and the choice behind it: playing it
-# opens a choice of up to 2 other hand cards (fewer when the hand holds
-# fewer, 0 always allowed), counted down by the prompt and confirmed by
-# its DONE - clicking Bide again does nothing; confirmed, the chosen
-# leave the hand for the deck's set-aside pile, Bide draws 1 and goes to
-# the discard; at the start of the next turn they come back after the
-# normal draw, which is unchanged. Cancelled, nothing is spent. Next-card
-# discounts (Leverage, Collateral) wait through it, to the turn's end. The readout names the
-# waiting cards.
+# Headless probe for Bide - 0 Energy, Common Skill, TOLL: "Spend 4 Toll.
+# Choose up to 2 cards in your hand. They gain Keep." Blocked under 4
+# Toll. The picker (up to 2 of the other hand cards, DONE) opens before
+# the play; none chosen still spends the Toll (and so hurries a
+# Sentence); alone in the hand it just plays. Keep (Deck.kept): a kept
+# card stays in the hand at the end of each turn until it leaves the
+# hand by any route - played, Spent, devoured - and loses Keep then;
+# Frayed Cord's pick keeps on top of it; the hand cap stops the draw; a
+# new fight's Deck starts with none. A kept face reads "KEEP ·" ahead of
+# its type, answering the hover as the Keep keyword. Bide+ keeps 3.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/bide_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 #
-# Fight cases load the real region scene and start fights through
-# RegionField's contact handler, as collateral_probe does, then drive
-# BattleController's own request_play() / toggle_choice() / confirm_
-# choice() / cancel_choice() / end_turn(). Each case discards the hand and
-# deals itself fresh copies of the cards it needs. Untyped against
-# anything that names the RunState autoload.
+# Deck cases drive a bare Deck; fight cases load the real region scene and
+# fight floor 1's Sputter through RegionField's contact handler, playing
+# real cards through BattleController.request_play() / toggle_choice() /
+# confirm_choice() / end_turn(). Untyped against anything that names the
+# RunState autoload.
 
 const CASES := 12
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BIDE_PATH := "res://cards/data/bide.tres"
+const TEMPERED_PATH := "res://cards/tempered/bide_tempered.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const RECKONING_PATH := "res://cards/data/reckoning.tres"
+const SENTENCE_STATUS_PATH := "res://battle/rules/statuses/sentence.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const ART_PATH := "res://cards/art/Wanderer/Bide.png"
-const LEVERAGE_STATUS_PATH := "res://battle/rules/statuses/leverage.tres"
-const COLLATERAL_STATUS_PATH := "res://battle/rules/statuses/collateral.tres"
 const ENEMY_HP := 999
 const TURN_DRAW := 5
 const SAFETY_SECONDS := 400.0
@@ -40,6 +40,7 @@ var _run_state: Node = null
 var _field: Node = null
 var _failures: int = 0
 var _completed: int = 0
+var _toll: int = 0
 
 func _initialize() -> void:
 	create_timer(SAFETY_SECONDS).timeout.connect(func() -> void:
@@ -47,19 +48,20 @@ func _initialize() -> void:
 		quit(1)
 	)
 	_run_state = root.get_node("RunState")
+	_toll = (load(BIDE_PATH) as CardData).effects[0].toll_cost
 
 	_check_data()
-	_check_reshuffle_leaves_it()
-	await _check_alone()
+	_check_deck_keep()
+	_check_keep_lost_any_route()
+	_check_frayed_cord_on_top()
+	_check_hand_cap()
 	await _check_choose_two()
-	await _check_cap()
+	await _check_kept_through_turns()
+	await _check_played_loses_keep()
+	await _check_zero_counts()
+	await _check_alone()
 	await _check_cancel()
-	await _check_zero()
-	await _check_one_other()
-	await _check_return_next_turn()
-	await _check_hand_full_on_return()
-	await _check_discounts_wait()
-	await _check_fight_ends_first()
+	await _check_blocked()
 
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
@@ -70,273 +72,210 @@ func _initialize() -> void:
 		print("bide_probe: %d FAILED" % _failures)
 		quit(1)
 
-# --- Rules ---
+# --- Data ---
 
 func _check_data() -> void:
-	var bide := load(BIDE_PATH) as CardData
-	_expect_eq(bide.card_name, "Bide", "The card is named Bide")
-	_expect_eq(bide.cost, 0, "...costs 0")
-	_expect_eq(bide.card_type, CardData.CardType.SKILL, "...is a Skill")
-	_expect_eq(bide.rarity, CardData.CardRarity.COMMON, "...is Common")
-	_expect(bide.description.begins_with("Set aside up to {set_aside} cards"), "...and its text says up to")
-	var tempered: CardData = bide.tempered
-	_expect(tempered != null and tempered.description == bide.description, "...as Bide+'s does")
-	_expect_eq(bide.target_type, CardData.TargetType.SELF, "...targets the player")
-	_expect_eq(bide.removal_scope, CardData.RemovalScope.NONE, "...is not Spent")
-	_expect_eq(bide.effects.size(), 2, "...two effects")
-	_expect_eq(bide.effects[0].effect_type, CardEffect.EffectType.SET_ASIDE, "...SET_ASIDE first")
-	_expect_eq(bide.effects[0].value, 2, "...of 2")
-	_expect_eq(bide.effects[1].effect_type, CardEffect.EffectType.DRAW, "...then DRAW")
-	_expect_eq(bide.effects[1].value, 1, "...of 1")
-	_expect(bide.art != null and bide.art.resource_path == ART_PATH, "...and carries its art")
-	var in_pool: bool = false
-	for card: CardData in (load(POOL_PATH) as RewardPool).entries:
-		if card == bide:
-			in_pool = true
-	_expect(in_pool, "...and is in the Wanderer reward pool")
+	var card: CardData = load(BIDE_PATH)
+	_expect_eq([card.card_name, card.cost, card.card_type, card.rarity, card.removal_scope], ["Bide", 0, CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.RemovalScope.NONE], "Bide: 0 Energy, a Common Skill, not Spent")
+	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[0].toll_cost == 4 and card.effects[1].effect_type == CardEffect.EffectType.GRANT_KEEP and card.effects[1].value == 2, "...SPEND_TOLL 4, then GRANT_KEEP 2")
+	_expect_eq(card.description, "Spend {toll_cost} Toll.\nChoose up to {keep} cards in your hand. They gain Keep.", "...its text, numbers from data")
+	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
+	_expect(card.art != null and card.art.resource_path == ART_PATH, "...its art kept")
+	_expect((load(POOL_PATH) as RewardPool).entries.has(card), "...in the Wanderer pool")
+	var tempered: CardData = load(TEMPERED_PATH)
+	_expect(card.tempered == tempered, "...tempering to Bide+")
+	_expect_eq([tempered.card_name, tempered.effects[1].value, tempered.description], ["Bide+", 3, card.description], "Bide+: up to 3, the same text")
+	_expect_eq(KeywordTable.shared().definition("Keep"), "Stays in your hand at the end of each turn until played.", "The Keep keyword")
 	_completed += 1
 
-# The set-aside pile is outside every pile a draw or a reshuffle reads.
-func _check_reshuffle_leaves_it() -> void:
-	var slash := (load(SLASH_PATH) as CardData).duplicate() as CardData
-	var brace := (load(BRACE_PATH) as CardData).duplicate() as CardData
-	var others: Array[CardData] = []
-	for i in 4:
-		others.append((load(SLASH_PATH) as CardData).duplicate() as CardData)
-	var deck := Deck.new(others)
-	deck.hand = [slash, brace] as Array[CardData]
-	deck.set_aside([slash, brace] as Array[CardData])
-	_expect_eq(deck.hand.size(), 0, "Set aside: the hand gives them up")
-	deck.discard_pile = deck.draw_pile
-	deck.draw_pile = [] as Array[CardData]
-	deck.draw(4)
-	_expect(not deck.hand.has(slash) and not deck.hand.has(brace) and not deck.draw_pile.has(slash), "A reshuffle and draw never reach the set-aside cards")
-	_expect_eq(deck.set_aside_pile, [slash, brace] as Array[CardData], "...they wait in the set-aside pile")
+# --- The Deck ---
+
+# Two of four kept: the end of the turn discards the other two, the kept
+# stay - and stay again at the next end.
+func _check_deck_keep() -> void:
+	var cards: Array[CardData] = [_card(SLASH_PATH), _card(BRACE_PATH), _card(RECKONING_PATH), _card(SLASH_PATH)]
+	var deck := Deck.new([])
+	deck.hand.append_array(cards)
+	_expect(deck.grant_keep(cards[0]) and deck.grant_keep(cards[1]), "Two hand cards gain Keep")
+	_expect(not deck.grant_keep(_card(SLASH_PATH)), "...one not in the hand can't")
+	deck.discard_hand()
+	_expect_eq(deck.hand, [cards[0], cards[1]] as Array[CardData], "The turn ends: the kept two stay")
+	_expect_eq(deck.discard_pile.size(), 2, "...the other two discarded")
+	deck.discard_hand()
+	_expect_eq(deck.hand.size(), 2, "...and they stay again at the next end")
+	var next := Deck.new(cards)
+	_expect(next.kept.is_empty(), "A new fight's Deck starts with none kept")
+	_completed += 1
+
+# Played, Spent or devoured (exhaust), discarded: Keep goes with the card.
+func _check_keep_lost_any_route() -> void:
+	var cards: Array[CardData] = [_card(SLASH_PATH), _card(BRACE_PATH), _card(RECKONING_PATH)]
+	var deck := Deck.new([])
+	deck.hand.append_array(cards)
+	for card in cards:
+		deck.grant_keep(card)
+	deck.begin_play(cards[0])
+	_expect(not deck.has_keep(cards[0]), "Played: Keep gone")
+	deck.exhaust(cards[1])
+	_expect(not deck.has_keep(cards[1]), "Spent from the hand (Devour): Keep gone")
+	deck.discard(cards[2])
+	_expect(not deck.has_keep(cards[2]), "Discarded: Keep gone")
+	_completed += 1
+
+# Frayed Cord keeps one more on top of a kept card, not counted against it.
+func _check_frayed_cord_on_top() -> void:
+	var cards: Array[CardData] = [_card(SLASH_PATH), _card(BRACE_PATH), _card(RECKONING_PATH)]
+	var deck := Deck.new([])
+	deck.hand.append_array(cards)
+	deck.grant_keep(cards[0])
+	deck.discard_hand([cards[1]] as Array[CardData])
+	_expect_eq(deck.hand, [cards[0], cards[1]] as Array[CardData], "Keep and Frayed Cord's pick both stay")
+	_completed += 1
+
+# Eight kept and a draw of 5: the hand stops at 10, the rest waiting in
+# the draw pile.
+func _check_hand_cap() -> void:
+	var pile: Array[CardData] = []
+	for i in 10:
+		pile.append(_card(SLASH_PATH))
+	var deck := Deck.new(pile)
+	for i in 8:
+		var card: CardData = _card(BRACE_PATH)
+		deck.hand.append(card)
+		deck.grant_keep(card)
+	deck.discard_hand()
+	deck.draw(TURN_DRAW)
+	_expect_eq(deck.hand.size(), deck.hand_size, "Eight kept, a draw of 5: the hand stops at %d" % deck.hand_size)
+	_expect_eq(deck.draw_pile.size(), 8, "...the rest left in the draw pile")
 	_completed += 1
 
 # --- Fights ---
 
-# Bide alone: nothing to choose, so it just plays - draws 1, sets aside
-# nothing, and goes to the discard.
-func _check_alone() -> void:
-	var controller: Node = await _start_fight()
-	if controller != null:
-		var deck: Object = controller.get("deck")
-		var bide: CardData = await _deal(controller, BIDE_PATH)
-		controller.call("request_play", _view(controller, bide))
-		_expect(not bool(controller.call("is_choosing")), "Bide alone opens no choice")
-		await _settle(controller)
-		_expect_eq((deck.get("hand") as Array).size(), 1, "...it draws 1")
-		_expect_eq((deck.get("set_aside_pile") as Array).size(), 0, "...sets aside nothing")
-		_expect((deck.get("discard_pile") as Array).has(bide), "...and goes to the discard")
-		_expect_eq((controller.get("player") as Combatant).energy, 3, "...for 0 Energy")
-	await _teardown()
-	_completed += 1
-
-# Two chosen from three: they leave the hand, Bide draws 1 and is
-# discarded, and the readout names them.
+# Bide on 4 Toll with Slash, Brace and Reckoning: the picker asks for up to
+# 2; Slash and Brace chosen - Toll spent, both kept, their faces reading
+# KEEP and answering the Keep keyword.
 func _check_choose_two() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
-		var deck: Object = controller.get("deck")
+		var player: Combatant = controller.get("player")
+		player.toll = _toll
 		var slash: CardData = await _deal(controller, SLASH_PATH)
 		var brace: CardData = await _deal(controller, BRACE_PATH)
-		var reckoning: CardData = await _deal(controller, RECKONING_PATH)
+		await _deal(controller, RECKONING_PATH)
 		var bide: CardData = await _deal(controller, BIDE_PATH)
 		controller.call("request_play", _view(controller, bide))
-		_expect(bool(controller.call("is_choosing")), "Bide with three others opens the choice")
-		_expect_eq(int(controller.get("_choice_cap")), 2, "...capped at 2")
-		_expect_eq(_prompt_text(), "SET ASIDE  ·  2 LEFT", "...the prompt counts 2 left")
-		var done: Button = _done_button()
-		_expect(done != null and done.visible, "...and shows DONE")
-		_expect_eq(_view(controller, reckoning).modulate.a, 1.0, "...every other card at full ink, pickable")
-		controller.call("_on_card_view_clicked", _view(controller, bide))
-		_expect(bool(controller.call("is_choosing")), "Clicking Bide again doesn't confirm")
-		var slash_view: CardView = _view(controller, slash)
-		controller.call("toggle_choice", slash_view)
-		_expect_eq(_prompt_text(), "SET ASIDE  ·  1 LEFT", "One marked: 1 left")
+		_expect(_prompt_text().begins_with("KEEP"), "The picker opens: %s" % _prompt_text())
+		controller.call("toggle_choice", _view(controller, slash))
 		controller.call("toggle_choice", _view(controller, brace))
-		_expect(slash_view.is_marked(), "A clicked card is marked")
-		_expect(bool(controller.call("is_choosing")), "...the cap reached, still open: DONE confirms")
-		if done != null:
-			done.pressed.emit()
-		_expect(done == null or not done.visible, "DONE: the choice closes, DONE with it")
-		await _settle(controller)
-		var hand: Array = deck.get("hand")
-		_expect_eq(deck.get("set_aside_pile"), [slash, brace], "Confirmed: Slash and Brace are set aside")
-		_expect(hand.has(reckoning) and not hand.has(slash) and not hand.has(brace), "...Reckoning stays in hand")
-		_expect_eq(hand.size(), 2, "...beside the 1 Bide drew")
-		_expect((deck.get("discard_pile") as Array).has(bide), "Bide goes to the discard")
-		_expect_eq((controller.get("player") as Combatant).energy, 3, "...for 0 Energy")
-		var line: Dictionary = _readout_line(controller, "Set aside")
-		_expect_eq(line.get("text", ""), "Set aside 2", "The readout reads Set aside 2")
-		_expect_eq(line.get("rules", ""), "Back in your hand at the start of your next turn: Slash, Brace.", "...and its reveal names them")
-	await _teardown()
-	_completed += 1
-
-# A third mark past the cap does nothing; unmarking frees a slot.
-func _check_cap() -> void:
-	var controller: Node = await _start_fight()
-	if controller != null:
-		var a: CardData = await _deal(controller, SLASH_PATH)
-		var b: CardData = await _deal(controller, BRACE_PATH)
-		var c: CardData = await _deal(controller, RECKONING_PATH)
-		var bide: CardData = await _deal(controller, BIDE_PATH)
-		controller.call("request_play", _view(controller, bide))
-		controller.call("toggle_choice", _view(controller, a))
-		controller.call("toggle_choice", _view(controller, b))
-		controller.call("toggle_choice", _view(controller, c))
-		_expect(not _view(controller, c).is_marked(), "A third mark past the cap of 2 does nothing")
-		_expect_eq((controller.get("_choice_marked") as Array).size(), 2, "...two stay marked")
-		controller.call("toggle_choice", _view(controller, b))
-		controller.call("toggle_choice", _view(controller, c))
-		_expect(_view(controller, c).is_marked() and not _view(controller, b).is_marked(), "Unmarking one frees the slot")
-		controller.call("cancel_choice")
-		await _settle(controller)
-	await _teardown()
-	_completed += 1
-
-# Cancelled: nothing spent, nothing set aside, the marks come off and
-# Bide is back in the hand; End Turn comes back.
-func _check_cancel() -> void:
-	var controller: Node = await _start_fight()
-	if controller != null:
-		var deck: Object = controller.get("deck")
-		var slash: CardData = await _deal(controller, SLASH_PATH)
-		await _deal(controller, BRACE_PATH)
-		var bide: CardData = await _deal(controller, BIDE_PATH)
-		controller.call("request_play", _view(controller, bide))
-		controller.call("toggle_choice", _view(controller, slash))
-		controller.call("cancel_choice")
-		await create_timer(0.8).timeout
-		_expect(not bool(controller.call("is_choosing")), "Cancelled: the choice closes")
-		_expect((deck.get("hand") as Array).has(bide), "...Bide stays in hand")
-		_expect_eq((deck.get("hand") as Array).size(), 3, "...with both others")
-		_expect_eq((deck.get("set_aside_pile") as Array).size(), 0, "...nothing set aside")
-		_expect(not _view(controller, slash).is_marked(), "...the mark comes off")
-		_expect_eq((controller.get("player") as Combatant).energy, 3, "...nothing spent")
-		_expect(not bool(_overlay().get("_card_armed")), "...and End Turn is back")
-	await _teardown()
-	_completed += 1
-
-# Confirmed with nothing marked: Bide just draws 1.
-func _check_zero() -> void:
-	var controller: Node = await _start_fight()
-	if controller != null:
-		var deck: Object = controller.get("deck")
-		await _deal(controller, SLASH_PATH)
-		await _deal(controller, BRACE_PATH)
-		var bide: CardData = await _deal(controller, BIDE_PATH)
-		controller.call("request_play", _view(controller, bide))
 		controller.call("confirm_choice")
 		await _settle(controller)
-		_expect_eq((deck.get("set_aside_pile") as Array).size(), 0, "Set aside 0: nothing set aside")
-		_expect_eq((deck.get("hand") as Array).size(), 3, "...both others stay, plus the 1 drawn")
-		_expect((deck.get("discard_pile") as Array).has(bide), "...and Bide goes to the discard")
-		_expect(_readout_line(controller, "Set aside").is_empty(), "...and no readout line")
-	await _teardown()
-	_completed += 1
-
-# One other card: the cap shrinks to 1, and it is still a choice.
-func _check_one_other() -> void:
-	var controller: Node = await _start_fight()
-	if controller != null:
 		var deck: Object = controller.get("deck")
-		var slash: CardData = await _deal(controller, SLASH_PATH)
-		var bide: CardData = await _deal(controller, BIDE_PATH)
-		controller.call("request_play", _view(controller, bide))
-		_expect(bool(controller.call("is_choosing")), "One other card: the choice still opens")
-		_expect_eq(int(controller.get("_choice_cap")), 1, "...capped at 1")
-		controller.call("toggle_choice", _view(controller, slash))
-		controller.call("confirm_choice")
-		await _settle(controller)
-		_expect_eq(deck.get("set_aside_pile"), [slash], "...and Slash is set aside")
+		_expect_eq(player.toll, 0, "Bide spends 4")
+		_expect(bool(deck.call("has_keep", slash)) and bool(deck.call("has_keep", brace)), "...Slash and Brace kept")
+		var view: CardView = _view(controller, slash)
+		_expect(view != null and view.is_kept() and view.type_label.text.begins_with("KEEP · "), "...Slash's face reads %s" % (view.type_label.text if view != null else "?"))
+		if view != null:
+			var at: Vector2 = view.type_label.position + Vector2((view.type_label.size.x - view.type_label.get_theme_font("font").get_string_size(view.type_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, view.type_label_font_size_px).x) / 2.0 + 4.0, view.type_label.size.y / 2.0)
+			_expect_eq(view.keyword_at(at), "Keep", "...its KEEP answering the Keep keyword")
 	await _teardown()
 	_completed += 1
 
-# Next turn: the normal draw is 5, as ever, and the two come back after it.
-func _check_return_next_turn() -> void:
-	var controller: Node = await _start_fight()
-	if controller != null:
-		var deck: Object = controller.get("deck")
-		var slash: CardData = await _deal(controller, SLASH_PATH)
-		var brace: CardData = await _deal(controller, BRACE_PATH)
-		var bide: CardData = await _deal(controller, BIDE_PATH)
-		await _bide(controller, bide, [slash, brace])
-		var drawn: Array = []
-		deck.connect("drawn", func(card: CardData) -> void: drawn.append(card))
-		await _end_turn(controller)
-		var hand: Array = deck.get("hand")
-		_expect_eq(drawn.size(), TURN_DRAW, "Next turn draws %d, as ever" % TURN_DRAW)
-		_expect(hand.has(slash) and hand.has(brace), "...and Slash and Brace are back in hand")
-		_expect_eq(hand.size(), TURN_DRAW + 2, "...beside the %d drawn" % TURN_DRAW)
-		_expect(not drawn.has(slash) and not drawn.has(brace), "...returned, not drawn")
-		_expect_eq((deck.get("set_aside_pile") as Array).size(), 0, "...the set-aside pile empty")
-		_expect(_readout_line(controller, "Set aside").is_empty(), "...and the readout line gone")
-	await _teardown()
-	_completed += 1
-
-# A hand already at its limit when they come back: what doesn't fit goes
-# to the discard, never lost.
-func _check_hand_full_on_return() -> void:
-	var controller: Node = await _start_fight()
-	if controller != null:
-		var deck: Object = controller.get("deck")
-		var slash: CardData = await _deal(controller, SLASH_PATH)
-		var brace: CardData = await _deal(controller, BRACE_PATH)
-		var bide: CardData = await _deal(controller, BIDE_PATH)
-		await _bide(controller, bide, [slash, brace])
-		deck.set("hand_size", TURN_DRAW + 1)
-		await _end_turn(controller)
-		var hand: Array = deck.get("hand")
-		_expect_eq(hand.size(), TURN_DRAW + 1, "A hand limit of %d: 5 drawn, 1 back" % (TURN_DRAW + 1))
-		_expect(hand.has(slash), "...Slash, set aside first, back in hand")
-		_expect((deck.get("discard_pile") as Array).has(brace), "...Brace, past the limit, to the discard")
-		_expect_eq((deck.get("set_aside_pile") as Array).size(), 0, "...and none left waiting")
-	await _teardown()
-	_completed += 1
-
-# Leverage and Collateral wait through Bide (it costs 0); both are this
-# turn's, and end with it.
-func _check_discounts_wait() -> void:
+# Kept through two turn ends: still in the hand, the turn's draw added.
+func _check_kept_through_turns() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var player: Combatant = controller.get("player")
-		Status.apply_to(player.statuses, load(LEVERAGE_STATUS_PATH))
-		Status.apply_to(player.statuses, load(COLLATERAL_STATUS_PATH))
+		player.toll = _toll
 		var slash: CardData = await _deal(controller, SLASH_PATH)
 		var reckoning: CardData = await _deal(controller, RECKONING_PATH)
-		var bide: CardData = await _deal(controller, BIDE_PATH)
-		await _bide(controller, bide, [slash, reckoning])
-		_expect_eq(_labels(player), ["Leverage", "Collateral"] as Array[String], "Bide spends neither Leverage nor Collateral")
+		await _bide(controller, await _deal(controller, BIDE_PATH), [slash])
+		var deck: Object = controller.get("deck")
 		await _end_turn(controller)
-		_expect_eq(_labels(player), [] as Array[String], "...both end with the turn")
-		_expect_eq(player.energy_cost(slash), 1, "...the returned Slash reads its own 1")
-		_expect_eq(player.energy_cost(reckoning), 2, "...and Reckoning its own 2")
+		var hand: Array = deck.get("hand")
+		_expect(hand.has(slash) and not hand.has(reckoning), "The turn ends: Slash kept, Reckoning discarded")
+		_expect_eq(hand.size(), 1 + TURN_DRAW, "...and the turn's draw added")
+		await _end_turn(controller)
+		_expect((deck.get("hand") as Array).has(slash), "...still there after another turn")
 	await _teardown()
 	_completed += 1
 
-# The fight ends with cards set aside: the run's deck is untouched - each
-# fight's Deck is built fresh from it.
-func _check_fight_ends_first() -> void:
+func _check_played_loses_keep() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
+		var player: Combatant = controller.get("player")
+		player.toll = _toll
+		var slash: CardData = await _deal(controller, SLASH_PATH)
+		await _bide(controller, await _deal(controller, BIDE_PATH), [slash])
 		var deck: Object = controller.get("deck")
-		var run_deck: Array = (_run_state.get("deck") as Array).duplicate()
-		# The opening hand kept: Bide joins it rather than replacing it.
-		controller.set_meta("probe_dealt", true)
-		var hand: Array = (deck.get("hand") as Array).duplicate()
-		var bide: CardData = await _deal(controller, BIDE_PATH)
-		var chosen: Array = [hand[0], hand[1]]
-		await _bide(controller, bide, chosen)
-		_expect_eq((deck.get("set_aside_pile") as Array).size(), 2, "Two of the opening hand set aside")
-		for combatant: Combatant in (controller.get("_combatants") as Dictionary).values():
-			combatant.hp = 0
-		controller.call("_check_battle_end")
-		await create_timer(0.5).timeout
-		_expect_eq((_run_state.get("deck") as Array), run_deck, "The fight ends: the run's deck holds every card, as before")
+		controller.call("request_play", _view(controller, slash))
+		controller.call("confirm_target", (controller.get("_combatants") as Dictionary).keys()[0])
+		await _settle(controller)
+		_expect(not bool(deck.call("has_keep", slash)), "Played, Slash loses Keep")
+		await _end_turn(controller)
+		_expect(not (deck.get("hand") as Array).has(slash), "...and isn't held at the turn's end")
 	await _teardown()
 	_completed += 1
+
+# None chosen: the Toll is spent all the same, and a Sentence hurried.
+func _check_zero_counts() -> void:
+	var controller: Node = await _start_fight()
+	if controller != null:
+		var player: Combatant = controller.get("player")
+		var enemy: Combatant = (controller.get("_combatants") as Dictionary).values()[0]
+		Status.apply_to(enemy.statuses, load(SENTENCE_STATUS_PATH))
+		player.toll = _toll
+		await _deal(controller, SLASH_PATH)
+		await _bide(controller, await _deal(controller, BIDE_PATH), [])
+		_expect_eq(player.toll, 0, "None chosen: the 4 Toll still spent")
+		var sentence: Status = Status.find_in(enemy.statuses, load(SENTENCE_STATUS_PATH))
+		_expect(sentence != null and sentence.turns_remaining == 2, "...and a Sentence hurried, 3 -> 2")
+	await _teardown()
+	_completed += 1
+
+func _check_alone() -> void:
+	var controller: Node = await _start_fight()
+	if controller != null:
+		var player: Combatant = controller.get("player")
+		player.toll = _toll
+		var bide: CardData = await _deal(controller, BIDE_PATH)
+		controller.call("request_play", _view(controller, bide))
+		_expect_eq(_prompt_text(), "", "Alone in the hand: no picker")
+		await _settle(controller)
+		_expect_eq(player.toll, 0, "...it just plays, spending 4")
+	await _teardown()
+	_completed += 1
+
+func _check_cancel() -> void:
+	var controller: Node = await _start_fight()
+	if controller != null:
+		var player: Combatant = controller.get("player")
+		player.toll = _toll
+		var slash: CardData = await _deal(controller, SLASH_PATH)
+		var bide: CardData = await _deal(controller, BIDE_PATH)
+		controller.call("request_play", _view(controller, bide))
+		controller.call("toggle_choice", _view(controller, slash))
+		controller.call("cancel_choice")
+		await process_frame
+		_expect_eq(player.toll, _toll, "Cancelled: nothing spent")
+		_expect(not bool(controller.get("deck").call("has_keep", slash)), "...nothing kept")
+		_expect(_view(controller, bide) != null, "...Bide still in the hand")
+	await _teardown()
+	_completed += 1
+
+func _check_blocked() -> void:
+	var controller: Node = await _start_fight()
+	if controller != null:
+		var player: Combatant = controller.get("player")
+		player.toll = _toll - 1
+		await _deal(controller, SLASH_PATH)
+		var bide: CardData = await _deal(controller, BIDE_PATH)
+		_expect(not bool(controller.call("_is_playable", bide)), "On 3 Toll Bide can't be played")
+		_expect(not controller.get("_hand_container").call("_can_play", bide, player.energy), "...the hand fades it")
+	await _teardown()
+	_completed += 1
+
+func _card(path: String) -> CardData:
+	return (load(path) as CardData).duplicate()
 
 # --- Helpers ---
 

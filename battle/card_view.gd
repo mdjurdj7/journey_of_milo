@@ -101,8 +101,8 @@ const TOKEN_DRAW := "{draw}"
 # when Critical).
 const TOKEN_ENERGY := "{energy}"
 const TOKEN_BONUS_ENERGY := "{bonus_energy}"
-# How many cards a SET_ASIDE (Bide) sets aside - its value.
-const TOKEN_SET_ASIDE := "{set_aside}"
+# How many cards a GRANT_KEEP (Bide) gives Keep - its value.
+const TOKEN_KEEP := "{keep}"
 # The Toll a SPEND_TOLL spends - its toll_cost (Second Swing's 5).
 const TOKEN_TOLL_COST := "{toll_cost}"
 # The Energy owed next turn - the value of an effect applying an energy-
@@ -543,6 +543,8 @@ var _name_font_size: int = 0
 # clipped into it by the field.
 var _art_rule: Control = null
 var _hp_cost: int = 0
+# Keep on this card (set_kept()).
+var _kept: bool = false
 var _rest_offset_y: float = 0.0
 # How far down from this card's own local origin "at rest" actually sits -
 # pushed down by HandContainer.hand_rest_visible_height so only part of
@@ -579,6 +581,11 @@ const KEYWORD_HIT_PAD_PX := 2.0
 # What keyword_at() answers over the STRIKE type label, and the word its
 # reveal leads with.
 const STRIKE_LABEL_WORD := "STRIKE"
+# A card with Keep (Bide) says so ahead of its type - "KEEP · GUARD" - and
+# the word answers keyword_at() with this keyword (KeywordTable's Keep).
+const KEEP_LABEL_WORD := "KEEP"
+const KEEP_KEYWORD := "Keep"
+const TYPE_PREFIX_SEPARATOR := " · "
 
 func _ready() -> void:
 	size = card_size
@@ -653,7 +660,7 @@ func set_card_data(data: CardData) -> void:
 	art_rect.visible = data.art != null
 	glyph.visible = data.art == null
 	_refresh_dynamic_text()
-	type_label.text = _type_label_text(_keyline_type)
+	type_label.text = _type_prefix() + _type_label_text(_keyline_type)
 	_apply_type_style()
 	_apply_layout()
 	_apply_name_finish()
@@ -794,10 +801,10 @@ func _resolve_tokens(description: String) -> String:
 			if effect != null and effect.status_data != null and effect.status_data.energy_debt:
 				text = text.replace(TOKEN_DEBT, str(effect.value))
 				break
-	if text.contains(TOKEN_SET_ASIDE):
-		var set_aside: int = _effect_value(card_data, [CardEffect.EffectType.SET_ASIDE])
-		if set_aside >= 0:
-			text = text.replace(TOKEN_SET_ASIDE, str(set_aside))
+	if text.contains(TOKEN_KEEP):
+		var keep: int = _effect_value(card_data, [CardEffect.EffectType.GRANT_KEEP])
+		if keep >= 0:
+			text = text.replace(TOKEN_KEEP, str(keep))
 	if text.contains(TOKEN_HP_COST):
 		text = text.replace(TOKEN_HP_COST, str(_hp_cost))
 	if text.contains(TOKEN_HITS):
@@ -1426,28 +1433,62 @@ func get_hovered_keyword() -> String:
 	return _hovered_keyword
 
 # The bold keyword at `local_pos` (this card's own, unscaled pixels) -
-# or STRIKE_LABEL_WORD over a STRIKE card's type label - or "".
+# or STRIKE_LABEL_WORD over a STRIKE card's type label, Keep over a kept
+# card's KEEP - or "".
 func keyword_at(local_pos: Vector2) -> String:
 	for entry: Dictionary in keyword_rects():
 		var rect: Rect2 = entry["rect"]
 		if rect.has_point(local_pos):
 			return String(entry["keyword"])
+	if _kept and _type_part_rect(0, KEEP_LABEL_WORD.length()).has_point(local_pos):
+		return KEEP_KEYWORD
 	if strike_label_rect().has_point(local_pos):
 		return STRIKE_LABEL_WORD
 	return ""
 
-# The STRIKE type label's drawn text and the hit pad round it, in this
+# The STRIKE type label's drawn word and the hit pad round it, in this
 # card's own unscaled pixels - the label is centred across the card, so
-# only the word itself answers. Empty on any other type.
+# only the word itself answers, not a KEEP ahead of it. Empty on any
+# other type.
 func strike_label_rect() -> Rect2:
 	if card_data == null or _keyline_type != KeylineType.STRIKE or type_label == null:
+		return Rect2()
+	var start: int = _type_prefix().length()
+	return _type_part_rect(start, type_label.text.length() - start)
+
+# The span of the type label's text from character `from`, `count` long,
+# and the hit pad round it - the label centred across the card. Empty
+# with no label or font.
+func _type_part_rect(from: int, count: int) -> Rect2:
+	if type_label == null or count <= 0:
 		return Rect2()
 	var font: Font = type_label.get_theme_font("font")
 	if font == null:
 		return Rect2()
-	var width: float = font.get_string_size(type_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, type_label_font_size_px).x
-	var left: float = type_label.position.x + (type_label.size.x - width) / 2.0
+	var text: String = type_label.text
+	var whole: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, type_label_font_size_px).x
+	var before: float = font.get_string_size(text.left(from), HORIZONTAL_ALIGNMENT_LEFT, -1, type_label_font_size_px).x if from > 0 else 0.0
+	var width: float = font.get_string_size(text.substr(from, count), HORIZONTAL_ALIGNMENT_LEFT, -1, type_label_font_size_px).x
+	var left: float = type_label.position.x + (type_label.size.x - whole) / 2.0 + before
 	return Rect2(left, type_label.position.y, width, type_label.size.y).grow(KEYWORD_HIT_PAD_PX)
+
+# This card has Keep (Deck.has_keep() - pushed by HandContainer): "KEEP ·"
+# ahead of its type, answering keyword_at() as Keep.
+func set_kept(on: bool) -> void:
+	if on == _kept:
+		return
+	_kept = on
+	if card_data == null:
+		return
+	type_label.text = _type_prefix() + _type_label_text(_keyline_type)
+	_apply_layout()
+
+func is_kept() -> bool:
+	return _kept
+
+# What the type label leads with: "KEEP · " on a kept card, else "".
+func _type_prefix() -> String:
+	return KEEP_LABEL_WORD + TYPE_PREFIX_SEPARATOR if _kept else ""
 
 # Every bold keyword on the face and the rect it covers, in this card's
 # own unscaled pixels - [{"keyword": String, "rect": Rect2}], in text
