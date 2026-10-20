@@ -94,7 +94,8 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 # choice_row_centre_fraction of its height. TAKE ONE sits above the row
 # (baseline reward_header_gap above the cards' top edge), NONE OF THESE
 # below it (reward_decline_gap of clear space under the cards' bottom
-# edge - room for a hovered card's growth and its keyword's definition -
+# edge - room for a hovered card's growth and its keyword's definition:
+# 152 holds the longest, Not So's note, 5 lines on its slip, 12px clear -
 # dropping further only to clear the Wanderer, and never past twice that
 # gap - see _decline_top()), both centred on the row, both in the
 # tracked caps the loot window's choices use. While the choice is open
@@ -133,7 +134,7 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 	set(value):
 		reward_header_gap = value
 		_relayout_choice()
-@export var reward_decline_gap: float = 100.0:
+@export var reward_decline_gap: float = 152.0:
 	set(value):
 		reward_decline_gap = value
 		_relayout_choice()

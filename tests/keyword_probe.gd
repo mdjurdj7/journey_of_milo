@@ -420,6 +420,8 @@ func _check_reward_below() -> void:
 		_expect(absf(reveal.get_center().x - card_rect.get_center().x) <= 1.0, "Reward: centred on it")
 		_expect(Rect2(Vector2.ZERO, root.get_visible_rect().size).encloses(reveal), "Reward: on screen (%s)" % reveal)
 		_expect_slip(view, "Reward")
+		var decline: Rect2 = reward.call("_decline_rect")
+		_expect(reveal.end.y < decline.position.y, "Reward: Not So's slip ends above NONE OF THESE (slip %s, NONE OF THESE %s)" % [reveal, decline])
 	reward.queue_free()
 	await _frames(5)
 	_completed += 1
