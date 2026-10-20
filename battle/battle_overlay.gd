@@ -262,8 +262,6 @@ var _number_counts: Dictionary = {}
 # Target -> the sideways jitter its stack's first number drew - the rest of
 # the stack share it, so the step stays exact.
 var _stack_jitter: Dictionary = {}
-# A Toll blow's Toll as it landed, for its toll_changed; -1 = none.
-var _toll_blow_from: int = -1
 # The Wanderer, for his numbers' anchor (_screen_pos_for_damage_target()).
 var _wanderer: Wanderer = null
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
@@ -512,12 +510,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.player_hit_blocked.connect(_battle_feedback.on_player_hit_blocked)
 	# A card's play effect (Blood Arc's stroke) goes down before its hits
 	# report, over the enemies it can hit - and under their intent
-	# readouts, the lowest of whose bottom edges it is handed. And the
-	# heavy tier learns which card's hits these are (a Toll blow's floor).
+	# readouts, the lowest of whose bottom edges it is handed.
 	battle_controller.card_impact.connect(func(card: CardData) -> void:
-		_battle_feedback.set_impact_card(card)
-		# Its Toll before it's spent - the play's toll_changed follows.
-		_toll_blow_from = battle_controller.player.toll if BattleFeedback.is_toll_blow(card) else -1
 		_battle_feedback.on_card_impact(card, battle_controller.enemies, _lowest_intent_height()))
 
 	_deck_readout.bind_to_deck(battle_controller.deck, DeckPanel.Pile.DRAW)
@@ -782,14 +776,8 @@ func _refresh_cost_preview() -> void:
 
 func _on_toll_changed(new_toll: int) -> void:
 	# A gain counts up and shows its "+N" at the readout (HPBar.update_toll()).
-	# A Toll blow's spend pours into its hit: counted down, not snapped.
-	var drained_from: int = _toll_blow_from
-	_toll_blow_from = -1
-	if drained_from > new_toll:
-		_field_hp_bar.drain_toll(drained_from, new_toll)
-	else:
-		_field_hp_bar.update_toll(new_toll)
-	# Reckoning prints a number made of Toll.
+	_field_hp_bar.update_toll(new_toll)
+	# A TOLL_HEAL prints a number made of Toll.
 	hand_container.set_toll(new_toll)
 
 func _on_grace_changed(grace: int) -> void:

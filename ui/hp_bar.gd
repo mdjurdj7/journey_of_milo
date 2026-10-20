@@ -444,9 +444,6 @@ class_name HPBar
 		queue_redraw()
 @export var toll_pop_scale: float = 1.15
 @export var toll_pop_time: float = 0.22
-# A Toll blow's count down from the Toll it spent (drain_toll()), in real
-# seconds - it runs through the hit-stop.
-@export var toll_drain_time: float = 0.25
 # A gain's count up to the new Toll (update_toll()), in real seconds.
 @export var toll_count_time: float = 0.25
 # A gain's "+N" (update_toll()): ink in Spectral at toll_gain_size_px,
@@ -492,8 +489,7 @@ var _toll: int = 0
 var _toll_visible: bool = false
 var _toll_pop: float = 1.0
 var _pop_tween: Tween = null
-# The numeral counting - down for a Toll blow (drain_toll()), up for a gain
-# (update_toll()).
+# The numeral counting up for a gain (update_toll()).
 var _drain_tween: Tween = null
 # The Toll the numeral is counting to (or shows).
 var _toll_target: int = 0
@@ -1408,24 +1404,6 @@ func _show_toll_gain(gained: int) -> void:
 func _set_toll_gain_alpha(value: float) -> void:
 	_toll_gain_alpha = value
 	queue_redraw()
-
-# A Toll blow (Reckoning): the numeral counts down from `from`, the Toll
-# it spent, to `to`, what is left, over toll_drain_time - on real time,
-# so it pours on through the hit-stop its blow makes. Popped as it
-# starts, like any change. A later update_toll() cuts it short.
-func drain_toll(from: int, to: int) -> void:
-	if not _toll_visible:
-		return
-	if _drain_tween != null:
-		_drain_tween.kill()
-	_toll = maxi(from, 0)
-	_toll_target = maxi(to, 0)
-	_pop_toll()
-	_apply_layout()
-	_drain_tween = create_tween()
-	_drain_tween.set_pause_mode(Tween.TWEEN_PAUSE_PROCESS)
-	_drain_tween.set_ignore_time_scale(true)
-	_drain_tween.tween_method(_set_drained_toll, float(from), float(maxi(to, 0)), toll_drain_time)
 
 func _set_drained_toll(value: float) -> void:
 	var shown: int = roundi(value)

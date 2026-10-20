@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -141,7 +141,7 @@
       },
       {
         "name": "Toll",
-        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Leverage, Settled Account (5, for 5 block), Bide (4: up to 2 hand cards gain Keep), Countersign (7: a copy of a hand card), Not So (10: the last enemy attack undone and returned), and the three that turn it into time and actions: Second Swing (5: play the last Attack again), Come Due (5: 2 Energy now, 2 less next turn) and Deny (6: an enemy's next action a turn later); each card (or replay) that spends any of it brings every Sentence a turn closer. Collateral's HP makes it too."
+        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Leverage, Settled Account (5, for 5 block), Bide (4: up to 2 hand cards gain Keep), Countersign (7: a copy of a hand card), Not So (10: the last enemy attack undone and returned), and the three that turn it into time and actions: Second Swing (5: play the last Attack again), Come Due (5: 2 Energy now, 2 less next turn) and Deny (6: an enemy's next action a turn later); each card (or replay) that spends any of it brings every Sentence a turn closer. Reckoning deals what you've spent this fight, spending none. Collateral's HP makes it too."
       },
       {
         "name": "Grace",
@@ -1915,15 +1915,15 @@
       "face_type_label": "STRIKE",
       "energy_cost": 2,
       "rarity": "UNCOMMON",
-      "card_text": "Spend all Toll.\nDeal that much damage.",
+      "card_text": "Deal damage equal to the Toll you've spent this fight.\nSpent.",
       "face_hp_line": null,
-      "card_text_template": "Spend all Toll.\n{battle}Deal {toll} damage.{/battle}{outside}Deal that much damage.{/outside}",
+      "card_text_template": "{battle}Deal {toll_spent_damage} damage.{/battle}{outside}Deal damage equal to the Toll you've spent this fight.{/outside}\nSpent.",
       "targeting": "enemy",
-      "removal_after_play": "discard pile",
+      "removal_after_play": "Spent: leaves this fight's rotation once played",
       "effects": [
         {
-          "type": "TOLL_DAMAGE",
-          "plain_english": "Spend all Toll; deal that much damage to the target (plus the attack bonus)."
+          "type": "TOLL_SPENT_DAMAGE",
+          "plain_english": "Deal damage to the target equal to all the Toll spent this fight so far (Combatant.toll_spent_this_fight - by every card and every Second Swing replay, from the fight's start to this moment; not the Toll held, nothing from earlier fights), plus the attack bonus. Spends no Toll itself, so it brings no Sentence closer."
         }
       ],
       "keywords": [
@@ -1935,7 +1935,7 @@
       "draw": null,
       "energy_gain": null,
       "toll_gain": null,
-      "toll_spend": "all current Toll",
+      "toll_spend": null,
       "persistent_effect": null,
       "stance_effect": null,
       "power_effect": null,
@@ -1944,7 +1944,7 @@
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "Damage = all Toll held when it resolves (Toll made by Self-Eater's HP price on this same play counts), plus the attack bonus once, then damage modifiers.",
+          "rule": "In a battle hand the face reads the live blow - the Toll spent this fight, plus the attack bonus once, then damage modifiers ('Deal 23 damage.') - updating as Toll is spent; outside a fight it reads the rule. Toll made by Self-Eater's HP price is gained, not spent, so it adds nothing. A Second Swing replay deals the tally as it stands then, Second Swing's own 5 in it.",
           "default_displayed": 0
         },
         {
@@ -1962,7 +1962,12 @@
       "rules_font_px": 15,
       "battle_animation": "Slash",
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Reckoning+",
+        "file_path": "res://cards/tempered/reckoning_tempered.tres",
+        "card_text": "Deal damage equal to the Toll you've spent this fight.\nSpent.",
+        "changes": "Costs 1 Energy in place of 2; still Spent."
+      },
       "starting_deck_count": 0,
       "in_reward_pool": true,
       "in_belongings_pool": false,
@@ -2183,7 +2188,7 @@
       "effects": [
         {
           "type": "APPLY_STATUS_TO_TARGET",
-          "plain_english": "Put a Sentence on the target enemy: in 3 turns it takes 36 damage. It counts down 1 at the start of that enemy's own turn, and 1 for each card or replay you play that spends any Toll - once a card, whatever the amount; a Second Swing replaying a Toll-spending Attack counts twice; Settled Account on under 5 Toll none. At 0 it goes off at once, mid-turn if a spend got it there. Not an Attack - no attack bonus, Self-Eater or Bent Nail - and it goes through the enemy's modifiers (Covered/Exposed) and Block. Lost if the enemy dies first. Several on one enemy each count on their own."
+          "plain_english": "Put a Sentence on the target enemy: in 3 turns it takes 36 damage. It counts down 1 at the start of that enemy's own turn, and 1 for each card or replay you play that spends any Toll - once a card, whatever the amount; Settled Account on under 5 Toll none, Reckoning never. At 0 it goes off at once, mid-turn if a spend got it there. Not an Attack - no attack bonus, Self-Eater or Bent Nail - and it goes through the enemy's modifiers (Covered/Exposed) and Block. Lost if the enemy dies first. Several on one enemy each count on their own."
         }
       ],
       "keywords": [

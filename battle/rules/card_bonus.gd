@@ -128,9 +128,9 @@ static func state(card: CardData, ctx: EffectContext) -> State:
 # here, so the sound is lifted exactly when the face shows the clause live.
 #
 # The effects that end the count: every damage type (CardView.DAMAGE_
-# EFFECT_TYPES) and Reckoning's TOLL_DAMAGE.
+# EFFECT_TYPES) and Reckoning's TOLL_SPENT_DAMAGE.
 const HP_COST_STOPS: Array = [CardEffect.EffectType.DAMAGE, CardEffect.EffectType.FIRST_CARD_DAMAGE,
-	CardEffect.EffectType.DAMAGE_ALL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_DAMAGE]
+	CardEffect.EffectType.DAMAGE_ALL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_SPENT_DAMAGE]
 
 static func upfront_hp_cost(card: CardData, stance: Stance, replaced_hp: int) -> int:
 	if card == null:

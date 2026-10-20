@@ -74,6 +74,11 @@ var has_toll: bool = true
 # EffectContext.spend_toll(), cleared by BattleController._start_player_
 # turn(). Read by CardEffect.Condition.TOLL_SPENT_THIS_TURN (Gnaw).
 var toll_spent_this_turn: bool = false
+# Toll spent since this fight began, by any card, replay or effect - raised
+# by EffectContext.spend_toll() by what it actually spent. The player is
+# built afresh for each fight (BattleController.setup()), so it starts at
+# 0. Read by TOLL_SPENT_DAMAGE (Reckoning).
+var toll_spent_this_fight: int = 0
 # Cards played since this turn began, by tag (CardData.tags): tag ->
 # count. Counted at a play's commit (count_play() - BattleController.
 # _resolve_play()), cleared by BattleController._start_player_turn().

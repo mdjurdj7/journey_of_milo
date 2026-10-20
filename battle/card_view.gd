@@ -56,8 +56,9 @@ static var KEYWORDS: Array[String] = KeywordTable.shared().keywords()
 # normally and "Deal 12 damage." under two stacks of Self-Eater.
 #
 # Only for text whose number IS an effect value. Reckoning's "damage
-# equal to the amount consumed" has no fixed number to substitute and
-# stays prose - a token there would have to invent one.
+# equal to the Toll you've spent this fight" has no fixed number to
+# substitute and stays prose outside a fight - its {battle} half reads
+# the live blow ({toll_spent_damage}).
 #
 # {hp_cost} is the exception that reads across effects rather than from
 # one: it's the same sum the "-N HP" line shows (see _derive_hp_cost()),
@@ -86,7 +87,7 @@ const MARK_IF_CLOSE := "{/if}"
 const MARK_ELSE_OPEN := "{else}"
 const MARK_ELSE_CLOSE := "{/else}"
 # A card whose live number means nothing outside a fight (Reckoning's
-# Toll - 0 with no Toll held) says it two ways:
+# blow - the Toll spent this fight) says it two ways:
 # {battle}...{/battle} only in a battle hand (a bonus context), live;
 # {outside}...{/outside} everywhere else - the compendium, the deck view,
 # rewards, belongings - as the rule. Keep both on one line, so the line
@@ -140,10 +141,11 @@ const TOKEN_CHAIN_BONUS := "{chain_bonus}"
 const DAMAGE_EFFECT_TYPES: Array = [CardEffect.EffectType.DAMAGE, CardEffect.EffectType.FIRST_CARD_DAMAGE,
 	CardEffect.EffectType.DAMAGE_ALL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE]
 const BLOCK_EFFECT_TYPES: Array = [CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK]
-# The player's Toll right now - 0 outside a battle, which is also what a
-# card in the deck view shows. Reckoning spends all of it, so its printed
-# damage IS this number.
-const TOKEN_TOLL := "{toll}"
+# The blow a TOLL_SPENT_DAMAGE lands now (Reckoning): the Toll spent this
+# fight (Combatant.toll_spent_this_fight) plus the attack bonus, through
+# _landed() against the target - as toll_spent_damage_effect.gd will land
+# it. A battle hand's number only; outside a fight the card says its rule.
+const TOKEN_TOLL_SPENT_DAMAGE := "{toll_spent_damage}"
 # What a TOLL_HEAL would heal for at that Toll: half of whatever it can
 # actually spend, capped. No card carries a TOLL_HEAL at present.
 const TOKEN_TOLL_HEAL := "{toll_heal}"
@@ -854,8 +856,10 @@ func _resolve_tokens(description: String) -> String:
 	if text.contains(TOKEN_HITS):
 		var hits: int = _hit_count()
 		text = text.replace(TOKEN_HITS, " damage" if hits <= 1 else " ×%d" % hits)
-	if text.contains(TOKEN_TOLL):
-		text = text.replace(TOKEN_TOLL, str(_toll_token_value()))
+	if text.contains(TOKEN_TOLL_SPENT_DAMAGE):
+		var blow: int = _toll_spent_damage_preview()
+		if blow >= 0:
+			text = text.replace(TOKEN_TOLL_SPENT_DAMAGE, str(blow))
 	if text.contains(TOKEN_TOLL_HEAL):
 		text = text.replace(TOKEN_TOLL_HEAL, str(_toll_heal_preview()))
 	if text.contains(TOKEN_TOLL_BLOCK):
@@ -1805,8 +1809,8 @@ static func _underline_numbers(line: String, which: Array[int]) -> String:
 # --- Derivations from CardData ---
 
 # Strike / guard / toll / utility from what the card does. Every ATTACK
-# is a strike and every strike an ATTACK, whatever it spends (Reckoning
-# spends Toll): the label is where a reader learns which cards the
+# is a strike and every strike an ATTACK, whatever it reads (Reckoning
+# reads Toll spent): the label is where a reader learns which cards the
 # "your Attacks" effects touch (tests/starter_cards_probe.gd holds the
 # rule). Otherwise any Toll-mechanic effect makes a toll card, whatever
 # else it does, and SKILL splits on whether the card actually defends
@@ -1828,7 +1832,7 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 		match effect.effect_type:
 			# Not TOLL_BLOCK: a card that spends Toll only to add Block
 			# (Settled Account) reads as the Block it is - GUARD, below.
-			CardEffect.EffectType.TOLL_DAMAGE, CardEffect.EffectType.TOLL_RETALIATE, \
+			CardEffect.EffectType.TOLL_RETALIATE, \
 			CardEffect.EffectType.SELF_DAMAGE_TOLL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_FRACTION_DAMAGE_ALL, 			CardEffect.EffectType.TOLL_HEAL, CardEffect.EffectType.SPEND_TOLL:
 				return KeylineType.TOLL
 	# Read off card_type, not off the effect: a stance is a stance because
@@ -1925,22 +1929,19 @@ func _attack_bonus_for_half(conditional_half: bool) -> int:
 		break
 	return _attack_bonus_preview()
 
-# What {toll} prints. On a card that spends all Toll as damage
-# (Reckoning) it is that blow, as toll_damage_effect.gd will land it: the
-# Toll held, plus the Toll the card's own upfront HP will make (Self-
-# Eater's 2, paid first - never more than the HP there is to lose), plus
-# the attack bonus, through _landed() against the target. Anywhere else,
-# the Toll held.
-func _toll_token_value() -> int:
+# What {toll_spent_damage} prints - see TOKEN_TOLL_SPENT_DAMAGE. 0 spent
+# outside a battle hand. -1 with no such effect, which leaves the token
+# standing.
+func _toll_spent_damage_preview() -> int:
 	for effect in card_data.effects:
-		if effect == null or effect.effect_type != CardEffect.EffectType.TOLL_DAMAGE:
+		if effect == null or effect.effect_type != CardEffect.EffectType.TOLL_SPENT_DAMAGE:
 			continue
-		var made: int = _upfront_hp_cost()
+		var spent: int = 0
 		if _bonus_context != null and _bonus_context.player != null:
-			made = mini(made, _bonus_context.player.hp)
+			spent = _bonus_context.player.toll_spent_this_fight
 		var bonus: int = _attack_bonus_preview() if card_data.card_type == CardData.CardType.ATTACK else 0
-		return _landed(_toll + made + bonus, false)
-	return _toll
+		return _landed(spent + bonus, false)
+	return -1
 
 # The attack bonus this Attack would get if played now - AttackBonus, the
 # resolver's own sum, at the HP left after _upfront_hp_cost(). Outside a

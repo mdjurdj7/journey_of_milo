@@ -3,16 +3,15 @@ extends SceneTree
 # Headless probe for the heavy-hit tier and the hit-stop (BattleFeedback):
 # a 30-damage card hit is in the tier and a 5 isn't; the impact layer is
 # silent at the light end and heavy_impact_max_volume_db at the full one,
-# and deals its two takes in turn; a Toll blow (Reckoning) counts as at
-# least heavy_min_damage. The stop: 70 ms for a normal hit, 110 for one
+# and deals its two takes in turn - a hit's tier is its own damage. The
+# stop: 70 ms for a normal hit, 110 for one
 # of 15 or more or a kill, 40 for each hit of a multi-hit (a kill still
 # 110) and for a hit a block takes whole, none with hitstop_enabled off.
-# And presentation only: a real Reckoning on 30 Toll, played through
+# And presentation only: a real Reckoning on 30 Toll spent, played through
 # BattleController with the tier and the stop on and again with both
 # off, leaves the fight in the same state - on, it held the two fighters
 # (FieldEnemy.is_held(), Wanderer.is_animation_held()) and sounded the
-# layer, off it did neither; Engine.time_scale never moves; and the Toll
-# readout, drained, reads what is left.
+# layer, off it did neither; and Engine.time_scale never moves.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/heavy_hit_probe.gd
 #
@@ -21,14 +20,13 @@ extends SceneTree
 # only - untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 4
+const CASES := 3
 const FEEDBACK_PATH := "res://battle/battle_feedback.gd"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const RECKONING_PATH := "res://cards/data/reckoning.tres"
-const SLASH_PATH := "res://cards/data/slash.tres"
 const TAKE_PATHS: Array[String] = ["res://assets/audio/sfx/heavy_impact_01.mp3", "res://assets/audio/sfx/heavy_impact_02.mp3"]
-const TOLL := 30
+const SPENT := 30
 const PLAYER_HP := 40
 const ENEMY_HP := 999
 # Slack for frame timing, in milliseconds.
@@ -49,7 +47,6 @@ func _initialize() -> void:
 
 	_check_tier()
 	_check_takes_alternate()
-	_check_toll_blow_floor()
 	await _check_rules_unchanged()
 
 	if _completed != CASES:
@@ -106,19 +103,7 @@ func _check_takes_alternate() -> void:
 	feedback.free()
 	_completed += 1
 
-# Reckoning's blow counts as at least heavy_min_damage; a Slash's is its
-# own.
-func _check_toll_blow_floor() -> void:
-	var feedback: Node = _feedback()
-	feedback.call("set_impact_card", load(RECKONING_PATH))
-	_expect_eq(int(feedback.call("heavy_damage", 3)), 10, "A Reckoning for 3 counts as 10")
-	_expect_eq(int(feedback.call("heavy_damage", 27)), 27, "...one for 27 as 27")
-	feedback.call("set_impact_card", load(SLASH_PATH))
-	_expect_eq(int(feedback.call("heavy_damage", 3)), 3, "A Slash for 3 is 3")
-	feedback.free()
-	_completed += 1
-
-# The same Reckoning on 30 Toll, tier and stop on, then both off: the
+# The same Reckoning on 30 Toll spent, tier and stop on, then both off: the
 # same enemy HP, Toll, HP and Energy after. On: the enemy and the
 # Wanderer held, and the layer sounded; off: none of it. The world's
 # time scale untouched throughout.
@@ -126,19 +111,18 @@ func _check_rules_unchanged() -> void:
 	var on: Dictionary = await _reckoning_fight(true)
 	var off: Dictionary = await _reckoning_fight(false)
 	_expect_eq(on.get("state"), off.get("state"), "Reckoning's outcome is the same with the tier on and off")
-	_expect(int((on.get("state", [0]) as Array)[0]) == ENEMY_HP - TOLL, "...30 dealt (%s)" % str(on.get("state")))
+	_expect(int((on.get("state", [0]) as Array)[0]) == ENEMY_HP - SPENT, "...30 dealt (%s)" % str(on.get("state")))
 	_expect(bool(on.get("enemy_held", false)) and bool(on.get("wanderer_held", false)), "On: the enemy and the Wanderer held (%s / %s)" % [str(on.get("enemy_held")), str(on.get("wanderer_held"))])
 	_expect(int(on.get("held_ms", 0)) >= 110 - SLACK_MS, "...for the big hit's stop (%d ms)" % int(on.get("held_ms", 0)))
 	_expect(bool(on.get("layer", false)), "...and the impact layer sounded")
 	_expect(not bool(off.get("enemy_held", true)) and not bool(off.get("wanderer_held", true)), "Off: no hold")
 	_expect(not bool(off.get("layer", true)), "...and no layer")
 	_expect(is_equal_approx(float(on.get("slowest", 0.0)), 1.0) and is_equal_approx(float(off.get("slowest", 0.0)), 1.0), "The world's time scale never moves (%.2f / %.2f)" % [float(on.get("slowest", 0.0)), float(off.get("slowest", 0.0))])
-	_expect(int(on.get("toll_shown", -1)) == 0 and int(off.get("toll_shown", -1)) == 0, "The Toll readout has drained to 0 (%s / %s)" % [str(on.get("toll_shown")), str(off.get("toll_shown"))])
 	_completed += 1
 
-# One fight: Reckoning on TOLL at the first enemy, the tier and the stop
-# `enabled`. Returns {state: [enemy HP, Toll, HP, Energy], toll_shown: the
-# Toll readout's numeral after, slowest: the lowest time_scale seen while
+# One fight: Reckoning on SPENT at the first enemy, the tier and the stop
+# `enabled`. Returns {state: [enemy HP, Toll, HP, Energy], slowest: the
+# lowest time_scale seen while
 # it resolved, enemy_held / wanderer_held: whether each was ever held,
 # held_ms: the enemy's longest hold (game ms), layer: whether
 # HeavyImpactAudio played a take}.
@@ -151,7 +135,7 @@ func _reckoning_fight(enabled: bool) -> Dictionary:
 		feedback.set("hitstop_enabled", enabled)
 		var wanderer: Node = _field.get_node("Wanderer")
 		var player: Combatant = controller.get("player")
-		player.toll = TOLL
+		player.toll_spent_this_fight = SPENT
 		var card: CardData = (load(RECKONING_PATH) as CardData).duplicate()
 		var deck: Object = controller.get("deck")
 		(deck.get("draw_pile") as Array).append(card)
@@ -185,14 +169,10 @@ func _reckoning_fight(enabled: bool) -> Dictionary:
 					held_from = -1
 				if not bool(controller.get("_input_locked")) and not held_now:
 					break
-			# The Toll readout's drain runs on real time; let it finish.
-			await create_timer(0.5, true, false, true).timeout
 		var layer: Node = enemy.get_node_or_null("HeavyImpactAudio")
 		var combatant: Combatant = (controller.get("_combatants") as Dictionary).values()[0]
-		var bar: Object = controller.get_parent().get("_field_hp_bar")
 		out = {
 			"state": [combatant.hp, player.toll, player.hp, player.energy],
-			"toll_shown": int(bar.get("_toll")) if bar != null else -1,
 			"slowest": slowest,
 			"enemy_held": enemy_held,
 			"wanderer_held": wanderer_held,

@@ -383,25 +383,26 @@ func _check_preview() -> void:
 	_expect_eq(AttackBonus.for_player(player, 21), 0, "No bonus with nothing held")
 	_completed += 1
 
-# Reckoning is an Attack: the attack bonus lands on it once, and Self-
-# Eater's HP is paid - and made into Toll - before the Toll is spent.
+# Reckoning is an Attack: the attack bonus lands on it once, on top of
+# the Toll spent this fight. Self-Eater's HP price makes Toll but spends
+# none, so it adds nothing to the tally.
 func _check_reckoning() -> void:
 	var card: CardData = _card("reckoning")
 	var player: Combatant = _player(50)
 	_play(_card("self_eater"), player, null)
-	player.toll = 5
-	_expect_eq(_deal(card, player), 10, "Reckoning under Self-Eater: 5 Toll + 2 made + 3")
+	player.toll_spent_this_fight = 5
+	_expect_eq(_deal(card, player), 8, "Reckoning under Self-Eater: 5 spent + 3")
 	_expect_eq(player.hp, 48, "Self-Eater's price paid")
-	_expect_eq(player.toll, 0, "Reckoning spends all of it")
-	_expect_eq(_deal(card, player), 5, "Reckoning at 0 Toll: 2 made + 3")
+	_expect_eq(player.toll_spent_this_fight, 5, "...the tally untouched: the price made Toll, spent none")
+	player.toll_spent_this_fight = 0
+	_expect_eq(_deal(card, player), 3, "Reckoning with nothing spent: the 3 alone")
 
 	player = _player(20)
 	_play(_card("last_resort"), player, null)
-	player.toll = 4
+	player.toll_spent_this_fight = 4
 	_expect_eq(_deal(card, player), 10, "Reckoning at Critical: 4 + 6")
-	player.toll = 4
 	player.hp = 40
-	_expect_eq(_deal(card, player), 4, "Reckoning above the line: Toll only")
+	_expect_eq(_deal(card, player), 4, "Reckoning above the line: the tally only")
 	_completed += 1
 
 # What the faces print. Each half of a Critical card is read in its own
@@ -432,9 +433,9 @@ func _check_faces() -> void:
 
 	player = _player(50)
 	_play(_card("self_eater"), player, null)
-	player.toll = 5
+	player.toll_spent_this_fight = 5
 	face = await _face("reckoning", player)
-	_expect(face.contains("Deal 10 damage"), "Reckoning's face under Self-Eater: " + face)
+	_expect(face.contains("Deal 8 damage"), "Reckoning's face under Self-Eater: 5 spent + 3: " + face)
 
 	player.hp = 21
 	face = await _face("cornered", player)

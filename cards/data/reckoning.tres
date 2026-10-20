@@ -5,9 +5,9 @@
 [ext_resource type="Texture2D" uid="uid://c8b8ykxx7hyu5" path="res://cards/art/Wanderer/Reckoning.png" id="9_art"]
 [ext_resource type="Resource" path="res://cards/tempered/reckoning_tempered.tres" id="10_tempered"]
 
-[sub_resource type="Resource" id="CardEffect_toll_damage"]
+[sub_resource type="Resource" id="CardEffect_toll_spent_damage"]
 script = ExtResource("2_card_effect")
-effect_type = 5
+effect_type = 29
 
 [resource]
 script = ExtResource("1_card_data")
@@ -16,9 +16,10 @@ rarity = 2
 cost = 2
 card_type = 0
 target_type = 0
-description = "Spend all Toll.
-{battle}Deal {toll} damage.{/battle}{outside}Deal that much damage.{/outside}"
-effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_toll_damage")])
+description = "{battle}Deal {toll_spent_damage} damage.{/battle}{outside}Deal damage equal to the Toll you've spent this fight.{/outside}
+Spent."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_toll_spent_damage")])
+removal_scope = 1
 battle_animation = &"Slash"
 art = ExtResource("9_art")
 tempered = ExtResource("10_tempered")

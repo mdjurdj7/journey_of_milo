@@ -24,7 +24,7 @@ const CASES := 10
 const MAX_HP := 70
 const CARD_PATH := "res://cards/data/settled_account.tres"
 const TEMPERED_PATH := "res://cards/tempered/settled_account_tempered.tres"
-const RECKONING_PATH := "res://cards/data/reckoning.tres"
+const COME_DUE_PATH := "res://cards/data/come_due.tres"
 const LAST_RESORT_PATH := "res://cards/data/last_resort.tres"
 const WANDERER_POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const COLLECTOR_POOL_PATH := "res://cards/pools/collector_pool.tres"
@@ -148,15 +148,15 @@ func _check_more_held() -> void:
 	_expect_eq(player.toll, 7, "...7 left")
 	_completed += 1
 
-# Toll spent earlier this turn no longer counts: Reckoning took it all, so
-# there is nothing to spend.
+# Toll spent earlier this turn doesn't matter: Come Due spends 5 of 10,
+# and the 5 left still pay.
 func _check_earlier_spend() -> void:
 	var player: Combatant = _player()
-	player.toll = 20
-	_play_card(load(RECKONING_PATH), player, Combatant.new(100))
-	_expect(player.toll == 0 and player.toll_spent_this_turn, "Reckoning spends all 20")
+	player.toll = _spend * 2
+	_play_card(load(COME_DUE_PATH), player, null)
+	_expect(player.toll == _spend and player.toll_spent_this_turn, "Come Due spends 5 of 10")
 	_play(player)
-	_expect_eq(player.block, _base, "...then %d block, no more" % _base)
+	_expect_eq(player.block, _base + _more, "...then %d block: the 5 left pay" % (_base + _more))
 	_completed += 1
 
 # Last Resort refuses Block from any card - and with no Block to buy, the
