@@ -118,8 +118,10 @@
   third instance exists.
 - Audio follows 04_FIELD_ASSET_SPEC §4: WAV or MP3 are both fine - don't
   flag the format. Do flag level (not −6 dBFS peak), trim (more than a
-  few ms before the first transient) and channels (stereo for a
-  positional sound).
+  few ms before the first transient) and, for a positional sound only
+  (played from a body in the world), stereo - it should be mono. A
+  non-positional sound (UI, cards, music) may be mono or stereo; don't
+  flag its channels.
 
 ## GDScript strictness
 - The project treats inferred-Variant as an error. Never write `:=`
