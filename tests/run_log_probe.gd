@@ -31,8 +31,9 @@ extends SceneTree
 # advanced by each spend (Second Swing, Come Due, Deny) until it goes off
 # on the third. Then Bide
 # keeps a Slash and Countersign copies it: keep, copy and - the copy left
-# unplayed - copy_end "vanished" at the turn's end. Last, Not So undoes an
-# attack put on the player's record: the undo line.
+# unplayed - copy_end "vanished" at the turn's end. Then Take In devours
+# the Slash: the devour_keyword line. Last, Not So undoes an attack put on
+# the player's record: the undo line.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/run_log_probe.gd
 #
@@ -58,6 +59,7 @@ const SENTENCE_PATH := "res://cards/data/sentence.tres"
 const BIDE_PATH := "res://cards/data/bide.tres"
 const COUNTERSIGN_PATH := "res://cards/data/countersign.tres"
 const NOT_SO_PATH := "res://cards/data/not_so.tres"
+const TAKE_IN_PATH := "res://cards/data/take_in.tres"
 const GLOBAL_SEED := 20261004
 const RUN_SEED := 4242
 const MAX_TURNS := 12
@@ -256,6 +258,8 @@ func _toll_package_run() -> void:
 	player.toll = 7
 	await _choose(controller, await _deal(controller, COUNTERSIGN_PATH), slash)
 	await ProbePlay.settle(self, controller)
+	await _choose(controller, await _deal(controller, TAKE_IN_PATH), slash)
+	await ProbePlay.settle(self, controller)
 	var turn: int = int(controller.get("_player_turn"))
 	controller.call("end_turn")
 	await ProbePlay.wait_until(self, func() -> bool: return int(controller.get("_player_turn")) > turn and ProbePlay.is_settled(controller), 20.0)
@@ -315,6 +319,8 @@ func _toll_package_run() -> void:
 	_expect_eq(str((kinds.get("copy", {}) as Dictionary).get("card", "")), "Slash", "A copy line: Countersign copied Slash")
 	var copy_end: Dictionary = kinds.get("copy_end", {})
 	_expect_eq([str(copy_end.get("card", "")), str(copy_end.get("outcome", ""))], ["Slash", "vanished"], "...and the copy, unplayed, vanished at the turn's end")
+	var devoured: Dictionary = _first(lines, "devour_keyword")
+	_expect_eq([str(devoured.get("card", "")), str(devoured.get("yield", "")), int(devoured.get("amount", -1))], ["Slash", "attack", 2], "A devour_keyword line: Take In ate Slash, an attack yield of 2")
 	var undo: Dictionary = kinds.get("undo", {})
 	_expect_eq([str(undo.get("attack", "")), int(undo.get("restored", 0)), int(undo.get("dealt", 0)), undo.get("grace_closed", true)], ["Probe Hit", 6, 6, false], "An undo line: Probe Hit, 6 restored, 6 dealt back, no Grace closed")
 	_expect(not str(undo.get("enemy", "")).is_empty(), "...naming its enemy (%s)" % str(undo))

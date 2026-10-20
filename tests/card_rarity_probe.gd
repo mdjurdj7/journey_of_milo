@@ -82,6 +82,7 @@ const EXPECTED_RARITY: Dictionary = {
 	"Ransom": CardData.CardRarity.RARE,
 	"Claw Back": CardData.CardRarity.RARE,
 	"Not So": CardData.CardRarity.RARE,
+	"Take In": CardData.CardRarity.UNCOMMON,
 	"Gnaw": CardData.CardRarity.COMMON,
 	"Settled Account": CardData.CardRarity.COMMON,
 	"Left Hand": CardData.CardRarity.COMMON,
