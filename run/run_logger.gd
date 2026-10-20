@@ -101,9 +101,14 @@ class_name RunLogger
 # damage "dealt" back to that enemy, and whether its Grace share closed
 # ("grace_closed").
 
+# Format 11 (2026-10-19): the Samurai's skillchains. Mechanic line
+# "skillchain": the "link" fired ("Parry", "Recover", "Lunge"), the chain
+# "level" it fired at, the "card" whose play fired it, and whether it
+# "fizzled" (a Lunge with its target already down).
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 10
+const FORMAT_VERSION := 11
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]
@@ -445,7 +450,7 @@ static func turn_ended(energy: int) -> void:
 # threshold_queued, threshold_resolved, escalation, queued_state,
 # keepsake_double, keepsake_draw, keepsake_block_carry, replay,
 # energy_debt, delay, sentence_advance, sentence_resolved, keep, copy,
-# copy_end, undo.
+# copy_end, undo, skillchain.
 static func mechanic(kind: String, data: Dictionary) -> void:
 	if not _fight_open:
 		return

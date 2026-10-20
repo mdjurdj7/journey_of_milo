@@ -94,6 +94,17 @@ enum GraceCapMode { LARGEST_HIT, SUM }
 # this) (RunState.carry_toll()). In a fight Toll runs free.
 @export var toll_carry_cap: int = 5
 
+# --- Skillchains, the Samurai's ---
+#
+# What a chain link pays (Skillchain), after the card's own effects: Parry
+# (Advance -> Hold) Block per chain level, Recover (Hold -> Withdraw) a
+# draw, Lunge (Withdraw -> Advance) damage per chain level to the card's
+# target. Only cards with a chain property (CardData.chain_property) ever
+# step a chain, so a class without them never sees these.
+@export var parry_block_per_level: int = 3
+@export var recover_draw: int = 1
+@export var lunge_damage_per_level: int = 3
+
 # --- Field model ---
 #
 # The body the Wanderer node wears on the field (Wanderer._ready()) - every

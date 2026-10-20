@@ -352,6 +352,9 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	player.grace_window_turns = RunState.character.grace_window_turns
 	player.grace_open_fraction = RunState.character.grace_open_fraction
 	player.critical_hp_fraction = RunState.character.critical_hp_fraction
+	player.parry_block_per_level = RunState.character.parry_block_per_level
+	player.recover_draw = RunState.character.recover_draw
+	player.lunge_damage_per_level = RunState.character.lunge_damage_per_level
 	player.energy = player.max_energy
 	# Nothing lost in this fight yet (RunState.hp_lost_this_combat).
 	RunState.begin_combat()
@@ -1045,6 +1048,8 @@ func _finish_turn(keep: Array[CardData]) -> void:
 	# it, before the enemy turn - the readout never claims "this turn" for
 	# the enemy's.
 	Status.remove_at_turn_end(player.statuses)
+	# The chain is the turn's: gone before the enemies act.
+	Skillchain.reset(player)
 	status_changed.emit()
 	if discard_fade > 0.0:
 		await get_tree().create_timer(discard_fade).timeout
@@ -1121,6 +1126,11 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	# own context carries the count from before it (below).
 	cards_played_this_turn += 1
 	player.count_play(card)
+	# The chain steps at commit too: a Burst card reads the level from
+	# before it, and the link's skillchain fires after the card's effects.
+	var chain_before: int = player.chain_level
+	var skillchain: StringName = Skillchain.step(player, card)
+	var skillchain_level: int = player.chain_level
 	if card.battle_copy:
 		RunLogger.mechanic("copy_end", {"card": card.card_name, "outcome": "played"})
 	# The last Attack, for Second Swing - a real play only, never a replay.
@@ -1173,6 +1183,9 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	var ctx: EffectContext = _card_context(target_enemy, target_mound)
 	ctx.cards_played_before_this = cards_played_this_turn - 1
 	ctx.tagged_plays_before_this = _tagged_plays_before(card)
+	ctx.chain_level_before_this = chain_before
+	ctx.skillchain = skillchain
+	ctx.skillchain_level = skillchain_level
 	ctx.replaced_cost_hp = replaced_hp
 	if replaced_hp > 0 and collateral != null and collateral.data != null:
 		ctx.replaced_cost_source = "status:" + collateral.data.id
@@ -2391,6 +2404,7 @@ func _start_player_turn() -> void:
 	player.damage_taken_this_turn = 0
 	player.toll_spent_this_turn = false
 	player.tagged_plays_this_turn.clear()
+	Skillchain.reset(player)
 	player.clear_last_attack()
 	_last_attack_enemy = null
 	_last_attack_mound = -1

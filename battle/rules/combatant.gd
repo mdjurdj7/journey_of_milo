@@ -79,6 +79,19 @@ var toll_spent_this_turn: bool = false
 # _resolve_play()), cleared by BattleController._start_player_turn().
 # Read through EffectContext.tagged_plays_before_this (Lash's repeats).
 var tagged_plays_this_turn: Dictionary = {}
+# The chain this turn (Skillchain): its level, the last chained card's
+# property (NONE: no chain), and the last skillchain this chain fired
+# (&"" once it breaks). Stepped at a
+# play's commit (Skillchain.step()), cleared as a turn ends and begins
+# (Skillchain.reset()).
+var chain_level: int = 0
+var chain_property: CardData.ChainProperty = CardData.ChainProperty.NONE
+var last_skillchain: StringName = &""
+# What the skillchains pay (Skillchain.payoff()) - CharacterData's,
+# copied by BattleController.setup(). 0 on every enemy.
+var parry_block_per_level: int = 0
+var recover_draw: int = 0
+var lunge_damage_per_level: int = 0
 # The last Attack card played this turn, what it was played at (null for
 # an all-enemies one) and whether it hit every enemy - what Second Swing
 # plays again (ReplayLastAttackEffect). Set at a play's commit (record_

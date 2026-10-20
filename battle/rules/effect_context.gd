@@ -39,6 +39,11 @@ var tagged_plays_before_this: Dictionary = {}
 # card reads (CardEffect.bonus_per_chain_level). For a preview of a card
 # still in hand it is the level now. 0 with no chain.
 var chain_level_before_this: int = 0
+# The skillchain this card's play fired (Skillchain.step() at commit) and
+# the chain level it fired at - resolved after the card's own effects
+# (EffectResolver.resolve_card()). &"": none, and on any replay.
+var skillchain: StringName = &""
+var skillchain_level: int = 0
 # Called with the amount reclaimed, so battle_controller.gd can mirror it
 # onto RunState and tell the readouts. Grace itself is spent here, in the
 # rules, the same way damage is dealt here and only REPORTED outward.

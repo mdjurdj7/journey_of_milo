@@ -121,6 +121,12 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 		RunLogger.push_source(Status.attacks_drain_source(ctx.player.statuses))
 		ctx.heal(floori(float(ctx.hp_dealt_this_card) * Status.attacks_drain_fraction(ctx.player.statuses)))
 		RunLogger.pop_source()
+	# The skillchain the play's chain link fired (Skillchain), after the
+	# card's own effects and what waits on an Attack's blows: a Lunge is
+	# no Attack's blow, so it takes no attack bonus and nothing an Attack
+	# spends or Drains.
+	if ctx.skillchain != &"" and not ctx.is_replay:
+		_fire_skillchain(card, ctx)
 	# After the whole card: its own HP cost (self-damage, the stance's
 	# price) may have made the player Critical, and a status waiting for
 	# that (No Further) gives way now - as does one this card just applied
@@ -214,6 +220,23 @@ static func card_blocked(card: CardData, player: Combatant) -> bool:
 		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS and effect.status_data != null and effect.status_data.blocks_reapply_while_held and Status.find_in(player.statuses, effect.status_data) != null:
 			return true
 	return false
+
+# ctx.skillchain at ctx.skillchain_level, through the effect script its
+# payoff names - so its Block, draw and damage report as a card's do. A
+# Lunge whose target is down (the card's own blow killed it) fizzles.
+func _fire_skillchain(card: CardData, ctx: EffectContext) -> void:
+	var effect: CardEffect = Skillchain.payoff(ctx.skillchain, ctx.skillchain_level, ctx.player)
+	var fizzled: bool = effect == null or (ctx.skillchain == Skillchain.LUNGE and not Skillchain.target_standing(ctx.target))
+	RunLogger.mechanic("skillchain", {"link": String(ctx.skillchain), "level": ctx.skillchain_level, "card": card.card_name, "fizzled": fizzled})
+	if fizzled:
+		return
+	var was_attack: bool = ctx.card_is_attack
+	ctx.card_is_attack = false
+	var resolver: Object = _get_resolver(effect.effect_type)
+	if resolver != null:
+		resolver.resolve(effect, ctx)
+	ctx.card_is_attack = was_attack
+	ctx.resolve_pending_drain()
 
 func _get_resolver(effect_type: CardEffect.EffectType) -> Object:
 	if _cache.has(effect_type):
