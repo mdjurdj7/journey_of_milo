@@ -637,6 +637,8 @@ func preview_context() -> EffectContext:
 	ctx.deck = deck
 	ctx.cards_played_before_this = cards_played_this_turn
 	ctx.tagged_plays_before_this = player.tagged_plays_this_turn.duplicate()
+	# The chain as it stands: what a Burst card in hand would read played now.
+	ctx.chain_level_before_this = player.chain_level
 	if ctx.enemies.size() == 1:
 		ctx.target = ctx.enemies[0]
 	return ctx

@@ -18,9 +18,13 @@ extends SceneTree
 #             nothing
 #   burst   - a Burst card reads the level from before it was played, and
 #             its own lack of property ends the chain
+#   face    - that card's face in a battle hand prints its damage at the
+#             chain level now (5, 9, 13 at levels 0, 1, 2); outside a
+#             fight its rule prints the per-level number ({chain_bonus})
 #   turn    - in a fight: a play's commit steps the chain and fires its
-#             link; the chain is gone once the turn ends, before the
-#             enemies act, and at the next turn's start
+#             link, and the hand's context carries the new level; the
+#             chain is gone once the turn ends, before the enemies act,
+#             and at the next turn's start
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/skillchain_probe.gd
 #
@@ -28,9 +32,12 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 8
+const CASES := 9
 const SAMURAI_PATH := "res://run/data/samurai.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
+const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
+# The test Burst card's rules: the live number in a fight, the rule outside.
+const BURST_TEXT := "{battle}Deal {damage} damage.{/battle}{outside}Deal {damage} damage, plus {chain_bonus} per chain level.{/outside}"
 const PLAYER_HP := 999
 const ENEMY_HP := 100
 const CARD_DAMAGE := 6
@@ -61,6 +68,7 @@ func _initialize() -> void:
 	_check_lunge()
 	_check_fizzle()
 	_check_burst()
+	await _check_face()
 	await _check_turn()
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
@@ -174,14 +182,7 @@ func _check_fizzle() -> void:
 func _check_burst() -> void:
 	var player: Combatant = _player()
 	_chain_at(player, CardData.ChainProperty.HOLD, 2)
-	var card := CardData.new()
-	card.card_name = "Probe Burst"
-	card.card_type = CardData.CardType.ATTACK
-	card.target_type = CardData.TargetType.ENEMY
-	card.burst = true
-	var hit: CardEffect = _effect(CardEffect.EffectType.DAMAGE, BURST_DAMAGE)
-	hit.bonus_per_chain_level = BURST_PER_LEVEL
-	card.effects = [hit] as Array[CardEffect]
+	var card: CardData = _burst_card()
 	var enemy := Combatant.new(ENEMY_HP)
 	var hits: Array[int] = []
 	var ctx: EffectContext = _ctx(player, [enemy])
@@ -191,6 +192,29 @@ func _check_burst() -> void:
 	_expect_eq(hits, [expected] as Array[int], "A Burst card at level 2 deals %d + %d x 2" % [BURST_DAMAGE, BURST_PER_LEVEL])
 	_expect_eq(link, &"", "...fires no link")
 	_expect_eq(player.chain_level, 0, "...and, with no property, ends the chain")
+	_completed += 1
+
+func _check_face() -> void:
+	var outside: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
+	root.add_child(outside)
+	await process_frame
+	outside.set_card_data(_burst_card())
+	var rule: String = "Deal %d damage, plus %d per chain level." % [BURST_DAMAGE, BURST_PER_LEVEL]
+	_expect_eq(outside.rules_text.get_parsed_text(), rule, "Outside a fight the face says the rule")
+	outside.free()
+	var player: Combatant = _player()
+	var enemy := Combatant.new(ENEMY_HP)
+	for level in [0, 1, 2]:
+		var hand: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
+		root.add_child(hand)
+		await process_frame
+		var ctx: EffectContext = _ctx(player, [enemy])
+		ctx.chain_level_before_this = level
+		hand.set_bonus_context(ctx)
+		hand.set_card_data(_burst_card())
+		var live: String = "Deal %d damage." % (BURST_DAMAGE + BURST_PER_LEVEL * level)
+		_expect_eq(hand.rules_text.get_parsed_text(), live, "In a battle hand at chain level %d" % level)
+		hand.free()
 	_completed += 1
 
 # A fight as her on floor 1 with a hand of test cards: an Advance and four
@@ -218,6 +242,8 @@ func _check_turn() -> void:
 	_expect_eq(player.chain_level, 1, "A play's commit steps the chain: level 1")
 	_expect_eq(player.last_skillchain, Skillchain.PARRY, "...Parry fired")
 	_expect_eq(player.block - block_before, CARD_BLOCK + _samurai.parry_block_per_level, "...its Block after the card's")
+	var preview: EffectContext = controller.call("preview_context")
+	_expect_eq(preview.chain_level_before_this, 1, "...and the hand reads the chain at level 1")
 
 	controller.call("end_turn")
 	var enemies_acting: bool = await ProbePlay.wait_until(self, func() -> bool: return bool(controller.get("_enemy_phase")), 10.0)
@@ -319,6 +345,19 @@ func _block_card(property: CardData.ChainProperty) -> CardData:
 	var card: CardData = _skill(property)
 	card.card_name = "Probe Guard"
 	card.effects = [_effect(CardEffect.EffectType.BLOCK, CARD_BLOCK)] as Array[CardEffect]
+	return card
+
+# Like Severance: no property, Burst, 5 damage and 4 more per chain level.
+func _burst_card() -> CardData:
+	var card := CardData.new()
+	card.card_name = "Probe Burst"
+	card.card_type = CardData.CardType.ATTACK
+	card.target_type = CardData.TargetType.ENEMY
+	card.burst = true
+	card.description = BURST_TEXT
+	var hit: CardEffect = _effect(CardEffect.EffectType.DAMAGE, BURST_DAMAGE)
+	hit.bonus_per_chain_level = BURST_PER_LEVEL
+	card.effects = [hit] as Array[CardEffect]
 	return card
 
 func _attack(property: CardData.ChainProperty) -> CardData:
