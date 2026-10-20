@@ -4,7 +4,8 @@ class_name Traveller
 # Someone glimpsed on arrival (FloorData.traveller_glimpse): already walking
 # away up the floor, his whole body in frame just under its top edge, as
 # the floor fades in - and out through that edge before the player can
-# follow (the glimpse's own arrival hold outlasts him).
+# follow (the glimpse's arrival hold lasts until he has left the frame -
+# left_frame).
 # RegionField spawns one at load the first time a run stands on a floor
 # that has a glimpse (has_glimpsed()/mark_glimpsed(), cleared by
 # RunState.new_run()) - when the glimpse's chance comes up, and never two
@@ -26,6 +27,10 @@ class_name Traveller
 # shown or not - a static set like Hull._findings_shown, so a floor stood
 # on again shows no one and never rolls again.
 static var _glimpsed: Dictionary = {}
+
+# He is wholly outside the camera's frustum and about to be freed - what
+# RegionField's arrival hold waits for on the visit that shows him.
+signal left_frame
 # Whether this run, and the run before it, showed anyone - the chance
 # (TravellerGlimpse.chance_per_run) never comes up two runs in a row.
 # Only within the session: nothing persists between sessions.
@@ -145,6 +150,7 @@ func _physics_process(delta: float) -> void:
 			_advance(maxf(_glimpse.speed, 0.0) * delta)
 	_place()
 	if _frames > 2 and _out_of_frame():
+		left_frame.emit()
 		queue_free()
 
 func _advance(metres: float) -> void:

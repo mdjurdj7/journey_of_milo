@@ -237,6 +237,18 @@ enum ExitKind { CHANNEL, LINE }
 # them, which is what every floor did before floor 2 grew an alcove.
 @export var gate_channel_max_width: float = 0.0
 
+@export_group("Arrival")
+# The arrival hold (RegionField.is_arrival_held()): from the moment the
+# floor loads - the fade-in runs through it - the player's input stays
+# locked this long while the world runs on. After a zone intro it counts
+# from the intro's end. The visit that shows the floor's glimpse holds
+# until the traveller has left the frame instead (TravellerGlimpse).
+# Read live.
+@export var arrival_hold_seconds: float = 0.5:
+	set(value):
+		arrival_hold_seconds = maxf(value, 0.0)
+		emit_changed()
+
 @export_group("Glimpse")
 # Someone walking away ahead of him as the floor fades in, the first time
 # a run stands on it (TravellerGlimpse, Traveller). Null (the default) =

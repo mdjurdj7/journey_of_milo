@@ -23,9 +23,10 @@ class_name TravellerGlimpse
 # the first frame.
 @export var start_delay: float = 0.0
 # The arrival hold on the visit that shows him: the player's control
-# returns this long after he is removed (out of frame) - never before
-# RegionField.arrival_hold_seconds. Read live.
-@export var release_after_removal_seconds: float = 0.3
+# returns this long after he leaves the frame (Traveller.left_frame) - in
+# place of the floor's FloorData.arrival_hold_seconds. 0 = the moment he
+# is gone. Read live.
+@export var release_after_removal_seconds: float = 0.0
 # Seconds of hold at most, however long he takes - a traveller who never
 # leaves the frame can't keep the player locked. Read live.
 @export var hold_cap_seconds: float = 6.0

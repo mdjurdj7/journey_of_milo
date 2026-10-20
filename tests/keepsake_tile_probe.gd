@@ -175,7 +175,7 @@ func _check_hud() -> void:
 	root.add_child(_field)
 	for i in 3:
 		await process_frame
-	# The arrival hold swallows presses at first (RegionField.
+	# The arrival hold swallows presses at first (FloorData.
 	# arrival_hold_seconds).
 	while bool(_field.call("is_arrival_held")):
 		await process_frame
