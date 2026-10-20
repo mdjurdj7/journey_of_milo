@@ -59,6 +59,8 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	ctx.toll_spent_this_card = false
 	ctx.hp_dealt_this_card = 0
 	ctx.attack_card_extra_this_card = 0
+	# Before any of the card's HP costs below (Condition.ENTERED_CRITICAL).
+	ctx.hp_at_card_start = ctx.player.hp
 	# A cost replacement's HP (Collateral), first of all - it is this
 	# card's price. A price that kills ends the card: none of its effects
 	# resolve, and the fight ends as a defeat.
@@ -297,4 +299,9 @@ static func condition_met(effect: CardEffect, ctx: EffectContext) -> bool:
 			return ctx.player.is_critical_at(ctx.player.hp - ctx.preview_hp_cost)
 		CardEffect.Condition.TOLL_SPENT_THIS_TURN:
 			return ctx.player.toll_spent_this_turn
+		CardEffect.Condition.ENTERED_CRITICAL:
+			# Resolving: before is the HP the card started at, after is now.
+			# On a face: before is now, after is now less the costs to come.
+			var before: int = ctx.hp_at_card_start if ctx.hp_at_card_start >= 0 else ctx.player.hp
+			return not ctx.player.is_critical_at(before) and ctx.player.is_critical_at(ctx.player.hp - ctx.preview_hp_cost)
 	return true

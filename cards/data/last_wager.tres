@@ -5,26 +5,25 @@
 [ext_resource type="Texture2D" uid="uid://cw06we70if8cw" path="res://cards/art/Wanderer/Last Wager.png" id="9_art"]
 [ext_resource type="Resource" uid="uid://buyfdpvlj7rew" path="res://cards/tempered/last_wager_tempered.tres" id="10_tempered"]
 
-[sub_resource type="Resource" id="CardEffect_damage"]
-script = ExtResource("2_card_effect")
-value = 16
-condition = 7
-alt_value = 26
-
 [sub_resource type="Resource" id="CardEffect_self_damage"]
 script = ExtResource("2_card_effect")
 effect_type = 2
-value = 4
+value = 8
+
+[sub_resource type="Resource" id="CardEffect_damage"]
+script = ExtResource("2_card_effect")
+value = 12
+condition = 9
+alt_value = 32
 
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Last Wager"
-cost = 1
+cost = 2
 rarity = 2
 target_type = 0
-description = "{else}Deal {damage} damage.{/else} {if}Critical: deal {alt_damage}.{/if}
-Then lose 4 HP."
-effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage"), SubResource("CardEffect_self_damage")])
+description = "{else}Deal {damage} damage.{/else} {if}If this makes you Critical, deal {alt_damage}.{/if}"
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_self_damage"), SubResource("CardEffect_damage")])
 art = ExtResource("9_art")
 battle_animation = &"Slash"
 tempered = ExtResource("10_tempered")

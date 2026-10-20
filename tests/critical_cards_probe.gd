@@ -114,60 +114,63 @@ func _check_unbroken() -> void:
 func _unbroken(player: Combatant) -> Status:
 	return Status.find_in(player.statuses, load("res://battle/rules/statuses/unbroken.tres"))
 
-# Last Wager attacks first and pays after, like Bite Down: Critical is
-# judged at the HP held when it is played, so its own 4 HP can make the
-# player Critical but never upgrades the blow that paid it.
+# Last Wager pays first and attacks after: its 8 HP, then 12 - or 32 when
+# that 8 took the player from above the line (21 of 70) to at or under
+# it. Already Critical: 12. The loss makes Toll; at 8 HP it still kills,
+# like any self-damage, with the blow landing first. last_wager_probe
+# has the other lines, the Toll and the fight.
 func _check_last_wager() -> void:
 	var card: CardData = _card("last_wager")
-	var player: Combatant = _player(30)
-	_expect_eq(_deal(card, player), 16, "Last Wager above the line deals 16")
-	_expect_eq(player.hp, 26, "...then loses 4 HP")
-	_expect_eq(player.toll, 4, "Last Wager makes 4 Toll")
+	var player: Combatant = _player(35)
+	_expect_eq(_deal(card, player), 12, "Last Wager at 35 (27 after): 12")
+	_expect_eq(player.hp, 27, "...having lost 8 HP")
+	_expect_eq(player.toll, 8, "Last Wager makes 8 Toll")
 
-	player = _player(25)
-	_expect_eq(_deal(card, player), 16, "Last Wager at 25: its 4 HP reaches Critical, the blow stays 16")
-	_expect_eq(player.hp, 21, "...ends at 21")
-	_expect(player.is_critical(), "...and Critical afterward")
+	player = _player(29)
+	_expect_eq(_deal(card, player), 32, "Last Wager at 29: its 8 HP takes it to 21, into Critical - 32")
+	_expect(player.is_critical(), "...Critical afterward")
 
 	player = _player(21)
-	_expect_eq(_deal(card, player), 26, "Last Wager already Critical deals 26")
-	_expect_eq(player.hp, 17, "...then loses 4 HP")
-	_expect_eq(player.toll, 4, "...and makes 4 Toll")
+	_expect_eq(_deal(card, player), 12, "Last Wager already Critical at 21: 12")
+	_expect_eq(player.hp, 13, "...having lost 8 HP")
 
-	# The order itself: the blow is reported before the payment.
-	player = _player(30)
+	# The order itself: the payment is reported before the blow.
+	player = _player(35)
 	var enemy := Combatant.new(100)
 	var ctx: EffectContext = _ctx(player, enemy)
 	var reports: Array[String] = []
 	ctx.on_damage = func(who: Combatant, amount: int, kind: String) -> void:
 		reports.append("%s %d %s" % ["player" if who == player else "enemy", amount, kind])
 	_resolver.resolve_card(card, ctx)
-	_expect_eq(reports, ["enemy 16 card", "player 4 self"] as Array[String], "Last Wager: damage first, HP second")
+	_expect_eq(reports, ["player 8 self", "enemy 12 card"] as Array[String], "Last Wager: HP first, damage second")
 
-	# The payment can still kill - after the blow has landed.
-	player = _player(3)
-	enemy = Combatant.new(16)
+	# The payment can kill - the blow still lands after it.
+	player = _player(8)
+	enemy = Combatant.new(12)
 	_play(card, player, enemy)
-	_expect_eq(enemy.hp, 0, "Last Wager at 3 HP still lands its 16")
-	_expect_eq(player.hp, 0, "...then the 4 HP kills, like Bite Down")
+	_expect_eq(player.hp, 0, "Last Wager at 8 HP: its 8 kills, like Bite Down")
+	_expect_eq(enemy.hp, 0, "...and its 12 still lands")
 	_completed += 1
 
-# Last Wager's attack bonus goes through the normal pipeline, read in the
-# same state as its Critical clause: before the payment.
+# Last Wager's attack bonus goes through the normal pipeline, read after
+# every HP the card costs. Self-Eater's 2 is one of them, so it counts
+# toward the crossing too.
 func _check_last_wager_bonus() -> void:
 	var card: CardData = _card("last_wager")
 	var player: Combatant = _player(50)
 	_play(_card("self_eater"), player, null)
-	_expect_eq(_deal(card, player), 19, "Last Wager under Self-Eater: 16 + 3")
-	_expect_eq(player.hp, 44, "...Self-Eater's 2 and Last Wager's 4 paid")
-	_expect_eq(player.toll, 6, "...and made into 6 Toll")
+	_expect_eq(_deal(card, player), 15, "Last Wager under Self-Eater at 50: 12 + 3")
+	_expect_eq(player.hp, 40, "...Self-Eater's 2 and Last Wager's 8 paid")
+	_expect_eq(player.toll, 10, "...and made into 10 Toll")
+	player = _player(31)
+	_play(_card("self_eater"), player, null)
+	_expect_eq(_deal(card, player), 35, "...at 31: 2 + 8 take it to 21, into Critical - 32 + 3")
 
-	player = _player(25)
+	player = _player(29)
 	_play(_card("last_resort"), player, null)
-	_expect_eq(_deal(card, player), 16, "Last Wager at 25 under Last Resort: no Critical bonus yet")
-	_expect_eq(player.hp, 21, "...Critical only after")
-	_expect_eq(_deal(card, player), 32, "Last Wager at 21 under Last Resort: 26 + 6")
-	_expect_eq(player.hp, 17, "...then loses 4 HP")
+	_expect_eq(_deal(card, player), 38, "Last Wager at 29 under Last Resort: into Critical, 32 + 6")
+	_expect_eq(_deal(card, player), 18, "...again at 21, already Critical: 12 + 6")
+	_expect_eq(_deal(card, _player(35)), 12, "Above the line after (35 to 27), no Last Resort: 12")
 	_completed += 1
 
 # Dying Light is Energy now, not damage: Critical at a turn's start gives
@@ -300,7 +303,7 @@ func _check_refuse_the_end() -> void:
 	_expect_eq(player.hp, 0, "No save when the hit lands from above the line")
 
 	# Self-inflicted loss never triggers it.
-	player = _player(3)
+	player = _player(8)
 	_play(power, player, null)
 	_deal(_card("last_wager"), player)
 	_expect_eq(player.hp, 0, "Self-damage isn't saved")
@@ -369,16 +372,18 @@ func _check_refuse_the_end_face() -> void:
 	_expect(armed != null and armed.describe(small) == "The next time an enemy would kill you while Critical, survive at 6 HP.", "The readout says what the card says, its number the holder's")
 	_completed += 1
 
-# The face's reading: Last Wager's 4 HP is paid after its blow, so it
-# goes LIVE only when the player is Critical already - not when its own
-# payment would get them there.
+# The face's reading: Last Wager's 8 HP is paid before its blow, so it
+# goes LIVE only when that payment would take the player into Critical -
+# not above the line after it, and not when they're Critical already.
 func _check_preview() -> void:
 	var card: CardData = _card("last_wager")
-	var player: Combatant = _player(25)
-	var ctx: EffectContext = _ctx(player, null).for_card_preview(0)
-	_expect_eq(CardBonus.state(card, ctx), CardBonus.State.DORMANT, "Last Wager previews DORMANT at 25")
+	var player: Combatant = _player(29)
+	var ctx: EffectContext = _ctx(player, null).for_card_preview(8)
+	_expect_eq(CardBonus.state(card, ctx), CardBonus.State.LIVE, "Last Wager previews LIVE at 29 (21 after its 8)")
+	player.hp = 35
+	_expect_eq(CardBonus.state(card, ctx), CardBonus.State.DORMANT, "...DORMANT at 35 (27 after)")
 	player.hp = 21
-	_expect_eq(CardBonus.state(card, ctx), CardBonus.State.LIVE, "Last Wager previews LIVE at 21")
+	_expect_eq(CardBonus.state(card, ctx), CardBonus.State.DORMANT, "...DORMANT at 21, already Critical")
 	player.hp = 30
 	_expect_eq(AttackBonus.for_player(player, 21), 0, "No bonus with nothing held")
 	_completed += 1
@@ -415,14 +420,20 @@ func _check_faces() -> void:
 	_expect(face.contains("Deal 8 damage"), "Cornered's {else} half without Critical bonuses: " + face)
 	_expect(face.contains("deal 22"), "Cornered's {if} half with them (16 + 6): " + face)
 
+	# Last Wager under Last Resort: its {if} half lands Critical (32 + 6);
+	# its {else} half prints the bonus as the 8 HP would leave it - at 25
+	# that's Critical too (12 + 6), at 40 it isn't (12).
 	player.hp = 25
 	face = await _face("last_wager", player)
-	_expect(face.begins_with("Deal 16 damage"), "Last Wager's {else} half, first: " + face)
-	_expect(face.contains("deal 32"), "Last Wager's {if} half (26 + 6): " + face)
-	_expect(face.ends_with("Then lose 4 HP."), "Last Wager's HP line, last, after the blow: " + face)
-	_expect_eq(await _face_state("last_wager", player), CardBonus.State.DORMANT, "Last Wager's face DORMANT at 25")
+	_expect(face.begins_with("Deal 18 damage"), "Last Wager's {else} half at 25, Critical after its 8 (12 + 6): " + face)
+	_expect(face.contains("deal 38"), "Last Wager's {if} half (32 + 6): " + face)
+	_expect_eq(await _face_state("last_wager", player), CardBonus.State.LIVE, "Last Wager's face LIVE at 25 (17 after)")
+	player.hp = 40
+	face = await _face("last_wager", player)
+	_expect(face.begins_with("Deal 12 damage"), "Last Wager's {else} half at 40: " + face)
+	_expect_eq(await _face_state("last_wager", player), CardBonus.State.DORMANT, "...DORMANT at 40 (32 after)")
 	player.hp = 21
-	_expect_eq(await _face_state("last_wager", player), CardBonus.State.LIVE, "Last Wager's face LIVE at 21")
+	_expect_eq(await _face_state("last_wager", player), CardBonus.State.DORMANT, "...DORMANT at 21, already Critical")
 
 	face = await _face("unbroken", player)
 	_expect(face == "Gain 0 block.\nCritical: the next Attack against you deals 4 less.", "Unbroken under Last Resort: no block, the guard still there: " + face)

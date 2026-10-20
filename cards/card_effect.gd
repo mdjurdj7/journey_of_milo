@@ -66,7 +66,11 @@ enum EffectType {
 # TOLL_SPENT_THIS_TURN: any Toll spent this turn before the card resolves,
 # by any card or effect (Combatant.toll_spent_this_turn) - Gnaw's drain.
 # Appended: an inserted value would rewrite every .tres that stores one.
-enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE, UNDAMAGED_LAST_TURN, CRITICAL, TOLL_SPENT_THIS_TURN }
+# ENTERED_CRITICAL: this card's own HP costs took the player into Critical
+# - above the line in force before all of them (EffectContext.hp_at_card_
+# start: Collateral's, the stance's, its self-damage), at or below it
+# after (Last Wager). Already Critical before: false. Appended likewise.
+enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE, UNDAMAGED_LAST_TURN, CRITICAL, TOLL_SPENT_THIS_TURN, ENTERED_CRITICAL }
 
 # Which combatant(s) an effect resolves against - lets DAMAGE_ALL collapse
 # into plain DAMAGE (target_scope = ALL_ENEMIES) instead of needing its

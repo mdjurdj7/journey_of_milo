@@ -66,8 +66,13 @@ var toll_spent_this_card: bool = false
 # its own self-damage ahead of them, and the stance's per-Attack cost. Set
 # only on a card face's preview copy (for_card_preview()); 0 when a card
 # actually resolves, since by then those costs HAVE been paid. Read by
-# Condition.CRITICAL alone.
+# Condition.CRITICAL and Condition.ENTERED_CRITICAL.
 var preview_hp_cost: int = 0
+# The player's HP as this card began resolving, before any of its HP
+# costs (EffectResolver.resolve_card()) - what Condition.ENTERED_CRITICAL
+# judges "before" by. -1 on a card face's preview copy, which reads the
+# player's HP now instead (preview_hp_cost not yet paid).
+var hp_at_card_start: int = -1
 
 # HP this card costs in place of its Energy - a cost replacement's
 # (Collateral, Combatant.replaced_cost_hp()), read by the controller when

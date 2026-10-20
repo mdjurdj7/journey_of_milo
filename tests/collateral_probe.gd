@@ -245,9 +245,10 @@ func _check_critical_entry() -> void:
 
 # Faces: on 3 Energy under Collateral Reckoning reads 2, no HP line; on 1,
 # "1" and "-3 HP", Blood Arc (made to cost 2) its own loss plus 3, Slash
-# untouched. Last Wager 1 short just above the Critical line reads its
-# Critical half live - the shared HP-paid helper counts the 3 - and the
-# play sound's check counts what the play pays.
+# untouched. Last Wager 2 short, where its own 8 alone would leave the
+# player above the Critical line, reads its into-Critical half live - the
+# shared HP-paid helper counts Collateral's 6 too - and the play sound's
+# check counts what the play pays.
 func _check_faces() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -265,14 +266,16 @@ func _check_faces() -> void:
 		_expect_eq(_face(controller, blood_arc), ["1", "−%d HP" % (own_loss + _rate)], "...Blood Arc 1 and its own loss plus 3")
 		_expect_eq(_face(controller, slash), ["1", ""], "...Slash untouched")
 		player.energy = 0
-		player.hp = int(player.max_hp * player.critical_fraction()) + _rate
+		var wager_data: CardData = load(LAST_WAGER_PATH)
+		var short: int = wager_data.cost * _rate
+		player.hp = int(player.max_hp * player.critical_fraction()) + short + _self_damage(wager_data)
 		controller.emit_signal("energy_changed", 0)
 		controller.emit_signal("hp_changed", player.hp, player.max_hp)
 		await process_frame
 		var wager: CardData = await _deal(controller, LAST_WAGER_PATH)
 		var view: CardView = _view(controller, wager)
-		_expect(view != null and view.get("_bonus_state") == CardBonus.State.LIVE, "Last Wager 1 short at %d HP: its Critical half live, the 3 counted" % player.hp)
-		controller.set("play_hp_cost", _rate)
+		_expect(view != null and view.get("_bonus_state") == CardBonus.State.LIVE, "Last Wager %d short at %d HP: its into-Critical half live, the %d counted" % [wager_data.cost, player.hp, short])
+		controller.set("play_hp_cost", short)
 		var overlay: Node = _field.get_node("BattleLayer").get_child(0)
 		var ctx: EffectContext = controller.call("preview_context")
 		_expect(CardBonus.state(wager, ctx.for_card_preview(CardBonus.upfront_hp_cost(wager, player.stance, int(controller.get("play_hp_cost"))))) == CardBonus.State.LIVE, "...and the play sound's reading counts the HP the play pays")

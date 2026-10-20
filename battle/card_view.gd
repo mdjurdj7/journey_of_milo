@@ -1970,6 +1970,11 @@ func _attack_bonus_for_half(conditional_half: bool) -> int:
 			continue
 		if effect.condition == CardEffect.Condition.CRITICAL:
 			return AttackBonus.when_critical(_bonus_context.player, conditional_half)
+		# Into Critical (Last Wager): its {if} half lands Critical; its
+		# {else} half may land either side, so it prints the bonus as it
+		# stands.
+		if effect.condition == CardEffect.Condition.ENTERED_CRITICAL and conditional_half:
+			return AttackBonus.when_critical(_bonus_context.player, true)
 		break
 	return _attack_bonus_preview()
 

@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20); Last Wager reworked (2026-10-20)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -131,7 +131,6 @@
     "rules_text_below_15px": {
       "Cornered": 14,
       "Last Resort": 14,
-      "Last Wager": 13,
       "No Further": 12,
       "Refuse the End": 13,
       "The Return": 13
@@ -1564,28 +1563,28 @@
       "pool_class": "wanderer",
       "card_type": "ATTACK",
       "face_type_label": "STRIKE",
-      "energy_cost": 1,
+      "energy_cost": 2,
       "rarity": "UNCOMMON",
-      "card_text": "Deal 16 damage. Critical: deal 26.\nThen lose 4 HP.",
-      "face_hp_line": "−4 HP",
-      "card_text_template": "{else}Deal {damage} damage.{/else} {if}Critical: deal {alt_damage}.{/if}\nThen lose 4 HP.",
+      "card_text": "Deal 12 damage. If this makes you Critical, deal 32.",
+      "face_hp_line": "−8 HP",
+      "card_text_template": "{else}Deal {damage} damage.{/else} {if}If this makes you Critical, deal {alt_damage}.{/if}",
       "targeting": "enemy",
       "removal_after_play": "discard pile",
       "effects": [
         {
-          "type": "DAMAGE",
-          "plain_english": "Deal 16 damage to the target; if you are Critical, 26 damage instead."
+          "type": "SELF_DAMAGE",
+          "plain_english": "Lose 8 HP first (the face's −8 HP badge): bypasses block and absorb, makes 1 Toll per HP lost, opens no Grace, and can kill - at 8 HP or less it does, the blow below still lands, and the fight is lost (no lethal guard catches self-damage)."
         },
         {
-          "type": "SELF_DAMAGE",
-          "plain_english": "Lose 4 HP: bypasses block and absorb, makes 1 Toll per HP lost, opens no Grace, and can kill."
+          "type": "DAMAGE",
+          "plain_english": "Then deal 12 damage to the target - or 32 if this card's HP costs took you into Critical: above the line in force before all of them (Collateral's, Self-Eater's 2, the 8), at or below it after (Condition.ENTERED_CRITICAL). Already Critical before playing: 12."
         }
       ],
       "keywords": [
         "Critical"
       ],
-      "self_hp_cost": 4,
-      "base_damage": 16,
+      "self_hp_cost": 8,
+      "base_damage": 12,
       "base_block": null,
       "draw": null,
       "energy_gain": null,
@@ -1596,16 +1595,16 @@
       "power_effect": null,
       "status_effect": null,
       "critical_condition": {
-        "rule": "Critical = HP at or below 30% of max HP, checked when the effect resolves (after any HP this card paid before it).",
+        "rule": "Into Critical: HP above the line before this card's HP costs, at or below it after - the line in force then (30%, or 50% under Go Under or On the Brink). Being Critical already doesn't count.",
         "effect": "DAMAGE",
-        "normal_value": 16,
-        "critical_value": 26
+        "normal_value": 12,
+        "critical_value": 32
       },
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "16 normally, 26 while Critical; the face previews the live state in battle.",
-          "default_displayed": "16 / 26"
+          "rule": "12, or 32 when its HP costs would take you into Critical; the face's clause is in ink exactly then, in battle.",
+          "default_displayed": "12 / 32"
         },
         {
           "field": "damage",
@@ -1615,14 +1614,19 @@
         {
           "field": "cost",
           "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
-          "default_displayed": 1
+          "default_displayed": 2
         }
       ],
       "art_path": "res://cards/art/Wanderer/Last Wager.png",
-      "rules_font_px": 13,
+      "rules_font_px": 15,
       "battle_animation": "Slash",
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Last Wager+",
+        "file_path": "res://cards/tempered/last_wager_tempered.tres",
+        "card_text": "Deal 16 damage. If this makes you Critical, deal 40.",
+        "changes": "16 / 40 in place of 12 / 32; the same 8 HP and 2 Energy."
+      },
       "starting_deck_count": 0,
       "in_reward_pool": true,
       "in_belongings_pool": false,
