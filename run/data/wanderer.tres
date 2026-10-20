@@ -15,8 +15,8 @@ character_name = "Wanderer"
 card_class = &"wanderer"
 max_hp = 80
 starting_deck_counts = {
-ExtResource("2_slash"): 4,
-ExtResource("3_bite_down"): 2,
+ExtResource("2_slash"): 5,
+ExtResource("3_bite_down"): 1,
 ExtResource("4_brace"): 2,
 ExtResource("5_settled_account"): 1,
 ExtResource("6_down_payment"): 1

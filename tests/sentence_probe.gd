@@ -312,7 +312,7 @@ func _check_pool() -> void:
 	var counts: Dictionary = {}
 	for card: CardData in character.starting_deck_counts:
 		counts[card.card_name] = character.starting_deck_counts[card]
-	_expect_eq(counts, {"Slash": 4, "Bite Down": 2, "Brace": 2, "Settled Account": 1, "Down Payment": 1}, "...and the starting deck is unchanged")
+	_expect_eq(counts, {"Slash": 5, "Bite Down": 1, "Brace": 2, "Settled Account": 1, "Down Payment": 1}, "...and the starting deck is unchanged")
 	_completed += 1
 
 # --- Helpers ---
