@@ -136,6 +136,9 @@ signal enemy_status_gained(enemy: FieldEnemy, status: StatusData)
 signal devour_changed(available: bool, used: bool)
 # A hand card was devoured: out of the hand to the Spent pile, unplayed.
 signal card_devoured(card: CardData)
+# A hand card was Devoured by the keyword (Take In), as its bite starts -
+# once per card eaten; never the Devour button's (card_devoured).
+signal keyword_devoured(card: CardData)
 signal battle_won()
 signal battle_lost()
 
@@ -1722,10 +1725,12 @@ func _devour_card(card_view: CardView, route: String) -> void:
 	_emit_devour_changed()
 
 # EffectContext.on_devour: a card Devoured by the keyword (Take In) - the
-# hand's bite, faded where it stands. Nothing of the Devour button's: no
-# card_devoured, no slide into its jaw, no use of it, no heal.
+# hand's bite, faded where it stands, and keyword_devoured with it (its
+# sound). Nothing of the Devour button's: no card_devoured, no slide into
+# its jaw, no use of it, no heal.
 func _on_keyword_devoured(card: CardData) -> void:
 	_hand_container.devour_card(card, false)
+	keyword_devoured.emit(card)
 
 # Where a played card goes: the exhaust pile (true) for a SPENT or
 # CONSUMED card, and for a power or a stance - it has done its work once

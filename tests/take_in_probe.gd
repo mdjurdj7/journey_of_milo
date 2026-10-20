@@ -8,8 +8,10 @@ extends SceneTree
 # a Skill Marrow (that much Block at the start of each turn); a 0-cost
 # card, a Power and a Stance nothing. The line the hand shows over a
 # candidate (DevourYield.describe()) says exactly what the Devour applies.
-# The fight's Devoured list counts each. The Devour button is untouched:
-# it still heals 3, yields nothing and counts nothing. Take In+ costs 0.
+# The fight's Devoured list counts each. The keyword's own sound plays
+# once per card it eats, as the bite starts - not as Take In is played.
+# The Devour button is untouched: it still heals 3, yields nothing, counts
+# nothing and never plays the keyword's sound. Take In+ costs 0.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/take_in_probe.gd
 #
@@ -36,6 +38,7 @@ const TEETH_PATH := "res://battle/rules/statuses/teeth.tres"
 const MARROW_PATH := "res://battle/rules/statuses/marrow.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
+const KEYWORD_SOUND_PATH := "res://assets/audio/sfx/devour/devour_keyword.wav"
 const LASH_TAG := &"lash"
 
 var _run_state: Node = null
@@ -183,7 +186,8 @@ func _check_greyed_and_cancel() -> void:
 
 # The real choice: hovering a candidate shows its yield over it - the
 # card's own line, clear of the armed Take In above and of the card - and
-# no keyword definition; picking it devours it.
+# no keyword definition; picking it devours it, its sound once with the
+# bite and not as Take In plays.
 func _check_choose_and_devour() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -220,8 +224,14 @@ func _check_choose_and_devour() -> void:
 			for i in 5:
 				await process_frame
 		_expect(line != null and not line.visible, "Over no candidate: no line")
+		var heard: Dictionary = _listen_keyword_sound(controller, take_in)
 		controller.call("toggle_choice", _view(controller, claw))
 		await ProbePlay.settle(self, controller)
+		_stop_listening(controller, heard)
+		_expect_eq(heard["at_play"], [false] as Array[bool], "Take In played: not the keyword's sound")
+		_expect_eq(heard["at_devour"], [true] as Array[bool], "Claw Back devoured: the keyword's sound, once")
+		var sound: AudioStreamPlayer = _overlay().get("_devour_keyword_player")
+		_expect(sound != null and sound.stream != null and sound.stream.resource_path == KEYWORD_SOUND_PATH and sound.bus == &"SFX", "...devour_keyword.wav, on the SFX bus")
 		_expect(not (deck.get("hand") as Array).has(claw) and (deck.get("exhaust_pile") as Array).has(claw), "Picked: Claw Back devoured")
 		_expect_eq(_applied_line(player), "+4 damage this combat", "...Teeth 4 on the Wanderer")
 		var eaten: Array[CardData] = [claw]
@@ -251,7 +261,8 @@ func _check_marrow_next_turn() -> void:
 	await _teardown()
 	_completed += 1
 
-# The Devour button: still heals 3, yields nothing, counts nothing.
+# The Devour button: still heals 3, yields nothing, counts nothing, and
+# never plays the keyword's sound.
 func _check_button_unchanged() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -260,9 +271,17 @@ func _check_button_unchanged() -> void:
 		var claw: CardData = await _deal(controller, CLAW_BACK_PATH)
 		player.hp = player.max_hp - 10
 		var hp: int = player.hp
+		var heard: Dictionary = _listen_keyword_sound(controller, null)
+		var bitten: Array[bool] = []
+		var on_bite := func(_card: CardData) -> void: bitten.append(_keyword_sound_playing())
+		controller.connect("card_devoured", on_bite)
 		controller.call("devour")
 		controller.call("request_play", _view(controller, claw))
 		await ProbePlay.wait_until(self, func() -> bool: return not bool(controller.get("_input_locked")), 5.0)
+		controller.disconnect("card_devoured", on_bite)
+		_stop_listening(controller, heard)
+		_expect_eq(bitten, [false] as Array[bool], "The Devour button's bite: not the keyword's sound")
+		_expect(not _keyword_sound_playing() and (heard["at_devour"] as Array).is_empty(), "...nor after it")
 		_expect(not (deck.get("hand") as Array).has(claw), "The Devour button eats Claw Back")
 		_expect_eq(player.hp - hp, 3, "...heals 3")
 		_expect_eq(_applied_line(player), "Nothing", "...yields nothing")
@@ -315,6 +334,35 @@ func _damage_of(path: String, player: Combatant, earlier: int) -> int:
 	ctx.tagged_plays_before_this = {LASH_TAG: earlier}
 	_resolver.resolve_card(load(path), ctx)
 	return ENEMY_HP - enemy.hp
+
+# Listens for the Devour keyword's sound: whether it plays as `card` is
+# played (card_played) and at each keyword_devoured - read after the
+# overlay has answered each, as it connected first. The player stopped
+# first, so a sound before this can't read as one now.
+func _listen_keyword_sound(controller: Node, card: CardData) -> Dictionary:
+	var sound: AudioStreamPlayer = _overlay().get("_devour_keyword_player")
+	if sound != null:
+		sound.stop()
+	var at_play: Array[bool] = []
+	var at_devour: Array[bool] = []
+	var heard: Dictionary = {"at_play": at_play, "at_devour": at_devour}
+	heard["on_play"] = func(played: CardData, _target: Node) -> void:
+		if played == card:
+			at_play.append(_keyword_sound_playing())
+	heard["on_devour"] = func(_eaten: CardData) -> void:
+		at_devour.append(_keyword_sound_playing())
+	controller.connect("card_played", heard["on_play"])
+	controller.connect("keyword_devoured", heard["on_devour"])
+	return heard
+
+func _stop_listening(controller: Node, heard: Dictionary) -> void:
+	controller.disconnect("card_played", heard["on_play"])
+	controller.disconnect("keyword_devoured", heard["on_devour"])
+
+func _keyword_sound_playing() -> bool:
+	var overlay: Node = _overlay()
+	var sound: AudioStreamPlayer = overlay.get("_devour_keyword_player") if overlay != null else null
+	return sound != null and sound.playing
 
 func _start_fight() -> Node:
 	_run_state.call("new_run", load(CHARACTER_PATH))

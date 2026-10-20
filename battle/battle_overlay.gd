@@ -16,6 +16,9 @@ const DEVOUR_SFX_PATHS: Array[String] = [
 	"res://assets/audio/sfx/devour/devour_01.mp3",
 	"res://assets/audio/sfx/devour/devour_02.mp3",
 ]
+# The Devour keyword's sound (BattleController.keyword_devoured - Take In),
+# once per card eaten; never the Devour button's bite above.
+const DEVOUR_KEYWORD_SFX_PATH := "res://assets/audio/sfx/devour/devour_keyword.wav"
 
 enum Outcome { WIN, LOSE, ESCAPE }
 
@@ -127,6 +130,10 @@ signal battle_finished(outcome: Outcome)
 # Devour's bite, a 2D UI sound: its takes peak at -6.6 and -6.0 dBFS, so
 # -10 here lands them about -16 at the listener. Read at each bite.
 @export var devour_volume_db: float = -10.0
+# The Devour keyword's sound, a 2D UI sound like the bite: a -6 dBFS take
+# at card play's level (card_play_volume_db) to start. Read at each card
+# eaten.
+@export var devour_keyword_volume_db: float = -16.0
 # The battle sand puffs' tint (BattleFeedback.sand_puff_tint), set here as
 # BattleFeedback is built in code (enter_battle()); passed on live.
 @export var sand_puff_tint: float = 0.75:
@@ -303,6 +310,8 @@ var _card_override_player: AudioStreamPlayer = null
 var _devour_player: AudioStreamPlayer = null
 var _devour_takes: Array[AudioStream] = []
 var _devour_last_take: int = -1
+# The Devour keyword's player, made on the first card it eats.
+var _devour_keyword_player: AudioStreamPlayer = null
 var _resources: BattleResources = null
 var _deck_readout: DeckPanel = null
 var _discard_readout: DeckPanel = null
@@ -476,6 +485,7 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 		Input.set_default_cursor_shape(Input.CURSOR_ARROW)
 		_play_devour_take()
 		_push_bonus_context())
+	battle_controller.keyword_devoured.connect(func(_card: CardData) -> void: _play_devour_keyword())
 	battle_controller.hand_choice_started.connect(_on_hand_choice_started)
 	battle_controller.hand_choice_changed.connect(_on_hand_choice_changed)
 	battle_controller.hand_choice_ended.connect(_on_hand_choice_ended)
@@ -1455,6 +1465,21 @@ func _play_devour_take() -> void:
 	_devour_player.stream = _devour_takes[take]
 	_devour_player.volume_db = devour_volume_db
 	_devour_player.play()
+
+# The Devour keyword's sound, as the eaten card's bite starts
+# (BattleController._on_keyword_devoured()), on the SFX bus.
+func _play_devour_keyword() -> void:
+	if _devour_keyword_player == null:
+		_devour_keyword_player = AudioStreamPlayer.new()
+		_devour_keyword_player.bus = &"SFX"
+		add_child(_devour_keyword_player)
+		_devour_keyword_player.stream = load(DEVOUR_KEYWORD_SFX_PATH) as AudioStream
+		if _devour_keyword_player.stream == null:
+			push_warning("BattleOverlay: the Devour keyword's sound failed to load (%s)." % DEVOUR_KEYWORD_SFX_PATH)
+	if _devour_keyword_player.stream == null:
+		return
+	_devour_keyword_player.volume_db = devour_keyword_volume_db
+	_devour_keyword_player.play()
 
 # Placeholder-only: shows whatever amount actually landed, no distinction
 # between damage/self-damage/attack kinds yet - see this pass's own
