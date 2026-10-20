@@ -18,16 +18,20 @@ extends SceneTree
 # keyword's threshold. The fight case plays Go Under through
 # BattleController on the real region scene: the HP bar's line easing to
 # 50% and its colour, In the Red's sound lift, the tooltip - and all of it
-# back to 30% when the fight is won. Untyped against anything that names
-# the RunState autoload (the HP bar is read by name, not as HPBar).
+# back to 30% when the fight is won. The turn-scoped case raises the same
+# line for one turn only (On the Brink's status, StatusData.ends_at_turn_
+# end), gone at the turn's end - and under Gone Under, still 50% after.
+# Untyped against anything that names the RunState autoload (the HP bar
+# is read by name, not as HPBar).
 
-const CASES := 8
+const CASES := 9
 const MAX_HP := 80
 const BASE_FRACTION := 0.3
 const CARD_PATH := "res://cards/data/go_under.tres"
 const TEMPERED_PATH := "res://cards/tempered/go_under_tempered.tres"
 const STATUS_PATH := "res://battle/rules/statuses/gone_under.tres"
-const NO_FURTHER_STATUS_PATH := "res://battle/rules/statuses/no_further.tres"
+const TURN_STATUS_PATH := "res://battle/rules/statuses/on_the_brink.tres"
+const NO_FURTHER_STATUS_PATH :="res://battle/rules/statuses/no_further.tres"
 const CORNERED_PATH := "res://cards/data/cornered.tres"
 const IN_THE_RED_PATH := "res://cards/data/in_the_red.tres"
 const FILLER_PATH := "res://cards/data/slash.tres"
@@ -54,6 +58,7 @@ func _initialize() -> void:
 
 	_check_data()
 	_check_threshold()
+	_check_turn_scoped()
 	_check_entry()
 	_check_cornered()
 	_check_in_the_red()
@@ -120,6 +125,30 @@ func _check_threshold() -> void:
 	higher.critical_hp_fraction = 0.6
 	_play(load(CARD_PATH), higher)
 	_expect_eq(higher.critical_fraction(), 0.6, "A line already above 50% stays where it is")
+	_completed += 1
+
+# The turn-scoped raise (On the Brink's status): 35 of 80 Critical at 50%
+# while it's held; the turn's end (Status.remove_at_turn_end(), the call
+# BattleController._finish_turn() makes before the enemy turn) takes it
+# and the line is 30% again. Held beside Gone Under it adds nothing, and
+# its end leaves Gone Under's 50%.
+func _check_turn_scoped() -> void:
+	var status: StatusData = load(TURN_STATUS_PATH)
+	_expect_eq([status.raises_critical_percent, status.ends_at_turn_end, status.stack_rule], [50, true, StatusData.StackRule.IGNORE], "On the Brink's status: 50%, this turn only, a second copy ignored")
+	var player: Combatant = _player(35)
+	Status.apply_to(player.statuses, status)
+	_expect_eq(player.critical_fraction(), _raised, "Held: the line at 50%")
+	_expect(player.is_critical(), "...35 of 80 Critical")
+	Status.remove_at_turn_end(player.statuses)
+	_expect_eq(player.critical_fraction(), BASE_FRACTION, "The turn's end: the line back at 30%")
+	_expect(not player.is_critical(), "...35 of 80 not Critical")
+	var under: Combatant = _player(35)
+	_play(load(CARD_PATH), under)
+	Status.apply_to(under.statuses, status)
+	_expect_eq(under.critical_fraction(), _raised, "With Gone Under: still 50%")
+	Status.remove_at_turn_end(under.statuses)
+	_expect_eq(under.critical_fraction(), _raised, "...and 50% after the turn's end")
+	_expect_eq(_held(under), 1, "...Gone Under kept")
 	_completed += 1
 
 # Played at 35 with No Further held and the keepsake's entry Block armed:

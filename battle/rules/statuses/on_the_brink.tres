@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "on_the_brink"
+display_name = "On the Brink"
+description = "This turn, you're Critical at {critical_percent}% of max HP or below."
+category = 2
+default_duration_turns = -1
+stack_rule = 3
+ends_at_turn_end = true
+raises_critical_percent = 50
