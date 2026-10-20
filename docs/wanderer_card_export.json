@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -140,7 +140,7 @@
       },
       {
         "name": "Toll",
-        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Leverage, Settled Account (up to 5, for block), Bide (4: up to 2 hand cards gain Keep), Countersign (7: a copy of a hand card), and the three that turn it into time and actions: Second Swing (5: play the last Attack again), Come Due (5: 2 Energy now, 2 less next turn) and Deny (6: an enemy's next action a turn later); each card (or replay) that spends any of it brings every Sentence a turn closer. Collateral's HP makes it too."
+        "rule": "Gained when you lose HP to your own cards. Carries between fights; up to 5 carries to the next floor. Self-inflicted losses only (self-damage, status ticks, stance prices), never enemy hits. Spent by Reckoning, Leverage, Settled Account (5, for 5 block), Bide (4: up to 2 hand cards gain Keep), Countersign (7: a copy of a hand card), and the three that turn it into time and actions: Second Swing (5: play the last Attack again), Come Due (5: 2 Energy now, 2 less next turn) and Deny (6: an enemy's next action a turn later); each card (or replay) that spends any of it brings every Sentence a turn closer. Collateral's HP makes it too."
       },
       {
         "name": "Grace",
@@ -2112,7 +2112,7 @@
       "effects": [
         {
           "type": "APPLY_STATUS_TO_TARGET",
-          "plain_english": "Put a Sentence on the target enemy: in 3 turns it takes 36 damage. It counts down 1 at the start of that enemy's own turn, and 1 for each card or replay you play that spends any Toll - once a card, whatever the amount; a Second Swing replaying a Toll-spending Attack counts twice; Settled Account on 0 Toll none. At 0 it goes off at once, mid-turn if a spend got it there. Not an Attack - no attack bonus, Self-Eater or Bent Nail - and it goes through the enemy's modifiers (Covered/Exposed) and Block. Lost if the enemy dies first. Several on one enemy each count on their own."
+          "plain_english": "Put a Sentence on the target enemy: in 3 turns it takes 36 damage. It counts down 1 at the start of that enemy's own turn, and 1 for each card or replay you play that spends any Toll - once a card, whatever the amount; a Second Swing replaying a Toll-spending Attack counts twice; Settled Account on under 5 Toll none. At 0 it goes off at once, mid-turn if a spend got it there. Not an Attack - no attack bonus, Self-Eater or Bent Nail - and it goes through the enemy's modifiers (Covered/Exposed) and Block. Lost if the enemy dies first. Several on one enemy each count on their own."
         }
       ],
       "keywords": [
@@ -2174,9 +2174,9 @@
       "face_type_label": "GUARD",
       "energy_cost": 1,
       "rarity": "COMMON",
-      "card_text": "Gain 5 block.\nSpend up to 5 Toll: gain that much more block.",
+      "card_text": "Gain 5 block.\nSpend 5 Toll: 5 more block.",
       "face_hp_line": null,
-      "card_text_template": "Gain {block} block.\n{battle}Spend {toll_block} Toll: gain {toll_block} more block.{/battle}{outside}Spend up to {toll_block} Toll: gain that much more block.{/outside}",
+      "card_text_template": "Gain {block} block.\n{if}Spend {toll_cost} Toll: {toll_block} more block.{/if}",
       "targeting": "self",
       "removal_after_play": "discard pile",
       "effects": [
@@ -2186,7 +2186,7 @@
         },
         {
           "type": "TOLL_BLOCK",
-          "plain_english": "Spend up to 5 of the Toll held (toll_cost is the cap), automatically, and gain 1 block per Toll spent - 10 block in all on 5 Toll or more. Toll spent earlier in the turn doesn't matter. Anything it spends counts as Toll spent this turn (Gnaw) and brings a Sentence a turn closer. While Block can't be gained (Last Resort) it spends nothing."
+          "plain_english": "All or nothing: holding at least 5 Toll (toll_cost), spend exactly 5, automatically, and gain 5 more block (value) - 10 block in all. On less than 5 it spends nothing and gains nothing. Toll spent earlier in the turn doesn't matter. The spend counts as Toll spent this turn (Gnaw) and brings a Sentence a turn closer; spending nothing does neither. While Block can't be gained (Last Resort) it spends nothing."
         }
       ],
       "keywords": [
@@ -2198,7 +2198,7 @@
       "draw": null,
       "energy_gain": null,
       "toll_gain": null,
-      "toll_spend": "up to 5 (all held, if less)",
+      "toll_spend": "5 Toll, only if 5 are held",
       "persistent_effect": null,
       "stance_effect": null,
       "power_effect": null,
@@ -2207,12 +2207,12 @@
       "dynamic_values": [
         {
           "field": "toll_block",
-          "rule": "In a battle hand the second line reads the Toll it will spend, the Toll held up to 5 ('Spend 3 Toll: gain 3 more block.'); outside a fight it reads the rule ('Spend up to 5 Toll: gain that much more block.').",
-          "default_displayed": "up to 5"
+          "rule": "The Toll clause's numbers are fixed, never the live Toll. In a battle hand the clause is grey while you hold under 5 Toll (or Last Resort is held) and in full ink at 5 or more; 'Gain 5 block.' is always in ink.",
+          "default_displayed": 5
         },
         {
           "field": "block",
-          "rule": "Both numbers show and give 0 while Last Resort is held, and it spends no Toll.",
+          "rule": "The base block shows and gives 0 while Last Resort is held, as on every Block card; the Toll clause then spends nothing.",
           "default_displayed": 5
         },
         {
@@ -2225,7 +2225,12 @@
       "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Settled Account+",
+        "file_path": "res://cards/tempered/settled_account_tempered.tres",
+        "card_text": "Gain 8 block.\nSpend 5 Toll: 5 more block.",
+        "changes": "8 block in place of 5; the Toll clause unchanged."
+      },
       "starting_deck_count": 1,
       "in_reward_pool": true,
       "in_belongings_pool": false,
@@ -2238,7 +2243,7 @@
         "path": "res://assets/audio/cards/Settled Account/Settled Account.mp3",
         "critical_sound_pitch": 0.95,
         "critical_sound_volume_db": 1.0,
-        "rule": "Played when it will spend Toll (judged at play: Toll held and no Last Resort), the sound plays at pitch 0.95 and 1 dB louder."
+        "rule": "Played when it will spend Toll (judged at play: at least 5 Toll held and no Last Resort), the sound plays at pitch 0.95 and 1 dB louder."
       }
     },
     {

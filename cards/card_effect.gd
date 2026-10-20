@@ -91,8 +91,9 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 @export var toll_cost: int = 0
 # Fixed Toll spent by TOLL_RETALIATE, and by SPEND_TOLL - which also
 # REQUIRES it: a card carrying a SPEND_TOLL can't be played on less
-# (EffectResolver.card_blocked()). TOLL_HEAL and TOLL_BLOCK read it as a
-# cap - TOLL_BLOCK spends up to it, 1 Block per Toll (Settled Account).
+# (EffectResolver.card_blocked()). TOLL_HEAL reads it as a cap. TOLL_BLOCK
+# spends exactly it for `value` Block, or nothing on less held (Settled
+# Account).
 # Unused by every other type.
 
 @export var repeat_per_earlier_play_tag: StringName = &""

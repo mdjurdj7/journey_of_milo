@@ -78,9 +78,6 @@ static func bonus_value(effect: CardEffect) -> int:
 		_:
 			return effect.value
 
-# The card's reading: LIVE if any previewable condition on it holds now,
-# DORMANT if it has one and none holds, NONE if it has none - in which
-# case the face shows nothing either way.
 # Whether the hit of a DAMAGE effect drains in this context: always with
 # `drains`, and with drain_on_condition while its condition holds.
 static func drains(effect: CardEffect, ctx: EffectContext) -> bool:
@@ -88,11 +85,21 @@ static func drains(effect: CardEffect, ctx: EffectContext) -> bool:
 		return true
 	return mode(effect) == Mode.DRAIN and EffectResolver.condition_met(effect, ctx)
 
+# The card's reading: LIVE if any previewable condition on it holds now,
+# DORMANT if it has one and none holds, NONE if it has none - in which
+# case the face shows nothing either way. A TOLL_BLOCK's all-or-nothing
+# spend reads as one too (Settled Account): live while it will pay
+# (TollBlockEffect.pays()).
 static func state(card: CardData, ctx: EffectContext) -> State:
 	if card == null or ctx == null:
 		return State.NONE
 	var has_condition: bool = false
 	for effect in card.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.TOLL_BLOCK and ctx.player != null:
+			has_condition = true
+			if TollBlockEffect.pays(effect, ctx.player.toll, ctx.player.stance):
+				return State.LIVE
+			continue
 		if not previewable(effect):
 			continue
 		has_condition = true

@@ -103,7 +103,8 @@ const TOKEN_ENERGY := "{energy}"
 const TOKEN_BONUS_ENERGY := "{bonus_energy}"
 # How many cards a GRANT_KEEP (Bide) gives Keep - its value.
 const TOKEN_KEEP := "{keep}"
-# The Toll a SPEND_TOLL spends - its toll_cost (Second Swing's 5).
+# The Toll a SPEND_TOLL or a TOLL_BLOCK spends - its toll_cost (Second
+# Swing's 5, Settled Account's 5).
 const TOKEN_TOLL_COST := "{toll_cost}"
 # The Energy owed next turn - the value of an effect applying an energy-
 # debt status (StatusData.energy_debt - Come Due's 2).
@@ -136,10 +137,9 @@ const TOKEN_TOLL := "{toll}"
 # What a TOLL_HEAL would heal for at that Toll: half of whatever it can
 # actually spend, capped. No card carries a TOLL_HEAL at present.
 const TOKEN_TOLL_HEAL := "{toll_heal}"
-# What a TOLL_BLOCK spends, and so the Block it adds (TollBlockEffect.
-# spendable()): in a battle hand the Toll held up to its cap - 0 under a
-# stance that forbids Block - and its cap anywhere else, the rule's own
-# number (Settled Account's "Spend up to 5 Toll").
+# The Block a TOLL_BLOCK adds for its spend - its value, fixed (Settled
+# Account's "gain 5 more block"). Never the live Toll: whether it pays is
+# the clause's ink (CardBonus.state()), not its number.
 const TOKEN_TOLL_BLOCK := "{toll_block}"
 # Where a lethal guard the card applies would leave the player (Refuse the
 # End - StatusData.survive_hp()): for the fight's player in a battle hand,
@@ -801,7 +801,7 @@ func _resolve_tokens(description: String) -> String:
 			text = text.replace(TOKEN_ENERGY, str(energy))
 	if text.contains(TOKEN_TOLL_COST):
 		for effect in card_data.effects:
-			if effect != null and effect.effect_type == CardEffect.EffectType.SPEND_TOLL:
+			if effect != null and (effect.effect_type == CardEffect.EffectType.SPEND_TOLL or effect.effect_type == CardEffect.EffectType.TOLL_BLOCK):
 				text = text.replace(TOKEN_TOLL_COST, str(effect.toll_cost))
 				break
 	if text.contains(TOKEN_COUNTDOWN_TURNS) or text.contains(TOKEN_COUNTDOWN_DAMAGE):
@@ -838,7 +838,7 @@ func _resolve_tokens(description: String) -> String:
 	if text.contains(TOKEN_TOLL_HEAL):
 		text = text.replace(TOKEN_TOLL_HEAL, str(_toll_heal_preview()))
 	if text.contains(TOKEN_TOLL_BLOCK):
-		var toll_block: int = _toll_block_preview()
+		var toll_block: int = _effect_value(card_data, [CardEffect.EffectType.TOLL_BLOCK])
 		if toll_block >= 0:
 			text = text.replace(TOKEN_TOLL_BLOCK, str(toll_block))
 	if text.contains(TOKEN_CRITICAL_PERCENT):
@@ -899,17 +899,6 @@ func _toll_heal_preview() -> int:
 		if effect != null and effect.effect_type == CardEffect.EffectType.TOLL_HEAL:
 			return mini(mini(effect.toll_cost, _toll) / 2, effect.value)
 	return 0
-
-# What this card's TOLL_BLOCK prints - see TOKEN_TOLL_BLOCK. -1 with no
-# such effect, which leaves the token standing.
-func _toll_block_preview() -> int:
-	for effect in card_data.effects:
-		if effect == null or effect.effect_type != CardEffect.EffectType.TOLL_BLOCK:
-			continue
-		if _bonus_context == null:
-			return effect.toll_cost
-		return TollBlockEffect.spendable(effect, _toll, _stance)
-	return -1
 
 # What a blow the card adds up to `blow` (its value and attack bonus)
 # lands for against the context's target - DamageEffect.landed(), the

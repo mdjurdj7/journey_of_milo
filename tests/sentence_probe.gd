@@ -196,7 +196,8 @@ func _check_second_swing_twice() -> void:
 	_expect_eq(_label_of(enemy, "sentence"), "Sentence 1", "...two spends, two turns off: 3 -> 1")
 	_completed += 1
 
-# Settled Account on 0 Toll spends nothing, and takes nothing off.
+# Settled Account on under 5 Toll spends nothing, and takes nothing off;
+# on 5 it spends them, and takes one off.
 func _check_settled_account_on_nothing() -> void:
 	var player: Combatant = _player()
 	var enemy := Combatant.new(200)
@@ -204,9 +205,13 @@ func _check_settled_account_on_nothing() -> void:
 	player.toll = 0
 	_play("settled_account", player, [enemy])
 	_expect_eq(_label_of(enemy, "sentence"), "Sentence 3", "Settled Account on 0 Toll takes nothing off")
-	player.toll = 1
+	player.toll = 4
 	_play("settled_account", player, [enemy])
-	_expect_eq(_label_of(enemy, "sentence"), "Sentence 2", "...on 1 Toll it spends it, and takes one off")
+	_expect_eq(_label_of(enemy, "sentence"), "Sentence 3", "...nor on 4 Toll, which it keeps")
+	_expect_eq(player.toll, 4, "...all 4 of it")
+	player.toll = 5
+	_play("settled_account", player, [enemy])
+	_expect_eq(_label_of(enemy, "sentence"), "Sentence 2", "...on 5 Toll it spends them, and takes one off")
 	_completed += 1
 
 func _check_tempered() -> void:
