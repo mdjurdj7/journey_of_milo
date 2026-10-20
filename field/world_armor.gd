@@ -50,6 +50,10 @@ var _body: Node3D = null
 # The body's bounds in this node's space, measured as it's built.
 var _aabb: AABB = AABB()
 var _taken: bool = false
+# Its plate has been looked at once - or the Wanderer set it down himself:
+# every later look is at the examine scale, not first loot's reveal
+# (RegionField.open_armor_examine(), ArmorExamine.reveal_scale).
+var revealed: bool = false
 
 func _ready() -> void:
 	add_to_group(GROUP)

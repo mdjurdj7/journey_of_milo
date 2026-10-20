@@ -3588,7 +3588,8 @@ func open_weapon_offer(weapon: WeaponData) -> bool:
 		return false
 	var examine := ArmorExamine.new()
 	examine.name = "WeaponOffer"
-	examine.setup_weapon(weapon, Rect2(), RunState.weapon, true)
+	# First loot: revealed at ArmorExamine.reveal_scale.
+	examine.setup_weapon(weapon, Rect2(), RunState.weapon, true, true)
 	examine.closed.connect(_on_weapon_offer_closed.bind(weapon))
 	if wanderer != null:
 		wanderer.clear_move_target()
@@ -4036,7 +4037,9 @@ func open_armor_examine(drop: WorldArmor) -> bool:
 		return false
 	var examine := ArmorExamine.new()
 	examine.name = "ArmorExamine"
-	examine.setup(drop.piece, RunState.worn, true)
+	# Its first look is first loot's reveal; every later one is not.
+	examine.setup(drop.piece, RunState.worn, true, Rect2(), not drop.revealed)
+	drop.revealed = true
 	examine.closed.connect(_on_armor_examine_closed.bind(drop))
 	if wanderer != null:
 		wanderer.clear_move_target()
@@ -4065,7 +4068,9 @@ func take_worn_piece(drop: WorldArmor) -> void:
 	TakeFeedback.play_sound(get_tree(), armor_take_sfx_path, armor_take_volume_db, "ArmorTakeAudio", "RegionField")
 	print("RegionField: wore '%s'%s." % [piece.display_name, " (set down '%s')" % old.display_name if old != null else ""])
 	if old != null and wanderer != null:
-		spawn_world_armor(old, wanderer.global_position)
+		# Set down, it is no find: no reveal when looked at again.
+		var set_down: WorldArmor = spawn_world_armor(old, wanderer.global_position)
+		set_down.revealed = true
 
 # The worn piece looked at from the HUD: its plate, no choice - KeepsakeExamine's
 # terms for the keepsake.

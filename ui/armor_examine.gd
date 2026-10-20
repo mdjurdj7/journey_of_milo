@@ -22,6 +22,10 @@ class_name ArmorExamine
 #     and LEAVE, and "REPLACES" the weapon carried. Only a choice closes
 #     it - a click off the plate, Escape and a right click do nothing,
 #     since a weapon left is gone for good (_choice_only).
+# First loot is revealed (setup()/setup_weapon() with `reveal`): a weapon's
+# offer, and a worn piece's first look on the sand - the plate centred at
+# reveal_scale, eased in from examine_scale and from clear over
+# reveal_duration_sec. Every other look is at examine_scale.
 # Layer 100, running ALWAYS.
 
 signal closed(taken: bool)
@@ -29,6 +33,8 @@ signal closed(taken: bool)
 @export var examine_scale: float = 1.0
 @export var inspect_duration_sec: float = 0.15
 @export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.35)
+@export var reveal_scale: float = 1.6
+@export var reveal_duration_sec: float = 0.3
 
 var _piece: TrinketData = null
 var _weapon: WeaponData = null
@@ -38,6 +44,8 @@ var _carried: WeaponData = null
 var _with_choice: bool = false
 # A weapon offer: TAKE or LEAVE is the only way out.
 var _choice_only: bool = false
+# First loot: opens at reveal_scale.
+var _reveal: bool = false
 var _from_rect: Rect2 = Rect2()
 var _scrim: ColorRect = null
 var _plate: ItemPlate = null
@@ -46,17 +54,18 @@ var _closing: bool = false
 
 # Called before the layer enters the tree. `worn`: the piece worn now,
 # which taking this would replace (with_choice only).
-func setup(piece: TrinketData, worn: TrinketData, with_choice: bool, from_rect: Rect2 = Rect2()) -> void:
+func setup(piece: TrinketData, worn: TrinketData, with_choice: bool, from_rect: Rect2 = Rect2(), reveal: bool = false) -> void:
 	_piece = piece
 	_worn = worn
 	_with_choice = with_choice
 	_from_rect = from_rect
+	_reveal = reveal
 
 # The weapon instead of a piece - no choice, or for an offer with_choice
 # and `carried`, the weapon taking it would replace. Called before the
 # layer enters the tree.
-func setup_weapon(weapon: WeaponData, from_rect: Rect2 = Rect2(), carried: WeaponData = null, with_choice: bool = false) -> void:
-	setup(null, null, with_choice, from_rect)
+func setup_weapon(weapon: WeaponData, from_rect: Rect2 = Rect2(), carried: WeaponData = null, with_choice: bool = false, reveal: bool = false) -> void:
+	setup(null, null, with_choice, from_rect, reveal)
 	_weapon = weapon
 	_carried = carried
 	_choice_only = with_choice
@@ -96,10 +105,19 @@ func _ready() -> void:
 func get_plate() -> ItemPlate:
 	return _plate
 
-# Grows from from_rect (at the scale that fits it) to the centre.
+# Grows from from_rect (at the scale that fits it) to the centre - or,
+# first loot, from examine_scale and clear to reveal_scale, centred
+# throughout (its position and size ease alike).
 func _open() -> void:
 	var view: Vector2 = _scrim.get_viewport_rect().size
 	var unit: Vector2 = _plate.get_plate_size() / _plate.plate_scale
+	if _reveal:
+		_plate.plate_scale = examine_scale
+		_plate.position = ((view - unit * examine_scale) / 2.0).round()
+		_plate.modulate.a = 0.0
+		var tween: Tween = _tween_to(reveal_scale, ((view - unit * reveal_scale) / 2.0).round(), 1.0, reveal_duration_sec)
+		tween.tween_property(_plate, "modulate:a", 1.0, reveal_duration_sec)
+		return
 	var start_scale: float = examine_scale
 	var start_position: Vector2
 	if _from_rect.size.x > 0.0:
@@ -111,16 +129,22 @@ func _open() -> void:
 	_plate.position = start_position
 	_tween_to(examine_scale, ((view - unit * examine_scale) / 2.0).round(), 1.0)
 
-func _tween_to(to_scale: float, to_position: Vector2, scrim_alpha: float) -> Tween:
+func _tween_to(to_scale: float, to_position: Vector2, scrim_alpha: float, duration: float = -1.0) -> Tween:
+	if duration < 0.0:
+		duration = inspect_duration_sec
 	if _tween != null and _tween.is_valid():
 		_tween.kill()
 	_tween = create_tween()
 	_tween.set_ease(Tween.EASE_OUT).set_trans(Tween.TRANS_CUBIC)
 	_tween.set_parallel(true)
-	_tween.tween_property(_plate, "plate_scale", to_scale, inspect_duration_sec)
-	_tween.tween_property(_plate, "position", to_position, inspect_duration_sec)
-	_tween.tween_property(_scrim, "modulate:a", scrim_alpha, inspect_duration_sec)
+	_tween.tween_property(_plate, "plate_scale", to_scale, duration)
+	_tween.tween_property(_plate, "position", to_position, duration)
+	_tween.tween_property(_scrim, "modulate:a", scrim_alpha, duration)
 	return _tween
+
+# For probes: whether this look is first loot's reveal.
+func is_reveal() -> bool:
+	return _reveal
 
 func _on_scrim_gui_input(event: InputEvent) -> void:
 	var button := event as InputEventMouseButton

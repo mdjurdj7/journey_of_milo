@@ -30,6 +30,7 @@ const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
 const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
 const ENEMIES_DIR := "res://battle/rules/enemies"
+const TAIL_PATH := "res://run/weapons/greyshelfs_tail.tres"
 const SAFETY_SECONDS := 240.0
 
 var _run_state: Node = null
@@ -356,7 +357,9 @@ func _check_find_line() -> void:
 
 # The plate from the sand: TAKE and LEAVE, "Replaces ..." with one worn;
 # LEAVE leaves it lying and the slot as it was; the field frozen under it
-# and live again after.
+# and live again after. Its first look is first loot's reveal - centred at
+# ArmorExamine.reveal_scale - and looked at again it is not. A weapon's
+# offer is always revealed.
 func _check_examine_leave() -> void:
 	_new_run()
 	await _load_field(0)
@@ -377,11 +380,27 @@ func _check_examine_leave() -> void:
 		var card: Vector2 = plate.call("get_card_size")
 		_expect((plate.call("get_plate_size") as Vector2).y > card.y, "...REPLACES and TAKE / LEAVE in a strip below the plate, the plate itself unchanged")
 		_expect_eq(plate.call("get_type_label"), "WORN", "...which says WORN")
+		await _seconds(0.5)
+		_expect_revealed(examine, true, "Its first look")
 		plate.call("activate", 1) # LEAVE
 		await _seconds(0.5)
 	_expect(_field.can_process(), "LEAVE: the field is live again")
 	_expect(_run_state.get("worn") == worn, "...the worn piece still worn")
 	_expect(is_instance_valid(drop) and not bool(drop.call("is_taken")), "...and the piece still lying there")
+	_expect(bool(_field.call("open_armor_examine", drop)), "Looked at again")
+	await _seconds(0.5)
+	var again: Node = _field.get_node_or_null("ArmorExamine")
+	if again != null:
+		_expect_revealed(again, false, "...its second look")
+		again.call("get_plate").call("activate", 1)
+		await _seconds(0.5)
+	_expect(bool(_field.call("open_weapon_offer", load(TAIL_PATH))), "The Tail's offer opens")
+	await _seconds(0.5)
+	var offer: Node = _field.get_node_or_null("WeaponOffer")
+	if offer != null:
+		_expect_revealed(offer, true, "...as first loot")
+		offer.call("get_plate").call("activate", 1)
+		await _seconds(0.5)
 	await _teardown()
 	_completed += 1
 
@@ -415,6 +434,7 @@ func _check_swap_sets_old_down() -> void:
 		_expect(_run_state.get("worn") == first, "It can be taken again")
 		var back: Array[Node] = _lying()
 		_expect(back.size() == 1 and back[0].get("piece") == second, "...setting the second down in turn")
+		_expect(back.size() == 1 and bool(back[0].get("revealed")), "...no find: set down, it is never revealed")
 	await _teardown()
 	_completed += 1
 
@@ -552,6 +572,16 @@ func _lying() -> Array[Node]:
 func _physics(frames: int) -> void:
 	for i in frames:
 		await physics_frame
+
+# `examine` (an ArmorExamine, eased in) at its reveal: reveal_scale,
+# centred on screen - or, `revealed` false, at examine_scale.
+func _expect_revealed(examine: Node, revealed: bool, label: String) -> void:
+	var plate: Control = examine.call("get_plate")
+	var scale: float = float(examine.get("reveal_scale") if revealed else examine.get("examine_scale"))
+	_expect_eq(bool(examine.call("is_reveal")), revealed, "%s is %sfirst loot's reveal" % [label, "" if revealed else "not "])
+	_expect(is_equal_approx(float(plate.get("plate_scale")), scale), "...its plate at %.1fx (%.2f)" % [scale, float(plate.get("plate_scale"))])
+	var centre: Vector2 = plate.position + (plate.call("get_plate_size") as Vector2) / 2.0
+	_expect(centre.distance_to(plate.get_viewport_rect().size / 2.0) <= 1.0, "...centred (%s)" % centre)
 
 func _seconds(seconds: float) -> void:
 	await create_timer(seconds).timeout
