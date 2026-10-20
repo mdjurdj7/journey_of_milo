@@ -620,6 +620,19 @@ static func remove_at_turn_end(statuses: Array[Status]) -> void:
 		if active.data != null and active.data.ends_at_turn_end:
 			statuses.erase(active)
 
+# Its holder's turn has ended: if a status owes them another turn
+# (StatusData.grants_extra_turn - Owed Time), one charge is spent, the
+# last removing it, and true - the enemies don't act before it.
+static func take_extra_turn(statuses: Array[Status]) -> bool:
+	for active in statuses:
+		if active.data == null or not active.data.grants_extra_turn:
+			continue
+		active.charges -= 1
+		if active.charges <= 0:
+			statuses.erase(active)
+		return true
+	return false
+
 # Whether an Attack played now Drains (StatusData.attacks_drain).
 static func attacks_drain(statuses: Array[Status]) -> bool:
 	for active in statuses:

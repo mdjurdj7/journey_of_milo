@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20); Last Wager reworked (2026-10-20); Nothing Left (2026-10-20)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20); Last Wager reworked (2026-10-20); Nothing Left (2026-10-20); Owed Time (2026-10-20)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 39,
+    "total_unique_wanderer_cards": 40,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 35,
+      "count": 36,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -87,12 +87,13 @@
         "Not So",
         "Take In",
         "On the Brink",
-        "Nothing Left"
+        "Nothing Left",
+        "Owed Time"
       ],
       "by_rarity": {
         "COMMON": 10,
         "UNCOMMON": 15,
-        "RARE": 10
+        "RARE": 11
       },
       "weights": "all 1.0 (weights array empty)"
     },
@@ -109,7 +110,7 @@
       "where": "floor 2's belongings (a RewardSpread prop on region1_floor2.tres)"
     },
     "wanderer_card_types": {
-      "SKILL": 21,
+      "SKILL": 22,
       "ATTACK": 11,
       "POWER": 5,
       "STANCE": 2
@@ -117,12 +118,13 @@
     "wanderer_cards_by_rarity": {
       "COMMON": 14,
       "UNCOMMON": 15,
-      "RARE": 10
+      "RARE": 11
     },
     "implemented_but_not_obtainable": [],
     "missing_art": [
       "Countersign",
-      "Nothing Left"
+      "Nothing Left",
+      "Owed Time"
     ],
     "neutral_cards_missing_art": [
       "Endure",
@@ -1990,6 +1992,79 @@
         "file_path": "res://cards/tempered/on_the_brink_tempered.tres",
         "card_text": "This turn, your Critical line is 50% HP. Draw 2.\nSpent.",
         "changes": "Draws 2 in place of 1."
+      },
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Owed Time",
+      "file_path": "res://cards/data/owed_time.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "UTILITY",
+      "energy_cost": 3,
+      "rarity": "RARE",
+      "card_text": "Spend 20 Toll.\nTake another turn after this.\nSpent.",
+      "face_hp_line": null,
+      "card_text_template": "Spend {toll_cost} Toll.\nTake another turn after this.\nSpent.",
+      "targeting": "self",
+      "removal_after_play": "Spent: leaves this fight's rotation once played",
+      "effects": [
+        {
+          "type": "SPEND_TOLL",
+          "plain_english": "Spend 20 Toll. Can't be played holding less. Like every spend, it hurries every Sentence by a turn."
+        },
+        {
+          "type": "APPLY_STATUS",
+          "plain_english": "Apply Owed Time to yourself: a charge per play (a Countersign copy adds a second). When your turn ends with a charge up, one goes and the enemy turn is skipped: the turn ends as any does (hand discarded but Keep, Grace closed, this-turn statuses gone), the enemies don't act and their intents stay as shown (their Block stays, their statuses don't age, Sentence doesn't count down), and your next turn starts in full - Block resets (Blue Fastener's carry aside), Energy refills, Dying Light, Marrow, Venom and status ages, and the draw. 'Took damage last turn' then means the turn just ended."
+        }
+      ],
+      "keywords": [
+        "Toll",
+        "Spent"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": 20,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "status_effect": {
+        "id": "owed_time",
+        "name": "Owed Time",
+        "description": "Take another turn after this one.",
+        "file_path": "res://battle/rules/statuses/owed_time.tres",
+        "duration": "until its charges are spent, one at each of your turn ends",
+        "stack_rule": "ADD_CHARGES (\"Owed Time ×2\")",
+        "applied_to": "self",
+        "grants_extra_turn": true
+      },
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "cost",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
+          "default_displayed": 3
+        }
+      ],
+      "art_path": null,
+      "rules_font_px": 15,
+      "battle_animation": null,
+      "play_effect_scene_path": null,
+      "upgrade_data": {
+        "name": "Owed Time+",
+        "file_path": "res://cards/tempered/owed_time_tempered.tres",
+        "card_text": "Spend 16 Toll.\nTake another turn after this.\nSpent.",
+        "changes": "Spends 16 Toll in place of 20."
       },
       "starting_deck_count": 0,
       "in_reward_pool": true,

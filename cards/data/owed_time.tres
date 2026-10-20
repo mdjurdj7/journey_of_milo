@@ -1,0 +1,31 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/owed_time.tres" id="3_owed_time"]
+[ext_resource type="Resource" path="res://cards/tempered/owed_time_tempered.tres" id="10_tempered"]
+
+[sub_resource type="Resource" id="E_spend"]
+script = ExtResource("2_card_effect")
+effect_type = 21
+toll_cost = 20
+
+[sub_resource type="Resource" id="E_owed_time"]
+script = ExtResource("2_card_effect")
+effect_type = 12
+status_data = ExtResource("3_owed_time")
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Owed Time"
+cost = 3
+card_type = 1
+rarity = 3
+target_type = 1
+removal_scope = 1
+description = "Spend {toll_cost} Toll.
+Take another turn after this.
+Spent."
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_owed_time")])
+tempered = ExtResource("10_tempered")
+card_class = &"wanderer"

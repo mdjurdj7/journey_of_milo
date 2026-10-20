@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "owed_time"
+display_name = "Owed Time"
+description = "Take another turn after this one."
+category = 2
+default_duration_turns = -1
+stack_rule = 5
+default_charges = 1
+grants_extra_turn = true

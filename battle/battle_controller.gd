@@ -1050,6 +1050,8 @@ func end_turn() -> void:
 # The turn ends: the hand discarded but for `keep` (the end-of-turn keep's
 # cards, which stay for the next turn's draw to land on top of), Grace
 # closed, stance and turn statuses aged, the enemy turn, the next turn.
+# A turn owed (Owed Time - Status.take_extra_turn()) skips the enemy turn:
+# their intents stand as shown, and the next player turn starts in full.
 func _finish_turn(keep: Array[CardData]) -> void:
 	RunLogger.turn_ended(player.energy)
 	_input_locked = true
@@ -1072,7 +1074,15 @@ func _finish_turn(keep: Array[CardData]) -> void:
 	status_changed.emit()
 	if discard_fade > 0.0:
 		await get_tree().create_timer(discard_fade).timeout
-	await _run_enemy_turn()
+	if Status.take_extra_turn(player.statuses):
+		# "Last turn" is the player's own just ended, as the enemy turn
+		# would have left it (_run_enemy_turn()).
+		player.took_damage_last_turn = player.took_damage_this_turn
+		player.took_damage_this_turn = false
+		RunLogger.mechanic("extra_turn", {"turn": _player_turn + 1})
+		status_changed.emit()
+	else:
+		await _run_enemy_turn()
 	_input_locked = false
 	if not _check_battle_end():
 		_start_player_turn()

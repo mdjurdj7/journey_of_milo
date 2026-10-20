@@ -316,6 +316,13 @@ enum Mark { NONE, COIL, DROP }
 # Pair it with DURATION_UNTIL_REMOVED so no tick takes it first.
 @export var ends_at_turn_end: bool = false
 
+# Each charge is a turn of the player's own after this one (Owed Time):
+# when their turn ends, one charge goes and the enemy turn is skipped -
+# the next player turn starts at once (BattleController._finish_turn(),
+# Status.take_extra_turn()). Pair it with ADD_CHARGES, so every play queues
+# one more, and DURATION_UNTIL_REMOVED.
+@export var grants_extra_turn: bool = false
+
 # While this is up, every Attack card the player plays Drains: after its
 # last effect it heals ransom_heal_fraction of the HP its hits took from
 # enemies, rounded down - not a killing blow's overkill, and less
