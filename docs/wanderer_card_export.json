@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 37,
+    "total_unique_wanderer_cards": 38,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 33,
+      "count": 34,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -85,10 +85,11 @@
         "Go Under",
         "Countersign",
         "Not So",
-        "Take In"
+        "Take In",
+        "On the Brink"
       ],
       "by_rarity": {
-        "COMMON": 9,
+        "COMMON": 10,
         "UNCOMMON": 15,
         "RARE": 9
       },
@@ -107,13 +108,13 @@
       "where": "floor 2's belongings (a RewardSpread prop on region1_floor2.tres)"
     },
     "wanderer_card_types": {
-      "SKILL": 20,
+      "SKILL": 21,
       "ATTACK": 10,
       "POWER": 5,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
-      "COMMON": 13,
+      "COMMON": 14,
       "UNCOMMON": 15,
       "RARE": 9
     },
@@ -150,7 +151,7 @@
       },
       {
         "name": "Critical",
-        "rule": "At or below 30% of your max HP. (CharacterData.critical_hp_fraction 0.3.) Checked live when an effect resolves. Go Under raises it to 50% for the rest of the fight (the tooltip and the HP bar's tick follow)."
+        "rule": "At or below 30% of your max HP. (CharacterData.critical_hp_fraction 0.3.) Checked live when an effect resolves. Go Under raises it to 50% for the rest of the fight, On the Brink to 50% for the turn (the tooltip and the HP bar's tick follow)."
       },
       {
         "name": "Drain",
@@ -1834,6 +1835,86 @@
         "file_path": "res://cards/tempered/not_so_tempered.tres",
         "card_text": "Spend 7 Toll.\nUndo the last attack; return it.\nSpent.",
         "changes": "Spends 7 Toll in place of 10."
+      },
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "On the Brink",
+      "file_path": "res://cards/data/on_the_brink.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "UTILITY",
+      "energy_cost": 0,
+      "rarity": "COMMON",
+      "card_text": "This turn, your Critical line is 50% HP. Draw 1.\nSpent.",
+      "face_hp_line": null,
+      "card_text_template": "This turn, your Critical line is {critical_percent}% HP. Draw {draw}.\nSpent.",
+      "targeting": "self",
+      "removal_after_play": "Spent: leaves this fight's rotation once played",
+      "effects": [
+        {
+          "type": "APPLY_STATUS",
+          "plain_english": "Apply On the Brink to yourself: for the rest of this turn you are Critical at or below 50% of max HP (StatusData.raises_critical_percent 50, read through Combatant.critical_fraction() - the higher of your own line and any status's). It ends with your turn, before any enemy acts, and the line is back where it was (30%, or Gone Under's 50%). HP, max HP and Go Under are untouched. Played at or under the new line, you enter Critical at once: No Further arms (and stays armed into the enemy's turn) and the keepsake's Critical-entry Block fires, as if HP had dropped there."
+        },
+        {
+          "type": "DRAW",
+          "plain_english": "Draw 1 card."
+        }
+      ],
+      "keywords": [
+        "Critical",
+        "Spent"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": null,
+      "draw": 1,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": null,
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "status_effect": {
+        "id": "on_the_brink",
+        "name": "On the Brink",
+        "description": "This turn, you're Critical at 50% of max HP or below.",
+        "file_path": "res://battle/rules/statuses/on_the_brink.tres",
+        "duration": "this turn (ends at its end)",
+        "stack_rule": "IGNORE",
+        "applied_to": "self",
+        "raises_critical_percent": 50
+      },
+      "critical_condition": {
+        "rule": "Raises the line itself for this turn: everything that reads Critical this turn (Critical-condition cards, Critical costs, Last Resort's bonus, live card faces, the play sound, Refuse the End against a strike-back on your own turn) judges it at 50%. Checks in the enemy's turn or at the next turn's start (Refuse the End against an enemy attack, Dying Light, Venom's tick) see the old line. Under Gone Under it adds nothing; the draw still happens."
+      },
+      "dynamic_values": [
+        {
+          "field": "HP bar",
+          "rule": "When played, the HP bar's Critical tick eases up to 50% and its colour turns Critical at once if HP is under it; the Critical keyword's tooltip reads 50%. Both go back at End Turn, before the enemies act.",
+          "default_displayed": "30% outside a fight"
+        },
+        {
+          "field": "cost",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
+          "default_displayed": 0
+        }
+      ],
+      "art_path": "res://cards/art/Wanderer/On the Brink.png",
+      "rules_font_px": 15,
+      "battle_animation": null,
+      "play_effect_scene_path": null,
+      "upgrade_data": {
+        "name": "On the Brink+",
+        "file_path": "res://cards/tempered/on_the_brink_tempered.tres",
+        "card_text": "This turn, your Critical line is 50% HP. Draw 2.\nSpent.",
+        "changes": "Draws 2 in place of 1."
       },
       "starting_deck_count": 0,
       "in_reward_pool": true,

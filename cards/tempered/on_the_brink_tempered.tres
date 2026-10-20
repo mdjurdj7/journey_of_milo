@@ -1,0 +1,30 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/on_the_brink.tres" id="3_on_the_brink"]
+[ext_resource type="Texture2D" uid="uid://cncuxkfm2yu38" path="res://cards/art/Wanderer/On the Brink.png" id="4_art"]
+
+[sub_resource type="Resource" id="CardEffect_apply_status"]
+script = ExtResource("2_card_effect")
+effect_type = 12
+status_data = ExtResource("3_on_the_brink")
+
+[sub_resource type="Resource" id="CardEffect_draw"]
+script = ExtResource("2_card_effect")
+effect_type = 3
+value = 2
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "On the Brink+"
+cost = 0
+card_type = 1
+rarity = 1
+target_type = 1
+removal_scope = 1
+description = "This turn, your Critical line is {critical_percent}% HP. Draw {draw}.
+Spent."
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status"), SubResource("CardEffect_draw")])
+art = ExtResource("4_art")
+card_class = &"wanderer"

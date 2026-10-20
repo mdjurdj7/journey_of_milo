@@ -29,6 +29,9 @@ const UNSAID_TOLL_CARDS: Array[String] = ["In the Red", "In the Red+"]
 # Cards whose Critical-gated effects in a row share one clause line ("1
 # more, and draw 2"); every other step is a line of its own.
 const ONE_CRITICAL_LINE_CARDS: Array[String] = ["In the Red", "In the Red+"]
+# Cards whose draw shares the line before it ("...50% HP. Draw 1."): on its
+# own line On the Brink's text falls to 12 px; shared, it holds 15.
+const SHARED_DRAW_LINE_CARDS: Array[String] = ["On the Brink", "On the Brink+"]
 # The rules text size each card lands at outside a fight; any card not
 # listed fits at the first size, 15, cleanly - inside the rules margins
 # (CardView.rules_margin_px) and no lone last word. A card that moves
@@ -60,6 +63,7 @@ const CARD_ART: Dictionary = {
 	"in_the_red": "res://cards/art/Wanderer/In the Red.png",
 	"not_so": "res://cards/art/Wanderer/Not So.png",
 	"take_in": "res://cards/art/Wanderer/Take In.png",
+	"on_the_brink": "res://cards/art/Wanderer/On the Brink.png",
 	"go_under": "res://cards/art/Wanderer/Go Under.png",
 	"slash": "res://cards/art/Wanderer/Slash.png",
 	"bite_down": "res://cards/art/Wanderer/Bite Down.png",
@@ -482,7 +486,8 @@ func _check_lasting_cards_leave_rotation() -> void:
 #     then acts (2), SELF_DAMAGE_TOLL's line is its Toll (the
 #     HP is the badge's; none for UNSAID_TOLL_CARDS), a conditional upgrade
 #     shares its effect's line, ONE_CRITICAL_LINE_CARDS' Critical gates in
-#     a row share one, and TWO_LINE_STATUS_CARDS' status takes 2 - then a
+#     a row share one, SHARED_DRAW_LINE_CARDS' draw shares the line before
+#     it, and TWO_LINE_STATUS_CARDS' status takes 2 - then a
 #     Critical cost
 #     (critical_cost) as "Critical: costs N.", and the scope last:
 #     "Spent." for a SPENT card, "Consumed." for a CONSUMED one.
@@ -578,6 +583,8 @@ func _lines_for(effect: CardEffect, card: CardData) -> int:
 			return 2
 		CardEffect.EffectType.APPLY_STATUS, CardEffect.EffectType.APPLY_STATUS_TO_TARGET:
 			return 2 if TWO_LINE_STATUS_CARDS.has(card.card_name) else 1
+		CardEffect.EffectType.DRAW:
+			return 0 if SHARED_DRAW_LINE_CARDS.has(card.card_name) else 1
 	return 1
 
 # --- Helpers ---
