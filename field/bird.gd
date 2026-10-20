@@ -274,10 +274,15 @@ func _spawn_approach_area() -> void:
 	add_child(_approach_area)
 	_approach_area.body_entered.connect(_on_approach_body_entered)
 
+# Deferred: body_entered is a physics callback, and the take-off turns
+# this very area's monitoring off and reparents it with the bird - not
+# allowed mid-callback. It goes at the end of this frame; _flying is set
+# now, so a second body in the same frame can't queue a second one.
 func _on_approach_body_entered(body: Node3D) -> void:
 	if _flying or not body.is_in_group("wanderer"):
 		return
-	_take_flight()
+	_flying = true
+	_take_flight.call_deferred()
 
 # The flight heading in world space: the bias direction relative to the
 # field's forward, yawed by fly_yaw_offset_degrees.
