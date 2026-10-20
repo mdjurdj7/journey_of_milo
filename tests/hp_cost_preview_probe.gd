@@ -8,7 +8,8 @@ extends SceneTree
 # Collateral paying for missing Energy, Self-Eater's price on an Attack,
 # a play that crosses the Critical line, a lethal play, and a play's
 # preview holding until the card has resolved and its HP has dropped.
-# Every number is read from the cards' and statuses' data.
+# In every case the card's own "−N HP" badge reads the same number as the
+# bar. Every number is read from the cards' and statuses' data.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/hp_cost_preview_probe.gd
 #
@@ -149,6 +150,7 @@ func _check_lethal() -> void:
 	await _set_hp(maxi(loss - 1, 1))
 	_expect_eq(int(_bar.call("get_cost_preview_result")), 0, "...at less HP than it costs: still 0, the loss clamped to the HP held")
 	_expect_eq(int(_bar.call("get_cost_preview")), maxi(loss - 1, 1), "...the preview the HP held")
+	_expect_eq(_view(card).hp_cost_label.text, "−%d HP" % maxi(loss - 1, 1), "...and so does the card's badge")
 	await _unhover(card)
 	_completed += 1
 
@@ -192,6 +194,8 @@ func _expect_preview(loss: int, result: int, label: String) -> void:
 	_expect_eq(int(_bar.call("get_cost_preview")), loss, "...the bar previews %d HP" % loss)
 	_expect_eq(int(_bar.call("get_cost_preview_result")), result, "...the numeral reads → %d" % result)
 	_expect(bool(_bar.call("shows_cost_preview")), "...and the preview shows")
+	var view: CardView = _view(card)
+	_expect_eq(view.hp_cost_label.text if view != null else "", "−%d HP" % loss, "...and the card's badge agrees")
 
 # The card's own SELF_DAMAGE / SELF_DAMAGE_TOLL values, from its data.
 func _self_loss(path: String) -> int:

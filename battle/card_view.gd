@@ -771,8 +771,13 @@ func set_stance(stance: Stance) -> void:
 func _refresh_dynamic_text() -> void:
 	_hp_cost = _derive_hp_cost(card_data)
 	# The line is everything playing it costs in HP, a cost replacement's
-	# included - {hp_cost} leaves that out (see TOKEN_HP_COST's doc).
-	var line_hp: int = _hp_cost + _replaced_cost_hp()
+	# included - {hp_cost} leaves that out (see TOKEN_HP_COST's doc). In a
+	# fight it is CardBonus.predicted_self_loss() - the number the HP bar
+	# previews, so the two always agree; outside one, the card's own
+	# self-loss and the stance's price.
+	var line_hp: int = _hp_cost
+	if _bonus_context != null and _bonus_context.player != null:
+		line_hp = CardBonus.predicted_self_loss(card_data, _bonus_context)
 	hp_cost_label.text = "−%d HP" % line_hp if line_hp > 0 else ""
 	hp_cost_label.visible = line_hp > 0
 	var was: CardBonus.State = _bonus_state

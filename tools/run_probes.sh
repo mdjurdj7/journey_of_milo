@@ -258,7 +258,7 @@ SMOKE_PROBES="kill_order devour pathing hold_line wanderer_rig starter_cards"
 area_probes() {
 	case "$1" in
 		cards) echo "starter_cards card_rarity frayed_cord" ;;
-		face) echo "starter_cards keyword come_due critical_cards card_rarity_finish second_swing reckoning on_the_brink last_wager nothing_left owed_time" ;;
+		face) echo "starter_cards keyword come_due critical_cards card_rarity_finish second_swing reckoning on_the_brink last_wager nothing_left owed_time hp_cost_preview" ;;
 		keywords) echo "keyword starter_cards the_return" ;;
 		rules) echo "starter_cards critical_cards come_due collateral leverage no_further ransom sentence the_return trinket keeper_keepsake toll_carry kill_order armored_contact bide deny dying_light run_log frayed_cord blood_advance dunecur blackback greyshelf underfoot play_order grace second_swing garnish claw_back gnaw settled_account devour adder killing_blow critical_cost reckoning on_the_brink last_wager nothing_left owed_time hp_cost_preview" ;;
 		enemies) echo "blackback siltjaw wardling dunecur greyshelf underfoot sentence no_further critical_cards kill_order armored_contact deny enemy_export adder glassbone" ;;
