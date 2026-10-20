@@ -95,7 +95,7 @@ const EXPECTED_POOL: Array[String] = [
 	"Refuse the End", "Last Resort", "Blood Arc", "With Regards", "Come Due",
 	"No Further", "Sentence", "The Return", "Collateral", "Ransom", "Leverage",
 	"Bide", "Deny", "Blood Advance", "Second Swing", "Garnish", "Claw Back",
-	"Gnaw", "Settled Account", "Reckoning", "In the Red", "Go Under",
+	"Gnaw", "Settled Account", "Reckoning", "In the Red", "Go Under", "Countersign",
 ]
 const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Down Payment"]
 
@@ -192,7 +192,7 @@ func _check_pool_membership() -> void:
 	var names: Array[String] = []
 	for card in pool.entries:
 		names.append(card.card_name)
-	_expect_eq(names.size(), 30, "Wanderer pool holds 30 cards")
+	_expect_eq(names.size(), 31, "Wanderer pool holds 31 cards")
 	for card_name in EXPECTED_POOL:
 		_expect(names.has(card_name), "%s is in the Wanderer pool" % card_name)
 	for card_name in STARTER_ONLY:
