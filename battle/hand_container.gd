@@ -182,16 +182,29 @@ signal draw_started(card_data: CardData)
 
 @export_group("Devour Yield Line")
 # While Take In's choice is open, the hovered candidate's yield in one
-# line of ink (DevourYieldLine, DevourYield.describe()) centred over the
-# card as it stands lifted, yield_line_gap_px above its top edge - the
-# keyword definition's place, which stays off for candidates meanwhile.
-# Each re-applies live.
+# line of ink on a strip of the card's bone (DevourYieldLine, DevourYield.
+# describe()) centred over the card as it stands lifted, yield_line_gap_px
+# above its top edge - the keyword definition's place, which stays off for
+# candidates meanwhile. Each re-applies live.
 @export var yield_line_font_size_px: int = 13:
 	set(value):
 		yield_line_font_size_px = value
 		if _yield_line != null:
 			_yield_line.set_font_size_px(value)
-@export var yield_line_gap_px: float = 8.0
+@export var yield_line_gap_px: float = 6.0
+# Bone between the strip's edge and its line: x each side, y top and
+# bottom, in screen pixels.
+@export var yield_line_padding_px: Vector2 = Vector2(6.0, 2.0):
+	set(value):
+		yield_line_padding_px = value
+		if _yield_line != null:
+			_yield_line.set_padding(value)
+# The strip's height for its one line, in ems of the type.
+@export var yield_line_height: float = 1.2:
+	set(value):
+		yield_line_height = value
+		if _yield_line != null:
+			_yield_line.set_line_height(value)
 @export_group("")
 
 # The bitten card's render reaches this far past the card on every side,
@@ -266,6 +279,8 @@ func _ready() -> void:
 	_yield_line = DevourYieldLine.new()
 	_yield_line.name = "DevourYieldLine"
 	_yield_line.set_font_size_px(yield_line_font_size_px)
+	_yield_line.set_padding(yield_line_padding_px)
+	_yield_line.set_line_height(yield_line_height)
 	add_child(_yield_line)
 	set_process(false)
 
@@ -373,6 +388,7 @@ func _process(_delta: float) -> void:
 		return
 	if has_theme_color("ink", "Battle"):
 		_yield_line.set_ink(get_theme_color("ink", "Battle"))
+	_yield_line.set_bone(hovered.field_color)
 	_yield_line.show_over(DevourYield.describe(hovered.card_data, _devour_per_energy), hovered.get_screen_rect_now(), yield_line_gap_px)
 
 # For probes: the yield line, or null.

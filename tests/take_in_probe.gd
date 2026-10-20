@@ -212,6 +212,10 @@ func _check_choose_and_devour() -> void:
 				var armed_rect: Rect2 = armed.get_screen_rect_now()
 				_expect(shown.end.y <= card_rect.position.y and not shown.intersects(armed_rect) and not shown.intersects(card_rect), "...above the card, clear of it and of Take In (line %s, card %s, Take In %s)" % [shown, card_rect, armed_rect])
 				_expect(not view.keyword_hover_allowed(), "...and no keyword definition on it")
+				# On a one-line strip of the card's bone, so it reads over
+				# any ground.
+				_expect(line.get("_bone") == view.field_color and float(line.get("_reveal")) >= 1.0, "...on a strip of the card's bone (%s)" % str(line.get("_bone")))
+				_expect(line.get_line_count() == 1 and line.size.y > float(hand.get("yield_line_font_size_px")), "...one line on it (%d lines, %.0f px tall)" % [line.get_line_count(), line.size.y])
 			view.set_hovered(false)
 			for i in 5:
 				await process_frame
