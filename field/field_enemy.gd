@@ -2595,13 +2595,18 @@ func _finish_death() -> void:
 	death_finished.emit()
 	queue_free()
 
+# Deferred: body_entered is a physics callback, and the contact
+# (RegionField._on_enemy_contacted()) freezes the field, taking its bodies
+# out of the physics space - not allowed mid-callback. It goes out at the
+# end of this frame instead; _contacted is set now, so a second body this
+# frame queues nothing more.
 func _on_body_entered(body: Node3D) -> void:
 	# A dead body's area comes back into the space with the field's
 	# unfreeze a beat before the node is freed - never a contact.
 	if _contacted or _defeated or is_queued_for_deletion() or not body.is_in_group("wanderer"):
 		return
 	_contacted = true
-	contacted.emit(self)
+	contacted.emit.call_deferred(self)
 
 # Reset the once-only guard when the Wanderer leaves, so a return visit
 # (e.g. after an ESCAPE push-back) can trigger contact again.
