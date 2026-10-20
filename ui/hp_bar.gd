@@ -302,18 +302,40 @@ class_name HPBar
 	set(value):
 		critical_color = value
 		_apply_critical_colors()
-# A hairline across the bar at the Critical line, shown at every HP, in
-# the track's ink at this alpha. It overhangs the bar by critical_tick_
-# overhang_px above and below, so it still reads where the fill covers it.
-@export_range(0.0, 1.0) var critical_tick_alpha: float = 0.5:
+# The Critical line, shown at every HP: a 1 px hairline in this colour at
+# critical_line_alpha - the Critical colour the numeral and fill turn, by
+# default. In battle it runs full height, critical_line_above_px over the
+# bar to critical_line_below_px under it, drawn over the fill, Grace and
+# the cost preview, so it reads wherever they reach; the field's smaller
+# bar overhangs it by critical_tick_overhang_px each way.
+@export var critical_line_color: Color = Color(0.46, 0.14, 0.13):
 	set(value):
-		critical_tick_alpha = value
+		critical_line_color = value
 		_apply_critical_colors()
+@export_range(0.0, 1.0) var critical_line_alpha: float = 0.85:
+	set(value):
+		critical_line_alpha = value
+		_apply_critical_colors()
+@export var critical_line_above_px: float = 7.0:
+	set(value):
+		critical_line_above_px = value
+		queue_redraw()
+@export var critical_line_below_px: float = 4.0:
+	set(value):
+		critical_line_below_px = value
+		queue_redraw()
+# Where the battle line crosses the dark fill, a 1 px knockout either
+# side of it in the bar's bone (the Battle theme's paper token), so the
+# line stands apart from the fill instead of sinking into it. Off: the
+# line straight over the fill.
+@export var critical_line_knockout: bool = true:
+	set(value):
+		critical_line_knockout = value
+		queue_redraw()
 @export var critical_tick_overhang_px: float = 2.0:
 	set(value):
 		critical_tick_overhang_px = value
-		if is_node_ready():
-			_apply_layout()
+		queue_redraw()
 # Read at each crossing, so an edit takes on the next one.
 @export var critical_fade_time: float = 0.2:
 	set(value):
@@ -361,8 +383,8 @@ class_name HPBar
 		cost_preview_arrow = value
 		queue_redraw()
 # A previewed result that crosses the Critical line from above marks the
-# line: a flat hairline this wide, centred on it, over the line's top end,
-# in critical_color.
+# line: a flat hairline this wide, centred on it, across the line's top
+# end above the bar, in critical_line_color.
 @export var critical_cross_mark_px: float = 5.0:
 	set(value):
 		critical_cross_mark_px = value
@@ -536,6 +558,8 @@ var _in_battle: bool = false
 var _visibility: HoverFadeVisibility = null
 # Cached theme ink/bone (see refresh_style()).
 var _ink: Color = Color.BLACK
+# The Battle theme's bone - the Critical line's knockout.
+var _bone: Color = Color.WHITE
 # Critical now (see _refresh_critical()), and how far the numeral and
 # fill have eased toward critical_color: 0 ink, 1 critical_color.
 var _critical: bool = false
@@ -649,8 +673,7 @@ func _draw_field(alpha: float) -> void:
 	draw_rect(Rect2(bar_left, 0.0, field_bar_width, field_bar_height), track)
 	draw_rect(Rect2(bar_left, 0.0, field_bar_width * _fill_drawn(_displayed_fraction), field_bar_height), hp_ink)
 	_draw_hp_change(bar_left, 0.0, field_bar_width, field_bar_height, _displayed_fraction, hp_ink)
-	var tick_color: Color = _ink
-	tick_color.a = critical_tick_alpha * alpha
+	var tick_color: Color = Color(critical_line_color, critical_line_alpha * alpha)
 	var tick_x: float = roundf(bar_left + field_bar_width * _critical_fraction())
 	if _shows_critical():
 		draw_rect(Rect2(tick_x, -critical_tick_overhang_px, 1.0, field_bar_height + critical_tick_overhang_px * 2.0), tick_color)
@@ -900,16 +923,6 @@ func _draw_battle() -> void:
 		preview_from = minf(_hp_fraction(get_cost_preview_result(), _max_hp), _displayed_fraction)
 		fill = minf(fill, preview_from)
 	draw_rect(Rect2(left, bar_top, battle_width * fill, battle_bar_height), hp_ink)
-	# The Critical line, after the fill, overhanging the bar.
-	var tick_color: Color = _ink
-	tick_color.a = critical_tick_alpha * _battle_blend
-	var tick_x: float = roundf(left + battle_width * _critical_fraction())
-	if _shows_critical():
-		draw_rect(Rect2(tick_x, bar_top - critical_tick_overhang_px, 1.0, battle_bar_height + critical_tick_overhang_px * 2.0), tick_color)
-		# The previewed play crosses it: a flat hairline over its top end.
-		if cost_preview_crosses_critical():
-			var mark_color: Color = Color(critical_color, _battle_blend)
-			draw_rect(Rect2(tick_x + 0.5 - critical_cross_mark_px * 0.5, bar_top - critical_tick_overhang_px - 1.0, critical_cross_mark_px, 1.0), mark_color)
 
 	# Pinned to _displayed_fraction, so it stays welded to the filled end
 	# while the bar eases toward a new HP value rather than briefly
@@ -928,6 +941,20 @@ func _draw_battle() -> void:
 		var pale: Color = hp_ink
 		pale.a *= cost_preview_alpha
 		draw_rect(Rect2(left + battle_width * preview_from, bar_top, battle_width * (_displayed_fraction - preview_from), battle_bar_height), pale)
+	# The Critical line last, full height through the bar, over everything
+	# drawn in it; a previewed play that crosses it marks its top end.
+	if _shows_critical():
+		var line_x: float = roundf(left + battle_width * _critical_fraction())
+		# Each side's knockout pixel only where it would sit on the fill.
+		if critical_line_knockout:
+			var fill_end: float = left + battle_width * fill
+			var knockout: Color = Color(_bone, _battle_blend)
+			for side_x: float in [line_x - 1.0, line_x + 1.0]:
+				if side_x >= left and side_x + 1.0 <= fill_end:
+					draw_rect(Rect2(side_x, bar_top, 1.0, battle_bar_height), knockout)
+		draw_rect(Rect2(line_x, bar_top - critical_line_above_px, 1.0, critical_line_above_px + battle_bar_height + critical_line_below_px), Color(critical_line_color, critical_line_alpha * _battle_blend))
+		if cost_preview_crosses_critical():
+			draw_rect(Rect2(line_x + 0.5 - critical_cross_mark_px * 0.5, bar_top - critical_line_above_px, critical_cross_mark_px, 1.0), Color(critical_line_color, _battle_blend))
 
 	if _toll_visible:
 		_draw_toll(bar_top, ink)
@@ -1050,6 +1077,7 @@ func set_target(wanderer: Wanderer) -> void:
 # the Battle ink token.
 func refresh_style() -> void:
 	_ink = get_theme_color("ink", "Battle")
+	_bone = get_theme_color("bone", "Battle")
 	_toll_rule_color = get_theme_color("toll_rule", "Battle")
 	# Alegreya Bold, tracked - the same treatment the card's own type label
 	# uses, so the row reads as the same voice as "STRIKE"/"GUARD".
