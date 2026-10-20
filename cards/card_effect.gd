@@ -17,10 +17,15 @@ enum EffectType {
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
 	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL, DRAIN, SET_ASIDE, CONSUME,
 	REPLAY_LAST_ATTACK, GRANT_KEEP, COPY_HAND_CARD, UNDO_LAST_ATTACK,
+	TOLL_SPENT_DAMAGE,
 }
 # CONSUME and SET_ASIDE are retired (Deny no longer takes a hand card,
-# Bide no longer sets cards aside) - no resolver, nothing authors them;
-# kept so the values after them keep their numbers.
+# Bide no longer sets cards aside), and TOLL_DAMAGE (Reckoning no longer
+# spends all Toll) - no resolver, nothing authors them; kept so the
+# values after them keep their numbers.
+# TOLL_SPENT_DAMAGE (Reckoning): deal the Toll spent this fight
+# (Combatant.toll_spent_this_fight), spending none (toll_spent_damage_
+# effect.gd).
 # GRANT_KEEP (Bide): up to `value` chosen hand cards gain Keep (grant_
 # keep_effect.gd).
 # COPY_HAND_CARD (Countersign): a fight-only copy of the chosen hand card

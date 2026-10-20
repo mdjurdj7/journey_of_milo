@@ -209,16 +209,16 @@ func _check_grace() -> void:
 # cap: 27 heals 13; a Skill under the same status heals nothing.
 func _check_reckoning_and_skills() -> void:
 	var player: Combatant = _player()
-	player.toll = 7
+	player.toll_spent_this_fight = 7
 	var enemy := Combatant.new(ENEMY_HP)
 	_resolve(RECKONING_PATH, player, [enemy], enemy)
-	_expect_eq([ENEMY_HP - enemy.hp, _healed], [7, 3], "Reckoning on 7 Toll deals 7 and heals 3")
+	_expect_eq([ENEMY_HP - enemy.hp, _healed], [7, 3], "Reckoning on 7 Toll spent deals 7 and heals 3")
 	player = _player()
 	player.hp = PLAYER_HP - 20
-	player.toll = 27
+	player.toll_spent_this_fight = 27
 	enemy = Combatant.new(40)
 	_resolve(RECKONING_PATH, player, [enemy], enemy)
-	_expect_eq([40 - enemy.hp, _healed], [27, 13], "Reckoning on 27 Toll deals 27 and heals 13")
+	_expect_eq([40 - enemy.hp, _healed], [27, 13], "Reckoning on 27 Toll spent deals 27 and heals 13")
 	player = _player()
 	enemy = Combatant.new(ENEMY_HP)
 	_resolve(BRACE_PATH, player, [enemy], null)

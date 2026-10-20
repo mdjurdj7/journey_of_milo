@@ -159,6 +159,7 @@ func spend_toll(amount: int) -> int:
 	if spent <= 0:
 		return 0
 	player.toll -= spent
+	player.toll_spent_this_fight += spent
 	toll_spent_this_card = true
 	player.toll_spent_this_turn = true
 	return spent

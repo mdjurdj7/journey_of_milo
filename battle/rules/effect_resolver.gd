@@ -17,7 +17,6 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.SELF_DAMAGE: "res://battle/rules/effects/self_damage_effect.gd",
 	CardEffect.EffectType.DRAW: "res://battle/rules/effects/draw_effect.gd",
 	CardEffect.EffectType.HEAL: "res://battle/rules/effects/heal_effect.gd",
-	CardEffect.EffectType.TOLL_DAMAGE: "res://battle/rules/effects/toll_damage_effect.gd",
 	CardEffect.EffectType.STUN: "res://battle/rules/effects/stun_effect.gd",
 	CardEffect.EffectType.TOLL_BLOCK: "res://battle/rules/effects/toll_block_effect.gd",
 	CardEffect.EffectType.TOLL_RETALIATE: "res://battle/rules/effects/toll_retaliate_effect.gd",
@@ -36,6 +35,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.GRANT_KEEP: "res://battle/rules/effects/grant_keep_effect.gd",
 	CardEffect.EffectType.COPY_HAND_CARD: "res://battle/rules/effects/copy_hand_card_effect.gd",
 	CardEffect.EffectType.UNDO_LAST_ATTACK: "res://battle/rules/effects/undo_last_attack_effect.gd",
+	CardEffect.EffectType.TOLL_SPENT_DAMAGE: "res://battle/rules/effects/toll_spent_damage_effect.gd",
 }
 
 var _cache: Dictionary = {}

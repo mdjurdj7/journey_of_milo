@@ -44,9 +44,7 @@ class_name BattleFeedback
 # hit's damage, is weightier - a deep impact layered under the contact
 # sound (heavy_impact_clips dealt in turn, silent at heavy_min_damage
 # rising to heavy_impact_max_volume_db), and the recoil grown up to its
-# max multiplier. A card that spends Toll as
-# its blow (CardEffect TOLL_DAMAGE - Reckoning) always counts as at least
-# heavy_min_damage. A card hit of shake_min_damage or more also jolts the
+# max multiplier. A card hit of shake_min_damage or more also jolts the
 # camera once (CameraRig.jolt()) - the only camera movement a hit makes,
 # off with camera_shake_enabled. Presentation only: nothing here touches
 # the rules, and heavy_hit_enabled off gives the plain reaction, no jolt
@@ -155,9 +153,6 @@ var _met_block: Dictionary[FieldEnemy, bool] = {}
 # overkill's hit that follows in the same blow doesn't play it again.
 # Cleared at the frame's end.
 var _surfaced: Dictionary[FieldEnemy, bool] = {}
-# The card resolving right now - set at its impact and cleared at the end
-# of that frame, like _effect: whether its blow counts as heavy at least.
-var _impact_card: CardData = null
 var _heavy_pool := SoundPool.new()
 
 func _init() -> void:
@@ -188,7 +183,7 @@ func on_damage_dealt(source: Variant, target: Variant, amount: int, kind: String
 		var armored: bool = _met_block.has(target)
 		_met_block.erase(target)
 		var sounded: bool = _surfaced.has(target)
-		var heavy: float = heavy_level(heavy_damage(amount))
+		var heavy: float = heavy_level(amount)
 		var killing: bool = battle_controller != null and battle_controller.is_dying(target)
 		# One of a card's several hits (Lash): the multi-hit stop.
 		var multi: bool = battle_controller != null and battle_controller.is_multi_hit_report()
@@ -276,34 +271,7 @@ func on_card_impact(card: CardData, targets: Array[FieldEnemy], ceiling_y: float
 	_effect = effect
 	_release_effect.call_deferred()
 
-# Every card's impact (BattleController.card_impact, before its effects
-# resolve): which card this frame's hits belong to, for heavy_damage().
-func set_impact_card(card: CardData) -> void:
-	_impact_card = card
-	_release_impact_card.call_deferred()
-
-func _release_impact_card() -> void:
-	_impact_card = null
-
 # --- Heavy tier ---
-
-# Whether `card`'s blow is its Toll, spent whole (CardEffect TOLL_DAMAGE -
-# Reckoning): its hit counts as heavy at least, and BattleOverlay pours
-# the spent Toll into it.
-static func is_toll_blow(card: CardData) -> bool:
-	if card == null:
-		return false
-	for effect in card.effects:
-		if effect != null and effect.effect_type == CardEffect.EffectType.TOLL_DAMAGE:
-			return true
-	return false
-
-# The damage the heavy tier reads for a hit of `amount` this frame: the
-# hit's own, or at least heavy_min_damage for a Toll blow.
-func heavy_damage(amount: int) -> int:
-	if is_toll_blow(_impact_card):
-		return maxi(amount, heavy_min_damage)
-	return amount
 
 # Where `damage` sits in the tier: -1 below it (or with the tier off), 0
 # at heavy_min_damage rising to 1 at heavy_max_damage, and held there.

@@ -477,8 +477,8 @@ func _check_lasting_cards_leave_rotation() -> void:
 #   - HP paid after another effect stays in the text where it happens,
 #     as "Then lose X HP." with the effect's own number;
 #   - any HP the card costs shows in the badge;
-#   - one line per resolution step, in order - TOLL_DAMAGE and TOLL_HEAL
-#     spend and then act (2), SELF_DAMAGE_TOLL's line is its Toll (the
+#   - one line per resolution step, in order - TOLL_HEAL spends and
+#     then acts (2), SELF_DAMAGE_TOLL's line is its Toll (the
 #     HP is the badge's; none for UNSAID_TOLL_CARDS), a conditional upgrade
 #     shares its effect's line, ONE_CRITICAL_LINE_CARDS' Critical gates in
 #     a row share one, and TWO_LINE_STATUS_CARDS' status takes 2 - then a
@@ -556,25 +556,24 @@ func _check_toll_cards() -> void:
 	root.add_child(view)
 	await process_frame
 	view.set_card_data(_card("reckoning"))
-	_expect_eq(view.rules_text.get_parsed_text(), "Spend all Toll.\nDeal that much damage.", "Reckoning outside a fight says its rule")
+	_expect_eq(view.rules_text.get_parsed_text(), "Deal damage equal to the Toll you've spent this fight.\nSpent.", "Reckoning outside a fight says its rule")
 	view.free()
 	var hand_view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(hand_view)
 	await process_frame
 	var battle := EffectContext.new()
 	battle.player = _player(40)
-	battle.player.toll = 13
+	battle.player.toll_spent_this_fight = 13
 	hand_view.set_bonus_context(battle)
-	hand_view.set_toll(13)
 	hand_view.set_card_data(_card("reckoning"))
-	_expect_eq(hand_view.rules_text.get_parsed_text(), "Spend all Toll.\nDeal 13 damage.", "In a battle hand on 13 Toll Reckoning reads its live 13")
+	_expect_eq(hand_view.rules_text.get_parsed_text(), "Deal 13 damage.\nSpent.", "In a battle hand, 13 Toll spent this fight: Reckoning reads its live 13")
 	hand_view.free()
 	_completed += 1
 
 # The rules lines one effect takes - see _check_rules_text_pattern().
 func _lines_for(effect: CardEffect, card: CardData) -> int:
 	match effect.effect_type:
-		CardEffect.EffectType.TOLL_DAMAGE, CardEffect.EffectType.TOLL_HEAL:
+		CardEffect.EffectType.TOLL_HEAL:
 			return 2
 		CardEffect.EffectType.APPLY_STATUS, CardEffect.EffectType.APPLY_STATUS_TO_TARGET:
 			return 2 if TWO_LINE_STATUS_CARDS.has(card.card_name) else 1

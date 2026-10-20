@@ -26,9 +26,10 @@ extends SceneTree
 #
 # Last, a run of its own for the Toll package: Sentence on the Sputter,
 # Reckoning, Second Swing replaying it, Come Due and Deny - every Toll
-# spend put down to its source ("replay:Reckoning" for the replay's own),
-# the replay, energy_debt and delay lines, and Sentence advanced by each
-# spend (card, card, replay) until it goes off on the third. Then Bide
+# spend put down to its source (none for Reckoning or its replay, which
+# spend nothing), the replay, energy_debt and delay lines, and Sentence
+# advanced by each spend (Second Swing, Come Due, Deny) until it goes off
+# on the third. Then Bide
 # keeps a Slash and Countersign copies it: keep, copy and - the copy left
 # unplayed - copy_end "vanished" at the turn's end. Last, Not So undoes an
 # attack put on the player's record: the undo line.
@@ -210,8 +211,8 @@ func _scripted_run(logging: bool) -> Dictionary:
 	await _teardown()
 	return seen
 
-# The Toll package, logged: on 20 Toll Reckoning spends it all; on 15,
-# Second Swing spends 5 and replays Reckoning, which spends the other 10;
+# The Toll package, logged: Reckoning spends nothing; on 15, Second Swing
+# spends 5 and replays Reckoning, which spends nothing either;
 # on 5, Come Due; on 6, Deny at the Sputter. End Turn: the Sputter's
 # turn waits (delay), and the next turn starts owing 2 (energy_debt).
 # The fight's Toll spent by source, and the three lines, read back.
@@ -240,7 +241,6 @@ func _toll_package_run() -> void:
 	player.energy = 99
 	_fresh_hand(controller)
 	await _play(controller, await _deal(controller, SENTENCE_PATH), _field_enemy(controller))
-	player.toll = 20
 	await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
 	player.toll = 15
 	await _play(controller, await _deal(controller, SECOND_SWING_PATH))
@@ -285,9 +285,10 @@ func _toll_package_run() -> void:
 			lines.append(parsed)
 	var fight_end: Dictionary = _first(lines, "fight_end")
 	var spent: Dictionary = (fight_end.get("toll", {}) as Dictionary).get("spent_by_source", {})
-	var expected: Dictionary = {"card:Reckoning": 20, "card:Second Swing": 5, "replay:Reckoning": 10, "card:Come Due": 5, "card:Deny": 6, "card:Bide": 4, "card:Countersign": 7, "card:Not So": 10}
+	var expected: Dictionary = {"card:Second Swing": 5, "card:Come Due": 5, "card:Deny": 6, "card:Bide": 4, "card:Countersign": 7, "card:Not So": 10}
 	for source: String in expected:
 		_expect_eq(int(spent.get(source, 0)), int(expected[source]), "Toll spent by %s" % source)
+	_expect(not spent.has("card:Reckoning") and not spent.has("replay:Reckoning"), "...none by Reckoning or its replay (%s)" % str(spent))
 	var kinds: Dictionary = {}
 	for line in lines:
 		if str(line.get("ev", "")) == "mechanic":
@@ -307,7 +308,7 @@ func _toll_package_run() -> void:
 			advances.append([str(line.get("source", "")), int(line.get("turns_left", -1))])
 		if str(line.get("ev", "")) == "mechanic" and str(line.get("kind", "")) == "sentence_resolved":
 			resolved = line
-	_expect_eq(advances, [["card:Reckoning", 2], ["card:Second Swing", 1], ["replay:Reckoning", 0]], "Sentence advanced by each spend: Reckoning, Second Swing, its replay")
+	_expect_eq(advances, [["card:Second Swing", 2], ["card:Come Due", 1], ["card:Deny", 0]], "Sentence advanced by each spend: Second Swing, Come Due, Deny")
 	_expect_eq(str(resolved.get("by", "")), "spend", "...going off on the third, mid-turn")
 	var keep: Dictionary = kinds.get("keep", {})
 	_expect_eq(keep.get("cards", []), ["Slash"], "A keep line: Bide kept Slash")
@@ -416,7 +417,7 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	_expect(int(block.get("used", 0)) > 0 and int(block.get("used", 0)) <= int(block.get("gained", 0)), "Block used: some, never more than gained")
 	var toll: Dictionary = fight.get("toll", {})
 	_expect(int(toll.get("gained", 0)) >= 8, "Toll gained: the 8 HP self-inflicted at least")
-	_expect(int(toll.get("spent", 0)) > 0, "Toll spent: Reckoning's")
+	_expect_eq(int(toll.get("spent", -1)), 0, "Toll spent: none - Reckoning spends none")
 	_expect_eq(int(toll.get("start", 0)) + int(toll.get("gained", 0)) - int(toll.get("spent", 0)), int(toll.get("end", -1)), "Toll reconciles: start + gained - spent = end")
 
 	# Format 2: sources, hits, turns.
@@ -449,9 +450,8 @@ func _check_log(path: String, seen: Dictionary) -> void:
 	for key in toll_gained_by:
 		toll_gained_sum += int(toll_gained_by[key])
 	_expect_eq(toll_gained_sum, int(toll.get("gained", -1)), "Toll gained by source adds up to the gain")
-	_expect_eq((toll.get("spent_by_source", {}) as Dictionary).get("card:Reckoning"), toll.get("spent"), "...and all of the spend is Reckoning's")
 	if cards.size() >= 4:
-		_expect_eq(int((cards[3] as Dictionary).get("toll_spent", -1)), int(toll.get("spent", -2)), "Reckoning's entry: the Toll it spent")
+		_expect_eq(int((cards[3] as Dictionary).get("toll_spent", -1)), 0, "Reckoning's entry: no Toll spent")
 	var turn_log: Array = fight.get("turn_log", [])
 	_expect_eq(turn_log.size(), _turns, "turn_log: a line per turn")
 	var spent_energy: int = 0

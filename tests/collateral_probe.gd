@@ -134,7 +134,7 @@ func _check_enough_energy() -> void:
 	_completed += 1
 
 # On 1 Energy, 5 Block and Toll 0: Reckoning takes the 1 and 3 HP - past
-# the Block, 3 Toll made, no Grace - and spends that Toll in its blow.
+# the Block, 3 Toll made, no Grace - and keeps that Toll: it spends none.
 func _check_shortfall() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
@@ -143,15 +143,13 @@ func _check_shortfall() -> void:
 		player.energy = 1
 		player.block = 5
 		player.toll = 0
-		var enemy: Combatant = _enemy(controller)
 		var hp: int = player.hp
-		var enemy_before: int = enemy.hp + enemy.block
 		await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
 		_expect_eq(player.energy, 0, "1 Energy short: Reckoning takes the 1")
 		_expect_eq(hp - player.hp, _rate, "...and 3 HP")
 		_expect_eq(player.block, 5, "...past the Block")
 		_expect_eq(player.grace, 0, "...opening no Grace")
-		_expect_eq(enemy_before - (enemy.hp + enemy.block), _rate, "...its 3 Toll spent in Reckoning's blow")
+		_expect_eq(player.toll, _rate, "...its 3 Toll made and kept: Reckoning spends none")
 	await _teardown()
 	_completed += 1
 

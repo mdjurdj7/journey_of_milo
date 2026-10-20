@@ -37,7 +37,7 @@ func _initialize() -> void:
 	_check_hurried_to_zero_resolves_now()
 	_check_not_an_attack()
 	_check_several_count_apart()
-	_check_second_swing_twice()
+	_check_second_swing_replay()
 	_check_settled_account_on_nothing()
 	_check_tempered()
 	_check_separate_enemies()
@@ -106,16 +106,15 @@ func _check_toll_spends_once_each() -> void:
 	_expect_eq(_label_of(enemy, "sentence"), "Sentence 2", "...and takes exactly one off (3 -> 2)")
 	_completed += 1
 
+# Reckoning reads the Toll spent and spends none: nothing off.
 func _check_reckoning_once() -> void:
 	var player: Combatant = _player()
 	var enemy := Combatant.new(200)
 	_play("sentence", player, [enemy])
 	player.toll = 14
 	_play("reckoning", player, [enemy])
-	_expect_eq(player.toll, 0, "Reckoning spends all 14")
-	_expect_eq(_labels(enemy), ["Sentence 2"] as Array[String], "...and takes only one off, not 14")
-	_play("reckoning", player, [enemy])
-	_expect_eq(_labels(enemy), ["Sentence 2"] as Array[String], "A Toll-less Reckoning spends nothing, and takes nothing off")
+	_expect_eq(player.toll, 14, "Reckoning spends none of 14")
+	_expect_eq(_labels(enemy), ["Sentence 3"] as Array[String], "...and takes nothing off")
 	_completed += 1
 
 func _check_gaining_toll_does_nothing() -> void:
@@ -183,17 +182,17 @@ func _check_several_count_apart() -> void:
 	_expect_eq(enemy.hp, 200 - 2 * DAMAGE, "...and goes off a turn later: 36 again")
 	_completed += 1
 
-# Second Swing replaying Reckoning: its own 5, then the replay's spend -
-# two Toll spends, two turns off: 3 -> 1.
-func _check_second_swing_twice() -> void:
+# Second Swing replaying Reckoning: its own 5 takes one off; the replay
+# spends nothing, and takes nothing more: 3 -> 2.
+func _check_second_swing_replay() -> void:
 	var player: Combatant = _player()
 	var enemy := Combatant.new(200)
 	_play("sentence", player, [enemy])
 	player.record_attack(_card("reckoning"), enemy, false)
 	player.toll = 8
 	_play("second_swing", player, [enemy])
-	_expect_eq(player.toll, 0, "Second Swing spends 5, its Reckoning replay the other 3")
-	_expect_eq(_label_of(enemy, "sentence"), "Sentence 1", "...two spends, two turns off: 3 -> 1")
+	_expect_eq(player.toll, 3, "Second Swing spends 5, its Reckoning replay none")
+	_expect_eq(_label_of(enemy, "sentence"), "Sentence 2", "...one spend, one turn off: 3 -> 2")
 	_completed += 1
 
 # Settled Account on under 5 Toll spends nothing, and takes nothing off;
