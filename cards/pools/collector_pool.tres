@@ -1,4 +1,4 @@
-[gd_resource type="Resource" script_class="RewardPool" load_steps=40 format=3]
+[gd_resource type="Resource" script_class="RewardPool" load_steps=41 format=3]
 
 [ext_resource type="Script" path="res://cards/reward_pool.gd" id="1_reward_pool"]
 [ext_resource type="Resource" path="res://cards/data/carve.tres" id="2_carve"]
@@ -35,6 +35,7 @@
 [ext_resource type="Resource" path="res://cards/data/not_so.tres" id="36_not_so"]
 [ext_resource type="Resource" path="res://cards/data/take_in.tres" id="37_take_in"]
 [ext_resource type="Resource" path="res://cards/data/on_the_brink.tres" id="38_on_the_brink"]
+[ext_resource type="Resource" path="res://cards/data/nothing_left.tres" id="39_nothing_left"]
 [ext_resource type="Resource" uid="uid://c7jcraas74exv" path="res://cards/neutral/left_hand.tres" id="n_left_hand"]
 [ext_resource type="Resource" uid="uid://dka7rqy5ml1mf" path="res://cards/neutral/second_thoughts.tres" id="n_second_thoughts"]
 [ext_resource type="Resource" uid="uid://cjvv17es5rb3e" path="res://cards/neutral/untouched.tres" id="n_untouched"]
@@ -42,7 +43,7 @@
 
 [resource]
 script = ExtResource("1_reward_pool")
-entries = Array[ExtResource("2_carve")]([ExtResource("2_carve"), ExtResource("4_hold_fast"), ExtResource("6_small_price"), ExtResource("8_self_eater"), ExtResource("9_cornered"), ExtResource("10_unbroken"), ExtResource("11_dying_light"), ExtResource("12_last_wager"), ExtResource("13_refuse_the_end"), ExtResource("14_last_resort"), ExtResource("15_blood_arc"), ExtResource("16_with_regards"), ExtResource("17_come_due"), ExtResource("18_no_further"), ExtResource("19_sentence"), ExtResource("20_the_return"), ExtResource("21_collateral"), ExtResource("22_ransom"), ExtResource("23_leverage"), ExtResource("24_bide"), ExtResource("25_deny"), ExtResource("26_blood_advance"), ExtResource("27_second_swing"), ExtResource("28_garnish"), ExtResource("29_claw_back"), ExtResource("30_gnaw"), ExtResource("31_settled_account"), ExtResource("32_reckoning"), ExtResource("33_in_the_red"), ExtResource("34_go_under"), ExtResource("35_countersign"), ExtResource("36_not_so"), ExtResource("37_take_in"), ExtResource("38_on_the_brink"), ExtResource("n_left_hand"), ExtResource("n_second_thoughts"), ExtResource("n_untouched"), ExtResource("n_endure")])
+entries = Array[ExtResource("2_carve")]([ExtResource("2_carve"), ExtResource("4_hold_fast"), ExtResource("6_small_price"), ExtResource("8_self_eater"), ExtResource("9_cornered"), ExtResource("10_unbroken"), ExtResource("11_dying_light"), ExtResource("12_last_wager"), ExtResource("13_refuse_the_end"), ExtResource("14_last_resort"), ExtResource("15_blood_arc"), ExtResource("16_with_regards"), ExtResource("17_come_due"), ExtResource("18_no_further"), ExtResource("19_sentence"), ExtResource("20_the_return"), ExtResource("21_collateral"), ExtResource("22_ransom"), ExtResource("23_leverage"), ExtResource("24_bide"), ExtResource("25_deny"), ExtResource("26_blood_advance"), ExtResource("27_second_swing"), ExtResource("28_garnish"), ExtResource("29_claw_back"), ExtResource("30_gnaw"), ExtResource("31_settled_account"), ExtResource("32_reckoning"), ExtResource("33_in_the_red"), ExtResource("34_go_under"), ExtResource("35_countersign"), ExtResource("36_not_so"), ExtResource("37_take_in"), ExtResource("38_on_the_brink"), ExtResource("39_nothing_left"), ExtResource("n_left_hand"), ExtResource("n_second_thoughts"), ExtResource("n_untouched"), ExtResource("n_endure")])
 weights = Array[float]([])
 enemy_bias = {}
 enemy_bias_multiplier = 2.0
