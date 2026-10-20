@@ -400,9 +400,13 @@ func _on_drained() -> void:
 # Only once open: the trigger now sits a couple of metres past the gate
 # line, inside the closed Blocker's own reach, so a Wanderer pressed
 # against the blocker must not be able to end the floor through it.
+# Deferred: body_entered is a physics callback, and the floor's end
+# (RegionField._on_floor_exited()) freezes the field, taking its bodies
+# out of the physics space - not allowed mid-callback. It goes out at the
+# end of this frame instead.
 func _on_trigger_body_entered(body: Node3D) -> void:
 	if _open and body.is_in_group("wanderer"):
-		floor_exited.emit()
+		floor_exited.emit.call_deferred()
 
 # push_warning, not print - this is a confirm-the-collision-is-real signal
 # for verifying the blocker actually stops the Wanderer, not routine field
