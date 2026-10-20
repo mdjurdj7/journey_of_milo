@@ -16,7 +16,9 @@ extends SceneTree
 #              elsewhere (RunState.encounter_rolls) is passed over
 #   rng      - the roll leaves RunState.rng exactly where it was
 #   role     - a slot whose options are fought as different roles fails
-#              validation, and the field stands nothing in it
+#              validation, and the field stands nothing in it - the
+#              engine ERROR it reports on purpose (run_probes.sh):
+# probe-expects-error: slot 'fixture': option 'fixture_adder' is fought as elite, but 'fixture_sputter' as required - every option in a slot must share its role; it stands nothing.
 #   rules    - a floor's roll rules (FloorData.roll_unique_enemies,
 #              roll_single_and_multi): a second slot whose roll breaks one
 #              is re-rolled to an option that keeps it; with no legal
