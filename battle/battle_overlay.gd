@@ -301,6 +301,11 @@ var _card_play_player: AudioStreamPlayer = null
 # lands - see _on_cost_focus_changed().
 var _cost_focus: CardData = null
 var _cost_preview_held: bool = false
+# The HP bar's preview of the same card's HP cost holds from the play's
+# commit until the card has resolved and its losses have landed
+# (BattleController.play_resolved) - later than the pips, whose Energy is
+# spent at the commit. See _refresh_hp_cost_preview().
+var _hp_preview_held: bool = false
 var _card_draw_players: Array[AudioStreamPlayer] = []
 var _card_draw_next: int = 0
 # The per-card override's player, made on first use - see _on_card_played().
@@ -467,6 +472,13 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	# A play holds the outlined pips until its energy_changed turns them
 	# spent.
 	battle_controller.card_played.connect(func(_card: CardData, _target: FieldEnemy) -> void: _cost_preview_held = true)
+	battle_controller.card_played.connect(func(_card: CardData, _target: FieldEnemy) -> void:
+		_hp_preview_held = true
+		if _field_hp_bar != null:
+			_field_hp_bar.hold_cost_preview())
+	battle_controller.play_resolved.connect(func(_card: CardData) -> void:
+		_hp_preview_held = false
+		_refresh_hp_cost_preview())
 	battle_controller.status_changed.connect(_on_status_changed)
 	battle_controller.turn_phase_changed.connect(_on_turn_phase_changed)
 	battle_controller.enemy_acting.connect(_on_enemy_acting)
@@ -772,6 +784,7 @@ func _on_cost_focus_changed(card: CardData) -> void:
 # only when it can be paid; an unaffordable card is already dimmed. A
 # play holds what it showed until its energy_changed.
 func _refresh_cost_preview() -> void:
+	_refresh_hp_cost_preview()
 	if _resources == null or battle_controller == null or battle_controller.player == null:
 		return
 	if _cost_preview_held:
@@ -783,6 +796,22 @@ func _refresh_cost_preview() -> void:
 		if cost > battle_controller.player.energy:
 			cost = 0
 	_resources.set_cost_preview(cost)
+
+# The same card's HP cost on the HP bar - every HP playing it now will
+# take (CardBonus.predicted_self_loss(), which its face's badge reads
+# too), and only when it can be paid, as the pips. Re-read whenever the
+# hand's faces are (_push_bonus_context() - HP, statuses, stance, Energy,
+# Grace, the turn), so it previews the fight as it stands. A play holds
+# what it showed until play_resolved.
+func _refresh_hp_cost_preview() -> void:
+	if _field_hp_bar == null or battle_controller == null or battle_controller.player == null:
+		return
+	if _hp_preview_held:
+		return
+	var loss: int = 0
+	if _cost_focus != null and not battle_controller.is_armed_for_devour_only() and battle_controller.player.can_pay(_cost_focus):
+		loss = CardBonus.predicted_self_loss(_cost_focus, battle_controller.preview_context())
+	_field_hp_bar.set_cost_preview(loss)
 
 func _on_toll_changed(new_toll: int) -> void:
 	# A gain counts up and shows its "+N" at the readout (HPBar.update_toll()).
@@ -924,6 +953,7 @@ func _push_bonus_context() -> void:
 	if battle_controller == null:
 		return
 	hand_container.set_bonus_context(battle_controller.preview_context())
+	_refresh_hp_cost_preview()
 
 # The hand back to the battle as it stands, then - while a card is armed
 # and the cursor is over an enemy - that card's face aimed at it. Over no

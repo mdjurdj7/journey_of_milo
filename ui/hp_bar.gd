@@ -344,6 +344,30 @@ class_name HPBar
 		queue_redraw()
 @export var heal_fade_sec: float = 0.5
 
+@export_group("HP Cost Preview")
+# While a card is hovered or armed (set_cost_preview(), from BattleOverlay),
+# the HP playing it will cost (CardBonus.predicted_self_loss()) is cut
+# from the fill's right end and drawn in the fill's own ink at this alpha -
+# the ghost's language, ahead of the loss instead of after it. A lethal
+# play's segment runs to the bar's left end. The numeral reads "26 → 18":
+# the result after an arrow, at the " / max" size and alpha, in its place;
+# a lethal one "→ 0" in full ink.
+@export_range(0.0, 1.0) var cost_preview_alpha: float = 0.5:
+	set(value):
+		cost_preview_alpha = value
+		queue_redraw()
+@export var cost_preview_arrow: String = " → ":
+	set(value):
+		cost_preview_arrow = value
+		queue_redraw()
+# A previewed result that crosses the Critical line from above marks the
+# line: a flat hairline this wide, centred on it, over the line's top end,
+# in critical_color.
+@export var critical_cross_mark_px: float = 5.0:
+	set(value):
+		critical_cross_mark_px = value
+		queue_redraw()
+
 @export_group("Block Readout")
 # While block is up it reads in the HP row, LEFT of the HP numeral: the
 # card's open-shield glyph with the block value set inside it, centred, in
@@ -524,6 +548,12 @@ var _critical_tween: Tween = null
 var _critical_override: float = -1.0
 var _critical_line: float = NAN
 var _critical_line_tween: Tween = null
+# The HP the hovered or armed card will cost (set_cost_preview()); 0: none.
+var _cost_preview: int = 0
+# The HP the preview leads to, fixed as a play commits (hold_cost_
+# preview()) so the HP it then loses closes the segment rather than
+# moving it; -1 while the preview follows the HP held.
+var _cost_preview_held_result: int = -1
 
 # 0 = field style, 1 = battle style. Tweened by enter_battle()/exit_battle()
 # over the battle transition time (passed in by BattleOverlay, which reads
@@ -853,17 +883,33 @@ func _draw_battle() -> void:
 	_draw_block_readout(baseline, ink)
 	var left: float = _block_readout_width()
 	var x: float = left + InkType.draw_run(self, numeral_font, str(_current_hp), Vector2(left, baseline), battle_numeral_size_px, hp_ink)
-	InkType.draw_run(self, numeral_font, battle_max_prefix + str(_max_hp), Vector2(x, baseline), battle_max_size_px, secondary)
+	# A card's HP cost previewed: " → result" in the " / max"'s place - in
+	# full ink when it is lethal.
+	if shows_cost_preview():
+		var result: int = get_cost_preview_result()
+		InkType.draw_run(self, numeral_font, cost_preview_arrow + str(result), Vector2(x, baseline), battle_max_size_px, ink if result <= 0 else secondary)
+	else:
+		InkType.draw_run(self, numeral_font, battle_max_prefix + str(_max_hp), Vector2(x, baseline), battle_max_size_px, secondary)
 
 	var bar_top: float = _battle_bar_top()
 	draw_rect(Rect2(left, bar_top, battle_width, battle_bar_height), track)
-	draw_rect(Rect2(left, bar_top, battle_width * _fill_drawn(_displayed_fraction), battle_bar_height), hp_ink)
+	# The preview's stretch is cut from the fill and drawn pale instead.
+	var fill: float = _fill_drawn(_displayed_fraction)
+	var preview_from: float = _displayed_fraction
+	if shows_cost_preview():
+		preview_from = minf(_hp_fraction(get_cost_preview_result(), _max_hp), _displayed_fraction)
+		fill = minf(fill, preview_from)
+	draw_rect(Rect2(left, bar_top, battle_width * fill, battle_bar_height), hp_ink)
 	# The Critical line, after the fill, overhanging the bar.
 	var tick_color: Color = _ink
 	tick_color.a = critical_tick_alpha * _battle_blend
 	var tick_x: float = roundf(left + battle_width * _critical_fraction())
 	if _shows_critical():
 		draw_rect(Rect2(tick_x, bar_top - critical_tick_overhang_px, 1.0, battle_bar_height + critical_tick_overhang_px * 2.0), tick_color)
+		# The previewed play crosses it: a flat hairline over its top end.
+		if cost_preview_crosses_critical():
+			var mark_color: Color = Color(critical_color, _battle_blend)
+			draw_rect(Rect2(tick_x + 0.5 - critical_cross_mark_px * 0.5, bar_top - critical_tick_overhang_px - 1.0, critical_cross_mark_px, 1.0), mark_color)
 
 	# Pinned to _displayed_fraction, so it stays welded to the filled end
 	# while the bar eases toward a new HP value rather than briefly
@@ -878,6 +924,10 @@ func _draw_battle() -> void:
 			grace_color.a = grace_alpha * _battle_blend
 			draw_rect(Rect2(grace_left, bar_top, grace_length, battle_bar_height), grace_color)
 	_draw_hp_change(left, bar_top, battle_width, battle_bar_height, _displayed_fraction, hp_ink)
+	if shows_cost_preview() and _displayed_fraction > preview_from:
+		var pale: Color = hp_ink
+		pale.a *= cost_preview_alpha
+		draw_rect(Rect2(left + battle_width * preview_from, bar_top, battle_width * (_displayed_fraction - preview_from), battle_bar_height), pale)
 
 	if _toll_visible:
 		_draw_toll(bar_top, ink)
@@ -1298,6 +1348,44 @@ func update_grace(grace: int) -> void:
 	_grace = maxi(grace, 0)
 	queue_redraw()
 
+# The HP the focused card will cost if played (CardBonus.
+# predicted_self_loss()), from BattleOverlay; 0 takes the preview off.
+# Battle-only, like Grace.
+func set_cost_preview(hp: int) -> void:
+	var value: int = maxi(hp, 0)
+	if value == _cost_preview and _cost_preview_held_result < 0:
+		return
+	_cost_preview = value
+	_cost_preview_held_result = -1
+	queue_redraw()
+
+# The play is committed: the preview holds the HP it leads to while the
+# card resolves and its losses land, until the next set_cost_preview().
+func hold_cost_preview() -> void:
+	if _cost_preview > 0:
+		_cost_preview_held_result = get_cost_preview_result()
+
+func get_cost_preview() -> int:
+	return _cost_preview
+
+# The HP the preview leaves: what the numeral reads after the arrow.
+func get_cost_preview_result() -> int:
+	if _cost_preview_held_result >= 0:
+		return _cost_preview_held_result
+	return maxi(_current_hp - _cost_preview, 0)
+
+# Whether a preview shows: a cost, and HP still above where it leads.
+func shows_cost_preview() -> bool:
+	return _cost_preview > 0 and get_cost_preview_result() < _current_hp
+
+# Whether the previewed play takes the Wanderer from above the Critical
+# line to on or under it - the line's mark (critical_cross_mark_px).
+func cost_preview_crosses_critical() -> bool:
+	if not shows_cost_preview() or not _shows_critical():
+		return false
+	var line: float = _target_critical_fraction()
+	return not Combatant.critical_at(_current_hp, _max_hp, line) and Combatant.critical_at(get_cost_preview_result(), _max_hp, line)
+
 func hide_grace() -> void:
 	update_grace(0)
 
@@ -1346,6 +1434,8 @@ func exit_battle(duration: float) -> void:
 	# The fight's line ends with it: back to the character's own.
 	set_critical_fraction(-1.0)
 	_energy_right_x = NAN
+	_cost_preview = 0
+	_cost_preview_held_result = -1
 	_block = 0
 	_block_prev = 0
 	_block_fade = 1.0

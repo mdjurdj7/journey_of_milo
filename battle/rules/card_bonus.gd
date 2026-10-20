@@ -147,3 +147,64 @@ static func upfront_hp_cost(card: CardData, stance: Stance, replaced_hp: int) ->
 		if effect.condition != CardEffect.Condition.NONE or HP_COST_STOPS.has(effect.effect_type):
 			break
 	return total
+
+# All the HP playing `card` now will cost the player - every self-inflicted
+# loss, predicted from the card's data and the fight as `ctx` holds it
+# (BattleController.preview_context()), nothing resolved. In the order
+# EffectResolver.resolve_card() pays it: a cost replacement's HP
+# (Collateral - Combatant.replaced_cost_hp(); a price that kills ends the
+# card), the stance's price on an Attack with something to hit, then each
+# SELF_DAMAGE (can kill) and SELF_DAMAGE_TOLL (never below 1 HP) in the
+# card's order, gated as the resolver gates them, judged at the HP already
+# paid. A REPLAY_LAST_ATTACK (Second Swing) adds the replayed Attack's own
+# stance price and self-loss - never its Collateral. Each payment is
+# clamped to the HP left, so the total never passes the HP held. Not
+# counted: heals mid-card (Drain, The Return) and enemy blows (Coiled).
+# With no player (outside a fight) it is the card's printed self-loss.
+# The card's HP badge and the HP bar's preview both read this.
+static func predicted_self_loss(card: CardData, ctx: EffectContext) -> int:
+	if card == null:
+		return 0
+	if ctx == null or ctx.player == null:
+		return printed_self_loss(card)
+	var start: int = maxi(ctx.player.hp, 0)
+	var hp: int = start - mini(maxi(ctx.player.replaced_cost_hp(card), 0), start)
+	if hp > 0:
+		hp = _hp_after_self_loss(card, ctx, hp, start, true)
+	return start - hp
+
+# The sum of the card's own SELF_DAMAGE / SELF_DAMAGE_TOLL values, as
+# printed - no stance, no clamp.
+static func printed_self_loss(card: CardData) -> int:
+	var total: int = 0
+	if card == null:
+		return total
+	for effect in card.effects:
+		if effect != null and (effect.effect_type == CardEffect.EffectType.SELF_DAMAGE or effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL):
+			total += maxi(effect.value, 0)
+	return total
+
+# The HP left after `card`'s stance price and own self-loss, from `hp`
+# (`start` the HP before the play). `may_replay`: a replay's own replay
+# effect doesn't replay again.
+static func _hp_after_self_loss(card: CardData, ctx: EffectContext, hp: int, start: int, may_replay: bool) -> int:
+	if card.card_type == CardData.CardType.ATTACK and not ctx.enemies.is_empty():
+		hp -= mini(maxi(Stance.attack_hp_loss(ctx.player.stance), 0), hp)
+	for effect in card.effects:
+		if effect == null or not should_resolve(effect, ctx.for_card_preview(start - hp)):
+			continue
+		match effect.effect_type:
+			CardEffect.EffectType.SELF_DAMAGE:
+				hp -= mini(maxi(effect.value, 0), hp)
+			CardEffect.EffectType.SELF_DAMAGE_TOLL:
+				hp -= clampi(effect.value, 0, maxi(hp - 1, 0))
+			CardEffect.EffectType.REPLAY_LAST_ATTACK:
+				# Replayed at what it was played at (BattleController.
+				# _replay_attack()): an all-enemies Attack while anything
+				# can be hit, else only while its target still stands.
+				var replayed: CardData = ctx.player.last_attack
+				var before: Combatant = ctx.player.last_attack_target
+				var lands: bool = not ctx.enemies.is_empty() if ctx.player.last_attack_all else (before != null and before.hp > 0 and ctx.enemies.has(before))
+				if may_replay and replayed != null and lands:
+					hp = _hp_after_self_loss(replayed, ctx, hp, start, false)
+	return hp

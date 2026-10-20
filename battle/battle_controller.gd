@@ -22,6 +22,12 @@ signal card_swing(card: CardData)
 # card_swing and card_impact follow as a play's do. Not card_played: it
 # isn't one (no play sound, no hand, no cost).
 signal card_replayed(card: CardData, target: FieldEnemy)
+# A played card has resolved in full - its effects, its further hits'
+# beats and any replay it set off (Second Swing) - so every HP it cost has
+# landed. Before what the enemy it hit answers with (Coiled) and the
+# play's wind-down (_after_play()). What the HP bar's cost preview holds
+# for (BattleOverlay).
+signal play_resolved(card: CardData)
 signal hand_changed()
 signal target_requested(card: CardData)
 signal target_cancelled()
@@ -1253,6 +1259,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 		RunLogger.event("consumed_play", {"card": card.card_name, "hp_before": hp_before_effects, "hp_after": player.hp})
 	var attacked: Array[FieldEnemy] = _count_attack_card(card, ctx)
 	RunLogger.card_finished()
+	play_resolved.emit(card)
 	# Then whoever it was played against strikes back (Coiled), before the
 	# previews and the battle-end check read where the play left things.
 	await _counter_strikes(attacked)
