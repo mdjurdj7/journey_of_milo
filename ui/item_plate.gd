@@ -369,6 +369,10 @@ var _paper_seed: float = 0.0
 var _lore_font: Font = null
 var _rules_font: Font = null
 var _rules_bold_font: Font = null
+# The name's face (Spectral SemiBold), loaded once and kept: drawn from
+# the draw callbacks, a font loaded there and dropped is freed with its
+# glyphs as the callback returns - its text drawn as solid ink boxes.
+var _numeral_font: Font = null
 var _action_font: Font = null
 # The type label's tracked face, built for _label_font_px (scaled).
 var _label_font: Font = null
@@ -406,6 +410,7 @@ var _hovered_link: CardData = null
 var _link_preview: CardView = null
 
 func _init() -> void:
+	_numeral_font = InkType.numeral_font()
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	_shadow = _new_shadow("Shadow")
 	_strip_shadow = _new_shadow("StripShadow")
@@ -615,7 +620,7 @@ func get_card_size() -> Vector2:
 func fits() -> bool:
 	if get_rules_line_count() > rules_lines or get_lore_line_count() > lore_lines:
 		return false
-	var name_width: float = InkType.width(InkType.numeral_font(), _shown_name(), _font_px(name_size_px))
+	var name_width: float = InkType.width(_numeral_font, _shown_name(), _font_px(name_size_px))
 	return name_width <= _card_rect.size.x - _px(padding_px) * 2.0 + 0.5
 
 func get_rules_line_count() -> int:
@@ -853,7 +858,7 @@ func _relayout() -> void:
 	var art: float = roundf(_px(art_size_px))
 	_art_rect = Rect2(roundf((width - art) / 2.0), roundf(pad), art, art)
 	var name_px: int = _font_px(name_size_px)
-	var name_font: Font = InkType.numeral_font()
+	var name_font: Font = _numeral_font
 	_name_baseline = roundf(_art_rect.end.y + _px(name_gap_px) + name_font.get_ascent(name_px))
 	var y: float = _name_baseline + name_font.get_descent(name_px)
 	# The type line: glyph and label centred together, the glyph's middle
@@ -1010,7 +1015,7 @@ func _draw_face() -> void:
 			InkGlyph.draw(_face, InkGlyph.Kind.BEDROLL, glyph_rect, maxf(_px(type_glyph_stroke_px) * 2.0, 1.0), Color(ink, maxf(placeholder_initial_alpha, 0.7)))
 		var initial: String = "" if _bedroll != null else _shown_name().left(1).to_upper()
 		var initial_px: int = _font_px(placeholder_initial_size_px)
-		var font: Font = InkType.numeral_font()
+		var font: Font = _numeral_font
 		var initial_width: float = InkType.width(font, initial, initial_px)
 		var baseline: float = _art_rect.get_center().y + (font.get_ascent(initial_px) - font.get_descent(initial_px)) * 0.5
 		InkType.draw_run(_face, font, initial, Vector2(roundf(_art_rect.get_center().x - initial_width / 2.0), roundf(baseline)), initial_px, Color(ink, placeholder_initial_alpha))
@@ -1042,7 +1047,7 @@ func _draw_name() -> void:
 	var color: Color = ink
 	if _name_layer.material == null and _finish != null:
 		color = _finish.common_ink
-	InkType.draw_run(_name_layer, InkType.numeral_font(), _shown_name(), Vector2(0.0, _name_baseline), _font_px(name_size_px), color)
+	InkType.draw_run(_name_layer, _numeral_font, _shown_name(), Vector2(0.0, _name_baseline), _font_px(name_size_px), color)
 
 # The worn piece's (or carried weapon's) name after REPLACES, the same
 # way - a weapon's in flat ink, having no rarity.
@@ -1052,7 +1057,7 @@ func _draw_replaced_name() -> void:
 	var color: Color = ink
 	if _replaced_name_layer.material == null and _finish != null:
 		color = _finish.common_ink
-	InkType.draw_run(_replaced_name_layer, InkType.numeral_font(), _replaced_name(), Vector2(0.0, _replaces_baseline), _font_px(replaced_name_size_px), color)
+	InkType.draw_run(_replaced_name_layer, _numeral_font, _replaced_name(), Vector2(0.0, _replaces_baseline), _font_px(replaced_name_size_px), color)
 
 # The title menu's treatment: each choice centred in its half in tracked
 # caps, the focused one in ink with a short hairline to its left, the
