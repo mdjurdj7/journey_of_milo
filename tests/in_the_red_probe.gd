@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Headless probe for In the Red - 0 Energy, Uncommon Skill, TOLL, no
-# target, Spent: lose 8 HP (SELF_DAMAGE_TOLL, no top-up: past Block, 1
+# target, Spent: lose 5 HP (SELF_DAMAGE_TOLL, no top-up: past Block, 1
 # Toll for each HP lost, never below 1 HP, no Grace), gain 1 Energy, and
 # if that leaves the player Critical - judged after the loss, against the
 # fighter's own threshold as it stands - 1 more Energy and draw 2.
@@ -91,21 +91,21 @@ func _check_data() -> void:
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...with its art")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...mipmapped")
-	_expect_eq(card.description, "Gain {energy} Energy.\n{if}Critical: {bonus_energy} more, and draw {draw}.{/if}\nSpent.", "...its text - the 8 HP on the badge alone")
-	_expect_eq(_shape(card), [CardEffect.EffectType.SELF_DAMAGE_TOLL, 8, 0, CardEffect.Condition.NONE,
+	_expect_eq(card.description, "Gain {energy} Energy.\n{if}Critical: {bonus_energy} more, and draw {draw}.{/if}\nSpent.", "...its text - the 5 HP on the badge alone")
+	_expect_eq(_shape(card), [CardEffect.EffectType.SELF_DAMAGE_TOLL, 5, 0, CardEffect.Condition.NONE,
 		CardEffect.EffectType.GAIN_ENERGY, 1, CardEffect.Condition.NONE,
 		CardEffect.EffectType.GAIN_ENERGY, 1, CardEffect.Condition.CRITICAL,
-		CardEffect.EffectType.DRAW, 2, CardEffect.Condition.CRITICAL], "...lose 8, gain 1, then 1 more and draw 2 when Critical")
+		CardEffect.EffectType.DRAW, 2, CardEffect.Condition.CRITICAL], "...lose 5, gain 1, then 1 more and draw 2 when Critical")
 	_expect_eq(CardBonus.mode(card.effects[2]), CardBonus.Mode.GATE, "...the Critical Energy a gate")
 	_expect_eq(CardBonus.mode(card.effects[3]), CardBonus.Mode.GATE, "...and the draw")
-	_expect_eq(CardBonus.upfront_hp_cost(card, null, 0), 8, "...its 8 paid before Critical is read")
+	_expect_eq(CardBonus.upfront_hp_cost(card, null, 0), 5, "...its 5 paid before Critical is read")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to In the Red+")
 	_expect_eq(tempered.card_name, "In the Red+", "In the Red+ loads")
 	_expect_eq(tempered.description, card.description, "...reads the same text")
 	_expect_eq([tempered.cost, tempered.rarity, tempered.card_class, tempered.removal_scope], [0, CardData.CardRarity.UNCOMMON, &"wanderer", CardData.RemovalScope.SPENT], "...0 Energy, Uncommon, the Wanderer's, Spent")
 	_expect(tempered.art == card.art, "...the same art")
-	_expect_eq(_shape(tempered), [CardEffect.EffectType.SELF_DAMAGE_TOLL, 8, 0, CardEffect.Condition.NONE,
+	_expect_eq(_shape(tempered), [CardEffect.EffectType.SELF_DAMAGE_TOLL, 5, 0, CardEffect.Condition.NONE,
 		CardEffect.EffectType.GAIN_ENERGY, 1, CardEffect.Condition.NONE,
 		CardEffect.EffectType.GAIN_ENERGY, 1, CardEffect.Condition.CRITICAL,
 		CardEffect.EffectType.DRAW, 3, CardEffect.Condition.CRITICAL], "...draws 3 when Critical, the rest the same")
@@ -124,7 +124,7 @@ func _shape(card: CardData) -> Array:
 
 # --- Rules ---
 
-# 50 HP and 5 Block: 42 after, the Block untouched, 8 Toll, no Grace. Not
+# 50 HP and 5 Block: 45 after, the Block untouched, 5 Toll, no Grace. Not
 # Critical: 1 Energy, nothing drawn.
 func _check_loss() -> void:
 	var player: Combatant = _player(50)
@@ -155,38 +155,38 @@ func _check_floor() -> void:
 	_expect_eq([spent.hp, spent.toll], [1, 0], "On 1 HP: nothing lost, no Toll")
 	_completed += 1
 
-# 28 HP isn't Critical, 20 is: the check reads the HP after the loss. 30
+# 26 HP isn't Critical, 21 is: the check reads the HP after the loss. 27
 # goes to 22, still above 21: 1 Energy only.
 func _check_critical_after_loss() -> void:
-	var player: Combatant = _player(28)
-	_expect(not player.is_critical(), "28 of 70 isn't Critical")
+	var player: Combatant = _player(26)
+	_expect(not player.is_critical(), "26 of 70 isn't Critical")
 	var deck: Deck = _deck()
 	_play(load(CARD_PATH), player, deck)
-	_expect_eq(player.hp, 20, "...down to 20")
+	_expect_eq(player.hp, 21, "...down to 21")
 	_expect_eq(player.energy, _energy + _bonus_energy, "...Critical after the loss: %d Energy" % (_energy + _bonus_energy))
 	_expect_eq(deck.hand.size(), _draw, "...and %d drawn" % _draw)
-	var short: Combatant = _player(30)
+	var short: Combatant = _player(27)
 	var short_deck: Deck = _deck()
 	_play(load(CARD_PATH), short, short_deck)
-	_expect_eq(short.hp, 22, "30 HP: down to 22")
+	_expect_eq(short.hp, 22, "27 HP: down to 22")
 	_expect_eq(short.energy, _energy, "...not Critical: %d Energy" % _energy)
 	_expect_eq(short_deck.hand.size(), 0, "...nothing drawn")
 	_completed += 1
 
 # The threshold is the fighter's own, read at play: at half (35 of 70),
-# 42 to 34 is Critical; at a tenth (7), 20 to 12 isn't.
+# 40 to 35 is Critical; at a tenth (7), 20 to 15 isn't.
 func _check_live_threshold() -> void:
-	var raised: Combatant = _player(42)
+	var raised: Combatant = _player(40)
 	raised.critical_hp_fraction = 0.5
 	var deck: Deck = _deck()
 	_play(load(CARD_PATH), raised, deck)
-	_expect_eq(raised.energy, _energy + _bonus_energy, "Critical at 35: 42 to 34 pays %d Energy" % (_energy + _bonus_energy))
+	_expect_eq(raised.energy, _energy + _bonus_energy, "Critical at 35: 40 to 35 pays %d Energy" % (_energy + _bonus_energy))
 	_expect_eq(deck.hand.size(), _draw, "...and draws %d" % _draw)
 	var lowered: Combatant = _player(20)
 	lowered.critical_hp_fraction = 0.1
 	var lowered_deck: Deck = _deck()
 	_play(load(CARD_PATH), lowered, lowered_deck)
-	_expect_eq(lowered.energy, _energy, "Critical at 7: 20 to 12 pays %d" % _energy)
+	_expect_eq(lowered.energy, _energy, "Critical at 7: 20 to 15 pays %d" % _energy)
 	_expect_eq(lowered_deck.hand.size(), 0, "...and draws nothing")
 	_completed += 1
 
@@ -207,7 +207,7 @@ func _check_tempered() -> void:
 	var player: Combatant = _player(25)
 	var deck: Deck = _deck()
 	_play(load(TEMPERED_PATH), player, deck)
-	_expect_eq([player.hp, player.toll, player.energy, deck.hand.size()], [17, 8, 2, 3], "In the Red+ on 25: 17 HP, 8 Toll, 2 Energy, 3 drawn")
+	_expect_eq([player.hp, player.toll, player.energy, deck.hand.size()], [20, 5, 2, 3], "In the Red+ on 25: 20 HP, 5 Toll, 2 Energy, 3 drawn")
 	var calm: Combatant = _player(50)
 	var calm_deck: Deck = _deck()
 	_play(load(TEMPERED_PATH), calm, calm_deck)
@@ -218,8 +218,8 @@ func _check_tempered() -> void:
 
 # Outside a fight: the rule, no ink state. In a battle hand: the Critical
 # clause grey when the loss won't reach Critical, in ink when it will -
-# judged at the HP after the 8 - and "Gain 1 Energy." always in ink. The
-# 8 HP is the badge's alone.
+# judged at the HP after the 5 - and "Gain 1 Energy." always in ink. The
+# 5 HP is the badge's alone.
 func _check_face() -> void:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
 	root.add_child(view)
@@ -228,7 +228,7 @@ func _check_face() -> void:
 	view.set_card_data(load(CARD_PATH))
 	_expect_eq(view.rules_text.get_parsed_text(), rule, "The face outside a fight says its rule")
 	_expect_eq(view._bonus_state, CardBonus.State.NONE, "...with no clause to light")
-	_expect_eq(view.hp_cost_label.text, "−8 HP", "...and its −8 HP line")
+	_expect_eq(view.hp_cost_label.text, "−5 HP", "...and its −5 HP line")
 	_expect(not view.rules_text.text.contains("[color="), "...all of it in ink")
 	view.set_card_data(load(TEMPERED_PATH))
 	_expect_eq(view.rules_text.get_parsed_text(), rule.replace("draw 2", "draw 3"), "In the Red+ outside a fight")
@@ -236,29 +236,29 @@ func _check_face() -> void:
 	var dormant: String = "[color=#%s]" % Color(view.bonus_dormant_ink, view.rules_alpha).to_html(true)
 	var calm: Combatant = _player(30)
 	view.set_bonus_context(_ctx(calm))
-	_expect_eq(view._bonus_state, CardBonus.State.DORMANT, "On 30 HP (22 after): the clause dormant")
+	_expect_eq(view._bonus_state, CardBonus.State.DORMANT, "On 30 HP (25 after): the clause dormant")
 	var text: String = view.rules_text.text
 	var clause: int = text.find(dormant + "[b]Critical[/b]")
 	_expect(clause >= 0, "...the Critical clause in grey (%s)" % text)
 	_expect(clause >= 0 and not text.substr(0, clause).contains("[color="), "...Gain 1 Energy still in ink")
 	_expect_eq(view.rules_text.get_parsed_text(), rule, "...the words the same")
-	var near: Combatant = _player(28)
+	var near: Combatant = _player(26)
 	view.set_bonus_context(_ctx(near))
-	_expect_eq(view._bonus_state, CardBonus.State.LIVE, "On 28 HP (20 after): the clause live")
+	_expect_eq(view._bonus_state, CardBonus.State.LIVE, "On 26 HP (21 after): the clause live")
 	_expect(not view.rules_text.text.contains("[color="), "...everything in ink")
 	view.free()
 	_completed += 1
 
-# The real fight - the Wanderer's 80 HP, Critical at 24 - on 30 HP and a
+# The real fight - the Wanderer's 80 HP, Critical at 24 - on 29 HP and a
 # full 3 Energy: the face at hand size, live; the play sound reads it as
-# Critical (30 isn't - 22 is), and at 50 wouldn't. Played: 22 HP, 8 Toll,
+# Critical (29 isn't - 24 is), and at 50 wouldn't. Played: 24 HP, 5 Toll,
 # 5 Energy with two pips past the row, 2 more in hand, the card Spent.
 # The next turn starts on 3 again.
 func _check_fight() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var player: Combatant = controller.get("player")
-		player.hp = 30
+		player.hp = 29
 		player.toll = 0
 		player.energy = player.max_energy
 		controller.emit_signal("toll_changed", 0)
@@ -270,14 +270,14 @@ func _check_fight() -> void:
 			_expect_eq(view.type_label.text, "TOLL", "...labelled TOLL")
 			_expect(view.rules_font_sizes.has(view.rules_text.get_theme_font_size("normal_font_size")), "...its text at a rules size")
 			_expect_eq(view.size, view.card_size, "...fitting the face at hand size")
-		_expect(bool(_overlay.call("_condition_live_at_commit", card)), "The play sound reads Critical on 30 HP: the 8 counted")
+		_expect(bool(_overlay.call("_condition_live_at_commit", card)), "The play sound reads Critical on 29 HP: the 5 counted")
 		player.hp = 50
 		_expect(not bool(_overlay.call("_condition_live_at_commit", card)), "...and not on 50")
-		player.hp = 30
+		player.hp = 29
 		var deck: Deck = controller.get("deck")
 		var in_hand: int = deck.hand.size()
 		await _play_real(controller, card)
-		_expect_eq(player.hp, 22, "Played on 30: 22 HP")
+		_expect_eq(player.hp, 24, "Played on 29: 24 HP")
 		_expect_eq(player.toll, _loss, "...%d Toll" % _loss)
 		_expect_eq(player.energy, player.max_energy + _energy + _bonus_energy, "...%d Energy, past the maximum" % (player.max_energy + _energy + _bonus_energy))
 		_expect_eq(deck.hand.size(), in_hand - 1 + _draw, "...%d drawn" % _draw)

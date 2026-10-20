@@ -187,14 +187,14 @@ func _check_cornered() -> void:
 	_expect_eq(100 - after.hp, cornered.effects[0].alt_value, "...after Go Under: %d" % cornered.effects[0].alt_value)
 	_completed += 1
 
-# In the Red at 48: 40 after its 8 - not Critical at 24, Critical at 40.
+# In the Red at 45: 40 after its 5 - not Critical at 24, Critical at 40.
 func _check_in_the_red() -> void:
 	var in_the_red: CardData = load(IN_THE_RED_PATH)
-	var plain: Combatant = _player(48)
+	var plain: Combatant = _player(45)
 	var plain_deck: Deck = _deck()
 	_play(in_the_red, plain, null, plain_deck)
-	_expect_eq([plain.energy, plain_deck.hand.size()], [1, 0], "In the Red at 48, line at 30%: 1 Energy, nothing drawn")
-	var under: Combatant = _player(48)
+	_expect_eq([plain.energy, plain_deck.hand.size()], [1, 0], "In the Red at 45, line at 30%: 1 Energy, nothing drawn")
+	var under: Combatant = _player(45)
 	_play(load(CARD_PATH), under)
 	var under_deck: Deck = _deck()
 	_play(in_the_red, under, null, under_deck)
@@ -203,7 +203,7 @@ func _check_in_the_red() -> void:
 
 # --- Face, tooltip, HP bar, fight ---
 
-# Go Under's face: its 50 from data. In the Red at 48 in a battle hand:
+# Go Under's face: its 50 from data. In the Red at 45 in a battle hand:
 # the Critical clause grey at 30%, in ink with Gone Under.
 func _check_face() -> void:
 	var view: CardView = (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate()
@@ -216,9 +216,9 @@ func _check_face() -> void:
 	view.set_card_data(load(TEMPERED_PATH))
 	_expect_eq(view.cost_label.text, "0", "Go Under+'s face: 0 Energy")
 	view.set_card_data(load(IN_THE_RED_PATH))
-	var player: Combatant = _player(48)
+	var player: Combatant = _player(45)
 	view.set_bonus_context(_ctx(player))
-	_expect_eq(view._bonus_state, CardBonus.State.DORMANT, "In the Red at 48, line at 30%: its clause grey")
+	_expect_eq(view._bonus_state, CardBonus.State.DORMANT, "In the Red at 45, line at 30%: its clause grey")
 	_play(load(CARD_PATH), player)
 	view.set_bonus_context(_ctx(player))
 	_expect_eq(view._bonus_state, CardBonus.State.LIVE, "...with Gone Under: in ink")
@@ -234,10 +234,10 @@ func _check_tooltip() -> void:
 	_expect_eq(table.definition("Critical"), "At or below 30% of your max HP.", "...30% again once cleared")
 	_completed += 1
 
-# The real fight on 38 of 80: In the Red's sound reads not Critical (30
-# after its 8, over 24); Go Under played - the line at 50% (40), 38
+# The real fight on 38 of 80: In the Red's sound reads not Critical (33
+# after its 5, over 24); Go Under played - the line at 50% (40), 38
 # Critical, the HP bar's tick easing there (seen partway, not snapped) and
-# the bar Critical, the tooltip at 50%, In the Red's sound live (30 is
+# the bar Critical, the tooltip at 50%, In the Red's sound live (33 is
 # under 40). The fight won:
 # the tick eased back to 30%, the tooltip at 30%.
 func _check_fight() -> void:

@@ -8,7 +8,7 @@
 [sub_resource type="Resource" id="E_self"]
 script = ExtResource("2_card_effect")
 effect_type = 9
-value = 8
+value = 5
 
 [sub_resource type="Resource" id="E_energy"]
 script = ExtResource("2_card_effect")

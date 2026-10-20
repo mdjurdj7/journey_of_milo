@@ -161,7 +161,7 @@ func _check_go_under() -> void:
 	_completed += 1
 
 # This turn's Critical reads: Cornered at 35 deals its Critical damage; In
-# the Red at 48 (40 after its 8) its Critical Energy and draw.
+# the Red at 45 (40 after its 5) its Critical Energy and draw.
 func _check_critical_cards() -> void:
 	var cornered: CardData = load(CORNERED_PATH)
 	var player: Combatant = _player(35)
@@ -170,11 +170,11 @@ func _check_critical_cards() -> void:
 	_play(cornered, player, enemy)
 	_expect_eq(100 - enemy.hp, cornered.effects[0].alt_value, "Cornered at 35 after On the Brink: %d" % cornered.effects[0].alt_value)
 	var in_the_red: CardData = load(IN_THE_RED_PATH)
-	var red: Combatant = _player(48)
+	var red: Combatant = _player(45)
 	_play(load(CARD_PATH), red)
 	var red_deck: Deck = _deck()
 	_play(in_the_red, red, null, red_deck)
-	_expect_eq([red.energy, red_deck.hand.size()], [2, 2], "In the Red at 48 after On the Brink: 2 Energy, 2 drawn")
+	_expect_eq([red.energy, red_deck.hand.size()], [2, 2], "In the Red at 45 after On the Brink: 2 Energy, 2 drawn")
 	_completed += 1
 
 # No Further held at 35: On the Brink makes the player Critical, No Further
