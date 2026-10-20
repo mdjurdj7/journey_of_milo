@@ -51,9 +51,19 @@ static func should_resolve(effect: CardEffect, ctx: EffectContext) -> bool:
 
 # The number the effect lands for in this context - alt_value on a met
 # REPLACE, value + bonus_value on a met ADD, alt_value (when set) on a met
-# DRAIN, value otherwise. Before any stance or status modifier: those are
-# the resolver's and the face's to apply alike, on top of this.
+# DRAIN, value otherwise. Then bonus_per_chain_level for each chain level
+# before the card (Severance). Before any stance or status modifier: those
+# are the resolver's and the face's to apply alike, on top of this.
 static func resolved_value(effect: CardEffect, ctx: EffectContext) -> int:
+	return _condition_value(effect, ctx) + chain_bonus(effect, ctx)
+
+# What the chain adds to the effect's number in this context.
+static func chain_bonus(effect: CardEffect, ctx: EffectContext) -> int:
+	if effect == null or ctx == null or effect.bonus_per_chain_level == 0:
+		return 0
+	return effect.bonus_per_chain_level * maxi(ctx.chain_level_before_this, 0)
+
+static func _condition_value(effect: CardEffect, ctx: EffectContext) -> int:
 	match mode(effect):
 		Mode.REPLACE:
 			return effect.alt_value if EffectResolver.condition_met(effect, ctx) else effect.value

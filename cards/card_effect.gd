@@ -147,6 +147,12 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 # mode of the Condition enum's own doc, read through CardBonus. Authored
 # on UNDAMAGED_BLOCK (Untouched) today.
 
+@export var bonus_per_chain_level: int = 0
+# Added on top of the effect's number once for each chain level as it
+# stood before the card was played (EffectContext.chain_level_before_
+# this) - Severance's 4. Read through CardBonus.resolved_value(), so the
+# face prints what the rules pay. 0: the chain changes nothing.
+
 @export_multiline var combat_message: String = ""
 # Shown when a STUN resolves. Unused by every other type - and STUN
 # itself has no real caller yet this pass (see stun_effect.gd: interrupts

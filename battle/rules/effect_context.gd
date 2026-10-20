@@ -35,6 +35,10 @@ var cards_played_before_this: int = 0
 # own tags taken back off, a hand card's preview the count itself. What
 # CardEffect.repeat_per_earlier_play_tag reads (earlier_plays_tagged()).
 var tagged_plays_before_this: Dictionary = {}
+# The chain level as it stood before this card was played - what a Burst
+# card reads (CardEffect.bonus_per_chain_level). For a preview of a card
+# still in hand it is the level now. 0 with no chain.
+var chain_level_before_this: int = 0
 # Called with the amount reclaimed, so battle_controller.gd can mirror it
 # onto RunState and tell the readouts. Grace itself is spent here, in the
 # rules, the same way damage is dealt here and only REPORTED outward.
@@ -184,6 +188,7 @@ func for_card_preview(hp_cost: int) -> EffectContext:
 	copy.deck = deck
 	copy.cards_played_before_this = cards_played_before_this
 	copy.tagged_plays_before_this = tagged_plays_before_this
+	copy.chain_level_before_this = chain_level_before_this
 	copy.preview_hp_cost = hp_cost
 	return copy
 

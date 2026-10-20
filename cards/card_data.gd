@@ -44,8 +44,11 @@ enum OfferScope { REWARDABLE = 0, STARTER_ONLY = 1, KEEPER_ONLY = 2, OWN_CHANNEL
 # the fight it was played in ends, whatever the outcome (RegionField._
 # apply_consumed_removals()). Rules text ends on "Spent." or "Consumed."
 
-# Chain roles (Opener/Closer/chain payoffs) are deliberately not ported -
-# see DESIGN.md's own parked-items note. No current card needs them.
+# A card's place in the Samurai's chain loop: ADVANCE -> HOLD -> WITHDRAW
+# -> ADVANCE. A card whose property follows the last chained card's
+# extends the chain a level; NONE, or the wrong one, ends it. Integers are
+# baked into every .tres: append, never reorder.
+enum ChainProperty { NONE = 0, ADVANCE = 1, HOLD = 2, WITHDRAW = 3 }
 
 @export var card_name: String = ""
 @export var cost: int = 0
@@ -62,6 +65,12 @@ enum OfferScope { REWARDABLE = 0, STARTER_ONLY = 1, KEEPER_ONLY = 2, OWN_CHANNEL
 @export_multiline var description: String = ""
 @export var effects: Array[CardEffect] = []
 @export var removal_scope: RemovalScope = RemovalScope.NONE
+# See ChainProperty. NONE on every card that isn't the Samurai's.
+@export var chain_property: ChainProperty = ChainProperty.NONE
+# A Burst card reads the chain level as it stood before it was played
+# (EffectContext.chain_level_before_this - CardEffect.bonus_per_chain_
+# level). Separate from chain_property: a Burst card may carry one or not.
+@export var burst: bool = false
 
 # The illustration in the face's art field (CardView), shown as a centred
 # cover crop over the type-coloured field. Null is fine and expected for
