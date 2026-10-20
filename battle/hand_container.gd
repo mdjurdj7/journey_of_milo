@@ -429,7 +429,18 @@ func _queue_arrival(slot: Control) -> void:
 	var now: int = Time.get_ticks_msec()
 	var launch_at: int = maxi(now, _next_launch_msec)
 	_next_launch_msec = launch_at + int(draw_stagger * 1000.0)
-	get_tree().create_timer(float(launch_at - now) / 1000.0).timeout.connect(_launch_arrival.bind(slot))
+	# The slot's own timer, so it goes with the slot: a slot freed first
+	# (the hand cleared, the fight over) never calls back. Run always, as
+	# a tree timer is; the next frame at least, as one of 0 s fires.
+	var timer := Timer.new()
+	timer.name = "ArrivalTimer"
+	timer.one_shot = true
+	timer.autostart = true
+	timer.process_mode = Node.PROCESS_MODE_ALWAYS
+	timer.wait_time = maxf(float(launch_at - now) / 1000.0, 0.001)
+	timer.timeout.connect(_launch_arrival.bind(slot))
+	timer.timeout.connect(timer.queue_free)
+	slot.add_child(timer)
 
 # The slot joins the layout (the hand making room over draw_duration),
 # then starts from the DECK readout's centre - straight, small and clear
