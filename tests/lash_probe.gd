@@ -17,7 +17,11 @@ extends SceneTree
 # off the plate and Escape do nothing - while a piece on the sand still
 # closes on either. A deck view shows the deck as the weapon carried
 # makes it (Lash under the Tail, Slash under the Blade), and a pick hands
-# back the deck's own card. Rules cases on the real .tres; the fight cases
+# back the deck's own card. On the Tail's plate looked at closely (the
+# offer, the examine), "Lash" is its one hoverable name - never the lash
+# in "Slashes" - showing base Lash beside the plate, clear of TAKE and
+# LEAVE; the examine still closes on a click on the plate, and a plate
+# with no links (the HUD's) reads it plain. Rules cases on the real .tres; the fight cases
 # load floor 5 and play the cards through BattleController.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/lash_probe.gd
@@ -26,7 +30,7 @@ extends SceneTree
 # Untyped against anything that names the RunState autoload, as
 # blackback_probe.gd's header explains.
 
-const CASES := 12
+const CASES := 13
 const LASH_PATH := "res://cards/weapon/lash.tres"
 const LASH_PLUS_PATH := "res://cards/weapon/lash_tempered.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
@@ -69,6 +73,7 @@ func _initialize() -> void:
 	await _check_face()
 	_check_weapon_mapping()
 	await _check_offer_needs_a_choice()
+	await _check_lash_hover()
 	await _check_deck_view()
 	await _check_fight()
 	if _completed != CASES:
@@ -337,6 +342,55 @@ func _deck_view_faces(view: DeckView) -> Array[CardView]:
 			if child is CardView and not child.is_queued_for_deletion():
 				faces.append(child as CardView)
 	return faces
+
+# The Tail's offer: one link, base Lash, over the "Lash" its effect names;
+# hovering it shows base Lash beside the plate's card - on screen, over
+# neither the card nor the strip with TAKE and LEAVE - and moving off
+# hides it. The examine (no choice) has the link and still closes on a
+# click on the plate. A plate with no links: none, and no mouse.
+func _check_lash_hover() -> void:
+	var lash: CardData = load(LASH_PATH)
+	var offer := ArmorExamine.new()
+	offer.setup_weapon(load(TAIL_PATH) as WeaponData, Rect2(), load(BLADE_PATH) as WeaponData, true)
+	root.add_child(offer)
+	await create_timer(0.4).timeout
+	var plate: ItemPlate = offer.get_plate()
+	var links: Array[Dictionary] = plate.get_link_rects()
+	_expect(links.size() == 1 and links[0]["card"] == lash, "The Tail's offer names one card: base Lash (%d links)" % links.size())
+	if links.size() == 1:
+		var motion := InputEventMouseMotion.new()
+		motion.position = (links[0]["rect"] as Rect2).get_center()
+		plate.gui_input.emit(motion)
+		var preview: CardView = plate.get_link_preview()
+		_expect(preview != null and preview.card_data == lash, "...hovering it shows Lash")
+		if preview != null:
+			var shown := Rect2(preview.global_position, preview.card_size * preview.scale)
+			var card := Rect2(plate.global_position, plate.get_card_size())
+			var whole := Rect2(plate.global_position, plate.get_plate_size())
+			var strip := Rect2(whole.position + Vector2(0.0, card.size.y), Vector2(whole.size.x, whole.size.y - card.size.y))
+			_expect(not shown.intersects(card) and not shown.intersects(strip), "...beside the plate, over neither its card nor TAKE and LEAVE (%s; plate %s)" % [shown, whole])
+			_expect(plate.get_viewport_rect().encloses(shown), "...and on screen")
+		motion.position = Vector2(4.0, 4.0)
+		plate.gui_input.emit(motion)
+		_expect(plate.get_link_preview() == null, "...moving off the name hides it")
+	offer.get_plate().activate(ItemPlate.Choice.LEAVE)
+	await create_timer(0.4).timeout
+	var examine := ArmorExamine.new()
+	examine.setup_weapon(load(TAIL_PATH) as WeaponData)
+	var results: Array = []
+	examine.closed.connect(func(taken: bool) -> void: results.append(taken))
+	root.add_child(examine)
+	await create_timer(0.4).timeout
+	_expect_eq(examine.get_plate().get_link_rects().size(), 1, "The Tail's examine names Lash too")
+	examine.get_plate().gui_input.emit(_click(MOUSE_BUTTON_LEFT))
+	await create_timer(0.4).timeout
+	_expect_eq(results, [false], "...and a click on its plate still closes it")
+	var plain := ItemPlate.new()
+	root.add_child(plain)
+	plain.set_weapon(load(TAIL_PATH) as WeaponData)
+	_expect(plain.get_link_rects().is_empty() and plain.mouse_filter == Control.MOUSE_FILTER_IGNORE, "A plate with no links (the HUD's) reads Lash plain and ignores the mouse")
+	plain.free()
+	_completed += 1
 
 func _click(button_index: MouseButton) -> InputEventMouseButton:
 	var click := InputEventMouseButton.new()

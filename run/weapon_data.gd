@@ -99,3 +99,12 @@ func modify_basic_attack(card: CardData) -> CardData:
 
 func describe() -> String:
 	return description
+
+# The cards its description names, by card_name: basic_attack_as, the base
+# version (the Tail's Lash). Its plate inks each name and, where the plate
+# is looked at (ItemPlate.card_links_enabled), shows that card on hover.
+func named_cards() -> Array[CardData]:
+	var cards: Array[CardData] = []
+	if basic_attack_as != null:
+		cards.append(basic_attack_as)
+	return cards

@@ -24,7 +24,12 @@ class_name ItemPlate
 #   what it does  TrinketData.describe() / WeaponData.describe() in the
 #                 cards' rules voice (Alegreya Sans, full ink, centred), in
 #                 a block always rules_lines tall - left blank when the
-#                 piece does nothing, so nothing below it moves
+#                 piece does nothing, so nothing below it moves. With
+#                 card_links_enabled, each card the piece names (Weapon-
+#                 Data.named_cards() - the Tail's Lash) is set in the
+#                 rules bold, as a card's keywords are, and hovering it
+#                 shows that card (a CardView) beside the plate - never
+#                 over the strip
 #   its lore      under a short centred hairline, in Spectral Italic at
 #                 full ink, in a block always lore_lines tall - no lore,
 #                 no hairline (never a rule alone)
@@ -55,6 +60,7 @@ enum Choice { TAKE, LEAVE }
 
 const PAPER_MATERIAL_PATH := "res://battle/card_paper_material.tres"
 const LORE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
+const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 
 @export var plate_width: float = 300.0:
 	set(value):
@@ -240,6 +246,21 @@ const LORE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
 		_relayout()
 @export_group("")
 
+@export_group("Card Links")
+# The card a hovered name shows: a CardView at this scale (its own, not
+# times plate_scale), card_link_gap_px beside the plate's card - right of
+# it, or left where the screen has no room - centred on it, kept on
+# screen. It never takes the mouse. Each re-applies live.
+@export_range(0.2, 2.0) var card_link_preview_scale: float = 1.0:
+	set(value):
+		card_link_preview_scale = value
+		_place_link_preview()
+@export var card_link_gap_px: float = 24.0:
+	set(value):
+		card_link_gap_px = value
+		_place_link_preview()
+@export_group("")
+
 @export_group("Offer")
 # Between the plate and the offer's strip under it.
 @export var strip_gap_px: float = 10.0:
@@ -323,6 +344,14 @@ var _replaced: TrinketData = null
 # weapon()'s offer) - in _replaced's place in the strip; null otherwise.
 var _replaced_weapon: WeaponData = null
 var _show_actions: bool = false
+# Set by a host the player looks at closely (ArmorExamine): the names of
+# the cards the piece names are inked and hoverable. Off everywhere else
+# (the HUD's hovers, the battle row), where they read as plain text.
+var card_links_enabled: bool = false:
+	set(value):
+		card_links_enabled = value
+		_apply_mouse_filter()
+		_relayout()
 var _focus: int = Choice.TAKE
 var _stat_text: String = ""
 
@@ -339,6 +368,7 @@ var _paper_seed: float = 0.0
 # else holds is freed before the paragraph shapes.
 var _lore_font: Font = null
 var _rules_font: Font = null
+var _rules_bold_font: Font = null
 var _action_font: Font = null
 # The type label's tracked face, built for _label_font_px (scaled).
 var _label_font: Font = null
@@ -368,6 +398,12 @@ var _replaces_label_left: float = 0.0
 var _replaces: TextParagraph = null
 var _replaces_top: float = 0.0
 var _action_rects: Array[Rect2] = []
+# The named cards in the effect: {"card", "start", "end"} by character in
+# its text; and laid out, {"rect", "card"} per line a name sits on.
+var _links: Array[Dictionary] = []
+var _link_rects: Array[Dictionary] = []
+var _hovered_link: CardData = null
+var _link_preview: CardView = null
 
 func _init() -> void:
 	mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -397,6 +433,7 @@ func _init() -> void:
 	_replaced_name_layer.draw.connect(_draw_replaced_name)
 	add_child(_replaced_name_layer)
 	gui_input.connect(_on_gui_input)
+	mouse_exited.connect(func() -> void: _set_hovered_link(null))
 
 func _new_shadow(shadow_name: String) -> Panel:
 	var shadow := Panel.new()
@@ -421,7 +458,7 @@ func set_piece(piece: TrinketData, replaced: TrinketData = null, show_actions: b
 	# The paper's grain from the piece's id: the same plate wherever it is
 	# shown, and no draw on the global generator a run's shuffles use.
 	_paper_seed = float(absi(hash(piece.id)) % 1000) / 1000.0 if piece != null else 0.0
-	mouse_filter = Control.MOUSE_FILTER_STOP if show_actions else Control.MOUSE_FILTER_IGNORE
+	_apply_mouse_filter()
 	_apply_finish()
 	_relayout()
 
@@ -444,6 +481,7 @@ func set_weapon(weapon: WeaponData, replaced: WeaponData = null, show_actions: b
 	_weapon = weapon
 	_replaced_weapon = replaced if replaced != weapon else null
 	_paper_seed = float(absi(hash(weapon.id)) % 1000) / 1000.0 if weapon != null else 0.0
+	_apply_mouse_filter()
 	_relayout()
 
 func get_weapon() -> WeaponData:
@@ -522,6 +560,23 @@ func _shown_lore() -> String:
 	if _weapon != null:
 		return _weapon.lore
 	return _piece.flavor_text if _piece != null else ""
+
+# The cards the piece shown names in its effect - a weapon's (WeaponData.
+# named_cards()); a worn piece or keepsake names none yet.
+func _named_cards() -> Array[CardData]:
+	if _weapon != null and _bedroll == null:
+		return _weapon.named_cards()
+	return []
+
+# An offer takes the mouse (STOP); a plate whose names are hoverable
+# watches it but lets a click through to its host (PASS); else IGNORE.
+func _apply_mouse_filter() -> void:
+	if _show_actions:
+		mouse_filter = Control.MOUSE_FILTER_STOP
+	elif card_links_enabled and not _named_cards().is_empty():
+		mouse_filter = Control.MOUSE_FILTER_PASS
+	else:
+		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _shows_something() -> bool:
 	return _piece != null or _weapon != null or _bedroll != null
@@ -655,6 +710,133 @@ func _paragraph(text: String, font: Font, font_px: int, width: float) -> TextPar
 	paragraph.add_string(text, font, font_px)
 	return paragraph
 
+# The effect, with each card it names (card_links_enabled) in the rules
+# bold and its characters noted in _links. Without links, _paragraph().
+func _rules_paragraph(text: String, font_px: int, width: float) -> TextParagraph:
+	_links.clear()
+	var cards: Array[CardData] = _named_cards() if card_links_enabled else ([] as Array[CardData])
+	if cards.is_empty():
+		return _paragraph(text, _rules_font, font_px, width)
+	if _rules_bold_font == null:
+		_rules_bold_font = InkType.text_bold_font()
+	var paragraph := TextParagraph.new()
+	paragraph.width = width
+	var at: int = 0
+	while at < text.length():
+		var found: int = -1
+		var found_card: CardData = null
+		for card in cards:
+			var index: int = _find_word(text, card.card_name, at)
+			if index >= 0 and (found < 0 or index < found):
+				found = index
+				found_card = card
+		if found < 0:
+			paragraph.add_string(text.substr(at), _rules_font, font_px)
+			break
+		if found > at:
+			paragraph.add_string(text.substr(at, found - at), _rules_font, font_px)
+		var end: int = found + found_card.card_name.length()
+		paragraph.add_string(found_card.card_name, _rules_bold_font, font_px)
+		_links.append({"card": found_card, "start": found, "end": end})
+		at = end
+	return paragraph
+
+# `word` in `text` from `from`, standing alone (no letter either side) -
+# "Lash", never the lash in "Slashes"; -1 for none.
+static func _find_word(text: String, word: String, from: int) -> int:
+	if word.is_empty():
+		return -1
+	var index: int = text.find(word, from)
+	while index >= 0:
+		var before: bool = index == 0 or not _is_letter(text[index - 1])
+		var after_index: int = index + word.length()
+		var after: bool = after_index >= text.length() or not _is_letter(text[after_index])
+		if before and after:
+			return index
+		index = text.find(word, index + 1)
+	return -1
+
+static func _is_letter(character: String) -> bool:
+	return character.to_lower() != character.to_upper()
+
+# Each named card's box on each line it sits on, where _draw_paragraph()
+# draws it: the line centred, the box its pitch tall.
+func _place_links() -> void:
+	_link_rects.clear()
+	if _rules == null or _links.is_empty():
+		return
+	var server: TextServer = TextServerManager.get_primary_interface()
+	var pitch: float = _pitch(_font_px(rules_size_px))
+	var left: float = _px(padding_px)
+	for line in _rules.get_line_count():
+		var span: Vector2i = _rules.get_line_range(line)
+		var line_left: float = left + roundf((_rules.width - _rules.get_line_width(line)) / 2.0)
+		var top: float = _rules_top + pitch * float(line)
+		for link: Dictionary in _links:
+			var start: int = maxi(int(link["start"]), span.x)
+			var end: int = mini(int(link["end"]), span.y)
+			if start >= end:
+				continue
+			for run: Vector2 in server.shaped_text_get_selection(_rules.get_line_rid(line), start, end):
+				_link_rects.append({"rect": Rect2(line_left + run.x, top, run.y - run.x, pitch), "card": link["card"]})
+
+# For probes: each named card's box, {"rect", "card"}, in plate pixels.
+func get_link_rects() -> Array[Dictionary]:
+	return _link_rects
+
+# For probes: the card shown for a hovered name, or null.
+func get_link_preview() -> CardView:
+	return _link_preview if _link_preview != null and _link_preview.visible else null
+
+func _link_at(at: Vector2) -> CardData:
+	for link: Dictionary in _link_rects:
+		if (link["rect"] as Rect2).has_point(at):
+			return link["card"]
+	return null
+
+# Shows `card` beside the plate (null hides it).
+func _set_hovered_link(card: CardData) -> void:
+	if card == _hovered_link:
+		return
+	_hovered_link = card
+	if card == null:
+		if _link_preview != null:
+			_link_preview.visible = false
+		return
+	if _link_preview == null:
+		var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene
+		if scene == null:
+			return
+		_link_preview = scene.instantiate() as CardView
+		_link_preview.name = "CardLinkPreview"
+		_link_preview.hover_enabled = false
+		add_child(_link_preview)
+		_ignore_mouse(_link_preview)
+	_link_preview.set_card_data(card)
+	_link_preview.visible = true
+	_place_link_preview()
+
+func _place_link_preview() -> void:
+	if _link_preview == null or not _link_preview.visible or not is_inside_tree():
+		return
+	_link_preview.pivot_offset = Vector2.ZERO
+	_link_preview.scale = Vector2.ONE * card_link_preview_scale
+	var shown: Vector2 = _link_preview.card_size * card_link_preview_scale
+	var screen: Rect2 = get_viewport_rect()
+	var origin: Vector2 = get_global_transform().origin
+	var at := Vector2(_card_rect.end.x + card_link_gap_px, _card_rect.get_center().y - shown.y * 0.5)
+	if origin.x + at.x + shown.x > screen.end.x:
+		at.x = _card_rect.position.x - card_link_gap_px - shown.x
+	at.y = clampf(at.y, screen.position.y - origin.y, screen.end.y - origin.y - shown.y)
+	_link_preview.position = at.round()
+
+# `node` and everything under it let the mouse through.
+static func _ignore_mouse(node: Node) -> void:
+	if node is Control:
+		(node as Control).mouse_filter = Control.MOUSE_FILTER_IGNORE
+	for child in node.get_children():
+		_ignore_mouse(child)
+
 func _paragraph_height(paragraph: TextParagraph, font_px: int) -> float:
 	return _pitch(font_px) * float(paragraph.get_line_count()) if paragraph != null else 0.0
 
@@ -701,7 +883,8 @@ func _relayout() -> void:
 	_rules = null
 	var rules_text: String = _shown_rules()
 	if not rules_text.is_empty():
-		_rules = _paragraph(rules_text, _rules_font, rules_px, text_width)
+		_rules = _rules_paragraph(rules_text, rules_px, text_width)
+	_place_links()
 	y = _rules_top + _pitch(rules_px) * float(rules_lines)
 	# The hairline, then the lore's block, lore_lines tall.
 	_hairline_y = roundf(y + _px(lore_gap_px))
@@ -731,6 +914,7 @@ func _relayout() -> void:
 	_name_layer.size = Vector2(maxf(name_width, 1.0), _plate_size.y)
 	if _name_finish != null:
 		_name_finish.set_shader_parameter("text_width_px", name_width)
+	_place_link_preview()
 	_redraw()
 
 # An offer's strip under the plate: REPLACES <name> on one baseline,
@@ -912,9 +1096,11 @@ func _hit(position: Vector2) -> int:
 	return -1
 
 func _on_gui_input(event: InputEvent) -> void:
+	var motion := event as InputEventMouseMotion
+	if motion != null:
+		_set_hovered_link(_link_at(motion.position))
 	if not _show_actions:
 		return
-	var motion := event as InputEventMouseMotion
 	if motion != null:
 		var under: int = _hit(motion.position)
 		if under >= 0:

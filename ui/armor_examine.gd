@@ -75,6 +75,8 @@ func _ready() -> void:
 	add_child(_scrim)
 	_plate = ItemPlate.new()
 	_plate.name = "Plate"
+	# Looked at closely: the cards it names show on hover (the Tail's Lash).
+	_plate.card_links_enabled = true
 	add_child(_plate)
 	if _piece == null and _weapon == null:
 		close(false)
@@ -84,6 +86,10 @@ func _ready() -> void:
 	else:
 		_plate.set_piece(_piece, _worn if _with_choice else null, _with_choice)
 	_plate.chosen.connect(close)
+	# With no choice, a click on the plate closes as one off it does - the
+	# plate only watches the mouse for its card names (PASS).
+	if not _with_choice:
+		_plate.gui_input.connect(_on_scrim_gui_input)
 	_open()
 	_plate.play_name_sheen()
 
