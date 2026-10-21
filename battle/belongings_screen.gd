@@ -1272,7 +1272,7 @@ func _activate(index: int) -> void:
 			TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "BelongingsScreen")
 			print("BelongingsScreen: took '%s' (deck now %d)." % [_card.card_name, RunState.deck.size()])
 		Slot.KEEPSAKE when _bedroll != null:
-			RunState.take_bedroll()
+			RunState.take_bedroll("belongings")
 			_log_choice(index, glassbone, null)
 			TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "BedrollTakeAudio", "BelongingsScreen")
 			print("BelongingsScreen: took the Bedroll.")

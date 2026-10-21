@@ -98,6 +98,10 @@ var _ink: Color = Color.BLACK
 var _day_fog_color: Color = Color.WHITE
 var _healed: int = 0
 var _heal_target: int = 0
+# For the run log's bedroll_use: HP as the hold began, and where the
+# Bedroll came from (RunState.bedroll_source, read before it is spent).
+var _hp_before: int = 0
+var _source: String = ""
 
 var _confirm_layer: CanvasLayer = null
 var _confirm: Control = null
@@ -285,6 +289,8 @@ func _set_night(amount: float) -> void:
 # The hold: the Bedroll spent, the HP rising a point at a time.
 func _begin_hold() -> void:
 	_set_hud_on_dark(true)
+	_hp_before = RunState.player_hp
+	_source = RunState.bedroll_source
 	RunState.use_bedroll()
 	var room: int = maxi(RunState.player_max_hp - RunState.player_hp, 0)
 	_heal_target = mini(_heal_target, room)
@@ -304,6 +310,7 @@ func _say_line() -> void:
 	_heal_to(float(_heal_target))
 	_set_hud_on_dark(day_on_dark)
 	RunLogger.player_healed(_healed, "bedroll")
+	RunLogger.event("bedroll_use", {"hp_before": _hp_before, "hp_after": RunState.player_hp, "source": RunLogger.or_null(_source)})
 	if rest_lines.is_empty():
 		return
 	var pick := RandomNumberGenerator.new()

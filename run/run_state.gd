@@ -100,6 +100,9 @@ var weapon: WeaponData = null
 # it's used (BedrollRest); new_run() empties it. Changed only through
 # take_bedroll() and use_bedroll().
 var has_bedroll: bool = false
+# Where the Bedroll carried came from ("belongings", "collector"), for the
+# run log's bedroll_use; "" with none carried or none said.
+var bedroll_source: String = ""
 # HP actually lost since the fight in progress (or the last one) opened -
 # what lose_hp() really took, never the damage that was attempted, from
 # any source: an enemy's hit, the Wanderer's own self-damage, a status
@@ -189,6 +192,7 @@ func new_run(starting_character: CharacterData) -> void:
 	worn = null
 	weapon = starting_character.starting_weapon
 	has_bedroll = false
+	bedroll_source = ""
 	keepsakes_offered.clear()
 	hp_lost_this_combat = 0
 	player_max_hp = starting_character.max_hp
@@ -430,12 +434,13 @@ func acquire_keepsake(trinket: TrinketData) -> bool:
 	equip_keepsake(trinket)
 	return true
 
-# A Bedroll into the pack: true, or false with one already carried - and
-# nothing changes.
-func take_bedroll() -> bool:
+# A Bedroll into the pack from `source` (bedroll_source): true, or false
+# with one already carried - and nothing changes.
+func take_bedroll(source: String = "") -> bool:
 	if has_bedroll:
 		return false
 	has_bedroll = true
+	bedroll_source = source
 	bedroll_changed.emit(has_bedroll)
 	return true
 
@@ -446,6 +451,7 @@ func use_bedroll() -> bool:
 	if not has_bedroll:
 		return false
 	has_bedroll = false
+	bedroll_source = ""
 	bedroll_changed.emit(has_bedroll)
 	return true
 
