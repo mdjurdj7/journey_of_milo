@@ -112,7 +112,7 @@ options = Array[ExtResource("91_encounter_option")]([SubResource("EncounterOptio
 
 [sub_resource type="Resource" id="TravellerGlimpse_arrival"]
 script = ExtResource("92_traveller_glimpse")
-path = PackedVector2Array(0.62, -7.95, 1.5, -19, 4.7, -28.1, 8, -31.6, 14.7, -33.6, 24.1, -33.5)
+path = PackedVector2Array(0.62, -7.95, -2.6, -12, -5.4, -14.6, -7.6, -18.6, -6, -23.5, -3.9, -27.7, -5.3, -31.6, -6.13, -34.5, -3.73, -38.33, 1.6, -40.5)
 speed = 1.6
 
 [sub_resource type="Resource" id="ShoreFlockData_stream"]
