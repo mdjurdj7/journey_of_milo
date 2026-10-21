@@ -131,7 +131,7 @@ func _check_data() -> void:
 	_expect_eq(samphire.rarity, CardData.CardRarity.COMMON, "...Common")
 	_expect_eq(samphire.removal_scope, CardData.RemovalScope.CONSUMED, "...Consumed")
 	_expect(samphire.effects.size() == 1 and samphire.effects[0].effect_type == CardEffect.EffectType.HEAL, "...one Heal")
-	_expect_eq(samphire.description, "Heal 8.\nConsumed.", "...reading Heal 8. / Consumed.")
+	_expect_eq(samphire.description, "Heal {heal}.\nConsumed.", "...reading Heal {heal}. / Consumed.")
 	_completed += 1
 
 # --- Floor 4's own ---

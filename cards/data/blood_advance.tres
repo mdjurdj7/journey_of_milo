@@ -18,7 +18,7 @@ cost = 1
 card_type = 1
 rarity = 2
 target_type = 1
-description = "Gain 20 Toll.
+description = "Gain {toll_gain} Toll.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_self_damage_toll")])
 removal_scope = 1

@@ -486,7 +486,7 @@ func _check_lasting_cards_leave_rotation() -> void:
 #   - HP paid before any other effect is the cost badge's alone - the
 #     text never says "Lose X HP" for it;
 #   - HP paid after another effect stays in the text where it happens,
-#     as "Then lose X HP." with the effect's own number;
+#     as "Then lose {self_loss} HP.", the effect's own number;
 #   - any HP the card costs shows in the badge;
 #   - one line per resolution step, in order - TOLL_HEAL spends and
 #     then acts (2), TAKE_FROM_ATTACK takes and then gives Block (2), SELF_DAMAGE_TOLL's line is its Toll (the
@@ -527,7 +527,7 @@ func _check_rules_text_pattern() -> void:
 				upfront = false
 				if self_loss:
 					var at: String = lines[expected] if expected < lines.size() else "(none)"
-					_expect_eq(at, "Then lose %d HP." % effect.value, "%s's HP after another effect reads on its own line %d" % [card.card_name, expected + 1])
+					_expect_eq(at, "Then lose %s HP." % CardView.TOKEN_SELF_LOSS, "%s's HP after another effect reads on its own line %d" % [card.card_name, expected + 1])
 					expected += 1
 					continue
 				var critical_gate: bool = effect.condition == CardEffect.Condition.CRITICAL and CardBonus.mode(effect) == CardBonus.Mode.GATE

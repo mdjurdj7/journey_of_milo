@@ -162,6 +162,20 @@ const TOKEN_SURVIVE_HP := "{survive_hp}"
 # The Critical line a status the card applies raises its player's to
 # (StatusData.raises_critical_percent - Go Under's 50).
 const TOKEN_CRITICAL_PERCENT := "{critical_percent}"
+# The HP a SELF_DAMAGE after another effect loses - its value as printed
+# (Bite Down's "Then lose 2 HP."), never the badge's sum.
+const TOKEN_SELF_LOSS := "{self_loss}"
+# The Toll a SELF_DAMAGE_TOLL makes in all - its toll_gain (Blood Advance's
+# 20, Garnish's 5).
+const TOKEN_TOLL_GAIN := "{toll_gain}"
+# What a HEAL heals - its value (Samphire's 8).
+const TOKEN_HEAL := "{heal}"
+# What's left standing after the card's own tokens is filled from the
+# status or stance the card applies, in the names its template uses -
+# Status.template_values(), Stance.template_values(): {bonus} and
+# {hp_loss} (Self-Eater), {energy} (Dying Light), {count} and {drain}
+# (The Return), {value} (Unbroken, Garnish), {share} (Ransom). A card
+# that says its status's rule reads the numbers its reveal will.
 # The blank border Godot's glyph rasteriser puts round every glyph
 # bitmap - an engine fact, not a tunable. See _cap_top().
 const GLYPH_RECT_MARGIN_PX := 1.0
@@ -909,6 +923,27 @@ func _resolve_tokens(description: String) -> String:
 		var survive: int = _survive_hp_preview()
 		if survive > 0:
 			text = text.replace(TOKEN_SURVIVE_HP, str(survive))
+	if text.contains(TOKEN_SELF_LOSS):
+		var self_loss: int = _effect_value(card_data, [CardEffect.EffectType.SELF_DAMAGE])
+		if self_loss >= 0:
+			text = text.replace(TOKEN_SELF_LOSS, str(self_loss))
+	if text.contains(TOKEN_TOLL_GAIN):
+		for effect in card_data.effects:
+			if effect != null and effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL:
+				text = text.replace(TOKEN_TOLL_GAIN, str(effect.toll_gain))
+				break
+	if text.contains(TOKEN_HEAL):
+		var heal: int = _effect_value(card_data, [CardEffect.EffectType.HEAL])
+		if heal >= 0:
+			text = text.replace(TOKEN_HEAL, str(heal))
+	# Last, so the card's own tokens win a name they share.
+	for effect in card_data.effects:
+		if effect == null:
+			continue
+		if effect.status_data != null:
+			text = Status.fill_template(text, Status.new(effect.status_data).template_values())
+		if effect.stance_data != null:
+			text = Status.fill_template(text, Stance.new(effect.stance_data).template_values())
 	return text
 
 # What the chain adds to the first effect of one of `types` now - the

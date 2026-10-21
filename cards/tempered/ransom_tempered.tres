@@ -17,7 +17,7 @@ cost = 1
 card_type = 1
 rarity = 3
 target_type = 1
-description = "Next turn, your Attacks heal half the damage dealt.
+description = "Next turn, your Attacks heal {share} the damage dealt.
 Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_apply_status")])
 removal_scope = 1

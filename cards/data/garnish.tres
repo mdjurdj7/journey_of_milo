@@ -24,8 +24,8 @@ cost = 1
 card_type = 1
 rarity = 2
 target_type = 0
-description = "An attack deals 5 less.
-Gain 5 Toll."
+description = "An attack deals {value} less.
+Gain {toll_gain} Toll."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_self_damage_toll"), SubResource("E_garnish")])
 art = ExtResource("4_art")
 play_sound_path = "res://assets/audio/cards/Garnish/Garnish.mp3"

@@ -13,9 +13,12 @@ class_name KeywordTable
 #   {carry}      the Toll a floor advance carries over (toll_carry_cap)
 # Both read the run's character, or the Wanderer's data outside a run
 # (the title's compendium).
+#   {devour}     what Devour gives for each Energy - Take In's
+#                DEVOUR_FROM_HAND value, the card that Devours
 
 const TABLE_PATH := "res://ui/keywords.tres"
 const FALLBACK_CHARACTER_PATH := "res://run/data/wanderer.tres"
+const DEVOUR_CARD_PATH := "res://cards/data/take_in.tres"
 
 # Keyword -> definition template, in the order a reader meets them. Whole
 # words, case-sensitive, as they're written in rules text.
@@ -82,7 +85,14 @@ static func live_values() -> Dictionary:
 		character = load(FALLBACK_CHARACTER_PATH) as CharacterData
 	if character == null:
 		return {}
-	return {
+	var values: Dictionary = {
 		"threshold": roundi((fight_critical_fraction if fight_critical_fraction >= 0.0 else character.critical_hp_fraction) * 100.0),
 		"carry": character.toll_carry_cap,
 	}
+	var devour_card: CardData = load(DEVOUR_CARD_PATH) as CardData
+	if devour_card != null:
+		for effect in devour_card.effects:
+			if effect != null and effect.effect_type == CardEffect.EffectType.DEVOUR_FROM_HAND:
+				values["devour"] = effect.value
+				break
+	return values

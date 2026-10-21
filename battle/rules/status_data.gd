@@ -65,7 +65,9 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {survive_hp} survive_hp() for the holder (only with one - describe(holder))
 #   {decay}    tick_decay
 #   {critical_percent} raises_critical_percent
-#   {s}        "s" unless the count token before it is 1 ("Attack{s}")
+#   {share}    ransom_heal_fraction in words ("half") - or, with none, that
+#              of the status it gives way to (grants_on_turn_start)
+#   {s}      "s" unless the count token before it is 1 ("Attack{s}")
 # An unknown token is left standing. "It" is the enemy holding it, "you"
 # the player.
 

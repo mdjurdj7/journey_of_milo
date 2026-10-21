@@ -89,7 +89,7 @@ func _check_data() -> void:
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "...Uncommon")
 	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
-	_expect_eq(card.description, "An attack deals 5 less.\nGain 5 Toll.", "...its text")
+	_expect_eq(card.description, "An attack deals {value} less.\nGain {toll_gain} Toll.", "...its text, numbers from data")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...and reads TOLL")
 	_expect_eq(card.effects.size(), 2, "...two effects")
 	if card.effects.size() == 2:
@@ -272,7 +272,7 @@ func _check_fight() -> void:
 			_expect_eq(view.cost_label.text, "1", "The face: 1 Energy")
 			_expect_eq(view.hp_cost_label.text if view.hp_cost_label.visible else "", "−1 HP", "...−1 HP in the cost badge")
 			_expect_eq(view.type_label.text, "TOLL", "...labelled TOLL")
-			_expect_eq(view.rules_text.get_parsed_text(), card.description, "...its text as written")
+			_expect_eq(view.rules_text.get_parsed_text(), card.description.replace("{value}", str(_garnish_total)).replace("{toll_gain}", str(card.effects[0].toll_gain)), "...its text as written, its numbers filled")
 			_expect(view.rules_font_sizes.has(view.rules_text.get_theme_font_size("normal_font_size")), "...at a rules size")
 			_expect_eq(view.size, view.card_size, "...fitting the face at hand size")
 			var type_baseline: float = view.type_label.position.y + view.type_label.get_theme_font("font").get_ascent(view.type_label_font_size_px)

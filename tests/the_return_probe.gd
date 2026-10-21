@@ -68,7 +68,7 @@ func _check_card_data() -> void:
 	_expect_eq(card.rarity, CardData.CardRarity.RARE, "...is Rare")
 	_expect_eq(card.target_type, CardData.TargetType.SELF, "...targets the player")
 	_expect_eq(card.removal_scope, CardData.RemovalScope.NONE, "...leaves rotation as a Power does, nothing more")
-	_expect_eq(card.description, RULE % [COUNT, DRAIN], "...and says so")
+	_expect_eq(card.description, (load(STATUS_PATH) as StatusData).description, "...and says what its status says")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...and carries its art")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.POWER, "...and its face reads POWER")
 	_expect(CardView.KEYWORDS.has("Drain"), "Drain is a bold rules keyword")

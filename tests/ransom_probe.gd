@@ -95,7 +95,7 @@ func _check_data() -> void:
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.RARE, "...Rare")
 	_expect_eq(card.removal_scope, CardData.RemovalScope.SPENT, "...and Spent")
-	_expect_eq(card.description, WAITING_TEXT + "\nSpent.", "The card's text")
+	_expect_eq(Status.fill_template(card.description, Status.new(waiting).template_values()), WAITING_TEXT + "\nSpent.", "The card's text, as its waiting status says it")
 	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Ransom.png", "...shows its art")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...mipmapped")
 	_expect((load(POOL_PATH) as RewardPool).entries.has(card), "...in the Wanderer pool")

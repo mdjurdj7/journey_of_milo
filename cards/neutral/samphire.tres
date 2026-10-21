@@ -16,7 +16,7 @@ cost = 1
 card_type = 1
 rarity = 1
 target_type = 1
-description = "Heal 8.
+description = "Heal {heal}.
 Consumed."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_heal")])
 removal_scope = 2

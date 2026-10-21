@@ -111,6 +111,14 @@ func label() -> String:
 func describe(holder: Combatant = null) -> String:
 	if data == null:
 		return ""
+	return fill_template(data.description, template_values(holder))
+
+# The numbers describe() fills its template with, by token name - also
+# what a card face that applies this status reads for the tokens its own
+# don't cover (CardView._resolve_tokens()).
+func template_values(holder: Combatant = null) -> Dictionary:
+	if data == null:
+		return {}
 	var grant: int = data.grants_on_critical.default_charges if data.grants_on_critical != null else 0
 	var values: Dictionary = {
 		"charges": charges,
@@ -137,7 +145,15 @@ func describe(holder: Combatant = null) -> String:
 	}
 	if holder != null:
 		values["survive_hp"] = data.survive_hp(holder.max_hp, holder.critical_fraction())
-	return fill_template(data.description, values)
+	# {share}: the share of damage an Attack heals - this status's, or the
+	# one it gives way to at turn start (Ransom's waiting status says its
+	# live one's). Left standing on a status with none.
+	var heal_fraction: float = data.ransom_heal_fraction
+	if heal_fraction <= 0.0 and data.grants_on_turn_start != null:
+		heal_fraction = data.grants_on_turn_start.ransom_heal_fraction
+	if heal_fraction > 0.0:
+		values["share"] = share_word(heal_fraction)
+	return values
 
 # Replaces each {token} in `text` with its value from `values`, and each
 # {s} with "s" unless the nearest count token before it is 1 - so a
@@ -177,6 +193,13 @@ static func times_word(multiplier: float) -> String:
 	if is_equal_approx(multiplier, 3.0):
 		return "triple"
 	return "%s×" % String.num(snappedf(multiplier, 0.01))
+
+# A share of something in words, for rules text before "the": "half", or
+# "N% of".
+static func share_word(fraction: float) -> String:
+	if is_equal_approx(fraction, 0.5):
+		return "half"
+	return "%d%% of" % roundi(fraction * 100.0)
 
 # A count as an ordinal word, for rules text: "first" to "tenth", "Nth"
 # past that.

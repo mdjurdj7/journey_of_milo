@@ -210,7 +210,7 @@ func _check_dying_light() -> void:
 	_expect_eq(_deal(cornered, player), 14, "...and no attack bonus: Cornered's Critical 14, nothing added")
 	_expect(EffectResolver.card_blocked(power, player), "A second Dying Light can't be played while one is held")
 	_expect_eq(Status.new(load("res://battle/rules/statuses/dying_light.tres") as StatusData).describe(), "While Critical, gain 1 Energy at the start of your turn.", "Its readout line matches the card")
-	_expect_eq(power.description, "While Critical, gain 1 Energy at the start of your turn.", "...and the card says so")
+	_expect_eq(power.description, (load("res://battle/rules/statuses/dying_light.tres") as StatusData).description, "...and the card says what its status says")
 	_completed += 1
 
 func _check_last_resort() -> void:

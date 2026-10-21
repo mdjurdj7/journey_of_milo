@@ -40,12 +40,17 @@ static func apply_to(combatant: Combatant, stance_data: StanceData) -> Stance:
 func describe() -> String:
 	if data == null:
 		return ""
-	return Status.fill_template(data.description, {
+	return Status.fill_template(data.description, template_values())
+
+# The numbers describe() fills its template with, by token name - also
+# what a card face that takes this stance reads (CardView._resolve_tokens()).
+func template_values() -> Dictionary:
+	return {
 		"stacks": stacks,
 		"turns": turns_left,
 		"bonus": data.attack_damage_bonus * stacks,
 		"hp_loss": data.attack_hp_loss * stacks,
-	})
+	}
 
 # Extra damage this stance adds to an Attack, all stacks counted. 0 with
 # no stance, which is every fight for a player who hasn't taken one - and
