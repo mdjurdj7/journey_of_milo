@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Headless probe for Deny - 1 Energy, Uncommon Skill, TOLL, aimed at an
-# enemy, Spent: "Spend 6 Toll. Delay target enemy's next action. Spent."
+# enemy, Spent: "Spend 6 Toll. Delay target enemy. Spent."
 # Blocked under 6 Toll; not on an enemy already Delayed. On its
 # coming turn the enemy does nothing - its move held where it is, the
 # marks on it still bound, its turn count (escalation) not moving, its
@@ -84,7 +84,7 @@ func _check_data() -> void:
 	var delayed: StatusData = load(DELAYED_PATH)
 	_expect_eq(card.card_name, "Deny", "The card loads")
 	_expect_eq([card.cost, card.card_type, card.rarity, card.target_type, card.removal_scope, card.card_class], [1, CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.TargetType.ENEMY, CardData.RemovalScope.SPENT, &"wanderer"], "...1 Energy, a Skill, Uncommon, at an enemy, Spent, the Wanderer's")
-	_expect_eq(card.description, "Spend {toll_cost} Toll.\nDelay target enemy's next action.\nSpent.", "...its text")
+	_expect_eq(card.description, "Spend {toll_cost} Toll.\nDelay target enemy.\nSpent.", "...its text")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and card.effects[1].status_data == delayed, "...SPEND_TOLL, then Delayed on the target - no hand card taken")
 	_expect_eq(_toll, 6, "...6 Toll")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")

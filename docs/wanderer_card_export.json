@@ -1021,9 +1021,9 @@
       "face_type_label": "TOLL",
       "energy_cost": 1,
       "rarity": "UNCOMMON",
-      "card_text": "Spend 6 Toll.\nDelay target enemy's next action.\nSpent.",
+      "card_text": "Spend 6 Toll.\nDelay target enemy.\nSpent.",
       "face_hp_line": null,
-      "card_text_template": "Spend {toll_cost} Toll.\nDelay target enemy's next action.\nSpent.",
+      "card_text_template": "Spend {toll_cost} Toll.\nDelay target enemy.\nSpent.",
       "targeting": "enemy",
       "removal_after_play": "Spent: leaves this fight's rotation once played",
       "effects": [
@@ -1075,7 +1075,7 @@
       "upgrade_data": {
         "name": "Deny+",
         "file_path": "res://cards/tempered/deny_tempered.tres",
-        "card_text": "Spend 4 Toll.\nDelay target enemy's next action.\nSpent.",
+        "card_text": "Spend 4 Toll.\nDelay target enemy.\nSpent.",
         "changes": "Spends 4 Toll in place of 6."
       },
       "starting_deck_count": 0,
