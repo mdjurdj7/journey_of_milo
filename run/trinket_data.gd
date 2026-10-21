@@ -62,6 +62,11 @@ class_name TrinketData
 #                        turn - every committed play, 0-cost included;
 #                        never a set-aside, Devoured or discarded card),
 #                        draw card_count_draw, once that card has resolved
+#   discount_on_card_count, card_count_discount  the card that is this
+#                        many plays into each turn (the same count as
+#                        draw_on_card_count) costs card_count_discount
+#                        less, never below 0 (Combatant._reduced_cost()) -
+#                        whatever it costs: a 0-cost card there spends it
 #   first_attack_multiplier  above 1: the fight's first Attack card deals
 #                        this times its damage - every hit, every target -
 #                        through a status (FIRST_ATTACK_STATUS_PATH, an
@@ -97,6 +102,8 @@ enum Slot { KEEPSAKE, WORN }
 #   {carry}  block_carry
 #   {play_draw}  card_count_draw
 #   {big_hit}  big_hit_threshold     {big_cut}  big_hit_reduction
+#   {cost_nth}  discount_on_card_count as an ordinal ("third")
+#   {cost_cut}  card_count_discount
 #   {s}      "s" unless the count token before it is 1
 @export_multiline var description: String = ""
 # The shortened line for where it's shown small - the "currently held"
@@ -151,6 +158,14 @@ enum Slot { KEEPSAKE, WORN }
 	set(value):
 		card_count_draw = value
 		emit_changed()
+@export var discount_on_card_count: int = 0:
+	set(value):
+		discount_on_card_count = value
+		emit_changed()
+@export var card_count_discount: int = 0:
+	set(value):
+		card_count_discount = value
+		emit_changed()
 @export var first_attack_multiplier: float = 1.0:
 	set(value):
 		first_attack_multiplier = value
@@ -190,6 +205,8 @@ func _fill(template: String) -> String:
 		"play_draw": card_count_draw,
 		"big_hit": big_hit_threshold,
 		"big_cut": big_hit_reduction,
+		"cost_nth": Status.ordinal_word(discount_on_card_count),
+		"cost_cut": card_count_discount,
 	})
 
 # The fight is opening: this trinket's status, if it has one, onto the

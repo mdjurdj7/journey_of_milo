@@ -84,6 +84,15 @@ var toll_spent_this_fight: int = 0
 # _resolve_play()), cleared by BattleController._start_player_turn().
 # Read through EffectContext.tagged_plays_before_this (Lash's repeats).
 var tagged_plays_this_turn: Dictionary = {}
+# Cards played since this turn began, every committed play - the
+# controller's cards_played_this_turn, mirrored here at commit and at the
+# turn's start so a cost can read it.
+var plays_this_turn: int = 0
+# The held piece's turn discount (TrinketData.discount_on_card_count/card_
+# count_discount): the card that would be play number discount_on_card_
+# count this turn costs card_count_discount less. 0 = none.
+var discount_on_card_count: int = 0
+var card_count_discount: int = 0
 # The chain this turn (Skillchain): its level, the last chained card's
 # property (NONE: no chain), and the last skillchain this chain fired
 # (&"" once it breaks). Stepped at a
@@ -361,10 +370,17 @@ func can_pay(card: CardData) -> bool:
 # card, then every waiting cost reduction (Status.cost_reduction()),
 # never below 0. A card whose base is 0 is 0 with neither.
 func _reduced_cost(card: CardData) -> int:
+	var count_cut: int = card_count_discount if counts_for_turn_discount() else 0
 	if not takes_next_card_discount(card):
-		return maxi(base_cost(card), 0)
+		return maxi(base_cost(card) - count_cut, 0)
 	var base: int = 0 if first_card_free else base_cost(card)
-	return maxi(base - Status.cost_reduction(statuses), 0)
+	return maxi(base - Status.cost_reduction(statuses) - count_cut, 0)
+
+# Whether the next card played is the one the turn discount lands on: the
+# play that brings this turn's count to discount_on_card_count. Not a
+# "next card" discount - a 0-cost card there takes it, and it is gone.
+func counts_for_turn_discount() -> bool:
+	return card_count_discount > 0 and discount_on_card_count > 0 and plays_this_turn == discount_on_card_count - 1
 
 # `card`'s Energy before any modifier: its critical_cost while this
 # fighter is Critical at the HP held now - Energy is paid before any HP

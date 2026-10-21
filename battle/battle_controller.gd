@@ -390,6 +390,10 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		opening_bonus += maxi(piece.opening_draw_bonus, 0)
 		player.first_card_free = player.first_card_free or piece.first_card_free
 		player.critical_entry_block += maxi(piece.critical_entry_block, 0)
+		# The largest turn discount held, with its own count.
+		if piece.card_count_discount > player.card_count_discount:
+			player.card_count_discount = piece.card_count_discount
+			player.discount_on_card_count = maxi(piece.discount_on_card_count, 0)
 		_end_turn_keep += maxi(piece.end_turn_keep, 0)
 		player.first_hit_scale = minf(player.first_hit_scale, clampf(piece.first_hit_scale, 0.0, 1.0))
 		# The largest big-hit cut held, with its own threshold.
@@ -1174,6 +1178,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	# re-reads itself on card_played sees this card as played. The card's
 	# own context carries the count from before it (below).
 	cards_played_this_turn += 1
+	player.plays_this_turn = cards_played_this_turn
 	player.count_play(card)
 	# The chain steps at commit too: a Burst card reads the level from
 	# before it, and the link's skillchain fires after the card's effects.
@@ -2477,6 +2482,7 @@ func _start_player_turn() -> void:
 	if carry > 0 and block_before > 0:
 		RunLogger.mechanic("keepsake_block_carry", {"kept": player.block, "lost": block_before - player.block})
 	cards_played_this_turn = 0
+	player.plays_this_turn = 0
 	_devour_uses_this_turn = 0
 	# A fresh turn for every interrupt threshold, and for Toll spent
 	# (Condition.TOLL_SPENT_THIS_TURN).
