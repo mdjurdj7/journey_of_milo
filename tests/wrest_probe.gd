@@ -93,7 +93,7 @@ func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	var status: StatusData = load(STATUS_PATH)
 	_expect_eq([card.card_name, card.cost, card.card_type, card.rarity, card.target_type, card.card_class, card.offer], ["Wrest", 2, CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.TargetType.ENEMY, &"wanderer", CardData.OfferScope.REWARDABLE], "Wrest: 2 Energy, a Common Skill at one enemy, the Wanderer's")
-	_expect(card.art == null, "...no art yet")
+	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Wrest.png", "...with its art")
 	_expect_eq(card.description, "Take up to {take} from an attack.\nGain that much Block.", "...its text")
 	_expect(card.effects.size() == 1 and card.effects[0].effect_type == CardEffect.EffectType.TAKE_FROM_ATTACK and card.effects[0].value == 8 and card.effects[0].status_data == status, "...one effect: take up to 8, as Wrested")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.GUARD, "...reading GUARD")

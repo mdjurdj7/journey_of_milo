@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20); Last Wager reworked (2026-10-20); Nothing Left (2026-10-20); Owed Time (2026-10-20); Nothing Left's and Owed Time's art (2026-10-20); In the Red's HP 8 to 5 (2026-10-20); Countersign renamed Twice Over (2026-10-20); Twice Over's art (2026-10-20); the starter's second Bite Down to a fifth Slash (2026-10-20); Nothing Left made Uncommon (2026-10-20); Wrest (2026-10-20)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20); Last Wager reworked (2026-10-20); Nothing Left (2026-10-20); Owed Time (2026-10-20); Nothing Left's and Owed Time's art (2026-10-20); In the Red's HP 8 to 5 (2026-10-20); Countersign renamed Twice Over (2026-10-20); Twice Over's art (2026-10-20); the starter's second Bite Down to a fifth Slash (2026-10-20); Nothing Left made Uncommon (2026-10-20); Wrest (2026-10-20); Wrest's art (2026-10-20)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -122,9 +122,7 @@
       "RARE": 10
     },
     "implemented_but_not_obtainable": [],
-    "missing_art": [
-      "Wrest"
-    ],
+    "missing_art": [],
     "neutral_cards_missing_art": [
       "Endure",
       "Left Hand",
@@ -3219,7 +3217,7 @@
           "default_displayed": 2
         }
       ],
-      "art_path": null,
+      "art_path": "res://cards/art/Wanderer/Wrest.png",
       "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
