@@ -540,9 +540,11 @@ func get_weapon() -> WeaponData:
 	return _weapon
 
 # The Bedroll, in place of a piece: its plate_name, its REST kind and
-# glyph, its plate_text as the effect, its lore; no choice, plain ink.
-func set_bedroll(bedroll: BedrollData) -> void:
-	set_piece(null)
+# glyph, its plate_text as the effect, its lore; plain ink. With
+# show_actions (the collector's), TAKE and LEAVE under it - nothing it
+# would replace.
+func set_bedroll(bedroll: BedrollData, show_actions: bool = false) -> void:
+	set_piece(null, null, show_actions)
 	_bedroll = bedroll
 	_paper_seed = float(absi(hash(bedroll.plate_name)) % 1000) / 1000.0 if bedroll != null else 0.0
 	_relayout()

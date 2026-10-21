@@ -16,6 +16,9 @@ class_name ArmorExamine
 #     right click close with false - the piece stays where it lies.
 #   the piece worn (the WORN line) - no choice: any click, Escape or a
 #     right click closes.
+#   a Bedroll offered (the collector's, setup_bedroll()): its plate with
+#     TAKE and LEAVE; LEAVE, a click off, Escape or a right click close
+#     it with nothing taken.
 #   the run's weapon (the WEAPON line, setup_weapon()) - the same, on its
 #     weapon plate (ItemPlate.set_weapon()).
 #   a weapon offered (the Greyshelf's - setup_weapon() with_choice): TAKE
@@ -39,6 +42,7 @@ signal closed(taken: bool)
 
 var _piece: TrinketData = null
 var _weapon: WeaponData = null
+var _bedroll: BedrollData = null
 var _worn: TrinketData = null
 # The weapon carried, which taking an offered one would replace.
 var _carried: WeaponData = null
@@ -76,6 +80,12 @@ func setup_weapon(weapon: WeaponData, from_rect: Rect2 = Rect2(), carried: Weapo
 	_carried = carried
 	_choice_only = with_choice and not escapable
 
+# The Bedroll instead of a piece, offered with_choice or only shown.
+# Called before the layer enters the tree.
+func setup_bedroll(bedroll: BedrollData, with_choice: bool = false, from_rect: Rect2 = Rect2()) -> void:
+	setup(null, null, with_choice, from_rect)
+	_bedroll = bedroll
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 100
@@ -93,10 +103,12 @@ func _ready() -> void:
 	# Looked at closely: the cards it names show on hover (the Tail's Lash).
 	_plate.card_links_enabled = true
 	add_child(_plate)
-	if _piece == null and _weapon == null:
+	if _piece == null and _weapon == null and _bedroll == null:
 		close(false)
 		return
-	if _weapon != null:
+	if _bedroll != null:
+		_plate.set_bedroll(_bedroll, _with_choice)
+	elif _weapon != null:
 		_plate.set_weapon(_weapon, _carried if _with_choice else null, _with_choice)
 	else:
 		_plate.set_piece(_piece, _worn if _with_choice else null, _with_choice)
@@ -183,7 +195,7 @@ func close(taken: bool) -> void:
 	if _closing:
 		return
 	_closing = true
-	if _plate == null or (_piece == null and _weapon == null):
+	if _plate == null or (_piece == null and _weapon == null and _bedroll == null):
 		closed.emit(false)
 		queue_free()
 		return
