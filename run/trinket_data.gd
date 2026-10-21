@@ -62,6 +62,10 @@ class_name TrinketData
 #                        turn - every committed play, 0-cost included;
 #                        never a set-aside, Devoured or discarded card),
 #                        draw card_count_draw, once that card has resolved
+#   draw_on_skill_after_attack  cards drawn the first time each turn a
+#                        Skill resolves with an Attack already played that
+#                        turn (Combatant.last_attack - BattleController._
+#                        draw_for_skill_after_attack()), once it has resolved
 #   discount_on_card_count, card_count_discount  the card that is this
 #                        many plays into each turn (the same count as
 #                        draw_on_card_count) costs card_count_discount
@@ -104,6 +108,7 @@ enum Slot { KEEPSAKE, WORN }
 #   {big_hit}  big_hit_threshold     {big_cut}  big_hit_reduction
 #   {cost_nth}  discount_on_card_count as an ordinal ("third")
 #   {cost_cut}  card_count_discount
+#   {skill_draw}  draw_on_skill_after_attack
 #   {s}      "s" unless the count token before it is 1
 @export_multiline var description: String = ""
 # The shortened line for where it's shown small - the "currently held"
@@ -158,6 +163,10 @@ enum Slot { KEEPSAKE, WORN }
 	set(value):
 		card_count_draw = value
 		emit_changed()
+@export var draw_on_skill_after_attack: int = 0:
+	set(value):
+		draw_on_skill_after_attack = value
+		emit_changed()
 @export var discount_on_card_count: int = 0:
 	set(value):
 		discount_on_card_count = value
@@ -207,6 +216,7 @@ func _fill(template: String) -> String:
 		"big_cut": big_hit_reduction,
 		"cost_nth": Status.ordinal_word(discount_on_card_count),
 		"cost_cut": card_count_discount,
+		"skill_draw": draw_on_skill_after_attack,
 	})
 
 # The fight is opening: this trinket's status, if it has one, onto the

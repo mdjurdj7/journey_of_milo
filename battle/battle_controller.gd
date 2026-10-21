@@ -332,6 +332,8 @@ var _multi_hit_draw_used: bool = false
 # Whether this turn's card-count draw (TrinketData.draw_on_card_count -
 # Worn Page) has been taken. Reset at the turn's start.
 var _card_count_draw_used: bool = false
+# The held pieces' Skill-after-Attack draw (Knotted Cord) spent this turn.
+var _skill_after_attack_draw_used: bool = false
 # The HP enemy hits have taken by the rules but not yet reported, hit by
 # hit (_owe_attacks()) - what the HP bar is still to lose: shown_player_
 # hp(). And whether the hit reporting now is one of an attack's several
@@ -1267,6 +1269,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	_multi_hit_report = false
 	_after_card_effects()
 	_draw_for_card_count()
+	_draw_for_skill_after_attack(card)
 	if not _extra_hit_reports.is_empty():
 		await _land_extra_hits()
 	if _replay_pending:
@@ -2205,6 +2208,24 @@ func _draw_for_card_count() -> void:
 	RunLogger.mechanic("keepsake_draw", {"card_count": cards_played_this_turn, "drawn": draw})
 	deck.draw(draw)
 
+# The held pieces' draw for a Skill after an Attack (TrinketData.draw_on_
+# skill_after_attack - Knotted Cord, both slots summed): `card`, just
+# resolved, is a Skill, an Attack has been played this turn (Combatant.
+# last_attack - a real play, set at its commit, cleared as the turn
+# starts), and this turn's draw is unspent. Once a turn.
+func _draw_for_skill_after_attack(card: CardData) -> void:
+	if _skill_after_attack_draw_used or card == null or card.card_type != CardData.CardType.SKILL or player.last_attack == null:
+		return
+	var draw: int = 0
+	for piece in RunState.held_pieces():
+		draw += maxi(piece.draw_on_skill_after_attack, 0)
+	if draw <= 0:
+		return
+	_skill_after_attack_draw_used = true
+	print("BattleController: a Skill after an Attack; drawing %d (draw_on_skill_after_attack)." % draw)
+	RunLogger.mechanic("keepsake_draw", {"skill_after_attack": true, "drawn": draw})
+	deck.draw(draw)
+
 # The attacks a turn's result landed, each as _report_enemy_attack()
 # reads one: its "actions" (EnemyTurn.take_turn()), or the result itself
 # when it holds none.
@@ -2461,6 +2482,7 @@ func _start_player_turn() -> void:
 	_player_turn += 1
 	_multi_hit_draw_used = false
 	_card_count_draw_used = false
+	_skill_after_attack_draw_used = false
 	# The refill, and Dying Light's 1 if the turn begins Critical - judged
 	# here, before any tick, so entering Critical later gives nothing
 	# until the next turn starts.

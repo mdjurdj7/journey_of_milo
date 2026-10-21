@@ -1,0 +1,11 @@
+[gd_resource type="Resource" script_class="TrinketData" format=3]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"knotted_cord"
+display_name = "Knotted Cord"
+flavor_text = "Someone kept count on it. The count stopped."
+description = "The first Skill you play after an Attack each turn draws {skill_draw}."
+draw_on_skill_after_attack = 1
