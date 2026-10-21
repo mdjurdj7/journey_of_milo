@@ -2,10 +2,11 @@ extends CanvasLayer
 class_name KeepsakeOffer
 
 # Keepsake Found: a dropped keepsake shown as the object it is, on its
-# own panel, after the normal reward has closed (see RegionField.open_
-# keepsake_offer()). A different class of reward from the card choice -
-# never in its grid. The field is frozen under it and a scrim dims it;
-# this layer runs ALWAYS on layer 100.
+# own panel - over the reward screen, from its keepsake line (RewardScreen.
+# offer_keepsake()), or over the field (RegionField.open_keepsake_offer()).
+# A different class of reward from the card choice - never in its grid.
+# The field is frozen under it and a scrim dims it; this layer runs ALWAYS
+# on layer 100 (the reward screen lifts it over itself).
 #
 # The panel is card stock - the card's bone paper (card_paper_material),
 # a charcoal frame, a soft shadow - sized to what it holds, and reads top

@@ -398,23 +398,32 @@ func _check_table_drop_offered() -> void:
 	_kill_all(controller)
 	await _await_reward_screen()
 	var reward: Node = _child_with_script(_field, "reward_screen.gd")
-	_expect(reward != null, "Killing an enemy with a table opens its normal reward first")
+	_expect(reward != null, "Killing an enemy with a table opens its normal reward")
 	_expect(_child_with_script(_field, "keepsake_offer.gd") == null, "...with the keepsake offer not yet up")
 	var offered: Array = _run_state.get("keepsakes_offered")
 	_expect_eq(offered.size(), 1, "...and one keepsake already rolled (the guarantee)")
+	var offer: Node = null
 	if reward != null:
-		reward.call("close")
-	await process_frame
-	var offer: Node = _child_with_script(_field, "keepsake_offer.gd")
-	_expect(offer != null, "The keepsake offer follows the reward")
+		var index: int = _line_ids(reward).find("keepsake")
+		_expect(index >= 0, "...the keepsake a line on it (%s)" % [_line_ids(reward)])
+		if index >= 0:
+			reward.call("_take_line", index)
+			offer = reward.call("get_keepsake_offer")
+	_expect(offer != null, "Its CHOOSE opens the keepsake offer")
 	if offer != null:
+		_expect(int(offer.get("layer")) > int(reward.get("layer")), "...over the screen")
 		_expect_eq(_choice_label(offer, 1), "LEAVE", "...TAKE / LEAVE with an empty slot")
 		_expect_eq(str(offer.get("_source")), "Wardling", "...its source line names the Wardling")
 		_expect(not _field.can_process(), "...over a frozen field")
 		offer.call("_activate", 0)
 		await process_frame
 		_expect(_keepsake() != null and StringName(_keepsake().id) == StringName(offered[0]), "TAKE equips the offered keepsake")
-		_expect(_field.can_process(), "...and the field is live again once it closes")
+		_expect(is_instance_valid(reward) and bool(((reward.get("_lines") as Array)[_line_ids(reward).find("keepsake")] as RefCounted).get("taken")), "...and strikes its line")
+	if is_instance_valid(reward):
+		reward.call("close")
+	await process_frame
+	_expect(_field.can_process(), "...and the field is live again once the screen closes")
+	_expect(_child_with_script(_field, "keepsake_offer.gd") == null, "...with no second offer after it")
 	data.keepsake_table = saved
 	await _teardown()
 	# A Sputter leaves none.
@@ -429,6 +438,12 @@ func _check_table_drop_offered() -> void:
 		_expect(_child_with_script(_field, "keepsake_offer.gd") == null, "A Sputter leaves no keepsake")
 	await _teardown()
 	_completed += 1
+
+func _line_ids(reward: Node) -> Array[String]:
+	var ids: Array[String] = []
+	for line in reward.get("_lines") as Array:
+		ids.append(str((line as RefCounted).get("id")))
+	return ids
 
 func _check_debug_row() -> void:
 	_new_run()

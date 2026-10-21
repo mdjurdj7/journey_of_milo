@@ -218,25 +218,28 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 @export var glassbone_volume_db: float = -24.0
 @export_group("")
 
-@export_group("Weapon")
-# A weapon the win left (the Greyshelf's Tail): its own line, its name and
-# art / CHOOSE. CHOOSE opens its plate (ArmorExamine.setup_weapon(), TAKE
-# and LEAVE, "REPLACES" the weapon carried) weapon_offer_layer_offset
-# layers over this screen, the screen deaf to its own input until it is
-# answered. Either answer strikes the line; WALK ON leaves it behind.
-@export var weapon_action_text: String = "CHOOSE":
+@export_group("Offers")
+# A weapon the win left (the Greyshelf's Tail) and a keepsake it left (an
+# enemy's drop, or a pack felled together): each its own line, its name
+# and art / CHOOSE. CHOOSE opens its offer - the weapon's plate
+# (ArmorExamine.setup_weapon(), TAKE and LEAVE, "REPLACES" the weapon
+# carried), the keepsake's KeepsakeOffer - offer_layer_offset layers over
+# this screen, the screen deaf to its own input until it is answered.
+# Either answer strikes the line; WALK ON leaves it behind.
+@export var offer_action_text: String = "CHOOSE":
 	set(value):
-		weapon_action_text = value
+		offer_action_text = value
 		for line in _lines:
-			if line.id == "weapon":
-				line.action = weapon_action_text
+			if line.id == "weapon" or line.id == "keepsake":
+				line.action = offer_action_text
 		if _draw_layer != null:
 			_draw_layer.queue_redraw()
-@export var weapon_offer_layer_offset: int = 1:
+@export var offer_layer_offset: int = 1:
 	set(value):
-		weapon_offer_layer_offset = value
-		if _weapon_offer_open():
-			_weapon_offer.layer = layer + weapon_offer_layer_offset
+		offer_layer_offset = value
+		var open: CanvasLayer = _open_offer()
+		if open != null:
+			open.layer = layer + offer_layer_offset
 @export_group("")
 
 @export_group("Extra")
@@ -298,6 +301,12 @@ var _samphire_preview: CardView = null
 # The weapon on offer (offer_weapon()), and its plate while it is open.
 var _weapon: WeaponData = null
 var _weapon_offer: ArmorExamine = null
+# The keepsake on offer (offer_keepsake()), who left it, the offer's scene,
+# and that offer while it is open.
+var _keepsake: TrinketData = null
+var _keepsake_source: String = ""
+var _keepsake_offer_scene_path: String = ""
+var _keepsake_offer: KeepsakeOffer = null
 # The deck viewer opened from DECK (_open_deck_view()), while it is open;
 # and whether DECK is under the cursor.
 var _deck_view: DeckView = null
@@ -374,6 +383,14 @@ func setup(gold: int, pool: RewardPool, deck_panel: Control, glassbone: int = 0,
 func offer_weapon(weapon: WeaponData) -> void:
 	_weapon = weapon if weapon != RunState.weapon else null
 
+# The keepsake the win left, on a line of its own; `source` names who left
+# it (KeepsakeOffer's source line), `scene_path` is the offer opened over
+# the screen. Called before the screen is added to the tree.
+func offer_keepsake(trinket: TrinketData, source: String, scene_path: String) -> void:
+	_keepsake = trinket
+	_keepsake_source = source
+	_keepsake_offer_scene_path = scene_path
+
 func _ready() -> void:
 	# The field is frozen under this (RegionField goes back to
 	# PROCESS_MODE_DISABLED while the screen is up), which is also what
@@ -445,11 +462,18 @@ func _build_lines() -> void:
 		card_line.item = "A card"
 		card_line.action = "CHOOSE"
 		_lines.append(card_line)
+	if _keepsake != null:
+		var keepsake_line := RewardLine.new()
+		keepsake_line.id = "keepsake"
+		keepsake_line.item = _keepsake.display_name
+		keepsake_line.action = offer_action_text
+		keepsake_line.icon = _keepsake.art
+		_lines.append(keepsake_line)
 	if _weapon != null:
 		var weapon_line := RewardLine.new()
 		weapon_line.id = "weapon"
 		weapon_line.item = _weapon.display_name
-		weapon_line.action = weapon_action_text
+		weapon_line.action = offer_action_text
 		weapon_line.icon = _weapon.art
 		_lines.append(weapon_line)
 	if _lines.is_empty():
@@ -919,20 +943,34 @@ func _take_line(index: int) -> void:
 			_take_samphire(line)
 		"weapon":
 			_open_weapon_offer(line)
+		"keepsake":
+			_open_keepsake_offer(line)
 
 # --- Extra ---
 
 # The Samphire is on its way to the deck, or a view is open over the screen.
 func _extra_busy() -> bool:
-	return _samphire_flying or _deck_view_open() or _weapon_offer_open()
+	return _samphire_flying or _deck_view_open() or _open_offer() != null
 
 func _weapon_offer_open() -> bool:
 	return _weapon_offer != null and is_instance_valid(_weapon_offer)
 
+func _keepsake_offer_open() -> bool:
+	return _keepsake_offer != null and is_instance_valid(_keepsake_offer)
+
+# The weapon's plate or the keepsake's offer, whichever is open over the
+# screen; null with neither.
+func _open_offer() -> CanvasLayer:
+	if _weapon_offer_open():
+		return _weapon_offer
+	if _keepsake_offer_open():
+		return _keepsake_offer
+	return null
+
 # The weapon's plate over the screen, first loot's reveal; answered, its
 # line is struck.
 func _open_weapon_offer(line: RewardLine) -> void:
-	if _weapon == null or _weapon_offer_open():
+	if _weapon == null or _open_offer() != null:
 		return
 	_weapon_offer = ArmorExamine.new()
 	_weapon_offer.name = "WeaponOffer"
@@ -940,7 +978,7 @@ func _open_weapon_offer(line: RewardLine) -> void:
 	_weapon_offer.closed.connect(_on_weapon_offer_closed.bind(line))
 	add_child(_weapon_offer)
 	# Its own _ready() puts it on layer 100 - this screen's.
-	_weapon_offer.layer = layer + weapon_offer_layer_offset
+	_weapon_offer.layer = layer + offer_layer_offset
 	_set_list_focus(-1)
 	_list_mouse_on = -1
 	weapon_shown.emit(_weapon)
@@ -955,6 +993,35 @@ func _on_weapon_offer_closed(taken: bool, line: RewardLine) -> void:
 # For probes: the weapon's plate while it is open, else null.
 func get_weapon_offer() -> ArmorExamine:
 	return _weapon_offer if _weapon_offer_open() else null
+
+# The keepsake's offer over the screen - TAKE / LEAVE, or TAKE / KEEP
+# CURRENT on a full slot; it takes, logs and sounds the choice itself.
+# Answered, its line is struck.
+func _open_keepsake_offer(line: RewardLine) -> void:
+	if _keepsake == null or _open_offer() != null:
+		return
+	var scene := load(_keepsake_offer_scene_path) as PackedScene
+	if scene == null:
+		push_warning("RewardScreen: could not load %s; no keepsake offer." % _keepsake_offer_scene_path)
+		return
+	_keepsake_offer = scene.instantiate() as KeepsakeOffer
+	_keepsake_offer.setup(_keepsake, RunState.keepsake, _keepsake_source)
+	_keepsake_offer.closed.connect(_on_keepsake_offer_closed.bind(line))
+	add_child(_keepsake_offer)
+	# Its own _ready() puts it on layer 100 - this screen's.
+	_keepsake_offer.layer = layer + offer_layer_offset
+	_set_list_focus(-1)
+	_list_mouse_on = -1
+
+func _on_keepsake_offer_closed(_taken: bool, line: RewardLine) -> void:
+	_keepsake_offer = null
+	line.taken = true
+	_draw_layer.queue_redraw()
+	_close_if_spent()
+
+# For probes: the keepsake's offer while it is open, else null.
+func get_keepsake_offer() -> KeepsakeOffer:
+	return _keepsake_offer if _keepsake_offer_open() else null
 
 func _deck_view_open() -> bool:
 	return _deck_view != null and is_instance_valid(_deck_view)
@@ -1221,10 +1288,22 @@ func _close_if_spent() -> void:
 	close()
 
 func close() -> void:
-	# A weapon left on the list is left behind.
+	# A weapon or keepsake left on the list is left behind - logged as the
+	# keepsake's own offer logs a LEAVE.
 	for line in _lines:
-		if line.id == "weapon" and not line.taken:
+		if line.taken:
+			continue
+		if line.id == "weapon":
 			line.taken = true
 			weapon_answered.emit(_weapon, false)
+		elif line.id == "keepsake":
+			line.taken = true
+			RunLogger.event("keepsake_offer", {
+				"source": RunLogger.or_null(_keepsake_source),
+				"offered": RunLogger.keepsake_id(_keepsake),
+				"held": RunLogger.keepsake_id(RunState.keepsake),
+				"taken": false,
+			})
+			print("RewardScreen: left the keepsake '%s'." % _keepsake.display_name)
 	closed.emit()
 	queue_free()

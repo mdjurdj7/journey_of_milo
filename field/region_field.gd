@@ -621,8 +621,9 @@ var _fight_fallen_at: Array[Vector3] = []
 # ...and how far over the relief each stood (FieldEnemy.height_offset - the
 # Adder on its slab), so the piece lies on what they lay on.
 var _fight_fallen_lift: Array[float] = []
-# A keepsake rolled on the last win, waiting for the normal reward to
-# close before it's offered (_open_pending_offers()).
+# A keepsake rolled on the last win, waiting for the reward screen to offer
+# it on a line of its own (RewardScreen.offer_keepsake()) - or, with no
+# screen (RewardMode.SPREAD), offered at once (_open_pending_offers()).
 var _pending_keepsake: TrinketData = null
 # Who left it - the enemy's name, for the offer's quiet source line.
 var _pending_keepsake_source: String = ""
@@ -3431,12 +3432,10 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	# The floor can be left, or the run ended, during that beat.
 	if not is_inside_tree():
 		return
-	if not has_pool and _pending_glassbone <= 0 and _pending_weapon == null:
-		_open_pending_offers()
+	if not has_pool and _pending_glassbone <= 0 and _pending_weapon == null and _pending_keepsake == null:
 		return
 	if reward_mode == RewardMode.SCREEN or not has_pool:
-		# The weapon is a line on it; the keepsake follows when it closes
-		# (_on_reward_screen_closed()).
+		# The keepsake and weapon are lines on it.
 		_open_reward_screen()
 		return
 	var scene := load(reward_spread_scene_path) as PackedScene
@@ -3485,7 +3484,8 @@ func _open_reward_screen() -> void:
 		return
 	var screen := scene.instantiate() as RewardScreen
 	# Only reached through _spawn_reward_spread(), which has already checked
-	# the floor, and that there is a pool, Glassbone or a weapon to offer.
+	# the floor, and that there is a pool, Glassbone, a keepsake or a weapon
+	# to offer.
 	var floor_data := get_floor_data()
 	# What the fight's role pays (EncounterRewards): with none to read, the
 	# floor's gold and the card offer, as every fight once had.
@@ -3493,8 +3493,8 @@ func _open_reward_screen() -> void:
 	if rewards == null:
 		push_warning("RegionField: could not load %s; the reward is the floor's gold and a card." % encounter_rewards_path)
 	var role_reward: RoleReward = rewards.for_role(_pending_role) if rewards != null else null
-	# A floor with no pool opens this only for Glassbone or a weapon: no
-	# gold, no card, no extra.
+	# A floor with no pool opens this only for Glassbone, a keepsake or a
+	# weapon: no gold, no card, no extra.
 	var gold: int = 0
 	var extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE
 	if run_reward_pool(floor_data) != null:
@@ -3509,7 +3509,11 @@ func _open_reward_screen() -> void:
 	_pending_elite = false
 	_pending_top_tier = false
 	_pending_role = "basic"
-	# The win's weapon, a line of its own (RewardScreen.offer_weapon()).
+	# The win's keepsake and weapon, each a line of its own (RewardScreen.
+	# offer_keepsake(), offer_weapon()).
+	if _pending_keepsake != null:
+		screen.offer_keepsake(_pending_keepsake, _pending_keepsake_source, keepsake_offer_scene_path)
+		_pending_keepsake = null
 	if _pending_weapon != null:
 		screen.offer_weapon(_pending_weapon)
 		_pending_weapon = null
@@ -3521,8 +3525,6 @@ func _open_reward_screen() -> void:
 
 func _on_reward_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
-	_open_pending_offers()
-	# A keepsake or weapon offer opened over it holds the find line in turn.
 	_say_pending_find()
 
 # A won fight's keepsake: the first enemy it was won against whose own
