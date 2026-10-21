@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20); Last Wager reworked (2026-10-20); Nothing Left (2026-10-20); Owed Time (2026-10-20); Nothing Left's and Owed Time's art (2026-10-20); In the Red's HP 8 to 5 (2026-10-20); Countersign renamed Twice Over (2026-10-20); Twice Over's art (2026-10-20); the starter's second Bite Down to a fifth Slash (2026-10-20); Nothing Left made Uncommon (2026-10-20); Wrest (2026-10-20); Wrest's art (2026-10-20); Garnished and Wrested cut only the action they were put on (2026-10-20)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20); Last Wager reworked (2026-10-20); Nothing Left (2026-10-20); Owed Time (2026-10-20); Nothing Left's and Owed Time's art (2026-10-20); In the Red's HP 8 to 5 (2026-10-20); Countersign renamed Twice Over (2026-10-20); Twice Over's art (2026-10-20); the starter's second Bite Down to a fifth Slash (2026-10-20); Nothing Left made Uncommon (2026-10-20); Wrest (2026-10-20); Wrest's art (2026-10-20); Garnished and Wrested cut only the action they were put on (2026-10-20); Thick Skin (2026-10-20)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -17,7 +17,7 @@
     "upgrades": "No upgrade system exists in the current project (CardData has no upgrade fields); upgrade_data is null on every card."
   },
   "summary": {
-    "total_unique_wanderer_cards": 41,
+    "total_unique_wanderer_cards": 42,
     "total_unique_neutral_cards_obtainable_by_wanderer": 3,
     "starting_deck": {
       "total_cards": 10,
@@ -51,7 +51,7 @@
     },
     "reward_pool": {
       "file_path": "res://cards/pools/wanderer_pool.tres",
-      "count": 37,
+      "count": 38,
       "cards": [
         "Carve",
         "Hold Fast",
@@ -89,10 +89,11 @@
         "On the Brink",
         "Nothing Left",
         "Owed Time",
-        "Wrest"
+        "Wrest",
+        "Thick Skin"
       ],
       "by_rarity": {
-        "COMMON": 11,
+        "COMMON": 12,
         "UNCOMMON": 16,
         "RARE": 10
       },
@@ -111,18 +112,20 @@
       "where": "floor 2's belongings (a RewardSpread prop on region1_floor2.tres)"
     },
     "wanderer_card_types": {
-      "SKILL": 23,
+      "SKILL": 24,
       "ATTACK": 11,
       "POWER": 5,
       "STANCE": 2
     },
     "wanderer_cards_by_rarity": {
-      "COMMON": 15,
+      "COMMON": 16,
       "UNCOMMON": 16,
       "RARE": 10
     },
     "implemented_but_not_obtainable": [],
-    "missing_art": [],
+    "missing_art": [
+      "Thick Skin"
+    ],
     "neutral_cards_missing_art": [
       "Endure",
       "Left Hand",
@@ -863,6 +866,83 @@
       "battle_animation": "Slash",
       "play_effect_scene_path": null,
       "upgrade_data": null,
+      "starting_deck_count": 0,
+      "in_reward_pool": true,
+      "in_belongings_pool": false,
+      "obtainable_from": [
+        "wanderer_reward_pool"
+      ],
+      "not_obtainable_in_play": false
+    },
+    {
+      "name": "Thick Skin",
+      "file_path": "res://cards/data/thick_skin.tres",
+      "pool_class": "wanderer",
+      "card_type": "SKILL",
+      "face_type_label": "TOLL",
+      "energy_cost": 2,
+      "rarity": "COMMON",
+      "card_text": "Gain 6 block.\nUntil your next turn, damage past Block costs Toll first.",
+      "face_hp_line": null,
+      "card_text_template": "Gain {block} block.\nUntil your next turn, damage past Block costs Toll first.",
+      "targeting": "self",
+      "removal_after_play": "discard pile",
+      "effects": [
+        {
+          "type": "BLOCK",
+          "plain_english": "Gain 6 Block."
+        },
+        {
+          "type": "APPLY_STATUS",
+          "plain_english": "Apply Thick Skin to yourself until your next turn starts: enemy damage that gets past your Block (attacks and strike backs) takes your Toll first, 1 for 1, and only the rest reaches HP (DamagePipeline - Block, absorb, Toll, then HP). Your own HP loss - card costs, Self-Eater's price, Collateral, ticks like Venom - is never paid with Toll. Toll paid this way counts as spent - Reckoning counts it; Gnaw's 'spent Toll this turn' sees it (in practice a strike back during your own turn) - but it hurries no Sentence. HP Toll paid opens no Grace; a lethal guard (Refuse the End) fires only on what's left past Toll; the intent preview's HP and lethal warning read your Toll too. The Toll readout drops hit by hit; the run log puts it down to status:thick_skin."
+        }
+      ],
+      "keywords": [
+        "Toll"
+      ],
+      "self_hp_cost": 0,
+      "base_damage": null,
+      "base_block": 6,
+      "draw": null,
+      "energy_gain": null,
+      "toll_gain": null,
+      "toll_spend": "as damage past Block takes it",
+      "persistent_effect": null,
+      "stance_effect": null,
+      "power_effect": null,
+      "status_effect": {
+        "id": "thick_skin",
+        "name": "Thick Skin",
+        "description": "Until your next turn, damage past Block costs Toll first.",
+        "file_path": "res://battle/rules/statuses/thick_skin.tres",
+        "duration": "until the start of your next turn",
+        "stack_rule": "IGNORE",
+        "applied_to": "self",
+        "toll_pays_damage": true
+      },
+      "critical_condition": null,
+      "dynamic_values": [
+        {
+          "field": "block",
+          "rule": "Block a card gives (Last Resort forbids it).",
+          "default_displayed": 6
+        },
+        {
+          "field": "cost",
+          "rule": "In order: House Key's free card (a keepsake), then Leverage's 2 off this turn (never below 0) - both land on and are spent by the next card costing at least 1 Energy, so a 0-cost card leaves them waiting - then, under Collateral this turn, Energy short of what's left is paid at 3 HP each (its face's -N HP line). The face shows the Energy it would be paid at.",
+          "default_displayed": 2
+        }
+      ],
+      "art_path": null,
+      "rules_font_px": 15,
+      "battle_animation": null,
+      "play_effect_scene_path": null,
+      "upgrade_data": {
+        "name": "Thick Skin+",
+        "file_path": "res://cards/tempered/thick_skin_tempered.tres",
+        "card_text": "Gain 9 block.\nUntil your next turn, damage past Block costs Toll first.",
+        "changes": "9 Block in place of 6."
+      },
       "starting_deck_count": 0,
       "in_reward_pool": true,
       "in_belongings_pool": false,
