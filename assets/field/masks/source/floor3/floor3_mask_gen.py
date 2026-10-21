@@ -36,7 +36,7 @@ src = np.array(Image.open("floor3_walkable_sample.png").convert("RGB")).astype(i
 # north-south streaks on the slopes); the sea needs room so its far side
 # (mask_beyond_is_land) sits out of view. The sample stays as painted; every
 # image-px constant below is in sample px and goes through Y()/P().
-PAD_T, PAD_R = 240, 300
+PAD_T, PAD_R = 600, 300   # top 240 -> 600: the field camera reaches ~10 m north of the trail
 src = np.pad(src, ((PAD_T, 0), (0, PAD_R), (0, 0)))
 def Y(y): return y + PAD_T
 def P(pts): return [(x, Y(y)) for x, y in pts]
@@ -185,7 +185,7 @@ bank = np.clip(d_stream / STREAM_BANK_M, 0, 1)
 bank = bank * bank * (3 - 2 * bank)
 
 # SEA: open water past the Wardling's pocket (east canvas edge). Image px.
-SEA = True
+SEA = False   # dropped 2026-10-21: read as a pool twice; floor 3 stays inland
 SEA_COAST = P([(1950, 420), (1740, 520), (1580, 640), (1500, 760), (1468, 880), (1452, 960), (1470, 1060), (1500, 1180), (1488, 1300), (1530, 1420), (1620, 1560), (1780, 1660), (1950, 1700)])
 sea = np.zeros((H, W), bool)
 if SEA:
@@ -296,7 +296,7 @@ if SEA:
     extra["sea"] = {"coast_world_xz": [to_world(y_, x_) for x_, y_ in SEA_COAST], "note": "Open water at the east canvas edge (landmass 0)."}
 
 layout = {
-    "canvas_px": [W, H], "px_per_m": PX, "canvas_pad_px": {"top": PAD_T, "right": PAD_R, "note": "Padded 2026-10-21 from 1650x1710. Pad the hand-painted wear mask the same way (black rows on top, black columns on the right) and update mask_origin in region1_floor3.tres to landmass_mask_origin_uv."},
+    "canvas_px": [W, H], "px_per_m": PX, "canvas_pad_px": {"top": PAD_T, "right": PAD_R, "note": "Padded 2026-10-21 from 1650x1710. Pad the hand-painted wear mask to match (black rows on top, black columns on the right) and update mask_origin in region1_floor3.tres to landmass_mask_origin_uv."},
     "landmass_mask_origin_uv": [round(spawn[0] / W, 5), round(spawn[1] / H, 5)],
     "spawn_px": [round(spawn[0], 1), round(spawn[1], 1)],
     "exit_world_xz": to_world(exit_[1], exit_[0]),

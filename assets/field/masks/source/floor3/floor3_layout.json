@@ -1,21 +1,21 @@
 {
  "canvas_px": [
   1950,
-  1950
+  2310
  ],
  "px_per_m": 30.0,
  "canvas_pad_px": {
-  "top": 240,
+  "top": 600,
   "right": 300,
-  "note": "Padded 2026-10-21 from 1650x1710. Pad the hand-painted wear mask the same way (black rows on top, black columns on the right) and update mask_origin in region1_floor3.tres to landmass_mask_origin_uv."
+  "note": "Padded 2026-10-21 from 1650x1710. Pad the hand-painted wear mask to match (black rows on top, black columns on the right) and update mask_origin in region1_floor3.tres to landmass_mask_origin_uv."
  },
  "landmass_mask_origin_uv": [
   0.31385,
-  0.82308
+  0.85065
  ],
  "spawn_px": [
   612.0,
-  1605.0
+  1965.0
  ],
  "exit_world_xz": [
   24.1,
@@ -153,63 +153,6 @@
   ],
   "width_m": 3.0,
   "note": "Rock mask carries scree on the path floor. If the shader gates rock by slope, the floor shows sand: then flat slabs/scree go in as no-collision scatter, boulders with collision on both sides."
- },
- "sea": {
-  "coast_world_xz": [
-   [
-    44.6,
-    -31.5
-   ],
-   [
-    37.6,
-    -28.167
-   ],
-   [
-    32.267,
-    -24.167
-   ],
-   [
-    29.6,
-    -20.167
-   ],
-   [
-    28.533,
-    -16.167
-   ],
-   [
-    28.0,
-    -13.5
-   ],
-   [
-    28.6,
-    -10.167
-   ],
-   [
-    29.6,
-    -6.167
-   ],
-   [
-    29.2,
-    -2.167
-   ],
-   [
-    30.6,
-    1.833
-   ],
-   [
-    33.6,
-    6.5
-   ],
-   [
-    38.933,
-    9.833
-   ],
-   [
-    44.6,
-    11.167
-   ]
-  ],
-  "note": "Open water at the east canvas edge (landmass 0)."
  },
  "ledge_barrier_world_xz": [
   [
@@ -513,8 +456,8 @@
    -21.167
   ],
   [
-   6.617,
-   -20.433
+   6.45,
+   -20.1
   ],
   [
    5.817,
@@ -860,8 +803,8 @@
     -16.617
    ],
    [
-    -5.567,
-    -16.383
+    -5.733,
+    -16.417
    ],
    [
     -5.083,
