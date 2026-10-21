@@ -388,6 +388,11 @@ path_probes_hand() {
 		# The equipment plate (ItemPlate) - the weapon's, a worn piece's and
 		# a keepsake's: every probe that shows one.
 		ui/item_plate.*) out="trinket keepsake_tile armor keeper_keepsake belongings_choice" ;;
+		# The worn piece's and the weapon's examine view (ArmorExamine): the
+		# armor and weapon offers, the reward screen's Tail line (floor5),
+		# the Tail's Lash on its plate, the plate scales, the collector's
+		# goods.
+		ui/armor_examine.*) out="armor belongings_choice floor5 keepsake_tile lash collector" ;;
 		# The keepsake's examine view.
 		ui/keepsake_examine.*) out="keepsake_tile trinket keeper_keepsake belongings_choice" ;;
 		ui/gold_line.gd|ui/glassbone_line.gd|ui/keepsake_line.gd|ui/ink_line.gd|ui/hp_line.gd|ui/ink_glyph.gd|ui/hud_row_style.gd) out=$(area_probes hud) ;;
