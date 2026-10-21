@@ -24,7 +24,7 @@ extends SceneTree
 # trinket_probe does. Untyped against anything that names the RunState
 # autoload: a SceneTree script compiles before the autoloads register.
 
-const CASES := 16
+const CASES := 17
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
@@ -57,6 +57,7 @@ func _initialize() -> void:
 	await _check_find_line()
 	await _check_examine_leave()
 	await _check_swap_sets_old_down()
+	await _check_max_hp_line()
 	_check_plate_finish()
 	await _check_worn_line()
 	await _check_weapon_line()
@@ -436,6 +437,45 @@ func _check_swap_sets_old_down() -> void:
 		_expect(back.size() == 1 and back[0].get("piece") == second, "...setting the second down in turn")
 		_expect(back.size() == 1 and bool(back[0].get("revealed")), "...no find: set down, it is never revealed")
 	await _teardown()
+	_completed += 1
+
+# A worn piece's offer says what taking it does to max HP, in one line in
+# its strip: a +6 piece worn, one with none offered, "Max HP a → a-6" -
+# through ArmorExamine, from the run's max HP; with nothing worn, the +6
+# piece offered, "Max HP a → a+6"; no line where max HP stays as it is,
+# nor on a plate given no max HP.
+func _check_max_hp_line() -> void:
+	_new_run()
+	var plus: TrinketData = _piece(&"probe_plus", CardData.CardRarity.COMMON)
+	plus.max_hp_bonus = 6
+	var plain: TrinketData = _piece(&"probe_plain", CardData.CardRarity.COMMON)
+	var other_plain: TrinketData = _piece(&"probe_other_plain", CardData.CardRarity.COMMON)
+	_run_state.call("equip_worn", plus)
+	var max_hp: int = int(_run_state.get("player_max_hp"))
+	var examine := ArmorExamine.new()
+	examine.setup(plain, _run_state.get("worn"), true, Rect2(), false, max_hp)
+	root.add_child(examine)
+	await process_frame
+	var plate: ItemPlate = examine.get_plate()
+	_expect_eq(plate.max_hp_text(), "Max HP %d → %d" % [max_hp, max_hp - 6], "Swapping a +6 piece off: its offer reads the drop")
+	examine.queue_free()
+	await process_frame
+	var bare := ItemPlate.new()
+	root.add_child(bare)
+	bare.set_piece(plus, null, true)
+	var without: float = bare.get_plate_size().y
+	var card_before: Vector2 = bare.get_card_size()
+	bare.set_max_hp(80)
+	_expect_eq(bare.max_hp_text(), "Max HP 80 → 86", "Nothing worn, the +6 piece offered: Max HP 80 → 86")
+	_expect(bare.get_plate_size().y > without, "...a line of its own in the strip")
+	_expect_eq(bare.get_card_size(), card_before, "...the plate itself unchanged")
+	bare.set_piece(plain, other_plain, true)
+	bare.set_max_hp(80)
+	_expect_eq(bare.max_hp_text(), "", "No change to max HP: no line")
+	bare.set_piece(plus, null, true)
+	_expect_eq(bare.max_hp_text(), "", "...nor on a plate given no max HP")
+	bare.queue_free()
+	await process_frame
 	_completed += 1
 
 # The name's finish: the cards' own for RARE, none for COMMON.

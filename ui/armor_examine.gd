@@ -47,19 +47,24 @@ var _choice_only: bool = false
 # First loot: opens at reveal_scale.
 var _reveal: bool = false
 var _from_rect: Rect2 = Rect2()
+# The run's max HP, for the offer's "Max HP a → b" line (-1: none).
+var _max_hp: int = -1
 var _scrim: ColorRect = null
 var _plate: ItemPlate = null
 var _tween: Tween = null
 var _closing: bool = false
 
 # Called before the layer enters the tree. `worn`: the piece worn now,
-# which taking this would replace (with_choice only).
-func setup(piece: TrinketData, worn: TrinketData, with_choice: bool, from_rect: Rect2 = Rect2(), reveal: bool = false) -> void:
+# which taking this would replace (with_choice only); `max_hp`: the run's
+# max HP, so the offer says what taking it makes that (ItemPlate.set_max_
+# hp()), -1 for no line.
+func setup(piece: TrinketData, worn: TrinketData, with_choice: bool, from_rect: Rect2 = Rect2(), reveal: bool = false, max_hp: int = -1) -> void:
 	_piece = piece
 	_worn = worn
 	_with_choice = with_choice
 	_from_rect = from_rect
 	_reveal = reveal
+	_max_hp = max_hp
 
 # The weapon instead of a piece - no choice, or for an offer with_choice
 # and `carried`, the weapon taking it would replace. Called before the
@@ -94,6 +99,8 @@ func _ready() -> void:
 		_plate.set_weapon(_weapon, _carried if _with_choice else null, _with_choice)
 	else:
 		_plate.set_piece(_piece, _worn if _with_choice else null, _with_choice)
+		if _with_choice:
+			_plate.set_max_hp(_max_hp)
 	_plate.chosen.connect(close)
 	# With no choice, a click on the plate closes as one off it does - the
 	# plate only watches the mouse for its card names (PASS).

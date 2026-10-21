@@ -4087,7 +4087,7 @@ func open_armor_examine(drop: WorldArmor) -> bool:
 	var examine := ArmorExamine.new()
 	examine.name = "ArmorExamine"
 	# Its first look is first loot's reveal; every later one is not.
-	examine.setup(drop.piece, RunState.worn, true, Rect2(), not drop.revealed)
+	examine.setup(drop.piece, RunState.worn, true, Rect2(), not drop.revealed, RunState.player_max_hp)
 	drop.revealed = true
 	examine.closed.connect(_on_armor_examine_closed.bind(drop))
 	if wanderer != null:

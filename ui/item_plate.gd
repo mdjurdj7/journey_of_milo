@@ -290,6 +290,14 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 	set(value):
 		replaces_color = value
 		_redraw()
+# A worn piece's offer that would change max HP (set_max_hp()): one line,
+# "Max HP 86 → 80", at replaces_size_px in replaces_color, under the
+# replaced piece's effect - or alone above the choices with nothing worn.
+# None when taking it leaves max HP as it is.
+@export var max_hp_format: String = "Max HP %d → %d":
+	set(value):
+		max_hp_format = value
+		_relayout()
 @export var take_text: String = "TAKE":
 	set(value):
 		take_text = value
@@ -401,6 +409,11 @@ var _replaces_baseline: float = 0.0
 var _replaces_label_left: float = 0.0
 var _replaces: TextParagraph = null
 var _replaces_top: float = 0.0
+# The run's max HP as it stands (set_max_hp(); -1 = not given, no line),
+# and its line in the strip while taking the offer would change it.
+var _max_hp: int = -1
+var _max_hp_line: TextParagraph = null
+var _max_hp_top: float = 0.0
 var _action_rects: Array[Rect2] = []
 # The named cards in the effect: {"card", "start", "end"} by character in
 # its text; and laid out, {"rect", "card"} per line a name sits on.
@@ -459,6 +472,7 @@ func set_piece(piece: TrinketData, replaced: TrinketData = null, show_actions: b
 	_bedroll = null
 	_replaced = replaced if replaced != piece else null
 	_show_actions = show_actions
+	_max_hp = -1
 	_focus = Choice.TAKE
 	# The paper's grain from the piece's id: the same plate wherever it is
 	# shown, and no draw on the global generator a run's shuffles use.
@@ -466,6 +480,29 @@ func set_piece(piece: TrinketData, replaced: TrinketData = null, show_actions: b
 	_apply_mouse_filter()
 	_apply_finish()
 	_relayout()
+
+# For a worn piece's offer, after set_piece(): the run's max HP now, so
+# the strip says what taking it makes that (max_hp_format) - the worn
+# piece's max_hp_bonus off, the offered one's on, as RunState.equip_worn()
+# does. -1 shows no line.
+func set_max_hp(max_hp: int) -> void:
+	_max_hp = max_hp
+	_relayout()
+
+# Max HP once the offered piece is taken - the same as now with nothing
+# to say (no offer, no max HP given, or no change).
+func max_hp_after() -> int:
+	if _max_hp < 0 or _piece == null or not _show_actions:
+		return _max_hp
+	var worn_bonus: int = maxi(_replaced.max_hp_bonus, 0) if _replaced != null else 0
+	return _max_hp - worn_bonus + maxi(_piece.max_hp_bonus, 0)
+
+# The strip's max HP line, "" when there is none.
+func max_hp_text() -> String:
+	var after: int = max_hp_after()
+	if _max_hp < 0 or after == _max_hp:
+		return ""
+	return max_hp_format % [_max_hp, after]
 
 # A keepsake: set_piece() with no offer of its own (its hosts draw theirs).
 func set_keepsake(keepsake: TrinketData) -> void:
@@ -928,6 +965,7 @@ func _relayout() -> void:
 func _layout_strip(width: float, pad: float, text_width: float, label_px: int, name_font: Font) -> void:
 	_strip_rect = Rect2()
 	_replaces = null
+	_max_hp_line = null
 	_action_rects.clear()
 	var replaced_name_left: float = 0.0
 	var replaced_name_width: float = 0.0
@@ -946,10 +984,16 @@ func _layout_strip(width: float, pad: float, text_width: float, label_px: int, n
 			var replaces_px: int = _font_px(replaces_size_px)
 			_replaces = _paragraph(_replaced_rules(), _rules_font, replaces_px, text_width)
 			y = _replaces_top + _paragraph_height(_replaces, replaces_px)
+		var max_hp_text_now: String = max_hp_text()
+		if not max_hp_text_now.is_empty():
+			var max_hp_px: int = _font_px(replaces_size_px)
+			_max_hp_line = _paragraph(max_hp_text_now, _rules_font, max_hp_px, text_width)
+			_max_hp_top = y
+			y += _paragraph_height(_max_hp_line, max_hp_px)
 		if _show_actions:
 			if _action_font == null:
 				_action_font = InkType.tracked(InkType.text_bold_font(), action_size_px, caps_tracking_em)
-			var row_top: float = roundf(y + (_px(actions_gap_px) if _has_replaced() else 0.0))
+			var row_top: float = roundf(y + (_px(actions_gap_px) if _has_replaced() or _max_hp_line != null else 0.0))
 			var row_height: float = _px(action_row_height_px)
 			var half: float = text_width / 2.0
 			_action_rects.append(Rect2(pad, row_top, half, row_height))
@@ -1037,6 +1081,7 @@ func _draw_face() -> void:
 	if _replaces != null:
 		InkType.draw_run(_face, _label_font, replaces_label_text, Vector2(_replaces_label_left, _replaces_baseline), label_px, type_color)
 		_draw_paragraph(_replaces, _replaces_top, _pitch(_font_px(replaces_size_px)), replaces_color)
+	_draw_paragraph(_max_hp_line, _max_hp_top, _pitch(_font_px(replaces_size_px)), replaces_color)
 	_draw_actions()
 
 # The name at the layer's own origin - its finish (or flat ink) is the
