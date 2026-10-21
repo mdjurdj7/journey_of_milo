@@ -15,14 +15,26 @@ extends SceneTree
 #              Samphire in no pool at all; Samphire's own data
 #   screen   - a collector on floor 4 opens its screen with the field
 #              locked: five rolled cards, distinct, from the pool, then
-#              Samphire; prices by rarity; LEAVE closes and unlocks
-#   buy      - an affordable card: gold down by its price, deck up one,
-#              the slot empty; an unaffordable one: nothing; Samphire
-#              bought: in the deck, its slot empty; reopened, the same
-#              stock minus both
-#   removal  - HAND ONE OVER opens the deck picking, above the screen;
-#              a cancel spends nothing; a pick spends 50 and the card
-#              leaves; then it's spent - inert, and still on reopening
+#              Samphire; each at the collector's own price for it; the
+#              camera eased off its rest and back after LEAVE, which
+#              closes and unlocks
+#   buy      - a card opens to look at with TAKE FOR its price; with the
+#              price short by one TAKE does nothing; affordable: gold down
+#              by its price, deck up one, its slot empty and the others
+#              where they were, the purchase line said; Samphire likewise;
+#              reopened, the same stock minus both
+#   goods    - stocked equipment (Collector.goods): a worn piece that
+#              changes max HP says MAX HP a -> b, a weapon REPLACES the one
+#              carried, a keepsake its kind alone; CHOOSE opens its plate
+#              with TAKE FOR its price, inert while short; BACK takes
+#              nothing (a weapon too); taken, the price spent, it equipped
+#              at once and its line gone
+#   removal  - the removal line opens the deck picking, above the screen,
+#              its heading the world line; a cancel spends nothing; a card
+#              lifted shows its confirm and DECK n -> n-1; confirmed, the
+#              removal's price spent once and exactly that card gone; then
+#              its line is gone, and still on reopening; short of the
+#              price it can't be chosen
 #   restock  - a new run on a new collector rolls its own stock
 #   consumed - Samphire played in a real fight heals 8 (clamped at max
 #              HP) and, when the fight ends, has left RunState.deck
@@ -34,7 +46,7 @@ extends SceneTree
 # CollectorScreen, DeckView's panel): a SceneTree script compiles before
 # the autoloads register.
 
-const CASES := 7
+const CASES := 8
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SAMURAI_PATH := "res://run/data/samurai.tres"
@@ -45,6 +57,12 @@ const POOLS_DIR := "res://cards/pools/"
 const SAMPHIRE_PATH := "res://cards/neutral/samphire.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const RARITY_FINISH_PATH := "res://battle/card_rarity_finish.tres"
+# Goods for the goods case - any worn piece with a max HP bonus, any
+# keepsake, any weapon that isn't the starting one. Their prices are the
+# probe's own, read back from the CollectorGood.
+const HARNESS_PATH := "res://run/armor/harness.tres"
+const KEEPSAKE_PATH := "res://run/keepsakes/bent_nail.tres"
+const WEAPON_PATH := "res://run/weapons/greyshelfs_tail.tres"
 const NEUTRAL_IN_STOCK: Array[String] = ["Left Hand", "Second Thoughts", "Untouched", "Endure"]
 const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Down Payment"]
 const FLOOR_4 := 3
@@ -53,9 +71,6 @@ const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
 # walkable spot on floor 4.
 const SPOT := Vector3(-24.4, 0.0, -21.6)
 const SPOT_YAW := -6.3
-const PRICES: Dictionary = {1: 40, 2: 55, 3: 80, 4: 120}
-const SAMPHIRE_PRICE := 8
-const REMOVAL_PRICE := 50
 const STOCK := 5
 const SAFETY_SECONDS := 300.0
 # How long a won fight may take to open its reward screen: the killing
@@ -78,6 +93,7 @@ func _initialize() -> void:
 	await _check_placed()
 	await _check_screen()
 	await _check_buy()
+	await _check_goods()
 	await _check_removal()
 	await _check_restock()
 	await _check_consumed()
@@ -182,16 +198,27 @@ func _check_screen() -> void:
 			if card != null:
 				_expect(not rolled.has(card.card_name), "...distinct (%s)" % card.card_name)
 				rolled.append(card.card_name)
-				_expect_eq(int(screen.call("_price_at", index)), int(PRICES[card.rarity]), "...%s at its rarity's price" % card.card_name)
+				_expect_eq(int(screen.call("price_at", index)), int(_collector.call("price_of", card)), "...%s at the collector's price for it" % card.card_name)
 		var fixed: CardData = cards[STOCK]
 		_expect(fixed != null and fixed.resource_path == SAMPHIRE_PATH, "The sixth is Samphire")
 		_expect(not rolled.has("Samphire"), "...and Samphire is not in the roll")
-		_expect_eq(int(screen.call("_price_at", STOCK)), SAMPHIRE_PRICE, "...at 8")
-		_check_tiers(screen, cards)
-		screen.call("_activate", int(screen.call("_leave_index")))
+		_expect_eq(int(screen.call("price_at", STOCK)), int(_collector.get("fixed_price")), "...at its fixed price")
+		_check_sheens(screen, cards)
+		var camera: Camera3D = screen.call("get_camera")
+		var rest: float = float(screen.call("get_camera_rest_offset"))
+		var ease_sec: float = float(screen.get("camera_ease_seconds"))
+		if camera == null:
+			_fail("The field has a camera for the screen to ease")
+		else:
+			await ProbePlay.wait_until(self, func() -> bool: return absf(camera.h_offset - rest) > 0.01, ease_sec + 1.0)
+			_expect(absf(camera.h_offset - rest) > 0.01, "The camera eases off its rest while the screen is open (%.2f)" % camera.h_offset)
+		screen.call("activate", int(screen.call("leave_index")))
 		await process_frame
 		_expect(not is_instance_valid(screen) or screen.is_queued_for_deletion(), "LEAVE closes it")
 		_expect_eq(_field.process_mode, Node.PROCESS_MODE_INHERIT, "...and unlocks the field")
+		if camera != null:
+			await ProbePlay.wait_until(self, func() -> bool: return absf(camera.h_offset - rest) < 0.001, ease_sec + 1.0)
+			_expect(absf(camera.h_offset - rest) < 0.001, "...and the camera eases back to rest (%.3f)" % camera.h_offset)
 	await _teardown()
 	_completed += 1
 
@@ -201,21 +228,35 @@ func _check_buy() -> void:
 	if screen != null:
 		var cards: Array = screen.call("get_slot_cards")
 		var first: CardData = cards[0]
-		var price: int = int(PRICES[first.rarity])
+		var price: int = int(screen.call("price_at", 0))
+		var samphire_price: int = int(screen.call("price_at", STOCK))
 		_add_gold(price - 1)
 		var deck_before: int = (_run_state.get("deck") as Array).size()
-		screen.call("_activate", 0)
-		_expect_eq(int(_run_state.get("gold")), price - 1, "Unaffordable by 1: no gold spent")
-		_expect_eq((_run_state.get("deck") as Array).size(), deck_before, "...no card")
-		_expect((screen.call("get_slot_cards") as Array)[0] != null, "...and the card stays")
-		_add_gold(1 + SAMPHIRE_PRICE)
-		screen.call("_activate", 0)
-		_expect_eq(int(_run_state.get("gold")), SAMPHIRE_PRICE, "Affordable: its price spent")
+		screen.call("activate", 0)
+		_expect(bool(screen.call("is_card_open")), "A card clicked opens to look at")
+		_expect_eq(str(screen.call("take_text_at", 0)), str(screen.get("take_format")) % price, "...with TAKE FOR its price")
+		screen.call("take_open_card")
+		_expect_eq(int(_run_state.get("gold")), price - 1, "Short by 1: TAKE spends nothing")
+		_expect_eq((_run_state.get("deck") as Array).size(), deck_before, "...adds no card")
+		_expect(bool(screen.call("is_card_open")), "...and the card stays open")
+		screen.call("back_out_of_card")
+		_expect(not bool(screen.call("is_card_open")), "BACK puts it down")
+		_expect((screen.call("get_slot_cards") as Array)[0] != null, "...the card still on offer")
+		_add_gold(1 + samphire_price)
+		screen.call("activate", 0)
+		screen.call("take_open_card")
+		_expect_eq(int(_run_state.get("gold")), samphire_price, "Affordable: exactly its price spent")
 		_expect_eq((_run_state.get("deck") as Array).size(), deck_before + 1, "...the deck one up")
 		_expect(_deck_has(first.card_name), "...with %s in it" % first.card_name)
-		_expect((screen.call("get_slot_cards") as Array)[0] == null, "...and the slot empty")
-		screen.call("_activate", STOCK)
-		_expect_eq(int(_run_state.get("gold")), 0, "Samphire bought for 8")
+		var after: Array = screen.call("get_slot_cards")
+		_expect_eq(after.size(), cards.size(), "...the row the same length")
+		_expect(after[0] == null, "...its slot empty")
+		for index in range(1, cards.size()):
+			_expect(after[index] == cards[index], "...slot %d unmoved" % index)
+		_expect(bool(screen.call("is_purchase_line_showing")), "...and the purchase line said")
+		screen.call("activate", STOCK)
+		screen.call("take_open_card")
+		_expect_eq(int(_run_state.get("gold")), 0, "Samphire bought for its price")
 		_expect(_deck_has("Samphire"), "...Samphire in the deck")
 		_expect((screen.call("get_slot_cards") as Array)[STOCK] == null, "...its slot empty")
 		screen.call("close")
@@ -231,38 +272,150 @@ func _check_buy() -> void:
 	await _teardown()
 	_completed += 1
 
-func _check_removal() -> void:
-	await _load_floor_4(REMOVAL_PRICE)
+# Equipment beside the cards: a worn piece, a keepsake and a weapon,
+# each at a price of the probe's own choosing.
+func _check_goods() -> void:
+	await _load_floor_4(0)
+	var harness := load(HARNESS_PATH) as TrinketData
+	var keepsake := load(KEEPSAKE_PATH) as TrinketData
+	var weapon := load(WEAPON_PATH) as WeaponData
+	var goods: Array[CollectorGood] = []
+	for entry: Array in [[harness, 31], [keepsake, 23], [weapon, 47]]:
+		var good := CollectorGood.new()
+		good.item = entry[0]
+		good.price = entry[1]
+		goods.append(good)
+	_collector.set("goods", goods)
 	var screen: Node = _open()
 	if screen != null:
-		var deck_before: int = (_run_state.get("deck") as Array).size()
-		screen.call("_activate", int(screen.call("_removal_index")))
-		var picker: Node = screen.get("_picker")
-		_expect(picker != null and bool(picker.get("pick_mode")), "HAND ONE OVER opens the deck picking")
-		if picker != null:
-			_expect(int((picker.get_parent() as CanvasLayer).layer) > int(screen.get("layer")), "...above the screen")
-			picker.call("close")
+		var lines: Array = screen.call("get_lines")
+		_expect_eq(lines.size(), 4, "Three goods listed, then the removal")
+		var max_hp: int = int(_run_state.get("player_max_hp"))
+		var carried: WeaponData = _run_state.get("weapon")
+		var harness_line: int = _line_of(screen, harness)
+		var keepsake_line: int = _line_of(screen, keepsake)
+		var weapon_line: int = _line_of(screen, weapon)
+		_expect_eq(str(screen.call("type_line_at", harness_line)), str(screen.get("worn_kind_text")) + str(screen.get("type_separator")) + str(screen.get("max_hp_format")) % [max_hp, max_hp + harness.max_hp_bonus], "A worn piece that changes max HP says so")
+		_expect_eq(str(screen.call("type_line_at", keepsake_line)), str(screen.get("keepsake_kind_text")), "A keepsake with none held: its kind alone")
+		if carried != null:
+			_expect_eq(str(screen.call("type_line_at", weapon_line)), str(screen.get("weapon_kind_text")) + str(screen.get("type_separator")) + (str(screen.get("replaces_format")) % carried.display_name).to_upper(), "A weapon REPLACES the one carried")
+		var harness_price: int = int(screen.call("line_price", harness_line))
+		_expect_eq(harness_price, goods[0].price, "Each good at its own price")
+
+		# Short of the price: the plate opens, TAKE inert.
+		screen.call("activate", int(screen.call("line_focus_index", harness_line)))
+		var offer: Node = screen.call("get_offer")
+		_expect(offer != null, "CHOOSE opens the plate, gold or not")
+		if offer != null:
+			_expect(int((offer as CanvasLayer).layer) > int(screen.get("layer")), "...above the screen")
+			var plate: Node = offer.call("get_plate")
+			_expect_eq(str(plate.get("take_text")), str(screen.get("take_format")) % harness_price, "...TAKE FOR its price")
+			_expect_eq(str(plate.get("leave_text")), str(screen.get("back_text")), "...and BACK")
+			_expect_eq(str(plate.call("max_hp_text")), str(plate.get("max_hp_format")) % [max_hp, max_hp + harness.max_hp_bonus], "...the plate's Max HP line")
+			_expect(not bool(plate.get("take_enabled")), "...TAKE inert while short")
+			plate.call("activate", 0)
 			await process_frame
-			_expect_eq(int(_run_state.get("gold")), REMOVAL_PRICE, "A cancel spends nothing")
-			_expect_eq((_run_state.get("deck") as Array).size(), deck_before, "...and keeps the deck")
-			_expect(bool(screen.call("_removal_open")), "...and the removal is still on offer")
-		screen.call("_activate", int(screen.call("_removal_index")))
-		picker = screen.get("_picker")
-		if picker != null:
-			var handed: CardData = (_run_state.get("deck") as Array)[0]
-			picker.emit_signal("card_picked", handed)
-			picker.call("close")
-			await process_frame
-			_expect_eq(int(_run_state.get("gold")), 0, "A pick spends 50")
-			_expect_eq((_run_state.get("deck") as Array).size(), deck_before - 1, "...and the card leaves the deck")
-			_expect(not (_run_state.get("deck") as Array).has(handed), "...that very card")
-		_add_gold(200)
-		_expect(not bool(screen.call("_removal_open")), "Once used, HAND ONE OVER is inert, gold or not")
+			_expect(screen.call("get_offer") != null, "...choosing it does nothing")
+			_expect(_run_state.get("worn") == null, "...nothing worn")
+			offer.call("close", false)
+			await _offer_gone(screen)
+
+		# Paid for: taken, worn, its line gone.
+		_add_gold(harness_price + goods[2].price)
+		var gold_before: int = int(_run_state.get("gold"))
+		screen.call("activate", int(screen.call("line_focus_index", harness_line)))
+		offer = screen.call("get_offer")
+		if offer != null:
+			var plate: Node = offer.call("get_plate")
+			_expect(bool(plate.get("take_enabled")), "Affordable: TAKE live")
+			plate.call("activate", 0)
+			await _offer_gone(screen)
+			_expect_eq(int(_run_state.get("gold")), gold_before - harness_price, "...exactly its price spent")
+			_expect(_run_state.get("worn") == harness, "...worn at once")
+			_expect_eq(int(_run_state.get("player_max_hp")), max_hp + harness.max_hp_bonus, "...max HP with it")
+			_expect_eq(_line_of(screen, harness), -1, "...and its line gone")
+			_expect(bool(screen.call("is_purchase_line_showing")), "...the purchase line said")
+
+		# The weapon: BACK leaves it on sale, nothing spent.
+		gold_before = int(_run_state.get("gold"))
+		weapon_line = _line_of(screen, weapon)
+		screen.call("activate", int(screen.call("line_focus_index", weapon_line)))
+		offer = screen.call("get_offer")
+		if offer != null:
+			offer.call("close", false)
+			await _offer_gone(screen)
+			_expect(screen.call("get_offer") == null, "A weapon's plate closes on BACK")
+			_expect_eq(int(_run_state.get("gold")), gold_before, "...nothing spent")
+			_expect(_run_state.get("weapon") == carried, "...the weapon carried kept")
+		screen.call("activate", int(screen.call("line_focus_index", _line_of(screen, weapon))))
+		offer = screen.call("get_offer")
+		if offer != null:
+			(offer.call("get_plate") as Node).call("activate", 0)
+			await _offer_gone(screen)
+			_expect(_run_state.get("weapon") == weapon, "Taken, the weapon is carried at once")
+			_expect_eq(int(_run_state.get("gold")), gold_before - goods[2].price, "...for exactly its price")
+			_expect_eq(_line_of(screen, weapon), -1, "...and its line gone")
 		screen.call("close")
 		await process_frame
 		var again: Node = _open()
 		if again != null:
-			_expect(not bool(again.call("_removal_open")), "...and still spent on reopening")
+			_expect_eq(_line_of(again, harness), -1, "Reopened: the taken goods stay gone")
+			_expect(_line_of(again, keepsake) >= 0, "...the keepsake still there")
+			again.call("close")
+	await _teardown()
+	_completed += 1
+
+func _check_removal() -> void:
+	await _load_floor_4(0)
+	var removal_price: int = int(_collector.get("removal_price"))
+	var screen: Node = _open()
+	if screen != null:
+		_add_gold(removal_price - 1)
+		_expect(not bool(screen.call("is_removal_open")), "Short of its price, the removal can't be chosen")
+		screen.call("activate", int(screen.call("line_focus_index", _removal_line(screen))))
+		_expect(screen.call("get_picker") == null, "...its CHOOSE opens nothing")
+		_add_gold(1)
+		var deck_before: int = (_run_state.get("deck") as Array).size()
+		screen.call("activate", int(screen.call("line_focus_index", _removal_line(screen))))
+		var picker: Node = screen.call("get_picker")
+		_expect(picker != null and bool(picker.get("pick_mode")), "The removal opens the deck picking")
+		if picker != null:
+			_expect(int((picker.get_parent() as CanvasLayer).layer) > int(screen.get("layer")), "...above the screen")
+			_expect(bool(picker.get("header_voice")), "...its heading the world line")
+			picker.call("close")
+			await process_frame
+			_expect_eq(int(_run_state.get("gold")), removal_price, "A cancel spends nothing")
+			_expect_eq((_run_state.get("deck") as Array).size(), deck_before, "...and keeps the deck")
+			_expect(bool(screen.call("is_removal_open")), "...and the removal is still on offer")
+		screen.call("activate", int(screen.call("line_focus_index", _removal_line(screen))))
+		picker = screen.call("get_picker")
+		if picker != null:
+			var views: Array = picker.call("get_card_views")
+			var view: CardView = views[0] if not views.is_empty() else null
+			if view == null:
+				_fail("The picker shows the deck")
+			else:
+				view.emit_signal("clicked", view.card_data)
+				await ProbePlay.wait_until(self, func() -> bool: return not bool(picker.get("_inspect_busy")), 2.0)
+				var handed: CardData = picker.call("get_pending_pick")
+				_expect(handed != null and (_run_state.get("deck") as Array).has(handed), "A card clicked waits for a confirm")
+				_expect_eq((_run_state.get("deck") as Array).size(), deck_before, "...nothing gone yet")
+				if handed != null:
+					_expect(str(picker.call("get_confirm_text")).contains(handed.card_name.to_upper()), "...the confirm names it (%s)" % picker.call("get_confirm_text"))
+					_expect_eq(int(picker.get("pick_confirm_price")), removal_price, "...with the removal's price")
+					_expect_eq(str(picker.call("get_detail_text")), str(screen.get("removal_detail_format")) % [deck_before, deck_before - 1], "...and the deck's count to one fewer")
+					picker.call("confirm_pick")
+					await process_frame
+					_expect_eq(int(_run_state.get("gold")), 0, "Confirmed: the removal's price spent once")
+					_expect_eq((_run_state.get("deck") as Array).size(), deck_before - 1, "...one card gone")
+					_expect(not (_run_state.get("deck") as Array).has(handed), "...that very card")
+		_add_gold(500)
+		_expect_eq(_removal_line(screen), -1, "Once used, the removal line is gone, gold or not")
+		screen.call("close")
+		await process_frame
+		var again: Node = _open()
+		if again != null:
+			_expect_eq(_removal_line(again), -1, "...and still gone on reopening")
 			again.call("close")
 	await _teardown()
 	_completed += 1
@@ -362,24 +515,38 @@ func _check_consumed() -> void:
 
 # --- Helpers ---
 
-# Each slot - Samphire's too - names its card's tier directly under the
-# face, above where the price line sits; and each finished name sheened
-# once as the stock arrived.
-func _check_tiers(screen: Node, cards: Array) -> void:
+# Each finished name sheened once as the stock arrived (a Common's not).
+func _check_sheens(screen: Node, cards: Array) -> void:
 	var finish := load(RARITY_FINISH_PATH) as CardRarityFinish
 	var views: Array = screen.get("_views")
 	for slot in cards.size():
 		var card: CardData = cards[slot]
 		if card == null:
 			continue
-		_expect_eq(str(screen.call("tier_label_at", slot)), finish.tier_label_text(card.rarity), "Slot %d (%s) names its tier under it" % [slot, card.card_name])
-		var face: Rect2 = screen.call("_slot_rect", slot)
-		var origin: Vector2 = screen.call("tier_label_origin", slot)
-		var tier_room: float = float(screen.call("_tier_line_height"))
-		_expect(origin.y > face.end.y and origin.y <= face.end.y + tier_room, "...between its face and its price (%s, face bottom %.0f, room %.0f)" % [origin, face.end.y, tier_room])
 		var view: CardView = views[slot]
 		var expected: int = 1 if finish.has_finish(card.rarity) else 0
-		_expect_eq(view.get_name_sheens_started(), expected, "...and its name sheened %d time(s) on arrival" % expected)
+		_expect_eq(view.get_name_sheens_started(), expected, "Slot %d (%s): its name sheened %d time(s) on arrival" % [slot, card.card_name, expected])
+
+# The list index of the line selling `item`, or -1.
+func _line_of(screen: Node, item: Resource) -> int:
+	var lines: Array = screen.call("get_lines")
+	for index in lines.size():
+		var good: CollectorGood = (lines[index] as Dictionary)["good"]
+		if good != null and good.item == item:
+			return index
+	return -1
+
+# The list index of the removal line, or -1.
+func _removal_line(screen: Node) -> int:
+	var lines: Array = screen.call("get_lines")
+	for index in lines.size():
+		if (lines[index] as Dictionary)["good"] == null:
+			return index
+	return -1
+
+# A plate answered: until it has eased away.
+func _offer_gone(screen: Node) -> void:
+	await ProbePlay.wait_until(self, func() -> bool: return screen.call("get_offer") == null, 2.0)
 
 # A new run on floor 4 with `gold`, and a collector of our own at its
 # spot, stocked from collector_pool and wired to the field as RegionField

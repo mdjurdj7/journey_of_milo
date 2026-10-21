@@ -113,7 +113,8 @@ class_name CardRarityFinish
 		emit_changed()
 
 @export_group("Tier Label")
-# The tier named under an offered card (RewardScreen, CollectorScreen):
+# The tier named under an offered card (RewardScreen; the collector's
+# ledger names none - its prices follow the tier):
 # Alegreya Sans Bold caps, tracked; Common and Uncommon dim, Rare and
 # Ultra Rare at full bone, over the screens' own ink outline.
 @export var tier_label_size_px: int = 11:
