@@ -4,7 +4,7 @@ extends SceneTree
 # Sputter: its Sting -> Rebury loop, Covered (takes 50% less) while the
 # Sting is queued and Exposed (takes 50% more) while the Rebury is -
 # starting Covered, and still alternating after a Stunned
-# Sting; the Sting one unbreakable blow of 16 that Block and Brace
+# Sting; the Sting one unbreakable blow of 14 that Block and Brace
 # soften; the Rebury nothing; taunt (Inflated) on a packmate barring a
 # Slash from it but not Brace or Sentence. Floor 2's required cluster is the Sputter
 # (or, forced, the Glower's option: the Glower in the inlet's water within
@@ -61,7 +61,7 @@ const BODY_SCATTER_MARGIN_M := 0.15
 const LOG_DIR := "user://underfoot_probe"
 const FLOOR_2 := 1
 const MAX_HP := 52
-const STING := 16
+const STING := 14
 const PLAYER_HP := 999
 # The barb raised should stand at least this tall on a 1080p screen.
 const BARB_MIN_PX := 40.0
@@ -145,7 +145,7 @@ func _check_data() -> void:
 	if data.intents.size() == 2:
 		var sting: EnemyIntent = data.intents[0]
 		var rebury: EnemyIntent = data.intents[1]
-		_expect(sting.intent_name == "Sting" and sting.type == EnemyIntent.IntentType.ATTACK and sting.value == STING and sting.hits == 1, "Sting first, one blow of 16")
+		_expect(sting.intent_name == "Sting" and sting.type == EnemyIntent.IntentType.ATTACK and sting.value == STING and sting.hits == 1, "Sting first, one blow of 14")
 		_expect(sting.interrupt_threshold == 0 and sting.on_interrupt == null, "...unbreakable: no threshold")
 		_expect(sting.rear_while_queued, "...its barb raised while queued")
 		_expect(sting.status_while_queued != null and sting.status_while_queued.resource_path == COVERED_PATH, "...Covered while queued")
@@ -177,7 +177,7 @@ func _check_multipliers() -> void:
 	_completed += 1
 
 # Nothing played, twice round: Covered with the Sting queued - it lands
-# 16 - then Exposed with the Rebury queued - nothing - and Covered again.
+# 14 - then Exposed with the Rebury queued - nothing - and Covered again.
 func _check_loop() -> void:
 	var data: EnemyData = _underfoot()
 	var enemy: Combatant = _enemy(data)
@@ -189,7 +189,7 @@ func _check_loop() -> void:
 		var before: int = player.hp
 		var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
 		seen.append("%s %s %d%s" % [state, intent.intent_name.to_lower(), before - player.hp, "" if bool(result["attacked"]) else " (no attack)"])
-	_expect_eq(seen, ["covered sting 16", "exposed rebury 0 (no attack)", "covered sting 16", "exposed rebury 0 (no attack)"] as Array[String], "Covered Sting 16 -> Exposed Rebury, looping")
+	_expect_eq(seen, ["covered sting 14", "exposed rebury 0 (no attack)", "covered sting 14", "exposed rebury 0 (no attack)"] as Array[String], "Covered Sting 14 -> Exposed Rebury, looping")
 	var preview: Dictionary = EnemyTurn.preview_intent(enemy, data, player)
 	EnemyTurn.take_turn(enemy, data, player)
 	preview = EnemyTurn.preview_intent(enemy, data, player)
@@ -213,7 +213,7 @@ func _check_lost_sting() -> void:
 	_completed += 1
 
 # 99 dealt on the Sting's turn: it lands all the same. Block 5 takes 5 of
-# it; Braced halves it; both: 3.
+# it; Braced halves it; both: 2.
 func _check_sting_defence() -> void:
 	var data: EnemyData = _underfoot()
 	var lost: Array[int] = []
@@ -232,7 +232,7 @@ func _check_sting_defence() -> void:
 		EnemyTurn.take_turn(enemy, data, player)
 		lost.append(before - player.hp)
 		_expect_eq(before - player.hp, int(preview["damage_to_hp"]), "%s: the Sting lands its preview" % case)
-	_expect_eq(lost, [STING, 11, 8, 3] as Array[int], "The Sting: 16 through anything dealt, 11 through Block 5, 8 Braced, 3 both")
+	_expect_eq(lost, [STING, 9, 7, 2] as Array[int], "The Sting: 14 through anything dealt, 9 through Block 5, 7 Braced, 2 both")
 	_completed += 1
 
 # --- Floor 2 ---

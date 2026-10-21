@@ -2454,7 +2454,7 @@
       "file": "res://battle/rules/enemies/underfoot.tres",
       "hp": 52,
       "elite": false,
-      "mechanic_summary": "A stingray under the sand at the waterline, on a two-turn rhythm: Covered (takes 50% less damage) while its Sting (16) is telegraphed, then Exposed (takes 50% more) while it reburies, dealing nothing. The Sting can't be broken — Block or Brace it, work the enemy beside it, and hit the Underfoot when it's Exposed.",
+      "mechanic_summary": "A stingray under the sand at the waterline, on a two-turn rhythm: Covered (takes 50% less damage) while its Sting (14) is telegraphed, then Exposed (takes 50% more) while it reburies, dealing nothing. The Sting can't be broken — Block or Brace it, work the enemy beside it, and hit the Underfoot when it's Exposed.",
       "starts_dormant": false,
       "field": {
         "model": "res://assets/models/enemies/Underfoot/Underfoot.glb",
@@ -2480,7 +2480,7 @@
           {
             "name": "Sting",
             "type": "ATTACK",
-            "damage_per_hit": 16,
+            "damage_per_hit": 14,
             "hits": 1,
             "rears_while_queued": true,
             "status_while_queued": "covered"
