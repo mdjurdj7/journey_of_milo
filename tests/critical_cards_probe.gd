@@ -63,7 +63,7 @@ func _check_threshold() -> void:
 func _check_cornered() -> void:
 	var card: CardData = _card("cornered")
 	_expect_eq(_deal(card, _player(50)), 8, "Cornered above the line")
-	_expect_eq(_deal(card, _player(21)), 16, "Cornered while Critical")
+	_expect_eq(_deal(card, _player(21)), 14, "Cornered while Critical")
 	_completed += 1
 
 # 6 block either way; at Critical, the Unbroken status too: until the
@@ -207,7 +207,7 @@ func _check_dying_light() -> void:
 	_expect_eq(player.turn_start_energy(), 3, "Dying Light above the line: still 3")
 	player.hp = 20
 	_expect_eq(player.turn_start_energy(), 4, "Dying Light while Critical: 4")
-	_expect_eq(_deal(cornered, player), 16, "...and no attack bonus: Cornered's Critical 16, nothing added")
+	_expect_eq(_deal(cornered, player), 14, "...and no attack bonus: Cornered's Critical 14, nothing added")
 	_expect(EffectResolver.card_blocked(power, player), "A second Dying Light can't be played while one is held")
 	_expect_eq(Status.new(load("res://battle/rules/statuses/dying_light.tres") as StatusData).describe(), "While Critical, gain 1 Energy at the start of your turn.", "Its readout line matches the card")
 	_expect_eq(power.description, "While Critical, gain 1 Energy at the start of your turn.", "...and the card says so")

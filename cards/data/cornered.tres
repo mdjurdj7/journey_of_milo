@@ -9,7 +9,7 @@
 script = ExtResource("2_card_effect")
 value = 8
 condition = 7
-alt_value = 16
+alt_value = 14
 
 [resource]
 script = ExtResource("1_card_data")

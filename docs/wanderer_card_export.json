@@ -811,7 +811,7 @@
       "face_type_label": "STRIKE",
       "energy_cost": 1,
       "rarity": "COMMON",
-      "card_text": "Deal 8 damage. Critical: deal 16.",
+      "card_text": "Deal 8 damage. Critical: deal 14.",
       "face_hp_line": null,
       "card_text_template": "{else}Deal {damage} damage.{/else} {if}Critical: deal {alt_damage}.{/if}",
       "targeting": "enemy",
@@ -819,7 +819,7 @@
       "effects": [
         {
           "type": "DAMAGE",
-          "plain_english": "Deal 8 damage to the target; if you are Critical, 16 damage instead."
+          "plain_english": "Deal 8 damage to the target; if you are Critical, 14 damage instead."
         }
       ],
       "keywords": [
@@ -840,13 +840,13 @@
         "rule": "Critical = HP at or below 30% of max HP, checked when the effect resolves (after any HP this card paid before it).",
         "effect": "DAMAGE",
         "normal_value": 8,
-        "critical_value": 16
+        "critical_value": 14
       },
       "dynamic_values": [
         {
           "field": "damage",
-          "rule": "8 normally, 16 while Critical; the face previews the live state in battle.",
-          "default_displayed": "8 / 16"
+          "rule": "8 normally, 14 while Critical; the face previews the live state in battle.",
+          "default_displayed": "8 / 14"
         },
         {
           "field": "damage",
