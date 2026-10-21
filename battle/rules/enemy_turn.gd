@@ -311,8 +311,10 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 	for active in marked:
 		if active.data.reduces_attack_total:
 			mark_left[active] = maxi(active.magnitude, 0)
-	for hit in hit_count(combatant, intent):
-		var amount: int = hit_amount(combatant, data, intent, hit, player.statuses, strike_back)
+	for _hit in hit_count(combatant, intent):
+		# Read off the statuses this action sees (a repeat's without its
+		# marks, a strike back's without what waits for the enemy's turn).
+		var amount: int = _hit_amount_seen(combatant, data, intent, own_statuses, player_statuses)
 		if not marked.is_empty():
 			var plain: int = _hit_amount_seen(combatant, data, intent, Status.without(own_statuses, marked), player.statuses)
 			for active in marked:
