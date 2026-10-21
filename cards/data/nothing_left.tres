@@ -14,7 +14,7 @@ script = ExtResource("1_card_data")
 card_name = "Nothing Left"
 cost = 3
 critical_cost = 0
-rarity = 3
+rarity = 2
 target_type = 0
 description = "Deal {damage} damage.
 Critical: costs 0."

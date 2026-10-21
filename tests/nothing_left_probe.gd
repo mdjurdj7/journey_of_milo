@@ -1,6 +1,6 @@
 extends SceneTree
 
-# Headless probe for Nothing Left - Rare Attack: deal 28, costing 3 Energy,
+# Headless probe for Nothing Left - Uncommon Attack: deal 28, costing 3 Energy,
 # or 0 whenever the player is Critical (CardData.critical_cost, read
 # through Combatant.base_cost(), as Cornered+ does). Nothing Left+ deals
 # 36. At 0 a "next card" discount (Leverage) passes it by; above the line
@@ -68,14 +68,14 @@ func _initialize() -> void:
 
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
-	_expect_eq([card.card_name, card.cost, card.critical_cost, card.card_type, card.rarity, card.card_class], ["Nothing Left", 3, 0, CardData.CardType.ATTACK, CardData.CardRarity.RARE, &"wanderer"], "Nothing Left: 3 Energy, 0 while Critical, a Rare Attack")
+	_expect_eq([card.card_name, card.cost, card.critical_cost, card.card_type, card.rarity, card.card_class], ["Nothing Left", 3, 0, CardData.CardType.ATTACK, CardData.CardRarity.UNCOMMON, &"wanderer"], "Nothing Left: 3 Energy, 0 while Critical, an Uncommon Attack")
 	_expect_eq([card.target_type, card.offer, card.removal_scope], [CardData.TargetType.ENEMY, CardData.OfferScope.REWARDABLE, CardData.RemovalScope.NONE], "...at an enemy, rewardable, to the discard")
 	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Nothing Left.png", "...with its art")
 	_expect_eq(card.description, "Deal {damage} damage.\nCritical: costs 0.", "...its text")
 	_expect(card.effects.size() == 1 and card.effects[0].effect_type == CardEffect.EffectType.DAMAGE and card.effects[0].value == 28 and card.effects[0].condition == CardEffect.Condition.NONE, "...one blow of 28")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Nothing Left+")
-	_expect_eq([tempered.card_name, tempered.cost, tempered.critical_cost, tempered.rarity, tempered.description], ["Nothing Left+", 3, 0, CardData.CardRarity.RARE, card.description], "Nothing Left+: the same costs and text")
+	_expect_eq([tempered.card_name, tempered.cost, tempered.critical_cost, tempered.rarity, tempered.description], ["Nothing Left+", 3, 0, CardData.CardRarity.UNCOMMON, card.description], "Nothing Left+: the same costs and text")
 	_expect(tempered.effects.size() == 1 and tempered.effects[0].value == 36, "...a blow of 36")
 	for pool_path: String in [WANDERER_POOL_PATH, COLLECTOR_POOL_PATH]:
 		_expect((load(pool_path) as RewardPool).entries.has(card), "In %s" % pool_path)
