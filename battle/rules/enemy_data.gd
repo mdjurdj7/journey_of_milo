@@ -8,10 +8,20 @@ class_name EnemyData
 # of these (field_enemy.gd's own enemy_data export).
 
 @export var enemy_name: String = ""
+# More than one, where the hover lines count them ("3 Nettles"); empty is
+# enemy_name with an "s" (plural()).
+@export var plural_name: String = ""
 # One or two plain sentences: what it does and what it teaches. For the
 # enemy export (tests/enemy_export.gd); nothing in a fight shows it.
 @export_multiline var mechanic_summary: String = ""
 @export var max_hp: int = 1
+
+# enemy_name for `count` of them: plural_name (or enemy_name + "s") for
+# any but one.
+func named(count: int) -> String:
+	if count == 1:
+		return enemy_name
+	return plural_name if not plural_name.is_empty() else enemy_name + "s"
 @export var intents: Array[EnemyIntent] = []
 # Opens every fight already under the sand, its loop's first DIG done
 # before the first turn (EnemyTurn.pick_initial_intent()): its mounds up,

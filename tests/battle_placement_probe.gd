@@ -30,6 +30,8 @@ extends SceneTree
 #     fighter's from in front (COVER_DEPTH_M nearer the camera) or meets a
 #     readout - an enemy's HP/name plate or intent, his HP bar
 #   - no two readouts overlapping
+#   - each enemy's intent hovered in turn: its line's slip clear of every
+#     other readout and every fighter, inside the window
 #   - the frame's bottom edge open: along its bottom row, the ground as
 #     drawn (less the press) no more than BOTTOM_EDGE_TOLERANCE_M over the
 #     feet line - the lowest feet, or the water's surface over them
@@ -221,6 +223,7 @@ func _check_fight(floor_index: int, slot: EncounterSlot, option: EncounterOption
 	await ProbePlay.wait_until(self, _fades_settled, FADE_SETTLE_MAX_SECONDS)
 	await _sentence_all(layer)
 	_check_readability(label, camera, wanderer, members, ground, sea_level)
+	await _check_hover_slips(label, layer)
 	# For the record: the pitch the frame settled at, and the Tower.
 	print("INFO: %s: battle pitch %.0f degrees; the Tower %s" % [label, float(_field.get_node("CameraPivot").get("_battle_pitch_now")), "in frame" if _tower_in_frame(camera) else "not in frame"])
 	if _failures == failures_before:
@@ -561,6 +564,40 @@ func _sentence_all(layer: Node) -> void:
 	controller.emit_signal("status_changed")
 	for i in LAYOUT_SETTLE_FRAMES:
 		await process_frame
+
+# Each enemy's intent hovered in turn (BattleOverlay.hover_intent_
+# override): a line to say, its slip clear of every other readout and
+# every fighter (BattleOverlay.fighter_screen_boxes()), inside the window.
+func _check_hover_slips(label: String, layer: Node) -> void:
+	if layer.get_child_count() == 0:
+		return
+	var overlay: Node = layer.get_child(0)
+	var intents: Dictionary = overlay.get("_enemy_intents")
+	for member: Node in intents:
+		var intent: Node = intents[member]
+		if not is_instance_valid(intent) or str(overlay.call("_intent_hover_text", member)).is_empty():
+			continue
+		overlay.set("hover_intent_override", member)
+		for i in LAYOUT_SETTLE_FRAMES:
+			await process_frame
+		var slip: Rect2 = intent.call("get_hover_slip_rect")
+		if not slip.has_area():
+			if bool(intent.call("is_visible_in_tree")):
+				_fail("%s: %s's hovered intent shows no slip" % [label, member.name])
+			continue
+		for rect: Rect2 in overlay.call("get_readout_rects"):
+			if rect != slip and slip.intersects(rect):
+				_fail("%s: %s's hover slip overlaps a readout at %s" % [label, member.name, rect.position.round()])
+		var hp_bar: Control = _field.get("hp_bar")
+		if hp_bar != null and hp_bar.is_visible_in_tree() and slip.intersects(hp_bar.get_global_rect()):
+			_fail("%s: %s's hover slip overlaps his HP bar" % [label, member.name])
+		for box: Rect2 in overlay.call("fighter_screen_boxes"):
+			if slip.intersects(box):
+				_fail("%s: %s's hover slip crosses a fighter at %s" % [label, member.name, box.position.round()])
+		var view: Vector2 = root.get_visible_rect().size
+		if slip.position.x < 0.0 or slip.end.x > view.x or slip.position.y < 0.0:
+			_fail("%s: %s's hover slip leaves the window (%s)" % [label, member.name, slip])
+	overlay.set("hover_intent_override", null)
 
 func _teardown() -> void:
 	if _field != null:

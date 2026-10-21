@@ -91,12 +91,19 @@ signal battle_finished(outcome: Outcome)
 	&"hits": "%d×%d",
 	&"total": "%d over %d hits",
 	&"twice": "%s twice",
+	&"times": "%s %d times",
 	&"applies": " Then %s %d.",
 	&"threshold": " Deal %d to it this turn to break it.",
 	&"strike_back": "%s: %d from below as your turn ends; only Block reduces it.",
 	&"defend": "%s: gains %d Block.",
 	&"defend_twice": "%s: gains %d Block, twice.",
-	&"heal": "%s: heals its pack %d.",
+	&"defend_times": "%s: gains %d Block, %d times.",
+	# The one it heals by name ("heals the Blackback 8"), else its pack;
+	# nothing to heal, "its pack is unhurt".
+	&"heal": "%s: heals %s %d.",
+	&"heal_one": "the %s",
+	&"heal_pack": "its pack",
+	&"heal_none": "%s: its pack is unhurt.",
 	&"brings": "%s: %s until its next %s. While %s, %s",
 	&"brings_next": "%s (%d)",
 	&"brings_any": "move",
@@ -104,8 +111,14 @@ signal battle_finished(outcome: Outcome)
 	&"half_damage": "for half damage",
 	&"less_damage": "for %d%% less damage",
 	&"more_damage": "for %d%% more damage",
-	&"signal": "%s: %s %s; each answers with %s %d (%d in all).",
-	&"signal_mixed": "%s: %s %s; they answer with %s (%d in all).",
+	# "Signal: wakes 1 Nettle to Nip 2." / "...wakes 3 Nettles to Nip 2
+	# each (6)." / hits that differ: "...to Nip 0, 2 and 2 (4)." - wakes
+	# while every answerer sleeps, else calls.
+	&"signal_one": "%s: %s %s to %s %d.",
+	&"signal": "%s: %s %s to %s %d each (%d).",
+	&"signal_mixed": "%s: %s %s to %s (%d).",
+	&"signal_count": "%d %s",
+	&"and": " and ",
 	&"signal_wakes": "wakes",
 	&"signal_calls": "calls",
 	&"signal_none": "%s: calls a pack that isn't there.",
@@ -271,6 +284,9 @@ var _number_counts: Dictionary = {}
 var _stack_jitter: Dictionary = {}
 # The Wanderer, for his numbers' anchor (_screen_pos_for_damage_target()).
 var _wanderer: Wanderer = null
+# For probes: this enemy's intent reads as hovered wherever the cursor is
+# (_sync_armed_intents()). null in play.
+var hover_intent_override: FieldEnemy = null
 var _enemy_statuses: Dictionary = {} # FieldEnemy -> EnemyStatus
 # A dug-in enemy's mounds' plates (EnemyStatus.set_mound()), made and
 # dropped as its row stands (_sync_mound_plates()) - children of this
@@ -723,6 +739,12 @@ func get_readout_rects() -> Array[Rect2]:
 		var rect: Rect2 = control.get_global_rect()
 		if rect.has_area():
 			rects.append(rect)
+	# A hovered intent's slip is a readout too while it shows.
+	for intent: BattleIntent in _enemy_intents.values():
+		if is_instance_valid(intent):
+			var slip: Rect2 = intent.get_hover_slip_rect()
+			if slip.has_area():
+				rects.append(slip)
 	return rects
 
 # `enemy`'s intent readout on screen (BattleIntent.get_pair_global_rect()),
@@ -1109,6 +1131,8 @@ func _sync_armed_intents() -> void:
 		if not is_instance_valid(intent):
 			continue
 		var hovered_intent: bool = not over_ui and intent.is_visible_in_tree() and intent.get_pair_global_rect().has_point(mouse)
+		if enemy == hover_intent_override and intent.is_visible_in_tree():
+			hovered_intent = true
 		if card == null:
 			# Nothing armed: the hovered intent says what it does.
 			intent.set_armed(BattleIntent.ARMED_NONE)
@@ -1158,39 +1182,59 @@ func _intent_hover_text(enemy: FieldEnemy) -> String:
 			return line + holds
 		EnemyIntent.IntentType.DEFEND:
 			var times: int = maxi(int(preview.get("repeats", 1)), 1)
+			if times > 2:
+				return str(lines.get(&"defend_times", "%s %d %d")) % [name, int(preview.get("per_hit", 0)) / times, times]
 			if times > 1:
 				return str(lines.get(&"defend_twice", "%s %d")) % [name, int(preview.get("per_hit", 0)) / times]
 			return str(lines.get(&"defend", "%s %d")) % [name, int(preview.get("per_hit", 0))]
 		EnemyIntent.IntentType.HEAL_ALLY:
-			return str(lines.get(&"heal", "%s %d")) % [name, int(preview.get("per_hit", 0))]
+			var healed: int = int(preview.get("per_hit", 0))
+			if healed <= 0:
+				return str(lines.get(&"heal_none", "%s")) % name
+			var heals: Array = facts["heals"]
+			var whom: String = str(lines.get(&"heal_pack", ""))
+			if heals.size() == 1:
+				whom = str(lines.get(&"heal_one", "%s")) % (heals[0] as EnemyData).enemy_name
+			return str(lines.get(&"heal", "%s %s %d")) % [name, whom, healed]
 		EnemyIntent.IntentType.SIGNAL:
 			var answers: Array = facts["answers"]
 			if answers.is_empty():
 				return str(lines.get(&"signal_none", "%s")) % name
-			var verb: String = str(lines.get(&"signal_wakes" if int(facts["waking"]) > 0 else &"signal_calls", ""))
+			# Wakes while every answerer sleeps; any awake, it calls them.
+			var verb: String = str(lines.get(&"signal_wakes" if int(facts["waking"]) >= answers.size() else &"signal_calls", ""))
 			var total: int = 0
-			var parts: PackedStringArray = PackedStringArray()
-			var names: Array[String] = []
+			var kinds: Array[EnemyData] = []
 			var alike: bool = true
+			var one_move: bool = true
 			for answer: Array in answers:
 				total += int(answer[1])
-				parts.append("%s %d" % [answer[0], int(answer[1])])
-				if not names.has(str(answer[2])):
-					names.append(str(answer[2]))
+				if not kinds.has(answer[2]):
+					kinds.append(answer[2])
+				if str(answer[0]) != str(answers[0][0]):
+					one_move = false
 				if str(answer[0]) != str(answers[0][0]) or int(answer[1]) != int(answers[0][1]):
 					alike = false
-			# Who it calls, by their names: "the Nettles" (living, the total
-			# theirs), "the Nettle" for one left.
+			# Who it calls, counted by kind: "1 Nettle", "3 Nettles", "1
+			# Nettle and 2 Grubs".
 			var who: PackedStringArray = PackedStringArray()
-			for mate_name in names:
+			for kind: EnemyData in kinds:
 				var count: int = 0
 				for answer: Array in answers:
-					if str(answer[2]) == mate_name:
+					if answer[2] == kind:
 						count += 1
-				who.append("the " + (mate_name + "s" if count > 1 else mate_name))
+				who.append(str(lines.get(&"signal_count", "%d %s")) % [count, kind.named(count)])
+			var whom: String = _and_list(who)
+			if answers.size() == 1:
+				return str(lines.get(&"signal_one", "%s %s %s %s %d")) % [name, verb, whom, answers[0][0], int(answers[0][1])]
 			if alike:
-				return str(lines.get(&"signal", "%s %s %s %s %d %d")) % [name, verb, " and ".join(who), answers[0][0], int(answers[0][1]), total]
-			return str(lines.get(&"signal_mixed", "%s %s %s %s %d")) % [name, verb, " and ".join(who), ", ".join(parts), total]
+				return str(lines.get(&"signal", "%s %s %s %s %d %d")) % [name, verb, whom, answers[0][0], int(answers[0][1]), total]
+			# Hits that differ: one move named once with its numbers ("Nip 0,
+			# 2 and 2"), else each answer by its move.
+			var parts: PackedStringArray = PackedStringArray()
+			for answer: Array in answers:
+				parts.append(str(int(answer[1])) if one_move else "%s %d" % [answer[0], int(answer[1])])
+			var what: String = (str(answers[0][0]) + " " + _and_list(parts)) if one_move else _and_list(parts)
+			return str(lines.get(&"signal_mixed", "%s %s %s %s %d")) % [name, verb, whom, what, total]
 		EnemyIntent.IntentType.DIG:
 			var under: Array = facts["under"]
 			if under.size() == 2:
@@ -1254,9 +1298,17 @@ func _attack_phrase(preview: Dictionary) -> String:
 			for amount: Variant in mine:
 				total += int(amount)
 			phrase = str(lines.get(&"total", "%d %d")) % [total, hits]
-	if times > 1:
+	if times > 2:
+		phrase = str(lines.get(&"times", "%s %d")) % [phrase, times]
+	elif times > 1:
 		phrase = str(lines.get(&"twice", "%s")) % phrase
 	return phrase
+
+# "a", "a and b", "a, b and c" (intent_hover_lines' "and").
+func _and_list(parts: PackedStringArray) -> String:
+	if parts.size() <= 1:
+		return "".join(parts)
+	return ", ".join(parts.slice(0, parts.size() - 1)) + str(intent_hover_lines.get(&"and", " and ")) + parts[parts.size() - 1]
 
 # A marked attack's breakdown, from data: its numbers without the marks
 # (BattleController.intent_facts() "unmarked_hits", as _attack_phrase()
@@ -1423,6 +1475,75 @@ func _lay_out_readouts() -> void:
 	for i in nodes.size():
 		if movable[i]:
 			nodes[i].set("layout_offset", shifts[i].round())
+	_lay_out_hover_slips(nodes, rects, shifts)
+
+# A hovered intent's slip (BattleIntent.get_hover_slip_home_rect()), where
+# the layout has just put its intent: lifted - only ever up - until
+# readout_gap_px lies between it and every other readout and every
+# fighter on screen, then kept inside the window. It moves nothing else,
+# so a hover never shuffles the readouts.
+func _lay_out_hover_slips(nodes: Array[Control], rects: Array[Rect2], shifts: Array[Vector2]) -> void:
+	var obstacles: Array[Rect2] = []
+	var view: Vector2 = get_viewport().get_visible_rect().size
+	for enemy: FieldEnemy in _enemy_intents:
+		var intent: BattleIntent = _enemy_intents[enemy]
+		if not is_instance_valid(intent):
+			continue
+		var home: Rect2 = intent.get_hover_slip_home_rect()
+		if not home.has_area():
+			intent.set_hover_slip_offset(Vector2.ZERO)
+			continue
+		if obstacles.is_empty():
+			for i in nodes.size():
+				obstacles.append(Rect2(rects[i].position + shifts[i].round(), rects[i].size))
+			obstacles.append_array(fighter_screen_boxes())
+		# Where its intent goes this frame, the layout's new offset on.
+		var index: int = nodes.find(intent)
+		var moved: Vector2 = (shifts[index].round() - intent.layout_offset) if index >= 0 else Vector2.ZERO
+		var slip := Rect2(home.position + moved, home.size)
+		for _pass in 8:
+			var lifted: bool = false
+			for box: Rect2 in obstacles:
+				if slip.intersects(box.grow(readout_gap_px)):
+					slip.position.y = box.position.y - readout_gap_px - slip.size.y
+					lifted = true
+			if not lifted:
+				break
+		slip.position.x = clampf(slip.position.x, 0.0, maxf(view.x - slip.size.x, 0.0))
+		slip.position.y = maxf(slip.position.y, 0.0)
+		intent.set_hover_slip_offset((slip.position - home.position - moved).round())
+
+# Every fighter's box on screen - each living enemy's model rect
+# (FieldEnemy.get_screen_rect()), and the Wanderer's meshes - what a
+# hover slip stays off.
+func fighter_screen_boxes() -> Array[Rect2]:
+	var boxes: Array[Rect2] = []
+	var camera := get_viewport().get_camera_3d()
+	if camera == null:
+		return boxes
+	if battle_controller != null:
+		for enemy in battle_controller.enemies:
+			if is_instance_valid(enemy):
+				var rect: Rect2 = enemy.get_screen_rect(camera, 0.0)
+				if rect.has_area():
+					boxes.append(rect)
+	if _wanderer != null and is_instance_valid(_wanderer):
+		var box := Rect2()
+		var started: bool = false
+		for node in _wanderer.find_children("*", "MeshInstance3D", true, false):
+			var mesh := node as MeshInstance3D
+			if not mesh.is_visible_in_tree() or mesh.get_aabb().size == Vector3.ZERO:
+				continue
+			for k in 8:
+				var corner: Vector3 = mesh.global_transform * mesh.get_aabb().get_endpoint(k)
+				if camera.is_position_behind(corner):
+					continue
+				var point: Vector2 = camera.unproject_position(corner)
+				box = box.expand(point) if started else Rect2(point, Vector2.ZERO)
+				started = true
+		if box.has_area():
+			boxes.append(box)
+	return boxes
 
 # The plates outlive the fight (each FieldEnemy's own): what the layout
 # moved them by goes with it.

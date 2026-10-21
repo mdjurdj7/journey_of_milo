@@ -52,8 +52,9 @@ class_name BattleIntent
 # is the hover's to say (BattleOverlay._intent_hover_text()). While
 # a card that marks intents is armed (set_armed()), an intent it may
 # target gets a hairline under it and one it may not fades to armed_
-# invalid_alpha; hovered, a refused one says why beneath it (set_
-# refusal()) in Alegreya Sans, ink, no box.
+# invalid_alpha; hovered, a refused one says why (set_refusal()) - and,
+# nothing armed, a hovered one says what it does - on the cards' own bone
+# keyword slip above the readout (the Hover Slip group).
 #
 # One per enemy, created by BattleOverlay for the fight (its child, so it
 # dies with the overlay - nothing of this exists on the field). Anchored
@@ -301,20 +302,45 @@ var layout_offset: Vector2 = Vector2.ZERO
 	set(value):
 		armed_invalid_alpha = value
 		_apply_armed_look()
-# A refused intent's reason (set_refusal()): refusal_font at refusal_size_px,
-# ink, centred refusal_gap_px under the display.
-@export var refusal_font: Font = load("res://assets/fonts/AlegreyaSans-Regular.ttf"):
+@export_group("")
+
+@export_group("Hover Slip")
+# A hovered intent's line (set_refusal() - what it does, or why an armed
+# card refuses it) on the cards' own bone keyword slip (KeywordSlip):
+# ink at hover_slip_font_size_px, wrapped at hover_slip_max_width_px,
+# centred hover_slip_gap_px above the readout - the hourglass's row too -
+# so it never crosses its own enemy. BattleOverlay lifts it clear of the
+# other readouts and the fighters (set_hover_slip_offset()) and counts it
+# as a readout (get_hover_slip_rect()). The cards' bone and ink, never the
+# world's, so it reads the same on pale ground and dark.
+@export var hover_slip_font_size_px: int = 17:
 	set(value):
-		refusal_font = value
-		_restyle_refusal()
-@export var refusal_size_px: int = 15:
+		hover_slip_font_size_px = value
+		_restyle_slip()
+@export var hover_slip_max_width_px: float = 320.0:
 	set(value):
-		refusal_size_px = value
-		_restyle_refusal()
-@export var refusal_gap_px: float = 6.0:
+		hover_slip_max_width_px = value
+		_restyle_slip()
+@export var hover_slip_gap_px: float = 6.0:
 	set(value):
-		refusal_gap_px = value
-		_place_refusal()
+		hover_slip_gap_px = value
+		_place_slip()
+@export var hover_slip_padding_px: Vector2 = Vector2(8.0, 6.0):
+	set(value):
+		hover_slip_padding_px = value
+		_restyle_slip()
+@export var hover_slip_line_height: float = 1.28:
+	set(value):
+		hover_slip_line_height = value
+		_restyle_slip()
+@export var hover_slip_bone: Color = Color(0.94, 0.91, 0.86, 1.0):
+	set(value):
+		hover_slip_bone = value
+		_restyle_slip()
+@export var hover_slip_ink: Color = Color(0.165, 0.165, 0.18, 1.0):
+	set(value):
+		hover_slip_ink = value
+		_restyle_slip()
 @export_group("")
 
 @export_group("Escalation Pips")
@@ -457,7 +483,11 @@ const ARMED_NONE := 0
 const ARMED_VALID := 1
 const ARMED_REFUSED := 2
 var _armed: int = ARMED_NONE
-var _refusal_label: Label = null
+# The hover slip (the Hover Slip group), its line ("" for none), and how
+# far BattleOverlay has moved it from its place above the readout.
+var _slip: KeywordSlip = null
+var _slip_text: String = ""
+var _slip_offset: Vector2 = Vector2.ZERO
 # A combat number over its enemy dims it (BattleOverlay._dim_intents_
 # under_numbers()): 1 with none.
 var _number_dim: float = 1.0
@@ -500,11 +530,13 @@ func _ready() -> void:
 	add_child(_threshold_label)
 
 	# Its own child, so the refused intent's fade (self_modulate) leaves
-	# the reason it gives at full ink.
-	_refusal_label = Label.new()
-	_refusal_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_refusal_label.visible = false
-	add_child(_refusal_label)
+	# the slip at full ink.
+	_slip = KeywordSlip.new()
+	_slip.name = "HoverSlip"
+	_slip.set_fade_time(0.0)
+	_slip.visible = false
+	add_child(_slip)
+	_restyle_slip()
 
 	refresh_style()
 	_apply_layout()
@@ -519,11 +551,10 @@ func set_target(enemy: FieldEnemy) -> void:
 func refresh_style() -> void:
 	if _label == null:
 		return
-	for label: Label in [_label, _threshold_label, _hits_label, _refusal_label]:
+	for label: Label in [_label, _threshold_label, _hits_label]:
 		label.add_theme_color_override("font_color", get_theme_color("ink", "Battle"))
 		label.add_theme_color_override("font_outline_color", get_theme_color("bone", "Battle"))
 		label.add_theme_constant_override("outline_size", outline_size_px)
-	_restyle_refusal()
 	queue_redraw()
 
 # preview is EnemyTurn.preview_intent()'s dictionary (empty = nothing).
@@ -617,13 +648,21 @@ func set_armed(state: int) -> void:
 		set_refusal("")
 	_apply_armed_look()
 
-# Why an armed card can't target this intent, shown under it while it is
-# hovered; "" hides it.
+# What the hovered intent does, or why an armed card can't target it, on
+# its slip above it; "" hides it.
 func set_refusal(text: String) -> void:
-	if _refusal_label == null or text == _refusal_label.text:
+	if _slip == null or text == _slip_text:
 		return
-	_refusal_label.text = text
-	_place_refusal()
+	_slip_text = text
+	if text.is_empty():
+		_slip.set_lines(PackedStringArray(), PackedStringArray())
+	else:
+		_slip.set_lines(PackedStringArray([""]), PackedStringArray([text]))
+	_place_slip()
+
+# The line on the slip now, "" for none.
+func get_refusal() -> String:
+	return _slip_text
 
 # The intent dimmed under a combat number over its enemy, its marks with
 # it (`alpha`, 1 for none).
@@ -644,23 +683,56 @@ func _apply_armed_look() -> void:
 			label.self_modulate.a = alpha
 	queue_redraw()
 
-func _restyle_refusal() -> void:
-	if _refusal_label == null:
+func _restyle_slip() -> void:
+	if _slip == null:
 		return
-	if refusal_font != null:
-		_refusal_label.add_theme_font_override("font", refusal_font)
-	_refusal_label.add_theme_font_size_override("font_size", refusal_size_px)
-	_place_refusal()
+	_slip.set_font_size_px(hover_slip_font_size_px)
+	_slip.set_max_width(hover_slip_max_width_px)
+	_slip.set_padding(hover_slip_padding_px)
+	_slip.set_line_height(hover_slip_line_height)
+	_slip.set_bone(hover_slip_bone)
+	_slip.set_ink(hover_slip_ink)
+	_slip.set_edge(0.0, hover_slip_ink)
+	_place_slip()
 
-# Centred refusal_gap_px under the display.
-func _place_refusal() -> void:
-	if _refusal_label == null:
+# A line to show, and the pair up to show it over.
+func _hover_slip_shown() -> bool:
+	return _slip != null and not _slip_text.is_empty() and _pair_shown()
+
+# Where the slip sits with no offset: centred on the readout,
+# hover_slip_gap_px clear above its top.
+func _slip_home() -> Vector2:
+	return Vector2((size.x - _slip.size.x) * 0.5, -_slip.size.y - hover_slip_gap_px)
+
+func _place_slip() -> void:
+	if _slip == null:
 		return
-	_refusal_label.visible = not _refusal_label.text.is_empty() and _pair_shown()
-	var font: Font = _refusal_label.get_theme_font("font")
-	var width: float = font.get_string_size(_refusal_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, refusal_size_px).x if font != null else 0.0
-	_refusal_label.size = Vector2(width, font.get_height(refusal_size_px) if font != null else float(refusal_size_px))
-	_refusal_label.position = Vector2(roundf((size.x - width) * 0.5), roundf(size.y + refusal_gap_px))
+	var shown: bool = _hover_slip_shown()
+	_slip.visible = shown
+	_slip.set_revealed(shown)
+	_slip.position = (_slip_home() + _slip_offset).round()
+
+# The slip on screen as placed - empty while it shows nothing.
+func get_hover_slip_rect() -> Rect2:
+	if not _hover_slip_shown() or not is_visible_in_tree():
+		return Rect2()
+	return Rect2(_slip.global_position, _slip.size)
+
+# Where the slip would sit over the readout as it stands now, with no
+# offset - what BattleOverlay lays it out from. Empty while it shows
+# nothing.
+func get_hover_slip_home_rect() -> Rect2:
+	if not _hover_slip_shown() or not is_visible_in_tree():
+		return Rect2()
+	return Rect2(global_position + _slip_home(), _slip.size)
+
+# How far BattleOverlay has moved the slip from its home, set every frame
+# one shows (BattleOverlay._lay_out_hover_slips()).
+func set_hover_slip_offset(offset: Vector2) -> void:
+	if offset == _slip_offset:
+		return
+	_slip_offset = offset
+	_place_slip()
 
 func set_revealed(revealed: bool) -> void:
 	_revealed = revealed
@@ -847,7 +919,7 @@ func _apply_layout() -> void:
 	_threshold_label.position = _ring_centre - Vector2(ring_box, ring_box) * 0.5
 	_threshold_label.size = Vector2(ring_box, ring_box)
 	_threshold_label.visible = _has_threshold and not _threshold_label.text.is_empty() and _pair_shown()
-	_place_refusal()
+	_place_slip()
 	queue_redraw()
 
 # The width of action `i`'s pair after the first (_extra_texts): glyph
