@@ -35,8 +35,9 @@ class_name Collector
 # stock_pool, tier first at the pool's own rates (RewardPool.roll_by_
 # rarity()) from the run's generator, on the first open - then the same
 # stock, minus what was bought, for as long as the floor lasts; never
-# restocked. Beside them one fixed_card (Samphire), one copy. And one
-# removal, once. Every price is an export, overridable per floor through
+# restocked. Beside them one fixed_card (Samphire), one copy; the floor's
+# goods (worn pieces, keepsakes, a weapon - CollectorGood), each once. And
+# one removal, once. Every price is an export, overridable per floor through
 # the FloorProp's overrides; a change re-prices an open screen
 # (prices_changed). State lives on this node: a new floor is a new node.
 
@@ -98,6 +99,14 @@ const GROUP := &"collectors"
 # Always stocked beside the roll, one copy, at fixed_price (collector.tscn
 # sets Samphire). Null = no fixed slot.
 @export var fixed_card: CardData = null
+# Equipment stocked beside the cards - worn pieces, keepsakes, a weapon -
+# each an existing item at its own price (CollectorGood), listed by the
+# floor (FloorProp.overrides), not rolled; each taken at most once.
+@export var goods: Array[CollectorGood] = []:
+	set(value):
+		goods = value
+		_goods_taken.clear()
+		prices_changed.emit()
 @export_group("")
 
 @export_group("Prices")
@@ -154,6 +163,8 @@ var _stock: Array[CardData] = []
 var _rolled: bool = false
 var _fixed_taken: bool = false
 var _removal_used: bool = false
+# Indices into goods already taken.
+var _goods_taken: Dictionary = {}
 
 # FloorProp's placement (RegionField._spawn_floor_props()): XZ here, Y
 # from the relief, the entry's yaw as its facing - for good.
@@ -341,6 +352,18 @@ func is_fixed_available() -> bool:
 
 func take_fixed() -> void:
 	_fixed_taken = true
+
+# The goods in their slots, a null for each one taken or not sellable.
+func get_goods() -> Array[CollectorGood]:
+	var shown: Array[CollectorGood] = []
+	for index in goods.size():
+		var good: CollectorGood = goods[index]
+		shown.append(good if good != null and good.is_valid() and not _goods_taken.has(index) else null)
+	return shown
+
+func take_good(index: int) -> void:
+	if index >= 0 and index < goods.size():
+		_goods_taken[index] = true
 
 func is_removal_used() -> bool:
 	return _removal_used
