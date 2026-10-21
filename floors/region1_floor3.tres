@@ -163,6 +163,7 @@ outer_mask = ExtResource("11_outer")
 mask_origin = Vector2(0.31385, 0.85065)
 mask_beyond_is_land = true
 interior_height = 0.45
+sea_inland_reach_m = 47.0
 underwater_falloff = 3.0
 relief_amplitude = 0.22
 caustic_strength = 0.06

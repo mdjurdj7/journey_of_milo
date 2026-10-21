@@ -786,11 +786,14 @@ func _enter_tree() -> void:
 		wade_drain_enabled = floor_data.wade_drain_enabled
 	# The floor's ambience balance onto the Sea before its _ready() spawns
 	# the bed (the wind bed reads its own in _ready() below); the low-pass
-	# written every time, since its bus outlives the scene.
+	# written every time, since its bus outlives the scene. Its plane's
+	# inland reach too, when the floor sets one, before the mesh is built.
 	var sea := get_node_or_null(sea_path) as Sea
 	if sea != null and floor_data != null:
 		sea.floor_offset_db = floor_data.ambience_sea_db
 		sea.set_lowpass_hz(floor_data.ambience_sea_lowpass_hz)
+		if floor_data.sea_inland_reach_m >= 0.0:
+			sea.mesh_inland_reach = floor_data.sea_inland_reach_m
 	if spawn_node != null and floor_data != null:
 		spawn_node.position = Vector3(floor_data.spawn.x, 0.0, floor_data.spawn.y)
 		var exit: Vector3 = get_exit_direction()

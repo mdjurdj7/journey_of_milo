@@ -148,6 +148,11 @@ class_name FloorData
 # widest midline of any water he must cross, plus Wanderer.wade_limit_
 # ease_distance, or he slows there.
 @export var wade_limit_m: float = -1.0
+# How far the sea plane runs back inland from its near edge, metres
+# (Sea.mesh_inland_reach, pushed by RegionField before the Sea builds) -
+# an inland floor stops it short of its back edge, so no low ground there
+# reads as water. Below 0: the Sea's own (60 m, the whole field).
+@export var sea_inland_reach_m: float = -1.0
 
 @export_group("Ambience")
 # This floor's sea/wind balance, as offsets on the beds' own base levels
