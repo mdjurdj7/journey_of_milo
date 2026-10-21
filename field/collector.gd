@@ -31,15 +31,24 @@ class_name Collector
 # reset_hint(); a hint cut off by a screen opening waits for the next
 # visit.
 #
-# What it hands over (CollectorScreen): stock_count cards rolled from
-# stock_pool, tier first at the pool's own rates (RewardPool.roll_by_
-# rarity()) from the run's generator, on the first open - then the same
-# stock, minus what was bought, for as long as the floor lasts; never
-# restocked. Beside them one fixed_card (Samphire), one copy; the floor's
-# goods (worn pieces, keepsakes, a weapon - CollectorGood), each once. And
-# one removal, once. Every price is an export, overridable per floor through
-# the FloorProp's overrides; a change re-prices an open screen
-# (prices_changed). State lives on this node: a new floor is a new node.
+# What it hands over (CollectorScreen), rolled once on the first open
+# from the run's generator (RunState.rng) and never restocked - the same
+# stock, minus what was bought, for as long as the floor lasts:
+#   class_card_count cards of the run's class from its reward pool
+#     (RegionField.run_reward_pool(), neutrals left out) and neutral_card_
+#     count from the neutral pool, each tier first at the floor's own
+#     fight rates (RegionField.fight_rarity_rates());
+#   one fixed_card (Samphire), one copy;
+#   the Bedroll (bedroll_path), one - the screen lists it only while none
+#     is carried;
+#   one worn piece and one keepsake from the shop's own tables (worn_
+#     table_path, keepsake_table_path - never the piece already held);
+#   with weapon_chance, one weapon of weapon_paths for the run's class
+#     (WeaponData.card_class), never the one carried;
+#   and one removal, once.
+# Every price is an export, overridable per floor through the FloorProp's
+# overrides; a change re-prices an open screen (prices_changed). State
+# lives on this node: a new floor is a new node.
 
 signal open_requested(collector: Collector)
 # A price changed (an export set live) - an open screen redraws.
@@ -91,22 +100,22 @@ const GROUP := &"collectors"
 @export var hint_gap_seconds: float = 0.4
 @export_group("")
 
-# What its stock rolls from (FloorProp.pool, set by RegionField).
-@export var stock_pool: RewardPool = null
-
 @export_group("Stock")
-@export var stock_count: int = 5
+@export var class_card_count: int = 1
+@export var neutral_card_count: int = 1
+@export_file("*.tres") var neutral_pool_path: String = "res://cards/pools/neutral_pool.tres"
 # Always stocked beside the roll, one copy, at fixed_price (collector.tscn
 # sets Samphire). Null = no fixed slot.
 @export var fixed_card: CardData = null
-# Equipment stocked beside the cards - worn pieces, keepsakes, a weapon -
-# each an existing item at its own price (CollectorGood), listed by the
-# floor (FloorProp.overrides), not rolled; each taken at most once.
-@export var goods: Array[CollectorGood] = []:
-	set(value):
-		goods = value
-		_goods_taken.clear()
-		prices_changed.emit()
+# The Bedroll, one, at bedroll_price. Empty = none.
+@export_file("*.tres") var bedroll_path: String = "res://run/data/bedroll.tres"
+# The shop's own equipment pool: a worn piece and a keepsake from these
+# tables (KeepsakeTable.roll()), and with weapon_chance one of these
+# weapons.
+@export_file("*.tres") var worn_table_path: String = "res://run/shop/shop_worn.tres"
+@export_file("*.tres") var keepsake_table_path: String = "res://run/shop/shop_keepsakes.tres"
+@export var weapon_paths: PackedStringArray = PackedStringArray(["res://run/weapons/gaff_hook.tres"])
+@export_range(0.0, 1.0, 0.01) var weapon_chance: float = 0.35
 @export_group("")
 
 @export_group("Prices")
@@ -134,6 +143,22 @@ const GROUP := &"collectors"
 	set(value):
 		removal_price = value
 		prices_changed.emit()
+@export var bedroll_price: int = 45:
+	set(value):
+		bedroll_price = value
+		prices_changed.emit()
+@export var worn_price: int = 85:
+	set(value):
+		worn_price = value
+		_reprice_goods()
+@export var keepsake_price: int = 75:
+	set(value):
+		keepsake_price = value
+		_reprice_goods()
+@export var weapon_price: int = 110:
+	set(value):
+		weapon_price = value
+		_reprice_goods()
 @export_group("")
 # Set by RegionField._spawn_floor_props(): the floor's path plus the
 # prop's index.
@@ -163,8 +188,12 @@ var _stock: Array[CardData] = []
 var _rolled: bool = false
 var _fixed_taken: bool = false
 var _removal_used: bool = false
-# Indices into goods already taken.
+# The rolled equipment (CollectorGood, priced by kind), and the indices
+# already taken.
+var _goods: Array[CollectorGood] = []
 var _goods_taken: Dictionary = {}
+var _bedroll: BedrollData = null
+var _bedroll_taken: bool = false
 
 # FloorProp's placement (RegionField._spawn_floor_props()): XZ here, Y
 # from the relief, the entry's yaw as its facing - for good.
@@ -324,20 +353,84 @@ func can_open_from(from: Vector3) -> bool:
 
 # --- Stock ---
 
-# The roll, on the first call only (the first open).
+# The roll, on the first call only (the first open): the class cards,
+# the neutral cards, the worn piece, the keepsake, then the weapon's
+# chance - in that order, from the run's generator.
 func ensure_stock() -> void:
 	if _rolled:
 		return
 	_rolled = true
 	_stock.clear()
-	if stock_pool == null:
-		push_warning("Collector '%s': no stock pool; nothing rolled." % name)
-		return
-	_stock = stock_pool.roll_by_rarity(stock_count, RunState.rng, null, false, RunState.character)
+	_goods.clear()
+	_goods_taken.clear()
+	var rng: RandomNumberGenerator = RunState.rng
+	var character: CharacterData = RunState.character
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	var rates: RarityRates = region_field.fight_rarity_rates() if region_field != null else null
+	var class_pool: RewardPool = region_field.run_reward_pool(region_field.get_floor_data()) if region_field != null else null
+	if class_pool != null:
+		_stock.append_array(class_pool.roll_by_rarity(class_card_count, rng, null, false, character, rates, true))
+	else:
+		push_warning("Collector '%s': no class reward pool; no class card." % name)
+	var neutral_pool: RewardPool = load(neutral_pool_path) as RewardPool if not neutral_pool_path.is_empty() else null
+	if neutral_pool != null:
+		_stock.append_array(neutral_pool.roll_by_rarity(neutral_card_count, rng, null, false, character, rates))
+	_bedroll = load(bedroll_path) as BedrollData if not bedroll_path.is_empty() else null
+	_add_good(_roll_table(worn_table_path, rng, RunState.worn))
+	_add_good(_roll_table(keepsake_table_path, rng, RunState.keepsake))
+	if rng.randf() < weapon_chance:
+		_add_good(_roll_weapon(rng, character))
+	_reprice_goods()
 	var names: Array[String] = []
 	for card in _stock:
 		names.append(card.card_name)
+	for good in _goods:
+		names.append(str(good.item.get("display_name")))
 	print("Collector '%s': stock %s." % [name, ", ".join(names)])
+
+# One trinket from the table at `path`, never `held`; null with none.
+func _roll_table(path: String, rng: RandomNumberGenerator, held: TrinketData) -> Resource:
+	var table: KeepsakeTable = load(path) as KeepsakeTable if not path.is_empty() else null
+	if table == null:
+		return null
+	return table.roll(rng, held, RunState.keepsakes_offered)
+
+# One of weapon_paths for `character`'s class (or any class), never the
+# one carried; null with none.
+func _roll_weapon(rng: RandomNumberGenerator, character: CharacterData) -> Resource:
+	var candidates: Array[WeaponData] = []
+	for path in weapon_paths:
+		var weapon := load(path) as WeaponData
+		if weapon == null or weapon == RunState.weapon:
+			continue
+		if weapon.card_class != &"" and (character == null or weapon.card_class != character.card_class):
+			continue
+		candidates.append(weapon)
+	if candidates.is_empty():
+		return null
+	return candidates[rng.randi_range(0, candidates.size() - 1)]
+
+func _add_good(item: Resource) -> void:
+	if item == null:
+		return
+	var good := CollectorGood.new()
+	good.item = item
+	if good.is_valid():
+		_goods.append(good)
+
+# Each good at its kind's price.
+func _reprice_goods() -> void:
+	for good in _goods:
+		good.price = good_price(good)
+	prices_changed.emit()
+
+# A good's price, by its kind: worn_price, keepsake_price, weapon_price.
+func good_price(good: CollectorGood) -> int:
+	if good == null:
+		return 0
+	if good.get_weapon() != null:
+		return weapon_price
+	return worn_price if good.get_trinket().slot == TrinketData.Slot.WORN else keepsake_price
 
 # The rolled stock in its slots, a null for each one bought.
 func get_stock() -> Array[CardData]:
@@ -353,17 +446,23 @@ func is_fixed_available() -> bool:
 func take_fixed() -> void:
 	_fixed_taken = true
 
-# The goods in their slots, a null for each one taken or not sellable.
+# The goods in their slots, a null for each one taken.
 func get_goods() -> Array[CollectorGood]:
 	var shown: Array[CollectorGood] = []
-	for index in goods.size():
-		var good: CollectorGood = goods[index]
-		shown.append(good if good != null and good.is_valid() and not _goods_taken.has(index) else null)
+	for index in _goods.size():
+		shown.append(_goods[index] if not _goods_taken.has(index) else null)
 	return shown
 
 func take_good(index: int) -> void:
-	if index >= 0 and index < goods.size():
+	if index >= 0 and index < _goods.size():
 		_goods_taken[index] = true
+
+# The Bedroll stocked, until it is bought; null with none or once taken.
+func get_bedroll() -> BedrollData:
+	return _bedroll if not _bedroll_taken else null
+
+func take_bedroll() -> void:
+	_bedroll_taken = true
 
 func is_removal_used() -> bool:
 	return _removal_used

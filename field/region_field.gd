@@ -1990,7 +1990,6 @@ func _spawn_prop_list(entries: Array[FloorProp], props_root: Node3D, id_prefix: 
 			collector.collector_id = id
 			if not entry.world_line.is_empty():
 				collector.world_line = entry.world_line
-			collector.stock_pool = entry.pool
 			collector.open_requested.connect(open_collector_screen)
 		elif prop is Wagon:
 			var wagon := prop as Wagon
@@ -3483,7 +3482,7 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	spread.roll_by_rarity = true
 	spread.elite_rates = _pending_elite
 	spread.top_tier = _pending_top_tier
-	spread.rarity_rates = _fight_rarity_rates()
+	spread.rarity_rates = fight_rarity_rates()
 	_pending_elite = false
 	_pending_top_tier = false
 	add_child(spread)
@@ -3494,8 +3493,9 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 # The rarity rates a normal fight's card offer rolls with on this floor:
 # EncounterRewards' FightRarityTable at the region's floor (1 = its
 # first), or null - the pool's own rates - with no table or no step for
-# it. Elite and region-end offers never read what this returns.
-func _fight_rarity_rates() -> RarityRates:
+# it. Elite and region-end offers never read what this returns; the
+# collector's card slots do (Collector.ensure_stock()).
+func fight_rarity_rates() -> RarityRates:
 	var rewards := load(encounter_rewards_path) as EncounterRewards
 	if rewards == null or rewards.fight_rarity_by_floor == null:
 		return null
@@ -3534,7 +3534,7 @@ func _open_reward_screen() -> void:
 			extra = rewards.roll_extra(role_reward, RunState.rng)
 	var offers_cards: bool = role_reward == null or role_reward.offers_cards
 	var samphire: CardData = rewards.samphire_card if rewards != null else null
-	screen.setup(gold, run_reward_pool(floor_data), deck_panel, _pending_glassbone, _pending_elite, _pending_top_tier, offers_cards, extra, samphire, _fight_rarity_rates())
+	screen.setup(gold, run_reward_pool(floor_data), deck_panel, _pending_glassbone, _pending_elite, _pending_top_tier, offers_cards, extra, samphire, fight_rarity_rates())
 	_pending_glassbone = 0
 	_pending_elite = false
 	_pending_top_tier = false

@@ -1,0 +1,18 @@
+[gd_resource type="Resource" script_class="KeepsakeTable" format=3]
+
+[ext_resource type="Script" uid="uid://c1w6aiosotgic" path="res://run/keepsake_table.gd" id="1_table"]
+[ext_resource type="Script" uid="uid://c2mabcrat0q5d" path="res://run/keepsake_entry.gd" id="2_entry"]
+[ext_resource type="Resource" path="res://run/keepsakes/counting_stone.tres" id="3_first"]
+[ext_resource type="Resource" path="res://run/keepsakes/knotted_cord.tres" id="4_second"]
+
+[sub_resource type="Resource" id="KeepsakeEntry_first"]
+script = ExtResource("2_entry")
+trinket = ExtResource("3_first")
+
+[sub_resource type="Resource" id="KeepsakeEntry_second"]
+script = ExtResource("2_entry")
+trinket = ExtResource("4_second")
+
+[resource]
+script = ExtResource("1_table")
+entries = Array[ExtResource("2_entry")]([SubResource("KeepsakeEntry_first"), SubResource("KeepsakeEntry_second")])

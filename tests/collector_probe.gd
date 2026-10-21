@@ -8,14 +8,14 @@ extends SceneTree
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 #
 #   placed   - floor 4's FloorData puts one Collector on the floor,
-#              grounded, with its line and collector_pool, wired to open
-#              its screen
-#   data     - collector_pool: the 38 Wanderer pool cards and the four
-#              neutral pool cards, 42, no STARTER_ONLY card, no Samphire;
-#              Samphire in no pool at all; Samphire's own data
+#              grounded, with its line, wired to open its screen
+#   data     - the neutral pool offers only neutral, rewardable cards -
+#              the four named ones, never Samphire or a starter; Samphire
+#              in no pool at all; Samphire's own data
 #   screen   - a collector on floor 4 opens its screen with the field
-#              locked: five rolled cards, distinct, from the pool, then
-#              Samphire; each at the collector's own price for it; the
+#              locked: its class cards from the run's class pool, its
+#              neutral cards from the neutral pool, then Samphire; each
+#              at the collector's own price for it; the
 #              camera eased off its rest and back after LEAVE, which
 #              closes and unlocks
 #   buy      - a card opens to look at with TAKE FOR its price; with the
@@ -23,12 +23,16 @@ extends SceneTree
 #              by its price, deck up one, its slot empty and the others
 #              where they were, the purchase line said; Samphire likewise;
 #              reopened, the same stock minus both
-#   goods    - stocked equipment (Collector.goods): a worn piece that
-#              changes max HP says MAX HP a -> b, a weapon REPLACES the one
-#              carried, a keepsake its kind alone; CHOOSE opens its plate
-#              with TAKE FOR its price, inert while short; BACK takes
-#              nothing (a weapon too); taken, the price spent, it equipped
-#              at once and its line gone
+#   goods    - one worn piece and one keepsake from the shop's tables,
+#              the weapon only by its chance (always at 1, never at 0),
+#              each at the collector's price for its kind; type lines by
+#              the rule; CHOOSE opens its plate with TAKE FOR its price,
+#              inert while short; BACK takes nothing (a weapon too);
+#              taken, the price spent, it equipped at once and its line
+#              gone; a good held when the screen opens isn't listed
+#   bedroll  - the Bedroll is listed only while none is carried; bought,
+#              its price spent, carried from the collector, gone from the
+#              list - and still gone once that one is used
 #   removal  - the removal line opens the deck picking, above the screen,
 #              its heading the world line; a cancel spends nothing; a card
 #              lifted shows its confirm and DECK n -> n-1; confirmed, the
@@ -46,23 +50,16 @@ extends SceneTree
 # CollectorScreen, DeckView's panel): a SceneTree script compiles before
 # the autoloads register.
 
-const CASES := 8
+const CASES := 9
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SAMURAI_PATH := "res://run/data/samurai.tres"
 const COLLECTOR_SCENE_PATH := "res://field/collector.tscn"
-const COLLECTOR_POOL_PATH := "res://cards/pools/collector_pool.tres"
-const WANDERER_POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const POOLS_DIR := "res://cards/pools/"
 const SAMPHIRE_PATH := "res://cards/neutral/samphire.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
 const RARITY_FINISH_PATH := "res://battle/card_rarity_finish.tres"
-# Goods for the goods case - any worn piece with a max HP bonus, any
-# keepsake, any weapon that isn't the starting one. Their prices are the
-# probe's own, read back from the CollectorGood.
-const HARNESS_PATH := "res://run/armor/harness.tres"
-const KEEPSAKE_PATH := "res://run/keepsakes/bent_nail.tres"
-const WEAPON_PATH := "res://run/weapons/greyshelfs_tail.tres"
+const NEUTRAL_POOL_PATH := "res://cards/pools/neutral_pool.tres"
 const NEUTRAL_IN_STOCK: Array[String] = ["Left Hand", "Second Thoughts", "Untouched", "Endure"]
 const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Down Payment"]
 const FLOOR_4 := 3
@@ -71,7 +68,12 @@ const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
 # walkable spot on floor 4.
 const SPOT := Vector3(-24.4, 0.0, -21.6)
 const SPOT_YAW := -6.3
-const STOCK := 5
+# Kind values of CollectorScreen.Kind, read off its lines untyped.
+const KIND_WORN := 0
+const KIND_KEEPSAKE := 1
+const KIND_WEAPON := 2
+const KIND_REMOVAL := 3
+const KIND_BEDROLL := 4
 const SAFETY_SECONDS := 300.0
 # How long a won fight may take to open its reward screen: the killing
 # blow, the last death, the camera's return.
@@ -80,6 +82,8 @@ const REWARD_WAIT_SECONDS := 5.0
 var _run_state: Node = null
 var _field: Node = null
 var _collector: Node3D = null
+# The collector's rolled card slots (class + neutral), before Samphire's.
+var _stock: int = 0
 var _failures: int = 0
 var _completed: int = 0
 
@@ -94,6 +98,7 @@ func _initialize() -> void:
 	await _check_screen()
 	await _check_buy()
 	await _check_goods()
+	await _check_bedroll()
 	await _check_removal()
 	await _check_restock()
 	await _check_consumed()
@@ -110,16 +115,15 @@ func _initialize() -> void:
 # --- Data ---
 
 func _check_data() -> void:
-	var pool := load(COLLECTOR_POOL_PATH) as RewardPool
-	var wanderer := load(WANDERER_POOL_PATH) as RewardPool
+	var neutral := load(NEUTRAL_POOL_PATH) as RewardPool
+	var neutral_rng := RandomNumberGenerator.new()
+	neutral_rng.seed = 1
 	var names: Array[String] = []
-	for card in pool.entries:
+	for card in neutral.roll(999, neutral_rng, null, load(CHARACTER_PATH) as CharacterData):
+		_expect(card.card_class == &"", "The neutral pool offers only neutral cards (%s)" % card.card_name)
 		names.append(card.card_name)
-	_expect_eq(names.size(), 42, "collector_pool holds 42 cards")
-	for card in wanderer.entries:
-		_expect(names.has(card.card_name), "...including the Wanderer pool's %s" % card.card_name)
 	for card_name in NEUTRAL_IN_STOCK:
-		_expect(names.has(card_name), "...and the neutral %s" % card_name)
+		_expect(names.has(card_name), "...the neutral %s among them" % card_name)
 	for card_name in STARTER_ONLY:
 		_expect(not names.has(card_name), "...never the starter %s" % card_name)
 	_expect(not names.has("Samphire"), "...nor Samphire")
@@ -176,7 +180,6 @@ func _check_placed() -> void:
 		var local: Vector3 = (ground as Node3D).to_local(collector.global_position)
 		_expect(absf(collector.global_position.y - float(ground.call("get_height_at", Vector2(local.x, local.z)))) < 0.01, "...grounded on the relief")
 		_expect_eq(str(collector.get("world_line")), "It is sorting what it has.", "...with its line")
-		_expect_eq((collector.get("stock_pool") as Resource).resource_path, COLLECTOR_POOL_PATH, "...stocked from collector_pool")
 		_expect(collector.is_connected("open_requested", Callable(_field, "open_collector_screen")), "...and wired to open its screen")
 	await _teardown()
 	_completed += 1
@@ -189,20 +192,25 @@ func _check_screen() -> void:
 	if screen != null:
 		_expect_eq(_field.process_mode, Node.PROCESS_MODE_DISABLED, "The screen locks the field")
 		var cards: Array = screen.call("get_slot_cards")
-		_expect_eq(cards.size(), STOCK + 1, "Six slots: five rolled, then the fixed one")
-		var pool := load(COLLECTOR_POOL_PATH) as RewardPool
+		_expect_eq(cards.size(), _stock + 1, "The rolled slots, then the fixed one")
+		var class_pool: RewardPool = _field.call("run_reward_pool", _field.call("get_floor_data"))
+		var character := load(CHARACTER_PATH) as CharacterData
+		var class_count: int = int(_collector.get("class_card_count"))
 		var rolled: Array[String] = []
-		for index in STOCK:
+		for index in _stock:
 			var card: CardData = cards[index]
-			_expect(card != null and pool.entries.has(card), "Slot %d is a pool card" % index)
+			if index < class_count:
+				_expect(card != null and card.card_class == character.card_class and _pool_offers(class_pool, card), "Slot %d is a class card from the class pool" % index)
+			else:
+				_expect(card != null and card.card_class == &"" and _pool_offers(load(NEUTRAL_POOL_PATH) as RewardPool, card), "Slot %d is a neutral card from the neutral pool" % index)
 			if card != null:
 				_expect(not rolled.has(card.card_name), "...distinct (%s)" % card.card_name)
 				rolled.append(card.card_name)
 				_expect_eq(int(screen.call("price_at", index)), int(_collector.call("price_of", card)), "...%s at the collector's price for it" % card.card_name)
-		var fixed: CardData = cards[STOCK]
+		var fixed: CardData = cards[_stock]
 		_expect(fixed != null and fixed.resource_path == SAMPHIRE_PATH, "The sixth is Samphire")
 		_expect(not rolled.has("Samphire"), "...and Samphire is not in the roll")
-		_expect_eq(int(screen.call("price_at", STOCK)), int(_collector.get("fixed_price")), "...at its fixed price")
+		_expect_eq(int(screen.call("price_at", _stock)), int(_collector.get("fixed_price")), "...at its fixed price")
 		_check_sheens(screen, cards)
 		var camera: Camera3D = screen.call("get_camera")
 		var rest: float = float(screen.call("get_camera_rest_offset"))
@@ -229,7 +237,7 @@ func _check_buy() -> void:
 		var cards: Array = screen.call("get_slot_cards")
 		var first: CardData = cards[0]
 		var price: int = int(screen.call("price_at", 0))
-		var samphire_price: int = int(screen.call("price_at", STOCK))
+		var samphire_price: int = int(screen.call("price_at", _stock))
 		_add_gold(price - 1)
 		var deck_before: int = (_run_state.get("deck") as Array).size()
 		screen.call("activate", 0)
@@ -254,64 +262,71 @@ func _check_buy() -> void:
 		for index in range(1, cards.size()):
 			_expect(after[index] == cards[index], "...slot %d unmoved" % index)
 		_expect(bool(screen.call("is_purchase_line_showing")), "...and the purchase line said")
-		screen.call("activate", STOCK)
+		screen.call("activate", _stock)
 		screen.call("take_open_card")
 		_expect_eq(int(_run_state.get("gold")), 0, "Samphire bought for its price")
 		_expect(_deck_has("Samphire"), "...Samphire in the deck")
-		_expect((screen.call("get_slot_cards") as Array)[STOCK] == null, "...its slot empty")
+		_expect((screen.call("get_slot_cards") as Array)[_stock] == null, "...its slot empty")
 		screen.call("close")
 		await process_frame
 		var again: Node = _open()
 		if again != null:
 			var reopened: Array = again.call("get_slot_cards")
 			_expect(reopened[0] == null, "Reopened: the bought slot still empty")
-			_expect(reopened[STOCK] == null, "...Samphire still gone")
-			for index in range(1, STOCK):
+			_expect(reopened[_stock] == null, "...Samphire still gone")
+			for index in range(1, _stock):
 				_expect(reopened[index] == cards[index], "...slot %d the same card" % index)
 			again.call("close")
 	await _teardown()
 	_completed += 1
 
-# Equipment beside the cards: a worn piece, a keepsake and a weapon,
-# each at a price of the probe's own choosing.
+# The shop's equipment: one worn piece and one keepsake from its tables,
+# a weapon by its chance - forced to 1 here, then 0.
 func _check_goods() -> void:
 	await _load_floor_4(0)
-	var harness := load(HARNESS_PATH) as TrinketData
-	var keepsake := load(KEEPSAKE_PATH) as TrinketData
-	var weapon := load(WEAPON_PATH) as WeaponData
-	var goods: Array[CollectorGood] = []
-	for entry: Array in [[harness, 31], [keepsake, 23], [weapon, 47]]:
-		var good := CollectorGood.new()
-		good.item = entry[0]
-		good.price = entry[1]
-		goods.append(good)
-	_collector.set("goods", goods)
+	_collector.set("weapon_chance", 1.0)
+	var worn_table := load(str(_collector.get("worn_table_path"))) as KeepsakeTable
+	var keepsake_table := load(str(_collector.get("keepsake_table_path"))) as KeepsakeTable
 	var screen: Node = _open()
 	if screen != null:
-		var lines: Array = screen.call("get_lines")
-		_expect_eq(lines.size(), 4, "Three goods listed, then the removal")
-		var max_hp: int = int(_run_state.get("player_max_hp"))
+		var worn_line: int = _line_of_kind(screen, KIND_WORN)
+		var keepsake_line: int = _line_of_kind(screen, KIND_KEEPSAKE)
+		var weapon_line: int = _line_of_kind(screen, KIND_WEAPON)
+		_expect(worn_line >= 0 and keepsake_line >= 0 and weapon_line >= 0, "One worn piece, one keepsake and (at chance 1) a weapon")
+		_expect_eq(_lines_of_kind(screen, KIND_WORN) + _lines_of_kind(screen, KIND_KEEPSAKE) + _lines_of_kind(screen, KIND_WEAPON), 3, "...one of each")
+		var worn: TrinketData = _item_at(screen, worn_line)
+		var keepsake: TrinketData = _item_at(screen, keepsake_line)
+		var weapon: WeaponData = _item_at(screen, weapon_line)
+		_expect(worn != null and _table_has(worn_table, worn), "...the worn piece from the shop's worn table")
+		_expect(keepsake != null and _table_has(keepsake_table, keepsake), "...the keepsake from the shop's keepsake table")
 		var carried: WeaponData = _run_state.get("weapon")
-		var harness_line: int = _line_of(screen, harness)
-		var keepsake_line: int = _line_of(screen, keepsake)
-		var weapon_line: int = _line_of(screen, weapon)
-		_expect_eq(str(screen.call("type_line_at", harness_line)), str(screen.get("worn_kind_text")) + str(screen.get("type_separator")) + str(screen.get("max_hp_format")) % [max_hp, max_hp + harness.max_hp_bonus], "A worn piece that changes max HP says so")
-		_expect_eq(str(screen.call("type_line_at", keepsake_line)), str(screen.get("keepsake_kind_text")), "A keepsake with none held: its kind alone")
+		var character := load(CHARACTER_PATH) as CharacterData
+		_expect(weapon != null and weapon != carried and (weapon.card_class == &"" or weapon.card_class == character.card_class), "...a weapon for the class, not the one carried")
+		var worn_price: int = int(_collector.get("worn_price"))
+		var weapon_price: int = int(_collector.get("weapon_price"))
+		_expect_eq(int(screen.call("line_price", worn_line)), worn_price, "The worn piece at the worn price")
+		_expect_eq(int(screen.call("line_price", keepsake_line)), int(_collector.get("keepsake_price")), "The keepsake at the keepsake price")
+		_expect_eq(int(screen.call("line_price", weapon_line)), weapon_price, "The weapon at the weapon price")
+		var max_hp: int = int(_run_state.get("player_max_hp"))
+		var separator: String = str(screen.get("type_separator"))
+		if worn != null:
+			var worn_type: String = str(screen.get("worn_kind_text"))
+			if worn.max_hp_bonus > 0:
+				worn_type += separator + str(screen.get("max_hp_format")) % [max_hp, max_hp + worn.max_hp_bonus]
+			_expect_eq(str(screen.call("type_line_at", worn_line)), worn_type, "Nothing worn: the worn piece's type line by the rule")
+		_expect_eq(str(screen.call("type_line_at", keepsake_line)), str(screen.get("keepsake_kind_text")), "No keepsake held: its kind alone")
 		if carried != null:
-			_expect_eq(str(screen.call("type_line_at", weapon_line)), str(screen.get("weapon_kind_text")) + str(screen.get("type_separator")) + (str(screen.get("replaces_format")) % carried.display_name).to_upper(), "A weapon REPLACES the one carried")
-		var harness_price: int = int(screen.call("line_price", harness_line))
-		_expect_eq(harness_price, goods[0].price, "Each good at its own price")
+			_expect_eq(str(screen.call("type_line_at", weapon_line)), str(screen.get("weapon_kind_text")) + separator + (str(screen.get("replaces_format")) % carried.display_name).to_upper(), "A weapon REPLACES the one carried")
 
 		# Short of the price: the plate opens, TAKE inert.
-		screen.call("activate", int(screen.call("line_focus_index", harness_line)))
+		screen.call("activate", int(screen.call("line_focus_index", worn_line)))
 		var offer: Node = screen.call("get_offer")
 		_expect(offer != null, "CHOOSE opens the plate, gold or not")
 		if offer != null:
 			_expect(int((offer as CanvasLayer).layer) > int(screen.get("layer")), "...above the screen")
 			var plate: Node = offer.call("get_plate")
-			_expect_eq(str(plate.get("take_text")), str(screen.get("take_format")) % harness_price, "...TAKE FOR its price")
+			_expect_eq(str(plate.get("take_text")), str(screen.get("take_format")) % worn_price, "...TAKE FOR its price")
 			_expect_eq(str(plate.get("leave_text")), str(screen.get("back_text")), "...and BACK")
-			_expect_eq(str(plate.call("max_hp_text")), str(plate.get("max_hp_format")) % [max_hp, max_hp + harness.max_hp_bonus], "...the plate's Max HP line")
 			_expect(not bool(plate.get("take_enabled")), "...TAKE inert while short")
 			plate.call("activate", 0)
 			await process_frame
@@ -321,25 +336,23 @@ func _check_goods() -> void:
 			await _offer_gone(screen)
 
 		# Paid for: taken, worn, its line gone.
-		_add_gold(harness_price + goods[2].price)
+		_add_gold(worn_price + weapon_price)
 		var gold_before: int = int(_run_state.get("gold"))
-		screen.call("activate", int(screen.call("line_focus_index", harness_line)))
+		screen.call("activate", int(screen.call("line_focus_index", _line_of(screen, worn))))
 		offer = screen.call("get_offer")
 		if offer != null:
 			var plate: Node = offer.call("get_plate")
 			_expect(bool(plate.get("take_enabled")), "Affordable: TAKE live")
 			plate.call("activate", 0)
 			await _offer_gone(screen)
-			_expect_eq(int(_run_state.get("gold")), gold_before - harness_price, "...exactly its price spent")
-			_expect(_run_state.get("worn") == harness, "...worn at once")
-			_expect_eq(int(_run_state.get("player_max_hp")), max_hp + harness.max_hp_bonus, "...max HP with it")
-			_expect_eq(_line_of(screen, harness), -1, "...and its line gone")
+			_expect_eq(int(_run_state.get("gold")), gold_before - worn_price, "...exactly its price spent")
+			_expect(_run_state.get("worn") == worn, "...worn at once")
+			_expect_eq(_line_of(screen, worn), -1, "...and its line gone")
 			_expect(bool(screen.call("is_purchase_line_showing")), "...the purchase line said")
 
 		# The weapon: BACK leaves it on sale, nothing spent.
 		gold_before = int(_run_state.get("gold"))
-		weapon_line = _line_of(screen, weapon)
-		screen.call("activate", int(screen.call("line_focus_index", weapon_line)))
+		screen.call("activate", int(screen.call("line_focus_index", _line_of(screen, weapon))))
 		offer = screen.call("get_offer")
 		if offer != null:
 			offer.call("close", false)
@@ -353,15 +366,64 @@ func _check_goods() -> void:
 			(offer.call("get_plate") as Node).call("activate", 0)
 			await _offer_gone(screen)
 			_expect(_run_state.get("weapon") == weapon, "Taken, the weapon is carried at once")
-			_expect_eq(int(_run_state.get("gold")), gold_before - goods[2].price, "...for exactly its price")
+			_expect_eq(int(_run_state.get("gold")), gold_before - weapon_price, "...for exactly its price")
 			_expect_eq(_line_of(screen, weapon), -1, "...and its line gone")
 		screen.call("close")
 		await process_frame
+		# Held when the screen opens: not listed.
+		_run_state.call("equip_keepsake", keepsake)
 		var again: Node = _open()
 		if again != null:
-			_expect_eq(_line_of(again, harness), -1, "Reopened: the taken goods stay gone")
-			_expect(_line_of(again, keepsake) >= 0, "...the keepsake still there")
+			_expect_eq(_line_of(again, worn), -1, "Reopened: the taken goods stay gone")
+			_expect_eq(_line_of(again, keepsake), -1, "...and a keepsake already held isn't listed")
 			again.call("close")
+	await _teardown()
+
+	await _load_floor_4(0)
+	_collector.set("weapon_chance", 0.0)
+	var without: Node = _open()
+	if without != null:
+		_expect_eq(_line_of_kind(without, KIND_WEAPON), -1, "At chance 0, no weapon")
+		without.call("close")
+	await _teardown()
+	_completed += 1
+
+# The Bedroll: one per collector, listed only while none is carried.
+func _check_bedroll() -> void:
+	await _load_floor_4(0)
+	var price: int = int(_collector.get("bedroll_price"))
+	_run_state.call("take_bedroll", "belongings")
+	var screen: Node = _open()
+	if screen != null:
+		_expect_eq(_line_of_kind(screen, KIND_BEDROLL), -1, "Carrying a Bedroll: the collector's isn't listed")
+		screen.call("close")
+		await process_frame
+	_run_state.call("use_bedroll")
+	_add_gold(price)
+	screen = _open()
+	if screen != null:
+		var line: int = _line_of_kind(screen, KIND_BEDROLL)
+		_expect(line >= 0, "Its own used: the collector's is listed")
+		_expect_eq(int(screen.call("line_price", line)), price, "...at the Bedroll's price")
+		_expect_eq(str(screen.call("type_line_at", line)), str(screen.get("bedroll_kind_text")), "...its kind alone")
+		screen.call("activate", int(screen.call("line_focus_index", line)))
+		var offer: Node = screen.call("get_offer")
+		_expect(offer != null, "CHOOSE opens its plate")
+		if offer != null:
+			(offer.call("get_plate") as Node).call("activate", 0)
+			await _offer_gone(screen)
+			_expect(bool(_run_state.get("has_bedroll")), "Bought: carried")
+			_expect_eq(str(_run_state.get("bedroll_source")), "collector", "...from the collector")
+			_expect_eq(int(_run_state.get("gold")), 0, "...exactly its price spent")
+			_expect_eq(_line_of_kind(screen, KIND_BEDROLL), -1, "...and its line gone")
+		screen.call("close")
+		await process_frame
+	_run_state.call("use_bedroll")
+	_add_gold(price)
+	screen = _open()
+	if screen != null:
+		_expect_eq(_line_of_kind(screen, KIND_BEDROLL), -1, "That one used: the collector has no second")
+		screen.call("close")
 	await _teardown()
 	_completed += 1
 
@@ -538,19 +600,48 @@ func _line_of(screen: Node, item: Resource) -> int:
 
 # The list index of the removal line, or -1.
 func _removal_line(screen: Node) -> int:
+	return _line_of_kind(screen, KIND_REMOVAL)
+
+# The list index of the first line of `kind`, or -1; and how many there are.
+func _line_of_kind(screen: Node, kind: int) -> int:
 	var lines: Array = screen.call("get_lines")
 	for index in lines.size():
-		if (lines[index] as Dictionary)["good"] == null:
+		if int((lines[index] as Dictionary)["kind"]) == kind:
 			return index
 	return -1
+
+func _lines_of_kind(screen: Node, kind: int) -> int:
+	var count: int = 0
+	for line: Dictionary in screen.call("get_lines"):
+		if int(line["kind"]) == kind:
+			count += 1
+	return count
+
+# The item line `index` sells, or null.
+func _item_at(screen: Node, index: int) -> Resource:
+	if index < 0:
+		return null
+	var good: CollectorGood = ((screen.call("get_lines") as Array)[index] as Dictionary)["good"]
+	return good.item if good != null else null
+
+func _table_has(table: KeepsakeTable, trinket: TrinketData) -> bool:
+	for entry in table.entries:
+		if entry != null and entry.trinket == trinket:
+			return true
+	return false
+
+# Whether `pool` can offer `card` at all - its own cards, folders included.
+func _pool_offers(pool: RewardPool, card: CardData) -> bool:
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 7
+	return pool.roll(999, rng, null, load(CHARACTER_PATH) as CharacterData).has(card)
 
 # A plate answered: until it has eased away.
 func _offer_gone(screen: Node) -> void:
 	await ProbePlay.wait_until(self, func() -> bool: return screen.call("get_offer") == null, 2.0)
 
 # A new run on floor 4 with `gold`, and a collector of our own at its
-# spot, stocked from collector_pool and wired to the field as RegionField
-# wires a placed one.
+# spot, wired to the field as RegionField wires a placed one.
 func _load_floor_4(gold: int) -> void:
 	_run_state.call("new_run", load(CHARACTER_PATH))
 	_run_state.set("current_floor_index", FLOOR_4)
@@ -564,9 +655,9 @@ func _load_floor_4(gold: int) -> void:
 	_collector = (load(COLLECTOR_SCENE_PATH) as PackedScene).instantiate() as Node3D
 	_collector.set("ground_path", NodePath("../Ground"))
 	_collector.set("region_field_path", NodePath(".."))
-	_collector.set("stock_pool", load(COLLECTOR_POOL_PATH))
 	_collector.call("set_floor_placement", SPOT, SPOT_YAW, 0.0)
 	_field.add_child(_collector)
+	_stock = int(_collector.get("class_card_count")) + int(_collector.get("neutral_card_count"))
 	await physics_frame
 
 # The collector's screen, opened the way its click opens it.

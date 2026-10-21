@@ -119,10 +119,11 @@ func roll(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, chara
 # `elite` rolls the tiers at the elite rates instead; `character` as in
 # roll(). `rates`, when given, stands in for this pool's normal rates
 # (a normal fight's floor rates - FightRarityTable); the elite rates
-# never take it.
-func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, elite: bool = false, character: CharacterData = null, rates: RarityRates = null) -> Array[CardData]:
+# never take it. `class_only` leaves out every neutral card (no card_
+# class) - the collector's class slot, from a pool that holds both.
+func roll_by_rarity(count: int, rng: RandomNumberGenerator, enemy: EnemyData = null, elite: bool = false, character: CharacterData = null, rates: RarityRates = null, class_only: bool = false) -> Array[CardData]:
 	var picked: Array[CardData] = []
-	var remaining: Array[int] = _rarity_eligible(enemy, character)
+	var remaining: Array[int] = _rarity_eligible(enemy, character, class_only)
 	while picked.size() < count and not remaining.is_empty():
 		var available: Array[CardData.CardRarity] = []
 		for index in remaining:
@@ -215,9 +216,11 @@ func rarity_rate(tier: CardData.CardRarity, elite: bool = false, rates: RarityRa
 
 # Indices of the entries a rarity roll can offer: _offerable() for
 # `character`, tagged (not UNSET), with a weight above 0.
-func _rarity_eligible(enemy: EnemyData, character: CharacterData) -> Array[int]:
+func _rarity_eligible(enemy: EnemyData, character: CharacterData, class_only: bool = false) -> Array[int]:
 	var eligible: Array[int] = []
 	for index in _cards().size():
+		if class_only and _cards()[index] != null and _cards()[index].card_class == &"":
+			continue
 		if _offerable(index, character) and _cards()[index].rarity != CardData.CardRarity.UNSET and _weight_of(index, enemy) > 0.0:
 			eligible.append(index)
 	return eligible

@@ -34,7 +34,10 @@ class_name CollectorScreen
 #     the screen (ArmorExamine) - REPLACES and the Max HP line on the
 #     plate, TAKE FOR <price> and BACK. A good taken is equipped at once,
 #     whatever it replaces gone (the collector keeps it), and its line
-#     leaves the list. Then the removal line: "Remove a card", OPENS YOUR
+#     leaves the list. Then the Bedroll (Collector.get_bedroll()) while
+#     none is carried - REST, its plate with TAKE FOR / BACK, into the
+#     pack (RunState.take_bedroll("collector")) and off the list for good.
+#     Then the removal line: "Remove a card", OPENS YOUR
 #     DECK, its price, CHOOSE - the deck as a picker (DeckView pick
 #     confirm): a card lifted shows GIVE IT <NAME> with the price, DECK
 #     n → n-1 and BACK; given, exactly that card leaves and the line goes.
@@ -68,7 +71,7 @@ const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 const THEME_PATH := "res://ui/battle_theme.tres"
 const VOICE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
 
-enum Kind { WORN, KEEPSAKE, WEAPON, REMOVAL }
+enum Kind { WORN, KEEPSAKE, WEAPON, REMOVAL, BEDROLL }
 
 @export_group("Veil")
 # The fog's colour from the left edge (veil_left_alpha) to the right
@@ -366,6 +369,10 @@ enum Kind { WORN, KEEPSAKE, WEAPON, REMOVAL }
 	set(value):
 		type_separator = value
 		_refresh()
+@export var bedroll_kind_text: String = "REST":
+	set(value):
+		bedroll_kind_text = value
+		_refresh()
 @export var removal_name: String = "Remove a card":
 	set(value):
 		removal_name = value
@@ -582,9 +589,9 @@ func _price_at(slot: int) -> int:
 func _affordable(slot: int) -> bool:
 	return slot >= 0 and slot < _cards.size() and _cards[slot] != null and RunState.gold >= _price_at(slot)
 
-# The goods still on offer, then the removal until it is used. A good the
-# run already holds (its weapon, its worn piece, its keepsake) isn't
-# listed.
+# The goods still on offer, the Bedroll while it is and none is carried,
+# then the removal until it is used. A good the run already holds (its
+# weapon, its worn piece, its keepsake) isn't listed.
 func _build_lines() -> void:
 	_lines.clear()
 	if _collector == null:
@@ -598,6 +605,9 @@ func _build_lines() -> void:
 		if _held(good, kind):
 			continue
 		_lines.append({"kind": kind, "good_index": index, "good": good})
+	var bedroll: BedrollData = _collector.get_bedroll()
+	if bedroll != null and not RunState.has_bedroll:
+		_lines.append({"kind": Kind.BEDROLL, "good_index": -1, "good": null, "bedroll": bedroll})
 	if not _collector.is_removal_used():
 		_lines.append({"kind": Kind.REMOVAL, "good_index": -1, "good": null})
 
@@ -620,8 +630,11 @@ func _removal_open() -> bool:
 	return _collector != null and not _collector.is_removal_used() and RunState.gold >= _collector.removal_price and not RunState.deck.is_empty()
 
 func _line_price(line: Dictionary) -> int:
-	if int(line["kind"]) == Kind.REMOVAL:
-		return _collector.removal_price if _collector != null else 0
+	match int(line["kind"]):
+		Kind.REMOVAL:
+			return _collector.removal_price if _collector != null else 0
+		Kind.BEDROLL:
+			return _collector.bedroll_price if _collector != null else 0
 	return (line["good"] as CollectorGood).price
 
 func _line_affordable(line: Dictionary) -> bool:
@@ -634,6 +647,8 @@ func _line_name(line: Dictionary) -> String:
 	match int(line["kind"]):
 		Kind.REMOVAL:
 			return removal_name
+		Kind.BEDROLL:
+			return (line["bedroll"] as BedrollData).plate_name
 		Kind.WEAPON:
 			return good.get_weapon().display_name
 	return good.get_trinket().display_name
@@ -657,6 +672,8 @@ func type_line_at(line_index: int) -> String:
 	var kind: int = int(line["kind"])
 	if kind == Kind.REMOVAL:
 		return removal_type_text
+	if kind == Kind.BEDROLL:
+		return bedroll_kind_text
 	var text: String = weapon_kind_text
 	var replaced_name: String = ""
 	match kind:
@@ -1159,6 +1176,8 @@ func _activate(index: int) -> void:
 		var line: Dictionary = _lines[index - _line_base()]
 		if int(line["kind"]) == Kind.REMOVAL:
 			_open_picker()
+		elif int(line["kind"]) == Kind.BEDROLL:
+			_open_offer(line)
 		else:
 			_open_offer(line)
 
@@ -1331,14 +1350,19 @@ func _take_card() -> void:
 # A good's plate over the screen (ArmorExamine): a worn piece's with its
 # Max HP line, a keepsake's, a weapon's - each with REPLACES what it
 # would, TAKE FOR <price> (grey and inert while it can't be paid) and
-# BACK. Escape, a click off it and BACK close it with nothing taken.
+# BACK. The Bedroll's, the same with nothing it replaces. Escape, a click
+# off it and BACK close it with nothing taken.
 func _open_offer(line: Dictionary) -> void:
 	var good: CollectorGood = line["good"]
-	if good == null or _offer_open():
+	var kind: int = int(line["kind"])
+	if (good == null and kind != Kind.BEDROLL) or _offer_open():
 		return
+	var price: int = _line_price(line)
 	_offer = ArmorExamine.new()
 	_offer.name = "GoodOffer"
-	match int(line["kind"]):
+	match kind:
+		Kind.BEDROLL:
+			_offer.setup_bedroll(line["bedroll"], true)
 		Kind.WEAPON:
 			_offer.setup_weapon(good.get_weapon(), Rect2(), RunState.weapon, true, false, true)
 		Kind.WORN:
@@ -1352,9 +1376,9 @@ func _open_offer(line: Dictionary) -> void:
 	_offer.layer = layer + offer_layer_offset
 	var plate: ItemPlate = _offer.get_plate()
 	if plate != null:
-		plate.take_text = take_format % good.price
+		plate.take_text = take_format % price
 		plate.leave_text = back_text
-		plate.take_enabled = RunState.gold >= good.price
+		plate.take_enabled = RunState.gold >= price
 	_mouse_on = -1
 
 func _on_offer_closed(taken: bool) -> void:
@@ -1370,14 +1394,24 @@ func _on_offer_closed(taken: bool) -> void:
 # the list.
 func _buy_good(line: Dictionary) -> void:
 	var good: CollectorGood = line["good"]
-	if good == null or _collector == null:
+	var kind: int = int(line["kind"])
+	if (good == null and kind != Kind.BEDROLL) or _collector == null:
 		return
+	# The carry limit: one Bedroll in the pack at a time.
+	if kind == Kind.BEDROLL and RunState.has_bedroll:
+		return
+	var price: int = _line_price(line)
 	var gold_before: int = RunState.gold
-	if not RunState.spend_gold(good.price):
+	if not RunState.spend_gold(price):
 		return
 	var item_id: String = ""
 	var kind_name: String = "keepsake"
-	match int(line["kind"]):
+	match kind:
+		Kind.BEDROLL:
+			item_id = "bedroll"
+			kind_name = "bedroll"
+			RunState.take_bedroll("collector")
+			_collector.take_bedroll()
 		Kind.WEAPON:
 			item_id = String(good.get_weapon().id)
 			kind_name = "weapon"
@@ -1391,16 +1425,17 @@ func _buy_good(line: Dictionary) -> void:
 			# Seen and held: no drop offers it again this run.
 			RunState.note_keepsake_offered(good.get_trinket())
 			RunState.equip_keepsake(good.get_trinket())
-	_collector.take_good(int(line["good_index"]))
+	if kind != Kind.BEDROLL:
+		_collector.take_good(int(line["good_index"]))
 	RunLogger.event("collector_buy", {
 		"item": item_id,
 		"kind": kind_name,
-		"price": good.price,
+		"price": price,
 		"gold_before": gold_before,
 		"gold_after": RunState.gold,
 	})
 	TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, gold_volume_db, "GoodTakeAudio", "CollectorScreen")
-	print("CollectorScreen: bought '%s' (%s) for %d (gold %d)." % [item_id, kind_name, good.price, RunState.gold])
+	print("CollectorScreen: bought '%s' (%s) for %d (gold %d)." % [item_id, kind_name, price, RunState.gold])
 	_rebuild_lines()
 	_purchased()
 

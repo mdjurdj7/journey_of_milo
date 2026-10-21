@@ -13,7 +13,6 @@
 [ext_resource type="Script" uid="uid://bi5wh88prg3u6" path="res://floors/floor_prop.gd" id="10_floor_prop"]
 [ext_resource type="PackedScene" path="res://field/bone_scatter.tscn" id="11_bone_scatter"]
 [ext_resource type="PackedScene" path="res://field/collector.tscn" id="12_collector"]
-[ext_resource type="Resource" path="res://cards/pools/collector_pool.tres" id="13_collector_pool"]
 [ext_resource type="PackedScene" path="res://field/basking_slab.tscn" id="14_basking_slab"]
 [ext_resource type="Script" uid="uid://c1xsh7mpatcy3" path="res://floors/encounter_slot.gd" id="90_encounter_slot"]
 [ext_resource type="Script" uid="uid://n5us4ml13k7m" path="res://floors/encounter_option.gd" id="91_encounter_option"]
@@ -31,7 +30,6 @@ scene = ExtResource("12_collector")
 position = Vector3(-19.8, 0, -11.8)
 yaw_degrees = -160.0
 world_line = "It is sorting what it has."
-pool = ExtResource("13_collector_pool")
 
 [sub_resource type="Resource" id="FloorEnemy_required"]
 script = ExtResource("2_floor_enemy")
