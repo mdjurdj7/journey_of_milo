@@ -2594,7 +2594,7 @@ func get_enemy_status_labels(enemy: FieldEnemy) -> PackedStringArray:
 	for active: Status in combatant.statuses:
 		if active.data != null and active.data.shows_beside_hp:
 			continue
-		# A countdown (Sentence) shows beside the HP, glyph and numeral
+		# A countdown (Sentence) shows beside the intent, glyph and numeral
 		# (get_enemy_countdowns()).
 		if active.has_countdown():
 			continue

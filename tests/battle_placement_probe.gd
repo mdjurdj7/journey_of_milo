@@ -94,6 +94,11 @@ const BOTTOM_EDGE_RAY_STEP_M := 0.05
 # A fade or a press settles within this much game time once the frame
 # has, seconds - a cap, not a wait.
 const FADE_SETTLE_MAX_SECONDS := 3.0
+# Sentence on every enemy before the readability checks, so each intent
+# carries its hourglass (BattleIntent's Countdown group) - its widest.
+const SENTENCE_STATUS_PATH := "res://battle/rules/statuses/sentence.tres"
+# Frames for the readout layout to settle round the wider intents.
+const LAYOUT_SETTLE_FRAMES := 10
 # Approaches round a lone enemy for the ground check.
 const GROUND_ANGLES := 16
 const FIELD_ENEMY_SCRIPT_PATH := "res://field/field_enemy.gd"
@@ -214,6 +219,7 @@ func _check_fight(floor_index: int, slot: EncounterSlot, option: EncounterOption
 	_check_fight_end_ground(label, wanderer.global_position, members)
 	# The frame's readability, once its fades and the press have settled.
 	await ProbePlay.wait_until(self, _fades_settled, FADE_SETTLE_MAX_SECONDS)
+	await _sentence_all(layer)
 	_check_readability(label, camera, wanderer, members, ground, sea_level)
 	# For the record: the pitch the frame settled at, and the Tower.
 	print("INFO: %s: battle pitch %.0f degrees; the Tower %s" % [label, float(_field.get_node("CameraPivot").get("_battle_pitch_now")), "in frame" if _tower_in_frame(camera) else "not in frame"])
@@ -537,6 +543,24 @@ func _name_of(body: Node3D, wanderer: Node3D) -> String:
 
 func _flat(at: Vector3) -> Vector2:
 	return Vector2(at.x, at.z)
+
+# Sentence on every enemy in the fight, its hourglass beside each intent,
+# and the readout layout given frames to settle round them.
+func _sentence_all(layer: Node) -> void:
+	if layer.get_child_count() == 0:
+		return
+	var controller: Node = layer.get_child(0).get("battle_controller")
+	if controller == null:
+		return
+	var combatants: Dictionary = controller.get("_combatants")
+	var sentence: StatusData = load(SENTENCE_STATUS_PATH)
+	for member in controller.get("enemies") as Array:
+		var combatant: Combatant = combatants.get(member)
+		if combatant != null:
+			Status.apply_to(combatant.statuses, sentence)
+	controller.emit_signal("status_changed")
+	for i in LAYOUT_SETTLE_FRAMES:
+		await process_frame
 
 func _teardown() -> void:
 	if _field != null:

@@ -281,8 +281,8 @@ func _check_faces_and_sentence() -> void:
 		Status.apply_to(enemy.statuses, load(SENTENCE_STATUS_PATH))
 		controller.emit_signal("status_changed")
 		_expect_eq(_sentence_label(enemy), "Sentence 3", "The enemy carries Sentence 3")
-		var plate: Node = (controller.get_parent().get("_enemy_statuses") as Dictionary).get(_field_enemy(controller))
-		_expect(plate != null and str(plate.call("get_countdowns")) == "[3]", "...its plate's hourglass reads 3, beside the HP")
+		var plate: Node = (controller.get_parent().get("_enemy_intents") as Dictionary).get(_field_enemy(controller))
+		_expect(plate != null and str(plate.call("get_countdowns")) == "[3]", "...its hourglass reads 3, beside the intent")
 		player.toll = 5
 		player.energy = 1
 		var hand: Object = controller.get("_hand_container")

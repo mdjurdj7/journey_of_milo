@@ -36,6 +36,11 @@ class_name BattleIntent
 # per-hit number repeated over hits that differ; one whose hits are equal
 # stays "M×N" (No Further's every-hit 0 reads 0×3).
 #
+# A countdown on the enemy (Sentence) is an hourglass and its turns left
+# right of the last pair (the Countdown group), on the numeral's cap line
+# - not on the HP plate, where it ran into the name. It stays up while the
+# enemy acts, the pair hidden, so the tick at its turn's start is seen.
+#
 # An enemy acting more than once this turn (preview "repeats" - Bereft)
 # shows each action as a pair of its own, side by side, action_gap_px
 # apart: glyph and number for each, so two actions never read like one
@@ -327,6 +332,46 @@ var layout_offset: Vector2 = Vector2.ZERO
 		_apply_layout()
 @export_group("")
 
+@export_group("Countdown")
+# Each countdown (set_countdowns()), soonest first, from countdown_gap_px
+# right of the last pair: an hourglass countdown_glyph_px tall in
+# countdown_stroke_px of the tapered pen, centred on the numeral's cap
+# centre, then its turns left countdown_value_gap_px on, in the numeral's
+# face at countdown_value_size_px with its cap centred on the same line;
+# the next countdown_gap_px after that. The control grows by the run on
+# both sides, so the pair stays centred over the enemy and the readout
+# layout sees it all; the pair's hit rect never takes it in. On a drop
+# every hourglass swells by countdown_pulse_scale of its size and eases
+# back over countdown_pulse_sec - the tick a Toll spend makes.
+@export var countdown_gap_px: float = 8.0:
+	set(value):
+		countdown_gap_px = value
+		_apply_layout()
+@export var countdown_glyph_px: float = 16.0:
+	set(value):
+		countdown_glyph_px = value
+		_apply_layout()
+@export var countdown_value_gap_px: float = 3.0:
+	set(value):
+		countdown_value_gap_px = value
+		_apply_layout()
+@export var countdown_value_size_px: int = 22:
+	set(value):
+		countdown_value_size_px = value
+		_apply_layout()
+@export var countdown_stroke_px: float = 2.4:
+	set(value):
+		countdown_stroke_px = value
+		queue_redraw()
+@export_range(0.0, 1.0) var countdown_pulse_scale: float = 0.35:
+	set(value):
+		countdown_pulse_scale = value
+		queue_redraw()
+@export var countdown_pulse_sec: float = 0.3:
+	set(value):
+		countdown_pulse_sec = maxf(value, 0.0)
+@export_group("")
+
 # Where along the spearhead's blade, from its point, it is widest.
 const SPEAR_WIDEST_AT: float = 0.7
 # The ground line under BURROW and SETTLE: a thin stroke, this fraction
@@ -357,6 +402,8 @@ const TAUNT_CENTRE: float = 0.34
 const SIGNAL_DOT: float = 0.16
 const SIGNAL_RING: float = 1.25
 const SIGNAL_SWEEP: float = 0.3
+# The hourglass's half-width, as a fraction of its half-height.
+const HOURGLASS_WIDTH: float = 0.72
 
 var target: FieldEnemy = null
 var _label: Label = null
@@ -414,6 +461,16 @@ var _refusal_label: Label = null
 # A combat number over its enemy dims it (BattleOverlay._dim_intents_
 # under_numbers()): 1 with none.
 var _number_dim: float = 1.0
+# Each countdown's turns left (Sentence), soonest first - set_countdowns() -
+# the pulse its last drop set off, 1 easing to 0, where the run starts and
+# the turns' cap height. _ever_revealed: shown once the frame settled, so
+# a countdown keeps it up while the enemy acts.
+var _countdowns: Array[int] = []
+var _countdown_pulse: float = 0.0
+var _countdown_tween: Tween = null
+var _countdown_left: float = 0.0
+var _countdown_cap: float = 0.0
+var _ever_revealed: bool = false
 
 func _ready() -> void:
 	_ready_done = true
@@ -535,7 +592,7 @@ func show_intent(preview: Dictionary) -> void:
 # The glyph and numeral's box on screen - what a card aimed at an intent
 # (Brace, Garnish) clicks (BattleController.intent_rect_of).
 func get_pair_global_rect() -> Rect2:
-	if not _has_intent:
+	if not _pair_shown():
 		return Rect2()
 	return get_global_transform() * _pair_rect
 
@@ -599,7 +656,7 @@ func _restyle_refusal() -> void:
 func _place_refusal() -> void:
 	if _refusal_label == null:
 		return
-	_refusal_label.visible = not _refusal_label.text.is_empty()
+	_refusal_label.visible = not _refusal_label.text.is_empty() and _pair_shown()
 	var font: Font = _refusal_label.get_theme_font("font")
 	var width: float = font.get_string_size(_refusal_label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, refusal_size_px).x if font != null else 0.0
 	_refusal_label.size = Vector2(width, font.get_height(refusal_size_px) if font != null else float(refusal_size_px))
@@ -607,10 +664,97 @@ func _place_refusal() -> void:
 
 func set_revealed(revealed: bool) -> void:
 	_revealed = revealed
+	_ever_revealed = _ever_revealed or revealed
 	_update_visibility()
 
+# Shown with its intent once revealed - or, once the frame has settled,
+# for its countdowns alone while the pair is hidden (the enemy acting).
 func _update_visibility() -> void:
-	visible = _revealed and _has_intent
+	visible = _pair_shown() or (_ever_revealed and not _countdowns.is_empty())
+	_apply_layout()
+
+# The glyph and numeral are up: revealed, with an intent to show.
+func _pair_shown() -> bool:
+	return _revealed and _has_intent
+
+# Each countdown on the enemy (Sentence): `turns` its turns left, soonest
+# first. A count that dropped since - a Toll spend, the enemy's turn -
+# pulses them all (countdown_pulse_sec).
+func set_countdowns(turns: Array[int]) -> void:
+	if turns == _countdowns:
+		return
+	var dropped: bool = false
+	for i in mini(turns.size(), _countdowns.size()):
+		if turns[i] < _countdowns[i]:
+			dropped = true
+	_countdowns = turns.duplicate()
+	if dropped:
+		_pulse_countdowns()
+	_update_visibility()
+
+# What set_countdowns() last put beside the intent.
+func get_countdowns() -> Array[int]:
+	return _countdowns.duplicate()
+
+func _pulse_countdowns() -> void:
+	if _countdown_tween != null:
+		_countdown_tween.kill()
+	_countdown_pulse = 1.0
+	if countdown_pulse_sec <= 0.0:
+		_countdown_pulse = 0.0
+		return
+	_countdown_tween = create_tween()
+	_countdown_tween.tween_method(func(value: float) -> void:
+		_countdown_pulse = value
+		queue_redraw(), 1.0, 0.0, countdown_pulse_sec)
+
+# The countdowns' run, its leading gap included; 0 with none.
+func _countdowns_width() -> float:
+	if _countdowns.is_empty() or numeral_font == null:
+		return 0.0
+	var width: float = 0.0
+	for turns in _countdowns:
+		width += countdown_gap_px + countdown_glyph_px * HOURGLASS_WIDTH + countdown_value_gap_px
+		width += numeral_font.get_string_size(str(turns), HORIZONTAL_ALIGNMENT_LEFT, -1, countdown_value_size_px).x
+	return width
+
+# Each countdown's hourglass and turns, from _countdown_left on the
+# numeral's cap centre - ink over the bone outline, as the pair.
+func _draw_countdowns() -> void:
+	if _countdowns.is_empty() or numeral_font == null:
+		return
+	var ink: Color = get_theme_color("ink", "Battle")
+	var bone: Color = get_theme_color("bone", "Battle")
+	var r: float = countdown_glyph_px * 0.5 * (1.0 + countdown_pulse_scale * _countdown_pulse)
+	var glyph_width: float = countdown_glyph_px * HOURGLASS_WIDTH
+	var baseline: float = roundf(_glyph_centre.y + _countdown_cap * 0.5)
+	var x: float = _countdown_left
+	for turns in _countdowns:
+		var centre := Vector2(x + glyph_width * 0.5, _glyph_centre.y)
+		InkPen.draw_ink(self, hourglass_shapes(centre, r, countdown_stroke_px, glyph_taper), ink, bone, float(outline_size_px), glyph_edge_px, 1.0)
+		var value_x: float = x + glyph_width + countdown_value_gap_px
+		var text: String = str(turns)
+		draw_string_outline(numeral_font, Vector2(value_x, baseline), text, HORIZONTAL_ALIGNMENT_LEFT, -1, countdown_value_size_px, outline_size_px * 2, bone)
+		draw_string(numeral_font, Vector2(value_x, baseline), text, HORIZONTAL_ALIGNMENT_LEFT, -1, countdown_value_size_px, ink)
+		x = value_x + numeral_font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, countdown_value_size_px).x + countdown_gap_px
+
+# An hourglass `r` either side of its centre, HOURGLASS_WIDTH of that
+# across: the top and bottom rules and the two strokes crossing between
+# them, in the tapered pen.
+static func hourglass_shapes(centre: Vector2, r: float, stroke_px: float, taper: float) -> Array[PackedVector2Array]:
+	var w: float = r * HOURGLASS_WIDTH
+	var corners: Array[Vector2] = [centre + Vector2(-w, -r), centre + Vector2(w, -r), centre + Vector2(-w, r), centre + Vector2(w, r)]
+	var lines: Array = [[corners[0], corners[1]], [corners[2], corners[3]], [corners[0], corners[3]], [corners[1], corners[2]]]
+	var shapes: Array[PackedVector2Array] = []
+	for line: Array in lines:
+		var spine := PackedVector2Array()
+		var factors := PackedFloat32Array()
+		for step in 9:
+			var t: float = float(step) / 8.0
+			spine.append((line[0] as Vector2).lerp(line[1] as Vector2, t))
+			factors.append(1.0)
+		shapes.append(InkPen.ribbon(spine, factors, stroke_px, taper))
+	return shapes
 
 # Glyph on the left, numeral on the right, on one line; the rule's place
 # centred beneath, whether or not it is drawn. This control's width is the wider of the pair and the
@@ -656,6 +800,10 @@ func _apply_layout() -> void:
 	var rule_band: float = maxf(lethal_rule_px, hairline_thickness_px)
 	var ring_box: float = ring_diameter_px + ring_stroke_px + float(outline_size_px) * 2.0
 	var content_width: float = maxf(pair_width, hairline_width_px)
+	# The countdowns right of the pair, the same room kept left of it.
+	var countdown_width: float = _countdowns_width()
+	if countdown_width > 0.0:
+		content_width = maxf(content_width, pair_width + countdown_width * 2.0)
 	var content_height: float = above_rule + hairline_drop_px + rule_band
 	if _has_threshold:
 		content_width = maxf(content_width, ring_box)
@@ -675,13 +823,15 @@ func _apply_layout() -> void:
 	# The label's one line fills its box, so its baseline is the ascent.
 	_ascent = ascent
 	_glyph_centre = Vector2(pair_left + _glyph_width() * 0.5, ascent - cap_height * 0.5)
+	_countdown_left = pair_left + pair_width + countdown_gap_px
+	_countdown_cap = cap_height * float(countdown_value_size_px) / float(maxi(numeral_size_px, 1))
 	_text_rect = Rect2(pair_left + _glyph_width() + glyph_numeral_gap_px, 0.0, text_width, line_height)
 	_label.position = _text_rect.position
 	_label.size = _text_rect.size
-	_label.visible = text_width > 0.0
+	_label.visible = text_width > 0.0 and _pair_shown()
 	_label.modulate.a = hairline_alpha if _interrupted or _delayed else 1.0
 	# "N HITS" beneath the numeral, centred on it.
-	_hits_label.visible = hits_width > 0.0
+	_hits_label.visible = hits_width > 0.0 and _pair_shown()
 	if hits_width > 0.0:
 		_hits_label.position = Vector2(roundf(_text_rect.get_center().x - hits_width * 0.5), _hits_top)
 		_hits_label.size = Vector2(hits_width, hits_height)
@@ -696,7 +846,7 @@ func _apply_layout() -> void:
 	_ring_centre = Vector2(content_width * 0.5, ring_top + ring_box * 0.5)
 	_threshold_label.position = _ring_centre - Vector2(ring_box, ring_box) * 0.5
 	_threshold_label.size = Vector2(ring_box, ring_box)
-	_threshold_label.visible = _has_threshold and not _threshold_label.text.is_empty()
+	_threshold_label.visible = _has_threshold and not _threshold_label.text.is_empty() and _pair_shown()
 	_place_refusal()
 	queue_redraw()
 
@@ -815,7 +965,8 @@ func _text_width(label: Label, font_size: int) -> float:
 # never flip. Beneath the pair, the lethal rule, or the hairline a
 # threshold ring hangs from - otherwise nothing.
 func _draw() -> void:
-	if not _has_intent:
+	_draw_countdowns()
+	if not _pair_shown():
 		return
 	var ink: Color = get_theme_color("ink", "Battle")
 	var glyph_centre: Vector2 = _glyph_centre

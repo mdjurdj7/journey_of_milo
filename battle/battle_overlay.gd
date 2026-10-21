@@ -920,7 +920,9 @@ func _on_status_changed() -> void:
 		if status != null and is_instance_valid(status):
 			status.set_block(battle_controller.get_enemy_block(enemy))
 			status.set_status_row(battle_controller.get_enemy_status_labels(enemy))
-			status.set_countdowns(battle_controller.get_enemy_countdowns(enemy))
+			var intent: BattleIntent = _enemy_intents.get(enemy)
+			if intent != null and is_instance_valid(intent):
+				intent.set_countdowns(battle_controller.get_enemy_countdowns(enemy))
 			# Beside its HP: the one status shown there (Coiled), mark and
 			# magnitude - or nothing.
 			var beside: Status = battle_controller.get_enemy_hp_mark_status(enemy)
