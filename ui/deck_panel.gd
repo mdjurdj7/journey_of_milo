@@ -114,6 +114,11 @@ enum Pile { DRAW, DISCARD }
 		align_bottom = value
 		_relayout()
 
+# The view this line opened has opened, and has closed - however it
+# closed (BattleOverlay hides the hand under a battle pile's).
+signal view_opened()
+signal view_closed()
+
 var _deck: Deck = null
 var _pile: Pile = Pile.DRAW
 var _whole_deck_cards: Array[CardData] = []
@@ -352,9 +357,11 @@ func _open_deck_view() -> void:
 	var deck_view: DeckView = open_view(get_tree(), _pile_cards(), header_text)
 	deck_view.closed.connect(_on_deck_view_closed)
 	_deck_view_instance = deck_view
+	view_opened.emit()
 
 func _on_deck_view_closed() -> void:
 	_deck_view_instance = null
+	view_closed.emit()
 
 # Opens a DeckView over everything. See DECK_VIEW_LAYER's own doc -
 # DeckView has no CanvasLayer of its own, so this is what actually puts it

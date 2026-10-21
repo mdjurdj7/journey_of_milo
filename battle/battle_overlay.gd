@@ -595,6 +595,11 @@ func _create_corner_readouts() -> void:
 	_discard_readout = DeckPanel.new()
 	_discard_readout.align_right = true
 	add_child(_discard_readout)
+	# A pile's view is over the battle but lets it show through its scrim:
+	# the hand goes while one is open, so it never reads through the view.
+	for readout: DeckPanel in [_deck_readout, _discard_readout]:
+		readout.view_opened.connect(_on_pile_view_opened)
+		readout.view_closed.connect(_on_pile_view_closed)
 	_keepsake_row = KeepsakeRow.new()
 	add_child(_keepsake_row)
 	# A class without Devour (CharacterData.has_devour) gets no button; the
@@ -753,6 +758,19 @@ func _on_enemy_intent_changed(enemy: FieldEnemy, preview: Dictionary) -> void:
 	intent.show_intent(preview)
 	if _intents_revealed and not _enemy_phase:
 		intent.set_revealed(true)
+
+# The pile views open over the battle (DRAW / DISCARD): the hand hidden
+# while any is.
+var _pile_views_open: int = 0
+
+func _on_pile_view_opened() -> void:
+	_pile_views_open += 1
+	hand_container.visible = false
+
+func _on_pile_view_closed() -> void:
+	_pile_views_open = maxi(_pile_views_open - 1, 0)
+	if _pile_views_open == 0:
+		hand_container.visible = true
 
 func _on_enemy_acting(enemy: FieldEnemy) -> void:
 	var intent: BattleIntent = _enemy_intents.get(enemy)
