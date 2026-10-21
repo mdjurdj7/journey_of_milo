@@ -8,11 +8,15 @@ class_name Collector
 # position, yaw, world_line, pool; anything else through overrides) -
 # nothing floor-specific is in collector.tscn.
 #
-# A placeholder body until its species is decided: one low, elongated
-# capsule lying along its facing axis (body_length x body_height), in the
-# project's flat matte (Hull's shared material, duplicated) tinted dark
-# like the cormorant. Origin at the base, grounded on the relief; a
-# capsule StaticBody3D the Wanderer walks round. No idle animation.
+# The body is model_scene_path on its own colour map (colour_map_path)
+# under the painted shader, with the enemy_fog pass laid over it at
+# fog_factor (PaintedProp, as the Handcart wears it) - an enemy's share
+# of the fog, not a prop's. The model's own frame: feet at y 0 (grounded
+# by its box), head along +Z, tail along -Z; the FloorProp's yaw turns
+# it. Origin grounded on the relief; a contact pool sized to the box; one
+# capsule StaticBody3D along the body, tail tip to nose, the box's
+# half-width round - over all four legs - that the Wanderer walks round.
+# No idle animation.
 #
 # The floor 2 trough's trigger, shared through PropApproach: inside
 # approach_radius the world line shows near the body, once per visit into
@@ -43,23 +47,36 @@ signal prices_changed()
 const GROUP := &"collectors"
 
 @export_group("Body")
-@export var body_length: float = 0.9:
+@export_file("*.glb", "*.tscn") var model_scene_path: String = "res://assets/models/collector/collector.glb":
 	set(value):
-		body_length = value
-		_apply_body()
-@export var body_height: float = 0.5:
+		model_scene_path = value
+		_rebuild_body()
+# The model's own colour map: its glb's albedo, extracted once on import
+# (the glb's other maps are discarded - the painted shader takes none).
+@export_file("*.jpg", "*.png") var colour_map_path: String = "res://assets/models/collector/collector_texture_0.png":
 	set(value):
-		body_height = value
-		_apply_body()
-# The cormorant's (Bird.bird_tint).
-@export var tint: Color = Color(0.28, 0.29, 0.31):
+		colour_map_path = value
+		_rebuild_body()
+@export var model_scale: float = 1.0:
+	set(value):
+		model_scale = value
+		_rebuild_body()
+# Multiplied into the colour map - white is the map as painted.
+@export var tint: Color = Color(1.0, 1.0, 1.0):
 	set(value):
 		tint = value
 		_apply_tint()
+# Its share of the depth fog - an enemy's (RegionField.enemy_fog_factor).
+@export_range(0.0, 1.0, 0.01) var fog_factor: float = 0.4:
+	set(value):
+		fog_factor = value
+		_push_fog()
 @export_group("")
 
 @export_group("Approach")
-@export var approach_radius: float = 2.5:
+# From the origin (between its legs): reach past the nose (1.22 m out)
+# with room for the Wanderer to stand clear of the head.
+@export var approach_radius: float = 3.0:
 	set(value):
 		approach_radius = value
 		_apply_approach_radius()
@@ -116,12 +133,14 @@ const GROUP := &"collectors"
 @export var region_field_path: NodePath = ^"../.."
 
 var _placement_yaw: float = 0.0
-var _mesh_instance: MeshInstance3D = null
-var _mesh: CapsuleMesh = null
-var _material: StandardMaterial3D = null
+var _model: Node3D = null
+var _material: Material = null
+var _fog: ShaderMaterial = null
+var _sky: RegionSky = null
+# The model's box in this node's frame, feet at y 0.
+var _aabb: AABB = AABB()
 var _collision_body: StaticBody3D = null
-var _collision_shape: CapsuleShape3D = null
-var _collision_node: CollisionShape3D = null
+var _contact_shadow: ContactShadow = null
 var _approach: PropApproach = null
 var _ground: Ground = null
 # hint_line has been said this run.
@@ -148,53 +167,99 @@ func _ready() -> void:
 	rotation = Vector3(0.0, deg_to_rad(_placement_yaw), 0.0)
 	_spawn_body()
 	_spawn_approach()
+	var region_field := get_node_or_null(region_field_path) as RegionField
+	_sky = region_field.get_region_sky() if region_field != null else null
+	if _sky != null:
+		_sky.fog_changed.connect(_push_fog)
+	_push_fog()
+	_contact_shadow = ContactShadow.new()
+	_contact_shadow.name = "ContactShadow"
+	_contact_shadow.feet_source = _contact_feet
+	add_child(_contact_shadow)
+	_apply_shadow_footprint()
 	_ground = get_node_or_null(ground_path) as Ground
 	if _ground == null:
 		push_warning("Collector '%s': ground_path did not resolve to a Ground; not grounded." % name)
 		return
+	_contact_shadow.set_ground(_ground)
 	_ground.relief_rebuilt.connect(_ground_to_relief)
 	_ground_to_relief()
 
+# The model, dressed, its feet on the origin by its box, and the capsule
+# round it.
 func _spawn_body() -> void:
-	_mesh = CapsuleMesh.new()
-	_mesh_instance = MeshInstance3D.new()
-	_mesh_instance.name = "Body"
-	_mesh_instance.mesh = _mesh
-	_mesh_instance.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_ON
-	_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
-	_mesh_instance.material_override = _material
-	add_child(_mesh_instance)
+	var scene := load(model_scene_path) as PackedScene
+	if scene == null:
+		push_warning("Collector '%s': could not load %s; no body." % [name, model_scene_path])
+		return
+	_model = scene.instantiate() as Node3D
+	_model.name = "Model"
+	_model.scale = Vector3.ONE * model_scale
+	add_child(_model)
+	_material = PaintedProp.material(colour_map_path, tint)
+	_fog = null
+	if _material != null:
+		_fog = PaintedProp.fog_pass()
+		_material.next_pass = _fog
+	else:
+		_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
+		_apply_tint()
+	_aabb = PaintedProp.dress_model(_model, _material, self)
+	if _aabb.size == Vector3.ZERO:
+		return
+	_model.position.y -= _aabb.position.y
+	_aabb.position.y = 0.0
 	_collision_body = StaticBody3D.new()
 	_collision_body.name = "Collision"
 	# RegionField's freeze would otherwise take the body out of the
 	# physics space (the trough's reason).
 	_collision_body.disable_mode = CollisionObject3D.DISABLE_MODE_MAKE_STATIC
-	_collision_shape = CapsuleShape3D.new()
-	_collision_node = CollisionShape3D.new()
-	_collision_node.shape = _collision_shape
-	_collision_body.add_child(_collision_node)
+	# Along the body's Z, end to end over the box's length, its radius the
+	# box's widest half - the legs, the packs and the tail inside it.
+	var capsule := CapsuleShape3D.new()
+	capsule.radius = maxf(_aabb.size.x * 0.5, 0.01)
+	capsule.height = maxf(_aabb.size.z, capsule.radius * 2.0)
+	var shape_node := CollisionShape3D.new()
+	shape_node.shape = capsule
+	var centre: Vector3 = _aabb.get_center()
+	shape_node.transform = Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(centre.x, capsule.radius, centre.z))
+	_collision_body.add_child(shape_node)
 	add_child(_collision_body)
-	_apply_body()
-	_apply_tint()
 
-# A capsule of body_height across, body_length end to end, lying along
-# the body's own Z (its facing axis), its underside on the origin.
-func _apply_body() -> void:
-	var radius: float = maxf(body_height, 0.01) * 0.5
-	var length: float = maxf(body_length, radius * 2.0)
-	var lying := Transform3D(Basis(Vector3.RIGHT, PI * 0.5), Vector3(0.0, radius, 0.0))
-	if _mesh != null:
-		_mesh.radius = radius
-		_mesh.height = length
-		_mesh_instance.transform = lying
-	if _collision_shape != null:
-		_collision_shape.radius = radius
-		_collision_shape.height = length
-		_collision_node.transform = lying
+# A new model, colour map or scale: the body, its capsule and its pool
+# again.
+func _rebuild_body() -> void:
+	if not is_inside_tree():
+		return
+	if _model != null:
+		_model.free()
+		_model = null
+	if _collision_body != null:
+		_collision_body.free()
+		_collision_body = null
+	_spawn_body()
+	_push_fog()
+	_apply_shadow_footprint()
 
+# A painted material's albedo_tint, the flat fallback's albedo_color.
 func _apply_tint() -> void:
-	if _material != null:
-		_material.albedo_color = tint
+	if _material is ShaderMaterial:
+		(_material as ShaderMaterial).set_shader_parameter("albedo_tint", tint)
+	elif _material is BaseMaterial3D:
+		(_material as BaseMaterial3D).albedo_color = tint
+
+func _push_fog() -> void:
+	PaintedProp.push_fog(_fog, _sky, fog_factor)
+
+# The pool's radii: the box's half-extents across and along the body.
+func _apply_shadow_footprint() -> void:
+	if _contact_shadow != null and _aabb.size != Vector3.ZERO:
+		_contact_shadow.footprint = Vector2(_aabb.size.x, _aabb.size.z) * 0.5
+
+# Under the middle of the box, at its feet (ContactShadow.feet_source).
+func _contact_feet() -> Vector3:
+	var centre: Vector3 = _aabb.get_center()
+	return global_transform * Vector3(centre.x, 0.0, centre.z)
 
 # The walk-up and the click (PropApproach): the line near the body once
 # per visit; a click on the body in reach asks to open.
@@ -296,15 +361,14 @@ func price_of(card: CardData) -> int:
 
 func _say(text: String) -> void:
 	if _approach != null:
-		_approach.say_near(text, hold_seconds, fade_seconds, self, Vector3.UP * (body_height + line_clearance_m))
+		_approach.say_near(text, hold_seconds, fade_seconds, self, Vector3.UP * (_aabb.end.y + line_clearance_m))
 
-# The body's box on screen, grown by padding_px - TroughProp.get_screen_
+# The model's box on screen, grown by padding_px - TroughProp.get_screen_
 # rect()'s padded rect.
 func get_screen_rect(camera: Camera3D, padding_px: float) -> Rect2:
-	if camera == null or not is_inside_tree():
+	if camera == null or not is_inside_tree() or _aabb.size == Vector3.ZERO:
 		return Rect2()
-	var half_length: float = maxf(body_length, body_height) * 0.5
-	var box := AABB(Vector3(-body_height * 0.5, 0.0, -half_length), Vector3(body_height, body_height, half_length * 2.0))
+	var box: AABB = _aabb
 	var to_world: Transform3D = global_transform
 	var rect := Rect2()
 	for i in 8:
