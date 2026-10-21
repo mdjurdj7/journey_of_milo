@@ -1,0 +1,25 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+[ext_resource type="Resource" path="res://battle/rules/statuses/wrested.tres" id="3_wrested"]
+[ext_resource type="Resource" path="res://cards/tempered/wrest_tempered.tres" id="10_tempered"]
+
+[sub_resource type="Resource" id="E_take"]
+script = ExtResource("2_card_effect")
+effect_type = 31
+value = 8
+status_data = ExtResource("3_wrested")
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Wrest"
+cost = 2
+card_type = 1
+rarity = 1
+target_type = 0
+description = "Take up to {take} from an attack.
+Gain that much Block."
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_take")])
+tempered = ExtResource("10_tempered")
+card_class = &"wanderer"
