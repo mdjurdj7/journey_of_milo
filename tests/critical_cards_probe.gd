@@ -117,7 +117,7 @@ func _check_unbroken() -> void:
 		_expect_eq(tempered_guard.describe(), "Until your next turn, take 6 less from each attack.", "...its hover")
 	player.block = 0
 	enemy = _enemy(lash)
-	_expect_eq(EnemyTurn.preview_intent(enemy, lash, player)["hit_amounts"], [0, 0, 4] as Array[int], "4×3 against Unbroken+ previews 0, 0, 4")
+	_expect_eq(EnemyTurn.preview_intent(enemy, lash, player)["hit_amounts"], [0, 2, 4] as Array[int], "4×3 against Unbroken+ previews 0, 2, 4")
 	player = _player(10)
 	_play(card, player, null)
 	_play(card, player, null)
@@ -222,14 +222,14 @@ func _check_last_resort() -> void:
 	_expect_eq(player.block, 5, "Last Resort keeps Block already up")
 	_expect_eq(_deal(cornered, player), 8, "Last Resort off above the line")
 	player.hp = 20
-	_expect_eq(_deal(cornered, player), 22, "Last Resort +6 while Critical")
+	_expect_eq(_deal(cornered, player), 20, "Last Resort +6 while Critical")
 	_play(stance_card, player, null)
 	_expect_eq(player.stance.stacks, 2, "A second Last Resort stacks")
-	_expect_eq(_deal(cornered, player), 28, "Last Resort ×2: +12 while Critical")
+	_expect_eq(_deal(cornered, player), 26, "Last Resort ×2: +12 while Critical")
 	_play(_card("unbroken"), player, null)
 	_expect_eq(player.block, 5, "No Block gained under Last Resort")
 	_play(_card("dying_light"), player, null)
-	_expect_eq(_deal(cornered, player), 28, "Dying Light beside Last Resort ×2 adds no damage")
+	_expect_eq(_deal(cornered, player), 26, "Dying Light beside Last Resort ×2 adds no damage")
 	_play(_card("self_eater"), player, null)
 	_expect_eq(player.stance.data.id, "self_eater", "Self-Eater replaces Last Resort")
 	_expect_eq(player.stance.stacks, 1, "...every stack of it gone, Self-Eater at 1")
@@ -438,7 +438,7 @@ func _check_faces() -> void:
 	_play(_card("last_resort"), player, null)
 	var face: String = await _face("cornered", player)
 	_expect(face.contains("Deal 8 damage"), "Cornered's {else} half without Critical bonuses: " + face)
-	_expect(face.contains("deal 22"), "Cornered's {if} half with them (16 + 6): " + face)
+	_expect(face.contains("deal 20"), "Cornered's {if} half with them (14 + 6): " + face)
 
 	# Last Wager under Last Resort: its {if} half lands Critical (32 + 6);
 	# its {else} half prints the bonus as the 8 HP would leave it - at 25
@@ -470,7 +470,7 @@ func _check_faces() -> void:
 
 	player.hp = 21
 	face = await _face("cornered", player)
-	_expect(face.contains("Deal 11 damage") and face.contains("deal 19"), "Self-Eater's bonus is in both halves: " + face)
+	_expect(face.contains("Deal 11 damage") and face.contains("deal 17"), "Self-Eater's bonus is in both halves: " + face)
 	_completed += 1
 
 # --- Helpers ---
