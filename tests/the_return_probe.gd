@@ -14,7 +14,7 @@ extends SceneTree
 
 const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
-const CASES := 18
+const CASES := 19
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const BELONGINGS_POOL_PATH := "res://cards/pools/belongings_pool.tres"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
@@ -49,6 +49,7 @@ func _initialize() -> void:
 	_check_blood_arc_order()
 	_check_stance_price_counts()
 	_check_real_self_damage_cards()
+	_check_blood_advance_counts_once()
 	_check_drain_card_effect()
 	_check_pool()
 	if _completed != CASES:
@@ -264,6 +265,16 @@ func _check_real_self_damage_cards() -> void:
 	player.hp = 1
 	_play(_card("down_payment"), player, [enemy])
 	_expect_eq(_labels(player), [_label(3 % COUNT)] as Array[String], "...Down Payment at 1 HP loses nothing and counts nothing")
+	_completed += 1
+
+# Blood Advance's loss is one SELF_DAMAGE_TOLL effect, as Down Payment's
+# is: one loss on the counter, and its Toll the card's total, no more.
+func _check_blood_advance_counts_once() -> void:
+	var player: Combatant = _armed(50)
+	var card: CardData = _card("blood_advance")
+	_play(card, player, [_enemy(100)])
+	_expect_eq(_labels(player), [_label(1 % COUNT)] as Array[String], "Blood Advance counts once: one self-inflicted loss")
+	_expect_eq(player.toll, card.effects[0].toll_gain, "...and makes exactly its Toll in total")
 	_completed += 1
 
 # Drain as a card effect, for a later card: the same rule, with no counter.

@@ -15,7 +15,6 @@ armored_contact_probe 13 slow
 belongings_choice_probe 50 slow
 bide_probe 50 slow
 blackback_probe 58 slow
-blood_advance_probe 14 slow
 bundle_roll_probe 3 fast
 card_rarity_finish_probe 13 fast
 card_rarity_probe 12 fast
