@@ -68,7 +68,7 @@ static func is_interrupted(combatant: Combatant, intent: EnemyIntent) -> bool:
 # "buried" in the result when that is a BURROW. A BURROW resolving does
 # nothing and ends the burial: "surfaced".
 static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "block_cleared": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "phase_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "delayed": false, "blocked": 0, "absorbed": 0, "applied_to_player": 0}
+	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "defended": false, "block_gained": 0, "block_cleared": 0, "grace_opened": 0, "interrupted": false, "buried": false, "surfaced": false, "countdown_damage": 0, "pain_turn": false, "pain_turn_triggered": false, "phase_triggered": false, "heal_allies": 0, "saved_heal": 0, "denied": false, "delayed": false, "blocked": 0, "absorbed": 0, "tolled": 0, "applied_to_player": 0}
 
 	# Its Block is gone as its own turn starts, as the player's is at
 	# theirs (BattleController._start_player_turn()): what a Defend gained
@@ -177,7 +177,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 					# what came back off its last attack (hit_back_damage).
 					if player.hp <= 0 or combatant.hp <= 0:
 						break
-					var attack: Dictionary = {"intent": result["intent"], "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "applied_to_player": 0, "mark_numbers": mark_numbers}
+					var attack: Dictionary = {"intent": result["intent"], "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "tolled": 0, "applied_to_player": 0, "mark_numbers": mark_numbers}
 					land_attack(combatant, data, intent, player, attack, intent.lands_as_strike_back, action > 0)
 					# What the attack leaves on the player (the Adder's Venom)
 					# lands whatever its hits did - Block taking all of them too.
@@ -187,7 +187,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 					actions.append(attack)
 					result["attacked"] = true
 					(result["hits"] as Array).append_array(attack["hits"])
-					for key: String in ["damage_to_hp", "grace_opened", "saved_heal", "blocked", "absorbed", "applied_to_player"]:
+					for key: String in ["damage_to_hp", "grace_opened", "saved_heal", "blocked", "absorbed", "tolled", "applied_to_player"]:
 						result[key] += attack[key]
 				result["actions"] = actions
 			EnemyIntent.IntentType.DEFEND:
@@ -341,6 +341,8 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 		# What the player's block and absorb took, for the run log.
 		result["blocked"] += damage_result["blocked"]
 		result["absorbed"] += damage_result["absorbed"]
+		# What Toll paid of it (Thick Skin - DamagePipeline.resolve()).
+		result["tolled"] = int(result.get("tolled", 0)) + int(damage_result["tolled"])
 		# Saved, what reached HP is what was actually lost - the number the
 		# run's HP, the floating number and Grace all take from here - and a
 		# save that left them higher than before the hit (survive HP over
@@ -356,7 +358,7 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 			result["saved_heal"] += saved
 		total_to_hp += to_hp
 		largest_hit = maxi(largest_hit, to_hp)
-		(result["hits"] as Array).append({"damage": amount, "blocked": damage_result["blocked"], "absorbed": damage_result["absorbed"], "to_hp": to_hp, "saved_heal": saved})
+		(result["hits"] as Array).append({"damage": amount, "blocked": damage_result["blocked"], "absorbed": damage_result["absorbed"], "tolled": damage_result["tolled"], "to_hp": to_hp, "saved_heal": saved})
 	# The attack has resolved, every hit of it: a status that lasted only
 	# until then (Braced on this enemy) is spent - even if the player's
 	# block ate all of it.
@@ -415,7 +417,7 @@ static func counter_strike(combatant: Combatant, data: EnemyData, player: Combat
 	var strike := EnemyIntent.new()
 	strike.intent_name = coiled.data.display_name
 	strike.value = coiled.magnitude
-	var result: Dictionary = {"intent": strike.intent_name, "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0}
+	var result: Dictionary = {"intent": strike.intent_name, "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "tolled": 0}
 	land_attack(combatant, data, strike, player, result, true)
 	return result
 
@@ -544,6 +546,8 @@ static func preview_intent(combatant: Combatant, data: EnemyData, player: Combat
 static func simulate_hits(player: Combatant, amounts: Array[int]) -> Dictionary:
 	var block: int = player.block
 	var absorb: int = player.absorb
+	# Toll pays what's past them while Thick Skin is up (DamagePipeline).
+	var toll: int = maxi(player.toll, 0) if Status.toll_payer(player.statuses) != null else 0
 	var hp: int = player.hp
 	var saves_used: int = 0
 	var total_to_hp: int = 0
@@ -551,11 +555,13 @@ static func simulate_hits(player: Combatant, amounts: Array[int]) -> Dictionary:
 		var blocked: int = mini(block, amount)
 		var after_block: int = amount - blocked
 		var absorbed: int = mini(absorb, after_block)
+		var tolled: int = mini(toll, after_block - absorbed)
 		block -= blocked
 		absorb -= absorbed
-		total_to_hp += after_block - absorbed
+		toll -= tolled
+		total_to_hp += after_block - absorbed - tolled
 		var was_critical: bool = player.is_critical_at(hp)
-		hp -= after_block - absorbed
+		hp -= after_block - absorbed - tolled
 		if hp <= 0:
 			var guard: Status = Status.lethal_guard(player.statuses, was_critical)
 			if guard != null and saves_used < guard.charges:
@@ -569,7 +575,7 @@ static func simulate_hits(player: Combatant, amounts: Array[int]) -> Dictionary:
 # whether the worn piece's first hit is spent, Block, absorb, HP and the
 # lethal guard's saves used so far.
 static func turn_state(player: Combatant) -> Dictionary:
-	return {"statuses": Status.clones(player.statuses), "first_hit_spent": player.first_hit_spent, "block": player.block, "absorb": player.absorb, "hp": player.hp, "saves_used": 0}
+	return {"statuses": Status.clones(player.statuses), "first_hit_spent": player.first_hit_spent, "block": player.block, "absorb": player.absorb, "toll": player.toll, "hp": player.hp, "saves_used": 0}
 
 static func copy_state(state: Dictionary) -> Dictionary:
 	var copy: Dictionary = state.duplicate()
@@ -605,9 +611,14 @@ static func replay_attack(attacker: Combatant, data: EnemyData, intent: EnemyInt
 		var absorbed: int = mini(int(state["absorb"]), after_block)
 		state["block"] = int(state["block"]) - blocked
 		state["absorb"] = int(state["absorb"]) - absorbed
+		# Toll pays what's past them (Thick Skin), as DamagePipeline does.
+		var tolled: int = 0
+		if Status.toll_payer(theirs) != null:
+			tolled = mini(maxi(int(state.get("toll", 0)), 0), after_block - absorbed)
+			state["toll"] = int(state.get("toll", 0)) - tolled
 		var hp: int = int(state["hp"])
 		var was_critical: bool = player.is_critical_at(hp)
-		hp -= after_block - absorbed
+		hp -= after_block - absorbed - tolled
 		if hp <= 0:
 			var guard: Status = Status.lethal_guard(theirs, was_critical)
 			if guard != null and int(state["saves_used"]) < guard.charges:
@@ -1008,7 +1019,7 @@ static func leave_pack(combatant: Combatant, data: EnemyData) -> bool:
 # for its own turn are left alone. take_turn()'s attack keys; "attacked"
 # false when it has no attack to answer with.
 static func answer_signal(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
-	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "applied_to_player": 0}
+	var result: Dictionary = {"intent": "", "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "tolled": 0, "applied_to_player": 0}
 	var intent: EnemyIntent = signal_answer_intent(combatant, data)
 	if intent == null or combatant.hp <= 0 or player.hp <= 0:
 		return result

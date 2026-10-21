@@ -1890,6 +1890,11 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 			CardEffect.EffectType.TOLL_RETALIATE, \
 			CardEffect.EffectType.SELF_DAMAGE_TOLL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_FRACTION_DAMAGE_ALL, 			CardEffect.EffectType.TOLL_HEAL, CardEffect.EffectType.SPEND_TOLL:
 				return KeylineType.TOLL
+			# A status that has Toll pay for damage (Thick Skin) is a Toll
+			# card, whatever Block comes with it.
+			CardEffect.EffectType.APPLY_STATUS:
+				if effect.status_data != null and effect.status_data.toll_pays_damage:
+					return KeylineType.TOLL
 	# Read off card_type, not off the effect: a stance is a stance because
 	# of what it LEAVES BEHIND, and the effect that applies it is the same
 	# APPLY_STANCE whatever the stance does.

@@ -643,6 +643,14 @@ static func take_extra_turn(statuses: Array[Status]) -> bool:
 		return true
 	return false
 
+# The status that has damage past Block take its holder's Toll first
+# (StatusData.toll_pays_damage - Thick Skin), or null.
+static func toll_payer(statuses: Array[Status]) -> Status:
+	for active in statuses:
+		if active.data != null and active.data.toll_pays_damage:
+			return active
+	return null
+
 # Whether an Attack played now Drains (StatusData.attacks_drain).
 static func attacks_drain(statuses: Array[Status]) -> bool:
 	for active in statuses:

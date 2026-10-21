@@ -323,6 +323,16 @@ enum Mark { NONE, COIL, DROP }
 # one more, and DURATION_UNTIL_REMOVED.
 @export var grants_extra_turn: bool = false
 
+# While its holder has it, damage that gets past their Block and absorb
+# takes their Toll first, 1 for 1, and only the rest reaches HP (Thick
+# Skin - DamagePipeline.resolve()): enemy hits, strike backs included.
+# Never their own HP loss - self-damage, a stance's price, a status tick
+# go round the pipeline (apply_bypass()). Toll taken this way is spent
+# (Reckoning counts it, Gnaw's "spent this turn" sees it) but hurries no
+# Sentence - that is a card's spend's alone. On a card face it reads as
+# Toll (CardView's keyline).
+@export var toll_pays_damage: bool = false
+
 # While this is up, every Attack card the player plays Drains: after its
 # last effect it heals ransom_heal_fraction of the HP its hits took from
 # enemies, rounded down - not a killing blow's overkill, and less

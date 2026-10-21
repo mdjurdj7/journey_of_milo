@@ -333,6 +333,9 @@ var _card_count_draw_used: bool = false
 # hp(). And whether the hit reporting now is one of an attack's several
 # (is_multi_hit_report()).
 var _hp_owed: int = 0
+# The Toll an attack's hits have taken (Thick Skin) but not yet reported:
+# the readout drops hit by hit, as the HP bar does (_report_enemy_hit()).
+var _toll_owed: int = 0
 # Packmates a SIGNAL woke this enemy turn (_answer_signal()) - their
 # answer was their turn. Cleared as each enemy turn begins.
 var _signal_woken: Dictionary = {}
@@ -2256,12 +2259,17 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 	if enemy.enemy_data != null:
 		RunLogger.enemy_attack(enemy.enemy_data.resource_path.get_file().get_basename(), result["intent"], result["hits"])
 	var hits: Array = result.get("hits", [])
+	_toll_owed = 0
+	for hit: Variant in hits:
+		_toll_owed += int((hit as Dictionary).get("tolled", 0))
 	for i in hits.size():
 		if i > 0 and enemy_hit_interval > 0.0:
 			await get_tree().create_timer(enemy_hit_interval).timeout
 			if not is_instance_valid(enemy):
+				_toll_owed = 0
 				return
 		_report_enemy_hit(enemy, hits[i] as Dictionary, hits.size() > 1)
+	_toll_owed = 0
 	_report_entry_block()
 	if result["grace_opened"] > 0:
 		RunLogger.grace_opened(result["grace_opened"])
@@ -2280,19 +2288,24 @@ func _report_enemy_attack(enemy: FieldEnemy, result: Dictionary) -> void:
 			_report_damage("player", combatant, hit_back, "hit_back")
 
 # One hit of an enemy's attack (`multi`: one of several): what reached HP
-# as its own report, or - Block or absorb having taken it whole -
-# player_hit_blocked. A lethal guard that left the player above where the
+# as its own report, or - Block, absorb or Toll (Thick Skin) having taken
+# it whole - player_hit_blocked. Toll it took drops the readout now, hit
+# by hit. A lethal guard that left the player above where the
 # hit found them (Refuse the End's survive HP) lifts the run's HP after
 # it, the way a card's heal does - HP only, no Toll - in the fight's
 # order: all the loss first would stop the run's HP at 0 and lose the
 # later hits.
 func _report_enemy_hit(enemy: FieldEnemy, hit: Dictionary, multi: bool) -> void:
 	var to_hp: int = int(hit["to_hp"])
+	var tolled: int = int(hit.get("tolled", 0))
 	_multi_hit_report = multi
+	if tolled > 0:
+		_toll_owed = maxi(_toll_owed - tolled, 0)
+		toll_changed.emit(player.toll + _toll_owed)
 	if to_hp > 0:
 		_hp_owed -= to_hp
 		_report_damage(enemy, player, to_hp, "attack")
-	elif int(hit["damage"]) > 0 and int(hit["blocked"]) + int(hit["absorbed"]) > 0:
+	elif int(hit["damage"]) > 0 and int(hit["blocked"]) + int(hit["absorbed"]) + tolled > 0:
 		player_hit_blocked.emit(enemy)
 	_multi_hit_report = false
 	var lift: int = int(hit.get("saved_heal", 0))
