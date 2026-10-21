@@ -95,8 +95,9 @@ func _check_data() -> void:
 	_expect_eq(bereft.gained_line, "The other keeps dancing.", "...and its line")
 	_completed += 1
 
-# Loaded: both stand on walkable ground - inside floor 3's ledge lines,
-# across none - with their feet on the ground under them.
+# Loaded: both stand on walkable ground - inside floor 3's ledge lines
+# (every loop that holds spawn, none that doesn't), across none - with
+# their feet on the ground under them.
 func _check_standing() -> void:
 	await _load_floor_3()
 	var ground: Node = _field.get_node("Ground")
@@ -109,7 +110,7 @@ func _check_standing() -> void:
 			continue
 		var at := Vector2(body.global_position.x, body.global_position.z)
 		for ledge: PackedVector2Array in ledges:
-			_expect(Geometry2D.is_point_in_polygon(at - Vector2(spawn.x, spawn.z), ledge), "%s inside floor 3's ledge lines" % path.get_file())
+			_expect(Geometry2D.is_point_in_polygon(at - Vector2(spawn.x, spawn.z), ledge) == Geometry2D.is_point_in_polygon(Vector2.ZERO, ledge), "%s inside floor 3's ledge lines" % path.get_file())
 		var bed: float = float(ground.call("get_height_at", at))
 		_expect(absf(body.global_position.y - bed) < 0.05, "...its feet on the ground under it (%.2f vs %.2f)" % [body.global_position.y, bed])
 	await _teardown()

@@ -186,7 +186,9 @@ func _check_others_untouched() -> void:
 	_completed += 1
 
 # Floor 3 places the Wardling - in a slot of its own, optional - inside
-# the floor's ledge lines. Where it stands is not this probe's to say.
+# the floor's ledge lines: inside every loop that holds spawn and outside
+# every loop that doesn't (a hole - the ridges the rim trail rings), as
+# ledge_nav_probe reads them. Where it stands is not this probe's to say.
 func _check_floor_3() -> void:
 	var floor_data := load(FLOOR_3_PATH) as FloorData
 	var found: bool = false
@@ -199,7 +201,7 @@ func _check_floor_3() -> void:
 				_expect(not slot.required, "Floor 3's Wardling is optional")
 				var at: Vector2 = slot.to_floor(member.position)
 				for ledge: PackedVector2Array in floor_data.ledges:
-					_expect(Geometry2D.is_point_in_polygon(at, ledge), "...inside the floor's ledge lines (%s)" % at)
+					_expect(Geometry2D.is_point_in_polygon(at, ledge) == Geometry2D.is_point_in_polygon(Vector2.ZERO, ledge), "...inside the floor's ledge lines (%s)" % at)
 	_expect(found, "Floor 3 places the Wardling")
 	_completed += 1
 

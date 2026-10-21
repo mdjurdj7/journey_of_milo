@@ -48,7 +48,8 @@ func _initialize() -> void:
 
 # Floors 1-3: no override, the derived three points from spawn to the
 # gate; an override, every point of it, in order. Where ledge lines are,
-# the band's curve stays inside them.
+# the band's curve stays inside them - inside every loop that holds spawn,
+# outside every loop that doesn't.
 func _check_three_point_floors() -> void:
 	for index in 3:
 		await _load_field(index)
@@ -69,7 +70,7 @@ func _check_three_point_floors() -> void:
 		var outside: int = 0
 		for p in _drawn_curve(points.slice(0, _count())):
 			for ledge: PackedVector2Array in ledges:
-				if not Geometry2D.is_point_in_polygon(p - Vector2(spawn.x, spawn.z), ledge):
+				if Geometry2D.is_point_in_polygon(p - Vector2(spawn.x, spawn.z), ledge) != Geometry2D.is_point_in_polygon(Vector2.ZERO, ledge):
 					outside += 1
 		_expect_eq(outside, 0, "Floor %d: the band's curve inside the floor's ledge lines" % (index + 1))
 		await _teardown()
