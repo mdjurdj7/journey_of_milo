@@ -38,8 +38,8 @@ world_line = "A wagon, unhitched. The tools are still on it."
 [sub_resource type="Resource" id="FloorProp_handcart"]
 script = ExtResource("13_floor_prop")
 scene = ExtResource("16_handcart")
-position = Vector3(-5.82, 0, -28.63)
-yaw_degrees = -6.0
+position = Vector3(-11.1, 0, -21.5)
+yaw_degrees = 84.0
 roll_degrees = 2.5
 
 [sub_resource type="Resource" id="FloorEnemy_strawcrown"]
