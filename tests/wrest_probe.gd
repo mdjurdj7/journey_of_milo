@@ -263,17 +263,21 @@ func _check_strike_back() -> void:
 	_expect(_wrested(enemy) != null and _wrested(enemy).magnitude == taken, "...and Wrested stays for its Bite")
 	_completed += 1
 
-# Last Resort forbids Block: Wrest gives none - and still takes off the
-# attack.
+# Last Resort forbids Block while Critical: above the line Wrest gives its
+# Block as ever; under it none - and still takes off the attack.
 func _check_no_block_stance() -> void:
 	var data: EnemyData = load(UNDERFOOT_PATH)
 	var raw: Array[int] = _hits(data, "Sting")
-	var enemy: Combatant = _enemy(data, "Sting")
+	var taken: int = mini(_take, _sum(raw))
 	var player: Combatant = _player(60)
 	_play_on(load(LAST_RESORT_PATH), player, null)
+	_wrest(player, _enemy(data, "Sting"))
+	_expect_eq(player.block, taken, "Under Last Resort above the line: %d Block" % taken)
+	var enemy: Combatant = _enemy(data, "Sting")
+	player = _player(20)
+	_play_on(load(LAST_RESORT_PATH), player, null)
 	_wrest(player, enemy)
-	_expect_eq(player.block, 0, "Under Last Resort: no Block")
-	var taken: int = mini(_take, _sum(raw))
+	_expect_eq(player.block, 0, "Under Last Resort while Critical: no Block")
 	_expect(_wrested(enemy) != null and _wrested(enemy).magnitude == taken, "...the Sting still Wrested %d" % taken)
 	_expect_attack(enemy, data, player, _absorb(raw, taken), "Sting, Wrested under Last Resort")
 	_completed += 1

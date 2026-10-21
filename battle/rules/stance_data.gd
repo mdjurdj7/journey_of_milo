@@ -49,13 +49,15 @@ class_name StanceData
 # whole stance's timer rather than tracking its own.
 @export var duration_turns: int = 0
 
-# The attack bonus only while the player is Critical (Last Resort) - off
-# the moment HP climbs back over the line, on again when it drops. Read
-# when the attack lands (see AttackBonus). The HP loss above is never
-# gated: a price is a price.
+# The attack bonus - and the Block refusal below - only while the player
+# is Critical (Last Resort): off the moment HP climbs back over the line,
+# on again when it drops. Read when the attack lands (see AttackBonus) and
+# when Block would be gained. The HP loss above is never gated: a price
+# is a price.
 @export var bonus_requires_critical: bool = false
 
-# While held, the player gains no Block from anything - every player
-# Block gain goes through EffectContext.gain_block(), which asks. Block
-# already up when the stance is taken stays.
+# While held - and Critical, under bonus_requires_critical - the player
+# gains no Block from anything: every player Block gain goes through
+# EffectContext.gain_block(), which asks (Stance.prevents_block_gain()).
+# Block already up stays.
 @export var prevents_block_gain: bool = false

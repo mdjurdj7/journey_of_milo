@@ -107,7 +107,7 @@ static func state(card: CardData, ctx: EffectContext) -> State:
 	for effect in card.effects:
 		if effect != null and effect.effect_type == CardEffect.EffectType.TOLL_BLOCK and ctx.player != null:
 			has_condition = true
-			if TollBlockEffect.pays(effect, ctx.player.toll, ctx.player.stance):
+			if TollBlockEffect.pays(effect, ctx.player.toll, ctx.player.stance, ctx.player.is_critical_at(ctx.player.hp - ctx.preview_hp_cost)):
 				return State.LIVE
 			continue
 		if not previewable(effect):

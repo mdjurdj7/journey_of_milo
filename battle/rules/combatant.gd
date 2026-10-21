@@ -390,7 +390,7 @@ func resolve_critical_entry() -> int:
 	var amount: int = critical_entry_block
 	critical_entry_block = 0
 	critical_entry_armed = false
-	if Stance.prevents_block_gain(stance):
+	if Stance.prevents_block_gain(stance, is_critical()):
 		return 0
 	block += amount
 	RunLogger.block_gained(amount)

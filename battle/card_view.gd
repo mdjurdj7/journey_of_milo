@@ -830,10 +830,14 @@ func _resolve_tokens(description: String) -> String:
 				bonus_damage += _attack_bonus_for_half(true)
 			bonus_damage = _landed(bonus_damage, _damage_reaches_all(true))
 			text = text.replace(TOKEN_ALT_DAMAGE, str(bonus_damage)).replace(TOKEN_BONUS_DAMAGE, str(bonus_damage))
-	# Under a stance that forbids Block (Last Resort) every Block number
-	# reads 0 - what EffectContext.gain_block() will actually give. The
-	# card's own data is untouched.
-	var no_block: bool = Stance.prevents_block_gain(_stance)
+	# Under a stance that forbids Block (Last Resort, while Critical at the
+	# HP this card leaves - as _attack_bonus_preview() judges it) every
+	# Block number reads 0 - what EffectContext.gain_block() will actually
+	# give. The card's own data is untouched.
+	var critical: bool = false
+	if _bonus_context != null and _bonus_context.player != null:
+		critical = _bonus_context.player.is_critical_at(_bonus_context.player.hp - _upfront_hp_cost())
+	var no_block: bool = Stance.prevents_block_gain(_stance, critical)
 	if text.contains(TOKEN_BLOCK):
 		var block: int = _effect_value(card_data, BLOCK_EFFECT_TYPES)
 		if block >= 0:

@@ -63,9 +63,13 @@ static func attack_bonus(stance: Stance, critical: bool) -> int:
 		return 0
 	return stance.data.attack_damage_bonus * stance.stacks
 
-# Whether the stance held forbids gaining Block (Last Resort).
-static func prevents_block_gain(stance: Stance) -> bool:
-	return stance != null and stance.data != null and stance.data.prevents_block_gain
+# Whether the stance held forbids gaining Block now (Last Resort) - gated
+# on Critical as attack_bonus() is: false when the stance wants Critical
+# and `critical` says the player isn't. Block already held is never taken.
+static func prevents_block_gain(stance: Stance, critical: bool) -> bool:
+	if stance == null or stance.data == null or not stance.data.prevents_block_gain:
+		return false
+	return critical or not stance.data.bonus_requires_critical
 
 # HP playing an Attack costs, all stacks counted.
 static func attack_hp_loss(stance: Stance) -> int:

@@ -185,9 +185,10 @@ func spend_toll(amount: int) -> int:
 	return spent
 
 # Every Block the player gains goes through here, so a stance that
-# forbids it (Last Resort) is asked in one place. Returns what was gained.
+# forbids it (Last Resort, while Critical - read live, here) is asked in
+# one place. Returns what was gained.
 func gain_block(amount: int) -> int:
-	if amount <= 0 or Stance.prevents_block_gain(player.stance):
+	if amount <= 0 or Stance.prevents_block_gain(player.stance, player.is_critical()):
 		return 0
 	player.block += amount
 	RunLogger.block_gained(amount)
