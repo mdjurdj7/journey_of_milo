@@ -951,7 +951,11 @@ func _draw_line(index: int) -> void:
 func _draw_voice() -> void:
 	if _voice_font == null:
 		return
-	var lines: Array[String] = [purchase_line] if _purchase_left > 0.0 else [open_line, second_line]
+	var lines: Array[String] = []
+	if _purchase_left > 0.0:
+		lines.append(purchase_line)
+	else:
+		lines.append_array([open_line, second_line])
 	var pitch: float = float(_voice_px) + _px(voice_line_gap_px)
 	var anchor: Vector2 = _body_anchor()
 	var margin: float = _px(voice_margin_px)
