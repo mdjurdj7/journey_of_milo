@@ -178,7 +178,7 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 					if player.hp <= 0 or combatant.hp <= 0:
 						break
 					var attack: Dictionary = {"intent": result["intent"], "hits": [], "attacked": false, "damage_to_hp": 0, "grace_opened": 0, "saved_heal": 0, "blocked": 0, "absorbed": 0, "applied_to_player": 0, "mark_numbers": mark_numbers}
-					land_attack(combatant, data, intent, player, attack, intent.lands_as_strike_back)
+					land_attack(combatant, data, intent, player, attack, intent.lands_as_strike_back, action > 0)
 					# What the attack leaves on the player (the Adder's Venom)
 					# lands whatever its hits did - Block taking all of them too.
 					if intent.applies_to_player != null and intent.applied_amount > 0:
@@ -279,7 +279,11 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 # Siltjaw's Erupt) - the statuses that wait for the enemy's own turn
 # (StatusData.ignores_strike_backs: Braced, Garnished, No Further's armed,
 # Unbroken's) neither soften it nor are spent by it.
-static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyIntent, player: Combatant, result: Dictionary, strike_back: bool = false) -> void:
+#
+# `repeat_action`: a second action of an intent carried out twice (Bereft)
+# - the marks that cut a total (Status.total_marks() - Garnished, Wrested)
+# cut the first action only, so this one reads its statuses without them.
+static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyIntent, player: Combatant, result: Dictionary, strike_back: bool = false, repeat_action: bool = false) -> void:
 	result["attacked"] = true
 	var total_to_hp: int = 0
 	# Tracked per hit as well as summed, because Grace's LARGEST_HIT cap is
@@ -290,6 +294,8 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 	# player), soaked hit by hit.
 	# A strike back reads neither (Status.strike_back_view()).
 	var own_statuses: Array[Status] = Status.strike_back_view(combatant.statuses) if strike_back else combatant.statuses
+	if repeat_action:
+		own_statuses = Status.without(own_statuses, Status.total_marks(own_statuses))
 	var player_statuses: Array[Status] = Status.strike_back_view(player.statuses) if strike_back else player.statuses
 	var reduction_left: int = Status.attack_total_reduction(own_statuses) + Status.attack_total_reduction(player_statuses)
 	# What lives on the intent (StatusData.intent_mark - Braced, Garnished;
@@ -646,15 +652,16 @@ static func repeats(combatant: Combatant, intent: EnemyIntent) -> int:
 	return Status.intent_repeats(combatant.statuses)
 
 # The enemy as a repeated attack after its first finds it: its own
-# statuses spent by an attack (StatusData.consumed_by_own_attack - Braced,
-# Garnished) gone, the rest as they are - a copy, for the preview to read
-# the next attack's hits off without touching the real one.
+# statuses spent by an attack (StatusData.consumed_by_own_attack) gone,
+# and the marks that cut the first action's total (Status.total_marks() -
+# Garnished, Wrested), the rest as they are - a copy, for the preview to
+# read the next attack's hits off without touching the real one.
 static func _after_own_attack(combatant: Combatant, data: EnemyData, intent: EnemyIntent) -> Combatant:
 	var shadow := Combatant.new(combatant.max_hp)
 	shadow.hp = combatant.hp
 	shadow.critical_hp_fraction = combatant.critical_hp_fraction
 	shadow.turns_taken = combatant.turns_taken
-	shadow.statuses = combatant.statuses.duplicate()
+	shadow.statuses = Status.without(combatant.statuses, Status.total_marks(combatant.statuses))
 	Status.consume_after_attack(shadow.statuses, held_back(data, intent))
 	return shadow
 

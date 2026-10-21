@@ -12,10 +12,10 @@ class_name TakeFromAttackEffect
 # gives none). The Block stays whatever later changes the attack: it is
 # what Wrest took when played.
 #
-# An intent carried out twice (Bereft) loses a mark's total on each
-# action, as Garnish's 5 comes off each of its two Scissors - so what Wrest
-# takes is read off the first action, and the second loses as much again;
-# the Block is given once.
+# An intent carried out twice (Bereft): the mark cuts the first action -
+# the one it was put on - and is spent there; the second lands in full
+# (Status.total_marks()). So what Wrest takes is read off the first
+# action, and the Block is given once.
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	var target: Combatant = ctx.status_target()
 	if effect.status_data == null or target == null or target.enemy_data == null:

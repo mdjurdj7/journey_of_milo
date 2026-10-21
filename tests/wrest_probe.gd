@@ -176,8 +176,9 @@ func _check_small_attack() -> void:
 	_expect_eq(player.block, taken, "Wrest+ on it: %d Block, all it has" % taken)
 	player.block = 0
 	_expect_attack(enemy, data, player, _absorb(hits, taken), "Scissor, Wrested+")
-	# Bereft's two Scissors: each loses the take, as each loses Garnish's;
-	# the Block is given once.
+	# Bereft's two Scissors: the first loses the take - the action it was
+	# put on - and the second lands in full, as with Garnish; the Block is
+	# given once.
 	enemy = _enemy(data, "Scissor")
 	Status.apply_to(enemy.statuses, load(BEREFT_PATH))
 	player = _player(60)
@@ -185,10 +186,10 @@ func _check_small_attack() -> void:
 	var each: int = mini(_take, _sum(hits))
 	_expect_eq(player.block, each, "Bereft's Scissors, Wrested: %d Block, once" % each)
 	player.block = 0
-	var both: Array[int] = []
-	for action in 2:
-		both.append_array(_absorb(hits, each))
-	_expect_attack(enemy, data, player, both, "Bereft's two Scissors, Wrested: each")
+	var both: Array[int] = _absorb(hits, each)
+	both.append_array(hits)
+	_expect_attack(enemy, data, player, both, "Bereft's two Scissors, Wrested: the first cut, the second in full")
+	_expect(_wrested(enemy) == null, "...and Wrested spent")
 	_completed += 1
 
 # With Brace: Braced's 50% first, then the take - whichever went on first.

@@ -7,7 +7,7 @@ extends SceneTree
 # down to 0 at most, after Braced's 50% and before block (EnemyTurn.
 # reduce_hit()). Only an attack that will land may be Garnished, once
 # (StatusData.intent_mark); bound to its intent, the Garnish is lost if
-# that intent doesn't land, and covers both of Bereft's actions.
+# that intent doesn't land, and cuts only the first of Bereft's two actions.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/garnish_probe.gd
 #
@@ -203,9 +203,10 @@ func _check_needs_an_attack() -> void:
 	_expect(not EffectResolver.can_target(card, enemy), "A Stunned Sting can't be Garnished")
 	_completed += 1
 
-# One Garnish an intent - Garnish+ too - and it covers every hit of every
-# action: the Tail Lash's hits soak it in order; Bereft's two Scissors
-# each lose it.
+# One Garnish an intent - Garnish+ too - and it covers every hit of the
+# action it was put on: the Tail Lash's hits soak it in order; of Bereft's
+# two Scissors only the first loses it - the second lands in full - and
+# it is spent with that turn.
 func _check_once_per_intent() -> void:
 	var data: EnemyData = load(SPUTTER_PATH)
 	var intent: EnemyIntent = _queue(data, "Scissor")
@@ -229,10 +230,10 @@ func _check_once_per_intent() -> void:
 	enemy = _enemy(data, "Scissor")
 	Status.apply_to(enemy.statuses, load(BEREFT_PATH))
 	_garnish(player, enemy)
-	var both: Array[int] = []
-	for action in 2:
-		both.append_array(_absorb([intent.value], _garnish_total))
-	_expect_attack(enemy, data, player, both, "Bereft's two Scissors, Garnished: each")
+	var both: Array[int] = _absorb([intent.value], _garnish_total)
+	both.append(intent.value)
+	_expect_attack(enemy, data, player, both, "Bereft's two Scissors, Garnished: the first cut, the second in full")
+	_expect(_garnished(enemy) == null, "...and the Garnish spent")
 	_completed += 1
 
 # The price: 1 HP, and 5 Toll in total - the HP's own 1 topped up by 4.
