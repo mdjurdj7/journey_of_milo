@@ -24,6 +24,31 @@
 [ext_resource type="Resource" path="res://battle/rules/enemies/nettlebasket.tres" id="98_nettlebasket"]
 [ext_resource type="Resource" path="res://battle/rules/enemies/nettle.tres" id="99_nettle"]
 [ext_resource type="Script" uid="uid://d4mb532t1ord0" path="res://floors/rut_look.gd" id="100_rut_look"]
+[ext_resource type="Script" uid="uid://cel5cvd5ai181" path="res://field/collector_good.gd" id="102_collector_good"]
+[ext_resource type="Resource" path="res://run/armor/harness.tres" id="103_harness"]
+[ext_resource type="Resource" path="res://run/armor/shed_skin.tres" id="104_shed_skin"]
+[ext_resource type="Resource" path="res://run/keepsakes/bent_nail.tres" id="105_bent_nail"]
+[ext_resource type="Resource" path="res://run/weapons/greyshelfs_tail.tres" id="106_greyshelfs_tail"]
+
+[sub_resource type="Resource" id="CollectorGood_harness"]
+script = ExtResource("102_collector_good")
+item = ExtResource("103_harness")
+price = 85
+
+[sub_resource type="Resource" id="CollectorGood_shed_skin"]
+script = ExtResource("102_collector_good")
+item = ExtResource("104_shed_skin")
+price = 70
+
+[sub_resource type="Resource" id="CollectorGood_bent_nail"]
+script = ExtResource("102_collector_good")
+item = ExtResource("105_bent_nail")
+price = 65
+
+[sub_resource type="Resource" id="CollectorGood_greyshelfs_tail"]
+script = ExtResource("102_collector_good")
+item = ExtResource("106_greyshelfs_tail")
+price = 100
 
 [sub_resource type="Resource" id="FloorProp_collector"]
 script = ExtResource("10_floor_prop")
@@ -32,6 +57,9 @@ position = Vector3(-19.8, 0, -11.8)
 yaw_degrees = -160.0
 world_line = "It is sorting what it has."
 pool = ExtResource("13_collector_pool")
+overrides = {
+"goods": Array[ExtResource("102_collector_good")]([SubResource("CollectorGood_harness"), SubResource("CollectorGood_shed_skin"), SubResource("CollectorGood_bent_nail"), SubResource("CollectorGood_greyshelfs_tail")])
+}
 
 [sub_resource type="Resource" id="FloorEnemy_required"]
 script = ExtResource("2_floor_enemy")
