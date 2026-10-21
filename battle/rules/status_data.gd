@@ -198,10 +198,12 @@ enum Mark { NONE, COIL, DROP }
 # INFORMATIONAL, or apply_modifiers() would take it off every hit too.
 # Copies add up through StackRule.ADD_MAGNITUDE. Pair it with
 # consumed_by_own_attack and DURATION_UNTIL_TRIGGERED.
-# On the player instead, it's the next enemy ATTACK against them that
-# deals `magnitude` less in all (Unbroken's, at Critical) - the same pool,
-# so Garnished on the attacker and this add up. Pair it there with
-# consumed_by_attack_against, not consumed_by_own_attack.
+# On the player instead, it's each enemy ATTACK against them that deals
+# `magnitude` less in all (Unbroken's, at Critical) - the same pool, so
+# Garnished on the attacker and this add up. Unbroken pairs it there with
+# default_duration_turns 1, so it lasts until the player's next turn
+# starts; consumed_by_attack_against instead would end it with the first
+# attack. Never consumed_by_own_attack.
 @export var reduces_attack_total: bool = false
 
 # Its holder's next turn is skipped (Stunned): whatever move is queued

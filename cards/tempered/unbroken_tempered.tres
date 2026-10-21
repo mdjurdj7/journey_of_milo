@@ -24,7 +24,7 @@ card_type = 1
 rarity = 1
 target_type = 1
 description = "Gain {block} block.
-{if}Critical: the next Attack against you deals 8 less.{/if}"
+{if}Critical: until your next turn, take 6 less from each attack.{/if}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_block"), SubResource("CardEffect_guard")])
 art = ExtResource("3_art")
 card_class = &"wanderer"

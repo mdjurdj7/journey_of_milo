@@ -446,7 +446,8 @@ static func counter_strike(combatant: Combatant, data: EnemyData, player: Combat
 #
 # `state` (turn_state()) is the player as the enemies before this one in
 # the coming turn leave him - what their hits spend (the worn piece's
-# first hit, Unbroken's and No Further's armed, Block) gone - and this
+# first hit, No Further's armed, Block) gone, Unbroken's still up for
+# each - and this
 # one's hits are read from it and spend from it in turn, so each enemy's
 # numbers are the ones that will land (BattleController's previews pass
 # one along in turn order). Empty = the player as he stands, alone.
@@ -590,8 +591,8 @@ static func copy_state(state: Dictionary) -> Dictionary:
 # the worn piece's first hit, if this is the first to get past Block and
 # absorb), worn through Block, absorb and HP, the lethal guard saving as
 # it would; then what lasted until an attack against him resolved (No
-# Further's, Unbroken's) goes. `state` is changed; nothing real is. The
-# hits' damage, in order.
+# Further's) goes - Unbroken's stays, for the next attack too. `state` is
+# changed; nothing real is. The hits' damage, in order.
 static func replay_attack(attacker: Combatant, data: EnemyData, intent: EnemyIntent, player: Combatant, state: Dictionary, strike_back: bool = false) -> Array[int]:
 	var theirs: Array[Status] = state["statuses"]
 	var own_seen: Array[Status] = Status.strike_back_view(attacker.statuses) if strike_back else attacker.statuses

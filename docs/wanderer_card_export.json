@@ -1,7 +1,7 @@
 {
   "export_info": {
     "description": "Read-only export of every implemented Wanderer card, plus the class-agnostic neutral cards in cards/neutral/ (flagged pool_class = neutral) - the four in the belongings pool. card_text is the rules text a real CardView shows outside a fight (deck view / reward screen): no stance, 0 Toll, no conditional highlighted; an HP price is shown on the face's separate HP line (face_hp_line), not in the text. Numbers that move in battle are listed under dynamic_values with their rule and this default.",
-    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20); Last Wager reworked (2026-10-20); Nothing Left (2026-10-20); Owed Time (2026-10-20); Nothing Left's and Owed Time's art (2026-10-20); In the Red's HP 8 to 5 (2026-10-20); Countersign renamed Twice Over (2026-10-20); Twice Over's art (2026-10-20); the starter's second Bite Down to a fifth Slash (2026-10-20); Nothing Left made Uncommon (2026-10-20); Wrest (2026-10-20); Wrest's art (2026-10-20); Garnished and Wrested cut only the action they were put on (2026-10-20); Thick Skin (2026-10-20); Thick Skin's art (2026-10-20); Braced cuts only the action it was put on (2026-10-20); Deny made Spent (2026-10-20); Nothing Left costs 1 while Critical (2026-10-20); Wrest takes up to 7, Wrest+ 11 (2026-10-20)",
+    "generated": "2026-10-04, from the live data at 67d4637 plus Blood Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account; Come Due's text to Attack hits (2026-10-18); In the Red (2026-10-19); Go Under (2026-10-19); the Toll package - Second Swing, Come Due, Deny (2026-10-19); the Toll package, part 2 - Leverage, Collateral, Sentence (2026-10-19); Bide reworked, Countersign (2026-10-19); Settled Account all or nothing (2026-10-19); Not So (2026-10-19); Not So's art (2026-10-19); Reckoning reworked (2026-10-19); Take In (2026-10-20); Take In's art (2026-10-20); Collateral's text reworded (2026-10-20); On the Brink (2026-10-20); Last Wager reworked (2026-10-20); Nothing Left (2026-10-20); Owed Time (2026-10-20); Nothing Left's and Owed Time's art (2026-10-20); In the Red's HP 8 to 5 (2026-10-20); Countersign renamed Twice Over (2026-10-20); Twice Over's art (2026-10-20); the starter's second Bite Down to a fifth Slash (2026-10-20); Nothing Left made Uncommon (2026-10-20); Wrest (2026-10-20); Wrest's art (2026-10-20); Garnished and Wrested cut only the action they were put on (2026-10-20); Thick Skin (2026-10-20); Thick Skin's art (2026-10-20); Braced cuts only the action it was put on (2026-10-20); Deny made Spent (2026-10-20); Nothing Left costs 1 while Critical (2026-10-20); Wrest takes up to 7, Wrest+ 11 (2026-10-20); Unbroken lasts until your next turn, Unbroken+ 6 (2026-10-20)",
     "generated_from": [
       "res://cards/data/*.tres",
       "res://cards/neutral/*.tres",
@@ -212,7 +212,7 @@
       },
       {
         "name": "Unbroken (you)",
-        "rule": "Unbroken's status at Critical: the next enemy Attack against you deals 4 less in all, its hits soaking it in order. After other modifiers, before Block; adds to Garnished on the attacker. Copies add up (two: 8). Gone once an enemy Attack against you resolves; a Defend or other move leaves it."
+        "rule": "Unbroken's status at Critical: until your next turn, each enemy Attack against you deals 4 less in all (Unbroken+ 6), its hits soaking it in order. After other modifiers, before Block; adds to Garnished on the attacker. Copies add up (two: 8). An attack doesn't spend it; it goes as your next turn starts. A strike back (Coiled, the Erupt) passes it by."
       }
     ]
   },
@@ -2878,9 +2878,9 @@
       "face_type_label": "GUARD",
       "energy_cost": 1,
       "rarity": "COMMON",
-      "card_text": "Gain 6 block.\nCritical: the next Attack against you deals 4 less.",
+      "card_text": "Gain 6 block.\nCritical: until your next turn, take 4 less from each attack.",
       "face_hp_line": null,
-      "card_text_template": "Gain {block} block.\n{if}Critical: the next Attack against you deals 4 less.{/if}",
+      "card_text_template": "Gain {block} block.\n{if}Critical: until your next turn, take 4 less from each attack.{/if}",
       "targeting": "self",
       "removal_after_play": "discard pile",
       "effects": [
@@ -2890,7 +2890,7 @@
         },
         {
           "type": "APPLY_STATUS",
-          "plain_english": "If you are Critical: apply Unbroken 4 to yourself - the next enemy Attack against you deals 4 less in all, its hits soaking it in order (4×3 lands 0, 4, 4), after other modifiers and before block. Above Critical, nothing."
+          "plain_english": "If you are Critical: apply Unbroken 4 to yourself - until your next turn, each enemy Attack against you deals 4 less in all, its hits soaking it in order (4×3 lands 0, 4, 4), after other modifiers and before block; it goes as your next turn starts, and a strike back passes it by. Above Critical, nothing."
         }
       ],
       "keywords": [
@@ -2909,14 +2909,14 @@
       "status_effect": {
         "id": "unbroken",
         "name": "Unbroken",
-        "description": "The next Attack against you deals {value} less.",
+        "description": "Until your next turn, take {value} less from each attack.",
         "file_path": "res://battle/rules/statuses/unbroken.tres",
-        "duration": "until triggered",
+        "duration": "until your next turn (1 turn)",
         "stack_rule": "ADD_MAGNITUDE",
         "applied_to": "self",
         "magnitude": 4,
         "reduces_attack_total": true,
-        "consumed_by_attack_against": true
+        "consumed_by_attack_against": false
       },
       "critical_condition": {
         "rule": "Critical = HP at or below 30% of max HP, checked when the effect resolves.",
@@ -2945,7 +2945,12 @@
       "rules_font_px": 15,
       "battle_animation": null,
       "play_effect_scene_path": null,
-      "upgrade_data": null,
+      "upgrade_data": {
+        "name": "Unbroken+",
+        "file_path": "res://cards/tempered/unbroken_tempered.tres",
+        "card_text": "Gain 6 block.\nCritical: until your next turn, take 6 less from each attack.",
+        "changes": "Unbroken 6 (res://battle/rules/statuses/unbroken_tempered.tres) in place of 4; the same 6 block and 1 Energy."
+      },
       "starting_deck_count": 0,
       "in_reward_pool": true,
       "in_belongings_pool": false,

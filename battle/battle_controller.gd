@@ -500,10 +500,11 @@ func get_intent_preview(enemy: FieldEnemy) -> Dictionary:
 
 # Every enemy's preview for the coming enemy turn, in turn order, each
 # read from where the ones before it leave the player (EnemyTurn.turn_
-# state()): the worn piece's first hit, Unbroken's and No Further's armed
-# are spent by the first attack that spends them, not shown off every
-# enemy's - so each readout, each Signal's answers and the warning across
-# enemies carry the hits that will land.
+# state()): the worn piece's first hit and No Further's armed are spent
+# by the first attack that spends them, not shown off every enemy's, and
+# Unbroken cuts each attack until the player's next turn - so each
+# readout, each Signal's answers and the warning across enemies carry
+# the hits that will land.
 func _turn_previews() -> Dictionary:
 	var state: Dictionary = EnemyTurn.turn_state(player)
 	var previews: Dictionary = {}
@@ -583,10 +584,10 @@ func _intent_preview_alone(enemy: FieldEnemy, state: Dictionary) -> Dictionary:
 # What each living packmate of `enemy` would answer its SIGNAL with, in
 # member order - one list of hits per answer (EnemyTurn.signal_answer_
 # intent() - its first ATTACK, every hit of it), as each would land:
-# replayed on `state` (EnemyTurn.replay_attack()), so they read and spend
-# the player's Unbroken, No Further's armed and the worn piece's first hit
-# as the answers do, the mate's own marks (Braced, Garnished on its own
-# intent) set by, as EnemyTurn.answer_signal() sets them by. Empty `state`
+# replayed on `state` (EnemyTurn.replay_attack()), so they read the
+# player's Unbroken, and read and spend No Further's armed and the worn
+# piece's first hit, as the answers do, the mate's own marks (Braced,
+# Garnished on its own intent) set by, as EnemyTurn.answer_signal() sets them by. Empty `state`
 # = the player as he stands. Empty without a pack.
 func signal_answer_lists(enemy: FieldEnemy, state: Dictionary = {}) -> Array:
 	var lists: Array = []
@@ -1483,7 +1484,8 @@ func _counter_strikes(against: Array[FieldEnemy]) -> void:
 			await get_tree().create_timer(snap_delay).timeout
 		await _report_enemy_attack(enemy, result)
 		_hp_owed = 0
-		# What the strike spent (Garnished, Unbroken) leaves the readouts.
+		# What the strike spent leaves the readouts (Garnished and
+		# Unbroken wait for the enemy's own turn - ignores_strike_backs).
 		status_changed.emit()
 
 # --- The dig (EnemyIntent.IntentType.DIG) ---
