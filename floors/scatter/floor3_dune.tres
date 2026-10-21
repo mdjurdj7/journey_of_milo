@@ -277,6 +277,26 @@ clusters_per_100m2 = 0.35
 items_per_cluster = Vector2i(4, 8)
 cluster_spread_m = Vector2(0.2, 0.4)
 
+[sub_resource type="Resource" id="ScatterEntry_grass_lip"]
+script = ExtResource("2_entry")
+name = "dune_grass_lip"
+scale_range = Vector2(0.85, 1.15)
+sink_fraction = 0.04
+tint = Color(1, 1, 1, 1)
+tint_jitter = 0.06
+wind = 0.04
+cast_shadow = true
+zones = 63
+inland_range_m = Vector2(0, 1000)
+area = PackedVector2Array(13, -38.7, 15.7, -38.7, 15.7, -37.8, 13, -37.8)
+ledge_margin_m = 0.1
+card_spacing_fraction = 0.15
+cards = Array[ExtResource("3_card")]([SubResource("ScatterCard_small"), SubResource("ScatterCard_medium"), SubResource("ScatterCard_large")])
+battle_fade = true
+cluster_count = Vector2i(3, 4)
+items_per_cluster = Vector2i(3, 6)
+cluster_spread_m = Vector2(0.1, 0.3)
+
 [resource]
 script = ExtResource("1_set")
-entries = Array[ExtResource("2_entry")]([SubResource("ScatterEntry_stone_slab_foot"), SubResource("ScatterEntry_stone_pair_foot"), SubResource("ScatterEntry_stone_cluster_foot"), SubResource("ScatterEntry_stone_slab_open"), SubResource("ScatterEntry_stone_pair_open"), SubResource("ScatterEntry_stone_cluster_open"), SubResource("ScatterEntry_grass_foot"), SubResource("ScatterEntry_grass_bank"), SubResource("ScatterEntry_grass_flank"), SubResource("ScatterEntry_grass_upper"), SubResource("ScatterEntry_grass_open"), SubResource("ScatterEntry_grass_stone")])
+entries = Array[ExtResource("2_entry")]([SubResource("ScatterEntry_stone_slab_foot"), SubResource("ScatterEntry_stone_pair_foot"), SubResource("ScatterEntry_stone_cluster_foot"), SubResource("ScatterEntry_stone_slab_open"), SubResource("ScatterEntry_stone_pair_open"), SubResource("ScatterEntry_stone_cluster_open"), SubResource("ScatterEntry_grass_foot"), SubResource("ScatterEntry_grass_bank"), SubResource("ScatterEntry_grass_flank"), SubResource("ScatterEntry_grass_upper"), SubResource("ScatterEntry_grass_open"), SubResource("ScatterEntry_grass_stone"), SubResource("ScatterEntry_grass_lip")])

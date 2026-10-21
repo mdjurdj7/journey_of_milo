@@ -36,6 +36,8 @@ class_name FieldScatter
 #     gate_margin_m; a rock shelf's outline by shelf_margin_m; an empty
 #     Siltjaw spot's old mounds and trails (SiltjawSigns) by prop_margin_m;
 #     the spawn by spawn_clear_m;
+#   - the floor's own keep-outs (FloorData.scatter_keep_outs), but for an
+#     entry with an area of its own, which places inside it regardless;
 #   - the battle frame's feet: a lone enemy's body and the ring his stance
 #     can land on - every spot RegionField's stance rule can give, its
 #     stance_distance_min()..stance_distance() for that enemy (its near
@@ -308,6 +310,9 @@ var _sea_level: float = 0.0
 var _spawn: Vector2 = Vector2.ZERO
 var _wear_points: PackedVector2Array = PackedVector2Array()
 var _keepouts: Array[KeepOut] = []
+# The floor's own keep-outs (FloorData.scatter_keep_outs), apart from
+# _keepouts: an entry with an area of its own places inside them.
+var _floor_keepouts: Array[KeepOut] = []
 # Every enemy where it stands, for an entry's enemy_clearance_m; and as
 # (x, z, stance distance) for its stance_clearance_m.
 var _enemy_points: PackedVector2Array = PackedVector2Array()
@@ -342,6 +347,8 @@ var _cell_excluded: PackedByteArray = PackedByteArray()
 var _cell_excluded_off_ledges: PackedByteArray = PackedByteArray()
 # Inside a battle keep-out (KeepOut.battle): no cluster centres there.
 var _cell_battle: PackedByteArray = PackedByteArray()
+# Inside one of the floor's own keep-outs (in_floor_keep_out()).
+var _cell_floor_keep_out: PackedByteArray = PackedByteArray()
 var _cell_rock: PackedByteArray = PackedByteArray()
 # Signed metres to the walkable edge: into the floor +, onto the bank -.
 var _cell_edge: PackedFloat32Array = PackedFloat32Array()
@@ -467,6 +474,7 @@ func _build_grid() -> void:
 	_cell_excluded.resize(count)
 	_cell_excluded_off_ledges.resize(count)
 	_cell_battle.resize(count)
+	_cell_floor_keep_out.resize(count)
 	_cell_rock.resize(count)
 	var wet_band: float = wet_band_height_m if wet_band_height_m >= 0.0 else _ground.shore_slope_start
 	for row in _grid_rows:
@@ -482,6 +490,7 @@ func _build_grid() -> void:
 			_cell_excluded[i] = 1 if is_excluded(p, -1.0, false) else 0
 			_cell_excluded_off_ledges[i] = 1 if _cell_excluded[i] != 0 and _excluded_off_ledges(p) else 0
 			_cell_battle[i] = 1 if _in_battle_keepout(p) else 0
+			_cell_floor_keep_out[i] = 1 if in_floor_keep_out(p) else 0
 	_mark_dry_ground()
 	_mark_edge_distance()
 
@@ -836,6 +845,23 @@ func _build_keepouts() -> void:
 			_keepouts.append(_polygon(footprint, prop_margin_m))
 	_keepouts.append(_disc(_spawn, spawn_clear_m))
 	_add_battle_keepouts()
+	_floor_keepouts.clear()
+	if _floor != null:
+		for area in _floor.scatter_keep_outs:
+			if area.size() < 3:
+				continue
+			var outline := PackedVector2Array()
+			for point in area:
+				outline.append(_spawn + point)
+			_floor_keepouts.append(_polygon(outline, 0.0))
+
+# Whether `p` is inside one of the floor's own keep-outs (FloorData.
+# scatter_keep_outs) - kept off by every entry but one with an area.
+func in_floor_keep_out(p: Vector2) -> bool:
+	for keepout in _floor_keepouts:
+		if keepout.contains(p):
+			return true
+	return false
 
 # A collision shape's footprint - its box through its transform, flattened
 # to XZ, the hull of the corners (NavGrid.footprint_cells()'s reading) -
@@ -1226,6 +1252,8 @@ func _centre_allowed(entry: ScatterEntry, cell: int) -> bool:
 		return false
 	if entry.avoid_rock and _cell_rock[cell] != 0:
 		return false
+	if entry.area.is_empty() and _cell_floor_keep_out[cell] != 0:
+		return false
 	# Off the fights as well: a cluster centres where it can lie whole.
 	if _cell_battle[cell] != 0:
 		return false
@@ -1276,6 +1304,8 @@ func _point_allowed(entry: ScatterEntry, p: Vector2) -> Allowed:
 	if in_pool_keep_out(p):
 		return Allowed.NO
 	if is_excluded(p, entry.ledge_margin_m, false):
+		return Allowed.NO
+	if entry.area.is_empty() and in_floor_keep_out(p):
 		return Allowed.NO
 	if entry.avoid_rock and is_rock(p):
 		return Allowed.NO

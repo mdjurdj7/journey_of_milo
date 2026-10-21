@@ -327,6 +327,14 @@ enum ExitKind { CHANNEL, LINE }
 	set(value):
 		scatter_budget = value
 		emit_changed()
+# Ground none of this floor's scatter lies on: polygons, world XZ from the
+# spawn (floor 3's rim trail, rocky path and neck). An entry with an area
+# of its own (ScatterEntry.area) places inside that area whatever covers
+# it - the path's scree, the bank's lip (FieldScatter.in_floor_keep_out()).
+@export var scatter_keep_outs: Array[PackedVector2Array] = []:
+	set(value):
+		scatter_keep_outs = value
+		emit_changed()
 
 @export_group("Rewards")
 # What a won fight offers. Null = no drop at all.
