@@ -1,12 +1,13 @@
 extends SceneTree
 
 # Headless probe for Nothing Left - Uncommon Attack: deal 28, costing 3 Energy,
-# or 0 whenever the player is Critical (CardData.critical_cost, read
+# or 1 whenever the player is Critical (CardData.critical_cost, read
 # through Combatant.base_cost(), as Cornered+ does). Nothing Left+ deals
-# 36. At 0 a "next card" discount (Leverage) passes it by; above the line
-# Leverage makes it 1. Under Collateral, above the line it costs 3 HP per
-# Energy short; Critical, nothing. A Twice Over copy keeps its Critical
-# cost. On the Brink at 31-50% makes it free for the turn.
+# 36, at the same costs. A "next card" discount (Leverage) lands on it
+# either way: above the line it makes it 1, Critical 0. Under Collateral
+# it costs 3 HP per Energy short - 9 above the line on 0 Energy, 3
+# Critical. A Twice Over copy keeps its Critical cost. On the Brink at
+# 31-50% makes it free for the turn.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/nothing_left_probe.gd
 #
@@ -68,14 +69,14 @@ func _initialize() -> void:
 
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
-	_expect_eq([card.card_name, card.cost, card.critical_cost, card.card_type, card.rarity, card.card_class], ["Nothing Left", 3, 0, CardData.CardType.ATTACK, CardData.CardRarity.UNCOMMON, &"wanderer"], "Nothing Left: 3 Energy, 0 while Critical, an Uncommon Attack")
+	_expect_eq([card.card_name, card.cost, card.critical_cost, card.card_type, card.rarity, card.card_class], ["Nothing Left", 3, 1, CardData.CardType.ATTACK, CardData.CardRarity.UNCOMMON, &"wanderer"], "Nothing Left: 3 Energy, 1 while Critical, an Uncommon Attack")
 	_expect_eq([card.target_type, card.offer, card.removal_scope], [CardData.TargetType.ENEMY, CardData.OfferScope.REWARDABLE, CardData.RemovalScope.NONE], "...at an enemy, rewardable, to the discard")
 	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Nothing Left.png", "...with its art")
-	_expect_eq(card.description, "Deal {damage} damage.\nCritical: costs 0.", "...its text")
+	_expect_eq(card.description, "Deal {damage} damage.\nCritical: costs 1.", "...its text")
 	_expect(card.effects.size() == 1 and card.effects[0].effect_type == CardEffect.EffectType.DAMAGE and card.effects[0].value == 28 and card.effects[0].condition == CardEffect.Condition.NONE, "...one blow of 28")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Nothing Left+")
-	_expect_eq([tempered.card_name, tempered.cost, tempered.critical_cost, tempered.rarity, tempered.description], ["Nothing Left+", 3, 0, CardData.CardRarity.UNCOMMON, card.description], "Nothing Left+: the same costs and text")
+	_expect_eq([tempered.card_name, tempered.cost, tempered.critical_cost, tempered.rarity, tempered.description], ["Nothing Left+", 3, 1, CardData.CardRarity.UNCOMMON, card.description], "Nothing Left+: the same costs and text")
 	_expect(tempered.effects.size() == 1 and tempered.effects[0].value == 36, "...a blow of 36")
 	for pool_path: String in [WANDERER_POOL_PATH, COLLECTOR_POOL_PATH]:
 		_expect((load(pool_path) as RewardPool).entries.has(card), "In %s" % pool_path)
@@ -83,14 +84,14 @@ func _check_data() -> void:
 
 # --- Rules ---
 
-# 3 above the line, 0 at or under it - Go Under's or On the Brink's line
+# 3 above the line, 1 at or under it - Go Under's or On the Brink's line
 # too; 28 either way, bonuses on top.
 func _check_cost_and_damage() -> void:
 	var card: CardData = load(CARD_PATH)
 	var player: Combatant = _player(50)
 	_expect_eq(player.energy_cost(card), 3, "At 50: costs 3")
 	player.hp = 24
-	_expect_eq(player.energy_cost(card), 0, "At 24, Critical: costs 0")
+	_expect_eq(player.energy_cost(card), 1, "At 24, Critical: costs 1")
 	player = _player(40)
 	_play(load(ON_THE_BRINK_PATH), player)
 	_expect_eq(player.energy_cost(card), 0, "At 40 under On the Brink: 0")
@@ -105,8 +106,8 @@ func _check_cost_and_damage() -> void:
 	_expect_eq(_deal(card, teeth), 28 + bonus, "Teeth on top: 28 + %d" % bonus)
 	_completed += 1
 
-# Leverage (2 off the next card costing at least 1): above the line it
-# lands - 1 - and is spent; Critical, the card costs 0 and passes it by.
+# Leverage (2 off the next card costing at least 1): it lands either way
+# and is spent - above the line 3 - 2 = 1; Critical 1 - 2, never below 0.
 func _check_leverage() -> void:
 	var card: CardData = load(CARD_PATH)
 	var player: Combatant = _player(50)
@@ -114,12 +115,12 @@ func _check_leverage() -> void:
 	_expect(player.takes_next_card_discount(card), "Leverage at 50: lands on Nothing Left")
 	_expect_eq(player.energy_cost(card), 1, "...3 - 2 = 1")
 	player.hp = 20
-	_expect(not player.takes_next_card_discount(card), "Critical: it costs 0 and Leverage waits")
-	_expect_eq(player.energy_cost(card), 0, "...at 0")
+	_expect(player.takes_next_card_discount(card), "Critical: it costs 1 and Leverage lands")
+	_expect_eq(player.energy_cost(card), 0, "...1 - 2, at 0")
 	_completed += 1
 
 # Collateral (3 HP per Energy short): on 0 Energy above the line, 9 HP;
-# Critical, it costs nothing to cover.
+# Critical, its 1 Energy short is 3 HP.
 func _check_collateral() -> void:
 	var card: CardData = load(CARD_PATH)
 	var player: Combatant = _player(50)
@@ -128,8 +129,8 @@ func _check_collateral() -> void:
 	_expect_eq(player.replaced_cost_hp(card), 9, "Collateral on 0 Energy at 50: 9 HP")
 	_expect(player.can_pay(card), "...and playable")
 	player.hp = 20
-	_expect_eq(player.replaced_cost_hp(card), 0, "Critical: no HP")
-	_expect(player.can_pay(card), "...and free")
+	_expect_eq(player.replaced_cost_hp(card), 3, "Critical: 3 HP")
+	_expect(player.can_pay(card), "...and playable")
 	_completed += 1
 
 # A Twice Over copy is the same card, Critical cost and all, and a fight-
@@ -141,9 +142,9 @@ func _check_copy() -> void:
 	var copy: CardData = deck.add_copy(deck.hand[0])
 	_expect(copy != null and copy.battle_copy, "Twice Over's copy: a fight-only card")
 	if copy != null:
-		_expect_eq([copy.cost, copy.critical_cost], [3, 0], "...3 Energy, 0 while Critical")
+		_expect_eq([copy.cost, copy.critical_cost], [3, 1], "...3 Energy, 1 while Critical")
 		var player: Combatant = _player(20)
-		_expect_eq(player.energy_cost(copy), 0, "...free at 20")
+		_expect_eq(player.energy_cost(copy), 1, "...1 at 20")
 		deck.discard(copy)
 		_expect(not deck.discard_pile.has(copy) and not deck.hand.has(copy), "...and gone when it leaves the hand")
 	_completed += 1
