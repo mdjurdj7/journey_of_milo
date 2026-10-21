@@ -338,6 +338,16 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 	set(value):
 		hairline_thickness_px = value
 		_redraw()
+# Off (a price the run can't pay - CollectorScreen): TAKE in inert_color,
+# never focused in ink, and choosing it does nothing; LEAVE as ever.
+@export var take_enabled: bool = true:
+	set(value):
+		take_enabled = value
+		_redraw()
+@export var inert_color: Color = Color(0.58, 0.58, 0.60, 0.45):
+	set(value):
+		inert_color = value
+		_redraw()
 @export_group("")
 
 # A worn piece or a keepsake (by its slot).
@@ -709,9 +719,12 @@ func set_focus(index: int) -> void:
 	_focus = index
 	_redraw()
 
-# What a click or a key resolves: TAKE or LEAVE, said once.
+# What a click or a key resolves: TAKE or LEAVE, said once - nothing for
+# a TAKE that isn't enabled.
 func activate(index: int) -> void:
 	if not _show_actions or index < 0 or index > Choice.LEAVE:
+		return
+	if index == Choice.TAKE and not take_enabled:
 		return
 	chosen.emit(index == Choice.TAKE)
 
@@ -1117,8 +1130,9 @@ func _draw_actions() -> void:
 		var label_width: float = InkType.width(_action_font, label, action_px)
 		var left: float = roundf(row.get_center().x - label_width / 2.0)
 		var baseline: float = roundf(row.get_center().y + float(action_px) * 0.35)
-		var focused: bool = index == _focus
-		InkType.draw_run(_face, _action_font, label, Vector2(left, baseline), action_px, ink if focused else unfocused_color)
+		var inert: bool = index == Choice.TAKE and not take_enabled
+		var focused: bool = index == _focus and not inert
+		InkType.draw_run(_face, _action_font, label, Vector2(left, baseline), action_px, inert_color if inert else (ink if focused else unfocused_color))
 		if focused:
 			var thickness: float = maxf(roundf(_px(hairline_thickness_px)), 1.0)
 			var hairline_y: float = roundf(baseline - float(action_px) * 0.35 - thickness * 0.5)

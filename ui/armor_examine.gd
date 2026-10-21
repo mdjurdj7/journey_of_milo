@@ -21,7 +21,8 @@ class_name ArmorExamine
 #   a weapon offered (the Greyshelf's - setup_weapon() with_choice): TAKE
 #     and LEAVE, and "REPLACES" the weapon carried. Only a choice closes
 #     it - a click off the plate, Escape and a right click do nothing,
-#     since a weapon left is gone for good (_choice_only).
+#     since a weapon left is gone for good (_choice_only) - unless the
+#     host passes `escapable` (the collector's: BACK leaves it on sale).
 # First loot is revealed (setup()/setup_weapon() with `reveal`): a weapon's
 # offer, and a worn piece's first look on the sand - the plate centred at
 # reveal_scale, eased in from examine_scale and from clear over
@@ -69,11 +70,11 @@ func setup(piece: TrinketData, worn: TrinketData, with_choice: bool, from_rect: 
 # The weapon instead of a piece - no choice, or for an offer with_choice
 # and `carried`, the weapon taking it would replace. Called before the
 # layer enters the tree.
-func setup_weapon(weapon: WeaponData, from_rect: Rect2 = Rect2(), carried: WeaponData = null, with_choice: bool = false, reveal: bool = false) -> void:
+func setup_weapon(weapon: WeaponData, from_rect: Rect2 = Rect2(), carried: WeaponData = null, with_choice: bool = false, reveal: bool = false, escapable: bool = false) -> void:
 	setup(null, null, with_choice, from_rect, reveal)
 	_weapon = weapon
 	_carried = carried
-	_choice_only = with_choice
+	_choice_only = with_choice and not escapable
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
