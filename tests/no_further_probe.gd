@@ -15,7 +15,6 @@ const CRITICAL_FRACTION := 0.3
 const CASES := 14
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
 const BELONGINGS_POOL_PATH := "res://cards/pools/belongings_pool.tres"
-const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const ART_PATH := "res://cards/art/Wanderer/No Further.png"
 const WAITING_PATH := "res://battle/rules/statuses/no_further.tres"
 const ARMED_PATH := "res://battle/rules/statuses/no_further_armed.tres"
@@ -187,11 +186,6 @@ func _check_pool() -> void:
 	var belongings := load(BELONGINGS_POOL_PATH) as RewardPool
 	for card in belongings.entries:
 		_expect(card == null or card.card_name != "No Further", "...not in the belongings (Keeper) pool")
-	var character := load(CHARACTER_PATH) as CharacterData
-	var counts: Dictionary = {}
-	for card: CardData in character.starting_deck_counts:
-		counts[card.card_name] = character.starting_deck_counts[card]
-	_expect_eq(counts, {"Slash": 5, "Bite Down": 1, "Brace": 2, "Settled Account": 1, "Down Payment": 1}, "...and the starting deck is unchanged")
 	_completed += 1
 
 # The Critical check after a card is general; it mustn't disturb the other

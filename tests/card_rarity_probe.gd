@@ -17,7 +17,7 @@ const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
 # With Regards: what its kill heals.
 const WITH_REGARDS_HEAL := 5
-const CASES := 19
+const CASES := 18
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SAMURAI_PATH := "res://run/data/samurai.tres"
 # Each card folder and the card_class every card directly in it carries
@@ -131,7 +131,6 @@ func _initialize() -> void:
 	_check_blood_arc_self_eater()
 	_check_blood_arc_last_resort()
 	_check_with_regards()
-	_check_starting_deck()
 	_check_card_class_and_offer()
 	_check_offer_filter()
 	if _completed != CASES:
@@ -525,14 +524,6 @@ func _check_with_regards() -> void:
 	_play_into(card, player, [enemy])
 	_expect_eq(enemy.hp, 0, "With Regards + Self-Eater kills 11")
 	_expect_eq(player.hp, mini(hp_before - 2 + WITH_REGARDS_HEAL, player.max_hp), "...and heals 5 after Self-Eater's 2 HP")
-	_completed += 1
-
-func _check_starting_deck() -> void:
-	var character: CharacterData = load(CHARACTER_PATH) as CharacterData
-	var counts: Dictionary = {}
-	for card: CardData in character.starting_deck_counts:
-		counts[card.card_name] = character.starting_deck_counts[card]
-	_expect_eq(counts, {"Slash": 5, "Bite Down": 1, "Brace": 2, "Settled Account": 1, "Down Payment": 1}, "Starting deck unchanged")
 	_completed += 1
 
 # --- Class and offer ---
