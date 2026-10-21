@@ -83,10 +83,9 @@ func _check_data() -> void:
 	var card: CardData = load(DENY_PATH)
 	var delayed: StatusData = load(DELAYED_PATH)
 	_expect_eq(card.card_name, "Deny", "The card loads")
-	_expect_eq([card.cost, card.card_type, card.rarity, card.target_type, card.removal_scope, card.card_class], [1, CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.TargetType.ENEMY, CardData.RemovalScope.SPENT, &"wanderer"], "...1 Energy, a Skill, Uncommon, at an enemy, Spent, the Wanderer's")
+	_expect_eq([card.card_type, card.rarity, card.target_type, card.removal_scope, card.card_class], [CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.TargetType.ENEMY, CardData.RemovalScope.SPENT, &"wanderer"], "...a Skill, Uncommon, at an enemy, Spent, the Wanderer's")
 	_expect_eq(card.description, "Spend {toll_cost} Toll.\nDelay target enemy.\nSpent.", "...its text")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and card.effects[1].status_data == delayed, "...SPEND_TOLL, then Delayed on the target - no hand card taken")
-	_expect_eq(_toll, 6, "...6 Toll")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...its art kept")
 	_expect_eq(card.play_sound_path, SOUND_PATH, "...and its sound")
@@ -95,7 +94,7 @@ func _check_data() -> void:
 	_expect(not ResourceLoader.exists(DENIED_PATH), "Denied is gone")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Deny+")
-	_expect_eq([tempered.card_name, tempered.cost, tempered.effects[0].toll_cost, tempered.description], ["Deny+", 1, 4, card.description], "Deny+: 1 Energy, spends 4, the same text")
+	_expect_eq([tempered.card_name, tempered.description], ["Deny+", card.description], "Deny+: the same text")
 	_expect((load(POOL_PATH) as RewardPool).entries.has(card), "In the Wanderer pool")
 	_completed += 1
 

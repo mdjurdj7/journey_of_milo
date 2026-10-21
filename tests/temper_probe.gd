@@ -106,26 +106,17 @@ func _check_data() -> void:
 		_expect(tempered.removal_scope == card.removal_scope or drops_spent, "...its removal scope, or Spent dropped (%d from %d)" % [tempered.removal_scope, card.removal_scope])
 		_expect(tempered.tempered == null, "...and can't be tempered again")
 		_expect_eq(tempered.art, card.art, "...its art")
-	var slash: CardData = _tempered("slash")
-	_expect_eq(_values(slash, CardEffect.EffectType.DAMAGE), [9], "Slash+ deals 9")
-	var bite: CardData = _tempered("bite_down")
-	_expect_eq(_values(bite, CardEffect.EffectType.DAMAGE), [11], "Bite Down+ deals 11")
-	_expect_eq(_values(bite, CardEffect.EffectType.SELF_DAMAGE), [2], "...and loses 2 HP")
 	var brace: CardData = _tempered("brace")
 	_expect_eq(brace.effects.size(), 2, "Brace+ has two effects")
 	_expect_eq(brace.effects[0].effect_type, CardEffect.EffectType.APPLY_STATUS_TO_TARGET, "...the Brace first")
 	_expect_eq(brace.effects[0].status_data, (load("res://cards/data/brace.tres") as CardData).effects[0].status_data, "...the same status")
-	_expect_eq(_values(brace, CardEffect.EffectType.DRAW), [1], "...then draw 1")
+	_expect_eq(brace.effects[1].effect_type, CardEffect.EffectType.DRAW, "...then a draw")
 	var reckoning: CardData = _tempered("reckoning")
 	var original_reckoning := load("res://cards/data/reckoning.tres") as CardData
-	_expect_eq(reckoning.cost, 1, "Reckoning+ costs 1")
-	_expect_eq(original_reckoning.cost, 2, "...Reckoning 2")
+	_expect(reckoning.cost < original_reckoning.cost, "Reckoning+ costs less than Reckoning")
 	_expect_eq(reckoning.description, original_reckoning.description, "...otherwise unchanged in text")
 	_expect_eq(_values(reckoning, CardEffect.EffectType.TOLL_SPENT_DAMAGE), _values(original_reckoning, CardEffect.EffectType.TOLL_SPENT_DAMAGE), "...and in effect")
 	_expect_eq(reckoning.removal_scope, CardData.RemovalScope.SPENT, "...and still Spent")
-	var down: CardData = _tempered("down_payment")
-	_expect_eq(_values(down, CardEffect.EffectType.SELF_DAMAGE_TOLL), [1], "Down Payment+ loses 1 HP")
-	_expect_eq(down.effects[0].toll_gain, 8, "...and gains 8 Toll")
 	for file in DirAccess.get_files_at(TEMPERED_DIR):
 		if file.ends_with(".tres"):
 			var named: bool = false

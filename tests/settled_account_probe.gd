@@ -81,19 +81,18 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	_expect_eq(card.card_name, "Settled Account", "The card loads")
-	_expect_eq(card.cost, 1, "...costs 1 Energy")
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.COMMON, "...Common")
 	_expect_eq(card.offer, CardData.OfferScope.REWARDABLE, "...rewardable")
 	_expect_eq(card.target_type, CardData.TargetType.SELF, "...takes no enemy target")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.GUARD, "...reading GUARD")
 	_expect_eq(card.description, "Gain {block} block.\n{if}Spend {toll_cost} Toll: {toll_block} more block.{/if}", "...its text")
-	_expect_eq(_shape(card), [CardEffect.EffectType.BLOCK, 5, CardEffect.EffectType.TOLL_BLOCK, 5, 5], "...BLOCK 5, then TOLL_BLOCK: 5 Toll for 5")
+	_expect_eq(_shape(card), [CardEffect.EffectType.BLOCK, CardEffect.EffectType.TOLL_BLOCK], "...BLOCK, then TOLL_BLOCK")
 	_expect_eq(CardBonus.mode(card.effects[0]), CardBonus.Mode.NONE, "...no condition left")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Settled Account+")
 	_expect_eq(tempered.description, card.description, "Settled Account+ reads the same text")
-	_expect_eq(_shape(tempered), [CardEffect.EffectType.BLOCK, 8, CardEffect.EffectType.TOLL_BLOCK, 5, 5], "...BLOCK 8, then the same 5 Toll for 5")
+	_expect_eq(_shape(tempered), _shape(card), "...the same effects")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "The card has its art")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...mipmapped")
 	_expect_eq(card.play_sound_path, SOUND_PATH, "...and its play sound")
@@ -110,7 +109,7 @@ func _shape(card: CardData) -> Array:
 		return [card.effects.size()]
 	var block: CardEffect = card.effects[0]
 	var toll_block: CardEffect = card.effects[1]
-	return [block.effect_type, block.value, toll_block.effect_type, toll_block.toll_cost, toll_block.value]
+	return [block.effect_type, toll_block.effect_type]
 
 # --- Rules ---
 

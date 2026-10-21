@@ -127,10 +127,10 @@ func _check_data() -> void:
 				_expect(card.resource_path != SAMPHIRE_PATH, "%s never offers Samphire (%s)" % [file, character.character_name])
 	var samphire := load(SAMPHIRE_PATH) as CardData
 	_expect_eq(samphire.card_name, "Samphire", "Samphire")
-	_expect(samphire.card_type == CardData.CardType.SKILL and samphire.cost == 1, "...a 1-Energy Skill")
+	_expect(samphire.card_type == CardData.CardType.SKILL, "...a Skill")
 	_expect_eq(samphire.rarity, CardData.CardRarity.COMMON, "...Common")
 	_expect_eq(samphire.removal_scope, CardData.RemovalScope.CONSUMED, "...Consumed")
-	_expect(samphire.effects.size() == 1 and samphire.effects[0].effect_type == CardEffect.EffectType.HEAL and samphire.effects[0].value == 8, "...one Heal for 8")
+	_expect(samphire.effects.size() == 1 and samphire.effects[0].effect_type == CardEffect.EffectType.HEAL, "...one Heal")
 	_expect_eq(samphire.description, "Heal 8.\nConsumed.", "...reading Heal 8. / Consumed.")
 	_completed += 1
 

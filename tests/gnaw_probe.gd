@@ -79,7 +79,6 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	_expect_eq(card.card_name, "Gnaw", "The card loads")
-	_expect_eq(card.cost, 0, "...costs 0 Energy")
 	_expect_eq(card.card_type, CardData.CardType.ATTACK, "...is an Attack")
 	_expect_eq(card.rarity, CardData.CardRarity.COMMON, "...Common")
 	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")

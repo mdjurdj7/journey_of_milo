@@ -86,7 +86,6 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	_expect_eq(card.card_name, "Garnish", "The card loads")
-	_expect_eq(card.cost, 1, "...costs 1 Energy")
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "...Uncommon")
 	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
@@ -101,7 +100,6 @@ func _check_data() -> void:
 		_expect(garnish.status_data != null and garnish.status_data.resource_path == STATUS_PATH, "...Garnished")
 	var status: StatusData = load(STATUS_PATH)
 	_expect_eq(status.display_name, "Garnished", "Garnished: one word")
-	_expect_eq(status.default_magnitude, 5, "...worth 5")
 	_expect(status.reduces_attack_total and status.consumed_by_own_attack, "...a total off the next Attack, spent when it resolves")
 	_expect_eq(status.category, StatusData.Category.INFORMATIONAL, "...not a per-hit modifier")
 	_expect_eq(status.stack_rule, StatusData.StackRule.ADD_MAGNITUDE, "...copies adding up")

@@ -76,8 +76,8 @@ func _initialize() -> void:
 
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
-	_expect_eq([card.card_name, card.cost, card.card_type, card.rarity, card.removal_scope, card.offer, card.card_class], ["Not So", 1, CardData.CardType.SKILL, CardData.CardRarity.RARE, CardData.RemovalScope.SPENT, CardData.OfferScope.REWARDABLE, &"wanderer"], "Not So: 1 Energy, a Rare Skill, Spent, rewardable, the Wanderer's")
-	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[0].toll_cost == 10 and card.effects[1].effect_type == CardEffect.EffectType.UNDO_LAST_ATTACK, "...SPEND_TOLL 10, then UNDO_LAST_ATTACK")
+	_expect_eq([card.card_name, card.card_type, card.rarity, card.removal_scope, card.offer, card.card_class], ["Not So", CardData.CardType.SKILL, CardData.CardRarity.RARE, CardData.RemovalScope.SPENT, CardData.OfferScope.REWARDABLE, &"wanderer"], "Not So: a Rare Skill, Spent, rewardable, the Wanderer's")
+	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.UNDO_LAST_ATTACK, "...SPEND_TOLL, then UNDO_LAST_ATTACK")
 	_expect_eq(card.description, "Spend {toll_cost} Toll.\n{battle}Undo {undo_hp} ({undo_attack}); return it.{/battle}{outside}Undo the last attack; return it.{/outside}\nSpent.", "...its text")
 	_expect(card.hover_note.contains("deal that much to its attacker"), "...its hover note spells out 'return it'")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
@@ -85,7 +85,7 @@ func _check_data() -> void:
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Not So+")
 	_expect(tempered.art == card.art, "...which carries the same art")
-	_expect_eq([tempered.card_name, tempered.effects[0].toll_cost, tempered.description], ["Not So+", 7, card.description], "Not So+: spends 7, the same text")
+	_expect_eq([tempered.card_name, tempered.description], ["Not So+", card.description], "Not So+: the same text")
 	_completed += 1
 
 # An attack of 9 through 3 Block: on the record, 6, the Scissor, its

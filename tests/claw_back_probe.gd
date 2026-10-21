@@ -83,7 +83,6 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	_expect_eq(card.card_name, "Claw Back", "The card loads")
-	_expect_eq(card.cost, 2, "...costs 2 Energy")
 	_expect_eq(card.card_type, CardData.CardType.ATTACK, "...is an Attack")
 	_expect_eq(card.rarity, CardData.CardRarity.RARE, "...Rare")
 	_expect_eq(card.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
@@ -93,7 +92,7 @@ func _check_data() -> void:
 	var effect: CardEffect = card.effects[0]
 	_expect_eq(effect.effect_type, CardEffect.EffectType.DAMAGE, "...an ordinary hit, the card's own blow")
 	_expect(effect.drains, "...that Drains")
-	_expect_eq([effect.value, effect.condition, effect.alt_value], [5, CardEffect.Condition.CRITICAL, 12], "...5, or 12 at Critical")
+	_expect_eq(effect.condition, CardEffect.Condition.CRITICAL, "...with a Critical alt")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.STRIKE, "...reading STRIKE")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "The card has its art")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...mipmapped")

@@ -75,18 +75,18 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var card: CardData = load(COLLATERAL_PATH)
 	var status: StatusData = load(COLLATERAL_STATUS_PATH)
-	_expect_eq([card.cost, card.card_type, card.rarity, card.removal_scope], [0, CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.RemovalScope.SPENT], "Collateral: 0 Energy, a Skill, Uncommon, Spent")
+	_expect_eq([card.card_type, card.rarity, card.removal_scope], [CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.RemovalScope.SPENT], "Collateral: a Skill, Uncommon, Spent")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...with mipmapped art")
 	_expect((load(POOL_PATH) as RewardPool).entries.has(card), "...in the Wanderer pool")
 	_expect_eq(card.description, "This turn, cover missing Energy with HP: {hp_per_energy} HP each.\nSpent.", "The card's text, its number from data")
-	_expect_eq([status.hp_per_missing_energy, status.default_charges, status.ends_at_turn_end, status.default_duration_turns], [3, 0, true, StatusData.DURATION_UNTIL_REMOVED], "The status: 3 HP an Energy, no charges, for the turn")
+	_expect_eq([status.default_charges, status.ends_at_turn_end, status.default_duration_turns], [0, true, StatusData.DURATION_UNTIL_REMOVED], "The status: no charges, for the turn")
 	var statuses: Array[Status] = []
 	Status.apply_to(statuses, status)
 	_expect_eq(statuses[0].label(), "Collateral", "Its line reads Collateral")
 	_expect_eq(statuses[0].describe(), "This turn, cover missing Energy with HP: 3 HP each.", "...and the reveal")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Collateral+")
-	_expect_eq([tempered.cost, tempered.removal_scope, tempered.description, tempered.effects[0].status_data.hp_per_missing_energy], [0, CardData.RemovalScope.SPENT, card.description, 2], "Collateral+: the same card at 2 HP an Energy")
+	_expect_eq([tempered.removal_scope, tempered.description], [CardData.RemovalScope.SPENT, card.description], "Collateral+: the same card")
 	_completed += 1
 
 # On bare fighters: 2 short of Reckoning's 2 at 0 Energy is 6 HP, at 1

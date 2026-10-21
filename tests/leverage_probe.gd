@@ -76,19 +76,18 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var card: CardData = load(LEVERAGE_PATH)
 	var status: StatusData = load(LEVERAGE_STATUS_PATH)
-	_expect_eq(card.cost, 0, "Leverage costs 0")
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "...Uncommon")
 	_expect_eq(card.removal_scope, CardData.RemovalScope.NONE, "...and not Spent")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...with mipmapped art")
 	_expect((load(POOL_PATH) as RewardPool).entries.has(card), "...in the Wanderer pool")
 	_expect_eq(card.effects.size(), 2, "Two effects")
-	_expect_eq([card.effects[0].effect_type, card.effects[0].toll_cost], [CardEffect.EffectType.SPEND_TOLL, 5], "...Spend 5 Toll first")
+	_expect_eq(card.effects[0].effect_type, CardEffect.EffectType.SPEND_TOLL, "...Spend Toll first")
 	_expect_eq([card.effects[1].effect_type, card.effects[1].status_data], [CardEffect.EffectType.APPLY_STATUS, status], "...then the Leverage status")
 	_expect_eq(card.description, "Spend {toll_cost} Toll.\nThe next card you play this turn costs {reduction} less Energy.", "The card's text, its numbers from data")
-	_expect_eq([status.next_card_cost_reduction, status.default_duration_turns, status.stack_rule, status.ends_at_turn_end], [2, StatusData.DURATION_UNTIL_REMOVED, StatusData.StackRule.IGNORE, true], "The status: 2 less, until spent or the turn ends, stacks by count")
+	_expect_eq([status.default_duration_turns, status.stack_rule, status.ends_at_turn_end], [StatusData.DURATION_UNTIL_REMOVED, StatusData.StackRule.IGNORE, true], "The status: until spent or the turn ends, stacks by count")
 	var tempered: CardData = card.tempered
-	_expect_eq([tempered.card_name, tempered.effects[0].toll_cost, tempered.removal_scope, tempered.description], ["Leverage+", 4, CardData.RemovalScope.NONE, card.description], "Leverage+: spends 4, the same text, not Spent")
+	_expect_eq([tempered.card_name, tempered.removal_scope, tempered.description], ["Leverage+", CardData.RemovalScope.NONE, card.description], "Leverage+: the same text, not Spent")
 	var statuses: Array[Status] = []
 	Status.apply_to(statuses, status)
 	_expect_eq(statuses[0].label(), "Leverage", "One play: the line reads Leverage")

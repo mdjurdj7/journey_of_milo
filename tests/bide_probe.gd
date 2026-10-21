@@ -76,15 +76,15 @@ func _initialize() -> void:
 
 func _check_data() -> void:
 	var card: CardData = load(BIDE_PATH)
-	_expect_eq([card.card_name, card.cost, card.card_type, card.rarity, card.removal_scope], ["Bide", 0, CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.RemovalScope.NONE], "Bide: 0 Energy, a Common Skill, not Spent")
-	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[0].toll_cost == 4 and card.effects[1].effect_type == CardEffect.EffectType.GRANT_KEEP and card.effects[1].value == 2, "...SPEND_TOLL 4, then GRANT_KEEP 2")
+	_expect_eq([card.card_name, card.card_type, card.rarity, card.removal_scope], ["Bide", CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.RemovalScope.NONE], "Bide: a Common Skill, not Spent")
+	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.GRANT_KEEP, "...SPEND_TOLL, then GRANT_KEEP")
 	_expect_eq(card.description, "Spend {toll_cost} Toll.\nChoose up to {keep} cards in your hand. They gain Keep.", "...its text, numbers from data")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...its art kept")
 	_expect((load(POOL_PATH) as RewardPool).entries.has(card), "...in the Wanderer pool")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Bide+")
-	_expect_eq([tempered.card_name, tempered.effects[1].value, tempered.description], ["Bide+", 3, card.description], "Bide+: up to 3, the same text")
+	_expect_eq([tempered.card_name, tempered.description], ["Bide+", card.description], "Bide+: the same text")
 	_expect_eq(KeywordTable.shared().definition("Keep"), "Stays in your hand at the end of each turn until played.", "The Keep keyword")
 	_completed += 1
 

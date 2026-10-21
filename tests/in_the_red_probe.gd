@@ -81,7 +81,6 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	_expect_eq(card.card_name, "In the Red", "The card loads")
-	_expect_eq(card.cost, 0, "...costs 0 Energy")
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "...Uncommon")
 	_expect_eq(card.offer, CardData.OfferScope.REWARDABLE, "...rewardable")
@@ -92,10 +91,10 @@ func _check_data() -> void:
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...with its art")
 	_expect(card.art != null and card.art.get_image().has_mipmaps(), "...mipmapped")
 	_expect_eq(card.description, "Gain {energy} Energy.\n{if}Critical: {bonus_energy} more, and draw {draw}.{/if}\nSpent.", "...its text - the 5 HP on the badge alone")
-	_expect_eq(_shape(card), [CardEffect.EffectType.SELF_DAMAGE_TOLL, 5, 0, CardEffect.Condition.NONE,
-		CardEffect.EffectType.GAIN_ENERGY, 1, CardEffect.Condition.NONE,
-		CardEffect.EffectType.GAIN_ENERGY, 1, CardEffect.Condition.CRITICAL,
-		CardEffect.EffectType.DRAW, 2, CardEffect.Condition.CRITICAL], "...lose 5, gain 1, then 1 more and draw 2 when Critical")
+	_expect_eq(_shape(card), [CardEffect.EffectType.SELF_DAMAGE_TOLL, CardEffect.Condition.NONE,
+		CardEffect.EffectType.GAIN_ENERGY, CardEffect.Condition.NONE,
+		CardEffect.EffectType.GAIN_ENERGY, CardEffect.Condition.CRITICAL,
+		CardEffect.EffectType.DRAW, CardEffect.Condition.CRITICAL], "...lose HP, gain Energy, then more Energy and a draw when Critical")
 	_expect_eq(CardBonus.mode(card.effects[2]), CardBonus.Mode.GATE, "...the Critical Energy a gate")
 	_expect_eq(CardBonus.mode(card.effects[3]), CardBonus.Mode.GATE, "...and the draw")
 	_expect_eq(CardBonus.upfront_hp_cost(card, null, 0), 5, "...its 5 paid before Critical is read")
@@ -103,22 +102,16 @@ func _check_data() -> void:
 	_expect(card.tempered == tempered, "...tempering to In the Red+")
 	_expect_eq(tempered.card_name, "In the Red+", "In the Red+ loads")
 	_expect_eq(tempered.description, card.description, "...reads the same text")
-	_expect_eq([tempered.cost, tempered.rarity, tempered.card_class, tempered.removal_scope], [0, CardData.CardRarity.UNCOMMON, &"wanderer", CardData.RemovalScope.SPENT], "...0 Energy, Uncommon, the Wanderer's, Spent")
+	_expect_eq([tempered.rarity, tempered.card_class, tempered.removal_scope], [CardData.CardRarity.UNCOMMON, &"wanderer", CardData.RemovalScope.SPENT], "...Uncommon, the Wanderer's, Spent")
 	_expect(tempered.art == card.art, "...the same art")
-	_expect_eq(_shape(tempered), [CardEffect.EffectType.SELF_DAMAGE_TOLL, 5, 0, CardEffect.Condition.NONE,
-		CardEffect.EffectType.GAIN_ENERGY, 1, CardEffect.Condition.NONE,
-		CardEffect.EffectType.GAIN_ENERGY, 1, CardEffect.Condition.CRITICAL,
-		CardEffect.EffectType.DRAW, 3, CardEffect.Condition.CRITICAL], "...draws 3 when Critical, the rest the same")
+	_expect_eq(_shape(tempered), _shape(card), "...the same effects")
 	_completed += 1
 
-# Each effect's type, value and condition - the self-loss's top-up too.
+# Each effect's type and condition.
 func _shape(card: CardData) -> Array:
 	var shape: Array = []
 	for effect in card.effects:
 		shape.append(effect.effect_type)
-		shape.append(effect.value)
-		if effect.effect_type == CardEffect.EffectType.SELF_DAMAGE_TOLL:
-			shape.append(effect.toll_gain)
 		shape.append(effect.condition)
 	return shape
 

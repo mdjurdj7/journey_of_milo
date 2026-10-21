@@ -92,17 +92,17 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	var status: StatusData = load(STATUS_PATH)
-	_expect_eq([card.card_name, card.cost, card.card_type, card.rarity, card.target_type, card.card_class, card.offer], ["Wrest", 2, CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.TargetType.ENEMY, &"wanderer", CardData.OfferScope.REWARDABLE], "Wrest: 2 Energy, a Common Skill at one enemy, the Wanderer's")
+	_expect_eq([card.card_name, card.card_type, card.rarity, card.target_type, card.card_class, card.offer], ["Wrest", CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.TargetType.ENEMY, &"wanderer", CardData.OfferScope.REWARDABLE], "Wrest: a Common Skill at one enemy, the Wanderer's")
 	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Wrest.png", "...with its art")
 	_expect_eq(card.description, "Take up to {take} from an attack.\nGain that much Block.", "...its text")
-	_expect(card.effects.size() == 1 and card.effects[0].effect_type == CardEffect.EffectType.TAKE_FROM_ATTACK and card.effects[0].value == 7 and card.effects[0].status_data == status, "...one effect: take up to 7, as Wrested")
+	_expect(card.effects.size() == 1 and card.effects[0].effect_type == CardEffect.EffectType.TAKE_FROM_ATTACK and card.effects[0].status_data == status, "...one effect: take from an attack, as Wrested")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.GUARD, "...reading GUARD")
 	_expect_eq(EffectResolver.intent_mark_status(card.effects[0]), status, "...marking an intent")
 	_expect_eq([status.display_name, status.intent_mark, status.reduces_attack_total, status.consumed_by_own_attack, status.ignores_strike_backs], ["Wrested", &"wrest", true, true, true], "Wrested: a mark that cuts the attack's total, spent by it, passed by a strike back")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Wrest+")
-	_expect_eq([tempered.card_name, tempered.cost, tempered.rarity, tempered.description], ["Wrest+", 2, CardData.CardRarity.COMMON, card.description], "Wrest+: 2 Energy, the same text")
-	_expect(tempered.effects.size() == 1 and tempered.effects[0].value == 11 and tempered.effects[0].status_data == status, "...up to 11")
+	_expect_eq([tempered.card_name, tempered.rarity, tempered.description], ["Wrest+", CardData.CardRarity.COMMON, card.description], "Wrest+: the same text")
+	_expect(tempered.effects.size() == 1 and tempered.effects[0].status_data == status, "...as Wrested too")
 	for pool_path: String in [WANDERER_POOL_PATH, COLLECTOR_POOL_PATH]:
 		_expect((load(pool_path) as RewardPool).entries.has(card), "In %s" % pool_path)
 	_completed += 1

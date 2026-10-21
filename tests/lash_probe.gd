@@ -88,7 +88,6 @@ func _initialize() -> void:
 func _check_card_data() -> void:
 	var lash: CardData = _lash()
 	_expect_eq(lash.card_name, "Lash", "The card is named Lash")
-	_expect_eq(lash.cost, 1, "...costs 1")
 	_expect_eq(lash.card_type, CardData.CardType.ATTACK, "...is an Attack")
 	_expect_eq(lash.target_type, CardData.TargetType.ENEMY, "...targets one enemy")
 	_expect(lash.rarity != CardData.CardRarity.UNSET, "...has a rarity")

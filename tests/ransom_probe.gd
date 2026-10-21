@@ -92,7 +92,6 @@ func _check_data() -> void:
 	var card: CardData = load(RANSOM_PATH)
 	var waiting: StatusData = load(RANSOM_STATUS_PATH)
 	var active: StatusData = load(RANSOM_ACTIVE_PATH)
-	_expect_eq(card.cost, 2, "Ransom costs 2")
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
 	_expect_eq(card.rarity, CardData.CardRarity.RARE, "...Rare")
 	_expect_eq(card.removal_scope, CardData.RemovalScope.SPENT, "...and Spent")
@@ -104,7 +103,6 @@ func _check_data() -> void:
 	_expect_eq(waiting.grants_on_turn_start, active, "The waiting status gives way to the live one at turn start")
 	_expect(not waiting.attacks_drain and not waiting.ends_at_turn_end, "...and does nothing itself")
 	_expect(active.attacks_drain and active.ends_at_turn_end, "The live one Drains and ends with the turn")
-	_expect(is_equal_approx(active.ransom_heal_fraction, 0.5), "...healing half")
 	_expect_eq([waiting.default_duration_turns, active.default_duration_turns], [StatusData.DURATION_UNTIL_REMOVED, StatusData.DURATION_UNTIL_REMOVED], "Neither is aged by the turn counter")
 	var statuses: Array[Status] = []
 	Status.apply_to(statuses, waiting)

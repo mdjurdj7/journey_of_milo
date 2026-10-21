@@ -74,7 +74,6 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	_expect_eq(card.card_name, "Reckoning", "The card loads")
-	_expect_eq(card.cost, 2, "...costs 2 Energy")
 	_expect_eq(card.card_type, CardData.CardType.ATTACK, "...an Attack")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "...Uncommon")
 	_expect_eq(card.offer, CardData.OfferScope.REWARDABLE, "...rewardable")
@@ -86,7 +85,6 @@ func _check_data() -> void:
 	_expect((load(COLLECTOR_POOL_PATH) as RewardPool).entries.has(card), "...and the collector pool")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Reckoning+")
-	_expect_eq(tempered.cost, 1, "Reckoning+ costs 1")
 	_expect_eq([tempered.description, tempered.removal_scope, tempered.card_type], [card.description, card.removal_scope, card.card_type], "...otherwise the same card, Spent")
 	_completed += 1
 

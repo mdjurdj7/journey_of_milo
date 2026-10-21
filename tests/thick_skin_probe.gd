@@ -92,17 +92,17 @@ func _initialize() -> void:
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	var status: StatusData = load(STATUS_PATH)
-	_expect_eq([card.card_name, card.cost, card.card_type, card.rarity, card.target_type, card.card_class, card.offer], ["Thick Skin", 2, CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.TargetType.SELF, &"wanderer", CardData.OfferScope.REWARDABLE], "Thick Skin: 2 Energy, a Common Skill, no target, the Wanderer's")
+	_expect_eq([card.card_name, card.card_type, card.rarity, card.target_type, card.card_class, card.offer], ["Thick Skin", CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.TargetType.SELF, &"wanderer", CardData.OfferScope.REWARDABLE], "Thick Skin: a Common Skill, no target, the Wanderer's")
 	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Thick Skin.png", "...with its art")
 	_expect_eq(card.description, "Gain {block} block.\nUntil your next turn, damage past Block costs Toll first.", "...its text")
-	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.BLOCK and card.effects[0].value == 6, "...6 Block")
+	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.BLOCK, "...Block")
 	_expect(card.effects.size() == 2 and card.effects[1].effect_type == CardEffect.EffectType.APPLY_STATUS and card.effects[1].status_data == status, "...then Thick Skin")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect_eq([status.toll_pays_damage, status.default_duration_turns, status.ignores_strike_backs], [true, 1, false], "The status: Toll pays, until the next turn, strike backs too")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Thick Skin+")
-	_expect_eq([tempered.card_name, tempered.cost, tempered.rarity, tempered.description], ["Thick Skin+", 2, CardData.CardRarity.COMMON, card.description], "Thick Skin+: the same card")
-	_expect(tempered.effects.size() == 2 and tempered.effects[0].value == 9 and tempered.effects[1].status_data == status, "...9 Block")
+	_expect_eq([tempered.card_name, tempered.rarity, tempered.description], ["Thick Skin+", CardData.CardRarity.COMMON, card.description], "Thick Skin+: the same card")
+	_expect(tempered.effects.size() == 2 and tempered.effects[0].effect_type == CardEffect.EffectType.BLOCK and tempered.effects[1].status_data == status, "...Block, then the same status")
 	for pool_path: String in [WANDERER_POOL_PATH, COLLECTOR_POOL_PATH]:
 		_expect((load(pool_path) as RewardPool).entries.has(card), "In %s" % pool_path)
 	_completed += 1

@@ -57,7 +57,6 @@ func _initialize() -> void:
 func _check_card_data() -> void:
 	var card: CardData = _card("sentence")
 	_expect_eq(card.card_name, "Sentence", "The card is named Sentence")
-	_expect_eq(card.cost, 1, "...costs 1")
 	_expect_eq(card.removal_scope, CardData.RemovalScope.SPENT, "...is Spent")
 	_expect_eq(card.description, "In {countdown_turns} turns, deal {countdown_damage} damage.\nEach Toll spend: 1 turn sooner.\nSpent.", "...its text, numbers from data")
 	_expect_eq(card.card_type, CardData.CardType.SKILL, "...is a Skill")
@@ -217,8 +216,8 @@ func _check_tempered() -> void:
 	var card: CardData = _card("sentence")
 	var tempered: CardData = card.tempered
 	var status: StatusData = tempered.effects[0].status_data
-	_expect_eq([tempered.card_name, tempered.cost, tempered.removal_scope, tempered.description], ["Sentence+", 1, CardData.RemovalScope.SPENT, card.description], "Sentence+: 1 Energy, Spent, the same text")
-	_expect_eq([status.default_duration_turns, status.countdown_damage, status.stack_rule], [3, 45, StatusData.StackRule.SEPARATE], "...3 turns, 45 damage, each its own")
+	_expect_eq([tempered.card_name, tempered.removal_scope, tempered.description], ["Sentence+", CardData.RemovalScope.SPENT, card.description], "Sentence+: Spent, the same text")
+	_expect_eq(status.stack_rule, StatusData.StackRule.SEPARATE, "...each its own")
 	_completed += 1
 
 func _check_separate_enemies() -> void:

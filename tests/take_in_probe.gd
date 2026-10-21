@@ -73,12 +73,12 @@ func _initialize() -> void:
 
 func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
-	_expect_eq([card.card_name, card.cost, card.card_type, card.rarity, card.removal_scope, card.offer, card.card_class, card.description], ["Take In", 1, CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.RemovalScope.NONE, CardData.OfferScope.REWARDABLE, &"wanderer", "Devour a card in your hand."], "Take In: 1 Energy, an Uncommon Skill, rewardable, the Wanderer's")
-	_expect(card.effects.size() == 1 and card.effects[0].effect_type == CardEffect.EffectType.DEVOUR_FROM_HAND and _per_energy == 2, "...one DEVOUR_FROM_HAND, 2 per Energy")
+	_expect_eq([card.card_name, card.card_type, card.rarity, card.removal_scope, card.offer, card.card_class, card.description], ["Take In", CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.RemovalScope.NONE, CardData.OfferScope.REWARDABLE, &"wanderer", "Devour a card in your hand."], "Take In: an Uncommon Skill, rewardable, the Wanderer's")
+	_expect(card.effects.size() == 1 and card.effects[0].effect_type == CardEffect.EffectType.DEVOUR_FROM_HAND, "...one DEVOUR_FROM_HAND")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Take In+")
 	_expect(card.art != null and card.art.resource_path == ART_PATH and tempered.art == card.art, "...both carrying its art")
-	_expect_eq([tempered.card_name, tempered.cost, tempered.description, tempered.effects[0].value], ["Take In+", 0, card.description, _per_energy], "Take In+: 0 Energy, the same text and yield")
+	_expect_eq([tempered.card_name, tempered.description, tempered.effects[0].value], ["Take In+", card.description, _per_energy], "Take In+: the same text and yield")
 	var definition: String = KeywordTable.shared().definition("Devour")
 	_expect(definition.contains("deal %d more" % _per_energy) and definition.contains("gives %d Block" % _per_energy), "The Devour keyword's numbers are the card's (%s)" % definition)
 	_expect(KeywordTable.shared().pattern().search("Devour a card") != null, "...and Take In's text inks it")

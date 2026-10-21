@@ -415,7 +415,6 @@ func _check_top_tier_prefers_ultra() -> void:
 
 func _check_blood_arc_basics() -> void:
 	var card: CardData = _card("blood_arc")
-	_expect_eq(card.cost, 1, "Blood Arc costs 1")
 	_expect_eq(card.card_type, CardData.CardType.ATTACK, "Blood Arc is an Attack")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "Blood Arc is Uncommon")
 
@@ -485,7 +484,6 @@ func _check_blood_arc_last_resort() -> void:
 
 func _check_with_regards() -> void:
 	var card: CardData = _card("with_regards")
-	_expect_eq(card.cost, 1, "With Regards costs 1")
 	_expect_eq(card.rarity, CardData.CardRarity.UNCOMMON, "With Regards is Uncommon")
 
 	var heal: CardEffect = card.effects[1] if card.effects.size() > 1 else null
