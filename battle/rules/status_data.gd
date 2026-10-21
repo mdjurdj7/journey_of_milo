@@ -177,11 +177,12 @@ enum Mark { NONE, COIL, DROP }
 # instead (below).
 @export var consumed_by_own_attack: bool = false
 
-# Lives on one enemy intent, not on the enemy (Braced, Garnished): the
-# card that puts it on (APPLY_STATUS_TO_TARGET) targets an attack intent
-# the enemy has queued - one that will deal damage when it resolves, not a
-# strike back - and binds to it (Status.bound_intent). It holds every hit
-# of every action of that intent (both of Bereft's), is spent once the
+# Lives on one enemy intent, not on the enemy (Braced, Garnished,
+# Wrested): the card that puts it on (APPLY_STATUS_TO_TARGET, TAKE_FROM_
+# ATTACK) targets an attack intent the enemy has queued - one that will
+# deal damage when it resolves, not a strike back - and binds to it
+# (Status.bound_intent). It holds every hit of the action it was put on -
+# the first of Bereft's two; the second lands in full - is spent once the
 # intent has landed, and is lost - with why - if the intent is replaced,
 # cancelled (Stunned, a pain turn, an interrupt) or its enemy dies first
 # (EnemyTurn.mark_loss(), take_turn()). An out-of-turn answer to a Signal

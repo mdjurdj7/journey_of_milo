@@ -254,16 +254,6 @@ static func marks(statuses: Array[Status]) -> Array[Status]:
 			found.append(active)
 	return found
 
-# The marks that cut an attack's total (StatusData.reduces_attack_total -
-# Garnished, Wrested): they cut the one action they were put on, and an
-# intent carried out twice (Bereft) lands its second action in full.
-static func total_marks(statuses: Array[Status]) -> Array[Status]:
-	var found: Array[Status] = []
-	for active in marks(statuses):
-		if active.data.reduces_attack_total:
-			found.append(active)
-	return found
-
 # The one carrying `mark` ("brace", "garnish"), or null.
 static func find_mark(statuses: Array[Status], mark: StringName) -> Status:
 	for active in statuses:

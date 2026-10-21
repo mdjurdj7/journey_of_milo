@@ -118,7 +118,7 @@ func _initialize() -> void:
 	_check_brace_spent_when_blocked()
 	_check_brace_lost_on_interrupt()
 	_check_brace_once_per_intent()
-	_check_brace_both_actions()
+	_check_brace_first_action()
 	_check_brace_waits_out_an_answer()
 	_check_brace_face()
 	_check_lasting_cards_leave_rotation()
@@ -259,20 +259,22 @@ func _check_brace_once_per_intent() -> void:
 	_expect_eq(int(result["damage_to_hp"]), 4, "Braced 8 -> 4")
 	_completed += 1
 
-# Bereft's two actions of the Braced intent: both halved, the Brace
-# spent once both are done.
-func _check_brace_both_actions() -> void:
+# Bereft's two actions of the Braced intent: the first - the action the
+# Brace was put on - halved, the second in full, as Garnish and Wrest cut
+# only theirs; the Brace spent once both are done, its numbers the first
+# action's.
+func _check_brace_first_action() -> void:
 	var player: Combatant = _player(50)
 	var data: EnemyData = _enemy_data([_attack(8, 1)])
 	var enemy: Combatant = _enemy(data)
 	Status.apply_to(enemy.statuses, load(BEREFT_PATH) as StatusData)
 	_brace(player, enemy)
 	var preview: Dictionary = EnemyTurn.preview_intent(enemy, data, player)
-	_expect_eq(preview.get("hit_amounts", []), [4, 4], "Bereft, Braced: both actions preview 4")
+	_expect_eq(preview.get("hit_amounts", []), [4, 8], "Bereft, Braced: the first action previews 4, the second 8")
 	var result: Dictionary = EnemyTurn.take_turn(enemy, data, player)
-	_expect_eq(int(result["damage_to_hp"]), 8, "...and land 4 + 4")
+	_expect_eq(int(result["damage_to_hp"]), 12, "...and land 4 + 8")
 	var marks: Array = result.get("marks", [])
-	_expect(marks.size() == 1 and str(marks[0]["outcome"]) == "spent" and int(marks[0]["before"]) == 16 and int(marks[0]["after"]) == 8, "...spent once, 16 before, 8 after")
+	_expect(marks.size() == 1 and str(marks[0]["outcome"]) == "spent" and int(marks[0]["before"]) == 8 and int(marks[0]["after"]) == 4, "...spent once, 8 before, 4 after")
 	_completed += 1
 
 # An out-of-turn answer to a Signal (EnemyTurn.answer_signal()) is no

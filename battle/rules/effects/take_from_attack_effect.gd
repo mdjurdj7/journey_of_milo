@@ -14,7 +14,7 @@ class_name TakeFromAttackEffect
 #
 # An intent carried out twice (Bereft): the mark cuts the first action -
 # the one it was put on - and is spent there; the second lands in full
-# (Status.total_marks()). So what Wrest takes is read off the first
+# (Status.marks()). So what Wrest takes is read off the first
 # action, and the Block is given once.
 func resolve(effect: CardEffect, ctx: EffectContext) -> void:
 	var target: Combatant = ctx.status_target()
