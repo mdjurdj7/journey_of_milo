@@ -34,6 +34,7 @@ signal card_picked(card: CardData)
 # and any battle overlay. Every size is in the 1080p canvas's pixels.
 
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
+const VOICE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
 
 @export_group("Page")
 # The reward screen's scrim: its ink, so the world recedes rather than
@@ -209,6 +210,58 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 # with no pick, which is the caller's cancel. Read at the click.
 @export var pick_mode: bool = false
 
+# A pick that waits for a yes (the collector's removal - set by the host
+# before open()): with pick_confirm_format set, a click in pick mode lifts
+# the card to pick_inspect_scale instead, its centre at pick_inspect_
+# centre_fraction of the height, and three lines under it - the confirm
+# (pick_confirm_format with the card's name, in caps, then pick_confirm_
+# price in Spectral numerals when it is 0 or more), pick_detail_format
+# (with the pile's count and one fewer) in the grey, and BACK. The confirm
+# emits card_picked and closes; BACK, Escape or a click anywhere else
+# puts the card down with nothing picked. The mouse focuses by hovering;
+# ui_up/ui_down move between the confirm and BACK, ui_accept acts.
+@export_group("Pick Confirm")
+@export var pick_confirm_format: String = "":
+	set(value):
+		pick_confirm_format = value
+		_redraw_footer()
+@export var pick_confirm_price: int = -1:
+	set(value):
+		pick_confirm_price = value
+		_redraw_footer()
+@export var pick_detail_format: String = "":
+	set(value):
+		pick_detail_format = value
+		_redraw_footer()
+@export var pick_inspect_scale: float = 1.5
+@export_range(0.0, 1.0) var pick_inspect_centre_fraction: float = 0.4
+# From the lifted card's bottom edge to the confirm line's top.
+@export var pick_footer_gap_px: float = 36.0:
+	set(value):
+		pick_footer_gap_px = value
+		_redraw_footer()
+@export var pick_line_gap_px: float = 14.0:
+	set(value):
+		pick_line_gap_px = value
+		_redraw_footer()
+@export var pick_price_gap_px: float = 16.0:
+	set(value):
+		pick_price_gap_px = value
+		_redraw_footer()
+
+# The heading as the host wrote it, in Spectral Italic at voice_size_px -
+# a world line (the collector's "It will not give it back.") - in place of
+# the tracked caps.
+@export var header_voice: bool = false:
+	set(value):
+		header_voice = value
+		_relayout()
+@export var voice_size_px: int = 26:
+	set(value):
+		voice_size_px = maxi(value, 1)
+		_relayout()
+@export_group("")
+
 @onready var _scrim: ColorRect = $Scrim
 @onready var _page: Control = $Page
 @onready var _scroll: ScrollContainer = $ScrollContainer
@@ -234,6 +287,14 @@ var _inspect_slot: Control = null
 var _inspect_tween: Tween = null
 # True for the length of a lift or a return - see _on_card_clicked().
 var _inspect_busy: bool = false
+# A pick waiting for its confirm (pick_confirm_format): the card lifted,
+# its footer drawn on _footer, and which footer line has focus.
+enum Footer { NONE = -1, CONFIRM, BACK }
+var _pending_pick: CardData = null
+var _footer: Control = null
+var _footer_focus: int = Footer.NONE
+var _voice_font: Font = null
+var _card_height: float = 0.0
 
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
@@ -262,6 +323,14 @@ func _ready() -> void:
 	# Starts fully transparent and is faded in by the lift; the colour's
 	# own 0.35 is the target, modulate is what animates to it.
 	_inspect_scrim.modulate.a = 0.0
+	# The pending pick's lines, over the dim; the lifted card, added after
+	# it, sits above them but never reaches down to them.
+	_footer = Control.new()
+	_footer.name = "PickFooter"
+	_footer.set_anchors_preset(Control.PRESET_FULL_RECT)
+	_footer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_footer.draw.connect(_draw_footer)
+	_inspect_layer.add_child(_footer)
 
 	_refresh_page()
 
@@ -308,6 +377,8 @@ func _refresh_page() -> void:
 	_scrim.color = scrim_color
 	_label_font = InkType.tracked(InkType.text_bold_font(), label_size_px, tracking_em)
 	_numeral_font = InkType.numeral_font()
+	if header_voice and _voice_font == null:
+		_voice_font = load(VOICE_FONT_PATH) as Font
 	var view: Vector2 = get_viewport_rect().size
 	var width: float = view.x * content_width_fraction
 	var top: float = title_top_px + _line_height(label_size_px) + title_rows_gap_px
@@ -512,9 +583,13 @@ func _draw_page() -> void:
 		return
 	var view: Vector2 = get_viewport_rect().size
 	var ascent: float = _label_font.get_ascent(label_size_px)
-	var title: String = _header_text.to_upper()
-	var title_width: float = InkType.width(_label_font, title, label_size_px)
-	_text(_page, _label_font, title, Vector2(roundf((view.x - title_width) * 0.5), roundf(title_top_px + ascent)), label_size_px, bone)
+	if header_voice and _voice_font != null:
+		var voice_width: float = InkType.width(_voice_font, _header_text, voice_size_px)
+		_text(_page, _voice_font, _header_text, Vector2(roundf((view.x - voice_width) * 0.5), roundf(title_top_px + ascent)), voice_size_px, bone)
+	else:
+		var title: String = _header_text.to_upper()
+		var title_width: float = InkType.width(_label_font, title, label_size_px)
+		_text(_page, _label_font, title, Vector2(roundf((view.x - title_width) * 0.5), roundf(title_top_px + ascent)), label_size_px, bone)
 	var back: Rect2 = _back_label_rect()
 	var baseline: float = back.position.y + ascent
 	_text(_page, _label_font, back_text, Vector2(back.position.x, baseline), label_size_px, bone if _back_hovered else unfocused_color)
@@ -564,6 +639,16 @@ func _gui_input(event: InputEvent) -> void:
 # before it closes the view, so the key never skips a step the click
 # can't.
 func _unhandled_input(event: InputEvent) -> void:
+	if _pending_pick != null and _inspected != null:
+		if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down"):
+			_set_footer_focus(Footer.BACK if _footer_focus == Footer.CONFIRM else Footer.CONFIRM)
+			get_viewport().set_input_as_handled()
+			return
+		if event.is_action_pressed("ui_accept"):
+			if _footer_focus != Footer.NONE:
+				_activate_footer(_footer_focus)
+			get_viewport().set_input_as_handled()
+			return
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
 		if _inspected != null:
 			_end_inspect()
@@ -582,7 +667,7 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_card_clicked(card_data: CardData, card_view: CardView, slot: Control) -> void:
 	card_view.accept_event()
 	get_viewport().set_input_as_handled()
-	if pick_mode:
+	if pick_mode and not _confirms_pick():
 		card_picked.emit(card_data)
 		close()
 		return
@@ -591,11 +676,21 @@ func _on_card_clicked(card_data: CardData, card_view: CardView, slot: Control) -
 	if _inspected == card_view:
 		_end_inspect()
 	elif _inspected == null:
+		if pick_mode:
+			_pending_pick = card_data
+			_footer_focus = Footer.NONE
 		_begin_inspect(card_view, slot)
 
 func _on_inspect_scrim_gui_input(event: InputEvent) -> void:
+	if _pending_pick != null and event is InputEventMouseMotion:
+		_set_footer_focus(_footer_hit((event as InputEventMouseMotion).position))
+		return
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		_end_inspect()
+		var hit: int = _footer_hit((event as InputEventMouseButton).position) if _pending_pick != null else Footer.NONE
+		if hit == Footer.CONFIRM:
+			_activate_footer(Footer.CONFIRM)
+		else:
+			_end_inspect()
 		get_viewport().set_input_as_handled()
 
 # Lifts the card out of its slot into the overlay, keeping it exactly
@@ -614,7 +709,8 @@ func _begin_inspect(card_view: CardView, slot: Control) -> void:
 	_inspect_layer.visible = true
 	# Up for inspection: its keywords define themselves on hover.
 	card_view.set_keyword_inspect(true)
-	_tween_inspect(card_view, _inspect_centre(card_view), inspect_scale, 1.0)
+	_tween_inspect(card_view, _inspect_centre(card_view), _inspect_target_scale(), 1.0)
+	_redraw_footer()
 
 # Puts it back: the reverse tween onto the slot's own screen position,
 # then home into the slot at a clean zero offset so the row owns its
@@ -626,6 +722,9 @@ func _end_inspect() -> void:
 	var slot: Control = _inspect_slot
 	_inspected = null
 	_inspect_slot = null
+	_pending_pick = null
+	_footer_focus = Footer.NONE
+	_redraw_footer()
 	card_view.set_keyword_inspect(false)
 	_tween_inspect(card_view, slot.global_position, deck_view_card_scale, 0.0)
 	_inspect_tween.tween_callback(func() -> void:
@@ -640,7 +739,131 @@ func _end_inspect() -> void:
 # position and its rendered size is card_size x scale - the centring has
 # to account for that rather than just using the viewport's middle.
 func _inspect_centre(card_view: CardView) -> Vector2:
-	return (get_viewport_rect().size - card_view.card_size * inspect_scale) / 2.0
+	var view: Vector2 = get_viewport_rect().size
+	var size: Vector2 = card_view.card_size * _inspect_target_scale()
+	if _pending_pick != null:
+		return Vector2((view.x - size.x) / 2.0, view.y * pick_inspect_centre_fraction - size.y / 2.0)
+	return (view - size) / 2.0
+
+func _inspect_target_scale() -> float:
+	return pick_inspect_scale if _pending_pick != null else inspect_scale
+
+# --- Pick confirm ---
+
+func _confirms_pick() -> bool:
+	return not pick_confirm_format.is_empty()
+
+func _redraw_footer() -> void:
+	if _footer != null:
+		_footer.queue_redraw()
+
+# The confirm line's text: the format with the pending card's name (as
+# carried), in caps.
+func _confirm_text() -> String:
+	if _pending_pick == null:
+		return ""
+	var text: String = pick_confirm_format
+	if text.contains("%s"):
+		text = text % _as_carried(_pending_pick).card_name
+	return text.to_upper()
+
+func _detail_text() -> String:
+	if pick_detail_format.is_empty():
+		return ""
+	return pick_detail_format % [_cards.size(), maxi(_cards.size() - 1, 0)]
+
+# CardView's own height, read once from a throwaway instance.
+func _reference_card_height() -> float:
+	if _card_height <= 0.0:
+		var reference_card := (load(CARD_VIEW_SCENE_PATH) as PackedScene).instantiate() as CardView
+		_card_height = reference_card.card_size.y
+		reference_card.free()
+	return _card_height
+
+# Footer row `index` (0 the confirm, 1 the detail, 2 BACK): its text,
+# left edge, baseline and width (the confirm's price in it), centred under
+# where the lifted card settles.
+func _footer_line(index: int) -> Dictionary:
+	var view: Vector2 = get_viewport_rect().size
+	var card_bottom: float = view.y * pick_inspect_centre_fraction + _reference_card_height() * pick_inspect_scale / 2.0
+	var pitch: float = _line_height(label_size_px) + pick_line_gap_px
+	var ascent: float = _label_font.get_ascent(label_size_px) if _label_font != null else float(label_size_px)
+	var text: String = back_text
+	if index == 0:
+		text = _confirm_text()
+	elif index == 1:
+		text = _detail_text()
+	var width: float = InkType.width(_label_font, text, label_size_px)
+	if index == 0 and pick_confirm_price >= 0:
+		width += pick_price_gap_px + InkType.width(_numeral_font, str(pick_confirm_price), label_size_px)
+	var baseline: float = roundf(card_bottom + pick_footer_gap_px + pitch * float(index) + ascent)
+	return {"text": text, "left": roundf((view.x - width) * 0.5), "baseline": baseline, "width": width}
+
+# The row's hit rect, with the hairline's room to its left.
+func _footer_rect(index: int) -> Rect2:
+	var line: Dictionary = _footer_line(index)
+	var ascent: float = _label_font.get_ascent(label_size_px) if _label_font != null else float(label_size_px)
+	var rect := Rect2(float(line["left"]), float(line["baseline"]) - ascent, float(line["width"]), _line_height(label_size_px))
+	return rect.grow_side(SIDE_LEFT, hairline_gap_px + hairline_length_px)
+
+func _footer_hit(position: Vector2) -> int:
+	if _footer_rect(0).has_point(position):
+		return Footer.CONFIRM
+	if _footer_rect(2).has_point(position):
+		return Footer.BACK
+	return Footer.NONE
+
+func _set_footer_focus(index: int) -> void:
+	if index == _footer_focus:
+		return
+	_footer_focus = index
+	_redraw_footer()
+
+func _activate_footer(index: int) -> void:
+	if _pending_pick == null or _inspect_busy:
+		return
+	if index == Footer.CONFIRM:
+		var card: CardData = _pending_pick
+		card_picked.emit(card)
+		close()
+	elif index == Footer.BACK:
+		_end_inspect()
+
+func _draw_footer() -> void:
+	if _pending_pick == null or _label_font == null:
+		return
+	for index in 3:
+		var line: Dictionary = _footer_line(index)
+		var text: String = line["text"]
+		var left: float = line["left"]
+		var baseline: float = line["baseline"]
+		var focused: bool = (index == 0 and _footer_focus == Footer.CONFIRM) or (index == 2 and _footer_focus == Footer.BACK)
+		var color: Color = bone if focused else unfocused_color
+		var advance: float = _text(_footer, _label_font, text, Vector2(left, baseline), label_size_px, color)
+		if index == 0 and pick_confirm_price >= 0:
+			_text(_footer, _numeral_font, str(pick_confirm_price), Vector2(roundf(left + advance + pick_price_gap_px), baseline), label_size_px, color)
+		if focused:
+			var mid: float = baseline - float(label_size_px) * 0.35
+			_footer.draw_rect(Rect2(left - hairline_gap_px - hairline_length_px, mid - hairline_thickness_px * 0.5, hairline_length_px, hairline_thickness_px), bone)
+
+# For probes: the card a confirm is waiting on, else null.
+func get_pending_pick() -> CardData:
+	return _pending_pick
+
+# For probes: the confirm and detail lines as shown ("" with nothing
+# pending).
+func get_confirm_text() -> String:
+	return _confirm_text()
+
+func get_detail_text() -> String:
+	return _detail_text() if _pending_pick != null else ""
+
+# For probes: the confirm or BACK, as a click or a key would.
+func confirm_pick() -> void:
+	_activate_footer(Footer.CONFIRM)
+
+func back_out_of_pick() -> void:
+	_activate_footer(Footer.BACK)
 
 func _tween_inspect(card_view: CardView, to_position: Vector2, to_scale: float, scrim_alpha: float) -> void:
 	if _inspect_tween != null and _inspect_tween.is_valid():
