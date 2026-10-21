@@ -1,7 +1,7 @@
 extends SceneTree
 
 # Headless probe for Wrest - 2 Energy, Common Skill, GUARD, aimed at one
-# enemy's attack intent: it takes up to 8 off that attack (Wrest+ 12) -
+# enemy's attack intent: it takes up to 7 off that attack (Wrest+ 11) -
 # off its landing total as it stands when played, after any Brace or
 # Garnish already on it - as Wrested, an intent mark soaked hit by hit as
 # Garnish's is, and gives as much Block, once (TakeFromAttackEffect). The
@@ -95,14 +95,14 @@ func _check_data() -> void:
 	_expect_eq([card.card_name, card.cost, card.card_type, card.rarity, card.target_type, card.card_class, card.offer], ["Wrest", 2, CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.TargetType.ENEMY, &"wanderer", CardData.OfferScope.REWARDABLE], "Wrest: 2 Energy, a Common Skill at one enemy, the Wanderer's")
 	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Wrest.png", "...with its art")
 	_expect_eq(card.description, "Take up to {take} from an attack.\nGain that much Block.", "...its text")
-	_expect(card.effects.size() == 1 and card.effects[0].effect_type == CardEffect.EffectType.TAKE_FROM_ATTACK and card.effects[0].value == 8 and card.effects[0].status_data == status, "...one effect: take up to 8, as Wrested")
+	_expect(card.effects.size() == 1 and card.effects[0].effect_type == CardEffect.EffectType.TAKE_FROM_ATTACK and card.effects[0].value == 7 and card.effects[0].status_data == status, "...one effect: take up to 7, as Wrested")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.GUARD, "...reading GUARD")
 	_expect_eq(EffectResolver.intent_mark_status(card.effects[0]), status, "...marking an intent")
 	_expect_eq([status.display_name, status.intent_mark, status.reduces_attack_total, status.consumed_by_own_attack, status.ignores_strike_backs], ["Wrested", &"wrest", true, true, true], "Wrested: a mark that cuts the attack's total, spent by it, passed by a strike back")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Wrest+")
 	_expect_eq([tempered.card_name, tempered.cost, tempered.rarity, tempered.description], ["Wrest+", 2, CardData.CardRarity.COMMON, card.description], "Wrest+: 2 Energy, the same text")
-	_expect(tempered.effects.size() == 1 and tempered.effects[0].value == 12 and tempered.effects[0].status_data == status, "...up to 12")
+	_expect(tempered.effects.size() == 1 and tempered.effects[0].value == 11 and tempered.effects[0].status_data == status, "...up to 11")
 	for pool_path: String in [WANDERER_POOL_PATH, COLLECTOR_POOL_PATH]:
 		_expect((load(pool_path) as RewardPool).entries.has(card), "In %s" % pool_path)
 	_completed += 1
@@ -113,12 +113,12 @@ func _check_face() -> void:
 	root.add_child(view)
 	await process_frame
 	view.set_card_data(load(CARD_PATH))
-	_expect_eq(view.rules_text.get_parsed_text(), "Take up to 8 from an attack.\nGain that much Block.", "Wrest's face")
+	_expect_eq(view.rules_text.get_parsed_text(), "Take up to 7 from an attack.\nGain that much Block.", "Wrest's face")
 	_expect_eq(view.type_label.text, "GUARD", "...its footer GUARD")
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
 	_expect_eq(view.cost_label.text, "2", "...2 Energy")
 	view.set_card_data(load(TEMPERED_PATH))
-	_expect_eq(view.rules_text.get_parsed_text(), "Take up to 12 from an attack.\nGain that much Block.", "Wrest+'s face")
+	_expect_eq(view.rules_text.get_parsed_text(), "Take up to 11 from an attack.\nGain that much Block.", "Wrest+'s face")
 	_expect_eq(view.type_label.text, "GUARD", "...GUARD too")
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
 	view.free()
@@ -162,7 +162,7 @@ func _check_tail_lash() -> void:
 	_expect(_wrested(enemy) == null, "...spent by the whole attack")
 	_completed += 1
 
-# An attack under the take gives what it has: Wrest+ (12) on the Sputter's
+# An attack under the take gives what it has: Wrest+ (11) on the Sputter's
 # Scissor takes all of it, and gives that much Block.
 func _check_small_attack() -> void:
 	var data: EnemyData = load(SPUTTER_PATH)

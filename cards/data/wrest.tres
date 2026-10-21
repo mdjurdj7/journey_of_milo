@@ -9,7 +9,7 @@
 [sub_resource type="Resource" id="E_take"]
 script = ExtResource("2_card_effect")
 effect_type = 31
-value = 8
+value = 7
 status_data = ExtResource("3_wrested")
 
 [resource]
