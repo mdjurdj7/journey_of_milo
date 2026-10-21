@@ -185,6 +185,10 @@ var play_hp_cost: int = 0
 # Padding around each enemy's projected model rect for the armed-card
 # target test - see _refresh_enemy_rects().
 @export var target_padding_px: float = 16.0
+# Every enemy's target is at least this many pixels each way (FieldEnemy.
+# get_pick_rect()) - RegionField's min_target_size_px, the one floor the
+# field's click-to-move shares, set as the fight opens. Not on mounds.
+var min_target_size_px: float = 0.0
 # Devour - the Wanderer's own action, not a card (devour()): the HP one
 # eaten card gives back, how many it may eat per turn, and the Energy each
 # eating costs - paid when the card is eaten, and needed in hand for
@@ -3157,8 +3161,9 @@ func _default_target() -> FieldEnemy:
 	return best
 
 # Each living enemy's screen-space bounding rect of its model's world
-# AABB (FieldEnemy.get_screen_rect() - the real mesh bounds, as placed,
-# padded by target_padding_px on every side). No physics shape, no
+# AABB (FieldEnemy.get_pick_rect() - the real mesh bounds, as placed,
+# padded by target_padding_px on every side, and no smaller than
+# min_target_size_px). No physics shape, no
 # camera-distance dependence - what you can see is what you can target,
 # plus a little. Recomputed by _physics_process() while a card is armed;
 # _enemy_at() reads the cache. An enemy whose AABB reaches behind the
@@ -3198,7 +3203,7 @@ func _refresh_enemy_rects() -> void:
 				if mound_rect.size != Vector2.ZERO:
 					_mound_rects.append({"enemy": enemy, "mound": mound, "rect": mound_rect})
 			continue
-		var rect: Rect2 = enemy.get_screen_rect(camera, target_padding_px)
+		var rect: Rect2 = enemy.get_pick_rect(camera, target_padding_px, min_target_size_px)
 		if rect.size == Vector2.ZERO:
 			continue
 		_enemy_rects[enemy] = rect

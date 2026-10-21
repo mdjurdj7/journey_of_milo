@@ -769,6 +769,17 @@ func get_screen_rect(camera: Camera3D, padding_px: float) -> Rect2:
 		rect = Rect2(point, Vector2.ZERO) if i == 0 else rect.expand(point)
 	return rect.grow(padding_px)
 
+# What a click or hover picks it by: get_screen_rect() grown by padding_px,
+# then to at least min_size_px each way about its own centre - so a small
+# body (a Nettle) is never a target smaller than the floor, and the
+# centre a target line ends at never moves. Empty where that is.
+func get_pick_rect(camera: Camera3D, padding_px: float, min_size_px: float) -> Rect2:
+	var rect: Rect2 = get_screen_rect(camera, padding_px)
+	if rect.size == Vector2.ZERO:
+		return rect
+	var size := Vector2(maxf(rect.size.x, min_size_px), maxf(rect.size.y, min_size_px))
+	return Rect2(rect.get_center() - size * 0.5, size)
+
 @onready var contact_area: Area3D = $ContactArea
 @onready var contact_shape: CollisionShape3D = $ContactArea/CollisionShape3D
 

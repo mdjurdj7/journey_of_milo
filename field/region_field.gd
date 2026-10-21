@@ -464,6 +464,18 @@ static func reset_hold_line_spoken() -> void:
 # ground, hull, wall alike, the hit point is the target. Clicks the HUD
 # swallows (DeckPanel, WorldVoiceLine's band) never get here.
 @export var click_target_padding_px: float = 16.0
+# Every enemy is a target at least this many pixels each way, grown about
+# its own centre (FieldEnemy.get_pick_rect()) - here, and in a fight
+# (BattleController.min_target_size_px), so a Nettle is never a speck to
+# hunt for. Where targets overlap, the nearer enemy wins.
+@export var min_target_size_px: float = 80.0:
+	set(value):
+		min_target_size_px = value
+		if battle_layer != null:
+			for child in battle_layer.get_children():
+				var open := child as BattleOverlay
+				if open != null and open.battle_controller != null:
+					open.battle_controller.min_target_size_px = min_target_size_px
 @export var click_ray_length: float = 1000.0
 
 @onready var wanderer: Wanderer = $Wanderer
@@ -1348,7 +1360,7 @@ func _enemy_under_cursor(camera: Camera3D, screen_pos: Vector2) -> FieldEnemy:
 		var enemy := node as FieldEnemy
 		if enemy == null or enemy.is_defeated():
 			continue
-		var rect: Rect2 = enemy.get_screen_rect(camera, click_target_padding_px)
+		var rect: Rect2 = enemy.get_pick_rect(camera, click_target_padding_px, min_target_size_px)
 		if rect.size == Vector2.ZERO or not rect.has_point(screen_pos):
 			continue
 		var distance: float = camera.global_position.distance_to(enemy.global_position)
@@ -2828,6 +2840,7 @@ func _on_enemy_contacted(enemy: FieldEnemy) -> void:
 
 	var transition_time: float = camera_rig.battle_transition_time if camera_rig != null else 0.0
 	overlay.enter_battle(ui_on_dark_world, _battle_members.duplicate(), deck_panel, hp_bar, transition_time, wanderer)
+	overlay.battle_controller.min_target_size_px = min_target_size_px
 	# Cards, End Turn and targeting take no input until the Wanderer's own
 	# draw strikes the ground (Wanderer.draw_sword_strike_time), the sword
 	# in his hand and the camera settled; the hand still deals in under it.
