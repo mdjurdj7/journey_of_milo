@@ -68,6 +68,11 @@
 # the results line and the run's last lines. A crash before PASSED, or
 # any other exit code, still fails.
 #
+# A pass whose log says more than LEAK_BASELINE (2) "ObjectDB instances
+# were leaked at exit" passes as "PASS (leaked N)" - a warning, never a
+# fail - in the results line and the run's last lines. 2 is what every
+# probe leaks today (enemy_intent.gd's script and its native class).
+#
 # GODOT overrides the engine (default ../Godot_v4.7.1.exe beside the repo:
 # the main executable, not the _console wrapper). Exit code 0 = every
 # probe passed, 1 = a failure, 2 = usage, 3 = the worktree stayed busy,
@@ -810,6 +815,11 @@ fi
 # from the environment, as GODOT is (a test with OS.crash(), 132).
 EXIT_CRASH_CODE=${EXIT_CRASH_CODE:-139}
 
+# What every probe leaks at exit today (Godot's "N ObjectDB instances
+# were leaked at exit" WARNING): more is a pass with a note - see the
+# header.
+LEAK_BASELINE=2
+
 # Engine ERROR messages never counted, whatever the probe: text in the
 # message, one per line - Godot's leak report as it exits, printed by
 # every probe.
@@ -901,6 +911,12 @@ run_one() {
 		suffix="  (crashed at exit: exit $code after PASSED, $LOGS/$p.log)"
 		echo "NOTE [run_probes]: crashed at exit (exit $code) after PASSED - counted as a pass" >> "$LOGS/$p.log"
 	fi
+	# A pass that leaked more than every probe does says how many.
+	local leaked
+	leaked=$(grep -oE '^WARNING: [0-9]+ ObjectDB instances were leaked at exit' "$LOGS/$p.log" | head -1 | grep -oE '[0-9]+')
+	if [ "$verdict" = PASS ] && [ -n "$leaked" ] && [ "$leaked" -gt "$LEAK_BASELINE" ]; then
+		suffix="$suffix  (leaked $leaked, baseline $LEAK_BASELINE, $LOGS/$p.log)"
+	fi
 	printf '%-26s %s %4ss%s\n' "$p" "$verdict" "$dur" "$suffix" | tee -a "$LOGS/_results.txt"
 }
 
@@ -946,6 +962,8 @@ record_times
 echo "run_probes: $((COUNT - FAILED)) of $COUNT passed in $((T1 - T0))s"
 CRASHED=$(awk '$2 == "PASS" && /\(crashed at exit/ { printf " %s", $1 }' "$LOGS/_results.txt" 2>/dev/null)
 [ -n "$CRASHED" ] && echo "run_probes: PASS (crashed at exit):$CRASHED"
+LEAKED=$(awk '$2 == "PASS" && match($0, /\(leaked [0-9]+/) { printf " %s (%s)", $1, substr($0, RSTART + 8, RLENGTH - 8) }' "$LOGS/_results.txt" 2>/dev/null)
+[ -n "$LEAKED" ] && echo "run_probes: PASS (leaked N, over $LEAK_BASELINE):$LEAKED"
 
 # --- Did HEAD move under the run? ---
 END_HEAD=$(git -C "$REPO" rev-parse HEAD)

@@ -26,7 +26,9 @@
 #   PASSED line (run_probes.sh's "PASS (crashed at exit)") is marked on
 #   its row, and a section counts each probe that ever has: tonight, and
 #   in how many of the nightly reports in REPORT_DIR - so a spread to
-#   other probes, or a rising rate, shows.
+#   other probes, or a rising rate, shows. A pass that leaked more than
+#   run_probes.sh's baseline ("PASS (leaked N)") is marked on its row
+#   with N, and listed in a section of its own.
 # - Removes the worktree; the logs stay in REPORT_DIR.
 #
 # REPORT_DIR defaults to ../probe-nightly beside the repo, outside git.
@@ -65,8 +67,9 @@ report() {
 			echo "probes:   $(grep -c ' PASS ' "$LOGS/_results.txt") passed, $(grep -c ' FAIL ' "$LOGS/_results.txt") failed, of $(wc -l < "$LOGS/_results.txt")"
 			grep -E '^run_probes: [0-9]+ of [0-9]+ passed in [0-9]+s$' "$RUNNER_LOG" 2>/dev/null | sed 's/^run_probes: /the set:  /; s/$/ (the probes alone)/'
 			echo
-			sort -k3,3nr "$LOGS/_results.txt" | awk '{ printf "%-28s %s %5s%s\n", $1, $2, $3, (/\(crashed at exit/ ? "  crashed at exit" : "") }'
+			sort -k3,3nr "$LOGS/_results.txt" | awk '{ printf "%-28s %s %5s%s\n", $1, $2, $3, (/\(crashed at exit/ ? "  crashed at exit" : "") (match($0, /\(leaked [0-9]+/) ? "  leaked " substr($0, RSTART + 8, RLENGTH - 8) : "") }'
 			exit_crashes
+			leaks
 			for p in $(awk '$2 == "FAIL" { print $1 }' "$LOGS/_results.txt"); do
 				echo
 				echo "== $p"
@@ -97,6 +100,17 @@ exit_crashes() {
 		n=$(printf '%s\n' $tonight $earlier | grep -cxF "$p")
 		printf '  %-28s tonight: %-3s in %d of %d nightly reports\n' "$p" "$(printf '%s\n' $tonight | grep -qxF "$p" && echo yes || echo no)" "$n" "$reports"
 	done
+}
+
+# Every pass tonight that leaked more ObjectDB instances at exit than
+# run_probes.sh's baseline, and how many. Nothing when none did.
+leaks() {
+	local found
+	found=$(awk '$2 == "PASS" && match($0, /\(leaked [0-9]+, baseline [0-9]+/) { split(substr($0, RSTART + 1, RLENGTH - 1), w, /[ ,]+/); printf "  %-28s leaked %s (baseline %s)\n", $1, w[2], w[4] }' "$LOGS/_results.txt")
+	[ -z "$found" ] && return 0
+	echo
+	echo "Leaked more ObjectDB instances at exit than the baseline (passes, a warning):"
+	echo "$found"
 }
 
 # Other sessions' probe processes or imports (CLAUDE.md's check).
