@@ -208,6 +208,9 @@ class_name FloorData
 # offsets from spawn in order along the lip. Empty: every face stops him
 # or doesn't by its slope alone.
 @export var ledges: Array[PackedVector2Array] = []
+# Ledge walls walked down through but never up (OneWayLedge) - floor 3's
+# rim trail ending in its bank. Empty: none.
+@export var one_way_ledges: Array[OneWayLedgeData] = []
 @export_group("Gate")
 # How the way out is closed while required fights remain (ExitGate.
 # exit_kind). CHANNEL: a tidal channel across the neck, a Blocker in it,

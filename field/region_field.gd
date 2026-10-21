@@ -1838,7 +1838,8 @@ func get_patrol_routes() -> Dictionary:
 	return _patrol_routes
 
 # The floor's ledge walls (FloorData.ledges), one LedgeBarrier each,
-# standing on Ground's relief and rebuilt with it.
+# standing on Ground's relief and rebuilt with it - and its one-way ones
+# (FloorData.one_way_ledges), a OneWayLedge each, watching the Wanderer.
 func _spawn_floor_ledges() -> void:
 	var floor_data := get_floor_data()
 	var ground := get_node_or_null(ground_path) as Ground
@@ -1853,6 +1854,19 @@ func _spawn_floor_ledges() -> void:
 		barrier.name = "LedgeBarrier%d" % index
 		add_child(barrier)
 		barrier.setup(ground, line)
+	for index in floor_data.one_way_ledges.size():
+		var data: OneWayLedgeData = floor_data.one_way_ledges[index]
+		if data == null or data.line.size() < 2:
+			continue
+		var line := PackedVector2Array()
+		for point: Vector2 in data.line:
+			line.append(Vector2(spawn.x + point.x, spawn.z + point.y))
+		var one_way := OneWayLedge.new()
+		one_way.name = "OneWayLedge%d" % index
+		one_way.down_point = Vector2(spawn.x + data.down_point.x, spawn.z + data.down_point.y)
+		add_child(one_way)
+		one_way.setup(ground, line)
+		one_way.watch(wanderer)
 
 # The floor's props under one Props node made here: the floor's own
 # (FloorData.props) first, in their own order, then each chosen option's
@@ -4600,7 +4614,8 @@ func _nav_static_shapes(ground: Ground) -> Array[CollisionShape3D]:
 	if gate != null:
 		skip.append(gate.get_node_or_null(^"Blocker"))
 	for node in find_children("*", "StaticBody3D", true, false):
-		if skip.has(node) or node is RockShelf or node.name == &"SpawnSlabBody":
+		# A one-way ledge is the queries' own (_nav_dynamic_shapes()).
+		if skip.has(node) or node is RockShelf or node is OneWayLedge or node.name == &"SpawnSlabBody":
 			continue
 		for child in node.find_children("*", "CollisionShape3D", true, false):
 			shapes.append(child as CollisionShape3D)
@@ -4613,13 +4628,22 @@ func get_obstacle_shapes() -> Array[CollisionShape3D]:
 	var ground := get_node_or_null(ground_path) as Ground
 	return _nav_static_shapes(ground) if ground != null else [] as Array[CollisionShape3D]
 
-# The closed channel's Blocker while it stands.
+# The closed channel's Blocker while it stands, and each one-way ledge's
+# boxes while they stand (OneWayLedge - he is below it).
 func _nav_dynamic_shapes() -> Array[CollisionShape3D]:
 	var shapes: Array[CollisionShape3D] = []
 	var gate := get_node_or_null(exit_gate_path)
 	var blocker := gate.get_node_or_null(^"Blocker/CollisionShape3D") as CollisionShape3D if gate != null else null
 	if blocker != null and not blocker.disabled:
 		shapes.append(blocker)
+	for node in find_children("*", "OneWayLedge", false, false):
+		var one_way := node as OneWayLedge
+		if one_way == null or not one_way.is_blocking():
+			continue
+		for child in one_way.get_children():
+			var shape := child as CollisionShape3D
+			if shape != null and not shape.is_queued_for_deletion():
+				shapes.append(shape)
 	return shapes
 
 func _rebuild_boundary_walls() -> void:
