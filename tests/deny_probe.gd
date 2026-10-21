@@ -1,8 +1,8 @@
 extends SceneTree
 
 # Headless probe for Deny - 1 Energy, Uncommon Skill, TOLL, aimed at an
-# enemy, not Spent: "Spend 6 Toll. Delay target enemy's next action by a
-# turn." Blocked under 6 Toll; not on an enemy already Delayed. On its
+# enemy, Spent: "Spend 6 Toll. Delay target enemy's next action. Spent."
+# Blocked under 6 Toll; not on an enemy already Delayed. On its
 # coming turn the enemy does nothing - its move held where it is, the
 # marks on it still bound, its turn count (escalation) not moving, its
 # statuses still ticking, a pain turn due then spent on it - and on the
@@ -83,8 +83,8 @@ func _check_data() -> void:
 	var card: CardData = load(DENY_PATH)
 	var delayed: StatusData = load(DELAYED_PATH)
 	_expect_eq(card.card_name, "Deny", "The card loads")
-	_expect_eq([card.cost, card.card_type, card.rarity, card.target_type, card.removal_scope, card.card_class], [1, CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.TargetType.ENEMY, CardData.RemovalScope.NONE, &"wanderer"], "...1 Energy, a Skill, Uncommon, at an enemy, not Spent, the Wanderer's")
-	_expect_eq(card.description, "Spend {toll_cost} Toll.\nDelay target enemy's next action by a turn.", "...its text")
+	_expect_eq([card.cost, card.card_type, card.rarity, card.target_type, card.removal_scope, card.card_class], [1, CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, CardData.TargetType.ENEMY, CardData.RemovalScope.SPENT, &"wanderer"], "...1 Energy, a Skill, Uncommon, at an enemy, Spent, the Wanderer's")
+	_expect_eq(card.description, "Spend {toll_cost} Toll.\nDelay target enemy's next action.\nSpent.", "...its text")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and card.effects[1].status_data == delayed, "...SPEND_TOLL, then Delayed on the target - no hand card taken")
 	_expect_eq(_toll, 6, "...6 Toll")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
@@ -235,8 +235,8 @@ func _check_gape_held() -> void:
 
 # --- Fights ---
 
-# Deny on 6 Toll at the Sputter's Scissor: 0 Toll, 1 Energy spent, Deny to
-# the discard, the rest of the hand untouched; the intent dimmed, not
+# Deny on 6 Toll at the Sputter's Scissor: 0 Toll, 1 Energy spent, Deny
+# Spent, the rest of the hand untouched; the intent dimmed, not
 # struck, its hover saying delayed. The enemy turn: nothing lands, the
 # turn holds its beat, the Scissor still queued; the turn after, it lands.
 func _check_fight() -> void:
@@ -255,7 +255,7 @@ func _check_fight() -> void:
 		controller.call("confirm_target", _field_enemy(controller))
 		await _settle(controller)
 		_expect_eq([player.toll, player.energy], [0, 2], "Played: 6 Toll and 1 Energy spent")
-		_expect((deck.get("discard_pile") as Array).has(deny) and not (deck.get("exhaust_pile") as Array).has(deny), "...Deny to the discard, not Spent")
+		_expect((deck.get("exhaust_pile") as Array).has(deny) and not (deck.get("discard_pile") as Array).has(deny), "...Deny Spent, not to the discard")
 		_expect((deck.get("hand") as Array).has(slash), "...no hand card taken")
 		var intent: Node = (controller.get_parent().get("_enemy_intents") as Dictionary).get(_field_enemy(controller))
 		_expect(intent != null and bool(intent.get("_delayed")) and not bool(intent.get("_denied")), "The intent reads Delayed - dimmed, not struck")

@@ -22,8 +22,10 @@ cost = 1
 card_type = 1
 rarity = 2
 target_type = 0
+removal_scope = 1
 description = "Spend {toll_cost} Toll.
-Delay target enemy's next action by a turn."
+Delay target enemy's next action.
+Spent."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_spend"), SubResource("E_delay")])
 art = ExtResource("4_art")
 play_sound_path = "res://assets/audio/cards/Deny/Deny.mp3"
