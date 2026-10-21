@@ -97,6 +97,8 @@ const MARK_BATTLE_CLOSE := "{/battle}"
 const MARK_OUTSIDE_OPEN := "{outside}"
 const MARK_OUTSIDE_CLOSE := "{/outside}"
 const TOKEN_DRAW := "{draw}"
+# The most a TAKE_FROM_ATTACK takes off an attack (Wrest's 8) - its value.
+const TOKEN_TAKE := "{take}"
 # The Energy a GAIN_ENERGY gives: {energy} the card's first (In the Red's
 # unconditional 1), {bonus_energy} its first conditional one (the 1 more
 # when Critical).
@@ -833,6 +835,10 @@ func _resolve_tokens(description: String) -> String:
 		var draw: int = _effect_value(card_data, [CardEffect.EffectType.DRAW])
 		if draw >= 0:
 			text = text.replace(TOKEN_DRAW, str(draw))
+	if text.contains(TOKEN_TAKE):
+		var take: int = _effect_value(card_data, [CardEffect.EffectType.TAKE_FROM_ATTACK])
+		if take >= 0:
+			text = text.replace(TOKEN_TAKE, str(take))
 	if text.contains(TOKEN_BONUS_ENERGY):
 		var bonus_energy: int = _bonus_effect_value(card_data, [CardEffect.EffectType.GAIN_ENERGY])
 		if bonus_energy >= 0:
@@ -1896,7 +1902,9 @@ static func _derive_keyline_type(data: CardData) -> KeylineType:
 			if effect == null:
 				continue
 			match effect.effect_type:
-				CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK, CardEffect.EffectType.TOLL_BLOCK, CardEffect.EffectType.ABSORB:
+				# TAKE_FROM_ATTACK (Wrest): it takes off an attack and gives
+				# as much Block - guard both ways.
+				CardEffect.EffectType.BLOCK, CardEffect.EffectType.UNDAMAGED_BLOCK, CardEffect.EffectType.TOLL_BLOCK, CardEffect.EffectType.ABSORB, CardEffect.EffectType.TAKE_FROM_ATTACK:
 					return KeylineType.GUARD
 				CardEffect.EffectType.APPLY_STATUS:
 					if _is_defensive_status(effect.status_data):

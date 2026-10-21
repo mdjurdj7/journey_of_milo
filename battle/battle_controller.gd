@@ -862,18 +862,20 @@ func _has_effect(card: CardData, type: CardEffect.EffectType) -> bool:
 func _can_target(card: CardData, combatant: Combatant) -> bool:
 	return EffectResolver.can_target(_targeting_card(card), combatant, _hittable_enemy_combatants())
 
-# Whether `card` marks an intent (StatusData.intent_mark - Brace, Garnish):
-# aimed at an enemy's queued intent, its readout or its body.
+# Whether `card` marks an intent (StatusData.intent_mark - Brace, Garnish,
+# Wrest): aimed at an enemy's queued intent, its readout or its body.
 func _marks_intent(card: CardData) -> bool:
 	return marking_status(card) != null
 
-# The status `card` puts on an intent (StatusData.intent_mark), or null.
+# The status `card` puts on an intent (EffectResolver.intent_mark_
+# status()), or null.
 func marking_status(card: CardData) -> StatusData:
 	if card == null:
 		return null
 	for effect in card.effects:
-		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and effect.status_data != null and effect.status_data.intent_mark != &"":
-			return effect.status_data
+		var mark: StatusData = EffectResolver.intent_mark_status(effect)
+		if mark != null:
+			return mark
 	return null
 
 # Why `card` can't mark `enemy`'s queued intent (EnemyTurn.mark_refusal()):

@@ -37,6 +37,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.UNDO_LAST_ATTACK: "res://battle/rules/effects/undo_last_attack_effect.gd",
 	CardEffect.EffectType.TOLL_SPENT_DAMAGE: "res://battle/rules/effects/toll_spent_damage_effect.gd",
 	CardEffect.EffectType.DEVOUR_FROM_HAND: "res://battle/rules/effects/devour_from_hand_effect.gd",
+	CardEffect.EffectType.TAKE_FROM_ATTACK: "res://battle/rules/effects/take_from_attack_effect.gd",
 }
 
 var _cache: Dictionary = {}
@@ -161,17 +162,28 @@ static func can_target(card: CardData, combatant: Combatant, enemies: Array[Comb
 		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and effect.status_data != null and effect.status_data.delays_next_action:
 			if Status.delay_status(combatant.statuses) != null:
 				return false
-		# A card that marks an intent (Brace, Garnish) targets the enemy's
-		# queued intent: only an attack that will land, carrying none of
-		# the same mark yet (EnemyTurn.mark_refusal()).
-		if effect != null and effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET and effect.status_data != null and effect.status_data.intent_mark != &"":
-			if EnemyTurn.mark_refusal(combatant, combatant.enemy_data, effect.status_data) != EnemyTurn.MarkRefusal.NONE:
+		# A card that marks an intent (Brace, Garnish, Wrest) targets the
+		# enemy's queued intent: only an attack that will land, carrying none
+		# of the same mark yet (EnemyTurn.mark_refusal()).
+		var mark: StatusData = intent_mark_status(effect)
+		if mark != null:
+			if EnemyTurn.mark_refusal(combatant, combatant.enemy_data, mark) != EnemyTurn.MarkRefusal.NONE:
 				return false
 	if card.card_type == CardData.CardType.ATTACK and card.target_type == CardData.TargetType.ENEMY and not is_taunting(combatant):
 		for other in enemies:
 			if other != null and other != combatant and other.hp > 0 and not other.buried and is_taunting(other):
 				return false
 	return true
+
+# The status `effect` puts on an enemy's queued intent (StatusData.
+# intent_mark): an APPLY_STATUS_TO_TARGET's (Brace, Garnish) or a TAKE_
+# FROM_ATTACK's (Wrest) - null for any other effect.
+static func intent_mark_status(effect: CardEffect) -> StatusData:
+	if effect == null or effect.status_data == null or effect.status_data.intent_mark == &"":
+		return null
+	if effect.effect_type == CardEffect.EffectType.APPLY_STATUS_TO_TARGET or effect.effect_type == CardEffect.EffectType.TAKE_FROM_ATTACK:
+		return effect.status_data
+	return null
 
 # Whether any of `enemies` is one `card` may land on.
 static func has_target(card: CardData, enemies: Array[Combatant]) -> bool:

@@ -72,7 +72,7 @@ signal battle_finished(outcome: Outcome)
 @export var mark_refusal_only_block: String = "%s: only Block reduces it."
 @export var mark_refusal_not_attack: String = "%s: not an attack."
 @export var mark_refusal_wont_land: String = "%s: it won't land."
-@export var mark_refusal_already: Dictionary = {&"brace": "Already braced.", &"garnish": "Already garnished."}
+@export var mark_refusal_already: Dictionary = {&"brace": "Already braced.", &"garnish": "Already garnished.", &"wrest": "Already wrested."}
 # What hovering an intent says, at any time (_intent_hover_text()), one
 # line in system voice beneath it - while a Brace or Garnish is armed its
 # validity lines (above) take the refused ones' place. By what the intent

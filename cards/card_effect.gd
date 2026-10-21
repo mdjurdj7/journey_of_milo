@@ -17,8 +17,14 @@ enum EffectType {
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
 	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL, DRAIN, SET_ASIDE, CONSUME,
 	REPLAY_LAST_ATTACK, GRANT_KEEP, COPY_HAND_CARD, UNDO_LAST_ATTACK,
-	TOLL_SPENT_DAMAGE, DEVOUR_FROM_HAND,
+	TOLL_SPENT_DAMAGE, DEVOUR_FROM_HAND, TAKE_FROM_ATTACK,
 }
+# TAKE_FROM_ATTACK (Wrest): up to `value` off the target's queued attack -
+# off the attack's landing total as it stands when played, soaked hit by
+# hit like Garnish's - as `status_data` (an intent mark, reduces_attack_
+# total) at that amount, and as much Block (take_from_attack_effect.gd).
+# A card with one marks an intent as Brace and Garnish do (marking_
+# status()).
 # CONSUME and SET_ASIDE are retired (Deny no longer takes a hand card,
 # Bide no longer sets cards aside), and TOLL_DAMAGE (Reckoning no longer
 # spends all Toll) - no resolver, nothing authors them; kept so the
