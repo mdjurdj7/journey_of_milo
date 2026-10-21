@@ -218,6 +218,13 @@ crest_h = base + CREST_RISE
 h = np.where(o > FACE_W + CREST_W, crest_h - crest_h * fall_t, h)
 h = gaussian_filter(h, sigma=0.3 * PX)
 
+# The top padding sits above the region's sea level (0.30 m), or the ground
+# shader draws it as water (a band across the top of the frame from the trail).
+# Full PAD_FLOOR_M north of PAD_T - 150 px, easing to nothing by PAD_T + 150 px;
+# max() so ridges and the trail are never lowered.
+PAD_FLOOR_M = 0.40
+t_pad = np.clip((yy - (PAD_T - 150)) / 300.0, 0, 1); t_pad = t_pad * t_pad * (3 - 2 * t_pad)
+h = np.maximum(h, PAD_FLOOR_M * (1 - t_pad))
 elev = np.clip(h / ELEV_MAX, 0, 1)
 Image.fromarray((elev * 255 + 0.5).astype(np.uint8), "L").save("../../region1_floor3_elev.png")
 
