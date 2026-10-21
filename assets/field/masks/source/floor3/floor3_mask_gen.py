@@ -31,6 +31,15 @@ OUTER_EDGE_AT = FACE_W + 0.5 * CREST_W   # outer ground starts at the crest cent
 OUTER_EDGE_WIDTH = 0.3         # the whole outer-ground transition (m)
 
 src = np.array(Image.open("floor3_walkable_sample.png").convert("RGB")).astype(int)
+# Canvas padding (2026-10-21): the rim trail runs within ~3 m of the sample's
+# top edge, and the shader extends edge values past the canvas (straight
+# north-south streaks on the slopes); the sea needs room so its far side
+# (mask_beyond_is_land) sits out of view. The sample stays as painted; every
+# image-px constant below is in sample px and goes through Y()/P().
+PAD_T, PAD_R = 240, 300
+src = np.pad(src, ((PAD_T, 0), (0, PAD_R), (0, 0)))
+def Y(y): return y + PAD_T
+def P(pts): return [(x, Y(y)) for x, y in pts]
 H, W, _ = src.shape
 r, g, b = src[...,0], src[...,1], src[...,2]
 def dot(mask):
@@ -70,9 +79,9 @@ PATH_Y = 938                   # px: path centreline (the lobe centre's row is 9
 PATH_WIDTH_M = 3.0
 cut_px = spawn[0] + LOBE_CUT_X * PX
 path_band = np.zeros((H, W), bool)
-PATH_PTS = [(790, 950), (880, 1000), (975, 990), (1052, 936)]   # an elbow: dips south-east, turns north-east into the pocket
+PATH_PTS = P([(790, 950), (880, 1000), (975, 990), (1052, 936)])   # an elbow: dips south-east, turns north-east into the pocket
 if ROCKY_PATH:
-    arm = (xx >= PATH_X0) & (xx <= cut_px + 2) & (yy > 840) & (yy < 1090)
+    arm = (xx >= PATH_X0) & (xx <= cut_px + 2) & (yy > Y(840)) & (yy < Y(1090))
     walk = walk & ~arm
     px_, py_ = spline(PATH_PTS, 500)
     rr = 0.5 * PATH_WIDTH_M * PX
@@ -82,7 +91,7 @@ if ROCKY_PATH:
         path_band[y0:y1, x0:x1] |= sub
     path_band &= xx <= cut_px
     walk |= path_band
-    win = (xx > PATH_X0 - 2 * PX) & (xx < PATH_X0 + 2 * PX) & (yy > 820) & (yy < 1110)
+    win = (xx > PATH_X0 - 2 * PX) & (xx < PATH_X0 + 2 * PX) & (yy > Y(820)) & (yy < Y(1110))
     walk = smooth_local(walk, win, 1.0, 0.6)
 
 # The east lobe (the Wardling's) is drawn here, not painted: the painted
@@ -114,13 +123,13 @@ elite = px_of(*ELITE_WORLD)
 # notch above the wagon lobe down to RIDGE_PTS' last point; below that is the
 # neck, facing spawn. Image px.
 WEST_LUMP = True
-LUMP_BLOBS = [((330, 700), 110), ((335, 880), 115)]
-RIDGE_PTS = [(600, 480), (520, 620), (462, 760), (452, 830)]   # ends halfway down the lump: the neck opens mid-hub
+LUMP_BLOBS = [((330, Y(700)), 110), ((335, Y(880)), 115)]
+RIDGE_PTS = P([(600, 480), (520, 620), (462, 760), (452, 830)])   # ends halfway down the lump: the neck opens mid-hub
 RIDGE_GAP_M = 3.7
 if WEST_LUMP:
     for (bx, by), br in LUMP_BLOBS:
         walk |= (xx - bx) ** 2 + (yy - by) ** 2 <= br * br
-    win = (xx < 640) & (yy > 560) & (yy < 1240)
+    win = (xx < 640) & (yy > Y(560)) & (yy < Y(1240))
     walk = smooth_local(walk, win, 1.5, 0.8)
     walk &= polyline_dist(RIDGE_PTS) > 0.5 * RIDGE_GAP_M * PX
 
@@ -129,7 +138,7 @@ if WEST_LUMP:
 # Heights: rises TRAIL_RISE_M over TRAIL_RAMP_M from the lump, holds, and
 # drops back over the last BANK_M where it meets the top arm. Image px.
 RIM_TRAIL = True
-TRAIL_PTS = [(420, 455), (428, 330), (500, 215), (660, 150), (830, 110), (960, 92), (1030, 120), (1045, 190), (1042, 266)]
+TRAIL_PTS = P([(420, 455), (428, 330), (500, 215), (660, 150), (830, 110), (960, 92), (1030, 120), (1045, 190), (1042, 266)])
 TRAIL_WIDTH_M = 2.7
 TRAIL_RISE_M = 0.8
 TRAIL_RAMP_M = 12.0
@@ -154,7 +163,7 @@ if RIM_TRAIL:
 
 # The stream across the top bend (unchanged).
 STREAM = True
-STREAM_PTS = [(898, 282), (872, 352), (872, 440), (846, 512), (862, 594)]
+STREAM_PTS = P([(898, 282), (872, 352), (872, 440), (846, 512), (862, 594)])
 STREAM_WIDTH_M = (1.8, 3.2)
 STREAM_INTO_FACE_M = 0.5
 STREAM_BANK_M = 5.0
@@ -177,12 +186,12 @@ bank = bank * bank * (3 - 2 * bank)
 
 # SEA: open water past the Wardling's pocket (east canvas edge). Image px.
 SEA = True
-SEA_COAST = [(1650, 560), (1560, 640), (1500, 760), (1468, 880), (1452, 960), (1470, 1060), (1500, 1180), (1488, 1300), (1530, 1420), (1600, 1560), (1650, 1640)]
+SEA_COAST = P([(1950, 420), (1740, 520), (1580, 640), (1500, 760), (1468, 880), (1452, 960), (1470, 1060), (1500, 1180), (1488, 1300), (1530, 1420), (1620, 1560), (1780, 1660), (1950, 1700)])
 sea = np.zeros((H, W), bool)
 if SEA:
     cxs, cys = spline(SEA_COAST, 400)
     im = Image.new("L", (W, H), 0)
-    ImageDraw.Draw(im).polygon(list(zip(cxs, cys)) + [(W + 5, 1640), (W + 5, 560)], fill=255)
+    ImageDraw.Draw(im).polygon(list(zip(cxs, cys)) + [(W + 5, Y(1700)), (W + 5, Y(420))], fill=255)
     sea = np.array(im) > 127
 
 # floor heights: the floor (dipped to the stream), the trail raised on it
@@ -287,7 +296,7 @@ if SEA:
     extra["sea"] = {"coast_world_xz": [to_world(y_, x_) for x_, y_ in SEA_COAST], "note": "Open water at the east canvas edge (landmass 0)."}
 
 layout = {
-    "canvas_px": [W, H], "px_per_m": PX,
+    "canvas_px": [W, H], "px_per_m": PX, "canvas_pad_px": {"top": PAD_T, "right": PAD_R, "note": "Padded 2026-10-21 from 1650x1710. Pad the hand-painted wear mask the same way (black rows on top, black columns on the right) and update mask_origin in region1_floor3.tres to landmass_mask_origin_uv."},
     "landmass_mask_origin_uv": [round(spawn[0] / W, 5), round(spawn[1] / H, 5)],
     "spawn_px": [round(spawn[0], 1), round(spawn[1], 1)],
     "exit_world_xz": to_world(exit_[1], exit_[0]),

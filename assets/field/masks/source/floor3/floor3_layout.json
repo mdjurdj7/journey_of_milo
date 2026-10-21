@@ -1,16 +1,21 @@
 {
  "canvas_px": [
-  1650,
-  1710
+  1950,
+  1950
  ],
  "px_per_m": 30.0,
+ "canvas_pad_px": {
+  "top": 240,
+  "right": 300,
+  "note": "Padded 2026-10-21 from 1650x1710. Pad the hand-painted wear mask the same way (black rows on top, black columns on the right) and update mask_origin in region1_floor3.tres to landmass_mask_origin_uv."
+ },
  "landmass_mask_origin_uv": [
-  0.37091,
-  0.79825
+  0.31385,
+  0.82308
  ],
  "spawn_px": [
   612.0,
-  1365.0
+  1605.0
  ],
  "exit_world_xz": [
   24.1,
@@ -152,11 +157,15 @@
  "sea": {
   "coast_world_xz": [
    [
-    34.6,
-    -26.833
+    44.6,
+    -31.5
    ],
    [
-    31.6,
+    37.6,
+    -28.167
+   ],
+   [
+    32.267,
     -24.167
    ],
    [
@@ -188,12 +197,16 @@
     1.833
    ],
    [
-    32.933,
+    33.6,
     6.5
    ],
    [
-    34.6,
-    9.167
+    38.933,
+    9.833
+   ],
+   [
+    44.6,
+    11.167
    ]
   ],
   "note": "Open water at the east canvas edge (landmass 0)."
@@ -811,8 +824,8 @@
     -31.217
    ],
    [
-    -3.033,
-    -30.683
+    -3.2,
+    -30.817
    ],
    [
     -2.183,
@@ -847,8 +860,8 @@
     -16.617
    ],
    [
-    -5.733,
-    -16.417
+    -5.567,
+    -16.383
    ],
    [
     -5.083,
