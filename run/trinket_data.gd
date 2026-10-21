@@ -47,6 +47,11 @@ class_name TrinketData
 #                        that would get past Block is scaled by it,
 #                        rounded down, before Block (EnemyTurn.land_
 #                        attack()) - Grace opens on what then reaches HP
+#   big_hit_threshold, big_hit_reduction  the first enemy attack hit
+#                        each fight that would deal big_hit_threshold or
+#                        more (after its own modifiers and reductions,
+#                        before Block) deals big_hit_reduction less, never
+#                        below 0 (EnemyTurn.land_attack()) - once a fight
 #   hit_back_damage      damage to an enemy, through its Block, once for
 #                        each of its attacks that lands on him
 #   block_carry          at most this much of the Wanderer's Block outlasts
@@ -91,6 +96,7 @@ enum Slot { KEEPSAKE, WORN }
 #   {nth}    draw_on_card_count as an ordinal ("third")
 #   {carry}  block_carry
 #   {play_draw}  card_count_draw
+#   {big_hit}  big_hit_threshold     {big_cut}  big_hit_reduction
 #   {s}      "s" unless the count token before it is 1
 @export_multiline var description: String = ""
 # The shortened line for where it's shown small - the "currently held"
@@ -125,6 +131,14 @@ enum Slot { KEEPSAKE, WORN }
 @export var max_hp_bonus: int = 0
 @export_range(0.0, 1.0, 0.05) var first_hit_scale: float = 1.0
 @export var hit_back_damage: int = 0
+@export var big_hit_threshold: int = 0:
+	set(value):
+		big_hit_threshold = value
+		emit_changed()
+@export var big_hit_reduction: int = 0:
+	set(value):
+		big_hit_reduction = value
+		emit_changed()
 @export var block_carry: int = 0:
 	set(value):
 		block_carry = value
@@ -174,6 +188,8 @@ func _fill(template: String) -> String:
 		"nth": Status.ordinal_word(draw_on_card_count),
 		"carry": block_carry,
 		"play_draw": card_count_draw,
+		"big_hit": big_hit_threshold,
+		"big_cut": big_hit_reduction,
 	})
 
 # The fight is opening: this trinket's status, if it has one, onto the

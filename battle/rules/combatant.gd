@@ -158,6 +158,13 @@ var entry_block_unreported: int = 0
 # EnemyTurn.scale_first_hit(). Once taken, first_hit_spent for the fight.
 var first_hit_scale: float = 1.0
 var first_hit_spent: bool = false
+# The worn piece's big hit (TrinketData.big_hit_threshold/_reduction): the
+# first enemy attack hit this fight of big_hit_threshold or more deals
+# big_hit_reduction less, before Block - see EnemyTurn.takes_big_hit().
+# Once taken, big_hit_spent for the fight. 0 reduction = none.
+var big_hit_threshold: int = 0
+var big_hit_reduction: int = 0
+var big_hit_spent: bool = false
 # The worn piece's damage back (TrinketData.hit_back_damage): this much
 # to an enemy, through its Block, once for each of its attacks that lands
 # on this fighter (EnemyTurn.land_attack()). 0 = none.

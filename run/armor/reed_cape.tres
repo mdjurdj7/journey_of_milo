@@ -1,0 +1,14 @@
+[gd_resource type="Resource" script_class="TrinketData" format=3]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"reed_cape"
+display_name = "Reed Cape"
+slot = 1
+rarity = 1
+description = "The first time each fight a single hit would deal {big_hit} or more, take {big_cut} less."
+flavor_text = "Woven to shed rain. It still does."
+big_hit_threshold = 15
+big_hit_reduction = 8

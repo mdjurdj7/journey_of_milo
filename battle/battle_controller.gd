@@ -392,6 +392,10 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 		player.critical_entry_block += maxi(piece.critical_entry_block, 0)
 		_end_turn_keep += maxi(piece.end_turn_keep, 0)
 		player.first_hit_scale = minf(player.first_hit_scale, clampf(piece.first_hit_scale, 0.0, 1.0))
+		# The largest big-hit cut held, with its own threshold.
+		if piece.big_hit_reduction > player.big_hit_reduction:
+			player.big_hit_reduction = piece.big_hit_reduction
+			player.big_hit_threshold = maxi(piece.big_hit_threshold, 0)
 		player.hit_back_damage += maxi(piece.hit_back_damage, 0)
 	player.block += opening_block
 	opening_block_gained = opening_block

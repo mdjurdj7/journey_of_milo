@@ -1,0 +1,13 @@
+[gd_resource type="Resource" script_class="TrinketData" format=3]
+
+[ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
+
+[resource]
+script = ExtResource("1_trinket_data")
+id = &"salt_collar"
+display_name = "Salt Collar"
+slot = 1
+rarity = 1
+description = "The first time you drop to Critical in a fight, gain {critical_block} Block."
+flavor_text = "Stiff and white at the seams. It was worn close."
+critical_entry_block = 8

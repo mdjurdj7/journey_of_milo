@@ -329,6 +329,12 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 			_tally_mark(numbers, active.data.intent_mark, amount, amount - share)
 		amount -= cut
 		reduction_left -= cut
+		# The worn piece's big hit (big_hit_reduction): this one, if it is
+		# the fight's first that big - cut before Block.
+		if takes_big_hit(player.big_hit_threshold, player.big_hit_reduction, player.big_hit_spent, amount):
+			amount = maxi(amount - player.big_hit_reduction, 0)
+			player.big_hit_spent = true
+			result["big_hit_reduced"] = true
 		# The worn piece's first hit (first_hit_scale): this one, if it is
 		# the first to get past Block and absorb - scaled before them.
 		if takes_first_hit(player.first_hit_scale, player.first_hit_spent, amount, player.block, player.absorb):
@@ -399,6 +405,13 @@ static func takes_first_hit(scale: float, spent: bool, amount: int, block: int, 
 # That hit, scaled: rounded down, never below 0.
 static func scaled_first_hit(amount: int, scale: float) -> int:
 	return floori(float(amount) * clampf(scale, 0.0, 1.0))
+
+# Whether a hit of `amount` is the one the worn piece's big hit takes
+# (Combatant.big_hit_reduction): one is armed (a cut above 0, not yet
+# spent) and this hit is at least `threshold`, Block or not. The one rule
+# land_attack() spends and replay_attack() replays.
+static func takes_big_hit(threshold: int, reduction: int, spent: bool, amount: int) -> bool:
+	return reduction > 0 and not spent and amount >= threshold
 
 # The strike back (StatusData.strikes_back_on_attack_card - the Adder's
 # Coiled): an Attack card has just been played against this living enemy,
@@ -577,10 +590,10 @@ static func simulate_hits(player: Combatant, amounts: Array[int]) -> Dictionary:
 # The player as the coming enemy turn finds him, for the previews to
 # spend from in turn (preview_intent()'s `state`): his statuses as
 # copies (Status.clones() - spending one here touches nothing real),
-# whether the worn piece's first hit is spent, Block, absorb, HP and the
-# lethal guard's saves used so far.
+# whether the worn piece's first hit and big hit are spent, Block,
+# absorb, HP and the lethal guard's saves used so far.
 static func turn_state(player: Combatant) -> Dictionary:
-	return {"statuses": Status.clones(player.statuses), "first_hit_spent": player.first_hit_spent, "block": player.block, "absorb": player.absorb, "toll": player.toll, "hp": player.hp, "saves_used": 0}
+	return {"statuses": Status.clones(player.statuses), "first_hit_spent": player.first_hit_spent, "big_hit_spent": player.big_hit_spent, "block": player.block, "absorb": player.absorb, "toll": player.toll, "hp": player.hp, "saves_used": 0}
 
 static func copy_state(state: Dictionary) -> Dictionary:
 	var copy: Dictionary = state.duplicate()
@@ -606,6 +619,9 @@ static func replay_attack(attacker: Combatant, data: EnemyData, intent: EnemyInt
 		var cut: int = reduce_hit(amount, reduction_left)
 		amount -= cut
 		reduction_left -= cut
+		if takes_big_hit(player.big_hit_threshold, player.big_hit_reduction, bool(state.get("big_hit_spent", true)), amount):
+			amount = maxi(amount - player.big_hit_reduction, 0)
+			state["big_hit_spent"] = true
 		if takes_first_hit(player.first_hit_scale, bool(state["first_hit_spent"]), amount, int(state["block"]), int(state["absorb"])):
 			amount = scaled_first_hit(amount, player.first_hit_scale)
 			state["first_hit_spent"] = true
