@@ -383,6 +383,11 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	# draw below. The first turn opens without _start_player_turn()'s
 	# Block reset, so the opening Block stands until the first enemy turn
 	# is over.
+	# The weapon's one fight hook (Gaff Hook): its self-loss bonus, for the
+	# basic attack it names.
+	if RunState.weapon != null and RunState.weapon.self_loss_attack_bonus > 0:
+		player.self_loss_attack_bonus = RunState.weapon.self_loss_attack_bonus
+		player.self_loss_attack_tag = RunState.weapon.basic_attack_tag
 	var held: Array[TrinketData] = RunState.held_pieces()
 	var opening_block: int = 0
 	var opening_bonus: int = 0
@@ -2511,6 +2516,7 @@ func _start_player_turn() -> void:
 	player.damage_taken_this_turn = 0
 	player.toll_spent_this_turn = false
 	player.tagged_plays_this_turn.clear()
+	player.self_loss_attack_armed = false
 	Skillchain.reset(player)
 	player.clear_last_attack()
 	_last_attack_enemy = null

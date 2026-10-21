@@ -1,0 +1,12 @@
+[gd_resource type="Resource" script_class="WeaponData" format=3]
+
+[ext_resource type="Script" path="res://run/weapon_data.gd" id="1_weapon_data"]
+
+[resource]
+script = ExtResource("1_weapon_data")
+id = &"gaff_hook"
+display_name = "Gaff Hook"
+description = "After you damage yourself, your next Slash this turn deals {bonus} more."
+lore = "Made to land things heavier than the hand."
+self_loss_attack_bonus = 4
+card_class = &"wanderer"

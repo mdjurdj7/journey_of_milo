@@ -5,7 +5,8 @@ class_name WeaponData
 # character's starting_weapon by new_run() and changed only through
 # RunState.equip_weapon(). Shown in the HUD's WEAPON slot (KeepsakeLine)
 # and on its plate (ItemPlate.set_weapon()). Never a trinket:
-# held_pieces() and the fight hooks don't read it.
+# held_pieces() and the trinkets' fight hooks don't read it; its own one
+# fight hook is self_loss_attack_bonus, below.
 #
 # What a weapon is for (DESIGN.md, Weapons): it modifies the class's basic
 # attack - Slash for the Wanderer - through modify_basic_attack(), which
@@ -17,7 +18,8 @@ class_name WeaponData
 @export var id: StringName = &""
 @export var display_name: String = ""
 # One sentence in rules voice for what it does to the basic attack, shown
-# on its plate. Empty = no effect, and no effect line.
+# on its plate. Empty = no effect, and no effect line. {bonus} is
+# self_loss_attack_bonus.
 @export_multiline var description: String = ""
 # One quiet line about the object itself, under its name on the plate.
 # Empty = no line.
@@ -32,6 +34,15 @@ class_name WeaponData
 # What marks a card as the class's basic attack (CardData.tags) - Slash
 # and Slash+ carry it.
 @export var basic_attack_tag: StringName = &"basic_attack"
+# Above 0 (Gaff Hook): after the Wanderer loses HP to his own effect - the
+# self-inflicted loss Toll counts (Combatant.gain_self_loss_toll()) - his
+# next basic attack this turn deals this much more. Armed again by a
+# later loss once spent; two losses before one Slash still give it once.
+# Copied onto the fight's Combatant by BattleController.setup().
+@export var self_loss_attack_bonus: int = 0
+# The class this weapon is for (CharacterData.card_class); empty = any. A
+# source that offers weapons (the collector) offers only the run's own.
+@export var card_class: StringName = &""
 
 @export_group("Field Model")
 # What the Wanderer carries in the field and the battle frame (Wanderer.
@@ -98,7 +109,7 @@ func modify_basic_attack(card: CardData) -> CardData:
 	return source.duplicate() as CardData
 
 func describe() -> String:
-	return description
+	return description.replace("{bonus}", str(self_loss_attack_bonus))
 
 # The cards its description names, by card_name: basic_attack_as, the base
 # version (the Tail's Lash). Its plate inks each name and, where the plate

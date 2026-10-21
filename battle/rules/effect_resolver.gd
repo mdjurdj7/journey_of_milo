@@ -56,6 +56,7 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	# damage, so a kill from the card before must not still be standing.
 	ctx.killed_this_card = false
 	ctx.card_is_attack = card.card_type == CardData.CardType.ATTACK
+	ctx.resolving_card = card
 	ctx.attack_bonus_taken = false
 	ctx.toll_spent_this_card = false
 	ctx.hp_dealt_this_card = 0

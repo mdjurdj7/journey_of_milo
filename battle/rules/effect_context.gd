@@ -55,6 +55,9 @@ var on_grace_reclaimed: Callable = Callable()
 # Whether the card being resolved is an ATTACK - set by EffectResolver.
 # resolve_card(), and what take_attack_bonus() pays out on.
 var card_is_attack: bool = false
+# The card being resolved - set by EffectResolver.resolve_card() - for the
+# weapon's self-loss bonus, which only the basic attack takes.
+var resolving_card: CardData = null
 # Whether this card's attack bonus has been handed out already - see
 # take_attack_bonus(). Cleared per card by resolve_card().
 var attack_bonus_taken: bool = false
@@ -153,7 +156,7 @@ func take_attack_bonus() -> int:
 	if not card_is_attack or attack_bonus_taken:
 		return 0
 	attack_bonus_taken = true
-	var bonus: int = AttackBonus.for_player(player, player.hp)
+	var bonus: int = AttackBonus.for_player(player, player.hp) + player.take_self_loss_attack_bonus(resolving_card)
 	# A charged bonus ("+3 on your next Attack") is spent by the card that
 	# took it - whether or not the blow lands on anyone.
 	Status.spend_attack_bonus_charges(player.statuses, player.is_critical())

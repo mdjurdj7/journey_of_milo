@@ -2057,7 +2057,10 @@ func _attack_bonus_preview() -> int:
 	if _bonus_context == null or _bonus_context.player == null:
 		return Stance.attack_bonus(_stance, false)
 	var player: Combatant = _bonus_context.player
-	return AttackBonus.for_player(player, player.hp - _upfront_hp_cost())
+	var upfront: int = _upfront_hp_cost()
+	# The weapon's self-loss bonus on the basic attack - armed, or about to
+	# be by this card's own price (Self-Eater's).
+	return AttackBonus.for_player(player, player.hp - upfront) + player.self_loss_attack_bonus_for(card_data, upfront > 0)
 
 static func _type_label_text(keyline_type: KeylineType) -> String:
 	match keyline_type:
