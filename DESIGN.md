@@ -229,12 +229,14 @@ and up the west shore north of z -27. (2026-10-17.)
   and out of `held_pieces()`. Its art is
   `assets/textures/weapons/rusted_blade.png`. (2026-10-17.)
   Greyshelf's Tail (`run/weapons/greyshelfs_tail.tres`) is offered after
-  every Greyshelf win while not carried (`EnemyData.weapon_reward`):
+  every Greyshelf win while not carried (`EnemyData.weapon_reward`), on a
+  line of the reward screen's own - its name / CHOOSE, which opens its
+  plate with TAKE and LEAVE; WALK ON leaves it (2026-10-20):
   Slash plays as Lash, Slash+ as Lash+ (`cards/weapon/`). **Placeholder
   art:** the Tail's plate reuses the Rusted Blade's art and Lash/Lash+
   reuse Slash's, until real art exists. (2026-10-18.)
   **Reveal sound:** `assets/audio/sfx/weapon_reveal.mp3` plays once as a
-  weapon offer's plate appears (`RegionField.open_weapon_offer()`). It is
+  weapon offer's plate appears (`RegionField._on_weapon_shown()`). It is
   the old 2D project's ultra-rare drop sound,
   `reference/old_project/deck-builder/assets/audio/cards/ultra_rare.mp3`
   (its `rare_drop`; the same bytes as `assets/audio/cards_old/

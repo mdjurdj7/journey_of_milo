@@ -179,7 +179,7 @@ func _check_greyshelf_take() -> void:
 	_expect(reward != null, "Killing the Greyshelf opens the reward screen")
 	if reward != null:
 		var ids: Array[String] = _line_ids(reward)
-		_expect_eq(ids, ["gold", "glassbone", "card"] as Array[String], "...gold, Glassbone, a card")
+		_expect_eq(ids, ["gold", "glassbone", "card", "weapon"] as Array[String], "...gold, Glassbone, a card, its Tail")
 		var index: int = ids.find("glassbone")
 		if index >= 0:
 			var line: RefCounted = (reward.get("_lines") as Array)[index]

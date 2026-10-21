@@ -627,8 +627,9 @@ var _pending_keepsake: TrinketData = null
 # Who left it - the enemy's name, for the offer's quiet source line.
 var _pending_keepsake_source: String = ""
 # A weapon the last win left (EnemyData.weapon_reward - the Greyshelf's
-# Tail), waiting for the normal reward and any keepsake to close before
-# it's offered (_open_pending_offers()).
+# Tail), waiting for the reward screen to offer it on a line of its own
+# (RewardScreen.offer_weapon()) - or, with no screen (RewardMode.SPREAD),
+# for any keepsake to close before it's offered (_open_pending_offers()).
 var _pending_weapon: WeaponData = null
 # Glassbone the last win left (EnemyData.glassbone_reward, summed over
 # everyone it was won against), waiting for the reward screen to offer it
@@ -3430,12 +3431,12 @@ func _spawn_reward_spread(fell_at: Vector3, fell_to: EnemyData) -> void:
 	# The floor can be left, or the run ended, during that beat.
 	if not is_inside_tree():
 		return
-	if not has_pool and _pending_glassbone <= 0:
+	if not has_pool and _pending_glassbone <= 0 and _pending_weapon == null:
 		_open_pending_offers()
 		return
 	if reward_mode == RewardMode.SCREEN or not has_pool:
-		# The keepsake and weapon follow when the screen closes (_on_reward_screen_
-		# closed()).
+		# The weapon is a line on it; the keepsake follows when it closes
+		# (_on_reward_screen_closed()).
 		_open_reward_screen()
 		return
 	var scene := load(reward_spread_scene_path) as PackedScene
@@ -3484,7 +3485,7 @@ func _open_reward_screen() -> void:
 		return
 	var screen := scene.instantiate() as RewardScreen
 	# Only reached through _spawn_reward_spread(), which has already checked
-	# the floor, and that there is a pool or Glassbone to offer.
+	# the floor, and that there is a pool, Glassbone or a weapon to offer.
 	var floor_data := get_floor_data()
 	# What the fight's role pays (EncounterRewards): with none to read, the
 	# floor's gold and the card offer, as every fight once had.
@@ -3492,8 +3493,8 @@ func _open_reward_screen() -> void:
 	if rewards == null:
 		push_warning("RegionField: could not load %s; the reward is the floor's gold and a card." % encounter_rewards_path)
 	var role_reward: RoleReward = rewards.for_role(_pending_role) if rewards != null else null
-	# A floor with no pool opens this only for Glassbone: no gold, no card,
-	# no extra.
+	# A floor with no pool opens this only for Glassbone or a weapon: no
+	# gold, no card, no extra.
 	var gold: int = 0
 	var extra: EncounterRewards.Extra = EncounterRewards.Extra.NONE
 	if run_reward_pool(floor_data) != null:
@@ -3508,6 +3509,12 @@ func _open_reward_screen() -> void:
 	_pending_elite = false
 	_pending_top_tier = false
 	_pending_role = "basic"
+	# The win's weapon, a line of its own (RewardScreen.offer_weapon()).
+	if _pending_weapon != null:
+		screen.offer_weapon(_pending_weapon)
+		_pending_weapon = null
+		screen.weapon_shown.connect(_on_weapon_shown)
+		screen.weapon_answered.connect(_answer_weapon_offer)
 	screen.closed.connect(_on_reward_screen_closed)
 	add_child(screen)
 	process_mode = Node.PROCESS_MODE_DISABLED
@@ -3613,11 +3620,21 @@ func open_weapon_offer(weapon: WeaponData) -> bool:
 		wanderer.clear_move_target()
 	process_mode = Node.PROCESS_MODE_DISABLED
 	add_child(examine)
-	TakeFeedback.play_sound(get_tree(), weapon_reveal_sfx_path, weapon_reveal_volume_db, "WeaponRevealAudio", "RegionField")
+	_on_weapon_shown(weapon)
 	return true
 
 func _on_weapon_offer_closed(taken: bool, weapon: WeaponData) -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
+	_answer_weapon_offer(weapon, taken)
+	_say_pending_find()
+
+# A weapon's plate up - over the field, or a reward screen's line: its reveal.
+func _on_weapon_shown(_weapon: WeaponData) -> void:
+	TakeFeedback.play_sound(get_tree(), weapon_reveal_sfx_path, weapon_reveal_volume_db, "WeaponRevealAudio", "RegionField")
+
+# A weapon offer answered, wherever it was made: logged, and TAKE carries
+# it (RunState.equip_weapon()) - the one it replaces is gone.
+func _answer_weapon_offer(weapon: WeaponData, taken: bool) -> void:
 	var carried: WeaponData = RunState.weapon
 	RunLogger.event("weapon_offer", {"offered": String(weapon.id), "carried": String(carried.id) if carried != null else "", "taken": taken})
 	if taken:
@@ -3626,7 +3643,6 @@ func _on_weapon_offer_closed(taken: bool, weapon: WeaponData) -> void:
 		print("RegionField: took the weapon '%s'%s." % [weapon.display_name, " (left '%s')" % carried.display_name if carried != null else ""])
 	else:
 		print("RegionField: left the weapon '%s'." % weapon.display_name)
-	_say_pending_find()
 
 # A keepsake offered over the field, under the belongings screen's own
 # scrim and freeze: TAKE / LEAVE on an empty slot, TAKE / KEEP CURRENT on

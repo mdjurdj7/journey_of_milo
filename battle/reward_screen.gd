@@ -21,6 +21,11 @@ class_name RewardScreen
 # this screen is over a scrim, not over the world.
 
 signal closed()
+# The weapon line's plate has opened (RegionField plays its reveal), and
+# the weapon answered - TAKE or LEAVE on that plate, or left behind on WALK
+# ON (taken false). RegionField carries it and logs it.
+signal weapon_shown(weapon: WeaponData)
+signal weapon_answered(weapon: WeaponData, taken: bool)
 
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
@@ -213,6 +218,27 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 @export var glassbone_volume_db: float = -24.0
 @export_group("")
 
+@export_group("Weapon")
+# A weapon the win left (the Greyshelf's Tail): its own line, its name and
+# art / CHOOSE. CHOOSE opens its plate (ArmorExamine.setup_weapon(), TAKE
+# and LEAVE, "REPLACES" the weapon carried) weapon_offer_layer_offset
+# layers over this screen, the screen deaf to its own input until it is
+# answered. Either answer strikes the line; WALK ON leaves it behind.
+@export var weapon_action_text: String = "CHOOSE":
+	set(value):
+		weapon_action_text = value
+		for line in _lines:
+			if line.id == "weapon":
+				line.action = weapon_action_text
+		if _draw_layer != null:
+			_draw_layer.queue_redraw()
+@export var weapon_offer_layer_offset: int = 1:
+	set(value):
+		weapon_offer_layer_offset = value
+		if _weapon_offer_open():
+			_weapon_offer.layer = layer + weapon_offer_layer_offset
+@export_group("")
+
 @export_group("Extra")
 # An optional basic fight's extra (EncounterRewards), a Samphire: its own
 # line under the gold, its card's name / TAKE - left behind on WALK ON.
@@ -269,6 +295,9 @@ var _samphire_flying: bool = false
 # The Samphire row's card, shown while the row is focused (_sync_samphire_
 # preview()); made the first time.
 var _samphire_preview: CardView = null
+# The weapon on offer (offer_weapon()), and its plate while it is open.
+var _weapon: WeaponData = null
+var _weapon_offer: ArmorExamine = null
 # The deck viewer opened from DECK (_open_deck_view()), while it is open;
 # and whether DECK is under the cursor.
 var _deck_view: DeckView = null
@@ -339,6 +368,11 @@ func setup(gold: int, pool: RewardPool, deck_panel: Control, glassbone: int = 0,
 	_extra = extra
 	_extra_card = extra_card
 	_rarity_rates = rarity_rates
+
+# The weapon the win left, on a line of its own - never the one carried.
+# Called before the screen is added to the tree.
+func offer_weapon(weapon: WeaponData) -> void:
+	_weapon = weapon if weapon != RunState.weapon else null
 
 func _ready() -> void:
 	# The field is frozen under this (RegionField goes back to
@@ -411,6 +445,13 @@ func _build_lines() -> void:
 		card_line.item = "A card"
 		card_line.action = "CHOOSE"
 		_lines.append(card_line)
+	if _weapon != null:
+		var weapon_line := RewardLine.new()
+		weapon_line.id = "weapon"
+		weapon_line.item = _weapon.display_name
+		weapon_line.action = weapon_action_text
+		weapon_line.icon = _weapon.art
+		_lines.append(weapon_line)
 	if _lines.is_empty():
 		close()
 
@@ -876,12 +917,44 @@ func _take_line(index: int) -> void:
 			_open_choice()
 		"samphire":
 			_take_samphire(line)
+		"weapon":
+			_open_weapon_offer(line)
 
 # --- Extra ---
 
-# The Samphire is on its way to the deck.
+# The Samphire is on its way to the deck, or a view is open over the screen.
 func _extra_busy() -> bool:
-	return _samphire_flying or _deck_view_open()
+	return _samphire_flying or _deck_view_open() or _weapon_offer_open()
+
+func _weapon_offer_open() -> bool:
+	return _weapon_offer != null and is_instance_valid(_weapon_offer)
+
+# The weapon's plate over the screen, first loot's reveal; answered, its
+# line is struck.
+func _open_weapon_offer(line: RewardLine) -> void:
+	if _weapon == null or _weapon_offer_open():
+		return
+	_weapon_offer = ArmorExamine.new()
+	_weapon_offer.name = "WeaponOffer"
+	_weapon_offer.setup_weapon(_weapon, Rect2(), RunState.weapon, true, true)
+	_weapon_offer.closed.connect(_on_weapon_offer_closed.bind(line))
+	add_child(_weapon_offer)
+	# Its own _ready() puts it on layer 100 - this screen's.
+	_weapon_offer.layer = layer + weapon_offer_layer_offset
+	_set_list_focus(-1)
+	_list_mouse_on = -1
+	weapon_shown.emit(_weapon)
+
+func _on_weapon_offer_closed(taken: bool, line: RewardLine) -> void:
+	_weapon_offer = null
+	line.taken = true
+	weapon_answered.emit(_weapon, taken)
+	_draw_layer.queue_redraw()
+	_close_if_spent()
+
+# For probes: the weapon's plate while it is open, else null.
+func get_weapon_offer() -> ArmorExamine:
+	return _weapon_offer if _weapon_offer_open() else null
 
 func _deck_view_open() -> bool:
 	return _deck_view != null and is_instance_valid(_deck_view)
@@ -1148,5 +1221,10 @@ func _close_if_spent() -> void:
 	close()
 
 func close() -> void:
+	# A weapon left on the list is left behind.
+	for line in _lines:
+		if line.id == "weapon" and not line.taken:
+			line.taken = true
+			weapon_answered.emit(_weapon, false)
 	closed.emit()
 	queue_free()

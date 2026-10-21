@@ -334,7 +334,8 @@ func _past_fight() -> Vector2:
 	var exit := Vector2(forward.x, forward.z).normalized()
 	return Vector2(gate.global_position.x - _spawn.x, gate.global_position.z - _spawn.z) - exit * PAST_GATE_BACK_M
 
-# The required fight started and won outright; false when it never starts.
+# The required fight started and won outright, its reward screen up;
+# false when it never starts.
 func _win_fight(fight: Node) -> bool:
 	var layer: Node = _field.get_node("BattleLayer")
 	if layer.get_child_count() == 0:
@@ -352,31 +353,50 @@ func _win_fight(fight: Node) -> bool:
 		controller.call("_report_damage", "player", combatant, 99, "card")
 	controller.call("_check_battle_end")
 	await _await_reward_screen()
-	var reward: Node = _child_with_script(_field, "reward_screen.gd")
-	if reward != null:
-		reward.call("close")
-	for i in 30:
-		await physics_frame
 	return true
 
-# The Greyshelf won: its Tail offered (RegionField.open_weapon_offer()),
-# the field frozen under it - then answered the player's way, TAKE or
-# LEAVE on its plate, and the field live again, the weapon carried as
-# chosen.
+# The Greyshelf won: its Tail a line on the reward screen (RewardScreen.
+# offer_weapon()), its CHOOSE opening the plate over the screen and the
+# frozen field - then answered the player's way, TAKE or LEAVE on its
+# plate, the line struck, and the screen closed with the field live again,
+# the weapon carried as chosen.
 func _answer_weapon_offer(take: bool) -> void:
-	var offer: Node = _field.get_node_or_null("WeaponOffer")
-	_expect(offer != null, "Won: the Greyshelf's Tail is offered")
+	var reward: Node = _child_with_script(_field, "reward_screen.gd")
+	_expect(reward != null, "Won: the reward screen is up")
+	if reward == null:
+		return
+	var lines: Array = reward.get("_lines")
+	var index: int = -1
+	for i in lines.size():
+		if str((lines[i] as RefCounted).get("id")) == "weapon":
+			index = i
+	_expect(index >= 0, "...the Greyshelf's Tail a line on it")
+	if index < 0:
+		reward.call("close")
+		return
+	reward.call("_take_line", index)
+	var offer: Node = reward.call("get_weapon_offer")
+	_expect(offer != null, "...its CHOOSE opens the Tail's plate")
 	if offer == null:
+		reward.call("close")
 		return
 	var plate: Node = offer.call("get_plate")
 	_expect_eq(str((plate.call("get_weapon") as Resource).get("id")), str(TAIL_ID), "...its plate the Tail's")
+	_expect(int(offer.get("layer")) > int(reward.get("layer")), "...over the screen")
 	_expect(not _field.can_process(), "...over a frozen field")
 	plate.call("activate", 0 if take else 1)
 	for i in 60:
-		if not is_instance_valid(offer) and _field.can_process():
+		if not is_instance_valid(offer):
 			break
 		await physics_frame
-	_expect(not is_instance_valid(offer) and _field.can_process(), "...%s closes it, the field live again" % ("TAKE" if take else "LEAVE"))
+	_expect(not is_instance_valid(offer) and bool((lines[index] as RefCounted).get("taken")), "...%s closes it, the line struck" % ("TAKE" if take else "LEAVE"))
+	if is_instance_valid(reward):
+		reward.call("close")
+	for i in 60:
+		if _field.can_process():
+			break
+		await physics_frame
+	_expect(_field.can_process(), "...the screen closed, the field live again")
 	var carried: Resource = _run_state.get("weapon")
 	_expect_eq(str(carried.get("id")) if carried != null else "", str(TAIL_ID if take else BLADE_ID), "...the weapon carried %s" % ("the Tail" if take else "still the Rusted Blade"))
 
