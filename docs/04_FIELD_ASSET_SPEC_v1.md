@@ -97,6 +97,7 @@ Anything with colour baked in — the keeper's texture, the Wanderer's — does 
 | Glassbone material | floor 2 island (the seam) | flat values, no texture - see §3 Props; retune there |
 | Greyshelf texture | floor 5 crest | dark slate, pale scutes, blue throat; no tint - the Gape's throat pass deepens its blue by hue and value |
 | Nettlebasket texture | floor 4, the road side's start | the Meshy albedo as exported - brown plates, the cradle lined in muted red; no tint; the Nettles wear the same map at 0.12 scale |
+| Collector texture | floor 4, the bay west of the road | albedo from Meshy; gear colour pass pending — retexture or regenerate, no tint |
 
 If this list grows past half a dozen, the palette pass has quietly become a regeneration pass.
 
