@@ -3,6 +3,7 @@
 [ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
 [ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
 [ext_resource type="Resource" path="res://battle/rules/statuses/thick_skin.tres" id="3_thick_skin"]
+[ext_resource type="Texture2D" uid="uid://ufqx028frdt6" path="res://cards/art/Wanderer/Thick Skin.png" id="9_art"]
 
 [sub_resource type="Resource" id="E_block"]
 script = ExtResource("2_card_effect")
@@ -24,4 +25,5 @@ target_type = 1
 description = "Gain {block} block.
 Until your next turn, damage past Block costs Toll first."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_block"), SubResource("E_thick_skin")])
+art = ExtResource("9_art")
 card_class = &"wanderer"

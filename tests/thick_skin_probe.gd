@@ -93,7 +93,7 @@ func _check_data() -> void:
 	var card: CardData = load(CARD_PATH)
 	var status: StatusData = load(STATUS_PATH)
 	_expect_eq([card.card_name, card.cost, card.card_type, card.rarity, card.target_type, card.card_class, card.offer], ["Thick Skin", 2, CardData.CardType.SKILL, CardData.CardRarity.COMMON, CardData.TargetType.SELF, &"wanderer", CardData.OfferScope.REWARDABLE], "Thick Skin: 2 Energy, a Common Skill, no target, the Wanderer's")
-	_expect(card.art == null, "...no art yet")
+	_expect(card.art != null and card.art.resource_path == "res://cards/art/Wanderer/Thick Skin.png", "...with its art")
 	_expect_eq(card.description, "Gain {block} block.\nUntil your next turn, damage past Block costs Toll first.", "...its text")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.BLOCK and card.effects[0].value == 6, "...6 Block")
 	_expect(card.effects.size() == 2 and card.effects[1].effect_type == CardEffect.EffectType.APPLY_STATUS and card.effects[1].status_data == status, "...then Thick Skin")
