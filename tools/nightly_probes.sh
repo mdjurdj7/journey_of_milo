@@ -22,7 +22,11 @@
 # - Writes REPORT_DIR/<date>-<time>.txt and copies it to REPORT_DIR/
 #   latest.txt: main's commit, the start and end, total time, the passed
 #   count, each probe's PASS/FAIL and seconds (longest first), and each
-#   failure's first FAIL lines.
+#   failure's first FAIL lines. A pass that crashed at exit after its
+#   PASSED line (run_probes.sh's "PASS (crashed at exit)") is marked on
+#   its row, and a section counts each probe that ever has: tonight, and
+#   in how many of the nightly reports in REPORT_DIR - so a spread to
+#   other probes, or a rising rate, shows.
 # - Removes the worktree; the logs stay in REPORT_DIR.
 #
 # REPORT_DIR defaults to ../probe-nightly beside the repo, outside git.
@@ -61,7 +65,8 @@ report() {
 			echo "probes:   $(grep -c ' PASS ' "$LOGS/_results.txt") passed, $(grep -c ' FAIL ' "$LOGS/_results.txt") failed, of $(wc -l < "$LOGS/_results.txt")"
 			grep -E '^run_probes: [0-9]+ of [0-9]+ passed in [0-9]+s$' "$RUNNER_LOG" 2>/dev/null | sed 's/^run_probes: /the set:  /; s/$/ (the probes alone)/'
 			echo
-			sort -k3,3nr "$LOGS/_results.txt" | awk '{ printf "%-28s %s %5s\n", $1, $2, $3 }'
+			sort -k3,3nr "$LOGS/_results.txt" | awk '{ printf "%-28s %s %5s%s\n", $1, $2, $3, (/\(crashed at exit/ ? "  crashed at exit" : "") }'
+			exit_crashes
 			for p in $(awk '$2 == "FAIL" { print $1 }' "$LOGS/_results.txt"); do
 				echo
 				echo "== $p"
@@ -74,6 +79,24 @@ report() {
 	} > "$REPORT"
 	cp "$REPORT" "$REPORT_DIR/latest.txt"
 	echo "nightly_probes: summary in $REPORT"
+}
+
+# Every probe that passed but crashed at exit after its PASSED line,
+# tonight or in an earlier nightly report here: whether it did tonight,
+# and in how many of the reports (this one included) it did. Nothing when
+# none ever has.
+exit_crashes() {
+	local tonight earlier p reports n
+	tonight=$(awk '$2 == "PASS" && /\(crashed at exit/ { print $1 }' "$LOGS/_results.txt")
+	earlier=$(ls "$REPORT_DIR"/20*.txt 2>/dev/null | grep -vxF "$REPORT" | xargs -r awk '$2 == "PASS" && / crashed at exit$/ { print $1 }')
+	[ -z "$tonight$earlier" ] && return 0
+	reports=$(( $(ls "$REPORT_DIR"/20*.txt 2>/dev/null | grep -vxcF "$REPORT") + 1 ))
+	echo
+	echo "Crashed at exit after PASSED (counted as passes), per probe:"
+	for p in $(printf '%s\n' $tonight $earlier | sort -u); do
+		n=$(printf '%s\n' $tonight $earlier | grep -cxF "$p")
+		printf '  %-28s tonight: %-3s in %d of %d nightly reports\n' "$p" "$(printf '%s\n' $tonight | grep -qxF "$p" && echo yes || echo no)" "$n" "$reports"
+	done
 }
 
 # Other sessions' probe processes or imports (CLAUDE.md's check).

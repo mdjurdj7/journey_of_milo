@@ -61,6 +61,13 @@
 # and an error whose message holds that text isn't counted. Engine errors
 # no probe answers for - Godot's own report at exit - are IGNORED_ERRORS.
 #
+# A probe that crashes (exit EXIT_CRASH_CODE, 139 - a segfault) after its
+# PASSED line, with no counted error, passes as "PASS (crashed at exit)":
+# every check came before PASSED, and Godot 4.7.1 can crash in its own
+# teardown after that (samurai_probe, about 1 run in 10). It is noted in
+# the results line and the run's last lines. A crash before PASSED, or
+# any other exit code, still fails.
+#
 # GODOT overrides the engine (default ../Godot_v4.7.1.exe beside the repo:
 # the main executable, not the _console wrapper). Exit code 0 = every
 # probe passed, 1 = a failure, 2 = usage, 3 = the worktree stayed busy,
@@ -798,6 +805,11 @@ if [ "$DO_IMPORT" = 1 ]; then
 fi
 
 # --- Run ---
+# The exit code a crash comes back as (SIGSEGV under MSYS): after the
+# probe's PASSED line, a pass with a note - see the header. Overridable
+# from the environment, as GODOT is (a test with OS.crash(), 132).
+EXIT_CRASH_CODE=${EXIT_CRASH_CODE:-139}
+
 # Engine ERROR messages never counted, whatever the probe: text in the
 # message, one per line - Godot's leak report as it exits, printed by
 # every probe.
@@ -861,7 +873,7 @@ script_errors() {
 # every checkout and session, so a probe that writes and reads run logs
 # would otherwise see another copy's files.
 run_one() {
-	local p="$1" ff="" start code dur verdict runlog runlog_arg errors note
+	local p="$1" ff="" start code dur verdict runlog runlog_arg errors note passed=no
 	[ "$(table_flag "$p" realtime)" = yes ] || ff="--fixed-fps 60"
 	runlog=$(mktemp -d "$LOGS/runlog.$p.XXXXXX")
 	runlog_arg="$runlog"
@@ -871,7 +883,9 @@ run_one() {
 	code=$?
 	rm -rf "$runlog"
 	dur=$(( $(date +%s) - start ))
-	if [ "$code" = 0 ] && grep -q "^$p: PASSED" "$LOGS/$p.log"; then verdict=PASS; else verdict=FAIL; fi
+	grep -q "^$p: PASSED" "$LOGS/$p.log" && passed=yes
+	verdict=FAIL
+	if [ "$passed" = yes ] && { [ "$code" = 0 ] || [ "$code" = "$EXIT_CRASH_CODE" ]; }; then verdict=PASS; fi
 	errors=$(script_errors "$p")
 	note=""
 	if [ -n "$errors" ]; then
@@ -879,7 +893,15 @@ run_one() {
 		note="; ${errors%%$'\t'*} error(s), first: ${errors#*$'\t'}"
 		echo "FAIL [run_probes]: ${errors%%$'\t'*} error(s), the first: ${errors#*$'\t'}" >> "$LOGS/$p.log"
 	fi
-	printf '%-26s %s %4ss%s\n' "$p" "$verdict" "$dur" "$([ "$verdict" = FAIL ] && echo "  (exit $code$note, $LOGS/$p.log)")" | tee -a "$LOGS/_results.txt"
+	# A pass that crashed after its PASSED line says so (see the header).
+	local suffix=""
+	if [ "$verdict" = FAIL ]; then
+		suffix="  (exit $code$note, $LOGS/$p.log)"
+	elif [ "$code" = "$EXIT_CRASH_CODE" ]; then
+		suffix="  (crashed at exit: exit $code after PASSED, $LOGS/$p.log)"
+		echo "NOTE [run_probes]: crashed at exit (exit $code) after PASSED - counted as a pass" >> "$LOGS/$p.log"
+	fi
+	printf '%-26s %s %4ss%s\n' "$p" "$verdict" "$dur" "$suffix" | tee -a "$LOGS/_results.txt"
 }
 
 COUNT=$(echo $SELECTED | wc -w)
@@ -922,6 +944,8 @@ record_times() {
 }
 record_times
 echo "run_probes: $((COUNT - FAILED)) of $COUNT passed in $((T1 - T0))s"
+CRASHED=$(awk '$2 == "PASS" && /\(crashed at exit/ { printf " %s", $1 }' "$LOGS/_results.txt" 2>/dev/null)
+[ -n "$CRASHED" ] && echo "run_probes: PASS (crashed at exit):$CRASHED"
 
 # --- Did HEAD move under the run? ---
 END_HEAD=$(git -C "$REPO" rev-parse HEAD)
