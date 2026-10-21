@@ -247,6 +247,21 @@ poly = approximate_polygon(c, tolerance=0.08 * PX)
 def to_world(py, px_):
     return [round((px_ - spawn[0]) / PX, 3), round((py - spawn[1]) / PX, 3)]
 ledge = [to_world(p[0], p[1]) for p in poly]
+# Interior barrier loops: since the rim trail closes a ring (lump - trail -
+# top arm - hub), the ridges inside that ring are holes in the walkable area,
+# not part of the outer loop. Each becomes its own closed barrier loop, so the
+# ridges block like every other ledge; the neck and the trail's bank stay open
+# (the bank's one-way ledge is added in the wiring).
+barrier_holes = []
+for c_h in cs:
+    if c_h is c or len(c_h) < 40:
+        continue
+    py_, px_ = c_h[:, 0], c_h[:, 1]
+    area = 0.5 * abs(np.dot(px_, np.roll(py_, 1)) - np.dot(py_, np.roll(px_, 1)))
+    if area < (2.0 * PX) ** 2:
+        continue
+    poly_h = approximate_polygon(c_h, tolerance=0.08 * PX)
+    barrier_holes.append([to_world(q[0], q[1]) for q in poly_h])
 
 extra = {}
 if RIM_TRAIL:
@@ -285,6 +300,7 @@ layout = {
     "east_lobe": {"cut_x_m": LOBE_CUT_X, "centre_world_xz": list(LOBE_CENTRE), "radii_m": list(LOBE_RADII), "fillet_m": LOBE_FILLET},
     **extra,
     "ledge_barrier_world_xz": ledge,
+    "ledge_barrier_holes_world_xz": barrier_holes,
     "note": "World XZ in metres relative to spawn; +X right, +Z toward the bottom of the image (south). Forward/exit is toward -Z.",
 }
 json.dump(layout, open("./floor3_layout.json", "w"), indent=1)
@@ -324,7 +340,7 @@ dr.line(pts + [pts[0]], fill=(30,60,140), width=2)
 im.save("./floor3_ground_preview.png")
 
 print("spawn", spawn, "exit", exit_, "elite", elite)
-print("ledge points", len(ledge))
+print("ledge points", len(ledge), "hole loops", [len(hh) for hh in barrier_holes])
 print("max slope on faces", round(float(slope[(o>0)&(o<FACE_W)].max()),1), "deg")
 if RIM_TRAIL:
     print("trail length m", round(TRAIL_LEN_M,1), "trail height range m", round(float(floor[trail].min()),2), round(float(floor[trail].max()),2))
