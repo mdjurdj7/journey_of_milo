@@ -81,7 +81,10 @@ enum EffectType {
 # - above the line in force before all of them (EffectContext.hp_at_card_
 # start: Collateral's, the stance's, its self-damage), at or below it
 # after (Last Wager). Already Critical before: false. Appended likewise.
-enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE, UNDAMAGED_LAST_TURN, CRITICAL, TOLL_SPENT_THIS_TURN, ENTERED_CRITICAL }
+# HIT_LAST_TURN: an enemy's attack took HP last turn (Combatant.lost_hp_
+# to_enemy_last_turn) - self-inflicted loss and ticks never count (Mended
+# Strap). Appended likewise.
+enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE, UNDAMAGED_LAST_TURN, CRITICAL, TOLL_SPENT_THIS_TURN, ENTERED_CRITICAL, HIT_LAST_TURN }
 
 # Which combatant(s) an effect resolves against - lets DAMAGE_ALL collapse
 # into plain DAMAGE (target_scope = ALL_ENEMIES) instead of needing its

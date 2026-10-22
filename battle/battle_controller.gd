@@ -1320,6 +1320,8 @@ func _finish_turn(keep: Array[CardData]) -> void:
 		# would have left it (_run_enemy_turn()).
 		player.took_damage_last_turn = player.took_damage_this_turn
 		player.took_damage_this_turn = false
+		player.lost_hp_to_enemy_last_turn = player.lost_hp_to_enemy_this_turn
+		player.lost_hp_to_enemy_this_turn = false
 		RunLogger.mechanic("extra_turn", {"turn": _player_turn + 1})
 		status_changed.emit()
 	else:
@@ -2205,6 +2207,8 @@ func _run_enemy_turn() -> void:
 
 	player.took_damage_last_turn = player.took_damage_this_turn
 	player.took_damage_this_turn = false
+	player.lost_hp_to_enemy_last_turn = player.lost_hp_to_enemy_this_turn
+	player.lost_hp_to_enemy_this_turn = false
 	toll_changed.emit(player.toll)
 
 func _run_sequential_turn() -> void:

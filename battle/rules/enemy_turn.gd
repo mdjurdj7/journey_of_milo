@@ -393,6 +393,7 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 	result["damage_to_hp"] = total_to_hp
 	if total_to_hp > 0:
 		player.took_damage_this_turn = true
+		player.lost_hp_to_enemy_this_turn = true
 		result["grace_opened"] = open_grace(player, largest_hit, total_to_hp)
 		# On the record for Not So: the whole attack, every hit of it.
 		player.record_hit_taken(combatant, intent.intent_name if intent != null else "", total_to_hp, grace_share(player, largest_hit, total_to_hp))

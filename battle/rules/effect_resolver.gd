@@ -310,4 +310,6 @@ static func condition_met(effect: CardEffect, ctx: EffectContext) -> bool:
 			# On a face: before is now, after is now less the costs to come.
 			var before: int = ctx.hp_at_card_start if ctx.hp_at_card_start >= 0 else ctx.player.hp
 			return not ctx.player.is_critical_at(before) and ctx.player.is_critical_at(ctx.player.hp - ctx.preview_hp_cost)
+		CardEffect.Condition.HIT_LAST_TURN:
+			return ctx.player.lost_hp_to_enemy_last_turn
 	return true

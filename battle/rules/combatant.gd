@@ -129,6 +129,12 @@ var devoured_cards: Array[CardData] = []
 var last_attack_target: Combatant = null
 var last_attack_all: bool = false
 var took_damage_last_turn: bool = false
+# Whether an enemy's attack took HP this turn - what got past Block and
+# all (EnemyTurn.land_attack(): an intent, a strike back, an answer) -
+# and last turn, rolled over with took_damage_* (Mended Strap). Never
+# self-inflicted loss, and never a tick - Venom's included.
+var lost_hp_to_enemy_this_turn: bool = false
+var lost_hp_to_enemy_last_turn: bool = false
 # Critical: HP at or below this fraction of max HP. A default only, like
 # the Grace fields above - BattleController.setup() copies CharacterData.
 # critical_hp_fraction over it. Read through is_critical_at(), never
