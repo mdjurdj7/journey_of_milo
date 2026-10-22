@@ -78,6 +78,15 @@ enum GraceCapMode { LARGEST_HIT, SUM }
 # it there is no button and nothing reaches the action.
 @export var has_devour: bool = false
 
+# --- Sheathe, the Samurai's battle action ---
+#
+# Whether the battle offers Sheathe (BattleController.sheathe()): its
+# button in Devour's place over the energy readout, and a hand card picked
+# after it keeping for the turn's end. Without it there is no button and
+# nothing reaches the action. A class has Devour or Sheathe, not both:
+# they take the same place.
+@export var has_sheathe: bool = false
+
 # Critical: HP at or below this fraction of max HP. What the Critical
 # cards (Cornered, Unbroken, Last Wager, Dying Light, Refuse the End, Last
 # Resort) read - see Combatant.is_critical_at(). 0.3 is a playtest

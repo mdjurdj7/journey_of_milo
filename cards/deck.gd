@@ -33,6 +33,13 @@ var spent_unplayed: Array[CardData] = []
 # fight's cards are the run deck's own, and each fight's Deck is built
 # fresh, so Keep never carries from one fight to the next.
 var kept: Array[CardData] = []
+# The hand cards with Keep for this turn's end only (Sheathe - Battle
+# Controller.sheathe()): each stays in the hand when the turn's hand is
+# discarded (discard_hand()), then the Keep is gone - it doesn't hold
+# through another turn's end, as kept's does. Played or otherwise out of
+# the hand first, it loses it then. has_keep() answers for both, so the
+# face reads Keep's marker either way.
+var kept_once: Array[CardData] = []
 # The card being played, from its commit (begin_play()) until its effects
 # have resolved (end_play()); null between plays. Out of the hand from the
 # commit - no slot, not counted toward hand_size - and in no pile until
@@ -104,20 +111,24 @@ func add_copy(card: CardData) -> CardData:
 # Every hand card to the discard pile but `keep` (Frayed Cord's end-of-
 # turn keep, one occurrence each, so keeping one of two copies discards
 # the other) and every card with Keep, on top of it. A fight-only copy
-# goes whatever keeps it (discard()).
+# goes whatever keeps it (discard()). A one-turn Keep (kept_once) is used
+# up here: its cards stay, and lose it.
 func discard_hand(keep: Array[CardData] = []) -> void:
 	var keeping: Array[CardData] = keep.duplicate()
 	for card in hand.duplicate():
 		if card.battle_copy:
 			discard(card)
 			continue
-		if kept.has(card):
+		if kept.has(card) or kept_once.has(card):
 			continue
 		var index: int = keeping.find(card)
 		if index >= 0:
 			keeping.remove_at(index)
 			continue
 		discard(card)
+	if not kept_once.is_empty():
+		kept_once.clear()
+		keep_changed.emit()
 
 # `card`, in the hand, gains Keep (Bide). False for one not in the hand.
 func grant_keep(card: CardData) -> bool:
@@ -128,14 +139,25 @@ func grant_keep(card: CardData) -> bool:
 		keep_changed.emit()
 	return true
 
+# `card`, in the hand, gains Keep for this turn's end only (Sheathe). False
+# for one not in the hand, or a fight-only copy, which no Keep holds.
+func grant_keep_once(card: CardData) -> bool:
+	if not hand.has(card) or card.battle_copy:
+		return false
+	if not kept_once.has(card):
+		kept_once.append(card)
+		keep_changed.emit()
+	return true
+
 func has_keep(card: CardData) -> bool:
-	return kept.has(card)
+	return kept.has(card) or kept_once.has(card)
 
 # `card` leaves the hand - by any route - and with it its Keep.
 func _leave_hand(card: CardData) -> void:
 	hand.erase(card)
-	if kept.has(card):
+	if kept.has(card) or kept_once.has(card):
 		kept.erase(card)
+		kept_once.erase(card)
 		keep_changed.emit()
 
 # A play commits: `card` leaves the hand - in no pile yet, and no longer

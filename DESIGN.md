@@ -409,9 +409,22 @@ and up the west shore north of z -27. (2026-10-17.)
     every card in `cards/samurai/`, STARTER_ONLY or not.
   - **No Devour, and no sustain in a fight.** Devour is the Wanderer's
     (`CharacterData.has_devour`, on in `wanderer.tres` only): her fights
-    show no Devour button and nothing reaches the action. Her own
-    ability, not designed yet, will take Devour's HUD slot over the
-    energy readout; until then she has no in-battle sustain.
+    show no Devour button and nothing reaches the action. Her own ability
+    is Sheathe (below), which heals nothing, so she has no in-battle
+    sustain.
+  - **Sheathe, her class ability.** `CharacterData.has_sheathe` (on in
+    `samurai.tres` only), in Devour's HUD place over the energy readout
+    (`SheatheButton`). 1 Energy, once a turn (`BattleController.
+    sheathe_energy_cost`, `sheathe_uses_per_turn`): click it, then a
+    hand card - playable or not, not a fight-only copy, not one with Keep
+    already; right-click, Esc or Sheathe again cancel, End Turn is greyed
+    while the pick is open. There is no arming a card first. The card
+    gains a one-turn Keep (`Deck.kept_once`, Frayed Cord's end-of-turn
+    keep in kind) and shows Keep's marker: it stays in the hand through
+    this turn's end, then loses it; played first, the use is gone. Run
+    log: the `sheathe` event (format 17). Open: hovering KEEP on a
+    sheathed card reads the Keep keyword's "until played", which
+    overstates a one-turn keep; no sound of its own. (2026-10-21.)
   (2026-10-18, Samurai shell.)
 - **The Siltjaw's mound rework leaves four things open.** Its mounds are
   12 HP targets with plates, unbroken it erupts for 14 (Block-only),

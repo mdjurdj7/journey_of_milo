@@ -338,6 +338,9 @@ var _deck_readout: DeckPanel = null
 var _discard_readout: DeckPanel = null
 var _keepsake_row: KeepsakeRow = null
 var _devour_button: DevourButton = null
+# Sheathe (SheatheButton), the Samurai's, in Devour's place - see
+# _apply_energy_anchor().
+var _sheathe_button: SheatheButton = null
 # The energy readout and Devour under it, as one group (_create_corner_
 # readouts()): placed as a whole by _apply_energy_anchor(), their own
 # layout inside it. Ignores the mouse, so it never stands in front of a
@@ -507,6 +510,10 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.entry_lock_changed.connect(func(_locked: bool) -> void: _update_end_turn())
 	if _devour_button != null:
 		_devour_button.setup(battle_controller)
+	# Sheathe's pick greys End Turn as Devour's does.
+	battle_controller.sheathe_changed.connect(func(_available: bool, _used: bool) -> void: _update_end_turn())
+	if _sheathe_button != null:
+		_sheathe_button.setup(battle_controller)
 	# A devoured card is out of the hand: the cursor back, and the faces
 	# that read the hand re-read.
 	battle_controller.card_devoured.connect(func(_card: CardData) -> void:
@@ -618,8 +625,15 @@ func _create_corner_readouts() -> void:
 		readout.view_closed.connect(_on_pile_view_closed)
 	_keepsake_row = KeepsakeRow.new()
 	add_child(_keepsake_row)
+	# The Samurai's Sheathe (CharacterData.has_sheathe), in the place
+	# Devour takes for the Wanderer.
+	if RunState.character != null and RunState.character.has_sheathe:
+		_sheathe_button = SheatheButton.new()
+		_sheathe_button.name = "SheatheButton"
+		add_child(_sheathe_button)
+		_sheathe_button.resized.connect(_apply_energy_anchor)
 	# A class without Devour (CharacterData.has_devour) gets no button; the
-	# stack's top is then the energy numeral's.
+	# stack's top is then the energy numeral's, or Sheathe's.
 	if RunState.character != null and not RunState.character.has_devour:
 		return
 	_devour_button = DevourButton.new()
@@ -683,6 +697,12 @@ func _apply_energy_anchor() -> void:
 		_devour_button.position = Vector2(corner_margin_px, numeral_top - devour_gap_px - _devour_button.size.y)
 		stack_top = _devour_button.position.y
 		_devour_button.set_hover_floor_y(stack_top)
+	# Sheathe in that same place, for the class that has it instead.
+	elif _sheathe_button != null:
+		var numeral_top: float = _energy_group.position.y + _resources.numeral_ink_top()
+		_sheathe_button.position = Vector2(corner_margin_px, numeral_top - devour_gap_px - _sheathe_button.size.y)
+		stack_top = _sheathe_button.position.y
+		_sheathe_button.set_hover_floor_y(stack_top)
 	if _keepsake_row != null:
 		_keepsake_row.set_reveal_floor_y(stack_top)
 	_energy_group.size = _energy_group_extent()
@@ -1012,7 +1032,7 @@ func _on_card_armed_changed(armed: bool) -> void:
 	_update_end_turn()
 
 func _update_end_turn() -> void:
-	var picking: bool = battle_controller != null and battle_controller.is_devour_picking()
+	var picking: bool = battle_controller != null and (battle_controller.is_devour_picking() or battle_controller.is_sheathe_picking())
 	var opening: bool = battle_controller != null and battle_controller.is_entry_locked()
 	end_turn_button.set_enabled(_player_turn and not _card_armed and not picking and not opening)
 
@@ -1918,6 +1938,8 @@ func _flip_dark_world() -> void:
 		_keepsake_row.refresh_style()
 	if _devour_button != null:
 		_devour_button.refresh_style()
+	if _sheathe_button != null:
+		_sheathe_button.refresh_style()
 	end_turn_button.refresh_style()
 	if _choice_done != null:
 		_choice_done.refresh_style()

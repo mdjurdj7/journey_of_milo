@@ -142,6 +142,13 @@ signal enemy_status_gained(enemy: FieldEnemy, status: StatusData)
 signal devour_changed(available: bool, used: bool)
 # A hand card was devoured: out of the hand to the Spent pile, unplayed.
 signal card_devoured(card: CardData)
+# Sheathe (sheathe()): whether it can be used now, and whether this turn's
+# use is spent - at the same moments as devour_changed, and when its pick
+# opens or closes. SheatheButton re-reads is_sheathe_lit() on it.
+signal sheathe_changed(available: bool, used: bool)
+# A hand card was sheathed: it keeps for this turn's end (Deck.grant_keep_
+# once()), where it stands in the hand.
+signal card_sheathed(card: CardData)
 # A hand card was Devoured by the keyword (Take In), as its bite starts -
 # once per card eaten; never the Devour button's (card_devoured).
 signal keyword_devoured(card: CardData)
@@ -200,6 +207,20 @@ var min_target_size_px: float = 0.0
 		devour_energy_cost = value
 		if is_inside_tree():
 			_emit_devour_changed()
+# Sheathe - the Samurai's own action, not a card (sheathe()): how many
+# cards it may keep per turn, and the Energy each costs - paid when the
+# card is picked, and needed in hand for Sheathe to be available at all
+# (is_sheathe_available()).
+@export var sheathe_uses_per_turn: int = 1:
+	set(value):
+		sheathe_uses_per_turn = value
+		if is_inside_tree():
+			_emit_sheathe_changed()
+@export var sheathe_energy_cost: int = 1:
+	set(value):
+		sheathe_energy_cost = value
+		if is_inside_tree():
+			_emit_sheathe_changed()
 
 var deck: Deck
 var player: Combatant
@@ -211,6 +232,13 @@ var cards_played_this_turn: int = 0
 var has_devour: bool = true
 # Devours this player turn - reset at its start (_start_player_turn()).
 var _devour_uses_this_turn: int = 0
+# Whether this class has Sheathe (CharacterData.has_sheathe), from setup().
+# Off, is_sheathe_available() is always false and sheathe() does nothing.
+var has_sheathe: bool = false
+# Sheathes this player turn - reset at its start, as Devour's are.
+var _sheathe_uses_this_turn: int = 0
+# Sheathe was clicked: the next hand card clicked keeps - see sheathe().
+var _sheathe_picking: bool = false
 
 var _hand_container: HandContainer
 var _pending_card_view: CardView = null
@@ -371,6 +399,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	player.has_toll = RunState.character.has_toll
 	player.has_grace = RunState.character.has_grace
 	has_devour = RunState.character.has_devour
+	has_sheathe = RunState.character.has_sheathe
 	player.grace_cap_mode = RunState.character.grace_cap_mode
 	player.grace_window_turns = RunState.character.grace_window_turns
 	player.grace_open_fraction = RunState.character.grace_open_fraction
@@ -490,6 +519,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 	_push_enemy_target_available()
 	energy_changed.emit(player.energy)
 	_devour_uses_this_turn = 0
+	_sheathe_uses_this_turn = 0
 	_emit_devour_changed()
 	_hand_container.draw_cards(turn_draw_amount + opening_bonus)
 	_apply_intent_exclusions(enemies)
@@ -765,6 +795,13 @@ func request_play(card_view: CardView) -> void:
 	if _devour_picking:
 		_devour_picking = false
 		_devour_card(card_view, "pick")
+		return
+	# Sheathe first: the card clicked is the one it keeps, playable or not;
+	# one it can't keep is passed over, the pick still open.
+	if _sheathe_picking:
+		if can_sheathe(card_view.card_data):
+			_sheathe_picking = false
+			_sheathe_card(card_view.card_data)
 		return
 	var card: CardData = card_view.card_data
 	if not _is_playable(card):
@@ -1085,6 +1122,7 @@ func end_turn() -> void:
 	# Turn lets it go altogether.
 	cancel_target()
 	cancel_devour_pick()
+	cancel_sheathe_pick()
 	if _begin_keep_choice():
 		return
 	await _finish_turn([])
@@ -1725,6 +1763,9 @@ func cancel_devour_pick() -> void:
 
 func _emit_devour_changed() -> void:
 	devour_changed.emit(is_devour_available(), is_devour_used())
+	# Sheathe's availability turns on the same moments (a play, a hold, a
+	# choice, the turn), so it is told at each of them too.
+	_emit_sheathe_changed()
 
 # Devour, clicked (DevourButton): the armed card is eaten - see
 # _devour_card(). Nothing armed: the pick opens (_begin_devour_pick()),
@@ -1804,6 +1845,85 @@ func _devour_card(card_view: CardView, route: String) -> void:
 func _on_keyword_devoured(card: CardData) -> void:
 	_hand_container.devour_card(card, false)
 	keyword_devoured.emit(card)
+
+# --- Sheathe ---
+
+# Whether Sheathe can be used now: a use left this turn, its Energy
+# (sheathe_energy_cost) in hand, on the player's turn with nothing
+# resolving, and no hand choice open - never for a class without it
+# (has_sheathe). The button and the pick both key on this.
+func is_sheathe_available() -> bool:
+	return has_sheathe and player != null and _sheathe_uses_this_turn < sheathe_uses_per_turn and is_sheathe_affordable() and not _entry_locked and not _input_locked and not _play_queued and not _choice_open()
+
+# Whether the player has the Energy Sheathe costs.
+func is_sheathe_affordable() -> bool:
+	return player != null and player.energy >= maxi(sheathe_energy_cost, 0)
+
+# Whether this turn's Sheathes are spent.
+func is_sheathe_used() -> bool:
+	return _sheathe_uses_this_turn >= sheathe_uses_per_turn
+
+# Whether Sheathe is lit: available, with its pick open.
+func is_sheathe_lit() -> bool:
+	return is_sheathe_available() and _sheathe_picking
+
+# Sheathe first: waiting for the hand card it will keep.
+func is_sheathe_picking() -> bool:
+	return _sheathe_picking
+
+# Whether Sheathe may keep `card`: in the hand, without Keep already, and
+# not a fight-only copy (Twice Over's), which is gone at the turn's end
+# whatever keeps it.
+func can_sheathe(card: CardData) -> bool:
+	return card != null and deck != null and deck.hand.has(card) and not deck.has_keep(card) and not card.battle_copy
+
+func cancel_sheathe_pick() -> void:
+	if not _sheathe_picking:
+		return
+	_sheathe_picking = false
+	_emit_sheathe_changed()
+
+func _emit_sheathe_changed() -> void:
+	sheathe_changed.emit(is_sheathe_available(), is_sheathe_used())
+
+# Sheathe, clicked (SheatheButton): the pick opens - every hand card the
+# next click's to keep (request_play()), the dimmed ones too; no enemy
+# targeting, End Turn greyed - and a second click closes it, as do
+# right-click and Esc. An armed card is let go first. No use left, or its
+# Energy short: nothing. There is no arming a card first: Sheathe is
+# always picked after.
+func sheathe() -> void:
+	# A class without Sheathe: nothing, not even the entry hold's refusal.
+	if not has_sheathe:
+		return
+	if _sheathe_picking:
+		cancel_sheathe_pick()
+		return
+	if _refused_by_entry_hold("Sheathe"):
+		return
+	if not is_sheathe_available():
+		return
+	cancel_target()
+	_sheathe_picking = true
+	_emit_sheathe_changed()
+
+# The card keeps for this turn's end (Deck.grant_keep_once()) where it
+# stands in the hand, with Keep's marker, and is in the hand for the next
+# turn; sheathe_energy_cost paid and one of this turn's uses spent.
+# Nothing of the card's own: not played, no cost, no effect.
+func _sheathe_card(card: CardData) -> void:
+	# Read before Sheathe's Energy goes: whether it could have been played.
+	var playable: bool = _is_playable(card)
+	if not deck.grant_keep_once(card):
+		_emit_sheathe_changed()
+		return
+	_sheathe_uses_this_turn += 1
+	var energy_spent: int = mini(maxi(sheathe_energy_cost, 0), player.energy)
+	player.energy -= energy_spent
+	energy_changed.emit(player.energy)
+	card_sheathed.emit(card)
+	RunLogger.event("sheathe", {"card": card.card_name, "playable": playable, "energy": energy_spent})
+	_emit_devour_changed()
 
 # Where a played card goes: the exhaust pile (true) for a SPENT or
 # CONSUMED card, and for a power or a stance - it has done its work once
@@ -2557,6 +2677,7 @@ func _start_player_turn() -> void:
 	cards_played_this_turn = 0
 	player.plays_this_turn = 0
 	_devour_uses_this_turn = 0
+	_sheathe_uses_this_turn = 0
 	# A fresh turn for every interrupt threshold, and for Toll spent
 	# (Condition.TOLL_SPENT_THIS_TURN).
 	player.damage_taken_this_turn = 0
@@ -3161,6 +3282,11 @@ func _unhandled_input(event: InputEvent) -> void:
 	if _devour_picking:
 		if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT) or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE):
 			cancel_devour_pick()
+			get_viewport().set_input_as_handled()
+		return
+	if _sheathe_picking:
+		if (event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_RIGHT) or (event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE):
+			cancel_sheathe_pick()
 			get_viewport().set_input_as_handled()
 		return
 	if _choice_open():
