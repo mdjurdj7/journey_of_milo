@@ -127,12 +127,19 @@ class_name RunLogger
 # sand untaken (the floor left). Mechanic line "barbed": Barbed went off
 # - the "attacker" and the "damage" that reached its HP.
 
+# Format 15 (2026-10-21): event "collector_stock", once per floor, on the
+# collector screen's first open: every good it lists ("goods", in the
+# ledger's order - the cards, the equipment, the Bedroll, the removal),
+# each with its "id", "kind" and "price" (a card also its "rarity"; ids
+# and kinds as collector_buy writes them), and the run's "gold". Not a
+# choice: a run of nothing else is still an empty one.
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 14
-# Lines written inside a fight that aren't choices (_write_detail()) - a
-# run made of nothing else is still an empty one.
-const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]
+const FORMAT_VERSION := 15
+# Lines that aren't choices (_write_detail()) - a run made of nothing else
+# is still an empty one.
+const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark", "collector_stock"]
 
 # The switch - RegionField.run_logging_enabled pushes it here.
 static var enabled: bool = true
@@ -749,6 +756,11 @@ static func rarity_name(card: CardData) -> String:
 		return ""
 	var key: Variant = CardData.CardRarity.find_key(card.rarity)
 	return String(key).to_lower() if key != null else ""
+
+# The collector screen's first open on a floor: what it lists and the
+# gold to pay with. A detail line, not a choice.
+static func collector_stock(goods: Array[Dictionary], gold: int) -> void:
+	_write_detail("collector_stock", {"goods": goods, "gold": gold})
 
 # Any other choice - reward_gold, reward_glassbone, belongings,
 # keepsake_offer, trough - with where in the run it happened.

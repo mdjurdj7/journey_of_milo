@@ -50,7 +50,8 @@ class_name CollectorScreen
 # A price the run can't pay is grey. CHOOSE and a card's click still open
 # the plate or the card to look at, with TAKE grey and inert; no red, no
 # shake. Every purchase and removal is logged (RunLogger) with the item's
-# id, kind, price and gold before and after.
+# id, kind, price and gold before and after; the first open on a floor
+# logs the whole stock and the gold (RunLogger.collector_stock()).
 #
 # Focus is the title menu's: the focused card or line is full ink with a
 # short hairline to its left, the rest grey. The mouse focuses by hovering
@@ -547,6 +548,8 @@ func _ready() -> void:
 			_cards.append(_collector.fixed_card if _collector.is_fixed_available() else null)
 	_build_views()
 	_build_lines()
+	if _collector != null and _collector.claim_stock_log():
+		_log_stock()
 	_relayout()
 	_start_camera()
 
@@ -610,6 +613,40 @@ func _build_lines() -> void:
 		_lines.append({"kind": Kind.BEDROLL, "good_index": -1, "good": null, "bedroll": bedroll})
 	if not _collector.is_removal_used():
 		_lines.append({"kind": Kind.REMOVAL, "good_index": -1, "good": null})
+
+# The first open on a floor: collector_stock - every good the ledger
+# lists (the cards, then the equipment lines, the Bedroll and the
+# removal), each with its id, kind and price, and the run's gold. Ids
+# and kinds are collector_buy's.
+func _log_stock() -> void:
+	var goods: Array[Dictionary] = []
+	for slot in _cards.size():
+		var card: CardData = _cards[slot]
+		if card == null:
+			continue
+		goods.append({"id": card.card_name, "kind": "card", "price": _price_at(slot), "rarity": RunLogger.rarity_name(card)})
+	for line in _lines:
+		var kind: int = int(line["kind"])
+		var good: CollectorGood = line["good"]
+		var entry: Dictionary = {"price": _line_price(line)}
+		match kind:
+			Kind.WEAPON:
+				entry["id"] = String(good.get_weapon().id)
+				entry["kind"] = "weapon"
+			Kind.WORN:
+				entry["id"] = String(good.get_trinket().id)
+				entry["kind"] = "worn"
+			Kind.KEEPSAKE:
+				entry["id"] = String(good.get_trinket().id)
+				entry["kind"] = "keepsake"
+			Kind.BEDROLL:
+				entry["id"] = "bedroll"
+				entry["kind"] = "bedroll"
+			Kind.REMOVAL:
+				entry["id"] = "removal"
+				entry["kind"] = "removal"
+		goods.append(entry)
+	RunLogger.collector_stock(goods, RunState.gold)
 
 func _kind_of(good: CollectorGood) -> int:
 	if good.get_weapon() != null:

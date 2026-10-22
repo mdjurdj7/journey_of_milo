@@ -194,6 +194,8 @@ var _goods: Array[CollectorGood] = []
 var _goods_taken: Dictionary = {}
 var _bedroll: BedrollData = null
 var _bedroll_taken: bool = false
+# The screen's first open on this floor wrote its collector_stock line.
+var _stock_logged: bool = false
 
 # FloorProp's placement (RegionField._spawn_floor_props()): XZ here, Y
 # from the relief, the entry's yaw as its facing - for good.
@@ -469,6 +471,14 @@ func is_removal_used() -> bool:
 
 func use_removal() -> void:
 	_removal_used = true
+
+# True on the first call only - the screen's first open on this floor
+# logs the stock (CollectorScreen._log_stock()).
+func claim_stock_log() -> bool:
+	if _stock_logged:
+		return false
+	_stock_logged = true
+	return true
 
 # A rolled card's price, by its rarity (an untagged card at Common's).
 func price_of(card: CardData) -> int:
