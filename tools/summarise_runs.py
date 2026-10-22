@@ -250,11 +250,19 @@ def summarise(runs, include_debug):
                 if taken is not None:
                     reward[taken][source + "_taken"] += 1
             elif ev == "belongings":
-                offered_card = (event.get("offered") or {}).get("card")
-                if offered_card:
-                    reward[offered_card]["belongings_offered"] += 1
+                offered = event.get("offered") or {}
+                if "cards" in offered:
+                    # Format 19: the pack's cards count as offered once it's
+                    # opened (looked inside), each one shown.
                     if event.get("taken") == "card":
-                        reward[offered_card]["belongings_taken"] += 1
+                        for card in offered.get("cards") or []:
+                            reward[card]["belongings_offered"] += 1
+                        if event.get("card_taken"):
+                            reward[event["card_taken"]]["belongings_taken"] += 1
+                elif offered.get("card"):
+                    reward[offered["card"]]["belongings_offered"] += 1
+                    if event.get("taken") == "card":
+                        reward[offered["card"]]["belongings_taken"] += 1
             elif ev == "run_end":
                 causes[event.get("cause", "?")] += 1
                 ended = True

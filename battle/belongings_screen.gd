@@ -11,20 +11,21 @@ class_name BelongingsScreen
 # the scrim with the reward screen's ink outline - no box, no quotes.
 # Lower, one row of three columns side by side, centred across the
 # screen at columns_centre_fraction of its height, each its object alone
-# - the case, the pack, the bedroll, rendered from their models (see
-# _build_render()) - and just above the row the rule, TAKE ONE, in the
-# system voice's tracked caps. A soft band of the ink, feathered top and
-# bottom, darkens the screen's full width behind the row, over the
-# scrim. The kind of thing each holds is fixed (Slot) and named under its
-# column in the choices' tracked caps - COIN, CARD, KEEPSAKE - any one of
-# them perhaps Glassbone too; which thing is a mystery until it's taken:
-# nothing of what is inside is drawn or named before. A column whose slot
-# rolled nothing is not drawn and cannot be focused.
+# - the case, the pack, the shard of Glassbone, rendered from their
+# models (see _build_render()) - and just above the row the rule, TAKE
+# ONE, in the system voice's tracked caps. A soft band of the ink,
+# feathered top and bottom, darkens the screen's full width behind the
+# row, over the scrim. What each offers is fixed (Slot) and named under
+# its column in the choices' tracked caps - COIN, LOOK INSIDE, GLASSBONE;
+# how much coin, and which cards, stay a mystery until it's taken. A
+# column with nothing to offer is not drawn and cannot be focused.
 #
-# The objects wear what they wear on the sand (BelongingsObject.painted_
-# material()): each model's own colour map on the painted shader, times
-# the cache's object_tint, lit by the field's own sun and ambient as the
-# field camera sees them (light_like()).
+# The objects wear what they wear on the sand: each model's own colour
+# map on the painted shader, times the cache's object_tint (Belongings
+# Object.painted_material()) - or, where the cache names a material for
+# its column, that material untinted (the shard's Glassbone) - lit by
+# the field's own sun and ambient as the field camera sees them
+# (light_like()).
 #
 # The focus language is on the object itself, the title menu's two
 # states carried over: at rest the object is drawn down (rest_modulate)
@@ -35,48 +36,40 @@ class_name BelongingsScreen
 # focused until the mouse or a key says so. WALK ON keeps the text form
 # of the language (grey at rest, bone and a hairline to its left).
 #
-# Taking one is the reveal. The taken column stays full bone with its
-# hairline, the other two dim (dimmed_modulate), TAKE ONE and WALK ON go,
-# and what was inside shows on the screen itself, in full bone - the
-# field HUD under the scrim only echoes it:
-#   the case     "+45 gold"
-#   the pack     its card, lifted at the deck view's inspect size (card_
-#                inspect_scale) over the screen
-#   the bedroll  its keepsake's ItemPlate, at keepsake_tile_scale over
-#                the bedroll's column
-# and "+ Glassbone ×1" under whichever carried it. Everything is granted
-# through RunState as it's revealed, and the take's sound plays; the
-# reveal holds for result_hold_time, then a card flies to the Belongings
-# panel (reveal_card_on_take) and the screen closes as it lands, anything
-# else closes at once. The bedroll's keepsake counts as offered (RunState.
-# note_keepsake_offered()) only here, once it has been seen.
+# The coin or the Glassbone taken is the reveal. The taken column stays
+# full bone with its hairline, the other two dim (dimmed_modulate), TAKE
+# ONE and WALK ON go, and what it held shows under it in full bone -
+# "+45 gold", "+ Glassbone ×1" - granted through RunState as it's
+# revealed, with the take's sound. The reveal holds for result_hold_time
+# and the screen closes.
 #
-# The bedroll taken with the keepsake slot already full: the reveal shows
-# the held keepsake's tile and the new one's side by side at the same
-# scale, labelled HELD and OFFERED, centred on the screen, and asks under
-# them REPLACE <held> or KEEP <held>, in
-# the WALK ON form of the focus language - and holds, with no timeout,
-# until one is chosen. REPLACE puts the new one in the slot; KEEP leaves
-# it behind. Either closes the screen, and the take is spent either way
-# (Glassbone the bedroll carried is granted with the reveal, before the
-# question). The mouse focuses by hovering and chooses by clicking;
-# ui_up/ui_down/ui_left/ui_right move between the two, ui_accept chooses,
-# ui_cancel and a right click are KEEP.
+# LOOK INSIDE commits to the pack: the coin and the Glassbone are no
+# longer on offer. The row and its band go, and the pack's cards - the
+# distinct ones BelongingsCache.roll() drew with the floor - are laid out
+# in a level row at card_inspect_scale, centred, card_pick_gap_fraction
+# of a card's width apart, their centre line at card_inspect_centre_
+# fraction of the height; TAKE ONE over them, TAKE NOTHING under them in
+# WALK ON's place and form. The cards and TAKE NOTHING are one focus set,
+# a focused card wearing the column's hairline under it. The mouse
+# focuses by hovering and takes by clicking; ui_left/ui_right move across
+# the cards (wrapping), ui_down drops to TAKE NOTHING, ui_up returns,
+# ui_accept takes; ui_cancel and a right click are TAKE NOTHING. Each
+# card's keywords define themselves on hover. A card taken goes into the
+# deck (RunState.add_card()) and the others go; it holds for result_
+# hold_time, then flies to the Belongings panel (reveal_card_on_take) and
+# the screen closes as it lands. TAKE NOTHING closes at once. The pack is
+# spent either way.
+#
+# Glassbone may also ride with the coin or the pack (BelongingsCache.
+# glassbone_chance - 0 on floor 2's): "+ Glassbone ×N" under the coin's
+# reveal, or under the pack's cards once it's opened, granted as either
+# is taken.
 #
 # Before a take, WALK ON, ui_cancel, a right click anywhere and a fresh
 # press of a move key all decline and grant nothing - the move keys only
 # after move_decline_delay_sec, so a key held down while walking in
 # doesn't count. Declining is final, as the reward screen's skip is: the
 # cache is spent either way (see BelongingsCache).
-#
-# The bedroll may hold the Bedroll itself instead of a keepsake (offer_
-# bedroll() - floor 2's cache, BelongingsCache.offers_bedroll): its kind
-# is the Bedroll's own label (BEDROLL), and taken it goes into the pack
-# (RunState.take_bedroll()) with "+ Bedroll" under the column. With one
-# already carried it can't be taken: the column is drawn at rest, its
-# kind followed by BedrollData.carrying_text ("(carrying one)") in the
-# utility grey, and it can't be focused, hovered or chosen - the other
-# two are offered as ever.
 #
 # The scrim, the outlined text and the hairline are copies of
 # RewardScreen's own - the shared focus-drawing extraction is deferred
@@ -85,16 +78,15 @@ class_name BelongingsScreen
 # The column taken, or -1 for a decline.
 signal closed(taken: int)
 
-# Column order - the case, the pack, the bedroll (BelongingsCache).
-enum Slot { GOLD, CARD, KEEPSAKE }
-# The full-slot question's two answers, top to bottom.
-enum Choice { REPLACE, KEEP }
+# Column order - the case, the pack, the shard (BelongingsCache).
+enum Slot { GOLD, CARD, GLASSBONE }
 
 const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 const SLOT_COUNT := 3
-# The focus index WALK ON takes, after the three columns.
+# The focus index WALK ON takes, after the three columns - and TAKE
+# NOTHING, in its place, while the pack's cards are up.
 const DISMISS := SLOT_COUNT
 
 @export var scrim_color: Color = Color(0.165, 0.165, 0.18, 0.40):
@@ -129,7 +121,8 @@ const DISMISS := SLOT_COUNT
 		line_centre_fraction = value
 		_refresh()
 # The rule, in the choices' tracked caps (label_size_px, label_tracking_
-# em), its baseline this far above the row's top.
+# em), its baseline this far above the row's top - the columns', or the
+# pack's cards'.
 @export var take_one_text: String = "TAKE ONE":
 	set(value):
 		take_one_text = value
@@ -177,7 +170,7 @@ const DISMISS := SLOT_COUNT
 # Each column's kind under it, column order, in the choices' tracked caps
 # (choice_word_size_px): the baseline this far under the column's square.
 # Grey at rest, bone on focus; gone with the take.
-@export var kind_labels: PackedStringArray = PackedStringArray(["COIN", "CARD", "KEEPSAKE"]):
+@export var kind_labels: PackedStringArray = PackedStringArray(["COIN", "LOOK INSIDE", "GLASSBONE"]):
 	set(value):
 		kind_labels = value
 		_refresh()
@@ -185,6 +178,10 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		kind_label_gap_px = value
 		_refresh()
+@export var choice_word_size_px: int = 17:
+	set(value):
+		choice_word_size_px = value
+		_rebuild_fonts()
 @export_group("")
 
 @export_group("Band")
@@ -229,105 +226,40 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		glassbone_format = value
 		_refresh()
-# The Bedroll taken (offer_bedroll()).
-@export var bedroll_taken_text: String = "+ Bedroll":
-	set(value):
-		bedroll_taken_text = value
-		_refresh()
-@export_group("")
-
-@export_group("Full Slot")
-# The bedroll's question when the slot is full: each choice this word in
-# the choices' tracked caps at choice_word_size_px, then the held
-# keepsake's name - REPLACE first, KEEP under it, the first baseline
-# choice_gap_px below where a next line of the reveal would sit, the
-# second one choice_pitch_px further. Focused, a choice is bone with the hairline to its
-# left; at rest, the utility grey.
-@export var replace_text: String = "REPLACE":
-	set(value):
-		replace_text = value
-		_refresh()
-@export var keep_text: String = "KEEP":
-	set(value):
-		keep_text = value
-		_refresh()
-@export var choice_word_size_px: int = 17:
-	set(value):
-		choice_word_size_px = value
-		_rebuild_fonts()
-@export var choice_gap_px: float = 16.0:
-	set(value):
-		choice_gap_px = value
-		_refresh()
-@export var choice_pitch_px: float = 34.0:
-	set(value):
-		choice_pitch_px = value
-		_refresh()
-@export_group("")
-
-@export_group("Keepsake Tile")
-# The bedroll's keepsake, revealed: its ItemPlate at this scale (the one
-# plate scale), its
-# centre at keepsake_tile_centre_fraction of the viewport height - over
-# the bedroll's column alone, centred on the screen beside the held one.
-@export var keepsake_tile_scale: float = 1.0:
-	set(value):
-		keepsake_tile_scale = value
-		_refresh()
-@export_range(0.0, 1.0) var keepsake_tile_centre_fraction: float = 0.47:
-	set(value):
-		keepsake_tile_centre_fraction = value
-		_refresh()
-# The Bedroll offered in the keepsake column: while that column is
-# focused, before anything is taken, its item plate (ItemPlate.set_
-# bedroll()) shows beside it - bedroll_plate_gap_px right of the column
-# (left, if it would leave the screen), centred on it, at bedroll_plate_
-# scale - so it reads as the rest item it is. The other two columns stay
-# a mystery. Each re-applies live.
-@export var bedroll_plate_scale: float = 0.85:
-	set(value):
-		bedroll_plate_scale = value
-		_sync_bedroll_plate()
-@export var bedroll_plate_gap_px: float = 36.0:
-	set(value):
-		bedroll_plate_gap_px = value
-		_sync_bedroll_plate()
-@export var keepsake_tile_gap_px: float = 40.0:
-	set(value):
-		keepsake_tile_gap_px = value
-		_refresh()
-# Over each tile when one is held, this far above it.
-@export var held_label_text: String = "HELD":
-	set(value):
-		held_label_text = value
-		_refresh()
-@export var offered_label_text: String = "OFFERED":
-	set(value):
-		offered_label_text = value
-		_refresh()
-@export var keepsake_label_gap_px: float = 12.0:
-	set(value):
-		keepsake_label_gap_px = value
-		_refresh()
 @export_group("")
 
 @export_group("Card Inspect")
-# The pack's card, revealed: lifted at the deck view's inspect size
-# (DeckView.inspect_scale), centred on the pack's column, its centre at
-# this fraction of the viewport height. A Glassbone line hangs under it.
+# The pack's cards, once it's opened: each at the deck view's inspect size
+# (DeckView.inspect_scale), card_pick_gap_fraction of a card's width
+# apart, the row centred, its centre line at this fraction of the
+# viewport height. A Glassbone line hangs under the row.
 @export var card_inspect_scale: float = 2.2:
 	set(value):
 		card_inspect_scale = value
+		_refresh()
+@export_range(0.0, 1.0) var card_pick_gap_fraction: float = 0.2:
+	set(value):
+		card_pick_gap_fraction = value
 		_refresh()
 @export_range(0.0, 1.0) var card_inspect_centre_fraction: float = 0.47:
 	set(value):
 		card_inspect_centre_fraction = value
 		_refresh()
+# The focused card's hairline: this far under the card.
+@export var card_hairline_gap_px: float = 14.0:
+	set(value):
+		card_hairline_gap_px = value
+		_refresh()
+# In WALK ON's place and form while the cards are up.
+@export var take_nothing_text: String = "TAKE NOTHING":
+	set(value):
+		take_nothing_text = value
+		_refresh()
 @export_group("")
 
 @export_group("Result")
 # Seconds the reveal holds before the screen closes (a card flies
-# first). Read on the take. The full-slot question has no timeout.
+# first). Read on the take.
 @export var result_hold_time: float = 1.2
 # The two columns not taken, through the reveal: their objects at this
 # multiple of their render - neutral, as rest_modulate is.
@@ -342,7 +274,8 @@ const DISMISS := SLOT_COUNT
 # models keep their relative sizes at the cache's object_scales (the
 # same as on the sand), the largest fitted to its cell.
 # Each its own colour map times this tint - the cache's object_tint, which
-# RegionField hands over, so the render matches the sand.
+# RegionField hands over, so the render matches the sand. A column with a
+# material of its own (setup()) wears that, untinted.
 @export var object_tint: Color = Color(0.76, 0.62, 0.46, 1.0):
 	set(value):
 		object_tint = value
@@ -431,7 +364,7 @@ const DISMISS := SLOT_COUNT
 @export_group("")
 
 @export_group("Take")
-# A taken card flies from its column to the Belongings panel - after the
+# A taken card flies from its place to the Belongings panel - after the
 # choice. Off = the sound alone.
 @export var reveal_card_on_take: bool = true
 @export var take_volume_db: float = -18.0
@@ -439,30 +372,22 @@ const DISMISS := SLOT_COUNT
 # Glassbone has no take sound of its own: the gold take, under it
 # (RewardScreen.glassbone_volume_db).
 @export var glassbone_volume_db: float = -24.0
-@export var keepsake_volume_db: float = -18.0
 @export var card_flight_duration_sec: float = 0.45
 @export var card_flight_end_scale: float = 0.12
 @export_group("")
 
 var _line: String = ""
 var _gold: int = 0
-var _card: CardData = null
-var _keepsake: TrinketData = null
+# The pack's cards, distinct; empty = that column is left out.
+var _cards: Array[CardData] = []
+# What the shard's column holds; 0 = that column is left out.
+var _glassbone_offer: int = 0
 var _glassbone_slot: int = -1
 var _glassbone_amount: int = 0
 var _object_paths: PackedStringArray = PackedStringArray()
 var _object_scales: PackedFloat32Array = PackedFloat32Array()
+var _object_materials: PackedStringArray = PackedStringArray()
 var _deck_panel: Control = null
-# The keepsake held as the screen opened - what the bedroll's keepsake
-# would replace (the full-slot question).
-var _held: TrinketData = null
-# The Bedroll the bedroll holds instead of a keepsake (offer_bedroll()),
-# and whether one was already carried as the screen opened - it can't be
-# taken then.
-var _bedroll: BedrollData = null
-var _bedroll_carried: bool = false
-# The Bedroll's plate while its column is focused (_sync_bedroll_plate()).
-var _bedroll_plate: ItemPlate = null
 
 var _scrim: ColorRect = null
 var _draw_layer: Control = null
@@ -470,20 +395,19 @@ var _line_font: Font = null
 var _label_font: Font = null
 var _contents_font: Font = null
 var _choice_font: Font = null
-# The pack's card while it's lifted (_sync_card_lift()), else null.
-var _lifted: CardView = null
-# The bedroll's keepsake and the held one while they're shown
-# (_sync_keepsake_tiles()), else null.
-var _offered_tile: ItemPlate = null
-var _held_tile: ItemPlate = null
+# The pack's cards while they're up (_open_pack()), in _cards' order; the
+# taken one alone once it's taken, until it flies.
+var _pick_views: Array[CardView] = []
 
 var _viewport: SubViewport = null
 var _cell_px: int = 1
 var _camera: Camera3D = null
 var _light: DirectionalLight3D = null
 var _environment: Environment = null
-# Per column, the model's material (null with no model).
+# Per column, the model's material (null with no model), and whether it's
+# the painted one that wears object_tint.
 var _materials: Array[Material] = []
+var _tinted: Array[bool] = []
 # The field's light, once light_like() has it.
 var _field_lit: bool = false
 var _field_light_direction: Vector3 = Vector3.DOWN
@@ -509,12 +433,14 @@ var _opened_msec: int = 0
 # taken card has left for the Belongings panel - nothing else is drawn.
 var _taken: int = -1
 var _flying: bool = false
-# The full-slot question (Choice), open after the bedroll's reveal: its
-# focus and what the mouse is over, as _focus and _mouse_on are for the
-# columns.
-var _asking: bool = false
-var _choice_focus: int = -1
-var _choice_mouse_on: int = -1
+# The pack opened (LOOK INSIDE): its cards up, and the one focused - a
+# card's index, DISMISS for TAKE NOTHING, -1 nothing - and what the mouse
+# is over, as _focus and _mouse_on are for the columns. _picked is the
+# card taken, -1 before (or for nothing).
+var _picking: bool = false
+var _pick_focus: int = -1
+var _pick_mouse_on: int = -1
+var _picked: int = -1
 
 # Called by RegionField before the screen enters the tree, after setup():
 # the objects' light is the field's - sun (its direction turned into the
@@ -534,29 +460,24 @@ func light_like(sun: DirectionalLight3D, sky: RegionSky, camera: Camera3D) -> vo
 	_field_tonemap_exposure = sky.tonemap_exposure
 	_render_objects()
 
-# Called by RegionField before the screen enters the tree. gold may be 0
-# and card or keepsake null - that column is then left out. glassbone_slot
-# is the column that also holds glassbone_amount Glassbone, -1 for none.
-# object_paths are the three models and object_scales their scales, column
-# order - the same scales the cache puts on the sand.
-func setup(line: String, gold: int, card: CardData, keepsake: TrinketData, glassbone_slot: int, glassbone_amount: int, object_paths: PackedStringArray, object_scales: PackedFloat32Array, deck_panel: Control) -> void:
+# Called by RegionField before the screen enters the tree. gold and
+# glassbone_offer may be 0 and cards empty - that column is then left
+# out. glassbone_slot is the column that also holds glassbone_amount
+# Glassbone (the coin's or the pack's), -1 for none. object_paths are the
+# three models and object_scales their scales, column order - the same
+# scales the cache puts on the sand; object_materials, where a column
+# names one, the material its model wears instead of the painted one.
+func setup(line: String, gold: int, cards: Array[CardData], glassbone_offer: int, glassbone_slot: int, glassbone_amount: int, object_paths: PackedStringArray, object_scales: PackedFloat32Array, object_materials: PackedStringArray, deck_panel: Control) -> void:
 	_line = line
 	_gold = gold
-	_card = card
-	_keepsake = keepsake
+	_cards = cards.duplicate()
+	_glassbone_offer = glassbone_offer
 	_glassbone_slot = glassbone_slot
 	_glassbone_amount = glassbone_amount
 	_object_paths = object_paths
 	_object_scales = object_scales
+	_object_materials = object_materials
 	_deck_panel = deck_panel
-
-# The bedroll holds the Bedroll rather than a keepsake - whatever keepsake
-# setup() handed over is left out. Called by RegionField after setup(),
-# before the screen enters the tree.
-func offer_bedroll(bedroll: BedrollData) -> void:
-	_bedroll = bedroll
-	if _bedroll != null:
-		_keepsake = null
 
 func _ready() -> void:
 	# The field is frozen under this (see RegionField.open_belongings_
@@ -564,8 +485,6 @@ func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 100
 	_opened_msec = Time.get_ticks_msec()
-	_held = RunState.keepsake
-	_bedroll_carried = RunState.has_bedroll
 	_rebuild_fonts()
 
 	_scrim = ColorRect.new()
@@ -602,38 +521,32 @@ func _rebuild_fonts() -> void:
 func _refresh() -> void:
 	if _draw_layer != null:
 		_draw_layer.queue_redraw()
-	_place_lift()
-	_place_keepsake_tiles()
+	_place_pick()
 
 func _has_slot(slot: int) -> bool:
 	match slot:
 		Slot.GOLD:
 			return _gold > 0
 		Slot.CARD:
-			return _card != null
-		Slot.KEEPSAKE:
-			return _keepsake != null or _bedroll != null
+			return not _cards.is_empty()
+		Slot.GLASSBONE:
+			return _glassbone_offer > 0
 	return false
 
-# Whether a column can be taken: it holds something, and it isn't the
-# Bedroll with one already carried.
+# Whether a column can be taken: it holds something.
 func can_take(slot: int) -> bool:
-	return _has_slot(slot) and not (slot == Slot.KEEPSAKE and _bedroll != null and _bedroll_carried)
+	return _has_slot(slot)
 
-# What's named under a column before the take: its kind - the Bedroll's
-# own label where the bedroll holds it - and, where it can't be taken for
-# one carried, the carrying text after it.
+# What's named under a column before the take: its kind.
 func kind_text(slot: int) -> String:
-	if slot == Slot.KEEPSAKE and _bedroll != null:
-		return _bedroll.hud_label + (" " + _bedroll.carrying_text if _bedroll_carried else "")
 	return kind_labels[slot] if slot < kind_labels.size() else ""
 
-# The Glassbone a column holds alongside its own thing, 0 for none.
+# The Glassbone that rides with a column (the coin's or the pack's), 0
+# for none.
 func _glassbone_in(slot: int) -> int:
 	return maxi(_glassbone_amount, 0) if slot == _glassbone_slot and _has_slot(slot) else 0
 
-# The columns that hold something, left to right - drawn, whether or not
-# they can be taken.
+# The columns that hold something, left to right - drawn and takeable.
 func _present_slots() -> Array[int]:
 	var slots: Array[int] = []
 	for slot in SLOT_COUNT:
@@ -649,14 +562,22 @@ func _takeable_slots() -> Array[int]:
 			slots.append(slot)
 	return slots
 
+# For probes: whether the pack is open, and its cards' views while it is.
+func is_picking() -> bool:
+	return _picking
+
+func get_pick_views() -> Array[CardView]:
+	return _pick_views.duplicate()
+
 # --- The objects' render ---
 
 # One SubViewport three cells wide, its own world, transparent, rendered
 # once (and again when a render export changes): the three models side
 # by side along X, one cell apart, each centred on its own bbox and
 # turned by its own yaw, under one orthographic camera whose frame is
-# exactly the three cells. Each model on its own painted material, lit
-# by one directional light and a flat ambient. Cheaper than three viewports - one world, one camera,
+# exactly the three cells. Each model on its own painted material - or the
+# material its column names - lit by one directional light and a flat
+# ambient. Cheaper than three viewports - one world, one camera,
 # one render pass - and the columns draw sub-rects of its one texture.
 func _build_render() -> void:
 	_viewport = SubViewport.new()
@@ -673,6 +594,7 @@ func _build_render() -> void:
 	for slot in SLOT_COUNT:
 		var model: Node3D = null
 		var material: Material = null
+		var tinted: bool = false
 		var aabb := AABB()
 		var path: String = _object_paths[slot] if slot < _object_paths.size() else ""
 		var scene: PackedScene = null
@@ -683,10 +605,17 @@ func _build_render() -> void:
 		else:
 			model = scene.instantiate() as Node3D
 			_viewport.add_child(model)
-			material = BelongingsObject.painted_material(path, object_tint)
+			var own_path: String = _object_materials[slot] if slot < _object_materials.size() else ""
+			if not own_path.is_empty():
+				material = load(own_path) as Material
+				if material == null:
+					push_warning("BelongingsScreen: could not load object %d's material (%s); painted instead." % [slot, own_path])
 			if material == null:
-				material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
-				BelongingsObject.set_material_tint(material, object_tint)
+				tinted = true
+				material = BelongingsObject.painted_material(path, object_tint)
+				if material == null:
+					material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
+					BelongingsObject.set_material_tint(material, object_tint)
 			var has_aabb := false
 			for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
 				var mi := mesh_instance as MeshInstance3D
@@ -697,6 +626,7 @@ func _build_render() -> void:
 		_models.append(model)
 		_model_aabbs.append(aabb)
 		_materials.append(material)
+		_tinted.append(tinted)
 		if model == null:
 			_drop_slot(slot)
 
@@ -721,16 +651,16 @@ func _drop_slot(slot: int) -> void:
 		Slot.GOLD:
 			_gold = 0
 		Slot.CARD:
-			_card = null
-		Slot.KEEPSAKE:
-			_keepsake = null
-			_bedroll = null
+			_cards.clear()
+		Slot.GLASSBONE:
+			_glassbone_offer = 0
 
 func _render_objects() -> void:
 	if _viewport == null or _camera == null:
 		return
-	for material in _materials:
-		BelongingsObject.set_material_tint(material, object_tint)
+	for slot in _materials.size():
+		if _tinted[slot]:
+			BelongingsObject.set_material_tint(_materials[slot], object_tint)
 	# One cell is one bounding-sphere diameter of the largest object, over
 	# object_fill.
 	var diameter: float = 0.01
@@ -785,25 +715,31 @@ func _column_rect(slot: int) -> Rect2:
 	var top: float = roundf(_draw_layer.size.y * columns_centre_fraction - column_px / 2.0)
 	return Rect2(left, top, column_px, column_px)
 
-# TAKE ONE's baseline, just above the row.
+# TAKE ONE's baseline, just above the row - the pack's cards' while
+# they're up.
 func _take_one_baseline() -> float:
+	if _picking:
+		return roundf(_pick_row().position.y - take_one_gap_px)
 	return roundf(_column_rect(Slot.GOLD).position.y - take_one_gap_px)
 
 # A column's kind: its baseline under the square.
 func _kind_baseline(slot: int) -> float:
 	return roundf(_column_rect(slot).end.y + kind_label_gap_px)
 
+func _dismiss_text() -> String:
+	return take_nothing_text if _picking else dismiss_text
+
 func _dismiss_baseline() -> float:
 	return roundf(_draw_layer.size.y * dismiss_baseline_fraction)
 
 func _dismiss_label_left() -> float:
-	return roundf((_draw_layer.size.x - InkType.width(_label_font, dismiss_text, label_size_px)) / 2.0)
+	return roundf((_draw_layer.size.x - InkType.width(_label_font, _dismiss_text(), label_size_px)) / 2.0)
 
-# WALK ON's label and the hairline's room to its left.
+# WALK ON's label (TAKE NOTHING's) and the hairline's room to its left.
 func _dismiss_rect() -> Rect2:
 	var label_left: float = _dismiss_label_left()
 	var left: float = label_left - hairline_gap_px - hairline_length_px
-	var right: float = label_left + InkType.width(_label_font, dismiss_text, label_size_px)
+	var right: float = label_left + InkType.width(_label_font, _dismiss_text(), label_size_px)
 	return Rect2(left, _dismiss_baseline() - float(label_size_px), right - left, float(label_size_px) * 1.3)
 
 # --- Draw ---
@@ -827,9 +763,13 @@ func _draw_columns() -> void:
 	# child of this layer) is left over the scrim.
 	if _flying:
 		return
-	_draw_band()
 	var line_width: float = InkType.width(_line_font, _line, line_size_px)
 	var line_baseline: float = roundf(_draw_layer.size.y * line_centre_fraction + float(line_size_px) * 0.35)
+	if _picking:
+		_text(_line_font, _line, Vector2(roundf((_draw_layer.size.x - line_width) / 2.0), line_baseline), line_size_px, bone)
+		_draw_pick()
+		return
+	_draw_band()
 	_text(_line_font, _line, Vector2(roundf((_draw_layer.size.x - line_width) / 2.0), line_baseline), line_size_px, bone)
 	if _taken < 0:
 		_text_centred(_label_font, take_one_text, _draw_layer.size.x / 2.0, _take_one_baseline(), label_size_px, bone)
@@ -853,17 +793,16 @@ func _draw_columns() -> void:
 			_text_centred(_choice_font, kind_text(slot), rect.get_center().x, _kind_baseline(slot), choice_word_size_px, bone if lit else unfocused_color)
 
 	if _taken >= 0:
-		_reveal(_taken, true)
-		if _asking:
-			_draw_keepsake_labels()
-			for choice in [Choice.REPLACE, Choice.KEEP]:
-				_draw_choice(choice)
+		_reveal(_taken)
 		return
-	var dismiss_focused: bool = _focus == DISMISS
-	var dismiss_left: float = _dismiss_label_left()
-	_text(_label_font, dismiss_text, Vector2(dismiss_left, _dismiss_baseline()), label_size_px, bone if dismiss_focused else unfocused_color)
-	if dismiss_focused:
-		_hairline_left_of(dismiss_left, _dismiss_baseline(), label_size_px)
+	_draw_dismiss(_focus == DISMISS)
+
+# WALK ON - or TAKE NOTHING - in the text form of the focus language.
+func _draw_dismiss(focused: bool) -> void:
+	var left: float = _dismiss_label_left()
+	_text(_label_font, _dismiss_text(), Vector2(left, _dismiss_baseline()), label_size_px, bone if focused else unfocused_color)
+	if focused:
+		_hairline_left_of(left, _dismiss_baseline(), label_size_px)
 
 # The band behind the row: solid from over TAKE ONE's caps to under the
 # kinds, feathered to nothing above and below, the full width.
@@ -894,186 +833,145 @@ func _hairline_left_of(left: float, baseline: float, size_px: int) -> void:
 func _is_lit(slot: int) -> bool:
 	return slot == _taken if _taken >= 0 else slot == _focus
 
-# What the taken column held, line by line in full bone under it - or,
-# for the pack, under its lifted card, the card speaking for itself.
-# Drawn when `draw`; either way, returns where a next line's baseline
-# would sit (the full-slot question hangs from it).
-func _reveal(slot: int, draw: bool) -> float:
+# What the taken coin or Glassbone column held, line by line in full bone
+# under it.
+func _reveal(slot: int) -> void:
 	var rect: Rect2 = _column_rect(slot)
 	var x: float = rect.get_center().x
 	var y: float = rect.end.y + contents_gap_px
 	match slot:
 		Slot.GOLD:
-			if draw:
-				_text_centred(_contents_font, gold_format % _gold, x, y, contents_size_px, bone)
+			_text_centred(_contents_font, gold_format % _gold, x, y, contents_size_px, bone)
 			y += contents_pitch_px
-		Slot.CARD:
-			var lift: Rect2 = _lift_rect()
-			if lift.has_area():
-				y = lift.end.y + contents_gap_px
-		Slot.KEEPSAKE:
-			if _bedroll != null:
-				if draw:
-					_text_centred(_contents_font, bedroll_taken_text, x, y, contents_size_px, bone)
-				y += contents_pitch_px
-				return _reveal_glassbone(slot, x, y, draw)
-			# The tile speaks for it; lines hang under the tiles.
-			var tiles: Rect2 = _keepsake_tiles_rect()
-			if tiles.has_area():
-				x = tiles.get_center().x
-				y = tiles.end.y + contents_gap_px
-	return _reveal_glassbone(slot, x, y, draw)
+		Slot.GLASSBONE:
+			_text_centred(_contents_font, glassbone_format % _glassbone_offer, x, y, contents_size_px, bone)
+			y += contents_pitch_px
+	_reveal_glassbone(slot, x, y)
 
-# The "+ Glassbone" line under a reveal, where its column held some.
-func _reveal_glassbone(slot: int, x: float, y: float, draw: bool) -> float:
+# The "+ Glassbone" line under a reveal, where Glassbone rode with it.
+func _reveal_glassbone(slot: int, x: float, y: float) -> void:
 	var glassbone: int = _glassbone_in(slot)
 	if glassbone > 0:
-		if draw:
-			_text_centred(_contents_font, glassbone_format % glassbone, x, y, contents_size_px, bone)
-		y += contents_pitch_px
-	return y
+		_text_centred(_contents_font, glassbone_format % glassbone, x, y, contents_size_px, bone)
 
-# --- The full-slot question ---
+# --- The pack's cards ---
 
-# Each choice is its word in the choices' caps, a space and the held
-# keepsake's name, centred under the bedroll.
-func _choice_baseline(choice: int) -> float:
-	return roundf(_reveal(Slot.KEEPSAKE, false) + choice_gap_px + float(choice) * choice_pitch_px)
+# The size of one card at card_inspect_scale.
+func _pick_card_size() -> Vector2:
+	var card_size: Vector2 = _pick_views[0].card_size if not _pick_views.is_empty() and is_instance_valid(_pick_views[0]) else Vector2(200.0, 280.0)
+	return card_size * card_inspect_scale
 
-func _choice_word(choice: int) -> String:
-	return replace_text if choice == Choice.REPLACE else keep_text
+# The cards' row: centred, its centre line at card_inspect_centre_
+# fraction of the height - laid out for every card shown, so the one
+# taken stays where it was.
+func _pick_row() -> Rect2:
+	var card: Vector2 = _pick_card_size()
+	var count: int = maxi(_cards.size(), 1)
+	var gap: float = card.x * card_pick_gap_fraction
+	var span: float = float(count) * card.x + float(count - 1) * gap
+	var left: float = roundf((_draw_layer.size.x - span) / 2.0)
+	var top: float = roundf(_draw_layer.size.y * card_inspect_centre_fraction - card.y / 2.0)
+	return Rect2(left, top, span, card.y)
 
-func _choice_width(choice: int) -> float:
-	var gap: float = InkType.width(_contents_font, " ", contents_size_px)
-	return InkType.width(_choice_font, _choice_word(choice), choice_word_size_px) + gap + InkType.width(_contents_font, _held.display_name, contents_size_px)
+# Card `index`'s face, in _cards' order.
+func _pick_rect(index: int) -> Rect2:
+	var card: Vector2 = _pick_card_size()
+	var row: Rect2 = _pick_row()
+	return Rect2(roundf(row.position.x + float(index) * card.x * (1.0 + card_pick_gap_fraction)), row.position.y, card.x, card.y)
 
-func _choice_left(choice: int) -> float:
-	var tiles: Rect2 = _keepsake_tiles_rect()
-	var centre: float = tiles.get_center().x if tiles.has_area() else _column_rect(Slot.KEEPSAKE).get_center().x
-	return roundf(centre - _choice_width(choice) / 2.0)
-
-# The choice and the hairline's room to its left.
-func _choice_rect(choice: int) -> Rect2:
-	var left: float = _choice_left(choice) - hairline_gap_px - hairline_length_px
-	var right: float = _choice_left(choice) + _choice_width(choice)
-	return Rect2(left, _choice_baseline(choice) - float(contents_size_px), right - left, float(contents_size_px) * 1.3)
-
-func _draw_choice(choice: int) -> void:
-	var focused: bool = _choice_focus == choice
-	var color: Color = bone if focused else unfocused_color
-	var left: float = _choice_left(choice)
-	var baseline: float = _choice_baseline(choice)
-	var word: String = _choice_word(choice)
-	var word_width: float = InkType.width(_choice_font, word, choice_word_size_px)
-	_text(_choice_font, word, Vector2(left, baseline), choice_word_size_px, color)
-	_text(_contents_font, _held.display_name, Vector2(left + word_width + InkType.width(_contents_font, " ", contents_size_px), baseline), contents_size_px, color)
-	if focused:
-		_hairline_left_of(left, baseline, choice_word_size_px)
-
-# --- The bedroll's keepsake ---
-
-# The tiles' row on screen: the offered tile alone over the bedroll's
-# column (held inside the screen), or the held and the offered side by
-# side, centred on the screen. Empty while none is shown.
-func _keepsake_tiles_rect() -> Rect2:
-	if _offered_tile == null or _draw_layer == null:
-		return Rect2()
-	var tile: Vector2 = _offered_tile.get_plate_size()
-	var both: bool = _held_tile != null
-	var width: float = tile.x * (2.0 if both else 1.0) + (keepsake_tile_gap_px if both else 0.0)
-	var view: Vector2 = _draw_layer.size
-	var centre_x: float = view.x / 2.0
-	if not both:
-		centre_x = clampf(_column_rect(Slot.KEEPSAKE).get_center().x, width / 2.0 + 24.0, view.x - width / 2.0 - 24.0)
-	var top: float = view.y * keepsake_tile_centre_fraction - tile.y / 2.0
-	return Rect2(Vector2(centre_x - width / 2.0, top).round(), Vector2(width, tile.y))
-
-# Up through the bedroll's reveal: its tile, and the held one beside it
-# while the full slot is asked about.
-func _sync_keepsake_tiles() -> void:
-	var wanted: bool = _keepsake != null and _bedroll == null and not _flying and _taken == Slot.KEEPSAKE
-	var wanted_held: bool = wanted and _asking and _held != null
-	if wanted and _offered_tile == null:
-		_offered_tile = _new_tile(_keepsake)
-	elif not wanted and _offered_tile != null:
-		_offered_tile.queue_free()
-		_offered_tile = null
-	if wanted_held and _held_tile == null:
-		_held_tile = _new_tile(_held)
-	elif not wanted_held and _held_tile != null:
-		_held_tile.queue_free()
-		_held_tile = null
-	_place_keepsake_tiles()
-
-func _new_tile(keepsake: TrinketData) -> ItemPlate:
-	var tile := ItemPlate.new()
-	tile.plate_scale = keepsake_tile_scale
-	_draw_layer.add_child(tile)
-	tile.set_keepsake(keepsake)
-	return tile
-
-func _place_keepsake_tiles() -> void:
-	var row: Rect2 = _keepsake_tiles_rect()
-	if not row.has_area():
-		return
-	for tile: ItemPlate in [_held_tile, _offered_tile]:
-		if tile != null and not is_equal_approx(tile.plate_scale, keepsake_tile_scale):
-			tile.plate_scale = keepsake_tile_scale
-	if _held_tile != null:
-		_held_tile.position = row.position
-		_offered_tile.position = row.position + Vector2(_offered_tile.get_plate_size().x + keepsake_tile_gap_px, 0.0)
-	else:
-		_offered_tile.position = row.position
-
-# HELD and OFFERED, each centred over its tile, in the labels' caps.
-func _draw_keepsake_labels() -> void:
-	if _held_tile == null or _offered_tile == null:
-		return
-	for pair: Array in [[_held_tile, held_label_text], [_offered_tile, offered_label_text]]:
-		var tile: ItemPlate = pair[0]
-		var centre: float = tile.position.x + tile.get_plate_size().x / 2.0
-		_text_centred(_label_font, pair[1], centre, roundf(tile.position.y - keepsake_label_gap_px), label_size_px, bone)
-
-# For probes: the tiles up now (held first when both), empty with none.
-func get_keepsake_tiles() -> Array[ItemPlate]:
-	var tiles: Array[ItemPlate] = []
-	for tile: ItemPlate in [_held_tile, _offered_tile]:
-		if tile != null:
-			tiles.append(tile)
-	return tiles
-
-# --- The pack's card ---
-
-# Where the lifted card sits: centred on the pack's column, at card_
-# inspect_scale. Empty while nothing is lifted.
-func _lift_rect() -> Rect2:
-	if _lifted == null or _draw_layer == null:
-		return Rect2()
-	var size: Vector2 = _lifted.card_size * card_inspect_scale
-	var centre := Vector2(_column_rect(Slot.CARD).get_center().x, _draw_layer.size.y * card_inspect_centre_fraction)
-	return Rect2((centre - size / 2.0).round(), size)
-
-# The card is up through the pack's own reveal, until it flies.
-func _sync_card_lift() -> void:
-	var wanted: bool = _card != null and not _flying and _taken == Slot.CARD
-	if wanted and _lifted == null:
-		_lifted = _new_card_view(_card)
+# LOOK INSIDE: the cards up, TAKE ONE over them and TAKE NOTHING under,
+# nothing focused yet.
+func _open_pack() -> void:
+	_picking = true
+	_pick_focus = -1
+	_pick_mouse_on = -1
+	for card in _cards:
+		var view: CardView = _new_card_view(card)
+		if view == null:
+			continue
 		# Up for inspection: its keywords define themselves on hover.
-		if _lifted != null:
-			_lifted.set_keyword_inspect(true)
-		_place_lift()
-		# Revealed, the pack's card has arrived: its name sheens once.
-		if _lifted != null:
-			_lifted.play_name_sheen()
-	elif not wanted and _lifted != null:
-		_lifted.queue_free()
-		_lifted = null
+		view.set_keyword_inspect(true)
+		_pick_views.append(view)
+	if _pick_views.size() != _cards.size():
+		push_warning("BelongingsScreen: a card view failed to load; the pack offers TAKE NOTHING alone.")
+		for view in _pick_views:
+			view.queue_free()
+		_pick_views.clear()
+	_place_pick()
+	# Opened, the pack's cards have arrived: each name sheens once.
+	for view in _pick_views:
+		view.play_name_sheen()
+	_draw_layer.queue_redraw()
 
-func _place_lift() -> void:
-	if _lifted == null or _flying:
+func _place_pick() -> void:
+	if _flying or _draw_layer == null:
 		return
-	_lifted.scale = Vector2.ONE * card_inspect_scale
-	_lifted.position = _lift_rect().position
+	for index in _pick_views.size():
+		var view: CardView = _pick_views[index]
+		if not is_instance_valid(view):
+			continue
+		view.scale = Vector2.ONE * card_inspect_scale
+		view.position = _pick_rect(_picked if _picked >= 0 else index).position
+
+# Over the scrim while the pack is open: TAKE ONE, the focused card's
+# hairline, TAKE NOTHING - and, once a card is taken, the Glassbone that
+# rode with the pack under the row.
+func _draw_pick() -> void:
+	var row: Rect2 = _pick_row()
+	if _picked >= 0:
+		_reveal_glassbone(Slot.CARD, row.get_center().x, row.end.y + contents_gap_px)
+		return
+	_text_centred(_label_font, take_one_text, _draw_layer.size.x / 2.0, _take_one_baseline(), label_size_px, bone)
+	if _pick_focus >= 0 and _pick_focus < _pick_views.size():
+		var rect: Rect2 = _pick_rect(_pick_focus)
+		_draw_layer.draw_rect(Rect2(roundf(rect.get_center().x - object_hairline_length_px / 2.0), rect.end.y + card_hairline_gap_px, object_hairline_length_px, hairline_thickness_px), bone)
+	_draw_dismiss(_pick_focus == DISMISS)
+	_reveal_glassbone(Slot.CARD, row.get_center().x, _dismiss_baseline() - contents_pitch_px * 1.5)
+
+func _pick_hit(position: Vector2) -> int:
+	for index in _pick_views.size():
+		if _pick_rect(index).has_point(position):
+			return index
+	if _dismiss_rect().has_point(position):
+		return DISMISS
+	return -1
+
+func _set_pick_focus(index: int) -> void:
+	if index == _pick_focus:
+		return
+	_pick_focus = index
+	_draw_layer.queue_redraw()
+
+# The pack's answer - the first one wins. A card into the deck, the
+# others gone, the reveal holding before it flies; TAKE NOTHING closes
+# now.
+func _take_pick(index: int) -> void:
+	if not _picking or _picked >= 0:
+		return
+	if index == DISMISS:
+		_picking = false
+		print("BelongingsScreen: looked inside, took nothing.")
+		_log_choice(Slot.CARD, _glassbone_in(Slot.CARD), null)
+		_finish(Slot.CARD)
+		return
+	if index < 0 or index >= _pick_views.size():
+		return
+	_picked = index
+	var card: CardData = _cards[index]
+	RunState.add_card(card)
+	_log_choice(Slot.CARD, _glassbone_in(Slot.CARD), card)
+	TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "BelongingsScreen")
+	print("BelongingsScreen: took '%s' (deck now %d)." % [card.card_name, RunState.deck.size()])
+	var kept: CardView = _pick_views[index]
+	for view in _pick_views:
+		if view != kept:
+			view.queue_free()
+	_pick_views = [kept]
+	_place_pick()
+	_draw_layer.queue_redraw()
+	var hold: Tween = create_tween()
+	hold.tween_interval(maxf(result_hold_time, 0.0))
+	hold.tween_callback(_end_hold)
 
 # --- Input ---
 
@@ -1090,50 +988,16 @@ func _set_focus(index: int) -> void:
 		return
 	_focus = index
 	_draw_layer.queue_redraw()
-	_sync_bedroll_plate()
-
-# The Bedroll's plate beside its column while that column is focused and
-# nothing is taken yet; gone otherwise.
-func _sync_bedroll_plate() -> void:
-	if _draw_layer == null:
-		return
-	var wanted: bool = _bedroll != null and _taken < 0 and _focus == Slot.KEEPSAKE and not _flying
-	if not wanted:
-		if _bedroll_plate != null:
-			_bedroll_plate.queue_free()
-			_bedroll_plate = null
-		return
-	if _bedroll_plate == null:
-		_bedroll_plate = ItemPlate.new()
-		_draw_layer.add_child(_bedroll_plate)
-		_bedroll_plate.set_bedroll(_bedroll)
-	_bedroll_plate.plate_scale = bedroll_plate_scale
-	var column: Rect2 = _column_rect(Slot.KEEPSAKE)
-	var plate: Vector2 = _bedroll_plate.get_plate_size()
-	var x: float = column.end.x + bedroll_plate_gap_px
-	if x + plate.x > _draw_layer.size.x:
-		x = column.position.x - bedroll_plate_gap_px - plate.x
-	_bedroll_plate.position = Vector2(x, column.get_center().y - plate.y * 0.5).round()
-
-func _choice_hit(position: Vector2) -> int:
-	for choice in [Choice.REPLACE, Choice.KEEP]:
-		if _choice_rect(choice).has_point(position):
-			return choice
-	return -1
-
-func _set_choice_focus(choice: int) -> void:
-	if choice == _choice_focus:
-		return
-	_choice_focus = choice
-	_draw_layer.queue_redraw()
 
 func _on_gui_input(event: InputEvent) -> void:
-	# The lifted card takes no mouse of its own (_new_card_view()), so
-	# its keyword hover reads the motion here.
-	if event is InputEventMouseMotion and _lifted != null:
-		_lifted.update_keyword_hover()
-	if _asking:
-		_on_choice_gui_input(event)
+	# The cards take no mouse of their own (_new_card_view()), so their
+	# keyword hover reads the motion here.
+	if event is InputEventMouseMotion:
+		for view in _pick_views:
+			if is_instance_valid(view):
+				view.update_keyword_hover()
+	if _picking:
+		_on_pick_gui_input(event)
 		return
 	if _done:
 		return
@@ -1159,34 +1023,36 @@ func _on_gui_input(event: InputEvent) -> void:
 			_activate(index)
 		_draw_layer.accept_event()
 
-# The full-slot question's mouse: hover focuses, a click answers, a right
-# click anywhere is KEEP.
-func _on_choice_gui_input(event: InputEvent) -> void:
+# The pack's mouse: hover focuses, a click takes, a right click anywhere
+# is TAKE NOTHING.
+func _on_pick_gui_input(event: InputEvent) -> void:
+	if _picked >= 0:
+		return
 	var motion := event as InputEventMouseMotion
 	if motion != null:
-		var under: int = _choice_hit(motion.position)
-		if under != _choice_mouse_on:
+		var under: int = _pick_hit(motion.position)
+		if under != _pick_mouse_on:
 			if under >= 0:
-				_set_choice_focus(under)
-			elif _choice_focus == _choice_mouse_on:
-				_set_choice_focus(-1)
-			_choice_mouse_on = under
+				_set_pick_focus(under)
+			elif _pick_focus == _pick_mouse_on:
+				_set_pick_focus(-1)
+			_pick_mouse_on = under
 		return
 	var button := event as InputEventMouseButton
 	if button == null or not button.pressed:
 		return
 	if button.button_index == MOUSE_BUTTON_RIGHT:
-		_answer(Choice.KEEP)
+		_take_pick(DISMISS)
 		_draw_layer.accept_event()
 	elif button.button_index == MOUSE_BUTTON_LEFT:
-		var choice: int = _choice_hit(button.position)
-		if choice >= 0:
-			_answer(choice)
+		var index: int = _pick_hit(button.position)
+		if index >= 0:
+			_take_pick(index)
 		_draw_layer.accept_event()
 
 func _unhandled_input(event: InputEvent) -> void:
-	if _asking:
-		_on_choice_key(event)
+	if _picking:
+		_on_pick_key(event)
 		return
 	if _done:
 		return
@@ -1216,16 +1082,30 @@ func _unhandled_input(event: InputEvent) -> void:
 		return
 	get_viewport().set_input_as_handled()
 
-# The full-slot question's keys: any arrow moves between the two (from
-# nothing, to REPLACE), ui_accept answers, ui_cancel is KEEP.
-func _on_choice_key(event: InputEvent) -> void:
-	if event.is_action_pressed("ui_up") or event.is_action_pressed("ui_down") or event.is_action_pressed("ui_left") or event.is_action_pressed("ui_right"):
-		_set_choice_focus(Choice.KEEP if _choice_focus == Choice.REPLACE else Choice.REPLACE)
+# The pack's keys: left/right across the cards (wrapping), down to TAKE
+# NOTHING, up back to the cards, ui_accept takes, ui_cancel is TAKE
+# NOTHING. The move keys do nothing here - the pack is already opened.
+func _on_pick_key(event: InputEvent) -> void:
+	if _picked >= 0:
+		return
+	var cards: int = _pick_views.size()
+	var on_card: bool = _pick_focus >= 0 and _pick_focus < cards
+	if event.is_action_pressed("ui_right"):
+		if cards > 0:
+			_set_pick_focus(posmod(_pick_focus + 1, cards) if on_card else 0)
+	elif event.is_action_pressed("ui_left"):
+		if cards > 0:
+			_set_pick_focus(posmod(_pick_focus - 1, cards) if on_card else cards - 1)
+	elif event.is_action_pressed("ui_down"):
+		_set_pick_focus(DISMISS)
+	elif event.is_action_pressed("ui_up"):
+		if not on_card and cards > 0:
+			_set_pick_focus(int(float(cards) / 2.0))
 	elif event.is_action_pressed("ui_accept"):
-		if _choice_focus >= 0:
-			_answer(_choice_focus)
+		if _pick_focus >= 0:
+			_take_pick(_pick_focus)
 	elif event.is_action_pressed("ui_cancel"):
-		_answer(Choice.KEEP)
+		_take_pick(DISMISS)
 	else:
 		return
 	get_viewport().set_input_as_handled()
@@ -1237,10 +1117,10 @@ func _is_move_press(event: InputEvent) -> bool:
 			return true
 	return false
 
-# The one gate: the first activation wins. A take reveals that column's
-# contents and grants them - with its Glassbone - and nothing else; the
-# reveal then holds. The bedroll with the slot full grants its Glassbone
-# only, and asks (_answer()).
+# The one gate: the first activation wins. The coin or the Glassbone
+# taken reveals and grants what it held - with any Glassbone riding with
+# it - and the reveal holds. LOOK INSIDE grants any Glassbone riding with
+# the pack and opens it (_open_pack()); its own answer is _take_pick()'s.
 func _activate(index: int) -> void:
 	if _done:
 		return
@@ -1254,7 +1134,6 @@ func _activate(index: int) -> void:
 		return
 	_done = true
 	_taken = index
-	_sync_bedroll_plate()
 	var glassbone: int = _glassbone_in(index)
 	if glassbone > 0:
 		RunState.add_glassbone(glassbone)
@@ -1266,86 +1145,52 @@ func _activate(index: int) -> void:
 			_log_choice(index, glassbone, null)
 			TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, gold_volume_db, "GoldTakeAudio", "BelongingsScreen")
 			print("BelongingsScreen: took %d gold (run total %d)." % [_gold, RunState.gold])
+		Slot.GLASSBONE:
+			RunState.add_glassbone(_glassbone_offer)
+			_log_choice(index, glassbone, null)
+			TakeFeedback.play_sound(get_tree(), GOLD_SFX_PATH, glassbone_volume_db, "GlassboneTakeAudio", "BelongingsScreen")
+			print("BelongingsScreen: took %d Glassbone (run total %d)." % [_glassbone_offer, RunState.glassbone])
 		Slot.CARD:
-			RunState.add_card(_card)
-			_log_choice(index, glassbone, null)
-			TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "CardTakeAudio", "BelongingsScreen")
-			print("BelongingsScreen: took '%s' (deck now %d)." % [_card.card_name, RunState.deck.size()])
-		Slot.KEEPSAKE when _bedroll != null:
-			RunState.take_bedroll("belongings")
-			_log_choice(index, glassbone, null)
-			TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, take_volume_db, "BedrollTakeAudio", "BelongingsScreen")
-			print("BelongingsScreen: took the Bedroll.")
-		Slot.KEEPSAKE:
-			# Offered once it is seen - here, at the reveal.
-			RunState.note_keepsake_offered(_keepsake)
-			_held = RunState.keepsake
-			if _held != null:
-				_asking = true
-				print("BelongingsScreen: found '%s'; asking whether to replace '%s'." % [_keepsake.display_name, _held.display_name])
-			else:
-				RunState.equip_keepsake(_keepsake)
-				_log_choice(index, glassbone, null)
-				TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, keepsake_volume_db, "KeepsakeTakeAudio", "BelongingsScreen")
-				print("BelongingsScreen: took '%s'." % _keepsake.display_name)
-	_sync_card_lift()
-	_sync_keepsake_tiles()
+			print("BelongingsScreen: looked inside.")
+			_open_pack()
+			return
 	_draw_layer.queue_redraw()
-	if _asking:
-		return
 	var hold: Tween = create_tween()
 	hold.tween_interval(maxf(result_hold_time, 0.0))
 	hold.tween_callback(_end_hold)
 
-# The full-slot question answered - the first answer wins. REPLACE puts
-# the bedroll's keepsake in the slot, whatever was held gone; KEEP leaves
-# it behind. Either closes the screen; the take is spent either way.
-func _answer(choice: int) -> void:
-	if not _asking:
-		return
-	_asking = false
-	_log_choice(Slot.KEEPSAKE, _glassbone_in(Slot.KEEPSAKE), choice == Choice.REPLACE)
-	if choice == Choice.REPLACE:
-		RunState.equip_keepsake(_keepsake)
-		TakeFeedback.play_sound(get_tree(), TAKE_SFX_PATH, keepsake_volume_db, "KeepsakeTakeAudio", "BelongingsScreen")
-		print("BelongingsScreen: took '%s' (left '%s')." % [_keepsake.display_name, _held.display_name])
-	else:
-		print("BelongingsScreen: left '%s' (kept '%s')." % [_keepsake.display_name, _held.display_name])
-	_finish(Slot.KEEPSAKE)
-
-# The choice, for the run log: what each column held, which was taken
-# (-1 walked on), the Glassbone that came with it, and - when the slot
-# was full - whether the bedroll's keepsake replaced the one held (null
-# when there was nothing to replace).
-func _log_choice(taken: int, glassbone_taken: int, replaced: Variant) -> void:
+# The choice, for the run log: what each column offered - the coin, the
+# pack's cards, the Glassbone, and any Glassbone riding with one - which
+# was taken (-1 walked on), the riding Glassbone that came with it, and,
+# for the pack, the card taken from it (null for TAKE NOTHING).
+func _log_choice(taken: int, glassbone_taken: int, card: CardData) -> void:
 	var glassbone_slot: String = String(Slot.find_key(_glassbone_slot)).to_lower() if _glassbone_slot >= 0 else ""
+	var shown: Array[String] = []
+	for each in _cards:
+		shown.append(each.card_name)
 	var offered: Dictionary = {
 		"gold": _gold if _has_slot(Slot.GOLD) else 0,
-		"card": RunLogger.or_null(_card.card_name if _has_slot(Slot.CARD) else ""),
-		"keepsake": RunLogger.keepsake_id(_keepsake),
-		"bedroll": _bedroll != null,
-		"glassbone": {"slot": RunLogger.or_null(glassbone_slot), "amount": maxi(_glassbone_amount, 0)},
+		"cards": shown,
+		"glassbone": _glassbone_offer if _has_slot(Slot.GLASSBONE) else 0,
+		"glassbone_rider": {"slot": RunLogger.or_null(glassbone_slot), "amount": maxi(_glassbone_amount, 0)},
 	}
 	var taken_name: String = String(Slot.find_key(taken)).to_lower() if taken >= 0 else ""
-	if taken == Slot.KEEPSAKE and _bedroll != null:
-		taken_name = "bedroll"
 	RunLogger.event("belongings", {
 		"offered": offered,
 		"taken": RunLogger.or_null(taken_name),
+		"card_taken": RunLogger.or_null(card.card_name if card != null else "") if taken == Slot.CARD else null,
 		"glassbone_taken": glassbone_taken,
-		"held_before": RunLogger.keepsake_id(_held),
-		"replaced": replaced,
 	})
 
 # The hold is over: a taken card flies to the Belongings panel and the
 # screen closes as it lands; anything else closes now.
 func _end_hold() -> void:
-	var view: CardView = _lifted if _taken == Slot.CARD and reveal_card_on_take else null
+	var view: CardView = _pick_views[0] if _taken == Slot.CARD and _picked >= 0 and not _pick_views.is_empty() and reveal_card_on_take else null
 	if view == null:
 		_finish(_taken)
 		return
 	_flying = true
-	_lifted = null
+	_pick_views.clear()
 	view.set_keyword_inspect(false)
 	_draw_layer.queue_redraw()
 	var taken: int = _taken
@@ -1353,8 +1198,8 @@ func _end_hold() -> void:
 	tween.chain().tween_callback(func() -> void:
 		_finish(taken))
 
-# The pack's card at inspect size: not interactive anywhere on its face,
-# and scaled about its top-left so TakeFeedback.fly_to()'s placement
+# One of the pack's cards at inspect size: not interactive anywhere on its
+# face, and scaled about its top-left so TakeFeedback.fly_to()'s placement
 # holds.
 func _new_card_view(card_data: CardData) -> CardView:
 	var scene := load(CARD_VIEW_SCENE_PATH) as PackedScene

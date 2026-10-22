@@ -65,7 +65,7 @@ scene = ExtResource("9_belongings_cache")
 position = Vector3(10.1, 0, -24.3)
 pool = ExtResource("10_belongings_pool")
 overrides = {
-"offers_bedroll": true
+"glassbone_chance": 0.0
 }
 
 [sub_resource type="Resource" id="FloorProp_sand_fence1"]

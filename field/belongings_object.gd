@@ -13,7 +13,9 @@ class_name BelongingsObject
 # by an enemy_fog.gdshader pass at fog_factor, filled from the field's
 # RegionSky and again whenever its fog changes (both through PaintedProp,
 # which the workbench and the handcart share). If the shader or the
-# colour map fails to load, the hulls' flat material wears the tint. The
+# colour map fails to load, the hulls' flat material wears the tint.
+# With material_path set, that material is worn instead, as it is - no
+# tint, the scene's own fog (the cache's shard, in the seam's Glassbone). The
 # bbox is measured in this node's space and its bottom seated on the
 # origin, so a model whose origin isn't at its base still sits on the
 # sand. A box of that bbox is its collision, MAKE_STATIC like every prop
@@ -26,10 +28,17 @@ class_name BelongingsObject
 const COLOUR_MAP_SUFFIX := "_Image_0.jpg"
 
 @export_file("*.glb", "*.tscn") var model_scene_path: String = ""
+# A material worn in place of the painted one, untinted; empty = painted.
+# Read when the model is made.
+@export_file("*.tres") var material_path: String = "":
+	set(value):
+		material_path = value
+		_rebuild()
 @export var tint: Color = Color(0.76, 0.62, 0.46):
 	set(value):
 		tint = value
-		set_material_tint(_material, tint)
+		if material_path.is_empty():
+			set_material_tint(_material, tint)
 # The object's share of the depth fog - 1 fogged as the scene fogs it.
 @export_range(0.0, 1.0, 0.01) var fog_factor: float = 1.0:
 	set(value):
@@ -81,14 +90,18 @@ func _spawn_model() -> void:
 	_model.name = "Model"
 	_model.scale = Vector3.ONE * model_scale
 	add_child(_model)
-	_material = painted_material(model_scene_path, tint)
 	_fog = null
-	if _material != null:
-		_fog = PaintedProp.fog_pass()
-		_material.next_pass = _fog
-	else:
-		_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
-		set_material_tint(_material, tint)
+	_material = load(material_path) as Material if not material_path.is_empty() else null
+	if _material == null:
+		if not material_path.is_empty():
+			push_warning("BelongingsObject '%s': could not load %s; painted instead." % [name, material_path])
+		_material = painted_material(model_scene_path, tint)
+		if _material != null:
+			_fog = PaintedProp.fog_pass()
+			_material.next_pass = _fog
+		else:
+			_material = Hull._get_shared_flat_material().duplicate() as StandardMaterial3D
+			set_material_tint(_material, tint)
 	_aabb = AABB()
 	var has_aabb := false
 	for mesh_instance in _model.find_children("*", "MeshInstance3D", true, false):

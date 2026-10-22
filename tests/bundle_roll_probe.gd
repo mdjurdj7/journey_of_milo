@@ -15,10 +15,10 @@ extends SceneTree
 # (BelongingsCache), instantiates that scene the way RegionField does
 # (overrides applied, never added to the tree) and rolls it once per seed,
 # with the arguments RegionField._setup_belongings_cache() passes. Asserts
-# the case holds 45 gold, that the pack's card is always there and from
-# the pool, and that Glassbone comes up near glassbone_chance, spread
-# evenly over the three. Floor 2's cache offers the Bedroll in the
-# bedroll's column, so no keepsake is drawn here.
+# the case holds gold and the shard Glassbone, that the pack always holds
+# pick_count distinct cards (or the whole pool, when it's shorter), each
+# from the pool, and that Glassbone rides with the coin or the pack near
+# glassbone_chance - spread evenly over the two, never the shard's.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/bundle_roll_probe.gd
 #
@@ -119,32 +119,41 @@ func _probe_cache(floor_data: Resource) -> void:
 	var pool: Resource = entry.get("pool") if entry.get("pool") != null else floor_data.get("reward_pool")
 	var coin_amount: int = cache.get("coin_amount")
 	var glassbone_chance: float = cache.get("glassbone_chance")
-	print("cache at %s: case %d gold, pack from %s, Glassbone %.0f%%" % [entry.get("position"), coin_amount, pool.resource_path, glassbone_chance * 100.0])
-	if coin_amount != 45:
-		_fail("the case holds %d gold, not 45" % coin_amount)
+	var glassbone_offer: int = cache.get("glassbone_offer")
+	var pick_count: int = cache.get("pick_count")
+	var entries: Array = pool.get("entries")
+	print("cache at %s: case %d gold, pack %d from %s, shard %d Glassbone, Glassbone riding %.0f%%" % [entry.get("position"), coin_amount, pick_count, pool.resource_path, glassbone_offer, glassbone_chance * 100.0])
+	if coin_amount <= 0:
+		_fail("the case holds no gold (%d)" % coin_amount)
+	if glassbone_offer <= 0:
+		_fail("the shard holds no Glassbone (%d)" % glassbone_offer)
 
-	# The roll at floor load: the pack's card and the Glassbone.
+	# The roll at floor load: the pack's cards and the riding Glassbone.
 	var glassbone_rolls: int = 0
-	var glassbone_by_slot: Array[int] = [0, 0, 0]
+	var glassbone_by_slot: Array[int] = [0, 0]
 	var rng := RandomNumberGenerator.new()
 	for seed_value in SEED_COUNT:
 		rng.seed = seed_value
 		cache.call("roll", rng, pool)
-		var card: Resource = cache.get("card")
-		if card == null:
-			_fail("cache seed %d: the pack's card rolled nothing" % seed_value)
-		elif not (pool.get("entries") as Array).has(card):
-			_fail("cache seed %d: card '%s' is not in the cache's pool" % [seed_value, card.resource_path])
+		var cards: Array = cache.get("cards")
+		if cards.size() != mini(pick_count, entries.size()):
+			_fail("cache seed %d: the pack holds %d cards, not %d" % [seed_value, cards.size(), mini(pick_count, entries.size())])
+		for card: Resource in cards:
+			if not entries.has(card):
+				_fail("cache seed %d: card '%s' is not in the cache's pool" % [seed_value, card.resource_path])
+			elif cards.count(card) > 1:
+				_fail("cache seed %d: '%s' twice in the pack" % [seed_value, card.resource_path])
 		var slot: int = cache.get("glassbone_slot")
 		if slot >= 0:
-			if slot > 2:
-				_fail("cache seed %d: Glassbone in column %d" % [seed_value, slot])
+			if slot > 1:
+				_fail("cache seed %d: Glassbone riding with column %d" % [seed_value, slot])
 				continue
 			glassbone_rolls += 1
 			glassbone_by_slot[slot] += 1
 	_expect_share("Glassbone", glassbone_rolls, SEED_COUNT, glassbone_chance, GLASSBONE_TOLERANCE)
-	for slot in 3:
-		_expect_share("  in column %d" % slot, glassbone_by_slot[slot], glassbone_rolls, 1.0 / 3.0, GLASSBONE_SLOT_TOLERANCE)
+	if glassbone_rolls > 0:
+		for slot in 2:
+			_expect_share("  with column %d" % slot, glassbone_by_slot[slot], glassbone_rolls, 0.5, GLASSBONE_SLOT_TOLERANCE)
 
 	cache.free()
 

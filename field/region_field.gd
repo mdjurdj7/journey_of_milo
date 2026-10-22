@@ -2088,7 +2088,7 @@ func _setup_bundle(bundle: BundleProp, entry: FloorProp, floor_data: FloorData) 
 	bundle.roll(RunState.rng, floor_data.gold_min, floor_data.gold_max, pool, floor_data.rare_pool, get_run_character())
 
 # A belongings cache's one roll, at floor load from the run's own
-# generator - the pack's card from the prop's pool, the floor's reward
+# generator - the pack's cards from the prop's pool, the floor's reward
 # pool when it names none (see BelongingsCache.roll()) - plus its once-
 # per-run id and the prop's own line when it names one.
 func _setup_belongings_cache(cache: BelongingsCache, entry: FloorProp, floor_data: FloorData, id: String) -> void:
@@ -3986,13 +3986,7 @@ func open_belongings_screen(cache: BelongingsCache) -> bool:
 		push_warning("RegionField: could not load %s; no belongings screen." % belongings_screen_scene_path)
 		return false
 	var screen := scene.instantiate() as BelongingsScreen
-	# The bedroll's keepsake, or the Bedroll in its place (no keepsake
-	# drawn then).
-	if not cache.offers_bedroll:
-		cache.ensure_keepsake()
-	screen.setup(cache.world_line, cache.coin_amount, cache.card, cache.keepsake, cache.glassbone_slot, cache.glassbone_amount, cache.object_scene_paths, cache.object_scales, deck_panel)
-	if cache.offers_bedroll:
-		screen.offer_bedroll(load(bedroll_data_path) as BedrollData)
+	screen.setup(cache.world_line, cache.coin_amount, cache.cards, cache.glassbone_offer, cache.glassbone_slot, cache.glassbone_amount, cache.object_scene_paths, cache.object_scales, cache.object_material_paths, deck_panel)
 	# The objects as they are on the sand: the cache's tint, the field's light.
 	screen.object_tint = cache.object_tint
 	screen.light_like(get_node_or_null(directional_light_path) as DirectionalLight3D, get_region_sky(), get_viewport().get_camera_3d())

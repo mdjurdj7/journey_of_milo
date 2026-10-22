@@ -1,33 +1,27 @@
 extends SceneTree
 
 # Headless probe for the belongings screen's choice: that a take grants
-# exactly the taken pack's contents - and the Glassbone with it, where
-# that pack holds it - and nothing from the other two, and that WALK ON
-# grants nothing at all.
+# exactly what the taken column holds - and the Glassbone riding with it,
+# where the coin or the pack holds some - and nothing from the other two,
+# and that WALK ON grants nothing at all.
 #
-# Each case is a fresh run (RunState.new_run(), Bent Nail held or not)
-# and a fresh BelongingsScreen, set up as RegionField.open_belongings_
-# screen() sets it up - the case 45 gold, the pack a card, the bedroll a
-# keepsake, Glassbone in one column or none - and added to the root. The
-# probe then takes a column (or walks on) through the screen's own gate
-# (_activate()) and asserts the run's gold, deck, keepsake and Glassbone
-# against what that column holds. Also: a second activation during the
-# result hold grants nothing more; the screen stays open through
-# result_hold_time and closes after it, reporting the column taken (-1
-# for WALK ON); and the bedroll's keepsake is noted offered only when the
-# bedroll is taken.
+# Each case is a fresh run (RunState.new_run()) and a fresh
+# BelongingsScreen, set up as RegionField.open_belongings_screen() sets
+# it up - the case's gold, the pack's distinct cards, the shard's
+# Glassbone, Glassbone riding with the coin or the pack or none - and
+# added to the root. The probe then takes a column (or walks on) through
+# the screen's own gate (_activate()) and asserts the run's gold, deck
+# and Glassbone against what that column holds; the coin and the shard
+# close after result_hold_time, reporting their column, WALK ON at once
+# (-1). A second activation during the hold grants nothing more.
 #
-# The bedroll with the slot full: the take grants its Glassbone (where it
-# carried it) and nothing else, and the screen asks - open past the hold,
-# no timeout, other columns and WALK ON ignored. REPLACE (_answer()) puts
-# the new keepsake in the slot; KEEP grants nothing more. Either closes
-# at once, reporting the bedroll - the take spent.
+# LOOK INSIDE commits: the pack opens (is_picking()), every card it holds
+# shown as its own view, and the coin and the shard can no longer be
+# taken. A card taken (_take_pick()) is the one added to the deck and the
+# screen closes after the hold and the card's flight; TAKE NOTHING grants
+# nothing and closes at once - both reporting the pack.
 #
-# The bedroll holding the Bedroll (offer_bedroll(), floor 2's cache): its
-# kind is BEDROLL, the take puts one in the pack (RunState.has_bedroll)
-# and no keepsake is offered or shown; a second screen with one carried
-# names it "(carrying one)" and won't take it, the other columns still
-# offered. Then the rest itself on the field (RegionField.open_bedroll_
+# Then the Bedroll's rest itself on the field (RegionField.open_bedroll_
 # rest(), BedrollRest): at 50 / 80 HP YES brings 74 / 80 and the Bedroll
 # is gone, the HUD in bone through the night and back after; it can't
 # open at full HP, nor in a fight.
@@ -41,35 +35,28 @@ extends SceneTree
 
 const SCREEN_SCENE_PATH := "res://battle/belongings_screen.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
-const CARD_PATH := "res://cards/neutral/endure.tres"
-const OFFERED_PATH := "res://run/keepsakes/frayed_cord.tres"
-const BEDROLL_PATH := "res://run/data/bedroll.tres"
+# Any three distinct cards: what the pack holds is the cache's roll, not
+# this probe's business.
+const CARD_PATHS := ["res://cards/data/slash.tres", "res://cards/data/bite_down.tres", "res://cards/neutral/endure.tres"]
+const CACHE_SCENE_PATH := "res://field/belongings_cache.tscn"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const SPUTTER_PATH := "res://battle/rules/enemies/sputter.tres"
 # The rest's whole night - in, hold, out - with slack: a cap on the wait,
 # not a wait.
 const REST_MAX_SEC := 8.0
-const HELD_PATH := "res://run/keepsakes/bent_nail.tres"
-const OBJECT_PATHS := [
-	"res://assets/models/props/belongings/case.glb",
-	"res://assets/models/props/belongings/pack.glb",
-	"res://assets/models/props/belongings/bedroll.glb",
-]
 const GOLD := 45
+const GLASSBONE_OFFER := 1
 const GLASSBONE := 1
-# BelongingsScreen.Slot, and its WALK ON index.
+# BelongingsScreen.Slot, and its WALK ON index - TAKE NOTHING's too.
 const CASE := 0
 const PACK := 1
-const BEDROLL := 2
+const SHARD := 2
 const WALK_ON := 3
-# BelongingsScreen.Choice - the full-slot question's answers.
-const REPLACE := 0
-const KEEP := 1
+# How the pack is answered: a card's index, or TAKE NOTHING.
+const NOTHING := -1
 # A shorter hold than the default, so the suite runs quickly; the closing
 # assert still checks the screen waits it out.
 const HOLD_SEC := 0.4
-# Past the hold: the card's flight (card_flight_duration_sec 0.45) and slack.
-const FLIGHT_ROOM_SEC := 0.8
 # The most game time a take may take to close the screen, seconds - a cap
 # on the wait for its report, not a wait.
 const CLOSE_MAX_SEC := 3.0
@@ -86,73 +73,68 @@ func _run() -> void:
 	_run_state = root.get_node("RunState")
 	_deck_panel = Control.new()
 	root.add_child(_deck_panel)
-	for held: bool in [false, true]:
-		for glassbone_slot in [-1, CASE, PACK, BEDROLL]:
-			for taken in [CASE, PACK, BEDROLL, WALK_ON]:
-				if taken == BEDROLL and held:
-					continue
-				await _check_take(taken, glassbone_slot, held)
-	for glassbone_slot in [-1, CASE, PACK, BEDROLL]:
-		for answer in [REPLACE, KEEP]:
-			await _check_full_slot(answer, glassbone_slot)
+	for glassbone_slot in [-1, CASE, PACK]:
+		for taken in [CASE, SHARD, WALK_ON]:
+			await _check_take(taken, glassbone_slot)
+		for answer in [0, CARD_PATHS.size() - 1, NOTHING]:
+			await _check_pack(answer, glassbone_slot)
 	await _check_second_activation()
-	await _check_bedroll_take()
 	await _check_bedroll_rest()
 	_finish()
 
-func _new_run(held: bool) -> void:
+func _new_run() -> void:
 	_run_state.call("new_run", load(CHARACTER_PATH))
-	if held:
-		_run_state.call("equip_keepsake", load(HELD_PATH))
 
 func _snapshot() -> Dictionary:
 	return {
 		"gold": _run_state.get("gold"),
 		"deck": (_run_state.get("deck") as Array).size(),
-		"keepsake": _run_state.get("keepsake"),
 		"glassbone": _run_state.get("glassbone"),
 	}
 
+func _cards() -> Array[CardData]:
+	var cards: Array[CardData] = []
+	for path: String in CARD_PATHS:
+		cards.append(load(path) as CardData)
+	return cards
+
+# The cache's own models, materials and scales, as RegionField hands them
+# over.
 func _open(glassbone_slot: int) -> Node:
+	var cache: Node = (load(CACHE_SCENE_PATH) as PackedScene).instantiate()
 	var screen: Node = (load(SCREEN_SCENE_PATH) as PackedScene).instantiate()
-	screen.call("setup", "Three packs.", GOLD, load(CARD_PATH), load(OFFERED_PATH), glassbone_slot, GLASSBONE, PackedStringArray(OBJECT_PATHS), PackedFloat32Array([0.6, 1.0, 1.0]), _deck_panel)
+	screen.call("setup", "Three packs.", GOLD, _cards(), GLASSBONE_OFFER, glassbone_slot, GLASSBONE, cache.get("object_scene_paths"), cache.get("object_scales"), cache.get("object_material_paths"), _deck_panel)
+	cache.free()
 	screen.set("result_hold_time", HOLD_SEC)
 	root.add_child(screen)
 	return screen
 
-func _check_take(taken: int, glassbone_slot: int, held: bool) -> void:
-	_new_run(held)
-	var label: String = "%s, Glassbone in %s, %s" % [["case", "pack", "bedroll", "WALK ON"][taken], "none" if glassbone_slot < 0 else str(glassbone_slot), "Bent Nail held" if held else "slot empty"]
+func _label(column: String, glassbone_slot: int) -> String:
+	return "%s, Glassbone riding with %s" % [column, "none" if glassbone_slot < 0 else ["the coin", "the pack"][glassbone_slot]]
+
+# The coin, the shard or WALK ON.
+func _check_take(taken: int, glassbone_slot: int) -> void:
+	_new_run()
+	var label: String = _label(["case", "pack", "shard", "WALK ON"][taken], glassbone_slot)
 	var before: Dictionary = _snapshot()
 	var screen: Node = _open(glassbone_slot)
 	var report: Array = []
 	screen.connect("closed", func(column: int) -> void: report.append(column))
 	await process_frame
+	_expect((screen.call("_takeable_slots") as Array) == [CASE, PACK, SHARD], "%s: all three columns offered" % label)
 	screen.call("_activate", taken)
 
 	var after: Dictionary = _snapshot()
 	var expected: Dictionary = before.duplicate()
 	if taken == CASE:
 		expected["gold"] = int(before["gold"]) + GOLD
-	elif taken == PACK:
-		expected["deck"] = int(before["deck"]) + 1
-	elif taken == BEDROLL:
-		expected["keepsake"] = load(OFFERED_PATH)
+	elif taken == SHARD:
+		expected["glassbone"] = int(before["glassbone"]) + GLASSBONE_OFFER
 	if taken != WALK_ON and taken == glassbone_slot:
-		expected["glassbone"] = int(before["glassbone"]) + GLASSBONE
+		expected["glassbone"] = int(expected["glassbone"]) + GLASSBONE
 	for key: String in expected:
 		_expect(after[key] == expected[key], "%s: %s %s, expected %s" % [label, key, after[key], expected[key]])
-	if taken == PACK:
-		var deck: Array = _run_state.get("deck")
-		# add_card() keeps a copy, so the name, not the resource.
-		_expect(not deck.is_empty() and deck.back().get("card_name") == load(CARD_PATH).get("card_name"), "%s: the pack's card is the one added" % label)
-	var noted: bool = (_run_state.get("keepsakes_offered") as Array).has(load(OFFERED_PATH).get("id"))
-	_expect(noted == (taken == BEDROLL), "%s: the bedroll's keepsake %s offered" % [label, "noted" if noted else "not noted"])
-	var tiles: Array = screen.call("get_keepsake_tiles")
-	if taken == BEDROLL:
-		_expect(tiles.size() == 1 and tiles[0].call("get_keepsake") == load(OFFERED_PATH), "%s: the reveal shows the bedroll's keepsake as a tile" % label)
-	else:
-		_expect(tiles.is_empty(), "%s: no keepsake tile for another column" % label)
+	_expect(not bool(screen.call("is_picking")), "%s: the pack stays shut" % label)
 
 	if taken == WALK_ON:
 		_expect(report == [-1], "%s: walking on closes at once, reporting -1 (got %s)" % [label, report])
@@ -164,129 +146,84 @@ func _check_take(taken: int, glassbone_slot: int, held: bool) -> void:
 	if is_instance_valid(screen):
 		screen.free()
 
-# The bedroll taken with Bent Nail held: only its Glassbone at the take,
-# the question held open past the hold with nothing else answering, then
-# `answer` - REPLACE takes the new keepsake, KEEP nothing more - closing
-# at once on the bedroll.
-func _check_full_slot(answer: int, glassbone_slot: int) -> void:
-	_new_run(true)
-	var label: String = "bedroll, slot full, %s, Glassbone in %s" % [["REPLACE", "KEEP"][answer], "none" if glassbone_slot < 0 else str(glassbone_slot)]
+# LOOK INSIDE, then `answer`: a card's index, or TAKE NOTHING.
+func _check_pack(answer: int, glassbone_slot: int) -> void:
+	_new_run()
+	var label: String = _label("pack, %s" % ("take nothing" if answer == NOTHING else "take card %d" % answer), glassbone_slot)
 	var before: Dictionary = _snapshot()
 	var screen: Node = _open(glassbone_slot)
 	var report: Array = []
 	screen.connect("closed", func(column: int) -> void: report.append(column))
 	await process_frame
-	screen.call("_activate", BEDROLL)
+	screen.call("_activate", PACK)
 
 	var expected: Dictionary = before.duplicate()
-	if glassbone_slot == BEDROLL:
+	if glassbone_slot == PACK:
 		expected["glassbone"] = int(before["glassbone"]) + GLASSBONE
-	var asked: Dictionary = _snapshot()
+	var opened: Dictionary = _snapshot()
 	for key: String in expected:
-		_expect(asked[key] == expected[key], "%s: at the reveal, %s %s, expected %s" % [label, key, asked[key], expected[key]])
-	_expect((_run_state.get("keepsakes_offered") as Array).has(load(OFFERED_PATH).get("id")), "%s: the bedroll's keepsake noted offered at the reveal" % label)
-	_expect(bool(screen.get("_asking")), "%s: the question is open" % label)
-	var tiles: Array = screen.call("get_keepsake_tiles")
-	_expect(tiles.size() == 2, "%s: HELD and OFFERED tiles both shown (got %d)" % [label, tiles.size()])
-	if tiles.size() == 2:
-		var held_tile: Control = tiles[0]
-		var offered_tile: Control = tiles[1]
-		_expect(held_tile.call("get_keepsake") == load(HELD_PATH) and offered_tile.call("get_keepsake") == load(OFFERED_PATH), "%s: the held one first, the offered one second" % label)
-		_expect(is_equal_approx(held_tile.position.y, offered_tile.position.y) and held_tile.position.x + held_tile.call("get_plate_size").x < offered_tile.position.x, "%s: side by side, apart" % label)
-		_expect(float(screen.call("_choice_baseline", REPLACE)) > offered_tile.position.y + offered_tile.call("get_plate_size").y, "%s: the choices sit under the tiles" % label)
-
-	# No timeout, and nothing but an answer closes it.
-	for other in [CASE, PACK, BEDROLL, WALK_ON]:
+		_expect(opened[key] == expected[key], "%s: opened, %s %s, expected %s" % [label, key, opened[key], expected[key]])
+	_expect(bool(screen.call("is_picking")), "%s: the pack is open" % label)
+	var views: Array = screen.call("get_pick_views")
+	_expect(views.size() == CARD_PATHS.size(), "%s: every card shown (%d of %d)" % [label, views.size(), CARD_PATHS.size()])
+	var shown: Array[String] = []
+	for view: Control in views:
+		shown.append(str((view.get("card_data") as CardData).card_name))
+	for card in _cards():
+		_expect(shown.has(card.card_name), "%s: %s shown" % [label, card.card_name])
+	# Committed: the coin and the shard are gone, WALK ON too.
+	for other in [CASE, SHARD, WALK_ON]:
 		screen.call("_activate", other)
-	await create_timer(HOLD_SEC + FLIGHT_ROOM_SEC).timeout
-	_expect(report.is_empty() and is_instance_valid(screen), "%s: still asking past the hold (got %s)" % [label, report])
-	_expect(_snapshot() == asked, "%s: the other columns and WALK ON grant nothing while it asks" % label)
+	_expect(_snapshot() == opened and report.is_empty(), "%s: the coin, the shard and WALK ON grant nothing once it's open" % label)
 
-	screen.call("_answer", answer)
-	if answer == REPLACE:
-		expected["keepsake"] = load(OFFERED_PATH)
+	screen.call("_take_pick", WALK_ON if answer == NOTHING else answer)
+	if answer != NOTHING:
+		expected["deck"] = int(before["deck"]) + 1
 	var after: Dictionary = _snapshot()
 	for key: String in expected:
-		_expect(after[key] == expected[key], "%s: after the answer, %s %s, expected %s" % [label, key, after[key], expected[key]])
-	_expect(report == [BEDROLL], "%s: the answer closes at once, reporting the bedroll (got %s)" % [label, report])
-	screen.call("_answer", REPLACE if answer == KEEP else KEEP)
+		_expect(after[key] == expected[key], "%s: %s %s, expected %s" % [label, key, after[key], expected[key]])
+	if answer == NOTHING:
+		_expect(report == [PACK], "%s: closes at once, reporting the pack (got %s)" % [label, report])
+		return
+	var deck: Array = _run_state.get("deck")
+	# add_card() keeps a copy, so the name, not the resource.
+	_expect(not deck.is_empty() and deck.back().get("card_name") == _cards()[answer].card_name, "%s: the card taken is the one added" % label)
+	_expect((screen.call("get_pick_views") as Array).size() == 1, "%s: only the card taken is left up" % label)
+	screen.call("_take_pick", 0)
+	screen.call("_take_pick", WALK_ON)
 	_expect(_snapshot() == after, "%s: a second answer changes nothing" % label)
+	await create_timer(HOLD_SEC * 0.5).timeout
+	_expect(report.is_empty() and is_instance_valid(screen), "%s: still open halfway through the hold" % label)
+	await ProbePlay.wait_until(self, func() -> bool: return not report.is_empty(), CLOSE_MAX_SEC)
+	_expect(report == [PACK], "%s: closed after the hold and the flight, reporting the pack (got %s)" % [label, report])
 	if is_instance_valid(screen):
 		screen.free()
 
 # A take, then every other column and WALK ON pressed during its hold:
 # nothing more is granted, and the screen still reports the first take.
 func _check_second_activation() -> void:
-	_new_run(false)
+	_new_run()
 	var screen: Node = _open(PACK)
 	var report: Array = []
 	screen.connect("closed", func(column: int) -> void: report.append(column))
 	await process_frame
 	screen.call("_activate", CASE)
 	var after_take: Dictionary = _snapshot()
-	for other in [PACK, BEDROLL, WALK_ON, CASE]:
+	for other in [PACK, SHARD, WALK_ON, CASE]:
 		screen.call("_activate", other)
 	var after_presses: Dictionary = _snapshot()
 	_expect(after_presses == after_take, "presses during the hold grant nothing more (%s, then %s)" % [after_take, after_presses])
+	_expect(not bool(screen.call("is_picking")), "...and the pack stays shut")
 	await ProbePlay.wait_until(self, func() -> bool: return not report.is_empty(), CLOSE_MAX_SEC)
 	_expect(report == [CASE], "the hold still closes on the first take (got %s)" % [report])
 	if is_instance_valid(screen):
 		screen.free()
 
-# The Bedroll in the bedroll's place: BEDROLL under it, the take into the
-# pack - no keepsake noted or shown - and the screen closing on the
-# bedroll after its hold. Then, with one carried, "(carrying one)": the
-# column can't be taken or focused, a press grants nothing, and the case
-# is taken as ever.
-func _check_bedroll_take() -> void:
-	_new_run(false)
-	var screen: Node = _open_bedroll(-1)
-	var report: Array = []
-	screen.connect("closed", func(column: int) -> void: report.append(column))
-	await process_frame
-	_expect(str(screen.call("kind_text", BEDROLL)) == "BEDROLL", "Bedroll offer: the column reads BEDROLL (got '%s')" % screen.call("kind_text", BEDROLL))
-	_expect(bool(screen.call("can_take", BEDROLL)), "Bedroll offer: it can be taken with none carried")
-	screen.call("_activate", BEDROLL)
-	_expect(bool(_run_state.get("has_bedroll")), "Bedroll offer: taken, one is carried")
-	_expect(_run_state.get("keepsake") == null, "Bedroll offer: no keepsake comes with it")
-	_expect(not (_run_state.get("keepsakes_offered") as Array).has(load(OFFERED_PATH).get("id")), "Bedroll offer: no keepsake noted offered")
-	_expect((screen.call("get_keepsake_tiles") as Array).is_empty(), "Bedroll offer: no keepsake tile in the reveal")
-	await ProbePlay.wait_until(self, func() -> bool: return not report.is_empty(), CLOSE_MAX_SEC)
-	_expect(report == [BEDROLL], "Bedroll offer: closed after the hold, reporting the bedroll (got %s)" % [report])
-	if is_instance_valid(screen):
-		screen.free()
-
-	var second: Node = _open_bedroll(-1)
-	var second_report: Array = []
-	second.connect("closed", func(column: int) -> void: second_report.append(column))
-	await process_frame
-	_expect(str(second.call("kind_text", BEDROLL)).ends_with("(carrying one)"), "Carrying one: the offer says so (got '%s')" % second.call("kind_text", BEDROLL))
-	_expect(not bool(second.call("can_take", BEDROLL)), "Carrying one: the second can't be taken")
-	var before: Dictionary = _snapshot()
-	second.call("_set_focus", -1)
-	second.call("_activate", BEDROLL)
-	_expect(_snapshot() == before and bool(_run_state.get("has_bedroll")), "Carrying one: pressing it grants nothing")
-	_expect(not bool(second.get("_done")) and second_report.is_empty(), "Carrying one: the screen stays open for the other two")
-	_expect(not (second.call("_takeable_slots") as Array).has(BEDROLL), "Carrying one: it can't be focused")
-	second.call("_activate", CASE)
-	_expect(int(_run_state.get("gold")) == int(before["gold"]) + GOLD, "Carrying one: the case is still taken")
-	await ProbePlay.wait_until(self, func() -> bool: return not second_report.is_empty(), CLOSE_MAX_SEC)
-	if is_instance_valid(second):
-		second.free()
-
-func _open_bedroll(glassbone_slot: int) -> Node:
-	var screen: Node = (load(SCREEN_SCENE_PATH) as PackedScene).instantiate()
-	screen.call("setup", "Three packs.", GOLD, load(CARD_PATH), load(OFFERED_PATH), glassbone_slot, GLASSBONE, PackedStringArray(OBJECT_PATHS), PackedFloat32Array([0.6, 1.0, 1.0]), _deck_panel)
-	screen.call("offer_bedroll", load(BEDROLL_PATH))
-	screen.set("result_hold_time", HOLD_SEC)
-	root.add_child(screen)
-	return screen
-
 # The rest on the field: at 50 / 80, YES, and once the night is over 74 /
 # 80, the Bedroll gone and the field running again; none at full HP; none
 # in a fight.
 func _check_bedroll_rest() -> void:
-	_new_run(false)
+	_new_run()
 	var field: Node = await _load_field()
 	_run_state.call("take_bedroll")
 	_run_state.call("set_max_hp", 80)

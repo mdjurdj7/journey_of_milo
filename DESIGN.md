@@ -683,8 +683,9 @@ and up the west shore north of z -27. (2026-10-17.)
 - **Glassbone's upgrade economy is deferred.** Glassbone is the single
   material reward (Glassbone x1; Framework §3), kept apart from gold,
   which stays the currency. The run holds it (RunState.glassbone): the
-  Greyshelf leaves one (the elites leave armor instead), and a belongings cache
-  sometimes holds one. Its first use is tempering at floor 3's wagon:
+  Greyshelf leaves one (the elites leave armor instead), and floor 2's
+  belongings cache offers one as a choice of its own (a shard, beside the
+  coin and the pack; 2026-10-22). Its first use is tempering at floor 3's wagon:
   1 Glassbone (Wagon.temper_cost) swaps a card for its authored tempered
   version (CardData.tempered, cards/tempered/), once per card - only the
   five starters have one yet, and the values are provisional. Still not
@@ -699,8 +700,9 @@ and up the west shore north of z -27. (2026-10-17.)
   worn piece in the shop's worn table now (run/armor/, 2026-10-21). The
   bedroll's four small finds (Wrapped Sweet, White Shell, Signal Glass,
   Pressed Flower) and their table were cut on 2026-10-21: nothing could
-  reach them while floor 2's cache offers the Bedroll, and a cache with
-  no keepsake_table leaves that column out. Their hooks (heal_on_win,
+  reach them while floor 2's cache offered the Bedroll. Since 2026-10-22
+  the cache has no keepsake column at all - a case, a pack, a shard of
+  Glassbone - and the Bedroll comes from the Collector alone. Their hooks (heal_on_win,
   heal_on_win_after_loss) stay in TrinketData, probed on probe-only
   trinkets. Three of the keeper's five live in run/keepsakes/, two in
   run/keepsakes/keeper/. (2026-10-18, keeper pool.)

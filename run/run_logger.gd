@@ -149,9 +149,21 @@ class_name RunLogger
 # was "deferred" - crossed on the enemy's turn, resolved as his next one
 # started. The old turn-start Energy while Critical is gone.
 
+# Format 19 (2026-10-22): floor 2's belongings - the case's coin, the
+# pack's cards (look inside, take one or none) and a shard of Glassbone;
+# no Bedroll, no keepsake. Event "belongings": "offered" holds the "gold",
+# the "cards" the pack held (all shown once it's opened), the "glassbone"
+# the shard held, and "glassbone_rider" (the "slot" and "amount" of any
+# Glassbone riding with the coin or the pack - was "glassbone"); "taken"
+# is "gold", "card" (looked inside), "glassbone" or null (walked on);
+# "card_taken" is the card taken from the pack, null for none taken - or
+# null when the pack wasn't opened. "keepsake", "bedroll", "held_before"
+# and "replaced" are gone. A mechanic "to_top": the card Weathered Map put
+# on top of the draw pile, and whether it went "unasked" (the only one).
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 18
+const FORMAT_VERSION := 19
 # Lines that aren't choices (_write_detail()) - a run made of nothing else
 # is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark", "collector_stock", "dying_light"]
@@ -495,7 +507,7 @@ static func turn_ended(energy: int) -> void:
 # keepsake_keep, keepsake_energy_carry, replay, energy_debt, delay,
 # sentence_advance, sentence_resolved, keep, copy, copy_end, undo,
 # skillchain, collateral (its look: the cards seen, top first, the one
-# played or null, and whether it was skipped).
+# played or null, and whether it was skipped), to_top.
 static func mechanic(kind: String, data: Dictionary) -> void:
 	if not _fight_open:
 		return

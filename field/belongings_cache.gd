@@ -1,21 +1,19 @@
 extends Node3D
 class_name BelongingsCache
 
-# Three things set down together - a case, a pack, a bedroll - and one
-# choice between them, made on a screen (BelongingsScreen) rather than at
-# the things themselves. The sand carries the three objects; the screen
-# carries the choice, showing each object - what is in it shows only once
-# it is taken.
+# Three things set down together - a case, a pack, a shard of Glassbone -
+# and one choice between them, made on a screen (BelongingsScreen) rather
+# than at the things themselves. The sand carries the three objects; the
+# screen carries the choice, showing each object - what is in it shows
+# only once it is taken.
 #
 # Each object holds one kind of thing, always the same one: the case
-# coin (coin_amount), the pack a card from the prop's pool, the bedroll a
-# keepsake from keepsake_table - or, with offers_bedroll (floor 2's), the
-# Bedroll itself, one carried at most. The card, and whether one of the three
+# coin (coin_amount), the pack pick_count distinct cards from the prop's
+# pool - looked through and one taken, or none - and the shard
+# glassbone_offer Glassbone. The cards, and whether the case or the pack
 # also holds Glassbone (glassbone_chance, which one picked at random),
 # are rolled once, when the floor loads (RegionField._spawn_floor_props()
-# calls roll() from the run's own generator). The keepsake is drawn the
-# first time the screen opens (ensure_keepsake()), as the Keeper draws
-# hers, so it is never the one held by then. None of it changes after.
+# calls roll() from the run's own generator). None of it changes after.
 #
 # Walking within trigger_radius of this node (on the ground plane) opens
 # the screen through RegionField.open_belongings_screen(), once. Taking or
@@ -27,19 +25,30 @@ class_name BelongingsCache
 #
 # The objects are BelongingsObjects: the model's own colour map on the
 # painted shader times object_tint, grounded by its bbox, solid, and
-# inert - nothing opens them from the field and they say nothing. Object
-# i is column i (BelongingsScreen.Slot): the case (the coin), the pack
-# (the card), the bedroll (the keepsake).
+# inert - nothing opens them from the field and they say nothing - save
+# a column whose object_material_paths entry names a material: that
+# object wears it instead, untinted (the shard's Glassbone). Object i is
+# column i (BelongingsScreen.Slot): the case (the coin), the pack (the
+# cards), the shard (the Glassbone).
 
 @export_group("Objects")
-# The three models, in column order: the case, the pack, the bedroll.
+# The three models, in column order: the case, the pack, the shard - the
+# seam's own model (GlassboneSeam.shard_model_path).
 @export var object_scene_paths: PackedStringArray = PackedStringArray([
 	"res://assets/models/props/belongings/case.glb",
 	"res://assets/models/props/belongings/pack.glb",
-	"res://assets/models/props/belongings/bedroll.glb",
+	"res://assets/models/props/glassbone_shard/glassbone_shard.glb",
 ]):
 	set(value):
 		object_scene_paths = value
+		_respawn_objects()
+# A material for a column's object in place of its painted colour map and
+# object_tint, column order; empty = painted. The shard wears the seam's
+# Glassbone (GlassboneSeam.glassbone_material_path), on the sand and on
+# the screen.
+@export var object_material_paths: PackedStringArray = PackedStringArray(["", "", "res://field/glassbone_material.tres"]):
+	set(value):
+		object_material_paths = value
 		_respawn_objects()
 # Each object's XZ offset from this node, in its own (yawed) frame, and
 # its yaw - index i is column i's object.
@@ -52,9 +61,10 @@ class_name BelongingsCache
 		object_yaws_degrees = value
 		_place_objects()
 # Each model's uniform scale, column order - the case at 0.6 so it is the
-# smallest of the three, as a case beside a pack and a bedroll should be.
-# The screen renders them at these scales too.
-@export var object_scales: PackedFloat32Array = PackedFloat32Array([0.6, 1.0, 1.0]):
+# smallest of the three, as a case beside a pack should be, and the shard
+# (0.8 m long as modelled, for the seam) at 0.4, a fragment the pack's
+# height. The screen renders them at these scales too.
+@export var object_scales: PackedFloat32Array = PackedFloat32Array([0.6, 1.0, 0.4]):
 	set(value):
 		object_scales = value
 		for index in _objects.size():
@@ -82,7 +92,7 @@ class_name BelongingsCache
 @export var trigger_radius: float = 1.5
 # The line at the top of the screen - FloorProp.world_line replaces it
 # when set.
-@export_multiline var world_line: String = "Three packs, set down out of the wind. Nobody came back."
+@export_multiline var world_line: String = "Someone's things, set down out of the wind."
 # Whether a take sinks the taken column's object, and whether a decline
 # sinks all three. Read when the screen closes.
 @export var sink_taken_object: bool = true
@@ -90,19 +100,20 @@ class_name BelongingsCache
 @export_group("")
 
 @export_group("Contents")
-# What the case holds. Read when the screen opens.
+# What the case holds. Read when the screen opens. Its own number - set
+# to the Collector's Bedroll price (Collector.bedroll_price), never read
+# from it.
 @export var coin_amount: int = 45
-# What the bedroll draws from - never the keepsake held (KeepsakeTable.
-# roll()). Read when the screen first opens.
-@export var keepsake_table: KeepsakeTable = null
-# The bedroll holds the Bedroll itself (RegionField's bedroll_data_path,
-# BelongingsScreen.offer_bedroll()) rather than a keepsake - no keepsake
-# is drawn then. Floor 2's cache sets it (FloorProp overrides). Read when
-# the screen opens.
-@export var offers_bedroll: bool = false
-# The chance, per cache, that one of the three (any, equally) also holds
-# glassbone_amount Glassbone, taken with it. The chance is read by roll(),
-# the amount when the screen opens.
+# How many distinct cards the pack holds, from the prop's pool (fewer
+# only when the pool runs short). Read by roll().
+@export var pick_count: int = 3
+# What the shard holds. Read when the screen opens; 0 leaves that column
+# out.
+@export var glassbone_offer: int = 1
+# The chance, per cache, that the case or the pack (either, equally) also
+# holds glassbone_amount Glassbone, taken with it. Floor 2's sets it to 0
+# (FloorProp overrides) - its Glassbone is the shard's. The chance is
+# read by roll(), the amount when the screen opens.
 @export_range(0.0, 1.0, 0.01) var glassbone_chance: float = 0.25
 @export var glassbone_amount: int = 1
 @export_group("")
@@ -113,17 +124,15 @@ class_name BelongingsCache
 # the floor resource's path plus the prop's index.
 @export var cache_id: String = ""
 
-# The card and glassbone_slot rolled by roll(), the keepsake by ensure_
-# keepsake(). null = that column is left out; glassbone_slot is the column
-# that also holds Glassbone, -1 for none.
-var card: CardData = null
-var keepsake: TrinketData = null
+# The cards and glassbone_slot rolled by roll(). Empty = the pack's column
+# is left out; glassbone_slot is the column that also holds Glassbone, -1
+# for none.
+var cards: Array[CardData] = []
 var glassbone_slot: int = -1
 
 var _objects: Array[BelongingsObject] = []
 var _wanderer: Node3D = null
 var _opened: bool = false
-var _keepsake_rolled: bool = false
 
 # cache_id -> PackedInt32Array of the objects that sank. Present = spent.
 static var _spent: Dictionary = {}
@@ -131,30 +140,14 @@ static var _spent: Dictionary = {}
 static func reset_spent() -> void:
 	_spent.clear()
 
-# `character` is whose run it is - the pack's card only of theirs or
-# neutral (RewardPool.roll()).
+# `character` is whose run it is - the pack's cards only of theirs or
+# neutral (RewardPool.roll()), distinct.
 func roll(rng: RandomNumberGenerator, pool: RewardPool, character: CharacterData = null) -> void:
-	var cards: Array[CardData] = []
-	if pool != null:
-		cards = pool.roll(1, rng, null, character)
-	card = cards[0] if not cards.is_empty() else null
-	if card == null:
-		push_warning("BelongingsCache '%s': the pack's card rolled nothing; that column is left out." % name)
+	cards = pool.roll(pick_count, rng, null, character) if pool != null else ([] as Array[CardData])
+	if cards.is_empty():
+		push_warning("BelongingsCache '%s': the pack's cards rolled nothing; that column is left out." % name)
 	var has_glassbone: bool = rng.randf() < glassbone_chance
-	glassbone_slot = rng.randi_range(0, object_scene_paths.size() - 1) if has_glassbone else -1
-
-# The bedroll's keepsake, drawn once, from the run's generator - never the
-# keepsake held as the screen first opens.
-func ensure_keepsake() -> void:
-	if _keepsake_rolled:
-		return
-	roll_keepsake(RunState.rng, RunState.keepsake, RunState.keepsakes_offered)
-
-func roll_keepsake(rng: RandomNumberGenerator, equipped: TrinketData, offered: Array[StringName]) -> void:
-	_keepsake_rolled = true
-	keepsake = keepsake_table.roll(rng, equipped, offered) if keepsake_table != null else null
-	if keepsake == null:
-		push_warning("BelongingsCache '%s': the bedroll's keepsake rolled nothing; that column is left out." % name)
+	glassbone_slot = rng.randi_range(BelongingsScreen.Slot.GOLD, BelongingsScreen.Slot.CARD) if has_glassbone else -1
 
 # FloorProp's placement (RegionField._spawn_floor_props()): XZ here, the
 # objects ground themselves; yaw onto yaw_degrees.
@@ -181,6 +174,7 @@ func _spawn_objects() -> void:
 		object.name = "Object%d" % index
 		object.model_scene_path = object_scene_paths[index]
 		object.model_scale = object_scale(index)
+		object.material_path = object_material_paths[index] if index < object_material_paths.size() else ""
 		object.tint = object_tint
 		object.ground_path = NodePath("../" + String(ground_path))
 		add_child(object)

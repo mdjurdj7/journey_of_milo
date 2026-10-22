@@ -100,7 +100,7 @@ var weapon: WeaponData = null
 # it's used (BedrollRest); new_run() empties it. Changed only through
 # take_bedroll() and use_bedroll().
 var has_bedroll: bool = false
-# Where the Bedroll carried came from ("belongings", "collector"), for the
+# Where the Bedroll carried came from ("collector"), for the
 # run log's bedroll_use; "" with none carried or none said.
 var bedroll_source: String = ""
 # The Warped Shell has dropped this run (RegionField._roll_warped_shell()):

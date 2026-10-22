@@ -27,8 +27,7 @@ extends SceneTree
 #                keepsake's plate at the plate scale, reveal_gap_px over
 #                its floor
 #
-# The offer and the belongings screen's HELD / OFFERED plates are checked
-# in trinket_probe and belongings_choice_probe, the Keeper's in
+# The offer's plates are checked in trinket_probe, the Keeper's in
 # keeper_keepsake_probe, a worn piece's offer in armor_probe. Headless,
 # the mouse can't be moved, so a hover is driven through the hosts' own
 # steps (KeepsakeLine._place_tile(), KeepsakeRow._set_hovered()); a click
@@ -50,7 +49,7 @@ const WEAPONS_DIR := "res://run/weapons/"
 const PLATE_SCRIPT_PATH := "res://ui/item_plate.gd"
 # The one plate scale, each host's own export: the hovers, the examine
 # views, the offers.
-const PLATE_SCALES := [["res://ui/hud_row_style.gd", "hud_plate_scale"], ["res://battle/keepsake_row.gd", "reveal_plate_scale"], ["res://ui/armor_examine.gd", "examine_scale"], ["res://ui/keepsake_examine.gd", "examine_scale"], ["res://battle/keepsake_offer.gd", "tile_scale"], ["res://battle/belongings_screen.gd", "keepsake_tile_scale"], ["res://field/world_keepsake.gd", "plate_scale"]]
+const PLATE_SCALES := [["res://ui/hud_row_style.gd", "hud_plate_scale"], ["res://battle/keepsake_row.gd", "reveal_plate_scale"], ["res://ui/armor_examine.gd", "examine_scale"], ["res://ui/keepsake_examine.gd", "examine_scale"], ["res://battle/keepsake_offer.gd", "tile_scale"], ["res://field/world_keepsake.gd", "plate_scale"]]
 # The screens a plate must stay within a third of the height of, through
 # the window's stretch (display/window/stretch/mode).
 const SCREENS := [Vector2(1920.0, 1080.0), Vector2(2560.0, 1440.0)]
