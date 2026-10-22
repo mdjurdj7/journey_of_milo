@@ -14,8 +14,8 @@ signal keep_changed()
 signal added(card: CardData)
 # A fight-only copy left the hand unplayed (discard()) - gone, in no pile.
 signal vanished(card: CardData)
-# A hand card went back to the bottom of the draw pile unplayed
-# (hand_to_bottom() - Collateral's pick not played after all).
+# A hand card went back on top of the draw pile unplayed (hand_to_top() -
+# Weathered Map's pick).
 signal returned(card: CardData)
 
 @export var hand_size: int = 10
@@ -126,6 +126,16 @@ func hand_to_bottom(card: CardData) -> void:
 	_leave_hand(card)
 	draw_pile.insert(0, card)
 	discarded.emit(card)
+
+# `card`, in the hand, on top of draw_pile - the next card drawn
+# (Weathered Map's pick). Never a fight-only copy: it can't outlive its
+# turn.
+func hand_to_top(card: CardData) -> void:
+	if not hand.has(card) or card.battle_copy:
+		return
+	_leave_hand(card)
+	draw_pile.append(card)
+	returned.emit(card)
 
 func discard(card: CardData) -> void:
 	if not hand.has(card):

@@ -103,6 +103,7 @@ const EXPECTED_RARITY: Dictionary = {
 	"Mended Strap": CardData.CardRarity.UNCOMMON,
 	"Wrapped Blade": CardData.CardRarity.UNCOMMON,
 	"Spare Buckle": CardData.CardRarity.UNCOMMON,
+	"Weathered Map": CardData.CardRarity.UNCOMMON,
 }
 
 const EXPECTED_POOL: Array[String] = [

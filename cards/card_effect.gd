@@ -18,7 +18,12 @@ enum EffectType {
 	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL, DRAIN, SET_ASIDE, CONSUME,
 	REPLAY_LAST_ATTACK, GRANT_KEEP, COPY_HAND_CARD, UNDO_LAST_ATTACK,
 	TOLL_SPENT_DAMAGE, DEVOUR_FROM_HAND, TAKE_FROM_ATTACK, LOOK_AND_PLAY,
+	TOP_FROM_HAND,
 }
+# TOP_FROM_HAND (Weathered Map): once the card has resolved - after any
+# draw it made - one hand card, the player's pick, goes on top of the
+# draw pile; with one card it goes unasked, with none nothing happens
+# (top_from_hand_effect.gd, BattleController._begin_top_choice()).
 # LOOK_AND_PLAY (Collateral): once the card has resolved, the top `value`
 # cards of the draw pile are shown, and one the player may play is played
 # free - no Energy, any HP or Toll price on it paid - the rest to the

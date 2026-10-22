@@ -133,7 +133,9 @@ static func hand_views(controller: Node) -> Array:
 # (BattleController._can_target(), so an intent mark only on an attack
 # that will land), a dug-in enemy at its first mound. Then settle(). A look
 # (Collateral's) then picks the first card it may play, answered the same
-# way, and settles again - or skips, when none can be. True once the play
+# way, and settles again - or skips, when none can be. A pick of a hand
+# card for the top of the draw pile (Weathered Map's) takes the first card
+# it may. True once the play
 # committed; false, with anything opened closed again, when the controller
 # refused it or it had nothing to choose or aim at. `stop`: as settle()'s.
 static func play_any(tree: SceneTree, controller: Node, view: CardView, stop: Callable = Callable()) -> bool:
@@ -158,6 +160,11 @@ static func play_any(tree: SceneTree, controller: Node, view: CardView, stop: Ca
 			if picked_view != null:
 				_answer(controller, picked_view)
 			await settle(tree, controller, stop)
+	if is_instance_valid(controller) and bool(controller.call("is_putting_on_top")):
+		for other: CardView in hand_views(controller):
+			controller.call("toggle_choice", other)
+			if not bool(controller.call("is_putting_on_top")):
+				break
 	# A play that ended the fight can take the controller with it.
 	if not is_instance_valid(controller):
 		return true

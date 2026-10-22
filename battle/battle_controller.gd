@@ -202,6 +202,9 @@ var min_target_size_px: float = 0.0
 # may be skipped.
 @export var look_header_text: String = "PLAY ONE FREE"
 @export var look_skip_text: String = "SKIP"
+# Weathered Map's pick (TOP_FROM_HAND - _begin_top_choice()): the hand
+# choice's verb.
+@export var top_choice_verb: String = "PUT ON TOP"
 @export var devour_uses_per_turn: int = 1
 @export var devour_energy_cost: int = 1:
 	set(value):
@@ -272,6 +275,9 @@ var _look_open: bool = false
 var _look_seen: Array[CardData] = []
 var _look_picker: DeckView = null
 var _look_card: CardData = null
+# Weathered Map's pick (_begin_top_choice()): open while the hand chooses
+# the card to go on top of the draw pile. It can't be cancelled.
+var _top_choice_open: bool = false
 # The most unspent Energy the held pieces carry into the next turn
 # (TrinketData.energy_carry - Departure Stub), read as the fight opens;
 # and what the turn just ended left for the next one's refill.
@@ -759,6 +765,10 @@ func get_hovered_enemy() -> FieldEnemy:
 func is_choosing() -> bool:
 	return _choosing_card_view != null
 
+# Whether Weathered Map's pick is open (_begin_top_choice()).
+func is_putting_on_top() -> bool:
+	return _top_choice_open
+
 func get_choosing_card_view() -> CardView:
 	return _choosing_card_view
 
@@ -919,6 +929,36 @@ func _begin_look(count: int) -> void:
 	picker.card_picked.connect(_on_look_picked)
 	picker.closed.connect(_on_look_closed)
 	_look_picker = picker
+
+# Weathered Map's pick (TOP_FROM_HAND), once its play has resolved: one
+# hand card on top of the draw pile. The hand chooses as Twice Over's
+# does - every card but a fight-only copy, the play over at the pick, no
+# DONE - and can't back out: right-click, Esc and End Turn do nothing
+# while it's open. One such card goes unasked; none, and nothing happens.
+# Not once the fight is over.
+func _begin_top_choice() -> void:
+	if player.hp <= 0 or _win_waiting or _living_enemy_combatants().is_empty():
+		return
+	var eligible: Array[CardView] = []
+	for view: CardView in _hand_container.call("_card_views"):
+		if view.card_data != null and not view.card_data.battle_copy and deck.hand.has(view.card_data):
+			eligible.append(view)
+	if eligible.size() <= 1:
+		if eligible.size() == 1:
+			_put_on_top(eligible[0].card_data, true)
+		return
+	_top_choice_open = true
+	_choice_marked.clear()
+	_choice_cap = 1
+	_choice_eligible = eligible
+	_hand_container.begin_choice(null, eligible)
+	hand_choice_started.emit("", 1, top_choice_verb, false)
+	hand_choice_changed.emit(0, 1)
+	_emit_devour_changed()
+
+func _put_on_top(card: CardData, unasked: bool) -> void:
+	deck.hand_to_top(card)
+	RunLogger.mechanic("to_top", {"card": card.card_name, "unasked": unasked})
 
 # Whether the look may pick `card`: never another LOOK_AND_PLAY card (a
 # Collateral), else whether it could be played now at no Energy - every
@@ -1151,7 +1191,7 @@ func _begin_choice(card_view: CardView, cap: int, eligible: Array[CardView] = []
 
 # Whether a hand choice is open - an armed card's, or the end-of-turn keep.
 func _choice_open() -> bool:
-	return _choosing_card_view != null or _keep_choice_open
+	return _choosing_card_view != null or _keep_choice_open or _top_choice_open
 
 # The end-of-turn keep (TrinketData.end_turn_keep - Frayed Cord): End Turn
 # opens it before anything of the turn ends, Bide's mode with no card
@@ -1186,8 +1226,8 @@ func toggle_choice(card_view: CardView) -> void:
 	else:
 		return
 	hand_choice_changed.emit(_choice_marked.size(), _choice_cap)
-	# Twice Over's goes on at its pick.
-	if not _choice_eligible.is_empty() and _choosing_card_view != null and _choice_marked.size() == _choice_cap:
+	# Twice Over's goes on at its pick, as does Weathered Map's.
+	if not _choice_eligible.is_empty() and (_choosing_card_view != null or _top_choice_open) and _choice_marked.size() == _choice_cap:
 		confirm_choice()
 
 func confirm_choice() -> void:
@@ -1203,6 +1243,13 @@ func confirm_choice() -> void:
 		_close_choice()
 		_finish_turn(kept)
 		return
+	if _top_choice_open:
+		if _choice_marked.size() != 1:
+			return
+		var picked: CardData = _choice_marked[0].card_data
+		_close_choice()
+		_put_on_top(picked, false)
+		return
 	if _choosing_card_view == null:
 		return
 	var card_view: CardView = _choosing_card_view
@@ -1214,6 +1261,9 @@ func confirm_choice() -> void:
 	_resolve_play(card_view, null, chosen)
 
 func cancel_choice() -> void:
+	# Weathered Map's pick is owed: nothing backs out of it.
+	if _top_choice_open:
+		return
 	if _keep_choice_open:
 		_close_choice()
 		return
@@ -1227,6 +1277,7 @@ func cancel_choice() -> void:
 func _close_choice() -> void:
 	_choosing_card_view = null
 	_keep_choice_open = false
+	_top_choice_open = false
 	_choice_marked.clear()
 	_choice_cap = 0
 	_choice_eligible = []
@@ -1272,7 +1323,7 @@ func cancel_target() -> void:
 func end_turn() -> void:
 	if _refused_by_entry_hold("End Turn"):
 		return
-	if _input_locked or _play_queued or _look_open:
+	if _input_locked or _play_queued or _look_open or _top_choice_open:
 		return
 	if _keep_choice_open:
 		confirm_choice()
@@ -1498,6 +1549,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	_deferring_pack_check = false
 	_multi_hit_report = false
 	var look_count: int = ctx.look_count
+	var top_from_hand: bool = ctx.top_from_hand
 	_after_card_effects()
 	_draw_for_card_count()
 	_draw_for_skill_after_attack(card)
@@ -1522,6 +1574,9 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	# Collateral: its look, once its own play is done.
 	if look_count > 0:
 		_begin_look(look_count)
+	# Weathered Map: a hand card on top, once its draw is in the hand.
+	if top_from_hand:
+		_begin_top_choice()
 
 # A card's effect context for the fight as it stands, aimed at
 # `target_enemy` (at `target_mound` when it's dug in), its reports wired to

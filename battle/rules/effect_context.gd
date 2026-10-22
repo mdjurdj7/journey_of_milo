@@ -28,6 +28,10 @@ var devour_choice: CardData = null
 # resolved (LOOK_AND_PLAY - Collateral's 3), for one to be played free; 0
 # for none. Set by the effect, read by the controller after the play.
 var look_count: int = 0
+# Whether the play puts a hand card on top of the draw pile once it has
+# resolved (TOP_FROM_HAND - Weathered Map). Set by the effect, read by
+# the controller after the play.
+var top_from_hand: bool = false
 # What a Not So just undid (UndoLastAttackEffect): {"intent", "attacker",
 # "restored", "dealt", "grace_closed"} - for the run log. Empty for any
 # other card.

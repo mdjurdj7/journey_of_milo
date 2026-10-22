@@ -169,7 +169,7 @@ func _play_card(card: CardData, basic: CardData) -> bool:
 			_fail("%s: its play ended the fight" % card.card_name)
 			_controller = null
 			return false
-		var open: bool = bool(controller.call("is_awaiting_target")) or bool(controller.call("is_choosing")) or bool(controller.call("is_looking")) or not ProbePlay.is_settled(controller)
+		var open: bool = bool(controller.call("is_awaiting_target")) or bool(controller.call("is_choosing")) or bool(controller.call("is_looking")) or bool(controller.call("is_putting_on_top")) or not ProbePlay.is_settled(controller)
 		if open:
 			_fail("%s: its play left a target, a choice, a look or the play open" % card.card_name)
 			controller.call("cancel_target")

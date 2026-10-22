@@ -39,6 +39,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.DEVOUR_FROM_HAND: "res://battle/rules/effects/devour_from_hand_effect.gd",
 	CardEffect.EffectType.TAKE_FROM_ATTACK: "res://battle/rules/effects/take_from_attack_effect.gd",
 	CardEffect.EffectType.LOOK_AND_PLAY: "res://battle/rules/effects/look_and_play_effect.gd",
+	CardEffect.EffectType.TOP_FROM_HAND: "res://battle/rules/effects/top_from_hand_effect.gd",
 }
 
 var _cache: Dictionary = {}
