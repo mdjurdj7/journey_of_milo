@@ -316,7 +316,7 @@ path_probes_hand() {
 		default_bus_layout.tres|docs/*|*.md|reference/*|tools/*|.githooks/*|.gitignore|.gitattributes) return 0 ;;
 		tests/*_probe.gd) basename "$path" .gd; return 0 ;;
 		tests/*) return 0 ;;
-		cards/data/*.tres|cards/neutral/*.tres)
+		cards/data/*.tres|cards/neutral/*.tres|cards/belongings/*.tres)
 			# The starters' probes, and every probe that names this card.
 			local id
 			id=$(basename "$path" .tres)
