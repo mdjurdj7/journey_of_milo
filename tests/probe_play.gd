@@ -53,7 +53,7 @@ static func settle(tree: SceneTree, controller: Node, stop: Callable = Callable(
 	var deadline: int = cap_msec() + timeout_ms
 	while cap_msec() < deadline:
 		await tree.process_frame
-		if (stop.is_valid() and bool(stop.call())) or is_settled(controller):
+		if (stop.is_valid() and bool(stop.call())) or not is_instance_valid(controller) or is_settled(controller):
 			break
 	for i in 3:
 		await tree.process_frame
@@ -122,3 +122,72 @@ static func settle_fight(tree: SceneTree, field: Node, controller: Node, timeout
 	var framed: bool = await settle_frame(tree, field, timeout_sec)
 	var ready: bool = await wait_until(tree, func() -> bool: return fight_ready(controller), timeout_sec)
 	return framed and ready
+
+# The cards in `controller`'s hand, as their views.
+static func hand_views(controller: Node) -> Array:
+	return controller.get("_hand_container").call("_card_views")
+
+# Plays `view` as a player would, whatever it asks for: a hand choice -
+# Bide's the first other card, then DONE; Twice Over's and Take In's the
+# first card they may take - and a target, the first enemy it may land on
+# (BattleController._can_target(), so an intent mark only on an attack
+# that will land), a dug-in enemy at its first mound. Then settle(). True
+# once the play committed; false, with anything opened closed again, when
+# the controller refused it or it had nothing to choose or aim at.
+# `stop`: as settle()'s.
+static func play_any(tree: SceneTree, controller: Node, view: CardView, stop: Callable = Callable()) -> bool:
+	var card: CardData = view.card_data
+	var played_before: int = int(controller.get("cards_played_this_turn"))
+	controller.call("request_play", view)
+	if controller.call("get_choosing_card_view") == view:
+		for other: CardView in hand_views(controller):
+			if other == view:
+				continue
+			controller.call("toggle_choice", other)
+			if controller.call("get_choosing_card_view") != view:
+				break
+		if controller.call("get_choosing_card_view") == view:
+			controller.call("confirm_choice")
+		if controller.call("get_choosing_card_view") == view:
+			controller.call("cancel_choice")
+			return false
+	if bool(controller.call("is_awaiting_target")):
+		var combatants: Dictionary = controller.get("_combatants")
+		for enemy: Node in (controller.get("enemies") as Array).duplicate():
+			var combatant: Combatant = combatants.get(enemy)
+			if combatant == null or not bool(controller.call("_can_target", card, combatant)):
+				continue
+			var mound: int = combatant.mounds[0] if combatant.dug_in and not combatant.mounds.is_empty() else -1
+			controller.call("confirm_target", enemy, mound)
+			break
+		if bool(controller.call("is_awaiting_target")):
+			controller.call("cancel_target")
+			return false
+	await settle(tree, controller, stop)
+	# A play that ended the fight can take the controller with it.
+	if not is_instance_valid(controller):
+		return true
+	return int(controller.get("cards_played_this_turn")) > played_before
+
+# Starts a fight with `target` the way its contact Area would - the
+# Wanderer put just outside its contact radius first, so only this call
+# starts it - and waits it ready (settle_fight()). The BattleController,
+# or null when none opened.
+static func start_fight(tree: SceneTree, field: Node, target: Node3D, timeout_sec: float = 8.0) -> Node:
+	var wanderer: Node3D = field.get_node("Wanderer") as Node3D
+	var reach: float = float(target.get("contact_radius")) + 0.6
+	var away: Vector3 = wanderer.global_position - target.global_position
+	away.y = 0.0
+	if away.length() < 0.01:
+		away = Vector3.RIGHT
+	wanderer.global_position = target.global_position + away.normalized() * reach
+	await tree.physics_frame
+	field.call_deferred("_on_enemy_contacted", target)
+	for i in 10:
+		await tree.physics_frame
+	var layer: Node = field.get_node("BattleLayer")
+	if layer.get_child_count() == 0:
+		return null
+	var controller: Node = layer.get_child(0).get("battle_controller")
+	await settle_fight(tree, field, controller, timeout_sec)
+	return controller
