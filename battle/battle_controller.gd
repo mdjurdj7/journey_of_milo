@@ -1001,6 +1001,11 @@ func confirm_choice() -> void:
 		var kept: Array[CardData] = []
 		for view in _choice_marked:
 			kept.append(view.card_data)
+		if not kept.is_empty():
+			var kept_names: Array[String] = []
+			for kept_card in kept:
+				kept_names.append(kept_card.card_name)
+			RunLogger.mechanic("keepsake_keep", {"cards": kept_names, "kept": kept.size()})
 		_close_choice()
 		_finish_turn(kept)
 		return
@@ -1174,6 +1179,13 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	var collateral: Status = Status.missing_energy_status(player.statuses)
 	var replaced_hp: int = player.replaced_cost_hp(card)
 	var energy_paid: int = player.energy_cost(card)
+	# The free card (House Key) about to be spent, and what the card would
+	# have cost without it - for the run log's line below.
+	var free_card_saved: int = -1
+	if player.first_card_free and player.takes_next_card_discount(card):
+		player.first_card_free = false
+		free_card_saved = player.energy_cost(card) - energy_paid
+		player.first_card_free = true
 	play_hp_cost = replaced_hp
 	player.energy -= energy_paid
 	# The play is committed: a free card (House Key) is spent here, before
@@ -1211,6 +1223,8 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 
 	var target_name: String = target_enemy.enemy_data.enemy_name if target_enemy != null and target_enemy.enemy_data != null else ""
 	RunLogger.card_started(card.card_name, energy_paid, target_name)
+	if free_card_saved >= 0:
+		RunLogger.mechanic("keepsake_free_card", {"card": card.card_name, "saved": free_card_saved})
 	deck.begin_play(card)
 	card_played.emit(card, target_enemy)
 	_hand_container.play_card(card, _screen_pos_for(target_enemy))
@@ -2517,6 +2531,10 @@ func _start_player_turn() -> void:
 	# carried Energy too: the "energy" the turn starts on after it.
 	if owed > 0:
 		RunLogger.mechanic("energy_debt", {"owed": owed, "carried": carried, "energy": player.energy})
+	# In the new turn's lines: the Energy carried over (Departure Stub) and
+	# the turn it starts on, debt paid.
+	if carried > 0:
+		RunLogger.mechanic("keepsake_energy_carry", {"carried": carried, "energy": player.energy})
 	# In the new turn's lines: what the carry kept of the Block left over.
 	if carry > 0 and block_before > 0:
 		RunLogger.mechanic("keepsake_block_carry", {"kept": player.block, "lost": block_before - player.block})

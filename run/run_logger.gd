@@ -110,9 +110,18 @@ class_name RunLogger
 # Devour keyword ate, its "yield" ("attack", "block" or "nothing") and the
 # "amount". The Devour button's own "devour" event is unchanged.
 
+# Format 13 (2026-10-21): the keeper's keepsakes that logged nothing.
+# Mechanic lines "keepsake_free_card" (House Key: the "card" played free
+# and the Energy it "saved"), "keepsake_keep" (Frayed Cord: the "cards"
+# kept at End Turn and how many, "kept" - only when one is) and
+# "keepsake_energy_carry" (Departure Stub: the Energy "carried" into the
+# turn and the "energy" it starts on). "energy_debt" also says what was
+# "carried": the debt comes out of the refill and the carry together, and
+# its "energy" is what is left.
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 12
+const FORMAT_VERSION := 13
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]
@@ -452,9 +461,10 @@ static func turn_ended(energy: int) -> void:
 # A mechanic line: `kind` and what it says, on the fight and turn it
 # happened in. Kinds: enemy_died, pain_turn, pain_turn_spent, phase,
 # threshold_queued, threshold_resolved, escalation, queued_state,
-# keepsake_double, keepsake_draw, keepsake_block_carry, replay,
-# energy_debt, delay, sentence_advance, sentence_resolved, keep, copy,
-# copy_end, undo, skillchain.
+# keepsake_double, keepsake_draw, keepsake_block_carry, keepsake_free_card,
+# keepsake_keep, keepsake_energy_carry, replay, energy_debt, delay,
+# sentence_advance, sentence_resolved, keep, copy, copy_end, undo,
+# skillchain.
 static func mechanic(kind: String, data: Dictionary) -> void:
 	if not _fight_open:
 		return
