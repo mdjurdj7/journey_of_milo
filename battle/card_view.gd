@@ -313,7 +313,7 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # numeral's size tall - its 32-unit box, the stroke's ink a little less -
 # moved by toll_mark_offset_px. The name gets what is left. Each re-applies
 # live.
-@export_range(0.1, 2.0) var toll_mark_height_fraction: float = 0.85:
+@export_range(0.1, 2.0) var toll_mark_height_fraction: float = 1.1:
 	set(value):
 		toll_mark_height_fraction = value
 		_relayout()
@@ -331,7 +331,7 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # toll_mark_number_offset_px. One digit is toll_mark_digit_fraction of the
 # mark's height (its box), two toll_mark_two_digit_fraction: the mark
 # never widens.
-@export var toll_mark_number_centre: Vector2 = Vector2(15.0, 16.0):
+@export var toll_mark_number_centre: Vector2 = Vector2(15.0, 15.5):
 	set(value):
 		toll_mark_number_centre = value
 		_redraw_toll_marks()
@@ -339,18 +339,18 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 	set(value):
 		toll_mark_number_offset_px = value
 		_redraw_toll_marks()
-@export_range(0.1, 1.5) var toll_mark_digit_fraction: float = 0.56:
+@export_range(0.1, 1.5) var toll_mark_digit_fraction: float = 0.6:
 	set(value):
 		toll_mark_digit_fraction = value
 		_redraw_toll_marks()
-@export_range(0.1, 1.5) var toll_mark_two_digit_fraction: float = 0.41:
+@export_range(0.1, 1.5) var toll_mark_two_digit_fraction: float = 0.46:
 	set(value):
 		toll_mark_two_digit_fraction = value
 		_redraw_toll_marks()
 # The inline mark (TOKEN_TOLL_PRICE): inline_toll_mark_height_fraction of
 # the rules text's size tall (its box), its ink centred on the x-height and moved by
 # inline_toll_mark_offset_px, inline_toll_mark_gap_px before what follows.
-@export_range(0.1, 2.0) var inline_toll_mark_height_fraction: float = 1.3:
+@export_range(0.1, 2.0) var inline_toll_mark_height_fraction: float = 1.5:
 	set(value):
 		inline_toll_mark_height_fraction = value
 		_relayout_rules()
