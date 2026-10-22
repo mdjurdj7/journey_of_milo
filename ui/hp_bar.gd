@@ -347,6 +347,59 @@ class_name HPBar
 	set(value):
 		critical_line_ease_time = maxf(value, 0.0)
 
+@export_group("Critical Hover")
+# The battle line hovered: the exact threshold on the intents' hover slip
+# (KeywordSlip, the cards' bone and ink, the system voice), centred
+# critical_hover_gap_px above the line's top - under it where there's no
+# room above. critical_hover_format's %d is the most HP that is still
+# Critical at the line the fight holds now (Combatant.critical_at()), so
+# it moves with Go Under and On the Brink. The hover area is
+# critical_hover_width_px wide, centred on the 1 px line, and reaches
+# critical_hover_reach_px past its ends. Read off the mouse every frame
+# (as the intents' hovers are) - no control to catch a click; a card or
+# button under the cursor wins.
+@export var critical_hover_format: String = "Critical at %d HP or below":
+	set(value):
+		critical_hover_format = value
+		_sync_critical_hover(true)
+@export var critical_hover_width_px: float = 9.0:
+	set(value):
+		critical_hover_width_px = value
+		_sync_critical_hover(true)
+@export var critical_hover_reach_px: float = 3.0:
+	set(value):
+		critical_hover_reach_px = value
+		_sync_critical_hover(true)
+@export var critical_hover_gap_px: float = 6.0:
+	set(value):
+		critical_hover_gap_px = value
+		_sync_critical_hover(true)
+@export var critical_hover_font_size_px: int = 17:
+	set(value):
+		critical_hover_font_size_px = value
+		_restyle_critical_slip()
+@export var critical_hover_max_width_px: float = 320.0:
+	set(value):
+		critical_hover_max_width_px = value
+		_restyle_critical_slip()
+@export var critical_hover_padding_px: Vector2 = Vector2(8.0, 6.0):
+	set(value):
+		critical_hover_padding_px = value
+		_restyle_critical_slip()
+@export var critical_hover_line_height: float = 1.28:
+	set(value):
+		critical_hover_line_height = value
+		_restyle_critical_slip()
+@export var critical_hover_bone: Color = Color(0.94, 0.91, 0.86, 1.0):
+	set(value):
+		critical_hover_bone = value
+		_restyle_critical_slip()
+@export var critical_hover_ink: Color = Color(0.165, 0.165, 0.18, 1.0):
+	set(value):
+		critical_hover_ink = value
+		_restyle_critical_slip()
+@export_group("")
+
 @export_group("HP Change")
 # A loss: the fill drops in the frame it lands, and a ghost - the fill's
 # own ink at ghost_alpha - holds the lost stretch for ghost_hold_sec, then
@@ -590,6 +643,9 @@ var _cost_preview_held_result: int = -1
 # tweens fighting over the fill's width.
 var _battle_blend: float = 0.0
 var _blend_tween: Tween = null
+# The Critical line's hover slip, and the line it shows ("" for none).
+var _critical_slip: KeywordSlip = null
+var _critical_slip_text: String = ""
 
 func _ready() -> void:
 	# FieldHUD (this panel's parent) already sets PROCESS_MODE_ALWAYS, so
@@ -618,6 +674,13 @@ func _ready() -> void:
 	# doesn't fade into it.
 	_critical = _is_critical()
 	_critical_blend = 1.0 if _critical else 0.0
+
+	_critical_slip = KeywordSlip.new()
+	_critical_slip.name = "CriticalSlip"
+	_critical_slip.set_fade_time(0.0)
+	_critical_slip.visible = false
+	add_child(_critical_slip)
+	_restyle_critical_slip()
 
 	_reveal = StatusReveal.new()
 	_reveal.name = "StatusReveal"
@@ -1110,6 +1173,86 @@ func _restyle_if_ready() -> void:
 # of battle).
 func set_energy_clearance_x(right_x: float) -> void:
 	_energy_right_x = right_x
+
+func _process(_delta: float) -> void:
+	_sync_critical_hover()
+
+# The most HP that is Critical at the line the fight holds now - the
+# fight's own rule (Combatant.critical_at()), so it can't drift from it.
+func critical_threshold_hp() -> int:
+	var fraction: float = _target_critical_fraction()
+	var threshold: int = floori(float(_max_hp) * fraction)
+	while threshold > 0 and not Combatant.critical_at(threshold, _max_hp, fraction):
+		threshold -= 1
+	while threshold < _max_hp and Combatant.critical_at(threshold + 1, _max_hp, fraction):
+		threshold += 1
+	return threshold
+
+# The battle line's hover area, in this control's space: the drawn line
+# (_draw_battle()) widened to critical_hover_width_px and reaching
+# critical_hover_reach_px past its ends. Empty out of battle or for a
+# class that shows no Critical.
+func critical_hover_rect() -> Rect2:
+	if _battle_blend < 1.0 or not _shows_critical() or numeral_font == null:
+		return Rect2()
+	var line_x: float = roundf(_block_readout_width() + battle_width * _critical_fraction())
+	var top: float = _battle_bar_top() - critical_line_above_px - critical_hover_reach_px
+	var bottom: float = _battle_bar_top() + battle_bar_height + critical_line_below_px + critical_hover_reach_px
+	var width: float = maxf(critical_hover_width_px, 1.0)
+	return Rect2(line_x + 0.5 - width * 0.5, top, width, bottom - top)
+
+func is_critical_hover_shown() -> bool:
+	return not _critical_slip_text.is_empty()
+
+func get_critical_hover_text() -> String:
+	return _critical_slip_text
+
+# Every frame: the slip shows while the cursor is on the line's hover
+# area and nothing of the UI is under it, with the threshold as it is
+# now; `force` re-places it after a layout edit.
+func _sync_critical_hover(force: bool = false) -> void:
+	if _critical_slip == null:
+		return
+	var area: Rect2 = critical_hover_rect()
+	var hovered: bool = area.has_area() and is_visible_in_tree() and get_viewport().gui_get_hovered_control() == null and area.has_point(get_local_mouse_position())
+	var text: String = (critical_hover_format % critical_threshold_hp()) if hovered else ""
+	if text == _critical_slip_text and not force:
+		if hovered:
+			_place_critical_slip(area)
+		return
+	_critical_slip_text = text
+	if text.is_empty():
+		_critical_slip.set_lines(PackedStringArray(), PackedStringArray())
+	else:
+		_critical_slip.set_lines(PackedStringArray([""]), PackedStringArray([text]))
+	_critical_slip.visible = hovered
+	_critical_slip.set_revealed(hovered)
+	if hovered:
+		_place_critical_slip(area)
+
+# Centred on the line, critical_hover_gap_px above the area - below it
+# where the window's top would cut it - and kept inside the window.
+func _place_critical_slip(area: Rect2) -> void:
+	var slip_size: Vector2 = _critical_slip.size
+	var at := Vector2(area.get_center().x - slip_size.x * 0.5, area.position.y - critical_hover_gap_px - slip_size.y)
+	var view: Vector2 = get_viewport_rect().size
+	var origin: Vector2 = get_global_transform() * Vector2.ZERO
+	if origin.y + at.y < 0.0:
+		at.y = area.end.y + critical_hover_gap_px
+	at.x = clampf(origin.x + at.x, 0.0, maxf(view.x - slip_size.x, 0.0)) - origin.x
+	_critical_slip.position = at.round()
+
+func _restyle_critical_slip() -> void:
+	if _critical_slip == null:
+		return
+	_critical_slip.set_font_size_px(critical_hover_font_size_px)
+	_critical_slip.set_max_width(critical_hover_max_width_px)
+	_critical_slip.set_padding(critical_hover_padding_px)
+	_critical_slip.set_line_height(critical_hover_line_height)
+	_critical_slip.set_bone(critical_hover_bone)
+	_critical_slip.set_ink(critical_hover_ink)
+	_critical_slip.set_edge(0.0, critical_hover_ink)
+	_sync_critical_hover(true)
 
 func _physics_process(delta: float) -> void:
 	if _wanderer == null or not is_instance_valid(_wanderer):
