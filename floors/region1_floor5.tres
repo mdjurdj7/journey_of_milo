@@ -18,7 +18,7 @@
 script = ExtResource("2_floor_enemy")
 enemy_data = ExtResource("7_greyshelf")
 height_offset_m = 0.85
-stance_gap_m = 2.3
+stance_gap_m = 2.635
 holds_facing = true
 phase_drop_offset = Vector2(5.013, 1.334)
 phase_drop_frame_offset = Vector2(5.174, -0.53)

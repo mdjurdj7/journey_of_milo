@@ -47,9 +47,9 @@ const PLAYER_HP := 999
 const RUN_MAX_HP := 80
 # The band over the body's own feet its mesh counts as its feet in, metres.
 const FEET_BAND_M := 0.08
-# The body: 5 m long; the top of its back, belly sunk on the rock, about
+# The body: 4.4 m long; the top of its back, belly sunk on the rock, about
 # the Wanderer's waist-to-chest (measured and printed).
-const LENGTH_M := 5.0
+const LENGTH_M := 4.4
 const LENGTH_TOLERANCE_M := 0.05
 const SAFETY_SECONDS := 300.0
 
@@ -116,7 +116,7 @@ func _check_data() -> void:
 	_expect(is_equal_approx(data.phase_hp_threshold, 0.5), "...at half HP")
 	_expect_eq(data.glassbone_reward, 1, "It leaves Glassbone x1")
 	_expect_eq(data.model_scene_path, MODEL_PATH, "Its body the Greyshelf glb")
-	_expect(is_equal_approx(data.model_scale, 1.36) and is_equal_approx(data.model_yaw_offset_degrees, 180.0), "...at 1.36, turned 180")
+	_expect(is_equal_approx(data.model_scale, 1.197) and is_equal_approx(data.model_yaw_offset_degrees, 180.0), "...at 1.197, turned 180")
 	_expect(is_equal_approx(data.rest_height_m, 0.0), "...not buried")
 	_expect_eq(data.attachment_scene_path, POSE_SCENE_PATH, "...GreyshelfPose")
 	_expect(data.contact_sounds.size() == 1 and data.contact_sounds[0].resource_path == CONTACT_SOUND_PATH, "...the placeholder contact sound")
@@ -416,7 +416,7 @@ func _check_fight_refuse() -> void:
 
 # --- The body ---
 
-# On floor 5: 5 m long; the head turns and lifts toward the Wanderer within its look range and
+# On floor 5: 4.4 m long; the head turns and lifts toward the Wanderer within its look range and
 # eases back beyond it; the fight's freeze eases it back too.
 func _check_body() -> void:
 	_new_run()
@@ -434,7 +434,7 @@ func _check_body() -> void:
 	var length: float = maxf(aabb.size.x, aabb.size.z)
 	var top: float = aabb.position.y + aabb.size.y
 	print("greyshelf_probe: body %.2f m long, %.2f m wide, its back's top %.2f m above the rock (sunk %.2f), head height %.2f" % [length, minf(aabb.size.x, aabb.size.z), top, float(greyshelf.get("sink")), float(greyshelf.call("get_head_height"))])
-	_expect(absf(length - LENGTH_M) < LENGTH_TOLERANCE_M, "It is 5 m long (%.2f)" % length)
+	_expect(absf(length - LENGTH_M) < LENGTH_TOLERANCE_M, "It is 4.4 m long (%.2f)" % length)
 	var forward: Vector3 = -greyshelf.global_transform.basis.z
 	forward = Vector3(forward.x, 0.0, forward.z).normalized()
 	# Off to his side, whichever way he lies.
