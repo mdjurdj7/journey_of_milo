@@ -20,7 +20,6 @@ class_name CollectorScreen
 #
 # The ledger, in a right-hand column (column_left_fraction to column_
 # right_margin_fraction):
-#   GOLD and the run's gold, top right.
 #   CARDS, a caps label over a hairline: the rolled stock (Collector.
 #     get_stock()) and its fixed card (Samphire) a little apart at the
 #     row's end, at card_scale; under each, "HAVE N" small and grey when
@@ -229,24 +228,7 @@ enum Kind { WORN, KEEPSAKE, WEAPON, REMOVAL, BEDROLL }
 	set(value):
 		column_right_margin_fraction = value
 		_relayout()
-# GOLD's baseline, from the top.
-@export var top_margin_px: float = 64.0:
-	set(value):
-		top_margin_px = value
-		_refresh()
-@export var gold_text: String = "GOLD":
-	set(value):
-		gold_text = value
-		_refresh()
-@export var gold_size_px: int = 26:
-	set(value):
-		gold_size_px = value
-		_relayout()
-@export var gold_gap_px: float = 14.0:
-	set(value):
-		gold_gap_px = value
-		_refresh()
-# The caps: GOLD, the headings, CHOOSE, LEAVE, TAKE FOR, BACK.
+# The caps: the headings, CHOOSE, LEAVE, TAKE FOR, BACK.
 @export var label_size_px: int = 16:
 	set(value):
 		label_size_px = value
@@ -490,7 +472,6 @@ var _fit: float = 1.0
 var _row_fit: float = 1.0
 # Fitted sizes.
 var _label_px: int = 16
-var _gold_px: int = 26
 var _price_px: int = 24
 var _have_px: int = 11
 var _item_px: int = 24
@@ -859,7 +840,6 @@ func _relayout() -> void:
 	if span_at_one > 0.0:
 		_row_fit = minf(_fit, _column_width() / span_at_one)
 	_label_px = _px_int(label_size_px)
-	_gold_px = _px_int(gold_size_px)
 	_price_px = _px_int(price_size_px)
 	_have_px = _px_int(have_size_px)
 	_item_px = _px_int(item_size_px)
@@ -1009,7 +989,6 @@ func _draw_screen() -> void:
 	if _closing or _label_font == null:
 		return
 	_draw_voice()
-	_draw_gold()
 	if _has_cards():
 		_heading(cards_heading_text, _cards_heading_baseline())
 		_draw_cards()
@@ -1021,14 +1000,6 @@ func _draw_screen() -> void:
 	_text(_draw_layer, _label_font, leave_text, Vector2(_leave_left(), _leave_baseline()), _label_px, _ink if leave_focused else _with_alpha(unfocused_alpha))
 	if leave_focused:
 		_hairline(_draw_layer, _leave_left(), _leave_baseline() - float(_label_px) * 0.35)
-
-func _draw_gold() -> void:
-	var amount: String = str(RunState.gold)
-	var baseline: float = roundf(_px(top_margin_px))
-	var amount_left: float = _column_right() - InkType.width(_numeral_font, amount, _gold_px)
-	_text(_draw_layer, _numeral_font, amount, Vector2(amount_left, baseline), _gold_px, _ink)
-	var caps_width: float = InkType.width(_label_font, gold_text, _label_px)
-	_text(_draw_layer, _label_font, gold_text, Vector2(roundf(amount_left - _px(gold_gap_px) - caps_width), baseline), _label_px, _with_alpha(unfocused_alpha))
 
 func _draw_cards() -> void:
 	for slot in _cards.size():
