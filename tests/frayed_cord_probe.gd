@@ -22,8 +22,6 @@ const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const FRAYED_CORD_PATH := "res://run/keepsakes/frayed_cord.tres"
 const ART_PATH := "res://assets/textures/keepsakes/frayed_cord.png"
-const BELONGINGS_TABLE_PATH := "res://run/keepsakes/belongings_keepsakes.tres"
-const BELONGINGS_IDS: Array[StringName] = [&"wrapped_sweet", &"white_shell", &"signal_glass", &"pressed_flower"]
 const KEEPER_TABLE_PATH := "res://run/keepsakes/keeper/keeper_keepsakes.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
@@ -74,15 +72,9 @@ func _check_data() -> void:
 	_expect(cord.art != null and cord.art.resource_path == ART_PATH, "...and its own art, frayed_cord.png")
 	_completed += 1
 
-# Frayed Cord is the keeper's: her table holds it, and no other table -
-# the bedroll's holds the small finds.
+# Frayed Cord is the keeper's: her table holds it, and no other table.
 func _check_signature_drop() -> void:
 	var cord: TrinketData = load(FRAYED_CORD_PATH)
-	var belongings: KeepsakeTable = load(BELONGINGS_TABLE_PATH)
-	var ids: Array[StringName] = []
-	for entry in belongings.entries:
-		ids.append(entry.trinket.id)
-	_expect_eq(ids, BELONGINGS_IDS, "The bedroll offers Wrapped Sweet, White Shell, Signal Glass and Pressed Flower")
 	var tables: int = 0
 	for path in _tres_under(SEARCH_ROOTS):
 		var resource: Resource = load(path)

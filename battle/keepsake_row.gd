@@ -3,7 +3,7 @@ class_name KeepsakeRow
 
 # The keepsakes the Wanderer carries into this fight that have no
 # in-combat counter, as one line of grey tracked caps directly under the
-# battle DECK line ("SIGNAL GLASS") - names apart by name_gap_px, no
+# battle DECK line ("DEPARTURE STUB") - names apart by name_gap_px, no
 # bullets, no dividers. A keepsake whose status counts (a combat_start_
 # status with a self_loss_trigger_count) is a counter line under the HP
 # bar instead, and not here. Drawn, not boxed, sized to its own text.

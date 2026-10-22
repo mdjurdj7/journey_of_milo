@@ -3,7 +3,9 @@ extends SceneTree
 # Headless probe for the Keeper's keepsake: her own table and its one
 # roll per run, the in-world plaque's take / replace / keep, the offer
 # claimed for good, and each of her five keepsakes' effects - in the one
-# keepsake slot, never a stack.
+# keepsake slot, never a stack. Then the keepsake hooks no keepsake carries
+# now (opening Block, healing on a win, healing on a win that cost HP),
+# on probe-only trinkets.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/keeper_keepsake_probe.gd
 #
@@ -22,12 +24,9 @@ const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const KEEPER_TABLE_PATH := "res://run/keepsakes/keeper/keeper_keepsakes.tres"
 const HOUSE_KEY_PATH := "res://run/keepsakes/keeper/house_key.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
-const WRAPPED_SWEET_PATH := "res://run/keepsakes/keeper/wrapped_sweet.tres"
 const BLUE_FASTENER_PATH := "res://run/armor/blue_fastener.tres"
 const SHOP_WORN_PATH := "res://run/shop/shop_worn.tres"
 const DEPARTURE_STUB_PATH := "res://run/keepsakes/keeper/departure_stub.tres"
-const SIGNAL_GLASS_PATH := "res://run/keepsakes/keeper/signal_glass.tres"
-const PRESSED_FLOWER_PATH := "res://run/keepsakes/keeper/pressed_flower.tres"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
 const FRAYED_CORD_PATH := "res://run/keepsakes/frayed_cord.tres"
 const WORN_PAGE_PATH := "res://run/keepsakes/worn_page.tres"
@@ -65,10 +64,10 @@ func _initialize() -> void:
 	await _check_house_key()
 	await _check_house_key_resets_and_zero_cost()
 	await _check_departure_stub()
-	await _check_signal_glass()
+	await _check_combat_start_block()
 	await _check_blue_fastener_self_damage()
-	await _check_wrapped_sweet()
-	await _check_pressed_flower()
+	await _check_heal_after_loss()
+	await _check_heal_on_win()
 
 	if _completed != CASES:
 		_fail("%d of %d cases ran to their end" % [_completed, CASES])
@@ -485,17 +484,19 @@ func _next_turn(controller: Node) -> bool:
 	_expect(back, "...the next turn comes round")
 	return back
 
-func _check_signal_glass() -> void:
+func _check_combat_start_block() -> void:
 	_new_run()
 	var controller: Node = await _start_fight(0, &"")
 	if controller != null:
 		_expect_eq((controller.get("player") as Combatant).block, 0, "No keepsake: the fight opens with 0 Block")
 	await _teardown()
-	_run_state.call("equip_keepsake", load(SIGNAL_GLASS_PATH))
+	var trinket: TrinketData = _probe_trinket(&"probe_start_block")
+	trinket.combat_start_block = 3
+	_run_state.call("equip_keepsake", trinket)
 	controller = await _start_fight(0, &"")
 	if controller != null:
 		var player: Combatant = controller.get("player")
-		_expect_eq(player.block, 3, "Signal Glass: the fight opens with exactly 3 Block")
+		_expect_eq(player.block, 3, "combat_start_block 3: the fight opens with exactly 3 Block")
 		controller.get("_hand_container").call("discard_hand")
 		controller.call("_start_player_turn")
 		_expect_eq(player.block, 0, "...ordinary Block: gone at the next turn's reset")
@@ -528,9 +529,11 @@ func _check_blue_fastener_self_damage() -> void:
 	await _teardown()
 	_completed += 1
 
-func _check_wrapped_sweet() -> void:
+func _check_heal_after_loss() -> void:
 	_new_run()
-	_run_state.call("equip_keepsake", load(WRAPPED_SWEET_PATH))
+	var trinket: TrinketData = _probe_trinket(&"probe_heal_after_loss")
+	trinket.heal_on_win_after_loss = 2
+	_run_state.call("equip_keepsake", trinket)
 	var max_hp: int = int(_run_state.get("player_max_hp"))
 	# Opening hurt but losing nothing in the fight.
 	_run_state.set("player_hp", max_hp - 10)
@@ -538,7 +541,7 @@ func _check_wrapped_sweet() -> void:
 	if controller != null:
 		_expect_eq(int(_run_state.get("hp_lost_this_combat")), 0, "A fight opens with nothing lost in it")
 		await _win()
-		_expect_eq(int(_run_state.get("player_hp")), max_hp - 10, "Wrapped Sweet: opening below max alone heals nothing")
+		_expect_eq(int(_run_state.get("player_hp")), max_hp - 10, "heal_on_win_after_loss: opening below max alone heals nothing")
 	await _teardown()
 	# An enemy's hit.
 	controller = await _start_fight(0, &"")
@@ -590,15 +593,17 @@ func _check_wrapped_sweet() -> void:
 	await _teardown()
 	_completed += 1
 
-func _check_pressed_flower() -> void:
+func _check_heal_on_win() -> void:
 	_new_run()
-	_run_state.call("equip_keepsake", load(PRESSED_FLOWER_PATH))
+	var trinket: TrinketData = _probe_trinket(&"probe_heal_on_win")
+	trinket.heal_on_win = 1
+	_run_state.call("equip_keepsake", trinket)
 	var max_hp: int = int(_run_state.get("player_max_hp"))
 	_run_state.set("player_hp", max_hp - 5)
 	var controller: Node = await _start_fight(0, &"")
 	if controller != null:
 		await _win()
-		_expect_eq(int(_run_state.get("player_hp")), max_hp - 4, "Pressed Flower: +1 HP after a win, hurt or not")
+		_expect_eq(int(_run_state.get("player_hp")), max_hp - 4, "heal_on_win 1: +1 HP after a win, hurt or not")
 	await _teardown()
 	controller = await _start_fight(0, &"")
 	if controller != null:
@@ -612,7 +617,7 @@ func _check_pressed_flower() -> void:
 		await _win()
 		_expect_eq(int(_run_state.get("player_hp")), max_hp, "...and never past max HP")
 	await _teardown()
-	_expect(_keepsake() == load(PRESSED_FLOWER_PATH), "The keepsake persists across every fight")
+	_expect(_keepsake() == trinket, "The keepsake persists across every fight")
 	_completed += 1
 
 # --- Helpers ---
@@ -622,6 +627,13 @@ func _new_run() -> void:
 
 func _keepsake() -> TrinketData:
 	return _run_state.get("keepsake") as TrinketData
+
+# A probe-only trinket with no hook set, for a case to give one.
+func _probe_trinket(id: StringName) -> TrinketData:
+	var trinket := TrinketData.new()
+	trinket.id = id
+	trinket.display_name = str(id)
+	return trinket
 
 # A probe-only trinket with the Critical-entry hook's 6 Block - what
 # Blue Fastener used to carry.

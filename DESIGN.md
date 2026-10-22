@@ -696,12 +696,14 @@ and up the west shore north of z -27. (2026-10-17.)
   bedroll's.** The keeper offers one of House Key, Frayed Cord, Departure
   Stub, Bent Nail and Worn Page (run/keepsakes/keeper/
   keeper_keepsakes.tres, weight 1 each) - Blue Fastener, once hers, is a
-  worn piece in the shop's worn table now (run/armor/, 2026-10-21); the
-  belongings bedroll's table holds Wrapped Sweet, White Shell, Signal Glass and Pressed Flower - a
-  column still unreachable while floor 2's cache offers the Bedroll.
-  The files kept their paths and UIDs, so the folder names no longer
-  match the tables: run/keepsakes/keeper/ holds three of the bedroll's,
-  and three of hers live in run/keepsakes/. (2026-10-18, keeper pool.)
+  worn piece in the shop's worn table now (run/armor/, 2026-10-21). The
+  bedroll's four small finds (Wrapped Sweet, White Shell, Signal Glass,
+  Pressed Flower) and their table were cut on 2026-10-21: nothing could
+  reach them while floor 2's cache offers the Bedroll, and a cache with
+  no keepsake_table leaves that column out. Their hooks (heal_on_win,
+  heal_on_win_after_loss) stay in TrinketData, probed on probe-only
+  trinkets. Three of the keeper's five live in run/keepsakes/, two in
+  run/keepsakes/keeper/. (2026-10-18, keeper pool.)
 - **Armor is deferred past its first four pieces.** The WORN slot, its
   rules (max HP while worn, the first hit halved, Block at the start,
   damage back) and the two elites' tables are in. Deferred: armor shown
@@ -713,16 +715,6 @@ and up the west shore north of z -27. (2026-10-17.)
   its name in the cards' rarity finish; the RARE finish's dark gold was
   tuned against bone, so a dark-world variant for that line is deferred
   until a floor uses ui_on_dark_world. (2026-10-16, find line.)
-- **Signal Glass shows no future intent.** Its intended effect was to
-  preview each enemy's intent after the current one. The intent
-  architecture doesn't support that cleanly: erratic enemies (Sputter)
-  roll their next intent with the unseeded global `randf()` only when
-  they advance (`EnemyTurn._advance_intent()`); an interrupt, an
-  interjected intent, a lone pack member's skip or a pain turn can
-  replace the next one; and `battle_intent.gd` shows one intent per
-  enemy. It ships as +3 Block at the start of combat
-  (`TrinketData.combat_start_block`). Revisit if intents ever become
-  pre-rolled for their own reasons. (2026-09-30, Keeper keepsakes.)
 - **The keepsake plaque's flavour line is a slanted upright face.** The
   project ships no italic font, so `WorldKeepsake` leans AlegreyaSans
   through `FontVariation.variation_transform` (`flavor_slant`, 0.2). It

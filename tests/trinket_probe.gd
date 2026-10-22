@@ -16,7 +16,7 @@ extends SceneTree
 # the RunState autoload (RegionField, BattleController, KeepsakeOffer):
 # a SceneTree script compiles before the autoloads register.
 
-const CASES := 21
+const CASES := 20
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const RUN_OVER_SCENE_PATH := "res://run/run_over.tscn"
 const KEEPSAKE_OFFER_SCENE_PATH := "res://battle/keepsake_offer.tscn"
@@ -25,7 +25,6 @@ const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
 # Keen, the "+3 on your next Attack" status - Bent Nail's until it took
 # the doubling; still the plain charged attack bonus the stance case reads.
 const KEEN_PATH := "res://battle/rules/statuses/keen.tres"
-const WHITE_SHELL_PATH := "res://run/keepsakes/white_shell.tres"
 const FRAYED_CORD_PATH := "res://run/keepsakes/frayed_cord.tres"
 const WORN_PAGE_PATH := "res://run/keepsakes/worn_page.tres"
 const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
@@ -68,7 +67,6 @@ func _initialize() -> void:
 	_check_never_in_card_rewards()
 	_check_guaranteed_table()
 	await _check_combat_start_and_worn_page()
-	await _check_white_shell_win_not_escape()
 	await _check_frayed_cord_tick()
 	await _check_persists_across_floors()
 	await _check_table_drop_offered()
@@ -98,42 +96,42 @@ func _check_empty_slot_equips() -> void:
 func _check_second_does_not_stack() -> void:
 	_new_run()
 	var nail: TrinketData = load(BENT_NAIL_PATH)
-	var shell: TrinketData = load(WHITE_SHELL_PATH)
+	var page: TrinketData = load(WORN_PAGE_PATH)
 	_run_state.call("acquire_keepsake", nail)
-	_expect(not bool(_run_state.call("acquire_keepsake", shell)), "A second acquisition into a full slot is refused - it's a choice, not a stack")
+	_expect(not bool(_run_state.call("acquire_keepsake", page)), "A second acquisition into a full slot is refused - it's a choice, not a stack")
 	_expect(_keepsake() == nail, "...the first is still the one held")
 	_completed += 1
 
 func _check_offer_take_replaces() -> void:
 	_new_run()
 	var nail: TrinketData = load(BENT_NAIL_PATH)
-	var shell: TrinketData = load(WHITE_SHELL_PATH)
+	var page: TrinketData = load(WORN_PAGE_PATH)
 	_run_state.call("equip_keepsake", nail)
-	var offer: Node = await _open_offer(shell, nail)
+	var offer: Node = await _open_offer(page, nail)
 	_expect_eq(_choice_label(offer, 1), "KEEP CURRENT", "A full slot offers TAKE / KEEP CURRENT")
 	var held_tile: Control = offer.get("_held_tile")
 	var offered_tile: Control = offer.get("_offered_tile")
 	_expect(held_tile.visible and held_tile.call("get_keepsake") == nail, "...showing the held one's tile (Bent Nail)")
-	_expect(offered_tile.call("get_keepsake") == shell, "...beside the offered one's (White Shell)")
+	_expect(offered_tile.call("get_keepsake") == page, "...beside the offered one's (Worn Page)")
 	_expect(is_equal_approx(held_tile.position.y, offered_tile.position.y) and held_tile.position.x < offered_tile.position.x, "...HELD left of OFFERED, side by side")
 	offer.call("_activate", 0)
 	await process_frame
-	_expect(_keepsake() == shell, "TAKE replaces: White Shell held, Bent Nail left behind")
+	_expect(_keepsake() == page, "TAKE replaces: Worn Page held, Bent Nail left behind")
 	_expect(not is_instance_valid(offer), "...and the offer is gone")
 	_completed += 1
 
 func _check_offer_keep_leaves_new() -> void:
 	_new_run()
 	var nail: TrinketData = load(BENT_NAIL_PATH)
-	var shell: TrinketData = load(WHITE_SHELL_PATH)
+	var page: TrinketData = load(WORN_PAGE_PATH)
 	_run_state.call("equip_keepsake", nail)
-	var offer: Node = await _open_offer(shell, nail)
+	var offer: Node = await _open_offer(page, nail)
 	offer.call("_activate", 1)
 	await process_frame
 	_expect(_keepsake() == nail, "KEEP CURRENT leaves the new one behind: Bent Nail still held")
 	# An empty slot's offer is TAKE / LEAVE, and LEAVE leaves it empty.
 	_run_state.call("equip_keepsake", null)
-	offer = await _open_offer(shell, null)
+	offer = await _open_offer(page, null)
 	_expect_eq(_choice_label(offer, 1), "LEAVE", "An empty slot offers TAKE / LEAVE")
 	_expect(not (offer.get("_held_tile") as Control).visible, "...and shows the offered tile alone")
 	offer.call("_activate", 1)
@@ -144,7 +142,7 @@ func _check_offer_keep_leaves_new() -> void:
 func _check_new_run_clears() -> void:
 	_new_run()
 	_run_state.call("equip_keepsake", load(BENT_NAIL_PATH))
-	_run_state.call("note_keepsake_offered", load(WHITE_SHELL_PATH))
+	_run_state.call("note_keepsake_offered", load(WORN_PAGE_PATH))
 	_run_state.call("set_toll", 4)
 	_new_run()
 	_expect(_keepsake() == null, "new_run() empties the slot")
@@ -232,7 +230,7 @@ func _check_descriptions() -> void:
 	var cord: TrinketData = load(FRAYED_CORD_PATH)
 	_expect_eq(cord.describe(), "At the end of your turn, you may keep 1 card in your hand.", "Frayed Cord's description")
 	_expect_eq(cord.describe_short(), "Keep 1 card at the end of each turn.", "...and its short line")
-	for path in [BENT_NAIL_PATH, WHITE_SHELL_PATH, FRAYED_CORD_PATH, WORN_PAGE_PATH]:
+	for path in [BENT_NAIL_PATH, FRAYED_CORD_PATH, WORN_PAGE_PATH]:
 		var trinket: TrinketData = load(path)
 		print("   ", trinket.display_name, ": ", trinket.describe())
 		_expect(not trinket.describe().contains("{"), "%s's description has no unfilled token" % trinket.display_name)
@@ -241,7 +239,7 @@ func _check_descriptions() -> void:
 # Every prototype keepsake has its object art: a square texture, for the
 # offer's large view and its small held strip alike.
 func _check_art() -> void:
-	for path in [BENT_NAIL_PATH, WHITE_SHELL_PATH, FRAYED_CORD_PATH, WORN_PAGE_PATH]:
+	for path in [BENT_NAIL_PATH, FRAYED_CORD_PATH, WORN_PAGE_PATH]:
 		var trinket: TrinketData = load(path)
 		_expect(trinket.art != null, "%s has art" % trinket.display_name)
 		if trinket.art != null:
@@ -308,27 +306,6 @@ func _check_combat_start_and_worn_page() -> void:
 		controller.call("_start_player_turn")
 		_expect_eq(_hand_size(controller), 5, "...and the second turn's draw is the usual 5")
 	await _teardown()
-	_completed += 1
-
-func _check_white_shell_win_not_escape() -> void:
-	_new_run()
-	_run_state.call("equip_keepsake", load(WHITE_SHELL_PATH))
-	var max_hp: int = int(_run_state.get("player_max_hp"))
-	_run_state.set("player_hp", max_hp - 10)
-	var controller: Node = await _start_fight(0, &"")
-	if controller != null:
-		_overlay().call("_finish_battle", 0) # WIN
-		await physics_frame
-		_expect_eq(int(_run_state.get("player_hp")), max_hp - 8, "White Shell: +2 HP after a win")
-	await _teardown()
-	_run_state.set("player_hp", max_hp - 10)
-	controller = await _start_fight(0, &"")
-	if controller != null:
-		_overlay().call("_finish_battle", 2) # ESCAPE
-		await physics_frame
-		_expect_eq(int(_run_state.get("player_hp")), max_hp - 10, "...and nothing after an escape")
-	await _teardown()
-	_expect(_keepsake() == load(WHITE_SHELL_PATH), "The keepsake persists across both fights")
 	_completed += 1
 
 # Frayed Cord in a real fight: no status on the Wanderer, and End Turn
@@ -466,7 +443,8 @@ func _check_debug_row() -> void:
 			await process_frame
 			var line: Control = _hud_line("KeepsakeLine")
 			if line != null:
-				_expect_eq(str(line.get("_value_text")), "White Shell", "After TAKE replaces it, the KEEPSAKE line names the new one")
+				var second: TrinketData = load((_field.get("debug_keepsake_paths") as PackedStringArray)[1])
+				_expect_eq(str(line.get("_value_text")), second.display_name, "After TAKE replaces it, the KEEPSAKE line names the new one")
 	await _teardown()
 	_completed += 1
 
