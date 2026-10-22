@@ -37,6 +37,11 @@ var last_undo: Dictionary = {}
 # commit, so for the card resolving this is its count minus one; for a
 # preview of a card still in hand it is the count itself.
 var cards_played_before_this: int = 0
+# The same for Attack cards alone (Combatant.attacks_played_this_turn) -
+# the resolving Attack's own count taken back off, a hand card's preview
+# the count itself, a replay never 0. What Condition.FIRST_ATTACK_THIS_
+# TURN reads.
+var attacks_played_before_this: int = 0
 # The same count by tag (Combatant.tagged_plays_this_turn): tag -> cards
 # carrying it committed this turn before this one - the resolving card's
 # own tags taken back off, a hand card's preview the count itself. What
@@ -207,6 +212,7 @@ func for_card_preview(hp_cost: int) -> EffectContext:
 	copy.enemies = enemies
 	copy.deck = deck
 	copy.cards_played_before_this = cards_played_before_this
+	copy.attacks_played_before_this = attacks_played_before_this
 	copy.tagged_plays_before_this = tagged_plays_before_this
 	copy.chain_level_before_this = chain_level_before_this
 	copy.preview_hp_cost = hp_cost

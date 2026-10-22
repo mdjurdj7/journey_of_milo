@@ -135,6 +135,10 @@ var took_damage_last_turn: bool = false
 # self-inflicted loss, and never a tick - Venom's included.
 var lost_hp_to_enemy_this_turn: bool = false
 var lost_hp_to_enemy_last_turn: bool = false
+# Attack cards committed this turn - real plays only, counted with last_
+# attack at commit (record_attack()) and cleared with it at turn start.
+# What Condition.FIRST_ATTACK_THIS_TURN reads (Wrapped Blade).
+var attacks_played_this_turn: int = 0
 # Critical: HP at or below this fraction of max HP. A default only, like
 # the Grace fields above - BattleController.setup() copies CharacterData.
 # critical_hp_fraction over it. Read through is_critical_at(), never
@@ -298,6 +302,7 @@ func record_attack(card: CardData, target: Combatant, all_enemies: bool) -> void
 	last_attack = card
 	last_attack_target = null if all_enemies else target
 	last_attack_all = all_enemies
+	attacks_played_this_turn += 1
 
 # An enemy attack took `hp` past Block: on the record (hits_taken), and
 # in the Grace window's list when it opened Grace (`grace_share` > 0).
@@ -335,6 +340,7 @@ func clear_last_attack() -> void:
 	last_attack = null
 	last_attack_target = null
 	last_attack_all = false
+	attacks_played_this_turn = 0
 
 func is_critical() -> bool:
 	return is_critical_at(hp)

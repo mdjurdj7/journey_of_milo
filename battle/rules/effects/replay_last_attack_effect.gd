@@ -30,6 +30,7 @@ func resolve(_effect: CardEffect, ctx: EffectContext) -> void:
 	replay.target = before if before != null and before.hp > 0 and ctx.enemies.has(before) else ctx.target
 	replay.is_replay = true
 	replay.cards_played_before_this = ctx.cards_played_before_this + 1
+	replay.attacks_played_before_this = maxi(ctx.player.attacks_played_this_turn, 1)
 	replay.tagged_plays_before_this = ctx.player.tagged_plays_this_turn.duplicate()
 	replay.on_damage = ctx.on_damage
 	replay.on_heal = ctx.on_heal

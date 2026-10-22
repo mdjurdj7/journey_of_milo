@@ -1694,6 +1694,8 @@ func _condition_live_at_commit(card: CardData) -> bool:
 		return false
 	var ctx: EffectContext = battle_controller.preview_context()
 	ctx.cards_played_before_this = maxi(ctx.cards_played_before_this - 1, 0)
+	if card.card_type == CardData.CardType.ATTACK:
+		ctx.attacks_played_before_this = maxi(ctx.attacks_played_before_this - 1, 0)
 	var paid: EffectContext = ctx.for_card_preview(CardBonus.upfront_hp_cost(card, ctx.player.stance))
 	return CardBonus.state(card, paid) == CardBonus.State.LIVE
 

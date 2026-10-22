@@ -1,0 +1,19 @@
+[gd_resource type="Resource" script_class="CardData" format=3]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+
+[sub_resource type="Resource" id="E_damage"]
+script = ExtResource("2_card_effect")
+value = 7
+condition = 11
+bonus_value = 3
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Wrapped Blade"
+cost = 1
+rarity = 2
+target_type = 0
+description = "Deal {damage} damage. {if}First Attack this turn: {bonus_damage} more.{/if}"
+effects = Array[ExtResource("2_card_effect")]([SubResource("E_damage")])

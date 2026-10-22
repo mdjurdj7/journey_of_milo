@@ -722,6 +722,7 @@ func preview_context() -> EffectContext:
 	ctx.enemies = _hittable_enemy_combatants()
 	ctx.deck = deck
 	ctx.cards_played_before_this = cards_played_this_turn
+	ctx.attacks_played_before_this = player.attacks_played_this_turn
 	ctx.tagged_plays_before_this = player.tagged_plays_this_turn.duplicate()
 	# The chain as it stands: what a Burst card in hand would read played now.
 	ctx.chain_level_before_this = player.chain_level
@@ -1468,6 +1469,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 
 	var ctx: EffectContext = _card_context(target_enemy, target_mound)
 	ctx.cards_played_before_this = cards_played_this_turn - 1
+	ctx.attacks_played_before_this = player.attacks_played_this_turn - (1 if card.card_type == CardData.CardType.ATTACK else 0)
 	ctx.tagged_plays_before_this = _tagged_plays_before(card)
 	ctx.chain_level_before_this = chain_before
 	ctx.unspent_energy = unspent_energy
@@ -1604,6 +1606,8 @@ func _replay_attack(chosen: FieldEnemy) -> void:
 	# Not a play: every card this turn was played before it, and it adds no
 	# count of its own.
 	ctx.cards_played_before_this = cards_played_this_turn
+	# The Attack it replays came first: never the first Attack itself.
+	ctx.attacks_played_before_this = maxi(player.attacks_played_this_turn, 1)
 	ctx.tagged_plays_before_this = player.tagged_plays_this_turn.duplicate()
 	# No cost of its own: the Energy held as it replays.
 	ctx.unspent_energy = maxi(player.energy, 0)

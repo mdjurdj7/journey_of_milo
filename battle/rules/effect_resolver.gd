@@ -312,4 +312,6 @@ static func condition_met(effect: CardEffect, ctx: EffectContext) -> bool:
 			return not ctx.player.is_critical_at(before) and ctx.player.is_critical_at(ctx.player.hp - ctx.preview_hp_cost)
 		CardEffect.Condition.HIT_LAST_TURN:
 			return ctx.player.lost_hp_to_enemy_last_turn
+		CardEffect.Condition.FIRST_ATTACK_THIS_TURN:
+			return ctx.attacks_played_before_this == 0
 	return true

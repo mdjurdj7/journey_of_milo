@@ -84,7 +84,10 @@ enum EffectType {
 # HIT_LAST_TURN: an enemy's attack took HP last turn (Combatant.lost_hp_
 # to_enemy_last_turn) - self-inflicted loss and ticks never count (Mended
 # Strap). Appended likewise.
-enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE, UNDAMAGED_LAST_TURN, CRITICAL, TOLL_SPENT_THIS_TURN, ENTERED_CRITICAL, HIT_LAST_TURN }
+# FIRST_ATTACK_THIS_TURN: no Attack card committed this turn before this
+# one (EffectContext.attacks_played_before_this) - Skills don't count, a
+# replay is never first (Wrapped Blade). Appended likewise.
+enum Condition { NONE, TOLL_AT_LEAST, HP_BELOW_PERCENT, FIRST_CARD_THIS_TURN, TARGET_KILLED, HAS_GRACE, UNDAMAGED_LAST_TURN, CRITICAL, TOLL_SPENT_THIS_TURN, ENTERED_CRITICAL, HIT_LAST_TURN, FIRST_ATTACK_THIS_TURN }
 
 # Which combatant(s) an effect resolves against - lets DAMAGE_ALL collapse
 # into plain DAMAGE (target_scope = ALL_ENEMIES) instead of needing its
