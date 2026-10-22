@@ -9,6 +9,8 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const HOVER_Z_INDEX := 1000
 # Above even a hovered card.
 const ARMED_Z_INDEX := 1001
+# The replay ghost, above even the armed card it sits beside.
+const REPLAY_GHOST_Z_INDEX := 1002
 
 signal card_clicked(card_view: CardView)
 # A card was lifted into the armed position / returned or played from it -
@@ -207,6 +209,49 @@ signal draw_started(card_data: CardData)
 			_yield_line.set_line_height(value)
 @export_group("")
 
+@export_group("Replay Ghost")
+# While a Second Swing is the hand's focus - armed, else hovered (the card
+# cost_focus_changed names) - and has an Attack to replay (CardView.
+# replay_attack()), that Attack's real face beside it (ReplayGhost): at
+# replay_ghost_alpha, replay_ghost_scale of a full card, replay_ghost_gap_
+# px off the focus card's right edge (its left, where the right has no
+# room), its bottom level with the focus card's and never lower than
+# replay_ghost_hand_clear_px above the resting hand's top. REPLAY above
+# it, centred, replay_label_gap_px over its top edge. Each re-applies live.
+@export_range(0.0, 1.0) var replay_ghost_alpha: float = 0.55:
+	set(value):
+		replay_ghost_alpha = value
+		_style_replay_ghost()
+@export_range(0.1, 2.0) var replay_ghost_scale: float = 0.9:
+	set(value):
+		replay_ghost_scale = value
+		_style_replay_ghost()
+@export var replay_ghost_gap_px: float = 18.0
+@export var replay_ghost_hand_clear_px: float = 14.0
+# REPLAY: Alegreya Sans Bold caps, tracked like the card's type label.
+@export var replay_label_font: Font = load("res://assets/fonts/AlegreyaSans-Bold.ttf"):
+	set(value):
+		replay_label_font = value
+		_style_replay_ghost()
+@export var replay_label_font_size_px: int = 13:
+	set(value):
+		replay_label_font_size_px = value
+		_style_replay_ghost()
+@export_range(0.0, 1.0) var replay_label_letter_spacing_em: float = 0.16:
+	set(value):
+		replay_label_letter_spacing_em = value
+		_style_replay_ghost()
+# The bone outline round REPLAY's ink, as the intent readouts carry.
+@export var replay_label_outline_px: int = 1:
+	set(value):
+		replay_label_outline_px = value
+		_style_replay_ghost()
+@export var replay_label_gap_px: float = 6.0:
+	set(value):
+		replay_label_gap_px = value
+		_style_replay_ghost()
+@export_group("")
+
 @export_group("Wash")
 # Dying Light resolving (play_wash()): one pale wash passes across the
 # hand - each card brightens toward wash_color (a cool off-white, the
@@ -251,6 +296,10 @@ var _devour_target: DevourButton = null
 var _devour_per_energy: int = -1
 var _devour_candidates: Array[CardView] = []
 var _yield_line: DevourYieldLine = null
+# The Second Swing ghost (ReplayGhost) and the focus card it follows -
+# null while the focus replays nothing.
+var _replay_ghost: ReplayGhost = null
+var _replay_focus: CardView = null
 # The hand's slots in hand order, each a Control whose only child is a
 # CardView, and the card each shows. An ARRAY, not a map keyed by
 # CardData: the deck can hold one CardData twice (a reward taken twice
@@ -315,6 +364,11 @@ func _ready() -> void:
 	_yield_line.set_padding(yield_line_padding_px)
 	_yield_line.set_line_height(yield_line_height)
 	add_child(_yield_line)
+	_replay_ghost = ReplayGhost.new()
+	_replay_ghost.name = "ReplayGhost"
+	_replay_ghost.z_index = REPLAY_GHOST_Z_INDEX
+	add_child(_replay_ghost)
+	_style_replay_ghost()
 	set_process(false)
 
 # This slot's own current arc target - read back by _on_card_lowered() to
@@ -386,7 +440,7 @@ func begin_choice(chooser: CardView, eligible: Array[CardView] = []) -> void:
 		if pickable:
 			view.set_hover_suppressed(false)
 		view.set_keyword_hover_blocked(true)
-	set_process(_devour_per_energy >= 0)
+	_update_processing()
 
 # The choice closed (confirmed or cancelled): every mark comes off, and
 # while a card is still armed the rest of the hand goes back to not
@@ -394,7 +448,7 @@ func begin_choice(chooser: CardView, eligible: Array[CardView] = []) -> void:
 func end_choice() -> void:
 	_devour_per_energy = -1
 	_devour_candidates.clear()
-	set_process(false)
+	_update_processing()
 	if _yield_line != null:
 		_yield_line.hide_line()
 	for view in _card_views():
@@ -408,10 +462,73 @@ func end_choice() -> void:
 		if view != armed_view:
 			view.set_hover_suppressed(true)
 
+# Runs while there is something to follow: Take In's yield line, or the
+# replay ghost.
+func _update_processing() -> void:
+	set_process(_devour_per_energy >= 0 or _replay_focus != null)
+
+# The replay ghost's looks, from the exports.
+func _style_replay_ghost() -> void:
+	if _replay_ghost == null or not _replay_ghost.is_node_ready():
+		return
+	_replay_ghost.set_face_alpha(replay_ghost_alpha)
+	_replay_ghost.set_face_scale(replay_ghost_scale)
+	if replay_label_font != null:
+		_replay_ghost.set_label_font(replay_label_font, replay_label_font_size_px, replay_label_letter_spacing_em, replay_label_outline_px)
+	_replay_ghost.set_label_gap(replay_label_gap_px)
+
+# Which card the ghost follows: the focus card, while it has an Attack to
+# replay. Re-read with the focus and with every context push (a play, the
+# turn).
+func _refresh_replay_focus() -> void:
+	var view: CardView = _focus_view()
+	_replay_focus = view if view != null and view.replay_attack() != null else null
+	if _replay_focus == null and _replay_ghost != null:
+		_replay_ghost.hide_ghost()
+	_update_processing()
+
+# The ghost beside its focus card as it stands now (lifted, armed, still
+# travelling): its bottom level with the card's, never lower than the
+# resting hand's top less replay_ghost_hand_clear_px, kept on screen.
+func _place_replay_ghost() -> void:
+	if _replay_ghost == null or _replay_focus == null:
+		return
+	var attack: CardData = _replay_focus.replay_attack() if is_instance_valid(_replay_focus) else null
+	if attack == null:
+		_replay_ghost.hide_ghost()
+		return
+	var focus: Rect2 = _replay_focus.get_screen_rect_now()
+	var face: Vector2 = _replay_ghost.face_size()
+	var bottom: float = focus.end.y
+	var hand_top: float = INF
+	for slot in _slots:
+		if slot == _armed_slot or _lifted_slots.has(slot) or slot.get_child_count() == 0:
+			continue
+		var view: CardView = slot.get_child(0) as CardView
+		if view != null and view != _replay_focus:
+			hand_top = minf(hand_top, view.get_screen_rect_now().position.y)
+	if hand_top < INF:
+		bottom = minf(bottom, hand_top - replay_ghost_hand_clear_px)
+	var screen: Rect2 = get_viewport_rect()
+	var x: float = focus.end.x + replay_ghost_gap_px
+	if x + face.x > screen.end.x:
+		x = focus.position.x - replay_ghost_gap_px - face.x
+	x = clampf(x, screen.position.x, maxf(screen.end.x - face.x, screen.position.x))
+	var y: float = maxf(bottom - face.y, screen.position.y)
+	if has_theme_color("ink", "Battle"):
+		_replay_ghost.set_label_colors(get_theme_color("ink", "Battle"), get_theme_color("bone", "Battle"))
+	_replay_ghost.show_card(attack, _bonus_context, Vector2(x, y))
+
+# For probes: the replay ghost.
+func get_replay_ghost() -> ReplayGhost:
+	return _replay_ghost
+
 # While Take In's choice is open: the line over the candidate hovered now,
-# following it as it lifts and grows; hidden over none.
+# following it as it lifts and grows; hidden over none. And the replay
+# ghost beside its card.
 func _process(_delta: float) -> void:
-	if _yield_line == null:
+	_place_replay_ghost()
+	if _yield_line == null or _devour_per_energy < 0:
 		return
 	var hovered: CardView = null
 	for view in _devour_candidates:
@@ -672,6 +789,7 @@ func set_bonus_context(ctx: EffectContext) -> void:
 		card_view.set_bonus_context(ctx)
 	if _last_energy >= 0:
 		update_playable(_last_energy)
+	_refresh_replay_focus()
 
 # One face read against its own context - the armed card's, aimed at the
 # enemy under the cursor (BattleOverlay._on_hovered_enemy_changed()). Not
@@ -873,18 +991,31 @@ func _forget_slot(slot: Control) -> void:
 # armed card wins; else a lifted card that is hovered, not just marked.
 func _refresh_cost_focus() -> void:
 	var card: CardData = null
-	if _armed_slot != null:
-		card = _slot_cards.get(_armed_slot)
-	else:
-		for slot: Control in _lifted_slots:
-			var view: CardView = slot.get_child(0) as CardView
-			if view != null and not view.is_marked():
-				card = _slot_cards.get(slot)
-				break
+	var slot: Control = _focus_slot()
+	if slot != null:
+		card = _slot_cards.get(slot)
+	_refresh_replay_focus()
 	if card == _focus_card:
 		return
 	_focus_card = card
 	cost_focus_changed.emit(card)
+
+# The focus card's slot: the armed one, else a lifted one that is
+# hovered, not just marked - or null.
+func _focus_slot() -> Control:
+	if _armed_slot != null:
+		return _armed_slot
+	for slot: Control in _lifted_slots:
+		var view: CardView = slot.get_child(0) as CardView
+		if view != null and not view.is_marked():
+			return slot
+	return null
+
+func _focus_view() -> CardView:
+	var slot: Control = _focus_slot()
+	if slot == null or not is_instance_valid(slot) or slot.get_child_count() == 0:
+		return null
+	return slot.get_child(0) as CardView
 
 func _kill_reflow_tween(slot: Control) -> void:
 	var tween: Tween = _reflow_tweens.get(slot)

@@ -93,6 +93,12 @@ const MARK_BATTLE_OPEN := "{battle}"
 const MARK_BATTLE_CLOSE := "{/battle}"
 const MARK_OUTSIDE_OPEN := "{outside}"
 const MARK_OUTSIDE_CLOSE := "{/outside}"
+# {none}...{/none}: in a battle hand while the card has nothing to act on
+# yet (_lacks_subject() - Second Swing with no Attack played this turn),
+# in place of its {battle} block. A card without one reads its {outside}
+# rule then instead (Not So with nothing to undo).
+const MARK_NONE_OPEN := "{none}"
+const MARK_NONE_CLOSE := "{/none}"
 const TOKEN_DRAW := "{draw}"
 # The most a TAKE_FROM_ATTACK takes off an attack (Wrest's 8) - its value.
 const TOKEN_TAKE := "{take}"
@@ -121,9 +127,13 @@ const TOKEN_COUNTDOWN_TURNS := "{countdown_turns}"
 const TOKEN_COUNTDOWN_DAMAGE := "{countdown_damage}"
 # What an UNDO_LAST_ATTACK (Not So) would undo now: the HP and the move of
 # the newest enemy attack on the player's record not yet undone (Combatant.
-# last_undoable_hit()). With none, the face shows its {outside} rule.
+# last_undoable_hit()). With none, the face shows its {outside} rule (it
+# has no {none} block).
 const TOKEN_UNDO_HP := "{undo_hp}"
 const TOKEN_UNDO_ATTACK := "{undo_attack}"
+# The Attack a REPLAY_LAST_ATTACK (Second Swing) would replay now - the
+# name of the player's last Attack this turn (Combatant.last_attack).
+const TOKEN_REPLAY_ATTACK := "{replay_attack}"
 const TOKEN_HP_COST := "{hp_cost}"
 # What follows a repeating hit's number (CardEffect.repeat_per_earlier_
 # play_tag - Lash), by how many times it lands now (DamageEffect.hit_
@@ -889,6 +899,10 @@ func _resolve_tokens(description: String) -> String:
 			if effect != null and (effect.effect_type == CardEffect.EffectType.SPEND_TOLL or effect.effect_type == CardEffect.EffectType.TOLL_BLOCK):
 				text = text.replace(TOKEN_TOLL_COST, str(effect.toll_cost))
 				break
+	if text.contains(TOKEN_REPLAY_ATTACK):
+		var replayed: CardData = replay_attack()
+		if replayed != null:
+			text = text.replace(TOKEN_REPLAY_ATTACK, replayed.card_name)
 	if text.contains(TOKEN_UNDO_HP) or text.contains(TOKEN_UNDO_ATTACK):
 		var undo: Dictionary = _undo_preview()
 		if not undo.is_empty():
@@ -1178,23 +1192,43 @@ func _style_bonus_clauses(bbcode: String) -> String:
 
 # The description with its markers stripped - what the face reads as
 # plain text, for measuring.
-# `description` with the {battle}/{outside} block this face isn't showing
-# taken out and the kept one's markers dropped - in a battle hand when it
-# has a bonus context.
+# `description` with the {battle}/{none}/{outside} blocks this face isn't
+# showing taken out and the kept one's markers dropped: {battle} in a
+# battle hand (a bonus context), {none} there instead while the card has
+# nothing to act on - or {outside}, when it has no {none} block - and
+# {outside} anywhere else.
 func _select_context(description: String) -> String:
-	# A Not So with nothing to undo reads its rule, as outside a fight.
-	var in_battle: bool = _bonus_context != null and not (_undoes() and _undo_preview().is_empty())
-	var drop_open: String = MARK_OUTSIDE_OPEN if in_battle else MARK_BATTLE_OPEN
-	var drop_close: String = MARK_OUTSIDE_CLOSE if in_battle else MARK_BATTLE_CLOSE
+	var in_battle: bool = _bonus_context != null
+	var idle: bool = in_battle and _lacks_subject()
+	var keep: String = MARK_OUTSIDE_OPEN
+	if idle and description.contains(MARK_NONE_OPEN):
+		keep = MARK_NONE_OPEN
+	elif in_battle and not idle:
+		keep = MARK_BATTLE_OPEN
 	var text: String = description
-	var start: int = text.find(drop_open)
+	for pair: Array in [[MARK_BATTLE_OPEN, MARK_BATTLE_CLOSE], [MARK_NONE_OPEN, MARK_NONE_CLOSE], [MARK_OUTSIDE_OPEN, MARK_OUTSIDE_CLOSE]]:
+		if pair[0] != keep:
+			text = _drop_blocks(text, pair[0], pair[1])
+	return text.replace(MARK_BATTLE_OPEN, "").replace(MARK_BATTLE_CLOSE, "").replace(MARK_NONE_OPEN, "").replace(MARK_NONE_CLOSE, "").replace(MARK_OUTSIDE_OPEN, "").replace(MARK_OUTSIDE_CLOSE, "")
+
+# `text` with every `open`...`close` block cut out.
+static func _drop_blocks(text: String, open: String, close: String) -> String:
+	var start: int = text.find(open)
 	while start >= 0:
-		var end: int = text.find(drop_close, start)
+		var end: int = text.find(close, start)
 		if end < 0:
 			break
-		text = text.substr(0, start) + text.substr(end + drop_close.length())
-		start = text.find(drop_open)
-	return text.replace(MARK_BATTLE_OPEN, "").replace(MARK_BATTLE_CLOSE, "").replace(MARK_OUTSIDE_OPEN, "").replace(MARK_OUTSIDE_CLOSE, "")
+		text = text.substr(0, start) + text.substr(end + close.length())
+		start = text.find(open)
+	return text
+
+# Whether this card, in a battle hand, has nothing yet for its live line
+# to name: a Not So with nothing to undo, a Second Swing with no Attack
+# to replay.
+func _lacks_subject() -> bool:
+	if _undoes() and _undo_preview().is_empty():
+		return true
+	return _replays() and replay_attack() == null
 
 static func _strip_markers(text: String) -> String:
 	return text.replace(MARK_IF_OPEN, "").replace(MARK_IF_CLOSE, "").replace(MARK_ELSE_OPEN, "").replace(MARK_ELSE_CLOSE, "")
@@ -1658,6 +1692,25 @@ func keyword_hover_allowed() -> bool:
 	if _keyword_inspect:
 		return true
 	return hover_enabled and _hovering and not _hover_suppressed
+
+# Whether this card replays the last Attack (REPLAY_LAST_ATTACK - Second
+# Swing).
+func _replays() -> bool:
+	if card_data == null:
+		return false
+	for effect in card_data.effects:
+		if effect != null and effect.effect_type == CardEffect.EffectType.REPLAY_LAST_ATTACK:
+			return true
+	return false
+
+# The Attack this card would replay now (the player's last this turn,
+# Combatant.last_attack) - null for a card that replays nothing, outside a
+# battle hand, or with no Attack played yet. The face names it, and the
+# hand shows its ghost (ReplayGhost).
+func replay_attack() -> CardData:
+	if not _replays() or _bonus_context == null or _bonus_context.player == null:
+		return null
+	return _bonus_context.player.last_attack
 
 # Whether this card undoes an enemy attack (UNDO_LAST_ATTACK - Not So).
 func _undoes() -> bool:

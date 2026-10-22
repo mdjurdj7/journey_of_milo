@@ -1,7 +1,8 @@
 extends SceneTree
 
 # Headless probe for Second Swing - 1 Energy, Uncommon Skill, TOLL:
-# "Spend 5 Toll. Play the last Attack you played this turn again." No
+# "Spend 5 Toll. Play the last Attack you played this turn again." - in a
+# fight "Replay <the Attack>.", or "No Attack to replay yet." No
 # damage of its own; blocked under 5 Toll or with no Attack played this
 # turn. The replay resolves that Attack's effects in full as if played -
 # its own HP and Toll (Bite Down), the stance's price and bonus (Self-
@@ -83,7 +84,7 @@ func _check_card_data() -> void:
 	_expect_eq([card.card_type, card.rarity, card.card_class], [CardData.CardType.SKILL, CardData.CardRarity.UNCOMMON, &"wanderer"], "...a Skill, Uncommon, the Wanderer's")
 	_expect_eq(card.target_type, CardData.TargetType.SELF, "...no target of its own")
 	_expect_eq(card.removal_scope, CardData.RemovalScope.NONE, "...not Spent")
-	_expect_eq(card.description, "Spend {toll_cost} Toll.\nPlay the last Attack you played this turn again.", "...its text")
+	_expect_eq(card.description, "Spend {toll_cost} Toll.\n{battle}Replay {replay_attack}.{/battle}{none}No Attack to replay yet.{/none}{outside}Play the last Attack you played this turn again.{/outside}", "...its text")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SPEND_TOLL and card.effects[1].effect_type == CardEffect.EffectType.REPLAY_LAST_ATTACK, "...SPEND_TOLL, then REPLAY_LAST_ATTACK")
 	_expect_eq(CardView._derive_keyline_type(card), CardView.KeylineType.TOLL, "...reading TOLL")
 	_expect(card.art != null and card.art.resource_path == ART_PATH, "...its art kept")
@@ -209,6 +210,20 @@ func _check_face() -> void:
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
 	_expect_eq(view.type_label.text, "TOLL", "...labelled TOLL")
 	_expect(not view.hp_cost_label.visible, "...no HP badge")
+	# In a fight: nothing to replay yet, then the Attack it would replay,
+	# by name - the card the hand's ghost shows.
+	var player: Combatant = _player()
+	var ctx := EffectContext.new()
+	ctx.player = player
+	view.set_bonus_context(ctx)
+	_expect_eq(view.rules_text.get_parsed_text(), "Spend %d Toll.\nNo Attack to replay yet." % _toll, "In a fight with no Attack played: nothing to replay")
+	_expect(view.replay_attack() == null, "...and no ghost")
+	var slash: CardData = load(SLASH_PATH)
+	player.record_attack(slash, null, true)
+	view.set_bonus_context(ctx)
+	_expect_eq(view.rules_text.get_parsed_text(), "Spend %d Toll.\nReplay %s." % [_toll, slash.card_name], "After %s: it names it" % slash.card_name)
+	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
+	_expect(view.replay_attack() == slash, "...the ghost's card")
 	view.free()
 	_completed += 1
 
