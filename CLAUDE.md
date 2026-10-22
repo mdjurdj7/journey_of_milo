@@ -55,17 +55,21 @@
   event (ProbePlay.wait_until()) rather than a fixed timer.
 - If a headless import fails or crashes, stop before running any
   generator or probe on that tree, and re-import.
-- Data-only changes (scene/.tres values, assets, masks, docs): no probes.
-- Code changes: run only the probe(s) for the system you touched
-  (`--probe`), once, at the end, in the foreground - not whole areas,
-  and not `--changed`.
-- No --smoke and no full set before a push: a push needs only the
-  per-change probes above. The full set runs nightly
-  (tools/nightly_probes.sh, below); --smoke, --full, `--changed`,
-  `--prepush` (the mapped probes plus the fast tier) and area sweeps run
-  only when I ask for them.
-- Never re-run a probe that already passed unless the code it covers
-  changed since.
+- Probes test that systems work, never content: no exact numbers,
+  positions, yaws, counts or composition. Read values from data; I check
+  content in game.
+- Data-only changes: no probes, except floor data (FloorData/RegionData
+  .tres, masks, floor props): run floor_smoke alone, once
+  (`tools/run_probes.sh --probe floor_smoke --path <worktree>`).
+- Code changes: run the core set once, at the end, in the foreground,
+  from your own worktree: `tools/run_probes.sh --core --path <worktree>`
+  after `--import` there. The core set is run_flow, combat_rules,
+  card_smoke, enemy_smoke, floor_smoke and economy. Any SCRIPT ERROR or
+  engine ERROR fails a probe.
+- Never run anything else in the day (the full suite, an area, a named
+  probe) unless I ask. Everything else runs in the nightly. A push needs
+  only the core set.
+- Never re-run the core set if it passed and no code changed since.
 - If memory is too low to run probes, don't wait; commit and say so.
   The nightly full set covers it.
 - A task prompt's own stop or merge conditions ("merge only if the
@@ -84,11 +88,8 @@
 - Never push unless my current message says "push". A push word in an
   earlier message, or approval to commit or merge, doesn't carry over.
 - Before any push, run `git pull --rebase`.
-- Don't write a new probe unless I ask for one, or unless it guards a
-  bug that actually happened.
-- Don't pin content in probes: no exact positions, yaws, point counts
-  or composition checks for props, enemies or bands. Where something
-  stands is checked by me in game.
+- No new probes unless I ask or they guard a bug that actually happened.
+  Such a guard joins the nightly set, not the core.
 - Runs record their timings in tools/probe_times.local.txt (git-ignored),
   never in the tracked tools/probe_times.txt; `--refresh-times` copies
   the local averages over it when I choose to commit them. `--batch`
