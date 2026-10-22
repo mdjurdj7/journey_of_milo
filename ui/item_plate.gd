@@ -678,7 +678,9 @@ func _apply_mouse_filter() -> void:
 	else:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
-func _shows_something() -> bool:
+# Whether the plate holds an item - a piece, a weapon, a Bedroll, a
+# shell: what its hosts ask, so a new kind is counted here alone.
+func has_item() -> bool:
 	return _piece != null or _weapon != null or _bedroll != null or _shell != null
 
 func get_replaced() -> TrinketData:
@@ -740,7 +742,7 @@ func get_replaced_name_finish() -> ShaderMaterial:
 	return _replaced_name_layer.material as ShaderMaterial if _replaced_name_layer != null else null
 
 func uses_placeholder() -> bool:
-	return _shows_something() and _shown_art() == null
+	return has_item() and _shown_art() == null
 
 # One sweep of the finish's sheen across the name - CardView's, played
 # once as the plate opens. Nothing for a name with no finish.
@@ -1108,7 +1110,7 @@ func _draw_face() -> void:
 	_face.draw_style_box(frame, _card_rect)
 	if _strip_rect.has_area():
 		_face.draw_style_box(frame, _strip_rect)
-	if not _shows_something():
+	if not has_item():
 		return
 	var art: Texture2D = _shown_art()
 	if art != null:
@@ -1150,7 +1152,7 @@ func _draw_face() -> void:
 # The name at the layer's own origin - its finish (or flat ink) is the
 # layer's material's to colour.
 func _draw_name() -> void:
-	if not _shows_something():
+	if not has_item():
 		return
 	var color: Color = ink
 	if _name_layer.material == null and _finish != null:

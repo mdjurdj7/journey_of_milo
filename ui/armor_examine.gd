@@ -207,7 +207,7 @@ func close(taken: bool) -> void:
 	if _closing:
 		return
 	_closing = true
-	if _plate == null or (_piece == null and _weapon == null and _bedroll == null and _shell == null):
+	if _plate == null or not _plate.has_item():
 		closed.emit(false)
 		queue_free()
 		return
