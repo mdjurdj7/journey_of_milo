@@ -12,8 +12,11 @@ class_name WorldShell
 const SHELL_GROUP := &"shell_drops"
 
 @export var shell: WarpedShellData = null
-# The roll that dropped it, for the run log's shell_drop.
+# The roll that dropped it, for the run log's shell_drop - and whether
+# the F1 row's Drop shell put it there (RegionField._on_debug_shell_
+# pressed()), so a test drop can be left out of playtest data.
 var roll: float = 0.0
+var debug: bool = false
 
 func _init() -> void:
 	placeholder_size = Vector3(0.3, 0.1, 0.24)
@@ -24,7 +27,7 @@ func _init() -> void:
 func _exit_tree() -> void:
 	if shell == null or is_taken():
 		return
-	RunLogger.event("shell_drop", {"roll": roll, "dropped": true, "taken": false, "card_before": null, "card_after": null})
+	RunLogger.event("shell_drop", {"roll": roll, "dropped": true, "taken": false, "card_before": null, "card_after": null, "debug": debug})
 
 func _group() -> StringName:
 	return SHELL_GROUP

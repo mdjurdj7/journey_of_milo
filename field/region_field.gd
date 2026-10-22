@@ -95,6 +95,11 @@ enum RewardMode { SCREEN, WORLD }
 # The Warped Shell's one data file (WarpedShellData): who drops it, how
 # often, and the change it makes.
 @export_file("*.tres") var warped_shell_path: String = "res://run/data/warped_shell.tres"
+# Debug builds only: the F1 row's Drop shell - how far in front of the
+# Wanderer it sets the shell down, metres, and what the find line says
+# when the deck holds nothing for it to change (%s the shell's from_card).
+@export var debug_shell_step_m: float = 1.2
+@export var debug_shell_no_host_format: String = "No %s to change."
 # A weapon taken from its offer (open_weapon_offer()): the same take.
 @export var weapon_take_sfx_path: String = "res://assets/audio/cards/card_take.wav"
 @export var weapon_take_volume_db: float = -18.0
@@ -3715,7 +3720,8 @@ func _on_keepsake_offer_closed(_taken: bool) -> void:
 
 # Debug builds only: a row of debug buttons on the field HUD in the
 # battle row's style (BattleTheme's DebugButton), hidden until F1 -
-# Keepsake, a card picker with its Add card, +1 Glassbone, Weapon, Path (the
+# Keepsake, a card picker with its Add card, +1 Glassbone, Weapon, Drop
+# shell (the Warped Shell set down in front of him), Path (the
 # planned walk and the walk grid near him - NavDebugDraw), Scatter,
 # Traveller, and Spawn (back to the floor's spawn). It goes with the DECK
 # line when a fight hides that, so it never sits over a battle.
@@ -3755,6 +3761,12 @@ func _setup_debug_row() -> void:
 	weapon_button.text = "Weapon"
 	weapon_button.pressed.connect(_on_debug_weapon_pressed)
 	_debug_row.add_child(weapon_button)
+	var shell_button := Button.new()
+	shell_button.name = "ShellButton"
+	shell_button.theme_type_variation = &"DebugButton"
+	shell_button.text = "Drop shell"
+	shell_button.pressed.connect(_on_debug_shell_pressed)
+	_debug_row.add_child(shell_button)
 	var path_button := Button.new()
 	path_button.name = "PathButton"
 	path_button.theme_type_variation = &"DebugButton"
@@ -3859,6 +3871,40 @@ func _on_debug_weapon_pressed() -> void:
 			RunLogger.event("debug_weapon", {"weapon": String(weapon.id)})
 			print("RegionField: debug weapon '%s'." % weapon.display_name)
 			return
+
+# The Warped Shell dropped as a Sputter's kill drops it - the WorldShell
+# on the sand debug_shell_step_m in front of the Wanderer, the find line,
+# its plate's TAKE / LEAVE - with no roll, and the once-a-run flag
+# (RunState.warped_shell_dropped) cleared first so it drops every press.
+# Its shell_drop line says debug. With nothing in the deck for it to
+# change: the find line says so (debug_shell_no_host_format), nothing
+# drops.
+func _on_debug_shell_pressed() -> void:
+	if _battle_open or not can_process() or wanderer == null:
+		return
+	var shell := load(warped_shell_path) as WarpedShellData if not warped_shell_path.is_empty() else null
+	if shell == null:
+		return
+	RunState.warped_shell_dropped = false
+	if shell.host_in(RunState.deck) == null:
+		var line := FindLine.on_hud(get_node_or_null(^"FieldHUD"))
+		if line != null and shell.from_card != null:
+			line.use_theme(deck_panel.theme)
+			line.say_plain(debug_shell_no_host_format % shell.from_card.card_name)
+		return
+	RunState.warped_shell_dropped = true
+	var forward: Vector3 = -wanderer.global_transform.basis.z
+	forward.y = 0.0
+	forward = forward.normalized() if forward.length() > 0.001 else get_forward()
+	var at: Vector3 = wanderer.global_position + forward * debug_shell_step_m
+	RunLogger.event("debug_shell", {})
+	print("RegionField: debug drop of the %s." % shell.plate_name)
+	var drop: WorldShell = spawn_world_shell(shell, at)
+	drop.debug = true
+	_pending_shell_find = shell
+	await get_tree().process_frame
+	if is_inside_tree():
+		_say_pending_find()
 
 # Grants the next of debug_keepsake_paths, skipping the one held: into an
 # empty slot at once, or - the slot full - through the take-or-keep offer.
@@ -4172,7 +4218,7 @@ func _roll_warped_shell(won_against: Array[EnemyData], won_at: Array[Vector3], w
 			return
 		var roll: float = RunState.rng.randf()
 		if roll >= shell.drop_chance:
-			RunLogger.event("shell_drop", {"roll": roll, "dropped": false, "taken": false, "card_before": null, "card_after": null})
+			RunLogger.event("shell_drop", {"roll": roll, "dropped": false, "taken": false, "card_before": null, "card_after": null, "debug": false})
 			continue
 		RunState.warped_shell_dropped = true
 		var at: Vector3 = won_at[index] if index < won_at.size() else _last_fallen_at
@@ -4238,7 +4284,7 @@ func take_world_shell(drop: WorldShell) -> void:
 	var into: CardData = drop.shell.result_for(host)
 	if RunState.warp_card(host, into) == null:
 		return
-	RunLogger.event("shell_drop", {"roll": drop.roll, "dropped": true, "taken": true, "card_before": host.card_name, "card_after": into.card_name})
+	RunLogger.event("shell_drop", {"roll": drop.roll, "dropped": true, "taken": true, "card_before": host.card_name, "card_after": into.card_name, "debug": drop.debug})
 	drop.take()
 	print("RegionField: the %s made '%s' '%s'." % [drop.shell.plate_name, host.card_name, into.card_name])
 

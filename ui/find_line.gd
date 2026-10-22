@@ -151,10 +151,24 @@ func say_find_thing(article: String, thing: String, creature: String) -> void:
 	_piece = null
 	_say(article, thing, creature)
 
+# A line that isn't a find, in plain ink, the same fade (the F1 row's Drop
+# shell with nothing to change - RegionField._on_debug_shell_pressed()).
+func say_plain(text: String) -> void:
+	if text.is_empty():
+		return
+	_piece = null
+	_before = text
+	_name = ""
+	_after = ""
+	_show()
+
 func _say(article: String, thing: String, creature: String) -> void:
 	_before = "You find %s" % (article + " " if not article.is_empty() else "")
 	_name = thing
 	_after = " on the %s." % creature if not creature.is_empty() else "."
+	_show()
+
+func _show() -> void:
 	_apply_finish()
 	_relayout()
 	visible = true

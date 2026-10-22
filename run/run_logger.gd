@@ -134,9 +134,13 @@ class_name RunLogger
 # and kinds as collector_buy writes them), and the run's "gold". Not a
 # choice: a run of nothing else is still an empty one.
 
+# Format 16 (2026-10-21): shell_drop says whether it was a "debug" drop
+# (the field's F1 Drop shell, which also writes a "debug_shell" event) -
+# false for every real roll, so test drops filter out of playtest data.
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 15
+const FORMAT_VERSION := 16
 # Lines that aren't choices (_write_detail()) - a run made of nothing else
 # is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark", "collector_stock"]
