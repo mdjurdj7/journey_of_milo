@@ -24,6 +24,14 @@ class_name BattleTheme
 # The one colour outside the cards' two tones: the toll keyline, under
 # the Toll numeral (BattleResources). Never inverts.
 @export var toll_rule_color: Color = Color(0.54, 0.50, 0.58, 1.0)
+# The Toll glyph's ink ("Battle" token "toll_ink"): the card faces' Toll
+# cost badge and an inline Toll price (CardView), glyph and numeral.
+# Never inverts - the cards don't. Re-applies live; CardView follows the
+# theme's `changed`.
+@export var toll_ink: Color = Color(0.369, 0.149, 0.157, 1.0):
+	set(value):
+		toll_ink = value
+		_reapply()
 
 # The combat numbers' two tints ("Battle" tokens "self_loss" and "heal",
 # FloatingNumber): HP the Wanderer's own effects took - the Toll keyline's
@@ -78,6 +86,7 @@ func apply_value_set(on_dark_world: bool) -> void:
 	set_color("ink", "Battle", ink)
 	set_color("bone", "Battle", bone)
 	set_color("toll_rule", "Battle", toll_rule_color)
+	set_color("toll_ink", "Battle", toll_ink)
 	set_color("self_loss", "Battle", on_dark_self_loss if on_dark_world else on_pale_self_loss)
 	set_color("heal", "Battle", on_dark_heal if on_dark_world else on_pale_heal)
 
