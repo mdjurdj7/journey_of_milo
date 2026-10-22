@@ -267,6 +267,19 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 	set(value):
 		strip_gap_px = value
 		_relayout()
+# The offer in the plate itself, no strip (the collector's): one paper,
+# frame and shadow - after the lore, a thin rule across the text width
+# joined_rule_gap_px off each side, then REPLACES and its effect, the Max
+# HP line, the choices. Nothing replaced: no rule and no REPLACES, the
+# rest as it is. Both re-apply live.
+@export var joined_offer: bool = false:
+	set(value):
+		joined_offer = value
+		_relayout()
+@export var joined_rule_gap_px: float = 10.0:
+	set(value):
+		joined_rule_gap_px = value
+		_relayout()
 @export var replaces_label_text: String = "REPLACES":
 	set(value):
 		replaces_label_text = value
@@ -420,6 +433,8 @@ var _stat_baseline: float = -1.0
 var _rules: TextParagraph = null
 var _rules_top: float = 0.0
 var _hairline_y: float = 0.0
+# joined_offer's rule over REPLACES; -1: none.
+var _join_rule_y: float = -1.0
 var _lore: TextParagraph = null
 var _lore_top: float = 0.0
 var _replaces_baseline: float = 0.0
@@ -1040,6 +1055,7 @@ func _relayout() -> void:
 # No strip (an empty rect) when the plate offers nothing.
 func _layout_strip(width: float, pad: float, text_width: float, label_px: int, name_font: Font) -> void:
 	_strip_rect = Rect2()
+	_join_rule_y = -1.0
 	_replaces = null
 	_max_hp_line = null
 	_action_rects.clear()
@@ -1048,6 +1064,13 @@ func _layout_strip(width: float, pad: float, text_width: float, label_px: int, n
 	if _has_replaced() or _show_actions:
 		var top: float = roundf(_card_rect.end.y + _px(strip_gap_px))
 		var y: float = top + pad * 0.75
+		if joined_offer:
+			# On from the lore's block, inside the same paper.
+			top = _card_rect.end.y - pad
+			y = top
+			if _has_replaced():
+				_join_rule_y = roundf(y + _px(joined_rule_gap_px))
+				y = _join_rule_y + _px(joined_rule_gap_px)
 		if _has_replaced():
 			var replaced_px: int = _font_px(replaced_name_size_px)
 			var label_width: float = InkType.width(_label_font, replaces_label_text, label_px)
@@ -1075,7 +1098,10 @@ func _layout_strip(width: float, pad: float, text_width: float, label_px: int, n
 			_action_rects.append(Rect2(pad, row_top, half, row_height))
 			_action_rects.append(Rect2(pad + half, row_top, half, row_height))
 			y = row_top + row_height
-		_strip_rect = Rect2(0.0, top, width, roundf(y + pad * 0.75 - top))
+		if joined_offer:
+			_card_rect = Rect2(Vector2.ZERO, Vector2(width, roundf(y + pad)))
+		else:
+			_strip_rect = Rect2(0.0, top, width, roundf(y + pad * 0.75 - top))
 	_replaced_name_layer.position = Vector2(replaced_name_left, 0.0)
 	_replaced_name_layer.size = Vector2(maxf(replaced_name_width, 1.0), maxf(_strip_rect.end.y, 1.0))
 	if _replaced_name_finish != null:
@@ -1154,6 +1180,9 @@ func _draw_face() -> void:
 		var hairline_width: float = roundf(_plate_size.x * hairline_width_fraction)
 		_face.draw_rect(Rect2(roundf((_plate_size.x - hairline_width) / 2.0), _hairline_y, hairline_width, maxf(roundf(plate_scale), 1.0)), Color(ink, hairline_alpha))
 	_draw_paragraph(_lore, _lore_top, _pitch(_font_px(lore_size_px)), ink)
+	if _join_rule_y >= 0.0:
+		var pad: float = _px(padding_px)
+		_face.draw_rect(Rect2(pad, _join_rule_y, _plate_size.x - pad * 2.0, maxf(roundf(plate_scale), 1.0)), Color(ink, hairline_alpha))
 	if _replaces != null:
 		InkType.draw_run(_face, _label_font, replaces_label_text, Vector2(_replaces_label_left, _replaces_baseline), label_px, type_color)
 		_draw_paragraph(_replaces, _replaces_top, _pitch(_font_px(replaces_size_px)), replaces_color)

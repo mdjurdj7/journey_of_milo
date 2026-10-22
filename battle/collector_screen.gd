@@ -31,8 +31,9 @@ class_name CollectorScreen
 #     - its art, its name, a caps type line under it (the kind, then MAX
 #     HP a → b if taking it changes max HP, else REPLACES <name> if its
 #     slot is filled), its price, CHOOSE. CHOOSE opens its ItemPlate over
-#     the screen (ArmorExamine) - REPLACES and the Max HP line on the
-#     plate, TAKE FOR <price> and BACK. A good taken is equipped at once,
+#     the screen (ArmorExamine) as one plate (ItemPlate.joined_offer) -
+#     under a rule, REPLACES and the Max HP line, then TAKE FOR <price>
+#     and BACK. A good taken is equipped at once,
 #     whatever it replaces gone (the collector keeps it), and its line
 #     leaves the list. Then the Bedroll (Collector.get_bedroll()) while
 #     none is carried - REST, its plate with TAKE FOR / BACK, into the
@@ -1563,6 +1564,8 @@ func _open_offer(line: Dictionary) -> void:
 	_offer = ArmorExamine.new()
 	_offer.name = "GoodOffer"
 	_offer.scrim_color = _examine_scrim()
+	# One plate: the good, a rule, what it replaces, TAKE FOR and BACK.
+	_offer.joined_offer = true
 	match kind:
 		Kind.BEDROLL:
 			_offer.setup_bedroll(line["bedroll"], true)

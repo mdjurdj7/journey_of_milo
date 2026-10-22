@@ -64,6 +64,9 @@ var _from_rect: Rect2 = Rect2()
 var _max_hp: int = -1
 var _scrim: ColorRect = null
 var _plate: ItemPlate = null
+# The offer inside the plate, no strip (ItemPlate.joined_offer) - set
+# before the layer enters the tree (the collector's).
+var joined_offer: bool = false
 var _tween: Tween = null
 var _closing: bool = false
 
@@ -117,6 +120,7 @@ func _ready() -> void:
 	_plate.name = "Plate"
 	# Looked at closely: the cards it names show on hover (the Tail's Lash).
 	_plate.card_links_enabled = true
+	_plate.joined_offer = joined_offer
 	add_child(_plate)
 	if _piece == null and _weapon == null and _bedroll == null and _shell == null:
 		close(false)
