@@ -57,6 +57,11 @@ class_name TrinketData
 #   block_carry          at most this much of the Wanderer's Block outlasts
 #                        each turn's reset (BattleController._start_player_
 #                        turn()): the rest goes as ever; absorb is untouched
+#   energy_carry         at most this much of the Energy left unspent as a
+#                        turn ends is added at the next turn's refill
+#                        (Combatant.turn_start_energy()) - worked out
+#                        afresh each turn from what was left, so it never
+#                        stacks past the cap; never into a new fight
 #   draw_on_card_count   the first time each turn this many cards have
 #                        been played (BattleController.cards_played_this_
 #                        turn - every committed play, 0-cost included;
@@ -103,7 +108,7 @@ enum Slot { KEEPSAKE, WORN }
 #   {max_hp}  max_hp_bonus           {hit_back}  hit_back_damage
 #   {times}  first_attack_multiplier in words ("double")
 #   {nth}    draw_on_card_count as an ordinal ("third")
-#   {carry}  block_carry
+#   {carry}  block_carry             {energy_carry}  energy_carry
 #   {play_draw}  card_count_draw
 #   {big_hit}  big_hit_threshold     {big_cut}  big_hit_reduction
 #   {cost_nth}  discount_on_card_count as an ordinal ("third")
@@ -154,6 +159,10 @@ enum Slot { KEEPSAKE, WORN }
 @export var block_carry: int = 0:
 	set(value):
 		block_carry = value
+		emit_changed()
+@export var energy_carry: int = 0:
+	set(value):
+		energy_carry = value
 		emit_changed()
 @export var draw_on_card_count: int = 0:
 	set(value):
@@ -211,6 +220,7 @@ func _fill(template: String) -> String:
 		"times": Status.times_word(first_attack_multiplier),
 		"nth": Status.ordinal_word(draw_on_card_count),
 		"carry": block_carry,
+		"energy_carry": energy_carry,
 		"play_draw": card_count_draw,
 		"big_hit": big_hit_threshold,
 		"big_cut": big_hit_reduction,

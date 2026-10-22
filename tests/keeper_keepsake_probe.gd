@@ -32,6 +32,7 @@ const FRAYED_CORD_PATH := "res://run/keepsakes/frayed_cord.tres"
 const WORN_PAGE_PATH := "res://run/keepsakes/worn_page.tres"
 const BITE_DOWN_PATH := "res://cards/data/bite_down.tres"
 const DOWN_PAYMENT_PATH := "res://cards/data/down_payment.tres"
+const OWED_PATH := "res://battle/rules/statuses/owed.tres"
 const KEEPER_IDS: Array[StringName] = [&"house_key", &"frayed_cord", &"departure_stub", &"bent_nail", &"worn_page", &"blue_fastener"]
 const KEEPER_PATHS: Array[String] = [HOUSE_KEY_PATH, FRAYED_CORD_PATH, DEPARTURE_STUB_PATH, BENT_NAIL_PATH, WORN_PAGE_PATH, BLUE_FASTENER_PATH]
 const SAFETY_SECONDS := 400.0
@@ -160,7 +161,7 @@ func _check_descriptions() -> void:
 	var expected := {
 		HOUSE_KEY_PATH: ["Someone meant to need it again.", "The first card you play each combat costs 0 Energy."],
 		FRAYED_CORD_PATH: ["Tied off neatly, for later.", "At the end of your turn, you may keep 1 card in your hand."],
-		DEPARTURE_STUB_PATH: ["The number is still legible.", "Draw 1 extra card on your first turn of each combat."],
+		DEPARTURE_STUB_PATH: ["The number is still legible.", "Up to 1 unspent Energy carries over to your next turn."],
 		BENT_NAIL_PATH: ["Drawn from a stacked board.", "Your first Attack each combat deals double damage."],
 		WORN_PAGE_PATH: ["Folded the same way, many times.", "The first time each turn you play your third card, draw 1."],
 		BLUE_FASTENER_PATH: ["Too small for you.", "Up to 3 of your Block carries over to your next turn."],
@@ -420,21 +421,61 @@ func _check_house_key_resets_and_zero_cost() -> void:
 	await _teardown()
 	_completed += 1
 
+# Real turns, through End Turn and the enemy turn: the carry is worked
+# out from the Energy left as the turn ends, capped, and any debt (Come
+# Due's Owed) comes out of the refill and the carry together.
 func _check_departure_stub() -> void:
 	_new_run()
+	var stub: TrinketData = load(DEPARTURE_STUB_PATH)
+	var cap: int = stub.energy_carry
+	_expect_eq(cap, 1, "Departure Stub carries up to 1 Energy")
+	_expect_eq(stub.opening_draw_bonus, 0, "...and draws nothing extra")
+	_run_state.call("equip_keepsake", stub)
 	var controller: Node = await _start_fight(0, &"")
 	if controller != null:
-		_expect_eq(_hand_size(controller), 5, "No keepsake: the opening hand is 5")
-	await _teardown()
-	_run_state.call("equip_keepsake", load(DEPARTURE_STUB_PATH))
-	controller = await _start_fight(0, &"")
-	if controller != null:
-		_expect_eq(_hand_size(controller), 6, "Departure Stub: the opening hand is 6")
-		controller.get("_hand_container").call("discard_hand")
-		controller.call("_start_player_turn")
-		_expect_eq(_hand_size(controller), 5, "...and the second turn's draw is the usual 5")
+		var player: Combatant = controller.get("player")
+		player.hp = 999
+		var refill: int = player.max_energy
+		_expect_eq(player.energy, refill, "The fight opens on the plain refill: nothing carried in")
+		_expect_eq(_hand_size(controller), 5, "...and the usual opening hand")
+		player.energy = cap + 1
+		if await _next_turn(controller):
+			_expect_eq(player.energy, refill + cap, "Ended on %d: the next turn starts on %d, not %d" % [cap + 1, refill + cap, refill + cap + 1])
+		# Unspent again at once: worked out afresh, never stacked.
+		if await _next_turn(controller):
+			_expect_eq(player.energy, refill + cap, "Ended on %d again: still %d" % [refill + cap, refill + cap])
+		player.energy = 0
+		if await _next_turn(controller):
+			_expect_eq(player.energy, refill, "Ended on 0: the plain refill")
+		# A debt larger than the refill takes the carried point too.
+		var owed_amount: int = refill + 1
+		player.energy = cap
+		_owe(player, owed_amount)
+		if await _next_turn(controller):
+			_expect_eq(player.energy, maxi(refill + cap - owed_amount, 0), "Owed %d against %d + %d carried: the turn starts on 0" % [owed_amount, refill, cap])
+		# A smaller one comes out of the two together.
+		player.energy = cap
+		_owe(player, 2)
+		if await _next_turn(controller):
+			_expect_eq(player.energy, refill + cap - 2, "Owed 2 against %d + %d carried: %d" % [refill, cap, refill + cap - 2])
 	await _teardown()
 	_completed += 1
+
+# Come Due's Owed on the Wanderer, `amount` of it.
+func _owe(player: Combatant, amount: int) -> void:
+	var owed: StatusData = load(OWED_PATH)
+	Status.apply_to(player.statuses, owed)
+	for active in player.statuses:
+		if active.data == owed:
+			active.magnitude = amount
+
+# End Turn, and the enemy turn, until the next player turn is settled.
+func _next_turn(controller: Node) -> bool:
+	var turn: int = int(controller.get("_player_turn"))
+	controller.call("end_turn")
+	var back: bool = await ProbePlay.wait_until(self, func() -> bool: return int(controller.get("_player_turn")) > turn and ProbePlay.is_settled(controller), 20.0)
+	_expect(back, "...the next turn comes round")
+	return back
 
 func _check_signal_glass() -> void:
 	_new_run()

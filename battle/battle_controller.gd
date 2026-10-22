@@ -234,6 +234,11 @@ var _choice_cap: int = 0
 # lets the hand keep (TrinketData.end_turn_keep), read as the fight opens.
 var _keep_choice_open: bool = false
 var _end_turn_keep: int = 0
+# The most unspent Energy the held pieces carry into the next turn
+# (TrinketData.energy_carry - Departure Stub), read as the fight opens;
+# and what the turn just ended left for the next one's refill.
+var _energy_carry: int = 0
+var _energy_carried: int = 0
 var _hovered_enemy: FieldEnemy = null
 # The enemy under the cursor itself, without the default - see
 # hovered_enemy_changed.
@@ -402,6 +407,7 @@ func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wandere
 			player.card_count_discount = piece.card_count_discount
 			player.discount_on_card_count = maxi(piece.discount_on_card_count, 0)
 		_end_turn_keep += maxi(piece.end_turn_keep, 0)
+		_energy_carry += maxi(piece.energy_carry, 0)
 		player.first_hit_scale = minf(player.first_hit_scale, clampf(piece.first_hit_scale, 0.0, 1.0))
 		# The largest big-hit cut held, with its own threshold.
 		if piece.big_hit_reduction > player.big_hit_reduction:
@@ -1085,6 +1091,8 @@ func end_turn() -> void:
 # their intents stand as shown, and the next player turn starts in full.
 func _finish_turn(keep: Array[CardData]) -> void:
 	RunLogger.turn_ended(player.energy)
+	# What the next turn's refill gets of the Energy left unspent.
+	_energy_carried = mini(maxi(player.energy, 0), _energy_carry)
 	_input_locked = true
 	turn_phase_changed.emit(false)
 	_emit_devour_changed()
@@ -2488,11 +2496,14 @@ func _start_player_turn() -> void:
 	_multi_hit_draw_used = false
 	_card_count_draw_used = false
 	_skill_after_attack_draw_used = false
-	# The refill, and Dying Light's 1 if the turn begins Critical - judged
+	# The refill, Dying Light's 1 if the turn begins Critical - judged
 	# here, before any tick, so entering Critical later gives nothing
-	# until the next turn starts.
+	# until the next turn starts - and the Energy carried over, with any
+	# debt paid out of all of it.
 	var owed: int = Status.energy_debt(player.statuses)
-	player.energy = player.turn_start_energy()
+	var carried: int = _energy_carried
+	_energy_carried = 0
+	player.energy = player.turn_start_energy(carried)
 	# The run log's turn opens on the refill, before any tick it counts.
 	RunLogger.turn_started(player.energy)
 	# Marrow (a Devoured Skill's yield): its Block, on top of what the
@@ -2502,9 +2513,10 @@ func _start_player_turn() -> void:
 		player.block += marrow
 		combat_text.emit("player", marrow, "block")
 		RunLogger.block_gained(marrow)
-	# Energy owed (Come Due) paid off in the refill just now.
+	# Energy owed (Come Due) paid off in the refill just now, out of the
+	# carried Energy too: the "energy" the turn starts on after it.
 	if owed > 0:
-		RunLogger.mechanic("energy_debt", {"owed": owed, "energy": player.energy})
+		RunLogger.mechanic("energy_debt", {"owed": owed, "carried": carried, "energy": player.energy})
 	# In the new turn's lines: what the carry kept of the Block left over.
 	if carry > 0 and block_before > 0:
 		RunLogger.mechanic("keepsake_block_carry", {"kept": player.block, "lost": block_before - player.block})
