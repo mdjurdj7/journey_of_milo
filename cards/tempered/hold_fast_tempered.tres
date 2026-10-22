@@ -12,7 +12,7 @@ value = 2
 [sub_resource type="Resource" id="E_block"]
 script = ExtResource("2_card_effect")
 effect_type = 1
-value = 11
+value = 9
 
 [sub_resource type="Resource" id="E_draw"]
 script = ExtResource("2_card_effect")
