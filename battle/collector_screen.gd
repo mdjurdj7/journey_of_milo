@@ -47,9 +47,21 @@ class_name CollectorScreen
 #   LEAVE, bottom right. Escape and a right click close it too.
 # A group with nothing stocked is hidden.
 #
-# A price the run can't pay is grey. CHOOSE and a card's click still open
-# the plate or the card to look at, with TAKE grey and inert; no red, no
-# shake. Every purchase and removal is logged (RunLogger) with the item's
+# A good the run can't pay for reads as unavailable: a card takes the
+# hand's unaffordable fade (CardView.set_playable(false) - its
+# unplayable_alpha), an equipment, Bedroll or removal line goes wholly to
+# the inert grey (art, name, type line, effect, price, CHOOSE). Each stays
+# hoverable, and CHOOSE and a card's click still open the plate or the
+# card to read, with TAKE grey and inert; no red, no shake. Read again
+# whenever the gold changes (RunState.gold_changed).
+#
+# Each equipment line shows its effect in a middle column between the
+# name block and the price - the plate's own string (TrinketData/
+# WeaponData.describe()), in the cards' rules voice (Alegreya Sans at
+# effect_size_px), up to effect_max_lines and then an ellipsis. The
+# Bedroll's line shows its heal (BedrollData.describe()); the removal's
+# none. The column starts past the widest name block on the list (never
+# narrower than name_column_min_px), so no name or type line runs into it. Every purchase and removal is logged (RunLogger) with the item's
 # id, kind, price and gold before and after; the first open on a floor
 # logs the whole stock and the gold (RunLogger.collector_stock()).
 #
@@ -382,6 +394,26 @@ enum Kind { WORN, KEEPSAKE, WEAPON, REMOVAL, BEDROLL }
 	set(value):
 		removal_type_text = value
 		_refresh()
+# The effect column: the cards' rules size, at most this many lines then
+# an ellipsis, effect_gap_px clear of the name block and of the price.
+@export var effect_size_px: int = 15:
+	set(value):
+		effect_size_px = value
+		_relayout()
+@export var effect_max_lines: int = 2:
+	set(value):
+		effect_max_lines = value
+		_refresh()
+@export var effect_gap_px: float = 32.0:
+	set(value):
+		effect_gap_px = value
+		_refresh()
+# The name block's narrowest width - the effect column starts past it, or
+# past the widest name or type line on the list, whichever is wider.
+@export var name_column_min_px: float = 200.0:
+	set(value):
+		name_column_min_px = value
+		_refresh()
 # The picker's footer (DeckView pick confirm): the name goes in the %s,
 # the deck's count and one fewer in the %d's.
 @export var removal_confirm_format: String = "GIVE IT %s"
@@ -443,6 +475,7 @@ var _numeral_font: Font = null
 var _label_font: Font = null
 var _have_font: Font = null
 var _type_font: Font = null
+var _effect_font: Font = null
 var _voice_font: Font = null
 var _fit: float = 1.0
 var _row_fit: float = 1.0
@@ -453,6 +486,7 @@ var _price_px: int = 24
 var _have_px: int = 11
 var _item_px: int = 24
 var _type_px: int = 12
+var _effect_px: int = 15
 var _voice_px: int = 26
 # One per slot: the rolled stock, then the fixed card - null once bought
 # (or a slot that rolled nothing). _views alongside.
@@ -548,12 +582,16 @@ func _ready() -> void:
 			_cards.append(_collector.fixed_card if _collector.is_fixed_available() else null)
 	_build_views()
 	_build_lines()
+	_apply_card_fades()
+	RunState.gold_changed.connect(_on_gold_changed)
 	if _collector != null and _collector.claim_stock_log():
 		_log_stock()
 	_relayout()
 	_start_camera()
 
 func _exit_tree() -> void:
+	if RunState.gold_changed.is_connected(_on_gold_changed):
+		RunState.gold_changed.disconnect(_on_gold_changed)
 	if _collector != null and is_instance_valid(_collector) and _collector.prices_changed.is_connected(_on_prices_changed):
 		_collector.prices_changed.disconnect(_on_prices_changed)
 	if _picker != null and is_instance_valid(_picker):
@@ -698,6 +736,23 @@ func _line_art(line: Dictionary) -> Texture2D:
 		return good.get_weapon().art
 	return good.get_trinket().art
 
+# The line's effect, the plate's own string; the Bedroll's heal; the
+# removal none.
+func effect_text_at(line_index: int) -> String:
+	if line_index < 0 or line_index >= _lines.size():
+		return ""
+	var line: Dictionary = _lines[line_index]
+	var good: CollectorGood = line["good"]
+	match int(line["kind"]):
+		Kind.REMOVAL:
+			return ""
+		Kind.BEDROLL:
+			var heal: String = (line["bedroll"] as BedrollData).describe()
+			return heal.left(1).to_upper() + heal.substr(1)
+		Kind.WEAPON:
+			return good.get_weapon().describe()
+	return good.get_trinket().describe()
+
 # The type line: the kind, then at most one clause - MAX HP a → b when
 # taking it changes max HP, else REPLACES <name> when its slot is filled.
 # The plate keeps the full detail.
@@ -794,11 +849,13 @@ func _relayout() -> void:
 	_have_px = _px_int(have_size_px)
 	_item_px = _px_int(item_size_px)
 	_type_px = _px_int(type_size_px)
+	_effect_px = _px_int(effect_size_px)
 	_voice_px = _px_int(voice_size_px)
 	_numeral_font = InkType.numeral_font()
 	_label_font = InkType.tracked(InkType.text_bold_font(), _label_px, label_tracking_em)
 	_have_font = InkType.tracked(InkType.text_bold_font(), _have_px, label_tracking_em)
 	_type_font = InkType.tracked(InkType.text_bold_font(), _type_px, label_tracking_em)
+	_effect_font = InkType.text_font()
 	var face_scale: float = card_scale * _row_fit
 	for slot in _views.size():
 		var view: CardView = _views[slot]
@@ -972,32 +1029,73 @@ func _draw_line(index: int) -> void:
 	var left: float = _column_left()
 	var focused: bool = _focus == _line_base() + index
 	var affordable: bool = _line_affordable(line)
-	var name_color: Color = _ink if focused else _with_alpha(unfocused_alpha)
+	var inert: Color = _with_alpha(inert_alpha)
+	var name_color: Color = (_ink if focused else _with_alpha(unfocused_alpha)) if affordable else inert
 	var icon: float = _px(icon_size_px)
-	var text_left: float = left + icon + _px(icon_gap_px)
+	var text_left: float = _text_left()
 	var mid: float = rect.position.y + rect.size.y * 0.5
 	var art: Texture2D = _line_art(line)
 	if art != null:
 		var art_size: Vector2 = art.get_size()
 		var width: float = icon * (art_size.x / maxf(art_size.y, 1.0))
-		_draw_layer.draw_texture_rect(art, Rect2(roundf(left + (icon - width) * 0.5), roundf(mid - icon * 0.5), width, icon), false, Color(1.0, 1.0, 1.0, 1.0 if focused else art_unfocused_alpha))
+		var art_alpha: float = (1.0 if focused else art_unfocused_alpha) if affordable else inert_alpha
+		_draw_layer.draw_texture_rect(art, Rect2(roundf(left + (icon - width) * 0.5), roundf(mid - icon * 0.5), width, icon), false, Color(1.0, 1.0, 1.0, art_alpha))
 	# The name and its type line as one block, centred on the row.
 	var block: float = float(_item_px) + _px(type_gap_px) + float(_type_px)
 	var name_baseline: float = roundf(mid - block * 0.5 + float(_item_px) * 0.8)
 	var type_baseline: float = roundf(name_baseline + _px(type_gap_px) + float(_type_px))
 	_text(_draw_layer, _numeral_font, _line_name(line), Vector2(text_left, name_baseline), _item_px, name_color)
-	_text(_draw_layer, _type_font, type_line_at(index), Vector2(text_left, type_baseline), _type_px, _with_alpha(unfocused_alpha))
-	var choose_left: float = _column_right() - InkType.width(_label_font, choose_text, _label_px)
-	var choose_color: Color = name_color
-	if int(line["kind"]) == Kind.REMOVAL and not affordable:
-		choose_color = _with_alpha(inert_alpha)
-	_text(_draw_layer, _label_font, choose_text, Vector2(choose_left, roundf(mid + float(_label_px) * 0.35)), _label_px, choose_color)
+	_text(_draw_layer, _type_font, type_line_at(index), Vector2(text_left, type_baseline), _type_px, _with_alpha(unfocused_alpha) if affordable else inert)
+	var choose_left: float = _choose_left()
+	_text(_draw_layer, _label_font, choose_text, Vector2(choose_left, roundf(mid + float(_label_px) * 0.35)), _label_px, name_color)
 	var price: String = str(_line_price(line))
 	var price_left: float = choose_left - _px(price_column_gap_px) - InkType.width(_numeral_font, price, _price_px)
-	_text(_draw_layer, _numeral_font, price, Vector2(roundf(price_left), roundf(mid + float(_price_px) * 0.35)), _price_px, _ink if affordable else _with_alpha(inert_alpha))
+	_text(_draw_layer, _numeral_font, price, Vector2(roundf(price_left), roundf(mid + float(_price_px) * 0.35)), _price_px, _ink if affordable else inert)
+	_draw_effect(effect_text_at(index), mid, name_color)
 	_draw_layer.draw_rect(Rect2(left, roundf(rect.end.y - rule_thickness_px), _column_width(), rule_thickness_px), _with_alpha(line_rule_alpha))
 	if focused:
 		_hairline(_draw_layer, left, mid)
+
+# Where every line's name and type line start, right of the art.
+func _text_left() -> float:
+	return _column_left() + _px(icon_size_px) + _px(icon_gap_px)
+
+func _choose_left() -> float:
+	return _column_right() - InkType.width(_label_font, choose_text, _label_px)
+
+# The effect column, shared by every line (x: its left, y: its right):
+# from past the widest name block on the list (name_column_min_px at
+# least) to clear of the widest price, effect_gap_px off each.
+func effect_column() -> Vector2:
+	var block: float = _px(name_column_min_px)
+	var widest_price: float = 0.0
+	for index in _lines.size():
+		var line: Dictionary = _lines[index]
+		block = maxf(block, InkType.width(_numeral_font, _line_name(line), _item_px))
+		block = maxf(block, InkType.width(_type_font, type_line_at(index), _type_px))
+		widest_price = maxf(widest_price, InkType.width(_numeral_font, str(_line_price(line)), _price_px))
+	var from: float = _text_left() + block + _px(effect_gap_px)
+	var to: float = _choose_left() - _px(price_column_gap_px) - widest_price - _px(effect_gap_px)
+	return Vector2(roundf(from), roundf(maxf(to, from)))
+
+# A line's effect, wrapped in the effect column to effect_max_lines and
+# then an ellipsis, centred on the row.
+func _draw_effect(text: String, mid: float, color: Color) -> void:
+	if text.is_empty() or _effect_font == null:
+		return
+	var column: Vector2 = effect_column()
+	if column.y - column.x < 1.0:
+		return
+	var paragraph := TextParagraph.new()
+	paragraph.width = column.y - column.x
+	paragraph.max_lines_visible = maxi(effect_max_lines, 1)
+	paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
+	paragraph.text_overrun_behavior = TextServer.OVERRUN_TRIM_ELLIPSIS
+	paragraph.add_string(text, _effect_font, _effect_px)
+	var height: float = 0.0
+	for line_index in mini(paragraph.get_line_count(), paragraph.max_lines_visible):
+		height += paragraph.get_line_size(line_index).y
+	paragraph.draw(_draw_layer.get_canvas_item(), Vector2(column.x, roundf(mid - height * 0.5)), color)
 
 # The world voice by the collector: the open line and the greyer second -
 # or, a purchase just made, the purchase line alone - centred over its
@@ -1531,7 +1629,21 @@ func _purchased() -> void:
 
 func _on_prices_changed() -> void:
 	_rebuild_lines()
+	_apply_card_fades()
 	_relayout()
+
+# What can be paid for changed: the cards' fades and the lines' grey.
+func _on_gold_changed(_amount: int) -> void:
+	_apply_card_fades()
+	_refresh()
+
+# Each card in the row at the hand's unaffordable fade while its price
+# can't be paid.
+func _apply_card_fades() -> void:
+	for slot in _views.size():
+		var view: CardView = _views[slot]
+		if view != null and is_instance_valid(view):
+			view.set_playable(_affordable(slot))
 
 func _deck_panel_centre() -> Vector2:
 	if _deck_panel == null:
