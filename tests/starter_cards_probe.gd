@@ -56,8 +56,8 @@ const TEMPERED_DIR := "res://cards/tempered/"
 # Come Due, No Further, Sentence, Last Wager, The Return, Blood Arc,
 # Collateral, Ransom, Leverage, Self-Eater, Unbroken, Small Price, Bide,
 # Deny, Refuse the End, With Regards, Last Resort, Dying Light, Blood
-# Advance, Second Swing, Garnish, Claw Back, Gnaw and Settled Account.
-# Every other card has none yet.
+# Advance, Second Swing, Garnish, Claw Back, Gnaw, Settled Account and
+# the neutral Endure. Every other card has none yet.
 const CARD_ART: Dictionary = {
 	"in_the_red": "res://cards/art/Wanderer/In the Red.png",
 	"not_so": "res://cards/art/Wanderer/Not So.png",
@@ -101,6 +101,7 @@ const CARD_ART: Dictionary = {
 	"claw_back": "res://cards/art/Wanderer/Claw Back.png",
 	"gnaw": "res://cards/art/Wanderer/Gnaw.png",
 	"settled_account": "res://cards/art/Wanderer/Settled Account.png",
+	"endure": "res://cards/art/Wanderer/Endure.png",
 }
 
 var _failures: int = 0
@@ -312,7 +313,7 @@ func _check_starter_art() -> void:
 				continue
 			var card := load(dir + file) as CardData
 			var key: String = file.get_basename()
-			if dir == "res://cards/data/" and CARD_ART.has(key):
+			if CARD_ART.has(key):
 				_expect(card.art != null and card.art.resource_path == CARD_ART[key], "%s shows %s (got %s)" % [key, CARD_ART[key], card.art.resource_path if card.art != null else "none"])
 				if card.art != null:
 					_expect(card.art.get_image().has_mipmaps(), "%s's art is mipmapped" % key)
@@ -326,12 +327,12 @@ func _check_starter_art() -> void:
 	root.add_child(without_art)
 	await process_frame
 	with_art.set_card_data(_card("slash"))
-	without_art.set_card_data(_card("endure"))
+	without_art.set_card_data(_card("left_hand"))
 	_expect(with_art.art_rect.visible and with_art.art_rect.texture == _card("slash").art, "Slash's face shows its art")
 	_expect(not with_art.glyph.visible, "...and hides the glyph")
 	_expect_eq(with_art.art_rect.size, with_art.art_field.size, "...filling the art field")
 	_expect_eq(with_art.art_rect.stretch_mode, TextureRect.STRETCH_KEEP_ASPECT_COVERED, "...as a cover crop")
-	_expect(not without_art.art_rect.visible and without_art.art_rect.texture == null, "Endure's face shows no image")
+	_expect(not without_art.art_rect.visible and without_art.art_rect.texture == null, "Left Hand's face shows no image")
 	_expect(without_art.glyph.visible, "...and keeps its glyph")
 	# One shared material, tuned in one place; its defaults leave the art
 	# as painted.
@@ -342,7 +343,7 @@ func _check_starter_art() -> void:
 		_expect_eq(material.shader.get_shader_uniform_list().size(), 3, "The card-art shader compiles (3 uniforms)")
 		_expect_eq(material.get_shader_parameter("art_contrast"), 1.0, "art_contrast defaults to 1.0 (off)")
 		_expect_eq(material.get_shader_parameter("art_tint"), Color.WHITE, "art_tint defaults to white (off)")
-	with_art.set_card_data(_card("endure"))
+	with_art.set_card_data(_card("left_hand"))
 	_expect(not with_art.art_rect.visible and with_art.glyph.visible, "A reused face drops the art for a card without")
 	with_art.queue_free()
 	without_art.queue_free()
@@ -648,7 +649,7 @@ func _check_blood_arc_effect() -> void:
 		node.free()
 	_completed += 1
 
-# A card by file name - the Wanderer's, else a neutral one (Endure).
+# A card by file name - the Wanderer's, else a neutral one (Endure, Left Hand).
 func _card(card_name: String) -> CardData:
 	var path: String = "res://cards/data/%s.tres" % card_name
 	if not ResourceLoader.exists(path):
