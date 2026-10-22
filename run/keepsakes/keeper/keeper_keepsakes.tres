@@ -7,7 +7,6 @@
 [ext_resource type="Resource" path="res://run/keepsakes/keeper/departure_stub.tres" id="5_departure_stub"]
 [ext_resource type="Resource" path="res://run/keepsakes/bent_nail.tres" id="6_bent_nail"]
 [ext_resource type="Resource" path="res://run/keepsakes/worn_page.tres" id="7_worn_page"]
-[ext_resource type="Resource" path="res://run/keepsakes/keeper/blue_fastener.tres" id="8_blue_fastener"]
 
 [sub_resource type="Resource" id="KeepsakeEntry_house_key"]
 script = ExtResource("2_entry")
@@ -29,10 +28,6 @@ trinket = ExtResource("6_bent_nail")
 script = ExtResource("2_entry")
 trinket = ExtResource("7_worn_page")
 
-[sub_resource type="Resource" id="KeepsakeEntry_blue_fastener"]
-script = ExtResource("2_entry")
-trinket = ExtResource("8_blue_fastener")
-
 [resource]
 script = ExtResource("1_table")
-entries = Array[ExtResource("2_entry")]([SubResource("KeepsakeEntry_house_key"), SubResource("KeepsakeEntry_frayed_cord"), SubResource("KeepsakeEntry_departure_stub"), SubResource("KeepsakeEntry_bent_nail"), SubResource("KeepsakeEntry_worn_page"), SubResource("KeepsakeEntry_blue_fastener")])
+entries = Array[ExtResource("2_entry")]([SubResource("KeepsakeEntry_house_key"), SubResource("KeepsakeEntry_frayed_cord"), SubResource("KeepsakeEntry_departure_stub"), SubResource("KeepsakeEntry_bent_nail"), SubResource("KeepsakeEntry_worn_page")])

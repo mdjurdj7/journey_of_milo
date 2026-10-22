@@ -1,12 +1,15 @@
 [gd_resource type="Resource" script_class="TrinketData" load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://run/trinket_data.gd" id="1_trinket_data"]
-[ext_resource type="Texture2D" path="res://assets/textures/keepsakes/blue_fastener.svg" id="9_art"]
+[ext_resource type="Texture2D" path="res://assets/textures/armor/blue_fastener.svg" id="9_art"]
 
 [resource]
 script = ExtResource("1_trinket_data")
 id = &"blue_fastener"
 display_name = "Blue Fastener"
+slot = 1
+rarity = 1
+article = "a"
 flavor_text = "Too small for you."
 description = "Up to {carry} of your Block carries over to your next turn."
 short_description = "Keep up to {carry} Block between turns."

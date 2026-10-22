@@ -2,7 +2,7 @@ extends SceneTree
 
 # Headless probe for the Keeper's keepsake: her own table and its one
 # roll per run, the in-world plaque's take / replace / keep, the offer
-# claimed for good, and each of her six keepsakes' effects - in the one
+# claimed for good, and each of her five keepsakes' effects - in the one
 # keepsake slot, never a stack.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/keeper_keepsake_probe.gd
@@ -23,7 +23,8 @@ const KEEPER_TABLE_PATH := "res://run/keepsakes/keeper/keeper_keepsakes.tres"
 const HOUSE_KEY_PATH := "res://run/keepsakes/keeper/house_key.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const WRAPPED_SWEET_PATH := "res://run/keepsakes/keeper/wrapped_sweet.tres"
-const BLUE_FASTENER_PATH := "res://run/keepsakes/keeper/blue_fastener.tres"
+const BLUE_FASTENER_PATH := "res://run/armor/blue_fastener.tres"
+const SHOP_WORN_PATH := "res://run/shop/shop_worn.tres"
 const DEPARTURE_STUB_PATH := "res://run/keepsakes/keeper/departure_stub.tres"
 const SIGNAL_GLASS_PATH := "res://run/keepsakes/keeper/signal_glass.tres"
 const PRESSED_FLOWER_PATH := "res://run/keepsakes/keeper/pressed_flower.tres"
@@ -33,8 +34,8 @@ const WORN_PAGE_PATH := "res://run/keepsakes/worn_page.tres"
 const BITE_DOWN_PATH := "res://cards/data/bite_down.tres"
 const DOWN_PAYMENT_PATH := "res://cards/data/down_payment.tres"
 const OWED_PATH := "res://battle/rules/statuses/owed.tres"
-const KEEPER_IDS: Array[StringName] = [&"house_key", &"frayed_cord", &"departure_stub", &"bent_nail", &"worn_page", &"blue_fastener"]
-const KEEPER_PATHS: Array[String] = [HOUSE_KEY_PATH, FRAYED_CORD_PATH, DEPARTURE_STUB_PATH, BENT_NAIL_PATH, WORN_PAGE_PATH, BLUE_FASTENER_PATH]
+const KEEPER_IDS: Array[StringName] = [&"house_key", &"frayed_cord", &"departure_stub", &"bent_nail", &"worn_page"]
+const KEEPER_PATHS: Array[String] = [HOUSE_KEY_PATH, FRAYED_CORD_PATH, DEPARTURE_STUB_PATH, BENT_NAIL_PATH, WORN_PAGE_PATH]
 const SAFETY_SECONDS := 400.0
 
 var _run_state: Node = null
@@ -80,7 +81,7 @@ func _initialize() -> void:
 
 # --- Her table ---
 
-# Each of her six has its object art: 1024 square with mipmaps (the
+# Each of her five has its object art: 1024 square with mipmaps (the
 # plaque's ItemPlate draws it well under that) - an SVG or a PNG, named
 # for the keepsake.
 func _check_art() -> void:
@@ -104,9 +105,16 @@ func _check_table() -> void:
 	var ids: Array[StringName] = []
 	for entry in table.entries:
 		ids.append(entry.trinket.id)
-	_expect_eq(ids, KEEPER_IDS, "...holds exactly her six keepsakes")
+	_expect_eq(ids, KEEPER_IDS, "...holds exactly her five keepsakes")
 	for entry in table.entries:
 		_expect(entry.trinket.slot == TrinketData.Slot.KEEPSAKE, "...each a keepsake, not a worn piece (%s)" % entry.trinket.display_name)
+	# Blue Fastener, once hers, is the shop's worn piece now.
+	var fastener: TrinketData = load(BLUE_FASTENER_PATH)
+	_expect(fastener.slot == TrinketData.Slot.WORN, "Blue Fastener is a worn piece")
+	var shop_ids: Array[StringName] = []
+	for entry in (load(SHOP_WORN_PATH) as KeepsakeTable).entries:
+		shop_ids.append(entry.trinket.id)
+	_expect(shop_ids.has(fastener.id) and not ids.has(fastener.id), "...in the shop's worn table, not hers")
 	var keeper: Node = (load(KEEPER_SCENE_PATH) as PackedScene).instantiate()
 	_expect(keeper.get("keeper_pool") == table, "keeper.tscn draws from that table")
 	_expect(keeper.get("offered_keepsake") == null, "...with no forced keepsake")

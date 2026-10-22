@@ -4,6 +4,7 @@
 [ext_resource type="Script" uid="uid://c2mabcrat0q5d" path="res://run/keepsake_entry.gd" id="2_entry"]
 [ext_resource type="Resource" path="res://run/armor/salt_collar.tres" id="3_first"]
 [ext_resource type="Resource" path="res://run/armor/reed_cape.tres" id="4_second"]
+[ext_resource type="Resource" path="res://run/armor/blue_fastener.tres" id="5_third"]
 
 [sub_resource type="Resource" id="KeepsakeEntry_first"]
 script = ExtResource("2_entry")
@@ -13,6 +14,10 @@ trinket = ExtResource("3_first")
 script = ExtResource("2_entry")
 trinket = ExtResource("4_second")
 
+[sub_resource type="Resource" id="KeepsakeEntry_third"]
+script = ExtResource("2_entry")
+trinket = ExtResource("5_third")
+
 [resource]
 script = ExtResource("1_table")
-entries = Array[ExtResource("2_entry")]([SubResource("KeepsakeEntry_first"), SubResource("KeepsakeEntry_second")])
+entries = Array[ExtResource("2_entry")]([SubResource("KeepsakeEntry_first"), SubResource("KeepsakeEntry_second"), SubResource("KeepsakeEntry_third")])

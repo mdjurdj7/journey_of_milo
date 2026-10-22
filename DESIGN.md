@@ -672,9 +672,10 @@ and up the west shore north of z -27. (2026-10-17.)
   Glassbone docs; tempering 2026-10-07.)
 - **The keeper's pool is the run's opening lean; small finds are the
   bedroll's.** The keeper offers one of House Key, Frayed Cord, Departure
-  Stub, Bent Nail, Worn Page and Blue Fastener (run/keepsakes/keeper/
-  keeper_keepsakes.tres, weight 1 each); the belongings bedroll's table
-  holds Wrapped Sweet, White Shell, Signal Glass and Pressed Flower - a
+  Stub, Bent Nail and Worn Page (run/keepsakes/keeper/
+  keeper_keepsakes.tres, weight 1 each) - Blue Fastener, once hers, is a
+  worn piece in the shop's worn table now (run/armor/, 2026-10-21); the
+  belongings bedroll's table holds Wrapped Sweet, White Shell, Signal Glass and Pressed Flower - a
   column still unreachable while floor 2's cache offers the Bedroll.
   The files kept their paths and UIDs, so the folder names no longer
   match the tables: run/keepsakes/keeper/ holds three of the bedroll's,
