@@ -19,4 +19,5 @@ target_type = 1
 description = "Gain {block} block."
 effects = Array[ExtResource("2_card_effect")]([SubResource("E_block")])
 art = ExtResource("9_art")
+play_sound_path = "res://assets/audio/cards/Endure/Endure.mp3"
 offer = 1
