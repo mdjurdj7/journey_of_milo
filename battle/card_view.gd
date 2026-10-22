@@ -121,6 +121,21 @@ const TOKEN_TOLL_COST := "{toll_cost}"
 const TOLL_GLYPH_PATH := "res://assets/ui/toll_glyph.svg"
 const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 const TOLL_KEYWORD := "Toll"
+# A conditional Toll price inline (Settled Account's "{toll_price}: 5 more
+# block."): the glyph, then its toll_cost in bold toll ink. In the plain
+# text the fitter and keyword_rects() shape, the glyph is TOLL_GLYPH_CHAR -
+# one character, as RichTextLabel counts the image that holds its place: a
+# clear spacer the glyph's width (TOLL_SPACER_*), the glyph drawn over it
+# (_draw_inline_toll_glyphs()) where the face wants it, centred on the
+# x-height. Hovered, it answers as Toll.
+const TOKEN_TOLL_PRICE := "{toll_price}"
+const TOLL_GLYPH_CHAR := "\uFFFC"
+const TOLL_SPACER_OPEN := "[img width="
+const TOLL_SPACER_CLOSE := " height=1 color=#00000000]res://assets/ui/toll_glyph.svg[/img]"
+# _rules_runs()' kinds.
+const RUN_REGULAR := 0
+const RUN_BOLD := 1
+const RUN_GLYPH := 2
 # The Energy owed next turn - the value of an effect applying an energy-
 # debt status (StatusData.energy_debt - Come Due's 2).
 const TOKEN_DEBT := "{debt}"
@@ -319,6 +334,21 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 	set(value):
 		toll_glyph_offset_px = value
 		_relayout()
+# The inline glyph (TOKEN_TOLL_PRICE): inline_toll_glyph_height_fraction of
+# the rules text's size tall, centred on its x-height and moved by
+# inline_toll_glyph_offset_px, inline_toll_glyph_gap_px before its number.
+@export_range(0.1, 2.0) var inline_toll_glyph_height_fraction: float = 0.8:
+	set(value):
+		inline_toll_glyph_height_fraction = value
+		_relayout_rules()
+@export var inline_toll_glyph_gap_px: float = 1.0:
+	set(value):
+		inline_toll_glyph_gap_px = value
+		_relayout_rules()
+@export var inline_toll_glyph_offset_px: Vector2 = Vector2.ZERO:
+	set(value):
+		inline_toll_glyph_offset_px = value
+		_relayout_rules()
 # The rules text's sizes at 1x, largest first: each is tried in turn
 # until the text fits the space under the art field. The last is the
 # floor - text that still doesn't fit there wraps on and the card grows
@@ -803,6 +833,8 @@ func _ready() -> void:
 	_toll_glyph.texture = toll_glyph_texture()
 	_toll_glyph.visible = false
 	cost_label.add_sibling(_toll_glyph)
+	rules_text.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	rules_text.draw.connect(_draw_inline_toll_glyphs)
 	# The toll ink lives on the theme: a tune there re-inks every face.
 	var battle_theme: BattleTheme = _battle_theme()
 	if battle_theme != null:
@@ -894,7 +926,7 @@ func _refresh_dynamic_text() -> void:
 	# Read at the HP the card will have once its own costs are paid, so a
 	# Critical clause the payment itself reaches (Self-Eater's) already shows.
 	_bonus_state = CardBonus.state(card_data, _bonus_context.for_card_preview(_upfront_hp_cost())) if _bonus_context != null else CardBonus.State.NONE
-	rules_text.text = _style_bonus_clauses(_format_rules(_resolve_tokens(card_data.description)))
+	rules_text.text = _inline_toll_prices(_style_bonus_clauses(_format_rules(_resolve_tokens(card_data.description))))
 	if _bonus_state != was:
 		_animate_bonus_corner()
 
@@ -961,10 +993,10 @@ func _resolve_tokens(description: String) -> String:
 		var energy: int = _effect_value(card_data, [CardEffect.EffectType.GAIN_ENERGY])
 		if energy >= 0:
 			text = text.replace(TOKEN_ENERGY, str(energy))
-	if text.contains(TOKEN_TOLL_COST):
+	if text.contains(TOKEN_TOLL_COST) or text.contains(TOKEN_TOLL_PRICE):
 		for effect in card_data.effects:
 			if effect != null and (effect.effect_type == CardEffect.EffectType.SPEND_TOLL or effect.effect_type == CardEffect.EffectType.TOLL_BLOCK):
-				text = text.replace(TOKEN_TOLL_COST, str(effect.toll_cost))
+				text = text.replace(TOKEN_TOLL_COST, str(effect.toll_cost)).replace(TOKEN_TOLL_PRICE, TOLL_GLYPH_CHAR + str(effect.toll_cost))
 				break
 	if text.contains(TOKEN_REPLAY_ATTACK):
 		var replayed: CardData = replay_attack()
@@ -1256,6 +1288,74 @@ func _style_bonus_clauses(bbcode: String) -> String:
 	text = text.replace(MARK_IF_OPEN, if_open).replace(MARK_IF_CLOSE, "[/color]" if not if_open.is_empty() else "")
 	text = text.replace(MARK_ELSE_OPEN, else_open).replace(MARK_ELSE_CLOSE, "[/color]" if not else_open.is_empty() else "")
 	return text
+
+# Each inline Toll price (TOLL_GLYPH_CHAR and its number) as BBCode: the
+# glyph's clear spacer at the rules text's size now, then the number in
+# bold - in the toll ink, or the clause's own dormant ink while it is
+# dormant.
+func _inline_toll_prices(bbcode: String) -> String:
+	if not bbcode.contains(TOLL_GLYPH_CHAR):
+		return bbcode
+	var spacer: String = _toll_spacer(rules_text.get_theme_font_size("normal_font_size"))
+	var ink: String = "" if _toll_price_dormant() else "[color=#%s]" % _toll_ink().to_html(true)
+	var price := RegEx.create_from_string(TOLL_GLYPH_CHAR + "(\\d+)")
+	return price.sub(bbcode, spacer + "[b]" + ink + "$1" + ("[/color]" if not ink.is_empty() else "") + "[/b]", true)
+
+# The inline glyph's place in the text at `font_size`: a clear image as
+# wide as the glyph and its gap, whole pixels.
+func _toll_spacer(font_size: int) -> String:
+	return TOLL_SPACER_OPEN + str(_toll_spacer_width(font_size)) + TOLL_SPACER_CLOSE
+
+func _toll_spacer_width(font_size: int) -> int:
+	return maxi(roundi(_inline_toll_glyph_size(font_size).x + inline_toll_glyph_gap_px), 1)
+
+func _inline_toll_glyph_size(font_size: int) -> Vector2:
+	return toll_glyph_size(float(font_size) * inline_toll_glyph_height_fraction)
+
+# Whether the inline price sits in a clause that reads dormant now.
+func _toll_price_dormant() -> bool:
+	if _bonus_state != CardBonus.State.DORMANT or card_data == null:
+		return false
+	var open: int = card_data.description.find(MARK_IF_OPEN)
+	var at: int = card_data.description.find(TOKEN_TOLL_PRICE)
+	var close: int = card_data.description.find(MARK_IF_CLOSE, maxi(open, 0))
+	return open >= 0 and open < at and at < close
+
+# The ink the inline glyph draws in - its number's.
+func _inline_toll_ink() -> Color:
+	return Color(bonus_dormant_ink, rules_alpha) if _toll_price_dormant() else _toll_ink()
+
+# The spacers re-cut for the size the layout landed on.
+func _size_toll_spacers(font_size: int) -> void:
+	if rules_text == null or not rules_text.text.contains(TOLL_SPACER_CLOSE):
+		return
+	var text: String = rules_text.text
+	var out: String = ""
+	var at: int = text.find(TOLL_SPACER_OPEN)
+	while at >= 0:
+		var close: int = text.find(TOLL_SPACER_CLOSE, at)
+		if close < 0:
+			break
+		out += text.substr(0, at) + _toll_spacer(font_size)
+		text = text.substr(close + TOLL_SPACER_CLOSE.length())
+		at = text.find(TOLL_SPACER_OPEN)
+	rules_text.text = out + text
+
+# Over each inline spacer, the glyph: on the rules label's own canvas,
+# after its text.
+func _draw_inline_toll_glyphs() -> void:
+	var texture: Texture2D = toll_glyph_texture()
+	if texture == null or not rules_text.text.contains(TOLL_SPACER_CLOSE):
+		return
+	var ink: Color = _inline_toll_ink()
+	for rect: Rect2 in _rules_geometry()["glyphs"]:
+		rules_text.draw_texture_rect(texture, Rect2(rect.position - rules_text.position, rect.size), false, ink)
+
+# The inline glyph's spacing exports moved: the text and the face again.
+func _relayout_rules() -> void:
+	if is_node_ready() and card_data != null:
+		_refresh_dynamic_text()
+		_apply_layout()
 
 # The description with its markers stripped - what the face reads as
 # plain text, for measuring.
@@ -1890,23 +1990,46 @@ func _is_copy() -> bool:
 # shaped in the label's fonts at its size: RichTextLabel reports no
 # per-character positions.
 func keyword_rects() -> Array[Dictionary]:
+	return _rules_geometry()["keywords"]
+
+# keyword_rects() - an inline Toll glyph answering as Toll among them - and
+# under "glyphs" each inline glyph's own rect, where it draws: its ink
+# inline_toll_glyph_height_fraction of the size tall, centred on the
+# x-height, at the start of its spacer.
+func _rules_geometry() -> Dictionary:
 	var found: Array[Dictionary] = []
-	if card_data == null or rules_text == null or KEYWORDS.is_empty():
-		return found
+	var glyphs: Array[Rect2] = []
+	var geometry: Dictionary = {"keywords": found, "glyphs": glyphs}
+	if card_data == null or rules_text == null:
+		return geometry
 	var text: String = rules_text.get_parsed_text()
+	# The label reads each inline glyph's image as one character of its
+	# own; the plain text says which.
+	var plain: String = _strip_markers(_resolve_tokens(card_data.description))
+	if plain.length() == text.length() and plain.contains(TOLL_GLYPH_CHAR):
+		var at: int = plain.find(TOLL_GLYPH_CHAR)
+		while at >= 0:
+			text = text.substr(0, at) + TOLL_GLYPH_CHAR + text.substr(at + 1)
+			at = plain.find(TOLL_GLYPH_CHAR, at + 1)
+	var has_glyph: bool = text.contains(TOLL_GLYPH_CHAR)
+	if KEYWORDS.is_empty() and not has_glyph:
+		return geometry
 	var regular: Font = rules_text.get_theme_font("normal_font")
 	var bold: Font = rules_text.get_theme_font("bold_font")
 	var font_size: int = rules_text.get_theme_font_size("normal_font_size")
 	var keyword: RegEx = KeywordTable.shared().pattern()
 	var matches: Array[RegExMatch] = keyword.search_all(text)
-	if matches.is_empty():
-		return found
+	if matches.is_empty() and not has_glyph:
+		return geometry
+	var glyph_size: Vector2 = _inline_toll_glyph_size(font_size)
+	var x_middle: float = regular.get_ascent(font_size) + _cap_top(rules_font, font_size, "x") / 2.0
 	var top: float = rules_text.position.y + maxf((rules_text.size.y - float(rules_text.get_content_height())) / 2.0, 0.0)
 	for line in rules_text.get_line_count():
 		var span: Vector2i = rules_text.get_line_range(line)
 		# A wrapped line's break space, or a paragraph's newline, isn't drawn.
 		var start: int = span.x
-		while start < span.y and (text[start] == " " or text[start] == "\n"):
+		while start < span.y and (text[start] == " " or text[start] == "
+"):
 			start += 1
 		var left: float = rules_text.position.x + (rules_text.size.x - float(rules_text.get_line_width(line))) / 2.0
 		var y: float = top + rules_text.get_line_offset(line)
@@ -1917,24 +2040,57 @@ func keyword_rects() -> Array[Dictionary]:
 			var x: float = left + _shaped_width(text, start, found_match.get_start(), matches, regular, bold, font_size)
 			var width: float = bold.get_string_size(found_match.get_string(), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 			found.append({"keyword": found_match.get_string(1), "rect": Rect2(x, y, width, height).grow(KEYWORD_HIT_PAD_PX)})
-	return found
+		var glyph_at: int = text.find(TOLL_GLYPH_CHAR, start)
+		while glyph_at >= 0 and glyph_at < span.y:
+			var x: float = left + _shaped_width(text, start, glyph_at, matches, regular, bold, font_size)
+			var rect := Rect2(Vector2(x, y + x_middle - glyph_size.y / 2.0) + inline_toll_glyph_offset_px, glyph_size)
+			glyphs.append(rect)
+			found.append({"keyword": TOLL_KEYWORD, "rect": rect.grow(KEYWORD_HIT_PAD_PX)})
+			glyph_at = text.find(TOLL_GLYPH_CHAR, glyph_at + 1)
+	return geometry
 
 # The width of text[from, to) on one line, keywords in Bold as drawn.
-static func _shaped_width(text: String, from: int, to: int, matches: Array[RegExMatch], regular: Font, bold: Font, font_size: int) -> float:
+func _shaped_width(text: String, from: int, to: int, matches: Array[RegExMatch], regular: Font, bold: Font, font_size: int) -> float:
 	var line := TextLine.new()
-	var at: int = from
-	for found_match in matches:
-		if found_match.get_end() <= from or found_match.get_start() >= to:
-			continue
-		var bold_from: int = maxi(found_match.get_start(), from)
-		var bold_to: int = mini(found_match.get_end(), to)
-		if bold_from > at:
-			line.add_string(text.substr(at, bold_from - at), regular, font_size)
-		line.add_string(text.substr(bold_from, bold_to - bold_from), bold, font_size)
-		at = bold_to
-	if to > at:
-		line.add_string(text.substr(at, to - at), regular, font_size)
+	var spacer: Vector2 = Vector2(float(_toll_spacer_width(font_size)), 1.0)
+	for run: Vector3i in _rules_runs(text, from, to, matches):
+		if run.z == RUN_GLYPH:
+			line.add_object("toll_glyph_%d" % run.x, spacer, INLINE_ALIGNMENT_CENTER, 1)
+		else:
+			line.add_string(text.substr(run.x, run.y - run.x), bold if run.z == RUN_BOLD else regular, font_size)
 	return line.get_line_width()
+
+# text[from, to) as the face sets it, in runs (start, end, RUN_*): bold
+# on keywords (`matches`) and on an inline Toll price's number, the
+# price's glyph (TOLL_GLYPH_CHAR) an object of its own, regular between.
+static func _rules_runs(text: String, from: int, to: int, matches: Array[RegExMatch]) -> Array[Vector3i]:
+	var marks: Array[Vector3i] = []
+	for found_match in matches:
+		marks.append(Vector3i(found_match.get_start(), found_match.get_end(), RUN_BOLD))
+	var glyph: int = text.find(TOLL_GLYPH_CHAR)
+	while glyph >= 0:
+		marks.append(Vector3i(glyph, glyph + 1, RUN_GLYPH))
+		var end: int = glyph + 1
+		while end < text.length() and text[end] >= "0" and text[end] <= "9":
+			end += 1
+		if end > glyph + 1:
+			marks.append(Vector3i(glyph + 1, end, RUN_BOLD))
+		glyph = text.find(TOLL_GLYPH_CHAR, end)
+	marks.sort_custom(func(a: Vector3i, b: Vector3i) -> bool: return a.x < b.x)
+	var runs: Array[Vector3i] = []
+	var at: int = from
+	for mark in marks:
+		if mark.y <= from or mark.x >= to:
+			continue
+		var start: int = maxi(mark.x, from)
+		var end: int = mini(mark.y, to)
+		if start > at:
+			runs.append(Vector3i(at, start, RUN_REGULAR))
+		runs.append(Vector3i(start, end, mark.z))
+		at = end
+	if to > at:
+		runs.append(Vector3i(at, to, RUN_REGULAR))
+	return runs
 
 func _show_keyword(word: String) -> void:
 	if word == _hovered_keyword or _keyword_reveal == null:
@@ -2434,6 +2590,7 @@ func _apply_style() -> void:
 
 func _apply_rules_font_size(font_size: int) -> void:
 	var metrics: Vector3i = rules_metrics(font_size)
+	_size_toll_spacers(font_size)
 	rules_text.add_theme_font_size_override("normal_font_size", font_size)
 	rules_text.add_theme_font_size_override("bold_font_size", font_size)
 	rules_text.add_theme_constant_override("line_separation", metrics.y)
@@ -2807,18 +2964,18 @@ func _rules_wrap(font_size: int, width: float) -> Array[PackedStringArray]:
 	var bold: Font = rules_font_bold if rules_font_bold != null else rules_font
 	var keyword: RegEx = KeywordTable.shared().pattern()
 	var plain: String = _strip_markers(_resolve_tokens(card_data.description)).strip_edges()
+	var spacer: Vector2 = Vector2(float(_toll_spacer_width(font_size)), 1.0)
 	for text in plain.split("\n"):
 		var paragraph := TextParagraph.new()
 		paragraph.width = width
 		paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
-		var at: int = 0
-		for found in keyword.search_all(text):
-			if found.get_start() > at:
-				paragraph.add_string(text.substr(at, found.get_start() - at), rules_font, font_size)
-			paragraph.add_string(found.get_string(), bold, font_size)
-			at = found.get_end()
-		if at < text.length() or text.is_empty():
-			paragraph.add_string(text.substr(at), rules_font, font_size)
+		for run: Vector3i in _rules_runs(text, 0, text.length(), keyword.search_all(text)):
+			if run.z == RUN_GLYPH:
+				paragraph.add_object("toll_glyph_%d" % run.x, spacer, INLINE_ALIGNMENT_CENTER, 1)
+			else:
+				paragraph.add_string(text.substr(run.x, run.y - run.x), bold if run.z == RUN_BOLD else rules_font, font_size)
+		if text.is_empty():
+			paragraph.add_string(text, rules_font, font_size)
 		var lines := PackedStringArray()
 		for i in paragraph.get_line_count():
 			var span: Vector2i = paragraph.get_line_range(i)

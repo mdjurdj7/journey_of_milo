@@ -482,8 +482,8 @@ func _check_screen_temper() -> void:
 			"brace":
 				_expect(text.ends_with("\n[u]Draw 1.[/u]") and text.count("[u]") == 1, "...Brace+ underlines its added line whole (%s)" % text)
 			"settled_account":
-				_expect_eq(text, "Gain [u]8[/u] block.
-Spend 5 [b]Toll[/b]: 5 more block.", "...Settled Account+ underlines its 8 alone")
+				_expect(text.begins_with("Gain [u]8[/u] block.
+") and text.count("[u]") == 1 and text.contains(CardView.TOLL_SPACER_CLOSE), "...Settled Account+ underlines its 8 alone, its Toll glyph inline (%s)" % text)
 			"down_payment":
 				_expect(text.begins_with("Gain [u]8[/u] ") and text.count("[u]") == 1, "...Down Payment+ underlines its 8 (%s)" % text)
 		_expect(cost_mark == null, "...and no cost (it's the same)")

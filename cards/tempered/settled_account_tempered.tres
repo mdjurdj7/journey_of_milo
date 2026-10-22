@@ -23,7 +23,7 @@ card_type = 1
 rarity = 1
 target_type = 1
 description = "Gain {block} block.
-{if}Spend {toll_cost} Toll: {toll_block} more block.{/if}"
+{if}{toll_price}: {toll_block} more block.{/if}"
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_block"), SubResource("CardEffect_toll_block")])
 art = ExtResource("9_art")
 play_sound_path = "res://assets/audio/cards/Settled Account/Settled Account.mp3"
