@@ -6,9 +6,8 @@
 script = ExtResource("1_status_data")
 id = "unbroken"
 display_name = "Unbroken"
-description = "Until your next turn, take {value} less from each attack."
+description = "Until your next turn, each hit deals {value} less."
 default_magnitude = 4
 default_duration_turns = 1
 stack_rule = 1
-reduces_attack_total = true
-ignores_strike_backs = true
+reduces_each_hit = true

@@ -402,6 +402,15 @@ static func attack_total_reduction(statuses: Array[Status]) -> int:
 			total += maxi(active.magnitude, 0)
 	return total
 
+# What `statuses` take off every enemy hit against their holder
+# (StatusData.reduces_each_hit - Unbroken's), summed.
+static func hit_reduction(statuses: Array[Status]) -> int:
+	var total: int = 0
+	for active in statuses:
+		if active.data != null and active.data.reduces_each_hit:
+			total += maxi(active.magnitude, 0)
+	return total
+
 static func remove_from(statuses: Array[Status], active: Status) -> void:
 	statuses.erase(active)
 
@@ -749,7 +758,7 @@ static func consume_after_attack(statuses: Array[Status], keep: StatusData = nul
 			statuses.erase(active)
 
 # `statuses` less those a strike back passes by (StatusData.ignores_strike_
-# backs - Braced, Garnished, No Further's armed, Unbroken's): what such a
+# backs - Braced, Garnished, No Further's armed): what such a
 # hit reads its modifiers and reductions off. A new list; the statuses themselves are the same.
 static func strike_back_view(statuses: Array[Status]) -> Array[Status]:
 	var seen: Array[Status] = []

@@ -144,8 +144,8 @@ enum IntentType { ATTACK, DEFEND, BURROW, HEAL_ALLY, WATCH, SETTLE, COIL, DIG, T
 
 # An ATTACK that lands as a strike back does (EnemyTurn.land_attack()'s
 # strike_back): the statuses that wait for the enemy's own turn - Braced,
-# Garnished, No Further's armed, Unbroken's - neither soften it nor are
-# spent by it; Block and absorb still take their share. The Siltjaw's
+# Garnished, No Further's armed - neither soften it nor are spent by it;
+# Unbroken's, Block and absorb still take their share. The Siltjaw's
 # Erupt.
 @export var lands_as_strike_back: bool = false
 

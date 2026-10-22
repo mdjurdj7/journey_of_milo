@@ -575,7 +575,7 @@ func get_intent_preview(enemy: FieldEnemy) -> Dictionary:
 # read from where the ones before it leave the player (EnemyTurn.turn_
 # state()): the worn piece's first hit and No Further's armed are spent
 # by the first attack that spends them, not shown off every enemy's, and
-# Unbroken cuts each attack until the player's next turn - so each
+# Unbroken cuts every hit until the player's next turn - so each
 # readout, each Signal's answers and the warning across enemies carry
 # the hits that will land.
 func _turn_previews() -> Dictionary:
@@ -1734,8 +1734,8 @@ func _counter_strikes(against: Array[FieldEnemy]) -> void:
 			await get_tree().create_timer(snap_delay).timeout
 		await _report_enemy_attack(enemy, result)
 		_hp_owed = 0
-		# What the strike spent leaves the readouts (Garnished and
-		# Unbroken wait for the enemy's own turn - ignores_strike_backs).
+		# What the strike spent leaves the readouts (Garnished waits for
+		# the enemy's own turn - ignores_strike_backs).
 		status_changed.emit()
 
 # --- The dig (EnemyIntent.IntentType.DIG) ---

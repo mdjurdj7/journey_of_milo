@@ -201,12 +201,20 @@ enum Mark { NONE, COIL, DROP }
 # Copies add up through StackRule.ADD_MAGNITUDE. Pair it with
 # consumed_by_own_attack and DURATION_UNTIL_TRIGGERED.
 # On the player instead, it's each enemy ATTACK against them that deals
-# `magnitude` less in all (Unbroken's, at Critical) - the same pool, so
-# Garnished on the attacker and this add up. Unbroken pairs it there with
-# default_duration_turns 1, so it lasts until the player's next turn
-# starts; consumed_by_attack_against instead would end it with the first
-# attack. Never consumed_by_own_attack.
+# `magnitude` less in all - the same pool, so Garnished on the attacker
+# and this add up. Never consumed_by_own_attack.
 @export var reduces_attack_total: bool = false
+
+# On the player: every enemy hit against them deals `magnitude` less, each
+# down to 0 at most - after every modifier and the attack's total
+# reduction (Garnished's), before block (EnemyTurn.land_attack(); the
+# intent's preview reads it the same way - replay_attack()). Unbroken's,
+# at Critical, with default_duration_turns 1: until the player's next turn
+# starts, every hit of every attack, so a 3-hit attack loses it three
+# times. A strike back is a hit too - leave ignores_strike_backs off.
+# Self-inflicted loss never goes through a hit. Copies add up through
+# StackRule.ADD_MAGNITUDE.
+@export var reduces_each_hit: bool = false
 
 # Its holder's next turn is skipped (Stunned): whatever move is queued
 # doesn't happen and the pattern moves on as if it had - lost, not
@@ -291,8 +299,7 @@ enum Mark { NONE, COIL, DROP }
 # Siltjaw's Erupt): it neither softens that hit nor
 # is spent by it, and waits, armed, for the enemy's own turn. The strike
 # back lands in full past it. Braced (Brace) and Garnished (Garnish) on
-# the enemy's intent; No Further's armed status and Unbroken's on the
-# player.
+# the enemy's intent; No Further's armed status on the player.
 @export var ignores_strike_backs: bool = false
 
 # Barbed (Stoneshell): the first enemy attack hit its holder's Block takes

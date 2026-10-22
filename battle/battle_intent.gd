@@ -31,7 +31,7 @@ class_name BattleIntent
 # TAUNT (the Glower's Puff), a ring round a dark centre. A
 # HEAL_ALLY (the Nipper's Forage) is a plus beside the HP its packmates
 # will heal. A multi-hit attack whose hits differ once its modifiers have
-# run - Unbroken soaking the first, so a 4×4 lands 0, 4, 4, 4 - reads
+# run - Garnish soaking the first, so a 4×4 lands 0, 4, 4, 4 - reads
 # their total with "4 HITS" small beneath it (the Hits group), never a
 # per-hit number repeated over hits that differ; one whose hits are equal
 # stays "M×N" (No Further's every-hit 0 reads 0×3).
@@ -205,7 +205,7 @@ var layout_offset: Vector2 = Vector2.ZERO
 # 22) - it has to read at the battle frame's scale.
 @export_group("Hits")
 # A multi-hit attack whose hits differ once its modifiers have run (the
-# first soaked by Unbroken): the numeral reads their total, and this
+# first soaked by Garnish): the numeral reads their total, and this
 # small beneath it names how many - "4 HITS" - in the card type label's
 # voice (CardView: Alegreya Sans Bold caps, 0.16 em, at its alpha),
 # centred under the numeral, its line box hits_gap_px under the numeral's

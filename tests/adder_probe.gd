@@ -4,8 +4,8 @@ extends SceneTree
 # Bite -> Strike loop; Coiled, brought by the Coil resolving - a Stunned
 # Coil brings none - and held until its next move, striking back for 5
 # at each Attack card played against it - an enemy hit in every way (Block,
-# its attack bonuses, Grace) except that Brace, Garnish, No Further and
-# Unbroken pass it by - it lands in full and each stays armed for its turn;
+# its attack bonuses, Grace, Unbroken) except that Brace, Garnish and No
+# Further pass it by - it lands in full and each stays armed for its turn;
 # its attack bonuses, Grace) - Skills never, an all-enemies Attack once;
 # the Bite's Venom, landing whatever Block took and adding up; Venom's
 # tick at the turn's start - its stacks in HP, falling by 1, gone at 0,
@@ -165,12 +165,13 @@ func _check_counter_rules() -> void:
 	_expect_eq(PLAYER_HP - player.hp, COUNTER, "Garnished 5 on it: the strike back lands in full (5)")
 	_expect(_has(enemy, GARNISHED_PATH), "...and Garnished stays for its turn")
 	_clear(enemy, GARNISHED_PATH)
-	# Unbroken on the player: passed by - in full, and still armed.
+	# Unbroken on the player: a hit like any - cut, and still up.
 	player = _grace_player()
-	Status.apply_to(player.statuses, load(UNBROKEN_PATH))
+	var unbroken: StatusData = load(UNBROKEN_PATH)
+	Status.apply_to(player.statuses, unbroken)
 	EnemyTurn.counter_strike(enemy, data, player)
-	_expect_eq(PLAYER_HP - player.hp, COUNTER, "Unbroken 4: the strike back lands in full (5)")
-	_expect(_has(player, UNBROKEN_PATH), "...and Unbroken stays for its turn")
+	_expect_eq(PLAYER_HP - player.hp, maxi(COUNTER - unbroken.default_magnitude, 0), "Unbroken %d: the strike back lands %d" % [unbroken.default_magnitude, maxi(COUNTER - unbroken.default_magnitude, 0)])
+	_expect(_has(player, UNBROKEN_PATH), "...and Unbroken stays until the next turn")
 	# Brace and No Further wait for its own turn: a strike back lands in
 	# full past them and spends neither; its Bite, after, takes both.
 	player = _grace_player()

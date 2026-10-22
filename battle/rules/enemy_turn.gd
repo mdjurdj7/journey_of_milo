@@ -278,8 +278,9 @@ static func take_turn(combatant: Combatant, data: EnemyData, player: Combatant) 
 # `strike_back`: the hit answers a card in the player's turn (counter_
 # strike()), or lands as one does (EnemyIntent.lands_as_strike_back - the
 # Siltjaw's Erupt) - the statuses that wait for the enemy's own turn
-# (StatusData.ignores_strike_backs: Braced, Garnished, No Further's armed,
-# Unbroken's) neither soften it nor are spent by it.
+# (StatusData.ignores_strike_backs: Braced, Garnished, No Further's
+# armed) neither soften it nor are spent by it. Unbroken's softens it as
+# it does every hit.
 #
 # `repeat_action`: a second action of an intent carried out twice (Bereft)
 # - every mark on the intent (Status.marks() - Braced, Garnished, Wrested)
@@ -292,14 +293,15 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 	# about one hit, not the turn's total - and DamagePipeline is the only
 	# thing that knows the split between what block ate and what reached HP.
 	var largest_hit: int = 0
-	# What the attack loses in all (Garnished on this enemy, Unbroken on the
-	# player), soaked hit by hit.
-	# A strike back reads neither (Status.strike_back_view()).
+	# What the attack loses in all (Garnished on this enemy), soaked hit by
+	# hit, and what every hit loses (Unbroken on the player).
+	# A strike back reads only the latter (Status.strike_back_view()).
 	var own_statuses: Array[Status] = Status.strike_back_view(combatant.statuses) if strike_back else combatant.statuses
 	if repeat_action:
 		own_statuses = Status.without(own_statuses, Status.marks(own_statuses))
 	var player_statuses: Array[Status] = Status.strike_back_view(player.statuses) if strike_back else player.statuses
 	var reduction_left: int = Status.attack_total_reduction(own_statuses) + Status.attack_total_reduction(player_statuses)
+	var each_hit_cut: int = Status.hit_reduction(player_statuses)
 	# Barbed on the player (Stoneshell): armed for the first hit their
 	# Block takes any of - never a strike back's - and spent by it.
 	var barbed: Status = null if strike_back else barbed_on(player)
@@ -333,6 +335,8 @@ static func land_attack(combatant: Combatant, data: EnemyData, intent: EnemyInte
 			_tally_mark(numbers, active.data.intent_mark, amount, amount - share)
 		amount -= cut
 		reduction_left -= cut
+		# Unbroken: off every hit, after the total's cut, before Block.
+		amount = maxi(amount - each_hit_cut, 0)
 		# The worn piece's big hit (big_hit_reduction): this one, if it is
 		# the fight's first that big - cut before Block.
 		if takes_big_hit(player.big_hit_threshold, player.big_hit_reduction, player.big_hit_spent, amount):
@@ -441,9 +445,9 @@ static func takes_big_hit(threshold: int, reduction: int, spent: bool, amount: i
 # Coiled): an Attack card has just been played against this living enemy,
 # and it answers with one hit of the status's magnitude - an ATTACK in
 # every way, through land_attack() as a strike back - its attack bonuses
-# and modifiers, Block, Refuse the End, Grace - except that Braced,
-# Garnished, No Further's armed and Unbroken's wait for its own turn,
-# neither softening it nor spent by it. "intent" is the status's name, for the run log ("adder:Coiled").
+# and modifiers, Block, Unbroken's, Refuse the End, Grace - except that
+# Braced, Garnished and No Further's armed wait for its own turn, neither
+# softening it nor spent by it. "intent" is the status's name, for the run log ("adder:Coiled").
 # Empty when it holds nothing that strikes back, or either side is down.
 static func counter_strike(combatant: Combatant, data: EnemyData, player: Combatant) -> Dictionary:
 	if combatant == null or player == null or combatant.hp <= 0 or player.hp <= 0:
@@ -626,8 +630,8 @@ static func copy_state(state: Dictionary) -> Dictionary:
 
 # One attack of `attacker`'s landing on `state` - land_attack()'s
 # arithmetic, replayed: each hit's damage (its modifiers, then the total
-# reductions soaked hit by hit - Garnished on it, Unbroken on him - then
-# the worn piece's first hit, if this is the first to get past Block and
+# reductions soaked hit by hit - Garnished on it - and Unbroken's off
+# every hit, then the worn piece's first hit, if this is the first to get past Block and
 # absorb), worn through Block, absorb and HP, the lethal guard saving as
 # it would; then what lasted until an attack against him resolved (No
 # Further's) goes - Unbroken's stays, for the next attack too. `state` is
@@ -637,12 +641,14 @@ static func replay_attack(attacker: Combatant, data: EnemyData, intent: EnemyInt
 	var own_seen: Array[Status] = Status.strike_back_view(attacker.statuses) if strike_back else attacker.statuses
 	var theirs_seen: Array[Status] = Status.strike_back_view(theirs) if strike_back else theirs
 	var reduction_left: int = Status.attack_total_reduction(own_seen) + Status.attack_total_reduction(theirs_seen)
+	var each_hit_cut: int = Status.hit_reduction(theirs_seen)
 	var amounts: Array[int] = []
 	for hit in hit_count(attacker, intent):
 		var amount: int = hit_amount(attacker, data, intent, hit, theirs, strike_back)
 		var cut: int = reduce_hit(amount, reduction_left)
 		amount -= cut
 		reduction_left -= cut
+		amount = maxi(amount - each_hit_cut, 0)
 		if takes_big_hit(player.big_hit_threshold, player.big_hit_reduction, bool(state.get("big_hit_spent", true)), amount):
 			amount = maxi(amount - player.big_hit_reduction, 0)
 			state["big_hit_spent"] = true

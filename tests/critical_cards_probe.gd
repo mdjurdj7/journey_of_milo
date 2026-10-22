@@ -67,11 +67,11 @@ func _check_cornered() -> void:
 	_completed += 1
 
 # 6 block either way; at Critical, the Unbroken status too: until the
-# player's next turn, each enemy Attack against them deals 4 less in all
-# (Unbroken+ 6), soaked hit by hit like Garnish (4×3 lands 0, 4, 4),
-# after other modifiers and before block. An attack doesn't spend it -
-# the next one is cut as well - and it goes as the player's turn starts.
-# Two stack; with Garnish on the attacker, they add.
+# player's next turn, every enemy hit against them deals its magnitude
+# less (Unbroken+ more), after other modifiers and before block. An
+# attack doesn't spend it - the next one is cut as well - and it goes as
+# the player's turn starts. Two stack; Garnish's total on the attacker
+# comes off first.
 func _check_unbroken() -> void:
 	var card: CardData = _card("unbroken")
 	var player: Combatant = _player(50)
@@ -84,7 +84,7 @@ func _check_unbroken() -> void:
 	var guard: Status = _unbroken(player)
 	_expect(guard != null and guard.magnitude == 4, "...and Unbroken 4")
 	if guard != null:
-		_expect_eq(guard.describe(), "Until your next turn, take 4 less from each attack.", "...its hover")
+		_expect_eq(guard.describe(), "Until your next turn, each hit deals %d less." % guard.magnitude, "...its hover")
 	player.block = 0
 	var defender := EnemyData.new()
 	var defend := EnemyIntent.new()
@@ -94,17 +94,21 @@ func _check_unbroken() -> void:
 	defender.intents = [defend]
 	EnemyTurn.take_turn(_enemy(defender), defender, player)
 	_expect(_unbroken(player) != null, "A Defend leaves it")
-	var lash: EnemyData = _attacker_hits(4, 3)
+	# Every hit bigger than the cut, so each shows it.
+	var cut: int = guard.magnitude if guard != null else 0
+	var per_hit: int = cut + 3
+	var lash: EnemyData = _attacker_hits(per_hit, 3)
 	var enemy: Combatant = _enemy(lash)
-	_expect_eq(EnemyTurn.preview_intent(enemy, lash, player)["hit_amounts"], [0, 4, 4] as Array[int], "4×3 previews 0, 4, 4")
+	var each: Array[int] = [per_hit - cut, per_hit - cut, per_hit - cut]
+	_expect_eq(EnemyTurn.preview_intent(enemy, lash, player)["hit_amounts"], each, "%d×3 previews %d on every hit" % [per_hit, per_hit - cut])
 	var result: Dictionary = EnemyTurn.take_turn(enemy, lash, player)
-	_expect_eq(int(result["damage_to_hp"]), 8, "...and lands 8")
+	_expect_eq(int(result["damage_to_hp"]), 3 * (per_hit - cut), "...and lands %d" % (3 * (per_hit - cut)))
 	_expect(_unbroken(player) != null, "...leaving it up")
 	player.hp = 10
 	enemy = _enemy(lash)
-	_expect_eq(EnemyTurn.preview_intent(enemy, lash, player)["hit_amounts"], [0, 4, 4] as Array[int], "A second 4×3 previews 0, 4, 4 too")
+	_expect_eq(EnemyTurn.preview_intent(enemy, lash, player)["hit_amounts"], each, "A second %d×3 previews the same" % per_hit)
 	result = EnemyTurn.take_turn(enemy, lash, player)
-	_expect_eq(int(result["damage_to_hp"]), 8, "...and lands 8")
+	_expect_eq(int(result["damage_to_hp"]), 3 * (per_hit - cut), "...and lands %d" % (3 * (per_hit - cut)))
 	# The player's turn starts: its tick and expiry, as BattleController's.
 	Status.tick_all(player.statuses, func(_amount: int, _ticking: Status) -> void: pass)
 	Status.remove_expired(player.statuses)
@@ -114,10 +118,14 @@ func _check_unbroken() -> void:
 	var tempered_guard: Status = Status.find_in(player.statuses, load("res://battle/rules/statuses/unbroken_tempered.tres"))
 	_expect(tempered_guard != null and tempered_guard.magnitude == 6, "Unbroken+ while Critical: Unbroken 6")
 	if tempered_guard != null:
-		_expect_eq(tempered_guard.describe(), "Until your next turn, take 6 less from each attack.", "...its hover")
+		_expect_eq(tempered_guard.describe(), "Until your next turn, each hit deals %d less." % tempered_guard.magnitude, "...its hover")
 	player.block = 0
 	enemy = _enemy(lash)
-	_expect_eq(EnemyTurn.preview_intent(enemy, lash, player)["hit_amounts"], [0, 2, 4] as Array[int], "4×3 against Unbroken+ previews 0, 2, 4")
+	var tempered_cut: int = tempered_guard.magnitude if tempered_guard != null else 0
+	var tempered_each: Array[int] = []
+	for _hit in 3:
+		tempered_each.append(maxi(per_hit - tempered_cut, 0))
+	_expect_eq(EnemyTurn.preview_intent(enemy, lash, player)["hit_amounts"], tempered_each, "%d×3 against Unbroken+ previews %d on every hit" % [per_hit, tempered_each[0]])
 	player = _player(10)
 	_play(card, player, null)
 	_play(card, player, null)
@@ -128,7 +136,7 @@ func _check_unbroken() -> void:
 	enemy = _enemy(hit)
 	var ctx: EffectContext = _ctx(player, enemy)
 	_resolver.resolve_card(load("res://cards/data/garnish.tres"), ctx)
-	_expect_eq(int(EnemyTurn.take_turn(enemy, hit, player)["damage_to_hp"]), 0, "With Garnish's 5 on the attacker, a 10 lands 0 (10 - 8 - 5)")
+	_expect_eq(int(EnemyTurn.take_turn(enemy, hit, player)["damage_to_hp"]), 0, "With Garnish's 5 on the attacker, a 10 lands 0 (10 - 5 - 8)")
 	_completed += 1
 
 func _unbroken(player: Combatant) -> Status:
@@ -456,7 +464,7 @@ func _check_faces() -> void:
 	_expect_eq(await _face_state("last_wager", player), CardBonus.State.DORMANT, "...DORMANT at 21, already Critical")
 
 	face = await _face("unbroken", player)
-	_expect(face == "Gain 0 block.\nCritical: until your next turn, take 4 less from each attack.", "Unbroken under Last Resort: no block, the guard still there: " + face)
+	_expect(face == "Gain 0 block.\nCritical: each hit deals 4 less until your next turn.", "Unbroken under Last Resort: no block, the guard still there: " + face)
 	_expect_eq(await _face_state("unbroken", player), CardBonus.State.LIVE, "...its Critical line LIVE at 21")
 	player.hp = 50
 	_expect_eq(await _face_state("unbroken", player), CardBonus.State.DORMANT, "...and DORMANT at 50")
