@@ -146,6 +146,12 @@ enum ChainProperty { NONE = 0, ADVANCE = 1, HOLD = 2, WITHDRAW = 3 }
 var battle_copy: bool = false
 # See OfferScope.
 @export var offer: OfferScope = OfferScope.REWARDABLE
+# Set aside without deleting: never offered by any roll (RewardPool._
+# offerable() - rewards, bundles, belongings, the collector's stock),
+# whatever pool lists it, and left out of the title's card compendium and
+# the F1 card pickers. A deck that already holds it keeps it; card_smoke
+# still plays it so it doesn't rot.
+@export var benched: bool = false
 # What hovering this card's rules text says, under its name, when its
 # face is too short to spell out a rule (Not So's "return it": deal that
 # much to its attacker). Empty: the rules text answers only its keywords.

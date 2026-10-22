@@ -27,3 +27,4 @@ art = ExtResource("3_art")
 battle_animation = &"Slash"
 impact_time = 0.55
 card_class = &"wanderer"
+benched = true

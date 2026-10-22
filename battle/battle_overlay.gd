@@ -1768,7 +1768,7 @@ func _fill_debug_card_picker() -> void:
 			if not file.ends_with(".tres"):
 				continue
 			var card := load(dir.path_join(file)) as CardData
-			if card != null and card.usable_by(RunState.character):
+			if card != null and not card.benched and card.usable_by(RunState.character):
 				cards.append(card)
 	cards.sort_custom(func(a: CardData, b: CardData) -> bool: return a.card_name.naturalnocasecmp_to(b.card_name) < 0)
 	for card in cards:

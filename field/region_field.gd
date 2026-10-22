@@ -3936,8 +3936,8 @@ func _next_debug_keepsake() -> TrinketData:
 	return null
 
 # Every CardData in debug_card_dirs the run's class may have (CardData.
-# usable_by() - its own and neutral cards, never another class's), by
-# card name, each item carrying its card as metadata.
+# usable_by() - its own and neutral cards, never another class's), save a
+# benched one (CardData.benched), by card name, each item carrying its card as metadata.
 func _fill_debug_card_picker() -> void:
 	var cards: Array[CardData] = []
 	for dir in debug_card_dirs:
@@ -3945,7 +3945,7 @@ func _fill_debug_card_picker() -> void:
 			if not file.ends_with(".tres"):
 				continue
 			var card := load(dir.path_join(file)) as CardData
-			if card != null and card.usable_by(RunState.character):
+			if card != null and not card.benched and card.usable_by(RunState.character):
 				cards.append(card)
 	cards.sort_custom(func(a: CardData, b: CardData) -> bool: return a.card_name.naturalnocasecmp_to(b.card_name) < 0)
 	for card in cards:

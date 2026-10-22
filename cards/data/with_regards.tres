@@ -29,3 +29,4 @@ battle_animation = &"Slash"
 impact_time = 0.55
 tempered = ExtResource("10_tempered")
 card_class = &"wanderer"
+benched = true

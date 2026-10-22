@@ -285,7 +285,8 @@ func _collect_sections() -> Array[Section]:
 		section.cards.append_array(_load_folder(folder))
 	return sections
 
-# Every CardData directly in `folder` - not its subfolders.
+# Every CardData directly in `folder` - not its subfolders - save a
+# benched one (CardData.benched).
 func _load_folder(folder: String) -> Array[CardData]:
 	var cards: Array[CardData] = []
 	var files: PackedStringArray = ResourceLoader.list_directory(folder)
@@ -301,6 +302,8 @@ func _load_folder(folder: String) -> Array[CardData]:
 		var card := load(folder.path_join(file)) as CardData
 		if card == null:
 			push_warning("CardCompendium: %s is not a CardData; skipped." % folder.path_join(file))
+			continue
+		if card.benched:
 			continue
 		cards.append(card)
 	return cards
