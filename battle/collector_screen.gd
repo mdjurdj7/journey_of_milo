@@ -43,16 +43,17 @@ class_name CollectorScreen
 #     confirm): a card lifted shows GIVE IT <NAME> with the price, DECK
 #     n → n-1 and BACK; given, exactly that card leaves and the line goes.
 #     Once per collector (Collector.is_removal_used()), and only while it
-#     can be paid for and the deck holds a card - else its CHOOSE is grey
-#     and inert.
+#     can be paid for and the deck holds a card - else it is grey and
+#     inert. CHOOSE shows on the focused line alone, never on a grey one;
+#     the whole line is what takes the click, and its price always shows.
 #   LEAVE, bottom right. Escape and a right click close it too.
 # A group with nothing stocked is hidden.
 #
 # A good the run can't pay for reads as unavailable: a card takes the
 # hand's unaffordable fade (CardView.set_playable(false) - its
 # unplayable_alpha), an equipment, Bedroll or removal line goes wholly to
-# the inert grey (art, name, type line, effect, price, CHOOSE). Each stays
-# hoverable, and CHOOSE and a card's click still open the plate or the
+# the inert grey (art, name, type line, effect, price - no CHOOSE). Each
+# stays hoverable, and a click on the line or a card still opens the plate or the
 # card to read, with TAKE grey and inert; no red, no shake. Read again
 # whenever the gold changes (RunState.gold_changed).
 #
@@ -1073,8 +1074,12 @@ func _draw_line(index: int) -> void:
 	else:
 		_text(_draw_layer, _numeral_font, _line_name(line), Vector2(text_left, name_baseline), _item_px, name_color)
 	_text(_draw_layer, _type_font, type_line_at(index), Vector2(text_left, type_baseline), _type_px, _with_alpha(unfocused_alpha) if affordable else inert)
+	# CHOOSE on the focused row alone (mouse or keys), and only one that
+	# can be paid for - the whole row is what takes the click. Its room is
+	# kept either way, so the price never moves.
 	var choose_left: float = _choose_left()
-	_text(_draw_layer, _label_font, choose_text, Vector2(choose_left, roundf(mid + float(_label_px) * 0.35)), _label_px, name_color)
+	if focused and affordable:
+		_text(_draw_layer, _label_font, choose_text, Vector2(choose_left, roundf(mid + float(_label_px) * 0.35)), _label_px, name_color)
 	var price: String = str(_line_price(line))
 	var price_left: float = choose_left - _px(price_column_gap_px) - InkType.width(_numeral_font, price, _price_px)
 	_text(_draw_layer, _numeral_font, price, Vector2(roundf(price_left), roundf(mid + float(_price_px) * 0.35)), _price_px, _ink if affordable else inert)
