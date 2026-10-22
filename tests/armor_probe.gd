@@ -6,7 +6,8 @@ extends SceneTree
 # past Block scaled once a fight (Grace opening on what then reaches HP,
 # the intent preview agreeing), Block as a fight opens, damage back once
 # per attack through the enemy's Block - a kill by it included - Barbed's
-# (Stoneshell) once, on the first hit Block takes, and an
+# (Stoneshell) once, on the first hit Block takes, the Warped Shell's
+# drop on a Sputter's kill and its change, and an
 # elite's table rolling by rarity, never the piece already worn. On the
 # sand (WorldArmor): its line once he walks up, the plate's TAKE / LEAVE
 # and "Replaces ...", a swap setting the old piece down where he stands to
@@ -25,7 +26,7 @@ extends SceneTree
 # trinket_probe does. Untyped against anything that names the RunState
 # autoload: a SceneTree script compiles before the autoloads register.
 
-const CASES := 18
+const CASES := 20
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const BENT_NAIL_PATH := "res://run/keepsakes/bent_nail.tres"
@@ -33,6 +34,7 @@ const WARDLING_PATH := "res://battle/rules/enemies/wardling.tres"
 const ENEMIES_DIR := "res://battle/rules/enemies"
 const TAIL_PATH := "res://run/weapons/greyshelfs_tail.tres"
 const BARBED_PATH := "res://battle/rules/statuses/barbed.tres"
+const SHELL_PATH := "res://run/data/warped_shell.tres"
 const SAFETY_SECONDS := 240.0
 
 var _run_state: Node = null
@@ -65,6 +67,8 @@ func _initialize() -> void:
 	await _check_worn_line()
 	await _check_weapon_line()
 	await _check_elite_drop()
+	_check_shell_rules()
+	await _check_shell_drop()
 	_check_elites_leave_armor()
 
 	if _completed != CASES:
@@ -650,6 +654,108 @@ func _check_elites_leave_armor() -> void:
 		_expect(data.keepsake_table == null and data.glassbone_reward == 0, "...and no keepsake or Glassbone (%s)" % file)
 	_expect(elites >= 2, "The search found the elites (%d)" % elites)
 	_completed += 1
+
+# The Warped Shell's change: a plain Endure first, an Endure+ (becoming
+# Stoneshell+) only with no plain one left, none with neither; the swap
+# keeps the card's place in the deck.
+func _check_shell_rules() -> void:
+	var shell: WarpedShellData = load(SHELL_PATH)
+	var plain: CardData = shell.from_card
+	var tempered: CardData = shell.from_card.tempered
+	var deck: Array[CardData] = [tempered.duplicate(), plain.duplicate()]
+	_expect(shell.host_in(deck) == deck[1], "A plain Endure is changed before an Endure+")
+	_expect_eq(shell.result_for(deck[1]).card_name, shell.to_card.card_name, "...into Stoneshell")
+	deck.remove_at(1)
+	_expect(shell.host_in(deck) == deck[0], "With no plain one, an Endure+")
+	_expect_eq(shell.result_for(deck[0]).card_name, shell.to_card.tempered.card_name, "...into Stoneshell+")
+	deck.clear()
+	_expect(shell.host_in(deck) == null, "No Endure: nothing to change")
+	_new_run()
+	var run_deck: Array = _run_state.get("deck")
+	var host: CardData = shell.host_in(_run_state.get("deck"))
+	var at: int = run_deck.find(host)
+	var made: CardData = _run_state.call("warp_card", host, shell.result_for(host))
+	_expect(made != null and run_deck[at] == made and made.card_name == shell.to_card.card_name, "The swap is in the deck, at the card's own place")
+	_completed += 1
+
+# A Sputter's kill drops the shell where it fell (drop_chance set to 1
+# here) - once a run: a second roll leaves nothing. With no Endure in
+# the deck no roll is made and the once a run isn't spent. TAKE turns an
+# Endure+ into Stoneshell+.
+func _check_shell_drop() -> void:
+	var shell: WarpedShellData = load(SHELL_PATH)
+	var chance: float = shell.drop_chance
+	shell.drop_chance = 1.0
+	_new_run()
+	var controller: Node = await _start_fight(0, shell.source_enemy.resource_path)
+	if controller != null:
+		var fell_at: Vector3 = Vector3.ZERO
+		for member in (controller.get("enemies") as Array):
+			fell_at = (member as Node3D).global_position
+		_kill_all(controller)
+		await _wait_for_shell()
+		var lying: Array[Node] = _shells()
+		_expect_eq(lying.size(), 1, "A Sputter's kill leaves the shell on the sand")
+		_expect(bool(_run_state.get("warped_shell_dropped")), "...and spends the once a run")
+		if lying.size() == 1:
+			var at: Vector3 = (lying[0] as Node3D).global_position
+			_expect(Vector2(at.x - fell_at.x, at.z - fell_at.z).length() < 0.01, "...where it fell")
+			_expect(_lying().is_empty(), "...not as a worn piece")
+	await _teardown()
+	await _load_field(0)
+	var against: Array[EnemyData] = [shell.source_enemy]
+	var where: Array[Vector3] = [Vector3.ZERO]
+	var lift: Array[float] = [0.0]
+	_field.call("_roll_warped_shell", against, where, lift)
+	await _seconds(2.0)
+	_expect(_shells().is_empty(), "Once a run: a second Sputter leaves none")
+	_new_run()
+	_run_state.set("run_opening_pending", false)
+	var bare: Array[CardData] = []
+	for card: CardData in _run_state.get("deck"):
+		if card.card_name != shell.from_card.card_name:
+			bare.append(card)
+	_run_state.set("deck", bare)
+	_field.call("_roll_warped_shell", against, where, lift)
+	await _seconds(2.0)
+	_expect(_shells().is_empty() and not bool(_run_state.get("warped_shell_dropped")), "No Endure: no roll, and the once a run unspent")
+	bare.append(shell.from_card.tempered.duplicate())
+	_run_state.set("deck", bare)
+	_field.call("_roll_warped_shell", against, where, lift)
+	await _wait_for_shell()
+	var found: Array[Node] = _shells()
+	_expect_eq(found.size(), 1, "An Endure+ in the deck: the shell drops")
+	if found.size() == 1:
+		_expect(bool(_field.call("open_shell_examine", found[0])), "Its plate opens")
+		var examine: Node = _field.get_node_or_null("ShellExamine")
+		var plate: Node = examine.call("get_plate") if examine != null else null
+		_expect(plate != null and plate.call("get_shell") == shell, "...showing the shell")
+		var preview: Node = plate.call("get_link_preview") if plate != null else null
+		var shown: CardData = preview.get("card_data") if preview != null else null
+		_expect(shown != null and shown.card_name == shell.to_card.tempered.card_name, "...and Stoneshell+ beside it")
+		if examine != null:
+			examine.call("close", false)
+		await _seconds(0.5)
+		_field.call("take_world_shell", found[0])
+		var names: Array[String] = []
+		for card: CardData in _run_state.get("deck"):
+			names.append(card.card_name)
+		_expect(names.has(shell.to_card.tempered.card_name) and not names.has(shell.from_card.tempered.card_name), "TAKE: the Endure+ is Stoneshell+")
+	shell.drop_chance = chance
+	await _teardown()
+	_completed += 1
+
+func _shells() -> Array[Node]:
+	var lying: Array[Node] = []
+	for node in get_nodes_in_group(&"shell_drops"):
+		if not bool(node.call("is_taken")):
+			lying.append(node)
+	return lying
+
+func _wait_for_shell() -> void:
+	var start: int = ProbePlay.cap_msec()
+	while _shells().is_empty() and ProbePlay.cap_msec() - start < 6000:
+		await process_frame
 
 func _lying() -> Array[Node]:
 	var lying: Array[Node] = []

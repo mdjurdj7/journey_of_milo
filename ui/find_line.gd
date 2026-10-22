@@ -141,8 +141,19 @@ func say_find(piece: TrinketData, creature: String) -> void:
 	if piece == null:
 		return
 	_piece = piece
-	_before = "You find %s" % (piece.article + " " if not piece.article.is_empty() else "")
-	_name = piece.find_name()
+	_say(piece.article, piece.find_name(), creature)
+
+# A find that isn't a piece (the Warped Shell - WarpedShellData): "You find
+# <article> <thing> on the <creature>.", the thing in plain ink.
+func say_find_thing(article: String, thing: String, creature: String) -> void:
+	if thing.is_empty():
+		return
+	_piece = null
+	_say(article, thing, creature)
+
+func _say(article: String, thing: String, creature: String) -> void:
+	_before = "You find %s" % (article + " " if not article.is_empty() else "")
+	_name = thing
 	_after = " on the %s." % creature if not creature.is_empty() else "."
 	_apply_finish()
 	_relayout()

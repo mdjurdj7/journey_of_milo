@@ -103,6 +103,9 @@ var has_bedroll: bool = false
 # Where the Bedroll carried came from ("belongings", "collector"), for the
 # run log's bedroll_use; "" with none carried or none said.
 var bedroll_source: String = ""
+# The Warped Shell has dropped this run (RegionField._roll_warped_shell()):
+# at most once a run, taken or left. new_run() clears it.
+var warped_shell_dropped: bool = false
 # HP actually lost since the fight in progress (or the last one) opened -
 # what lose_hp() really took, never the damage that was attempted, from
 # any source: an enemy's hit, the Wanderer's own self-damage, a status
@@ -193,6 +196,7 @@ func new_run(starting_character: CharacterData) -> void:
 	weapon = starting_character.starting_weapon
 	has_bedroll = false
 	bedroll_source = ""
+	warped_shell_dropped = false
 	keepsakes_offered.clear()
 	hp_lost_this_combat = 0
 	player_max_hp = starting_character.max_hp
@@ -521,4 +525,19 @@ func temper_card(card: CardData, cost: int) -> CardData:
 	deck[index] = copy
 	deck_changed.emit()
 	RunLogger.event("temper", {"card": card.card_name, "tempered": copy.card_name, "glassbone_after": glassbone})
+	return copy
+
+# The Warped Shell's change (WarpedShellData): `card` in the deck becomes a
+# fresh copy of `into` at the same place - its own object, as temper_card()'s
+# is. Between fights only. Null, with nothing changed, when the card isn't
+# in the deck. Returns the new card.
+func warp_card(card: CardData, into: CardData) -> CardData:
+	if card == null or into == null:
+		return null
+	var index: int = deck.find(card)
+	if index < 0:
+		return null
+	var copy := into.duplicate() as CardData
+	deck[index] = copy
+	deck_changed.emit()
 	return copy

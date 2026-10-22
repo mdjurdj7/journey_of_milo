@@ -357,6 +357,13 @@ var _weapon: WeaponData = null
 # The Bedroll shown instead (set_bedroll()); null otherwise. It has no art
 # of its own: its ink glyph stands in for one, on the placeholder's tone.
 var _bedroll: BedrollData = null
+# The Warped Shell shown instead (set_shell()), and the card in the deck it
+# would change; null otherwise. Its art is what that card becomes.
+var _shell: WarpedShellData = null
+var _shell_host: CardData = null
+# A card shown beside the plate whatever the mouse does (the shell's
+# Stoneshell) - a hovered name shows its own over it while hovered.
+var _pinned_link: CardData = null
 var _replaced: TrinketData = null
 # The weapon carried that taking the one shown would replace (set_
 # weapon()'s offer) - in _replaced's place in the strip; null otherwise.
@@ -480,6 +487,9 @@ func set_piece(piece: TrinketData, replaced: TrinketData = null, show_actions: b
 	_weapon = null
 	_replaced_weapon = null
 	_bedroll = null
+	_shell = null
+	_shell_host = null
+	_pinned_link = null
 	_replaced = replaced if replaced != piece else null
 	_show_actions = show_actions
 	_max_hp = -1
@@ -552,6 +562,22 @@ func set_bedroll(bedroll: BedrollData, show_actions: bool = false) -> void:
 func get_bedroll() -> BedrollData:
 	return _bedroll
 
+# The Warped Shell's change: `host` (the card in the deck) and what it
+# becomes, named in the effect and that card shown beside the plate;
+# with show_actions, TAKE and LEAVE.
+func set_shell(shell: WarpedShellData, host: CardData, show_actions: bool = false) -> void:
+	set_piece(null, null, show_actions)
+	_shell = shell
+	_shell_host = host
+	_paper_seed = float(absi(hash(shell.plate_name)) % 1000) / 1000.0 if shell != null else 0.0
+	_apply_mouse_filter()
+	_relayout()
+	_pinned_link = shell.result_for(host) if shell != null else null
+	_set_hovered_link(_pinned_link)
+
+func get_shell() -> WarpedShellData:
+	return _shell
+
 # The stat row's line under the type line - "" (the default) shows none
 # and takes no room. For a later piece that changes your attacks' damage
 # or your defence cards' block; nothing sets it yet.
@@ -569,6 +595,8 @@ func shows_rules() -> bool:
 
 # The type label shown (WEAPON, WORN, KEEPSAKE) - for probes.
 func get_type_label() -> String:
+	if _shell != null:
+		return _shell.plate_label
 	if _bedroll != null:
 		return rest_label_text
 	if _weapon != null:
@@ -578,6 +606,8 @@ func get_type_label() -> String:
 	return keepsake_label_text
 
 func _type_glyph() -> InkGlyph.Kind:
+	if _shell != null:
+		return InkGlyph.Kind.DECK
 	if _bedroll != null:
 		return InkGlyph.Kind.BEDROLL
 	if _weapon != null:
@@ -588,6 +618,8 @@ func _type_glyph() -> InkGlyph.Kind:
 
 # What the plate shows, from the piece or the weapon, whichever it holds.
 func _shown_name() -> String:
+	if _shell != null:
+		return _shell.plate_name
 	if _bedroll != null:
 		return _bedroll.plate_name
 	if _weapon != null:
@@ -595,6 +627,9 @@ func _shown_name() -> String:
 	return _piece.display_name if _piece != null else ""
 
 func _shown_art() -> Texture2D:
+	if _shell != null:
+		var into: CardData = _shell.result_for(_shell_host)
+		return into.art if into != null else null
 	if _bedroll != null:
 		return null
 	if _weapon != null:
@@ -602,6 +637,8 @@ func _shown_art() -> Texture2D:
 	return _piece.art if _piece != null else null
 
 func _shown_rules() -> String:
+	if _shell != null:
+		return _shell.describe(_shell_host)
 	if _bedroll != null:
 		return _bedroll.describe_plate()
 	if _weapon != null:
@@ -609,6 +646,8 @@ func _shown_rules() -> String:
 	return _piece.describe() if _piece != null else ""
 
 func _shown_lore() -> String:
+	if _shell != null:
+		return _shell.lore
 	if _bedroll != null:
 		return _bedroll.lore
 	if _weapon != null:
@@ -616,8 +655,15 @@ func _shown_lore() -> String:
 	return _piece.flavor_text if _piece != null else ""
 
 # The cards the piece shown names in its effect - a weapon's (WeaponData.
-# named_cards()); a worn piece or keepsake names none yet.
+# named_cards()), the Warped Shell's card and what it becomes; a worn
+# piece or keepsake names none yet.
 func _named_cards() -> Array[CardData]:
+	if _shell != null:
+		var named: Array[CardData] = []
+		for card: CardData in [_shell_host, _shell.result_for(_shell_host)]:
+			if card != null:
+				named.append(card)
+		return named
 	if _weapon != null and _bedroll == null:
 		return _weapon.named_cards()
 	return []
@@ -633,7 +679,7 @@ func _apply_mouse_filter() -> void:
 		mouse_filter = Control.MOUSE_FILTER_IGNORE
 
 func _shows_something() -> bool:
-	return _piece != null or _weapon != null or _bedroll != null
+	return _piece != null or _weapon != null or _bedroll != null or _shell != null
 
 func get_replaced() -> TrinketData:
 	return _replaced
@@ -851,8 +897,10 @@ func _link_at(at: Vector2) -> CardData:
 			return link["card"]
 	return null
 
-# Shows `card` beside the plate (null hides it).
+# Shows `card` beside the plate (null: the pinned card, else nothing).
 func _set_hovered_link(card: CardData) -> void:
+	if card == null:
+		card = _pinned_link
 	if card == _hovered_link:
 		return
 	_hovered_link = card

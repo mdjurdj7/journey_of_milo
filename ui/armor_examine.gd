@@ -43,6 +43,9 @@ signal closed(taken: bool)
 var _piece: TrinketData = null
 var _weapon: WeaponData = null
 var _bedroll: BedrollData = null
+# The Warped Shell, and the card in the deck it would change.
+var _shell: WarpedShellData = null
+var _shell_host: CardData = null
 var _worn: TrinketData = null
 # The weapon carried, which taking an offered one would replace.
 var _carried: WeaponData = null
@@ -86,6 +89,13 @@ func setup_bedroll(bedroll: BedrollData, with_choice: bool = false, from_rect: R
 	setup(null, null, with_choice, from_rect)
 	_bedroll = bedroll
 
+# The Warped Shell instead of a piece: `host` becoming what the shell makes
+# it, offered with_choice. Called before the layer enters the tree.
+func setup_shell(shell: WarpedShellData, host: CardData, with_choice: bool = true, reveal: bool = false) -> void:
+	setup(null, null, with_choice, Rect2(), reveal)
+	_shell = shell
+	_shell_host = host
+
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	layer = 100
@@ -103,10 +113,12 @@ func _ready() -> void:
 	# Looked at closely: the cards it names show on hover (the Tail's Lash).
 	_plate.card_links_enabled = true
 	add_child(_plate)
-	if _piece == null and _weapon == null and _bedroll == null:
+	if _piece == null and _weapon == null and _bedroll == null and _shell == null:
 		close(false)
 		return
-	if _bedroll != null:
+	if _shell != null:
+		_plate.set_shell(_shell, _shell_host, _with_choice)
+	elif _bedroll != null:
 		_plate.set_bedroll(_bedroll, _with_choice)
 	elif _weapon != null:
 		_plate.set_weapon(_weapon, _carried if _with_choice else null, _with_choice)

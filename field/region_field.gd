@@ -92,6 +92,9 @@ enum RewardMode { SCREEN, WORLD }
 # take, at its level.
 @export var armor_take_sfx_path: String = "res://assets/audio/cards/card_take.wav"
 @export var armor_take_volume_db: float = -18.0
+# The Warped Shell's one data file (WarpedShellData): who drops it, how
+# often, and the change it makes.
+@export_file("*.tres") var warped_shell_path: String = "res://run/data/warped_shell.tres"
 # A weapon taken from its offer (open_weapon_offer()): the same take.
 @export var weapon_take_sfx_path: String = "res://assets/audio/cards/card_take.wav"
 @export var weapon_take_volume_db: float = -18.0
@@ -540,6 +543,8 @@ var _bedroll_rest: BedrollRest = null
 # any keepsake offer after it, has closed.
 var _pending_find: TrinketData = null
 var _pending_find_creature: String = ""
+# The Warped Shell waiting to be named the same way (_roll_warped_shell()).
+var _pending_shell_find: WarpedShellData = null
 # The find line is waiting on a world-voice line to finish.
 var _find_waiting_on_voice: bool = false
 var _nav_build_queued: bool = false
@@ -1339,7 +1344,7 @@ func _try_examine_armor(screen_pos: Vector2) -> bool:
 		return false
 	var best: WorldArmor = null
 	var best_distance: float = INF
-	for node in get_tree().get_nodes_in_group(WorldArmor.GROUP):
+	for node in get_tree().get_nodes_in_group(WorldArmor.GROUP) + get_tree().get_nodes_in_group(WorldShell.SHELL_GROUP):
 		var drop := node as WorldArmor
 		if drop == null or not drop.can_open_from(wanderer.global_position):
 			continue
@@ -1352,6 +1357,8 @@ func _try_examine_armor(screen_pos: Vector2) -> bool:
 			best = drop
 	if best == null:
 		return false
+	if best is WorldShell:
+		return open_shell_examine(best as WorldShell)
 	return open_armor_examine(best)
 
 # The enemy whose padded screen rect holds the cursor; nearest to the
@@ -3352,6 +3359,8 @@ func _on_battle_finished(outcome: BattleOverlay.Outcome, overlay: BattleOverlay)
 			_pending_weapon = _weapon_left_by(won_against)
 			# ...and a worn piece, lying where the one that left it fell.
 			_drop_armor(won_against, won_at, won_lift)
+			# ...and the Warped Shell, where the crab that dropped it fell.
+			_roll_warped_shell(won_against, won_at, won_lift)
 			# Felled together: the option's own keepsake, over any drop.
 			if felled_together:
 				_offer_felled_together_keepsake()
@@ -4057,7 +4066,7 @@ func _drop_armor(won_against: Array[EnemyData], won_at: Array[Vector3], won_lift
 # screen after a win closes; the first with the field free says it -
 # after any world-voice line showing then (the defeat line) has faded out.
 func _say_pending_find() -> void:
-	if _pending_find == null or _battle_open or not can_process() or _find_waiting_on_voice:
+	if (_pending_find == null and _pending_shell_find == null) or _battle_open or not can_process() or _find_waiting_on_voice:
 		return
 	var hud: Node = get_node_or_null(^"FieldHUD")
 	var voice: WorldVoiceLine = hud.get_node_or_null(WorldVoiceLine.NODE_NAME) as WorldVoiceLine if hud != null else null
@@ -4065,12 +4074,19 @@ func _say_pending_find() -> void:
 		_say_find_after(voice)
 		return
 	var piece: TrinketData = _pending_find
-	_pending_find = null
+	var shell: WarpedShellData = _pending_shell_find if piece == null else null
+	if piece != null:
+		_pending_find = null
+	else:
+		_pending_shell_find = null
 	var line := FindLine.on_hud(get_node_or_null(^"FieldHUD"))
 	if line == null:
 		return
 	line.use_theme(deck_panel.theme)
-	line.say_find(piece, _pending_find_creature)
+	if shell != null:
+		line.say_find_thing(shell.find_article, shell.find_name, shell.find_creature)
+	else:
+		line.say_find(piece, _pending_find_creature)
 
 # The find line once `voice` has faded out and find_after_voice_gap_sec
 # more - checked again then, as any screen may have opened meanwhile.
@@ -4137,6 +4153,92 @@ func take_worn_piece(drop: WorldArmor) -> void:
 		# Set down, it is no find: no reveal when looked at again.
 		var set_down: WorldArmor = spawn_world_armor(old, wanderer.global_position)
 		set_down.revealed = true
+
+# A won fight's Warped Shell (WarpedShellData): each kill of its source
+# enemy rolls drop_chance on the run's generator, in won_against's order,
+# until one drops - once a run at most (RunState.warped_shell_dropped).
+# With nothing in the deck for it to change, no roll is made and the
+# once a run isn't spent. It lies where that one fell, the same beat
+# after the fight as a worn piece, and the find line names it.
+func _roll_warped_shell(won_against: Array[EnemyData], won_at: Array[Vector3], won_lift: Array[float]) -> void:
+	var shell := load(warped_shell_path) as WarpedShellData if not warped_shell_path.is_empty() else null
+	if shell == null or shell.source_enemy == null:
+		return
+	for index in won_against.size():
+		var data: EnemyData = won_against[index]
+		if data == null or data.resource_path != shell.source_enemy.resource_path:
+			continue
+		if RunState.warped_shell_dropped or shell.host_in(RunState.deck) == null:
+			return
+		var roll: float = RunState.rng.randf()
+		if roll >= shell.drop_chance:
+			continue
+		RunState.warped_shell_dropped = true
+		var at: Vector3 = won_at[index] if index < won_at.size() else _last_fallen_at
+		var lift: float = won_lift[index] if index < won_lift.size() else 0.0
+		print("RegionField: '%s' left the %s." % [data.enemy_name, shell.plate_name])
+		_pending_shell_find = shell
+		var delay: float = reward_spread_delay_sec
+		var camera_rig := get_node_or_null(camera_rig_path) as CameraRig
+		if camera_rig != null:
+			delay = maxf(delay, camera_rig.battle_transition_time)
+		await get_tree().create_timer(delay).timeout
+		if not is_inside_tree():
+			return
+		spawn_world_shell(shell, at, lift, roll)
+		await get_tree().process_frame
+		if is_inside_tree():
+			_say_pending_find()
+		return
+
+# The Warped Shell lying on the sand at `at` (seated on the relief by
+# WorldShell itself, `height_offset` over it); `roll` the roll that
+# dropped it.
+func spawn_world_shell(shell: WarpedShellData, at: Vector3, height_offset: float = 0.0, roll: float = 0.0) -> WorldShell:
+	var drop := WorldShell.new()
+	drop.name = "WorldShell"
+	drop.shell = shell
+	drop.roll = roll
+	drop.height_offset = height_offset
+	drop.position = to_local(at)
+	add_child(drop, true)
+	return drop
+
+# The Warped Shell looked at with the choice: its plate (ItemPlate.set_
+# shell()) - the card it would change now and what that becomes - with
+# TAKE and LEAVE, the field frozen under it. With nothing left in the deck
+# for it to change, the plate only shows. False when a fight or another
+# screen has the field.
+func open_shell_examine(drop: WorldShell) -> bool:
+	if drop == null or drop.is_taken() or drop.shell == null or _battle_open or not can_process():
+		return false
+	var host: CardData = drop.shell.host_in(RunState.deck)
+	var examine := ArmorExamine.new()
+	examine.name = "ShellExamine"
+	examine.setup_shell(drop.shell, host, host != null, not drop.revealed)
+	drop.revealed = true
+	examine.closed.connect(_on_shell_examine_closed.bind(drop))
+	if wanderer != null:
+		wanderer.clear_move_target()
+	process_mode = Node.PROCESS_MODE_DISABLED
+	add_child(examine)
+	return true
+
+func _on_shell_examine_closed(taken: bool, drop: WorldShell) -> void:
+	process_mode = Node.PROCESS_MODE_INHERIT
+	if not is_instance_valid(drop) or drop.is_taken() or not taken:
+		return
+	take_world_shell(drop)
+
+# TAKE: the card the shell changes, changed for the rest of the run
+# (RunState.warp_card()), and the shell gone from the sand.
+func take_world_shell(drop: WorldShell) -> void:
+	var host: CardData = drop.shell.host_in(RunState.deck)
+	var into: CardData = drop.shell.result_for(host)
+	if RunState.warp_card(host, into) == null:
+		return
+	drop.take()
+	print("RegionField: the %s made '%s' '%s'." % [drop.shell.plate_name, host.card_name, into.card_name])
 
 # The worn piece looked at from the HUD: its plate, no choice - KeepsakeExamine's
 # terms for the keepsake.

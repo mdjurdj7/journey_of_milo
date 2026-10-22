@@ -56,9 +56,9 @@ var _taken: bool = false
 var revealed: bool = false
 
 func _ready() -> void:
-	add_to_group(GROUP)
-	if piece == null:
-		push_warning("WorldArmor: spawned with no piece; freeing rather than lying empty.")
+	add_to_group(_group())
+	if not _holds_something():
+		push_warning("%s: spawned with nothing to hold; freeing rather than lying empty." % name)
 		queue_free()
 		return
 	_rebuild_body()
@@ -66,17 +66,18 @@ func _ready() -> void:
 # The body, built again from the piece (and the placeholder's settings),
 # then seated: its lowest point on the relief.
 func _rebuild_body() -> void:
-	if not is_inside_tree() or piece == null:
+	if not is_inside_tree() or not _holds_something():
 		return
 	if _body != null:
 		_body.queue_free()
 		_body = null
-	if not piece.field_model_path.is_empty():
-		var scene := load(piece.field_model_path) as PackedScene
+	var model_path: String = _model_path()
+	if not model_path.is_empty():
+		var scene := load(model_path) as PackedScene
 		if scene != null:
 			_body = scene.instantiate() as Node3D
 		else:
-			push_warning("WorldArmor: could not load %s; a placeholder block instead." % piece.field_model_path)
+			push_warning("%s: could not load %s; a placeholder block instead." % [name, model_path])
 	if _body == null:
 		var block := MeshInstance3D.new()
 		var mesh := BoxMesh.new()
@@ -151,10 +152,22 @@ func take() -> void:
 	if _taken:
 		return
 	_taken = true
-	remove_from_group(GROUP)
+	remove_from_group(_group())
 	var tween := create_tween()
 	tween.tween_property(self, "scale", Vector3(1.0, 0.01, 1.0), 0.25)
 	tween.tween_callback(queue_free)
 
 func is_taken() -> bool:
 	return _taken
+
+# What a lying thing of another kind (WorldShell) answers in its own way:
+# the group the field's click looks in, whether it holds anything, and
+# its model ("": the placeholder block).
+func _group() -> StringName:
+	return GROUP
+
+func _holds_something() -> bool:
+	return piece != null
+
+func _model_path() -> String:
+	return piece.field_model_path
