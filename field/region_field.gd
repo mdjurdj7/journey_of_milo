@@ -4172,6 +4172,7 @@ func _roll_warped_shell(won_against: Array[EnemyData], won_at: Array[Vector3], w
 			return
 		var roll: float = RunState.rng.randf()
 		if roll >= shell.drop_chance:
+			RunLogger.event("shell_drop", {"roll": roll, "dropped": false, "taken": false, "card_before": null, "card_after": null})
 			continue
 		RunState.warped_shell_dropped = true
 		var at: Vector3 = won_at[index] if index < won_at.size() else _last_fallen_at
@@ -4237,6 +4238,7 @@ func take_world_shell(drop: WorldShell) -> void:
 	var into: CardData = drop.shell.result_for(host)
 	if RunState.warp_card(host, into) == null:
 		return
+	RunLogger.event("shell_drop", {"roll": drop.roll, "dropped": true, "taken": true, "card_before": host.card_name, "card_after": into.card_name})
 	drop.take()
 	print("RegionField: the %s made '%s' '%s'." % [drop.shell.plate_name, host.card_name, into.card_name])
 

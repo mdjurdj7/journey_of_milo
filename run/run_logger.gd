@@ -119,9 +119,17 @@ class_name RunLogger
 # "carried": the debt comes out of the refill and the carry together, and
 # its "energy" is what is left.
 
+# Format 14 (2026-10-21): the Warped Shell and Stoneshell. Event
+# "shell_drop", one per Sputter kill that rolls for the shell: the
+# "roll", whether it "dropped", whether it was "taken", and the
+# "card_before" and "card_after" of the change (null with none) - a
+# miss written as it rolls, a drop once it's taken or once it leaves the
+# sand untaken (the floor left). Mechanic line "barbed": Barbed went off
+# - the "attacker" and the "damage" that reached its HP.
+
 const RUNS_DIR := "user://runs"
 const DIR_ARG_PREFIX := "--runlog-dir="
-const FORMAT_VERSION := 13
+const FORMAT_VERSION := 14
 # Lines written inside a fight that aren't choices (_write_detail()) - a
 # run made of nothing else is still an empty one.
 const _DETAIL_EVENTS: Array[String] = ["enemy_attack", "self_loss", "heal", "mechanic", "intent_mark"]

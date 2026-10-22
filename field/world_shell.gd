@@ -19,6 +19,13 @@ func _init() -> void:
 	placeholder_size = Vector3(0.3, 0.1, 0.24)
 	placeholder_color = Color(0.62, 0.57, 0.48)
 
+# Gone from the sand untaken - the floor left, the run ended: its roll's
+# shell_drop line, not taken.
+func _exit_tree() -> void:
+	if shell == null or is_taken():
+		return
+	RunLogger.event("shell_drop", {"roll": roll, "dropped": true, "taken": false, "card_before": null, "card_after": null})
+
 func _group() -> StringName:
 	return SHELL_GROUP
 
