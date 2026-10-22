@@ -61,7 +61,7 @@ const BRACE_PATH := "res://cards/data/brace.tres"
 const RARITY_FINISH_PATH := "res://battle/card_rarity_finish.tres"
 const NEUTRAL_POOL_PATH := "res://cards/pools/neutral_pool.tres"
 const NEUTRAL_IN_STOCK: Array[String] = ["Left Hand", "Second Thoughts", "Untouched"]
-const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Brace", "Down Payment", "Endure"]
+const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Endure"]
 const FLOOR_4 := 3
 const FLOOR_4_PATH := "res://floors/region1_floor4.tres"
 # Where the field cases put their own collector, from spawn - any

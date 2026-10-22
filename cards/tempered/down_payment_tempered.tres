@@ -21,4 +21,3 @@ description = "Gain 8 Toll."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_self_damage_toll")])
 art = ExtResource("9_art")
 card_class = &"wanderer"
-offer = 1

@@ -23,4 +23,3 @@ effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_self_dama
 art = ExtResource("9_art")
 tempered = ExtResource("10_tempered")
 card_class = &"wanderer"
-offer = 1

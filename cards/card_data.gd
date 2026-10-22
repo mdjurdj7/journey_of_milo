@@ -31,7 +31,7 @@ enum RemovalScope { NONE, SPENT, CONSUMED }
 # Whether a random card offer may give this card (RewardPool - every
 # reward, bundle, belongings and collector roll), whatever pool lists it.
 # REWARDABLE: it may. STARTER_ONLY: only ever in a starting deck (the
-# Wanderer's five). KEEPER_ONLY: only ever from the Keeper. OWN_CHANNEL:
+# Wanderer's Slash, Bite Down and Endure). KEEPER_ONLY: only ever from the Keeper. OWN_CHANNEL:
 # offered only by a channel of its own, never by a roll (Samphire - the
 # fight's Samphire chance, the collector's fixed slot). Integers are baked
 # into every .tres: append, never reorder.
