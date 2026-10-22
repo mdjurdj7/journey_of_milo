@@ -10,4 +10,4 @@ description = "This fight, you're Critical at {critical_percent}% of max HP or b
 category = 2
 default_duration_turns = -1
 stack_rule = 3
-raises_critical_percent = 50
+raises_critical_percent = 40

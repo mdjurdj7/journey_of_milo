@@ -163,8 +163,12 @@ const TOKEN_TOLL_BLOCK := "{toll_block}"
 # for the run's max HP anywhere else.
 const TOKEN_SURVIVE_HP := "{survive_hp}"
 # The Critical line a status the card applies raises its player's to
-# (StatusData.raises_critical_percent - Go Under's 50).
+# (StatusData.raises_critical_percent - Go Under's 40).
 const TOKEN_CRITICAL_PERCENT := "{critical_percent}"
+# The most HP still Critical at that line (Combatant.critical_at()): of the
+# fight's player's max HP in a battle hand, of the run's anywhere else
+# (_critical_hp_preview()).
+const TOKEN_CRITICAL_HP := "{critical_hp}"
 # The HP a SELF_DAMAGE after another effect loses - its value as printed
 # (Bite Down's "Then lose 2 HP."), never the badge's sum.
 const TOKEN_SELF_LOSS := "{self_loss}"
@@ -942,6 +946,10 @@ func _resolve_tokens(description: String) -> String:
 			if effect != null and effect.status_data != null and effect.status_data.raises_critical_percent > 0:
 				text = text.replace(TOKEN_CRITICAL_PERCENT, str(effect.status_data.raises_critical_percent))
 				break
+	if text.contains(TOKEN_CRITICAL_HP):
+		var critical_hp: int = _critical_hp_preview()
+		if critical_hp >= 0:
+			text = text.replace(TOKEN_CRITICAL_HP, str(critical_hp))
 	if text.contains(TOKEN_SURVIVE_HP):
 		var survive: int = _survive_hp_preview()
 		if survive > 0:
@@ -1030,6 +1038,43 @@ func _survive_hp_preview() -> int:
 	if max_hp <= 0:
 		max_hp = character.max_hp
 	return guard.survive_hp(max_hp, character.critical_hp_fraction)
+
+# The most HP that is Critical at the line a status this card applies
+# raises to (StatusData.raises_critical_percent - Go Under): of the fight's
+# player's max HP in a battle hand (its bonus context), otherwise of the
+# run's - the Wanderer's data before a run starts (the title's
+# compendium). Combatant.critical_at() decides, so it can't drift from the
+# fight's rule. -1 with no such status, which leaves the token standing.
+func _critical_hp_preview() -> int:
+	var percent: int = 0
+	for effect in card_data.effects:
+		if effect != null and effect.status_data != null and effect.status_data.raises_critical_percent > 0:
+			percent = effect.status_data.raises_critical_percent
+			break
+	if percent <= 0:
+		return -1
+	var max_hp: int = 0
+	if _bonus_context != null and _bonus_context.player != null:
+		max_hp = _bonus_context.player.max_hp
+	else:
+		var tree: SceneTree = Engine.get_main_loop() as SceneTree
+		var run_state: Node = tree.root.get_node_or_null(^"RunState") if tree != null else null
+		if run_state != null:
+			max_hp = int(run_state.get(&"player_max_hp"))
+		if max_hp <= 0:
+			var character: CharacterData = run_state.get(&"character") as CharacterData if run_state != null else null
+			if character == null:
+				character = load(KeywordTable.FALLBACK_CHARACTER_PATH) as CharacterData
+			max_hp = character.max_hp if character != null else 0
+	if max_hp <= 0:
+		return -1
+	var fraction: float = clampf(percent / 100.0, 0.0, 1.0)
+	var threshold: int = floori(float(max_hp) * fraction)
+	while threshold > 0 and not Combatant.critical_at(threshold, max_hp, fraction):
+		threshold -= 1
+	while threshold < max_hp and Combatant.critical_at(threshold + 1, max_hp, fraction):
+		threshold += 1
+	return threshold
 
 # What this card's TOLL_HEAL would actually heal at the Toll now held -
 # the same arithmetic toll_heal_effect.gd does, so the face can't promise

@@ -268,7 +268,7 @@ enum Mark { NONE, COIL, DROP }
 
 # While its holder has it, they are Critical at or below this percent of
 # max HP - over their own line when it is higher (Go Under's Gone Under:
-# 50), never under it. Read through Combatant.critical_fraction(), so
+# 40), never under it. Read through Combatant.critical_fraction(), so
 # everything that judges Critical moves with it. 0 = none.
 @export_range(0, 100) var raises_critical_percent: int = 0
 
