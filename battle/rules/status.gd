@@ -232,6 +232,21 @@ static func attack_card_extra(blow: int, statuses: Array[Status]) -> int:
 	var without: int = apply_modifiers(blow, statuses, StatusData.ModifierTarget.OUTGOING_DAMAGE, true)
 	return maxi(with_all - without, 0)
 
+# An Attack card that took its attack bonus has finished resolving, a
+# replay too (EffectResolver.resolve_card()): every status whose bonus
+# lasted the card (StatusData.bonus_lasts_the_card) spends one charge, and
+# goes at 0. Gated on Critical as attack_bonus() is, so one it didn't pay
+# spends nothing.
+static func spend_card_attack_bonus(statuses: Array[Status], critical: bool) -> void:
+	for active in statuses.duplicate():
+		if active.data == null or not active.data.bonus_lasts_the_card or not active.has_charges():
+			continue
+		if active.data.bonus_requires_critical and not critical:
+			continue
+		active.charges -= 1
+		if active.charges <= 0:
+			statuses.erase(active)
+
 # An Attack card has finished resolving (EffectResolver.resolve_card()):
 # every status that StatusData.spent_by_attack_card spends one charge,
 # and goes at 0 - Bent Nail's doubling, once its Attack is done. Returns
@@ -464,7 +479,7 @@ static func attack_bonus(statuses: Array[Status], critical: bool, skip: StatusDa
 			continue
 		if skip != null and active.data == skip:
 			continue
-		if ongoing_only and active.has_charges():
+		if ongoing_only and active.has_charges() and not active.data.bonus_lasts_the_card:
 			continue
 		if active.data.bonus_requires_critical and not critical:
 			continue
@@ -475,10 +490,11 @@ static func attack_bonus(statuses: Array[Status], critical: bool, skip: StatusDa
 # bonus()): every status whose bonus that paid and that counts charges -
 # "+3 on your next Attack" - spends one, and goes at 0. The same gate as
 # attack_bonus() above, so a bonus that waits for Critical spends nothing
-# while it isn't paid. A status without charges is never touched.
+# while it isn't paid. A status without charges is never touched, nor one
+# whose bonus lasts the card (spend_card_attack_bonus()).
 static func spend_attack_bonus_charges(statuses: Array[Status], critical: bool) -> void:
 	for active in statuses.duplicate():
-		if active.data == null or active.data.attack_damage_bonus == 0 or not active.has_charges():
+		if active.data == null or active.data.attack_damage_bonus == 0 or not active.has_charges() or active.data.bonus_lasts_the_card:
 			continue
 		if active.data.bonus_requires_critical and not critical:
 			continue

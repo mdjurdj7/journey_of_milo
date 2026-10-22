@@ -1,0 +1,16 @@
+[gd_resource type="Resource" script_class="StatusData" load_steps=2 format=3]
+
+[ext_resource type="Script" path="res://battle/rules/status_data.gd" id="1_status_data"]
+
+[resource]
+script = ExtResource("1_status_data")
+id = "spare_buckle"
+display_name = "Spare Buckle"
+description = "Your next Attack this turn deals {bonus} more damage."
+category = 2
+default_charges = 1
+default_duration_turns = -1
+stack_rule = 3
+attack_damage_bonus = 4
+bonus_lasts_the_card = true
+ends_at_turn_end = true

@@ -92,6 +92,10 @@ func resolve_card(card: CardData, ctx: EffectContext) -> void:
 	if ctx.card_is_attack and not ctx.is_replay:
 		for spent_id in Status.spend_on_attack_card(ctx.player.statuses):
 			RunLogger.mechanic("keepsake_double", {"card": card.card_name, "status": spent_id, "extra": ctx.attack_card_extra_this_card})
+	# A bonus that lasted the card (Spare Buckle) goes with the card that
+	# took it - a replay counts as that Attack, and spends it too.
+	if ctx.card_is_attack and ctx.attack_bonus_taken:
+		Status.spend_card_attack_bonus(ctx.player.statuses, ctx.player.is_critical())
 	# After the whole card, once however much it spent: Toll spent hurries
 	# every countdown that listens for it (Sentence), and one that reaches
 	# 0 goes off now, in the player's turn - reported as damage, never as

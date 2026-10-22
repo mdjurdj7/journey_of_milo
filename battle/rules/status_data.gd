@@ -89,6 +89,11 @@ const DURATION_UNTIL_TRIGGERED := -2
 # outgoing doubling) holds for all of them: each target, each extra hit,
 # a repeat.
 @export var spent_by_attack_card: bool = false
+# A charged attack_damage_bonus that holds for the whole Attack card that
+# takes it - every hit, each repeat (Lash) - and is spent once that card
+# has finished, a replay's too (Spare Buckle's "your next Attack"). Keen's
+# goes with the first hit instead. See Status.spend_card_attack_bonus().
+@export var bonus_lasts_the_card: bool = false
 # Made REAL this pass (the old project's own version was decorative - see
 # Phase 1 report's flagged items): status.gd's consume_triggered() removes
 # every status with this flag set, unconditionally, whenever a trigger
