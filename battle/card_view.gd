@@ -326,7 +326,7 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 	set(value):
 		toll_glyph_gap_px = value
 		_relayout()
-@export var toll_badge_gap_px: float = 8.0:
+@export var toll_badge_gap_px: float = 6.0:
 	set(value):
 		toll_badge_gap_px = value
 		_relayout()
