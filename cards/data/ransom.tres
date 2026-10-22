@@ -16,7 +16,7 @@ script = ExtResource("1_card_data")
 card_name = "Ransom"
 cost = 2
 card_type = 1
-rarity = 3
+rarity = 2
 target_type = 1
 description = "Next turn, your Attacks heal {share} the damage dealt.
 Spent."
