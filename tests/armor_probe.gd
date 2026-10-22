@@ -733,14 +733,22 @@ func _check_shell_drop() -> void:
 		var preview: Node = plate.call("get_link_preview") if plate != null else null
 		var shown: CardData = preview.get("card_data") if preview != null else null
 		_expect(shown != null and shown.card_name == shell.to_card.tempered.card_name, "...and Stoneshell+ beside it")
-		if examine != null:
-			examine.call("close", false)
+		# TAKE clicked on the plate, through its own input - the path a
+		# click takes, not the swap called directly.
 		await _seconds(0.5)
-		_field.call("take_world_shell", found[0])
+		var rects: Array = plate.get("_action_rects") if plate != null else []
+		if rects.size() > 0:
+			var click := InputEventMouseButton.new()
+			click.button_index = MOUSE_BUTTON_LEFT
+			click.pressed = true
+			click.position = (rects[0] as Rect2).get_center()
+			plate.call("_on_gui_input", click)
+		await _seconds(1.0)
 		var names: Array[String] = []
 		for card: CardData in _run_state.get("deck"):
 			names.append(card.card_name)
-		_expect(names.has(shell.to_card.tempered.card_name) and not names.has(shell.from_card.tempered.card_name), "TAKE: the Endure+ is Stoneshell+")
+		_expect(names.has(shell.to_card.tempered.card_name) and not names.has(shell.from_card.tempered.card_name), "TAKE clicked: the Endure+ is Stoneshell+")
+		_expect(_shells().is_empty() and _field.get_node_or_null("ShellExamine") == null, "...the shell gone from the sand and the plate closed")
 	shell.drop_chance = chance
 	await _teardown()
 	_completed += 1
