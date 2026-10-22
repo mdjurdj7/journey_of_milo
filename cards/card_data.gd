@@ -155,6 +155,12 @@ var battle_copy: bool = false
 func has_tag(tag: StringName) -> bool:
 	return tags.has(tag)
 
+# Whether `character`'s class may have this card: a neutral card (no
+# card_class) or one of its own class's. A null character - no run yet -
+# may have any. The one class check: RewardPool's offers read it.
+func usable_by(character: CharacterData) -> bool:
+	return character == null or card_class == &"" or card_class == character.card_class
+
 # The four real tiers, lowest first - UNSET left out. What a rarity roll
 # walks and what a probe checks a card's tag against.
 static func rarity_tiers() -> Array[CardRarity]:

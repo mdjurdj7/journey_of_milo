@@ -228,12 +228,13 @@ func _rarity_eligible(enemy: EnemyData, character: CharacterData, class_only: bo
 # Whether a random offer in `character`'s run may give the card at `index`
 # (in _cards()): a card, REWARDABLE (CardData.offer - never a starter-only,
 # Keeper-only or own-channel one), and neutral (no card_class) or
-# `character`'s own class. A null character skips the class check.
+# `character`'s own class (CardData.usable_by()). A null character skips
+# the class check.
 func _offerable(index: int, character: CharacterData) -> bool:
 	var card: CardData = _cards()[index]
 	if card == null or card.offer != CardData.OfferScope.REWARDABLE:
 		return false
-	return character == null or card.card_class == &"" or card.card_class == character.card_class
+	return card.usable_by(character)
 
 # One of `candidates` (entry indices, not empty), by weight and bias - one
 # rng draw. The pick inside a tier for roll_by_rarity() and roll_top_
