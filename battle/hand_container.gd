@@ -395,12 +395,14 @@ func _process(_delta: float) -> void:
 func get_yield_line() -> DevourYieldLine:
 	return _yield_line
 
-# Each face says whether its card has Keep (Deck.has_keep()).
+# Each face says whether its card has Keep (Deck.has_keep()), and whether
+# that is Sheathe's one-turn Keep (Deck.has_keep_once()).
 func _sync_keep() -> void:
 	if _deck == null:
 		return
 	for view in _card_views():
-		view.set_kept(view.card_data != null and _deck.has_keep(view.card_data))
+		var card: CardData = view.card_data
+		view.set_kept(card != null and _deck.has_keep(card), card != null and _deck.has_keep_once(card))
 
 # The one way the hand's contents change: the Deck's hand is the truth,
 # and the slots are brought to match it - a slot for every card the

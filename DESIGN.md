@@ -420,11 +420,12 @@ and up the west shore north of z -27. (2026-10-17.)
     already; right-click, Esc or Sheathe again cancel, End Turn is greyed
     while the pick is open. There is no arming a card first. The card
     gains a one-turn Keep (`Deck.kept_once`, Frayed Cord's end-of-turn
-    keep in kind) and shows Keep's marker: it stays in the hand through
-    this turn's end, then loses it; played first, the use is gone. Run
-    log: the `sheathe` event (format 17). Open: hovering KEEP on a
-    sheathed card reads the Keep keyword's "until played", which
-    overstates a one-turn keep; no sound of its own. (2026-10-21.)
+    keep in kind) and reads "SHEATHED ·" ahead of its type, hovering to
+    "Stays in your hand at the end of this turn." (`CardView.sheathed_
+    label_definition`, not a keyword - never bolded in rules text): it
+    stays in the hand through this turn's end, then loses it; played
+    first, the use is gone. Real Keep still reads "KEEP ·". Run log: the
+    `sheathe` event (format 17). Open: no sound of its own. (2026-10-21.)
   (2026-10-18, Samurai shell.)
 - **The Siltjaw's mound rework leaves four things open.** Its mounds are
   12 HP targets with plates, unbroken it erupts for 14 (Block-only),

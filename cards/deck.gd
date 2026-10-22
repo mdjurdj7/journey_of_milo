@@ -37,8 +37,8 @@ var kept: Array[CardData] = []
 # Controller.sheathe()): each stays in the hand when the turn's hand is
 # discarded (discard_hand()), then the Keep is gone - it doesn't hold
 # through another turn's end, as kept's does. Played or otherwise out of
-# the hand first, it loses it then. has_keep() answers for both, so the
-# face reads Keep's marker either way.
+# the hand first, it loses it then. has_keep() answers for both;
+# has_keep_once() tells this one apart, for the face's SHEATHED.
 var kept_once: Array[CardData] = []
 # The card being played, from its commit (begin_play()) until its effects
 # have resolved (end_play()); null between plays. Out of the hand from the
@@ -151,6 +151,11 @@ func grant_keep_once(card: CardData) -> bool:
 
 func has_keep(card: CardData) -> bool:
 	return kept.has(card) or kept_once.has(card)
+
+# Whether `card`'s Keep is the one-turn kind alone (Sheathe's): Keep itself
+# outranks it, so a card with both answers false.
+func has_keep_once(card: CardData) -> bool:
+	return kept_once.has(card) and not kept.has(card)
 
 # `card` leaves the hand - by any route - and with it its Keep.
 func _leave_hand(card: CardData) -> void:

@@ -526,6 +526,10 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 @export_multiline var strike_label_definition: String = "An Attack card."
 # What a fight-only copy's COPY says when hovered (CardData.battle_copy).
 @export_multiline var copy_label_definition: String = "A copy: Spent when played, and gone at the end of the turn."
+# What a sheathed card's SHEATHED says when hovered (Sheathe's one-turn
+# Keep - Deck.kept_once). Its own text, as COPY's is, not a KeywordTable
+# entry.
+@export_multiline var sheathed_label_definition: String = "Stays in your hand at the end of this turn."
 # A copy's quiet mark: a band this deep along the face's top edge, hatched
 # with 1px ink strokes this far apart at this alpha - no glow, no colour.
 @export var copy_band_px: float = 6.0:
@@ -619,8 +623,10 @@ var _name_font_size: int = 0
 # clipped into it by the field.
 var _art_rule: Control = null
 var _hp_cost: int = 0
-# Keep on this card (set_kept()).
+# Keep on this card (set_kept()), and whether it is Sheathe's one-turn
+# Keep rather than Keep itself.
 var _kept: bool = false
+var _kept_once: bool = false
 var _rest_offset_y: float = 0.0
 # How far down from this card's own local origin "at rest" actually sits -
 # pushed down by HandContainer.hand_rest_visible_height so only part of
@@ -661,6 +667,11 @@ const STRIKE_LABEL_WORD := "STRIKE"
 # the word answers keyword_at() with this keyword (KeywordTable's Keep).
 const KEEP_LABEL_WORD := "KEEP"
 const KEEP_KEYWORD := "Keep"
+# A card with Sheathe's one-turn Keep says SHEATHED in KEEP's place, and
+# the word answers keyword_at() as SHEATHED_KEYWORD
+# (sheathed_label_definition).
+const SHEATHED_LABEL_WORD := "SHEATHED"
+const SHEATHED_KEYWORD := "Sheathed"
 const TYPE_PREFIX_SEPARATOR := " · "
 # A fight-only copy (CardData.battle_copy - Twice Over's) leads with this,
 # before any KEEP, and answers keyword_at() as COPY_KEYWORD.
@@ -1640,8 +1651,8 @@ func keyword_at(local_pos: Vector2) -> String:
 		return COPY_KEYWORD
 	if _kept:
 		var keep_at: int = (COPY_LABEL_WORD + TYPE_PREFIX_SEPARATOR).length() if _is_copy() else 0
-		if _type_part_rect(keep_at, KEEP_LABEL_WORD.length()).has_point(local_pos):
-			return KEEP_KEYWORD
+		if _type_part_rect(keep_at, _keep_label_word().length()).has_point(local_pos):
+			return SHEATHED_KEYWORD if _kept_once else KEEP_KEYWORD
 	if strike_label_rect().has_point(local_pos):
 		return STRIKE_LABEL_WORD
 	# A card with a hover note (CardData.hover_note - Not So): anywhere on
@@ -1677,11 +1688,15 @@ func _type_part_rect(from: int, count: int) -> Rect2:
 	return Rect2(left, type_label.position.y, width, type_label.size.y).grow(KEYWORD_HIT_PAD_PX)
 
 # This card has Keep (Deck.has_keep() - pushed by HandContainer): "KEEP ·"
-# ahead of its type, answering keyword_at() as Keep.
-func set_kept(on: bool) -> void:
-	if on == _kept:
+# ahead of its type, answering keyword_at() as Keep - or, with `once`
+# (Sheathe's one-turn Keep, Deck.has_keep_once()), "SHEATHED ·", answering
+# as Sheathed.
+func set_kept(on: bool, once: bool = false) -> void:
+	var sheathed: bool = on and once
+	if on == _kept and sheathed == _kept_once:
 		return
 	_kept = on
+	_kept_once = sheathed
 	if card_data == null:
 		return
 	type_label.text = _type_prefix() + _type_label_text(_keyline_type)
@@ -1691,14 +1706,20 @@ func is_kept() -> bool:
 	return _kept
 
 # What the type label leads with: "COPY · " on a fight-only copy, then
-# "KEEP · " on a kept card - "" for neither.
+# "KEEP · " on a kept card ("SHEATHED · " on a sheathed one) - "" for
+# neither.
 func _type_prefix() -> String:
 	var prefix: String = ""
 	if _is_copy():
 		prefix += COPY_LABEL_WORD + TYPE_PREFIX_SEPARATOR
 	if _kept:
-		prefix += KEEP_LABEL_WORD + TYPE_PREFIX_SEPARATOR
+		prefix += _keep_label_word() + TYPE_PREFIX_SEPARATOR
 	return prefix
+
+# The word a kept card leads with: SHEATHED for Sheathe's one-turn Keep,
+# KEEP for Keep.
+func _keep_label_word() -> String:
+	return SHEATHED_LABEL_WORD if _kept_once else KEEP_LABEL_WORD
 
 func _is_copy() -> bool:
 	return card_data != null and card_data.battle_copy
@@ -1766,6 +1787,8 @@ func _show_keyword(word: String) -> void:
 		_keyword_reveal.set_revealed(false)
 		return
 	var definition: String = strike_label_definition if word == STRIKE_LABEL_WORD else (copy_label_definition if word == COPY_KEYWORD else KeywordTable.shared().definition(word))
+	if word == SHEATHED_KEYWORD:
+		definition = sheathed_label_definition
 	if card_data != null and word == card_data.card_name and not card_data.hover_note.is_empty():
 		definition = card_data.hover_note
 	_keyword_reveal.set_bone(field_color)
