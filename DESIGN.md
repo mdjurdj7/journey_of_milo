@@ -265,12 +265,19 @@ and up the west shore north of z -27. (2026-10-17.)
     card was played, through `CardEffect.bonus_per_chain_level`. The
     face prints the live number in a fight and `{chain_bonus}` outside
     one.
+  - **Dormant since 2026-10-21.** Her starter was replaced (below) and no
+    card carries a chain property or Burst any more, so no chain ever
+    starts. The code, its keywords (Advance, Hold, Withdraw, Burst) and
+    `skillchain_probe` (its own test cards) stay as they are. The standing
+    row shows "Chain N · <last skillchain>" while a chain is live, which
+    is never now.
   - **Starter deck** (`run/data/samurai.tres`, cards in `cards/samurai/`,
-    all STARTER_ONLY): 4 Cut (Advance, 1, deal 6), 2 Guard (Hold, 1, 5
-    block), 2 Step Back (Withdraw, 0, draw 1), 1 Measured Cut (Hold, 1,
-    deal 5), 1 Severance (Burst, 1, deal 5 plus 4 per chain level). The
-    standing row shows "Chain N · <last skillchain>" while a chain is
-    live.
+    all STARTER_ONLY, no chain property): 5 Cut (1, deal 6), 4 Stillness
+    (1, gain 5 block), 1 Patient Cut (1, deal 4 plus 4 for each Energy
+    left after its own cost, `CardEffect.bonus_per_unspent_energy`; the
+    face prints the live number in a fight and `{energy_bonus}` outside
+    one). Guard, Step Back, Measured Cut and Severance, the prototype's,
+    are deleted. (2026-10-21.)
   - **Open:** the Edge and Counter archetypes; her reward pool (her
     starters never roll, so her rolls are neutral cards only); tempering
     her cards (none has a tempered version); attack animations for her
@@ -395,10 +402,10 @@ and up the west shore north of z -27. (2026-10-17.)
   - **Placeholders:** her max HP (80, the Wanderer's),
     `field_model_height` 1.7 (the glb's own) and
     `field_model_yaw_degrees` 180 are guesses to settle in play. Her
-    albedo is the glb's own base colour, unpainted. Her starting deck is
-    the skillchain prototype's ten (see Parked, "The Samurai's
-    skillchains"), its numbers guesses too.
-  - **The compendium shows her five starters** under SAMURAI: it lists
+    albedo is the glb's own base colour, unpainted. Her starting deck's
+    numbers (5 Cut, 4 Stillness, 1 Patient Cut - see "The Samurai's
+    skillchains") are guesses too.
+  - **The compendium shows her three starters** under SAMURAI: it lists
     every card in `cards/samurai/`, STARTER_ONLY or not.
   - **No Devour, and no sustain in a fight.** Devour is the Wanderer's
     (`CharacterData.has_devour`, on in `wanderer.tres` only): her fights

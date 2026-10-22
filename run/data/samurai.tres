@@ -1,13 +1,11 @@
-[gd_resource type="Resource" script_class="CharacterData" load_steps=9 format=3]
+[gd_resource type="Resource" script_class="CharacterData" load_steps=7 format=3]
 
 [ext_resource type="Script" uid="uid://dm776r835syew" path="res://run/character_data.gd" id="1_character_data"]
 [ext_resource type="Resource" uid="uid://br0h41oocgae2" path="res://cards/samurai/cut.tres" id="2_cut"]
-[ext_resource type="Resource" uid="uid://ciyiha74yc4tt" path="res://cards/samurai/guard.tres" id="3_guard"]
-[ext_resource type="Resource" uid="uid://cbc83i0dwvrxb" path="res://cards/samurai/step_back.tres" id="4_step_back"]
-[ext_resource type="Resource" uid="uid://c66dxuio1qbfp" path="res://cards/samurai/measured_cut.tres" id="5_measured_cut"]
+[ext_resource type="Resource" uid="uid://cm2v44pxxtlco" path="res://cards/samurai/stillness.tres" id="3_stillness"]
+[ext_resource type="Resource" uid="uid://c43y6q4wmxlee" path="res://cards/samurai/patient_cut.tres" id="4_patient_cut"]
 [ext_resource type="Resource" path="res://cards/pools/samurai_pool.tres" id="6_pool"]
 [ext_resource type="Texture2D" uid="uid://chol5clvwqkkw" path="res://assets/models/samurai/samurai_v2_texture_0.png" id="7_albedo"]
-[ext_resource type="Resource" uid="uid://ckedx53rnnq4o" path="res://cards/samurai/severance.tres" id="8_severance"]
 
 [resource]
 script = ExtResource("1_character_data")
@@ -15,11 +13,9 @@ character_name = "Samurai"
 card_class = &"samurai"
 max_hp = 80
 starting_deck_counts = {
-ExtResource("2_cut"): 4,
-ExtResource("3_guard"): 2,
-ExtResource("4_step_back"): 2,
-ExtResource("5_measured_cut"): 1,
-ExtResource("8_severance"): 1
+ExtResource("2_cut"): 5,
+ExtResource("3_stillness"): 4,
+ExtResource("4_patient_cut"): 1
 }
 reward_pool = ExtResource("6_pool")
 field_model_path = "res://assets/models/samurai/samurai_v2.glb"

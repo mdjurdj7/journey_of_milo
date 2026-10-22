@@ -13,9 +13,7 @@ card_name = "Cut"
 cost = 1
 rarity = 1
 target_type = 0
-description = "Advance.
-Deal {damage} damage."
+description = "Deal {damage} damage."
 effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
-chain_property = 1
 card_class = &"samurai"
 offer = 1
