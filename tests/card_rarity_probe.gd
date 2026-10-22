@@ -17,7 +17,7 @@ const MAX_HP := 70
 const CRITICAL_FRACTION := 0.3
 # With Regards: what its kill heals.
 const WITH_REGARDS_HEAL := 5
-const CASES := 18
+const CASES := 19
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SAMURAI_PATH := "res://run/data/samurai.tres"
 # Each card folder and the card_class every card directly in it carries
@@ -35,6 +35,9 @@ const OWN_CHANNEL: Array[String] = ["Samphire", "Stoneshell"]
 # tempered copy, is OWN_CHANNEL.
 const WEAPON_CARD_DIR := "res://cards/weapon/"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
+# Floor 2's cache alone offers the cards in BELONGINGS_DIR, from this pool.
+const BELONGINGS_DIR := "res://cards/belongings/"
+const BELONGINGS_POOL_PATH := "res://cards/pools/belongings_pool.tres"
 const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/", "res://cards/belongings/"]
 # Folders whose cards are authored in the editor, not entered in
 # EXPECTED_RARITY: each must carry a real tier, whichever it is (cards/
@@ -144,6 +147,7 @@ func _initialize() -> void:
 	_check_with_regards()
 	_check_card_class_and_offer()
 	_check_offer_filter()
+	_check_belongings_only()
 	if _completed != CASES:
 		_failures += 1
 		print("FAIL: only %d of %d cases ran to the end" % [_completed, CASES])
@@ -631,6 +635,29 @@ func _check_offer_filter() -> void:
 			for card: CardData in offered:
 				_expect(card.offer == CardData.OfferScope.REWARDABLE, "%s's %s: %s is rewardable" % [character.character_name, file, card.card_name])
 				_expect(card.card_class == &"" or card.card_class == character.card_class, "%s's %s: %s is neutral or theirs" % [character.character_name, file, card.card_name])
+	_completed += 1
+
+# The belongings cards: neutral and rewardable, every one in the belongings
+# pool, and in no other pool's roll - its entries or a folder it pulls in
+# (RewardPool._cards()) - so no fight, collector or class pool can offer
+# one.
+func _check_belongings_only() -> void:
+	var belongings: Array[CardData] = []
+	for file in DirAccess.get_files_at(BELONGINGS_DIR):
+		if file.ends_with(".tres"):
+			belongings.append(load(BELONGINGS_DIR + file) as CardData)
+	_expect(not belongings.is_empty(), "There are belongings cards")
+	var pool := load(BELONGINGS_POOL_PATH) as RewardPool
+	var listed: Array[CardData] = pool.call("_cards")
+	for card in belongings:
+		_expect(card.card_class == &"" and card.offer == CardData.OfferScope.REWARDABLE, "%s is neutral and rewardable" % card.card_name)
+		_expect(listed.has(card), "%s is in the belongings pool" % card.card_name)
+	for file in DirAccess.get_files_at("res://cards/pools/"):
+		if not file.ends_with(".tres") or "res://cards/pools/" + file == BELONGINGS_POOL_PATH:
+			continue
+		var other: Array[CardData] = (load("res://cards/pools/" + file) as RewardPool).call("_cards")
+		for card in belongings:
+			_expect(not other.has(card), "%s is in no other pool (%s)" % [card.card_name, file])
 	_completed += 1
 
 # --- Helpers ---

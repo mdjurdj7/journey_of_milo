@@ -381,9 +381,8 @@ and up the west shore north of z -27. (2026-10-17.)
     reward screen's fixed extra and the Collector's fixed card, lives in
     the second. The Wanderer's pool holds no neutral card at all.
     Accepted for now.
-  - **Floor props hand her Wanderer cards.** Floor 2's belongings pool
-    holds Hold Fast and the Collector's stock on floor 4 holds 27
-    Wanderer cards; both are props' own pools, which the class's pool
+  - **Floor props hand her Wanderer cards.** The Collector's stock on
+    floor 4 holds 27 Wanderer cards - a prop's own pool, which the class's pool
     doesn't replace (`RegionField.run_reward_pool()` stands in only for
     the floor's `reward_pool`), nor does it replace a floor's `rare_pool`.
   - **"him" in the world's lines:** `run/run_over.tscn`'s drowned_line
@@ -504,9 +503,10 @@ and up the west shore north of z -27. (2026-10-17.)
   holds class-agnostic cards the Keeper used to hand out (Left Hand,
   Untouched, Second Thoughts) - not reward or shop stock, and a scan
   rooted at `cards/` would sweep them into both. Since 2026-09-30 she
-  offers a keepsake instead; the three, with Hold Fast, are
-  floor 2's belongings stock (`cards/pools/belongings_pool.tres`) and the
-  Collector's (`cards/pools/collector_pool.tres`). The old project
+  offers a keepsake instead; the three are the Collector's neutral
+  stock (`cards/pools/neutral_pool.tres`). Floor 2's belongings offer
+  cards of their own, in `cards/belongings/`, which no pool but
+  `cards/pools/belongings_pool.tres` names (2026-10-22). The old project
   hit exactly this and solved it by hiding the cards in a subfolder its
   flat, non-recursive scan happened to miss (`npc_offers/`, see
   `reference/old_project/deck-builder/docs/DESIGN.md`) - a guard that
