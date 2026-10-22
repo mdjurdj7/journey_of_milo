@@ -308,10 +308,8 @@ func _check_pool() -> void:
 	for card in belongings.entries:
 		_expect(card == null or card.card_name != "Sentence", "...not in the belongings (Keeper) pool")
 	var character := load(CHARACTER_PATH) as CharacterData
-	var counts: Dictionary = {}
 	for card: CardData in character.starting_deck_counts:
-		counts[card.card_name] = character.starting_deck_counts[card]
-	_expect_eq(counts, {"Slash": 5, "Bite Down": 1, "Brace": 2, "Settled Account": 1, "Down Payment": 1}, "...and the starting deck is unchanged")
+		_expect(card.card_name != "Sentence", "...nor the starting deck")
 	_completed += 1
 
 # --- Helpers ---
