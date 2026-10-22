@@ -13,12 +13,17 @@ class_name BelongingsScreen
 # screen at columns_centre_fraction of its height, each its object alone
 # - the case, the pack, the shard of Glassbone, rendered from their
 # models (see _build_render()) - and just above the row the rule, TAKE
-# ONE, in the system voice's tracked caps. A soft band of the ink,
-# feathered top and bottom, darkens the screen's full width behind the
-# row, over the scrim. What each offers is fixed (Slot) and named under
-# its column in the choices' tracked caps - COIN, LOOK INSIDE, GLASSBONE;
-# how much coin, and which cards, stay a mystery until it's taken. A
-# column with nothing to offer is not drawn and cannot be focused.
+# ONE, in the system voice's tracked caps. The three lie on one worn
+# blanket on the sand, on one baseline, each over a soft contact shadow,
+# the shard on a small folded square of cloth with a corner turned back
+# (the Ground group) - rendered as a second view of the objects' world.
+# A soft band of the ink, feathered top and bottom, darkens the screen's
+# full width behind the row and behind WALK ON, over the scrim - the
+# ground the labels read on. What each offers is fixed (Slot) and named
+# under its column in the choices' tracked caps - 45 GOLD (the cache's
+# coin_amount), LOOK INSIDE, GLASSBONE ×1; which cards, stay a mystery
+# until it's taken. A column with nothing to offer is not drawn and
+# cannot be focused.
 #
 # The objects wear what they wear on the sand: each model's own colour
 # map on the painted shader, times the cache's object_tint (Belongings
@@ -29,8 +34,9 @@ class_name BelongingsScreen
 #
 # The focus language is on the object itself, the title menu's two
 # states carried over: at rest the object is drawn down (rest_modulate)
-# and its kind in the utility grey; focused it is drawn as rendered, its
-# kind in bone, with the short hairline centred under it. The mouse focuses by hovering a column and takes by
+# and its kind in the rest grey; focused it is drawn as rendered, lifted
+# focus_lift_px off the cloth (eased), its kind in bone, with the short
+# hairline centred under it. The mouse focuses by hovering a column and takes by
 # clicking it; ui_left/ui_right move across the columns (wrapping),
 # ui_down drops to WALK ON, ui_up returns, ui_accept takes. Nothing is
 # focused until the mouse or a key says so. WALK ON keeps the text form
@@ -85,6 +91,9 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 const SLOT_COUNT := 3
+# The two passes' render layers: the objects, and the ground under them.
+const OBJECT_LAYER := 2
+const GROUND_LAYER := 1
 # The focus index WALK ON takes, after the three columns - and TAKE
 # NOTHING, in its place, while the pack's cards are up.
 const DISMISS := SLOT_COUNT
@@ -167,12 +176,22 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		rest_modulate = value
 		_refresh()
-# Each column's kind under it, column order, in the choices' tracked caps
-# (choice_word_size_px): the baseline this far under the column's square.
-# Grey at rest, bone on focus; gone with the take.
-@export var kind_labels: PackedStringArray = PackedStringArray(["COIN", "LOOK INSIDE", "GLASSBONE"]):
+# Each column's kind under it, in the choices' tracked caps (choice_word_
+# size_px): the coin's amount (the cache's coin_amount) in gold_kind_
+# format, LOOK INSIDE, the Glassbone on offer in glassbone_kind_format -
+# the baseline kind_label_gap_px under the column's square. Grey at rest
+# (unfocused_color), bone on focus; gone with the take.
+@export var gold_kind_format: String = "%d GOLD":
 	set(value):
-		kind_labels = value
+		gold_kind_format = value
+		_refresh()
+@export var card_kind_text: String = "LOOK INSIDE":
+	set(value):
+		card_kind_text = value
+		_refresh()
+@export var glassbone_kind_format: String = "GLASSBONE ×%d":
+	set(value):
+		glassbone_kind_format = value
 		_refresh()
 @export var kind_label_gap_px: float = 34.0:
 	set(value):
@@ -185,10 +204,13 @@ const DISMISS := SLOT_COUNT
 @export_group("")
 
 @export_group("Band")
-# Behind the row only: the ink at band_alpha across the full width, from
-# band_pad_px over TAKE ONE's caps to band_pad_px under the kinds, eased
-# to nothing over band_feather_px above and below - over the scrim.
-@export_range(0.0, 1.0) var band_alpha: float = 0.25:
+# Behind the row - from band_pad_px over TAKE ONE's caps to band_pad_px
+# under the kinds - and behind WALK ON: the ink at band_alpha across the
+# full width, eased to nothing over band_feather_px above and below - over
+# the scrim. It is the ground the labels read on: at 0.6, over the pale
+# sand (the fog's 0.87) under the scrim, bone reads about 6:1 and
+# unfocused_color about 4.9:1.
+@export_range(0.0, 1.0) var band_alpha: float = 0.6:
 	set(value):
 		band_alpha = value
 		_refresh()
@@ -313,6 +335,18 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		ambient_energy = value
 		_render_objects()
+# Each object's own scale on the screen on top of the cache's (column
+# order) - the case a little larger, so the three weigh alike.
+@export var object_screen_scales: PackedFloat32Array = PackedFloat32Array([1.25, 1.0, 1.0]):
+	set(value):
+		object_screen_scales = value
+		_render_objects()
+# The row's baseline: every object stands on it, this far down its
+# column's square.
+@export_range(0.0, 1.0) var base_line_fraction: float = 0.8:
+	set(value):
+		base_line_fraction = value
+		_render_objects()
 # Each cell renders at its column's on-screen size - column_px times the
 # window's stretch scale - so the objects draw 1:1 at any window size,
 # re-rendered when the window changes. Capped here (768 covers a 5K
@@ -321,6 +355,79 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		render_cell_max_px = value
 		_render_objects()
+@export_group("")
+
+@export_group("Ground")
+# The three lie on one worn blanket on the sand, in the region's cool
+# palette: cloth_color, worn toward cloth_wear_color in soft patches
+# (cloth_wear_scale of them across the cloth). On screen it reaches
+# cloth_side_px past the outer columns, cloth_back_px above the baseline
+# and cloth_front_px below it - clear of the kinds. Each object casts a
+# soft contact shadow: shadow_color, shadow_scale of its footprint, its
+# edge fading from shadow_softness of the way out. The shard rests on a
+# small folded square of cloth (fold_color, its turned-back corner fold_
+# flap_color), fold_scale of its footprint, the corner turned fold_turn_
+# fraction of the way in, turned fold_yaw_degrees. All re-apply live.
+@export var cloth_color: Color = Color(0.33, 0.36, 0.39, 1.0):
+	set(value):
+		cloth_color = value
+		_render_objects()
+@export var cloth_wear_color: Color = Color(0.44, 0.47, 0.49, 1.0):
+	set(value):
+		cloth_wear_color = value
+		_render_objects()
+@export var cloth_wear_scale: float = 3.0:
+	set(value):
+		cloth_wear_scale = value
+		_render_objects()
+@export var cloth_side_px: float = 48.0:
+	set(value):
+		cloth_side_px = value
+		_render_objects()
+@export var cloth_back_px: float = 70.0:
+	set(value):
+		cloth_back_px = value
+		_render_objects()
+@export var cloth_front_px: float = 22.0:
+	set(value):
+		cloth_front_px = value
+		_render_objects()
+@export var shadow_color: Color = Color(0.06, 0.07, 0.09, 0.55):
+	set(value):
+		shadow_color = value
+		_render_objects()
+@export var shadow_scale: float = 1.3:
+	set(value):
+		shadow_scale = value
+		_render_objects()
+@export_range(0.0, 1.0) var shadow_softness: float = 0.35:
+	set(value):
+		shadow_softness = value
+		_render_objects()
+@export var fold_color: Color = Color(0.52, 0.55, 0.58, 1.0):
+	set(value):
+		fold_color = value
+		_render_objects()
+@export var fold_flap_color: Color = Color(0.43, 0.46, 0.49, 1.0):
+	set(value):
+		fold_flap_color = value
+		_render_objects()
+@export var fold_scale: float = 1.5:
+	set(value):
+		fold_scale = value
+		_render_objects()
+@export_range(0.0, 0.9) var fold_turn_fraction: float = 0.35:
+	set(value):
+		fold_turn_fraction = value
+		_render_objects()
+@export var fold_yaw_degrees: float = 10.0:
+	set(value):
+		fold_yaw_degrees = value
+		_render_objects()
+# The focused object lifts focus_lift_px off the cloth, eased over
+# focus_lift_sec; its shadow stays.
+@export var focus_lift_px: float = 6.0
+@export var focus_lift_sec: float = 0.15
 @export_group("")
 
 @export_group("Choices")
@@ -342,8 +449,9 @@ const DISMISS := SLOT_COUNT
 	set(value):
 		dismiss_baseline_fraction = value
 		_refresh()
-# The title menu's unfocused item: CardView's keyline_utility.
-@export var unfocused_color: Color = Color(0.58, 0.58, 0.60, 1.0):
+# A label at rest - the kinds, WALK ON, TAKE NOTHING: light enough to
+# hold 4.5:1 on the band (band_alpha).
+@export var unfocused_color: Color = Color(0.82, 0.82, 0.84, 1.0):
 	set(value):
 		unfocused_color = value
 		_refresh()
@@ -400,7 +508,20 @@ var _choice_font: Font = null
 var _pick_views: Array[CardView] = []
 
 var _viewport: SubViewport = null
-var _cell_px: int = 1
+# The ground pass - the cloth, the shadows, the fold - a second view of
+# the same world (layer GROUND_LAYER), drawn first.
+var _ground_viewport: SubViewport = null
+var _ground_camera: Camera3D = null
+var _cloth: MeshInstance3D = null
+var _cloth_material: StandardMaterial3D = null
+var _shadows: Array[MeshInstance3D] = []
+var _fold: MeshInstance3D = null
+# The render's rect on screen, and its pixels per screen pixel.
+var _render_rect: Rect2 = Rect2()
+var _render_scale: float = 1.0
+# Each column's lift now (focus_lift_px when focused), and its tween.
+var _lift: PackedFloat32Array = PackedFloat32Array([0.0, 0.0, 0.0])
+var _lift_tweens: Array[Tween] = [null, null, null]
 var _camera: Camera3D = null
 var _light: DirectionalLight3D = null
 var _environment: Environment = null
@@ -501,7 +622,7 @@ func _ready() -> void:
 	_draw_layer.mouse_filter = Control.MOUSE_FILTER_STOP
 	_draw_layer.gui_input.connect(_on_gui_input)
 	_draw_layer.draw.connect(_draw_columns)
-	_draw_layer.resized.connect(_refresh)
+	_draw_layer.resized.connect(_render_objects)
 	add_child(_draw_layer)
 
 	_build_render()
@@ -537,9 +658,16 @@ func _has_slot(slot: int) -> bool:
 func can_take(slot: int) -> bool:
 	return _has_slot(slot)
 
-# What's named under a column before the take: its kind.
+# What's named under a column before the take: its kind, and how much.
 func kind_text(slot: int) -> String:
-	return kind_labels[slot] if slot < kind_labels.size() else ""
+	match slot:
+		Slot.GOLD:
+			return gold_kind_format % _gold
+		Slot.CARD:
+			return card_kind_text
+		Slot.GLASSBONE:
+			return glassbone_kind_format % _glassbone_offer
+	return ""
 
 # The Glassbone that rides with a column (the coin's or the pack's), 0
 # for none.
@@ -585,8 +713,7 @@ func _build_render() -> void:
 	_viewport.own_world_3d = true
 	_viewport.transparent_bg = true
 	_viewport.msaa_3d = Viewport.MSAA_4X
-	_cell_px = _render_cell_size()
-	_viewport.size = Vector2i(_cell_px * SLOT_COUNT, _cell_px)
+	_viewport.size = Vector2i.ONE
 	_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
 	add_child(_viewport)
 	get_viewport().size_changed.connect(_render_objects)
@@ -620,6 +747,7 @@ func _build_render() -> void:
 			for mesh_instance in model.find_children("*", "MeshInstance3D", true, false):
 				var mi := mesh_instance as MeshInstance3D
 				mi.material_override = material
+				mi.layers = 1 << (OBJECT_LAYER - 1)
 				var mi_aabb: AABB = (model.global_transform.affine_inverse() * mi.global_transform) * mi.get_aabb()
 				aabb = mi_aabb if not has_aabb else aabb.merge(mi_aabb)
 				has_aabb = true
@@ -639,11 +767,77 @@ func _build_render() -> void:
 	var world_environment := WorldEnvironment.new()
 	world_environment.environment = _environment
 	_viewport.add_child(world_environment)
-	_camera = Camera3D.new()
-	_camera.projection = Camera3D.PROJECTION_ORTHOGONAL
-	_camera.keep_aspect = Camera3D.KEEP_HEIGHT
+	_camera = _new_camera(OBJECT_LAYER)
 	_viewport.add_child(_camera)
+	_build_ground()
 	_render_objects()
+
+func _new_camera(layer_number: int) -> Camera3D:
+	var camera := Camera3D.new()
+	camera.projection = Camera3D.PROJECTION_ORTHOGONAL
+	camera.keep_aspect = Camera3D.KEEP_HEIGHT
+	camera.cull_mask = 1 << (layer_number - 1)
+	return camera
+
+# The ground pass: its own view of the objects' world, seeing only the
+# ground layer - the cloth, a shadow under each object, the shard's fold.
+func _build_ground() -> void:
+	_ground_viewport = SubViewport.new()
+	_ground_viewport.name = "Ground"
+	_ground_viewport.transparent_bg = true
+	_ground_viewport.msaa_3d = Viewport.MSAA_4X
+	_ground_viewport.size = Vector2i.ONE
+	_ground_viewport.render_target_update_mode = SubViewport.UPDATE_DISABLED
+	add_child(_ground_viewport)
+	_ground_viewport.world_3d = _viewport.find_world_3d()
+	_ground_camera = _new_camera(GROUND_LAYER)
+	_ground_viewport.add_child(_ground_camera)
+
+	_cloth = MeshInstance3D.new()
+	_cloth.name = "Cloth"
+	_cloth.layers = 1 << (GROUND_LAYER - 1)
+	_cloth.mesh = PlaneMesh.new()
+	_cloth_material = StandardMaterial3D.new()
+	_cloth_material.roughness = 1.0
+	var wear := NoiseTexture2D.new()
+	wear.seamless = true
+	wear.noise = FastNoiseLite.new()
+	wear.color_ramp = Gradient.new()
+	_cloth_material.albedo_texture = wear
+	_cloth.material_override = _cloth_material
+	_viewport.add_child(_cloth)
+
+	var soft := GradientTexture2D.new()
+	soft.fill = GradientTexture2D.FILL_RADIAL
+	soft.fill_from = Vector2(0.5, 0.5)
+	soft.fill_to = Vector2(1.0, 0.5)
+	soft.gradient = Gradient.new()
+	for slot in SLOT_COUNT:
+		var shadow := MeshInstance3D.new()
+		shadow.name = "Shadow%d" % slot
+		shadow.layers = 1 << (GROUND_LAYER - 1)
+		shadow.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		var quad := PlaneMesh.new()
+		quad.size = Vector2.ONE
+		shadow.mesh = quad
+		var material := StandardMaterial3D.new()
+		material.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		material.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+		material.albedo_texture = soft
+		shadow.material_override = material
+		shadow.visible = false
+		_viewport.add_child(shadow)
+		_shadows.append(shadow)
+
+	_fold = MeshInstance3D.new()
+	_fold.name = "Fold"
+	_fold.layers = 1 << (GROUND_LAYER - 1)
+	var fold_material := StandardMaterial3D.new()
+	fold_material.roughness = 1.0
+	fold_material.vertex_color_use_as_albedo = true
+	_fold.material_override = fold_material
+	_fold.visible = false
+	_viewport.add_child(_fold)
 
 # A column with no model is a column with nothing to take.
 func _drop_slot(slot: int) -> void:
@@ -656,28 +850,78 @@ func _drop_slot(slot: int) -> void:
 			_glassbone_offer = 0
 
 func _render_objects() -> void:
-	if _viewport == null or _camera == null:
+	if _viewport == null or _camera == null or _ground_camera == null or _draw_layer == null:
 		return
 	for slot in _materials.size():
 		if _tinted[slot]:
 			BelongingsObject.set_material_tint(_materials[slot], object_tint)
-	# One cell is one bounding-sphere diameter of the largest object, over
-	# object_fill.
+	# One column is one bounding-sphere diameter of the largest object,
+	# over object_fill: px_per_m screen pixels to the metre.
 	var diameter: float = 0.01
 	for slot in _model_aabbs.size():
 		diameter = maxf(diameter, _model_aabbs[slot].size.length() * _scale_of(slot))
 	var cell: float = diameter / maxf(object_fill, 0.1)
+	var px_per_m: float = column_px / cell
+	var pitch: float = deg_to_rad(object_pitch_degrees)
+	var depth_px: float = maxf(sin(pitch), 0.05) * px_per_m
+	var row_centre_x: float = _draw_layer.size.x / 2.0
+	var base_y: float = _base_line_y()
+	# The render's rect: the columns' tops to past the cloth's front edge,
+	# the cloth's width, each side padded for the shadows.
+	var cloth_left: float = _column_rect(0).position.x - cloth_side_px
+	var cloth_right: float = _column_rect(SLOT_COUNT - 1).end.x + cloth_side_px
+	var pad: float = column_px * 0.1
+	var top: float = minf(_column_rect(0).position.y, base_y - cloth_back_px) - pad
+	var bottom: float = maxf(base_y + cloth_front_px, base_y) + pad
+	_render_rect = Rect2(cloth_left - pad, top, cloth_right - cloth_left + pad * 2.0, bottom - top).abs()
+	# Rendered in whole pixels at the window's scale: the rect takes the
+	# size those pixels cover, so the cameras map to it exactly.
+	_render_scale = float(_render_cell_size()) / maxf(column_px, 1.0)
+	var pixels := Vector2i(maxi(ceili(_render_rect.size.x * _render_scale), 1), maxi(ceili(_render_rect.size.y * _render_scale), 1))
+	_render_rect.size = Vector2(pixels) / _render_scale
+	# Each object on the baseline at its column's centre: its base on y 0,
+	# its footprint centred on z 0.
 	for slot in _models.size():
 		var model: Node3D = _models[slot]
+		var shadow: MeshInstance3D = _shadows[slot] if slot < _shadows.size() else null
 		if model == null:
+			if shadow != null:
+				shadow.visible = false
 			continue
 		var yaw: float = deg_to_rad(object_yaws_degrees[slot]) if slot < object_yaws_degrees.size() else 0.0
 		var basis := Basis(Vector3.UP, yaw) * Basis.from_scale(Vector3.ONE * _scale_of(slot))
-		model.transform = Transform3D(basis, Vector3((float(slot) - 1.0) * cell, 0.0, 0.0) - basis * _model_aabbs[slot].get_center())
-	var pitch: float = deg_to_rad(object_pitch_degrees)
-	_camera.size = cell
-	_camera.position = Vector3(0.0, sin(pitch), cos(pitch)) * (cell * 4.0)
-	_camera.look_at(Vector3.ZERO, Vector3.UP)
+		var placed: AABB = Transform3D(basis, Vector3.ZERO) * _model_aabbs[slot]
+		var x: float = (_column_rect(slot).get_center().x - row_centre_x) / px_per_m
+		var centre := Vector3(placed.get_center().x, placed.position.y, placed.get_center().z)
+		model.transform = Transform3D(basis, Vector3(x, 0.0, 0.0) - centre)
+		if shadow != null:
+			shadow.visible = true
+			shadow.transform = Transform3D(Basis(Vector3.UP, yaw).scaled(Vector3(placed.size.x, 1.0, placed.size.z) * shadow_scale), Vector3(x, 0.002, 0.0))
+			var shadow_material := shadow.material_override as StandardMaterial3D
+			shadow_material.albedo_color = shadow_color
+			var soft := shadow_material.albedo_texture as GradientTexture2D
+			soft.gradient.offsets = PackedFloat32Array([clampf(1.0 - shadow_softness, 0.0, 0.99), 1.0])
+			soft.gradient.colors = PackedColorArray([Color.WHITE, Color(1.0, 1.0, 1.0, 0.0)])
+		if slot == Slot.GLASSBONE:
+			_place_fold(Vector3(x, 0.0, 0.0), placed.size, yaw)
+	# The cloth, from the screen's edges back to the ground: a ground point
+	# z metres toward the viewer sits z * depth_px lower on screen.
+	var plane := _cloth.mesh as PlaneMesh
+	var back_z: float = -cloth_back_px / depth_px
+	var front_z: float = cloth_front_px / depth_px
+	plane.size = Vector2((cloth_right - cloth_left) / px_per_m, front_z - back_z)
+	_cloth.position = Vector3((cloth_left + cloth_right) / 2.0 / px_per_m - row_centre_x / px_per_m, 0.0, (back_z + front_z) / 2.0)
+	var wear := _cloth_material.albedo_texture as NoiseTexture2D
+	wear.color_ramp.colors = PackedColorArray([cloth_color, cloth_wear_color])
+	_cloth_material.uv1_scale = Vector3(maxf(cloth_wear_scale, 0.01), maxf(cloth_wear_scale, 0.01) * plane.size.y / maxf(plane.size.x, 0.01), 1.0)
+	# Both cameras alike: the baseline at the row's centre lands on screen
+	# at (row centre, base_y) of the render's rect.
+	for camera: Camera3D in [_camera, _ground_camera]:
+		camera.size = _render_rect.size.y / px_per_m
+		camera.position = Vector3(0.0, sin(pitch), cos(pitch)) * (cell * 4.0)
+		camera.look_at(Vector3.ZERO, Vector3.UP)
+		camera.h_offset = (_render_rect.get_center().x - row_centre_x) / px_per_m
+		camera.v_offset = (base_y - _render_rect.get_center().y) / px_per_m
 	if _field_lit:
 		_light.light_color = _field_light_color
 		_light.light_energy = _field_light_energy
@@ -694,13 +938,45 @@ func _render_objects() -> void:
 		_light.light_energy = light_energy
 		_light.rotation = Vector3(deg_to_rad(light_pitch_degrees), deg_to_rad(light_yaw_degrees), 0.0)
 		_environment.ambient_light_energy = ambient_energy
-	_cell_px = _render_cell_size()
-	_viewport.size = Vector2i(_cell_px * SLOT_COUNT, _cell_px)
-	_viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
+	for viewport: SubViewport in [_viewport, _ground_viewport]:
+		viewport.size = pixels
+		viewport.render_target_update_mode = SubViewport.UPDATE_ONCE
 	_refresh()
 
+# The shard's folded square under it: fold_scale of its footprint, turned
+# fold_yaw_degrees on its own, the corner nearest the viewer turned back
+# fold_turn_fraction of the way in - the flap lying on top, its underside
+# up (fold_flap_color), the ground showing where the corner was.
+func _place_fold(at: Vector3, footprint: Vector3, yaw: float) -> void:
+	var half: float = maxf(footprint.x, footprint.z) * fold_scale * 0.5
+	var turn: float = half * 2.0 * clampf(fold_turn_fraction, 0.0, 0.9)
+	var a := Vector3(-half, 0.0, -half)
+	var b := Vector3(half, 0.0, -half)
+	var d := Vector3(-half, 0.0, half)
+	var m1 := Vector3(half, 0.0, half - turn)
+	var m2 := Vector3(half - turn, 0.0, half)
+	var flap := Vector3(half - turn, 0.0, half - turn)
+	var lift := Vector3(0.0, 0.001, 0.0)
+	var surface := SurfaceTool.new()
+	surface.begin(Mesh.PRIMITIVE_TRIANGLES)
+	surface.set_normal(Vector3.UP)
+	surface.set_color(fold_color)
+	for vertex: Vector3 in [a, b, m1, a, m1, m2, a, m2, d]:
+		surface.add_vertex(vertex)
+	surface.set_color(fold_flap_color)
+	for vertex: Vector3 in [m1 + lift, flap + lift, m2 + lift]:
+		surface.add_vertex(vertex)
+	_fold.mesh = surface.commit()
+	_fold.transform = Transform3D(Basis(Vector3.UP, yaw + deg_to_rad(fold_yaw_degrees)), at + Vector3(0.0, 0.003, 0.0))
+	_fold.visible = true
+
+# The row's baseline on screen.
+func _base_line_y() -> float:
+	return _column_rect(0).position.y + column_px * clampf(base_line_fraction, 0.0, 1.0)
+
 func _scale_of(slot: int) -> float:
-	return _object_scales[slot] if slot < _object_scales.size() else 1.0
+	var on_sand: float = _object_scales[slot] if slot < _object_scales.size() else 1.0
+	return on_sand * (object_screen_scales[slot] if slot < object_screen_scales.size() else 1.0)
 
 # One column's on-screen size in window pixels (see render_cell_max_px).
 func _render_cell_size() -> int:
@@ -774,6 +1050,11 @@ func _draw_columns() -> void:
 	if _taken < 0:
 		_text_centred(_label_font, take_one_text, _draw_layer.size.x / 2.0, _take_one_baseline(), label_size_px, bone)
 
+	# The ground first, whole; then each object in its column - drawn down
+	# at rest, lifted when focused.
+	var ground: Texture2D = _ground_viewport.get_texture() if _ground_viewport != null else null
+	if ground != null:
+		_draw_layer.draw_texture_rect(ground, _render_rect, false)
 	var texture: Texture2D = _viewport.get_texture() if _viewport != null else null
 	for slot in _present_slots():
 		var rect: Rect2 = _column_rect(slot)
@@ -784,8 +1065,10 @@ func _draw_columns() -> void:
 		elif _taken >= 0:
 			tint = dimmed_modulate
 		if texture != null:
-			var source := Rect2(float(slot * _cell_px), 0.0, float(_cell_px), float(_cell_px))
-			_draw_layer.draw_texture_rect_region(texture, rect, source, tint)
+			var lift: float = _lift[slot] if slot < _lift.size() else 0.0
+			var dest := Rect2(rect.position.x, _render_rect.position.y - lift, rect.size.x, _render_rect.size.y)
+			var source := Rect2((rect.position.x - _render_rect.position.x) * _render_scale, 0.0, rect.size.x * _render_scale, _render_rect.size.y * _render_scale)
+			_draw_layer.draw_texture_rect_region(texture, dest, source, tint)
 		if lit:
 			var y: float = rect.end.y + object_hairline_gap_px
 			_draw_layer.draw_rect(Rect2(roundf(rect.get_center().x - object_hairline_length_px / 2.0), y, object_hairline_length_px, hairline_thickness_px), bone)
@@ -804,15 +1087,20 @@ func _draw_dismiss(focused: bool) -> void:
 	if focused:
 		_hairline_left_of(left, _dismiss_baseline(), label_size_px)
 
-# The band behind the row: solid from over TAKE ONE's caps to under the
-# kinds, feathered to nothing above and below, the full width.
+# The bands: behind the row, solid from over TAKE ONE's caps to under the
+# kinds, and behind WALK ON until the take - feathered to nothing above and
+# below, the full width.
 func _draw_band() -> void:
 	if band_alpha <= 0.0:
 		return
+	_draw_band_over(_take_one_baseline() - float(label_size_px) * 0.72 - band_pad_px, _kind_baseline(Slot.GOLD) + band_pad_px)
+	if _taken < 0:
+		_draw_band_over(_dismiss_baseline() - float(label_size_px) * 0.72 - band_pad_px, _dismiss_baseline() + band_pad_px)
+
+# One band, solid from `top` to `bottom`, feathered above and below.
+func _draw_band_over(top: float, bottom: float) -> void:
 	var on := Color(ink.r, ink.g, ink.b, band_alpha)
 	var off := Color(ink.r, ink.g, ink.b, 0.0)
-	var top: float = _take_one_baseline() - float(label_size_px) * 0.72 - band_pad_px
-	var bottom: float = _kind_baseline(Slot.GOLD) + band_pad_px
 	var ys: Array[float] = [top - band_feather_px, top, bottom, bottom + band_feather_px]
 	var colors: Array[Color] = [off, on, on, off]
 	var width: float = _draw_layer.size.x
@@ -987,7 +1275,29 @@ func _set_focus(index: int) -> void:
 	if index == _focus:
 		return
 	_focus = index
+	_ease_lifts()
 	_draw_layer.queue_redraw()
+
+# Each column toward its lift: focus_lift_px for the focused one, none for
+# the rest, eased over focus_lift_sec.
+func _ease_lifts() -> void:
+	for slot in SLOT_COUNT:
+		var target: float = focus_lift_px if slot == _focus else 0.0
+		if is_equal_approx(_lift[slot], target):
+			continue
+		if _lift_tweens[slot] != null and _lift_tweens[slot].is_valid():
+			_lift_tweens[slot].kill()
+		var tween: Tween = create_tween()
+		tween.tween_method(_set_lift.bind(slot), _lift[slot], target, maxf(focus_lift_sec, 0.001)).set_trans(Tween.TRANS_SINE).set_ease(Tween.EASE_OUT)
+		_lift_tweens[slot] = tween
+
+func _set_lift(value: float, slot: int) -> void:
+	_lift[slot] = value
+	_refresh()
+
+# For probes: how far a column's object is lifted now.
+func lift_of(slot: int) -> float:
+	return _lift[slot] if slot >= 0 and slot < _lift.size() else 0.0
 
 func _on_gui_input(event: InputEvent) -> void:
 	# The cards take no mouse of their own (_new_card_view()), so their
