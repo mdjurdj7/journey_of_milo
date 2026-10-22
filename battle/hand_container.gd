@@ -712,8 +712,8 @@ func _can_play(card: CardData, energy: int) -> bool:
 	# Take In with nothing else to eat (EffectResolver.devour_targets()).
 	if _deck != null and EffectResolver.devours_from_hand(card) and EffectResolver.devour_targets(card, _deck.hand).is_empty():
 		return false
-	# The fight's own affordability check (Combatant.can_pay() - Energy,
-	# or Collateral's HP), once there's a context to ask.
+	# The fight's own affordability check (Combatant.can_pay()), once
+	# there's a context to ask.
 	if _bonus_context != null:
 		return _bonus_context.player.can_pay(card)
 	return card.cost <= energy

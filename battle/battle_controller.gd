@@ -156,10 +156,6 @@ signal battle_won()
 signal battle_lost()
 
 @export var turn_draw_amount: int = 5
-# The HP the play being committed pays on top of its Energy (Collateral -
-# Combatant.replaced_cost_hp(), read before the Energy is spent), from its
-# commit until the next: what the play sound's Critical check counts.
-var play_hp_cost: int = 0
 # A Stunned enemy's skipped turn, or a Delayed one's do-nothing turn,
 # holds this long (seconds), the status gone from the readout, so the
 # turn reads - it has no lunge to wait on.
@@ -1376,10 +1372,6 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 			return
 	_play_in_flight = true
 	var card: CardData = card_view.card_data
-	# Read before anything is spent: what Collateral's HP comes to depends
-	# on the Energy held and any cost reduction (Leverage) still there.
-	var collateral: Status = Status.missing_energy_status(player.statuses)
-	var replaced_hp: int = player.replaced_cost_hp(card)
 	var energy_paid: int = player.energy_cost(card)
 	# The free card (House Key) about to be spent, and what the card would
 	# have cost without it - for the run log's line below.
@@ -1388,7 +1380,6 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 		player.first_card_free = false
 		free_card_saved = player.energy_cost(card) - energy_paid
 		player.first_card_free = true
-	play_hp_cost = replaced_hp
 	player.energy -= energy_paid
 	# What this card's cost left: Patient Cut's bonus reads it at impact,
 	# whatever a later play has spent since.
@@ -1480,9 +1471,6 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	ctx.unspent_energy = unspent_energy
 	ctx.skillchain = skillchain
 	ctx.skillchain_level = skillchain_level
-	ctx.replaced_cost_hp = replaced_hp
-	if replaced_hp > 0 and collateral != null and collateral.data != null:
-		ctx.replaced_cost_source = "status:" + collateral.data.id
 	ctx.on_replay = func() -> void:
 		_replay_pending = true
 	# The hand choice's cards: Bide's to gain Keep where they are,

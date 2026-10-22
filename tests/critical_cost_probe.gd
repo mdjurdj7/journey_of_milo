@@ -25,7 +25,6 @@ const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const LEVERAGE_STATUS_PATH := "res://battle/rules/statuses/leverage.tres"
-const COLLATERAL_STATUS_PATH := "res://battle/rules/statuses/collateral.tres"
 const HOUSE_KEY_PATH := "res://run/keepsakes/keeper/house_key.tres"
 const MAX_HP := 80
 # Above the Critical line, and on it (80 x 0.3 = 24).
@@ -90,9 +89,6 @@ func _check_rules() -> void:
 	_completed += 1
 
 # Leverage: 0 and left waiting while Critical; 1 - 2, floored at 0, above.
-# Collateral judges the base: on 0 Energy a cost-2 card with Critical cost
-# 0 is 2 short above the line (0 Energy, 6 HP) and short of nothing while
-# Critical (0 Energy, no HP).
 func _check_modifiers() -> void:
 	var card: CardData = _card(1, 0)
 	var player: Combatant = _player(SAFE_HP)
@@ -101,36 +97,24 @@ func _check_modifiers() -> void:
 	player.hp = CRITICAL_HP
 	_expect_eq(player.energy_cost(card), 0, "Leverage while Critical: 0")
 	_expect(not player.takes_next_card_discount(card), "...the card passing Leverage by")
-
-	var heavy: CardData = _card(2, 0)
-	var other: Combatant = _player(SAFE_HP)
-	other.energy = 0
-	var collateral: StatusData = load(COLLATERAL_STATUS_PATH)
-	Status.apply_to(other.statuses, collateral)
-	_expect_eq([other.energy_cost(heavy), other.replaced_cost_hp(heavy)], [0, 2 * collateral.hp_per_missing_energy], "Collateral above the line on 0 Energy: 2 short, 0 Energy and 6 HP")
-	other.hp = CRITICAL_HP
-	_expect_eq([other.energy_cost(heavy), other.replaced_cost_hp(heavy)], [0, 0], "While Critical its base is 0: nothing short, no HP")
 	_completed += 1
 
 # --- Fight ---
 
 # Played while Critical at 0 Energy: it plays, spends nothing, and
-# Leverage waits, Collateral still up. Above the line it pays 1 and spends
-# Leverage.
+# Leverage waits. Above the line it pays 1 and spends Leverage.
 func _check_commit_leaves_discounts() -> void:
 	var controller: Node = await _start_fight()
 	if controller != null:
 		var player: Combatant = controller.get("player")
 		_set_hp(controller, CRITICAL_HP)
 		Status.apply_to(player.statuses, load(LEVERAGE_STATUS_PATH))
-		Status.apply_to(player.statuses, load(COLLATERAL_STATUS_PATH))
 		player.energy = 0
 		var card: CardData = await _deal(controller, SLASH_PATH, 1, 0)
 		_expect(bool(controller.call("_is_playable", card)), "Critical at 0 Energy: playable")
 		await _play(controller, card, _field_enemy(controller))
 		_expect_eq(player.energy, 0, "...played for 0 Energy")
 		_expect_eq(_label_of(player, "leverage"), "Leverage", "...Leverage still waiting")
-		_expect(_label_of(player, "collateral") != "", "...Collateral still up")
 		_expect_eq(player.hp, CRITICAL_HP, "...and no HP paid")
 		_set_hp(controller, SAFE_HP)
 		player.energy = 3

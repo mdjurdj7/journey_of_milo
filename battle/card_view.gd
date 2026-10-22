@@ -62,10 +62,7 @@ static var KEYWORDS: Array[String] = KeywordTable.shared().keywords()
 #
 # {hp_cost} is the exception that reads across effects rather than from
 # one: it's the same sum the "-N HP" line shows (see _derive_hp_cost()),
-# stance included - all but a cost replacement's HP (Collateral), which
-# the line adds and the text doesn't: the text says what the card does,
-# and Collateral's price isn't the card's own ("Lose 2 HP" on Blood Arc
-# stays 2 while its line reads -7).
+# stance included.
 const TOKEN_DAMAGE := "{damage}"
 const TOKEN_BLOCK := "{block}"
 # The number a conditional clause is FOR (CardBonus.bonus_value(): the
@@ -118,9 +115,6 @@ const TOKEN_DEBT := "{debt}"
 # What a cost reduction the card applies takes off the next card (Status
 # Data.next_card_cost_reduction - Leverage's 2).
 const TOKEN_REDUCTION := "{reduction}"
-# The HP a status the card applies charges for each Energy short (Status
-# Data.hp_per_missing_energy - Collateral's 3).
-const TOKEN_HP_PER_ENERGY := "{hp_per_energy}"
 # A countdown the card puts on its target (StatusData.countdown_damage -
 # Sentence): the turns it starts at and what it deals.
 const TOKEN_COUNTDOWN_TURNS := "{countdown_turns}"
@@ -806,11 +800,10 @@ func set_stance(stance: Stance) -> void:
 # and the HP cost line. Re-run whenever the card or the stance changes.
 func _refresh_dynamic_text() -> void:
 	_hp_cost = _derive_hp_cost(card_data)
-	# The line is everything playing it costs in HP, a cost replacement's
-	# included - {hp_cost} leaves that out (see TOKEN_HP_COST's doc). In a
-	# fight it is CardBonus.predicted_self_loss() - the number the HP bar
-	# previews, so the two always agree; outside one, the card's own
-	# self-loss and the stance's price.
+	# The line is everything playing it costs in HP. In a fight it is
+	# CardBonus.predicted_self_loss() - the number the HP bar previews, so
+	# the two always agree; outside one, the card's own self-loss and the
+	# stance's price.
 	var line_hp: int = _hp_cost
 	if _bonus_context != null and _bonus_context.player != null:
 		line_hp = CardBonus.predicted_self_loss(card_data, _bonus_context)
@@ -900,11 +893,6 @@ func _resolve_tokens(description: String) -> String:
 		for effect in card_data.effects:
 			if effect != null and effect.status_data != null and effect.status_data.countdown_damage > 0:
 				text = text.replace(TOKEN_COUNTDOWN_TURNS, str(effect.status_data.default_duration_turns)).replace(TOKEN_COUNTDOWN_DAMAGE, str(effect.status_data.countdown_damage))
-				break
-	if text.contains(TOKEN_HP_PER_ENERGY):
-		for effect in card_data.effects:
-			if effect != null and effect.status_data != null and effect.status_data.hp_per_missing_energy > 0:
-				text = text.replace(TOKEN_HP_PER_ENERGY, str(effect.status_data.hp_per_missing_energy))
 				break
 	if text.contains(TOKEN_REDUCTION):
 		for effect in card_data.effects:
@@ -2054,20 +2042,12 @@ func _derive_hp_cost(data: CardData) -> int:
 		total += Stance.attack_hp_loss(_stance)
 	return total
 
-# The HP a cost replacement (Collateral) takes for this card in place of
-# its Energy, as the fight would read it now (Combatant.replaced_cost_
-# hp()); 0 outside a battle hand.
-func _replaced_cost_hp() -> int:
-	if _bonus_context == null or _bonus_context.player == null:
-		return 0
-	return _bonus_context.player.replaced_cost_hp(card_data)
-
 # The HP paid before this card's first conditional or damage effect reads
 # anything (CardBonus.upfront_hp_cost(), which the play sound reads too).
 # What the face judges Critical against, so it shows the number the card
 # will land for, not the one it would at the HP held now.
 func _upfront_hp_cost() -> int:
-	return CardBonus.upfront_hp_cost(card_data, _stance, _replaced_cost_hp())
+	return CardBonus.upfront_hp_cost(card_data, _stance)
 
 # The attack bonus one half of the face prints. On a card whose damage is
 # conditional on Critical, each half is read in its own state - the {if}

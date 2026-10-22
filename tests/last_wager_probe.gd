@@ -76,7 +76,7 @@ func _check_data() -> void:
 	_expect_eq(card.description, "{else}Deal {damage} damage.{/else} {if}If this makes you Critical, deal {alt_damage}.{/if}", "...its text")
 	_expect(card.effects.size() == 2 and card.effects[0].effect_type == CardEffect.EffectType.SELF_DAMAGE, "...first it loses HP")
 	_expect(card.effects.size() == 2 and card.effects[1].effect_type == CardEffect.EffectType.DAMAGE and card.effects[1].condition == CardEffect.Condition.ENTERED_CRITICAL, "...then deals damage, more into Critical")
-	_expect_eq(CardBonus.upfront_hp_cost(card, null, 0), 8, "...its 8 the badge's, paid up front")
+	_expect_eq(CardBonus.upfront_hp_cost(card, null), 8, "...its 8 the badge's, paid up front")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to Last Wager+")
 	_expect_eq([tempered.card_name, tempered.rarity, tempered.description], ["Last Wager+", CardData.CardRarity.UNCOMMON, card.description], "Last Wager+: the same text")

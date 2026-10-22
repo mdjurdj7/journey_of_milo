@@ -5,7 +5,7 @@ extends SceneTree
 # (CardBonus.predicted_self_loss()) - a pale stretch cut from the fill's
 # right end, and the numeral's result after an arrow. Cases: a plain
 # HP-badge card (Small Price), self-loss after the hit (Bite Down),
-# Collateral paying for missing Energy, Self-Eater's price on an Attack,
+# Self-Eater's price on an Attack,
 # a play that crosses the Critical line, a lethal play, and a play's
 # preview holding until the card has resolved and its HP has dropped.
 # In every case the card's own "−N HP" badge reads the same number as the
@@ -16,14 +16,13 @@ extends SceneTree
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 # Untyped against anything that names the RunState autoload.
 
-const CASES := 7
+const CASES := 6
 const MAX_HP := 70
 const SMALL_PRICE_PATH := "res://cards/data/small_price.tres"
 const BITE_DOWN_PATH := "res://cards/data/bite_down.tres"
 const HOLD_FAST_PATH := "res://cards/data/hold_fast.tres"
 const SLASH_PATH := "res://cards/data/slash.tres"
 const SELF_EATER_PATH := "res://cards/data/self_eater.tres"
-const COLLATERAL_STATUS_PATH := "res://battle/rules/statuses/collateral.tres"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 
@@ -41,7 +40,6 @@ func _initialize() -> void:
 		_bar = _overlay().get("_field_hp_bar")
 		await _check_plain_badge()
 		await _check_bite_down()
-		await _check_collateral()
 		await _check_self_eater()
 		await _check_crossing_critical()
 		await _check_lethal()
@@ -78,24 +76,6 @@ func _check_bite_down() -> void:
 	await _hover(card)
 	_expect_preview(loss, 50 - loss, "Bite Down at 50 HP")
 	await _unhover(card)
-	_completed += 1
-
-# Collateral: no Energy, a 1-cost Slash - its Energy paid in HP.
-func _check_collateral() -> void:
-	var player: Combatant = _controller.get("player")
-	var collateral: StatusData = load(COLLATERAL_STATUS_PATH)
-	Status.apply_to(player.statuses, collateral)
-	player.energy = 0
-	await _set_hp(50)
-	var card: CardData = await _deal(SLASH_PATH)
-	var loss: int = card.cost * collateral.hp_per_missing_energy
-	await _hover(card)
-	_expect_preview(loss, 50 - loss, "Collateral, no Energy, Slash (%d Energy at %d HP each)" % [card.cost, collateral.hp_per_missing_energy])
-	await _unhover(card)
-	for status in player.statuses.duplicate():
-		if (status as Status).data == collateral:
-			player.statuses.erase(status)
-	player.energy = 3
 	_completed += 1
 
 # Self-Eater up: an Attack pays the stance's price; a Skill doesn't.

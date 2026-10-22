@@ -13,7 +13,7 @@ extends SceneTree
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 #
 # Fights load the real region scene and fight floor 1's Sputter through
-# RegionField's contact handler, as collateral_probe does, playing real
+# RegionField's contact handler, playing real
 # cards through BattleController.request_play() and end_turn(). The
 # Wanderer keeps 70 max HP, so Critical is 21 and below. Untyped against
 # anything that names the RunState autoload.

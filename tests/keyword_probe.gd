@@ -15,7 +15,7 @@ extends SceneTree
 # keyword_hover_allowed(), and _show_keyword() for a word the hit test
 # found) rather than a real cursor, which headless has none of. The fight
 # case loads the real region scene and arms a card through
-# BattleController.request_play(), as collateral_probe does; the
+# BattleController.request_play(); the
 # inspect cases open the real DeckView, compendium and reward screen. Untyped against
 # anything that names the RunState autoload.
 

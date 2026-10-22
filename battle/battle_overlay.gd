@@ -533,7 +533,8 @@ func enter_battle(on_dark_world: bool, enemy_list: Array[FieldEnemy], field_deck
 	battle_controller.grace_changed.connect(func(_grace: int) -> void: _push_bonus_context())
 	battle_controller.hp_changed.connect(func(_current: int, _max_hp: int) -> void: _push_bonus_context())
 	battle_controller.toll_changed.connect(func(_toll: int) -> void: _push_bonus_context())
-	# Collateral's "-N HP" depends on the Energy held: the faces re-read it.
+	# A face's cost reads the Energy held and Collateral's free card (both
+	# emit energy_changed): the faces re-read it.
 	battle_controller.energy_changed.connect(func(_energy: int) -> void: _push_bonus_context())
 	# A status taken (Keen, a keepsake's) moves every Attack's printed damage.
 	battle_controller.status_changed.connect(func() -> void: _push_bonus_context())
@@ -1610,16 +1611,14 @@ func _on_card_played(card: CardData, _target: FieldEnemy) -> void:
 # Energy paid, nothing of it resolved, and itself not among the cards
 # played before it (the commit has already counted it). Critical is read
 # at the HP the card will have paid before its conditions, as the face
-# reads it (CardBonus.upfront_hp_cost()): In the Red's own 8, the stance's
-# price on an Attack, and the HP this play pays for Energy short
-# (Collateral - BattleController.play_hp_cost, read before the commit
-# spent the Energy).
+# reads it (CardBonus.upfront_hp_cost()): In the Red's own 8 and the
+# stance's price on an Attack.
 func _condition_live_at_commit(card: CardData) -> bool:
 	if battle_controller == null or battle_controller.player == null:
 		return false
 	var ctx: EffectContext = battle_controller.preview_context()
 	ctx.cards_played_before_this = maxi(ctx.cards_played_before_this - 1, 0)
-	var paid: EffectContext = ctx.for_card_preview(CardBonus.upfront_hp_cost(card, ctx.player.stance, battle_controller.play_hp_cost))
+	var paid: EffectContext = ctx.for_card_preview(CardBonus.upfront_hp_cost(card, ctx.player.stance))
 	return CardBonus.state(card, paid) == CardBonus.State.LIVE
 
 # A drawn card leaves the deck: the draw sound, on the next voice, its

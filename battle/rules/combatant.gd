@@ -357,46 +357,24 @@ static func critical_at(at_hp: int, of_max_hp: int, fraction: float) -> bool:
 # and the face's number all ask here. CardData.cost itself never changes.
 #
 # Its base first (base_cost(): critical_cost while Critical), then
-# House Key's free card, then a cost reduction (Leverage). Under
-# Collateral (StatusData.hp_per_missing_energy) a card costing more than
-# the Energy held costs all of it here, and the rest in HP (replaced_
-# cost_hp()). The free card and the reduction are "your next card"
-# discounts: a card that costs 0 takes neither and leaves both waiting
-# (takes_next_card_discount()).
+# House Key's free card, then a cost reduction (Leverage). The free card
+# and the reduction are "your next card" discounts: a card that costs 0
+# takes neither and leaves both waiting (takes_next_card_discount()).
 func energy_cost(card: CardData) -> int:
 	if card == null:
 		return 0
-	var full: int = _reduced_cost(card)
-	if Status.missing_energy_status(statuses) != null:
-		return mini(full, maxi(energy, 0))
-	return full
-
-# The HP `card` costs this fighter on top of its Energy right now: under
-# Collateral, its rate for each Energy short, else 0. Paid before the
-# card's effects (EffectResolver.resolve_card()); shown on the face's
-# "-N HP" line.
-func replaced_cost_hp(card: CardData) -> int:
-	if card == null:
-		return 0
-	var collateral: Status = Status.missing_energy_status(statuses)
-	if collateral == null:
-		return 0
-	return maxi(_reduced_cost(card) - maxi(energy, 0), 0) * collateral.data.hp_per_missing_energy
+	return _reduced_cost(card)
 
 # Whether this fighter can pay for `card` now - the one affordability
 # check: the controller's, the hand's fade and the Energy pips' all ask
-# here. Its Energy, or under Collateral the Energy there is and HP that
-# leaves at least 1.
+# here. Its Energy.
 func can_pay(card: CardData) -> bool:
 	if card == null:
 		return false
-	if _reduced_cost(card) <= energy:
-		return true
-	return Status.missing_energy_status(statuses) != null and hp - replaced_cost_hp(card) >= 1
+	return _reduced_cost(card) <= energy
 
-# `card`'s Energy before Collateral: its base, then the free
-# card, then every waiting cost reduction (Status.cost_reduction()),
-# never below 0. A card whose base is 0 is 0 with neither.
+# `card`'s Energy: its base, then the free card, then every waiting cost
+# reduction (Status.cost_reduction()), never below 0. A card whose base is 0 is 0 with neither.
 func _reduced_cost(card: CardData) -> int:
 	if card == free_card:
 		return 0

@@ -19,7 +19,6 @@ bundle_roll_probe 3 fast
 card_rarity_finish_probe 13 fast
 card_rarity_probe 12 fast
 claw_back_probe 14 slow
-collateral_probe 43 slow
 collector_probe 37 slow
 come_due_probe 5 fast
 critical_cards_probe 4 fast

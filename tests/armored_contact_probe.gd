@@ -14,7 +14,7 @@ extends SceneTree
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 #
 # Fight cases load the real region scene and start a fight with floor 1's
-# Sputter through RegionField's contact handler, as collateral_probe does,
+# Sputter through RegionField's contact handler,
 # then play real Slashes (5 damage) through BattleController.request_play()
 # / confirm_target() with the Sputter's block set by hand. Untyped against
 # anything that names the RunState autoload.

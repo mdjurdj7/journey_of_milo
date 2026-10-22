@@ -148,7 +148,6 @@ func template_values(holder: Combatant = null) -> Dictionary:
 		"progress": progress,
 		"count": data.self_loss_trigger_count,
 		"drain": trigger_drain(),
-		"hp": data.hp_per_missing_energy,
 		"alone_bonus": data.grants_when_alone.attack_damage_bonus if data.grants_when_alone != null else 0,
 		"reduction": data.next_card_cost_reduction * stack_count,
 		"block": data.turn_start_block * stack_count,
@@ -477,18 +476,6 @@ static func spend_attack_bonus_charges(statuses: Array[Status], critical: bool) 
 		active.charges -= 1
 		if active.charges <= 0:
 			statuses.erase(active)
-
-# The status letting Energy short be paid in HP this turn (StatusData.
-# hp_per_missing_energy - Collateral), or null - the cheapest, when
-# Collateral and Collateral+ are both up.
-static func missing_energy_status(statuses: Array[Status]) -> Status:
-	var best: Status = null
-	for active in statuses:
-		if active.data == null or active.data.hp_per_missing_energy <= 0:
-			continue
-		if best == null or active.data.hp_per_missing_energy < best.data.hp_per_missing_energy:
-			best = active
-	return best
 
 # The Energy every waiting cost reduction (StatusData.next_card_cost_
 # reduction - Leverage) takes off the next card: each one's amount per

@@ -58,7 +58,6 @@ const DURATION_UNTIL_TRIGGERED := -2
 #   {damage}   countdown_damage          {grant}  grants_on_critical's charges
 #   {progress} a counter's losses so far  {count}  self_loss_trigger_count
 #   {drain}    self_loss_trigger_drain × stacks
-#   {hp}       hp_per_missing_energy
 #   {alone_bonus} grants_when_alone's attack_damage_bonus (what it turns into)
 #   {reduction} next_card_cost_reduction × stacks
 #   {block}    turn_start_block × stacks
@@ -401,22 +400,10 @@ enum Mark { NONE, COIL, DROP }
 @export var self_loss_trigger_drain: int = 0
 
 
-# While its holder has it (Collateral - for the turn, with ends_at_turn_
-# end), a card whose Energy cost - after every other modifier, Leverage's
-# discount and House Key's free card first - is more than the Energy held
-# is paid with all the Energy there is and this much HP for each Energy
-# short. Energy enough, nothing changes. The HP is paid as the card
-# resolves, before its effects, the way a stance's per-Attack cost is
-# (EffectResolver.resolve_card()) - self-inflicted: past Block, 1 Toll a
-# point, no Grace - and a card it would leave at 0 HP can't be played.
-# Read through Combatant.energy_cost()/replaced_cost_hp()/can_pay(). The
-# cheapest rate wins when two are up. 0 = none.
-@export var hp_per_missing_energy: int = 0
-
 # A cost reduction (Leverage): the next card played costs this much less
-# Energy per stack, never below 0 - after House Key's free card, before
-# Collateral judges what's left short (Combatant.energy_cost()). The next
-# card costing at least 1 Energy spends it, and the whole status goes; a
+# Energy per stack, never below 0 - after House Key's free card
+# (Combatant.energy_cost()). The next card costing at least 1 Energy
+# spends it, and the whole status goes; a
 # 0-cost card passes it by (Combatant.takes_next_card_discount()), and a
 # card that applies this same status adds to it instead, so two in a row
 # reduce one card by both (Status.spend_cost_reduction(), at the play's

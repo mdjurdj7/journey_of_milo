@@ -136,10 +136,9 @@ static func state(card: CardData, ctx: EffectContext) -> State:
 
 # The HP `card` will have paid before its first conditional or damage
 # effect reads anything - what state() is judged against, through
-# EffectContext.for_card_preview(): `replaced_hp` (a cost replacement's,
-# Collateral - paid before any effect, see EffectResolver.resolve_card()),
-# the stance's per-Attack price, and the card's own self-loss authored
-# ahead of its conditions (In the Red's 8). Self-loss authored after
+# EffectContext.for_card_preview(): the stance's per-Attack price, and
+# the card's own self-loss authored ahead of its conditions (In the Red's
+# 8). Self-loss authored after
 # (Bite Down's, Last Wager's - the Wanderer's attack-then-pay convention)
 # is paid too late to count. The card face and the play sound both ask
 # here, so the sound is lifted exactly when the face shows the clause live.
@@ -149,10 +148,10 @@ static func state(card: CardData, ctx: EffectContext) -> State:
 const HP_COST_STOPS: Array = [CardEffect.EffectType.DAMAGE, CardEffect.EffectType.FIRST_CARD_DAMAGE,
 	CardEffect.EffectType.DAMAGE_ALL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE, CardEffect.EffectType.TOLL_SPENT_DAMAGE]
 
-static func upfront_hp_cost(card: CardData, stance: Stance, replaced_hp: int) -> int:
+static func upfront_hp_cost(card: CardData, stance: Stance) -> int:
 	if card == null:
 		return 0
-	var total: int = replaced_hp
+	var total: int = 0
 	if card.card_type == CardData.CardType.ATTACK:
 		total += Stance.attack_hp_loss(stance)
 	for effect in card.effects:
@@ -168,14 +167,13 @@ static func upfront_hp_cost(card: CardData, stance: Stance, replaced_hp: int) ->
 # All the HP playing `card` now will cost the player - every self-inflicted
 # loss, predicted from the card's data and the fight as `ctx` holds it
 # (BattleController.preview_context()), nothing resolved. In the order
-# EffectResolver.resolve_card() pays it: a cost replacement's HP
-# (Collateral - Combatant.replaced_cost_hp(); a price that kills ends the
-# card), the stance's price on an Attack with something to hit, then each
-# SELF_DAMAGE (can kill) and SELF_DAMAGE_TOLL (never below 1 HP) in the
-# card's order, gated as the resolver gates them, judged at the HP already
-# paid. A REPLAY_LAST_ATTACK (Second Swing) adds the replayed Attack's own
-# stance price and self-loss - never its Collateral. Each payment is
-# clamped to the HP left, so the total never passes the HP held. Not
+# EffectResolver.resolve_card() pays it: the stance's price on an Attack
+# with something to hit, then each SELF_DAMAGE (can kill) and
+# SELF_DAMAGE_TOLL (never below 1 HP) in the card's order, gated as the
+# resolver gates them, judged at the HP already paid. A REPLAY_LAST_ATTACK
+# (Second Swing) adds the replayed Attack's own stance price and
+# self-loss. Each payment is clamped to the HP left, so the total never
+# passes the HP held. Not
 # counted: heals mid-card (Drain, The Return) and enemy blows (Coiled).
 # With no player (outside a fight) it is the card's printed self-loss.
 # The card's HP badge and the HP bar's preview both read this.
@@ -185,7 +183,7 @@ static func predicted_self_loss(card: CardData, ctx: EffectContext) -> int:
 	if ctx == null or ctx.player == null:
 		return printed_self_loss(card)
 	var start: int = maxi(ctx.player.hp, 0)
-	var hp: int = start - mini(maxi(ctx.player.replaced_cost_hp(card), 0), start)
+	var hp: int = start
 	if hp > 0:
 		hp = _hp_after_self_loss(card, ctx, hp, start, true)
 	return start - hp

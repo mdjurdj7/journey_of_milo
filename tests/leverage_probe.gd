@@ -4,31 +4,26 @@ extends SceneTree
 # reduction behind them (StatusData.next_card_cost_reduction): it spends
 # 5 Toll like Come Due (and can't be played on less), isn't Spent, and
 # the next card played this turn that costs at least 1 Energy costs 2
-# less, never below 0; a 0-cost card passes it by and leaves it waiting;
-# unused, it ends with the turn. Two Leverages before another card give
+# less, never below 0; unused, it ends with the turn. Two Leverages before another card give
 # that card both. Leverage+ spends 4. House
-# Key's free card comes first, then Leverage, and Collateral judges what
-# is left short of the Energy held.
+# Key's free card comes first, then Leverage.
 #
 #   Godot_v4.7.1.exe --headless --path . -s res://tests/leverage_probe.gd
 #
 # Exit code 0 = every check passed, 1 = a failure (each printed as FAIL).
 #
 # Rules cases read the data; fight cases load the real region scene and
-# start fights through RegionField's contact handler, as collateral_probe
-# does, then play real cards through BattleController.request_play() /
-# confirm_target() - so the commit-time spend and the faces are the
-# game's own. Each case discards the hand and deals itself fresh copies
+# start fights through RegionField's contact handler, then play real
+# cards through BattleController.request_play() / confirm_target() - so
+# the commit-time spend and the faces are the game's own. Each case discards the hand and deals itself fresh copies
 # of the cards it needs. Untyped against anything that names the
 # RunState autoload.
 
-const CASES := 10
+const CASES := 8
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const LEVERAGE_PATH := "res://cards/data/leverage.tres"
 const LEVERAGE_STATUS_PATH := "res://battle/rules/statuses/leverage.tres"
-const COLLATERAL_PATH := "res://cards/data/collateral.tres"
-const COLLATERAL_STATUS_PATH := "res://battle/rules/statuses/collateral.tres"
 const SENTENCE_STATUS_PATH := "res://battle/rules/statuses/sentence.tres"
 const RECKONING_PATH := "res://cards/data/reckoning.tres"
 const BLOOD_ARC_PATH := "res://cards/data/blood_arc.tres"
@@ -55,10 +50,8 @@ func _initialize() -> void:
 	await _check_toll()
 	await _check_not_enough_toll()
 	await _check_next_card_only()
-	await _check_zero_cost_passes_by()
 	await _check_persists_then_ends()
 	await _check_two_stack()
-	await _check_collateral_order()
 	await _check_house_key_first()
 	await _check_faces_and_sentence()
 
@@ -157,27 +150,6 @@ func _check_next_card_only() -> void:
 	await _teardown()
 	_completed += 1
 
-# A 0-cost card passes it by - Collateral here, with nothing for the
-# reduction to take off - and it waits for the next card that costs
-# something, which takes it.
-func _check_zero_cost_passes_by() -> void:
-	var controller: Node = await _start_fight()
-	if controller != null:
-		var player: Combatant = controller.get("player")
-		player.toll = 5
-		await _play(controller, await _deal(controller, LEVERAGE_PATH))
-		await _play(controller, await _deal(controller, COLLATERAL_PATH))
-		_expect_eq(_status_label(player), "Leverage", "A 0-cost Collateral leaves Leverage waiting")
-		_expect_eq(_collateral_label(player), "Collateral", "...and Collateral is up for the turn")
-		_expect_eq(player.energy, 3, "...Energy 3, unchanged")
-		var slash: CardData = await _deal(controller, SLASH_PATH)
-		_expect_eq(player.energy_cost(slash), 0, "The Slash after it reads 0")
-		await _play(controller, slash, _field_enemy(controller))
-		_expect_eq(player.energy, 3, "...costs no Energy")
-		_expect_eq(_status_label(player), "", "...and spends Leverage")
-	await _teardown()
-	_completed += 1
-
 # Unused, the reduction ends with the turn: the next turn's card costs
 # its full Energy, and the next fight starts without it.
 func _check_persists_then_ends() -> void:
@@ -227,31 +199,8 @@ func _check_two_stack() -> void:
 	await _teardown()
 	_completed += 1
 
-# Leverage -> Collateral: on 0 Energy with Leverage waiting, Reckoning's
-# 2 comes down to 0 before Collateral asks what's short - 0 Energy, 0 HP.
-# The next Reckoning, Leverage spent, is 2 short: 6 HP.
-func _check_collateral_order() -> void:
-	var controller: Node = await _start_fight()
-	if controller != null:
-		var player: Combatant = controller.get("player")
-		player.toll = 5
-		await _play(controller, await _deal(controller, COLLATERAL_PATH))
-		await _play(controller, await _deal(controller, LEVERAGE_PATH))
-		_expect_eq(_status_label(player), "Leverage", "Leverage waits beside Collateral")
-		player.energy = 0
-		var hp_before: int = player.hp
-		await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
-		_expect_eq(player.hp, hp_before, "Reckoning under Leverage and Collateral on 0 Energy: 0 HP")
-		_expect_eq(_status_label(player), "", "...Leverage spent")
-		var rate: int = (load(COLLATERAL_STATUS_PATH) as StatusData).hp_per_missing_energy
-		await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
-		_expect_eq(hp_before - player.hp, 2 * rate, "The next Reckoning, 2 short: %d HP" % (2 * rate))
-	await _teardown()
-	_completed += 1
-
 # House Key's free first card is "the next card": it costs 0 before
-# Leverage is asked, and spends a waiting Leverage all the same; nothing
-# is short, so Collateral takes no HP. (In play
+# Leverage is asked, and spends a waiting Leverage all the same. (In play
 # Leverage would itself be the free card - the status is applied directly
 # here to reach the ordering.)
 func _check_house_key_first() -> void:
@@ -259,13 +208,9 @@ func _check_house_key_first() -> void:
 	if controller != null:
 		var player: Combatant = controller.get("player")
 		Status.apply_to(player.statuses, load(LEVERAGE_STATUS_PATH))
-		Status.apply_to(player.statuses, load(COLLATERAL_STATUS_PATH))
-		var hp_before: int = player.hp
 		await _play(controller, await _deal(controller, RECKONING_PATH), _field_enemy(controller))
 		_expect_eq(player.energy, 3, "House Key's free Reckoning costs 0 Energy")
-		_expect_eq(player.hp, hp_before, "...and no HP")
 		_expect_eq(_status_label(player), "", "...and spends the waiting Leverage")
-		_expect_eq(_collateral_label(player), "Collateral", "...while Collateral stays up")
 	await _teardown()
 	_completed += 1
 
@@ -394,9 +339,6 @@ func _face(controller: Node, card: CardData) -> String:
 
 func _status_label(player: Combatant) -> String:
 	return _label_of(player, "leverage")
-
-func _collateral_label(player: Combatant) -> String:
-	return _label_of(player, "collateral")
 
 func _sentence_label(enemy: Combatant) -> String:
 	return _label_of(enemy, "sentence")

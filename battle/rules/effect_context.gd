@@ -86,16 +86,6 @@ var preview_hp_cost: int = 0
 # player's HP now instead (preview_hp_cost not yet paid).
 var hp_at_card_start: int = -1
 
-# HP this card costs in place of its Energy - a cost replacement's
-# (Collateral, Combatant.replaced_cost_hp()), read by the controller when
-# the play committed, since its charge is spent then. Paid by
-# EffectResolver.resolve_card() before anything else on the card. 0 for
-# every card nothing covered.
-var replaced_cost_hp: int = 0
-# What that HP is paid to, for the run log: "status:<id>" of the cost
-# replacement. Set with replaced_cost_hp.
-var replaced_cost_source: String = ""
-
 # Did this card's damage finish something off? Set by damage_effect.gd,
 # cleared per card by EffectResolver.resolve_card(), read by
 # Condition.TARGET_KILLED - the one condition that depends on what an
@@ -309,13 +299,12 @@ func report_block(target_combatant: Combatant, result: Dictionary) -> void:
 # lands, never past max HP and never more Grace than is left. Silent and
 # free when the player has none open, which is every fight for a class
 # without the passive.
-# HP a card costs before its effects: the stance's per-Attack price, or
-# what a cost replacement (Collateral) takes in place of Energy.
+# HP a card costs before its effects: the stance's per-Attack price.
 # Self-inflicted, so it takes the same route SELF_DAMAGE does: past block
 # and absorb, accruing Toll, reported as "self" - and opening no Grace,
 # because Grace only ever opens on an enemy's hit.
 # `source` names what the price is paid to, for the run log ("stance:
-# <id>", "status:<id>"); the Toll it accrues is put down to it too.
+# <id>"); the Toll it accrues is put down to it too.
 func pay_upfront_hp_cost(amount: int, source: String = "") -> void:
 	if amount <= 0:
 		return

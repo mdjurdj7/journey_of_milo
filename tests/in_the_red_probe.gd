@@ -97,7 +97,7 @@ func _check_data() -> void:
 		CardEffect.EffectType.DRAW, CardEffect.Condition.CRITICAL], "...lose HP, gain Energy, then more Energy and a draw when Critical")
 	_expect_eq(CardBonus.mode(card.effects[2]), CardBonus.Mode.GATE, "...the Critical Energy a gate")
 	_expect_eq(CardBonus.mode(card.effects[3]), CardBonus.Mode.GATE, "...and the draw")
-	_expect_eq(CardBonus.upfront_hp_cost(card, null, 0), 5, "...its 5 paid before Critical is read")
+	_expect_eq(CardBonus.upfront_hp_cost(card, null), 5, "...its 5 paid before Critical is read")
 	var tempered: CardData = load(TEMPERED_PATH)
 	_expect(card.tempered == tempered, "...tempering to In the Red+")
 	_expect_eq(tempered.card_name, "In the Red+", "In the Red+ loads")

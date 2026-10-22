@@ -16,13 +16,13 @@ extends SceneTree
 # Rules cases resolve the real cards through EffectResolver.resolve_card()
 # against bare Combatants - block, the cap, all enemies, the bonuses and
 # Grace, with nothing else moving the numbers. Fight cases load the real
-# region scene and start fights through RegionField's contact handler, as
-# collateral_probe does, then play real cards through BattleController.
+# region scene and start fights through RegionField's contact handler,
+# then play real cards through BattleController.
 # request_play() / confirm_target() and end_turn() - so the turn-start
 # swap, the turn-end removal, Spent and the readout are the game's own.
 # Untyped against anything that names the RunState autoload.
 
-const CASES := 14
+const CASES := 13
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTER_PATH := "res://run/data/wanderer.tres"
 const RANSOM_PATH := "res://cards/data/ransom.tres"
@@ -32,7 +32,6 @@ const SLASH_PATH := "res://cards/data/slash.tres"
 const CARVE_PATH := "res://cards/data/carve.tres"
 const RECKONING_PATH := "res://cards/data/reckoning.tres"
 const BRACE_PATH := "res://cards/data/brace.tres"
-const COLLATERAL_PATH := "res://cards/data/collateral.tres"
 const KEEN_STATUS_PATH := "res://battle/rules/statuses/keen.tres"
 const SELF_EATER_STANCE_PATH := "res://battle/rules/stances/self_eater.tres"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
@@ -74,7 +73,6 @@ func _initialize() -> void:
 	await _check_no_stack()
 	await _check_played_while_active()
 	await _check_spent()
-	await _check_collateral()
 	await _check_fight_ends_first()
 
 	if _completed != CASES:
@@ -318,21 +316,6 @@ func _check_spent() -> void:
 		_expect(exhaust.has(ransom), "...and stays Spent two turns on")
 		for pile: String in ["draw_pile", "hand", "discard_pile"]:
 			_expect(not (deck.get(pile) as Array).has(ransom), "...not in %s" % pile)
-	await _teardown()
-	_completed += 1
-
-# Collateral pays for it on 0 Energy: its 2 short, 6 HP.
-func _check_collateral() -> void:
-	var controller: Node = await _start_fight()
-	if controller != null:
-		var player: Combatant = controller.get("player")
-		await _play(controller, await _deal(controller, COLLATERAL_PATH))
-		player.energy = 0
-		var hp_before: int = player.hp
-		await _play(controller, await _deal(controller, RANSOM_PATH))
-		_expect_eq(player.energy, 0, "Under Collateral on 0 Energy, Ransom is played")
-		_expect_eq(hp_before - player.hp, 6, "...for 6 HP, 3 for each Energy short")
-		_expect_eq(_ransom_lines(controller), [WAITING_TEXT], "...and still waits for next turn")
 	await _teardown()
 	_completed += 1
 
