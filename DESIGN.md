@@ -277,8 +277,9 @@ and up the west shore north of z -27. (2026-10-17.)
     model (her cards leave `battle_animation` empty); balance - every
     number above is a prototype guess.
   (2026-10-19, Samurai prototype.)
-- **Endure stays out of the Wanderer reward pool.** Restored to the
-  belongings and collector pools (2026-10-16).
+- **Endure is starter-only.** 5 Block (Endure+ 8), four in the Wanderer's
+  starting deck, never offered: out of every pool, and its STARTER_ONLY
+  flag keeps the neutral pool's folder scan from rolling it (2026-10-21).
 - **Debt Forgiven removed; Toll has no HP sink for now.** Turning Toll
   into HP let a player stall a fight to heal, so the card, its art and
   its pool entries are gone (2026-10-16). The TOLL_HEAL effect stays in
@@ -481,7 +482,7 @@ and up the west shore north of z -27. (2026-10-17.)
   holds class-agnostic cards the Keeper used to hand out (Left Hand,
   Untouched, Second Thoughts) - not reward or shop stock, and a scan
   rooted at `cards/` would sweep them into both. Since 2026-09-30 she
-  offers a keepsake instead; the three, with Hold Fast and Endure, are
+  offers a keepsake instead; the three, with Hold Fast, are
   floor 2's belongings stock (`cards/pools/belongings_pool.tres`) and the
   Collector's (`cards/pools/collector_pool.tres`). The old project
   hit exactly this and solved it by hiding the cards in a subfolder its
