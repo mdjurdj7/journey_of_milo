@@ -201,6 +201,11 @@ var min_target_size_px: float = 0.0
 # eating costs - paid when the card is eaten, and needed in hand for
 # Devour to be available at all (is_devour_available()).
 @export var devour_heal_amount: int = 3
+# Collateral's look (LOOK_AND_PLAY - _begin_look()): the picker's heading,
+# and BACK's text when none of the cards shown can be played and the look
+# may be skipped.
+@export var look_header_text: String = "PLAY ONE FREE"
+@export var look_skip_text: String = "SKIP"
 @export var devour_uses_per_turn: int = 1
 @export var devour_energy_cost: int = 1:
 	set(value):
@@ -262,6 +267,15 @@ var _choice_cap: int = 0
 # lets the hand keep (TrinketData.end_turn_keep), read as the fight opens.
 var _keep_choice_open: bool = false
 var _end_turn_keep: int = 0
+# Collateral's look (_begin_look()): open while its picker is up - the
+# cards it shows, top first, and the picker; then the card picked, in the
+# hand as the player's free card (Combatant.free_card) until its play
+# commits or it goes back to the bottom of the draw pile (_return_look_
+# card()).
+var _look_open: bool = false
+var _look_seen: Array[CardData] = []
+var _look_picker: DeckView = null
+var _look_card: CardData = null
 # The most unspent Energy the held pieces carry into the next turn
 # (TrinketData.energy_carry - Departure Stub), read as the fight opens;
 # and what the turn just ended left for the next one's refill.
@@ -382,6 +396,14 @@ var _multi_hit_report: bool = false
 # Members of a shared move (_run_simultaneous_turn()) still reporting
 # their hits.
 var _reports_running: int = 0
+
+# The look's picker is the tree root's, not the fight's: it goes with the
+# fight.
+func _exit_tree() -> void:
+	if _look_picker != null and is_instance_valid(_look_picker):
+		_look_picker.closed.disconnect(_on_look_closed)
+		_look_picker.close()
+	_look_picker = null
 
 func setup(hand_container: HandContainer, enemy_list: Array[FieldEnemy], wanderer: Wanderer) -> void:
 	_hand_container = hand_container
@@ -743,6 +765,35 @@ func is_choosing() -> bool:
 func get_choosing_card_view() -> CardView:
 	return _choosing_card_view
 
+# Collateral's look: its picker is up, waiting for a pick (or a skip).
+func is_looking() -> bool:
+	return _look_open
+
+func get_look_picker() -> DeckView:
+	return _look_picker
+
+# For probes: the cards the open look shows, top first.
+func get_look_cards() -> Array[CardData]:
+	var cards: Array[CardData] = []
+	if _look_open:
+		cards.append_array(_look_seen)
+	return cards
+
+# For probes: the look's pick, as a click on `card` in the picker would -
+# or its skip, as BACK would (only when nothing shown can be played).
+func pick_look(card: CardData) -> void:
+	var picker: DeckView = _look_picker
+	if not _look_open or not _look_seen.has(card) or not _look_can_play(card):
+		return
+	_on_look_picked(card)
+	if picker != null and is_instance_valid(picker):
+		picker.close()
+
+func skip_look() -> void:
+	if not _look_open or _look_picker == null or _look_picker.pick_required:
+		return
+	_look_picker.close()
+
 # The fight's opening hold: no card, End Turn, target or Devour takes
 # input until `release` is emitted (RegionField._on_enemy_contacted()
 # passes the Wanderer's draw_strike_passed - his draw's ground strike), or
@@ -789,7 +840,7 @@ func _refused_by_entry_hold(action: String) -> bool:
 func request_play(card_view: CardView) -> void:
 	if _refused_by_entry_hold("card play"):
 		return
-	if (_input_locked and not _play_in_flight) or _play_queued or _pending_card_view != null or _choice_open() or card_view.card_data == null:
+	if (_input_locked and not _play_in_flight) or _play_queued or _pending_card_view != null or _choice_open() or _look_open or card_view.card_data == null:
 		return
 	# Devour first: the card clicked is the one it eats, playable or not.
 	if _devour_picking:
@@ -840,6 +891,115 @@ func request_play(card_view: CardView) -> void:
 		_begin_choice(card_view, 1, to_eat, "DEVOUR")
 		return
 	_arm_or_play(card_view)
+
+# Collateral's look (LOOK_AND_PLAY), once its play has resolved: the top
+# `count` cards of the draw pile (Deck.peek_top() - the discard shuffled
+# in first when it is empty) in the deck view's picker (DeckPanel.open_
+# picker()). Those that can't be played free (_look_can_play()) are faded
+# and can't be picked. One can be: a pick is required - no BACK, no Esc.
+# None can: BACK reads look_skip_text, and closing is the skip - all of
+# them to the bottom. The pick goes into the hand free (_on_look_picked());
+# no cards to show, nothing opens. Not once the fight is over.
+func _begin_look(count: int) -> void:
+	if player.hp <= 0 or _win_waiting or _living_enemy_combatants().is_empty():
+		return
+	var seen: Array[CardData] = deck.peek_top(count)
+	_look_seen = seen
+	if seen.is_empty():
+		_log_look(null, true)
+		return
+	var unpickable: Array[CardData] = []
+	for card in seen:
+		if not _look_can_play(card):
+			unpickable.append(card)
+	_look_open = true
+	_emit_devour_changed()
+	var picker: DeckView = DeckPanel.open_picker(get_tree(), seen, look_header_text, DeckPanel.DECK_VIEW_LAYER)
+	picker.unpickable_cards = unpickable
+	picker.pick_required = unpickable.size() < seen.size()
+	if not picker.pick_required:
+		picker.back_text = look_skip_text
+	picker.card_picked.connect(_on_look_picked)
+	picker.closed.connect(_on_look_closed)
+	_look_picker = picker
+
+# Whether the look may pick `card`: never another LOOK_AND_PLAY card (a
+# Collateral), else whether it could be played now at no Energy - every
+# other price and rule as the hand's own (_is_playable()).
+func _look_can_play(card: CardData) -> bool:
+	if _has_effect(card, CardEffect.EffectType.LOOK_AND_PLAY):
+		return false
+	var was_free: CardData = player.free_card
+	player.free_card = card
+	var playable: bool = _is_playable(card)
+	player.free_card = was_free
+	return playable
+
+# The look's pick: the rest to the bottom of the draw pile, the pick into
+# the hand as the free card, and played from there as any hand card is
+# (request_play()) - its target, or its own hand choice, as usual. If it
+# can't be, it goes to the bottom too.
+func _on_look_picked(card: CardData) -> void:
+	if not _look_open:
+		return
+	_look_open = false
+	_look_picker = null
+	for other in _look_seen:
+		if other != card:
+			deck.to_bottom(other)
+	if not deck.take_from_draw(card):
+		_log_look(null, true)
+		_emit_devour_changed()
+		return
+	player.free_card = card
+	_look_card = card
+	energy_changed.emit(player.energy)
+	_emit_devour_changed()
+	var view: CardView = null
+	for hand_view: CardView in _hand_container.call("_card_views"):
+		if hand_view.card_data == card:
+			view = hand_view
+	if view != null:
+		request_play(view)
+	# Refused - nothing armed, chosen, queued or committed: back it goes.
+	if _look_card == card and not _play_queued and (view == null or (_pending_card_view != view and _choosing_card_view != view)):
+		_return_look_card()
+
+# The picker closed with no pick: the skip - every card shown to the
+# bottom of the draw pile.
+func _on_look_closed() -> void:
+	if not _look_open:
+		return
+	_look_open = false
+	_look_picker = null
+	for card in _look_seen:
+		deck.to_bottom(card)
+	_log_look(null, true)
+	_emit_devour_changed()
+
+# The look's pick, armed or choosing, let go of (its target or its choice
+# cancelled, End Turn, a queued play gone stale): to the bottom of the
+# draw pile with the rest, unplayed - the look skipped after all.
+func _return_if_look_card(card: CardData) -> void:
+	if card != null and card == _look_card:
+		_return_look_card()
+
+func _return_look_card() -> void:
+	var card: CardData = _look_card
+	_look_card = null
+	player.free_card = null
+	deck.hand_to_bottom(card)
+	_log_look(null, true)
+	energy_changed.emit(player.energy)
+	_emit_devour_changed()
+
+# The look's run-log line: the cards shown, top first, and the one played
+# (null on a skip).
+func _log_look(played: CardData, skipped: bool) -> void:
+	var seen: Array[String] = []
+	for card in _look_seen:
+		seen.append(card.card_name)
+	RunLogger.mechanic("collateral", {"seen": seen, "played": RunLogger.or_null(played.card_name if played != null else ""), "skipped": skipped})
 
 # Whether `card` can be played now: affordable, not blocked by the rules,
 # and with something to land on.
@@ -1065,6 +1225,7 @@ func cancel_choice() -> void:
 	var card_view: CardView = _choosing_card_view
 	_close_choice()
 	card_view.release()
+	_return_if_look_card(card_view.card_data)
 
 func _close_choice() -> void:
 	_choosing_card_view = null
@@ -1098,6 +1259,7 @@ func confirm_target(enemy: FieldEnemy, mound: int = -1) -> void:
 func cancel_target() -> void:
 	if _pending_card_view == null:
 		return
+	var card: CardData = _pending_card_view.card_data
 	_pending_card_view.release()
 	_pending_card_view = null
 	_pending_devour_only = false
@@ -1106,13 +1268,14 @@ func cancel_target() -> void:
 	_enemy_rects.clear()
 	target_cancelled.emit()
 	_emit_devour_changed()
+	_return_if_look_card(card)
 
 # End Turn: with a keepsake that keeps cards and a card in hand, the keep
 # choice first (_begin_keep_choice()) - and End Turn again confirms it.
 func end_turn() -> void:
 	if _refused_by_entry_hold("End Turn"):
 		return
-	if _input_locked or _play_queued:
+	if _input_locked or _play_queued or _look_open:
 		return
 	if _keep_choice_open:
 		confirm_choice()
@@ -1208,6 +1371,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 		if not _still_playable(card_view, target_enemy):
 			if is_instance_valid(card_view):
 				card_view.release()
+				_return_if_look_card(card_view.card_data)
 			_emit_devour_changed()
 			return
 	_play_in_flight = true
@@ -1229,6 +1393,11 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	# What this card's cost left: Patient Cut's bonus reads it at impact,
 	# whatever a later play has spent since.
 	var unspent_energy: int = maxi(player.energy, 0)
+	# Collateral's pick, committed: free no longer, and the look's line.
+	if card == _look_card:
+		player.free_card = null
+		_look_card = null
+		_log_look(card, false)
 	# The play is committed: a free card (House Key) is spent here, before
 	# card_played re-reads the hand's faces - never on a hover, a face or
 	# a cancelled target. So is a cost replacement's charge; its HP is paid
@@ -1336,6 +1505,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	_effect_resolver.resolve_card(card, ctx)
 	_deferring_pack_check = false
 	_multi_hit_report = false
+	var look_count: int = ctx.look_count
 	_after_card_effects()
 	_draw_for_card_count()
 	_draw_for_skill_after_attack(card)
@@ -1355,6 +1525,9 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	# previews and the battle-end check read where the play left things.
 	await _counter_strikes(attacked)
 	await _after_play()
+	# Collateral: its look, once its own play is done.
+	if look_count > 0:
+		_begin_look(look_count)
 
 # A card's effect context for the fight as it stands, aimed at
 # `target_enemy` (at `target_mound` when it's dug in), its reports wired to
@@ -1654,6 +1827,9 @@ func _still_playable(card_view: CardView, target_enemy: FieldEnemy) -> bool:
 		return false
 	if player.hp <= 0 or _win_waiting or _living_enemy_combatants().is_empty():
 		return false
+	# Collateral's look opened while it waited: the look comes first.
+	if _look_open:
+		return false
 	var card: CardData = card_view.card_data
 	if not _is_playable(card):
 		return false
@@ -1720,7 +1896,7 @@ static func encounter_role(members: Array[Dictionary]) -> String:
 # (has_devour). Everything that offers it keys on this - the button,
 # arming an unplayable card for it, the pick, lighting up as a target.
 func is_devour_available() -> bool:
-	return has_devour and player != null and _devour_uses_this_turn < devour_uses_per_turn and is_devour_affordable() and not _entry_locked and not _input_locked and not _play_queued and not _choice_open()
+	return has_devour and player != null and _devour_uses_this_turn < devour_uses_per_turn and is_devour_affordable() and not _entry_locked and not _input_locked and not _play_queued and not _choice_open() and not _look_open and _look_card == null
 
 # Whether the player has the Energy Devour costs.
 func is_devour_affordable() -> bool:
@@ -1850,10 +2026,10 @@ func _on_keyword_devoured(card: CardData) -> void:
 
 # Whether Sheathe can be used now: a use left this turn, its Energy
 # (sheathe_energy_cost) in hand, on the player's turn with nothing
-# resolving, and no hand choice open - never for a class without it
-# (has_sheathe). The button and the pick both key on this.
+# resolving, no hand choice open and no Collateral look open or its
+# pick waiting - never for a class without it (has_sheathe). The button and the pick both key on this.
 func is_sheathe_available() -> bool:
-	return has_sheathe and player != null and _sheathe_uses_this_turn < sheathe_uses_per_turn and is_sheathe_affordable() and not _entry_locked and not _input_locked and not _play_queued and not _choice_open()
+	return has_sheathe and player != null and _sheathe_uses_this_turn < sheathe_uses_per_turn and is_sheathe_affordable() and not _entry_locked and not _input_locked and not _play_queued and not _choice_open() and not _look_open and _look_card == null
 
 # Whether the player has the Energy Sheathe costs.
 func is_sheathe_affordable() -> bool:

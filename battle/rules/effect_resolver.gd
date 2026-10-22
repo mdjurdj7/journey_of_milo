@@ -38,6 +38,7 @@ const EFFECT_SCRIPT_PATHS: Dictionary = {
 	CardEffect.EffectType.TOLL_SPENT_DAMAGE: "res://battle/rules/effects/toll_spent_damage_effect.gd",
 	CardEffect.EffectType.DEVOUR_FROM_HAND: "res://battle/rules/effects/devour_from_hand_effect.gd",
 	CardEffect.EffectType.TAKE_FROM_ATTACK: "res://battle/rules/effects/take_from_attack_effect.gd",
+	CardEffect.EffectType.LOOK_AND_PLAY: "res://battle/rules/effects/look_and_play_effect.gd",
 }
 
 var _cache: Dictionary = {}

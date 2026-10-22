@@ -4,11 +4,12 @@ extends SceneTree
 # cards/ - tempered copies, weapon cards and cards no pool offers alike,
 # once each - is dealt into a real fight's hand and played through
 # BattleController as a player would (ProbePlay.play_any(): its hand
-# choice and its target found). The Wanderer's own and the neutral cards
-# in a Wanderer run, the Samurai's in hers; each on floor 1's first fight.
+# choice, its target and a look's pick found). The Wanderer's own and the
+# neutral cards in a Wanderer run, the Samurai's in hers; each on floor
+# 1's first fight.
 #
 # A card fails when it can't be played or doesn't commit, or when its play
-# leaves anything open (a target, a choice) or the fight stuck. A card the
+# leaves anything open (a target, a choice, a look) or the fight stuck. A card the
 # rules block as dealt - nothing to replay, no attack on the record - is
 # given the turn it needs: a basic Attack played first, then an enemy turn,
 # then tried again. Values are never checked: that the game plays every
@@ -167,9 +168,9 @@ func _play_card(card: CardData, basic: CardData) -> bool:
 			_fail("%s: its play ended the fight" % card.card_name)
 			_controller = null
 			return false
-		var open: bool = bool(controller.call("is_awaiting_target")) or bool(controller.call("is_choosing")) or not ProbePlay.is_settled(controller)
+		var open: bool = bool(controller.call("is_awaiting_target")) or bool(controller.call("is_choosing")) or bool(controller.call("is_looking")) or not ProbePlay.is_settled(controller)
 		if open:
-			_fail("%s: its play left a target, a choice or the play open" % card.card_name)
+			_fail("%s: its play left a target, a choice, a look or the play open" % card.card_name)
 			controller.call("cancel_target")
 			controller.call("cancel_choice")
 			return false

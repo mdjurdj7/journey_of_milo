@@ -24,6 +24,10 @@ var copy_choice: CardData = null
 # The hand card a DEVOUR_FROM_HAND card (Take In) eats - the hand choice's
 # one pick, as copy_choice is Twice Over's.
 var devour_choice: CardData = null
+# How many cards off the top of the draw pile the play shows once it has
+# resolved (LOOK_AND_PLAY - Collateral's 3), for one to be played free; 0
+# for none. Set by the effect, read by the controller after the play.
+var look_count: int = 0
 # What a Not So just undid (UndoLastAttackEffect): {"intent", "attacker",
 # "restored", "dealt", "grace_closed"} - for the run log. Empty for any
 # other card.

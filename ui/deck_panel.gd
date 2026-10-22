@@ -215,6 +215,7 @@ func bind_to_deck(deck: Deck, pile: Pile) -> void:
 	deck.exhausted.connect(_on_deck_changed)
 	deck.shuffled.connect(_on_deck_changed)
 	deck.added.connect(_on_deck_changed)
+	deck.returned.connect(_on_deck_changed)
 	_relayout()
 
 func _unbind() -> void:
@@ -224,6 +225,7 @@ func _unbind() -> void:
 		_deck.exhausted.disconnect(_on_deck_changed)
 		_deck.shuffled.disconnect(_on_deck_changed)
 		_deck.added.disconnect(_on_deck_changed)
+		_deck.returned.disconnect(_on_deck_changed)
 	_deck = null
 
 func _on_deck_changed(_card: CardData = null) -> void:

@@ -309,6 +309,7 @@ func set_deck(deck: Deck) -> void:
 		_deck.discarded.disconnect(_on_deck_changed)
 		_deck.added.disconnect(_on_deck_changed)
 		_deck.vanished.disconnect(_on_deck_changed)
+		_deck.returned.disconnect(_on_deck_changed)
 		_deck.keep_changed.disconnect(_sync_keep)
 	_deck = deck
 	_arriving_cards.clear()
@@ -316,6 +317,7 @@ func set_deck(deck: Deck) -> void:
 	_deck.discarded.connect(_on_deck_changed)
 	_deck.added.connect(_on_deck_changed)
 	_deck.vanished.connect(_on_deck_changed)
+	_deck.returned.connect(_on_deck_changed)
 	_deck.keep_changed.connect(_sync_keep)
 	_sync_with_deck()
 
@@ -411,7 +413,7 @@ func _sync_keep() -> void:
 # for every card without one - then a single reflow. A drawn card's
 # fresh view waits its turn and flies in from the DECK readout (_queue_
 # arrival()); any other appears in place. Called on every
-# drawn/discarded/added signal and on set_deck(); a played card is out of
+# drawn/discarded/added/vanished/returned signal and on set_deck(); a played card is out of
 # deck.hand from its commit (Deck.begin_play()) and play_card() takes its
 # own slot out, so nothing in the play brings it back - a draw it makes
 # included. A view is never made or dropped

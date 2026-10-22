@@ -131,14 +131,43 @@ static func hand_views(controller: Node) -> Array:
 # Bide's the first other card, then DONE; Twice Over's and Take In's the
 # first card they may take - and a target, the first enemy it may land on
 # (BattleController._can_target(), so an intent mark only on an attack
-# that will land), a dug-in enemy at its first mound. Then settle(). True
-# once the play committed; false, with anything opened closed again, when
-# the controller refused it or it had nothing to choose or aim at.
-# `stop`: as settle()'s.
+# that will land), a dug-in enemy at its first mound. Then settle(). A look
+# (Collateral's) then picks the first card it may play, answered the same
+# way, and settles again - or skips, when none can be. True once the play
+# committed; false, with anything opened closed again, when the controller
+# refused it or it had nothing to choose or aim at. `stop`: as settle()'s.
 static func play_any(tree: SceneTree, controller: Node, view: CardView, stop: Callable = Callable()) -> bool:
-	var card: CardData = view.card_data
 	var played_before: int = int(controller.get("cards_played_this_turn"))
 	controller.call("request_play", view)
+	if not _answer(controller, view):
+		return false
+	await settle(tree, controller, stop)
+	if is_instance_valid(controller) and bool(controller.call("is_looking")):
+		var picked: CardData = null
+		for seen: CardData in controller.call("get_look_cards"):
+			if bool(controller.call("_look_can_play", seen)):
+				picked = seen
+				break
+		if picked == null:
+			controller.call("skip_look")
+		else:
+			controller.call("pick_look", picked)
+			var armed: CardView = controller.call("get_pending_card_view")
+			var choosing: CardView = controller.call("get_choosing_card_view")
+			var picked_view: CardView = armed if armed != null else choosing
+			if picked_view != null:
+				_answer(controller, picked_view)
+			await settle(tree, controller, stop)
+	# A play that ended the fight can take the controller with it.
+	if not is_instance_valid(controller):
+		return true
+	return int(controller.get("cards_played_this_turn")) > played_before
+
+# What `view`'s play, just requested, asks for: its hand choice, then its
+# target. False, with anything opened closed again, when it can't be
+# answered.
+static func _answer(controller: Node, view: CardView) -> bool:
+	var card: CardData = view.card_data
 	if controller.call("get_choosing_card_view") == view:
 		for other: CardView in hand_views(controller):
 			if other == view:
@@ -163,11 +192,7 @@ static func play_any(tree: SceneTree, controller: Node, view: CardView, stop: Ca
 		if bool(controller.call("is_awaiting_target")):
 			controller.call("cancel_target")
 			return false
-	await settle(tree, controller, stop)
-	# A play that ended the fight can take the controller with it.
-	if not is_instance_valid(controller):
-		return true
-	return int(controller.get("cards_played_this_turn")) > played_before
+	return true
 
 # Starts a fight with `target` the way its contact Area would - the
 # Wanderer put just outside its contact radius first, so only this call

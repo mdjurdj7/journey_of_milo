@@ -14,6 +14,9 @@ signal keep_changed()
 signal added(card: CardData)
 # A fight-only copy left the hand unplayed (discard()) - gone, in no pile.
 signal vanished(card: CardData)
+# A hand card went back to the bottom of the draw pile unplayed
+# (hand_to_bottom() - Collateral's pick not played after all).
+signal returned(card: CardData)
 
 @export var hand_size: int = 10
 
@@ -83,6 +86,46 @@ func add(card: CardData) -> void:
 	else:
 		draw_pile.append(card)
 	added.emit(card)
+
+# The top `count` cards of draw_pile, the top first - the discard pile
+# shuffled in first when it is empty, as draw() would; fewer when it
+# holds fewer. Nothing moves (Collateral's look).
+func peek_top(count: int) -> Array[CardData]:
+	if draw_pile.is_empty() and not discard_pile.is_empty():
+		_reshuffle_discard_into_draw()
+	var top: Array[CardData] = []
+	for i in mini(maxi(count, 0), draw_pile.size()):
+		top.append(draw_pile[draw_pile.size() - 1 - i])
+	return top
+
+# `card`, in draw_pile, to its bottom - drawn last.
+func to_bottom(card: CardData) -> void:
+	var index: int = draw_pile.find(card)
+	if index < 0:
+		return
+	draw_pile.remove_at(index)
+	draw_pile.insert(0, card)
+
+# `card`, in draw_pile, into the hand to be played from there (Collateral's
+# pick) - even over hand_size, as it leaves again at once. Emits added, not
+# drawn: it isn't a draw. False for a card not in draw_pile.
+func take_from_draw(card: CardData) -> bool:
+	var index: int = draw_pile.find(card)
+	if index < 0:
+		return false
+	draw_pile.remove_at(index)
+	hand.append(card)
+	added.emit(card)
+	return true
+
+# `card`, in the hand, back to the bottom of draw_pile (Collateral's pick
+# not played after all). Emits discarded, so the hand drops its view.
+func hand_to_bottom(card: CardData) -> void:
+	if not hand.has(card):
+		return
+	_leave_hand(card)
+	draw_pile.insert(0, card)
+	discarded.emit(card)
 
 func discard(card: CardData) -> void:
 	if not hand.has(card):

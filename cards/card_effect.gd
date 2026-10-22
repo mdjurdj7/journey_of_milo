@@ -17,8 +17,13 @@ enum EffectType {
 	UNDAMAGED_BLOCK, GAIN_ENERGY, ABSORB, APPLY_STATUS_TO_TARGET,
 	APPLY_STANCE, TOLL_HEAL, SPEND_TOLL, DRAIN, SET_ASIDE, CONSUME,
 	REPLAY_LAST_ATTACK, GRANT_KEEP, COPY_HAND_CARD, UNDO_LAST_ATTACK,
-	TOLL_SPENT_DAMAGE, DEVOUR_FROM_HAND, TAKE_FROM_ATTACK,
+	TOLL_SPENT_DAMAGE, DEVOUR_FROM_HAND, TAKE_FROM_ATTACK, LOOK_AND_PLAY,
 }
+# LOOK_AND_PLAY (Collateral): once the card has resolved, the top `value`
+# cards of the draw pile are shown, and one the player may play is played
+# free - no Energy, any HP or Toll price on it paid - the rest to the
+# bottom of the draw pile (look_and_play_effect.gd, BattleController.
+# _begin_look()).
 # TAKE_FROM_ATTACK (Wrest): up to `value` off the target's queued attack -
 # off the attack's landing total as it stands when played, soaked hit by
 # hit like Garnish's - as `status_data` (an intent mark, reduces_attack_

@@ -487,7 +487,8 @@ static func turn_ended(energy: int) -> void:
 # keepsake_double, keepsake_draw, keepsake_block_carry, keepsake_free_card,
 # keepsake_keep, keepsake_energy_carry, replay, energy_debt, delay,
 # sentence_advance, sentence_resolved, keep, copy, copy_end, undo,
-# skillchain.
+# skillchain, collateral (its look: the cards seen, top first, the one
+# played or null, and whether it was skipped).
 static func mechanic(kind: String, data: Dictionary) -> void:
 	if not _fight_open:
 		return

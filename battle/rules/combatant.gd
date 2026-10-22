@@ -152,6 +152,11 @@ var pending_drain: int = 0
 # a face, or a target armed and cancelled. Per fight, like everything
 # here.
 var first_card_free: bool = false
+# The one card the look (Collateral - BattleController._begin_look()) put
+# into the hand to be played free: 0 Energy, its every other price paid,
+# and no "your next card" discount spent on it. This instance only, and
+# only until it is played or goes back (cleared by the controller).
+var free_card: CardData = null
 # The keepsake's Critical-entry Block (TrinketData.critical_entry_block)
 # and whether it is still waiting: armed only while this fighter is seen
 # OUT of Critical, so opening a fight already there doesn't count as
@@ -395,6 +400,8 @@ func can_pay(card: CardData) -> bool:
 # card, then every waiting cost reduction (Status.cost_reduction()),
 # never below 0. A card whose base is 0 is 0 with neither.
 func _reduced_cost(card: CardData) -> int:
+	if card == free_card:
+		return 0
 	var count_cut: int = card_count_discount if counts_for_turn_discount() else 0
 	if not takes_next_card_discount(card):
 		return maxi(base_cost(card) - count_cut, 0)
@@ -420,7 +427,7 @@ func base_cost(card: CardData) -> int:
 # at least 1 Energy. A card at 0 - printed, or by its critical_cost
 # while Critical - has nothing to discount and passes them by.
 func takes_next_card_discount(card: CardData) -> bool:
-	return card != null and base_cost(card) >= 1
+	return card != null and card != free_card and base_cost(card) >= 1
 
 # The Critical-entry edge, checked wherever Critical is (Status.resolve_
 # critical_triggers(), after each action that can move HP). Out of

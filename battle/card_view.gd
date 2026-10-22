@@ -106,6 +106,9 @@ const TOKEN_ENERGY := "{energy}"
 const TOKEN_BONUS_ENERGY := "{bonus_energy}"
 # How many cards a GRANT_KEEP (Bide) gives Keep - its value.
 const TOKEN_KEEP := "{keep}"
+# How many cards a LOOK_AND_PLAY (Collateral) shows off the draw pile - its
+# value.
+const TOKEN_LOOK := "{look}"
 # The Toll a SPEND_TOLL or a TOLL_BLOCK spends - its toll_cost (Second
 # Swing's 5, Settled Account's 5).
 const TOKEN_TOLL_COST := "{toll_cost}"
@@ -917,6 +920,10 @@ func _resolve_tokens(description: String) -> String:
 		var keep: int = _effect_value(card_data, [CardEffect.EffectType.GRANT_KEEP])
 		if keep >= 0:
 			text = text.replace(TOKEN_KEEP, str(keep))
+	if text.contains(TOKEN_LOOK):
+		var look: int = _effect_value(card_data, [CardEffect.EffectType.LOOK_AND_PLAY])
+		if look >= 0:
+			text = text.replace(TOKEN_LOOK, str(look))
 	if text.contains(TOKEN_HP_COST):
 		text = text.replace(TOKEN_HP_COST, str(_hp_cost))
 	if text.contains(TOKEN_CHAIN_BONUS):

@@ -209,6 +209,19 @@ const VOICE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
 # card_picked, then close(); BACK, Escape or a click off the cards closes
 # with no pick, which is the caller's cancel. Read at the click.
 @export var pick_mode: bool = false
+# Pick mode only (Collateral's look): the cards that can't be picked -
+# faded as the hand fades a card it can't play (CardView.set_playable(
+# false)), a click on one doing nothing.
+var unpickable_cards: Array[CardData] = []:
+	set(value):
+		unpickable_cards = value
+		_relayout()
+# Pick mode only: a pick must be made - no BACK, and neither Escape nor a
+# click off the cards closes the view.
+@export var pick_required: bool = false:
+	set(value):
+		pick_required = value
+		_relayout()
 
 # A pick that waits for a yes (the collector's removal - set by the host
 # before open()): with pick_confirm_format set, a click in pick mode lifts
@@ -552,6 +565,8 @@ func _add_slot(flow: HFlowContainer, stack: Dictionary, slot_size: Vector2) -> v
 	# wouldn't work while the card is out of the tree it came from. The
 	# handler gets the deck's own card, not the one shown.
 	var own: CardData = cards[0]
+	if pick_mode and unpickable_cards.has(own):
+		card_view.set_playable(false)
 	card_view.clicked.connect(func(_shown_card: CardData) -> void: _on_card_clicked(own, card_view, slot))
 
 func _numeral_line_height() -> float:
@@ -590,6 +605,8 @@ func _draw_page() -> void:
 		var title: String = _header_text.to_upper()
 		var title_width: float = InkType.width(_label_font, title, label_size_px)
 		_text(_page, _label_font, title, Vector2(roundf((view.x - title_width) * 0.5), roundf(title_top_px + ascent)), label_size_px, bone)
+	if _must_pick():
+		return
 	var back: Rect2 = _back_label_rect()
 	var baseline: float = back.position.y + ascent
 	_text(_page, _label_font, back_text, Vector2(back.position.x, baseline), label_size_px, bone if _back_hovered else unfocused_color)
@@ -611,6 +628,10 @@ func _back_rect() -> Rect2:
 
 # --- Close ---
 
+# A pick is required (pick_required): nothing but a pick closes the view.
+func _must_pick() -> bool:
+	return pick_mode and pick_required
+
 # Frees the wrapping CanvasLayer DeckPanel.open_view() parents this
 # under (see DeckPanel.DECK_VIEW_LAYER's own doc), not just this node -
 # that CanvasLayer has no purpose once this is gone. Falls back to freeing
@@ -627,12 +648,13 @@ func close() -> void:
 # the rows' empty space - and closes. The pointer over BACK focuses it.
 func _gui_input(event: InputEvent) -> void:
 	if event is InputEventMouseMotion:
-		var over: bool = _back_rect().has_point((event as InputEventMouseMotion).position)
+		var over: bool = not _must_pick() and _back_rect().has_point((event as InputEventMouseMotion).position)
 		if over != _back_hovered:
 			_back_hovered = over
 			_page.queue_redraw()
 	elif event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:
-		close()
+		if not _must_pick():
+			close()
 		get_viewport().set_input_as_handled()
 
 # Escape backs out one level at a time: it puts an inspected card down
@@ -652,7 +674,7 @@ func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo and event.keycode == KEY_ESCAPE:
 		if _inspected != null:
 			_end_inspect()
-		else:
+		elif not _must_pick():
 			close()
 		get_viewport().set_input_as_handled()
 
@@ -667,6 +689,8 @@ func _unhandled_input(event: InputEvent) -> void:
 func _on_card_clicked(card_data: CardData, card_view: CardView, slot: Control) -> void:
 	card_view.accept_event()
 	get_viewport().set_input_as_handled()
+	if pick_mode and unpickable_cards.has(card_data):
+		return
 	if pick_mode and not _confirms_pick():
 		card_picked.emit(card_data)
 		close()
