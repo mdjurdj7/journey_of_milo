@@ -274,9 +274,10 @@ and up the west shore north of z -27. (2026-10-17.)
   - **Starter deck** (`run/data/samurai.tres`, cards in `cards/samurai/`,
     all STARTER_ONLY, no chain property): 5 Cut (1, deal 6), 4 Stillness
     (1, gain 5 block), 1 Patient Cut (1, deal 4 plus 4 for each Energy
-    left after its own cost, `CardEffect.bonus_per_unspent_energy`; the
-    face prints the live number in a fight and `{energy_bonus}` outside
-    one). Guard, Step Back, Measured Cut and Severance, the prototype's,
+    left after its own cost, `CardEffect.bonus_per_unspent_energy`; in a
+    fight the face prints the live number and the rule - "Deal 12 damage.
+    +4 for each unspent Energy." - and outside one the rule alone, "Deal 4
+    damage, plus 4 for each unspent Energy."). Guard, Step Back, Measured Cut and Severance, the prototype's,
     are deleted. (2026-10-21.)
   - **Open:** the Edge and Counter archetypes; her reward pool (her
     starters never roll, so her rolls are neutral cards only); tempering
