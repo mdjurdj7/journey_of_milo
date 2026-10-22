@@ -8,7 +8,7 @@
 [sub_resource type="Resource" id="E_block"]
 script = ExtResource("2_card_effect")
 effect_type = 1
-value = 9
+value = 6
 
 [sub_resource type="Resource" id="E_thick_skin"]
 script = ExtResource("2_card_effect")
@@ -18,7 +18,7 @@ status_data = ExtResource("3_thick_skin")
 [resource]
 script = ExtResource("1_card_data")
 card_name = "Thick Skin+"
-cost = 2
+cost = 1
 card_type = 1
 rarity = 1
 target_type = 1
