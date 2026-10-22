@@ -42,6 +42,8 @@ class_name BedrollLine
 var bedroll: BedrollData = null
 
 var _held: bool = false
+# set_held_off().
+var _held_off: bool = false
 var _reveal: StatusReveal = null
 
 func _ready() -> void:
@@ -62,8 +64,17 @@ func set_held(held: bool) -> void:
 func is_held() -> bool:
 	return _held
 
+# Held off while a screen covers its corner - the collector's, whose
+# LEAVE sits there: hidden whatever is carried (a Bedroll bought there
+# included), back on release.
+func set_held_off(on: bool) -> void:
+	if _held_off == on:
+		return
+	_held_off = on
+	_relayout()
+
 func _is_shown() -> bool:
-	return _held
+	return _held and not _held_off
 
 # Bottom-right: as far in from the screen's right edge as DECK is from its
 # left, bottoms level with the row.

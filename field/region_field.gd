@@ -4018,11 +4018,17 @@ func open_collector_screen(collector: Collector) -> bool:
 	if _loot_screen != null and is_instance_valid(_loot_screen):
 		_loot_screen.close()
 	process_mode = Node.PROCESS_MODE_DISABLED
+	# The Bedroll's REST sits where the screen's LEAVE does: off until it
+	# closes.
+	if _bedroll_line != null:
+		_bedroll_line.set_held_off(true)
 	add_child(screen)
 	return true
 
 func _on_collector_screen_closed() -> void:
 	process_mode = Node.PROCESS_MODE_INHERIT
+	if _bedroll_line != null:
+		_bedroll_line.set_held_off(false)
 
 # A keepsake looked at closely (KeepsakeExamine), growing out of
 # `from_rect`; the field locked under it until it closes. False when a
