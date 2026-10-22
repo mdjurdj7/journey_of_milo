@@ -52,8 +52,9 @@ const FLOOR_INDEX := 4
 const EXIT_AT := Vector2(-3.5, -60.0)
 const FINDING_AT := Vector2(-7.167, -15.9)
 # Spawn to the crest along the worn band's S-bend: the long climb, the
-# foot of the shelf, its top, the crest flat - short of the fight.
-const CLIMB: Array[Vector2] = [Vector2(1.5, -6), Vector2(2.47, -10), Vector2(3.5, -20), Vector2(2.9, -26), Vector2(2.47, -30), Vector2(1.9, -32.5), Vector2(1.4, -35), Vector2(0.6, -37.5)]
+# foot of the shelf, its top, the crest flat - short of the fight, outside
+# its contact area and east of the crest rock's foot.
+const CLIMB: Array[Vector2] = [Vector2(1.5, -6), Vector2(2.47, -10), Vector2(3.5, -20), Vector2(2.9, -26), Vector2(2.47, -30), Vector2(1.9, -32.5), Vector2(1.4, -35), Vector2(2.4, -35.5)]
 const DESCENT: Array[Vector2] = [Vector2(1.4, -35), Vector2(1.9, -32.5), Vector2(2.47, -30), Vector2(2.9, -26)]
 # The descent starts on the crest flat, clear of the fight's contact area.
 const DESCENT_FROM := Vector2(3.0, -36.5)
