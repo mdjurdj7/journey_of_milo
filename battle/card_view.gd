@@ -139,6 +139,12 @@ const TOKEN_HITS := "{hits}"
 # a battle hand {damage} and {block} already carry it at the chain level
 # now (CardBonus.chain_bonus()), so the live half says the number alone.
 const TOKEN_CHAIN_BONUS := "{chain_bonus}"
+# What each Energy left after the card's own cost adds to its number
+# (CardEffect.bonus_per_unspent_energy - Patient Cut's 4), the rule a face
+# says outside a fight. In a battle hand {damage} and {block} already
+# carry it at the Energy held now (_energy_bonus()), so the live half says
+# the number alone.
+const TOKEN_ENERGY_BONUS := "{energy_bonus}"
 # The effect types {damage}/{alt_damage} and {block}/{alt_block} read.
 const DAMAGE_EFFECT_TYPES: Array = [CardEffect.EffectType.DAMAGE, CardEffect.EffectType.FIRST_CARD_DAMAGE,
 	CardEffect.EffectType.DAMAGE_ALL, CardEffect.EffectType.TOLL_THRESHOLD_DAMAGE]
@@ -820,6 +826,7 @@ func _resolve_tokens(description: String) -> String:
 			if card_data.card_type == CardData.CardType.ATTACK:
 				damage += _attack_bonus_for_half(false)
 			damage += _chain_bonus(DAMAGE_EFFECT_TYPES)
+			damage += _energy_bonus(DAMAGE_EFFECT_TYPES)
 			damage = _landed(damage, _damage_reaches_all(false))
 			text = text.replace(TOKEN_DAMAGE, str(damage))
 	if text.contains(TOKEN_ALT_DAMAGE) or text.contains(TOKEN_BONUS_DAMAGE):
@@ -842,6 +849,7 @@ func _resolve_tokens(description: String) -> String:
 		var block: int = _effect_value(card_data, BLOCK_EFFECT_TYPES)
 		if block >= 0:
 			block += _chain_bonus(BLOCK_EFFECT_TYPES)
+			block += _energy_bonus(BLOCK_EFFECT_TYPES)
 			text = text.replace(TOKEN_BLOCK, str(0 if no_block else block))
 	if text.contains(TOKEN_ALT_BLOCK) or text.contains(TOKEN_BONUS_BLOCK):
 		var bonus_block: int = _bonus_effect_value(card_data, BLOCK_EFFECT_TYPES)
@@ -905,6 +913,11 @@ func _resolve_tokens(description: String) -> String:
 			if effect != null and effect.bonus_per_chain_level != 0:
 				text = text.replace(TOKEN_CHAIN_BONUS, str(effect.bonus_per_chain_level))
 				break
+	if text.contains(TOKEN_ENERGY_BONUS):
+		for effect in card_data.effects:
+			if effect != null and effect.bonus_per_unspent_energy != 0:
+				text = text.replace(TOKEN_ENERGY_BONUS, str(effect.bonus_per_unspent_energy))
+				break
 	if text.contains(TOKEN_HITS):
 		var hits: int = _hit_count()
 		text = text.replace(TOKEN_HITS, " damage" if hits <= 1 else " ×%d" % hits)
@@ -959,6 +972,18 @@ func _chain_bonus(types: Array) -> int:
 	for effect in card_data.effects:
 		if effect != null and types.has(effect.effect_type):
 			return CardBonus.chain_bonus(effect, _bonus_context)
+	return 0
+
+# What the Energy left after this card's cost adds to the first effect of
+# one of `types` - the Energy held now less what the card costs now
+# (CardBonus.unspent_energy_after()), through CardBonus.energy_bonus(), the
+# resolvers' own call. 0 outside a battle hand.
+func _energy_bonus(types: Array) -> int:
+	if _bonus_context == null or _bonus_context.player == null:
+		return 0
+	for effect in card_data.effects:
+		if effect != null and types.has(effect.effect_type):
+			return CardBonus.energy_bonus(effect, CardBonus.unspent_energy_after(card_data, _bonus_context.player))
 	return 0
 
 # How many times the card's first damage effect lands now: its repeats

@@ -42,6 +42,11 @@ var tagged_plays_before_this: Dictionary = {}
 # card reads (CardEffect.bonus_per_chain_level). For a preview of a card
 # still in hand it is the level now. 0 with no chain.
 var chain_level_before_this: int = 0
+# The Energy the player held once this card's own cost was paid - what
+# CardEffect.bonus_per_unspent_energy reads (Patient Cut). Set at the
+# commit, and as a replay resolves; a card face in hand works its own out
+# (CardBonus.unspent_energy_after()), so the shared preview leaves it 0.
+var unspent_energy: int = 0
 # The skillchain this card's play fired (Skillchain.step() at commit) and
 # the chain level it fired at - resolved after the card's own effects
 # (EffectResolver.resolve_card()). &"": none, and on any replay.

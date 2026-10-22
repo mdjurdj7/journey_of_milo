@@ -1,0 +1,20 @@
+[gd_resource type="Resource" script_class="CardData" format=3 uid="uid://c43y6q4wmxlee"]
+
+[ext_resource type="Script" uid="uid://cdquudll7v5iv" path="res://cards/card_data.gd" id="1_card_data"]
+[ext_resource type="Script" uid="uid://hlcvchobnyi1" path="res://cards/card_effect.gd" id="2_card_effect"]
+
+[sub_resource type="Resource" id="CardEffect_damage"]
+script = ExtResource("2_card_effect")
+value = 4
+bonus_per_unspent_energy = 4
+
+[resource]
+script = ExtResource("1_card_data")
+card_name = "Patient Cut"
+cost = 1
+rarity = 1
+target_type = 0
+description = "{battle}Deal {damage} damage.{/battle}{outside}Deal {damage} damage, plus {energy_bonus} for each unspent Energy.{/outside}"
+effects = Array[ExtResource("2_card_effect")]([SubResource("CardEffect_damage")])
+card_class = &"samurai"
+offer = 1

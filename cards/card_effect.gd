@@ -171,6 +171,12 @@ enum TargetScope { TARGET, ALL_ENEMIES, SELF }
 # this) - Severance's 4. Read through CardBonus.resolved_value(), so the
 # face prints what the rules pay. 0: the chain changes nothing.
 
+@export var bonus_per_unspent_energy: int = 0
+# Added on top of the effect's number once for each Energy the player
+# still holds once the card's own cost is paid (EffectContext.unspent_
+# energy) - Patient Cut's 4. Read through CardBonus.resolved_value(), so
+# the face prints what the rules pay. 0: Energy changes nothing.
+
 @export_multiline var combat_message: String = ""
 # Shown when a STUN resolves. Unused by every other type - and STUN
 # itself has no real caller yet this pass (see stun_effect.gd: interrupts

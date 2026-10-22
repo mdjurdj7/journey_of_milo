@@ -1188,6 +1188,9 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 		player.first_card_free = true
 	play_hp_cost = replaced_hp
 	player.energy -= energy_paid
+	# What this card's cost left: Patient Cut's bonus reads it at impact,
+	# whatever a later play has spent since.
+	var unspent_energy: int = maxi(player.energy, 0)
 	# The play is committed: a free card (House Key) is spent here, before
 	# card_played re-reads the hand's faces - never on a hover, a face or
 	# a cancelled target. So is a cost replacement's charge; its HP is paid
@@ -1267,6 +1270,7 @@ func _resolve_play(card_view: CardView, target_enemy: FieldEnemy, chosen_views: 
 	ctx.cards_played_before_this = cards_played_this_turn - 1
 	ctx.tagged_plays_before_this = _tagged_plays_before(card)
 	ctx.chain_level_before_this = chain_before
+	ctx.unspent_energy = unspent_energy
 	ctx.skillchain = skillchain
 	ctx.skillchain_level = skillchain_level
 	ctx.replaced_cost_hp = replaced_hp
@@ -1398,6 +1402,8 @@ func _replay_attack(chosen: FieldEnemy) -> void:
 	# count of its own.
 	ctx.cards_played_before_this = cards_played_this_turn
 	ctx.tagged_plays_before_this = player.tagged_plays_this_turn.duplicate()
+	# No cost of its own: the Energy held as it replays.
+	ctx.unspent_energy = maxi(player.energy, 0)
 	_multi_hit_report = _card_hit_count(card, ctx) > 1
 	_deferring_pack_check = true
 	_effect_resolver.resolve_card(card, ctx)

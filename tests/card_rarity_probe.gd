@@ -109,7 +109,7 @@ const EXPECTED_POOL: Array[String] = [
 	"Brace", "Down Payment",
 ]
 const STARTER_ONLY: Array[String] = ["Slash", "Bite Down", "Endure",
-	"Cut", "Guard", "Step Back", "Measured Cut", "Severance"]
+	"Cut", "Guard", "Step Back", "Measured Cut", "Severance", "Patient Cut"]
 
 var _failures: int = 0
 # Cases that ran to their end. A script error aborts a case without

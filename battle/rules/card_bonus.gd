@@ -52,16 +52,33 @@ static func should_resolve(effect: CardEffect, ctx: EffectContext) -> bool:
 # The number the effect lands for in this context - alt_value on a met
 # REPLACE, value + bonus_value on a met ADD, alt_value (when set) on a met
 # DRAIN, value otherwise. Then bonus_per_chain_level for each chain level
-# before the card (Severance). Before any stance or status modifier: those
-# are the resolver's and the face's to apply alike, on top of this.
+# before the card (Severance), and bonus_per_unspent_energy for each
+# Energy left once it was paid for (Patient Cut). Before any stance or
+# status modifier: those are the resolver's and the face's to apply alike,
+# on top of this.
 static func resolved_value(effect: CardEffect, ctx: EffectContext) -> int:
-	return _condition_value(effect, ctx) + chain_bonus(effect, ctx)
+	return _condition_value(effect, ctx) + chain_bonus(effect, ctx) + energy_bonus(effect, ctx.unspent_energy if ctx != null else 0)
 
 # What the chain adds to the effect's number in this context.
 static func chain_bonus(effect: CardEffect, ctx: EffectContext) -> int:
 	if effect == null or ctx == null or effect.bonus_per_chain_level == 0:
 		return 0
 	return effect.bonus_per_chain_level * maxi(ctx.chain_level_before_this, 0)
+
+# What `unspent` Energy, left after the card's own cost, adds to the
+# effect's number.
+static func energy_bonus(effect: CardEffect, unspent: int) -> int:
+	if effect == null or effect.bonus_per_unspent_energy == 0:
+		return 0
+	return effect.bonus_per_unspent_energy * maxi(unspent, 0)
+
+# The Energy `player` would hold once `card`, still in hand, was paid for
+# now (Combatant.energy_cost() - the free card, a reduction, Critical's
+# cost): what a face reads in place of EffectContext.unspent_energy.
+static func unspent_energy_after(card: CardData, player: Combatant) -> int:
+	if card == null or player == null:
+		return 0
+	return maxi(player.energy - player.energy_cost(card), 0)
 
 static func _condition_value(effect: CardEffect, ctx: EffectContext) -> int:
 	match mode(effect):
