@@ -157,7 +157,8 @@ func has_tag(tag: StringName) -> bool:
 
 # Whether `character`'s class may have this card: a neutral card (no
 # card_class) or one of its own class's. A null character - no run yet -
-# may have any. The one class check: RewardPool's offers read it.
+# may have any. The one class check: RewardPool's offers and the F1 card
+# pickers read it.
 func usable_by(character: CharacterData) -> bool:
 	return character == null or card_class == &"" or card_class == character.card_class
 
