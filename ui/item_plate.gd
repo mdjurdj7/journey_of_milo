@@ -11,7 +11,7 @@ class_name ItemPlate
 #   its name      Spectral SemiBold, centred, in its rarity's finish - the
 #                 cards' own (CardRarityFinish, card_name_finish.gdshader):
 #                 flat ink for COMMON and for anything with no rarity (a
-#                 weapon, a keepsake), the RARE base with its faint
+#                 keepsake), a piece's or weapon's tier base with its faint
 #                 gradient, a sheen once when the plate opens (play_name_
 #                 sheen()). Nothing else says rarity.
 #   its type      a small line drawing and a caps label, centred: a sword
@@ -39,7 +39,7 @@ class_name ItemPlate
 # An offer - with show_actions, or a piece already worn (or, for a weapon,
 # the weapon carried) that taking this would replace - adds a strip of the same paper and frame strip_gap_px
 # below the plate, the plate itself unchanged: "REPLACES" in the type
-# label's voice and the worn piece's name in Spectral, in its own rarity
+# label's voice and the worn piece's (or weapon's) name in Spectral, in its own rarity
 # finish (its own canvas item, as the name's), that piece's effect in grey
 # under them; then TAKE and LEAVE side by side - the title menu's
 # treatment (TitleMenu, WorldKeepsake): plain tracked caps, the focused
@@ -544,6 +544,7 @@ func set_weapon(weapon: WeaponData, replaced: WeaponData = null, show_actions: b
 	_replaced_weapon = replaced if replaced != weapon else null
 	_paper_seed = float(absi(hash(weapon.id)) % 1000) / 1000.0 if weapon != null else 0.0
 	_apply_mouse_filter()
+	_apply_finish()
 	_relayout()
 
 func get_weapon() -> WeaponData:
@@ -783,14 +784,24 @@ func activate(index: int) -> void:
 func _apply_finish() -> void:
 	if _finish == null and not rarity_finish_path.is_empty():
 		_finish = load(rarity_finish_path) as CardRarityFinish
-	_name_finish = _finish_on(_name_layer, _piece, _name_finish)
-	_replaced_name_finish = _finish_on(_replaced_name_layer, _replaced, _replaced_name_finish)
+	_name_finish = _finish_on(_name_layer, _shown_rarity(), _name_finish)
+	_replaced_name_finish = _finish_on(_replaced_name_layer, _replaced_rarity(), _replaced_name_finish)
 	_redraw()
 
-# Puts `piece`'s rarity finish on `layer` (reusing `material`), or takes
-# it off for a piece with none. Returns the material to keep.
-func _finish_on(layer: Control, piece: TrinketData, material: ShaderMaterial) -> ShaderMaterial:
-	var rarity: CardData.CardRarity = piece.rarity if piece != null else CardData.CardRarity.UNSET
+# The shown item's rarity - a weapon's or a piece's; UNSET for the rest.
+func _shown_rarity() -> CardData.CardRarity:
+	if _weapon != null:
+		return _weapon.rarity
+	return _piece.rarity if _piece != null else CardData.CardRarity.UNSET
+
+func _replaced_rarity() -> CardData.CardRarity:
+	if _replaced_weapon != null:
+		return _replaced_weapon.rarity
+	return _replaced.rarity if _replaced != null else CardData.CardRarity.UNSET
+
+# Puts `rarity`'s finish on `layer` (reusing `material`), or takes it off
+# for one with none. Returns the material to keep.
+func _finish_on(layer: Control, rarity: CardData.CardRarity, material: ShaderMaterial) -> ShaderMaterial:
 	if _finish == null or not _finish.has_finish(rarity):
 		layer.material = null
 		return material
@@ -1160,7 +1171,7 @@ func _draw_name() -> void:
 	InkType.draw_run(_name_layer, _numeral_font, _shown_name(), Vector2(0.0, _name_baseline), _font_px(name_size_px), color)
 
 # The worn piece's (or carried weapon's) name after REPLACES, the same
-# way - a weapon's in flat ink, having no rarity.
+# way.
 func _draw_replaced_name() -> void:
 	if not _has_replaced():
 		return

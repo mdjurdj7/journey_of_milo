@@ -6,6 +6,7 @@
 script = ExtResource("1_weapon_data")
 id = &"gaff_hook"
 display_name = "Gaff Hook"
+rarity = 2
 description = "After you damage yourself, your next Slash this turn deals {bonus} more."
 lore = "Made to land things heavier than the hand."
 self_loss_attack_bonus = 4

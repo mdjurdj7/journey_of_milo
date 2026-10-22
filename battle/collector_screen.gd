@@ -83,6 +83,11 @@ const TAKE_SFX_PATH := "res://assets/audio/cards/card_take.wav"
 const GOLD_SFX_PATH := "res://assets/audio/ui/gold_take.wav"
 const THEME_PATH := "res://ui/battle_theme.tres"
 const VOICE_FONT_PATH := "res://assets/fonts/Spectral-Italic.ttf"
+# A line's name wears its item's rarity finish - a weapon's or a worn
+# piece's tier, as on the item plate - on a canvas item of its own; Common,
+# a keepsake, the Bedroll and the removal are ink.
+const RARITY_FINISH_PATH := "res://battle/card_rarity_finish.tres"
+const NAME_FINISH_SHADER_PATH := "res://battle/card_name_finish.gdshader"
 
 enum Kind { WORN, KEEPSAKE, WEAPON, REMOVAL, BEDROLL }
 
@@ -511,6 +516,11 @@ var _camera: Camera3D = null
 var _camera_rest_offset: float = 0.0
 var _camera_tween: Tween = null
 var _closing: bool = false
+var _finish: CardRarityFinish = null
+# A finished name's canvas item per line index, and what it draws:
+# {"text", "color", "ascent"}.
+var _name_layers: Array[Control] = []
+var _name_draws: Array[Dictionary] = []
 
 # Called by RegionField before the screen enters the tree.
 func setup(collector: Collector, deck_panel: Control) -> void:
@@ -531,6 +541,7 @@ func _ready() -> void:
 	if sky != null:
 		_fog = sky.fog_color
 	_voice_font = load(VOICE_FONT_PATH) as Font
+	_finish = load(RARITY_FINISH_PATH) as CardRarityFinish
 
 	_gradient = Gradient.new()
 	var gradient_texture := GradientTexture2D.new()
@@ -982,6 +993,9 @@ func _heading(label: String, baseline: float) -> void:
 	_draw_layer.draw_rect(Rect2(_column_left(), rule_y, _column_width(), rule_thickness_px), _with_alpha(rule_alpha))
 
 func _draw_screen() -> void:
+	# A finished name shows only while its line is drawn.
+	for name_layer in _name_layers:
+		name_layer.visible = false
 	if _closing or _label_font == null:
 		return
 	_draw_voice()
@@ -1044,7 +1058,11 @@ func _draw_line(index: int) -> void:
 	var block: float = float(_item_px) + _px(type_gap_px) + float(_type_px)
 	var name_baseline: float = roundf(mid - block * 0.5 + float(_item_px) * 0.8)
 	var type_baseline: float = roundf(name_baseline + _px(type_gap_px) + float(_type_px))
-	_text(_draw_layer, _numeral_font, _line_name(line), Vector2(text_left, name_baseline), _item_px, name_color)
+	var rarity: CardData.CardRarity = _line_rarity(line)
+	if _finish != null and _finish.has_finish(rarity):
+		_draw_finished_name(index, _line_name(line), rarity, Vector2(text_left, name_baseline), name_color)
+	else:
+		_text(_draw_layer, _numeral_font, _line_name(line), Vector2(text_left, name_baseline), _item_px, name_color)
 	_text(_draw_layer, _type_font, type_line_at(index), Vector2(text_left, type_baseline), _type_px, _with_alpha(unfocused_alpha) if affordable else inert)
 	var choose_left: float = _choose_left()
 	_text(_draw_layer, _label_font, choose_text, Vector2(choose_left, roundf(mid + float(_label_px) * 0.35)), _label_px, name_color)
@@ -1055,6 +1073,47 @@ func _draw_line(index: int) -> void:
 	_draw_layer.draw_rect(Rect2(left, roundf(rect.end.y - rule_thickness_px), _column_width(), rule_thickness_px), _with_alpha(line_rule_alpha))
 	if focused:
 		_hairline(_draw_layer, left, mid)
+
+# A line's item's rarity: a weapon's, a worn piece's; UNSET for a keepsake
+# and the rest.
+func _line_rarity(line: Dictionary) -> CardData.CardRarity:
+	var good: CollectorGood = line["good"]
+	if good == null:
+		return CardData.CardRarity.UNSET
+	if good.get_weapon() != null:
+		return good.get_weapon().rarity
+	return good.get_trinket().rarity
+
+# A line's name in its rarity's finish: on its own canvas item, at the
+# name's left (the finish shader reads that item's local x), u over the
+# name's width. The colour's alpha still greys it.
+func _draw_finished_name(index: int, text: String, rarity: CardData.CardRarity, origin: Vector2, color: Color) -> void:
+	while _name_layers.size() <= index:
+		var name_layer := Control.new()
+		name_layer.name = "Name%d" % _name_layers.size()
+		name_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		name_layer.draw.connect(_draw_name_layer.bind(_name_layers.size()))
+		_draw_layer.add_child(name_layer)
+		_name_layers.append(name_layer)
+		_name_draws.append({})
+	var name_layer: Control = _name_layers[index]
+	var material: ShaderMaterial = _finish.name_material(rarity, name_layer.material as ShaderMaterial, NAME_FINISH_SHADER_PATH)
+	name_layer.material = material
+	var width: float = InkType.width(_numeral_font, text, _item_px)
+	if material != null:
+		material.set_shader_parameter("text_width_px", width)
+	var ascent: float = _numeral_font.get_ascent(_item_px)
+	_name_draws[index] = {"text": text, "color": color, "ascent": ascent}
+	name_layer.position = Vector2(origin.x, origin.y - ascent)
+	name_layer.size = Vector2(maxf(width, 1.0), ascent + _numeral_font.get_descent(_item_px))
+	name_layer.visible = true
+	name_layer.queue_redraw()
+
+func _draw_name_layer(index: int) -> void:
+	var entry: Dictionary = _name_draws[index]
+	if entry.is_empty():
+		return
+	_text(_name_layers[index], _numeral_font, str(entry["text"]), Vector2(0.0, float(entry["ascent"])), _item_px, entry["color"])
 
 # Where every line's name and type line start, right of the art.
 func _text_left() -> float:

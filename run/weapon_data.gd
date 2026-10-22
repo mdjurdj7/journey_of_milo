@@ -17,6 +17,10 @@ class_name WeaponData
 
 @export var id: StringName = &""
 @export var display_name: String = ""
+# Its rarity - the cards' and worn pieces' tiers, and its name's finish
+# wherever the name is drawn (CardRarityFinish: the plate, the reward and
+# collector lines). Common and unset show none.
+@export var rarity: CardData.CardRarity = CardData.CardRarity.UNSET
 # One sentence in rules voice for what it does to the basic attack, shown
 # on its plate. Empty = no effect, and no effect line. {bonus} is
 # self_loss_attack_bonus.

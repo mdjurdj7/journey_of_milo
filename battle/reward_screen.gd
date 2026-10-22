@@ -47,6 +47,11 @@ const CHOICE_OPEN_SFX_PATH := "res://assets/audio/ui/3_card_reward.mp3"
 # its size, tracking, gap and dim from this shared CardRarityFinish - see
 # _draw_tier_labels().
 @export_file("*.tres") var rarity_finish_path: String = "res://battle/card_rarity_finish.tres"
+# A line's item with a rarity (the weapon's, the Samphire card's) wears its
+# tier's name finish from that resource, as cards and the item plate do -
+# drawn on a canvas item of its own over the line's ink outline. Common,
+# a keepsake and the rest are bone.
+@export_file("*.gdshader") var name_finish_shader_path: String = "res://battle/card_name_finish.gdshader"
 
 # The list's caps - LEFT BEHIND, each line's TAKE/CHOOSE and WALK ON -
 # are the card choice's own tracked caps (22 px at 0.16 em), and the
@@ -295,6 +300,13 @@ class RewardLine:
 	# shard_glyph is set and there is none. Neither = text only.
 	var icon: Texture2D = null
 	var shard_glyph: bool = false
+	# The item's rarity, for its name finish (UNSET: none), and the canvas
+	# item that draws a finished name - made the first time it's needed.
+	var rarity: CardData.CardRarity = CardData.CardRarity.UNSET
+	var name_layer: Control = null
+	var name_material: ShaderMaterial = null
+	var paragraph: TextParagraph = null
+	var name_color: Color = Color.WHITE
 	var taken: bool = false
 	var rect: Rect2 = Rect2()
 
@@ -475,6 +487,7 @@ func _build_lines() -> void:
 		var samphire_line := RewardLine.new()
 		samphire_line.id = "samphire"
 		samphire_line.item = _extra_card.card_name
+		samphire_line.rarity = _extra_card.rarity
 		samphire_line.action = "TAKE"
 		_lines.append(samphire_line)
 	if _offers_cards and _pool != null and _pool.has_cards(RunState.character):
@@ -496,6 +509,7 @@ func _build_lines() -> void:
 		weapon_line.item = _weapon.display_name
 		weapon_line.action = offer_action_text
 		weapon_line.icon = _weapon.art
+		weapon_line.rarity = _weapon.rarity
 		_lines.append(weapon_line)
 	if _lines.is_empty():
 		close()
@@ -558,6 +572,10 @@ func _text(font: Font, text: String, origin: Vector2, size_px: int, color: Color
 	return InkType.draw_run(_draw_layer, font, text, origin, size_px, color)
 
 func _draw_column() -> void:
+	# A finished name shows only while its line is drawn.
+	for line in _lines:
+		if line.name_layer != null:
+			line.name_layer.visible = false
 	if _mode == Mode.CHOICE:
 		_draw_choice()
 		return
@@ -582,7 +600,10 @@ func _draw_column() -> void:
 			var outline: Color = ink
 			outline.a = ink.a * color.a
 			paragraph.draw_outline(_draw_layer.get_canvas_item(), item_origin, text_outline_px, outline)
-		paragraph.draw(_draw_layer.get_canvas_item(), item_origin, color)
+		if _rarity_finish != null and _rarity_finish.has_finish(line.rarity):
+			_draw_finished_name(line, paragraph, item_origin, color)
+		else:
+			paragraph.draw(_draw_layer.get_canvas_item(), item_origin, color)
 		# The action centred on the row - on the text's baseline when it is
 		# one line.
 		var action_baseline: float = y + (row_height - line_height_px) * 0.5 + line_height_px * 0.62
@@ -690,6 +711,34 @@ func _rows_height() -> float:
 func _redraw() -> void:
 	if _draw_layer != null:
 		_draw_layer.queue_redraw()
+
+# A line's item in its rarity's finish: its own canvas item at `origin`
+# (the finish shader reads that item's local x), the material's u over the
+# widest of its lines.
+func _draw_finished_name(line: RewardLine, paragraph: TextParagraph, origin: Vector2, color: Color) -> void:
+	if line.name_layer == null:
+		line.name_layer = Control.new()
+		line.name_layer.name = "Name_%s" % line.id
+		line.name_layer.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		line.name_layer.draw.connect(_draw_name_layer.bind(line))
+		_draw_layer.add_child(line.name_layer)
+	line.name_material = _rarity_finish.name_material(line.rarity, line.name_material, name_finish_shader_path)
+	line.name_layer.material = line.name_material
+	var width: float = 0.0
+	for text_line in _shown_lines(paragraph):
+		width = maxf(width, paragraph.get_line_width(text_line))
+	if line.name_material != null:
+		line.name_material.set_shader_parameter("text_width_px", width)
+	line.paragraph = paragraph
+	line.name_color = color
+	line.name_layer.position = origin
+	line.name_layer.size = paragraph.get_size()
+	line.name_layer.visible = true
+	line.name_layer.queue_redraw()
+
+func _draw_name_layer(line: RewardLine) -> void:
+	if line.paragraph != null:
+		line.paragraph.draw(line.name_layer.get_canvas_item(), Vector2.ZERO, line.name_color)
 
 # The focus hairline: choice_hairline_length_px long, choice_hairline_
 # gap_px left of a label starting at label_left, at the caps' middle.
