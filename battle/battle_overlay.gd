@@ -258,6 +258,7 @@ signal battle_finished(outcome: Outcome)
 	"res://cards/data/",
 	"res://cards/neutral/",
 	"res://cards/samurai/",
+	"res://cards/belongings/",
 ]):
 	set(value):
 		debug_card_dirs = value

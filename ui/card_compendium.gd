@@ -52,6 +52,7 @@ class Section:
 	"res://cards/data/": "Wanderer",
 	"res://cards/samurai/": "Samurai",
 	"res://cards/neutral/": "Neutral",
+	"res://cards/belongings/": "Belongings",
 }:
 	set(value):
 		card_folders = value

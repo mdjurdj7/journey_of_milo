@@ -49,7 +49,7 @@ const CARD_VIEW_SCENE_PATH := "res://battle/card_view.tscn"
 # The numeral's ink stays this far below the card's top edge - the room it
 # had beside the inset rule, kept now the rule is gone.
 const NUMERAL_TOP_CLEAR_PX := 5.0
-const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
+const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/", "res://cards/belongings/"]
 # The tempered versions (CardData.tempered) - in no class's folder, so only
 # the rules-text pattern reads them here; temper_probe checks the rest.
 const TEMPERED_DIR := "res://cards/tempered/"

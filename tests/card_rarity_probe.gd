@@ -26,6 +26,7 @@ const FOLDER_CLASS: Dictionary = {
 	"res://cards/data/": &"wanderer",
 	"res://cards/samurai/": &"samurai",
 	"res://cards/neutral/": &"",
+	"res://cards/belongings/": &"",
 }
 # Offered only on a channel of its own (CardData.OfferScope.OWN_CHANNEL).
 # Stoneshell comes only from the Warped Shell.
@@ -34,7 +35,7 @@ const OWN_CHANNEL: Array[String] = ["Samphire", "Stoneshell"]
 # tempered copy, is OWN_CHANNEL.
 const WEAPON_CARD_DIR := "res://cards/weapon/"
 const POOL_PATH := "res://cards/pools/wanderer_pool.tres"
-const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/"]
+const CARD_DIRS: Array[String] = ["res://cards/data/", "res://cards/neutral/", "res://cards/belongings/"]
 # Folders whose cards are authored in the editor, not entered in
 # EXPECTED_RARITY: each must carry a real tier, whichever it is (cards/
 # samurai/AUTHORING.md).
@@ -96,6 +97,9 @@ const EXPECTED_RARITY: Dictionary = {
 	"Second Thoughts": CardData.CardRarity.COMMON,
 	"Untouched": CardData.CardRarity.COMMON,
 	"Samphire": CardData.CardRarity.COMMON,
+	"Walking Stick": CardData.CardRarity.UNCOMMON,
+	"Spare Rope": CardData.CardRarity.UNCOMMON,
+	"Whetstone": CardData.CardRarity.UNCOMMON,
 }
 
 const EXPECTED_POOL: Array[String] = [

@@ -78,7 +78,7 @@ func _check_rules() -> void:
 	_expect(player.takes_next_card_discount(plain), "...and still takes a discount")
 	player.hp = SAFE_HP
 	_expect_eq(player.energy_cost(plain), 1, "...and 1 above the line")
-	for dir in ["res://cards/data/", "res://cards/neutral/", "res://cards/tempered/"]:
+	for dir in ["res://cards/data/", "res://cards/neutral/", "res://cards/belongings/", "res://cards/tempered/"]:
 		for file in DirAccess.get_files_at(dir):
 			if file.ends_with(".tres"):
 				var real := load(dir + file) as CardData
