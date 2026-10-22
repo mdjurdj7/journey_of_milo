@@ -214,7 +214,7 @@ func _check_face() -> void:
 	# badge answers the hover as Toll.
 	var badge: Rect2 = view.toll_badge_rect()
 	_expect(badge.has_area() and badge.end.x <= view.cost_label.position.x, "...its Toll a badge left of the Energy cost (%s)" % badge)
-	_expect_eq((view.get_node("TollCostLabel") as Label).text, str(_toll), "...reading its Toll")
+	_expect_eq(view.toll_badge_value(), _toll, "...its Toll on the mark")
 	_expect_eq(view.keyword_at(badge.get_center()), "Toll", "...hovered: the Toll slip")
 	# In a fight: nothing to replay yet, then the Attack it would replay,
 	# by name - the card the hand's ghost shows.

@@ -192,17 +192,17 @@ func _check_face() -> void:
 	root.add_child(view)
 	await process_frame
 	view.set_card_data(load(CARD_PATH))
-	# The price is the Toll glyph - its image's place, one space in the
-	# parsed text - then its number.
-	var rule: String = " 5: 5 more block."
+	# The price is the Toll mark with its number on it - the mark's place
+	# is one space in the parsed text.
+	var rule: String = " : 5 more block."
 	_expect_eq(view.rules_text.get_parsed_text(), "Gain 5 block.\n" + rule, "The face outside a fight")
 	_expect_eq(view.rules_text.get_theme_font_size("normal_font_size"), 15, "...at 15 px")
 	_expect_eq(view._bonus_state, CardBonus.State.NONE, "...with no clause to light")
 	_expect_clause_grey(view, false, "...all in ink")
-	_expect(view.rules_text.text.contains(CardView.TOLL_SPACER_CLOSE), "...the Toll glyph inline")
-	_expect(view.rules_text.text.contains("[b][color=#%s]%d[/color][/b]" % [(view.call("_toll_ink") as Color).to_html(true), _spend]), "...its number bold in the toll ink")
-	var glyphs: Array = (view.call("_rules_geometry") as Dictionary)["glyphs"]
-	_expect(glyphs.size() == 1 and view.keyword_at((glyphs[0] as Rect2).get_center()) == "Toll", "...the glyph hovered: the Toll slip")
+	_expect(view.rules_text.text.contains(CardView.TOLL_SPACER_CLOSE), "...the Toll mark inline")
+	_expect_eq(int(view.call("_toll_price_value")), _spend, "...carrying its %d" % _spend)
+	var marks: Array = (view.call("_rules_geometry") as Dictionary)["marks"]
+	_expect(marks.size() == 1 and view.keyword_at((marks[0] as Rect2).get_center()) == "Toll", "...the mark hovered: the Toll slip")
 	view.set_card_data(load(TEMPERED_PATH))
 	_expect_eq(view.rules_text.get_parsed_text(), "Gain 8 block.\n" + rule, "Settled Account+ outside a fight")
 	view.set_card_data(load(CARD_PATH))
@@ -268,7 +268,7 @@ func _check_fight() -> void:
 		var second: CardData = await _deal(controller, CARD_PATH)
 		view = _view(controller, second)
 		var face: String = view.rules_text.get_parsed_text() if view != null else "no view"
-		_expect(face.ends_with(" 5: 5 more block."), "On 7 Toll a copy in hand reads its 5 for 5 (%s)" % face)
+		_expect(face.ends_with(" : 5 more block."), "On 7 Toll a copy in hand reads its 5 for 5 (%s)" % face)
 		_expect(view != null and view._bonus_state == CardBonus.State.LIVE, "...its clause in ink")
 		before = player.block
 		await _play_real(controller, second, null)

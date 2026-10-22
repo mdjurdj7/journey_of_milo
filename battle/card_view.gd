@@ -115,27 +115,27 @@ const TOKEN_LOOK := "{look}"
 # The Toll a SPEND_TOLL or a TOLL_BLOCK spends - its toll_cost (Second
 # Swing's 5, Settled Account's 5).
 const TOKEN_TOLL_COST := "{toll_cost}"
-# The Toll glyph (white, tinted toll ink - BattleTheme.toll_ink) and the
-# theme that holds the ink. Hovered, the glyph answers keyword_at() as
-# the Toll keyword.
-const TOLL_GLYPH_PATH := "res://assets/ui/toll_glyph.svg"
+# The Toll mark - a brush stroke, white, tinted toll ink (BattleTheme.
+# toll_ink), the number drawn on it - and the theme that holds the ink.
+# Hovered, the mark answers keyword_at() as the Toll keyword.
+const TOLL_MARK_PATH := "res://assets/ui/toll_glyph.svg"
 const BATTLE_THEME_PATH := "res://ui/battle_theme.tres"
 const TOLL_KEYWORD := "Toll"
 # A conditional Toll price inline (Settled Account's "{toll_price}: 5 more
-# block."): the glyph, then its toll_cost in bold toll ink. In the plain
-# text the fitter and keyword_rects() shape, the glyph is TOLL_GLYPH_CHAR -
-# one character, as RichTextLabel counts the image that holds its place: a
-# clear spacer the glyph's width (TOLL_SPACER_*), the glyph drawn over it
-# (_draw_inline_toll_glyphs()) where the face wants it, centred on the
+# block."): the Toll mark with its toll_cost on it. In the plain text the
+# fitter and keyword_rects() shape, the mark is TOLL_MARK_CHAR - one
+# character, as RichTextLabel counts the image that holds its place: a
+# clear spacer the mark's width (TOLL_SPACER_*), the mark drawn over it
+# (_draw_inline_toll_marks()) where the face wants it, centred on the
 # x-height. Hovered, it answers as Toll.
 const TOKEN_TOLL_PRICE := "{toll_price}"
-const TOLL_GLYPH_CHAR := "\uFFFC"
+const TOLL_MARK_CHAR := "\uFFFC"
 const TOLL_SPACER_OPEN := "[img width="
 const TOLL_SPACER_CLOSE := " height=1 color=#00000000]res://assets/ui/toll_glyph.svg[/img]"
 # _rules_runs()' kinds.
 const RUN_REGULAR := 0
 const RUN_BOLD := 1
-const RUN_GLYPH := 2
+const RUN_MARK := 2
 # The Energy owed next turn - the value of an effect applying an energy-
 # debt status (StatusData.energy_debt - Come Due's 2).
 const TOKEN_DEBT := "{debt}"
@@ -306,48 +306,61 @@ const GLYPH_RECT_MARGIN_PX := 1.0
 # card that costs HP - as wide as the wider of the two, right-aligned.
 @export var cost_rule_y_px: float = 33.0
 @export_range(0.0, 1.0) var cost_rule_alpha: float = 0.3
-# A required Toll cost (required_toll() - a SPEND_TOLL) is a badge in the
-# header, left of the Energy numeral: the Toll glyph, toll_glyph_gap_px,
-# then its number in cost_font at toll_badge_font_size_px on the header
-# baseline, toll_badge_gap_px clear of the Energy numeral - both in the
-# toll ink, no box. The glyph's ink is toll_glyph_height_fraction of the
-# Energy numeral's size tall, centred on the badge numeral's figures, then
-# moved by toll_glyph_offset_px. The name gets what is left. Each
-# re-applies live.
-@export var toll_badge_font_size_px: int = 18:
+# A required Toll cost (required_toll() - a SPEND_TOLL) is one mark in the
+# header, left of the Energy numeral: the Toll mark in the toll ink with
+# its number on it, toll_badge_gap_px clear of the numeral and centred on
+# its figures. The mark is toll_mark_height_fraction of the Energy
+# numeral's size tall - its 32-unit box, the stroke's ink a little less -
+# moved by toll_mark_offset_px. The name gets what is left. Each re-applies
+# live.
+@export_range(0.1, 2.0) var toll_mark_height_fraction: float = 0.85:
 	set(value):
-		toll_badge_font_size_px = value
-		_relayout()
-@export_range(0.1, 2.0) var toll_glyph_height_fraction: float = 0.58:
-	set(value):
-		toll_glyph_height_fraction = value
-		_relayout()
-@export var toll_glyph_gap_px: float = 1.0:
-	set(value):
-		toll_glyph_gap_px = value
+		toll_mark_height_fraction = value
 		_relayout()
 @export var toll_badge_gap_px: float = 6.0:
 	set(value):
 		toll_badge_gap_px = value
 		_relayout()
-@export var toll_glyph_offset_px: Vector2 = Vector2.ZERO:
+@export var toll_mark_offset_px: Vector2 = Vector2.ZERO:
 	set(value):
-		toll_glyph_offset_px = value
+		toll_mark_offset_px = value
 		_relayout()
-# The inline glyph (TOKEN_TOLL_PRICE): inline_toll_glyph_height_fraction of
-# the rules text's size tall, centred on its x-height and moved by
-# inline_toll_glyph_offset_px, inline_toll_glyph_gap_px before its number.
-@export_range(0.1, 2.0) var inline_toll_glyph_height_fraction: float = 0.8:
+# The number on a mark, badge or inline: Spectral SemiBold (name_font) in
+# the card's paper (field_color), centred on toll_mark_number_centre - the
+# stroke's fattest part, in the mark's own 32-unit box - moved by
+# toll_mark_number_offset_px. One digit is toll_mark_digit_fraction of the
+# mark's height (its box), two toll_mark_two_digit_fraction: the mark
+# never widens.
+@export var toll_mark_number_centre: Vector2 = Vector2(15.0, 16.0):
 	set(value):
-		inline_toll_glyph_height_fraction = value
+		toll_mark_number_centre = value
+		_redraw_toll_marks()
+@export var toll_mark_number_offset_px: Vector2 = Vector2.ZERO:
+	set(value):
+		toll_mark_number_offset_px = value
+		_redraw_toll_marks()
+@export_range(0.1, 1.5) var toll_mark_digit_fraction: float = 0.56:
+	set(value):
+		toll_mark_digit_fraction = value
+		_redraw_toll_marks()
+@export_range(0.1, 1.5) var toll_mark_two_digit_fraction: float = 0.41:
+	set(value):
+		toll_mark_two_digit_fraction = value
+		_redraw_toll_marks()
+# The inline mark (TOKEN_TOLL_PRICE): inline_toll_mark_height_fraction of
+# the rules text's size tall (its box), its ink centred on the x-height and moved by
+# inline_toll_mark_offset_px, inline_toll_mark_gap_px before what follows.
+@export_range(0.1, 2.0) var inline_toll_mark_height_fraction: float = 1.3:
+	set(value):
+		inline_toll_mark_height_fraction = value
 		_relayout_rules()
-@export var inline_toll_glyph_gap_px: float = 1.0:
+@export var inline_toll_mark_gap_px: float = 2.0:
 	set(value):
-		inline_toll_glyph_gap_px = value
+		inline_toll_mark_gap_px = value
 		_relayout_rules()
-@export var inline_toll_glyph_offset_px: Vector2 = Vector2.ZERO:
+@export var inline_toll_mark_offset_px: Vector2 = Vector2.ZERO:
 	set(value):
-		inline_toll_glyph_offset_px = value
+		inline_toll_mark_offset_px = value
 		_relayout_rules()
 # The rules text's sizes at 1x, largest first: each is tried in turn
 # until the text fits the space under the art field. The last is the
@@ -699,15 +712,21 @@ var _name_font_size: int = 0
 # clipped into it by the field.
 var _art_rule: Control = null
 var _hp_cost: int = 0
-# The Toll cost badge (toll_badge_font_size_px): the glyph and the number,
-# made in _ready().
-var _toll_glyph: TextureRect = null
-var _toll_cost_label: Label = null
+# The Toll cost badge: the mark with its number on it, drawn by a child
+# made in _ready(); the number it carries, 0 for none.
+var _toll_mark: Control = null
+var _toll_badge_value: int = 0
+# The toll ink last applied (_apply_toll_ink()).
+var _toll_ink_applied: Color = Color(0, 0, 0, 0)
 # What mark_changes() marks: the Energy cost, the Toll badge.
 var _cost_changed: bool = false
 var _toll_changed: bool = false
-# The glyph's ink cropped from its SVG's box - shared by every card.
-static var _toll_glyph_texture: Texture2D = null
+# The mark's ink cropped from its SVG's box, and where that ink sits in
+# the box (the source's pixels, and its pixels per unit) - shared by
+# every card.
+static var _toll_mark_texture: Texture2D = null
+static var _toll_mark_region: Rect2 = Rect2()
+static var _toll_mark_unit: float = 1.0
 # Keep on this card (set_kept()), and whether it is Sheathe's one-turn
 # Keep rather than Keep itself.
 var _kept: bool = false
@@ -819,22 +838,15 @@ func _ready() -> void:
 	# here, as set_playable() does from now on.
 	_keyword_reveal.modulate.a = 1.0 / maxf(modulate.a, 0.01)
 	_apply_keyword_reveal_style()
-	_toll_cost_label = Label.new()
-	_toll_cost_label.name = "TollCostLabel"
-	_toll_cost_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_toll_cost_label.visible = false
-	cost_label.add_sibling(_toll_cost_label)
-	_toll_glyph = TextureRect.new()
-	_toll_glyph.name = "TollGlyph"
-	_toll_glyph.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	_toll_glyph.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
-	_toll_glyph.stretch_mode = TextureRect.STRETCH_SCALE
-	_toll_glyph.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	_toll_glyph.texture = toll_glyph_texture()
-	_toll_glyph.visible = false
-	cost_label.add_sibling(_toll_glyph)
+	_toll_mark = Control.new()
+	_toll_mark.name = "TollMark"
+	_toll_mark.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_toll_mark.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
+	_toll_mark.visible = false
+	_toll_mark.draw.connect(_draw_toll_badge)
+	cost_label.add_sibling(_toll_mark)
 	rules_text.texture_filter = CanvasItem.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
-	rules_text.draw.connect(_draw_inline_toll_glyphs)
+	rules_text.draw.connect(_draw_inline_toll_marks)
 	# The toll ink lives on the theme: a tune there re-inks every face.
 	var battle_theme: BattleTheme = _battle_theme()
 	if battle_theme != null:
@@ -909,10 +921,9 @@ func set_stance(stance: Stance) -> void:
 # stance changes.
 func _refresh_dynamic_text() -> void:
 	_hp_cost = _derive_hp_cost(card_data)
-	var toll: int = required_toll(card_data)
-	_toll_cost_label.text = str(toll) if toll > 0 else ""
-	_toll_cost_label.visible = toll > 0
-	_toll_glyph.visible = toll > 0
+	_toll_badge_value = required_toll(card_data)
+	_toll_mark.visible = _toll_badge_value > 0
+	_toll_mark.queue_redraw()
 	# The line is everything playing it costs in HP. In a fight it is
 	# CardBonus.predicted_self_loss() - the number the HP bar previews, so
 	# the two always agree; outside one, the card's own self-loss and the
@@ -996,7 +1007,7 @@ func _resolve_tokens(description: String) -> String:
 	if text.contains(TOKEN_TOLL_COST) or text.contains(TOKEN_TOLL_PRICE):
 		for effect in card_data.effects:
 			if effect != null and (effect.effect_type == CardEffect.EffectType.SPEND_TOLL or effect.effect_type == CardEffect.EffectType.TOLL_BLOCK):
-				text = text.replace(TOKEN_TOLL_COST, str(effect.toll_cost)).replace(TOKEN_TOLL_PRICE, TOLL_GLYPH_CHAR + str(effect.toll_cost))
+				text = text.replace(TOKEN_TOLL_COST, str(effect.toll_cost)).replace(TOKEN_TOLL_PRICE, TOLL_MARK_CHAR)
 				break
 	if text.contains(TOKEN_REPLAY_ATTACK):
 		var replayed: CardData = replay_attack()
@@ -1289,28 +1300,33 @@ func _style_bonus_clauses(bbcode: String) -> String:
 	text = text.replace(MARK_ELSE_OPEN, else_open).replace(MARK_ELSE_CLOSE, "[/color]" if not else_open.is_empty() else "")
 	return text
 
-# Each inline Toll price (TOLL_GLYPH_CHAR and its number) as BBCode: the
-# glyph's clear spacer at the rules text's size now, then the number in
-# bold - in the toll ink, or the clause's own dormant ink while it is
-# dormant.
+# Each inline Toll price (TOLL_MARK_CHAR) as BBCode: the mark's clear
+# spacer at the rules text's size now - the mark and its number are drawn
+# over it (_draw_inline_toll_marks()).
 func _inline_toll_prices(bbcode: String) -> String:
-	if not bbcode.contains(TOLL_GLYPH_CHAR):
+	if not bbcode.contains(TOLL_MARK_CHAR):
 		return bbcode
-	var spacer: String = _toll_spacer(rules_text.get_theme_font_size("normal_font_size"))
-	var ink: String = "" if _toll_price_dormant() else "[color=#%s]" % _toll_ink().to_html(true)
-	var price := RegEx.create_from_string(TOLL_GLYPH_CHAR + "(\\d+)")
-	return price.sub(bbcode, spacer + "[b]" + ink + "$1" + ("[/color]" if not ink.is_empty() else "") + "[/b]", true)
+	return bbcode.replace(TOLL_MARK_CHAR, _toll_spacer(rules_text.get_theme_font_size("normal_font_size")))
 
-# The inline glyph's place in the text at `font_size`: a clear image as
-# wide as the glyph and its gap, whole pixels.
+# The inline mark's place in the text at `font_size`: a clear image as
+# wide as the mark and its gap, whole pixels.
 func _toll_spacer(font_size: int) -> String:
 	return TOLL_SPACER_OPEN + str(_toll_spacer_width(font_size)) + TOLL_SPACER_CLOSE
 
 func _toll_spacer_width(font_size: int) -> int:
-	return maxi(roundi(_inline_toll_glyph_size(font_size).x + inline_toll_glyph_gap_px), 1)
+	return maxi(roundi(_inline_toll_mark_size(font_size).x + inline_toll_mark_gap_px), 1)
 
-func _inline_toll_glyph_size(font_size: int) -> Vector2:
-	return toll_glyph_size(float(font_size) * inline_toll_glyph_height_fraction)
+func _inline_toll_mark_size(font_size: int) -> Vector2:
+	return toll_mark_size(float(font_size) * inline_toll_mark_height_fraction)
+
+# The inline price's number: the toll_cost of the card's Toll spend.
+func _toll_price_value() -> int:
+	if card_data == null:
+		return 0
+	for effect in card_data.effects:
+		if effect != null and (effect.effect_type == CardEffect.EffectType.SPEND_TOLL or effect.effect_type == CardEffect.EffectType.TOLL_BLOCK):
+			return effect.toll_cost
+	return 0
 
 # Whether the inline price sits in a clause that reads dormant now.
 func _toll_price_dormant() -> bool:
@@ -1321,7 +1337,8 @@ func _toll_price_dormant() -> bool:
 	var close: int = card_data.description.find(MARK_IF_CLOSE, maxi(open, 0))
 	return open >= 0 and open < at and at < close
 
-# The ink the inline glyph draws in - its number's.
+# The ink the inline mark draws in - the clause's dormant ink while it is
+# dormant.
 func _inline_toll_ink() -> Color:
 	return Color(bonus_dormant_ink, rules_alpha) if _toll_price_dormant() else _toll_ink()
 
@@ -1341,17 +1358,17 @@ func _size_toll_spacers(font_size: int) -> void:
 		at = text.find(TOLL_SPACER_OPEN)
 	rules_text.text = out + text
 
-# Over each inline spacer, the glyph: on the rules label's own canvas,
-# after its text.
-func _draw_inline_toll_glyphs() -> void:
-	var texture: Texture2D = toll_glyph_texture()
-	if texture == null or not rules_text.text.contains(TOLL_SPACER_CLOSE):
+# Over each inline spacer, the mark and its number: on the rules label's
+# own canvas, after its text.
+func _draw_inline_toll_marks() -> void:
+	if not rules_text.text.contains(TOLL_SPACER_CLOSE):
 		return
 	var ink: Color = _inline_toll_ink()
-	for rect: Rect2 in _rules_geometry()["glyphs"]:
-		rules_text.draw_texture_rect(texture, Rect2(rect.position - rules_text.position, rect.size), false, ink)
+	var value: int = _toll_price_value()
+	for rect: Rect2 in _rules_geometry()["marks"]:
+		_draw_toll_mark(rules_text, Rect2(rect.position - rules_text.position, rect.size), value, ink)
 
-# The inline glyph's spacing exports moved: the text and the face again.
+# The inline mark's exports moved: the text and the face again.
 func _relayout_rules() -> void:
 	if is_node_ready() and card_data != null:
 		_refresh_dynamic_text()
@@ -1992,36 +2009,36 @@ func _is_copy() -> bool:
 func keyword_rects() -> Array[Dictionary]:
 	return _rules_geometry()["keywords"]
 
-# keyword_rects() - an inline Toll glyph answering as Toll among them - and
-# under "glyphs" each inline glyph's own rect, where it draws: its ink
-# inline_toll_glyph_height_fraction of the size tall, centred on the
+# keyword_rects() - an inline Toll mark answering as Toll among them - and
+# under "marks" each inline mark's own rect, where it draws: its ink - the
+# mark inline_toll_mark_height_fraction of the size tall - centred on the
 # x-height, at the start of its spacer.
 func _rules_geometry() -> Dictionary:
 	var found: Array[Dictionary] = []
-	var glyphs: Array[Rect2] = []
-	var geometry: Dictionary = {"keywords": found, "glyphs": glyphs}
+	var marks: Array[Rect2] = []
+	var geometry: Dictionary = {"keywords": found, "marks": marks}
 	if card_data == null or rules_text == null:
 		return geometry
 	var text: String = rules_text.get_parsed_text()
-	# The label reads each inline glyph's image as one character of its
+	# The label reads each inline mark's image as one character of its
 	# own; the plain text says which.
 	var plain: String = _strip_markers(_resolve_tokens(card_data.description))
-	if plain.length() == text.length() and plain.contains(TOLL_GLYPH_CHAR):
-		var at: int = plain.find(TOLL_GLYPH_CHAR)
+	if plain.length() == text.length() and plain.contains(TOLL_MARK_CHAR):
+		var at: int = plain.find(TOLL_MARK_CHAR)
 		while at >= 0:
-			text = text.substr(0, at) + TOLL_GLYPH_CHAR + text.substr(at + 1)
-			at = plain.find(TOLL_GLYPH_CHAR, at + 1)
-	var has_glyph: bool = text.contains(TOLL_GLYPH_CHAR)
-	if KEYWORDS.is_empty() and not has_glyph:
+			text = text.substr(0, at) + TOLL_MARK_CHAR + text.substr(at + 1)
+			at = plain.find(TOLL_MARK_CHAR, at + 1)
+	var has_mark: bool = text.contains(TOLL_MARK_CHAR)
+	if KEYWORDS.is_empty() and not has_mark:
 		return geometry
 	var regular: Font = rules_text.get_theme_font("normal_font")
 	var bold: Font = rules_text.get_theme_font("bold_font")
 	var font_size: int = rules_text.get_theme_font_size("normal_font_size")
 	var keyword: RegEx = KeywordTable.shared().pattern()
 	var matches: Array[RegExMatch] = keyword.search_all(text)
-	if matches.is_empty() and not has_glyph:
+	if matches.is_empty() and not has_mark:
 		return geometry
-	var glyph_size: Vector2 = _inline_toll_glyph_size(font_size)
+	var mark_size: Vector2 = _inline_toll_mark_size(font_size)
 	var x_middle: float = regular.get_ascent(font_size) + _cap_top(rules_font, font_size, "x") / 2.0
 	var top: float = rules_text.position.y + maxf((rules_text.size.y - float(rules_text.get_content_height())) / 2.0, 0.0)
 	for line in rules_text.get_line_count():
@@ -2040,13 +2057,13 @@ func _rules_geometry() -> Dictionary:
 			var x: float = left + _shaped_width(text, start, found_match.get_start(), matches, regular, bold, font_size)
 			var width: float = bold.get_string_size(found_match.get_string(), HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 			found.append({"keyword": found_match.get_string(1), "rect": Rect2(x, y, width, height).grow(KEYWORD_HIT_PAD_PX)})
-		var glyph_at: int = text.find(TOLL_GLYPH_CHAR, start)
-		while glyph_at >= 0 and glyph_at < span.y:
-			var x: float = left + _shaped_width(text, start, glyph_at, matches, regular, bold, font_size)
-			var rect := Rect2(Vector2(x, y + x_middle - glyph_size.y / 2.0) + inline_toll_glyph_offset_px, glyph_size)
-			glyphs.append(rect)
+		var mark_at: int = text.find(TOLL_MARK_CHAR, start)
+		while mark_at >= 0 and mark_at < span.y:
+			var x: float = left + _shaped_width(text, start, mark_at, matches, regular, bold, font_size)
+			var rect := Rect2(Vector2(x, y + x_middle - mark_size.y / 2.0) + inline_toll_mark_offset_px, mark_size)
+			marks.append(rect)
 			found.append({"keyword": TOLL_KEYWORD, "rect": rect.grow(KEYWORD_HIT_PAD_PX)})
-			glyph_at = text.find(TOLL_GLYPH_CHAR, glyph_at + 1)
+			mark_at = text.find(TOLL_MARK_CHAR, mark_at + 1)
 	return geometry
 
 # The width of text[from, to) on one line, keywords in Bold as drawn.
@@ -2054,39 +2071,34 @@ func _shaped_width(text: String, from: int, to: int, matches: Array[RegExMatch],
 	var line := TextLine.new()
 	var spacer: Vector2 = Vector2(float(_toll_spacer_width(font_size)), 1.0)
 	for run: Vector3i in _rules_runs(text, from, to, matches):
-		if run.z == RUN_GLYPH:
-			line.add_object("toll_glyph_%d" % run.x, spacer, INLINE_ALIGNMENT_CENTER, 1)
+		if run.z == RUN_MARK:
+			line.add_object("toll_mark_%d" % run.x, spacer, INLINE_ALIGNMENT_CENTER, 1)
 		else:
 			line.add_string(text.substr(run.x, run.y - run.x), bold if run.z == RUN_BOLD else regular, font_size)
 	return line.get_line_width()
 
 # text[from, to) as the face sets it, in runs (start, end, RUN_*): bold
-# on keywords (`matches`) and on an inline Toll price's number, the
-# price's glyph (TOLL_GLYPH_CHAR) an object of its own, regular between.
+# on keywords (`matches`), an inline Toll price's mark (TOLL_MARK_CHAR) an
+# object of its own, regular between.
 static func _rules_runs(text: String, from: int, to: int, matches: Array[RegExMatch]) -> Array[Vector3i]:
 	var marks: Array[Vector3i] = []
 	for found_match in matches:
 		marks.append(Vector3i(found_match.get_start(), found_match.get_end(), RUN_BOLD))
-	var glyph: int = text.find(TOLL_GLYPH_CHAR)
-	while glyph >= 0:
-		marks.append(Vector3i(glyph, glyph + 1, RUN_GLYPH))
-		var end: int = glyph + 1
-		while end < text.length() and text[end] >= "0" and text[end] <= "9":
-			end += 1
-		if end > glyph + 1:
-			marks.append(Vector3i(glyph + 1, end, RUN_BOLD))
-		glyph = text.find(TOLL_GLYPH_CHAR, end)
+	var mark: int = text.find(TOLL_MARK_CHAR)
+	while mark >= 0:
+		marks.append(Vector3i(mark, mark + 1, RUN_MARK))
+		mark = text.find(TOLL_MARK_CHAR, mark + 1)
 	marks.sort_custom(func(a: Vector3i, b: Vector3i) -> bool: return a.x < b.x)
 	var runs: Array[Vector3i] = []
 	var at: int = from
-	for mark in marks:
-		if mark.y <= from or mark.x >= to:
+	for span in marks:
+		if span.y <= from or span.x >= to:
 			continue
-		var start: int = maxi(mark.x, from)
-		var end: int = mini(mark.y, to)
+		var start: int = maxi(span.x, from)
+		var end: int = mini(span.y, to)
 		if start > at:
 			runs.append(Vector3i(at, start, RUN_REGULAR))
-		runs.append(Vector3i(start, end, mark.z))
+		runs.append(Vector3i(start, end, span.z))
 		at = end
 	if to > at:
 		runs.append(Vector3i(at, to, RUN_REGULAR))
@@ -2200,7 +2212,7 @@ func mark_changes(before_text: String, before_cost: int, cost_mark_gap_px: float
 	else:
 		push_warning("CardView: '%s' rules text doesn't split into its lines; no hairlines under it." % card_data.card_name)
 	_cost_changed = before_cost != card_data.cost
-	_toll_changed = before_toll >= 0 and before_toll != required_toll(card_data) and _toll_cost_label.visible
+	_toll_changed = before_toll >= 0 and before_toll != required_toll(card_data) and _toll_mark.visible
 	if (_cost_changed or _toll_changed) and get_node_or_null(^"CostMark") == null:
 		var cost_mark := Control.new()
 		cost_mark.name = "CostMark"
@@ -2222,7 +2234,7 @@ func _draw_cost_mark(cost_mark: Control) -> void:
 	if _cost_changed:
 		cost_mark.draw_line(Vector2(cost_label.position.x, y), Vector2(cost_label.position.x + cost_label.size.x, y), ink_color, -1.0)
 	if _toll_changed:
-		cost_mark.draw_line(Vector2(_toll_cost_label.position.x, y), Vector2(_toll_cost_label.position.x + _toll_cost_label.size.x, y), _toll_ink(), -1.0)
+		cost_mark.draw_line(Vector2(_toll_mark.position.x, y), Vector2(_toll_mark.position.x + _toll_mark.size.x, y), _toll_ink(), -1.0)
 
 # Which numbers (by order in the line) differ, when the two lines are the
 # same words round them; empty when the words differ too, or nothing does.
@@ -2542,9 +2554,6 @@ func _apply_style() -> void:
 		cost_label.add_theme_font_override("font", _msdf(cost_font))
 
 	_apply_toll_ink()
-	_toll_cost_label.add_theme_font_size_override("font_size", toll_badge_font_size_px)
-	if cost_font != null:
-		_toll_cost_label.add_theme_font_override("font", _msdf(cost_font))
 
 	var hp_ink: Color = ink_color
 	hp_ink.a = hp_cost_alpha
@@ -2820,51 +2829,92 @@ func _string_width(label: Label, font_size: int) -> float:
 		return 0.0
 	return font.get_string_size(label.text, HORIZONTAL_ALIGNMENT_LEFT, -1, font_size).x
 
-# The Toll badge left of the Energy numeral, on the header baseline: the
-# number toll_badge_gap_px off the numeral, the glyph toll_glyph_gap_px
-# before it, centred on its figures. Returns the header width it takes
-# (its gap to the numeral included) - 0 with no Toll cost.
+# The Toll badge left of the Energy numeral: the mark toll_badge_gap_px
+# off the numeral, centred on its figures. Returns the header width it
+# takes (its gap to the numeral included) - 0 with no Toll cost.
 func _lay_out_toll_badge() -> float:
-	if _toll_cost_label == null or not _toll_cost_label.visible:
+	if _toll_mark == null or not _toll_mark.visible:
 		return 0.0
-	var number_width: float = _string_width(_toll_cost_label, toll_badge_font_size_px)
-	var right: float = cost_label.position.x - toll_badge_gap_px
-	_toll_cost_label.position = Vector2(right - number_width, _top_for_baseline(_toll_cost_label, toll_badge_font_size_px, header_baseline_px))
-	_toll_cost_label.size = Vector2(number_width, _line_height(_toll_cost_label, toll_badge_font_size_px))
-	var glyph_size: Vector2 = toll_glyph_size(float(cost_font_size_px) * toll_glyph_height_fraction)
-	var figures_middle: float = header_baseline_px + _cap_top(cost_font, toll_badge_font_size_px, "0") / 2.0
-	_toll_glyph.position = Vector2(_toll_cost_label.position.x - toll_glyph_gap_px - glyph_size.x, figures_middle - glyph_size.y / 2.0) + toll_glyph_offset_px
-	_toll_glyph.size = glyph_size
-	return cost_label.position.x - _toll_glyph.position.x
+	var mark: Vector2 = toll_mark_size(float(cost_font_size_px) * toll_mark_height_fraction)
+	var figures_middle: float = header_baseline_px + _cap_top(cost_font, cost_font_size_px, "0") / 2.0
+	_toll_mark.position = Vector2(cost_label.position.x - toll_badge_gap_px - mark.x, figures_middle - mark.y / 2.0) + toll_mark_offset_px
+	_toll_mark.size = mark
+	_toll_mark.queue_redraw()
+	return cost_label.position.x - _toll_mark.position.x
 
-# The badge's glyph and number, in this card's own unscaled pixels - empty
-# on a card with no Toll cost. Answers keyword_at() as Toll.
+# The badge's mark, in this card's own unscaled pixels - empty on a card
+# with no Toll cost. Answers keyword_at() as Toll.
 func toll_badge_rect() -> Rect2:
-	if _toll_cost_label == null or not _toll_cost_label.visible:
+	if _toll_mark == null or not _toll_mark.visible:
 		return Rect2()
-	return Rect2(_toll_glyph.position, _toll_glyph.size).merge(Rect2(_toll_cost_label.position, _toll_cost_label.size)).grow(KEYWORD_HIT_PAD_PX)
+	return Rect2(_toll_mark.position, _toll_mark.size).grow(KEYWORD_HIT_PAD_PX)
 
-# The glyph at `height` px of ink, at its own aspect.
-static func toll_glyph_size(height: float) -> Vector2:
-	var texture: Texture2D = toll_glyph_texture()
-	if texture == null or texture.get_height() <= 0:
-		return Vector2(height * 0.5, height)
-	return Vector2(height * float(texture.get_width()) / float(texture.get_height()), height)
+# The number the badge carries - 0 with none.
+func toll_badge_value() -> int:
+	return _toll_badge_value if _toll_mark != null and _toll_mark.visible else 0
 
-# The Toll glyph's ink - the SVG cropped to its used rect, so a height
-# given is the stroke's own, not its 24-unit box's.
-static func toll_glyph_texture() -> Texture2D:
-	if _toll_glyph_texture != null:
-		return _toll_glyph_texture
-	var source: Texture2D = load(TOLL_GLYPH_PATH)
+func _draw_toll_badge() -> void:
+	_draw_toll_mark(_toll_mark, Rect2(Vector2.ZERO, _toll_mark.size), _toll_badge_value, _toll_ink())
+
+# The mark's ink filling `rect`, in `ink`, with `value` on it: Spectral
+# SemiBold in the paper, toll_mark_digit_fraction of the mark's (box's)
+# height for one digit, toll_mark_two_digit_fraction for more, its figures
+# centred on toll_mark_number_centre.
+func _draw_toll_mark(canvas: CanvasItem, rect: Rect2, value: int, ink: Color) -> void:
+	var texture: Texture2D = toll_mark_texture()
+	if texture == null:
+		return
+	canvas.draw_texture_rect(texture, rect, false, ink)
+	if value <= 0 or name_font == null:
+		return
+	var text: String = str(value)
+	var box_height: float = rect.size.y / toll_mark_ink_fraction().y
+	var size_px: int = maxi(roundi(box_height * (toll_mark_digit_fraction if text.length() == 1 else toll_mark_two_digit_fraction)), 1)
+	var font: Font = _msdf(name_font)
+	var centre: Vector2 = rect.position + toll_mark_number_point() * rect.size + toll_mark_number_offset_px
+	var width: float = font.get_string_size(text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px).x
+	var baseline: float = centre.y - _cap_top(name_font, size_px, "0") / 2.0
+	canvas.draw_string(font, Vector2(centre.x - width / 2.0, baseline), text, HORIZONTAL_ALIGNMENT_LEFT, -1, size_px, field_color)
+
+# The marks to draw again - a number export moved.
+func _redraw_toll_marks() -> void:
+	if not is_node_ready():
+		return
+	_toll_mark.queue_redraw()
+	rules_text.queue_redraw()
+
+# toll_mark_number_centre as a fraction of the mark's ink rect.
+func toll_mark_number_point() -> Vector2:
+	if toll_mark_texture() == null or not _toll_mark_region.has_area():
+		return Vector2(0.5, 0.5)
+	return (toll_mark_number_centre * _toll_mark_unit - _toll_mark_region.position) / _toll_mark_region.size
+
+# The mark's ink for a mark `height` px tall (its 32-unit box).
+static func toll_mark_size(height: float) -> Vector2:
+	return toll_mark_ink_fraction() * height
+
+# The stroke's ink as a fraction of the mark's box, each way.
+static func toll_mark_ink_fraction() -> Vector2:
+	if toll_mark_texture() == null or not _toll_mark_region.has_area():
+		return Vector2.ONE
+	return _toll_mark_region.size / (32.0 * _toll_mark_unit)
+
+# The Toll mark's ink - the SVG cropped to its used rect, drawn at the
+# ink's own rect (toll_mark_size()).
+static func toll_mark_texture() -> Texture2D:
+	if _toll_mark_texture != null:
+		return _toll_mark_texture
+	var source: Texture2D = load(TOLL_MARK_PATH)
 	if source == null:
 		return null
 	var atlas := AtlasTexture.new()
 	atlas.atlas = source
 	var image: Image = source.get_image()
-	atlas.region = Rect2(image.get_used_rect()) if image != null and not image.is_empty() else Rect2(Vector2.ZERO, source.get_size())
-	_toll_glyph_texture = atlas
-	return _toll_glyph_texture
+	_toll_mark_region = Rect2(image.get_used_rect()) if image != null and not image.is_empty() else Rect2(Vector2.ZERO, source.get_size())
+	_toll_mark_unit = float(source.get_width()) / 32.0
+	atlas.region = _toll_mark_region
+	_toll_mark_texture = atlas
+	return _toll_mark_texture
 
 # The Toll a card requires to be played (its SPEND_TOLL's toll_cost) - its
 # badge's number; 0 for none.
@@ -2885,14 +2935,14 @@ func _toll_ink() -> Color:
 	return battle_theme.toll_ink if battle_theme != null else ink_color
 
 func _apply_toll_ink() -> void:
-	var toll_ink: Color = _toll_ink()
-	_toll_cost_label.add_theme_color_override("font_color", toll_ink)
-	_toll_glyph.modulate = toll_ink
+	_toll_ink_applied = _toll_ink()
+	_toll_mark.queue_redraw()
+	rules_text.queue_redraw()
 
 # The theme changes on every value set it applies - only a new toll ink
 # re-inks the face.
 func _on_battle_theme_changed() -> void:
-	if not is_node_ready() or _toll_ink() == _toll_glyph.modulate:
+	if not is_node_ready() or _toll_ink() == _toll_ink_applied:
 		return
 	_apply_toll_ink()
 	if card_data != null:
@@ -2970,8 +3020,8 @@ func _rules_wrap(font_size: int, width: float) -> Array[PackedStringArray]:
 		paragraph.width = width
 		paragraph.break_flags = TextServer.BREAK_MANDATORY | TextServer.BREAK_WORD_BOUND | TextServer.BREAK_ADAPTIVE
 		for run: Vector3i in _rules_runs(text, 0, text.length(), keyword.search_all(text)):
-			if run.z == RUN_GLYPH:
-				paragraph.add_object("toll_glyph_%d" % run.x, spacer, INLINE_ALIGNMENT_CENTER, 1)
+			if run.z == RUN_MARK:
+				paragraph.add_object("toll_mark_%d" % run.x, spacer, INLINE_ALIGNMENT_CENTER, 1)
 			else:
 				paragraph.add_string(text.substr(run.x, run.y - run.x), bold if run.z == RUN_BOLD else rules_font, font_size)
 		if text.is_empty():
