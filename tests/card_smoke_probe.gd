@@ -1,8 +1,8 @@
 extends SceneTree
 
-# Core probe: every card plays. Data-driven: every card in every pool
-# under cards/pools/, every class's starters, and each one's tempered copy
-# - once each - is dealt into a real fight's hand and played through
+# Core probe: every card plays. Data-driven: every CardData resource under
+# cards/ - tempered copies, weapon cards and cards no pool offers alike,
+# once each - is dealt into a real fight's hand and played through
 # BattleController as a player would (ProbePlay.play_any(): its hand
 # choice and its target found). The Wanderer's own and the neutral cards
 # in a Wanderer run, the Samurai's in hers; each on floor 1's first fight.
@@ -23,7 +23,7 @@ extends SceneTree
 # Exit code 0 = every card played, 1 = a failure (each printed as FAIL).
 # Untyped against anything that names the RunState autoload.
 
-const POOLS_DIR := "res://cards/pools/"
+const CARDS_DIR := "res://cards/"
 const REGION_SCENE_PATH := "res://field/region_field.tscn"
 const CHARACTERS: Array[String] = ["res://run/data/wanderer.tres", "res://run/data/samurai.tres"]
 const HUGE_HP := 99999
@@ -57,6 +57,10 @@ func _initialize() -> void:
 				own.append(card)
 		total += own.size()
 		await _play_all(character, own)
+	# A card no character's run deals (a class with no character) is
+	# never tried.
+	if total != cards.size():
+		_fail("%d cards found, %d of them in a character's run" % [cards.size(), total])
 	print("card_smoke_probe: %d of %d cards played" % [_played, total])
 	if _played != total:
 		_fail("%d of %d cards played" % [_played, total])
@@ -224,21 +228,18 @@ func _basic_attack(character: CharacterData) -> CardData:
 			return card
 	return null
 
-# Every card the game can deal: every pool's, every class's starters, and
-# each one's tempered copy - once each.
+# Every CardData under cards/, its folders walked - once each. (Test
+# fixtures live under tests/, never here.)
 func _all_cards() -> Array[CardData]:
 	var found: Array[CardData] = []
-	for file in DirAccess.get_files_at(POOLS_DIR):
-		var pool := load(POOLS_DIR.path_join(file)) as RewardPool
-		if pool != null:
-			for card: CardData in pool.call("_cards"):
-				_add_card(found, card)
-	for path in CHARACTERS:
-		var character := load(path) as CharacterData
-		for card: CardData in character.starting_deck_counts:
-			_add_card(found, card)
-	for card in found.duplicate():
-		_add_card(found, card.tempered)
+	var dirs: Array[String] = [CARDS_DIR]
+	while not dirs.is_empty():
+		var dir_path: String = dirs.pop_back()
+		for sub in DirAccess.get_directories_at(dir_path):
+			dirs.append(dir_path.path_join(sub))
+		for file in DirAccess.get_files_at(dir_path):
+			if file.get_extension() == "tres":
+				_add_card(found, load(dir_path.path_join(file)) as CardData)
 	return found
 
 func _add_card(found: Array[CardData], card: CardData) -> void:
